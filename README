@@ -1,0 +1,5 @@
+This is under GPL license.
+
+Some files come from matita, the TPTP parser is from Darwin, the hashcons
+module comes from Jean-Christophe Filliâtre. Since all of them are under GPL,
+the present software is also under GPL.
