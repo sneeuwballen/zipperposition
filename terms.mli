@@ -11,96 +11,140 @@
 
 (* $Id: terms.mli 10720 2010-02-08 07:24:34Z asperti $ *)
 
-type 'a foterm = 
-  | Leaf of 'a
-  | Var of int
-  | Node of ('a foterm) list
-
-type 'a substitution = (int * 'a foterm) list
-
-type comparison = Lt | Eq | Gt | Incomparable | Invertible
-
-type rule = Superposition | Demodulation
-
-(* A Discrimination tree is a map: foterm |-> (dir, clause) *)
-type direction = Left2Right | Right2Left | Nodir
-
-type position = int list
-
-(* TODO update *)
-type 'a proof =
-  | Exact of 'a foterm
-         (* for theorems like T : \forall x. C[x] = D[x] the proof is 
-          * a foterm like (Node [ Leaf T ; Var i ]), while for the Goal
-          * it is just (Var g), i.e. the identity proof *)
-  | Step of rule * int * int * direction * position * 'a substitution
-         (* rule, eq1, eq2, direction of eq2, position, substitution *)
-
-type 'a literal = 
- | Equation of    'a foterm  (* lhs *)
-                * 'a foterm  (* rhs *)
-                * 'a foterm  (* type *)
-                * comparison (* orientation *)
- | Predicate of   'a foterm 
-
-type varlist = int list
-
-type 'a unit_clause =
-   int        (* ID *)
- * 'a literal
- * varlist
- * 'a proof      (* proof *)
-
-type 'a clause =
-    int (* ID *)
-  * 'a literal list
-  * varlist
-  * 'a proof
-
-type 'a passive_clause = int * 'a unit_clause (* weight * equation *)
-
-val is_eq_clause : 'a unit_clause -> bool
-val vars_of_term : 'a foterm -> int list
-
-module M : Map.S with type key = int 
-
-type 'a bag = int (* max ID  *)
-              * (('a unit_clause * bool * int) M.t)
-
-(* also gives a fresh ID to the clause *)
-    val add_to_bag : 
-          'a unit_clause -> 'a bag ->
-            'a bag * 'a unit_clause
-
-    val replace_in_bag : 
-          'a unit_clause * bool * int -> 'a bag ->
-            'a bag
-
-    val get_from_bag : 
-          int -> 'a bag -> 'a unit_clause * bool * int
-
-    val empty_bag : 'a bag
-
 module type Blob =
   sig
     (* Blob is the type for opaque leaves: 
-     * - checking equlity should be efficient
+     * - checking equality should be efficient
      * - atoms have to be equipped with a total order relation
      *)
     type t
+
     val eq : t -> t -> bool
     val compare : t -> t -> int
-    val eqP : t
-    (* TODO: consider taking in input an imperative buffer for Format 
-     *  val pp : Format.formatter -> t -> unit
-     * *)
-    val is_eq : t foterm -> (t foterm * t foterm * t foterm) option
-    val pp : t -> string
+    val pp : Format.formatter -> t -> unit  (* pretty print object *)
 
+    (* special leaves *)
+    val eqP : t  (* symbol for equality predicate *)
+    val bool_symbol : t (* symbol for boolean *)
+    val univ_symbol : t (* symbol for universal (terms) sort *)
+
+    (* why is this in the /leaves/ signature?!
     type input
     val embed : input -> t foterm
     (* saturate [proof] [type] -> [proof] * [type] *)
     val saturate : input -> input -> t foterm * t foterm
+    *)
+  end
+
+(* Signature for terms parametrized by leaves *)
+module type TermSig =
+  sig
+    (* type of constant terms and sorts *)
+    type leaf
+
+    (* a sort for terms *)
+    type sort =
+      | BaseSort of leaf      (* constant sort *)
+      | NodeSort of sort list (* [a,b,c] is sort (b,c) -> a *)
+
+    (* some special sorts *)
+    val bool_sort : sort
+    val univ_sort : sort
+
+    (* exception raised when sorts are mismatched *)
+    exception SortError of string
+
+    (* a type term *)
+    type foterm = typed_term Hashcons.hash_consed
+    and typed_term = private {
+      term : foterm_cell;   (* the term itself *)
+      sort : sort;          (* the sort of the term *)
+    }
+    and foterm_cell = private
+      | Leaf of leaf  (* constant *)
+      | Var of int  (* variable *)
+      | Node of foterm list  (* term application *)
+
+    (* smart constructors, with type-checking *)
+    val mk_var : int -> sort -> foterm
+    val mk_leaf : leaf -> sort -> foterm
+    val mk_node : foterm list -> foterm
+
+    (* special term for equality *)
+    val eq_term : foterm
+
+    (* free variables in the term *)
+    val vars_of_term : foterm -> foterm list
+
+    (* substitution, a list of variables -> term *)
+    type substitution = (foterm * foterm) list
+
+    (* partial order comparison *)
+    type comparison = Lt | Eq | Gt | Incomparable | Invertible
+
+    (* direction of an equation (for rewriting) *)
+    type direction = Left2Right | Right2Left | Nodir
+    (* side of an equation *)
+    type side = LeftSide | RightSide
+    (* position in a term *)
+    type position = int list
+
+    (* a literal, that is, a signed equation *)
+    type literal = 
+     | Equation of    foterm  (* lhs *)
+                    * foterm  (* rhs *)
+                    * comparison (* orientation *)
+
+    (* a proof step for a clause *)
+    type proof =
+      | Axiom  (* axiom of input *)
+      | SuperpositionLeft of sup_position
+      | SuperpositionRight of sup_position
+      | EqualityFactoring of eq_factoring_position  
+      | EqualityResolution of eq_resolution_position
+    and sup_position = {
+      (* describes a superposition inference *)
+      sup_active : clause;  (* rewriting clause *)
+      sup_passive : clause; (* rewritten clause *)
+      sup_active_pos : (int * side * position);
+      sup_passive_pos : (int * side * position);
+      sup_subst : substitution;
+    }
+    and eq_factoring_position = {
+      (* describes an equality factoring inference *)
+      eqf_clause : clause;
+      eqf_bigger : (int * side);  (* bigger equation s=t, s > t *)
+      eqf_smaller : (int * side); (* smaller equation u=v *)
+      eqf_subst : substitution; (* subst(s) = subst(u) *)
+    }
+    and eq_resolution_position = {
+      (* describes an equality resolution inference *)
+      eqr_clause : clause;
+      eqr_position : int;
+      eqr_subst : substitution;
+    }
+    and clause =
+        (* a first order clause *)
+        int (* ID *)
+      * literal list  (* the equations *)
+      * foterm list  (* the free variables *)
+      * proof (* the proof for this clause *)
+
+    module M : Map.S with type key = int 
+
+    (* multiset of clauses TODO use a map? *)
+    type bag = int (* max ID  *)
+                  * ((clause * bool * int) M.t)
+
+    (* also gives a fresh ID to the clause *)
+    val add_to_bag : clause -> bag -> bag * clause
+
+    val replace_in_bag : clause * bool * int -> bag -> bag
+
+    val get_from_bag : int -> bag -> clause * bool * int
+
+    val empty_bag : bag
 
   end
 
+module Make(B : Blob) : (TermSig with type leaf = B.t)
