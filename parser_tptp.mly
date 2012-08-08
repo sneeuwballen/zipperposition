@@ -27,16 +27,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     let inc counter = counter := !counter + 1
     let value counter = !counter
   end
-  
-  type term = string Terms.foterm
-  type variable = term
-  type literal = string Terms.literal
-  type clause = string Terms.clause
+
+  module T = Terms.Default
+
+  type term = T.foterm
+  type variable = T.foterm
+  type literal = T.literal
+  type clause = T.clause
 
   (* includes from input *)
   let include_files: string list ref =
     ref []
-
 
   (* these are only valid for the current clause
      and have to be invalidated with init_clause for every new clause *)
@@ -47,7 +48,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       
   (* mapping of the variable names (e.g. "X") of the currently read term/clause
      to variables. *)
-  let (var_map: (string * variable) list ref) =
+  let (var_map: (string * T.sort * variable) list ref) =
     ref []
 
   (* the literals of the currently read clause *)
@@ -59,30 +60,26 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     Counter.set var_id_counter 0;
     var_map := [];
     literals := []
-
-  module Const = struct
-    type error = FOF of bool | PARSE_ERROR
-  end
 	
   (* gets the variables associated with a string from the variable mapping
-     creates a new mapping for a new variable *)
-  let get_var (var_name: string) =
+     creates a new mapping for a new variable with the given sort *)
+  let get_var ?(sort=T.univ_sort) (var_name: string) =
     try 
       (* way faster than List.assoc *)
-      snd (
+      match (
 	List.find
-	  (fun (var_name', _) ->
-             var_name = var_name'
+	  (fun (var_name', var_sort, _) ->
+             var_name = var_name' && var_sort == sort
 	  )
 	  !var_map
-      )
+      ) with (_, _, t) -> t
     with
       | Not_found ->
 	  let new_var = 
-	    Terms.Var (Counter.value var_id_counter)
+	    T.mk_var (Counter.value var_id_counter) sort
 	  in
 	    Counter.inc var_id_counter;
-	    var_map := (var_name, new_var) :: !var_map;
+	    var_map := (var_name, sort, new_var) :: !var_map;
 	    new_var
 
   (* need to detect if input is fof and contains a conjecture *)
@@ -133,7 +130,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token UNKNOWN
 
 %start parse_file
-%type <clause list * string list> parse_file
+%type <Terms.Default.clause list * string list> parse_file
 
 
 %%
@@ -161,7 +158,8 @@ parse_file:
       }
 
   | EOI
-      { print_endline "empty problem specification"; raise Const.PARSE_ERROR }
+      { print_endline "empty problem specification";
+        raise Const.PARSE_ERROR }
 
 
 /* parse rules */
@@ -201,12 +199,14 @@ annotated_formula:
       { $1 }
 
 thf_annotated:
-  | THF LEFT_PARENTHESIS name COMMA formula_role COMMA fof_formula annotations RIGHT_PARENTHESIS DOT
+  | THF LEFT_PARENTHESIS name COMMA formula_role COMMA
+    fof_formula annotations RIGHT_PARENTHESIS DOT
     { failwith "Parser_tptp: tfh syntax not supported." }
 
 fof_annotated:
-  | FOF LEFT_PARENTHESIS name COMMA formula_role COMMA fof_formula annotations RIGHT_PARENTHESIS DOT
-    { fof := true; [] }
+  | FOF LEFT_PARENTHESIS name COMMA formula_role COMMA
+    fof_formula annotations RIGHT_PARENTHESIS DOT
+    { fof := true; failwith "fof formula not handled (no CNF-ication)" }
 
 fof_formula:
   | binary_formula
@@ -278,7 +278,8 @@ unitary_formula:
     { "" }
 
 quantified_formula:
-  | quantifier LEFT_BRACKET variable_list RIGHT_BRACKET COLON unitary_formula
+  | quantifier LEFT_BRACKET variable_list RIGHT_BRACKET
+    COLON unitary_formula
     { "" }
 
 quantifier:
@@ -303,11 +304,12 @@ unary_connective:
 
 
 cnf_annotated:
-  | CNF LEFT_PARENTHESIS name COMMA formula_role COMMA cnf_formula annotations RIGHT_PARENTHESIS DOT
+  | CNF LEFT_PARENTHESIS name COMMA formula_role COMMA
+  cnf_formula annotations RIGHT_PARENTHESIS DOT
       // ignore everything except for the formula
       {
 	let clause = 
-	  $7
+	  T.mk_clause $7 (T.Axiom $3)
 	in
 	  init_clause ();
 	  clause
@@ -320,7 +322,6 @@ formula_role:
       in
         if role = "conjecture" then
           theorem := true;
-
         $1
     }
 
@@ -355,7 +356,7 @@ literal:
       { $1 }
 
   | NEGATION atomic_formula
-      { Term.request_negated_literal $2 }
+      { T.negate_lit $2 }
 
 atomic_formula:
   | plain_atom
@@ -369,7 +370,7 @@ atomic_formula:
 
 plain_atom:
   | plain_term_top
-      { Term.request_literal true $1 }
+      { T.mk_eq $1 T.true_term }
 
 arguments:
   | term
@@ -380,20 +381,19 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { Term.true_literal }
+      { T.mk_eq T.true_term T.true_term }
 
   | DOLLAR_FALSE
-      { Term.false_literal }
+      { T.mk_neq T.true_term T.true_term (* T!=T is false *) }
 
   | term EQUALITY term
-      { Term.request_literal true (Term.request_func (Symbol.equality, [| $1; $3|])) }
-
+      { T.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { Term.request_literal false (Term.request_func (Symbol.equality, [| $1; $3|])) }
+      { T.mk_neq $1 $3 }
 
 system_atom:
   | system_term_top
-      { Term.request_literal true $1 }
+      { T.mk_eq $1 T.true_term }
 
 
 term:
@@ -401,7 +401,7 @@ term:
       { $1 }
 
   | variable
-      { Term.request_var $1 }
+      { $1 }
 
 function_term:
   | plain_term
@@ -415,20 +415,20 @@ function_term:
 
 plain_term_top:
   | constant
-      { Term.request_const (Symbol.create_predicate $1 0) }
+      { T.mk_leaf $1 T.bool_sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = Array.of_list $3 in
-	  Term.request_func (Symbol.create_predicate $1 (Array.length subterms), subterms)
+      { let subterms = $1 :: $3 in
+        T.mk_node subterms
       }
 
 plain_term:
   | constant
-      { Term.request_const (Symbol.create_function $1 0) }
+      { T.mk_leaf $1 T.univ_sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = Array.of_list $3 in
-	  Term.request_func (Symbol.create_function $1 (Array.length subterms), subterms)
+      { let subterms = $1 :: $3 in
+        T.mk_node subterms
       }
 
 constant:
@@ -437,31 +437,34 @@ constant:
 
 functor_:
   | atomic_word
-      { $1 }
+      { T.mk_leaf $1 T.univ_sort }
 
 defined_term:
   | number
-      { print_endline ("Parser_tptp: <defined_term: number> not supported: " ^ $1); raise Const.PARSE_ERROR }
+      { print_endline ("Parser_tptp: <defined_term: number> not supported: "
+                      ^ $1);
+        raise Const.PARSE_ERROR }
 
   | DISTINCT_OBJECT
-      { print_endline ("Parser_tptp: <defined_term: distinct_object> not supported: " ^ $1); raise Const.PARSE_ERROR }
+      { print_endline ("Parser_tptp: <defined_term: distinct_object> not supported: " ^ $1);
+        raise Const.PARSE_ERROR }
 
 system_term_top:
   | system_constant
-      { Term.request_const (Symbol.create_predicate $1 0) }
+      { T.mk_leaf $1 T.bool_sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = Array.of_list $3 in
-	  Term.request_func (Symbol.create_predicate $1 (Array.length subterms), subterms)
+      { let subterms = (T.mk_leaf $1 T.univ_sort) :: $3 in
+        T.mk_node subterms
       }
 
 system_term:
   | system_constant
-      { Term.request_const (Symbol.create_function $1 0) }
+      { T.mk_leaf $1 T.univ_sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = Array.of_list $3 in
-	  Term.request_func (Symbol.create_function $1 (Array.length subterms), subterms)
+      { let subterms = (T.mk_leaf $1 T.univ_sort) :: $3 in
+        T.mk_node subterms
       }
 
 system_functor:
@@ -477,7 +480,6 @@ system_constant:
 variable:
   | UPPER_WORD
       { get_var $1 }
-
 
 
 source:
@@ -577,7 +579,8 @@ atomic_word:
 
 atomic_system_word:
   | DOLLAR_DOLLAR_WORD
-      { print_endline ("Parser_tptp: <$$word> not supported: " ^ $1); raise Const.PARSE_ERROR }
+      { print_endline ("Parser_tptp: <$$word> not supported: " ^ $1);
+        raise Const.PARSE_ERROR  }
 
 number:
   | REAL
