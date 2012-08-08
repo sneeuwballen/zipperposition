@@ -75,6 +75,9 @@ module type TermSig =
     val eq_term : foterm  (* equality of terms *)
     val true_term : foterm  (* tautology symbol *)
 
+    (* cast (change sort) *)
+    val cast : foterm -> sort -> foterm
+
     (* free variables in the term *)
     val vars_of_term : foterm -> foterm list
 

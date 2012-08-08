@@ -75,6 +75,9 @@ module type TermSig =
     val eq_term : foterm  (* equality of terms *)
     val true_term : foterm  (* tautology symbol *)
 
+    (* cast (change sort) *)
+    val cast : foterm -> sort -> foterm
+
     (* free variables in the term *)
     val vars_of_term : foterm -> foterm list
 
@@ -210,7 +213,9 @@ module Make(B : Blob) =
     (* special terms *)
     let eq_term = mk_leaf B.eqP bool_sort (* equality, returns bool *)
     let true_term = mk_leaf B.true_symbol bool_sort (* tautology symbol *)
-      
+
+    (* cast (change sort) *)
+    let cast t sort = H.hashcons terms { t.node with sort=sort; }
 
     (* free variables in the term *)
     let vars_of_term t =

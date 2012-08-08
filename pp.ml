@@ -21,9 +21,9 @@ module Pp (T : Terms.TermSig) = struct
 
   (* print a list of items using the printing function *)
   let rec pp_list ?(sep=", ") pp_item  formatter = function
-    | x::y::xs -> Format.fprintf formatter "%a%s,@%a"
-        pp_item x sep (pp_list ~sep:sep pp_item) xs
-    | x::_ -> pp_item formatter x
+    | x::y::xs -> Format.fprintf formatter "%a%s@,%a"
+        pp_item x sep (pp_list ~sep:sep pp_item) (y::xs)
+    | x::[] -> pp_item formatter x
     | [] -> ()
 
   (* print a term *)
@@ -38,7 +38,6 @@ module Pp (T : Terms.TermSig) = struct
       | T.Left2Right -> "Left to right"
       | T.Right2Left -> "Right to left"
       | T.Nodir -> "No direction"
-  ;;
 
   let string_of_side = function
       | T.LeftSide -> "LeftSide"
@@ -46,13 +45,12 @@ module Pp (T : Terms.TermSig) = struct
 
   (* print substitution *)
   let pp_substitution formatter subst =
-    Format.fprintf formatter "@[<v 2>";
+    Format.fprintf formatter "@[<h>";
     List.iter
       (fun (v, t) ->
          Format.fprintf formatter "?%a ->@, %a@;" pp_foterm v pp_foterm t)
       subst;
-    Format.fprintf formatter "@]";
-  ;;
+    Format.fprintf formatter "@]"
 
   (* print proof
   let pp_proof bag ~formatter:f p =
@@ -94,7 +92,7 @@ module Pp (T : Terms.TermSig) = struct
         pp_foterm left pp_foterm T.eq_term pp_foterm right
 
   let pp_clause formatter (id, lits, vars, _) =
-    Format.fprintf formatter "@[<hov 2>%a@]@;"
+    Format.fprintf formatter "@[<hv 2>%a@]@;"
       (pp_list ~sep:" | " pp_literal) lits
 
 
@@ -151,7 +149,5 @@ module Pp (T : Terms.TermSig) = struct
     f formatter t;
     Format.fprintf formatter "@?";
     Buffer.contents buff
-  ;;
-
 
 end

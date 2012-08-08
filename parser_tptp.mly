@@ -370,7 +370,8 @@ atomic_formula:
 
 plain_atom:
   | plain_term_top
-      { T.mk_eq $1 T.true_term }
+      { let t = T.cast $1 T.bool_sort in (* cast term to bool *)
+        T.mk_eq t T.true_term }
 
 arguments:
   | term
@@ -393,8 +394,8 @@ defined_atom:
 
 system_atom:
   | system_term_top
-      { T.mk_eq $1 T.true_term }
-
+      { let t = T.cast $1 T.bool_sort in
+        T.mk_eq t T.true_term }
 
 term:
   | function_term
@@ -415,7 +416,7 @@ function_term:
 
 plain_term_top:
   | constant
-      { T.mk_leaf $1 T.bool_sort }
+      { T.mk_leaf $1 T.univ_sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let subterms = $1 :: $3 in
@@ -451,7 +452,7 @@ defined_term:
 
 system_term_top:
   | system_constant
-      { T.mk_leaf $1 T.bool_sort }
+      { T.mk_leaf $1 T.univ_sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let subterms = (T.mk_leaf $1 T.univ_sort) :: $3 in
