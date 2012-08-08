@@ -10,6 +10,6 @@ clean:
 	ocamlbuild -clean
 
 tags:
-	ctags $(INTERFACE_FILES)
+	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
 .PHONY: all clean tags
