@@ -4,11 +4,16 @@
 
 TMPFILE=$(mktemp proverXXXXX)
 
-echo "clausify into $TMPFILE"
-eprover --cnf --tptp-in --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
+echo "# clausify into $TMPFILE"
+if [ -z "$2" ]; then
+    INPUT="--tptp-in"
+else
+    INPUT="$2"
+fi
+eprover --cnf "$INPUT" --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
 
-echo "run prover"
+echo "# run prover"
 ./main.native "$TMPFILE"
 
-echo "clean up $TMPFILE"
+echo "# clean up $TMPFILE"
 rm -f "$TMPFILE"

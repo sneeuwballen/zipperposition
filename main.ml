@@ -24,7 +24,7 @@ module Pretty = Pp.Pp(Terms.Default)
 
 let () =
   let f = get_file () in
-  Printf.printf "process file %s\n" f;
+  Printf.printf "# process file %s\n" f;
   let clauses, _ = parse_file f in
-  Printf.printf "parsed %d clauses\n" (List.length clauses);
+  Printf.printf "# parsed %d clauses\n" (List.length clauses);
   Format.printf "@[<v>%a@]@." (Pretty.pp_list ~sep:"" Pretty.pp_clause) clauses
