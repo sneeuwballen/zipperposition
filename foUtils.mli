@@ -11,43 +11,49 @@
 
 (* $Id: terms.ml 9836 2009-06-05 15:33:35Z denes $ *)
 
+(* lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
 
-module Utils (B : Orderings.Blob) :
-  sig
-    val eq_foterm : B.t Terms.foterm -> B.t Terms.foterm -> bool
-    val compare_foterm : B.t Terms.foterm -> B.t Terms.foterm -> int
+open Terms
 
-    val eq_literal : B.t Terms.literal -> B.t Terms.literal -> bool
-    val compare_literal : B.t Terms.literal -> B.t Terms.literal -> int
+(* standard equality on terms *)
+val eq_foterm : foterm -> foterm -> bool
+(* a simple order on terms *)
+val compare_foterm : foterm -> foterm -> int
 
-    (* mk_unit_clause [maxvar] [type] [proof] -> [clause] * [maxvar] *)
-    val mk_unit_clause : 
-         int -> B.t Terms.foterm -> B.t Terms.foterm -> 
-           B.t Terms.unit_clause * int
+(* equality literals *)
+val eq_literal : literal -> literal -> bool
+(* lexicographic comparison of literals *)
+val compare_literal : literal -> literal -> int
 
-    val mk_passive_clause :
-      B.t Terms.unit_clause -> B.t Terms.passive_clause
+(* build literals. If sides so not have the same sort,
+ * this will raise a SortError. A term comparison
+ * function can be provided. *)
+val mk_eq : ?comp:(foterm -> foterm -> comparison) ->
+             foterm -> foterm -> literal
+val mk_neq : ?comp:(foterm -> foterm -> comparison) ->
+              foterm -> foterm -> literal
+(* negate literal *)
+val negate_lit : literal -> literal
 
-    val mk_passive_goal :
-      B.t Terms.unit_clause -> B.t Terms.passive_clause
+(* compare clauses *)
+val eq_clause : clause -> clause -> bool
+val compare_clause : clause -> clause -> int
 
-    val eq_unit_clause : B.t Terms.unit_clause -> B.t Terms.unit_clause -> bool
-    val compare_unit_clause : B.t Terms.unit_clause -> B.t Terms.unit_clause -> int
+(* build a clause with a new ID *)
+val mk_clause : literal list -> proof -> clause
 
+(* rename a clause w.r.t. maxvar *)
+val fresh_clause : int -> clause -> clause * int
 
-    val fresh_unit_clause : 
-          int -> B.t Terms.unit_clause -> B.t Terms.unit_clause * int
+(* perform renaming to get disjoint variables sets
+   relocate [maxvar] [varlist] -> [newmaxvar] * [varlist] * [relocsubst] *)
+val relocate : 
+      int -> varlist -> substitution -> 
+        (int * varlist * substitution)
 
-    (* relocate [maxvar] [varlist] -> [newmaxvar] * [varlist] * [relocsubst] *)
-    val relocate : 
-          int -> int list -> B.t Terms.substitution -> 
-            int * int list * B.t Terms.substitution 
+(*
+val compare_passive_clauses_weight : passive_clause -> passive_clause -> int
 
-    val compare_passive_clauses_weight :
-      B.t Terms.passive_clause -> B.t Terms.passive_clause -> int
-
-    val compare_passive_clauses_age :
-      B.t Terms.passive_clause -> B.t Terms.passive_clause -> int
-
-  end
+val compare_passive_clauses_age : passive_clause -> passive_clause -> int
+*)

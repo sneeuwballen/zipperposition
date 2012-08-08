@@ -13,37 +13,29 @@
 
 type aux_comparison = XEQ | XLE | XGE | XLT | XGT | XINCOMPARABLE | XINVERTIBLE
 
-module type Blob =
+module type S =
   sig 
-    include Terms.Blob 
+    type foterm = Terms.foterm
 
     (* This order relation should be:
      * - stable for instantiation
      * - total on ground terms
      *
      *)
-    val compare_terms : 
-          t Terms.foterm -> t Terms.foterm -> Terms.comparison
+    val compare_terms : Terms.foterm -> Terms.foterm -> Terms.comparison
 
-    val compute_unit_clause_weight : 't Terms.unit_clause -> int
-
-    val compute_goal_weight : 't Terms.unit_clause -> int
+    (* these could be outside the module, but to ease experimentation
+     * we allow them to be tied with the ordering *)
+    val compute_clause_weight : Terms.clause -> int
 
     val name : string
-
   end
+
+module T = Terms
+open Hashcons
+open T
   
-type weight = int * (int * int) list;;
-  
-let rec eq_foterm f x y =
-    x == y ||
-    match x, y with
-    | Terms.Leaf t1, Terms.Leaf t2 -> f t1 t2
-    | Terms.Var i, Terms.Var j -> i = j
-    | Terms.Node l1, Terms.Node l2 when List.length l1 = List.length l2 -> 
-        List.for_all2 (eq_foterm f) l1 l2
-    | _ -> false
-;;
+type weight = int * (int * int) list
   
 let string_of_weight (cw, mw) =
   let s =
@@ -51,20 +43,19 @@ let string_of_weight (cw, mw) =
       (List.map (function (m, w) -> Printf.sprintf "(%d,%d)" m w) mw)
   in
   Printf.sprintf "[%d; %s]" cw s
-;;
   
 let weight_of_term term =
     let vars_dict = Hashtbl.create 5 in
-    let rec aux = function
-      | Terms.Var i -> 
+    let rec aux x = match x.node.term with
+      | T.Var i -> 
           (try
              let oldw = Hashtbl.find vars_dict i in
              Hashtbl.replace vars_dict i (oldw+1)
            with Not_found ->
              Hashtbl.add vars_dict i 1);
           0
-      | Terms.Leaf _ -> 1
-      | Terms.Node l -> List.fold_left (+) 0 (List.map aux l)
+      | T.Leaf _ -> 1
+      | T.Node l -> List.fold_left (+) 0 (List.map aux l)
     in
     let w = aux term in
     let l =
@@ -75,48 +66,17 @@ let weight_of_term term =
       | (m1, _), (m2, _) -> m1 - m2
     in 
     (w, List.sort compare l) (* from the smallest meta to the bigest *)
-;;
-  
-let compute_unit_clause_weight (_,l, _, _) = 
-    let weight_of_polynomial w m =
+
+let compute_clause_weight (_,lits, _, _) = 
+    let rec weight_of_polynomial w m =
       let factor = 2 in      
       w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
-    in
-    match l with
-    | Terms.Predicate t -> 
-        let w, m = weight_of_term t in 
-        weight_of_polynomial w m
-    | Terms.Equation (_,x,_,Terms.Lt) 
-    | Terms.Equation (x,_,_,Terms.Gt) ->
-        let w, m = weight_of_term x in 
-        weight_of_polynomial w m
-    | Terms.Equation (l,r,_,Terms.Eq) 
-    | Terms.Equation (l,r,_,Terms.Incomparable) 
-    | Terms.Equation (l,r,_,Terms.Invertible) ->
+    and weight_of_lit l = match l with
+    | T.Equation (l,r,_,ord) ->  (* TODO use order? *)
         let wl, ml = weight_of_term l in 
         let wr, mr = weight_of_term r in 
-        weight_of_polynomial (wl+wr) (ml@mr)
-;;
-
-(* UNUSED for now *)
-let compute_goal_weight (_,l, _, _) = 
-    let weight_of_polynomial w m =
-      let factor = 2 in      
-      w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
-    in
-    match l with
-    | Terms.Predicate t -> 
-        let w, m = weight_of_term t in 
-        weight_of_polynomial w m
-    | Terms.Equation (l,r,_,_) ->
-        let wl, ml = weight_of_term l in 
-        let wr, mr = weight_of_term r in 
-        let wl = weight_of_polynomial wl ml in
-        let wr = weight_of_polynomial wr mr in
-          - (abs (wl-wr))
-  ;;
-
-let compute_goal_weight = compute_unit_clause_weight;;
+        weight_of_polynomial (wl+wr) (ml@mr) in
+    List.fold_left (+) 0 (List.map weight_of_lit lits)
   
 (* Riazanov: 3.1.5 pag 38 *)
 (* Compare weights normalized in a new way :
@@ -160,28 +120,28 @@ let compare_weights (h1, w1) (h2, w2) =
             else XEQ
   in
     aux (h1-h2) (false,false) 0 w1 w2
-;;
+
 
 (* Riazanov: p. 40, relation >>> 
  * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
-  match t1, t2 with
+  match t1.node.term, t2.node.term with
   (* We want to discard any identity equality. *
    * If we give back XEQ, no inference rule    *
    * will be applied on this equality          *)
-  | Terms.Var i, Terms.Var j when i = j ->
+  | T.Var i, T.Var j when i = j ->
       XEQ
   (* 1. *)
-  | Terms.Var _, _
-  | _, Terms.Var _ -> XINCOMPARABLE
+  | T.Var _, _
+  | _, T.Var _ -> XINCOMPARABLE
   (* 2.a *)
-  | Terms.Leaf a1, Terms.Leaf a2 -> 
+  | T.Leaf a1, T.Leaf a2 -> 
       let cmp = b_compare a1 a2 in
       if cmp = 0 then XEQ else if cmp < 0 then XLT else XGT
-  | Terms.Leaf _, Terms.Node _ -> XLT
-  | Terms.Node _, Terms.Leaf _ -> XGT
+  | T.Leaf _, T.Node _ -> XLT
+  | T.Node _, T.Leaf _ -> XGT
   (* 2.b *)
-  | Terms.Node l1, Terms.Node l2 ->
+  | T.Node l1, T.Node l2 ->
       let rec cmp t1 t2 =
         match t1, t2 with
         | [], [] -> XEQ
@@ -192,75 +152,48 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
             if o = XEQ && not head_only then cmp tl1 tl2 else o
       in
       cmp l1 l2
-;;
+
   
+(* compare terms using the given auxiliary ordering, and
+   convert the result to Terms.Comparison *)
 let compare_terms o x y = 
     match o x y with
-      | XINCOMPARABLE -> Terms.Incomparable
-      | XGT -> Terms.Gt
-      | XLT -> Terms.Lt
-      | XEQ -> Terms.Eq
-      | XINVERTIBLE -> Terms.Invertible
+      | XINCOMPARABLE -> T.Incomparable
+      | XGT -> T.Gt
+      | XLT -> T.Lt
+      | XEQ -> T.Eq
+      | XINVERTIBLE -> T.Invertible
       | _ -> assert false
-;;
 
-module NRKBO (B : Terms.Blob) = struct
+
+module NRKBO = struct
   let name = "nrkbo"
-  include B 
 
-  module Pp = Pp.Pp(B)
+  type foterm = Terms.foterm
 
-  let eq_foterm = eq_foterm B.eq;;
+  let eq_foterm x y = x == y
 
-exception UnificationFailure of string Lazy.t;;
+  exception UnificationFailure of string Lazy.t
 
-
-(* DUPLICATE CODE FOR TESTS (see FoUnif)  *)
-  let alpha_eq s t =
-    let rec equiv subst s t =
-      let s = match s with Terms.Var i -> FoSubst.lookup i subst | _ -> s
-      and t = match t with Terms.Var i -> FoSubst.lookup i subst | _ -> t
-        
-      in
-      match s, t with
-        | s, t when eq_foterm s t -> subst
-        | Terms.Var i, Terms.Var j
-            when (not (List.exists (fun (_,k) -> k=t) subst)) ->
-            let subst = FoSubst.build_subst i t subst in
-              subst
-        | Terms.Node l1, Terms.Node l2 -> (
-            try
-              List.fold_left2
-                (fun subst' s t -> equiv subst' s t)
-                subst l1 l2
-            with Invalid_argument _ ->
-              raise (UnificationFailure (lazy "Inference.unification.unif"))
-          )
-        | _, _ ->
-            raise (UnificationFailure (lazy "Inference.unification.unif"))
-    in
-      equiv FoSubst.id_subst s t
-;;
-
-let relocate maxvar varlist subst =
-    List.fold_right
-      (fun i (maxvar, varlist, s) -> 
-         maxvar+1, maxvar::varlist, FoSubst.build_subst i (Terms.Var maxvar) s)
-      varlist (maxvar+1, [], subst)
-  ;;
-
-  let are_invertible l r =
-    let varlist = (Terms.vars_of_term l)@(Terms.vars_of_term r) in
+  let are_invertible l r = false   (* FIXME ignore this case *)
+    (*
+    let relocate maxvar varlist subst =
+      List.fold_right
+        (fun i (maxvar, varlist, s) -> 
+           maxvar+1, maxvar::varlist, FoSubst.build_subst i (T.Var maxvar) s)
+        varlist (maxvar+1, [], subst) in
+    let varlist = (T.vars_of_term l)@(T.vars_of_term r) in
     let maxvar = List.fold_left max 0 varlist in
     let _,_,subst = relocate maxvar varlist FoSubst.id_subst in
     let newl = FoSubst.apply_subst subst l in
     let newr = FoSubst.apply_subst subst r in
-      try (let subst = alpha_eq l newr in eq_foterm newl (FoSubst.apply_subst subst r)) with
+      try (let subst = FoUnif.alpha_eq l newr in
+           eq_foterm newl (FoSubst.apply_subst subst r))
+      with
 	  UnificationFailure _ -> false
-;;
+    *)
 
-  let compute_unit_clause_weight = compute_unit_clause_weight;;
-  let compute_goal_weight = compute_goal_weight;;
+  let compute_clause_weight = compute_clause_weight
   
   (* Riazanov: p. 40, relation >_n *)
   let nonrec_kbo t1 t2 =
@@ -268,38 +201,33 @@ let relocate maxvar varlist subst =
     let w2 = weight_of_term t2 in
     match compare_weights w1 w2 with
     | XLE ->  (* this is .> *)
-        if aux_ordering B.compare t1 t2 = XLT then XLT else XINCOMPARABLE
+        if aux_ordering Signature.compare t1 t2 = XLT then XLT else XINCOMPARABLE
     | XGE -> 
-        if aux_ordering B.compare t1 t2 = XGT then XGT else XINCOMPARABLE
-    | XEQ -> let res = aux_ordering B.compare t1 t2 in
+        if aux_ordering Signature.compare t1 t2 = XGT then XGT else XINCOMPARABLE
+    | XEQ -> let res = aux_ordering Signature.compare t1 t2 in
 	if res = XINCOMPARABLE && are_invertible t1 t2 then XINVERTIBLE
 	else res
     | res -> res
-  ;;
+  
+  let compare_terms = compare_terms nonrec_kbo
 
-  let compare_terms = compare_terms nonrec_kbo;;
-
-  let profiler = HExtlib.profile ~enable:true "compare_terms(nrkbo)";;
+  let profiler = HExtlib.profile ~enable:true "compare_terms(nrkbo)"
   let compare_terms x y =
     profiler.HExtlib.profile (compare_terms x) y
-  ;;
-
 end
   
-module KBO (B : Terms.Blob) = struct
+module KBO = struct
   let name = "kbo"
-  include B 
 
-  module Pp = Pp.Pp(B)
+  type foterm = Terms.foterm
 
-  let eq_foterm = eq_foterm B.eq;;
+  let eq_foterm x y = x == y
 
-  let compute_unit_clause_weight = compute_unit_clause_weight;;
-  let compute_goal_weight = compute_goal_weight;;
+  let compute_clause_weight = compute_clause_weight
 
   (* Riazanov: p. 38, relation > *)
   let rec kbo t1 t2 =
-    let aux = aux_ordering B.compare ~head_only:true in
+    let aux = aux_ordering Signature.compare ~head_only:true in
     let rec cmp t1 t2 =
       match t1, t2 with
       | [], [] -> XEQ
@@ -318,8 +246,8 @@ module KBO (B : Terms.Blob) = struct
         let r = aux t1 t2 in
         if r = XLT then XLT
         else if r = XEQ then (
-          match t1, t2 with
-          | Terms.Node (_::tl1), Terms.Node (_::tl2) ->
+          match t1.node.term, t2.node.term with
+          | T.Node (_::tl1), T.Node (_::tl2) ->
               if cmp tl1 tl2 = XLT then XLT else XINCOMPARABLE
           | _, _ -> assert false
         ) else XINCOMPARABLE
@@ -327,55 +255,51 @@ module KBO (B : Terms.Blob) = struct
         let r = aux t1 t2 in
         if r = XGT then XGT
         else if r = XEQ then (
-          match t1, t2 with
-          | Terms.Node (_::tl1), Terms.Node (_::tl2) ->
+          match t1.node.term, t2.node.term with
+          | T.Node (_::tl1), T.Node (_::tl2) ->
               if cmp tl1 tl2 = XGT then XGT else XINCOMPARABLE
           | _, _ ->  assert false
         ) else XINCOMPARABLE
     | XEQ ->
         let r = aux t1 t2 in
         if r = XEQ then (
-          match t1, t2 with
-	  | Terms.Var i, Terms.Var j when i=j -> XEQ
-          | Terms.Node (_::tl1), Terms.Node (_::tl2) -> cmp tl1 tl2
+          match t1.node.term, t2.node.term with
+	  | T.Var i, T.Var j when i=j -> XEQ
+          | T.Node (_::tl1), T.Node (_::tl2) -> cmp tl1 tl2
           | _, _ ->  XINCOMPARABLE
         ) else r 
     | res -> res
-  ;;
+  
 
-  let compare_terms = compare_terms kbo;;
+  let compare_terms = compare_terms kbo
 
-  let profiler = HExtlib.profile ~enable:true "compare_terms(kbo)";;
+  let profiler = HExtlib.profile ~enable:true "compare_terms(kbo)"
   let compare_terms x y =
     profiler.HExtlib.profile (compare_terms x) y
-  ;;
-
 end
 
-module LPO (B : Terms.Blob) = struct
+module LPO = struct
   let name = "lpo"
-  include B 
 
-  module Pp = Pp.Pp(B)
+  type foterm = Terms.foterm
 
-  let eq_foterm = eq_foterm B.eq;;
+  let eq_foterm x y = x == y
 
-  let compute_unit_clause_weight = compute_unit_clause_weight;;
-  let compute_goal_weight = compute_goal_weight;;
+  let compute_clause_weight = compute_clause_weight
 
   let rec lpo s t =
-    match s,t with
-      | s, t when eq_foterm s t ->
+    match s.node.term, t.node.term with
+      | _, _ when eq_foterm s t ->
           XEQ
-      | Terms.Var _, Terms.Var _ ->
+      | T.Var _, T.Var _ ->
           XINCOMPARABLE
-      | _, Terms.Var i ->
-          if (List.mem i (Terms.vars_of_term s)) then XGT
+      | _, T.Var i ->
+          if (List.mem t (T.vars_of_term s)) then XGT
           else XINCOMPARABLE
-      | Terms.Var i,_ ->
-          if (List.mem i (Terms.vars_of_term t)) then XLT
+      | T.Var i,_ ->
+          if (List.mem s (T.vars_of_term t)) then XLT
           else XINCOMPARABLE
-      | Terms.Node (hd1::tl1), Terms.Node (hd2::tl2) ->
+      | T.Node (hd1::tl1), T.Node (hd2::tl2) ->
           let rec ge_subterm t ol = function
             | [] -> (false, ol)
             | x::tl ->
@@ -398,7 +322,7 @@ module LPO (B : Terms.Blob) = struct
                       if lpo x t = XLT then check_subterms t ([],tl)
                       else false
                 in
-                match aux_ordering B.compare hd1 hd2 with
+                match aux_ordering Signature.compare hd1 hd2 with
                   | XGT -> if check_subterms s (r_ol,tl2) then XGT
                     else XINCOMPARABLE
                   | XLT -> if check_subterms t (l_ol,tl1) then XLT
@@ -422,16 +346,16 @@ module LPO (B : Terms.Blob) = struct
               | XINCOMPARABLE -> XINCOMPARABLE
               | _ -> assert false
           end
-      | _,_ -> aux_ordering B.compare s t
+      | _,_ -> aux_ordering Signature.compare s t
             
-  ;;
+  
 
-  let compare_terms = compare_terms lpo;;
+  let compare_terms = compare_terms lpo
 
-  let profiler = HExtlib.profile ~enable:true "compare_terms(lpo)";;
+  let profiler = HExtlib.profile ~enable:true "compare_terms(lpo)"
   let compare_terms x y =
     profiler.HExtlib.profile (compare_terms x) y
-  ;;
-
 end
 
+(* default ordering (LPO) *)
+module Default = LPO

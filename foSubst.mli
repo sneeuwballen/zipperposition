@@ -11,24 +11,16 @@
 
 (* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
 
-(*
-module Subst (B : Terms.Blob) : 
-  sig
-*)
-    val id_subst : 'a Terms.substitution
-    val build_subst : 
-      int -> 'a Terms.foterm -> 'a Terms.substitution -> 
-       'a Terms.substitution
-    val lookup : 
-          int -> 'a Terms.substitution -> 'a Terms.foterm
-    val filter : 'a Terms.substitution -> Terms.varlist -> Terms.varlist
-    val reloc_subst : 
-          'a Terms.substitution -> 'a Terms.foterm -> 'a Terms.foterm
-    val apply_subst : 
-          'a Terms.substitution -> 'a Terms.foterm -> 'a Terms.foterm
-    val flat: 
-          'a Terms.substitution -> 'a Terms.substitution
-    val concat: 
-          'a Terms.substitution -> 'a Terms.substitution -> 
-            'a Terms.substitution
-(*   end *)
+exception OccurCheck of (Terms.foterm * Terms.foterm)
+
+val id_subst : Terms.substitution
+val build_subst : Terms.foterm -> Terms.foterm -> ?recursive:bool ->
+                  Terms.substitution -> Terms.substitution
+val lookup : Terms.foterm -> Terms.substitution -> Terms.foterm
+val is_in_subst : Terms.foterm -> Terms.substitution -> bool
+val filter : Terms.substitution -> Terms.varlist -> Terms.varlist
+val reloc_subst : Terms.substitution -> Terms.foterm -> Terms.foterm
+val apply_subst : Terms.substitution -> ?recursive:bool ->
+                  Terms.foterm -> Terms.foterm
+val flat: Terms.substitution -> Terms.substitution
+val concat: Terms.substitution -> Terms.substitution -> Terms.substitution

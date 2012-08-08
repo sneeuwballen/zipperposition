@@ -1,5 +1,8 @@
 (* main file *)
 
+module Ord = Orderings
+module Utils = FoUtils
+
 (* get first file of command line arguments *)
 let get_file () =
   let files = ref [] in

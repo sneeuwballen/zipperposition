@@ -9,58 +9,54 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* module Subst (B : Terms.Blob) = struct *)
-  
-  let id_subst = [];;
-  
-  let build_subst n t tail = (n,t) :: tail ;;
-  
-  let rec lookup var subst =
-    match var with
-      | Terms.Var i ->
-          (try
-            lookup (List.assoc i subst) subst
-          with
-              Not_found -> var)
-      | _ -> var
-  ;;
-  let lookup i subst = lookup (Terms.Var i) subst;;
-  
-  let is_in_subst i subst = List.mem_assoc i subst;;
-  
-  (* filter out from metasenv the variables in substs *)
-  let filter subst varlist =
-    List.filter
-      (fun m ->
-         not (is_in_subst m subst))
-      varlist
-  ;;
+open Hashcons
+open Terms
 
-  let rec reloc_subst subst = function
-    | (Terms.Leaf _) as t -> t
-    | Terms.Var i -> 
-        (try
-           List.assoc i subst
-         with
-             Not_found -> assert false)
-    | (Terms.Node l) ->
-	Terms.Node (List.map (fun t -> reloc_subst subst t) l)
-;;
+exception OccurCheck of (Terms.foterm * Terms.foterm)
 
-  let rec apply_subst subst = function
-    | (Terms.Leaf _) as t -> t
-    | Terms.Var i -> 
-        (match lookup i subst with
-        | Terms.Node _ as t -> apply_subst subst t
-        | t -> t)
-    | (Terms.Node l) ->
-	Terms.Node (List.map (fun t -> apply_subst subst t) l)
-;;
+let id_subst = []
 
-  let flat subst =
-    List.map (fun (x,t) -> (x, apply_subst subst t)) subst
-;;
+let rec lookup var subst =
+  match subst with
+    | [] -> var
+    | ((v,t) :: tail) -> if v == var then t else lookup var tail
 
-  let concat x y = x @ y;;
-  
-(* end *)
+let is_in_subst var subst = lookup var subst != var
+
+(* filter out from metasenv the variables in substs *)
+let filter subst varlist =
+  List.filter
+    (fun var ->
+       not (is_in_subst var subst))
+    varlist
+
+let rec reloc_subst subst t = match t.node.term with
+  | Terms.Leaf _ -> t
+  | Terms.Var _ -> 
+      let new_t = lookup t subst in
+      assert (t != new_t);
+      new_t
+  | (Terms.Node l) ->
+      Terms.mk_node (List.map (fun t -> reloc_subst subst t) l)
+
+let rec apply_subst subst ?(recursive=false) t = match t.node.term with
+  | Terms.Leaf _ -> t
+  | Terms.Var _ -> 
+      let new_t = lookup t subst in
+      if recursive then apply_subst subst ~recursive new_t else new_t
+  | Terms.Node l ->
+      Terms.mk_node (List.map (fun t -> apply_subst subst t) l)
+
+let build_subst v t ?(recursive=true) tail =
+  if recursive
+    then (
+      let new_t = apply_subst ~recursive tail t in
+      if Terms.member_term v new_t then raise (OccurCheck (v, new_t));
+      (v, new_t) :: tail )
+    else
+      (v,t) :: tail 
+
+let flat subst = List.map (fun (x,t) -> (x, apply_subst subst t)) subst
+
+let concat x y = x @ y
+

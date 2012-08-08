@@ -11,32 +11,29 @@
 
 (* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
 
-module type Blob =
+module type S =
   sig 
-    include Terms.Blob 
+    type foterm = Terms.foterm
 
     (* This order relation should be:
      * - stable for instantiation
      * - total on ground terms
      *
      *)
-    val compare_terms : 
-          t Terms.foterm -> t Terms.foterm -> Terms.comparison
+    val compare_terms : Terms.foterm -> Terms.foterm -> Terms.comparison
 
     (* these could be outside the module, but to ease experimentation
      * we allow them to be tied with the ordering *)
-    val compute_unit_clause_weight : 't Terms.unit_clause -> int
-    val compute_goal_weight : 't Terms.unit_clause -> int
+    val compute_clause_weight : Terms.clause -> int
 
     val name : string
-
   end
 
-module NRKBO (B : Terms.Blob) : Blob 
-with type t = B.t and type input = B.input
+module NRKBO : S
 
-module KBO (B : Terms.Blob) : Blob 
-with type t = B.t and type input = B.input
+module KBO  : S 
 
-module LPO (B : Terms.Blob) : Blob 
-with type t = B.t and type input = B.input
+module LPO  : S
+
+(* default ordering (LPO) *)
+module Default : S

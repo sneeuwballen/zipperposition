@@ -44,18 +44,21 @@ val mk_node : foterm list -> foterm
 val eq_term : foterm  (* equality of terms *)
 val true_term : foterm  (* tautology symbol *)
 
+(* membership: [a] [b] checks if a subterm of b *)
+val member_term : foterm -> foterm -> bool 
+
 (* cast (change sort) *)
 val cast : foterm -> sort -> foterm
-
+(* list of variables *)
+type varlist = foterm list
 (* free variables in the term *)
-val vars_of_term : foterm -> foterm list
+val vars_of_term : foterm -> varlist
 
 (* substitution, a list of variables -> term *)
 type substitution = (foterm * foterm) list
 
 (* partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable | Invertible
-
 (* direction of an equation (for rewriting) *)
 type direction = Left2Right | Right2Left | Nodir
 (* side of an equation *)
@@ -68,52 +71,20 @@ type literal =
  | Equation of    foterm  (* lhs *)
                 * foterm  (* rhs *)
                 * bool    (* sign *)
-                (* * comparison (* orientation *) *)
+                * comparison (* orientation *)
 
-(* build literals. If sides so not have the same sort,
- * this will raise a SortError *)
-val mk_eq : foterm -> foterm -> literal
-val mk_neq : foterm -> foterm -> literal
-(* negate literal *)
-val negate_lit : literal -> literal
-
-(* a proof step for a clause *)
-type proof =
-  | Axiom of string (* axiom of input *)
-  | SuperpositionLeft of sup_position
-  | SuperpositionRight of sup_position
-  | EqualityFactoring of eq_factoring_position  
-  | EqualityResolution of eq_resolution_position
-and sup_position = {
-  (* describes a superposition inference *)
-  sup_active : clause;  (* rewriting clause *)
-  sup_passive : clause; (* rewritten clause *)
-  sup_active_pos : (int * side * position);
-  sup_passive_pos : (int * side * position);
-  sup_subst : substitution;
-}
-and eq_factoring_position = {
-  (* describes an equality factoring inference *)
-  eqf_clause : clause;
-  eqf_bigger : (int * side);  (* bigger equation s=t, s > t *)
-  eqf_smaller : (int * side); (* smaller equation u=v *)
-  eqf_subst : substitution; (* subst(s) = subst(u) *)
-}
-and eq_resolution_position = {
-  (* describes an equality resolution inference *)
-  eqr_clause : clause;
-  eqr_position : int;
-  eqr_subst : substitution;
-}
-and clause =
-    (* a first order clause *)
+(* a first order clause *)
+type clause =
     int (* ID *)
   * literal list  (* the equations *)
   * foterm list  (* the free variables *)
   * proof (* the proof for this clause *)
-
-(* build a clause with a new ID *)
-val mk_clause : literal list -> proof -> clause
+(* a proof step for a clause *)
+and proof = Axiom of string | Proof of rule * proof_clauses
+(* an inference rule name *)
+and rule = string
+(* a list of terms in clauses involved in an inference *)
+and proof_clauses = (clause * int * side * position) list
 
 module M : Map.S with type key = int 
 

@@ -66,8 +66,16 @@ let rec mk_node = function
 let eq_term = mk_leaf Signature.eq_symbol bool_sort (* equality, returns bool *)
 let true_term = mk_leaf Signature.true_symbol bool_sort (* tautology term *)
 
+(* membership: [a] [b] checks if a subterm of b *)
+let rec member_term a b = a == b || match b.node.term with
+  | Leaf _ | Var _ -> false
+  | Node subterms -> List.exists (member_term a) subterms
+
 (* cast (change sort) *)
 let cast t sort = H.hashcons terms { t.node with sort=sort; }
+
+(* list of variables *)
+type varlist = foterm list
 
 (* free variables in the term *)
 let vars_of_term t =
@@ -82,7 +90,6 @@ type substitution = (foterm * foterm) list
 
 (* partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable | Invertible
-
 (* direction of an equation (for rewriting) *)
 type direction = Left2Right | Right2Left | Nodir
 (* side of an equation *)
@@ -95,66 +102,20 @@ type literal =
  | Equation of    foterm  (* lhs *)
                 * foterm  (* rhs *)
                 * bool    (* sign *)
-                (* * comparison (* orientation *) *)
+                * comparison (* orientation *)
 
-(* build literals *)
-let check_type a b = if a.node.sort <> b.node.sort
-  then raise (SortError "sides of equations of different sorts") else ()
-let mk_eq a b = (check_type a b; Equation (a, b, true))
-let mk_neq a b = (check_type a b; Equation (a, b, false))
-(* negate literal *)
-let negate_lit (Equation (l,r,sign)) = Equation (l,r, not sign)
-
-
-(* a proof step for a clause *)
-type proof =
-  | Axiom of string (* axiom of input *)
-  | SuperpositionLeft of sup_position
-  | SuperpositionRight of sup_position
-  | EqualityFactoring of eq_factoring_position  
-  | EqualityResolution of eq_resolution_position
-and sup_position = {
-  (* describes a superposition inference *)
-  sup_active : clause;  (* rewriting clause *)
-  sup_passive : clause; (* rewritten clause *)
-  sup_active_pos : (int * side * position);
-  sup_passive_pos : (int * side * position);
-  sup_subst : substitution;
-}
-and eq_factoring_position = {
-  (* describes an equality factoring inference *)
-  eqf_clause : clause;
-  eqf_bigger : (int * side);  (* bigger equation s=t, s > t *)
-  eqf_smaller : (int * side); (* smaller equation u=v *)
-  eqf_subst : substitution; (* subst(s) = subst(u) *)
-}
-and eq_resolution_position = {
-  (* describes an equality resolution inference *)
-  eqr_clause : clause;
-  eqr_position : int;
-  eqr_subst : substitution;
-}
-and clause =
-  (* a first order clause *)
+(* a first order clause *)
+type clause =
     int (* ID *)
   * literal list  (* the equations *)
   * foterm list  (* the free variables *)
   * proof (* the proof for this clause *)
-
-let clause_id = ref 0
-
-(* build a clause with a new ID *)
-let mk_clause lits proof =
-  let rec merge_vars vars = function
-    | [] -> vars
-    | (x::xs) -> if List.mem x vars
-      then merge_vars vars xs else merge_vars (x::vars) xs
-  and vars_of_lits (Equation (l, r, _)) =
-    merge_vars (vars_of_term l) (vars_of_term r) in
-  let all_vars =
-    List.fold_left merge_vars [] (List.map vars_of_lits lits)
-  and id = (let i = !clause_id in clause_id := i+1; i) in
-  (id, lits, all_vars, proof)
+(* a proof step for a clause *)
+and proof = Axiom of string | Proof of rule * proof_clauses
+(* an inference rule name *)
+and rule = string
+(* a list of terms in clauses involved in an inference *)
+and proof_clauses = (clause * int * side * position) list
 
 module OT =
  struct

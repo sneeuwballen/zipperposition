@@ -13,22 +13,14 @@
 
 exception UnificationFailure of string Lazy.t;;
 
-module Founif (B : Orderings.Blob) : 
-  sig
+val unification:
+  (* global varlist for both terms t1 and t2 (UNUSED) *)
+  (* Terms.varlist -> *)
+  (* locked variables: if equal to FV(t2) we match t1 with t2*)
+  Terms.varlist -> 
+  Terms.foterm ->
+  Terms.foterm ->
+  Terms.substitution 
 
-   val unification:
-     (* global varlist for both terms t1 and t2 (UNUSED) *)
-     (* Terms.varlist -> *)
-     (* locked variables: if equal to FV(t2) we match t1 with t2*)
-     Terms.varlist -> 
-     B.t Terms.foterm ->
-     B.t Terms.foterm ->
-        B.t Terms.substitution 
+val alpha_eq: Terms.foterm -> Terms.foterm -> Terms.substitution
 
-
-   val alpha_eq:
-     B.t Terms.foterm ->
-     B.t Terms.foterm ->
-     B.t Terms.substitution
-
-  end

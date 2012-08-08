@@ -31,9 +31,9 @@ type 'a path_string_elem =
   | Proposition (* arity is 0 *) 
   | Datatype (* arity is 0 *) 
   | Dead (* arity is 0 *) 
-;;  
 
-type 'a path = ('a path_string_elem) list;;
+
+type 'a path = ('a path_string_elem) list
 
 module type Indexable = sig
   type input

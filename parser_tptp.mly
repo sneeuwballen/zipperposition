@@ -309,7 +309,7 @@ cnf_annotated:
       // ignore everything except for the formula
       {
 	let clause = 
-	  T.mk_clause $7 (T.Axiom $3)
+	  FoUtils.mk_clause $7 (T.Axiom $3)
 	in
 	  init_clause ();
 	  clause
@@ -356,7 +356,7 @@ literal:
       { $1 }
 
   | NEGATION atomic_formula
-      { T.negate_lit $2 }
+      { FoUtils.negate_lit $2 }
 
 atomic_formula:
   | plain_atom
@@ -371,7 +371,7 @@ atomic_formula:
 plain_atom:
   | plain_term_top
       { let t = T.cast $1 T.bool_sort in (* cast term to bool *)
-        T.mk_eq t T.true_term }
+        FoUtils.mk_eq t T.true_term }
 
 arguments:
   | term
@@ -382,20 +382,20 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { T.mk_eq T.true_term T.true_term }
+      { FoUtils.mk_eq T.true_term T.true_term }
 
   | DOLLAR_FALSE
-      { T.mk_neq T.true_term T.true_term (* T!=T is false *) }
+      { FoUtils.mk_neq T.true_term T.true_term (* T!=T is false *) }
 
   | term EQUALITY term
-      { T.mk_eq $1 $3 }
+      { FoUtils.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { T.mk_neq $1 $3 }
+      { FoUtils.mk_neq $1 $3 }
 
 system_atom:
   | system_term_top
       { let t = T.cast $1 T.bool_sort in
-        T.mk_eq t T.true_term }
+        FoUtils.mk_eq t T.true_term }
 
 term:
   | function_term

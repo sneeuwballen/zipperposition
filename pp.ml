@@ -83,7 +83,7 @@ let string_of_comparison = function
   | T.Incomparable -> "=?="
   | T.Invertible -> "=<->="
 
-let pp_literal formatter (Equation (left, right, sign)) =
+let pp_literal formatter (Equation (left, right, sign, ord)) =
   if sign
   then Format.fprintf formatter "@[%a@ %a@ %a@]"
       pp_foterm left pp_foterm T.eq_term pp_foterm right
