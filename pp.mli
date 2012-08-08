@@ -11,13 +11,29 @@
 
 (* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
 
-module Pp (B : Terms.Blob) : 
+module Pp (T : Terms.TermSig) : 
   sig
 
-    val pp_foterm: B.t Terms.foterm -> string
-    val pp_proof: B.t Terms.bag -> B.t Terms.proof -> string
-    val pp_substitution: B.t Terms.substitution -> string
+    (* print a list of items using the printing function *)
+    val pp_list: ?sep:string -> (Format.formatter -> 'a -> unit)
+        -> Format.formatter -> 'a list -> unit
+
+    val pp_foterm: Format.formatter -> T.foterm -> unit
+
+    (*
+    val pp_proof: Format.formatter -> T.proof -> unit
+    *)
+
+    val pp_substitution: Format.formatter -> T.substitution -> unit
+
+    val pp_clause : Format.formatter -> T.clause -> unit
+
+    (*
     val pp_unit_clause: ?margin:int -> B.t Terms.unit_clause -> string
     val pp_bag: B.t Terms.bag -> string
+    *)
 
+    (* print into a string *)
+    val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b)
+                    -> 'a -> string
   end
