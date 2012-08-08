@@ -25,6 +25,7 @@ module type Blob =
 
     (* special leaves *)
     val eqP : t  (* symbol for equality predicate *)
+    val true_symbol : t (* symbol for 'true' *)
     val bool_symbol : t (* symbol for boolean *)
     val univ_symbol : t (* symbol for universal (terms) sort *)
 
@@ -42,10 +43,10 @@ module type TermSig =
     (* type of constant terms and sorts *)
     type leaf
 
-    (* a sort for terms *)
-    type sort =
-      | BaseSort of leaf      (* constant sort *)
-      | NodeSort of sort list (* [a,b,c] is sort (b,c) -> a *)
+    val pp_leaf : Format.formatter -> leaf -> unit
+
+    (* a sort for terms (only the return sort is kept) *)
+    type sort = leaf
 
     (* some special sorts *)
     val bool_sort : sort
@@ -70,8 +71,9 @@ module type TermSig =
     val mk_leaf : leaf -> sort -> foterm
     val mk_node : foterm list -> foterm
 
-    (* special term for equality *)
-    val eq_term : foterm
+    (* special terms *)
+    val eq_term : foterm  (* equality of terms *)
+    val true_term : foterm  (* tautology symbol *)
 
     (* free variables in the term *)
     val vars_of_term : foterm -> foterm list
@@ -93,11 +95,19 @@ module type TermSig =
     type literal = 
      | Equation of    foterm  (* lhs *)
                     * foterm  (* rhs *)
-                    * comparison (* orientation *)
+                    * bool    (* sign *)
+                    (* * comparison (* orientation *) *)
+
+    (* build literals. If sides so not have the same sort,
+     * this will raise a SortError *)
+    val mk_eq : foterm -> foterm -> literal
+    val mk_neq : foterm -> foterm -> literal
+    (* negate literal *)
+    val negate_lit : literal -> literal
 
     (* a proof step for a clause *)
     type proof =
-      | Axiom  (* axiom of input *)
+      | Axiom of string (* axiom of input *)
       | SuperpositionLeft of sup_position
       | SuperpositionRight of sup_position
       | EqualityFactoring of eq_factoring_position  
@@ -130,6 +140,9 @@ module type TermSig =
       * foterm list  (* the free variables *)
       * proof (* the proof for this clause *)
 
+    (* build a clause with a new ID *)
+    val mk_clause : literal list -> proof -> clause
+
     module M : Map.S with type key = int 
 
     (* multiset of clauses TODO use a map? *)
@@ -148,3 +161,6 @@ module type TermSig =
   end
 
 module Make(B : Blob) : (TermSig with type leaf = B.t)
+
+(* default implementation with strings *)
+module Default : (TermSig with type leaf = string)

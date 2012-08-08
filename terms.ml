@@ -25,9 +25,10 @@ module type Blob =
 
     (* special leaves *)
     val eqP : t  (* symbol for equality predicate *)
+    val true_symbol : t (* symbol for 'true' *)
     val bool_symbol : t (* symbol for boolean *)
     val univ_symbol : t (* symbol for universal (terms) sort *)
-
+ 
     (* why is this in the /leaves/ signature?!
     type input
     val embed : input -> t foterm
@@ -42,10 +43,10 @@ module type TermSig =
     (* type of constant terms and sorts *)
     type leaf
 
+    val pp_leaf : Format.formatter -> leaf -> unit
+
     (* a sort for terms *)
-    type sort =
-      | BaseSort of leaf      (* constant sort *)
-      | NodeSort of sort list (* [a,b,c] is sort (b,c) -> a *)
+    type sort = leaf
 
     (* some special sorts *)
     val bool_sort : sort
@@ -70,8 +71,9 @@ module type TermSig =
     val mk_leaf : leaf -> sort -> foterm
     val mk_node : foterm list -> foterm
 
-    (* special term for equality *)
-    val eq_term : foterm
+    (* special terms *)
+    val eq_term : foterm  (* equality of terms *)
+    val true_term : foterm  (* tautology symbol *)
 
     (* free variables in the term *)
     val vars_of_term : foterm -> foterm list
@@ -93,11 +95,18 @@ module type TermSig =
     type literal = 
      | Equation of    foterm  (* lhs *)
                     * foterm  (* rhs *)
-                    * comparison (* orientation *)
+                    * bool    (* sign *)
+                    (* * comparison (* orientation *) *)
+
+    (* build literals *)
+    val mk_eq : foterm -> foterm -> literal
+    val mk_neq : foterm -> foterm -> literal
+    (* negate literal *)
+    val negate_lit : literal -> literal
 
     (* a proof step for a clause *)
     type proof =
-      | Axiom  (* axiom of input *)
+      | Axiom of string  (* axiom of input *)
       | SuperpositionLeft of sup_position
       | SuperpositionRight of sup_position
       | EqualityFactoring of eq_factoring_position  
@@ -130,6 +139,9 @@ module type TermSig =
       * foterm list  (* the free variables *)
       * proof (* the proof for this clause *)
 
+    (* build a clause with a new ID *)
+    val mk_clause : literal list -> proof -> clause
+
     module M : Map.S with type key = int 
 
     (* multiset of clauses TODO use a map? *)
@@ -154,14 +166,14 @@ module Make(B : Blob) =
 
     type leaf = B.t
 
+    let pp_leaf = B.pp
+
     (* a sort for terms *)
-    type sort =
-      | BaseSort of leaf
-      | NodeSort of sort list
+    type sort = leaf
 
     (* some special sorts *)
-    let bool_sort = BaseSort B.bool_symbol
-    let univ_sort = BaseSort B.univ_symbol
+    let bool_sort = B.bool_symbol
+    let univ_sort = B.univ_symbol
 
     (* exception raised when sorts are mismatched *)
     exception SortError of string
@@ -192,26 +204,13 @@ module Make(B : Blob) =
     let mk_leaf leaf sort = H.hashcons terms {term = Leaf leaf; sort=sort}
     let rec mk_node = function
       | [] -> failwith "cannot build empty node term"
-      | (head::args) as subterms -> 
-          (* typecheck *)
-          match head.node.sort with
-          | NodeSort (res_sort::args_sort) ->
-            if not (typecheck_args args_sort args) then
-                raise (SortError "wrong argument sort");
-            (* ok, build the term *)
-            H.hashcons terms {term = (Node subterms); sort=res_sort}
-          | _ -> failwith "try to apply non-functional-sorted object"
-    and typecheck_args args_sort args = match (args_sort, args) with
-      | ([], []) -> true
-      | ([], _) -> false
-      | (_, []) -> false
-      | (sort::sorts, arg::args) ->
-          sort = arg.node.sort && typecheck_args sorts args
+      | (head::_) as subterms -> 
+            H.hashcons terms {term = (Node subterms); sort=head.node.sort}
 
-    (* special term for equality *)
-    let eq_term =
-      let sort = NodeSort [bool_sort; univ_sort; univ_sort] in
-      mk_leaf B.eqP sort
+    (* special terms *)
+    let eq_term = mk_leaf B.eqP bool_sort (* equality, returns bool *)
+    let true_term = mk_leaf B.true_symbol bool_sort (* tautology symbol *)
+      
 
     (* free variables in the term *)
     let vars_of_term t =
@@ -238,11 +237,21 @@ module Make(B : Blob) =
     type literal = 
      | Equation of    foterm  (* lhs *)
                     * foterm  (* rhs *)
-                    * comparison (* orientation *)
+                    * bool    (* sign *)
+                    (* * comparison (* orientation *) *)
+
+    (* build literals *)
+    let check_type a b = if a.node.sort <> b.node.sort
+      then raise (SortError "sides of equations of different sorts") else ()
+    let mk_eq a b = (check_type a b; Equation (a, b, true))
+    let mk_neq a b = (check_type a b; Equation (a, b, false))
+    (* negate literal *)
+    let negate_lit (Equation (l,r,sign)) = Equation (l,r, not sign)
+
 
     (* a proof step for a clause *)
     type proof =
-      | Axiom  (* axiom of input *)
+      | Axiom of string (* axiom of input *)
       | SuperpositionLeft of sup_position
       | SuperpositionRight of sup_position
       | EqualityFactoring of eq_factoring_position  
@@ -275,6 +284,21 @@ module Make(B : Blob) =
       * foterm list  (* the free variables *)
       * proof (* the proof for this clause *)
 
+    let clause_id = ref 0
+
+    (* build a clause with a new ID *)
+    let mk_clause lits proof =
+      let rec merge_vars vars = function
+        | [] -> vars
+        | (x::xs) -> if List.mem x vars
+          then merge_vars vars xs else merge_vars (x::vars) xs
+      and vars_of_lits (Equation (l, r, _)) =
+        merge_vars (vars_of_term l) (vars_of_term r) in
+      let all_vars =
+        List.fold_left merge_vars [] (List.map vars_of_lits lits)
+      and id = (let i = !clause_id in clause_id := i+1; i) in
+      (id, lits, all_vars, proof)
+
     module OT =
      struct
        type t = int 
@@ -304,3 +328,17 @@ module Make(B : Blob) =
     let empty_bag = (0,M.empty)
 
 end
+
+(* default implementation with strings *)
+module Default = Make(struct
+  type t = string
+  let eq a b = a = b
+  let compare = Pervasives.compare
+  let pp f x = Format.fprintf f "%s" x
+  let eqP = "="
+  let equivP = "<=>"
+  let true_symbol = "true"
+  let bool_symbol = "Bool"
+  let univ_symbol = "U"
+end)
+
