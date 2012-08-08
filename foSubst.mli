@@ -14,8 +14,14 @@
 exception OccurCheck of (Terms.foterm * Terms.foterm)
 
 val id_subst : Terms.substitution
+
+(* add v -> t to the substitution. If recursive is true,
+ * then v -> subst(t) is considered instead.
+ * If v occurs in t, OccurCheck (v,t) is raised.
+ *)
 val build_subst : Terms.foterm -> Terms.foterm -> ?recursive:bool ->
                   Terms.substitution -> Terms.substitution
+
 val lookup : Terms.foterm -> Terms.substitution -> Terms.foterm
 val is_in_subst : Terms.foterm -> Terms.substitution -> bool
 val filter : Terms.substitution -> Terms.varlist -> Terms.varlist

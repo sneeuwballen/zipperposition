@@ -2,6 +2,7 @@
 
 module Ord = Orderings
 module Utils = FoUtils
+module Unif = FoUnif
 
 (* get first file of command line arguments *)
 let get_file () =
