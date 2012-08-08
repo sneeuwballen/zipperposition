@@ -12,7 +12,9 @@ let get_file () =
 
 (* parse given tptp file *)
 let parse_file f =
-  let input = open_in f in
+  let input = match f with
+    | "stdin" -> stdin
+    | f -> open_in f in
   try
     let buf = Lexing.from_channel input in
     Parser_tptp.parse_file Lexer_tptp.token buf
@@ -25,4 +27,4 @@ let () =
   Printf.printf "process file %s\n" f;
   let clauses, _ = parse_file f in
   Printf.printf "parsed %d clauses\n" (List.length clauses);
-  Format.printf "@[<v>%a@]" (Pretty.pp_list ~sep:"" Pretty.pp_clause) clauses
+  Format.printf "@[<v>%a@]@." (Pretty.pp_list ~sep:"" Pretty.pp_clause) clauses

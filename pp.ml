@@ -88,11 +88,11 @@ module Pp (T : Terms.TermSig) = struct
     if sign
     then Format.fprintf formatter "@[%a@ %a@ %a@]"
         pp_foterm left pp_foterm T.eq_term pp_foterm right
-    else Format.fprintf formatter "@[%a@ !%a@ %a@]"
+    else Format.fprintf formatter "@[<hv 2>%a !%a@ %a@]"
         pp_foterm left pp_foterm T.eq_term pp_foterm right
 
   let pp_clause formatter (id, lits, vars, _) =
-    Format.fprintf formatter "@[<hv 2>%a@]@;"
+    Format.fprintf formatter "@[<hv 2>%a@]"
       (pp_list ~sep:" | " pp_literal) lits
 
 
