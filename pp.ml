@@ -83,62 +83,33 @@ let string_of_comparison = function
   | T.Incomparable -> "=?="
   | T.Invertible -> "=<->="
 
-let pp_literal formatter (Equation (left, right, sign, ord)) =
-  if sign
-  then Format.fprintf formatter "@[%a@ %a@ %a@]"
-      pp_foterm left pp_foterm T.eq_term pp_foterm right
-  else Format.fprintf formatter "@[<hv 2>%a !%a@ %a@]"
-      pp_foterm left pp_foterm T.eq_term pp_foterm right
+let pp_literal formatter = function
+  | T.Equation (left, right, false, _) when right = T.true_term->
+    Format.fprintf formatter "!%a" pp_foterm left
+  | T.Equation (left, right, true, _) when right = T.true_term->
+    pp_foterm formatter left
+  | T.Equation (left, right, true, _) when left = T.true_term ->
+    pp_foterm formatter right
+  | T.Equation (left, right, false, _) when left = T.true_term ->
+    Format.fprintf formatter "!%a" pp_foterm right
+  | T.Equation (left, right, sign, ord) ->
+    if sign
+    then Format.fprintf formatter "@[%a@ %a@ %a@]"
+        pp_foterm left pp_foterm T.eq_term pp_foterm right
+    else Format.fprintf formatter "@[<hv 2>%a !%a@ %a@]"
+        pp_foterm left pp_foterm T.eq_term pp_foterm right
 
 let pp_clause formatter (id, lits, vars, _) =
   Format.fprintf formatter "@[<hv 2>%a@]"
     (pp_list ~sep:" | " pp_literal) lits
 
-
-(*
-let pp_unit_clause ~formatter:f c =
-  let (id, l, vars, proof) = c in
-    Format.fprintf f "Id : %3d, " id ;
-    match l with
-      | Terms.Predicate t ->
-        Format.fprintf f "@[<hv>{";
-        pp_foterm f t;
-          Format.fprintf f "@;[%s] by "
-            (String.concat ", " (List.map string_of_int vars));
-          (match proof with
-           | Terms.Exact t -> pp_foterm f t
-           | Terms.Step (rule, id1, id2, _, p, _) ->
-               Format.fprintf f "%s %d with %d at %s"
-                 (string_of_rule rule) id1 id2 (String.concat
-                  "," (List.map string_of_int p)));
-          Format.fprintf f "@]"
-      | Terms.Equation (lhs, rhs, ty, comp) ->
-        Format.fprintf f "@[<hv>{";
-        pp_foterm f ty;
-          Format.fprintf f "}:@;@[<hv>";
-        pp_foterm f lhs;
-          Format.fprintf f "@;%s@;" (string_of_comparison comp);
-        pp_foterm f rhs;
-          Format.fprintf f "@]@;[%s] by "
-            (String.concat ", " (List.map string_of_int vars));
-          (match proof with
-           | Terms.Exact t -> pp_foterm f t
-           | Terms.Step (rule, id1, id2, _, p, _) ->
-               Format.fprintf f "%s %d with %d at %s"
-                 (string_of_rule rule) id1 id2 (String.concat
-                  "," (List.map string_of_int p)));
-          Format.fprintf f "@]"
-;;
-
-let pp_bag ~formatter:f (_,bag) =
-  Format.fprintf f "@[<v>";
+let pp_bag formatter bag =
+  Format.fprintf formatter "@[<v>";
   Terms.M.iter
-  (fun _ (c,d,_) -> pp_unit_clause ~formatter:f c;
-     if d then Format.fprintf f " (discarded)@;"
-     else Format.fprintf f "@;") bag;
-  Format.fprintf f "@]"
-;;
-*)
+    (fun _ (c,d,_) -> pp_clause formatter c;
+       if d then Format.fprintf formatter " (discarded)@;"
+       else Format.fprintf formatter "@;") bag.bag_clauses;
+  Format.fprintf formatter "@]"
 
 (* String buffer implementation *)
 let on_buffer ?(margin=80) f t =

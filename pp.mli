@@ -25,10 +25,7 @@ val pp_substitution: Format.formatter -> Terms.substitution -> unit
 
 val pp_clause : Format.formatter -> Terms.clause -> unit
 
-(*
-val pp_unit_clause: ?margin:int -> B.t Terms.unit_clause -> string
-val pp_bag: B.t Terms.bag -> string
-*)
+val pp_bag: Format.formatter -> Terms.bag -> unit
 
 (* print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b)

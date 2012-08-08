@@ -88,9 +88,11 @@ and proof_clauses = (clause * int * side * position) list
 
 module M : Map.S with type key = int 
 
-(* multiset of clauses TODO use a map? *)
-type bag = int (* max ID  *)
-              * ((clause * bool * int) M.t)
+(* multiset of clauses *)
+type bag = {
+  bag_id : int; (* max ID  *)
+  bag_clauses : (clause * bool * int) M.t;
+}
 
 (* also gives a fresh ID to the clause *)
 val add_to_bag : clause -> bag -> bag * clause

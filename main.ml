@@ -26,5 +26,7 @@ let () =
   let f = get_file () in
   Printf.printf "# process file %s\n" f;
   let clauses, _ = parse_file f in
+  let bag = List.fold_left (fun bag c -> fst (Terms.add_to_bag c bag))
+    Terms.empty_bag clauses in
   Printf.printf "# parsed %d clauses\n" (List.length clauses);
-  Format.printf "@[<v>%a@]@." (Pp.pp_list ~sep:"" Pp.pp_clause) clauses
+  Format.printf "@[<v>%a@]@." Pp.pp_bag bag

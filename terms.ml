@@ -127,20 +127,24 @@ module M : Map.S with type key = int
   = Map.Make(OT) 
 
 (* multiset of clauses *)
-type bag = int (* max ID  *)
-              * ((clause * bool * int) M.t)
+type bag = {
+  bag_id : int; (* max ID  *)
+  bag_clauses : (clause * bool * int) M.t;
+}
 
-let add_to_bag (_,lit,vl,proof) (id,bag) =
-  let id = id+1 in
+(* also gives a fresh ID to the clause *)
+let add_to_bag (_,lit,vl,proof) bag =
+  let id = bag.bag_id+1 in
   let clause = (id, lit, vl, proof) in
-  let bag = M.add id (clause,false,0) bag in
-  (id,bag), clause 
+  let new_bag = {bag_id=id;
+                 bag_clauses=M.add id (clause,false,0) bag.bag_clauses} in
+  new_bag, clause 
 
-let replace_in_bag ((id,_,_,_),_,_ as cl) (max_id,bag) =
-  let bag = M.add id cl bag in
-    (max_id,bag)
+let replace_in_bag ((id,_,_,_),_,_ as cl) bag =
+  let new_clauses = M.add id cl bag.bag_clauses in
+    { bag with bag_clauses = new_clauses }
 
-let get_from_bag id (_,bag) =
-  M.find id bag
+let get_from_bag id bag =
+  M.find id bag.bag_clauses
   
-let empty_bag = (0,M.empty)
+let empty_bag = {bag_id=0; bag_clauses=M.empty}
