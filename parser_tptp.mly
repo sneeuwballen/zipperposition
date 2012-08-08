@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     let value counter = !counter
   end
 
-  module T = Terms.Default
+  module T = Terms
 
   type term = T.foterm
   type variable = T.foterm
@@ -130,7 +130,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token UNKNOWN
 
 %start parse_file
-%type <Terms.Default.clause list * string list> parse_file
+%type <Terms.clause list * string list> parse_file
 
 
 %%
@@ -434,11 +434,12 @@ plain_term:
 
 constant:
   | atomic_word
-      { $1 }
+      { let sym = Signature.str_to_sym $1 in sym }
 
 functor_:
   | atomic_word
-      { T.mk_leaf $1 T.univ_sort }
+      { let sym = Signature.str_to_sym $1 in
+        T.mk_leaf sym T.univ_sort }
 
 defined_term:
   | number

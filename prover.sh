@@ -6,7 +6,7 @@ TMPFILE=$(mktemp proverXXXXX)
 
 echo "# clausify into $TMPFILE"
 if [ -z "$2" ]; then
-    INPUT="--tptp-in"
+    INPUT="--tptp3-in"
 else
     INPUT="$2"
 fi
