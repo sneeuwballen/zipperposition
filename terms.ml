@@ -54,6 +54,8 @@ end)
 (* the terms table *)
 let terms = H.create 251
 
+let iter_terms f = H.iter f terms
+
 (* smart constructors, with type-checking *)
 let mk_var idx sort = H.hashcons terms {term = Var idx; sort=sort}
 let mk_leaf leaf sort = H.hashcons terms {term = Leaf leaf; sort=sort}

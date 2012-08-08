@@ -177,14 +177,9 @@ module NRKBO = struct
 
   let are_invertible l r = false   (* FIXME ignore this case *)
     (*
-    let relocate maxvar varlist subst =
-      List.fold_right
-        (fun i (maxvar, varlist, s) -> 
-           maxvar+1, maxvar::varlist, FoSubst.build_subst i (T.Var maxvar) s)
-        varlist (maxvar+1, [], subst) in
     let varlist = (T.vars_of_term l)@(T.vars_of_term r) in
     let maxvar = List.fold_left max 0 varlist in
-    let _,_,subst = relocate maxvar varlist FoSubst.id_subst in
+    let _,_,subst = FoUtils.relocate maxvar varlist FoSubst.id_subst in
     let newl = FoSubst.apply_subst subst l in
     let newr = FoSubst.apply_subst subst r in
       try (let subst = FoUnif.alpha_eq l newr in

@@ -12,7 +12,6 @@ let get_file () =
   | [] -> failwith "file required."
   | (x::_) -> x
 
-
 (* parse given tptp file *)
 let parse_file f =
   let input = match f with
@@ -23,6 +22,28 @@ let parse_file f =
     Parser_tptp.parse_file Lexer_tptp.token buf
   with _ as e -> close_in input; raise e
 
+(* gather all terms in list *)
+let all_terms () =
+  let l = ref [] in
+  Terms.iter_terms (fun t -> l := t :: !l);
+  !l
+
+(* try to pairwise unify all terms *)
+let unify_all_terms all_terms =
+  let max_var = List.fold_left
+    (fun max_var t -> max max_var (FoUtils.max_var (Terms.vars_of_term t)))
+    0 all_terms in
+  let alt_terms = List.map  (* renamed terms *)
+    (fun t -> FoUtils.fresh_foterm max_var t)
+    all_terms in
+  let pairs = List.fold_left (* all combinations *)
+    (fun pairs_ t ->
+      List.append (List.map (fun t' -> (t, t')) alt_terms) pairs_)
+    [] all_terms
+  in
+  List.iter (fun (t,t') -> Format.printf "  %a -- %a@."
+    Pp.pp_foterm t Pp.pp_foterm t') pairs
+
 let () =
   let f = get_file () in
   Printf.printf "# process file %s\n" f;
@@ -30,4 +51,7 @@ let () =
   let bag = List.fold_left (fun bag c -> fst (Terms.add_to_bag c bag))
     Terms.empty_bag clauses in
   Printf.printf "# parsed %d clauses\n" (List.length clauses);
-  Format.printf "@[<v>%a@]@." Pp.pp_bag bag
+  Format.printf "@[<v>%a@]@." Pp.pp_bag bag;
+  let terms = all_terms () in
+  Format.printf "@[<h>terms: %a@]@." (Pp.pp_list Pp.pp_foterm) terms;
+  unify_all_terms (all_terms ())

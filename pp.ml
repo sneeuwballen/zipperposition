@@ -85,13 +85,13 @@ let string_of_comparison = function
 
 let pp_literal formatter = function
   | T.Equation (left, right, false, _) when right = T.true_term->
-    Format.fprintf formatter "!%a" pp_foterm left
+    Format.fprintf formatter "~%a" pp_foterm left
   | T.Equation (left, right, true, _) when right = T.true_term->
     pp_foterm formatter left
   | T.Equation (left, right, true, _) when left = T.true_term ->
     pp_foterm formatter right
   | T.Equation (left, right, false, _) when left = T.true_term ->
-    Format.fprintf formatter "!%a" pp_foterm right
+    Format.fprintf formatter "~%a" pp_foterm right
   | T.Equation (left, right, sign, ord) ->
     if sign
     then Format.fprintf formatter "@[%a@ %a@ %a@]"

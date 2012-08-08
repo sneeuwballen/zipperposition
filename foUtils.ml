@@ -45,6 +45,17 @@ let rec compare_foterm x y =
   | Terms.Node _, Terms.Var _ -> ~-1
   | Terms.Var _, _ ->  1
 
+(* fresh term, which variables are all > maxvar *)
+let fresh_foterm maxvar t =
+  let _, subst = List.fold_left
+    (fun (offset, subst) ({node={sort=sort}} as var) ->
+      let new_var = Terms.mk_var offset sort in
+      (offset+1, FoSubst.build_subst var new_var ~recursive:false subst))
+    (maxvar+1, FoSubst.id_subst) (Terms.vars_of_term t)
+  in
+  FoSubst.apply_subst ~recursive:false subst t
+
+
 (* ----------------------------------------------------------------------
  * literals
  * ---------------------------------------------------------------------- *)
@@ -83,6 +94,14 @@ let mk_neq ?(comp=default_compare) a b =
 (* negate literal *)
 let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
 
+(* fmap in literal *)
+let fmap_lit ?(comp=default_compare) f = function
+  | Equation (left, right, sign, ord) ->
+    let new_left = f left
+    and new_right = f right in
+    Equation (new_left, new_right, sign, comp new_left new_right)
+
+
 (* ----------------------------------------------------------------------
  * clauses
  * ---------------------------------------------------------------------- *)
@@ -105,6 +124,15 @@ let mk_clause =
       List.fold_left merge_vars [] (List.map vars_of_lits lits)
     and id = (let i = !clause_id in clause_id := i+1; i) in
     (id, lits, all_vars, proof)
+
+(* find the maximum variable index in the varlist *)
+let max_var vars =
+  let rec aux idx = function
+  | [] -> idx
+  | ({node={term=Var i}}::vars) -> aux (max i idx) vars
+  | _::vars -> assert false
+  in
+  aux 0 vars
   
 (* perform renaming to get disjoint variables sets
    relocate [maxvar] [varlist] [subst] -> [newmaxvar] * [varlist] * [relocsubst] *)
@@ -114,7 +142,6 @@ let relocate maxvar varlist subst =
        let new_v = Terms.mk_var maxvar sort in
        maxvar+1, new_v::varlist, Subst.build_subst v new_v s)
     varlist (maxvar+1, [], subst)
-
 
 let fresh_clause maxvar (id, lits, varlist, proof) =
   (* prerr_endline 
@@ -137,6 +164,21 @@ let fresh_clause maxvar (id, lits, varlist, proof) =
   in
   *)
   (id, lits, varlist, proof), maxvar
+
+(* rename clauses and terms so that they have no variable in varlist *)
+let relocate_term varlist t =
+  let idx = max_var varlist in
+  let _, _, subst = relocate idx varlist FoSubst.id_subst in
+  FoSubst.apply_subst subst t
+
+let relocate_clause varlist (id, lits, vars, proof) =
+  let idx = max_var varlist in
+  let _, newvars, subst = relocate idx varlist FoSubst.id_subst in
+  let new_lits = List.map
+    (fun lit -> fmap_lit (FoSubst.apply_subst subst) lit)
+    lits
+  in
+  (id, new_lits, newvars, proof)  (* TODO update proof *)
 
 
 (*

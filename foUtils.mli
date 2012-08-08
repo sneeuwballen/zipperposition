@@ -20,6 +20,8 @@ open Terms
 val eq_foterm : foterm -> foterm -> bool
 (* a simple order on terms *)
 val compare_foterm : foterm -> foterm -> int
+(* fresh term, which variables are all > maxvar *)
+val fresh_foterm : int -> foterm -> foterm
 
 (* equality literals *)
 val eq_literal : literal -> literal -> bool
@@ -35,6 +37,9 @@ val mk_neq : ?comp:(foterm -> foterm -> comparison) ->
               foterm -> foterm -> literal
 (* negate literal *)
 val negate_lit : literal -> literal
+(* fmap in literal *)
+val fmap_lit : ?comp:(foterm -> foterm -> comparison) ->
+               (foterm -> foterm) -> literal -> literal
 
 (* compare clauses *)
 val eq_clause : clause -> clause -> bool
@@ -42,15 +47,24 @@ val compare_clause : clause -> clause -> int
 
 (* build a clause with a new ID *)
 val mk_clause : literal list -> proof -> clause
-
 (* rename a clause w.r.t. maxvar *)
 val fresh_clause : int -> clause -> clause * int
 
-(* perform renaming to get disjoint variables sets
-   relocate [maxvar] [varlist] -> [newmaxvar] * [varlist] * [relocsubst] *)
+(* find the maximum variable index in the varlist *)
+val max_var : varlist -> int
+
+(* perform renaming to get disjoint variables sets,
+   ie the resulting substitution's domain has no common
+   variable with [varlist], and its new domain is newvarlist
+   relocate [maxvar] [varlist] [subst] ->
+   [newmaxvar] * [newvarlist] * [relocsubst] *)
 val relocate : 
       int -> varlist -> substitution -> 
         (int * varlist * substitution)
+
+(* rename clauses and terms so that they have no variable in varlist *)
+val relocate_term : varlist -> foterm -> foterm
+val relocate_clause : varlist -> clause -> clause
 
 (*
 val compare_passive_clauses_weight : passive_clause -> passive_clause -> int

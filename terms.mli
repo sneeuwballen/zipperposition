@@ -35,6 +35,9 @@ and foterm_cell = private
   | Var of int  (* variable *)
   | Node of foterm list  (* term application *)
 
+(* iterate through existing terms *)
+val iter_terms : (foterm -> unit) -> unit
+
 (* smart constructors, with type-checking *)
 val mk_var : int -> sort -> foterm
 val mk_leaf : leaf -> sort -> foterm
