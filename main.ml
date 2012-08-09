@@ -3,7 +3,8 @@
 module Ord = Orderings
 module Utils = FoUtils
 module Unif = FoUnif
-module Index = Index.Index(Orderings.Default)
+
+module I = Index.Index(Orderings.Default)
 
 (* get first file of command line arguments *)
 let get_file () =
@@ -66,6 +67,25 @@ let unify_all_terms all_terms =
         Format.printf "failure.@.")
     pairs
       
+(* create a bag from the given clauses *)
+let make_initial_bag clauses =
+  let b = Terms.empty_bag in
+  List.fold_left (fun b c -> fst (Terms.add_to_bag c b)) b clauses
+
+
+(* print an index *)
+let print_index idx = 
+  let print_dt_path path set =
+    let l = I.ClauseSet.elements set in
+    Format.printf "%s : @[<hov>%a@]@;"
+      (I.FotermIndexable.string_of_path path)
+      (Pp.pp_list ~sep:", " Pp.pp_clause_pos) l
+  in
+  Format.printf "index:@.root_index=@[<v 2>";
+  I.DT.iter idx.I.root_index print_dt_path;
+  Format.printf "@]@;subterm_index=@[<v 2>";
+  I.DT.iter idx.I.subterm_index print_dt_path;
+  Format.printf "@]@;"
 
 let () =
   let f = get_file () in
@@ -77,4 +97,10 @@ let () =
   Format.printf "@[<v>%a@]@." Pp.pp_bag bag;
   let terms = all_terms () in
   Format.printf "@[<h>terms: %a@]@." (Pp.pp_list Pp.pp_foterm) terms;
-  unify_all_terms (all_terms ())
+  (* now for bag testing *)
+  let bag = make_initial_bag clauses in
+  Format.printf "clauses: %a@." Pp.pp_bag bag;
+  (* and indexing *)
+  let index = List.fold_left (fun i c -> I.index_clause i c)
+    I.empty clauses in
+  print_index index

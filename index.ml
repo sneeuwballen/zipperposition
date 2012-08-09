@@ -71,7 +71,12 @@ module Index(Ord : Orderings.S) = struct
       | Bound _, _ | _, Bound _ -> assert false
 
     (* print path into string *)
-    let string_of_path l = String.concat "." (List.map (fun _ -> "*") l)
+    let string_of_path l =
+      let str_of_elem = function
+      | Variable -> "*"
+      | Constant (a, ar) -> Pp.on_buffer Signature.pp_symbol a
+      | _ -> "?"
+      in String.concat "." (List.map str_of_elem l)
   end
 
   (* the discrimination trees used for indexing *)
@@ -120,26 +125,33 @@ module Index(Ord : Orderings.S) = struct
   (* apply (op tree) to all subterms, folding the resulting tree *)
   let rec fold_subterms op tree t (c, path) = match t.node.term with
     | Terms.Var _ -> tree  (* variables are not indexed *)
-    | Terms.Leaf _ -> op tree t (c, List.rev path)
-    | Terms.Node l ->
+    | Terms.Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
+    | Terms.Node (_::l) ->
         (* apply the operation on the term itself *)
         let tmp_tree = op tree t (c, List.rev path) in
         let _, new_tree = List.fold_left
-          (* apply the operation on each i-th subterm with i::path as position *)
+          (* apply the operation on each i-th subterm with i::path
+             as position. i starts at 1 and the function symbol is ignored. *)
           (fun (idx, tree) t -> idx+1, fold_subterms op tree t (c, idx::path))
           (1, tmp_tree) l
         in new_tree
+    | _ -> assert false
+
+  (* apply (op tree) to the root term, after reversing the path *)
+  let apply_root_term op tree t (c, path) = op tree t (c, List.rev path)
 
   (* add root terms and subterms to respective indexes *)
   let index_clause {root_index; subterm_index} clause =
     let new_subterm_index = process (fold_subterms DT.index) subterm_index clause
-    and new_root_index = process DT.index root_index clause
+    and new_root_index = process (apply_root_term DT.index) root_index clause
     in {root_index=new_root_index; subterm_index=new_subterm_index}
  
   (* remove root terms and subterms from respective indexes *)
   let remove_clause {root_index; subterm_index} clause =
-    let new_subterm_index = process (fold_subterms DT.remove_index) subterm_index clause
-    and new_root_index = process DT.remove_index root_index clause
+    let new_subterm_index =
+      process (fold_subterms DT.remove_index) subterm_index clause
+    and new_root_index =
+      process (apply_root_term DT.remove_index) root_index clause
     in {root_index=new_root_index; subterm_index=new_subterm_index}
 
   let fold = DT.fold 
@@ -148,5 +160,6 @@ module Index(Ord : Orderings.S) = struct
     DT.fold index (fun _ dataset acc -> ClauseSet.union dataset acc)
       ClauseSet.empty
     
-  type active_set = Terms.clause list * DT.t
+  (* an active set contains a list of clauses and an index on those clauses *)
+  type active_set = Terms.clause list * t
 end

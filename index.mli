@@ -55,7 +55,6 @@ module Index (Ord : Orderings.S) :
 
     val elems : DT.t -> ClauseSet.t
 
-    (* TODO what does this mean? why a DT with a single clause? *)
-    type active_set = Terms.clause list * DT.t
-
+    (* an active set contains a list of clauses and an index on those clauses *)
+    type active_set = Terms.clause list * t
   end

@@ -225,6 +225,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
           (List.flatten (List.map 
             (fun (x,_) -> A.elements x) (merge (S.elements t))))
 
+      (* TODO why not use Set.inter? *)
       let inter t1 t2 =
         let l1 = merge (S.elements t1) in
         let l2 = merge (S.elements t2) in

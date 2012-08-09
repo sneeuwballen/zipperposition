@@ -25,6 +25,8 @@ val pp_substitution: Format.formatter -> Terms.substitution -> unit
 
 val pp_clause : Format.formatter -> Terms.clause -> unit
 
+val pp_clause_pos : Format.formatter -> (Terms.clause * Terms.position) -> unit
+
 val pp_bag: Format.formatter -> Terms.bag -> unit
 
 (* print into a string *)

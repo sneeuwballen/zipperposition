@@ -104,12 +104,16 @@ let pp_clause formatter (id, lits, vars, _) =
   Format.fprintf formatter "@[<hv 2>%a@]"
     (pp_list ~sep:" | " pp_literal) lits
 
+let pp_clause_pos formatter (c, pos) =
+  Format.fprintf formatter "[%a at @[<h>%a@]]@;"
+  pp_clause c (pp_list ~sep:"." Format.pp_print_int) pos
+
 let pp_bag formatter bag =
-  Format.fprintf formatter "@[<v>";
+  Format.fprintf formatter "@[<v>((*) mean active, (_) discarded)@;";
   Terms.M.iter
     (fun _ (c,d,_) -> pp_clause formatter c;
-       if d then Format.fprintf formatter " (discarded)@;"
-       else Format.fprintf formatter "@;") bag.bag_clauses;
+       if d then Format.fprintf formatter " (_)@;"
+       else Format.fprintf formatter " (*)@;") bag.bag_clauses;
   Format.fprintf formatter "@]"
 
 (* String buffer implementation *)
