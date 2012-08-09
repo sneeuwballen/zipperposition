@@ -46,40 +46,39 @@ module type Indexable = sig
 end
 
 module type DiscriminationTree  =
-    sig
+  sig
+    type input    (* indexed type *)
+    type data     (* value associated with input *)
+    type dataset  (* set of such values *)
+    type constant_name  (* constant terms (leaves) *)
+    type t        (* the tree itself *)
 
-      type input 
-      type data
-      type dataset
-      type constant_name
+    val iter : t -> (constant_name path -> dataset -> unit) -> unit
+    val fold : t -> (constant_name path -> dataset -> 'b -> 'b) -> 'b -> 'b
+
+    val empty : t
+    val index : t -> input -> data -> t
+    val remove_index : t -> input -> data -> t
+    val in_index : t -> input -> (data -> bool) -> bool
+    val retrieve_generalizations : t -> input -> dataset
+    val retrieve_unifiables : t -> input -> dataset
+
+    (* the int is the number of symbols that matched, note that
+     * Collector.to_list returns a sorted list, biggest matches first. *)
+    module type Collector = sig
       type t
-
-      val iter : t -> (constant_name path -> dataset -> unit) -> unit
-      val fold : t -> (constant_name path -> dataset -> 'b -> 'b) -> 'b -> 'b
-
       val empty : t
-      val index : t -> input -> data -> t
-      val remove_index : t -> input -> data -> t
-      val in_index : t -> input -> (data -> bool) -> bool
-      val retrieve_generalizations : t -> input -> dataset
-      val retrieve_unifiables : t -> input -> dataset
-
-      (* the int is the number of symbools that matched, note that
-       * Collector.to_list returns a sorted list, biggest matches first. *)
-      module type Collector = sig
-        type t
-        val empty : t
-        val union : t -> t -> t
-        val inter : t -> t -> data list
-        val to_list : t -> data list
-      end
-      module Collector : Collector
-      val retrieve_generalizations_sorted : t -> input -> Collector.t
-      val retrieve_unifiables_sorted : t -> input -> Collector.t
+      val union : t -> t -> t
+      val inter : t -> t -> data list
+      val to_list : t -> data list
     end
+    module Collector : Collector
+    val retrieve_generalizations_sorted : t -> input -> Collector.t
+    val retrieve_unifiables_sorted : t -> input -> Collector.t
+  end
 
 
 module Make (I : Indexable) (A : Set.S) : DiscriminationTree 
-with type constant_name = I.constant_name and type input = I.input
-and type data = A.elt and type dataset = A.t
+  with  type constant_name = I.constant_name and type input = I.input
+    and type data = A.elt and type dataset = A.t
 
