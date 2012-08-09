@@ -15,5 +15,4 @@ eprover --cnf "$INPUT" --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
 echo "# run prover"
 ./main.native "$TMPFILE"
 
-echo "# clean up $TMPFILE"
-rm -f "$TMPFILE"
+trap 'echo "# clean up $TMPFILE" && rm -f "$TMPFILE"' EXIT
