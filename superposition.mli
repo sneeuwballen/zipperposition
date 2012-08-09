@@ -71,7 +71,7 @@ module Superposition (B : Orderings.Blob) :
       int ->
       B.t Terms.bag * (B.t Terms.unit_clause * Index.Index(B).active_set) option
 
-    val  orphan_murder:
+    val orphan_murder:
       B.t Terms.bag ->
       B.t Terms.unit_clause list ->
       B.t Terms.unit_clause ->

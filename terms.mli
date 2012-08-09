@@ -29,6 +29,7 @@ type foterm = typed_term Hashcons.hash_consed
 and typed_term = private {
   term : foterm_cell;   (* the term itself *)
   sort : sort;          (* the sort of the term *)
+  vars : foterm list Lazy.t;   (* the variables of the term *)
 }
 and foterm_cell = private
   | Leaf of leaf  (* constant *)
