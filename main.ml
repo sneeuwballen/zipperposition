@@ -3,6 +3,7 @@
 module Ord = Orderings
 module Utils = FoUtils
 module Unif = FoUnif
+module Index = Index.Index(Orderings.Default)
 
 (* get first file of command line arguments *)
 let get_file () =
@@ -21,6 +22,20 @@ let parse_file f =
     let buf = Lexing.from_channel input in
     Parser_tptp.parse_file Lexer_tptp.token buf
   with _ as e -> close_in input; raise e
+
+(* parse a string in a clause list option *)
+let parse_string s =
+  let buf = Lexing.from_string s in
+  try
+    Some (fst (Parser_tptp.parse_file Lexer_tptp.token buf))
+  with _ -> None
+
+(* parse a string into a term option *)
+let parse_term_str s =
+  let buf = Lexing.from_string s in
+  try
+    Some (Parser_tptp.term Lexer_tptp.token buf)
+  with _ -> None
 
 (* gather all terms in list *)
 let all_terms () =
@@ -41,8 +56,16 @@ let unify_all_terms all_terms =
       List.append (List.map (fun t' -> (t, t')) alt_terms) pairs_)
     [] all_terms
   in
-  List.iter (fun (t,t') -> Format.printf "  %a -- %a@."
-    Pp.pp_foterm t Pp.pp_foterm t') pairs
+  List.iter
+    (fun (t, t') ->
+      Format.printf "  unify %a %a ... " Pp.pp_foterm t Pp.pp_foterm t';
+      try
+        let subst = FoUnif.unification t t' in
+        Format.printf "success, %a@." Pp.pp_substitution subst
+      with FoUnif.UnificationFailure _ ->
+        Format.printf "failure.@.")
+    pairs
+      
 
 let () =
   let f = get_file () in

@@ -17,8 +17,7 @@ val id_subst : Terms.substitution
 
 (* add v -> t to the substitution. If recursive is true,
  * then v -> subst(t) is considered instead.
- * If v occurs in t, OccurCheck (v,t) is raised.
- *)
+ * If v occurs in t, OccurCheck (v,t) is raised. *)
 val build_subst : Terms.foterm -> Terms.foterm -> ?recursive:bool ->
                   Terms.substitution -> Terms.substitution
 

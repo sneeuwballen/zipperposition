@@ -16,14 +16,10 @@ exception OccurCheck of (Terms.foterm * Terms.foterm)
 
 let id_subst = []
 
-let lookup var subst = match var.node.term with
-  | Var _ ->
-    let rec do_lookup var subst =
-      match subst with
-        | [] -> var
-        | ((v,t) :: tail) -> if v == var then t else do_lookup var tail
-    in do_lookup var subst
-  | _ -> assert false
+let rec lookup var subst = match subst with
+  | [] -> var
+  | ((v,t) :: tail) ->
+      if Terms.eq_foterm v var then t else lookup var tail
 
 let is_in_subst var subst = lookup var subst != var
 
@@ -43,28 +39,35 @@ let rec reloc_subst subst t = match t.node.term with
   | (Terms.Node l) ->
       Terms.mk_node (List.map (fun t -> reloc_subst subst t) l)
 
-let rec apply_subst subst ?(recursive=false) t = match t.node.term with
+let rec apply_subst subst ?(recursive=true) t = match t.node.term with
   | Terms.Leaf _ -> t
   | Terms.Var _ ->
       let new_t = lookup t subst in
       if recursive then apply_subst subst ~recursive new_t else new_t
   | Terms.Node l ->
-      Terms.mk_node (List.map (fun t -> apply_subst subst t) l)
+      Terms.mk_node (List.map (fun t -> apply_subst subst ~recursive t) l)
 
 (* add v -> t to the substitution. If recursive is true,
  * then v -> subst(t) is considered instead.
  * If v occurs in t, OccurCheck (v,t) is raised.
  *)
-let build_subst v t ?(recursive=true) tail =
+let build_subst v t ?(recursive=false) tail =
   if recursive
     then (
       let new_t = apply_subst ~recursive tail t in
-      if Terms.member_term v new_t then raise (OccurCheck (v, new_t));
-      (v, new_t) :: tail )
-    else
-      (v,t) :: tail
+      (* v -> v, no need to add to subst *)
+      if Terms.eq_foterm v new_t then tail
+      (* v -> t[v], not well-formed substitution *)
+      else if Terms.member_term v new_t then raise (OccurCheck (v, new_t))
+      (* append to list *)
+      else (v, new_t) :: tail )
+    else if Terms.eq_foterm v t
+      then tail
+      else (v,t) :: tail
 
-let flat subst = List.map (fun (x,t) -> (x, apply_subst subst t)) subst
+(* normalize the substitution, such that subst(subst(v)) = subst(v)
+ * for all v. The result is idempotent. *)
+let flat subst = List.map (fun (x, t) -> (x, apply_subst subst t)) subst
 
 let concat x y = x @ y
 

@@ -49,6 +49,8 @@ val true_term : foterm  (* tautology symbol *)
 
 (* membership: [a] [b] checks if a subterm of b *)
 val member_term : foterm -> foterm -> bool 
+(* standard equality on terms *)
+val eq_foterm : foterm -> foterm -> bool
 
 (* cast (change sort) *)
 val cast : foterm -> sort -> foterm
@@ -64,10 +66,12 @@ type substitution = (foterm * foterm) list
 type comparison = Lt | Eq | Gt | Incomparable | Invertible
 (* direction of an equation (for rewriting) *)
 type direction = Left2Right | Right2Left | Nodir
-(* side of an equation *)
-type side = LeftSide | RightSide
 (* position in a term *)
 type position = int list
+
+(* left and right position in equation *)
+val left_pos : int
+val right_pos : int
 
 (* a literal, that is, a signed equation *)
 type literal = 
@@ -87,7 +91,7 @@ and proof = Axiom of string | Proof of rule * proof_clauses
 (* an inference rule name *)
 and rule = string
 (* a list of terms in clauses involved in an inference *)
-and proof_clauses = (clause * int * side * position) list
+and proof_clauses = (clause * position * substitution) list
 
 module M : Map.S with type key = int 
 

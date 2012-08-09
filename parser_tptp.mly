@@ -132,6 +132,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %start parse_file
 %type <Terms.clause list * string list> parse_file
 
+%start term
+%type <Terms.foterm> term
 
 %%
 

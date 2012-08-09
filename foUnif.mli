@@ -17,7 +17,7 @@ exception UnificationFailure of string Lazy.t
 val unification: Terms.foterm -> Terms.foterm -> Terms.substitution
 
 (* match_term [a] [b] returns sigma such that sigma(a) = b *)
-val match_term: Terms.foterm -> Terms.foterm -> Terms.substitution
+val matching: Terms.foterm -> Terms.foterm -> Terms.substitution
 
 (* alpha_eq [a] [b] returns sigma with sigma(a) = b, and sigma
  * a variable renaming, or raise UnificationFailure *)

@@ -72,6 +72,8 @@ let true_term = mk_leaf Signature.true_symbol bool_sort (* tautology term *)
 let rec member_term a b = a == b || match b.node.term with
   | Leaf _ | Var _ -> false
   | Node subterms -> List.exists (member_term a) subterms
+(* hashconsing! *)
+let eq_foterm x y = x == y
 
 (* cast (change sort) *)
 let cast t sort = H.hashcons terms { t.node with sort=sort; }
@@ -94,10 +96,12 @@ type substitution = (foterm * foterm) list
 type comparison = Lt | Eq | Gt | Incomparable | Invertible
 (* direction of an equation (for rewriting) *)
 type direction = Left2Right | Right2Left | Nodir
-(* side of an equation *)
-type side = LeftSide | RightSide
 (* position in a term *)
 type position = int list
+
+(* left and right position in equation *)
+let left_pos = 1
+let right_pos = 2
 
 (* a literal, that is, a signed equation *)
 type literal = 
@@ -117,7 +121,7 @@ and proof = Axiom of string | Proof of rule * proof_clauses
 (* an inference rule name *)
 and rule = string
 (* a list of terms in clauses involved in an inference *)
-and proof_clauses = (clause * int * side * position) list
+and proof_clauses = (clause * position * substitution) list
 
 module OT =
  struct

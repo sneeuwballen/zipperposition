@@ -38,9 +38,10 @@ let string_of_direction = function
     | T.Right2Left -> "Right to left"
     | T.Nodir -> "No direction"
 
-let string_of_side = function
-    | T.LeftSide -> "LeftSide"
-    | T.RightSide -> "RightSide"
+let string_of_pos s = match s with
+  | _ when s == T.left_pos -> "left"
+  | _ when s == T.right_pos -> "right"
+  | _ -> assert false
 
 (* print substitution *)
 let pp_substitution formatter subst =
