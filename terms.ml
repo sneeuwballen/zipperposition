@@ -102,6 +102,11 @@ type varlist = foterm list
 (* free variables in the term *)
 let vars_of_term t = Lazy.force t.node.vars
 
+(* is the term ground? *)
+let is_ground_term t = match vars_of_term t with
+  | [] -> true
+  | _ -> false
+
 (* substitution, a list of variables -> term *)
 type substitution = (foterm * foterm) list
 

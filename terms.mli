@@ -59,6 +59,8 @@ val cast : foterm -> sort -> foterm
 type varlist = foterm list
 (* free variables in the term *)
 val vars_of_term : foterm -> varlist
+(* is the term ground? *)
+val is_ground_term : foterm -> bool
 
 (* substitution, a list of variables -> term *)
 type substitution = (foterm * foterm) list
