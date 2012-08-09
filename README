@@ -1,5 +1,8 @@
-This is under GPL license.
+This is intended to be a superposition prover for full first order logic. The accent
+is on flexibility, modularity and simplicity rather than performance, to allow
+quick experimenting on automated theorem proving. It may at some point generate
+proofs.
 
-Some files come from matita, the TPTP parser is from Darwin, the hashcons
+Some files come from matita, the TPTP parser/lexer are from Darwin, the hashcons
 module comes from Jean-Christophe Filliâtre. Since all of them are under GPL,
-the present software is also under GPL.
+the present software is also under GPLv2.
