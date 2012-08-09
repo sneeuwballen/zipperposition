@@ -11,74 +11,83 @@
 
 (* $Id: index.mli 9822 2009-06-03 15:37:06Z tassi $ *)
 
-module Superposition (B : Orderings.Blob) : 
+module type InferenceContext =
   sig
+    module Ord : Orderings.S
+    module Idx : Index.Index(Ord)
+  end
 
-                        (* bag, maxvar, meeting point *)
+module Superposition (Ctx : InferenceContext) :
+  sig
+    module Ord = Ctx.Ord
+    module Idx = Ctx.Idx
+
+    (* bag, maxvar, empty clause *)
     exception Success of 
-      B.t Terms.bag 
+      Terms.bag 
       * int 
-      * B.t Terms.unit_clause
-      * B.t Terms.substitution
+      * Terms.clause
 
     (* The returned active set is the input one + the selected clause *)
     val infer_right :
-          B.t Terms.bag -> 
-          int -> (* maxvar *)
-          B.t Terms.unit_clause -> (* selected passive *)
-          Index.Index(B).active_set ->
-            B.t Terms.bag * int * Index.Index(B).active_set * B.t Terms.unit_clause list
+      Terms.bag -> 
+      int -> (* maxvar *)
+      Terms.clause -> (* selected passive *)
+      Idx.active_set ->
+      Terms.bag * int * Idx.active_set * Terms.clause list
 
     val infer_left :  
-          B.t Terms.bag -> 
-          int -> (* maxvar *)
-          B.t Terms.unit_clause -> (* selected goal *)
-          Index.Index(B).active_set ->
-            B.t Terms.bag * int * B.t Terms.unit_clause list
+      Terms.bag -> 
+      int -> (* maxvar *)
+      Terms.clause -> (* selected goal *)
+      Idx.active_set ->
+      Terms.bag * int * Terms.unit_clause list
 
     val demodulate : 
-          B.t Terms.bag ->
-          B.t Terms.unit_clause ->
-          Index.Index(B).DT.t -> B.t Terms.bag * B.t Terms.unit_clause
+      Terms.bag ->
+      Terms.clause ->
+      Idx.DT.t ->  (* index of unit clauses *)
+      Terms.bag * Terms.clause
 
     val simplify : 
-          Index.Index(B).DT.t ->
-          int ->
-          B.t Terms.bag ->
-          B.t Terms.unit_clause ->
-            B.t Terms.bag * (B.t Terms.unit_clause option)
+      Idx.DT.t ->
+      int ->
+      Terms.bag ->
+      Terms.clause ->
+      Terms.bag * (Terms.clause option)
 
     (* may raise success *)
     val simplify_goal :
-          no_demod:bool ->
-          int ->
-          Index.Index(B).DT.t ->
-          B.t Terms.bag ->
-          B.t Terms.unit_clause list ->
-          B.t Terms.unit_clause ->
-            (B.t Terms.bag * B.t Terms.unit_clause) option
+      no_demod:bool ->
+      int ->
+      Idx.DT.t ->
+      Terms.bag ->
+      Terms.clause list ->
+      Terms.clause ->
+      (Terms.bag * Terms.clause) option
 
     val one_pass_simplification:
-      B.t Terms.unit_clause ->
-      Index.Index(B).active_set ->
-      B.t Terms.bag ->
+      Terms.unit_clause ->
+      Idx.active_set ->
+      Terms.bag ->
       int ->
-      B.t Terms.bag * (B.t Terms.unit_clause * Index.Index(B).active_set) option
+      Terms.bag * (Terms.clause * Idx.active_set) option
+
     val keep_simplified:
-      B.t Terms.unit_clause ->
-      Index.Index(B).active_set ->
-      B.t Terms.bag ->
+      Terms.clause ->
+      Idx.active_set ->
+      Terms.bag ->
       int ->
-      B.t Terms.bag * (B.t Terms.unit_clause * Index.Index(B).active_set) option
+      Terms.bag * (Terms.clause * Idx.active_set) option
 
     val orphan_murder:
-      B.t Terms.bag ->
-      B.t Terms.unit_clause list ->
-      B.t Terms.unit_clause ->
+      Terms.bag ->
+      Terms.clause list ->
+      Terms.clause ->
       bool
 
     val are_alpha_eq : 
-      B.t Terms.unit_clause ->
-      B.t Terms.unit_clause ->
+      Terms.unit_clause ->
+      Terms.unit_clause ->
       bool
   end
