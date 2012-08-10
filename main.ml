@@ -3,6 +3,8 @@
 module Utils = FoUtils
 module Unif = FoUnif
 module CQ = ClauseQueue
+module PState = ProofState
+module I = Index
 
 (* get first file of command line arguments *)
 let get_file () =
@@ -69,10 +71,6 @@ let unify_all_terms all_terms =
 let make_initial_bag clauses =
   let b = Terms.empty_bag in
   List.fold_left (fun b c -> fst (Terms.add_to_bag c b)) b clauses
-
-(* TODO remove *)
-module O = Orderings.Default
-module I = Index.Index(O)
 
 (* print an index *)
 let print_index idx = 
