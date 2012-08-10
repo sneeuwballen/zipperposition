@@ -391,4 +391,4 @@ class lpo : ordering =
     method name = LPO.name
   end
 
-class default = lpo
+let default = new lpo

@@ -138,7 +138,7 @@ let max_var vars =
    relocate [maxvar] [varlist] [subst] -> [newmaxvar] * [varlist] * [relocsubst] *)
 let relocate maxvar varlist subst =
   List.fold_right
-    (fun ({node={T.term=T.Var _; T.sort=sort}} as v) (maxvar, varlist, s) -> 
+    (fun ({node={T.sort=sort}} as v) (maxvar, varlist, s) -> 
        let new_v = T.mk_var maxvar sort in
        maxvar+1, new_v::varlist, Subst.build_subst v new_v s)
     varlist (maxvar+1, [], subst)

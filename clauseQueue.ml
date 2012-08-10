@@ -18,7 +18,7 @@ module HeapQueue(Ord : HeapQueueOrd) =
 
     (* the functor contains a class implementation *)
     class q =
-      object (self)
+      object
         val heap = H.empty
         
         method is_empty = H.is_empty heap

@@ -63,4 +63,4 @@ class kbo : ordering
 
 class lpo : ordering
 
-class default : ordering
+val default : ordering
