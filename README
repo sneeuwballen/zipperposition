@@ -3,6 +3,6 @@ is on flexibility, modularity and simplicity rather than performance, to allow
 quick experimenting on automated theorem proving. It may at some point generate
 proofs.
 
-Some files come from matita, the TPTP parser/lexer are from Darwin, the hashcons
-module comes from Jean-Christophe Filliâtre. Since all of them are under GPL,
+Some files come from matita, the TPTP parser/lexer are from Darwin, some datastructures
+are from Jean-Christophe Filliâtre (Hashcons, Leftistheap). Since all of them are under GPL,
 the present software is also under GPLv2.
