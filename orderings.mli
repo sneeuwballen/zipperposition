@@ -11,6 +11,12 @@
 
 (* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
 
+(* ----------------------------------------------------------------------
+ module interface
+ ---------------------------------------------------------------------- *)
+
+val compute_clause_weight : Terms.clause -> int
+
 module type S =
   sig 
     type foterm = Terms.foterm
@@ -37,3 +43,24 @@ module LPO  : S
 
 (* default ordering (LPO) *)
 module Default : S
+
+(* ----------------------------------------------------------------------
+ class interface
+ ---------------------------------------------------------------------- *)
+
+
+(* the interface of a type *)
+class type ordering =
+  object
+    method compare_terms : Terms.foterm -> Terms.foterm -> Terms.comparison
+    method compute_clause_weight : Terms.clause -> int
+    method name : string
+  end
+
+class nrkbo : ordering
+
+class kbo : ordering
+
+class lpo : ordering
+
+class default : ordering
