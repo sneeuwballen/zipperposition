@@ -11,7 +11,8 @@
 
 (* $Id: index.ml 11696 2011-11-21 09:42:44Z asperti $ *)
 
-open Terms
+module T = Terms
+open T
 open Hashcons
 
 module Index(Ord : Orderings.S) = struct
@@ -21,7 +22,7 @@ module Index(Ord : Orderings.S) = struct
   (* an order on clauses+positions *)
   module ClauseOT =
     struct 
-      type t = Terms.clause * Terms.position
+      type t = T.clause * T.position
  
       let compare (c1, p1) (c2, p2) = 
         let c = Pervasives.compare p1 p2 in
@@ -33,25 +34,25 @@ module Index(Ord : Orderings.S) = struct
    * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
    * where ... is the path in the term *)
   module ClauseSet : Set.S with 
-    type elt = Terms.clause * Terms.position
+    type elt = T.clause * T.position
     = Set.Make(ClauseOT)
 
   open Discrimination_tree
 
   module FotermIndexable = struct
-    type input = Terms.foterm
+    type input = T.foterm
     type constant_name = Signature.symbol
 
     (* convert into a path string *)
     let path_string_of t =
       let rec aux arity t = match t.node.term with
-        | Terms.Leaf a -> [Constant (a, arity)]
-        | Terms.Var i -> (* assert (arity = 0); *) [Variable]
-        | Terms.Node ([] | [ _ ] )
+        | T.Leaf a -> [Constant (a, arity)]
+        | T.Var i -> (* assert (arity = 0); *) [Variable]
+        | T.Node ([] | [ _ ] )
         (* FIXME : should this be allowed or not ? *)
-        | Terms.Node ({node={term=Terms.Var _}}::_)
-        | Terms.Node ({node={term=Terms.Node _}}::_) -> assert false
-        | Terms.Node (hd::tl) ->
+        | T.Node ({node={term=T.Var _}}::_)
+        | T.Node ({node={term=T.Node _}}::_) -> assert false
+        | T.Node (hd::tl) ->
             aux (List.length tl) hd @ List.flatten (List.map (aux 0) tl) 
       in 
         aux 0 t
@@ -82,7 +83,7 @@ module Index(Ord : Orderings.S) = struct
   (* the discrimination trees used for indexing *)
   module DT : DiscriminationTree with
     type constant_name = Signature.symbol and 
-    type input = Terms.foterm and 
+    type input = T.foterm and 
     type data = ClauseSet.elt and 
     type dataset = ClauseSet.t
   = Make(FotermIndexable)(ClauseSet)
@@ -103,19 +104,19 @@ module Index(Ord : Orderings.S) = struct
   let empty = { root_index=DT.empty; subterm_index=DT.empty }
   
   (* apply op to some of the literals of the clause. *)
-  let process op tree ((_, lits, _, _) as c) =
+  let process op tree ({T.clits=lits} as c) =
     let process_lit (pos, tree) lit =
       let new_tree = match lit with
-      | Terms.Equation (l,_,_,Terms.Gt) -> 
-          op tree l (c, [Terms.left_pos; pos])
-      | Terms.Equation (_,r,_,Terms.Lt) -> 
-          op tree r (c, [Terms.right_pos; pos])
-      | Terms.Equation (l,r,_,Terms.Incomparable) ->
-          let tmp_tree = op tree l (c, [Terms.left_pos; pos]) in
-          op tmp_tree r (c, [Terms.right_pos; pos])
-      | Terms.Equation (l,r,_,Terms.Invertible) ->
-          op tree l (c, [Terms.left_pos; pos])
-      | Terms.Equation (_,r,_,Terms.Eq) -> assert false
+      | T.Equation (l,_,_,T.Gt) -> 
+          op tree l (c, [T.left_pos; pos])
+      | T.Equation (_,r,_,T.Lt) -> 
+          op tree r (c, [T.right_pos; pos])
+      | T.Equation (l,r,_,T.Incomparable) ->
+          let tmp_tree = op tree l (c, [T.left_pos; pos]) in
+          op tmp_tree r (c, [T.right_pos; pos])
+      | T.Equation (l,r,_,T.Invertible) ->
+          op tree l (c, [T.left_pos; pos])
+      | T.Equation (_,r,_,T.Eq) -> assert false
       and new_pos = pos+1
       in (new_pos, new_tree)
     in
@@ -124,9 +125,9 @@ module Index(Ord : Orderings.S) = struct
   
   (* apply (op tree) to all subterms, folding the resulting tree *)
   let rec fold_subterms op tree t (c, path) = match t.node.term with
-    | Terms.Var _ -> tree  (* variables are not indexed *)
-    | Terms.Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
-    | Terms.Node (_::l) ->
+    | T.Var _ -> tree  (* variables are not indexed *)
+    | T.Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
+    | T.Node (_::l) ->
         (* apply the operation on the term itself *)
         let tmp_tree = op tree t (c, List.rev path) in
         let _, new_tree = List.fold_left
@@ -161,5 +162,5 @@ module Index(Ord : Orderings.S) = struct
       ClauseSet.empty
     
   (* an active set contains a list of clauses and an index on those clauses *)
-  type active_set = Terms.clause list * t
+  type active_set = T.clause list * t
 end

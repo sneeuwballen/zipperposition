@@ -129,26 +129,22 @@ type literal =
                 * comparison (* orientation *)
 
 (* a first order clause *)
-type clause =
-    int (* ID *)
-  * literal list  (* the equations *)
-  * foterm list  (* the free variables *)
-  * proof (* the proof for this clause *)
+type clause = {
+  cid : int;            (* ID *)
+  clits : literal list; (* the equations *)
+  cvars : foterm list;  (* the free variables *)
+  cproof : proof;      (* the proof for this clause *)
+}
 (* a proof step for a clause *)
-and proof = Axiom of string | Proof of rule * proof_clauses
-(* an inference rule name *)
-and rule = string
-(* a list of terms in clauses involved in an inference *)
-and proof_clauses = (clause * position * substitution) list
-
-module OT =
- struct
-   type t = int
-   let compare = Pervasives.compare
- end
+and proof = Axiom of string
+          | Proof of string * (clause * position * substitution) list
 
 module M : Map.S with type key = int
-  = Map.Make(OT)
+  = Map.Make(
+     struct
+       type t = int
+       let compare = Pervasives.compare
+     end)
 
 (* multiset of clauses *)
 type bag = {
@@ -157,14 +153,15 @@ type bag = {
 }
 
 (* also gives a fresh ID to the clause *)
-let add_to_bag (_,lit,vl,proof) bag =
+let add_to_bag c bag =
   let id = bag.bag_id+1 in
-  let clause = (id, lit, vl, proof) in
+  let clause = {c with cid=id} in
   let new_bag = {bag_id=id;
+                 (* FIXME is this false,0 or true,id ? *)
                  bag_clauses=M.add id (clause,false,0) bag.bag_clauses} in
   new_bag, clause
 
-let replace_in_bag ((id,_,_,_),_,_ as cl) bag =
+let replace_in_bag ({cid=id},_,_ as cl) bag =
   let new_clauses = M.add id cl bag.bag_clauses in
     { bag with bag_clauses = new_clauses }
 

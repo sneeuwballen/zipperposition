@@ -11,6 +11,10 @@
 
 (* $Id: orderings.ml 10997 2010-10-17 09:12:29Z tassi $ *)
 
+(* ----------------------------------------------------------------------
+ module interface
+ ---------------------------------------------------------------------- *)
+
 type aux_comparison = XEQ | XLE | XGE | XLT | XGT | XINCOMPARABLE | XINVERTIBLE
 
 module type S =
@@ -67,7 +71,7 @@ let weight_of_term term =
     in 
     (w, List.sort compare l) (* from the smallest meta to the bigest *)
 
-let compute_clause_weight (_,lits, _, _) = 
+let compute_clause_weight {T.clits=lits} = 
     let rec weight_of_polynomial w m =
       let factor = 2 in      
       w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
@@ -354,3 +358,37 @@ end
 
 (* default ordering (LPO) *)
 module Default = LPO
+
+(* ----------------------------------------------------------------------
+ class interface
+ ---------------------------------------------------------------------- *)
+
+class type ordering =
+  object
+    method compare_terms : T.foterm -> T.foterm -> T.comparison
+    method compute_clause_weight : T.clause -> int
+    method name : string
+  end
+
+class nrkbo : ordering =
+  object
+    method compare_terms a b = NRKBO.compare_terms a b
+    method compute_clause_weight c = NRKBO.compute_clause_weight c
+    method name = NRKBO.name
+  end
+
+class kbo : ordering =
+  object
+    method compare_terms a b = KBO.compare_terms a b
+    method compute_clause_weight c = KBO.compute_clause_weight c
+    method name = KBO.name
+  end
+
+class lpo : ordering =
+  object
+    method compare_terms a b = LPO.compare_terms a b
+    method compute_clause_weight c = LPO.compute_clause_weight c
+    method name = LPO.name
+  end
+
+class default = lpo

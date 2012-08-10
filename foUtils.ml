@@ -24,7 +24,7 @@ let rec lexicograph f l1 l2 =
 module Subst = FoSubst
 module Order = Orderings
 
-open Terms
+module T = Terms
 open Hashcons
 
 (* ----------------------------------------------------------------------
@@ -36,22 +36,22 @@ let eq_foterm x y = x == y
 
 (* lexicographic comparison *)
 let rec compare_foterm x y =
-  match x.node.term, y.node.term with
-  | Terms.Leaf t1, Terms.Leaf t2 -> Signature.compare t1 t2
-  | Terms.Var i, Terms.Var j -> i - j
-  | Terms.Node l1, Terms.Node l2 -> lexicograph compare_foterm l1 l2
-  | Terms.Leaf _, ( Terms.Node _ | Terms.Var _ ) -> ~-1
-  | Terms.Node _, Terms.Leaf _ -> 1
-  | Terms.Node _, Terms.Var _ -> ~-1
-  | Terms.Var _, _ ->  1
+  match x.node.T.term, y.node.T.term with
+  | T.Leaf t1, T.Leaf t2 -> Signature.compare t1 t2
+  | T.Var i, T.Var j -> i - j
+  | T.Node l1, T.Node l2 -> lexicograph compare_foterm l1 l2
+  | T.Leaf _, ( T.Node _ | T.Var _ ) -> ~-1
+  | T.Node _, T.Leaf _ -> 1
+  | T.Node _, T.Var _ -> ~-1
+  | T.Var _, _ ->  1
 
 (* fresh term, which variables are all > maxvar *)
 let fresh_foterm maxvar t =
   let _, subst = List.fold_left
-    (fun (offset, subst) ({node={sort=sort}} as var) ->
-      let new_var = Terms.mk_var offset sort in
+    (fun (offset, subst) ({node={T.sort=sort}} as var) ->
+      let new_var = T.mk_var offset sort in
       (offset+1, FoSubst.build_subst var new_var ~recursive:false subst))
-    (maxvar+1, FoSubst.id_subst) (Terms.vars_of_term t)
+    (maxvar+1, FoSubst.id_subst) (T.vars_of_term t)
   in
   FoSubst.apply_subst ~recursive:false subst t
 
@@ -63,13 +63,13 @@ let fresh_foterm maxvar t =
 (* equaliy of literals *)
 let eq_literal l1 l2 =
   match l1, l2 with
-  | Terms.Equation (l1,r1,sign1,o1), Terms.Equation (l2,r2,sign2,o2) ->
+  | T.Equation (l1,r1,sign1,o1), T.Equation (l2,r2,sign2,o2) ->
       o1 = o2 && eq_foterm l1 l2 && eq_foterm r1 r2 && sign1 = sign2
 
 (* lexicographic comparison of literals *)
 let compare_literal l1 l2 =
   match l1, l2 with
-  | Terms.Equation (l1,r1,sign1,o1), Terms.Equation (l2,r2,sign2,o2) ->
+  | T.Equation (l1,r1,sign1,o1), T.Equation (l2,r2,sign2,o2) ->
       let c = Pervasives.compare o1 o2 in
       if c <> 0 then c else
         let c = compare_foterm l1 l2 in
@@ -78,28 +78,28 @@ let compare_literal l1 l2 =
           if c <> 0 then c else
             Pervasives.compare sign1 sign2
 
-let check_type a b = if a.node.sort <> b.node.sort
-  then raise (SortError "sides of equations of different sorts") else ()
+let check_type a b = if a.node.T.sort <> b.node.T.sort
+  then raise (T.SortError "sides of equations of different sorts") else ()
 
 let default_compare = Orderings.Default.compare_terms
 
 let mk_eq ?(comp=default_compare) a b =
   check_type a b;
-  Equation (a, b, true, comp a b)
+  T.Equation (a, b, true, comp a b)
 
 let mk_neq ?(comp=default_compare) a b = 
   check_type a b;
-  Equation (a, b, false, comp a b)
+  T.Equation (a, b, false, comp a b)
 
 (* negate literal *)
-let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
+let negate_lit (T.Equation (l,r,sign,ord)) = T.Equation (l,r,not sign,ord)
 
 (* fmap in literal *)
 let fmap_lit ?(comp=default_compare) f = function
-  | Equation (left, right, sign, ord) ->
+  | T.Equation (left, right, sign, ord) ->
     let new_left = f left
     and new_right = f right in
-    Equation (new_left, new_right, sign, comp new_left new_right)
+    T.Equation (new_left, new_right, sign, comp new_left new_right)
 
 
 (* ----------------------------------------------------------------------
@@ -107,8 +107,8 @@ let fmap_lit ?(comp=default_compare) f = function
  * ---------------------------------------------------------------------- *)
 
 
-let eq_clause (id1,_,_,_) (id2,_,_,_) = id1 = id2
-let compare_clause (id1,_,_,_) (id2,_,_,_) = Pervasives.compare id1 id2
+let eq_clause {T.cid=id1} {T.cid=id2} = id1 = id2
+let compare_clause {T.cid=id1} {T.cid=id2} = Pervasives.compare id1 id2
 
 (* build a clause with a new ID *)
 let mk_clause =
@@ -118,18 +118,18 @@ let mk_clause =
       | [] -> vars
       | (x::xs) -> if List.mem x vars
         then merge_vars vars xs else merge_vars (x::vars) xs
-    and vars_of_lits (Equation (l, r, _, _)) =
-      merge_vars (vars_of_term l) (vars_of_term r) in
+    and vars_of_lits (T.Equation (l, r, _, _)) =
+      merge_vars (T.vars_of_term l) (T.vars_of_term r) in
     let all_vars =
       List.fold_left merge_vars [] (List.map vars_of_lits lits)
     and id = (let i = !clause_id in clause_id := i+1; i) in
-    (id, lits, all_vars, proof)
+    {T.cid=id; T.clits=lits; T.cvars=all_vars; T.cproof=proof}
 
 (* find the maximum variable index in the varlist *)
 let max_var vars =
   let rec aux idx = function
   | [] -> idx
-  | ({node={term=Var i}}::vars) -> aux (max i idx) vars
+  | ({node={T.term=T.Var i}}::vars) -> aux (max i idx) vars
   | _::vars -> assert false
   in
   aux 0 vars
@@ -138,32 +138,32 @@ let max_var vars =
    relocate [maxvar] [varlist] [subst] -> [newmaxvar] * [varlist] * [relocsubst] *)
 let relocate maxvar varlist subst =
   List.fold_right
-    (fun ({node={term=Var _; sort=sort}} as v) (maxvar, varlist, s) -> 
-       let new_v = Terms.mk_var maxvar sort in
+    (fun ({node={T.term=T.Var _; T.sort=sort}} as v) (maxvar, varlist, s) -> 
+       let new_v = T.mk_var maxvar sort in
        maxvar+1, new_v::varlist, Subst.build_subst v new_v s)
     varlist (maxvar+1, [], subst)
 
-let fresh_clause maxvar (id, lits, varlist, proof) =
+let fresh_clause maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
-  let maxvar, varlist, subst = relocate maxvar varlist Subst.id_subst in
+  let maxvar, varlist, subst = relocate maxvar c.T.cvars Subst.id_subst in
   let lits = List.map
     (function
-      | Terms.Equation (l,r,sign,o) ->
+      | T.Equation (l,r,sign,o) ->
         let l = Subst.reloc_subst subst l in
         let r = Subst.reloc_subst subst r in
-        Terms.Equation (l,r,sign,o))
-    lits
+        T.Equation (l,r,sign,o))
+    c.T.clits
   in
   (*  TODO modify proof?
   let proof =
     match proof with
-    | Terms.Exact t -> Terms.Exact (Subst.reloc_subst subst t)
-    | Terms.Step (rule,c1,c2,dir,pos,s) ->
-        Terms.Step(rule,c1,c2,dir,pos,Subst.concat subst s)
+    | T.Exact t -> T.Exact (Subst.reloc_subst subst t)
+    | T.Step (rule,c1,c2,dir,pos,s) ->
+        T.Step(rule,c1,c2,dir,pos,Subst.concat subst s)
   in
   *)
-  (id, lits, varlist, proof), maxvar
+  {c with T.clits=lits; T.cvars=varlist}, maxvar
 
 (* rename clauses and terms so that they have no variable in varlist *)
 let relocate_term varlist t =
@@ -171,14 +171,15 @@ let relocate_term varlist t =
   let _, _, subst = relocate idx varlist FoSubst.id_subst in
   FoSubst.apply_subst subst t
 
-let relocate_clause varlist (id, lits, vars, proof) =
-  let idx = max_var varlist in
-  let _, newvars, subst = relocate idx varlist FoSubst.id_subst in
+let relocate_clause varlist c =
+  let idx = max_var c.T.cvars in
+  let _, newvars, subst = relocate idx c.T.cvars FoSubst.id_subst in
   let new_lits = List.map
     (fun lit -> fmap_lit (FoSubst.apply_subst subst) lit)
-    lits
+    c.T.clits
   in
-  (id, new_lits, newvars, proof)  (* TODO update proof *)
+  {c with T.clits=new_lits; T.cvars=newvars}
+  (* TODO update proof *)
 
 
 (*
@@ -186,9 +187,9 @@ let relocate_clause varlist (id, lits, vars, proof) =
 let mk_unit_clause maxvar ty proofterm =
   let varlist =
     let rec aux acc = function
-      | Terms.Leaf _ -> acc
-      | Terms.Var i -> if List.mem i acc then acc else i::acc
-      | Terms.Node l -> List.fold_left aux acc l 
+      | T.Leaf _ -> acc
+      | T.Var i -> if List.mem i acc then acc else i::acc
+      | T.Node l -> List.fold_left aux acc l 
     in
      aux (aux [] ty) proofterm
   in
@@ -196,10 +197,10 @@ let mk_unit_clause maxvar ty proofterm =
     match B.is_eq ty with
     | Some(ty,l,r) ->
          let o = Order.compare_terms l r in
-         Terms.Equation (l, r, ty, o)
-    | None -> Terms.Predicate ty
+         T.Equation (l, r, ty, o)
+    | None -> T.Predicate ty
   in
-  let proof = Terms.Exact proofterm in
+  let proof = T.Exact proofterm in
   fresh_unit_clause maxvar (0, lit, varlist, proof)
 
 

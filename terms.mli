@@ -84,17 +84,15 @@ type literal =
                 * comparison (* orientation *)
 
 (* a first order clause *)
-type clause =
-    int (* ID *)
-  * literal list  (* the equations *)
-  * foterm list  (* the free variables *)
-  * proof (* the proof for this clause *)
+type clause = {
+  cid : int;            (* ID *)
+  clits : literal list; (* the equations *)
+  cvars : foterm list;  (* the free variables *)
+  cproof : proof;      (* the proof for this clause *)
+}
 (* a proof step for a clause *)
-and proof = Axiom of string | Proof of rule * proof_clauses
-(* an inference rule name *)
-and rule = string
-(* a list of terms in clauses involved in an inference *)
-and proof_clauses = (clause * position * substitution) list
+and proof = Axiom of string
+          | Proof of string * (clause * position * substitution) list
 
 module M : Map.S with type key = int 
 
