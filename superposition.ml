@@ -11,20 +11,27 @@
 
 (* $Id: index.mli 9822 2009-06-03 15:37:06Z tassi $ *)
 
-module Superposition (B : Orderings.Blob) = 
+module type InferenceContext =
+  sig
+    module Ord : Orderings.S
+    module Idx : Index.Index(Ord)
+  end
+
+module Superposition (Ctx : InferenceContext) =
   struct
-    module IDX = Index.Index(B)
-    module Unif = FoUnif.Founif(B)
+    module IDX = Ctx.Idx
+    module Order = Ctx.Ord
+    module Unif = FoUnif
     module Subst = FoSubst 
     module Order = B
-    module Utils = FoUtils.Utils(B)
-    module Pp = Pp.Pp(B)
+    module Utils = FoUtils
+    module Pp = Pp
     
+    (* bag, maxvar, empty clause *)
     exception Success of 
-      B.t Terms.bag 
+      Terms.bag 
       * int 
-      * B.t Terms.unit_clause
-      * B.t Terms.substitution
+      * Terms.clause
 
     let print s = prerr_endline (Lazy.force s);; 
     let debug _ = ();; 
