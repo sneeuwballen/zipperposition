@@ -14,153 +14,150 @@
 module T = Terms
 open T
 open Hashcons
+module U = FoUtils
+module Unif = FoUnif
 
-module Index(Ord : Orderings.S) = struct
-  module U = FoUtils
-  module Unif = FoUnif
+(* an order on clauses+positions *)
+module ClauseOT =
+  struct 
+    type t = T.clause * T.position
 
-  (* an order on clauses+positions *)
-  module ClauseOT =
-    struct 
-      type t = T.clause * T.position
- 
-      let compare (c1, p1) (c2, p2) = 
-        let c = Pervasives.compare p1 p2 in
-        if c <> 0 then c else
-        U.compare_clause c1 c2
-    end
-
-  (* a set of (clause, position in clause). A position is a
-   * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
-   * where ... is the path in the term *)
-  module ClauseSet : Set.S with 
-    type elt = T.clause * T.position
-    = Set.Make(ClauseOT)
-
-  open Discrimination_tree
-
-  module FotermIndexable = struct
-    type input = T.foterm
-    type constant_name = Signature.symbol
-
-    (* convert into a path string *)
-    let path_string_of t =
-      let rec aux arity t = match t.node.term with
-        | T.Leaf a -> [Constant (a, arity)]
-        | T.Var i -> (* assert (arity = 0); *) [Variable]
-        | T.Node ([] | [ _ ] )
-        (* FIXME : should this be allowed or not ? *)
-        | T.Node ({node={term=T.Var _}}::_)
-        | T.Node ({node={term=T.Node _}}::_) -> assert false
-        | T.Node (hd::tl) ->
-            aux (List.length tl) hd @ List.flatten (List.map (aux 0) tl) 
-      in 
-        aux 0 t
-
-    (* compare two path string elements *)
-    let compare e1 e2 = 
-      match e1,e2 with 
-      | Constant (a1,ar1), Constant (a2,ar2) ->
-          let c = Signature.compare a1 a2 in
-          if c <> 0 then c else Pervasives.compare ar1 ar2
-      | Variable, Variable -> 0
-      | Constant _, Variable -> ~-1
-      | Variable, Constant _ -> 1
-      | Proposition, _ | _, Proposition
-      | Datatype, _ | _, Datatype
-      | Dead, _ | _, Dead
-      | Bound _, _ | _, Bound _ -> assert false
-
-    (* print path into string *)
-    let string_of_path l =
-      let str_of_elem = function
-      | Variable -> "*"
-      | Constant (a, ar) -> Pp.on_buffer Signature.pp_symbol a
-      | _ -> "?"
-      in String.concat "." (List.map str_of_elem l)
+    let compare (c1, p1) (c2, p2) = 
+      let c = Pervasives.compare p1 p2 in
+      if c <> 0 then c else
+      U.compare_clause c1 c2
   end
 
-  (* the discrimination trees used for indexing *)
-  module DT : DiscriminationTree with
-    type constant_name = Signature.symbol and 
-    type input = T.foterm and 
-    type data = ClauseSet.elt and 
-    type dataset = ClauseSet.t
-  = Make(FotermIndexable)(ClauseSet)
+(* a set of (clause, position in clause). A position is a
+ * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
+ * where ... is the path in the term *)
+module ClauseSet : Set.S with 
+  type elt = T.clause * T.position
+  = Set.Make(ClauseOT)
 
-  type input = DT.input
-  type data = DT.data
-  type dataset = DT.dataset
+open Discrimination_tree
 
-  (* the main index type. It contains two trees, that are
-   * used to index all subterms of a clause, and terms
-   * that occur directly under an equation. *)
-  type t = {
-    root_index : DT.t;
-    subterm_index : DT.t;
-  }
+module FotermIndexable = struct
+  type input = T.foterm
+  type constant_name = Signature.symbol
 
-  (* empty index *)
-  let empty = { root_index=DT.empty; subterm_index=DT.empty }
-  
-  (* apply op to some of the literals of the clause. *)
-  let process op tree ({T.clits=lits} as c) =
-    let process_lit (pos, tree) lit =
-      let new_tree = match lit with
-      | T.Equation (l,_,_,T.Gt) -> 
-          op tree l (c, [T.left_pos; pos])
-      | T.Equation (_,r,_,T.Lt) -> 
-          op tree r (c, [T.right_pos; pos])
-      | T.Equation (l,r,_,T.Incomparable) ->
-          let tmp_tree = op tree l (c, [T.left_pos; pos]) in
-          op tmp_tree r (c, [T.right_pos; pos])
-      | T.Equation (l,r,_,T.Invertible) ->
-          op tree l (c, [T.left_pos; pos])
-      | T.Equation (_,r,_,T.Eq) -> assert false
-      and new_pos = pos+1
-      in (new_pos, new_tree)
-    in
-    let _, new_tree = List.fold_left process_lit (1,tree) lits in
-    new_tree
-  
-  (* apply (op tree) to all subterms, folding the resulting tree *)
-  let rec fold_subterms op tree t (c, path) = match t.node.term with
-    | T.Var _ -> tree  (* variables are not indexed *)
-    | T.Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
-    | T.Node (_::l) ->
-        (* apply the operation on the term itself *)
-        let tmp_tree = op tree t (c, List.rev path) in
-        let _, new_tree = List.fold_left
-          (* apply the operation on each i-th subterm with i::path
-             as position. i starts at 1 and the function symbol is ignored. *)
-          (fun (idx, tree) t -> idx+1, fold_subterms op tree t (c, idx::path))
-          (1, tmp_tree) l
-        in new_tree
-    | _ -> assert false
+  (* convert into a path string *)
+  let path_string_of t =
+    let rec aux arity t = match t.node.term with
+      | T.Leaf a -> [Constant (a, arity)]
+      | T.Var i -> (* assert (arity = 0); *) [Variable]
+      | T.Node ([] | [ _ ] )
+      (* FIXME : should this be allowed or not ? *)
+      | T.Node ({node={term=T.Var _}}::_)
+      | T.Node ({node={term=T.Node _}}::_) -> assert false
+      | T.Node (hd::tl) ->
+          aux (List.length tl) hd @ List.flatten (List.map (aux 0) tl) 
+    in 
+      aux 0 t
 
-  (* apply (op tree) to the root term, after reversing the path *)
-  let apply_root_term op tree t (c, path) = op tree t (c, List.rev path)
+  (* compare two path string elements *)
+  let compare e1 e2 = 
+    match e1,e2 with 
+    | Constant (a1,ar1), Constant (a2,ar2) ->
+        let c = Signature.compare a1 a2 in
+        if c <> 0 then c else Pervasives.compare ar1 ar2
+    | Variable, Variable -> 0
+    | Constant _, Variable -> ~-1
+    | Variable, Constant _ -> 1
+    | Proposition, _ | _, Proposition
+    | Datatype, _ | _, Datatype
+    | Dead, _ | _, Dead
+    | Bound _, _ | _, Bound _ -> assert false
 
-  (* add root terms and subterms to respective indexes *)
-  let index_clause {root_index; subterm_index} clause =
-    let new_subterm_index = process (fold_subterms DT.index) subterm_index clause
-    and new_root_index = process (apply_root_term DT.index) root_index clause
-    in {root_index=new_root_index; subterm_index=new_subterm_index}
- 
-  (* remove root terms and subterms from respective indexes *)
-  let remove_clause {root_index; subterm_index} clause =
-    let new_subterm_index =
-      process (fold_subterms DT.remove_index) subterm_index clause
-    and new_root_index =
-      process (apply_root_term DT.remove_index) root_index clause
-    in {root_index=new_root_index; subterm_index=new_subterm_index}
-
-  let fold = DT.fold 
-
-  let elems index =
-    DT.fold index (fun _ dataset acc -> ClauseSet.union dataset acc)
-      ClauseSet.empty
-    
-  (* an active set contains a list of clauses and an index on those clauses *)
-  type active_set = T.clause list * t
+  (* print path into string *)
+  let string_of_path l =
+    let str_of_elem = function
+    | Variable -> "*"
+    | Constant (a, ar) -> Pp.on_buffer Signature.pp_symbol a
+    | _ -> "?"
+    in String.concat "." (List.map str_of_elem l)
 end
+
+(* the discrimination trees used for indexing *)
+module DT : DiscriminationTree with
+  type constant_name = Signature.symbol and 
+  type input = T.foterm and 
+  type data = ClauseSet.elt and 
+  type dataset = ClauseSet.t
+= Make(FotermIndexable)(ClauseSet)
+
+type input = DT.input
+type data = DT.data
+type dataset = DT.dataset
+
+(* the main index type. It contains two trees, that are
+ * used to index all subterms of a clause, and terms
+ * that occur directly under an equation. *)
+type t = {
+  root_index : DT.t;
+  subterm_index : DT.t;
+}
+
+(* empty index *)
+let empty = { root_index=DT.empty; subterm_index=DT.empty }
+
+(* apply op to some of the literals of the clause. *)
+let process op tree ({T.clits=lits} as c) =
+  let process_lit (pos, tree) lit =
+    let new_tree = match lit with
+    | T.Equation (l,_,_,T.Gt) -> 
+        op tree l (c, [T.left_pos; pos])
+    | T.Equation (_,r,_,T.Lt) -> 
+        op tree r (c, [T.right_pos; pos])
+    | T.Equation (l,r,_,T.Incomparable) ->
+        let tmp_tree = op tree l (c, [T.left_pos; pos]) in
+        op tmp_tree r (c, [T.right_pos; pos])
+    | T.Equation (l,r,_,T.Invertible) ->
+        op tree l (c, [T.left_pos; pos])
+    | T.Equation (_,r,_,T.Eq) -> assert false
+    and new_pos = pos+1
+    in (new_pos, new_tree)
+  in
+  let _, new_tree = List.fold_left process_lit (1,tree) lits in
+  new_tree
+
+(* apply (op tree) to all subterms, folding the resulting tree *)
+let rec fold_subterms op tree t (c, path) = match t.node.term with
+  | T.Var _ -> tree  (* variables are not indexed *)
+  | T.Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
+  | T.Node (_::l) ->
+      (* apply the operation on the term itself *)
+      let tmp_tree = op tree t (c, List.rev path) in
+      let _, new_tree = List.fold_left
+        (* apply the operation on each i-th subterm with i::path
+           as position. i starts at 1 and the function symbol is ignored. *)
+        (fun (idx, tree) t -> idx+1, fold_subterms op tree t (c, idx::path))
+        (1, tmp_tree) l
+      in new_tree
+  | _ -> assert false
+
+(* apply (op tree) to the root term, after reversing the path *)
+let apply_root_term op tree t (c, path) = op tree t (c, List.rev path)
+
+(* add root terms and subterms to respective indexes *)
+let index_clause {root_index; subterm_index} clause =
+  let new_subterm_index = process (fold_subterms DT.index) subterm_index clause
+  and new_root_index = process (apply_root_term DT.index) root_index clause
+  in {root_index=new_root_index; subterm_index=new_subterm_index}
+
+(* remove root terms and subterms from respective indexes *)
+let remove_clause {root_index; subterm_index} clause =
+  let new_subterm_index =
+    process (fold_subterms DT.remove_index) subterm_index clause
+  and new_root_index =
+    process (apply_root_term DT.remove_index) root_index clause
+  in {root_index=new_root_index; subterm_index=new_subterm_index}
+
+let fold = DT.fold 
+
+let elems index =
+  DT.fold index (fun _ dataset acc -> ClauseSet.union dataset acc)
+    ClauseSet.empty
+  
+(* an active set contains a list of clauses and an index on those clauses *)
+type active_set = T.clause list * t
