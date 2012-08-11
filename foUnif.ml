@@ -29,6 +29,7 @@ let mem2 a b l =
 
 (* do both unification and match *)
 let rec unif locked_vars subst s t =
+  if s.node.sort <> t.node.sort then raise (UnificationFailure (lazy "different sorts"));
   let s = match s.node.term with Var _ -> Subst.lookup s subst | _ -> s
   and t = match t.node.term with Var _ -> Subst.lookup t subst | _ -> t in
   match s.node.term, t.node.term with
