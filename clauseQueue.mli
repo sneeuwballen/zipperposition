@@ -8,6 +8,7 @@ class type queue =
     method add : hclause -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
+    method remove : hclause list -> queue  (* slow *)
     method name : string
   end
 

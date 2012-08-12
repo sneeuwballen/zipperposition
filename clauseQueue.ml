@@ -11,6 +11,7 @@ class type queue =
     method add : hclause -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
+    method remove : hclause list -> queue  (* slow *)
     method name : string
   end
 
@@ -40,6 +41,11 @@ module HeapQueue(Ord : HeapQueueOrd) =
           assert (not (H.is_empty heap));
           let c,new_h = H.extract_min heap in
           (({< heap = new_h >} :> queue), c)
+
+        method remove hclauses =
+          match hclauses with
+          | [] -> ({< >} :> queue)
+          | _ ->  ({< heap = H.remove heap hclauses >} :> queue)
 
         method name = Ord.name
       end
