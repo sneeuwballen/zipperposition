@@ -15,7 +15,7 @@ open Types
  * list [lit index, 1|2 (left or right), ...]
  * where ... is the path in the term *)
 module ClauseSet : Set.S with 
-  type elt = hclause * position
+  type elt = hclause * position * foterm
 
 (* make terms indexable by discrimination_tree *)
 module FotermIndexable : Discrimination_tree.Indexable with 

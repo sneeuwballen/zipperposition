@@ -20,19 +20,21 @@ module Utils = FoUtils
 (* an order on clauses+positions *)
 module ClauseOT =
   struct 
-    type t = hclause * position
+    type t = hclause * position * foterm
 
-    let compare (c1, p1) (c2, p2) = 
+    let compare (c1, p1, t1) (c2, p2, t2) = 
       let c = Pervasives.compare p1 p2 in
       if c <> 0 then c else
-      C.compare_hclause c1 c2
+      let c = C.compare_hclause c1 c2 in
+      if c <> 0 then c else
+      (assert (T.eq_foterm t1 t2); 0)
   end
 
 (* a set of (hashconsed clause, position in clause). A position is a
  * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
  * where ... is the path in the term *)
 module ClauseSet : Set.S with 
-  type elt = hclause * position
+  type elt = hclause * position * foterm
   = Set.Make(ClauseOT)
 
 open Discrimination_tree
@@ -121,17 +123,17 @@ let process_lit op c (pos, tree) lit =
 
 (** apply op to some of the literals of the clause, and only to
     the maximal side(s) of the literals. *)
-let process op tree ({node={clits=lits}} as c) =
+let process_clause op tree ({node={clits=lits}} as c) =
   let _, new_tree = List.fold_left (process_lit op c) (1,tree) lits in
   new_tree
 
-(* apply (op tree) to all subterms, folding the resulting tree *)
+(** apply (op tree) to all subterms, folding the resulting tree *)
 let rec fold_subterms op tree t (c, path) = match t.node.term with
   | Var _ -> tree  (* variables are not indexed *)
-  | Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
+  | Leaf _ -> op tree t (c, List.rev path, t) (* reverse path now *)
   | Node (_::l) ->
       (* apply the operation on the term itself *)
-      let tmp_tree = op tree t (c, List.rev path) in
+      let tmp_tree = op tree t (c, List.rev path, t) in
       let _, new_tree = List.fold_left
         (* apply the operation on each i-th subterm with i::path
            as position. i starts at 1 and the function symbol is ignored. *)
@@ -140,28 +142,29 @@ let rec fold_subterms op tree t (c, path) = match t.node.term with
       in new_tree
   | _ -> assert false
 
-(* apply (op tree) to the root term, after reversing the path *)
-let apply_root_term op tree t (c, path) = op tree t (c, List.rev path)
+(** apply (op tree) to the root term, after reversing the path *)
+let apply_root_term op tree t (c, path) = op tree t (c, List.rev path, t)
 
 (** add root terms and subterms to respective indexes *)
 let index_clause {root_index; unit_root_index; subterm_index} clause =
-  let new_subterm_index = process (fold_subterms DT.index) subterm_index clause
+  let new_subterm_index = process_clause (fold_subterms DT.index) subterm_index clause
   and new_unit_root_index = match clause.node.clits with
       | [(Equation (_,_,true,_)) as lit] ->
-          snd (process_lit DT.index clause (1, unit_root_index) lit)
+          snd (process_lit (apply_root_term DT.index) clause (1, unit_root_index) lit)
       | _ -> unit_root_index
-  and new_root_index = process (apply_root_term DT.index) root_index clause
+  and new_root_index = process_clause (apply_root_term DT.index) root_index clause
   in {root_index=new_root_index;
       unit_root_index=new_unit_root_index;
       subterm_index=new_subterm_index}
 
 (** remove root terms and subterms from respective indexes *)
 let remove_clause {root_index; unit_root_index; subterm_index} clause =
-  let new_subterm_index = process (fold_subterms DT.remove_index) subterm_index clause
+  let new_subterm_index = process_clause (fold_subterms DT.remove_index) subterm_index clause
   and new_unit_root_index = match clause.node.clits with
-      | [lit] -> snd (process_lit DT.remove_index clause (1, unit_root_index) lit)
+      | [lit] -> snd (process_lit (apply_root_term DT.remove_index)
+                        clause (1, unit_root_index) lit)
       | _ -> unit_root_index
-  and new_root_index = process (apply_root_term DT.remove_index) root_index clause
+  and new_root_index = process_clause (apply_root_term DT.remove_index) root_index clause
   in {root_index=new_root_index;
       unit_root_index=new_unit_root_index;
       subterm_index=new_subterm_index}

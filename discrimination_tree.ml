@@ -180,7 +180,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
                   | n, path -> retrieve path n
                 with Not_found -> A.empty)
      in
-      retrieve path tree
+     retrieve path tree
 
     let retrieve_generalizations tree term = retrieve false tree term
     let retrieve_unifiables tree term = retrieve true tree term

@@ -108,7 +108,7 @@ let pp_clause_pos formatter (c, pos) =
 let pp_hclause formatter c =
   fprintf formatter "@[<h>hclause(%d) %a@]" c.tag pp_clause c.node
 
-let pp_hclause_pos formatter (c, pos) =
+let pp_hclause_pos formatter (c, pos, _) =
   fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
   pp_hclause c (pp_list ~sep:"." pp_print_int) pos
 
