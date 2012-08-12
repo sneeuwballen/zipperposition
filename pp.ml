@@ -102,14 +102,14 @@ let pp_clause formatter {clits=lits} =
   fprintf formatter "@[<h>%a@]" (pp_list ~sep:" | " pp_literal) lits
 
 let pp_clause_pos formatter (c, pos) =
-  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]@;"
+  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
   pp_clause c (pp_list ~sep:"." pp_print_int) pos
 
 let pp_hclause formatter c =
   fprintf formatter "@[<h>hclause(%d) %a@]" c.tag pp_clause c.node
 
 let pp_hclause_pos formatter (c, pos) =
-  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]@;"
+  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
   pp_hclause c (pp_list ~sep:"." pp_print_int) pos
 
 let pp_bag formatter bag =
@@ -119,18 +119,22 @@ let pp_bag formatter bag =
     bag.C.bag_clauses;
   fprintf formatter "@]"
 
-let pp_index formatter idx = 
+let pp_index ?(all_clauses=false) formatter idx = 
   let print_dt_path path set =
-    let l = I.ClauseSet.elements set in
+  if all_clauses
+    then let l = I.ClauseSet.elements set in
     fprintf formatter "%s : @[<hov>%a@]@;"
       (I.FotermIndexable.string_of_path path)
       (pp_list ~sep:", " pp_hclause_pos) l
+    else fprintf formatter "@[<h>%s : %d clauses/pos@]@;"
+      (I.FotermIndexable.string_of_path path)
+      (I.ClauseSet.cardinal set)
   in
-  fprintf formatter "index:@.root_index=@[<v 2>";
+  fprintf formatter "index:@.root_index=  @[<v>";
   I.DT.iter idx.I.root_index print_dt_path;
-  fprintf formatter "@]@.unit_root_index=@[<v 2>";
+  fprintf formatter "@]@.unit_root_index=  @[<v>";
   I.DT.iter idx.I.unit_root_index print_dt_path;
-  fprintf formatter "@]@.subterm_index=@[<v 2>";
+  fprintf formatter "@]@.subterm_index=  @[<v>";
   I.DT.iter idx.I.subterm_index print_dt_path;
   fprintf formatter "@]@."
 

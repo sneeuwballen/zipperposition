@@ -24,7 +24,7 @@ val pp_clause_pos : formatter -> (clause * position) -> unit
 val pp_hclause : formatter -> hclause -> unit
 val pp_hclause_pos : formatter -> (hclause * position) -> unit
 val pp_bag: formatter -> Clauses.bag -> unit
-val pp_index : formatter -> Index.t -> unit
+val pp_index : ?all_clauses:bool -> formatter -> Index.t -> unit
 val pp_queue : formatter -> ClauseQueue.queue -> unit
 val pp_queues : formatter -> (ClauseQueue.queue * int) list -> unit
 val pp_state : formatter -> ProofState.state -> unit

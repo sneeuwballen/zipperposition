@@ -2,7 +2,7 @@
 
 # helper to clausify then run prover (using eprover)
 
-TMPFILE=$(mktemp proverXXXXX)
+TMPFILE=$(mktemp /tmp/proverXXXXX)
 
 echo "# clausify into $TMPFILE"
 if [ -z "$2" ]; then
