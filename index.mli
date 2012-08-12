@@ -32,19 +32,20 @@ type input = DT.input
 type data = DT.data
 type dataset = DT.dataset
 
-(* the main index type. It contains two trees, that are
- * used to index all subterms of a clause, and terms
- * that occur directly under an equation. *)
+(** the main index type. It contains 3 trees, that are
+    used to index all subterms of a clause, maximal sides 
+    of unit equations, and terms that occur directly under an equation. *)
 type t = {
   root_index : DT.t;
+  unit_root_index : DT.t;
   subterm_index : DT.t;
 }
 
-val empty : t
+val empty : t                           (** empty index *)
 
-val index_clause : t -> hclause -> t 
+val index_clause : t -> hclause -> t    (** add the clause to the index *)
 
-val remove_clause : t -> hclause -> t 
+val remove_clause : t -> hclause -> t   (** remove the clause from the index *)
 
 val fold : 
   DT.t ->

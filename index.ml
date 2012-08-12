@@ -95,30 +95,34 @@ type dataset = DT.dataset
  * that occur directly under an equation. *)
 type t = {
   root_index : DT.t;
+  unit_root_index : DT.t;
   subterm_index : DT.t;
 }
 
-(* empty index *)
-let empty = { root_index=DT.empty; subterm_index=DT.empty }
+let empty = { root_index=DT.empty;
+              unit_root_index=DT.empty;
+              subterm_index=DT.empty }
 
-(* apply op to some of the literals of the clause. *)
+(** process the literal (only its maximal side(s)) *)
+let process_lit op c (pos, tree) lit =
+  let new_tree = match lit with
+  | Equation (l,_,_,Gt) -> 
+      op tree l (c, [C.left_pos; pos])
+  | Equation (_,r,_,Lt) -> 
+      op tree r (c, [C.right_pos; pos])
+  | Equation (l,r,_,Incomparable) ->
+      let tmp_tree = op tree l (c, [C.left_pos; pos]) in
+      op tmp_tree r (c, [C.right_pos; pos])
+  | Equation (l,r,_,Invertible) ->
+      op tree l (c, [C.left_pos; pos])
+  | Equation (_,r,_,Eq) -> assert false
+  and new_pos = pos+1
+  in (new_pos, new_tree)
+
+(** apply op to some of the literals of the clause, and only to
+    the maximal side(s) of the literals. *)
 let process op tree ({node={clits=lits}} as c) =
-  let process_lit (pos, tree) lit =
-    let new_tree = match lit with
-    | Equation (l,_,_,Gt) -> 
-        op tree l (c, [C.left_pos; pos])
-    | Equation (_,r,_,Lt) -> 
-        op tree r (c, [C.right_pos; pos])
-    | Equation (l,r,_,Incomparable) ->
-        let tmp_tree = op tree l (c, [C.left_pos; pos]) in
-        op tmp_tree r (c, [C.right_pos; pos])
-    | Equation (l,r,_,Invertible) ->
-        op tree l (c, [C.left_pos; pos])
-    | Equation (_,r,_,Eq) -> assert false
-    and new_pos = pos+1
-    in (new_pos, new_tree)
-  in
-  let _, new_tree = List.fold_left process_lit (1,tree) lits in
+  let _, new_tree = List.fold_left (process_lit op c) (1,tree) lits in
   new_tree
 
 (* apply (op tree) to all subterms, folding the resulting tree *)
@@ -139,19 +143,28 @@ let rec fold_subterms op tree t (c, path) = match t.node.term with
 (* apply (op tree) to the root term, after reversing the path *)
 let apply_root_term op tree t (c, path) = op tree t (c, List.rev path)
 
-(* add root terms and subterms to respective indexes *)
-let index_clause {root_index; subterm_index} clause =
+(** add root terms and subterms to respective indexes *)
+let index_clause {root_index; unit_root_index; subterm_index} clause =
   let new_subterm_index = process (fold_subterms DT.index) subterm_index clause
+  and new_unit_root_index = match clause.node.clits with
+      | [(Equation (_,_,true,_)) as lit] ->
+          snd (process_lit DT.index clause (1, unit_root_index) lit)
+      | _ -> unit_root_index
   and new_root_index = process (apply_root_term DT.index) root_index clause
-  in {root_index=new_root_index; subterm_index=new_subterm_index}
+  in {root_index=new_root_index;
+      unit_root_index=new_unit_root_index;
+      subterm_index=new_subterm_index}
 
-(* remove root terms and subterms from respective indexes *)
-let remove_clause {root_index; subterm_index} clause =
-  let new_subterm_index =
-    process (fold_subterms DT.remove_index) subterm_index clause
-  and new_root_index =
-    process (apply_root_term DT.remove_index) root_index clause
-  in {root_index=new_root_index; subterm_index=new_subterm_index}
+(** remove root terms and subterms from respective indexes *)
+let remove_clause {root_index; unit_root_index; subterm_index} clause =
+  let new_subterm_index = process (fold_subterms DT.remove_index) subterm_index clause
+  and new_unit_root_index = match clause.node.clits with
+      | [lit] -> snd (process_lit DT.remove_index clause (1, unit_root_index) lit)
+      | _ -> unit_root_index
+  and new_root_index = process (apply_root_term DT.remove_index) root_index clause
+  in {root_index=new_root_index;
+      unit_root_index=new_unit_root_index;
+      subterm_index=new_subterm_index}
 
 let fold = DT.fold 
 
