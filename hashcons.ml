@@ -22,10 +22,12 @@
 
 type 'a hash_consed = { 
   hkey : int;
+  tag : int;
   node : 'a }
 
 type 'a t = {
   mutable table : 'a hash_consed Weak.t array;
+  mutable ttag : int;                 (* current tag *)
   mutable totsize : int;             (* sum of the bucket sizes *)
   mutable limit : int;               (* max ratio totsize/table length *)
 }
@@ -35,12 +37,14 @@ let create sz =
   let sz = if sz > Sys.max_array_length then Sys.max_array_length else sz in
   let emptybucket = Weak.create 0 in
   { table = Array.create sz emptybucket;
+    ttag = 0;
     totsize = 0;
     limit = 3; }
 
 let clear t =
   let emptybucket = Weak.create 0 in
   for i = 0 to Array.length t.table - 1 do t.table.(i) <- emptybucket done;
+  t.ttag <- 0;
   t.totsize <- 0;
   t.limit <- 3
   
@@ -107,13 +111,15 @@ and add t d =
 
 let hashcons t d =
   let hkey = Hashtbl.hash d in
+  let tag = t.ttag in
   let index = hkey mod (Array.length t.table) in
   let bucket = t.table.(index) in
   let sz = Weak.length bucket in
   let rec loop i =
     if i >= sz then begin
-      let hnode = { hkey = hkey; node = d } in
+      let hnode = { hkey = hkey; node = d; tag = tag } in
       add t hnode;
+      t.ttag <- tag+1;
       hnode
     end else begin
       match Weak.get_copy bucket i with
@@ -163,6 +169,7 @@ module Make(H : HashedType) : (S with type key = H.t) = struct
 
   type t = {
     mutable table : data Weak.t array;
+    mutable ttag : int;
     mutable totsize : int;             (* sum of the bucket sizes *)
     mutable limit : int;               (* max ratio totsize/table length *)
   }
@@ -174,6 +181,7 @@ module Make(H : HashedType) : (S with type key = H.t) = struct
     let sz = if sz > Sys.max_array_length then Sys.max_array_length else sz in
     {
       table = Array.create sz emptybucket;
+      ttag = 0;
       totsize = 0;
       limit = 3;
     }
@@ -182,6 +190,7 @@ module Make(H : HashedType) : (S with type key = H.t) = struct
     for i = 0 to Array.length t.table - 1 do
       t.table.(i) <- emptybucket
     done;
+    t.ttag <- 0;
     t.totsize <- 0;
     t.limit <- 3
   
@@ -248,13 +257,15 @@ module Make(H : HashedType) : (S with type key = H.t) = struct
 
   let hashcons t d =
     let hkey = H.hash d in
+    let tag = t.ttag in
     let index = hkey mod (Array.length t.table) in
     let bucket = t.table.(index) in
     let sz = Weak.length bucket in
     let rec loop i =
       if i >= sz then begin
-	let hnode = { hkey = hkey; node = d } in
+	let hnode = { hkey = hkey; node = d; tag = tag } in
 	add t hnode;
+        t.ttag <- tag +1;
 	hnode
       end else begin
         match Weak.get_copy bucket i with

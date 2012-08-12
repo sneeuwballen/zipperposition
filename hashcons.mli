@@ -33,6 +33,7 @@
 
 type 'a hash_consed = private { 
   hkey : int;
+  tag : int;
   node : 'a }
 
 (*s Generic part, using ocaml generic equality and hash function. *)
