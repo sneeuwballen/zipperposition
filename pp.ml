@@ -99,7 +99,7 @@ let pp_literal formatter = function
         pp_foterm left pp_foterm T.eq_symbol pp_foterm right
 
 let pp_clause formatter {clits=lits} =
-  fprintf formatter "@[<hv 2>%a@]" (pp_list ~sep:" | " pp_literal) lits
+  fprintf formatter "@[<h>%a@]" (pp_list ~sep:" | " pp_literal) lits
 
 let pp_clause_pos formatter (c, pos) =
   fprintf formatter "[%a at @[<h>%a@]]@;"
@@ -113,7 +113,7 @@ let pp_hclause_pos formatter (c, pos) =
   pp_hclause c (pp_list ~sep:"." pp_print_int) pos
 
 let pp_bag formatter bag =
-  fprintf formatter "@[<hov>";
+  fprintf formatter "@[<v>";
   C.M.iter
     (fun _ hc -> fprintf formatter "%a@;" pp_clause hc.node)
     bag.C.bag_clauses;
