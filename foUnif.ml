@@ -15,8 +15,6 @@ open Hashcons
 module T = Terms
 module Subst = FoSubst
 
-exception UnificationFailure of string Lazy.t;;
-
 (* returns (a in l, b in l) *)
 let mem2 a b l =
   let rec aux found_a found_b = function

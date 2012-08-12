@@ -65,3 +65,5 @@ class type ordering =
     method compute_clause_weight : clause -> int
     method name : string
   end
+
+exception UnificationFailure of string Lazy.t

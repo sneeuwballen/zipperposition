@@ -11,9 +11,7 @@
 
 open Types
 
-exception UnificationFailure of string Lazy.t
-
-(* unify terms, returns a substitution of raise an exception *)
+(* unify terms, returns a substitution or raise an exception *)
 val unification: foterm -> foterm -> substitution
 
 (* match_term [a] [b] returns sigma such that sigma(a) = b *)
