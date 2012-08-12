@@ -67,4 +67,6 @@ let () =
   let state = PS.make_state O.default CQ.default_queues in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   (* print some stuff *)
-  Pp.debug_state Format.std_formatter state
+  Pp.debug_state Format.std_formatter state;
+  let state = {state with PS.active_set=PS.add_actives state.PS.active_set clauses} in
+  Pp.pp_index Format.std_formatter (state.PS.active_set.PS.idx)

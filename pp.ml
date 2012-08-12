@@ -102,14 +102,14 @@ let pp_clause formatter {clits=lits} =
   fprintf formatter "@[<h>%a@]" (pp_list ~sep:" | " pp_literal) lits
 
 let pp_clause_pos formatter (c, pos) =
-  fprintf formatter "[%a at @[<h>%a@]]@;"
+  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]@;"
   pp_clause c (pp_list ~sep:"." pp_print_int) pos
 
 let pp_hclause formatter c =
   fprintf formatter "@[<h>hclause(%d) %a@]" c.tag pp_clause c.node
 
 let pp_hclause_pos formatter (c, pos) =
-  fprintf formatter "[%a at @[<h>%a@]]@;"
+  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]@;"
   pp_hclause c (pp_list ~sep:"." pp_print_int) pos
 
 let pp_bag formatter bag =
@@ -128,9 +128,11 @@ let pp_index formatter idx =
   in
   fprintf formatter "index:@.root_index=@[<v 2>";
   I.DT.iter idx.I.root_index print_dt_path;
-  fprintf formatter "@]@;subterm_index=@[<v 2>";
+  fprintf formatter "@]@.unit_root_index=@[<v 2>";
+  I.DT.iter idx.I.unit_root_index print_dt_path;
+  fprintf formatter "@]@.subterm_index=@[<v 2>";
   I.DT.iter idx.I.subterm_index print_dt_path;
-  fprintf formatter "@]@;"
+  fprintf formatter "@]@."
 
 let pp_queue formatter q =
   Format.fprintf formatter "@[<h>queue %s@]" q#name
