@@ -15,23 +15,24 @@ open Hashcons
 module T = Terms
 module C = Clauses
 module Unif = FoUnif
+module Utils = FoUtils
 
 (* an order on clauses+positions *)
 module ClauseOT =
   struct 
-    type t = clause * position
+    type t = hclause * position
 
     let compare (c1, p1) (c2, p2) = 
       let c = Pervasives.compare p1 p2 in
       if c <> 0 then c else
-      C.compare_clause c1 c2
+      C.compare_hclause c1 c2
   end
 
-(* a set of (clause, position in clause). A position is a
+(* a set of (hashconsed clause, position in clause). A position is a
  * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
  * where ... is the path in the term *)
 module ClauseSet : Set.S with 
-  type elt = clause * position
+  type elt = hclause * position
   = Set.Make(ClauseOT)
 
 open Discrimination_tree
@@ -72,7 +73,7 @@ module FotermIndexable = struct
   let string_of_path l =
     let str_of_elem = function
     | Variable -> "*"
-    | Constant (a, ar) -> Pp.on_buffer Signature.pp_symbol a
+    | Constant (a, ar) -> Utils.on_buffer Signature.pp_symbol a
     | _ -> "?"
     in String.concat "." (List.map str_of_elem l)
 end
@@ -101,7 +102,7 @@ type t = {
 let empty = { root_index=DT.empty; subterm_index=DT.empty }
 
 (* apply op to some of the literals of the clause. *)
-let process op tree ({clits=lits} as c) =
+let process op tree ({node={clits=lits}} as c) =
   let process_lit (pos, tree) lit =
     let new_tree = match lit with
     | Equation (l,_,_,Gt) -> 

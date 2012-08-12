@@ -11,15 +11,18 @@
 
 open Types
 open Hashcons
+open Format
 
 module T = Terms
 module C = Clauses
+module I = Index
+module PS = ProofState
 
 (* Main pretty printing functions *)
 
 (* print a list of items using the printing function *)
 let rec pp_list ?(sep=", ") pp_item  formatter = function
-  | x::y::xs -> Format.fprintf formatter "%a%s@,%a"
+  | x::y::xs -> fprintf formatter "%a%s@,%a"
       pp_item x sep (pp_list ~sep:sep pp_item) (y::xs)
   | x::[] -> pp_item formatter x
   | [] -> ()
@@ -27,8 +30,8 @@ let rec pp_list ?(sep=", ") pp_item  formatter = function
 (* print a term *)
 let rec pp_foterm formatter t = match t.node.term with
   | Leaf x -> Signature.pp_symbol formatter x
-  | Var i -> Format.fprintf formatter "X%d" i
-  | Node (head::args) -> Format.fprintf formatter
+  | Var i -> fprintf formatter "X%d" i
+  | Node (head::args) -> fprintf formatter
       "@[<h>%a(%a)@]" pp_foterm head (pp_list ~sep:", " pp_foterm) args
   | Node [] -> failwith "bad term"
 
@@ -44,35 +47,35 @@ let string_of_pos s = match s with
 
 (* print substitution *)
 let pp_substitution formatter subst =
-  Format.fprintf formatter "@[<h>";
+  fprintf formatter "@[<h>";
   List.iter
     (fun (v, t) ->
-       Format.fprintf formatter "?%a ->@, %a@;" pp_foterm v pp_foterm t)
+       fprintf formatter "?%a ->@, %a@;" pp_foterm v pp_foterm t)
     subst;
-  Format.fprintf formatter "@]"
+  fprintf formatter "@]"
 
 (* print proof
 let pp_proof bag ~formatter:f p =
   let rec aux eq = function
     | Terms.Exact t ->
-        Format.fprintf f "%d: Exact (" eq;
+        fprintf f "%d: Exact (" eq;
         pp_foterm f t;
-        Format.fprintf f ")@;";
+        fprintf f ")@;";
     | Terms.Step (rule,eq1,eq2,dir,pos,subst) ->
-        Format.fprintf f "%d: %s("
+        fprintf f "%d: %s("
           eq (string_of_rule rule);
-      Format.fprintf f "|%d with %d dir %s))" eq1 eq2
+      fprintf f "|%d with %d dir %s))" eq1 eq2
         (string_of_direction dir);
       let (_, _, _, proof1),_,_ = Terms.get_from_bag eq1 bag in
       let (_, _, _, proof2),_,_ = Terms.get_from_bag eq2 bag in
-        Format.fprintf f "@[<v 2>";
+        fprintf f "@[<v 2>";
           aux eq1 proof1;
           aux eq2 proof2;
-        Format.fprintf f "@]";
+        fprintf f "@]";
   in
-    Format.fprintf f "@[<v>";
+    fprintf f "@[<v>";
     aux 0 p;
-    Format.fprintf f "@]"
+    fprintf f "@]"
 ;;
 *)
 
@@ -85,40 +88,60 @@ let string_of_comparison = function
 
 let pp_literal formatter = function
   | Equation (left, right, false, _) when right = T.true_symbol ->
-    Format.fprintf formatter "~%a" pp_foterm left
+    fprintf formatter "~%a" pp_foterm left
   | Equation (left, right, true, _) when right = T.true_symbol ->
     pp_foterm formatter left
   | Equation (left, right, true, _) when left = T.true_symbol ->
     pp_foterm formatter right
   | Equation (left, right, false, _) when left = T.true_symbol ->
-    Format.fprintf formatter "~%a" pp_foterm right
+    fprintf formatter "~%a" pp_foterm right
   | Equation (left, right, sign, ord) ->
     if sign
-    then Format.fprintf formatter "@[%a@ %a@ %a@]"
+    then fprintf formatter "@[%a@ %a@ %a@]"
         pp_foterm left pp_foterm T.eq_symbol pp_foterm right
-    else Format.fprintf formatter "@[<hv 2>%a !%a@ %a@]"
+    else fprintf formatter "@[<hv 2>%a !%a@ %a@]"
         pp_foterm left pp_foterm T.eq_symbol pp_foterm right
 
 let pp_clause formatter {clits=lits} =
-  Format.fprintf formatter "@[<hv 2>%a@]" (pp_list ~sep:" | " pp_literal) lits
+  fprintf formatter "@[<hv 2>%a@]" (pp_list ~sep:" | " pp_literal) lits
 
 let pp_clause_pos formatter (c, pos) =
-  Format.fprintf formatter "[%a at @[<h>%a@]]@;"
-  pp_clause c (pp_list ~sep:"." Format.pp_print_int) pos
+  fprintf formatter "[%a at @[<h>%a@]]@;"
+  pp_clause c (pp_list ~sep:"." pp_print_int) pos
+
+let pp_hclause_pos formatter (c, pos) =
+  fprintf formatter "[%a at @[<h>%a@]]@;"
+  pp_clause c.node (pp_list ~sep:"." pp_print_int) pos
 
 let pp_bag formatter bag =
-  Format.fprintf formatter "@[<v>((*) mean active, (_) discarded)@;";
+  fprintf formatter "@[<hov>";
   C.M.iter
-    (fun _ hc -> Format.fprintf formatter "%a@;" pp_clause hc.node)
+    (fun _ hc -> fprintf formatter "%a@;" pp_clause hc.node)
     bag.C.bag_clauses;
-  Format.fprintf formatter "@]"
+  fprintf formatter "@]"
 
-(* String buffer implementation *)
-let on_buffer ?(margin=80) f t =
-  let buff = Buffer.create 100 in
-  let formatter = Format.formatter_of_buffer buff in
-  Format.pp_set_margin formatter margin;
-  f formatter t;
-  Format.fprintf formatter "@?";
-  Buffer.contents buff
+let pp_index formatter idx = 
+  let print_dt_path path set =
+    let l = I.ClauseSet.elements set in
+    fprintf formatter "%s : @[<hov>%a@]@;"
+      (I.FotermIndexable.string_of_path path)
+      (pp_list ~sep:", " pp_hclause_pos) l
+  in
+  fprintf formatter "index:@.root_index=@[<v 2>";
+  I.DT.iter idx.I.root_index print_dt_path;
+  fprintf formatter "@]@;subterm_index=@[<v 2>";
+  I.DT.iter idx.I.subterm_index print_dt_path;
+  fprintf formatter "@]@;"
 
+let pp_state formatter state =
+  Format.fprintf formatter "state {%d active clauses; %d passive_clauses}"
+    (C.size_bag state.PS.active_set.PS.active_clauses)
+    (C.size_bag state.PS.passive_set.PS.passive_clauses)
+
+let debug_state formatter state =
+  Format.fprintf formatter
+    "@[<v 2>state {%d active clauses; %d passive_clauses;@;active:%a@;passive:%a@]@;"
+    (C.size_bag state.PS.active_set.PS.active_clauses)
+    (C.size_bag state.PS.passive_set.PS.passive_clauses)
+    pp_bag state.PS.active_set.PS.active_clauses
+    pp_bag state.PS.passive_set.PS.passive_clauses

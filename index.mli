@@ -15,7 +15,7 @@ open Types
  * list [lit index, 1|2 (left or right), ...]
  * where ... is the path in the term *)
 module ClauseSet : Set.S with 
-  type elt = clause * position
+  type elt = hclause * position
 
 (* make terms indexable by discrimination_tree *)
 module FotermIndexable : Discrimination_tree.Indexable with 
@@ -42,9 +42,9 @@ type t = {
 
 val empty : t
 
-val index_clause : t -> clause -> t 
+val index_clause : t -> hclause -> t 
 
-val remove_clause : t -> clause -> t 
+val remove_clause : t -> hclause -> t 
 
 val fold : 
   DT.t ->

@@ -10,26 +10,25 @@
       V_______________________________________________________________ *)
 
 open Types
+open Format
 
 (* print a list of items using the printing function *)
-val pp_list: ?sep:string -> (Format.formatter -> 'a -> unit)
-    -> Format.formatter -> 'a list -> unit
+val pp_list: ?sep:string -> (formatter -> 'a -> unit)
+    -> formatter -> 'a list -> unit
 
-val pp_foterm: Format.formatter -> foterm -> unit
+val pp_foterm: formatter -> foterm -> unit
+val pp_substitution: formatter -> substitution -> unit
+val pp_clause : formatter -> clause -> unit
+val pp_clause_pos : formatter -> (clause * position) -> unit
+val pp_hclause_pos : formatter -> (hclause * position) -> unit
+val pp_bag: formatter -> Clauses.bag -> unit
+val pp_index : formatter -> Index.t -> unit
+val pp_state : formatter -> ProofState.state -> unit
+
+(* debug functions: much more detailed printing *)
+val debug_state : formatter -> ProofState.state -> unit
 
 (*
 val pp_proof: Format.formatter -> T.proof -> unit
 *)
-
-val pp_substitution: Format.formatter -> substitution -> unit
-
-val pp_clause : Format.formatter -> clause -> unit
-
-val pp_clause_pos : Format.formatter -> (clause * position) -> unit
-
-val pp_bag: Format.formatter -> Clauses.bag -> unit
-
-(* print into a string *)
-val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b)
-                -> 'a -> string
 

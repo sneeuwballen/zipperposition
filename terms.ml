@@ -37,6 +37,11 @@ let terms = H.create 251
 
 let iter_terms f = H.iter f terms
 
+let all_terms () =
+  let l = ref [] in
+  iter_terms (fun t -> l := t :: !l);
+  !l
+
 let compute_vars t =  (* compute free vars of the term *)
   let rec aux acc t = match t.node.term with
     | Leaf _ -> acc

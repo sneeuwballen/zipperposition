@@ -14,3 +14,12 @@ val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
 
 (** multiset order on lists which elements are ordered by f *)
 val multiset : ('a -> 'b -> int) -> 'a list -> 'b list -> int
+
+(** get n-th element of list (linear) *)
+val list_get : 'a list -> int -> 'a
+
+(** set n-th element of list (linear) *)
+val list_set : 'a list -> int -> 'a -> 'a list
+
+(** pretty-print into a string *)
+val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string

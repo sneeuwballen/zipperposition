@@ -3,16 +3,16 @@
 open Types
 
 module T = Terms
+module O = Orderings
 module C = Clauses
 module I = Index
 module PS = ProofState
 module CQ = ClauseQueue
 module S = FoSubst
-
 module Utils = FoUtils
 module Unif = FoUnif
 
-(* get first file of command line arguments *)
+(** get first file of command line arguments *)
 let get_file () =
   let files = ref [] in
   Arg.parse [] (fun s -> files := s :: !files) "./prover file";
@@ -20,7 +20,7 @@ let get_file () =
   | [] -> failwith "file required."
   | (x::_) -> x
 
-(* parse given tptp file *)
+(** parse given tptp file (TODO also parse include()s *)
 let parse_file f =
   let input = match f with
     | "stdin" -> stdin
@@ -29,83 +29,19 @@ let parse_file f =
     let buf = Lexing.from_channel input in
     Parser_tptp.parse_file Lexer_tptp.token buf
   with _ as e -> close_in input; raise e
-
-(* parse a string in a clause list option *)
-let parse_string s =
-  let buf = Lexing.from_string s in
-  try
-    Some (fst (Parser_tptp.parse_file Lexer_tptp.token buf))
-  with _ -> None
-
-(* parse a string into a term option *)
-let parse_term_str s =
-  let buf = Lexing.from_string s in
-  try
-    Some (Parser_tptp.term Lexer_tptp.token buf)
-  with _ -> None
-
-(* gather all terms in list *)
-let all_terms () =
-  let l = ref [] in
-  T.iter_terms (fun t -> l := t :: !l);
-  !l
-
-(* try to pairwise unify all terms *)
-let unify_all_terms all_terms =
-  let max_var = List.fold_left
-    (fun max_var t -> max max_var (T.max_var (T.vars_of_term t)))
-    0 all_terms in
-  let alt_terms = List.map  (* renamed terms *)
-    (fun t -> S.fresh_foterm max_var t)
-    all_terms in
-  let pairs = List.fold_left (* all combinations *)
-    (fun pairs_ t ->
-      List.append (List.map (fun t' -> (t, t')) alt_terms) pairs_)
-    [] all_terms
-  in
-  List.iter
-    (fun (t, t') ->
-      Format.printf "  unify %a %a ... " Pp.pp_foterm t Pp.pp_foterm t';
-      try
-        let subst = Unif.unification t t' in
-        Format.printf "success, %a@." Pp.pp_substitution subst
-      with FoUnif.UnificationFailure _ ->
-        Format.printf "failure.@.")
-    pairs
       
 (* create a bag from the given clauses *)
 let make_initial_bag clauses =
   let b = C.empty_bag in
   List.fold_left (fun b c -> fst (C.add_to_bag b c)) b clauses
 
-(* print an index *)
-let print_index idx = 
-  let print_dt_path path set =
-    let l = I.ClauseSet.elements set in
-    Format.printf "%s : @[<hov>%a@]@;"
-      (I.FotermIndexable.string_of_path path)
-      (Pp.pp_list ~sep:", " Pp.pp_clause_pos) l
-  in
-  Format.printf "index:@.root_index=@[<v 2>";
-  I.DT.iter idx.I.root_index print_dt_path;
-  Format.printf "@]@;subterm_index=@[<v 2>";
-  I.DT.iter idx.I.subterm_index print_dt_path;
-  Format.printf "@]@;"
-
 let () =
   let f = get_file () in
   Printf.printf "# process file %s\n" f;
   let clauses, _ = parse_file f in
-  let bag = List.fold_left (fun bag c -> fst (C.add_to_bag bag c))
-    C.empty_bag clauses in
   Printf.printf "# parsed %d clauses\n" (List.length clauses);
-  Format.printf "@[<v>%a@]@." Pp.pp_bag bag;
-  let terms = all_terms () in
-  Format.printf "@[<h>terms: %a@]@." (Pp.pp_list Pp.pp_foterm) terms;
-  (* now for bag testing *)
-  let bag = make_initial_bag clauses in
-  Format.printf "clauses: %a@." Pp.pp_bag bag;
-  (* and indexing *)
-  let index = List.fold_left (fun i c -> I.index_clause i c)
-    I.empty clauses in
-  print_index index
+  (* create a state *)
+  let state = PS.make_state O.default CQ.default_queues in
+  let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
+  (* print some stuff *)
+  Pp.debug_state Format.std_formatter state

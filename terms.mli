@@ -15,8 +15,8 @@ open Types
 val bool_sort : sort
 val univ_sort : sort
 
-(** iterate through existing terms *)
-val iter_terms : (foterm -> unit) -> unit
+val iter_terms : (foterm -> unit) -> unit     (** iterate through existing terms *)
+val all_terms : unit -> foterm list           (** all currently existing terms *)
 
 (** smart constructors, with a bit of type-checking *)
 val mk_var : int -> sort -> foterm

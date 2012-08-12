@@ -54,10 +54,9 @@ module M : Map.S with type key = int
 
 (** multiset of hashconsed clauses *)
 type bag = {
-  bag_maxvar: int;            (* higher bound for the biggest var index *)
-  bag_clauses : hclause M.t;  (* clause ID -> clause *)
+  bag_maxvar: int;            (** higher bound for the biggest var index *)
+  bag_clauses : hclause M.t;  (** hclause ID -> hclause *)
 }
-
 
 val add_to_bag : bag -> clause -> bag * hclause
 
@@ -68,3 +67,5 @@ val get_from_bag : bag -> int -> hclause
 val is_in_bag : bag -> int -> bool
 
 val empty_bag : bag
+
+val size_bag : bag -> int

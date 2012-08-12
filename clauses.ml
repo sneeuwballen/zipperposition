@@ -142,7 +142,6 @@ module M : Map.S with type key = int
        let compare = Pervasives.compare
      end)
 
-(* multiset of clauses *)
 type bag = {
   bag_maxvar : int;           (* index of maximum variable *)
   bag_clauses : hclause M.t;  (* clause ID -> clause *)
@@ -165,6 +164,7 @@ let is_in_bag bag id = M.mem id bag.bag_clauses
 
 let empty_bag = {bag_maxvar=0; bag_clauses=M.empty}
 
+let size_bag bag = M.cardinal bag.bag_clauses
 
 (*
 (* may be moved inside the bag *)

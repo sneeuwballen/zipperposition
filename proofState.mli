@@ -29,8 +29,16 @@ type state = {
 (** create a state from the given ordering *)
 val make_state : ordering -> (ClauseQueue.queue * int) list -> state
 
-(** get the next clause, if any *)
-val next_clause : state -> (state * hclause option)
+(** add clauses to the active set *)
+val add_active : active_set -> clause -> active_set * hclause
+val add_actives : active_set -> clause list -> active_set
+
+(** add clauses to the passive set *)
+val add_passive : passive_set -> clause -> passive_set * hclause
+val add_passives : passive_set -> clause list -> passive_set
+
+(** pop the next passive clause, if any *)
+val next_passive_clause : passive_set -> (passive_set * hclause option)
 
 (* parse CLI arguments to create a state (TODO move somewhere else) *)
 val parse_args : unit -> state
