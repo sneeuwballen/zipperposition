@@ -16,13 +16,17 @@ open Format
 val pp_list: ?sep:string -> (formatter -> 'a -> unit)
     -> formatter -> 'a list -> unit
 
+(* pretty printing of objects *)
 val pp_foterm: formatter -> foterm -> unit
 val pp_substitution: formatter -> substitution -> unit
 val pp_clause : formatter -> clause -> unit
 val pp_clause_pos : formatter -> (clause * position) -> unit
+val pp_hclause : formatter -> hclause -> unit
 val pp_hclause_pos : formatter -> (hclause * position) -> unit
 val pp_bag: formatter -> Clauses.bag -> unit
 val pp_index : formatter -> Index.t -> unit
+val pp_queue : formatter -> ClauseQueue.queue -> unit
+val pp_queues : formatter -> (ClauseQueue.queue * int) list -> unit
 val pp_state : formatter -> ProofState.state -> unit
 
 (* debug functions: much more detailed printing *)

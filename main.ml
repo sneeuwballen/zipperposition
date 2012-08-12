@@ -20,6 +20,29 @@ let get_file () =
   | [] -> failwith "file required."
   | (x::_) -> x
 
+(* hashtable string -> ordering module *)
+let ords = Hashtbl.create 7
+let _ =
+  Hashtbl.add ords "lpo" (new Orderings.lpo);
+  Hashtbl.add ords "kbo" (new Orderings.kbo);
+  Hashtbl.add ords "nrkbo" (new Orderings.nrkbo)
+
+let ord = ref Orderings.default
+let set_ord s = (* select ordering *)
+  try
+    ord := Hashtbl.find ords s
+  with
+    Not_found -> Printf.printf "unknown ordering: %s\n" s
+
+let options =
+  [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo,nrkbo)") ]
+  (* TODO parse something about heuristics *)
+let args_fun s = ()
+
+let parse_args () =
+  Arg.parse options args_fun "solve problem in first file";
+  PS.make_state !ord CQ.default_queues
+
 (** parse given tptp file (TODO also parse include()s *)
 let parse_file f =
   let input = match f with

@@ -8,6 +8,7 @@ class type queue =
     method add : hclause -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
+    method name : string
   end
 
 (* select by increasing age (for fairness) *)

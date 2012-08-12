@@ -53,7 +53,7 @@ let next_passive_clause passive_set =
       else 
         let new_q, hc = q#take_first in (* pop from this queue *)
         let new_q_state = (idx, weight+1) (* increment weight *)
-        and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.hkey in
+        and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.tag in
         {passive_set with passive_clauses=new_clauses;
                           queues=U.list_set queues idx (new_q, w);
                           queue_state=new_q_state}, Some hc
@@ -85,26 +85,6 @@ let add_passive passive_set c =
 let add_passives passive_set l =
   List.fold_left (fun b c -> fst (add_passive b c)) passive_set l
 
-(* hashtable string -> ordering module *)
-let ords = Hashtbl.create 7
-let _ =
-  Hashtbl.add ords "lpo" (new Orderings.lpo);
-  Hashtbl.add ords "kbo" (new Orderings.kbo);
-  Hashtbl.add ords "nrkbo" (new Orderings.nrkbo)
-
-let ord = ref Orderings.default
-let set_ord s = (* select ordering *)
-  try
-    ord := Hashtbl.find ords s
-  with
-    Not_found -> Printf.printf "unknown ordering: %s\n" s
-
-let options =
-  [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo,nrkbo)") ]
-  (* TODO parse something about heuristics *)
-let args_fun s = ()
-
-let parse_args () =
-  Arg.parse options args_fun "solve problem in first file";
-  make_state !ord ClauseQueue.default_queues
-
+let relocate_active active_set c =
+  let maxvar = active_set.active_clauses.C.bag_maxvar in
+  fst (C.fresh_clause ~ord:active_set.a_ord maxvar c)

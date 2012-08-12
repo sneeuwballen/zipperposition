@@ -18,8 +18,6 @@ module C = Clauses
 module I = Index
 module PS = ProofState
 
-(* Main pretty printing functions *)
-
 (* print a list of items using the printing function *)
 let rec pp_list ?(sep=", ") pp_item  formatter = function
   | x::y::xs -> fprintf formatter "%a%s@,%a"
@@ -27,7 +25,6 @@ let rec pp_list ?(sep=", ") pp_item  formatter = function
   | x::[] -> pp_item formatter x
   | [] -> ()
 
-(* print a term *)
 let rec pp_foterm formatter t = match t.node.term with
   | Leaf x -> Signature.pp_symbol formatter x
   | Var i -> fprintf formatter "X%d" i
@@ -45,7 +42,6 @@ let string_of_pos s = match s with
   | _ when s == C.right_pos -> "right"
   | _ -> assert false
 
-(* print substitution *)
 let pp_substitution formatter subst =
   fprintf formatter "@[<h>";
   List.iter
@@ -109,9 +105,12 @@ let pp_clause_pos formatter (c, pos) =
   fprintf formatter "[%a at @[<h>%a@]]@;"
   pp_clause c (pp_list ~sep:"." pp_print_int) pos
 
+let pp_hclause formatter c =
+  fprintf formatter "@[<h>hclause(%d) %a@]" c.tag pp_clause c.node
+
 let pp_hclause_pos formatter (c, pos) =
   fprintf formatter "[%a at @[<h>%a@]]@;"
-  pp_clause c.node (pp_list ~sep:"." pp_print_int) pos
+  pp_hclause c (pp_list ~sep:"." pp_print_int) pos
 
 let pp_bag formatter bag =
   fprintf formatter "@[<hov>";
@@ -133,15 +132,26 @@ let pp_index formatter idx =
   I.DT.iter idx.I.subterm_index print_dt_path;
   fprintf formatter "@]@;"
 
+let pp_queue formatter q =
+  Format.fprintf formatter "@[<h>queue %s@]" q#name
+
+let pp_queue_weight formatter (q, w) =
+  Format.fprintf formatter "@[<h>queue %s, %d@]" q#name w
+
+let pp_queues formatter qs =
+  Format.fprintf formatter "@[<hov>%a@]" (pp_list ~sep:"; " pp_queue_weight) qs
+
 let pp_state formatter state =
-  Format.fprintf formatter "state {%d active clauses; %d passive_clauses}"
+  Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
     (C.size_bag state.PS.active_set.PS.active_clauses)
     (C.size_bag state.PS.passive_set.PS.passive_clauses)
+    pp_queues state.PS.passive_set.PS.queues
 
 let debug_state formatter state =
   Format.fprintf formatter
-    "@[<v 2>state {%d active clauses; %d passive_clauses;@;active:%a@;passive:%a@]@;"
+    "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
     (C.size_bag state.PS.active_set.PS.active_clauses)
     (C.size_bag state.PS.passive_set.PS.passive_clauses)
+    pp_queues state.PS.passive_set.PS.queues
     pp_bag state.PS.active_set.PS.active_clauses
     pp_bag state.PS.passive_set.PS.passive_clauses

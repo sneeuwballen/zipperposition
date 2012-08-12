@@ -9,19 +9,23 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* $Id: index.mli 9822 2009-06-03 15:37:06Z tassi $ *)
+open Types
 
-module O = Orderings
-module T = Terms
-module PS = ProofState
+(** inferences *)
 
-val infer_right : PS.active_set -> T.clause -> T.clause list
+val infer_right : ProofState.active_set -> clause -> clause list
 
-val infer_left : PS.active_set -> T.clause -> T.clause list
+val infer_left : ProofState.active_set -> clause -> clause list
 
-val demodulate : PS.active_set -> T.clause
-		 -> T.clause list   (* clauses to ignore *)
-		 -> T.clause	    (* the simplified clause *)
+val infer_equality_resolution : clause -> clause list
+
+val infer_equality_factoring : clause -> clause list
+
+(** simplifications *)
+
+val demodulate : ProofState.active_set
+                -> clause   (** the clause to simplifies *)
+		-> clause   (** the simplified clause *)
 
 (* bag, maxvar, empty clause *)
 exception Success of 

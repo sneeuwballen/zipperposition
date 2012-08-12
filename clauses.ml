@@ -61,35 +61,27 @@ let vars_of_lit = function
  * clauses
  * ---------------------------------------------------------------------- *)
 
-(** hashconsing for clauses *)
+let eq_clause c1 c2 =
+  try
+    List.for_all2 eq_literal c1.clits c2.clits
+  with
+    Invalid_argument _ -> false
+
+let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
+
 module HC = Hashcons.Make(struct
   type t = clause
-  let equal x y =
-    let rec aux x y = match (x, y) with
-    | [], [] -> true
-    | [], _ | _, [] -> false
-    | (lx::lxs, ly::lys) ->
-        if eq_literal lx ly then aux lxs lys else false
-    in
-    aux x.clits y.clits
+  let equal x y = eq_clause x y
   let hash x = Hashtbl.hash x.clits
 end)
 
 let clauses = HC.create 251  (* the hashtable for hclauses *)
 
-let eq_clause c1 c2 =
-  let rec aux lits1 lits2 = match (lits1, lits2) with
-  | [], [] -> true
-  | _, [] | [], _ -> false
-  | (l1::lits1, l2::lits2) ->
-    if eq_literal l1 l2 then aux lits1 lits2 else false
-  in aux c1.clits c2.clits
+let hashcons_clause c = HC.hashcons clauses c
 
-let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
+let eq_hclause hc1 hc2 = hc1 == hc2
 
-let eq_hclause hc1 hc2 = hc1.hkey == hc2.hkey
-
-let compare_hclause hc1 hc2 = Pervasives.compare hc1.hkey hc2.hkey
+let compare_hclause hc1 hc2 = Pervasives.compare hc1.tag hc2.tag
 
 let mk_clause lits proof =
     let all_vars =
@@ -129,8 +121,6 @@ let relocate_clause ~ord varlist c =
 
 let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)
 
-let hashcons_clause c = HC.hashcons clauses c
-
 (* ----------------------------------------------------------------------
  * bag of clauses
  * ---------------------------------------------------------------------- *)
@@ -151,7 +141,7 @@ let add_to_bag {bag_maxvar=maxvar_b; bag_clauses=clauses_b} c =
   let hc = hashcons_clause c
   and maxvar_c = T.max_var c.cvars in
   {bag_maxvar=(max maxvar_c maxvar_b);
-   bag_clauses=M.add hc.hkey hc clauses_b}, hc
+   bag_clauses=M.add hc.tag hc clauses_b}, hc
 
 let remove_from_bag ({bag_clauses=clauses_b} as bag) id =
   let new_clauses = M.remove id clauses_b in

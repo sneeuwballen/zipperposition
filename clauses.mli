@@ -29,6 +29,9 @@ val vars_of_lit : literal -> varlist (** gather variables *)
 
 val eq_clause : clause -> clause -> bool                (** equality of clauses *)
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
+
+val hashcons_clause : clause -> hclause
+
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
@@ -43,8 +46,6 @@ val fresh_clause : ord:ordering -> int -> clause -> clause * int
 val relocate_clause : ord:ordering -> varlist -> clause -> clause       
 (** normalize (vars start at 1) *)
 val normalize_clause : ord:ordering -> clause -> clause                 
-
-val hashcons_clause : clause -> hclause
 
 (* ----------------------------------------------------------------------
  * bag of clauses

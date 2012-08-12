@@ -11,9 +11,14 @@ class type queue =
     method add : hclause -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
+    method name : string
   end
 
-module type HeapQueueOrd = Leftistheap.Ordered with type t = hclause
+module type HeapQueueOrd =
+  sig
+    include Leftistheap.Ordered with type t = hclause
+    val name : string
+  end
 
 (* generic clause queue based on some ordering on clauses *)
 module HeapQueue(Ord : HeapQueueOrd) =
@@ -35,6 +40,8 @@ module HeapQueue(Ord : HeapQueueOrd) =
           assert (not (H.is_empty heap));
           let c,new_h = H.extract_min heap in
           (({< heap = new_h >} :> queue), c)
+
+        method name = Ord.name
       end
   end
 
@@ -42,7 +49,8 @@ module HeapQueue(Ord : HeapQueueOrd) =
 module FifoQueue = HeapQueue(
   struct
     type t = hclause
-    let le hc1 hc2 = hc1.hkey <= hc2.hkey
+    let le hc1 hc2 = hc1.tag <= hc2.tag
+    let name = "fifo_queue"
   end)
 
 class fifo = FifoQueue.q
@@ -55,6 +63,7 @@ module ClauseWeight = HeapQueue(
       let w1 = O.compute_clause_weight hc1.node
       and w2 = O.compute_clause_weight hc2.node in
       w1 <= w2
+    let name = "clause_weight"
   end)
 
 class clause_weight = ClauseWeight.q

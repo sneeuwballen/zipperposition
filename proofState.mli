@@ -40,5 +40,5 @@ val add_passives : passive_set -> clause list -> passive_set
 (** pop the next passive clause, if any *)
 val next_passive_clause : passive_set -> (passive_set * hclause option)
 
-(* parse CLI arguments to create a state (TODO move somewhere else) *)
-val parse_args : unit -> state
+(** relocate clause w.r.t clauses in the active_set *)
+val relocate_active : active_set -> clause -> clause
