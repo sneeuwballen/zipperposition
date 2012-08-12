@@ -42,4 +42,7 @@ sig
 
   val merge: t -> t -> t
     (* runs in O(log max(n1, n2)) *)
+
+  val remove: t -> X.t list -> t
+    (* runs in O(n), removing all elements in the list (assuming X.le is total) *)
 end

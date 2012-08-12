@@ -15,7 +15,8 @@
 
 (* Leftist heaps.
 
-   See for instance Chris Okasaki's "Purely Functional Data Structures" *)
+   See for instance Chris Okasaki's "Purely Functional Data Structures".
+   Added by Simon: a remove (slow) function *)
 
 module type Ordered = sig
   type t
@@ -33,6 +34,7 @@ sig
   val min : t -> X.t
   val extract_min : t -> X.t * t
   val merge : t -> t -> t
+  val remove: t -> X.t list -> t
 end
 =
 struct
@@ -62,5 +64,13 @@ struct
   let extract_min = function
     | E -> raise Empty
     | T (_,x,a,b) -> x, merge a b
+
+  let rec remove t l = match t with
+    | E -> E
+    | T (_,x,a,b) when List.exists (fun y -> X.le x y && X.le y x) l ->
+      (* eliminate x, it is in the list if X.le is a total order *)
+      merge (remove a l) (remove b l)
+    | T (_,x,a,b) ->
+      make x (remove a l) (remove b l)
 
 end
