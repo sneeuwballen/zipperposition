@@ -9,48 +9,47 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* $Id: index.ml 11696 2011-11-21 09:42:44Z asperti $ *)
+open Types
+open Hashcons
 
 module T = Terms
-open T
-open Hashcons
-module U = FoUtils
+module C = Clauses
 module Unif = FoUnif
 
 (* an order on clauses+positions *)
 module ClauseOT =
   struct 
-    type t = T.clause * T.position
+    type t = clause * position
 
     let compare (c1, p1) (c2, p2) = 
       let c = Pervasives.compare p1 p2 in
       if c <> 0 then c else
-      U.compare_clause c1 c2
+      C.compare_clause c1 c2
   end
 
 (* a set of (clause, position in clause). A position is a
  * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
  * where ... is the path in the term *)
 module ClauseSet : Set.S with 
-  type elt = T.clause * T.position
+  type elt = clause * position
   = Set.Make(ClauseOT)
 
 open Discrimination_tree
 
 module FotermIndexable = struct
-  type input = T.foterm
+  type input = foterm
   type constant_name = Signature.symbol
 
   (* convert into a path string *)
   let path_string_of t =
     let rec aux arity t = match t.node.term with
-      | T.Leaf a -> [Constant (a, arity)]
-      | T.Var i -> (* assert (arity = 0); *) [Variable]
-      | T.Node ([] | [ _ ] )
+      | Leaf a -> [Constant (a, arity)]
+      | Var i -> (* assert (arity = 0); *) [Variable]
+      | Node ([] | [ _ ] )
       (* FIXME : should this be allowed or not ? *)
-      | T.Node ({node={term=T.Var _}}::_)
-      | T.Node ({node={term=T.Node _}}::_) -> assert false
-      | T.Node (hd::tl) ->
+      | Node ({node={term=Var _}}::_)
+      | Node ({node={term=Node _}}::_) -> assert false
+      | Node (hd::tl) ->
           aux (List.length tl) hd @ List.flatten (List.map (aux 0) tl) 
     in 
       aux 0 t
@@ -81,7 +80,7 @@ end
 (* the discrimination trees used for indexing *)
 module DT : DiscriminationTree with
   type constant_name = Signature.symbol and 
-  type input = T.foterm and 
+  type input = foterm and 
   type data = ClauseSet.elt and 
   type dataset = ClauseSet.t
 = Make(FotermIndexable)(ClauseSet)
@@ -102,19 +101,19 @@ type t = {
 let empty = { root_index=DT.empty; subterm_index=DT.empty }
 
 (* apply op to some of the literals of the clause. *)
-let process op tree ({T.clits=lits} as c) =
+let process op tree ({clits=lits} as c) =
   let process_lit (pos, tree) lit =
     let new_tree = match lit with
-    | T.Equation (l,_,_,T.Gt) -> 
-        op tree l (c, [T.left_pos; pos])
-    | T.Equation (_,r,_,T.Lt) -> 
-        op tree r (c, [T.right_pos; pos])
-    | T.Equation (l,r,_,T.Incomparable) ->
-        let tmp_tree = op tree l (c, [T.left_pos; pos]) in
-        op tmp_tree r (c, [T.right_pos; pos])
-    | T.Equation (l,r,_,T.Invertible) ->
-        op tree l (c, [T.left_pos; pos])
-    | T.Equation (_,r,_,T.Eq) -> assert false
+    | Equation (l,_,_,Gt) -> 
+        op tree l (c, [C.left_pos; pos])
+    | Equation (_,r,_,Lt) -> 
+        op tree r (c, [C.right_pos; pos])
+    | Equation (l,r,_,Incomparable) ->
+        let tmp_tree = op tree l (c, [C.left_pos; pos]) in
+        op tmp_tree r (c, [C.right_pos; pos])
+    | Equation (l,r,_,Invertible) ->
+        op tree l (c, [C.left_pos; pos])
+    | Equation (_,r,_,Eq) -> assert false
     and new_pos = pos+1
     in (new_pos, new_tree)
   in
@@ -123,9 +122,9 @@ let process op tree ({T.clits=lits} as c) =
 
 (* apply (op tree) to all subterms, folding the resulting tree *)
 let rec fold_subterms op tree t (c, path) = match t.node.term with
-  | T.Var _ -> tree  (* variables are not indexed *)
-  | T.Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
-  | T.Node (_::l) ->
+  | Var _ -> tree  (* variables are not indexed *)
+  | Leaf _ -> op tree t (c, List.rev path) (* reverse path now *)
+  | Node (_::l) ->
       (* apply the operation on the term itself *)
       let tmp_tree = op tree t (c, List.rev path) in
       let _, new_tree = List.fold_left
@@ -158,6 +157,3 @@ let fold = DT.fold
 let elems index =
   DT.fold index (fun _ dataset acc -> ClauseSet.union dataset acc)
     ClauseSet.empty
-  
-(* an active set contains a list of clauses and an index on those clauses *)
-type active_set = T.clause list * t

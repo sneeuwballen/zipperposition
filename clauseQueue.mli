@@ -1,11 +1,13 @@
 (* heuristic selection of clauses *)
 
+open Types
+
 (* a queue of clauses, as a pure object *)
 class type queue =
   object
-    method add : Terms.clause -> queue
+    method add : hclause -> queue
     method is_empty: bool
-    method take_first : (queue * Terms.clause)
+    method take_first : (queue * hclause)
   end
 
 (* select by increasing age (for fairness) *)

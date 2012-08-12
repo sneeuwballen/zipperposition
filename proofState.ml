@@ -1,34 +1,42 @@
 (* the state of a proof *)
 
-module T = Terms
-module I = Index
+open Types
 
-(* set of active clauses *)
+module I = Index
+module C = Clauses
+
+(** set of active clauses *)
 type active_set = {
-  active_clauses : Terms.bag;
+  a_ord : ordering;
+  active_clauses : C.bag;
   idx : Index.t;
 }
 
-(* set of passive clauses *)
+(** set of passive clauses *)
 type passive_set = {
+  p_ord : ordering;
+  passive_clauses : C.bag;
   queues : (ClauseQueue.queue * int) list;
+  queue_state : int * int;  (** position in the queue/weight *)
 }
 
-(* state of a superposition calculus instance.
-   It contains a set of active clauses, a set of passive clauses,
-   and is parametrized by an ordering. *)
+(** state of a superposition calculus instance.
+    It contains a set of active clauses, a set of passive clauses,
+    and is parametrized by an ordering. *)
 type state = {
-  ord : Orderings.ordering;
-  active_set : active_set;  (* active clauses, indexed *)
-  passive_set : passive_set; (* passive clauses *)
+  ord : ordering;
+  active_set : active_set;    (* active clauses, indexed *)
+  passive_set : passive_set;  (* passive clauses *)
 }
 
-(* create a state *)
 let make_state ord queue_list =
-  let passive_set = {queues=queue_list}
-  and active_set = {active_clauses=T.empty_bag; idx=I.empty} in
+  let passive_set = {p_ord=ord; passive_clauses=C.empty_bag;
+                     queues=queue_list; queue_state=(0,0)}
+  and active_set = {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty} in
   {ord=ord; active_set=active_set;
    passive_set=passive_set}
+
+let next_clause state = (state, None)  (* TODO *)
 
 (* hashtable string -> ordering module *)
 let ords = Hashtbl.create 7

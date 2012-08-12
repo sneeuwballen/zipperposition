@@ -28,12 +28,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     let value counter = !counter
   end
 
-  module T = Terms
+  open Hashcons
+  open Types
 
-  type term = T.foterm
-  type variable = T.foterm
-  type literal = T.literal
-  type clause = T.clause
+  module T = Terms
+  module C = Clauses
+  module O = Orderings
+
+  type term = Types.foterm
+  type variable = Types.foterm
+  type literal = Types.literal
+  type clause = Types.clause
 
   (* includes from input *)
   let include_files: string list ref =
@@ -48,7 +53,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       
   (* mapping of the variable names (e.g. "X") of the currently read term/clause
      to variables. *)
-  let (var_map: (string * T.sort * variable) list ref) =
+  let (var_map: (string * sort * variable) list ref) =
     ref []
 
   (* the literals of the currently read clause *)
@@ -130,10 +135,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token UNKNOWN
 
 %start parse_file
-%type <Terms.clause list * string list> parse_file
+%type <Types.clause list * string list> parse_file
 
 %start term
-%type <Terms.foterm> term
+%type <Types.foterm> term
 
 %%
 
@@ -311,7 +316,7 @@ cnf_annotated:
       // ignore everything except for the formula
       {
 	let clause = 
-	  FoUtils.mk_clause $7 (T.Axiom $3)
+	  C.mk_clause $7 (lazy (Axiom $3))
 	in
 	  init_clause ();
 	  clause
@@ -358,7 +363,7 @@ literal:
       { $1 }
 
   | NEGATION atomic_formula
-      { FoUtils.negate_lit $2 }
+      { C.negate_lit $2 }
 
 atomic_formula:
   | plain_atom
@@ -373,7 +378,7 @@ atomic_formula:
 plain_atom:
   | plain_term_top
       { let t = T.cast $1 T.bool_sort in (* cast term to bool *)
-        FoUtils.mk_eq t T.true_term }
+        C.mk_eq ~ord:O.default t T.true_symbol }
 
 arguments:
   | term
@@ -384,20 +389,20 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { FoUtils.mk_eq T.true_term T.true_term }
+      { C.mk_eq ~ord:O.default T.true_symbol T.true_symbol }
 
   | DOLLAR_FALSE
-      { FoUtils.mk_neq T.true_term T.true_term (* T!=T is false *) }
+      { C.mk_neq ~ord:O.default T.true_symbol T.true_symbol (* T!=T is false *) }
 
   | term EQUALITY term
-      { FoUtils.mk_eq $1 $3 }
+      { C.mk_eq ~ord:O.default $1 $3 }
   | term DISEQUALITY term
-      { FoUtils.mk_neq $1 $3 }
+      { C.mk_neq ~ord:O.default $1 $3 }
 
 system_atom:
   | system_term_top
       { let t = T.cast $1 T.bool_sort in
-        FoUtils.mk_eq t T.true_term }
+        C.mk_eq t ~ord:O.default T.true_symbol }
 
 term:
   | function_term

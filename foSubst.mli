@@ -9,23 +9,39 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
+open Types
 
-exception OccurCheck of (Terms.foterm * Terms.foterm)
+exception OccurCheck of (foterm * foterm)
 
-val id_subst : Terms.substitution
+val id_subst : substitution
 
-(* add v -> t to the substitution. If recursive is true,
- * then v -> subst(t) is considered instead.
- * If v occurs in t, OccurCheck (v,t) is raised. *)
-val build_subst : Terms.foterm -> Terms.foterm -> ?recursive:bool ->
-                  Terms.substitution -> Terms.substitution
+(** add v -> t to the substitution. If recursive is true,
+    then v -> subst(t) is considered instead.
+    If v occurs in t, OccurCheck (v,t) is raised. *)
+val build_subst : ?recursive:bool -> foterm -> foterm -> substitution -> substitution
 
-val lookup : Terms.foterm -> Terms.substitution -> Terms.foterm
-val is_in_subst : Terms.foterm -> Terms.substitution -> bool
-val filter : Terms.substitution -> Terms.varlist -> Terms.varlist
-val reloc_subst : Terms.substitution -> Terms.foterm -> Terms.foterm
-val apply_subst : Terms.substitution -> ?recursive:bool ->
-                  Terms.foterm -> Terms.foterm
-val flat: Terms.substitution -> Terms.substitution
-val concat: Terms.substitution -> Terms.substitution -> Terms.substitution
+(** lookup variable in substitution *)
+val lookup : foterm -> substitution -> foterm
+val is_in_subst : foterm -> substitution -> bool
+
+(** filter out from the varlist the variables bound by subst *)
+val filter : substitution -> varlist -> varlist
+
+val apply_subst : ?recursive:bool -> substitution -> foterm -> foterm
+
+(** normalize the substitution, such that subst(subst(v)) = subst(v)
+    for all v. The result is idempotent. *)
+val flat: substitution -> substitution
+val concat: substitution -> substitution -> substitution
+
+(** perform renaming to get disjoint variables sets,
+    ie the resulting substitution's domain has no common
+    variable with [varlist], and its new domain is newvarlist
+    relocate [maxvar] [varlist] [subst] ->
+    [newmaxvar] * [newvarlist] * [relocsubst] *)
+
+val relocate : int -> varlist -> substitution -> (int * varlist * substitution)
+
+val fresh_foterm : int -> foterm -> foterm      (** fresh term, with all variables > maxvar *)
+val relocate_term : varlist -> foterm -> foterm (** rename the term so that
+                                                    it has no variable in varlist *)

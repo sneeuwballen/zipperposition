@@ -9,12 +9,11 @@
      \ /   This software is distributed as is, NO WARRANTY.
       V_______________________________________________________________ *)
 
-(* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
+open Types
+open Hashcons
 
 module T = Terms
-
-open Hashcons
-open Terms
+module C = Clauses
 
 (* Main pretty printing functions *)
 
@@ -34,13 +33,13 @@ let rec pp_foterm formatter t = match t.node.term with
   | Node [] -> failwith "bad term"
 
 let string_of_direction = function
-    | T.Left2Right -> "Left to right"
-    | T.Right2Left -> "Right to left"
-    | T.Nodir -> "No direction"
+    | Left2Right -> "Left to right"
+    | Right2Left -> "Right to left"
+    | Nodir -> "No direction"
 
 let string_of_pos s = match s with
-  | _ when s == T.left_pos -> "left"
-  | _ when s == T.right_pos -> "right"
+  | _ when s == C.left_pos -> "left"
+  | _ when s == C.right_pos -> "right"
   | _ -> assert false
 
 (* print substitution *)
@@ -78,31 +77,30 @@ let pp_proof bag ~formatter:f p =
 *)
 
 let string_of_comparison = function
-  | T.Lt -> "=<="
-  | T.Gt -> "=>="
-  | T.Eq -> "==="
-  | T.Incomparable -> "=?="
-  | T.Invertible -> "=<->="
+  | Lt -> "=<="
+  | Gt -> "=>="
+  | Eq -> "==="
+  | Incomparable -> "=?="
+  | Invertible -> "=<->="
 
 let pp_literal formatter = function
-  | T.Equation (left, right, false, _) when right = T.true_term->
+  | Equation (left, right, false, _) when right = T.true_symbol ->
     Format.fprintf formatter "~%a" pp_foterm left
-  | T.Equation (left, right, true, _) when right = T.true_term->
+  | Equation (left, right, true, _) when right = T.true_symbol ->
     pp_foterm formatter left
-  | T.Equation (left, right, true, _) when left = T.true_term ->
+  | Equation (left, right, true, _) when left = T.true_symbol ->
     pp_foterm formatter right
-  | T.Equation (left, right, false, _) when left = T.true_term ->
+  | Equation (left, right, false, _) when left = T.true_symbol ->
     Format.fprintf formatter "~%a" pp_foterm right
-  | T.Equation (left, right, sign, ord) ->
+  | Equation (left, right, sign, ord) ->
     if sign
     then Format.fprintf formatter "@[%a@ %a@ %a@]"
-        pp_foterm left pp_foterm T.eq_term pp_foterm right
+        pp_foterm left pp_foterm T.eq_symbol pp_foterm right
     else Format.fprintf formatter "@[<hv 2>%a !%a@ %a@]"
-        pp_foterm left pp_foterm T.eq_term pp_foterm right
+        pp_foterm left pp_foterm T.eq_symbol pp_foterm right
 
-let pp_clause formatter {T.cid=id; T.clits=lits} =
-  Format.fprintf formatter "@[<hv 2>(cl %d) %a@]"
-    id (pp_list ~sep:" | " pp_literal) lits
+let pp_clause formatter {clits=lits} =
+  Format.fprintf formatter "@[<hv 2>%a@]" (pp_list ~sep:" | " pp_literal) lits
 
 let pp_clause_pos formatter (c, pos) =
   Format.fprintf formatter "[%a at @[<h>%a@]]@;"
@@ -110,10 +108,9 @@ let pp_clause_pos formatter (c, pos) =
 
 let pp_bag formatter bag =
   Format.fprintf formatter "@[<v>((*) mean active, (_) discarded)@;";
-  Terms.M.iter
-    (fun _ (c,d,_) -> pp_clause formatter c;
-       if d then Format.fprintf formatter " (_)@;"
-       else Format.fprintf formatter " (*)@;") bag.bag_clauses;
+  C.M.iter
+    (fun _ hc -> Format.fprintf formatter "%a@;" pp_clause hc.node)
+    bag.C.bag_clauses;
   Format.fprintf formatter "@]"
 
 (* String buffer implementation *)

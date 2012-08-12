@@ -10,64 +10,72 @@
       V_______________________________________________________________ *)
 
 open Hashcons
-open Terms
+open Types
 
-exception OccurCheck of (Terms.foterm * Terms.foterm)
+module T = Terms
+
+exception OccurCheck of (foterm * foterm)
 
 let id_subst = []
 
 let rec lookup var subst = match subst with
   | [] -> var
   | ((v,t) :: tail) ->
-      if Terms.eq_foterm v var then t else lookup var tail
+      if T.eq_foterm v var then t else lookup var tail
 
 let is_in_subst var subst = lookup var subst != var
 
-(* filter out from metasenv the variables in substs *)
 let filter subst varlist =
   List.filter
     (fun var ->
        not (is_in_subst var subst))
     varlist
 
-let rec reloc_subst subst t = match t.node.term with
-  | Terms.Leaf _ -> t
-  | Terms.Var _ ->
+let rec apply_subst ?(recursive=true) subst t = match t.node.term with
+  | Leaf _ -> t
+  | Var _ ->
       let new_t = lookup t subst in
-      assert (t != new_t);
-      new_t
-  | (Terms.Node l) ->
-      Terms.mk_node (List.map (fun t -> reloc_subst subst t) l)
+      if recursive && not (T.eq_foterm new_t t)
+        then apply_subst subst ~recursive new_t
+        else new_t
+  | Node l ->
+      T.mk_node (List.map (fun t -> apply_subst subst ~recursive t) l)
 
-let rec apply_subst subst ?(recursive=true) t = match t.node.term with
-  | Terms.Leaf _ -> t
-  | Terms.Var _ ->
-      let new_t = lookup t subst in
-      if recursive then apply_subst subst ~recursive new_t else new_t
-  | Terms.Node l ->
-      Terms.mk_node (List.map (fun t -> apply_subst subst ~recursive t) l)
-
-(* add v -> t to the substitution. If recursive is true,
- * then v -> subst(t) is considered instead.
- * If v occurs in t, OccurCheck (v,t) is raised.
- *)
-let build_subst v t ?(recursive=false) tail =
+let build_subst ?(recursive=false) v t tail =
   if recursive
     then (
       let new_t = apply_subst ~recursive tail t in
       (* v -> v, no need to add to subst *)
-      if Terms.eq_foterm v new_t then tail
+      if T.eq_foterm v new_t then tail
       (* v -> t[v], not well-formed substitution *)
-      else if Terms.member_term v new_t then raise (OccurCheck (v, new_t))
+      else if T.member_term v new_t then raise (OccurCheck (v, new_t))
       (* append to list *)
       else (v, new_t) :: tail )
-    else if Terms.eq_foterm v t
+    else if T.eq_foterm v t
       then tail
       else (v,t) :: tail
 
-(* normalize the substitution, such that subst(subst(v)) = subst(v)
- * for all v. The result is idempotent. *)
 let flat subst = List.map (fun (x, t) -> (x, apply_subst subst t)) subst
 
 let concat x y = x @ y
 
+let relocate maxvar varlist subst =
+  List.fold_right
+    (fun ({node={sort=sort}} as v) (maxvar, varlist, s) -> 
+       let new_v = T.mk_var maxvar sort in
+       maxvar+1, new_v::varlist, build_subst v new_v s)
+    varlist (maxvar+1, [], subst)
+
+let fresh_foterm maxvar t =
+  let _, subst = List.fold_left
+    (fun (offset, subst) ({node={sort=sort}} as var) ->
+      let new_var = T.mk_var offset sort in
+      (offset+1, build_subst var new_var ~recursive:false subst))
+    (maxvar+1, id_subst) (T.vars_of_term t)
+  in
+  apply_subst ~recursive:false subst t
+
+let relocate_term varlist t =
+  let idx = T.max_var varlist in
+  let _, _, subst = relocate idx varlist id_subst in
+  apply_subst ~recursive:false subst t

@@ -9,7 +9,11 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* $Id: orderings.ml 10997 2010-10-17 09:12:29Z tassi $ *)
+open Types
+open Hashcons
+
+module T = Terms
+module C = Clauses
 
 (* ----------------------------------------------------------------------
  module interface
@@ -19,25 +23,18 @@ type aux_comparison = XEQ | XLE | XGE | XLT | XGT | XINCOMPARABLE | XINVERTIBLE
 
 module type S =
   sig 
-    type foterm = Terms.foterm
-
     (* This order relation should be:
      * - stable for instantiation
      * - total on ground terms
-     *
      *)
-    val compare_terms : Terms.foterm -> Terms.foterm -> Terms.comparison
+    val compare_terms : foterm -> foterm -> comparison
 
     (* these could be outside the module, but to ease experimentation
      * we allow them to be tied with the ordering *)
-    val compute_clause_weight : Terms.clause -> int
+    val compute_clause_weight : clause -> int
 
     val name : string
   end
-
-module T = Terms
-open Hashcons
-open T
   
 type weight = int * (int * int) list
   
@@ -51,15 +48,15 @@ let string_of_weight (cw, mw) =
 let weight_of_term term =
     let vars_dict = Hashtbl.create 5 in
     let rec aux x = match x.node.term with
-      | T.Var i -> 
+      | Var i -> 
           (try
              let oldw = Hashtbl.find vars_dict i in
              Hashtbl.replace vars_dict i (oldw+1)
            with Not_found ->
              Hashtbl.add vars_dict i 1);
           0
-      | T.Leaf _ -> 1
-      | T.Node l -> List.fold_left (+) 0 (List.map aux l)
+      | Leaf _ -> 1
+      | Node l -> List.fold_left (+) 0 (List.map aux l)
     in
     let w = aux term in
     let l =
@@ -71,12 +68,12 @@ let weight_of_term term =
     in 
     (w, List.sort compare l) (* from the smallest meta to the bigest *)
 
-let compute_clause_weight {T.clits=lits} = 
+let compute_clause_weight {clits=lits} = 
     let rec weight_of_polynomial w m =
       let factor = 2 in      
       w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
     and weight_of_lit l = match l with
-    | T.Equation (l,r,_,ord) ->  (* TODO use order? *)
+    | Equation (l,r,_,ord) ->  (* TODO use order? *)
         let wl, ml = weight_of_term l in 
         let wr, mr = weight_of_term r in 
         weight_of_polynomial (wl+wr) (ml@mr) in
@@ -133,19 +130,19 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
   (* We want to discard any identity equality. *
    * If we give back XEQ, no inference rule    *
    * will be applied on this equality          *)
-  | T.Var i, T.Var j when i = j ->
+  | Var i, Var j when i = j ->
       XEQ
   (* 1. *)
-  | T.Var _, _
-  | _, T.Var _ -> XINCOMPARABLE
+  | Var _, _
+  | _, Var _ -> XINCOMPARABLE
   (* 2.a *)
-  | T.Leaf a1, T.Leaf a2 -> 
+  | Leaf a1, Leaf a2 -> 
       let cmp = b_compare a1 a2 in
       if cmp = 0 then XEQ else if cmp < 0 then XLT else XGT
-  | T.Leaf _, T.Node _ -> XLT
-  | T.Node _, T.Leaf _ -> XGT
+  | Leaf _, Node _ -> XLT
+  | Node _, Leaf _ -> XGT
   (* 2.b *)
-  | T.Node l1, T.Node l2 ->
+  | Node l1, Node l2 ->
       let rec cmp t1 t2 =
         match t1, t2 with
         | [], [] -> XEQ
@@ -159,23 +156,21 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
 
   
 (* compare terms using the given auxiliary ordering, and
-   convert the result to Terms.Comparison *)
+   convert the result to .Comparison *)
 let compare_terms o x y = 
     match o x y with
-      | XINCOMPARABLE -> T.Incomparable
-      | XGT -> T.Gt
-      | XLT -> T.Lt
-      | XEQ -> T.Eq
-      | XINVERTIBLE -> T.Invertible
+      | XINCOMPARABLE -> Incomparable
+      | XGT -> Gt
+      | XLT -> Lt
+      | XEQ -> Eq
+      | XINVERTIBLE -> Invertible
       | _ -> assert false
 
 
 module NRKBO = struct
   let name = "nrkbo"
 
-  type foterm = Terms.foterm
-
-  let eq_foterm x y = x == y
+  let eq_foterm x y = T.eq_foterm x y
 
   exception UnificationFailure of string Lazy.t
 
@@ -218,9 +213,7 @@ end
 module KBO = struct
   let name = "kbo"
 
-  type foterm = Terms.foterm
-
-  let eq_foterm x y = x == y
+  let eq_foterm = T.eq_foterm
 
   let compute_clause_weight = compute_clause_weight
 
@@ -246,7 +239,7 @@ module KBO = struct
         if r = XLT then XLT
         else if r = XEQ then (
           match t1.node.term, t2.node.term with
-          | T.Node (_::tl1), T.Node (_::tl2) ->
+          | Node (_::tl1), Node (_::tl2) ->
               if cmp tl1 tl2 = XLT then XLT else XINCOMPARABLE
           | _, _ -> assert false
         ) else XINCOMPARABLE
@@ -255,7 +248,7 @@ module KBO = struct
         if r = XGT then XGT
         else if r = XEQ then (
           match t1.node.term, t2.node.term with
-          | T.Node (_::tl1), T.Node (_::tl2) ->
+          | Node (_::tl1), Node (_::tl2) ->
               if cmp tl1 tl2 = XGT then XGT else XINCOMPARABLE
           | _, _ ->  assert false
         ) else XINCOMPARABLE
@@ -263,8 +256,8 @@ module KBO = struct
         let r = aux t1 t2 in
         if r = XEQ then (
           match t1.node.term, t2.node.term with
-	  | T.Var i, T.Var j when i=j -> XEQ
-          | T.Node (_::tl1), T.Node (_::tl2) -> cmp tl1 tl2
+	  | Var i, Var j when i=j -> XEQ
+          | Node (_::tl1), Node (_::tl2) -> cmp tl1 tl2
           | _, _ ->  XINCOMPARABLE
         ) else r 
     | res -> res
@@ -280,9 +273,7 @@ end
 module LPO = struct
   let name = "lpo"
 
-  type foterm = Terms.foterm
-
-  let eq_foterm x y = x == y
+  let eq_foterm = T.eq_foterm
 
   let compute_clause_weight = compute_clause_weight
 
@@ -290,15 +281,15 @@ module LPO = struct
     match s.node.term, t.node.term with
       | _, _ when eq_foterm s t ->
           XEQ
-      | T.Var _, T.Var _ ->
+      | Var _, Var _ ->
           XINCOMPARABLE
-      | _, T.Var i ->
+      | _, Var i ->
           if (List.mem t (T.vars_of_term s)) then XGT
           else XINCOMPARABLE
-      | T.Var i,_ ->
+      | Var i,_ ->
           if (List.mem s (T.vars_of_term t)) then XLT
           else XINCOMPARABLE
-      | T.Node (hd1::tl1), T.Node (hd2::tl2) ->
+      | Node (hd1::tl1), Node (hd2::tl2) ->
           let rec ge_subterm t ol = function
             | [] -> (false, ol)
             | x::tl ->
@@ -362,13 +353,6 @@ module Default = LPO
 (* ----------------------------------------------------------------------
  class interface
  ---------------------------------------------------------------------- *)
-
-class type ordering =
-  object
-    method compare_terms : T.foterm -> T.foterm -> T.comparison
-    method compute_clause_weight : T.clause -> int
-    method name : string
-  end
 
 class nrkbo : ordering =
   object

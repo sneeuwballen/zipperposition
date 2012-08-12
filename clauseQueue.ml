@@ -1,16 +1,20 @@
 (* heuristic selection of clauses *)
 
-module T = Terms
+open Types
+open Hashcons
+
+module O = Orderings
 
 (* a queue of clauses *)
 class type queue =
   object
-    method add : Terms.clause -> queue
+    method add : hclause -> queue
     method is_empty: bool
-    method take_first : (queue * Terms.clause)
+    method take_first : (queue * hclause)
   end
 
-module type HeapQueueOrd = Leftistheap.Ordered with type t = T.clause
+module type HeapQueueOrd = Leftistheap.Ordered with type t = hclause
+
 (* generic clause queue based on some ordering on clauses *)
 module HeapQueue(Ord : HeapQueueOrd) =
   struct
@@ -37,8 +41,8 @@ module HeapQueue(Ord : HeapQueueOrd) =
 (* select by increasing age (for fairness) *)
 module FifoQueue = HeapQueue(
   struct
-    type t = T.clause
-    let le c1 c2 = c1.T.cid <= c2.T.cid
+    type t = hclause
+    let le hc1 hc2 = hc1.hkey <= hc2.hkey
   end)
 
 class fifo = FifoQueue.q
@@ -46,10 +50,10 @@ class fifo = FifoQueue.q
 (* select by increasing weight of clause *)
 module ClauseWeight = HeapQueue(
   struct
-    type t = T.clause
-    let le c1 c2 =
-      let w1 = Orderings.compute_clause_weight c1
-      and w2 = Orderings.compute_clause_weight c2 in
+    type t = hclause
+    let le hc1 hc2 =
+      let w1 = O.compute_clause_weight hc1.node
+      and w2 = O.compute_clause_weight hc2.node in
       w1 <= w2
   end)
 

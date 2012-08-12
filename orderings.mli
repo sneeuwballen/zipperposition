@@ -9,28 +9,27 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
+open Types
 
 (* ----------------------------------------------------------------------
  module interface
  ---------------------------------------------------------------------- *)
 
-val compute_clause_weight : Terms.clause -> int
+val compute_clause_weight : clause -> int
 
 module type S =
   sig 
-    type foterm = Terms.foterm
 
     (* This order relation should be:
      * - stable for instantiation
      * - total on ground terms
      *
      *)
-    val compare_terms : Terms.foterm -> Terms.foterm -> Terms.comparison
+    val compare_terms : foterm -> foterm -> comparison
 
     (* these could be outside the module, but to ease experimentation
      * we allow them to be tied with the ordering *)
-    val compute_clause_weight : Terms.clause -> int
+    val compute_clause_weight : clause -> int
 
     val name : string
   end
@@ -48,14 +47,6 @@ module Default : S
  class interface
  ---------------------------------------------------------------------- *)
 
-
-(* the interface of a type *)
-class type ordering =
-  object
-    method compare_terms : Terms.foterm -> Terms.foterm -> Terms.comparison
-    method compute_clause_weight : Terms.clause -> int
-    method name : string
-  end
 
 class nrkbo : ordering
 

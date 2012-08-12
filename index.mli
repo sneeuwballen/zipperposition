@@ -9,22 +9,22 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* $Id: index.mli 10591 2009-12-09 15:35:07Z asperti $ *)
+open Types
 
 (* a set of (clause, position in clause). A position is a
  * list [lit index, 1|2 (left or right), ...]
  * where ... is the path in the term *)
 module ClauseSet : Set.S with 
-  type elt = Terms.clause * Terms.position
+  type elt = clause * position
 
 (* make terms indexable by discrimination_tree *)
 module FotermIndexable : Discrimination_tree.Indexable with 
   type constant_name = Signature.symbol and
-  type input = Terms.foterm 
+  type input = foterm 
 
 module DT : Discrimination_tree.DiscriminationTree with 
   type constant_name = Signature.symbol and 
-  type input = Terms.foterm and 
+  type input = foterm and 
   type data = ClauseSet.elt and 
   type dataset = ClauseSet.t
 
@@ -42,9 +42,9 @@ type t = {
 
 val empty : t
 
-val index_clause : t -> Terms.clause -> t 
+val index_clause : t -> clause -> t 
 
-val remove_clause : t -> Terms.clause -> t 
+val remove_clause : t -> clause -> t 
 
 val fold : 
   DT.t ->
@@ -52,6 +52,3 @@ val fold :
   -> 'a -> 'a
 
 val elems : DT.t -> ClauseSet.t
-
-(* an active set contains a list of clauses and an index on those clauses *)
-type active_set = Terms.clause list * t

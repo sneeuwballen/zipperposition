@@ -9,7 +9,11 @@
      \ /   This software is distributed as is, NO WARRANTY.
       V_______________________________________________________________ *)
 
-(* $Id: nCic.ml 9058 2008-10-13 17:42:30Z tassi $ *)
+open Types
+open Hashcons
+
+module T = Terms
+module Subst = FoSubst
 
 exception UnificationFailure of string Lazy.t;;
 
@@ -25,19 +29,13 @@ let mem2 a b l =
   in
    aux false false l
 
-module Subst = FoSubst
-module Utils = FoUtils
-
-open Hashcons
-open Terms
-
 (* do both unification and match *)
 let rec unif locked_vars subst s t =
-  let s = match s.node.term with Terms.Var _ -> Subst.lookup s subst | _ -> s
-  and t = match t.node.term with Terms.Var _ -> Subst.lookup t subst | _ -> t in
+  let s = match s.node.term with Var _ -> Subst.lookup s subst | _ -> s
+  and t = match t.node.term with Var _ -> Subst.lookup t subst | _ -> t in
   match s.node.term, t.node.term with
-  | _, _ when Utils.eq_foterm s t -> subst
-  | Terms.Var _, Terms.Var _ ->
+  | _, _ when T.eq_foterm s t -> subst
+  | Var _, Var _ ->
       let s_locked, t_locked = mem2 s t locked_vars in
       if s_locked then
         if t_locked then
@@ -46,13 +44,13 @@ let rec unif locked_vars subst s t =
           Subst.build_subst t s subst
       else
         Subst.build_subst s t subst
-  | Terms.Var _, _ when occurs_check subst s t || List.mem s locked_vars ->
+  | Var _, _ when occurs_check subst s t || List.mem s locked_vars ->
       raise (UnificationFailure (lazy "Inference.unification.unif"))
-  | Terms.Var _, _ -> Subst.build_subst s t subst
-  | _, Terms.Var _ when occurs_check subst t s || List.mem t locked_vars ->
+  | Var _, _ -> Subst.build_subst s t subst
+  | _, Var _ when occurs_check subst t s || List.mem t locked_vars ->
       raise (UnificationFailure (lazy "Inference.unification.unif"))
-  | _, Terms.Var _ -> Subst.build_subst t s subst
-  | Terms.Node l1, Terms.Node l2 -> (
+  | _, Var _ -> Subst.build_subst t s subst
+  | Node l1, Node l2 -> (
       try
         List.fold_left2
           (fun subst' s t -> unif locked_vars subst' s t)
@@ -64,34 +62,34 @@ let rec unif locked_vars subst s t =
       raise (UnificationFailure (lazy "Inference.unification.unif"))
 and occurs_check subst what where =
   match where.node.term with
-  | Terms.Var _ when Utils.eq_foterm where what -> true
-  | Terms.Var _ ->
+  | Var _ when T.eq_foterm where what -> true
+  | Var _ ->
       let t = Subst.lookup where subst in
-      if not (Utils.eq_foterm t where)
+      if not (T.eq_foterm t where)
         then occurs_check subst what t else false
-  | Terms.Node l -> List.exists (occurs_check subst what) l
+  | Node l -> List.exists (occurs_check subst what) l
   | _ -> false
 
 (* full unification, no locked variables *)
 let unification a b = unif [] Subst.id_subst a b
 
 (* matching, lock variables of b (b must generalize a) *)
-let matching a b = unif (Terms.vars_of_term b) Subst.id_subst a b
+let matching a b = unif (T.vars_of_term b) Subst.id_subst a b
 
 (* Sets of variables in s and t are assumed to be disjoint  *)
 let alpha_eq s t =
   let rec equiv subst s t =
-    let s = match s.node.term with Terms.Var _ -> Subst.lookup s subst | _ -> s
-    and t = match t.node.term with Terms.Var _ -> Subst.lookup t subst | _ -> t
+    let s = match s.node.term with Var _ -> Subst.lookup s subst | _ -> s
+    and t = match t.node.term with Var _ -> Subst.lookup t subst | _ -> t
 
     in
     match s.node.term, t.node.term with
-      | _, _ when Utils.eq_foterm s t -> subst
-      | Terms.Var _, Terms.Var _
+      | _, _ when T.eq_foterm s t -> subst
+      | Var _, Var _
           when (not (List.exists (fun (_,k) -> k=t) subst)) ->
           let subst = Subst.build_subst s t subst in
             subst
-      | Terms.Node l1, Terms.Node l2 -> (
+      | Node l1, Node l2 -> (
           try
             List.fold_left2
               (fun subst' s t -> equiv subst' s t)

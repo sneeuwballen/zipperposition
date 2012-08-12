@@ -9,37 +9,17 @@
      \ /   This software is distributed as is, NO WARRANTY.
       V_______________________________________________________________ *)
 
-(* $Id: terms.ml 10720 2010-02-08 07:24:34Z asperti $ *)
 open Hashcons
-
-type leaf = Signature.symbol
-
-(* a sort for terms *)
-type sort = leaf
+open Types
 
 (* some special sorts *)
 let bool_sort = Signature.bool_symbol
 let univ_sort = Signature.univ_symbol
 
-(* exception raised when sorts are mismatched *)
-exception SortError of string
-
-(* simple term *)
-type foterm = typed_term Hashcons.hash_consed
-and typed_term = {
-  term : foterm_cell;   (* the term itself *)
-  sort : sort;          (* the sort of the term *)
-  vars : foterm list Lazy.t;   (* the variables of the term *)
-}
-and foterm_cell =
-  | Leaf of leaf  (* constant *)
-  | Var of int  (* variable *)
-  | Node of foterm list  (* term application *)
-
-(* hashconsing *)
+(* hashconsing for terms *)
 module H = Hashcons.Make(struct
   type t = typed_term
-  let rec equal = fun x y -> match (x.term, y.term) with
+  let rec equal x y = match (x.term, y.term) with
     | (Var i, Var j) -> i = j
     | (Leaf a, Leaf b) -> Signature.eq a b
     | (Node a, Node b) -> eq_subterms a b
@@ -64,7 +44,6 @@ let compute_vars t =  (* compute free vars of the term *)
     | Node l -> List.fold_left aux acc l
   in aux [] t
 
-(* smart constructors, with type-checking *)
 let mk_var idx sort =
   let my_v = {term = Var idx; sort=sort; vars=lazy []} in
   let v = H.hashcons terms
@@ -82,90 +61,39 @@ let rec mk_node = function
       let t = H.hashcons terms { my_t with vars=lazy_vars } in
       ignore (Lazy.force t.node.vars); t
 
-(* special terms *)
-let eq_term = mk_leaf Signature.eq_symbol bool_sort (* equality, returns bool *)
-let true_term = mk_leaf Signature.true_symbol bool_sort (* tautology term *)
+let eq_symbol = mk_leaf Signature.eq_symbol bool_sort     (* equality symbol *)
+let true_symbol = mk_leaf Signature.true_symbol bool_sort (* tautology symbol *)
 
-(* membership: [a] [b] checks if a subterm of b *)
 let rec member_term a b = a == b || match b.node.term with
   | Leaf _ | Var _ -> false
   | Node subterms -> List.exists (member_term a) subterms
-(* hashconsing! *)
-let eq_foterm x y = x == y
 
-(* cast (change sort) *)
+let eq_foterm x y = x == y  (* because of hashconsing *)
+
 let cast t sort = H.hashcons terms { t.node with sort=sort; }
 
-(* list of variables *)
-type varlist = foterm list
+let rec compare_foterm x y =
+  match x.node.term, y.node.term with
+  | Leaf t1, Leaf t2 -> Signature.compare t1 t2
+  | Var i, Var j -> i - j
+  | Node l1, Node l2 -> FoUtils.lexicograph compare_foterm l1 l2
+  | Leaf _, ( Node _ | Var _ ) -> ~-1
+  | Node _, Leaf _ -> 1
+  | Node _, Var _ -> ~-1
+  | Var _, _ ->  1
 
-(* free variables in the term *)
 let vars_of_term t = Lazy.force t.node.vars
 
-(* is the term ground? *)
 let is_ground_term t = match vars_of_term t with
   | [] -> true
   | _ -> false
 
-(* substitution, a list of variables -> term *)
-type substitution = (foterm * foterm) list
+let merge_varlist l1 l2 = List.merge compare_foterm l1 l2
 
-(* partial order comparison *)
-type comparison = Lt | Eq | Gt | Incomparable | Invertible
-(* direction of an equation (for rewriting) *)
-type direction = Left2Right | Right2Left | Nodir
-(* position in a term *)
-type position = int list
-
-(* left and right position in equation *)
-let left_pos = 1
-let right_pos = 2
-
-(* a literal, that is, a signed equation *)
-type literal =
- | Equation of    foterm  (* lhs *)
-                * foterm  (* rhs *)
-                * bool    (* sign *)
-                * comparison (* orientation *)
-
-(* a first order clause *)
-type clause = {
-  cid : int;            (* ID *)
-  clits : literal list; (* the equations *)
-  cvars : foterm list;  (* the free variables *)
-  cproof : proof;      (* the proof for this clause *)
-}
-(* a proof step for a clause *)
-and proof = Axiom of string
-          | Proof of string * (clause * position * substitution) list
-
-module M : Map.S with type key = int
-  = Map.Make(
-     struct
-       type t = int
-       let compare = Pervasives.compare
-     end)
-
-(* multiset of clauses *)
-type bag = {
-  bag_id : int; (* max ID  *)
-  bag_clauses : (clause * bool * int) M.t;
-}
-
-(* also gives a fresh ID to the clause *)
-let add_to_bag c bag =
-  let id = bag.bag_id+1 in
-  let clause = {c with cid=id} in
-  let new_bag = {bag_id=id;
-                 (* FIXME is this false,0 or true,id ? *)
-                 bag_clauses=M.add id (clause,false,0) bag.bag_clauses} in
-  new_bag, clause
-
-let replace_in_bag ({cid=id},_,_ as cl) bag =
-  let new_clauses = M.add id cl bag.bag_clauses in
-    { bag with bag_clauses = new_clauses }
-
-let get_from_bag id bag =
-  M.find id bag.bag_clauses
-
-let empty_bag = {bag_id=0; bag_clauses=M.empty}
+let max_var vars =
+  let rec aux idx = function
+  | [] -> idx
+  | ({node={term=Var i}}::vars) -> aux (max i idx) vars
+  | _::vars -> assert false
+  in
+  aux 0 vars
