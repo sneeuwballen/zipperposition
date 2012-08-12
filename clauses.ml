@@ -5,13 +5,20 @@ open Types
 
 module T = Terms
 module S = FoSubst
+module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
  * literals
  * ---------------------------------------------------------------------- *)
 
 let left_pos = 1
+
 let right_pos = 2
+
+let opposite_pos p = match p with
+  | _ when p = left_pos -> right_pos
+  | _ when p = right_pos -> left_pos
+  | _ -> assert false
 
 let eq_literal l1 l2 =
   match l1, l2 with
@@ -107,6 +114,27 @@ let apply_subst_cl ?(recursive=true) ~ord subst c =
         T.Step(rule,c1,c2,dir,pos,Subst.concat subst s)
   in
   *)
+
+let get_lit clause idx = Utils.list_get clause.clits idx
+
+let get_pos clause pos =
+  match pos with
+  | idx::side::tpos ->
+      let lit = get_lit clause idx in
+      let rec find_subterm pos t = match (pos, t.node.term) with
+      | [], _ -> t
+      | i::pos', Node l when List.length l > i ->
+          find_subterm pos' (Utils.list_get l i)
+      | _ -> invalid_arg "position does not match term"
+      in
+      (match lit with
+      | Equation (l, _, _, _) when side = left_pos ->
+          find_subterm tpos l
+      | Equation (_, r, _, _) when side = right_pos ->
+          find_subterm tpos r
+      | _ -> invalid_arg "wrong side in literal"
+      )
+  | _ -> invalid_arg "wrong position for clause"
 
 let fresh_clause ~ord maxvar c =
   (* prerr_endline 

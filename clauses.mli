@@ -9,6 +9,7 @@ open Types
 (** left and right position in equation *)
 val left_pos : int
 val right_pos : int
+val opposite_pos : int -> int
 
 val eq_literal : literal -> literal -> bool       (** equality of literals *)
 val compare_literal : literal -> literal -> int   (** lexicographic comparison of literals *)
@@ -39,6 +40,9 @@ val compare_hclause : hclause -> hclause -> int         (** simple order on lexi
 val mk_clause : literal list -> proof Lazy.t -> clause  (** build a clause *)
 val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
 val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
+
+val get_lit : clause -> int -> literal                  (** get the literal at given index *)
+val get_pos : clause -> position -> foterm              (** get the subterm at position *)
 
 (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
 val fresh_clause : ord:ordering -> int -> clause -> clause * int  
