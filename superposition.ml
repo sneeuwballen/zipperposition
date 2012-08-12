@@ -9,24 +9,138 @@
      \ /   This software is distributed as is, NO WARRANTY.     
       V_______________________________________________________________ *)
 
-(* $Id: index.mli 9822 2009-06-03 15:37:06Z tassi $ *)
+open Types
+open Hashcons
 
-module type InferenceContext =
-  sig
-    module Ord : Orderings.S
-    module Idx : Index.Index(Ord)
-  end
+module T = Terms
+module C = Clauses
+module O = Orderings
+module S = FoSubst
+module I = Index
+module Unif = FoUnif
+module Utils = FoUtils
 
-module Superposition (Ctx : InferenceContext) =
-  struct
-    module IDX = Ctx.Idx
-    module Order = Ctx.Ord
-    module Unif = FoUnif
-    module Subst = FoSubst 
-    module Order = B
-    module Utils = FoUtils
-    module Pp = Pp
+(** a conclusion is a clause, plus the clauses used to infer it *)
+type conclusion = clause * hclause list
+
+(** raised when the empty clause is found *)
+exception Success of hclause
+
+(** inferences *)
+type inference_rule = ProofState.active_set -> clause -> conclusion list
+
+(** returns the first (f e) that is not None, with e element of list *)
+let rec list_first f = function
+  | [] -> None
+  | x::tl -> match f x with
+    | Some _ as x -> x
+    | _ -> list_first f tl
+
+(** returns the term t where the first sutbterm t'
+    such that f t' is not None, is replaced by f t'.
+    Does not visit variables.
+
+    ctx is to be applied to the result, to build a bigger term
+    pos is the position of the term
+
+    int list -> (foterm -> 'a) -> foterm
+      -> (foterm -> (foterm * 'b * 'c * 'd) option)
+      -> ('a * 'b * 'c * 'd * int list) option
+    *)
+let first_position pos ctx t f =
+  (* re-build context from the result *)
+  let rec inject_pos pos ctx = function
+    | None -> None
+    | Some (a,b,c,d) -> Some (ctx a,b,c,d,pos)
+  and aux pos ctx t = match t.node.term with
+  | Leaf _ -> inject_pos pos ctx (f t)
+  | Var _ -> None
+  | Node l ->
+      match f t with  (* try f at the current composite term *)
+      | Some _ as x -> inject_pos pos ctx x
+      | None ->
+          (* pre is the list of subterm before, post the list of subterms
+             after the current subterm *)
+          let rec first pre idx post l = match l with
+          | [] -> None
+          | t :: tl -> 
+             (* newctx will re-build the current term around the result on a subterm *)
+             let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
+             match aux (idx :: pos (* extend position *)) newctx t with
+             | Some _ as x -> x
+             | None -> 
+                 if post = [] then None (* tl is also empty *)
+                 else first (pre @ [t]) (idx+1) (List.tl post) tl
+          in
+          first [] 1 (List.tl l) l 
+  in
+  aux pos ctx t
+
+(** apply f to all non-variable positions in t, accumulating the
+    results along. f is given the subterm, the position and the context
+    at each such position
+
+    int list -> (foterm -> 'a) -> foterm
+    -> (foterm -> int list -> (foterm -> 'a) -> 'b list)
+    -> 'b list
+    *)
+let all_positions pos ctx t f =
+  let rec aux pos ctx t = match t.node.term with
+  | Leaf _ -> f t pos ctx 
+  | Var _ -> []
+  | Node l -> 
+      let acc, _, _, _ = 
+        List.fold_left
+        (fun (acc,pre,idx,post) t -> (* Invariant: pre @ [t] @ post = l *)
+            let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
+            let acc = aux (idx :: pos) newctx t @ acc in
+            if post = [] then acc, l, idx, []
+            else acc, pre @ [t], idx+1, List.tl post)
+        (f t pos ctx (* apply f to t *), [], 1, List.tl l) l
+      in
+      acc
+  in
+  aux pos ctx t
+
+
+(** visits non-variable positions in t. f is given the bag, the subterm,
+    the position of the subterm, the context that rebuilds the subterm,
+    and the 'c object [id].
+
+    'a -> int list -> (foterm -> 'b) -> 'c -> foterm
+    -> ('a -> foterm -> int list -> (foterm -> 'b) -> 'c -> 'a * foterm * 'c)
+    -> 'a * foterm * 'c
+    *)
+let parallel_positions bag pos ctx id t f =
+  let rec aux bag pos ctx id t = match t.node.term with
+  | Leaf _  -> f bag t pos ctx id
+  | Var _ -> bag,t,id
+  | Node (hd::l) ->
+      let bag,t,id1 = f bag t pos ctx id in
+        if id = id1 then
+          let bag, l, _, id = 
+            List.fold_left
+              (fun (bag,pre,post,id) t ->
+                 let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
+                 let newpos = (List.length pre)::pos in
+                 let bag,newt,id = aux bag newpos newctx id t in
+                   if post = [] then bag, pre@[newt], [], id
+                   else bag, pre @ [newt], List.tl post, id)
+              (bag, [hd], List.tl l, id) l
+          in
+          bag, T.mk_node l, id
+        else bag,t,id1 
+        (* else aux bag pos ctx id1 t *) 
+  | _ -> assert false
+  in
+  aux bag pos ctx id t
+
     
+(* from here, old code to update *)
+
+(*
+
+
     (* bag, maxvar, empty clause *)
     exception Success of 
       Terms.bag 
@@ -37,81 +151,7 @@ module Superposition (Ctx : InferenceContext) =
     let debug _ = ();; 
     let enable = true;;
 
-    let rec list_first f = function
-      | [] -> None
-      | x::tl -> match f x with Some _ as x -> x | _ -> list_first f tl
-    ;;
-
-    let first_position pos ctx t f =
-      let inject_pos pos ctx = function
-        | None -> None
-        | Some (a,b,c,d) -> Some(ctx a,b,c,d,pos)
-      in
-      let rec aux pos ctx = function
-      | Terms.Leaf _ as t -> inject_pos pos ctx (f t)
-      | Terms.Var _ -> None
-      | Terms.Node l as t->
-          match f t with
-          | Some _ as x -> inject_pos pos ctx x
-          | None ->
-              let rec first pre post = function
-                | [] -> None
-                | t :: tl -> 
-                     let newctx = fun x -> ctx (Terms.Node (pre@[x]@post)) in
-                     match aux (List.length pre :: pos) newctx t with
-                     | Some _ as x -> x
-                     | None -> 
-                         if post = [] then None (* tl is also empty *)
-                         else first (pre @ [t]) (List.tl post) tl
-              in
-                first [] (List.tl l) l 
-      in
-        aux pos ctx t
-    ;;
                                      
-    let all_positions pos ctx t f =
-      let rec aux pos ctx = function
-      | Terms.Leaf _ as t -> f t pos ctx 
-      | Terms.Var _ -> []
-      | Terms.Node l as t-> 
-          let acc, _, _ = 
-            List.fold_left
-            (fun (acc,pre,post) t -> (* Invariant: pre @ [t] @ post = l *)
-                let newctx = fun x -> ctx (Terms.Node (pre@[x]@post)) in
-                let acc = aux (List.length pre :: pos) newctx t @ acc in
-                if post = [] then acc, l, []
-                else acc, pre @ [t], List.tl post)
-             (f t pos ctx, [], List.tl l) l
-          in
-           acc
-      in
-        aux pos ctx t
-    ;;
-
-    let parallel_positions bag pos ctx id t f =
-      let rec aux bag pos ctx id = function
-      | Terms.Leaf _ as t -> f bag t pos ctx id
-      | Terms.Var _ as t -> bag,t,id
-      | Terms.Node (hd::l) as t->
-          let bag,t,id1 = f bag t pos ctx id in
-            if id = id1 then
-              let bag, l, _, id = 
-                List.fold_left
-                  (fun (bag,pre,post,id) t ->
-                     let newctx = fun x -> ctx (Terms.Node (pre@[x]@post)) in
-                     let newpos = (List.length pre)::pos in
-                     let bag,newt,id = aux bag newpos newctx id t in
-                       if post = [] then bag, pre@[newt], [], id
-                       else bag, pre @ [newt], List.tl post, id)
-                  (bag, [hd], List.tl l, id) l
-              in
-                bag, Terms.Node l, id
-            else bag,t,id1 
-            (* else aux bag pos ctx id1 t *) 
-      | _ -> assert false
-      in
-        aux bag pos ctx id t
-    ;;
 
     let visit bag pos ctx id t f =
       let rec aux bag pos ctx id subst = function
@@ -867,4 +907,4 @@ module Superposition (Ctx : InferenceContext) =
       prof_il.HExtlib.profile (infer_left bag maxvar goal) t
     ;;
 
-  end
+*)

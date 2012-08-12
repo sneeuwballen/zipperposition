@@ -11,87 +11,41 @@
 
 open Types
 
+(** a conclusion is a clause, plus the clauses used to infer it *)
+type conclusion = clause * hclause list
+
+(** raised when the empty clause is found *)
+exception Success of hclause
+
 (** inferences *)
+type inference_rule = ProofState.active_set -> clause -> conclusion list
 
-val infer_right : ProofState.active_set -> clause -> clause list
+val infer_right : inference_rule
 
-val infer_left : ProofState.active_set -> clause -> clause list
+val infer_left : inference_rule
 
-val infer_equality_resolution : clause -> clause list
+val infer_equality_resolution : inference_rule
 
-val infer_equality_factoring : clause -> clause list
+val infer_equality_factoring : inference_rule
 
-(** simplifications *)
+(* simplifications *)
+
+val is_tautology : clause -> bool
 
 val demodulate : ProofState.active_set
-                -> clause   (** the clause to simplifies *)
+                -> clause   (** the clause to simplify *)
 		-> clause   (** the simplified clause *)
 
-(* bag, maxvar, empty clause *)
-exception Success of 
-  Terms.bag 
-  * int 
-  * Terms.clause
+(** subsumes c1 c2 iff c1 subsumes c2 *)
+val subsumes : clause -> clause -> bool
 
-(* The returned active set is the input one + the selected clause *)
-val infer_right :
-  Terms.bag -> 
-  int -> (* maxvar *)
-  Terms.clause -> (* selected passive *)
-  Idx.active_set ->
-  Terms.bag * int * Idx.active_set * Terms.clause list
+(** check whether the clause is subsumed by any clause in the set *)
+val subsumed_by_set : ProofState.active_set -> clause -> bool
 
-val infer_left :  
-  Terms.bag -> 
-  int -> (* maxvar *)
-  Terms.clause -> (* selected goal *)
-  Idx.active_set ->
-  Terms.bag * int * Terms.unit_clause list
+(** remove from the set the clauses subsumed by c *)
+val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 
-val demodulate : 
-  Terms.bag ->
-  Terms.clause ->
-  Idx.DT.t ->  (* index of unit clauses *)
-  Terms.bag * Terms.clause
-
-val simplify : 
-  Idx.DT.t ->
-  int ->
-  Terms.bag ->
-  Terms.clause ->
-  Terms.bag * (Terms.clause option)
-
-(* may raise success *)
-val simplify_goal :
-  no_demod:bool ->
-  int ->
-  Idx.DT.t ->
-  Terms.bag ->
-  Terms.clause list ->
-  Terms.clause ->
-  (Terms.bag * Terms.clause) option
-
-val one_pass_simplification:
-  Terms.unit_clause ->
-  Idx.active_set ->
-  Terms.bag ->
-  int ->
-  Terms.bag * (Terms.clause * Idx.active_set) option
-
-val keep_simplified:
-  Terms.clause ->
-  Idx.active_set ->
-  Terms.bag ->
-  int ->
-  Terms.bag * (Terms.clause * Idx.active_set) option
-
-val orphan_murder:
-  Terms.bag ->
-  Terms.clause list ->
-  Terms.clause ->
-  bool
-
-val are_alpha_eq : 
-  Terms.unit_clause ->
-  Terms.unit_clause ->
-  bool
+(** remove from the passive_set the list of orphans of clause *)
+val orphan_murder: ProofState.passive_set
+                -> clause   (** the clause whose orphans are to be deleted *)
+                -> ProofState.passive_set
