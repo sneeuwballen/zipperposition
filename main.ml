@@ -11,6 +11,7 @@ module CQ = ClauseQueue
 module S = FoSubst
 module Utils = FoUtils
 module Unif = FoUnif
+module Sup = Superposition
 
 (** get first file of command line arguments *)
 let get_file () =
@@ -63,10 +64,9 @@ let () =
   Printf.printf "# process file %s\n" f;
   let clauses, _ = parse_file f in
   Printf.printf "# parsed %d clauses\n" (List.length clauses);
-  (* create a state *)
+  (* create a state, with clauses added to passive_set and active_set *)
   let state = PS.make_state O.default CQ.default_queues in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
-  (* print some stuff *)
-  Pp.debug_state Format.std_formatter state;
   let state = {state with PS.active_set=PS.add_actives state.PS.active_set clauses} in
-  Pp.pp_index Format.std_formatter (state.PS.active_set.PS.idx)
+  (* print some stuff *)
+  Pp.debug_state Format.std_formatter state
