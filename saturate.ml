@@ -42,6 +42,7 @@ let do_inferences state c =
     inference_rules
 
 let given_clause_step state =
+  let ord = state.PS.ord in
   (* select next given clause *)
   match PS.next_passive_clause state.PS.passive_set with
   | passive_set, None -> state, Sat (* passive set is empty *)
@@ -58,9 +59,10 @@ let given_clause_step state =
         (Format.sprintf "  infered new clause %s"
           (Utils.on_buffer Pp.pp_clause new_c))))
       new_clauses;
-    (* add new clauses to passive set *)
-    let passive_set = PS.add_passives state.PS.passive_set new_clauses in
-    let state = { state with PS.passive_set=passive_set} in
+    (* add new clauses to passive set, and given clause to active set *)
+    let passive_set = PS.add_passives state.PS.passive_set new_clauses
+    and active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
+    let state = { state with PS.passive_set=passive_set; PS.active_set=active_set} in
     (* test whether the empty clause has been found *)
     try
       let empty_clause = List.find (fun c -> c.clits = []) new_clauses in
