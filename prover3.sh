@@ -5,7 +5,7 @@
 TMPFILE=$(mktemp /tmp/proverXXXXX)
 
 echo "# clausify into $TMPFILE"
-eprover --cnf --tptp-in --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
+eprover --cnf --tptp3-in --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
 
 echo "# run prover"
 shift
