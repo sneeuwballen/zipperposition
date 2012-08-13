@@ -208,7 +208,7 @@ let get_equations_sides clause pos = match pos with
     | Equation (l,r,sign,_) when eq_side = C.left_pos -> (l, r, sign)
     | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
-  | [] -> invalid_arg "wrong kind of position (expected binary list)"
+  | _ -> invalid_arg "wrong kind of position (expected binary list)"
         
 (* for profiling *)
 let enable = true
@@ -223,6 +223,36 @@ let prof_demodulate = HExtlib.profile ~enable "demodulate"
 (* ----------------------------------------------------------------------
  * inferences
  * ---------------------------------------------------------------------- *)
+
+(* helper that does one or zero superposition inference, with all
+   the given parameters *)
+let do_superposition ~ord active_clause active_pos passive_clause passive_pos subst =
+  assert (List.length active_pos = 2);
+  assert ((Utils.list_inter T.eq_foterm active_clause.cvars passive_clause.cvars) = []);
+  match passive_pos with
+  | [] | _::[] -> assert false
+  | passive_idx::passive_side::subterm_pos ->
+  let active_idx = List.hd active_pos
+  and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
+  and s, t, sign_st = get_equations_sides active_clause active_pos in
+  assert sign_st;
+  assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
+                      (S.apply_subst subst s));
+  if (ord#compare_terms (S.apply_subst subst s) (S.apply_subst subst t) = Lt ||
+      ord#compare_terms (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
+      not (check_maximal_lit ~ord active_clause active_idx subst) ||
+      not (check_maximal_lit ~ord passive_clause passive_idx subst))
+    then []
+    else (* ordering constraints are ok *)
+      let new_lits = Utils.list_remove active_clause.clits active_idx in
+      let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
+      let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
+      let new_lits = (C.mk_lit ~ord new_u v sign_uv) :: new_lits in
+      let rule = if sign_uv then "superposition right" else "superposition left" in
+      let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
+                                      (passive_clause, passive_pos, subst)])) in
+      let new_clause = C.mk_clause new_lits proof in
+      [new_clause]
 
 let infer_right actives clause = []  (* TODO *)
 
@@ -290,7 +320,7 @@ let infer_equality_factoring actives clause =
     let unifiables = find_unifiable_lits s idx lits_pos in
     List.fold_left
       (fun acc (passive_pos, subst) ->
-        (do_inference pos C.left_pos passive_pos subst) @ acc)
+        (do_inference active_pos passive_pos subst) @ acc)
       acc unifiables
   (* do the inference between given positions, if ordering
      conditions are respected *)
