@@ -12,6 +12,7 @@ module S = FoSubst
 module Utils = FoUtils
 module Unif = FoUnif
 module Sup = Superposition
+module Sat = Saturate
 
 (** get first file of command line arguments *)
 let get_file () =
@@ -28,45 +29,61 @@ let _ =
   Hashtbl.add ords "kbo" (new Orderings.kbo);
   Hashtbl.add ords "nrkbo" (new Orderings.nrkbo)
 
-let ord = ref Orderings.default
-let set_ord s = (* select ordering *)
-  try
-    ord := Hashtbl.find ords s
-  with
-    Not_found -> Printf.printf "unknown ordering: %s\n" s
+(** parameters for the main procedure *)
+type parameters = {
+  param_ord : ordering;
+  param_verbose : bool;
+  param_files : string list;
+}
 
-let options =
-  [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo,nrkbo)") ]
-  (* TODO parse something about heuristics *)
-let args_fun s = ()
-
+(** parse_args returns parameters *)
 let parse_args () =
-  Arg.parse options args_fun "solve problem in first file";
-  PS.make_state !ord CQ.default_queues
+  (* parameters *)
+  let ord = ref Orderings.default
+  and verbose = ref false
+  and file = ref "stdin" in
+  (* argument functions *)
+  let set_ord s = (* select ordering *)
+    try ord := Hashtbl.find ords s
+    with Not_found as e -> (Printf.printf "unknown ordering: %s\n" s; raise e)
+  and set_file s = file := s in
+  (* options list (TODO parse something about heuristics) *) 
+  let options =
+    [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo,nrkbo)");
+      ("-verbose", Arg.Set verbose, "verbose mode") ]
+  in
+  Arg.parse options set_file "solve problem in first file";
+  (* return parameter structure *)
+  { param_ord = !ord; param_verbose = !verbose; param_files = [!file] }
 
 (** parse given tptp file (TODO also parse include()s *)
 let parse_file f =
   let input = match f with
     | "stdin" -> stdin
-    | f -> open_in f in
+    | _ -> open_in f
+  in
   try
     let buf = Lexing.from_channel input in
     Parser_tptp.parse_file Lexer_tptp.token buf
   with _ as e -> close_in input; raise e
-      
-(* create a bag from the given clauses *)
-let make_initial_bag clauses =
-  let b = C.empty_bag in
-  List.fold_left (fun b c -> fst (C.add_to_bag b c)) b clauses
 
 let () =
-  let f = get_file () in
+  (* parse arguments *)
+  let params = parse_args () in
+  let verbose = params.param_verbose in
+  if verbose then Sat.set_debug true;
+  (* parse file *)
+  let f = List.hd params.param_files in
   Printf.printf "# process file %s\n" f;
   let clauses, _ = parse_file f in
   Printf.printf "# parsed %d clauses\n" (List.length clauses);
-  (* create a state, with clauses added to passive_set and active_set *)
-  let state = PS.make_state O.default CQ.default_queues in
+  (* create a state, with clauses added to passive_set *)
+  let state = PS.make_state params.param_ord CQ.default_queues in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
-  let state = {state with PS.active_set=PS.add_actives state.PS.active_set clauses} in
-  (* print some stuff *)
-  Pp.debug_state Format.std_formatter state
+  (* saturate *)
+  let state, result = Sat.given_clause state in
+  match result with
+  | Sat.Sat -> Printf.printf "# SZS status CounterSatisfiable\n"
+  | Sat.Unsat _ -> Printf.printf "# SZS status Theorem\n"
+  | Sat.Unknown | Sat.Timeout -> Printf.printf "# SZS status ResourceOut\n"
+  | Sat.Error s -> Printf.printf "error occurred: %s\n" s
