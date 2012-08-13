@@ -26,10 +26,16 @@ val mk_node : foterm list -> foterm
 val eq_symbol : foterm                        (** equality symbol *)
 val true_symbol : foterm                      (** tautology symbol *)
 
-val member_term : foterm -> foterm -> bool    (** membership: [a] [b] checks if a subterm of b *)
+val member_term : foterm -> foterm -> bool    (** [a] [b] checks if a subterm of b *)
 val eq_foterm : foterm -> foterm -> bool      (** standard equality on terms *)
 val compare_foterm : foterm -> foterm -> int  (** a simple order on terms *)
 val cast : foterm -> sort -> foterm           (** cast (change sort) *)
+
+val at_pos : foterm -> position -> foterm     (** retrieve subterm at pos, or
+                                                  raise Invalid_argument
+                                                  TODO also return a context? *)
+val replace_pos : foterm -> position          (** replace t|_p by the second term *)
+               -> foterm -> foterm
 
 val vars_of_term : foterm -> varlist          (** free variables in the term *)
 val is_ground_term : foterm -> bool           (** is the term ground? *)

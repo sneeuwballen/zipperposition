@@ -129,6 +129,16 @@ let list_pos l =
   in
   aux l 0
 
+let rec list_mem comp x l = match l with
+  | [] -> false
+  | y::ys when comp x y -> true
+  | _::ys -> list_mem comp x ys
+
+let rec list_inter comp l1 l2 = match l1 with
+  | [] -> []
+  | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)
+  | _::xs -> list_inter comp xs l2
+
 let on_buffer ?(margin=80) f t =
   let buff = Buffer.create 100 in
   let formatter = Format.formatter_of_buffer buff in

@@ -31,15 +31,16 @@ val multiset_partial : ('a -> 'a -> comparison) -> 'a list -> 'a list -> compari
 
 (** get n-th element of list (linear) *)
 val list_get : 'a list -> int -> 'a
-
 (** set n-th element of list (linear) *)
 val list_set : 'a list -> int -> 'a -> 'a list
-
 (** all the list but i-th element (linear) *)
 val list_remove : 'a list -> int -> 'a list
-
 (** zip the list with positions (starting at 0) *)
 val list_pos : 'a list -> ('a * int) list
+(** test for membership using the given comparison function *)
+val list_mem : ('a -> 'a -> bool) -> 'a -> 'a list -> bool
+(** list intersection, given the comparison function *)
+val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string

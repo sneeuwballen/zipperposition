@@ -12,6 +12,8 @@
 open Hashcons
 open Types
 
+module Utils = FoUtils
+
 (* some special sorts *)
 let bool_sort = Signature.bool_symbol
 let univ_sort = Signature.univ_symbol
@@ -86,6 +88,21 @@ let rec compare_foterm x y =
   | Node _, Leaf _ -> 1
   | Node _, Var _ -> ~-1
   | Var _, _ ->  1
+
+let rec at_pos t pos = match t.node.term, pos with
+  | _, [] -> t
+  | Leaf _, _::_ | Var _, _::_ -> invalid_arg "wrong position in term"
+  | Node l, i::subpos when i < List.length l ->
+      at_pos (Utils.list_get l i) subpos
+  | _ -> invalid_arg "index too high for subterm"
+
+let rec replace_pos t pos new_t = match t.node.term, pos with
+  | _, [] -> new_t
+  | Leaf _, _::_ | Var _, _::_ -> invalid_arg "wrong position in term"
+  | Node l, i::subpos when i < List.length l ->
+      let new_subterm = replace_pos (Utils.list_get l i) subpos new_t in
+      mk_node (Utils.list_set l i new_subterm)
+  | _ -> invalid_arg "index too high for subterm"
 
 let vars_of_term t = Lazy.force t.node.vars
 
