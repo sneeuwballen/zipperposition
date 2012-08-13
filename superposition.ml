@@ -177,6 +177,46 @@ let visit bag pos ctx id t f =
   in
   aux bag pos ctx id S.id_subst t
 
+(** fold f over all literals sides, with their positions.
+    f is given (acc, left side, right side, sign, position of left side)
+    if pos, then positive literals will be visited.
+    if neg, then negative literals will be visited.
+    if both, then both sides of a non-oriented equation
+      will be visited
+      
+    ?pos:bool -> ?neg:bool -> ?both:bool
+    -> ('a -> Types.foterm -> Types.foterm -> bool -> int list -> 'a)
+    -> 'a -> (Types.literal * int) list
+    -> 'a *)
+let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) f acc lits =
+  if (not pos) && (not neg) then acc else
+  (* is the sign ok, given the parameters? *)
+  let sign_ok sign = if sign then pos else neg in
+  List.fold_left
+    (fun acc (lit, idx) ->
+      match lit with
+      | Equation (l,r,sign,Gt) when sign_ok sign ->
+        f acc l r sign [idx; C.left_pos]
+      | Equation (l,r,sign,Lt) when sign_ok sign ->
+        f acc r l sign [idx; C.right_pos]
+      | Equation (l,r,sign,_) when sign_ok sign ->
+        if both
+        then (* visit both sides of the equation *)
+          let acc = f acc r l sign [idx; C.right_pos] in
+          f acc l r sign [idx; C.left_pos]
+        else (* only visit one side (arbitrary) *)
+          f acc l r sign [idx; C.left_pos]
+      | _ -> acc)
+    acc lits
+
+(** Visit all non-minimal sides of positive equations *)
+let rec fold_positive ?(both=true) f acc lits =
+  fold_lits ~pos:true ~neg:false ~both f acc lits
+
+(** Visit all non-minimal sides of negative equations *)
+let rec fold_negative ?(both=true) f acc lits =
+  fold_lits ~pos:false ~neg:true f acc lits
+
 (** compare literals as multisets of multisets of terms 
     TODO maybe handcode it to make it more efficient? *)
 let compare_lits_partial ~ord l1 l2 =
@@ -254,74 +294,56 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
       let new_clause = C.mk_clause new_lits proof in
       [new_clause]
 
-let infer_right actives clause = []  (* TODO *)
+let infer_right actives clause = [] (*
+  let ord = actives.PS.a_ord
+  and lits_pos = Utils.list_pos clause.clits in
+  (* do the inferences where clause is active *)
+  let infer_active = 
+    List.fold_left do_inferences []  in []
+    *)
 
 let infer_left actives clause = [] (* TODO *)
 
 let infer_equality_resolution actives clause =
   let ord = actives.PS.a_ord in
-  let infer_lit acc (lit, pos) = match lit with
-  | Equation (_, _, true, _) -> acc (* ignore positive equations *)
-  | Equation (l, r, false, _) ->
-    try
-      let subst = Unif.unification l r in
-      if check_maximal_lit ~ord clause pos subst
-        (* subst(lit) is maximal, we can do the inference *)
-        then
-          let proof = lazy (Proof ("equality resolution", [clause, [pos], subst]))
-          and new_lits = List.map
-            (C.apply_subst_lit ~ord subst) 
-            (Utils.list_remove clause.clits pos) in
-          let new_clause = C.mk_clause new_lits proof in
-          new_clause::acc
-        else
-          acc
-    with
-      (* l and r not unifiable, try next *)
-      UnificationFailure _ -> acc
-  in
-  List.fold_left infer_lit [] (Utils.list_pos clause.clits)
+  fold_positive ~both:false
+    (fun acc l r sign l_pos ->
+      match l_pos with
+      | [] -> assert false
+      | pos::_ -> 
+      try
+        let subst = Unif.unification l r in
+        if check_maximal_lit ~ord clause pos subst
+          (* subst(lit) is maximal, we can do the inference *)
+          then
+            let proof = lazy (Proof ("equality resolution", [clause, [pos], subst]))
+            and new_lits = Utils.list_remove clause.clits pos in
+            let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
+            let new_clause = C.mk_clause new_lits proof in
+            new_clause::acc
+          else
+            acc
+      with UnificationFailure _ -> acc (* l and r not unifiable, try next *)
+    )
+    [] (Utils.list_pos clause.clits)
 
 let infer_equality_factoring actives clause =
   let ord = actives.PS.a_ord
   and lits_pos = Utils.list_pos clause.clits in
   (* find root terms that are unifiable with s and are not in the
      literal at s_pos. This returns a list of position and substitution *)
-  let rec find_unifiable_lits s s_pos candidate_lits = match candidate_lits with
-  | [] -> []
-  | (_, pos)::tail when pos = s_pos -> find_unifiable_lits s s_pos tail
-  | (Equation (_, _, false, _), pos)::tail -> find_unifiable_lits s s_pos tail
-  | (Equation (u, v, true, _), pos)::tail ->
-      let try_u =
+  let find_unifiable_lits s s_pos candidate_lits =
+    fold_positive ~both:true
+      (fun acc u v _ u_pos ->
+        if List.hd s_pos = List.hd u_pos then acc (* same index *)
+        else
         try
-          let subst = Unif.unification s u in [[pos; C.left_pos], subst]
-        with UnificationFailure _ -> []
-      and try_v =
-        try
-          let subst = Unif.unification s v in [[pos; C.right_pos], subst]
-        with UnificationFailure _ -> []
-      in try_u @ try_v @ (find_unifiable_lits s s_pos tail)
-  (* tries to perform inferences where the literal (at position pos) is
-     the active literal *)
-  and infer_lit acc (lit, pos) = match lit with
-  | Equation (_, _, false, _) -> acc
-  | Equation (_, _, true, Gt) ->
-      do_inferences [pos; C.left_pos] acc
-  | Equation (_, _, true, Lt) ->
-      do_inferences [pos; C.right_pos] acc
-  | Equation (_, _, true, _) ->
-      let acc = do_inferences [pos; C.left_pos] acc in
-      do_inferences [pos; C.right_pos] acc
-  (* do all inferences where the equation at given position
-     is the active literal *)
-  and do_inferences active_pos acc =
-    let s, _, _ = get_equations_sides clause active_pos
-    and idx = List.hd active_pos in
-    let unifiables = find_unifiable_lits s idx lits_pos in
-    List.fold_left
-      (fun acc (passive_pos, subst) ->
-        (do_inference active_pos passive_pos subst) @ acc)
-      acc unifiables
+          let subst = Unif.unification s u in
+          (u_pos, subst) :: acc
+        with
+          UnificationFailure _ -> acc
+      )
+      [] lits_pos
   (* do the inference between given positions, if ordering
      conditions are respected *)
   and do_inference active_pos passive_pos subst =
@@ -342,7 +364,15 @@ let infer_equality_factoring actives clause =
         [C.mk_clause new_lits proof]
       else
         []
-  in List.fold_left infer_lit [] lits_pos
+  (* try to do inferences with each positive literal *)
+  in fold_positive ~both:true
+    (fun acc s t _ s_pos -> (* try with s=t *)
+      let unifiables = find_unifiable_lits s s_pos lits_pos in
+      List.fold_left
+        (fun acc (passive_pos, subst) ->
+          (do_inference s_pos passive_pos subst) @ acc)
+        acc unifiables)
+    [] lits_pos
 
 (* ----------------------------------------------------------------------
  * simplifications
