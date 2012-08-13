@@ -276,24 +276,26 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   let active_idx = List.hd active_pos
   and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = get_equations_sides active_clause active_pos in
-  assert sign_st;
-  assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
-                      (S.apply_subst subst s));
-  if (ord#compare_terms (S.apply_subst subst s) (S.apply_subst subst t) = Lt ||
-      ord#compare_terms (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
-      not (check_maximal_lit ~ord active_clause active_idx subst) ||
-      not (check_maximal_lit ~ord passive_clause passive_idx subst))
-    then []
-    else (* ordering constraints are ok *)
-      let new_lits = Utils.list_remove active_clause.clits active_idx in
-      let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
-      let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
-      let new_lits = (C.mk_lit ~ord new_u v sign_uv) :: new_lits in
-      let rule = if sign_uv then "superposition right" else "superposition left" in
-      let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
-                                      (passive_clause, passive_pos, subst)])) in
-      let new_clause = C.mk_clause new_lits proof in
-      [new_clause]
+  if not sign_st then []
+  else begin
+    assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
+                        (S.apply_subst subst s));
+    if (ord#compare_terms (S.apply_subst subst s) (S.apply_subst subst t) = Lt ||
+        ord#compare_terms (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
+        not (check_maximal_lit ~ord active_clause active_idx subst) ||
+        not (check_maximal_lit ~ord passive_clause passive_idx subst))
+      then []
+      else (* ordering constraints are ok *)
+        let new_lits = Utils.list_remove active_clause.clits active_idx in
+        let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
+        let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
+        let new_lits = (C.mk_lit ~ord new_u v sign_uv) :: new_lits in
+        let rule = if sign_uv then "superposition right" else "superposition left" in
+        let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
+                                        (passive_clause, passive_pos, subst)])) in
+        let new_clause = C.mk_clause new_lits proof in
+        [new_clause]
+  end
 
 let infer_active actives clause =
   let ord = actives.PS.a_ord
