@@ -32,6 +32,8 @@ val infer_equality_factoring : inference_rule
 
 val is_tautology : clause -> bool
 
+val basic_simplify : clause -> clause   (** basic simplifications *)
+
 val demodulate : ProofState.active_set
                 -> clause   (** the clause to simplify *)
 		-> clause   (** the simplified clause *)

@@ -39,6 +39,8 @@ val list_remove : 'a list -> int -> 'a list
 val list_pos : 'a list -> ('a * int) list
 (** test for membership using the given comparison function *)
 val list_mem : ('a -> 'a -> bool) -> 'a -> 'a list -> bool
+(** list uniq: remove duplicates w.r.t the equality predicate *)
+val list_uniq : ('a -> 'a -> bool) -> 'a list -> 'a list
 (** list intersection, given the comparison function *)
 val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 

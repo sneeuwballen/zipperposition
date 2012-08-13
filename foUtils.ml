@@ -134,6 +134,10 @@ let rec list_mem comp x l = match l with
   | y::ys when comp x y -> true
   | _::ys -> list_mem comp x ys
 
+let rec list_uniq comp l = match l with
+  | [] -> []
+  | x::xs -> x :: list_uniq comp (List.filter (fun x' -> not (comp x x')) xs)
+
 let rec list_inter comp l1 l2 = match l1 with
   | [] -> []
   | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)

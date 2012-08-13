@@ -50,26 +50,31 @@ let given_clause_step state =
     let state = { state with PS.passive_set=passive_set } in
     (* rename variables in c to avoid collisions *)
     let c = PS.relocate_active state.PS.active_set c.node in
-    debug (lazy (Format.sprintf "# *** step with given clause %s"
-                 (Utils.on_buffer Pp.pp_clause c)));
-    (* do inferences (TODO simplify before) *)
-    let new_clauses = do_inferences state c in
-    List.iter
-      (fun new_c -> debug (lazy
-        (Format.sprintf "  infered new clause %s"
-          (Utils.on_buffer Pp.pp_clause new_c))))
-      new_clauses;
-    (* add new clauses to passive set, and given clause to active set *)
-    let passive_set = PS.add_passives state.PS.passive_set new_clauses
-    and active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
-    let state = { state with PS.passive_set=passive_set; PS.active_set=active_set} in
-    (* test whether the empty clause has been found *)
-    try
-      let empty_clause = List.find (fun c -> c.clits = []) new_clauses in
-      state, Unsat (C.hashcons_clause empty_clause)
-    with Not_found ->
-    (* empty clause not found, return unknown *)
-    state, Unknown
+    let c = Sup.basic_simplify c in
+    if c.clits = [] then state, Unsat (C.hashcons_clause c)
+    else begin
+      debug (lazy (Format.sprintf "# *** step with given clause %s"
+                   (Utils.on_buffer Pp.pp_clause c)));
+      (* do inferences (TODO simplify before) *)
+      let new_clauses = do_inferences state c in
+      let new_clauses = List.map Sup.basic_simplify new_clauses in
+      List.iter
+        (fun new_c -> debug (lazy
+          (Format.sprintf "  infered new clause %s"
+            (Utils.on_buffer Pp.pp_clause new_c))))
+        new_clauses;
+      (* add new clauses to passive set, and given clause to active set *)
+      let passive_set = PS.add_passives state.PS.passive_set new_clauses
+      and active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
+      let state = { state with PS.passive_set=passive_set; PS.active_set=active_set} in
+      (* test whether the empty clause has been found *)
+      try
+        let empty_clause = List.find (fun c -> c.clits = []) new_clauses in
+        state, Unsat (C.hashcons_clause empty_clause)
+      with Not_found ->
+      (* empty clause not found, return unknown *)
+      state, Unknown
+    end
 
 let given_clause ?max_steps ?timeout state =
   let rec do_step state num =

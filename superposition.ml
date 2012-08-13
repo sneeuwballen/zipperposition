@@ -439,6 +439,18 @@ let demod active_set subterm =
   in rewritten
 
 let is_tautology c = false (* TODO *)
+
+let basic_simplify clause =
+  let absurd_lit lit = match lit with
+  | Equation (l, r, false, _) when T.eq_foterm l r -> true
+  | _ -> false in
+  (* remove s!=s literals *)
+  let new_lits = List.filter (fun lit -> not (absurd_lit lit)) clause.clits in
+  (* remove duplicate literals *)
+  let new_lits = Utils.list_uniq C.eq_literal new_lits in
+  C.mk_clause new_lits clause.cproof
+
+
 let demodulate active_set clause = clause (* TODO *)
 let subsumes a b = false (* TODO *)
 let subsumed_by_set set clause = false (* TODO *)
