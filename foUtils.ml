@@ -50,12 +50,14 @@ let not_partial cmp = match cmp with
   | Lt -> Gt
   | Gt -> Lt
 
-(** remove from l1, l2 elements that compare equal using f *)
+(** remove from l1, l2 elements that compare equal using f. This
+    should do a quadratic number of comparisons (at worst, compares
+    all elementts of l1 with all elements of l2) *)
 let multiset_remove_eq f l1 l2 =
   let rec aux l1 acc1 l2 acc2 = match l1, l2 with
   | [], [] | _, [] | [], _ -> l1 @ acc1, l2 @ acc2
   | x1::xs1, x2::xs2 when f x1 x2 = Eq ->
-    aux xs1 acc1 xs2 acc2
+    aux xs1 acc1 xs2 acc2 (* drop x1 and x2 *)
   | x1::xs1, x2::xs2 ->
     match remove x1 [] xs2, remove x2 [] xs1 with
       | None, None -> aux xs1 (x1::acc1) xs2 (x2::acc2) (* keep both *)
@@ -98,7 +100,9 @@ let multiset_partial f l1 l2 =
   | [] -> true
   | y::ys when f x y = Gt -> dominates x ys
   | _ -> false
-  in find_dominating l1 l2
+  in match l1, l2 with
+  | [], [] -> Eq (* all elements removed by multiset_remove_eq *)
+  | _ -> find_dominating l1 l2
 
 let rec list_get l i = match l, i with
   | [], i -> invalid_arg "index too high"
