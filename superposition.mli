@@ -20,9 +20,9 @@ exception Success of hclause
 (** inferences *)
 type inference_rule = ProofState.active_set -> clause -> conclusion list
 
-val infer_right : inference_rule
+val infer_active : inference_rule  (* superposition where given clause is active *)
 
-val infer_left : inference_rule
+val infer_passive : inference_rule (* superposition where given clause is passive *)
 
 val infer_equality_resolution : inference_rule
 
