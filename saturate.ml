@@ -24,14 +24,22 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Unix.gettimeofday () > timeout
 
+(** the list of inference rules *)
+let inference_rules =
+  [("infer_active", Sup.infer_active);
+   ("infer_passive", Sup.infer_passive);
+   ("equality_resolution", Sup.infer_equality_resolution);
+   ("equality_factoring", Sup.infer_equality_factoring);
+   ]
+
 (** do inferences that involve the given clause *)
 let do_inferences state c = 
   let active_set = state.PS.active_set in
-  let new_clauses = Sup.infer_active active_set c in
-  let new_clauses = (Sup.infer_passive active_set c) @ new_clauses in
-  let new_clauses = (Sup.infer_equality_resolution active_set c) @ new_clauses in
-  let new_clauses = (Sup.infer_equality_factoring active_set c) @ new_clauses in
-  new_clauses
+  HExtlib.flatten_map
+    (fun (name, rule) ->
+      debug (lazy ("#  apply rule " ^ name));
+      rule active_set c)
+    inference_rules
 
 let given_clause_step state =
   (* select next given clause *)
@@ -41,7 +49,7 @@ let given_clause_step state =
     let state = { state with PS.passive_set=passive_set } in
     (* rename variables in c to avoid collisions *)
     let c = PS.relocate_active state.PS.active_set c.node in
-    debug (lazy (Format.sprintf "step with given clause %s"
+    debug (lazy (Format.sprintf "# *** step with given clause %s"
                  (Utils.on_buffer Pp.pp_clause c)));
     (* do inferences (TODO simplify before) *)
     let new_clauses = do_inferences state c in
