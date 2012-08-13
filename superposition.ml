@@ -22,7 +22,7 @@ module Unif = FoUnif
 module Utils = FoUtils
 
 (** a conclusion is a clause, plus the clauses used to infer it *)
-type conclusion = clause * hclause list
+type conclusion = clause
 
 (** raised when the empty clause is found *)
 exception Success of hclause
@@ -177,7 +177,30 @@ let visit bag pos ctx id t f =
   in
   aux bag pos ctx id S.id_subst t
 
+(** compare literals as multisets of multisets of terms 
+    TODO maybe handcode it to make it more efficient? *)
+let compare_lits_partial ~ord l1 l2 =
+  let m1 = C.lit_to_multiset l1
+  and m2 = C.lit_to_multiset l2 in
+  Utils.multiset_partial (Utils.multiset_partial ord#compare_terms) m1 m2
 
+(** check that the literal subst(clause[i]) is maximal in subst(clause) *)
+let check_maximal_lit ~ord clause pos subst =
+  (* literals after substitution *)
+  let slits = List.map (C.apply_subst_lit ~ord subst) clause.clits in
+  let slit_at_pos = Utils.list_get slits pos
+  and slits_with_pos = Utils.list_pos slits in
+  List.for_all
+    (fun (slit', idx) ->
+      if idx = pos
+        then (assert (C.eq_literal slit_at_pos slit'); true) (* it must be slit *)
+        else
+          match compare_lits_partial ~ord slit_at_pos slit' with
+          | Eq | Gt | Invertible | Incomparable -> true
+          | Lt -> false  (* slit is not maximal *)
+    )
+    slits_with_pos
+        
 (* for profiling *)
 let enable = true
 
@@ -193,8 +216,33 @@ let prof_demodulate = HExtlib.profile ~enable "demodulate"
  * ---------------------------------------------------------------------- *)
 
 let infer_right actives clause = []  (* TODO *)
+
 let infer_left actives clause = [] (* TODO *)
-let infer_equality_resolution actives clause = []  (* TODO *)
+
+let infer_equality_resolution actives clause =
+  let ord = actives.PS.a_ord in
+  let infer_lit acc (lit, pos) = match lit with
+  | Equation (_, _, true, _) -> acc (* ignore positive equations *)
+  | Equation (l, r, false, _) ->
+    try
+      let subst = Unif.unification l r in
+      if check_maximal_lit ~ord clause pos subst
+        (* subst(lit) is maximal, we can do the inference *)
+        then
+          let proof = lazy (Proof ("equality resolution", [clause, [pos], subst]))
+          and new_lits = List.map
+            (C.apply_subst_lit ~ord subst) 
+            (Utils.list_remove clause.clits pos) in
+          let new_clause = C.mk_clause new_lits proof in
+          new_clause::acc
+        else
+          acc
+    with
+      (* l and r not unifiable, try next *)
+      UnificationFailure _ -> acc
+  in
+  List.fold_left infer_lit [] (Utils.list_pos clause.clits)
+
 let infer_equality_factoring actives clause = [] (* TODO *)
 
 (* ----------------------------------------------------------------------

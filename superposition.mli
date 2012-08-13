@@ -11,8 +11,8 @@
 
 open Types
 
-(** a conclusion is a clause, plus the clauses used to infer it *)
-type conclusion = clause * hclause list
+(** a conclusion is a clause *)
+type conclusion = clause
 
 (** raised when the empty clause is found *)
 exception Success of hclause
