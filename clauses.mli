@@ -24,6 +24,8 @@ val negate_lit : literal -> literal (** negate literal *)
 val fmap_lit : ord:ordering -> (foterm -> foterm) -> literal -> literal (** fmap in literal *)
 val vars_of_lit : literal -> varlist (** gather variables *)
 
+val lit_to_multiset : literal -> foterm list list (** literal to multiset of terms *)
+
 (* ----------------------------------------------------------------------
  * clauses
  * ---------------------------------------------------------------------- *)
@@ -35,7 +37,6 @@ val hashcons_clause : clause -> hclause
 
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
-
 
 val mk_clause : literal list -> proof Lazy.t -> clause  (** build a clause *)
 val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal

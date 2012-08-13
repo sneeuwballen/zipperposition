@@ -63,6 +63,9 @@ let vars_of_lit = function
   | Equation (left, right, _, _) ->
     T.merge_varlist (T.vars_of_term left) (T.vars_of_term right)
 
+let lit_to_multiset lit = match lit with
+  | Equation (l, r, true, _) -> [[l; r]]
+  | Equation (l, r, false, _) -> [[l]; [r]]
 
 (* ----------------------------------------------------------------------
  * clauses
