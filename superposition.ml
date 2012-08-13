@@ -83,7 +83,8 @@ let first_position pos ctx t f =
 
 (** apply f to all non-variable positions in t, accumulating the
     results along. f is given the subterm, the position and the context
-    at each such position
+    at each such position, and returns a list of objects; all lists
+    returned by f are concatenated.
 
     position -> (foterm -> 'a) -> foterm
     -> (foterm -> position -> (foterm -> 'a) -> 'b list)
@@ -98,7 +99,7 @@ let all_positions pos ctx t f =
         List.fold_left
         (fun (acc,pre,idx,post) t -> (* Invariant: pre @ [t] @ post = l *)
             let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
-            let acc = aux (idx :: pos) newctx t @ acc in
+            let acc = aux (idx :: pos) newctx t @ acc in (* append results to acc *)
             if post = [] then acc, l, idx, []
             else acc, pre @ [t], idx+1, List.tl post)
         (f t pos ctx (* apply f to t *), [], 1, List.tl l) l
