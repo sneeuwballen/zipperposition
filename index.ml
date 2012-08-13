@@ -106,8 +106,8 @@ let empty = { root_index=DT.empty;
               subterm_index=DT.empty }
 
 (** process the literal (only its maximal side(s)) *)
-let process_lit op c (pos, tree) lit =
-  let new_tree = match lit with
+let process_lit op c tree (lit, pos) =
+  match lit with
   | Equation (l,_,_,Gt) -> 
       op tree l (c, [C.left_pos; pos])
   | Equation (_,r,_,Lt) -> 
@@ -118,13 +118,12 @@ let process_lit op c (pos, tree) lit =
   | Equation (l,r,_,Invertible) ->
       op tree l (c, [C.left_pos; pos])
   | Equation (_,r,_,Eq) -> assert false
-  and new_pos = pos+1
-  in (new_pos, new_tree)
 
 (** apply op to some of the literals of the clause, and only to
     the maximal side(s) of the literals. *)
 let process_clause op tree ({node={clits=lits}} as c) =
-  let _, new_tree = List.fold_left (process_lit op c) (1,tree) lits in
+  let lits_pos = Utils.list_pos lits in
+  let new_tree = List.fold_left (process_lit op c) tree lits_pos in
   new_tree
 
 (** apply (op tree) to all subterms, folding the resulting tree *)
@@ -150,7 +149,7 @@ let index_clause {root_index; unit_root_index; subterm_index} clause =
   let new_subterm_index = process_clause (fold_subterms DT.index) subterm_index clause
   and new_unit_root_index = match clause.node.clits with
       | [(Equation (_,_,true,_)) as lit] ->
-          snd (process_lit (apply_root_term DT.index) clause (1, unit_root_index) lit)
+          process_lit (apply_root_term DT.index) clause unit_root_index (lit, 0)
       | _ -> unit_root_index
   and new_root_index = process_clause (apply_root_term DT.index) root_index clause
   in {root_index=new_root_index;
@@ -161,8 +160,7 @@ let index_clause {root_index; unit_root_index; subterm_index} clause =
 let remove_clause {root_index; unit_root_index; subterm_index} clause =
   let new_subterm_index = process_clause (fold_subterms DT.remove_index) subterm_index clause
   and new_unit_root_index = match clause.node.clits with
-      | [lit] -> snd (process_lit (apply_root_term DT.remove_index)
-                        clause (1, unit_root_index) lit)
+      | [lit] -> process_lit (apply_root_term DT.remove_index) clause unit_root_index (lit, 0)
       | _ -> unit_root_index
   and new_root_index = process_clause (apply_root_term DT.remove_index) root_index clause
   in {root_index=new_root_index;
