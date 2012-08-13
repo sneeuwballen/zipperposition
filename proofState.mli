@@ -42,3 +42,8 @@ val next_passive_clause : passive_set -> (passive_set * hclause option)
 
 (** relocate clause w.r.t clauses in the active_set *)
 val relocate_active : active_set -> clause -> clause
+
+val pp_state : Format.formatter -> state -> unit
+
+(* debug functions: much more detailed printing *)
+val debug_state : Format.formatter -> state -> unit

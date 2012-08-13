@@ -27,10 +27,6 @@ val pp_bag: formatter -> Clauses.bag -> unit
 val pp_index : ?all_clauses:bool -> formatter -> Index.t -> unit
 val pp_queue : formatter -> ClauseQueue.queue -> unit
 val pp_queues : formatter -> (ClauseQueue.queue * int) list -> unit
-val pp_state : formatter -> ProofState.state -> unit
-
-(* debug functions: much more detailed printing *)
-val debug_state : formatter -> ProofState.state -> unit
 
 (*
 val pp_proof: Format.formatter -> T.proof -> unit

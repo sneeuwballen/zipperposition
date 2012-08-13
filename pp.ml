@@ -16,7 +16,6 @@ open Format
 module T = Terms
 module C = Clauses
 module I = Index
-module PS = ProofState
 
 (* print a list of items using the printing function *)
 let rec pp_list ?(sep=", ") pp_item  formatter = function
@@ -147,17 +146,3 @@ let pp_queue_weight formatter (q, w) =
 let pp_queues formatter qs =
   Format.fprintf formatter "@[<hov>%a@]" (pp_list ~sep:"; " pp_queue_weight) qs
 
-let pp_state formatter state =
-  Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
-    (C.size_bag state.PS.active_set.PS.active_clauses)
-    (C.size_bag state.PS.passive_set.PS.passive_clauses)
-    pp_queues state.PS.passive_set.PS.queues
-
-let debug_state formatter state =
-  Format.fprintf formatter
-    "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
-    (C.size_bag state.PS.active_set.PS.active_clauses)
-    (C.size_bag state.PS.passive_set.PS.passive_clauses)
-    pp_queues state.PS.passive_set.PS.queues
-    pp_bag state.PS.active_set.PS.active_clauses
-    pp_bag state.PS.passive_set.PS.passive_clauses

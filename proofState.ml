@@ -42,30 +42,36 @@ let make_state ord queue_list =
 let next_passive_clause passive_set =
   (* index of the first queue to consider *)
   let first_idx, first_weight = passive_set.queue_state
-  and len = List.length passive_set.queues
-  and queues = passive_set.queues in
+  and len = List.length passive_set.queues in
+  assert (len > 0);
   (* try to get one from the idx-th queue *)
-  let rec try_queue idx weight =
+  let rec try_queue passive_set idx weight =
     assert (idx < len);
+    let queues = passive_set.queues in
     let q, w = U.list_get queues idx in
     if weight >= w || q#is_empty
-      then next_idx (idx+1) (* queue has been used enough time, or is empty *)
+      then next_idx passive_set (idx+1) (* queue has been used enough time, or is empty *)
       else 
         let new_q, hc = q#take_first in (* pop from this queue *)
-        let new_q_state = (idx, weight+1) (* increment weight *)
-        and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.tag in
-        {passive_set with passive_clauses=new_clauses;
-                          queues=U.list_set queues idx (new_q, w);
-                          queue_state=new_q_state}, Some hc
+        if C.is_in_bag passive_set.passive_clauses hc.tag
+          then (* the clause is still in the passive set, return it *)
+            let new_q_state = (idx, weight+1) (* increment weight for the clause *)
+            and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.tag in
+            {passive_set with passive_clauses=new_clauses;
+                              queues=U.list_set queues idx (new_q, w);
+                              queue_state=new_q_state}, Some hc
+          else (* we must find another clause, this one has already been pop'd *)
+            let passive_set = {passive_set with queues=U.list_set queues idx (new_q, w)} in
+            try_queue passive_set idx weight (* try again *)
   (* lookup for a non-empty queue to pop *)
-  and next_idx idx = 
+  and next_idx passive_set idx = 
     if idx >= len
-      then try_queue 0 0  (* back to the first queue *)
+      then next_idx passive_set 0 (* back to the first queue *)
       else if idx = first_idx
-      then (passive_set, None)  (* ran through all queues *)
-      else try_queue (idx+1) 0
+      then (passive_set, None)  (* ran through all queues, stop *)
+      else try_queue passive_set idx 0
   (* start at current index and weight *)
-  in try_queue first_idx first_weight
+  in try_queue passive_set first_idx first_weight
 
 let add_active active_set c =
   let new_bag, hc = C.add_to_bag active_set.active_clauses c in
@@ -88,3 +94,18 @@ let add_passives passive_set l =
 let relocate_active active_set c =
   let maxvar = active_set.active_clauses.C.bag_maxvar in
   fst (C.fresh_clause ~ord:active_set.a_ord maxvar c)
+
+let pp_state formatter state =
+  Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
+    (C.size_bag state.active_set.active_clauses)
+    (C.size_bag state.passive_set.passive_clauses)
+    Pp.pp_queues state.passive_set.queues
+
+let debug_state formatter state =
+  Format.fprintf formatter
+    "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
+    (C.size_bag state.active_set.active_clauses)
+    (C.size_bag state.passive_set.passive_clauses)
+    Pp.pp_queues state.passive_set.queues
+    Pp.pp_bag state.active_set.active_clauses
+    Pp.pp_bag state.passive_set.passive_clauses
