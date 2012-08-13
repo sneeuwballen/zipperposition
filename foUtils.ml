@@ -32,30 +32,73 @@ let total_to_partial ord a b = match ord a b with
 
 let opposite_order ord a b = - (ord a b)
 
-let multiset_partial f l1 l2 = 
-  (* sort lists in decreasing order w.r.t f *)
-  let l1 = List.stable_sort (opposite_order (partial_to_total f)) l1
-  and l2 = List.stable_sort (opposite_order (partial_to_total f)) l2 in
-  (* now for Mana and Dershowitz algorithm, as presented in
-     "on multiset ordering" by Jouannaud and Lescanne, p.7 *)
-  let rec aux_cmp l1 l2 = match l1, l2 with
-  | [], [] -> Eq
-  | [], _ -> Lt
-  | _, [] -> Gt
+(** combine two partial comparisons, that are assumed to be
+    compatible, ie they do not order differently if
+    Incomparable is not one of the values *)
+let or_partial cmp1 cmp2 = match cmp1, cmp2 with
+  | Eq, Eq | Eq, Invertible | Invertible, Eq
+  | Eq, Incomparable | Incomparable, Eq -> Eq
+  | Lt, Incomparable | Incomparable, Lt -> Lt
+  | Gt, Incomparable | Incomparable, Gt -> Gt
+  | Incomparable, Incomparable -> Incomparable
+  | Invertible, Invertible -> Invertible
+  | _ -> assert false  (* not compatible *)
+
+(** negation of a partial order relation *)
+let not_partial cmp = match cmp with
+  | Eq | Invertible | Incomparable -> cmp
+  | Lt -> Gt
+  | Gt -> Lt
+
+(** remove from l1, l2 elements that compare equal using f *)
+let multiset_remove_eq f l1 l2 =
+  let rec aux l1 acc1 l2 acc2 = match l1, l2 with
+  | [], [] | _, [] | [], _ -> l1 @ acc1, l2 @ acc2
+  | x1::xs1, x2::xs2 when f x1 x2 = Eq ->
+    aux xs1 acc1 xs2 acc2
   | x1::xs1, x2::xs2 ->
-    match f x1 x2 with
-    | Eq | Invertible -> aux_cmp xs1 xs2
-    | Incomparable -> Incomparable  (* maximal elements are incomparable *)
-    | Lt -> aux_cmp (remove_smaller x1 xs1) l2
-    | Gt -> aux_cmp l1 (remove_smaller x2 xs2)
-  (* remove from l elements that are smaller than x *)
-  and remove_smaller x l = match l with
-  | [] -> []
-  | y::ys ->
-    if f x y = Gt
-      then remove_smaller x ys
-      else y :: (remove_smaller x ys)
-  in aux_cmp l1 l2
+    match remove x1 [] xs2, remove x2 [] xs1 with
+      | None, None -> aux xs1 (x1::acc1) xs2 (x2::acc2) (* keep both *)
+      | Some l2', None -> aux xs1 acc1 l2' (x2::acc2)
+      | None, Some l1' -> aux l1' (x1::acc1) xs2 acc2
+      | Some l2', Some l1' -> aux l1' acc1 l2' acc2  (* drop both *)
+  (* if l contains an element equal to x, returns Some(l')
+     where l' is l without this element. Otherwise, None. *)
+  and remove x acc l = match l with
+  | [] -> None
+  | y::ys when f x y = Eq -> Some (acc @ ys)
+  | y::ys -> remove x (y :: acc) ys
+  in aux l1 [] l2 []
+
+(* check that l1 and l2 are equal multisets under f *)
+let multiset_eq f l1 l2 =
+  let l1, l2 = multiset_remove_eq f l1 l2 in
+  match l1, l2 with
+  | [], [] -> true
+  | _ -> false
+
+(* naive recursive version, tries all permutations *)
+let multiset_partial f l1 l2 = 
+  (* first, remove common elements *)
+  let l1, l2 = multiset_remove_eq f l1 l2 in
+  (* now for a naive Mana and Dershowitz ordering, as presented in
+     chapter "paramodulation-based theorem proving" of the
+     handbook of automated reasoning. We look for an element that
+     dominates the whole other multiset *)
+  let rec find_dominating l1' l2' = match l1', l2' with
+  | [], [] -> Incomparable
+  | x1::xs1, [] -> if dominates x1 l2 then Gt else find_dominating xs1 []
+  | [], x2::xs2 -> if dominates x2 l1 then Lt else find_dominating [] xs2
+  | x1::xs1, x2::xs2 ->
+    let x1_win = dominates x1 l2
+    and x2_win = dominates x2 l1 in
+    assert ((not x1_win) || (not x2_win));
+    if x1_win then Gt else if x2_win then Lt else find_dominating xs1 xs2
+  and dominates x l = match l with
+  | [] -> true
+  | y::ys when f x y = Gt -> dominates x ys
+  | _ -> false
+  in find_dominating l1 l2
 
 let rec list_get l i = match l, i with
   | [], i -> invalid_arg "index too high"

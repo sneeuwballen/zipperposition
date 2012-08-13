@@ -17,12 +17,15 @@ val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
 (** conversion from partial order to a total order, in which incomparable
     elements are considered to be in the same congruence class *)
 val partial_to_total : ('a -> 'b -> comparison) -> 'a -> 'b -> int
-
 val total_to_partial : ('a -> 'b -> int) -> 'a -> 'b -> comparison
+val or_partial : comparison -> comparison -> comparison
+val not_partial : comparison -> comparison
 
 (** the opposite order, that sorts elements the opposite way *)
 val opposite_order : ('a -> 'b -> int) -> 'a -> 'b -> int
 
+(** multiset equality given partial order f *)
+val multiset_eq : ('a -> 'a -> comparison) -> 'a list -> 'a list -> bool
 (** multiset order on lists which elements are ordered by f *)
 val multiset_partial : ('a -> 'a -> comparison) -> 'a list -> 'a list -> comparison
 
