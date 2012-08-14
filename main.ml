@@ -1,6 +1,7 @@
 (* main file *)
 
 open Types
+open Hashcons
 
 module T = Terms
 module O = Orderings
@@ -88,6 +89,9 @@ let () =
   let state, result = Sat.given_clause state in
   match result with
   | Sat.Sat -> Printf.printf "# SZS status CounterSatisfiable\n"
-  | Sat.Unsat _ -> Printf.printf "# SZS status Theorem\n"
   | Sat.Unknown | Sat.Timeout -> Printf.printf "# SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "error occurred: %s\n" s
+  | Sat.Unsat c ->
+      (* print status then proof *)
+      Printf.printf "# SZS status Theorem\n";
+      Format.printf "proof: @[<v>%a@]@." Pp.pp_proof_rec c.node

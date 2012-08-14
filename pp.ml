@@ -52,31 +52,6 @@ let pp_substitution formatter subst =
     subst;
   fprintf formatter "@]"
 
-(* print proof
-let pp_proof bag ~formatter:f p =
-  let rec aux eq = function
-    | Terms.Exact t ->
-        fprintf f "%d: Exact (" eq;
-        pp_foterm f t;
-        fprintf f ")@;";
-    | Terms.Step (rule,eq1,eq2,dir,pos,subst) ->
-        fprintf f "%d: %s("
-          eq (string_of_rule rule);
-      fprintf f "|%d with %d dir %s))" eq1 eq2
-        (string_of_direction dir);
-      let (_, _, _, proof1),_,_ = Terms.get_from_bag eq1 bag in
-      let (_, _, _, proof2),_,_ = Terms.get_from_bag eq2 bag in
-        fprintf f "@[<v 2>";
-          aux eq1 proof1;
-          aux eq2 proof2;
-        fprintf f "@]";
-  in
-    fprintf f "@[<v>";
-    aux 0 p;
-    fprintf f "@]"
-;;
-*)
-
 let string_of_comparison = function
   | Lt -> "=<="
   | Gt -> "=>="
@@ -120,6 +95,29 @@ let pp_bag formatter bag =
     (fun _ hc -> fprintf formatter "%a@;" pp_clause hc.node)
     bag.C.bag_clauses;
   fprintf formatter "@]"
+
+let pp_proof formatter p =
+  match p with
+  | Axiom s -> fprintf formatter "axiom %s" s
+  | Proof (rule, premisses) ->
+    fprintf formatter "@[<h>%s with %a@]" rule
+      (pp_list ~sep:", " pp_clause_pos)
+      (List.map (fun (c, pos, subst) -> (c, pos)) premisses)
+
+let pp_clause_proof formatter clause =
+  fprintf formatter "%a -| %a@;"
+    pp_clause clause pp_proof (Lazy.force clause.cproof)
+
+let rec pp_proof_rec formatter clause =
+  pp_clause_proof formatter clause;
+  match Lazy.force clause.cproof with
+  | Axiom _ -> ()
+  | Proof (_, premisses) ->
+      (* print premisses recursively *)
+      List.iter
+        (fun (c, pos, subst) ->
+            pp_proof_rec formatter c)
+        premisses
 
 let pp_index ?(all_clauses=false) formatter idx = 
   let print_dt_path path set =
