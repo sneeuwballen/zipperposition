@@ -10,14 +10,12 @@ type szs_status =
   | Error of string 
   | Timeout
 
-val set_debug : bool -> unit   (** enable debug *)
-
 (** Perform one step of the given clause algorithm *)
 val given_clause_step : ProofState.state -> ProofState.state * szs_status
 
 (** run the given clause until a timeout occurs or a result
     is found *)
-val given_clause :  ?max_steps:int -> ?timeout:float
+val given_clause :  ?steps:int -> ?timeout:float
                   -> ProofState.state
                   -> ProofState.state * szs_status
 

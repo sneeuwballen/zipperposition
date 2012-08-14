@@ -98,12 +98,12 @@ let apply_subst_lit ?(recursive=true) ~ord subst =
     let new_l = S.apply_subst ~recursive subst l
     and new_r = S.apply_subst ~recursive subst r
     in
-    Format.printf "apply %a to %a gives %a@."
-      (S.pp_substitution ~sort:true) subst
-      (T.pp_foterm ~sort:true) l (T.pp_foterm ~sort:true) new_l;
-    Format.printf "apply %a to %a gives %a@."
-      (S.pp_substitution ~sort:true) subst
-      (T.pp_foterm ~sort:true) r (T.pp_foterm ~sort:true) new_r;
+    Utils.debug 2 (lazy (Utils.sprintf "apply %a to %a gives %a"
+        (S.pp_substitution ~sort:true) subst
+        (T.pp_foterm ~sort:true) l (T.pp_foterm ~sort:true) new_l));
+    Utils.debug 2 (lazy (Utils.sprintf "apply %a to %a gives %a"
+        (S.pp_substitution ~sort:true) subst
+        (T.pp_foterm ~sort:true) r (T.pp_foterm ~sort:true) new_r));
     mk_lit ~ord new_l new_r sign
 
 let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
@@ -197,8 +197,8 @@ let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
   let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
-  Format.printf "  relocate %a using %a@." (pp_clause ~sort:true) c
-    (S.pp_substitution ~sort:true) subst;
+  Utils.debug 2 (lazy (Utils.sprintf "  relocate %a using %a"
+                      (pp_clause ~sort:true) c (S.pp_substitution ~sort:true) subst));
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 
 let relocate_clause ~ord varlist c =

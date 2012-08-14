@@ -8,10 +8,6 @@ module PS = ProofState
 module Sup = Superposition
 module Utils = FoUtils
 
-let debug_enabled = ref false
-let set_debug b = debug_enabled := b
-let debug s = if !debug_enabled then print_endline (Lazy.force s) else ()
-
 (** the status of a state *)
 type szs_status = 
   | Unsat of hclause
@@ -56,8 +52,8 @@ let given_clause_step state =
     (* tautology, useless *)
     else if Sup.is_tautology c then state, Unknown
     else begin
-      debug (lazy (Format.sprintf "# *** step with given clause %s"
-                   (Utils.on_buffer C.pp_clause c)));
+      Utils.debug 1 (lazy (Format.sprintf "# *** step with given clause %s"
+                    (Utils.on_buffer C.pp_clause c)));
       (* do inferences (TODO simplify before) *)
       let new_clauses = do_inferences state c in
       let new_clauses = List.map (Sup.basic_simplify ~ord) new_clauses in
@@ -68,9 +64,9 @@ let given_clause_step state =
         not (C.is_in_bag state.PS.active_set.PS.active_clauses hc.tag))
         new_clauses in
       List.iter
-        (fun new_c -> debug (lazy
+        (fun new_c -> Utils.debug 1 (lazy
           (Format.sprintf "#    infered new clause %s"
-            (Utils.on_buffer C.pp_clause new_c))))
+          (Utils.on_buffer C.pp_clause new_c))))
         new_clauses;
       (* add new clauses to passive set, and given clause to active set *)
       let passive_set = PS.add_passives state.PS.passive_set new_clauses
@@ -85,18 +81,24 @@ let given_clause_step state =
       state, Unknown
     end
 
-let given_clause ?max_steps ?timeout state =
+let given_clause ?steps ?timeout state =
   let rec do_step state num =
-    if check_timeout timeout then state, Unknown else
-    match max_steps with
-    | Some i when i >= num -> state, Unknown
+    if check_timeout timeout then state, Timeout else
+    begin
+    Utils.debug 2 (lazy (Format.sprintf "# iteration %d" num));
+    match steps with
+    | Some i when num >= i -> state, Unknown
     | _ ->
-    (* do one step *)
-    let new_state, status = given_clause_step state in
-    match status with
-    | Sat | Unsat _ | Error _ -> state, status (* finished *)
-    | Timeout -> assert false
-    | Unknown ->
-      do_step new_state (num+1)  (* do one more step *)
-  in do_step state 0
+      begin
+        (* do one step *)
+        let new_state, status = given_clause_step state in
+        match status with
+        | Sat | Unsat _ | Error _ -> state, status (* finished *)
+        | Timeout -> assert false
+        | Unknown ->
+          do_step new_state (num+1)  (* do one more step *)
+      end
+    end
+  in
+  do_step state 0
 

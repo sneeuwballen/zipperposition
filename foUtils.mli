@@ -11,6 +11,9 @@
 
 open Types
 
+val set_debug : int -> unit               (** set the level of debug *)
+val debug : int -> string Lazy.t -> unit  (** debug message with level *)
+
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
 
@@ -48,6 +51,7 @@ val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string
+val sprintf : ('a, Format.formatter, unit, string) format4 -> 'a
 (* print a list of items using the printing function *)
 val pp_list: ?sep:string -> (Format.formatter -> 'a -> unit)
-    -> Format.formatter -> 'a list -> unit
+          -> Format.formatter -> 'a list -> unit

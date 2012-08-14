@@ -11,6 +11,11 @@
 
 open Types
 
+(* debugging facilities *)
+let debug_level = ref 0
+let set_debug l = debug_level := l
+let debug l s = if l <= !debug_level then print_endline (Lazy.force s) else ()
+
 let rec lexicograph f l1 l2 =
   match l1, l2 with
   | [], [] -> 0
@@ -150,6 +155,19 @@ let on_buffer ?(margin=80) f t =
   f formatter t;
   Format.fprintf formatter "@?";
   Buffer.contents buff
+
+let sprintf format =
+  let buffer = Buffer.create 512 in
+  let fmt = Format.formatter_of_buffer buffer in
+  Format.kfprintf
+    (begin fun fmt ->
+    Format.pp_print_flush fmt ();
+    let s = Buffer.contents buffer in
+    Buffer.clear buffer;
+    s
+    end)
+  fmt
+  format
 
 (* print a list of items using the printing function *)
 let rec pp_list ?(sep=", ") pp_item formatter = function

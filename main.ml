@@ -33,7 +33,8 @@ let _ =
 (** parameters for the main procedure *)
 type parameters = {
   param_ord : unit -> ordering;
-  param_verbose : bool;
+  param_steps : int;
+  param_timeout : float;
   param_files : string list;
 }
 
@@ -41,7 +42,8 @@ type parameters = {
 let parse_args () =
   (* parameters *)
   let ord = ref Orderings.default_ordering
-  and verbose = ref false
+  and steps = ref 0
+  and timeout = ref 0.
   and file = ref "stdin" in
   (* argument functions *)
   let set_ord s = (* select ordering *)
@@ -51,11 +53,14 @@ let parse_args () =
   (* options list (TODO parse something about heuristics) *) 
   let options =
     [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo,nrkbo)");
-      ("-verbose", Arg.Set verbose, "verbose mode") ]
+      ("-debug", Arg.Int Utils.set_debug, "debug level");
+      ("-steps", Arg.Set_int steps, "verbose mode");
+      ("-timeout", Arg.Set_float timeout, "verbose mode");
+    ]
   in
   Arg.parse options set_file "solve problem in first file";
   (* return parameter structure *)
-  { param_ord = !ord; param_verbose = !verbose; param_files = [!file] }
+  { param_ord = !ord; param_steps = !steps; param_timeout = !timeout; param_files = [!file] }
 
 (** parse given tptp file (TODO also parse include()s *)
 let parse_file f =
@@ -71,8 +76,12 @@ let parse_file f =
 let () =
   (* parse arguments *)
   let params = parse_args () in
-  let verbose = params.param_verbose in
-  if verbose then Sat.set_debug true;
+  let steps = if params.param_steps = 0
+    then None else (Format.printf "# run for %d steps@." params.param_steps;
+                    Some params.param_steps)
+  and timeout = if params.param_timeout = 0.
+    then None else (Format.printf "# run for %f s@." params.param_timeout;
+                    Some (Unix.gettimeofday() +. params.param_timeout)) in
   (* parse file *)
   let f = List.hd params.param_files in
   Printf.printf "# process file %s\n" f;
@@ -86,7 +95,7 @@ let () =
   let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   (* saturate *)
-  let state, result = Sat.given_clause state in
+  let state, result = Sat.given_clause ?steps ?timeout state in
   match result with
   | Sat.Sat -> Printf.printf "# SZS status CounterSatisfiable\n"
   | Sat.Unknown | Sat.Timeout -> Printf.printf "# SZS status ResourceOut\n"
