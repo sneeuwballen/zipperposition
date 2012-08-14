@@ -276,16 +276,16 @@ let pp_proof ~subst formatter p =
   | Proof (rule, premisses) ->
     if subst
     then
-      fprintf formatter "@[<h>%s with %a@]" rule
+      fprintf formatter "%s with@ %a" rule
         (Utils.pp_list ~sep:", " pp_clause_pos_subst)
         premisses
     else
-      fprintf formatter "@[<h>%s with %a@]" rule
+      fprintf formatter "%s with@ %a" rule
         (Utils.pp_list ~sep:", " pp_clause_pos)
         (List.map (fun (c, pos, subst) -> (c, pos)) premisses)
 
 let pp_clause_proof formatter clause =
-  fprintf formatter "%a  <--- %a@;"
+  fprintf formatter "@[<hov 2>%a  <--- @[<hv>%a@]@]@;"
     (pp_clause ~sort:false) clause (pp_proof ~subst:true) (Lazy.force clause.cproof)
 
 let rec pp_proof_rec formatter clause =
