@@ -1,12 +1,12 @@
 (*
-    ||M||  This file is part of HELM, an Hypertextual, Electronic        
-    ||A||  Library of Mathematics, developed at the Computer Science     
-    ||T||  Department, University of Bologna, Italy.                     
-    ||I||                                                                
-    ||T||  HELM is free software; you can redistribute it and/or         
-    ||A||  modify it under the terms of the GNU General Public License   
-    \   /  version 2 or (at your option) any later version.      
-     \ /   This software is distributed as is, NO WARRANTY.     
+    ||M||  This file is part of HELM, an Hypertextual, Electronic
+    ||A||  Library of Mathematics, developed at the Computer Science
+    ||T||  Department, University of Bologna, Italy.
+    ||I||
+    ||T||  HELM is free software; you can redistribute it and/or
+    ||A||  modify it under the terms of the GNU General Public License
+    \   /  version 2 or (at your option) any later version.
+     \ /   This software is distributed as is, NO WARRANTY.
       V_______________________________________________________________ *)
 
 open Types
@@ -16,69 +16,132 @@ module T = Terms
 module C = Clauses
 
 (* ----------------------------------------------------------------------
- module interface
+ symbol ordering
+ ---------------------------------------------------------------------- *)
+
+(** compute the current signature: existing symbols,
+    with their aritys and sorts *)
+let current_signature () =
+  let sorts = Hashtbl.create 23
+  and arities  = Hashtbl.create 23
+  and symbols = ref [] in
+  T.iter_terms
+    (fun t -> match t.node.term with
+     | Var _ -> ()
+     | Leaf s ->
+        begin
+          (* update the arity only if not already found *)
+          if not (Hashtbl.mem arities s) then Hashtbl.replace arities s 0;
+          Hashtbl.replace sorts s t.node.sort;
+          if not (List.mem s !symbols) then symbols := (s::!symbols) else ()
+        end
+     | Node (({node={term=Leaf s}})::tail) ->
+        Hashtbl.replace arities s (List.length tail)
+     | _ -> assert false);
+  sorts, arities, !symbols
+
+(** build a map symbol -> int that gives an ordering on symbols, from the arities *)
+let build_ordering arities symbols =
+  let cmp t1 t2 = match t1, t2 with
+  | _, _ when t1 = t2 -> 0
+  | _, _ when t1 = T.true_symbol -> -1
+  | _, _ when t2 = T.true_symbol -> 1
+  | _, _ when t1 = T.eq_symbol -> -1
+  | _, _ when t2 = T.eq_symbol -> 1
+  | _, _ -> Hashtbl.find arities t1 - Hashtbl.find arities t2 in
+  let sorted_symbols = List.rev (List.stable_sort cmp symbols) in
+  let cur_idx = ref 1
+  and ordering = Hashtbl.create 23 in
+  List.iter
+    (fun s -> Hashtbl.replace ordering s !cur_idx; cur_idx := !cur_idx+1)
+    sorted_symbols;
+  ordering, sorted_symbols
+
+let rec arity_ordering () : symbol_ordering =
+  (* compute the current signature *)
+  let sorts, arities, symbols = current_signature () in
+  let ord, sorted_symbols = build_ordering arities symbols in
+  (* the object itself *)
+  object
+    method refresh () = arity_ordering ()
+    method signature = sorted_symbols
+    method compare s1 s2 = if s1 = s2 then 0
+      else (Hashtbl.find ord s2) - (Hashtbl.find ord s1)
+    method weight s = Hashtbl.find arities s  (* weight is arity *)
+  end
+
+let default_symbol_ordering () = arity_ordering ()
+
+let dummy_symbol_ordering =
+  let rec produce () =
+    object
+      method refresh () = produce ()
+      method signature = []
+      method compare a b = Pervasives.compare a b
+      method weight _ = 1
+    end
+  in produce ()
+
+(* ----------------------------------------------------------------------
+ module interface for orderings, internal (used to create the different classes)
  ---------------------------------------------------------------------- *)
 
 type aux_comparison = XEQ | XLE | XGE | XLT | XGT | XINCOMPARABLE | XINVERTIBLE
 
 module type S =
-  sig 
+  sig
     (* This order relation should be:
      * - stable for instantiation
      * - total on ground terms
      *)
-    val compare_terms : foterm -> foterm -> comparison
-
-    (* these could be outside the module, but to ease experimentation
-     * we allow them to be tied with the ordering *)
-    val compute_clause_weight : clause -> int
+    val compare_terms : so:symbol_ordering -> foterm -> foterm -> comparison
 
     val name : string
   end
-  
+
 type weight = int * (int * int) list
-  
+
 let string_of_weight (cw, mw) =
   let s =
     String.concat ", "
       (List.map (function (m, w) -> Printf.sprintf "(%d,%d)" m w) mw)
   in
   Printf.sprintf "[%d; %s]" cw s
-  
-let weight_of_term term =
+
+let weight_of_term ~so term =
     let vars_dict = Hashtbl.create 5 in
     let rec aux x = match x.node.term with
-      | Var i -> 
+      | Var i ->
           (try
              let oldw = Hashtbl.find vars_dict i in
              Hashtbl.replace vars_dict i (oldw+1)
            with Not_found ->
              Hashtbl.add vars_dict i 1);
           0
-      | Leaf _ -> 1
+      | Leaf symb -> so#weight symb
       | Node l -> List.fold_left (+) 0 (List.map aux l)
     in
     let w = aux term in
     let l =
-      Hashtbl.fold (fun meta metaw resw -> (meta, metaw)::resw) vars_dict [] 
+      Hashtbl.fold (fun meta metaw resw -> (meta, metaw)::resw) vars_dict []
     in
-    let compare w1 w2 = 
+    let compare w1 w2 =
       match w1, w2 with
       | (m1, _), (m2, _) -> m1 - m2
-    in 
+    in
     (w, List.sort compare l) (* from the smallest meta to the bigest *)
 
-let compute_clause_weight {clits=lits} = 
+let compute_clause_weight ~so {clits=lits} =
     let rec weight_of_polynomial w m =
-      let factor = 2 in      
+      let factor = 2 in
       w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
     and weight_of_lit l = match l with
     | Equation (l,r,_,ord) ->  (* TODO use order? *)
-        let wl, ml = weight_of_term l in 
-        let wr, mr = weight_of_term r in 
+        let wl, ml = weight_of_term ~so l in
+        let wr, mr = weight_of_term ~so r in
         weight_of_polynomial (wl+wr) (ml@mr) in
     List.fold_left (+) 0 (List.map weight_of_lit lits)
-  
+
 (* Riazanov: 3.1.5 pag 38 *)
 (* Compare weights normalized in a new way :
  * Variables should be sorted from the lowest index to the highest
@@ -98,7 +161,7 @@ let compare_weights (h1, w1) (h2, w2) =
                 aux hdiff (lt, gt) diffs tl1 tl2
           else if var1 < var2 then
             if lt then XINCOMPARABLE else
-              aux hdiff (false,true) (diffs+w1) tl1 l2        
+              aux hdiff (false,true) (diffs+w1) tl1 l2
           else
             if gt then XINCOMPARABLE else
               aux hdiff (true,false) (diffs-w2) l1 tl2
@@ -123,7 +186,7 @@ let compare_weights (h1, w1) (h2, w2) =
     aux (h1-h2) (false,false) 0 w1 w2
 
 
-(* Riazanov: p. 40, relation >>> 
+(* Riazanov: p. 40, relation >>>
  * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
   match t1.node.term, t2.node.term with
@@ -136,7 +199,7 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
   | Var _, _
   | _, Var _ -> XINCOMPARABLE
   (* 2.a *)
-  | Leaf a1, Leaf a2 -> 
+  | Leaf a1, Leaf a2 ->
       let cmp = b_compare a1 a2 in
       if cmp = 0 then XEQ else if cmp < 0 then XLT else XGT
   | Leaf _, Node _ -> XLT
@@ -154,10 +217,10 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
       in
       cmp l1 l2
 
-  
+
 (* compare terms using the given auxiliary ordering, and
    convert the result to .Comparison *)
-let compare_terms o x y = 
+let compare_terms o x y =
     match o x y with
       | XINCOMPARABLE -> Incomparable
       | XGT -> Gt
@@ -187,51 +250,47 @@ module NRKBO = struct
 	  UnificationFailure _ -> false
     *)
 
-  let compute_clause_weight = compute_clause_weight
-  
   (* Riazanov: p. 40, relation >_n *)
-  let nonrec_kbo t1 t2 =
-    let w1 = weight_of_term t1 in
-    let w2 = weight_of_term t2 in
+  let nonrec_kbo ~so t1 t2 =
+    let w1 = weight_of_term ~so t1 in
+    let w2 = weight_of_term ~so t2 in
     match compare_weights w1 w2 with
     | XLE ->  (* this is .> *)
-        if aux_ordering Signature.compare t1 t2 = XLT then XLT else XINCOMPARABLE
-    | XGE -> 
-        if aux_ordering Signature.compare t1 t2 = XGT then XGT else XINCOMPARABLE
-    | XEQ -> let res = aux_ordering Signature.compare t1 t2 in
+        if aux_ordering so#compare t1 t2 = XLT then XLT else XINCOMPARABLE
+    | XGE ->
+        if aux_ordering so#compare t1 t2 = XGT then XGT else XINCOMPARABLE
+    | XEQ -> let res = aux_ordering so#compare t1 t2 in
 	if res = XINCOMPARABLE && are_invertible t1 t2 then XINVERTIBLE
 	else res
     | res -> res
-  
-  let compare_terms = compare_terms nonrec_kbo
+
+  let compare_terms ~so = compare_terms (nonrec_kbo ~so)
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(nrkbo)"
-  let compare_terms x y =
-    profiler.HExtlib.profile (compare_terms x) y
+  let compare_terms ~so x y =
+    profiler.HExtlib.profile (compare_terms ~so x) y
 end
-  
+
 module KBO = struct
   let name = "kbo"
 
   let eq_foterm = T.eq_foterm
 
-  let compute_clause_weight = compute_clause_weight
-
   (* Riazanov: p. 38, relation > *)
-  let rec kbo t1 t2 =
-    let aux = aux_ordering Signature.compare ~head_only:true in
+  let rec kbo ~so t1 t2 =
+    let aux = aux_ordering so#compare ~head_only:true in
     let rec cmp t1 t2 =
       match t1, t2 with
       | [], [] -> XEQ
       | _, [] -> XGT
       | [], _ -> XLT
       | hd1::tl1, hd2::tl2 ->
-          let o = kbo hd1 hd2 in
+          let o = kbo ~so hd1 hd2 in
           if o = XEQ then cmp tl1 tl2
           else o
     in
-    let w1 = weight_of_term t1 in
-    let w2 = weight_of_term t2 in
+    let w1 = weight_of_term ~so t1 in
+    let w2 = weight_of_term ~so t2 in
     let comparison = compare_weights w1 w2 in
     match comparison with
     | XLE ->
@@ -259,15 +318,14 @@ module KBO = struct
 	  | Var i, Var j when i=j -> XEQ
           | Node (_::tl1), Node (_::tl2) -> cmp tl1 tl2
           | _, _ ->  XINCOMPARABLE
-        ) else r 
+        ) else r
     | res -> res
-  
 
-  let compare_terms = compare_terms kbo
+  let compare_terms ~so = compare_terms (kbo ~so)
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(kbo)"
-  let compare_terms x y =
-    profiler.HExtlib.profile (compare_terms x) y
+  let compare_terms ~so x y =
+    profiler.HExtlib.profile (compare_terms ~so x) y
 end
 
 module LPO = struct
@@ -275,9 +333,7 @@ module LPO = struct
 
   let eq_foterm = T.eq_foterm
 
-  let compute_clause_weight = compute_clause_weight
-
-  let rec lpo s t =
+  let rec lpo ~so s t =
     match s.node.term, t.node.term with
       | _, _ when eq_foterm s t ->
           XEQ
@@ -293,7 +349,7 @@ module LPO = struct
           let rec ge_subterm t ol = function
             | [] -> (false, ol)
             | x::tl ->
-                let res = lpo x t in
+                let res = lpo ~so x t in
                 match res with
                   | XGT | XEQ -> (true,res::ol)
                   | o -> ge_subterm t (o::ol) tl
@@ -309,70 +365,79 @@ module LPO = struct
                       if o = XLT then check_subterms t (ol,tl)
                       else false
                   | [], x::tl ->
-                      if lpo x t = XLT then check_subterms t ([],tl)
+                      if lpo ~so x t = XLT then check_subterms t ([],tl)
                       else false
                 in
-                match aux_ordering Signature.compare hd1 hd2 with
+                match aux_ordering so#compare hd1 hd2 with
                   | XGT -> if check_subterms s (r_ol,tl2) then XGT
                     else XINCOMPARABLE
                   | XLT -> if check_subterms t (l_ol,tl1) then XLT
                     else XINCOMPARABLE
-                  | XEQ -> 
+                  | XEQ ->
                      (try
                       let lex = List.fold_left2
-                        (fun acc si ti -> if acc = XEQ then lpo si ti else acc)
+                        (fun acc si ti -> if acc = XEQ then lpo ~so si ti else acc)
                         XEQ tl1 tl2
                       in
                  (match lex with
                     | XGT ->
-                        if List.for_all (fun x -> lpo s x = XGT) tl2 then XGT
+                        if List.for_all (fun x -> lpo ~so s x = XGT) tl2 then XGT
                       else XINCOMPARABLE
                     | XLT ->
-                        if List.for_all (fun x -> lpo x t = XLT) tl1 then XLT
+                        if List.for_all (fun x -> lpo ~so x t = XLT) tl1 then XLT
                       else XINCOMPARABLE
-                    | o -> o)   
+                    | o -> o)
                       with Invalid_argument _ -> (* assert false *)
                               XINCOMPARABLE)
               | XINCOMPARABLE -> XINCOMPARABLE
               | _ -> assert false
           end
-      | _,_ -> aux_ordering Signature.compare s t
-            
-  
+      | _,_ -> aux_ordering so#compare s t
 
-  let compare_terms = compare_terms lpo
+
+
+  let compare_terms ~so = compare_terms (lpo ~so)
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(lpo)"
-  let compare_terms x y =
-    profiler.HExtlib.profile (compare_terms x) y
+  let compare_terms ~so x y =
+    profiler.HExtlib.profile (compare_terms ~so x) y
 end
-
-(* default ordering (LPO) *)
-module Default = LPO
 
 (* ----------------------------------------------------------------------
  class interface
  ---------------------------------------------------------------------- *)
 
-class nrkbo : ordering =
+class nrkbo (so : symbol_ordering) : ordering =
   object
-    method compare_terms a b = NRKBO.compare_terms a b
-    method compute_clause_weight c = NRKBO.compute_clause_weight c
+    method symbol_ordering = so
+    method compare a b = NRKBO.compare_terms ~so a b
+    method compute_clause_weight c = compute_clause_weight ~so c
     method name = NRKBO.name
   end
 
-class kbo : ordering =
+class kbo (so : symbol_ordering) : ordering =
   object
-    method compare_terms a b = KBO.compare_terms a b
-    method compute_clause_weight c = KBO.compute_clause_weight c
+    method symbol_ordering = so
+    method compare a b = KBO.compare_terms ~so a b
+    method compute_clause_weight c = compute_clause_weight ~so c
     method name = KBO.name
   end
 
-class lpo : ordering =
+class lpo (so : symbol_ordering) : ordering =
   object
-    method compare_terms a b = LPO.compare_terms a b
-    method compute_clause_weight c = LPO.compute_clause_weight c
+    method symbol_ordering = so
+    method compare a b = LPO.compare_terms ~so a b
+    method compute_clause_weight c = compute_clause_weight ~so c
     method name = LPO.name
   end
 
-let default = new lpo
+let default_ordering () = new lpo (default_symbol_ordering ())
+
+let dummy_ordering =
+  object
+    method symbol_ordering = dummy_symbol_ordering
+    method compare a b = Incomparable
+    method compute_clause_weight c =
+      compute_clause_weight ~so:dummy_symbol_ordering c
+    method name = "dummy"
+  end

@@ -1,57 +1,42 @@
 (*
-    ||M||  This file is part of HELM, an Hypertextual, Electronic        
-    ||A||  Library of Mathematics, developed at the Computer Science     
-    ||T||  Department, University of Bologna, Italy.                     
-    ||I||                                                                
-    ||T||  HELM is free software; you can redistribute it and/or         
-    ||A||  modify it under the terms of the GNU General Public License   
-    \   /  version 2 or (at your option) any later version.      
-     \ /   This software is distributed as is, NO WARRANTY.     
+    ||M||  This file is part of HELM, an Hypertextual, Electronic
+    ||A||  Library of Mathematics, developed at the Computer Science
+    ||T||  Department, University of Bologna, Italy.
+    ||I||
+    ||T||  HELM is free software; you can redistribute it and/or
+    ||A||  modify it under the terms of the GNU General Public License
+    \   /  version 2 or (at your option) any later version.
+     \ /   This software is distributed as is, NO WARRANTY.
       V_______________________________________________________________ *)
 
 open Types
 
 (* ----------------------------------------------------------------------
- module interface
+ symbol total ordering
  ---------------------------------------------------------------------- *)
 
-val compute_clause_weight : clause -> int
+(** compute the current signature of symbols *)
+val current_signature : unit ->
+                        (symbol, sort) Hashtbl.t * (symbol, int) Hashtbl.t * symbol list
 
-module type S =
-  sig 
+(** compute an arity ordering, based on the current terms table *)
+val arity_ordering : unit -> symbol_ordering
 
-    (* This order relation should be:
-     * - stable for instantiation
-     * - total on ground terms
-     *
-     *)
-    val compare_terms : foterm -> foterm -> comparison
+(** default ordering on symbols *)
+val default_symbol_ordering : unit -> symbol_ordering
 
-    (* these could be outside the module, but to ease experimentation
-     * we allow them to be tied with the ordering *)
-    val compute_clause_weight : clause -> int
-
-    val name : string
-  end
-
-module NRKBO : S
-
-module KBO  : S 
-
-module LPO  : S
-
-(* default ordering (LPO) *)
-module Default : S
+val dummy_symbol_ordering : symbol_ordering
 
 (* ----------------------------------------------------------------------
- class interface
+ terms partial ordering
  ---------------------------------------------------------------------- *)
 
+class nrkbo : symbol_ordering -> ordering
 
-class nrkbo : ordering
+class kbo : symbol_ordering -> ordering
 
-class kbo : ordering
+class lpo : symbol_ordering -> ordering
 
-class lpo : ordering
+val default_ordering : unit -> ordering   (** default ordering on terms *)
 
-val default : ordering
+val dummy_ordering : ordering             (** always returns incomparable *)
