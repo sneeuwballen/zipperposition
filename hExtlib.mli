@@ -1,14 +1,14 @@
 (* Copyright (C) 2005, HELM Team.
- * 
+ *
  * This file is part of HELM, an Hypertextual, Electronic
  * Library of Mathematics, developed at the Computer Science
  * Department, University of Bologna, Italy.
- * 
+ *
  * HELM is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * HELM is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -18,7 +18,7 @@
  * along with HELM; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston,
  * MA  02111-1307, USA.
- * 
+ *
  * For details, see the HELM World-Wide-Web page,
  * http://helm.cs.unibo.it/
  *)
@@ -46,10 +46,10 @@ val normalize_path: string -> string (** /foo/./bar/..//baz -> /foo/baz *)
 
   (** find all _files_ whose name matches test under a filesystem root.
    * Test is passed the filename path relative to the given filesystem root *)
-val find: ?test:(string -> bool) -> string -> string list 
+val find: ?test:(string -> bool) -> string -> string list
 
-  (** find_in paths name returns the first path^"/"^name such that 
-   *  is a regular file and the current user can 'stat' it. 
+  (** find_in paths name returns the first path^"/"^name such that
+   *  is a regular file and the current user can 'stat' it.
    *  May raise (Failure "find_in") *)
 val find_in: string list -> string -> string
 
@@ -81,7 +81,7 @@ val trim_blanks: string -> string (** strip heading and trailing blanks *)
 
 (** {2 List processing} *)
 
-val list_uniq: 
+val list_uniq:
   ?eq:('a->'a->bool) -> 'a list -> 'a list (** uniq unix filter on lists *)
 val filter_map: ('a -> 'b option) -> 'a list -> 'b list (** filter + map *)
 val filter_map_acc: ('acc -> 'a -> ('acc * 'b) option) -> 'acc -> 'a list ->
@@ -97,12 +97,12 @@ val list_findopt: ('a -> int -> 'b option) -> 'a list -> 'b option
 val flatten_map: ('a -> 'b list) -> 'a list -> 'b list
 val list_last: 'a list -> 'a
 val list_mapi: ('a -> int -> 'b) -> 'a list -> 'b list
-val list_mapi_acc: 
-      ('a -> int -> 'acc -> 'acc * 'b) -> 'acc -> 'a list -> 'acc * 'b list 
+val list_mapi_acc:
+      ('a -> int -> 'acc -> 'acc * 'b) -> 'acc -> 'a list -> 'acc * 'b list
 (* Finds the zero based index of the first element that satisfies a predicate*)
 val list_index: ('a -> bool) -> 'a list -> (int * 'a) option
 val sharing_map: ('a -> 'a) -> 'a list -> 'a list
-val sharing_map_acc: 
+val sharing_map_acc:
      ('acc -> 'a -> 'acc * 'a) -> 'acc -> 'a list -> 'acc * 'a list
 (* Iters in parallel on two lists until the first list is empty.
    The second one can be shorter and is padded with a default value.
@@ -162,10 +162,10 @@ val raise_localized_exception: offset:int -> Stdpp.location -> exn -> 'a
 val estimate_size: 'a -> int
 
 (* is_prefix_of [prefix] [string], in terms of dirs:
- * foo/bar/ is prefix of foo/bar/baz 
- * foo/bar  is prefix of foo/bar/baz 
+ * foo/bar/ is prefix of foo/bar/baz
+ * foo/bar  is prefix of foo/bar/baz
  * foo/b    isn't of     foo/bar/baz
- * foo/bar  is prefix of foo/bar 
+ * foo/bar  is prefix of foo/bar
  *)
 val is_prefix_of: string -> string -> bool
 val chop_prefix: string -> string -> string

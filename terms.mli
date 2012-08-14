@@ -29,6 +29,10 @@ val mk_var : int -> sort -> foterm
 val mk_leaf : symbol -> sort -> foterm
 val mk_node : foterm list -> foterm
 
+val is_var : foterm -> bool
+val is_leaf : foterm -> bool
+val is_node : foterm -> bool
+
 val eq_term : foterm                          (** equality symbol *)
 val true_term : foterm                        (** tautology symbol *)
 

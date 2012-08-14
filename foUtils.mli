@@ -29,6 +29,8 @@ val multiset_eq : ('a -> 'a -> comparison) -> 'a list -> 'a list -> bool
 (** multiset order on lists which elements are ordered by f *)
 val multiset_partial : ('a -> 'a -> comparison) -> 'a list -> 'a list -> comparison
 
+(* TODO merge this and hExtlib *)
+
 (** get n-th element of list (linear) *)
 val list_get : 'a list -> int -> 'a
 (** set n-th element of list (linear) *)

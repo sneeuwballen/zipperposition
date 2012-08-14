@@ -37,7 +37,7 @@ let do_inferences state c =
   let active_set = state.PS.active_set in
   HExtlib.flatten_map
     (fun (name, rule) ->
-      debug (lazy ("#  apply rule " ^ name));
+      (* debug (lazy ("#  apply rule " ^ name)); *)
       rule active_set c)
     inference_rules
 
@@ -50,7 +50,7 @@ let given_clause_step state =
     let state = { state with PS.passive_set=passive_set } in
     (* rename variables in c to avoid collisions *)
     let c = PS.relocate_active state.PS.active_set c.node in
-    let c = Sup.basic_simplify c in
+    let c = Sup.basic_simplify ~ord c in
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
     (* tautology, useless *)
@@ -60,11 +60,16 @@ let given_clause_step state =
                    (Utils.on_buffer Pp.pp_clause c)));
       (* do inferences (TODO simplify before) *)
       let new_clauses = do_inferences state c in
-      let new_clauses = List.map Sup.basic_simplify new_clauses in
+      let new_clauses = List.map (Sup.basic_simplify ~ord) new_clauses in
       let new_clauses = List.filter (fun c -> not (Sup.is_tautology c)) new_clauses in
+      (* only keep clauses that are not already in active_set *)
+      let new_clauses = List.filter (fun c ->
+        let hc = C.hashcons_clause c in
+        not (C.is_in_bag state.PS.active_set.PS.active_clauses hc.tag))
+        new_clauses in
       List.iter
         (fun new_c -> debug (lazy
-          (Format.sprintf "  infered new clause %s"
+          (Format.sprintf "#    infered new clause %s"
             (Utils.on_buffer Pp.pp_clause new_c))))
         new_clauses;
       (* add new clauses to passive set, and given clause to active set *)

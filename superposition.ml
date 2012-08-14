@@ -459,7 +459,7 @@ let is_tautology c =
     )
     c.clits)
 
-let basic_simplify clause =
+let basic_simplify ~ord clause =
   let absurd_lit lit = match lit with
   | Equation (l, r, false, _) when T.eq_foterm l r -> true
   | _ -> false in
@@ -467,8 +467,21 @@ let basic_simplify clause =
   let new_lits = List.filter (fun lit -> not (absurd_lit lit)) clause.clits in
   (* remove duplicate literals *)
   let new_lits = Utils.list_uniq C.eq_literal new_lits in
+  (* destructive equality resolution *)
+  let rec er lits =
+    match HExtlib.list_index er_check lits with
+    | None -> lits
+    | Some (i, Equation (l, r, sign, _)) ->
+        assert (not sign);
+        assert (T.is_var l || T.is_var r);
+        try
+          let subst = Unif.unification l r in
+          er (List.map (C.apply_subst_lit ~ord subst) (Utils.list_remove lits i))
+        with UnificationFailure _ -> lits
+  (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
+  and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
+  let new_lits = er new_lits in
   C.mk_clause new_lits clause.cproof
-
 
 let demodulate active_set clause = clause (* TODO *)
 let subsumes a b = false (* TODO *)

@@ -75,6 +75,18 @@ let rec mk_node = function
       let t = H.hashcons terms { my_t with vars=lazy_vars } in
       ignore (Lazy.force t.node.vars); t
 
+let is_var t = match t.node.term with
+  | Var _ -> true
+  | _ -> false
+
+let is_leaf t = match t.node.term with
+  | Leaf _ -> true
+  | _ -> false
+
+let is_node t = match t.node.term with
+  | Node _ -> true
+  | _ -> false
+
 let eq_term = mk_leaf eq_symbol bool_sort     (* equality symbol *)
 
 let true_term = mk_leaf true_symbol bool_sort (* tautology symbol *)
