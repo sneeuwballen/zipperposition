@@ -36,21 +36,23 @@ let string_of_comparison = function
   | Invertible -> "=<->="
 
 
-let pp_literal formatter = function
+let pp_literal ?(sort=false) formatter lit =
+  let pp_foterm = T.pp_foterm ~sort in
+  match lit with
   | Equation (left, right, false, _) when right = T.true_term ->
-    fprintf formatter "~%a" T.pp_foterm left
+    fprintf formatter "~%a" pp_foterm left
   | Equation (left, right, true, _) when right = T.true_term ->
-    T.pp_foterm formatter left
+    pp_foterm formatter left
   | Equation (left, right, true, _) when left = T.true_term ->
-    T.pp_foterm formatter right
+    pp_foterm formatter right
   | Equation (left, right, false, _) when left = T.true_term ->
-    fprintf formatter "~%a" T.pp_foterm right
+    fprintf formatter "~%a" pp_foterm right
   | Equation (left, right, sign, ord) ->
     if sign
     then fprintf formatter "@[%a@ %a@ %a@]"
-        T.pp_foterm left T.pp_foterm T.eq_term T.pp_foterm right
+        pp_foterm left pp_foterm T.eq_term pp_foterm right
     else fprintf formatter "@[<hv 2>%a !%a@ %a@]"
-        T.pp_foterm left T.pp_foterm T.eq_term T.pp_foterm right
+        pp_foterm left pp_foterm T.eq_term pp_foterm right
 
 
 let opposite_pos p = match p with
@@ -89,6 +91,21 @@ let mk_lit ~ord a b sign =
   check_type a b;
   Equation (a, b, sign, ord#compare a b)
 
+let apply_subst_lit ?(recursive=true) ~ord subst =
+  function
+  | Equation (l,r,sign,_) ->
+    assert (l.node.sort = r.node.sort);
+    let new_l = S.apply_subst ~recursive subst l
+    and new_r = S.apply_subst ~recursive subst r
+    in
+    Format.printf "apply %a to %a gives %a@."
+      (S.pp_substitution ~sort:true) subst
+      (T.pp_foterm ~sort:true) l (T.pp_foterm ~sort:true) new_l;
+    Format.printf "apply %a to %a gives %a@."
+      (S.pp_substitution ~sort:true) subst
+      (T.pp_foterm ~sort:true) r (T.pp_foterm ~sort:true) new_r;
+    mk_lit ~ord new_l new_r sign
+
 let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
 
 let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
@@ -117,8 +134,8 @@ let eq_clause c1 c2 =
   with
     Invalid_argument _ -> false
 
-let pp_clause formatter {clits=lits} =
-  fprintf formatter "@[<h>[%a]@]" (Utils.pp_list ~sep:" | " pp_literal) lits
+let pp_clause ?(sort=false) formatter {clits=lits} =
+  fprintf formatter "@[<h>[%a]@]" (Utils.pp_list ~sep:" | " (pp_literal ~sort)) lits
 
 let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
@@ -142,15 +159,6 @@ let mk_clause lits proof =
     {clits=lits; cvars=all_vars; cproof=proof}
 
 let reord_clause ~ord c = mk_clause (List.map (reord_lit ~ord) c.clits) c.cproof
-
-let apply_subst_lit ?(recursive=true) ~ord subst =
-  function
-  | Equation (l,r,sign,_) ->
-    assert (l.node.sort = r.node.sort);
-    mk_lit ~ord
-      (S.apply_subst ~recursive subst l)
-      (S.apply_subst ~recursive subst r)
-      sign
 
 let apply_subst_cl ?(recursive=true) ~ord subst c =
   let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
@@ -189,7 +197,8 @@ let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
   let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
-  Format.printf "  relocate %a using %a@." pp_clause c S.pp_substitution subst;
+  Format.printf "  relocate %a using %a@." (pp_clause ~sort:true) c
+    (S.pp_substitution ~sort:true) subst;
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 
 let relocate_clause ~ord varlist c =
@@ -240,10 +249,10 @@ let size_bag bag = M.cardinal bag.bag_clauses
 
 let pp_clause_pos formatter (c, pos) =
   fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
-  pp_clause c (Utils.pp_list ~sep:"." pp_print_int) pos
+    (pp_clause ~sort:false) c (Utils.pp_list ~sep:"." pp_print_int) pos
 
 let pp_hclause formatter c =
-  fprintf formatter "@[<h>[%a]_%d@]" pp_clause c.node c.tag
+  fprintf formatter "@[<h>[%a]_%d@]" (pp_clause ~sort:false) c.node c.tag
 
 let pp_hclause_pos formatter (c, pos, _) =
   fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
@@ -252,14 +261,14 @@ let pp_hclause_pos formatter (c, pos, _) =
 let pp_bag formatter bag =
   fprintf formatter "@[<v>";
   M.iter
-    (fun _ hc -> fprintf formatter "%a@;" pp_clause hc.node)
+    (fun _ hc -> fprintf formatter "%a@;" (pp_clause ~sort:false) hc.node)
     bag.bag_clauses;
   fprintf formatter "@]"
 
 let pp_clause_pos_subst formatter (c, pos, subst) =
   fprintf formatter "@[<h>[%a at @[<h>%a@] with %a]@]"
-    pp_clause c (Utils.pp_list ~sep:"." pp_print_int) pos
-    S.pp_substitution subst
+    (pp_clause ~sort:false) c (Utils.pp_list ~sep:"." pp_print_int) pos
+    (S.pp_substitution ~sort:false) subst
 
 let pp_proof ~subst formatter p =
   match p with
@@ -277,7 +286,7 @@ let pp_proof ~subst formatter p =
 
 let pp_clause_proof formatter clause =
   fprintf formatter "%a  <--- %a@;"
-    pp_clause clause (pp_proof ~subst:true) (Lazy.force clause.cproof)
+    (pp_clause ~sort:false) clause (pp_proof ~subst:true) (Lazy.force clause.cproof)
 
 let rec pp_proof_rec formatter clause =
   pp_clause_proof formatter clause;

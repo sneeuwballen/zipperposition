@@ -21,6 +21,8 @@ val mk_neq : ord:ordering -> foterm -> foterm -> literal
 val mk_lit : ord:ordering -> foterm -> foterm -> bool -> literal
 val reord_lit : ord:ordering -> literal -> literal  (** recompute order *)
 
+val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
+
 val negate_lit : literal -> literal (** negate literal *)
 val fmap_lit : ord:ordering -> (foterm -> foterm) -> literal -> literal (** fmap in literal *)
 val vars_of_lit : literal -> varlist (** gather variables *)
@@ -42,7 +44,6 @@ val compare_hclause : hclause -> hclause -> int         (** simple order on lexi
 val mk_clause : literal list -> proof Lazy.t -> clause  (** build a clause *)
 val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
 
-val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
 val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
 
 val get_lit : clause -> int -> literal                  (** get the literal at given index *)
@@ -84,7 +85,7 @@ val empty_bag : bag
 open Format
 
 val size_bag : bag -> int
-val pp_clause : formatter -> clause -> unit
+val pp_clause : ?sort:bool -> formatter -> clause -> unit
 val pp_clause_pos : formatter -> (clause * position) -> unit
 val pp_hclause : formatter -> hclause -> unit
 val pp_hclause_pos : formatter -> (hclause * position* foterm) -> unit

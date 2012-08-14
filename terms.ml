@@ -109,7 +109,11 @@ let eq_foterm x y = x == y  (* because of hashconsing *)
 
 let compare_foterm x y = x.tag - y.tag
 
-let cast t sort = H.hashcons terms { t.node with sort=sort; }
+let rec cast t sort =
+  match t.node.term with
+  | Var _ | Leaf _ -> H.hashcons terms { t.node with sort=sort }
+  | Node (h::tail) -> mk_node ((cast h sort) :: tail)
+  | Node [] -> assert false
 
 let rec at_pos t pos = match t.node.term, pos with
   | _, [] -> t
@@ -144,12 +148,16 @@ let max_var vars =
 
 let pp_symbol formatter s = Format.pp_print_string formatter s
 
-let rec pp_foterm formatter t = match t.node.term with
+let rec pp_foterm formatter ?(sort=false) t =
+  (match t.node.term with
   | Leaf x -> pp_symbol formatter x
   | Var i -> Format.fprintf formatter "X%d" i
   | Node (head::args) -> Format.fprintf formatter
-      "@[<h>%a(%a)@]" pp_foterm head (Utils.pp_list ~sep:", " pp_foterm) args
-  | Node [] -> failwith "bad term"
+      "@[<h>%a(%a)@]" (pp_foterm ~sort:false) head
+      (Utils.pp_list ~sep:", " (pp_foterm ~sort)) args
+  | Node [] -> failwith "bad term");
+  if sort then Format.fprintf formatter ":%s" t.node.sort else ()
+  
 
 let pp_signature formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]" (Utils.pp_list ~sep:" > " pp_symbol) symbols

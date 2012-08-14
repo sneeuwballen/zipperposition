@@ -41,7 +41,7 @@ let rec apply_subst ?(recursive=true) subst t = match t.node.term with
         then apply_subst subst ~recursive new_t
         else new_t
   | Node l ->
-      T.mk_node (List.map (fun t -> apply_subst subst ~recursive t) l)
+      T.mk_node (List.map (apply_subst subst ~recursive) l)
 
 let build_subst ?(recursive=false) v t tail =
   assert (v.node.sort = t.node.sort);
@@ -83,8 +83,8 @@ let relocate_term varlist t =
   let _, _, subst = relocate idx varlist id_subst in
   apply_subst ~recursive:false subst t
 
-let pp_substitution formatter subst =
+let pp_substitution formatter ?(sort=false) subst =
   let pp_pair formatter (v, t) =
-    Format.fprintf formatter "%a -> %a" T.pp_foterm v T.pp_foterm t
+    Format.fprintf formatter "%a -> %a" (T.pp_foterm ~sort) v (T.pp_foterm ~sort) t
   in
   Format.fprintf formatter "@[<h>{%a}@]" (Utils.pp_list ~sep:", " pp_pair) subst
