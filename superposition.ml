@@ -290,6 +290,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
         let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
         let new_lits = (C.mk_lit ~ord new_u v sign_uv) :: new_lits in
+        (* apply substitution *)
+        let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
         let rule = if sign_uv then "superposition right" else "superposition left" in
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
