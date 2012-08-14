@@ -13,10 +13,10 @@ class type queue =
   end
 
 (* select by increasing age (for fairness) *)
-class fifo : queue
+val fifo : ord:ordering -> queue
 
 (* select by increasing weight of clause *)
-class clause_weight : queue
+val clause_weight : ord:ordering -> queue
 
 (* default combination of heuristics *)
-val default_queues : (queue * int) list
+val default_queues : ord:ordering -> (queue * int) list
