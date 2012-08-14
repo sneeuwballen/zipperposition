@@ -45,12 +45,12 @@ let string_of_pos s = match s with
   | _ -> assert false
 
 let pp_substitution formatter subst =
-  fprintf formatter "@[<h>";
+  fprintf formatter "@[<h>{";
   List.iter
     (fun (v, t) ->
-       fprintf formatter "?%a ->@, %a@;" pp_foterm v pp_foterm t)
+       fprintf formatter "%a ->@, %a@;" pp_foterm v pp_foterm t)
     subst;
-  fprintf formatter "@]"
+  fprintf formatter "@]}"
 
 let string_of_comparison = function
   | Lt -> "=<="
@@ -76,14 +76,14 @@ let pp_literal formatter = function
         pp_foterm left pp_foterm T.eq_term pp_foterm right
 
 let pp_clause formatter {clits=lits} =
-  fprintf formatter "@[<h>%a@]" (pp_list ~sep:" | " pp_literal) lits
+  fprintf formatter "@[<h>[%a]@]" (pp_list ~sep:" | " pp_literal) lits
 
 let pp_clause_pos formatter (c, pos) =
   fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
   pp_clause c (pp_list ~sep:"." pp_print_int) pos
 
 let pp_hclause formatter c =
-  fprintf formatter "@[<h>hclause(%d) %a@]" c.tag pp_clause c.node
+  fprintf formatter "@[<h>[%a]_%d@]" pp_clause c.node c.tag
 
 let pp_hclause_pos formatter (c, pos, _) =
   fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
@@ -96,17 +96,28 @@ let pp_bag formatter bag =
     bag.C.bag_clauses;
   fprintf formatter "@]"
 
-let pp_proof formatter p =
+let pp_clause_pos_subst formatter (c, pos, subst) =
+  fprintf formatter "@[<h>[%a at @[<h>%a@] with %a]@]"
+    pp_clause c (pp_list ~sep:"." pp_print_int) pos
+    pp_substitution subst
+
+let pp_proof ~subst formatter p =
   match p with
   | Axiom s -> fprintf formatter "axiom %s" s
   | Proof (rule, premisses) ->
-    fprintf formatter "@[<h>%s with %a@]" rule
-      (pp_list ~sep:", " pp_clause_pos)
-      (List.map (fun (c, pos, subst) -> (c, pos)) premisses)
+    if subst
+    then
+      fprintf formatter "@[<h>%s with %a@]" rule
+        (pp_list ~sep:", " pp_clause_pos_subst)
+        premisses
+    else
+      fprintf formatter "@[<h>%s with %a@]" rule
+        (pp_list ~sep:", " pp_clause_pos)
+        (List.map (fun (c, pos, subst) -> (c, pos)) premisses)
 
 let pp_clause_proof formatter clause =
-  fprintf formatter "%a -| %a@;"
-    pp_clause clause pp_proof (Lazy.force clause.cproof)
+  fprintf formatter "%a  <--- %a@;"
+    pp_clause clause (pp_proof ~subst:true) (Lazy.force clause.cproof)
 
 let rec pp_proof_rec formatter clause =
   pp_clause_proof formatter clause;

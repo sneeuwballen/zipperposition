@@ -25,7 +25,7 @@ val pp_clause_pos : formatter -> (clause * position) -> unit
 val pp_hclause : formatter -> hclause -> unit
 val pp_hclause_pos : formatter -> (hclause * position* foterm) -> unit
 val pp_bag: formatter -> Clauses.bag -> unit
-val pp_proof: formatter -> proof -> unit
+val pp_proof: subst:bool -> formatter -> proof -> unit
 val pp_clause_proof : formatter -> clause -> unit   (** print clause and its proof *)
 val pp_proof_rec : formatter -> clause -> unit      (** also print premisses, recursively*)
 val pp_index : ?all_clauses:bool -> formatter -> Index.t -> unit
