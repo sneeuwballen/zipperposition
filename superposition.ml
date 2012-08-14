@@ -440,7 +440,24 @@ let demod active_set subterm =
     (I.ClauseSet.elements matches)
   in rewritten
 
-let is_tautology c = false (* TODO *)
+let is_tautology c =
+  (* s=s literal *)
+  (List.exists
+    (fun (Equation (l, r, sign, _)) ->
+        (sign && T.eq_foterm l r))
+    c.clits) ||
+  (* both l=r and l!=r are literals *)
+  (List.exists
+    (fun (Equation (l, r, sign, _)) ->
+      List.exists
+        (fun (Equation (l', r', sign', _)) ->
+            (sign = not sign') &&
+            (((T.eq_foterm l l') && (T.eq_foterm r r')) ||
+            ((T.eq_foterm l r') && (T.eq_foterm l r')))
+        )
+      c.clits
+    )
+    c.clits)
 
 let basic_simplify clause =
   let absurd_lit lit = match lit with

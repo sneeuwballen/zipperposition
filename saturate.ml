@@ -51,13 +51,17 @@ let given_clause_step state =
     (* rename variables in c to avoid collisions *)
     let c = PS.relocate_active state.PS.active_set c.node in
     let c = Sup.basic_simplify c in
+    (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
+    (* tautology, useless *)
+    else if Sup.is_tautology c then state, Unknown
     else begin
       debug (lazy (Format.sprintf "# *** step with given clause %s"
                    (Utils.on_buffer Pp.pp_clause c)));
       (* do inferences (TODO simplify before) *)
       let new_clauses = do_inferences state c in
       let new_clauses = List.map Sup.basic_simplify new_clauses in
+      let new_clauses = List.filter (fun c -> not (Sup.is_tautology c)) new_clauses in
       List.iter
         (fun new_c -> debug (lazy
           (Format.sprintf "  infered new clause %s"
