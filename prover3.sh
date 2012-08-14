@@ -9,6 +9,6 @@ eprover --cnf --tptp3-in --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
 
 echo "# run prover"
 shift
-./main.native "$TMPFILE" $@
+OCAMLRUNPARAM=b ./main.native "$TMPFILE" $@
 
 trap 'echo "# clean up $TMPFILE" && rm -f "$TMPFILE"' EXIT
