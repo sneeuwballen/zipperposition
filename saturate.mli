@@ -17,5 +17,5 @@ val given_clause_step : ProofState.state -> ProofState.state * szs_status
     is found *)
 val given_clause :  ?steps:int -> ?timeout:float
                   -> ProofState.state
-                  -> ProofState.state * szs_status
+                  -> ProofState.state * szs_status * int
 

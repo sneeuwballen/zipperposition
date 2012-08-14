@@ -83,17 +83,17 @@ let given_clause_step state =
 
 let given_clause ?steps ?timeout state =
   let rec do_step state num =
-    if check_timeout timeout then state, Timeout else
+    if check_timeout timeout then state, Timeout, num else
     begin
     Utils.debug 2 (lazy (Format.sprintf "# iteration %d" num));
     match steps with
-    | Some i when num >= i -> state, Unknown
+    | Some i when num >= i -> state, Unknown, num
     | _ ->
       begin
         (* do one step *)
         let new_state, status = given_clause_step state in
         match status with
-        | Sat | Unsat _ | Error _ -> state, status (* finished *)
+        | Sat | Unsat _ | Error _ -> state, status, num (* finished *)
         | Timeout -> assert false
         | Unknown ->
           do_step new_state (num+1)  (* do one more step *)

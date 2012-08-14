@@ -95,7 +95,8 @@ let () =
   let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   (* saturate *)
-  let state, result = Sat.given_clause ?steps ?timeout state in
+  let state, result, num = Sat.given_clause ?steps ?timeout state in
+  Printf.printf "# done %d iterations\n" num;
   match result with
   | Sat.Sat -> Printf.printf "# SZS status CounterSatisfiable\n"
   | Sat.Unknown | Sat.Timeout -> Printf.printf "# SZS status ResourceOut\n"
