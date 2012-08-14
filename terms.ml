@@ -14,16 +14,22 @@ open Types
 
 module Utils = FoUtils
 
+let pp_symbol formatter s = Format.pp_print_string formatter s
+let str_to_sym s = s
+
 (* some special sorts *)
-let bool_sort = Signature.bool_symbol
-let univ_sort = Signature.univ_symbol
+let bool_sort = "Bool"
+let univ_sort = "U"
+let eq_symbol = "="
+let true_symbol = "$true"
+
 
 (* hashconsing for terms *)
 module H = Hashcons.Make(struct
   type t = typed_term
   let rec equal x y = match (x.term, y.term) with
     | (Var i, Var j) -> i = j
-    | (Leaf a, Leaf b) -> Signature.eq a b
+    | (Leaf a, Leaf b) -> a = b
     | (Node a, Node b) -> eq_subterms a b
     | (_, _) -> false
   and eq_subterms a b = match (a, b) with
@@ -51,14 +57,15 @@ let compute_vars t =  (* compute free vars of the term *)
     | Node l -> List.fold_left aux acc l
   in aux [] t
 
+(* constructors *)
 let mk_var idx sort =
   let my_v = {term = Var idx; sort=sort; vars=lazy []} in
   let v = H.hashcons terms
     {my_v with vars=lazy [H.hashcons terms my_v]} in
   ignore (Lazy.force v.node.vars); v
 
-let mk_leaf leaf sort =
-  H.hashcons terms {term = Leaf leaf; sort=sort; vars=lazy []}
+let mk_leaf symbol sort =
+  H.hashcons terms {term = Leaf symbol; sort=sort; vars=lazy []}
 
 let rec mk_node = function
   | [] -> failwith "cannot build empty node term"
@@ -68,8 +75,9 @@ let rec mk_node = function
       let t = H.hashcons terms { my_t with vars=lazy_vars } in
       ignore (Lazy.force t.node.vars); t
 
-let eq_symbol = mk_leaf Signature.eq_symbol bool_sort     (* equality symbol *)
-let true_symbol = mk_leaf Signature.true_symbol bool_sort (* tautology symbol *)
+let eq_term = mk_leaf eq_symbol bool_sort     (* equality symbol *)
+
+let true_term = mk_leaf true_symbol bool_sort (* tautology symbol *)
 
 let rec member_term a b = a == b || match b.node.term with
   | Leaf _ | Var _ -> false
@@ -81,7 +89,7 @@ let cast t sort = H.hashcons terms { t.node with sort=sort; }
 
 let rec compare_foterm x y =
   match x.node.term, y.node.term with
-  | Leaf t1, Leaf t2 -> Signature.compare t1 t2
+  | Leaf t1, Leaf t2 -> compare t1 t2
   | Var i, Var j -> i - j
   | Node l1, Node l2 -> FoUtils.lexicograph compare_foterm l1 l2
   | Leaf _, ( Node _ | Var _ ) -> ~-1

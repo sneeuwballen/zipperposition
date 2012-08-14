@@ -11,20 +11,26 @@
 
 open Types
 
+
+val pp_symbol : Format.formatter -> symbol -> unit
+val str_to_sym : string -> symbol
+
 (** some special sorts *)
 val bool_sort : sort
 val univ_sort : sort
+val true_symbol : symbol
+val eq_symbol : symbol
 
 val iter_terms : (foterm -> unit) -> unit     (** iterate through existing terms *)
 val all_terms : unit -> foterm list           (** all currently existing terms *)
 
 (** smart constructors, with a bit of type-checking *)
 val mk_var : int -> sort -> foterm
-val mk_leaf : leaf -> sort -> foterm
+val mk_leaf : symbol -> sort -> foterm
 val mk_node : foterm list -> foterm
 
-val eq_symbol : foterm                        (** equality symbol *)
-val true_symbol : foterm                      (** tautology symbol *)
+val eq_term : foterm                          (** equality symbol *)
+val true_term : foterm                        (** tautology symbol *)
 
 val member_term : foterm -> foterm -> bool    (** [a] [b] checks if a subterm of b *)
 val eq_foterm : foterm -> foterm -> bool      (** standard equality on terms *)

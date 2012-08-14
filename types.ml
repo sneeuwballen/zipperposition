@@ -1,10 +1,10 @@
 (** Most of the useful types *)
 
-(** Signature for terms parametrized by leaves *)
-type leaf = Signature.symbol
+
+type symbol = string
 
 (** a sort for terms (only the return sort is kept) *)
-type sort = leaf
+type sort = string
 
 (** exception raised when sorts are mismatched *)
 exception SortError of string
@@ -19,9 +19,9 @@ and typed_term = {
 }
 (** content of the term *)
 and foterm_cell =
-  | Leaf of leaf  (* constant *)
-  | Var of int  (* variable *)
-  | Node of foterm list  (* term application *)
+  | Leaf of symbol        (** constant *)
+  | Var of int            (** variable *)
+  | Node of foterm list   (** term application *)
 
 (** list of variables *)
 type varlist = foterm list            
@@ -57,10 +57,20 @@ and clause = {
 and proof = Axiom of string
           | Proof of string * (clause * position * substitution) list
 
+(** the interface of a total ordering on symbols *)
+class type symbol_ordering =
+  object
+    method refresh : unit -> symbol_ordering  (** refresh the signature *)
+    method signature : symbol list            (** current symbols in decreasing order *)
+    method compare : symbol -> symbol -> int  (** total order on symbols *)
+    method weight : symbol -> int             (** weight of symbol *)
+  end
+
 (** the interface of an ordering type *)
 class type ordering =
   object
-    method compare_terms : foterm -> foterm -> comparison
+    method symbol_ordering : symbol_ordering
+    method compare : foterm -> foterm -> comparison
     method compute_clause_weight : clause -> int
     method name : string
   end
