@@ -42,14 +42,15 @@ let current_signature () =
 
 (** build a map symbol -> int that gives an ordering on symbols, from the arities *)
 let build_ordering arities symbols =
-  let cmp t1 t2 = match t1, t2 with
+  let cmp t1 t2 = match t1, t2 with  (* caution, reverse order! *)
   | _, _ when t1 = t2 -> 0
-  | _, _ when t1 = T.true_symbol -> -1
-  | _, _ when t2 = T.true_symbol -> 1
-  | _, _ when t1 = T.eq_symbol -> -1
-  | _, _ when t2 = T.eq_symbol -> 1
-  | _, _ -> Hashtbl.find arities t1 - Hashtbl.find arities t2 in
-  let sorted_symbols = List.rev (List.stable_sort cmp symbols) in
+  | _, _ when t1 = T.true_symbol -> 1
+  | _, _ when t2 = T.true_symbol -> -1
+  | _, _ when t1 = T.eq_symbol -> 1
+  | _, _ when t2 = T.eq_symbol -> -1
+  | _, _ -> Hashtbl.find arities t2 - Hashtbl.find arities t1 in
+  (* thanks to the reverse order, sorted_symbols is stable-sorted by decreasing order *)
+  let sorted_symbols = List.stable_sort cmp symbols in
   let cur_idx = ref 1
   and ordering = Hashtbl.create 23 in
   List.iter
@@ -409,6 +410,8 @@ end
 
 class nrkbo (so : symbol_ordering) : ordering =
   object
+    val so = so
+    method refresh () = ({< so = so#refresh () >} :> ordering)
     method symbol_ordering = so
     method compare a b = NRKBO.compare_terms ~so a b
     method compute_clause_weight c = compute_clause_weight ~so c
@@ -417,6 +420,8 @@ class nrkbo (so : symbol_ordering) : ordering =
 
 class kbo (so : symbol_ordering) : ordering =
   object
+    val so = so
+    method refresh () = ({< so = so#refresh () >} :> ordering)
     method symbol_ordering = so
     method compare a b = KBO.compare_terms ~so a b
     method compute_clause_weight c = compute_clause_weight ~so c
@@ -425,6 +430,8 @@ class kbo (so : symbol_ordering) : ordering =
 
 class lpo (so : symbol_ordering) : ordering =
   object
+    val so = so
+    method refresh () = ({< so = so#refresh () >} :> ordering)
     method symbol_ordering = so
     method compare a b = LPO.compare_terms ~so a b
     method compute_clause_weight c = compute_clause_weight ~so c
@@ -435,6 +442,7 @@ let default_ordering () = new lpo (default_symbol_ordering ())
 
 let dummy_ordering =
   object
+    method refresh () = ({< >} :> ordering)
     method symbol_ordering = dummy_symbol_ordering
     method compare a b = Incomparable
     method compute_clause_weight c =

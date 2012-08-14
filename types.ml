@@ -69,6 +69,7 @@ class type symbol_ordering =
 (** the interface of an ordering type *)
 class type ordering =
   object
+    method refresh : unit -> ordering         (** refresh the symbol ordering *)
     method symbol_ordering : symbol_ordering
     method compare : foterm -> foterm -> comparison
     method compute_clause_weight : clause -> int

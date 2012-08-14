@@ -25,7 +25,7 @@ let rec pp_list ?(sep=", ") pp_item  formatter = function
   | [] -> ()
 
 let rec pp_foterm formatter t = match t.node.term with
-  | Leaf x -> Signature.pp_symbol formatter x
+  | Leaf x -> T.pp_symbol formatter x
   | Var i -> fprintf formatter "X%d" i
   | Node (head::args) -> fprintf formatter
       "@[<h>%a(%a)@]" pp_foterm head (pp_list ~sep:", " pp_foterm) args
