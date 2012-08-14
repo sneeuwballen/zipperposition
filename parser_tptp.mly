@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 %{
 
+  (** int counter for variables *)
   module Counter = struct
     type t = int ref
     let create_with i = ref i
@@ -86,6 +87,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	    Counter.inc var_id_counter;
 	    var_map := (var_name, sort, new_var) :: !var_map;
 	    new_var
+
+  let sort_table = Hashtbl.create 23
+  (* get the infered sort for the given constant *)
+  let get_sort constant =
+    try
+      Hashtbl.find sort_table constant
+    with Not_found -> T.univ_sort
+
+  let set_sort constant sort = Hashtbl.replace sort_table constant sort
 
   (* need to detect if input is fof and contains a conjecture *)
   (* is the input in fof format? *)
@@ -378,7 +388,11 @@ atomic_formula:
 plain_atom:
   | plain_term_top
       { let t = T.cast $1 T.bool_sort in (* cast term to bool *)
-        C.mk_eq ~ord:O.dummy_ordering t T.true_term }
+          (match T.hd_symbol t with
+            | None -> ()
+            | Some s -> set_sort s T.bool_sort);
+          C.mk_eq ~ord:O.dummy_ordering t T.true_term
+      }
 
 arguments:
   | term
@@ -402,6 +416,9 @@ defined_atom:
 system_atom:
   | system_term_top
       { let t = T.cast $1 T.bool_sort in
+        (match T.hd_symbol t with
+            | None -> ()
+            | Some s -> set_sort s T.bool_sort);
         C.mk_eq t ~ord:O.dummy_ordering T.true_term }
 
 term:
@@ -423,7 +440,8 @@ function_term:
 
 plain_term_top:
   | constant
-      { T.mk_leaf $1 T.univ_sort }
+      { let sort = get_sort $1 in
+        T.mk_leaf $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let subterms = $1 :: $3 in
@@ -432,7 +450,8 @@ plain_term_top:
 
 plain_term:
   | constant
-      { T.mk_leaf $1 T.univ_sort }
+      { let sort = get_sort $1 in
+        T.mk_leaf $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let subterms = $1 :: $3 in
@@ -446,7 +465,8 @@ constant:
 functor_:
   | atomic_word
       { let sym = T.str_to_sym $1 in
-        T.mk_leaf sym T.univ_sort }
+        let sort = get_sort sym in
+        T.mk_leaf sym sort }
 
 defined_term:
   | number
@@ -460,7 +480,8 @@ defined_term:
 
 system_term_top:
   | system_constant
-      { T.mk_leaf $1 T.univ_sort }
+      { let sort = get_sort $1 in
+        T.mk_leaf $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let subterms = (T.mk_leaf $1 T.univ_sort) :: $3 in
@@ -469,10 +490,13 @@ system_term_top:
 
 system_term:
   | system_constant
-      { T.mk_leaf $1 T.univ_sort }
+      { let sort = get_sort $1 in
+        T.mk_leaf $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = (T.mk_leaf $1 T.univ_sort) :: $3 in
+      { let sort = get_sort $1 in
+        let head = T.mk_leaf $1 sort in
+        let subterms = head :: $3 in
         T.mk_node subterms
       }
 

@@ -87,6 +87,17 @@ let is_node t = match t.node.term with
   | Node _ -> true
   | _ -> false
 
+let hd_term t = match t.node.term with
+  | Leaf _ -> Some t
+  | Var _ -> None
+  | Node (h::_) -> Some h
+  | Node _ -> assert false
+
+let hd_symbol t = match hd_term t with
+  | None -> None
+  | Some ({node={term=Leaf s}}) -> Some s
+  | Some _ -> assert false
+
 let eq_term = mk_leaf eq_symbol bool_sort     (* equality symbol *)
 
 let true_term = mk_leaf true_symbol bool_sort (* tautology symbol *)

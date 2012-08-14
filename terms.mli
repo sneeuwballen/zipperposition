@@ -32,6 +32,8 @@ val mk_node : foterm list -> foterm
 val is_var : foterm -> bool
 val is_leaf : foterm -> bool
 val is_node : foterm -> bool
+val hd_term : foterm -> foterm option         (** the head of the term *)
+val hd_symbol : foterm -> symbol option       (** the head of the term *)
 
 val eq_term : foterm                          (** equality symbol *)
 val true_term : foterm                        (** tautology symbol *)
