@@ -223,7 +223,7 @@ let rec fold_negative ?(both=true) f acc lits =
 let compare_lits_partial ~ord l1 l2 =
   let m1 = C.lit_to_multiset l1
   and m2 = C.lit_to_multiset l2 in
-  Utils.multiset_partial (Utils.multiset_partial ord#compare_terms) m1 m2
+  Utils.multiset_partial (Utils.multiset_partial ord#compare) m1 m2
 
 (** check that the literal subst(clause[i]) is maximal in subst(clause) *)
 let check_maximal_lit ~ord clause pos subst =
@@ -256,7 +256,7 @@ let enable = true
 
 let prof_demod_u = HExtlib.profile ~enable "demod.unify"
 let prof_demod_r = HExtlib.profile ~enable "demod.retrieve_generalizations"
-let prof_demod_o = HExtlib.profile ~enable "demod.compare_terms"
+let prof_demod_o = HExtlib.profile ~enable "demod.compare"
 let prof_demod_s = HExtlib.profile ~enable "demod.apply_subst"
 let prof_demod = HExtlib.profile ~enable "demod"
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
@@ -280,8 +280,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   else begin
     assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
                         (S.apply_subst subst s));
-    if (ord#compare_terms (S.apply_subst subst s) (S.apply_subst subst t) = Lt ||
-        ord#compare_terms (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
+    if (ord#compare (S.apply_subst subst s) (S.apply_subst subst t) = Lt ||
+        ord#compare (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
         not (check_maximal_lit ~ord active_clause active_idx subst) ||
         not (check_maximal_lit ~ord passive_clause passive_idx subst))
       then []
@@ -487,7 +487,7 @@ should be kept for the proof. *)
         let literal =
           match t with
           | Terms.Node [ Terms.Leaf eq ; ty; l; r ] when B.eq B.eqP eq ->
-               let o = Order.compare_terms l r in
+               let o = Order.compare l r in
                (* CSC: to avoid equations of the form ? -> T that
                   can always be applied and that lead to type-checking errors *)
                (match l,r,o with
@@ -516,7 +516,7 @@ should be kept for the proof. *)
     (* ============ simplification ================= *)
     let prof_demod_u = HExtlib.profile ~enable "demod.unify"
     let prof_demod_r = HExtlib.profile ~enable "demod.retrieve_generalizations"
-    let prof_demod_o = HExtlib.profile ~enable "demod.compare_terms"
+    let prof_demod_o = HExtlib.profile ~enable "demod.compare"
     let prof_demod_s = HExtlib.profile ~enable "demod.apply_subst"
 
 
@@ -925,7 +925,7 @@ should be kept for the proof. *)
                  if o = Terms.Incomparable || o = Terms.Invertible then
                    let side = Subst.apply_subst subst side in
                    let newside = Subst.apply_subst subst newside in
-                   let o = Order.compare_terms side newside in
+                   let o = Order.compare side newside in
                    (* XXX: check Riazanov p. 33 (iii) *)
                    if o <> Terms.Lt && o <> Terms.Eq then
                      Some (context newside, subst, id, pos, dir)
@@ -960,7 +960,7 @@ should be kept for the proof. *)
 	  let filtering avoid subst = (* Riazanov: p.33 condition (iv) *)
 	    let l = Subst.apply_subst subst l in
 	    let r = Subst.apply_subst subst r in
-	    let o = Order.compare_terms l r in
+	    let o = Order.compare l r in
 	    o <> avoid && o <> Terms.Eq
 	  in
           let bag, maxvar,r_terms =

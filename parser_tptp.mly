@@ -378,7 +378,7 @@ atomic_formula:
 plain_atom:
   | plain_term_top
       { let t = T.cast $1 T.bool_sort in (* cast term to bool *)
-        C.mk_eq ~ord:O.default t T.true_symbol }
+        C.mk_eq ~ord:O.dummy_ordering t T.true_term }
 
 arguments:
   | term
@@ -389,20 +389,20 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { C.mk_eq ~ord:O.default T.true_symbol T.true_symbol }
+      { C.mk_eq ~ord:O.dummy_ordering T.true_term T.true_term }
 
   | DOLLAR_FALSE
-      { C.mk_neq ~ord:O.default T.true_symbol T.true_symbol (* T!=T is false *) }
+      { C.mk_neq ~ord:O.dummy_ordering T.true_term T.true_term (* T!=T is false *) }
 
   | term EQUALITY term
-      { C.mk_eq ~ord:O.default $1 $3 }
+      { C.mk_eq ~ord:O.dummy_ordering $1 $3 }
   | term DISEQUALITY term
-      { C.mk_neq ~ord:O.default $1 $3 }
+      { C.mk_neq ~ord:O.dummy_ordering $1 $3 }
 
 system_atom:
   | system_term_top
       { let t = T.cast $1 T.bool_sort in
-        C.mk_eq t ~ord:O.default T.true_symbol }
+        C.mk_eq t ~ord:O.dummy_ordering T.true_term }
 
 term:
   | function_term
@@ -441,11 +441,11 @@ plain_term:
 
 constant:
   | atomic_word
-      { let sym = Signature.str_to_sym $1 in sym }
+      { let sym = T.str_to_sym $1 in sym }
 
 functor_:
   | atomic_word
-      { let sym = Signature.str_to_sym $1 in
+      { let sym = T.str_to_sym $1 in
         T.mk_leaf sym T.univ_sort }
 
 defined_term:

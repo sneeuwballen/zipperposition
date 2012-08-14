@@ -19,6 +19,7 @@ val compare_literal : literal -> literal -> int   (** lexicographic comparison o
 val mk_eq : ord:ordering -> foterm -> foterm -> literal
 val mk_neq : ord:ordering -> foterm -> foterm -> literal
 val mk_lit : ord:ordering -> foterm -> foterm -> bool -> literal
+val reord_lit : ord:ordering -> literal -> literal  (** recompute order *)
 
 val negate_lit : literal -> literal (** negate literal *)
 val fmap_lit : ord:ordering -> (foterm -> foterm) -> literal -> literal (** fmap in literal *)
@@ -39,6 +40,8 @@ val eq_hclause : hclause -> hclause -> bool             (** equality of hashcons
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
 val mk_clause : literal list -> proof Lazy.t -> clause  (** build a clause *)
+val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
+
 val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
 val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
 

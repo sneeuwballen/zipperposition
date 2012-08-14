@@ -41,15 +41,17 @@ let check_type a b = if a.node.sort <> b.node.sort
 
 let mk_eq ~ord a b =
   check_type a b;
-  Equation (a, b, true, ord#compare_terms a b)
+  Equation (a, b, true, ord#compare a b)
 
 let mk_neq ~ord a b = 
   check_type a b;
-  Equation (a, b, false, ord#compare_terms a b)
+  Equation (a, b, false, ord#compare a b)
 
 let mk_lit ~ord a b sign =
   check_type a b;
-  Equation (a, b, sign, ord#compare_terms a b)
+  Equation (a, b, sign, ord#compare a b)
+
+let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
 
 let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
 
@@ -57,7 +59,7 @@ let fmap_lit ~ord f = function
   | Equation (left, right, sign, _) ->
     let new_left = f left
     and new_right = f right in
-    Equation (new_left, new_right, sign, ord#compare_terms new_left new_right)
+    Equation (new_left, new_right, sign, ord#compare new_left new_right)
 
 let vars_of_lit = function
   | Equation (left, right, _, _) ->
@@ -97,6 +99,8 @@ let mk_clause lits proof =
     let all_vars =
       List.fold_left T.merge_varlist [] (List.map vars_of_lit lits) in
     {clits=lits; cvars=all_vars; cproof=proof}
+
+let reord_clause ~ord c = mk_clause (List.map (reord_lit ~ord) c.clits) c.cproof
 
 let apply_subst_lit ?(recursive=true) ~ord subst =
   function

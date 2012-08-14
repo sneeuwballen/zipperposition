@@ -25,13 +25,13 @@ let get_file () =
 (* hashtable string -> ordering module *)
 let ords = Hashtbl.create 7
 let _ =
-  Hashtbl.add ords "lpo" (new Orderings.lpo);
-  Hashtbl.add ords "kbo" (new Orderings.kbo);
-  Hashtbl.add ords "nrkbo" (new Orderings.nrkbo)
+  Hashtbl.add ords "lpo" (fun () -> new Orderings.lpo (Orderings.default_symbol_ordering ()));
+  Hashtbl.add ords "kbo" (fun () -> new Orderings.kbo (Orderings.default_symbol_ordering ()));
+  Hashtbl.add ords "nrkbo" (fun () -> new Orderings.nrkbo (Orderings.default_symbol_ordering ()))
 
 (** parameters for the main procedure *)
 type parameters = {
-  param_ord : ordering;
+  param_ord : unit -> ordering;
   param_verbose : bool;
   param_files : string list;
 }
@@ -39,7 +39,7 @@ type parameters = {
 (** parse_args returns parameters *)
 let parse_args () =
   (* parameters *)
-  let ord = ref Orderings.default
+  let ord = ref Orderings.default_ordering
   and verbose = ref false
   and file = ref "stdin" in
   (* argument functions *)
@@ -77,8 +77,12 @@ let () =
   Printf.printf "# process file %s\n" f;
   let clauses, _ = parse_file f in
   Printf.printf "# parsed %d clauses\n" (List.length clauses);
+  (* choose an ord now *)
+  let ord = params.param_ord () in  (* using current signature *)
+  Format.printf "# signature: %a@." Pp.pp_signature ord#symbol_ordering#signature;
+  let clauses = List.map (C.reord_clause ~ord) clauses in
   (* create a state, with clauses added to passive_set *)
-  let state = PS.make_state params.param_ord CQ.default_queues in
+  let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   (* saturate *)
   let state, result = Sat.given_clause state in

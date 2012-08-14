@@ -41,7 +41,7 @@ open Discrimination_tree
 
 module FotermIndexable = struct
   type input = foterm
-  type constant_name = Signature.symbol
+  type constant_name = symbol
 
   (* convert into a path string *)
   let path_string_of t =
@@ -61,7 +61,7 @@ module FotermIndexable = struct
   let compare e1 e2 = 
     match e1,e2 with 
     | Constant (a1,ar1), Constant (a2,ar2) ->
-        let c = Signature.compare a1 a2 in
+        let c = compare a1 a2 in
         if c <> 0 then c else Pervasives.compare ar1 ar2
     | Variable, Variable -> 0
     | Constant _, Variable -> ~-1
@@ -75,14 +75,14 @@ module FotermIndexable = struct
   let string_of_path l =
     let str_of_elem = function
     | Variable -> "*"
-    | Constant (a, ar) -> Utils.on_buffer Signature.pp_symbol a
+    | Constant (a, ar) -> Utils.on_buffer T.pp_symbol a
     | _ -> "?"
     in String.concat "." (List.map str_of_elem l)
 end
 
 (* the discrimination trees used for indexing *)
 module DT : DiscriminationTree with
-  type constant_name = Signature.symbol and 
+  type constant_name = symbol and 
   type input = foterm and 
   type data = ClauseSet.elt and 
   type dataset = ClauseSet.t

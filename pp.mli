@@ -18,6 +18,7 @@ val pp_list: ?sep:string -> (formatter -> 'a -> unit)
 
 (* pretty printing of objects *)
 val pp_foterm: formatter -> foterm -> unit
+val pp_signature : formatter -> symbol list -> unit
 val pp_substitution: formatter -> substitution -> unit
 val pp_clause : formatter -> clause -> unit
 val pp_clause_pos : formatter -> (clause * position) -> unit

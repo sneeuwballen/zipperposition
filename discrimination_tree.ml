@@ -1,14 +1,14 @@
 (* Copyright (C) 2005, HELM Team.
- * 
+ *
  * This file is part of HELM, an Hypertextual, Electronic
  * Library of Mathematics, developed at the Computer Science
  * Department, University of Bologna, Italy.
- * 
+ *
  * HELM is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * HELM is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -18,37 +18,37 @@
  * along with HELM; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston,
  * MA  02111-1307, USA.
- * 
+ *
  * For details, see the HELM World-Wide-Web page,
  * http://cs.unibo.it/helm/.
  *)
 
 (* $Id: discrimination_tree.ml 11171 2011-01-11 15:12:32Z tassi $ *)
 
-type 'a path_string_elem = 
+type 'a path_string_elem =
   | Constant of 'a * int (* name, arity *)
   | Bound of int * int (* rel, arity *)
   | Variable (* arity is 0 *)
-  | Proposition (* arity is 0 *) 
-  | Datatype (* arity is 0 *) 
-  | Dead (* arity is 0 *) 
+  | Proposition (* arity is 0 *)
+  | Datatype (* arity is 0 *)
+  | Dead (* arity is 0 *)
 
 type 'a path = ('a path_string_elem) list
 
 module type Indexable = sig
   type input
   type constant_name
-  val compare: 
-    constant_name path_string_elem -> 
+  val compare:
+    constant_name path_string_elem ->
     constant_name path_string_elem -> int
   val string_of_path : constant_name path -> string
   val path_string_of : input -> constant_name path
 end
 
 let arity_of = function
-  | Constant (_,a) 
+  | Constant (_,a)
   | Bound (_,a) -> a
-  | _ -> 0 
+  | _ -> 0
 
 module type DiscriminationTree =
   sig
@@ -82,7 +82,7 @@ module type DiscriminationTree =
     val retrieve_unifiables_sorted : t -> input -> Collector.t
   end
 
-module Make (I:Indexable) (A:Set.S) : DiscriminationTree 
+module Make (I:Indexable) (A:Set.S) : DiscriminationTree
   with type constant_name = I.constant_name and type input = I.input
    and type data = A.elt and type dataset = A.t =
 
@@ -116,7 +116,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
     let index tree term info =
       let ps = I.path_string_of term in
       let ps_set =
-        try DiscriminationTree.find ps tree with Not_found -> A.empty 
+        try DiscriminationTree.find ps tree with Not_found -> A.empty
       in
       DiscriminationTree.add ps (A.add info ps_set) tree
 
@@ -135,19 +135,19 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
         A.exists test ps_set
       with Not_found -> false
 
-    (* You have h(f(x,g(y,z)),t) whose path_string_of_term_with_jl is 
+    (* You have h(f(x,g(y,z)),t) whose path_string_of_term_with_jl is
        (h,2).(f,2).(x,0).(g,2).(y,0).(z,0).(t,0) and you are at f and want to
        skip all its progeny, thus you want to reach t.
-    
+
        You need to skip as many elements as the sum of all arities contained
         in the progeny of f.
-    
-       The input ariety is the one of f while the path is x.g....t  
+
+       The input ariety is the one of f while the path is x.g....t
        Should be the equivalent of after_t in the literature (handbook A.R.)
      *)
     let rec skip arity path =
-      if arity = 0 then path else match path with 
-      | [] -> assert false 
+      if arity = 0 then path else match path with
+      | [] -> assert false
       | m::tl -> skip (arity-1+arity_of m) tl
 
     (* the equivalent of skip, but on the index, thus the list of trees
@@ -155,7 +155,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
        are returned (we are skipping the root) *)
     let skip_root = function DiscriminationTree.Node (value, map) ->
       let rec get n = function DiscriminationTree.Node (v, m) as tree ->
-         if n = 0 then [tree] else 
+         if n = 0 then [tree] else
          PSMap.fold (fun k v res -> (get (n-1 + arity_of k) v) @ res) m []
       in
         PSMap.fold (fun k v res -> (get (arity_of k) v) @ res) map []
@@ -165,7 +165,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
       let rec retrieve path tree =
         match tree, path with
         | DiscriminationTree.Node (Some s, _), [] -> s
-        | DiscriminationTree.Node (None, _), [] -> A.empty 
+        | DiscriminationTree.Node (None, _), [] -> A.empty
         | DiscriminationTree.Node (_, map), Variable::path when unif ->
             List.fold_left A.union A.empty
               (List.map (retrieve path) (skip_root tree))
@@ -187,7 +187,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
 
     module O = struct
       type t = A.t * int
-      let compare (sa,wa) (sb,wb) = 
+      let compare (sa,wa) (sb,wb) =
         let c = compare wb wa in
         if c <> 0 then c else A.compare sb sa
     end
@@ -206,7 +206,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
       let union = S.union
       let empty = S.empty
 
-      let merge l = 
+      let merge l =
         let rec aux s w = function
           | [] -> [s,w]
           | (t, wt)::tl when w = wt -> aux (A.union s t) w tl
@@ -215,21 +215,21 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
         match l with
         | [] -> []
         | (s, w) :: l -> aux s w l
-        
+
       let rec undup ~eq = function
         | [] -> []
         | x :: tl -> x :: undup ~eq (List.filter (fun y -> not(eq x y)) tl)
 
       let to_list t =
-        undup ~eq:(fun x y -> A.equal (A.singleton x) (A.singleton y)) 
-          (List.flatten (List.map 
+        undup ~eq:(fun x y -> A.equal (A.singleton x) (A.singleton y))
+          (List.flatten (List.map
             (fun (x,_) -> A.elements x) (merge (S.elements t))))
 
       (* TODO why not use Set.inter? *)
       let inter t1 t2 =
         let l1 = merge (S.elements t1) in
         let l2 = merge (S.elements t2) in
-        let res = 
+        let res =
          List.flatten
           (List.map
             (fun (s, w) ->
@@ -239,7 +239,7 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
                  (A.elements s))
             l1)
         in
-        undup ~eq:(fun x y -> A.equal (A.singleton x) (A.singleton y)) 
+        undup ~eq:(fun x y -> A.equal (A.singleton x) (A.singleton y))
           (List.map fst (List.sort (fun (_,x) (_,y) -> y - x) res))
     end
 
@@ -259,16 +259,16 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
                 with Not_found -> S.empty)
                (try
                   match PSMap.find Variable map,skip (arity_of node) path with
-                  | DiscriminationTree.Node (Some s, _), [] -> 
+                  | DiscriminationTree.Node (Some s, _), [] ->
                      S.singleton (s, n)
                   | no, path -> retrieve n path no
                 with Not_found -> S.empty)
      in
       retrieve 0 path tree
 
-    let retrieve_generalizations_sorted tree term = 
+    let retrieve_generalizations_sorted tree term =
       retrieve_sorted false tree term
-    let retrieve_unifiables_sorted tree term = 
+    let retrieve_unifiables_sorted tree term =
       retrieve_sorted true tree term
   end
 

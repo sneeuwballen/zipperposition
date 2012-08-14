@@ -31,6 +31,9 @@ let rec pp_foterm formatter t = match t.node.term with
       "@[<h>%a(%a)@]" pp_foterm head (pp_list ~sep:", " pp_foterm) args
   | Node [] -> failwith "bad term"
 
+let pp_signature formatter symbols =
+  Format.fprintf formatter "@[<h>sig %a@]" (pp_list ~sep:" > " T.pp_symbol) symbols
+
 let string_of_direction = function
     | Left2Right -> "Left to right"
     | Right2Left -> "Right to left"
@@ -82,20 +85,20 @@ let string_of_comparison = function
   | Invertible -> "=<->="
 
 let pp_literal formatter = function
-  | Equation (left, right, false, _) when right = T.true_symbol ->
+  | Equation (left, right, false, _) when right = T.true_term ->
     fprintf formatter "~%a" pp_foterm left
-  | Equation (left, right, true, _) when right = T.true_symbol ->
+  | Equation (left, right, true, _) when right = T.true_term ->
     pp_foterm formatter left
-  | Equation (left, right, true, _) when left = T.true_symbol ->
+  | Equation (left, right, true, _) when left = T.true_term ->
     pp_foterm formatter right
-  | Equation (left, right, false, _) when left = T.true_symbol ->
+  | Equation (left, right, false, _) when left = T.true_term ->
     fprintf formatter "~%a" pp_foterm right
   | Equation (left, right, sign, ord) ->
     if sign
     then fprintf formatter "@[%a@ %a@ %a@]"
-        pp_foterm left pp_foterm T.eq_symbol pp_foterm right
+        pp_foterm left pp_foterm T.eq_term pp_foterm right
     else fprintf formatter "@[<hv 2>%a !%a@ %a@]"
-        pp_foterm left pp_foterm T.eq_symbol pp_foterm right
+        pp_foterm left pp_foterm T.eq_term pp_foterm right
 
 let pp_clause formatter {clits=lits} =
   fprintf formatter "@[<h>%a@]" (pp_list ~sep:" | " pp_literal) lits
