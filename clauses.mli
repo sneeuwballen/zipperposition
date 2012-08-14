@@ -77,4 +77,18 @@ val is_in_bag : bag -> int -> bool
 
 val empty_bag : bag
 
+(* ----------------------------------------------------------------------
+ * pretty printing
+ * ---------------------------------------------------------------------- *)
+
+open Format
+
 val size_bag : bag -> int
+val pp_clause : formatter -> clause -> unit
+val pp_clause_pos : formatter -> (clause * position) -> unit
+val pp_hclause : formatter -> hclause -> unit
+val pp_hclause_pos : formatter -> (hclause * position* foterm) -> unit
+val pp_bag: formatter -> bag -> unit
+val pp_proof: subst:bool -> formatter -> proof -> unit
+val pp_clause_proof : formatter -> clause -> unit   (** print clause and its proof *)
+val pp_proof_rec : formatter -> clause -> unit      (** also print premisses, recursively*)

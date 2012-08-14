@@ -53,3 +53,5 @@ val fold :
   -> 'a -> 'a
 
 val elems : DT.t -> ClauseSet.t
+
+val pp_index : ?all_clauses:bool -> Format.formatter -> t -> unit

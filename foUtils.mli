@@ -48,3 +48,6 @@ val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string
+(* print a list of items using the printing function *)
+val pp_list: ?sep:string -> (Format.formatter -> 'a -> unit)
+    -> Format.formatter -> 'a list -> unit

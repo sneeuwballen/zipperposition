@@ -7,6 +7,9 @@ module T = Terms
 module S = FoSubst
 module Utils = FoUtils
 
+(* some pretty printers are useful now *)
+open Format
+
 (* ----------------------------------------------------------------------
  * literals
  * ---------------------------------------------------------------------- *)
@@ -14,6 +17,41 @@ module Utils = FoUtils
 let left_pos = 1
 
 let right_pos = 2
+
+let string_of_pos s = match s with
+  | _ when s == left_pos -> "left"
+  | _ when s == right_pos -> "right"
+  | _ -> assert false
+
+let string_of_direction = function
+    | Left2Right -> "Left to right"
+    | Right2Left -> "Right to left"
+    | Nodir -> "No direction"
+
+let string_of_comparison = function
+  | Lt -> "=<="
+  | Gt -> "=>="
+  | Eq -> "==="
+  | Incomparable -> "=?="
+  | Invertible -> "=<->="
+
+
+let pp_literal formatter = function
+  | Equation (left, right, false, _) when right = T.true_term ->
+    fprintf formatter "~%a" T.pp_foterm left
+  | Equation (left, right, true, _) when right = T.true_term ->
+    T.pp_foterm formatter left
+  | Equation (left, right, true, _) when left = T.true_term ->
+    T.pp_foterm formatter right
+  | Equation (left, right, false, _) when left = T.true_term ->
+    fprintf formatter "~%a" T.pp_foterm right
+  | Equation (left, right, sign, ord) ->
+    if sign
+    then fprintf formatter "@[%a@ %a@ %a@]"
+        T.pp_foterm left T.pp_foterm T.eq_term T.pp_foterm right
+    else fprintf formatter "@[<hv 2>%a !%a@ %a@]"
+        T.pp_foterm left T.pp_foterm T.eq_term T.pp_foterm right
+
 
 let opposite_pos p = match p with
   | _ when p = left_pos -> right_pos
@@ -79,12 +117,15 @@ let eq_clause c1 c2 =
   with
     Invalid_argument _ -> false
 
+let pp_clause formatter {clits=lits} =
+  fprintf formatter "@[<h>[%a]@]" (Utils.pp_list ~sep:" | " pp_literal) lits
+
 let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
 module HC = Hashcons.Make(struct
   type t = clause
   let equal x y = eq_clause x y
-  let hash x = Hashtbl.hash x.clits
+  let hash x = List.fold_left (fun h lit -> Hashtbl.hash (h, lit)) 0 x.clits
 end)
 
 let clauses = HC.create 251  (* the hashtable for hclauses *)
@@ -105,6 +146,7 @@ let reord_clause ~ord c = mk_clause (List.map (reord_lit ~ord) c.clits) c.cproof
 let apply_subst_lit ?(recursive=true) ~ord subst =
   function
   | Equation (l,r,sign,_) ->
+    assert (l.node.sort = r.node.sort);
     mk_lit ~ord
       (S.apply_subst ~recursive subst l)
       (S.apply_subst ~recursive subst r)
@@ -146,12 +188,13 @@ let get_pos clause pos =
 let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
-  let maxvar, _, subst = S.relocate maxvar c.cvars S.id_subst in
+  let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
+  Format.printf "  relocate %a using %a@." pp_clause c S.pp_substitution subst;
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 
 let relocate_clause ~ord varlist c =
   let idx = T.max_var c.cvars in
-  let _, newvars, subst = S.relocate idx c.cvars S.id_subst in
+  let _, newvars, subst = S.relocate ~recursive:false idx c.cvars S.id_subst in
   apply_subst_cl ~recursive:false ~ord subst c
 
 let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)
@@ -190,6 +233,62 @@ let is_in_bag bag id = M.mem id bag.bag_clauses
 let empty_bag = {bag_maxvar=0; bag_clauses=M.empty}
 
 let size_bag bag = M.cardinal bag.bag_clauses
+
+(* ----------------------------------------------------------------------
+ * pretty printing
+ * ---------------------------------------------------------------------- *)
+
+let pp_clause_pos formatter (c, pos) =
+  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
+  pp_clause c (Utils.pp_list ~sep:"." pp_print_int) pos
+
+let pp_hclause formatter c =
+  fprintf formatter "@[<h>[%a]_%d@]" pp_clause c.node c.tag
+
+let pp_hclause_pos formatter (c, pos, _) =
+  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
+  pp_hclause c (Utils.pp_list ~sep:"." pp_print_int) pos
+
+let pp_bag formatter bag =
+  fprintf formatter "@[<v>";
+  M.iter
+    (fun _ hc -> fprintf formatter "%a@;" pp_clause hc.node)
+    bag.bag_clauses;
+  fprintf formatter "@]"
+
+let pp_clause_pos_subst formatter (c, pos, subst) =
+  fprintf formatter "@[<h>[%a at @[<h>%a@] with %a]@]"
+    pp_clause c (Utils.pp_list ~sep:"." pp_print_int) pos
+    S.pp_substitution subst
+
+let pp_proof ~subst formatter p =
+  match p with
+  | Axiom s -> fprintf formatter "axiom %s" s
+  | Proof (rule, premisses) ->
+    if subst
+    then
+      fprintf formatter "@[<h>%s with %a@]" rule
+        (Utils.pp_list ~sep:", " pp_clause_pos_subst)
+        premisses
+    else
+      fprintf formatter "@[<h>%s with %a@]" rule
+        (Utils.pp_list ~sep:", " pp_clause_pos)
+        (List.map (fun (c, pos, subst) -> (c, pos)) premisses)
+
+let pp_clause_proof formatter clause =
+  fprintf formatter "%a  <--- %a@;"
+    pp_clause clause (pp_proof ~subst:true) (Lazy.force clause.cproof)
+
+let rec pp_proof_rec formatter clause =
+  pp_clause_proof formatter clause;
+  match Lazy.force clause.cproof with
+  | Axiom _ -> ()
+  | Proof (_, premisses) ->
+      (* print premisses recursively *)
+      List.iter
+        (fun (c, pos, subst) ->
+            pp_proof_rec formatter c)
+        premisses
 
 (*
 (* may be moved inside the bag *)

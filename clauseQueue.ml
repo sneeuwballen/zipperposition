@@ -4,6 +4,7 @@ open Types
 open Hashcons
 
 module O = Orderings
+module Utils = FoUtils
 
 (* a queue of clauses *)
 class type queue =
@@ -69,3 +70,13 @@ let default_queues ~ord =
   [ (clause_weight ~ord, 5);
     (fifo ~ord, 2);
   ]
+
+let pp_queue formatter q =
+  Format.fprintf formatter "@[<h>queue %s@]" q#name
+
+let pp_queue_weight formatter (q, w) =
+  Format.fprintf formatter "@[<h>queue %s, %d@]" q#name w
+
+let pp_queues formatter qs =
+  Format.fprintf formatter "@[<hov>%a@]" (Utils.pp_list ~sep:"; " pp_queue_weight) qs
+

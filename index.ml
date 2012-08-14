@@ -172,3 +172,24 @@ let fold = DT.fold
 let elems index =
   DT.fold index (fun _ dataset acc -> ClauseSet.union dataset acc)
     ClauseSet.empty
+
+open Format
+
+let pp_index ?(all_clauses=false) formatter idx = 
+  let print_dt_path path set =
+  if all_clauses
+    then let l = ClauseSet.elements set in
+    fprintf formatter "%s : @[<hov>%a@]@;"
+      (FotermIndexable.string_of_path path)
+      (Utils.pp_list ~sep:", " C.pp_hclause_pos) l
+    else fprintf formatter "@[<h>%s : %d clauses/pos@]@;"
+      (FotermIndexable.string_of_path path)
+      (ClauseSet.cardinal set)
+  in
+  fprintf formatter "index:@.root_index=  @[<v>";
+  DT.iter idx.root_index print_dt_path;
+  fprintf formatter "@]@.unit_root_index=  @[<v>";
+  DT.iter idx.unit_root_index print_dt_path;
+  fprintf formatter "@]@.subterm_index=  @[<v>";
+  DT.iter idx.subterm_index print_dt_path;
+  fprintf formatter "@]@."

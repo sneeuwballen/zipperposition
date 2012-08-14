@@ -80,7 +80,7 @@ let () =
   Printf.printf "# parsed %d clauses\n" (List.length clauses);
   (* choose an ord now *)
   let ord = params.param_ord () in  (* using current signature *)
-  Format.printf "# signature: %a@." Pp.pp_signature ord#symbol_ordering#signature;
+  Format.printf "# signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   let clauses = List.map (C.reord_clause ~ord) clauses in
   (* create a state, with clauses added to passive_set *)
   let state = PS.make_state ord (CQ.default_queues ~ord) in
@@ -94,4 +94,4 @@ let () =
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";
-      Format.printf "proof: @[<v>%a@]@." Pp.pp_proof_rec c.node
+      Format.printf "proof: @[<v>%a@]@." C.pp_proof_rec c.node

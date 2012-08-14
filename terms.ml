@@ -14,7 +14,6 @@ open Types
 
 module Utils = FoUtils
 
-let pp_symbol formatter s = Format.pp_print_string formatter s
 let str_to_sym s = s
 
 (* some special sorts *)
@@ -108,17 +107,9 @@ let rec member_term a b = a == b || match b.node.term with
 
 let eq_foterm x y = x == y  (* because of hashconsing *)
 
-let cast t sort = H.hashcons terms { t.node with sort=sort; }
+let compare_foterm x y = x.tag - y.tag
 
-let rec compare_foterm x y =
-  match x.node.term, y.node.term with
-  | Leaf t1, Leaf t2 -> compare t1 t2
-  | Var i, Var j -> i - j
-  | Node l1, Node l2 -> FoUtils.lexicograph compare_foterm l1 l2
-  | Leaf _, ( Node _ | Var _ ) -> ~-1
-  | Node _, Leaf _ -> 1
-  | Node _, Var _ -> ~-1
-  | Var _, _ ->  1
+let cast t sort = H.hashcons terms { t.node with sort=sort; }
 
 let rec at_pos t pos = match t.node.term, pos with
   | _, [] -> t
@@ -150,3 +141,15 @@ let max_var vars =
   | _::vars -> assert false
   in
   aux 0 vars
+
+let pp_symbol formatter s = Format.pp_print_string formatter s
+
+let rec pp_foterm formatter t = match t.node.term with
+  | Leaf x -> pp_symbol formatter x
+  | Var i -> Format.fprintf formatter "X%d" i
+  | Node (head::args) -> Format.fprintf formatter
+      "@[<h>%a(%a)@]" pp_foterm head (Utils.pp_list ~sep:", " pp_foterm) args
+  | Node [] -> failwith "bad term"
+
+let pp_signature formatter symbols =
+  Format.fprintf formatter "@[<h>sig %a@]" (Utils.pp_list ~sep:" > " pp_symbol) symbols

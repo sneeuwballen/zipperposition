@@ -39,9 +39,11 @@ val concat: substitution -> substitution -> substitution
     variable with [varlist], and its new domain is newvarlist
     relocate [maxvar] [varlist] [subst] ->
     [newmaxvar] * [newvarlist] * [relocsubst] *)
-
-val relocate : int -> varlist -> substitution -> (int * varlist * substitution)
+val relocate : ?recursive:bool -> int -> varlist -> substitution
+            -> (int * varlist * substitution)
 
 val fresh_foterm : int -> foterm -> foterm      (** fresh term, with all variables > maxvar *)
 val relocate_term : varlist -> foterm -> foterm (** rename the term so that
                                                     it has no variable in varlist *)
+
+val pp_substitution: Format.formatter -> substitution -> unit

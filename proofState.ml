@@ -99,13 +99,13 @@ let pp_state formatter state =
   Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
     (C.size_bag state.active_set.active_clauses)
     (C.size_bag state.passive_set.passive_clauses)
-    Pp.pp_queues state.passive_set.queues
+    CQ.pp_queues state.passive_set.queues
 
 let debug_state formatter state =
   Format.fprintf formatter
     "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
     (C.size_bag state.active_set.active_clauses)
     (C.size_bag state.passive_set.passive_clauses)
-    Pp.pp_queues state.passive_set.queues
-    Pp.pp_bag state.active_set.active_clauses
-    Pp.pp_bag state.passive_set.passive_clauses
+    CQ.pp_queues state.passive_set.queues
+    C.pp_bag state.active_set.active_clauses
+    C.pp_bag state.passive_set.passive_clauses

@@ -20,3 +20,7 @@ val clause_weight : ord:ordering -> queue
 
 (* default combination of heuristics *)
 val default_queues : ord:ordering -> (queue * int) list
+
+val pp_queue : Format.formatter -> queue -> unit
+val pp_queues : Format.formatter -> (queue * int) list -> unit
+

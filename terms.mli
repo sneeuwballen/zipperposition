@@ -12,7 +12,6 @@
 open Types
 
 
-val pp_symbol : Format.formatter -> symbol -> unit
 val str_to_sym : string -> symbol
 
 (** some special sorts *)
@@ -55,3 +54,7 @@ val merge_varlist : varlist -> varlist -> varlist (** set union of variable list
 
 val max_var : varlist -> int                  (** find the maximum variable index
                                                   in the varlist *)
+
+val pp_symbol : Format.formatter -> symbol -> unit
+val pp_foterm: Format.formatter -> foterm -> unit
+val pp_signature : Format.formatter -> symbol list -> unit

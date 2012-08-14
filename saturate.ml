@@ -57,7 +57,7 @@ let given_clause_step state =
     else if Sup.is_tautology c then state, Unknown
     else begin
       debug (lazy (Format.sprintf "# *** step with given clause %s"
-                   (Utils.on_buffer Pp.pp_clause c)));
+                   (Utils.on_buffer C.pp_clause c)));
       (* do inferences (TODO simplify before) *)
       let new_clauses = do_inferences state c in
       let new_clauses = List.map (Sup.basic_simplify ~ord) new_clauses in
@@ -70,7 +70,7 @@ let given_clause_step state =
       List.iter
         (fun new_c -> debug (lazy
           (Format.sprintf "#    infered new clause %s"
-            (Utils.on_buffer Pp.pp_clause new_c))))
+            (Utils.on_buffer C.pp_clause new_c))))
         new_clauses;
       (* add new clauses to passive set, and given clause to active set *)
       let passive_set = PS.add_passives state.PS.passive_set new_clauses
