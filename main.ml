@@ -76,9 +76,8 @@ let parse_file f =
 (** print stats *)
 let print_stats state =
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
-    Printf.printf "# hashcons stats for %s:\n" what;
-    Printf.printf "#   size %d, num %d, sum length %d, buckets: small %d, median %d, big %d\n"
-      sz num sum_length small median big
+    Printf.printf "# hashcons stats for %s: size %d, num %d, sum length %d, buckets: small %d, median %d, big %d\n"
+      what sz num sum_length small median big
   and print_state_stats stats =
     Printf.printf "# proof state stats:\n";
     Printf.printf "#   active clauses   %d\n" stats.PS.stats_active_clauses;
@@ -111,6 +110,7 @@ let () =
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   (* saturate *)
   let state, result, num = Sat.given_clause ?steps ?timeout state in
+  Printf.printf "# ===============================================\n";
   Printf.printf "# done %d iterations\n" num;
   print_stats state;
   match result with
