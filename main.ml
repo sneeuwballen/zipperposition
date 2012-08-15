@@ -55,6 +55,7 @@ let parse_args () =
     [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo,nrkbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
       ("-steps", Arg.Set_int steps, "verbose mode");
+      ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
     ]
   in

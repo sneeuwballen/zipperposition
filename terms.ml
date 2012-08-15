@@ -40,13 +40,13 @@ module H = Hashcons.Make(struct
     | (_, _) -> false
   let hash t =
     let hash_term = match t.term with
-    | Var i -> 0x17 lxor (Hashtbl.hash i)
-    | Leaf s -> Hashtbl.hash s
+    | Var i -> 17 lxor (Hashtbl.hash i)
+    | Leaf s -> 2749 lxor Hashtbl.hash s
     | Node l ->
       let rec aux h = function
       | [] -> h
       | head::tail -> aux (head.hkey lxor h) tail
-      in aux 0x23 l
+      in aux 23 l
     in (Hashtbl.hash t.sort) lxor hash_term
 end)
 
