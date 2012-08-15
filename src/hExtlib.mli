@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 val map_option: ('a -> 'b) -> 'a option -> 'b option
 val iter_option: ('a -> unit) -> 'a option -> unit
-val unopt: 'a option -> 'a  (** @raise Failure *)
+val unopt: 'a option -> 'a  (** @raise Failure ...*)
 
 (** {2 Filesystem} *)
 
@@ -31,7 +31,7 @@ val is_dir: string -> bool  (** @return true if file is a directory *)
 val writable_dir: string -> bool  (** @return true if the directory is writable *)
 val is_regular: string -> bool  (** @return true if file is a regular file *)
 val is_executable: string -> bool  (** @return true if file is executable *)
-val mkdir: string -> unit (** create dir and parents. @raise Failure *)
+val mkdir: string -> unit (** create dir and parents. @raise Failure ...*)
 val tilde_expand: string -> string  (** bash-like (head) tilde expansion *)
 val safe_remove: string -> unit (** removes a file if it exists *)
 val safe_rmdir: string -> unit (** removes a dir if it exists and is empty *)
