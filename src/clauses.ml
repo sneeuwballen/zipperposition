@@ -98,7 +98,9 @@ let compare_literal l1 l2 =
 
 let hash_literal lit = match lit with
   | Equation (l, r, sign, _) ->
-    (Hashtbl.hash sign) lxor l.hkey lxor r.hkey lxor 1031
+    if sign
+      then Utils.murmur_hash ((Utils.murmur_hash l.hkey) lxor r.hkey)
+      else Utils.murmur_hash ((Utils.murmur_hash r.hkey) lxor l.hkey)
 
 let check_type a b = if a.node.sort <> b.node.sort
   then raise (SortError "sides of equations of different sorts") else ()
@@ -170,7 +172,7 @@ module H = Hashcons.Make(struct
   let hash c =
     let rec aux h = function
     | [] -> h
-    | lit::tail -> aux ((Hashtbl.hash h) lxor (hash_literal lit)) tail
+    | lit::tail -> aux (Utils.murmur_hash (h lxor hash_literal lit)) tail
     in aux 113 c.clits
 end)
 

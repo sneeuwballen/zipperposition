@@ -26,6 +26,19 @@ let set_debug l = debug_level_ := l
 let debug l s = if l <= !debug_level_ then print_endline (Lazy.force s) else ()
 let debug_level () = !debug_level_
 
+let murmur_hash i =
+  let m = 0xd1e995
+  and r = 24
+  and seed = 0x47b28c in
+  let hash = seed lxor 32 in
+  let k = i * m in
+  let k = k lxor (k lsr r) in
+  let k = k * m in
+  let hash = (hash * m) lxor k in
+  let hash = hash lxor (hash lsr 13) in
+  let hash = hash lxor (hash lsr 15) in
+  abs hash
+
 let rec lexicograph f l1 l2 =
   match l1, l2 with
   | [], [] -> 0

@@ -26,6 +26,9 @@ val set_debug : int -> unit               (** set the level of debug *)
 val debug : int -> string Lazy.t -> unit  (** debug message with level *)
 val debug_level : unit -> int             (** current debug level *)
 
+(** hashing on ints, cf http://en.wikipedia.org/wiki/MurmurHash *)
+val murmur_hash : int -> int
+
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
 

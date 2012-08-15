@@ -78,6 +78,9 @@ module type DiscriminationTree =
     val retrieve_unifiables_sorted : t -> input -> Collector.t
   end
 
+let prof_dt_generalization = HExtlib.profile ~enable:true "discr_tree.retrieve_generalizations"
+let prof_dt_unifiables = HExtlib.profile ~enable:true "discr_tree.retrieve_unifiables"
+
 module Make (I:Indexable) (A:Set.S) : DiscriminationTree
   with type constant_name = I.constant_name and type input = I.input
    and type data = A.elt and type dataset = A.t =
@@ -181,8 +184,11 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
      in
      retrieve path tree
 
-    let retrieve_generalizations tree term = retrieve false tree term
-    let retrieve_unifiables tree term = retrieve true tree term
+    let retrieve_generalizations tree term =
+      prof_dt_generalization.HExtlib.profile (retrieve false tree) term
+
+    let retrieve_unifiables tree term =
+      prof_dt_unifiables.HExtlib.profile (retrieve true tree) term
 
     let num_keys tree =
       let num = ref 0 in
