@@ -50,8 +50,9 @@ let given_clause_step state =
     let old_c = c
     and c = Sup.demodulate state.PS.active_set [] c in
     let c = Sup.basic_simplify ~ord c in
-    Utils.debug 2 (lazy (Utils.sprintf "clause %a demodulated into %a"
-                        (C.pp_clause ~sort:false) old_c (C.pp_clause ~sort:false) c));
+    (if not (C.eq_clause c old_c)
+      then Utils.debug 2 (lazy (Utils.sprintf "clause %a simplified into %a"
+                        (C.pp_clause ~sort:false) old_c (C.pp_clause ~sort:false) c)));
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
     (* tautology, useless *)
@@ -65,19 +66,46 @@ let given_clause_step state =
         (fun c -> Sup.basic_simplify ~ord (C.normalize_clause ~ord c))
         new_clauses in
       let new_clauses = List.filter (fun c -> not (Sup.is_tautology c)) new_clauses in
+      (* add given clause to active set and demodulate active set w.r.t itself *)
+      let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
+      let simplified_actives = ref [] in  (* simplified active clauses *)
+      let bag_remain, bag_simplified = C.partition_bag
+        active_set.PS.active_clauses
+        (fun hc ->
+          (* try to simplify hc using the active set *)
+          let renamed = PS.relocate_active active_set hc.node in
+          let simplified = Sup.demodulate active_set [hc.tag] renamed in
+          if C.eq_clause simplified renamed
+            then true
+            else begin
+              let simplified = Sup.basic_simplify ~ord simplified in
+              simplified_actives := simplified :: !simplified_actives;
+              Utils.debug 2 (lazy (Utils.sprintf "active clause %a simplified into %a"
+                           (C.pp_clause ~sort:false) renamed
+                           (C.pp_clause ~sort:false) simplified));
+              false
+            end
+        )
+      in
+      (* the simplified active clauses are removed from active set and
+         added to the set of new clauses *)
+      let active_set = {active_set with PS.active_clauses = bag_remain } in
+      let new_clauses = !simplified_actives @ new_clauses in
       (* only keep clauses that are not already in active_set *)
-      let new_clauses = List.filter (fun c ->
-        let hc = C.hashcons_clause c in
-        not (C.is_in_bag state.PS.active_set.PS.active_clauses hc.tag))
-        new_clauses in
+      let new_clauses =
+        List.filter
+          (fun c ->
+            let hc = C.hashcons_clause c in
+            not (C.is_in_bag state.PS.active_set.PS.active_clauses hc.tag))
+          new_clauses
+      in
       List.iter
-        (fun new_c -> Utils.debug 1 (lazy
-          (Format.sprintf "#    infered new clause %s"
-          (Utils.on_buffer C.pp_clause new_c))))
+        (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf "#    infered new clause %a"
+                                           (C.pp_clause ~sort:false) new_c)))
         new_clauses;
-      (* add new clauses to passive set, and given clause to active set *)
-      let passive_set = PS.add_passives state.PS.passive_set new_clauses
-      and active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
+      (* add new clauses (including simplified active clauses) to passive set
+         TODO remove orphans of simplified active clauses *)
+      let passive_set = PS.add_passives state.PS.passive_set new_clauses in
       let state = { state with PS.passive_set=passive_set; PS.active_set=active_set} in
       (* test whether the empty clause has been found *)
       try

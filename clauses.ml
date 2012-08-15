@@ -217,7 +217,12 @@ let relocate_clause ~ord varlist c =
   let _, newvars, subst = S.relocate ~recursive:false idx c.cvars S.id_subst in
   apply_subst_cl ~recursive:false ~ord subst c
 
-let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)
+let normalize_clause ~ord c =
+  (* sort literals and vars before renaming *)
+  let c = {c with cvars=List.stable_sort T.compare_foterm c.cvars;
+                  clits=List.stable_sort compare_literal c.clits;}
+  in
+  fst (fresh_clause ~ord 0 c)
 
 (* ----------------------------------------------------------------------
  * bag of clauses
@@ -230,11 +235,14 @@ type bag = {
   bag_clauses : hclause M.t;  (* clause ID -> clause *)
 }
 
-let add_to_bag {bag_maxvar=maxvar_b; bag_clauses=clauses_b} c =
-  let hc = hashcons_clause c
-  and maxvar_c = T.max_var c.cvars in
-  {bag_maxvar=(max maxvar_c maxvar_b);
-   bag_clauses=M.add hc.tag hc clauses_b}, hc
+let add_hc_to_bag {bag_maxvar=maxvar_b; bag_clauses=clauses_b} hc =
+  let maxvar_hc = T.max_var hc.node.cvars in
+  {bag_maxvar=(max maxvar_hc maxvar_b);
+   bag_clauses=M.add hc.tag hc clauses_b}
+
+let add_to_bag bag c =
+  let hc = hashcons_clause c in
+  add_hc_to_bag bag hc, hc
 
 let remove_from_bag ({bag_clauses=clauses_b} as bag) id =
   let new_clauses = M.remove id clauses_b in
@@ -246,6 +254,16 @@ let get_from_bag bag id =
 let is_in_bag bag id = M.mem id bag.bag_clauses
 
 let empty_bag = {bag_maxvar=0; bag_clauses=M.empty}
+
+let partition_bag bag pred =
+  let bag_yes = ref empty_bag
+  and bag_no = ref empty_bag in
+  M.iter
+    (fun _ hc -> if pred hc
+      then bag_yes := add_hc_to_bag !bag_yes hc
+      else bag_no := add_hc_to_bag !bag_no hc)
+    bag.bag_clauses;
+  !bag_yes, !bag_no
 
 let size_bag bag =
   let count = ref 0 in

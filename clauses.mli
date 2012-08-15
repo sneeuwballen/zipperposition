@@ -70,13 +70,18 @@ type bag = {
   bag_clauses : hclause Ptmap.t;  (** map tag -> hashconsed clause *)
 }
 
-val add_to_bag : bag -> clause -> bag * hclause
 
-val remove_from_bag : bag -> int -> bag
+val add_to_bag : bag -> clause -> bag * hclause   (** add the clause to the bag, hashconsing it *)
+val add_hc_to_bag : bag -> hclause -> bag         (** add a hclause to the bag *)
 
-val get_from_bag : bag -> int -> hclause
+val remove_from_bag : bag -> int -> bag           (** remove the clause from the bag *)
+
+val get_from_bag : bag -> int -> hclause          (** get a clause by its ID *)
 
 val is_in_bag : bag -> int -> bool
+
+(** for a predicate p, returns (bag of c s.t. p(c)), (bag of c s.t. not p(c)) *)
+val partition_bag : bag -> (hclause -> bool) -> bag * bag
 
 val empty_bag : bag
 
