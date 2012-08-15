@@ -1,0 +1,17 @@
+E/
+lettre_*
+dossier_bourse/
+.*.swp
+.*.swo
+*.log
+*.lof
+*.lot
+*.toc
+docs/*.pdf
+*.aux
+*.out
+_build
+tags
+*.native
+.session
+.subdirtouch
