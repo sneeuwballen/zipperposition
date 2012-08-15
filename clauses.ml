@@ -208,7 +208,7 @@ let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
   let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
-  Utils.debug 2 (lazy (Utils.sprintf "  relocate %a using %a"
+  Utils.debug 3 (lazy (Utils.sprintf "  @[<h>relocate %a using %a@]"
                       (pp_clause ~sort:true) c (S.pp_substitution ~sort:true) subst));
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 

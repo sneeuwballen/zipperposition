@@ -12,9 +12,10 @@
 open Types
 
 (* debugging facilities *)
-let debug_level = ref 0
-let set_debug l = debug_level := l
-let debug l s = if l <= !debug_level then print_endline (Lazy.force s) else ()
+let debug_level_ = ref 0
+let set_debug l = debug_level_ := l
+let debug l s = if l <= !debug_level_ then print_endline (Lazy.force s) else ()
+let debug_level () = !debug_level_
 
 let rec lexicograph f l1 l2 =
   match l1, l2 with
