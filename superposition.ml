@@ -30,6 +30,17 @@ exception Success of hclause
 (** inferences *)
 type inference_rule = ProofState.active_set -> clause -> conclusion list
 
+(* for profiling *)
+let enable = true
+
+let prof_demodulate = HExtlib.profile ~enable "demodulate"
+let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
+let prof_subsumption = HExtlib.profile ~enable "subsumption"
+let prof_infer_active = HExtlib.profile ~enable "infer_active"
+let prof_infer_passive = HExtlib.profile ~enable "infer_passive"
+let prof_infer_equality_resolution = HExtlib.profile ~enable "infer_equality_resolution"
+let prof_infer_equality_factoring = HExtlib.profile ~enable "infer_equality_factoring"
+
 (* ----------------------------------------------------------------------
  * combinators
  * ---------------------------------------------------------------------- *)
@@ -49,14 +60,14 @@ let rec list_first f = function
     pos is the position of the term
 
     position -> (foterm -> 'a) -> foterm
-      -> (foterm -> (foterm * 'b * 'c * 'd) option)
-      -> ('a * 'b * 'c * 'd * position) option
+      -> (foterm -> (foterm * 'b) option)
+      -> ('a * 'b * foterm * position) option
     *)
 let first_position pos ctx t f =
   (* re-build context from the result *)
   let rec inject_pos pos ctx = function
     | None -> None
-    | Some (a,b,c,d) -> Some (ctx a,b,c,d,pos)
+    | Some (t,b) -> Some (ctx t,b,t, List.rev pos)
   and aux pos ctx t = match t.node.term with
   | Leaf _ -> inject_pos pos ctx (f t)
   | Var _ -> None
@@ -184,7 +195,7 @@ let visit bag pos ctx id t f =
     if neg, then negative literals will be visited.
     if both, then both sides of a non-oriented equation
       will be visited
-      
+
     ?pos:bool -> ?neg:bool -> ?both:bool
     -> ('a -> Types.foterm -> Types.foterm -> bool -> int list -> 'a)
     -> 'a -> (Types.literal * int) list
@@ -218,7 +229,7 @@ let rec fold_positive ?(both=true) f acc lits =
 let rec fold_negative ?(both=true) f acc lits =
   fold_lits ~pos:false ~neg:true f acc lits
 
-(** compare literals as multisets of multisets of terms 
+(** compare literals as multisets of multisets of terms
     TODO maybe handcode it to make it more efficient? *)
 let compare_lits_partial ~ord l1 l2 =
   let m1 = C.lit_to_multiset l1
@@ -250,16 +261,6 @@ let get_equations_sides clause pos = match pos with
     | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (expected binary list)"
-        
-(* for profiling *)
-let enable = true
-
-let prof_demod_u = HExtlib.profile ~enable "demod.unify"
-let prof_demod_r = HExtlib.profile ~enable "demod.retrieve_generalizations"
-let prof_demod_o = HExtlib.profile ~enable "demod.compare"
-let prof_demod_s = HExtlib.profile ~enable "demod.apply_subst"
-let prof_demod = HExtlib.profile ~enable "demod"
-let prof_demodulate = HExtlib.profile ~enable "demodulate"
 
 (* ----------------------------------------------------------------------
  * inferences
@@ -302,7 +303,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         [new_clause]
   end
 
-let infer_active actives clause =
+let infer_active_ actives clause =
   let ord = actives.PS.a_ord
   and lits_pos = Utils.list_pos clause.clits in
   (* do the inferences where clause is active *)
@@ -322,7 +323,10 @@ let infer_active actives clause =
       in new_clauses @ acc)
   [] lits_pos
 
-let infer_passive actives clause =
+let infer_active actives clause =
+  prof_infer_active.HExtlib.profile (infer_active_ actives) clause
+
+let infer_passive_ actives clause =
   let ord = actives.PS.a_ord
   and lits_pos = Utils.list_pos clause.clits in
   (* do the inferences in which clause is passive (rewritten),
@@ -331,7 +335,7 @@ let infer_passive actives clause =
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
       let ctx x = x in
-      let new_clauses = all_positions u_pos ctx u 
+      let new_clauses = all_positions u_pos ctx u
         (fun u_p p ctx ->
           (* u at position p is u_p *)
           let root_idx = actives.PS.idx.I.root_index in
@@ -351,13 +355,16 @@ let infer_passive actives clause =
     )
     [] lits_pos
 
-let infer_equality_resolution actives clause =
+let infer_passive actives clause =
+  prof_infer_passive.HExtlib.profile (infer_passive_ actives) clause
+
+let infer_equality_resolution_ actives clause =
   let ord = actives.PS.a_ord in
   fold_positive ~both:false
     (fun acc l r sign l_pos ->
       match l_pos with
       | [] -> assert false
-      | pos::_ -> 
+      | pos::_ ->
       try
         let subst = Unif.unification l r in
         if check_maximal_lit ~ord clause pos subst
@@ -374,7 +381,10 @@ let infer_equality_resolution actives clause =
     )
     [] (Utils.list_pos clause.clits)
 
-let infer_equality_factoring actives clause =
+let infer_equality_resolution actives clause =
+  prof_infer_equality_resolution.HExtlib.profile (infer_equality_resolution_ actives) clause
+
+let infer_equality_factoring_ actives clause =
   let ord = actives.PS.a_ord
   and lits_pos = Utils.list_pos clause.clits in
   (* find root terms that are unifiable with s and are not in the
@@ -421,29 +431,78 @@ let infer_equality_factoring actives clause =
         acc unifiables)
     [] lits_pos
 
+let infer_equality_factoring actives clause =
+  prof_infer_equality_factoring.HExtlib.profile (infer_equality_factoring_ actives) clause
+
 (* ----------------------------------------------------------------------
  * simplifications
  * ---------------------------------------------------------------------- *)
 
+exception FoundMatch of (foterm * substitution * clause * position)
+
 (** Do one step of demodulation on subterm. *)
-let demod active_set subterm =
+let demod_subterm active_set subterm =
   (* unit clause+pos that potentially match subterm *)
-  let matches = I.DT.retrieve_generalizations
-                  active_set.PS.idx.I.unit_root_index
-                  subterm in
-  let rewritten = list_first
-    (fun (hclause, pos, l) ->
-      try
-        let subst = Unif.matching l subterm in
-        match pos with
-        | [1; side] ->
-            let r = C.get_pos hclause.node [1; C.opposite_pos side] in
-            Some (S.apply_subst subst r)
-        | _ -> assert false
-      with (UnificationFailure _) -> None
-    )
-    (I.ClauseSet.elements matches)
-  in rewritten
+  let matches =
+    I.DT.retrieve_generalizations active_set.PS.idx.I.unit_root_index subterm in
+  try
+    I.ClauseSet.iter
+      (fun (unit_hclause, pos, l) ->
+        try
+          let subst = Unif.matching l subterm in
+          match pos with
+          | [1; side] ->
+              let r = C.get_pos unit_hclause.node [1; C.opposite_pos side] in
+              raise (FoundMatch (S.apply_subst subst r, subst, unit_hclause.node, pos))
+          | _ -> assert false
+        with
+          UnificationFailure _ -> ()
+      )
+      matches;
+    None  (* not found any match *)
+  with
+    FoundMatch (new_t, subst, unit_hclause, pos) ->
+      Some (new_t, (unit_hclause, pos, subst))  (* return the new term, and proof *)
+
+(** Normalize term (which is at pos pos in the clause) w.r.t. active set.
+    This returns a list of clauses and positions in clauses that have
+    been used for rewriting. *)
+let demod_term active_set term =
+  let rec one_step term clauses =
+    let ctx = fun t -> t
+    and pos = [] in
+    match first_position pos ctx term (demod_subterm active_set) with
+    | None -> term, clauses
+    | Some (new_term, (unit_hc, active_pos, subst), _, _) ->
+      let new_clauses =  (unit_hc, active_pos, subst) :: clauses in
+      one_step new_term new_clauses
+  in one_step term []
+
+(** demodulate a whole clause w.r.t the active_set *)
+let demodulate_ active_set clause =
+  let ord = active_set.PS.a_ord in
+  (* rewrite the literal lit (at pos), returning a new lit
+     and clauses used to rewrite it *)
+  let rec demodulate_literal pos lit = match lit with
+  | Equation (l, r, sign, _) ->
+      let new_l, l_clauses = demod_term active_set l in
+      let new_r, r_clauses = demod_term active_set r in
+      C.mk_lit ~ord new_l new_r sign, l_clauses @ r_clauses
+  (* rewrite next lit, and get more clauses *)
+  and iterate_lits pos lits new_lits clauses = match lits with
+  | [] -> List.rev new_lits, clauses
+  | lit::tail ->
+    let new_lit, new_clauses = demodulate_literal pos lit in
+    iterate_lits (pos+1) tail (new_lit::new_lits) (new_clauses@clauses)
+  in
+  let new_lits, clauses = iterate_lits 0 clause.clits [] [] in
+  (* add the clause itself (without pos or subst, too complicated) to the proof *)
+  let proof = lazy (Proof ("demodulate", (clause, [], S.id_subst)::clauses)) in
+  C.mk_clause new_lits proof
+
+let demodulate active_set clause =
+  (* now with profiling *)
+  prof_demodulate.HExtlib.profile (demodulate_ active_set) clause
 
 let is_tautology c =
   (* s=s literal *)
@@ -488,7 +547,6 @@ let basic_simplify ~ord clause =
   let new_lits = er new_lits in
   C.mk_clause new_lits clause.cproof
 
-let demodulate active_set clause = clause (* TODO *)
 let subsumes a b = false (* TODO *)
 let subsumed_by_set set clause = false (* TODO *)
 let subsumed_in_set set clause = [] (* TODO *)

@@ -32,22 +32,24 @@ let profiling_enabled = ref false  (* ComponentsConf.profiling *)
 let something_profiled = ref false
 
 let _ =
-  if !something_profiled then
-    at_exit
-      (fun _ ->
+  at_exit
+    (fun _ ->
+      if !profiling_enabled && !something_profiled then
+        begin
         prerr_endline
-         (Printf.sprintf "!! %39s ---------- --------- --------- ---------"
+         (Printf.sprintf "# !! %39s ---------- --------- --------- ---------"
            (String.make 39 '-'));
         prerr_endline
-         (Printf.sprintf "!! %-39s %10s %9s %9s %9s"
-           "function" "#calls" "total" "max" "average"))
+         (Printf.sprintf "# !! %-39s %10s %9s %9s %9s"
+           "function" "#calls" "total" "max" "average")
+        end)
 
 let profiling_printings = ref (fun _ -> true)
 let set_profiling_printings f = profiling_printings := f
 
 type profiler = { profile : 'a 'b. ('a -> 'b) -> 'a -> 'b }
 let profile ?(enable = true) s =
- if !profiling_enabled && enable then
+ if enable then
    let total = ref 0.0 in
    let calls = ref 0 in
    let max = ref 0.0 in
@@ -72,11 +74,11 @@ let profile ?(enable = true) s =
    in
    at_exit
     (fun () ->
-      if !profiling_printings s && !calls <> 0 then
+      if !profiling_enabled && !profiling_printings s && !calls <> 0 then
        begin
         something_profiled := true;
         prerr_endline
-         (Printf.sprintf "!! %-39s %10d %9.4f %9.4f %9.4f"
+         (Printf.sprintf "# !! %-39s %10d %9.4f %9.4f %9.4f"
          s !calls !total !max (!total /. (float_of_int !calls)))
        end);
    { profile = profile }
