@@ -1,0 +1,33 @@
+# Zipperposition
+
+## Short summary
+This is intended to be a superposition prover for full first order logic. The accent
+is on flexibility, modularity and simplicity rather than performance, to allow
+quick experimenting on automated theorem proving. It may at some point generate
+proofs.
+
+## License
+Some files come from [matita](http://matita.cs.unibo.it/), the TPTP
+parser/lexer are from [Darwin](http://combination.cs.uiowa.edu/Darwin/), some
+datastructures are from [Jean-Christophe Filliâtre](http://www.lri.fr/~filliatr/software.en.html/)
+(Hashcons, Leftistheap, Ptmap). Since all of them are under GPL, the present software is also
+under GPLv2.
+
+A copy of the GPLv2 is attached to the project, in the file LICENSE.
+
+## Build
+You will need ocaml (3.12 or higher works; 3.11 or lower may work, I did not test). Type
+
+    make
+
+It should build files. Then
+
+    ./prover3.sh problem_file [options]
+
+or
+
+    ./prover.sh problem_file [options]
+
+to run the prover. Help is available with the option *-help*. The scripts `prover3.sh`
+and `prover.sh` call the external prover [E](http://eprover.org) for reduction to CNF;
+the former is for [TPTP3](http://tptp.org) syntax, and the latter for old TPTP syntax.
