@@ -1,6 +1,5 @@
 
-- a generic (bounded?) cache, based on hashtbl
-- caching ordering results
+- make multiset comparison fast
 - subsumption (backward and forward)
 - improve efficiency of trie by replacing map by array
     (better for small maps with unfrequent updates)

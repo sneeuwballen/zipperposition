@@ -23,6 +23,7 @@ open Hashcons
 
 module T = Terms
 module C = Clauses
+module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
  symbol ordering
@@ -422,7 +423,7 @@ module OrdCache = Cache.Make(
   struct
     type t = (foterm * foterm)
     let equal (x1,y1) (x2,y2) = T.eq_foterm x1 x2 && T.eq_foterm y1 y2
-    let hash (x,y) = (Hashtbl.hash x.hkey) lxor y.hkey
+    let hash (x,y) = (Utils.murmur_hash x.hkey) lxor y.hkey
     let should_cache (x,y) = match x.node.term, y.node.term with
     | Node _, Node _ -> true  (* cache for complex terms *)
     | _ -> false

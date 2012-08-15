@@ -42,6 +42,7 @@ type inference_rule = ProofState.active_set -> clause -> conclusion list
 (* for profiling *)
 let enable = true
 
+let prof_check_max_lit = HExtlib.profile ~enable "check_max_lit"
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
@@ -177,7 +178,7 @@ let compare_lits_partial ~ord l1 l2 =
   Utils.multiset_partial (Utils.multiset_partial ord#compare) m1 m2
 
 (** check that the literal subst(clause[i]) is maximal in subst(clause) *)
-let check_maximal_lit ~ord clause pos subst =
+let check_maximal_lit_ ~ord clause pos subst =
   (* literals after substitution *)
   let slits = List.map (C.apply_subst_lit ~ord subst) clause.clits in
   let slit_at_pos = Utils.list_get slits pos
@@ -192,6 +193,9 @@ let check_maximal_lit ~ord clause pos subst =
           | Lt -> false  (* slit is not maximal *)
     )
     slits_with_pos
+
+let check_maximal_lit ~ord clause pos subst =
+  prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
 
 (** decompose the literal at given position *)
 let get_equations_sides clause pos = match pos with
