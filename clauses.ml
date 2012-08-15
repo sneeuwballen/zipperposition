@@ -76,6 +76,10 @@ let compare_literal l1 l2 =
           if c <> 0 then c else
             Pervasives.compare sign1 sign2
 
+let hash_literal lit = match lit with
+  | Equation (l, r, sign, _) ->
+    (Hashtbl.hash sign) lxor l.hkey lxor r.hkey lxor 0x1031
+
 let check_type a b = if a.node.sort <> b.node.sort
   then raise (SortError "sides of equations of different sorts") else ()
 
@@ -142,8 +146,12 @@ let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
 module H = Hashcons.Make(struct
   type t = clause
-  let equal x y = eq_clause x y
-  let hash x = List.fold_left (fun h lit -> Hashtbl.hash (h, lit)) 0 x.clits
+  let equal c1 c2 = eq_clause c1 c2
+  let hash c =
+    let rec aux h = function
+    | [] -> h
+    | lit::tail -> aux ((hash_literal lit) lxor h) tail
+    in aux 0x113 c.clits
 end)
 
 let clauses = H.create 251  (* the hashtable for hclauses *)

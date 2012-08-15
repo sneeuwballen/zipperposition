@@ -13,6 +13,7 @@ val opposite_pos : int -> int
 
 val eq_literal : literal -> literal -> bool       (** equality of literals *)
 val compare_literal : literal -> literal -> int   (** lexicographic comparison of literals *)
+val hash_literal : literal -> int                 (** hashing of literal *)
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)

@@ -26,7 +26,9 @@ let true_symbol = "$true"
 (* hashconsing for terms *)
 module H = Hashcons.Make(struct
   type t = typed_term
-  let rec equal x y = match (x.term, y.term) with
+  let rec equal x y =
+    if x.sort <> y.sort then false
+    else match (x.term, y.term) with
     | (Var i, Var j) -> i = j
     | (Leaf a, Leaf b) -> a = b
     | (Node a, Node b) -> eq_subterms a b
@@ -36,7 +38,16 @@ module H = Hashcons.Make(struct
     | (a::a1, b::b1) -> if equal a.node b.node
       then eq_subterms a1 b1 else false
     | (_, _) -> false
-  let hash = Hashtbl.hash
+  let hash t =
+    let hash_term = match t.term with
+    | Var i -> 0x17 lxor (Hashtbl.hash i)
+    | Leaf s -> Hashtbl.hash s
+    | Node l ->
+      let rec aux h = function
+      | [] -> h
+      | head::tail -> aux (head.hkey lxor h) tail
+      in aux 0x23 l
+    in (Hashtbl.hash t.sort) lxor hash_term
 end)
 
 (* the terms table *)
@@ -61,7 +72,7 @@ let mk_var idx sort =
   let my_v = {term = Var idx; sort=sort; vars=lazy []} in
   let v = H.hashcons terms
     {my_v with vars=lazy [H.hashcons terms my_v]} in
-  (*ignore (Lazy.force v.node.vars); *) v
+  ignore (Lazy.force v.node.vars); v
 
 let mk_leaf symbol sort =
   H.hashcons terms {term = Leaf symbol; sort=sort; vars=lazy []}
@@ -72,7 +83,7 @@ let rec mk_node = function
       let my_t = {term=(Node subterms); sort=head.node.sort; vars=lazy []} in
       let lazy_vars = lazy (compute_vars (H.hashcons terms my_t)) in
       let t = H.hashcons terms { my_t with vars=lazy_vars } in
-      (* ignore (Lazy.force t.node.vars); *) t
+      ignore (Lazy.force t.node.vars); t
 
 let is_var t = match t.node.term with
   | Var _ -> true
