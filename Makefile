@@ -4,7 +4,9 @@ INTERFACE_FILES = $(wildcard *.mli)
 IMPLEMENTATION_FILES = $(INTERFACE_FILES:%.mli=%.ml)
 
 all:
-	ocamlbuild -libs str,unix -cflag -g main.native
+	ocamlbuild -libs str,unix -tag debug main.native
+profile:
+	ocamlbuild -libs str,unix -tags debug,profile main.native
 
 clean:
 	ocamlbuild -clean
