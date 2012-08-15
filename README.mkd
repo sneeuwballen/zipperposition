@@ -1,10 +1,17 @@
 # Zipperposition
 
 ## Short summary
-This is intended to be a superposition prover for full first order logic. The accent
+Zipperposition is intended to be a superposition prover for full first order logic. The accent
 is on flexibility, modularity and simplicity rather than performance, to allow
 quick experimenting on automated theorem proving. It may at some point generate
-proofs.
+TSTP proofs; right now it outputs its own (rather poor) proofs.
+
+Zipperposition is written in the functional language [OCaml](http://caml.inria.fr). The name is
+a bad play on the words "zipper" (a functional data structure) and "superposition" (the calculus
+used by the prover). Superposition-based theorem proving is an active field of research, so
+there is a lot of literature about it; for this implementation my references are the chapter
+_paramodulation-based theorem proving_ of the _handbook of automated reasoning_, and the
+paper "E: a brainiac theorem prover" that describes the [E](http://eprover.org) prover.
 
 ## License
 Some files come from [matita](http://matita.cs.unibo.it/), the TPTP
