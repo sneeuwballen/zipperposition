@@ -95,6 +95,30 @@ let relocate_active active_set c =
   let maxvar = active_set.active_clauses.C.bag_maxvar in
   fst (C.fresh_clause ~ord:active_set.a_ord maxvar c)
 
+(** statistics on the state *)
+type state_stats = {
+  stats_active_clauses : int;
+  stats_passive_clauses : int;
+  stats_root_index_keys : int;
+  stats_root_index_elems : int;
+  stats_subterm_index_keys : int;
+  stats_subterm_index_elems : int;
+  stats_unit_root_index_keys : int;
+  stats_unit_root_index_elems : int;
+}
+
+let stats state =
+  {
+    stats_active_clauses = C.size_bag state.active_set.active_clauses;
+    stats_passive_clauses = C.size_bag state.passive_set.passive_clauses;
+    stats_root_index_keys = I.DT.num_keys state.active_set.idx.I.root_index;
+    stats_root_index_elems = I.DT.num_elems state.active_set.idx.I.root_index;
+    stats_subterm_index_keys = I.DT.num_keys state.active_set.idx.I.subterm_index;
+    stats_subterm_index_elems = I.DT.num_elems state.active_set.idx.I.subterm_index;
+    stats_unit_root_index_keys = I.DT.num_keys state.active_set.idx.I.unit_root_index;
+    stats_unit_root_index_elems = I.DT.num_elems state.active_set.idx.I.unit_root_index;
+  }
+
 let pp_state formatter state =
   Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
     (C.size_bag state.active_set.active_clauses)

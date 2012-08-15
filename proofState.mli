@@ -43,7 +43,20 @@ val next_passive_clause : passive_set -> (passive_set * hclause option)
 (** relocate clause w.r.t clauses in the active_set *)
 val relocate_active : active_set -> clause -> clause
 
-val pp_state : Format.formatter -> state -> unit
+(** statistics on the state *)
+type state_stats = {
+  stats_active_clauses : int;
+  stats_passive_clauses : int;
+  stats_root_index_keys : int;
+  stats_root_index_elems : int;
+  stats_subterm_index_keys : int;
+  stats_subterm_index_elems : int;
+  stats_unit_root_index_keys : int;
+  stats_unit_root_index_elems : int;
+}
+val stats : state -> state_stats
 
-(* debug functions: much more detailed printing *)
+(** pretty print the content of the state *)
+val pp_state : Format.formatter -> state -> unit
+(** debug functions: much more detailed printing *)
 val debug_state : Format.formatter -> state -> unit

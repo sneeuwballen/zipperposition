@@ -73,6 +73,21 @@ let parse_file f =
     Parser_tptp.parse_file Lexer_tptp.token buf
   with _ as e -> close_in input; raise e
 
+(** print stats *)
+let print_stats state =
+  let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
+    Printf.printf "# hashcons stats for %s:\n" what;
+    Printf.printf "#   size %d, num %d, sum length %d, buckets: small %d, median %d, big %d\n"
+      sz num sum_length small median big
+  and print_state_stats stats =
+    Printf.printf "# proof state stats:\n";
+    Printf.printf "#   active clauses   %d\n" stats.PS.stats_active_clauses;
+    Printf.printf "#   passive clauses  %d\n" stats.PS.stats_passive_clauses
+  in
+  print_hashcons_stats "terms" (T.H.stats T.terms);
+  print_hashcons_stats "clauses" (C.H.stats C.clauses);
+  print_state_stats (PS.stats state)
+
 let () =
   (* parse arguments *)
   let params = parse_args () in
@@ -97,6 +112,7 @@ let () =
   (* saturate *)
   let state, result, num = Sat.given_clause ?steps ?timeout state in
   Printf.printf "# done %d iterations\n" num;
+  print_stats state;
   match result with
   | Sat.Sat -> Printf.printf "# SZS status CounterSatisfiable\n"
   | Sat.Unknown | Sat.Timeout -> Printf.printf "# SZS status ResourceOut\n"
