@@ -33,6 +33,9 @@ val lit_to_multiset : literal -> foterm list list (** literal to multiset of ter
  * clauses
  * ---------------------------------------------------------------------- *)
 
+module H : Hashcons.S with type key = clause
+val clauses : H.t
+
 val eq_clause : clause -> clause -> bool                (** equality of clauses *)
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
 
@@ -60,12 +63,10 @@ val normalize_clause : ord:ordering -> clause -> clause
  * bag of clauses
  * ---------------------------------------------------------------------- *)
 
-module M : Map.S with type key = int 
-
-(** multiset of hashconsed clauses *)
+(** set of hashconsed clauses *)
 type bag = {
-  bag_maxvar: int;            (** higher bound for the biggest var index *)
-  bag_clauses : hclause M.t;  (** hclause ID -> hclause *)
+  bag_maxvar: int;                (** higher bound for the biggest var index *)
+  bag_clauses : hclause Ptmap.t;  (** map tag -> hashconsed clause *)
 }
 
 val add_to_bag : bag -> clause -> bag * hclause
@@ -77,6 +78,8 @@ val get_from_bag : bag -> int -> hclause
 val is_in_bag : bag -> int -> bool
 
 val empty_bag : bag
+
+val size_bag : bag -> int         (** number of clauses in the bag (linear) *)
 
 (* ----------------------------------------------------------------------
  * pretty printing

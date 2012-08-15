@@ -91,8 +91,9 @@ let mk_lit ~ord a b sign =
   check_type a b;
   Equation (a, b, sign, ord#compare a b)
 
-let apply_subst_lit ?(recursive=true) ~ord subst =
-  function
+let apply_subst_lit ?(recursive=true) ~ord subst lit =
+  if subst = S.id_subst then lit
+  else match lit with
   | Equation (l,r,sign,_) ->
     assert (l.node.sort = r.node.sort);
     let new_l = S.apply_subst ~recursive subst l
@@ -139,15 +140,15 @@ let pp_clause ?(sort=false) formatter {clits=lits} =
 
 let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
-module HC = Hashcons.Make(struct
+module H = Hashcons.Make(struct
   type t = clause
   let equal x y = eq_clause x y
   let hash x = List.fold_left (fun h lit -> Hashtbl.hash (h, lit)) 0 x.clits
 end)
 
-let clauses = HC.create 251  (* the hashtable for hclauses *)
+let clauses = H.create 251  (* the hashtable for hclauses *)
 
-let hashcons_clause c = HC.hashcons clauses c
+let hashcons_clause c = H.hashcons clauses c
 
 let eq_hclause hc1 hc2 = hc1 == hc2
 
@@ -161,8 +162,10 @@ let mk_clause lits proof =
 let reord_clause ~ord c = mk_clause (List.map (reord_lit ~ord) c.clits) c.cproof
 
 let apply_subst_cl ?(recursive=true) ~ord subst c =
-  let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
-  mk_clause new_lits c.cproof
+  if subst = S.id_subst then c
+  else
+    let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
+    mk_clause new_lits c.cproof
   (*  TODO modify proof lazily
   let proof =
     match proof with
@@ -212,12 +215,7 @@ let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)
  * bag of clauses
  * ---------------------------------------------------------------------- *)
 
-module M : Map.S with type key = int
-  = Map.Make(
-     struct
-       type t = int
-       let compare = Pervasives.compare
-     end)
+module M = Ptmap
 
 type bag = {
   bag_maxvar : int;           (* index of maximum variable *)
@@ -241,7 +239,10 @@ let is_in_bag bag id = M.mem id bag.bag_clauses
 
 let empty_bag = {bag_maxvar=0; bag_clauses=M.empty}
 
-let size_bag bag = M.cardinal bag.bag_clauses
+let size_bag bag =
+  let count = ref 0 in
+  M.iter (fun _ _ -> count := !count+1) bag.bag_clauses;
+  !count
 
 (* ----------------------------------------------------------------------
  * pretty printing

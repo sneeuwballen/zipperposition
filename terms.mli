@@ -20,6 +20,9 @@ val univ_sort : sort
 val true_symbol : symbol
 val eq_symbol : symbol
 
+module H : Hashcons.S with type key = typed_term
+val terms : H.t
+
 val iter_terms : (foterm -> unit) -> unit     (** iterate through existing terms *)
 val all_terms : unit -> foterm list           (** all currently existing terms *)
 

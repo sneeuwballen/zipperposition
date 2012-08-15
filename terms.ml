@@ -61,7 +61,7 @@ let mk_var idx sort =
   let my_v = {term = Var idx; sort=sort; vars=lazy []} in
   let v = H.hashcons terms
     {my_v with vars=lazy [H.hashcons terms my_v]} in
-  ignore (Lazy.force v.node.vars); v
+  (*ignore (Lazy.force v.node.vars); *) v
 
 let mk_leaf symbol sort =
   H.hashcons terms {term = Leaf symbol; sort=sort; vars=lazy []}
@@ -72,7 +72,7 @@ let rec mk_node = function
       let my_t = {term=(Node subterms); sort=head.node.sort; vars=lazy []} in
       let lazy_vars = lazy (compute_vars (H.hashcons terms my_t)) in
       let t = H.hashcons terms { my_t with vars=lazy_vars } in
-      ignore (Lazy.force t.node.vars); t
+      (* ignore (Lazy.force t.node.vars); *) t
 
 let is_var t = match t.node.term with
   | Var _ -> true

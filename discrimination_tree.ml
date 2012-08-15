@@ -67,6 +67,8 @@ module type DiscriminationTree =
     val in_index : t -> input -> (data -> bool) -> bool
     val retrieve_generalizations : t -> input -> dataset
     val retrieve_unifiables : t -> input -> dataset
+    val num_keys : t -> int                       (** number of indexed keys (paths) *)
+    val num_elems : t -> int                      (** number of elements for any key *)
 
     (* the int is the number of symbols that matched, note that
      * Collector.to_list returns a sorted list, biggest matches first. *)
@@ -97,6 +99,9 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
     type dataset = A.t
     type input = I.input
 
+    (* TODO use an optimized Map implementation based on arrays.
+       it should be faster and more lightweight on small maps, which
+       is the usual case for DT *)
     (* map of string elements *)
     module PSMap = Map.Make(OrderedPathStringElement)
 
@@ -184,6 +189,16 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
 
     let retrieve_generalizations tree term = retrieve false tree term
     let retrieve_unifiables tree term = retrieve true tree term
+
+    let num_keys tree =
+      let num = ref 0 in
+      iter tree (fun _ _ -> incr num);
+      !num
+
+    let num_elems tree =
+      let num = ref 0 in
+      iter tree (fun _ elems -> num := !num + (A.cardinal elems));
+      !num
 
     module O = struct
       type t = A.t * int
