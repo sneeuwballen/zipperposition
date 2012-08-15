@@ -19,8 +19,8 @@ module S = FoSubst
 let mem2 a b l =
   let rec aux found_a found_b = function
     | x :: tl ->
-      let found_a = found_a || x = a in
-      let found_b = found_b || x = b in
+      let found_a = found_a || T.eq_foterm x a in
+      let found_b = found_b || T.eq_foterm x b in
       if found_a && found_b
         then true, true
         else aux found_a found_b tl
