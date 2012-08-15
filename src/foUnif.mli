@@ -18,6 +18,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+(** Unification and matching algorithms *)
+
 open Types
 
 (* unify terms, returns a substitution or raise an exception *)

@@ -18,7 +18,7 @@
  * 
  *)
 
-(*s Hash tables for hash consing. 
+(** Hash tables for hash consing. 
 
     Hash consed values are of the
     following type [hash_consed]. The field [tag] contains a unique
@@ -36,7 +36,7 @@ type 'a hash_consed = private {
   tag : int;
   node : 'a }
 
-(*s Generic part, using ocaml generic equality and hash function. *)
+(** Generic part, using ocaml generic equality and hash function. *)
 
 type 'a t
 
@@ -58,7 +58,7 @@ val stats : 'a t -> int * int * int * int * int * int
       table length, number of entries, sum of bucket lengths,
       smallest bucket length, median bucket length, biggest bucket length. *)
 
-(*s Functorial interface. *) 
+(** Functorial interface. *) 
 
 module type HashedType =
   sig

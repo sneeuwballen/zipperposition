@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+(** Non-perfect discrimination trees, without jumplist *)
 
 
 type 'a path_string_elem = 

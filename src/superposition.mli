@@ -18,6 +18,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+(** Inference and simplification rules for the superposition calculus *)
+
 open Types
 
 (** a conclusion is a clause *)

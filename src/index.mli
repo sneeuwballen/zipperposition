@@ -18,6 +18,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+(** Term indexing, using discrimination trees *)
+
 open Types
 
 (* a set of (clause, position in clause). A position is a

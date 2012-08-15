@@ -18,11 +18,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* main saturation algorithm *)
+(** Main saturation algorithm. It uses inference rules and
+    simplification rules from Superposition. *)
 
 open Types
 
-(** the status of a state *)
+(** The SZS status of a state *)
 type szs_status = 
   | Unsat of hclause
   | Sat

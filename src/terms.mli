@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+(** Functions on first-order terms *)
 
 val str_to_sym : string -> symbol
 

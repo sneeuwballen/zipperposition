@@ -18,7 +18,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* the state of a proof *)
+(** The state of a proof, contains a set of active clauses (processed),
+    a set of passive clauses (to be processed), and an ordering
+    that is used for redundancy elimination. *)
 
 open Types
 

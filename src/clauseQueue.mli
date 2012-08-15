@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* heuristic selection of clauses *)
+(** Heuristic selection of clauses, using queues*)
 
 open Types
 
