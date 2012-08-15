@@ -417,32 +417,52 @@ end
  class interface
  ---------------------------------------------------------------------- *)
 
+(** cache for pairs of terms *)
+module OrdCache = Cache.Make(
+  struct
+    type t = (foterm * foterm)
+    let equal (x1,y1) (x2,y2) = T.eq_foterm x1 x2 && T.eq_foterm y1 y2
+    let hash (x,y) = (Hashtbl.hash x.hkey) lxor y.hkey
+    let should_cache (x,y) = match x.node.term, y.node.term with
+    | Node _, Node _ -> true  (* cache for complex terms *)
+    | _ -> false
+  end)
+
 class nrkbo (so : symbol_ordering) : ordering =
   object
+    val cache = OrdCache.create 29
     val so = so
     method refresh () = ({< so = so#refresh () >} :> ordering)
+    method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = NRKBO.compare_terms ~so a b
+    method compare a b = OrdCache.with_cache cache
+      (fun (a, b) -> NRKBO.compare_terms ~so a b) (a, b)
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = NRKBO.name
   end
 
 class kbo (so : symbol_ordering) : ordering =
   object
+    val cache = OrdCache.create 29
     val so = so
     method refresh () = ({< so = so#refresh () >} :> ordering)
+    method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = KBO.compare_terms ~so a b
+    method compare a b = OrdCache.with_cache cache
+      (fun (a, b) -> KBO.compare_terms ~so a b) (a, b)
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = KBO.name
   end
 
 class lpo (so : symbol_ordering) : ordering =
   object
+    val cache = OrdCache.create 29
     val so = so
     method refresh () = ({< so = so#refresh () >} :> ordering)
+    method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = LPO.compare_terms ~so a b
+    method compare a b = OrdCache.with_cache cache
+      (fun (a, b) -> LPO.compare_terms ~so a b) (a, b)
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = LPO.name
   end
@@ -452,6 +472,7 @@ let default_ordering () = new lpo (default_symbol_ordering ())
 let dummy_ordering =
   object
     method refresh () = ({< >} :> ordering)
+    method clear_cache () = ()
     method symbol_ordering = dummy_symbol_ordering
     method compare a b = Incomparable
     method compute_clause_weight c =

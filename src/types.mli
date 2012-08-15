@@ -90,6 +90,7 @@ class type symbol_ordering =
 class type ordering =
   object
     method refresh : unit -> ordering         (** refresh the symbol ordering *)
+    method clear_cache : unit -> unit         (** clear cache, if any *)
     method symbol_ordering : symbol_ordering
     method compare : foterm -> foterm -> comparison
     method compute_clause_weight : clause -> int
