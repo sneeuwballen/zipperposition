@@ -159,16 +159,17 @@ let max_var vars =
 
 let pp_symbol formatter s = Format.pp_print_string formatter s
 
-let rec pp_foterm formatter ?(sort=false) t =
+let rec pp_foterm_sort formatter ?(sort=false) t =
   (match t.node.term with
   | Leaf x -> pp_symbol formatter x
   | Var i -> Format.fprintf formatter "X%d" i
   | Node (head::args) -> Format.fprintf formatter
-      "@[<h>%a(%a)@]" (pp_foterm ~sort:false) head
-      (Utils.pp_list ~sep:", " (pp_foterm ~sort)) args
+      "@[<h>%a(%a)@]" (pp_foterm_sort ~sort:false) head
+      (Utils.pp_list ~sep:", " (pp_foterm_sort ~sort)) args
   | Node [] -> failwith "bad term");
   if sort then Format.fprintf formatter ":%s" t.node.sort else ()
   
+let rec pp_foterm formatter t = pp_foterm_sort ~sort:false formatter t
 
 let pp_signature formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]" (Utils.pp_list ~sep:" > " pp_symbol) symbols

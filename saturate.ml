@@ -33,7 +33,7 @@ let do_inferences state c =
   let active_set = state.PS.active_set in
   HExtlib.flatten_map
     (fun (name, rule) ->
-      (* debug (lazy ("#  apply rule " ^ name)); *)
+      Utils.debug 3 (lazy ("#  apply rule " ^ name));
       rule active_set c)
     inference_rules
 
@@ -85,7 +85,7 @@ let given_clause ?steps ?timeout state =
   let rec do_step state num =
     if check_timeout timeout then state, Timeout, num else
     begin
-    Utils.debug 2 (lazy (Format.sprintf "# iteration %d" num));
+    Utils.debug 1 (lazy (Format.sprintf "# iteration %d" num));
     match steps with
     | Some i when num >= i -> state, Unknown, num
     | _ ->

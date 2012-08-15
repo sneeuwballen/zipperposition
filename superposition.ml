@@ -276,6 +276,9 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   let active_idx = List.hd active_pos
   and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = get_equations_sides active_clause active_pos in
+  Utils.debug 2 (lazy (Utils.sprintf "@[<h>sup s=%a t=%a u=%a v=%a p=%a subst=%a@]"
+                       T.pp_foterm s T.pp_foterm t T.pp_foterm u T.pp_foterm v
+                       C.pp_pos passive_pos (S.pp_substitution ~sort:false) subst));
   if not sign_st then []
   else begin
     assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))

@@ -85,6 +85,6 @@ let relocate_term varlist t =
 
 let pp_substitution formatter ?(sort=false) subst =
   let pp_pair formatter (v, t) =
-    Format.fprintf formatter "%a -> %a" (T.pp_foterm ~sort) v (T.pp_foterm ~sort) t
+    Format.fprintf formatter "%a -> %a" (T.pp_foterm_sort ~sort) v (T.pp_foterm_sort ~sort) t
   in
   Format.fprintf formatter "@[<h>{%a}@]" (Utils.pp_list ~sep:", " pp_pair) subst

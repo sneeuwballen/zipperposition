@@ -59,5 +59,6 @@ val max_var : varlist -> int                  (** find the maximum variable inde
                                                   in the varlist *)
 
 val pp_symbol : Format.formatter -> symbol -> unit
-val pp_foterm: Format.formatter -> ?sort:bool -> foterm -> unit
+val pp_foterm: Format.formatter -> foterm -> unit
+val pp_foterm_sort : Format.formatter -> ?sort:bool -> foterm -> unit
 val pp_signature : Format.formatter -> symbol list -> unit

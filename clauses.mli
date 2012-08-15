@@ -90,6 +90,7 @@ open Format
 
 val size_bag : bag -> int
 val pp_clause : ?sort:bool -> formatter -> clause -> unit
+val pp_pos : formatter -> position -> unit
 val pp_clause_pos : formatter -> (clause * position) -> unit
 val pp_hclause : formatter -> hclause -> unit
 val pp_hclause_pos : formatter -> (hclause * position* foterm) -> unit

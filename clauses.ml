@@ -37,7 +37,7 @@ let string_of_comparison = function
 
 
 let pp_literal ?(sort=false) formatter lit =
-  let pp_foterm = T.pp_foterm ~sort in
+  let pp_foterm = T.pp_foterm_sort ~sort in
   match lit with
   | Equation (left, right, false, _) when right = T.true_term ->
     fprintf formatter "~%a" pp_foterm left
@@ -103,12 +103,12 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
     let new_l = S.apply_subst ~recursive subst l
     and new_r = S.apply_subst ~recursive subst r
     in
-    Utils.debug 2 (lazy (Utils.sprintf "apply %a to %a gives %a"
+    Utils.debug 3 (lazy (Utils.sprintf "apply %a to %a gives %a"
         (S.pp_substitution ~sort:true) subst
-        (T.pp_foterm ~sort:true) l (T.pp_foterm ~sort:true) new_l));
-    Utils.debug 2 (lazy (Utils.sprintf "apply %a to %a gives %a"
+        (T.pp_foterm_sort ~sort:true) l (T.pp_foterm_sort ~sort:true) new_l));
+    Utils.debug 3 (lazy (Utils.sprintf "apply %a to %a gives %a"
         (S.pp_substitution ~sort:true) subst
-        (T.pp_foterm ~sort:true) r (T.pp_foterm ~sort:true) new_r));
+        (T.pp_foterm_sort ~sort:true) r (T.pp_foterm_sort ~sort:true) new_r));
     mk_lit ~ord new_l new_r sign
 
 let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
@@ -256,16 +256,18 @@ let size_bag bag =
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
+let pp_pos formatter pos =
+  fprintf formatter "@[<h>%a@]" (Utils.pp_list ~sep:"." pp_print_int) pos
+
 let pp_clause_pos formatter (c, pos) =
   fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
-    (pp_clause ~sort:false) c (Utils.pp_list ~sep:"." pp_print_int) pos
+    (pp_clause ~sort:false) c pp_pos pos
 
 let pp_hclause formatter c =
   fprintf formatter "@[<h>[%a]_%d@]" (pp_clause ~sort:false) c.node c.tag
 
 let pp_hclause_pos formatter (c, pos, _) =
-  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
-  pp_hclause c (Utils.pp_list ~sep:"." pp_print_int) pos
+  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]" pp_hclause c pp_pos pos
 
 let pp_bag formatter bag =
   fprintf formatter "@[<v>";
@@ -276,7 +278,7 @@ let pp_bag formatter bag =
 
 let pp_clause_pos_subst formatter (c, pos, subst) =
   fprintf formatter "@[<h>[%a at @[<h>%a@] with %a]@]"
-    (pp_clause ~sort:false) c (Utils.pp_list ~sep:"." pp_print_int) pos
+    (pp_clause ~sort:false) c pp_pos pos
     (S.pp_substitution ~sort:false) subst
 
 let pp_proof ~subst formatter p =
