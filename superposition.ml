@@ -441,19 +441,27 @@ let infer_equality_factoring actives clause =
 exception FoundMatch of (foterm * substitution * clause * position)
 
 (** Do one step of demodulation on subterm. *)
-let demod_subterm active_set subterm =
+let demod_subterm ~ord blocked_ids active_set subterm =
   (* unit clause+pos that potentially match subterm *)
   let matches =
     I.DT.retrieve_generalizations active_set.PS.idx.I.unit_root_index subterm in
   try
     I.ClauseSet.iter
       (fun (unit_hclause, pos, l) ->
+        (* do we have to ignore the clause? *)
+        if List.mem unit_hclause.tag blocked_ids then ()
+        else
         try
           let subst = Unif.matching l subterm in
           match pos with
-          | [1; side] ->
-              let r = C.get_pos unit_hclause.node [1; C.opposite_pos side] in
-              raise (FoundMatch (S.apply_subst subst r, subst, unit_hclause.node, pos))
+          | [0; side] ->
+              let r = C.get_pos unit_hclause.node [0; C.opposite_pos side] in
+              let new_l = subterm
+              and new_r = S.apply_subst subst r in
+              if ord#compare new_l new_r = Gt
+                (* subst(l) > subst(r), we can rewrite *)
+                then raise (FoundMatch (new_r, subst, unit_hclause.node, pos))
+                else ()
           | _ -> assert false
         with
           UnificationFailure _ -> ()
@@ -467,27 +475,29 @@ let demod_subterm active_set subterm =
 (** Normalize term (which is at pos pos in the clause) w.r.t. active set.
     This returns a list of clauses and positions in clauses that have
     been used for rewriting. *)
-let demod_term active_set term =
+let demod_term ~ord blocked_ids active_set term =
   let rec one_step term clauses =
     let ctx = fun t -> t
     and pos = [] in
-    match first_position pos ctx term (demod_subterm active_set) with
+    match first_position pos ctx term (demod_subterm ~ord blocked_ids active_set) with
     | None -> term, clauses
     | Some (new_term, (unit_hc, active_pos, subst), _, _) ->
       let new_clauses =  (unit_hc, active_pos, subst) :: clauses in
       one_step new_term new_clauses
   in one_step term []
 
-(** demodulate a whole clause w.r.t the active_set *)
-let demodulate_ active_set clause =
+(** demodulate a whole clause w.r.t the active_set, but ignores
+    the blocked clauses (generally the clause itself, if it
+    is already in the active_set) *)
+let demodulate_ active_set blocked_ids clause =
   let ord = active_set.PS.a_ord in
   (* rewrite the literal lit (at pos), returning a new lit
      and clauses used to rewrite it *)
   let rec demodulate_literal pos lit = match lit with
   | Equation (l, r, sign, _) ->
-      let new_l, l_clauses = demod_term active_set l in
-      let new_r, r_clauses = demod_term active_set r in
-      C.mk_lit ~ord new_l new_r sign, l_clauses @ r_clauses
+      let new_l, l_clauses = demod_term ~ord blocked_ids active_set l in
+      let new_r, r_clauses = demod_term ~ord blocked_ids active_set r in
+      (C.mk_lit ~ord new_l new_r sign), (l_clauses @ r_clauses)
   (* rewrite next lit, and get more clauses *)
   and iterate_lits pos lits new_lits clauses = match lits with
   | [] -> List.rev new_lits, clauses
@@ -496,9 +506,14 @@ let demodulate_ active_set clause =
     iterate_lits (pos+1) tail (new_lit::new_lits) (new_clauses@clauses)
   in
   let new_lits, clauses = iterate_lits 0 clause.clits [] [] in
-  (* add the clause itself (without pos or subst, too complicated) to the proof *)
-  let proof = lazy (Proof ("demodulate", (clause, [], S.id_subst)::clauses)) in
-  C.mk_clause new_lits proof
+  if try List.for_all2 C.eq_literal clause.clits new_lits with Invalid_argument _ -> false
+    (* if the literals are the same, no simplification occurred *)
+    then clause 
+    (* add the initial clause itself (without pos or subst, too complicated) to
+       the proof before returning the simplified clause *)
+    else
+      let proof = lazy (Proof ("demodulate", (clause, [], S.id_subst)::clauses)) in
+      C.mk_clause new_lits proof
 
 let demodulate active_set clause =
   (* now with profiling *)

@@ -46,7 +46,12 @@ let given_clause_step state =
     let state = { state with PS.passive_set=passive_set } in
     (* rename variables in c to avoid collisions *)
     let c = PS.relocate_active state.PS.active_set c.node in
+    (* simplify given clause w.r.t. active set *)
+    let old_c = c
+    and c = Sup.demodulate state.PS.active_set [] c in
     let c = Sup.basic_simplify ~ord c in
+    Utils.debug 2 (lazy (Utils.sprintf "clause %a demodulated into %a"
+                        (C.pp_clause ~sort:false) old_c (C.pp_clause ~sort:false) c));
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
     (* tautology, useless *)
@@ -54,9 +59,11 @@ let given_clause_step state =
     else begin
       Utils.debug 1 (lazy (Format.sprintf "# *** step with given clause %s"
                     (Utils.on_buffer C.pp_clause c)));
-      (* do inferences (TODO simplify before) *)
+      (* do inferences *)
       let new_clauses = do_inferences state c in
-      let new_clauses = List.map (Sup.basic_simplify ~ord) new_clauses in
+      let new_clauses = List.map
+        (fun c -> Sup.basic_simplify ~ord (C.normalize_clause ~ord c))
+        new_clauses in
       let new_clauses = List.filter (fun c -> not (Sup.is_tautology c)) new_clauses in
       (* only keep clauses that are not already in active_set *)
       let new_clauses = List.filter (fun c ->

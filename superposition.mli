@@ -35,6 +35,7 @@ val is_tautology : clause -> bool
 val basic_simplify : ord:ordering -> clause -> clause   (** basic simplifications *)
 
 val demodulate : ProofState.active_set
+                -> int list (** the IDs of active clauses to ignore for rewriting *)
                 -> clause   (** the clause to simplify *)
 		-> clause   (** the simplified clause *)
 
