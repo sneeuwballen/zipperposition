@@ -18,4 +18,4 @@ clean:
 tags:
 	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
-.PHONY: all clean tags
+.PHONY: all clean tags doc

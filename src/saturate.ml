@@ -141,6 +141,7 @@ let given_clause ?steps ?timeout state =
     if check_timeout timeout then state, Timeout, num else
     begin
     Utils.debug 1 (lazy (Format.sprintf "# iteration %d" num));
+    (if (num mod 50) = 0 then state.PS.ord#clear_cache ());
     match steps with
     | Some i when num >= i -> state, Unknown, num
     | _ ->
