@@ -231,6 +231,17 @@ let get_equations_sides clause pos = match pos with
  * inferences
  * ---------------------------------------------------------------------- *)
 
+(** do inferences that involve the given clause *)
+let do_inferences active_set rules c =
+  assert ((T.min_var c.cvars) > active_set.PS.active_clauses.C.bag_maxvar);
+  (* apply every inference rule *)
+  List.fold_left
+    (fun acc (name, rule) ->
+      Utils.debug 3 (lazy ("#  apply rule " ^ name));
+      let new_clauses = rule active_set c in
+      List.rev_append new_clauses acc)
+    [] rules
+
 (* helper that does one or zero superposition inference, with all
    the given parameters *)
 let do_superposition ~ord active_clause active_pos passive_clause passive_pos subst acc =

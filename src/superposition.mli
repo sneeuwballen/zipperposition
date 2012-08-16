@@ -31,15 +31,20 @@ exception Success of hclause
 (** inferences *)
 type inference_rule = ProofState.active_set -> clause -> conclusion list
 
-val infer_active : inference_rule  (* superposition where given clause is active *)
+(** perform the inferences in the list, returns the resulting clauses *)
+val do_inferences : ProofState.active_set
+                 -> (string * inference_rule) list (** named rules *)
+                 -> clause -> clause list
 
-val infer_passive : inference_rule (* superposition where given clause is passive *)
+val infer_active : inference_rule  (** superposition where given clause is active *)
+
+val infer_passive : inference_rule (** superposition where given clause is passive *)
 
 val infer_equality_resolution : inference_rule
 
 val infer_equality_factoring : inference_rule
 
-(* simplifications *)
+(** simplifications *)
 
 val is_tautology : clause -> bool
 

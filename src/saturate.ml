@@ -48,16 +48,6 @@ let inference_rules =
    ("equality_factoring", Sup.infer_equality_factoring);
    ]
 
-(** do inferences that involve the given clause *)
-let do_inferences active_set c = 
-  (* apply every inference rule *)
-  List.fold_left
-    (fun acc (name, rule) ->
-      Utils.debug 3 (lazy ("#  apply rule " ^ name));
-      let new_clauses = rule active_set c in
-      List.rev_append new_clauses acc)
-    [] inference_rules
-
 let given_clause_step state =
   let ord = state.PS.ord in
   (* select next given clause *)
@@ -91,8 +81,8 @@ let given_clause_step state =
       in
       (* do inferences w.r.t to the active set, and c itself *)
       let new_clauses = 
-        List.rev_append (do_inferences state.PS.active_set c)
-                        (do_inferences given_active_set c)
+        List.rev_append (Sup.do_inferences state.PS.active_set inference_rules c)
+                        (Sup.do_inferences given_active_set inference_rules c)
       in
       let new_clauses = List.map
         (fun c -> Sup.basic_simplify ~ord (C.normalize_clause ~ord c))

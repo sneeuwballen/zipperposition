@@ -65,8 +65,8 @@ val vars_of_term : foterm -> varlist          (** free variables in the term *)
 val is_ground_term : foterm -> bool           (** is the term ground? *)
 val merge_varlist : varlist -> varlist -> varlist (** set union of variable list *)
 
-val max_var : varlist -> int                  (** find the maximum variable index
-                                                  in the varlist *)
+val max_var : varlist -> int                  (** find the maximum variable index *)
+val min_var : varlist -> int
 
 val pp_symbol : Format.formatter -> symbol -> unit
 val pp_foterm: Format.formatter -> foterm -> unit

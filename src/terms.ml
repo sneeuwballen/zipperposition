@@ -166,6 +166,14 @@ let max_var vars =
   in
   aux 0 vars
 
+let min_var vars =
+  let rec aux idx = function
+  | [] -> idx
+  | ({node={term=Var i}}::vars) -> aux (min i idx) vars
+  | _::vars -> assert false
+  in
+  aux max_int vars
+
 let pp_symbol formatter s = Format.pp_print_string formatter s
 
 let rec pp_foterm_sort formatter ?(sort=false) t =
