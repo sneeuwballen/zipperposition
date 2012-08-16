@@ -120,10 +120,10 @@ let all_positions pos ctx t f =
         List.fold_left
         (fun (acc,pre,idx,post) t -> (* Invariant: pre @ [t] @ post = l *)
             let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
-            let acc = aux (idx :: pos) newctx t @ acc in (* append results to acc *)
+            let acc = (aux (pos @ [idx]) newctx t) @ acc in (* recurse in subterm *)
             if post = [] then acc, l, idx, []
             else acc, pre @ [t], idx+1, List.tl post)
-        (f t pos ctx (* apply f to t *), [], 1, List.tl l) l
+        (f t pos ctx (* apply f to t *), [], 0, List.tl l) l
       in
       acc
   in
@@ -250,22 +250,24 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
 let infer_active_ actives clause =
   let ord = actives.PS.a_ord
   and lits_pos = Utils.list_pos clause.clits in
-  (* do the inferences where clause is active *)
+  (* do the inferences where clause is active; for this,
+     we try to rewrite conditionally other clauses using
+     non-minimal sides of every positive literal *)
   fold_positive ~both:true
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
       let subterm_idx = actives.PS.idx.I.subterm_index in
       let unifiables = I.DT.retrieve_unifiables subterm_idx s in
-      let new_clauses = HExtlib.flatten_map
-        (fun (hc, u_pos, u_p) ->
+      I.ClauseSet.fold
+        (fun (hc, u_pos, u_p) acc ->
           try (* rewrite u_p with s, if they are unifiable *)
             let subst = Unif.unification s u_p in
-            do_superposition ~ord clause s_pos hc.node u_pos subst
+            (do_superposition ~ord clause s_pos hc.node u_pos subst) @ acc
           with
-            UnificationFailure _ -> [])
-        (I.ClauseSet.elements unifiables)
-      in new_clauses @ acc)
-  [] lits_pos
+            UnificationFailure _ -> acc)
+        unifiables acc
+    )
+    [] lits_pos
 
 let infer_active actives clause =
   prof_infer_active.HExtlib.profile (infer_active_ actives) clause
@@ -279,23 +281,21 @@ let infer_passive_ actives clause =
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
       let ctx x = x in
-      let new_clauses = all_positions u_pos ctx u
+      all_positions u_pos ctx u
         (fun u_p p ctx ->
           (* u at position p is u_p *)
           let root_idx = actives.PS.idx.I.root_index in
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p *)
           let unifiables = I.DT.retrieve_unifiables root_idx u_p in
-          let new_clauses = HExtlib.flatten_map
-            (fun (hc, s_pos, s) ->
+          I.ClauseSet.fold
+            (fun (hc, s_pos, s) acc ->
               try
                 let subst = Unif.unification s u_p in
-                do_superposition ~ord hc.node s_pos clause u_pos subst
+                (do_superposition ~ord hc.node s_pos clause p subst) @ acc
               with
                 UnificationFailure _ -> [])
-            (I.ClauseSet.elements unifiables)
-          in new_clauses)
-      in new_clauses @ acc
+            unifiables acc)
     )
     [] lits_pos
 
@@ -505,7 +505,10 @@ let basic_simplify ~ord clause =
   let new_lits = er new_lits in
   C.mk_clause new_lits clause.cproof
 
-let subsumes a b = false (* TODO *)
+let subsumes a b =
+  if List.length a.clits > List.length b.clits then false else false (* TODO *)
+  
+
 let subsumed_by_set set clause = false (* TODO *)
 let subsumed_in_set set clause = [] (* TODO *)
 let orphan_murder set clause = set (* TODO *)
