@@ -108,6 +108,12 @@ let print_stats state =
   print_hashcons_stats "clauses" (C.H.stats C.clauses);
   print_state_stats (PS.stats state)
 
+(** setup an alarm for abrupt stop *)
+let setup_alarm timeout =
+  let handler s = (Printf.printf "# SZS Status ResourceOut\n"; raise Exit) in
+  ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
+  Unix.alarm (max 1 (int_of_float timeout))
+
 let () =
   (* parse arguments *)
   let params = parse_args () in
@@ -116,6 +122,7 @@ let () =
                     Some params.param_steps)
   and timeout = if params.param_timeout = 0.
     then None else (Format.printf "# run for %f s@." params.param_timeout;
+                    ignore (setup_alarm params.param_timeout);
                     Some (Unix.gettimeofday() +. params.param_timeout)) in
   (* parse file *)
   let f = List.hd params.param_files in
