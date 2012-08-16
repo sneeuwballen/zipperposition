@@ -1,0 +1,29 @@
+%------------------------------------------------------------------------------
+% File     : PUZ034+3 : TPTP v5.2.0. Bugfixed v4.1.0.
+% Domain   : Puzzles
+% Problem  : N queens problem
+% Version  : Especial : Augmented > Especial.
+% English  : The problem is to show that the N-queens problem has the variable
+%            variable symmetry property.
+
+% Refs     : [Bau08] Baumgartner (2008), Email to G. Sutcliffe
+%          : [BS09]  Baumgartner & Slaney (2009), Constraint Modelling: A C
+% Source   : [Bau08]
+% Names    :
+
+% Status   : Theorem
+% Rating   : 0.70 v4.0.1, 0.74 v4.0.0
+% Syntax   : Number of formulae    :   10 (   2 unit)
+%            Number of atoms       :   37 (  13 equality)
+%            Maximal formula depth :   10 (   5 average)
+%            Number of connectives :   33 (   6 ~  ;   0  |;  16  &)
+%                                         (   3 <=>;   8 =>;   0 <=)
+%                                         (   0 <~>;   0 ~|;   0 ~&)
+%            Number of predicates  :    4 (   2 propositional; 0-2 arity)
+%            Number of functors    :    8 (   2 constant; 0-2 arity)
+%            Number of variables   :   21 (   0 singleton;  21 !;   0 ?)
+%            Maximal term depth    :    3 (   2 average)
+
+% Comments : Symmetry reduced in this version.
+% Bugfixes : v4.1.0 - Renamed to PUZ133+1
+%------------------------------------------------------------------------------

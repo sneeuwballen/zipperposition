@@ -1,0 +1,2 @@
+
+fof(ax_logic_a, axiom, ! [X,Y] : t(i(X,i(Y,X)))).

@@ -1,0 +1,2 @@
+
+fof(ax_b, axiom, ! [X] : f(a,X) = X).

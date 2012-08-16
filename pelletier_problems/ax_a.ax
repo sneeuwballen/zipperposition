@@ -1,0 +1,2 @@
+
+fof(ax_a, axiom, ! [X,Y,Z] : f(f(X,Y),Z) = f(X,f(Y,Z))).
