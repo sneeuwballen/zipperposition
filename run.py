@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python2.7
 
 """A script used to run provers against problem files,
 collect results into a sqlite database and perform some
@@ -280,7 +280,7 @@ def parse_args(args):
         epilog="".join(list_commands()),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", help="the command to run")
-    parser.add_argument("files", nargs="+", help="files to run the provers on")
+    parser.add_argument("files", nargs="*", help="files to run the provers on")
     parser.add_argument("-j", dest="cores", type=int, default=1, help="number of cores used")
     args = parser.parse_args(args=args)
     return args
