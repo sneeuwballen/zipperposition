@@ -16,3 +16,4 @@ tags
 .session
 .subdirtouch
 src/main.docdir
+provers_output.db
