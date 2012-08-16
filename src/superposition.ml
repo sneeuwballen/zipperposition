@@ -212,7 +212,7 @@ let get_equations_sides clause pos = match pos with
 
 (* helper that does one or zero superposition inference, with all
    the given parameters *)
-let do_superposition ~ord active_clause active_pos passive_clause passive_pos subst =
+let do_superposition ~ord active_clause active_pos passive_clause passive_pos subst acc =
   assert (List.length active_pos = 2);
   assert ((Utils.list_inter T.eq_foterm active_clause.cvars passive_clause.cvars) = []);
   match passive_pos with
@@ -224,7 +224,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   Utils.debug 3 (lazy (Utils.sprintf "@[<h>sup s=%a t=%a u=%a v=%a p=%a subst=%a@]"
                        T.pp_foterm s T.pp_foterm t T.pp_foterm u T.pp_foterm v
                        C.pp_pos passive_pos (S.pp_substitution ~sort:false) subst));
-  if not sign_st then []
+  if not sign_st then acc
   else begin
     assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
                         (S.apply_subst subst s));
@@ -232,7 +232,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         ord#compare (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
         not (check_maximal_lit ~ord active_clause active_idx subst) ||
         not (check_maximal_lit ~ord passive_clause passive_idx subst))
-      then []
+      then acc
       else (* ordering constraints are ok *)
         let new_lits = Utils.list_remove active_clause.clits active_idx in
         let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
@@ -244,7 +244,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
         let new_clause = C.mk_clause new_lits proof in
-        [new_clause]
+        new_clause :: acc
   end
 
 let infer_active_ actives clause =
@@ -262,7 +262,7 @@ let infer_active_ actives clause =
         (fun (hc, u_pos, u_p) acc ->
           try (* rewrite u_p with s, if they are unifiable *)
             let subst = Unif.unification s u_p in
-            (do_superposition ~ord clause s_pos hc.node u_pos subst) @ acc
+            do_superposition ~ord clause s_pos hc.node u_pos subst acc
           with
             UnificationFailure _ -> acc)
         unifiables acc
@@ -292,7 +292,7 @@ let infer_passive_ actives clause =
             (fun (hc, s_pos, s) acc ->
               try
                 let subst = Unif.unification s u_p in
-                (do_superposition ~ord hc.node s_pos clause p subst) @ acc
+                do_superposition ~ord hc.node s_pos clause p subst acc
               with
                 UnificationFailure _ -> [])
             unifiables acc)

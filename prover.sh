@@ -11,6 +11,6 @@ PROVER="./src/main.native"
 
 echo "# run prover $PROVER"
 shift
-OCAMLRUNPARAM="b,$OCAMLRUNPARAM" "$PROVER" "$TMPFILE" $@
+OCAMLRUNPARAM="b,l=5M,$OCAMLRUNPARAM" "$PROVER" "$TMPFILE" $@
 
 trap 'echo "# clean up $TMPFILE" && rm -f "$TMPFILE"' EXIT

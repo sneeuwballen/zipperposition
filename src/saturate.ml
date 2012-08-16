@@ -51,11 +51,12 @@ let inference_rules =
 (** do inferences that involve the given clause *)
 let do_inferences state c = 
   let active_set = state.PS.active_set in
-  HExtlib.flatten_map
-    (fun (name, rule) ->
+  List.fold_left
+    (fun acc (name, rule) ->
       Utils.debug 3 (lazy ("#  apply rule " ^ name));
-      rule active_set c)
-    inference_rules
+      let new_clauses = rule active_set c in
+      List.rev_append new_clauses acc)
+    [] inference_rules
 
 let given_clause_step state =
   let ord = state.PS.ord in
@@ -110,7 +111,7 @@ let given_clause_step state =
       (* the simplified active clauses are removed from active set and
          added to the set of new clauses *)
       let active_set = {active_set with PS.active_clauses = bag_remain } in
-      let new_clauses = !simplified_actives @ new_clauses in
+      let new_clauses = List.rev_append !simplified_actives new_clauses in
       (* only keep clauses that are not already in active_set *)
       let new_clauses =
         List.filter

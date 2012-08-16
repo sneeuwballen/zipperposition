@@ -54,17 +54,18 @@ module FotermIndexable = struct
 
   (* convert into a path string *)
   let path_string_of t =
-    let rec aux arity t = match t.node.term with
-      | Leaf a -> [Constant (a, arity)]
-      | Var i -> (* assert (arity = 0); *) [Variable]
+    let rec aux arity t acc = match t.node.term with
+      | Leaf a -> (Constant (a, arity)) :: acc
+      | Var i -> (* assert (arity = 0); *) Variable :: acc
       | Node ([] | [ _ ] )
       (* FIXME : should this be allowed or not ? *)
       | Node ({node={term=Var _}}::_)
       | Node ({node={term=Node _}}::_) -> assert false
       | Node (hd::tl) ->
-          aux (List.length tl) hd @ List.flatten (List.map (aux 0) tl) 
+          let acc = aux (List.length tl) hd acc in
+          List.fold_left (fun acc t -> aux 0 t acc) acc tl
     in 
-      aux 0 t
+    List.rev (aux 0 t [])
 
   (* compare two path string elements *)
   let compare e1 e2 = 
