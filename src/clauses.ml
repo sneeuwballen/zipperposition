@@ -55,7 +55,6 @@ let string_of_comparison = function
   | Incomparable -> "=?="
   | Invertible -> "=<->="
 
-
 let pp_literal ?(sort=false) formatter lit =
   let pp_foterm = T.pp_foterm_sort ~sort in
   match lit with
@@ -73,7 +72,6 @@ let pp_literal ?(sort=false) formatter lit =
         pp_foterm left pp_foterm T.eq_term pp_foterm right
     else fprintf formatter "@[<hv 2>%a !%a@ %a@]"
         pp_foterm left pp_foterm T.eq_term pp_foterm right
-
 
 let opposite_pos p = match p with
   | _ when p = left_pos -> right_pos

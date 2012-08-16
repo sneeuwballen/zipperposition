@@ -170,12 +170,33 @@ let rec fold_positive ?(both=true) f acc lits =
 let rec fold_negative ?(both=true) f acc lits =
   fold_lits ~pos:false ~neg:true f acc lits
 
-(** compare literals as multisets of multisets of terms
-    TODO maybe handcode it to make it more efficient? *)
+(** compare literals as multisets of multisets of terms *)
 let compare_lits_partial ~ord l1 l2 =
-  let m1 = C.lit_to_multiset l1
-  and m2 = C.lit_to_multiset l2 in
-  Utils.multiset_partial (Utils.multiset_partial ord#compare) m1 m2
+  match l1, l2 with
+  | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
+    let s_u = ord#compare s u
+    and s_v = ord#compare s v
+    and t_u = ord#compare t u
+    and t_v = ord#compare t v in
+    match s_u, s_v, t_u, t_v, sign_uv, sign_st with
+    | Eq, _, _, Eq, _, _
+    | _, Eq, Eq, _, _, _ ->
+      if sign_st = sign_uv then Eq
+      else if sign_st then Lt
+      else (assert sign_uv; Gt)
+    | Gt, Gt, _, _, _, _        (* s dominates *)
+    | _, _, Gt, Gt, _, _ -> Gt  (* t dominates *)
+    | Gt, Eq, _, _, false, true (* s = v & s > u *)
+    | Eq, Gt, _, _, false, true (* s = u & s > v *)
+    | _, _, Gt, Eq, false, true (* t = v & t > u *)
+    | _, _, Eq, Gt, false, true -> Gt (* t = u & t > v *)
+    | Lt, _, Lt, _, _, _        (* u dominates *)
+    | _, Lt, _, Lt, _, _ -> Lt  (* v dominates *)
+    | Eq, _, Lt, _, true, false (* s = u, t < u *)
+    | Lt, _, Eq, _, true, false (* t = u, s < u *)
+    | _, Eq, _, Lt, true, false (* s = v, t < v *)
+    | _, Lt, _, Eq, true, false -> Lt (* t = v, s < v *)
+    | _ -> Incomparable
 
 (** check that the literal subst(clause[i]) is maximal in subst(clause) *)
 let check_maximal_lit_ ~ord clause pos subst =
@@ -452,7 +473,7 @@ let demodulate_ active_set blocked_ids clause =
   let new_lits, clauses = iterate_lits 0 clause.clits [] [] in
   if try List.for_all2 C.eq_literal clause.clits new_lits with Invalid_argument _ -> false
     (* if the literals are the same, no simplification occurred *)
-    then clause 
+    then clause
     (* add the initial clause itself (without pos or subst, too complicated) to
        the proof before returning the simplified clause *)
     else
@@ -507,7 +528,7 @@ let basic_simplify ~ord clause =
 
 let subsumes a b =
   if List.length a.clits > List.length b.clits then false else false (* TODO *)
-  
+
 
 let subsumed_by_set set clause = false (* TODO *)
 let subsumed_in_set set clause = [] (* TODO *)

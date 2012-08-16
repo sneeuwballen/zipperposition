@@ -49,8 +49,8 @@ let inference_rules =
    ]
 
 (** do inferences that involve the given clause *)
-let do_inferences state c = 
-  let active_set = state.PS.active_set in
+let do_inferences active_set c = 
+  (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
       Utils.debug 3 (lazy ("#  apply rule " ^ name));
@@ -81,8 +81,19 @@ let given_clause_step state =
     else begin
       Utils.debug 1 (lazy (Format.sprintf "# *** step with given clause %s"
                     (Utils.on_buffer C.pp_clause c)));
-      (* do inferences *)
-      let new_clauses = do_inferences state c in
+      (* an active set containing only the given clause *)
+      let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
+      (* then rename c *)
+      let c, _ =
+        let maxvar = max (state.PS.active_set.PS.active_clauses.C.bag_maxvar)
+                         (given_active_set.PS.active_clauses.C.bag_maxvar) in
+        C.fresh_clause ~ord maxvar c
+      in
+      (* do inferences w.r.t to the active set, and c itself *)
+      let new_clauses = 
+        List.rev_append (do_inferences state.PS.active_set c)
+                        (do_inferences given_active_set c)
+      in
       let new_clauses = List.map
         (fun c -> Sup.basic_simplify ~ord (C.normalize_clause ~ord c))
         new_clauses in

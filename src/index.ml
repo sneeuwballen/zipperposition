@@ -65,6 +65,8 @@ module FotermIndexable = struct
           let acc = aux (List.length tl) hd acc in
           List.fold_left (fun acc t -> aux 0 t acc) acc tl
     in 
+    (* we build the path in reverse order because it should be faster,
+       only two lists have to be built, and rev is tailrec *)
     List.rev (aux 0 t [])
 
   (* compare two path string elements *)

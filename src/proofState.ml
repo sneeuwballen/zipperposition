@@ -94,19 +94,32 @@ let next_passive_clause passive_set =
   in try_queue passive_set first_idx first_weight
 
 let add_active active_set c =
-  let new_bag, hc = C.add_to_bag active_set.active_clauses c in
-  let new_idx = I.index_clause active_set.idx hc in
-  {active_set with active_clauses=new_bag; idx=new_idx}, hc
+  let hc = C.hashcons_clause c in
+  if C.is_in_bag active_set.active_clauses hc.tag
+    then active_set, hc  (* already in active set *)
+    else
+      let new_bag = C.add_hc_to_bag active_set.active_clauses hc in
+      let new_idx = I.index_clause active_set.idx hc in
+      {active_set with active_clauses=new_bag; idx=new_idx}, hc
 
 let add_actives active_set l =
   List.fold_left (fun b c -> fst (add_active b c)) active_set l
+
+let singleton_active_set ~ord clause =
+  let active_set = {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty} in
+  let active_set, hc = add_active active_set clause in
+  active_set
   
 let add_passive passive_set c =
-  let new_bag, hc = C.add_to_bag passive_set.passive_clauses c in
-  let new_queues = List.map
-    (fun (q,weight) -> q#add hc, weight)
-    passive_set.queues in
-  {passive_set with passive_clauses=new_bag; queues=new_queues}, hc
+  let hc = C.hashcons_clause c in
+  if C.is_in_bag passive_set.passive_clauses hc.tag
+    then passive_set, hc  (* already in passive set *)
+    else
+      let new_bag = C.add_hc_to_bag passive_set.passive_clauses hc in
+      let new_queues = List.map
+        (fun (q,weight) -> q#add hc, weight)
+        passive_set.queues in
+      {passive_set with passive_clauses=new_bag; queues=new_queues}, hc
 
 let add_passives passive_set l =
   List.fold_left (fun b c -> fst (add_passive b c)) passive_set l
