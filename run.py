@@ -12,6 +12,7 @@ import re
 import sqlite3
 import sys
 import time
+import argparse
 
 from subprocess import Popen, PIPE
 
@@ -45,12 +46,13 @@ provers_sat = {
 class Run(object):
     """Contains everything needed for running benchmarks."""
 
-    def __init__(self, db_name):
+    def __init__(self, db_name, cores=1):
         """Initializes with the given db file name. It opens a
         sqlite connection to the given file.
         """
         self.db_name = db_name
         self.conn = sqlite3.connect(db_name, isolation_level = None)
+        self.cores = cores
         try:
             # create table
             create_query =  """create table results (id integer primary key asc, filename varchar2(200),
@@ -102,7 +104,8 @@ class Run(object):
 
     @command
     def solve_using(self, prover, *filenames):
-        "solve the files using the given prover"
+        """solve the files using the given prover"""
+        # TODO use the self.cores argument to run those in parallel
         rows = []
         for filename in filenames:
             result, t = self.solve_with(filename, prover)
@@ -113,6 +116,7 @@ class Run(object):
     @command
     def solve(self, *filenames):
         "run all provers against the given files"
+        # TODO use the self.cores argument to run those in parallel
         for filename in filenames:
             results = []
             print "-" * 70
@@ -260,23 +264,33 @@ class Run(object):
         for p in provers.keys():
             print '  ', p
 
-    @command
-    def help(self):
-        "print this help"
-        print "usage: run.py cmd [arg...]"
-        print "available commands:"
-        for cmd in sorted(commands):
-            fun = getattr(self, cmd)
-            print "  %-15s %s" % (cmd, getattr(fun, '__doc__', ''))
+def list_commands():
+    "list commands"
+    l = []
+    for cmd in sorted(commands):
+        fun = getattr(Run, cmd)
+        l.append("  %-15s %s\n" % (cmd, getattr(fun, '__doc__', '')))
+    return l
 
+def parse_args(args):
+    """Parse the CLI arguments."""
+    parser = argparse.ArgumentParser(
+        description="A script to run provers against files, "\
+        "and store results in a database",
+        epilog="".join(list_commands()),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("command", help="the command to run")
+    parser.add_argument("files", nargs="+", help="files to run the provers on")
+    parser.add_argument("-j", dest="cores", type=int, default=1, help="number of cores used")
+    args = parser.parse_args(args=args)
+    return args
 
 if __name__ == "__main__":
-    run = Run(db_name = DB_FILE)
-    if len(sys.argv) == 1 or sys.argv[1] not in commands:
-        run.help()
-        sys.exit(1)
-    cmd = sys.argv[1]
-    fun = getattr(run, cmd)
-    fun(* sys.argv[2:])
+    # parse arguments
+    args = parse_args(sys.argv[1:])
+    # do actions
+    run = Run(db_name = DB_FILE, cores=args.cores)
+    fun = getattr(run, args.command)
+    fun(* args.files)
 
 # vim:foldnestmax=2:shiftwidth=4
