@@ -40,7 +40,7 @@ module LH = Leftistheap
 
 type clause_ord = hclause LH.ordered
 
-(* generic clause queue based on some ordering on clauses *)
+(** generic clause queue based on some ordering on clauses *)
 class hq (ord : clause_ord) (name : string) : queue =
   object
     val heap = new LH.leftistheap ord
@@ -64,7 +64,6 @@ class hq (ord : clause_ord) (name : string) : queue =
     method name = name
   end
 
-(* select by increasing age (for fairness) *)
 let fifo ~ord =
   let clause_ord =
     object
@@ -73,7 +72,6 @@ let fifo ~ord =
   and name = "fifo_queue" in
   new hq clause_ord name
 
-(* select by increasing weight of clause *)
 let clause_weight ~ord =
   let clause_ord =
     object
@@ -85,10 +83,53 @@ let clause_weight ~ord =
   and name = "clause_weight" in
   new hq clause_ord name
   
+let prefer_goals ~ord =
+  (** count the number of goals (negative literals) of the clause *)
+  let count_goals clause =
+    List.fold_left (fun num lit ->
+      match lit with
+      | Equation (_,_,false,_) -> num+1
+      | _ -> num)
+    0 clause.clits
+  in
+  let clause_ord =
+    object
+      method le hc1 hc2 =
+        let goals1 = count_goals hc1.node
+        and goals2 = count_goals hc2.node
+        and w1 = ord#compute_clause_weight hc1.node
+        and w2 = ord#compute_clause_weight hc2.node in
+        (* lexicographic comparison that favors clauses with more goals,
+           and then clauses with small weight *)
+        (Utils.lexicograph compare [-goals1; w1] [-goals2; w2]) <= 0
+    end
+  and name = "prefer_goals" in
+  new hq clause_ord name
+
+let prefer_pos_unit_clauses ~ord =
+  let is_unit_pos c = match c.clits with
+  | [Equation (_,_,true,_)] -> 0
+  | _ -> 1
+  in
+  let clause_ord =
+    object
+      method le hc1 hc2 =
+        let is_unit1 = is_unit_pos hc1.node
+        and is_unit2 = is_unit_pos hc2.node
+        and w1 = ord#compute_clause_weight hc1.node
+        and w2 = ord#compute_clause_weight hc2.node in
+        (* lexicographic comparison that favors clauses with more goals,
+           and then clauses with small weight *)
+        (Utils.lexicograph compare [is_unit1; w1] [is_unit2; w2]) <= 0
+    end
+  and name = "prefer_pos_unit_clauses" in
+  new hq clause_ord name
 
 let default_queues ~ord =
   [ (clause_weight ~ord, 5);
-    (fifo ~ord, 2);
+    (prefer_goals ~ord, 1);
+    (prefer_pos_unit_clauses ~ord, 1);
+    (fifo ~ord, 1);
   ]
 
 let pp_queue formatter q =

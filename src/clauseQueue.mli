@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-(* a queue of clauses, as a pure object *)
+(** A priority queue of clauses, purely functional *)
 class type queue =
   object
     method add : hclause -> queue
@@ -32,13 +32,19 @@ class type queue =
     method name : string
   end
 
-(* select by increasing age (for fairness) *)
+(** select by increasing age (for fairness) *)
 val fifo : ord:ordering -> queue
 
-(* select by increasing weight of clause *)
+(** select by increasing weight of clause *)
 val clause_weight : ord:ordering -> queue
 
-(* default combination of heuristics *)
+(** favor goals *)
+val prefer_goals : ord:ordering -> queue
+
+(** favor positive unit clauses *)
+val prefer_pos_unit_clauses : ord:ordering -> queue
+
+(** default combination of heuristics *)
 val default_queues : ord:ordering -> (queue * int) list
 
 val pp_queue : Format.formatter -> queue -> unit
