@@ -104,9 +104,9 @@ let given_clause_step state =
       let bag_remain, bag_simplified = C.partition_bag
         active_set.PS.active_clauses
         (fun hc ->
-          (* try to simplify hc using the active set *)
-          let renamed = PS.relocate_active active_set hc.node in
-          let simplified = Sup.demodulate active_set [hc.tag] renamed in
+          (* try to simplify hc using the given clause *)
+          let renamed = PS.relocate_active given_active_set hc.node in
+          let simplified = Sup.demodulate given_active_set [hc.tag] renamed in
           if C.eq_clause simplified renamed
             then true
             else begin
