@@ -110,7 +110,12 @@ let print_stats state =
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
-  let handler s = (Printf.printf "%% SZS Status ResourceOut\n"; raise Exit) in
+  let handler s =
+    begin
+      Printf.printf "%% SZS Status ResourceOut\n";
+      Unix.kill (Unix.getpid ()) Sys.sigterm
+    end
+  in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
 
@@ -123,7 +128,7 @@ let () =
   and timeout = if params.param_timeout = 0.
     then None else (Format.printf "%% run for %f s@." params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
-                    Some (Unix.gettimeofday() +. params.param_timeout)) in
+                    Some (Unix.gettimeofday() +. params.param_timeout -. 0.25)) in
   (* parse file *)
   let f = List.hd params.param_files in
   Printf.printf "%% process file %s\n" f;
