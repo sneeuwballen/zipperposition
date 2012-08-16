@@ -27,7 +27,12 @@ You will need ocaml (3.12 or higher works; 3.11 or lower may work, I did not tes
 
     make
 
-It should build files. Then
+It should build files (using ocamlbuild).
+
+
+## Use
+
+Typical usage:
 
     ./prover3.sh problem_file [options]
 
@@ -38,3 +43,11 @@ or
 to run the prover. Help is available with the option *-help*. The scripts `prover3.sh`
 and `prover.sh` call the external prover [E](http://eprover.org) for reduction to CNF;
 the former is for [TPTP3](http://tptp.org) syntax, and the latter for old TPTP syntax.
+
+For instance,
+
+    ./prover3.sh pelletier_problems/pb23.p -timeout 5
+
+
+*Disclaimer*: Note that the prover is currently an early prototype and is
+likely not correct nor complete.
