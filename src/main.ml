@@ -97,12 +97,12 @@ let parse_file f =
 (** print stats *)
 let print_stats state =
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
-    Printf.printf "# hashcons stats for %s: size %d, num %d, sum length %d, buckets: small %d, median %d, big %d\n"
+    Printf.printf "%% hashcons stats for %s: size %d, num %d, sum length %d, buckets: small %d, median %d, big %d\n"
       what sz num sum_length small median big
   and print_state_stats stats =
-    Printf.printf "# proof state stats:\n";
-    Printf.printf "#   active clauses   %d\n" stats.PS.stats_active_clauses;
-    Printf.printf "#   passive clauses  %d\n" stats.PS.stats_passive_clauses
+    Printf.printf "%% proof state stats:\n";
+    Printf.printf "%%   active clauses   %d\n" stats.PS.stats_active_clauses;
+    Printf.printf "%%   passive clauses  %d\n" stats.PS.stats_passive_clauses
   in
   print_hashcons_stats "terms" (T.H.stats T.terms);
   print_hashcons_stats "clauses" (C.H.stats C.clauses);
@@ -110,7 +110,7 @@ let print_stats state =
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
-  let handler s = (Printf.printf "# SZS Status ResourceOut\n"; raise Exit) in
+  let handler s = (Printf.printf "%% SZS Status ResourceOut\n"; raise Exit) in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
 
@@ -118,34 +118,34 @@ let () =
   (* parse arguments *)
   let params = parse_args () in
   let steps = if params.param_steps = 0
-    then None else (Format.printf "# run for %d steps@." params.param_steps;
+    then None else (Format.printf "%% run for %d steps@." params.param_steps;
                     Some params.param_steps)
   and timeout = if params.param_timeout = 0.
-    then None else (Format.printf "# run for %f s@." params.param_timeout;
+    then None else (Format.printf "%% run for %f s@." params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
                     Some (Unix.gettimeofday() +. params.param_timeout)) in
   (* parse file *)
   let f = List.hd params.param_files in
-  Printf.printf "# process file %s\n" f;
+  Printf.printf "%% process file %s\n" f;
   let clauses, _ = parse_file f in
-  Printf.printf "# parsed %d clauses\n" (List.length clauses);
+  Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* choose an ord now *)
   let ord = params.param_ord () in  (* using current signature *)
-  Format.printf "# signature: %a@." T.pp_signature ord#symbol_ordering#signature;
+  Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   let clauses = List.map (C.reord_clause ~ord) clauses in
   (* create a state, with clauses added to passive_set *)
   let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   (* saturate *)
   let state, result, num = Sat.given_clause ?steps ?timeout state in
-  Printf.printf "# ===============================================\n";
-  Printf.printf "# done %d iterations\n" num;
+  Printf.printf "%% ===============================================\n";
+  Printf.printf "%% done %d iterations\n" num;
   print_stats state;
   match result with
-  | Sat.Sat -> Printf.printf "# SZS status CounterSatisfiable\n"
-  | Sat.Unknown | Sat.Timeout -> Printf.printf "# SZS status ResourceOut\n"
-  | Sat.Error s -> Printf.printf "error occurred: %s\n" s
+  | Sat.Sat -> Printf.printf "%% SZS status CounterSatisfiable\n"
+  | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
+  | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
   | Sat.Unsat c ->
       (* print status then proof *)
-      Printf.printf "# SZS status Theorem\n";
+      Printf.printf "%% SZS status Theorem\n";
       Format.printf "proof: @[<v>%a@]@." C.pp_proof_rec c.node

@@ -4,13 +4,13 @@
 
 TMPFILE=$(mktemp /tmp/proverXXXXX)
 
-echo "# clausify into $TMPFILE"
+echo "% clausify into $TMPFILE"
 eprover --cnf --tptp-in --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
 
 PROVER="./src/main.native"
 
-echo "# run prover $PROVER"
+echo "% run prover $PROVER"
 shift
-OCAMLRUNPARAM="b,l=5M,$OCAMLRUNPARAM" "$PROVER" "$TMPFILE" $@
+OCAMLRUNPARAM="l=5M,$OCAMLRUNPARAM" "$PROVER" "$TMPFILE" $@
 
-trap 'echo "# clean up $TMPFILE" && rm -f "$TMPFILE"' EXIT
+trap 'echo "% clean up $TMPFILE" && rm -f "$TMPFILE"' EXIT
