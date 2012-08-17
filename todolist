@@ -3,4 +3,3 @@
 - subsumption (backward and forward)
 - improve efficiency of trie by replacing map by array
     (better for small maps with unfrequent updates)
-- use Sys.signal and Unix.alarm to interrupt abruptly the process when -timeout is given
