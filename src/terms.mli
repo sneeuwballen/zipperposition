@@ -28,7 +28,15 @@ val str_to_sym : string -> symbol
 val bool_sort : sort
 val univ_sort : sort
 val true_symbol : symbol
+val false_symbol : symbol
 val eq_symbol : symbol
+
+module SymbolSet : Set.S with type elt = symbol
+
+(** symbols with multiset status *)
+val multiset_symbols : SymbolSet.t
+(** infix symbols *)
+val infix_symbols : SymbolSet.t
 
 module H : Hashcons.S with type key = typed_term
 val terms : H.t
@@ -49,6 +57,7 @@ val hd_symbol : foterm -> symbol option       (** the head of the term *)
 
 val eq_term : foterm                          (** equality symbol *)
 val true_term : foterm                        (** tautology symbol *)
+val false_term : foterm                       (** antilogy symbol *)
 
 val member_term : foterm -> foterm -> bool    (** [a] [b] checks if a subterm of b *)
 val eq_foterm : foterm -> foterm -> bool      (** standard equality on terms *)

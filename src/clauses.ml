@@ -322,16 +322,16 @@ let pp_clause_pos_subst formatter (c, pos, subst) =
 let pp_proof ~subst formatter p =
   match p with
   | Axiom (f, s) -> fprintf formatter "axiom %s in %s" s f
-  | Proof (rule, premisses) ->
+  | Proof (rule, premises) ->
     if subst
     then
       fprintf formatter "%s with@ %a" rule
         (Utils.pp_list ~sep:", " pp_clause_pos_subst)
-        premisses
+        premises
     else
       fprintf formatter "%s with@ %a" rule
         (Utils.pp_list ~sep:", " pp_clause_pos)
-        (List.map (fun (c, pos, subst) -> (c, pos)) premisses)
+        (List.map (fun (c, pos, subst) -> (c, pos)) premises)
 
 let pp_clause_proof formatter clause =
   fprintf formatter "@[<hov 2>%a  <--- @[<hv>%a@]@]@;"
@@ -341,12 +341,12 @@ let rec pp_proof_rec formatter clause =
   pp_clause_proof formatter clause;
   match Lazy.force clause.cproof with
   | Axiom _ -> ()
-  | Proof (_, premisses) ->
-      (* print premisses recursively *)
+  | Proof (_, premises) ->
+      (* print premises recursively *)
       List.iter
         (fun (c, pos, subst) ->
             pp_proof_rec formatter c)
-        premisses
+        premises
 
 let pp_tstp_clause formatter clause =
   match clause.clits with
@@ -361,14 +361,14 @@ let rec pp_tstp_proof formatter clause =
   | Axiom (f, ax_name) ->
     fprintf formatter "@[<h>cnf(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
       hc.tag pp_tstp_clause clause f ax_name
-  | Proof (name, premisses) ->
-    let premisses_idx = List.map (fun (c,_,_) -> (hashcons_clause c).tag) premisses in
+  | Proof (name, premises) ->
+    let premises_idx = List.map (fun (c,_,_) -> (hashcons_clause c).tag) premises in
     (* print the inference *)
     fprintf formatter ("@[<h>cnf(%d, derived, %a,@ " ^^
                        "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
-      hc.tag pp_tstp_clause clause name (Utils.pp_list ~sep:"," pp_print_int) premisses_idx;
+      hc.tag pp_tstp_clause clause name (Utils.pp_list ~sep:"," pp_print_int) premises_idx;
     (* print every premisse *)
-    List.iter (fun (c,_,_) -> pp_tstp_proof formatter c) premisses
+    List.iter (fun (c,_,_) -> pp_tstp_proof formatter c) premises
   
 
 (*

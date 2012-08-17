@@ -26,11 +26,26 @@ module Utils = FoUtils
 let str_to_sym s = s
 
 (* some special sorts *)
-let bool_sort = "Bool"
-let univ_sort = "U"
+let bool_sort = "$$Bool"
+let univ_sort = "$$U"
 let eq_symbol = "="
 let true_symbol = "$true"
+let false_symbol = "$false"
 
+module SymbolSet = Set.Make(
+  struct
+    type t = symbol
+    let compare = Pervasives.compare
+  end)
+
+let build_set symbols =
+  List.fold_left
+    (fun s symb -> SymbolSet.add symb s)
+    SymbolSet.empty symbols
+
+let multiset_symbols = build_set [eq_symbol]
+
+let infix_symbols = build_set [eq_symbol]
 
 (* hashconsing for terms *)
 module H = Hashcons.Make(struct
@@ -117,9 +132,9 @@ let hd_symbol t = match hd_term t with
   | Some ({node={term=Leaf s}}) -> Some s
   | Some _ -> assert false
 
-let eq_term = mk_leaf eq_symbol bool_sort     (* equality symbol *)
-
-let true_term = mk_leaf true_symbol bool_sort (* tautology symbol *)
+let eq_term = mk_leaf eq_symbol bool_sort
+let true_term = mk_leaf true_symbol bool_sort
+let false_term = mk_leaf false_symbol bool_sort
 
 let rec member_term a b = a == b || match b.node.term with
   | Leaf _ | Var _ -> false
