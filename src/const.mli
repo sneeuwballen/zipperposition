@@ -22,3 +22,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 exception FOF of bool
 exception PARSE_ERROR
+
+(** name of the file being parsed *)
+val cur_filename : string ref

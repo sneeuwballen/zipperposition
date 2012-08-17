@@ -272,7 +272,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let new_lits = (C.mk_lit ~ord new_u v sign_uv) :: new_lits in
         (* apply substitution *)
         let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-        let rule = if sign_uv then "superposition right" else "superposition left" in
+        let rule = if sign_uv then "superposition_right" else "superposition_left" in
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
         let new_clause = C.mk_clause new_lits proof in
@@ -347,7 +347,7 @@ let infer_equality_resolution_ actives clause =
         if check_maximal_lit ~ord clause pos subst
           (* subst(lit) is maximal, we can do the inference *)
           then
-            let proof = lazy (Proof ("equality resolution", [clause, [pos], subst]))
+            let proof = lazy (Proof ("equality_resolution", [clause, [pos], subst]))
             and new_lits = Utils.list_remove clause.clits pos in
             let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
             let new_clause = C.mk_clause new_lits proof in
@@ -388,7 +388,7 @@ let infer_equality_factoring_ actives clause =
     (* check whether subst(lit) is maximal *)
     if check_maximal_lit ~ord clause active_idx subst
       then
-        let proof = lazy (Proof ("equality factoring",
+        let proof = lazy (Proof ("equality_factoring",
           [(clause, active_pos, subst); (clause, passive_pos, subst)]))
         (* new_lits: literals of the new clause. remove active literal
            and replace it by a t!=v one, and apply subst *)

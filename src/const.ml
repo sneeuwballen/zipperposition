@@ -22,3 +22,5 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 exception FOF of bool
 exception PARSE_ERROR
+
+let cur_filename = ref ""

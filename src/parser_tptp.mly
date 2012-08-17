@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 %{
 
+  (** TSTP parser *)
+
   (** int counter for variables *)
   module Counter = struct
     type t = int ref
@@ -66,27 +68,27 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     Counter.set var_id_counter 0;
     var_map := [];
     literals := []
-	
+        
   (* gets the variables associated with a string from the variable mapping
      creates a new mapping for a new variable with the given sort *)
   let get_var ?(sort=T.univ_sort) (var_name: string) =
     try 
       (* way faster than List.assoc *)
       match (
-	List.find
-	  (fun (var_name', var_sort, _) ->
+        List.find
+          (fun (var_name', var_sort, _) ->
              var_name = var_name' && var_sort == sort
-	  )
-	  !var_map
+          )
+          !var_map
       ) with (_, _, t) -> t
     with
       | Not_found ->
-	  let new_var = 
-	    T.mk_var (Counter.value var_id_counter) sort
-	  in
-	    Counter.inc var_id_counter;
-	    var_map := (var_name, sort, new_var) :: !var_map;
-	    new_var
+          let new_var = 
+            T.mk_var (Counter.value var_id_counter) sort
+          in
+            Counter.inc var_id_counter;
+            var_map := (var_name, sort, new_var) :: !var_map;
+            new_var
 
   let sort_table = Hashtbl.create 23
   (* get the infered sort for the given constant *)
@@ -157,18 +159,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 parse_file:
   | file EOI 
       {
-	let clauses = $1 in
+        let clauses = $1 in
         let includes = !include_files in
-	let is_fof = !fof in
+        let is_fof = !fof in
         let is_theorem = !theorem in
 
-	(* reset for next parser run *)
+        (* reset for next parser run *)
         include_files := [];
-	fof := false;
-	theorem := false;
+        fof := false;
+        theorem := false;
         
         if is_fof then
-	  raise (Const.FOF is_theorem)
+          raise (Const.FOF is_theorem)
 
         else
           clauses, includes
@@ -325,11 +327,12 @@ cnf_annotated:
   cnf_formula annotations RIGHT_PARENTHESIS DOT
       // ignore everything except for the formula
       {
-	let clause = 
-	  C.mk_clause $7 (lazy (Axiom $3))
-	in
-	  init_clause ();
-	  clause
+        let clause = 
+          let filename = !Const.cur_filename in  (* ugly *)
+          C.mk_clause $7 (lazy (Axiom (filename, $3)))
+        in
+          init_clause ();
+          clause
       }
 
 formula_role:

@@ -101,6 +101,7 @@ let parse_file ~recursive f =
     | _ -> open_in f in
     try
       let buf = Lexing.from_channel input in
+      Const.cur_filename := f;
       Parser_tptp.parse_file Lexer_tptp.token buf
     with _ as e -> close_in input; raise e
   in aux [f] []

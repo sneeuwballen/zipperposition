@@ -321,7 +321,7 @@ let pp_clause_pos_subst formatter (c, pos, subst) =
 
 let pp_proof ~subst formatter p =
   match p with
-  | Axiom s -> fprintf formatter "axiom %s" s
+  | Axiom (f, s) -> fprintf formatter "axiom %s in %s" s f
   | Proof (rule, premisses) ->
     if subst
     then

@@ -55,9 +55,9 @@ let count_new_lines (string: string) : unit =
   String.iter
     (fun char ->
        if char = '\n' then
-	 update_line_index ()
+         update_line_index ()
        else
-	 update_column_index (!current_column_index + 1)
+         update_column_index (!current_column_index + 1)
     )
     string
 
@@ -68,16 +68,16 @@ let update_token (token: string) =
 
 let lexing_error (error: string) (token: string) =
   print_endline (error
-	    ^ " at line " ^ string_of_int !current_line_index
-	    ^ " column " ^ string_of_int !current_column_index
-	    ^ ":\n" ^ token);
+            ^ " at line " ^ string_of_int !current_line_index
+            ^ " column " ^ string_of_int !current_column_index
+            ^ ":\n" ^ token);
   raise Const.PARSE_ERROR
 
 let parse_error () =
   print_endline ("Parse error"
-	    ^ " at line " ^ string_of_int !current_line_index
-	    ^ " column " ^ string_of_int !current_column_index
-	    ^ ":\n" ^ !current_token);
+            ^ " at line " ^ string_of_int !current_line_index
+            ^ " column " ^ string_of_int !current_column_index
+            ^ ":\n" ^ !current_token);
   raise Const.PARSE_ERROR
 
 }
@@ -151,20 +151,20 @@ let negation =
 rule token =
     parse
       | [' ' '\t' '\r']              { update_token (Lexing.lexeme lexbuf);
-				       token lexbuf } (* skip blanks *)
+                                       token lexbuf } (* skip blanks *)
       | ['\n']                       { update_line_index ();
-				       current_token := Lexing.lexeme lexbuf;
-				       token lexbuf } (* skip new lines *)
+                                       current_token := Lexing.lexeme lexbuf;
+                                       token lexbuf } (* skip new lines *)
       | one_line_comment             { update_line_index ();
-				       current_token := Lexing.lexeme lexbuf;
-				       token lexbuf } (* skip comment *)
+                                       current_token := Lexing.lexeme lexbuf;
+                                       token lexbuf } (* skip comment *)
       | multi_line_comment           { count_new_lines (Lexing.lexeme lexbuf);
-				       current_token := Lexing.lexeme lexbuf;
-				       token lexbuf } (* skip comment *)
+                                       current_token := Lexing.lexeme lexbuf;
+                                       token lexbuf } (* skip comment *)
       | multi_line_comment_unclosed  { prev_column_index := !current_column_index;
-				       prev_line_index := !current_line_index;
-				       lexing_error "Unclosed Comment" (Lexing.lexeme lexbuf) }
-	  (* end of input - for channels, strings, ... *)
+                                       prev_line_index := !current_line_index;
+                                       lexing_error "Unclosed Comment" (Lexing.lexeme lexbuf) }
+          (* end of input - for channels, strings, ... *)
       | eof                          { update_token (Lexing.lexeme lexbuf); EOI }
       | "fof"                        { update_token (Lexing.lexeme lexbuf); FOF }
       | "cnf"                        { update_token (Lexing.lexeme lexbuf); CNF }
@@ -174,8 +174,8 @@ rule token =
       | lower_word                   { update_token (Lexing.lexeme lexbuf); LOWER_WORD(Lexing.lexeme lexbuf) }
       | upper_word                   { update_token (Lexing.lexeme lexbuf); UPPER_WORD(Lexing.lexeme lexbuf) }
       | single_quoted_lower_word     { update_token (Lexing.lexeme lexbuf); 
-				       let s = Lexing.lexeme lexbuf in
-					 SINGLE_QUOTED(String.sub s 1 (String.length s - 2)) }
+                                       let s = Lexing.lexeme lexbuf in
+                                         SINGLE_QUOTED(String.sub s 1 (String.length s - 2)) }
       | single_quoted                { update_token (Lexing.lexeme lexbuf); SINGLE_QUOTED(Lexing.lexeme lexbuf) }
       | distinct_object              { update_token (Lexing.lexeme lexbuf); DISTINCT_OBJECT(Lexing.lexeme lexbuf) }
       | dollar_dollar_word           { update_token (Lexing.lexeme lexbuf); DOLLAR_DOLLAR_WORD(Lexing.lexeme lexbuf) }
@@ -204,8 +204,8 @@ rule token =
       | '!'                          { update_token (Lexing.lexeme lexbuf); FORALL }
       | '?'                          { update_token (Lexing.lexeme lexbuf); EXISTS }
       | _                            { prev_column_index := !current_column_index;
-				       prev_line_index := !current_line_index;
-				       lexing_error "Invalid Input" (Lexing.lexeme lexbuf) }
+                                       prev_line_index := !current_line_index;
+                                       lexing_error "Invalid Input" (Lexing.lexeme lexbuf) }
 
 
 { 

@@ -74,7 +74,7 @@ and clause = {
   cproof : proof Lazy.t;    (** the proof for this clause (lazy...) *)
 }
 (** a proof step for a clause *)
-and proof = Axiom of string
+and proof = Axiom of string * string (** file, axiom name *)
           | Proof of string * (clause * position * substitution) list
 
 (** the interface of a total ordering on symbols *)
