@@ -123,10 +123,10 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
     let new_l = S.apply_subst ~recursive subst l
     and new_r = S.apply_subst ~recursive subst r
     in
-    Utils.debug 3 (lazy (Utils.sprintf "apply %a to %a gives %a"
+    Utils.debug 4 (lazy (Utils.sprintf "apply %a to %a gives %a"
         (S.pp_substitution ~sort:true) subst
         (T.pp_foterm_sort ~sort:true) l (T.pp_foterm_sort ~sort:true) new_l));
-    Utils.debug 3 (lazy (Utils.sprintf "apply %a to %a gives %a"
+    Utils.debug 4 (lazy (Utils.sprintf "apply %a to %a gives %a"
         (S.pp_substitution ~sort:true) subst
         (T.pp_foterm_sort ~sort:true) r (T.pp_foterm_sort ~sort:true) new_r));
     mk_lit ~ord new_l new_r sign
@@ -228,7 +228,7 @@ let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
   let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
-  Utils.debug 3 (lazy (Utils.sprintf "  @[<h>relocate %a using %a@]"
+  Utils.debug 4 (lazy (Utils.sprintf "  @[<h>relocate %a using %a@]"
                       (pp_clause ~sort:true) c (S.pp_substitution ~sort:true) subst));
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 

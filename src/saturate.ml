@@ -80,6 +80,8 @@ let given_clause_step state =
         C.fresh_clause ~ord maxvar c
       in
       (* do inferences w.r.t to the active set, and c itself *)
+      Utils.debug 3 (lazy (Utils.sprintf "current active: %a" C.pp_bag
+                           state.PS.active_set.PS.active_clauses));
       let new_clauses = 
         List.rev_append (Sup.do_inferences state.PS.active_set inference_rules c)
                         (Sup.do_inferences given_active_set inference_rules c)

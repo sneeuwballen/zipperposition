@@ -113,7 +113,12 @@ val size_bag : bag -> int         (** number of clauses in the bag (linear) *)
 
 open Format
 
+val string_of_comparison : comparison -> string
+val string_of_pos : int -> string
+val string_of_direction : direction -> string
+
 val size_bag : bag -> int
+val pp_literal : ?sort:bool -> formatter -> literal -> unit
 val pp_clause : ?sort:bool -> formatter -> clause -> unit
 val pp_pos : formatter -> position -> unit
 val pp_clause_pos : formatter -> (clause * position) -> unit

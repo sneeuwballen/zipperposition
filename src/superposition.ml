@@ -168,7 +168,7 @@ let rec fold_positive ?(both=true) f acc lits =
 
 (** Visit all non-minimal sides of negative equations *)
 let rec fold_negative ?(both=true) f acc lits =
-  fold_lits ~pos:false ~neg:true f acc lits
+  fold_lits ~pos:false ~neg:true ~both f acc lits
 
 (** compare literals as multisets of multisets of terms *)
 let compare_lits_partial ~ord l1 l2 =
@@ -200,20 +200,24 @@ let compare_lits_partial ~ord l1 l2 =
 
 (** check that the literal subst(clause[i]) is maximal in subst(clause) *)
 let check_maximal_lit_ ~ord clause pos subst =
-  (* literals after substitution *)
-  let slits = List.map (C.apply_subst_lit ~ord subst) clause.clits in
-  let slit_at_pos = Utils.list_get slits pos
-  and slits_with_pos = Utils.list_pos slits in
+  let lits_pos = Utils.list_pos clause.clits in
+  let lit = Utils.list_get clause.clits pos in
+  let slit = C.apply_subst_lit ~ord subst lit in
   List.for_all
-    (fun (slit', idx) ->
+    (fun (lit', idx) ->
       if idx = pos
-        then (assert (C.eq_literal slit_at_pos slit'); true) (* it must be slit *)
+        then (assert (C.eq_literal lit lit'); true)
         else
-          match compare_lits_partial ~ord slit_at_pos slit' with
+          let slit' = C.apply_subst_lit ~ord subst lit' in
+          match compare_lits_partial ~ord slit slit' with
           | Eq | Gt | Invertible | Incomparable -> true
-          | Lt -> false  (* slit is not maximal *)
+          | Lt -> begin
+            Utils.debug 3 (lazy (Utils.sprintf "%a < %a" (C.pp_literal ~sort:false) slit
+                                 (C.pp_literal ~sort:false) slit'));
+            false  (* slit is not maximal *)
+          end
     )
-    slits_with_pos
+    lits_pos
 
 let check_maximal_lit ~ord clause pos subst =
   prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
@@ -253,10 +257,12 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   let active_idx = List.hd active_pos
   and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = get_equations_sides active_clause active_pos in
-  Utils.debug 3 (lazy (Utils.sprintf "@[<h>sup s=%a t=%a u=%a v=%a p=%a subst=%a@]"
-                       T.pp_foterm s T.pp_foterm t T.pp_foterm u T.pp_foterm v
+  Utils.debug 3 (lazy (Utils.sprintf "@[<h>sup %a s=%a t=%a %a u=%a v=%a p=%a subst=%a@]"
+                       (C.pp_clause ~sort:false) active_clause T.pp_foterm s T.pp_foterm t
+                       (C.pp_clause ~sort:false) passive_clause T.pp_foterm u T.pp_foterm v
                        C.pp_pos passive_pos (S.pp_substitution ~sort:false) subst));
-  if not sign_st then acc
+  if not sign_st
+  then (Utils.debug 3 (lazy "active literal is negative"); acc)
   else begin
     assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
                         (S.apply_subst subst s));
@@ -264,8 +270,17 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         ord#compare (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
         not (check_maximal_lit ~ord active_clause active_idx subst) ||
         not (check_maximal_lit ~ord passive_clause passive_idx subst))
-      then acc
-      else (* ordering constraints are ok *)
+      then begin
+        Utils.debug 3 (lazy (Utils.sprintf "ordering constraint failed %s %s %B %B"
+          (C.string_of_comparison (ord#compare
+            (S.apply_subst subst s) (S.apply_subst subst t)))
+          (C.string_of_comparison (ord#compare
+            (S.apply_subst subst u) (S.apply_subst subst v)))
+          (check_maximal_lit ~ord active_clause active_idx subst)
+          (check_maximal_lit ~ord passive_clause passive_idx subst)));
+        acc
+      end else begin (* ordering constraints are ok *)
+        Utils.debug 3 (lazy "ok");
         let new_lits = Utils.list_remove active_clause.clits active_idx in
         let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
         let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
@@ -277,6 +292,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                                         (passive_clause, passive_pos, subst)])) in
         let new_clause = C.mk_clause new_lits proof in
         new_clause :: acc
+      end
   end
 
 let infer_active_ actives clause =
@@ -326,7 +342,7 @@ let infer_passive_ actives clause =
                 let subst = Unif.unification s u_p in
                 do_superposition ~ord hc.node s_pos clause p subst acc
               with
-                UnificationFailure _ -> [])
+                UnificationFailure _ -> acc)
             unifiables acc)
     )
     [] lits_pos
@@ -367,15 +383,20 @@ let infer_equality_factoring_ actives clause =
   (* find root terms that are unifiable with s and are not in the
      literal at s_pos. This returns a list of position and substitution *)
   let find_unifiable_lits s s_pos candidate_lits =
-    fold_positive ~both:true
-      (fun acc u v _ u_pos ->
-        if List.hd s_pos = List.hd u_pos then acc (* same index *)
+    List.fold_left 
+      (fun acc (Equation (u, v, sign, _), idx) ->
+        if not sign then acc
+        else if List.hd s_pos = idx then acc (* same index *)
         else
-        try
-          let subst = Unif.unification s u in
-          (u_pos, subst) :: acc
-        with
-          UnificationFailure _ -> acc
+          let try_u =  (* try inference between s and u *)
+            try
+              let subst = Unif.unification s u in [[idx; C.left_pos], subst]
+            with UnificationFailure _ -> []
+          and try_v =  (* try inference between s and v *)
+            try
+              let subst = Unif.unification s v in [[idx; C.right_pos], subst]
+            with UnificationFailure _ -> []
+          in try_u @ try_v @ acc
       )
       [] lits_pos
   (* do the inference between given positions, if ordering

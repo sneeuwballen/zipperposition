@@ -173,6 +173,6 @@ let () =
       (* print status then proof *)
       Printf.printf "%% SZS status Theorem\n";
       (if params.param_proof then
-        Format.printf "@.%% TSTP proof: @.@[<v>%a@]@." C.pp_tstp_proof c.node);
+        Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@." C.pp_tstp_proof c.node);
       (if params.param_debug_proof then
         Format.printf "@.%% debug proof: @.@[<v>%a@]@." C.pp_proof_rec c.node)
