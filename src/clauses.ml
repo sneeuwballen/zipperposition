@@ -365,7 +365,7 @@ let rec pp_tstp_proof formatter clause =
     let premisses_idx = List.map (fun (c,_,_) -> (hashcons_clause c).tag) premisses in
     (* print the inference *)
     fprintf formatter ("@[<h>cnf(%d, derived, %a,@ " ^^
-                       "@[<h>inference('%s', [status(thm)], @[<h>[%a]@])@]).@]@;")
+                       "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
       hc.tag pp_tstp_clause clause name (Utils.pp_list ~sep:"," pp_print_int) premisses_idx;
     (* print every premisse *)
     List.iter (fun (c,_,_) -> pp_tstp_proof formatter c) premisses

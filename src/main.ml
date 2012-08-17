@@ -56,6 +56,8 @@ type parameters = {
   param_steps : int;
   param_timeout : float;
   param_files : string list;
+  param_proof : bool;
+  param_debug_proof : bool;
 }
 
 (** parse_args returns parameters *)
@@ -64,6 +66,8 @@ let parse_args () =
   let ord = ref Orderings.default_ordering
   and steps = ref 0
   and timeout = ref 0.
+  and proof = ref true
+  and debug_proof = ref false
   and file = ref "stdin" in
   (* argument functions *)
   let set_ord s = (* select ordering *)
@@ -77,11 +81,14 @@ let parse_args () =
       ("-steps", Arg.Set_int steps, "verbose mode");
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
+      ("-noproof", Arg.Clear proof, "disable proof printing");
+      ("-debug_proof", Arg.Set debug_proof, "print a debug (detailed) proof");
     ]
   in
   Arg.parse options set_file "solve problem in first file";
   (* return parameter structure *)
-  { param_ord = !ord; param_steps = !steps; param_timeout = !timeout; param_files = [!file] }
+  { param_ord = !ord; param_steps = !steps; param_timeout = !timeout; param_files = [!file];
+    param_proof = !proof; param_debug_proof = !debug_proof; }
 
 (** parse given tptp file (TODO also parse include()s *)
 let parse_file ~recursive f =
@@ -165,4 +172,7 @@ let () =
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "%% SZS status Theorem\n";
-      Format.printf "@.%% TSTP proof: @.@[<v>%a@]@." C.pp_tstp_proof c.node
+      (if params.param_proof then
+        Format.printf "@.%% TSTP proof: @.@[<v>%a@]@." C.pp_tstp_proof c.node);
+      (if params.param_debug_proof then
+        Format.printf "@.%% debug proof: @.@[<v>%a@]@." C.pp_proof_rec c.node)
