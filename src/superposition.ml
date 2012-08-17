@@ -336,8 +336,9 @@ let infer_passive actives clause =
 
 let infer_equality_resolution_ actives clause =
   let ord = actives.PS.a_ord in
-  fold_positive ~both:false
+  fold_negative ~both:false
     (fun acc l r sign l_pos ->
+      assert (not sign);
       match l_pos with
       | [] -> assert false
       | pos::_ ->
@@ -431,6 +432,7 @@ let demod_subterm ~ord blocked_ids active_set subterm =
           let subst = Unif.matching l subterm in
           match pos with
           | [0; side] ->
+              (* r is the term subterm is going to be rewritten into *)
               let r = C.get_pos unit_hclause.node [0; C.opposite_pos side] in
               let new_l = subterm
               and new_r = S.apply_subst subst r in
@@ -488,7 +490,7 @@ let demodulate_ active_set blocked_ids clause =
     (* add the initial clause itself (without pos or subst, too complicated) to
        the proof before returning the simplified clause *)
     else
-      let proof = lazy (Proof ("demodulate", (clause, [], S.id_subst)::clauses)) in
+      let proof = lazy (Proof ("demodulation", (clause, [], S.id_subst)::clauses)) in
       C.mk_clause new_lits proof
 
 let demodulate active_set clause =
