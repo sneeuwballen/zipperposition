@@ -3,8 +3,8 @@
 ## Short summary
 Zipperposition is intended to be a superposition prover for full first order logic. The accent
 is on flexibility, modularity and simplicity rather than performance, to allow
-quick experimenting on automated theorem proving. It may at some point generate
-TSTP proofs; right now it outputs its own (rather poor) proofs.
+quick experimenting on automated theorem proving. It generates TSTP proofs, but I
+don't have a proof checker yet so the proofs may be totally wrong.
 
 Zipperposition is written in the functional language [OCaml](http://caml.inria.fr). The name is
 a bad play on the words "zipper" (a functional data structure) and "superposition" (the calculus

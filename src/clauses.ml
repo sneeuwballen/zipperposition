@@ -348,6 +348,29 @@ let rec pp_proof_rec formatter clause =
             pp_proof_rec formatter c)
         premisses
 
+let pp_tstp_clause formatter clause =
+  match clause.clits with
+  | [] -> pp_print_string formatter "$false"
+  | _ ->
+    fprintf formatter "@[<h>(%a)@]"
+      (Utils.pp_list ~sep:" | " (pp_literal ~sort:false)) clause.clits
+
+let rec pp_tstp_proof formatter clause =
+  let hc = hashcons_clause clause in
+  match Lazy.force clause.cproof with
+  | Axiom (f, ax_name) ->
+    fprintf formatter "@[<h>cnf(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
+      hc.tag pp_tstp_clause clause f ax_name
+  | Proof (name, premisses) ->
+    let premisses_idx = List.map (fun (c,_,_) -> (hashcons_clause c).tag) premisses in
+    (* print the inference *)
+    fprintf formatter ("@[<h>cnf(%d, derived, %a,@ " ^^
+                       "@[<h>inference('%s', [status(thm)], @[<h>[%a]@])@]).@]@;")
+      hc.tag pp_tstp_clause clause name (Utils.pp_list ~sep:"," pp_print_int) premisses_idx;
+    (* print every premisse *)
+    List.iter (fun (c,_,_) -> pp_tstp_proof formatter c) premisses
+  
+
 (*
 (* may be moved inside the bag *)
 let mk_unit_clause maxvar ty proofterm =

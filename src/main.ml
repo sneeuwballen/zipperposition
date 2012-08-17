@@ -165,4 +165,4 @@ let () =
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "%% SZS status Theorem\n";
-      Format.printf "proof: @[<v>%a@]@." C.pp_proof_rec c.node
+      Format.printf "@.%% TSTP proof: @.@[<v>%a@]@." C.pp_tstp_proof c.node
