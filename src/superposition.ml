@@ -280,7 +280,6 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
           (check_maximal_lit ~ord passive_clause passive_idx subst)));
         acc
       end else begin (* ordering constraints are ok *)
-        Utils.debug 3 (lazy "ok");
         let new_lits = Utils.list_remove active_clause.clits active_idx in
         let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
         let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
@@ -291,6 +290,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
         let new_clause = C.mk_clause new_lits proof in
+        Utils.debug 3 (lazy (Utils.sprintf "ok, conclusion %a"
+                            (C.pp_clause ~sort:false) new_clause));
         new_clause :: acc
       end
   end
@@ -329,7 +330,7 @@ let infer_passive_ actives clause =
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
       let ctx x = x in
-      all_positions u_pos ctx u
+      let new_clauses = all_positions u_pos ctx u
         (fun u_p p ctx ->
           (* u at position p is u_p *)
           let root_idx = actives.PS.idx.I.root_index in
@@ -343,7 +344,8 @@ let infer_passive_ actives clause =
                 do_superposition ~ord hc.node s_pos clause p subst acc
               with
                 UnificationFailure _ -> acc)
-            unifiables acc)
+            unifiables [])
+      in List.rev_append new_clauses acc
     )
     [] lits_pos
 

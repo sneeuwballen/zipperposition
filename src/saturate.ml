@@ -69,7 +69,7 @@ let given_clause_step state =
     (* tautology, useless *)
     else if Sup.is_tautology c then state, Unknown
     else begin
-      Utils.debug 1 (lazy (Format.sprintf "# *** step with given clause %s"
+      Utils.debug 1 (lazy (Format.sprintf "============ step with given clause %s ======="
                     (Utils.on_buffer C.pp_clause c)));
       (* an active set containing only the given clause *)
       let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
@@ -124,7 +124,7 @@ let given_clause_step state =
           new_clauses
       in
       List.iter
-        (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf "#    infered new clause %a"
+        (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf "    infered new clause %a"
                                            (C.pp_clause ~sort:false) new_c)))
         new_clauses;
       (* add new clauses (including simplified active clauses) to passive set
