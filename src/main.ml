@@ -84,15 +84,26 @@ let parse_args () =
   { param_ord = !ord; param_steps = !steps; param_timeout = !timeout; param_files = [!file] }
 
 (** parse given tptp file (TODO also parse include()s *)
-let parse_file f =
-  let input = match f with
+let parse_file ~recursive f =
+  (* [aux files clauses] parses all files in files and add
+     the resulting clauses to clauses *)
+  let rec aux files clauses = match files with
+  | [] -> clauses
+  | f::tail ->
+    let new_clauses, new_includes = parse_this f in
+    if recursive
+      then aux (List.rev_append new_includes tail) (List.rev_append new_clauses clauses)
+      else (List.rev_append new_clauses clauses)
+  (* parse the given file, raise exception in case of error *)
+  and parse_this f =
+    let input = match f with
     | "stdin" -> stdin
-    | _ -> open_in f
-  in
-  try
-    let buf = Lexing.from_channel input in
-    Parser_tptp.parse_file Lexer_tptp.token buf
-  with _ as e -> close_in input; raise e
+    | _ -> open_in f in
+    try
+      let buf = Lexing.from_channel input in
+      Parser_tptp.parse_file Lexer_tptp.token buf
+    with _ as e -> close_in input; raise e
+  in aux [f] []
 
 (** print stats *)
 let print_stats state =
@@ -132,7 +143,7 @@ let () =
   (* parse file *)
   let f = List.hd params.param_files in
   Printf.printf "%% process file %s\n" f;
-  let clauses, _ = parse_file f in
+  let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* choose an ord now *)
   let ord = params.param_ord () in  (* using current signature *)
