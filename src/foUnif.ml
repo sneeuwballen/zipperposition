@@ -45,6 +45,9 @@ let rec unif locked_vars subst s t =
   and t = match t.node.term with Var _ -> S.apply_subst subst t | _ -> t in
   match s.node.term, t.node.term with
   | _, _ when T.eq_foterm s t -> subst
+  | _, _ when T.is_ground_term s && T.is_ground_term t ->
+      (* distinct ground terms cannot be unified *)
+      raise (UnificationFailure (lazy "unification failure"))
   | Var _, Var _ ->
       let s_locked, t_locked = mem2 s t locked_vars in
       if s_locked then
@@ -62,7 +65,7 @@ let rec unif locked_vars subst s t =
   | _, Var _ -> S.build_subst t s subst
   | Node l1, Node l2 -> (
       try
-        List.fold_left2
+        List.fold_left2 (* recursive pairwise unification *)
           (fun subst' s t -> unif locked_vars subst' s t)
           subst l1 l2
       with Invalid_argument _ ->
