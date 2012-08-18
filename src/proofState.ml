@@ -105,9 +105,26 @@ let add_active active_set c =
 let add_actives active_set l =
   List.fold_left (fun b c -> fst (add_active b c)) active_set l
 
+let remove_active active_set hc =
+  if C.is_in_bag active_set.active_clauses hc.tag
+    then
+      let new_bag = C.remove_from_bag active_set.active_clauses hc.tag
+      and new_idx = I.remove_clause active_set.idx hc in
+      {active_set with active_clauses=new_bag; idx=new_idx}
+    else
+      active_set
+
+let remove_actives active_set l =
+  List.fold_left remove_active active_set l
+
+let remove_active_bag active_set bag =
+  let active = ref active_set in
+  C.iter_bag bag (fun _ hc -> active := remove_active !active hc);
+  !active
+
 let singleton_active_set ~ord clause =
   let active_set = {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty} in
-  let active_set, hc = add_active active_set clause in
+  let active_set, _ = add_active active_set clause in
   active_set
   
 let add_passive passive_set c =
@@ -126,7 +143,7 @@ let add_passives passive_set l =
 
 let relocate_active active_set c =
   let maxvar = active_set.active_clauses.C.bag_maxvar in
-  fst (C.fresh_clause ~ord:active_set.a_ord maxvar c)
+  fst (C.fresh_clause ~ord:active_set.a_ord (maxvar+1) c)
 
 (** statistics on the state *)
 type state_stats = {

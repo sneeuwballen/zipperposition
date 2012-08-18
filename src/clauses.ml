@@ -334,6 +334,8 @@ let is_in_bag bag id = M.mem id bag.bag_clauses
 
 let empty_bag = {bag_maxvar=0; bag_clauses=M.empty}
 
+let iter_bag bag f = M.iter f bag.bag_clauses
+
 let partition_bag bag pred =
   let bag_yes = ref empty_bag
   and bag_no = ref empty_bag in

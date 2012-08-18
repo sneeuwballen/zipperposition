@@ -55,6 +55,11 @@ val make_state : ordering -> (ClauseQueue.queue * int) list -> state
 val add_active : active_set -> clause -> active_set * hclause
 val add_actives : active_set -> clause list -> active_set
 
+(** remove clause from the active set *)
+val remove_active : active_set -> hclause -> active_set
+val remove_actives : active_set -> hclause list -> active_set
+val remove_active_bag : active_set -> Clauses.bag -> active_set
+
 (** create an active_set that contains one clause *)
 val singleton_active_set : ord:ordering -> clause -> active_set
 
