@@ -67,11 +67,12 @@ let generate active_set clause =
 
 (** check whether the clause is redundant w.r.t the active_set *)
 let is_redundant active_set clause =
-  if Sup.is_tautology clause then true
-  else
-    (* subsumption check *)
-    let c = PS.relocate_active active_set clause in
-    Sup.subsumed_by_set active_set c
+  (* forward subsumption check *)
+  let c = PS.relocate_active active_set clause in
+  Sup.subsumed_by_set active_set c
+
+(** find redundant clauses in active_set, w.r.t c *)
+let subsumed_by active_set clause = Sup.subsumed_in_set active_set clause
 
 let given_clause_step state =
   let ord = state.PS.ord in
@@ -85,7 +86,7 @@ let given_clause_step state =
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
     (* tautology or subsumed, useless *)
-    else if is_redundant state.PS.active_set c then state, Unknown
+    else if Sup.is_tautology c || is_redundant state.PS.active_set c then state, Unknown
     else begin
       Utils.debug 1 (lazy (Format.sprintf "============ step with given clause %s ======="
                     (Utils.on_buffer C.pp_clause c)));
@@ -124,12 +125,15 @@ let given_clause_step state =
       let new_clauses = HExtlib.filter_map
         (fun c ->
           let _, simplified_c = simplify new_active_set c in
-          if is_redundant new_active_set simplified_c then None else Some simplified_c)
+          if Sup.is_tautology simplified_c then None else Some simplified_c)
           new_clauses
       in
       List.iter
         (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf "    inferred new clause %a"
                                            (C.pp_clause ~sort:false) new_c))) new_clauses;
+      (* find clauses that are subsumed by c in active_set *)
+      let subsumed_active = subsumed_by new_active_set c in
+      let new_active_set = PS.remove_actives new_active_set subsumed_active in
       (* add new clauses (including simplified active clauses) to passive set
          TODO remove orphans of simplified active clauses *)
       let new_passive_set = PS.add_passives state.PS.passive_set new_clauses in

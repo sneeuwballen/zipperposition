@@ -45,7 +45,8 @@ let enable = true
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
-let prof_subsumption_set = HExtlib.profile ~enable "subsumption_set"
+let prof_subsumption_set = HExtlib.profile ~enable "forward_subsumption"
+let prof_subsumption_in_set = HExtlib.profile ~enable "backward_subsumption"
 let prof_infer_active = HExtlib.profile ~enable "infer_active"
 let prof_infer_passive = HExtlib.profile ~enable "infer_passive"
 let prof_infer_equality_resolution = HExtlib.profile ~enable "infer_equality_resolution"
@@ -595,5 +596,16 @@ let subsumed_by_set_ set clause =
 
 let subsumed_by_set set clause =
   prof_subsumption_set.HExtlib.profile (subsumed_by_set_ set) clause
+
+let subsumed_in_set_ set clause =
+  let hclauses = ref [] in
+  C.iter_bag set.PS.active_clauses
+    (fun _ hc ->
+      if subsumes clause hc.node
+        then hclauses := hc :: !hclauses else ());
+  !hclauses
+
+let subsumed_in_set set clause =
+  prof_subsumption_in_set.HExtlib.profile (subsumed_in_set_ set) clause
 
 let orphan_murder set clause = set (* TODO *)
