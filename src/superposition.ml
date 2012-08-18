@@ -385,7 +385,7 @@ let infer_equality_factoring_ actives clause =
   (* find root terms that are unifiable with s and are not in the
      literal at s_pos. This returns a list of position and substitution *)
   let find_unifiable_lits s s_pos candidate_lits =
-    List.fold_left 
+    List.fold_left
       (fun acc (Equation (u, v, sign, _), idx) ->
         if not sign then acc
         else if List.hd s_pos = idx then acc (* same index *)
@@ -520,23 +520,28 @@ let demodulate active_set clause =
   prof_demodulate.HExtlib.profile (demodulate_ active_set) clause
 
 let is_tautology c =
-  (* s=s literal *)
-  (List.exists
-    (fun (Equation (l, r, sign, _)) ->
-        (sign && T.eq_foterm l r))
-    c.clits) ||
-  (* both l=r and l!=r are literals *)
-  (List.exists
-    (fun (Equation (l, r, sign, _)) ->
-      List.exists
-        (fun (Equation (l', r', sign', _)) ->
-            (sign = not sign') &&
-            (((T.eq_foterm l l') && (T.eq_foterm r r')) ||
-            ((T.eq_foterm l r') && (T.eq_foterm l r')))
-        )
-      c.clits
-    )
-    c.clits)
+  let is_tauto =
+    (* s=s literal *)
+    (List.exists
+      (fun (Equation (l, r, sign, _)) ->
+          (sign && T.eq_foterm l r))
+      c.clits) ||
+    (* both l=r and l!=r are literals *)
+    (List.exists
+      (fun (Equation (l, r, sign, _)) ->
+        List.exists
+          (fun (Equation (l', r', sign', _)) ->
+              (sign = not sign') &&
+              (((T.eq_foterm l l') && (T.eq_foterm r r')) ||
+              ((T.eq_foterm l r') && (T.eq_foterm l' r)))
+          )
+        c.clits
+      )
+      c.clits)
+  in
+  (if is_tauto then
+    Utils.debug 3 (lazy (Utils.sprintf "%a is a tautology" (C.pp_clause ~sort:false) c)));
+  is_tauto
 
 let basic_simplify ~ord clause =
   let absurd_lit lit = match lit with
@@ -560,7 +565,10 @@ let basic_simplify ~ord clause =
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
-  C.mk_clause new_lits clause.cproof
+  let new_clause = C.mk_clause new_lits clause.cproof in
+  (Utils.debug 3 (lazy (Utils.sprintf "%a basic_simplifies into %a" (C.pp_clause ~sort:false)
+                        clause (C.pp_clause ~sort:false) new_clause)));
+  new_clause
 
 let subsumes a b =
   if List.length a.clits > List.length b.clits then false else false (* TODO *)
