@@ -518,10 +518,74 @@ let basic_simplify ~ord clause =
                         clause (C.pp_clause ~sort:false) new_clause)));
   new_clause
 
+(** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
+    substitutions s such that s(lit_a) = lit_b and s contains subst. The list
+    is empty if lit_a does not subsume lit_b. *)
+let match_lits lit_a lit_b subst =
+  match lit_a, lit_b with
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) ->
+    if signa <> signb then [] else
+    (try
+      let s = Unif.matching (S.apply_subst subst la) (S.apply_subst subst lb) in
+      let s = S.concat s subst in
+      let s' = Unif.matching (S.apply_subst s ra) (S.apply_subst s rb) in
+      [S.concat s' s]
+    with UnificationFailure _ -> []) @
+    (try
+      let s = Unif.matching (S.apply_subst subst la) (S.apply_subst subst rb) in
+      let s = S.concat s subst in
+      let s' = Unif.matching (S.apply_subst s ra) (S.apply_subst s lb) in
+      [S.concat s' s]
+    with UnificationFailure _ -> [])
+
 let subsumes a b =
-  if List.length a.clits > List.length b.clits then false else false (* TODO *)
+  if List.length a.clits > List.length b.clits then false else
+  (* does the list subst(l1) subsume subst(l2)? *)
+  let rec aux l1 l2 subst = match l1 with
+  | [] -> true  (* no lits in subsuming clause *)
+  | x::l1_tail ->
+    (* is there a y in l2 with subst'(subst(x)) = subst(y)? if yes, remove
+       x from l1 and y from l2 and continue *)
+    attempt_with x l1_tail [] l2 subst
+  (* try to match x against literals in l2 (l2_pre are literals
+     in l2 that have already been tried), with subst *)
+  and attempt_with x l1 l2_pre l2 subst = match l2 with
+  | [] -> false
+  | y::l2_tail ->
+    let possible_matches = match_lits x y subst in
+    if possible_matches = []  (* x and y do not match *)
+      then attempt_with x l1 (y::l2_pre) l2_tail subst
+      else
+        let l2' = List.rev_append l2_pre l2_tail in  (* l2 without y *)
+        (* try to recurse with each possible match of x,y *)
+        if List.exists (fun subst' -> aux l1 l2' subst') possible_matches
+          then true
+          else attempt_with x l1 (y::l2_pre) l2_tail subst
+  (* try aux with the whole list of literals l1 *)
+  in let res = aux a.clits b.clits S.id_subst in
+  (if res then
+    Utils.debug 3 (lazy (Utils.sprintf "%a subsumes %a" (C.pp_clause ~sort:false) a
+                          (C.pp_clause ~sort:false) b)));
+  res
 
+let subsumed_by_set set clause =
+  match C.maxlits clause with
+  | [] -> (assert (clause.clits = []); false)  (* empty clause is not subsumed *)
+  | (Equation (l, r, _, _), _)::_ ->
+    (* filter clauses: only those with a least one term that matches a side of the
+       arbitrarily choosen equation will be checked for subsumption *)
+  let matchables = I.ClauseSet.union
+    (I.DT.retrieve_generalizations set.PS.idx.I.root_index l)
+    (I.DT.retrieve_generalizations set.PS.idx.I.root_index r) in
+  try
+    I.ClauseSet.iter
+      (fun (hc, _, _) ->
+        if subsumes hc.node clause then raise Exit else ())
+      matchables;
+    false
+  with Exit ->
+    Utils.debug 3 (lazy (Utils.sprintf "%a subsumed by active set"
+                         (C.pp_clause ~sort:false) clause));
+    true
 
-let subsumed_by_set set clause = false (* TODO *)
-let subsumed_in_set set clause = [] (* TODO *)
 let orphan_murder set clause = set (* TODO *)

@@ -61,9 +61,6 @@ val subsumes : clause -> clause -> bool
 (** check whether the clause is subsumed by any clause in the set *)
 val subsumed_by_set : ProofState.active_set -> clause -> bool
 
-(** remove from the set the clauses subsumed by c *)
-val subsumed_in_set : ProofState.active_set -> clause -> hclause list
-
 (** remove from the passive_set the list of orphans of clause *)
 val orphan_murder: ProofState.passive_set
                 -> clause   (** the clause whose orphans are to be deleted *)

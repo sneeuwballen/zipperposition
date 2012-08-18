@@ -67,7 +67,11 @@ let generate active_set clause =
 
 (** check whether the clause is redundant w.r.t the active_set *)
 let is_redundant active_set clause =
-  Sup.is_tautology clause  (* TODO use subsumption *)
+  if Sup.is_tautology clause then true
+  else
+    (* subsumption check *)
+    let c = PS.relocate_active active_set clause in
+    Sup.subsumed_by_set active_set c
 
 let given_clause_step state =
   let ord = state.PS.ord in
