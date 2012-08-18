@@ -25,6 +25,11 @@ open Hashcons
 module T = Terms
 module S = FoSubst
 
+let enable = true
+
+let prof_unification = HExtlib.profile ~enable "unification"
+let prof_matching = HExtlib.profile ~enable "matching"
+
 (* returns (a in l, b in l) *)
 let mem2 a b l =
   let rec aux found_a found_b = function
@@ -38,42 +43,8 @@ let mem2 a b l =
   in
    aux false false l
 
-(* do both unification and match *)
-let rec unif locked_vars subst s t =
-  if s.node.sort <> t.node.sort then raise (UnificationFailure (lazy "different sorts"));
-  let s = match s.node.term with Var _ -> S.apply_subst subst s | _ -> s
-  and t = match t.node.term with Var _ -> S.apply_subst subst t | _ -> t in
-  match s.node.term, t.node.term with
-  | _, _ when T.eq_foterm s t -> subst
-  | _, _ when T.is_ground_term s && T.is_ground_term t ->
-      (* distinct ground terms cannot be unified *)
-      raise (UnificationFailure (lazy "unification failure"))
-  | Var _, Var _ ->
-      let s_locked, t_locked = mem2 s t locked_vars in
-      if s_locked then
-        if t_locked then
-          raise (UnificationFailure (lazy "Inference.unification.unif"))
-        else
-          S.build_subst t s subst
-      else
-        S.build_subst s t subst
-  | Var _, _ when occurs_check subst s t || List.mem s locked_vars ->
-      raise (UnificationFailure (lazy "Inference.unification.unif"))
-  | Var _, _ -> S.build_subst s t subst
-  | _, Var _ when occurs_check subst t s || List.mem t locked_vars ->
-      raise (UnificationFailure (lazy "Inference.unification.unif"))
-  | _, Var _ -> S.build_subst t s subst
-  | Node l1, Node l2 -> (
-      try
-        List.fold_left2 (* recursive pairwise unification *)
-          (fun subst' s t -> unif locked_vars subst' s t)
-          subst l1 l2
-      with Invalid_argument _ ->
-        raise (UnificationFailure (lazy "Inference.unification.unif"))
-    )
-  | _, _ ->
-      raise (UnificationFailure (lazy "Inference.unification.unif"))
-and occurs_check subst what where =
+(** occur check of what in where *)
+let rec occurs_check subst what where =
   match where.node.term with
   | Var _ when T.eq_foterm where what -> true
   | Var _ ->
@@ -84,13 +55,57 @@ and occurs_check subst what where =
   | Node l -> List.exists (occurs_check subst what) l
   | _ -> false
 
-(* full unification, no locked variables *)
-let unification a b = unif [] S.id_subst a b
+let unification a b =
+  (* recursive unification *)
+  let rec unif subst s t =
+    if s.node.sort <> t.node.sort then raise (UnificationFailure (lazy "different sorts"));
+    let s = S.apply_subst subst s
+    and t = S.apply_subst subst t in
+    match s.node.term, t.node.term with
+    | _, _ when T.eq_foterm s t -> subst
+    | _, _ when T.is_ground_term s && T.is_ground_term t ->
+        (* distinct ground terms cannot be unified *)
+        raise (UnificationFailure (lazy "distinct ground terms"))
+    | Var _, Var _ -> S.build_subst s t subst
+    | Var _, _ when occurs_check subst s t -> raise (UnificationFailure (lazy "occur check"))
+    | Var _, _ -> S.build_subst s t subst
+    | _, Var _ when occurs_check subst t s -> raise (UnificationFailure (lazy "occur check"))
+    | _, Var _ -> S.build_subst t s subst
+    | Node l1, Node l2 -> (
+        try
+          List.fold_left2 unif subst l1 l2  (* recursive pairwise unification *)
+        with Invalid_argument _ ->
+          raise (UnificationFailure (lazy "arglists of distinct lengths"))
+      )
+    | _, _ -> raise (UnificationFailure (lazy "incompatible terms"))
+  in
+  prof_unification.HExtlib.profile (unif S.id_subst a) b
 
-(* matching, lock variables of b (b must generalize a) *)
-let matching a b = unif (T.vars_of_term b) S.id_subst a b
+let matching a b =
+  (* recursive matching *)
+  let rec unif locked subst s t =
+    if s.node.sort <> t.node.sort then raise (UnificationFailure (lazy "different sorts"));
+    let s = S.apply_subst subst s
+    and t = S.apply_subst subst t in
+    match s.node.term, t.node.term with
+    | _, _ when T.eq_foterm s t -> subst
+    | _, _ when T.is_ground_term s && T.is_ground_term t ->
+        (* distinct ground terms cannot be matched *) 
+        raise (UnificationFailure (lazy "distinct ground terms"))
+    | Var _, _ when occurs_check subst s t || List.mem s locked ->
+      raise (UnificationFailure (lazy "occur check"))
+    | Var _, _ -> S.build_subst s t subst
+    | Node l1, Node l2 -> (
+        try
+          List.fold_left2 (unif locked) subst l1 l2  (* recursive pairwise unification *)
+        with Invalid_argument _ ->
+          raise (UnificationFailure (lazy "arglists of distinct lengths"))
+      )
+    | _, _ -> raise (UnificationFailure (lazy "incompatible terms"))
+  in
+  prof_matching.HExtlib.profile (unif (T.vars_of_term b) S.id_subst a) b
 
-(* Sets of variables in s and t are assumed to be disjoint  *)
+(** Sets of variables in s and t are assumed to be disjoint  *)
 let alpha_eq s t =
   let rec equiv subst s t =
     let s = match s.node.term with Var _ -> S.lookup s subst | _ -> s
