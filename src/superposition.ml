@@ -184,8 +184,10 @@ let get_equations_sides clause pos = match pos with
 
 (** do inferences that involve the given clause *)
 let do_inferences active_set rules c =
-  assert ((T.min_var c.cvars) > active_set.PS.active_clauses.C.bag_maxvar);
-  Format.printf "index: %a@." (I.pp_index ~all_clauses:true) active_set.PS.idx;
+  (* rename clause to avoid collisions *)
+  let c = PS.relocate_active active_set c in
+  Utils.debug 3 (lazy (Utils.sprintf "do inferences with current active: %a" C.pp_bag
+                       active_set.PS.active_clauses));
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
@@ -198,7 +200,6 @@ let do_inferences active_set rules c =
    the given parameters *)
 let do_superposition ~ord active_clause active_pos passive_clause passive_pos subst acc =
   assert (List.length active_pos = 2);
-  assert ((Utils.list_inter T.eq_foterm active_clause.cvars passive_clause.cvars) = []);
   match passive_pos with
   | [] | _::[] -> assert false
   | passive_idx::passive_side::subterm_pos ->
@@ -209,6 +210,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                        (C.pp_clause ~sort:false) active_clause T.pp_foterm s T.pp_foterm t
                        (C.pp_clause ~sort:false) passive_clause T.pp_foterm u T.pp_foterm v
                        C.pp_pos passive_pos (S.pp_substitution ~sort:false) subst));
+  assert ((Utils.list_inter T.eq_foterm active_clause.cvars passive_clause.cvars) = []);
   if not sign_st
   then (Utils.debug 3 (lazy "active literal is negative"); acc)
   else begin
