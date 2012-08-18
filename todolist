@@ -2,6 +2,7 @@
 - make multiset comparison fast
 - improve efficiency of trie by replacing map by array
     (better for small maps with unfrequent updates)
+- feature vector indexing
 
 - for the "superposition and equivalence reasoning and delayed CNF" paper:
     * implement RPO because = has a multiset status
