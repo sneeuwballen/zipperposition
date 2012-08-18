@@ -18,7 +18,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* heuristic selection of clauses *)
+(** Heuristic selection of clauses, using queues. Note that some
+    queues do not need accept all clauses, as long as one of them does
+    (for completeness). Anyway, a fifo queue should always be present,
+    and presents this property. *)
 
 open Types
 open Hashcons
@@ -41,15 +44,18 @@ module LH = Leftistheap
 type clause_ord = hclause LH.ordered
 
 (** generic clause queue based on some ordering on clauses *)
-class hq (ord : clause_ord) (name : string) : queue =
+let make_hq ~ord ?(accept=(fun _ -> true)) name =
   object
     val heap = new LH.leftistheap ord
     
     method is_empty = heap#is_empty
 
     method add hc =
-      let new_heap = heap#insert hc in
-      ({< heap = new_heap >} :> queue)
+      if accept hc.node then
+        let new_heap = heap#insert hc in
+        ({< heap = new_heap >} :> queue)
+      else
+        ({<>} :> queue)
 
     method take_first =
       assert (not (heap#is_empty));
@@ -70,7 +76,7 @@ let fifo ~ord =
       method le hc1 hc2 =  hc1.tag <= hc2.tag
     end
   and name = "fifo_queue" in
-  new hq clause_ord name
+  make_hq ~ord:clause_ord name
 
 let clause_weight ~ord =
   let clause_ord =
@@ -81,22 +87,18 @@ let clause_weight ~ord =
         w1 <= w2
     end
   and name = "clause_weight" in
-  new hq clause_ord name
+  make_hq ~ord:clause_ord name
   
-let prefer_goals ~ord =
-  (** count the number of goals (negative literals) of the clause *)
-  let count_goals clause =
-    List.fold_left (fun num lit ->
-      match lit with
-      | Equation (_,_,false,_) -> num+1
-      | _ -> num)
-    0 clause.clits
-  in
+let goals ~ord =
+  (* check whether a literal is a goal *)
+  let is_goal_lit lit = match lit with
+  | Equation (_, _, sign, _) -> not sign in
+  let is_goal_clause clause = List.for_all is_goal_lit clause.clits in
   let clause_ord =
     object
       method le hc1 hc2 =
-        let goals1 = count_goals hc1.node
-        and goals2 = count_goals hc2.node
+        let goals1 = List.length hc1.node.clits
+        and goals2 = List.length hc2.node.clits
         and w1 = ord#compute_clause_weight hc1.node
         and w2 = ord#compute_clause_weight hc2.node in
         (* lexicographic comparison that favors clauses with more goals,
@@ -104,31 +106,30 @@ let prefer_goals ~ord =
         (Utils.lexicograph compare [-goals1; w1] [-goals2; w2]) <= 0
     end
   and name = "prefer_goals" in
-  new hq clause_ord name
+  make_hq ~ord:clause_ord ~accept:is_goal_clause name
 
-let prefer_pos_unit_clauses ~ord =
+let pos_unit_clauses ~ord =
   let is_unit_pos c = match c.clits with
-  | [Equation (_,_,true,_)] -> 0
-  | _ -> 1
+  | [Equation (_,_,true,_)] -> true
+  | _ -> false
   in
   let clause_ord =
     object
       method le hc1 hc2 =
-        let is_unit1 = is_unit_pos hc1.node
-        and is_unit2 = is_unit_pos hc2.node
-        and w1 = ord#compute_clause_weight hc1.node
+        assert (is_unit_pos hc1.node && is_unit_pos hc2.node);
+        let w1 = ord#compute_clause_weight hc1.node
         and w2 = ord#compute_clause_weight hc2.node in
         (* lexicographic comparison that favors clauses with more goals,
            and then clauses with small weight *)
-        (Utils.lexicograph compare [is_unit1; w1] [is_unit2; w2]) <= 0
+        w1 <= w2
     end
   and name = "prefer_pos_unit_clauses" in
-  new hq clause_ord name
+  make_hq ~ord:clause_ord ~accept:is_unit_pos name
 
 let default_queues ~ord =
   [ (clause_weight ~ord, 5);
-    (prefer_goals ~ord, 1);
-    (prefer_pos_unit_clauses ~ord, 1);
+    (pos_unit_clauses ~ord, 3);
+    (goals ~ord, 2);
     (fifo ~ord, 1);
   ]
 

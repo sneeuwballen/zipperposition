@@ -18,7 +18,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Heuristic selection of clauses, using queues*)
+(** Heuristic selection of clauses, using queues. Note that some
+    queues do not need accept all clauses, as long as one of them does
+    (for completeness). Anyway, a fifo queue should always be present,
+    and presents this property. *)
 
 open Types
 
@@ -38,11 +41,11 @@ val fifo : ord:ordering -> queue
 (** select by increasing weight of clause *)
 val clause_weight : ord:ordering -> queue
 
-(** favor goals *)
-val prefer_goals : ord:ordering -> queue
+(** only select goals (clauses with only negative lits) *)
+val goals : ord:ordering -> queue
 
-(** favor positive unit clauses *)
-val prefer_pos_unit_clauses : ord:ordering -> queue
+(** only select positive unit clauses *)
+val pos_unit_clauses : ord:ordering -> queue
 
 (** default combination of heuristics *)
 val default_queues : ord:ordering -> (queue * int) list

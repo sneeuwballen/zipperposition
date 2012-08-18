@@ -540,6 +540,7 @@ let match_lits lit_a lit_b subst =
     with UnificationFailure _ -> [])
 
 let subsumes_ a b =
+  (* a must not have more literals *)
   if List.length a.clits > List.length b.clits then false else
   (* does the list subst(l1) subsume subst(l2)? *)
   let rec aux l1 l2 subst = match l1 with
