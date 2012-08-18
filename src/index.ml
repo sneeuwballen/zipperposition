@@ -130,10 +130,11 @@ let process_lit op c tree (lit, pos) =
       op tmp_tree r (c, [C.right_pos; pos])
   | Equation (l,r,_,Eq) -> failwith (Utils.sprintf "add %a=%a to index" T.pp_foterm l T.pp_foterm r)
 
-(** apply op to some of the literals of the clause, and only to
-    the maximal side(s) of the literals. *)
-let process_clause op tree ({node={clits=lits}} as c) =
-  let lits_pos = Utils.list_pos lits in
+(** apply op to the maximal literals of the clause, and only to
+    the maximal side(s) of those. *)
+let process_clause op tree c =
+  (* only maximal literals and their positions are index *)
+  let lits_pos = C.maxlits c.node in
   let new_tree = List.fold_left (process_lit op c) tree lits_pos in
   new_tree
 

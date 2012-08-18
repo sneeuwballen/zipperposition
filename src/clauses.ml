@@ -30,6 +30,8 @@ module Utils = FoUtils
 (* some pretty printers are useful now *)
 open Format
 
+let prof_check_max_lit = HExtlib.profile ~enable:true "check_max_lit"
+
 (* ----------------------------------------------------------------------
  * literals
  * ---------------------------------------------------------------------- *)
@@ -93,6 +95,33 @@ let compare_literal l1 l2 =
           let c = T.compare_foterm r1 r2 in
           if c <> 0 then c else
             Pervasives.compare sign1 sign2
+
+let compare_lits_partial ~ord l1 l2 =
+  match l1, l2 with
+  | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
+    let s_u = ord#compare s u
+    and s_v = ord#compare s v
+    and t_u = ord#compare t u
+    and t_v = ord#compare t v in
+    match s_u, s_v, t_u, t_v, sign_uv, sign_st with
+    | Eq, _, _, Eq, _, _
+    | _, Eq, Eq, _, _, _ ->
+      if sign_st = sign_uv then Eq
+      else if sign_st then Lt
+      else (assert sign_uv; Gt)
+    | Gt, Gt, _, _, _, _        (* s dominates *)
+    | _, _, Gt, Gt, _, _ -> Gt  (* t dominates *)
+    | Gt, Eq, _, _, false, true (* s = v & s > u *)
+    | Eq, Gt, _, _, false, true (* s = u & s > v *)
+    | _, _, Gt, Eq, false, true (* t = v & t > u *)
+    | _, _, Eq, Gt, false, true -> Gt (* t = u & t > v *)
+    | Lt, _, Lt, _, _, _        (* u dominates *)
+    | _, Lt, _, Lt, _, _ -> Lt  (* v dominates *)
+    | Eq, _, Lt, _, true, false (* s = u, t < u *)
+    | Lt, _, Eq, _, true, false (* t = u, s < u *)
+    | _, Eq, _, Lt, true, false (* s = v, t < v *)
+    | _, Lt, _, Eq, true, false -> Lt (* t = v, s < v *)
+    | _ -> Incomparable
 
 let hash_literal lit = match lit with
   | Equation (l, r, sign, _) ->
@@ -182,26 +211,58 @@ let eq_hclause hc1 hc2 = hc1 == hc2
 
 let compare_hclause hc1 hc2 = Pervasives.compare hc1.tag hc2.tag
 
-let mk_clause lits proof =
-    let all_vars =
-      List.fold_left T.merge_varlist [] (List.map vars_of_lit lits) in
-    {clits=lits; cvars=all_vars; cproof=proof}
+let check_maximal_lit_ ~ord clause pos subst =
+  let lits_pos = Utils.list_pos clause.clits in
+  let lit = Utils.list_get clause.clits pos in
+  let slit = apply_subst_lit ~ord subst lit in
+  List.for_all
+    (fun (lit', idx) ->
+      if idx = pos
+        then (assert (eq_literal lit lit'); true)
+        else
+          let slit' = apply_subst_lit ~ord subst lit' in
+          match compare_lits_partial ~ord slit slit' with
+          | Eq | Gt | Invertible | Incomparable -> true
+          | Lt -> begin
+            Utils.debug 3 (lazy (Utils.sprintf "%a < %a" (pp_literal ~sort:false) slit
+                                 (pp_literal ~sort:false) slit'));
+            false  (* slit is not maximal *)
+          end
+    )
+    lits_pos
 
-let reord_clause ~ord c = mk_clause (List.map (reord_lit ~ord) c.clits) c.cproof
+let check_maximal_lit ~ord clause pos subst =
+  prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
+
+(** find the maximal literals among lits *)
+let find_max_lits ~ord lits_pos =
+  List.filter
+    (fun (lit, idx) ->
+      List.for_all
+        (fun (lit', idx') ->
+          if idx' = idx then true
+          else compare_lits_partial ~ord lit lit' <> Lt
+        )
+        lits_pos
+    )
+    lits_pos
+
+let mk_clause ~ord lits proof =
+    let all_vars = List.fold_left T.merge_varlist [] (List.map vars_of_lit lits) in
+    let all_vars = List.stable_sort T.compare_foterm all_vars
+    and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
+    {clits=lits; cvars=all_vars; cproof=proof; cmaxlits=maxlits}
+
+let maxlits clause = Lazy.force clause.cmaxlits
+
+let reord_clause ~ord c = mk_clause ~ord (List.map (reord_lit ~ord) c.clits) c.cproof
 
 let apply_subst_cl ?(recursive=true) ~ord subst c =
   if subst = S.id_subst then c
   else
     let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
-    mk_clause new_lits c.cproof
-  (*  TODO modify proof lazily
-  let proof =
-    match proof with
-    | T.Exact t -> T.Exact (Subst.reloc_subst subst t)
-    | T.Step (rule,c1,c2,dir,pos,s) ->
-        T.Step(rule,c1,c2,dir,pos,Subst.concat subst s)
-  in
-  *)
+    mk_clause ~ord new_lits c.cproof
+  (* TODO modify proof lazily *)
 
 let get_lit clause idx = Utils.list_get clause.clits idx
 
@@ -239,9 +300,7 @@ let relocate_clause ~ord varlist c =
 
 let normalize_clause ~ord c =
   (* sort literals and vars before renaming *)
-  let c = {c with cvars=List.stable_sort T.compare_foterm c.cvars;
-                  clits=List.stable_sort compare_literal c.clits;}
-  in
+  let c = mk_clause ~ord (List.stable_sort compare_literal c.clits) c.cproof in
   fst (fresh_clause ~ord 0 c)
 
 (* ----------------------------------------------------------------------

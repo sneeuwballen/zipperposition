@@ -42,7 +42,6 @@ type inference_rule = ProofState.active_set -> clause -> conclusion list
 (* for profiling *)
 let enable = true
 
-let prof_check_max_lit = HExtlib.profile ~enable "check_max_lit"
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
@@ -170,58 +169,6 @@ let rec fold_positive ?(both=true) f acc lits =
 let rec fold_negative ?(both=true) f acc lits =
   fold_lits ~pos:false ~neg:true ~both f acc lits
 
-(** compare literals as multisets of multisets of terms *)
-let compare_lits_partial ~ord l1 l2 =
-  match l1, l2 with
-  | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
-    let s_u = ord#compare s u
-    and s_v = ord#compare s v
-    and t_u = ord#compare t u
-    and t_v = ord#compare t v in
-    match s_u, s_v, t_u, t_v, sign_uv, sign_st with
-    | Eq, _, _, Eq, _, _
-    | _, Eq, Eq, _, _, _ ->
-      if sign_st = sign_uv then Eq
-      else if sign_st then Lt
-      else (assert sign_uv; Gt)
-    | Gt, Gt, _, _, _, _        (* s dominates *)
-    | _, _, Gt, Gt, _, _ -> Gt  (* t dominates *)
-    | Gt, Eq, _, _, false, true (* s = v & s > u *)
-    | Eq, Gt, _, _, false, true (* s = u & s > v *)
-    | _, _, Gt, Eq, false, true (* t = v & t > u *)
-    | _, _, Eq, Gt, false, true -> Gt (* t = u & t > v *)
-    | Lt, _, Lt, _, _, _        (* u dominates *)
-    | _, Lt, _, Lt, _, _ -> Lt  (* v dominates *)
-    | Eq, _, Lt, _, true, false (* s = u, t < u *)
-    | Lt, _, Eq, _, true, false (* t = u, s < u *)
-    | _, Eq, _, Lt, true, false (* s = v, t < v *)
-    | _, Lt, _, Eq, true, false -> Lt (* t = v, s < v *)
-    | _ -> Incomparable
-
-(** check that the literal subst(clause[i]) is maximal in subst(clause) *)
-let check_maximal_lit_ ~ord clause pos subst =
-  let lits_pos = Utils.list_pos clause.clits in
-  let lit = Utils.list_get clause.clits pos in
-  let slit = C.apply_subst_lit ~ord subst lit in
-  List.for_all
-    (fun (lit', idx) ->
-      if idx = pos
-        then (assert (C.eq_literal lit lit'); true)
-        else
-          let slit' = C.apply_subst_lit ~ord subst lit' in
-          match compare_lits_partial ~ord slit slit' with
-          | Eq | Gt | Invertible | Incomparable -> true
-          | Lt -> begin
-            Utils.debug 3 (lazy (Utils.sprintf "%a < %a" (C.pp_literal ~sort:false) slit
-                                 (C.pp_literal ~sort:false) slit'));
-            false  (* slit is not maximal *)
-          end
-    )
-    lits_pos
-
-let check_maximal_lit ~ord clause pos subst =
-  prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
-
 (** decompose the literal at given position *)
 let get_equations_sides clause pos = match pos with
   | idx::eq_side::[] ->
@@ -238,6 +185,7 @@ let get_equations_sides clause pos = match pos with
 (** do inferences that involve the given clause *)
 let do_inferences active_set rules c =
   assert ((T.min_var c.cvars) > active_set.PS.active_clauses.C.bag_maxvar);
+  Format.printf "index: %a@." (I.pp_index ~all_clauses:true) active_set.PS.idx;
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
@@ -268,16 +216,16 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                         (S.apply_subst subst s));
     if (ord#compare (S.apply_subst subst s) (S.apply_subst subst t) = Lt ||
         ord#compare (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
-        not (check_maximal_lit ~ord active_clause active_idx subst) ||
-        not (check_maximal_lit ~ord passive_clause passive_idx subst))
+        not (C.check_maximal_lit ~ord active_clause active_idx subst) ||
+        not (C.check_maximal_lit ~ord passive_clause passive_idx subst))
       then begin
         Utils.debug 3 (lazy (Utils.sprintf "ordering constraint failed %s %s %B %B"
           (C.string_of_comparison (ord#compare
             (S.apply_subst subst s) (S.apply_subst subst t)))
           (C.string_of_comparison (ord#compare
             (S.apply_subst subst u) (S.apply_subst subst v)))
-          (check_maximal_lit ~ord active_clause active_idx subst)
-          (check_maximal_lit ~ord passive_clause passive_idx subst)));
+          (C.check_maximal_lit ~ord active_clause active_idx subst)
+          (C.check_maximal_lit ~ord passive_clause passive_idx subst)));
         acc
       end else begin (* ordering constraints are ok *)
         let new_lits = Utils.list_remove active_clause.clits active_idx in
@@ -289,7 +237,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let rule = if sign_uv then "superposition_right" else "superposition_left" in
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
-        let new_clause = C.mk_clause new_lits proof in
+        let new_clause = C.mk_clause ~ord new_lits proof in
         Utils.debug 3 (lazy (Utils.sprintf "ok, conclusion %a"
                             (C.pp_clause ~sort:false) new_clause));
         new_clause :: acc
@@ -297,8 +245,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   end
 
 let infer_active_ actives clause =
-  let ord = actives.PS.a_ord
-  and lits_pos = Utils.list_pos clause.clits in
+  let ord = actives.PS.a_ord in
   (* do the inferences where clause is active; for this,
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
@@ -316,14 +263,13 @@ let infer_active_ actives clause =
             UnificationFailure _ -> acc)
         unifiables acc
     )
-    [] lits_pos
+    [] (C.maxlits clause)
 
 let infer_active actives clause =
   prof_infer_active.HExtlib.profile (infer_active_ actives) clause
 
 let infer_passive_ actives clause =
-  let ord = actives.PS.a_ord
-  and lits_pos = Utils.list_pos clause.clits in
+  let ord = actives.PS.a_ord in
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
   fold_lits ~both:true ~pos:true ~neg:true
@@ -347,7 +293,7 @@ let infer_passive_ actives clause =
             unifiables [])
       in List.rev_append new_clauses acc
     )
-    [] lits_pos
+    [] (C.maxlits clause)
 
 let infer_passive actives clause =
   prof_infer_passive.HExtlib.profile (infer_passive_ actives) clause
@@ -362,26 +308,26 @@ let infer_equality_resolution_ actives clause =
       | pos::_ ->
       try
         let subst = Unif.unification l r in
-        if check_maximal_lit ~ord clause pos subst
+        if C.check_maximal_lit ~ord clause pos subst
           (* subst(lit) is maximal, we can do the inference *)
           then
             let proof = lazy (Proof ("equality_resolution", [clause, [pos], subst]))
             and new_lits = Utils.list_remove clause.clits pos in
             let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-            let new_clause = C.mk_clause new_lits proof in
+            let new_clause = C.mk_clause ~ord new_lits proof in
             new_clause::acc
           else
             acc
       with UnificationFailure _ -> acc (* l and r not unifiable, try next *)
     )
-    [] (Utils.list_pos clause.clits)
+    [] (C.maxlits clause)
 
 let infer_equality_resolution actives clause =
   prof_infer_equality_resolution.HExtlib.profile (infer_equality_resolution_ actives) clause
 
 let infer_equality_factoring_ actives clause =
-  let ord = actives.PS.a_ord
-  and lits_pos = Utils.list_pos clause.clits in
+  let ord = actives.PS.a_ord in
+  let lits_pos = Utils.list_pos clause.clits in
   (* find root terms that are unifiable with s and are not in the
      literal at s_pos. This returns a list of position and substitution *)
   let find_unifiable_lits s s_pos candidate_lits =
@@ -400,7 +346,7 @@ let infer_equality_factoring_ actives clause =
             with UnificationFailure _ -> []
           in try_u @ try_v @ acc
       )
-      [] lits_pos
+      [] candidate_lits
   (* do the inference between given positions, if ordering
      conditions are respected *)
   and do_inference active_pos passive_pos subst =
@@ -409,7 +355,7 @@ let infer_equality_factoring_ actives clause =
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
     (* check whether subst(lit) is maximal *)
-    if check_maximal_lit ~ord clause active_idx subst
+    if C.check_maximal_lit ~ord clause active_idx subst
       then
         let proof = lazy (Proof ("equality_factoring",
           [(clause, active_pos, subst); (clause, passive_pos, subst)]))
@@ -418,7 +364,7 @@ let infer_equality_factoring_ actives clause =
         and new_lits = Utils.list_remove clause.clits active_idx in
         let new_lits = (C.mk_neq ~ord t v) :: new_lits in
         let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-        [C.mk_clause new_lits proof]
+        [C.mk_clause ~ord new_lits proof]
       else
         []
   (* try to do inferences with each positive literal *)
@@ -429,7 +375,7 @@ let infer_equality_factoring_ actives clause =
         (fun acc (passive_pos, subst) ->
           (do_inference s_pos passive_pos subst) @ acc)
         acc unifiables)
-    [] lits_pos
+    [] (C.maxlits clause)
 
 let infer_equality_factoring actives clause =
   prof_infer_equality_factoring.HExtlib.profile (infer_equality_factoring_ actives) clause
@@ -514,7 +460,7 @@ let demodulate_ active_set blocked_ids clause =
        the proof before returning the simplified clause *)
     else
       let proof = lazy (Proof ("demodulation", (clause, [], S.id_subst)::clauses)) in
-      C.mk_clause new_lits proof
+      C.mk_clause ~ord new_lits proof
 
 let demodulate active_set clause =
   prof_demodulate.HExtlib.profile (demodulate_ active_set) clause
@@ -565,7 +511,7 @@ let basic_simplify ~ord clause =
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
-  let new_clause = C.mk_clause new_lits clause.cproof in
+  let new_clause = C.mk_clause ~ord new_lits clause.cproof in
   (Utils.debug 3 (lazy (Utils.sprintf "%a basic_simplifies into %a" (C.pp_clause ~sort:false)
                         clause (C.pp_clause ~sort:false) new_clause)));
   new_clause

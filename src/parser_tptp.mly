@@ -332,7 +332,7 @@ cnf_annotated:
       {
         let clause = 
           let filename = !Const.cur_filename in  (* ugly *)
-          C.mk_clause $7 (lazy (Axiom (filename, $3)))
+          C.mk_clause ~ord:(Orderings.default_ordering ()) $7 (lazy (Axiom (filename, $3)))
         in
           init_clause ();
           clause

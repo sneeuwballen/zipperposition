@@ -31,9 +31,11 @@ val left_pos : int
 val right_pos : int
 val opposite_pos : int -> int
 
-val eq_literal : literal -> literal -> bool       (** equality of literals *)
-val compare_literal : literal -> literal -> int   (** lexicographic comparison of literals *)
-val hash_literal : literal -> int                 (** hashing of literal *)
+val eq_literal : literal -> literal -> bool         (** equality of literals *)
+val compare_literal : literal -> literal -> int     (** lexicographic comparison of literals *)
+val compare_lits_partial : ord:ordering -> literal
+                          -> literal -> comparison  (** partial comparison of literals *)
+val hash_literal : literal -> int                   (** hashing of literal *)
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
@@ -65,8 +67,12 @@ val hashcons_clause : clause -> hclause
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
-val mk_clause : literal list -> proof Lazy.t -> clause  (** build a clause *)
+val mk_clause : ord:ordering -> literal list
+              -> proof Lazy.t -> clause                 (** build a clause *)
 val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
+val maxlits : clause -> (literal * int) list            (** the indexed list of maximal literals *)
+val check_maximal_lit : ord:ordering -> clause -> int   (** check whether the i-th literal is *)
+                 -> substitution -> bool                (** maximal in subst(clause) *)
 
 val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
 
@@ -89,7 +95,6 @@ type bag = {
   bag_maxvar: int;                (** higher bound for the biggest var index *)
   bag_clauses : hclause Ptmap.t;  (** map tag -> hashconsed clause *)
 }
-
 
 val add_to_bag : bag -> clause -> bag * hclause   (** add the clause to the bag, hashconsing it *)
 val add_hc_to_bag : bag -> hclause -> bag         (** add a hclause to the bag *)

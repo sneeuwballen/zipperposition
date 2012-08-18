@@ -67,11 +67,13 @@ type literal =
 
 (** a hashconsed first order clause *)
 type hclause = clause Hashcons.hash_consed
-(** a first order clause (TODO add selected literals?) *)
+(** a first order clause *)
 and clause = {
-  clits : literal list;     (** the equations *)
-  cvars : foterm list;      (** the free variables *)
-  cproof : proof Lazy.t;    (** the proof for this clause (lazy...) *)
+  clits : literal list;                   (** the equations *)
+  cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
+  (* cselectedlits : (literal * int) list; (** selected literals *) *)
+  cvars : foterm list;                    (** the free variables *)
+  cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
 }
 (** a proof step for a clause *)
 and proof = Axiom of string * string (** file, axiom name *)
