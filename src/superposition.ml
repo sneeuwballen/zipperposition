@@ -45,6 +45,7 @@ let enable = true
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
+let prof_subsumption_set = HExtlib.profile ~enable "subsumption_set"
 let prof_infer_active = HExtlib.profile ~enable "infer_active"
 let prof_infer_passive = HExtlib.profile ~enable "infer_passive"
 let prof_infer_equality_resolution = HExtlib.profile ~enable "infer_equality_resolution"
@@ -538,7 +539,7 @@ let match_lits lit_a lit_b subst =
       [S.concat s' s]
     with UnificationFailure _ -> [])
 
-let subsumes a b =
+let subsumes_ a b =
   if List.length a.clits > List.length b.clits then false else
   (* does the list subst(l1) subsume subst(l2)? *)
   let rec aux l1 l2 subst = match l1 with
@@ -568,7 +569,10 @@ let subsumes a b =
                           (C.pp_clause ~sort:false) b)));
   res
 
-let subsumed_by_set set clause =
+let subsumes a b =
+  prof_subsumption.HExtlib.profile (subsumes_ a) b
+
+let subsumed_by_set_ set clause =
   match C.maxlits clause with
   | [] -> (assert (clause.clits = []); false)  (* empty clause is not subsumed *)
   | (Equation (l, r, _, _), _)::_ ->
@@ -587,5 +591,8 @@ let subsumed_by_set set clause =
     Utils.debug 3 (lazy (Utils.sprintf "%a subsumed by active set"
                          (C.pp_clause ~sort:false) clause));
     true
+
+let subsumed_by_set set clause =
+  prof_subsumption_set.HExtlib.profile (subsumed_by_set_ set) clause
 
 let orphan_murder set clause = set (* TODO *)
