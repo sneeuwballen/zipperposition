@@ -61,6 +61,7 @@ module type DiscriminationTree =
     val in_index : t -> input -> (data -> bool) -> bool
     val retrieve_generalizations : t -> input -> dataset
     val retrieve_unifiables : t -> input -> dataset
+    val retrieve_specializations: t -> input -> dataset
     val num_keys : t -> int                       (** number of indexed keys (paths) *)
     val num_elems : t -> int                      (** number of elements for any key *)
 
@@ -80,6 +81,7 @@ module type DiscriminationTree =
 
 let prof_dt_generalization = HExtlib.profile ~enable:true "discr_tree.retrieve_generalizations"
 let prof_dt_unifiables = HExtlib.profile ~enable:true "discr_tree.retrieve_unifiables"
+let prof_dt_specializations = HExtlib.profile ~enable:true "discr_tree.retrieve_specializations"
 
 module Make (I:Indexable) (A:Set.S) : DiscriminationTree
   with type constant_name = I.constant_name and type input = I.input
@@ -162,22 +164,24 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
       in
         PSMap.fold (fun k v res -> (get (arity_of k) v) @ res) map []
 
-    let retrieve unif tree term =
+    let retrieve ~unify_query ~unify_indexed tree term =
       let path = I.path_string_of term in
       let rec retrieve path tree =
         match tree, path with
         | DiscriminationTree.Node (Some s, _), [] -> s
         | DiscriminationTree.Node (None, _), [] -> A.empty
-        | DiscriminationTree.Node (_, map), Variable::path when unif ->
+        | DiscriminationTree.Node (_, map), Variable::path when unify_query ->
             List.fold_left A.union A.empty
               (List.map (retrieve path) (skip_root tree))
         | DiscriminationTree.Node (_, map), node::path ->
             A.union
-               (if not unif && node = Variable then A.empty else
+               (if not unify_query && node = Variable then A.empty else
+               (* follow the branch of the trie that corresponds to the query symbol *)
                 try retrieve path (PSMap.find node map)
                 with Not_found -> A.empty)
-               (try
-                  match PSMap.find Variable map,skip (arity_of node) path with
+               (if not unify_indexed then A.empty else
+               (* follow a 'variable' branch of the trie *)
+               try match PSMap.find Variable map,skip (arity_of node) path with
                   | DiscriminationTree.Node (Some s, _), [] -> s
                   | n, path -> retrieve path n
                 with Not_found -> A.empty)
@@ -185,10 +189,16 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
      retrieve path tree
 
     let retrieve_generalizations tree term =
-      prof_dt_generalization.HExtlib.profile (retrieve false tree) term
+      prof_dt_generalization.HExtlib.profile
+      (retrieve ~unify_query:false ~unify_indexed:true tree) term
 
     let retrieve_unifiables tree term =
-      prof_dt_unifiables.HExtlib.profile (retrieve true tree) term
+      prof_dt_unifiables.HExtlib.profile
+      (retrieve ~unify_query:true ~unify_indexed:true tree) term
+
+    let retrieve_specializations tree term =
+      prof_dt_specializations.HExtlib.profile
+      (retrieve ~unify_query:true ~unify_indexed:false tree) term
 
     let num_keys tree =
       let num = ref 0 in

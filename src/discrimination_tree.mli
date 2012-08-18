@@ -59,6 +59,7 @@ module type DiscriminationTree  =
     val in_index : t -> input -> (data -> bool) -> bool
     val retrieve_generalizations : t -> input -> dataset
     val retrieve_unifiables : t -> input -> dataset
+    val retrieve_specializations : t -> input -> dataset
     val num_keys : t -> int                       (** number of indexed keys (paths) *)
     val num_elems : t -> int                      (** number of elements for any key *)
 
