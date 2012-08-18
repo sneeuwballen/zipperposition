@@ -2,15 +2,12 @@
 
 # helper to clausify then run prover (using eprover)
 
-TMPFILE=$(mktemp /tmp/proverXXXXX)
-
-echo "% clausify into $TMPFILE"
-eprover --cnf --tptp3-in --tptp3-out $1 | sed -r 's/^#/%/g' > "$TMPFILE"
-
+TARGET="$1"
 PROVER="./src/main.native"
 
-echo "% run prover $PROVER"
-trap 'echo "% clean up $TMPFILE" && rm -f "$TMPFILE"' EXIT
+shift  # remove first option
 
-shift
-OCAMLRUNPARAM="l=5M,$OCAMLRUNPARAM" "$PROVER" "$TMPFILE" $@
+echo "% run prover $PROVER on $TARGET"
+eprover --cnf --tptp3-in --tptp3-out -l0 "$TARGET" |
+    sed -r 's/^#/%/g' |
+    OCAMLRUNPARAM="l=5M,$OCAMLRUNPARAM" "$PROVER" stdin $@
