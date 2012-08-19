@@ -48,6 +48,7 @@ module type CachedType =
     val should_cache : t -> bool
   end
 
+let max_size = 50000    (** maximum size for the cache *)
 
 (** functorial implementation *)
 module Make(HType : CachedType) =
@@ -60,16 +61,20 @@ module Make(HType : CachedType) =
 
     let create size = H.create size
 
+    (* helper that puts res for x in cache *)
+    let put_cache cache x res =
+      (if H.length cache >= max_size then H.clear cache); (* cache too big, clear it *)
+      H.replace cache x res
+
     let with_cache cache f x =
       try
         H.find cache x
       with Not_found ->
         let res = f x in
         (if HType.should_cache x
-          then H.replace cache x res);
+          then put_cache cache x res);
         res
 
     let clear cache =
       H.clear cache
-
   end
