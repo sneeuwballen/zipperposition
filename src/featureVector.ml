@@ -1,0 +1,199 @@
+(*
+Zipperposition: a functional superposition prover for prototyping
+Copyright (C) 2012 Simon Cruanes
+
+This is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+02110-1301 USA.
+*)
+
+(** Feature Vector indexing (see Schulz 2004) for efficient forward
+    and backward subsumption *)
+
+open Types
+open Hashcons
+
+module T = Terms
+module C = Clauses
+module Utils = FoUtils
+
+(* ----------------------------------------------------------------------
+ * features
+ * ---------------------------------------------------------------------- *)
+
+(** a vector of feature *)
+type feature_vector = int list
+
+(** a function that computes a feature *)
+type feature = clause -> int
+
+let compute_fv features clause =
+  List.map (fun feat -> feat clause) features
+
+let feat_size_plus clause =
+  let rec aux lits count = match lits with
+  | [] -> count
+  | (Equation (_,_,true,_))::lits' -> aux lits' (count+1)
+  | _::lits' -> aux lits' count
+  in aux clause.clits 0
+
+let feat_size_minus clause =
+  let rec aux lits count = match lits with
+  | [] -> count
+  | (Equation (_,_,false,_))::lits' -> aux lits' (count+1)
+  | _::lits' -> aux lits' count
+  in aux clause.clits 0
+
+(* number of occurrences of symbol in literal *)
+let count_symb_lit symb lit =
+  let rec count_symb_term t = match t.node.term with
+  | Var _ -> 0
+  | Leaf s -> if s = symb then 1 else 0
+  | Node l -> List.fold_left
+    (fun sum subterm -> sum + (count_symb_term subterm))
+    0 l
+  in match lit with
+  | Equation (l, r, _, _) -> count_symb_term l + count_symb_term r
+
+let count_symb_plus symb clause =
+  List.fold_left
+    (fun sum lit -> if C.pos_lit lit
+      then (count_symb_lit symb lit) + sum else sum)
+    0 clause.clits
+
+let count_symb_minus symb clause =
+  List.fold_left
+    (fun sum lit -> if C.neg_lit lit
+      then (count_symb_lit symb lit) + sum else sum)
+    0 clause.clits
+
+(* max depth of the symbol in the literal, or -1 *)
+let max_depth_lit symb lit =
+  let rec max_depth_term t depth = match t.node.term with
+  | Var _ -> -1
+  | Leaf s -> if s = symb then depth else -1
+  | Node l ->
+    List.fold_left
+      (fun maxdepth subterm -> max maxdepth (max_depth_term subterm (depth+1)))
+      (-1) l
+  in match lit with
+  | Equation (l, r, _, _) -> max (max_depth_term l 0) (max_depth_term r 0)
+
+let max_depth_plus symb clause =
+  List.fold_left
+    (fun maxdepth lit -> if C.pos_lit lit
+      then max maxdepth (max_depth_lit symb lit) else maxdepth)
+    0 clause.clits
+
+let max_depth_minus symb clause =
+  List.fold_left
+    (fun maxdepth lit -> if C.neg_lit lit
+      then max maxdepth (max_depth_lit symb lit) else maxdepth)
+    0 clause.clits
+
+(* ----------------------------------------------------------------------
+ * FV index
+ * ---------------------------------------------------------------------- *)
+
+(** a set of hclause *)
+type hclauses = clause Hset.t
+
+(** a trie of ints *)
+module FVTrie = Trie.Make(Ptmap)
+
+(** a feature vector index, based on a trie that contains sets of hclauses *)
+type fv_index = feature list * hclauses FVTrie.t
+
+let mk_fv_index features = (features, FVTrie.empty)
+
+let max_symbols = 20    (** maximum number of symbols considered for indexing *)
+
+let mk_fv_index_signature signature =
+  (* only consider a bounded number of symbols *)
+  let bounded_signature = Utils.list_take max_symbols signature in
+  let features = [feat_size_plus; feat_size_minus] @
+    List.flatten
+      (List.map (fun symb ->
+        (* for each symbol, use 4 features *)
+        [count_symb_plus symb; count_symb_minus symb;
+         max_depth_plus symb; max_depth_minus symb])
+        bounded_signature)
+  in
+  (* build an index with those features *)
+  mk_fv_index features
+
+let index_clause (features, trie) hc =
+  (* feature vector of the clause *)
+  let fv = compute_fv features hc.node in
+  (* set for this feature vector *)
+  let set = try FVTrie.find fv trie with Not_found -> Hset.empty in
+  (* add the set+clause to the trie *)
+  let new_trie = FVTrie.add fv (Hset.add hc set) trie in
+  (features, new_trie)
+
+let remove_clause (features, trie) hc =
+  (* feature vector of the clause *)
+  let fv = compute_fv features hc.node in
+  (* set for this feature vector *)
+  try
+    let set = FVTrie.find fv trie in
+    let set = Hset.remove hc set in
+    if Hset.is_empty set
+      then
+        (* remove the (now empty) set from the trie *)
+        let new_trie = FVTrie.remove fv trie in
+        (features, new_trie)
+      else
+        (* put the new set (without hc) in the trie *)
+        let new_trie = FVTrie.add fv set trie in
+        (features, new_trie)
+  with Not_found -> (features, trie)  (* the clause cannot be present *)
+
+
+(** clauses that subsume (potentially) the given clause *)
+let retrieve_subsuming (features, trie) clause =
+  (* feature vector of the clause *)
+  let fv = compute_fv features clause in
+  let rec fold_lower acc fv node = match fv, node with
+  | [], FVTrie.Node (None, _) -> acc
+  | [], FVTrie.Node (Some hclauses, _) ->
+      List.rev_append (Hset.elements hclauses) acc
+  | i::fv', FVTrie.Node (_, map) ->
+    Ptmap.fold
+      (fun j subnode acc -> if j <= i
+        then fold_lower acc fv' subnode  (* go in the branch *)
+        else acc  (* do not go in the branch *)
+      )
+      map acc
+  in
+  fold_lower [] fv trie
+
+(** clauses that are subsumed (potentially) by the given clause *)
+let retrieve_subsumed (features, trie) clause =
+  (* feature vector of the clause *)
+  let fv = compute_fv features clause in
+  let rec fold_higher acc fv node = match fv, node with
+  | [], FVTrie.Node (None, _) -> acc
+  | [], FVTrie.Node (Some hclauses, _) ->
+      List.rev_append (Hset.elements hclauses) acc
+  | i::fv', FVTrie.Node (_, map) ->
+    Ptmap.fold
+      (fun j subnode acc -> if j >= i
+        then fold_higher acc fv' subnode  (* go in the branch *)
+        else acc  (* do not go in the branch *)
+      )
+      map acc
+  in
+  fold_higher [] fv trie
+
