@@ -86,6 +86,7 @@ let next_passive_clause passive_set =
           then (* the clause is still in the passive set, return it *)
             let new_q_state = (idx, weight+1) (* increment weight for the clause *)
             and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.tag in
+            U.debug 3 (lazy (U.sprintf "taken clause from %s" q#name));
             {passive_set with passive_clauses=new_clauses;
                               queues=U.list_set queues idx (new_q, w);
                               queue_state=new_q_state}, Some hc
