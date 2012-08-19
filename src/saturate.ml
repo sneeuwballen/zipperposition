@@ -120,13 +120,14 @@ let given_clause_step state =
          added to the set of new clauses *)
       let new_active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
       let new_clauses = List.rev_append !simplified_actives new_clauses in
-      (* simplification of new clauses w.r.t active set; only the non-redundant ones
+      (* simplification of new clauses w.r.t active set; only the non-trivial ones
          are kept *)
       let new_clauses = HExtlib.filter_map
         (fun c ->
           let _, simplified_c = simplify new_active_set c in
-          if Sup.is_tautology simplified_c then None else Some simplified_c)
-          new_clauses
+          if Sup.is_tautology simplified_c then None else Some simplified_c
+        )
+        new_clauses
       in
       List.iter
         (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf "    inferred new clause %a"
