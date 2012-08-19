@@ -37,6 +37,9 @@ val compare_lits_partial : ord:ordering -> literal
                           -> literal -> comparison  (** partial comparison of literals *)
 val hash_literal : literal -> int                   (** hashing of literal *)
 
+val pos_lit : literal -> bool                       (** is the literal positive? *)
+val neg_lit : literal -> bool                       (** is the literal negative? *)
+
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
 val mk_eq : ord:ordering -> foterm -> foterm -> literal

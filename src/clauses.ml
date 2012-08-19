@@ -129,6 +129,12 @@ let hash_literal lit = match lit with
       then Utils.murmur_hash ((Utils.murmur_hash l.hkey) lxor r.hkey)
       else Utils.murmur_hash ((Utils.murmur_hash r.hkey) lxor l.hkey)
 
+let pos_lit lit = match lit with
+  | Equation (_,_,sign,_) -> sign
+
+let neg_lit lit = match lit with
+  | Equation (_,_,sign,_) -> not sign
+
 let check_type a b = if a.node.sort <> b.node.sort
   then raise (SortError "sides of equations of different sorts") else ()
 

@@ -171,6 +171,12 @@ let rec list_inter comp l1 l2 = match l1 with
   | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)
   | _::xs -> list_inter comp xs l2
 
+let rec list_take n l = match n, l with
+  | 0, _ -> l
+  | _, [] -> l
+  | _, x::xs when n > 0 -> x :: (list_take (n-1) xs)
+  | _ -> assert false
+
 let on_buffer ?(margin=80) f t =
   let buff = Buffer.create 100 in
   let formatter = Format.formatter_of_buffer buff in

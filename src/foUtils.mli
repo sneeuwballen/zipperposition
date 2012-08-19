@@ -63,6 +63,8 @@ val list_mem : ('a -> 'a -> bool) -> 'a -> 'a list -> bool
 val list_uniq : ('a -> 'a -> bool) -> 'a list -> 'a list
 (** list intersection, given the comparison function *)
 val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
+(** take n elements *)
+val list_take : int -> 'a list -> 'a list
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string
