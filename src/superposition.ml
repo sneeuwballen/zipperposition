@@ -320,6 +320,8 @@ let infer_equality_resolution_ actives clause =
             and new_lits = Utils.list_remove clause.clits pos in
             let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
             let new_clause = C.mk_clause ~ord new_lits proof in
+            Utils.debug 3 (lazy (Utils.sprintf "equality resolution on %a yields %a"
+                          (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause));
             new_clause::acc
           else
             acc
@@ -335,7 +337,7 @@ let infer_equality_factoring_ actives clause =
   let lits_pos = Utils.list_pos clause.clits in
   (* find root terms that are unifiable with s and are not in the
      literal at s_pos. This returns a list of position and substitution *)
-  let find_unifiable_lits s s_pos candidate_lits =
+  let find_unifiable_lits s s_pos =
     List.fold_left
       (fun acc (Equation (u, v, sign, _), idx) ->
         if not sign then acc
@@ -351,7 +353,7 @@ let infer_equality_factoring_ actives clause =
             with UnificationFailure _ -> []
           in try_u @ try_v @ acc
       )
-      [] candidate_lits
+      [] lits_pos
   (* do the inference between given positions, if ordering
      conditions are respected *)
   and do_inference active_pos passive_pos subst =
@@ -369,13 +371,16 @@ let infer_equality_factoring_ actives clause =
         and new_lits = Utils.list_remove clause.clits active_idx in
         let new_lits = (C.mk_neq ~ord t v) :: new_lits in
         let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-        [C.mk_clause ~ord new_lits proof]
+        let new_clause = C.mk_clause ~ord new_lits proof in
+        Utils.debug 3 (lazy (Utils.sprintf "equality factoring on %a yields %a"
+                      (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause));
+        [new_clause]
       else
         []
   (* try to do inferences with each positive literal *)
   in fold_positive ~both:true
     (fun acc s t _ s_pos -> (* try with s=t *)
-      let unifiables = find_unifiable_lits s s_pos lits_pos in
+      let unifiables = find_unifiable_lits s s_pos in
       List.fold_left
         (fun acc (passive_pos, subst) ->
           (do_inference s_pos passive_pos subst) @ acc)

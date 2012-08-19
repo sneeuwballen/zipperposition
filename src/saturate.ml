@@ -92,55 +92,55 @@ let given_clause_step state =
                     (Utils.on_buffer C.pp_clause c)));
       (* an active set containing only the given clause *)
       let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
-      (* do inferences w.r.t to the active set, and c itself *)
-      let new_clauses = 
-        List.rev_append (generate state.PS.active_set c)
-                        (generate given_active_set c)
-      in
-      (* simplify active set using c *)
+      (* find clauses that are subsumed by c in active_set *)
+      let subsumed_active = subsumed_by state.PS.active_set c in
+      let active_set = PS.remove_actives state.PS.active_set subsumed_active in
+      let state = { state with PS.active_set = active_set } in
+      (* simplify active set using c TODO write a function for this *)
       let simplified_actives = ref [] in  (* simplified active clauses *)
       let bag_remain, bag_simplified = C.partition_bag
         state.PS.active_set.PS.active_clauses
         (fun hc ->
           (* try to simplify hc using the given clause *)
           let original, simplified = simplify given_active_set hc.node in
-          if C.eq_clause original simplified
-            then true  (* keep the original clause, it has not been simplified *)
-            else begin
+          if not (C.eq_clause original simplified)
+            then begin
               (* remove the original clause form active_set, save the simplified clause *)
               simplified_actives := simplified :: !simplified_actives;
               Utils.debug 2 (lazy (Utils.sprintf "active clause %a simplified into %a"
                            (C.pp_clause ~sort:false) original
                            (C.pp_clause ~sort:false) simplified));
               false
-            end
+            end else true (* no change *)
         )
       in
       (* the simplified active clauses are removed from active set and
          added to the set of new clauses *)
-      let new_active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
-      let new_clauses = List.rev_append !simplified_actives new_clauses in
+      let active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
+      let state = { state with PS.active_set = active_set } in
+      let new_clauses = !simplified_actives in
+      (* do inferences w.r.t to the active set, and c itself *)
+      let new_clauses = List.rev_append (generate state.PS.active_set c) new_clauses in
+      let new_clauses = List.rev_append (generate given_active_set c) new_clauses in
+      (* add given clause to active set *)
+      let active_set, _ = PS.add_active state.PS.active_set c in
+      let state = { state with PS.active_set=active_set } in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
          are kept *)
       let new_clauses = HExtlib.filter_map
         (fun c ->
-          let _, simplified_c = simplify new_active_set c in
+          let _, simplified_c = simplify state.PS.active_set c in
           if Sup.is_tautology simplified_c then None else Some simplified_c
         )
         new_clauses
       in
       List.iter
         (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf "    inferred new clause %a"
-                                           (C.pp_clause ~sort:false) new_c))) new_clauses;
-      (* find clauses that are subsumed by c in active_set *)
-      let subsumed_active = subsumed_by new_active_set c in
-      let new_active_set = PS.remove_actives new_active_set subsumed_active in
+                                    (C.pp_clause ~sort:false) new_c))) new_clauses;
       (* add new clauses (including simplified active clauses) to passive set
          TODO remove orphans of simplified active clauses *)
-      let new_passive_set = PS.add_passives state.PS.passive_set new_clauses in
-      (* add given clause to active set *)
-      let new_active_set, _ = PS.add_active new_active_set c in
-      let state = { state with PS.passive_set=new_passive_set; PS.active_set=new_active_set} in
+      let passive_set = PS.add_passives state.PS.passive_set new_clauses in
+      let state = { state with PS.passive_set = passive_set } in
       (* test whether the empty clause has been found *)
       try
         let empty_clause = List.find (fun c -> c.clits = []) new_clauses in
