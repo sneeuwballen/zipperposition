@@ -26,6 +26,7 @@ module C = Clauses
 module O = Orderings
 module S = FoSubst
 module I = Index
+module FV = FeatureVector
 module PS = ProofState
 module Unif = FoUnif
 module Utils = FoUtils
@@ -575,19 +576,13 @@ let subsumes a b =
   prof_subsumption.HExtlib.profile (subsumes_ a) b
 
 let subsumed_by_set_ set clause =
-  match C.maxlits clause with
-  | [] -> (assert (clause.clits = []); false)  (* empty clause is not subsumed *)
-  | (Equation (l, r, _, _), _)::_ ->
-    (* filter clauses: only those with a least one term that matches a side of the
-       arbitrarily choosen equation will be checked for subsumption *)
-  let matchables = I.ClauseSet.union
-    (I.DT.retrieve_generalizations set.PS.idx.I.root_index l)
-    (I.DT.retrieve_generalizations set.PS.idx.I.root_index r) in
+  (* use feature vector indexing *)
+  let candidates = FV.retrieve_subsuming set.PS.fv_idx clause in
   try
-    I.ClauseSet.iter
-      (fun (hc, _, _) ->
+    List.iter
+      (fun hc ->
         if subsumes hc.node clause then raise Exit else ())
-      matchables;
+      candidates;
     false
   with Exit ->
     Utils.debug 3 (lazy (Utils.sprintf "%a subsumed by active set"
@@ -598,12 +593,11 @@ let subsumed_by_set set clause =
   prof_subsumption_set.HExtlib.profile (subsumed_by_set_ set) clause
 
 let subsumed_in_set_ set clause =
-  let hclauses = ref [] in
-  C.iter_bag set.PS.active_clauses
-    (fun _ hc ->
-      if subsumes clause hc.node
-        then hclauses := hc :: !hclauses else ());
-  !hclauses
+  (* use feature vector indexing *)
+  let candidates = FV.retrieve_subsumed set.PS.fv_idx clause in
+  List.filter
+    (fun hc -> subsumes clause hc.node)
+    candidates
 
 let subsumed_in_set set clause =
   prof_subsumption_in_set.HExtlib.profile (subsumed_in_set_ set) clause

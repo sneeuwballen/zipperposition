@@ -27,8 +27,9 @@ open Types
 (** set of active clauses *)
 type active_set = {
   a_ord : ordering;
-  active_clauses : Clauses.bag;
-  idx : Index.t;
+  active_clauses : Clauses.bag;       (** set of active clauses *)
+  idx : Index.t;                      (** term index *)
+  fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
 }
 
 (** set of passive clauses *)

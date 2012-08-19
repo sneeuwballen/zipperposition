@@ -24,6 +24,7 @@ open Types
 open Hashcons
 
 module I = Index
+module FV = FeatureVector
 module C = Clauses
 module CQ = ClauseQueue
 module U = FoUtils
@@ -31,8 +32,9 @@ module U = FoUtils
 (** set of active clauses *)
 type active_set = {
   a_ord : ordering;
-  active_clauses : C.bag;
-  idx : Index.t;
+  active_clauses : Clauses.bag;       (** set of active clauses *)
+  idx : Index.t;                      (** term index *)
+  fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
 }
 
 (** set of passive clauses *)
@@ -52,11 +54,18 @@ type state = {
   passive_set : passive_set;  (* passive clauses *)
 }
 
+let mk_active_set ~ord =
+  let signature = ord#symbol_ordering#signature in
+  (* feature vector index *)
+  let fv_idx = FV.mk_fv_index_signature signature in
+  {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty; fv_idx=fv_idx}
+
 let make_state ord queue_list =
   let passive_set = {p_ord=ord; passive_clauses=C.empty_bag;
                      queues=queue_list; queue_state=(0,0)}
-  and active_set = {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty} in
-  {ord=ord; active_set=active_set;
+  and active_set = mk_active_set ~ord in
+  {ord=ord;
+   active_set=active_set;
    passive_set=passive_set}
 
 let next_passive_clause passive_set =
@@ -98,9 +107,10 @@ let add_active active_set c =
   if C.is_in_bag active_set.active_clauses hc.tag
     then active_set, hc  (* already in active set *)
     else
-      let new_bag = C.add_hc_to_bag active_set.active_clauses hc in
-      let new_idx = I.index_clause active_set.idx hc in
-      {active_set with active_clauses=new_bag; idx=new_idx}, hc
+      let new_bag = C.add_hc_to_bag active_set.active_clauses hc
+      and new_idx = I.index_clause active_set.idx hc
+      and new_fv_idx = FV.index_clause active_set.fv_idx hc in
+      {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}, hc
 
 let add_actives active_set l =
   List.fold_left (fun b c -> fst (add_active b c)) active_set l
@@ -109,8 +119,9 @@ let remove_active active_set hc =
   if C.is_in_bag active_set.active_clauses hc.tag
     then
       let new_bag = C.remove_from_bag active_set.active_clauses hc.tag
-      and new_idx = I.remove_clause active_set.idx hc in
-      {active_set with active_clauses=new_bag; idx=new_idx}
+      and new_idx = I.remove_clause active_set.idx hc
+      and new_fv_idx = FV.remove_clause active_set.fv_idx hc in
+      {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}
     else
       active_set
 
@@ -123,7 +134,7 @@ let remove_active_bag active_set bag =
   !active
 
 let singleton_active_set ~ord clause =
-  let active_set = {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty} in
+  let active_set = mk_active_set ~ord in
   let active_set, _ = add_active active_set clause in
   active_set
   
