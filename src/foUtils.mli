@@ -65,6 +65,10 @@ val list_uniq : ('a -> 'a -> bool) -> 'a list -> 'a list
 val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 (** take n elements *)
 val list_take : int -> 'a list -> 'a list
+(** range from i to j *)
+val list_range : int -> int -> int list
+(** call the function n times with unit *)
+val times : int -> (unit -> 'a) -> 'a list
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string

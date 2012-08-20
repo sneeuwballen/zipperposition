@@ -177,6 +177,16 @@ let rec list_take n l = match n, l with
   | _, x::xs when n > 0 -> x :: (list_take (n-1) xs)
   | _ -> assert false
 
+let rec list_range low high =
+  assert (low <= high);
+  match low, high with
+  | _, _ when low = high -> []
+  | _ -> low :: (list_range (low+1) high)
+
+let rec times i f =
+  if i = 0 then []
+  else (f ()) :: (times (i-1) f)
+
 let on_buffer ?(margin=80) f t =
   let buff = Buffer.create 100 in
   let formatter = Format.formatter_of_buffer buff in
