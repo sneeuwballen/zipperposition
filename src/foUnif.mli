@@ -25,8 +25,12 @@ open Types
 (* unify terms, returns a substitution or raise an exception *)
 val unification: foterm -> foterm -> substitution
 
-(* match_term [a] [b] returns sigma such that sigma(a) = b *)
+(* [matching a b] returns sigma such that sigma(a) = b *)
 val matching: foterm -> foterm -> substitution
+
+(** [matching_locked ~locked a b returns sigma such that sigma(a) = b
+    and sigma does not bind any variable in locked, or raise UnificationFailure *)
+val matching_locked: locked:varlist -> foterm -> foterm -> substitution
 
 (* alpha_eq [a] [b] returns sigma with sigma(a) = b, and sigma
  * a variable renaming, or raise UnificationFailure *)

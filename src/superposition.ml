@@ -361,8 +361,9 @@ let infer_equality_factoring_ actives clause =
     and u, v, sign_uv = get_equations_sides clause passive_pos
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
-    (* check whether subst(lit) is maximal *)
-    if C.check_maximal_lit ~ord clause active_idx subst
+    (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
+    if C.check_maximal_lit ~ord clause active_idx subst &&
+       ord#compare (S.apply_subst subst s) (S.apply_subst subst t) <> Lt
       then
         let proof = lazy (Proof ("equality_factoring",
           [(clause, active_pos, subst); (clause, passive_pos, subst)]))
@@ -445,7 +446,8 @@ let demod_term ~ord blocked_ids active_set term =
 
 (** demodulate a whole clause w.r.t the active_set, but ignores
     the blocked clauses (generally the clause itself, if it
-    is already in the active_set) *)
+    is already in the active_set)
+    TODO ensure the conditions for rewrite of positive literals are ok (cf paper) *)
 let demodulate_ active_set blocked_ids clause =
   let ord = active_set.PS.a_ord in
   (* rewrite the literal lit (at pos), returning a new lit
@@ -516,42 +518,54 @@ let basic_simplify ~ord clause =
         assert (T.is_var l || T.is_var r);
         try
           let subst = Unif.unification l r in
+          (* remove the literal, and apply the substitution to the remaining literals
+             before trying to find another x!=t *)
           er (List.map (C.apply_subst_lit ~ord subst) (Utils.list_remove lits i))
         with UnificationFailure _ -> lits
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
   let new_clause = C.mk_clause ~ord new_lits clause.cproof in
-  (Utils.debug 3 (lazy (Utils.sprintf "%a basic_simplifies into %a" (C.pp_clause ~sort:false)
-                        clause (C.pp_clause ~sort:false) new_clause)));
+  (if not (C.eq_clause new_clause clause) then
+      (Utils.debug 3 (lazy (Utils.sprintf "%a basic_simplifies into %a"
+      (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause))));
   new_clause
 
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
     substitutions s such that s(lit_a) = lit_b and s contains subst. The list
     is empty if lit_a does not subsume lit_b. *)
-let match_lits lit_a lit_b subst =
+let match_lits ~locked lit_a lit_b subst =
   match lit_a, lit_b with
   | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) ->
     if signa <> signb then [] else
     (try
-      let s = Unif.matching (S.apply_subst subst la) (S.apply_subst subst lb) in
+      let s = Unif.matching_locked ~locked
+        (S.apply_subst subst la) (S.apply_subst subst lb) in
       let s = S.concat s subst in
-      let s' = Unif.matching (S.apply_subst s ra) (S.apply_subst s rb) in
+      let s' = Unif.matching_locked ~locked
+        (S.apply_subst s ra) (S.apply_subst s rb) in
       [S.concat s' s]
     with UnificationFailure _ -> []) @
     (try
-      let s = Unif.matching (S.apply_subst subst la) (S.apply_subst subst rb) in
+      let s = Unif.matching_locked ~locked
+        (S.apply_subst subst la) (S.apply_subst subst rb) in
       let s = S.concat s subst in
-      let s' = Unif.matching (S.apply_subst s ra) (S.apply_subst s lb) in
+      let s' = Unif.matching_locked ~locked
+        (S.apply_subst s ra) (S.apply_subst s lb) in
       [S.concat s' s]
     with UnificationFailure _ -> [])
 
-let subsumes_ a b =
+(** raised when a subsuming substitution is found *)
+exception SubsumptionFound of substitution
+
+let subsumes_with a b =
+  let locked = b.cvars in
   (* a must not have more literals *)
-  if List.length a.clits > List.length b.clits then false else
+  if List.length a.clits > List.length b.clits then None else
   (* does the list subst(l1) subsume subst(l2)? *)
   let rec aux l1 l2 subst = match l1 with
-  | [] -> true  (* no lits in subsuming clause *)
+  | [] -> (* no lits in subsuming clause *)
+    raise (SubsumptionFound subst)
   | x::l1_tail ->
     (* is there a y in l2 with subst'(subst(x)) = subst(y)? if yes, remove
        x from l1 and y from l2 and continue *)
@@ -559,26 +573,33 @@ let subsumes_ a b =
   (* try to match x against literals in l2 (l2_pre are literals
      in l2 that have already been tried), with subst *)
   and attempt_with x l1 l2_pre l2 subst = match l2 with
-  | [] -> false
+  | [] -> None
   | y::l2_tail ->
-    let possible_matches = match_lits x y subst in
+    let possible_matches = match_lits ~locked x y subst in
     if possible_matches = []  (* x and y do not match *)
       then attempt_with x l1 (y::l2_pre) l2_tail subst
       else
         let l2' = List.rev_append l2_pre l2_tail in  (* l2 without y *)
         (* try to recurse with each possible match of x,y *)
-        if List.exists (fun subst' -> aux l1 l2' subst') possible_matches
-          then true
-          else attempt_with x l1 (y::l2_pre) l2_tail subst
+        List.iter (fun subst' -> ignore (aux l1 l2' subst')) possible_matches;
+        attempt_with x l1 (y::l2_pre) l2_tail subst
   (* try aux with the whole list of literals l1 *)
-  in let res = aux a.clits b.clits S.id_subst in
-  (if res then
+  in
+  let res =
+    try aux a.clits b.clits S.id_subst
+    with SubsumptionFound subst -> Some subst
+  in
+  (if res <> None then
     Utils.debug 3 (lazy (Utils.sprintf "%a subsumes %a" (C.pp_clause ~sort:false) a
-                          (C.pp_clause ~sort:false) b)));
+                        (C.pp_clause ~sort:false) b)));
   res
 
 let subsumes a b =
-  prof_subsumption.HExtlib.profile (subsumes_ a) b
+  let check a b = match subsumes_with a b with
+  | None -> false
+  | Some _ -> true
+  in
+  prof_subsumption.HExtlib.profile (check a) b
 
 let subsumed_by_set_ set clause =
   (* use feature vector indexing *)

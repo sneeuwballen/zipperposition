@@ -166,9 +166,12 @@ let () =
   Printf.printf "%% done %d iterations\n" num;
   print_stats state;
   match result with
-  | Sat.Sat -> Printf.printf "%% SZS status CounterSatisfiable\n"
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
+  | Sat.Sat ->
+      Printf.printf "%% SZS status CounterSatisfiable\n";
+      if Utils.debug_level () > 1 then
+        Format.printf "%% saturated set: @[<v>%a@]@." C.pp_bag state.PS.active_set.PS.active_clauses
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "%% SZS status Theorem\n";

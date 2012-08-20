@@ -54,7 +54,6 @@ let simplify active_set clause =
   let ord = active_set.PS.a_ord in
   let old_c = PS.relocate_active active_set clause in
   let c = Sup.demodulate active_set [] old_c in
-  (* TODO simplify-reflect and such *)
   let c = Sup.basic_simplify ~ord c in
   (if not (C.eq_clause c old_c)
     then Utils.debug 2 (lazy (Utils.sprintf "clause %a simplified into %a"
@@ -72,7 +71,9 @@ let is_redundant active_set clause =
   Sup.subsumed_by_set active_set c
 
 (** find redundant clauses in active_set, w.r.t c *)
-let subsumed_by active_set clause = Sup.subsumed_in_set active_set clause
+let subsumed_by active_set clause =
+  let c = PS.relocate_active active_set clause in
+  Sup.subsumed_in_set active_set c
 
 let given_clause_step state =
   let ord = state.PS.ord in
@@ -123,7 +124,7 @@ let given_clause_step state =
       let new_clauses = List.rev_append (generate state.PS.active_set c) new_clauses in
       let new_clauses = List.rev_append (generate given_active_set c) new_clauses in
       (* add given clause to active set *)
-      let active_set, _ = PS.add_active state.PS.active_set c in
+      let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
       let state = { state with PS.active_set=active_set } in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
          are kept *)

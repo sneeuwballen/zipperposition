@@ -81,7 +81,7 @@ let unification a b =
   in
   prof_unification.HExtlib.profile (unif S.id_subst a) b
 
-let matching a b =
+let matching_locked ~locked a b =
   (* recursive matching *)
   let rec unif locked subst s t =
     if s.node.sort <> t.node.sort then raise (UnificationFailure (lazy "different sorts"));
@@ -103,7 +103,9 @@ let matching a b =
       )
     | _, _ -> raise (UnificationFailure (lazy "incompatible terms"))
   in
-  prof_matching.HExtlib.profile (unif (T.vars_of_term b) S.id_subst a) b
+  prof_matching.HExtlib.profile (unif locked S.id_subst a) b
+
+let matching a b = matching_locked ~locked:(T.vars_of_term b) a b
 
 (** Sets of variables in s and t are assumed to be disjoint  *)
 let alpha_eq s t =

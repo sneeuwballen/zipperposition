@@ -57,12 +57,15 @@ val demodulate : ProofState.active_set
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : clause -> clause -> bool
+val subsumes_with : clause -> clause -> substitution option   (** returns subsuming subst *)
 
 (** check whether the clause is subsumed by any clause in the set *)
 val subsumed_by_set : ProofState.active_set -> clause -> bool
 
 (** list of clauses in the active set that are subsumed by the clause *)
 val subsumed_in_set : ProofState.active_set -> clause -> hclause list
+
+(* TODO simplify-reflect and such *)
 
 (** remove from the passive_set the list of orphans of clause *)
 val orphan_murder: ProofState.passive_set
