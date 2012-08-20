@@ -96,14 +96,19 @@ let compare_literal l1 l2 =
           if c <> 0 then c else
             Pervasives.compare sign1 sign2
 
+let lit_to_multiset lit = match lit with
+  | Equation (l, r, true, _) -> [l; r]
+  | Equation (l, r, false, _) -> [l; l; r; r]
+
 let compare_lits_partial ~ord l1 l2 =
+  (* Utils.multiset_partial ord#compare (lit_to_multiset l1) (lit_to_multiset l2) *)
   match l1, l2 with
   | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
     let s_u = ord#compare s u
     and s_v = ord#compare s v
     and t_u = ord#compare t u
     and t_v = ord#compare t v in
-    match s_u, s_v, t_u, t_v, sign_uv, sign_st with
+    match s_u, s_v, t_u, t_v, sign_st, sign_uv with
     | Eq, _, _, Eq, _, _
     | _, Eq, Eq, _, _, _ ->
       if sign_st = sign_uv then Eq
@@ -121,6 +126,20 @@ let compare_lits_partial ~ord l1 l2 =
     | Lt, _, Eq, _, true, false (* t = u, s < u *)
     | _, Eq, _, Lt, true, false (* s = v, t < v *)
     | _, Lt, _, Eq, true, false -> Lt (* t = v, s < v *)
+    | Eq, _, _, Gt, _, _        (* s = u, t > v *)
+    | Gt, _, _, Eq, _, _        (* s > u, t = v *)
+    | _, Eq, Gt, _, _, _        (* s = v, t > u *)
+    | _, Gt, Eq, _, _, _        (* s > v, t = u *)
+      when sign_uv = sign_st -> Gt
+    | Eq, _, _, Lt, _, _        (* s = u, t < v *)
+    | Lt, _, _, Eq, _, _        (* s < u, t = v *)
+    | _, Eq, Lt, _, _, _        (* s = v, t < u *)
+    | _, Lt, Eq, _, _, _        (* s < v, t = u *)
+      when sign_uv = sign_st -> Lt
+    | Eq, Eq, _, _, false, true (* s = u, s = v *)
+    | _, _, Eq, Eq, false, true -> Gt (* t = u, t = v *)
+    | _, Eq, _, Eq, true, false (* s = v, t = v *)
+    | Eq, _, Eq, _, true, false -> Lt (* s = u, t = u *)
     | _ -> Incomparable
 
 let hash_literal lit = match lit with
@@ -179,10 +198,6 @@ let fmap_lit ~ord f = function
 let vars_of_lit = function
   | Equation (left, right, _, _) ->
     T.merge_varlist (T.vars_of_term left) (T.vars_of_term right)
-
-let lit_to_multiset lit = match lit with
-  | Equation (l, r, true, _) -> [[l; r]]
-  | Equation (l, r, false, _) -> [[l]; [r]]
 
 (* ----------------------------------------------------------------------
  * clauses

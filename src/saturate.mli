@@ -35,7 +35,7 @@ type szs_status =
 val given_clause_step : ProofState.state -> ProofState.state * szs_status
 
 (** run the given clause until a timeout occurs or a result
-    is found *)
+    is found. It returns a tuple (new state, result, number of steps done) *)
 val given_clause :  ?steps:int -> ?timeout:float
                   -> ProofState.state
                   -> ProofState.state * szs_status * int

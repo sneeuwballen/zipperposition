@@ -129,7 +129,7 @@ let pos_unit_clauses ~ord =
 let default_queues ~ord =
   [ (clause_weight ~ord, 5);
     (pos_unit_clauses ~ord, 3);
-    (goals ~ord, 2);
+    (goals ~ord, 1);
     (fifo ~ord, 1);
   ]
 

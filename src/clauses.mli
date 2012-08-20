@@ -53,7 +53,7 @@ val negate_lit : literal -> literal (** negate literal *)
 val fmap_lit : ord:ordering -> (foterm -> foterm) -> literal -> literal (** fmap in literal *)
 val vars_of_lit : literal -> varlist (** gather variables *)
 
-val lit_to_multiset : literal -> foterm list list (** literal to multiset of terms *)
+val lit_to_multiset : literal -> foterm list (** literal to multiset of terms *)
 
 (* ----------------------------------------------------------------------
  * clauses
