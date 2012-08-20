@@ -79,11 +79,10 @@ let check_subsumption (c1, c2) =
   match Sup.subsumes_with c1 c2 with
   | None -> H.TestPreconditionFalse
   | Some subst ->
-    let c1' = C.apply_subst_cl ~ord subst c1
-    and c2' = C.apply_subst_cl ~ord subst c2 in
-    if clause_subset c1' c2'
+    let c1' = C.apply_subst_cl ~ord subst c1 in
+    if clause_subset c1' c2
       then H.TestOk
-      else H.TestFail (c1, c2, c1', c2', subst)
+      else H.TestFail (c1, c2, c1', c2, subst)
 
 let print_subsuming_failure formatter (c1,c2,c1',c2',subst) =
   Format.fprintf formatter "@[<hv 3>(%a,@; %a,@; %a,@; %a,@; %a)@]"
