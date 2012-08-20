@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 open Hashcons
 
+module C = Clauses
 module O = Orderings
 module Utils = FoUtils
 
@@ -88,6 +89,31 @@ let clause_weight ~ord =
     end
   and name = "clause_weight" in
   make_hq ~ord:clause_ord name
+
+(** compute a clause weight that makes maximal literals bigger *)
+let compute_refined_clause_weight ~ord c =
+  (* is lit maximal in c? *)
+  let is_maxlit c lit =
+    List.exists (fun (lit', _) -> C.eq_literal lit lit') (C.maxlits c)
+  (* weight function that makes maximal literals heavier *)
+  in
+  List.fold_left
+    (fun sum (Equation (l, r, _, _) as lit) ->
+      let lit_weight = ord#compute_term_weight l + ord#compute_term_weight r in
+      sum + (if is_maxlit c lit
+        then (lit_weight +2) * (lit_weight +2) else lit_weight * lit_weight))
+    0 c.clits
+
+let refined_clause_weight ~ord =
+  let clause_ord =
+    object
+      method le hc1 hc2 =
+        let w1 = compute_refined_clause_weight ~ord hc1.node
+        and w2 = compute_refined_clause_weight ~ord hc2.node in
+        w1 <= w2
+    end
+  and name = "refined_clause_weight" in
+  make_hq ~ord:clause_ord name
   
 let goals ~ord =
   (* check whether a literal is a goal *)
@@ -99,11 +125,11 @@ let goals ~ord =
       method le hc1 hc2 =
         let goals1 = List.length hc1.node.clits
         and goals2 = List.length hc2.node.clits
-        and w1 = ord#compute_clause_weight hc1.node
-        and w2 = ord#compute_clause_weight hc2.node in
-        (* lexicographic comparison that favors clauses with more goals,
+        and w1 = compute_refined_clause_weight ~ord hc1.node
+        and w2 = compute_refined_clause_weight ~ord hc2.node in
+        (* lexicographic comparison that favors clauses with less literals
            and then clauses with small weight *)
-        (Utils.lexicograph compare [-goals1; w1] [-goals2; w2]) <= 0
+        (Utils.lexicograph compare [goals1; w1] [goals2; w2]) <= 0
     end
   and name = "prefer_goals" in
   make_hq ~ord:clause_ord ~accept:is_goal_clause name
@@ -117,8 +143,8 @@ let pos_unit_clauses ~ord =
     object
       method le hc1 hc2 =
         assert (is_unit_pos hc1.node && is_unit_pos hc2.node);
-        let w1 = ord#compute_clause_weight hc1.node
-        and w2 = ord#compute_clause_weight hc2.node in
+        let w1 = compute_refined_clause_weight ~ord hc1.node
+        and w2 = compute_refined_clause_weight ~ord hc2.node in
         (* lexicographic comparison that favors clauses with more goals,
            and then clauses with small weight *)
         w1 <= w2

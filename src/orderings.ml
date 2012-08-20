@@ -459,6 +459,7 @@ class nrkbo (so : symbol_ordering) : ordering =
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
       (fun (a, b) -> NRKBO.compare_terms ~so a b) (a, b)
+    method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = NRKBO.name
   end
@@ -472,6 +473,7 @@ class kbo (so : symbol_ordering) : ordering =
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
       (fun (a, b) -> KBO.compare_terms ~so a b) (a, b)
+    method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = KBO.name
   end
@@ -485,6 +487,7 @@ class lpo (so : symbol_ordering) : ordering =
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
       (fun (a, b) -> LPO.compare_terms ~so a b) (a, b)
+    method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = LPO.name
   end
@@ -497,6 +500,7 @@ let dummy_ordering =
     method clear_cache () = ()
     method symbol_ordering = dummy_symbol_ordering
     method compare a b = Incomparable
+    method compute_term_weight t = weight_of_term ~so:dummy_symbol_ordering t
     method compute_clause_weight c =
       compute_clause_weight ~so:dummy_symbol_ordering c
     method name = "dummy"
