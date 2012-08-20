@@ -85,7 +85,8 @@ class type symbol_ordering =
     method refresh : unit -> symbol_ordering  (** refresh the signature *)
     method signature : symbol list            (** current symbols in decreasing order *)
     method compare : symbol -> symbol -> int  (** total order on symbols *)
-    method weight : symbol -> int             (** weight of symbol *)
+    method weight : symbol -> int             (** weight of symbols *)
+    method var_weight : int                   (** weight of variables *)
   end
 
 (** the interface of an ordering type *)

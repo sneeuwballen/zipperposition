@@ -79,6 +79,7 @@ let rec arity_ordering () : symbol_ordering =
     method compare s1 s2 = if s1 = s2 then 0
       else (Hashtbl.find ord s2) - (Hashtbl.find ord s1)
     method weight s = Hashtbl.find arities s  (* weight is arity *)
+    method var_weight = 1
   end
 
 let default_symbol_ordering () = arity_ordering ()
@@ -89,7 +90,8 @@ let dummy_symbol_ordering =
       method refresh () = produce ()
       method signature = []
       method compare a b = Pervasives.compare a b
-      method weight _ = 1
+      method weight _ = 2
+      method var_weight = 1
     end
   in produce ()
 
@@ -110,7 +112,30 @@ module type S =
     val name : string
   end
 
-type weight = int * (int * int) list
+(** simple weight for terms *)
+let rec weight_of_term ~so term = match term.node.term with
+  | Var _ -> so#var_weight
+  | Leaf s -> so#weight s
+  | Node l -> List.fold_left
+      (fun sum subterm -> sum + weight_of_term ~so subterm) 0 l
+
+(** simple weight for clauses *)
+let compute_clause_weight ~so {clits=lits} =
+  let weight_of_lit l = match l with
+  | Equation (l,r,_,ord) ->
+      let wl = weight_of_term ~so l in
+      let wr = weight_of_term ~so r in
+      wl + wr
+  in
+  (* sum of squares of weights of literals *)
+  List.fold_left
+    (fun sum lit ->
+      let wlit = weight_of_lit lit in
+      sum + wlit*wlit)
+    0 lits 
+
+(** extended weight for KBO, with multiset of variables *)
+type kbo_weight = int * (int * int) list
 
 let string_of_weight (cw, mw) =
   let s =
@@ -119,7 +144,7 @@ let string_of_weight (cw, mw) =
   in
   Printf.sprintf "[%d; %s]" cw s
 
-let weight_of_term ~so term =
+let kbo_weight_of_term ~so term =
     let vars_dict = Hashtbl.create 5 in
     let rec aux x = match x.node.term with
       | Var i ->
@@ -142,14 +167,14 @@ let weight_of_term ~so term =
     in
     (w, List.sort compare l) (* from the smallest meta to the bigest *)
 
-let compute_clause_weight ~so {clits=lits} =
+let kbo_compute_clause_weight ~so {clits=lits} =
     let rec weight_of_polynomial w m =
       let factor = 2 in
       w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
     and weight_of_lit l = match l with
     | Equation (l,r,_,ord) ->  (* TODO use order? *)
-        let wl, ml = weight_of_term ~so l in
-        let wr, mr = weight_of_term ~so r in
+        let wl, ml = kbo_weight_of_term ~so l in
+        let wr, mr = kbo_weight_of_term ~so r in
         weight_of_polynomial (wl+wr) (ml@mr) in
     List.fold_left (+) 0 (List.map weight_of_lit lits)
 
@@ -159,7 +184,7 @@ let compute_clause_weight ~so {clits=lits} =
  * Variables which do not occur in the term should not be present
  * in the normalized polynomial
  *)
-let compare_weights (h1, w1) (h2, w2) =
+let compare_kbo_weights (h1, w1) (h2, w2) =
   let rec aux hdiff (lt, gt) diffs w1 w2 =
     match w1, w2 with
       | ((var1, w1)::tl1) as l1, (((var2, w2)::tl2) as l2) ->
@@ -246,8 +271,6 @@ module NRKBO = struct
 
   let eq_foterm x y = T.eq_foterm x y
 
-  exception UnificationFailure of string Lazy.t
-
   let are_invertible l r = false   (* FIXME ignore this case *)
     (*
     let varlist = (T.vars_of_term l)@(T.vars_of_term r) in
@@ -263,9 +286,9 @@ module NRKBO = struct
 
   (* Riazanov: p. 40, relation >_n *)
   let nonrec_kbo ~so t1 t2 =
-    let w1 = weight_of_term ~so t1 in
-    let w2 = weight_of_term ~so t2 in
-    match compare_weights w1 w2 with
+    let w1 = kbo_weight_of_term ~so t1 in
+    let w2 = kbo_weight_of_term ~so t2 in
+    match compare_kbo_weights w1 w2 with
     | XLE ->  (* this is .> *)
         if aux_ordering so#compare t1 t2 = XLT then XLT else XINCOMPARABLE
     | XGE ->
@@ -300,9 +323,9 @@ module KBO = struct
           if o = XEQ then cmp tl1 tl2
           else o
     in
-    let w1 = weight_of_term ~so t1 in
-    let w2 = weight_of_term ~so t2 in
-    let comparison = compare_weights w1 w2 in
+    let w1 = kbo_weight_of_term ~so t1 in
+    let w2 = kbo_weight_of_term ~so t2 in
+    let comparison = compare_kbo_weights w1 w2 in
     match comparison with
     | XLE ->
         let r = aux t1 t2 in
@@ -404,8 +427,6 @@ module LPO = struct
               | _ -> assert false
           end
       | _,_ -> aux_ordering so#compare s t
-
-
 
   let compare_terms ~so = compare_terms (lpo ~so)
 
