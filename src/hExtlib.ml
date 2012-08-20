@@ -30,10 +30,10 @@ let _ =
       if !profiling_enabled && !something_profiled then
         begin
         prerr_endline
-         (Printf.sprintf "# !! %39s ---------- --------- --------- ---------"
+         (Printf.sprintf "%% !! %39s ---------- --------- --------- ---------"
            (String.make 39 '-'));
         prerr_endline
-         (Printf.sprintf "# !! %-39s %10s %9s %9s %9s"
+         (Printf.sprintf "%% !! %-39s %10s %9s %9s %9s"
            "function" "#calls" "total" "max" "average")
         end)
 
@@ -71,7 +71,7 @@ let profile ?(enable = true) s =
        begin
         something_profiled := true;
         prerr_endline
-         (Printf.sprintf "# !! %-39s %10d %9.4f %9.4f %9.4f"
+         (Printf.sprintf "%% !! %-39s %10d %9.4f %9.4f %9.4f"
          s !calls !total !max (!total /. (float_of_int !calls)))
        end);
    { profile = profile }
