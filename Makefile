@@ -9,6 +9,9 @@ all:
 profile:
 	cd src && ocamlbuild -libs str,unix -tags debug,profile main.native
 
+tests:
+	cd tests && ocamlbuild -libs str,unix -I src tests.native
+
 doc:
 	cd src && ocamlbuild main.docdir/index.html
 
@@ -18,4 +21,4 @@ clean:
 tags:
 	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
-.PHONY: all clean tags doc
+.PHONY: all profile clean tags doc tests
