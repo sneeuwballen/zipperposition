@@ -96,6 +96,7 @@ class type ordering =
     method clear_cache : unit -> unit         (** clear cache, if any *)
     method symbol_ordering : symbol_ordering
     method compare : foterm -> foterm -> comparison
+    method compute_term_weight : foterm -> int
     method compute_clause_weight : clause -> int
     method name : string
   end

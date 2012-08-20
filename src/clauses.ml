@@ -85,6 +85,13 @@ let eq_literal l1 l2 =
   | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
       o1 = o2 && T.eq_foterm l1 l2 && T.eq_foterm r1 r2 && sign1 = sign2
 
+let eq_literal_com l1 l2 =
+  match l1, l2 with
+  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
+      o1 = o2 && sign1 = sign2 &&
+      ((T.eq_foterm l1 l2 && T.eq_foterm r1 r2) ||
+       (T.eq_foterm l1 r2 && T.eq_foterm r1 l2))
+
 let compare_literal l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
@@ -209,8 +216,13 @@ let eq_clause c1 c2 =
   with
     Invalid_argument _ -> false
 
-let pp_clause ?(sort=false) formatter {clits=lits} =
-  fprintf formatter "@[<h>[%a]@]" (Utils.pp_list ~sep:" | " (pp_literal ~sort)) lits
+let pp_clause ?(sort=false) formatter c =
+  let is_max_lit lit = List.exists (fun (lit',_) -> eq_literal lit lit') (Lazy.force c.cmaxlits) in
+  fprintf formatter "@[<hov 3>[%a]@]" (Utils.pp_list ~sep:" | "
+    (fun formatter lit -> if is_max_lit lit
+      then fprintf formatter "%a*" (pp_literal ~sort) lit
+      else pp_literal formatter ~sort lit))
+    c.clits
 
 let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
@@ -269,10 +281,16 @@ let find_max_lits ~ord lits_pos =
     lits_pos
 
 let mk_clause ~ord lits proof =
-    let all_vars = List.fold_left T.merge_varlist [] (List.map vars_of_lit lits) in
-    let all_vars = List.stable_sort T.compare_foterm all_vars
-    and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
-    {clits=lits; cvars=all_vars; cproof=proof; cmaxlits=maxlits}
+  (* merge sets of variables *)
+  let rec merge_vars acc vars1 = match vars1 with
+  | [] -> acc
+  | v::vars1' when List.mem v acc -> merge_vars acc vars1'
+  | v::vars1' -> merge_vars (v::acc) vars1'
+  in
+  let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
+  let all_vars = List.stable_sort T.compare_foterm all_vars
+  and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
+  {clits=lits; cvars=all_vars; cproof=proof; cmaxlits=maxlits}
 
 let maxlits clause = Lazy.force clause.cmaxlits
 

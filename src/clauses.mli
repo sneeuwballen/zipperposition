@@ -32,6 +32,7 @@ val right_pos : int
 val opposite_pos : int -> int
 
 val eq_literal : literal -> literal -> bool         (** equality of literals *)
+val eq_literal_com : literal -> literal -> bool     (** commutative equality of lits *)
 val compare_literal : literal -> literal -> int     (** lexicographic comparison of literals *)
 val compare_lits_partial : ord:ordering -> literal
                           -> literal -> comparison  (** partial comparison of literals *)
