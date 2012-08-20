@@ -6,8 +6,10 @@ module C = Clauses
 module O = Orderings
 module T = Terms
 module H = Helpers
+module S = FoSubst
 module TT = TestTerms
 module Utils = FoUtils
+module Sup = Superposition
 
 let print_clause = C.pp_clause ~sort:false
 let print_clause_pair formatter (c1, c2) = 
@@ -32,17 +34,20 @@ let random_lit () =
     else random_eq ()
 
 (** random clause *)
-let random_clause () =
+let random_clause ?(size=4) () =
   if H.random_in 0 200 >= 198 then
     (* empty clause, from time to time *)
     let ord = O.dummy_ordering in
     C.mk_clause ~ord [] (lazy (Axiom ("", "empty!")))
   else
     (* build an actual clause *)
-    let size = H.random_in 1 4 in
+    let size = H.random_in 1 size in
     let lits = Utils.times size (fun _ -> random_lit ()) in
     let ord = O.dummy_ordering in
     C.mk_clause ~ord lits (lazy (Axiom ("", "random")))
+
+(* pair of random clauses *)
+let random_clause_pair () = (random_clause ~size:3 (), random_clause ~size:6 ())
 
 (** check that renaming works *)
 let check_fresh c =
@@ -53,7 +58,42 @@ let check_fresh c =
     then H.TestOk
     else H.TestFail (c, c')
 
+(** check subsumption property *)
+let check_subsumption (c1, c2) =
+  (* check whether a clause is a subset of another clause *)
+  let rec clause_subset c1 c2 = lits_subset c1.clits c2.clits
+  and lits_subset lits1 lits2 = match lits1 with
+  | [] -> true
+  | x::lits1' -> if List.exists (fun y -> C.eq_literal_com x y) lits2
+    then let lits2' = remove_once x lits2 in
+      assert (List.length lits2' = (List.length lits2) - 1); lits_subset lits1' lits2'
+    else false
+  (* remove one occurrence of x in l *)
+  and remove_once x l = match l with
+  | [] -> assert false
+  | y::l' -> if C.eq_literal_com x y then l' else y :: (remove_once x l')
+  in
+  let ord = O.default_ordering () in
+  let c1 = C.relocate_clause ~ord c2.cvars c1 in
+  (* see whether c1 subsumes c2 *)
+  match Sup.subsumes_with c1 c2 with
+  | None -> H.TestPreconditionFalse
+  | Some subst ->
+    let c1' = C.apply_subst_cl ~ord subst c1
+    and c2' = C.apply_subst_cl ~ord subst c2 in
+    if clause_subset c1' c2'
+      then H.TestOk
+      else H.TestFail (c1, c2, c1', c2', subst)
+
+let print_subsuming_failure formatter (c1,c2,c1',c2',subst) =
+  Format.fprintf formatter "@[<hv 3>(%a,@; %a,@; %a,@; %a,@; %a)@]"
+    print_clause c1 print_clause c2 print_clause c1' print_clause c2'
+    (S.pp_substitution ~sort:false) subst
+
 let run () =
   Format.printf "run clauses tests@.";
-  H.check_and_print ~name:"check_fresh" check_fresh random_clause print_clause_pair 5000
+  H.check_and_print ~name:"check_fresh" check_fresh
+    (random_clause ~size:4) print_clause_pair 2000;
+  H.check_and_print ~name:"check_subsumption" check_subsumption
+    random_clause_pair print_subsuming_failure 10000
 

@@ -9,7 +9,7 @@ all:
 profile:
 	cd src && ocamlbuild -libs str,unix -tags debug,profile main.native
 
-tests:
+tests: all
 	cd tests && ocamlbuild -libs str,unix -I src tests.native
 
 doc:
