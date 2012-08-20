@@ -4,6 +4,8 @@ open Types
 
 module T = Terms
 module H = Helpers
+module S = FoSubst
+module Unif = FoUnif
 module Utils = FoUtils
 
 let preds = ["p"; "q"; "r"; "s"]
@@ -12,7 +14,7 @@ let symbols = ["a"; "b"; "c"]
 
 (** random term *)
 let random_term () =
-  let depth = H.random_in 0 3 in
+  let depth = H.random_in 0 4 in
   let rec aux depth = match depth with
   | 0 -> random_leaf ()
   | n ->
@@ -38,5 +40,28 @@ let random_pred () =
     then p
     else T.mk_node (p::(Utils.times arity random_term))
 
+(** random pairs of terms *)
+let random_pair () = (random_term (), random_term ())
+
+(** check all variables are subterms *)
+let check_subterm t = 
+  match T.vars_of_term t with
+  | [] -> H.TestPreconditionFalse
+  | vars ->
+      if List.for_all (fun v -> T.member_term v t) vars
+        then H.TestOk else H.TestFail t
+
+(** check unification *)
+let check_unif (t1, t2) =
+  try
+    let subst = Unif.unification t1 t2 in
+    if T.eq_foterm (S.apply_subst subst t1) (S.apply_subst subst t2)
+      then H.TestOk else H.TestFail (t1, t2)
+  with UnificationFailure _ -> H.TestPreconditionFalse
+
 let run () =
-  Format.printf "run terms test@."
+  Format.printf "run terms test@.";
+  let pp_pair formater (t1,t2) = Format.fprintf formater "(%a, %a)"
+    T.pp_foterm t1 T.pp_foterm t2 in
+  H.check_and_print ~name:"check_subterm" check_subterm random_term T.pp_foterm 5000;
+  H.check_and_print ~name:"check_unif" check_unif random_pair pp_pair 5000
