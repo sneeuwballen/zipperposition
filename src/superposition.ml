@@ -583,10 +583,16 @@ let subsumes_with a b =
         (* try to recurse with each possible match of x,y *)
         List.iter (fun subst' -> ignore (aux l1 l2' subst')) possible_matches;
         attempt_with x l1 (y::l2_pre) l2_tail subst
-  (* try aux with the whole list of literals l1 *)
+  (* used to sort literals by decreasing number of variables *)
+  and compare_lit_vars (Equation (l1,l2,_,_)) (Equation (r1,r2,_,_)) =
+    (List.length (T.vars_of_term r1)) + (List.length (T.vars_of_term r2)) 
+    - (List.length (T.vars_of_term l1)) - (List.length (T.vars_of_term l2))
   in
   let res =
-    try aux a.clits b.clits S.id_subst
+    (* try aux with the whole list of literals l1 *)
+    let l1 = List.sort compare_lit_vars a.clits
+    and l2 = List.sort compare_lit_vars b.clits in
+    try aux l1 l2 S.id_subst
     with SubsumptionFound subst -> Some subst
   in
   (if res <> None then
