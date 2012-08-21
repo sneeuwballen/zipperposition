@@ -444,8 +444,7 @@ let rec pp_proof_rec formatter clause =
   | Proof (_, premises) ->
       (* print premises recursively *)
       List.iter
-        (fun (c, pos, subst) ->
-            pp_proof_rec formatter c)
+        (fun (c, pos, subst) -> pp_proof_rec formatter c)
         premises
 
 let pp_tstp_clause formatter clause =
@@ -455,29 +454,43 @@ let pp_tstp_clause formatter clause =
     fprintf formatter "@[<h>(%a)@]"
       (Utils.pp_list ~sep:" | " (pp_literal ~sort:false)) clause.clits
 
-let rec pp_tstp_proof formatter clause =
+let pp_tstp_proof formatter clause =
   (* already_printed is a set of clauses already printed. *)
-  let already_printed = ref Hset.empty in
-  (* function to recurse in the clause's premises to print them, but only once per clause. *)
-  let rec recurse clause =
+  let already_printed = ref Hset.empty
+  and clause_num = ref Ptmap.empty
+  and counter = ref 1 in
+  (* get counter for hashconsed clause *)
+  let get_num clause = 
     let hc = hashcons_clause clause in
+    try hc, Ptmap.find hc.tag !clause_num
+    with Not_found ->
+      clause_num := Ptmap.add hc.tag !counter !clause_num;
+      incr counter;
+      hc, Ptmap.find hc.tag !clause_num
+  in
+  (* function to recurse in the clause's premises to print them, but only once per clause. *)
+  let rec recurse hc =
     (* check if the clause has already been printed *)
     if Hset.mem hc !already_printed then () else begin
     already_printed := Hset.add hc !already_printed;
-    match Lazy.force clause.cproof with
+    assert (Ptmap.mem hc.tag !clause_num);
+    let num = Ptmap.find hc.tag !clause_num in
+    match Lazy.force hc.node.cproof with
     | Axiom (f, ax_name) ->
       fprintf formatter "@[<h>cnf(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
-        hc.tag pp_tstp_clause clause f ax_name
+        num pp_tstp_clause hc.node f ax_name
     | Proof (name, premises) ->
-      let premises_idx = List.map (fun (c,_,_) -> (hashcons_clause c).tag) premises in
+      let premises = List.map (fun (c,_,_) -> get_num c) premises in
       (* print the inference *)
       fprintf formatter ("@[<h>cnf(%d, derived, %a,@ " ^^
                          "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
-        hc.tag pp_tstp_clause clause name (Utils.pp_list ~sep:"," pp_print_int) premises_idx;
-      (* print every premisse *)
-      List.iter (fun (c,_,_) -> recurse c) premises
+        num pp_tstp_clause hc.node name
+        (Utils.pp_list ~sep:"," pp_print_int) (List.map snd premises);
+      (* print every premise *)
+      List.iter (fun (c,num) -> recurse c) premises
     end
-  in recurse clause
+  in
+  let hc, _ = get_num clause in recurse hc
 
 (*
 (* may be moved inside the bag *)
