@@ -140,4 +140,4 @@ val pp_proof: subst:bool -> formatter -> proof -> unit
 val pp_clause_proof : formatter -> clause -> unit   (** print clause and its proof *)
 val pp_proof_rec : formatter -> clause -> unit      (** also print premisses, recursively*)
 val pp_tstp_clause : formatter -> clause -> unit    (** print as TSTP clause *)
-val pp_tstp_proof : formatter -> clause -> unit    (** print the proof recursively in TSTP *)
+val pp_tstp_proof : formatter -> clause -> unit     (** print the proof recursively in TSTP *)

@@ -456,20 +456,28 @@ let pp_tstp_clause formatter clause =
       (Utils.pp_list ~sep:" | " (pp_literal ~sort:false)) clause.clits
 
 let rec pp_tstp_proof formatter clause =
-  let hc = hashcons_clause clause in
-  match Lazy.force clause.cproof with
-  | Axiom (f, ax_name) ->
-    fprintf formatter "@[<h>cnf(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
-      hc.tag pp_tstp_clause clause f ax_name
-  | Proof (name, premises) ->
-    let premises_idx = List.map (fun (c,_,_) -> (hashcons_clause c).tag) premises in
-    (* print the inference *)
-    fprintf formatter ("@[<h>cnf(%d, derived, %a,@ " ^^
-                       "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
-      hc.tag pp_tstp_clause clause name (Utils.pp_list ~sep:"," pp_print_int) premises_idx;
-    (* print every premisse *)
-    List.iter (fun (c,_,_) -> pp_tstp_proof formatter c) premises
-  
+  (* already_printed is a set of clauses already printed. *)
+  let already_printed = ref Hset.empty in
+  (* function to recurse in the clause's premises to print them, but only once per clause. *)
+  let rec recurse clause =
+    let hc = hashcons_clause clause in
+    (* check if the clause has already been printed *)
+    if Hset.mem hc !already_printed then () else begin
+    already_printed := Hset.add hc !already_printed;
+    match Lazy.force clause.cproof with
+    | Axiom (f, ax_name) ->
+      fprintf formatter "@[<h>cnf(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
+        hc.tag pp_tstp_clause clause f ax_name
+    | Proof (name, premises) ->
+      let premises_idx = List.map (fun (c,_,_) -> (hashcons_clause c).tag) premises in
+      (* print the inference *)
+      fprintf formatter ("@[<h>cnf(%d, derived, %a,@ " ^^
+                         "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
+        hc.tag pp_tstp_clause clause name (Utils.pp_list ~sep:"," pp_print_int) premises_idx;
+      (* print every premisse *)
+      List.iter (fun (c,_,_) -> recurse c) premises
+    end
+  in recurse clause
 
 (*
 (* may be moved inside the bag *)
