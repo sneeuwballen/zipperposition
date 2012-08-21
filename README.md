@@ -13,6 +13,9 @@ there is a lot of literature about it; for this implementation my references are
 _paramodulation-based theorem proving_ of the _handbook of automated reasoning_, and the
 paper "E: a brainiac theorem prover" that describes the [E](http://eprover.org) prover.
 
+*Disclaimer*: Note that the prover is currently an early prototype and is
+likely not correct nor complete.
+
 ## License
 Some files come from [matita](http://matita.cs.unibo.it/), the TPTP
 parser/lexer are from [Darwin](http://combination.cs.uiowa.edu/Darwin/), some
@@ -48,6 +51,3 @@ For instance,
 
     ./prover3.sh pelletier_problems/pb23.p -timeout 5
 
-
-*Disclaimer*: Note that the prover is currently an early prototype and is
-likely not correct nor complete.
