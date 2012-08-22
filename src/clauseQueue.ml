@@ -101,7 +101,7 @@ let compute_refined_clause_weight ~ord c =
     (fun sum (Equation (l, r, _, _) as lit) ->
       let lit_weight = ord#compute_term_weight l + ord#compute_term_weight r in
       sum + (if is_maxlit c lit
-        then (lit_weight +2) * (lit_weight +2) else lit_weight * lit_weight))
+        then (lit_weight +4) * (lit_weight +4) else lit_weight * lit_weight))
     0 c.clits
 
 let refined_clause_weight ~ord =
@@ -123,16 +123,29 @@ let goals ~ord =
   let clause_ord =
     object
       method le hc1 hc2 =
-        let goals1 = List.length hc1.node.clits
-        and goals2 = List.length hc2.node.clits
-        and w1 = compute_refined_clause_weight ~ord hc1.node
+        let w1 = compute_refined_clause_weight ~ord hc1.node
         and w2 = compute_refined_clause_weight ~ord hc2.node in
-        (* lexicographic comparison that favors clauses with less literals
-           and then clauses with small weight *)
-        (Utils.lexicograph compare [goals1; w1] [goals2; w2]) <= 0
+        w1 <= w2
     end
   and name = "prefer_goals" in
   make_hq ~ord:clause_ord ~accept:is_goal_clause name
+
+let non_goals ~ord =
+  (* check whether a literal is a goal *)
+  let is_goal_lit lit = match lit with
+  | Equation (_, _, sign, _) -> not sign in
+  let is_non_goal_clause clause = List.for_all (fun x -> not (is_goal_lit x)) clause.clits in
+  let clause_ord =
+    object
+      method le hc1 hc2 =
+        let w1 = compute_refined_clause_weight ~ord hc1.node
+        and w2 = compute_refined_clause_weight ~ord hc2.node in
+        (* lexicographic comparison that favors clauses with less literals
+           and then clauses with small weight *)
+        w1 <= w2
+    end
+  and name = "prefer_non_goals" in
+  make_hq ~ord:clause_ord ~accept:is_non_goal_clause name
 
 let pos_unit_clauses ~ord =
   let is_unit_pos c = match c.clits with
@@ -153,8 +166,9 @@ let pos_unit_clauses ~ord =
   make_hq ~ord:clause_ord ~accept:is_unit_pos name
 
 let default_queues ~ord =
-  [ (clause_weight ~ord, 5);
+  [ (clause_weight ~ord, 4);
     (pos_unit_clauses ~ord, 3);
+    (non_goals ~ord, 2);
     (goals ~ord, 1);
     (fifo ~ord, 1);
   ]
