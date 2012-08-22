@@ -50,50 +50,144 @@ let current_signature () =
      | _ -> assert false);
   sorts, arities, !symbols
 
-(** build a map symbol -> int that gives an ordering on symbols, from the arities *)
-let build_ordering arities symbols =
-  let cmp t1 t2 = match t1, t2 with  (* caution, reverse order! *)
-  | _, _ when t1 = t2 -> 0
-  | _, _ when t1 = T.true_symbol -> 1
-  | _, _ when t2 = T.true_symbol -> -1
-  | _, _ when t1 = T.eq_symbol -> 1
-  | _, _ when t2 = T.eq_symbol -> -1
-  | _, _ -> Hashtbl.find arities t2 - Hashtbl.find arities t1 in
-  (* thanks to the reverse order, sorted_symbols is stable-sorted by decreasing order *)
-  let sorted_symbols = List.stable_sort cmp symbols in
-  let cur_idx = ref 1
-  and ordering = Hashtbl.create 23 in
+let cluster_constraint clusters =
+  let table = Hashtbl.create 17
+  and cluster_num = ref 0 in
+  (* for each cluster, assign it a (incremented) number, and
+     remember symbol->number for every symbol of the cluster *)
   List.iter
-    (fun s -> Hashtbl.replace ordering s !cur_idx; cur_idx := !cur_idx+1)
-    sorted_symbols;
-  ordering, sorted_symbols
+    (fun cluster ->
+      let num = !cluster_num in
+      incr cluster_num;
+      List.iter (fun symb -> Hashtbl.add table symb num) cluster)
+    clusters;
+  (* compare symbols by their number, if they have. Smaller numbers are bigger symbols *)
+  let compare s1 s2 =
+    try
+      let s1_num = Hashtbl.find table s1
+      and s2_num = Hashtbl.find table s2 in
+      s2_num - s1_num
+    with Not_found -> 0 (* at least one is not in the table, we do not order *)
+  in compare
 
-let rec arity_ordering () : symbol_ordering =
-  (* compute the current signature *)
-  let sorts, arities, symbols = current_signature () in
-  let ord, sorted_symbols = build_ordering arities symbols in
-  (* the object itself *)
-  object
-    method refresh () = arity_ordering ()
-    method signature = sorted_symbols
-    method compare s1 s2 = if s1 = s2 then 0
-      else (Hashtbl.find ord s2) - (Hashtbl.find ord s1)
-    method weight s = Hashtbl.find arities s  (* weight is arity *)
-    method var_weight = 1
+let list_constraint l =
+  let num = ref  0
+  and table = Hashtbl.create 13 in
+  (* give a number to every symbol *)
+  List.iter
+    (fun symb ->
+      let symb_num = !num in
+      incr num;
+      Hashtbl.add table symb symb_num)
+    l;
+  (* compare symbols by number. Smaller symbols have bigger number *)
+  let compare s1 s2 =
+    try
+      let s1_num = Hashtbl.find table s1
+      and s2_num = Hashtbl.find table s2 in
+      s2_num - s1_num
+    with Not_found -> 0 (* at least one is not in the table, we do not order *)
+  in compare
+
+let ordering_to_constraint so =
+  list_constraint so#signature 
+
+let arity_constraint arities =
+  let compare s1 s2 =
+    try
+      let s1_arity = Hashtbl.find arities s1
+      and s2_arity = Hashtbl.find arities s2 in
+      s1_arity - s2_arity  (* bigger arity is bigger *)
+    with Not_found -> 0
+  in compare
+
+let max_constraint symbols =
+  let table = Hashtbl.create 11
+  and num = ref 0 in
+  (* give number to symbols *)
+  List.iter
+    (fun symb -> let n = !num in
+      incr num; Hashtbl.add table symb n)
+    symbols;
+  let compare a b =
+    (* not found implies the symbol is smaller than maximal symbols *)
+    let a_n = try Hashtbl.find table a with Not_found -> !num
+    and b_n = try Hashtbl.find table b with Not_found -> !num in
+    b_n - a_n  (* if a > b then a_n < b_n *)
+  in compare
+  
+let min_constraint symbols =
+  let table = Hashtbl.create 11
+  and num = ref 0 in
+  (* give number to symbols *)
+  List.iter
+    (fun symb -> let n = !num in
+      incr num; Hashtbl.add table symb n)
+    symbols;
+  let compare a b =
+    (* not found implies the symbol is bigger than minimal symbols *)
+    let a_n = try Hashtbl.find table a with Not_found -> -1
+    and b_n = try Hashtbl.find table b with Not_found -> -1 in
+    b_n - a_n  (* if a > b then a_n < b_n *)
+  in compare
+
+let compose_constraints c1 c2 =
+  (* first we compare using c2, then using c1 if needed, because
+     c2 is prioritary *)
+  let compare a b =
+    let c2_ab = c2 a b in
+    if c2_ab <> 0 then c2_ab  (* c2 has decided *)
+    else c1 a b               (* let c1 decide *)
+  in compare
+
+let rec apply_constraint so constr =
+  let symbols = so#signature in
+  (* stable_sort the signature in decreasing order using the constraint *)
+  let ordered_symbols = List.stable_sort (fun x y -> - (constr x y)) symbols in
+  (* comparison function is given by the place in the ordered signature *)
+  let new_compare = list_constraint ordered_symbols in
+  object (self)
+    method refresh () = apply_constraint (so#refresh ()) constr
+    method signature = ordered_symbols
+    method compare = new_compare
+    method weight s = so#weight s       (* delegate to so *)
+    method var_weight = so#var_weight   (* delegate to so *)
   end
 
-let default_symbol_ordering () = arity_ordering ()
+let check_constraint so constr =
+  (* check whether a list is sorted in decreasing order w.r.t constraint *)
+  let rec is_sorted l = match l with
+  | [] | [_] -> true
+  | x::y::l' ->
+    let cmp_xy = constr x y in
+    if cmp_xy >= 0 then is_sorted l'
+    else false
+  in
+  is_sorted so#signature
+
+(** constraint that makes the three symbols the smaller ones *)
+let consts_constraint = min_constraint [T.false_symbol; T.true_symbol]
 
 let dummy_symbol_ordering =
+  (* recompute signature *)
   let rec produce () =
+    let _, _, signature = current_signature () in
+    let signature = List.sort Pervasives.compare signature in
     object
       method refresh () = produce ()
-      method signature = []
+      method signature = signature
       method compare a b = Pervasives.compare a b
       method weight _ = 2
       method var_weight = 1
     end
   in produce ()
+
+let rec default_symbol_ordering () =
+  let _, arities, _ = current_signature () in
+  let constr = compose_constraints
+    (arity_constraint arities) consts_constraint in
+  (* apply the constraints to the dummy symbol ordering *)
+  apply_constraint (dummy_symbol_ordering#refresh ()) constr
 
 (* ----------------------------------------------------------------------
  module interface for orderings, internal (used to create the different classes)
@@ -362,6 +456,7 @@ module KBO = struct
     profiler.HExtlib.profile (compare_terms ~so x) y
 end
 
+(* TODO extend into RPO, for symbols with multiset status *)
 module LPO = struct
   let name = "lpo"
 

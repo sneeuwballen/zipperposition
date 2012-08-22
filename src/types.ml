@@ -79,6 +79,9 @@ and clause = {
 and proof = Axiom of string * string (** file, axiom name *)
           | Proof of string * (clause * position * substitution) list
 
+(** an ordering constraint *)
+type ordering_constraint = symbol -> symbol -> int
+
 (** the interface of a total ordering on symbols *)
 class type symbol_ordering =
   object

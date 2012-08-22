@@ -26,17 +26,46 @@ open Types
  symbol total ordering
  ---------------------------------------------------------------------- *)
 
-(** compute the current signature of symbols *)
+(** compute the current signature of symbols. It returns a
+    map of symbols to sorts, a map of symbols to their arity,
+    and the signature (the list of current symbols) *)
 val current_signature : unit ->
                         (symbol, sort) Hashtbl.t * (symbol, int) Hashtbl.t * symbol list
 
-(** compute an arity ordering, based on the current terms table *)
-val arity_ordering : unit -> symbol_ordering
+(** ordering constraint by clustering symbols by decreasing order.
+    all symbols in the first clusters are bigger than those in the second, etc. *)
+val cluster_constraint : symbol list list -> ordering_constraint
+(** symbols in the given list are in decreasing order *)
+val list_constraint : symbol list -> ordering_constraint
+(** convert a symbol ordering into an ordering constraint. Useful to
+    extend an ordering without breaking it. *)
+val ordering_to_constraint : symbol_ordering -> ordering_constraint
+(** decreasing arity constraint *)
+val arity_constraint : (symbol, int) Hashtbl.t -> ordering_constraint
+(** maximal symbols, in decreasing order *)
+val max_constraint : symbol list -> ordering_constraint
+(** minimal symbols, in decreasing order *)
+val min_constraint : symbol list -> ordering_constraint
+
+(** compose constraints (the second one is prioritary) *)
+val compose_constraints : ordering_constraint -> ordering_constraint -> ordering_constraint
+
+(** apply the constraint to the ordering, to get a new ordering that respect
+    the constraint. less important constraints should be applied first,
+    most important constraints should be applied last. *)
+val apply_constraint : symbol_ordering -> ordering_constraint -> symbol_ordering
+(** check that the constraint is respected by the ordering *)
+val check_constraint : symbol_ordering -> ordering_constraint -> bool
+
+(** enforce that minimal symbols are $false > $true *)
+val consts_constraint : ordering_constraint
 
 (** default ordering on symbols *)
 val default_symbol_ordering : unit -> symbol_ordering
 
+(** symbol ordering that just compares symbols by string ordering *)
 val dummy_symbol_ordering : symbol_ordering
+
 
 (* ----------------------------------------------------------------------
  terms partial ordering
