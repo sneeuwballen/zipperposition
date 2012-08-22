@@ -35,6 +35,45 @@ module Unif = FoUnif
 module Sup = Superposition
 module Sat = Saturate
 
+(** special heuristic: an ordering constraint that makes symbols
+    occurring in negative equations bigger than symbols in
+    positive equations in the given list of clauses *)
+let heuristic_constraint clauses : ordering_constraint =
+  let _, _, signature = O.current_signature () in
+  let table = Hashtbl.create 23 in (* symbol -> (neg occurrences - pos occurences) *)
+  (* update counts with term *)
+  let rec update_with_term sign t = match t.node.term with
+    | Var _ -> ()
+    | Leaf s ->
+        let count = try Hashtbl.find table s with Not_found -> 0 in
+        Hashtbl.replace table s (if sign then count-1 else count+1)
+    | Node l -> List.iter (update_with_term sign) l
+  (* update counts with clause *)
+  and update_with_clause clause =
+    List.iter
+      (fun (Equation (l, r, sign, _)) ->
+        update_with_term sign l;
+        update_with_term sign r)
+    clause.clits
+  in 
+  List.iter update_with_clause clauses;
+  (* sort symbols by decreasing (neg occurences - pos occurences) *)
+  let ordered_symbols = List.sort
+    (fun a b ->
+      let count_a = try Hashtbl.find table a with Not_found -> 0
+      and count_b = try Hashtbl.find table b with Not_found -> 0 in
+      count_b - count_a)
+    signature
+  in
+  (* make a constraint out of the ordered signature *)
+  O.list_constraint ordered_symbols
+
+(** create an ordering from the clauses *)
+let heuristic_ordering clauses =
+  let constr = heuristic_constraint clauses in
+  let constr = O.compose_constraints constr O.consts_constraint in
+  O.make_ordering constr
+
 (** get first file of command line arguments *)
 let get_file () =
   let files = ref [] in
@@ -46,13 +85,15 @@ let get_file () =
 (* hashtable string -> ordering module *)
 let ords = Hashtbl.create 7
 let _ =
-  Hashtbl.add ords "lpo" (fun () -> new Orderings.lpo (Orderings.default_symbol_ordering ()));
-  Hashtbl.add ords "kbo" (fun () -> new Orderings.kbo (Orderings.default_symbol_ordering ()));
-  Hashtbl.add ords "nrkbo" (fun () -> new Orderings.nrkbo (Orderings.default_symbol_ordering ()))
+  (* function used to compute a symbol ordering *)
+  let get_so clauses = heuristic_ordering clauses in
+  Hashtbl.add ords "lpo" (fun clauses -> new O.lpo (get_so clauses));
+  Hashtbl.add ords "kbo" (fun clauses -> new O.kbo (get_so clauses));
+  Hashtbl.add ords "nrkbo" (fun clauses -> new O.nrkbo (get_so clauses))
 
 (** parameters for the main procedure *)
 type parameters = {
-  param_ord : unit -> ordering;
+  param_ord : clause list -> ordering;
   param_steps : int;
   param_timeout : float;
   param_files : string list;
@@ -63,7 +104,7 @@ type parameters = {
 (** parse_args returns parameters *)
 let parse_args () =
   (* parameters *)
-  let ord = ref Orderings.default_ordering
+  let ord = ref (fun clauses -> new O.lpo (heuristic_ordering clauses))
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true
@@ -154,9 +195,11 @@ let () =
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* choose an ord now *)
-  let ord = params.param_ord () in  (* using current signature *)
+  let ord = params.param_ord clauses in  (* compute precedence using clauses *)
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   let clauses = List.map (C.reord_clause ~ord) clauses in
+  Utils.debug 2 (lazy (Utils.sprintf "clauses: @[<v>%a@]@."
+                 (Utils.pp_list ~sep:"" (C.pp_clause ~sort:false)) clauses));
   (* create a state, with clauses added to passive_set *)
   let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in

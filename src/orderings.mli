@@ -50,15 +50,17 @@ val min_constraint : symbol list -> ordering_constraint
 (** compose constraints (the second one is prioritary) *)
 val compose_constraints : ordering_constraint -> ordering_constraint -> ordering_constraint
 
+(** enforce that minimal symbols are $false > $true *)
+val consts_constraint : ordering_constraint
+
 (** apply the constraint to the ordering, to get a new ordering that respect
     the constraint. less important constraints should be applied first,
     most important constraints should be applied last. *)
 val apply_constraint : symbol_ordering -> ordering_constraint -> symbol_ordering
 (** check that the constraint is respected by the ordering *)
 val check_constraint : symbol_ordering -> ordering_constraint -> bool
-
-(** enforce that minimal symbols are $false > $true *)
-val consts_constraint : ordering_constraint
+(** make an ordering from the given constraint *)
+val make_ordering : ordering_constraint -> symbol_ordering
 
 (** default ordering on symbols *)
 val default_symbol_ordering : unit -> symbol_ordering

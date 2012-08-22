@@ -140,6 +140,9 @@ let compose_constraints c1 c2 =
     else c1 a b               (* let c1 decide *)
   in compare
 
+(** constraint that makes the three symbols the smaller ones *)
+let consts_constraint = min_constraint [T.false_symbol; T.true_symbol]
+
 let rec apply_constraint so constr =
   let symbols = so#signature in
   (* stable_sort the signature in decreasing order using the constraint *)
@@ -165,9 +168,6 @@ let check_constraint so constr =
   in
   is_sorted so#signature
 
-(** constraint that makes the three symbols the smaller ones *)
-let consts_constraint = min_constraint [T.false_symbol; T.true_symbol]
-
 let dummy_symbol_ordering =
   (* recompute signature *)
   let rec produce () =
@@ -182,12 +182,15 @@ let dummy_symbol_ordering =
     end
   in produce ()
 
+let make_ordering constr =
+  apply_constraint (dummy_symbol_ordering#refresh ()) constr
+
 let rec default_symbol_ordering () =
   let _, arities, _ = current_signature () in
   let constr = compose_constraints
     (arity_constraint arities) consts_constraint in
   (* apply the constraints to the dummy symbol ordering *)
-  apply_constraint (dummy_symbol_ordering#refresh ()) constr
+  make_ordering constr
 
 (* ----------------------------------------------------------------------
  module interface for orderings, internal (used to create the different classes)
