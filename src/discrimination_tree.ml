@@ -98,9 +98,6 @@ module Make (I:Indexable) (A:Set.S) : DiscriminationTree
     type dataset = A.t
     type input = I.input
 
-    (* TODO use an optimized Map implementation based on arrays.
-       it should be faster and more lightweight on small maps, which
-       is the usual case for DT *)
     (* map of string elements *)
     module PSMap = Map.Make(OrderedPathStringElement)
 
