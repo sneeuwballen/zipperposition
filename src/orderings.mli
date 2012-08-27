@@ -75,7 +75,7 @@ val dummy_symbol_ordering : symbol_ordering
 
 class kbo : symbol_ordering -> ordering
 
-class lpo : symbol_ordering -> ordering
+class rpo : symbol_ordering -> ordering
 
 val default_ordering : unit -> ordering   (** default ordering on terms *)
 

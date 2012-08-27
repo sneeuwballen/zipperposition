@@ -196,8 +196,6 @@ let rec default_symbol_ordering () =
  module interface for orderings, internal (used to create the different classes)
  ---------------------------------------------------------------------- *)
 
-type aux_comparison = XEQ | XLE | XGE | XLT | XGT | XINCOMPARABLE | XINVERTIBLE
-
 module type S =
   sig
     (* This order relation should be:
@@ -236,42 +234,31 @@ let compute_clause_weight ~so {clits=lits} =
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
   match t1.node.term, t2.node.term with
   (* We want to discard any identity equality. *
-   * If we give back XEQ, no inference rule    *
+   * If we give back Eq, no inference rule    *
    * will be applied on this equality          *)
   | Var i, Var j when i = j ->
-      XEQ
+      Eq
   (* 1. *)
   | Var _, _
-  | _, Var _ -> XINCOMPARABLE
+  | _, Var _ -> Incomparable
   (* 2.a *)
   | Leaf a1, Leaf a2 ->
       let cmp = b_compare a1 a2 in
-      if cmp = 0 then XEQ else if cmp < 0 then XLT else XGT
-  | Leaf _, Node _ -> XLT
-  | Node _, Leaf _ -> XGT
+      if cmp = 0 then Eq else if cmp < 0 then Lt else Gt
+  | Leaf _, Node _ -> Lt
+  | Node _, Leaf _ -> Gt
   (* 2.b *)
   | Node l1, Node l2 ->
-      let rec cmp t1 t2 =
-        match t1, t2 with
-        | [], [] -> XEQ
-        | _, [] -> (* XGT *) assert false (* hd symbols were eq *)
-        | [], _ -> (* XLT *) assert false (* hd symbols were eq *)
-        | hd1::tl1, hd2::tl2 ->
-            let o = aux_ordering b_compare ~head_only hd1 hd2 in
-            if o = XEQ && not head_only then cmp tl1 tl2 else o
-      in
-      cmp l1 l2
-
-(* compare terms using the given auxiliary ordering, and
-   convert the result to .Comparison *)
-let compare_terms o x y =
-    match o x y with
-      | XINCOMPARABLE -> Incomparable
-      | XGT -> Gt
-      | XLT -> Lt
-      | XEQ -> Eq
-      | XINVERTIBLE -> Invertible
-      | _ -> assert false
+    let rec cmp t1 t2 =
+      match t1, t2 with
+      | [], [] -> Eq
+      | _, [] -> (* Gt *) assert false (* hd symbols were eq *)
+      | [], _ -> (* Lt *) assert false (* hd symbols were eq *)
+      | hd1::tl1, hd2::tl2 ->
+          let o = aux_ordering b_compare ~head_only hd1 hd2 in
+          if o = Eq && not head_only then cmp tl1 tl2 else o
+    in
+    cmp l1 l2
 
 module KBO = struct
   let name = "kbo"
@@ -418,78 +405,66 @@ module KBO = struct
     profiler.HExtlib.profile (compare_terms ~so x) y
 end
 
-(* TODO extend into RPO, for symbols with multiset status *)
-module LPO = struct
-  let name = "lpo"
+module RPO = struct
+  let name = "rpo"
 
-  let eq_foterm = T.eq_foterm
-
-  let rec lpo ~so s t =
+  let rec rpo ~so s t =
     match s.node.term, t.node.term with
-      | _, _ when eq_foterm s t ->
-          XEQ
-      | Var _, Var _ ->
-          XINCOMPARABLE
-      | _, Var i ->
-          if (List.mem t (T.vars_of_term s)) then XGT
-          else XINCOMPARABLE
-      | Var i,_ ->
-          if (List.mem s (T.vars_of_term t)) then XLT
-          else XINCOMPARABLE
-      | Node (hd1::tl1), Node (hd2::tl2) ->
-          let rec ge_subterm t ol = function
-            | [] -> (false, ol)
-            | x::tl ->
-                let res = lpo ~so x t in
-                match res with
-                  | XGT | XEQ -> (true,res::ol)
-                  | o -> ge_subterm t (o::ol) tl
-          in
-          let (res, l_ol) = ge_subterm t [] tl1 in
-            if res then XGT
-            else let (res, r_ol) = ge_subterm s [] tl2 in
-              if res then XLT
-              else begin
-                let rec check_subterms t = function
-                  | _,[] -> true
-                  | o::ol,_::tl ->
-                      if o = XLT then check_subterms t (ol,tl)
-                      else false
-                  | [], x::tl ->
-                      if lpo ~so x t = XLT then check_subterms t ([],tl)
-                      else false
-                in
-                match aux_ordering so#compare hd1 hd2 with
-                  | XGT -> if check_subterms s (r_ol,tl2) then XGT
-                    else XINCOMPARABLE
-                  | XLT -> if check_subterms t (l_ol,tl1) then XLT
-                    else XINCOMPARABLE
-                  | XEQ ->
-                     (try
-                      let lex = List.fold_left2
-                        (fun acc si ti -> if acc = XEQ then lpo ~so si ti else acc)
-                        XEQ tl1 tl2
-                      in
-                 (match lex with
-                    | XGT ->
-                        if List.for_all (fun x -> lpo ~so s x = XGT) tl2 then XGT
-                      else XINCOMPARABLE
-                    | XLT ->
-                        if List.for_all (fun x -> lpo ~so x t = XLT) tl1 then XLT
-                      else XINCOMPARABLE
-                    | o -> o)
-                      with Invalid_argument _ -> (* assert false *)
-                              XINCOMPARABLE)
-              | XINCOMPARABLE -> XINCOMPARABLE
-              | _ -> assert false
+    | _, _ when T.eq_foterm s t -> Eq
+    | Var _, Var _ -> Incomparable
+    | _, Var i -> if (List.mem t (T.vars_of_term s)) then Gt else Incomparable
+    | Var i,_ -> if (List.mem s (T.vars_of_term t)) then Lt else Incomparable
+    | Node (hd1::tl1), Node (hd2::tl2) ->
+      (* check whether an elemnt of the list is >= t, and
+         also returns the list of comparison results *)
+      let rec ge_subterm t ol = function
+        | [] -> (false, ol)
+        | x::tl ->
+            let res = rpo ~so x t in
+            match res with
+              | Gt | Eq -> (true, res::ol)
+              | o -> ge_subterm t (o::ol) tl
+      in
+      (* try the subterm property (when s in t or t in s) *)
+      let (res, l_ol) = ge_subterm t [] tl1 in
+        if res then Gt
+        else let (res, r_ol) = ge_subterm s [] tl2 in
+          if res then Lt
+          else begin
+            (* check whether all terms of the list are smaller than t *)
+            let rec check_subterms t = function
+              | _, [] -> true
+              | o::ol, _::tl ->
+                  if o = Lt then check_subterms t (ol,tl) else false
+              | [], x::tl ->
+                  if rpo ~so x t = Lt then check_subterms t ([],tl) else false
+            in
+            (* non recursive comparison of function symbols *)
+            match aux_ordering so#compare hd1 hd2 with
+            | Gt -> if check_subterms s (r_ol,tl2) then Gt else Incomparable
+            | Lt -> if check_subterms t (l_ol,tl1) then Lt else Incomparable
+            | Eq -> rpo_rec ~so hd1 tl1 tl2 s t
+            | Incomparable -> Incomparable
+            | _ -> assert false
           end
-      | _,_ -> aux_ordering so#compare s t
+    | _,_ -> aux_ordering so#compare s t
+  (* recursive comparison of lists of terms (head symbol is hd) *)
+  and rpo_rec ~so hd l1 l2 s t =
+    match hd.node.term with
+    | Var _ | Node _ -> assert false
+    | Leaf f ->
+    if T.is_symmetric_symbol f
+      then Utils.multiset_partial (rpo ~so) l1 l2
+      else match Utils.lexicograph_partial (rpo ~so) l1 l2 with
+        | Gt ->
+          if List.for_all (fun x -> rpo ~so s x = Gt) l2 then Gt else Incomparable
+        | Lt ->
+          if List.for_all (fun x -> rpo ~so x t = Lt) l1 then Lt else Incomparable
+        | o -> o
 
-  let compare_terms ~so = compare_terms (lpo ~so)
-
-  let profiler = HExtlib.profile ~enable:true "compare_terms(lpo)"
+  let profiler = HExtlib.profile ~enable:true "compare_terms(rpo)"
   let compare_terms ~so x y =
-    profiler.HExtlib.profile (compare_terms ~so x) y
+    profiler.HExtlib.profile (rpo ~so x) y
 end
 
 (* ----------------------------------------------------------------------
@@ -512,17 +487,16 @@ class kbo (so : symbol_ordering) : ordering =
     val cache = OrdCache.create 29
     val so = so
     method refresh () = ({< so = so#refresh () >} :> ordering)
-    method clear_cache () = (* OrdCache.clear cache *) ()
+    method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = (* OrdCache.with_cache cache
-      (fun (a, b) -> KBO.compare_terms ~so a b) (a, b) *)
-      KBO.compare_terms ~so a b
+    method compare a b = OrdCache.with_cache cache
+      (fun (a, b) -> KBO.compare_terms ~so a b) (a, b)
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = KBO.name
   end
 
-class lpo (so : symbol_ordering) : ordering =
+class rpo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 29
     val so = so
@@ -530,13 +504,13 @@ class lpo (so : symbol_ordering) : ordering =
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
-      (fun (a, b) -> LPO.compare_terms ~so a b) (a, b)
+      (fun (a, b) -> RPO.compare_terms ~so a b) (a, b)
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
-    method name = LPO.name
+    method name = RPO.name
   end
 
-let default_ordering () = new lpo (default_symbol_ordering ())
+let default_ordering () = new rpo (default_symbol_ordering ())
 
 let dummy_ordering =
   object

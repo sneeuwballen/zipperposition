@@ -87,7 +87,7 @@ let ords = Hashtbl.create 7
 let _ =
   (* function used to compute a symbol ordering *)
   let get_so clauses = heuristic_ordering clauses in
-  Hashtbl.add ords "lpo" (fun clauses -> new O.lpo (get_so clauses));
+  Hashtbl.add ords "rpo" (fun clauses -> new O.rpo (get_so clauses));
   Hashtbl.add ords "kbo" (fun clauses -> new O.kbo (get_so clauses));
 
 (** parameters for the main procedure *)
@@ -103,7 +103,7 @@ type parameters = {
 (** parse_args returns parameters *)
 let parse_args () =
   (* parameters *)
-  let ord = ref (fun clauses -> new O.lpo (heuristic_ordering clauses))
+  let ord = ref (fun clauses -> new O.rpo (heuristic_ordering clauses))
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true
@@ -116,7 +116,7 @@ let parse_args () =
   and set_file s = file := s in
   (* options list (TODO parse something about heuristics) *) 
   let options =
-    [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo)");
+    [ ("-ord", Arg.String set_ord, "choose ordering (rpo,kbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
       ("-steps", Arg.Set_int steps, "verbose mode");
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
