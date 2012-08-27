@@ -28,13 +28,8 @@ let str_to_sym s = s
 (* some special sorts *)
 let bool_sort = "$$Bool"
 let univ_sort = "$$U"
-let eq_symbol = "="
 let true_symbol = "$true"
 let false_symbol = "$false"
-
-let is_symmetric_symbol s = s = eq_symbol
-
-let is_infix_symbol s = s = eq_symbol
 
 (* hashconsing for terms *)
 module H = Hashcons.Make(struct
@@ -121,7 +116,6 @@ let hd_symbol t = match hd_term t with
   | Some ({node={term=Leaf s}}) -> Some s
   | Some _ -> assert false
 
-let eq_term = mk_leaf eq_symbol bool_sort
 let true_term = mk_leaf true_symbol bool_sort
 let false_term = mk_leaf false_symbol bool_sort
 

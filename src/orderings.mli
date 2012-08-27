@@ -61,6 +61,8 @@ val apply_constraint : symbol_ordering -> ordering_constraint -> symbol_ordering
 val check_constraint : symbol_ordering -> ordering_constraint -> bool
 (** make an ordering from the given constraint *)
 val make_ordering : ordering_constraint -> symbol_ordering
+(** update an ordering using a function for multiset status *)
+val set_multiset_symbols : symbol_ordering -> (symbol -> bool) -> symbol_ordering
 
 (** default ordering on symbols *)
 val default_symbol_ordering : unit -> symbol_ordering

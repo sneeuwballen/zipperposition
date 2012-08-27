@@ -155,6 +155,7 @@ let rec apply_constraint so constr =
     method compare = new_compare
     method weight s = so#weight s       (* delegate to so *)
     method var_weight = so#var_weight   (* delegate to so *)
+    method multiset_status s = so#multiset_status s
   end
 
 let check_constraint so constr =
@@ -179,11 +180,22 @@ let dummy_symbol_ordering =
       method compare a b = Pervasives.compare a b
       method weight _ = 2
       method var_weight = 1
+      method multiset_status s = false
     end
   in produce ()
 
 let make_ordering constr =
   apply_constraint (dummy_symbol_ordering#refresh ()) constr
+
+let set_multiset_symbols so multiset_pred =
+  object
+    method refresh = so#refresh
+    method signature = so#signature
+    method compare = so#compare
+    method weight = so#weight
+    method var_weight = so#var_weight
+    method multiset_status s = multiset_pred s
+  end
 
 let rec default_symbol_ordering () =
   let _, arities, _ = current_signature () in
@@ -387,7 +399,7 @@ module KBO = struct
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
-        then if T.is_symmetric_symbol f
+        then if so#multiset_status f
           (* use multiset or lexicographic comparison *)
           then tckbocommute wb ss ts else tckbolex wb ss ts
         else
@@ -453,7 +465,7 @@ module RPO = struct
     match hd.node.term with
     | Var _ | Node _ -> assert false
     | Leaf f ->
-    if T.is_symmetric_symbol f
+    if so#multiset_status f
       then Utils.multiset_partial (rpo ~so) l1 l2
       else match Utils.lexicograph_partial (rpo ~so) l1 l2 with
         | Gt ->

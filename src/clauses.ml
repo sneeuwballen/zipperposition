@@ -69,11 +69,8 @@ let pp_literal ?(sort=false) formatter lit =
   | Equation (left, right, false, _) when left = T.true_term ->
     fprintf formatter "~%a" pp_foterm right
   | Equation (left, right, sign, ord) ->
-    if sign
-    then fprintf formatter "@[%a@ %a@ %a@]"
-        pp_foterm left pp_foterm T.eq_term pp_foterm right
-    else fprintf formatter "@[<hv 2>%a !%a@ %a@]"
-        pp_foterm left pp_foterm T.eq_term pp_foterm right
+    let conn = if sign then "=" else "!=" in
+    fprintf formatter "@[%a@ %s@ %a@]" pp_foterm left conn pp_foterm right
 
 let opposite_pos p = match p with
   | _ when p = left_pos -> right_pos

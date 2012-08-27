@@ -29,12 +29,6 @@ val bool_sort : sort
 val univ_sort : sort
 val true_symbol : symbol
 val false_symbol : symbol
-val eq_symbol : symbol
-
-(** symbols that are symmetric (that is, order of arguments does not matter) *)
-val is_symmetric_symbol : symbol -> bool
-(** infix symbols *)
-val is_infix_symbol : symbol -> bool
 
 module H : Hashcons.S with type key = typed_term
 val terms : H.t
@@ -53,7 +47,6 @@ val is_node : foterm -> bool
 val hd_term : foterm -> foterm option         (** the head of the term *)
 val hd_symbol : foterm -> symbol option       (** the head of the term *)
 
-val eq_term : foterm                          (** equality symbol *)
 val true_term : foterm                        (** tautology symbol *)
 val false_term : foterm                       (** antilogy symbol *)
 

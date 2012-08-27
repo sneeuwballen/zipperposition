@@ -90,6 +90,7 @@ class type symbol_ordering =
     method compare : symbol -> symbol -> int  (** total order on symbols *)
     method weight : symbol -> int             (** weight of symbols *)
     method var_weight : int                   (** weight of variables *)
+    method multiset_status : symbol -> bool   (** does the symbol have a multiset status? *)
   end
 
 (** the interface of an ordering type *)
