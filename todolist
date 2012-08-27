@@ -4,8 +4,6 @@
     use compressed tries, or use some kind of patricia trees
 
 - for the "superposition and equivalence reasoning and delayed CNF" paper:
-    * implement RPO because = has a multiset status
-    * for RPO, implement a fast 2-elems multiset comparison function
     * insertion of skolem constants in the precedence, under the DeBruijn symbols but
         without modifying the previous precedence
     * special inferences for quantifier rules (to introduce skolem constants or variables)
