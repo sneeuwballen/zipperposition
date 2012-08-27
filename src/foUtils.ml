@@ -48,6 +48,15 @@ let rec lexicograph f l1 l2 =
   | [],_ -> ~-1
   | _,[] -> 1
 
+let rec lexicograph_partial f l1 l2 =
+  match l1, l2 with
+  | [], [] -> Eq
+  | x::xs, y::ys ->
+    (match f x y with
+    | Lt -> Lt | Gt -> Gt | Incomparable -> Incomparable | Invertible -> assert false
+    | Eq -> lexicograph_partial f xs ys)
+  | [], _ | _, [] -> Incomparable
+
 let partial_to_total ord a b = match ord a b with
   | Lt -> -1
   | Gt -> 1

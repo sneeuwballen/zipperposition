@@ -31,6 +31,8 @@ val murmur_hash : int -> int
 
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
+(** lexicographic partial order on lists. If lengths are different, returns Incomparable *)
+val lexicograph_partial : ('a -> 'b -> comparison) -> 'a list -> 'b list -> comparison
 
 (** conversion from partial order to a total order, in which incomparable
     elements are considered to be in the same congruence class *)
