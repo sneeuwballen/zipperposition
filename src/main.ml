@@ -34,6 +34,7 @@ module Utils = FoUtils
 module Unif = FoUnif
 module Sup = Superposition
 module Sat = Saturate
+module Delayed = Delayed
 
 (** special heuristic: an ordering constraint that makes symbols
     occurring in negative equations bigger than symbols in

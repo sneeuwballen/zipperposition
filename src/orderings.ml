@@ -498,7 +498,7 @@ class kbo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 29
     val so = so
-    method refresh () = ({< so = so#refresh () >} :> ordering)
+    method refresh () = OrdCache.clear cache; ({< so = so#refresh () >} :> ordering)
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
@@ -512,7 +512,7 @@ class rpo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 29
     val so = so
-    method refresh () = ({< so = so#refresh () >} :> ordering)
+    method refresh () = (OrdCache.clear cache; ({< so = so#refresh () >} :> ordering))
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
