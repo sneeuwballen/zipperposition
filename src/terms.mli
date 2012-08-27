@@ -31,12 +31,10 @@ val true_symbol : symbol
 val false_symbol : symbol
 val eq_symbol : symbol
 
-module SymbolSet : Set.S with type elt = symbol
-
-(** symbols with multiset status *)
-val multiset_symbols : SymbolSet.t
+(** symbols that are symmetric (that is, order of arguments does not matter) *)
+val is_symmetric_symbol : symbol -> bool
 (** infix symbols *)
-val infix_symbols : SymbolSet.t
+val is_infix_symbol : symbol -> bool
 
 module H : Hashcons.S with type key = typed_term
 val terms : H.t

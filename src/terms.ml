@@ -32,20 +32,9 @@ let eq_symbol = "="
 let true_symbol = "$true"
 let false_symbol = "$false"
 
-module SymbolSet = Set.Make(
-  struct
-    type t = symbol
-    let compare = Pervasives.compare
-  end)
+let is_symmetric_symbol s = s = eq_symbol
 
-let build_set symbols =
-  List.fold_left
-    (fun s symb -> SymbolSet.add symb s)
-    SymbolSet.empty symbols
-
-let multiset_symbols = build_set [eq_symbol]
-
-let infix_symbols = build_set [eq_symbol]
+let is_infix_symbol s = s = eq_symbol
 
 (* hashconsing for terms *)
 module H = Hashcons.Make(struct
