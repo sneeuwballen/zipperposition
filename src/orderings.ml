@@ -242,38 +242,38 @@ let string_of_weight (cw, mw) =
   Printf.sprintf "[%d; %s]" cw s
 
 let kbo_weight_of_term ~so term =
-    let vars_dict = Hashtbl.create 5 in
-    let rec aux x = match x.node.term with
-      | Var i ->
-          (try
-             let oldw = Hashtbl.find vars_dict i in
-             Hashtbl.replace vars_dict i (oldw+1)
-           with Not_found ->
-             Hashtbl.add vars_dict i 1);
-          0
-      | Leaf symb -> so#weight symb
-      | Node l -> List.fold_left (+) 0 (List.map aux l)
-    in
-    let w = aux term in
-    let l =
-      Hashtbl.fold (fun meta metaw resw -> (meta, metaw)::resw) vars_dict []
-    in
-    let compare w1 w2 =
-      match w1, w2 with
-      | (m1, _), (m2, _) -> m1 - m2
-    in
-    (w, List.sort compare l) (* from the smallest meta to the bigest *)
+  let vars_dict = Hashtbl.create 5 in
+  let rec aux x = match x.node.term with
+    | Var i ->
+        (try
+           let oldw = Hashtbl.find vars_dict i in
+           Hashtbl.replace vars_dict i (oldw+1)
+         with Not_found ->
+           Hashtbl.add vars_dict i 1);
+        0
+    | Leaf symb -> so#weight symb
+    | Node l -> List.fold_left (+) 0 (List.map aux l)
+  in
+  let w = aux term in
+  let l =
+    Hashtbl.fold (fun meta metaw resw -> (meta, metaw)::resw) vars_dict []
+  in
+  let compare w1 w2 =
+    match w1, w2 with
+    | (m1, _), (m2, _) -> m1 - m2
+  in
+  (w, List.sort compare l) (* from the smallest meta to the bigest *)
 
 let kbo_compute_clause_weight ~so {clits=lits} =
-    let rec weight_of_polynomial w m =
-      let factor = 2 in
-      w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
-    and weight_of_lit l = match l with
-    | Equation (l,r,_,ord) ->  (* TODO use order? *)
-        let wl, ml = kbo_weight_of_term ~so l in
-        let wr, mr = kbo_weight_of_term ~so r in
-        weight_of_polynomial (wl+wr) (ml@mr) in
-    List.fold_left (+) 0 (List.map weight_of_lit lits)
+  let rec weight_of_polynomial w m =
+    let factor = 2 in
+    w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
+  and weight_of_lit l = match l with
+  | Equation (l,r,_,ord) ->  (* TODO use order? *)
+      let wl, ml = kbo_weight_of_term ~so l in
+      let wr, mr = kbo_weight_of_term ~so r in
+      weight_of_polynomial (wl+wr) (ml@mr) in
+  List.fold_left (+) 0 (List.map weight_of_lit lits)
 
 (* Riazanov: 3.1.5 pag 38 *)
 (* Compare weights normalized in a new way :
@@ -362,95 +362,12 @@ let compare_terms o x y =
       | XINVERTIBLE -> Invertible
       | _ -> assert false
 
-
-module NRKBO = struct
-  let name = "nrkbo"
-
-  let eq_foterm x y = T.eq_foterm x y
-
-  let are_invertible l r = false   (* FIXME ignore this case *)
-    (*
-    let varlist = (T.vars_of_term l)@(T.vars_of_term r) in
-    let maxvar = List.fold_left max 0 varlist in
-    let _,_,subst = FoUtils.relocate maxvar varlist FoSubst.id_subst in
-    let newl = FoSubst.apply_subst subst l in
-    let newr = FoSubst.apply_subst subst r in
-      try (let subst = FoUnif.alpha_eq l newr in
-           eq_foterm newl (FoSubst.apply_subst subst r))
-      with
-	  UnificationFailure _ -> false
-    *)
-
-  (* Riazanov: p. 40, relation >_n *)
-  let nonrec_kbo ~so t1 t2 =
-    let w1 = kbo_weight_of_term ~so t1 in
-    let w2 = kbo_weight_of_term ~so t2 in
-    match compare_kbo_weights w1 w2 with
-    | XLE ->  (* this is .> *)
-        if aux_ordering so#compare t1 t2 = XLT then XLT else XINCOMPARABLE
-    | XGE ->
-        if aux_ordering so#compare t1 t2 = XGT then XGT else XINCOMPARABLE
-    | XEQ -> let res = aux_ordering so#compare t1 t2 in
-	if res = XINCOMPARABLE && are_invertible t1 t2 then XINVERTIBLE
-	else res
-    | res -> res
-
-  let compare_terms ~so = compare_terms (nonrec_kbo ~so)
-
-  let profiler = HExtlib.profile ~enable:true "compare_terms(nrkbo)"
-  let compare_terms ~so x y =
-    profiler.HExtlib.profile (compare_terms ~so x) y
-end
-
 module KBO = struct
   let name = "kbo"
 
   let eq_foterm = T.eq_foterm
 
-  (* Riazanov: p. 38, relation > *)
-  let rec kbo ~so t1 t2 =
-    let aux = aux_ordering so#compare ~head_only:true in
-    let rec cmp t1 t2 =
-      match t1, t2 with
-      | [], [] -> XEQ
-      | _, [] -> XGT
-      | [], _ -> XLT
-      | hd1::tl1, hd2::tl2 ->
-          let o = kbo ~so hd1 hd2 in
-          if o = XEQ then cmp tl1 tl2
-          else o
-    in
-    let w1 = kbo_weight_of_term ~so t1 in
-    let w2 = kbo_weight_of_term ~so t2 in
-    let comparison = compare_kbo_weights w1 w2 in
-    match comparison with
-    | XLE ->
-        let r = aux t1 t2 in
-        if r = XLT then XLT
-        else if r = XEQ then (
-          match t1.node.term, t2.node.term with
-          | Node (_::tl1), Node (_::tl2) ->
-              if cmp tl1 tl2 = XLT then XLT else XINCOMPARABLE
-          | _, _ -> assert false
-        ) else XINCOMPARABLE
-    | XGE ->
-        let r = aux t1 t2 in
-        if r = XGT then XGT
-        else if r = XEQ then (
-          match t1.node.term, t2.node.term with
-          | Node (_::tl1), Node (_::tl2) ->
-              if cmp tl1 tl2 = XGT then XGT else XINCOMPARABLE
-          | _, _ ->  assert false
-        ) else XINCOMPARABLE
-    | XEQ ->
-        let r = aux t1 t2 in
-        if r = XEQ then (
-          match t1.node.term, t2.node.term with
-	  | Var i, Var j when i=j -> XEQ
-          | Node (_::tl1), Node (_::tl2) -> cmp tl1 tl2
-          | _, _ ->  XINCOMPARABLE
-        ) else r
-    | res -> res
+  let kbo ~so t1 t2 = XINCOMPARABLE (* TODO *)
 
   let compare_terms ~so = compare_terms (kbo ~so)
 
@@ -547,20 +464,6 @@ module OrdCache = Cache.Make(
     | Node _, Node _ -> true  (* cache for complex terms *)
     | _ -> false
   end)
-
-class nrkbo (so : symbol_ordering) : ordering =
-  object
-    val cache = OrdCache.create 29
-    val so = so
-    method refresh () = ({< so = so#refresh () >} :> ordering)
-    method clear_cache () = OrdCache.clear cache
-    method symbol_ordering = so
-    method compare a b = OrdCache.with_cache cache
-      (fun (a, b) -> NRKBO.compare_terms ~so a b) (a, b)
-    method compute_term_weight t = weight_of_term ~so t
-    method compute_clause_weight c = compute_clause_weight ~so c
-    method name = NRKBO.name
-  end
 
 class kbo (so : symbol_ordering) : ordering =
   object

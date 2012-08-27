@@ -89,7 +89,6 @@ let _ =
   let get_so clauses = heuristic_ordering clauses in
   Hashtbl.add ords "lpo" (fun clauses -> new O.lpo (get_so clauses));
   Hashtbl.add ords "kbo" (fun clauses -> new O.kbo (get_so clauses));
-  Hashtbl.add ords "nrkbo" (fun clauses -> new O.nrkbo (get_so clauses))
 
 (** parameters for the main procedure *)
 type parameters = {
@@ -117,7 +116,7 @@ let parse_args () =
   and set_file s = file := s in
   (* options list (TODO parse something about heuristics) *) 
   let options =
-    [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo,nrkbo)");
+    [ ("-ord", Arg.String set_ord, "choose ordering (lpo,kbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
       ("-steps", Arg.Set_int steps, "verbose mode");
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");

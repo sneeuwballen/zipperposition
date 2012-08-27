@@ -73,8 +73,6 @@ val dummy_symbol_ordering : symbol_ordering
  terms partial ordering
  ---------------------------------------------------------------------- *)
 
-class nrkbo : symbol_ordering -> ordering
-
 class kbo : symbol_ordering -> ordering
 
 class lpo : symbol_ordering -> ordering
