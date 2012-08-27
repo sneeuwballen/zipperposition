@@ -231,94 +231,6 @@ let compute_clause_weight ~so {clits=lits} =
       sum + wlit*wlit)
     0 lits 
 
-(** extended weight for KBO, with multiset of variables *)
-type kbo_weight = int * (int * int) list
-
-let string_of_weight (cw, mw) =
-  let s =
-    String.concat ", "
-      (List.map (function (m, w) -> Printf.sprintf "(%d,%d)" m w) mw)
-  in
-  Printf.sprintf "[%d; %s]" cw s
-
-let kbo_weight_of_term ~so term =
-  let vars_dict = Hashtbl.create 5 in
-  let rec aux x = match x.node.term with
-    | Var i ->
-        (try
-           let oldw = Hashtbl.find vars_dict i in
-           Hashtbl.replace vars_dict i (oldw+1)
-         with Not_found ->
-           Hashtbl.add vars_dict i 1);
-        0
-    | Leaf symb -> so#weight symb
-    | Node l -> List.fold_left (+) 0 (List.map aux l)
-  in
-  let w = aux term in
-  let l =
-    Hashtbl.fold (fun meta metaw resw -> (meta, metaw)::resw) vars_dict []
-  in
-  let compare w1 w2 =
-    match w1, w2 with
-    | (m1, _), (m2, _) -> m1 - m2
-  in
-  (w, List.sort compare l) (* from the smallest meta to the bigest *)
-
-let kbo_compute_clause_weight ~so {clits=lits} =
-  let rec weight_of_polynomial w m =
-    let factor = 2 in
-    w + factor * List.fold_left (fun acc (_,occ) -> acc+occ) 0 m
-  and weight_of_lit l = match l with
-  | Equation (l,r,_,ord) ->  (* TODO use order? *)
-      let wl, ml = kbo_weight_of_term ~so l in
-      let wr, mr = kbo_weight_of_term ~so r in
-      weight_of_polynomial (wl+wr) (ml@mr) in
-  List.fold_left (+) 0 (List.map weight_of_lit lits)
-
-(* Riazanov: 3.1.5 pag 38 *)
-(* Compare weights normalized in a new way :
- * Variables should be sorted from the lowest index to the highest
- * Variables which do not occur in the term should not be present
- * in the normalized polynomial
- *)
-let compare_kbo_weights (h1, w1) (h2, w2) =
-  let rec aux hdiff (lt, gt) diffs w1 w2 =
-    match w1, w2 with
-      | ((var1, w1)::tl1) as l1, (((var2, w2)::tl2) as l2) ->
-          if var1 = var2 then
-            let diffs = (w1 - w2) + diffs in
-            let r = Pervasives.compare w1 w2 in
-            let lt = lt or (r < 0) in
-            let gt = gt or (r > 0) in
-              if lt && gt then XINCOMPARABLE else
-                aux hdiff (lt, gt) diffs tl1 tl2
-          else if var1 < var2 then
-            if lt then XINCOMPARABLE else
-              aux hdiff (false,true) (diffs+w1) tl1 l2
-          else
-            if gt then XINCOMPARABLE else
-              aux hdiff (true,false) (diffs-w2) l1 tl2
-      | [], (_,w2)::tl2 ->
-          if gt then XINCOMPARABLE else
-            aux hdiff (true,false) (diffs-w2) [] tl2
-      | (_,w1)::tl1, [] ->
-          if lt then XINCOMPARABLE else
-            aux hdiff (false,true) (diffs+w1) tl1 []
-      | [], [] ->
-          if lt then
-            if hdiff <= 0 then XLT
-            else if (- diffs) >= hdiff then XLE else XINCOMPARABLE
-          else if gt then
-            if hdiff >= 0 then XGT
-            else if diffs >= (- hdiff) then XGE else XINCOMPARABLE
-          else
-            if hdiff < 0 then XLT
-            else if hdiff > 0 then XGT
-            else XEQ
-  in
-    aux (h1-h2) (false,false) 0 w1 w2
-
-
 (* Riazanov: p. 40, relation >>>
  * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
@@ -350,7 +262,6 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
       in
       cmp l1 l2
 
-
 (* compare terms using the given auxiliary ordering, and
    convert the result to .Comparison *)
 let compare_terms o x y =
@@ -367,9 +278,140 @@ module KBO = struct
 
   let eq_foterm = T.eq_foterm
 
-  let kbo ~so t1 t2 = XINCOMPARABLE (* TODO *)
+  (** used to keep track of the balance of variables *)
+  type var_balance = {
+    mutable pos_counter : int;
+    mutable neg_counter : int;
+    balance : int array;
+  }
 
-  let compare_terms ~so = compare_terms (kbo ~so)
+  (** create a balance for the two terms *)
+  let mk_balance t1 t2 =
+    let maxvar = max (T.max_var (T.vars_of_term t1)) (T.max_var (T.vars_of_term t2)) in
+    {
+      pos_counter = 0;
+      neg_counter = 0;
+      balance = Array.make (maxvar + 1) 0;
+    }
+
+  (** add a positive variable *)
+  let add_pos_var balance idx =
+    let n = balance.balance.(idx) in
+    (if n = 0
+      then balance.pos_counter <- balance.pos_counter + 1
+      else if n = -1 then balance.neg_counter <- balance.neg_counter - 1);
+    balance.balance.(idx) <- n + 1
+
+  (** add a negative variable *)
+  let add_neg_var balance idx =
+    let n = balance.balance.(idx) in
+    (if n = 0
+      then balance.neg_counter <- balance.neg_counter + 1
+      else if n = 1 then balance.pos_counter <- balance.pos_counter - 1);
+    balance.balance.(idx) <- n - 1
+
+  (** the KBO ordering itself. The implementation is borrowed from
+      the kbo_5 version of "things to know when implementing KBO".
+      It should be linear time. TODO compatibility with symmetry of = *)
+  let rec kbo ~so t1 t2 =
+    let balance = mk_balance t1 t2 in
+    let extract t = match t.node.term with
+      | Var _ -> assert false
+      | Leaf s -> s, []
+      | Node ({node={term=(Leaf s)}}::tl) -> s, tl
+      | Node _ -> assert false
+    in
+    (** variable balance, weight balance, t contains variable y. pos
+        stands for positive (is t the left term) *)
+    let rec balance_weight wb t y pos =
+      match t.node.term with
+      | Var x ->
+        if pos
+          then (add_pos_var balance x; (wb + so#var_weight, x = y))
+          else (add_neg_var balance x; (wb - so#var_weight, x = y))
+      | Leaf s ->
+        if pos then (wb + so#weight s, false) else (wb - so#weight s, false)
+      | Node l ->
+        balance_weight_rec wb l y pos false
+    (** list version of the previous one *)
+    and balance_weight_rec wb terms y pos res = match terms with
+      | [] -> (wb, res)
+      | t::terms' ->
+        let (wb', res') = balance_weight wb t y pos in
+        balance_weight_rec wb' terms' y pos (res || res')
+    (** lexicographic comparison *)
+    and tckbolex wb terms1 terms2 =
+      match terms1, terms2 with
+      | [], [] -> wb, Eq
+      | [], _ | _, [] -> failwith "different arities in lexicographic comparison"
+      | t1::terms1', t2::terms2' ->
+        match tckbo wb t1 t2 with
+        | (wb', Eq) -> tckbolex wb' terms1' terms2'
+        | (wb', res) -> (* just compute the weights and return result *)
+          let wb'', _ = balance_weight_rec wb' terms1' 0 true false in
+          let wb''', _ = balance_weight_rec wb'' terms2' 0 false false in
+          wb''', res
+    (** commutative comparison. Not linear, must call kbo to
+        avoid breaking the weight computing invariants *)
+    and tckbocommute wb terms1 terms2 = 
+      match terms1, terms2 with
+      | _ -> assert false  (* TODO *)
+    (** tupled version of kbo (kbo_5 of the paper) *)
+    and tckbo wb t1 t2 =
+      match t1.node.term, t2.node.term with
+      | Var x, Var y when x = y -> (wb, Eq)
+      | Var x, Var y ->
+        add_pos_var balance x;
+        add_neg_var balance y;
+        (wb, Incomparable)
+      | Var x, Node _ | Var x, Leaf _ ->
+        add_pos_var balance x;
+        let wb', contains = balance_weight wb t2 x false in
+        (wb', if contains then Lt else Incomparable)
+      | Node _, Var y | Leaf _, Var y -> 
+        add_neg_var balance y;
+        let wb', contains = balance_weight wb t1 y true in
+        (wb', if contains then Gt else Incomparable)
+      | Leaf s, Leaf t when s = t -> (wb, Eq)
+      | Leaf s, Leaf t ->
+        let wb', _ = balance_weight wb t1 0 true in
+        let wb'', _ = balance_weight wb' t2 0 false in
+        (wb'', Incomparable)
+      | Leaf _, Node _ | Node _, Leaf _ | Node _, Node _ ->
+        let f, ss = extract t1
+        and g, ts = extract t2 in
+        (* do the recursive computation of kbo *)
+        let wb', recursive = tckbo_rec wb f g ss ts in
+        let wb'' = wb' + (so#weight f) - (so#weight g) in
+        (* check variable condition *)
+        let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
+        and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
+        (* lexicographic product of weight and precedence *)
+        if wb'' > 0 then wb'', g_or_n else
+        if wb'' < 0 then wb'', l_or_n else
+        let cmp_symbols = so#compare f g in
+        if cmp_symbols < 0 then wb'', l_or_n else
+        if cmp_symbols > 0 then wb'', g_or_n else
+        if f <> g || List.length ss <> List.length ts then wb'', Incomparable else
+        if recursive = Eq then wb'', Eq else
+        if recursive = Lt then wb'', l_or_n else
+        if recursive = Gt then wb'', g_or_n else
+        wb'', Incomparable
+    (** recursive comparison *)
+    and tckbo_rec wb f g ss ts =
+      if f = g
+        then if T.is_symmetric_symbol f
+          (* use multiset or lexicographic comparison *)
+          then tckbocommute wb ss ts else tckbolex wb ss ts
+        else
+          (* just compute variable and weight balances *)
+          let wb', _ = balance_weight_rec wb ss 0 true false in
+          let wb'', _ = balance_weight_rec wb' ts 0 false false in
+          wb'', Incomparable
+    in
+    let _, res = tckbo 0 t1 t2 in res  (* ignore the weight *)
+
+  let compare_terms ~so = kbo ~so
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(kbo)"
   let compare_terms ~so x y =
@@ -470,10 +512,11 @@ class kbo (so : symbol_ordering) : ordering =
     val cache = OrdCache.create 29
     val so = so
     method refresh () = ({< so = so#refresh () >} :> ordering)
-    method clear_cache () = OrdCache.clear cache
+    method clear_cache () = (* OrdCache.clear cache *) ()
     method symbol_ordering = so
-    method compare a b = OrdCache.with_cache cache
-      (fun (a, b) -> KBO.compare_terms ~so a b) (a, b)
+    method compare a b = (* OrdCache.with_cache cache
+      (fun (a, b) -> KBO.compare_terms ~so a b) (a, b) *)
+      KBO.compare_terms ~so a b
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = KBO.name
