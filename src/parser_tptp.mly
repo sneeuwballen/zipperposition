@@ -121,12 +121,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     T.mk_apply eq_symbol bool_sort [a; b]
 
   let mk_forall v t =
-    T.mk_apply forall_symbol bool_sort
-      [T.mk_apply lambda_symbol bool_sort [D.db_make t v]]
+    (* only add the quantifier if v is a free var in t *)
+    if List.exists (fun v' -> T.eq_foterm v v') (T.vars_of_term t)
+      then T.mk_apply forall_symbol bool_sort
+        [T.mk_apply lambda_symbol bool_sort [D.db_make t v]]
+      else t
 
   let mk_exists v t =
-    T.mk_apply exists_symbol bool_sort
-      [T.mk_apply lambda_symbol bool_sort [D.db_make t v]]
+    (* only add the quantifier if v is a free var in t *)
+    if List.exists (fun v' -> T.eq_foterm v v') (T.vars_of_term t)
+    then T.mk_apply exists_symbol bool_sort
+        [T.mk_apply lambda_symbol bool_sort [D.db_make t v]]
+    else t
     
 %}
   
@@ -268,7 +274,7 @@ binary_formula:
 
 nonassoc_binary:
   | unitary_formula binary_connective unitary_formula
-    { $1 }
+    { $2 $1 $3 }
 
 binary_connective:
   | BIJECTION
