@@ -83,18 +83,11 @@ let get_file () =
   | [] -> failwith "file required."
   | (x::_) -> x
 
-(* hashtable string -> ordering module *)
-let ords = Hashtbl.create 7
-let _ =
-  (* function used to compute a symbol ordering *)
-  let get_so clauses = heuristic_ordering clauses in
-  Hashtbl.add ords "rpo" (fun clauses -> new O.rpo (get_so clauses));
-  Hashtbl.add ords "kbo" (fun clauses -> new O.kbo (get_so clauses));
-
 (** parameters for the main procedure *)
 type parameters = {
-  param_ord : clause list -> ordering;
+  param_ord : string;
   param_steps : int;
+  param_calculus : string;
   param_timeout : float;
   param_files : string list;
   param_proof : bool;
@@ -104,31 +97,29 @@ type parameters = {
 (** parse_args returns parameters *)
 let parse_args () =
   (* parameters *)
-  let ord = ref (fun clauses -> new O.rpo (heuristic_ordering clauses))
+  let ord = ref "rpo"
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true
   and debug_proof = ref false
+  and calculus = ref "delayed"
   and file = ref "stdin" in
-  (* argument functions *)
-  let set_ord s = (* select ordering *)
-    try ord := Hashtbl.find ords s
-    with Not_found as e -> (Printf.printf "unknown ordering: %s\n" s; raise e)
-  and set_file s = file := s in
   (* options list (TODO parse something about heuristics) *) 
   let options =
-    [ ("-ord", Arg.String set_ord, "choose ordering (rpo,kbo)");
+    [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
       ("-steps", Arg.Set_int steps, "verbose mode");
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
+      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-debug_proof", Arg.Set debug_proof, "print a debug (detailed) proof");
     ]
   in
-  Arg.parse options set_file "solve problem in first file";
+  Arg.parse options (fun f -> file := f) "solve problem in first file";
   (* return parameter structure *)
-  { param_ord = !ord; param_steps = !steps; param_timeout = !timeout; param_files = [!file];
+  { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
+    param_timeout = !timeout; param_files = [!file];
     param_proof = !proof; param_debug_proof = !debug_proof; }
 
 (** parse given tptp file (TODO also parse include()s *)
@@ -194,17 +185,33 @@ let () =
   Printf.printf "%% process file %s\n" f;
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
+  (* find the calculus *)
+  let calculus = match params.param_calculus with
+    | "superposition" -> Sat.superposition
+    | "delayed" -> Sat.delayed_superposition
+    | x -> failwith ("unknown calculus "^x)
+  in
   (* choose an ord now *)
-  let ord = params.param_ord clauses in  (* compute precedence using clauses *)
+  let constr = O.compose_constraints
+    (heuristic_constraint clauses) calculus.Sat.calc_constraint in
+  let so = O.make_ordering constr in
+  let ord = match params.param_ord with
+    | "rpo" -> new O.rpo so
+    | "kbo" -> new O.kbo so
+    | x -> failwith ("unknown ordering " ^ x)
+  in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   let clauses = List.map (C.reord_clause ~ord) clauses in
   Utils.debug 2 (lazy (Utils.sprintf "clauses: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" (C.pp_clause ~sort:false)) clauses));
-  (* create a state, with clauses added to passive_set *)
+  (* create a state, with clauses added to passive_set and axioms to set of support *)
   let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
+  let state = Sat.set_of_support state calculus.Sat.calc_axioms in
   (* saturate *)
-  let state, result, num = Sat.given_clause ?steps ?timeout state in
+  let state, result, num = Sat.given_clause ?steps ?timeout
+    ~rules:calculus.Sat.calc_rules state
+  in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;
   print_stats state;
@@ -214,11 +221,13 @@ let () =
   | Sat.Sat ->
       Printf.printf "%% SZS status CounterSatisfiable\n";
       if Utils.debug_level () > 1 then
-        Format.printf "%% saturated set: @[<v>%a@]@." C.pp_bag state.PS.active_set.PS.active_clauses
+        Format.printf "%% saturated set: @[<v>%a@]@."
+          C.pp_bag state.PS.active_set.PS.active_clauses
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "%% SZS status Theorem\n";
       (if params.param_proof then
-        Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@." C.pp_tstp_proof c.node);
+        Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@."
+          C.pp_tstp_proof c.node);
       (if params.param_debug_proof then
         Format.printf "@.%% debug proof: @.@[<v>%a@]@." C.pp_proof_rec c.node)
