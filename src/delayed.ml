@@ -102,7 +102,24 @@ let db_replace t s =
   replace (T.mk_leaf db_symbol univ_sort) s t
 
 (* replace v by a De Bruijn symbol in t *)
-let db_make t v = assert false
+let db_make t v =
+  assert (T.is_var v);
+  (* go recursively and replace *)
+  let rec replace_and_lift depth t = match t.node.term with
+  | Var _ -> if T.eq_foterm t v then mk_db depth else t
+  | Leaf _ -> t
+  | Node [{node={term=Leaf s}} as hd; t'] when is_binder_symbol s ->
+    T.mk_node [hd; replace_and_lift (depth+1) t']  (* increment depth *) 
+  | Node l -> T.mk_node (List.map (replace_and_lift depth) l)
+  (* make De Bruijn index of given index *)
+  and mk_db n = match n with
+  | 0 -> T.mk_leaf db_symbol v.node.sort
+  | n when n > 0 ->
+    let next = mk_db (n-1) in
+    T.mk_apply succ_db_symbol v.node.sort [next]
+  | _ -> assert false
+  in
+  replace_and_lift 0 t
 
 (* constraint on the ordering *)
 let symbol_constraint =
