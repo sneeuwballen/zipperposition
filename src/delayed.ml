@@ -159,12 +159,14 @@ let rec look_db_sort depth t = match t.node.term with
 let alpha_eliminate ~ord clause idx t sign =
   let maxvar = T.max_var (T.vars_of_term t) in
   assert (t.node.sort = bool_sort);
-  try
-    look_db_sort 0 t; failwith "sort not found"
-  with FoundSort sort ->
-    (* sort is the sort of the first DB symbol *)
-    let new_var = T.mk_var (maxvar + 1) sort in
-    let new_t = db_replace t new_var in
+  let new_t =
+    try
+      look_db_sort 0 t; t (* the variable is not present *)
+    with FoundSort sort ->
+      (* sort is the sort of the first DB symbol *)
+      let new_var = T.mk_var (maxvar + 1) sort in
+      db_replace t new_var
+    in
     let new_lit = C.mk_lit ~ord new_t T.true_term sign in
     let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
     let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
@@ -176,12 +178,14 @@ let alpha_eliminate ~ord clause idx t sign =
 let delta_eliminate ~ord clause idx t sign =
   let vars = T.vars_of_term t in
   assert (t.node.sort = bool_sort);
-  try
-    look_db_sort 0 t; failwith "sort not found"
-  with FoundSort sort ->
-    (* sort is the sort of the first DB symbol *)
-    let new_skolem = skolem ord vars sort in
-    let new_t = db_replace t new_skolem in
+  let new_t =
+    try
+      look_db_sort 0 t; t (* the DB variable is not present *)
+    with FoundSort sort ->
+      (* sort is the sort of the first DB symbol *)
+      let new_skolem = skolem ord vars sort in
+      db_replace t new_skolem
+    in
     let new_lit = C.mk_lit ~ord new_t T.true_term sign in
     let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
     let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
