@@ -3,8 +3,3 @@
 - improve efficiency of discrimination trees: either
     use compressed tries, or use some kind of patricia trees
 
-- for the "superposition and equivalence reasoning and delayed CNF" paper:
-    * insertion of skolem constants in the precedence, under the DeBruijn symbols but
-        without modifying the previous precedence
-    * special inferences for quantifier rules (to introduce skolem constants or variables)
-    * special rewriting rule for De Bruijn substitution (also useful for lambda terms)
