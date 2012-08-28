@@ -51,17 +51,18 @@ val pp_foterm : Format.formatter -> foterm -> unit
 val pp_clause : Format.formatter -> clause -> unit
 
 (** Substitution of De Bruijn symbol by a term. [db_replace t s]
-    replaces the De Bruijn symbol 1 by s in t *)
+    replaces the De Bruijn symbol 0 by s in t *)
 val db_replace : foterm -> foterm -> foterm
 
 (** Precedence constraint *)
 val symbol_constraint : ordering_constraint
 
-(** Creation of a new skolem symbol, applied to the given arguments *)
-val skolem : ordering -> foterm list -> foterm * ordering
+(** Creation of a new skolem symbol, applied to the given arguments.
+    it also refreshes the ordering (the signature has changed) *)
+val skolem : ordering -> foterm list -> sort -> foterm
 
 (** new inference rules *)
 val inference_rules : Superposition.inference_rule list
 (** new superposition axioms, to add to the set of support *)
-val axioms : clause list
+val axioms : ordering -> clause list
 

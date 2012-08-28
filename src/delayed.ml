@@ -23,10 +23,12 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 open Types
 open Hashcons
 module T = Terms
+module C = Clauses
 module O = Orderings
 module S = FoSubst
 module Utils = FoUtils
 module Sup = Superposition
+module PS = ProofState
 
 let false_symbol = T.false_symbol
 let true_symbol = T.true_symbol
@@ -124,19 +126,250 @@ let symbol_constraint =
 (* creation of a new skolem symbol *)
 let skolem =
   let count = ref 0 in  (* current symbol counter *)
-  fun ord args ->
+  fun ord args sort ->
     let new_symbol = "$$sk_" ^ (string_of_int !count) in
     incr count;
     (* build the new term first *)
     let new_term =
-      if args = [] then T.mk_leaf new_symbol T.univ_sort
-      else T.mk_node ((T.mk_leaf new_symbol T.univ_sort) :: args)
+      if args = [] then T.mk_leaf new_symbol sort
+      else T.mk_node ((T.mk_leaf new_symbol sort) :: args)
     in
     (* update the ordering *)
-    new_term, ord#refresh ()
+    ord#refresh ();
+    new_term
 
-(* list of inference rules TODO *)
-let inference_rules = []
+(* ----------------------------------------------------------------------
+ * inference rules
+ * ---------------------------------------------------------------------- *)
 
-(* axioms TODO *)
-let axioms = []
+exception FoundSort of sort
+
+(** find the sort of the first De Bruijn term *)
+let rec look_db_sort depth t = match t.node.term with
+  | Node ({node={term=Leaf s}}::subterms) when is_binder_symbol s ->
+    List.iter (look_db_sort (depth+1)) subterms  (* increment for binder *)
+  | Node [{node={term=Leaf s}}; t] when s = succ_db_symbol ->
+    look_db_sort (depth-1) t  (* decrement for lifted De Bruijn *)
+  | Node l -> List.iter (look_db_sort depth) l
+  | Leaf s when s = db_symbol && depth = 0 -> raise (FoundSort t.node.sort)
+  | Leaf _ -> ()
+  | Var _ -> ()
+
+(** helper for gamma elimination (remove idx-th literal from clause
+    and adds t where De Bruijn 0 is replaced by a fresh var) *)
+let alpha_eliminate ~ord clause idx t sign =
+  let maxvar = T.max_var (T.vars_of_term t) in
+  assert (t.node.sort = T.bool_sort);
+  try
+    look_db_sort 0 t; failwith "sort not found"
+  with FoundSort sort ->
+    (* sort is the sort of the first DB symbol *)
+    let new_var = T.mk_var (maxvar + 1) sort in
+    let new_t = db_replace t new_var in
+    let new_lit = C.mk_lit ~ord new_t T.true_term sign in
+    let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
+    let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
+    C.mk_clause ~ord new_lits proof
+
+(** helper for delta elimination (remove idx-th literal from clause
+    and adds t where De Bruijn 0 is replaced by a skolem
+    of free variables of t) *)
+let delta_eliminate ~ord clause idx t sign =
+  let vars = T.vars_of_term t in
+  assert (t.node.sort = T.bool_sort);
+  try
+    look_db_sort 0 t; failwith "sort not found"
+  with FoundSort sort ->
+    (* sort is the sort of the first DB symbol *)
+    let new_skolem = skolem ord vars sort in
+    let new_t = db_replace t new_skolem in
+    let new_lit = C.mk_lit ~ord new_t T.true_term sign in
+    let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
+    let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
+    C.mk_clause ~ord new_lits proof
+
+(** elimination of forall *)
+let forall_elimination active_set clause =
+  let ord = active_set.PS.a_ord in
+  Sup.fold_lits ~both:false ~pos:true ~neg:true
+    (fun acc l r sign l_pos -> 
+      if not (T.eq_foterm r T.true_term) then acc else
+      let idx = List.hd l_pos in 
+      match l.node.term with
+      | Node [{node={term=Leaf s}};
+          {node={term=Node [{node={term=Leaf s'}}; t]}}]
+          when s = forall_symbol && s' = lambda_symbol ->
+          (* we have a forall (lambda t) *)
+          assert (t.node.sort = T.bool_sort);
+          if sign
+            then (alpha_eliminate ~ord clause idx t true) :: acc
+            else (delta_eliminate ~ord clause idx t false) :: acc
+      | _ -> acc
+    )
+    [] (Utils.list_pos clause.clits)
+
+(** elimination of exists *)
+let exists_elimination active_set clause =
+  let ord = active_set.PS.a_ord in
+  Sup.fold_lits ~both:false ~pos:true ~neg:true
+    (fun acc l r sign l_pos -> 
+      if not (T.eq_foterm r T.true_term) then acc else
+      let idx = List.hd l_pos in 
+      match l.node.term with
+      | Node [{node={term=Leaf s}};
+          {node={term=Node [{node={term=Leaf s'}}; t]}}]
+          when s = exists_symbol && s' = lambda_symbol ->
+          (* we have an exists (lambda t) *)
+          assert (t.node.sort = T.bool_sort);
+          if sign
+            then (delta_eliminate ~ord clause idx t true) :: acc
+            else (alpha_eliminate ~ord clause idx t false) :: acc
+      | _ -> acc
+    )
+    [] (Utils.list_pos clause.clits)
+
+(** equivalence elimination *)
+let equivalence_elimination active_set clause =
+  let ord = active_set.PS.a_ord in
+  (* check whether the term is not a non-equational proposition *)
+  let rec is_not_nonequational t = match t.node.term with
+  | Node ({node={term=Leaf s}}::_) ->
+      t.node.sort = T.bool_sort &&
+      (s = eq_symbol || s = exists_symbol || s = forall_symbol || s = not_symbol || 
+       s = and_symbol || s = imply_symbol || s = or_symbol)
+  | Var _ | Leaf _ -> false
+  | Node _ -> assert false
+  (* do the inference for positive equations *)
+  and do_inferences_pos l r l_pos =
+    if not (is_not_nonequational l) then [] else begin
+    assert (r.node.sort = T.bool_sort);
+    if ord#compare l r = Lt then [] else
+    (* ok, do it *)
+    match l_pos with
+    | [idx; _] ->
+      let new_lits = Utils.list_remove clause.clits idx in
+      let new_lits1 = (C.mk_neq ~ord l T.true_term) ::
+                      (C.mk_eq ~ord r T.true_term) :: new_lits
+      and proof1 = lazy (Proof ("pos_equiv_elim1", [clause, l_pos, S.id_subst]))
+      and new_lits2 = (C.mk_eq ~ord l T.true_term) ::
+                      (C.mk_neq ~ord r T.true_term) :: new_lits
+      and proof2 = lazy (Proof ("pos_equiv_elim2", [clause, l_pos, S.id_subst]))
+      in
+      [C.mk_clause ~ord new_lits1 proof1; C.mk_clause ~ord new_lits2 proof2]
+    | _ -> assert false
+    end
+  (* do the inference for negative equations *)
+  and do_inferences_neg l r l_pos =
+    if not (l.node.sort = T.bool_sort) then [] else begin
+    assert (r.node.sort = T.bool_sort);
+    match l_pos with
+    | [idx; _] ->
+      let new_lits = Utils.list_remove clause.clits idx in
+      let new_lits1 = (C.mk_eq ~ord l T.true_term) ::
+                      (C.mk_eq ~ord r T.true_term) :: new_lits
+      and proof1 = lazy (Proof ("neg_equiv_elim1", [clause, l_pos, S.id_subst]))
+      and new_lits2 = (C.mk_neq ~ord l T.true_term) ::
+                      (C.mk_neq ~ord r T.true_term) :: new_lits
+      and proof2 = lazy (Proof ("neg_equiv_elim2", [clause, l_pos, S.id_subst]))
+      in
+      [C.mk_clause ~ord new_lits1 proof1; C.mk_clause ~ord new_lits2 proof2]
+    | _ -> assert false
+    end
+  in
+  Sup.fold_lits ~both:true ~pos:true ~neg:true
+    (fun acc l r sign l_pos -> 
+      if sign
+        then (do_inferences_pos l r l_pos) @ acc
+        else (do_inferences_neg l r l_pos) @ acc)
+    [] (Utils.list_pos clause.clits)
+
+(* list of inference rules *)
+let inference_rules =
+  [ equivalence_elimination;
+    forall_elimination;
+    exists_elimination;
+  ]
+
+(* ----------------------------------------------------------------------
+ * axioms
+ * ---------------------------------------------------------------------- *)
+
+(* axioms (delta and gamma rules are implemented as inference rules *)
+let axioms ord =
+  let varu i = T.mk_var i T.univ_sort   (* create universal var *)
+  and varb i = T.mk_var i T.bool_sort   (* create boolean var *)
+  and tb s = T.mk_leaf s T.bool_sort    (* bool atom *)
+  in
+  let applyb f terms = T.mk_node ((tb f) :: terms)
+  and istrue t = C.mk_eq ~ord t (tb true_symbol)
+  and isfalse t = C.mk_neq ~ord t (tb true_symbol)
+  and iseq a b = C.mk_eq ~ord a b
+  and isneq a b = C.mk_neq ~ord a b
+  and lits l name = C.mk_clause ~ord l (lazy (Axiom ("delayed.ml", "axiom " ^ name)))
+  in
+  [
+  (* --------- alpha rules ------------ *)
+  (* positive expansion of and *)
+  (let x = varb 1 and y = varb 2 in
+    lits [isfalse (applyb and_symbol [x; y]);
+          istrue x] "positive_and_expansion1");
+  (let x = varb 1 and y = varb 2 in
+    lits [isfalse (applyb and_symbol [x; y]);
+          istrue y] "positive_and_expansion2");
+  (* negative expansion of or *)
+  (let x = varb 1 and y = varb 2 in
+    lits [istrue (applyb or_symbol [x; y]);
+          isfalse x] "negative_or_expansion1");
+  (let x = varb 1 and y = varb 2 in
+    lits [istrue (applyb or_symbol [x; y]);
+          isfalse y] "negative_or_expansion2");
+  (* negative expansion of imply *)
+  (let x = varb 1 and y = varb 2 in
+    lits [istrue (applyb imply_symbol [x; y]);
+          istrue x] "negative_imply_expansion1");
+  (let x = varb 1 and y = varb 2 in
+    lits [istrue (applyb imply_symbol [x; y]);
+          isfalse y]"negative_imply_expansion2");
+  (* --------- beta rules ------------ *)
+  (* negative expansion of and *)
+  (let x = varb 1 and y = varb 2 in
+    lits [istrue (applyb and_symbol [x; y]);
+          isfalse x; isfalse y] "negative_and_expansion");
+  (* positive expansion of or *)
+  (let x = varb 1 and y = varb 2 in
+    lits [isfalse (applyb or_symbol [x; y]);
+          istrue x; istrue y] "positive_or_expansion");
+  (* positive expansion of imply *)
+  (let x = varb 1 and y = varb 2 in
+    lits [isfalse (applyb imply_symbol [x; y]);
+          isfalse x; istrue y] "positive_imply_expansion");
+  (* --------- other rules ------------ *)
+  (* T elimination *)
+  (let x = varb 1 and y = varb 2 in
+    lits [isfalse (applyb eq_symbol [x; y]);
+          iseq x y] "T_elimination1");
+  (let x = varu 1 and y = varu 2 in
+    lits [isfalse (applyb eq_symbol [x; y]);
+          iseq x y] "T_elimination2");
+  (* \bot elimination *)
+  (lits [isfalse (tb false_symbol)] "false_elimination");
+  (* bonus rules to connect the symbolic = to literals *)
+  (let x = varb 1 in
+    lits [isneq x (tb false_symbol);
+          isfalse x] "false_equal1");
+  (let x = varb 1 in
+    lits [iseq x (tb false_symbol);
+          istrue x] "false_equal2");
+  (let x = varb 1 in
+    lits [isneq x (tb true_symbol);
+          istrue x] "true_equal1");
+  (let x = varb 1 in
+    lits [iseq x (tb true_symbol);
+          isfalse x] "true_equal2");
+  (let x = varb 1 and y = varb 2 in
+    lits [istrue (applyb eq_symbol [x; y]);
+          isneq x y] "'=_elimination1'");
+  (let x = varu 1 and y = varu 2 in
+    lits [istrue (applyb eq_symbol [x; y]);
+          isneq x y] "'=_elimination2'");
+  ]

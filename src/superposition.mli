@@ -31,6 +31,18 @@ exception Success of hclause
 (** inferences *)
 type inference_rule = ProofState.active_set -> clause -> conclusion list
 
+(* some helpers *)
+val fold_lits :
+  ?pos:bool -> ?neg:bool -> ?both:bool ->
+  ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
+  (literal * int) list -> 'a
+val fold_positive :
+  ?both:bool -> ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
+  (literal * int) list -> 'a
+val fold_negative :
+  ?both:bool -> ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
+  (literal * int) list -> 'a
+
 (** perform the inferences in the list, returns the resulting clauses *)
 val do_inferences : ProofState.active_set
                  -> (string * inference_rule) list (** named rules *)
