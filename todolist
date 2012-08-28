@@ -2,4 +2,6 @@
 - make multiset comparison fast
 - improve efficiency of discrimination trees: either
     use compressed tries, or use some kind of patricia trees
-
+- write delayed inference rules rather than using axioms, because
+    axioms rewrite everywhere in the term, whereas inferences
+    should only occur at root.
