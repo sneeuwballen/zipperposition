@@ -391,6 +391,13 @@ let infer_equality_factoring_ actives clause =
 let infer_equality_factoring actives clause =
   prof_infer_equality_factoring.HExtlib.profile (infer_equality_factoring_ actives) clause
 
+let inference_rules =
+  [("infer_active", infer_active);
+   ("infer_passive", infer_passive);
+   ("equality_resolution", infer_equality_resolution);
+   ("equality_factoring", infer_equality_factoring);
+   ];
+
 (* ----------------------------------------------------------------------
  * simplifications
  * ---------------------------------------------------------------------- *)
@@ -502,6 +509,8 @@ let is_tautology c =
   is_tauto
 
 let basic_simplify ~ord clause =
+  (* convert some fof to literals *)
+  let clause = C.clause_of_fof ~ord clause in
   let absurd_lit lit = match lit with
   | Equation (l, r, false, _) when T.eq_foterm l r -> true
   | _ -> false in

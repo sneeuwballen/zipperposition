@@ -48,6 +48,8 @@ val do_inferences : ProofState.active_set
                  -> (string * inference_rule) list (** named rules *)
                  -> clause -> clause list
 
+val inference_rules : (string * inference_rule) list
+
 val infer_active : inference_rule  (** superposition where given clause is active *)
 
 val infer_passive : inference_rule (** superposition where given clause is passive *)

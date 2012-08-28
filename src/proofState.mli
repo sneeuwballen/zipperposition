@@ -46,6 +46,7 @@ type passive_set = {
 type state = {
   ord : ordering;
   active_set : active_set;    (* active clauses, indexed *)
+  axioms_set : active_set;    (* set of support, indexed *)
   passive_set : passive_set;  (* passive clauses *)
 }
 
@@ -77,6 +78,7 @@ val relocate_active : active_set -> clause -> clause
 (** statistics on the state *)
 type state_stats = {
   stats_active_clauses : int;
+  stats_sos_clauses: int;
   stats_passive_clauses : int;
   stats_root_index_keys : int;
   stats_root_index_elems : int;

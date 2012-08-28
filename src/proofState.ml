@@ -51,6 +51,7 @@ type passive_set = {
 type state = {
   ord : ordering;
   active_set : active_set;    (* active clauses, indexed *)
+  axioms_set : active_set;    (* set of support, indexed *)
   passive_set : passive_set;  (* passive clauses *)
 }
 
@@ -66,6 +67,7 @@ let make_state ord queue_list =
   and active_set = mk_active_set ~ord in
   {ord=ord;
    active_set=active_set;
+   axioms_set=active_set;
    passive_set=passive_set}
 
 let next_passive_clause passive_set =
@@ -162,6 +164,7 @@ let relocate_active active_set c =
 (** statistics on the state *)
 type state_stats = {
   stats_active_clauses : int;
+  stats_sos_clauses: int;
   stats_passive_clauses : int;
   stats_root_index_keys : int;
   stats_root_index_elems : int;
@@ -174,6 +177,7 @@ type state_stats = {
 let stats state =
   {
     stats_active_clauses = C.size_bag state.active_set.active_clauses;
+    stats_sos_clauses = C.size_bag state.axioms_set.active_clauses;
     stats_passive_clauses = C.size_bag state.passive_set.passive_clauses;
     stats_root_index_keys = I.DT.num_keys state.active_set.idx.I.root_index;
     stats_root_index_elems = I.DT.num_elems state.active_set.idx.I.root_index;

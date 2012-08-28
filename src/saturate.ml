@@ -24,9 +24,11 @@ open Types
 open Hashcons
 
 module C = Clauses
+module O = Orderings
 module PS = ProofState
 module Sup = Superposition
 module Utils = FoUtils
+module Delayed = Delayed
 
 (** the status of a state *)
 type szs_status = 
@@ -40,13 +42,37 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Unix.gettimeofday () > timeout
 
-(** the list of inference rules *)
-let inference_rules =
-  [("infer_active", Sup.infer_active);
-   ("infer_passive", Sup.infer_passive);
-   ("equality_resolution", Sup.infer_equality_resolution);
-   ("equality_factoring", Sup.infer_equality_factoring);
-   ]
+(** A clausal calculus for first order reasoning *)
+type calculus = {
+  calc_rules : (string * Sup.inference_rule) list;
+  calc_axioms : clause list;
+  calc_constraint : ordering_constraint;
+}
+
+let superposition = {
+  calc_rules = Sup.inference_rules;
+  calc_axioms = [];
+  calc_constraint = O.consts_constraint;
+}
+
+let delayed_superposition = {
+  calc_rules = Sup.inference_rules @ Delayed.inference_rules;
+  calc_axioms = Delayed.axioms;
+  calc_constraint = Delayed.symbol_constraint;
+}
+
+let set_of_support state axioms =
+  (* reordonate causes using the ordering of the state *)
+  let ord = state.PS.ord in
+  let axioms = List.map
+    (fun c -> C.reord_clause ~ord (C.clause_of_fof ~ord c)) axioms in
+  let axioms = List.filter (fun c -> not (Sup.is_tautology c)) axioms in
+  (* add the axioms to the active set *)
+  let axioms_set = PS.add_actives state.PS.axioms_set axioms in
+  Utils.debug 1 (lazy (Utils.sprintf "%% added %d clauses to set-of-support"
+                  (List.length axioms)));
+  {state with PS.axioms_set = axioms_set}
+
 
 (** simplify the clause using the active_set. Returns
     the (renamed) clause and the simplified clause. *)
@@ -61,8 +87,8 @@ let simplify active_set clause =
   old_c, c
 
 (** generate all clauses *)
-let generate active_set clause =
-  Sup.do_inferences active_set inference_rules clause
+let generate ~rules active_set clause =
+  Sup.do_inferences active_set rules clause
 
 (** check whether the clause is redundant w.r.t the active_set *)
 let is_redundant active_set clause =
@@ -75,7 +101,7 @@ let subsumed_by active_set clause =
   let c = PS.relocate_active active_set clause in
   Sup.subsumed_in_set active_set c
 
-let given_clause_step state =
+let given_clause_step ~rules state =
   let ord = state.PS.ord in
   (* select next given clause *)
   match PS.next_passive_clause state.PS.passive_set with
@@ -120,9 +146,10 @@ let given_clause_step state =
       let active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
       let state = { state with PS.active_set = active_set } in
       let new_clauses = !simplified_actives in
-      (* do inferences w.r.t to the active set, and c itself *)
-      let new_clauses = List.rev_append (generate state.PS.active_set c) new_clauses in
-      let new_clauses = List.rev_append (generate given_active_set c) new_clauses in
+      (* do inferences w.r.t to the active set, SOS, and c itself *)
+      let new_clauses = List.rev_append (generate ~rules state.PS.axioms_set c) new_clauses in
+      let new_clauses = List.rev_append (generate ~rules state.PS.active_set c) new_clauses in
+      let new_clauses = List.rev_append (generate ~rules given_active_set c) new_clauses in
       (* add given clause to active set *)
       let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
       let state = { state with PS.active_set=active_set } in
@@ -151,7 +178,7 @@ let given_clause_step state =
       state, Unknown
     end
 
-let given_clause ?steps ?timeout state =
+let given_clause ?steps ?timeout ~rules state =
   let rec do_step state num =
     if check_timeout timeout then state, Timeout, num else
     begin
@@ -161,7 +188,7 @@ let given_clause ?steps ?timeout state =
     | _ ->
       begin
         (* do one step *)
-        let new_state, status = given_clause_step state in
+        let new_state, status = given_clause_step ~rules state in
         match status with
         | Sat | Unsat _ | Error _ -> state, status, num (* finished *)
         | Timeout -> assert false
@@ -171,4 +198,3 @@ let given_clause ?steps ?timeout state =
     end
   in
   do_step state 0
-
