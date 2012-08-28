@@ -108,8 +108,9 @@ let given_clause_step ~rules state =
   | passive_set, None -> state, Sat (* passive set is empty *)
   | passive_set, Some c ->
     let state = { state with PS.passive_set=passive_set } in
-    (* simplify given clause w.r.t. active set *)
+    (* simplify given clause w.r.t. active set and SOS *)
     let _, c = simplify state.PS.active_set c.node in
+    let _, c = simplify state.PS.axioms_set c in
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
     (* tautology or subsumed, useless *)
