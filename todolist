@@ -5,5 +5,6 @@
 - write delayed inference rules rather than using axioms, because
     axioms rewrite everywhere in the term, whereas inferences
     should only occur at root.
+- add some rules for negation
 - object-oriented pretty-printers, with imperative interfaces, to
     allow to change parameters easily...
