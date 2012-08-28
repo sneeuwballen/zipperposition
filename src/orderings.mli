@@ -46,6 +46,8 @@ val arity_constraint : (symbol, int) Hashtbl.t -> ordering_constraint
 val max_constraint : symbol list -> ordering_constraint
 (** minimal symbols, in decreasing order *)
 val min_constraint : symbol list -> ordering_constraint
+(** regular (alphabetic) ordering on symbols *)
+val alpha_constraint : ordering_constraint
 
 (** compose constraints (the second one is prioritary) *)
 val compose_constraints : ordering_constraint -> ordering_constraint -> ordering_constraint
@@ -53,22 +55,13 @@ val compose_constraints : ordering_constraint -> ordering_constraint -> ordering
 (** enforce that minimal symbols are $false > $true *)
 val consts_constraint : ordering_constraint
 
-(** apply the constraint to the ordering, to get a new ordering that respect
-    the constraint. less important constraints should be applied first,
-    most important constraints should be applied last. *)
-val apply_constraint : symbol_ordering -> ordering_constraint -> symbol_ordering
 (** check that the constraint is respected by the ordering *)
 val check_constraint : symbol_ordering -> ordering_constraint -> bool
-(** make an ordering from the given constraint *)
-val make_ordering : ordering_constraint -> symbol_ordering
-(** update an ordering using a function for multiset status *)
-val set_multiset_symbols : symbol_ordering -> (symbol -> bool) -> symbol_ordering
 
 (** default ordering on symbols *)
 val default_symbol_ordering : unit -> symbol_ordering
-
-(** symbol ordering that just compares symbols by string ordering *)
-val dummy_symbol_ordering : symbol_ordering
+(** make an ordering from the given constraint *)
+val make_ordering : ordering_constraint -> symbol_ordering
 
 
 (* ----------------------------------------------------------------------

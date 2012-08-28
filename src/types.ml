@@ -85,18 +85,19 @@ type ordering_constraint = symbol -> symbol -> int
 (** the interface of a total ordering on symbols *)
 class type symbol_ordering =
   object
-    method refresh : unit -> symbol_ordering  (** refresh the signature *)
+    method refresh : unit -> unit             (** refresh the signature *)
     method signature : symbol list            (** current symbols in decreasing order *)
     method compare : symbol -> symbol -> int  (** total order on symbols *)
     method weight : symbol -> int             (** weight of symbols *)
     method var_weight : int                   (** weight of variables *)
     method multiset_status : symbol -> bool   (** does the symbol have a multiset status? *)
+    method set_multiset : (symbol -> bool) -> unit  (** set the function that recognized multiset symbols *)
   end
 
 (** the interface of an ordering type *)
 class type ordering =
   object
-    method refresh : unit -> ordering         (** refresh the symbol ordering *)
+    method refresh : unit -> unit             (** refresh the symbol ordering (the signature) *)
     method clear_cache : unit -> unit         (** clear cache, if any *)
     method symbol_ordering : symbol_ordering
     method compare : foterm -> foterm -> comparison

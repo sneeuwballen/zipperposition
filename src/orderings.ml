@@ -131,6 +131,9 @@ let min_constraint symbols =
     b_n - a_n  (* if a > b then a_n < b_n *)
   in compare
 
+(* regular string ordering *)
+let alpha_constraint a b = Pervasives.compare a b
+
 let compose_constraints c1 c2 =
   (* first we compare using c2, then using c1 if needed, because
      c2 is prioritary *)
@@ -143,21 +146,6 @@ let compose_constraints c1 c2 =
 (** constraint that makes the three symbols the smaller ones *)
 let consts_constraint = min_constraint [T.false_symbol; T.true_symbol]
 
-let rec apply_constraint so constr =
-  let symbols = so#signature in
-  (* stable_sort the signature in decreasing order using the constraint *)
-  let ordered_symbols = List.stable_sort (fun x y -> - (constr x y)) symbols in
-  (* comparison function is given by the place in the ordered signature *)
-  let new_compare = list_constraint ordered_symbols in
-  object (self)
-    method refresh () = apply_constraint (so#refresh ()) constr
-    method signature = ordered_symbols
-    method compare = new_compare
-    method weight s = so#weight s       (* delegate to so *)
-    method var_weight = so#var_weight   (* delegate to so *)
-    method multiset_status s = so#multiset_status s
-  end
-
 let check_constraint so constr =
   (* check whether a list is sorted in decreasing order w.r.t constraint *)
   let rec is_sorted l = match l with
@@ -169,36 +157,36 @@ let check_constraint so constr =
   in
   is_sorted so#signature
 
-let dummy_symbol_ordering =
-  (* recompute signature *)
-  let rec produce () =
-    let _, _, signature = current_signature () in
-    let signature = List.sort Pervasives.compare signature in
-    object
-      method refresh () = produce ()
-      method signature = signature
-      method compare a b = Pervasives.compare a b
-      method weight _ = 2
-      method var_weight = 1
-      method multiset_status s = false
-    end
-  in produce ()
-
+(* build an ordering from a constraint *)
 let make_ordering constr =
-  apply_constraint (dummy_symbol_ordering#refresh ()) constr
-
-let set_multiset_symbols so multiset_pred =
-  object
-    method refresh = so#refresh
-    method signature = so#signature
-    method compare = so#compare
-    method weight = so#weight
-    method var_weight = so#var_weight
-    method multiset_status s = multiset_pred s
+  (* references that hold current state *)
+  let cur_signature = ref []
+  and cmp = ref (fun x y -> 0)
+  and multiset_pred = ref (fun s -> false) in
+  (* the object itself *)
+  let obj = object
+    (* refresh computes a new ordering based on the current signature *)
+    method refresh () =
+      let _, _, symbols = current_signature () in
+      (* sort according to the constraint *)
+      cur_signature := List.stable_sort (fun x y -> - (constr x y)) symbols;
+      (* comparison function is given by the place in the ordered signature *)
+      cmp := list_constraint !cur_signature
+    method signature = !cur_signature
+    method compare a b = !cmp a b
+    method weight s = 2
+    method var_weight = 1
+    method multiset_status s = !multiset_pred s
+    method set_multiset f = multiset_pred := f
   end
+  in
+  (* do the initial computation and return the object *)
+  obj#refresh ();
+  obj
 
 let rec default_symbol_ordering () =
   let _, arities, _ = current_signature () in
+  (* two constraints: false, true at end of precedence, and arity constraint *)
   let constr = compose_constraints
     (arity_constraint arities) consts_constraint in
   (* apply the constraints to the dummy symbol ordering *)
@@ -498,7 +486,7 @@ class kbo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 29
     val so = so
-    method refresh () = OrdCache.clear cache; ({< so = so#refresh () >} :> ordering)
+    method refresh () = (OrdCache.clear cache; so#refresh ())
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
@@ -512,7 +500,7 @@ class rpo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 29
     val so = so
-    method refresh () = (OrdCache.clear cache; ({< so = so#refresh () >} :> ordering))
+    method refresh () = OrdCache.clear cache; so#refresh ()
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.with_cache cache
@@ -525,13 +513,14 @@ class rpo (so : symbol_ordering) : ordering =
 let default_ordering () = new rpo (default_symbol_ordering ())
 
 let dummy_ordering =
+  let so = ref (default_symbol_ordering ()) in
   object
-    method refresh () = ({< >} :> ordering)
+    method refresh () = !so#refresh ()
     method clear_cache () = ()
-    method symbol_ordering = dummy_symbol_ordering
+    method symbol_ordering = !so
     method compare a b = Incomparable
-    method compute_term_weight t = weight_of_term ~so:dummy_symbol_ordering t
+    method compute_term_weight t = weight_of_term ~so:!so t
     method compute_clause_weight c =
-      compute_clause_weight ~so:dummy_symbol_ordering c
+      compute_clause_weight ~so:!so c
     method name = "dummy"
   end
