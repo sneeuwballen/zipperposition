@@ -82,7 +82,7 @@ let simplify active_set clause =
   let c = Sup.demodulate active_set [] old_c in
   let c = Sup.basic_simplify ~ord c in
   (if not (C.eq_clause c old_c)
-    then Utils.debug 2 (lazy (Utils.sprintf "clause %a simplified into %a"
+    then Utils.debug 2 (lazy (Utils.sprintf "clause @[<h>%a@] simplified into @[<h>%a@]"
                       (C.pp_clause ~sort:false) old_c (C.pp_clause ~sort:false) c)));
   old_c, c
 
@@ -116,8 +116,9 @@ let given_clause_step ~rules state =
     (* tautology or subsumed, useless *)
     else if Sup.is_tautology c || is_redundant state.PS.active_set c then state, Unknown
     else begin
-      Utils.debug 1 (lazy (Format.sprintf "============ step with given clause %s ======="
-                    (Utils.on_buffer C.pp_clause c)));
+      Utils.debug 1 (lazy (Utils.sprintf
+                    "============ step with given clause @[<h>%a@] =========="
+                    (C.pp_clause ~sort:false) c));
       (* an active set containing only the given clause *)
       let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
       (* find clauses that are subsumed by c in active_set *)
@@ -135,7 +136,8 @@ let given_clause_step ~rules state =
             then begin
               (* remove the original clause form active_set, save the simplified clause *)
               simplified_actives := simplified :: !simplified_actives;
-              Utils.debug 2 (lazy (Utils.sprintf "active clause %a simplified into %a"
+              Utils.debug 2 (lazy (Utils.sprintf
+                           "active clause @[<h>%a@] simplified into @[<h>%a@]"
                            (C.pp_clause ~sort:false) original
                            (C.pp_clause ~sort:false) simplified));
               false
@@ -164,7 +166,8 @@ let given_clause_step ~rules state =
         new_clauses
       in
       List.iter
-        (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf "    inferred new clause %a"
+        (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf
+                                    "    inferred new clause @[<hov 3>%a@]"
                                     (C.pp_clause ~sort:false) new_c))) new_clauses;
       (* add new clauses (including simplified active clauses) to passive set
          TODO remove orphans of simplified active clauses *)

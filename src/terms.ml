@@ -177,7 +177,26 @@ let min_var vars =
 
 let pp_symbol formatter s = Format.pp_print_string formatter s
   
-let rec pp_foterm formatter t = match t.node.term with
+(* readable representation of a term *)
+let rec pp_foterm formatter t =
+  (* print a De Bruijn symbol *)
+  let rec pp_db formatter t =
+    let n = db_depth t in
+    Format.fprintf formatter "•%d" n
+  (* compute index of a De Bruijn symbol *)
+  and db_depth t = match t.node.term with
+  | Leaf s when s = db_symbol -> 0
+  | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> (db_depth t') + 1
+  | _ -> assert false
+  in
+  match t.node.term with
+  | Node [{node={term=Leaf s}} as hd; t] when s = not_symbol ->
+    Format.fprintf formatter "%a%a" pp_foterm hd pp_foterm t
+  | Node [{node={term=Leaf s}} as hd; {node={term=Node [{node={term=Leaf s'}}; t]}}]
+    when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol ->
+    Format.fprintf formatter "%a%a" pp_foterm hd pp_foterm t
+  | Node [{node={term=Leaf s}}; _] when s = succ_db_symbol ->
+    pp_db formatter t (* print de bruijn symbol *)
   | Node (({node={term=Leaf s}} as head)::args) ->
     (* general case for nodes *)
     if is_infix_symbol s
@@ -196,6 +215,7 @@ let rec pp_foterm formatter t = match t.node.term with
   | Leaf s when s = and_symbol -> Format.pp_print_string formatter "•&"
   | Leaf s when s = or_symbol -> Format.pp_print_string formatter "•|"
   | Leaf s when s = imply_symbol -> Format.pp_print_string formatter "•→"
+  | Leaf s when s = db_symbol -> pp_db formatter t
   | Leaf s -> Format.pp_print_string formatter s
   | Var i -> Format.fprintf formatter "X%d" i
   | Node _ -> failwith "bad term"

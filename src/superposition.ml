@@ -209,7 +209,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   let active_idx = List.hd active_pos
   and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = get_equations_sides active_clause active_pos in
-  Utils.debug 3 (lazy (Utils.sprintf "@[<h>sup %a s=%a t=%a %a u=%a v=%a p=%a subst=%a@]"
+  Utils.debug 3 (lazy (Utils.sprintf ("@[<h>sup @[<h>%a@] s=%a t=%a @[<h>%a@] " ^^
+                                      "u=%a v=%a p=%a subst=%a@]")
                        (C.pp_clause ~sort:false) active_clause T.pp_foterm s T.pp_foterm t
                        (C.pp_clause ~sort:false) passive_clause T.pp_foterm u T.pp_foterm v
                        C.pp_pos passive_pos (S.pp_substitution ~sort:false) subst));
@@ -243,7 +244,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
         let new_clause = C.mk_clause ~ord new_lits proof in
-        Utils.debug 3 (lazy (Utils.sprintf "ok, conclusion %a"
+        Utils.debug 3 (lazy (Utils.sprintf "ok, conclusion @[<h>%a@]"
                             (C.pp_clause ~sort:false) new_clause));
         new_clause :: acc
       end
@@ -320,7 +321,8 @@ let infer_equality_resolution_ actives clause =
             and new_lits = Utils.list_remove clause.clits pos in
             let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
             let new_clause = C.mk_clause ~ord new_lits proof in
-            Utils.debug 3 (lazy (Utils.sprintf "equality resolution on %a yields %a"
+            Utils.debug 3 (lazy (Utils.sprintf
+                          "equality resolution on @[<h>%a@] yields @[<h>%a@]"
                           (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause));
             new_clause::acc
           else
@@ -373,7 +375,8 @@ let infer_equality_factoring_ actives clause =
         let new_lits = (C.mk_neq ~ord t v) :: new_lits in
         let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
         let new_clause = C.mk_clause ~ord new_lits proof in
-        Utils.debug 3 (lazy (Utils.sprintf "equality factoring on %a yields %a"
+        Utils.debug 3 (lazy (Utils.sprintf
+                      "equality factoring on @[<h>%a@] yields @[<h>%a@]"
                       (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause));
         [new_clause]
       else
@@ -505,7 +508,8 @@ let is_tautology c =
       c.clits)
   in
   (if is_tauto then
-    Utils.debug 3 (lazy (Utils.sprintf "%a is a tautology" (C.pp_clause ~sort:false) c)));
+    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] is a tautology"
+                  (C.pp_clause ~sort:false) c)));
   is_tauto
 
 let basic_simplify ~ord clause =
@@ -536,7 +540,7 @@ let basic_simplify ~ord clause =
   let new_lits = er new_lits in
   let new_clause = C.mk_clause ~ord new_lits clause.cproof in
   (if not (C.eq_clause new_clause clause) then
-      (Utils.debug 3 (lazy (Utils.sprintf "%a basic_simplifies into %a"
+      (Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] basic_simplifies into @[<h>%a@]"
       (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause))));
   new_clause
 
@@ -605,8 +609,8 @@ let subsumes_with a b =
     with SubsumptionFound subst -> Some subst
   in
   (if res <> None then
-    Utils.debug 3 (lazy (Utils.sprintf "%a subsumes %a" (C.pp_clause ~sort:false) a
-                        (C.pp_clause ~sort:false) b)));
+    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumes @[<h>%a@]"
+                  (C.pp_clause ~sort:false) a (C.pp_clause ~sort:false) b)));
   res
 
 let subsumes a b =
@@ -626,7 +630,7 @@ let subsumed_by_set_ set clause =
       candidates;
     false
   with Exit ->
-    Utils.debug 3 (lazy (Utils.sprintf "%a subsumed by active set"
+    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumed by active set"
                          (C.pp_clause ~sort:false) clause));
     true
 

@@ -70,7 +70,7 @@ let pp_literal ?(sort=false) formatter lit =
     fprintf formatter "~%a" pp_foterm right
   | Equation (left, right, sign, ord) ->
     let conn = if sign then "=" else "!=" in
-    fprintf formatter "@[%a@ %s@ %a@]" pp_foterm left conn pp_foterm right
+    fprintf formatter "@[<h>%a@ %s@ %a@]" pp_foterm left conn pp_foterm right
 
 let opposite_pos p = match p with
   | _ when p = left_pos -> right_pos
@@ -242,7 +242,7 @@ let eq_clause c1 c2 =
 
 let pp_clause ?(sort=false) formatter c =
   let is_max_lit lit = List.exists (fun (lit',_) -> eq_literal lit lit') (Lazy.force c.cmaxlits) in
-  fprintf formatter "@[<hov 3>[%a]@]" (Utils.pp_list ~sep:" | "
+  fprintf formatter "[%a]" (Utils.pp_list ~sep:" | "
     (fun formatter lit -> if is_max_lit lit
       then fprintf formatter "%a*" (pp_literal ~sort) lit
       else pp_literal formatter ~sort lit))
@@ -436,7 +436,7 @@ let pp_hclause_pos formatter (c, pos, _) =
 let pp_bag formatter bag =
   fprintf formatter "@[<v>";
   M.iter
-    (fun _ hc -> fprintf formatter "%a@;" (pp_clause ~sort:false) hc.node)
+    (fun _ hc -> fprintf formatter "@[<h>%a@]@;" (pp_clause ~sort:false) hc.node)
     bag.bag_clauses;
   fprintf formatter "@]"
 
