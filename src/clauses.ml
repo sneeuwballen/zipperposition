@@ -191,6 +191,35 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
 
 let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
 
+let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
+  match l.node.term, r.node.term with
+  (* deal with trivial literals *)
+  | _ when T.eq_foterm l T.true_term && T.eq_foterm r T.false_term && sign ->
+    mk_neq ~ord T.true_term T.true_term
+  | _ when T.eq_foterm r T.true_term && T.eq_foterm l T.false_term && sign ->
+    mk_neq ~ord T.true_term T.true_term
+  | _ when T.eq_foterm l r && sign ->
+    mk_eq ~ord T.true_term T.true_term
+  | _ when T.eq_foterm l r && not sign ->
+    mk_neq ~ord T.true_term T.true_term
+  (* deal with false/true *)
+  | _ when T.eq_foterm l T.false_term ->
+    lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
+  | _ when T.eq_foterm r T.false_term ->
+    lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
+  (* deal with negation *)
+  | Node [{node={term=Leaf s}}; t], _ when s = not_symbol && T.eq_foterm r T.true_term ->
+    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
+  | _, Node [{node={term=Leaf s}}; t] when s = not_symbol && T.eq_foterm l T.true_term ->
+    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
+  (* deal with equality symbol *)
+  | Node [{node={term=Leaf s}}; a; b], _ when s = eq_symbol && T.eq_foterm r T.true_term ->
+    lit_of_fof ~ord (mk_lit ~ord a b sign)
+  | _, Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm l T.true_term ->
+    lit_of_fof ~ord (mk_lit ~ord a b sign)
+  (* default is just reordering *)
+  | _ -> reord_lit ~ord lit
+
 let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
 
 let fmap_lit ~ord f = function
@@ -290,6 +319,8 @@ let mk_clause ~ord lits proof =
   {clits=lits; cvars=all_vars; cproof=proof; cmaxlits=maxlits}
 
 let maxlits clause = Lazy.force clause.cmaxlits
+
+let clause_of_fof ~ord c = mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits) c.cproof
 
 let reord_clause ~ord c = mk_clause ~ord (List.map (reord_lit ~ord) c.clits) c.cproof
 

@@ -144,7 +144,7 @@ let compose_constraints c1 c2 =
   in compare
 
 (** constraint that makes the three symbols the smaller ones *)
-let consts_constraint = min_constraint [T.false_symbol; T.true_symbol]
+let consts_constraint = min_constraint [false_symbol; true_symbol]
 
 let check_constraint so constr =
   (* check whether a list is sorted in decreasing order w.r.t constraint *)

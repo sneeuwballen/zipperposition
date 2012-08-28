@@ -47,6 +47,7 @@ val mk_eq : ord:ordering -> foterm -> foterm -> literal
 val mk_neq : ord:ordering -> foterm -> foterm -> literal
 val mk_lit : ord:ordering -> foterm -> foterm -> bool -> literal
 val reord_lit : ord:ordering -> literal -> literal  (** recompute order *)
+val lit_of_fof : ord:ordering -> literal -> literal (** translate eq/not to literal *)
 
 val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
 
@@ -73,6 +74,7 @@ val compare_hclause : hclause -> hclause -> int         (** simple order on lexi
 
 val mk_clause : ord:ordering -> literal list
               -> proof Lazy.t -> clause                 (** build a clause *)
+val clause_of_fof : ord:ordering -> clause -> clause    (** transform eq/not to literals *)
 val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
 val maxlits : clause -> (literal * int) list            (** the indexed list of maximal literals *)
 val check_maximal_lit : ord:ordering -> clause -> int   (** check whether the i-th literal is *)
