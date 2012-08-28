@@ -37,6 +37,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   module T = Terms
   module C = Clauses
   module O = Orderings
+  module D = Delayed
 
   type term = Types.foterm
   type variable = Types.foterm
@@ -63,15 +64,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let (literals: literal list ref) =
     ref []
 
+  (** is the current clause a conjecture? *)
+  let conjecture = ref false
+
   (* reset everything in order to parse a new term/clause *)
   let init_clause () =
     Counter.set var_id_counter 0;
     var_map := [];
-    literals := []
+    literals := [];
+    conjecture := false
         
   (* gets the variables associated with a string from the variable mapping
      creates a new mapping for a new variable with the given sort *)
-  let get_var ?(sort=T.univ_sort) (var_name: string) =
+  let get_var ?(sort=univ_sort) (var_name: string) =
     try 
       (* way faster than List.assoc *)
       match (
@@ -95,19 +100,34 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let get_sort constant =
     try
       Hashtbl.find sort_table constant
-    with Not_found -> T.univ_sort
+    with Not_found -> univ_sort
 
   let set_sort constant sort = Hashtbl.replace sort_table constant sort
 
-  (* need to detect if input is fof and contains a conjecture *)
-  (* is the input in fof format? *)
-  let fof =
-    ref false
+  (* helpers *)
+  let mk_and a b =
+    T.mk_apply and_symbol bool_sort [a; b]
+  
+  let mk_or a b =
+    T.mk_apply or_symbol bool_sort [a; b]
 
-  (* does the fof input contain a conjecture? *)
-  let theorem =
-    ref false
+  let mk_not t =
+    T.mk_apply not_symbol bool_sort [t]
 
+  let mk_imply a b =
+    T.mk_apply imply_symbol bool_sort [a; b]
+
+  let mk_equiv a b =
+    T.mk_apply eq_symbol bool_sort [a; b]
+
+  let mk_forall v t =
+    T.mk_apply forall_symbol bool_sort
+      [T.mk_apply lambda_symbol bool_sort [D.db_make t v]]
+
+  let mk_exists v t =
+    T.mk_apply exists_symbol bool_sort
+      [T.mk_apply lambda_symbol bool_sort [D.db_make t v]]
+    
 %}
   
 %token LEFT_PARENTHESIS
@@ -164,19 +184,11 @@ parse_file:
       {
         let clauses = $1 in
         let includes = !include_files in
-        let is_fof = !fof in
-        let is_theorem = !theorem in
 
         (* reset for next parser run *)
         include_files := [];
-        fof := false;
-        theorem := false;
         
-        if is_fof then
-          raise (Const.FOF is_theorem)
-
-        else
-          clauses, includes
+        clauses, includes
       }
 
   | EOI
@@ -228,101 +240,112 @@ thf_annotated:
 fof_annotated:
   | FOF LEFT_PARENTHESIS name COMMA formula_role COMMA
     fof_formula annotations RIGHT_PARENTHESIS DOT
-    { fof := true; failwith "fof formula not handled (no CNF-ication)" }
+    { 
+      let clause = 
+        let filename = !Const.cur_filename in  (* ugly *)
+        let ord = Orderings.default_ordering () in
+        let sign = not !conjecture in (* if conjecture, negate *)
+        let lit = C.mk_lit ~ord $7 T.true_term sign in
+        C.mk_clause ~ord [lit] (lazy (Axiom (filename, $3)))
+      in
+        init_clause ();  (* reset global state *)
+        clause
+    }
 
 fof_formula:
   | binary_formula
-    { "" }
-
+    { $1 }
   | unitary_formula
-    { "" }
+    { $1 }
 
 
 binary_formula:
   | nonassoc_binary
-    { "" }
+    { $1 }
 
   | assoc_binary
-    { "" }
+    { $1 }
 
 nonassoc_binary:
   | unitary_formula binary_connective unitary_formula
-    { "" }
+    { $1 }
 
 binary_connective:
   | BIJECTION
-    { "" }
+    { mk_equiv }
   | LEFT_IMPLICATION
-    { "" }
+    { mk_imply }
   | RIGHT_IMPLICATION
-    { "" }
+    { fun x y -> mk_imply y x }
   | UNKNOWN
-    { "" }
+    { failwith "unknown token" }
   | NEGATION OR
-    { "" }
+    { fun x y -> mk_not (mk_or x y) }
   | NEGATION AND
-    { "" }
+    { fun x y -> mk_not (mk_and x y) }
 
 assoc_binary:
   | or_formula
-    { "" }
+    { $1 }
   | and_formula
-    { "" }
+    { $1 }
 
 or_formula:
   | unitary_formula OR more_or_formula
-    { "" }
+    { mk_or $1 $3 }
 
 more_or_formula:
   | unitary_formula
-    { "" }
+    { $1 }
   | unitary_formula OR more_or_formula
-    { "" }
+    { mk_or $1 $3 }
 
 and_formula:
   | unitary_formula AND more_and_formula
-    { "" }
+    { mk_and $1 $3 }
 
 more_and_formula:
   | unitary_formula
-    { "" }
+    { $1 }
   | unitary_formula AND more_and_formula
-    { "" }
+    { mk_and $1 $3 }
 
 unitary_formula:
   | quantified_formula
-    { "" }
+    { $1 }
   | unary_formula
-    { "" }
+    { $1 }
   | LEFT_PARENTHESIS fof_formula RIGHT_PARENTHESIS
-    { "" }
+    { $2 }
   | atomic_formula
-    { "" }
+    { $1 }
 
 quantified_formula:
   | quantifier LEFT_BRACKET variable_list RIGHT_BRACKET
     COLON unitary_formula
-    { "" }
+    { 
+      List.fold_left (fun form v -> $1 v form) $6 $3
+    }
 
 quantifier:
   | FORALL
-    { "" }
+    { mk_forall }
   | EXISTS
-    { "" }
+    { mk_exists }
 
 variable_list:
   | variable
-    { "" }
+    { [$1] }
   | variable COMMA variable_list
-    { "" }
+    { $1 :: $3 }
 
 unary_formula:
   | unary_connective unitary_formula
-    { "" }
+    { $1 $2 }
 
 unary_connective:
   | NEGATION
-    { "" }
+    { mk_not }
 
 
 cnf_annotated:
@@ -331,8 +354,10 @@ cnf_annotated:
       // ignore everything except for the formula
       {
         let clause = 
+          let ord = Orderings.default_ordering () in
           let filename = !Const.cur_filename in  (* ugly *)
-          C.mk_clause ~ord:(Orderings.default_ordering ()) $7 (lazy (Axiom (filename, $3)))
+          let c = C.mk_clause ~ord $7 (lazy (Axiom (filename, $3))) in
+          C.clause_of_fof ~ord c
         in
           init_clause ();
           clause
@@ -340,12 +365,10 @@ cnf_annotated:
 
 formula_role:
   | LOWER_WORD
-    { let role =
-        $1
-      in
-        if role = "conjecture" then
-          theorem := true;
-        $1
+    { let role = $1 in
+      (if role = "conjecture" then
+        conjecture := true);
+      $1
     }
 
 annotations:
@@ -372,14 +395,12 @@ disjunction:
       { $1 :: $3 }
 
 
-
-
 literal:
   | atomic_formula
-      { $1 }
+      { C.mk_eq ~ord:(O.default_ordering ()) $1 T.true_term }
 
   | NEGATION atomic_formula
-      { C.negate_lit $2 }
+      { C.mk_neq ~ord:(O.default_ordering ()) $2 T.true_term }
 
 atomic_formula:
   | plain_atom
@@ -393,11 +414,11 @@ atomic_formula:
 
 plain_atom:
   | plain_term_top
-      { let t = T.cast $1 T.bool_sort in (* cast term to bool *)
-          (match T.hd_symbol t with
-            | None -> ()
-            | Some s -> set_sort s T.bool_sort);
-          C.mk_eq ~ord:O.dummy_ordering t T.true_term
+      { let t = T.cast $1 bool_sort in (* cast term to bool *)
+        (match T.hd_symbol t with
+          | None -> ()
+          | Some s -> set_sort s bool_sort);
+        t
       }
 
 arguments:
@@ -409,23 +430,24 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { C.mk_eq ~ord:O.dummy_ordering T.true_term T.true_term }
+      { T.true_term }
 
   | DOLLAR_FALSE
-      { C.mk_neq ~ord:O.dummy_ordering T.true_term T.true_term (* T!=T is false *) }
+      { T.false_term }
 
   | term EQUALITY term
-      { C.mk_eq ~ord:O.dummy_ordering $1 $3 }
+      { mk_equiv $1 $3 }
   | term DISEQUALITY term
-      { C.mk_neq ~ord:O.dummy_ordering $1 $3 }
+      { mk_not (mk_equiv $1 $3) }
 
 system_atom:
   | system_term_top
-      { let t = T.cast $1 T.bool_sort in
+      { let t = T.cast $1 bool_sort in
         (match T.hd_symbol t with
             | None -> ()
-            | Some s -> set_sort s T.bool_sort);
-        C.mk_eq t ~ord:O.dummy_ordering T.true_term }
+            | Some s -> set_sort s bool_sort);
+        t
+      }
 
 term:
   | function_term
@@ -466,11 +488,11 @@ plain_term:
 
 constant:
   | atomic_word
-      { let sym = T.str_to_sym $1 in sym }
+      { $1 }
 
 functor_:
   | atomic_word
-      { let sym = T.str_to_sym $1 in
+      { let sym = $1 in
         let sort = get_sort sym in
         T.mk_leaf sym sort }
 
@@ -490,7 +512,7 @@ system_term_top:
         T.mk_leaf $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = (T.mk_leaf $1 T.univ_sort) :: $3 in
+      { let subterms = (T.mk_leaf $1 univ_sort) :: $3 in
         T.mk_node subterms
       }
 
