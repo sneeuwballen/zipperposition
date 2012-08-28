@@ -22,23 +22,6 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 
 open Types
 
-(* connectives *)
-val eq_symbol : symbol
-val false_symbol : symbol
-val true_symbol : symbol
-val exists_symbol : symbol
-val forall_symbol : symbol
-val lambda_symbol : symbol
-val not_symbol : symbol
-val imply_symbol : symbol
-val and_symbol : symbol
-val or_symbol : symbol
-
-(* De Bruijn *)
-val db_symbol : symbol
-val succ_db_symbol : symbol
-val subst_symbol : symbol
-
 (** check whether s is a binding symbol *)
 val is_binder_symbol : symbol -> bool
 (** symbols that are symmetric (that is, order of arguments does not matter) *)
@@ -53,6 +36,8 @@ val pp_clause : Format.formatter -> clause -> unit
 (** Substitution of De Bruijn symbol by a term. [db_replace t s]
     replaces the De Bruijn symbol 0 by s in t *)
 val db_replace : foterm -> foterm -> foterm
+(** [db_make t v] replace v by a De Bruijn symbol in t *)
+val db_make : foterm -> foterm -> foterm
 
 (** Precedence constraint *)
 val symbol_constraint : ordering_constraint
@@ -62,7 +47,8 @@ val symbol_constraint : ordering_constraint
 val skolem : ordering -> foterm list -> sort -> foterm
 
 (** new inference rules *)
-val inference_rules : Superposition.inference_rule list
+val inference_rules : (string * Superposition.inference_rule) list
+
 (** new superposition axioms, to add to the set of support *)
-val axioms : ordering -> clause list
+val axioms : clause list
 
