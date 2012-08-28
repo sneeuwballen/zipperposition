@@ -30,12 +30,6 @@ module Utils = FoUtils
 module Sup = Superposition
 module PS = ProofState
 
-let is_symmetric_symbol s =
-  s = eq_symbol || s = or_symbol || s = and_symbol
-
-let is_infix_symbol s =
-  s = eq_symbol || s = or_symbol || s = and_symbol || s = imply_symbol
-
 (* check whether s is a binding symbol *)
 let is_binder_symbol s = s = lambda_symbol
 
@@ -48,7 +42,7 @@ let check_sym t s = match t.node.term with
 let rec pp_foterm formatter t = match t.node.term with
   | Node (({node={term=Leaf s}} as head)::args) ->
     (* general case for nodes *)
-    if is_infix_symbol s
+    if T.is_infix_symbol s
       then begin
         match args with
         | [l;r] -> Format.fprintf formatter "@[<h>%a %a %a@]" pp_foterm l

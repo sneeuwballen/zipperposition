@@ -22,6 +22,11 @@ open Types
 
 (** Functions on first-order terms *)
 
+(** symbols that are symmetric (that is, order of arguments does not matter) *)
+val is_symmetric_symbol : symbol -> bool
+(** infix symbols *)
+val is_infix_symbol : symbol -> bool
+
 module H : Hashcons.S with type key = typed_term
 val terms : H.t
 

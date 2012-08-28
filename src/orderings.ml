@@ -162,7 +162,7 @@ let make_ordering constr =
   (* references that hold current state *)
   let cur_signature = ref []
   and cmp = ref (fun x y -> 0)
-  and multiset_pred = ref (fun s -> false) in
+  and multiset_pred = ref (fun s -> s = eq_symbol) in
   (* the object itself *)
   let obj = object
     (* refresh computes a new ordering based on the current signature *)

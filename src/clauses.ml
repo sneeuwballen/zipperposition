@@ -194,14 +194,12 @@ let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r
 let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
   match l.node.term, r.node.term with
   (* deal with trivial literals *)
-  | _ when T.eq_foterm l T.true_term && T.eq_foterm r T.false_term && sign ->
-    mk_neq ~ord T.true_term T.true_term
-  | _ when T.eq_foterm r T.true_term && T.eq_foterm l T.false_term && sign ->
-    mk_neq ~ord T.true_term T.true_term
-  | _ when T.eq_foterm l r && sign ->
-    mk_eq ~ord T.true_term T.true_term
-  | _ when T.eq_foterm l r && not sign ->
-    mk_neq ~ord T.true_term T.true_term
+  | _ when T.eq_foterm l T.true_term && T.eq_foterm r T.false_term ->
+    mk_lit ~ord T.true_term T.true_term (not sign)
+  | _ when T.eq_foterm r T.true_term && T.eq_foterm l T.false_term ->
+    mk_lit ~ord T.true_term T.true_term (not sign)
+  | _ when T.eq_foterm l r ->
+    mk_lit ~ord T.true_term T.true_term sign
   (* deal with false/true *)
   | _ when T.eq_foterm l T.false_term ->
     lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))

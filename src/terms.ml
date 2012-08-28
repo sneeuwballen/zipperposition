@@ -23,6 +23,12 @@ open Types
 
 module Utils = FoUtils
 
+let is_symmetric_symbol s =
+  s = eq_symbol || s = or_symbol || s = and_symbol
+
+let is_infix_symbol s =
+  s = eq_symbol || s = or_symbol || s = and_symbol || s = imply_symbol
+
 (* hashconsing for terms *)
 module H = Hashcons.Make(struct
   type t = typed_term
@@ -170,8 +176,33 @@ let min_var vars =
   aux max_int vars
 
 let pp_symbol formatter s = Format.pp_print_string formatter s
+  
+let rec pp_foterm formatter t = match t.node.term with
+  | Node (({node={term=Leaf s}} as head)::args) ->
+    (* general case for nodes *)
+    if is_infix_symbol s
+      then begin
+        match args with
+        | [l;r] -> Format.fprintf formatter "@[<h>(%a %a %a)@]" pp_foterm l
+            pp_foterm head pp_foterm r
+        | _ -> assert false (* infix and not binary? *)
+      end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_foterm head
+        (Utils.pp_list ~sep:", " pp_foterm) args
+  | Leaf s when s = not_symbol -> Format.pp_print_string formatter "•¬"
+  | Leaf s when s = eq_symbol -> Format.pp_print_string formatter "•="
+  | Leaf s when s = lambda_symbol -> Format.pp_print_string formatter "•λ"
+  | Leaf s when s = exists_symbol -> Format.pp_print_string formatter "•∃"
+  | Leaf s when s = forall_symbol -> Format.pp_print_string formatter "•∀"
+  | Leaf s when s = and_symbol -> Format.pp_print_string formatter "•&"
+  | Leaf s when s = or_symbol -> Format.pp_print_string formatter "•|"
+  | Leaf s when s = imply_symbol -> Format.pp_print_string formatter "•→"
+  | Leaf s -> Format.pp_print_string formatter s
+  | Var i -> Format.fprintf formatter "X%d" i
+  | Node _ -> failwith "bad term"
 
 let rec pp_foterm_sort formatter ?(sort=false) t =
+  if not sort then pp_foterm formatter t  (* not debugging... *)
+  else
   (match t.node.term with
   | Leaf x -> pp_symbol formatter x
   | Var i -> Format.fprintf formatter "X%d" i
@@ -180,8 +211,7 @@ let rec pp_foterm_sort formatter ?(sort=false) t =
       (Utils.pp_list ~sep:", " (pp_foterm_sort ~sort)) args
   | Node [] -> failwith "bad term");
   if sort then Format.fprintf formatter ":%s" t.node.sort else ()
-  
-let rec pp_foterm formatter t = pp_foterm_sort ~sort:false formatter t
+
 
 let pp_signature formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]" (Utils.pp_list ~sep:" > " pp_symbol) symbols

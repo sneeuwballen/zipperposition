@@ -24,10 +24,6 @@ open Types
 
 (** check whether s is a binding symbol *)
 val is_binder_symbol : symbol -> bool
-(** symbols that are symmetric (that is, order of arguments does not matter) *)
-val is_symmetric_symbol : symbol -> bool
-(** infix symbols *)
-val is_infix_symbol : symbol -> bool
 
 (** nicer pretty printing *)
 val pp_foterm : Format.formatter -> foterm -> unit
