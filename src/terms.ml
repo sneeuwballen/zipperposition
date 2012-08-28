@@ -23,14 +23,6 @@ open Types
 
 module Utils = FoUtils
 
-let str_to_sym s = s
-
-(* some special sorts *)
-let bool_sort = "$$Bool"
-let univ_sort = "$$U"
-let true_symbol = "$true"
-let false_symbol = "$false"
-
 (* hashconsing for terms *)
 module H = Hashcons.Make(struct
   type t = typed_term
@@ -87,11 +79,16 @@ let mk_leaf symbol sort =
 
 let rec mk_node = function
   | [] -> failwith "cannot build empty node term"
+  | [_] -> failwith "cannot build node term with no arguments"
   | (head::_) as subterms ->
       let my_t = {term=(Node subterms); sort=head.node.sort; vars=lazy []} in
       let lazy_vars = lazy (compute_vars (H.hashcons terms my_t)) in
       let t = H.hashcons terms { my_t with vars=lazy_vars } in
       ignore (Lazy.force t.node.vars); t
+
+let mk_apply f sort args =
+  let head = mk_leaf f sort in
+  if args = [] then head else mk_node (head :: args)
 
 let is_var t = match t.node.term with
   | Var _ -> true

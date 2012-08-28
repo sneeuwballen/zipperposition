@@ -22,14 +22,6 @@ open Types
 
 (** Functions on first-order terms *)
 
-val str_to_sym : string -> symbol
-
-(** some special sorts *)
-val bool_sort : sort
-val univ_sort : sort
-val true_symbol : symbol
-val false_symbol : symbol
-
 module H : Hashcons.S with type key = typed_term
 val terms : H.t
 
@@ -40,6 +32,7 @@ val all_terms : unit -> foterm list           (** all currently existing terms *
 val mk_var : int -> sort -> foterm
 val mk_leaf : symbol -> sort -> foterm
 val mk_node : foterm list -> foterm
+val mk_apply : symbol -> sort -> foterm list -> foterm
 
 val is_var : foterm -> bool
 val is_leaf : foterm -> bool

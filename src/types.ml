@@ -23,8 +23,28 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** a symbol is just a string *)
 type symbol = string
 
+(* connectives *)
+let true_symbol = "$true"
+let false_symbol = "$false"
+let eq_symbol = "="
+let exists_symbol = "$$exists"
+let forall_symbol = "$$forall"
+let lambda_symbol = "$$lambda"
+let not_symbol = "$$not"
+let imply_symbol = "$$imply"
+let and_symbol = "$$and"
+let or_symbol = "$$or"
+
+(* De Bruijn *)
+let db_symbol = "$$db"
+let succ_db_symbol = "$$s"
+let subst_symbol = "$$subst"
+
 (** a sort for terms (only the return sort is kept) *)
 type sort = string
+
+let bool_sort = "$$Bool"
+let univ_sort = "$$U"
 
 (** exception raised when sorts are mismatched *)
 exception SortError of string
