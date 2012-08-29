@@ -119,8 +119,9 @@ let db_make t v =
 let symbol_constraint =
   O.compose_constraints
     (O.max_constraint [succ_db_symbol; db_symbol])
-    (O.min_constraint [eq_symbol; imply_symbol; forall_symbol; exists_symbol;
-                       or_symbol; and_symbol; false_symbol; true_symbol])
+    (O.min_constraint [eq_symbol; imply_symbol; lambda_symbol; forall_symbol;
+                       exists_symbol; or_symbol; and_symbol;
+                       not_symbol; false_symbol; true_symbol])
 
 (* creation of a new skolem symbol *)
 let skolem =
@@ -141,6 +142,27 @@ let skolem =
  * inference rules
  * ---------------------------------------------------------------------- *)
 
+(** helper for alpha elimination (remove idx-th literal from
+    clause and adds a and b to two new clauses *)
+let alpha_eliminate ~ord clause idx a signa b signb =
+  assert (a.node.sort = bool_sort && b.node.sort = bool_sort);
+  let new_lita = C.mk_lit ~ord a T.true_term signa
+  and new_litb = C.mk_lit ~ord b T.true_term signb in
+  let other_lits = Utils.list_remove clause.clits idx in
+  let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
+  [C.mk_clause ~ord (new_lita :: other_lits) proof;
+   C.mk_clause ~ord (new_litb :: other_lits) proof]
+
+(** helper for beta elimination (remove idx-th literal from
+    clause and adds a and b *)
+let beta_eliminate ~ord clause idx a signa b signb =
+  assert (a.node.sort = bool_sort && b.node.sort = bool_sort);
+  let new_lita = C.mk_lit ~ord a T.true_term signa
+  and new_litb = C.mk_lit ~ord b T.true_term signb in
+  let new_lits = new_lita :: new_litb :: (Utils.list_remove clause.clits idx) in
+  let proof = lazy (Proof ("beta_eliminate", [clause, [idx], S.id_subst])) in
+  C.mk_clause ~ord new_lits proof
+
 exception FoundSort of sort
 
 (** find the sort of the first De Bruijn term *)
@@ -156,7 +178,7 @@ let rec look_db_sort depth t = match t.node.term with
 
 (** helper for gamma elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a fresh var) *)
-let alpha_eliminate ~ord clause idx t sign =
+let gamma_eliminate ~ord clause idx t sign =
   let maxvar = T.max_var (T.vars_of_term t) in
   assert (t.node.sort = bool_sort);
   let new_t =
@@ -166,11 +188,11 @@ let alpha_eliminate ~ord clause idx t sign =
       (* sort is the sort of the first DB symbol *)
       let new_var = T.mk_var (maxvar + 1) sort in
       db_replace t new_var
-    in
-    let new_lit = C.mk_lit ~ord new_t T.true_term sign in
-    let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
-    let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
-    C.mk_clause ~ord new_lits proof
+  in
+  let new_lit = C.mk_lit ~ord new_t T.true_term sign in
+  let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
+  let proof = lazy (Proof ("gamma_eliminate", [clause, [idx], S.id_subst])) in
+  C.mk_clause ~ord new_lits proof
 
 (** helper for delta elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a skolem
@@ -185,11 +207,39 @@ let delta_eliminate ~ord clause idx t sign =
       (* sort is the sort of the first DB symbol *)
       let new_skolem = skolem ord vars sort in
       db_replace t new_skolem
-    in
-    let new_lit = C.mk_lit ~ord new_t T.true_term sign in
-    let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
-    let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
-    C.mk_clause ~ord new_lits proof
+  in
+  let new_lit = C.mk_lit ~ord new_t T.true_term sign in
+  let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
+  let proof = lazy (Proof ("delta_eliminate", [clause, [idx], S.id_subst])) in
+  C.mk_clause ~ord new_lits proof
+
+(** elimination of unary/binary logic connectives *)
+let connective_elimination active_set clause =
+  let ord = active_set.PS.a_ord in
+  Sup.fold_lits ~both:false ~pos:true ~neg:true
+    (fun acc l r sign l_pos ->
+      (* if a literal is true_term, must be r because it is the smallest term *)
+      if not (T.eq_foterm r T.true_term) then acc else
+      let idx = List.hd l_pos in
+      match l.node.term with
+      | Node [{node={term=Leaf s}}; a; b] ->
+        (* some alpha/beta eliminations *)
+        if s = and_symbol && sign
+        then (alpha_eliminate ~ord clause idx a true b true) @ acc
+        else if s = and_symbol && (not sign)
+        then (beta_eliminate ~ord clause idx a false b false) :: acc
+        else if s = or_symbol && sign
+        then (beta_eliminate ~ord clause idx a true b true) :: acc
+        else if s = or_symbol && (not sign)
+        then (alpha_eliminate ~ord clause idx a false b false) @ acc
+        else if s = imply_symbol && sign
+        then (beta_eliminate ~ord clause idx a false b true) :: acc
+        else if s = imply_symbol && (not sign)
+        then (alpha_eliminate ~ord clause idx a true b false) @ acc
+        else acc
+      | _ -> acc
+    )
+    [] (Utils.list_pos clause.clits)
 
 (** elimination of forall *)
 let forall_elimination active_set clause =
@@ -205,7 +255,7 @@ let forall_elimination active_set clause =
           (* we have a forall (lambda t) *)
           assert (t.node.sort = bool_sort);
           if sign
-            then (alpha_eliminate ~ord clause idx t true) :: acc
+            then (gamma_eliminate ~ord clause idx t true) :: acc
             else (delta_eliminate ~ord clause idx t false) :: acc
       | _ -> acc
     )
@@ -226,7 +276,7 @@ let exists_elimination active_set clause =
           assert (t.node.sort = bool_sort);
           if sign
             then (delta_eliminate ~ord clause idx t true) :: acc
-            else (alpha_eliminate ~ord clause idx t false) :: acc
+            else (gamma_eliminate ~ord clause idx t false) :: acc
       | _ -> acc
     )
     [] (Utils.list_pos clause.clits)
@@ -291,57 +341,7 @@ let inference_rules =
   [ "equivalence_elimination", equivalence_elimination;
     "forall_elimination", forall_elimination;
     "exists_elimination", exists_elimination;
+    "connective_elimination", connective_elimination;
   ]
 
-(* ----------------------------------------------------------------------
- * axioms
- * ---------------------------------------------------------------------- *)
-
-(* axioms (delta and gamma rules are implemented as inference rules *)
-let axioms =
-  let ord = O.default_ordering ()
-  and varb i = T.mk_var i bool_sort   (* create boolean var *)
-  and tb s = T.mk_leaf s bool_sort    (* bool atom *)
-  in
-  let applyb f terms = T.mk_node ((tb f) :: terms)
-  and istrue t = C.mk_eq ~ord t (tb true_symbol)
-  and isfalse t = C.mk_neq ~ord t (tb true_symbol)
-  and lits l name = C.mk_clause ~ord l (lazy (Axiom ("delayed.ml", "axiom " ^ name)))
-  in
-  [
-  (* --------- alpha rules ------------ *)
-  (* positive expansion of and *)
-  (let x = varb 1 and y = varb 2 in
-    lits [isfalse (applyb and_symbol [x; y]);
-          istrue x] "positive_and_expansion1");
-  (let x = varb 1 and y = varb 2 in
-    lits [isfalse (applyb and_symbol [x; y]);
-          istrue y] "positive_and_expansion2");
-  (* negative expansion of or *)
-  (let x = varb 1 and y = varb 2 in
-    lits [istrue (applyb or_symbol [x; y]);
-          isfalse x] "negative_or_expansion1");
-  (let x = varb 1 and y = varb 2 in
-    lits [istrue (applyb or_symbol [x; y]);
-          isfalse y] "negative_or_expansion2");
-  (* negative expansion of imply *)
-  (let x = varb 1 and y = varb 2 in
-    lits [istrue (applyb imply_symbol [x; y]);
-          istrue x] "negative_imply_expansion1");
-  (let x = varb 1 and y = varb 2 in
-    lits [istrue (applyb imply_symbol [x; y]);
-          isfalse y]"negative_imply_expansion2");
-  (* --------- beta rules ------------ *)
-  (* negative expansion of and *)
-  (let x = varb 1 and y = varb 2 in
-    lits [istrue (applyb and_symbol [x; y]);
-          isfalse x; isfalse y] "negative_and_expansion");
-  (* positive expansion of or *)
-  (let x = varb 1 and y = varb 2 in
-    lits [isfalse (applyb or_symbol [x; y]);
-          istrue x; istrue y] "positive_or_expansion");
-  (* positive expansion of imply *)
-  (let x = varb 1 and y = varb 2 in
-    lits [isfalse (applyb imply_symbol [x; y]);
-          isfalse x; istrue y] "positive_imply_expansion");
-  ]
+let axioms = []
