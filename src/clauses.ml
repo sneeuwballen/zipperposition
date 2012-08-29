@@ -60,13 +60,13 @@ let string_of_comparison = function
 let pp_literal ?(sort=false) formatter lit =
   let pp_foterm = T.pp_foterm_sort ~sort in
   match lit with
-  | Equation (left, right, false, _) when right = T.true_term ->
+  | Equation (left, right, false, _) when T.eq_foterm right T.true_term ->
     fprintf formatter "~%a" pp_foterm left
-  | Equation (left, right, true, _) when right = T.true_term ->
+  | Equation (left, right, true, _) when T.eq_foterm right T.true_term ->
     pp_foterm formatter left
-  | Equation (left, right, true, _) when left = T.true_term ->
+  | Equation (left, right, true, _) when T.eq_foterm left T.true_term ->
     pp_foterm formatter right
-  | Equation (left, right, false, _) when left = T.true_term ->
+  | Equation (left, right, false, _) when T.eq_foterm left T.true_term ->
     fprintf formatter "~%a" pp_foterm right
   | Equation (left, right, sign, ord) ->
     let conn = if sign then "=" else "!=" in
