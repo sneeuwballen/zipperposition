@@ -29,12 +29,6 @@ val is_binder_symbol : symbol -> bool
 val pp_foterm : Format.formatter -> foterm -> unit
 val pp_clause : Format.formatter -> clause -> unit
 
-(** Substitution of De Bruijn symbol by a term. [db_replace t s]
-    replaces the De Bruijn symbol 0 by s in t *)
-val db_replace : foterm -> foterm -> foterm
-(** [db_make t v] replace v by a De Bruijn symbol in t *)
-val db_make : foterm -> foterm -> foterm
-
 (** Precedence constraint *)
 val symbol_constraint : ordering_constraint
 

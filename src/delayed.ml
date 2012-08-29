@@ -79,51 +79,6 @@ let pp_clause formatter clause =
     Format.fprintf formatter "%a != %a" pp_foterm l pp_foterm r
   in Utils.pp_list ~sep:" | " pp_lit formatter clause.clits
 
-(* check whether t contains the De Bruijn symbol n *)
-let rec db_contains t n = match t.node.term with
-  | Leaf s when s = db_symbol -> n = 0
-  | Leaf _ | Var _ -> false
-  | Node [{node={term=Leaf s}}; t'] when s = lambda_symbol -> db_contains t' (n+1)
-  | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> db_contains t' (n-1)
-  | Node l -> List.exists (fun t' -> db_contains t' n) l
-
-(* replace 0 by s in t *)
-let db_replace t s =
-  (* lift the De Bruijn symbol *)
-  let mk_succ db = T.mk_node [T.mk_leaf succ_db_symbol univ_sort; db] in
-  (* replace db by s in t *)
-  let rec replace db s t = match t.node.term with
-  | _ when T.eq_foterm t db -> s
-  | Leaf _ | Var _ -> t
-  | Node (({node={term=Leaf symb}} as hd)::tl) when is_binder_symbol symb ->
-    (* lift the De Bruijn to replace *)
-    T.mk_node (hd :: (List.map (replace (mk_succ db) s) tl))
-  | Node ({node={term=Leaf s}}::_) when s = succ_db_symbol || s = db_symbol ->
-    t (* no the good De Bruijn symbol *)
-  | Node l -> T.mk_node (List.map (replace db s) l)
-  (* replace the 0 De Bruijn index by s in t *)
-  in
-  replace (T.mk_leaf db_symbol univ_sort) s t
-
-(* replace v by a De Bruijn symbol in t *)
-let db_make t v =
-  assert (T.is_var v);
-  (* go recursively and replace *)
-  let rec replace_and_lift depth t = match t.node.term with
-  | Var _ -> if T.eq_foterm t v then mk_db depth else t
-  | Leaf _ -> t
-  | Node [{node={term=Leaf s}} as hd; t'] when is_binder_symbol s ->
-    T.mk_node [hd; replace_and_lift (depth+1) t']  (* increment depth *) 
-  | Node l -> T.mk_node (List.map (replace_and_lift depth) l)
-  (* make De Bruijn index of given index *)
-  and mk_db n = match n with
-  | 0 -> T.mk_leaf db_symbol v.node.sort
-  | n when n > 0 ->
-    let next = mk_db (n-1) in
-    T.mk_apply succ_db_symbol v.node.sort [next]
-  | _ -> assert false
-  in
-  replace_and_lift 0 t
 
 (* constraint on the ordering *)
 let symbol_constraint =
@@ -178,11 +133,11 @@ let gamma_eliminate ~ord clause idx t sign =
   assert (t.node.sort = bool_sort);
   let new_t =
     try
-      look_db_sort 0 t; t (* the variable is not present *)
+      look_db_sort 0 t; T.db_unlift t (* the variable is not present *)
     with FoundSort sort ->
       (* sort is the sort of the first DB symbol *)
       let new_var = T.mk_var (maxvar + 1) sort in
-      db_replace t new_var
+      T.db_unlift (T.db_replace t new_var)
   in
   let new_lit = C.mk_lit ~ord new_t T.true_term sign in
   let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
@@ -197,11 +152,11 @@ let delta_eliminate ~ord clause idx t sign =
   assert (t.node.sort = bool_sort);
   let new_t =
     try
-      look_db_sort 0 t; t (* the DB variable is not present *)
+      look_db_sort 0 t; T.db_unlift t (* the DB variable is not present *)
     with FoundSort sort ->
       (* sort is the sort of the first DB symbol *)
       let new_skolem = skolem ord vars sort in
-      db_replace t new_skolem
+      T.db_unlift (T.db_replace t new_skolem)
   in
   let new_lit = C.mk_lit ~ord new_t T.true_term sign in
   let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
@@ -350,9 +305,9 @@ let simplify_inner ~ord c =
     T.true_term  (* not false -> true *)
   | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
     when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol
-    && not (db_contains t' 0) -> simp_term t' (* eta-reduction *)
+    && not (T.db_contains t' 0) -> simp_term (T.db_unlift t') (* eta-reduction *)
   | Node [{node={term=Node [{node={term=Leaf s}}; t']}}; v] when s = lambda_symbol ->
-    let new_t' = db_replace t' v in simp_term new_t' (* beta-reduction *)
+    let new_t' = T.db_unlift (T.db_replace t' v) in simp_term new_t' (* beta-reduction *)
   | Node [{node={term=Leaf s}}; a; b] when s = and_symbol &&
     (T.eq_foterm a T.false_term || T.eq_foterm b T.false_term) ->
     T.false_term  (* a and false -> false *)
