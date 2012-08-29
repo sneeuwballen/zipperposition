@@ -215,6 +215,7 @@ let connective_elimination ~ord clause =
       (* if a literal is true_term, must be r because it is the smallest term *)
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in
+      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then acc else
       match l.node.term with
       | Node [{node={term=Leaf s}}; a; b] ->
         (* some alpha/beta eliminations *)
@@ -233,7 +234,7 @@ let connective_elimination ~ord clause =
         else acc
       | _ -> acc
     )
-    [] (Utils.list_pos clause.clits)
+    [] (C.maxlits clause)
 
 (** elimination of forall *)
 let forall_elimination ~ord clause =
@@ -241,6 +242,7 @@ let forall_elimination ~ord clause =
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
+      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then acc else
       match l.node.term with
       | Node [{node={term=Leaf s}};
           {node={term=Node [{node={term=Leaf s'}}; t]}}]
@@ -252,7 +254,7 @@ let forall_elimination ~ord clause =
             else (delta_eliminate ~ord clause idx t false) :: acc
       | _ -> acc
     )
-    [] (Utils.list_pos clause.clits)
+    [] (C.maxlits clause)
 
 (** elimination of exists *)
 let exists_elimination ~ord clause =
@@ -260,6 +262,7 @@ let exists_elimination ~ord clause =
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
+      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then acc else
       match l.node.term with
       | Node [{node={term=Leaf s}};
           {node={term=Node [{node={term=Leaf s'}}; t]}}]
@@ -271,7 +274,7 @@ let exists_elimination ~ord clause =
             else (gamma_eliminate ~ord clause idx t false) :: acc
       | _ -> acc
     )
-    [] (Utils.list_pos clause.clits)
+    [] (C.maxlits clause)
 
 (** equivalence elimination *)
 let equivalence_elimination ~ord clause =
@@ -291,6 +294,7 @@ let equivalence_elimination ~ord clause =
     (* ok, do it *)
     match l_pos with
     | [idx; _] ->
+      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then [] else
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_neq ~ord l T.true_term) ::
                       (C.mk_eq ~ord r T.true_term) :: new_lits
@@ -308,6 +312,7 @@ let equivalence_elimination ~ord clause =
     assert (r.node.sort = bool_sort);
     match l_pos with
     | [idx; _] ->
+      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then [] else
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_eq ~ord l T.true_term) ::
                       (C.mk_eq ~ord r T.true_term) :: new_lits
@@ -325,19 +330,24 @@ let equivalence_elimination ~ord clause =
       if sign
         then (do_inferences_pos l r l_pos) @ acc
         else (do_inferences_neg l r l_pos) @ acc)
-    [] (Utils.list_pos clause.clits)
+    [] (C.maxlits clause)
 
 (* ----------------------------------------------------------------------
  * simplification
  * ---------------------------------------------------------------------- *)
 
-(** Simplify the inner formula (double negation, trivial equalities...) TODO *)
+(** Simplify the inner formula (double negation, trivial equalities...) *)
 let simplify_inner ~ord c =
+  let not_term = T.mk_leaf not_symbol bool_sort in
   (* simplify a term *)
   let rec simp_term t = match t.node.term with
   | Var _ | Leaf _ -> t
   | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
     when s = not_symbol && s' = not_symbol -> simp_term t'  (* double negation *)
+  | Node [{node={term=Leaf s}}; t'] when s = not_symbol && T.eq_foterm t' T.true_term ->
+    T.false_term  (* not true -> false *)
+  | Node [{node={term=Leaf s}}; t'] when s = not_symbol && T.eq_foterm t' T.false_term ->
+    T.true_term  (* not false -> true *)
   | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
     when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol
     && not (db_contains t' 0) -> simp_term t' (* eta-reduction *)
@@ -368,6 +378,14 @@ let simplify_inner ~ord c =
     ((T.eq_foterm a T.true_term && T.eq_foterm b T.false_term) ||
      (T.eq_foterm b T.true_term && T.eq_foterm a T.false_term)) ->
     T.false_term  (* true = false -> false *)
+  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm b T.true_term ->
+    simp_term a  (* a = true -> a *)
+  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm a T.true_term ->
+    simp_term b  (* b = true -> b *)
+  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm b T.false_term ->
+    simp_term (T.mk_node [not_term; a])  (* a = false -> not a *)
+  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm a T.false_term ->
+    simp_term (T.mk_node [not_term; b])  (* b = false -> not b *)
   | Node l ->
     let new_t = T.mk_node (List.map simp_term l) in
     if T.eq_foterm t new_t then t else simp_term new_t

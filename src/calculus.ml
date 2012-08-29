@@ -137,7 +137,7 @@ let get_equations_sides clause pos = match pos with
 let skolem =
   let count = ref 0 in  (* current symbol counter *)
   fun ord args sort ->
-    let new_symbol = "$$sk_" ^ (string_of_int !count) in
+    let new_symbol = "sk" ^ (string_of_int !count) in
     incr count;
     (* build the new term first *)
     let new_term =

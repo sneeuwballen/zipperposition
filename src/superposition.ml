@@ -447,7 +447,7 @@ let basic_simplify ~ord clause =
   (* remove s!=s literals *)
   let new_lits = List.filter (fun lit -> not (absurd_lit lit)) clause.clits in
   (* remove duplicate literals *)
-  let new_lits = Utils.list_uniq C.eq_literal new_lits in
+  let new_lits = Utils.list_uniq C.eq_literal_com new_lits in
   (* destructive equality resolution *)
   let rec er lits =
     match HExtlib.list_index er_check lits with
