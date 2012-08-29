@@ -79,6 +79,14 @@ let pp_clause formatter clause =
     Format.fprintf formatter "%a != %a" pp_foterm l pp_foterm r
   in Utils.pp_list ~sep:" | " pp_lit formatter clause.clits
 
+(* check whether t contains the De Bruijn symbol n *)
+let rec db_contains t n = match t.node.term with
+  | Leaf s when s = db_symbol -> n = 0
+  | Leaf _ | Var _ -> false
+  | Node [{node={term=Leaf s}}; t'] when s = lambda_symbol -> db_contains t' (n+1)
+  | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> db_contains t' (n-1)
+  | Node l -> List.exists (fun t' -> db_contains t' n) l
+
 (* replace 0 by s in t *)
 let db_replace t s =
   (* lift the De Bruijn symbol *)
@@ -324,7 +332,53 @@ let equivalence_elimination ~ord clause =
  * ---------------------------------------------------------------------- *)
 
 (** Simplify the inner formula (double negation, trivial equalities...) TODO *)
-let simplify_inner ~ord c = c
+let simplify_inner ~ord c =
+  (* simplify a term *)
+  let rec simp_term t = match t.node.term with
+  | Var _ | Leaf _ -> t
+  | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+    when s = not_symbol && s' = not_symbol -> simp_term t'  (* double negation *)
+  | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+    when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol
+    && not (db_contains t' 0) -> simp_term t' (* eta-reduction *)
+  | Node [{node={term=Node [{node={term=Leaf s}}; t']}}; v] when s = lambda_symbol ->
+    let new_t' = db_replace t' v in simp_term new_t' (* beta-reduction *)
+  | Node [{node={term=Leaf s}}; a; b] when s = and_symbol &&
+    (T.eq_foterm a T.false_term || T.eq_foterm b T.false_term) ->
+    T.false_term  (* a and false -> false *)
+  | Node [{node={term=Leaf s}}; a; b] when s = or_symbol &&
+    (T.eq_foterm a T.true_term || T.eq_foterm b T.true_term) ->
+    T.true_term  (* a or true -> true *)
+  | Node [{node={term=Leaf s}}; a; b] when s = or_symbol && T.eq_foterm a T.false_term ->
+    b (* b or false -> b *)
+  | Node [{node={term=Leaf s}}; a; b] when s = or_symbol && T.eq_foterm b T.false_term ->
+    a (* a or false -> a *)
+  | Node [{node={term=Leaf s}}; a; b] when s = and_symbol && T.eq_foterm a T.true_term ->
+    b (* b and true -> b *)
+  | Node [{node={term=Leaf s}}; a; b] when s = and_symbol && T.eq_foterm b T.true_term ->
+    a (* a and true -> a *)
+  | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol &&
+    (T.eq_foterm a T.false_term || T.eq_foterm b T.true_term) ->
+    T.true_term  (* (false => a) or (a => true) -> true *)
+  | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol && T.eq_foterm a T.true_term ->
+    simp_term b  (* (true => a) -> a *)
+  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm a b ->
+    T.true_term  (* a = a -> true *)
+  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && 
+    ((T.eq_foterm a T.true_term && T.eq_foterm b T.false_term) ||
+     (T.eq_foterm b T.true_term && T.eq_foterm a T.false_term)) ->
+    T.false_term  (* true = false -> false *)
+  | Node l ->
+    let new_t = T.mk_node (List.map simp_term l) in
+    if T.eq_foterm t new_t then t else simp_term new_t
+  (* simplify a lit *)
+  and simp_lit ((Equation (l,r,sign,_)) as lit) =
+    let new_l = simp_term l
+    and new_r = simp_term r in
+    if T.eq_foterm l new_l && T.eq_foterm r new_r then lit
+    else C.mk_lit ~ord new_l new_r sign
+  in
+  C.mk_clause ~ord (List.map simp_lit c.clits) c.cproof
 
 (* ----------------------------------------------------------------------
  * the calculus object
@@ -342,7 +396,7 @@ let delayed : calculus =
                           "exists_elimination", exists_elimination;
                           "equivalence_elimination", equivalence_elimination]
 
-    method basic_simplify ~ord c = simplify_inner ~ord (Sup.basic_simplify ~ord c)
+    method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
 
     method simplify actives c = Sup.demodulate actives [] c
 
