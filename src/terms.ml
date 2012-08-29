@@ -73,23 +73,37 @@ let compute_vars t =  (* compute free vars of the term *)
     | Node l -> List.fold_left aux acc l
   in aux [] t
 
+let rec compute_db_closed depth t = match t.node.term with
+  | Leaf s when s = db_symbol -> depth > 0
+  | Node [{node={term=Leaf s}}; t'] when s = lambda_symbol ->
+    compute_db_closed (depth+1) t'
+  | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> 
+    compute_db_closed (depth-1) t'
+  | Leaf _ | Var _ -> true
+  | Node l -> List.for_all (compute_db_closed depth) l
+
 (* constructors *)
 let mk_var idx sort =
-  let my_v = {term = Var idx; sort=sort; vars=lazy []} in
+  let my_v = {term = Var idx; sort=sort; vars=lazy []; db_closed=lazy false} in
+  let closed = lazy (compute_db_closed 0 (H.hashcons terms my_v)) in
   let v = H.hashcons terms
-    {my_v with vars=lazy [H.hashcons terms my_v]} in
+    {my_v with vars=lazy [H.hashcons terms my_v]; db_closed=closed} in
   ignore (Lazy.force v.node.vars); v
 
 let mk_leaf symbol sort =
-  H.hashcons terms {term = Leaf symbol; sort=sort; vars=lazy []}
+  let db_closed = lazy (if symbol = db_symbol then false else true) in
+  H.hashcons terms {term = Leaf symbol; sort=sort;
+                    vars=lazy []; db_closed=db_closed}
 
 let rec mk_node = function
   | [] -> failwith "cannot build empty node term"
   | [_] -> failwith "cannot build node term with no arguments"
   | (head::_) as subterms ->
-      let my_t = {term=(Node subterms); sort=head.node.sort; vars=lazy []} in
+      let my_t = {term=(Node subterms); sort=head.node.sort;
+                  vars=lazy []; db_closed=lazy false} in
       let lazy_vars = lazy (compute_vars (H.hashcons terms my_t)) in
-      let t = H.hashcons terms { my_t with vars=lazy_vars } in
+      let db_closed = lazy (compute_db_closed 0 (H.hashcons terms my_t)) in
+      let t = H.hashcons terms { my_t with vars=lazy_vars; db_closed=db_closed} in
       ignore (Lazy.force t.node.vars); t
 
 let mk_apply f sort args =
@@ -176,6 +190,7 @@ let min_var vars =
   aux max_int vars
 
 let pp_symbol formatter s = Format.pp_print_string formatter s
+
   
 (* readable representation of a term *)
 let rec pp_foterm formatter t =
@@ -235,3 +250,75 @@ let rec pp_foterm_sort formatter ?(sort=false) t =
 
 let pp_signature formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]" (Utils.pp_list ~sep:" > " pp_symbol) symbols
+
+
+(* check wether the term is closed w.r.t. De Bruijn variables *)
+let db_closed t = Lazy.force t.node.db_closed
+
+(* check whether t contains the De Bruijn symbol n *)
+let rec db_contains t n = match t.node.term with
+  | Leaf s when s = db_symbol -> n = 0
+  | Leaf _ | Var _ -> false
+  | Node [{node={term=Leaf s}}; t'] when s = lambda_symbol -> db_contains t' (n+1)
+  | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> db_contains t' (n-1)
+  | Node l -> List.exists (fun t' -> db_contains t' n) l
+
+(* replace 0 by s in t *)
+let db_replace t s =
+  (* lift the De Bruijn symbol *)
+  let mk_succ db = mk_node [mk_leaf succ_db_symbol univ_sort; db] in
+  (* replace db by s in t *)
+  let rec replace db s t = match t.node.term with
+  | _ when eq_foterm t db -> s
+  | Leaf _ | Var _ -> t
+  | Node (({node={term=Leaf symb}} as hd)::tl) when symb = lambda_symbol ->
+    (* lift the De Bruijn to replace *)
+    mk_node (hd :: (List.map (replace (mk_succ db) s) tl))
+  | Node ({node={term=Leaf s}}::_) when s = succ_db_symbol || s = db_symbol ->
+    t (* no the good De Bruijn symbol *)
+  | Node l -> mk_node (List.map (replace db s) l)
+  (* replace the 0 De Bruijn index by s in t *)
+  in
+  replace (mk_leaf db_symbol univ_sort) s t
+
+(* create a De Bruijn variable of index n *)
+let rec db_make n sort = match n with
+  | 0 -> mk_leaf db_symbol sort
+  | n when n > 0 ->
+    let next = db_make (n-1) sort in
+    mk_apply succ_db_symbol sort [next]
+  | _ -> assert false
+
+(* unlift the term (decrement indices of all De Bruijn variables inside *)
+let db_unlift t =
+  Utils.debug 4 (lazy (Utils.sprintf "  db_unlift @[<h>%a@]" pp_foterm t));
+  (* int indice of this DB term *)
+  let rec db_index t = match t.node.term with
+    | Leaf s when s = db_symbol -> 0
+    | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> (db_index t') + 1
+    | _ -> assert false
+  (* only unlift DB symbol that are free *)
+  and recurse depth t =
+    match t.node.term with
+    | Leaf s when s = db_symbol && depth = 0 -> assert false (* cannot unlift this *)
+    | Leaf _ | Var _ -> t
+    | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol ->
+      if db_index t >= depth then t' else t (* unlift only if not bound *)
+    | Node [{node={term=Leaf s}} as hd; t'] when s = lambda_symbol ->
+      mk_node [hd; recurse (depth+1) t'] (* unlift, but index of unbound variables is +1 *)
+    | Node l -> mk_node (List.map (recurse depth) l)
+  in recurse 0 t
+
+(* replace v by a De Bruijn symbol in t *)
+let db_from_var t v =
+  assert (is_var v);
+  (* go recursively and replace *)
+  let rec replace_and_lift depth t = match t.node.term with
+  | Var _ -> if eq_foterm t v then db_make depth v.node.sort else t
+  | Leaf _ -> t
+  | Node [{node={term=Leaf s}} as hd; t'] when s = lambda_symbol ->
+    mk_node [hd; replace_and_lift (depth+1) t']  (* increment depth *) 
+  | Node l -> mk_node (List.map (replace_and_lift depth) l)
+  (* make De Bruijn index of given index *)
+  in
+  replace_and_lift 0 t

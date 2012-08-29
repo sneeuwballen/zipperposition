@@ -53,9 +53,10 @@ exception SortError of string
 type foterm = typed_term Hashcons.hash_consed
 (** term with a simple sort *)
 and typed_term = {
-  term : foterm_cell;   (* the term itself *)
-  sort : sort;          (* the sort of the term *)
-  vars : foterm list Lazy.t;   (* the variables of the term *)
+  term : foterm_cell;           (** the term itself *)
+  sort : sort;                  (** the sort of the term *)
+  db_closed : bool Lazy.t;      (** is the term closed w.r.t. De Bruijn indexes? *)
+  vars : foterm list Lazy.t;    (** the variables of the term *)
 }
 (** content of the term *)
 and foterm_cell =

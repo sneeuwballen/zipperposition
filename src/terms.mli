@@ -66,6 +66,20 @@ val merge_varlist : varlist -> varlist -> varlist (** set union of variable list
 val max_var : varlist -> int                  (** find the maximum variable index *)
 val min_var : varlist -> int
 
+val db_closed : foterm -> bool                (** check whether the term is closed *)
+
+(** Does t contains the De Bruijn variable of index n? *)
+val db_contains : foterm -> int -> bool
+(** Substitution of De Bruijn symbol by a term. [db_replace t s]
+    replaces the De Bruijn symbol 0 by s in t *)
+val db_replace : foterm -> foterm -> foterm
+(** Create a De Bruijn variable of index n *)
+val db_make : int -> sort -> foterm
+(** Unlift the term (decrement indices of all De Bruijn variables inside *)
+val db_unlift : foterm -> foterm
+(** [db_from_var t v] replace v by a De Bruijn symbol in t *)
+val db_from_var : foterm -> foterm -> foterm
+
 val pp_symbol : Format.formatter -> symbol -> unit
 val pp_foterm: Format.formatter -> foterm -> unit
 val pp_foterm_sort : Format.formatter -> ?sort:bool -> foterm -> unit
