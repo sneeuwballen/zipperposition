@@ -187,13 +187,13 @@ let () =
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* find the calculus *)
   let calculus = match params.param_calculus with
-    | "superposition" -> Sat.superposition
-    | "delayed" -> Sat.delayed_superposition
+    | "superposition" -> Sup.superposition
+    | "delayed" -> Delayed.delayed
     | x -> failwith ("unknown calculus "^x)
   in
   (* choose an ord now *)
   let constr = O.compose_constraints
-    (heuristic_constraint clauses) calculus.Sat.calc_constraint in
+    (heuristic_constraint clauses) calculus#constr in
   let so = O.make_ordering constr in
   let ord = match params.param_ord with
     | "rpo" -> new O.rpo so
@@ -201,16 +201,17 @@ let () =
     | x -> failwith ("unknown ordering " ^ x)
   in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
-  let clauses = List.map (C.reord_clause ~ord) clauses in
-  Utils.debug 2 (lazy (Utils.sprintf "clauses: @[<v>%a@]@."
-                 (Utils.pp_list ~sep:"" (C.pp_clause ~sort:false)) clauses));
+  (* preprocess clauses *)
+  let num_clauses = List.length clauses in
+  let clauses = calculus#preprocess ~ord clauses in
+  Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
+                 num_clauses (Utils.pp_list ~sep:"" (C.pp_clause ~sort:false)) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
   let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
-  let state = Sat.set_of_support state calculus.Sat.calc_axioms in
+  let state = Sat.set_of_support ~calculus state calculus#axioms in
   (* saturate *)
-  let state, result, num = Sat.given_clause ?steps ?timeout
-    ~rules:calculus.Sat.calc_rules state
+  let state, result, num = Sat.given_clause ?steps ?timeout ~calculus state
   in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;

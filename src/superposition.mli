@@ -22,41 +22,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-(** a conclusion is a clause *)
-type conclusion = clause
+val infer_active: Calculus.binary_inf_rule (** superposition where given clause is active *)
 
-(** raised when the empty clause is found *)
-exception Success of hclause
+val infer_passive: Calculus.binary_inf_rule(** superposition where given clause is passive *)
 
-(** inferences *)
-type inference_rule = ProofState.active_set -> clause -> conclusion list
+val infer_equality_resolution: Calculus.unary_inf_rule
 
-(* some helpers *)
-val fold_lits :
-  ?pos:bool -> ?neg:bool -> ?both:bool ->
-  ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
-val fold_positive :
-  ?both:bool -> ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
-val fold_negative :
-  ?both:bool -> ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
-
-(** perform the inferences in the list, returns the resulting clauses *)
-val do_inferences : ProofState.active_set
-                 -> (string * inference_rule) list (** named rules *)
-                 -> clause -> clause list
-
-val inference_rules : (string * inference_rule) list
-
-val infer_active : inference_rule  (** superposition where given clause is active *)
-
-val infer_passive : inference_rule (** superposition where given clause is passive *)
-
-val infer_equality_resolution : inference_rule
-
-val infer_equality_factoring : inference_rule
+val infer_equality_factoring: Calculus.unary_inf_rule
 
 (** simplifications *)
 
@@ -85,3 +57,6 @@ val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 val orphan_murder: ProofState.passive_set
                 -> clause   (** the clause whose orphans are to be deleted *)
                 -> ProofState.passive_set
+
+(** The superposition calculus *)
+val superposition : Calculus.calculus

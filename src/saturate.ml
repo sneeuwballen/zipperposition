@@ -42,66 +42,49 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Unix.gettimeofday () > timeout
 
-(** A clausal calculus for first order reasoning *)
-type calculus = {
-  calc_rules : (string * Sup.inference_rule) list;
-  calc_axioms : clause list;
-  calc_constraint : ordering_constraint;
-}
-
-let superposition = {
-  calc_rules = Sup.inference_rules;
-  calc_axioms = [];
-  calc_constraint = O.consts_constraint;
-}
-
-let delayed_superposition = {
-  calc_rules = Sup.inference_rules @ Delayed.inference_rules;
-  calc_axioms = Delayed.axioms;
-  calc_constraint = Delayed.symbol_constraint;
-}
-
-let set_of_support state axioms =
+let set_of_support ~calculus state axioms =
   (* reordonate causes using the ordering of the state *)
   let ord = state.PS.ord in
-  let axioms = List.map
-    (fun c -> C.reord_clause ~ord (C.clause_of_fof ~ord c)) axioms in
-  let axioms = List.filter (fun c -> not (Sup.is_tautology c)) axioms in
+  let axioms = calculus#preprocess ~ord axioms in
+  let axioms = List.filter (fun c -> not (calculus#trivial c)) axioms in
   (* add the axioms to the active set *)
   let axioms_set = PS.add_actives state.PS.axioms_set axioms in
   Utils.debug 1 (lazy (Utils.sprintf "%% added %d clauses to set-of-support"
                   (List.length axioms)));
   {state with PS.axioms_set = axioms_set}
 
-
 (** simplify the clause using the active_set. Returns
     the (renamed) clause and the simplified clause. *)
-let simplify active_set clause =
+let simplify ~calculus active_set clause =
   let ord = active_set.PS.a_ord in
   let old_c = PS.relocate_active active_set clause in
-  let c = Sup.demodulate active_set [] old_c in
-  let c = Sup.basic_simplify ~ord c in
+  let c = calculus#simplify active_set old_c in
+  let c = calculus#basic_simplify ~ord c in
   (if not (C.eq_clause c old_c)
     then Utils.debug 2 (lazy (Utils.sprintf "clause @[<h>%a@] simplified into @[<h>%a@]"
                       (C.pp_clause ~sort:false) old_c (C.pp_clause ~sort:false) c)));
   old_c, c
 
-(** generate all clauses *)
-let generate ~rules active_set clause =
-  Sup.do_inferences active_set rules clause
+(** generate all clauses from binary inferences *)
+let generate_binary ~calculus active_set clause =
+  Calculus.do_binary_inferences active_set calculus#binary_rules clause
+
+(** generate all clauses from unary inferences *)
+let generate_unary ~calculus ~ord clause =
+  Calculus.do_unary_inferences ~ord calculus#unary_rules clause
 
 (** check whether the clause is redundant w.r.t the active_set *)
-let is_redundant active_set clause =
+let is_redundant ~calculus active_set clause =
   (* forward subsumption check *)
   let c = PS.relocate_active active_set clause in
-  Sup.subsumed_by_set active_set c
+  calculus#redundant active_set c
 
-(** find redundant clauses in active_set, w.r.t c *)
-let subsumed_by active_set clause =
+(** find redundant clauses in active_set, w.r.t clause c *)
+let subsumed_by ~calculus active_set clause =
   let c = PS.relocate_active active_set clause in
-  Sup.subsumed_in_set active_set c
+  calculus#redundant_set active_set c
 
-let given_clause_step ~rules state =
+let given_clause_step ~calculus state =
   let ord = state.PS.ord in
   (* select next given clause *)
   match PS.next_passive_clause state.PS.passive_set with
@@ -109,12 +92,14 @@ let given_clause_step ~rules state =
   | passive_set, Some c ->
     let state = { state with PS.passive_set=passive_set } in
     (* simplify given clause w.r.t. active set and SOS *)
-    let _, c = simplify state.PS.active_set c.node in
-    let _, c = simplify state.PS.axioms_set c in
+    let _, c = simplify ~calculus state.PS.active_set c.node in
+    let _, c = simplify ~calculus state.PS.axioms_set c in
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
     (* tautology or subsumed, useless *)
-    else if Sup.is_tautology c || is_redundant state.PS.active_set c then state, Unknown
+    else if calculus#trivial c ||
+            is_redundant ~calculus state.PS.active_set c
+    then state, Unknown
     else begin
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
@@ -122,7 +107,7 @@ let given_clause_step ~rules state =
       (* an active set containing only the given clause *)
       let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
       (* find clauses that are subsumed by c in active_set *)
-      let subsumed_active = subsumed_by state.PS.active_set c in
+      let subsumed_active = subsumed_by ~calculus state.PS.active_set c in
       let active_set = PS.remove_actives state.PS.active_set subsumed_active in
       let state = { state with PS.active_set = active_set } in
       (* simplify active set using c TODO write a function for this *)
@@ -131,7 +116,7 @@ let given_clause_step ~rules state =
         state.PS.active_set.PS.active_clauses
         (fun hc ->
           (* try to simplify hc using the given clause *)
-          let original, simplified = simplify given_active_set hc.node in
+          let original, simplified = simplify ~calculus given_active_set hc.node in
           if not (C.eq_clause original simplified)
             then begin
               (* remove the original clause form active_set, save the simplified clause *)
@@ -150,9 +135,13 @@ let given_clause_step ~rules state =
       let state = { state with PS.active_set = active_set } in
       let new_clauses = !simplified_actives in
       (* do inferences w.r.t to the active set, SOS, and c itself *)
-      let new_clauses = List.rev_append (generate ~rules state.PS.axioms_set c) new_clauses in
-      let new_clauses = List.rev_append (generate ~rules state.PS.active_set c) new_clauses in
-      let new_clauses = List.rev_append (generate ~rules given_active_set c) new_clauses in
+      let new_clauses = List.rev_append
+        (generate_binary ~calculus state.PS.axioms_set c) new_clauses in
+      let new_clauses = List.rev_append
+        (generate_binary ~calculus state.PS.active_set c) new_clauses in
+      let new_clauses = List.rev_append
+        (generate_binary ~calculus given_active_set c) new_clauses in
+      let new_clauses =  List.rev_append (generate_unary ~calculus ~ord c) new_clauses in
       (* add given clause to active set *)
       let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
       let state = { state with PS.active_set=active_set } in
@@ -160,8 +149,8 @@ let given_clause_step ~rules state =
          are kept *)
       let new_clauses = HExtlib.filter_map
         (fun c ->
-          let _, simplified_c = simplify state.PS.active_set c in
-          if Sup.is_tautology simplified_c then None else Some simplified_c
+          let _, simplified_c = simplify ~calculus state.PS.active_set c in
+          if calculus#trivial simplified_c then None else Some simplified_c
         )
         new_clauses
       in
@@ -182,7 +171,7 @@ let given_clause_step ~rules state =
       state, Unknown
     end
 
-let given_clause ?steps ?timeout ~rules state =
+let given_clause ?steps ?timeout ~calculus state =
   let rec do_step state num =
     if check_timeout timeout then state, Timeout, num else
     begin
@@ -192,7 +181,7 @@ let given_clause ?steps ?timeout ~rules state =
     | _ ->
       begin
         (* do one step *)
-        let new_state, status = given_clause_step ~rules state in
+        let new_state, status = given_clause_step ~calculus state in
         match status with
         | Sat | Unsat _ | Error _ -> state, status, num (* finished *)
         | Timeout -> assert false

@@ -22,6 +22,8 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 
 open Types
 open Hashcons
+open Calculus
+
 module T = Terms
 module C = Clauses
 module O = Orderings
@@ -123,21 +125,6 @@ let symbol_constraint =
                        exists_symbol; or_symbol; and_symbol;
                        not_symbol; false_symbol; true_symbol])
 
-(* creation of a new skolem symbol *)
-let skolem =
-  let count = ref 0 in  (* current symbol counter *)
-  fun ord args sort ->
-    let new_symbol = "$$sk_" ^ (string_of_int !count) in
-    incr count;
-    (* build the new term first *)
-    let new_term =
-      if args = [] then T.mk_leaf new_symbol sort
-      else T.mk_node ((T.mk_leaf new_symbol sort) :: args)
-    in
-    (* update the ordering *)
-    ord#refresh ();
-    new_term
-
 (* ----------------------------------------------------------------------
  * inference rules
  * ---------------------------------------------------------------------- *)
@@ -214,9 +201,8 @@ let delta_eliminate ~ord clause idx t sign =
   C.mk_clause ~ord new_lits proof
 
 (** elimination of unary/binary logic connectives *)
-let connective_elimination active_set clause =
-  let ord = active_set.PS.a_ord in
-  Sup.fold_lits ~both:false ~pos:true ~neg:true
+let connective_elimination ~ord clause =
+  fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos ->
       (* if a literal is true_term, must be r because it is the smallest term *)
       if not (T.eq_foterm r T.true_term) then acc else
@@ -242,9 +228,8 @@ let connective_elimination active_set clause =
     [] (Utils.list_pos clause.clits)
 
 (** elimination of forall *)
-let forall_elimination active_set clause =
-  let ord = active_set.PS.a_ord in
-  Sup.fold_lits ~both:false ~pos:true ~neg:true
+let forall_elimination ~ord clause =
+  fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
@@ -262,9 +247,8 @@ let forall_elimination active_set clause =
     [] (Utils.list_pos clause.clits)
 
 (** elimination of exists *)
-let exists_elimination active_set clause =
-  let ord = active_set.PS.a_ord in
-  Sup.fold_lits ~both:false ~pos:true ~neg:true
+let exists_elimination ~ord clause =
+  fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
@@ -282,8 +266,7 @@ let exists_elimination active_set clause =
     [] (Utils.list_pos clause.clits)
 
 (** equivalence elimination *)
-let equivalence_elimination active_set clause =
-  let ord = active_set.PS.a_ord in
+let equivalence_elimination ~ord clause =
   (* check whether the term is not a non-equational proposition *)
   let rec is_not_nonequational t = match t.node.term with
   | Node ({node={term=Leaf s}}::_) ->
@@ -329,19 +312,50 @@ let equivalence_elimination active_set clause =
     | _ -> assert false
     end
   in
-  Sup.fold_lits ~both:true ~pos:true ~neg:true
+  fold_lits ~both:true ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
       if sign
         then (do_inferences_pos l r l_pos) @ acc
         else (do_inferences_neg l r l_pos) @ acc)
     [] (Utils.list_pos clause.clits)
 
-(* list of inference rules *)
-let inference_rules =
-  [ "equivalence_elimination", equivalence_elimination;
-    "forall_elimination", forall_elimination;
-    "exists_elimination", exists_elimination;
-    "connective_elimination", connective_elimination;
-  ]
+(* ----------------------------------------------------------------------
+ * simplification
+ * ---------------------------------------------------------------------- *)
 
-let axioms = []
+(** Simplify the inner formula (double negation, trivial equalities...) TODO *)
+let simplify_inner ~ord c = c
+
+(* ----------------------------------------------------------------------
+ * the calculus object
+ * ---------------------------------------------------------------------- *)
+
+let delayed : calculus =
+  object
+    method binary_rules = ["superposition_active", Sup.infer_active;
+                           "superposition_passive", Sup.infer_passive]
+
+    method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
+                          "equality_factoring", Sup.infer_equality_factoring;
+                          "connective_elimination", connective_elimination;
+                          "forall_elimination", forall_elimination;
+                          "exists_elimination", exists_elimination;
+                          "equivalence_elimination", equivalence_elimination]
+
+    method basic_simplify ~ord c = simplify_inner ~ord (Sup.basic_simplify ~ord c)
+
+    method simplify actives c = Sup.demodulate actives [] c
+
+    method redundant actives c = Sup.subsumed_by_set actives c
+
+    method redundant_set actives c = Sup.subsumed_in_set actives c
+
+    method trivial c = Sup.is_tautology c
+
+    method axioms = []
+
+    method constr = symbol_constraint
+
+    method preprocess ~ord l =
+      List.map (fun c -> C.reord_clause ~ord (C.clause_of_fof ~ord c)) l
+  end

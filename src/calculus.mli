@@ -26,7 +26,7 @@ open Types
 type binary_inf_rule = ProofState.active_set -> clause -> clause list
 
 (** unary infererences *)
-type unary_inf_rule = clause -> clause list
+type unary_inf_rule = ord:ordering -> clause -> clause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -36,12 +36,13 @@ class type calculus =
     (** the unary inference rules *)
     method unary_rules : (string * unary_inf_rule) list
     (** how to simplify a clause *)
-    method basic_simplify : clause -> clause
-    (** how to simplify a clause w.r.t a set of clauses. Returns
-        the (renamed) clause and the simplified clause. *)
-    method simplify : ProofState.active_set -> clause -> clause * clause
+    method basic_simplify : ord:ordering -> clause -> clause
+    (** how to simplify a clause w.r.t a set of clauses *)
+    method simplify : ProofState.active_set -> clause -> clause
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
+    (** find redundant clauses in set w.r.t the clause *)
+    method redundant_set : ProofState.active_set -> clause -> hclause list
     (** check whether the clause is trivial *)
     method trivial : clause -> bool
     (** a list of axioms to add to the Set of Support *)
@@ -49,16 +50,18 @@ class type calculus =
     (** some constraints on the precedence *)
     method constr : ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : clause list -> clause list
+    method preprocess : ord:ordering -> clause list -> clause list
   end
 
 (** do binary inferences that involve the given clause *)
-val do_binary_inferences : ProofState.active_set
-                 -> (string * binary_inf_rule) list (** named rules *)
-                 -> clause -> clause list
+val do_binary_inferences : ProofState.active_set ->
+                          (string * binary_inf_rule) list -> (** named rules *)
+                          clause -> clause list
 
 (** do unary inferences for the given clause *)
-val do_unary_inferences : (string * unary_inf_rule) list -> clause -> clause list
+val do_unary_inferences : ord:ordering ->
+                          (string * unary_inf_rule) list ->
+                          clause -> clause list
 
 (* some helpers *)
 val fold_lits :
@@ -71,4 +74,9 @@ val fold_positive :
 val fold_negative :
   ?both:bool -> ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
   (literal * int) list -> 'a
+
 val get_equations_sides : clause -> position -> foterm * foterm * bool
+
+(** Creation of a new skolem symbol, applied to the given arguments.
+    it also refreshes the ordering (the signature has changed) *)
+val skolem : ordering -> foterm list -> sort -> foterm

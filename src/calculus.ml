@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+module T = Terms
 module C = Clauses
 module Utils = FoUtils
 module PS = ProofState
@@ -30,7 +31,7 @@ module PS = ProofState
 type binary_inf_rule = PS.active_set -> clause -> clause list
 
 (** unary infererences *)
-type unary_inf_rule = clause -> clause list
+type unary_inf_rule = ord:ordering -> clause -> clause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -40,12 +41,13 @@ class type calculus =
     (** the unary inference rules *)
     method unary_rules : (string * unary_inf_rule) list
     (** how to simplify a clause *)
-    method basic_simplify : clause -> clause
-    (** how to simplify a clause w.r.t a set of clauses. Returns
-        the (renamed) clause and the simplified clause. *)
-    method simplify : ProofState.active_set -> clause -> clause * clause
+    method basic_simplify : ord:ordering -> clause -> clause
+    (** how to simplify a clause w.r.t a set of clauses *)
+    method simplify : ProofState.active_set -> clause -> clause
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
+    (** find redundant clauses in set w.r.t the clause *)
+    method redundant_set : ProofState.active_set -> clause -> hclause list
     (** check whether the clause is trivial *)
     method trivial : clause -> bool
     (** a list of axioms to add to the Set of Support *)
@@ -53,7 +55,7 @@ class type calculus =
     (** some constraints on the precedence *)
     method constr : ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : clause list -> clause list
+    method preprocess : ord:ordering -> clause list -> clause list
   end
 
 (** do binary inferences that involve the given clause *)
@@ -71,13 +73,13 @@ let do_binary_inferences active_set rules c =
     [] rules
 
 (** do unary inferences for the given clause *)
-let do_unary_inferences rules c =
+let do_unary_inferences ~ord rules c =
   Utils.debug 3 (lazy "do unary inferences");
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
       Utils.debug 3 (lazy ("#  apply unary rule " ^ name));
-      let new_clauses = rule c in
+      let new_clauses = rule ~ord c in
       List.rev_append new_clauses acc)
     [] rules
 
@@ -129,3 +131,19 @@ let get_equations_sides clause pos = match pos with
     | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (expected binary list)"
+
+(** Creation of a new skolem symbol, applied to the given arguments.
+    it also refreshes the ordering (the signature has changed) *)
+let skolem =
+  let count = ref 0 in  (* current symbol counter *)
+  fun ord args sort ->
+    let new_symbol = "$$sk_" ^ (string_of_int !count) in
+    incr count;
+    (* build the new term first *)
+    let new_term =
+      if args = [] then T.mk_leaf new_symbol sort
+      else T.mk_node ((T.mk_leaf new_symbol sort) :: args)
+    in
+    (* update the ordering *)
+    ord#refresh ();
+    new_term

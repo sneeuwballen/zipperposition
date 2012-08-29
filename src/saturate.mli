@@ -31,29 +31,18 @@ type szs_status =
   | Error of string 
   | Timeout
 
-(** A clausal calculus for first order reasoning *)
-type calculus = {
-  calc_rules : (string * Superposition.inference_rule) list;
-  calc_axioms : clause list;
-  calc_constraint : ordering_constraint;
-}
-
-(** Superposition calculus *)
-val superposition : calculus
-(** Superposition with Equivalence Reasoning and Delayed CNF calculus *)
-val delayed_superposition : calculus
-
 (** Add the given axioms to the set of support *)
-val set_of_support: ProofState.state -> clause list -> ProofState.state
+val set_of_support: calculus:Calculus.calculus ->
+                    ProofState.state -> clause list -> ProofState.state
 
 (** Perform one step of the given clause algorithm *)
-val given_clause_step : rules:(string * Superposition.inference_rule) list ->
+val given_clause_step : calculus:Calculus.calculus ->
                         ProofState.state ->
                         ProofState.state * szs_status
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns a tuple (new state, result, number of steps done) *)
 val given_clause: ?steps:int -> ?timeout:float ->
-                  rules:(string * Superposition.inference_rule) list ->
+                  calculus:Calculus.calculus ->
                   ProofState.state ->
                   ProofState.state * szs_status * int

@@ -38,13 +38,6 @@ val db_make : foterm -> foterm -> foterm
 (** Precedence constraint *)
 val symbol_constraint : ordering_constraint
 
-(** Creation of a new skolem symbol, applied to the given arguments.
-    it also refreshes the ordering (the signature has changed) *)
-val skolem : ordering -> foterm list -> sort -> foterm
-
-(** new inference rules *)
-val inference_rules : (string * Superposition.inference_rule) list
-
-(** new superposition axioms, to add to the set of support *)
-val axioms : clause list
+(** The Delayed superposition calculus itself *)
+val delayed : Calculus.calculus
 

@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 open Hashcons
+open Calculus
 
 module T = Terms
 module C = Clauses
@@ -33,9 +34,6 @@ module Utils = FoUtils
 
 (** a conclusion is a clause, plus the clauses used to infer it *)
 type conclusion = clause
-
-(** raised when the empty clause is found *)
-exception Success of hclause
 
 (** inferences *)
 type inference_rule = ProofState.active_set -> clause -> conclusion list
@@ -132,72 +130,9 @@ let all_positions pos ctx t f =
   aux pos ctx t
 
 
-(** fold f over all literals sides, with their positions.
-    f is given (acc, left side, right side, sign, position of left side)
-    if pos, then positive literals will be visited.
-    if neg, then negative literals will be visited.
-    if both, then both sides of a non-oriented equation
-      will be visited
-
-    ?pos:bool -> ?neg:bool -> ?both:bool
-    -> ('a -> Types.foterm -> Types.foterm -> bool -> int list -> 'a)
-    -> 'a -> (Types.literal * int) list
-    -> 'a *)
-let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) f acc lits =
-  if (not pos) && (not neg) then acc else
-  (* is the sign ok, given the parameters? *)
-  let sign_ok sign = if sign then pos else neg in
-  List.fold_left
-    (fun acc (lit, idx) ->
-      match lit with
-      | Equation (l,r,sign,Gt) when sign_ok sign ->
-        f acc l r sign [idx; C.left_pos]
-      | Equation (l,r,sign,Lt) when sign_ok sign ->
-        f acc r l sign [idx; C.right_pos]
-      | Equation (l,r,sign,_) when sign_ok sign ->
-        if both
-        then (* visit both sides of the equation *)
-          let acc = f acc r l sign [idx; C.right_pos] in
-          f acc l r sign [idx; C.left_pos]
-        else (* only visit one side (arbitrary) *)
-          f acc l r sign [idx; C.left_pos]
-      | _ -> acc)
-    acc lits
-
-(** Visit all non-minimal sides of positive equations *)
-let rec fold_positive ?(both=true) f acc lits =
-  fold_lits ~pos:true ~neg:false ~both f acc lits
-
-(** Visit all non-minimal sides of negative equations *)
-let rec fold_negative ?(both=true) f acc lits =
-  fold_lits ~pos:false ~neg:true ~both f acc lits
-
-(** decompose the literal at given position *)
-let get_equations_sides clause pos = match pos with
-  | idx::eq_side::[] ->
-    (match Utils.list_get clause.clits idx with
-    | Equation (l,r,sign,_) when eq_side = C.left_pos -> (l, r, sign)
-    | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
-    | _ -> invalid_arg "wrong side")
-  | _ -> invalid_arg "wrong kind of position (expected binary list)"
-
 (* ----------------------------------------------------------------------
  * inferences
  * ---------------------------------------------------------------------- *)
-
-(** do inferences that involve the given clause *)
-let do_inferences active_set rules c =
-  (* rename clause to avoid collisions *)
-  let c = PS.relocate_active active_set c in
-  Utils.debug 3 (lazy (Utils.sprintf "do inferences with current active: %a" C.pp_bag
-                       active_set.PS.active_clauses));
-  (* apply every inference rule *)
-  List.fold_left
-    (fun acc (name, rule) ->
-      Utils.debug 3 (lazy ("#  apply rule " ^ name));
-      let new_clauses = rule active_set c in
-      List.rev_append new_clauses acc)
-    [] rules
 
 (* helper that does one or zero superposition inference, with all
    the given parameters *)
@@ -304,8 +239,7 @@ let infer_passive_ actives clause =
 let infer_passive actives clause =
   prof_infer_passive.HExtlib.profile (infer_passive_ actives) clause
 
-let infer_equality_resolution_ actives clause =
-  let ord = actives.PS.a_ord in
+let infer_equality_resolution_ ~ord clause =
   fold_negative ~both:false
     (fun acc l r sign l_pos ->
       assert (not sign);
@@ -331,11 +265,10 @@ let infer_equality_resolution_ actives clause =
     )
     [] (C.maxlits clause)
 
-let infer_equality_resolution actives clause =
-  prof_infer_equality_resolution.HExtlib.profile (infer_equality_resolution_ actives) clause
+let infer_equality_resolution ~ord clause =
+  prof_infer_equality_resolution.HExtlib.profile (infer_equality_resolution_ ~ord) clause
 
-let infer_equality_factoring_ actives clause =
-  let ord = actives.PS.a_ord in
+let infer_equality_factoring_ ~ord clause =
   let lits_pos = Utils.list_pos clause.clits in
   (* find root terms that are unifiable with s and are not in the
      literal at s_pos. This returns a list of position and substitution *)
@@ -391,15 +324,8 @@ let infer_equality_factoring_ actives clause =
         acc unifiables)
     [] (C.maxlits clause)
 
-let infer_equality_factoring actives clause =
-  prof_infer_equality_factoring.HExtlib.profile (infer_equality_factoring_ actives) clause
-
-let inference_rules =
-  [("infer_active", infer_active);
-   ("infer_passive", infer_passive);
-   ("equality_resolution", infer_equality_resolution);
-   ("equality_factoring", infer_equality_factoring);
-   ];
+let infer_equality_factoring ~ord clause =
+  prof_infer_equality_factoring.HExtlib.profile (infer_equality_factoring_ ~ord) clause
 
 (* ----------------------------------------------------------------------
  * simplifications
@@ -648,3 +574,48 @@ let subsumed_in_set set clause =
   prof_subsumption_in_set.HExtlib.profile (subsumed_in_set_ set) clause
 
 let orphan_murder set clause = set (* TODO *)
+
+
+(* ----------------------------------------------------------------------
+ * reduction to CNF
+ * ---------------------------------------------------------------------- *)
+
+(** Transform the clause into proper CNF; returns a list of clauses *)
+let cnf_of ~ord clause = [clause]  (* TODO *)
+
+(* ----------------------------------------------------------------------
+ * the Calculus object
+ * ---------------------------------------------------------------------- *)
+
+let superposition : calculus =
+  object
+    method binary_rules = ["superposition_active", infer_active;
+                           "superposition_passive", infer_passive]
+
+    method unary_rules = ["equality_resolution", infer_equality_resolution;
+                          "equality_factoring", infer_equality_factoring]
+
+    method basic_simplify ~ord c = basic_simplify ~ord c
+
+    method simplify actives c = demodulate actives [] c
+
+    method redundant actives c = subsumed_by_set actives c
+
+    method redundant_set actives c = subsumed_in_set actives c
+
+    method trivial c = is_tautology c
+
+    method axioms = []
+
+    method constr = O.consts_constraint 
+
+    method preprocess ~ord l =
+      List.fold_left
+        (fun acc c ->
+          (* reduction to CNF *)
+          let clauses = cnf_of ~ord c in
+          let clauses = List.map (fun c -> C.reord_clause ~ord
+            (C.clause_of_fof ~ord c)) clauses in
+          List.rev_append clauses acc)
+        [] l
+  end
