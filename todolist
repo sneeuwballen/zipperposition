@@ -6,5 +6,7 @@
     axioms rewrite everywhere in the term, whereas inferences
     should only occur at root.
 - add some rules for negation
+- simplification rules inside formulae (double negation, eta reduction...)
+- separate unary and binary inference rules
 - object-oriented pretty-printers, with imperative interfaces, to
     allow to change parameters easily...
