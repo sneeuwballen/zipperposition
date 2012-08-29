@@ -2,11 +2,7 @@
 - make multiset comparison fast
 - improve efficiency of discrimination trees: either
     use compressed tries, or use some kind of patricia trees
-- write delayed inference rules rather than using axioms, because
-    axioms rewrite everywhere in the term, whereas inferences
-    should only occur at root.
-- add some rules for negation
-- simplification rules inside formulae (double negation, eta reduction...)
-- separate unary and binary inference rules
+- only index, and use in inferences, closed terms (otherwise db(n) = foo
+    will be used for rewriting, which makes no sense)
 - object-oriented pretty-printers, with imperative interfaces, to
     allow to change parameters easily...
