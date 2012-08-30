@@ -15,7 +15,7 @@ there is a lot of literature about it; for this implementation my references are
 * the paper _E: a brainiac theorem prover_ that describes the [E](http://eprover.org) prover by S.Schulz,
 * the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H.Ganzinger and J.Stuber
 
-*Disclaimer*: Note that the prover is currently an early prototype and is
+**Disclaimer**: Note that the prover is currently an early prototype and is
 likely not correct nor complete.
 
 ## License
