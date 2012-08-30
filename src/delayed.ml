@@ -84,8 +84,8 @@ let pp_clause formatter clause =
 let symbol_constraint =
   O.compose_constraints
     (O.max_constraint [succ_db_symbol; db_symbol])
-    (O.min_constraint [eq_symbol; imply_symbol; lambda_symbol; forall_symbol;
-                       exists_symbol; or_symbol; and_symbol;
+    (O.min_constraint [eq_symbol; imply_symbol; forall_symbol; exists_symbol;
+                       lambda_symbol; or_symbol; and_symbol;
                        not_symbol; false_symbol; true_symbol])
 
 (* ----------------------------------------------------------------------

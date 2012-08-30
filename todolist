@@ -6,3 +6,4 @@
     will be used for rewriting, which makes no sense)
 - object-oriented pretty-printers, with imperative interfaces, to
     allow to change parameters easily...
+- parsing of axiom files relative to the problem file
