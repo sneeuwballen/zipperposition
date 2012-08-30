@@ -150,8 +150,11 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                        (C.pp_clause ~sort:false) passive_clause T.pp_foterm u T.pp_foterm v
                        C.pp_pos passive_pos (S.pp_substitution ~sort:false) subst));
   assert ((Utils.list_inter T.eq_foterm active_clause.cvars passive_clause.cvars) = []);
-  if not sign_st
+  assert (T.db_closed s);
+  if not sign_st 
   then (Utils.debug 3 (lazy "active literal is negative"); acc)
+  else if not (T.db_closed (T.at_pos u subterm_pos))
+  then (Utils.debug 3 (lazy "passive subterm is not DB closed"); acc)
   else begin
     assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
                         (S.apply_subst subst s));
@@ -296,6 +299,8 @@ let infer_equality_factoring_ ~ord clause =
     and u, v, sign_uv = get_equations_sides clause passive_pos
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
+    assert (T.db_closed u);
+    assert (T.db_closed s);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     if C.check_maximal_lit ~ord clause active_idx subst &&
        ord#compare (S.apply_subst subst s) (S.apply_subst subst t) <> Lt
@@ -335,6 +340,9 @@ exception FoundMatch of (foterm * substitution * clause * position)
 
 (** Do one step of demodulation on subterm. *)
 let demod_subterm ~ord blocked_ids active_set subterm =
+  (* do not rewrite non closed subterms *)
+  if not (T.db_closed subterm) then None else
+  if subterm.node.sort = bool_sort then None else (* no rewriting on formulae *)
   (* unit clause+pos that potentially match subterm *)
   let matches =
     I.DT.retrieve_generalizations active_set.PS.idx.I.unit_root_index subterm in
@@ -342,8 +350,8 @@ let demod_subterm ~ord blocked_ids active_set subterm =
     I.ClauseSet.iter
       (fun (unit_hclause, pos, l) ->
         (* do we have to ignore the clause? *)
-        if List.mem unit_hclause.tag blocked_ids then ()
-        else
+        if List.mem unit_hclause.tag blocked_ids then () else
+        assert (T.db_closed l);
         try
           let subst = Unif.matching l subterm in
           match pos with

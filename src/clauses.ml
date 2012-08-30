@@ -202,8 +202,10 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
     mk_lit ~ord T.true_term T.true_term sign
   (* deal with false/true *)
   | _ when T.eq_foterm l T.false_term ->
+    assert (r.node.sort = bool_sort);
     lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
   | _ when T.eq_foterm r T.false_term ->
+    assert (l.node.sort = bool_sort);
     lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
   (* deal with negation *)
   | Node [{node={term=Leaf s}}; t], _ when s = not_symbol && T.eq_foterm r T.true_term ->

@@ -233,8 +233,8 @@ let exists_elimination ~ord clause =
 
 (** equivalence elimination *)
 let equivalence_elimination ~ord clause =
-  (* check whether the term is not a non-equational proposition *)
-  let rec is_not_nonequational t = match t.node.term with
+  (* check whether the term is not an atomic proposition *)
+  let rec is_not_atomic t = match t.node.term with
   | Node ({node={term=Leaf s}}::_) ->
       t.node.sort = bool_sort &&
       (s = eq_symbol || s = exists_symbol || s = forall_symbol || s = not_symbol || 
@@ -243,7 +243,7 @@ let equivalence_elimination ~ord clause =
   | Node _ -> assert false
   (* do the inference for positive equations *)
   and do_inferences_pos l r l_pos =
-    if not (is_not_nonequational l) then [] else begin
+    if not (is_not_atomic l) then [] else begin
     assert (r.node.sort = bool_sort);
     if ord#compare l r = Lt then [] else
     (* ok, do it *)
@@ -315,13 +315,13 @@ let simplify_inner ~ord c =
     (T.eq_foterm a T.true_term || T.eq_foterm b T.true_term) ->
     T.true_term  (* a or true -> true *)
   | Node [{node={term=Leaf s}}; a; b] when s = or_symbol && T.eq_foterm a T.false_term ->
-    b (* b or false -> b *)
+    simp_term b (* b or false -> b *)
   | Node [{node={term=Leaf s}}; a; b] when s = or_symbol && T.eq_foterm b T.false_term ->
-    a (* a or false -> a *)
+    simp_term a (* a or false -> a *)
   | Node [{node={term=Leaf s}}; a; b] when s = and_symbol && T.eq_foterm a T.true_term ->
-    b (* b and true -> b *)
+    simp_term b (* b and true -> b *)
   | Node [{node={term=Leaf s}}; a; b] when s = and_symbol && T.eq_foterm b T.true_term ->
-    a (* a and true -> a *)
+    simp_term a (* a and true -> a *)
   | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol &&
     (T.eq_foterm a T.false_term || T.eq_foterm b T.true_term) ->
     T.true_term  (* (false => a) or (a => true) -> true *)
