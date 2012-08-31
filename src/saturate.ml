@@ -150,7 +150,11 @@ let given_clause_step ~calculus state =
       let new_clauses = HExtlib.filter_map
         (fun c ->
           let _, simplified_c = simplify ~calculus state.PS.active_set c in
-          if calculus#trivial simplified_c then None else Some simplified_c
+          (* do not keep trivial  clauses *)
+          if calculus#trivial simplified_c then None
+          (* do not keep subsumed clauses *)
+          else if is_redundant ~calculus state.PS.active_set c then None
+          else Some simplified_c
         )
         new_clauses
       in
