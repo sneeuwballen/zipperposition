@@ -2,8 +2,8 @@
 - make multiset comparison fast
 - improve efficiency of discrimination trees: either
     use compressed tries, or use some kind of patricia trees
-- only index, and use in inferences, closed terms (otherwise db(n) = foo
-    will be used for rewriting, which makes no sense)
 - object-oriented pretty-printers, with imperative interfaces, to
     allow to change parameters easily...
 - parsing of axiom files relative to the problem file
+- simple CNF reduction not to depend on eprover for superposition
+- study whether demodulation on bool terms can be compatible with completeness of delayed superposition
