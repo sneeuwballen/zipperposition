@@ -233,17 +233,9 @@ let exists_elimination ~ord clause =
 
 (** equivalence elimination *)
 let equivalence_elimination ~ord clause =
-  (* check whether the term is not an atomic proposition *)
-  let rec is_not_atomic t = match t.node.term with
-  | Node ({node={term=Leaf s}}::_) ->
-      t.node.sort = bool_sort &&
-      (s = eq_symbol || s = exists_symbol || s = forall_symbol || s = not_symbol || 
-       s = and_symbol || s = imply_symbol || s = or_symbol)
-  | Var _ | Leaf _ -> false
-  | Node _ -> assert false
   (* do the inference for positive equations *)
-  and do_inferences_pos l r l_pos =
-    if not (is_not_atomic l) then [] else begin
+  let do_inferences_pos l r l_pos =
+    if T.atomic l then [] else begin
     assert (r.node.sort = bool_sort);
     if ord#compare l r = Lt then [] else
     (* ok, do it *)

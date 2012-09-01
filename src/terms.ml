@@ -251,6 +251,14 @@ let rec pp_foterm_sort formatter ?(sort=false) t =
 let pp_signature formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]" (Utils.pp_list ~sep:" > " pp_symbol) symbols
 
+(* check whether the term is a term or an atomic proposition *)
+let rec atomic t = match t.node.term with
+  | Leaf s -> t.node.sort <> bool_sort || (not (s = and_symbol || s = or_symbol
+    || s = forall_symbol || s = exists_symbol || s = imply_symbol
+    || s = not_symbol || s = eq_symbol))
+  | Var _ -> true
+  | Node (hd::_) -> atomic hd
+  | Node [] -> assert false
 
 (* check wether the term is closed w.r.t. De Bruijn variables *)
 let db_closed t = Lazy.force t.node.db_closed

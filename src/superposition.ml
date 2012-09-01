@@ -342,7 +342,8 @@ exception FoundMatch of (foterm * substitution * clause * position)
 let demod_subterm ~ord blocked_ids active_set subterm =
   (* do not rewrite non closed subterms *)
   if not (T.db_closed subterm) then None else
-  if subterm.node.sort = bool_sort then None else (* no rewriting on formulae *)
+  (* no rewriting on non-atomic formulae *)
+  if subterm.node.sort = bool_sort && not (T.atomic subterm) then None else 
   (* unit clause+pos that potentially match subterm *)
   let matches =
     I.DT.retrieve_generalizations active_set.PS.idx.I.unit_root_index subterm in

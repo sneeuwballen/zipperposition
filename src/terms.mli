@@ -66,6 +66,7 @@ val merge_varlist : varlist -> varlist -> varlist (** set union of variable list
 val max_var : varlist -> int                  (** find the maximum variable index *)
 val min_var : varlist -> int
 
+val atomic : foterm -> bool                   (** atomic proposition, or term *)
 val db_closed : foterm -> bool                (** check whether the term is closed *)
 
 (** Does t contains the De Bruijn variable of index n? *)
