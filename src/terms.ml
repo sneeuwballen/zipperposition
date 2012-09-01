@@ -233,7 +233,10 @@ let rec pp_foterm formatter t =
   | Leaf s when s = db_symbol -> pp_db formatter t
   | Leaf s -> Format.pp_print_string formatter s
   | Var i -> Format.fprintf formatter "X%d" i
-  | Node _ -> failwith "bad term"
+  | Node (hd::tl) ->
+      Format.fprintf formatter "@[<h>(%a)(%a)@]" pp_foterm hd
+        (Utils.pp_list ~sep:", " pp_foterm) tl
+  | Node [] -> failwith "bad term"
 
 let rec pp_foterm_sort formatter ?(sort=false) t =
   if not sort then pp_foterm formatter t  (* not debugging... *)

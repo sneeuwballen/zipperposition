@@ -60,7 +60,7 @@ module FotermIndexable = struct
       | Node ([] | [ _ ] )
       (* FIXME : should this be allowed or not ? *)
       | Node ({node={term=Var _}}::_)
-      | Node ({node={term=Node _}}::_) -> assert false
+      | Node ({node={term=Node _}}::_) -> failwith (Utils.sprintf "linearizing %a failed." T.pp_foterm t)
       | Node (hd::tl) ->
           let acc = aux (List.length tl) hd acc in
           List.fold_left (fun acc t -> aux 0 t acc) acc tl
@@ -128,8 +128,9 @@ let process_lit op c tree (lit, pos) =
   | Equation (l,r,_,Invertible) ->
       let tmp_tree = op tree l (c, [C.left_pos; pos]) in
       op tmp_tree r (c, [C.right_pos; pos])
-  | Equation (l,r,_,Eq) -> failwith (Utils.sprintf "add %a=%a to index"
-                                     T.pp_foterm l T.pp_foterm r)
+  | Equation (l,r,_,Eq) ->
+    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index" T.pp_foterm l T.pp_foterm r));
+    op tree l (c, [C.left_pos; pos])  (* only index one side *)
 
 (** apply op to the maximal literals of the clause, and only to
     the maximal side(s) of those. *)
