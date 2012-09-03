@@ -23,4 +23,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 exception FOF of bool
 exception PARSE_ERROR
 
+type location = unit
+
+let first_pos () = 0
+let last_pos () = 0
+let make_loc _ = ()
 let cur_filename = ref ""
+

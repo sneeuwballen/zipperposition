@@ -586,12 +586,12 @@ let finally at_end f arg =
 
 (** {2 Localized exceptions } *)
 
-exception Localized of Stdpp.location * exn
+exception Localized of Const.location * exn
 
-let loc_of_floc floc = Stdpp.first_pos floc, Stdpp.last_pos floc
+let loc_of_floc floc = Const.first_pos floc, Const.last_pos floc
 
 let floc_of_loc (loc_begin, loc_end) =
- Stdpp.make_loc (loc_begin, loc_end)
+ Const.make_loc (loc_begin, loc_end)
 
 let dummy_floc = floc_of_loc (0, 0)
 

@@ -1,7 +1,9 @@
 Cache
+Calculus
 ClauseQueue
 Clauses
 Const
+Delayed
 Discrimination_tree
 FoSubst
 FoUnif
@@ -17,7 +19,6 @@ Parser_tptp
 ProofState
 Ptmap
 Saturate
-Stdpp
 Superposition
 Terms
 Trie

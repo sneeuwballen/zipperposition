@@ -146,14 +146,14 @@ val set_profiling_printings : (string -> bool) -> unit
 
 (** {2 Localized exceptions } *)
 
-exception Localized of Stdpp.location * exn
+exception Localized of Const.location * exn
 
-val loc_of_floc: Stdpp.location -> int * int
-val floc_of_loc: int * int -> Stdpp.location
+val loc_of_floc: Const.location -> int * int
+val floc_of_loc: int * int -> Const.location
 
-val dummy_floc: Stdpp.location
+val dummy_floc: Const.location
 
-val raise_localized_exception: offset:int -> Stdpp.location -> exn -> 'a
+val raise_localized_exception: offset:int -> Const.location -> exn -> 'a
 
 (* size in KB (SLOW) *)
 val estimate_size: 'a -> int

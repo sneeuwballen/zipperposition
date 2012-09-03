@@ -23,5 +23,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 exception FOF of bool
 exception PARSE_ERROR
 
+type location = unit
+
+val  first_pos : unit -> int
+val last_pos : unit -> int
+val make_loc : 'a -> unit
+
 (** name of the file being parsed *)
 val cur_filename : string ref
