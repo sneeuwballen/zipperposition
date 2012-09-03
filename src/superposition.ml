@@ -591,6 +591,8 @@ let orphan_murder set clause = set (* TODO *)
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
 let cnf_of ~ord clause =
+  (* unique counter for variable indexes *)
+  let varindex = ref 0 in
   (* convert literal to term (reify equality) *)
   let rec lit_to_term (Equation (l,r,sign,_)) =
     if T.eq_foterm l T.true_term then (if sign then r else T.mk_not r)
@@ -639,10 +641,10 @@ let cnf_of ~ord clause =
       let t' = T.mk_node (List.map nnf l) in
       if T.eq_foterm t t' then t' else nnf t'
   (* skolemization of existentials, removal of forall *)
-  and skolemize varindex t = match t.node.term with
+  and skolemize t = match t.node.term with
     | Var _ | Leaf _ -> t
     | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t]}}]
-      when s = not_symbol && s' = not_symbol -> skolemize varindex t (* double negation *)
+      when s = not_symbol && s' = not_symbol -> skolemize t (* double negation *)
     | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
       when s = forall_symbol ->
       assert (s' = lambda_symbol);
@@ -650,15 +652,15 @@ let cnf_of ~ord clause =
       let v = T.mk_var (!varindex) t.node.sort in
       incr varindex;
       let new_t' = T.db_unlift (T.db_replace t' v) in
-      skolemize varindex new_t' (* remove forall *)
+      skolemize new_t' (* remove forall *)
     | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
       when s = exists_symbol ->
       assert (s' = lambda_symbol);
       (* make a skolem symbol *)
       let sk = Calculus.skolem ord (T.vars_of_term t') t.node.sort in
       let new_t' = T.db_unlift (T.db_replace t' sk) in
-      skolemize varindex new_t' (* remove forall *)
-    | Node l -> T.mk_node (List.map (skolemize varindex) l)
+      skolemize new_t' (* remove forall *)
+    | Node l -> T.mk_node (List.map skolemize l)
   (* reduction to cnf using De Morgan. Returns a list of list of terms *)
   and to_cnf t =
     if t.node.sort <> bool_sort then [[t, true]]
@@ -694,7 +696,7 @@ let cnf_of ~ord clause =
       [clause] (* already cnf, perfect *)
     end else
       let nnf_lits = List.map (fun lit -> nnf (lit_to_term lit)) clause.clits in
-      let skolem_lits = List.map (fun t -> skolemize (ref 0) t) nnf_lits in
+      let skolem_lits = List.map (fun t -> skolemize t) nnf_lits in
       let clauses_of_lits = List.map to_cnf skolem_lits in
       (* list of list of literals, by or-product *)
       let lit_list_list = match clauses_of_lits with
@@ -747,7 +749,9 @@ let superposition : calculus =
         (fun acc c ->
           (* reduction to CNF *)
           let clauses = cnf_of ~ord c in
-          let clauses = List.map (C.clause_of_fof ~ord) clauses in
+          let clauses = List.map
+            (fun c -> C.reord_clause ~ord (C.clause_of_fof ~ord c))
+            clauses in
           List.rev_append clauses acc)
         [] l
   end
