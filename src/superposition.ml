@@ -590,7 +590,50 @@ let orphan_murder set clause = set (* TODO *)
  * ---------------------------------------------------------------------- *)
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
-let cnf_of ~ord clause = [clause]  (* TODO *)
+let cnf_of ~ord clause =
+  (* negation normal form *)
+  let rec nnf t = t  (* TODO *)
+  (* skolemization of existentials, removal of forall *)
+  and skolemize t = t  (* TODO *)
+  (* reduction to cnf using De Morgan. Returns a list of list of terms *)
+  and to_cnf t =
+    if t.node.sort <> bool_sort then [[t, true]]
+    else match t.node.term with
+    | Var _ | Leaf _ -> [[t, true]]
+    | Node [{node={term=Leaf s}}; a; b] when s = and_symbol ->
+      let ca = to_cnf a
+      and cb = to_cnf b in
+      List.rev_append ca cb
+    | Node [{node={term=Leaf s}}; a; b] when s = or_symbol ->
+      product (to_cnf a) (to_cnf b)
+    | _ -> [[t, true]]  (* TODO *)
+  (* cartesian product of lists of lists of terms *)
+  and product a b =
+    List.fold_left
+      (fun acc litsa -> List.fold_left
+        (fun acc litsb -> (litsa @ litsb) :: acc) acc b)
+      [] a
+  (* check whether the clause is already in CNF *)
+  and is_cnf c = true  (* TODO *)
+  in [] 
+  (*
+  if is_cnf clause
+    then [clause] (* already cnf, perfect *)
+    else
+      let nnf_lits = List.map nnf clause.clits in
+      let skolem_lits = List.map skolemize nnf_lits in
+      let clauses_of_lits = List.map to_cnf skolem_lits in
+      (* list of list of literals, by or-product *)
+      let lit_list_list = List.fold_left product [] clauses_of_lits in
+      (* build clauses from lits *)
+      List.map
+        (fun lits ->
+          C.mk_clause ~ord
+            (* make literals out of terms *)
+            (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
+            clause.cproof)
+        lit_list_list
+  TODO *)
 
 (* ----------------------------------------------------------------------
  * the Calculus object

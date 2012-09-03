@@ -58,5 +58,8 @@ val orphan_murder: ProofState.passive_set
                 -> clause   (** the clause whose orphans are to be deleted *)
                 -> ProofState.passive_set
 
+(** Transform the clause into proper CNF; returns a list of clauses *)
+val cnf_of : ord:ordering -> clause -> clause list
+
 (** The superposition calculus *)
 val superposition : Calculus.calculus
