@@ -609,7 +609,7 @@ let cnf_of ~ord clause =
       nnf (T.mk_and (T.mk_not a) (T.mk_not b)) (* de morgan *)
     | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol ->
       nnf (T.mk_or (T.mk_not a) b) (* (a => b) -> (not a or b) *)
-    | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol ->
+    | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && a.node.sort = bool_sort ->
       (* (a <=> b) -> (not a or b) and (not b or a) *)
       nnf (T.mk_and
         (T.mk_or (T.mk_not a) b)
@@ -618,7 +618,7 @@ let cnf_of ~ord clause =
       when s = not_symbol && s' = imply_symbol ->
       nnf (T.mk_and a (T.mk_not b)) (* not (a => b) -> (a and not b) *)
     | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
-      when s = not_symbol && s' = eq_symbol ->
+      when s = not_symbol && s' = eq_symbol && a.node.sort = bool_sort ->
       (* not (a <=> b) -> (a <=> (not b)) *)
       nnf (T.mk_or
         (T.mk_and a (T.mk_not b))
@@ -665,7 +665,7 @@ let cnf_of ~ord clause =
     else match t.node.term with
     | Var _ | Leaf _ -> [[t, true]]
     | Node [{node={term=Leaf s}}; t'] when s = not_symbol ->
-      assert (T.atomic_rec t');
+      assert (T.hd_symbol t' = Some eq_symbol || T.atomic_rec t');
       [[t', false]]
     | Node [{node={term=Leaf s}}; a; b] when s = and_symbol ->
       let ca = to_cnf a

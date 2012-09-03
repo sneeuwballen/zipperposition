@@ -142,7 +142,7 @@ let mk_not t = mk_apply not_symbol bool_sort [t]
 let mk_and a b = mk_apply and_symbol bool_sort [a; b]
 let mk_or a b = mk_apply or_symbol bool_sort [a; b]
 let mk_imply a b = mk_apply imply_symbol bool_sort [a; b]
-let mk_eq a b = mk_apply eq_symbol bool_sort [a; b]
+let mk_eq a b = (assert (a.node.sort = b.node.sort); mk_apply eq_symbol bool_sort [a; b])
 let mk_lambda t = mk_apply lambda_symbol t.node.sort [t]
 let mk_forall t = mk_apply forall_symbol bool_sort [mk_lambda t]
 let mk_exists t = mk_apply exists_symbol bool_sort [mk_lambda t]
