@@ -136,6 +136,17 @@ let hd_symbol t = match hd_term t with
 let true_term = mk_leaf true_symbol bool_sort
 let false_term = mk_leaf false_symbol bool_sort
 
+(* constructors for terms *)
+
+let mk_not t = mk_apply not_symbol bool_sort [t]
+let mk_and a b = mk_apply and_symbol bool_sort [a; b]
+let mk_or a b = mk_apply or_symbol bool_sort [a; b]
+let mk_imply a b = mk_apply imply_symbol bool_sort [a; b]
+let mk_eq a b = mk_apply eq_symbol bool_sort [a; b]
+let mk_lambda t = mk_apply lambda_symbol t.node.sort [t]
+let mk_forall t = mk_apply forall_symbol bool_sort [mk_lambda t]
+let mk_exists t = mk_apply exists_symbol bool_sort [mk_lambda t]
+
 let rec member_term a b = a == b || match b.node.term with
   | Leaf _ | Var _ -> false
   | Node subterms -> List.exists (member_term a) subterms
@@ -262,6 +273,14 @@ let rec atomic t = match t.node.term with
   | Var _ -> true
   | Node (hd::_) -> atomic hd
   | Node [] -> assert false
+
+(* check whether the term contains connectives or quantifiers *)
+let rec atomic_rec t = match t.node.term with
+  | Leaf s -> t.node.sort <> bool_sort || (not (s = and_symbol || s = or_symbol
+    || s = forall_symbol || s = exists_symbol || s = imply_symbol
+    || s = not_symbol || s = eq_symbol))
+  | Var _ -> true
+  | Node l -> List.for_all atomic_rec l
 
 (* check wether the term is closed w.r.t. De Bruijn variables *)
 let db_closed t = Lazy.force t.node.db_closed

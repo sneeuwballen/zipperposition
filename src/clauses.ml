@@ -244,7 +244,7 @@ let eq_clause c1 c2 =
 
 let pp_clause ?(sort=false) formatter c =
   let is_max_lit lit = List.exists (fun (lit',_) -> eq_literal lit lit') (Lazy.force c.cmaxlits) in
-  fprintf formatter "[%a]" (Utils.pp_list ~sep:" | "
+  fprintf formatter "@[<h>[%a]@]" (Utils.pp_list ~sep:" | "
     (fun formatter lit -> if is_max_lit lit
       then fprintf formatter "%a*" (pp_literal ~sort) lit
       else pp_literal formatter ~sort lit))

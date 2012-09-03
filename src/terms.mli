@@ -48,6 +48,15 @@ val hd_symbol : foterm -> symbol option       (** the head of the term *)
 val true_term : foterm                        (** tautology symbol *)
 val false_term : foterm                       (** antilogy symbol *)
 
+val mk_not : foterm -> foterm
+val mk_and : foterm -> foterm -> foterm
+val mk_or : foterm -> foterm -> foterm
+val mk_imply : foterm -> foterm -> foterm
+val mk_eq : foterm -> foterm -> foterm
+val mk_lambda : foterm -> foterm
+val mk_forall : foterm -> foterm
+val mk_exists : foterm -> foterm
+
 val member_term : foterm -> foterm -> bool    (** [a] [b] checks if a subterm of b *)
 val eq_foterm : foterm -> foterm -> bool      (** standard equality on terms *)
 val compare_foterm : foterm -> foterm -> int  (** a simple order on terms *)
@@ -66,7 +75,8 @@ val merge_varlist : varlist -> varlist -> varlist (** set union of variable list
 val max_var : varlist -> int                  (** find the maximum variable index *)
 val min_var : varlist -> int
 
-val atomic : foterm -> bool                   (** atomic proposition, or term *)
+val atomic : foterm -> bool                   (** atomic proposition, or term, at root *)
+val atomic_rec : foterm -> bool               (** does not contain connectives/quantifiers *)
 val db_closed : foterm -> bool                (** check whether the term is closed *)
 
 (** Does t contains the De Bruijn variable of index n? *)
