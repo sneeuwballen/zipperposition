@@ -591,49 +591,129 @@ let orphan_murder set clause = set (* TODO *)
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
 let cnf_of ~ord clause =
-  (* negation normal form *)
-  let rec nnf t = t  (* TODO *)
+  (* convert literal to term (reify equality) *)
+  let rec lit_to_term (Equation (l,r,sign,_)) =
+    if T.eq_foterm l T.true_term then (if sign then r else T.mk_not r)
+    else if T.eq_foterm r T.true_term then (if sign then l else T.mk_not l)
+    else (if sign then T.mk_eq l r else T.mk_not (T.mk_eq l r))
+  (* negation normal form (also remove equivalence and implications) *) 
+  and nnf t =
+    if t.node.sort <> bool_sort then t else
+    match t.node.term with
+    | Var _ | Leaf _ -> t
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+      when s = not_symbol && s' = and_symbol ->
+      nnf (T.mk_or (T.mk_not a) (T.mk_not b))  (* de morgan *)
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+      when s = not_symbol && s' = or_symbol ->
+      nnf (T.mk_and (T.mk_not a) (T.mk_not b)) (* de morgan *)
+    | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol ->
+      nnf (T.mk_or (T.mk_not a) b) (* (a => b) -> (not a or b) *)
+    | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol ->
+      (* (a <=> b) -> (not a or b) and (not b or a) *)
+      nnf (T.mk_and
+        (T.mk_or (T.mk_not a) b)
+        (T.mk_or (T.mk_not b) a))
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+      when s = not_symbol && s' = imply_symbol ->
+      nnf (T.mk_and a (T.mk_not b)) (* not (a => b) -> (a and not b) *)
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+      when s = not_symbol && s' = eq_symbol ->
+      (* not (a <=> b) -> (a <=> (not b)) *)
+      nnf (T.mk_or
+        (T.mk_and a (T.mk_not b))
+        (T.mk_and b (T.mk_not a)))
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}};
+        {node={term=Node [{node={term=Leaf s''}}; t']}}]}}]
+      when s = not_symbol && s' = forall_symbol ->
+      assert (s'' = lambda_symbol);
+      nnf (T.mk_exists (T.mk_not t')) (* not forall -> exists not *)
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}};
+        {node={term=Node [{node={term=Leaf s''}}; t']}}]}}]
+      when s = not_symbol && s' = exists_symbol ->
+      assert (s'' = lambda_symbol);
+      nnf (T.mk_forall (T.mk_not t')) (* not exists -> forall not *)
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t]}}]
+      when s = not_symbol && s' = not_symbol -> nnf t (* double negation *)
+    | Node l ->
+      let t' = T.mk_node (List.map nnf l) in
+      if T.eq_foterm t t' then t' else nnf t'
   (* skolemization of existentials, removal of forall *)
-  and skolemize t = t  (* TODO *)
+  and skolemize varindex t = match t.node.term with
+    | Var _ | Leaf _ -> t
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t]}}]
+      when s = not_symbol && s' = not_symbol -> skolemize varindex t (* double negation *)
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+      when s = forall_symbol ->
+      assert (s' = lambda_symbol);
+      (* a fresh variable *)
+      let v = T.mk_var (!varindex) t.node.sort in
+      incr varindex;
+      let new_t' = T.db_unlift (T.db_replace t' v) in
+      skolemize varindex new_t' (* remove forall *)
+    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+      when s = exists_symbol ->
+      assert (s' = lambda_symbol);
+      (* make a skolem symbol *)
+      let sk = Calculus.skolem ord (T.vars_of_term t') t.node.sort in
+      let new_t' = T.db_unlift (T.db_replace t' sk) in
+      skolemize varindex new_t' (* remove forall *)
+    | Node l -> T.mk_node (List.map (skolemize varindex) l)
   (* reduction to cnf using De Morgan. Returns a list of list of terms *)
   and to_cnf t =
     if t.node.sort <> bool_sort then [[t, true]]
     else match t.node.term with
     | Var _ | Leaf _ -> [[t, true]]
+    | Node [{node={term=Leaf s}}; t'] when s = not_symbol ->
+      assert (T.atomic_rec t');
+      [[t', false]]
     | Node [{node={term=Leaf s}}; a; b] when s = and_symbol ->
       let ca = to_cnf a
       and cb = to_cnf b in
       List.rev_append ca cb
     | Node [{node={term=Leaf s}}; a; b] when s = or_symbol ->
       product (to_cnf a) (to_cnf b)
-    | _ -> [[t, true]]  (* TODO *)
-  (* cartesian product of lists of lists of terms *)
+    | Node _ -> [[t, true]]
+  (* cartesian product of lists of lists *)
   and product a b =
     List.fold_left
       (fun acc litsa -> List.fold_left
-        (fun acc litsb -> (litsa @ litsb) :: acc) acc b)
+        (fun acc' litsb -> (litsa @ litsb) :: acc')
+        acc b)
       [] a
   (* check whether the clause is already in CNF *)
-  and is_cnf c = true  (* TODO *)
-  in [] 
-  (*
+  and is_cnf c =
+    List.for_all
+      (fun (Equation (l, r, sign, _)) -> T.atomic_rec l && T.atomic_rec r)
+      c.clits
+  in
   if is_cnf clause
-    then [clause] (* already cnf, perfect *)
-    else
-      let nnf_lits = List.map nnf clause.clits in
-      let skolem_lits = List.map skolemize nnf_lits in
+    then begin
+      Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf"
+                    (C.pp_clause ~sort:false) clause));
+      [clause] (* already cnf, perfect *)
+    end else
+      let nnf_lits = List.map (fun lit -> nnf (lit_to_term lit)) clause.clits in
+      let skolem_lits = List.map (fun t -> skolemize (ref 0) t) nnf_lits in
       let clauses_of_lits = List.map to_cnf skolem_lits in
       (* list of list of literals, by or-product *)
-      let lit_list_list = List.fold_left product [] clauses_of_lits in
+      let lit_list_list = match clauses_of_lits with
+        | [] -> assert false  (* is in cnf ;) *)
+        | hd::tl -> List.fold_left product hd tl in
       (* build clauses from lits *)
-      List.map
+      let clauses = List.map
         (fun lits ->
-          C.mk_clause ~ord
-            (* make literals out of terms *)
-            (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
-            clause.cproof)
+          C.clause_of_fof ~ord
+            (C.mk_clause ~ord
+              (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
+              clause.cproof))
         lit_list_list
-  TODO *)
+      in
+      Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"
+                    (C.pp_clause ~sort:false) clause
+                    (Utils.pp_list (C.pp_clause ~sort:false)) clauses));
+      List.iter (fun c -> assert (is_cnf c)) clauses;
+      clauses
 
 (* ----------------------------------------------------------------------
  * the Calculus object
@@ -666,8 +746,7 @@ let superposition : calculus =
         (fun acc c ->
           (* reduction to CNF *)
           let clauses = cnf_of ~ord c in
-          let clauses = List.map (fun c -> C.reord_clause ~ord
-            (C.clause_of_fof ~ord c)) clauses in
+          let clauses = List.map (C.clause_of_fof ~ord) clauses in
           List.rev_append clauses acc)
         [] l
   end
