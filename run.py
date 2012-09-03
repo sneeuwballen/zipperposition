@@ -32,16 +32,19 @@ def command(fun):
 provers = {
     'spass': "SPASS -TPTP -TimeLimit={time} -Memory=512000000 {file}",
     'zipperposition': "./prover3.sh {file} -timeout {time}",
+    'zipperposition-cnf': "./src/main.native {file} -timeout {time} -calculus superposition",
     'delayed': "./src/main.native {file} -timeout {time} -calculus delayed"
 }
 provers_unsat = {
     'spass': "proof found",
     'zipperposition': "SZS Status Theorem",
+    'zipperposition-cnf': "SZS Status Theorem",
     'delayed': "SZS Status Theorem"
 }
 provers_sat = {
     'spass': "completion found",
     'zipperposition': "SZS Status CounterSatisfiable",
+    'zipperposition-cnf': "SZS Status CounterSatisfiable",
     'delayed': "SZS Status CounterSatisfiable",
 }
 
