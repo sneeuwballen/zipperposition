@@ -701,12 +701,13 @@ let cnf_of ~ord clause =
         | [] -> assert false  (* is in cnf ;) *)
         | hd::tl -> List.fold_left product hd tl in
       (* build clauses from lits *)
+      let proof = lazy (Proof ("cnf_reduction", [clause, [], S.id_subst])) in
       let clauses = List.map
         (fun lits ->
           C.clause_of_fof ~ord
             (C.mk_clause ~ord
               (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
-              clause.cproof))
+              proof))
         lit_list_list
       in
       Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"
