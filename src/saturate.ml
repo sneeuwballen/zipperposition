@@ -62,7 +62,7 @@ let simplify ~calculus active_set clause =
   let c = calculus#basic_simplify ~ord c in
   (if not (C.eq_clause c old_c)
     then Utils.debug 2 (lazy (Utils.sprintf "clause @[<h>%a@] simplified into @[<h>%a@]"
-                      !C.pp_clause#pp old_c !C.pp_clause#pp c)));
+                        !C.pp_clause#pp old_c !C.pp_clause#pp c)));
   old_c, c
 
 (** generate all clauses from binary inferences *)

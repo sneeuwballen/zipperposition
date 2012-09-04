@@ -374,6 +374,8 @@ let pp_term_debug =
       | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
         when s = not_symbol && s' = eq_symbol ->
         Format.fprintf formatter "%a != %a" self#pp a self#pp b
+      | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol ->
+        Format.fprintf formatter "%a = %a" self#pp a self#pp b
       | Node [{node={term=Leaf s}} as hd; t] when s = not_symbol ->
         Format.fprintf formatter "%a%a" self#pp hd self#pp t
       | Node [{node={term=Leaf s}} as hd;

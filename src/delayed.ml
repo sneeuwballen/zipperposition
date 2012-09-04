@@ -219,7 +219,9 @@ let equivalence_elimination ~ord clause =
   in
   fold_lits ~both:true ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
-      if sign
+      if T.eq_foterm r T.true_term || T.eq_foterm r T.false_term
+      then acc
+      else if sign
         then (do_inferences_pos l r l_pos) @ acc
         else (do_inferences_neg l r l_pos) @ acc)
     [] (C.maxlits clause)
