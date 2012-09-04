@@ -2,3 +2,7 @@
 - make multiset comparison fast
 - improve efficiency of discrimination trees: either
     use compressed tries, or use some kind of patricia trees
+- find better heuristics for delayed superposition
+- output dedukti code (or even Coq code?)
+- cache skolem symbols
+- remove duplicates from debug printing
