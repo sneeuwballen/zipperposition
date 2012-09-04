@@ -502,8 +502,8 @@ let pp_clause_tstp =
       in
       (* print in an horizontal box, or not *)
       if !_horizontal
-        then fprintf formatter "@[<h>[%a]@]" lits_printer c.clits
-        else fprintf formatter "[%a]" lits_printer c.clits
+        then fprintf formatter "@[<h>%a@]" lits_printer c.clits
+        else fprintf formatter "%a" lits_printer c.clits
     inherit common_pp_clause
     method horizontal s = _horizontal := s
   end
