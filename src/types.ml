@@ -128,3 +128,9 @@ class type ordering =
   end
 
 exception UnificationFailure of string Lazy.t
+
+(** A pretty printer of 'a values *)
+class type ['a] pp_printer =
+  object
+    method pp : Format.formatter -> 'a -> unit
+  end

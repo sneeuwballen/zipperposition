@@ -146,9 +146,9 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   and s, t, sign_st = get_equations_sides active_clause active_pos in
   Utils.debug 3 (lazy (Utils.sprintf ("@[<h>sup @[<h>%a@] s=%a t=%a @[<h>%a@] " ^^
                                       "u=%a v=%a p=%a subst=%a@]")
-                       (C.pp_clause ~sort:false) active_clause T.pp_foterm s T.pp_foterm t
-                       (C.pp_clause ~sort:false) passive_clause T.pp_foterm u T.pp_foterm v
-                       C.pp_pos passive_pos (S.pp_substitution ~sort:false) subst));
+                       !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
+                       !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
+                       C.pp_pos passive_pos S.pp_substitution subst));
   assert ((Utils.list_inter T.eq_foterm active_clause.cvars passive_clause.cvars) = []);
   assert (T.db_closed s);
   if not sign_st 
@@ -183,7 +183,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                                         (passive_clause, passive_pos, subst)])) in
         let new_clause = C.mk_clause ~ord new_lits proof in
         Utils.debug 3 (lazy (Utils.sprintf "ok, conclusion @[<h>%a@]"
-                            (C.pp_clause ~sort:false) new_clause));
+                            !C.pp_clause#pp new_clause));
         new_clause :: acc
       end
   end
@@ -260,7 +260,7 @@ let infer_equality_resolution_ ~ord clause =
             let new_clause = C.mk_clause ~ord new_lits proof in
             Utils.debug 3 (lazy (Utils.sprintf
                           "equality resolution on @[<h>%a@] yields @[<h>%a@]"
-                          (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause));
+                          !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
             new_clause::acc
           else
             acc
@@ -315,7 +315,7 @@ let infer_equality_factoring_ ~ord clause =
         let new_clause = C.mk_clause ~ord new_lits proof in
         Utils.debug 3 (lazy (Utils.sprintf
                       "equality factoring on @[<h>%a@] yields @[<h>%a@]"
-                      (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause));
+                      !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
         [new_clause]
       else
         []
@@ -443,8 +443,7 @@ let is_tautology c =
       c.clits)
   in
   (if is_tauto then
-    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] is a tautology"
-                  (C.pp_clause ~sort:false) c)));
+    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] is a tautology" !C.pp_clause#pp c)));
   is_tauto
 
 let basic_simplify ~ord clause =
@@ -476,7 +475,7 @@ let basic_simplify ~ord clause =
   let new_clause = C.mk_clause ~ord new_lits clause.cproof in
   (if not (C.eq_clause new_clause clause) then
       (Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] basic_simplifies into @[<h>%a@]"
-      (C.pp_clause ~sort:false) clause (C.pp_clause ~sort:false) new_clause))));
+      !C.pp_clause#pp clause !C.pp_clause#pp new_clause))));
   new_clause
 
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
@@ -545,7 +544,7 @@ let subsumes_with a b =
   in
   (if res <> None then
     Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumes @[<h>%a@]"
-                  (C.pp_clause ~sort:false) a (C.pp_clause ~sort:false) b)));
+                  !C.pp_clause#pp a !C.pp_clause#pp b)));
   res
 
 let subsumes a b =
@@ -566,7 +565,7 @@ let subsumed_by_set_ set clause =
     false
   with Exit ->
     Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumed by active set"
-                         (C.pp_clause ~sort:false) clause));
+                         !C.pp_clause#pp clause));
     true
 
 let subsumed_by_set set clause =
@@ -691,8 +690,7 @@ let cnf_of ~ord clause =
   in
   if is_cnf clause
     then begin
-      Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf"
-                    (C.pp_clause ~sort:false) clause));
+      Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf" !C.pp_clause#pp clause));
       [clause] (* already cnf, perfect *)
     end else
       let nnf_lits = List.map (fun lit -> nnf (lit_to_term lit)) clause.clits in
@@ -713,8 +711,7 @@ let cnf_of ~ord clause =
         lit_list_list
       in
       Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"
-                    (C.pp_clause ~sort:false) clause
-                    (Utils.pp_list (C.pp_clause ~sort:false)) clauses));
+                    !C.pp_clause#pp clause (Utils.pp_list !C.pp_clause#pp) clauses));
       List.iter (fun c -> assert (is_cnf c)) clauses;
       clauses
 

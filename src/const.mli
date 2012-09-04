@@ -25,7 +25,7 @@ exception PARSE_ERROR
 
 type location = unit
 
-val  first_pos : unit -> int
+val first_pos : unit -> int
 val last_pos : unit -> int
 val make_loc : 'a -> unit
 

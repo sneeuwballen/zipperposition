@@ -62,7 +62,7 @@ let simplify ~calculus active_set clause =
   let c = calculus#basic_simplify ~ord c in
   (if not (C.eq_clause c old_c)
     then Utils.debug 2 (lazy (Utils.sprintf "clause @[<h>%a@] simplified into @[<h>%a@]"
-                      (C.pp_clause ~sort:false) old_c (C.pp_clause ~sort:false) c)));
+                      !C.pp_clause#pp old_c !C.pp_clause#pp c)));
   old_c, c
 
 (** generate all clauses from binary inferences *)
@@ -103,7 +103,7 @@ let given_clause_step ~calculus state =
     else begin
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
-                    (C.pp_clause ~sort:false) c));
+                    !C.pp_clause#pp c));
       (* an active set containing only the given clause *)
       let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
       (* find clauses that are subsumed by c in active_set *)
@@ -123,8 +123,7 @@ let given_clause_step ~calculus state =
               simplified_actives := simplified :: !simplified_actives;
               Utils.debug 2 (lazy (Utils.sprintf
                            "active clause @[<h>%a@] simplified into @[<h>%a@]"
-                           (C.pp_clause ~sort:false) original
-                           (C.pp_clause ~sort:false) simplified));
+                           !C.pp_clause#pp original !C.pp_clause#pp simplified));
               false
             end else true (* no change *)
         )
@@ -161,7 +160,7 @@ let given_clause_step ~calculus state =
       List.iter
         (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf
                                     "    inferred new clause @[<hov 3>%a@]"
-                                    (C.pp_clause ~sort:false) new_c))) new_clauses;
+                                    !C.pp_clause#pp new_c))) new_clauses;
       (* add new clauses (including simplified active clauses) to passive set
          TODO remove orphans of simplified active clauses *)
       let passive_set = PS.add_passives state.PS.passive_set new_clauses in

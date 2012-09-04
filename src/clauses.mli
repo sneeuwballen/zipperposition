@@ -48,6 +48,7 @@ val mk_neq : ord:ordering -> foterm -> foterm -> literal
 val mk_lit : ord:ordering -> foterm -> foterm -> bool -> literal
 val reord_lit : ord:ordering -> literal -> literal  (** recompute order *)
 val lit_of_fof : ord:ordering -> literal -> literal (** translate eq/not to literal *)
+val term_of_lit : literal -> foterm                 (** translate lit to term *)
 
 val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
 
@@ -130,16 +131,42 @@ val string_of_comparison : comparison -> string
 val string_of_pos : int -> string
 val string_of_direction : direction -> string
 
-val size_bag : bag -> int
-val pp_literal : ?sort:bool -> formatter -> literal -> unit
-val pp_clause : ?sort:bool -> formatter -> clause -> unit
+(** pretty printer for literals *)
+class type pprinter_literal =
+  object
+    method pp : Format.formatter -> literal -> unit     (** print literal *)
+  end
+
+val pp_literal : pprinter_literal                       (** use current term printer *)
+val pp_literal_debug : pprinter_literal                 (** use debug unicode syntax *)
+val pp_literal_tstp : pprinter_literal                  (** use TSTP syntax *)
+
 val pp_pos : formatter -> position -> unit
-val pp_clause_pos : formatter -> (clause * position) -> unit
-val pp_hclause : formatter -> hclause -> unit
-val pp_hclause_pos : formatter -> (hclause * position* foterm) -> unit
-val pp_bag: formatter -> bag -> unit
-val pp_proof: subst:bool -> formatter -> proof -> unit
-val pp_clause_proof : formatter -> clause -> unit   (** print clause and its proof *)
-val pp_proof_rec : formatter -> clause -> unit      (** also print premisses, recursively*)
-val pp_tstp_clause : formatter -> clause -> unit    (** print as TSTP clause *)
-val pp_tstp_proof : formatter -> clause -> unit     (** print the proof recursively in TSTP *)
+
+(** pretty printer for clauses *)
+class type pprinter_clause =
+  object
+    method pp : Format.formatter -> clause -> unit      (** print clause *)
+    method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
+    method pp_pos : Format.formatter -> (clause * position) -> unit
+    method pp_h_pos : Format.formatter -> (hclause * position * foterm) -> unit
+    method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
+    method horizontal : bool -> unit                    (** print in horizontal box? *)
+  end
+
+val pp_clause : pprinter_clause ref                     (** uses current term printer *)
+val pp_clause_tstp : pprinter_clause                    (** TSTP syntax *)
+val pp_clause_debug : pprinter_clause                   (** nice unicode syntax *)
+
+(** pretty printer for proofs *)
+class type pprinter_proof =
+  object
+    method pp : Format.formatter -> clause -> unit      (** pretty print proof from clause *)
+  end
+
+val pp_proof : pprinter_proof ref                       (** defaut printing of proofs *)
+val pp_proof_tstp : pprinter_proof
+val pp_proof_debug : pprinter_proof
+
+(** print the content of a bag *)
+val pp_bag : Format.formatter -> bag -> unit

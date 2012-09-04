@@ -60,7 +60,8 @@ module FotermIndexable = struct
       | Node ([] | [ _ ] )
       (* FIXME : should this be allowed or not ? *)
       | Node ({node={term=Var _}}::_)
-      | Node ({node={term=Node _}}::_) -> failwith (Utils.sprintf "linearizing %a failed." T.pp_foterm t)
+      | Node ({node={term=Node _}}::_) ->
+        failwith (Utils.sprintf "linearizing %a failed." !T.pp_term#pp t)
       | Node (hd::tl) ->
           let acc = aux (List.length tl) hd acc in
           List.fold_left (fun acc t -> aux 0 t acc) acc tl
@@ -87,7 +88,7 @@ module FotermIndexable = struct
   let string_of_path l =
     let str_of_elem = function
     | Variable -> "*"
-    | Constant (a, ar) -> Utils.on_buffer T.pp_symbol a
+    | Constant (a, ar) -> Utils.on_buffer !T.pp_symbol#pp a
     | _ -> "?"
     in String.concat "." (List.map str_of_elem l)
 end
@@ -129,7 +130,7 @@ let process_lit op c tree (lit, pos) =
       let tmp_tree = op tree l (c, [C.left_pos; pos]) in
       op tmp_tree r (c, [C.right_pos; pos])
   | Equation (l,r,_,Eq) ->
-    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index" T.pp_foterm l T.pp_foterm r));
+    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index" !T.pp_term#pp l !T.pp_term#pp r));
     op tree l (c, [C.left_pos; pos])  (* only index one side *)
 
 (** apply op to the maximal literals of the clause, and only to
@@ -195,7 +196,7 @@ let pp_index ?(all_clauses=false) formatter idx =
     then let l = ClauseSet.elements set in
     fprintf formatter "%s : @[<hov>%a@]@;"
       (FotermIndexable.string_of_path path)
-      (Utils.pp_list ~sep:", " C.pp_hclause_pos) l
+      (Utils.pp_list ~sep:", " !C.pp_clause#pp_h_pos) l
     else fprintf formatter "@[<h>%s : %d clauses/pos@]@;"
       (FotermIndexable.string_of_path path)
       (ClauseSet.cardinal set)

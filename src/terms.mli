@@ -24,8 +24,6 @@ open Types
 
 (** symbols that are symmetric (that is, order of arguments does not matter) *)
 val is_symmetric_symbol : symbol -> bool
-(** infix symbols *)
-val is_infix_symbol : symbol -> bool
 
 module H : Hashcons.S with type key = typed_term
 val terms : H.t
@@ -90,8 +88,34 @@ val db_make : int -> sort -> foterm
 val db_unlift : foterm -> foterm
 (** [db_from_var t v] replace v by a De Bruijn symbol in t *)
 val db_from_var : foterm -> foterm -> foterm
+(** index of the De Bruijn term *)
+val db_depth : foterm -> int
 
-val pp_symbol : Format.formatter -> symbol -> unit
-val pp_foterm: Format.formatter -> foterm -> unit
-val pp_foterm_sort : Format.formatter -> ?sort:bool -> foterm -> unit
-val pp_signature : Format.formatter -> symbol list -> unit
+(** type of a pretty printer for symbols *)
+class type pprinter_symbol =
+  object
+    method pp : Format.formatter -> symbol -> unit  (** pretty print a symbol *)
+    method infix : symbol -> bool                   (** which symbol is infix? *)
+  end
+
+val pp_symbol : pprinter_symbol ref                 (** default pp for symbols *)
+val pp_symbol_unicode : pprinter_symbol             (** print with unicode special symbols*)
+val pp_symbol_tstp : pprinter_symbol                (** tstp convention (raw) *)
+
+(** type of a pretty printer for terms *)
+class type pprinter_term =
+  object
+    method pp : Format.formatter -> foterm -> unit  (** pretty print a term *)
+  end
+
+val pp_term : pprinter_term ref                     (** current choice *)
+val pp_term_tstp : pprinter_term                    (** print term in TSTP syntax *)
+val pp_term_debug :                                 (** print term in a nice syntax *)
+  <
+    pp : Format.formatter  -> foterm -> unit;
+    sort : bool -> unit;                            (** print sorts of terms? *)
+    skip_lambdas : bool -> unit;                    (** print lambdas after quantifiers? *)
+    skip_db : bool -> unit;                         (** nice printing of De Bruijn terms *)
+  >
+
+val pp_signature : Format.formatter -> symbol list -> unit      (** print signature *)

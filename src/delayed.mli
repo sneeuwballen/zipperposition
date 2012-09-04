@@ -25,10 +25,6 @@ open Types
 (** check whether s is a binding symbol *)
 val is_binder_symbol : symbol -> bool
 
-(** nicer pretty printing *)
-val pp_foterm : Format.formatter -> foterm -> unit
-val pp_clause : Format.formatter -> clause -> unit
-
 (** Precedence constraint *)
 val symbol_constraint : ordering_constraint
 

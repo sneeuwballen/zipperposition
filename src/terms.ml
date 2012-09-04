@@ -200,71 +200,6 @@ let min_var vars =
   in
   aux max_int vars
 
-let pp_symbol formatter s = Format.pp_print_string formatter s
-
-  
-(* readable representation of a term *)
-let rec pp_foterm formatter t =
-  (* print a De Bruijn symbol *)
-  let rec pp_db formatter t =
-    let n = db_depth t in
-    Format.fprintf formatter "•%d" n
-  (* compute index of a De Bruijn symbol *)
-  and db_depth t = match t.node.term with
-  | Leaf s when s = db_symbol -> 0
-  | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> (db_depth t') + 1
-  | _ -> assert false
-  in
-  match t.node.term with
-  | Node [{node={term=Leaf s}} as hd; t] when s = not_symbol ->
-    Format.fprintf formatter "%a%a" pp_foterm hd pp_foterm t
-  | Node [{node={term=Leaf s}} as hd; {node={term=Node [{node={term=Leaf s'}}; t]}}]
-    when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol ->
-    Format.fprintf formatter "%a%a" pp_foterm hd pp_foterm t
-  | Node [{node={term=Leaf s}}; _] when s = succ_db_symbol ->
-    pp_db formatter t (* print de bruijn symbol *)
-  | Node (({node={term=Leaf s}} as head)::args) ->
-    (* general case for nodes *)
-    if is_infix_symbol s
-      then begin
-        match args with
-        | [l;r] -> Format.fprintf formatter "@[<h>(%a %a %a)@]" pp_foterm l
-            pp_foterm head pp_foterm r
-        | _ -> assert false (* infix and not binary? *)
-      end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_foterm head
-        (Utils.pp_list ~sep:", " pp_foterm) args
-  | Leaf s when s = not_symbol -> Format.pp_print_string formatter "•¬"
-  | Leaf s when s = eq_symbol -> Format.pp_print_string formatter "•="
-  | Leaf s when s = lambda_symbol -> Format.pp_print_string formatter "•λ"
-  | Leaf s when s = exists_symbol -> Format.pp_print_string formatter "•∃"
-  | Leaf s when s = forall_symbol -> Format.pp_print_string formatter "•∀"
-  | Leaf s when s = and_symbol -> Format.pp_print_string formatter "•&"
-  | Leaf s when s = or_symbol -> Format.pp_print_string formatter "•|"
-  | Leaf s when s = imply_symbol -> Format.pp_print_string formatter "•→"
-  | Leaf s when s = db_symbol -> pp_db formatter t
-  | Leaf s -> Format.pp_print_string formatter s
-  | Var i -> Format.fprintf formatter "X%d" i
-  | Node (hd::tl) ->
-      Format.fprintf formatter "@[<h>(%a)(%a)@]" pp_foterm hd
-        (Utils.pp_list ~sep:", " pp_foterm) tl
-  | Node [] -> failwith "bad term"
-
-let rec pp_foterm_sort formatter ?(sort=false) t =
-  if not sort then pp_foterm formatter t  (* not debugging... *)
-  else
-  (match t.node.term with
-  | Leaf x -> pp_symbol formatter x
-  | Var i -> Format.fprintf formatter "X%d" i
-  | Node (head::args) -> Format.fprintf formatter
-      "@[<h>%a(%a)@]" (pp_foterm_sort ~sort:false) head
-      (Utils.pp_list ~sep:", " (pp_foterm_sort ~sort)) args
-  | Node [] -> failwith "bad term");
-  if sort then Format.fprintf formatter ":%s" t.node.sort else ()
-
-
-let pp_signature formatter symbols =
-  Format.fprintf formatter "@[<h>sig %a@]" (Utils.pp_list ~sep:" > " pp_symbol) symbols
-
 (* check whether the term is a term or an atomic proposition *)
 let rec atomic t = match t.node.term with
   | Leaf s -> t.node.sort <> bool_sort || (not (s = and_symbol || s = or_symbol
@@ -321,7 +256,6 @@ let rec db_make n sort = match n with
 
 (* unlift the term (decrement indices of all De Bruijn variables inside *)
 let db_unlift t =
-  Utils.debug 4 (lazy (Utils.sprintf "  db_unlift @[<h>%a@]" pp_foterm t));
   (* int indice of this DB term *)
   let rec db_index t = match t.node.term with
     | Leaf s when s = db_symbol -> 0
@@ -352,3 +286,164 @@ let db_from_var t v =
   (* make De Bruijn index of given index *)
   in
   replace_and_lift 0 t
+
+(* index of the De Bruijn symbol *) 
+let rec db_depth t = match t.node.term with
+  | Leaf s when s = db_symbol -> 0
+  | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> (db_depth t') + 1
+  | _ -> failwith "not a proper De Bruijn term"
+
+(** type of a pretty printer for symbols *)
+class type pprinter_symbol =
+  object
+    method pp : Format.formatter -> symbol -> unit    (** pretty print a symbol *)
+    method infix : symbol -> bool                     (** which symbol is infix? *)
+  end
+
+let pp_symbol_unicode =
+  object
+    method pp formatter s = match s with
+      | _ when s = not_symbol -> Format.pp_print_string formatter "•¬"
+      | _ when s = eq_symbol -> Format.pp_print_string formatter "•="
+      | _ when s = lambda_symbol -> Format.pp_print_string formatter "•λ"
+      | _ when s = exists_symbol -> Format.pp_print_string formatter "•∃"
+      | _ when s = forall_symbol -> Format.pp_print_string formatter "•∀"
+      | _ when s = and_symbol -> Format.pp_print_string formatter "•&"
+      | _ when s = or_symbol -> Format.pp_print_string formatter "•|"
+      | _ when s = imply_symbol -> Format.pp_print_string formatter "•→"
+      | _ when s = db_symbol -> Format.pp_print_string formatter "•0"
+      | _ when s = succ_db_symbol -> Format.pp_print_string formatter "•s"
+      | _ -> Format.pp_print_string formatter s (* default *)
+    method infix s = s = or_symbol || s = eq_symbol || s = and_symbol || s = imply_symbol
+  end
+
+let pp_symbol_tstp =
+  object
+    method pp formatter s = match s with
+      | _ when s = not_symbol -> Format.pp_print_string formatter "~"
+      | _ when s = eq_symbol -> Format.pp_print_string formatter "="
+      | _ when s = lambda_symbol -> failwith "no lambdas in TSTP"
+      | _ when s = exists_symbol -> Format.pp_print_string formatter "?"
+      | _ when s = forall_symbol -> Format.pp_print_string formatter "!"
+      | _ when s = and_symbol -> Format.pp_print_string formatter "&"
+      | _ when s = or_symbol -> Format.pp_print_string formatter "|"
+      | _ when s = imply_symbol -> Format.pp_print_string formatter "=>"
+      | _ when s = db_symbol -> failwith "no DB symbols in TSTP"
+      | _ when s = succ_db_symbol -> failwith "no DB symbols in TSTP"
+      | _ -> Format.pp_print_string formatter s (* default *)
+    method infix s = s = or_symbol || s = eq_symbol || s = and_symbol || s = imply_symbol
+  end
+
+let pp_symbol = ref pp_symbol_unicode
+
+(** type of a pretty printer for terms *)
+class type pprinter_term =
+  object
+    method pp : Format.formatter -> foterm -> unit    (** pretty print a term *)
+  end
+
+let pp_term_debug =
+  (* print a De Bruijn term as nice unicode *)
+  let rec pp_db formatter t =
+    let n = db_depth t in
+    Format.fprintf formatter "•%d" n in
+  let _sort = ref false
+  and _skip_lambdas = ref true
+  and _skip_db = ref true in
+  (* printer itself *)
+  object (self)
+    method pp formatter t =
+      (match t.node.term with
+      | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+        when s = not_symbol && s' = eq_symbol ->
+        Format.fprintf formatter "%a != %a" self#pp a self#pp b
+      | Node [{node={term=Leaf s}} as hd; t] when s = not_symbol ->
+        Format.fprintf formatter "%a%a" self#pp hd self#pp t
+      | Node [{node={term=Leaf s}} as hd;
+        {node={term=Node [{node={term=Leaf s'}} as hd'; t']}}]
+        when (s = forall_symbol || s = exists_symbol) ->
+        assert (s' = lambda_symbol);
+        if !_skip_lambdas
+          then Format.fprintf formatter "%a%a" self#pp hd self#pp t'
+          else Format.fprintf formatter "%a%a%a" self#pp hd self#pp hd' self#pp t'
+      | Node [{node={term=Leaf s}}; _] when s = succ_db_symbol && !_skip_db ->
+        pp_db formatter t (* print de bruijn symbol *)
+      | Node (({node={term=Leaf s}} as head)::args) ->
+        (* general case for nodes *)
+        if pp_symbol_unicode#infix s
+          then begin
+            match args with
+            | [l;r] -> Format.fprintf formatter "@[<h>(%a %a %a)@]"
+                self#pp l self#pp head self#pp r
+            | _ -> assert false (* infix and not binary? *)
+          end else Format.fprintf formatter "@[<h>%a(%a)@]" self#pp head
+            (Utils.pp_list ~sep:", " self#pp) args
+      | Leaf s -> pp_symbol_unicode#pp formatter s
+      | Var i -> Format.fprintf formatter "X%d" i
+      | Node (hd::tl) ->
+          Format.fprintf formatter "@[<h>(%a)(%a)@]" self#pp hd
+            (Utils.pp_list ~sep:", " self#pp ) tl
+      | Node [] -> failwith "bad term");
+      (* also print the sort if needed *)
+      if !_sort then Format.fprintf formatter ":%s" t.node.sort else ()
+    method sort s = _sort := s
+    method skip_lambdas s = _skip_lambdas := s
+    method skip_db s = _skip_db := s
+  end
+
+let pp_term_tstp =
+  object (self)
+    method pp formatter t =
+      (* convert De Bruijn to regular variables *)
+      let rec db_to_var varindex t = match t.node.term with
+      | Node [{node={term=Leaf s}} as hd; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+        when (s = forall_symbol || s = exists_symbol) ->
+        (* use a fresh variable, and convert to a named-variable representation *)
+        let v = mk_var !varindex t'.node.sort in
+        incr varindex;
+        db_to_var varindex (mk_node [hd; v; db_unlift (db_replace t' v)])
+      | Leaf _ | Var _  -> t
+      | Node l -> mk_node (List.map (db_to_var varindex) l)
+      (* recursive printing function *)
+      and pp_rec t = match t.node.term with
+      | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+        when s = not_symbol && s' = eq_symbol ->
+        Format.fprintf formatter "%a != %a" self#pp a self#pp b
+      | Node [{node={term=Leaf s}} as hd; t] when s = not_symbol ->
+        Format.fprintf formatter "%a%a" self#pp hd self#pp t
+      | Node [{node={term=Leaf s}} as hd; v; t']
+        when (s = forall_symbol || s = exists_symbol) ->
+        assert (is_var v);
+        Format.fprintf formatter "%a[%a]: %a" self#pp hd self#pp v self#pp t'
+      | Node [{node={term=Leaf s}}; _] when s = succ_db_symbol ->
+        failwith "De Bruijn symbol in term, cannot be printed in TSTP"
+      | Leaf s when s = db_symbol ->
+        failwith "De Bruijn symbol in term, cannot be printed in TSTP"
+      | Node (({node={term=Leaf s}} as head)::args) ->
+        (* general case for nodes *)
+        if pp_symbol_tstp#infix s
+          then begin
+            match args with
+            | [l;r] -> Format.fprintf formatter "@[<h>(%a %a %a)@]"
+                self#pp l self#pp head self#pp r
+            | _ -> assert false (* infix and not binary? *)
+          end else Format.fprintf formatter "@[<h>%a(%a)@]" self#pp head
+            (Utils.pp_list ~sep:", " self#pp) args
+      | Leaf s -> pp_symbol_tstp#pp formatter s
+      | Var i -> Format.fprintf formatter "X%d" i
+      | Node (hd::tl) ->
+          Format.fprintf formatter "@[<h>(%a)(%a)@]" self#pp hd
+            (Utils.pp_list ~sep:", " self#pp ) tl
+      | Node [] -> failwith "bad term";
+      in
+      let maxvar = max_var (vars_of_term t) in
+      let varindex = ref (maxvar+1) in
+      (* convert everything to named variables, then print *)
+      pp_rec (db_to_var varindex t)
+  end
+
+let pp_term = ref (pp_term_debug :> pprinter_term)
+
+let pp_signature formatter symbols =
+  Format.fprintf formatter "@[<h>sig %a@]"
+    (Utils.pp_list ~sep:" > " !pp_symbol#pp) symbols

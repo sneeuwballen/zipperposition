@@ -57,4 +57,4 @@ val fresh_foterm : int -> foterm -> foterm      (** fresh term, with all variabl
 val relocate_term : varlist -> foterm -> foterm (** rename the term so that
                                                     it has no variable in varlist *)
 
-val pp_substitution: Format.formatter -> ?sort:bool -> substitution -> unit
+val pp_substitution : Format.formatter -> substitution -> unit

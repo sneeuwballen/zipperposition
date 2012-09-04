@@ -40,38 +40,6 @@ let left_pos = 1
 
 let right_pos = 2
 
-let string_of_pos s = match s with
-  | _ when s == left_pos -> "left"
-  | _ when s == right_pos -> "right"
-  | _ -> assert false
-
-let string_of_direction = function
-    | Left2Right -> "Left to right"
-    | Right2Left -> "Right to left"
-    | Nodir -> "No direction"
-
-let string_of_comparison = function
-  | Lt -> "=<="
-  | Gt -> "=>="
-  | Eq -> "==="
-  | Incomparable -> "=?="
-  | Invertible -> "=<->="
-
-let pp_literal ?(sort=false) formatter lit =
-  let pp_foterm = T.pp_foterm_sort ~sort in
-  match lit with
-  | Equation (left, right, false, _) when T.eq_foterm right T.true_term ->
-    fprintf formatter "~%a" pp_foterm left
-  | Equation (left, right, true, _) when T.eq_foterm right T.true_term ->
-    pp_foterm formatter left
-  | Equation (left, right, true, _) when T.eq_foterm left T.true_term ->
-    pp_foterm formatter right
-  | Equation (left, right, false, _) when T.eq_foterm left T.true_term ->
-    fprintf formatter "~%a" pp_foterm right
-  | Equation (left, right, sign, ord) ->
-    let conn = if sign then "=" else "!=" in
-    fprintf formatter "@[<h>%a@ %s@ %a@]" pp_foterm left conn pp_foterm right
-
 let opposite_pos p = match p with
   | _ when p = left_pos -> right_pos
   | _ when p = right_pos -> left_pos
@@ -182,11 +150,9 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
     and new_r = S.apply_subst ~recursive subst r
     in
     Utils.debug 4 (lazy (Utils.sprintf "apply %a to %a gives %a"
-        (S.pp_substitution ~sort:true) subst
-        (T.pp_foterm_sort ~sort:true) l (T.pp_foterm_sort ~sort:true) new_l));
+        S.pp_substitution subst !T.pp_term#pp l !T.pp_term#pp new_l));
     Utils.debug 4 (lazy (Utils.sprintf "apply %a to %a gives %a"
-        (S.pp_substitution ~sort:true) subst
-        (T.pp_foterm_sort ~sort:true) r (T.pp_foterm_sort ~sort:true) new_r));
+        S.pp_substitution subst !T.pp_term#pp r !T.pp_term#pp new_r));
     mk_lit ~ord new_l new_r sign
 
 let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
@@ -220,6 +186,19 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
   (* default is just reordering *)
   | _ -> reord_lit ~ord lit
 
+let term_of_lit lit =
+  match lit with
+  | Equation (left, right, false, _) when T.eq_foterm right T.true_term ->
+    T.mk_not left
+  | Equation (left, right, true, _) when T.eq_foterm right T.true_term ->
+    left
+  | Equation (left, right, true, _) when T.eq_foterm left T.true_term ->
+    right
+  | Equation (left, right, false, _) when T.eq_foterm left T.true_term ->
+    T.mk_not right
+  | Equation (left, right, sign, ord) ->
+    if sign then T.mk_eq left right else T.mk_not (T.mk_eq left right)
+
 let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
 
 let fmap_lit ~ord f = function
@@ -241,14 +220,6 @@ let eq_clause c1 c2 =
     List.for_all2 eq_literal c1.clits c2.clits
   with
     Invalid_argument _ -> false
-
-let pp_clause ?(sort=false) formatter c =
-  let is_max_lit lit = List.exists (fun (lit',_) -> eq_literal lit lit') (Lazy.force c.cmaxlits) in
-  fprintf formatter "@[<h>[%a]@]" (Utils.pp_list ~sep:" | "
-    (fun formatter lit -> if is_max_lit lit
-      then fprintf formatter "%a*" (pp_literal ~sort) lit
-      else pp_literal formatter ~sort lit))
-    c.clits
 
 let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
@@ -283,8 +254,6 @@ let check_maximal_lit_ ~ord clause pos subst =
           match compare_lits_partial ~ord slit slit' with
           | Eq | Gt | Invertible | Incomparable -> true
           | Lt -> begin
-            Utils.debug 3 (lazy (Utils.sprintf "%a < %a" (pp_literal ~sort:false) slit
-                                 (pp_literal ~sort:false) slit'));
             false  (* slit is not maximal *)
           end
     )
@@ -356,8 +325,6 @@ let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
   let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
-  Utils.debug 4 (lazy (Utils.sprintf "  @[<h>relocate %a using %a@]"
-                      (pp_clause ~sort:true) c (S.pp_substitution ~sort:true) subst));
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 
 let relocate_clause ~ord varlist c =
@@ -422,139 +389,210 @@ let size_bag bag =
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
+let string_of_pos s = match s with
+  | _ when s == left_pos -> "left"
+  | _ when s == right_pos -> "right"
+  | _ -> assert false
+
+let string_of_direction = function
+    | Left2Right -> "Left to right"
+    | Right2Left -> "Right to left"
+    | Nodir -> "No direction"
+
+let string_of_comparison = function
+  | Lt -> "=<="
+  | Gt -> "=>="
+  | Eq -> "==="
+  | Incomparable -> "=?="
+  | Invertible -> "=<->="
+
+(** pretty printer for literals *)
+class type pprinter_literal =
+  object
+    method pp : Format.formatter -> literal -> unit     (** print literal *)
+  end
+
+let pp_literal_gen pp_term formatter lit =
+  pp_term#pp formatter (term_of_lit lit)
+
+let pp_literal_debug =
+  object
+    method pp formatter lit = pp_literal_gen T.pp_term_debug formatter lit
+  end
+
+let pp_literal_tstp =
+  object
+    method pp formatter lit = pp_literal_gen T.pp_term_tstp formatter lit
+  end
+
+let pp_literal =
+  object
+    method pp formatter lit = pp_literal_gen !T.pp_term formatter lit
+  end
+
 let pp_pos formatter pos =
   fprintf formatter "@[<h>%a@]" (Utils.pp_list ~sep:"." pp_print_int) pos
 
-let pp_clause_pos formatter (c, pos) =
-  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]"
-    (pp_clause ~sort:false) c pp_pos pos
+(** pretty printer for clauses *)
+class type pprinter_clause =
+  object
+    method pp : Format.formatter -> clause -> unit      (** print clause *)
+    method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
+    method pp_pos : Format.formatter -> (clause * position) -> unit
+    method pp_h_pos : Format.formatter -> (hclause * position * foterm) -> unit
+    method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
+    method horizontal : bool -> unit                    (** print in horizontal box? *)
+  end
 
-let pp_hclause formatter c =
-  fprintf formatter "@[<h>[%a]_%d@]" (pp_clause ~sort:false) c.node c.tag
+(** factor some code for classes *)
+class virtual common_pp_clause =
+  object (self)
+    method virtual pp : Format.formatter -> clause -> unit
+    method pp_h formatter hc = self#pp formatter hc.node
+    method pp_pos formatter (c, pos) =
+      Format.fprintf formatter "@[<h>[%a at %a]@]" self#pp c pp_pos pos
+    method pp_h_pos formatter (hc, pos, t) =
+      Format.fprintf formatter "@[<h>[%a at %a with %a]@]"
+        self#pp_h hc pp_pos pos !T.pp_term#pp t
+    method pp_pos_subst formatter (c, pos, subst) =
+      Format.fprintf formatter "@[<h>[%a at %a with %a]@]"
+        self#pp c pp_pos pos S.pp_substitution subst
+  end
 
-let pp_hclause_pos formatter (c, pos, _) =
-  fprintf formatter "@[<h>[%a at @[<h>%a@]]@]" pp_hclause c pp_pos pos
+let pp_clause_debug =
+  let _horizontal = ref true in
+  object (self)
+    method pp formatter c =
+      let is_max_lit lit = List.exists (fun (lit',_) -> eq_literal lit lit') (maxlits c) in
+      (* how to print the list of literals *)
+      let lits_printer formatter lits =
+        Utils.pp_list ~sep:" | "
+          (fun formatter lit -> if is_max_lit lit
+            then fprintf formatter "%a*" pp_literal_debug#pp lit
+            else pp_literal_debug#pp formatter lit)
+          formatter lits
+      in
+      (* print in an horizontal box, or not *)
+      if !_horizontal
+        then fprintf formatter "@[<h>[%a]@]" lits_printer c.clits
+        else fprintf formatter "[%a]" lits_printer c.clits
+    inherit common_pp_clause
+    method horizontal s = _horizontal := s
+  end
 
+let pp_clause_tstp =
+  let _horizontal = ref true in
+  object (self)
+    method pp formatter c =
+      (* how to print the list of literals *)
+      let lits_printer formatter lits =
+        (* convert into a big term *)
+        let t = match lits with
+          | [] -> T.false_term
+          | hd::tl -> List.fold_left
+            (fun t lit -> T.mk_or t (term_of_lit lit)) (term_of_lit hd) tl
+        in
+        (* quantify all free variables *)
+        let vars = T.vars_of_term t in
+        let t = List.fold_left
+          (fun t var -> T.mk_node [T.mk_leaf forall_symbol bool_sort; var; t])
+          t vars
+        in
+        T.pp_term_tstp#pp formatter t
+      in
+      (* print in an horizontal box, or not *)
+      if !_horizontal
+        then fprintf formatter "@[<h>[%a]@]" lits_printer c.clits
+        else fprintf formatter "[%a]" lits_printer c.clits
+    inherit common_pp_clause
+    method horizontal s = _horizontal := s
+  end
+
+let pp_clause = ref pp_clause_debug
+
+(** pretty printer for proofs *)
+class type pprinter_proof =
+  object
+    method pp : Format.formatter -> clause -> unit      (** pretty print proof from clause *)
+  end
+
+let pp_proof_debug =
+  object (self)
+    method pp formatter clause =
+      let printed = ref Hset.empty in
+      (* recursive printing of clause and premises *)
+      let rec print_rec c =
+        let hc = hashcons_clause c in
+        if Hset.mem hc !printed then ()
+        else begin
+          printed := Hset.add hc !printed;
+          match Lazy.force clause.cproof with
+          | Axiom (f, s) ->
+              fprintf formatter "@[<h>%a <--- @[<h>axiom %s in %s@]@]@;"
+                !pp_clause#pp clause s f
+          | Proof (rule, premises) ->
+              (* print the proof step *)
+              fprintf formatter "@[<h>%a <--- @[<h>%s with @[<hv>%a@]@]@]@;"
+                !pp_clause#pp clause rule
+                (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
+              (* print premises recursively *)
+              List.iter
+                (fun (c, _, _) -> self#pp formatter c)
+                premises
+        end
+      in print_rec clause
+  end
+
+let pp_proof_tstp =
+  object (self)
+    method pp formatter clause =
+      assert (clause.clits = []);
+      (* already_printed is a set of clauses already printed. *)
+      let already_printed = ref Hset.empty
+      and clause_num = ref Ptmap.empty
+      and counter = ref 1
+      and to_print = Queue.create () in
+      (* c -> hashconsed c, unique number for c *)
+      let get_num clause = 
+        let hc = hashcons_clause clause in
+        try hc, Ptmap.find hc.tag !clause_num
+        with Not_found ->
+          clause_num := Ptmap.add hc.tag !counter !clause_num;
+          incr counter;
+          hc, Ptmap.find hc.tag !clause_num
+      in
+      (* initialize queue *)
+      let hc, num = get_num clause in
+      Queue.add (hc, num) to_print; 
+      (* print every clause in the queue, if not already printed *)
+      while not (Queue.is_empty to_print) do
+        let hc, num = Queue.take to_print in
+        if Hset.mem hc !already_printed then ()
+        else begin
+          already_printed := Hset.add hc !already_printed;
+          match Lazy.force hc.node.cproof with
+          | Axiom (f, ax_name) ->
+            fprintf formatter "@[<h>fof(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
+              num pp_clause_tstp#pp hc.node f ax_name
+          | Proof (name, premises) ->
+            let premises = List.map (fun (c,_,_) -> get_num c) premises in
+            (* print the inference *)
+            fprintf formatter ("@[<h>fof(%d, derived, %a,@ " ^^
+                               "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
+              num pp_clause_tstp#pp hc.node name
+              (Utils.pp_list ~sep:"," pp_print_int) (List.map snd premises);
+            (* print every premise *)
+            List.iter (fun (c,num) -> Queue.add (hc, num) to_print) premises
+        end
+      done
+  end
+
+let pp_proof = ref pp_proof_debug
+
+(** print the content of a bag *)
 let pp_bag formatter bag =
-  fprintf formatter "@[<v>";
-  M.iter
-    (fun _ hc -> fprintf formatter "@[<h>%a@]@;" (pp_clause ~sort:false) hc.node)
-    bag.bag_clauses;
-  fprintf formatter "@]"
-
-let pp_clause_pos_subst formatter (c, pos, subst) =
-  fprintf formatter "@[<h>[%a at @[<h>%a@] with %a]@]"
-    (pp_clause ~sort:false) c pp_pos pos
-    (S.pp_substitution ~sort:false) subst
-
-let pp_proof ~subst formatter p =
-  match p with
-  | Axiom (f, s) -> fprintf formatter "axiom %s in %s" s f
-  | Proof (rule, premises) ->
-    if subst
-    then
-      fprintf formatter "%s with@ %a" rule
-        (Utils.pp_list ~sep:", " pp_clause_pos_subst)
-        premises
-    else
-      fprintf formatter "%s with@ %a" rule
-        (Utils.pp_list ~sep:", " pp_clause_pos)
-        (List.map (fun (c, pos, subst) -> (c, pos)) premises)
-
-let pp_clause_proof formatter clause =
-  fprintf formatter "@[<hov 2>%a  <--- @[<hv>%a@]@]@;"
-    (pp_clause ~sort:false) clause (pp_proof ~subst:true) (Lazy.force clause.cproof)
-
-let rec pp_proof_rec formatter clause =
-  pp_clause_proof formatter clause;
-  match Lazy.force clause.cproof with
-  | Axiom _ -> ()
-  | Proof (_, premises) ->
-      (* print premises recursively *)
-      List.iter
-        (fun (c, pos, subst) -> pp_proof_rec formatter c)
-        premises
-
-let pp_tstp_clause formatter clause =
-  match clause.clits with
-  | [] -> pp_print_string formatter "$false"
-  | _ ->
-    fprintf formatter "@[<h>(%a)@]"
-      (Utils.pp_list ~sep:" | " (pp_literal ~sort:false)) clause.clits
-
-let pp_tstp_proof formatter clause =
-  (* already_printed is a set of clauses already printed. *)
-  let already_printed = ref Hset.empty
-  and clause_num = ref Ptmap.empty
-  and counter = ref 1 in
-  (* get counter for hashconsed clause *)
-  let get_num clause = 
-    let hc = hashcons_clause clause in
-    try hc, Ptmap.find hc.tag !clause_num
-    with Not_found ->
-      clause_num := Ptmap.add hc.tag !counter !clause_num;
-      incr counter;
-      hc, Ptmap.find hc.tag !clause_num
-  in
-  (* function to recurse in the clause's premises to print them, but only once per clause. *)
-  let rec recurse hc =
-    (* check if the clause has already been printed *)
-    if Hset.mem hc !already_printed then () else begin
-    already_printed := Hset.add hc !already_printed;
-    assert (Ptmap.mem hc.tag !clause_num);
-    let num = Ptmap.find hc.tag !clause_num in
-    match Lazy.force hc.node.cproof with
-    | Axiom (f, ax_name) ->
-      fprintf formatter "@[<h>cnf(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
-        num pp_tstp_clause hc.node f ax_name
-    | Proof (name, premises) ->
-      let premises = List.map (fun (c,_,_) -> get_num c) premises in
-      (* print the inference *)
-      fprintf formatter ("@[<h>cnf(%d, derived, %a,@ " ^^
-                         "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
-        num pp_tstp_clause hc.node name
-        (Utils.pp_list ~sep:"," pp_print_int) (List.map snd premises);
-      (* print every premise *)
-      List.iter (fun (c,num) -> recurse c) premises
-    end
-  in
-  let hc, _ = get_num clause in recurse hc
-
-(*
-(* may be moved inside the bag *)
-let mk_unit_clause maxvar ty proofterm =
-  let varlist =
-    let rec aux acc = function
-      | T.Leaf _ -> acc
-      | T.Var i -> if List.mem i acc then acc else i::acc
-      | T.Node l -> List.fold_left aux acc l 
-    in
-     aux (aux [] ty) proofterm
-  in
-  let lit = 
-    match B.is_eq ty with
-    | Some(ty,l,r) ->
-         let o = Order.compare_terms l r in
-         T.Equation (l, r, ty, o)
-    | None -> T.Predicate ty
-  in
-  let proof = T.Exact proofterm in
-  fresh_unit_clause maxvar (0, lit, varlist, proof)
-
-
-let mk_passive_clause cl =
-  (Order.compute_unit_clause_weight cl, cl)
-
-
-let mk_passive_goal g =
-  (Order.compute_unit_clause_weight g, g)
-*)
-
-(*
-let compare_passive_clauses_weight (w1,(id1,_,_,_)) (w2,(id2,_,_,_)) =
-  if w1 = w2 then id1 - id2
-  else w1 - w2
-
-let compare_passive_clauses_age (_,(id1,_,_,_)) (_,(id2,_,_,_)) =
-  id1 - id2
-*)
+  let clauses = ref [] in
+  (* collect clauses in the list by iterating on the map *)
+  M.iter (fun _ hc -> clauses := hc :: !clauses) bag.bag_clauses;
+  (* print as a list of clauses *)
+  fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) !clauses

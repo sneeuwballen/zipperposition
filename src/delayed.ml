@@ -41,45 +41,6 @@ let check_sym t s = match t.node.term with
   | Node _ -> false
   | Leaf s' -> s = s'
 
-let rec pp_foterm formatter t = match t.node.term with
-  | Node (({node={term=Leaf s}} as head)::args) ->
-    (* general case for nodes *)
-    if T.is_infix_symbol s
-      then begin
-        match args with
-        | [l;r] -> Format.fprintf formatter "@[<h>%a %a %a@]" pp_foterm l
-            pp_foterm head pp_foterm r
-        | _ -> assert false (* infix and not binary? *)
-      end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_foterm head
-        (Utils.pp_list ~sep:", " pp_foterm) args
-  | Leaf s when s = eq_symbol -> Format.pp_print_string formatter "•="
-  | Leaf s when s = lambda_symbol -> Format.pp_print_string formatter "•λ"
-  | Leaf s when s = exists_symbol -> Format.pp_print_string formatter "•∃"
-  | Leaf s when s = forall_symbol -> Format.pp_print_string formatter "•∀"
-  | Leaf s when s = and_symbol -> Format.pp_print_string formatter "•&"
-  | Leaf s when s = or_symbol -> Format.pp_print_string formatter "•|"
-  | Leaf s when s = imply_symbol -> Format.pp_print_string formatter "•→"
-  | Leaf s -> Format.pp_print_string formatter s
-  | Var i -> Format.fprintf formatter "X%d" i
-  | Node _ -> failwith "bad term"
-
-let pp_clause formatter clause =
-  let pp_lit formatter = function 
-  | Equation (l,r,true,_) when T.eq_foterm r T.true_term ->
-    pp_foterm formatter l
-  | Equation (l,r,true,_) when T.eq_foterm l T.true_term ->
-    pp_foterm formatter r
-  | Equation (l,r,true,_)  ->
-    Format.fprintf formatter "%a = %a" pp_foterm l pp_foterm r
-  | Equation (l,r,false,_) when T.eq_foterm r T.true_term ->
-    Format.fprintf formatter "~%a" pp_foterm l
-  | Equation (l,r,false,_) when T.eq_foterm l T.true_term ->
-    Format.fprintf formatter "~%a" pp_foterm r
-  | Equation (l,r,false,_)  ->
-    Format.fprintf formatter "%a != %a" pp_foterm l pp_foterm r
-  in Utils.pp_list ~sep:" | " pp_lit formatter clause.clits
-
-
 (* constraint on the ordering *)
 let symbol_constraint =
   O.compose_constraints
