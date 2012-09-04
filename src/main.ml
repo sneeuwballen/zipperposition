@@ -111,7 +111,7 @@ let parse_args () =
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
-      ("-print-all", Arg.Set print_sort, "print desugarized terms (lambdas, De Bruijn terms)");
+      ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
     ]
   in
   Arg.parse options (fun f -> file := f) "solve problem in first file";
@@ -184,10 +184,12 @@ let setup_output params =
     T.pp_term := (T.pp_term_debug :> T.pprinter_term);
     C.pp_proof := C.pp_proof_debug
   | s -> failwith ("unknown output syntax " ^ s));
-  (if params.param_print_sort && params.param_output_syntax = "debug"
+  (if params.param_print_sort
     then T.pp_term_debug#sort true);
-  (if params.param_print_all && params.param_output_syntax = "debug"
-    then T.pp_term_debug#skip_lambdas false; T.pp_term_debug#skip_db false)
+  (if params.param_print_all
+    then begin T.pp_term_debug#skip_lambdas false; T.pp_term_debug#skip_db false end);
+  Format.printf "%% format: %s, print sort: %B, print all: %B@." params.param_output_syntax
+    params.param_print_sort params.param_print_all
 
 let () =
   (* parse arguments *)

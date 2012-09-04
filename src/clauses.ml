@@ -582,7 +582,7 @@ let pp_proof_tstp =
               num pp_clause_tstp#pp hc.node name
               (Utils.pp_list ~sep:"," pp_print_int) (List.map snd premises);
             (* print every premise *)
-            List.iter (fun (c,num) -> Queue.add (hc, num) to_print) premises
+            List.iter (fun (hc,num) -> Queue.add (hc, num) to_print) premises
         end
       done
   end
