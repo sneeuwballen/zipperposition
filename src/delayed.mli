@@ -22,9 +22,6 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 
 open Types
 
-(** check whether s is a binding symbol *)
-val is_binder_symbol : symbol -> bool
-
 (** Precedence constraint *)
 val symbol_constraint : ordering_constraint
 

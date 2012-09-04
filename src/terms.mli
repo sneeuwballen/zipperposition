@@ -90,6 +90,8 @@ val db_unlift : foterm -> foterm
 val db_from_var : foterm -> foterm -> foterm
 (** index of the De Bruijn term *)
 val db_depth : foterm -> int
+(** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
+val look_db_sort : int -> foterm -> sort option
 
 (** type of a pretty printer for symbols *)
 class type pprinter_symbol =

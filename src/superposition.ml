@@ -648,7 +648,10 @@ let cnf_of ~ord clause =
       when s = forall_symbol ->
       assert (s' = lambda_symbol);
       (* a fresh variable *)
-      let v = T.mk_var (!varindex) t.node.sort in
+      let sort = match T.look_db_sort 0 t with
+        | None -> univ_sort
+        | Some s -> s in
+      let v = T.mk_var (!varindex) sort in
       incr varindex;
       let new_t' = T.db_unlift (T.db_replace t' v) in
       skolemize new_t' (* remove forall *)
@@ -656,7 +659,10 @@ let cnf_of ~ord clause =
       when s = exists_symbol ->
       assert (s' = lambda_symbol);
       (* make a skolem symbol *)
-      let sk = Calculus.skolem ord (T.vars_of_term t') t.node.sort in
+      let sort = match T.look_db_sort 0 t with
+        | None -> univ_sort
+        | Some s -> s in
+      let sk = Calculus.skolem ord (T.vars_of_term t') sort in
       let new_t' = T.db_unlift (T.db_replace t' sk) in
       skolemize new_t' (* remove forall *)
     | Node l -> T.mk_node (List.map skolemize l)
@@ -688,6 +694,7 @@ let cnf_of ~ord clause =
       (fun (Equation (l, r, sign, _)) -> T.atomic_rec l && T.atomic_rec r)
       c.clits
   in
+  Utils.debug 3 (lazy (Utils.sprintf "input clause %a@." !C.pp_clause#pp clause));
   if is_cnf clause
     then begin
       Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf" !C.pp_clause#pp clause));
@@ -704,10 +711,11 @@ let cnf_of ~ord clause =
       let proof = lazy (Proof ("cnf_reduction", [clause, [], S.id_subst])) in
       let clauses = List.map
         (fun lits ->
-          C.clause_of_fof ~ord
-            (C.mk_clause ~ord
+          let clause = C.mk_clause ~ord
               (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
-              proof))
+              proof in
+          Utils.debug 3 (lazy (Utils.sprintf "mk_clause %a@." !C.pp_clause#pp clause));
+          C.clause_of_fof ~ord clause)
         lit_list_list
       in
       Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"

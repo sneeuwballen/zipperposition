@@ -32,9 +32,6 @@ module Utils = FoUtils
 module Sup = Superposition
 module PS = ProofState
 
-(* check whether s is a binding symbol *)
-let is_binder_symbol s = s = lambda_symbol
-
 (** check whether the term is (Leaf s) *)
 let check_sym t s = match t.node.term with
   | Var _ -> false
@@ -74,28 +71,15 @@ let beta_eliminate ~ord clause idx a signa b signb =
   let proof = lazy (Proof ("beta_eliminate", [clause, [idx], S.id_subst])) in
   C.mk_clause ~ord new_lits proof
 
-exception FoundSort of sort
-
-(** find the sort of the first De Bruijn term *)
-let rec look_db_sort depth t = match t.node.term with
-  | Node ({node={term=Leaf s}}::subterms) when is_binder_symbol s ->
-    List.iter (look_db_sort (depth+1)) subterms  (* increment for binder *)
-  | Node [{node={term=Leaf s}}; t] when s = succ_db_symbol ->
-    look_db_sort (depth-1) t  (* decrement for lifted De Bruijn *)
-  | Node l -> List.iter (look_db_sort depth) l
-  | Leaf s when s = db_symbol && depth = 0 -> raise (FoundSort t.node.sort)
-  | Leaf _ -> ()
-  | Var _ -> ()
-
 (** helper for gamma elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a fresh var) *)
 let gamma_eliminate ~ord clause idx t sign =
   let maxvar = T.max_var (T.vars_of_term t) in
   assert (t.node.sort = bool_sort);
   let new_t =
-    try
-      look_db_sort 0 t; T.db_unlift t (* the variable is not present *)
-    with FoundSort sort ->
+    match T.look_db_sort 0 t with
+    | None -> T.db_unlift t (* the variable is not present *)
+    | Some sort ->
       (* sort is the sort of the first DB symbol *)
       let new_var = T.mk_var (maxvar + 1) sort in
       T.db_unlift (T.db_replace t new_var)
@@ -112,9 +96,9 @@ let delta_eliminate ~ord clause idx t sign =
   let vars = T.vars_of_term t in
   assert (t.node.sort = bool_sort);
   let new_t =
-    try
-      look_db_sort 0 t; T.db_unlift t (* the DB variable is not present *)
-    with FoundSort sort ->
+    match T.look_db_sort 0 t with
+    | None -> T.db_unlift t (* the variable is not present *)
+    | Some sort ->
       (* sort is the sort of the first DB symbol *)
       let new_skolem = skolem ord vars sort in
       T.db_unlift (T.db_replace t new_skolem)

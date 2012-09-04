@@ -137,15 +137,16 @@ let true_term = mk_leaf true_symbol bool_sort
 let false_term = mk_leaf false_symbol bool_sort
 
 (* constructors for terms *)
+let check_bool t = assert (t.node.sort = bool_sort)
 
-let mk_not t = mk_apply not_symbol bool_sort [t]
-let mk_and a b = mk_apply and_symbol bool_sort [a; b]
-let mk_or a b = mk_apply or_symbol bool_sort [a; b]
-let mk_imply a b = mk_apply imply_symbol bool_sort [a; b]
+let mk_not t = (check_bool t; mk_apply not_symbol bool_sort [t])
+let mk_and a b = (check_bool a; check_bool b; mk_apply and_symbol bool_sort [a; b])
+let mk_or a b = (check_bool a; check_bool b; mk_apply or_symbol bool_sort [a; b])
+let mk_imply a b = (check_bool a; check_bool b; mk_apply imply_symbol bool_sort [a; b])
 let mk_eq a b = (assert (a.node.sort = b.node.sort); mk_apply eq_symbol bool_sort [a; b])
 let mk_lambda t = mk_apply lambda_symbol t.node.sort [t]
-let mk_forall t = mk_apply forall_symbol bool_sort [mk_lambda t]
-let mk_exists t = mk_apply exists_symbol bool_sort [mk_lambda t]
+let mk_forall t = (check_bool t; mk_apply forall_symbol bool_sort [mk_lambda t])
+let mk_exists t = (check_bool t; mk_apply exists_symbol bool_sort [mk_lambda t])
 
 let rec member_term a b = a == b || match b.node.term with
   | Leaf _ | Var _ -> false
@@ -292,6 +293,22 @@ let rec db_depth t = match t.node.term with
   | Leaf s when s = db_symbol -> 0
   | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> (db_depth t') + 1
   | _ -> failwith "not a proper De Bruijn term"
+
+exception FoundSort of sort
+
+(** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
+let look_db_sort index t =
+  let rec lookup depth t = match t.node.term with
+    | Node ({node={term=Leaf s}}::subterms) when s = lambda_symbol ->
+      List.iter (lookup (depth+1)) subterms  (* increment for binder *)
+    | Node [{node={term=Leaf s}}; t] when s = succ_db_symbol ->
+      lookup (depth-1) t  (* decrement for lifted De Bruijn *)
+    | Node l -> List.iter (lookup depth) l
+    | Leaf s when s = db_symbol && depth = 0 -> raise (FoundSort t.node.sort)
+    | Leaf _ -> ()
+    | Var _ -> ()
+  in try lookup index t; None
+     with FoundSort s -> Some s
 
 (** type of a pretty printer for symbols *)
 class type pprinter_symbol =
