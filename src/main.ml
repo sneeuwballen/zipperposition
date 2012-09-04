@@ -75,14 +75,6 @@ let heuristic_ordering clauses =
   let constr = O.compose_constraints constr O.consts_constraint in
   O.make_ordering constr
 
-(** get first file of command line arguments *)
-let get_file () =
-  let files = ref [] in
-  Arg.parse [] (fun s -> files := s :: !files) "./prover file";
-  match !files with
-  | [] -> failwith "file required."
-  | (x::_) -> x
-
 (** parameters for the main procedure *)
 type parameters = {
   param_ord : string;
@@ -91,7 +83,9 @@ type parameters = {
   param_timeout : float;
   param_files : string list;
   param_proof : bool;
-  param_debug_proof : bool;
+  param_output_syntax : string;   (** syntax for output *)
+  param_print_sort : bool;        (** print sorts of terms *)
+  param_print_all : bool;         (** print desugarized lambda / DB symbols *)
 }
 
 (** parse_args returns parameters *)
@@ -101,8 +95,10 @@ let parse_args () =
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true
-  and debug_proof = ref false
+  and output = ref "debug"
   and calculus = ref "delayed"
+  and print_sort = ref false
+  and print_all = ref false
   and file = ref "stdin" in
   (* options list (TODO parse something about heuristics) *) 
   let options =
@@ -113,22 +109,28 @@ let parse_args () =
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-noproof", Arg.Clear proof, "disable proof printing");
-      ("-debug_proof", Arg.Set debug_proof, "print a debug (detailed) proof");
+      ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
+      ("-print-sort", Arg.Set print_sort, "print sorts of terms");
+      ("-print-all", Arg.Set print_sort, "print desugarized terms (lambdas, De Bruijn terms)");
     ]
   in
   Arg.parse options (fun f -> file := f) "solve problem in first file";
   (* return parameter structure *)
   { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
     param_timeout = !timeout; param_files = [!file];
-    param_proof = !proof; param_debug_proof = !debug_proof; }
+    param_proof = !proof; param_output_syntax = !output;
+    param_print_sort = !print_sort; param_print_all = !print_all; }
 
-(** parse given tptp file (TODO also parse include()s *)
+(** parse given tptp file *)
 let parse_file ~recursive f =
+  let dir = Filename.dirname f in
   (* [aux files clauses] parses all files in files and add
      the resulting clauses to clauses *)
   let rec aux files clauses = match files with
   | [] -> clauses
   | f::tail ->
+    (* if relative, append prefix, else keep absolute name *)
+    let f = if Filename.is_relative f then Filename.concat dir f else f in
     let new_clauses, new_includes = parse_this f in
     if recursive
       then aux (List.rev_append new_includes tail) (List.rev_append new_clauses clauses)
@@ -143,7 +145,7 @@ let parse_file ~recursive f =
       Const.cur_filename := f;
       Parser_tptp.parse_file Lexer_tptp.token buf
     with _ as e -> close_in input; raise e
-  in aux [f] []
+  in aux [Filename.basename f] []
 
 (** print stats *)
 let print_stats state =
@@ -170,6 +172,23 @@ let setup_alarm timeout =
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
 
+(** setup output format and details *)
+let setup_output params =
+  (match params.param_output_syntax with
+  | "tstp" ->
+    C.pp_clause := C.pp_clause_tstp;
+    T.pp_term := T.pp_term_tstp;
+    C.pp_proof := C.pp_proof_tstp
+  | "debug" ->
+    C.pp_clause := C.pp_clause_debug;
+    T.pp_term := (T.pp_term_debug :> T.pprinter_term);
+    C.pp_proof := C.pp_proof_debug
+  | s -> failwith ("unknown output syntax " ^ s));
+  (if params.param_print_sort && params.param_output_syntax = "debug"
+    then T.pp_term_debug#sort true);
+  (if params.param_print_all && params.param_output_syntax = "debug"
+    then T.pp_term_debug#skip_lambdas false; T.pp_term_debug#skip_db false)
+
 let () =
   (* parse arguments *)
   let params = parse_args () in
@@ -180,6 +199,8 @@ let () =
     then None else (Format.printf "%% run for %f s@." params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
                     Some (Unix.gettimeofday() +. params.param_timeout -. 0.25)) in
+  (* setup printing *)
+  setup_output params;
   (* parse file *)
   let f = List.hd params.param_files in
   Printf.printf "%% process file %s\n" f;
@@ -205,7 +226,7 @@ let () =
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
-                 num_clauses (Utils.pp_list ~sep:"" (C.pp_clause ~sort:false)) clauses));
+                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
   let state = PS.make_state ord (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
@@ -221,14 +242,11 @@ let () =
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
   | Sat.Sat ->
       Printf.printf "%% SZS status CounterSatisfiable\n";
-      if Utils.debug_level () > 1 then
-        Format.printf "%% saturated set: @[<v>%a@]@."
-          C.pp_bag state.PS.active_set.PS.active_clauses
+      Utils.debug 1 (lazy (Utils.sprintf "%% saturated set: @[<v>%a@]@."
+                     C.pp_bag state.PS.active_set.PS.active_clauses))
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "%% SZS status Theorem\n";
-      (if params.param_proof then
-        Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@."
-          C.pp_tstp_proof c.node);
-      (if params.param_debug_proof then
-        Format.printf "@.%% debug proof: @.@[<v>%a@]@." C.pp_proof_rec c.node)
+      if params.param_proof
+        then Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@." !C.pp_proof#pp c.node
+        else ()
