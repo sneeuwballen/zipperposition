@@ -130,7 +130,7 @@ let parse_file ~recursive f =
   | [] -> clauses
   | f::tail ->
     (* if relative, append prefix, else keep absolute name *)
-    let f = if Filename.is_relative f then Filename.concat dir f else f in
+    let f = if Filename.is_relative f && f <> "stdin" then Filename.concat dir f else f in
     let new_clauses, new_includes = parse_this f in
     if recursive
       then aux (List.rev_append new_includes tail) (List.rev_append new_clauses clauses)
