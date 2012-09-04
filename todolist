@@ -2,6 +2,3 @@
 - make multiset comparison fast
 - improve efficiency of discrimination trees: either
     use compressed tries, or use some kind of patricia trees
-- object-oriented pretty-printers, with imperative interfaces, to
-    allow to change parameters easily...
-- parsing of axiom files relative to the problem file
