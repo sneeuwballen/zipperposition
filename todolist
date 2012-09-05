@@ -4,3 +4,4 @@
 - maybe implement context trees for general purpose indexing
 - find better heuristics for delayed superposition
 - output dedukti code (or even Coq code?)
+- investigate pb49.p (ordering assert failure -> wrong term?)

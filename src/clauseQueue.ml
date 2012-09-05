@@ -97,12 +97,13 @@ let compute_refined_clause_weight ~ord c =
     List.exists (fun (lit', _) -> C.eq_literal lit lit') (C.maxlits c)
   (* weight function that makes maximal literals heavier *)
   in
-  List.fold_left
+  let weight = List.fold_left
     (fun sum (Equation (l, r, _, _) as lit) ->
       let lit_weight = ord#compute_term_weight l + ord#compute_term_weight r in
       sum + (if is_maxlit c lit
-        then (lit_weight +4) * (lit_weight +4) else lit_weight * lit_weight))
+        then 4 * lit_weight else lit_weight))
     0 c.clits
+  in (List.length c.clits) * weight
 
 let refined_clause_weight ~ord =
   let clause_ord =
