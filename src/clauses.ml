@@ -519,28 +519,34 @@ class type pprinter_proof =
 let pp_proof_debug =
   object (self)
     method pp formatter clause =
-      let printed = ref Hset.empty in
-      (* recursive printing of clause and premises *)
-      let rec print_rec c =
-        let hc = hashcons_clause c in
-        if Hset.mem hc !printed then ()
+      assert (clause.clits = []);
+      (* already_printed is a set of clauses already printed. *)
+      let already_printed = ref Hset.empty
+      and to_print = Queue.create () in
+      (* initialize queue *)
+      let hc = hashcons_clause clause in
+      Queue.add hc to_print; 
+      (* print every clause in the queue, if not already printed *)
+      while not (Queue.is_empty to_print) do
+        let hc = Queue.take to_print in
+        if Hset.mem hc !already_printed then ()
         else begin
-          printed := Hset.add hc !printed;
-          match Lazy.force clause.cproof with
+          already_printed := Hset.add hc !already_printed;
+          match Lazy.force hc.node.cproof with
           | Axiom (f, s) ->
               fprintf formatter "@[<h>%a <--- @[<h>axiom %s in %s@]@]@;"
-                !pp_clause#pp clause s f
+                !pp_clause#pp hc.node s f
           | Proof (rule, premises) ->
               (* print the proof step *)
               fprintf formatter "@[<h>%a <--- @[<h>%s with @[<hv>%a@]@]@]@;"
-                !pp_clause#pp clause rule
+                !pp_clause#pp hc.node rule
                 (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
               (* print premises recursively *)
               List.iter
-                (fun (c, _, _) -> self#pp formatter c)
+                (fun (c, _, _) -> Queue.add (hashcons_clause c) to_print)
                 premises
         end
-      in print_rec clause
+      done
   end
 
 let pp_proof_tstp =
