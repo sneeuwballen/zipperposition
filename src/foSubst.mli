@@ -56,5 +56,8 @@ val relocate : ?recursive:bool -> int -> varlist -> substitution
 val fresh_foterm : int -> foterm -> foterm      (** fresh term, with all variables > maxvar *)
 val relocate_term : varlist -> foterm -> foterm (** rename the term so that
                                                     it has no variable in varlist *)
+val normalize_term : foterm -> foterm * substitution  (** unique representation of term t,
+                                                          substitution to get back to t *)
+
 
 val pp_substitution : Format.formatter -> substitution -> unit

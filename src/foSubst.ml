@@ -92,6 +92,23 @@ let relocate_term varlist t =
   let _, _, subst = relocate idx varlist id_subst in
   apply_subst ~recursive:false subst t
 
+(** Returns a term t' that is unique for all alpha equivalent
+    representations of t, and a subst s such that s(t') = t *)
+let normalize_term t =
+  let vars = T.vars_of_term t in
+  let subst_from_t, subst_to_t = List.fold_left
+    (fun (s_from, s_to) var ->
+      match var.node.term with
+        | Var i ->
+          let new_var = (T.mk_var i var.node.sort) in
+          build_subst ~recursive:false var new_var s_from,
+          build_subst ~recursive:false new_var var s_to
+        | _ -> assert false
+    ) (id_subst, id_subst) vars
+  in
+  let normalized_t = apply_subst ~recursive:false subst_from_t t in
+  normalized_t, subst_to_t
+
 let pp_substitution formatter subst = 
   let pp_pair formatter (v, t) =
     Format.fprintf formatter "%a → %a" !T.pp_term#pp v !T.pp_term#pp t

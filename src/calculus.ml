@@ -24,6 +24,7 @@ open Types
 
 module T = Terms
 module C = Clauses
+module S = FoSubst
 module Utils = FoUtils
 module PS = ProofState
 
@@ -132,18 +133,43 @@ let get_equations_sides clause pos = match pos with
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (expected binary list)"
 
-(** Creation of a new skolem symbol, applied to the given arguments.
-    it also refreshes the ordering (the signature has changed) *)
+(** cache for terms *)
+module TCache = Hashtbl.Make(
+  struct
+    type t = foterm
+    let equal a b = T.eq_foterm a b
+    let hash t = t.Hashcons.hkey
+  end)
+
+(** Skolemize the given term at root (assumes it occurs just under an
+    existential quantifier, whose De Bruijn variable is replaced
+    by a fresh symbol applied to free variables). This also
+    caches symbols, so that the same term is always skolemized
+    the same way.
+
+    It also refreshes the ordering (the signature has changed) *)
 let skolem =
-  let count = ref 0 in  (* current symbol counter *)
-  fun ord args sort ->
-    let new_symbol = "sk" ^ (string_of_int !count) in
-    incr count;
-    (* build the new term first *)
-    let new_term =
-      if args = [] then T.mk_leaf new_symbol sort
-      else T.mk_node ((T.mk_leaf new_symbol sort) :: args)
+  let cache = TCache.create 13 (* global cache for skolemized terms *)
+  and count = ref 0 in  (* current symbol counter *)
+  fun ~ord t sort ->
+    let normalized_t, subst_to_t = S.normalize_term t in
+    let vars = T.vars_of_term normalized_t in
+    (* find the skolemized normalized term *)
+    let normalized_t'= try
+      TCache.find cache normalized_t
+    with Not_found ->
+      (* actual skolemization of normalized_t *)
+      let new_symbol = "sk" ^ (string_of_int !count) in
+      incr count;
+      let skolem_term =
+        if vars = [] then T.mk_leaf new_symbol sort
+        else T.mk_node ((T.mk_leaf new_symbol sort) :: vars)
+      in
+      (* update the ordering *)
+      ord#refresh ();
+      (* build the skolemized term *)
+      T.db_unlift (T.db_replace normalized_t skolem_term)
     in
-    (* update the ordering *)
-    ord#refresh ();
-    new_term
+    TCache.replace cache normalized_t normalized_t';
+    (* get back to the variables of the given term *)
+    S.apply_subst ~recursive:false subst_to_t normalized_t'

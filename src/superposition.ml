@@ -662,8 +662,7 @@ let cnf_of ~ord clause =
       let sort = match T.look_db_sort 0 t with
         | None -> univ_sort
         | Some s -> s in
-      let sk = Calculus.skolem ord (T.vars_of_term t') sort in
-      let new_t' = T.db_unlift (T.db_replace t' sk) in
+      let new_t' = Calculus.skolem ~ord t' sort in
       skolemize new_t' (* remove forall *)
     | Node l -> T.mk_node (List.map skolemize l)
   (* reduction to cnf using De Morgan. Returns a list of list of terms *)

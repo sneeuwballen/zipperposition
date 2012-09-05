@@ -93,15 +93,13 @@ let gamma_eliminate ~ord clause idx t sign =
     and adds t where De Bruijn 0 is replaced by a skolem
     of free variables of t) *)
 let delta_eliminate ~ord clause idx t sign =
-  let vars = T.vars_of_term t in
   assert (t.node.sort = bool_sort);
   let new_t =
     match T.look_db_sort 0 t with
     | None -> T.db_unlift t (* the variable is not present *)
     | Some sort ->
       (* sort is the sort of the first DB symbol *)
-      let new_skolem = skolem ord vars sort in
-      T.db_unlift (T.db_replace t new_skolem)
+      skolem ~ord t sort
   in
   let new_lit = C.mk_lit ~ord new_t T.true_term sign in
   let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in

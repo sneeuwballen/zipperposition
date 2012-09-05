@@ -77,6 +77,11 @@ val fold_negative :
 
 val get_equations_sides : clause -> position -> foterm * foterm * bool
 
-(** Creation of a new skolem symbol, applied to the given arguments.
-    it also refreshes the ordering (the signature has changed) *)
-val skolem : ordering -> foterm list -> sort -> foterm
+(** Skolemize the given term at root (assumes it occurs just under an
+    existential quantifier, whose De Bruijn variable is replaced
+    by a fresh symbol applied to free variables). This also
+    caches symbols, so that the same term is always skolemized
+    the same way. The sort is the sort of the free De Bruijn symbol in t.
+
+    It also refreshes the ordering (the signature has changed) *)
+val skolem : ord:ordering -> foterm -> sort -> foterm
