@@ -2,6 +2,7 @@
 - make multiset comparison fast
 - improve efficiency of discrimination trees: either use compressed tries, or use some kind of patricia trees
 - maybe implement context trees for general purpose indexing
+- literal selection
 - find better heuristics for delayed superposition
 - output dedukti code (or even Coq code?)
 - investigate pb49.p (ordering assert failure -> wrong term?)
