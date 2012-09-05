@@ -43,8 +43,9 @@ let subst_symbol = "$$subst"
 (** a sort for terms (only the return sort is kept) *)
 type sort = string
 
-let bool_sort = "$$Bool"
-let univ_sort = "$$U"
+let type_sort = "$tType"
+let bool_sort = "$o"
+let univ_sort = "$i"
 
 (** exception raised when sorts are mismatched *)
 exception SortError of string
