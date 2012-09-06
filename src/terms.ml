@@ -75,6 +75,7 @@ let compute_vars t =  (* compute free vars of the term *)
 
 let rec compute_db_closed depth t = match t.node.term with
   | Leaf s when s = db_symbol -> depth > 0
+  | Leaf s when s = succ_db_symbol -> false (* not a proper term *)
   | Node [{node={term=Leaf s}}; t'] when s = lambda_symbol ->
     compute_db_closed (depth+1) t'
   | Node [{node={term=Leaf s}}; t'] when s = succ_db_symbol -> 
@@ -98,6 +99,7 @@ let mk_leaf symbol sort =
 let rec mk_node = function
   | [] -> failwith "cannot build empty node term"
   | [_] -> failwith "cannot build node term with no arguments"
+  | {node={term=Var _}}::_ -> assert false
   | (head::_) as subterms ->
       let my_t = {term=(Node subterms); sort=head.node.sort;
                   vars=lazy []; db_closed=lazy false} in

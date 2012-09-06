@@ -152,6 +152,7 @@ let skolem =
   let cache = TCache.create 13 (* global cache for skolemized terms *)
   and count = ref 0 in  (* current symbol counter *)
   fun ~ord t sort ->
+    Utils.debug 4 (lazy (Utils.sprintf "skolem %a@." !T.pp_term#pp t));
     let normalized_t, subst_to_t = S.normalize_term t in
     let vars = T.vars_of_term normalized_t in
     (* find the skolemized normalized term *)
@@ -160,10 +161,11 @@ let skolem =
     with Not_found ->
       (* actual skolemization of normalized_t *)
       let new_symbol = "sk" ^ (string_of_int !count) in
+      Utils.debug 4 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
       incr count;
       let skolem_term =
         if vars = [] then T.mk_leaf new_symbol sort
-        else T.mk_node ((T.mk_leaf new_symbol sort) :: vars)
+        else T.mk_apply new_symbol sort vars
       in
       (* update the ordering *)
       ord#refresh ();
@@ -172,4 +174,6 @@ let skolem =
     in
     TCache.replace cache normalized_t normalized_t';
     (* get back to the variables of the given term *)
-    S.apply_subst ~recursive:false subst_to_t normalized_t'
+    let new_t = S.apply_subst ~recursive:false subst_to_t normalized_t' in
+    Utils.debug 4 (lazy (Utils.sprintf "skolem %a gives %a@." !T.pp_term#pp t !T.pp_term#pp new_t));
+    new_t

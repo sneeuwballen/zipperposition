@@ -47,7 +47,7 @@ let current_signature () =
         end
      | Node (({node={term=Leaf s}})::tail) ->
         Hashtbl.replace arities s (List.length tail)
-     | _ -> assert false);
+     | _ -> failwith (Utils.sprintf "bad term %a" !T.pp_term#pp t));
   sorts, arities, !symbols
 
 let cluster_constraint clusters =
