@@ -225,7 +225,7 @@ let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
 module H = Hashcons.Make(struct
   type t = clause
-  let equal c1 c2 = eq_clause c1 c2
+  let equal c1 c2 = eq_clause c1 c2 && (Lazy.force c1.cselected = Lazy.force c2.cselected)
   let hash c =
     let rec aux h = function
     | [] -> h
@@ -278,7 +278,7 @@ let find_max_lits ~ord lits_pos =
 (** is literal maximal among given literals? *)
 let max_among ~ord lit lits =
   List.for_all 
-    (fun (lit', _) ->
+    (fun lit' ->
       if eq_literal_com lit lit' then true
       else compare_lits_partial ~ord lit lit' <> Lt)
     lits
@@ -347,19 +347,15 @@ let relocate_clause ~ord varlist c =
   let _, newvars, subst = S.relocate ~recursive:false idx c.cvars S.id_subst in
   apply_subst_cl ~recursive:false ~ord subst c
 
-let normalize_clause ~ord c =
-  (* sort literals and vars before renaming *)
-  let c = mk_clause ~ord (List.stable_sort compare_literal c.clits)
-    ~selected:c.cselected c.cproof in
-  fst (fresh_clause ~ord 0 c)
+let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)
 
 (** check whether a literal is selected *)
 let selected_lit c idx =
-  let selected_lits = selected c in
   let rec check l = match l with
   | [] -> false
   | i::l' -> if i = idx then true else check l'
-  in check selected_lits
+  in
+  check (selected c)
 
 (** check whether a literal is eligible for resolution *)
 let eligible_res ~ord c idx subst =
@@ -368,7 +364,7 @@ let eligible_res ~ord c idx subst =
   | [] -> acc
   | (Equation (_, _, sign', _) as lit, idx)::lits_pos' when sign=sign' ->
     let acc' = if selected_lit c idx
-      then (apply_subst_lit ~ord subst lit, idx) :: acc (* same sign, maximal, selected *)
+      then (apply_subst_lit ~ord subst lit) :: acc (* same sign, maximal, selected *)
       else acc in
     gather_slits acc' lits_pos' sign
   | _::lits_pos' ->  gather_slits acc lits_pos' sign  (* goto next *)
@@ -387,6 +383,7 @@ let eligible_res ~ord c idx subst =
 (** check whether a literal is eligible for paramodulation *)
 let eligible_param ~ord c idx subst =
   if selected c <> [] then false
+  else if neg_lit (get_lit c idx) then false (* only positive lits *)
   else check_maximal_lit ~ord c idx subst
 
 (* ----------------------------------------------------------------------

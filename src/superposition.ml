@@ -155,11 +155,16 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   then (Utils.debug 3 (lazy "active literal is negative"); acc)
   else if not (T.db_closed (T.at_pos u subterm_pos))
   then (Utils.debug 3 (lazy "passive subterm is not DB closed"); acc)
+  else
+  let t' = S.apply_subst subst t
+  and v' = S.apply_subst subst v in
+  if sign_uv && T.eq_foterm t' v' && subterm_pos = []
+  then (Utils.debug 3 (lazy "will yield a tautology"); acc)
   else begin
     assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
                         (S.apply_subst subst s));
-    if (ord#compare (S.apply_subst subst s) (S.apply_subst subst t) = Lt ||
-        ord#compare (S.apply_subst subst u) (S.apply_subst subst v) = Lt ||
+    if (ord#compare (S.apply_subst subst s) t' = Lt ||
+        ord#compare (S.apply_subst subst u) v' = Lt ||
         not (C.eligible_res ~ord passive_clause passive_idx subst) ||
         not (C.eligible_param ~ord active_clause active_idx subst))
       then acc
@@ -182,6 +187,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
 
 let infer_active_ actives clause =
   let ord = actives.PS.a_ord in
+  if C.selected clause <> [] then []  (* no literal can be eligible for paramodulation *)
+  else
   (* do the inferences where clause is active; for this,
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
@@ -206,6 +213,9 @@ let infer_active actives clause =
 
 let infer_passive_ actives clause =
   let ord = actives.PS.a_ord in
+  let lits = if C.selected clause = []
+    then C.maxlits clause
+    else Utils.list_pos clause.clits in
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
   fold_lits ~both:true ~pos:true ~neg:true
@@ -229,12 +239,17 @@ let infer_passive_ actives clause =
             unifiables [])
       in List.rev_append new_clauses acc
     )
-    [] (C.maxlits clause)
+    [] lits
 
 let infer_passive actives clause =
   prof_infer_passive.HExtlib.profile (infer_passive_ actives) clause
 
 let infer_equality_resolution_ ~ord clause =
+  (* literals that can potentially be eligible for resolution *)
+  let lits = if C.selected clause = []
+    then C.maxlits clause
+    else Utils.list_pos clause.clits in
+  (* iterate on those literals *)
   fold_negative ~both:false
     (fun acc l r sign l_pos ->
       assert (not sign);
@@ -258,12 +273,14 @@ let infer_equality_resolution_ ~ord clause =
             acc
       with UnificationFailure _ -> acc (* l and r not unifiable, try next *)
     )
-    [] (C.maxlits clause)
+    [] lits
 
 let infer_equality_resolution ~ord clause =
   prof_infer_equality_resolution.HExtlib.profile (infer_equality_resolution_ ~ord) clause
 
 let infer_equality_factoring_ ~ord clause =
+  if C.selected clause <> [] then [] (* no eligible literal *)
+  else
   let lits_pos = Utils.list_pos clause.clits in
   (* find root terms that are unifiable with s and are not in the
      literal at s_pos. This returns a list of position and substitution *)
@@ -391,9 +408,12 @@ let demodulate_ active_set blocked_ids clause =
      and clauses used to rewrite it *)
   let rec demodulate_literal pos lit = match lit with
   | Equation (l, r, sign, _) ->
-      let new_l, l_clauses = demod_term ~ord blocked_ids active_set l in
-      let new_r, r_clauses = demod_term ~ord blocked_ids active_set r in
-      (C.mk_lit ~ord new_l new_r sign), (l_clauses @ r_clauses)
+      if sign && C.eligible_res ~ord clause pos S.id_subst
+        then lit, []  (* do not rewrite in this case *)
+        else
+          let new_l, l_clauses = demod_term ~ord blocked_ids active_set l in
+          let new_r, r_clauses = demod_term ~ord blocked_ids active_set r in
+          (C.mk_lit ~ord new_l new_r sign), (l_clauses @ r_clauses)
   (* rewrite next lit, and get more clauses *)
   and iterate_lits pos lits new_lits clauses = match lits with
   | [] -> List.rev new_lits, clauses
@@ -705,7 +725,7 @@ let cnf_of ~ord clause =
           let clause = C.mk_clause ~ord
               (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
               ~selected:(lazy []) proof in
-          Utils.debug 3 (lazy (Utils.sprintf "mk_clause %a@." !C.pp_clause#pp clause));
+          Utils.debug 4 (lazy (Utils.sprintf "mk_clause %a@." !C.pp_clause#pp clause));
           C.clause_of_fof ~ord clause)
         lit_list_list
       in
@@ -748,6 +768,7 @@ let superposition : calculus =
           let clauses = List.map
             (fun c -> C.reord_clause ~ord (C.clause_of_fof ~ord c))
             clauses in
+          let clauses = List.filter (fun c -> not (is_tautology c)) clauses in
           List.rev_append clauses acc)
         [] l
   end

@@ -108,6 +108,9 @@ let delta_eliminate ~ord clause idx t sign =
 
 (** elimination of unary/binary logic connectives *)
 let connective_elimination ~ord clause =
+  let lits = if C.selected clause = []
+    then C.maxlits clause
+    else Utils.list_pos clause.clits in
   fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos ->
       (* if a literal is true_term, must be r because it is the smallest term *)
@@ -132,10 +135,13 @@ let connective_elimination ~ord clause =
         else acc
       | _ -> acc
     )
-    [] (C.maxlits clause)
+    [] lits
 
 (** elimination of forall *)
 let forall_elimination ~ord clause =
+  let lits = if C.selected clause = []
+    then C.maxlits clause
+    else Utils.list_pos clause.clits in
   fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
@@ -152,10 +158,13 @@ let forall_elimination ~ord clause =
             else (delta_eliminate ~ord clause idx t false) :: acc
       | _ -> acc
     )
-    [] (C.maxlits clause)
+    [] lits
 
 (** elimination of exists *)
 let exists_elimination ~ord clause =
+  let lits = if C.selected clause = []
+    then C.maxlits clause
+    else Utils.list_pos clause.clits in
   fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
@@ -172,10 +181,13 @@ let exists_elimination ~ord clause =
             else (gamma_eliminate ~ord clause idx t false) :: acc
       | _ -> acc
     )
-    [] (C.maxlits clause)
+    [] lits
 
 (** equivalence elimination *)
 let equivalence_elimination ~ord clause =
+  let lits = if C.selected clause = []
+    then C.maxlits clause
+    else Utils.list_pos clause.clits in
   (* do the inference for positive equations *)
   let do_inferences_pos l r l_pos =
     if T.atomic l then [] else begin
@@ -224,7 +236,7 @@ let equivalence_elimination ~ord clause =
       else if sign
         then (do_inferences_pos l r l_pos) @ acc
         else (do_inferences_neg l r l_pos) @ acc)
-    [] (C.maxlits clause)
+    [] lits
 
 (* ----------------------------------------------------------------------
  * simplification

@@ -27,6 +27,7 @@ module C = Clauses
 module O = Orderings
 module PS = ProofState
 module Sup = Superposition
+module Sel = Selection
 module Utils = FoUtils
 module Delayed = Delayed
 
@@ -103,6 +104,7 @@ let given_clause_step ~calculus state =
     else begin
       (* select literals *)
       let c = C.select_clause state.PS.state_select c in
+      Sel.check_selected c;
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
                     !C.pp_clause#pp c));

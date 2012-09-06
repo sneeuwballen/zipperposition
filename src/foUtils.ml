@@ -175,6 +175,18 @@ let rec list_uniq comp l = match l with
   | [] -> []
   | x::xs -> x :: list_uniq comp (List.filter (fun x' -> not (comp x x')) xs)
 
+let list_merge comp l1 l2 =
+  let rec recurse l1 l2 = match l1,l2 with
+  | [], _ -> l2
+  | _, [] -> l1
+  | x::l1', y::l2' ->
+    let cmp = comp x y in
+    if cmp < 0 then x::(recurse l1' l2)
+    else if cmp > 0 then y::(recurse l1 l2')
+    else x::(recurse l1' l2')
+  in
+  List.rev (recurse l1 l2)
+
 let rec list_inter comp l1 l2 = match l1 with
   | [] -> []
   | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)

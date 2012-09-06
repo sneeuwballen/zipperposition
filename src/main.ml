@@ -83,6 +83,7 @@ type parameters = {
   param_calculus : string;
   param_timeout : float;
   param_files : string list;
+  param_select : string;
   param_proof : bool;
   param_output_syntax : string;   (** syntax for output *)
   param_print_sort : bool;        (** print sorts of terms *)
@@ -91,6 +92,9 @@ type parameters = {
 
 (** parse_args returns parameters *)
 let parse_args () =
+  let help_select = Utils.sprintf "selection function (@[<h>%a@])"
+    (Utils.pp_list ~sep:"," Format.pp_print_string)
+    (Sel.available_selections ()) in
   (* parameters *)
   let ord = ref "rpo"
   and steps = ref 0
@@ -98,10 +102,11 @@ let parse_args () =
   and proof = ref true
   and output = ref "debug"
   and calculus = ref "delayed"
+  and select = ref "SelectComplex"  (* TODO choose clause queues? *)
   and print_sort = ref false
   and print_all = ref false
   and file = ref "stdin" in
-  (* options list (TODO parse something about heuristics) *) 
+  (* options list *) 
   let options =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
@@ -109,6 +114,7 @@ let parse_args () =
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
+      ("-select", Arg.Set_string select, help_select);
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
@@ -118,7 +124,7 @@ let parse_args () =
   Arg.parse options (fun f -> file := f) "solve problem in first file";
   (* return parameter structure *)
   { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
-    param_timeout = !timeout; param_files = [!file];
+    param_timeout = !timeout; param_files = [!file]; param_select = !select;
     param_proof = !proof; param_output_syntax = !output;
     param_print_sort = !print_sort; param_print_all = !print_all; }
 
@@ -226,7 +232,8 @@ let () =
   in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (* selection function *)
-  let select = Sel.default_selection in
+  Format.printf "%% selection function: %s@." params.param_select;
+  let select = Sel.selection_from_string ~ord params.param_select in
   (* preprocess clauses *)
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord clauses in

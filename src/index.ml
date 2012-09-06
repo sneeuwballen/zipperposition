@@ -137,8 +137,8 @@ let process_lit op c tree (lit, pos) =
 (** apply op to the maximal literals of the clause, and only to
     the maximal side(s) of those. *)
 let process_clause op tree c =
-  (* only maximal literals and their positions are index *)
-  let lits_pos = C.maxlits c.node in
+  (* index literals with their position *)
+  let lits_pos = Utils.list_pos c.node.clits in
   let new_tree = List.fold_left (process_lit op c) tree lits_pos in
   new_tree
 

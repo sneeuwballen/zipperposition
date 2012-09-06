@@ -185,7 +185,7 @@ let is_ground_term t = match vars_of_term t with
   | [] -> true
   | _ -> false
 
-let merge_varlist l1 l2 = List.merge compare_foterm l1 l2
+let merge_varlist l1 l2 = Utils.list_merge compare_foterm l1 l2
 
 let max_var vars =
   let rec aux idx = function
