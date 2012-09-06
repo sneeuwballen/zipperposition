@@ -17,3 +17,4 @@ tags
 .subdirtouch
 src/main.docdir
 provers_output.db
+*.tgz
