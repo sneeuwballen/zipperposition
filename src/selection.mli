@@ -18,12 +18,20 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Selection functions *)
+(** Selection functions. See "E: a brainiac theorem prover". *)
 
 open Types
 
 (** Select a maximal negative literal, if any, or nothing *)
 val select_max_goal : selection_fun
+(** no selection *)
+val select_nothing : selection_fun
+(** arbitrary negative literal with maximal weight difference between sides *)
+val select_diff_neg_lit : selection_fun
+(** x!=y, or ground negative lit, or like select_diff_neg_lit *)
+val select_complex : selection_fun
+(** if clause is closed horn clause, then select nothing; otherwise, like select_complex *)
+val select_complex_except_horn : selection_fun
 
 (** Default selection function *)
 val default_selection : selection_fun

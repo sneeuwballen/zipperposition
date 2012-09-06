@@ -465,7 +465,19 @@ class type pprinter_literal =
   end
 
 let pp_literal_gen pp_term formatter lit =
-  pp_term#pp formatter (term_of_lit lit)
+  match lit with
+  | Equation (l, r, sign, _) when T.eq_foterm r T.true_term ->
+    if sign
+      then pp_term#pp formatter l
+      else Format.fprintf formatter "¬%a" pp_term#pp l
+  | Equation (l, r, sign, _) when T.eq_foterm l T.true_term ->
+    if sign
+      then pp_term#pp formatter r
+      else Format.fprintf formatter "¬%a" pp_term#pp r
+  | Equation (l, r, sign, _) ->
+    if sign
+      then Format.fprintf formatter "%a = %a" pp_term#pp l pp_term#pp r
+      else Format.fprintf formatter "%a != %a" pp_term#pp l pp_term#pp r
 
 let pp_literal_debug =
   object

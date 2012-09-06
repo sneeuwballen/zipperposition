@@ -101,6 +101,8 @@ let given_clause_step ~calculus state =
             is_redundant ~calculus state.PS.active_set c
     then state, Unknown
     else begin
+      (* select literals *)
+      let c = C.select_clause state.PS.state_select c in
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
                     !C.pp_clause#pp c));

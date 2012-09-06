@@ -33,4 +33,12 @@ let select_max_goal clause =
   | [] -> []  (* select nothing *)
   | (_,idx)::_ -> [idx]  (* select one negative max goal *)
 
+let select_nothing _ = []
+
+let select_diff_neg_lit c = failwith "not implemented"
+
+let select_complex c = failwith "not implemented"
+
+let select_complex_except_horn c = failwith "not implemented"
+
 let default_selection = select_max_goal

@@ -113,7 +113,7 @@ let connective_elimination ~ord clause =
       (* if a literal is true_term, must be r because it is the smallest term *)
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in
-      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then acc else
+      if not (C.eligible_res ~ord clause idx S.id_subst) then acc else
       match l.node.term with
       | Node [{node={term=Leaf s}}; a; b] ->
         (* some alpha/beta eliminations *)
@@ -140,7 +140,7 @@ let forall_elimination ~ord clause =
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
-      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then acc else
+      if not (C.eligible_res ~ord clause idx S.id_subst) then acc else
       match l.node.term with
       | Node [{node={term=Leaf s}};
           {node={term=Node [{node={term=Leaf s'}}; t]}}]
@@ -160,7 +160,7 @@ let exists_elimination ~ord clause =
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
-      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then acc else
+      if not (C.eligible_res ~ord clause idx S.id_subst) then acc else
       match l.node.term with
       | Node [{node={term=Leaf s}};
           {node={term=Node [{node={term=Leaf s'}}; t]}}]
@@ -184,7 +184,7 @@ let equivalence_elimination ~ord clause =
     (* ok, do it *)
     match l_pos with
     | [idx; _] ->
-      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then [] else
+      if not (C.eligible_res ~ord clause idx S.id_subst) then [] else
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_neq ~ord l T.true_term) ::
                       (C.mk_eq ~ord r T.true_term) :: new_lits
@@ -203,7 +203,7 @@ let equivalence_elimination ~ord clause =
     assert (r.node.sort = bool_sort);
     match l_pos with
     | [idx; _] ->
-      if not (C.check_maximal_lit ~ord clause idx S.id_subst) then [] else
+      if not (C.eligible_res ~ord clause idx S.id_subst) then [] else
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_eq ~ord l T.true_term) ::
                       (C.mk_eq ~ord r T.true_term) :: new_lits

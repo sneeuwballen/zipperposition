@@ -243,7 +243,7 @@ let infer_equality_resolution_ ~ord clause =
       | pos::_ ->
       try
         let subst = Unif.unification l r in
-        if C.check_maximal_lit ~ord clause pos subst
+        if C.eligible_res ~ord clause pos subst
           (* subst(lit) is maximal, we can do the inference *)
           then
             let proof = lazy (Proof ("equality_resolution", [clause, [pos], subst]))
@@ -294,8 +294,8 @@ let infer_equality_factoring_ ~ord clause =
     assert (T.db_closed u);
     assert (T.db_closed s);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
-    if C.check_maximal_lit ~ord clause active_idx subst &&
-       ord#compare (S.apply_subst subst s) (S.apply_subst subst t) <> Lt
+    if ord#compare (S.apply_subst subst s) (S.apply_subst subst t) <> Lt &&
+       C.eligible_param ~ord clause active_idx subst
       then
         let proof = lazy (Proof ("equality_factoring",
           [(clause, active_pos, subst); (clause, passive_pos, subst)]))
