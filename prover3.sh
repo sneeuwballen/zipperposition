@@ -7,7 +7,9 @@ PROVER="./src/main.native"
 
 shift  # remove first option
 
+. ./runtime.sh
+
 echo "% run prover $PROVER on $TARGET"
 eprover --cnf --tptp3-in --tptp3-out -l0 "$TARGET" |
     sed -r 's/^#/%/g' |
-    OCAMLRUNPARAM="l=5M,$OCAMLRUNPARAM" "$PROVER" stdin -calculus superposition $@
+    "$PROVER" stdin -calculus superposition $@
