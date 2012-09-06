@@ -19,6 +19,7 @@ Parser_tptp
 ProofState
 Ptmap
 Saturate
+Selection
 Superposition
 Terms
 Trie

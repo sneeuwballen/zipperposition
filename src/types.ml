@@ -93,13 +93,16 @@ type hclause = clause Hashcons.hash_consed
 and clause = {
   clits : literal list;                   (** the equations *)
   cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
-  (* cselectedlits : (literal * int) list; (** selected literals *) *)
+  cselected : int list Lazy.t;            (** index of selected literals *)
   cvars : foterm list;                    (** the free variables *)
   cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
 }
 (** a proof step for a clause *)
 and proof = Axiom of string * string (** file, axiom name *)
           | Proof of string * (clause * position * substitution) list
+
+(** a selection function *)
+type selection_fun = clause -> int list
 
 (** an ordering constraint *)
 type ordering_constraint = symbol -> symbol -> int
