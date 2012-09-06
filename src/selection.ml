@@ -22,13 +22,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+module C = Clauses
+
 let select_max_goal clause =
   (* find negative lits *)
   let negative_lits = List.filter
     (fun ((Equation (_,_,sign,_), _)) -> not sign)
     (C.maxlits clause) in
   match negative_lits with
-  | [] -> clause, []  (* select nothing *)
-  | (_,idx)::_ -> clause, [idx]  (* select one negative max goal *)
+  | [] -> []  (* select nothing *)
+  | (_,idx)::_ -> [idx]  (* select one negative max goal *)
 
-let default_selection = select_bigger_goal
+let default_selection = select_max_goal

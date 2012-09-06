@@ -58,8 +58,8 @@ let alpha_eliminate ~ord clause idx a signa b signb =
   and new_litb = C.mk_lit ~ord b T.true_term signb in
   let other_lits = Utils.list_remove clause.clits idx in
   let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
-  [C.mk_clause ~ord (new_lita :: other_lits) proof;
-   C.mk_clause ~ord (new_litb :: other_lits) proof]
+  [C.mk_clause ~ord (new_lita :: other_lits) ~selected:(lazy []) proof;
+   C.mk_clause ~ord (new_litb :: other_lits) ~selected:(lazy []) proof]
 
 (** helper for beta elimination (remove idx-th literal from
     clause and adds a and b *)
@@ -69,7 +69,7 @@ let beta_eliminate ~ord clause idx a signa b signb =
   and new_litb = C.mk_lit ~ord b T.true_term signb in
   let new_lits = new_lita :: new_litb :: (Utils.list_remove clause.clits idx) in
   let proof = lazy (Proof ("beta_eliminate", [clause, [idx], S.id_subst])) in
-  C.mk_clause ~ord new_lits proof
+  C.mk_clause ~ord new_lits ~selected:(lazy []) proof
 
 (** helper for gamma elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a fresh var) *)
@@ -87,7 +87,7 @@ let gamma_eliminate ~ord clause idx t sign =
   let new_lit = C.mk_lit ~ord new_t T.true_term sign in
   let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
   let proof = lazy (Proof ("gamma_eliminate", [clause, [idx], S.id_subst])) in
-  C.mk_clause ~ord new_lits proof
+  C.mk_clause ~ord new_lits ~selected:(lazy []) proof
 
 (** helper for delta elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a skolem
@@ -104,7 +104,7 @@ let delta_eliminate ~ord clause idx t sign =
   let new_lit = C.mk_lit ~ord new_t T.true_term sign in
   let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
   let proof = lazy (Proof ("delta_eliminate", [clause, [idx], S.id_subst])) in
-  C.mk_clause ~ord new_lits proof
+  C.mk_clause ~ord new_lits ~selected:(lazy []) proof
 
 (** elimination of unary/binary logic connectives *)
 let connective_elimination ~ord clause =
@@ -193,7 +193,8 @@ let equivalence_elimination ~ord clause =
                       (C.mk_neq ~ord r T.true_term) :: new_lits
       and proof2 = lazy (Proof ("pos_equiv_elim2", [clause, l_pos, S.id_subst]))
       in
-      [C.mk_clause ~ord new_lits1 proof1; C.mk_clause ~ord new_lits2 proof2]
+      [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1;
+       C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2]
     | _ -> assert false
     end
   (* do the inference for negative equations *)
@@ -211,7 +212,8 @@ let equivalence_elimination ~ord clause =
                       (C.mk_neq ~ord r T.true_term) :: new_lits
       and proof2 = lazy (Proof ("neg_equiv_elim2", [clause, l_pos, S.id_subst]))
       in
-      [C.mk_clause ~ord new_lits1 proof1; C.mk_clause ~ord new_lits2 proof2]
+      [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1;
+       C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2]
     | _ -> assert false
     end
   in
@@ -288,7 +290,7 @@ let simplify_inner ~ord c =
     if T.eq_foterm l new_l && T.eq_foterm r new_r then lit
     else C.mk_lit ~ord new_l new_r sign
   in
-  C.mk_clause ~ord (List.map simp_lit c.clits) c.cproof
+  C.mk_clause ~ord (List.map simp_lit c.clits) ~selected:(lazy []) c.cproof
 
 (* ----------------------------------------------------------------------
  * the calculus object

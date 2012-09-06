@@ -50,9 +50,10 @@ type passive_set = {
     and is parametrized by an ordering. *)
 type state = {
   ord : ordering;
-  active_set : active_set;    (* active clauses, indexed *)
-  axioms_set : active_set;    (* set of support, indexed *)
-  passive_set : passive_set;  (* passive clauses *)
+  state_select : selection_fun;
+  active_set : active_set;      (** active clauses, indexed *)
+  axioms_set : active_set;      (** set of support, indexed *)
+  passive_set : passive_set;    (** passive clauses *)
 }
 
 let mk_active_set ~ord =
@@ -61,11 +62,12 @@ let mk_active_set ~ord =
   let fv_idx = FV.mk_fv_index_signature signature in
   {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty; fv_idx=fv_idx}
 
-let make_state ord queue_list =
+let make_state ord queue_list select =
   let passive_set = {p_ord=ord; passive_clauses=C.empty_bag;
                      queues=queue_list; queue_state=(0,0)}
   and active_set = mk_active_set ~ord in
   {ord=ord;
+   state_select=select;
    active_set=active_set;
    axioms_set=active_set;
    passive_set=passive_set}
@@ -118,7 +120,7 @@ let add_active active_set c =
       {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}, hc
 
 let add_actives active_set l =
-  List.fold_left (fun b c -> fst (add_active b c)) active_set l
+  List.fold_left (fun b sc -> fst (add_active b sc)) active_set l
 
 let remove_active active_set hc =
   if C.is_in_bag active_set.active_clauses hc.tag

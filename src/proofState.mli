@@ -45,13 +45,14 @@ type passive_set = {
     and is parametrized by an ordering. *)
 type state = {
   ord : ordering;
-  active_set : active_set;    (* active clauses, indexed *)
-  axioms_set : active_set;    (* set of support, indexed *)
-  passive_set : passive_set;  (* passive clauses *)
+  state_select : selection_fun;
+  active_set : active_set;      (** active clauses, indexed *)
+  axioms_set : active_set;      (** set of support, indexed *)
+  passive_set : passive_set;    (** passive clauses *)
 }
 
-(** create a state from the given ordering *)
-val make_state : ordering -> (ClauseQueue.queue * int) list -> state
+(** create a state from the given ordering and selection function*)
+val make_state : ordering -> (ClauseQueue.queue * int) list -> selection_fun -> state
 
 (** add clauses to the active set *)
 val add_active : active_set -> clause -> active_set * hclause

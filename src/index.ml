@@ -130,7 +130,8 @@ let process_lit op c tree (lit, pos) =
       let tmp_tree = op tree l (c, [C.left_pos; pos]) in
       op tmp_tree r (c, [C.right_pos; pos])
   | Equation (l,r,_,Eq) ->
-    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index" !T.pp_term#pp l !T.pp_term#pp r));
+    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index"
+                   !T.pp_term#pp l !T.pp_term#pp r));
     op tree l (c, [C.left_pos; pos])  (* only index one side *)
 
 (** apply op to the maximal literals of the clause, and only to
@@ -160,24 +161,26 @@ let rec fold_subterms op tree t (c, path) = match t.node.term with
 let apply_root_term op tree t (c, path) = op tree t (c, List.rev path, t)
 
 (** add root terms and subterms to respective indexes *)
-let index_clause {root_index; unit_root_index; subterm_index} clause =
-  let new_subterm_index = process_clause (fold_subterms DT.index) subterm_index clause
-  and new_unit_root_index = match clause.node.clits with
+let index_clause {root_index; unit_root_index; subterm_index} hc =
+  let new_subterm_index = process_clause (fold_subterms DT.index) subterm_index hc
+  and new_unit_root_index = match hc.node.clits with
       | [(Equation (_,_,true,_)) as lit] ->
-          process_lit (apply_root_term DT.index) clause unit_root_index (lit, 0)
+          process_lit (apply_root_term DT.index) hc unit_root_index (lit, 0)
       | _ -> unit_root_index
-  and new_root_index = process_clause (apply_root_term DT.index) root_index clause
+  and new_root_index = process_clause (apply_root_term DT.index) root_index hc
   in {root_index=new_root_index;
       unit_root_index=new_unit_root_index;
       subterm_index=new_subterm_index}
 
 (** remove root terms and subterms from respective indexes *)
-let remove_clause {root_index; unit_root_index; subterm_index} clause =
-  let new_subterm_index = process_clause (fold_subterms DT.remove_index) subterm_index clause
-  and new_unit_root_index = match clause.node.clits with
-      | [lit] -> process_lit (apply_root_term DT.remove_index) clause unit_root_index (lit, 0)
+let remove_clause {root_index; unit_root_index; subterm_index} hc =
+  let new_subterm_index = process_clause (fold_subterms DT.remove_index)
+    subterm_index hc
+  and new_unit_root_index = match hc.node.clits with
+      | [lit] -> process_lit (apply_root_term DT.remove_index) hc
+        unit_root_index (lit, 0)
       | _ -> unit_root_index
-  and new_root_index = process_clause (apply_root_term DT.remove_index) root_index clause
+  and new_root_index = process_clause (apply_root_term DT.remove_index) root_index hc
   in {root_index=new_root_index;
       unit_root_index=new_unit_root_index;
       subterm_index=new_subterm_index}

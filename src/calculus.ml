@@ -63,8 +63,8 @@ class type calculus =
 let do_binary_inferences active_set rules c =
   (* rename clause to avoid collisions *)
   let c = PS.relocate_active active_set c in
-  Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active: %a" C.pp_bag
-                       active_set.PS.active_clauses));
+  Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active: %a"
+                       C.pp_bag active_set.PS.active_clauses));
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
@@ -175,5 +175,6 @@ let skolem =
     TCache.replace cache normalized_t normalized_t';
     (* get back to the variables of the given term *)
     let new_t = S.apply_subst ~recursive:false subst_to_t normalized_t' in
-    Utils.debug 4 (lazy (Utils.sprintf "skolem %a gives %a@." !T.pp_term#pp t !T.pp_term#pp new_t));
+    Utils.debug 4 (lazy (Utils.sprintf "skolem %a gives %a@."
+                         !T.pp_term#pp t !T.pp_term#pp new_t));
     new_t

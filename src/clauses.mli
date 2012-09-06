@@ -73,13 +73,18 @@ val hashcons_clause : clause -> hclause
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
-val mk_clause : ord:ordering -> literal list
-              -> proof Lazy.t -> clause                 (** build a clause *)
+val mk_clause : ord:ordering -> literal list ->
+                selected:int list Lazy.t ->
+                proof Lazy.t ->
+                clause                                  (** build a clause *)
 val clause_of_fof : ord:ordering -> clause -> clause    (** transform eq/not to literals *)
 val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
-val maxlits : clause -> (literal * int) list            (** the indexed list of maximal literals *)
-val check_maximal_lit : ord:ordering -> clause -> int   (** check whether the i-th literal is *)
-                 -> substitution -> bool                (** maximal in subst(clause) *)
+val select_clause : select:selection_fun
+                 -> clause -> clause                    (** select literals in clause *)
+val maxlits : clause -> (literal * int) list            (** indexed list of max literals *)
+val selected: clause -> int list                        (** indexes of selected literals *)
+val check_maximal_lit : ord:ordering -> clause -> int   (** is the i-th literal *)
+                    -> substitution -> bool             (** maximal in subst(clause)? *)
 
 val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
 
@@ -92,6 +97,13 @@ val fresh_clause : ord:ordering -> int -> clause -> clause * int
 val relocate_clause : ord:ordering -> varlist -> clause -> clause       
 (** normalize (vars start at 1) *)
 val normalize_clause : ord:ordering -> clause -> clause                 
+
+(** check whether a literal is selected *)
+val selected_lit : clause -> int -> bool
+(** check whether a literal is eligible for resolution *)
+val eligible_res : ord:ordering -> clause -> int -> substitution -> bool
+(** check whether a literal is eligible for paramodulation *)
+val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
 
 (* ----------------------------------------------------------------------
  * bag of clauses

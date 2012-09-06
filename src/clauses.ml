@@ -275,7 +275,15 @@ let find_max_lits ~ord lits_pos =
     )
     lits_pos
 
-let mk_clause ~ord lits proof =
+(** is literal maximal among given literals? *)
+let max_among ~ord lit lits =
+  List.for_all 
+    (fun (lit', _) ->
+      if eq_literal_com lit lit' then true
+      else compare_lits_partial ~ord lit lit' <> Lt)
+    lits
+
+let mk_clause ~ord lits ~selected proof =
   (* merge sets of variables *)
   let rec merge_vars acc vars1 = match vars1 with
   | [] -> acc
@@ -285,19 +293,26 @@ let mk_clause ~ord lits proof =
   let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
   let all_vars = List.stable_sort T.compare_foterm all_vars
   and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
-  {clits=lits; cvars=all_vars; cproof=proof; cmaxlits=maxlits}
+  {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cmaxlits=maxlits}
 
 let maxlits clause = Lazy.force clause.cmaxlits
 
-let clause_of_fof ~ord c = mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits) c.cproof
+let selected clause = Lazy.force clause.cselected
 
-let reord_clause ~ord c = mk_clause ~ord (List.map (reord_lit ~ord) c.clits) c.cproof
+let clause_of_fof ~ord c =
+  mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits) ~selected:c.cselected c.cproof
+
+let reord_clause ~ord c =
+  mk_clause ~ord (List.map (reord_lit ~ord) c.clits) ~selected:c.cselected c.cproof
+
+let select_clause ~select c =
+  {c with cselected = lazy (select c)}
 
 let apply_subst_cl ?(recursive=true) ~ord subst c =
   if subst = S.id_subst then c
   else
     let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
-    mk_clause ~ord new_lits c.cproof
+    mk_clause ~ord new_lits ~selected:c.cselected c.cproof
   (* TODO modify proof lazily *)
 
 let get_lit clause idx = Utils.list_get clause.clits idx
@@ -334,8 +349,45 @@ let relocate_clause ~ord varlist c =
 
 let normalize_clause ~ord c =
   (* sort literals and vars before renaming *)
-  let c = mk_clause ~ord (List.stable_sort compare_literal c.clits) c.cproof in
+  let c = mk_clause ~ord (List.stable_sort compare_literal c.clits)
+    ~selected:c.cselected c.cproof in
   fst (fresh_clause ~ord 0 c)
+
+(** check whether a literal is selected *)
+let selected_lit c idx =
+  let selected_lits = selected c in
+  let rec check l = match l with
+  | [] -> false
+  | i::l' -> if i = idx then true else check l'
+  in check selected_lits
+
+(** check whether a literal is eligible for resolution *)
+let eligible_res ~ord c idx subst =
+  (* find selected maximal literals with given sign *)
+  let rec gather_slits acc lits_pos sign = match lits_pos with
+  | [] -> acc
+  | (Equation (_, _, sign', _) as lit, idx)::lits_pos' when sign=sign' ->
+    let acc' = if selected_lit c idx
+      then (apply_subst_lit ~ord subst lit, idx) :: acc (* same sign, maximal, selected *)
+      else acc in
+    gather_slits acc' lits_pos' sign
+  | _::lits_pos' ->  gather_slits acc lits_pos' sign  (* goto next *)
+  in 
+  (* if no lit is selected, max lits are eligible *)
+  if selected c = []
+    then check_maximal_lit ~ord c idx subst
+    else begin
+      (* check maximality among selected literals of same sign *)
+      let (Equation (_,_,sign,_) as lit) = get_lit c idx in
+      let slit = apply_subst_lit ~ord subst lit in
+      let set = gather_slits [] (maxlits c) sign in
+      max_among ~ord slit set
+    end
+
+(** check whether a literal is eligible for paramodulation *)
+let eligible_param ~ord c idx subst =
+  if selected c <> [] then false
+  else check_maximal_lit ~ord c idx subst
 
 (* ----------------------------------------------------------------------
  * bag of clauses
@@ -461,21 +513,26 @@ class virtual common_pp_clause =
 
 let pp_clause_debug =
   let _horizontal = ref true in
+  let is_max_lit c lit = List.exists (fun (lit',_) -> eq_literal lit lit') (maxlits c) in
+  let pp_annot c (lit, idx) =
+    ""^(if selected_lit c idx then "+" else "")
+      ^(if is_max_lit c lit then "*" else "") in
   object (self)
+    (* print literals with a '*' for maximal, and '+' for selected *)
     method pp formatter c =
-      let is_max_lit lit = List.exists (fun (lit',_) -> eq_literal lit lit') (maxlits c) in
       (* how to print the list of literals *)
       let lits_printer formatter lits =
         Utils.pp_list ~sep:" | "
-          (fun formatter lit -> if is_max_lit lit
-            then fprintf formatter "%a*" pp_literal_debug#pp lit
-            else pp_literal_debug#pp formatter lit)
+          (fun formatter (lit, idx) ->
+            let annot = pp_annot c (lit, idx) in
+            fprintf formatter "%a%s" pp_literal_debug#pp lit annot)
           formatter lits
       in
       (* print in an horizontal box, or not *)
       if !_horizontal
-        then fprintf formatter "@[<h>[%a]@]" lits_printer c.clits
-        else fprintf formatter "[%a]" lits_printer c.clits
+        then fprintf formatter "@[<h>[%a]@]" lits_printer (Utils.list_pos c.clits)
+        else fprintf formatter "[%a]" lits_printer (Utils.list_pos c.clits)
+    (* regular printing is printing with no literal selected *)
     inherit common_pp_clause
     method horizontal s = _horizontal := s
   end

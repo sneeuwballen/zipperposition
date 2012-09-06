@@ -104,6 +104,8 @@ and proof = Axiom of string * string (** file, axiom name *)
 (** a selection function *)
 type selection_fun = clause -> int list
 
+let no_select c = []                          (** selects no literals *)
+
 (** an ordering constraint *)
 type ordering_constraint = symbol -> symbol -> int
 

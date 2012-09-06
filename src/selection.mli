@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 (** Select a maximal negative literal, if any, or nothing *)
-val select_bigger_goal : selection_fun
+val select_max_goal : selection_fun
 
 (** Default selection function *)
 val default_selection : selection_fun
