@@ -29,11 +29,14 @@ module C = Clauses
 module CQ = ClauseQueue
 module U = FoUtils
 
+(** Default indexing on terms *)
+let cur_index = ref Discrimination_tree.clause_index
+
 (** set of active clauses *)
 type active_set = {
   a_ord : ordering;
   active_clauses : Clauses.bag;       (** set of active clauses *)
-  idx : Index.t;                      (** term index *)
+  idx : Index.clause_index;           (** term index *)
   fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
 }
 
@@ -60,7 +63,7 @@ let mk_active_set ~ord =
   let signature = ord#symbol_ordering#signature in
   (* feature vector index *)
   let fv_idx = FV.mk_fv_index_signature signature in
-  {a_ord=ord; active_clauses=C.empty_bag; idx=I.empty; fv_idx=fv_idx}
+  {a_ord=ord; active_clauses=C.empty_bag; idx= !cur_index; fv_idx=fv_idx}
 
 let make_state ord queue_list select =
   let passive_set = {p_ord=ord; passive_clauses=C.empty_bag;
@@ -115,7 +118,7 @@ let add_active active_set c =
     then active_set, hc  (* already in active set *)
     else
       let new_bag = C.add_hc_to_bag active_set.active_clauses hc
-      and new_idx = I.index_clause active_set.idx hc
+      and new_idx = active_set.idx#index_clause hc
       and new_fv_idx = FV.index_clause active_set.fv_idx hc in
       {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}, hc
 
@@ -126,7 +129,7 @@ let remove_active active_set hc =
   if C.is_in_bag active_set.active_clauses hc.tag
     then
       let new_bag = C.remove_from_bag active_set.active_clauses hc.tag
-      and new_idx = I.remove_clause active_set.idx hc
+      and new_idx = active_set.idx#remove_clause hc
       and new_fv_idx = FV.remove_clause active_set.fv_idx hc in
       {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}
     else
@@ -168,12 +171,6 @@ type state_stats = {
   stats_active_clauses : int;
   stats_sos_clauses: int;
   stats_passive_clauses : int;
-  stats_root_index_keys : int;
-  stats_root_index_elems : int;
-  stats_subterm_index_keys : int;
-  stats_subterm_index_elems : int;
-  stats_unit_root_index_keys : int;
-  stats_unit_root_index_elems : int;
 }
 
 let stats state =
@@ -181,12 +178,6 @@ let stats state =
     stats_active_clauses = C.size_bag state.active_set.active_clauses;
     stats_sos_clauses = C.size_bag state.axioms_set.active_clauses;
     stats_passive_clauses = C.size_bag state.passive_set.passive_clauses;
-    stats_root_index_keys = I.DT.num_keys state.active_set.idx.I.root_index;
-    stats_root_index_elems = I.DT.num_elems state.active_set.idx.I.root_index;
-    stats_subterm_index_keys = I.DT.num_keys state.active_set.idx.I.subterm_index;
-    stats_subterm_index_elems = I.DT.num_elems state.active_set.idx.I.subterm_index;
-    stats_unit_root_index_keys = I.DT.num_keys state.active_set.idx.I.unit_root_index;
-    stats_unit_root_index_elems = I.DT.num_elems state.active_set.idx.I.unit_root_index;
   }
 
 let pp_state formatter state =

@@ -195,16 +195,14 @@ let infer_active_ actives clause =
   fold_positive ~both:true
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
-      let subterm_idx = actives.PS.idx.I.subterm_index in
-      let unifiables = I.DT.retrieve_unifiables subterm_idx s in
-      I.ClauseSet.fold
-        (fun (hc, u_pos, u_p) acc ->
+      let subterm_idx = actives.PS.idx#subterm_index in
+      subterm_idx#retrieve_unifiables s acc
+        (fun acc (hc, u_pos, u_p) ->
           try (* rewrite u_p with s, if they are unifiable *)
             let subst = Unif.unification s u_p in
             do_superposition ~ord clause s_pos hc.node u_pos subst acc
           with
             UnificationFailure _ -> acc)
-        unifiables acc
     )
     [] (C.maxlits clause)
 
@@ -224,19 +222,15 @@ let infer_passive_ actives clause =
       let ctx x = x in
       let new_clauses = all_positions u_pos ctx u
         (fun u_p p ctx ->
-          (* u at position p is u_p *)
-          let root_idx = actives.PS.idx.I.root_index in
           (* all terms that occur in an equation in the active_set
-             and that are potentially unifiable with u_p *)
-          let unifiables = I.DT.retrieve_unifiables root_idx u_p in
-          I.ClauseSet.fold
-            (fun (hc, s_pos, s) acc ->
+             and that are potentially unifiable with u_p (u at position p) *)
+          actives.PS.idx#root_index#retrieve_unifiables u_p acc
+            (fun acc (hc, s_pos, s) ->
               try
                 let subst = Unif.unification s u_p in
                 do_superposition ~ord hc.node s_pos clause p subst acc
               with
-                UnificationFailure _ -> acc)
-            unifiables [])
+                UnificationFailure _ -> acc))
       in List.rev_append new_clauses acc
     )
     [] lits
@@ -354,11 +348,9 @@ let demod_subterm ~ord blocked_ids active_set subterm =
   (* no rewriting on non-atomic formulae *)
   if subterm.node.sort = bool_sort && not (T.atomic subterm) then None else 
   (* unit clause+pos that potentially match subterm *)
-  let matches =
-    I.DT.retrieve_generalizations active_set.PS.idx.I.unit_root_index subterm in
   try
-    I.ClauseSet.iter
-      (fun (unit_hclause, pos, l) ->
+    active_set.PS.idx#unit_root_index#retrieve_generalizations subterm ()
+      (fun () (unit_hclause, pos, l) ->
         (* do we have to ignore the clause? *)
         if List.mem unit_hclause.tag blocked_ids then () else
         assert (T.db_closed l);
@@ -377,8 +369,7 @@ let demod_subterm ~ord blocked_ids active_set subterm =
           | _ -> assert false
         with
           UnificationFailure _ -> ()
-      )
-      matches;
+      );
     None  (* not found any match *)
   with
     FoundMatch (new_t, subst, unit_hclause, pos) ->

@@ -24,11 +24,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+(** (empty) index to use for active sets *)
+val cur_index : Index.clause_index ref
+
 (** set of active clauses *)
 type active_set = {
   a_ord : ordering;
   active_clauses : Clauses.bag;       (** set of active clauses *)
-  idx : Index.t;                      (** term index *)
+  idx : Index.clause_index;           (** term index *)
   fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
 }
 
@@ -81,12 +84,6 @@ type state_stats = {
   stats_active_clauses : int;
   stats_sos_clauses: int;
   stats_passive_clauses : int;
-  stats_root_index_keys : int;
-  stats_root_index_elems : int;
-  stats_subterm_index_keys : int;
-  stats_subterm_index_elems : int;
-  stats_unit_root_index_keys : int;
-  stats_unit_root_index_elems : int;
 }
 val stats : state -> state_stats
 

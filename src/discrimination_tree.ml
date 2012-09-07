@@ -18,279 +18,325 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+open Types
+open Hashcons
 
-type 'a path_string_elem =
-  | Constant of 'a * int (* name, arity *)
+module T = Terms
+module C = Clauses
+module Unif = FoUnif
+module Utils = FoUtils
+
+type path_string_elem = 
+  | Constant of symbol * int (* name, arity *)
   | Bound of int * int (* rel, arity *)
   | Variable (* arity is 0 *)
-  | Proposition (* arity is 0 *)
-  | Datatype (* arity is 0 *)
-  | Dead (* arity is 0 *)
+  | Proposition (* arity is 0 *) 
+  | Datatype (* arity is 0 *) 
+  | Dead (* arity is 0 *) 
 
-type 'a path = ('a path_string_elem) list
-
-module type Indexable = sig
-  type input
-  type constant_name
-  val compare:
-    constant_name path_string_elem ->
-    constant_name path_string_elem -> int
-  val string_of_path : constant_name path -> string
-  val path_string_of : input -> constant_name path
-end
+type path = path_string_elem list
 
 let arity_of = function
   | Constant (_,a)
   | Bound (_,a) -> a
   | _ -> 0
 
-module type DiscriminationTree =
-  sig
-    type input    (* indexed type *)
-    type data     (* value associated with input *)
-    type dataset  (* set of such values *)
-    type constant_name  (* constant terms (leaves) *)
-    type t        (* the tree itself *)
-
-    val iter : t -> (constant_name path -> dataset -> unit) -> unit
-    val fold : t -> (constant_name path -> dataset -> 'b -> 'b) -> 'b -> 'b
-
-    val empty : t
-    val index : t -> input -> data -> t
-    val remove_index : t -> input -> data -> t
-    val in_index : t -> input -> (data -> bool) -> bool
-    val retrieve_generalizations : t -> input -> dataset
-    val retrieve_unifiables : t -> input -> dataset
-    val retrieve_specializations: t -> input -> dataset
-    val num_keys : t -> int                       (** number of indexed keys (paths) *)
-    val num_elems : t -> int                      (** number of elements for any key *)
-
-    (* the int is the number of symbols that matched, note that
-     * Collector.to_list returns a sorted list, biggest matches first. *)
-    module type Collector = sig
-      type t
-      val empty : t
-      val union : t -> t -> t
-      val inter : t -> t -> data list
-      val to_list : t -> data list
-    end
-    module Collector : Collector
-    val retrieve_generalizations_sorted : t -> input -> Collector.t
-    val retrieve_unifiables_sorted : t -> input -> Collector.t
-  end
-
 let prof_dt_generalization = HExtlib.profile ~enable:true "discr_tree.retrieve_generalizations"
 let prof_dt_unifiables = HExtlib.profile ~enable:true "discr_tree.retrieve_unifiables"
 let prof_dt_specializations = HExtlib.profile ~enable:true "discr_tree.retrieve_specializations"
 
-module Make (I:Indexable) (A:Set.S) : DiscriminationTree
-  with type constant_name = I.constant_name and type input = I.input
-   and type data = A.elt and type dataset = A.t =
+(* a set of (hashconsed clause, position in clause). A position is a
+ * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
+ * where ... is the path in the term *)
+module ClauseSet : Set.S with 
+  type elt = hclause * position * foterm
+  = Set.Make(
+      struct 
+      type t = hclause * position * foterm
 
-  struct
-    module OrderedPathStringElement = struct
-      type t = I.constant_name path_string_elem
-      let compare = I.compare
-    end
+      let compare (c1, p1, t1) (c2, p2, t2) = 
+        let c = Pervasives.compare p1 p2 in
+        if c <> 0 then c else
+        let c = C.compare_hclause c1 c2 in
+        if c <> 0 then c else
+        (assert (T.eq_foterm t1 t2); 0)
+    end)
 
-    type constant_name = I.constant_name
-    type data = A.elt
-    type dataset = A.t
-    type input = I.input
+type input = foterm                         (** indexed type *)
+type data = ClauseSet.elt                   (** value associated with input *)
+type dataset = ClauseSet.t                  (** set of values *)
+type constant_name = symbol                 (** constant terms (leaves) *)
 
-    (* map of string elements *)
-    module PSMap = Map.Make(OrderedPathStringElement)
+module OrderedPathStringElement = struct
+  type t = path_string_elem
+  (** compare two path string elements *)
+  let compare e1 e2 = 
+    match e1,e2 with 
+    | Constant (a1,ar1), Constant (a2,ar2) ->
+        let c = compare a1 a2 in
+        if c <> 0 then c else Pervasives.compare ar1 ar2
+    | Variable, Variable -> 0
+    | Constant _, Variable -> ~-1
+    | Variable, Constant _ -> 1
+    | Proposition, _ | _, Proposition
+    | Datatype, _ | _, Datatype
+    | Dead, _ | _, Dead
+    | Bound _, _ | _, Bound _ -> assert false
+end
 
-    type key = PSMap.key
+(* convert into a path string *)
+let path_string_of t =
+  let rec aux arity t acc = match t.node.term with
+    | Leaf a -> (Constant (a, arity)) :: acc
+    | Var i -> (* assert (arity = 0); *) Variable :: acc
+    | Node ([] | [ _ ] )
+    (* FIXME : should this be allowed or not ? *)
+    | Node ({node={term=Var _}}::_)
+    | Node ({node={term=Node _}}::_) ->
+      failwith (Utils.sprintf "linearizing %a failed." !T.pp_term#pp t)
+    | Node (hd::tl) ->
+        let acc = aux (List.length tl) hd acc in
+        List.fold_left (fun acc t -> aux 0 t acc) acc tl
+  in 
+  (* we build the path in reverse order because it should be faster,
+     only two lists have to be built, and rev is tailrec *)
+  List.rev (aux 0 t [])
 
-    (* build a trie of such string elements *)
-    module DiscriminationTree = Trie.Make(PSMap)
+(* print path into string *)
+let string_of_path l =
+  let str_of_elem = function
+  | Variable -> "*"
+  | Constant (a, ar) -> Utils.on_buffer !T.pp_symbol#pp a
+  | _ -> "?"
+  in String.concat "." (List.map str_of_elem l)
 
-    type t = A.t DiscriminationTree.t
 
-    let empty = DiscriminationTree.empty
+(* map of string elements *)
+module PSMap = Map.Make(OrderedPathStringElement)
 
-    let iter dt f = DiscriminationTree.iter (fun p x -> f p x) dt
+type key = PSMap.key
 
-    let fold dt f = DiscriminationTree.fold (fun p x -> f p x) dt
+(** build a trie of such string elements *)
+module DiscriminationTree = Trie.Make(PSMap)
 
-    let index tree term info =
-      let ps = I.path_string_of term in
-      let ps_set =
-        try DiscriminationTree.find ps tree with Not_found -> A.empty
-      in
-      DiscriminationTree.add ps (A.add info ps_set) tree
+type tree = dataset DiscriminationTree.t
 
-    let remove_index tree term info =
-      let ps = I.path_string_of term in
-      try
-        let ps_set = A.remove info (DiscriminationTree.find ps tree) in
-        if A.is_empty ps_set then DiscriminationTree.remove ps tree
-        else DiscriminationTree.add ps ps_set tree
-      with Not_found -> tree
+let empty = DiscriminationTree.empty
 
-    let in_index tree term test =
-      let ps = I.path_string_of term in
-      try
-        let ps_set = DiscriminationTree.find ps tree in
-        A.exists test ps_set
-      with Not_found -> false
+let iter dt f = DiscriminationTree.iter (fun p x -> f p x) dt
 
-    (* You have h(f(x,g(y,z)),t) whose path_string_of_term_with_jl is
-       (h,2).(f,2).(x,0).(g,2).(y,0).(z,0).(t,0) and you are at f and want to
-       skip all its progeny, thus you want to reach t.
+let fold dt f = DiscriminationTree.fold (fun p x -> f p x) dt
 
-       You need to skip as many elements as the sum of all arities contained
-        in the progeny of f.
+let index tree term info =
+  let ps = path_string_of term in
+  let ps_set =
+    try DiscriminationTree.find ps tree with Not_found -> ClauseSet.empty
+  in
+  DiscriminationTree.add ps (ClauseSet.add info ps_set) tree
 
-       The input ariety is the one of f while the path is x.g....t
-       Should be the equivalent of after_t in the literature (handbook A.R.)
-     *)
-    let rec skip arity path =
-      if arity = 0 then path else match path with
-      | [] -> assert false
-      | m::tl -> skip (arity-1+arity_of m) tl
+let remove_index tree term info =
+  let ps = path_string_of term in
+  try
+    let ps_set = ClauseSet.remove info (DiscriminationTree.find ps tree) in
+    if ClauseSet.is_empty ps_set then DiscriminationTree.remove ps tree
+    else DiscriminationTree.add ps ps_set tree
+  with Not_found -> tree
 
-    (* the equivalent of skip, but on the index, thus the list of trees
-       that are rooted just after the term represented by the tree root
-       are returned (we are skipping the root) *)
-    let skip_root = function DiscriminationTree.Node (value, map) ->
-      let rec get n = function DiscriminationTree.Node (v, m) as tree ->
-         if n = 0 then [tree] else
-         PSMap.fold (fun k v res -> (get (n-1 + arity_of k) v) @ res) m []
-      in
-        PSMap.fold (fun k v res -> (get (arity_of k) v) @ res) map []
+let in_index tree term test =
+  let ps = path_string_of term in
+  try
+    let ps_set = DiscriminationTree.find ps tree in
+    ClauseSet.exists test ps_set
+  with Not_found -> false
 
-    let retrieve ~unify_query ~unify_indexed tree term =
-      let path = I.path_string_of term in
-      let rec retrieve path tree =
-        match tree, path with
-        | DiscriminationTree.Node (Some s, _), [] -> s
-        | DiscriminationTree.Node (None, _), [] -> A.empty
-        | DiscriminationTree.Node (_, map), Variable::path when unify_query ->
-            List.fold_left A.union A.empty
-              (List.map (retrieve path) (skip_root tree))
-        | DiscriminationTree.Node (_, map), node::path ->
-            A.union
-               (if not unify_query && node = Variable then A.empty else
-               (* follow the branch of the trie that corresponds to the query symbol *)
-                try retrieve path (PSMap.find node map)
-                with Not_found -> A.empty)
-               (if not unify_indexed then A.empty else
-               (* follow a 'variable' branch of the trie *)
-               try match PSMap.find Variable map,skip (arity_of node) path with
-                  | DiscriminationTree.Node (Some s, _), [] -> s
-                  | n, path -> retrieve path n
-                with Not_found -> A.empty)
-     in
-     retrieve path tree
+(* You have h(f(x,g(y,z)),t) whose path_string_of_term_with_jl is
+   (h,2).(f,2).(x,0).(g,2).(y,0).(z,0).(t,0) and you are at f and want to
+   skip all its progeny, thus you want to reach t.
 
-    let retrieve_generalizations tree term =
-      prof_dt_generalization.HExtlib.profile
-      (retrieve ~unify_query:false ~unify_indexed:true tree) term
+   You need to skip as many elements as the sum of all arities contained
+    in the progeny of f.
 
-    let retrieve_unifiables tree term =
-      prof_dt_unifiables.HExtlib.profile
-      (retrieve ~unify_query:true ~unify_indexed:true tree) term
+   The input ariety is the one of f while the path is x.g....t
+   Should be the equivalent of after_t in the literature (handbook A.R.)
+ *)
+let rec skip arity path =
+  if arity = 0 then path else match path with
+  | [] -> assert false
+  | m::tl -> skip (arity-1+arity_of m) tl
 
-    let retrieve_specializations tree term =
-      prof_dt_specializations.HExtlib.profile
-      (retrieve ~unify_query:true ~unify_indexed:false tree) term
+(* the equivalent of skip, but on the index, thus the list of trees
+   that are rooted just after the term represented by the tree root
+   are returned (we are skipping the root) *)
+let skip_root = function DiscriminationTree.Node (value, map) ->
+  let rec get n = function DiscriminationTree.Node (v, m) as tree ->
+     if n = 0 then [tree] else
+     PSMap.fold (fun k v res -> (get (n-1 + arity_of k) v) @ res) m []
+  in
+    PSMap.fold (fun k v res -> (get (arity_of k) v) @ res) map []
 
-    let num_keys tree =
-      let num = ref 0 in
-      iter tree (fun _ _ -> incr num);
-      !num
-
-    let num_elems tree =
-      let num = ref 0 in
-      iter tree (fun _ elems -> num := !num + (A.cardinal elems));
-      !num
-
-    module O = struct
-      type t = A.t * int
-      let compare (sa,wa) (sb,wb) =
-        let c = compare wb wa in
-        if c <> 0 then c else A.compare sb sa
-    end
-    module S = Set.Make(O)
-
-    (* TASSI: here we should think of a smarted data structure *)
-    module type Collector = sig
-      type t
-      val empty : t
-      val union : t -> t -> t
-      val inter : t -> t -> data list
-      val to_list : t -> data list
-    end
-    module Collector : Collector with type t = S.t = struct
-      type t = S.t
-      let union = S.union
-      let empty = S.empty
-
-      let merge l =
-        let rec aux s w = function
-          | [] -> [s,w]
-          | (t, wt)::tl when w = wt -> aux (A.union s t) w tl
-          | (t, wt)::tl -> (s, w) :: aux t wt tl
+let retrieve ~unify_query ~unify_indexed tree term acc f =
+  let path = path_string_of term in
+  let rec retrieve path acc tree =
+    match tree, path with
+    | DiscriminationTree.Node (Some s, _), [] -> ClauseSet.fold (fun elt acc -> f acc elt) s acc
+    | DiscriminationTree.Node (None, _), [] -> acc
+    | DiscriminationTree.Node (_, map), Variable::path when unify_query ->
+        List.fold_left (retrieve path) acc (skip_root tree)
+    | DiscriminationTree.Node (_, map), node::path ->
+        let acc = 
+          if not unify_query && node = Variable then acc else
+          (* follow the branch of the trie that corresponds to the query symbol *)
+          try retrieve path acc (PSMap.find node map)
+          with Not_found -> acc
         in
-        match l with
-        | [] -> []
-        | (s, w) :: l -> aux s w l
+        if not unify_indexed then acc else
+        (* follow a 'variable' branch of the trie *)
+        try match PSMap.find Variable map,skip (arity_of node) path with
+          | DiscriminationTree.Node (Some s, _), [] ->
+              ClauseSet.fold (fun elt acc -> f acc elt) s acc
+          | n, path -> retrieve path acc n
+        with Not_found -> acc
+ in
+ retrieve path acc tree
 
-      let rec undup ~eq = function
-        | [] -> []
-        | x :: tl -> x :: undup ~eq (List.filter (fun y -> not(eq x y)) tl)
+let num_keys tree =
+  let num = ref 0 in
+  iter tree (fun _ _ -> incr num);
+  !num
 
-      let to_list t =
-        undup ~eq:(fun x y -> A.equal (A.singleton x) (A.singleton y))
-          (List.flatten (List.map
-            (fun (x,_) -> A.elements x) (merge (S.elements t))))
+let num_elems tree =
+  let num = ref 0 in
+  iter tree (fun _ elems -> num := !num + (ClauseSet.cardinal elems));
+  !num
 
-      (* TODO why not use Set.inter? *)
-      let inter t1 t2 =
-        let l1 = merge (S.elements t1) in
-        let l2 = merge (S.elements t2) in
-        let res =
-         List.flatten
-          (List.map
-            (fun (s, w) ->
-               HExtlib.filter_map (fun x ->
-                 try Some (x, w + snd (List.find (fun (s,w) -> A.mem x s) l2))
-                 with Not_found -> None)
-                 (A.elements s))
-            l1)
-        in
-        undup ~eq:(fun x y -> A.equal (A.singleton x) (A.singleton y))
-          (List.map fst (List.sort (fun (_,x) (_,y) -> y - x) res))
-    end
+let index : Index.index =
+  object (_ : 'self)
+    val tree : tree = empty   (* the discrimination tree *)
 
-    let retrieve_sorted unif tree term =
-      let path = I.path_string_of term in
-      let rec retrieve n path tree =
-        match tree, path with
-        | DiscriminationTree.Node (Some s, _), [] -> S.singleton (s, n)
-        | DiscriminationTree.Node (None, _), [] -> S.empty
-        | DiscriminationTree.Node (_, map), Variable::path when unif ->
-            List.fold_left S.union S.empty
-              (List.map (retrieve n path) (skip_root tree))
-        | DiscriminationTree.Node (_, map), node::path ->
-            S.union
-               (if not unif && node = Variable then S.empty else
-                try retrieve (n+1) path (PSMap.find node map)
-                with Not_found -> S.empty)
-               (try
-                  match PSMap.find Variable map,skip (arity_of node) path with
-                  | DiscriminationTree.Node (Some s, _), [] ->
-                     S.singleton (s, n)
-                  | no, path -> retrieve n path no
-                with Not_found -> S.empty)
-     in
-      retrieve 0 path tree
+    method add t data = ({< tree = index tree t data >} : 'self)
 
-    let retrieve_generalizations_sorted tree term =
-      retrieve_sorted false tree term
-    let retrieve_unifiables_sorted tree term =
-      retrieve_sorted true tree term
+    method remove t data = ({< tree = remove_index tree t data >} : 'self)
+
+    method iter f = iter tree (fun p data -> ClauseSet.iter f data)
+
+    method fold : 'a. ('a -> ClauseSet.elt -> 'a) -> 'a -> 'a =
+      fun f acc ->
+        let acc = ref acc in
+        iter tree (fun p data -> acc :=
+          ClauseSet.fold (fun elt acc -> f acc elt) data !acc);
+        !acc
+
+    method retrieve_generalizations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
+      fun t acc f ->
+        prof_dt_generalization.HExtlib.profile
+        (retrieve ~unify_query:false ~unify_indexed:true tree t acc) f
+
+    method retrieve_unifiables : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
+      fun t acc f ->
+        prof_dt_unifiables.HExtlib.profile
+        (retrieve ~unify_query:true ~unify_indexed:true tree t acc) f
+
+    method retrieve_specializations : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
+      fun t acc f ->
+        prof_dt_specializations.HExtlib.profile
+        (retrieve ~unify_query:true ~unify_indexed:false tree t acc) f
+
+    method pp ~all_clauses formatter () =
+      let print_dt_path path set =
+        if all_clauses
+          then let l = ClauseSet.elements set in
+          Format.fprintf formatter "%s : @[<hov>%a@]@;" (string_of_path path)
+            (Utils.pp_list ~sep:", " !C.pp_clause#pp_h_pos) l
+          else Format.fprintf formatter "@[<h>%s : %d clauses/pos@]@;"
+            (string_of_path path) (ClauseSet.cardinal set)
+      in
+      iter tree print_dt_path
   end
 
+(** process the literal (only its maximal side(s)) *)
+let process_lit op c tree (lit, pos) =
+  match lit with
+  | Equation (l,_,_,Gt) -> 
+      op tree l (c, [C.left_pos; pos])
+  | Equation (_,r,_,Lt) -> 
+      op tree r (c, [C.right_pos; pos])
+  | Equation (l,r,_,Incomparable)
+  | Equation (l,r,_,Invertible) ->
+      let tmp_tree = op tree l (c, [C.left_pos; pos]) in
+      op tmp_tree r (c, [C.right_pos; pos])
+  | Equation (l,r,_,Eq) ->
+    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index"
+                   !T.pp_term#pp l !T.pp_term#pp r));
+    op tree l (c, [C.left_pos; pos])  (* only index one side *)
+
+(** apply op to the maximal literals of the clause, and only to
+    the maximal side(s) of those. *)
+let process_clause op tree c =
+  (* index literals with their position *)
+  let lits_pos = Utils.list_pos c.node.clits in
+  let new_tree = List.fold_left (process_lit op c) tree lits_pos in
+  new_tree
+
+(** apply (op tree) to all subterms, folding the resulting tree *)
+let rec fold_subterms op tree t (c, path) = match t.node.term with
+  | Var _ -> tree  (* variables are not indexed *)
+  | Leaf _ -> op tree t (c, List.rev path, t) (* reverse path now *)
+  | Node (_::l) ->
+      (* apply the operation on the term itself *)
+      let tmp_tree = op tree t (c, List.rev path, t) in
+      let _, new_tree = List.fold_left
+        (* apply the operation on each i-th subterm with i::path
+           as position. i starts at 1 and the function symbol is ignored. *)
+        (fun (idx, tree) t -> idx+1, fold_subterms op tree t (c, idx::path))
+        (1, tmp_tree) l
+      in new_tree
+  | _ -> assert false
+
+(** apply (op tree) to the root term, after reversing the path *)
+let apply_root_term op tree t (c, path) = op tree t (c, List.rev path, t)
+
+let clause_index =
+  object (_: 'self)
+    val _root_index = index
+    val _subterm_index = index
+    val _unit_root_index = index 
+
+    method name = "discrimination_tree_index"
+
+    (** add root terms and subterms to respective indexes *)
+    method index_clause hc =
+      let op tree = tree#add in
+      let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
+      and new_unit_root_index = match hc.node.clits with
+          | [(Equation (_,_,true,_)) as lit] ->
+              process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
+          | _ -> _unit_root_index
+      and new_root_index = process_clause (apply_root_term op) _root_index hc
+      in ({< _root_index=new_root_index;
+            _unit_root_index=new_unit_root_index;
+            _subterm_index=new_subterm_index >} :> 'self)
+
+    (** remove root terms and subterms from respective indexes *)
+    method remove_clause hc =
+      let op tree = tree#remove in
+      let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
+      and new_unit_root_index = match hc.node.clits with
+          | [(Equation (_,_,true,_)) as lit] ->
+              process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
+          | _ -> _unit_root_index
+      and new_root_index = process_clause (apply_root_term op) _root_index hc
+      in ({< _root_index=new_root_index;
+            _unit_root_index=new_unit_root_index;
+            _subterm_index=new_subterm_index >} :> 'self)
+
+    method root_index = _root_index
+    method unit_root_index = _unit_root_index
+    method subterm_index = _subterm_index
+
+    method pp ~all_clauses formatter () =
+      Format.fprintf formatter
+        "clause_index:@.root_index=@[<v>%a@]@.unit_root_index=@[<v>%a@]@.subterm_index=@[<v>%a@]@."
+        (_root_index#pp ~all_clauses) ()
+        (_unit_root_index#pp ~all_clauses) ()
+        (_subterm_index#pp ~all_clauses) ()
+  end
