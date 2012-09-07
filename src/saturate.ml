@@ -156,7 +156,7 @@ let given_clause_step ~calculus state =
           (* do not keep trivial  clauses *)
           if calculus#trivial simplified_c then None
           (* do not keep subsumed clauses *)
-          else if is_redundant ~calculus state.PS.active_set c then None
+          else if is_redundant ~calculus state.PS.active_set simplified_c then None
           else Some simplified_c
         )
         new_clauses
