@@ -385,8 +385,8 @@ let pp_term_debug =
         when (s = forall_symbol || s = exists_symbol) ->
         assert (s' = lambda_symbol);
         if !_skip_lambdas
-          then Format.fprintf formatter "%a%a" self#pp hd self#pp t'
-          else Format.fprintf formatter "%a%a%a" self#pp hd self#pp hd' self#pp t'
+          then Format.fprintf formatter "%a(%a)" self#pp hd self#pp t'
+          else Format.fprintf formatter "%a%a(%a)" self#pp hd self#pp hd' self#pp t'
       | Node [{node={term=Leaf s}}; _] when s = succ_db_symbol && !_skip_db ->
         pp_db formatter t (* print de bruijn symbol *)
       | Node (({node={term=Leaf s}} as head)::args) ->

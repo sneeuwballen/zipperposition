@@ -215,7 +215,7 @@ let infer_passive_ actives clause =
   let ord = actives.PS.a_ord in
   let lits = if C.selected clause = []
     then C.maxlits clause
-    else Utils.list_pos clause.clits in
+    else Utils.list_pos clause.clits in   (* TODO iterate only on selected lits *)
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
   fold_lits ~both:true ~pos:true ~neg:true
