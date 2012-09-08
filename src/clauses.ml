@@ -357,6 +357,10 @@ let selected_lit c idx =
   in
   check (selected c)
 
+(** get the list of selected literals *)
+let selected_lits c =
+  List.map (fun idx -> get_lit c idx, idx) (selected c)
+
 (** check whether a literal is eligible for resolution *)
 let eligible_res ~ord c idx subst =
   (* find selected maximal literals with given sign *)

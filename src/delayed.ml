@@ -110,7 +110,7 @@ let delta_eliminate ~ord clause idx t sign =
 let connective_elimination ~ord clause =
   let lits = if C.selected clause = []
     then C.maxlits clause
-    else Utils.list_pos clause.clits in
+    else C.selected_lits clause in
   fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos ->
       (* if a literal is true_term, must be r because it is the smallest term *)
@@ -141,7 +141,7 @@ let connective_elimination ~ord clause =
 let forall_elimination ~ord clause =
   let lits = if C.selected clause = []
     then C.maxlits clause
-    else Utils.list_pos clause.clits in
+    else C.selected_lits clause in
   fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
@@ -164,7 +164,7 @@ let forall_elimination ~ord clause =
 let exists_elimination ~ord clause =
   let lits = if C.selected clause = []
     then C.maxlits clause
-    else Utils.list_pos clause.clits in
+    else C.selected_lits clause in
   fold_lits ~both:false ~pos:true ~neg:true
     (fun acc l r sign l_pos -> 
       if not (T.eq_foterm r T.true_term) then acc else
@@ -187,7 +187,7 @@ let exists_elimination ~ord clause =
 let equivalence_elimination ~ord clause =
   let lits = if C.selected clause = []
     then C.maxlits clause
-    else Utils.list_pos clause.clits in
+    else C.selected_lits clause in
   (* do the inference for positive equations *)
   let do_inferences_pos l r l_pos =
     if T.atomic l then [] else begin

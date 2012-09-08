@@ -100,6 +100,8 @@ val normalize_clause : ord:ordering -> clause -> clause
 
 (** check whether a literal is selected *)
 val selected_lit : clause -> int -> bool
+(** get the list of selected literals *)
+val selected_lits : clause -> (literal * int) list
 (** check whether a literal is eligible for resolution *)
 val eligible_res : ord:ordering -> clause -> int -> substitution -> bool
 (** check whether a literal is eligible for paramodulation *)
