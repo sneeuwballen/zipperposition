@@ -21,12 +21,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** fingerprint term indexing (TODO use union-find to do indexing modulo axioms) *)
 
 open Types
+open Hashcons
 
 module Utils = FoUtils
 module T = Terms
+module C = Clauses
+
+type data = Index.data
 
 (** a feature *)
-type feature = A | B | N | Symb of symbol
+type feature = A | B | N | S of symbol
 
 (** a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = foterm -> feature list
@@ -35,12 +39,12 @@ type fingerprint_fun = foterm -> feature list
 (** compute a feature for a given position *)
 let rec gfpf pos t = match pos, t.node.term with
   | [], Var _ -> A
-  | [], Leaf s -> Symb s
-  | [], Node ({node={term=Leaf s}}::_) -> Symb s
+  | [], Leaf s -> S s
+  | [], Node ({node={term=Leaf s}}::_) -> S s
   | [], _ -> failwith (Utils.sprintf "bad term: %a" !T.pp_term#pp t)
   | i::pos', Node l ->
-    try gfpf pos' (Utils.list_get l i)  (* recurse in subterm *)
-    with Not_found -> N  (* not a position in t *)
+    (try gfpf pos' (Utils.list_get l i)  (* recurse in subterm *)
+    with Not_found -> N)  (* not a position in t *)
   | _::_, Var _ -> B  (* under variable *)
   | _::_, Leaf _ -> N
 
@@ -63,6 +67,7 @@ let fp4w = fp [[]; [1]; [2]; [3]]
 let fp5m = fp [[]; [1]; [2]; [3]; [1;1]]
 let fp6m = fp [[]; [1]; [2]; [3]; [1;1]; [1;2]]
 let fp7  = fp [[]; [1]; [2]; [1;1]; [1;2]; [2;1] ; [2;2]]
+let fp7m = fp [[]; [1]; [2]; [3]; [1;1]; [4]; [1;2]]
 let fp16 = fp [[]; [1]; [2]; [3]; [4]; [1;1]; [1;2]; [1;3]; [2;1];
                [2;2]; [2;3]; [3;1]; [3;2]; [3;3]; [1;1;1]; [2;1;1]]
 
@@ -93,8 +98,6 @@ let compatible_features_match f1 f2 =
   | A, B -> false
   | A, _ -> true
   | S _, _ -> false
-  | A, S _ | B, S _ -> true
-
 
 (** Map whose keys are features *)
 module FeatureMap = Map.Make(
@@ -165,8 +168,8 @@ let remove fp trie t data =
   (* recursive deletion *)
   let rec recurse trie features =
     match trie, features with
-    | Empty, [] | Empty, f::features ->
-      Empty '(* keep it empty *)
+    | Empty, [] | Empty, _::_ ->
+      Empty (* keep it empty *)
     | Node map, f::features' ->
       let map =
         (* delete from subtrie, if there is a subtrie *)
@@ -196,7 +199,7 @@ let remove fp trie t data =
 let rec iter trie f = match trie with
   | Empty -> ()
   | Node map -> FeatureMap.iter (fun _ subtrie -> iter subtrie f) map
-  | Leaf set -> ClauseSet.iter f
+  | Leaf set -> ClauseSet.iter f set
 
 let fold trie f acc =
   let acc = ref acc in
@@ -242,25 +245,25 @@ let mk_index fp =
 
     method iter f = iter trie f
 
-    method fold f acc = fold trie f acc
+    method fold : 'a. ('a -> ClauseSet.elt -> 'a) -> 'a -> 'a =
+      fun f acc -> fold trie f acc
 
     method retrieve_unifiables: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a  =
       fun t acc f ->
         let features = fp t in
-        traverse ~compatible:compatible_features_unif trie features acc
+        traverse ~compatible:compatible_features_unif trie features f acc
 
     method retrieve_generalizations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
       fun t acc f ->
         let features = fp t in
-        traverse ~compatible:compatible_features_match trie features acc
+        traverse ~compatible:compatible_features_match trie features f acc
 
     method retrieve_specializations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a = 
       fun t acc f ->
         let features = fp t in
         (* compatibility is like matching, but converse *)
         let compatible f1 f2 = compatible_features_match f2 f1 in
-        traverse ~compatible trie features acc
+        traverse ~compatible trie features f acc
 
-    method pp ~all_clauses formatter () =
-      failwith "not implemented" (* TODO *)
+    method pp ~all_clauses formatter () = ()  (* TODO *)
   end
