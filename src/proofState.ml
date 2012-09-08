@@ -30,7 +30,7 @@ module CQ = ClauseQueue
 module U = FoUtils
 
 (** Default indexing on terms *)
-let cur_index = ref Discrimination_tree.clause_index
+let cur_index = ref (I.mk_clause_index Discrimination_tree.index)
 
 (** set of active clauses *)
 type active_set = {

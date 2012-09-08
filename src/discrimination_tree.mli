@@ -51,4 +51,3 @@ val num_keys : tree -> int                  (** number of indexed keys (paths) *
 val num_elems : tree -> int                 (** number of elements for any key *)
 
 val index : Index.index                     (** the index *)
-val clause_index : Index.clause_index       (** the clause index *)

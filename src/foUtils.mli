@@ -51,7 +51,7 @@ val multiset_partial : ('a -> 'a -> comparison) -> 'a list -> 'a list -> compari
 
 (* TODO merge this and hExtlib *)
 
-(** get n-th element of list (linear) *)
+(** get n-th element of list (linear), or Not_found *)
 val list_get : 'a list -> int -> 'a
 (** set n-th element of list (linear) *)
 val list_set : 'a list -> int -> 'a -> 'a list

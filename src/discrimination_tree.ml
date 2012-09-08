@@ -45,9 +45,7 @@ let prof_dt_generalization = HExtlib.profile ~enable:true "discr_tree.retrieve_g
 let prof_dt_unifiables = HExtlib.profile ~enable:true "discr_tree.retrieve_unifiables"
 let prof_dt_specializations = HExtlib.profile ~enable:true "discr_tree.retrieve_specializations"
 
-(* a set of (hashconsed clause, position in clause). A position is a
- * list, that, once reversed, is [lit index, 1|2 (left or right), ...]
- * where ... is the path in the term *)
+(* a set of (hashconsed clause, position in clause, term at position). *)
 module ClauseSet : Set.S with 
   type elt = hclause * position * foterm
   = Set.Make(
@@ -213,6 +211,8 @@ let index : Index.index =
   object (_ : 'self)
     val tree : tree = empty   (* the discrimination tree *)
 
+    method name = "discrimination_tree_index"
+
     method add t data = ({< tree = index tree t data >} : 'self)
 
     method remove t data = ({< tree = remove_index tree t data >} : 'self)
@@ -251,92 +251,4 @@ let index : Index.index =
             (string_of_path path) (ClauseSet.cardinal set)
       in
       iter tree print_dt_path
-  end
-
-(** process the literal (only its maximal side(s)) *)
-let process_lit op c tree (lit, pos) =
-  match lit with
-  | Equation (l,_,_,Gt) -> 
-      op tree l (c, [C.left_pos; pos])
-  | Equation (_,r,_,Lt) -> 
-      op tree r (c, [C.right_pos; pos])
-  | Equation (l,r,_,Incomparable)
-  | Equation (l,r,_,Invertible) ->
-      let tmp_tree = op tree l (c, [C.left_pos; pos]) in
-      op tmp_tree r (c, [C.right_pos; pos])
-  | Equation (l,r,_,Eq) ->
-    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index"
-                   !T.pp_term#pp l !T.pp_term#pp r));
-    op tree l (c, [C.left_pos; pos])  (* only index one side *)
-
-(** apply op to the maximal literals of the clause, and only to
-    the maximal side(s) of those. *)
-let process_clause op tree c =
-  (* index literals with their position *)
-  let lits_pos = Utils.list_pos c.node.clits in
-  let new_tree = List.fold_left (process_lit op c) tree lits_pos in
-  new_tree
-
-(** apply (op tree) to all subterms, folding the resulting tree *)
-let rec fold_subterms op tree t (c, path) = match t.node.term with
-  | Var _ -> tree  (* variables are not indexed *)
-  | Leaf _ -> op tree t (c, List.rev path, t) (* reverse path now *)
-  | Node (_::l) ->
-      (* apply the operation on the term itself *)
-      let tmp_tree = op tree t (c, List.rev path, t) in
-      let _, new_tree = List.fold_left
-        (* apply the operation on each i-th subterm with i::path
-           as position. i starts at 1 and the function symbol is ignored. *)
-        (fun (idx, tree) t -> idx+1, fold_subterms op tree t (c, idx::path))
-        (1, tmp_tree) l
-      in new_tree
-  | _ -> assert false
-
-(** apply (op tree) to the root term, after reversing the path *)
-let apply_root_term op tree t (c, path) = op tree t (c, List.rev path, t)
-
-let clause_index =
-  object (_: 'self)
-    val _root_index = index
-    val _subterm_index = index
-    val _unit_root_index = index 
-
-    method name = "discrimination_tree_index"
-
-    (** add root terms and subterms to respective indexes *)
-    method index_clause hc =
-      let op tree = tree#add in
-      let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = match hc.node.clits with
-          | [(Equation (_,_,true,_)) as lit] ->
-              process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
-          | _ -> _unit_root_index
-      and new_root_index = process_clause (apply_root_term op) _root_index hc
-      in ({< _root_index=new_root_index;
-            _unit_root_index=new_unit_root_index;
-            _subterm_index=new_subterm_index >} :> 'self)
-
-    (** remove root terms and subterms from respective indexes *)
-    method remove_clause hc =
-      let op tree = tree#remove in
-      let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = match hc.node.clits with
-          | [(Equation (_,_,true,_)) as lit] ->
-              process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
-          | _ -> _unit_root_index
-      and new_root_index = process_clause (apply_root_term op) _root_index hc
-      in ({< _root_index=new_root_index;
-            _unit_root_index=new_unit_root_index;
-            _subterm_index=new_subterm_index >} :> 'self)
-
-    method root_index = _root_index
-    method unit_root_index = _unit_root_index
-    method subterm_index = _subterm_index
-
-    method pp ~all_clauses formatter () =
-      Format.fprintf formatter
-        "clause_index:@.root_index=@[<v>%a@]@.unit_root_index=@[<v>%a@]@.subterm_index=@[<v>%a@]@."
-        (_root_index#pp ~all_clauses) ()
-        (_unit_root_index#pp ~all_clauses) ()
-        (_subterm_index#pp ~all_clauses) ()
   end

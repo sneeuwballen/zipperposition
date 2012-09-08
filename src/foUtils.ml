@@ -142,7 +142,7 @@ let multiset_partial f l1 l2 =
   | _ -> find_dominating l1 l2
 
 let rec list_get l i = match l, i with
-  | [], i -> invalid_arg "index too high"
+  | [], i -> raise Not_found
   | x::_, i when i = 0 -> x
   | _::xs, i when i > 0 -> list_get xs (i-1)
   | _ -> failwith "error in list_get"
