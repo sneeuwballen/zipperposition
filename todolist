@@ -7,3 +7,4 @@
 - simplify : clause -> clause list (for elimination rules in delayed, also for redundancy)
 - find better heuristics for delayed superposition
 - output dedukti code (or even Coq code?)
+- graphviz output
