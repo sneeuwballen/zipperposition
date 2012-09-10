@@ -11,9 +11,9 @@ module TT = TestTerms
 module Utils = FoUtils
 module Sup = Superposition
 
-let print_clause = C.pp_clause ~sort:false
+let print_clause formatter c = !C.pp_clause#pp formatter c
 let print_clause_pair formatter (c1, c2) = 
-  Format.fprintf formatter "(%a, %a)" print_clause c1 print_clause c2
+  Format.fprintf formatter "(%a, %a)" !C.pp_clause#pp c1 !C.pp_clause#pp c2
 
 (** random literal *)
 let random_lit () =
@@ -38,13 +38,13 @@ let random_clause ?(size=4) () =
   if H.random_in 0 200 >= 198 then
     (* empty clause, from time to time *)
     let ord = O.dummy_ordering in
-    C.mk_clause ~ord [] (lazy (Axiom ("", "empty!")))
+    C.mk_clause ~ord [] ~selected:(lazy []) (lazy (Axiom ("", "empty!")))
   else
     (* build an actual clause *)
     let size = H.random_in 1 size in
     let lits = Utils.times size (fun _ -> random_lit ()) in
     let ord = O.dummy_ordering in
-    C.mk_clause ~ord lits (lazy (Axiom ("", "random")))
+    C.mk_clause ~ord lits ~selected:(lazy [])(lazy (Axiom ("", "random")))
 
 (* pair of random clauses *)
 let random_clause_pair () = (random_clause ~size:3 (), random_clause ~size:6 ())
@@ -87,12 +87,12 @@ let check_subsumption (c1, c2) =
 let print_subsuming_failure formatter (c1,c2,c1',c2',subst) =
   Format.fprintf formatter "@[<hv 3>(%a,@; %a,@; %a,@; %a,@; %a)@]"
     print_clause c1 print_clause c2 print_clause c1' print_clause c2'
-    (S.pp_substitution ~sort:false) subst
+    S.pp_substitution subst
 
 let run () =
   Format.printf "run clauses tests@.";
   H.check_and_print ~name:"check_fresh" check_fresh
     (random_clause ~size:4) print_clause_pair 2000;
   H.check_and_print ~name:"check_subsumption" check_subsumption
-    random_clause_pair print_subsuming_failure 10000
+    random_clause_pair print_subsuming_failure 1000
 

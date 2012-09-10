@@ -26,15 +26,15 @@ let random_term () =
     T.mk_node (head::subterms)
   and random_leaf () =
     if H.R.bool ()
-      then T.mk_leaf (H.choose symbols) T.univ_sort
-      else T.mk_var (H.random_in 0 3) T.univ_sort
+      then T.mk_leaf (H.choose symbols) univ_sort
+      else T.mk_var (H.random_in 0 3) univ_sort
   and random_fun () =
-    T.mk_leaf (H.choose funs) T.univ_sort
+    T.mk_leaf (H.choose funs) univ_sort
   in aux depth
 
 (** random bool-sorted term *)
 let random_pred () =
-  let p = T.mk_leaf (H.choose preds) T.bool_sort in
+  let p = T.mk_leaf (H.choose preds) bool_sort in
   let arity = H.random_in 0 3 in
   if arity = 0
     then p
@@ -62,6 +62,6 @@ let check_unif (t1, t2) =
 let run () =
   Format.printf "run terms test@.";
   let pp_pair formater (t1,t2) = Format.fprintf formater "(%a, %a)"
-    T.pp_foterm t1 T.pp_foterm t2 in
-  H.check_and_print ~name:"check_subterm" check_subterm random_term T.pp_foterm 5000;
+    !T.pp_term#pp t1 !T.pp_term#pp t2 in
+  H.check_and_print ~name:"check_subterm" check_subterm random_term !T.pp_term#pp 5000;
   H.check_and_print ~name:"check_unif" check_unif random_pair pp_pair 5000
