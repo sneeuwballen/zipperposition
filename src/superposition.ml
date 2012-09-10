@@ -557,29 +557,27 @@ let subsumes a b =
   in
   prof_subsumption.HExtlib.profile (check a) b
 
-let subsumed_by_set_ set clause =
+let subsumed_by_set_ set c =
   (* use feature vector indexing *)
-  let candidates = FV.retrieve_subsuming set.PS.fv_idx clause in
   try
-    List.iter
-      (fun hc ->
-        if subsumes hc clause then raise Exit else ())
-      candidates;
+    FV.retrieve_subsuming set.PS.fv_idx c
+      (fun c' -> if subsumes c' c then raise Exit);
     false
   with Exit ->
     Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumed by active set"
-                         !C.pp_clause#pp clause));
+                         !C.pp_clause#pp c));
     true
 
 let subsumed_by_set set clause =
   prof_subsumption_set.HExtlib.profile (subsumed_by_set_ set) clause
 
-let subsumed_in_set_ set clause =
+let subsumed_in_set_ set c =
   (* use feature vector indexing *)
-  let candidates = FV.retrieve_subsumed set.PS.fv_idx clause in
-  List.filter
-    (fun hc -> subsumes clause hc)
-    candidates
+  let l = ref [] in
+    FV.retrieve_subsumed
+      set.PS.fv_idx c
+      (fun c' -> if subsumes c c' then l := c' :: !l);
+  !l
 
 let subsumed_in_set set clause =
   prof_subsumption_in_set.HExtlib.profile (subsumed_in_set_ set) clause

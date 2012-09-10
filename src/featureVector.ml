@@ -167,38 +167,38 @@ let remove_clause (features, trie) hc =
 
 
 (** clauses that subsume (potentially) the given clause *)
-let retrieve_subsuming (features, trie) clause =
+let retrieve_subsuming (features, trie) clause f =
   (* feature vector of the clause *)
   let fv = compute_fv features clause in
-  let rec fold_lower acc fv node = match fv, node with
-  | [], FVTrie.Node (None, _) -> acc
+  let rec iter_lower fv node = match fv, node with
+  | [], FVTrie.Node (None, _) -> ()
   | [], FVTrie.Node (Some hclauses, _) ->
-      List.rev_append (S.elements hclauses) acc
+      S.iter f hclauses
   | i::fv', FVTrie.Node (_, map) ->
-    Ptmap.fold
-      (fun j subnode acc -> if j <= i
-        then fold_lower acc fv' subnode  (* go in the branch *)
-        else acc  (* do not go in the branch *)
+    Ptmap.iter
+      (fun j subnode -> if j <= i
+        then iter_lower fv' subnode  (* go in the branch *)
+        else () (* do not go in the branch *)
       )
-      map acc
+      map
   in
-  fold_lower [] fv trie
+  iter_lower fv trie
 
 (** clauses that are subsumed (potentially) by the given clause *)
-let retrieve_subsumed (features, trie) clause =
+let retrieve_subsumed (features, trie) clause f =
   (* feature vector of the clause *)
   let fv = compute_fv features clause in
-  let rec fold_higher acc fv node = match fv, node with
-  | [], FVTrie.Node (None, _) -> acc
+  let rec iter_higher fv node = match fv, node with
+  | [], FVTrie.Node (None, _) -> ()
   | [], FVTrie.Node (Some hclauses, _) ->
-      List.rev_append (S.elements hclauses) acc
+      S.iter f hclauses
   | i::fv', FVTrie.Node (_, map) ->
-    Ptmap.fold
-      (fun j subnode acc -> if j >= i
-        then fold_higher acc fv' subnode  (* go in the branch *)
-        else acc  (* do not go in the branch *)
+    Ptmap.iter
+      (fun j subnode -> if j >= i
+        then iter_higher fv' subnode  (* go in the branch *)
+        else () (* do not go in the branch *)
       )
-      map acc
+      map
   in
-  fold_higher [] fv trie
+  iter_higher fv trie
 

@@ -48,6 +48,8 @@ val mk_fv_index_signature : symbol list -> fv_index (** create an index from sig
 val index_clause : fv_index -> hclause -> fv_index  (** add the clause to the index *)
 val remove_clause : fv_index -> hclause -> fv_index (** remove the clause from the index *)
 
-val retrieve_subsuming : fv_index -> clause -> hclause list (** clauses that subsume c *)
-val retrieve_subsumed : fv_index -> clause -> hclause list  (** clauses subsumed by c *)
+val retrieve_subsuming : fv_index -> clause ->
+                         (hclause -> unit) -> unit  (** clauses that subsume c *)
+val retrieve_subsumed : fv_index -> clause ->
+                        (hclause -> unit) -> unit   (** clauses subsumed by c *)
 
