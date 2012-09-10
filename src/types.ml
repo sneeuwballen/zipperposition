@@ -51,13 +51,15 @@ let univ_sort = "$i"
 exception SortError of string
 
 (** hashconsed term *)
-type foterm = typed_term Hashcons.hash_consed
+type foterm = typed_term
 (** term with a simple sort *)
 and typed_term = {
   term : foterm_cell;           (** the term itself *)
   sort : sort;                  (** the sort of the term *)
   db_closed : bool Lazy.t;      (** is the term closed w.r.t. De Bruijn indexes? *)
   vars : foterm list Lazy.t;    (** the variables of the term *)
+  tag : int;                    (** hashconsing tag *)
+  hkey : int;                   (** hash *)
 }
 (** content of the term *)
 and foterm_cell =
@@ -88,9 +90,10 @@ type literal =
                 * comparison (* orientation *)
 
 (** a hashconsed first order clause *)
-type hclause = clause Hashcons.hash_consed
+type hclause = clause
 (** a first order clause *)
 and clause = {
+  ctag : int;                             (** hashconsing tag *)
   clits : literal list;                   (** the equations *)
   cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
   cselected : int list Lazy.t;            (** index of selected literals *)

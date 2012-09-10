@@ -138,7 +138,7 @@ module TCache = Hashtbl.Make(
   struct
     type t = foterm
     let equal a b = T.eq_foterm a b
-    let hash t = t.Hashcons.hkey
+    let hash t = t.hkey
   end)
 
 (** Skolemize the given term at root (assumes it occurs just under an

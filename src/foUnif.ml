@@ -45,7 +45,7 @@ let mem2 a b l =
 
 (** occur check of what in where *)
 let rec occurs_check subst what where =
-  match where.node.term with
+  match where.term with
   | Var _ when T.eq_foterm where what -> true
   | Var _ ->
       let t = S.lookup where subst in
@@ -58,10 +58,10 @@ let rec occurs_check subst what where =
 let unification a b =
   (* recursive unification *)
   let rec unif subst s t =
-    if s.node.sort <> t.node.sort then raise (UnificationFailure (lazy "different sorts"));
+    if s.sort <> t.sort then raise (UnificationFailure (lazy "different sorts"));
     let s = S.apply_subst subst s
     and t = S.apply_subst subst t in
-    match s.node.term, t.node.term with
+    match s.term, t.term with
     | _, _ when T.eq_foterm s t -> subst
     | _, _ when T.is_ground_term s && T.is_ground_term t ->
         (* distinct ground terms cannot be unified *)
@@ -84,10 +84,10 @@ let unification a b =
 let matching_locked ~locked a b =
   (* recursive matching *)
   let rec unif locked subst s t =
-    if s.node.sort <> t.node.sort then raise (UnificationFailure (lazy "different sorts"));
+    if s.sort <> t.sort then raise (UnificationFailure (lazy "different sorts"));
     let s = S.apply_subst subst s
     and t = S.apply_subst subst t in
-    match s.node.term, t.node.term with
+    match s.term, t.term with
     | _, _ when T.eq_foterm s t -> subst
     | _, _ when T.is_ground_term s && T.is_ground_term t ->
         (* distinct ground terms cannot be matched *) 
@@ -110,11 +110,11 @@ let matching a b = matching_locked ~locked:(T.vars_of_term b) a b
 (** Sets of variables in s and t are assumed to be disjoint  *)
 let alpha_eq s t =
   let rec equiv subst s t =
-    let s = match s.node.term with Var _ -> S.lookup s subst | _ -> s
-    and t = match t.node.term with Var _ -> S.lookup t subst | _ -> t
+    let s = match s.term with Var _ -> S.lookup s subst | _ -> s
+    and t = match t.term with Var _ -> S.lookup t subst | _ -> t
 
     in
-    match s.node.term, t.node.term with
+    match s.term, t.term with
       | _, _ when T.eq_foterm s t -> subst
       | Var _, Var _
           when (not (List.exists (fun (_,k) -> k=t) subst)) ->

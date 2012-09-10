@@ -52,7 +52,7 @@ let make_hq ~ord ?(accept=(fun _ -> true)) name =
     method is_empty = heap#is_empty
 
     method add hc =
-      if accept hc.node then
+      if accept hc then
         let new_heap = heap#insert hc in
         ({< heap = new_heap >} :> queue)
       else
@@ -74,7 +74,7 @@ let make_hq ~ord ?(accept=(fun _ -> true)) name =
 let fifo ~ord =
   let clause_ord =
     object
-      method le hc1 hc2 =  hc1.tag <= hc2.tag
+      method le hc1 hc2 =  hc1.ctag <= hc2.ctag
     end
   and name = "fifo_queue" in
   make_hq ~ord:clause_ord name
@@ -83,8 +83,8 @@ let clause_weight ~ord =
   let clause_ord =
     object
       method le hc1 hc2 =
-        let w1 = ord#compute_clause_weight hc1.node
-        and w2 = ord#compute_clause_weight hc2.node in
+        let w1 = ord#compute_clause_weight hc1
+        and w2 = ord#compute_clause_weight hc2 in
         w1 <= w2
     end
   and name = "clause_weight" in
@@ -109,8 +109,8 @@ let refined_clause_weight ~ord =
   let clause_ord =
     object
       method le hc1 hc2 =
-        let w1 = compute_refined_clause_weight ~ord hc1.node
-        and w2 = compute_refined_clause_weight ~ord hc2.node in
+        let w1 = compute_refined_clause_weight ~ord hc1
+        and w2 = compute_refined_clause_weight ~ord hc2 in
         w1 <= w2
     end
   and name = "refined_clause_weight" in
@@ -124,8 +124,8 @@ let goals ~ord =
   let clause_ord =
     object
       method le hc1 hc2 =
-        let w1 = compute_refined_clause_weight ~ord hc1.node
-        and w2 = compute_refined_clause_weight ~ord hc2.node in
+        let w1 = compute_refined_clause_weight ~ord hc1
+        and w2 = compute_refined_clause_weight ~ord hc2 in
         w1 <= w2
     end
   and name = "prefer_goals" in
@@ -139,8 +139,8 @@ let non_goals ~ord =
   let clause_ord =
     object
       method le hc1 hc2 =
-        let w1 = compute_refined_clause_weight ~ord hc1.node
-        and w2 = compute_refined_clause_weight ~ord hc2.node in
+        let w1 = compute_refined_clause_weight ~ord hc1
+        and w2 = compute_refined_clause_weight ~ord hc2 in
         (* lexicographic comparison that favors clauses with less literals
            and then clauses with small weight *)
         w1 <= w2
@@ -156,9 +156,9 @@ let pos_unit_clauses ~ord =
   let clause_ord =
     object
       method le hc1 hc2 =
-        assert (is_unit_pos hc1.node && is_unit_pos hc2.node);
-        let w1 = compute_refined_clause_weight ~ord hc1.node
-        and w2 = compute_refined_clause_weight ~ord hc2.node in
+        assert (is_unit_pos hc1 && is_unit_pos hc2);
+        let w1 = compute_refined_clause_weight ~ord hc1
+        and w2 = compute_refined_clause_weight ~ord hc2 in
         (* lexicographic comparison that favors clauses with more goals,
            and then clauses with small weight *)
         w1 <= w2

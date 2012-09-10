@@ -1,8 +1,6 @@
 
 - make multiset comparison fast
-
 - maybe implement context trees for general purpose indexing
-- hashconsing from why3 (less overhead)?
 
 - simplify : clause -> clause list (for elimination rules in delayed, also for redundancy)
 - find better heuristics for delayed superposition

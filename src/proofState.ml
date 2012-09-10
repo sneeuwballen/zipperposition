@@ -21,7 +21,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (* the state of a proof *)
 
 open Types
-open Hashcons
 
 module I = Index
 module FV = FeatureVector
@@ -89,10 +88,10 @@ let next_passive_clause passive_set =
       then next_idx passive_set (idx+1) (* queue has been used enough time, or is empty *)
       else 
         let new_q, hc = q#take_first in (* pop from this queue *)
-        if C.is_in_bag passive_set.passive_clauses hc.tag
+        if C.is_in_bag passive_set.passive_clauses hc.ctag
           then (* the clause is still in the passive set, return it *)
             let new_q_state = (idx, weight+1) (* increment weight for the clause *)
-            and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.tag in
+            and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.ctag in
             U.debug 3 (lazy (U.sprintf "taken clause from %s" q#name));
             let passive_set = {passive_set with passive_clauses=new_clauses;
                 queues=U.list_set queues idx (new_q, w);
@@ -114,7 +113,7 @@ let next_passive_clause passive_set =
 
 let add_active active_set c =
   let hc = C.hashcons_clause c in
-  if C.is_in_bag active_set.active_clauses hc.tag
+  if C.is_in_bag active_set.active_clauses hc.ctag
     then active_set, hc  (* already in active set *)
     else
       let new_bag = C.add_hc_to_bag active_set.active_clauses hc
@@ -126,9 +125,9 @@ let add_actives active_set l =
   List.fold_left (fun b sc -> fst (add_active b sc)) active_set l
 
 let remove_active active_set hc =
-  if C.is_in_bag active_set.active_clauses hc.tag
+  if C.is_in_bag active_set.active_clauses hc.ctag
     then
-      let new_bag = C.remove_from_bag active_set.active_clauses hc.tag
+      let new_bag = C.remove_from_bag active_set.active_clauses hc.ctag
       and new_idx = active_set.idx#remove_clause hc
       and new_fv_idx = FV.remove_clause active_set.fv_idx hc in
       {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}
@@ -150,7 +149,7 @@ let singleton_active_set ~ord clause =
   
 let add_passive passive_set c =
   let hc = C.hashcons_clause c in
-  if C.is_in_bag passive_set.passive_clauses hc.tag
+  if C.is_in_bag passive_set.passive_clauses hc.ctag
     then passive_set, hc  (* already in passive set *)
     else
       let new_bag = C.add_hc_to_bag passive_set.passive_clauses hc in

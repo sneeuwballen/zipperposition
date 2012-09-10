@@ -25,11 +25,9 @@ open Types
 (** symbols that are symmetric (that is, order of arguments does not matter) *)
 val is_symmetric_symbol : symbol -> bool
 
-module H : Hashcons.S with type key = typed_term
-val terms : H.t
-
 val iter_terms : (foterm -> unit) -> unit     (** iterate through existing terms *)
 val all_terms : unit -> foterm list           (** all currently existing terms *)
+val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
 (** smart constructors, with a bit of type-checking *)
 val mk_var : int -> sort -> foterm

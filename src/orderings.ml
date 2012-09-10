@@ -36,16 +36,16 @@ let current_signature () =
   and arities  = Hashtbl.create 23
   and symbols = ref [] in
   T.iter_terms
-    (fun t -> match t.node.term with
+    (fun t -> match t.term with
      | Var _ -> ()
      | Leaf s ->
         begin
           (* update the arity only if not already found *)
           if not (Hashtbl.mem arities s) then Hashtbl.replace arities s 0;
-          Hashtbl.replace sorts s t.node.sort;
+          Hashtbl.replace sorts s t.sort;
           if not (List.mem s !symbols) then symbols := (s::!symbols) else ()
         end
-     | Node (({node={term=Leaf s}})::tail) ->
+     | Node (({term=Leaf s})::tail) ->
         Hashtbl.replace arities s (List.length tail)
      | _ -> failwith (Utils.sprintf "bad term %a" !T.pp_term#pp t));
   sorts, arities, !symbols
@@ -208,7 +208,7 @@ module type S =
   end
 
 (** simple weight for terms *)
-let rec weight_of_term ~so term = match term.node.term with
+let rec weight_of_term ~so term = match term.term with
   | Var _ -> so#var_weight
   | Leaf s -> so#weight s
   | Node l -> List.fold_left
@@ -232,7 +232,7 @@ let compute_clause_weight ~so {clits=lits} =
 (* Riazanov: p. 40, relation >>>
  * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
-  match t1.node.term, t2.node.term with
+  match t1.term, t2.term with
   (* We want to discard any identity equality. *
    * If we give back Eq, no inference rule    *
    * will be applied on this equality          *)
@@ -302,16 +302,16 @@ module KBO = struct
       It should be linear time. TODO compatibility with symmetry of = *)
   let rec kbo ~so t1 t2 =
     let balance = mk_balance t1 t2 in
-    let extract t = match t.node.term with
+    let extract t = match t.term with
       | Var _ -> assert false
       | Leaf s -> s, []
-      | Node ({node={term=(Leaf s)}}::tl) -> s, tl
+      | Node ({term=(Leaf s)}::tl) -> s, tl
       | Node _ -> assert false
     in
     (** variable balance, weight balance, t contains variable y. pos
         stands for positive (is t the left term) *)
     let rec balance_weight wb t y pos =
-      match t.node.term with
+      match t.term with
       | Var x ->
         if pos
           then (add_pos_var balance x; (wb + so#var_weight, x = y))
@@ -345,7 +345,7 @@ module KBO = struct
       | _ -> assert false  (* TODO *)
     (** tupled version of kbo (kbo_5 of the paper) *)
     and tckbo wb t1 t2 =
-      match t1.node.term, t2.node.term with
+      match t1.term, t2.term with
       | Var x, Var y when x = y -> (wb, Eq)
       | Var x, Var y ->
         add_pos_var balance x;
@@ -409,7 +409,7 @@ module RPO = struct
   let name = "rpo"
 
   let rec rpo ~so s t =
-    match s.node.term, t.node.term with
+    match s.term, t.term with
     | _, _ when T.eq_foterm s t -> Eq
     | Var _, Var _ -> Incomparable
     | _, Var i -> if (List.mem t (T.vars_of_term s)) then Gt else Incomparable
@@ -450,7 +450,7 @@ module RPO = struct
     | _,_ -> aux_ordering so#compare s t
   (* recursive comparison of lists of terms (head symbol is hd) *)
   and rpo_rec ~so hd l1 l2 s t =
-    match hd.node.term with
+    match hd.term with
     | Var _ | Node _ -> assert false
     | Leaf f ->
     if so#multiset_status f
@@ -477,7 +477,7 @@ module OrdCache = Cache.Make(
     type t = (foterm * foterm)
     let equal (x1,y1) (x2,y2) = T.eq_foterm x1 x2 && T.eq_foterm y1 y2
     let hash (x,y) = (Utils.murmur_hash x.hkey) lxor y.hkey
-    let should_cache (x,y) = match x.node.term, y.node.term with
+    let should_cache (x,y) = match x.term, y.term with
     | Node _, Node _ -> true  (* cache for complex terms *)
     | _ -> false
   end)

@@ -80,12 +80,12 @@ let process_lit op c tree (lit, pos) =
     the maximal side(s) of those. *)
 let process_clause op tree c =
   (* index literals with their position *)
-  let lits_pos = Utils.list_pos c.node.clits in
+  let lits_pos = Utils.list_pos c.clits in
   let new_tree = List.fold_left (process_lit op c) tree lits_pos in
   new_tree
 
 (** apply (op tree) to all subterms, folding the resulting tree *)
-let rec fold_subterms op tree t (c, path) = match t.node.term with
+let rec fold_subterms op tree t (c, path) = match t.term with
   | Var _ -> tree  (* variables are not indexed *)
   | Leaf _ -> op tree t (c, List.rev path, t) (* reverse path now *)
   | Node (_::l) ->
@@ -112,7 +112,7 @@ let mk_clause_index (index : index) =
     method index_clause hc =
       let op tree = tree#add in
       let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = match hc.node.clits with
+      and new_unit_root_index = match hc.clits with
           | [(Equation (_,_,true,_)) as lit] ->
               process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
           | _ -> _unit_root_index
@@ -125,7 +125,7 @@ let mk_clause_index (index : index) =
     method remove_clause hc =
       let op tree = tree#remove in
       let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = match hc.node.clits with
+      and new_unit_root_index = match hc.clits with
           | [(Equation (_,_,true,_)) as lit] ->
               process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
           | _ -> _unit_root_index

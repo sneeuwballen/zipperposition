@@ -126,7 +126,7 @@ let pos_lit lit = match lit with
 let neg_lit lit = match lit with
   | Equation (_,_,sign,_) -> not sign
 
-let check_type a b = if a.node.sort <> b.node.sort
+let check_type a b = if a.sort <> b.sort
   then raise (SortError "sides of equations of different sorts") else ()
 
 let mk_eq ~ord a b =
@@ -145,7 +145,7 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
   if subst = S.id_subst then lit
   else match lit with
   | Equation (l,r,sign,_) ->
-    assert (l.node.sort = r.node.sort);
+    assert (l.sort = r.sort);
     let new_l = S.apply_subst ~recursive subst l
     and new_r = S.apply_subst ~recursive subst r
     in
@@ -158,7 +158,7 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
 let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
 
 let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
-  match l.node.term, r.node.term with
+  match l.term, r.term with
   (* deal with trivial literals *)
   | _ when T.eq_foterm l T.true_term && T.eq_foterm r T.false_term ->
     mk_lit ~ord T.true_term T.true_term (not sign)
@@ -168,20 +168,20 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
     mk_lit ~ord T.true_term T.true_term sign
   (* deal with false/true *)
   | _ when T.eq_foterm l T.false_term ->
-    assert (r.node.sort = bool_sort);
+    assert (r.sort = bool_sort);
     lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
   | _ when T.eq_foterm r T.false_term ->
-    assert (l.node.sort = bool_sort);
+    assert (l.sort = bool_sort);
     lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
   (* deal with negation *)
-  | Node [{node={term=Leaf s}}; t], _ when s = not_symbol && T.eq_foterm r T.true_term ->
+  | Node [{term=Leaf s}; t], _ when s = not_symbol && T.eq_foterm r T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
-  | _, Node [{node={term=Leaf s}}; t] when s = not_symbol && T.eq_foterm l T.true_term ->
+  | _, Node [{term=Leaf s}; t] when s = not_symbol && T.eq_foterm l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
   (* deal with equality symbol *)
-  | Node [{node={term=Leaf s}}; a; b], _ when s = eq_symbol && T.eq_foterm r T.true_term ->
+  | Node [{term=Leaf s}; a; b], _ when s = eq_symbol && T.eq_foterm r T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)
-  | _, Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm l T.true_term ->
+  | _, Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_foterm l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)
   (* default is just reordering *)
   | _ -> reord_lit ~ord lit
@@ -231,15 +231,16 @@ module H = Hashcons.Make(struct
     | [] -> h
     | lit::tail -> aux (Utils.murmur_hash (h lxor hash_literal lit)) tail
     in aux 113 c.clits
+  let tag i c = {c with ctag = i}
 end)
 
-let clauses = H.create 251  (* the hashtable for hclauses *)
+let hashcons_clause c = H.hashcons c
 
-let hashcons_clause c = H.hashcons clauses c
+let stats () = H.stats ()
 
 let eq_hclause hc1 hc2 = hc1 == hc2
 
-let compare_hclause hc1 hc2 = Pervasives.compare hc1.tag hc2.tag
+let compare_hclause hc1 hc2 = Pervasives.compare hc1.ctag hc2.ctag
 
 let check_maximal_lit_ ~ord clause pos subst =
   let lits_pos = Utils.list_pos clause.clits in
@@ -293,7 +294,8 @@ let mk_clause ~ord lits ~selected proof =
   let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
   let all_vars = List.stable_sort T.compare_foterm all_vars
   and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
-  {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cmaxlits=maxlits}
+  {clits=lits; cvars=all_vars; cproof=proof; cselected=selected;
+   cmaxlits=maxlits; ctag= -1}
 
 let maxlits clause = Lazy.force clause.cmaxlits
 
@@ -321,7 +323,7 @@ let get_pos clause pos =
   match pos with
   | idx::side::tpos ->
       let lit = get_lit clause idx in
-      let rec find_subterm pos t = match (pos, t.node.term) with
+      let rec find_subterm pos t = match (pos, t.term) with
       | [], _ -> t
       | i::pos', Node l when List.length l > i ->
           find_subterm pos' (Utils.list_get l i)
@@ -402,9 +404,9 @@ type bag = {
 }
 
 let add_hc_to_bag {bag_maxvar=maxvar_b; bag_clauses=clauses_b} hc =
-  let maxvar_hc = T.max_var hc.node.cvars in
+  let maxvar_hc = T.max_var hc.cvars in
   {bag_maxvar=(max maxvar_hc maxvar_b);
-   bag_clauses=M.add hc.tag hc clauses_b}
+   bag_clauses=M.add hc.ctag hc clauses_b}
 
 let add_to_bag bag c =
   let hc = hashcons_clause c in
@@ -513,7 +515,7 @@ class type pprinter_clause =
 class virtual common_pp_clause =
   object (self)
     method virtual pp : Format.formatter -> clause -> unit
-    method pp_h formatter hc = self#pp formatter hc.node
+    method pp_h formatter hc = self#pp formatter hc
     method pp_pos formatter (c, pos) =
       Format.fprintf formatter "@[<h>[%a at %a]@]" self#pp c pp_pos pos
     method pp_h_pos formatter (hc, pos, t) =
@@ -591,7 +593,7 @@ let pp_proof_debug =
     method pp formatter clause =
       assert (clause.clits = []);
       (* already_printed is a set of clauses already printed. *)
-      let already_printed = ref Hset.empty
+      let already_printed = ref Ptset.empty
       and to_print = Queue.create () in
       (* initialize queue *)
       let hc = hashcons_clause clause in
@@ -599,17 +601,17 @@ let pp_proof_debug =
       (* print every clause in the queue, if not already printed *)
       while not (Queue.is_empty to_print) do
         let hc = Queue.take to_print in
-        if Hset.mem hc !already_printed then ()
+        if Ptset.mem hc.ctag !already_printed then ()
         else begin
-          already_printed := Hset.add hc !already_printed;
-          match Lazy.force hc.node.cproof with
+          already_printed := Ptset.add hc.ctag !already_printed;
+          match Lazy.force hc.cproof with
           | Axiom (f, s) ->
               fprintf formatter "@[<h>%a <--- @[<h>axiom %s in %s@]@]@;"
-                !pp_clause#pp hc.node s f
+                !pp_clause#pp hc s f
           | Proof (rule, premises) ->
               (* print the proof step *)
               fprintf formatter "@[<h>%a <--- @[<h>%s with @[<hv>%a@]@]@]@;"
-                !pp_clause#pp hc.node rule
+                !pp_clause#pp hc rule
                 (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
               (* print premises recursively *)
               List.iter
@@ -624,18 +626,18 @@ let pp_proof_tstp =
     method pp formatter clause =
       assert (clause.clits = []);
       (* already_printed is a set of clauses already printed. *)
-      let already_printed = ref Hset.empty
+      let already_printed = ref Ptset.empty
       and clause_num = ref Ptmap.empty
       and counter = ref 1
       and to_print = Queue.create () in
       (* c -> hashconsed c, unique number for c *)
       let get_num clause = 
         let hc = hashcons_clause clause in
-        try hc, Ptmap.find hc.tag !clause_num
+        try hc, Ptmap.find hc.ctag !clause_num
         with Not_found ->
-          clause_num := Ptmap.add hc.tag !counter !clause_num;
+          clause_num := Ptmap.add hc.ctag !counter !clause_num;
           incr counter;
-          hc, Ptmap.find hc.tag !clause_num
+          hc, Ptmap.find hc.ctag !clause_num
       in
       (* initialize queue *)
       let hc, num = get_num clause in
@@ -643,19 +645,19 @@ let pp_proof_tstp =
       (* print every clause in the queue, if not already printed *)
       while not (Queue.is_empty to_print) do
         let hc, num = Queue.take to_print in
-        if Hset.mem hc !already_printed then ()
+        if Ptset.mem hc.ctag !already_printed then ()
         else begin
-          already_printed := Hset.add hc !already_printed;
-          match Lazy.force hc.node.cproof with
+          already_printed := Ptset.add hc.ctag !already_printed;
+          match Lazy.force hc.cproof with
           | Axiom (f, ax_name) ->
             fprintf formatter "@[<h>fof(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
-              num pp_clause_tstp#pp hc.node f ax_name
+              num pp_clause_tstp#pp hc f ax_name
           | Proof (name, premises) ->
             let premises = List.map (fun (c,_,_) -> get_num c) premises in
             (* print the inference *)
             fprintf formatter ("@[<h>fof(%d, derived, %a,@ " ^^
                                "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
-              num pp_clause_tstp#pp hc.node name
+              num pp_clause_tstp#pp hc name
               (Utils.pp_list ~sep:"," pp_print_int) (List.map snd premises);
             (* print every premise *)
             List.iter (fun (hc,num) -> Queue.add (hc, num) to_print) premises

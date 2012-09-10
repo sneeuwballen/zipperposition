@@ -21,7 +21,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (* main saturation algorithm *)
 
 open Types
-open Hashcons
 
 module C = Clauses
 module O = Orderings
@@ -93,7 +92,7 @@ let given_clause_step ~calculus state =
   | passive_set, Some c ->
     let state = { state with PS.passive_set=passive_set } in
     (* simplify given clause w.r.t. active set and SOS *)
-    let _, c = simplify ~calculus state.PS.active_set c.node in
+    let _, c = simplify ~calculus state.PS.active_set c in
     let _, c = simplify ~calculus state.PS.axioms_set c in
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
@@ -120,7 +119,7 @@ let given_clause_step ~calculus state =
         state.PS.active_set.PS.active_clauses
         (fun hc ->
           (* try to simplify hc using the given clause *)
-          let original, simplified = simplify ~calculus given_active_set hc.node in
+          let original, simplified = simplify ~calculus given_active_set hc in
           if not (C.eq_clause original simplified)
             then begin
               (* remove the original clause form active_set, save the simplified clause *)

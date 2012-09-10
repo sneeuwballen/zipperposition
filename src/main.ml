@@ -21,7 +21,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Main file for the prover *)
 
 open Types
-open Hashcons
 
 module T = Terms
 module O = Orderings
@@ -44,7 +43,7 @@ let heuristic_constraint clauses : ordering_constraint =
   let _, _, signature = O.current_signature () in
   let table = Hashtbl.create 23 in (* symbol -> (neg occurrences - pos occurences) *)
   (* update counts with term *)
-  let rec update_with_term sign t = match t.node.term with
+  let rec update_with_term sign t = match t.term with
     | Var _ -> ()
     | Leaf s ->
         let count = try Hashtbl.find table s with Not_found -> 0 in
@@ -167,8 +166,8 @@ let print_stats state =
     Printf.printf "%%   active clauses   %d\n" stats.PS.stats_active_clauses;
     Printf.printf "%%   passive clauses  %d\n" stats.PS.stats_passive_clauses
   in
-  print_hashcons_stats "terms" (T.H.stats T.terms);
-  print_hashcons_stats "clauses" (C.H.stats C.clauses);
+  print_hashcons_stats "terms" (T.stats ());
+  print_hashcons_stats "clauses" (C.stats ());
   print_state_stats (PS.stats state)
 
 (** setup an alarm for abrupt stop *)
@@ -264,5 +263,5 @@ let () =
       (* print status then proof *)
       Printf.printf "%% SZS status Theorem\n";
       if params.param_proof
-        then Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@." !C.pp_proof#pp c.node
+        then Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@." !C.pp_proof#pp c
         else ()

@@ -33,7 +33,7 @@ module Sup = Superposition
 module PS = ProofState
 
 (** check whether the term is (Leaf s) *)
-let check_sym t s = match t.node.term with
+let check_sym t s = match t.term with
   | Var _ -> false
   | Node _ -> false
   | Leaf s' -> s = s'
@@ -53,7 +53,7 @@ let symbol_constraint =
 (** helper for alpha elimination (remove idx-th literal from
     clause and adds a and b to two new clauses *)
 let alpha_eliminate ~ord clause idx a signa b signb =
-  assert (a.node.sort = bool_sort && b.node.sort = bool_sort);
+  assert (a.sort = bool_sort && b.sort = bool_sort);
   let new_lita = C.mk_lit ~ord a T.true_term signa
   and new_litb = C.mk_lit ~ord b T.true_term signb in
   let other_lits = Utils.list_remove clause.clits idx in
@@ -64,7 +64,7 @@ let alpha_eliminate ~ord clause idx a signa b signb =
 (** helper for beta elimination (remove idx-th literal from
     clause and adds a and b *)
 let beta_eliminate ~ord clause idx a signa b signb =
-  assert (a.node.sort = bool_sort && b.node.sort = bool_sort);
+  assert (a.sort = bool_sort && b.sort = bool_sort);
   let new_lita = C.mk_lit ~ord a T.true_term signa
   and new_litb = C.mk_lit ~ord b T.true_term signb in
   let new_lits = new_lita :: new_litb :: (Utils.list_remove clause.clits idx) in
@@ -75,7 +75,7 @@ let beta_eliminate ~ord clause idx a signa b signb =
     and adds t where De Bruijn 0 is replaced by a fresh var) *)
 let gamma_eliminate ~ord clause idx t sign =
   let maxvar = T.max_var (T.vars_of_term t) in
-  assert (t.node.sort = bool_sort);
+  assert (t.sort = bool_sort);
   let new_t =
     match T.look_db_sort 0 t with
     | None -> T.db_unlift t (* the variable is not present *)
@@ -93,7 +93,7 @@ let gamma_eliminate ~ord clause idx t sign =
     and adds t where De Bruijn 0 is replaced by a skolem
     of free variables of t) *)
 let delta_eliminate ~ord clause idx t sign =
-  assert (t.node.sort = bool_sort);
+  assert (t.sort = bool_sort);
   let new_t =
     match T.look_db_sort 0 t with
     | None -> T.db_unlift t (* the variable is not present *)
@@ -117,8 +117,8 @@ let connective_elimination ~ord clause =
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in
       if not (C.eligible_res ~ord clause idx S.id_subst) then acc else
-      match l.node.term with
-      | Node [{node={term=Leaf s}}; a; b] ->
+      match l.term with
+      | Node [{term=Leaf s}; a; b] ->
         (* some alpha/beta eliminations *)
         if s = and_symbol && sign
         then (alpha_eliminate ~ord clause idx a true b true) @ acc
@@ -147,12 +147,11 @@ let forall_elimination ~ord clause =
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
       if not (C.eligible_res ~ord clause idx S.id_subst) then acc else
-      match l.node.term with
-      | Node [{node={term=Leaf s}};
-          {node={term=Node [{node={term=Leaf s'}}; t]}}]
+      match l.term with
+      | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t]}]
           when s = forall_symbol && s' = lambda_symbol ->
           (* we have a forall (lambda t) *)
-          assert (t.node.sort = bool_sort);
+          assert (t.sort = bool_sort);
           if sign
             then (gamma_eliminate ~ord clause idx t true) :: acc
             else (delta_eliminate ~ord clause idx t false) :: acc
@@ -170,12 +169,11 @@ let exists_elimination ~ord clause =
       if not (T.eq_foterm r T.true_term) then acc else
       let idx = List.hd l_pos in 
       if not (C.eligible_res ~ord clause idx S.id_subst) then acc else
-      match l.node.term with
-      | Node [{node={term=Leaf s}};
-          {node={term=Node [{node={term=Leaf s'}}; t]}}]
+      match l.term with
+      | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t]}]
           when s = exists_symbol && s' = lambda_symbol ->
           (* we have an exists (lambda t) *)
-          assert (t.node.sort = bool_sort);
+          assert (t.sort = bool_sort);
           if sign
             then (delta_eliminate ~ord clause idx t true) :: acc
             else (gamma_eliminate ~ord clause idx t false) :: acc
@@ -191,7 +189,7 @@ let equivalence_elimination ~ord clause =
   (* do the inference for positive equations *)
   let do_inferences_pos l r l_pos =
     if T.atomic l then [] else begin
-    assert (r.node.sort = bool_sort);
+    assert (r.sort = bool_sort);
     if ord#compare l r = Lt then [] else
     (* ok, do it *)
     match l_pos with
@@ -211,8 +209,8 @@ let equivalence_elimination ~ord clause =
     end
   (* do the inference for negative equations *)
   and do_inferences_neg l r l_pos =
-    if not (l.node.sort = bool_sort) then [] else begin
-    assert (r.node.sort = bool_sort);
+    if not (l.sort = bool_sort) then [] else begin
+    assert (r.sort = bool_sort);
     match l_pos with
     | [idx; _] ->
       if not (C.eligible_res ~ord clause idx S.id_subst) then [] else
@@ -246,51 +244,51 @@ let equivalence_elimination ~ord clause =
 let simplify_inner ~ord c =
   let not_term = T.mk_leaf not_symbol bool_sort in
   (* simplify a term *)
-  let rec simp_term t = match t.node.term with
+  let rec simp_term t = match t.term with
   | Var _ | Leaf _ -> t
-  | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+  | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
     when s = not_symbol && s' = not_symbol -> simp_term t'  (* double negation *)
-  | Node [{node={term=Leaf s}}; t'] when s = not_symbol && T.eq_foterm t' T.true_term ->
+  | Node [{term=Leaf s}; t'] when s = not_symbol && T.eq_foterm t' T.true_term ->
     T.false_term  (* not true -> false *)
-  | Node [{node={term=Leaf s}}; t'] when s = not_symbol && T.eq_foterm t' T.false_term ->
+  | Node [{term=Leaf s}; t'] when s = not_symbol && T.eq_foterm t' T.false_term ->
     T.true_term  (* not false -> true *)
-  | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+  | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
     when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol
     && not (T.db_contains t' 0) -> simp_term (T.db_unlift t') (* eta-reduction *)
-  | Node [{node={term=Node [{node={term=Leaf s}}; t']}}; v] when s = lambda_symbol ->
+  | Node [{term=Node [{term=Leaf s}; t']}; v] when s = lambda_symbol ->
     let new_t' = T.db_unlift (T.db_replace t' v) in simp_term new_t' (* beta-reduction *)
-  | Node [{node={term=Leaf s}}; a; b] when s = and_symbol &&
+  | Node [{term=Leaf s}; a; b] when s = and_symbol &&
     (T.eq_foterm a T.false_term || T.eq_foterm b T.false_term) ->
     T.false_term  (* a and false -> false *)
-  | Node [{node={term=Leaf s}}; a; b] when s = or_symbol &&
+  | Node [{term=Leaf s}; a; b] when s = or_symbol &&
     (T.eq_foterm a T.true_term || T.eq_foterm b T.true_term) ->
     T.true_term  (* a or true -> true *)
-  | Node [{node={term=Leaf s}}; a; b] when s = or_symbol && T.eq_foterm a T.false_term ->
+  | Node [{term=Leaf s}; a; b] when s = or_symbol && T.eq_foterm a T.false_term ->
     simp_term b (* b or false -> b *)
-  | Node [{node={term=Leaf s}}; a; b] when s = or_symbol && T.eq_foterm b T.false_term ->
+  | Node [{term=Leaf s}; a; b] when s = or_symbol && T.eq_foterm b T.false_term ->
     simp_term a (* a or false -> a *)
-  | Node [{node={term=Leaf s}}; a; b] when s = and_symbol && T.eq_foterm a T.true_term ->
+  | Node [{term=Leaf s}; a; b] when s = and_symbol && T.eq_foterm a T.true_term ->
     simp_term b (* b and true -> b *)
-  | Node [{node={term=Leaf s}}; a; b] when s = and_symbol && T.eq_foterm b T.true_term ->
+  | Node [{term=Leaf s}; a; b] when s = and_symbol && T.eq_foterm b T.true_term ->
     simp_term a (* a and true -> a *)
-  | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol &&
+  | Node [{term=Leaf s}; a; b] when s = imply_symbol &&
     (T.eq_foterm a T.false_term || T.eq_foterm b T.true_term) ->
     T.true_term  (* (false => a) or (a => true) -> true *)
-  | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol && T.eq_foterm a T.true_term ->
+  | Node [{term=Leaf s}; a; b] when s = imply_symbol && T.eq_foterm a T.true_term ->
     simp_term b  (* (true => a) -> a *)
-  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm a b ->
+  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_foterm a b ->
     T.true_term  (* a = a -> true *)
-  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && 
+  | Node [{term=Leaf s}; a; b] when s = eq_symbol && 
     ((T.eq_foterm a T.true_term && T.eq_foterm b T.false_term) ||
      (T.eq_foterm b T.true_term && T.eq_foterm a T.false_term)) ->
     T.false_term  (* true = false -> false *)
-  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm b T.true_term ->
+  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_foterm b T.true_term ->
     simp_term a  (* a = true -> a *)
-  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm a T.true_term ->
+  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_foterm a T.true_term ->
     simp_term b  (* b = true -> b *)
-  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm b T.false_term ->
+  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_foterm b T.false_term ->
     simp_term (T.mk_node [not_term; a])  (* a = false -> not a *)
-  | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && T.eq_foterm a T.false_term ->
+  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_foterm a T.false_term ->
     simp_term (T.mk_node [not_term; b])  (* b = false -> not b *)
   | Node l ->
     let new_t = T.mk_node (List.map simp_term l) in

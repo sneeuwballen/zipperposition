@@ -62,13 +62,11 @@ val lit_to_multiset : literal -> foterm list (** literal to multiset of terms *)
  * clauses
  * ---------------------------------------------------------------------- *)
 
-module H : Hashcons.S with type key = clause
-val clauses : H.t
-
 val eq_clause : clause -> clause -> bool                (** equality of clauses *)
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
 
 val hashcons_clause : clause -> hclause
+val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
 
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)

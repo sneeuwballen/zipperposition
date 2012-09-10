@@ -78,7 +78,7 @@ let first_position pos ctx t f =
   let rec inject_pos pos ctx = function
     | None -> None
     | Some (t,b) -> Some (ctx t,b,t, List.rev pos)
-  and aux pos ctx t = match t.node.term with
+  and aux pos ctx t = match t.term with
   | Leaf _ -> inject_pos pos ctx (f t)
   | Var _ -> None
   | Node l ->
@@ -112,7 +112,7 @@ let first_position pos ctx t f =
     -> 'b list
     *)
 let all_positions pos ctx t f =
-  let rec aux pos ctx t = match t.node.term with
+  let rec aux pos ctx t = match t.term with
   | Leaf _ -> f t pos ctx
   | Var _ -> []
   | Node l ->
@@ -200,7 +200,7 @@ let infer_active_ actives clause =
         (fun acc (hc, u_pos, u_p) ->
           try (* rewrite u_p with s, if they are unifiable *)
             let subst = Unif.unification s u_p in
-            do_superposition ~ord clause s_pos hc.node u_pos subst acc
+            do_superposition ~ord clause s_pos hc u_pos subst acc
           with
             UnificationFailure _ -> acc)
     )
@@ -228,7 +228,7 @@ let infer_passive_ actives clause =
             (fun acc (hc, s_pos, s) ->
               try
                 let subst = Unif.unification s u_p in
-                do_superposition ~ord hc.node s_pos clause p subst acc
+                do_superposition ~ord hc s_pos clause p subst acc
               with
                 UnificationFailure _ -> acc))
       in List.rev_append new_clauses acc
@@ -346,25 +346,25 @@ let demod_subterm ~ord blocked_ids active_set subterm =
   (* do not rewrite non closed subterms *)
   if not (T.db_closed subterm) then None else
   (* no rewriting on non-atomic formulae *)
-  if subterm.node.sort = bool_sort && not (T.atomic subterm) then None else 
+  if subterm.sort = bool_sort && not (T.atomic subterm) then None else 
   (* unit clause+pos that potentially match subterm *)
   try
     active_set.PS.idx#unit_root_index#retrieve_generalizations subterm ()
       (fun () (unit_hclause, pos, l) ->
         (* do we have to ignore the clause? *)
-        if List.mem unit_hclause.tag blocked_ids then () else
+        if List.mem unit_hclause.ctag blocked_ids then () else
         assert (T.db_closed l);
         try
           let subst = Unif.matching l subterm in
           match pos with
           | [0; side] ->
               (* r is the term subterm is going to be rewritten into *)
-              let r = C.get_pos unit_hclause.node [0; C.opposite_pos side] in
+              let r = C.get_pos unit_hclause [0; C.opposite_pos side] in
               let new_l = subterm
               and new_r = S.apply_subst subst r in
               if ord#compare new_l new_r = Gt
                 (* subst(l) > subst(r), we can rewrite *)
-                then raise (FoundMatch (new_r, subst, unit_hclause.node, pos))
+                then raise (FoundMatch (new_r, subst, unit_hclause, pos))
                 else ()
           | _ -> assert false
         with
@@ -563,7 +563,7 @@ let subsumed_by_set_ set clause =
   try
     List.iter
       (fun hc ->
-        if subsumes hc.node clause then raise Exit else ())
+        if subsumes hc clause then raise Exit else ())
       candidates;
     false
   with Exit ->
@@ -578,7 +578,7 @@ let subsumed_in_set_ set clause =
   (* use feature vector indexing *)
   let candidates = FV.retrieve_subsumed set.PS.fv_idx clause in
   List.filter
-    (fun hc -> subsumes clause hc.node)
+    (fun hc -> subsumes clause hc)
     candidates
 
 let subsumed_in_set set clause =
@@ -602,52 +602,52 @@ let cnf_of ~ord clause =
     else (if sign then T.mk_eq l r else T.mk_not (T.mk_eq l r))
   (* negation normal form (also remove equivalence and implications) *) 
   and nnf t =
-    if t.node.sort <> bool_sort then t else
-    match t.node.term with
+    if t.sort <> bool_sort then t else
+    match t.term with
     | Var _ | Leaf _ -> t
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; a; b]}]
       when s = not_symbol && s' = and_symbol ->
       nnf (T.mk_or (T.mk_not a) (T.mk_not b))  (* de morgan *)
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; a; b]}]
       when s = not_symbol && s' = or_symbol ->
       nnf (T.mk_and (T.mk_not a) (T.mk_not b)) (* de morgan *)
-    | Node [{node={term=Leaf s}}; a; b] when s = imply_symbol ->
+    | Node [{term=Leaf s}; a; b] when s = imply_symbol ->
       nnf (T.mk_or (T.mk_not a) b) (* (a => b) -> (not a or b) *)
-    | Node [{node={term=Leaf s}}; a; b] when s = eq_symbol && a.node.sort = bool_sort ->
+    | Node [{term=Leaf s}; a; b] when s = eq_symbol && a.sort = bool_sort ->
       (* (a <=> b) -> (not a or b) and (not b or a) *)
       nnf (T.mk_and
         (T.mk_or (T.mk_not a) b)
         (T.mk_or (T.mk_not b) a))
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; a; b]}]
       when s = not_symbol && s' = imply_symbol ->
       nnf (T.mk_and a (T.mk_not b)) (* not (a => b) -> (a and not b) *)
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; a; b]}}]
-      when s = not_symbol && s' = eq_symbol && a.node.sort = bool_sort ->
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; a; b]}]
+      when s = not_symbol && s' = eq_symbol && a.sort = bool_sort ->
       (* not (a <=> b) -> (a <=> (not b)) *)
       nnf (T.mk_or
         (T.mk_and a (T.mk_not b))
         (T.mk_and b (T.mk_not a)))
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}};
-        {node={term=Node [{node={term=Leaf s''}}; t']}}]}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'};
+        {term=Node [{term=Leaf s''}; t']}]}]
       when s = not_symbol && s' = forall_symbol ->
       assert (s'' = lambda_symbol);
       nnf (T.mk_exists (T.mk_not t')) (* not forall -> exists not *)
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}};
-        {node={term=Node [{node={term=Leaf s''}}; t']}}]}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'};
+        {term=Node [{term=Leaf s''}; t']}]}]
       when s = not_symbol && s' = exists_symbol ->
       assert (s'' = lambda_symbol);
       nnf (T.mk_forall (T.mk_not t')) (* not exists -> forall not *)
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t]}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t]}]
       when s = not_symbol && s' = not_symbol -> nnf t (* double negation *)
     | Node l ->
       let t' = T.mk_node (List.map nnf l) in
       if T.eq_foterm t t' then t' else nnf t'
   (* skolemization of existentials, removal of forall *)
-  and skolemize t = match t.node.term with
+  and skolemize t = match t.term with
     | Var _ | Leaf _ -> t
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t]}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t]}]
       when s = not_symbol && s' = not_symbol -> skolemize t (* double negation *)
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
       when s = forall_symbol ->
       assert (s' = lambda_symbol);
       (* a fresh variable *)
@@ -658,7 +658,7 @@ let cnf_of ~ord clause =
       incr varindex;
       let new_t' = T.db_unlift (T.db_replace t' v) in
       skolemize new_t' (* remove forall *)
-    | Node [{node={term=Leaf s}}; {node={term=Node [{node={term=Leaf s'}}; t']}}]
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
       when s = exists_symbol ->
       assert (s' = lambda_symbol);
       (* make a skolem symbol *)
@@ -670,17 +670,17 @@ let cnf_of ~ord clause =
     | Node l -> T.mk_node (List.map skolemize l)
   (* reduction to cnf using De Morgan. Returns a list of list of terms *)
   and to_cnf t =
-    if t.node.sort <> bool_sort then [[t, true]]
-    else match t.node.term with
+    if t.sort <> bool_sort then [[t, true]]
+    else match t.term with
     | Var _ | Leaf _ -> [[t, true]]
-    | Node [{node={term=Leaf s}}; t'] when s = not_symbol ->
+    | Node [{term=Leaf s}; t'] when s = not_symbol ->
       assert (T.hd_symbol t' = Some eq_symbol || T.atomic_rec t');
       [[t', false]]
-    | Node [{node={term=Leaf s}}; a; b] when s = and_symbol ->
+    | Node [{term=Leaf s}; a; b] when s = and_symbol ->
       let ca = to_cnf a
       and cb = to_cnf b in
       List.rev_append ca cb
-    | Node [{node={term=Leaf s}}; a; b] when s = or_symbol ->
+    | Node [{term=Leaf s}; a; b] when s = or_symbol ->
       product (to_cnf a) (to_cnf b)
     | Node _ -> [[t, true]]
   (* cartesian product of lists of lists *)

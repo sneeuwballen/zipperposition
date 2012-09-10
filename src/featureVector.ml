@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     and backward subsumption *)
 
 open Types
-open Hashcons
 
 module T = Terms
 module C = Clauses
@@ -57,7 +56,7 @@ let feat_size_minus clause =
 
 (* number of occurrences of symbol in literal *)
 let count_symb_lit symb lit =
-  let rec count_symb_term t = match t.node.term with
+  let rec count_symb_term t = match t.term with
   | Var _ -> 0
   | Leaf s -> if s = symb then 1 else 0
   | Node l -> List.fold_left
@@ -80,7 +79,7 @@ let count_symb_minus symb clause =
 
 (* max depth of the symbol in the literal, or -1 *)
 let max_depth_lit symb lit =
-  let rec max_depth_term t depth = match t.node.term with
+  let rec max_depth_term t depth = match t.term with
   | Var _ -> -1
   | Leaf s -> if s = symb then depth else -1
   | Node l ->
@@ -106,8 +105,14 @@ let max_depth_minus symb clause =
  * FV index
  * ---------------------------------------------------------------------- *)
 
+module S = Set.Make(
+  struct
+    type t = hclause
+    let compare t1 t2 = t1.ctag - t2.ctag
+  end)
+
 (** a set of hclause *)
-type hclauses = clause Hset.t
+type hclauses = S.t
 
 (** a trie of ints *)
 module FVTrie = Trie.Make(Ptmap)
@@ -135,21 +140,21 @@ let mk_fv_index_signature signature =
 
 let index_clause (features, trie) hc =
   (* feature vector of the clause *)
-  let fv = compute_fv features hc.node in
+  let fv = compute_fv features hc in
   (* set for this feature vector *)
-  let set = try FVTrie.find fv trie with Not_found -> Hset.empty in
+  let set = try FVTrie.find fv trie with Not_found -> S.empty in
   (* add the set+clause to the trie *)
-  let new_trie = FVTrie.add fv (Hset.add hc set) trie in
+  let new_trie = FVTrie.add fv (S.add hc set) trie in
   (features, new_trie)
 
 let remove_clause (features, trie) hc =
   (* feature vector of the clause *)
-  let fv = compute_fv features hc.node in
+  let fv = compute_fv features hc in
   (* set for this feature vector *)
   try
     let set = FVTrie.find fv trie in
-    let set = Hset.remove hc set in
-    if Hset.is_empty set
+    let set = S.remove hc set in
+    if S.is_empty set
       then
         (* remove the (now empty) set from the trie *)
         let new_trie = FVTrie.remove fv trie in
@@ -168,7 +173,7 @@ let retrieve_subsuming (features, trie) clause =
   let rec fold_lower acc fv node = match fv, node with
   | [], FVTrie.Node (None, _) -> acc
   | [], FVTrie.Node (Some hclauses, _) ->
-      List.rev_append (Hset.elements hclauses) acc
+      List.rev_append (S.elements hclauses) acc
   | i::fv', FVTrie.Node (_, map) ->
     Ptmap.fold
       (fun j subnode acc -> if j <= i
@@ -186,7 +191,7 @@ let retrieve_subsumed (features, trie) clause =
   let rec fold_higher acc fv node = match fv, node with
   | [], FVTrie.Node (None, _) -> acc
   | [], FVTrie.Node (Some hclauses, _) ->
-      List.rev_append (Hset.elements hclauses) acc
+      List.rev_append (S.elements hclauses) acc
   | i::fv', FVTrie.Node (_, map) ->
     Ptmap.fold
       (fun j subnode acc -> if j >= i

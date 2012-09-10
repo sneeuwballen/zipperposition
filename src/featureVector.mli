@@ -35,19 +35,18 @@ val compute_fv : feature list -> clause -> feature_vector
 
 val feat_size_plus : feature              (** size of positive clause *)
 val feat_size_minus : feature             (** size of negative clause *)
-val count_symb_plus : symbol -> feature   (** count the occurrences of symbol in positive clause *)
-val count_symb_minus : symbol -> feature  (** count the occurrences of symbol in negative clause *)
+val count_symb_plus : symbol -> feature   (** occurrences of symbol in positive clause *)
+val count_symb_minus : symbol -> feature  (** occurrences of symbol in negative clause *)
 val max_depth_plus : symbol -> feature    (** maximal depth of symb in positive clause *)
 val max_depth_minus : symbol -> feature   (** maximal depth of symb in negative clause *)
 
-(** a feature vector index, based on a trie *)
-type fv_index
+type fv_index  (** a feature vector index, based on a trie *)
 
-val mk_fv_index : feature list -> fv_index                  (** create an index from features *)
-val mk_fv_index_signature : symbol list -> fv_index         (** create an index from signature *)
+val mk_fv_index : feature list -> fv_index          (** create an index from features *)
+val mk_fv_index_signature : symbol list -> fv_index (** create an index from signature *)
 
-val index_clause : fv_index -> hclause -> fv_index          (** add the clause to the index *)
-val remove_clause : fv_index -> hclause -> fv_index         (** remove the clause from the index *)
+val index_clause : fv_index -> hclause -> fv_index  (** add the clause to the index *)
+val remove_clause : fv_index -> hclause -> fv_index (** remove the clause from the index *)
 
 val retrieve_subsuming : fv_index -> clause -> hclause list (** clauses that subsume c *)
 val retrieve_subsumed : fv_index -> clause -> hclause list  (** clauses subsumed by c *)
