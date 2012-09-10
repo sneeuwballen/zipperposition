@@ -1,10 +1,11 @@
 
 - make multiset comparison fast
-- improve efficiency of discrimination trees: either use compressed tries, or use some kind of patricia trees
+
 - maybe implement context trees for general purpose indexing
-- fingerprint indexing
 - hashconsing from why3 (less overhead)?
+
 - simplify : clause -> clause list (for elimination rules in delayed, also for redundancy)
 - find better heuristics for delayed superposition
+
 - output dedukti code (or even Coq code?)
 - graphviz output
