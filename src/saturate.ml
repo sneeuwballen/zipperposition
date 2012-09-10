@@ -178,7 +178,14 @@ let given_clause_step ~calculus state =
       state, Unknown
     end
 
-let given_clause ?steps ?timeout ~calculus state =
+(** print progress *)
+let print_progress steps state =
+  let stats = PS.stats state in
+  Format.printf "\r%d steps; %d active; %d passive" steps stats.PS.stats_active_clauses
+    stats.PS.stats_passive_clauses;
+  Format.print_flush ()
+
+let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
   let rec do_step state num =
     if check_timeout timeout then state, Timeout, num else
     begin
@@ -187,6 +194,7 @@ let given_clause ?steps ?timeout ~calculus state =
     | Some i when num >= i -> state, Unknown, num
     | _ ->
       begin
+        if progress then print_progress num state else ();
         (* do one step *)
         let new_state, status = given_clause_step ~calculus state in
         match status with

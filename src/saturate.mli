@@ -42,7 +42,7 @@ val given_clause_step : calculus:Calculus.calculus ->
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns a tuple (new state, result, number of steps done) *)
-val given_clause: ?steps:int -> ?timeout:float ->
+val given_clause: ?steps:int -> ?timeout:float -> ?progress:bool ->
                   calculus:Calculus.calculus ->
                   ProofState.state ->
                   ProofState.state * szs_status * int

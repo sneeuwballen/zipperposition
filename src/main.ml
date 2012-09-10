@@ -84,6 +84,7 @@ type parameters = {
   param_timeout : float;
   param_files : string list;
   param_select : string;
+  param_progress : bool;
   param_proof : bool;
   param_output_syntax : string;   (** syntax for output *)
   param_print_sort : bool;        (** print sorts of terms *)
@@ -103,6 +104,7 @@ let parse_args () =
   and output = ref "debug"
   and calculus = ref "delayed"
   and select = ref "SelectComplex"  (* TODO choose clause queues? *)
+  and progress = ref false
   and print_sort = ref false
   and print_all = ref false
   and file = ref "stdin" in
@@ -115,6 +117,7 @@ let parse_args () =
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
+      ("-progress", Arg.Set progress, "print progress");
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
@@ -125,7 +128,7 @@ let parse_args () =
   (* return parameter structure *)
   { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
     param_timeout = !timeout; param_files = [!file]; param_select = !select;
-    param_proof = !proof; param_output_syntax = !output;
+    param_progress = !progress; param_proof = !proof; param_output_syntax = !output;
     param_print_sort = !print_sort; param_print_all = !print_all; }
 
 (** parse given tptp file *)
@@ -207,7 +210,8 @@ let () =
   and timeout = if params.param_timeout = 0.
     then None else (Format.printf "%% run for %f s@." params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
-                    Some (Unix.gettimeofday() +. params.param_timeout -. 0.25)) in
+                    Some (Unix.gettimeofday() +. params.param_timeout -. 0.25))
+  and progress = params.param_progress in
   (* setup printing *)
   setup_output params;
   (* parse file *)
@@ -244,7 +248,7 @@ let () =
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   let state = Sat.set_of_support ~calculus state calculus#axioms in
   (* saturate *)
-  let state, result, num = Sat.given_clause ?steps ?timeout ~calculus state
+  let state, result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;
