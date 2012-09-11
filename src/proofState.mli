@@ -26,6 +26,10 @@ open Types
 
 (** (empty) index to use for active sets *)
 val cur_index : Index.clause_index ref
+(** association name -> index *)
+val choose_index : string -> Index.index
+(** list of index names *)
+val names_index : unit -> string list
 
 (** set of active clauses *)
 type active_set = {

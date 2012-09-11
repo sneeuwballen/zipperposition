@@ -33,6 +33,21 @@ let cur_index =
   ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m))
   (* ref (I.mk_clause_index Discrimination_tree.index) *)
 
+let _indexes =
+  let table = Hashtbl.create 11 in
+  Hashtbl.add table "discr_tree" Discrimination_tree.index;
+  Hashtbl.add table "fp" (Fingerprint.mk_index Fingerprint.fp6m);
+  table
+
+let choose_index name =
+  try Hashtbl.find _indexes name
+  with Not_found -> failwith ("no such index name: " ^ name)
+
+let names_index () =
+  let names = ref [] in
+  Hashtbl.iter (fun n _ -> names := n :: !names) _indexes;
+  !names
+
 (** set of active clauses *)
 type active_set = {
   a_ord : ordering;

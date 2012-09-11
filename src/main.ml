@@ -86,6 +86,7 @@ type parameters = {
   param_progress : bool;
   param_proof : bool;
   param_output_syntax : string;   (** syntax for output *)
+  param_index : string;           (** indexing structure *)
   param_print_sort : bool;        (** print sorts of terms *)
   param_print_all : bool;         (** print desugarized lambda / DB symbols *)
 }
@@ -94,13 +95,17 @@ type parameters = {
 let parse_args () =
   let help_select = Utils.sprintf "selection function (@[<h>%a@])"
     (Utils.pp_list ~sep:"," Format.pp_print_string)
-    (Sel.available_selections ()) in
+    (Sel.available_selections ())
+  and help_index = Utils.sprintf "indexing structure (@[<h>%a@])"
+    (Utils.pp_list ~sep:"," Format.pp_print_string)
+    (PS.names_index ()) in
   (* parameters *)
   let ord = ref "rpo"
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true
   and output = ref "debug"
+  and index = ref "fp"
   and calculus = ref "delayed"
   and select = ref "SelectComplex"  (* TODO choose clause queues? *)
   and progress = ref false
@@ -119,6 +124,7 @@ let parse_args () =
       ("-progress", Arg.Set progress, "print progress");
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
+      ("-index", Arg.Set_string index, help_index);
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
       ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
       ("-print-ord", Arg.Unit (fun () -> C.pp_literal_debug#ord true), "print order of sides of literals");
@@ -129,7 +135,7 @@ let parse_args () =
   { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
     param_timeout = !timeout; param_files = [!file]; param_select = !select;
     param_progress = !progress; param_proof = !proof; param_output_syntax = !output;
-    param_print_sort = !print_sort; param_print_all = !print_all; }
+    param_index= !index; param_print_sort = !print_sort; param_print_all = !print_all; }
 
 (** parse given tptp file *)
 let parse_file ~recursive f =
@@ -156,6 +162,11 @@ let parse_file ~recursive f =
       Parser_tptp.parse_file Lexer_tptp.token buf
     with _ as e -> close_in input; raise e
   in aux [Filename.basename f] []
+
+(** setup index *)
+let setup_index name =
+  PS.cur_index := I.mk_clause_index (PS.choose_index name);
+  Format.printf "%% use indexing structure %s@." name
 
 (** print stats *)
 let print_stats state =
@@ -235,6 +246,8 @@ let () =
     | x -> failwith ("unknown ordering " ^ x)
   in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
+  (* indexing *)
+  setup_index params.param_index;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
