@@ -137,6 +137,30 @@ let parse_args () =
     param_progress = !progress; param_proof = !proof; param_output_syntax = !output;
     param_index= !index; param_print_sort = !print_sort; param_print_all = !print_all; }
 
+(** find the given file from given directory *)
+let find_file name dir =
+  (* check if the file exists *)
+  let rec file_exists name =
+    try ignore (Unix.stat name); true
+    with Unix.Unix_error (e, _, _) when e = Unix.ENOENT -> false
+  (* search recursively from dir *)
+  and search path cur_name =
+    Utils.debug 3 (lazy (Utils.sprintf "%% search %s as %s@." name cur_name));
+    match path with
+    | _ when file_exists cur_name -> cur_name (* found *)
+    | [] -> failwith ("unable to find file " ^ name)
+    | _::path' ->
+      let new_dir = List.fold_left Filename.concat "" (List.rev path') in
+      let new_name = Filename.concat new_dir name in
+      search path' new_name
+  in
+  if Filename.is_relative name
+    then
+      let r = Str.regexp Filename.dir_sep in
+      let path = List.rev (Str.split r dir) in
+      search path (Filename.concat dir name)
+    else if file_exists name then name else failwith ("unable to find file " ^ name)
+
 (** parse given tptp file *)
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
@@ -145,8 +169,6 @@ let parse_file ~recursive f =
   let rec aux files clauses = match files with
   | [] -> clauses
   | f::tail ->
-    (* if relative, append prefix, else keep absolute name *)
-    let f = if Filename.is_relative f && f <> "stdin" then Filename.concat dir f else f in
     let new_clauses, new_includes = parse_this f in
     if recursive
       then aux (List.rev_append new_includes tail) (List.rev_append new_clauses clauses)
@@ -155,7 +177,7 @@ let parse_file ~recursive f =
   and parse_this f =
     let input = match f with
     | "stdin" -> stdin
-    | _ -> open_in f in
+    | _ -> open_in (find_file f dir) in
     try
       let buf = Lexing.from_channel input in
       Const.cur_filename := f;
