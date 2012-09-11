@@ -26,6 +26,19 @@ open Types
 
 type data = hclause * position * foterm
 
+(** a set of (hashconsed clause, position in clause, term). *)
+module ClauseSet : Set.S with type elt = data
+
+(** a leaf of an index is generally a map of terms to data *)
+type index_leaf
+
+val empty_leaf : index_leaf
+val add_leaf : index_leaf -> foterm -> data -> index_leaf
+val remove_leaf : index_leaf -> foterm -> data -> index_leaf
+val is_empty_leaf : index_leaf -> bool
+val iter_leaf : index_leaf -> (foterm -> ClauseSet.t -> unit) -> unit
+val fold_leaf : index_leaf -> ('a -> foterm -> ClauseSet.t -> 'a) -> 'a -> 'a
+
 (** A term index *)
 class type index =
   object ('b)
@@ -33,12 +46,15 @@ class type index =
     method add : foterm -> data -> 'b
     method remove: foterm -> data -> 'b
 
-    method iter : (data -> unit) -> unit
-    method fold : 'a. ('a -> data -> 'a) -> 'a -> 'a
+    method iter : (foterm -> ClauseSet.t -> unit) -> unit
+    method fold : 'a. ('a -> foterm -> ClauseSet.t -> 'a) -> 'a -> 'a
 
-    method retrieve_unifiables : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a
-    method retrieve_generalizations : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a
-    method retrieve_specializations : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a
+    method retrieve_unifiables : 'a. foterm -> 'a ->
+                                 ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_generalizations : 'a. foterm -> 'a ->
+                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_specializations : 'a. foterm -> 'a ->
+                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
   end

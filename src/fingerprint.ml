@@ -26,8 +26,9 @@ open Hashcons
 module Utils = FoUtils
 module T = Terms
 module C = Clauses
+module I = Index
 
-type data = Index.data
+type data = I.data
 
 (** a feature *)
 type feature = A | B | N | S of symbol
@@ -115,24 +116,9 @@ module FeatureMap = Map.Make(
       | S s1, S s2 -> Pervasives.compare s1 s2
   end)
 
-(** a set of (hashconsed clause, position in clause, term). *)
-module ClauseSet : Set.S with 
-  type elt = hclause * position * foterm
-  = Set.Make(
-      struct 
-      type t = hclause * position * foterm
-
-      let compare (c1, p1, t1) (c2, p2, t2) = 
-        let c = Pervasives.compare p1 p2 in
-        if c <> 0 then c else
-        let c = C.compare_hclause c1 c2 in
-        if c <> 0 then c else
-        (assert (T.eq_foterm t1 t2); 0)
-    end)
-
 (** the fingerprint trie, of constant length *)
 type feature_trie =
-  Empty | Node of feature_trie FeatureMap.t | Leaf of ClauseSet.t
+  Empty | Node of feature_trie FeatureMap.t | Leaf of I.index_leaf
 
 (** add t -> data to the trie *)
 let add fp trie t data =
@@ -140,8 +126,8 @@ let add fp trie t data =
   let rec recurse trie features =
     match trie, features with
     | Empty, [] ->
-      let set = ClauseSet.add data ClauseSet.empty in 
-      Leaf set  (* creation of new leaf *)
+      let leaf = I.add_leaf I.empty_leaf t data in
+      Leaf leaf (* creation of new leaf *)
     | Empty, f::features' ->
       let subtrie = recurse Empty features' in
       let map = FeatureMap.add f subtrie FeatureMap.empty in
@@ -154,9 +140,9 @@ let add fp trie t data =
       let subtrie = recurse subtrie features' in
       let map = FeatureMap.add f subtrie map in
       Node map  (* point to new subtrie *)
-    | Leaf set, [] ->
-      let set = ClauseSet.add data set in
-      Leaf set  (* addition to set *)
+    | Leaf leaf, [] ->
+      let leaf = I.add_leaf leaf t data in
+      Leaf leaf (* addition to set *)
     | Node _, [] | Leaf _, _::_ ->
       failwith "different feature length in fingerprint trie"
   in
@@ -185,11 +171,11 @@ let remove fp trie t data =
       if FeatureMap.is_empty map
         then Empty
         else Node map
-    | Leaf set, [] ->
-      let set = ClauseSet.remove data set in
-      if ClauseSet.is_empty set
+    | Leaf leaf, [] ->
+      let leaf = I.remove_leaf leaf t data in
+      if I.is_empty_leaf leaf
         then Empty
-        else Leaf set
+        else Leaf leaf
     | Node _, [] | Leaf _, _::_ ->
       failwith "different feature length in fingerprint trie"
   in
@@ -199,17 +185,17 @@ let remove fp trie t data =
 let rec iter trie f = match trie with
   | Empty -> ()
   | Node map -> FeatureMap.iter (fun _ subtrie -> iter subtrie f) map
-  | Leaf set -> ClauseSet.iter f set
+  | Leaf leaf -> I.iter_leaf leaf f
 
 let fold trie f acc =
   let acc = ref acc in
-  iter trie (fun elt -> acc := f !acc elt);
+  iter trie (fun t set -> acc := f !acc t set);
   !acc
 
-(** number of indexed elements *)
+(** number of indexed terms *)
 let count trie =
   let n = ref 0 in
-  iter trie (fun _ -> incr n);
+  iter trie (fun _ _ -> incr n);
   !n
 
 (** fold on parts of the trie that are compatible with features *)
@@ -218,9 +204,9 @@ let traverse ~compatible trie features f acc =
   let rec recurse trie features acc =
     match trie, features with
     | Empty, _ -> acc
-    | Leaf set, [] ->
+    | Leaf leaf, [] ->
       (* fold on the set of data *)
-      ClauseSet.fold (fun elt acc -> f acc elt) set acc
+      I.fold_leaf leaf f acc
     | Node map, f::features' ->
       (* fold on any subtrie that is compatible with current feature *)
       FeatureMap.fold
@@ -251,22 +237,22 @@ let mk_index fp =
 
     method iter f = iter trie f
 
-    method fold : 'a. ('a -> ClauseSet.elt -> 'a) -> 'a -> 'a =
+    method fold : 'a. ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a -> 'a =
       fun f acc -> fold trie f acc
 
-    method retrieve_unifiables: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a  =
+    method retrieve_unifiables: 'a. foterm -> 'a -> ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a  =
       fun t acc f ->
         let features = fp t in
         traverse ~compatible:compatible_features_unif trie features f acc
 
-    method retrieve_generalizations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
+    method retrieve_generalizations: 'a. foterm -> 'a -> ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         let features = fp t in
         (* compatible t1 t2 if t2 can match t1 *)
         let compatible f1 f2 = compatible_features_match f2 f1 in
         traverse ~compatible trie features f acc
 
-    method retrieve_specializations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a = 
+    method retrieve_specializations: 'a. foterm -> 'a -> ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a = 
       fun t acc f ->
         let features = fp t in
         traverse ~compatible:compatible_features_match trie features f acc
@@ -275,12 +261,17 @@ let mk_index fp =
       if not all_clauses
         then Format.fprintf formatter "fingerprint for %d clauses" (count trie)
         else
-          let print (hc, pos, t) = Format.fprintf formatter "%a@;" !C.pp_clause#pp_h_pos (hc, pos, t)
+          let print_elt (hc, pos, t) = Format.fprintf formatter "%a@;" !C.pp_clause#pp_h_pos (hc, pos, t) in
+          let print t set =
+            begin
+              Format.fprintf formatter "%a -> @[<v>" !T.pp_term#pp t;
+              I.ClauseSet.iter print_elt set;
+              Format.fprintf formatter "@]@;"
+            end
           in begin
             Format.fprintf formatter "fingerprint for %d clauses: @[<v>"
               (count trie);
             iter trie print;
             Format.fprintf formatter "@]"
           end
-
   end

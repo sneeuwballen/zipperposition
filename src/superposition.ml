@@ -215,10 +215,13 @@ let infer_active_ actives clause =
       (* rewrite clauses using s *)
       let subterm_idx = actives.PS.idx#subterm_index in
       subterm_idx#retrieve_unifiables s acc
-        (fun acc (hc, u_pos, u_p) ->
+        (fun acc u_p set ->
           try (* rewrite u_p with s, if they are unifiable *)
             let subst = Unif.unification s u_p in
-            do_superposition ~ord clause s_pos hc u_pos subst acc
+            I.ClauseSet.fold
+              (fun (hc, u_pos, u_p) acc ->
+                do_superposition ~ord clause s_pos hc u_pos subst acc)
+              set acc
           with
             UnificationFailure _ -> acc)
     )
@@ -243,10 +246,13 @@ let infer_passive_ actives clause =
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
           actives.PS.idx#root_index#retrieve_unifiables u_p acc
-            (fun acc (hc, s_pos, s) ->
+            (fun acc s set ->
               try
                 let subst = Unif.unification s u_p in
-                do_superposition ~ord hc s_pos clause p subst acc
+                I.ClauseSet.fold
+                  (fun (hc, s_pos, s) acc ->
+                      do_superposition ~ord hc s_pos clause p subst acc)
+                  set acc
               with
                 UnificationFailure _ -> acc))
       in List.rev_append new_clauses acc
@@ -386,32 +392,37 @@ let demod_subterm ~ord blocked_ids active_set subterm =
     with Not_found -> ());
     (* unit clause+pos that potentially match subterm *)
     active_set.PS.idx#unit_root_index#retrieve_generalizations subterm ()
-      (fun () (unit_hclause, pos, l) ->
-        (* do we have to ignore the clause? *)
-        if List.mem unit_hclause.ctag blocked_ids then () else begin
+      (fun () l set ->
         assert (T.db_closed l);
         try
           let subst = Unif.matching l subterm in
-          match pos with
-          | [0; side] ->
-              (* r is the term subterm is going to be rewritten into *)
-              let r = C.get_pos unit_hclause [0; C.opposite_pos side] in
-              let new_l = subterm
-              and new_r = S.apply_subst subst r in
-              if ord#compare new_l new_r = Gt
-                (* subst(l) > subst(r), we can rewrite *)
-                then begin
-                  Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
-                                 !T.pp_term#pp subterm !T.pp_term#pp new_r
-                                 !C.pp_clause#pp_h unit_hclause));
-                  raise (FoundMatch (new_r, subst, unit_hclause, pos))
-                end else Utils.debug 4
-                  (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
-                   !T.pp_term#pp subterm !T.pp_term#pp new_r !C.pp_clause#pp_h unit_hclause));
-          | _ -> assert false
+          (* iterate on all clauses for this term *)
+          I.ClauseSet.iter 
+            (fun (unit_hclause, pos, l) ->
+              (* do we have to ignore the clause? *)
+              if List.mem unit_hclause.ctag blocked_ids then () else begin
+                match pos with
+                | [0; side] ->
+                  (* r is the term subterm is going to be rewritten into *)
+                  let r = C.get_pos unit_hclause [0; C.opposite_pos side] in
+                  let new_l = subterm
+                  and new_r = S.apply_subst subst r in
+                  if ord#compare new_l new_r = Gt
+                    (* subst(l) > subst(r), we can rewrite *)
+                    then begin
+                      Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
+                                     !T.pp_term#pp subterm !T.pp_term#pp new_r
+                                     !C.pp_clause#pp_h unit_hclause));
+                      raise (FoundMatch (new_r, subst, unit_hclause, pos))
+                    end else Utils.debug 4
+                      (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
+                             !T.pp_term#pp subterm !T.pp_term#pp new_r
+                             !C.pp_clause#pp_h unit_hclause));
+                | _ -> assert false
+              end
+          ) set
         with
           UnificationFailure _ -> ()
-        end
       );
     None  (* not found any match *)
   with

@@ -29,6 +29,50 @@ module Utils = FoUtils
 
 type data = hclause * position * foterm
 
+(** a set of (hashconsed clause, position in clause, term). *)
+module ClauseSet : Set.S with type elt = data
+  = Set.Make(
+      struct 
+      type t = data
+
+      let compare (c1, p1, t1) (c2, p2, t2) = 
+        let c = Pervasives.compare p1 p2 in
+        if c <> 0 then c else
+        let c = C.compare_hclause c1 c2 in
+        if c <> 0 then c else
+        (assert (T.eq_foterm t1 t2); 0)
+    end)
+
+(** a leaf of an index is generally a map of terms to data *)
+type index_leaf = (foterm * ClauseSet.t) Ptmap.t
+
+let empty_leaf = Ptmap.empty
+
+let add_leaf leaf t data =
+  let set =
+    try snd (Ptmap.find t.tag leaf)
+    with Not_found -> ClauseSet.empty in
+  let set = ClauseSet.add data set in
+  Ptmap.add t.tag (t, set) leaf
+
+let remove_leaf leaf t data =
+  try
+    let t', set = Ptmap.find t.tag leaf in
+    assert (T.eq_foterm t t');
+    let set = ClauseSet.remove data set in
+    if ClauseSet.is_empty set
+      then Ptmap.remove t.tag leaf
+      else Ptmap.add t.tag (t, set) leaf
+  with Not_found -> leaf
+
+let is_empty_leaf leaf = Ptmap.is_empty leaf
+
+let iter_leaf leaf f =
+  Ptmap.iter (fun _ (t, set) -> f t set) leaf
+
+let fold_leaf leaf f acc =
+  Ptmap.fold (fun _ (t, set) acc -> f acc t set) leaf acc
+
 (** A term index *)
 class type index =
   object ('b)
@@ -36,12 +80,15 @@ class type index =
     method add : foterm -> data -> 'b
     method remove: foterm -> data -> 'b
 
-    method iter : (data -> unit) -> unit
-    method fold : 'a. ('a -> data -> 'a) -> 'a -> 'a
+    method iter : (foterm -> ClauseSet.t -> unit) -> unit
+    method fold : 'a. ('a -> foterm -> ClauseSet.t -> 'a) -> 'a -> 'a
 
-    method retrieve_unifiables : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a
-    method retrieve_generalizations : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a
-    method retrieve_specializations : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a
+    method retrieve_unifiables : 'a. foterm -> 'a ->
+                                 ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_generalizations : 'a. foterm -> 'a ->
+                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_specializations : 'a. foterm -> 'a ->
+                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
   end
