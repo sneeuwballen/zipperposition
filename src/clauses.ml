@@ -483,8 +483,15 @@ let pp_literal_gen pp_term formatter lit =
       else Format.fprintf formatter "%a != %a" pp_term#pp l pp_term#pp r
 
 let pp_literal_debug =
+  let print_ord = ref false in
   object
-    method pp formatter lit = pp_literal_gen T.pp_term_debug formatter lit
+    method pp formatter ((Equation (_,_,_,ord)) as lit) =
+      pp_literal_gen T.pp_term_debug formatter lit;
+      if !print_ord
+        then Format.fprintf formatter "(%s)" (string_of_comparison ord)
+        else ()
+
+    method ord b = print_ord := b
   end
 
 let pp_literal_tstp =

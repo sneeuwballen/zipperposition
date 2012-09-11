@@ -150,7 +150,10 @@ class type pprinter_literal =
   end
 
 val pp_literal : pprinter_literal                       (** use current term printer *)
-val pp_literal_debug : pprinter_literal                 (** use debug unicode syntax *)
+val pp_literal_debug :                                  (** use debug unicode syntax *)
+  < pp : Format.formatter -> literal -> unit;
+    ord : bool -> unit;                                 (** print orientation of lit *)
+  >
 val pp_literal_tstp : pprinter_literal                  (** use TSTP syntax *)
 
 val pp_pos : formatter -> position -> unit

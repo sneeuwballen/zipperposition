@@ -121,6 +121,7 @@ let parse_args () =
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
       ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
+      ("-print-ord", Arg.Unit (fun () -> C.pp_literal_debug#ord true), "print order of sides of literals");
     ]
   in
   Arg.parse options (fun f -> file := f) "solve problem in first file";
