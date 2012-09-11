@@ -51,6 +51,7 @@ class type clause_index =
 
     method root_index : index
     method unit_root_index : index
+    method ground_rewrite_index : (foterm * data) Ptmap.t (** to rewrite ground terms *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit

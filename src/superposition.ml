@@ -53,7 +53,7 @@ let print_stats () =
     (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
     [stat_superposition_call; stat_equality_resolution_call; stat_equality_factoring_call;
      stat_subsumption_call; stat_subsumed_in_set_call; stat_subsumed_by_set_call;
-     stat_demodulate_call; stat_demodulate_call]
+     stat_demodulate_call; stat_demodulate_step]
 
 (* for profiling *)
 let enable = true
@@ -369,6 +369,16 @@ let demod_subterm ~ord blocked_ids active_set subterm =
   if subterm.sort = bool_sort && not (T.atomic subterm) then None else 
   (* unit clause+pos that potentially match subterm *)
   try
+    (* if ground, try to rewrite directly *)
+    (try
+      if T.is_ground_term subterm
+        then
+          let new_t, (hc, pos, l) = Ptmap.find subterm.tag
+            active_set.PS.idx#ground_rewrite_index in
+          assert (T.eq_foterm l subterm);
+          raise (FoundMatch (new_t, S.id_subst, hc, pos))
+        else ()
+    with Not_found -> ());
     active_set.PS.idx#unit_root_index#retrieve_generalizations subterm ()
       (fun () (unit_hclause, pos, l) ->
         (* do we have to ignore the clause? *)

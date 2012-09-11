@@ -54,6 +54,7 @@ class type clause_index =
 
     method root_index : index
     method unit_root_index : index
+    method ground_rewrite_index : (foterm * data) Ptmap.t (** to rewrite ground terms *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
@@ -102,11 +103,18 @@ let rec fold_subterms op tree t (c, path) = match t.term with
 (** apply (op tree) to the root term, after reversing the path *)
 let apply_root_term op tree t (c, path) = op tree t (c, List.rev path, t)
 
+(** size of a Ptmap *)
+let ptmap_size m =
+  let size = ref 0 in
+  Ptmap.iter (fun _ _ -> incr size) m;
+  !size
+
 let mk_clause_index (index : index) =
   object (_: 'self)
     val _root_index = index
     val _subterm_index = index
     val _unit_root_index = index 
+    val _ground_rewrite_index = Ptmap.empty
 
     (** add root terms and subterms to respective indexes *)
     method index_clause hc =
@@ -116,9 +124,16 @@ let mk_clause_index (index : index) =
           | [(Equation (_,_,true,_)) as lit] ->
               process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
           | _ -> _unit_root_index
+      and new_ground_rewrite_index = match hc.clits with
+          | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
+              Ptmap.add l.tag (r, (hc, [0; C.left_pos], l)) _ground_rewrite_index
+          | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
+              Ptmap.add r.tag (l, (hc, [0; C.right_pos], r)) _ground_rewrite_index
+          | _ -> _ground_rewrite_index
       and new_root_index = process_clause (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
+            _ground_rewrite_index=new_ground_rewrite_index;
             _subterm_index=new_subterm_index >} :> 'self)
 
     (** remove root terms and subterms from respective indexes *)
@@ -129,19 +144,29 @@ let mk_clause_index (index : index) =
           | [(Equation (_,_,true,_)) as lit] ->
               process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
           | _ -> _unit_root_index
+      and new_ground_rewrite_index = match hc.clits with
+          | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
+              Ptmap.remove l.tag _ground_rewrite_index
+          | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
+              Ptmap.remove r.tag _ground_rewrite_index
+          | _ -> _ground_rewrite_index
       and new_root_index = process_clause (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
+            _ground_rewrite_index=new_ground_rewrite_index;
             _subterm_index=new_subterm_index >} :> 'self)
 
     method root_index = _root_index
     method unit_root_index = _unit_root_index
+    method ground_rewrite_index = _ground_rewrite_index
     method subterm_index = _subterm_index
 
     method pp ~all_clauses formatter () =
       Format.fprintf formatter
-        "clause_index:@.root_index=@[<v>%a@]@.unit_root_index=@[<v>%a@]@.subterm_index=@[<v>%a@]@."
+        ("clause_index:@.root_index=@[<v>%a@]@.unit_root_index=@[<v>%a@]@." ^^
+         "ground_rewrite_index=%d rules@.subterm_index=@[<v>%a@]@.")
         (_root_index#pp ~all_clauses) ()
         (_unit_root_index#pp ~all_clauses) ()
+        (ptmap_size _ground_rewrite_index)
         (_subterm_index#pp ~all_clauses) ()
   end
