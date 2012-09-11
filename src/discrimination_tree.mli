@@ -32,22 +32,4 @@ type path_string_elem =
 
 type path = path_string_elem list
 
-module ClauseSet : Set.S with type elt = hclause * position * foterm
-
-type input = foterm                         (** indexed type *)
-type data = ClauseSet.elt                   (** value associated with input *)
-type dataset = ClauseSet.t                  (** set of values *)
-type constant_name = symbol                 (** constant terms (leaves) *)
-type tree                                   (** the tree itself *)
-
-val iter : tree -> (path -> dataset -> unit) -> unit
-val fold : tree -> (path -> dataset -> 'b -> 'b) -> 'b -> 'b
-
-val empty : tree
-val index : tree -> input -> data -> tree
-val remove_index : tree -> input -> data -> tree
-val in_index : tree -> input -> (data -> bool) -> bool
-val num_keys : tree -> int                  (** number of indexed keys (paths) *)
-val num_elems : tree -> int                 (** number of elements for any key *)
-
 val index : Index.index                     (** the index *)

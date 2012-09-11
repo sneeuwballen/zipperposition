@@ -23,6 +23,7 @@ open Hashcons
 
 module T = Terms
 module C = Clauses
+module I = Index
 module Unif = FoUnif
 module Utils = FoUtils
 
@@ -44,26 +45,6 @@ let arity_of = function
 let prof_dt_generalization = HExtlib.profile ~enable:true "discr_tree.retrieve_generalizations"
 let prof_dt_unifiables = HExtlib.profile ~enable:true "discr_tree.retrieve_unifiables"
 let prof_dt_specializations = HExtlib.profile ~enable:true "discr_tree.retrieve_specializations"
-
-(* a set of (hashconsed clause, position in clause, term at position). *)
-module ClauseSet : Set.S with 
-  type elt = hclause * position * foterm
-  = Set.Make(
-      struct 
-      type t = hclause * position * foterm
-
-      let compare (c1, p1, t1) (c2, p2, t2) = 
-        let c = Pervasives.compare p1 p2 in
-        if c <> 0 then c else
-        let c = C.compare_hclause c1 c2 in
-        if c <> 0 then c else
-        (assert (T.eq_foterm t1 t2); 0)
-    end)
-
-type input = foterm                         (** indexed type *)
-type data = ClauseSet.elt                   (** value associated with input *)
-type dataset = ClauseSet.t                  (** set of values *)
-type constant_name = symbol                 (** constant terms (leaves) *)
 
 module OrderedPathStringElement = struct
   type t = path_string_elem
@@ -108,7 +89,6 @@ let string_of_path l =
   | _ -> "?"
   in String.concat "." (List.map str_of_elem l)
 
-
 (* map of string elements *)
 module PSMap = Map.Make(OrderedPathStringElement)
 
@@ -117,7 +97,7 @@ type key = PSMap.key
 (** build a trie of such string elements *)
 module DiscriminationTree = Trie.Make(PSMap)
 
-type tree = dataset DiscriminationTree.t
+type tree = I.index_leaf DiscriminationTree.t
 
 let empty = DiscriminationTree.empty
 
@@ -125,27 +105,23 @@ let iter dt f = DiscriminationTree.iter (fun p x -> f p x) dt
 
 let fold dt f = DiscriminationTree.fold (fun p x -> f p x) dt
 
-let index tree term info =
+let index tree term data =
   let ps = path_string_of term in
-  let ps_set =
-    try DiscriminationTree.find ps tree with Not_found -> ClauseSet.empty
+  let leaf = 
+    try DiscriminationTree.find ps tree
+    with Not_found -> I.empty_leaf
   in
-  DiscriminationTree.add ps (ClauseSet.add info ps_set) tree
+  DiscriminationTree.add ps (I.add_leaf leaf term data) tree
 
-let remove_index tree term info =
+let remove_index tree term data =
   let ps = path_string_of term in
   try
-    let ps_set = ClauseSet.remove info (DiscriminationTree.find ps tree) in
-    if ClauseSet.is_empty ps_set then DiscriminationTree.remove ps tree
-    else DiscriminationTree.add ps ps_set tree
+    let leaf = DiscriminationTree.find ps tree in
+    let leaf = I.remove_leaf leaf term data in
+    if I.is_empty_leaf leaf
+      then DiscriminationTree.remove ps tree
+      else DiscriminationTree.add ps leaf tree
   with Not_found -> tree
-
-let in_index tree term test =
-  let ps = path_string_of term in
-  try
-    let ps_set = DiscriminationTree.find ps tree in
-    ClauseSet.exists test ps_set
-  with Not_found -> false
 
 (* You have h(f(x,g(y,z)),t) whose path_string_of_term_with_jl is
    (h,2).(f,2).(x,0).(g,2).(y,0).(z,0).(t,0) and you are at f and want to
@@ -176,7 +152,8 @@ let retrieve ~unify_query ~unify_indexed tree term acc f =
   let path = path_string_of term in
   let rec retrieve path acc tree =
     match tree, path with
-    | DiscriminationTree.Node (Some s, _), [] -> ClauseSet.fold (fun elt acc -> f acc elt) s acc
+    | DiscriminationTree.Node (Some leaf, _), [] ->
+      I.fold_leaf leaf f acc
     | DiscriminationTree.Node (None, _), [] -> acc
     | DiscriminationTree.Node (_, map), Variable::path when unify_query ->
         List.fold_left (retrieve path) acc (skip_root tree)
@@ -190,8 +167,8 @@ let retrieve ~unify_query ~unify_indexed tree term acc f =
         if not unify_indexed then acc else
         (* follow a 'variable' branch of the trie *)
         try match PSMap.find Variable map,skip (arity_of node) path with
-          | DiscriminationTree.Node (Some s, _), [] ->
-              ClauseSet.fold (fun elt acc -> f acc elt) s acc
+          | DiscriminationTree.Node (Some leaf, _), [] ->
+            I.fold_leaf leaf f acc 
           | n, path -> retrieve path acc n
         with Not_found -> acc
  in
@@ -200,11 +177,6 @@ let retrieve ~unify_query ~unify_indexed tree term acc f =
 let num_keys tree =
   let num = ref 0 in
   iter tree (fun _ _ -> incr num);
-  !num
-
-let num_elems tree =
-  let num = ref 0 in
-  iter tree (fun _ elems -> num := !num + (ClauseSet.cardinal elems));
   !num
 
 let index : Index.index =
@@ -217,38 +189,50 @@ let index : Index.index =
 
     method remove t data = ({< tree = remove_index tree t data >} : 'self)
 
-    method iter f = iter tree (fun p data -> ClauseSet.iter f data)
+    method iter f = iter tree (fun p leaf -> I.iter_leaf leaf (fun t set -> f t set))
 
-    method fold : 'a. ('a -> ClauseSet.elt -> 'a) -> 'a -> 'a =
+    method fold : 'a. ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a -> 'a =
       fun f acc ->
         let acc = ref acc in
-        iter tree (fun p data -> acc :=
-          ClauseSet.fold (fun elt acc -> f acc elt) data !acc);
+        iter tree (fun p leaf -> I.iter_leaf leaf (fun t set -> acc := f !acc t set));
         !acc
 
-    method retrieve_generalizations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
+    method retrieve_generalizations: 'a. foterm -> 'a ->
+      ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         prof_dt_generalization.HExtlib.profile
         (retrieve ~unify_query:false ~unify_indexed:true tree t acc) f
 
-    method retrieve_unifiables : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
+    method retrieve_unifiables : 'a. foterm -> 'a ->
+      ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         prof_dt_unifiables.HExtlib.profile
         (retrieve ~unify_query:true ~unify_indexed:true tree t acc) f
 
-    method retrieve_specializations : 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
+    method retrieve_specializations : 'a. foterm -> 'a ->
+      ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         prof_dt_specializations.HExtlib.profile
         (retrieve ~unify_query:true ~unify_indexed:false tree t acc) f
 
     method pp ~all_clauses formatter () =
-      let print_dt_path path set =
+      let rec print_elt (hc, pos, t) = Format.fprintf formatter "%a@;"
+        !C.pp_clause#pp_h_pos (hc, pos, t)
+      and print t set =
+        begin
+          Format.fprintf formatter "%a -> @[<v>" !T.pp_term#pp t;
+          I.ClauseSet.iter print_elt set;
+          Format.fprintf formatter "@]@;"
+        end
+      and print_dt_path path leaf =
         if all_clauses
-          then let l = ClauseSet.elements set in
-          Format.fprintf formatter "%s : @[<hov>%a@]@;" (string_of_path path)
-            (Utils.pp_list ~sep:", " !C.pp_clause#pp_h_pos) l
-          else Format.fprintf formatter "@[<h>%s : %d clauses/pos@]@;"
-            (string_of_path path) (ClauseSet.cardinal set)
+          then begin
+            Format.fprintf formatter "%s : @[<hov>" (string_of_path path);
+            I.iter_leaf leaf print;
+            Format.fprintf formatter "@]@;"
+          end else
+            Format.fprintf formatter "@[<h>%s : %d terms@]@;"
+              (string_of_path path) (I.size_leaf leaf)
       in
       iter tree print_dt_path
   end

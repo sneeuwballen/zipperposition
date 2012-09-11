@@ -38,6 +38,7 @@ val remove_leaf : index_leaf -> foterm -> data -> index_leaf
 val is_empty_leaf : index_leaf -> bool
 val iter_leaf : index_leaf -> (foterm -> ClauseSet.t -> unit) -> unit
 val fold_leaf : index_leaf -> ('a -> foterm -> ClauseSet.t -> 'a) -> 'a -> 'a
+val size_leaf : index_leaf -> int
 
 (** A term index *)
 class type index =

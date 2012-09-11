@@ -73,6 +73,11 @@ let iter_leaf leaf f =
 let fold_leaf leaf f acc =
   Ptmap.fold (fun _ (t, set) acc -> f acc t set) leaf acc
 
+let size_leaf leaf =
+  let cnt = ref 0 in
+  Ptmap.iter (fun _ _ -> incr cnt) leaf;
+  !cnt
+
 (** A term index *)
 class type index =
   object ('b)
