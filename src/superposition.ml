@@ -363,12 +363,17 @@ exception FoundMatch of (foterm * substitution * clause * position)
 
 (** Do one step of demodulation on subterm. *)
 let demod_subterm ~ord blocked_ids active_set subterm =
+  Utils.debug 4 (lazy (Utils.sprintf "  demod subterm %a" !T.pp_term#pp subterm));
   (* do not rewrite non closed subterms *)
-  if not (T.db_closed subterm) then None else
+  if not (T.db_closed subterm)
+    then (Utils.debug 3 (lazy (Utils.sprintf "demod: %a not closed" !T.pp_term#pp subterm));
+          None)
   (* no rewriting on non-atomic formulae *)
-  if subterm.sort = bool_sort && not (T.atomic subterm) then None else 
-  (* unit clause+pos that potentially match subterm *)
-  try
+  else if subterm.sort = bool_sort && not (T.atomic subterm)
+    then (Utils.debug 3 (lazy (Utils.sprintf "demod: %a not atomic" !T.pp_term#pp subterm));
+          None)
+  (* try to rewrite using unit positive clauses *)
+  else try
     (* if ground, try to rewrite directly *)
     (try
       if T.is_ground_term subterm
@@ -379,10 +384,11 @@ let demod_subterm ~ord blocked_ids active_set subterm =
           raise (FoundMatch (new_t, S.id_subst, hc, pos))
         else ()
     with Not_found -> ());
+    (* unit clause+pos that potentially match subterm *)
     active_set.PS.idx#unit_root_index#retrieve_generalizations subterm ()
       (fun () (unit_hclause, pos, l) ->
         (* do we have to ignore the clause? *)
-        if List.mem unit_hclause.ctag blocked_ids then () else
+        if List.mem unit_hclause.ctag blocked_ids then () else begin
         assert (T.db_closed l);
         try
           let subst = Unif.matching l subterm in
@@ -394,17 +400,26 @@ let demod_subterm ~ord blocked_ids active_set subterm =
               and new_r = S.apply_subst subst r in
               if ord#compare new_l new_r = Gt
                 (* subst(l) > subst(r), we can rewrite *)
-                then raise (FoundMatch (new_r, subst, unit_hclause, pos))
-                else ()
+                then begin
+                  Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
+                                 !T.pp_term#pp subterm !T.pp_term#pp new_r
+                                 !C.pp_clause#pp_h unit_hclause));
+                  raise (FoundMatch (new_r, subst, unit_hclause, pos))
+                end else Utils.debug 4
+                  (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
+                   !T.pp_term#pp subterm !T.pp_term#pp new_r !C.pp_clause#pp_h unit_hclause));
           | _ -> assert false
         with
           UnificationFailure _ -> ()
+        end
       );
     None  (* not found any match *)
   with
     FoundMatch (new_t, subst, unit_hclause, pos) ->
-      (incr_stat stat_demodulate_step;
-      Some (new_t, (unit_hclause, pos, subst)))  (* return the new term, and proof *)
+      begin
+        incr_stat stat_demodulate_step;
+        Some (new_t, (unit_hclause, pos, subst))  (* return the new term, and proof *)
+      end
 
 (** Normalize term (which is at pos pos in the clause) w.r.t. active set.
     This returns a list of clauses and positions in clauses that have
@@ -417,7 +432,7 @@ let demod_term ~ord blocked_ids active_set term =
     | None -> term, clauses
     | Some (new_term, (unit_hc, active_pos, subst), _, _) ->
       let new_clauses =  (unit_hc, active_pos, subst) :: clauses in
-      one_step new_term new_clauses
+      one_step new_term new_clauses (* do another step *)
   in one_step term []
 
 (** demodulate a whole clause w.r.t the active_set, but ignores
@@ -425,6 +440,7 @@ let demod_term ~ord blocked_ids active_set term =
     is already in the active_set)
     TODO ensure the conditions for rewrite of positive literals are ok (cf paper) *)
 let demodulate_ active_set blocked_ids clause =
+  Utils.debug 4 (lazy (Utils.sprintf "demodulate %a..." !C.pp_clause#pp clause));
   incr_stat stat_demodulate_call;
   let ord = active_set.PS.a_ord in
   (* rewrite the literal lit (at pos), returning a new lit
@@ -766,7 +782,8 @@ let superposition : calculus =
 
     method basic_simplify ~ord c = basic_simplify ~ord c
 
-    method simplify actives c = demodulate actives [] c
+    method simplify actives c =
+      basic_simplify ~ord:actives.PS.a_ord (demodulate actives [] c)
 
     method redundant actives c = subsumed_by_set actives c
 

@@ -29,7 +29,9 @@ module CQ = ClauseQueue
 module U = FoUtils
 
 (** Default indexing on terms *)
-let cur_index = ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m))
+let cur_index =
+  ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m))
+  (* ref (I.mk_clause_index Discrimination_tree.index) *)
 
 (** set of active clauses *)
 type active_set = {
