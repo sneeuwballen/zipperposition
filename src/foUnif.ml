@@ -81,9 +81,9 @@ let unification a b =
   in
   prof_unification.HExtlib.profile (unif S.id_subst a) b
 
-let matching_locked ~locked a b =
+let matching_locked ~locked subst a b =
   (* recursive matching *)
-  let rec unif locked subst s t =
+  let rec unif subst s t =
     if s.sort <> t.sort then raise (UnificationFailure (lazy "different sorts"));
     let s = S.apply_subst subst s
     and t = S.apply_subst subst t in
@@ -97,15 +97,15 @@ let matching_locked ~locked a b =
     | Var _, _ -> S.build_subst s t subst
     | Node l1, Node l2 -> (
         try
-          List.fold_left2 (unif locked) subst l1 l2  (* recursive pairwise unification *)
+          List.fold_left2 unif subst l1 l2  (* recursive pairwise unification *)
         with Invalid_argument _ ->
           raise (UnificationFailure (lazy "arglists of distinct lengths"))
       )
     | _, _ -> raise (UnificationFailure (lazy "incompatible terms"))
   in
-  prof_matching.HExtlib.profile (unif locked S.id_subst a) b
+  prof_matching.HExtlib.profile (unif subst a) b
 
-let matching a b = matching_locked ~locked:(T.vars_of_term b) a b
+let matching a b = matching_locked ~locked:(T.vars_of_term b) S.id_subst a b
 
 (** Sets of variables in s and t are assumed to be disjoint  *)
 let alpha_eq s t =

@@ -252,6 +252,7 @@ let () =
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;
   print_stats state;
+  Sup.print_stats ();
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s

@@ -22,6 +22,18 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+(* statistics *)
+val stat_superposition_call : statistics
+val stat_equality_resolution_call : statistics
+val stat_equality_factoring_call : statistics
+val stat_subsumption_call : statistics
+val stat_subsumed_in_set_call : statistics
+val stat_subsumed_by_set_call : statistics
+val stat_demodulate_call : statistics
+val stat_demodulate_step : statistics
+
+val print_stats : unit -> unit
+
 val infer_active: Calculus.binary_inf_rule (** superposition where given clause is active *)
 
 val infer_passive: Calculus.binary_inf_rule(** superposition where given clause is passive *)

@@ -38,6 +38,23 @@ type conclusion = clause
 (** inferences *)
 type inference_rule = ProofState.active_set -> clause -> conclusion list
 
+(* statistics *)
+let stat_superposition_call = mk_stat "superposition calls"
+let stat_equality_resolution_call = mk_stat "equality_resolution calls"
+let stat_equality_factoring_call = mk_stat "equality_factoring calls"
+let stat_subsumption_call = mk_stat "subsumption calls"
+let stat_subsumed_in_set_call = mk_stat "subsumed_in_set calls"
+let stat_subsumed_by_set_call = mk_stat "subsumed_by_set calls"
+let stat_demodulate_call = mk_stat "demodulate calls"
+let stat_demodulate_step = mk_stat "demodulate steps"
+
+let print_stats () =
+  List.iter
+    (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
+    [stat_superposition_call; stat_equality_resolution_call; stat_equality_factoring_call;
+     stat_subsumption_call; stat_subsumed_in_set_call; stat_subsumed_by_set_call;
+     stat_demodulate_call; stat_demodulate_call]
+
 (* for profiling *)
 let enable = true
 
@@ -138,6 +155,7 @@ let all_positions pos ctx t f =
    the given parameters *)
 let do_superposition ~ord active_clause active_pos passive_clause passive_pos subst acc =
   assert (List.length active_pos = 2);
+  incr_stat stat_superposition_call;
   match passive_pos with
   | [] | _::[] -> assert false
   | passive_idx::passive_side::subterm_pos ->
@@ -254,7 +272,8 @@ let infer_equality_resolution_ ~ord clause =
         let subst = Unif.unification l r in
         if C.eligible_res ~ord clause pos subst
           (* subst(lit) is maximal, we can do the inference *)
-          then
+          then begin
+            incr_stat stat_equality_resolution_call;
             let proof = lazy (Proof ("equality_resolution", [clause, [pos], subst]))
             and new_lits = Utils.list_remove clause.clits pos in
             let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
@@ -263,7 +282,7 @@ let infer_equality_resolution_ ~ord clause =
                           "equality resolution on @[<h>%a@] yields @[<h>%a@]"
                           !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
             new_clause::acc
-          else
+          end else
             acc
       with UnificationFailure _ -> acc (* l and r not unifiable, try next *)
     )
@@ -307,7 +326,8 @@ let infer_equality_factoring_ ~ord clause =
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     if ord#compare (S.apply_subst subst s) (S.apply_subst subst t) <> Lt &&
        C.eligible_param ~ord clause active_idx subst
-      then
+      then begin
+        incr_stat stat_equality_factoring_call;
         let proof = lazy (Proof ("equality_factoring",
           [(clause, active_pos, subst); (clause, passive_pos, subst)]))
         (* new_lits: literals of the new clause. remove active literal
@@ -320,7 +340,7 @@ let infer_equality_factoring_ ~ord clause =
                       "equality factoring on @[<h>%a@] yields @[<h>%a@]"
                       !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
         [new_clause]
-      else
+      end else
         []
   (* try to do inferences with each positive literal *)
   in fold_positive ~both:true
@@ -373,7 +393,8 @@ let demod_subterm ~ord blocked_ids active_set subterm =
     None  (* not found any match *)
   with
     FoundMatch (new_t, subst, unit_hclause, pos) ->
-      Some (new_t, (unit_hclause, pos, subst))  (* return the new term, and proof *)
+      (incr_stat stat_demodulate_step;
+      Some (new_t, (unit_hclause, pos, subst)))  (* return the new term, and proof *)
 
 (** Normalize term (which is at pos pos in the clause) w.r.t. active set.
     This returns a list of clauses and positions in clauses that have
@@ -394,6 +415,7 @@ let demod_term ~ord blocked_ids active_set term =
     is already in the active_set)
     TODO ensure the conditions for rewrite of positive literals are ok (cf paper) *)
 let demodulate_ active_set blocked_ids clause =
+  incr_stat stat_demodulate_call;
   let ord = active_set.PS.a_ord in
   (* rewrite the literal lit (at pos), returning a new lit
      and clauses used to rewrite it *)
@@ -484,31 +506,26 @@ let basic_simplify ~ord clause =
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
     substitutions s such that s(lit_a) = lit_b and s contains subst. The list
     is empty if lit_a does not subsume lit_b. *)
-let match_lits ~locked lit_a lit_b subst =
+let match_lits ~locked subst lit_a lit_b =
   match lit_a, lit_b with
   | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) ->
     if signa <> signb then [] else
     (try
-      let s = Unif.matching_locked ~locked
-        (S.apply_subst subst la) (S.apply_subst subst lb) in
-      let s = S.concat s subst in
-      let s' = Unif.matching_locked ~locked
-        (S.apply_subst s ra) (S.apply_subst s rb) in
-      [S.concat s' s]
+      let subst = Unif.matching_locked ~locked subst la lb in
+      let subst = Unif.matching_locked ~locked subst ra rb in
+      [subst]
     with UnificationFailure _ -> []) @
     (try
-      let s = Unif.matching_locked ~locked
-        (S.apply_subst subst la) (S.apply_subst subst rb) in
-      let s = S.concat s subst in
-      let s' = Unif.matching_locked ~locked
-        (S.apply_subst s ra) (S.apply_subst s lb) in
-      [S.concat s' s]
+      let subst = Unif.matching_locked ~locked subst la rb in
+      let subst = Unif.matching_locked ~locked subst ra lb in
+      [subst]
     with UnificationFailure _ -> [])
 
 (** raised when a subsuming substitution is found *)
 exception SubsumptionFound of substitution
 
 let subsumes_with a b =
+  incr_stat stat_subsumption_call;
   let locked = b.cvars in
   (* a must not have more literals *)
   if List.length a.clits > List.length b.clits then None else
@@ -525,7 +542,7 @@ let subsumes_with a b =
   and attempt_with x l1 l2_pre l2 subst = match l2 with
   | [] -> None
   | y::l2_tail ->
-    let possible_matches = match_lits ~locked x y subst in
+    let possible_matches = match_lits ~locked subst x y in
     if possible_matches = []  (* x and y do not match *)
       then attempt_with x l1 (y::l2_pre) l2_tail subst
       else
@@ -558,6 +575,7 @@ let subsumes a b =
   prof_subsumption.HExtlib.profile (check a) b
 
 let subsumed_by_set_ set c =
+  incr_stat stat_subsumed_by_set_call;
   (* use feature vector indexing *)
   try
     FV.retrieve_subsuming set.PS.fv_idx c
@@ -572,6 +590,7 @@ let subsumed_by_set set clause =
   prof_subsumption_set.HExtlib.profile (subsumed_by_set_ set) clause
 
 let subsumed_in_set_ set c =
+  incr_stat stat_subsumed_in_set_call;
   (* use feature vector indexing *)
   let l = ref [] in
     FV.retrieve_subsumed

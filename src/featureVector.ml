@@ -122,7 +122,7 @@ type fv_index = feature list * hclauses FVTrie.t
 
 let mk_fv_index features = (features, FVTrie.empty)
 
-let max_symbols = 20    (** maximum number of symbols considered for indexing *)
+let max_symbols = 30    (** maximum number of symbols considered for indexing *)
 
 let mk_fv_index_signature signature =
   (* only consider a bounded number of symbols *)

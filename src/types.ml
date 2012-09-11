@@ -143,3 +143,8 @@ class type ['a] pp_printer =
   object
     method pp : Format.formatter -> 'a -> unit
   end
+
+(** a statistic object: name and count *)
+type statistics = string * int64 ref
+let mk_stat name = (name, ref Int64.zero)
+let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)

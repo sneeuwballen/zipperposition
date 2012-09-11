@@ -28,9 +28,10 @@ val unification: foterm -> foterm -> substitution
 (* [matching a b] returns sigma such that sigma(a) = b *)
 val matching: foterm -> foterm -> substitution
 
-(** [matching_locked ~locked a b] returns sigma such that sigma(a) = b
-    and sigma does not bind any variable in locked, or raise UnificationFailure *)
-val matching_locked: locked:varlist -> foterm -> foterm -> substitution
+(** [matching_locked ~locked subst a b] returns sigma such that sigma(a) = b
+    and sigma does not bind any variable in locked and subst \in sigma,
+    or raise UnificationFailure *)
+val matching_locked: locked:varlist -> substitution -> foterm -> foterm -> substitution
 
 (* alpha_eq [a] [b] returns sigma with sigma(a) = b, and sigma
  * a variable renaming, or raise UnificationFailure *)
