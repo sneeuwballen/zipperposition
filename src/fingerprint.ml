@@ -206,6 +206,12 @@ let fold trie f acc =
   iter trie (fun elt -> acc := f !acc elt);
   !acc
 
+(** number of indexed elements *)
+let count trie =
+  let n = ref 0 in
+  iter trie (fun _ -> incr n);
+  !n
+
 (** fold on parts of the trie that are compatible with features *)
 let traverse ~compatible trie features f acc =
   (* fold on the trie *)
@@ -256,14 +262,25 @@ let mk_index fp =
     method retrieve_generalizations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a =
       fun t acc f ->
         let features = fp t in
-        traverse ~compatible:compatible_features_match trie features f acc
+        (* compatible t1 t2 if t2 can match t1 *)
+        let compatible f1 f2 = compatible_features_match f2 f1 in
+        traverse ~compatible trie features f acc
 
     method retrieve_specializations: 'a. foterm -> 'a -> ('a -> data -> 'a) -> 'a = 
       fun t acc f ->
         let features = fp t in
-        (* compatibility is like matching, but converse *)
-        let compatible f1 f2 = compatible_features_match f2 f1 in
-        traverse ~compatible trie features f acc
+        traverse ~compatible:compatible_features_match trie features f acc
 
-    method pp ~all_clauses formatter () = ()  (* TODO *)
+    method pp ~all_clauses formatter () =
+      if not all_clauses
+        then Format.fprintf formatter "fingerprint for %d clauses" (count trie)
+        else
+          let print (hc, pos, t) = Format.fprintf formatter "%a@;" !C.pp_clause#pp_h_pos (hc, pos, t)
+          in begin
+            Format.fprintf formatter "fingerprint for %d clauses: @[<v>"
+              (count trie);
+            iter trie print;
+            Format.fprintf formatter "@]"
+          end
+
   end
