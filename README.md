@@ -28,11 +28,11 @@ under GPLv2.
 A copy of the GPLv2 is attached to the project, in the file LICENSE.
 
 ## Build
-You will need ocaml (3.12 or higher works; 3.11 or lower may work, I did not test). Type
+You will need ocaml >= 3.12 or higher with ocamlbuild and the standard library. Type in a terminal:
 
     make
 
-It should build files (using ocamlbuild).
+It should build the project files (using ocamlbuild).
 
 
 ## Use
@@ -41,14 +41,15 @@ Typical usage:
 
     $ ./prover3.sh problem_file [options]
     $ ./prover.sh problem_file [options]
-    $ ./src/main.native problem_file -calculus [delayed|superposition]
+    $ ./zipperposition.sh problem_file -calculus [delayed|superposition]
 
 to run the prover. Help is available with the option *-help*. The scripts `prover3.sh`
 and `prover.sh` call the external prover [E](http://eprover.org) for reduction to CNF;
 the former is for [TPTP3](http://tptp.org) syntax, and the latter for old TPTP syntax.
-You can also call the binary directly (it parses TPTP3 syntax); it accepts CNF files
-with `-calculus superposition`, and CNF or FOF files for `-calculus delayed` (where
-reduction to CNF is done during the saturation process).
+You can also call the binary directly (it parses TPTP3 syntax); it accepts CNF and FOF files
+for both calculi `-calculus superposition` and `-calculus delayed` (where
+reduction to CNF is done during the saturation process). The prover now
+embeds its own (simple) reduction to CNF algorithm.
 
 For instance,
 
