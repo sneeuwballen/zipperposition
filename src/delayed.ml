@@ -320,7 +320,13 @@ let delayed : calculus =
 
     method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
 
-    method simplify actives c = Sup.demodulate actives [] c
+    method simplify actives c =
+      let ord = actives.PS.a_ord in
+      let c = Sup.basic_simplify ~ord (simplify_inner ~ord c) in
+      let c = Sup.basic_simplify ~ord (Sup.positive_simplify_reflect actives c) in
+      let c = Sup.basic_simplify ~ord (Sup.negative_simplify_reflect actives c) in
+      let c = Sup.basic_simplify ~ord (Sup.demodulate actives [] c) in
+      simplify_inner ~ord c
 
     method redundant actives c = Sup.subsumed_by_set actives c
 
