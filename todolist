@@ -2,9 +2,10 @@
 - make multiset comparison fast
 - maybe implement context trees for general purpose indexing
 
-- simplify : clause -> clause list (for elimination rules in delayed, also for redundancy)
+- elimination rules in delayed as simplifications
 - find better heuristics for delayed superposition
 - syntactic tautology deletion
+- more profiling/statistics 
 
 - output dedukti code (or even Coq code?)
 - graphviz output
