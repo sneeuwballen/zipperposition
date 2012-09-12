@@ -28,8 +28,8 @@ module S = FoSubst
 module Utils = FoUtils
 module PS = ProofState
 
-(** binary inferences *)
-type binary_inf_rule = PS.active_set -> clause -> clause list
+(** binary inferences. An inference returns a list of conclusions *)
+type binary_inf_rule = ProofState.active_set -> clause -> clause list
 
 (** unary infererences *)
 type unary_inf_rule = ord:ordering -> clause -> clause list

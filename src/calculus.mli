@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-(** binary inferences *)
+(** binary inferences. An inference returns a list of conclusions *)
 type binary_inf_rule = ProofState.active_set -> clause -> clause list
 
 (** unary infererences *)

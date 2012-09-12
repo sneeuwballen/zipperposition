@@ -25,6 +25,7 @@ open Types
 module C = Clauses
 module O = Orderings
 module PS = ProofState
+module CD = ClauseDag
 module Sup = Superposition
 module Sel = Selection
 module Utils = FoUtils
@@ -73,6 +74,42 @@ let generate_binary ~calculus active_set clause =
 let generate_unary ~calculus ~ord clause =
   Calculus.do_unary_inferences ~ord calculus#unary_rules clause
 
+(** generate all clauses from inferences, updating the state (for the
+    parent/descendant relation) *)
+let generate ~calculus state c =
+  let ord = state.PS.ord in
+  (* an active set containing only the given clause *)
+  let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
+  (* binary clauses *)
+  let binary_clauses = [] in
+  let binary_clauses = List.rev_append
+    (generate_binary ~calculus state.PS.axioms_set c) binary_clauses in
+  let binary_clauses = List.rev_append
+    (generate_binary ~calculus state.PS.active_set c) binary_clauses in
+  let binary_clauses = List.rev_append
+    (generate_binary ~calculus given_active_set c) binary_clauses in
+  (* unary inferences *)
+  let unary_clauses = generate_unary ~calculus ~ord c in
+  let new_clauses =  List.rev_append unary_clauses binary_clauses in
+  new_clauses
+
+(** remove direct descendants of the clauses from the passive set *)
+let remove_orphans state removed_clauses =
+  let passive = state.PS.passive_set
+  and ord = state.PS.ord in
+  let passive =
+    List.fold_left
+      (fun passive removed_clause ->
+        (* remove descendnts of removed_clause from the passive set *)
+        let descendants = CD.descendants ~ord state.PS.dag removed_clause in
+        List.iter (fun c ->
+          Utils.debug 3 (lazy (Utils.sprintf "  @[<h>remove orphan clause %a@]"
+                         !C.pp_clause#pp c))) descendants;
+        PS.remove_passives passive descendants)
+      passive removed_clauses
+  in
+  {state with PS.passive_set = passive}
+
 (** check whether the clause is redundant w.r.t the active_set *)
 let is_redundant ~calculus active_set clause =
   (* forward subsumption check *)
@@ -113,6 +150,7 @@ let given_clause_step ~calculus state =
       let subsumed_active = subsumed_by ~calculus state.PS.active_set c in
       let active_set = PS.remove_actives state.PS.active_set subsumed_active in
       let state = { state with PS.active_set = active_set } in
+      let state = remove_orphans state subsumed_active in   (* orphan criterion *)
       (* simplify active set using c TODO write a function for this; TODO use indexing *)
       let simplified_actives = ref [] in  (* simplified active clauses *)
       let bag_remain, bag_simplified = C.partition_bag
@@ -127,47 +165,46 @@ let given_clause_step ~calculus state =
               Utils.debug 2 (lazy (Utils.sprintf
                            "active clause @[<h>%a@] simplified into @[<h>%a@]"
                            !C.pp_clause#pp original !C.pp_clause#pp simplified));
+              Utils.debug 3 (lazy (Utils.sprintf
+                            "simplified clause %a has descendants %a"
+                            !C.pp_clause#pp original (Utils.pp_list !C.pp_clause#pp_h)
+                            (CD.descendants ~ord state.PS.dag original)));
               false
             end else true (* no change *)
         )
       in
       (* the simplified active clauses are removed from active set and
-         added to the set of new clauses *)
+         added to the set of new clauses. *)
       let active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
       let state = { state with PS.active_set = active_set } in
-      let new_clauses = !simplified_actives in
+      let state = remove_orphans state !simplified_actives in  (* orphan criterion *)
+      let new_clauses = List.map (C.normalize_clause ~ord) !simplified_actives in
       (* do inferences w.r.t to the active set, SOS, and c itself *)
-      let new_clauses = List.rev_append
-        (generate_binary ~calculus state.PS.axioms_set c) new_clauses in
-      let new_clauses = List.rev_append
-        (generate_binary ~calculus state.PS.active_set c) new_clauses in
-      let new_clauses = List.rev_append
-        (generate_binary ~calculus given_active_set c) new_clauses in
-      let new_clauses =  List.rev_append (generate_unary ~calculus ~ord c) new_clauses in
+      let inferred_clauses = generate ~calculus state c in
+      let new_clauses = List.rev_append inferred_clauses new_clauses in
       (* add given clause to active set *)
       let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
       let state = { state with PS.active_set=active_set } in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
          are kept *)
-      let new_clauses = HExtlib.filter_map
-        (fun c ->
-          let _, simplified_c = simplify ~calculus state.PS.active_set c in
+      let new_clauses = List.fold_left
+        (fun new_clauses c ->
+          let c, simplified_c = simplify ~calculus state.PS.active_set c in
           (* do not keep trivial  clauses *)
-          if calculus#trivial simplified_c then None
-          (* do not keep subsumed clauses *)
-          else if is_redundant ~calculus state.PS.active_set simplified_c then None
-          else Some simplified_c
-        )
-        new_clauses
+          if calculus#trivial simplified_c
+            then new_clauses
+            else simplified_c::new_clauses)
+        [] new_clauses
       in
       List.iter
         (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf
                                     "    inferred new clause @[<hov 3>%a@]"
                                     !C.pp_clause#pp new_c))) new_clauses;
-      (* add new clauses (including simplified active clauses) to passive set
-         TODO remove orphans of simplified active clauses *)
+      (* add new clauses (including simplified active clauses) to passive set *)
       let passive_set = PS.add_passives state.PS.passive_set new_clauses in
-      let state = { state with PS.passive_set = passive_set } in
+      (* update the dag *)
+      let dag = CD.updates ~ord state.PS.dag new_clauses in
+      let state = {state with PS.passive_set = passive_set; PS.dag = dag} in
       (* test whether the empty clause has been found *)
       try
         let empty_clause = List.find (fun c -> c.clits = []) new_clauses in

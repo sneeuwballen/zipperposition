@@ -25,8 +25,9 @@ open Types
 module I = Index
 module FV = FeatureVector
 module C = Clauses
-module CQ = ClauseQueue
 module U = FoUtils
+module CQ = ClauseQueue
+module CD = ClauseDag
 
 (** Default indexing on terms *)
 let cur_index =
@@ -73,6 +74,7 @@ type state = {
   active_set : active_set;      (** active clauses, indexed *)
   axioms_set : active_set;      (** set of support, indexed *)
   passive_set : passive_set;    (** passive clauses *)
+  dag : CD.clause_dag;          (** DAG of clauses *)
 }
 
 let mk_active_set ~ord =
@@ -89,7 +91,8 @@ let make_state ord queue_list select =
    state_select=select;
    active_set=active_set;
    axioms_set=active_set;
-   passive_set=passive_set}
+   passive_set=passive_set;
+   dag=CD.empty;}
 
 let next_passive_clause passive_set =
   (* index of the first queue to consider *)
@@ -177,6 +180,16 @@ let add_passive passive_set c =
 
 let add_passives passive_set l =
   List.fold_left (fun b c -> fst (add_passive b c)) passive_set l
+
+let remove_passive passive_set c =
+  let hc = C.hashcons_clause_noselect c in
+  (* just remove from the set of passive clauses *)
+  let new_passive_clauses = 
+    C.remove_from_bag passive_set.passive_clauses hc.ctag in
+  {passive_set with passive_clauses = new_passive_clauses}
+
+let remove_passives passive_set l =
+  List.fold_left (fun set c -> remove_passive set c) passive_set l
 
 let relocate_active active_set c =
   let maxvar = active_set.active_clauses.C.bag_maxvar in

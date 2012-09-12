@@ -56,6 +56,7 @@ type state = {
   active_set : active_set;      (** active clauses, indexed *)
   axioms_set : active_set;      (** set of support, indexed *)
   passive_set : passive_set;    (** passive clauses *)
+  dag : ClauseDag.clause_dag;   (** DAG of clauses *)
 }
 
 (** create a state from the given ordering and selection function*)
@@ -76,6 +77,9 @@ val singleton_active_set : ord:ordering -> clause -> active_set
 (** add clauses to the passive set *)
 val add_passive : passive_set -> clause -> passive_set * hclause
 val add_passives : passive_set -> clause list -> passive_set
+(** remove clause from passive set *)
+val remove_passive : passive_set -> clause -> passive_set
+val remove_passives : passive_set -> clause list -> passive_set
 
 (** pop the next passive clause, if any *)
 val next_passive_clause : passive_set -> (passive_set * hclause option)
