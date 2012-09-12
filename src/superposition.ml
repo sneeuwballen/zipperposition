@@ -83,14 +83,11 @@ let rec list_first f = function
     such that f t' is not None, is replaced by f t'.
     Does not visit variables.
 
-    ctx is to be applied to the result, to build a bigger term
-    pos is the position of the term
-
-    position -> (foterm -> 'a) -> foterm
+    position -> foterm
       -> (foterm -> (foterm * 'b) option)
-      -> ('a * 'b * foterm * position) option
+      -> (foterm * 'b * foterm * position) option
     *)
-let first_position pos ctx t f =
+let first_position pos t f =
   (* re-build context from the result *)
   let rec inject_pos pos ctx = function
     | None -> None
@@ -117,35 +114,34 @@ let first_position pos ctx t f =
           in
           first [] 1 (List.tl l) l
   in
-  aux pos ctx t
+  aux pos (fun x -> x) t
 
 (** apply f to all non-variable positions in t, accumulating the
     results along. f is given the subterm, the position and the context
     at each such position, and returns a list of objects; all lists
     returned by f are concatenated.
 
-    position -> (foterm -> 'a) -> foterm
-    -> (foterm -> position -> (foterm -> 'a) -> 'b list)
+    position -> foterm
+    -> (foterm -> position -> 'b list)
     -> 'b list
     *)
-let all_positions pos ctx t f =
-  let rec aux pos ctx t = match t.term with
-  | Leaf _ -> f t pos ctx
+let all_positions pos t f =
+  let rec aux pos t = match t.term with
+  | Leaf _ -> f t pos
   | Var _ -> []
   | Node [] -> assert false
   | Node (hd::tl) ->
       let acc, _, _, _ =
         List.fold_left
         (fun (acc,pre,idx,post) t -> (* Invariant: pre @ [t] @ post = hd::tl *)
-            let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
-            let acc = (aux (pos @ [idx]) newctx t) @ acc in (* recurse in subterm *)
+            let acc = (aux (pos @ [idx]) t) @ acc in (* recurse in subterm *)
             if post = [] then acc, pre, idx, []
             else acc, pre @ [t], idx+1, List.tl post)
-        (f t pos ctx (* apply f to t *), [hd], 1, tl) tl
+        (f t pos (* apply f to t *), [hd], 1, tl) tl
       in
       acc
   in
-  aux pos ctx t
+  aux pos t
 
 
 (* ----------------------------------------------------------------------
@@ -242,9 +238,8 @@ let infer_passive_ actives clause =
   fold_lits ~both:true ~pos:true ~neg:true
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
-      let ctx x = x in
-      let new_clauses = all_positions u_pos ctx u
-        (fun u_p p ctx ->
+      let new_clauses = all_positions u_pos u
+        (fun u_p p ->
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
           actives.PS.idx#root_index#retrieve_unifiables u_p acc
@@ -441,9 +436,8 @@ let demod_subterm ~ord blocked_ids active_set subterm =
     been used for rewriting. *)
 let demod_term ~ord blocked_ids active_set term =
   let rec one_step term clauses =
-    let ctx = fun t -> t
-    and pos = [] in
-    match first_position pos ctx term (demod_subterm ~ord blocked_ids active_set) with
+    let pos = [] in
+    match first_position pos term (demod_subterm ~ord blocked_ids active_set) with
     | None -> term, clauses
     | Some (new_term, (unit_hc, active_pos, subst), _, _) ->
       let new_clauses =  (unit_hc, active_pos, subst) :: clauses in
