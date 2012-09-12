@@ -113,7 +113,7 @@ let given_clause_step ~calculus state =
       let subsumed_active = subsumed_by ~calculus state.PS.active_set c in
       let active_set = PS.remove_actives state.PS.active_set subsumed_active in
       let state = { state with PS.active_set = active_set } in
-      (* simplify active set using c TODO write a function for this *)
+      (* simplify active set using c TODO write a function for this; TODO use indexing *)
       let simplified_actives = ref [] in  (* simplified active clauses *)
       let bag_remain, bag_simplified = C.partition_bag
         state.PS.active_set.PS.active_clauses
