@@ -143,6 +143,34 @@ let all_positions pos t f =
   in
   aux pos t
 
+(** iterate through positions that are common to both terms.
+    f has type
+    'a -> position -> foterm -> foterm -> 'a option,
+    so it can choose to stop by returning None. *)
+let parallel_positions pos t1 t2 acc f =
+  (** fold on both lists *)
+  let rec fold acc pos idx l1 l2 = match l1, l2 with
+  | [], [] -> Some acc
+  | [], _ | _, [] -> None  (* different length *)
+  | hd1::tl1, hd2::tl2 ->
+    begin
+      match aux acc (idx::pos) hd1 hd2 with
+      | None -> None
+      | Some acc -> fold acc pos (idx+1) tl1 tl2
+    end
+  (** fold through common positions *)
+  and aux acc pos t1 t2 =
+    match t1.term, t2.term with
+    | Var _, _ | _, Var _ | Leaf _, _ | _, Leaf _ ->
+      f acc (List.rev pos) t1 t2
+    | Node (hd1::tl1), Node (hd2::tl2) ->
+      begin match f acc (List.rev pos) t1 t2 with
+      | None when T.eq_foterm hd1 hd2 -> fold acc pos 1 tl1 tl2  (* recurse in subterms *)
+      | None -> None (* not the same, and not accepted by f *)
+      | Some acc -> Some acc (* f is ok on this pair of terms *)
+      end
+    | _ -> assert false
+  in aux acc pos t1 t2
 
 (* ----------------------------------------------------------------------
  * inferences
@@ -448,7 +476,7 @@ let demod_term ~ord blocked_ids active_set term =
     the blocked clauses (generally the clause itself, if it
     is already in the active_set)
     TODO ensure the conditions for rewrite of positive literals are ok (cf paper) *)
-let demodulate_ active_set blocked_ids clause =
+let demodulate active_set blocked_ids clause =
   Utils.debug 4 (lazy (Utils.sprintf "demodulate %a..." !C.pp_clause#pp clause));
   incr_stat stat_demodulate_call;
   let ord = active_set.PS.a_ord in
@@ -481,9 +509,6 @@ let demodulate_ active_set blocked_ids clause =
       let parents = lazy ((List.map (fun (c,_,_) -> c) clauses) @ (C.parents clause)) in
       C.mk_clause ~ord new_lits ~selected:(lazy []) proof parents
 
-let demodulate active_set clause =
-  prof_demodulate.HExtlib.profile (demodulate_ active_set) clause
-
 let is_tautology c =
   let is_tauto =
     (* s=s literal *)
@@ -507,6 +532,10 @@ let is_tautology c =
   (if is_tauto then
     Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] is a tautology" !C.pp_clause#pp c)));
   is_tauto
+
+(** semantic tautology deletion, using a congruence closure algorithm
+    to see if negative literals imply some positive literal *)
+let is_semantic_tautology c = false (* TODO *)
 
 let basic_simplify ~ord clause =
   (* convert some fof to literals *)
@@ -535,11 +564,127 @@ let basic_simplify ~ord clause =
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
   let parents = lazy (clause :: C.parents clause) in
-  let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) clause.cproof parents in
+  let proof =
+    try if List.for_all2 C.eq_literal_com clause.clits new_lits
+      then clause.cproof else lazy (Proof ("basic_simplify", [clause, [], S.id_subst]))
+    with Invalid_argument _ -> lazy (Proof ("basic_simplify", [clause, [], S.id_subst])) in
+  let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) proof parents in
   (if not (C.eq_clause new_clause clause) then
       (Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] basic_simplifies into @[<h>%a@]"
       !C.pp_clause#pp clause !C.pp_clause#pp new_clause))));
   new_clause
+
+let positive_simplify_reflect active_set clause =
+  let ord = active_set.PS.a_ord in
+  (* iterate through literals and try to resolve negative ones *)
+  let rec iterate_lits acc lits clauses = match lits with
+  | [] -> List.rev acc, clauses
+  | (Equation (s, t, false, _) as lit, idx)::lits' ->
+    begin match parallel_positions [C.left_pos; idx] s t [] equatable_lits with
+    | None -> (* keep literal *)
+      iterate_lits (lit::acc) lits' clauses
+    | Some new_clauses -> (* drop literal, remember clauses *)
+      iterate_lits acc lits' (new_clauses @ clauses)
+    end
+  | (lit, _)::lits' -> iterate_lits (lit::acc) lits' clauses
+  (** try to remove the literal using some positive unit clauses
+      from active_set *)
+  and equatable_lits clauses pos t1 t2 =
+    if T.eq_foterm t1 t2
+      then Some clauses  (* trivial *)
+      else  (* try to solve it with a unit equality *)
+        try active_set.PS.idx#unit_root_index#retrieve_generalizations t1 ()
+          (fun () l set ->
+            try
+              let subst = Unif.matching l t1 in
+              (* find some r in the set, such that subst(r) = t2 *)
+              I.ClauseSet.iter
+                (fun (clause, pos, _) ->
+                  match pos with
+                  | [idx; side] ->
+                    (* get the other side of the equation *)
+                    let r = C.get_pos clause [idx; C.opposite_pos side] in
+                    if T.eq_foterm t2 (S.apply_subst subst r)
+                    then begin
+                      Utils.debug 4 (lazy (Utils.sprintf "equate %a and %a using %a"
+                                  !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp clause));
+                      raise (FoundMatch (r, subst, clause, pos)) (* success *)
+                    end else ()
+                  | _ -> assert false)
+                set
+            with UnificationFailure _ -> ());
+          None (* no match *)
+        with FoundMatch (r, subst, clause, pos) ->
+          Some ((clause, pos, subst) :: clauses)  (* success *)
+  in
+  (* fold over literals *)
+  let lits, premises = iterate_lits [] (Utils.list_pos clause.clits) [] in
+  if List.length lits = List.length clause.clits
+    then clause (* no literal removed *)
+    else 
+      let proof = lazy (Proof ("pos_simplify_reflect", (clause, [], S.id_subst)::premises))
+      and clauses = List.map (fun (c,_,_) -> c) premises in
+      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::clauses)) in
+      Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a pos_simplify_reflect into %a@]"
+                    !C.pp_clause#pp clause !C.pp_clause#pp c));
+      c
+    
+let negative_simplify_reflect active_set clause =
+  let ord = active_set.PS.a_ord in
+  (* iterate through literals and try to resolve positive ones *)
+  let rec iterate_lits acc lits clauses = match lits with
+  | [] -> List.rev acc, clauses
+  | (Equation (s, t, true, _) as lit)::lits' ->
+    begin match can_refute s t, can_refute t s with
+    | None, None -> (* keep literal *)
+      iterate_lits (lit::acc) lits' clauses
+    | Some new_clause, _ | _, Some new_clause -> (* drop literal, remember clause *)
+      iterate_lits acc lits' (new_clause :: clauses)
+    end
+  | lit::lits' -> iterate_lits (lit::acc) lits' clauses
+  (** try to remove the literal using a negative unit clause *)
+  and can_refute s t =
+    try active_set.PS.idx#root_index#retrieve_generalizations s ()
+      (fun () l set ->
+        try
+          let subst = Unif.matching l s in
+          (* find some r in the set, such that subst(r) = t *)
+          I.ClauseSet.iter
+            (fun (clause, pos, _) ->
+              match pos with
+              | [idx; side] ->
+                (* get the other side of the equation *)
+                let r = C.get_pos clause [idx; C.opposite_pos side] in
+                if List.length clause.clits = 1 &&
+                   C.neg_lit (List.hd clause.clits) &&
+                   T.eq_foterm t (S.apply_subst subst r)
+                then begin
+                  Utils.debug 3 (lazy (Utils.sprintf "neg_reflect eliminates %a=%a with %a"
+                                 !T.pp_term#pp s !T.pp_term#pp t !C.pp_clause#pp clause));
+                  raise (FoundMatch (r, subst, clause, pos)) (* success *)
+                end else ()
+              | _ -> assert false)
+            set
+        with UnificationFailure _ -> ());
+      None (* no match *)
+    with FoundMatch (r, subst, clause, pos) ->
+      Some (clause, pos, subst)  (* success *)
+  in
+  (* fold over literals *)
+  let lits, premises = iterate_lits [] clause.clits [] in
+  if List.length lits = List.length clause.clits
+    then clause (* no literal removed *)
+    else 
+      let proof = lazy (Proof ("neg_simplify_reflect", (clause, [], S.id_subst)::premises))
+      and clauses = List.map (fun (c,_,_) -> c) premises in
+      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::clauses)) in
+      Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a neg_simplify_reflect into %a@]"
+                    !C.pp_clause#pp clause !C.pp_clause#pp c));
+      c
+
+(* ----------------------------------------------------------------------
+ * subsumption
+ * ---------------------------------------------------------------------- *)
 
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
     substitutions s such that s(lit_a) = lit_b and s contains subst. The list
@@ -795,7 +940,12 @@ let superposition : calculus =
     method basic_simplify ~ord c = basic_simplify ~ord c
 
     method simplify actives c =
-      basic_simplify ~ord:actives.PS.a_ord (demodulate actives [] c)
+      let ord = actives.PS.a_ord in
+      let c = basic_simplify ~ord c in
+      let c = basic_simplify ~ord (positive_simplify_reflect actives c) in
+      let c = basic_simplify ~ord (negative_simplify_reflect actives c) in
+      let c = basic_simplify ~ord (demodulate actives [] c) in
+      c
 
     method redundant actives c = subsumed_by_set actives c
 

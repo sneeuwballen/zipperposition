@@ -46,12 +46,19 @@ val infer_equality_factoring: Calculus.unary_inf_rule
 
 val is_tautology : clause -> bool
 
+(** semantic tautology deletion, using a congruence closure algorithm
+    to see if negative literals imply some positive literal *)
+val is_semantic_tautology : clause -> bool
+
 val basic_simplify : ord:ordering -> clause -> clause   (** basic simplifications *)
 
 val demodulate : ProofState.active_set
                 -> int list (** the IDs of active clauses to ignore for rewriting *)
                 -> clause   (** the clause to simplify *)
 		-> clause   (** the simplified clause *)
+
+val positive_simplify_reflect : ProofState.active_set -> clause -> clause
+val negative_simplify_reflect : ProofState.active_set -> clause -> clause
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : clause -> clause -> bool

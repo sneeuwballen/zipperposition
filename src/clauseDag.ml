@@ -56,7 +56,7 @@ let parent_of ~ord dag parent child =
   if C.eq_hclause parent child
     then dag
     else begin
-      Utils.debug 3 (lazy (Utils.sprintf "  @[<h>%a parent of %a@]"
+      Utils.debug 4 (lazy (Utils.sprintf "  @[<h>%a parent of %a@]"
                            !C.pp_clause#pp_h parent !C.pp_clause#pp_h child));
       (* descendants of parent, parents of child *)
       let descendants = find_default ~default:[] dag.dag_down parent
