@@ -188,10 +188,10 @@ class Run(object):
             ','.join('"'+f+'"' for f in filenames))
 
     @command
-    def clear_provers(self, provers):
+    def clear_provers(self, *provers):
         "remove results relative to the given provers"
-        self.conn.executemany("""delete from results where prover like "?"; """,
-            [(prover, ) for prover in provers])
+        self.conn.executemany("""delete from results where prover like ?; """,
+            [(prover,) for prover in provers])
 
     @command
     def normalize(self):
