@@ -132,15 +132,16 @@ let all_positions pos ctx t f =
   let rec aux pos ctx t = match t.term with
   | Leaf _ -> f t pos ctx
   | Var _ -> []
-  | Node l ->
+  | Node [] -> assert false
+  | Node (hd::tl) ->
       let acc, _, _, _ =
         List.fold_left
-        (fun (acc,pre,idx,post) t -> (* Invariant: pre @ [t] @ post = l *)
+        (fun (acc,pre,idx,post) t -> (* Invariant: pre @ [t] @ post = hd::tl *)
             let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
             let acc = (aux (pos @ [idx]) newctx t) @ acc in (* recurse in subterm *)
-            if post = [] then acc, l, idx, []
+            if post = [] then acc, pre, idx, []
             else acc, pre @ [t], idx+1, List.tl post)
-        (f t pos ctx (* apply f to t *), [], 0, List.tl l) l
+        (f t pos ctx (* apply f to t *), [hd], 1, tl) tl
       in
       acc
   in
@@ -196,7 +197,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let rule = if sign_uv then "superposition_right" else "superposition_left" in
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
-        let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) proof in
+        let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy [])
+          proof (lazy [active_clause; passive_clause]) in
         Utils.debug 3 (lazy (Utils.sprintf "ok, conclusion @[<h>%a@]"
                             !C.pp_clause#pp new_clause));
         new_clause :: acc
@@ -283,7 +285,8 @@ let infer_equality_resolution_ ~ord clause =
             let proof = lazy (Proof ("equality_resolution", [clause, [pos], subst]))
             and new_lits = Utils.list_remove clause.clits pos in
             let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-            let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) proof in
+            let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy [])
+              proof (lazy [clause]) in
             Utils.debug 3 (lazy (Utils.sprintf
                           "equality resolution on @[<h>%a@] yields @[<h>%a@]"
                           !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
@@ -341,7 +344,8 @@ let infer_equality_factoring_ ~ord clause =
         and new_lits = Utils.list_remove clause.clits active_idx in
         let new_lits = (C.mk_neq ~ord t v) :: new_lits in
         let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-        let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) proof in
+        let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy [])
+          proof (lazy [clause]) in
         Utils.debug 3 (lazy (Utils.sprintf
                       "equality factoring on @[<h>%a@] yields @[<h>%a@]"
                       !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
@@ -479,7 +483,9 @@ let demodulate_ active_set blocked_ids clause =
        the proof before returning the simplified clause *)
     else
       let proof = lazy (Proof ("demodulation", (clause, [], S.id_subst)::clauses)) in
-      C.mk_clause ~ord new_lits ~selected:(lazy []) proof
+      (* parents are clauses used to simplify the clause, plus parents of the clause *)
+      let parents = lazy ((List.map (fun (c,_,_) -> c) clauses) @ (C.parents clause)) in
+      C.mk_clause ~ord new_lits ~selected:(lazy []) proof parents
 
 let demodulate active_set clause =
   prof_demodulate.HExtlib.profile (demodulate_ active_set) clause
@@ -534,7 +540,8 @@ let basic_simplify ~ord clause =
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
-  let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) clause.cproof in
+  let parents = lazy (clause :: C.parents clause) in
+  let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) clause.cproof parents in
   (if not (C.eq_clause new_clause clause) then
       (Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] basic_simplifies into @[<h>%a@]"
       !C.pp_clause#pp clause !C.pp_clause#pp new_clause))));
@@ -769,7 +776,7 @@ let cnf_of ~ord clause =
         (fun lits ->
           let clause = C.mk_clause ~ord
               (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
-              ~selected:(lazy []) proof in
+              ~selected:(lazy []) proof (lazy [clause]) in
           Utils.debug 4 (lazy (Utils.sprintf "mk_clause %a@." !C.pp_clause#pp clause));
           C.clause_of_fof ~ord clause)
         lit_list_list
