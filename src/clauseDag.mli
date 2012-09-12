@@ -28,14 +28,13 @@ type clause_dag
 (** empty dag *)
 val empty : clause_dag
 
-(** [descends_from dag parent child] means that child descends from parent *)
-val descends_from : clause_dag -> hclause -> hclause -> clause_dag
+(** [parent_of dag parent child] means that child descends from parent *)
+val parent_of : ord:ordering -> clause_dag -> clause -> clause -> clause_dag
 
-(** [simplification_of dag parent child] means that child is a simplification of parent *)
-val simplification_of : clause_dag -> hclause -> hclause -> clause_dag
+(** update the DAG using the list of parents of the clause *)
+val update : ord:ordering -> clause_dag -> clause -> clause_dag
+val updates : ord:ordering -> clause_dag -> clause list -> clause_dag
 
-(** get the list of descendants of clause *)
-val descendants : clause_dag -> hclause -> hclause list
-
-(** [simplified_to c d] checks whether b is obtained by simplifications on a *)
-val simplified_to: clause_dag -> hclause -> hclause -> bool
+(** get the list of descendants of clause. Selected literals are not
+    taken into account in hashconsing. *)
+val descendants : ord:ordering -> clause_dag -> clause -> hclause list
