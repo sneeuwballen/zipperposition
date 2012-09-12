@@ -187,6 +187,11 @@ let list_merge comp l1 l2 =
   in
   List.rev (recurse l1 l2)
 
+let rec list_union comp l1 l2 = match l1 with
+  | [] -> l2
+  | x::xs when list_mem comp x l2 -> list_union comp xs l2
+  | x::xs -> x::(list_union comp xs l2)
+
 let rec list_inter comp l1 l2 = match l1 with
   | [] -> []
   | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)

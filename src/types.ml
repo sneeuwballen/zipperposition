@@ -99,6 +99,7 @@ and clause = {
   cselected : int list Lazy.t;            (** index of selected literals *)
   cvars : foterm list;                    (** the free variables *)
   cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
+  cparents : clause list Lazy.t;          (** clauses used to create this one *)
 }
 (** a proof step for a clause *)
 and proof = Axiom of string * string (** file, axiom name *)

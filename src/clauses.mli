@@ -66,6 +66,7 @@ val eq_clause : clause -> clause -> bool                (** equality of clauses 
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
 
 val hashcons_clause : clause -> hclause
+val hashcons_clause_noselect : clause -> hclause        (** hashcons ignoring selected lits *)
 val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
 
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
@@ -73,7 +74,7 @@ val compare_hclause : hclause -> hclause -> int         (** simple order on lexi
 
 val mk_clause : ord:ordering -> literal list ->
                 selected:int list Lazy.t ->
-                proof Lazy.t ->
+                proof Lazy.t -> clause list Lazy.t ->
                 clause                                  (** build a clause *)
 val clause_of_fof : ord:ordering -> clause -> clause    (** transform eq/not to literals *)
 val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
@@ -81,6 +82,7 @@ val select_clause : select:selection_fun
                  -> clause -> clause                    (** select literals in clause *)
 val maxlits : clause -> (literal * int) list            (** indexed list of max literals *)
 val selected: clause -> int list                        (** indexes of selected literals *)
+val parents : clause -> clause list                     (** list of parents of the clause *)
 val check_maximal_lit : ord:ordering -> clause -> int   (** is the i-th literal *)
                     -> substitution -> bool             (** maximal in subst(clause)? *)
 

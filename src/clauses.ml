@@ -236,6 +236,8 @@ end)
 
 let hashcons_clause c = H.hashcons c
 
+let hashcons_clause_noselect c = H.hashcons {c with cselected=lazy []}
+
 let stats () = H.stats ()
 
 let eq_hclause hc1 hc2 = hc1 == hc2
@@ -284,7 +286,7 @@ let max_among ~ord lit lits =
       else compare_lits_partial ~ord lit lit' <> Lt)
     lits
 
-let mk_clause ~ord lits ~selected proof =
+let mk_clause ~ord lits ~selected proof parents =
   (* merge sets of variables *)
   let rec merge_vars acc vars1 = match vars1 with
   | [] -> acc
@@ -294,27 +296,32 @@ let mk_clause ~ord lits ~selected proof =
   let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
   let all_vars = List.stable_sort T.compare_foterm all_vars
   and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
-  {clits=lits; cvars=all_vars; cproof=proof; cselected=selected;
+  {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cparents=parents;
    cmaxlits=maxlits; ctag= -1}
 
 let maxlits clause = Lazy.force clause.cmaxlits
 
 let selected clause = Lazy.force clause.cselected
 
+let parents clause = Lazy.force clause.cparents
+
 let clause_of_fof ~ord c =
-  mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits) ~selected:c.cselected c.cproof
+  mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits)
+    ~selected:c.cselected c.cproof c.cparents
 
 let reord_clause ~ord c =
-  mk_clause ~ord (List.map (reord_lit ~ord) c.clits) ~selected:c.cselected c.cproof
+  mk_clause ~ord (List.map (reord_lit ~ord) c.clits)
+    ~selected:c.cselected c.cproof c.cparents
 
 let select_clause ~select c =
   {c with cselected = lazy (select c)}
 
-let apply_subst_cl ?(recursive=true) ~ord subst c =
+let rec apply_subst_cl ?(recursive=true) ~ord subst c =
   if subst = S.id_subst then c
   else
-    let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
-    mk_clause ~ord new_lits ~selected:c.cselected c.cproof
+    let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits
+    and new_parents = lazy (List.map (apply_subst_cl ~recursive ~ord subst) (parents c)) in
+    mk_clause ~ord new_lits ~selected:c.cselected c.cproof new_parents
   (* TODO modify proof lazily *)
 
 let get_lit clause idx = Utils.list_get clause.clits idx
