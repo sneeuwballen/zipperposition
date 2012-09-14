@@ -130,10 +130,16 @@ let process_lit op c tree (lit, pos) =
     op tree l (c, [C.left_pos; pos])  (* only index one side *)
 
 (** apply op to the maximal literals of the clause, and only to
-    the maximal side(s) of those. *)
-let process_clause op tree c =
+    the maximal side(s) of those, if restruct is true. Otherwise
+    process all literals *)
+let process_clause ~restrict op tree c =
+  (* which literals to process? *)
+  let lits_pos =
+    if restrict && C.selected c = [] then C.maxlits c
+    else if restrict then C.selected_lits c
+    else Utils.list_pos c.clits
+  in
   (* index literals with their position *)
-  let lits_pos = Utils.list_pos c.clits in
   let new_tree = List.fold_left (process_lit op c) tree lits_pos in
   new_tree
 
@@ -171,7 +177,7 @@ let mk_clause_index (index : index) =
     (** add root terms and subterms to respective indexes *)
     method index_clause hc =
       let op tree = tree#add in
-      let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
+      let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
       and new_unit_root_index = match hc.clits with
           | [(Equation (_,_,true,_)) as lit] ->
               process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
@@ -182,7 +188,7 @@ let mk_clause_index (index : index) =
           | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
               Ptmap.add r.tag (l, (hc, [0; C.right_pos], r)) _ground_rewrite_index
           | _ -> _ground_rewrite_index
-      and new_root_index = process_clause (apply_root_term op) _root_index hc
+      and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
             _ground_rewrite_index=new_ground_rewrite_index;
@@ -191,7 +197,7 @@ let mk_clause_index (index : index) =
     (** remove root terms and subterms from respective indexes *)
     method remove_clause hc =
       let op tree = tree#remove in
-      let new_subterm_index = process_clause (fold_subterms op) _subterm_index hc
+      let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
       and new_unit_root_index = match hc.clits with
           | [(Equation (_,_,true,_)) as lit] ->
               process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
@@ -202,7 +208,7 @@ let mk_clause_index (index : index) =
           | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
               Ptmap.remove r.tag _ground_rewrite_index
           | _ -> _ground_rewrite_index
-      and new_root_index = process_clause (apply_root_term op) _root_index hc
+      and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
             _ground_rewrite_index=new_ground_rewrite_index;
