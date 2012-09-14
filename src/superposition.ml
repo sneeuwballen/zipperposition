@@ -942,9 +942,9 @@ let superposition : calculus =
     method simplify actives c =
       let ord = actives.PS.a_ord in
       let c = basic_simplify ~ord c in
+      let c = basic_simplify ~ord (demodulate actives [] c) in
       let c = basic_simplify ~ord (positive_simplify_reflect actives c) in
       let c = basic_simplify ~ord (negative_simplify_reflect actives c) in
-      let c = basic_simplify ~ord (demodulate actives [] c) in
       c
 
     method redundant actives c = subsumed_by_set actives c
