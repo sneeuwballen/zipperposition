@@ -26,7 +26,7 @@ let th1 =
 
 (* print list of substitutions *)
 let print_solutions substs =
-  Format.printf "answers: @[<hov>%a@]@." (Utils.pp_list ~sep:"" S.pp_substitution) substs
+  Format.printf "answers: @[<v>%a@]@." (Utils.pp_list ~sep:"" S.pp_substitution) substs
 
 (* test E-unification of f(x,x)=x in theory th1 *)
 let test_1 () =

@@ -52,13 +52,20 @@ let add_axiom th axiom =
     { axioms = bag;
       index = index; }
   | _ -> failwith "a E-theory can only contain equations"
+
+let add_axioms th axioms = List.fold_left add_axiom th axioms
   
+let pp_theory formatter theory =
+  Format.fprintf formatter "theory: @[<h>%a@]" C.pp_bag theory.axioms
+
 (** a state of the E-unification resolution algorithm *)
 type state = (foterm * foterm) list * substitution
 
 (** Abstract type for a lazy set of E-unifiers, It is associated with
     a E-unification problem. *)
 type e_unifiers = {
+  left: foterm;
+  right: foterm;
   ord: ordering;
   mutable substs: substitution list;
   queue: state Queue.t;
@@ -72,7 +79,8 @@ let e_unify ~ord th t1 t2 =
   and substs = []
   and max_var = th.axioms.C.bag_maxvar  in
   Queue.add ([t1, t2], S.id_subst) queue;
-  { ord=ord; substs = substs; queue = queue; theory = th; var_num=max_var+1;}
+  { left=t1; right=t2; ord=ord; substs = substs;
+    queue = queue; theory = th; var_num=max_var+1;}
 
 (** status of a set of E-unifiers *)
 type e_status =
@@ -87,6 +95,22 @@ let e_state unifiers =
       then EUnsat
       else ESat unifiers.substs
     else EUnknown unifiers.substs
+
+(** pretty printing of the problem *)
+let pp_unifiers formatter unifiers =
+  Format.fprintf formatter "E-unification of %a and %a modulo %a"
+    !T.pp_term#pp unifiers.left !T.pp_term#pp unifiers.right
+    pp_theory unifiers.theory
+
+
+(** pretty print a pair of terms *)
+let pp_pair formatter (a,b) =
+  Format.fprintf formatter "%a ?= %a" !T.pp_term#pp a !T.pp_term#pp b
+
+(** pretty printing of a state *)
+let pp_state formatter (pairs, subst) =
+  Format.fprintf formatter "state: @[<h>%a@] with %a"
+    (Utils.pp_list pp_pair) pairs S.pp_substitution subst
 
 (* ----------------------------------------------------------------------
  * computation of E-unifiers
@@ -147,7 +171,7 @@ let rec syntactically_unifiable pairs subst =
         else
           let subst = S.build_subst b a subst in
           syntactically_unifiable pairs' subst
-      | Leaf s, Leaf s' -> assert (s <> s'); None (* trivial conflict *)
+      | Leaf s, Leaf s' -> (assert (s <> s'); None) (* trivial conflict *)
       | _ ->
         if top_unifiable a b
           then
@@ -171,7 +195,7 @@ let do_paramod unifiers pairs subst =
     | [] -> raise Not_found  (* found no suitable pair *)
     | ((a,b) as pair)::pairs' ->
       match paramodulate pair with
-      | [] -> recurse (pair::pre) pairs  (* pair not suitable for paramodulation *)
+      | [] -> recurse (pair::pre) pairs'  (* pair not suitable for paramodulation *)
       | new_pairs ->
         pair, new_pairs, List.rev_append pre pairs' (* pair can be paramodulated *)
   (* find an unsolvable pair, and returns it and the list without it *)
@@ -230,6 +254,13 @@ let do_paramod unifiers pairs subst =
        of the list of other_pairs, to create a new problem *)
     List.map (fun new_pairs -> other_pairs @ new_pairs, subst) new_pairs_set
 
+(** simplify the list of pairs by removing trivial pairs *)
+let rec simplify pairs =
+  match pairs with
+  | [] -> []
+  | (a,b)::pairs' when T.eq_foterm a b -> simplify pairs'  (* eliminate tautology *)
+  | pair::pairs' -> pair::(simplify pairs')
+
 (** make some progress in the computation of E-unifiers *)
 let e_compute ?steps unifiers =
   let steps = match steps with
@@ -242,7 +273,13 @@ let e_compute ?steps unifiers =
     (* generate other problems by paramodulation *)
     begin
       try
+        (* remove trivial pairs *)
+        let pairs = simplify pairs in
+        (* do all possible paramodulations on some pair *)
         let new_problems = do_paramod unifiers pairs subst in
+        List.iter (fun pb -> Utils.debug 3
+          (lazy (Utils.sprintf "  @[<h>... add problem %a to E-unify %a=%a@]" pp_state pb
+                 !T.pp_term#pp unifiers.left !T.pp_term#pp unifiers.right))) new_problems;
         (* add new problems to the queue *)
         List.iter (fun pb -> Queue.add pb unifiers.queue) new_problems
       with Not_found -> ()  (* no new problems *)
@@ -253,6 +290,7 @@ let e_compute ?steps unifiers =
     if (not (Queue.is_empty unifiers.queue)) && steps > 0
       then
         let problem = Queue.take unifiers.queue in
+        Utils.debug 3 (lazy (Utils.sprintf "try to solve @[<h>%a@] " pp_state problem));
         (match do_step problem with
         | None -> ()
         | Some subst ->

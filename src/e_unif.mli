@@ -27,6 +27,7 @@ type e_theory
 
 val empty_theory : e_theory                         (** the empty theory *)
 val add_axiom : e_theory -> clause -> e_theory      (** clause must be positive unit *)
+val add_axioms : e_theory -> clause list -> e_theory
 
 (** Abstract type for a lazy set of E-unifiers, It is associated with
     a E-unification problem. *)
