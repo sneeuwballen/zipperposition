@@ -2,5 +2,7 @@
 
 let _ =
   TestTerms.run ();
+  TestEUnif.run ();
   TestClauses.run ();
-  TestOrderings.run ()
+  TestOrderings.run ();
+  ()
