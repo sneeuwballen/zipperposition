@@ -512,7 +512,9 @@ let pp_literal =
   end
 
 let pp_pos formatter pos =
-  fprintf formatter "@[<h>%a@]" (Utils.pp_list ~sep:"." pp_print_int) pos
+  if pos = []
+    then Format.pp_print_string formatter "ε"
+    else fprintf formatter "@[<h>%a@]" (Utils.pp_list ~sep:"." pp_print_int) pos
 
 (** pretty printer for clauses *)
 class type pprinter_clause =

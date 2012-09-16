@@ -232,6 +232,9 @@ let do_paramod unifiers pairs subst =
                   and r = C.get_pos equation [0; C.opposite_pos side] in
                   (* new_a is a[pos <- r] *)
                   let new_a = T.replace_pos a pos r in 
+                  Utils.debug 3 (lazy (Utils.sprintf "  ... demodulate %a[at %a] ?= %a with %a"
+                                !T.pp_term#pp a C.pp_pos pos !T.pp_term#pp b
+                                !C.pp_clause#pp equation));
                   ((decompose sub_t l) @ [new_a, b]) :: acc
                 | _ -> assert false
               ) set acc
@@ -270,6 +273,9 @@ let e_compute ?steps unifiers =
   let rec do_step (pairs, subst) = 
     (* first, try to syntactically solve the the problem *)
     let new_subst = syntactically_unifiable pairs subst in
+    (match new_subst with None -> ()
+      | Some subst -> Utils.debug 3 (lazy (Utils.sprintf "  ... yield subst %a"
+                                     S.pp_substitution subst)));
     (* generate other problems by paramodulation *)
     begin
       try
