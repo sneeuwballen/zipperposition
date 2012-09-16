@@ -33,13 +33,13 @@ val add_axiom : e_theory -> clause -> e_theory      (** clause must be positive 
 type e_unifiers
 
 (** E-unify two terms yields a lazy set of E-unifiers *)
-val e_unify : e_theory -> foterm -> foterm -> e_unifiers
+val e_unify : ord:ordering -> e_theory -> foterm -> foterm -> e_unifiers
 
 (** status of a set of E-unifiers *)
 type e_status =
+  | EUnknown of substitution list       (** substitutions already computed *)
   | ESat of substitution list           (** satisfiable, with the given set of unifiers *)
   | EUnsat                              (** no unifier *)
-  | EUnknown of substitution list       (** substitutions already computed *)
 
 (** get the current state *)
 val e_state : e_unifiers -> e_status

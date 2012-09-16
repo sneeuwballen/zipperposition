@@ -59,23 +59,26 @@ type state = (foterm * foterm) list * substitution
 (** Abstract type for a lazy set of E-unifiers, It is associated with
     a E-unification problem. *)
 type e_unifiers = {
+  ord: ordering;
   mutable substs: substitution list;
   queue: state Queue.t;
+  mutable var_num: int;
   theory: e_theory;
 }
 
 (** E-unify two terms yields a lazy set of E-unifiers *)
-let e_unify th t1 t2 =
+let e_unify ~ord th t1 t2 =
   let queue = Queue.create ()
-  and substs = [] in
+  and substs = []
+  and max_var = th.axioms.C.bag_maxvar  in
   Queue.add ([t1, t2], S.id_subst) queue;
-  { substs = substs; queue = queue; theory = th; }
+  { ord=ord; substs = substs; queue = queue; theory = th; var_num=max_var+1;}
 
 (** status of a set of E-unifiers *)
 type e_status =
+  | EUnknown of substitution list       (** substitutions already computed *)
   | ESat of substitution list           (** satisfiable, with the given set of unifiers *)
   | EUnsat                              (** no unifier *)
-  | EUnknown of substitution list       (** substitutions already computed *)
 
 (** get the current state *)
 let e_state unifiers =
@@ -158,7 +161,9 @@ let rec syntactically_unifiable pairs subst =
 
 (** choose a pair to perform relaxed paramodulation on, and or
     raise Not_found *)
-let do_paramod th pairs subst =
+let do_paramod unifiers pairs subst =
+  let th = unifiers.theory
+  and ord = unifiers.ord in
   (* recurse through pairs, looking for one pair to solve using
      paramodulation. pre is the reversed list of previous pairs *)
   let rec recurse pre pairs =
@@ -195,8 +200,12 @@ let do_paramod th pairs subst =
               (fun (equation, pos', _) acc ->
                 match pos' with
                 | [0; side] ->
-                  (* equation is l=r *)
-                  let r = C.get_pos equation [0; C.opposite_pos side] in
+                  (* rename equation with fresh variables *)
+                  let equation, new_var_num = C.fresh_clause ~ord unifiers.var_num equation in
+                  unifiers.var_num <- new_var_num;
+                  (* (renamed) equation is l=r *)
+                  let l = C.get_pos equation pos'
+                  and r = C.get_pos equation [0; C.opposite_pos side] in
                   (* new_a is a[pos <- r] *)
                   let new_a = T.replace_pos a pos r in 
                   ((decompose sub_t l) @ [new_a, b]) :: acc
@@ -233,7 +242,7 @@ let e_compute ?steps unifiers =
     (* generate other problems by paramodulation *)
     begin
       try
-        let new_problems = do_paramod unifiers.theory pairs subst in
+        let new_problems = do_paramod unifiers pairs subst in
         (* add new problems to the queue *)
         List.iter (fun pb -> Queue.add pb unifiers.queue) new_problems
       with Not_found -> ()  (* no new problems *)
