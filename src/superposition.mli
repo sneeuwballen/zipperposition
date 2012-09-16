@@ -34,6 +34,9 @@ val stat_demodulate_step : statistics
 
 val print_stats : unit -> unit
 
+val all_positions : position -> foterm ->  (* combinator *)
+                    (foterm -> position -> 'b list) -> 'b list
+
 val infer_active: Calculus.binary_inf_rule (** superposition where given clause is active *)
 
 val infer_passive: Calculus.binary_inf_rule(** superposition where given clause is passive *)

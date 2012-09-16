@@ -134,7 +134,7 @@ let all_positions pos t f =
       let acc, _, _, _ =
         List.fold_left
         (fun (acc,pre,idx,post) t -> (* Invariant: pre @ [t] @ post = hd::tl *)
-            let acc = (aux (pos @ [idx]) t) @ acc in (* recurse in subterm *)
+            let acc = List.rev_append (aux (pos @ [idx]) t) acc in (* recurse in subterm *)
             if post = [] then acc, pre, idx, []
             else acc, pre @ [t], idx+1, List.tl post)
         (f t pos (* apply f to t *), [hd], 1, tl) tl

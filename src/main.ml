@@ -35,6 +35,7 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
+module EUnif = E_unif
 
 (** special heuristic: an ordering constraint that makes symbols
     occurring in negative equations bigger than symbols in
