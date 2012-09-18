@@ -25,16 +25,16 @@ open Types
 type egraph_node
 type egraph
 
-val empty: unit -> egraph                                   (** get a new, empty E-graph *)
-val push: egraph -> unit                                    (** push a backtracking point *)
-val pop: egraph -> unit                                     (** pop last backtracking point, or Invalid_argument *)
+val empty: unit -> egraph                               (** get a new, empty E-graph *)
+val push: egraph -> unit                                (** push a backtracking point *)
+val pop: egraph -> unit                                 (** pop last backtracking point, or Invalid_argument *)
 
-val term_of_node: egraph_node -> foterm                     (** get the term back from the node *)
-val node_of_term: egraph -> foterm -> egraph_node           (** get the node representing the term *)
+val term_of_node: egraph_node -> foterm                 (** get the term back from the node *)
+val node_of_term: egraph -> foterm -> egraph_node       (** get the node representing the term *)
 
-val are_equal: egraph_node -> egraph_node -> bool           (** test whether nodes are equal *)
-val equiv_class: egraph_node -> egraph_node list            (** equivalence class of the node *)
-val representative: egraph_node -> egraph_node              (** representative of the node *)
-val merge: egraph -> egraph_node -> egraph_node -> unit     (** merge two nodes in the E-graph (and propagate) *)
+val are_equal: egraph_node -> egraph_node -> bool       (** test whether nodes are equal *)
+val equiv_class: egraph_node -> egraph_node list        (** equivalence class of the node *)
+val representative: egraph_node -> egraph_node          (** representative of the node *)
+val merge: egraph -> egraph_node -> egraph_node -> unit (** merge two nodes in the E-graph (and propagate) *)
 
 val to_dot: name:string -> egraph -> string

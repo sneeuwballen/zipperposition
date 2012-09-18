@@ -50,37 +50,85 @@ type action =
   | SetParents of egraph_node * egraph_node list
   | SetClass of egraph_node * egraph_node list
   | SetRepresentative of egraph_node * egraph_node
+  | SetSymbol of string * egraph_node list
 
 (** The E-graph structure *)
 type egraph = {
-  graph_nodes: egraph_node THashtbl.t;      (** term -> node *)
-  graph_stack: action Stack.t;
+  graph_nodes: egraph_node THashtbl.t;                  (** term -> node *)
+  graph_symbol: (string, egraph_node list) Hashtbl.t;   (** f -> nodes f(t1...tn) *)
+  graph_stack: action Stack.t;                          (** stack used for backtracking *)
 }
+
+(** Label of a node: symbol or variable *)
+type label = NodeVar of int | NodeSymbol of string
+
+(** label of a node, i.e. the root term *)
+let label node =
+  let rec seek t = match t.term with
+    | Var i -> NodeVar i
+    | Leaf s -> NodeSymbol s
+    | Node (hd::_) -> seek hd
+    | Node [] -> assert false
+  in
+  seek node.node_term
 
 (** create an empty E-graph *)
 let empty () =
   let nodes = THashtbl.create 1621
   and stack = Stack.create () in
   Stack.push StopBacktracking stack;
-  { graph_nodes = nodes; graph_stack = stack }
+  { graph_nodes = nodes; graph_symbol = Hashtbl.create 41; graph_stack = stack }
 
 (** push a backtracking point on the stack *)
 let push egraph =
   Stack.push StopBacktracking egraph.graph_stack
 
+let add_to_symbols egraph symbol node =
+  let l =
+    try Hashtbl.find egraph.graph_symbol symbol
+    with Not_found -> []
+  in
+  Stack.push (SetSymbol (symbol, l)) egraph.graph_stack;
+  Hashtbl.replace egraph.graph_symbol symbol (node::l)
+
+let remove_from_symbols egraph symbol node =
+  try
+    let l = Hashtbl.find egraph.graph_symbol symbol in
+    let l = List.filter (fun n -> n != node) l in
+    if l = []
+      then Hashtbl.remove egraph.graph_symbol symbol
+      else Hashtbl.replace egraph.graph_symbol symbol l
+  with Not_found -> failwith "tried to remove an unknown symbol"
+
+let remove_node egraph node =
+  THashtbl.remove egraph.graph_nodes node.node_term;
+  List.iter
+    (fun child ->  (* remove node from the parents of all its children *)
+      child.node_parents <- List.filter (fun parent -> parent != node) child.node_parents)
+    node.node_children;
+  (* now if node = f(t1...tn) remove node from terms_f *)
+  match node.node_term.term with
+  | Var _ | Leaf _ -> ()
+  | Node (hd::_) ->
+    begin
+    match label node with
+    | NodeVar _ -> assert false
+    | NodeSymbol s -> remove_from_symbols egraph s node
+    end
+  | Node [] -> assert false
+
 (** pop to the last backtracking point, cancelling all actions performed since *)
 let pop egraph =
   let do_action = function
   | StopBacktracking -> assert false
-  | Delete node ->
-    THashtbl.remove egraph.graph_nodes node.node_term;
-    List.iter
-      (fun child ->  (* remove node from the parents of all its children *)
-        child.node_parents <- List.filter (fun parent -> parent != node) child.node_parents)
-      node.node_children
+  | Delete node -> remove_node egraph node
   | SetParents (node, parents) -> node.node_parents <- parents
   | SetClass (node, class_) -> node.node_class <- class_
   | SetRepresentative (node, representative) -> node.node_representative <- representative
+  | SetSymbol (symbol, nodes) ->
+    if nodes = []
+      then Hashtbl.remove egraph.graph_symbol symbol
+      else Hashtbl.replace egraph.graph_symbol symbol nodes
   in
   (* unwind the stack down to the last backtracking point *)
   let rec unwind () =
@@ -152,6 +200,11 @@ let rec node_of_term egraph t =
     in
     (* add node as a parent of all its children *)
     List.iter (fun child -> child.node_parents <- node :: child.node_parents) subterms;
+    (* if t = f(t1...tn), put t in the use list of f *)
+    (match label node with
+    | NodeVar _ -> ()
+    | NodeSymbol f -> add_to_symbols egraph f node);
+    (* put the node in the hashtable *)
     THashtbl.add egraph.graph_nodes t node;
     Stack.push (Delete node) egraph.graph_stack; (* delete node when backtracking *)
     node
@@ -161,18 +214,6 @@ let are_equal n1 n2 = n1 == n2 || find n1 == find n2
 let equiv_class node = node.node_class
 
 let representative node = find node
-
-type label = NodeVar of int | NodeSymbol of string
-
-(** label of a node, i.e. the root term *)
-let label node =
-  let rec seek t = match t.term with
-    | Var i -> NodeVar i
-    | Leaf s -> NodeSymbol s
-    | Node (hd::_) -> seek hd
-    | Node [] -> assert false
-  in
-  seek node.node_term
 
 (** check whether two nodes are congruent. They are if they
     are currently equal (same representative), or if they have the
