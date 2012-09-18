@@ -51,17 +51,17 @@ module Make(G: Graph) =
       | Weight of int
       | Style of string
       | Label of string
+      | Other of string * string
 
     (** a node of the DOT graph *)
     type dot_node = {
       node_label: G.vertex;
       node_count: int;
-      mutable node_edges: G.edge list;
+      mutable node_edges: dot_edge list;
       mutable node_attributes: attribute list;
     }
-
     (** an edge of the DOT graph *)
-    type dot_edge = {
+    and dot_edge = {
       edge_label: G.edge;
       edge_from: dot_node;
       edge_to: dot_node;
@@ -72,14 +72,13 @@ module Make(G: Graph) =
     type graph = {
       name: string;
       mutable count: int;
-      nodes: node VertexTable.t;
+      nodes: dot_node VertexTable.t;
     }
 
     let mk_graph ~name =
       { name = name;
         count = 0;
-        nodes = VertexTable.create 23;
-        attributes = []; }
+        nodes = VertexTable.create 23; }
 
     (** get the node associated with the given vertex (v) *)
     let get_node graph v =
@@ -104,6 +103,7 @@ module Make(G: Graph) =
         edge_label = label;
         edge_from = from;
         edge_to = dest;
+        edge_attributes = [];
       } in
       from.node_edges <- edge :: from.node_edges;
       edge
@@ -114,7 +114,7 @@ module Make(G: Graph) =
     (** print graph in DOT format *)
     let print_graph graph =
       let buf = Buffer.create 200 in
-      Buffer.add_string (Utils.sprintf "digraph %s {\n" graph.name);
+      Buffer.add_string buf (Utils.sprintf "digraph %s {\n" graph.name);
       (* the name of a node *)
       let rec node_name node = Utils.sprintf "node_%d" node.node_count
       (* print a node *)
@@ -124,7 +124,7 @@ module Make(G: Graph) =
         let attributes = (Label label) :: node.node_attributes in
         let str = Utils.sprintf "  %s [%a];\n" (node_name node)
           (Utils.pp_list ~sep:"," print_attribute) attributes in
-        Buffer.add_string str;
+        Buffer.add_string buf str;
         (* print all outgoing edges *)
         List.iter print_edge node.node_edges
       (* print an edge *)
@@ -135,14 +135,20 @@ module Make(G: Graph) =
         let str = Utils.sprintf "  %s -> %s [%a];\n"
           (node_name edge.edge_from) (node_name edge.edge_to)
           (Utils.pp_list ~sep:"," print_attribute) attributes in
+        Buffer.add_string buf str
       (* print an attribute *)
-      and print_attribute = function
-      | Color c -> "color=" ^ c
-      | Shape s -> "shape=" ^ s
-      | Weight w -> Utils.sprintf "weight=%f" w
-      | Style s -> "style=" ^ s
-      | Label l -> Utils.sprintf "label=\"%s\"" l
+      and print_attribute formatter attr =
+        let value = match attr with
+        | Color c -> "color=" ^ c
+        | Shape s -> "shape=" ^ s
+        | Weight w -> Utils.sprintf "weight=%d" w
+        | Style s -> "style=" ^ s
+        | Label l -> Utils.sprintf "label=\"%s\"" l
+        | Other (name, value) -> Utils.sprintf "%s=\"%s\"" name value
+        in Format.pp_print_string formatter value
       in
       VertexTable.iter print_node graph.nodes;
-      Buffer.add_string "}\n"
+      Buffer.add_string buf "}\n";
+      (* extract the string built in the buffer *)
+      Buffer.contents buf
   end

@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** E-graph imperative data structure *)
 
+open Types
+
 type egraph_node
 type egraph
 
@@ -35,4 +37,4 @@ val equiv_class: egraph_node -> egraph_node list            (** equivalence clas
 val representative: egraph_node -> egraph_node              (** representative of the node *)
 val merge: egraph -> egraph_node -> egraph_node -> unit     (** merge two nodes in the E-graph (and propagate) *)
 
-val to_dot: egraph -> string
+val to_dot: name:string -> egraph -> string

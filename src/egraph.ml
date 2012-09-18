@@ -20,11 +20,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** E-graph imperative data structure *)
 
+open Types
+
+module T = Terms
+module Utils = FoUtils
+
 (** A node that represents a term in the E-graph *)
 type egraph_node = {
   node_term: foterm;                        (** term this node represents *)
   node_children: egraph_node list;          (** children of the node *)
-  mutable node_representative: foterm;      (** representative of the term *)
+  mutable node_representative: egraph_node; (** representative of the term *)
   mutable node_parents: egraph_node list;   (** parents terms of the node *)
   mutable node_class: egraph_node list;     (** equivalence class, only meaningful when the
                                                 node is the representative of its class *)
@@ -49,7 +54,7 @@ type action =
 (** The E-graph structure *)
 type egraph = {
   graph_nodes: egraph_node THashtbl.t;      (** term -> node *)
-  graph_stack: action list Stack.t;
+  graph_stack: action Stack.t;
 }
 
 (** create an empty E-graph *)
@@ -81,7 +86,7 @@ let pop egraph =
   let rec unwind () =
     let action =
       try Stack.pop egraph.graph_stack
-      with Empty -> raise Invalid_argument "no backtracking point left"
+      with Stack.Empty -> raise (Invalid_argument "no backtracking point left")
     in
     match action with
     | StopBacktracking -> ()  (* reached the last backtracking point *)
@@ -127,7 +132,7 @@ let union egraph n1 n2 =
 let term_of_node node = node.node_term
 
 (** creation of a node *)
-let node_of_term egraph t =
+let rec node_of_term egraph t =
   try THashtbl.find egraph.graph_nodes t
   with Not_found ->
     (* find subnodes *)
@@ -137,11 +142,11 @@ let node_of_term egraph t =
     | Node [] -> assert false
     in
     (* create a node *)
-    let node = {
+    let rec node = {
       node_term = t;
       node_children = subterms;
-      node_representative = t;
-      node_class = [t];
+      node_representative = node;
+      node_class = [node];
       node_parents = [];
     }
     in
@@ -160,12 +165,14 @@ let representative node = find node
 type label = NodeVar of int | NodeSymbol of string
 
 (** label of a node, i.e. the root term *)
-let rec label node =
-  match node.node_term.term with
-  | Var i -> NodeVar i
-  | Leaf s -> NodeSymbol s
-  | Node (hd::_) -> label hd
-  | Node [] -> assert false
+let label node =
+  let rec seek t = match t.term with
+    | Var i -> NodeVar i
+    | Leaf s -> NodeSymbol s
+    | Node (hd::_) -> seek hd
+    | Node [] -> assert false
+  in
+  seek node.node_term
 
 (** check whether two nodes are congruent. They are if they
     are currently equal (same representative), or if they have the
@@ -187,7 +194,7 @@ let rec merge egraph n1 n2 =
       let c1 = n1.node_class
       and c2 = n2.node_class in
       (* union of classes *)
-      union n1 n2;
+      union egraph n1 n2;
       (* check parents of equivalence classes for new congruences *)
       let rec check_congruent l1 l2 = match l1 with
       | [] -> ()
@@ -204,8 +211,60 @@ let rec merge egraph n1 n2 =
       | t1::c1' ->
         (* check congruence of parents of t1 with parents of any term of c2 *)
         List.iter (fun t2 -> check_parents t1.node_parents t2.node_parents) c2;
-        check_parents c1'
+        check_parents c1' c2
       in check_parents c1 c2
     end
 
-let to_dot egraph = ()  (* TODO *)
+
+module Graph =
+  struct
+    type vertex = egraph_node
+    type edge = EdgeSubterm | EdgeCongruent
+
+    let equal n1 n2 = n1 == n2
+    let hash n = n.node_term.hkey
+    
+    let print_vertex node =
+      match label node with
+      | NodeVar i -> Utils.sprintf "X%d" i
+      | NodeSymbol s -> s
+
+    let print_edge _ = ""
+  end
+
+(** module to print E-graphs to DOT *)
+module D = Dot.Make(Graph)
+
+(** Print the E-graph in DOT format *)
+let to_dot ~name egraph =
+  let graph = D.mk_graph ~name in
+  (* map the node to the DOT graph *)
+  let on_node node = 
+    let n = D.get_node graph node in
+    D.add_node_attribute n (D.Shape "box");
+    (* add links to children *)
+    List.iter
+      (fun child ->
+        let c = D.get_node graph child in
+        let e = D.add_edge graph n c Graph.EdgeSubterm in
+        D.add_edge_attribute e (D.Weight 10);
+        D.add_edge_attribute e (D.Style "filled");
+        D.add_edge_attribute e (D.Style "bold"))
+      node.node_children;
+    (* add links to congruent terms *)
+    List.iter
+      (fun congruent_node ->
+        if congruent_node.node_term.tag <= node.node_term.tag
+          then ()  (* print the link only once *)
+          else begin
+            let c = D.get_node graph congruent_node in
+            let e = D.add_edge graph n c Graph.EdgeCongruent in
+            D.add_edge_attribute e (D.Weight 1);
+            D.add_edge_attribute e (D.Style "dotted");
+            D.add_edge_attribute e (D.Other ("arrowhead", "none"))
+          end)
+      node.node_class;
+  in
+  THashtbl.iter (fun _ node -> on_node node) egraph.graph_nodes;
+  (* print the graph into a string *)
+  D.print_graph graph
