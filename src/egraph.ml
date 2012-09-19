@@ -25,6 +25,10 @@ open Types
 module T = Terms
 module Utils = FoUtils
 
+(* ----------------------------------------------------------------------
+ * types
+ * ---------------------------------------------------------------------- *)
+
 (** Label of a node: symbol or variable *)
 type label = NodeVar of int | NodeSymbol of string
 
@@ -56,13 +60,19 @@ type action =
   | SetClass of egraph_node * egraph_node list
   | SetRepresentative of egraph_node * egraph_node
   | SetSymbol of string * egraph_node list
+  | SetMaxvar of int
 
 (** The E-graph structure *)
 type egraph = {
   graph_nodes: egraph_node THashtbl.t;                  (** term -> node *)
   graph_symbol: (string, egraph_node list) Hashtbl.t;   (** f -> nodes f(t1...tn) *)
   graph_stack: action Stack.t;                          (** stack used for backtracking *)
+  mutable graph_maxvar: int;                            (** max variable in E-graph *)
 }
+
+(* ----------------------------------------------------------------------
+ * basic operations and congruence closure
+ * ---------------------------------------------------------------------- *)
 
 (** label of a term, i.e. the root symbol/var *)
 let rec compute_label t =
@@ -79,7 +89,8 @@ let empty () =
   Stack.push StopBacktracking stack;
   { graph_nodes = nodes;
     graph_symbol = Hashtbl.create 41;
-    graph_stack = stack }
+    graph_stack = stack;
+    graph_maxvar = 0; }
 
 (** push a backtracking point on the stack *)
 let push egraph =
@@ -131,6 +142,7 @@ let pop egraph =
     if nodes = []
       then Hashtbl.remove egraph.graph_symbol symbol
       else Hashtbl.replace egraph.graph_symbol symbol nodes
+  | SetMaxvar v -> egraph.graph_maxvar <- v
   in
   (* unwind the stack down to the last backtracking point *)
   let rec unwind () =
@@ -261,7 +273,10 @@ let rec node_of_term egraph t =
     (* if t = f(t1...tn), put t in the use list of f, and
        check for congruences *)
     begin match node.node_label with
-    | NodeVar _ -> ()
+    | NodeVar i ->
+      if i > egraph.graph_maxvar then
+        (Stack.push (SetMaxvar egraph.graph_maxvar) egraph.graph_stack;
+        egraph.graph_maxvar <- i)
     | NodeSymbol f ->
       add_to_symbols egraph f node;
       List.iter
@@ -271,6 +286,41 @@ let rec node_of_term egraph t =
     (* return the node *)
     node
 
+(** max var index in E-graph *)
+let maxvar egraph = egraph.graph_maxvar
+
+(* ----------------------------------------------------------------------
+ * unification/matching functions
+ * ---------------------------------------------------------------------- *)
+
+(** A substitution maps (var) nodes to nodes. *)
+type subst = (egraph_node * egraph_node) list
+
+(** All possible linear unifications between the two terms, modulo congruence.
+    If a variable is to be bound several times, it will be bound only
+    once, the other bindings will be ignored. *)
+let linear_soft_unify egraph n1 n2 = assert false
+
+(** Linear unification of the term t against the E-graph. Any substitution
+    sigma returned is such that sigma(t) and sigma(t'), where t' is
+    a term in the E-graph, top-unify. *)
+let linear_hard_unify egraph t = assert false
+
+(** Proper matching of the terms against the E-graph. Proper means
+    that if a variable x occurs several times in the list of terms,
+    all its occurrences will match nodes in the same equivalence class.
+
+    It returns a list of results, where each result is a list of nodes
+    that match the input terms, and a substitution to bind variables.
+
+    For instance, when matching [f(x,x), x] against an E-graph
+    where a = b, and f(a,b) and b occur, then [f(a,b),b] and sigma={x->a} will be
+    a proper matcher since f(x,x) matches f(a,b) modulo the congruence. *)
+let proper_match egraph patterns = assert false
+
+(* ----------------------------------------------------------------------
+ * DOT printing
+ * ---------------------------------------------------------------------- *)
 
 module Graph =
   struct
