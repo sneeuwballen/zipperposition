@@ -32,6 +32,14 @@ module Utils = FoUtils
 (** Label of a node: symbol or variable *)
 type label = NodeVar of int | NodeSymbol of string
 
+let is_var_label = function
+  | NodeVar _ -> true
+  | NodeSymbol _ -> false
+
+let is_symb_label = function
+  | NodeVar _ -> false
+  | NodeSymbol _ -> true
+
 (** A node that represents a term in the E-graph *)
 type egraph_node = {
   node_label: label;                        (** label of the node *)
@@ -184,11 +192,13 @@ let union egraph n1 n2 =
   (* merge one parent into the other *)
   let n1 = find n1
   and n2 = find n2 in
-  if n1 == n2
-    then ()  (* already merged *)
-    else if List.length n1.node_class > List.length n2.node_class
-      then merge_into n2 n1 (* n1 bigger than n2, merge n2 into n1 *)
-      else merge_into n1 n2
+  match n1, n2 with
+  | _ when n1 == n2 -> () (* already merged *)
+  | _ when is_var_label n1.node_label -> merge_into n1 n2 (* var -> term *)
+  | _ when is_var_label n2.node_label -> merge_into n2 n1 (* var -> term *)
+  | _ when List.length n1.node_class > List.length n2.node_class ->
+    merge_into n2 n1  (* smaller class merged into bigger class *)
+  | _ -> merge_into n1 n2
 
 (** get term from node *)
 let term_of_node node = node.node_term
@@ -299,12 +309,12 @@ type subst = (egraph_node * egraph_node) list
 (** All possible linear unifications between the two terms, modulo congruence.
     If a variable is to be bound several times, it will be bound only
     once, the other bindings will be ignored. *)
-let linear_soft_unify egraph n1 n2 = assert false
+let linear_soft_unify egraph n1 n2 subst = assert false
 
 (** Linear unification of the term t against the E-graph. Any substitution
     sigma returned is such that sigma(t) and sigma(t'), where t' is
     a term in the E-graph, top-unify. *)
-let linear_hard_unify egraph t = assert false
+let linear_hard_unify egraph t subst = assert false
 
 (** Proper matching of the terms against the E-graph. Proper means
     that if a variable x occurs several times in the list of terms,
@@ -316,7 +326,7 @@ let linear_hard_unify egraph t = assert false
     For instance, when matching [f(x,x), x] against an E-graph
     where a = b, and f(a,b) and b occur, then [f(a,b),b] and sigma={x->a} will be
     a proper matcher since f(x,x) matches f(a,b) modulo the congruence. *)
-let proper_match egraph patterns = assert false
+let proper_match egraph patterns subst = assert false
 
 (* ----------------------------------------------------------------------
  * DOT printing

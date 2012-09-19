@@ -48,12 +48,12 @@ type subst = (egraph_node * egraph_node) list
 (** All possible linear unifications between the two terms, modulo congruence.
     If a variable is to be bound several times, it will be bound only
     once, the other bindings will be ignored. *)
-val linear_soft_unify: egraph -> egraph_node -> egraph_node -> subst list
+val linear_soft_unify: egraph -> egraph_node -> egraph_node -> subst -> subst list
 
 (** Linear unification of the term t against the E-graph. Any substitution
     sigma returned is such that sigma(t) and sigma(t'), where t' is
     a term in the E-graph, top-unify. *)
-val linear_hard_unify: egraph -> foterm -> substitution list
+val linear_hard_unify: egraph -> foterm -> substitution -> substitution list
 
 (** Proper matching of the terms against the E-graph. Proper means
     that if a variable x occurs several times in the list of terms,
@@ -65,7 +65,7 @@ val linear_hard_unify: egraph -> foterm -> substitution list
     For instance, when matching [f(x,x), x] against an E-graph
     where a = b, and f(a,b) and b occur, then [f(a,b),b] and sigma={x->a} will be
     a proper matcher since f(x,x) matches f(a,b) modulo the congruence. *)
-val proper_match: egraph -> foterm list -> (egraph_node list * substitution) list
+val proper_match: egraph -> foterm list -> substitution -> (egraph_node list * substitution) list
 
 (** Print the E-graph in DOT format *)
 val to_dot: name:string -> egraph -> string
