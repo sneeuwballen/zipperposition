@@ -71,8 +71,26 @@ val linear_hard_unify: egraph -> foterm -> substitution ->
 val proper_match: egraph -> foterm list -> substitution -> 
                   (egraph_node list -> substitution -> unit) -> unit
 
+type theory = (foterm * foterm) list
+
 (** Close the E-graph w.r.t some set of equations *)
-val theory_close: egraph -> (foterm * foterm) list -> unit
+val theory_close: egraph -> theory -> unit
+
+(** Set of possible paramodulation inferences. Each inference is a 
+    (possibly speculative) top-unification of the side of an equation,
+    and of some node in the E-graph. *)
+val find_paramodulations: egraph -> theory -> (foterm * foterm * substitution) list
+
+(** Apply the paramodulation to the E-graph *)
+val apply_paramodulation: egraph -> (foterm * foterm * substitution) -> unit
+
+(** Apply a substitution *)
+val apply_subst: egraph -> subst -> unit
+
+(** Try to close the E-graph by unifying the two given nodes. It
+    returns a list of E-substitutions on success,
+    or an empty list on failure. *)
+val try_unify: egraph -> egraph_node -> egraph_node -> subst list
 
 (** Print the E-graph in DOT format *)
 val to_dot: name:string -> egraph -> string

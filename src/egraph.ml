@@ -516,6 +516,9 @@ let proper_match egraph patterns subst f =
  * High level interface for theories
  * ---------------------------------------------------------------------- *)
 
+type theory = (foterm * foterm) list
+
+(** Close the E-graph w.r.t some set of equations *)
 let theory_close egraph equations =
   (* apply equations while they give new equalities *)
   let rec loop current_equations =
@@ -545,6 +548,80 @@ let theory_close egraph equations =
         else loop next_equations
   in
   loop equations
+
+(** Set of possible paramodulation inferences. Each inference is a 
+    (possibly speculative) top-unification of the side of an equation,
+    and of some node in the E-graph. *)
+let find_paramodulations egraph equations =
+  let answers = ref [] in
+  List.iter
+    (fun (e1, e2) ->
+      (* avoid variable collision by renaming terms *)
+      let _, _, renaming = S.relocate (maxvar egraph + 1) [] S.id_subst in
+      let e1 = S.apply_subst renaming e1
+      and e2 = S.apply_subst renaming e2 in
+      (* function that will update answers *)
+      let f subst =
+        answers := (e1, e2, subst) :: !answers in
+      linear_hard_unify egraph e1 S.id_subst f;
+      linear_hard_unify egraph e2 S.id_subst f)
+    equations;
+  !answers
+
+(** Apply the term substitution to the E-graph, after adding both
+    terms to the E-graph *)
+let rec apply_substitution egraph subst =
+  match subst with
+  | [] -> ()
+  | (v,t) :: subst' ->
+    let v = node_of_term egraph v
+    and t = node_of_term egraph t in
+    merge egraph v t;
+    apply_substitution  egraph subst'
+
+(** Apply the paramodulation to the E-graph *)
+let apply_paramodulation egraph (t1, t2, subst) =
+  ignore (node_of_term egraph t1);
+  ignore (node_of_term egraph t2);
+  apply_substitution egraph subst
+
+(** Apply the substitution to the E-graph *)
+let rec apply_subst egraph subst =
+  match subst with
+  | [] -> ()
+  | (n1, n2) :: subst' ->
+    merge egraph n1 n2;
+    apply_subst egraph subst'
+
+(** Try to close the E-graph by unifying the two given nodes. It
+    returns a list of E-substitutions on success,
+    or an empty list on failure. *)
+let try_unify egraph n1 n2 =
+  (* remove multiple bindings of a variable *)
+  let rec uniquify subst =
+    match subst with 
+    | [] -> []
+    | (n1, n2) as pair :: subst' ->
+      assert (is_var_label n1.node_label);
+      if List.exists (fun (n1',_) -> n1 == n1') subst'
+        then uniquify subst'
+        else pair :: (uniquify subst')
+  in
+  (* collect answers by unification within the E-graph *)
+  let answers = ref [] in
+  let f subst =
+    answers := subst :: !answers in
+  linear_soft_unify egraph n1 n2 [] f;
+  let answers = !answers in
+  List.filter
+    (fun subst ->
+      (* test whether the substitution actually works, by applying them *)
+      push egraph;
+      apply_subst egraph subst;
+      let did_unify = are_equal n1 n2 in
+      pop egraph;
+      did_unify)
+    answers
 
 (* ----------------------------------------------------------------------
  * DOT printing
@@ -595,6 +672,7 @@ let to_dot ~name egraph =
             let e = D.add_edge graph n c Graph.EdgeCongruent in
             D.add_edge_attribute e (D.Weight 1);
             D.add_edge_attribute e (D.Style "dotted");
+            D.add_edge_attribute e (D.Color "red");
             D.add_edge_attribute e (D.Other ("arrowhead", "none"))
           end)
       (equiv_class node);
