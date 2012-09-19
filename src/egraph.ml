@@ -411,15 +411,15 @@ let linear_hard_unify egraph t subst f =
     | _ -> assert false
   (* unify term and node *)
   and unify_node t node subst f =
+    (if term_in_graph egraph t && are_equal (node_of_term egraph t) node
+      then f subst (* t congruent to node, success *) else ());
     match t.term, node.node_label with
     | Var _, _ -> f (S.build_subst t node.node_term subst)
     | _, NodeVar _ -> f (S.build_subst node.node_term t subst)
     | Leaf g, _ ->
-      List.iter  (* unify t with terms congruent to node *)
+      List.iter  (* try to unify t with a variable *)
         (fun node' ->
           match node'.node_label with
-          | _ when T.eq_foterm node'.node_term t ->
-            f subst (* t congruent to node, success *)
           | NodeVar _ ->
             f (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
           | _ -> ())
@@ -488,10 +488,8 @@ let proper_match egraph patterns subst f =
     match t.term with
     | Var _ -> f acc (S.build_subst t node.node_term subst)
     | Leaf g ->
-      if List.exists
-        (fun node' -> T.eq_foterm node'.node_term t) (* is t congruent to node? *)
-        (equiv_class node)
-        then f acc subst  (* matches some element of the equivalence class *)
+      if term_in_graph egraph t && are_equal (node_of_term egraph t) node
+        then f acc subst  (* t is congruent to node *)
         else ()
     | Node ({term=Leaf g}::tl) ->
       let len = List.length tl in
@@ -505,6 +503,37 @@ let proper_match egraph patterns subst f =
     | Node _ -> assert false
   in
   match_terms patterns [] subst f
+
+(* ----------------------------------------------------------------------
+ * High level interface for theories
+ * ---------------------------------------------------------------------- *)
+
+let theory_close egraph equations =
+  (* apply equations while they give new equalities *)
+  let rec loop current_equations =
+    match current_equations with
+    | [] -> ()  (* exit *)
+    | (e1,e2)::next_equations ->
+      let some_change = ref false in
+      (* equate the list of nodes *)
+      let f nodes subst =
+        some_change := true;
+        match nodes with
+        | [a;b] -> (* merge a and b! *)
+          Utils.debug 3 (lazy (Utils.sprintf "  @[<h>theory equation %a=%a -> merge %a and %a@]"
+                               !T.pp_term#pp e1 !T.pp_term#pp e2
+                               !T.pp_term#pp a.node_term !T.pp_term#pp b.node_term));
+          merge egraph a b
+        | _ -> assert false
+      in
+      (* E-matching to propagate the equation e1=e2 *)
+      proper_match egraph [e1; e2] S.id_subst f;
+      (* if it did something, re-scan through all equations *)
+      if !some_change
+        then loop equations
+        else loop next_equations
+  in
+  loop equations
 
 (* ----------------------------------------------------------------------
  * DOT printing

@@ -71,5 +71,8 @@ val linear_hard_unify: egraph -> foterm -> substitution ->
 val proper_match: egraph -> foterm list -> substitution -> 
                   (egraph_node list -> substitution -> unit) -> unit
 
+(** Close the E-graph w.r.t some set of equations *)
+val theory_close: egraph -> (foterm * foterm) list -> unit
+
 (** Print the E-graph in DOT format *)
 val to_dot: name:string -> egraph -> string
