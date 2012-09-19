@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 module T = Terms
+module S = FoSubst
 module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
@@ -137,6 +138,10 @@ let remove_node egraph node =
     | NodeSymbol s -> remove_from_symbols egraph s node
     end
   | Node [] -> assert false
+
+let from_symbol egraph symbol =
+  try Hashtbl.find egraph.graph_symbol symbol
+  with Not_found -> []
 
 (** pop to the last backtracking point, cancelling all actions performed since *)
 let pop egraph =
@@ -306,15 +311,135 @@ let maxvar egraph = egraph.graph_maxvar
 (** A substitution maps (var) nodes to nodes. *)
 type subst = (egraph_node * egraph_node) list
 
+(** check whether var is bound by subst *)
+let in_subst subst var =
+  assert (is_var_label var.node_label);
+  List.exists (fun (v, _) -> v == var) subst
+
+(** get the term var is bound to in subst, or raises Not_found *)
+let get_subst subst var =
+  assert (is_var_label var.node_label);
+  let rec recurse subst = match subst with
+  | [] -> raise Not_found
+  | (v,n)::subst' -> if v == var then n else recurse subst'
+  in
+  recurse subst
+
+(** apply substitution to node, but only at the root *)
+let rec apply_subst subst node =
+  match node.node_label with
+  | NodeVar _ ->
+    let node' =
+      try get_subst subst node
+      with Not_found -> node in
+    if node == node' then node else apply_subst subst node'
+  | NodeSymbol _ -> node
+
 (** All possible linear unifications between the two terms, modulo congruence.
     If a variable is to be bound several times, it will be bound only
     once, the other bindings will be ignored. *)
-let linear_soft_unify egraph n1 n2 subst = assert false
+let linear_soft_unify egraph n1 n2 subst f =
+  (* try to unify those equivalence classes *)
+  let rec unify n1 n2 subst f =
+    if are_equal n1 n2
+      then f subst  (* trivial success *)
+      else if n1.node_sort <> n2.node_sort
+      then () (* cannot unify, distinct sorts *)
+      else unify_all (equiv_class n1) (equiv_class n2) subst f (* try all combinations *)
+  (* try to unify every term of l1 with every term of l2 *)
+  and unify_all l1 l2 subst f = match l1 with
+  | [] -> ()
+  | n1::l1' ->
+    (* unify n1 with terms in l2 *)
+    List.iter (fun n2 -> root_unify n1 n2 subst f) l2;
+    unify_all l1' l2 subst f
+  (* try to unify those two terms *)
+  and root_unify n1 n2 subst f =
+    assert (not (are_equal n1 n2));
+    match n1.node_label, n2.node_label with
+    | NodeVar _, _ -> f ((n1, n2) :: subst)  (* bind n1 to n2 *)
+    | _, NodeVar _ -> f ((n2, n1) :: subst)  (* bind n2 to n1 *)
+    | NodeSymbol g, NodeSymbol h when g = h &&
+      List.length n1.node_children = List.length n2.node_children ->
+      assert (n1.node_children <> []);  (* otherwise they would be equal *)
+      unify_subterms n1.node_children n2.node_children subst f
+    | _ -> ()  (* failure *)
+  (* unify children pairwise *)
+  and unify_subterms l1 l2 subst f =
+    match l1, l2 with
+    | [], [] -> f subst (* success *)
+    | n1::l1', n2::l2' ->
+      let new_f subst' = unify_subterms l1' l2' subst' f in
+      unify n1 n2 subst new_f
+    | _ -> assert false (* not same length *)
+  in
+  unify n1 n2 subst f
 
 (** Linear unification of the term t against the E-graph. Any substitution
     sigma returned is such that sigma(t) and sigma(t'), where t' is
     a term in the E-graph, top-unify. *)
-let linear_hard_unify egraph t subst = assert false
+let linear_hard_unify egraph t subst f =
+  (* match term against E-graph *)
+  let rec unify_term t subst f =
+    match t.term with
+    | Var _ ->
+      (* try against all nodes that have the same sort... *)
+      THashtbl.iter
+        (fun _ node ->
+          if node.node_sort = t.sort && not (T.member_term t node.node_term)
+            then f ((t, node.node_term) :: subst))
+        egraph.graph_nodes
+    | Leaf g ->
+      if term_in_graph egraph t
+        then f subst  (* ok, it matches some term in the graph *)
+        else ()  (* fails, no such term *)
+    | Node ({term=Leaf g}::tl) ->
+      (* unify against children of all terms that start with g *)
+      List.iter
+        (fun node ->
+           if List.length tl = List.length node.node_children
+             then unify_list tl node.node_children subst f)
+        (from_symbol egraph g)
+    | Node _ -> assert false
+  (* unify list of terms against list of nodes *)
+  and unify_list terms nodes subst f =
+    match terms, nodes with
+    | [], [] -> f subst  (* success *)
+    | t::terms', node::nodes' ->
+      let new_f subst = unify_list terms' nodes' subst f in
+      unify_node t node subst new_f
+    | _ -> assert false
+  (* unify term and node *)
+  and unify_node t node subst f =
+    match t.term, node.node_label with
+    | Var _, _ -> f (S.build_subst t node.node_term subst)
+    | _, NodeVar _ -> f (S.build_subst node.node_term t subst)
+    | Leaf g, _ ->
+      List.iter  (* unify t with terms congruent to node *)
+        (fun node' ->
+          match node'.node_label with
+          | _ when T.eq_foterm node'.node_term t ->
+            f subst (* t congruent to node, success *)
+          | NodeVar _ ->
+            f (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
+          | _ -> ())
+        (equiv_class node)
+    | Node ({term=Leaf g}::tl), _ ->
+      let len = List.length tl in
+      (* try to match tl with children of all nodes congruent to node, that are
+         labelled with g *)
+      List.iter
+        (fun node' -> 
+          match node'.node_label with
+          | NodeVar _ ->
+            f (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
+          | NodeSymbol h when g = h &&  List.length node'.node_children = len ->
+            unify_list tl node'.node_children subst f (* unify subterms *)
+          | _ -> ())
+        (equiv_class node)
+    | Node _, _ -> assert false
+  in
+  unify_term t subst f
 
 (** Proper matching of the terms against the E-graph. Proper means
     that if a variable x occurs several times in the list of terms,
@@ -326,7 +451,60 @@ let linear_hard_unify egraph t subst = assert false
     For instance, when matching [f(x,x), x] against an E-graph
     where a = b, and f(a,b) and b occur, then [f(a,b),b] and sigma={x->a} will be
     a proper matcher since f(x,x) matches f(a,b) modulo the congruence. *)
-let proper_match egraph patterns subst = assert false
+let proper_match egraph patterns subst f =
+  (* match terms against E-graph (inspired from Simplify's E-matching iterators) *)
+  let rec match_terms terms acc subst f =
+    match terms with
+    | [] -> f acc subst
+    | t::terms' ->
+      let new_f nodes subst = match_terms terms' acc subst f in
+      match_term t acc subst new_f
+  (* match term against E-graph *)
+  and match_term t acc subst f =
+    match t.term with
+    | Var _ -> assert false (* TODO: all equivalence classes that have good sort? *)
+    | Leaf g ->
+      if term_in_graph egraph t
+        then f acc subst  (* ok, it matches some term in the graph *)
+        else ()  (* fails, no such term *)
+    | Node ({term=Leaf g}::tl) ->
+      (* match against children of all terms that start with g *)
+      List.iter
+        (fun node ->
+           if List.length tl = List.length node.node_children
+             then match_list tl node.node_children acc subst f)
+        (from_symbol egraph g)
+    | Node _ -> assert false
+  (* match list of terms against list of nodes *)
+  and match_list terms nodes acc subst f =
+    match terms, nodes with
+    | [], [] -> f acc subst  (* success *)
+    | t::terms', node::nodes' ->
+      let new_f acc subst = match_list terms' nodes' (node::acc) subst f in
+      match_node t node acc subst new_f
+    | _ -> assert false
+  (* match term and node *)
+  and match_node t node acc subst f =
+    match t.term with
+    | Var _ -> f acc (S.build_subst t node.node_term subst)
+    | Leaf g ->
+      if List.exists
+        (fun node' -> T.eq_foterm node'.node_term t) (* is t congruent to node? *)
+        (equiv_class node)
+        then f acc subst  (* matches some element of the equivalence class *)
+        else ()
+    | Node ({term=Leaf g}::tl) ->
+      let len = List.length tl in
+      (* try to match tl with children of all nodes congruent to node, that are
+         labelled with g *)
+      List.iter
+        (fun node' -> 
+          if node'.node_label = (NodeSymbol g) && List.length node'.node_children = len
+            then match_list tl node'.node_children acc subst f)
+        (equiv_class node)
+    | Node _ -> assert false
+  in
+  match_terms patterns [] subst f
 
 (* ----------------------------------------------------------------------
  * DOT printing

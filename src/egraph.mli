@@ -40,22 +40,25 @@ val merge: egraph -> egraph_node -> egraph_node -> unit (** merge two nodes in t
 val term_of_node: egraph_node -> foterm                 (** get the term back from the node *)
 val node_of_term: egraph -> foterm -> egraph_node       (** get the node representing the term *)
 val term_in_graph: egraph -> foterm -> bool             (** is the term represented in the DAG? *)
+val from_symbol: egraph -> string -> egraph_node list   (** list of nodes labelled by symbol *)
 val maxvar: egraph -> int                               (** max var index in E-graph *)
 
-(** A substitution maps (var) nodes to nodes. *)
+(** A substitution maps (var) nodes to nodes (to their equivalence class). *)
 type subst = (egraph_node * egraph_node) list
 
 (** All possible linear unifications between the two terms, modulo congruence.
-    If a variable is to be bound several times, it will be bound only
-    once, the other bindings will be ignored. *)
-val linear_soft_unify: egraph -> egraph_node -> egraph_node -> subst -> subst list
+    If a variable is to be bound several times, it will be bound several times
+    in the substitution *)
+val linear_soft_unify: egraph -> egraph_node -> egraph_node ->
+                       subst -> (subst -> unit) -> unit
 
 (** Linear unification of the term t against the E-graph. Any substitution
     sigma returned is such that sigma(t) and sigma(t'), where t' is
     a term in the E-graph, top-unify. *)
-val linear_hard_unify: egraph -> foterm -> substitution -> substitution list
+val linear_hard_unify: egraph -> foterm -> substitution ->
+                       (substitution -> unit) -> unit
 
-(** Proper matching of the terms against the E-graph. Proper means
+(** Proper E-matching of the terms against the E-graph. Proper means
     that if a variable x occurs several times in the list of terms,
     all its occurrences will match nodes in the same equivalence class.
 
@@ -65,7 +68,8 @@ val linear_hard_unify: egraph -> foterm -> substitution -> substitution list
     For instance, when matching [f(x,x), x] against an E-graph
     where a = b, and f(a,b) and b occur, then [f(a,b),b] and sigma={x->a} will be
     a proper matcher since f(x,x) matches f(a,b) modulo the congruence. *)
-val proper_match: egraph -> foterm list -> substitution -> (egraph_node list * substitution) list
+val proper_match: egraph -> foterm list -> substitution -> 
+                  (egraph_node list -> substitution -> unit) -> unit
 
 (** Print the E-graph in DOT format *)
 val to_dot: name:string -> egraph -> string
