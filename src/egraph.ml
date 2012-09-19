@@ -461,6 +461,7 @@ let proper_match egraph patterns subst f =
       match_term t acc subst new_f
   (* match term against E-graph *)
   and match_term t acc subst f =
+    let t = S.apply_subst subst t in
     match t.term with
     | Var _ ->
       (* try against all nodes that have the same sort... *)
@@ -524,12 +525,14 @@ let theory_close egraph equations =
       let some_change = ref false in
       (* equate the list of nodes *)
       let f nodes subst =
-        some_change := true;
         match nodes with
+        | [a;b] when are_equal a b -> ()  (* already equal *)
         | [a;b] -> (* merge a and b! *)
-          Utils.debug 3 (lazy (Utils.sprintf "  @[<h>theory equation %a=%a -> merge %a and %a@]"
-                               !T.pp_term#pp e1 !T.pp_term#pp e2
-                               !T.pp_term#pp a.node_term !T.pp_term#pp b.node_term));
+          Utils.debug 3 (lazy (Utils.sprintf
+            "  @[<h>theory equation %a=%a -> merge %a and %a with %a@]"
+            !T.pp_term#pp e1 !T.pp_term#pp e2 !T.pp_term#pp a.node_term
+            !T.pp_term#pp b.node_term S.pp_substitution subst));
+          some_change := true;
           merge egraph a b
         | _ -> (Format.printf "got nodes [%a]@." (Utils.pp_list
               (fun f node -> !T.pp_term#pp f node.node_term)) nodes; assert false)
