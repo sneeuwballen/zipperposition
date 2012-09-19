@@ -591,3 +591,12 @@ let to_dot ~name egraph =
   THashtbl.iter (fun _ node -> on_node node) egraph.graph_nodes;
   (* print the graph into a string *)
   D.print_graph graph
+
+(** print to a file *)
+let to_dot_file ~name egraph filename =
+  let f = open_out filename in
+  let content = to_dot ~name egraph in
+  output_string f content;
+  flush f;
+  close_out f
+

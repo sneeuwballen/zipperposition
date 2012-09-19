@@ -122,7 +122,7 @@ module Make(G: Graph) =
         (* add a 'label' attribute *)
         let label = G.print_vertex node.node_label in
         let attributes = (Label label) :: node.node_attributes in
-        let str = Utils.sprintf "  %s [%a];\n" (node_name node)
+        let str = Utils.sprintf "  @[<h>%s [%a];@]@." (node_name node)
           (Utils.pp_list ~sep:"," print_attribute) attributes in
         Buffer.add_string buf str;
         (* print all outgoing edges *)
@@ -132,7 +132,7 @@ module Make(G: Graph) =
         (* add a 'label' attribute *)
         let label = G.print_edge edge.edge_label in
         let attributes = (Label label) :: edge.edge_attributes in
-        let str = Utils.sprintf "  %s -> %s [%a];\n"
+        let str = Utils.sprintf "  @[<h>%s -> %s [%a];@]@."
           (node_name edge.edge_from) (node_name edge.edge_to)
           (Utils.pp_list ~sep:"," print_attribute) attributes in
         Buffer.add_string buf str

@@ -76,3 +76,5 @@ val theory_close: egraph -> (foterm * foterm) list -> unit
 
 (** Print the E-graph in DOT format *)
 val to_dot: name:string -> egraph -> string
+(** print to a file *)
+val to_dot_file: name:string -> egraph -> string -> unit
