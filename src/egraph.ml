@@ -214,7 +214,7 @@ let are_equal n1 n2 = n1 == n2 || find n1 == find n2
 let term_in_graph egraph t =
   THashtbl.mem egraph.graph_nodes t
 
-let equiv_class node = node.node_class
+let equiv_class node = (find node).node_class
 
 let representative node = find node
 
@@ -457,39 +457,46 @@ let proper_match egraph patterns subst f =
     match terms with
     | [] -> f acc subst
     | t::terms' ->
-      let new_f nodes subst = match_terms terms' acc subst f in
+      let new_f acc subst = match_terms terms' acc subst f in
       match_term t acc subst new_f
   (* match term against E-graph *)
   and match_term t acc subst f =
     match t.term with
-    | Var _ -> assert false (* TODO: all equivalence classes that have good sort? *)
+    | Var _ ->
+      (* try against all nodes that have the same sort... *)
+      THashtbl.iter
+        (fun _ node ->
+          if node.node_sort = t.sort && not (T.member_term t node.node_term)
+            then f (node :: acc) ((t, node.node_term) :: subst))
+        egraph.graph_nodes
     | Leaf g ->
       if term_in_graph egraph t
-        then f acc subst  (* ok, it matches some term in the graph *)
+        then f ((node_of_term egraph t) :: acc) subst  (* matches itself *)
         else ()  (* fails, no such term *)
     | Node ({term=Leaf g}::tl) ->
       (* match against children of all terms that start with g *)
       List.iter
         (fun node ->
+          let new_f subst = f (node :: acc) subst in
            if List.length tl = List.length node.node_children
-             then match_list tl node.node_children acc subst f)
+             then match_list tl node.node_children subst new_f)
         (from_symbol egraph g)
     | Node _ -> assert false
   (* match list of terms against list of nodes *)
-  and match_list terms nodes acc subst f =
+  and match_list terms nodes subst f =
     match terms, nodes with
-    | [], [] -> f acc subst  (* success *)
+    | [], [] -> f subst  (* success *)
     | t::terms', node::nodes' ->
-      let new_f acc subst = match_list terms' nodes' (node::acc) subst f in
-      match_node t node acc subst new_f
+      let new_f subst = match_list terms' nodes' subst f in
+      match_node t node subst new_f
     | _ -> assert false
   (* match term and node *)
-  and match_node t node acc subst f =
+  and match_node t node subst f =
     match t.term with
-    | Var _ -> f acc (S.build_subst t node.node_term subst)
+    | Var _ -> f (S.build_subst t node.node_term subst)
     | Leaf g ->
       if term_in_graph egraph t && are_equal (node_of_term egraph t) node
-        then f acc subst  (* t is congruent to node *)
+        then f subst  (* t is congruent to node *)
         else ()
     | Node ({term=Leaf g}::tl) ->
       let len = List.length tl in
@@ -498,7 +505,7 @@ let proper_match egraph patterns subst f =
       List.iter
         (fun node' -> 
           if node'.node_label = (NodeSymbol g) && List.length node'.node_children = len
-            then match_list tl node'.node_children acc subst f)
+            then match_list tl node'.node_children subst f)
         (equiv_class node)
     | Node _ -> assert false
   in
@@ -524,7 +531,8 @@ let theory_close egraph equations =
                                !T.pp_term#pp e1 !T.pp_term#pp e2
                                !T.pp_term#pp a.node_term !T.pp_term#pp b.node_term));
           merge egraph a b
-        | _ -> assert false
+        | _ -> (Format.printf "got nodes [%a]@." (Utils.pp_list
+              (fun f node -> !T.pp_term#pp f node.node_term)) nodes; assert false)
       in
       (* E-matching to propagate the equation e1=e2 *)
       proper_match egraph [e1; e2] S.id_subst f;
@@ -586,7 +594,7 @@ let to_dot ~name egraph =
             D.add_edge_attribute e (D.Style "dotted");
             D.add_edge_attribute e (D.Other ("arrowhead", "none"))
           end)
-      node.node_class;
+      (equiv_class node);
   in
   THashtbl.iter (fun _ node -> on_node node) egraph.graph_nodes;
   (* print the graph into a string *)

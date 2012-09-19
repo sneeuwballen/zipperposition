@@ -28,10 +28,10 @@ let peano_theory =
 
 let dot_file = ref "/tmp/egraph.dot"
 
+let egraph = Egraph.empty ()
+
 (** try to E-unify n+n and 2n *)
 let test n =
-  let egraph = Egraph.empty () in 
-  Egraph.push egraph;
   let a = plus (from_int n) (from_int n)
   and b = from_int (2 * n) in
   (* put terms in E-graph *)
@@ -43,8 +43,16 @@ let test n =
   Format.printf "done.@.";
   let eq = Egraph.are_equal left right in
   Format.printf "%a and %a are%s equal@." !T.pp_term#pp a
-    !T.pp_term#pp b (if eq then "" else " not");
+    !T.pp_term#pp b (if eq then "" else " not")
+
+let () =
+  let z = Egraph.node_of_term egraph zero
+  and zxz = Egraph.node_of_term egraph (plus zero zero)
+  and zpz = Egraph.node_of_term egraph (times zero zero) in
+  Egraph.merge egraph z zxz;
+  Egraph.merge egraph z zpz;
+  Format.printf "0 = @[<h>%a@]@." (Utils.pp_list (fun f node -> !T.pp_term#pp f
+    (Egraph.term_of_node node))) (Egraph.equiv_class z);
+  test 2;
   Format.printf "print to %s@." !dot_file;
   Egraph.to_dot_file ~name:"egraph" egraph !dot_file
-
-let () = test 2
