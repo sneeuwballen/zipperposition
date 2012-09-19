@@ -179,37 +179,11 @@ let union egraph n1 n2 =
 (** get term from node *)
 let term_of_node node = node.node_term
 
-(** creation of a node *)
-let rec node_of_term egraph t =
-  try THashtbl.find egraph.graph_nodes t
-  with Not_found ->
-    (* find subnodes *)
-    let subterms = match t.term with
-    | Var _ | Leaf _ -> []
-    | Node (hd::tl) -> List.map (node_of_term egraph) tl
-    | Node [] -> assert false
-    in
-    (* create a node *)
-    let rec node = {
-      node_term = t;
-      node_children = subterms;
-      node_representative = node;
-      node_class = [node];
-      node_parents = [];
-    }
-    in
-    (* add node as a parent of all its children *)
-    List.iter (fun child -> child.node_parents <- node :: child.node_parents) subterms;
-    (* if t = f(t1...tn), put t in the use list of f *)
-    (match label node with
-    | NodeVar _ -> ()
-    | NodeSymbol f -> add_to_symbols egraph f node);
-    (* put the node in the hashtable *)
-    THashtbl.add egraph.graph_nodes t node;
-    Stack.push (Delete node) egraph.graph_stack; (* delete node when backtracking *)
-    node
-
 let are_equal n1 n2 = n1 == n2 || find n1 == find n2
+
+(** Is the term present in the E-graph? *)
+let term_in_graph egraph t =
+  THashtbl.mem egraph.graph_nodes t
 
 let equiv_class node = node.node_class
 
@@ -255,6 +229,43 @@ let rec merge egraph n1 n2 =
         check_parents c1' c2
       in check_parents c1 c2
     end
+
+(** creation of a node *)
+let rec node_of_term egraph t =
+  try THashtbl.find egraph.graph_nodes t
+  with Not_found ->
+    (* find subnodes *)
+    let subterms = match t.term with
+    | Var _ | Leaf _ -> []
+    | Node (hd::tl) -> List.map (node_of_term egraph) tl
+    | Node [] -> assert false
+    in
+    (* create a node *)
+    let rec node = {
+      node_term = t;
+      node_children = subterms;
+      node_representative = node;
+      node_class = [node];
+      node_parents = [];
+    }
+    in
+    (* add node as a parent of all its children *)
+    List.iter (fun child -> child.node_parents <- node :: child.node_parents) subterms;
+    (* put the node in the hashtable *)
+    THashtbl.add egraph.graph_nodes t node;
+    Stack.push (Delete node) egraph.graph_stack; (* delete node when backtracking *)
+    (* if t = f(t1...tn), put t in the use list of f, and
+       check for congruences *)
+    begin match label node with
+    | NodeVar _ -> ()
+    | NodeSymbol f ->
+      add_to_symbols egraph f node;
+      List.iter
+        (fun node' -> if node != node' && congruent node node' then merge egraph node node')
+        (Hashtbl.find egraph.graph_symbol f)
+    end;
+    (* return the node *)
+    node
 
 
 module Graph =
