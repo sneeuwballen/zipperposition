@@ -25,8 +25,13 @@ open Types
 module T = Terms
 module Utils = FoUtils
 
+(** Label of a node: symbol or variable *)
+type label = NodeVar of int | NodeSymbol of string
+
 (** A node that represents a term in the E-graph *)
 type egraph_node = {
+  node_label: label;                        (** label of the node *)
+  node_sort: sort;                          (** sort of the node *)
   node_term: foterm;                        (** term this node represents *)
   node_children: egraph_node list;          (** children of the node *)
   mutable node_representative: egraph_node; (** representative of the term *)
@@ -59,25 +64,22 @@ type egraph = {
   graph_stack: action Stack.t;                          (** stack used for backtracking *)
 }
 
-(** Label of a node: symbol or variable *)
-type label = NodeVar of int | NodeSymbol of string
-
-(** label of a node, i.e. the root term *)
-let label node =
-  let rec seek t = match t.term with
-    | Var i -> NodeVar i
-    | Leaf s -> NodeSymbol s
-    | Node (hd::_) -> seek hd
-    | Node [] -> assert false
-  in
-  seek node.node_term
+(** label of a term, i.e. the root symbol/var *)
+let rec compute_label t =
+  match t.term with
+  | Var i -> NodeVar i
+  | Leaf s -> NodeSymbol s
+  | Node (hd::_) -> compute_label hd
+  | Node [] -> assert false
 
 (** create an empty E-graph *)
 let empty () =
   let nodes = THashtbl.create 1621
   and stack = Stack.create () in
   Stack.push StopBacktracking stack;
-  { graph_nodes = nodes; graph_symbol = Hashtbl.create 41; graph_stack = stack }
+  { graph_nodes = nodes;
+    graph_symbol = Hashtbl.create 41;
+    graph_stack = stack }
 
 (** push a backtracking point on the stack *)
 let push egraph =
@@ -111,7 +113,7 @@ let remove_node egraph node =
   | Var _ | Leaf _ -> ()
   | Node (hd::_) ->
     begin
-    match label node with
+    match node.node_label with
     | NodeVar _ -> assert false
     | NodeSymbol s -> remove_from_symbols egraph s node
     end
@@ -194,7 +196,7 @@ let representative node = find node
     same label and all their children are congruent. *)
 let congruent n1 n2 =
   are_equal n1 n2 ||
-    (label n1 = label n2 &&
+    (n1.node_label = n2.node_label &&
      (try List.for_all2 are_equal n1.node_children n2.node_children
       with Invalid_argument _ -> false))
 
@@ -243,6 +245,8 @@ let rec node_of_term egraph t =
     (* create a node *)
     let rec node = {
       node_term = t;
+      node_sort = t.sort;
+      node_label = compute_label t;
       node_children = subterms;
       node_representative = node;
       node_class = [node];
@@ -256,7 +260,7 @@ let rec node_of_term egraph t =
     Stack.push (Delete node) egraph.graph_stack; (* delete node when backtracking *)
     (* if t = f(t1...tn), put t in the use list of f, and
        check for congruences *)
-    begin match label node with
+    begin match node.node_label with
     | NodeVar _ -> ()
     | NodeSymbol f ->
       add_to_symbols egraph f node;
@@ -277,7 +281,7 @@ module Graph =
     let hash n = n.node_term.hkey
     
     let print_vertex node =
-      match label node with
+      match node.node_label with
       | NodeVar i -> Utils.sprintf "X%d" i
       | NodeSymbol s -> s
 
