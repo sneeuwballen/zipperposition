@@ -92,6 +92,10 @@ val apply_subst: egraph -> subst -> unit
     or an empty list on failure. *)
 val try_unify: egraph -> egraph_node -> egraph_node -> subst list
 
+(** Search the tree of possible paramodulations, down to the given
+    depth, and returns all substitutions that close some branch *)
+val e_unify: egraph -> theory -> foterm -> foterm -> int -> substitution list
+
 (** Print the E-graph in DOT format *)
 val to_dot: name:string -> egraph -> string
 (** print to a file *)

@@ -623,6 +623,56 @@ let try_unify egraph n1 n2 =
       did_unify)
     answers
 
+(** Convert a substitution on nodes to a substitution on terms
+    TODO what happens if all terms of some equivalence class do occur check? *)
+let substitution_of_subst subst =
+  List.map
+    (fun (n1, n2) ->
+      assert (is_var_label n1.node_label);
+      let v = n1.node_term in
+      if T.member_term v (find n2).node_term
+        then  (* find a term that does not occur check with v *)
+          let n2 =
+            List.find
+              (fun node -> not (T.member_term v node.node_term))
+              (equiv_class n2) in
+          v, n2.node_term
+        else v, (find n2).node_term (* normalize if occur check allows it *))
+    subst
+
+(** Search the tree of possible paramodulations, down to the given
+    depth, and returns all substitutions that close some branch *)
+let e_unify egraph theory t1 t2 depth =
+  assert (depth >= 0);
+  let answers = ref [] in
+  push egraph;
+  let n1 = node_of_term egraph t1
+  and n2 = node_of_term egraph t2 in
+  (* depth-first search *)
+  let rec explore depth =
+    if depth = 0
+      then ()
+      else begin
+        (* is the current state suitable for syntactic unification? *)
+        let current_answers = try_unify egraph n1 n2 in
+        answers := List.rev_append (List.map substitution_of_subst current_answers) !answers;
+        (* try paramodulations *)
+        let params = find_paramodulations egraph theory in
+        List.iter
+          (fun param ->
+            (* try this paramodulation in a new stack frame *)
+            push egraph;
+            apply_paramodulation egraph param;
+            explore (depth-1);
+            pop egraph)
+          params
+      end
+  in
+  (* do the exploration down to the given depth *)
+  explore depth;
+  pop egraph;
+  !answers  (* TODO remove duplicate answers *)
+
 (* ----------------------------------------------------------------------
  * DOT printing
  * ---------------------------------------------------------------------- *)
