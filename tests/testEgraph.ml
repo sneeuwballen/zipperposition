@@ -37,6 +37,13 @@ let test n =
   (* put terms in E-graph *)
   let left = Egraph.node_of_term egraph a
   and right = Egraph.node_of_term egraph b in
+  (* add intermediate terms (TODO remove once there is paramodulation) *)
+  ignore (Egraph.node_of_term egraph (plus zero (from_int 4)));
+  ignore (Egraph.node_of_term egraph (plus zero (from_int 3)));
+  ignore (Egraph.node_of_term egraph (plus zero (from_int 2)));
+  ignore (Egraph.node_of_term egraph (plus (from_int 1) (from_int 3)));
+  ignore (Egraph.node_of_term egraph (succ (plus (from_int 1) (from_int 2))));
+  ignore (Egraph.node_of_term egraph (succ (plus zero (from_int 3))));
   (* close by Peano theory *)
   Format.printf "close E-graph w.r.t. theory@.";
   Egraph.theory_close egraph peano_theory;
@@ -46,13 +53,7 @@ let test n =
     !T.pp_term#pp b (if eq then "" else " not")
 
 let () =
-  let z = Egraph.node_of_term egraph zero
-  and zxz = Egraph.node_of_term egraph (plus zero zero)
-  and zpz = Egraph.node_of_term egraph (times zero zero) in
-  Egraph.merge egraph z zxz;
-  Egraph.merge egraph z zpz;
-  Format.printf "0 = @[<h>%a@]@." (Utils.pp_list (fun f node -> !T.pp_term#pp f
-    (Egraph.term_of_node node))) (Egraph.equiv_class z);
+  Utils.set_debug 3;
   test 2;
   Format.printf "print to %s@." !dot_file;
   Egraph.to_dot_file ~name:"egraph" egraph !dot_file
