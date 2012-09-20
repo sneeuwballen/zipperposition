@@ -18,3 +18,5 @@ tags
 src/main.docdir
 provers_output.db
 *.tgz
+TPTP-*
+Axioms
