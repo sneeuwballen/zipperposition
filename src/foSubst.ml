@@ -65,6 +65,9 @@ let filter subst varlist =
        not (is_in_subst var subst))
     varlist
 
+let restrict_exclude subst term =
+  List.filter (fun (v, t) -> not (T.member_term v term)) subst
+
 let rec apply_subst ?(recursive=true) subst t = match t.term with
   | Leaf _ -> t
   | Var _ ->

@@ -44,6 +44,8 @@ val is_in_subst : foterm -> substitution -> bool
 
 (** filter out from the varlist the variables bound by subst *)
 val filter : substitution -> varlist -> varlist
+(** restrict the domain to variables not present in term *)
+val restrict_exclude: substitution -> foterm -> substitution
 
 val apply_subst : ?recursive:bool -> substitution -> foterm -> foterm
 

@@ -69,6 +69,8 @@ val list_merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
 val list_union : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 (** list intersection, given the comparison function *)
 val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
+(** flatten map *)
+val list_flatmap : ('a -> 'b list) -> 'a list -> 'b list
 (** take n elements *)
 val list_take : int -> 'a list -> 'a list
 (** range from i to j *)

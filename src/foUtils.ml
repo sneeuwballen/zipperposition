@@ -197,6 +197,12 @@ let rec list_inter comp l1 l2 = match l1 with
   | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)
   | _::xs -> list_inter comp xs l2
 
+let list_flatmap f l =
+  let rec recurse acc l = match l with
+  | [] -> List.rev acc
+  | x::l' -> recurse ((f x) @ acc) l'
+  in recurse [] l
+
 let rec list_take n l = match n, l with
   | 0, _ -> l
   | _, [] -> l
