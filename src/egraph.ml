@@ -236,23 +236,20 @@ let rec merge egraph n1 n2 =
       (* union of classes *)
       union egraph n1 n2;
       (* check parents of equivalence classes for new congruences *)
-      let rec check_congruent l1 l2 = match l1 with
-      | [] -> ()
-      | t1::l1' ->
-        List.iter
-          (fun t2 -> (* those two parents are congruent, merge them *)
-            if find t1 != find t2 && congruent t1 t2 then merge egraph t1 t2)
-          l2;
-        check_congruent l1' l2
-      (* check whether some parents of those two terms, that are congruent
-         respectively to n1 and n2, are also congruent *)
-      and check_parents c1 c2 = match c1 with
-      | [] -> ()
-      | t1::c1' ->
-        (* check congruence of parents of t1 with parents of any term of c2 *)
-        List.iter (fun t2 -> check_parents t1.node_parents t2.node_parents) c2;
-        check_parents c1' c2
-      in check_parents c1 c2
+      List.iter
+        (fun t1 ->
+          List.iter
+            (fun t2 ->
+              List.iter
+                (fun parent1 ->
+                  List.iter
+                    (fun parent2 ->
+                        if find parent1 != find parent2 &&
+                            congruent parent1 parent2 then merge egraph parent1 parent2)
+                    t2.node_parents)
+                t1.node_parents)
+            c2)
+        c1
     end
 
 (** creation of a node *)
@@ -322,103 +319,114 @@ let get_subst subst var =
   in
   recurse subst
 
-(** apply substitution to node, but only at the root *)
-let rec apply_subst subst node =
-  match node.node_label with
-  | NodeVar _ ->
-    let node' =
-      try get_subst subst node
-      with Not_found -> node in
-    if node == node' then node else apply_subst subst node'
-  | NodeSymbol _ -> node
+module PairSet = Set.Make(
+  struct
+    type t = egraph_node * egraph_node
+    let compare (n1, n2) (n1', n2') =
+      if T.eq_foterm n1.node_term n1'.node_term
+        then T.compare_foterm n2.node_term n2'.node_term
+        else T.compare_foterm n1.node_term n1'.node_term
+  end)
 
-(** All possible linear unifications between the two terms, modulo congruence.
-    If a variable is to be bound several times, it will be bound only
-    once, the other bindings will be ignored. *)
-let linear_soft_unify egraph n1 n2 subst f =
-  (* try to unify those equivalence classes *)
-  let rec unify n1 n2 subst f =
+(** Check whether the node (which must be a variable) is
+    bound in the E-graph. It amounts to check whether
+    the representative is a variable. *)
+let is_bound node =
+  assert (is_var_label node.node_label);
+  not (is_var_label (find node).node_label)
+
+(** all possible linear unifications between the two terms, modulo congruence.
+    if a variable is to be bound several times, it will be bound several times
+    in the substitution *)
+let linear_soft_unify egraph n1 n2 subst k =
+  (* try to unify those equivalence classes (explored: set of pairs already tried) *)
+  let rec unify n1 n2 explored subst k =
     if are_equal n1 n2
-      then f subst  (* trivial success *)
-      else if n1.node_sort <> n2.node_sort
-      then () (* cannot unify, distinct sorts *)
-      else unify_all (equiv_class n1) (equiv_class n2) subst f (* try all combinations *)
+      then k subst  (* trivial success *)
+      else if n1.node_sort <> n2.node_sort || PairSet.mem (find n1, find n2) explored
+        then () (* cannot unify, distinct sorts or already pending pair *)
+        else    (* try all combinations *)
+          let explored = PairSet.add (find n1, find n2) explored in
+          unify_all (equiv_class n1) (equiv_class n2) explored subst k
   (* try to unify every term of l1 with every term of l2 *)
-  and unify_all l1 l2 subst f = match l1 with
-  | [] -> ()
-  | n1::l1' ->
-    (* unify n1 with terms in l2 *)
-    List.iter (fun n2 -> root_unify n1 n2 subst f) l2;
-    unify_all l1' l2 subst f
+  and unify_all l1 l2 explored subst k =
+    match l1 with
+    | [] -> ()
+    | n1::l1' ->
+      (* unify n1 with terms in l2 *)
+      List.iter (fun n2 -> root_unify n1 n2 explored subst k) l2;
+      unify_all l1' l2 explored subst k
   (* try to unify those two terms *)
-  and root_unify n1 n2 subst f =
+  and root_unify n1 n2 explored subst k =
     assert (not (are_equal n1 n2));
     match n1.node_label, n2.node_label with
-    | NodeVar _, _ -> f ((n1, n2) :: subst)  (* bind n1 to n2 *)
-    | _, NodeVar _ -> f ((n2, n1) :: subst)  (* bind n2 to n1 *)
+    | NodeVar _, _ when not (is_bound n1) && not (T.member_term n1.node_term n2.node_term) ->
+      k ((n1, n2) :: subst)  (* bind n1 to n2, if n1 not bound *)
+    | _, NodeVar _ when not (is_bound n2) && not (T.member_term n2.node_term n1.node_term) ->
+      k ((n2, n1) :: subst)  (* bind n2 to n1, if n2 not bound *)
     | NodeSymbol g, NodeSymbol h when g = h &&
       List.length n1.node_children = List.length n2.node_children ->
       assert (n1.node_children <> []);  (* otherwise they would be equal *)
-      unify_subterms n1.node_children n2.node_children subst f
+      unify_subterms n1.node_children n2.node_children explored subst k
     | _ -> ()  (* failure *)
   (* unify children pairwise *)
-  and unify_subterms l1 l2 subst f =
+  and unify_subterms l1 l2 explored subst k =
     match l1, l2 with
-    | [], [] -> f subst (* success *)
+    | [], [] -> k subst (* success *)
     | n1::l1', n2::l2' ->
-      let new_f subst' = unify_subterms l1' l2' subst' f in
-      unify n1 n2 subst new_f
+      let new_f subst' = unify_subterms l1' l2' explored subst' k in
+      unify n1 n2 explored subst new_f
     | _ -> assert false (* not same length *)
   in
-  unify n1 n2 subst f
+  unify n1 n2 PairSet.empty subst k
 
 (** Linear unification of the term t against the E-graph. Any substitution
     sigma returned is such that sigma(t) and sigma(t'), where t' is
     a term in the E-graph, top-unify. *)
-let linear_hard_unify egraph t subst f =
+let linear_hard_unify egraph t subst k =
   (* match term against E-graph *)
-  let rec unify_term t subst f =
+  let rec unify_term t subst k =
     match t.term with
     | Var _ ->
       (* try against all nodes that have the same sort... *)
       THashtbl.iter
         (fun _ node ->
           if node.node_sort = t.sort && not (T.member_term t node.node_term)
-            then f ((t, node.node_term) :: subst))
+            then k ((t, node.node_term) :: subst))
         egraph.graph_nodes
     | Leaf g ->
       if term_in_graph egraph t
-        then f subst  (* ok, it matches some term in the graph *)
+        then k subst  (* ok, it matches some term in the graph *)
         else ()  (* fails, no such term *)
     | Node ({term=Leaf g}::tl) ->
       (* unify against children of all terms that start with g *)
       List.iter
         (fun node ->
            if List.length tl = List.length node.node_children
-             then unify_list tl node.node_children subst f)
+             then unify_list tl node.node_children subst k)
         (from_symbol egraph g)
     | Node _ -> assert false
   (* unify list of terms against list of nodes *)
-  and unify_list terms nodes subst f =
+  and unify_list terms nodes subst k =
     match terms, nodes with
-    | [], [] -> f subst  (* success *)
+    | [], [] -> k subst  (* success *)
     | t::terms', node::nodes' ->
-      let new_f subst = unify_list terms' nodes' subst f in
+      let new_f subst = unify_list terms' nodes' subst k in
       unify_node t node subst new_f
     | _ -> assert false
   (* unify term and node *)
-  and unify_node t node subst f =
+  and unify_node t node subst k =
     (if term_in_graph egraph t && are_equal (node_of_term egraph t) node
-      then f subst (* t congruent to node, success *) else ());
+      then k subst (* t congruent to node, success *) else ());
     match t.term, node.node_label with
-    | Var _, _ -> f (S.build_subst t node.node_term subst)
-    | _, NodeVar _ -> f (S.build_subst node.node_term t subst)
+    | Var _, _ -> k (S.build_subst t node.node_term subst)
+    | _, NodeVar _ -> k (S.build_subst node.node_term t subst)
     | Leaf g, _ ->
       List.iter  (* try to unify t with a variable *)
         (fun node' ->
           match node'.node_label with
           | NodeVar _ ->
-            f (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
+            k (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
           | _ -> ())
         (equiv_class node)
     | Node ({term=Leaf g}::tl), _ ->
@@ -429,14 +437,14 @@ let linear_hard_unify egraph t subst f =
         (fun node' -> 
           match node'.node_label with
           | NodeVar _ ->
-            f (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
+            k (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
           | NodeSymbol h when g = h &&  List.length node'.node_children = len ->
-            unify_list tl node'.node_children subst f (* unify subterms *)
+            unify_list tl node'.node_children subst k (* unify subterms *)
           | _ -> ())
         (equiv_class node)
     | Node _, _ -> assert false
   in
-  unify_term t subst f
+  unify_term t subst k
 
 (** Proper matching of the terms against the E-graph. Proper means
     that if a variable x occurs several times in the list of terms,
@@ -448,66 +456,78 @@ let linear_hard_unify egraph t subst f =
     For instance, when matching [f(x,x), x] against an E-graph
     where a = b, and f(a,b) and b occur, then [f(a,b),b] and sigma={x->a} will be
     a proper matcher since f(x,x) matches f(a,b) modulo the congruence. *)
-let proper_match egraph patterns subst f =
+let proper_match egraph patterns subst k =
+  (* only those variables can be bound during matching *)
+  let vars = List.fold_left
+    (fun vars t -> T.merge_varlist (T.vars_of_term t) vars)
+    [] patterns in
+  let can_bind v = List.exists (fun t -> T.eq_foterm v t) vars in
   (* match terms against E-graph (inspired from Simplify's E-matching iterators) *)
-  let rec match_terms terms acc subst f =
+  let rec match_terms terms acc subst k =
     match terms with
-    | [] -> f acc subst
+    | [] -> k acc subst
     | t::terms' ->
-      let new_f acc subst = match_terms terms' acc subst f in
+      let new_f acc subst = match_terms terms' acc subst k in
       match_term t acc subst new_f
   (* match term against E-graph *)
-  and match_term t acc subst f =
+  and match_term t acc subst k =
     let t = S.apply_subst subst t in
+    Utils.debug 4 (lazy (Utils.sprintf "match term %a with E-graph" !T.pp_term#pp t));
     match t.term with
-    | Var _ ->
+    | Var _ when can_bind t ->
       (* try against all nodes that have the same sort... *)
       THashtbl.iter
         (fun _ node ->
           if node.node_sort = t.sort && not (T.member_term t node.node_term)
-            then f (node :: acc) ((t, node.node_term) :: subst))
+            then k (node :: acc) ((t, node.node_term) :: subst))
         egraph.graph_nodes
-    | Leaf g ->
+    | Var _ | Leaf _ ->
       if term_in_graph egraph t
-        then f ((node_of_term egraph t) :: acc) subst  (* matches itself *)
+        then k ((node_of_term egraph t) :: acc) subst  (* matches itself *)
         else ()  (* fails, no such term *)
     | Node ({term=Leaf g}::tl) ->
       (* match against children of all terms that start with g *)
       List.iter
         (fun node ->
-          let new_f subst = f (node :: acc) subst in
+          let new_f subst = k (node :: acc) subst in
            if List.length tl = List.length node.node_children
              then match_list tl node.node_children subst new_f)
         (from_symbol egraph g)
     | Node _ -> assert false
   (* match list of terms against list of nodes *)
-  and match_list terms nodes subst f =
+  and match_list terms nodes subst k =
     match terms, nodes with
-    | [], [] -> f subst  (* success *)
+    | [], [] -> k subst  (* success *)
     | t::terms', node::nodes' ->
-      let new_f subst = match_list terms' nodes' subst f in
+      let new_f subst = match_list terms' nodes' subst k in
       match_node t node subst new_f
     | _ -> assert false
   (* match term and node *)
-  and match_node t node subst f =
+  and match_node t node subst k =
+    let t = S.apply_subst subst t in
+    Utils.debug 4 (lazy (Utils.sprintf "match term %a with node %a"
+                  !T.pp_term#pp t !T.pp_term#pp node.node_term));
     match t.term with
-    | Var _ -> f (S.build_subst t node.node_term subst)
-    | Leaf g ->
+    | Var _ when can_bind t ->
+      let node = find node in (* bind with representative, to avoid var-> bound var *)
+      k (S.build_subst t node.node_term subst)
+    | Var _ | Leaf _ ->
       if term_in_graph egraph t && are_equal (node_of_term egraph t) node
-        then f subst  (* t is congruent to node *)
+        then k subst  (* t is congruent to node *)
         else ()
     | Node ({term=Leaf g}::tl) ->
       let len = List.length tl in
       (* try to match tl with children of all nodes congruent to node, that are
          labelled with g *)
+      let g_label = NodeSymbol g in
       List.iter
         (fun node' -> 
-          if node'.node_label = (NodeSymbol g) && List.length node'.node_children = len
-            then match_list tl node'.node_children subst f)
+          if node'.node_label = g_label && List.length node'.node_children = len
+            then match_list tl node'.node_children subst k)
         (equiv_class node)
     | Node _ -> assert false
   in
-  match_terms patterns [] subst f
+  match_terms patterns [] subst k
 
 (* ----------------------------------------------------------------------
  * High level interface for theories
@@ -521,7 +541,7 @@ let relocate_equation egraph (e1, e2) =
     else
       let vars = T.merge_varlist (T.vars_of_term e1) (T.vars_of_term e2) in
       let _, _, renaming = S.relocate (maxvar egraph) vars S.id_subst in
-      S.apply_subst renaming e1, S.apply_subst renaming e2
+      S.apply_subst ~recursive:false renaming e1, S.apply_subst ~recursive:false renaming e2
 
 type theory = (foterm * foterm) list
 
@@ -607,10 +627,16 @@ let rec apply_substitution egraph subst =
 
 (** Apply the paramodulation to the E-graph *)
 let apply_paramodulation egraph (t1, t2, subst) =
-  ignore (node_of_term egraph t1);
-  ignore (node_of_term egraph t2);
+  let t1' = S.apply_subst subst t1
+  and t2' = S.apply_subst subst t2 in
   Utils.debug 3 (lazy (Utils.sprintf "apply paramodulation %a=%a with %a"
                 !T.pp_term#pp t1 !T.pp_term#pp t2 S.pp_substitution subst));
+  ignore (node_of_term egraph t1');
+  ignore (node_of_term egraph t2');
+  (* remove from subst the bindings of terms, keep the bindings of E-graph nodes *)
+  let subst = S.restrict_exclude subst t1 in
+  let subst = S.restrict_exclude subst t2 in
+  (* TODO: if the effect of the paramodulation is null (already done, for instance), backtrack *)
   apply_substitution egraph subst
 
 (** Apply the substitution to the E-graph *)
@@ -641,7 +667,7 @@ let substitution_of_subst subst =
 (** Try to close the E-graph by unifying the two given nodes. It
     returns a list of E-substitutions on success,
     or an empty list on failure. *)
-let try_unify egraph n1 n2 =
+let try_unify egraph theory n1 n2 =
   (* remove multiple bindings of a variable *)
   let rec uniquify subst =
     match subst with 
@@ -654,19 +680,22 @@ let try_unify egraph n1 n2 =
   in
   (* collect answers by unification within the E-graph *)
   let answers = ref [] in
-  let f subst = answers := subst :: !answers in
-  linear_soft_unify egraph n1 n2 [] f;
+  let k subst = answers := (uniquify subst) :: !answers in
+  linear_soft_unify egraph n1 n2 [] k;
   let answers = !answers in
   List.filter
     (fun subst ->
       (* test whether the substitution actually works, by applying them *)
       push egraph;
-      try apply_subst egraph subst;
+      try
+        apply_subst egraph subst;     (* apply substitution to E-graph *)
+        theory_close egraph theory;   (* apply theories *)
         let did_unify = are_equal n1 n2 in
+        Utils.debug 3 (lazy (Utils.sprintf
+          "unification of %a and %a with %a %s" !T.pp_term#pp n1.node_term
+          !T.pp_term#pp n2.node_term S.pp_substitution (substitution_of_subst subst)
+          (if did_unify then "succeeds" else "fails")));
         pop egraph;
-        (if did_unify then Utils.debug 3 (lazy (Utils.sprintf
-          "unification of %a and %a with %a succeeds" !T.pp_term#pp n1.node_term
-          !T.pp_term#pp n2.node_term S.pp_substitution (substitution_of_subst subst))));
         did_unify
       with e ->
         pop egraph; raise e)
@@ -678,52 +707,77 @@ module SubstSet = Set.Make(
     let compare = S.compare_substs
   end)
 
+(** Complete the substitution by finding bindings, if any, for
+    the given list of variables.*)
+let complete_subst egraph subst vars =
+  let subst = substitution_of_subst subst in
+  List.fold_left
+    (fun subst v ->
+      if not (S.is_in_subst v subst) && term_in_graph egraph v
+        then
+          let node = node_of_term egraph v in
+          S.build_subst v (find node).node_term subst
+        else subst)
+    subst vars
+
 (** Search the tree of possible paramodulations, down to the given
     depth, and returns all substitutions that close some branch *)
 let e_unify egraph theory t1 t2 depth k =
+  let vars = T.merge_varlist (T.vars_of_term t1) (T.vars_of_term t2) in
   assert (depth >= 0);
   let answers = ref SubstSet.empty in
+  Utils.debug 2 (lazy (Utils.sprintf "*** E-unify @[<h>%a@] and %a in theory @[<hv>%a@]"
+                 !T.pp_term#pp t1 !T.pp_term#pp t2
+                 (Utils.pp_list (fun f (e1,e2) -> Format.fprintf f "@[<h>%a=%a@]"
+                    !T.pp_term#pp e1 !T.pp_term#pp e2)) theory));
   push egraph;
   let n1 = node_of_term egraph t1
   and n2 = node_of_term egraph t2 in
   (* depth-first search *)
   let rec explore cur_depth =
-    if cur_depth = depth
-      then ()
-      else begin
-        (* close w.r.t. the theory *)
-        theory_close egraph theory;
-        (* is the current state suitable for syntactic unification? *)
-        let current_answers = try_unify egraph n1 n2 in
-        let current_answers = List.map substitution_of_subst current_answers in
-        List.iter
-          (fun subst -> if SubstSet.mem subst !answers
-            then ()  (* already yieldec *)
-            else begin
-              answers := SubstSet.add subst !answers;
-              k subst (* yield this substitution *)
-            end)
-          current_answers;
-        (* try paramodulations *)
+    Utils.debug 3 (lazy (Utils.sprintf "==== enter depth %d ====" cur_depth));
+    (* close w.r.t. the theory *)
+    theory_close egraph theory;
+    (* is the current state suitable for syntactic unification? *)
+    let current_answers = try_unify egraph theory n1 n2 in
+    List.iter
+      (fun subst ->
+        let subst = complete_subst egraph subst vars in
+        if SubstSet.mem subst !answers
+          then ()  (* already yielded *)
+          else begin
+            answers := SubstSet.add subst !answers;
+            k subst (* yield this substitution *)
+          end)
+      current_answers;
+    (* try paramodulations, if not too deep *)
+    if cur_depth < depth
+      then begin
         let params = find_paramodulations egraph theory in
         List.iter
           (fun param ->
-            Utils.debug 3 (lazy (Utils.sprintf "==== enter depth %d ====" cur_depth));
             (* try this paramodulation in a new stack frame *)
             push egraph;
             try
               apply_paramodulation egraph param;
               explore (cur_depth+1);
               pop egraph
-            with e -> pop egraph; raise e)
+            with e -> (pop egraph; raise e))
           params
-      end
+      end else ();
+    Utils.debug 3 (lazy (Utils.sprintf "==== exit depth %d ====" cur_depth));
   in
   (* do the exploration down to the given depth *)
   (try
     explore 0;
     pop egraph
   with e -> (pop egraph; raise e))
+
+(* TODO: investigate stack overflow
+   TODO: caching of already yielded answers at the e_unify function level
+   TODO: detect commutating paramodulations, to avoid repeating work
+   TODO: detect non-restraining paramodulations and do them inconditionally when expanding
+*)
 
 (* ----------------------------------------------------------------------
  * DOT printing
@@ -764,20 +818,15 @@ let to_dot ~name egraph =
         D.add_edge_attribute e (D.Style "filled");
         D.add_edge_attribute e (D.Style "bold"))
       node.node_children;
-    (* add links to congruent terms *)
-    List.iter
-      (fun congruent_node ->
-        if congruent_node.node_term.tag <= node.node_term.tag
-          then ()  (* print the link only once *)
-          else begin
-            let c = D.get_node graph congruent_node in
-            let e = D.add_edge graph n c Graph.EdgeCongruent in
-            D.add_edge_attribute e (D.Weight 1);
-            D.add_edge_attribute e (D.Style "dotted");
-            D.add_edge_attribute e (D.Color "red");
-            D.add_edge_attribute e (D.Other ("arrowhead", "none"))
-          end)
-      (equiv_class node);
+    (* add links to congruent terms (to representative) *)
+    if node.node_representative != node
+      then 
+        let c = D.get_node graph node.node_representative in
+        let e = D.add_edge graph n c Graph.EdgeCongruent in
+        D.add_edge_attribute e (D.Weight 1);
+        D.add_edge_attribute e (D.Style "dotted");
+        D.add_edge_attribute e (D.Color "red");
+        D.add_edge_attribute e (D.Other ("arrowhead", "none"))
   in
   THashtbl.iter (fun _ node -> on_node node) egraph.graph_nodes;
   (* print the graph into a string *)

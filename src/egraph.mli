@@ -46,8 +46,8 @@ val maxvar: egraph -> int                               (** max var index in E-g
 (** A substitution maps (var) nodes to nodes (to their equivalence class). *)
 type subst = (egraph_node * egraph_node) list
 
-(** All possible linear unifications between the two terms, modulo congruence.
-    If a variable is to be bound several times, it will be bound several times
+(** all possible linear unifications between the two terms, modulo congruence.
+    if a variable is to be bound several times, it will be bound several times
     in the substitution *)
 val linear_soft_unify: egraph -> egraph_node -> egraph_node ->
                        subst -> (subst -> unit) -> unit
@@ -86,11 +86,13 @@ val apply_paramodulation: egraph -> (foterm * foterm * substitution) -> unit
 
 (** Apply a substitution *)
 val apply_subst: egraph -> subst -> unit
+(** Apply a term substitution *)
+val apply_substitution: egraph -> substitution -> unit
 
 (** Try to close the E-graph by unifying the two given nodes. It
     returns a list of E-substitutions on success,
     or an empty list on failure. *)
-val try_unify: egraph -> egraph_node -> egraph_node -> subst list
+val try_unify: egraph -> theory -> egraph_node -> egraph_node -> subst list
 
 (** Search the tree of possible paramodulations, down to the given
     depth, and returns all substitutions that close some branch *)
