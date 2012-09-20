@@ -638,20 +638,28 @@ let try_unify egraph n1 n2 =
     (fun subst ->
       (* test whether the substitution actually works, by applying them *)
       push egraph;
-      apply_subst egraph subst;
-      let did_unify = are_equal n1 n2 in
-      pop egraph;
-      (if did_unify then Utils.debug 3 (lazy (Utils.sprintf
-        "unification of %a and %a with %a succeeds" !T.pp_term#pp n1.node_term
-        !T.pp_term#pp n2.node_term S.pp_substitution (substitution_of_subst subst))));
-      did_unify)
+      try apply_subst egraph subst;
+        let did_unify = are_equal n1 n2 in
+        pop egraph;
+        (if did_unify then Utils.debug 3 (lazy (Utils.sprintf
+          "unification of %a and %a with %a succeeds" !T.pp_term#pp n1.node_term
+          !T.pp_term#pp n2.node_term S.pp_substitution (substitution_of_subst subst))));
+        did_unify
+      with e ->
+        pop egraph; raise e)
     answers
+
+module SubstSet = Set.Make(
+  struct
+    type t = substitution
+    let compare = S.compare_substs
+  end)
 
 (** Search the tree of possible paramodulations, down to the given
     depth, and returns all substitutions that close some branch *)
-let e_unify egraph theory t1 t2 depth =
+let e_unify egraph theory t1 t2 depth k =
   assert (depth >= 0);
-  let answers = ref [] in
+  let answers = ref SubstSet.empty in
   push egraph;
   let n1 = node_of_term egraph t1
   and n2 = node_of_term egraph t2 in
@@ -665,7 +673,14 @@ let e_unify egraph theory t1 t2 depth =
         (* is the current state suitable for syntactic unification? *)
         let current_answers = try_unify egraph n1 n2 in
         let current_answers = List.map substitution_of_subst current_answers in
-        answers := List.rev_append current_answers !answers;
+        List.iter
+          (fun subst -> if SubstSet.mem subst !answers
+            then ()  (* already yieldec *)
+            else begin
+              answers := SubstSet.add subst !answers;
+              k subst (* yield this substitution *)
+            end)
+          current_answers;
         (* try paramodulations *)
         let params = find_paramodulations egraph theory in
         List.iter
@@ -673,18 +688,19 @@ let e_unify egraph theory t1 t2 depth =
             Utils.debug 3 (lazy (Utils.sprintf "==== enter depth %d ====" cur_depth));
             (* try this paramodulation in a new stack frame *)
             push egraph;
-            apply_paramodulation egraph param;
-            explore (cur_depth+1);
-            pop egraph)
+            try
+              apply_paramodulation egraph param;
+              explore (cur_depth+1);
+              pop egraph
+            with e -> pop egraph; raise e)
           params
       end
   in
   (* do the exploration down to the given depth *)
-  explore 0;
-  pop egraph;
-  (* remove trivially identical duplicate substitutions *)
-  let answers = Utils.list_uniq S.eq_subst !answers in
-  answers
+  (try
+    explore 0;
+    pop egraph
+  with e -> (pop egraph; raise e))
 
 (* ----------------------------------------------------------------------
  * DOT printing

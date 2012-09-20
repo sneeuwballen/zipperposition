@@ -34,12 +34,18 @@ let egraph = Egraph.empty ()
 let test n =
   let a = plus (from_int n) (from_int n)
   and b = from_int (2 * n) in
-  (* close by Peano theory *)
-  let substs = Egraph.e_unify egraph peano_theory a b 5 in
-  Format.printf "got %d answers for unification@." (List.length substs)
+  (* callback used for solutions *)
+  let counter = ref 1 in
+  let k subst =
+    let file = Utils.sprintf "/tmp/egraph%d.dot" !counter in
+    incr counter;
+    Format.printf "unifying succeeds with %a. Print E-graph to file %s@."
+      S.pp_substitution subst file;
+    Egraph.to_dot_file ~name:"egraph" egraph file
+  in
+  (* E-unify with Peano theory *)
+  Egraph.e_unify egraph peano_theory a b 5 k
 
 let () =
   Utils.set_debug 3;
-  test 2;
-  Format.printf "print to %s@." !dot_file;
-  Egraph.to_dot_file ~name:"egraph" egraph !dot_file
+  test 2
