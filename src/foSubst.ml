@@ -28,6 +28,30 @@ exception OccurCheck of (foterm * foterm)
 
 let id_subst = []
 
+let eq_subst s1 s2 =
+  try List.for_all2
+    (fun (v1, t1) (v2, t2) -> T.eq_foterm v1 v2 && T.eq_foterm t1 t2)
+    s1 s2
+  with Invalid_argument _ -> false
+
+let hash_subst s =
+  let rec recurse h s = match s with
+  | [] -> h
+  | (v,t)::s' ->
+    let h' = (Utils.murmur_hash (v.hkey lxor t.hkey)) lxor h in
+    recurse h' s'
+  in recurse 1913 s
+
+let compare_substs s1 s2 =
+  let h1 = hash_subst s1
+  and h2 = hash_subst s2 in
+  if h1 <> h2  (* first compare hashes *)
+    then h1 - h2
+    else Utils.lexicograph (* else compare by lexicographic order *)
+      (fun (v1,t1) (v2,t2) ->
+        Utils.lexicograph Pervasives.compare [v1.tag; t1.tag] [v2.tag; t2.tag])
+      s1 s2
+
 let rec lookup var subst = match subst with
   | [] -> var
   | ((v,t) :: tail) ->
@@ -40,12 +64,6 @@ let filter subst varlist =
     (fun var ->
        not (is_in_subst var subst))
     varlist
-
-let eq_subst s1 s2 =
-  try List.for_all2
-    (fun (v1, t1) (v2, t2) -> T.eq_foterm v1 v2 && T.eq_foterm t1 t2)
-    s1 s2
-  with Invalid_argument _ -> false
 
 let rec apply_subst ?(recursive=true) subst t = match t.term with
   | Leaf _ -> t

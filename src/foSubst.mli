@@ -31,15 +31,19 @@ val id_subst : substitution
     If v occurs in t, OccurCheck (v,t) is raised. *)
 val build_subst : ?recursive:bool -> foterm -> foterm -> substitution -> substitution
 
+(** check (naively, ie structurally) whether two substitutions are equal *)
+val eq_subst: substitution -> substitution -> bool
+(** hash a substitution *)
+val hash_subst: substitution -> int
+(** compare substitutions (arbitrary but total order) *)
+val compare_substs: substitution -> substitution -> int
+
 (** lookup variable in substitution *)
 val lookup : foterm -> substitution -> foterm
 val is_in_subst : foterm -> substitution -> bool
 
 (** filter out from the varlist the variables bound by subst *)
 val filter : substitution -> varlist -> varlist
-
-(** check (naively, ie structurally) whether two substitutions are equal *)
-val eq_subst: substitution -> substitution -> bool
 
 val apply_subst : ?recursive:bool -> substitution -> foterm -> foterm
 
