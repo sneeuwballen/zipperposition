@@ -38,6 +38,9 @@ val is_in_subst : foterm -> substitution -> bool
 (** filter out from the varlist the variables bound by subst *)
 val filter : substitution -> varlist -> varlist
 
+(** check (naively, ie structurally) whether two substitutions are equal *)
+val eq_subst: substitution -> substitution -> bool
+
 val apply_subst : ?recursive:bool -> substitution -> foterm -> foterm
 
 (** normalize the substitution, such that subst(subst(v)) = subst(v)

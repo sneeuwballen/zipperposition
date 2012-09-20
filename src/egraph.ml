@@ -175,11 +175,13 @@ let rec find node =
   if node == repr
     then node  (* its own representative *)
     else begin
+      (if T.eq_foterm node.node_term repr.node_term
+        then Format.printf "two nodes have same term %a" !T.pp_term#pp node.node_term);
       assert (not (T.eq_foterm node.node_term repr.node_term));
       (* recurse to find the actual representative *)
       let root = find repr in
-      (* path compression *)
-      node.node_representative <- root;
+      (* path compression, disabled because it may not be backtrackable *)
+      (* node.node_representative <- root; *)
       root
     end
 
@@ -280,11 +282,11 @@ let rec node_of_term egraph t =
       node_parents = [];
     }
     in
-    (* add node as a parent of all its children *)
-    List.iter (fun child -> child.node_parents <- node :: child.node_parents) subterms;
     (* put the node in the hashtable *)
     THashtbl.add egraph.graph_nodes t node;
     Stack.push (Delete node) egraph.graph_stack; (* delete node when backtracking *)
+    (* add node as a parent of all its children *)
+    List.iter (fun child -> child.node_parents <- node :: child.node_parents) subterms;
     (* if t = f(t1...tn), put t in the use list of f, and
        check for congruences *)
     begin match node.node_label with
@@ -296,7 +298,7 @@ let rec node_of_term egraph t =
       add_to_symbols egraph f node;
       List.iter
         (fun node' -> if node != node' && congruent node node' then merge egraph node node')
-        (Hashtbl.find egraph.graph_symbol f)
+        (from_symbol egraph f)
     end;
     (* return the node *)
     node
@@ -547,6 +549,7 @@ let theory_close egraph equations =
         then loop equations
         else loop next_equations
   in
+  Utils.debug 3 (lazy "close egraph w.r.t theory");
   loop equations
 
 (** Set of possible paramodulation inferences. Each inference is a 
@@ -583,6 +586,8 @@ let rec apply_substitution egraph subst =
 let apply_paramodulation egraph (t1, t2, subst) =
   ignore (node_of_term egraph t1);
   ignore (node_of_term egraph t2);
+  Utils.debug 3 (lazy (Utils.sprintf "apply paramodulation %a=%a with %a"
+                !T.pp_term#pp t1 !T.pp_term#pp t2 S.pp_substitution subst));
   apply_substitution egraph subst
 
 (** Apply the substitution to the E-graph *)
@@ -592,36 +597,6 @@ let rec apply_subst egraph subst =
   | (n1, n2) :: subst' ->
     merge egraph n1 n2;
     apply_subst egraph subst'
-
-(** Try to close the E-graph by unifying the two given nodes. It
-    returns a list of E-substitutions on success,
-    or an empty list on failure. *)
-let try_unify egraph n1 n2 =
-  (* remove multiple bindings of a variable *)
-  let rec uniquify subst =
-    match subst with 
-    | [] -> []
-    | (n1, n2) as pair :: subst' ->
-      assert (is_var_label n1.node_label);
-      if List.exists (fun (n1',_) -> n1 == n1') subst'
-        then uniquify subst'
-        else pair :: (uniquify subst')
-  in
-  (* collect answers by unification within the E-graph *)
-  let answers = ref [] in
-  let f subst =
-    answers := subst :: !answers in
-  linear_soft_unify egraph n1 n2 [] f;
-  let answers = !answers in
-  List.filter
-    (fun subst ->
-      (* test whether the substitution actually works, by applying them *)
-      push egraph;
-      apply_subst egraph subst;
-      let did_unify = are_equal n1 n2 in
-      pop egraph;
-      did_unify)
-    answers
 
 (** Convert a substitution on nodes to a substitution on terms
     TODO what happens if all terms of some equivalence class do occur check? *)
@@ -640,6 +615,38 @@ let substitution_of_subst subst =
         else v, (find n2).node_term (* normalize if occur check allows it *))
     subst
 
+(** Try to close the E-graph by unifying the two given nodes. It
+    returns a list of E-substitutions on success,
+    or an empty list on failure. *)
+let try_unify egraph n1 n2 =
+  (* remove multiple bindings of a variable *)
+  let rec uniquify subst =
+    match subst with 
+    | [] -> []
+    | (n1, n2) as pair :: subst' ->
+      assert (is_var_label n1.node_label);
+      if List.exists (fun (n1',_) -> n1 == n1') subst'
+        then uniquify subst'
+        else pair :: (uniquify subst')
+  in
+  (* collect answers by unification within the E-graph *)
+  let answers = ref [] in
+  let f subst = answers := subst :: !answers in
+  linear_soft_unify egraph n1 n2 [] f;
+  let answers = !answers in
+  List.filter
+    (fun subst ->
+      (* test whether the substitution actually works, by applying them *)
+      push egraph;
+      apply_subst egraph subst;
+      let did_unify = are_equal n1 n2 in
+      pop egraph;
+      (if did_unify then Utils.debug 3 (lazy (Utils.sprintf
+        "unification of %a and %a with %a succeeds" !T.pp_term#pp n1.node_term
+        !T.pp_term#pp n2.node_term S.pp_substitution (substitution_of_subst subst))));
+      did_unify)
+    answers
+
 (** Search the tree of possible paramodulations, down to the given
     depth, and returns all substitutions that close some branch *)
 let e_unify egraph theory t1 t2 depth =
@@ -649,29 +656,35 @@ let e_unify egraph theory t1 t2 depth =
   let n1 = node_of_term egraph t1
   and n2 = node_of_term egraph t2 in
   (* depth-first search *)
-  let rec explore depth =
-    if depth = 0
+  let rec explore cur_depth =
+    if cur_depth = depth
       then ()
       else begin
+        (* close w.r.t. the theory *)
+        theory_close egraph theory;
         (* is the current state suitable for syntactic unification? *)
         let current_answers = try_unify egraph n1 n2 in
-        answers := List.rev_append (List.map substitution_of_subst current_answers) !answers;
+        let current_answers = List.map substitution_of_subst current_answers in
+        answers := List.rev_append current_answers !answers;
         (* try paramodulations *)
         let params = find_paramodulations egraph theory in
         List.iter
           (fun param ->
+            Utils.debug 3 (lazy (Utils.sprintf "==== enter depth %d ====" cur_depth));
             (* try this paramodulation in a new stack frame *)
             push egraph;
             apply_paramodulation egraph param;
-            explore (depth-1);
+            explore (cur_depth+1);
             pop egraph)
           params
       end
   in
   (* do the exploration down to the given depth *)
-  explore depth;
+  explore 0;
   pop egraph;
-  !answers  (* TODO remove duplicate answers *)
+  (* remove trivially identical duplicate substitutions *)
+  let answers = Utils.list_uniq S.eq_subst !answers in
+  answers
 
 (* ----------------------------------------------------------------------
  * DOT printing

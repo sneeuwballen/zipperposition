@@ -34,23 +34,9 @@ let egraph = Egraph.empty ()
 let test n =
   let a = plus (from_int n) (from_int n)
   and b = from_int (2 * n) in
-  (* put terms in E-graph *)
-  let left = Egraph.node_of_term egraph a
-  and right = Egraph.node_of_term egraph b in
-  (* add intermediate terms (TODO remove once there is paramodulation) *)
-  ignore (Egraph.node_of_term egraph (plus zero (from_int 4)));
-  ignore (Egraph.node_of_term egraph (plus zero (from_int 3)));
-  ignore (Egraph.node_of_term egraph (plus zero (from_int 2)));
-  ignore (Egraph.node_of_term egraph (plus (from_int 1) (from_int 3)));
-  ignore (Egraph.node_of_term egraph (succ (plus (from_int 1) (from_int 2))));
-  ignore (Egraph.node_of_term egraph (succ (plus zero (from_int 3))));
   (* close by Peano theory *)
-  Format.printf "close E-graph w.r.t. theory@.";
-  Egraph.theory_close egraph peano_theory;
-  Format.printf "done.@.";
-  let eq = Egraph.are_equal left right in
-  Format.printf "%a and %a are%s equal@." !T.pp_term#pp a
-    !T.pp_term#pp b (if eq then "" else " not")
+  let substs = Egraph.e_unify egraph peano_theory a b 5 in
+  Format.printf "got %d answers for unification@." (List.length substs)
 
 let () =
   Utils.set_debug 3;

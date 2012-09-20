@@ -41,6 +41,12 @@ let filter subst varlist =
        not (is_in_subst var subst))
     varlist
 
+let eq_subst s1 s2 =
+  try List.for_all2
+    (fun (v1, t1) (v2, t2) -> T.eq_foterm v1 v2 && T.eq_foterm t1 t2)
+    s1 s2
+  with Invalid_argument _ -> false
+
 let rec apply_subst ?(recursive=true) subst t = match t.term with
   | Leaf _ -> t
   | Var _ ->
