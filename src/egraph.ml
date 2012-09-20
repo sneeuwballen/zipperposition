@@ -120,7 +120,7 @@ let remove_from_symbols egraph symbol node =
     if l = []
       then Hashtbl.remove egraph.graph_symbol symbol
       else Hashtbl.replace egraph.graph_symbol symbol l
-  with Not_found -> failwith "tried to remove an unknown symbol"
+  with Not_found -> failwith ("tried to remove unknown symbol " ^ symbol)
 
 let remove_node egraph node =
   THashtbl.remove egraph.graph_nodes node.node_term;
@@ -129,15 +129,9 @@ let remove_node egraph node =
       child.node_parents <- List.filter (fun parent -> parent != node) child.node_parents)
     node.node_children;
   (* now if node = f(t1...tn) remove node from terms_f *)
-  match node.node_term.term with
-  | Var _ | Leaf _ -> ()
-  | Node (hd::_) ->
-    begin
-    match node.node_label with
-    | NodeVar _ -> assert false
-    | NodeSymbol s -> remove_from_symbols egraph s node
-    end
-  | Node [] -> assert false
+  match node.node_label with
+  | NodeVar _ -> ()
+  | NodeSymbol f -> remove_from_symbols egraph f node
 
 let from_symbol egraph symbol =
   try Hashtbl.find egraph.graph_symbol symbol
@@ -284,7 +278,6 @@ let rec node_of_term egraph t =
     in
     (* put the node in the hashtable *)
     THashtbl.add egraph.graph_nodes t node;
-    Stack.push (Delete node) egraph.graph_stack; (* delete node when backtracking *)
     (* add node as a parent of all its children *)
     List.iter (fun child -> child.node_parents <- node :: child.node_parents) subterms;
     (* if t = f(t1...tn), put t in the use list of f, and
@@ -300,6 +293,8 @@ let rec node_of_term egraph t =
         (fun node' -> if node != node' && congruent node node' then merge egraph node node')
         (from_symbol egraph f)
     end;
+    (* delete node when backtracking *)
+    Stack.push (Delete node) egraph.graph_stack;
     (* return the node *)
     node
 
@@ -518,6 +513,16 @@ let proper_match egraph patterns subst f =
  * High level interface for theories
  * ---------------------------------------------------------------------- *)
 
+(** rename the equation so that none of its variables
+    occur in the current E-graph *)
+let relocate_equation egraph (e1, e2) =
+  if T.is_ground_term e1 && T.is_ground_term e2
+    then (e1, e2)
+    else
+      let vars = T.merge_varlist (T.vars_of_term e1) (T.vars_of_term e2) in
+      let _, _, renaming = S.relocate (maxvar egraph) vars S.id_subst in
+      S.apply_subst renaming e1, S.apply_subst renaming e2
+
 type theory = (foterm * foterm) list
 
 (** Close the E-graph w.r.t some set of equations *)
@@ -528,6 +533,8 @@ let theory_close egraph equations =
     | [] -> ()  (* exit *)
     | (e1,e2)::next_equations ->
       let some_change = ref false in
+      (* avoid variable collision by renaming terms *)
+      let e1, e2 = relocate_equation egraph (e1, e2) in
       (* equate the list of nodes *)
       let f nodes subst =
         match nodes with
@@ -557,15 +564,31 @@ let theory_close egraph equations =
     and of some node in the E-graph. *)
 let find_paramodulations egraph equations =
   let answers = ref [] in
+  (* check whether the substitution is already true in the E-graph *)
+  let subst_true subst =
+    List.for_all
+      (fun (v, t) ->
+        term_in_graph egraph v && term_in_graph egraph t &&
+        are_equal (node_of_term egraph v) (node_of_term egraph t))
+      subst
+  in
+  (* try to paramodulate with every equation of the theory *)
   List.iter
     (fun (e1, e2) ->
       (* avoid variable collision by renaming terms *)
-      let _, _, renaming = S.relocate (maxvar egraph + 1) [] S.id_subst in
-      let e1 = S.apply_subst renaming e1
-      and e2 = S.apply_subst renaming e2 in
+      let e1, e2 = relocate_equation egraph (e1, e2) in
+      (* if terms are already in the E-graph, and equal, it's no use
+         paramodulating with them *)
+      (if term_in_graph egraph e1
+        then assert (T.vars_of_term e1 = []));
+      (if term_in_graph egraph e2
+        then assert (T.vars_of_term e2 = []));
       (* function that will update answers *)
       let f subst =
-        answers := (e1, e2, subst) :: !answers in
+        if subst_true subst
+          (* means that the term is already in the E-graph *)
+          then assert (T.vars_of_term e1 = [] || T.vars_of_term e2 = [])
+          else answers := (e1, e2, subst) :: !answers in
       linear_hard_unify egraph e1 S.id_subst f;
       linear_hard_unify egraph e2 S.id_subst f)
     equations;
