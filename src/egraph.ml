@@ -386,6 +386,7 @@ let linear_soft_unify egraph n1 n2 subst k =
 let linear_hard_unify egraph t subst k =
   (* match term against E-graph *)
   let rec unify_term t subst k =
+    let t = S.apply_subst subst t in
     match t.term with
     | Var _ ->
       (* try against all nodes that have the same sort... *)
@@ -419,13 +420,17 @@ let linear_hard_unify egraph t subst k =
     (if term_in_graph egraph t && are_equal (node_of_term egraph t) node
       then k subst (* t congruent to node, success *) else ());
     match t.term, node.node_label with
-    | Var _, _ -> k (S.build_subst t node.node_term subst)
-    | _, NodeVar _ -> k (S.build_subst node.node_term t subst)
+    | Var _, _ when not (T.member_term t node.node_term) ->
+      k (S.build_subst t node.node_term subst)  (* bind variable term *)
+    | Var _, _ -> ()  (* occur check *)
+    | _, NodeVar _ when not (is_bound node) && not (T.member_term node.node_term t) ->
+      k (S.build_subst node.node_term t subst)  (* bind variable node *)
+    | _, NodeVar _ -> ()  (* occur check *)
     | Leaf g, _ ->
       List.iter  (* try to unify t with a variable *)
         (fun node' ->
           match node'.node_label with
-          | NodeVar _ ->
+          | NodeVar _ when not (is_bound node') ->
             k (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
           | _ -> ())
         (equiv_class node)
@@ -436,7 +441,7 @@ let linear_hard_unify egraph t subst k =
       List.iter
         (fun node' -> 
           match node'.node_label with
-          | NodeVar _ ->
+          | NodeVar _ when not (is_bound node') && not (T.member_term node'.node_term t) ->
             k (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
           | NodeSymbol h when g = h &&  List.length node'.node_children = len ->
             unify_list tl node'.node_children subst k (* unify subterms *)
@@ -604,13 +609,13 @@ let find_paramodulations egraph equations =
       (if term_in_graph egraph e2
         then assert (T.vars_of_term e2 = []));
       (* function that will update answers *)
-      let f subst =
+      let k subst =
         if subst_true subst
           (* means that the term is already in the E-graph *)
           then assert (T.vars_of_term e1 = [] || T.vars_of_term e2 = [])
           else answers := (e1, e2, subst) :: !answers in
-      linear_hard_unify egraph e1 S.id_subst f;
-      linear_hard_unify egraph e2 S.id_subst f)
+      linear_hard_unify egraph e1 S.id_subst k;
+      linear_hard_unify egraph e2 S.id_subst k)
     equations;
   !answers
 
@@ -627,10 +632,10 @@ let rec apply_substitution egraph subst =
 
 (** Apply the paramodulation to the E-graph *)
 let apply_paramodulation egraph (t1, t2, subst) =
-  let t1' = S.apply_subst subst t1
-  and t2' = S.apply_subst subst t2 in
   Utils.debug 3 (lazy (Utils.sprintf "apply paramodulation %a=%a with %a"
                 !T.pp_term#pp t1 !T.pp_term#pp t2 S.pp_substitution subst));
+  let t1' = S.apply_subst subst t1
+  and t2' = S.apply_subst subst t2 in
   ignore (node_of_term egraph t1');
   ignore (node_of_term egraph t2');
   (* remove from subst the bindings of terms, keep the bindings of E-graph nodes *)
