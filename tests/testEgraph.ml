@@ -92,11 +92,12 @@ let test_commutativity () =
 let test_group () =
   let a = plus (minus zero) x
   and b = x in
-  test ~depth:3 group_theory a b
+  test ~depth:2 group_theory a b
 
 let () =
   Utils.set_debug 3;
   test_simple ();
   test_commutativity ();
   test_group ();
-  test_peano 1
+  test_peano 2;
+  ()
