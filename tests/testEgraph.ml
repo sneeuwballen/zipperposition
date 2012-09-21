@@ -84,8 +84,8 @@ let test_simple () =
 
 (** try to E-unify f(x,y) and f(a,b) in commutativity_theory *)
 let test_commutativity () =
-  let a = f x y
-  and b = f a b in
+  let a = g (f x y)
+  and b = g (f a b) in
   test ~depth:2 commutativity_theory a b
 
 (** try to E-unify -0+x and x in group_theory *)
