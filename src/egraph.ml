@@ -693,6 +693,26 @@ let apply_paramodulation egraph (t1, t2, subst) =
   (* TODO: if the effect of the paramodulation is null (already done, for instance), backtrack *)
   apply_substitution egraph subst
 
+(** Are those two paramodulations equivalent in current E-graph?
+    This boils down to having substitutions whose codomains are pairwise congruent. *)
+let equiv_paramodulation egraph (t1, t2, subst) (t1', t2', subst') =
+  let compare_pair (v1, t1) (v2, t2) = T.compare_foterm v1 v2 in
+  (* are the two substitutions basically the same? *)
+  let equiv_subst subst subst' =
+    let subst = List.sort compare_pair subst
+    and subst' = List.sort compare_pair subst' in
+    try List.for_all2
+      (fun (v1, t1) (v2,  t2) ->
+        T.eq_foterm v1 v2 && term_in_graph egraph t1 && term_in_graph egraph t2 &&
+        are_equal (node_of_term egraph t1) (node_of_term egraph t2))
+      subst subst'
+    with Invalid_argument _ -> false
+  in
+  (* check whether terms are the same, then check substitutions *)
+  if not (T.eq_foterm t1 t1') || not (T.eq_foterm t2 t2')
+    then false
+    else equiv_subst subst subst'
+
 (** Try to close the E-graph by unifying the two given nodes. It
     returns a list of E-substitutions on success,
     or an empty list on failure. *)
@@ -802,6 +822,8 @@ let e_unify egraph theory t1 t2 depth k =
     if cur_depth < depth
       then begin
         let params = find_paramodulations egraph theory in
+        (* remove equivalent paramodulations *)
+        let params = Utils.list_uniq (equiv_paramodulation egraph) params in
         let dont_care, do_care =
           List.partition (is_dont_care egraph) params in
         List.iter (apply_paramodulation egraph) dont_care;
