@@ -74,7 +74,7 @@ let test ~depth theory a b =
 let test_peano n =
   let a = plus (from_int n) (from_int n)
   and b = from_int (2 * n) in
-  test ~depth:4 peano_theory a b
+  test ~depth:2 peano_theory a b
 
 (** try to E-unify f(x,x) and x in simple_theory *)
 let test_simple () =

@@ -752,6 +752,24 @@ let complete_subst egraph subst =
     egraph.graph_nodes;
   !subst
 
+(** Check whether the paramodulation is a don't-care, ie if
+    it binds no variable of the E-graph *)
+let is_dont_care egraph (e1, e2, subst) =
+  let res =
+    List.for_all (fun (v, t) -> not (term_in_graph egraph v)) subst in
+  Utils.debug 3 (lazy (Utils.sprintf "  paramodulation %a=%a with %a is %s care"
+                 !T.pp_term#pp e1 !T.pp_term#pp e2 S.pp_substitution subst
+                 (if res then "don't" else "do")));
+  res
+
+(** do the action within a stack frame *)
+let within_frame egraph action =
+  try
+    push egraph;
+    action ();
+    pop egraph;
+  with e -> (pop egraph; raise e)
+
 (** Search the tree of possible paramodulations, down to the given
     depth, and returns all substitutions that close some branch *)
 let e_unify egraph theory t1 t2 depth k =
@@ -785,16 +803,19 @@ let e_unify egraph theory t1 t2 depth k =
     if cur_depth < depth
       then begin
         let params = find_paramodulations egraph theory in
+        let dont_care, do_care =
+          List.partition (is_dont_care egraph) params in
+        List.iter (apply_paramodulation egraph) dont_care;
+        (* try without further paramodulation *)
+        within_frame egraph (fun () -> explore (cur_depth+1));
         List.iter
           (fun param ->
             (* try this paramodulation in a new stack frame *)
-            push egraph;
-            try
-              apply_paramodulation egraph param;
-              explore (cur_depth+1);
-              pop egraph
-            with e -> (pop egraph; raise e))
-          params
+            within_frame egraph
+              (fun () ->
+                apply_paramodulation egraph param;
+                explore (cur_depth+1)))
+          do_care;
       end else ();
     Utils.debug 3 (lazy (Utils.sprintf "==== exit depth %d ====" cur_depth));
   in
@@ -807,7 +828,7 @@ let e_unify egraph theory t1 t2 depth k =
 (* TODO: investigate stack overflow
    TODO: caching of already yielded answers at the e_unify function level
    TODO: detect commutating paramodulations, to avoid repeating work
-   TODO: detect non-restraining paramodulations and do them inconditionally when expanding
+   TODO: detect don't care paramodulations that are useless (equate already equal nodes)
 *)
 
 (* ----------------------------------------------------------------------

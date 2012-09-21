@@ -68,5 +68,4 @@ val relocate_term : varlist -> foterm -> foterm (** rename the term so that
 val normalize_term : foterm -> foterm * substitution  (** unique representation of term t,
                                                           substitution to get back to t *)
 
-
 val pp_substitution : Format.formatter -> substitution -> unit
