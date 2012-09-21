@@ -43,20 +43,16 @@ val term_in_graph: egraph -> foterm -> bool             (** is the term represen
 val from_symbol: egraph -> string -> egraph_node list   (** list of nodes labelled by symbol *)
 val maxvar: egraph -> int                               (** max var index in E-graph *)
 
-(** A substitution maps (var) nodes to nodes (to their equivalence class). *)
-type subst = (egraph_node * egraph_node) list
-
 (** all possible linear unifications between the two terms, modulo congruence.
     if a variable is to be bound several times, it will be bound several times
     in the substitution *)
 val linear_soft_unify: egraph -> egraph_node -> egraph_node ->
-                       subst -> (subst -> unit) -> unit
+                       substitution -> (substitution -> unit) -> unit
 
 (** Linear unification of the term t against the E-graph. Any substitution
     sigma returned is such that sigma(t) and sigma(t'), where t' is
-    a term in the E-graph, top-unify. *)
-val linear_hard_unify: egraph -> foterm -> substitution ->
-                       (substitution -> unit) -> unit
+    a term in the E-graph, top-unify modulo congruence. *)
+val linear_hard_unify: egraph -> foterm -> (substitution -> unit) -> unit
 
 (** Proper E-matching of the terms against the E-graph. Proper means
     that if a variable x occurs several times in the list of terms,
@@ -84,15 +80,13 @@ val find_paramodulations: egraph -> theory -> (foterm * foterm * substitution) l
 (** Apply the paramodulation to the E-graph *)
 val apply_paramodulation: egraph -> (foterm * foterm * substitution) -> unit
 
-(** Apply a substitution *)
-val apply_subst: egraph -> subst -> unit
 (** Apply a term substitution *)
 val apply_substitution: egraph -> substitution -> unit
 
 (** Try to close the E-graph by unifying the two given nodes. It
     returns a list of E-substitutions on success,
     or an empty list on failure. *)
-val try_unify: egraph -> theory -> egraph_node -> egraph_node -> subst list
+val try_unify: egraph -> theory -> egraph_node -> egraph_node -> substitution list
 
 (** Search the tree of possible paramodulations, down to the given
     depth, and returns all substitutions that close some branch *)

@@ -308,23 +308,6 @@ let maxvar egraph = egraph.graph_maxvar
  * unification/matching functions
  * ---------------------------------------------------------------------- *)
 
-(** A substitution maps (var) nodes to nodes. *)
-type subst = (egraph_node * egraph_node) list
-
-(** check whether var is bound by subst *)
-let in_subst subst var =
-  assert (is_var_label var.node_label);
-  List.exists (fun (v, _) -> v == var) subst
-
-(** get the term var is bound to in subst, or raises Not_found *)
-let get_subst subst var =
-  assert (is_var_label var.node_label);
-  let rec recurse subst = match subst with
-  | [] -> raise Not_found
-  | (v,n)::subst' -> if v == var then n else recurse subst'
-  in
-  recurse subst
-
 module NodeSet = Set.Make(
   struct
     type t = egraph_node
@@ -347,44 +330,57 @@ let is_bound node =
   assert (is_var_label node.node_label);
   not (is_var_label (find node).node_label)
 
-(** Check whether t is congruent to some subterm of n2 *)
-let occur_check t n2 subst =
-  assert (T.is_var t);
-  (* look for n1 in the given equivalence class *)
-  let rec explore_list explored l =
-    match l with
-    | [] -> false
-    | node::l' when NodeSet.mem node explored ->
-      explore_list explored l' (* avoid infinite loops *)
-    | node::_ when T.eq_foterm t node.node_term -> true
-    | node::l' ->
-      let explored = NodeSet.add node explored in
-      if explore_nodes explored node.node_children
-        then true (* occurs in some child of some node of the list *)
-        else
-          if is_var_label node.node_label
-            && S.is_in_subst node.node_term subst
-            && T.member_term t (S.apply_subst subst node.node_term)
-            then true (* node is a variable that is bound to a term containing t *)
-            else explore_list explored l'
-  (* explore the congruence class of each given node *)
-  and explore_nodes explored l = 
-    match l with
-    | [] -> false
-    | node::_ when explore_list explored (equiv_class node) -> true
-    | node::l' ->
-      let explored = NodeSet.add node explored in
-      explore_nodes explored l'
-  in
-  T.eq_foterm t n2.node_term || explore_list NodeSet.empty (equiv_class n2)
+(** Is the node a variable bound by the substitution? *)
+let node_bound_in_subst subst node =
+  if not (is_var_label node.node_label)
+    then false
+    else S.is_in_subst node.node_term subst
 
-(** all possible linear unifications between the two terms, modulo congruence.
-    if a variable is to be bound several times, it will be bound several times
-    in the substitution *)
+(** Is the term a variable that is bound in the E-graph? *)
+let find_var egraph t =
+  if T.is_var t && term_in_graph egraph t
+    then (find (node_of_term egraph t)).node_term  (* t bound to this node *)
+    else t
+
+(** Check whether t is congruent to some subterm of n *)
+let occur_check egraph t n subst =
+  assert (T.is_var t);
+  let explored = ref NodeSet.empty in
+  (* look for n1 in the given equivalence class *)
+  let rec explore_list l =
+    match l with
+    | [] -> ()
+    | node::l' when NodeSet.mem node !explored ->
+      explore_list l' (* already checked for this node *)
+    | node::l' ->
+      let t' = S.apply_subst subst node.node_term in
+      explored := NodeSet.add node !explored;
+      (if T.member_term t t'
+        then raise Exit);
+      (if term_in_graph egraph t'
+        then
+          let node' = node_of_term egraph t' in
+          if node != node'
+            then explore_list (equiv_class node')); (* check in substituted term *)
+      explore_nodes node.node_children;
+      explore_list l'
+  (* explore the congruence class of each given node *)
+  and explore_nodes l = 
+    match l with
+    | [] -> ()
+    | node::l' ->
+      explore_list (equiv_class node);
+      explore_nodes l'
+  in
+  try explore_list (equiv_class n); false
+  with Exit -> true
+
+(** all possible linear unifications between the two terms, modulo congruence. 
+    TODO is it still linear? *)
 let linear_soft_unify egraph n1 n2 subst k =
   (* try to unify those equivalence classes (explored: set of pairs already tried) *)
   let rec unify n1 n2 explored subst k =
-    (* TODO apply substitution here *)
+    (* first, apply subst *)
     if are_equal n1 n2
       then k subst  (* trivial success *)
       else if n1.node_sort <> n2.node_sort || PairSet.mem (find n1, find n2) explored
@@ -402,17 +398,22 @@ let linear_soft_unify egraph n1 n2 subst k =
       unify_all l1' l2 explored subst k
   (* try to unify those two terms *)
   and root_unify n1 n2 explored subst k =
-    assert (not (are_equal n1 n2));
-    match n1.node_label, n2.node_label with
-    | NodeVar _, _ when not (is_bound n1) && not (occur_check n1.node_term n2 S.id_subst) ->
-      k ((n1, n2) :: subst)  (* bind n1 to n2, if n1 not bound *)
-    | _, NodeVar _ when not (is_bound n2) && not (occur_check n2.node_term n1 S.id_subst) ->
-      k ((n2, n1) :: subst)  (* bind n2 to n1, if n2 not bound *)
-    | NodeSymbol g, NodeSymbol h when g = h &&
-      List.length n1.node_children = List.length n2.node_children ->
-      assert (n1.node_children <> []);  (* otherwise they would be equal *)
-      unify_subterms n1.node_children n2.node_children explored subst k
-    | _ -> ()  (* failure *)
+    if are_equal n1 n2
+      then k subst  (* trivial *)
+      else begin
+        match n1.node_label, n2.node_label with
+        | NodeVar _, _ when not (is_bound n1)
+          && not (occur_check egraph n1.node_term n2 subst) ->
+          k (S.build_subst n1.node_term n2.node_term subst)  (* bind n1 to n2, if n1 not bound *)
+        | _, NodeVar _ when not (is_bound n2)
+          && not (occur_check egraph n2.node_term n1 subst) ->
+          k (S.build_subst n2.node_term n1.node_term subst)  (* bind n2 to n1, if n2 not bound *)
+        | NodeSymbol g, NodeSymbol h when g = h &&
+          List.length n1.node_children = List.length n2.node_children ->
+          assert (n1.node_children <> []);  (* otherwise they would be equal *)
+          unify_subterms n1.node_children n2.node_children explored subst k
+        | _ -> ()  (* failure *)
+      end
   (* unify children pairwise *)
   and unify_subterms l1 l2 explored subst k =
     match l1, l2 with
@@ -426,30 +427,35 @@ let linear_soft_unify egraph n1 n2 subst k =
 
 (** Linear unification of the term t against the E-graph. Any substitution
     sigma returned is such that sigma(t) and sigma(t'), where t' is
-    a term in the E-graph, top-unify. *)
-let linear_hard_unify egraph t subst k =
+    a term in the E-graph, /top-unify/. *)
+let linear_hard_unify egraph t k =
+  List.iter (fun v -> assert (not (term_in_graph egraph v))) (T.vars_of_term t);
   (* match term against E-graph *)
-  let rec unify_term t subst k =
-    Format.printf "unify term %a with E-graph@." !T.pp_term#pp t;
-    let t = S.apply_subst subst t in
+  let rec unify_term t k =
+    let subst = S.id_subst in  (* initial substitution, empty *)
     match t.term with
     | Var _ ->
-      (* try against all nodes that have the same sort... *)
+      let explored_classes = ref NodeSet.empty in
+      (* try against all nodes that have the same sort... TODO only once per equiv class *)
       THashtbl.iter
         (fun _ node ->
-          if node.node_sort = t.sort && not (occur_check t node subst)
-            then k ((t, node.node_term) :: subst))
+          if node.node_sort = t.sort && not (NodeSet.mem (find node) !explored_classes)
+            then begin (* this class has the right sort, and is not explored *)
+              explored_classes := NodeSet.add (find node) !explored_classes;
+              k ((t, node.node_term) :: subst)
+            end)
         egraph.graph_nodes
     | Leaf g ->
       if term_in_graph egraph t
         then k subst  (* ok, it matches some term in the graph *)
         else ()  (* fails, no such term *)
     | Node ({term=Leaf g}::tl) ->
-      (* unify against children of all terms that start with g *)
+      (* unify tl against children of all terms that start with g *)
       List.iter
         (fun node ->
-           if List.length tl = List.length node.node_children
-             then unify_list tl node.node_children subst k)
+            if node.node_sort = t.sort
+            && List.length tl = List.length node.node_children
+              then unify_list tl node.node_children subst k)
         (from_symbol egraph g)
     | Node _ -> assert false
   (* unify list of terms against list of nodes *)
@@ -458,49 +464,41 @@ let linear_hard_unify egraph t subst k =
     | [], [] -> k subst  (* success *)
     | t::terms', node::nodes' ->
       let new_k subst = unify_list terms' nodes' subst k in
-      unify_node t node subst new_k
+      (* unify t against the equivalence class of node *)
+      unify_class t (equiv_class node) subst new_k
     | _ -> assert false
-  (* unify term and node *)
+  (* unify term and equivalence class *)
+  and unify_class t class_ subst k =
+    let t = S.apply_subst subst t in
+    let t = find_var egraph t in  (* also see whether t bound in E-graph *)
+    if List.exists (fun node -> T.eq_foterm t node.node_term) class_
+      then k subst  (* success, t is in the congruence class *)
+      else
+        List.iter (fun node -> unify_node t node subst k) class_
+  (* unify term and node, by decomposition/trivial rules *)
   and unify_node t node subst k =
-    (* TODO apply substitution to node *)
+    (* apply substitution *)
+    let t = S.apply_subst subst t in
+    let t' = S.apply_subst subst node.node_term in
     match t.term, node.node_label with
-    | Var _, _ when not (occur_check t node subst) ->
-      k (S.build_subst t node.node_term subst)  (* bind variable term *)
+    | Var _, _ when not (occur_check egraph t node subst) ->
+      k (S.build_subst t t' subst)  (* bind variable term *)
     | Var _, _ -> ()  (* occur check *)
-    | _, NodeVar _ when not (is_bound node)
-      && not (T.member_term (S.apply_subst subst node.node_term) t) ->
-      k (S.build_subst node.node_term t subst)  (* bind variable node TODO E-occur_check? *)
+    | _, NodeVar _ when not (is_bound node) && T.is_var t' && not (T.member_term t' t) ->
+      k (S.build_subst t' t subst)  (* bind variable node to t *)
     | _, NodeVar _ -> ()  (* occur check *)
-    | Leaf g, _ when term_in_graph egraph t ->  (* unify two nodes in the E-graph *)
+    | Leaf g, _ when term_in_graph egraph t ->
       if are_equal (node_of_term egraph t) node
-        then k subst
-        else ()
-    | Leaf g, _ ->
-      List.iter  (* t not present in the E-graph, try to unify it with a variable *)
-        (fun node' ->
-          match node'.node_label with
-          | NodeVar _ when not (is_bound node') ->
-            k (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
-          | _ -> ())
-        (equiv_class node)
-    | Node ({term=Leaf g}::tl), _ ->
+        then k subst  (* t congruent to node *)
+        else ()       (* t present in E-graph but not congruent to node *)
+    | Node ({term=Leaf g}::tl), NodeSymbol h when g = h
+      && List.length tl = List.length node.node_children ->
       (if term_in_graph egraph t && are_equal (node_of_term egraph t) node
-        then k subst  (* immediate success *));
-      let len = List.length tl in
-      (* try to match tl with children of all nodes congruent to node, that are
-         labelled with g *)
-      List.iter
-        (fun node' ->
-          match node'.node_label with
-          | NodeVar _ when not (is_bound node') && not (T.member_term node'.node_term t) ->
-            k (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
-          | NodeSymbol h when g = h &&  List.length node'.node_children = len ->
-            unify_list tl node'.node_children subst k (* unify subterms *)
-          | _ -> ())
-        (equiv_class node)
-    | Node _, _ -> assert false
+        then k subst); (* immediate success *)
+      unify_list tl node.node_children subst k (* unify subterms *)
+    | _ -> ()
   in
-  unify_term t subst k
+  unify_term t k
 
 (** Proper matching of the terms against the E-graph. Proper means
     that if a variable x occurs several times in the list of terms,
@@ -652,6 +650,8 @@ let find_paramodulations egraph equations =
     (fun (e1, e2) ->
       (* avoid variable collision by renaming terms *)
       let e1, e2 = relocate_equation egraph (e1, e2) in
+      Utils.debug 3 (lazy (Utils.sprintf "  paramodulate with %a=%a"
+                    !T.pp_term#pp e1 !T.pp_term#pp e2));
       (* if terms are already in the E-graph, and equal, it's no use
          paramodulating with them *)
       (if term_in_graph egraph e1
@@ -664,8 +664,8 @@ let find_paramodulations egraph equations =
           (* means that the term is already in the E-graph *)
           then assert (T.vars_of_term e1 = [] || T.vars_of_term e2 = [])
           else answers := (e1, e2, subst) :: !answers in
-      linear_hard_unify egraph e1 S.id_subst k;
-      linear_hard_unify egraph e2 S.id_subst k)
+      linear_hard_unify egraph e1 k;
+      linear_hard_unify egraph e2 k)
     equations;
   !answers
 
@@ -694,60 +694,25 @@ let apply_paramodulation egraph (t1, t2, subst) =
   (* TODO: if the effect of the paramodulation is null (already done, for instance), backtrack *)
   apply_substitution egraph subst
 
-(** Apply the substitution to the E-graph *)
-let rec apply_subst egraph subst =
-  match subst with
-  | [] -> ()
-  | (n1, n2) :: subst' ->
-    merge egraph n1 n2;
-    apply_subst egraph subst'
-
-(** Convert a substitution on nodes to a substitution on terms
-    TODO what happens if all terms of some equivalence class do occur check? *)
-let substitution_of_subst subst =
-  List.map
-    (fun (n1, n2) ->
-      assert (is_var_label n1.node_label);
-      let v = n1.node_term in
-      if T.member_term v (find n2).node_term
-        then  (* find a term that does not occur check with v *)
-          let n2 =
-            List.find
-              (fun node -> not (T.member_term v node.node_term))
-              (equiv_class n2) in
-          v, n2.node_term
-        else v, (find n2).node_term (* normalize if occur check allows it *))
-    subst
-
 (** Try to close the E-graph by unifying the two given nodes. It
     returns a list of E-substitutions on success,
     or an empty list on failure. *)
 let try_unify egraph theory n1 n2 =
-  (* remove multiple bindings of a variable *)
-  let rec uniquify subst =
-    match subst with
-    | [] -> []
-    | (n1, n2) as pair :: subst' ->
-      assert (is_var_label n1.node_label);
-      if List.exists (fun (n1',_) -> n1 == n1') subst'
-        then uniquify subst'
-        else pair :: (uniquify subst')
-  in
   (* collect answers by unification within the E-graph *)
   let answers = ref [] in
-  let k subst = answers := (uniquify subst) :: !answers in
+  let k subst = answers := subst :: !answers in
   linear_soft_unify egraph n1 n2 [] k;
   List.filter
     (fun subst ->
       (* test whether the substitution actually works, by applying them *)
       push egraph;
       try
-        apply_subst egraph subst;     (* apply substitution to E-graph *)
-        theory_close egraph theory;   (* apply theories *)
+        apply_substitution egraph subst;  (* apply substitution to E-graph *)
+        theory_close egraph theory;       (* apply theories *)
         let did_unify = are_equal n1 n2 in
         Utils.debug 3 (lazy (Utils.sprintf
           "unification of %a and %a with %a %s" pp_node n1
-          pp_node n2 S.pp_substitution (substitution_of_subst subst)
+          pp_node n2 S.pp_substitution subst
           (if did_unify then "succeeds" else "fails")));
         pop egraph;
         did_unify
@@ -764,11 +729,26 @@ module SubstSet = Set.Make(
 (** Complete the substitution by finding bindings of
     all variables in the E-graph *)
 let complete_subst egraph subst =
-  let subst = ref (substitution_of_subst subst) in
+  (* find a term congruent to node, that does not contain node *)
+  let find_binding node subst =
+    assert (is_var_label node.node_label);
+    let t = node.node_term in
+    List.find
+      (fun node' ->
+        let t' = S.apply_subst subst node'.node_term in
+        not (T.member_term t t'))
+      (equiv_class node)
+  in
+  let subst = ref subst in
   THashtbl.iter
     (fun _ node ->
       if is_var_label node.node_label && is_bound node
-        then subst := S.build_subst node.node_term (find node).node_term !subst)
+      && not (S.is_in_subst node.node_term !subst)
+        then
+          try 
+            let repr = find_binding node !subst in   (* find a suitable binding *)
+            subst := S.build_subst node.node_term repr.node_term !subst
+          with Not_found -> ()) (* not found: the variable is not bound *)
     egraph.graph_nodes;
   !subst
 
