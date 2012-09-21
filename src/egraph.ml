@@ -477,15 +477,14 @@ let linear_hard_unify egraph t k =
         List.iter (fun node -> unify_node t node subst k) class_
   (* unify term and node, by decomposition/trivial rules *)
   and unify_node t node subst k =
-    (* apply substitution *)
-    let t = S.apply_subst subst t in
-    let t' = S.apply_subst subst node.node_term in
     match t.term, node.node_label with
     | Var _, _ when not (occur_check egraph t node subst) ->
-      k (S.build_subst t t' subst)  (* bind variable term *)
+      k (S.build_subst t node.node_term subst)  (* bind variable term *)
+    | Var _, _ when S.is_in_subst t subst -> k subst  (* linearity *)
     | Var _, _ -> ()  (* occur check *)
-    | _, NodeVar _ when not (is_bound node) && T.is_var t' && not (T.member_term t' t) ->
-      k (S.build_subst t' t subst)  (* bind variable node to t *)
+    | _, NodeVar _ when not (is_bound node) && not (T.member_term node.node_term t) ->
+      k (S.build_subst node.node_term t subst)  (* bind variable node to t *)
+    | _, NodeVar _ when is_bound node -> k subst (* linearity *)
     | _, NodeVar _ -> ()  (* occur check *)
     | Leaf g, _ when term_in_graph egraph t ->
       if are_equal (node_of_term egraph t) node
