@@ -439,7 +439,7 @@ let linear_hard_unify egraph t subst k =
       (* try to match tl with children of all nodes congruent to node, that are
          labelled with g *)
       List.iter
-        (fun node' -> 
+        (fun node' ->
           match node'.node_label with
           | NodeVar _ when not (is_bound node') && not (T.member_term node'.node_term t) ->
             k (S.build_subst node'.node_term t subst)  (* variable congruent to node *)
@@ -526,7 +526,7 @@ let proper_match egraph patterns subst k =
          labelled with g *)
       let g_label = NodeSymbol g in
       List.iter
-        (fun node' -> 
+        (fun node' ->
           if node'.node_label = g_label && List.length node'.node_children = len
             then match_list tl node'.node_children subst k)
         (equiv_class node)
@@ -584,7 +584,7 @@ let theory_close egraph equations =
   Utils.debug 3 (lazy "close egraph w.r.t theory");
   loop equations
 
-(** Set of possible paramodulation inferences. Each inference is a 
+(** Set of possible paramodulation inferences. Each inference is a
     (possibly speculative) top-unification of the side of an equation,
     and of some node in the E-graph. *)
 let find_paramodulations egraph equations =
@@ -675,7 +675,7 @@ let substitution_of_subst subst =
 let try_unify egraph theory n1 n2 =
   (* remove multiple bindings of a variable *)
   let rec uniquify subst =
-    match subst with 
+    match subst with
     | [] -> []
     | (n1, n2) as pair :: subst' ->
       assert (is_var_label n1.node_label);
@@ -795,7 +795,7 @@ module Graph =
 
     let equal n1 n2 = n1 == n2
     let hash n = n.node_term.hkey
-    
+
     let print_vertex node =
       match node.node_label with
       | NodeVar i -> Utils.sprintf "X%d" i
@@ -811,7 +811,7 @@ module D = Dot.Make(Graph)
 let to_dot ~name egraph =
   let graph = D.mk_graph ~name in
   (* map the node to the DOT graph *)
-  let on_node node = 
+  let on_node node =
     let n = D.get_node graph node in
     D.add_node_attribute n (D.Shape "box");
     (* add links to children *)
@@ -825,13 +825,15 @@ let to_dot ~name egraph =
       node.node_children;
     (* add links to congruent terms (to representative) *)
     if node.node_representative != node
-      then 
+      then
         let c = D.get_node graph node.node_representative in
         let e = D.add_edge graph n c Graph.EdgeCongruent in
         D.add_edge_attribute e (D.Weight 1);
-        D.add_edge_attribute e (D.Style "dotted");
         D.add_edge_attribute e (D.Color "red");
-        D.add_edge_attribute e (D.Other ("arrowhead", "none"))
+        if is_symb_label node.node_label
+          then
+            (D.add_edge_attribute e (D.Style "dotted");
+            D.add_edge_attribute e (D.Other ("arrowhead", "none")))
   in
   THashtbl.iter (fun _ node -> on_node node) egraph.graph_nodes;
   (* print the graph into a string *)
