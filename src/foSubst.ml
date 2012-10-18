@@ -52,6 +52,12 @@ let compare_substs s1 s2 =
         Utils.lexicograph Pervasives.compare [v1.tag; t1.tag] [v2.tag; t2.tag])
       s1 s2
 
+module SSet = Set.Make(
+  struct
+    type t = substitution
+    let compare = compare_substs
+  end)
+
 let rec lookup var subst = match subst with
   | [] -> var
   | ((v,t) :: tail) ->
@@ -141,3 +147,15 @@ let pp_substitution formatter subst =
     Format.fprintf formatter "%a → %a" !T.pp_term#pp v !T.pp_term#pp t
   in
   Format.fprintf formatter "@[<h>{%a}@]" (Utils.pp_list ~sep:", " pp_pair) subst
+
+let pp_set formatter set =
+  Format.fprintf formatter "{";
+  let prev = ref false in
+  SSet.iter
+    (fun subst ->
+      (if !prev
+        then Format.fprintf formatter "@[<h>%a@],@ " pp_substitution subst
+        else Format.fprintf formatter "@[<h>%a@]" pp_substitution subst);
+      prev := true)
+    set;
+  Format.fprintf formatter "}"

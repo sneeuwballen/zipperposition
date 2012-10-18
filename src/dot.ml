@@ -34,8 +34,52 @@ module type Graph =
     val print_edge: edge -> string
   end
 
+module type S =
+  sig
+    module G : Graph
+
+    type vertex = G.vertex
+    type edge = G.edge
+
+    type attribute =
+      | Color of string
+      | Shape of string
+      | Weight of int
+      | Style of string
+      | Label of string
+      | Other of string * string
+
+    (** A node of the DOT graph *)
+    type dot_node
+
+    (** An edge of the DOT graph *)
+    type dot_edge
+
+    (** A DOT graph *)
+    type graph
+
+    val mk_graph : name:string -> graph
+
+    (** Nodes are cached *)
+    val get_node : graph -> vertex -> dot_node
+
+    val add_edge : graph -> dot_node -> dot_node -> edge -> dot_edge
+
+    val add_node_attribute : dot_node -> attribute -> unit
+    val add_edge_attribute : dot_edge -> attribute -> unit
+
+    (** render the graph as a string *)
+    val print_graph : graph -> string
+    (** print the graph to the given formatter *)
+    val pp_graph : Format.formatter -> graph -> unit
+  end
+
 module Make(G: Graph) =
   struct
+    module G = G
+
+    type vertex = G.vertex
+    type edge = G.edge
 
     (** hashtable of vertices *)
     module VertexTable = Hashtbl.Make(
@@ -151,4 +195,8 @@ module Make(G: Graph) =
       Buffer.add_string buf "}\n";
       (* extract the string built in the buffer *)
       Buffer.contents buf
+
+    let pp_graph formatter graph =
+      let s = print_graph graph in
+      Format.pp_print_string formatter s
   end

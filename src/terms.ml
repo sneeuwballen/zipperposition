@@ -74,7 +74,7 @@ let stats () = H.stats ()
 let compute_vars t =  (* compute free vars of the term *)
   let rec aux acc t = match t.term with
     | Leaf _ -> acc
-    | Var _ -> if (List.mem t acc) then acc else t::acc
+    | Var _ -> if (List.exists (fun t' -> t == t') acc) then acc else t::acc
     | Node l -> List.fold_left aux acc l
   in aux [] t
 
@@ -166,6 +166,17 @@ let rec member_term a b = a == b || match b.term with
 let eq_foterm x y = x == y  (* because of hashconsing *)
 
 let compare_foterm x y = x.tag - y.tag
+
+module TSet = Set.Make(struct type t = foterm let compare = compare_foterm end)
+
+module TPairSet = Set.Make(
+  struct
+    type t = foterm * foterm
+    let compare (t1, t1') (t2, t2') =
+      if eq_foterm t1 t2
+        then compare_foterm t1' t2'
+        else compare_foterm t1 t2
+  end)
 
 let rec cast t sort =
   match t.term with

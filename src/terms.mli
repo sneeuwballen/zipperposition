@@ -58,6 +58,9 @@ val eq_foterm : foterm -> foterm -> bool      (** standard equality on terms *)
 val compare_foterm : foterm -> foterm -> int  (** a simple order on terms *)
 val cast : foterm -> sort -> foterm           (** cast (change sort) *)
 
+module TSet : Set.S with type elt = foterm
+module TPairSet : Set.S with type elt = foterm * foterm
+
 val at_pos : foterm -> position -> foterm     (** retrieve subterm at pos, or
                                                   raise Invalid_argument
                                                   TODO also return a context? *)

@@ -38,6 +38,8 @@ val hash_subst: substitution -> int
 (** compare substitutions (arbitrary but total order) *)
 val compare_substs: substitution -> substitution -> int
 
+module SSet : Set.S with type elt = substitution
+
 (** lookup variable in substitution *)
 val lookup : foterm -> substitution -> foterm
 val is_in_subst : foterm -> substitution -> bool
@@ -69,3 +71,4 @@ val normalize_term : foterm -> foterm * substitution  (** unique representation 
                                                           substitution to get back to t *)
 
 val pp_substitution : Format.formatter -> substitution -> unit
+val pp_set : Format.formatter -> SSet.t -> unit
