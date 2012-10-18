@@ -24,13 +24,13 @@ open Types
 module T = Terms
 module Utils = FoUtils
 
-exception OccurCheck of (foterm * foterm)
+exception OccurCheck of (term * term)
 
 let id_subst = []
 
 let eq_subst s1 s2 =
   try List.for_all2
-    (fun (v1, t1) (v2, t2) -> T.eq_foterm v1 v2 && T.eq_foterm t1 t2)
+    (fun (v1, t1) (v2, t2) -> T.eq_term v1 v2 && T.eq_term t1 t2)
     s1 s2
   with Invalid_argument _ -> false
 
@@ -61,7 +61,7 @@ module SSet = Set.Make(
 let rec lookup var subst = match subst with
   | [] -> var
   | ((v,t) :: tail) ->
-      if T.eq_foterm v var then t else lookup var tail
+      if T.eq_term v var then t else lookup var tail
 
 let is_in_subst var subst = lookup var subst != var
 
@@ -79,7 +79,7 @@ let rec apply_subst ?(recursive=true) subst t = match t.term with
   | Var _ ->
       let new_t = lookup t subst in
       assert (new_t.sort = t.sort);
-      if recursive && not (T.eq_foterm new_t t)
+      if recursive && not (T.eq_term new_t t)
         then apply_subst subst ~recursive new_t
         else new_t
   | Node l ->
@@ -91,12 +91,12 @@ let build_subst ?(recursive=false) v t tail =
     then (
       let new_t = apply_subst ~recursive tail t in
       (* v -> v, no need to add to subst *)
-      if T.eq_foterm v new_t then tail
+      if T.eq_term v new_t then tail
       (* v -> t[v], not well-formed substitution *)
       else if T.member_term v new_t then raise (OccurCheck (v, new_t))
       (* append to list *)
       else (v, new_t) :: tail )
-    else if T.eq_foterm v t
+    else if T.eq_term v t
       then tail
       else (v,t) :: tail
 
@@ -111,7 +111,7 @@ let relocate ?(recursive=true) maxvar varlist subst =
        maxvar+1, new_v::varlist, build_subst ~recursive v new_v s)
     varlist (maxvar+1, [], subst)
 
-let fresh_foterm maxvar t =
+let fresh_term maxvar t =
   let _, subst = List.fold_left
     (fun (offset, subst) ({sort=sort} as var) ->
       let new_var = T.mk_var offset sort in

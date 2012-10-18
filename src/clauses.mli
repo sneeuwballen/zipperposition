@@ -43,20 +43,20 @@ val neg_lit : literal -> bool                       (** is the literal negative?
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
-val mk_eq : ord:ordering -> foterm -> foterm -> literal
-val mk_neq : ord:ordering -> foterm -> foterm -> literal
-val mk_lit : ord:ordering -> foterm -> foterm -> bool -> literal
+val mk_eq : ord:ordering -> term -> term -> literal
+val mk_neq : ord:ordering -> term -> term -> literal
+val mk_lit : ord:ordering -> term -> term -> bool -> literal
 val reord_lit : ord:ordering -> literal -> literal  (** recompute order *)
 val lit_of_fof : ord:ordering -> literal -> literal (** translate eq/not to literal *)
-val term_of_lit : literal -> foterm                 (** translate lit to term *)
+val term_of_lit : literal -> term                 (** translate lit to term *)
 
 val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
 
 val negate_lit : literal -> literal (** negate literal *)
-val fmap_lit : ord:ordering -> (foterm -> foterm) -> literal -> literal (** fmap in literal *)
+val fmap_lit : ord:ordering -> (term -> term) -> literal -> literal (** fmap in literal *)
 val vars_of_lit : literal -> varlist (** gather variables *)
 
-val lit_to_multiset : literal -> foterm list (** literal to multiset of terms *)
+val lit_to_multiset : literal -> term list (** literal to multiset of terms *)
 
 (* ----------------------------------------------------------------------
  * clauses
@@ -71,6 +71,8 @@ val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
 
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
+
+module CHashtbl : Hashtbl.S with type key = clause
 
 val mk_clause : ord:ordering -> literal list ->
                 selected:int list Lazy.t ->
@@ -89,7 +91,7 @@ val check_maximal_lit : ord:ordering -> clause -> int   (** is the i-th literal 
 val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
 
 val get_lit : clause -> int -> literal                  (** get the literal at given index *)
-val get_pos : clause -> position -> foterm              (** get the subterm at position *)
+val get_pos : clause -> position -> term              (** get the subterm at position *)
 
 (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
 val fresh_clause : ord:ordering -> int -> clause -> clause * int  
@@ -166,7 +168,7 @@ class type pprinter_clause =
     method pp : Format.formatter -> clause -> unit      (** print clause *)
     method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
     method pp_pos : Format.formatter -> (clause * position) -> unit
-    method pp_h_pos : Format.formatter -> (hclause * position * foterm) -> unit
+    method pp_h_pos : Format.formatter -> (hclause * position * term) -> unit
     method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
     method horizontal : bool -> unit                    (** print in horizontal box? *)
   end

@@ -55,7 +55,7 @@ let check_subterm t =
 let check_unif (t1, t2) =
   try
     let subst = Unif.unification t1 t2 in
-    if T.eq_foterm (S.apply_subst subst t1) (S.apply_subst subst t2)
+    if T.eq_term (S.apply_subst subst t1) (S.apply_subst subst t2)
       then H.TestOk else H.TestFail (t1, t2)
   with UnificationFailure _ -> H.TestPreconditionFalse
 

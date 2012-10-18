@@ -92,7 +92,7 @@ let do_unary_inferences ~ord rules c =
       will be visited
 
     ?pos:bool -> ?neg:bool -> ?both:bool
-    -> ('a -> Types.foterm -> Types.foterm -> bool -> int list -> 'a)
+    -> ('a -> Types.term -> Types.term -> bool -> int list -> 'a)
     -> 'a -> (Types.literal * int) list
     -> 'a *)
 let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) f acc lits =
@@ -136,8 +136,8 @@ let get_equations_sides clause pos = match pos with
 (** cache for terms *)
 module TCache = Hashtbl.Make(
   struct
-    type t = foterm
-    let equal a b = T.eq_foterm a b
+    type t = term
+    let equal a b = T.eq_term a b
     let hash t = t.hkey
   end)
 

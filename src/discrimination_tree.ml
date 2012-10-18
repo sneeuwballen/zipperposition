@@ -191,26 +191,26 @@ let index : Index.index =
 
     method iter f = iter tree (fun p leaf -> I.iter_leaf leaf (fun t set -> f t set))
 
-    method fold : 'a. ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a -> 'a =
+    method fold : 'a. ('a -> term -> I.ClauseSet.t -> 'a) -> 'a -> 'a =
       fun f acc ->
         let acc = ref acc in
         iter tree (fun p leaf -> I.iter_leaf leaf (fun t set -> acc := f !acc t set));
         !acc
 
-    method retrieve_generalizations: 'a. foterm -> 'a ->
-      ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
+    method retrieve_generalizations: 'a. term -> 'a ->
+      ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         prof_dt_generalization.HExtlib.profile
         (retrieve ~unify_query:false ~unify_indexed:true tree t acc) f
 
-    method retrieve_unifiables : 'a. foterm -> 'a ->
-      ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
+    method retrieve_unifiables : 'a. term -> 'a ->
+      ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         prof_dt_unifiables.HExtlib.profile
         (retrieve ~unify_query:true ~unify_indexed:true tree t acc) f
 
-    method retrieve_specializations : 'a. foterm -> 'a ->
-      ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
+    method retrieve_specializations : 'a. term -> 'a ->
+      ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         prof_dt_specializations.HExtlib.profile
         (retrieve ~unify_query:true ~unify_indexed:false tree t acc) f

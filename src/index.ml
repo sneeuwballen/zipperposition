@@ -26,7 +26,7 @@ module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
-type data = hclause * position * foterm
+type data = hclause * position * term
 
 (** a set of (hashconsed clause, position in clause, term). *)
 module ClauseSet : Set.S with type elt = data
@@ -39,11 +39,11 @@ module ClauseSet : Set.S with type elt = data
         if c <> 0 then c else
         let c = C.compare_hclause c1 c2 in
         if c <> 0 then c else
-        (assert (T.eq_foterm t1 t2); 0)
+        (assert (T.eq_term t1 t2); 0)
     end)
 
 (** a leaf of an index is generally a map of terms to data *)
-type index_leaf = (foterm * ClauseSet.t) Ptmap.t
+type index_leaf = (term * ClauseSet.t) Ptmap.t
 
 let empty_leaf = Ptmap.empty
 
@@ -57,7 +57,7 @@ let add_leaf leaf t data =
 let remove_leaf leaf t data =
   try
     let t', set = Ptmap.find t.tag leaf in
-    assert (T.eq_foterm t t');
+    assert (T.eq_term t t');
     let set = ClauseSet.remove data set in
     if ClauseSet.is_empty set
       then Ptmap.remove t.tag leaf
@@ -81,18 +81,18 @@ let size_leaf leaf =
 class type index =
   object ('b)
     method name : string
-    method add : foterm -> data -> 'b
-    method remove: foterm -> data -> 'b
+    method add : term -> data -> 'b
+    method remove: term -> data -> 'b
 
-    method iter : (foterm -> ClauseSet.t -> unit) -> unit
-    method fold : 'a. ('a -> foterm -> ClauseSet.t -> 'a) -> 'a -> 'a
+    method iter : (term -> ClauseSet.t -> unit) -> unit
+    method fold : 'a. ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
 
-    method retrieve_unifiables : 'a. foterm -> 'a ->
-                                 ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_generalizations : 'a. foterm -> 'a ->
-                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_specializations : 'a. foterm -> 'a ->
-                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_unifiables : 'a. term -> 'a ->
+                                 ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_generalizations : 'a. term -> 'a ->
+                                      ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_specializations : 'a. term -> 'a ->
+                                      ('a -> term -> ClauseSet.t -> 'a) -> 'a
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
   end
@@ -105,7 +105,7 @@ class type clause_index =
 
     method root_index : index
     method unit_root_index : index
-    method ground_rewrite_index : (foterm * data) Ptmap.t (** to rewrite ground terms *)
+    method ground_rewrite_index : (term * data) Ptmap.t (** to rewrite ground terms *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit

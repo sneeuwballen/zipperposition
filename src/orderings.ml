@@ -202,7 +202,7 @@ module type S =
      * - stable for instantiation
      * - total on ground terms
      *)
-    val compare_terms : so:symbol_ordering -> foterm -> foterm -> comparison
+    val compare_terms : so:symbol_ordering -> term -> term -> comparison
 
     val name : string
   end
@@ -263,7 +263,7 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
 module KBO = struct
   let name = "kbo"
 
-  let eq_foterm = T.eq_foterm
+  let eq_term = T.eq_term
 
   (** used to keep track of the balance of variables *)
   type var_balance = {
@@ -410,7 +410,7 @@ module RPO = struct
 
   let rec rpo ~so s t =
     match s.term, t.term with
-    | _, _ when T.eq_foterm s t -> Eq
+    | _, _ when T.eq_term s t -> Eq
     | Var _, Var _ -> Incomparable
     | _, Var i -> if (List.mem t (T.vars_of_term s)) then Gt else Incomparable
     | Var i,_ -> if (List.mem s (T.vars_of_term t)) then Lt else Incomparable
@@ -474,8 +474,8 @@ end
 (** cache for pairs of terms *)
 module OrdCache = Cache.Make(
   struct
-    type t = (foterm * foterm)
-    let equal (x1,y1) (x2,y2) = T.eq_foterm x1 x2 && T.eq_foterm y1 y2
+    type t = (term * term)
+    let equal (x1,y1) (x2,y2) = T.eq_term x1 x2 && T.eq_term y1 y2
     let hash (x,y) = (Utils.murmur_hash x.hkey) lxor y.hkey
     let should_cache (x,y) = match x.term, y.term with
     | Node _, Node _ -> true  (* cache for complex terms *)

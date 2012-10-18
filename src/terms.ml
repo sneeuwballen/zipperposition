@@ -163,19 +163,26 @@ let rec member_term a b = a == b || match b.term with
   | Leaf _ | Var _ -> false
   | Node subterms -> List.exists (member_term a) subterms
 
-let eq_foterm x y = x == y  (* because of hashconsing *)
+let eq_term x y = x == y  (* because of hashconsing *)
 
-let compare_foterm x y = x.tag - y.tag
+let compare_term x y = x.tag - y.tag
 
-module TSet = Set.Make(struct type t = foterm let compare = compare_foterm end)
+module TSet = Set.Make(struct type t = term let compare = compare_term end)
 
 module TPairSet = Set.Make(
   struct
-    type t = foterm * foterm
+    type t = term * term
     let compare (t1, t1') (t2, t2') =
-      if eq_foterm t1 t2
-        then compare_foterm t1' t2'
-        else compare_foterm t1 t2
+      if eq_term t1 t2
+        then compare_term t1' t2'
+        else compare_term t1 t2
+  end)
+
+module THashtbl = Hashtbl.Make(
+  struct
+    type t = term
+    let hash t = t.hkey
+    let equal t1 t2 = eq_term t1 t2
   end)
 
 let rec cast t sort =
@@ -207,7 +214,7 @@ let is_ground_term t = match vars_of_term t with
   | [] -> true
   | _ -> false
 
-let merge_varlist l1 l2 = Utils.list_merge compare_foterm l1 l2
+let merge_varlist l1 l2 = Utils.list_merge compare_term l1 l2
 
 let max_var vars =
   let rec aux idx = function
@@ -259,7 +266,7 @@ let db_replace t s =
   let mk_succ db = mk_node [mk_leaf succ_db_symbol univ_sort; db] in
   (* replace db by s in t *)
   let rec replace db s t = match t.term with
-  | _ when eq_foterm t db -> s
+  | _ when eq_term t db -> s
   | Leaf _ | Var _ -> t
   | Node (({term=Leaf symb} as hd)::tl) when symb = lambda_symbol ->
     (* lift the De Bruijn to replace *)
@@ -303,7 +310,7 @@ let db_from_var t v =
   assert (is_var v);
   (* go recursively and replace *)
   let rec replace_and_lift depth t = match t.term with
-  | Var _ -> if eq_foterm t v then db_make depth v.sort else t
+  | Var _ -> if eq_term t v then db_make depth v.sort else t
   | Leaf _ -> t
   | Node [{term=Leaf s} as hd; t'] when s = lambda_symbol ->
     mk_node [hd; replace_and_lift (depth+1) t']  (* increment depth *) 
@@ -380,7 +387,7 @@ let pp_symbol = ref pp_symbol_unicode
 (** type of a pretty printer for terms *)
 class type pprinter_term =
   object
-    method pp : Format.formatter -> foterm -> unit    (** pretty print a term *)
+    method pp : Format.formatter -> term -> unit    (** pretty print a term *)
   end
 
 let pp_term_debug =

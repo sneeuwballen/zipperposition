@@ -23,17 +23,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 (* unify terms, returns a substitution or raise an exception *)
-val unification: foterm -> foterm -> substitution
+val unification: term -> term -> substitution
 
 (* [matching a b] returns sigma such that sigma(a) = b *)
-val matching: foterm -> foterm -> substitution
+val matching: term -> term -> substitution
 
 (** [matching_locked ~locked subst a b] returns sigma such that sigma(a) = b
     and sigma does not bind any variable in locked and subst \in sigma,
     or raise UnificationFailure *)
-val matching_locked: locked:varlist -> substitution -> foterm -> foterm -> substitution
+val matching_locked: locked:varlist -> substitution -> term -> term -> substitution
 
 (* alpha_eq [a] [b] returns sigma with sigma(a) = b, and sigma
  * a variable renaming, or raise UnificationFailure *)
-val alpha_eq: foterm -> foterm -> substitution
+val alpha_eq: term -> term -> substitution
 

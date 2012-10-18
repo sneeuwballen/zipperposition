@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-type data = hclause * position * foterm
+type data = hclause * position * term
 
 (** a set of (hashconsed clause, position in clause, term). *)
 module ClauseSet : Set.S with type elt = data
@@ -33,29 +33,29 @@ module ClauseSet : Set.S with type elt = data
 type index_leaf
 
 val empty_leaf : index_leaf
-val add_leaf : index_leaf -> foterm -> data -> index_leaf
-val remove_leaf : index_leaf -> foterm -> data -> index_leaf
+val add_leaf : index_leaf -> term -> data -> index_leaf
+val remove_leaf : index_leaf -> term -> data -> index_leaf
 val is_empty_leaf : index_leaf -> bool
-val iter_leaf : index_leaf -> (foterm -> ClauseSet.t -> unit) -> unit
-val fold_leaf : index_leaf -> ('a -> foterm -> ClauseSet.t -> 'a) -> 'a -> 'a
+val iter_leaf : index_leaf -> (term -> ClauseSet.t -> unit) -> unit
+val fold_leaf : index_leaf -> ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
 val size_leaf : index_leaf -> int
 
 (** A term index *)
 class type index =
   object ('b)
     method name : string
-    method add : foterm -> data -> 'b
-    method remove: foterm -> data -> 'b
+    method add : term -> data -> 'b
+    method remove: term -> data -> 'b
 
-    method iter : (foterm -> ClauseSet.t -> unit) -> unit
-    method fold : 'a. ('a -> foterm -> ClauseSet.t -> 'a) -> 'a -> 'a
+    method iter : (term -> ClauseSet.t -> unit) -> unit
+    method fold : 'a. ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
 
-    method retrieve_unifiables : 'a. foterm -> 'a ->
-                                 ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_generalizations : 'a. foterm -> 'a ->
-                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_specializations : 'a. foterm -> 'a ->
-                                      ('a -> foterm -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_unifiables : 'a. term -> 'a ->
+                                 ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_generalizations : 'a. term -> 'a ->
+                                      ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_specializations : 'a. term -> 'a ->
+                                      ('a -> term -> ClauseSet.t -> 'a) -> 'a
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
   end
@@ -68,7 +68,7 @@ class type clause_index =
 
     method root_index : index
     method unit_root_index : index
-    method ground_rewrite_index : (foterm * data) Ptmap.t (** to rewrite ground terms *)
+    method ground_rewrite_index : (term * data) Ptmap.t (** to rewrite ground terms *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit

@@ -54,7 +54,7 @@ let check_fresh c =
   let maxvar = T.max_var c.cvars in
   let ord = O.default_ordering () in
   let c', _ = C.fresh_clause ~ord (maxvar+1) c in
-  if Utils.list_inter T.eq_foterm c.cvars c'.cvars = []
+  if Utils.list_inter T.eq_term c.cvars c'.cvars = []
     then H.TestOk
     else H.TestFail (c, c')
 

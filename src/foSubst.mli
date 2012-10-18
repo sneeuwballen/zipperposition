@@ -22,14 +22,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-exception OccurCheck of (foterm * foterm)
+exception OccurCheck of (term * term)
 
 val id_subst : substitution
 
 (** add v -> t to the substitution. If recursive is true,
     then v -> subst(t) is considered instead.
     If v occurs in t, OccurCheck (v,t) is raised. *)
-val build_subst : ?recursive:bool -> foterm -> foterm -> substitution -> substitution
+val build_subst : ?recursive:bool -> term -> term -> substitution -> substitution
 
 (** check (naively, ie structurally) whether two substitutions are equal *)
 val eq_subst: substitution -> substitution -> bool
@@ -41,15 +41,15 @@ val compare_substs: substitution -> substitution -> int
 module SSet : Set.S with type elt = substitution
 
 (** lookup variable in substitution *)
-val lookup : foterm -> substitution -> foterm
-val is_in_subst : foterm -> substitution -> bool
+val lookup : term -> substitution -> term
+val is_in_subst : term -> substitution -> bool
 
 (** filter out from the varlist the variables bound by subst *)
 val filter : substitution -> varlist -> varlist
 (** restrict the domain to variables not present in term *)
-val restrict_exclude: substitution -> foterm -> substitution
+val restrict_exclude: substitution -> term -> substitution
 
-val apply_subst : ?recursive:bool -> substitution -> foterm -> foterm
+val apply_subst : ?recursive:bool -> substitution -> term -> term
 
 (** normalize the substitution, such that subst(subst(v)) = subst(v)
     for all v. The result is idempotent. *)
@@ -64,10 +64,10 @@ val concat: substitution -> substitution -> substitution
 val relocate : ?recursive:bool -> int -> varlist -> substitution
             -> (int * varlist * substitution)
 
-val fresh_foterm : int -> foterm -> foterm      (** fresh term, with all variables > maxvar *)
-val relocate_term : varlist -> foterm -> foterm (** rename the term so that
+val fresh_term : int -> term -> term      (** fresh term, with all variables > maxvar *)
+val relocate_term : varlist -> term -> term (** rename the term so that
                                                     it has no variable in varlist *)
-val normalize_term : foterm -> foterm * substitution  (** unique representation of term t,
+val normalize_term : term -> term * substitution  (** unique representation of term t,
                                                           substitution to get back to t *)
 
 val pp_substitution : Format.formatter -> substitution -> unit

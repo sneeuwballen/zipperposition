@@ -51,27 +51,27 @@ let univ_sort = "$i"
 exception SortError of string
 
 (** hashconsed term *)
-type foterm = typed_term
+type term = typed_term
 (** term with a simple sort *)
 and typed_term = {
-  term : foterm_cell;           (** the term itself *)
+  term : term_cell;           (** the term itself *)
   sort : sort;                  (** the sort of the term *)
   db_closed : bool Lazy.t;      (** is the term closed w.r.t. De Bruijn indexes? *)
-  vars : foterm list Lazy.t;    (** the variables of the term *)
+  vars : term list Lazy.t;    (** the variables of the term *)
   tag : int;                    (** hashconsing tag *)
   hkey : int;                   (** hash *)
 }
 (** content of the term *)
-and foterm_cell =
+and term_cell =
   | Leaf of symbol        (** constant *)
   | Var of int            (** variable *)
-  | Node of foterm list   (** term application *)
+  | Node of term list   (** term application *)
 
 (** list of variables *)
-type varlist = foterm list            
+type varlist = term list            
 
 (** substitution, a list of variables -> term *)
-type substitution = (foterm * foterm) list
+type substitution = (term * term) list
 
 (** partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable | Invertible
@@ -84,8 +84,8 @@ type position = int list
 
 (** a literal, that is, a signed equation *)
 type literal = 
- | Equation of    foterm  (* lhs *)
-                * foterm  (* rhs *)
+ | Equation of    term  (* lhs *)
+                * term  (* rhs *)
                 * bool    (* sign *)
                 * comparison (* orientation *)
 
@@ -97,7 +97,7 @@ and clause = {
   clits : literal list;                   (** the equations *)
   cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
   cselected : int list Lazy.t;            (** index of selected literals *)
-  cvars : foterm list;                    (** the free variables *)
+  cvars : term list;                    (** the free variables *)
   cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
   cparents : clause list Lazy.t;          (** clauses used to create this one *)
 }
@@ -131,8 +131,8 @@ class type ordering =
     method refresh : unit -> unit             (** refresh the symbol ordering (the signature) *)
     method clear_cache : unit -> unit         (** clear cache, if any *)
     method symbol_ordering : symbol_ordering
-    method compare : foterm -> foterm -> comparison
-    method compute_term_weight : foterm -> int
+    method compare : term -> term -> comparison
+    method compute_term_weight : term -> int
     method compute_clause_weight : clause -> int
     method name : string
   end

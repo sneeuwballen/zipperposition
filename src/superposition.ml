@@ -83,9 +83,9 @@ let rec list_first f = function
     such that f t' is not None, is replaced by f t'.
     Does not visit variables.
 
-    position -> foterm
-      -> (foterm -> (foterm * 'b) option)
-      -> (foterm * 'b * foterm * position) option
+    position -> term
+      -> (term -> (term * 'b) option)
+      -> (term * 'b * term * position) option
     *)
 let first_position pos t f =
   (* re-build context from the result *)
@@ -121,8 +121,8 @@ let first_position pos t f =
     at each such position, and returns a list of objects; all lists
     returned by f are concatenated.
 
-    position -> foterm
-    -> (foterm -> position -> 'b list)
+    position -> term
+    -> (term -> position -> 'b list)
     -> 'b list
     *)
 let all_positions pos t f =
@@ -145,7 +145,7 @@ let all_positions pos t f =
 
 (** iterate through positions that are common to both terms.
     f has type
-    'a -> position -> foterm -> foterm -> 'a option,
+    'a -> position -> term -> term -> 'a option,
     so it can choose to stop by returning None. *)
 let parallel_positions pos t1 t2 acc f =
   (** fold on both lists *)
@@ -165,7 +165,7 @@ let parallel_positions pos t1 t2 acc f =
       f acc (List.rev pos) t1 t2
     | Node (hd1::tl1), Node (hd2::tl2) ->
       begin match f acc (List.rev pos) t1 t2 with
-      | None when T.eq_foterm hd1 hd2 -> fold acc pos 1 tl1 tl2  (* recurse in subterms *)
+      | None when T.eq_term hd1 hd2 -> fold acc pos 1 tl1 tl2  (* recurse in subterms *)
       | None -> None (* not the same, and not accepted by f *)
       | Some acc -> Some acc (* f is ok on this pair of terms *)
       end
@@ -192,7 +192,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                        !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
                        !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
                        C.pp_pos passive_pos S.pp_substitution subst));
-  assert ((Utils.list_inter T.eq_foterm active_clause.cvars passive_clause.cvars) = []);
+  assert ((Utils.list_inter T.eq_term active_clause.cvars passive_clause.cvars) = []);
   assert (T.db_closed s);
   if not sign_st 
   then (Utils.debug 3 (lazy "active literal is negative"); acc)
@@ -201,10 +201,10 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   else
   let t' = S.apply_subst subst t
   and v' = S.apply_subst subst v in
-  if sign_uv && T.eq_foterm t' v' && subterm_pos = []
+  if sign_uv && T.eq_term t' v' && subterm_pos = []
   then (Utils.debug 3 (lazy "will yield a tautology"); acc)
   else begin
-    assert (T.eq_foterm (S.apply_subst subst (T.at_pos u subterm_pos))
+    assert (T.eq_term (S.apply_subst subst (T.at_pos u subterm_pos))
                         (S.apply_subst subst s));
     if (ord#compare (S.apply_subst subst s) t' = Lt ||
         ord#compare (S.apply_subst subst u) v' = Lt ||
@@ -392,7 +392,7 @@ let infer_equality_factoring ~ord clause =
  * simplifications
  * ---------------------------------------------------------------------- *)
 
-exception FoundMatch of (foterm * substitution * clause * position)
+exception FoundMatch of (term * substitution * clause * position)
 
 (** Do one step of demodulation on subterm. *)
 let demod_subterm ~ord blocked_ids active_set subterm =
@@ -413,7 +413,7 @@ let demod_subterm ~ord blocked_ids active_set subterm =
         then
           let new_t, (hc, pos, l) = Ptmap.find subterm.tag
             active_set.PS.idx#ground_rewrite_index in
-          assert (T.eq_foterm l subterm);
+          assert (T.eq_term l subterm);
           raise (FoundMatch (new_t, S.id_subst, hc, pos))
         else ()
     with Not_found -> ());
@@ -514,7 +514,7 @@ let is_tautology c =
     (* s=s literal *)
     (List.exists
       (fun (Equation (l, r, sign, _)) ->
-          (sign && T.eq_foterm l r))
+          (sign && T.eq_term l r))
       c.clits) ||
     (* both l=r and l!=r are literals *)
     (List.exists
@@ -522,8 +522,8 @@ let is_tautology c =
         List.exists
           (fun (Equation (l', r', sign', _)) ->
               (sign = not sign') &&
-              (((T.eq_foterm l l') && (T.eq_foterm r r')) ||
-              ((T.eq_foterm l r') && (T.eq_foterm l' r)))
+              (((T.eq_term l l') && (T.eq_term r r')) ||
+              ((T.eq_term l r') && (T.eq_term l' r)))
           )
         c.clits
       )
@@ -541,7 +541,7 @@ let basic_simplify ~ord clause =
   (* convert some fof to literals *)
   let clause = C.clause_of_fof ~ord clause in
   let absurd_lit lit = match lit with
-  | Equation (l, r, false, _) when T.eq_foterm l r -> true
+  | Equation (l, r, false, _) when T.eq_term l r -> true
   | _ -> false in
   (* remove s!=s literals *)
   let new_lits = List.filter (fun lit -> not (absurd_lit lit)) clause.clits in
@@ -590,7 +590,7 @@ let positive_simplify_reflect active_set clause =
   (** try to remove the literal using some positive unit clauses
       from active_set *)
   and equatable_lits clauses pos t1 t2 =
-    if T.eq_foterm t1 t2
+    if T.eq_term t1 t2
       then Some clauses  (* trivial *)
       else  (* try to solve it with a unit equality *)
         try active_set.PS.idx#unit_root_index#retrieve_generalizations t1 ()
@@ -604,7 +604,7 @@ let positive_simplify_reflect active_set clause =
                   | [idx; side] ->
                     (* get the other side of the equation *)
                     let r = C.get_pos clause [idx; C.opposite_pos side] in
-                    if T.eq_foterm t2 (S.apply_subst subst r)
+                    if T.eq_term t2 (S.apply_subst subst r)
                     then begin
                       Utils.debug 4 (lazy (Utils.sprintf "equate %a and %a using %a"
                                   !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp clause));
@@ -657,7 +657,7 @@ let negative_simplify_reflect active_set clause =
                 let r = C.get_pos clause [idx; C.opposite_pos side] in
                 if List.length clause.clits = 1 &&
                    C.neg_lit (List.hd clause.clits) &&
-                   T.eq_foterm t (S.apply_subst subst r)
+                   T.eq_term t (S.apply_subst subst r)
                 then begin
                   Utils.debug 3 (lazy (Utils.sprintf "neg_reflect eliminates %a=%a with %a"
                                  !T.pp_term#pp s !T.pp_term#pp t !C.pp_clause#pp clause));
@@ -797,8 +797,8 @@ let cnf_of ~ord clause =
   let varindex = ref 0 in
   (* convert literal to term (reify equality) *)
   let rec lit_to_term (Equation (l,r,sign,_)) =
-    if T.eq_foterm l T.true_term then (if sign then r else T.mk_not r)
-    else if T.eq_foterm r T.true_term then (if sign then l else T.mk_not l)
+    if T.eq_term l T.true_term then (if sign then r else T.mk_not r)
+    else if T.eq_term r T.true_term then (if sign then l else T.mk_not l)
     else (if sign then T.mk_eq l r else T.mk_not (T.mk_eq l r))
   (* negation normal form (also remove equivalence and implications) *) 
   and nnf t =
@@ -841,7 +841,7 @@ let cnf_of ~ord clause =
       when s = not_symbol && s' = not_symbol -> nnf t (* double negation *)
     | Node l ->
       let t' = T.mk_node (List.map nnf l) in
-      if T.eq_foterm t t' then t' else nnf t'
+      if T.eq_term t t' then t' else nnf t'
   (* skolemization of existentials, removal of forall *)
   and skolemize t = match t.term with
     | Var _ | Leaf _ -> t

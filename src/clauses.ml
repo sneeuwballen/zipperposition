@@ -48,23 +48,23 @@ let opposite_pos p = match p with
 let eq_literal l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      o1 = o2 && T.eq_foterm l1 l2 && T.eq_foterm r1 r2 && sign1 = sign2
+      o1 = o2 && T.eq_term l1 l2 && T.eq_term r1 r2 && sign1 = sign2
 
 let eq_literal_com l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
       o1 = o2 && sign1 = sign2 &&
-      ((T.eq_foterm l1 l2 && T.eq_foterm r1 r2) ||
-       (T.eq_foterm l1 r2 && T.eq_foterm r1 l2))
+      ((T.eq_term l1 l2 && T.eq_term r1 r2) ||
+       (T.eq_term l1 r2 && T.eq_term r1 l2))
 
 let compare_literal l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
       let c = Pervasives.compare o1 o2 in
       if c <> 0 then c else
-        let c = T.compare_foterm l1 l2 in
+        let c = T.compare_term l1 l2 in
         if c <> 0 then c else
-          let c = T.compare_foterm r1 r2 in
+          let c = T.compare_term r1 r2 in
           if c <> 0 then c else
             Pervasives.compare sign1 sign2
 
@@ -160,41 +160,41 @@ let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r
 let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
   match l.term, r.term with
   (* deal with trivial literals *)
-  | _ when T.eq_foterm l T.true_term && T.eq_foterm r T.false_term ->
+  | _ when T.eq_term l T.true_term && T.eq_term r T.false_term ->
     mk_lit ~ord T.true_term T.true_term (not sign)
-  | _ when T.eq_foterm r T.true_term && T.eq_foterm l T.false_term ->
+  | _ when T.eq_term r T.true_term && T.eq_term l T.false_term ->
     mk_lit ~ord T.true_term T.true_term (not sign)
-  | _ when T.eq_foterm l r ->
+  | _ when T.eq_term l r ->
     mk_lit ~ord T.true_term T.true_term sign
   (* deal with false/true *)
-  | _ when T.eq_foterm l T.false_term ->
+  | _ when T.eq_term l T.false_term ->
     assert (r.sort = bool_sort);
     lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
-  | _ when T.eq_foterm r T.false_term ->
+  | _ when T.eq_term r T.false_term ->
     assert (l.sort = bool_sort);
     lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
   (* deal with negation *)
-  | Node [{term=Leaf s}; t], _ when s = not_symbol && T.eq_foterm r T.true_term ->
+  | Node [{term=Leaf s}; t], _ when s = not_symbol && T.eq_term r T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
-  | _, Node [{term=Leaf s}; t] when s = not_symbol && T.eq_foterm l T.true_term ->
+  | _, Node [{term=Leaf s}; t] when s = not_symbol && T.eq_term l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
   (* deal with equality symbol *)
-  | Node [{term=Leaf s}; a; b], _ when s = eq_symbol && T.eq_foterm r T.true_term ->
+  | Node [{term=Leaf s}; a; b], _ when s = eq_symbol && T.eq_term r T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)
-  | _, Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_foterm l T.true_term ->
+  | _, Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)
   (* default is just reordering *)
   | _ -> reord_lit ~ord lit
 
 let term_of_lit lit =
   match lit with
-  | Equation (left, right, false, _) when T.eq_foterm right T.true_term ->
+  | Equation (left, right, false, _) when T.eq_term right T.true_term ->
     T.mk_not left
-  | Equation (left, right, true, _) when T.eq_foterm right T.true_term ->
+  | Equation (left, right, true, _) when T.eq_term right T.true_term ->
     left
-  | Equation (left, right, true, _) when T.eq_foterm left T.true_term ->
+  | Equation (left, right, true, _) when T.eq_term left T.true_term ->
     right
-  | Equation (left, right, false, _) when T.eq_foterm left T.true_term ->
+  | Equation (left, right, false, _) when T.eq_term left T.true_term ->
     T.mk_not right
   | Equation (left, right, sign, ord) ->
     if sign then T.mk_eq left right else T.mk_not (T.mk_eq left right)
@@ -223,14 +223,16 @@ let eq_clause c1 c2 =
 
 let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
 
+let hash_clause c =
+  let rec aux h = function
+  | [] -> h
+  | lit::tail -> aux (Utils.murmur_hash (h lxor hash_literal lit)) tail
+  in aux 113 c.clits
+
 module H = Hashcons.Make(struct
   type t = clause
   let equal c1 c2 = eq_clause c1 c2 && (Lazy.force c1.cselected = Lazy.force c2.cselected)
-  let hash c =
-    let rec aux h = function
-    | [] -> h
-    | lit::tail -> aux (Utils.murmur_hash (h lxor hash_literal lit)) tail
-    in aux 113 c.clits
+  let hash c = hash_clause c
   let tag i c = {c with ctag = i}
 end)
 
@@ -243,6 +245,13 @@ let stats () = H.stats ()
 let eq_hclause hc1 hc2 = hc1 == hc2
 
 let compare_hclause hc1 hc2 = Pervasives.compare hc1.ctag hc2.ctag
+
+module CHashtbl = Hashtbl.Make(
+  struct
+    type t = clause
+    let hash c = hash_clause c
+    let equal c1 c2 = eq_clause c1 c2
+  end)
 
 let check_maximal_lit_ ~ord clause pos subst =
   let lits_pos = Utils.list_pos clause.clits in
@@ -294,7 +303,7 @@ let mk_clause ~ord lits ~selected proof parents =
   | v::vars1' -> merge_vars (v::acc) vars1'
   in
   let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
-  let all_vars = List.stable_sort T.compare_foterm all_vars
+  let all_vars = List.stable_sort T.compare_term all_vars
   and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
   {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cparents=parents;
    cmaxlits=maxlits; ctag= -1}
@@ -476,11 +485,11 @@ class type pprinter_literal =
 
 let pp_literal_gen pp_term formatter lit =
   match lit with
-  | Equation (l, r, sign, _) when T.eq_foterm r T.true_term ->
+  | Equation (l, r, sign, _) when T.eq_term r T.true_term ->
     if sign
       then pp_term#pp formatter l
       else Format.fprintf formatter "¬%a" pp_term#pp l
-  | Equation (l, r, sign, _) when T.eq_foterm l T.true_term ->
+  | Equation (l, r, sign, _) when T.eq_term l T.true_term ->
     if sign
       then pp_term#pp formatter r
       else Format.fprintf formatter "¬%a" pp_term#pp r
@@ -522,7 +531,7 @@ class type pprinter_clause =
     method pp : Format.formatter -> clause -> unit      (** print clause *)
     method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
     method pp_pos : Format.formatter -> (clause * position) -> unit
-    method pp_h_pos : Format.formatter -> (hclause * position * foterm) -> unit
+    method pp_h_pos : Format.formatter -> (hclause * position * term) -> unit
     method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
     method horizontal : bool -> unit                    (** print in horizontal box? *)
   end

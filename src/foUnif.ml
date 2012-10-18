@@ -34,8 +34,8 @@ let prof_matching = HExtlib.profile ~enable "matching"
 let mem2 a b l =
   let rec aux found_a found_b = function
     | x :: tl ->
-      let found_a = found_a || T.eq_foterm x a in
-      let found_b = found_b || T.eq_foterm x b in
+      let found_a = found_a || T.eq_term x a in
+      let found_b = found_b || T.eq_term x b in
       if found_a && found_b
         then true, true
         else aux found_a found_b tl
@@ -46,10 +46,10 @@ let mem2 a b l =
 (** occur check of what in where *)
 let rec occurs_check subst what where =
   match where.term with
-  | Var _ when T.eq_foterm where what -> true
+  | Var _ when T.eq_term where what -> true
   | Var _ ->
       let t = S.lookup where subst in
-      if not (T.eq_foterm t where)
+      if not (T.eq_term t where)
         then occurs_check subst what t
         else false
   | Node l -> List.exists (occurs_check subst what) l
@@ -62,7 +62,7 @@ let unification a b =
     let s = S.apply_subst subst s
     and t = S.apply_subst subst t in
     match s.term, t.term with
-    | _, _ when T.eq_foterm s t -> subst
+    | _, _ when T.eq_term s t -> subst
     | _, _ when T.is_ground_term s && T.is_ground_term t ->
         (* distinct ground terms cannot be unified *)
         raise (UnificationFailure (lazy "distinct ground terms"))
@@ -88,7 +88,7 @@ let matching_locked ~locked subst a b =
     let s = S.apply_subst subst s
     and t = S.apply_subst subst t in
     match s.term, t.term with
-    | _, _ when T.eq_foterm s t -> subst
+    | _, _ when T.eq_term s t -> subst
     | _, _ when T.is_ground_term s && T.is_ground_term t ->
         (* distinct ground terms cannot be matched *) 
         raise (UnificationFailure (lazy "distinct ground terms"))
@@ -115,7 +115,7 @@ let alpha_eq s t =
 
     in
     match s.term, t.term with
-      | _, _ when T.eq_foterm s t -> subst
+      | _, _ when T.eq_term s t -> subst
       | Var _, Var _
           when (not (List.exists (fun (_,k) -> k=t) subst)) ->
           let subst = S.build_subst s t subst in

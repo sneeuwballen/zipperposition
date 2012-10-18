@@ -34,7 +34,7 @@ type data = I.data
 type feature = A | B | N | S of symbol
 
 (** a fingerprint function, it computes several features of a term *)
-type fingerprint_fun = foterm -> feature list
+type fingerprint_fun = term -> feature list
 
 
 (** compute a feature for a given position *)
@@ -237,22 +237,22 @@ let mk_index fp =
 
     method iter f = iter trie f
 
-    method fold : 'a. ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a -> 'a =
+    method fold : 'a. ('a -> term -> I.ClauseSet.t -> 'a) -> 'a -> 'a =
       fun f acc -> fold trie f acc
 
-    method retrieve_unifiables: 'a. foterm -> 'a -> ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a  =
+    method retrieve_unifiables: 'a. term -> 'a -> ('a -> term -> I.ClauseSet.t -> 'a) -> 'a  =
       fun t acc f ->
         let features = fp t in
         traverse ~compatible:compatible_features_unif trie features f acc
 
-    method retrieve_generalizations: 'a. foterm -> 'a -> ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a =
+    method retrieve_generalizations: 'a. term -> 'a -> ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
         let features = fp t in
         (* compatible t1 t2 if t2 can match t1 *)
         let compatible f1 f2 = compatible_features_match f2 f1 in
         traverse ~compatible trie features f acc
 
-    method retrieve_specializations: 'a. foterm -> 'a -> ('a -> foterm -> I.ClauseSet.t -> 'a) -> 'a = 
+    method retrieve_specializations: 'a. term -> 'a -> ('a -> term -> I.ClauseSet.t -> 'a) -> 'a = 
       fun t acc f ->
         let features = fp t in
         traverse ~compatible:compatible_features_match trie features f acc

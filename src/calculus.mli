@@ -66,16 +66,16 @@ val do_unary_inferences : ord:ordering ->
 (* some helpers *)
 val fold_lits :
   ?pos:bool -> ?neg:bool -> ?both:bool ->
-  ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
+  ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
   (literal * int) list -> 'a
 val fold_positive :
-  ?both:bool -> ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
+  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
   (literal * int) list -> 'a
 val fold_negative :
-  ?both:bool -> ('a -> foterm -> foterm -> bool -> position -> 'a) -> 'a ->
+  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
   (literal * int) list -> 'a
 
-val get_equations_sides : clause -> position -> foterm * foterm * bool
+val get_equations_sides : clause -> position -> term * term * bool
 
 (** Skolemize the given term at root (assumes it occurs just under an
     existential quantifier, whose De Bruijn variable is replaced
@@ -84,4 +84,4 @@ val get_equations_sides : clause -> position -> foterm * foterm * bool
     the same way. The sort is the sort of the free De Bruijn symbol in t.
 
     It also refreshes the ordering (the signature has changed) *)
-val skolem : ord:ordering -> foterm -> sort -> foterm
+val skolem : ord:ordering -> term -> sort -> term

@@ -171,6 +171,11 @@ let rec list_mem comp x l = match l with
   | y::ys when comp x y -> true
   | _::ys -> list_mem comp x ys
 
+let rec list_subset cmp l1 l2 =
+  List.for_all
+    (fun t -> list_mem cmp t l2)
+    l1
+
 let rec list_uniq comp l = match l with
   | [] -> []
   | x::xs -> x :: list_uniq comp (List.filter (fun x' -> not (comp x x')) xs)
@@ -208,6 +213,13 @@ let rec list_take n l = match n, l with
   | _, [] -> l
   | _, x::xs when n > 0 -> x :: (list_take (n-1) xs)
   | _ -> assert false
+
+let rec list_min cmp l =
+  match l with
+  | [] -> []
+  | x::xs when List.exists (fun x' -> cmp x x' = Gt) xs ->
+    list_min cmp xs
+  | x::xs -> x : (list_min cmp xs)
 
 let rec list_range low high =
   assert (low <= high);

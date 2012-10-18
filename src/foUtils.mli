@@ -61,6 +61,8 @@ val list_remove : 'a list -> int -> 'a list
 val list_pos : 'a list -> ('a * int) list
 (** test for membership using the given comparison function *)
 val list_mem : ('a -> 'a -> bool) -> 'a -> 'a list -> bool
+(** test for inclusion *)
+val list_subset : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 (** list uniq: remove duplicates w.r.t the equality predicate *)
 val list_uniq : ('a -> 'a -> bool) -> 'a list -> 'a list
 (** merges elements from both sorted list, removing duplicates *)
@@ -73,6 +75,8 @@ val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 val list_flatmap : ('a -> 'b list) -> 'a list -> 'b list
 (** take n elements *)
 val list_take : int -> 'a list -> 'a list
+(** Extract the minimum objects of the list *)
+val list_min : ('a -> 'a -> comparison) -> 'a list -> 'a list
 (** range from i to j *)
 val list_range : int -> int -> int list
 (** call the function n times with unit *)

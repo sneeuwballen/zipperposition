@@ -10,7 +10,7 @@ profile:
 	cd src && ocamlbuild -libs str,unix -tags debug,profile main.native
 
 tests: all
-	cd tests && ocamlbuild -libs str,unix -tag debug -I src tests.native testEgraph.native
+	cd tests && ocamlbuild -libs str,unix -tag debug -I src tests.native
 
 doc:
 	cd src && ocamlbuild main.docdir/index.html
