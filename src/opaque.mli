@@ -44,7 +44,7 @@ val mk_oterm : theory:theory -> term -> oterm
 val mk_oclause : theory:theory -> clause -> oclause
   (** Build or find the opaque clause associated with the clause *)
 
-val rewrite : ord:ordering -> oterm -> oterm -> unit
+val rewrite : oterm -> oterm -> unit
   (** Inform the first opaque term that it rewrites into the second term
       (the latter must therefore be smaller in the ordering). *)
 
@@ -54,10 +54,10 @@ val minimal_terms : oterm -> term list
 val active_clauses : oclause -> clause list
   (** List of non-redundant clauses that this opaque clause is congruent to *)
 
-val vars : oterm -> Terms.varlist
+val vars : oterm -> varlist
   (** Variables for this opaque term *)
 
-val oclause_vars : oclause -> Terms.varlist
+val oclause_vars : oclause -> varlist
   (** Variables for this opaque clause *)
 
 val congruent : oterm -> oterm -> bool

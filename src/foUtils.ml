@@ -219,7 +219,7 @@ let rec list_min cmp l =
   | [] -> []
   | x::xs when List.exists (fun x' -> cmp x x' = Gt) xs ->
     list_min cmp xs
-  | x::xs -> x : (list_min cmp xs)
+  | x::xs -> x :: (list_min cmp xs)
 
 let rec list_range low high =
   assert (low <= high);

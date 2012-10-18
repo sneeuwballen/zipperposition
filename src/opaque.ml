@@ -39,7 +39,7 @@ type theory =
 
 type oterm = {
   ot_theory : theory;
-  ot_vars : T.varlist;
+  ot_vars : varlist;
   ot_terms : term list;
   mutable ot_minimal_terms : term list;
   mutable ot_points_to : oterm list;
@@ -48,7 +48,7 @@ type oterm = {
 
 type oclause = {
   oc_theory : theory;
-  oc_vars : T.varlist;
+  oc_vars : varlist;
   oc_clauses : clause list;
   mutable oc_active_clauses : clause list;
   mutable oc_up_to_date : bool;         (** indicates whether active_clauses is up-to-date *)
@@ -67,6 +67,7 @@ let mk_oterm ~theory t =
     let vars = T.vars_of_term t in
     let congruence = theory#congruence t in
     let ot = {
+      ot_theory = theory;
       ot_vars = vars;
       ot_terms = congruence;
       ot_minimal_terms = congruence;  (* will be computed on demand *)
@@ -75,7 +76,7 @@ let mk_oterm ~theory t =
     } in
     (* associate opaque term with all terms of the congruence *)
     List.iter
-      (fun t -> Hashtbl.replace oterms t ot)
+      (fun t -> T.THashtbl.replace oterms t ot)
       congruence;
     ot
   end
@@ -84,7 +85,7 @@ let mk_oclause ~theory clause = failwith "not implemented"
 
 let rewrite ot1 ot2 =
   if ot1 == ot2 then () else begin
-    assert (Utils.list_subset ot2.ot_vars ot1.ot_vars);
+    assert (Utils.list_subset T.eq_term ot2.ot_vars ot1.ot_vars);
     if Utils.list_mem (fun x y -> x == y) ot2 ot1.ot_points_to
       then ()
       else (ot1.ot_points_to <- ot2 :: ot1.ot_points_to;
@@ -111,10 +112,10 @@ let minimal_terms ot =
   and gather_minimal_terms acc ot =
     let acc = List.rev_append ot.ot_minimal_terms acc in
     List.fold_left gather_minimal_terms acc ot.ot_points_to
+  in
   (* update; then return *)
   update (ref false) ot;
   ot.ot_minimal_terms
-  and
 
 let active_clauses oc =
   (* TODO update *)
