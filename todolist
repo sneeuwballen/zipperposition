@@ -2,6 +2,7 @@
 - make multiset comparison fast
 - maybe implement context trees for general purpose indexing
 
+- miniscoping in CNF reduction
 - elimination rules in delayed as simplifications
 - find better heuristics for delayed superposition
 - syntactic tautology deletion
