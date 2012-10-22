@@ -3,7 +3,7 @@
 # helper to clausify then run prover (using eprover)
 
 TARGET="$1"
-PROVER="./src/main.native"
+PROVER="./main.native"
 
 shift  # remove first option
 

@@ -2,7 +2,7 @@
 
 # helper to run the Zipperposition prover
 
-PROVER="./src/main.native"
+PROVER="./main.native"
 
 . ./runtime.sh
 

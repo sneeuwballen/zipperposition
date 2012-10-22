@@ -1,22 +1,24 @@
 
-INTERFACE_FILES = $(wildcard src/*.mli)
+INTERFACE_FILES = $(shell find src -name '*.mli')
 
-IMPLEMENTATION_FILES = $(INTERFACE_FILES:%.mli=%.ml)
+IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 
 all:
-	cd src && ocamlbuild -libs str,unix -tag debug main.native
+	ocamlbuild -libs str,unix -tag debug src/main.native
 
 profile:
-	cd src && ocamlbuild -libs str,unix -tags debug,profile main.native
+	ocamlbuild -libs str,unix -tags debug,profile src/main.native
 
 tests: all
-	cd tests && ocamlbuild -libs str,unix -tag debug -I src tests.native
+	ocamlbuild -libs str,unix -tag debug -I src tests/tests.native
+profile_tests: all
+	ocamlbuild -libs str,unix -tags debug,profile -I src tests.native
 
 doc:
-	cd src && ocamlbuild main.docdir/index.html
+	ocamlbuild src/main.docdir/index.html
 
 clean:
-	cd src && ocamlbuild -clean
+	ocamlbuild -clean
 
 tags:
 	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
