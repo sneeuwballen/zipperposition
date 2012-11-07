@@ -243,7 +243,7 @@ let infer_active_ actives clause =
       subterm_idx#retrieve_unifiables s acc
         (fun acc u_p set ->
           try (* rewrite u_p with s, if they are unifiable *)
-            let subst = Unif.unification s u_p in
+            let subst = Unif.unification S.id_subst s u_p in
             I.ClauseSet.fold
               (fun (hc, u_pos, u_p) acc ->
                 do_superposition ~ord clause s_pos hc u_pos subst acc)
@@ -273,7 +273,7 @@ let infer_passive_ actives clause =
           actives.PS.idx#root_index#retrieve_unifiables u_p acc
             (fun acc s set ->
               try
-                let subst = Unif.unification s u_p in
+                let subst = Unif.unification S.id_subst s u_p in
                 I.ClauseSet.fold
                   (fun (hc, s_pos, s) acc ->
                       do_superposition ~ord hc s_pos clause p subst acc)
@@ -300,7 +300,7 @@ let infer_equality_resolution_ ~ord clause =
       | [] -> assert false
       | pos::_ ->
       try
-        let subst = Unif.unification l r in
+        let subst = Unif.unification S.id_subst l r in
         if C.eligible_res ~ord clause pos subst
           (* subst(lit) is maximal, we can do the inference *)
           then begin
@@ -337,11 +337,11 @@ let infer_equality_factoring_ ~ord clause =
         else
           let try_u =  (* try inference between s and u *)
             try
-              let subst = Unif.unification s u in [[idx; C.left_pos], subst]
+              let subst = Unif.unification S.id_subst s u in [[idx; C.left_pos], subst]
             with UnificationFailure -> []
           and try_v =  (* try inference between s and v *)
             try
-              let subst = Unif.unification s v in [[idx; C.right_pos], subst]
+              let subst = Unif.unification S.id_subst s v in [[idx; C.right_pos], subst]
             with UnificationFailure -> []
           in try_u @ try_v @ acc
       )
@@ -422,7 +422,7 @@ let demod_subterm ~ord blocked_ids active_set subterm =
       (fun () l set ->
         assert (T.db_closed l);
         try
-          let subst = Unif.fast_matching l subterm in
+          let subst = Unif.matching S.id_subst l subterm in
           (* iterate on all clauses for this term *)
           I.ClauseSet.iter 
             (fun (unit_hclause, pos, l) ->
@@ -555,7 +555,7 @@ let basic_simplify ~ord clause =
         assert (not sign);
         assert (T.is_var l || T.is_var r);
         try
-          let subst = Unif.unification l r in
+          let subst = Unif.unification S.id_subst l r in
           (* remove the literal, and apply the substitution to the remaining literals
              before trying to find another x!=t *)
           er (List.map (C.apply_subst_lit ~ord subst) (Utils.list_remove lits i))
@@ -596,7 +596,7 @@ let positive_simplify_reflect active_set clause =
         try active_set.PS.idx#unit_root_index#retrieve_generalizations t1 ()
           (fun () l set ->
             try
-              let subst = Unif.fast_matching l t1 in
+              let subst = Unif.matching S.id_subst l t1 in
               (* find some r in the set, such that subst(r) = t2 *)
               I.ClauseSet.iter
                 (fun (clause, pos, _) ->
@@ -647,7 +647,7 @@ let negative_simplify_reflect active_set clause =
     try active_set.PS.idx#root_index#retrieve_generalizations s ()
       (fun () l set ->
         try
-          let subst = Unif.fast_matching l s in
+          let subst = Unif.matching S.id_subst l s in
           (* find some r in the set, such that subst(r) = t *)
           I.ClauseSet.iter
             (fun (clause, pos, _) ->

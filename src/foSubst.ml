@@ -74,6 +74,9 @@ let filter subst varlist =
 let restrict_exclude subst term =
   List.filter (fun (v, t) -> not (T.member_term v term)) subst
 
+let apply_subst_bind subst =
+  List.iter (fun (v, t) -> T.set_binding v t) subst
+
 let rec apply_subst ?(recursive=true) subst t = match t.term with
   | Leaf _ -> t
   | Var _ ->
@@ -84,9 +87,6 @@ let rec apply_subst ?(recursive=true) subst t = match t.term with
         else new_t
   | Node l ->
       T.mk_node (List.map (apply_subst subst ~recursive) l)
-
-let bind_subst subst =
-  List.iter (fun (v, t) -> T.set_binding v t) subst
 
 let build_subst ?(recursive=false) v t tail =
   assert (v.sort = t.sort);
@@ -106,7 +106,7 @@ let build_subst ?(recursive=false) v t tail =
 let update_binding subst v =
   assert (T.is_var v);
   let t = T.get_binding v in
-  (v,t)::subst
+  if t == v then subst else (v,t)::subst
 
 let update_bindings subst l = List.fold_left update_binding subst l
 

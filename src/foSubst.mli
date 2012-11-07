@@ -55,7 +55,7 @@ val filter : substitution -> varlist -> varlist
 val restrict_exclude: substitution -> term -> substitution
 
 (** for each (v, t) in subst, v.binding <- t *)
-val bind_subst : substitution -> unit
+val apply_subst_bind : substitution -> unit
 (** apply substitution to term, replacing variables by the term they are bound to *)
 val apply_subst : ?recursive:bool -> substitution -> term -> term
 

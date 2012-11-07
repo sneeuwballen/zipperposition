@@ -48,6 +48,12 @@ let rec member_term a b = a == b || match b.term with
   | Leaf _ | Var _ -> false
   | Node subterms -> List.exists (member_term a) subterms
 
+let rec member_term_rec a b =
+  a == b || match b.term with
+  | Var _ when b.binding != b -> member_term_rec a b.binding
+  | Leaf _ | Var _ -> false
+  | Node subterms -> List.exists (member_term_rec a) subterms
+
 let eq_term x y = x == y  (* because of hashconsing *)
 
 let compare_term x y = x.tag - y.tag
@@ -299,6 +305,9 @@ let expand_bindings t =
         then mk_node (List.map fst l'), true
         else t, false
   in fst (recurse t)
+
+(** reset bindings of variables of the term *)
+let reset_vars t = List.iter reset_binding t.vars
 
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas

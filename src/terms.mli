@@ -29,6 +29,7 @@ val is_symmetric_symbol : symbol -> bool
  * comparison, equality, containers
  * ---------------------------------------------------------------------- *)
 val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *)
+val member_term_rec : term -> term -> bool(** same, but follows variable bindings *)
 val eq_term : term -> term -> bool        (** standard equality on terms *)
 val compare_term : term -> term -> int    (** a simple order on terms *)
 
@@ -107,6 +108,7 @@ val reset_binding : term -> unit            (** reset variable binding/normal fo
 val get_binding : term -> term              (** get the binding of variable/normal form of term *)
 val expand_bindings : term -> term          (** replace variables by their bindings *)
 
+val reset_vars : term -> unit               (** reset bindings of variables of the term *)
 
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
