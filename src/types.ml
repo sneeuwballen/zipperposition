@@ -54,24 +54,28 @@ exception SortError of string
 type term = typed_term
 (** term with a simple sort *)
 and typed_term = {
-  term : term_cell;           (** the term itself *)
+  term : term_cell;             (** the term itself *)
   sort : sort;                  (** the sort of the term *)
-  db_closed : bool Lazy.t;      (** is the term closed w.r.t. De Bruijn indexes? *)
-  vars : term list Lazy.t;    (** the variables of the term *)
-  tag : int;                    (** hashconsing tag *)
-  hkey : int;                   (** hash *)
+  mutable binding : term;       (** binding of the term (if variable), or normal form *)
+  mutable vars : term list;     (** the variables of the term *)
+  mutable db_closed : bool;     (** is the term closed w.r.t. De Bruijn indexes? *)
+  mutable tag : int;            (** hashconsing tag *)
+  mutable hkey : int;           (** hash *)
 }
 (** content of the term *)
 and term_cell =
-  | Leaf of symbol        (** constant *)
-  | Var of int            (** variable *)
-  | Node of term list   (** term application *)
+  | Leaf of symbol          (** constant *)
+  | Var of int              (** variable *)
+  | Node of term list       (** term application *)
 
 (** list of variables *)
 type varlist = term list            
 
-(** substitution, a list of variables -> term *)
+(** substitution, a list of (variable -> term) *)
 type substitution = (term * term) list
+
+(** (Church-Rosser) term rewriting system *)
+type rewriting_system = term -> term
 
 (** partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable | Invertible

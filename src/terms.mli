@@ -25,21 +25,42 @@ open Types
 (** symbols that are symmetric (that is, order of arguments does not matter) *)
 val is_symmetric_symbol : symbol -> bool
 
-val iter_terms : (term -> unit) -> unit     (** iterate through existing terms *)
-val all_terms : unit -> term list           (** all currently existing terms *)
+(* ----------------------------------------------------------------------
+ * comparison, equality, containers
+ * ---------------------------------------------------------------------- *)
+val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *)
+val eq_term : term -> term -> bool        (** standard equality on terms *)
+val compare_term : term -> term -> int    (** a simple order on terms *)
+
+module TSet : Set.S with type elt = term
+module TPairSet : Set.S with type elt = term * term
+module THashtbl : Hashtbl.S with type key = term
+
+(** Simple hashset for small sets of terms *)
+module THashSet :
+  sig
+    type t
+    val create : unit -> t
+    val iter : t -> (term -> unit) -> unit
+    val add : t -> term -> unit
+    val merge : t -> t -> unit              (** [merge s1 s2] adds elements of s2 to s1 *)
+    val to_list : t -> term list            (** build a list from the set *)
+  end
+
+(* ----------------------------------------------------------------------
+ * access global terms table (hashconsing)
+ * ---------------------------------------------------------------------- *)
+val iter_terms : (term -> unit) -> unit       (** iterate through existing terms *)
+val all_terms : unit -> term list             (** all currently existing terms *)
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
-(** smart constructors, with a bit of type-checking *)
+(* ----------------------------------------------------------------------
+ * smart constructors, with a bit of type-checking
+ * ---------------------------------------------------------------------- *)
 val mk_var : int -> sort -> term
 val mk_leaf : symbol -> sort -> term
 val mk_node : term list -> term
 val mk_apply : symbol -> sort -> term list -> term
-
-val is_var : term -> bool
-val is_leaf : term -> bool
-val is_node : term -> bool
-val hd_term : term -> term option         (** the head of the term *)
-val hd_symbol : term -> symbol option       (** the head of the term *)
 
 val true_term : term                        (** tautology symbol *)
 val false_term : term                       (** antilogy symbol *)
@@ -53,16 +74,18 @@ val mk_lambda : term -> term
 val mk_forall : term -> term
 val mk_exists : term -> term
 
-val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *)
-val eq_term : term -> term -> bool      (** standard equality on terms *)
-val compare_term : term -> term -> int  (** a simple order on terms *)
 val cast : term -> sort -> term           (** cast (change sort) *)
 
-module TSet : Set.S with type elt = term
-module TPairSet : Set.S with type elt = term * term
-module THashtbl : Hashtbl.S with type key = term
+(* ----------------------------------------------------------------------
+ * examine term/subterms, positions...
+ * ---------------------------------------------------------------------- *)
+val is_var : term -> bool
+val is_leaf : term -> bool
+val is_node : term -> bool
+val hd_term : term -> term option           (** the head of the term *)
+val hd_symbol : term -> symbol option       (** the head of the term *)
 
-val at_pos : term -> position -> term     (** retrieve subterm at pos, or
+val at_pos : term -> position -> term       (** retrieve subterm at pos, or
                                                   raise Invalid_argument
                                                   TODO also return a context? *)
 val replace_pos : term -> position          (** replace t|_p by the second term *)
@@ -71,10 +94,19 @@ val replace_pos : term -> position          (** replace t|_p by the second term 
 val vars_of_term : term -> varlist          (** free variables in the term *)
 val is_ground_term : term -> bool           (** is the term ground? *)
 val merge_varlist : varlist -> varlist -> varlist (** set union of variable list *)
-
-val max_var : varlist -> int                  (** find the maximum variable index *)
+val max_var : varlist -> int                (** find the maximum variable index *)
 val min_var : varlist -> int
 
+(* ----------------------------------------------------------------------
+ * bindings and normal forms
+ * ---------------------------------------------------------------------- *)
+val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding or normal form of t *)
+val reset_binding : term -> unit            (** reset variable binding/normal form *)
+val get_binding : term -> term              (** get the binding of variable/normal form of term *)
+
+(* ----------------------------------------------------------------------
+ * De Bruijn terms, and dotted formulas
+ * ---------------------------------------------------------------------- *)
 val atomic : term -> bool                   (** atomic proposition, or term, at root *)
 val atomic_rec : term -> bool               (** does not contain connectives/quantifiers *)
 val db_closed : term -> bool                (** check whether the term is closed *)
@@ -94,6 +126,10 @@ val db_from_var : term -> term -> term
 val db_depth : term -> int
 (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
 val look_db_sort : int -> term -> sort option
+
+(* ----------------------------------------------------------------------
+ * Pretty printing
+ * ---------------------------------------------------------------------- *)
 
 (** type of a pretty printer for symbols *)
 class type pprinter_symbol =
