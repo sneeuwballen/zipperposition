@@ -77,16 +77,10 @@ let restrict_exclude subst term =
 let apply_subst_bind subst =
   List.iter (fun (v, t) -> T.set_binding v t) subst
 
-let rec apply_subst ?(recursive=true) subst t = match t.term with
-  | Leaf _ -> t
-  | Var _ ->
-      let new_t = lookup t subst in
-      assert (new_t.sort = t.sort);
-      if recursive && not (T.eq_term new_t t)
-        then apply_subst subst ~recursive new_t
-        else new_t
-  | Node l ->
-      T.mk_node (List.map (apply_subst subst ~recursive) l)
+let apply_subst ?(recursive=true) subst t =
+  T.reset_vars t;
+  apply_subst_bind subst;
+  T.expand_bindings ~recursive t
 
 let build_subst ?(recursive=false) v t tail =
   assert (v.sort = t.sort);

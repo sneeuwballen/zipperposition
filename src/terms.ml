@@ -291,13 +291,16 @@ let rec get_binding t =
   if t.binding == t then t else get_binding t.binding
 
 (** replace variables by their bindings *)
-let expand_bindings t =
+let expand_bindings ?(recursive=true) t =
   (* recurse to expand bindings, returns new term and a boolean (true if term expanded) *)
   let rec recurse t =
     if is_ground_term t then t, false
     else match t.term with
     | Leaf _ -> t, false
-    | Var _ -> if t.binding == t then t, false else fst (recurse t.binding), true
+    | Var _ ->
+      if t.binding == t then t.binding, false
+      else if recursive then fst (recurse t.binding), true
+      else t.binding, true
     | Node l ->
       let l' = List.map recurse l in
       (* recursive replacement in subterms. Re-build term iff some subterm changed *)

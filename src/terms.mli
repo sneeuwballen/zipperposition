@@ -106,7 +106,8 @@ val min_var : varlist -> int
 val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding or normal form of t *)
 val reset_binding : term -> unit            (** reset variable binding/normal form *)
 val get_binding : term -> term              (** get the binding of variable/normal form of term *)
-val expand_bindings : term -> term          (** replace variables by their bindings *)
+val expand_bindings : ?recursive:bool ->
+                      term -> term          (** replace variables by their bindings *)
 
 val reset_vars : term -> unit               (** reset bindings of variables of the term *)
 
