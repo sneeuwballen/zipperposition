@@ -249,7 +249,7 @@ let infer_active_ actives clause =
                 do_superposition ~ord clause s_pos hc u_pos subst acc)
               set acc
           with
-            UnificationFailure _ -> acc)
+            UnificationFailure -> acc)
     )
     [] (C.maxlits clause)
 
@@ -279,7 +279,7 @@ let infer_passive_ actives clause =
                       do_superposition ~ord hc s_pos clause p subst acc)
                   set acc
               with
-                UnificationFailure _ -> acc))
+                UnificationFailure -> acc))
       in List.rev_append new_clauses acc
     )
     [] lits
@@ -316,7 +316,7 @@ let infer_equality_resolution_ ~ord clause =
             new_clause::acc
           end else
             acc
-      with UnificationFailure _ -> acc (* l and r not unifiable, try next *)
+      with UnificationFailure -> acc (* l and r not unifiable, try next *)
     )
     [] lits
 
@@ -338,11 +338,11 @@ let infer_equality_factoring_ ~ord clause =
           let try_u =  (* try inference between s and u *)
             try
               let subst = Unif.unification s u in [[idx; C.left_pos], subst]
-            with UnificationFailure _ -> []
+            with UnificationFailure -> []
           and try_v =  (* try inference between s and v *)
             try
               let subst = Unif.unification s v in [[idx; C.right_pos], subst]
-            with UnificationFailure _ -> []
+            with UnificationFailure -> []
           in try_u @ try_v @ acc
       )
       [] lits_pos
@@ -422,7 +422,7 @@ let demod_subterm ~ord blocked_ids active_set subterm =
       (fun () l set ->
         assert (T.db_closed l);
         try
-          let subst = Unif.matching l subterm in
+          let subst = Unif.fast_matching l subterm in
           (* iterate on all clauses for this term *)
           I.ClauseSet.iter 
             (fun (unit_hclause, pos, l) ->
@@ -449,7 +449,7 @@ let demod_subterm ~ord blocked_ids active_set subterm =
               end
           ) set
         with
-          UnificationFailure _ -> ()
+          UnificationFailure -> ()
       );
     None  (* not found any match *)
   with
@@ -559,7 +559,7 @@ let basic_simplify ~ord clause =
           (* remove the literal, and apply the substitution to the remaining literals
              before trying to find another x!=t *)
           er (List.map (C.apply_subst_lit ~ord subst) (Utils.list_remove lits i))
-        with UnificationFailure _ -> lits
+        with UnificationFailure -> lits
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
@@ -596,7 +596,7 @@ let positive_simplify_reflect active_set clause =
         try active_set.PS.idx#unit_root_index#retrieve_generalizations t1 ()
           (fun () l set ->
             try
-              let subst = Unif.matching l t1 in
+              let subst = Unif.fast_matching l t1 in
               (* find some r in the set, such that subst(r) = t2 *)
               I.ClauseSet.iter
                 (fun (clause, pos, _) ->
@@ -612,7 +612,7 @@ let positive_simplify_reflect active_set clause =
                     end else ()
                   | _ -> assert false)
                 set
-            with UnificationFailure _ -> ());
+            with UnificationFailure -> ());
           None (* no match *)
         with FoundMatch (r, subst, clause, pos) ->
           Some ((clause, pos, subst) :: clauses)  (* success *)
@@ -647,7 +647,7 @@ let negative_simplify_reflect active_set clause =
     try active_set.PS.idx#root_index#retrieve_generalizations s ()
       (fun () l set ->
         try
-          let subst = Unif.matching l s in
+          let subst = Unif.fast_matching l s in
           (* find some r in the set, such that subst(r) = t *)
           I.ClauseSet.iter
             (fun (clause, pos, _) ->
@@ -665,7 +665,7 @@ let negative_simplify_reflect active_set clause =
                 end else ()
               | _ -> assert false)
             set
-        with UnificationFailure _ -> ());
+        with UnificationFailure -> ());
       None (* no match *)
     with FoundMatch (r, subst, clause, pos) ->
       Some (clause, pos, subst)  (* success *)
@@ -697,12 +697,12 @@ let match_lits ~locked subst lit_a lit_b =
       let subst = Unif.matching_locked ~locked subst la lb in
       let subst = Unif.matching_locked ~locked subst ra rb in
       [subst]
-    with UnificationFailure _ -> []) @
+    with UnificationFailure -> []) @
     (try
       let subst = Unif.matching_locked ~locked subst la rb in
       let subst = Unif.matching_locked ~locked subst ra lb in
       [subst]
-    with UnificationFailure _ -> [])
+    with UnificationFailure -> [])
 
 (** raised when a subsuming substitution is found *)
 exception SubsumptionFound of substitution

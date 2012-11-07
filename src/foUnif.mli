@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Unification and matching algorithms *)
+(** Unification and matching algorithms. TODO use var bindings to fasten computation *)
 
 open Types
 
@@ -32,6 +32,9 @@ val matching: term -> term -> substitution
     and sigma does not bind any variable in locked and subst \in sigma,
     or raise UnificationFailure *)
 val matching_locked: locked:varlist -> substitution -> term -> term -> substitution
+
+(** Fast matching algorithm *)
+val fast_matching : term -> term -> substitution
 
 (* alpha_eq [a] [b] returns sigma with sigma(a) = b, and sigma
  * a variable renaming, or raise UnificationFailure *)

@@ -85,6 +85,9 @@ let rec apply_subst ?(recursive=true) subst t = match t.term with
   | Node l ->
       T.mk_node (List.map (apply_subst subst ~recursive) l)
 
+let bind_subst subst =
+  List.iter (fun (v, t) -> T.set_binding v t) subst
+
 let build_subst ?(recursive=false) v t tail =
   assert (v.sort = t.sort);
   if recursive
@@ -99,6 +102,13 @@ let build_subst ?(recursive=false) v t tail =
     else if T.eq_term v t
       then tail
       else (v,t) :: tail
+
+let update_binding subst v =
+  assert (T.is_var v);
+  let t = T.get_binding v in
+  (v,t)::subst
+
+let update_bindings subst l = List.fold_left update_binding subst l
 
 let flat subst = List.map (fun (x, t) -> (x, apply_subst subst t)) subst
 

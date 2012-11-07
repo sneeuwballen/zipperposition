@@ -31,6 +31,11 @@ val id_subst : substitution
     If v occurs in t, OccurCheck (v,t) is raised. *)
 val build_subst : ?recursive:bool -> term -> term -> substitution -> substitution
 
+(** update the substitution with the current binding of the variable *)
+val update_binding : substitution -> term -> substitution
+(** update the substitution with current binding of the varibles *)
+val update_bindings : substitution -> term list -> substitution
+
 (** check (naively, ie structurally) whether two substitutions are equal *)
 val eq_subst: substitution -> substitution -> bool
 (** hash a substitution *)
@@ -49,6 +54,9 @@ val filter : substitution -> varlist -> varlist
 (** restrict the domain to variables not present in term *)
 val restrict_exclude: substitution -> term -> substitution
 
+(** for each (v, t) in subst, v.binding <- t *)
+val bind_subst : substitution -> unit
+(** apply substitution to term, replacing variables by the term they are bound to *)
 val apply_subst : ?recursive:bool -> substitution -> term -> term
 
 (** normalize the substitution, such that subst(subst(v)) = subst(v)
