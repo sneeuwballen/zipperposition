@@ -10,6 +10,6 @@ shift  # remove first option
 . ./runtime.sh
 
 echo "% run prover $PROVER on $TARGET"
-eprover --cnf --tptp-in --tptp3-out -l0 "$TARGET" |
+eprover --cnf --tptp3-in --tptp3-out -l0 "$TARGET" |
     sed -r 's/^#/%/g' |
     "$PROVER" stdin -calculus superposition $@

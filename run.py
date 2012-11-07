@@ -32,8 +32,8 @@ def command(fun):
 provers = {
     'spass': "SPASS -TPTP -TimeLimit={time} -Memory=512000000 {file}",
     #'zipperposition': "./prover3.sh {file} -timeout {time}",
-    'zipperposition-cnf': "./src/main.native {file} -timeout {time} -calculus superposition",
-    'delayed': "./src/main.native {file} -timeout {time} -calculus delayed"
+    'zipperposition-cnf': "./main.native {file} -timeout {time} -calculus superposition",
+    'delayed': "./main.native {file} -timeout {time} -calculus delayed"
 }
 provers_unsat = {
     'spass': "proof found",
@@ -80,7 +80,7 @@ class Run(object):
         except sqlite3.Error as e:
             print "sqlite error while saving", e
 
-    def solve_with(self, filename, prover, verbose=True):
+    def solve_with(self, filename, prover, verbose=False):
         "Solve the file with the prover."
         if prover not in provers:
             print "unknown prover", prover
@@ -106,6 +106,9 @@ class Run(object):
             result = "sat"
 
         print "%-10s in %-6.3f" % (result, stop - start)
+        if verbose:
+            print "  (prover cmd line was: %s)" % cmd
+
         return (result, stop - start)
 
     @command
