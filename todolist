@@ -1,12 +1,19 @@
 
 - make multiset comparison fast
 - maybe implement context trees for general purpose indexing
+- fast matching/unification
+- variables with temporary bindings (for fast unification)
 
+- efficient rewriting by given confluent terminating TRS
+- left-to-right tree pattern matching paper (for rewriting)
+- storage and detection of axiom schemes (cf Waldmeister) to detect theories -> associate ordering+TRS
+- superposition modulo rewriting
 - miniscoping in CNF reduction
-- elimination rules in delayed as simplifications
+- simplification rules from clause to clause list
+- elimination rules in delayed as simplifications (cf prev. item)
 - find better heuristics for delayed superposition
-- syntactic tautology deletion
-- more profiling/statistics 
+- syntactic tautology deletion?
+- more profiling/statistics
 
 - output dedukti code (or even Coq code?)
-- graphviz output
+- graphviz output for data structures and proof
