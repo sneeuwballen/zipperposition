@@ -1,8 +1,6 @@
 
 - make multiset comparison fast
 - maybe implement context trees for general purpose indexing
-- fast matching/unification
-- variables with temporary bindings (for fast unification)
 
 - efficient rewriting by given confluent terminating TRS
 - left-to-right tree pattern matching paper (for rewriting)
