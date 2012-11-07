@@ -35,6 +35,8 @@ val build_subst : ?recursive:bool -> term -> term -> substitution -> substitutio
 val update_binding : substitution -> term -> substitution
 (** update the substitution with current binding of the varibles *)
 val update_bindings : substitution -> term list -> substitution
+(** expand bindings in the codomain of subst *)
+val expand_bindings : substitution -> substitution
 
 (** check (naively, ie structurally) whether two substitutions are equal *)
 val eq_subst: substitution -> substitution -> bool

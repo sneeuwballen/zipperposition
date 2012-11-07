@@ -44,9 +44,6 @@ let rec occurs_check var t =
   | Node l -> List.exists (occurs_check var) l
 
 let unification subst a b =
-  T.reset_vars a;
-  T.reset_vars b;
-  S.apply_subst_bind subst;
   (* recursive unification *)
   let rec unif subst s t =
     (if s.sort <> t.sort then raise UnificationFailure);
@@ -57,24 +54,44 @@ let unification subst a b =
     | _, _ when T.is_ground_term s && T.is_ground_term t -> raise UnificationFailure
         (* distinct ground terms cannot be unified *)
     | Var _, Var _ ->
-      T.set_binding s t;
+      T.set_binding s (T.expand_bindings t);
       S.update_binding subst s
     | Var _, _ when occurs_check s t -> raise UnificationFailure
     | Var _, _ ->
-      T.set_binding s t;
+      T.set_binding s (T.expand_bindings t);
       S.update_binding subst s
     | _, Var _ when occurs_check t s -> raise UnificationFailure
     | _, Var _ ->
-      T.set_binding t s;
+      T.set_binding t (T.expand_bindings s);
       S.update_binding subst t
-    | Node l1, Node l2 -> (
-        try
-          List.fold_left2 unif subst l1 l2  (* recursive pairwise unification *)
-        with Invalid_argument _ -> raise UnificationFailure
-      )
+    | Node l1, Node l2 when List.length l1 = List.length l2 ->
+      let subst = unify_composites subst l1 l2 in (* unify non-vars *)
+      unify_vars subst l1 l2  (* unify vars *)
     | _, _ -> raise UnificationFailure
+  (* unify pairwise when pairs contain no variable at root *)
+  and unify_composites subst l1 l2 =
+    match l1, l2 with
+    | [], [] -> subst
+    | x1::l1', x2::l2' ->
+      let subst = if T.is_var x1 || T.is_var x2 then subst else unif subst x1 x2 in
+      unify_composites subst l1' l2'
+    | _ -> assert false
+  (* unify pairwise when pairs contain at least one variable at root *)
+  and unify_vars subst l1 l2 =
+    match l1, l2 with
+    | [], [] -> subst
+    | x1::l1', x2::l2' ->
+      let subst = if T.is_var x1 || T.is_var x2 then unif subst x1 x2 else subst in
+      unify_vars subst l1' l2'
+    | _ -> assert false
+  (* setup and cleanup *)
+  and root_unify () =
+    T.reset_vars a;
+    T.reset_vars b;
+    S.apply_subst_bind subst;
+    unif subst a b
   in
-  prof_unification.HExtlib.profile (unif subst a) b
+  prof_unification.HExtlib.profile root_unify ()
 
 let matching_locked ~locked subst a b =
   T.reset_vars a;
@@ -94,13 +111,10 @@ let matching_locked ~locked subst a b =
     | Var _, _ when occurs_check s t || T.THashSet.member locked s ->
       raise UnificationFailure
     | Var _, _ ->
-      T.set_binding s t;
+      T.set_binding s (T.expand_bindings t);
       S.update_binding subst s
-    | Node l1, Node l2 -> (
-        try
-          List.fold_left2 unif subst l1 l2  (* recursive pairwise unification *)
-        with Invalid_argument _ -> raise UnificationFailure
-      )
+    | Node l1, Node l2 when List.length l1 = List.length l2 ->
+      List.fold_left2 unif subst l1 l2
     | _, _ -> raise UnificationFailure
   in
   prof_matching.HExtlib.profile (unif subst a) b

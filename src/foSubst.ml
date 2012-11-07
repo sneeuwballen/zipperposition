@@ -110,6 +110,9 @@ let update_binding subst v =
 
 let update_bindings subst l = List.fold_left update_binding subst l
 
+let expand_bindings subst =
+  List.map (fun (v, t) -> (v, T.expand_bindings t)) subst
+
 let flat subst = List.map (fun (x, t) -> (x, apply_subst subst t)) subst
 
 let concat x y = x @ y
