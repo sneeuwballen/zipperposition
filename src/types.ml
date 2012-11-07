@@ -141,7 +141,7 @@ class type ordering =
     method name : string
   end
 
-exception UnificationFailure of string Lazy.t
+exception UnificationFailure
 
 (** A pretty printer of 'a values *)
 class type ['a] pp_printer =

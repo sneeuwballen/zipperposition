@@ -74,13 +74,16 @@ module THashSet =
   struct
     type t = unit THashtbl.t
     let create () = THashtbl.create 13
+    let member t term = THashtbl.mem t term
     let iter set f = THashtbl.iter (fun t () -> f t) set
     let add set t = THashtbl.replace set t ()
     let merge s1 s2 = iter s2 (add s1)
     let to_list set =
       let l = ref [] in
-      iter set (fun t -> l := t :: !l);
-      !l
+      iter set (fun t -> l := t :: !l); !l
+    let from_list l =
+      let set = create () in
+      List.iter (add set) l; set
   end
 
 (* ----------------------------------------------------------------------
@@ -278,7 +281,24 @@ let set_binding t d = t.binding <- d
 let reset_binding t = t.binding <- t
 
 (** get the binding of variable/normal form of term *)
-let get_binding t = t.binding
+let rec get_binding t = 
+  if t.binding == t then t else get_binding t.binding
+
+(** replace variables by their bindings *)
+let expand_bindings t =
+  (* recurse to expand bindings, returns new term and a boolean (true if term expanded) *)
+  let rec recurse t =
+    if is_ground_term t then t, false
+    else match t.term with
+    | Leaf _ -> t, false
+    | Var _ -> if t.binding == t then t, false else fst (recurse t.binding), true
+    | Node l ->
+      let l' = List.map recurse l in
+      (* recursive replacement in subterms. Re-build term iff some subterm changed *)
+      if List.exists (fun (_, b) -> b) l'
+        then mk_node (List.map fst l'), true
+        else t, false
+  in fst (recurse t)
 
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas

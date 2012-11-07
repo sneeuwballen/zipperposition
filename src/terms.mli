@@ -41,10 +41,12 @@ module THashSet :
   sig
     type t
     val create : unit -> t
+    val member : t -> term -> bool
     val iter : t -> (term -> unit) -> unit
     val add : t -> term -> unit
     val merge : t -> t -> unit              (** [merge s1 s2] adds elements of s2 to s1 *)
     val to_list : t -> term list            (** build a list from the set *)
+    val from_list : term list -> t          (** build a set from the list *)
   end
 
 (* ----------------------------------------------------------------------
@@ -103,6 +105,8 @@ val min_var : varlist -> int
 val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding or normal form of t *)
 val reset_binding : term -> unit            (** reset variable binding/normal form *)
 val get_binding : term -> term              (** get the binding of variable/normal form of term *)
+val expand_bindings : term -> term          (** replace variables by their bindings *)
+
 
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
