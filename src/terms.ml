@@ -155,8 +155,7 @@ let mk_var idx sort =
   let rec my_v = {term = Var idx; sort=sort; vars=[my_v];
     db_closed=true; binding=my_v; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
-  let v = H.hashcons my_v in
-  v
+  H.hashcons my_v
 
 let mk_leaf symbol sort =
   let db_closed = if symbol = db_symbol then false else true in
@@ -294,20 +293,18 @@ let rec get_binding t =
 let expand_bindings ?(recursive=true) t =
   (* recurse to expand bindings, returns new term and a boolean (true if term expanded) *)
   let rec recurse t =
-    if is_ground_term t then t, false
+    (* if no variable of t is bound (or t ground), nothing to do *)
+    if is_ground_term t || List.for_all (fun v -> v.binding == v) t.vars then t
     else match t.term with
-    | Leaf _ -> t, false
+    | Leaf _ -> t
     | Var _ ->
-      if t.binding == t then t.binding, false
-      else if recursive then fst (recurse t.binding), true
-      else t.binding, true
+      if t.binding == t then t
+      else if recursive then recurse t.binding
+      else t.binding
     | Node l ->
-      let l' = List.map recurse l in
       (* recursive replacement in subterms. Re-build term iff some subterm changed *)
-      if List.exists (fun (_, b) -> b) l'
-        then mk_node (List.map fst l'), true
-        else t, false
-  in fst (recurse t)
+      mk_node (List.map recurse l)
+  in recurse t
 
 (** reset bindings of variables of the term *)
 let reset_vars t = List.iter reset_binding t.vars
@@ -480,6 +477,7 @@ let pp_term_debug =
     let n = db_depth t in
     Format.fprintf formatter "•%d" n in
   let _sort = ref false
+  and _bindings = ref false
   and _skip_lambdas = ref true
   and _skip_db = ref true in
   (* printer itself *)
@@ -513,7 +511,11 @@ let pp_term_debug =
           end else Format.fprintf formatter "@[<h>%a(%a)@]" self#pp head
             (Utils.pp_list ~sep:", " self#pp) args
       | Leaf s -> pp_symbol_unicode#pp formatter s
-      | Var i -> Format.fprintf formatter "X%d" i
+      | Var i -> if !_bindings && t != t.binding
+        then (_bindings := false;
+              Format.fprintf formatter "X%d → %a" i self#pp t.binding;
+              _bindings := true)
+        else Format.fprintf formatter "X%d" i
       | Node (hd::tl) ->
           Format.fprintf formatter "@[<h>(%a)(%a)@]" self#pp hd
             (Utils.pp_list ~sep:", " self#pp ) tl
@@ -521,6 +523,7 @@ let pp_term_debug =
       (* also print the sort if needed *)
       if !_sort then Format.fprintf formatter ":%s" t.sort else ()
     method sort s = _sort := s
+    method bindings s = _bindings := s
     method skip_lambdas s = _skip_lambdas := s
     method skip_db s = _skip_db := s
   end

@@ -78,9 +78,12 @@ let apply_subst_bind subst =
   List.iter (fun (v, t) -> T.set_binding v t) subst
 
 let apply_subst ?(recursive=true) subst t =
-  T.reset_vars t;
-  apply_subst_bind subst;
-  T.expand_bindings ~recursive t
+  if subst = [] then t else
+  begin
+    T.reset_vars t;
+    apply_subst_bind subst;
+    T.expand_bindings ~recursive t
+  end
 
 let build_subst ?(recursive=false) v t tail =
   assert (v.sort = t.sort);

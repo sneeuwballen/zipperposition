@@ -160,6 +160,7 @@ val pp_term_tstp : pprinter_term                    (** print term in TSTP synta
 val pp_term_debug :                                 (** print term in a nice syntax *)
   <
     pp : Format.formatter  -> term -> unit;
+    bindings : bool -> unit;                        (** print bindings of variables? *)
     sort : bool -> unit;                            (** print sorts of terms? *)
     skip_lambdas : bool -> unit;                    (** print lambdas after quantifiers? *)
     skip_db : bool -> unit;                         (** nice printing of De Bruijn terms *)

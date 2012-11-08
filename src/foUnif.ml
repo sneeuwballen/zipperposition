@@ -30,32 +30,33 @@ let enable = true
 let prof_unification = HExtlib.profile ~enable "unification"
 let prof_matching = HExtlib.profile ~enable "matching"
 
-(** does var appear in the bindings of t? *)
+(** does var appear in t (even when expanding bindings)? *)
 let rec occurs_check var t =
-  if T.is_ground_term t then false else
   match t.term with
-  | Leaf _ -> assert false
+  | _ when T.is_ground_term t -> false
   | Var _ when T.eq_term var t -> true
-  | Var _ ->
-    let new_t = T.get_binding t in
-    if not (T.eq_term t new_t)
-      then occurs_check var new_t  (* see in the binding *)
-      else false
-  | Node l -> List.exists (occurs_check var) l
+  | Var _ when not (T.eq_term t (T.get_binding t)) ->
+    occurs_check var (T.get_binding t)  (* see in binding *)
+  | Var _ -> false
+  | Leaf _ -> assert false
+  | Node _ -> List.exists (occurs_check var) (T.vars_of_term t)
+
+(** if t is a variable, return its current binding *)
+let rec get_var_binding t =
+  if T.is_var t && not (T.eq_term (T.get_binding t) t)
+    then get_var_binding (T.get_binding t)
+    else t
 
 let unification subst a b =
   (* recursive unification *)
   let rec unif subst s t =
     (if s.sort <> t.sort then raise UnificationFailure);
-    let s = T.get_binding s
-    and t = T.get_binding t in
+    let s = get_var_binding s
+    and t = get_var_binding t in
     match s.term, t.term with
     | _, _ when T.eq_term s t -> subst
     | _, _ when T.is_ground_term s && T.is_ground_term t -> raise UnificationFailure
         (* distinct ground terms cannot be unified *)
-    | Var _, Var _ ->
-      T.set_binding s (T.expand_bindings t);
-      S.update_binding subst s
     | Var _, _ when occurs_check s t -> raise UnificationFailure
     | Var _, _ ->
       T.set_binding s (T.expand_bindings t);
@@ -89,26 +90,25 @@ let unification subst a b =
     T.reset_vars a;
     T.reset_vars b;
     S.apply_subst_bind subst;
-    unif subst a b
+    let subst = unif subst a b in
+    FoUtils.debug 2 (lazy (FoUtils.sprintf "unify %a and %a gives %a" !T.pp_term#pp a !T.pp_term#pp b S.pp_substitution subst));
+    subst
   in
   prof_unification.HExtlib.profile root_unify ()
 
 let matching_locked ~locked subst a b =
-  T.reset_vars a;
-  T.reset_vars b;
-  S.apply_subst_bind subst;
   let locked = T.THashSet.from_list locked in
   (* recursive matching *)
   let rec unif subst s t =
     (if s.sort <> t.sort then raise UnificationFailure);
-    let s = T.get_binding s
-    and t = T.get_binding t in
+    let s = get_var_binding s
+    and t = get_var_binding t in
     match s.term, t.term with
     | _, _ when T.eq_term s t -> subst
     | _, _ when T.is_ground_term s && T.is_ground_term t ->
         (* distinct ground terms cannot be matched *) 
         raise UnificationFailure
-    | Var _, _ when occurs_check s t || T.THashSet.member locked s ->
+    | Var _, _ when T.THashSet.member locked s || occurs_check s t ->
       raise UnificationFailure
     | Var _, _ ->
       T.set_binding s (T.expand_bindings t);
@@ -116,8 +116,14 @@ let matching_locked ~locked subst a b =
     | Node l1, Node l2 when List.length l1 = List.length l2 ->
       List.fold_left2 unif subst l1 l2
     | _, _ -> raise UnificationFailure
+  (* main matching procedure, with setup *)
+  and root_match () =
+    T.reset_vars a;
+    T.reset_vars b;
+    S.apply_subst_bind subst;
+    unif subst a b
   in
-  prof_matching.HExtlib.profile (unif subst a) b
+  prof_matching.HExtlib.profile root_match ()
 
 let matching subst a b = matching_locked ~locked:(T.vars_of_term b) subst a b
 
