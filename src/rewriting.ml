@@ -20,13 +20,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Term rewriting *)
 
+open Types
 
 (* ----------------------------------------------------------------------
  * Definition of TRS
  * ---------------------------------------------------------------------- *)
 
 (** Term Rewriting System *)
-type trs = (term * term) list  (* TODO *)
+type trs = (term * term) list (* TODO structure with index *)
 
 let id_trs = []
 

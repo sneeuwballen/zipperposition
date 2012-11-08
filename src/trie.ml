@@ -42,7 +42,29 @@ module type Map =
     val mapi: (key -> 'a -> 'b) -> 'a t -> 'b t
   end
 
+module type S =
+  sig
+    module M : Map
+    type key = M.key list
+    type 'a t = Node of 'a option * 'a t M.t
+    val empty : 'a t
+    val find : M.key list -> 'a t -> 'a
+    val mem : M.key list -> 'a t -> bool
+    val add : M.key list -> 'a -> 'a t -> 'a t
+    val remove : M.key list -> 'a t -> 'a t
+    val map : ('a -> 'b) -> 'a t -> 'b t
+    val mapi : (M.key list -> 'a -> 'b) -> 'a t -> 'b t
+    val iter : (M.key list -> 'a -> 'b) -> 'a t -> unit
+    val fold : (M.key list -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+    val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+    val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+    val is_empty : 'a t -> bool
+  end
+
+
 module Make (M : Map) = struct
+
+  module M = M
   
 (*s Then a trie is just a tree-like structure, where a possible
     information is stored at the node (['a option]) and where the sons

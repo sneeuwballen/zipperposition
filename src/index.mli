@@ -20,8 +20,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Generic term indexing *)
 
-(** Generic term indexing *)
-
 open Types
 
 type data = hclause * position * term

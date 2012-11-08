@@ -301,9 +301,7 @@ let expand_bindings ?(recursive=true) t =
       if t.binding == t then t
       else if recursive then recurse t.binding
       else t.binding
-    | Node l ->
-      (* recursive replacement in subterms. Re-build term iff some subterm changed *)
-      mk_node (List.map recurse l)
+    | Node l -> mk_node (List.map recurse l) (* recursive replacement in subterms *)
   in recurse t
 
 (** reset bindings of variables of the term *)

@@ -32,4 +32,10 @@ type path_string_elem =
 
 type path = path_string_elem list
 
+val path_string_of : term -> path
+val string_of_path : path -> string
+
+module PSMap : Trie.Map with type key = path_string_elem
+module DiscriminationTree : Trie.S with module M = PSMap
+
 val index : Index.index                     (** the index *)

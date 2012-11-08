@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Term rewriting *)
 
+open Types
+
 (** Term Rewriting System *)
 type trs
 
