@@ -8,6 +8,8 @@ all:
 
 profile:
 	ocamlbuild -libs str,unix -tags debug,profile src/main.native
+byte:
+	ocamlbuild -libs str,unix -tags debug src/main.byte
 
 tests: all
 	ocamlbuild -libs str,unix -tag debug -I src tests/tests.native
