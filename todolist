@@ -1,11 +1,14 @@
 
 - make multiset comparison fast
 - maybe implement context trees for general purpose indexing
+- fast LPO (using paper)
+- LRU cache (rather than flush when full)
 
 - efficient rewriting by given confluent terminating TRS
-- left-to-right tree pattern matching paper (for rewriting)
+- dedicated structure for rewriting (adaptive automata?)
 - storage and detection of axiom schemes (cf Waldmeister) to detect theories -> associate ordering+TRS
 - superposition modulo rewriting
+
 - miniscoping in CNF reduction
 - simplification rules from clause to clause list
 - elimination rules in delayed as simplifications (cf prev. item)
