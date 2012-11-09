@@ -81,6 +81,7 @@ let apply_subst ?(recursive=true) subst t =
   if subst = [] then t else
   begin
     T.reset_vars t;
+    List.iter (fun (_, t) -> T.reset_vars t) subst;
     apply_subst_bind subst;
     T.expand_bindings ~recursive t
   end
