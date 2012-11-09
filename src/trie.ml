@@ -67,9 +67,9 @@ module Make (M : Map) = struct
   module M = M
   
 (*s Then a trie is just a tree-like structure, where a possible
-    information is stored at the node (['a option]) and where the sons
-    are given by a map from type [key] to sub-tries, so of type 
-    ['a t M.t]. The empty trie is just the empty map. *)
+  information is stored at the node (['a option]) and where the sons
+  are given by a map from type [key] to sub-tries, so of type 
+  ['a t M.t]. The empty trie is just the empty map. *)
 
   type key = M.key list
 

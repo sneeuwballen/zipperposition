@@ -58,6 +58,7 @@ and typed_term = {
   sort : sort;                  (** the sort of the term *)
   mutable binding : term;       (** binding of the term (if variable), or normal form *)
   mutable vars : term list;     (** the variables of the term *)
+  mutable normal_form : bool;   (** has the normal form been computed? (in binding) *)
   mutable db_closed : bool;     (** is the term closed w.r.t. De Bruijn indexes? *)
   mutable tag : int;            (** hashconsing tag *)
   mutable hkey : int;           (** hash *)

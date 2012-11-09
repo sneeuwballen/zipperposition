@@ -34,6 +34,8 @@ type path = path_string_elem list
 
 val path_string_of : term -> path
 val string_of_path : path -> string
+val arity_of : path_string_elem -> int 
+val skip : int -> path -> path
 
 module PSMap : Trie.Map with type key = path_string_elem
 module DiscriminationTree : Trie.S with module M = PSMap

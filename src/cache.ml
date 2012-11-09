@@ -18,7 +18,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* an imperative cache for memoization *)
+(* an imperative cache for memoization
+  TODO LRU policy *)
 
 module type S =
   sig 

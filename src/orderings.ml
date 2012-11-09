@@ -482,6 +482,8 @@ module OrdCache = Cache.Make(
     | _ -> false
   end)
 
+(* TODO use cache in some recursive calls in LPO? *)
+
 class kbo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 29

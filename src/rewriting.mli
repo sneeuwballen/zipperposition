@@ -22,12 +22,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+type rule = (term * term)
+
 (** Term Rewriting System *)
 type trs
 
-val id_trs : trs
-val add_rule : trs -> (term * term) -> trs
-val add_rules : trs -> (term * term) list -> trs
+val create : unit -> trs
+val add_rule : trs -> rule -> unit
+val add_rules : trs -> rule list -> unit
 
-(** Rewrite term to its normal form *)
+val size : trs -> int
+val iter : trs -> (rule -> unit) -> unit
+
+(** Compute normal form of the term, and set its binding to the normal form *)
 val rewrite : trs -> term -> term
