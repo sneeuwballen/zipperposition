@@ -91,7 +91,6 @@ let unification subst a b =
     T.reset_vars b;
     S.apply_subst_bind subst;
     let subst = unif subst a b in
-    FoUtils.debug 2 (lazy (FoUtils.sprintf "unify %a and %a gives %a" !T.pp_term#pp a !T.pp_term#pp b S.pp_substitution subst));
     subst
   in
   prof_unification.HExtlib.profile root_unify ()

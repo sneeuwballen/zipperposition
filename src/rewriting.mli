@@ -30,9 +30,13 @@ type trs
 val create : unit -> trs
 val add_rule : trs -> rule -> unit
 val add_rules : trs -> rule list -> unit
+val from_list : rule list -> trs
 
 val size : trs -> int
 val iter : trs -> (rule -> unit) -> unit
+
+val pp_trs : Format.formatter -> trs -> unit
+val pp_trs_index : Format.formatter -> trs -> unit
 
 (** Compute normal form of the term, and set its binding to the normal form *)
 val rewrite : trs -> term -> term
