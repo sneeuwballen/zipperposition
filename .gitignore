@@ -13,6 +13,7 @@ docs/*.pdf
 _build
 tags
 *.native
+*.byte
 .session
 .subdirtouch
 src/main.docdir
