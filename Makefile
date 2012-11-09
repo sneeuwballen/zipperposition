@@ -14,7 +14,7 @@ byte:
 tests: all
 	ocamlbuild -libs str,unix -tag debug -I src tests/tests.native
 profile_tests: all
-	ocamlbuild -libs str,unix -tags debug,profile -I src tests.native
+	ocamlbuild -libs str,unix -tags debug,profile -I src tests/tests.native
 
 doc:
 	ocamlbuild src/main.docdir/index.html

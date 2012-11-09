@@ -7,6 +7,7 @@ let _ =
 
 let _ =
   TestTerms.run ();
+  TestRewriting.run ();
   TestClauses.run ();
   TestOrderings.run ();
   ()

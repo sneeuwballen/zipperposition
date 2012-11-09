@@ -54,10 +54,10 @@ let check_subterm t =
 (** check unification *)
 let check_unif (t1, t2) =
   try
-    let subst = Unif.unification t1 t2 in
+    let subst = Unif.unification S.id_subst t1 t2 in
     if T.eq_term (S.apply_subst subst t1) (S.apply_subst subst t2)
       then H.TestOk else H.TestFail (t1, t2)
-  with UnificationFailure _ -> H.TestPreconditionFalse
+  with UnificationFailure -> H.TestPreconditionFalse
 
 let run () =
   Format.printf "run terms test@.";
