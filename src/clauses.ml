@@ -630,11 +630,11 @@ let pp_proof_debug =
           already_printed := Ptset.add hc.ctag !already_printed;
           match Lazy.force hc.cproof with
           | Axiom (f, s) ->
-              fprintf formatter "@[<h>%a <--- @[<h>axiom %s in %s@]@]@;"
+              fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>axiom %s in %s@]@]@;"
                 !pp_clause#pp hc s f
           | Proof (rule, premises) ->
               (* print the proof step *)
-              fprintf formatter "@[<h>%a <--- @[<h>%s with @[<hv>%a@]@]@]@;"
+              fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>%s with @[<hv>%a@]@]@]@;"
                 !pp_clause#pp hc rule
                 (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
               (* print premises recursively *)

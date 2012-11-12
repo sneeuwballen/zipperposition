@@ -738,7 +738,7 @@ let subsumes_with a b =
     with SubsumptionFound subst -> Some subst
   in
   (if res <> None then
-    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumes @[<h>%a@]"
+    Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ subsumes @[<h>%a@]@]"
                   !C.pp_clause#pp a !C.pp_clause#pp b)));
   res
 

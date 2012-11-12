@@ -192,7 +192,7 @@ let equivalence_elimination ~ord clause =
       assert (r.sort = bool_sort);
       assert (ord#compare l r <> Lt);
       (* ok, do it *)
-      Format.printf "  equivalence_elim: %a %s %a@." !T.pp_term#pp l
+      Format.printf "%%  equivalence_elim: @[<h>%a %s %a@]@." !T.pp_term#pp l
         (C.string_of_comparison (ord#compare l r)) !T.pp_term#pp r;
       let idx = List.hd l_pos in
       if not (C.eligible_res ~ord clause idx S.id_subst) then [] else
@@ -310,8 +310,7 @@ let delayed : calculus =
                            "superposition_passive", Sup.infer_passive]
 
     method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
-                          "equality_factoring", Sup.infer_equality_factoring;
-                          "equivalence_elimination", equivalence_elimination; ]
+                          "equality_factoring", Sup.infer_equality_factoring; ]
 
     method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
 
@@ -329,7 +328,8 @@ let delayed : calculus =
 
     (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify ~ord c =
-      let all_rules = [connective_elimination; forall_elimination; exists_elimination; ] in
+      let all_rules = [connective_elimination; forall_elimination;
+                       exists_elimination; equivalence_elimination ] in
       (* try to use the rules to simplify c *)
       let rec try_simplify rules c =
         if Sup.is_tautology c then [] else
