@@ -72,6 +72,8 @@ class kbo : symbol_ordering -> ordering
 
 class rpo : symbol_ordering -> ordering
 
+class rpo6 : symbol_ordering -> ordering
+
 val default_ordering : unit -> ordering   (** default ordering on terms *)
 
 val dummy_ordering : ordering             (** always returns incomparable *)

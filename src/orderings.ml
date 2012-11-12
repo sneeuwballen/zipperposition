@@ -229,6 +229,20 @@ let compute_clause_weight ~so {clits=lits} =
       sum + wlit*wlit)
     0 lits 
 
+(** helper to decompose a non-var term into (symbol, list of subterms) *)
+let decompose t =
+  let rec get_head t = match t.term with
+  | Leaf a -> a
+  | Node (hd::_) -> get_head hd
+  | Var _ -> assert false
+  | Node [] -> assert false
+  in
+  match t.term with
+  | Leaf a -> a, []
+  | Node ({term=Leaf a}::l) -> a, l
+  | Node (hd::l) -> get_head hd, l
+  | _ -> assert false
+
 (* Riazanov: p. 40, relation >>>
  * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
@@ -267,6 +281,7 @@ module KBO = struct
 
   (** used to keep track of the balance of variables *)
   type var_balance = {
+    offset : int;
     mutable pos_counter : int;
     mutable neg_counter : int;
     balance : int array;
@@ -274,15 +289,27 @@ module KBO = struct
 
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
-    let maxvar = max (T.max_var (T.vars_of_term t1)) (T.max_var (T.vars_of_term t2)) in
-    {
-      pos_counter = 0;
-      neg_counter = 0;
-      balance = Array.make (maxvar + 1) 0;
-    }
+    if T.is_ground_term t1 && T.is_ground_term t2
+      then
+        { offset = 0; pos_counter = 0; neg_counter = 0; balance = Obj.magic None }
+      else begin
+        let minvar = min (T.min_var t1.vars) (T.min_var t2.vars)
+        and maxvar = max (T.max_var t1.vars) (T.max_var t2.vars) in
+        assert (minvar <= maxvar);
+        let width = maxvar - minvar + 1 in  (* width between min var and max var *)
+        let vb = {
+          offset = minvar; (* offset of variables to 0 *)
+          pos_counter = 0;
+          neg_counter = 0;
+          balance = Array.make width 0;
+        } in
+        Obj.set_tag (Obj.repr vb.balance) Obj.no_scan_tag;  (* no GC scan *)
+        vb
+      end
 
   (** add a positive variable *)
   let add_pos_var balance idx =
+    let idx = idx - balance.offset in
     let n = balance.balance.(idx) in
     (if n = 0
       then balance.pos_counter <- balance.pos_counter + 1
@@ -291,6 +318,7 @@ module KBO = struct
 
   (** add a negative variable *)
   let add_neg_var balance idx =
+    let idx = idx - balance.offset in
     let n = balance.balance.(idx) in
     (if n = 0
       then balance.neg_counter <- balance.neg_counter + 1
@@ -302,12 +330,6 @@ module KBO = struct
       It should be linear time. TODO compatibility with symmetry of = *)
   let rec kbo ~so t1 t2 =
     let balance = mk_balance t1 t2 in
-    let extract t = match t.term with
-      | Var _ -> assert false
-      | Leaf s -> s, []
-      | Node ({term=(Leaf s)}::tl) -> s, tl
-      | Node _ -> assert false
-    in
     (** variable balance, weight balance, t contains variable y. pos
         stands for positive (is t the left term) *)
     let rec balance_weight wb t y pos =
@@ -320,7 +342,7 @@ module KBO = struct
         if pos then (wb + so#weight s, false) else (wb - so#weight s, false)
       | Node l ->
         balance_weight_rec wb l y pos false
-    (** list version of the previous one *)
+    (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
       | [] -> (wb, res)
       | t::terms' ->
@@ -330,43 +352,38 @@ module KBO = struct
     and tckbolex wb terms1 terms2 =
       match terms1, terms2 with
       | [], [] -> wb, Eq
-      | [], _ | _, [] -> failwith "different arities in lexicographic comparison"
       | t1::terms1', t2::terms2' ->
-        match tckbo wb t1 t2 with
+        (match tckbo wb t1 t2 with
         | (wb', Eq) -> tckbolex wb' terms1' terms2'
         | (wb', res) -> (* just compute the weights and return result *)
           let wb'', _ = balance_weight_rec wb' terms1' 0 true false in
           let wb''', _ = balance_weight_rec wb'' terms2' 0 false false in
-          wb''', res
+          wb''', res)
+      | [], _ | _, [] -> failwith "different arities in lexicographic comparison"
     (** commutative comparison. Not linear, must call kbo to
         avoid breaking the weight computing invariants *)
     and tckbocommute wb terms1 terms2 = 
       match terms1, terms2 with
-      | _ -> assert false  (* TODO *)
+      | _ -> failwith "KBO for multiset symbols not implemented" (* TODO *)
     (** tupled version of kbo (kbo_5 of the paper) *)
     and tckbo wb t1 t2 =
       match t1.term, t2.term with
-      | Var x, Var y when x = y -> (wb, Eq)
+      | _ when T.eq_term t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
       | Var x, Var y ->
         add_pos_var balance x;
         add_neg_var balance y;
         (wb, Incomparable)
-      | Var x, Node _ | Var x, Leaf _ ->
+      | Var x,  _ ->
         add_pos_var balance x;
         let wb', contains = balance_weight wb t2 x false in
-        (wb', if contains then Lt else Incomparable)
-      | Node _, Var y | Leaf _, Var y -> 
+        (wb' + so#var_weight, if contains then Lt else Incomparable)
+      |  _, Var y -> 
         add_neg_var balance y;
         let wb', contains = balance_weight wb t1 y true in
-        (wb', if contains then Gt else Incomparable)
-      | Leaf s, Leaf t when s = t -> (wb, Eq)
-      | Leaf s, Leaf t ->
-        let wb', _ = balance_weight wb t1 0 true in
-        let wb'', _ = balance_weight wb' t2 0 false in
-        (wb'', Incomparable)
-      | Leaf _, Node _ | Node _, Leaf _ | Node _, Node _ ->
-        let f, ss = extract t1
-        and g, ts = extract t2 in
+        (wb' - so#var_weight, if contains then Gt else Incomparable)
+      | _ ->
+        let f, ss = decompose t1
+        and g, ts = decompose t2 in
         (* do the recursive computation of kbo *)
         let wb', recursive = tckbo_rec wb f g ss ts in
         let wb'' = wb' + (so#weight f) - (so#weight g) in
@@ -374,22 +391,24 @@ module KBO = struct
         let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
         and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
         (* lexicographic product of weight and precedence *)
-        if wb'' > 0 then wb'', g_or_n else
-        if wb'' < 0 then wb'', l_or_n else
-        let cmp_symbols = so#compare f g in
-        if cmp_symbols < 0 then wb'', l_or_n else
-        if cmp_symbols > 0 then wb'', g_or_n else
-        if f <> g || List.length ss <> List.length ts then wb'', Incomparable else
-        if recursive = Eq then wb'', Eq else
-        if recursive = Lt then wb'', l_or_n else
-        if recursive = Gt then wb'', g_or_n else
-        wb'', Incomparable
+        if wb'' > 0 then wb'', g_or_n
+        else if wb'' < 0 then wb'', l_or_n
+        else (match so#compare f g with
+          | n when n > 0 -> wb'', g_or_n
+          | n when n < 0 ->  wb'', l_or_n
+          | _ ->
+            assert (List.length ss = List.length ts);
+            if recursive = Eq then wb'', Eq
+            else if recursive = Lt then wb'', l_or_n
+            else if recursive = Gt then wb'', g_or_n
+            else wb'', Incomparable)
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
         then if so#multiset_status f
           (* use multiset or lexicographic comparison *)
-          then tckbocommute wb ss ts else tckbolex wb ss ts
+          then tckbocommute wb ss ts
+          else tckbolex wb ss ts
         else
           (* just compute variable and weight balances *)
           let wb', _ = balance_weight_rec wb ss 0 true false in
@@ -398,11 +417,9 @@ module KBO = struct
     in
     let _, res = tckbo 0 t1 t2 in res  (* ignore the weight *)
 
-  let compare_terms ~so = kbo ~so
-
   let profiler = HExtlib.profile ~enable:true "compare_terms(kbo)"
   let compare_terms ~so x y =
-    profiler.HExtlib.profile (compare_terms ~so x) y
+    profiler.HExtlib.profile (kbo ~so x) y
 end
 
 module RPO = struct
@@ -412,8 +429,8 @@ module RPO = struct
     match s.term, t.term with
     | _, _ when T.eq_term s t -> Eq
     | Var _, Var _ -> Incomparable
-    | _, Var i -> if (List.mem t (T.vars_of_term s)) then Gt else Incomparable
-    | Var i,_ -> if (List.mem s (T.vars_of_term t)) then Lt else Incomparable
+    | _, Var i -> if T.var_occurs t s then Gt else Incomparable
+    | Var i,_ -> if T.var_occurs s t then Lt else Incomparable
     | Node (hd1::tl1), Node (hd2::tl2) ->
       (* check whether an elemnt of the list is >= t, and
          also returns the list of comparison results *)
@@ -445,7 +462,6 @@ module RPO = struct
             | Lt -> if check_subterms t (l_ol,tl1) then Lt else Incomparable
             | Eq -> rpo_rec ~so hd1 tl1 tl2 s t
             | Incomparable -> Incomparable
-            | _ -> assert false
           end
     | _,_ -> aux_ordering so#compare s t
   (* recursive comparison of lists of terms (head symbol is hd) *)
@@ -465,6 +481,72 @@ module RPO = struct
   let profiler = HExtlib.profile ~enable:true "compare_terms(rpo)"
   let compare_terms ~so x y =
     profiler.HExtlib.profile (rpo ~so x) y
+end
+
+(** hopefully more efficient (polynomial) implementation of LPO,
+    following the paper "things to know when implementing LPO" by Löchner.
+    We adapt here the implementation clpo6 with some multiset symbols (=) *)
+module RPO6 = struct
+  let name = "rpo6"
+
+  (** recursive path ordering *)
+  let rec rpo6 ~so s t =
+    if T.eq_term s t then Eq else  (* equality test is cheap *)
+    match s.term, t.term with
+    | Var _, Var _ -> Incomparable
+    | _, Var _ -> if T.var_occurs t s then Gt else Incomparable
+    | Var _, _ -> if T.var_occurs s t then Lt else Incomparable
+    | _ ->
+      match decompose s, decompose t with
+        (f, ss), (g, ts) ->
+          (match so#compare f g with
+          | 0 when so#multiset_status f ->
+            cMultiset ~so ss ts (* multiset subterm comparison *)
+          | 0 ->
+            cLMA ~so s t ss ts  (* lexicographic subterm comparison *)
+          | n when n > 0 -> cMA ~so s ts
+          | n when n < 0 -> Utils.not_partial (cMA ~so t ss)
+          | _ -> assert false   (* match exhaustively *)
+          )
+  (** try to dominate all the terms in ts by s; but by subterm property
+      if some t' in ts is >= s then s < t=g(ts) *)
+  and cMA ~so s ts = match s, ts with
+    | _, [] -> Gt
+    | s, t::ts' ->
+      (match rpo6 ~so s t with
+      | Gt -> cMA ~so s ts'
+      | Eq | Lt -> Lt
+      | Incomparable -> Utils.not_partial (alpha ~so ts' s))
+  (** lexicographic comparison of s=f(ss), and t=f(ts) *)
+  and cLMA ~so s t ss ts = match ss, ts with
+    | si::ss', ti::ts' ->
+      (match rpo6 ~so si ti with
+        | Eq -> cLMA ~so s t ss' ts'
+        | Gt -> cMA ~so s ts' (* just need s to dominate the remaining elements *)
+        | Lt -> Utils.not_partial (cMA ~so t ss')
+        | Incomparable -> cAA ~so s t ss' ts'
+      )
+    | [], [] -> assert false (* should be equal?! *)
+    | _ -> assert false (* different length... *)
+  (** multiset comparison of subterms (not optimized) *)
+  and cMultiset ~so ss ts = Utils.multiset_partial (rpo6 ~so) ss ts
+  (** bidirectional comparison by subterm property (bidirectional alpha) *)
+  and cAA ~so s t ss ts =
+    match alpha ~so ss t with
+    | Gt -> Gt
+    | Incomparable -> Utils.not_partial (alpha ~so ts s)
+    | _ -> assert false
+  (** if some s in ss is >= t, then s > t by subterm property and transitivity *)
+  and alpha ~so ss t = match ss with
+    | [] -> Incomparable
+    | s::ss' ->
+      (match rpo6 ~so s t with
+       | Eq | Gt -> Gt
+       | Incomparable | Lt -> alpha ~so ss' t)
+
+  let profiler = HExtlib.profile ~enable:true "compare_terms(rpo6)"
+  let compare_terms ~so x y =
+    profiler.HExtlib.profile (rpo6 ~so x) y
 end
 
 (* ----------------------------------------------------------------------
@@ -512,7 +594,21 @@ class rpo (so : symbol_ordering) : ordering =
     method name = RPO.name
   end
 
-let default_ordering () = new rpo (default_symbol_ordering ())
+class rpo6 (so : symbol_ordering) : ordering =
+  object
+    val cache = OrdCache.create 29
+    val so = so
+    method refresh () = OrdCache.clear cache; so#refresh ()
+    method clear_cache () = OrdCache.clear cache
+    method symbol_ordering = so
+    method compare a b = OrdCache.with_cache cache
+      (fun (a, b) -> RPO6.compare_terms ~so a b) (a, b)
+    method compute_term_weight t = weight_of_term ~so t
+    method compute_clause_weight c = compute_clause_weight ~so c
+    method name = RPO6.name
+  end
+
+let default_ordering () = new rpo6 (default_symbol_ordering ())
 
 let dummy_ordering =
   let so = ref (default_symbol_ordering ()) in
