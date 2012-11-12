@@ -74,7 +74,7 @@ let beta_eliminate ~ord clause idx a signa b signb =
 (** helper for gamma elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a fresh var) *)
 let gamma_eliminate ~ord clause idx t sign =
-  let maxvar = T.max_var t.vars in
+  let maxvar = max (T.max_var t.vars) 0 in
   assert (t.sort = bool_sort);
   let new_t =
     match T.look_db_sort 0 t with

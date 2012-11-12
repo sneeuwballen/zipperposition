@@ -327,7 +327,7 @@ module KBO = struct
 
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
-      It should be linear time. TODO compatibility with symmetry of = *)
+      It should be linear time. *)
   let rec kbo ~so t1 t2 =
     let balance = mk_balance t1 t2 in
     (** variable balance, weight balance, t contains variable y. pos
@@ -362,9 +362,13 @@ module KBO = struct
       | [], _ | _, [] -> failwith "different arities in lexicographic comparison"
     (** commutative comparison. Not linear, must call kbo to
         avoid breaking the weight computing invariants *)
-    and tckbocommute wb terms1 terms2 = 
-      match terms1, terms2 with
-      | _ -> failwith "KBO for multiset symbols not implemented" (* TODO *)
+    and tckbocommute wb ss ts =
+      (* multiset comparison *)
+      let res = Utils.multiset_partial (kbo ~so) ss ts in
+      (* also compute weights of subterms *)
+      let wb', _ = balance_weight_rec wb ss 0 true false in
+      let wb'', _ = balance_weight_rec wb' ts 0 false false in
+      wb'', res
     (** tupled version of kbo (kbo_5 of the paper) *)
     and tckbo wb t1 t2 =
       match t1.term, t2.term with
