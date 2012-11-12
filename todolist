@@ -4,6 +4,16 @@
 - maybe ordering that take a substitution (more efficiently than just applying subst)
 - LRU cache (rather than flush when full)
 
+- fix RPO6 (incorrect on test.p)
+- fix substitution wrt De Bruijn: if  p(X) -> \forall q(X, 0)
+  then \forall p(0) will be rewritten in \forall \forall q(0, 0) instead
+  of the correct \forall \forall q(0, 1).
+  ↓
+  If we replace l by r in some context, and l is not closed, we have
+  to be careful about captures from binders in r; maybe, we have
+  to be careful when applying a substitution \sigma to r when
+  some term in codom(\sigma) is not closed
+
 - efficient rewriting by given confluent terminating TRS
 - dedicated structure for rewriting (adaptive automata?)
 - storage and detection of axiom schemes (cf Waldmeister) to detect theories -> associate ordering+TRS
