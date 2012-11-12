@@ -401,14 +401,9 @@ exception FoundMatch of (term * substitution * clause * position)
 (** Do one step of demodulation on subterm. *)
 let demod_subterm ~ord blocked_ids active_set subterm =
   Utils.debug 4 (lazy (Utils.sprintf "  demod subterm %a" !T.pp_term#pp subterm));
-  (* do not rewrite non closed subterms *)
-  if not (T.db_closed subterm)
-    then (Utils.debug 3 (lazy (Utils.sprintf "demod: %a not closed" !T.pp_term#pp subterm));
-          None)
-  (* no rewriting on non-atomic formulae *)
-  else if subterm.sort = bool_sort && not (T.atomic subterm)
-    then (Utils.debug 3 (lazy (Utils.sprintf "demod: %a not atomic" !T.pp_term#pp subterm));
-          None)
+  (* do not rewrite non closed subterms, or non-atomic formulas *)
+  if not (T.db_closed subterm) || (subterm.sort = bool_sort  && not (T.atomic subterm))
+    then None
   (* try to rewrite using unit positive clauses *)
   else try
     (* if ground, try to rewrite directly *)

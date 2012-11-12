@@ -250,13 +250,15 @@ let given_clause_step ~calculus state =
       let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
       let state = { state with PS.active_set=active_set } in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
-         are kept (by list-simplify) *)
+         are kept (by list-simplify), if they are not subsumed by the active set *)
+      let new_clauses = List.rev_append !simplified_actives new_clauses in
       let new_clauses = List.fold_left
         (fun new_clauses c ->
           let cs = all_simplify ~ord ~calculus state.PS.active_set c in
           let cs = List.map (C.normalize_clause ~ord) cs in
+          let cs = List.filter (fun c' -> not (is_redundant ~calculus state.PS.active_set c')) cs in
           List.rev_append cs new_clauses)
-        new_clauses !simplified_actives
+        [] new_clauses
       in
       List.iter
         (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf
