@@ -47,7 +47,6 @@ let set_of_support ~calculus state axioms =
   (* reordonate causes using the ordering of the state *)
   let ord = state.PS.ord in
   let axioms = calculus#preprocess ~ord axioms in
-  let axioms = List.filter (fun c -> not (calculus#trivial c)) axioms in
   (* add the axioms to the active set *)
   let axioms_set = PS.add_actives state.PS.axioms_set axioms in
   Utils.debug 1 (lazy (Utils.sprintf "%% added %d clauses to set-of-support"
@@ -65,6 +64,52 @@ let simplify ~calculus active_set clause =
     then Utils.debug 2 (lazy (Utils.sprintf "clause @[<h>%a@] simplified into @[<h>%a@]"
                         !C.pp_clause#pp old_c !C.pp_clause#pp c)));
   old_c, c
+
+(** perform list simplifications and basic simplifications on
+    the clause, recursively. Returns a bool if the clause has
+    been simplified. *)
+let list_simplify ~ord ~calculus clause =
+  let clauses = ref []    (* list of clauses *)
+  and queue = Queue.create ()
+  and changed = ref false in
+  Queue.push clause queue;
+  (* process clauses in the queue *)
+  while not (Queue.is_empty queue) do
+    let c = Queue.pop queue in
+    (* compute list_simplify (basic_simplify c) *)
+    let c = calculus#basic_simplify ~ord c in
+    let new_clauses = calculus#list_simplify ~ord c in
+    match new_clauses with
+    | None -> clauses := c :: !clauses  (* c is totally simplified *)
+    | Some l ->
+      changed := true;
+      List.iter (fun c' -> Queue.push c' queue) l (* process new clauses *)
+  done;
+  !clauses, !changed
+
+(** Use all simplification rules to convert a clause into a list of maximally
+    simplified clauses (possibly empty, if redundant or trivial).
+    This is used on generated clauses, and on the given clause. *)
+let all_simplify ~ord ~calculus active_set clause =
+  let clauses = ref []
+  and queue = Queue.create () in
+  Queue.push clause queue;
+  while not (Queue.is_empty queue) do
+    let c = Queue.pop queue in
+    let c = calculus#basic_simplify ~ord c in
+    let cs, changed = list_simplify ~ord ~calculus c in
+    if changed
+      (* just process those new clauses *)
+      then List.iter (fun c' -> Queue.push c' queue) cs
+      (* simplify using the active set *)
+      else begin
+        let old_c, c = simplify ~calculus active_set c in
+        if C.eq_clause old_c c
+          then clauses := c :: !clauses   (* totally simplified clause *)
+          else Queue.add c queue          (* process the new clause *)
+      end
+  done;
+  !clauses
 
 (** generate all clauses from binary inferences *)
 let generate_binary ~calculus active_set clause =
@@ -146,13 +191,15 @@ let given_clause_step ~calculus state =
   | passive_set, Some c ->
     let state = { state with PS.passive_set=passive_set } in
     (* simplify given clause w.r.t. active set and SOS *)
-    let _, c = simplify ~calculus state.PS.active_set c in
     let _, c = simplify ~calculus state.PS.axioms_set c in
+    let c_list = all_simplify ~ord ~calculus state.PS.active_set c in
+    match c_list with
+    | [] -> state, Unknown  (* all simplifications are redundant *)
+    | c::new_clauses ->     (* select first clause, the other ones are passive *) 
     (* empty clause found *)
     if c.clits = [] then state, Unsat (C.hashcons_clause c)
-    (* tautology or subsumed, useless *)
-    else if calculus#trivial c ||
-            is_redundant ~calculus state.PS.active_set c
+    (* subsumed, useless *)
+    else if is_redundant ~calculus state.PS.active_set c
     then state, Unknown
     else begin
       (* select literals *)
@@ -195,7 +242,7 @@ let given_clause_step ~calculus state =
       let active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
       let state = { state with PS.active_set = active_set } in
       let state = remove_orphans state !simplified_actives in  (* orphan criterion *)
-      let new_clauses = List.map (C.normalize_clause ~ord) !simplified_actives in
+      let new_clauses = List.rev_append !simplified_actives new_clauses in
       (* do inferences w.r.t to the active set, SOS, and c itself *)
       let inferred_clauses = generate ~calculus state c in
       let new_clauses = List.rev_append inferred_clauses new_clauses in
@@ -203,15 +250,13 @@ let given_clause_step ~calculus state =
       let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
       let state = { state with PS.active_set=active_set } in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
-         are kept *)
+         are kept (by list-simplify) *)
       let new_clauses = List.fold_left
         (fun new_clauses c ->
-          let c, simplified_c = simplify ~calculus state.PS.active_set c in
-          (* do not keep trivial  clauses *)
-          if calculus#trivial simplified_c
-            then new_clauses
-            else simplified_c::new_clauses)
-        [] new_clauses
+          let cs = all_simplify ~ord ~calculus state.PS.active_set c in
+          let cs = List.map (C.normalize_clause ~ord) cs in
+          List.rev_append cs new_clauses)
+        new_clauses !simplified_actives
       in
       List.iter
         (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf

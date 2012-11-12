@@ -952,7 +952,8 @@ let superposition : calculus =
 
     method redundant_set actives c = subsumed_in_set actives c
 
-    method trivial c = is_tautology c
+    method list_simplify ~ord c =
+      if is_tautology c then Some [] else None  (* no other list simplification *)
 
     method axioms = []
 

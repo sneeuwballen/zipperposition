@@ -332,7 +332,9 @@ let delayed : calculus =
 
     method redundant_set actives c = Sup.subsumed_in_set actives c
 
-    method trivial c = Sup.is_tautology c
+    (* TODO use elimination rules as simplifications rather than inferences, here *)
+    method list_simplify ~ord c =
+      if Sup.is_tautology c then Some [] else None
 
     method axioms = []
 
