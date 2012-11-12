@@ -394,6 +394,10 @@ let infer_equality_factoring ~ord clause =
 
 exception FoundMatch of (term * substitution * clause * position)
 
+(* TODO more efficient demodulation: use references, use leftmost-innermost
+   strategy with a recursive 'reduce to normal form' function;
+   clauses used for demodulation should be put in a list ref. *)
+
 (** Do one step of demodulation on subterm. *)
 let demod_subterm ~ord blocked_ids active_set subterm =
   Utils.debug 4 (lazy (Utils.sprintf "  demod subterm %a" !T.pp_term#pp subterm));

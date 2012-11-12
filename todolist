@@ -1,6 +1,7 @@
 
 - make multiset comparison fast
 - maybe implement context trees for general purpose indexing
+- maybe ordering that take a substitution (more efficiently than just applying subst)
 - LRU cache (rather than flush when full)
 
 - efficient rewriting by given confluent terminating TRS
