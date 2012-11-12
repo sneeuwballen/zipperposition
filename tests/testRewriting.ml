@@ -138,6 +138,3 @@ let run () =
   Utils.set_debug 1;
   List.iter (fun f -> f ()) benchmarks
 
-let _ =
-  HExtlib.profiling_enabled := true
-

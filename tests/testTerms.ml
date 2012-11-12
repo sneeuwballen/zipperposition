@@ -12,40 +12,52 @@ let preds = ["p"; "q"; "r"; "s"]
 let funs = ["f"; "g"; "h"]
 let symbols = ["a"; "b"; "c"]
 
+let arities =
+  let tbl = Hashtbl.create 3 in
+  Hashtbl.add tbl "f" 2;
+  Hashtbl.add tbl "g" 1;
+  Hashtbl.add tbl "h" 1;
+  Hashtbl.add tbl "p" 1;
+  Hashtbl.add tbl "q" 1;
+  Hashtbl.add tbl "r" 2;
+  Hashtbl.add tbl "s" 2;
+  tbl
+
 (** random term *)
-let random_term () =
+let random_term ?(ground=false) () =
   let depth = H.random_in 0 4 in
   let rec aux depth = match depth with
   | 0 -> random_leaf ()
   | n ->
-    let arity = H.random_in 1 3
-    and head = random_fun () in
+    let head = random_fun_symbol () in
+    let arity = Hashtbl.find arities head in
+    let head = T.mk_leaf head univ_sort in
     let subterms =
       Utils.times arity (fun _ -> aux (depth - (H.random_in 1 2)))
     in
     T.mk_node (head::subterms)
   and random_leaf () =
-    if H.R.bool ()
+    if ground || H.R.bool ()
       then T.mk_leaf (H.choose symbols) univ_sort
       else T.mk_var (H.random_in 0 3) univ_sort
-  and random_fun () =
-    T.mk_leaf (H.choose funs) univ_sort
+  and random_fun_symbol () = H.choose funs
   in aux depth
 
 (** random bool-sorted term *)
-let random_pred () =
-  let p = T.mk_leaf (H.choose preds) bool_sort in
-  let arity = H.random_in 0 3 in
+let random_pred ?(ground=false) () =
+  let p = H.choose preds in
+  let arity = Hashtbl.find arities p in
+  let p = T.mk_leaf p bool_sort in
   if arity = 0
     then p
-    else T.mk_node (p::(Utils.times arity random_term))
+    else T.mk_node (p::(Utils.times arity (random_term ~ground)))
 
 (** random pairs of terms *)
 let random_pair () = (random_term (), random_term ())
 
 (** check all variables are subterms *)
 let check_subterm t = 
-  match T.vars_of_term t with
+  match t.vars with
   | [] -> H.TestPreconditionFalse
   | vars ->
       if List.for_all (fun v -> T.member_term v t) vars
