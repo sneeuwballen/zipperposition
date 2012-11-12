@@ -193,11 +193,10 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                        !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
                        C.pp_pos passive_pos S.pp_substitution subst));
   assert ((Utils.list_inter T.eq_term active_clause.cvars passive_clause.cvars) = []);
-  assert (T.db_closed s);
   if not sign_st 
   then (Utils.debug 3 (lazy "active literal is negative"); acc)
-  else if not (T.db_closed (T.at_pos u subterm_pos))
-  then (Utils.debug 3 (lazy "passive subterm is not DB closed"); acc)
+  else if T.db_var (T.at_pos u subterm_pos)
+  then (Utils.debug 3 (lazy "passive subterm is a DB variable"); acc)
   else
   let t' = S.apply_subst subst t
   and v' = S.apply_subst subst v in
@@ -353,8 +352,6 @@ let infer_equality_factoring_ ~ord clause =
     and u, v, sign_uv = get_equations_sides clause passive_pos
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
-    assert (T.db_closed u);
-    assert (T.db_closed s);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     if ord#compare (S.apply_subst subst s) (S.apply_subst subst t) <> Lt &&
        C.eligible_param ~ord clause active_idx subst
@@ -401,8 +398,8 @@ exception FoundMatch of (term * substitution * clause * position)
 (** Do one step of demodulation on subterm. *)
 let demod_subterm ~ord blocked_ids active_set subterm =
   Utils.debug 4 (lazy (Utils.sprintf "  demod subterm %a" !T.pp_term#pp subterm));
-  (* do not rewrite non closed subterms, or non-atomic formulas *)
-  if not (T.db_closed subterm) || (subterm.sort = bool_sort  && not (T.atomic subterm))
+  (* do not rewrite non-atomic formulas *)
+  if subterm.sort = bool_sort  && not (T.atomic subterm)
     then None
   (* try to rewrite using unit positive clauses *)
   else try
@@ -419,7 +416,6 @@ let demod_subterm ~ord blocked_ids active_set subterm =
     (* unit clause+pos that potentially match subterm *)
     active_set.PS.idx#unit_root_index#retrieve_generalizations subterm ()
       (fun () l set ->
-        assert (T.db_closed l);
         try
           let subst = Unif.matching S.id_subst l subterm in
           (* iterate on all clauses for this term *)

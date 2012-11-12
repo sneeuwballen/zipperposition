@@ -189,11 +189,12 @@ let equivalence_elimination ~ord clause =
   (* do the inference for positive equations *)
   let do_inferences_pos l r l_pos =
     if T.atomic l then [] else begin
-    assert (r.sort = bool_sort);
-    if ord#compare l r = Lt then [] else
-    (* ok, do it *)
-    match l_pos with
-    | [idx; _] ->
+      assert (r.sort = bool_sort);
+      assert (ord#compare l r <> Lt);
+      (* ok, do it *)
+      Format.printf "  equivalence_elim: %a %s %a@." !T.pp_term#pp l
+        (C.string_of_comparison (ord#compare l r)) !T.pp_term#pp r;
+      let idx = List.hd l_pos in
       if not (C.eligible_res ~ord clause idx S.id_subst) then [] else
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_neq ~ord l T.true_term) ::
@@ -205,14 +206,12 @@ let equivalence_elimination ~ord clause =
       in
       [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1 (lazy [clause]);
        C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2 (lazy [clause])]
-    | _ -> assert false
     end
   (* do the inference for negative equations *)
   and do_inferences_neg l r l_pos =
     if not (l.sort = bool_sort) then [] else begin
-    assert (r.sort = bool_sort);
-    match l_pos with
-    | [idx; _] ->
+      assert (r.sort = bool_sort);
+      let idx = List.hd l_pos in
       if not (C.eligible_res ~ord clause idx S.id_subst) then [] else
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_eq ~ord l T.true_term) ::
@@ -224,7 +223,6 @@ let equivalence_elimination ~ord clause =
       in
       [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1 (lazy [clause]);
        C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2 (lazy [clause])]
-    | _ -> assert false
     end
   in
   fold_lits ~both:true ~pos:true ~neg:true
@@ -313,10 +311,7 @@ let delayed : calculus =
 
     method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
                           "equality_factoring", Sup.infer_equality_factoring;
-                          "connective_elimination", connective_elimination;
-                          "forall_elimination", forall_elimination;
-                          "exists_elimination", exists_elimination;
-                          "equivalence_elimination", equivalence_elimination]
+                          "equivalence_elimination", equivalence_elimination; ]
 
     method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
 
@@ -332,9 +327,24 @@ let delayed : calculus =
 
     method redundant_set actives c = Sup.subsumed_in_set actives c
 
-    (* TODO use elimination rules as simplifications rather than inferences, here *)
+    (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify ~ord c =
-      if Sup.is_tautology c then Some [] else None
+      let all_rules = [connective_elimination; forall_elimination; exists_elimination; ] in
+      (* try to use the rules to simplify c *)
+      let rec try_simplify rules c =
+        if Sup.is_tautology c then [] else
+        match rules with 
+        | [] -> [c]
+        | rule::rules' ->
+          (match rule ~ord c with
+          | [] -> try_simplify rules' c  (* use next rules *)
+          | clauses -> (* keep only non-tautologies, and simplify using all rules *)
+            let clauses =  List.filter (fun c -> not (Sup.is_tautology c)) clauses in
+            Utils.list_flatmap (try_simplify all_rules) clauses)
+      in
+      match try_simplify all_rules c with
+      | [c'] when C.eq_clause c c' -> None
+      | clauses -> Some clauses
 
     method axioms = []
 
