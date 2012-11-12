@@ -79,7 +79,7 @@ type substitution = (term * term) list
 type rewriting_system = term -> term
 
 (** partial order comparison *)
-type comparison = Lt | Eq | Gt | Incomparable | Invertible
+type comparison = Lt | Eq | Gt | Incomparable
 
 (** direction of an equation (for rewriting) *)
 type direction = Left2Right | Right2Left | Nodir

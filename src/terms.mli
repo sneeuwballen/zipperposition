@@ -77,7 +77,7 @@ val mk_lambda : term -> term
 val mk_forall : term -> term
 val mk_exists : term -> term
 
-val cast : term -> sort -> term           (** cast (change sort) *)
+val cast : term -> sort -> term             (** cast (change sort) *)
 
 (* ----------------------------------------------------------------------
  * examine term/subterms, positions...
@@ -94,7 +94,7 @@ val at_pos : term -> position -> term       (** retrieve subterm at pos, or
 val replace_pos : term -> position          (** replace t|_p by the second term *)
                -> term -> term
 
-val vars_of_term : term -> varlist          (** free variables in the term *)
+val var_occurs : term -> term -> bool       (** [var_occurs x t] true iff x in t *)
 val is_ground_term : term -> bool           (** is the term ground? *)
 val merge_varlist : varlist -> varlist -> varlist (** set union of variable list *)
 val max_var : varlist -> int                (** find the maximum variable index *)

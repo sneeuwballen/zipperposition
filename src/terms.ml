@@ -250,14 +250,19 @@ let rec replace_pos t pos new_t = match t.term, pos with
       mk_node (Utils.list_set l i new_subterm)
   | _ -> invalid_arg "index too high for subterm"
 
-let vars_of_term t = t.vars
+let var_occurs x t =
+  let rec check l =
+    match l with
+    | [] -> false
+    | y::l' -> if x == y then true else check l'
+  in check t.vars
 
 let is_ground_term t =
   match t.vars with
   | [] -> true
   | _ -> false
 
-let merge_varlist l1 l2 = Utils.list_merge compare_term l1 l2
+let merge_varlist l1 l2 = Utils.list_union eq_term l1 l2
 
 let max_var vars =
   let rec aux idx = function
@@ -265,13 +270,13 @@ let max_var vars =
   | ({term=Var i}::vars) -> aux (max i idx) vars
   | _::vars -> assert false
   in
-  aux 0 vars
+  aux min_int vars
 
 let min_var vars =
   let rec aux idx = function
   | [] -> idx
   | ({term=Var i}::vars) -> aux (min i idx) vars
-  | _::vars -> assert false
+  | _ -> assert false
   in
   aux max_int vars
 
@@ -571,7 +576,7 @@ let pp_term_tstp =
             (Utils.pp_list ~sep:", " self#pp ) tl
       | Node [] -> failwith "bad term";
       in
-      let maxvar = max_var (vars_of_term t) in
+      let maxvar = max_var t.vars in
       let varindex = ref (maxvar+1) in
       (* convert everything to named variables, then print *)
       pp_rec (db_to_var varindex t)
