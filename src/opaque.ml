@@ -64,7 +64,7 @@ let mk_oterm ~theory t =
   try
     T.THashtbl.find oterms t
   with Not_found -> begin
-    let vars = T.vars_of_term t in
+    let vars = t.vars in
     let congruence = theory#congruence t in
     let ot = {
       ot_theory = theory;

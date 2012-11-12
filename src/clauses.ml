@@ -209,7 +209,7 @@ let fmap_lit ~ord f = function
 
 let vars_of_lit = function
   | Equation (left, right, _, _) ->
-    T.merge_varlist (T.vars_of_term left) (T.vars_of_term right)
+    T.merge_varlist left.vars right.vars
 
 (* ----------------------------------------------------------------------
  * clauses
@@ -264,7 +264,7 @@ let check_maximal_lit_ ~ord clause pos subst =
         else
           let slit' = apply_subst_lit ~ord subst lit' in
           match compare_lits_partial ~ord slit slit' with
-          | Eq | Gt | Invertible | Incomparable -> true
+          | Eq | Gt | Incomparable -> true
           | Lt -> begin
             false  (* slit is not maximal *)
           end
@@ -475,7 +475,6 @@ let string_of_comparison = function
   | Gt -> "=>="
   | Eq -> "==="
   | Incomparable -> "=?="
-  | Invertible -> "=<->="
 
 (** pretty printer for literals *)
 class type pprinter_literal =
@@ -590,7 +589,7 @@ let pp_clause_tstp =
             (fun t lit -> T.mk_or t (term_of_lit lit)) (term_of_lit hd) tl
         in
         (* quantify all free variables *)
-        let vars = T.vars_of_term t in
+        let vars = t.vars in
         let t = List.fold_left
           (fun t var -> T.mk_node [T.mk_leaf forall_symbol bool_sort; var; t])
           t vars

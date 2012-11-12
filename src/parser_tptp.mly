@@ -122,14 +122,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   let mk_forall v t =
     (* only add the quantifier if v is a free var in t *)
-    if List.exists (fun v' -> T.eq_term v v') (T.vars_of_term t)
+    if T.var_occurs v t
       then T.mk_apply forall_symbol bool_sort
         [T.mk_apply lambda_symbol bool_sort [T.db_from_var t v]]
       else t
 
   let mk_exists v t =
     (* only add the quantifier if v is a free var in t *)
-    if List.exists (fun v' -> T.eq_term v v') (T.vars_of_term t)
+    if T.var_occurs v t
     then T.mk_apply exists_symbol bool_sort
         [T.mk_apply lambda_symbol bool_sort [T.db_from_var t v]]
     else t

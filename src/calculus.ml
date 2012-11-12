@@ -154,7 +154,7 @@ let skolem =
   fun ~ord t sort ->
     Utils.debug 4 (lazy (Utils.sprintf "skolem %a@." !T.pp_term#pp t));
     let normalized_t, subst_to_t = S.normalize_term t in
-    let vars = T.vars_of_term normalized_t in
+    let vars = normalized_t.vars in
     (* find the skolemized normalized term *)
     let normalized_t'= try
       TCache.find cache normalized_t

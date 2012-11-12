@@ -53,14 +53,14 @@ let rec lexicograph_partial f l1 l2 =
   | [], [] -> Eq
   | x::xs, y::ys ->
     (match f x y with
-    | Lt -> Lt | Gt -> Gt | Incomparable -> Incomparable | Invertible -> assert false
+    | Lt -> Lt | Gt -> Gt | Incomparable -> Incomparable
     | Eq -> lexicograph_partial f xs ys)
   | [], _ | _, [] -> Incomparable
 
 let partial_to_total ord a b = match ord a b with
   | Lt -> -1
   | Gt -> 1
-  | Eq | Invertible | Incomparable -> 0
+  | Eq | Incomparable -> 0
 
 let total_to_partial ord a b = match ord a b with
   | x when x > 0 -> Gt
@@ -73,17 +73,16 @@ let opposite_order ord a b = - (ord a b)
     compatible, ie they do not order differently if
     Incomparable is not one of the values *)
 let or_partial cmp1 cmp2 = match cmp1, cmp2 with
-  | Eq, Eq | Eq, Invertible | Invertible, Eq
+  | Eq, Eq
   | Eq, Incomparable | Incomparable, Eq -> Eq
   | Lt, Incomparable | Incomparable, Lt -> Lt
   | Gt, Incomparable | Incomparable, Gt -> Gt
   | Incomparable, Incomparable -> Incomparable
-  | Invertible, Invertible -> Invertible
   | _ -> assert false  (* not compatible *)
 
 (** negation of a partial order relation *)
 let not_partial cmp = match cmp with
-  | Eq | Invertible | Incomparable -> cmp
+  | Eq | Incomparable -> cmp
   | Lt -> Gt
   | Gt -> Lt
 

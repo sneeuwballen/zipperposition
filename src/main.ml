@@ -104,7 +104,7 @@ let parse_args () =
     (Utils.pp_list ~sep:"," Format.pp_print_string)
     (PS.names_index ()) in
   (* parameters *)
-  let ord = ref "rpo"
+  let ord = ref "rpo6"
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true
@@ -268,6 +268,7 @@ let () =
   let so = O.make_ordering constr in
   let ord = match params.param_ord with
     | "rpo" -> new O.rpo so
+    | "rpo6" -> new O.rpo6 so
     | "kbo" -> new O.kbo so
     | x -> failwith ("unknown ordering " ^ x)
   in

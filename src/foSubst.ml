@@ -127,7 +127,7 @@ let fresh_term maxvar t =
     (fun (offset, subst) ({sort=sort} as var) ->
       let new_var = T.mk_var offset sort in
       (offset+1, build_subst var new_var ~recursive:false subst))
-    (maxvar+1, id_subst) (T.vars_of_term t)
+    (maxvar+1, id_subst) t.vars
   in
   apply_subst ~recursive:false subst t
 
@@ -139,7 +139,7 @@ let relocate_term varlist t =
 (** Returns a term t' that is unique for all alpha equivalent
     representations of t, and a subst s such that s(t') = t *)
 let normalize_term t =
-  let vars = T.vars_of_term t in
+  let vars = t.vars in
   let subst_from_t, subst_to_t = List.fold_left
     (fun (s_from, s_to) var ->
       match var.term with

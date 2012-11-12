@@ -39,7 +39,7 @@ let rec occurs_check var t =
     occurs_check var (T.get_binding t)  (* see in binding *)
   | Var _ -> false
   | Leaf _ -> assert false
-  | Node _ -> List.exists (occurs_check var) (T.vars_of_term t)
+  | Node _ -> List.exists (occurs_check var) t.vars
 
 (** if t is a variable, return its current binding *)
 let rec get_var_binding t =
@@ -124,7 +124,7 @@ let matching_locked ~locked subst a b =
   in
   prof_matching.HExtlib.profile root_match ()
 
-let matching subst a b = matching_locked ~locked:(T.vars_of_term b) subst a b
+let matching subst a b = matching_locked ~locked:b.vars subst a b
 
 (** Sets of variables in s and t are assumed to be disjoint  *)
 let alpha_eq s t =

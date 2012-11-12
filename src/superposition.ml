@@ -735,8 +735,8 @@ let subsumes_with a b =
         attempt_with x l1 (y::l2_pre) l2_tail subst
   (* used to sort literals by decreasing number of variables *)
   and compare_lit_vars (Equation (l1,l2,_,_)) (Equation (r1,r2,_,_)) =
-    (List.length (T.vars_of_term r1)) + (List.length (T.vars_of_term r2)) 
-    - (List.length (T.vars_of_term l1)) - (List.length (T.vars_of_term l2))
+    (List.length r1.vars) + (List.length r2.vars) 
+    - (List.length l1.vars) - (List.length l2.vars)
   in
   let res =
     (* try aux with the whole list of literals l1 *)

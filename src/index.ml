@@ -119,8 +119,7 @@ let process_lit op c tree (lit, pos) =
       op tree l (c, [C.left_pos; pos])
   | Equation (_,r,_,Lt) -> 
       op tree r (c, [C.right_pos; pos])
-  | Equation (l,r,_,Incomparable)
-  | Equation (l,r,_,Invertible) ->
+  | Equation (l,r,_,Incomparable) ->
       let tmp_tree = op tree l (c, [C.left_pos; pos]) in
       op tmp_tree r (c, [C.right_pos; pos])
   | Equation (l,r,_,Eq) ->
