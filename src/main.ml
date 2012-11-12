@@ -104,7 +104,7 @@ let parse_args () =
     (Utils.pp_list ~sep:"," Format.pp_print_string)
     (PS.names_index ()) in
   (* parameters *)
-  let ord = ref "rpo6"
+  let ord = ref "rpo"
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true

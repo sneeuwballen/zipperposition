@@ -336,6 +336,12 @@ let rec atomic_rec t = match t.term with
 (* check wether the term is closed w.r.t. De Bruijn variables *)
 let db_closed t = t.db_closed
 
+let rec db_var t =
+  match t.term with
+  | Leaf s when s = db_symbol -> true
+  | Node [{term=Leaf s}; t] when s = succ_db_symbol -> db_var t
+  | _ -> false
+
 (* check whether t contains the De Bruijn symbol n *)
 let rec db_contains t n = match t.term with
   | Leaf s when s = db_symbol -> n = 0

@@ -96,17 +96,17 @@ let all_simplify ~ord ~calculus active_set clause =
   Queue.push clause queue;
   while not (Queue.is_empty queue) do
     let c = Queue.pop queue in
+    (* usual simplifications *)
     let c = calculus#basic_simplify ~ord c in
-    let cs, changed = list_simplify ~ord ~calculus c in
-    if changed
-      (* just process those new clauses *)
-      then List.iter (fun c' -> Queue.push c' queue) cs
-      (* simplify using the active set *)
+    let old_c, c = simplify ~calculus active_set c in
+    if not (C.eq_clause old_c c)
+      then Queue.add c queue          (* process the new clause *)
       else begin
-        let old_c, c = simplify ~calculus active_set c in
-        if C.eq_clause old_c c
-          then clauses := c :: !clauses   (* totally simplified clause *)
-          else Queue.add c queue          (* process the new clause *)
+        let cs, changed = list_simplify ~ord ~calculus c in
+        if changed
+          then List.iter (fun c' -> Queue.push c' queue) cs (* process new clauses *)
+          else
+            clauses := c :: !clauses   (* totally simplified clause *)
       end
   done;
   !clauses

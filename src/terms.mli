@@ -117,6 +117,7 @@ val reset_vars : term -> unit               (** reset bindings of variables of t
 val atomic : term -> bool                   (** atomic proposition, or term, at root *)
 val atomic_rec : term -> bool               (** does not contain connectives/quantifiers *)
 val db_closed : term -> bool                (** check whether the term is closed *)
+val db_var : term -> bool                   (** is the term a De Bruijn index? *)
 
 (** Does t contains the De Bruijn variable of index n? *)
 val db_contains : term -> int -> bool
