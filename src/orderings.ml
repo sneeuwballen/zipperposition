@@ -496,9 +496,14 @@ module RPO6 = struct
     | Var _, Var _ -> Incomparable
     | _, Var _ -> if T.var_occurs t s then Gt else Incomparable
     | Var _, _ -> if T.var_occurs s t then Lt else Incomparable
-    | _ ->
+    | _ -> begin
       match decompose s, decompose t with
-        (f, ss), (g, ts) ->
+       | (f, []), (g, []) ->
+          (match so#compare f g with
+           | n when n < 0 -> Lt
+           | n when n > 0 -> Gt
+           | _ -> Eq)
+       | (f, ss), (g, ts) ->
           (match so#compare f g with
           | 0 when so#multiset_status f ->
             cMultiset ~so ss ts (* multiset subterm comparison *)
@@ -508,6 +513,7 @@ module RPO6 = struct
           | n when n < 0 -> Utils.not_partial (cMA ~so t ss)
           | _ -> assert false   (* match exhaustively *)
           )
+      end
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
   and cMA ~so s ts = match s, ts with
