@@ -74,6 +74,10 @@ let generate_binary ~calculus active_set clause =
 let generate_unary ~calculus ~ord clause =
   Calculus.do_unary_inferences ~ord calculus#unary_rules clause
 
+(** depth at which unary inferences are performed (max number
+    of times inferences are applied recursively to a clause) *)
+let unary_max_depth = ref 4
+
 (** generate all clauses from inferences, updating the state (for the
     parent/descendant relation) *)
 let generate ~calculus state c =
@@ -89,8 +93,21 @@ let generate ~calculus state c =
   let binary_clauses = List.rev_append
     (generate_binary ~calculus given_active_set c) binary_clauses in
   (* unary inferences *)
-  let unary_clauses = generate_unary ~calculus ~ord c in
-  let new_clauses =  List.rev_append unary_clauses binary_clauses in
+  let unary_clauses = ref []
+  and unary_queue = Queue.create () in
+  Queue.push (c, 0) unary_queue;
+  while not (Queue.is_empty unary_queue) do
+    let c, depth = Queue.pop unary_queue in
+    let c = calculus#basic_simplify ~ord c in   (* simplify a bit the clause *)
+    unary_clauses := c :: !unary_clauses;       (* add the clause to set of inferred clauses *)
+    if depth < !unary_max_depth
+      then begin
+        (* infer clauses from c, add them to the queue *)
+        let new_clauses = generate_unary ~calculus ~ord c in
+        List.iter (fun c' -> Queue.push (c', depth+1) unary_queue) new_clauses
+      end
+  done;
+  let new_clauses =  List.rev_append !unary_clauses binary_clauses in
   new_clauses
 
 (** remove direct descendants of the clauses from the passive set *)

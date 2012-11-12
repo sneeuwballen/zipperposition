@@ -564,10 +564,7 @@ let basic_simplify ~ord clause =
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
   let parents = lazy (clause :: C.parents clause) in
-  let proof =
-    try if List.for_all2 C.eq_literal_com clause.clits new_lits
-      then clause.cproof else lazy (Proof ("basic_simplify", [clause, [], S.id_subst]))
-    with Invalid_argument _ -> lazy (Proof ("basic_simplify", [clause, [], S.id_subst])) in
+  let proof = clause.cproof in  (* do not bother printing this *)
   let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) proof parents in
   (if not (C.eq_clause new_clause clause) then
       (Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] basic_simplifies into @[<h>%a@]"
