@@ -24,6 +24,8 @@ open Types
 
 (** symbols that are symmetric (that is, order of arguments does not matter) *)
 val is_symmetric_symbol : symbol -> bool
+val is_infix_symbol : symbol -> bool
+val is_binder_symbol : symbol -> bool
 
 (* ----------------------------------------------------------------------
  * comparison, equality, containers
@@ -101,17 +103,6 @@ val max_var : varlist -> int                (** find the maximum variable index 
 val min_var : varlist -> int
 
 (* ----------------------------------------------------------------------
- * bindings and normal forms
- * ---------------------------------------------------------------------- *)
-val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding or normal form of t *)
-val reset_binding : term -> unit            (** reset variable binding/normal form *)
-val get_binding : term -> term              (** get the binding of variable/normal form of term *)
-val expand_bindings : ?recursive:bool ->
-                      term -> term          (** replace variables by their bindings *)
-
-val reset_vars : term -> unit               (** reset bindings of variables of the term *)
-
-(* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
  * ---------------------------------------------------------------------- *)
 val atomic : term -> bool                   (** atomic proposition, or term, at root *)
@@ -126,6 +117,8 @@ val db_contains : term -> int -> bool
 val db_replace : term -> term -> term
 (** Create a De Bruijn variable of index n *)
 val db_make : int -> sort -> term
+(** lift the non-captured De Bruijn indexes in the term by n *)
+val db_lift : int -> term -> term
 (** Unlift the term (decrement indices of all De Bruijn variables inside *)
 val db_unlift : term -> term
 (** [db_from_var t v] replace v by a De Bruijn symbol in t *)
@@ -134,6 +127,17 @@ val db_from_var : term -> term -> term
 val db_depth : term -> int
 (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
 val look_db_sort : int -> term -> sort option
+
+(* ----------------------------------------------------------------------
+ * bindings and normal forms
+ * ---------------------------------------------------------------------- *)
+val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding or normal form of t *)
+val reset_binding : term -> unit            (** reset variable binding/normal form *)
+val get_binding : term -> term              (** get the binding of variable/normal form of term *)
+val expand_bindings : ?recursive:bool ->
+                      term -> term          (** replace variables by their bindings *)
+
+val reset_vars : term -> unit               (** reset bindings of variables of the term *)
 
 (* ----------------------------------------------------------------------
  * Pretty printing

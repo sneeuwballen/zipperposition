@@ -29,6 +29,9 @@ let is_symmetric_symbol s =
 let is_infix_symbol s =
   s = eq_symbol || s = or_symbol || s = and_symbol || s = imply_symbol
 
+let is_binder_symbol s =
+  s = lambda_symbol
+
 let hash_term t =
   let hash t = match t.term with
   | Var i -> 17 lxor (Utils.murmur_hash i)
@@ -142,25 +145,27 @@ let compute_vars l =
   THashSet.to_list set
 
 let rec compute_db_closed depth t = match t.term with
-  | Leaf s when s = db_symbol -> depth > 0
-  | Leaf s when s = succ_db_symbol -> false (* not a proper term *)
-  | Node [{term=Leaf s}; t'] when s = lambda_symbol ->
-    compute_db_closed (depth+1) t'
-  | Node [{term=Leaf s}; t'] when s = succ_db_symbol -> 
+  | Leaf s when s = db_symbol -> depth < 0
+  | Leaf s when s = succ_db_symbol -> assert false (* not a proper term *)
+  | Node [{term=Leaf s}; t'] when is_binder_symbol s ->
     compute_db_closed (depth-1) t'
+  | Node [{term=Leaf s}; t'] when s = succ_db_symbol -> 
+    compute_db_closed (depth+1) t'
   | Leaf _ | Var _ -> true
   | Node l -> List.for_all (compute_db_closed depth) l
 
 let mk_var idx sort =
   let rec my_v = {term = Var idx; sort=sort; vars=[my_v];
-    db_closed=true; binding=my_v; normal_form = true; tag= -1; hkey=0} in
+                  db_closed=true; binding=my_v;
+                  normal_form = true; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
 let mk_leaf symbol sort =
   let db_closed = if symbol = db_symbol then false else true in
   let rec my_t = {term = Leaf symbol; sort=sort; vars=[];
-              db_closed=db_closed; binding=my_t; normal_form = false; tag= -1; hkey=0} in
+                  db_closed=db_closed; binding=my_t;
+                  normal_form = false; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
   H.hashcons my_t
 
@@ -170,7 +175,8 @@ let rec mk_node = function
   | {term=Var _}::_ -> assert false
   | (head::_) as subterms ->
       let rec my_t = {term=(Node subterms); sort=head.sort; vars=[];
-                  db_closed=false; binding=my_t; normal_form = false; tag= -1; hkey=0} in
+                      db_closed=false; binding=my_t;
+                      normal_form = false; tag= -1; hkey=0} in
       my_t.hkey <- hash_term my_t;
       let t = H.hashcons my_t in
       (if t == my_t
@@ -281,38 +287,6 @@ let min_var vars =
   aux max_int vars
 
 (* ----------------------------------------------------------------------
- * bindings and normal forms
- * ---------------------------------------------------------------------- *)
-
-(** [set_binding t d] set variable binding or normal form of t *)
-let set_binding t d = t.binding <- d
-
-(** reset variable binding/normal form *)
-let reset_binding t = t.binding <- t
-
-(** get the binding of variable/normal form of term *)
-let rec get_binding t = 
-  if t.binding == t then t else get_binding t.binding
-
-(** replace variables by their bindings *)
-let expand_bindings ?(recursive=true) t =
-  (* recurse to expand bindings, returns new term and a boolean (true if term expanded) *)
-  let rec recurse t =
-    (* if no variable of t is bound (or t ground), nothing to do *)
-    if is_ground_term t || List.for_all (fun v -> v.binding == v) t.vars then t
-    else match t.term with
-    | Leaf _ -> t
-    | Var _ ->
-      if t.binding == t then t
-      else if recursive then recurse t.binding
-      else t.binding
-    | Node l -> mk_node (List.map recurse l) (* recursive replacement in subterms *)
-  in recurse t
-
-(** reset bindings of variables of the term *)
-let reset_vars t = List.iter reset_binding t.vars
-
-(* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
  * ---------------------------------------------------------------------- *)
 
@@ -376,6 +350,28 @@ let rec db_make n sort = match n with
     mk_apply succ_db_symbol sort [next]
   | _ -> assert false
 
+(** lift the non-captured De Bruijn indexes in the term by n *)
+let db_lift n t =
+  (* traverse the term, looking for non-captured DB indexes.
+     db_balance is (height of DB - number of binders on path) *)
+  let rec recurse db_balance t = 
+    match t.term with
+    | _ when db_closed t -> t  (* closed. *)
+    | Var _ -> t
+    | Leaf s when s = db_symbol && db_balance >= 0 ->
+      db_make n t.sort  (* lift by n, term not captured *)
+    | Leaf _ -> t
+    | Node [{term=Leaf s} as hd; t'] when s = succ_db_symbol ->
+      mk_node [hd; recurse (db_balance + 1) t']  (* ++ db_balance *)
+    | Node [{term=Leaf s} as hd; t'] when is_binder_symbol s ->
+      mk_node [hd; recurse (db_balance - 1) t']  (* -- db_balance *)
+    | Node l ->
+      let l' = List.map (recurse db_balance) l in
+      mk_node l'  (* recurse in subterms *)
+  in
+  assert (n >= 0);
+  if n = 0 then t else recurse 0 t
+
 (* unlift the term (decrement indices of all De Bruijn variables inside *)
 let db_unlift t =
   (* int indice of this DB term *)
@@ -430,6 +426,52 @@ let look_db_sort index t =
     | Var _ -> ()
   in try lookup index t; None
      with FoundSort s -> Some s
+
+(* ----------------------------------------------------------------------
+ * bindings and normal forms
+ * ---------------------------------------------------------------------- *)
+
+(** [set_binding t d] set variable binding or normal form of t *)
+let set_binding t d = t.binding <- d
+
+(** reset variable binding/normal form *)
+let reset_binding t = t.binding <- t
+
+(** get the binding of variable/normal form of term *)
+let rec get_binding t = 
+  if t.binding == t then t else get_binding t.binding
+
+(** replace variables by their bindings *)
+let expand_bindings ?(recursive=true) t =
+  (* recurse to expand bindings, returns new term.  Also keeps track of the
+    number of binders met so far, for lifting non-closed De Bruijn indexes in
+    substituted terms. *)
+  let rec recurse binder_depth t =
+    (* if no variable of t is bound (or t ground), nothing to do *)
+    if is_ground_term t || List.for_all (fun v -> v.binding == v) t.vars then t
+    else match t.term with
+    | Var _ ->
+      if t.binding == t then t
+      else
+        let t' = if db_closed t.binding  (* maybe have to lift DB vars *)
+          then t.binding
+          else db_lift binder_depth t.binding in
+        if recursive then recurse binder_depth t' else t'
+      (* lift open De Bruijn symbols in t.binding by the number of binders encountered *)
+    | Node [{term=Leaf s} as hd; t'] when is_binder_symbol s ->
+      mk_node [hd; recurse (binder_depth+1) t']  (* increase number of binders met *)
+    | Node l ->
+      let l' = List.map (recurse binder_depth) l in
+      mk_node l' (* recursive replacement in subterms *)
+    | Leaf _ -> assert false (* should be ground *)
+  in recurse 0 t
+
+(** reset bindings of variables of the term *)
+let reset_vars t = List.iter reset_binding t.vars
+
+(* ----------------------------------------------------------------------
+ * Pretty printing
+ * ---------------------------------------------------------------------- *)
 
 (** type of a pretty printer for symbols *)
 class type pprinter_symbol =
