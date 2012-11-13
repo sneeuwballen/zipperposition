@@ -4,16 +4,8 @@
 - maybe ordering that take a substitution (more efficiently than just applying subst)
 - LRU cache (rather than flush when full)
 
-- constraint ordering on delayed calculus is weaker: predicates can (and should) 
-  be above De Bruijn indices (so that definitions of predicates can be oriented)
-- fix substitution wrt De Bruijn: if  p(X) -> \forall q(X, 0)
-  then \forall p(0) will be rewritten in \forall \forall q(0, 0) instead
-  of the correct \forall \forall q(0, 1).
-  ↓
-  If we replace l by r in some context, and l is not closed, we have
-  to be careful about captures from binders in r; maybe, we have
-  to be careful when applying a substitution \sigma to r when
-  some term in codom(\sigma) is not closed
+- apply selection function consistently (delayed reductions take it
+  into account), or make reductions insensitive to selected literals
 
 - efficient rewriting by given confluent terminating TRS
 - dedicated structure for rewriting (adaptive automata?)
