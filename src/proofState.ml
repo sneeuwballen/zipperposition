@@ -223,3 +223,56 @@ let debug_state formatter state =
     CQ.pp_queues state.passive_set.queues
     C.pp_bag state.active_set.active_clauses
     C.pp_bag state.passive_set.passive_clauses
+
+
+module DotState = Dot.Make(
+  struct
+    type vertex = clause
+    type edge = string
+
+    let equal = C.eq_clause
+    let hash = C.hash_clause
+    let print_vertex c = U.sprintf "@[<h>%a@]" !C.pp_clause#pp c
+    let print_edge s = s
+  end)
+
+(** print to dot *)
+let pp_dot ?(name="state") formatter state =
+  let graph = DotState.mk_graph ~name
+  and explored = C.CHashSet.create ()
+  and queue = Queue.create () in
+  C.iter_bag state.active_set.active_clauses (fun _ c -> Queue.push c queue);
+  (* breadth first exploration of clauses and their parents *)
+  while not (Queue.is_empty queue) do
+    let c = Queue.pop queue in
+    if C.CHashSet.member explored c then ()
+    else begin
+      (* node for this clause *)
+      let n = DotState.get_node graph c in
+      C.CHashSet.add explored c;
+      DotState.add_node_attribute n (DotState.Style "filled");
+      DotState.add_node_attribute n (DotState.Shape "box");
+      match Lazy.force c.cproof with
+      | Axiom (file, axiom) ->
+        DotState.add_node_attribute n (DotState.Color "yellow");
+      | Proof (rule, clauses) ->
+        List.iter
+          (fun (parent, _, _) ->
+            Queue.push parent queue;  (* explore this parent *)
+            let n_parent = DotState.get_node graph parent in
+            ignore (DotState.add_edge graph n_parent n rule))
+          clauses
+    end
+  done;
+  DotState.pp_graph formatter graph
+
+(** print to dot into a file *)
+let pp_dot_file filename state =
+  let out = open_out filename in
+  try
+    (* write on the opened out channel *)
+    let formatter = Format.formatter_of_out_channel out in
+    Format.printf "%% print state to %s@." filename;
+    pp_dot formatter state;
+    close_out out
+  with _ -> close_out out

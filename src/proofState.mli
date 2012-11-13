@@ -99,3 +99,8 @@ val stats : state -> state_stats
 val pp_state : Format.formatter -> state -> unit
 (** debug functions: much more detailed printing *)
 val debug_state : Format.formatter -> state -> unit
+
+(** print to dot *)
+val pp_dot : ?name:string -> Format.formatter -> state -> unit
+(** print to dot into a file *)
+val pp_dot_file : string -> state -> unit

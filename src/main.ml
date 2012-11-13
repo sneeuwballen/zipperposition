@@ -89,6 +89,7 @@ type parameters = {
   param_select : string;
   param_progress : bool;
   param_proof : bool;
+  param_dot_file : string option; (** file to print the final state in *)
   param_presimplify : bool;       (** do we simplify the initial set? *)
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
@@ -113,6 +114,7 @@ let parse_args () =
   and index = ref "fp"
   and calculus = ref "superposition"
   and presimplify = ref false
+  and dot_file = ref None
   and select = ref "SelectComplex"  (* TODO choose clause queues? *)
   and progress = ref false
   and print_sort = ref false
@@ -130,6 +132,7 @@ let parse_args () =
       ("-progress", Arg.Set progress, "print progress");
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
+      ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-index", Arg.Set_string index, help_index);
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
@@ -142,7 +145,7 @@ let parse_args () =
   { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
     param_timeout = !timeout; param_files = [!file]; param_select = !select;
     param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
-    param_output_syntax = !output; param_index= !index;
+    param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
     param_print_sort = !print_sort; param_print_all = !print_all; }
 
 (** find the given file from given directory *)
@@ -211,6 +214,16 @@ let print_stats state =
   print_hashcons_stats "terms" (T.stats ());
   print_hashcons_stats "clauses" (C.stats ());
   print_state_stats (PS.stats state)
+
+(** print the final state to given file in DOT, with
+    clauses in result if needed *)
+let print_state filename (state, result) =
+  let state = match result with
+    | Sat.Unsat c ->
+      let active, _ = PS.add_active state.PS.active_set c in (* put empty clause in state *)
+      {state with PS.active_set = active}
+    | _ -> state in
+  PS.pp_dot_file filename state
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -301,6 +314,9 @@ let () =
   Printf.printf "%% done %d iterations\n" num;
   print_stats state;
   Sup.print_stats ();
+  (match params.param_dot_file with (* print state *)
+  | None -> ()
+  | Some f -> print_state f (state, result));
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
