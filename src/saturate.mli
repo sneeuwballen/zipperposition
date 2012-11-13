@@ -37,6 +37,7 @@ val set_of_support: calculus:Calculus.calculus ->
 
 (** Simplifications to perform on initial clauses *)
 val initial_simplifications : ord:ordering ->
+                              select:selection_fun ->
                               calculus:Calculus.calculus ->
                               clause list -> clause list
 

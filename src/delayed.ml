@@ -364,13 +364,14 @@ let delayed : calculus =
     method redundant_set actives c = Sup.subsumed_in_set actives c
 
     (* use elimination rules as simplifications rather than inferences, here *)
-    method list_simplify ~ord c =
+    method list_simplify ~ord ~select c =
       let all_rules = [connective_elimination; forall_elimination;
                        exists_elimination; equivalence_elimination ] in
       (* try to use the rules to simplify c *)
       let rec try_simplify rules c =
         let c = Sup.basic_simplify ~ord (simplify_inner ~ord c) in
         if Sup.is_tautology c then [] else
+        let c = C.select_clause ~select c in
         match rules with 
         | [] -> [c]  (* c is not simplifiable by any rule *)
         | rule::rules' ->
@@ -381,7 +382,7 @@ let delayed : calculus =
                           !C.pp_clause#pp c (Utils.pp_list !C.pp_clause#pp) clauses));
             (* keep only non-tautologies, and simplify new clauses
                using all rules again *)
-            let clauses =  List.filter (fun c -> not (Sup.is_tautology c)) clauses in
+            let clauses =  List.filter (fun c' -> not (Sup.is_tautology c')) clauses in
             Utils.list_flatmap (try_simplify all_rules) clauses)
       in
       match try_simplify all_rules c with

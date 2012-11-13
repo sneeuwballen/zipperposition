@@ -299,7 +299,7 @@ let () =
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord (List.map (C.reord_clause ~ord) clauses) in
   let clauses = if params.param_presimplify
-    then Sat.initial_simplifications ~ord ~calculus clauses
+    then Sat.initial_simplifications ~ord ~calculus ~select clauses
     else clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));

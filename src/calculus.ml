@@ -52,7 +52,7 @@ class type calculus =
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
-    method list_simplify : ord:ordering -> clause -> clause list option
+    method list_simplify : ord:ordering -> select:selection_fun -> clause -> clause list option
     (** a list of axioms to add to the Set of Support *)
     method axioms : clause list
     (** some constraints on the precedence *)

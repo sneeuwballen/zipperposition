@@ -65,28 +65,6 @@ let simplify ~calculus active_set clause =
                         !C.pp_clause#pp old_c !C.pp_clause#pp c)));
   old_c, c
 
-(** perform list simplifications and basic simplifications on
-    the clause, recursively. Returns a bool if the clause has
-    been simplified. *)
-let list_simplify ~ord ~calculus clause =
-  let clauses = ref []    (* list of clauses *)
-  and queue = Queue.create ()
-  and changed = ref false in
-  Queue.push clause queue;
-  (* process clauses in the queue *)
-  while not (Queue.is_empty queue) do
-    let c = Queue.pop queue in
-    (* compute list_simplify (basic_simplify c) *)
-    let c = calculus#basic_simplify ~ord c in
-    let new_clauses = calculus#list_simplify ~ord c in
-    match new_clauses with
-    | None -> clauses := c :: !clauses  (* c is totally simplified *)
-    | Some l ->
-      changed := true;
-      List.iter (fun c' -> Queue.push c' queue) l (* process new clauses *)
-  done;
-  !clauses, !changed
-
 (** generate all clauses from binary inferences *)
 let generate_binary ~calculus active_set clause =
   Calculus.do_binary_inferences active_set calculus#binary_rules clause
@@ -162,7 +140,7 @@ let subsumed_by ~calculus active_set clause =
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if redundant or trivial).
     This is used on generated clauses, and on the given clause. *)
-let all_simplify ~ord ~calculus active_set clause =
+let all_simplify ~ord ~calculus ~select active_set clause =
   let clauses = ref []
   and queue = Queue.create () in
   Queue.push clause queue;
@@ -174,30 +152,29 @@ let all_simplify ~ord ~calculus active_set clause =
     (* remove redundant clause *)
     if is_redundant ~calculus active_set c then ()
     else if not (C.eq_clause old_c c)
-      then Queue.add c queue          (* process the new clause *)
+      then Queue.add c queue (* process the new clause *)
       else begin
-        let cs, changed = list_simplify ~ord ~calculus c in
-        if changed
-          then List.iter (fun c' -> Queue.push c' queue) cs (* process new clauses *)
-          else
-            clauses := c :: !clauses   (* totally simplified clause *)
+        match calculus#list_simplify ~ord ~select c with
+        | None -> clauses := c :: !clauses (* totally simplified clause *)
+        | Some clauses ->
+          List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
       end
   done;
   !clauses
 
 (** Simplifications to perform on initial clauses *)
-let initial_simplifications ~ord ~calculus clauses =
+let initial_simplifications ~ord ~select ~calculus clauses =
   List.fold_left
     (fun acc c ->
       (* apply list simplifications in a flatMap step *)
-      let clauses, changed = list_simplify ~ord ~calculus c in
-      if changed
-        then List.rev_append clauses acc
-        else c :: acc)
+      match calculus#list_simplify ~ord ~select c with
+      | None -> c::acc
+      | Some clauses -> List.rev_append clauses acc)
     [] clauses
 
 let given_clause_step ~calculus state =
-  let ord = state.PS.ord in
+  let ord = state.PS.ord
+  and select = state.PS.state_select in
   (* select next given clause *)
   match PS.next_passive_clause state.PS.passive_set with
   | passive_set, None -> state, Sat (* passive set is empty *)
@@ -205,7 +182,7 @@ let given_clause_step ~calculus state =
     let state = { state with PS.passive_set=passive_set } in
     (* simplify given clause w.r.t. active set and SOS *)
     let _, c = simplify ~calculus state.PS.axioms_set c in
-    let c_list = all_simplify ~ord ~calculus state.PS.active_set c in
+    let c_list = all_simplify ~ord ~calculus ~select state.PS.active_set c in
     match c_list with
     | [] -> state, Unknown  (* all simplifications are redundant *)
     | c::new_clauses ->     (* select first clause, the other ones are passive *) 
@@ -215,7 +192,7 @@ let given_clause_step ~calculus state =
     else begin
       assert (not (is_redundant ~calculus state.PS.active_set c));
       (* select literals *)
-      let c = C.select_clause state.PS.state_select c in
+      let c = C.select_clause select c in
       Sel.check_selected c;
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
@@ -266,7 +243,7 @@ let given_clause_step ~calculus state =
       let new_clauses = List.rev_append !simplified_actives new_clauses in
       let new_clauses = List.fold_left
         (fun new_clauses c ->
-          let cs = all_simplify ~ord ~calculus state.PS.active_set c in
+          let cs = all_simplify ~ord ~select ~calculus state.PS.active_set c in
           let cs = List.map (C.normalize_clause ~ord) cs in
           let cs = List.filter (fun c' -> not (is_redundant ~calculus state.PS.active_set c')) cs in
           List.rev_append cs new_clauses)
