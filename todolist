@@ -4,7 +4,8 @@
 - maybe ordering that take a substitution (more efficiently than just applying subst)
 - LRU cache (rather than flush when full)
 
-- fix RPO6 (incorrect on test.p)
+- constraint ordering on delayed calculus is weaker: predicates can (and should) 
+  be above De Bruijn indices (so that definitions of predicates can be oriented)
 - fix substitution wrt De Bruijn: if  p(X) -> \forall q(X, 0)
   then \forall p(0) will be rewritten in \forall \forall q(0, 0) instead
   of the correct \forall \forall q(0, 1).
@@ -20,8 +21,6 @@
 - superposition modulo rewriting
 
 - miniscoping in CNF reduction
-- simplification rules from clause to clause list
-- elimination rules in delayed as simplifications (cf prev. item)
 - find better heuristics for delayed superposition
 - syntactic tautology deletion?
 - more profiling/statistics

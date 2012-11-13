@@ -520,9 +520,9 @@ module RPO6 = struct
       end
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
-  and cMA ~so s ts = match s, ts with
-    | _, [] -> Gt
-    | s, t::ts' ->
+  and cMA ~so s ts = match ts with
+    |[] -> Gt
+    | t::ts' ->
       (match rpo6 ~so s t with
       | Gt -> cMA ~so s ts'
       | Eq | Lt -> Lt
