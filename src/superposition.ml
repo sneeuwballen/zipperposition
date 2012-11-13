@@ -187,21 +187,21 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   let active_idx = List.hd active_pos
   and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = get_equations_sides active_clause active_pos in
-  Utils.debug 3 (lazy (Utils.sprintf ("@[<h>sup @[<h>%a@] s=%a t=%a @[<h>%a@] " ^^
-                                      "u=%a v=%a p=%a subst=%a@]")
+  Utils.debug 3 (lazy (Utils.sprintf ("sup @[<hov>@[<h>%a s=%a t=%a@]@ @[<h>%a " ^^
+                                      "u=%a v=%a p=%a@]@ subst=%a@]")
                        !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
                        !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
                        C.pp_pos passive_pos S.pp_substitution subst));
   assert ((Utils.list_inter T.eq_term active_clause.cvars passive_clause.cvars) = []);
   if not sign_st 
-  then (Utils.debug 3 (lazy "active literal is negative"); acc)
+  then (Utils.debug 3 (lazy "... active literal is negative"); acc)
   else if T.db_var (T.at_pos u subterm_pos)
-  then (Utils.debug 3 (lazy "passive subterm is a DB variable"); acc)
+  then (Utils.debug 3 (lazy "... passive subterm is a DB variable"); acc)
   else
   let t' = S.apply_subst subst t
   and v' = S.apply_subst subst v in
   if sign_uv && T.eq_term t' v' && subterm_pos = []
-  then (Utils.debug 3 (lazy "will yield a tautology"); acc)
+  then (Utils.debug 3 (lazy "... will yield a tautology"); acc)
   else begin
     assert (T.eq_term (S.apply_subst subst (T.at_pos u subterm_pos))
                         (S.apply_subst subst s));
@@ -222,7 +222,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                                         (passive_clause, passive_pos, subst)])) in
         let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy [])
           proof (lazy [active_clause; passive_clause]) in
-        Utils.debug 3 (lazy (Utils.sprintf "ok, conclusion @[<h>%a@]"
+        Utils.debug 3 (lazy (Utils.sprintf "... ok, conclusion @[<h>%a@]"
                             !C.pp_clause#pp new_clause));
         new_clause :: acc
       end

@@ -319,7 +319,7 @@ let simplify_inner ~ord c =
  * ---------------------------------------------------------------------- *)
 
 let delayed : calculus =
-  object
+  object (self)
     method binary_rules = ["superposition_active", Sup.infer_active;
                            "superposition_passive", Sup.infer_passive]
 
@@ -329,12 +329,16 @@ let delayed : calculus =
     method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
 
     method simplify actives c =
-      let ord = actives.PS.a_ord in
+      let ord = actives.PS.a_ord
+      and old_c = c in
       let c = Sup.basic_simplify ~ord (simplify_inner ~ord c) in
       let c = Sup.basic_simplify ~ord (Sup.positive_simplify_reflect actives c) in
       let c = Sup.basic_simplify ~ord (Sup.negative_simplify_reflect actives c) in
       let c = Sup.basic_simplify ~ord (Sup.demodulate actives [] c) in
-      simplify_inner ~ord c
+      let c = simplify_inner ~ord c in
+      if C.eq_clause c old_c
+        then c
+        else self#simplify actives c
 
     method redundant actives c = Sup.subsumed_by_set actives c
 
