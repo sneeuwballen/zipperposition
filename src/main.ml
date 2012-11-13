@@ -104,7 +104,7 @@ let parse_args () =
     (Utils.pp_list ~sep:"," Format.pp_print_string)
     (PS.names_index ()) in
   (* parameters *)
-  let ord = ref "rpo"
+  let ord = ref "rpo6"
   and steps = ref 0
   and timeout = ref 0.
   and proof = ref true
@@ -264,7 +264,7 @@ let () =
   in
   (* choose an ord now *)
   let constr = O.compose_constraints
-    (heuristic_constraint clauses) calculus#constr in
+    (heuristic_constraint clauses) (calculus#constr clauses) in
   let so = O.make_ordering constr in
   let ord = match params.param_ord with
     | "rpo" -> new O.rpo so

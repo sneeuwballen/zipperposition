@@ -42,7 +42,10 @@ let current_signature () =
         begin
           (* update the arity only if not already found *)
           if not (Hashtbl.mem arities s) then Hashtbl.replace arities s 0;
-          Hashtbl.replace sorts s t.sort;
+          (* update sort only if it is not already bool *)
+          (if (try Hashtbl.find sorts s = bool_sort with Not_found -> false)
+            then ()
+            else Hashtbl.replace sorts s t.sort);
           if not (List.mem s !symbols) then symbols := (s::!symbols) else ()
         end
      | Node (({term=Leaf s})::tail) ->

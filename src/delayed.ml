@@ -38,13 +38,27 @@ let check_sym t s = match t.term with
   | Node _ -> false
   | Leaf s' -> s = s'
 
-(* constraint on the ordering *)
-let symbol_constraint =
+(** special predicate/connective symbols, in decreasing order *)
+let special_preds =
+  [eq_symbol; imply_symbol; forall_symbol; exists_symbol; lambda_symbol;
+   or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
+
+(** constraint on the ordering *)
+let symbol_constraint clauses =
+  let sorts, _, _ = O.current_signature () in
+  (* find predicates, to put them higher in precedence *)
+  let predicate_symbols = ref [] in
+  Hashtbl.iter
+    (fun f sort ->
+      if sort = bool_sort && not (List.mem f special_preds)
+        then predicate_symbols := f :: !predicate_symbols)
+    sorts;
+  let pred_constraint = O.cluster_constraint
+    [!predicate_symbols; [db_symbol; succ_db_symbol]] in
+  (* compose constraints *)
   O.compose_constraints
     (O.max_constraint [succ_db_symbol; db_symbol])
-    (O.min_constraint [eq_symbol; imply_symbol; forall_symbol; exists_symbol;
-                       lambda_symbol; or_symbol; and_symbol;
-                       not_symbol; false_symbol; true_symbol])
+    (O.compose_constraints pred_constraint (O.min_constraint special_preds))
 
 (* ----------------------------------------------------------------------
  * inference rules
@@ -348,7 +362,7 @@ let delayed : calculus =
 
     method axioms = []
 
-    method constr = symbol_constraint
+    method constr clauses = symbol_constraint clauses
 
     method preprocess ~ord l =
       List.map (fun c -> C.reord_clause ~ord (C.clause_of_fof ~ord c)) l

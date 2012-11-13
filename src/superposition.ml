@@ -948,7 +948,7 @@ let superposition : calculus =
 
     method axioms = []
 
-    method constr = O.consts_constraint 
+    method constr _ = O.consts_constraint 
 
     method preprocess ~ord l =
       List.fold_left

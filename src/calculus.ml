@@ -56,7 +56,7 @@ class type calculus =
     (** a list of axioms to add to the Set of Support *)
     method axioms : clause list
     (** some constraints on the precedence *)
-    method constr : ordering_constraint
+    method constr : clause list -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
     method preprocess : ord:ordering -> clause list -> clause list
   end
