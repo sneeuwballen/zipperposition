@@ -314,6 +314,7 @@ let () =
   Printf.printf "%% done %d iterations\n" num;
   print_stats state;
   Sup.print_stats ();
+  Format.printf "%% final signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (match params.param_dot_file with (* print state *)
   | None -> ()
   | Some f -> print_state f (state, result));

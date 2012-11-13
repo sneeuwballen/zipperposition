@@ -252,6 +252,7 @@ let pp_dot ?(name="state") formatter state =
       C.CHashSet.add explored c;
       DotState.add_node_attribute n (DotState.Style "filled");
       DotState.add_node_attribute n (DotState.Shape "box");
+      (if c.clits = [] then DotState.add_node_attribute n (DotState.Color "red"));
       match Lazy.force c.cproof with
       | Axiom (file, axiom) ->
         DotState.add_node_attribute n (DotState.Color "yellow");
