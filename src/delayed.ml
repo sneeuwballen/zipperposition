@@ -220,8 +220,6 @@ let equivalence_elimination ~ord clause =
       assert (r.sort = bool_sort);
       assert (ord#compare l r <> Lt);
       (* ok, do it *)
-      Format.printf "%%  equivalence_elim: @[<h>%a %s %a@]@." !T.pp_term#pp l
-        (C.string_of_comparison (ord#compare l r)) !T.pp_term#pp r;
       let idx = List.hd l_pos in
       if not (C.eligible_res ~ord clause idx S.id_subst) then () else
       let new_lits = Utils.list_remove clause.clits idx in

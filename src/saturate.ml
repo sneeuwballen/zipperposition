@@ -149,9 +149,7 @@ let all_simplify ~ord ~calculus ~select active_set clause =
     (* usual simplifications *)
     let c = calculus#basic_simplify ~ord c in
     let old_c, c = simplify ~calculus active_set c in
-    (* remove redundant clause *)
-    if is_redundant ~calculus active_set c then ()
-    else if not (C.eq_clause old_c c)
+    if not (C.eq_clause old_c c)
       then Queue.add c queue (* process the new clause *)
       else begin
         match calculus#list_simplify ~ord ~select c with
@@ -180,9 +178,12 @@ let given_clause_step ~calculus state =
   | passive_set, None -> state, Sat (* passive set is empty *)
   | passive_set, Some c ->
     let state = { state with PS.passive_set=passive_set } in
-    (* simplify given clause w.r.t. active set and SOS *)
+    (* simplify given clause w.r.t. active set and SOS, then remove redundant clauses *)
     let _, c = simplify ~calculus state.PS.axioms_set c in
     let c_list = all_simplify ~ord ~calculus ~select state.PS.active_set c in
+    let c_list = List.filter
+      (fun c' -> not (is_redundant ~calculus state.PS.active_set c'))
+      c_list in
     match c_list with
     | [] -> state, Unknown  (* all simplifications are redundant *)
     | c::new_clauses ->     (* select first clause, the other ones are passive *) 
