@@ -102,7 +102,7 @@ and clause = {
   clits : literal list;                   (** the equations *)
   cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
   cselected : int list Lazy.t;            (** index of selected literals *)
-  cvars : term list;                    (** the free variables *)
+  cvars : term list;                      (** the free variables *)
   cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
   cparents : clause list Lazy.t;          (** clauses used to create this one *)
 }
