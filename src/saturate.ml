@@ -75,7 +75,7 @@ let generate_unary ~calculus ~ord clause =
 
 (** depth at which unary inferences are performed (max number
     of times inferences are applied recursively to a clause) *)
-let unary_max_depth = ref 4
+let unary_max_depth = ref 2
 
 (** generate all clauses from inferences, updating the state (for the
     parent/descendant relation) *)
@@ -98,13 +98,15 @@ let generate ~calculus state c =
   while not (Queue.is_empty unary_queue) do
     let c, depth = Queue.pop unary_queue in
     let c = calculus#basic_simplify ~ord c in   (* simplify a bit the clause *)
-    unary_clauses := c :: !unary_clauses;       (* add the clause to set of inferred clauses *)
-    if depth < !unary_max_depth
-      then begin
-        (* infer clauses from c, add them to the queue *)
-        let new_clauses = generate_unary ~calculus ~ord c in
-        List.iter (fun c' -> Queue.push (c', depth+1) unary_queue) new_clauses
-      end
+    if not (Sup.is_tautology c) then begin
+      unary_clauses := c :: !unary_clauses;     (* add the clause to set of inferred clauses *)
+      if depth < !unary_max_depth
+        then begin
+          (* infer clauses from c, add them to the queue *)
+          let new_clauses = generate_unary ~calculus ~ord c in
+          List.iter (fun c' -> Queue.push (c', depth+1) unary_queue) new_clauses
+        end
+    end
   done;
   let new_clauses =  List.rev_append !unary_clauses binary_clauses in
   new_clauses
