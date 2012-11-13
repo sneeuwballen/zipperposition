@@ -253,6 +253,18 @@ module CHashtbl = Hashtbl.Make(
     let equal c1 c2 = eq_clause c1 c2
   end)
 
+module CHashSet =
+  struct
+    type t = unit CHashtbl.t
+    let create () = CHashtbl.create 13
+    let member t c =
+      try ignore(CHashtbl.find t c); true
+      with Not_found -> false
+    let iter t f =
+      CHashtbl.iter (fun c _ -> f c) t
+    let add t c = CHashtbl.replace t c ()
+  end
+
 let check_maximal_lit_ ~ord clause pos subst =
   let lits_pos = Utils.list_pos clause.clits in
   let lit = Utils.list_get clause.clits pos in

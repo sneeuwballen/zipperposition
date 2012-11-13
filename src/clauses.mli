@@ -64,6 +64,7 @@ val lit_to_multiset : literal -> term list (** literal to multiset of terms *)
 
 val eq_clause : clause -> clause -> bool                (** equality of clauses *)
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
+val hash_clause : clause -> int                         (** hash of the clause *)
 
 val hashcons_clause : clause -> hclause
 val hashcons_clause_noselect : clause -> hclause        (** hashcons ignoring selected lits *)
@@ -73,6 +74,14 @@ val eq_hclause : hclause -> hclause -> bool             (** equality of hashcons
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
 module CHashtbl : Hashtbl.S with type key = clause
+module CHashSet : 
+  sig
+    type t
+    val create : unit -> t
+    val member : t -> clause -> bool
+    val iter : t -> (clause -> unit) -> unit
+    val add : t -> clause -> unit
+  end
 
 val mk_clause : ord:ordering -> literal list ->
                 selected:int list Lazy.t ->
