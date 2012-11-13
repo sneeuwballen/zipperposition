@@ -35,6 +35,11 @@ type szs_status =
 val set_of_support: calculus:Calculus.calculus ->
                     ProofState.state -> clause list -> ProofState.state
 
+(** Simplifications to perform on initial clauses *)
+val initial_simplifications : ord:ordering ->
+                              calculus:Calculus.calculus ->
+                              clause list -> clause list
+
 (** Perform one step of the given clause algorithm *)
 val given_clause_step : calculus:Calculus.calculus ->
                         ProofState.state ->

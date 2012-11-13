@@ -89,6 +89,7 @@ type parameters = {
   param_select : string;
   param_progress : bool;
   param_proof : bool;
+  param_presimplify : bool;       (** do we simplify the initial set? *)
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
   param_print_sort : bool;        (** print sorts of terms *)
@@ -111,6 +112,7 @@ let parse_args () =
   and output = ref "debug"
   and index = ref "fp"
   and calculus = ref "superposition"
+  and presimplify = ref false
   and select = ref "SelectComplex"  (* TODO choose clause queues? *)
   and progress = ref false
   and print_sort = ref false
@@ -127,6 +129,7 @@ let parse_args () =
       ("-select", Arg.Set_string select, help_select);
       ("-progress", Arg.Set progress, "print progress");
       ("-noproof", Arg.Clear proof, "disable proof printing");
+      ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-index", Arg.Set_string index, help_index);
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
@@ -138,8 +141,9 @@ let parse_args () =
   (* return parameter structure *)
   { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
     param_timeout = !timeout; param_files = [!file]; param_select = !select;
-    param_progress = !progress; param_proof = !proof; param_output_syntax = !output;
-    param_index= !index; param_print_sort = !print_sort; param_print_all = !print_all; }
+    param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
+    param_output_syntax = !output; param_index= !index;
+    param_print_sort = !print_sort; param_print_all = !print_all; }
 
 (** find the given file from given directory *)
 let find_file name dir =
@@ -278,9 +282,12 @@ let () =
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
-  (* preprocess clauses *)
+  (* preprocess clauses, then possibly simplify them *)
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~ord clauses in
+  let clauses = calculus#preprocess ~ord (List.map (C.reord_clause ~ord) clauses) in
+  let clauses = if params.param_presimplify
+    then Sat.initial_simplifications ~ord ~calculus clauses
+    else clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
