@@ -21,3 +21,5 @@ provers_output.db
 *.tgz
 TPTP-*
 Axioms
+*.svg
+*.dot
