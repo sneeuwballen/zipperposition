@@ -71,7 +71,7 @@ let alpha_eliminate ~ord clause idx a signa b signb =
   let new_lita = C.mk_lit ~ord a T.true_term signa
   and new_litb = C.mk_lit ~ord b T.true_term signb in
   let other_lits = Utils.list_remove clause.clits idx in
-  let proof = lazy (Proof ("alpha_eliminate", [clause, [idx], S.id_subst])) in
+  let proof = lazy (Proof ("α-elim", [clause, [idx], S.id_subst])) in
   [C.mk_clause ~ord (new_lita :: other_lits) ~selected:(lazy []) proof (lazy [clause]);
    C.mk_clause ~ord (new_litb :: other_lits) ~selected:(lazy []) proof (lazy [clause])]
 
@@ -82,7 +82,7 @@ let beta_eliminate ~ord clause idx a signa b signb =
   let new_lita = C.mk_lit ~ord a T.true_term signa
   and new_litb = C.mk_lit ~ord b T.true_term signb in
   let new_lits = new_lita :: new_litb :: (Utils.list_remove clause.clits idx) in
-  let proof = lazy (Proof ("beta_eliminate", [clause, [idx], S.id_subst])) in
+  let proof = lazy (Proof ("β-elim", [clause, [idx], S.id_subst])) in
   C.mk_clause ~ord new_lits ~selected:(lazy []) proof (lazy [clause])
 
 (** helper for gamma elimination (remove idx-th literal from clause
@@ -100,7 +100,7 @@ let gamma_eliminate ~ord clause idx t sign =
   in
   let new_lit = C.mk_lit ~ord new_t T.true_term sign in
   let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
-  let proof = lazy (Proof ("gamma_eliminate", [clause, [idx], S.id_subst])) in
+  let proof = lazy (Proof ("γ-elim", [clause, [idx], S.id_subst])) in
   C.mk_clause ~ord new_lits ~selected:(lazy []) proof (lazy [clause])
 
 (** helper for delta elimination (remove idx-th literal from clause
@@ -117,7 +117,7 @@ let delta_eliminate ~ord clause idx t sign =
   in
   let new_lit = C.mk_lit ~ord new_t T.true_term sign in
   let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
-  let proof = lazy (Proof ("delta_eliminate", [clause, [idx], S.id_subst])) in
+  let proof = lazy (Proof ("δ-elim", [clause, [idx], S.id_subst])) in
   C.mk_clause ~ord new_lits ~selected:(lazy []) proof (lazy [clause])
 
 (** elimination of unary/binary logic connectives *)
@@ -213,10 +213,10 @@ let equivalence_elimination ~ord clause =
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_neq ~ord l T.true_term) ::
                       (C.mk_eq ~ord r T.true_term) :: new_lits
-      and proof1 = lazy (Proof ("pos_equiv_elim1", [clause, l_pos, S.id_subst]))
+      and proof1 = lazy (Proof ("<=>-elim+", [clause, l_pos, S.id_subst]))
       and new_lits2 = (C.mk_eq ~ord l T.true_term) ::
                       (C.mk_neq ~ord r T.true_term) :: new_lits
-      and proof2 = lazy (Proof ("pos_equiv_elim2", [clause, l_pos, S.id_subst]))
+      and proof2 = lazy (Proof ("<=>-elim+", [clause, l_pos, S.id_subst]))
       in
       [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1 (lazy [clause]);
        C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2 (lazy [clause])]
@@ -230,10 +230,10 @@ let equivalence_elimination ~ord clause =
       let new_lits = Utils.list_remove clause.clits idx in
       let new_lits1 = (C.mk_eq ~ord l T.true_term) ::
                       (C.mk_eq ~ord r T.true_term) :: new_lits
-      and proof1 = lazy (Proof ("neg_equiv_elim1", [clause, l_pos, S.id_subst]))
+      and proof1 = lazy (Proof ("<=>-elim-", [clause, l_pos, S.id_subst]))
       and new_lits2 = (C.mk_neq ~ord l T.true_term) ::
                       (C.mk_neq ~ord r T.true_term) :: new_lits
-      and proof2 = lazy (Proof ("neg_equiv_elim2", [clause, l_pos, S.id_subst]))
+      and proof2 = lazy (Proof ("<=>-elim-", [clause, l_pos, S.id_subst]))
       in
       [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1 (lazy [clause]);
        C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2 (lazy [clause])]
