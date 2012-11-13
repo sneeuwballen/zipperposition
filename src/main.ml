@@ -217,13 +217,13 @@ let print_stats state =
 
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
-let print_state filename (state, result) =
+let print_state ?name filename (state, result) =
   let state = match result with
     | Sat.Unsat c ->
       let active, _ = PS.add_active state.PS.active_set c in (* put empty clause in state *)
       {state with PS.active_set = active}
     | _ -> state in
-  PS.pp_dot_file filename state
+  PS.pp_dot_file ?name filename state
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -317,7 +317,7 @@ let () =
   Format.printf "%% final signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (match params.param_dot_file with (* print state *)
   | None -> ()
-  | Some f -> print_state f (state, result));
+  | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s

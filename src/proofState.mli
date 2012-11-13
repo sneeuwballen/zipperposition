@@ -103,4 +103,4 @@ val debug_state : Format.formatter -> state -> unit
 (** print to dot *)
 val pp_dot : ?name:string -> Format.formatter -> state -> unit
 (** print to dot into a file *)
-val pp_dot_file : string -> state -> unit
+val pp_dot_file : ?name:string -> string -> state -> unit

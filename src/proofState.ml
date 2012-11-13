@@ -268,12 +268,12 @@ let pp_dot ?(name="state") formatter state =
   DotState.pp_graph formatter graph
 
 (** print to dot into a file *)
-let pp_dot_file filename state =
+let pp_dot_file ?name filename state =
   let out = open_out filename in
   try
     (* write on the opened out channel *)
     let formatter = Format.formatter_of_out_channel out in
     Format.printf "%% print state to %s@." filename;
-    pp_dot formatter state;
+    pp_dot ?name formatter state;
     close_out out
   with _ -> close_out out

@@ -369,6 +369,7 @@ let delayed : calculus =
                        exists_elimination; equivalence_elimination ] in
       (* try to use the rules to simplify c *)
       let rec try_simplify rules c =
+        let c = Sup.basic_simplify ~ord (simplify_inner ~ord c) in
         if Sup.is_tautology c then [] else
         match rules with 
         | [] -> [c]  (* c is not simplifiable by any rule *)
