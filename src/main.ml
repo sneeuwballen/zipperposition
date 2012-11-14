@@ -255,6 +255,13 @@ let setup_output params =
   Format.printf "%% format: %s, print sort: %B, print all: %B@." params.param_output_syntax
     params.param_print_sort params.param_print_all
 
+(** Time elapsed since initialization of the program *)
+let get_total_time =
+  let start = Unix.gettimeofday () in
+  function () ->
+    let stop = Unix.gettimeofday () in
+    stop -. start
+
 let () =
   (* parse arguments *)
   let params = parse_args () in
@@ -331,3 +338,7 @@ let () =
       if params.param_proof
         then Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@." !C.pp_proof#pp c
         else ()
+
+let _ =
+  at_exit (fun () -> 
+    Printf.printf "\n%% run time: %.3f\n" (get_total_time ()))
