@@ -31,6 +31,14 @@ module Sel = Selection
 module Utils = FoUtils
 module Delayed = Delayed
 
+let enable = true
+let prof_generate = HExtlib.profile ~enable "generate"
+let prof_generate_unary = HExtlib.profile ~enable "generate_unary"
+let prof_generate_binary = HExtlib.profile ~enable "generate_binary"
+let prof_simplify = HExtlib.profile ~enable "simplify"
+let prof_all_simplify = HExtlib.profile ~enable "all_simplify"
+let prof_is_redundant = HExtlib.profile ~enable "is_redundant"
+
 (** the status of a state *)
 type szs_status = 
   | Unsat of hclause
@@ -56,22 +64,27 @@ let set_of_support ~calculus state axioms =
 (** simplify the clause using the active_set. Returns
     the (renamed) clause and the simplified clause. *)
 let simplify ~calculus active_set clause =
-  let ord = active_set.PS.a_ord in
-  let old_c = PS.relocate_active active_set clause in
-  let c = calculus#simplify active_set old_c in
-  let c = calculus#basic_simplify ~ord c in
-  (if not (C.eq_clause c old_c)
-    then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                        !C.pp_clause#pp old_c !C.pp_clause#pp c)));
-  old_c, c
+  let do_it clause =
+    let ord = active_set.PS.a_ord in
+    let old_c = PS.relocate_active active_set clause in
+    let c = calculus#simplify active_set old_c in
+    let c = calculus#basic_simplify ~ord c in
+    (if not (C.eq_clause c old_c)
+      then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
+                          !C.pp_clause#pp old_c !C.pp_clause#pp c)));
+    old_c, c
+  in 
+  prof_simplify.HExtlib.profile do_it clause
 
 (** generate all clauses from binary inferences *)
 let generate_binary ~calculus active_set clause =
-  Calculus.do_binary_inferences active_set calculus#binary_rules clause
+  prof_generate_binary.HExtlib.profile
+    (Calculus.do_binary_inferences active_set calculus#binary_rules) clause
 
 (** generate all clauses from unary inferences *)
 let generate_unary ~calculus ~ord clause =
-  Calculus.do_unary_inferences ~ord calculus#unary_rules clause
+  prof_generate_unary.HExtlib.profile
+    (Calculus.do_unary_inferences ~ord calculus#unary_rules) clause
 
 (** depth at which unary inferences are performed (max number
     of times inferences are applied recursively to a clause) *)
@@ -80,36 +93,39 @@ let unary_max_depth = ref 2
 (** generate all clauses from inferences, updating the state (for the
     parent/descendant relation) *)
 let generate ~calculus state c =
-  let ord = state.PS.ord in
-  (* an active set containing only the given clause *)
-  let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
-  (* binary clauses *)
-  let binary_clauses = [] in
-  let binary_clauses = List.rev_append
-    (generate_binary ~calculus state.PS.axioms_set c) binary_clauses in
-  let binary_clauses = List.rev_append
-    (generate_binary ~calculus state.PS.active_set c) binary_clauses in
-  let binary_clauses = List.rev_append
-    (generate_binary ~calculus given_active_set c) binary_clauses in
-  (* unary inferences *)
-  let unary_clauses = ref []
-  and unary_queue = Queue.create () in
-  Queue.push (c, 0) unary_queue;
-  while not (Queue.is_empty unary_queue) do
-    let c, depth = Queue.pop unary_queue in
-    let c = calculus#basic_simplify ~ord c in   (* simplify a bit the clause *)
-    if not (Sup.is_tautology c) then begin
-      unary_clauses := c :: !unary_clauses;     (* add the clause to set of inferred clauses *)
-      if depth < !unary_max_depth
-        then begin
-          (* infer clauses from c, add them to the queue *)
-          let new_clauses = generate_unary ~calculus ~ord c in
-          List.iter (fun c' -> Queue.push (c', depth+1) unary_queue) new_clauses
-        end
-    end
-  done;
-  let new_clauses =  List.rev_append !unary_clauses binary_clauses in
-  new_clauses
+  let do_it c =
+    let ord = state.PS.ord in
+    (* an active set containing only the given clause *)
+    let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
+    (* binary clauses *)
+    let binary_clauses = [] in
+    let binary_clauses = List.rev_append
+      (generate_binary ~calculus state.PS.axioms_set c) binary_clauses in
+    let binary_clauses = List.rev_append
+      (generate_binary ~calculus state.PS.active_set c) binary_clauses in
+    let binary_clauses = List.rev_append
+      (generate_binary ~calculus given_active_set c) binary_clauses in
+    (* unary inferences *)
+    let unary_clauses = ref []
+    and unary_queue = Queue.create () in
+    Queue.push (c, 0) unary_queue;
+    while not (Queue.is_empty unary_queue) do
+      let c, depth = Queue.pop unary_queue in
+      let c = calculus#basic_simplify ~ord c in   (* simplify a bit the clause *)
+      if not (Sup.is_tautology c) then begin
+        unary_clauses := c :: !unary_clauses;     (* add the clause to set of inferred clauses *)
+        if depth < !unary_max_depth
+          then begin
+            (* infer clauses from c, add them to the queue *)
+            let new_clauses = generate_unary ~calculus ~ord c in
+            List.iter (fun c' -> Queue.push (c', depth+1) unary_queue) new_clauses
+          end
+      end
+    done;
+    let new_clauses =  List.rev_append !unary_clauses binary_clauses in
+    new_clauses
+  in
+  prof_generate.HExtlib.profile do_it c
 
 (** remove direct descendants of the clauses from the passive set *)
 let remove_orphans state removed_clauses =
@@ -132,7 +148,7 @@ let remove_orphans state removed_clauses =
 let is_redundant ~calculus active_set clause =
   (* forward subsumption check *)
   let c = PS.relocate_active active_set clause in
-  calculus#redundant active_set c
+  prof_is_redundant.HExtlib.profile (calculus#redundant active_set) c
 
 (** find redundant clauses in active_set, w.r.t clause c *)
 let subsumed_by ~calculus active_set clause =
@@ -143,20 +159,23 @@ let subsumed_by ~calculus active_set clause =
     simplified clauses (possibly empty, if redundant or trivial).
     This is used on generated clauses, and on the given clause. *)
 let all_simplify ~ord ~calculus ~select active_set clause =
-  let clauses = ref []
-  and queue = Queue.create () in
-  Queue.push clause queue;
-  while not (Queue.is_empty queue) do
-    let c = Queue.pop queue in
-    (* usual simplifications *)
-    let c = calculus#basic_simplify ~ord c in
-    let _, c = simplify ~calculus active_set c in
-    match calculus#list_simplify ~ord ~select c with
-    | None -> clauses := c :: !clauses (* totally simplified clause *)
-    | Some clauses ->
-      List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
-  done;
-  !clauses
+  let do_it clause =
+    let clauses = ref []
+    and queue = Queue.create () in
+    Queue.push clause queue;
+    while not (Queue.is_empty queue) do
+      let c = Queue.pop queue in
+      (* usual simplifications *)
+      let c = calculus#basic_simplify ~ord c in
+      let _, c = simplify ~calculus active_set c in
+      match calculus#list_simplify ~ord ~select c with
+      | None -> clauses := c :: !clauses (* totally simplified clause *)
+      | Some clauses ->
+        List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
+    done;
+    !clauses
+  in
+  prof_all_simplify.HExtlib.profile do_it clause
 
 (** Simplifications to perform on initial clauses *)
 let initial_simplifications ~ord ~select ~calculus clauses =
