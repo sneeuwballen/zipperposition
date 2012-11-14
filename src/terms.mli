@@ -59,6 +59,9 @@ val iter_terms : (term -> unit) -> unit       (** iterate through existing terms
 val all_terms : unit -> term list             (** all currently existing terms *)
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
+val sig_version : int ref                     (** last version of signature (modified
+                                                  when a new leaf is built *)
+
 (* ----------------------------------------------------------------------
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)

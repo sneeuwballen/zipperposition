@@ -133,6 +133,8 @@ let all_terms () =
   
 let stats () = H.stats ()
 
+let sig_version = ref 0
+
 (* ----------------------------------------------------------------------
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
@@ -167,7 +169,9 @@ let mk_leaf symbol sort =
                   db_closed=db_closed; binding=my_t;
                   normal_form = false; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
-  H.hashcons my_t
+  let t = H.hashcons my_t in
+  (if t == my_t then incr sig_version);  (* the signature has changed *)
+  t
 
 let rec mk_node = function
   | [] -> failwith "cannot build empty node term"

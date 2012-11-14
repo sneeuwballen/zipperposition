@@ -30,8 +30,8 @@ module Utils = FoUtils
  ---------------------------------------------------------------------- *)
 
 (** compute the current signature: existing symbols,
-    with their aritys and sorts *)
-let current_signature () =
+    with their arities and sorts *)
+let compute_signature () =
   let sorts = Hashtbl.create 23
   and arities  = Hashtbl.create 23
   and symbols = ref [] in
@@ -52,6 +52,21 @@ let current_signature () =
         Hashtbl.replace arities s (List.length tail)
      | _ -> failwith (Utils.sprintf "bad term %a" !T.pp_term#pp t));
   sorts, arities, !symbols
+
+let sig_version = ref 0  (* version of signature that is computed *)
+
+let current_signature =
+  (* store the signature, to avoid recomputing it all the time *)
+  let cached_signature = ref (compute_signature ()) in
+  fun () ->
+    assert (!sig_version <= !T.sig_version);
+    (if !sig_version < !T.sig_version
+      then begin
+        (* recompute signature, it did change *)
+        Utils.debug 3 (lazy "signature changed");
+        cached_signature := compute_signature ()
+      end);
+    !cached_signature
 
 let cluster_constraint clusters =
   let table = Hashtbl.create 17
@@ -167,14 +182,19 @@ let make_ordering constr =
   and cmp = ref (fun x y -> 0)
   and multiset_pred = ref (fun s -> s = eq_symbol) in
   (* the object itself *)
-  let obj = object
+  let obj = object (self)
     (* refresh computes a new ordering based on the current signature *)
     method refresh () =
+      (* the constraint is: keep the current signature in the same order *)
+      let keep_constr = compose_constraints constr !cmp in
+      (* the new signature, possibly with more symbols*)
       let _, _, symbols = current_signature () in
       (* sort according to the constraint *)
-      cur_signature := List.stable_sort (fun x y -> - (constr x y)) symbols;
+      cur_signature := List.stable_sort (fun x y -> -(keep_constr x y)) symbols;
       (* comparison function is given by the place in the ordered signature *)
-      cmp := list_constraint !cur_signature
+      cmp := list_constraint !cur_signature;
+      Format.printf "%% new signature %a@." T.pp_signature self#signature;
+      (* assert (check_constraint self (list_constraint old_signature)) *)
     method signature = !cur_signature
     method compare a b = !cmp a b
     method weight s = 2
