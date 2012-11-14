@@ -257,11 +257,8 @@ module CHashSet =
   struct
     type t = unit CHashtbl.t
     let create () = CHashtbl.create 13
-    let member t c =
-      try ignore(CHashtbl.find t c); true
-      with Not_found -> false
-    let iter t f =
-      CHashtbl.iter (fun c _ -> f c) t
+    let member t c = CHashtbl.mem t c
+    let iter t f = CHashtbl.iter (fun c _ -> f c) t
     let add t c = CHashtbl.replace t c ()
   end
 
