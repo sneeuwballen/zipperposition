@@ -150,15 +150,11 @@ let all_simplify ~ord ~calculus ~select active_set clause =
     let c = Queue.pop queue in
     (* usual simplifications *)
     let c = calculus#basic_simplify ~ord c in
-    let old_c, c = simplify ~calculus active_set c in
-    if not (C.eq_clause old_c c)
-      then Queue.add c queue (* process the new clause *)
-      else begin
-        match calculus#list_simplify ~ord ~select c with
-        | None -> clauses := c :: !clauses (* totally simplified clause *)
-        | Some clauses ->
-          List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
-      end
+    let _, c = simplify ~calculus active_set c in
+    match calculus#list_simplify ~ord ~select c with
+    | None -> clauses := c :: !clauses (* totally simplified clause *)
+    | Some clauses ->
+      List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
   done;
   !clauses
 

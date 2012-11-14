@@ -32,33 +32,41 @@ module Utils = FoUtils
 module Sup = Superposition
 module PS = ProofState
 
-(** check whether the term is (Leaf s) *)
-let check_sym t s = match t.term with
-  | Var _ -> false
-  | Node _ -> false
-  | Leaf s' -> s = s'
-
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
   [eq_symbol; imply_symbol; forall_symbol; exists_symbol; lambda_symbol;
    or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
 
+type symbol_kind = 
+  | Predicate | DeBruijn | Function | Special
+
+(** order on kinds of symbols *)
+let order k1 k2 =
+  match k1, k2 with
+  | _, _ when k1 = k2 -> 0
+  | Predicate, _ -> 1
+  | _, Predicate -> -1
+  | DeBruijn, _ -> 1
+  | _, DeBruijn -> -1
+  | Function, _ -> 1
+  | Special, _ -> -1
+
+(* classify symbol into categories *)
+let classify =
+  let special_set = Utils.SHashSet.from_list special_preds in 
+  function s ->
+    let sorts, _, _ = O.current_signature () in
+    match s with
+    | _ when s = succ_db_symbol || s = db_symbol -> DeBruijn
+    | _ when Utils.SHashSet.member special_set s -> Special
+    | _ when Hashtbl.find sorts s = bool_sort -> Predicate
+    | _ -> Function
+
 (** constraint on the ordering *)
 let symbol_constraint clauses =
-  let sorts, _, _ = O.current_signature () in
-  (* find predicates, to put them higher in precedence *)
-  let predicate_symbols = ref [] in
-  Hashtbl.iter
-    (fun f sort ->
-      if sort = bool_sort && not (List.mem f special_preds)
-        then predicate_symbols := f :: !predicate_symbols)
-    sorts;
-  let pred_constraint = O.cluster_constraint
-    [!predicate_symbols; [db_symbol; succ_db_symbol]] in
-  (* compose constraints *)
   O.compose_constraints
-    (O.max_constraint [succ_db_symbol; db_symbol])
-    (O.compose_constraints pred_constraint (O.min_constraint special_preds))
+    (fun x y -> order (classify x) (classify y))
+    (O.min_constraint special_preds)
 
 (* ----------------------------------------------------------------------
  * elimination rules
