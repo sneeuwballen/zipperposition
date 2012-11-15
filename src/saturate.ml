@@ -302,7 +302,7 @@ let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
     | Some i when num >= i -> state, Unknown, num
     | _ ->
       begin
-        if progress then print_progress num state else ();
+        if progress && (num mod 10) = 0 then print_progress num state else ();
         (* do one step *)
         let new_state, status = given_clause_step ~calculus state in
         match status with

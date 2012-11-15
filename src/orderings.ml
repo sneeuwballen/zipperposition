@@ -556,7 +556,7 @@ module RPO6 = struct
         | Lt -> Utils.not_partial (cMA ~so t ss')
         | Incomparable -> cAA ~so s t ss' ts'
       )
-    | [], [] -> assert false (* should be equal?! *)
+    | [], [] -> Eq
     | _ -> assert false (* different length... *)
   (** multiset comparison of subterms (not optimized) *)
   and cMultiset ~so ss ts = Utils.multiset_partial (rpo6 ~so) ss ts
