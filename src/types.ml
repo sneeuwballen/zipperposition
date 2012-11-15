@@ -60,6 +60,7 @@ and typed_term = {
   mutable vars : term list;     (** the variables of the term *)
   mutable normal_form : bool;   (** has the normal form been computed? (in binding) *)
   mutable db_closed : bool;     (** is the term closed w.r.t. De Bruijn indexes? *)
+  mutable simplified : bool;    (** as a formula, totally simplified *)
   mutable tag : int;            (** hashconsing tag *)
   mutable hkey : int;           (** hash *)
 }

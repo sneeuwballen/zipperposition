@@ -279,57 +279,63 @@ let equivalence_elimination ~ord clause =
 
 (** Simplify the inner formula (double negation, trivial equalities...) *)
 let simplify_inner ~ord c =
-  let not_term = T.mk_leaf not_symbol bool_sort in
+  let not_term = T.mk_leaf not_symbol bool_sort
+  and mark_simplified t = t.simplified <- true in
   (* simplify a term *)
-  let rec simp_term t = match t.term with
-  | Var _ | Leaf _ -> t
-  | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
-    when s = not_symbol && s' = not_symbol -> simp_term t'  (* double negation *)
-  | Node [{term=Leaf s}; t'] when s = not_symbol && T.eq_term t' T.true_term ->
-    T.false_term  (* not true -> false *)
-  | Node [{term=Leaf s}; t'] when s = not_symbol && T.eq_term t' T.false_term ->
-    T.true_term  (* not false -> true *)
-  | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
-    when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol
-    && not (T.db_contains t' 0) -> simp_term (T.db_unlift t') (* eta-reduction *)
-  | Node [{term=Node [{term=Leaf s}; t']}; v] when s = lambda_symbol ->
-    let new_t' = T.db_unlift (T.db_replace t' v) in simp_term new_t' (* beta-reduction *)
-  | Node [{term=Leaf s}; a; b] when s = and_symbol &&
-    (T.eq_term a T.false_term || T.eq_term b T.false_term) ->
-    T.false_term  (* a and false -> false *)
-  | Node [{term=Leaf s}; a; b] when s = or_symbol &&
-    (T.eq_term a T.true_term || T.eq_term b T.true_term) ->
-    T.true_term  (* a or true -> true *)
-  | Node [{term=Leaf s}; a; b] when s = or_symbol && T.eq_term a T.false_term ->
-    simp_term b (* b or false -> b *)
-  | Node [{term=Leaf s}; a; b] when s = or_symbol && T.eq_term b T.false_term ->
-    simp_term a (* a or false -> a *)
-  | Node [{term=Leaf s}; a; b] when s = and_symbol && T.eq_term a T.true_term ->
-    simp_term b (* b and true -> b *)
-  | Node [{term=Leaf s}; a; b] when s = and_symbol && T.eq_term b T.true_term ->
-    simp_term a (* a and true -> a *)
-  | Node [{term=Leaf s}; a; b] when s = imply_symbol &&
-    (T.eq_term a T.false_term || T.eq_term b T.true_term) ->
-    T.true_term  (* (false => a) or (a => true) -> true *)
-  | Node [{term=Leaf s}; a; b] when s = imply_symbol && T.eq_term a T.true_term ->
-    simp_term b  (* (true => a) -> a *)
-  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term a b ->
-    T.true_term  (* a = a -> true *)
-  | Node [{term=Leaf s}; a; b] when s = eq_symbol && 
-    ((T.eq_term a T.true_term && T.eq_term b T.false_term) ||
-     (T.eq_term b T.true_term && T.eq_term a T.false_term)) ->
-    T.false_term  (* true = false -> false *)
-  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term b T.true_term ->
-    simp_term a  (* a = true -> a *)
-  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term a T.true_term ->
-    simp_term b  (* b = true -> b *)
-  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term b T.false_term ->
-    simp_term (T.mk_node [not_term; a])  (* a = false -> not a *)
-  | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term a T.false_term ->
-    simp_term (T.mk_node [not_term; b])  (* b = false -> not b *)
-  | Node l ->
-    let new_t = T.mk_node (List.map simp_term l) in
-    if T.eq_term t new_t then t else simp_term new_t
+  let rec simp_term t =
+    if t.simplified then t else  (* maybe it's already simplified *)
+    match t.term with
+    | Var _ | Leaf _ -> (mark_simplified t; t)
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
+      when s = not_symbol && s' = not_symbol -> simp_term t'  (* double negation *)
+    | Node [{term=Leaf s}; t'] when s = not_symbol && T.eq_term t' T.true_term ->
+      T.false_term  (* not true -> false *)
+    | Node [{term=Leaf s}; t'] when s = not_symbol && T.eq_term t' T.false_term ->
+      T.true_term   (* not false -> true *)
+    | Node [{term=Leaf s}; {term=Node [{term=Leaf s'}; t']}]
+      when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol
+      && not (T.db_contains t' 0) -> simp_term (T.db_unlift t') (* eta-reduction *)
+    | Node [{term=Node [{term=Leaf s}; t']}; v] when s = lambda_symbol ->
+      let new_t' = T.db_unlift (T.db_replace t' v) in
+      simp_term new_t' (* beta-reduction *)
+    | Node [{term=Leaf s}; a; b] when s = and_symbol &&
+      (T.eq_term a T.false_term || T.eq_term b T.false_term) ->
+      T.false_term  (* a and false -> false *)
+    | Node [{term=Leaf s}; a; b] when s = or_symbol &&
+      (T.eq_term a T.true_term || T.eq_term b T.true_term) ->
+      T.true_term  (* a or true -> true *)
+    | Node [{term=Leaf s}; a; b] when s = or_symbol && T.eq_term a T.false_term ->
+      simp_term b  (* b or false -> b *)
+    | Node [{term=Leaf s}; a; b] when s = or_symbol && T.eq_term b T.false_term ->
+      simp_term a  (* a or false -> a *)
+    | Node [{term=Leaf s}; a; b] when s = and_symbol && T.eq_term a T.true_term ->
+      simp_term b  (* b and true -> b *)
+    | Node [{term=Leaf s}; a; b] when s = and_symbol && T.eq_term b T.true_term ->
+      simp_term a  (* a and true -> a *)
+    | Node [{term=Leaf s}; a; b] when s = imply_symbol &&
+      (T.eq_term a T.false_term || T.eq_term b T.true_term) ->
+      T.true_term  (* (false => a) or (a => true) -> true *)
+    | Node [{term=Leaf s}; a; b] when s = imply_symbol && T.eq_term a T.true_term ->
+      simp_term b  (* (true => a) -> a *)
+    | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term a b ->
+      T.true_term  (* a = a -> true *)
+    | Node [{term=Leaf s}; a; b] when s = eq_symbol && 
+      ((T.eq_term a T.true_term && T.eq_term b T.false_term) ||
+       (T.eq_term b T.true_term && T.eq_term a T.false_term)) ->
+      T.false_term (* true = false -> false *)
+    | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term b T.true_term ->
+      simp_term a  (* a = true -> a *)
+    | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term a T.true_term ->
+      simp_term b  (* b = true -> b *)
+    | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term b T.false_term ->
+      simp_term (T.mk_node [not_term; a])  (* a = false -> not a *)
+    | Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term a T.false_term ->
+      simp_term (T.mk_node [not_term; b])  (* b = false -> not b *)
+    | Node l ->
+      let new_t = T.mk_node (List.map simp_term l) in
+      if T.eq_term t new_t
+        then (mark_simplified t; t)  (* no more simplifications *)
+        else simp_term new_t
   (* simplify a lit *)
   and simp_lit ((Equation (l,r,sign,_)) as lit) =
     let new_l = simp_term l
