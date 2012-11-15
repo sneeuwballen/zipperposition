@@ -362,7 +362,7 @@ let delayed : calculus =
     method simplify actives c =
       let ord = actives.PS.a_ord
       and old_c = c in
-      let c = Sup.basic_simplify ~ord (simplify_inner ~ord c) in
+      let c = simplify_inner ~ord (Sup.basic_simplify ~ord c) in
       let c = Sup.basic_simplify ~ord (Sup.positive_simplify_reflect actives c) in
       let c = Sup.basic_simplify ~ord (Sup.negative_simplify_reflect actives c) in
       let c = Sup.basic_simplify ~ord (Sup.demodulate actives [] c) in
@@ -378,26 +378,33 @@ let delayed : calculus =
     (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify ~ord ~select c =
       let all_rules = [connective_elimination; forall_elimination;
-                       exists_elimination; equivalence_elimination ] in
+                       exists_elimination; equivalence_elimination; ] in
       (* try to use the rules to simplify c *)
-      let rec try_simplify rules c =
-        let c = Sup.basic_simplify ~ord (simplify_inner ~ord c) in
-        if Sup.is_tautology c then [] else
-        let c = C.select_clause ~select c in
+      let queue = Queue.create ()
+      and clauses = ref [] in
+      let c = C.select_clause ~select (self#basic_simplify ~ord c) in
+      Queue.push (c, all_rules) queue;
+      while not (Queue.is_empty queue) do
+        (* process a clause *)
+        let c, rules = Queue.pop queue in
         match rules with 
-        | [] -> [c]  (* c is not simplifiable by any rule *)
+        | [] -> clauses := c :: !clauses  (* c is not simplifiable by any rule *)
         | rule::rules' ->
           (match rule ~ord c with
-          | None -> try_simplify rules' c  (* use next rules *)
+          | None -> Queue.push (c, rules') queue  (* use next rules *)
           | Some clauses -> 
-            Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
-                          !C.pp_clause#pp c (Utils.pp_list !C.pp_clause#pp) clauses));
-            (* keep only non-tautologies, and simplify new clauses
-               using all rules again *)
-            let clauses =  List.filter (fun c' -> not (Sup.is_tautology c')) clauses in
-            Utils.list_flatmap (try_simplify all_rules) clauses)
-      in
-      match try_simplify all_rules c with
+            begin
+              Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
+                            !C.pp_clause#pp c (Utils.pp_list !C.pp_clause#pp) clauses));
+              List.iter
+                (fun c' ->  (* simplify the clause with all rules, if not trivial *)
+                  let c' = self#basic_simplify ~ord (simplify_inner ~ord c') in
+                  if not (Sup.is_tautology c')
+                    then Queue.push (C.select_clause ~select c', all_rules) queue)
+                clauses
+            end)
+      done;
+      match !clauses with
       | [c'] when C.eq_clause c c' -> None
       | clauses -> Some clauses
 
