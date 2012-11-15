@@ -462,7 +462,7 @@ let partition_bag bag pred =
 
 let size_bag bag =
   let count = ref 0 in
-  M.iter (fun _ _ -> count := !count+1) bag.bag_clauses;
+  M.iter (fun _ _ -> incr count) bag.bag_clauses;
   !count
 
 (* ----------------------------------------------------------------------
