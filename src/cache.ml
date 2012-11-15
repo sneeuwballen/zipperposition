@@ -53,7 +53,10 @@ module Make(HType : CachedType) =
 
     (** A slot of the array contains a (key, value, true)
         if key->value is stored there (at index hash(key) % length),
-        (null, null, false) otherwise *)
+        (null, null, false) otherwise.
+        
+        The first slot in the array contains the function
+        used to produce the value upon a cache miss. *)
     type 'a t = (key * 'a * bool) array
 
     let my_null = (Obj.magic None, Obj.magic None, false)
