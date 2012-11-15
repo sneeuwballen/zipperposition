@@ -583,6 +583,13 @@ end
  class interface
  ---------------------------------------------------------------------- *)
 
+module OrdCache = Cache.Make(
+  struct
+    type t = (term * term)
+    let hash (t1, t2) = t1.hkey lxor t2.hkey
+    let equal (t1, t2) (t1', t2') = t1 == t1' && t2 == t2'
+  end)
+
 class kbo (so : symbol_ordering) : ordering =
   object
     val so = so
@@ -597,11 +604,17 @@ class kbo (so : symbol_ordering) : ordering =
 
 class rpo (so : symbol_ordering) : ordering =
   object
+    val cache = OrdCache.create 512
     val so = so
-    method refresh () = so#refresh ()
-    method clear_cache () = ()
+    method refresh () = (OrdCache.clear cache; so#refresh ())
+    method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = RPO.compare_terms ~so a b
+    method compare a b =
+      match OrdCache.lookup cache (a, b) with
+      | None ->
+        let cmp = RPO.compare_terms ~so a b in
+        OrdCache.save cache (a, b) cmp; cmp
+      | Some cmp -> cmp
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = RPO.name
@@ -609,11 +622,17 @@ class rpo (so : symbol_ordering) : ordering =
 
 class rpo6 (so : symbol_ordering) : ordering =
   object
+    val cache = OrdCache.create 512
     val so = so
-    method refresh () = so#refresh ()
-    method clear_cache () = ()
+    method refresh () = (OrdCache.clear cache; so#refresh ())
+    method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = RPO6.compare_terms ~so a b
+    method compare a b =
+      match OrdCache.lookup cache (a, b) with
+      | None ->
+        let cmp = RPO6.compare_terms ~so a b in
+        OrdCache.save cache (a, b) cmp; cmp
+      | Some cmp -> cmp
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = RPO6.name
