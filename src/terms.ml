@@ -628,7 +628,7 @@ let pp_term_tstp =
             (Utils.pp_list ~sep:", " self#pp ) tl
       | Node [] -> failwith "bad term";
       in
-      let maxvar = max_var t.vars in
+      let maxvar = max (max_var t.vars) 0 in
       let varindex = ref (maxvar+1) in
       (* convert everything to named variables, then print *)
       pp_rec (db_to_var varindex t)
