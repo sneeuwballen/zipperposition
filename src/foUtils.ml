@@ -187,9 +187,10 @@ let rec list_subset cmp l1 l2 =
     (fun t -> list_mem cmp t l2)
     l1
 
-let rec list_uniq comp l = match l with
+let rec list_uniq eq l = match l with
   | [] -> []
-  | x::xs -> x :: list_uniq comp (List.filter (fun x' -> not (comp x x')) xs)
+  | x::xs when List.exists (eq x) xs -> list_uniq eq xs
+  | x::xs -> x :: list_uniq eq xs
 
 let list_merge comp l1 l2 =
   let rec recurse l1 l2 = match l1,l2 with

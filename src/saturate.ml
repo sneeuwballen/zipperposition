@@ -166,8 +166,9 @@ let all_simplify ~ord ~calculus ~select active_set clause =
     while not (Queue.is_empty queue) do
       let c = Queue.pop queue in
       (* usual simplifications *)
-      let c = calculus#basic_simplify ~ord c in
       let _, c = simplify ~calculus active_set c in
+      if calculus#is_trivial c then () else
+      (* list simplification *)
       match calculus#list_simplify ~ord ~select c with
       | None -> clauses := c :: !clauses (* totally simplified clause *)
       | Some clauses ->
