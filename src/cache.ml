@@ -27,13 +27,13 @@ module type S =
     type 'a t
 
     (** create a cache with given size *)
-    val create : int -> 'a t
+    val create : int -> (key -> 'a) -> 'a t
+
+    (** change the producing function *)
+    val set_fun : 'a t -> (key -> 'a) -> unit
 
     (** find a value in the cache *)
-    val lookup : 'a t -> key -> 'a option
-
-    (** put a value in the cache *)
-    val save : 'a t -> key -> 'a -> unit
+    val lookup : 'a t -> key -> 'a
 
     (** clear the cache from its content *)
     val clear : 'a t -> unit
@@ -58,18 +58,26 @@ module Make(HType : CachedType) =
 
     let my_null = (Obj.magic None, Obj.magic None, false)
 
-    let create size = Array.create (size+1) my_null
+    let set_fun c f = c.(0) <- Obj.magic f
+
+    let create size f =
+      let c = Array.create (size+1) my_null in
+      c.(0) <- Obj.magic f;
+      c
 
     let lookup c k =
-      let i = (HType.hash k) mod (Array.length c) in
+      let i = ((HType.hash k) mod (Array.length c -1)) + 1 in
       match c.(i) with
-      | (_, _, false) -> None
-      | (k', v, true) when HType.equal k k' -> Some v
-      | _ -> None  (* good hash, wrong key *)
+      | (_, _, false) ->
+        let v = ((Obj.magic c.(0)) : key -> 'a) k in
+        c.(i) <- (k, v, true); v
+      | (k', _, true) when not (HType.equal k k') ->
+        let v = ((Obj.magic c.(0)) : key -> 'a) k in
+        c.(i) <- (k, v, true); v
+      | (_, v, true) -> v
 
-    let save c k v =
-      let i = (HType.hash k) mod (Array.length c) in
-      c.(i) <- (k, v, true)
-
-    let clear c = Array.iteri (fun i _ -> c.(i) <- my_null) c
+    let clear c =
+      let f = c.(0) in
+      Array.iteri (fun i _ -> c.(i) <- my_null) c;
+      c.(0) <- f
   end

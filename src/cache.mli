@@ -27,13 +27,13 @@ module type S =
     type 'a t
 
     (** create a cache with given size *)
-    val create : int -> 'a t
+    val create : int -> (key -> 'a) -> 'a t
+
+    (** change the producing function *)
+    val set_fun : 'a t -> (key -> 'a) -> unit
 
     (** find a value in the cache *)
-    val lookup : 'a t -> key -> 'a option
-
-    (** put a value in the cache *)
-    val save : 'a t -> key -> 'a -> unit
+    val lookup : 'a t -> key -> 'a
 
     (** clear the cache from its content *)
     val clear : 'a t -> unit
