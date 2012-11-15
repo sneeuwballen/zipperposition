@@ -6,16 +6,18 @@ is on flexibility, modularity and simplicity rather than performance, to allow
 quick experimenting on automated theorem proving. It generates TSTP proofs, but I
 don't have a proof checker yet so the proofs may be totally wrong.
 
-Zipperposition is written in the functional language [OCaml](http://caml.inria.fr). The name is
-a bad play on the words "zipper" (a functional data structure) and "superposition" (the calculus
-used by the prover). Superposition-based theorem proving is an active field of research, so
-there is a lot of literature about it; for this implementation my references are
+Zipperposition is written in the functional and imperative language
+[OCaml](http://caml.inria.fr). The name is a bad play on the words "zipper" (a
+functional data structure) and "superposition" (the calculus used by the
+prover). Superposition-based theorem proving is an active field of research, so
+there is a lot of literature about it; for this implementation my main references
+are
 
 * the chapter _paramodulation-based theorem proving_ of the _handbook of automated reasoning_,
 * the paper _E: a brainiac theorem prover_ that describes the [E](http://eprover.org) prover by S.Schulz,
 * the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H.Ganzinger and J.Stuber
 
-**Disclaimer**: Note that the prover is currently an early prototype and is
+**Disclaimer**: Note that the prover is currently a prototype and is
 likely not correct nor complete.
 
 ## License
@@ -30,7 +32,7 @@ A copy of the GPLv2 is attached to the project, in the file LICENSE.
 ## Build
 You will need ocaml >= 3.12 or higher with ocamlbuild and the standard library. Type in a terminal:
 
-    make
+    $ make
 
 It should build the project files (using ocamlbuild).
 
@@ -39,19 +41,16 @@ It should build the project files (using ocamlbuild).
 
 Typical usage:
 
-    $ ./prover3.sh problem_file [options]
-    $ ./prover.sh problem_file [options]
-    $ ./zipperposition.sh problem_file -calculus [delayed|superposition]
+    $ ./main.native problem_file [options]
+    $ ./main.native problem_file -calculus [delayed|superposition]
 
-to run the prover. Help is available with the option *-help*. The scripts `prover3.sh`
-and `prover.sh` call the external prover [E](http://eprover.org) for reduction to CNF;
-the former is for [TPTP3](http://tptp.org) syntax, and the latter for old TPTP syntax.
-You can also call the binary directly (it parses TPTP3 syntax); it accepts CNF and FOF files
-for both calculi `-calculus superposition` and `-calculus delayed` (where
-reduction to CNF is done during the saturation process). The prover now
-embeds its own (simple) reduction to CNF algorithm.
+to run the prover. Help is available with the option *-help*. The prover
+accepts CNF and FOF files for both calculi `-calculus superposition` and
+`-calculus delayed` (where reduction to CNF is done during the saturation
+process). The prover now embeds its own (simple) reduction to CNF algorithm
+for the former case.
 
 For instance,
 
-    ./prover3.sh pelletier_problems/pb23.p -timeout 5
+    $ ./main.native ./pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
 
