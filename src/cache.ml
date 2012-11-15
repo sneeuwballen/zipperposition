@@ -18,24 +18,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* an imperative cache for memoization
-  TODO LRU policy *)
+(** an imperative cache for memoization *)
 
 module type S =
   sig 
     type key
 
-    module H : Hashtbl.S with type key = key
-
-    type 'a t = 'a H.t 
+    type 'a t
 
     (** create a cache with given size *)
     val create : int -> 'a t
 
-    (** try to find the value associated to the argument in the cache.
-        If not found, the value will be computed using the function, then
-        saved in the cache. *)
-    val with_cache : 'a t -> (key -> 'a) -> key -> 'a
+    (** find a value in the cache *)
+    val lookup : 'a t -> key -> 'a option
+
+    (** put a value in the cache *)
+    val save : 'a t -> key -> 'a -> unit
 
     (** clear the cache from its content *)
     val clear : 'a t -> unit
@@ -43,39 +41,35 @@ module type S =
 
 module type CachedType =
   sig
-    include Hashtbl.HashedType
-
-    (** decide whether this value should be memoized in the cache *)
-    val should_cache : t -> bool
+    type t
+    val hash : t -> int
+    val equal : t -> t -> bool
   end
 
-let max_size = 50000    (** maximum size for the cache *)
 
-(** functorial implementation *)
 module Make(HType : CachedType) =
   struct
-    module H = Hashtbl.Make(HType)
-
     type key = HType.t
 
-    type 'a t = 'a H.t 
+    (** A slot of the array contains a (key, value, true)
+        if key->value is stored there (at index hash(key) % length),
+        (null, null, false) otherwise *)
+    type 'a t = (key * 'a * bool) array
 
-    let create size = H.create size
+    let my_null = (Obj.magic None, Obj.magic None, false)
 
-    (* helper that puts res for x in cache *)
-    let put_cache cache x res =
-      (if H.length cache >= max_size then H.clear cache); (* cache too big, clear it *)
-      H.replace cache x res
+    let create size = Array.create (size+1) my_null
 
-    let with_cache cache f x =
-      try
-        H.find cache x
-      with Not_found ->
-        let res = f x in
-        (if HType.should_cache x
-          then put_cache cache x res);
-        res
+    let lookup c k =
+      let i = (HType.hash k) mod (Array.length c) in
+      match c.(i) with
+      | (_, _, false) -> None
+      | (k', v, true) when HType.equal k k' -> Some v
+      | _ -> None  (* good hash, wrong key *)
 
-    let clear cache =
-      H.clear cache
+    let save c k v =
+      let i = (HType.hash k) mod (Array.length c) in
+      c.(i) <- (k, v, true)
+
+    let clear c = Array.iteri (fun i _ -> c.(i) <- my_null) c
   end

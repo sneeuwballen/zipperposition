@@ -18,23 +18,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** An imperative cache for memoization *)
+(** An imperative cache of fixed size for memoization *)
 
 module type S =
   sig 
     type key
 
-    module H : Hashtbl.S with type key = key
-
-    type 'a t = 'a H.t 
+    type 'a t
 
     (** create a cache with given size *)
     val create : int -> 'a t
 
-    (** try to find the value associated to the argument in the cache.
-        If not found, the value will be computed using the function, then
-        saved in the cache. *)
-    val with_cache : 'a t -> (key -> 'a) -> key -> 'a
+    (** find a value in the cache *)
+    val lookup : 'a t -> key -> 'a option
+
+    (** put a value in the cache *)
+    val save : 'a t -> key -> 'a -> unit
 
     (** clear the cache from its content *)
     val clear : 'a t -> unit
@@ -42,10 +41,9 @@ module type S =
 
 module type CachedType =
   sig
-    include Hashtbl.HashedType
-
-    (** decide whether this value should be memoized in the cache *)
-    val should_cache : t -> bool
+    type t
+    val hash : t -> int
+    val equal : t -> t -> bool
   end
 
 (** functorial implementation *)
