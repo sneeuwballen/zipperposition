@@ -46,7 +46,6 @@ let _ =
   control.minor_heap_size <- 3 * 1024 * 1024;  (* 3M for minor heap *)
   Gc.set control
   
-
 (** special heuristic: an ordering constraint that makes symbols
     occurring in negative equations bigger than symbols in
     positive equations in the given list of clauses *)
