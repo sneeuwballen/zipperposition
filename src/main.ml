@@ -39,12 +39,6 @@ module Delayed = Delayed
 (* included to have them compiled *)
 module Opaque = Opaque
 module Rewriting = Rewriting
-
-(* GC params *)
-let _ =
-  let control = Gc.get () in
-  control.minor_heap_size <- 3 * 1024 * 1024;  (* 3M for minor heap *)
-  Gc.set control
   
 (** special heuristic: an ordering constraint that makes symbols
     occurring in negative equations bigger than symbols in
