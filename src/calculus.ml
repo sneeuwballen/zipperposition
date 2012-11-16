@@ -135,14 +135,6 @@ let get_equations_sides clause pos = match pos with
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (expected binary list)"
 
-(** cache for terms *)
-module TCache = Hashtbl.Make(
-  struct
-    type t = term
-    let equal a b = T.eq_term a b
-    let hash t = t.hkey
-  end)
-
 (** Skolemize the given term at root (assumes it occurs just under an
     existential quantifier, whose De Bruijn variable is replaced
     by a fresh symbol applied to free variables). This also
@@ -151,7 +143,7 @@ module TCache = Hashtbl.Make(
 
     It also refreshes the ordering (the signature has changed) *)
 let skolem =
-  let cache = TCache.create 13 (* global cache for skolemized terms *)
+  let cache = T.THashtbl.create 13 (* global cache for skolemized terms *)
   and count = ref 0 in  (* current symbol counter *)
   fun ~ord t sort ->
     Utils.debug 4 (lazy (Utils.sprintf "skolem %a@." !T.pp_term#pp t));
@@ -159,7 +151,7 @@ let skolem =
     let vars = normalized_t.vars in
     (* find the skolemized normalized term *)
     let normalized_t'= try
-      TCache.find cache normalized_t
+      T.THashtbl.find cache normalized_t
     with Not_found ->
       (* actual skolemization of normalized_t *)
       let new_symbol = "sk" ^ (string_of_int !count) in
@@ -174,7 +166,7 @@ let skolem =
       (* build the skolemized term *)
       T.db_unlift (T.db_replace normalized_t skolem_term)
     in
-    TCache.replace cache normalized_t normalized_t';
+    T.THashtbl.replace cache normalized_t normalized_t';
     (* get back to the variables of the given term *)
     let new_t = S.apply_subst ~recursive:false subst_to_t normalized_t' in
     Utils.debug 4 (lazy (Utils.sprintf "skolem %a gives %a@."
