@@ -2,20 +2,18 @@
 - make multiset comparison fast
 - maybe implement context trees for general purpose indexing
 - maybe ordering that take a substitution (more efficiently than just applying subst)
-- LRU cache (rather than flush when full)
-
-- apply selection function consistently (delayed reductions take it
-  into account), or make reductions insensitive to selected literals
 
 - efficient rewriting by given confluent terminating TRS
 - dedicated structure for rewriting (adaptive automata?)
-- storage and detection of axiom schemes (cf Waldmeister) to detect theories -> associate ordering+TRS
+- storage and detection of axiom schemes (cf Waldmeister) to detect theories
+    -> associate ordering+TRS
+    -> associate interesting lemma (learned before)
+    -> restarts after theories have been detected during search?
 - superposition modulo rewriting
 
-- miniscoping in CNF reduction
+- miniscoping in CNF reduction (even in formulas?)
 - find better heuristics for delayed superposition
 - syntactic tautology deletion?
 - more profiling/statistics
 
 - output dedukti code (or even Coq code?)
-- graphviz output for data structures and proof
