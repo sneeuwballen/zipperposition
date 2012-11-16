@@ -586,7 +586,8 @@ end
 module OrdCache = Cache.Make(
   struct
     type t = (term * term)
-    let hash (t1, t2) = t1.hkey lxor t2.hkey
+    let hash (t1, t2) = (t1.hkey + 17) lxor t2.hkey
+      (* non commutative to avoid collision between (t1, t2) and (t2, t1) *)
     let equal (t1, t2) (t1', t2') = t1 == t1' && t2 == t2'
   end)
 

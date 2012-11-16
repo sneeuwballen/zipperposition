@@ -236,12 +236,21 @@ module DotState = Dot.Make(
     let print_edge s = s
   end)
 
-(** print to dot *)
+(** print to dot (if empty clause is present, only print a proof,
+    otherwise print the active set and its proof) *)
 let pp_dot ?(name="state") formatter state =
   let graph = DotState.mk_graph ~name
   and explored = C.CHashSet.create ()
   and queue = Queue.create () in
-  C.iter_bag state.active_set.active_clauses (fun _ c -> Queue.push c queue);
+  (* start from empty clause if present, all active clauses otherwise *)
+  let empty_clause = ref None in
+  try C.iter_bag state.active_set.active_clauses
+    (fun _ c' -> if c'.clits = [] then (empty_clause := Some c'; raise Exit));
+  with Exit -> ();
+  (match !empty_clause with
+  | Some c -> Queue.push c queue
+  | None -> C.iter_bag state.active_set.active_clauses
+    (fun _ c -> Queue.push c queue));
   (* breadth first exploration of clauses and their parents *)
   while not (Queue.is_empty queue) do
     let c = Queue.pop queue in

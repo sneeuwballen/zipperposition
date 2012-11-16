@@ -73,13 +73,6 @@ val subsumed_by_set : ProofState.active_set -> clause -> bool
 (** list of clauses in the active set that are subsumed by the clause *)
 val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 
-(* TODO simplify-reflect and such *)
-
-(** remove from the passive_set the list of orphans of clause *)
-val orphan_murder: ProofState.passive_set
-                -> clause   (** the clause whose orphans are to be deleted *)
-                -> ProofState.passive_set
-
 (** Transform the clause into proper CNF; returns a list of clauses *)
 val cnf_of : ord:ordering -> clause -> clause list
 

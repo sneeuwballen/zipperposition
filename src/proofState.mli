@@ -100,7 +100,8 @@ val pp_state : Format.formatter -> state -> unit
 (** debug functions: much more detailed printing *)
 val debug_state : Format.formatter -> state -> unit
 
-(** print to dot *)
+(** print to dot (if empty clause is present, only print a proof,
+    otherwise print the active set and its proof) *)
 val pp_dot : ?name:string -> Format.formatter -> state -> unit
 (** print to dot into a file *)
 val pp_dot_file : ?name:string -> string -> state -> unit

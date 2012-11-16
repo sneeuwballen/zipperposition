@@ -776,9 +776,6 @@ let subsumed_in_set_ set c =
 let subsumed_in_set set clause =
   prof_subsumption_in_set.HExtlib.profile (subsumed_in_set_ set) clause
 
-let orphan_murder set clause = set (* TODO *)
-
-
 (* ----------------------------------------------------------------------
  * reduction to CNF
  * ---------------------------------------------------------------------- *)

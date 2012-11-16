@@ -39,6 +39,9 @@ module Delayed = Delayed
 (* included to have them compiled *)
 module Opaque = Opaque
 module Rewriting = Rewriting
+
+(* TODO move special heuristic to calculus
+   TODO generalize it for defined predicates/functions *)
   
 (** special heuristic: an ordering constraint that makes symbols
     occurring in negative equations bigger than symbols in
