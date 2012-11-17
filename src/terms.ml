@@ -159,7 +159,7 @@ let rec compute_db_closed depth t = match t.term with
 let mk_var idx sort =
   let rec my_v = {term = Var idx; sort=sort; vars=[my_v];
                   db_closed=true; binding=my_v; simplified=true;
-                  normal_form = true; size=1; tag= -1; hkey=0} in
+                  normal_form = true; tsize=1; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
@@ -167,7 +167,7 @@ let mk_leaf symbol sort =
   let db_closed = if symbol = db_symbol then false else true in
   let rec my_t = {term = Leaf symbol; sort=sort; vars=[];
                   db_closed=db_closed; binding=my_t; simplified=true;
-                  normal_form = false; size=1; tag= -1; hkey=0} in
+                  normal_form = false; tsize=1; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
   let t = H.hashcons my_t in
   (if t == my_t then incr sig_version);  (* the signature has changed *)
@@ -179,7 +179,7 @@ let rec mk_node = function
   | {term=Var _}::_ -> assert false
   | (head::_) as subterms ->
       let rec my_t = {term=(Node subterms); sort=head.sort; vars=[];
-                      db_closed=false; binding=my_t; simplified=false;
+                      db_closed=false; binding=my_t; tsize=0; simplified=false;
                       normal_form = false; tag= -1; hkey=0} in
       my_t.hkey <- hash_term my_t;
       let t = H.hashcons my_t in
@@ -187,7 +187,7 @@ let rec mk_node = function
         then begin  (* compute additional data, the term is new *)
           t.db_closed <- compute_db_closed 0 t;
           t.vars <- compute_vars subterms;
-          t.size <- List.fold_left (fun acc subt -> acc + subt.size) 0 subterms;
+          t.tsize <- List.fold_left (fun acc subt -> acc + subt.tsize) 0 subterms;
         end);
       t
 

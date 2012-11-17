@@ -38,7 +38,7 @@ let rec get_pos t pos =
   | Node (_::l) -> get_subpos l pos
 and get_subpos l pos =
   match l, pos with
-  | t::l', _ when t.size <= pos -> get_subpos l' (pos - t.size)
+  | t::l', _ when t.tsize <= pos -> get_subpos l' (pos - t.tsize)
   | t::l', _ -> get_pos t pos  (* search inside the term *)
   | [], _ -> assert false
 
@@ -48,7 +48,7 @@ let next t pos = pos+1
 (** skip subterms, got to next term that is not a subterm of t|pos *)
 let skip t pos =
   let t = get_pos t pos in
-  pos + t.size
+  pos + t.tsize
 
 (** arity of the subterm of t which is at given pos *)
 let arity t pos =
@@ -58,7 +58,7 @@ let arity t pos =
   | Node [] -> assert false
 
 (** maximum position in the term *)
-let maxpos t = t.size - 1
+let maxpos t = t.tsize - 1
 
 type character =
   | CVar of sort * int * term           (** var index, var *)

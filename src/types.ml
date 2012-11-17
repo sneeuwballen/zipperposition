@@ -61,7 +61,7 @@ and typed_term = {
   mutable normal_form : bool;   (** has the normal form been computed? (in binding) *)
   mutable db_closed : bool;     (** is the term closed w.r.t. De Bruijn indexes? *)
   mutable simplified : bool;    (** as a formula, totally simplified *)
-  mutable size : int;           (** number of symbol/vars occurrences in the term *)
+  mutable tsize : int;          (** number of symbol/vars occurrences in the term *)
   mutable tag : int;            (** hashconsing tag *)
   mutable hkey : int;           (** hash *)
 }
