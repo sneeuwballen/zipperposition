@@ -53,7 +53,7 @@ let eq_literal l1 l2 =
 let eq_literal_com l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      o1 = o2 && sign1 = sign2 &&
+      sign1 = sign2 &&
       ((T.eq_term l1 l2 && T.eq_term r1 r2) ||
        (T.eq_term l1 r2 && T.eq_term r1 l2))
 
