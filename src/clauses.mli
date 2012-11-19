@@ -78,9 +78,11 @@ module CHashSet :
   sig
     type t
     val create : unit -> t
+    val is_empty : t -> bool
     val member : t -> clause -> bool
     val iter : t -> (clause -> unit) -> unit
     val add : t -> clause -> unit
+    val to_list : t -> clause list
   end
 
 val mk_clause : ord:ordering -> literal list ->

@@ -257,9 +257,14 @@ module CHashSet =
   struct
     type t = unit CHashtbl.t
     let create () = CHashtbl.create 13
+    let is_empty t = CHashtbl.length t = 0
     let member t c = CHashtbl.mem t c
     let iter t f = CHashtbl.iter (fun c _ -> f c) t
     let add t c = CHashtbl.replace t c ()
+    let to_list t =
+      let l = ref [] in
+      iter t (fun c -> l := c :: !l);
+      !l
   end
 
 let check_maximal_lit_ ~ord clause pos subst =
