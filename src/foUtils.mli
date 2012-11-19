@@ -65,6 +65,8 @@ val multiset_partial : ('a -> 'a -> comparison) -> 'a list -> 'a list -> compari
 val list_get : 'a list -> int -> 'a
 (** set n-th element of list (linear) *)
 val list_set : 'a list -> int -> 'a -> 'a list
+(** map with index *)
+val list_mapi : 'a list -> (int -> 'a -> 'b) -> 'b list
 (** all the list but i-th element (linear) *)
 val list_remove : 'a list -> int -> 'a list
 (** zip the list with positions (starting at 0) *)

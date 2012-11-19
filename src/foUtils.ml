@@ -164,6 +164,13 @@ let rec list_set l i elem = match l, i with
   | x::xs, i when i > 0 -> x::(list_set xs (i-1) elem)
   | _ -> failwith "error in list_set"
 
+let list_mapi l f =
+  let rec recurse l i =
+    match l with
+    | [] -> []
+    | x::l' -> f i x :: recurse l' (i+1)
+  in recurse l 0
+
 let rec list_remove l i = match l, i with
   | [], i -> invalid_arg "index too high"
   | _::xs, i when i = 0 -> xs
