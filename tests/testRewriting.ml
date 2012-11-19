@@ -24,6 +24,8 @@ let y = T.mk_var 2 univ_sort
 let z = T.mk_var 3 univ_sort
 let u = T.mk_var 4 univ_sort
 
+let _ = Utils.set_debug 3
+
 let rec from_int n =
   assert (n >= 0);
   if n = 0 then zero else succ (from_int (n-1))
