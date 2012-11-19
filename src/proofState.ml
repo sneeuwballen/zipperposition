@@ -31,7 +31,7 @@ module CD = ClauseDag
 
 (** Default indexing on terms *)
 let cur_index =
-  ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m))
+  ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m) Dtree.unit_index)
   (* ref (I.mk_clause_index Discrimination_tree.index) *)
 
 let _indexes =

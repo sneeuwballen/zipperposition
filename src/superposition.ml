@@ -95,8 +95,8 @@ let first_position pos t f =
   and aux pos ctx t = match t.term with
   | Leaf _ -> inject_pos pos ctx (f t)
   | Var _ -> None
-  | Node l ->
-      match f t with  (* try f at the current composite term *)
+  | Node (hd::l) ->
+      (match f t with  (* try f at the current composite term *)
       | Some _ as x -> inject_pos pos ctx x
       | None ->
           (* pre is the list of subterm before, post the list of subterms
@@ -112,7 +112,8 @@ let first_position pos t f =
                  if post = [] then None (* tl is also empty *)
                  else first (pre @ [t]) (idx+1) (List.tl post) tl
           in
-          first [] 1 (List.tl l) l
+          first [hd] 1 l l)
+  | Node [] -> assert false
   in
   aux pos (fun x -> x) t
 
@@ -389,14 +390,14 @@ let infer_equality_factoring ~ord clause =
  * simplifications
  * ---------------------------------------------------------------------- *)
 
-exception FoundMatch of (term * substitution * clause * position)
+exception FoundMatch of (term * hclause)
 
 (* TODO more efficient demodulation: use references, use leftmost-innermost
    strategy with a recursive 'reduce to normal form' function;
    clauses used for demodulation should be put in a list ref. *)
 
 (** Do one step of demodulation on subterm. *)
-let demod_subterm ~ord blocked_ids active_set subterm =
+let demod_subterm ~ord active_set subterm =
   Utils.debug 4 (lazy (Utils.sprintf "  demod subterm %a" !T.pp_term#pp subterm));
   (* do not rewrite non-atomic formulas *)
   if subterm.sort = bool_sort  && not (T.atomic subterm)
@@ -410,57 +411,42 @@ let demod_subterm ~ord blocked_ids active_set subterm =
           let new_t, (hc, pos, l) = Ptmap.find subterm.tag
             active_set.PS.idx#ground_rewrite_index in
           assert (T.eq_term l subterm);
-          raise (FoundMatch (new_t, S.id_subst, hc, pos))
+          raise (FoundMatch (new_t, hc))
         else ()
     with Not_found -> ());
-    (* unit clause+pos that potentially match subterm *)
-    active_set.PS.idx#unit_root_index#retrieve_generalizations subterm ()
-      (fun () l set ->
-        try
-          let subst = Unif.matching S.id_subst l subterm in
-          (* iterate on all clauses for this term *)
-          I.ClauseSet.iter 
-            (fun (unit_hclause, pos, l) ->
-              (* do we have to ignore the clause? *)
-              if List.mem unit_hclause.ctag blocked_ids then () else begin
-                match pos with
-                | [0; side] ->
-                  (* r is the term subterm is going to be rewritten into *)
-                  let r = C.get_pos unit_hclause [0; C.opposite_pos side] in
-                  let new_l = subterm
-                  and new_r = S.apply_subst subst r in
-                  if ord#compare new_l new_r = Gt
-                    (* subst(l) > subst(r), we can rewrite *)
-                    then begin
-                      Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
-                                     !T.pp_term#pp subterm !T.pp_term#pp new_r
-                                     !C.pp_clause#pp_h unit_hclause));
-                      raise (FoundMatch (new_r, subst, unit_hclause, pos))
-                    end else Utils.debug 4
-                      (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
-                             !T.pp_term#pp subterm !T.pp_term#pp new_r
-                             !C.pp_clause#pp_h unit_hclause));
-                | _ -> assert false
-              end
-          ) set
-        with
-          UnificationFailure -> ()
+    (* equations l=r that match subterm *)
+    active_set.PS.idx#unit_root_index#retrieve ~sign:true subterm
+      (fun l r subst unit_hclause ->
+        (* r is the term subterm is going to be rewritten into *)
+        let new_l = subterm
+        and new_r = S.apply_subst subst r in
+        if ord#compare new_l new_r = Gt
+          (* subst(l) > subst(r), we can rewrite *)
+          then begin
+            Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
+                           !T.pp_term#pp subterm !T.pp_term#pp new_r
+                           !C.pp_clause#pp_h unit_hclause));
+            raise (FoundMatch (new_r, unit_hclause))
+          end else Utils.debug 4
+            (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
+                   !T.pp_term#pp subterm !T.pp_term#pp new_r
+                   !C.pp_clause#pp_h unit_hclause));
       );
     None  (* not found any match *)
   with
-    FoundMatch (new_t, subst, unit_hclause, pos) ->
+    FoundMatch (new_t, unit_hclause) ->
       begin
         incr_stat stat_demodulate_step;
-        Some (new_t, (unit_hclause, pos, subst))  (* return the new term, and proof *)
+        Some (new_t, (unit_hclause, [], S.id_subst))  (* return the new term, and proof *)
       end
 
 (** Normalize term (which is at pos pos in the clause) w.r.t. active set.
     This returns a list of clauses and positions in clauses that have
     been used for rewriting. *)
-let demod_term ~ord blocked_ids active_set term =
+let demod_term ~ord active_set term =
   let rec one_step term clauses =
     let pos = [] in
-    match first_position pos term (demod_subterm ~ord blocked_ids active_set) with
+    match first_position pos term (demod_subterm ~ord active_set) with
     | None -> term, clauses
     | Some (new_term, (unit_hc, active_pos, subst), _, _) ->
       let new_clauses =  (unit_hc, active_pos, subst) :: clauses in
@@ -471,7 +457,7 @@ let demod_term ~ord blocked_ids active_set term =
     the blocked clauses (generally the clause itself, if it
     is already in the active_set)
     TODO ensure the conditions for rewrite of positive literals are ok (cf paper) *)
-let demodulate active_set blocked_ids clause =
+let demodulate active_set clause =
   Utils.debug 4 (lazy (Utils.sprintf "demodulate %a..." !C.pp_clause#pp clause));
   incr_stat stat_demodulate_call;
   let ord = active_set.PS.a_ord in
@@ -482,8 +468,8 @@ let demodulate active_set blocked_ids clause =
       if sign && C.eligible_res ~ord clause pos S.id_subst
         then lit, []  (* do not rewrite in this case *)
         else
-          let new_l, l_clauses = demod_term ~ord blocked_ids active_set l in
-          let new_r, r_clauses = demod_term ~ord blocked_ids active_set r in
+          let new_l, l_clauses = demod_term ~ord active_set l in
+          let new_r, r_clauses = demod_term ~ord active_set r in
           (C.mk_lit ~ord new_l new_r sign), (l_clauses @ r_clauses)
   (* rewrite next lit, and get more clauses *)
   and iterate_lits pos lits new_lits clauses = match lits with
@@ -585,38 +571,26 @@ let positive_simplify_reflect active_set clause =
     if T.eq_term t1 t2
       then Some clauses  (* trivial *)
       else  (* try to solve it with a unit equality *)
-        try active_set.PS.idx#unit_root_index#retrieve_generalizations t1 ()
-          (fun () l set ->
-            try
-              let subst = Unif.matching S.id_subst l t1 in
-              (* find some r in the set, such that subst(r) = t2 *)
-              I.ClauseSet.iter
-                (fun (clause, pos, _) ->
-                  match pos with
-                  | [idx; side] ->
-                    (* get the other side of the equation *)
-                    let r = C.get_pos clause [idx; C.opposite_pos side] in
-                    if T.eq_term t2 (S.apply_subst subst r)
-                    then begin
-                      Utils.debug 4 (lazy (Utils.sprintf "equate %a and %a using %a"
-                                  !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp clause));
-                      raise (FoundMatch (r, subst, clause, pos)) (* success *)
-                    end else ()
-                  | _ -> assert false)
-                set
-            with UnificationFailure -> ());
+        try active_set.PS.idx#unit_root_index#retrieve ~sign:true t1
+          (fun l r subst hc ->
+            if T.eq_term t2 (S.apply_subst subst r)
+            then begin
+              Utils.debug 4 (lazy (Utils.sprintf "equate %a and %a using %a"
+                          !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp hc));
+              raise (FoundMatch (r, hc)) (* success *)
+            end else ());
           None (* no match *)
-        with FoundMatch (r, subst, clause, pos) ->
-          Some ((clause, pos, subst) :: clauses)  (* success *)
+        with FoundMatch (r, clause) ->
+          Some (clause :: clauses)  (* success *)
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Utils.list_pos clause.clits) [] in
   if List.length lits = List.length clause.clits
     then clause (* no literal removed *)
     else 
-      let proof = lazy (Proof ("simplify_reflect+", (clause, [], S.id_subst)::premises))
-      and clauses = List.map (fun (c,_,_) -> c) premises in
-      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::clauses)) in
+      let proof = lazy (Proof ("simplify_reflect+",
+        (clause, [], S.id_subst)::(List.map (fun c -> (c, [], S.id_subst)) premises))) in
+      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::premises)) in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a pos_simplify_reflect into %a@]"
                     !C.pp_clause#pp clause !C.pp_clause#pp c));
       c
@@ -636,40 +610,26 @@ let negative_simplify_reflect active_set clause =
   | lit::lits' -> iterate_lits (lit::acc) lits' clauses
   (** try to remove the literal using a negative unit clause *)
   and can_refute s t =
-    try active_set.PS.idx#root_index#retrieve_generalizations s ()
-      (fun () l set ->
-        try
-          let subst = Unif.matching S.id_subst l s in
-          (* find some r in the set, such that subst(r) = t *)
-          I.ClauseSet.iter
-            (fun (clause, pos, _) ->
-              match pos with
-              | [idx; side] ->
-                (* get the other side of the equation *)
-                let r = C.get_pos clause [idx; C.opposite_pos side] in
-                if List.length clause.clits = 1 &&
-                   C.neg_lit (List.hd clause.clits) &&
-                   T.eq_term t (S.apply_subst subst r)
-                then begin
-                  Utils.debug 3 (lazy (Utils.sprintf "neg_reflect eliminates %a=%a with %a"
-                                 !T.pp_term#pp s !T.pp_term#pp t !C.pp_clause#pp clause));
-                  raise (FoundMatch (r, subst, clause, pos)) (* success *)
-                end else ()
-              | _ -> assert false)
-            set
-        with UnificationFailure -> ());
+    try active_set.PS.idx#unit_root_index#retrieve ~sign:false s
+      (fun l r subst hc ->
+        if T.eq_term t (S.apply_subst subst r)
+        then begin
+          Utils.debug 3 (lazy (Utils.sprintf "neg_reflect eliminates %a=%a with %a"
+                         !T.pp_term#pp s !T.pp_term#pp t !C.pp_clause#pp hc));
+          raise (FoundMatch (r, hc)) (* success *)
+        end else ());
       None (* no match *)
-    with FoundMatch (r, subst, clause, pos) ->
-      Some (clause, pos, subst)  (* success *)
+    with FoundMatch (r, hc) ->
+      Some hc  (* success *)
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] clause.clits [] in
   if List.length lits = List.length clause.clits
     then clause (* no literal removed *)
     else 
-      let proof = lazy (Proof ("simplify_reflect-", (clause, [], S.id_subst)::premises))
-      and clauses = List.map (fun (c,_,_) -> c) premises in
-      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::clauses)) in
+      let proof = lazy (Proof ("simplify_reflect-",
+        (clause, [], S.id_subst)::(List.map (fun c -> (c, [], S.id_subst)) premises))) in
+      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::premises)) in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a neg_simplify_reflect into %a@]"
                     !C.pp_clause#pp clause !C.pp_clause#pp c));
       c
@@ -931,7 +891,7 @@ let superposition : calculus =
     method simplify actives c =
       let ord = actives.PS.a_ord in
       let c = basic_simplify ~ord c in
-      let c = basic_simplify ~ord (demodulate actives [] c) in
+      let c = basic_simplify ~ord (demodulate actives c) in
       let c = basic_simplify ~ord (positive_simplify_reflect actives c) in
       let c = basic_simplify ~ord (negative_simplify_reflect actives c) in
       c

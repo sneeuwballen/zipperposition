@@ -201,7 +201,7 @@ let parse_file ~recursive f =
 
 (** setup index *)
 let setup_index name =
-  PS.cur_index := I.mk_clause_index (PS.choose_index name);
+  PS.cur_index := I.mk_clause_index (PS.choose_index name) Dtree.unit_index;
   Format.printf "%% use indexing structure %s@." name
 
 (** print stats *)

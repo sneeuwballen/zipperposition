@@ -365,7 +365,7 @@ let delayed : calculus =
       let c = simplify_inner ~ord (Sup.basic_simplify ~ord c) in
       let c = Sup.basic_simplify ~ord (Sup.positive_simplify_reflect actives c) in
       let c = Sup.basic_simplify ~ord (Sup.negative_simplify_reflect actives c) in
-      let c = Sup.basic_simplify ~ord (Sup.demodulate actives [] c) in
+      let c = Sup.basic_simplify ~ord (Sup.demodulate actives c) in
       let c = simplify_inner ~ord c in
       if C.eq_clause c old_c
         then c
