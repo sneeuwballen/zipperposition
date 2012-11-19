@@ -171,6 +171,13 @@ let list_mapi l f =
     | x::l' -> f i x :: recurse l' (i+1)
   in recurse l 0
 
+let list_iteri l f =
+  let rec recurse l i =
+    match l with
+    | [] -> ()
+    | x::l' -> f i x; recurse l' (i+1)
+  in recurse l 0
+
 let rec list_remove l i = match l, i with
   | [], i -> invalid_arg "index too high"
   | _::xs, i when i = 0 -> xs

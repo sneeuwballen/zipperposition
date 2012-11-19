@@ -30,8 +30,8 @@ val matching: substitution -> term -> term -> substitution
 
 (** [matching_locked ~locked subst a b] returns sigma such that sigma(a) = b
     and sigma does not bind any variable in locked and subst \in sigma,
-    or raise UnificationFailure *)
-val matching_locked: locked:varlist -> substitution -> term -> term -> substitution
+    or raise UnificationFailure. *)
+val matching_locked: locked:Terms.THashSet.t -> substitution -> term -> term -> substitution
 
 (* alpha_eq [a] [b] returns sigma with sigma(a) = b, and sigma
  * a variable renaming, or raise UnificationFailure *)

@@ -56,6 +56,14 @@ val filter : substitution -> varlist -> varlist
 (** restrict the domain to variables not present in term *)
 val restrict_exclude: substitution -> term -> substitution
 
+(** domain of substitution *)
+val domain : substitution -> Terms.THashSet.t
+(** codomain (image terms) of substitution *)
+val codomain : substitution -> Terms.THashSet.t
+
+(** reset bindings of variables and terms of the substitution *)
+val reset_bindings : substitution -> unit
+
 (** for each (v, t) in subst, v.binding <- t *)
 val apply_subst_bind : substitution -> unit
 (** apply substitution to term, replacing variables by the term they are bound to *)

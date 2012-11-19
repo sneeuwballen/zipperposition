@@ -74,6 +74,19 @@ let filter subst varlist =
 let restrict_exclude subst term =
   List.filter (fun (v, t) -> not (T.member_term v term)) subst
 
+let domain subst =
+  let set = T.THashSet.create () in
+  List.iter (fun (v, _) -> T.THashSet.add set v) subst;
+  set
+
+let codomain subst =
+  let set = T.THashSet.create () in
+  List.iter (fun (_, t) -> T.THashSet.add set t) subst;
+  set
+
+let reset_bindings subst =
+  List.iter (fun (v, t) -> T.reset_binding v; T.reset_vars t) subst
+
 let apply_subst_bind subst =
   List.iter (fun (v, t) -> T.set_binding v t) subst
 

@@ -67,6 +67,8 @@ val list_get : 'a list -> int -> 'a
 val list_set : 'a list -> int -> 'a -> 'a list
 (** map with index *)
 val list_mapi : 'a list -> (int -> 'a -> 'b) -> 'b list
+(** iter with index *)
+val list_iteri : 'a list -> (int -> 'a -> unit) -> unit
 (** all the list but i-th element (linear) *)
 val list_remove : 'a list -> int -> 'a list
 (** zip the list with positions (starting at 0) *)

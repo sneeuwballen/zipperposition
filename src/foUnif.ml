@@ -96,17 +96,14 @@ let unification subst a b =
   prof_unification.HExtlib.profile root_unify ()
 
 let matching_locked ~locked subst a b =
-  let locked = T.THashSet.from_list locked in
   (* recursive matching *)
   let rec unif subst s t =
     (if s.sort <> t.sort then raise UnificationFailure);
     let s = get_var_binding s
     and t = get_var_binding t in
     match s.term, t.term with
-    | _, _ when T.eq_term s t -> subst
-    | _, _ when T.is_ground_term s && T.is_ground_term t ->
-        (* distinct ground terms cannot be matched *) 
-        raise UnificationFailure
+    | _ when T.eq_term s t -> subst
+    | _ when T.is_ground_term s -> raise UnificationFailure 
     | Var _, _ when T.THashSet.member locked s || occurs_check s t ->
       raise UnificationFailure
     | Var _, _ ->
@@ -114,17 +111,19 @@ let matching_locked ~locked subst a b =
       S.update_binding subst s
     | Node l1, Node l2 when List.length l1 = List.length l2 ->
       List.fold_left2 unif subst l1 l2
-    | _, _ -> raise UnificationFailure
-  (* main matching procedure, with setup *)
-  and root_match () =
-    T.reset_vars a;
-    T.reset_vars b;
-    S.apply_subst_bind subst;
-    unif subst a b
+    | _ -> raise UnificationFailure
   in
-  prof_matching.HExtlib.profile root_match ()
+  T.reset_vars a;
+  T.reset_vars b;
+  S.apply_subst_bind subst;
+  prof_matching.HExtlib.profile (unif subst a) b
 
-let matching subst a b = matching_locked ~locked:b.vars subst a b
+let matching subst a b =
+  let locked = T.THashSet.from_list b.vars in
+  T.reset_vars a;
+  T.reset_vars b;
+  S.apply_subst_bind subst;
+  matching_locked ~locked subst a b
 
 (** Sets of variables in s and t are assumed to be disjoint  *)
 let alpha_eq s t =
