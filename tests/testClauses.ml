@@ -47,7 +47,7 @@ let random_clause ?(size=4) () =
     C.mk_clause ~ord lits ~selected:(lazy [])(lazy (Axiom ("", "random"))) (lazy [])
 
 (* pair of random clauses *)
-let random_clause_pair () = (random_clause ~size:3 (), random_clause ~size:6 ())
+let random_clause_pair () = (random_clause ~size:2 (), random_clause ~size:5 ())
 
 (** check that renaming works *)
 let check_fresh c =
@@ -64,7 +64,7 @@ let check_subsumption (c1, c2) =
   let rec clause_subset c1 c2 = lits_subset c1.clits c2.clits
   and lits_subset lits1 lits2 = match lits1 with
   | [] -> true
-  | x::lits1' -> if List.exists (fun y -> C.eq_literal_com x y) lits2
+  | x::lits1' -> if List.exists (C.eq_literal_com x) lits2
     then let lits2' = remove_once x lits2 in
       assert (List.length lits2' = (List.length lits2) - 1); lits_subset lits1' lits2'
     else false
@@ -90,6 +90,7 @@ let print_subsuming_failure formatter (c1,c2,c1',c2',subst) =
     S.pp_substitution subst
 
 let run () =
+  Utils.set_debug 1;
   Format.printf "run clauses tests@.";
   H.check_and_print ~name:"check_fresh" check_fresh
     (random_clause ~size:4) print_clause_pair 2000;

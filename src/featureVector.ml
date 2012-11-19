@@ -131,8 +131,7 @@ let mk_fv_index_signature signature =
     List.flatten
       (List.map (fun symb ->
         (* for each symbol, use 4 features *)
-        [count_symb_plus symb; count_symb_minus symb;
-         max_depth_plus symb; max_depth_minus symb])
+        [count_symb_plus symb; count_symb_minus symb])
         bounded_signature)
   in
   (* build an index with those features *)
@@ -190,14 +189,11 @@ let retrieve_subsumed (features, trie) clause f =
   let fv = compute_fv features clause in
   let rec iter_higher fv node = match fv, node with
   | [], FVTrie.Node (None, _) -> ()
-  | [], FVTrie.Node (Some hclauses, _) ->
-      S.iter f hclauses
+  | [], FVTrie.Node (Some hclauses, _) -> S.iter f hclauses
   | i::fv', FVTrie.Node (_, map) ->
     Ptmap.iter
       (fun j subnode -> if j >= i
-        then iter_higher fv' subnode  (* go in the branch *)
-        else () (* do not go in the branch *)
-      )
+        then iter_higher fv' subnode)  (* go in the branch *)
       map
   in
   iter_higher fv trie

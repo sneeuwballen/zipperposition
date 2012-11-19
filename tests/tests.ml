@@ -3,9 +3,8 @@
 module Utils = FoUtils
 
 let _ =
-  Utils.set_debug 3;
+  TestClauses.run ();
   TestRewriting.run ();
   TestTerms.run ();
   TestOrderings.run ();
-  TestClauses.run ();
   ()
