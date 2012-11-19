@@ -38,6 +38,7 @@ val compare_term : term -> term -> int    (** a simple order on terms *)
 module TSet : Set.S with type elt = term
 module TPairSet : Set.S with type elt = term * term
 module THashtbl : Hashtbl.S with type key = term
+module TMap : Map.S with type key = term
 
 (** Simple hashset for small sets of terms *)
 module THashSet :

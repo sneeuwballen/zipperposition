@@ -79,6 +79,8 @@ module THashtbl = Hashtbl.Make(
     let equal t1 t2 = eq_term t1 t2
   end)
 
+module TMap = Map.Make( struct type t = term let compare = compare_term end)
+
 module THashSet =
   struct
     type t = unit THashtbl.t
