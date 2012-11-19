@@ -633,13 +633,56 @@ let negative_simplify_reflect active_set clause =
  * subsumption
  * ---------------------------------------------------------------------- *)
 
+(** raised when a subsuming substitution is found *)
+exception SubsumptionFound of substitution
+
+(** Check compatibility of two (normalized) substitutions *)
+let compatible_substs s1 s2 =
+  S.reset_bindings s1;
+  S.reset_bindings s2;
+  S.apply_subst_bind s2;  (* apply s2, but not s1 *)
+  List.for_all
+    (fun (v1, t1) ->
+      (* either s2 does not bind v1, or it binds it to the same term *)
+      T.eq_term v1 v1.binding || T.eq_term v1.binding t1)
+    s1
+
+(** Merge two compatible substs (merge s1 into s2) *)
+let merge_substs s1 s2 =
+  (* reset bindings occurring in substitutions *)
+  S.reset_bindings s1;
+  S.reset_bindings s2;
+  S.apply_subst_bind s2;
+  List.fold_left
+    (fun subst (v, t) ->
+      if T.eq_term v v.binding
+        then (v, t) :: subst  (* not bound in t2 *)
+        else subst)
+    s2 s1
+
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
     substitutions s such that s(lit_a) = lit_b and s contains subst. The list
     is empty if lit_a does not subsume lit_b. *)
 let match_lits ~locked subst lit_a lit_b =
   match lit_a, lit_b with
-  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) ->
-    if signa <> signb then [] else
+  | Equation (_, _, signa, _), Equation (_, _, signb, _) when signa <> signb -> [] (* different sign *)
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) when T.eq_term la lb && T.eq_term ra rb ->
+    [S.id_subst]
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) when T.eq_term la rb && T.eq_term ra lb ->
+    [S.id_subst]
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) when T.eq_term la lb ->
+    (try [Unif.matching_locked ~locked subst ra rb]
+    with UnificationFailure -> [])
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) when T.eq_term la rb ->
+    (try [Unif.matching_locked ~locked subst ra lb]
+    with UnificationFailure -> [])
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) when T.eq_term ra rb ->
+    (try [Unif.matching_locked ~locked subst la lb]
+    with UnificationFailure -> [])
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) when T.eq_term ra lb ->
+    (try [Unif.matching_locked ~locked subst la rb]
+    with UnificationFailure -> [])
+  | Equation (la, ra, signa, _), Equation (lb, rb, signb, _) -> (* general case *)
     (try
       let subst = Unif.matching_locked ~locked subst la lb in
       let subst = Unif.matching_locked ~locked subst ra rb in
@@ -651,51 +694,56 @@ let match_lits ~locked subst lit_a lit_b =
       [subst]
     with UnificationFailure -> [])
 
-(** raised when a subsuming substitution is found *)
-exception SubsumptionFound of substitution
+(** finds all literals matched by this literal in clause, with the
+    corresponding substitutions. It returns a list of
+    (index of subsumed lit, subst) *)
+let matched_lits ~locked lit clause =
+  let ans = ref [] 
+  and count = ref 0 in
+  Utils.list_iteri clause.clits
+    (fun idx lit' -> (* match lit with lit', add substitutions to ans *)
+      List.iter
+        (fun subst -> ans := (idx, subst) :: !ans; incr count)
+        (match_lits ~locked S.id_subst lit lit'));
+  !count, !ans
 
+(** Check whether a subsumes b, and if it does, return the
+    corresponding substitution *)
 let subsumes_with a b =
   incr_stat stat_subsumption_call;
-  let locked = b.cvars in
   (* a must not have more literals *)
   if List.length a.clits > List.length b.clits then None else
-  (* does the list subst(l1) subsume subst(l2)? *)
-  let rec aux l1 l2 subst = match l1 with
-  | [] -> (* no lits in subsuming clause *)
-    raise (SubsumptionFound subst)
-  | x::l1_tail ->
-    (* is there a y in l2 with subst'(subst(x)) = subst(y)? if yes, remove
-       x from l1 and y from l2 and continue *)
-    attempt_with x l1_tail [] l2 subst
-  (* try to match x against literals in l2 (l2_pre are literals
-     in l2 that have already been tried), with subst *)
-  and attempt_with x l1 l2_pre l2 subst = match l2 with
-  | [] -> None
-  | y::l2_tail ->
-    let possible_matches = match_lits ~locked subst x y in
-    if possible_matches = []  (* x and y do not match *)
-      then attempt_with x l1 (y::l2_pre) l2_tail subst
-      else
-        let l2' = List.rev_append l2_pre l2_tail in  (* l2 without y *)
-        (* try to recurse with each possible match of x,y *)
-        List.iter (fun subst' -> ignore (aux l1 l2' subst')) possible_matches;
-        attempt_with x l1 (y::l2_pre) l2_tail subst
-  (* used to sort literals by decreasing number of variables *)
-  and compare_lit_vars (Equation (l1,l2,_,_)) (Equation (r1,r2,_,_)) =
-    (List.length r1.vars) + (List.length r2.vars) 
-    - (List.length l1.vars) - (List.length l2.vars)
+  let locked = T.THashSet.from_list b.cvars in
+  (* list of matched literals in b, for each literal of a *)
+  let ans_list = List.map
+    (fun lit -> matched_lits ~locked lit b)
+    a.clits in
+  (* find a compatible superset of all those substitutions *)
+  let rec find_compatible subst indexes l =
+    match l with
+    | [] -> raise (SubsumptionFound subst)
+    | substs::l' ->
+      List.iter
+        (fun (idx, s) ->
+          match () with
+          | _ when Ptset.mem idx indexes -> ()
+          | _ when compatible_substs s subst ->
+            (* merge subst with lits, continue *)
+            let indexes' = Ptset.add idx indexes
+            and subst' = merge_substs s subst in
+            find_compatible subst' indexes' l'
+          | _ -> ()
+        ) substs;
   in
-  let res =
-    (* try aux with the whole list of literals l1 *)
-    let l1 = List.sort compare_lit_vars a.clits
-    and l2 = List.sort compare_lit_vars b.clits in
-    try aux l1 l2 S.id_subst
+  (* sort by increasing number of solutions *)
+  let ans_list = List.sort (fun (count1, _) (count2, _) -> count1 - count2) ans_list in
+  let ans_list = List.map snd ans_list in
+  if List.exists (fun substs -> substs = []) ans_list
+    then None  (* some literal matches no literal in b *)
+    else try
+      find_compatible S.id_subst Ptset.empty ans_list;
+      None  (* no subsuming substitution found *)
     with SubsumptionFound subst -> Some subst
-  in
-  (if res <> None then
-    Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ subsumes @[<h>%a@]@]"
-                  !C.pp_clause#pp a !C.pp_clause#pp b)));
-  res
 
 let subsumes a b =
   let check a b = match subsumes_with a b with
