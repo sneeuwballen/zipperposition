@@ -97,6 +97,19 @@ class type index =
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
   end
 
+(** A simplification index *)
+class type unit_index = 
+  object ('b)
+    method name : string
+    method add : term -> term -> bool -> hclause -> 'b    (** add (in)equation (with given ID) *)
+    method remove : term -> term -> bool -> hclause ->'b  (** remove (in)equation (with given ID) *)
+    method retrieve : sign:bool -> term ->
+                      (term -> term -> substitution -> hclause -> unit) ->
+                      unit                      (** iter on (in)equations of given sign l=r
+                                                    where subst(l) = query term *)
+    method pp : Format.formatter -> unit -> unit
+  end
+
 (** A global index, that operates on hashconsed clauses *)
 class type clause_index =
   object ('a)
@@ -104,7 +117,7 @@ class type clause_index =
     method remove_clause : hclause -> 'a
 
     method root_index : index
-    method unit_root_index : index
+    method unit_root_index : unit_index (** for simplifications that only require matching *)
     method ground_rewrite_index : (term * data) Ptmap.t (** to rewrite ground terms *)
     method subterm_index : index
 
@@ -126,6 +139,21 @@ let process_lit op c tree (lit, pos) =
     Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index"
                    !T.pp_term#pp l !T.pp_term#pp r));
     op tree l (c, [C.left_pos; pos])  (* only index one side *)
+
+let process_unit_lit lit hc op tree =
+  match lit with
+  | Equation (l,r,sign,Gt) -> 
+      op tree l r sign hc
+  | Equation (l,r,sign,Lt) -> 
+      op tree r l sign hc
+  | Equation (l,r,sign,Incomparable) ->
+      let tree' = op tree l r sign hc in
+      op tree' r l sign hc
+  | Equation (l,r,sign,Eq) ->
+    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to unit index"
+                   !T.pp_term#pp l !T.pp_term#pp r));
+    op tree l r sign hc  (* only index one side *)
+
 
 (** apply op to the maximal literals of the clause, and only to
     the maximal side(s) of those, if restruct is true. Otherwise
@@ -165,11 +193,11 @@ let ptmap_size m =
   Ptmap.iter (fun _ _ -> incr size) m;
   !size
 
-let mk_clause_index (index : index) =
+let mk_clause_index (index : index) (unit_index : unit_index) =
   object (_: 'self)
     val _root_index = index
     val _subterm_index = index
-    val _unit_root_index = index 
+    val _unit_root_index = unit_index
     val _ground_rewrite_index = Ptmap.empty
 
     (** add root terms and subterms to respective indexes *)
@@ -177,8 +205,7 @@ let mk_clause_index (index : index) =
       let op tree = tree#add in
       let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
       and new_unit_root_index = match hc.clits with
-          | [(Equation (_,_,true,_)) as lit] ->
-              process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
+          | [lit] -> process_unit_lit lit hc op _unit_root_index
           | _ -> _unit_root_index
       and new_ground_rewrite_index = match hc.clits with
           | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
@@ -197,8 +224,7 @@ let mk_clause_index (index : index) =
       let op tree = tree#remove in
       let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
       and new_unit_root_index = match hc.clits with
-          | [(Equation (_,_,true,_)) as lit] ->
-              process_lit (apply_root_term op) hc _unit_root_index (lit, 0)
+          | [lit] -> process_unit_lit lit hc op _unit_root_index
           | _ -> _unit_root_index
       and new_ground_rewrite_index = match hc.clits with
           | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
@@ -222,7 +248,7 @@ let mk_clause_index (index : index) =
         ("clause_index:@.root_index=@[<v>%a@]@.unit_root_index=@[<v>%a@]@." ^^
          "ground_rewrite_index=%d rules@.subterm_index=@[<v>%a@]@.")
         (_root_index#pp ~all_clauses) ()
-        (_unit_root_index#pp ~all_clauses) ()
+        _unit_root_index#pp ()
         (ptmap_size _ground_rewrite_index)
         (_subterm_index#pp ~all_clauses) ()
   end

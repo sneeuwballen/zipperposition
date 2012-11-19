@@ -35,3 +35,4 @@ val fp7m : fingerprint_fun
 val fp16 : fingerprint_fun
 
 val mk_index : fingerprint_fun -> Index.index
+  (** Index for terms *)

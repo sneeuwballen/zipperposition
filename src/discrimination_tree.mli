@@ -40,4 +40,5 @@ val skip : int -> path -> path
 module PSMap : Trie.Map with type key = path_string_elem
 module DiscriminationTree : Trie.S with module M = PSMap
 
-val index : Index.index                     (** the index *)
+val index : Index.index             (** the index *)
+
