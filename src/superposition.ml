@@ -79,43 +79,6 @@ let rec list_first f = function
     | Some _ as x -> x
     | _ -> list_first f tl
 
-(** returns the term t where the first sutbterm t'
-    such that f t' is not None, is replaced by f t'.
-    Does not visit variables.
-
-    position -> term
-      -> (term -> (term * 'b) option)
-      -> (term * 'b * term * position) option
-    *)
-let first_position pos t f =
-  (* re-build context from the result *)
-  let rec inject_pos pos ctx = function
-    | None -> None
-    | Some (t,b) -> Some (ctx t,b,t, List.rev pos)
-  and aux pos ctx t = match t.term with
-  | Leaf _ -> inject_pos pos ctx (f t)
-  | Var _ -> None
-  | Node (hd::l) ->
-      (match f t with  (* try f at the current composite term *)
-      | Some _ as x -> inject_pos pos ctx x
-      | None ->
-          (* pre is the list of subterm before, post the list of subterms
-             after the current subterm *)
-          let rec first pre idx post l = match l with
-          | [] -> None
-          | t :: tl ->
-             (* newctx will re-build the current term around the result on a subterm *)
-             let newctx = fun x -> ctx (T.mk_node (pre@[x]@post)) in
-             match aux (idx :: pos (* extend position *)) newctx t with
-             | Some _ as x -> x
-             | None ->
-                 if post = [] then None (* tl is also empty *)
-                 else first (pre @ [t]) (idx+1) (List.tl post) tl
-          in
-          first [hd] 1 l l)
-  | Node [] -> assert false
-  in
-  aux pos (fun x -> x) t
 
 (** apply f to all non-variable positions in t, accumulating the
     results along. f is given the subterm, the position and the context
