@@ -222,7 +222,33 @@ let iter dt k =
  * pretty printing
  * -------------------------------------------------------- *)
 
-module PrintTree = Prtree.Make(
+module PrintTHCTree = Prtree.Make(
+  struct
+    type t = string * (term * hclause) trie
+
+    (* get a list of (key, sub-node) *)
+    let get_values map =
+      let l : t list ref = ref [] in
+      T.TMap.iter
+        (fun key node -> 
+          let key_repr = Utils.sprintf "[@[<h>%a@]]" !T.pp_term#pp key in
+          l := (key_repr, node) :: !l) map;
+      !l
+    and pp_rule formatter (_, (_, hc), _) =
+      Format.fprintf formatter "@[<h>%a@]" !Clauses.pp_clause#pp_h hc
+
+    (* recurse in subterms *)
+    let decomp (prefix, t) = match t with
+      | Node m -> prefix, get_values m
+      | Leaf l ->
+        let rules_repr = Utils.sprintf "%s @[<h>{%a}@]"
+          prefix (Utils.pp_list ~sep:"; " pp_rule) l in
+        rules_repr, []
+  end)
+
+let pp_term_hclause_tree formatter dt = PrintTHCTree.print formatter ("", dt.tree)
+
+module PrintTTree = Prtree.Make(
   struct
     type t = string * term trie
 
@@ -246,4 +272,38 @@ module PrintTree = Prtree.Make(
         rules_repr, []
   end)
 
-let pp_term_tree formatter dt = PrintTree.print formatter ("", dt.tree)
+let pp_term_tree formatter dt = PrintTTree.print formatter ("", dt.tree)
+
+(* --------------------------------------------------------
+ * index
+ * -------------------------------------------------------- *)
+
+let unit_index =
+  let eq_term_hclause (t1, hc1) (t2, hc2) =
+    T.eq_term t1 t2 && Clauses.eq_hclause hc1 hc2
+  in
+  object (_ : 'self)
+    val pos = empty eq_term_hclause
+    val neg = empty eq_term_hclause
+
+    method name = "dtree_unit_index"
+
+    method add l r sign hc =
+      if sign
+        then ({< pos = add pos l (r, hc) >} :> 'self)
+        else ({< neg = add neg l (r, hc) >} :> 'self)
+
+    method remove l r sign hc =
+      if sign
+        then ({< pos = remove pos l (r, hc) >} :> 'self)
+        else ({< neg = remove neg l (r, hc) >} :> 'self)
+
+    method retrieve ~sign t k =
+      if sign
+        then iter_match pos t (fun l (r, hc) subst -> k l r subst hc)
+        else iter_match neg t (fun l (r, hc) subst -> k l r subst hc)
+
+    method pp formatter () =
+      Format.fprintf formatter "@[<hv>pos: %a@.neg:%a@]"
+        pp_term_hclause_tree pos pp_term_hclause_tree neg
+  end
