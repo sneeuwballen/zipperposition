@@ -104,6 +104,7 @@ val mk_state : ?select:selection_fun -> ord:ordering ->
 val mk_clause : cs:clause_state -> equation array ->
                 proof Lazy.t -> clause list ->
                 clause                                  (** build a clause *)
+
 val clause_of_fof : cs:clause_state -> clause -> clause (** transform eq/not to literals *)
 
 val parents : clause -> clause list                     (** list of parents of the clause *)

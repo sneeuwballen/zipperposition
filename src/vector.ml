@@ -132,6 +132,13 @@ let map v f =
   done;
   v'
 
+let filter v f =
+  let v' = create v.size in
+  for i = 0 to v.size - 1 do
+    if f v.vec.(i) then push v' v.vec.(i);
+  done;
+  v'
+
 let fold v acc f =
   let acc = ref acc in
   for i = 0 to v.size - 1 do

@@ -68,6 +68,9 @@ val iteri : 'a t -> (int -> 'a -> unit) -> unit
 val map : 'a t -> ('a -> 'b) -> 'b t
   (** map elements of the vector *)
 
+val filter : 'a t -> ('a -> bool) -> 'a t
+  (** filter elements from vector *)
+
 val fold : 'a t -> 'b -> ('b -> 'a -> 'b) -> 'b
   (** fold on elements of the vector *)
 

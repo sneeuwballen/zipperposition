@@ -352,7 +352,14 @@ let parents clause = clause.cparents
 
 let clause_of_fof ~cs c =
   let eqns = Array.map (fun lit -> eqn_of_fof lit.lit_eqn) c.clits in
-  mk_clause ~cs eqns c.cproof c.cparents
+  let same =
+    try Array.iteri
+      (fun i lit -> if not (eq_eqn lit.lit_eqn eqns.(i)) then raise Exit) c.clits;
+      true
+    with Exit -> false
+  in
+  (* rebuild a clause only if some equation was changed *)
+  if same then c else mk_clause ~cs eqns c.cproof c.cparents
 
 let rec apply_subst_cl ?(recursive=true) ~cs subst c =
   if subst = S.id_subst then c
