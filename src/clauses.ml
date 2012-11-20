@@ -33,7 +33,7 @@ open Format
 let prof_check_max_lit = HExtlib.profile ~enable:true "check_max_lit"
 
 (* ----------------------------------------------------------------------
- * literals
+ * equations
  * ---------------------------------------------------------------------- *)
 
 let left_pos = 1
@@ -45,37 +45,31 @@ let opposite_pos p = match p with
   | _ when p = right_pos -> left_pos
   | _ -> assert false
 
-let eq_literal l1 l2 =
+let eq_eqn l1 l2 =
   match l1, l2 with
-  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      o1 = o2 && T.eq_term l1 l2 && T.eq_term r1 r2 && sign1 = sign2
+  | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
+    T.eq_term l1 l2 && T.eq_term r1 r2 && sign1 = sign2
 
-let eq_literal_com l1 l2 =
-  match l1, l2 with
-  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      sign1 = sign2 &&
-      ((T.eq_term l1 l2 && T.eq_term r1 r2) ||
-       (T.eq_term l1 r2 && T.eq_term r1 l2))
+(* by construction, equations are sorted by term hash *)
+let eq_eqn_com l1 l2 = eq_eqn l1 l2
 
-let compare_literal l1 l2 =
+let compare_eqn l1 l2 =
   match l1, l2 with
-  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      let c = Pervasives.compare o1 o2 in
+  | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
+    let c = T.compare_term l1 l2 in
+    if c <> 0 then c else
+      let c = T.compare_term r1 r2 in
       if c <> 0 then c else
-        let c = T.compare_term l1 l2 in
-        if c <> 0 then c else
-          let c = T.compare_term r1 r2 in
-          if c <> 0 then c else
-            Pervasives.compare sign1 sign2
+        Pervasives.compare sign1 sign2
 
-let lit_to_multiset lit = match lit with
-  | Equation (l, r, true, _) -> [l; r]
-  | Equation (l, r, false, _) -> [l; l; r; r]
+let eqn_to_multiset = function
+  | Equation (l, r, true) -> [l; r]
+  | Equation (l, r, false) -> [l; l; r; r]
 
-let compare_lits_partial ~ord l1 l2 =
+let compare_eqn_partial ~ord l1 l2 =
   (* Utils.multiset_partial ord#compare (lit_to_multiset l1) (lit_to_multiset l2) *)
   match l1, l2 with
-  | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
+  | Equation (s, t, sign_st), Equation (u, v, sign_uv) ->
     let s_u = ord#compare s u
     and s_v = ord#compare s v
     and t_u = ord#compare t u
@@ -114,38 +108,35 @@ let compare_lits_partial ~ord l1 l2 =
     | Eq, _, Eq, _, true, false -> Lt (* s = u, t = u *)
     | _ -> Incomparable
 
-let hash_literal lit = match lit with
-  | Equation (l, r, sign, _) ->
+let hash_eqn = function
+  | Equation (l, r, sign) ->
     if sign
-      then Utils.murmur_hash ((Utils.murmur_hash l.hkey) lxor r.hkey)
-      else Utils.murmur_hash ((Utils.murmur_hash r.hkey) lxor l.hkey)
+      then (Utils.murmur_hash l.hkey) lxor (33 + r.hkey)
+      else (Utils.murmur_hash r.hkey) lxor (42 + l.hkey)
 
-let pos_lit lit = match lit with
-  | Equation (_,_,sign,_) -> sign
+let pos_eqn = function
+  | Equation (_,_,sign) -> sign
 
-let neg_lit lit = match lit with
-  | Equation (_,_,sign,_) -> not sign
+let neg_eqn = function
+  | Equation (_,_,sign) -> not sign
 
 let check_type a b = if a.sort <> b.sort
   then raise (SortError "sides of equations of different sorts") else ()
 
-let mk_eq ~ord a b =
+let mk_eqn a b sign =
   check_type a b;
-  Equation (a, b, true, ord#compare a b)
+  if a.tag < b.tag
+    then Equation (a, b, sign)
+    else Equation (b, a, sign)
 
-let mk_neq ~ord a b = 
-  check_type a b;
-  Equation (a, b, false, ord#compare a b)
+let mk_eq a b = mk_eqn a b true
 
-let mk_lit ~ord a b sign =
-  check_type a b;
-  Equation (a, b, sign, ord#compare a b)
+let mk_neq a b = mk_eqn a b false
 
-let apply_subst_lit ?(recursive=true) ~ord subst lit =
-  if subst = S.id_subst then lit
-  else match lit with
-  | Equation (l,r,sign,_) ->
-    assert (l.sort = r.sort);
+let apply_subst_eqn ?(recursive=true) subst eqn =
+  if subst = S.id_subst then eqn
+  else match eqn with
+  | Equation (l,r,sign) ->
     let new_l = S.apply_subst ~recursive subst l
     and new_r = S.apply_subst ~recursive subst r
     in
@@ -153,105 +144,132 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
         S.pp_substitution subst !T.pp_term#pp l !T.pp_term#pp new_l));
     Utils.debug 4 (lazy (Utils.sprintf "apply %a to %a gives %a"
         S.pp_substitution subst !T.pp_term#pp r !T.pp_term#pp new_r));
-    mk_lit ~ord new_l new_r sign
+    mk_eqn new_l new_r sign
 
-let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
-
-let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
+let rec eqn_of_fof ((Equation (l,r,sign)) as eqn) =
   match l.term, r.term with
   (* deal with trivial literals *)
   | _ when T.eq_term l T.true_term && T.eq_term r T.false_term ->
-    mk_lit ~ord T.true_term T.true_term (not sign)
+    mk_eqn T.true_term T.true_term (not sign)
   | _ when T.eq_term r T.true_term && T.eq_term l T.false_term ->
-    mk_lit ~ord T.true_term T.true_term (not sign)
+    mk_eqn T.true_term T.true_term (not sign)
   | _ when T.eq_term l r ->
-    mk_lit ~ord T.true_term T.true_term sign
+    mk_eqn T.true_term T.true_term sign
   (* deal with false/true *)
   | _ when T.eq_term l T.false_term ->
     assert (r.sort = bool_sort);
-    lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
+    eqn_of_fof (mk_eqn r T.true_term (not sign))
   | _ when T.eq_term r T.false_term ->
     assert (l.sort = bool_sort);
-    lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
+    eqn_of_fof (mk_eqn l T.true_term (not sign))
   (* deal with negation *)
   | Node (s, [t]), _ when s = not_symbol && T.eq_term r T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
+    eqn_of_fof (mk_eqn t T.true_term (not sign))
   | _, Node (s, [t]) when s = not_symbol && T.eq_term l T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
+    eqn_of_fof (mk_eqn t T.true_term (not sign))
   (* deal with equality symbol *)
   | Node (s, [a; b]), _ when s = eq_symbol && T.eq_term r T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
+    eqn_of_fof (mk_eqn a b sign)
   | _, Node (s, [a; b]) when s = eq_symbol && T.eq_term l T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
+    eqn_of_fof (mk_eqn a b sign)
   (* default is just reordering *)
-  | _ -> reord_lit ~ord lit
+  | _ -> eqn
 
-let term_of_lit lit =
-  match lit with
-  | Equation (left, right, false, _) when T.eq_term right T.true_term ->
+let term_of_eqn = function
+  | Equation (left, right, false) when T.eq_term right T.true_term ->
     T.mk_not left
-  | Equation (left, right, true, _) when T.eq_term right T.true_term ->
+  | Equation (left, right, true) when T.eq_term right T.true_term ->
     left
-  | Equation (left, right, true, _) when T.eq_term left T.true_term ->
+  | Equation (left, right, true) when T.eq_term left T.true_term ->
     right
-  | Equation (left, right, false, _) when T.eq_term left T.true_term ->
+  | Equation (left, right, false) when T.eq_term left T.true_term ->
     T.mk_not right
-  | Equation (left, right, sign, ord) ->
+  | Equation (left, right, sign) ->
     if sign then T.mk_eq left right else T.mk_not (T.mk_eq left right)
 
-let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
+let negate_eqn (Equation (l,r,sign)) = Equation (l,r,not sign)
 
-let fmap_lit ~ord f = function
-  | Equation (left, right, sign, _) ->
+let fmap_eqn f = function
+  | Equation (left, right, sign) ->
     let new_left = f left
     and new_right = f right in
-    Equation (new_left, new_right, sign, ord#compare new_left new_right)
+    Equation (new_left, new_right, sign)
 
-let vars_of_lit = function
-  | Equation (left, right, _, _) ->
-    T.merge_varlist left.vars right.vars
+let vars_of_eqn = function
+  | Equation (left, right, _) ->
+    let v = Vector.from_array left.vars in
+    Vector.append_array v right.vars;
+    Vector.uniq_sort ~cmp:T.compare_term v
+
+let eqn_depth (Equation (l, r, _)) = max (T.depth l) (T.depth r)
+
+(* ----------------------------------------------------------------------
+ * literals
+ * ---------------------------------------------------------------------- *)
+
+(** compare literals, including the selected status *)
+let compare_lit l1 l2 =
+  let cmp = compare_eqn l1.lit_eqn l2.lit_eqn in
+  if cmp <> 0
+    then cmp
+    else if l1.lit_selected && not l2.lit_selected then 1
+    else if l2.lit_selected && not l1.lit_selected then -1
+    else 0
+
+let eq_lit l1 l2 = compare_lit l1 l2 = 0
+
+let mk_lit eqn = {
+  lit_eqn = eqn;
+  lit_selected = false;
+  lit_maximal = false;
+  lit_hash = hash_eqn eqn;
+  lit_depth = eqn_depth eqn;
+}
+
+let copy_lit lit = {lit with lit_selected=false; lit_maximal=false}
 
 (* ----------------------------------------------------------------------
  * clauses
  * ---------------------------------------------------------------------- *)
 
-let eq_clause c1 c2 =
-  try
-    List.for_all2 eq_literal c1.clits c2.clits
-  with
-    Invalid_argument _ -> false
+(* the comparison is sensitive to the selected literals *)
+let compare_clause c1 c2 =
+  if Array.length c1.clits < Array.length c2.clits then -1
+  else if Array.length c1.clits > Array.length c2.clits then 1
+  else (* lexicographic comparison *)
+    let ans = ref 0 in
+    try
+      for i = 0 to Array.length c1.clits do
+        let cmp = compare_lit c1.clits.(i) c2.clits.(i) in
+        (* this literal differs from c1 to c2 *)
+        if cmp <> 0 then (ans := cmp; raise Exit)
+      done;
+      0
+    with Exit -> !ans
 
-let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
+let eq_clause c1 c2 = compare_clause c1 c2 = 0
 
-let hash_clause c =
-  let rec aux h = function
-  | [] -> h
-  | lit::tail -> aux (Utils.murmur_hash (h lxor hash_literal lit)) tail
-  in aux 113 c.clits
+let hash_clause c = c.chkey
 
-module H = Hashcons.Make(struct
-  type t = clause
-  let equal c1 c2 = eq_clause c1 c2 && (Lazy.force c1.cselected = Lazy.force c2.cselected)
-  let hash c = hash_clause c
-  let tag i c = {c with ctag = i}
-end)
+module HashedClause =
+  struct
+    type t = clause
+    let equal c1 c2 = eq_clause c1 c2
+    let hash c = hash_clause c
+    let tag i c = (c.ctag <- i; c)
+  end
+
+module H = Hashcons.Make(HashedClause)
 
 let hashcons_clause c = H.hashcons c
-
-let hashcons_clause_noselect c = H.hashcons {c with cselected=lazy []}
 
 let stats () = H.stats ()
 
 let eq_hclause hc1 hc2 = hc1 == hc2
 
-let compare_hclause hc1 hc2 = Pervasives.compare hc1.ctag hc2.ctag
+let compare_hclause hc1 hc2 = hc1.ctag - hc2.ctag
 
-module CHashtbl = Hashtbl.Make(
-  struct
-    type t = clause
-    let hash c = hash_clause c
-    let equal c1 c2 = eq_clause c1 c2
-  end)
+module CHashtbl = Hashtbl.Make(HashedClause)
 
 module CHashSet =
   struct
@@ -267,160 +285,180 @@ module CHashSet =
       !l
   end
 
-let check_maximal_lit_ ~ord clause pos subst =
-  let lits_pos = Utils.list_pos clause.clits in
-  let lit = Utils.list_get clause.clits pos in
-  let slit = apply_subst_lit ~ord subst lit in
-  List.for_all
-    (fun (lit', idx) ->
-      if idx = pos
-        then (assert (eq_literal lit lit'); true)
-        else
-          let slit' = apply_subst_lit ~ord subst lit' in
-          match compare_lits_partial ~ord slit slit' with
-          | Eq | Gt | Incomparable -> true
-          | Lt -> begin
-            false  (* slit is not maximal *)
-          end
-    )
-    lits_pos
+(** container used to store the state necessary to build clauses *)
+type clause_state =
+  < ord : ordering;
+    select : selection_fun >
 
-let check_maximal_lit ~ord clause pos subst =
-  prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
+let mk_state ?(select=no_select) ~ord =
+  object
+    method ord = ord
+    method select = select
+  end
 
-(** find the maximal literals among lits *)
-let find_max_lits ~ord lits_pos =
-  List.filter
-    (fun (lit, idx) ->
-      List.for_all
-        (fun (lit', idx') ->
-          if idx' = idx then true
-          else compare_lits_partial ~ord lit lit' <> Lt
-        )
-        lits_pos
-    )
-    lits_pos
+(** put the flag 'maximal' on literal of the array
+    that are maximal *)
+let compute_maxlits ~ord lits =
+  for i = 0 to Array.length lits - 1 do
+    let lit = lits.(i) in
+    let rec check_max j =
+      if j >= Array.length lits then true
+      else 
+        let lit' = lits.(j) in
+        match () with
+        | _ when j < i ->
+          (* compare with max literals only *)
+          (not lit'.lit_maximal
+            || compare_eqn_partial ~ord lit.lit_eqn lit'.lit_eqn <> Lt)
+          && check_max (j+1)
+        | _ when j > i ->
+          (* compare in any case *)
+          compare_eqn_partial ~ord lit.lit_eqn lit'.lit_eqn <> Lt && check_max (j+1)
+        | _ -> check_max (j+1)
+    in lit.lit_maximal <- check_max 0
+  done
 
-(** is literal maximal among given literals? *)
-let max_among ~ord lit lits =
-  List.for_all 
-    (fun lit' ->
-      if eq_literal_com lit lit' then true
-      else compare_lits_partial ~ord lit lit' <> Lt)
-    lits
+(** compute which literals are selected *)
+let compute_selected ~select lits = select lits
 
-let mk_clause ~ord lits ~selected proof parents =
+(** compute hash from the list of literals *)
+let compute_hash_clause lits =
+  let h = ref 113 in
+  for i = 0 to Array.length lits - 1 do
+    h := Utils.murmur_hash (!h lxor hash_eqn lits.(i).lit_eqn);
+  done;
+  !h
+
+let mk_clause ~cs eqns cproof cparents =
   (* merge sets of variables *)
-  let rec merge_vars acc vars1 = match vars1 with
-  | [] -> acc
-  | v::vars1' when List.mem v acc -> merge_vars acc vars1'
-  | v::vars1' -> merge_vars (v::acc) vars1'
-  in
-  let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
-  let all_vars = List.stable_sort T.compare_term all_vars
-  and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
-  {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cparents=parents;
-   cmaxlits=maxlits; ctag= -1}
+  let v = Vector.create 10 in
+  for i = 0 to Array.length eqns - 1 do
+    Vector.append v (vars_of_eqn eqns.(i));
+  done;
+  let v' = Vector.uniq_sort ~cmp:T.compare_term v in
+  let cvars = Vector.to_array v' in
+  (* sort literals by hash, after copying them *)
+  let clits = Array.map mk_lit eqns in
+  Array.sort (fun lit1 lit2 -> lit1.lit_hash - lit2.lit_hash) clits;
+  let chkey = compute_hash_clause clits in
+  (* select literals and find the maximal ones. Also count selected lits *)
+  compute_maxlits ~ord:cs#ord clits;
+  compute_selected ~select:cs#select clits;
+  let cselected = Array.fold_left
+    (fun cnt lit -> if lit.lit_selected then cnt+1 else cnt) 0 clits in
+  {clits; cvars; cproof; cselected; cparents; ctag= -1; chkey}
 
-let maxlits clause = Lazy.force clause.cmaxlits
+let parents clause = clause.cparents
 
-let selected clause = Lazy.force clause.cselected
+let clause_of_fof ~cs c =
+  let eqns = Array.map (fun lit -> eqn_of_fof lit.lit_eqn) c.clits in
+  mk_clause ~cs eqns c.cproof c.cparents
 
-let parents clause = Lazy.force clause.cparents
-
-let clause_of_fof ~ord c =
-  mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits)
-    ~selected:c.cselected c.cproof c.cparents
-
-let reord_clause ~ord c =
-  mk_clause ~ord (List.map (reord_lit ~ord) c.clits)
-    ~selected:c.cselected c.cproof c.cparents
-
-let select_clause ~select c =
-  {c with cselected = lazy (select c)}
-
-let rec apply_subst_cl ?(recursive=true) ~ord subst c =
+let rec apply_subst_cl ?(recursive=true) ~cs subst c =
   if subst = S.id_subst then c
   else
-    let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits
-    and new_parents = lazy (List.map (apply_subst_cl ~recursive ~ord subst) (parents c)) in
-    mk_clause ~ord new_lits ~selected:c.cselected c.cproof new_parents
-  (* TODO modify proof lazily *)
+    (* recompute lits *)
+    let eqns = Array.map
+      (fun lit -> apply_subst_eqn ~recursive subst lit.lit_eqn)
+      c.clits in
+    (* do not update parents nor proof *)
+    mk_clause ~cs eqns c.cproof c.cparents
 
-let get_lit clause idx = Utils.list_get clause.clits idx
+(** check that the literal is maximal in the clause, after
+    substitution. We only need to compare it to instantiated
+    maximal literals, by stability under substitution of > *)
+let check_maximal_lit ~ord clause pos subst =
+  let lits = clause.clits in
+  let eqn = apply_subst_eqn subst lits.(pos).lit_eqn in
+  (* iterate through literals *)
+  let rec check i =
+    if i >= Array.length lits
+      then true
+      else
+        let lit' = lits.(i) in
+        match () with
+        | _ when i = pos -> check (i+1)
+        | _ when not lit'.lit_selected -> check (i+1)  (* lit is not maximal *)
+        | _ -> (* compare with substituted lit *)
+          let eqn' = apply_subst_eqn subst lit'.lit_eqn in
+          compare_eqn_partial ~ord eqn eqn' <> Lt && check (i+1)
+  in
+  prof_check_max_lit.HExtlib.profile check 0
+
+let get_lit clause idx = clause.clits.(idx)
 
 let get_pos clause pos =
   match pos with
   | idx::side::tpos ->
-      let lit = get_lit clause idx in
-      let rec find_subterm pos t = match (pos, t.term) with
-      | [], _ -> t
-      | i::pos', Node (s, l) when List.length l > i ->
-          find_subterm pos' (Utils.list_get l i)
-      | _ -> invalid_arg "position does not match term"
-      in
-      (match lit with
-      | Equation (l, _, _, _) when side = left_pos ->
-          find_subterm tpos l
-      | Equation (_, r, _, _) when side = right_pos ->
-          find_subterm tpos r
-      | _ -> invalid_arg "wrong side in literal"
-      )
+    let lit = get_lit clause idx in
+    (* find the subterm in the good side of the literal *)
+    (match lit.lit_eqn with
+    | Equation (l, _, _) when side = left_pos -> T.at_pos l tpos
+    | Equation (_, r, _) when side = right_pos -> T.at_pos r tpos
+    | _ -> invalid_arg "wrong side in literal")
   | _ -> invalid_arg "wrong position for clause"
 
-let fresh_clause ~ord maxvar c =
-  (* prerr_endline 
-    ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
-  let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
-  (apply_subst_cl ~recursive:false ~ord subst c), maxvar
+let iter_maxlits c k =
+  for i = 0 to Array.length c.clits - 1 do
+    let lit = c.clits.(i) in
+    if lit.lit_maximal then k i lit
+  done
 
-let relocate_clause ~ord varlist c =
-  let idx = T.max_var c.cvars in
-  let _, newvars, subst = S.relocate ~recursive:false idx c.cvars S.id_subst in
-  apply_subst_cl ~recursive:false ~ord subst c
+let iter_selected c k =
+  for i = 0 to Array.length c.clits - 1 do
+    let lit = c.clits.(i) in
+    if lit.lit_selected then k i lit
+  done
 
-let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)
+let fresh_clause ~cs maxvar c =
+  let subst = S.relocate_array maxvar c.cvars in
+  apply_subst_cl ~recursive:false ~cs subst c
+
+let normalize_clause ~cs c = fresh_clause ~cs 0 c
 
 (** check whether a literal is selected *)
-let selected_lit c idx =
-  let rec check l = match l with
-  | [] -> false
-  | i::l' -> if i = idx then true else check l'
-  in
-  check (selected c)
+let selected_lit c idx = c.clits.(idx).lit_selected
 
-(** get the list of selected literals *)
+(** get the list of selected literals, with their index *)
 let selected_lits c =
-  List.map (fun idx -> get_lit c idx, idx) (selected c)
+  let l = ref [] in
+  for i = 0 to Array.length c.clits - 1 do
+    let lit = c.clits.(i) in
+    if lit.lit_selected then l := (lit, i) :: !l;
+  done;
+  !l
 
 (** check whether a literal is eligible for resolution *)
-let eligible_res ~ord c idx subst =
-  (* find selected maximal literals with given sign *)
-  let rec gather_slits acc lits_pos sign = match lits_pos with
-  | [] -> acc
-  | (Equation (_, _, sign', _) as lit, idx)::lits_pos' when sign=sign' ->
-    let acc' = if selected_lit c idx
-      then (apply_subst_lit ~ord subst lit) :: acc (* same sign, maximal, selected *)
-      else acc in
-    gather_slits acc' lits_pos' sign
-  | _::lits_pos' ->  gather_slits acc lits_pos' sign  (* goto next *)
-  in 
-  (* if no lit is selected, max lits are eligible *)
-  if selected c = []
-    then check_maximal_lit ~ord c idx subst
-    else begin
+let eligible_res ~cs c idx subst =
+  let lit = c.clits.(idx) in
+  if c.cselected = 0
+    then (* if no lit is selected, max lits are eligible *)
+      check_maximal_lit ~ord:cs#ord c idx subst
+    else if not c.clits.(idx).lit_selected
+      then false (* literal not selected but others are *)
+    else
+      let eqn = c.clits.(idx).lit_eqn in
+      let eqn = apply_subst_eqn subst eqn in
       (* check maximality among selected literals of same sign *)
-      let (Equation (_,_,sign,_) as lit) = get_lit c idx in
-      let slit = apply_subst_lit ~ord subst lit in
-      let set = gather_slits [] (maxlits c) sign in
-      max_among ~ord slit set
-    end
+      let rec check_selected i =
+        let lit' = c.clits.(i) in
+        if i >= Array.length c.clits
+          then true
+        else if i = idx || not lit'.lit_selected || pos_eqn lit.lit_eqn <> pos_eqn lit'.lit_eqn
+          then check_selected (i+1)  (* no need to compare *)
+          else
+            let eqn' = apply_subst_eqn subst c.clits.(i).lit_eqn in
+            if compare_eqn_partial ~ord:cs#ord eqn eqn' = Lt
+              then false  (* some other selected lit *)
+              else check_selected (i+1)
+      in
+      check_selected 0
 
 (** check whether a literal is eligible for paramodulation *)
-let eligible_param ~ord c idx subst =
-  if selected c <> [] then false
-  else if neg_lit (get_lit c idx) then false (* only positive lits *)
-  else check_maximal_lit ~ord c idx subst
+let eligible_param ~cs c idx subst =
+  if c.cselected > 0 || neg_eqn c.clits.(idx).lit_eqn
+    then false  (* negative lit, or there are some selected lits *)
+    else check_maximal_lit ~ord:cs#ord c idx subst
 
 (* ----------------------------------------------------------------------
  * bag of clauses
@@ -492,30 +530,23 @@ class type pprinter_literal =
   end
 
 let pp_literal_gen pp_term formatter lit =
-  match lit with
-  | Equation (l, r, sign, _) when T.eq_term r T.true_term ->
+  match lit.lit_eqn with
+  | Equation (l, r, sign) when T.eq_term r T.true_term ->
     if sign
       then pp_term#pp formatter l
       else Format.fprintf formatter "¬%a" pp_term#pp l
-  | Equation (l, r, sign, _) when T.eq_term l T.true_term ->
+  | Equation (l, r, sign) when T.eq_term l T.true_term ->
     if sign
       then pp_term#pp formatter r
       else Format.fprintf formatter "¬%a" pp_term#pp r
-  | Equation (l, r, sign, _) ->
+  | Equation (l, r, sign) ->
     if sign
       then Format.fprintf formatter "%a = %a" pp_term#pp l pp_term#pp r
       else Format.fprintf formatter "%a != %a" pp_term#pp l pp_term#pp r
 
 let pp_literal_debug =
-  let print_ord = ref false in
   object
-    method pp formatter ((Equation (_,_,_,ord)) as lit) =
-      pp_literal_gen T.pp_term_debug formatter lit;
-      if !print_ord
-        then Format.fprintf formatter "(%s)" (string_of_comparison ord)
-        else ()
-
-    method ord b = print_ord := b
+    method pp formatter lit = pp_literal_gen T.pp_term_debug formatter lit
   end
 
 let pp_literal_tstp =
@@ -561,25 +592,24 @@ class virtual common_pp_clause =
 
 let pp_clause_debug =
   let _horizontal = ref true in
-  let is_max_lit c lit = List.exists (fun (lit',_) -> eq_literal lit lit') (maxlits c) in
-  let pp_annot c (lit, idx) =
-    ""^(if selected_lit c idx then "+" else "")
-      ^(if is_max_lit c lit then "*" else "") in
+  let pp_annot c idx lit =
+    ""^(if lit.lit_selected then "+" else "")
+      ^(if lit.lit_maximal then "*" else "") in
   object (self)
     (* print literals with a '*' for maximal, and '+' for selected *)
     method pp formatter c =
       (* how to print the list of literals *)
       let lits_printer formatter lits =
-        Utils.pp_list ~sep:" | "
-          (fun formatter (lit, idx) ->
-            let annot = pp_annot c (lit, idx) in
+        Utils.pp_array ~sep:" | "
+          (fun formatter idx lit ->
+            let annot = pp_annot c idx lit in
             fprintf formatter "%a%s" pp_literal_debug#pp lit annot)
           formatter lits
       in
       (* print in an horizontal box, or not *)
       if !_horizontal
-        then fprintf formatter "@[<h>[%a]@]" lits_printer (Utils.list_pos c.clits)
-        else fprintf formatter "[%a]" lits_printer (Utils.list_pos c.clits)
+        then fprintf formatter "@[<h>[%a]@]" lits_printer c.clits
+        else fprintf formatter "[%a]" lits_printer c.clits
     (* regular printing is printing with no literal selected *)
     inherit common_pp_clause
     method horizontal s = _horizontal := s
@@ -592,16 +622,15 @@ let pp_clause_tstp =
       (* how to print the list of literals *)
       let lits_printer formatter lits =
         (* convert into a big term *)
-        let t = match lits with
+        let t = match Array.to_list lits with
           | [] -> T.false_term
           | hd::tl -> List.fold_left
-            (fun t lit -> T.mk_or t (term_of_lit lit)) (term_of_lit hd) tl
+            (fun t lit -> T.mk_or t (term_of_eqn lit.lit_eqn)) (term_of_eqn hd.lit_eqn) tl
         in
         (* quantify all free variables *)
-        let vars = t.vars in
-        let t = List.fold_left
+        let t = Array.fold_left
           (fun t var -> T.mk_node forall_symbol bool_sort [var; t])
-          t vars
+          t t.vars
         in
         T.pp_term_tstp#pp formatter t
       in
@@ -624,7 +653,7 @@ class type pprinter_proof =
 let pp_proof_debug =
   object (self)
     method pp formatter clause =
-      assert (clause.clits = []);
+      assert (clause.clits = [||]);
       (* already_printed is a set of clauses already printed. *)
       let already_printed = ref Ptset.empty
       and to_print = Queue.create () in
@@ -657,7 +686,7 @@ let pp_proof_debug =
 let pp_proof_tstp =
   object (self)
     method pp formatter clause =
-      assert (clause.clits = []);
+      assert (clause.clits = [||]);
       (* already_printed is a set of clauses already printed. *)
       let already_printed = ref Ptset.empty
       and clause_num = ref Ptmap.empty

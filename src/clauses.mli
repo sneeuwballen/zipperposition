@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 (* ----------------------------------------------------------------------
- * literals
+ * equations
  * ---------------------------------------------------------------------- *)
 
 (** left and right position in equation *)
@@ -31,51 +31,57 @@ val left_pos : int
 val right_pos : int
 val opposite_pos : int -> int
 
-val eq_literal : literal -> literal -> bool         (** equality of literals *)
-val eq_literal_com : literal -> literal -> bool     (** commutative equality of lits *)
-val compare_literal : literal -> literal -> int     (** lexicographic comparison of literals *)
-val compare_lits_partial : ord:ordering -> literal
-                          -> literal -> comparison  (** partial comparison of literals *)
-val hash_literal : literal -> int                   (** hashing of literal *)
+val eq_eqn : equation -> equation -> bool             (** equality of equations *)
+val eq_eqn_com : equation -> equation -> bool         (** commutative equality of equations *)
+val compare_eqn : equation -> equation -> int         (** lexicographic comparison of eqns *)
+val compare_eqn_partial : ord:ordering -> equation
+                          -> equation -> comparison   (** partial comparison of eqns *)
+val hash_eqn : equation -> int                        (** hashing of equation *)
 
-val pos_lit : literal -> bool                       (** is the literal positive? *)
-val neg_lit : literal -> bool                       (** is the literal negative? *)
+val pos_eqn : equation -> bool                        (** is the eqn positive? *)
+val neg_eqn : equation -> bool                        (** is the eqn negative? *)
 
-(** build literals. If sides so not have the same sort,
-    a SortError will be raised. An ordering must be provided *)
-val mk_eq : ord:ordering -> term -> term -> literal
-val mk_neq : ord:ordering -> term -> term -> literal
-val mk_lit : ord:ordering -> term -> term -> bool -> literal
-val reord_lit : ord:ordering -> literal -> literal  (** recompute order *)
-val lit_of_fof : ord:ordering -> literal -> literal (** translate eq/not to literal *)
-val term_of_lit : literal -> term                 (** translate lit to term *)
+(** Build equations. If sides so not have the same sort,
+    a SortError will be raised. *)
+val mk_eq : term -> term -> equation
+val mk_neq : term -> term -> equation
+val mk_eqn : term -> term -> bool -> equation
+val eqn_of_fof : equation -> equation                 (** translate eq/not to literal *)
+val term_of_eqn : equation -> term                    (** translate lit to term *)
 
-val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
+val apply_subst_eqn : ?recursive:bool -> substitution -> equation -> equation
 
-val negate_lit : literal -> literal (** negate literal *)
-val fmap_lit : ord:ordering -> (term -> term) -> literal -> literal (** fmap in literal *)
-val vars_of_lit : literal -> varlist (** gather variables *)
+val negate_eqn : equation -> equation                 (** negate equation *)
+val fmap_eqn : (term -> term) -> equation -> equation (** fmap in equation *)
+val vars_of_eqn : equation -> varset                  (** gather variables *)
 
-val lit_to_multiset : literal -> term list (** literal to multiset of terms *)
+val eqn_depth : equation -> int                       (** depth of terms *)
+val eqn_to_multiset : equation -> term list           (** equation to multiset of terms *)
+
+(* ----------------------------------------------------------------------
+ * literals
+ * ---------------------------------------------------------------------- *)
+
+val eq_lit : literal -> literal -> bool
+val compare_lit : literal -> literal -> int
+
+val mk_lit : equation -> literal                        (** build literal *)
+val copy_lit : literal -> literal                       (** copy shared parts of literal *)
 
 (* ----------------------------------------------------------------------
  * clauses
  * ---------------------------------------------------------------------- *)
-
-(* TODO hashconsing module, with optional arguments for clause constructors *)
 
 val eq_clause : clause -> clause -> bool                (** equality of clauses *)
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
 val hash_clause : clause -> int                         (** hash of the clause *)
 
 val hashcons_clause : clause -> hclause
-val hashcons_clause_noselect : clause -> hclause        (** hashcons ignoring selected lits *)
 val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
 
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
-module CHashtbl : Hashtbl.S with type key = clause
 module CHashSet : 
   sig
     type t
@@ -87,40 +93,46 @@ module CHashSet :
     val to_list : t -> clause list
   end
 
-val mk_clause : ord:ordering -> literal list ->
-                selected:int list Lazy.t ->
-                proof Lazy.t -> clause list Lazy.t ->
-                clause                                  (** build a clause *)
-val clause_of_fof : ord:ordering -> clause -> clause    (** transform eq/not to literals *)
-val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
-val select_clause : select:selection_fun
-                 -> clause -> clause                    (** select literals in clause *)
-val maxlits : clause -> (literal * int) list            (** indexed list of max literals *)
-val selected: clause -> int list                        (** indexes of selected literals *)
-val parents : clause -> clause list                     (** list of parents of the clause *)
-val check_maximal_lit : ord:ordering -> clause -> int   (** is the i-th literal *)
-                    -> substitution -> bool             (** maximal in subst(clause)? *)
+(** container used to store the state necessary to build clauses *)
+type clause_state =
+  < ord : ordering;
+    select : selection_fun >
 
-val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
+val mk_state : ?select:selection_fun -> ord:ordering ->
+                clause_state                            (** build a clause state *)
+
+val mk_clause : cs:clause_state -> equation array ->
+                proof Lazy.t -> clause list ->
+                clause                                  (** build a clause *)
+val clause_of_fof : cs:clause_state -> clause -> clause (** transform eq/not to literals *)
+
+val parents : clause -> clause list                     (** list of parents of the clause *)
+val check_maximal_lit: ord:ordering -> clause -> int -> (** is the i-th literal *)
+                       substitution -> bool             (** maximal in subst(clause)? *)
+
+val apply_subst_cl : ?recursive:bool -> cs:clause_state -> substitution -> clause -> clause
 
 val get_lit : clause -> int -> literal                  (** get the literal at given index *)
-val get_pos : clause -> position -> term              (** get the subterm at position *)
+val get_pos : clause -> position -> term                (** get the subterm at position *)
+
+val iter_maxlits : clause ->
+                   (int -> literal -> unit) -> unit     (** iterate on maximal literals *)
+val iter_selected: clause ->
+                   (int -> literal -> unit) -> unit     (** iterate on selected literals *)
 
 (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
-val fresh_clause : ord:ordering -> int -> clause -> clause * int  
-(** rename clause w.r.t. varlist *)
-val relocate_clause : ord:ordering -> varlist -> clause -> clause       
+val fresh_clause : cs:clause_state -> int -> clause -> clause
 (** normalize (vars start at 1) *)
-val normalize_clause : ord:ordering -> clause -> clause                 
+val normalize_clause : cs:clause_state -> clause -> clause                 
 
 (** check whether a literal is selected *)
 val selected_lit : clause -> int -> bool
 (** get the list of selected literals *)
 val selected_lits : clause -> (literal * int) list
 (** check whether a literal is eligible for resolution *)
-val eligible_res : ord:ordering -> clause -> int -> substitution -> bool
+val eligible_res : cs:clause_state -> clause -> int -> substitution -> bool
 (** check whether a literal is eligible for paramodulation *)
-val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
+val eligible_param : cs:clause_state -> clause -> int -> substitution -> bool
 
 (* ----------------------------------------------------------------------
  * bag of clauses
@@ -166,10 +178,7 @@ class type pprinter_literal =
   end
 
 val pp_literal : pprinter_literal                       (** use current term printer *)
-val pp_literal_debug :                                  (** use debug unicode syntax *)
-  < pp : Format.formatter -> literal -> unit;
-    ord : bool -> unit;                                 (** print orientation of lit *)
-  >
+val pp_literal_debug : pprinter_literal                 (** use debug unicode syntax *)
 val pp_literal_tstp : pprinter_literal                  (** use TSTP syntax *)
 
 val pp_pos : formatter -> position -> unit

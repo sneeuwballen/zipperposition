@@ -36,10 +36,6 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
-(* included to have them compiled *)
-module Opaque = Opaque
-module Rewriting = Rewriting
-
 (* TODO move special heuristic to calculus
    TODO generalize it for defined predicates/functions *)
   
@@ -58,8 +54,8 @@ let heuristic_constraint clauses : ordering_constraint =
         List.iter (update_with_term sign) l
   (* update counts with clause *)
   and update_with_clause clause =
-    List.iter
-      (fun (Equation (l, r, sign, _)) ->
+    Array.iter
+      (fun ({lit_eqn=Equation (l, r, sign)}) ->
         update_with_term sign l;
         update_with_term sign r)
     clause.clits
@@ -140,7 +136,6 @@ let parse_args () =
       ("-index", Arg.Set_string index, help_index);
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
       ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
-      ("-print-ord", Arg.Unit (fun () -> C.pp_literal_debug#ord true), "print order of sides of literals");
     ]
   in
   Arg.parse options (fun f -> file := f) "solve problem in first file";
@@ -305,9 +300,11 @@ let () =
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
+  (* clause state *)
+  let cs = C.mk_state ~ord ~select in
   (* preprocess clauses, then possibly simplify them *)
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~ord (List.map (C.reord_clause ~ord) clauses) in
+  let clauses = calculus#preprocess ~ord clauses in
   let clauses = if params.param_presimplify
     then Sat.initial_simplifications ~ord ~calculus ~select clauses
     else clauses in

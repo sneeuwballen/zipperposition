@@ -18,13 +18,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Hashcons
 open Types
 
 module T = Terms
 module Utils = FoUtils
-
-exception OccurCheck of (term * term)
 
 let id_subst = []
 
@@ -61,18 +58,9 @@ module SSet = Set.Make(
 let rec lookup var subst = match subst with
   | [] -> var
   | ((v,t) :: tail) ->
-      if T.eq_term v var then t else lookup var tail
+    if T.eq_term v var then t else lookup var tail
 
 let is_in_subst var subst = lookup var subst != var
-
-let filter subst varlist =
-  List.filter
-    (fun var ->
-       not (is_in_subst var subst))
-    varlist
-
-let restrict_exclude subst term =
-  List.filter (fun (v, t) -> not (T.member_term v term)) subst
 
 let domain subst =
   let set = T.THashSet.create () in
@@ -87,7 +75,10 @@ let codomain subst =
 let rec reset_bindings subst =
   match subst with
   | [] -> ()
-  | (v, t) :: subst' -> T.reset_binding v; T.reset_vars t; reset_bindings subst'
+  | (v, t) :: subst' ->
+    (T.reset_binding v;
+     T.reset_vars t;
+     reset_bindings subst')
 
 let rec apply_subst_bind subst =
   match subst with
@@ -104,69 +95,63 @@ let apply_subst ?(recursive=true) subst t =
     T.expand_bindings ~recursive t
   end
 
-let build_subst ?(recursive=false) v t tail =
+let build_subst ?(recursive=false) subst v t =
   assert (v.sort = t.sort);
   if recursive
     then (
-      let new_t = apply_subst ~recursive tail t in
+      let new_t = apply_subst ~recursive subst t in
       (* v -> v, no need to add to subst *)
-      if T.eq_term v new_t then tail
+      if T.eq_term v new_t then subst
       (* v -> t[v], not well-formed substitution *)
-      else if T.member_term v new_t then raise (OccurCheck (v, new_t))
+      else if T.member_term v new_t then failwith "occur check while building subst"
       (* append to list *)
-      else (v, new_t) :: tail )
+      else (v, new_t) :: subst)
     else if T.eq_term v t
-      then tail
-      else (v,t) :: tail
+      then subst
+      else (v,t) :: subst
 
-let update_binding subst v =
+let update_binding ?(recursive=false) subst v =
   assert (T.is_var v);
-  let t = T.get_binding v in
+  let t = if recursive then T.get_binding v else v.binding in
   if t == v then subst else (v,t)::subst
 
-let update_bindings subst l = List.fold_left update_binding subst l
+let update_bindings ?(recursive=false) subst l =
+  List.fold_left (update_binding ~recursive) subst l
 
 let expand_bindings subst =
   List.map (fun (v, t) -> (v, T.expand_bindings t)) subst
 
-let flat subst = List.map (fun (x, t) -> (x, apply_subst subst t)) subst
+(** helper used for relocate *)
+let relocate_fun subst offset i t =
+  match t.term with
+  | Var _ ->
+    let t' = T.mk_var (offset + i) t.sort in
+    subst := build_subst ~recursive:false !subst t t'
+  | _ -> assert false
 
-let concat x y = x @ y
+let relocate_array offset a =
+  let subst = ref id_subst in
+  Array.iteri (relocate_fun subst offset) a;
+  !subst
 
-let relocate ?(recursive=true) maxvar varlist subst =
-  List.fold_right
-    (fun ({sort=sort} as v) (maxvar, varlist, s) -> 
-       let new_v = T.mk_var maxvar sort in
-       maxvar+1, new_v::varlist, build_subst ~recursive v new_v s)
-    varlist (maxvar+1, [], subst)
-
-let fresh_term maxvar t =
-  let _, subst = List.fold_left
-    (fun (offset, subst) ({sort=sort} as var) ->
-      let new_var = T.mk_var offset sort in
-      (offset+1, build_subst var new_var ~recursive:false subst))
-    (maxvar+1, id_subst) t.vars
-  in
-  apply_subst ~recursive:false subst t
-
-let relocate_term varlist t =
-  let idx = T.max_var varlist in
-  let _, _, subst = relocate idx varlist id_subst in
-  apply_subst ~recursive:false subst t
+let relocate offset v =
+  let subst = ref id_subst in
+  Vector.iteri v (relocate_fun subst offset);
+  !subst
 
 (** Returns a term t' that is unique for all alpha equivalent
     representations of t, and a subst s such that s(t') = t *)
 let normalize_term t =
-  let vars = t.vars in
-  let subst_from_t, subst_to_t = List.fold_left
-    (fun (s_from, s_to) var ->
-      match var.term with
+  let subst_from_t, subst_to_t =
+    Array.fold_left
+      (fun (s_from, s_to) var ->
+        match var.term with
         | Var i ->
           let new_var = (T.mk_var i var.sort) in
-          build_subst ~recursive:false var new_var s_from,
-          build_subst ~recursive:false new_var var s_to
-        | _ -> assert false
-    ) (id_subst, id_subst) vars
+          build_subst ~recursive:false s_from var new_var,
+          build_subst ~recursive:false s_to new_var var
+        | _ -> assert false)
+      (id_subst, id_subst) t.vars
   in
   let normalized_t = apply_subst ~recursive:false subst_from_t t in
   normalized_t, subst_to_t
