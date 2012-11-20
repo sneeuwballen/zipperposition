@@ -84,11 +84,15 @@ let codomain subst =
   List.iter (fun (_, t) -> T.THashSet.add set t) subst;
   set
 
-let reset_bindings subst =
-  List.iter (fun (v, t) -> T.reset_binding v; T.reset_vars t) subst
+let rec reset_bindings subst =
+  match subst with
+  | [] -> ()
+  | (v, t) :: subst' -> T.reset_binding v; T.reset_vars t; reset_bindings subst'
 
-let apply_subst_bind subst =
-  List.iter (fun (v, t) -> T.set_binding v t) subst
+let rec apply_subst_bind subst =
+  match subst with
+  | [] -> ()
+  | (v, t) :: subst' -> (T.set_binding v t; apply_subst_bind subst')
 
 let apply_subst ?(recursive=true) subst t =
   if subst = [] then t else

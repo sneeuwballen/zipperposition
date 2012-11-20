@@ -136,21 +136,7 @@ let all_terms () =
   
 let stats () = H.stats ()
 
-(** hashconsing of symbol, and signature versions *)
-module SymbolH = Hashcons.Make(
-  struct
-    type t = symbol
-    let equal s1 s2 = s1 = s2
-    let hash s = Hashtbl.hash s
-    let tag i h = h  (* no tag *)
-  end)
-
 let sig_version = ref 0
-
-let get_symbol s =
-  let s' = SymbolH.hashcons s in
-  (if s == s' then incr sig_version);  (* update signature *)
-  s'
 
 (* ----------------------------------------------------------------------
  * smart constructors, with a bit of type-checking
@@ -180,7 +166,6 @@ let mk_var idx sort =
   H.hashcons my_v
 
 let mk_node s sort l =
-  let s = get_symbol s in  (* hashcons symbol *)
   let rec my_t = {term=Node (s, l); sort; vars=[];
                   db_closed=false; binding=my_t; tsize=0; simplified=false;
                   normal_form = false; tag= -1; hkey=0} in
@@ -460,7 +445,11 @@ let expand_bindings ?(recursive=true) t =
   in recurse 0 t
 
 (** reset bindings of variables of the term *)
-let reset_vars t = List.iter reset_binding t.vars
+let reset_vars t =
+  let rec reset = function
+  | [] -> ()
+  | v::l -> reset_binding v; reset l
+  in reset t.vars
 
 (* ----------------------------------------------------------------------
  * Pretty printing

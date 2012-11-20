@@ -119,9 +119,6 @@ let matching_locked ~locked subst a b =
 
 let matching subst a b =
   let locked = T.THashSet.from_list b.vars in
-  T.reset_vars a;
-  T.reset_vars b;
-  S.apply_subst_bind subst;
   matching_locked ~locked subst a b
 
 (** Sets of variables in s and t are assumed to be disjoint  *)

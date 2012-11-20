@@ -37,7 +37,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   module T = Terms
   module C = Clauses
   module O = Orderings
-  module D = Delayed
+  module Utils = FoUtils
 
   type term = Types.term
   type variable = Types.term
@@ -101,6 +101,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     try
       Hashtbl.find sort_table constant
     with Not_found -> univ_sort
+
+  (** update signature when news symbols are created *)
+  let update_sig =
+    let sig_table = Utils.SHashSet.create () in
+    fun s ->
+      if not (Utils.SHashSet.member sig_table s)
+        then begin  (* signature just changed *)
+          Utils.SHashSet.add sig_table s;
+          incr T.sig_version
+        end
 
   let set_sort constant sort = Hashtbl.replace sort_table constant sort
 
@@ -422,10 +432,10 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { T.true_term }
+      { update_sig true_symbol; T.true_term }
 
   | DOLLAR_FALSE
-      { T.false_term }
+      { update_sig false_symbol; T.false_term }
 
   | term EQUALITY term
       { T.mk_eq $1 $3 }
@@ -480,11 +490,11 @@ plain_term:
 
 constant:
   | atomic_word
-      { $1 }
+      { update_sig $1; $1 }
 
 functor_:
   | atomic_word
-      { $1 }
+      { update_sig $1; $1 }
 
 defined_term:
   | number
@@ -518,11 +528,11 @@ system_term:
 
 system_functor:
   | atomic_system_word
-      { $1 }
+      { update_sig $1; $1 }
       
 system_constant:
   | atomic_system_word
-      { $1 }
+      { update_sig $1; $1 }
 
 
 

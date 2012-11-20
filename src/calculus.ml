@@ -156,6 +156,7 @@ let skolem =
       (* actual skolemization of normalized_t *)
       let new_symbol = "sk" ^ (string_of_int !count) in
       Utils.debug 4 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
+      incr T.sig_version;  (* update version of signature *)
       incr count;
       let skolem_term =
         if vars = [] then T.mk_const new_symbol sort
