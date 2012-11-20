@@ -428,9 +428,9 @@ defined_atom:
       { T.false_term }
 
   | term EQUALITY term
-      { T.mk_equiv $1 $3 }
+      { T.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { T.mk_not (T.mk_equiv $1 $3) }
+      { T.mk_not (T.mk_eq $1 $3) }
 
 system_atom:
   | system_term_top

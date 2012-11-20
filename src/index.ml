@@ -178,9 +178,9 @@ let rec fold_subterms op tree t (c, path) = match t.term with
       let tmp_tree = op tree t (c, List.rev path, t) in
       let _, new_tree = List.fold_left
         (* apply the operation on each i-th subterm with i::path
-           as position. i starts at 1 and the function symbol is ignored. *)
+           as position. i starts at 0 and the function symbol is ignored. *)
         (fun (idx, tree) t -> idx+1, fold_subterms op tree t (c, idx::path))
-        (1, tmp_tree) l
+        (0, tmp_tree) l
       in new_tree
 
 (** apply (op tree) to the root term, after reversing the path *)

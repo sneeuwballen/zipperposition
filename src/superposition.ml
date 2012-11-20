@@ -100,7 +100,7 @@ let all_positions pos t f =
           let acc = List.rev_append (aux (pos @ [idx]) t) acc in (* recurse in subterm *)
           if post = [] then acc, idx, []
           else acc, idx+1, List.tl post)
-      (acc, 1, tl) tl
+      (acc, 0, tl) tl
     in
     acc
   in
@@ -128,7 +128,7 @@ let parallel_positions pos t1 t2 acc f =
       f acc (List.rev pos) t1 t2
     | Node (hd1, tl1), Node (hd2, tl2) ->
       begin match f acc (List.rev pos) t1 t2 with
-      | None when hd1 = hd2 -> fold acc pos 1 tl1 tl2  (* recurse in subterms *)
+      | None when hd1 = hd2 -> fold acc pos 0 tl1 tl2  (* recurse in subterms *)
       | None -> None (* not the same, and not accepted by f *)
       | Some acc -> Some acc (* f is ok on this pair of terms *)
       end
