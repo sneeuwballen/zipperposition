@@ -37,6 +37,7 @@ val push : 'a t -> 'a -> unit
 
 val append : 'a t -> 'a t -> unit
   (** [append a b] adds all elements of b to a *)
+
 val append_array : 'a t -> 'a array -> unit
   (** same as append, with an array *)
 
