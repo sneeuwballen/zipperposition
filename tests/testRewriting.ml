@@ -99,8 +99,10 @@ let benchmark_count = 1  (* with caching, not accurate to do it several times *)
 let benchmark ?(count=benchmark_count) trs a b =
   (* rewrite to normal form *)
   let one_step () =
-    a.binding <- a; a.normal_form <- false;
-    b.binding <- b; b.normal_form <- false;
+    a.binding <- a; 
+    T.set_flag T.flag_normal_form a false;
+    b.binding <- b;
+    T.set_flag T.flag_normal_form b false;
     Gc.major ();
     let a' = Rw.rewrite trs a
     and b' = Rw.rewrite trs b in

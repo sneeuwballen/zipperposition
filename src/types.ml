@@ -57,10 +57,8 @@ and typed_term = {
   term : term_cell;             (** the term itself *)
   sort : sort;                  (** the sort of the term *)
   mutable binding : term;       (** binding of the term (if variable), or normal form *)
-  mutable vars : term list;     (** the variables of the term *)
-  mutable normal_form : bool;   (** has the normal form been computed? (in binding) *)
-  mutable db_closed : bool;     (** is the term closed w.r.t. De Bruijn indexes? *)
-  mutable simplified : bool;    (** as a formula, totally simplified *)
+  mutable vars : term list;     (** the variables of the term TODO use an array *)
+  mutable flags : int;
   mutable tsize : int;          (** number of symbol/vars occurrences in the term *)
   mutable tag : int;            (** hashconsing tag *)
   mutable hkey : int;           (** hash *)
@@ -87,10 +85,10 @@ type position = int list
 
 (** a literal, that is, a signed equation *)
 type literal = 
- | Equation of    term  (* lhs *)
-                * term  (* rhs *)
-                * bool    (* sign *)
-                * comparison (* orientation TODO remove (trust the comparison cache) *)
+ | Equation of    term  (** lhs *)
+                * term  (** rhs *)
+                * bool  (** sign (equality, ie true, or difference) *)
+                * comparison   (* TODO remove *)
 
 (** a hashconsed first order clause *)
 type hclause = clause

@@ -330,9 +330,9 @@ quantified_formula:
 
 quantifier:
   | FORALL
-    { mk_forall }
+    { update_sig forall_symbol; update_sig lambda_symbol; mk_forall }
   | EXISTS
-    { mk_exists }
+    { update_sig exists_symbol; update_sig lambda_symbol; mk_exists }
 
 variable_list:
   | variable
@@ -346,7 +346,7 @@ unary_formula:
 
 unary_connective:
   | NEGATION
-    { T.mk_not }
+    { update_sig not_symbol; T.mk_not }
 
 
 cnf_annotated:
@@ -440,7 +440,7 @@ defined_atom:
   | term EQUALITY term
       { T.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { T.mk_not (T.mk_eq $1 $3) }
+      { update_sig not_symbol; T.mk_not (T.mk_eq $1 $3) }
 
 system_atom:
   | system_term_top

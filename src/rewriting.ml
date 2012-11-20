@@ -97,11 +97,11 @@ exception RewrittenIn of term
 let rec rewrite trs t = 
   match t.term with
   | Var _ -> t  (* always in normal form *)
-  | _ when t.normal_form -> t.binding  (* normal form already computed *)
+  | _ when T.get_flag T.flag_normal_form t -> t.binding  (* normal form already computed *)
   | _ -> (* compute normal form, store it, and return it *)
     let normal_form = compute_nf trs t in
     T.set_binding t normal_form;
-    t.normal_form <- true;
+    T.set_flag T.flag_normal_form t true;
     normal_form
 (* compute normal form of this term *)
 and compute_nf trs t =

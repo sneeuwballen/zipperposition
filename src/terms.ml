@@ -139,6 +139,21 @@ let stats () = H.stats ()
 let sig_version = ref 0
 
 (* ----------------------------------------------------------------------
+ * boolean flags
+ * ---------------------------------------------------------------------- *)
+
+let flag_db_closed = 0x1
+and flag_simplified = 0x2
+and flag_normal_form = 0x4
+
+let set_flag flag t truth =
+  if truth
+    then t.flags <- t.flags lor flag
+    else t.flags <- t.flags land (lnot flag)
+
+let get_flag flag t = (t.flags land flag) != 0
+
+(* ----------------------------------------------------------------------
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
 
@@ -160,20 +175,19 @@ let rec compute_db_closed depth t = match t.term with
 
 let mk_var idx sort =
   let rec my_v = {term = Var idx; sort=sort; vars=[my_v];
-                  db_closed=true; binding=my_v; simplified=true;
-                  normal_form = true; tsize=1; tag= -1; hkey=0} in
+                  flags=(flag_db_closed lor flag_simplified lor flag_normal_form);
+                  binding=my_v; tsize=1; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
 let mk_node s sort l =
-  let rec my_t = {term=Node (s, l); sort; vars=[];
-                  db_closed=false; binding=my_t; tsize=0; simplified=false;
-                  normal_form = false; tag= -1; hkey=0} in
+  let rec my_t = {term=Node (s, l); sort; vars=[]; flags=0;
+                  binding=my_t; tsize=0; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
   let t = H.hashcons my_t in
   (if t == my_t
     then begin  (* compute additional data, the term is new *)
-      t.db_closed <- compute_db_closed 0 t;
+      set_flag flag_db_closed t (compute_db_closed 0 t);
       t.vars <- compute_vars l;
       t.tsize <- List.fold_left (fun acc subt -> acc + subt.tsize) 1 l;
     end);
@@ -191,7 +205,7 @@ let mk_not t = (check_bool t; mk_node not_symbol bool_sort [t])
 let mk_and a b = (check_bool a; check_bool b; mk_node and_symbol bool_sort [a; b])
 let mk_or a b = (check_bool a; check_bool b; mk_node or_symbol bool_sort [a; b])
 let mk_imply a b = (check_bool a; check_bool b; mk_node imply_symbol bool_sort [a; b])
-let mk_equiv a b = mk_and (mk_imply a b) (mk_imply b a)
+let mk_equiv a b = (check_bool a; check_bool b; mk_node eq_symbol bool_sort [a; b])
 let mk_eq a b = (assert (a.sort = b.sort); mk_node eq_symbol bool_sort [a; b])
 let mk_lambda t = mk_node lambda_symbol t.sort [t]
 let mk_forall t = (check_bool t; mk_node forall_symbol bool_sort [mk_lambda t])
@@ -285,7 +299,7 @@ let rec atomic_rec t = match t.term with
     && List.for_all atomic_rec l
 
 (** check wether the term is closed w.r.t. De Bruijn variables *)
-let db_closed t = t.db_closed
+let db_closed t = get_flag flag_db_closed t
 
 let rec db_var t =
   match t.term with

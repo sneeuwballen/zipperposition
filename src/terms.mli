@@ -66,8 +66,22 @@ val sig_version : int ref                     (** last version of signature (mod
                                                   when a new leaf is built *)
 
 (* ----------------------------------------------------------------------
+ * boolean flags
+ * ---------------------------------------------------------------------- *)
+
+val flag_db_closed : int
+val flag_simplified : int
+val flag_normal_form : int
+
+val set_flag : int -> term -> bool -> unit
+  (** set or reset the given flag of the term to bool *)
+val get_flag : int -> term -> bool
+  (** read the flag *)
+
+(* ----------------------------------------------------------------------
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
+
 val mk_var : int -> sort -> term
 val mk_node : symbol -> sort -> term list -> term
 val mk_const : symbol -> sort -> term

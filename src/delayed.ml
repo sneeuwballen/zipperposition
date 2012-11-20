@@ -277,10 +277,10 @@ let equivalence_elimination ~ord clause =
 
 (** Simplify the inner formula (double negation, trivial equalities...) *)
 let simplify_inner ~ord c =
-  let mark_simplified t = t.simplified <- true in
+  let mark_simplified t = T.set_flag T.flag_simplified t true in
   (* simplify a term *)
   let rec simp_term t =
-    if t.simplified then t else  (* maybe it's already simplified *)
+    if T.get_flag T.flag_simplified t then t else  (* maybe it's already simplified *)
     match t.term with
     | Var _ | Node (_, []) -> (mark_simplified t; t)
     | Node (s, [{term=Node (s', [t'])}]) when s = not_symbol && s' = not_symbol ->
