@@ -278,9 +278,20 @@ let sprintf format =
   fmt
   format
 
-(* print a list of items using the printing function *)
+(** print a list of items using the printing function *)
 let rec pp_list ?(sep=", ") pp_item formatter = function
   | x::y::xs -> Format.fprintf formatter "%a%s@,%a"
       pp_item x sep (pp_list ~sep:sep pp_item) (y::xs)
   | x::[] -> pp_item formatter x
   | [] -> ()
+
+(** print an array of items using the printing function *)
+let rec pp_array ?(sep=", ") pp_item formatter a =
+  match a with
+  | [||] -> ()
+  | [|x|] -> pp_item formatter 0 x
+  | _ ->
+    for i = 0 to Array.length a -1 do
+      (if i < Array.length a - 1 then Format.pp_print_string formatter sep);
+      pp_item formatter i a.(i)
+    done
