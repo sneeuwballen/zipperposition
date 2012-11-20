@@ -304,9 +304,9 @@ let () =
   let cs = C.mk_state ~ord ~select in
   (* preprocess clauses, then possibly simplify them *)
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~ord clauses in
+  let clauses = calculus#preprocess ~cs clauses in
   let clauses = if params.param_presimplify
-    then Sat.initial_simplifications ~ord ~calculus ~select clauses
+    then Sat.initial_simplifications ~cs ~calculus clauses
     else clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));

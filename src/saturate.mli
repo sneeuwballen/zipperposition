@@ -36,8 +36,7 @@ val set_of_support: calculus:Calculus.calculus ->
                     ProofState.state -> clause list -> ProofState.state
 
 (** Simplifications to perform on initial clauses *)
-val initial_simplifications : ord:ordering ->
-                              select:selection_fun ->
+val initial_simplifications : cs:Clauses.clause_state ->
                               calculus:Calculus.calculus ->
                               clause list -> clause list
 
