@@ -311,7 +311,7 @@ let () =
   Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
-  let state = PS.make_state ord (CQ.default_queues ~ord) select in
+  let state = PS.make_state cs (CQ.default_queues ~ord) in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   let state = Sat.set_of_support ~calculus state calculus#axioms in
   (* saturate *)

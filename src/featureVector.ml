@@ -41,66 +41,69 @@ let compute_fv features clause =
   List.map (fun feat -> feat clause) features
 
 let feat_size_plus clause =
-  let rec aux lits count = match lits with
-  | [] -> count
-  | (Equation (_,_,true,_))::lits' -> aux lits' (count+1)
-  | _::lits' -> aux lits' count
-  in aux clause.clits 0
+  let cnt = ref 0 in
+  Array.iter (fun {lit_eqn=Equation (_,_,sign)} -> if sign then incr cnt) clause.clits;
+  !cnt
 
 let feat_size_minus clause =
-  let rec aux lits count = match lits with
-  | [] -> count
-  | (Equation (_,_,false,_))::lits' -> aux lits' (count+1)
-  | _::lits' -> aux lits' count
-  in aux clause.clits 0
+  let cnt = ref 0 in
+  Array.iter (fun {lit_eqn=Equation (_,_,sign)} -> if not sign then incr cnt) clause.clits;
+  !cnt
 
 (* number of occurrences of symbol in literal *)
 let count_symb_lit symb lit =
+  let cnt = ref 0 in
   let rec count_symb_term t = match t.term with
-  | Var _ -> 0
+  | Var _ -> ()
   | Node (s, l) ->
-    let cnt = if s = symb then 1 else 0 in
-    List.fold_left
-      (fun sum subterm -> sum + (count_symb_term subterm))
-      cnt l
-  in match lit with
-  | Equation (l, r, _, _) -> count_symb_term l + count_symb_term r
+    (if s = symb then incr cnt);
+    List.iter count_symb_term l
+  in
+  match lit.lit_eqn with
+  | Equation (l, r, _) ->
+    count_symb_term l; count_symb_term r; !cnt
 
 let count_symb_plus symb clause =
-  List.fold_left
-    (fun sum lit -> if C.pos_lit lit
-      then (count_symb_lit symb lit) + sum else sum)
-    0 clause.clits
+  let cnt = ref 0 in
+  Array.iter
+    (fun lit -> if C.pos_eqn lit.lit_eqn
+      then cnt := !cnt + count_symb_lit symb lit) clause.clits;
+  !cnt
 
 let count_symb_minus symb clause =
-  List.fold_left
-    (fun sum lit -> if C.neg_lit lit
-      then (count_symb_lit symb lit) + sum else sum)
-    0 clause.clits
+  let cnt = ref 0 in
+  Array.iter
+    (fun lit -> if C.neg_eqn lit.lit_eqn
+      then cnt := !cnt + count_symb_lit symb lit) clause.clits;
+  !cnt
 
 (* max depth of the symbol in the literal, or -1 *)
 let max_depth_lit symb lit =
-  let rec max_depth_term t depth = match t.term with
-  | Var _ -> -1
-  | Node (s, l) ->
-    let depth = if s = symb then depth else -1 in
-    List.fold_left
-      (fun maxdepth subterm -> max maxdepth (max_depth_term subterm (depth+1)))
-      depth l
-  in match lit with
-  | Equation (l, r, _, _) -> max (max_depth_term l 0) (max_depth_term r 0)
+  let rec max_depth_term t depth =
+    match t.term with
+    | Var _ -> -1
+    | Node (s, l) ->
+      let depth = if s = symb then depth else -1 in
+      List.fold_left
+        (fun maxdepth subterm -> max maxdepth (max_depth_term subterm (depth+1)))
+        depth l
+  in
+  match lit.lit_eqn with
+  | Equation (l, r, _) -> max (max_depth_term l 0) (max_depth_term r 0)
 
 let max_depth_plus symb clause =
-  List.fold_left
-    (fun maxdepth lit -> if C.pos_lit lit
-      then max maxdepth (max_depth_lit symb lit) else maxdepth)
-    0 clause.clits
+  let depth = ref 0 in
+  Array.iter
+    (fun lit -> if C.pos_eqn lit.lit_eqn
+      then depth := max !depth (max_depth_lit symb lit)) clause.clits;
+  !depth
 
 let max_depth_minus symb clause =
-  List.fold_left
-    (fun maxdepth lit -> if C.neg_lit lit
-      then max maxdepth (max_depth_lit symb lit) else maxdepth)
-    0 clause.clits
+  let depth = ref 0 in
+  Array.iter
+    (fun lit -> if C.neg_eqn lit.lit_eqn
+      then depth := max !depth (max_depth_lit symb lit)) clause.clits;
+  !depth
 
 (* ----------------------------------------------------------------------
  * FV index

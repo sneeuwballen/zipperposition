@@ -93,45 +93,46 @@ let do_unary_inferences ~ord rules c =
     if both, then both sides of a non-oriented equation
       will be visited
 
-    ?pos:bool -> ?neg:bool -> ?both:bool
+    ?pos:bool -> ?neg:bool -> ?both:bool -> ord:ordering ->
     -> ('a -> Types.term -> Types.term -> bool -> int list -> 'a)
     -> 'a -> (Types.literal * int) list
     -> 'a *)
-let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) f acc lits =
+let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) ~ord f acc lits =
   if (not pos) && (not neg) then acc else
   (* is the sign ok, given the parameters? *)
   let sign_ok sign = if sign then pos else neg in
-  List.fold_left
-    (fun acc (lit, idx) ->
-      match lit with
-      | Equation (l,r,sign,Gt) when sign_ok sign ->
-        f acc l r sign [idx; C.left_pos]
-      | Equation (l,r,sign,Lt) when sign_ok sign ->
-        f acc r l sign [idx; C.right_pos]
-      | Equation (l,r,sign,_) when sign_ok sign ->
+  let acc = ref acc in
+  Array.iteri
+    (fun idx {lit_eqn=Equation (l,r,sign)} ->
+      if sign_ok sign then
+      match ord#compare l r with
+      | Gt -> acc := f !acc l r sign [idx; C.left_pos]
+      | Lt -> acc := f !acc r l sign [idx; C.right_pos]
+      | _ ->
         if both
         then (* visit both sides of the equation *)
-          let acc = f acc r l sign [idx; C.right_pos] in
-          f acc l r sign [idx; C.left_pos]
+          acc := f !acc r l sign [idx; C.right_pos];
+          acc := f !acc l r sign [idx; C.left_pos]
         else (* only visit one side (arbitrary) *)
-          f acc l r sign [idx; C.left_pos]
-      | _ -> acc)
-    acc lits
+          acc := f !acc l r sign [idx; C.left_pos])
+    lits;
+  !acc
 
 (** Visit all non-minimal sides of positive equations *)
-let rec fold_positive ?(both=true) f acc lits =
-  fold_lits ~pos:true ~neg:false ~both f acc lits
+let rec fold_positive ?(both=true) ~ord f acc lits =
+  fold_lits ~pos:true ~neg:false ~both ~ord f acc lits
 
 (** Visit all non-minimal sides of negative equations *)
-let rec fold_negative ?(both=true) f acc lits =
-  fold_lits ~pos:false ~neg:true ~both f acc lits
+let rec fold_negative ?(both=true) ~ord f acc lits =
+  fold_lits ~pos:false ~neg:true ~both ~ord f acc lits
 
 (** decompose the literal at given position *)
-let get_equations_sides clause pos = match pos with
+let get_equations_sides clause pos =
+  match pos with
   | idx::eq_side::[] ->
-    (match Utils.list_get clause.clits idx with
-    | Equation (l,r,sign,_) when eq_side = C.left_pos -> (l, r, sign)
-    | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
+    (match clause.clits.(idx).lit_eqn with
+    | Equation (l,r,sign) when eq_side = C.left_pos -> (l, r, sign)
+    | Equation (l,r,sign) when eq_side = C.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (expected binary list)"
 
@@ -159,8 +160,8 @@ let skolem =
       incr T.sig_version;  (* update version of signature *)
       incr count;
       let skolem_term =
-        if vars = [] then T.mk_const new_symbol sort
-        else T.mk_node new_symbol sort vars
+        if vars = [||] then T.mk_const new_symbol sort
+        else T.mk_node new_symbol sort (Array.to_list vars)
       in
       (* update the ordering *)
       ord#refresh ();

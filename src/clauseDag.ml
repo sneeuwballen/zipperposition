@@ -50,9 +50,9 @@ let insert_hclause l hc =
     else hc :: l
 
 (** [parent_of dag parent child] means that child descends from parent *)
-let parent_of ~ord dag parent child =
-  let parent = C.hashcons_clause_noselect (C.normalize_clause ~ord parent)
-  and child = C.hashcons_clause_noselect (C.normalize_clause ~ord child) in
+let parent_of ~cs dag parent child =
+  let parent = C.hashcons_clause (C.normalize_clause ~cs parent)
+  and child = C.hashcons_clause (C.normalize_clause ~cs child) in
   if C.eq_hclause parent child
     then dag
     else begin
@@ -69,15 +69,15 @@ let parent_of ~ord dag parent child =
     end
 
 (** update the DAG using the list of parents of the clause *)
-let update ~ord dag c =
+let update ~cs dag c =
   let parents = C.parents c in
-  List.fold_left (fun dag parent -> parent_of ~ord dag parent c) dag parents
+  List.fold_left (fun dag parent -> parent_of ~cs dag parent c) dag parents
 
-let updates ~ord dag l =
-  List.fold_left (update ~ord) dag l
+let updates ~cs dag l =
+  List.fold_left (update ~cs) dag l
 
 (** get the list of descendants of clause *)
-let descendants ~ord dag parent =
-  let parent = C.hashcons_clause_noselect (C.normalize_clause ~ord parent) in
+let descendants ~cs dag parent =
+  let parent = C.hashcons_clause (C.normalize_clause ~cs parent) in
   let descendants = find_default ~default:[] dag.dag_down parent in
   Utils.list_uniq C.eq_hclause descendants

@@ -51,7 +51,7 @@ let names_index () =
 
 (** set of active clauses *)
 type active_set = {
-  a_ord : ordering;
+  a_cs : Clauses.clause_state;
   active_clauses : Clauses.bag;       (** set of active clauses *)
   idx : Index.clause_index;           (** term index *)
   fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
@@ -59,7 +59,7 @@ type active_set = {
 
 (** set of passive clauses *)
 type passive_set = {
-  p_ord : ordering;
+  p_cs : Clauses.clause_state;
   passive_clauses : C.bag;
   queues : (ClauseQueue.queue * int) list;
   queue_state : int * int;  (** position in the queue/weight *)
@@ -69,29 +69,27 @@ type passive_set = {
     It contains a set of active clauses, a set of passive clauses,
     and is parametrized by an ordering. *)
 type state = {
-  ord : ordering;
-  state_select : selection_fun;
+  cs : Clauses.clause_state;
   active_set : active_set;      (** active clauses, indexed *)
   axioms_set : active_set;      (** set of support, indexed *)
   passive_set : passive_set;    (** passive clauses *)
   dag : CD.clause_dag;          (** DAG of clauses *)
 }
 
-let mk_active_set ~ord =
-  let signature = ord#symbol_ordering#signature in
+let mk_active_set ~cs =
+  let signature = cs#ord#symbol_ordering#signature in
   (* feature vector index *)
   let fv_idx = FV.mk_fv_index_signature signature in
-  {a_ord=ord; active_clauses=C.empty_bag; idx= !cur_index; fv_idx=fv_idx}
+  {a_cs=cs; active_clauses=C.empty_bag; idx= !cur_index; fv_idx=fv_idx}
 
-let make_state ord queue_list select =
-  let passive_set = {p_ord=ord; passive_clauses=C.empty_bag;
+let make_state ~cs queue_list =
+  let passive_set = {p_cs=cs; passive_clauses=C.empty_bag;
                      queues=queue_list; queue_state=(0,0)}
-  and active_set = mk_active_set ~ord in
-  {ord=ord;
-   state_select=select;
-   active_set=active_set;
+  and active_set = mk_active_set ~cs in
+  {cs;
+   active_set;
    axioms_set=active_set;
-   passive_set=passive_set;
+   passive_set;
    dag=CD.empty;}
 
 let next_passive_clause passive_set =
@@ -137,7 +135,7 @@ let add_active active_set c =
     then active_set, hc  (* already in active set *)
     else
       let new_bag = C.add_hc_to_bag active_set.active_clauses hc
-      and new_idx = active_set.idx#index_clause hc
+      and new_idx = active_set.idx#index_clause ~ord:active_set.a_cs#ord hc
       and new_fv_idx = FV.index_clause active_set.fv_idx hc in
       {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}, hc
 
@@ -148,7 +146,7 @@ let remove_active active_set hc =
   if C.is_in_bag active_set.active_clauses hc.ctag
     then
       let new_bag = C.remove_from_bag active_set.active_clauses hc.ctag
-      and new_idx = active_set.idx#remove_clause hc
+      and new_idx = active_set.idx#remove_clause ~ord:active_set.a_cs#ord hc
       and new_fv_idx = FV.remove_clause active_set.fv_idx hc in
       {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}
     else
@@ -162,8 +160,8 @@ let remove_active_bag active_set bag =
   C.iter_bag bag (fun _ hc -> active := remove_active !active hc);
   !active
 
-let singleton_active_set ~ord clause =
-  let active_set = mk_active_set ~ord in
+let singleton_active_set ~cs clause =
+  let active_set = mk_active_set ~cs in
   let active_set, _ = add_active active_set clause in
   active_set
   
@@ -182,7 +180,7 @@ let add_passives passive_set l =
   List.fold_left (fun b c -> fst (add_passive b c)) passive_set l
 
 let remove_passive passive_set c =
-  let hc = C.hashcons_clause_noselect c in
+  let hc = C.hashcons_clause c in
   (* just remove from the set of passive clauses *)
   let new_passive_clauses = 
     C.remove_from_bag passive_set.passive_clauses hc.ctag in
@@ -193,7 +191,7 @@ let remove_passives passive_set l =
 
 let relocate_active active_set c =
   let maxvar = active_set.active_clauses.C.bag_maxvar in
-  fst (C.fresh_clause ~ord:active_set.a_ord (maxvar+1) c)
+  C.fresh_clause ~cs:active_set.a_cs (maxvar+1) c
 
 (** statistics on the state *)
 type state_stats = {
@@ -245,7 +243,7 @@ let pp_dot ?(name="state") formatter state =
   (* start from empty clause if present, all active clauses otherwise *)
   let empty_clause = ref None in
   try C.iter_bag state.active_set.active_clauses
-    (fun _ c' -> if c'.clits = [] then (empty_clause := Some c'; raise Exit));
+    (fun _ c' -> if c'.clits = [||] then (empty_clause := Some c'; raise Exit));
   with Exit -> ();
   (match !empty_clause with
   | Some c -> Queue.push c queue
@@ -261,7 +259,7 @@ let pp_dot ?(name="state") formatter state =
       C.CHashSet.add explored c;
       DotState.add_node_attribute n (DotState.Style "filled");
       DotState.add_node_attribute n (DotState.Shape "box");
-      (if c.clits = [] then DotState.add_node_attribute n (DotState.Color "red"));
+      (if c.clits = [||] then DotState.add_node_attribute n (DotState.Color "red"));
       match Lazy.force c.cproof with
       | Axiom (file, axiom) ->
         DotState.add_node_attribute n (DotState.Color "yellow");

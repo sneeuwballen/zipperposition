@@ -410,6 +410,18 @@ let iter_selected c k =
     if lit.lit_selected then k i lit
   done
 
+let fold_lits ~pos ~neg ~selected ~max c acc k =
+  let acc = ref acc in
+  for i = 0 to Array.length c.clits - 1 do
+    let lit = c.clits.(i) in
+    if (   (not pos || pos_eqn lit.lit_eqn)
+        && (not neg || neg_eqn lit.lit_eqn)
+        && (not selected || lit.lit_selected)
+        && (not max || lit.lit_maximal))
+      then acc := k !acc i lit
+  done;
+  !acc
+
 let fresh_clause ~cs maxvar c =
   let subst = S.relocate_array maxvar c.cvars in
   apply_subst_cl ~recursive:false ~cs subst c

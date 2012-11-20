@@ -74,8 +74,8 @@ class type unit_index =
 (** A global index, that operates on hashconsed clauses *)
 class type clause_index =
   object ('a)
-    method index_clause : hclause -> 'a
-    method remove_clause : hclause -> 'a
+    method index_clause : ord:ordering -> hclause -> 'a
+    method remove_clause : ord:ordering -> hclause -> 'a
 
     method root_index : index
     method unit_root_index : unit_index (** for simplifications that only require matching *)

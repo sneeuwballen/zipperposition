@@ -53,6 +53,7 @@ module THashSet :
     val to_list : t -> term list            (** build a list from the set *)
     val to_vector : t -> term Vector.t      (** build a vector from the set *)
     val from_list : term list -> t          (** build a set from the list *)
+    val from_array : term array -> t
   end
 
 (* ----------------------------------------------------------------------

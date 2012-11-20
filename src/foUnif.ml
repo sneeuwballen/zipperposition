@@ -38,7 +38,13 @@ let rec occurs_check var t =
   | Var _ when not (T.eq_term t (T.get_binding t)) ->
     occurs_check var (T.get_binding t)  (* see in binding *)
   | Var _ -> false
-  | Node _ -> List.exists (occurs_check var) t.vars
+  | Node _ ->
+    try (* check all variables *)
+      for i = 0 to Array.length t.vars - 1 do
+        if occurs_check var t.vars.(i) then raise Exit
+      done;
+      false
+    with Exit -> true
 
 (** if t is a variable, return its current binding *)
 let rec get_var_binding t =
@@ -118,30 +124,6 @@ let matching_locked ~locked subst a b =
   prof_matching.HExtlib.profile (unif subst a) b
 
 let matching subst a b =
-  let locked = T.THashSet.from_list b.vars in
+  let locked = T.THashSet.from_array b.vars in
   matching_locked ~locked subst a b
-
-(** Sets of variables in s and t are assumed to be disjoint  *)
-let alpha_eq s t =
-  let rec equiv subst s t =
-    let s = match s.term with Var _ -> S.lookup s subst | _ -> s
-    and t = match t.term with Var _ -> S.lookup t subst | _ -> t
-
-    in
-    match s.term, t.term with
-      | _, _ when T.eq_term s t -> subst
-      | Var _, Var _
-          when (not (List.exists (fun (_,k) -> k=t) subst)) ->
-          let subst = S.build_subst s t subst in
-            subst
-      | Node (f, l1), Node (g, l2) when f = g -> (
-          try
-            List.fold_left2
-              (fun subst' s t -> equiv subst' s t)
-              subst l1 l2
-          with Invalid_argument _ -> raise UnificationFailure
-        )
-      | _, _ -> raise UnificationFailure
-  in
-    equiv S.id_subst s t
 

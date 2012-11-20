@@ -92,18 +92,12 @@ let clause_weight ~ord =
 
 (** compute a clause weight that makes maximal literals bigger *)
 let compute_refined_clause_weight ~ord c =
-  (* is lit maximal in c? *)
-  let is_maxlit c lit =
-    List.exists (fun (lit', _) -> C.eq_literal lit lit') (C.maxlits c)
-  (* weight function that makes maximal literals heavier *)
-  in
-  let weight = List.fold_left
-    (fun sum (Equation (l, r, _, _) as lit) ->
+  let weight = Array.fold_left
+    (fun sum ({lit_eqn=Equation (l, r, _)} as lit) ->
       let lit_weight = ord#compute_term_weight l + ord#compute_term_weight r in
-      sum + (if is_maxlit c lit
-        then 4 * lit_weight else lit_weight))
+      sum + (if lit.lit_selected then 4 * lit_weight else lit_weight))
     0 c.clits
-  in (List.length c.clits) * weight
+  in (Array.length c.clits) * weight
 
 let refined_clause_weight ~ord =
   let clause_ord =
@@ -117,10 +111,13 @@ let refined_clause_weight ~ord =
   make_hq ~ord:clause_ord name
   
 let goals ~ord =
-  (* check whether a literal is a goal *)
-  let is_goal_lit lit = match lit with
-  | Equation (_, _, sign, _) -> not sign in
-  let is_goal_clause clause = List.for_all is_goal_lit clause.clits in
+  (* is the clause a goal clause? *)
+  let is_goal_clause c =
+    try
+      Array.iter (fun lit -> if C.pos_eqn lit.lit_eqn then raise Exit) c.clits;
+      true
+    with Exit -> false
+  in 
   let clause_ord =
     object
       method le hc1 hc2 =
@@ -132,10 +129,13 @@ let goals ~ord =
   make_hq ~ord:clause_ord ~accept:is_goal_clause name
 
 let non_goals ~ord =
-  (* check whether a literal is a goal *)
-  let is_goal_lit lit = match lit with
-  | Equation (_, _, sign, _) -> not sign in
-  let is_non_goal_clause clause = List.for_all (fun x -> not (is_goal_lit x)) clause.clits in
+  (* is the clause clause without goals? *)
+  let is_non_goal_clause c =
+    try
+      Array.iter (fun lit -> if C.neg_eqn lit.lit_eqn then raise Exit) c.clits;
+      true
+    with Exit -> false
+  in
   let clause_ord =
     object
       method le hc1 hc2 =
@@ -150,7 +150,7 @@ let non_goals ~ord =
 
 let pos_unit_clauses ~ord =
   let is_unit_pos c = match c.clits with
-  | [Equation (_,_,true,_)] -> true
+  | [|{lit_eqn=Equation (_,_,true)}|] -> true
   | _ -> false
   in
   let clause_ord =

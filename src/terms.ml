@@ -104,6 +104,9 @@ module THashSet =
     let from_list l =
       let set = create () in
       List.iter (add set) l; set
+    let from_array a =
+      let set = create () in
+      Array.iter (add set) a; set
   end
 
 (* ----------------------------------------------------------------------

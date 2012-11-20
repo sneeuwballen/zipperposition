@@ -67,15 +67,15 @@ val do_unary_inferences : ord:ordering ->
 
 (* some helpers *)
 val fold_lits :
-  ?pos:bool -> ?neg:bool -> ?both:bool ->
+  ?pos:bool -> ?neg:bool -> ?both:bool -> ord:ordering ->
   ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
+  literal array -> 'a
 val fold_positive :
-  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
+  ?both:bool -> ord:ordering -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
+  literal array -> 'a
 val fold_negative :
-  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
+  ?both:bool -> ord:ordering -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
+  literal array -> 'a
 
 val get_equations_sides : clause -> position -> term * term * bool
 
