@@ -31,14 +31,13 @@ let random_term ?(ground=false) () =
   | n ->
     let head = random_fun_symbol () in
     let arity = Hashtbl.find arities head in
-    let head = T.mk_leaf head univ_sort in
     let subterms =
       Utils.times arity (fun _ -> aux (depth - (H.random_in 1 2)))
     in
-    T.mk_node (head::subterms)
+    T.mk_node head univ_sort subterms
   and random_leaf () =
     if ground || H.R.bool ()
-      then T.mk_leaf (H.choose symbols) univ_sort
+      then T.mk_const (H.choose symbols) univ_sort
       else T.mk_var (H.random_in 0 3) univ_sort
   and random_fun_symbol () = H.choose funs
   in aux depth
@@ -47,10 +46,9 @@ let random_term ?(ground=false) () =
 let random_pred ?(ground=false) () =
   let p = H.choose preds in
   let arity = Hashtbl.find arities p in
-  let p = T.mk_leaf p bool_sort in
   if arity = 0
-    then p
-    else T.mk_node (p::(Utils.times arity (random_term ~ground)))
+    then T.mk_const p bool_sort
+    else T.mk_node p bool_sort (Utils.times arity (random_term ~ground))
 
 (** random pairs of terms *)
 let random_pair () = (random_term (), random_term ())

@@ -37,7 +37,7 @@ type position = int
 let rec get_pos t pos = 
   match t.term, pos with
   | _, 0 -> t
-  | Node (hd::l), _ -> get_subpos l (pos - hd.tsize)
+  | Node (_, l), _ -> get_subpos l (pos - 1)
   | _ -> assert false
 and get_subpos l pos =
   match l, pos with
@@ -56,14 +56,24 @@ let skip t pos =
 (** maximum position in the term *)
 let maxpos t = t.tsize - 1
 
-(** find first atomic term of t *)
+type character = Symbol of symbol | Variable of term
+
+let compare_char c1 c2 =
+  match c1, c2 with
+  | Symbol s1, Symbol s2 -> Pervasives.compare s1 s2
+  | Variable v1, Variable v2 -> T.compare_term v1 v2
+  | Symbol _, Variable _ -> -1
+  | Variable _, Symbol _ -> 1
+
+let eq_char c1 c2 = compare_char c1 c2 = 0
+ 
+(** first symbol of t, or variable *)
 let rec term_to_char t =
   match t.term with
-  | Var _ | Leaf _ -> t
-  | Node (hd::_) -> term_to_char hd (* recurse to get the symbol *)
-  | Node [] -> assert false
+  | Var _ -> Variable t
+  | Node (f, _) -> Symbol f
 
-(** convert term to list of char *)
+(** convert term to list of var/symbol *)
 let to_list t =
   let l = ref []
   and pos = ref 0 in
@@ -74,16 +84,22 @@ let to_list t =
   done;
   List.rev !l
 
+module CharMap = Map.Make(
+  struct
+    type t = character
+    let compare = compare_char
+  end)
+
 (* --------------------------------------------------------
  * discrimination tree
  * -------------------------------------------------------- *)
 
 type 'a trie =
-  | Node of 'a trie Terms.TMap.t        (** map atom -> trie *)
+  | Node of 'a trie CharMap.t        (** map atom -> trie *)
   | Leaf of (term * 'a * int) list      (** leaf with (term, value, priority) list *)
 
 let empty_trie n = match n with
-  | Node m when T.TMap.is_empty m -> true
+  | Node m when CharMap.is_empty m -> true
   | Leaf [] -> true
   | _ -> false
 
@@ -103,17 +119,17 @@ let goto_leaf trie t k =
       | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
     | Node m, c::t' ->
       (try  (* insert in subtrie *)
-        let subtrie = T.TMap.find c m in
+        let subtrie = CharMap.find c m in
         let rebuild' subtrie = match subtrie with
-          | _ when empty_trie subtrie -> rebuild (Node (T.TMap.remove c m))
-          | _ -> rebuild (Node (T.TMap.add c subtrie m))
+          | _ when empty_trie subtrie -> rebuild (Node (CharMap.remove c m))
+          | _ -> rebuild (Node (CharMap.add c subtrie m))
         in
         goto subtrie t' rebuild'
       with Not_found -> (* no subtrie found *)
-        let subtrie = if t' = [] then Leaf [] else Node T.TMap.empty
+        let subtrie = if t' = [] then Leaf [] else Node CharMap.empty
         and rebuild' subtrie = match subtrie with
-          | _ when empty_trie subtrie -> rebuild (Node (T.TMap.remove c m))
-          | _ -> rebuild (Node (T.TMap.add c subtrie m))
+          | _ when empty_trie subtrie -> rebuild (Node (CharMap.remove c m))
+          | _ -> rebuild (Node (CharMap.add c subtrie m))
         in
         goto subtrie t' rebuild')
     | Node _, [] -> assert false (* ill-formed term *)
@@ -134,7 +150,7 @@ let empty f = {
   min_var = max_int;
   max_var = min_int;
   cmp = f;
-  tree = Node T.TMap.empty;
+  tree = Node CharMap.empty;
 }
 
 (** add a term and a value to the discrimination tree. The priority
@@ -183,27 +199,27 @@ let iter_match dt t k =
       (* "lazy" transformation to flatterm *)
       let t_pos = get_pos t pos in
       let t1 = term_to_char t_pos in
-      T.TMap.iter
+      CharMap.iter
         (fun t1' subtrie ->
           (* explore branch that has the same symbol, if any *)
-          (if T.eq_term t1' t1 then (assert (not (T.is_var t1));
-                                     traverse subtrie (next t pos) subst));
+          (if eq_char t1' t1 then (assert (match t1 with Variable _ -> false | _ -> true);
+                                   traverse subtrie (next t pos) subst));
           (* if variable, try to bind it and continue *)
-          (if T.is_var t1' && t1'.sort = t_pos.sort && S.is_in_subst t1' subst
-            then  (* already bound, check consistency *)
-              let t_matched = T.expand_bindings t_pos
-              and t_bound = T.expand_bindings t1'.binding in
-              if T.eq_term t_matched t_bound
-                then traverse subtrie (skip t pos) subst  (* skip term *)
+          (match t1' with
+           | Variable v1' when v1'.sort = t_pos.sort && S.is_in_subst v1' subst ->
+             (* already bound, check consistency *)
+             let t_matched = T.expand_bindings t_pos
+             and t_bound = T.expand_bindings v1'.binding in
+             if T.eq_term t_matched t_bound
+               then traverse subtrie (skip t pos) subst  (* skip term *)
                 else () (* incompatible bindings of the variable *)
-            else if T.is_var t1' && t1'.sort = t_pos.sort
-              then begin
-                (* t1' not bound, so we bind it and continue in subtree *)
-                T.set_binding t1' (T.expand_bindings t_pos);
-                let subst' = S.update_binding subst t1' in
-                traverse subtrie (skip t pos) subst';
-                T.reset_binding t1'  (* cleanup the variable *)
-              end))
+          | Variable v1' when v1'.sort = t_pos.sort ->
+            (* t1' not bound, so we bind it and continue in subtree *)
+            T.set_binding v1' (T.expand_bindings t_pos);
+            let subst' = S.update_binding subst v1' in
+            traverse subtrie (skip t pos) subst';
+            T.reset_binding v1'  (* cleanup the variable *)
+          | _ -> ()))
         m
   in
   T.reset_vars t;
@@ -213,7 +229,7 @@ let iter_match dt t k =
 let iter dt k =
   let rec iter trie =
     match trie with
-    | Node m -> T.TMap.iter (fun _ sub_dt -> iter sub_dt) m
+    | Node m -> CharMap.iter (fun _ sub_dt -> iter sub_dt) m
     | Leaf l -> List.iter (fun (t, v, _) -> k t v) l
   in iter dt.tree
   
@@ -222,6 +238,10 @@ let iter dt k =
  * pretty printing
  * -------------------------------------------------------- *)
 
+let char_to_str = function
+  | Variable v -> Utils.sprintf "%a" !T.pp_term#pp v
+  | Symbol s -> s
+
 module PrintTHCTree = Prtree.Make(
   struct
     type t = string * (term * hclause) trie
@@ -229,9 +249,9 @@ module PrintTHCTree = Prtree.Make(
     (* get a list of (key, sub-node) *)
     let get_values map =
       let l : t list ref = ref [] in
-      T.TMap.iter
+      CharMap.iter
         (fun key node -> 
-          let key_repr = Utils.sprintf "[@[<h>%a@]]" !T.pp_term#pp key in
+          let key_repr = char_to_str key in
           l := (key_repr, node) :: !l) map;
       !l
     and pp_rule formatter (_, (_, hc), _) =
@@ -255,9 +275,9 @@ module PrintTTree = Prtree.Make(
     (* get a list of (key, sub-node) *)
     let get_values map =
       let l : t list ref = ref [] in
-      T.TMap.iter
+      CharMap.iter
         (fun key node -> 
-          let key_repr = Utils.sprintf "[@[<h>%a@]]" !T.pp_term#pp key in
+          let key_repr = char_to_str key in
           l := (key_repr, node) :: !l) map;
       !l
     and pp_rule formatter (l, r, _) =

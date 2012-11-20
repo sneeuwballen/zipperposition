@@ -104,34 +104,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   let set_sort constant sort = Hashtbl.replace sort_table constant sort
 
-  (* helpers *)
-  let mk_and a b =
-    T.mk_apply and_symbol bool_sort [a; b]
-  
-  let mk_or a b =
-    T.mk_apply or_symbol bool_sort [a; b]
-
-  let mk_not t =
-    T.mk_apply not_symbol bool_sort [t]
-
-  let mk_imply a b =
-    T.mk_apply imply_symbol bool_sort [a; b]
-
-  let mk_equiv a b =
-    T.mk_apply eq_symbol bool_sort [a; b]
-
   let mk_forall v t =
     (* only add the quantifier if v is a free var in t *)
     if T.var_occurs v t
-      then T.mk_apply forall_symbol bool_sort
-        [T.mk_apply lambda_symbol bool_sort [T.db_from_var t v]]
+      then T.mk_node forall_symbol bool_sort
+        [T.mk_node lambda_symbol bool_sort [T.db_from_var t v]]
       else t
 
   let mk_exists v t =
     (* only add the quantifier if v is a free var in t *)
     if T.var_occurs v t
-    then T.mk_apply exists_symbol bool_sort
-        [T.mk_apply lambda_symbol bool_sort [T.db_from_var t v]]
+    then T.mk_node exists_symbol bool_sort
+        [T.mk_node lambda_symbol bool_sort [T.db_from_var t v]]
     else t
     
 %}
@@ -279,17 +263,17 @@ nonassoc_binary:
 
 binary_connective:
   | BIJECTION
-    { mk_equiv }
+    { T.mk_equiv }
   | LEFT_IMPLICATION
-    { mk_imply }
+    { T.mk_imply }
   | RIGHT_IMPLICATION
-    { fun x y -> mk_imply y x }
+    { fun x y -> T.mk_imply y x }
   | UNKNOWN
     { failwith "unknown token" }
   | NEGATION OR
-    { fun x y -> mk_not (mk_or x y) }
+    { fun x y -> T.mk_not (T.mk_or x y) }
   | NEGATION AND
-    { fun x y -> mk_not (mk_and x y) }
+    { fun x y -> T.mk_not (T.mk_and x y) }
 
 assoc_binary:
   | or_formula
@@ -299,23 +283,23 @@ assoc_binary:
 
 or_formula:
   | unitary_formula OR more_or_formula
-    { mk_or $1 $3 }
+    { T.mk_or $1 $3 }
 
 more_or_formula:
   | unitary_formula
     { $1 }
   | unitary_formula OR more_or_formula
-    { mk_or $1 $3 }
+    { T.mk_or $1 $3 }
 
 and_formula:
   | unitary_formula AND more_and_formula
-    { mk_and $1 $3 }
+    { T.mk_and $1 $3 }
 
 more_and_formula:
   | unitary_formula
     { $1 }
   | unitary_formula AND more_and_formula
-    { mk_and $1 $3 }
+    { T.mk_and $1 $3 }
 
 unitary_formula:
   | quantified_formula
@@ -352,7 +336,7 @@ unary_formula:
 
 unary_connective:
   | NEGATION
-    { mk_not }
+    { T.mk_not }
 
 
 cnf_annotated:
@@ -423,9 +407,9 @@ atomic_formula:
 plain_atom:
   | plain_term_top
       { let t = T.cast $1 bool_sort in (* cast term to bool *)
-        (match T.hd_symbol t with
-          | None -> ()
-          | Some s -> set_sort s bool_sort);
+        (match t.term with
+        | Node (s, _) -> set_sort s bool_sort
+        | Var _ -> assert false);
         t
       }
 
@@ -444,16 +428,16 @@ defined_atom:
       { T.false_term }
 
   | term EQUALITY term
-      { mk_equiv $1 $3 }
+      { T.mk_equiv $1 $3 }
   | term DISEQUALITY term
-      { mk_not (mk_equiv $1 $3) }
+      { T.mk_not (T.mk_equiv $1 $3) }
 
 system_atom:
   | system_term_top
       { let t = T.cast $1 bool_sort in
-        (match T.hd_symbol t with
-            | None -> ()
-            | Some s -> set_sort s bool_sort);
+        (match t.term with
+        | Node (s, _) -> set_sort s bool_sort
+        | Var _ -> assert false);
         t
       }
 
@@ -477,21 +461,21 @@ function_term:
 plain_term_top:
   | constant
       { let sort = get_sort $1 in
-        T.mk_leaf $1 sort }
+        T.mk_const $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = $1 :: $3 in
-        T.mk_node subterms
+      { let sort = get_sort $1 in
+        T.mk_node $1 sort $3
       }
 
 plain_term:
   | constant
       { let sort = get_sort $1 in
-        T.mk_leaf $1 sort }
+        T.mk_const $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = $1 :: $3 in
-        T.mk_node subterms
+      { let sort = get_sort $1 in
+        T.mk_node $1 sort $3
       }
 
 constant:
@@ -500,9 +484,7 @@ constant:
 
 functor_:
   | atomic_word
-      { let sym = $1 in
-        let sort = get_sort sym in
-        T.mk_leaf sym sort }
+      { $1 }
 
 defined_term:
   | number
@@ -517,23 +499,21 @@ defined_term:
 system_term_top:
   | system_constant
       { let sort = get_sort $1 in
-        T.mk_leaf $1 sort }
+        T.mk_const $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let subterms = (T.mk_leaf $1 univ_sort) :: $3 in
-        T.mk_node subterms
+      { 
+        T.mk_node $1 univ_sort $3
       }
 
 system_term:
   | system_constant
       { let sort = get_sort $1 in
-        T.mk_leaf $1 sort }
+        T.mk_const $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        let head = T.mk_leaf $1 sort in
-        let subterms = head :: $3 in
-        T.mk_node subterms
+        T.mk_node $1 sort $3
       }
 
 system_functor:

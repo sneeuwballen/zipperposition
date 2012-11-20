@@ -38,7 +38,6 @@ val compare_term : term -> term -> int    (** a simple order on terms *)
 module TSet : Set.S with type elt = term
 module TPairSet : Set.S with type elt = term * term
 module THashtbl : Hashtbl.S with type key = term
-module TMap : Map.S with type key = term
 
 (** Simple hashset for small sets of terms *)
 module THashSet :
@@ -56,6 +55,9 @@ module THashSet :
 (* ----------------------------------------------------------------------
  * access global terms table (hashconsing)
  * ---------------------------------------------------------------------- *)
+
+(* TODO hashconsing module, with optional arguments for term constructors *)
+
 val iter_terms : (term -> unit) -> unit       (** iterate through existing terms *)
 val all_terms : unit -> term list             (** all currently existing terms *)
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
@@ -67,9 +69,8 @@ val sig_version : int ref                     (** last version of signature (mod
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
 val mk_var : int -> sort -> term
-val mk_leaf : symbol -> sort -> term
-val mk_node : term list -> term
-val mk_apply : symbol -> sort -> term list -> term
+val mk_node : symbol -> sort -> term list -> term
+val mk_const : symbol -> sort -> term
 
 val true_term : term                        (** tautology symbol *)
 val false_term : term                       (** antilogy symbol *)
@@ -78,6 +79,7 @@ val mk_not : term -> term
 val mk_and : term -> term -> term
 val mk_or : term -> term -> term
 val mk_imply : term -> term -> term
+val mk_equiv : term -> term -> term
 val mk_eq : term -> term -> term
 val mk_lambda : term -> term
 val mk_forall : term -> term
@@ -89,16 +91,16 @@ val cast : term -> sort -> term             (** cast (change sort) *)
  * examine term/subterms, positions...
  * ---------------------------------------------------------------------- *)
 val is_var : term -> bool
-val is_leaf : term -> bool
+val is_const : term -> bool
 val is_node : term -> bool
-val hd_term : term -> term option           (** the head of the term *)
-val hd_symbol : term -> symbol option       (** the head of the term *)
 
 val at_pos : term -> position -> term       (** retrieve subterm at pos, or
                                                   raise Invalid_argument
                                                   TODO also return a context? *)
 val replace_pos : term -> position          (** replace t|_p by the second term *)
                -> term -> term
+
+(* TODO compact positions (cf dtree) *)
 
 val var_occurs : term -> term -> bool       (** [var_occurs x t] true iff x in t *)
 val is_ground_term : term -> bool           (** is the term ground? *)

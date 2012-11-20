@@ -38,19 +38,16 @@ let compute_signature () =
   T.iter_terms
     (fun t -> match t.term with
      | Var _ -> ()
-     | Leaf s ->
-        begin
-          (* update the arity only if not already found *)
-          if not (Hashtbl.mem arities s) then Hashtbl.replace arities s 0;
-          (* update sort only if it is not already bool *)
-          (if (try Hashtbl.find sorts s = bool_sort with Not_found -> false)
-            then ()
-            else Hashtbl.replace sorts s t.sort);
-          if not (List.mem s !symbols) then symbols := (s::!symbols) else ()
-        end
-     | Node (({term=Leaf s})::tail) ->
-        Hashtbl.replace arities s (List.length tail)
-     | _ -> failwith (Utils.sprintf "bad term %a" !T.pp_term#pp t));
+     | Node (s, l) ->
+       begin
+         (* update the arity only if not already found *)
+         if not (Hashtbl.mem arities s) then Hashtbl.replace arities s (List.length l);
+         (* update sort only if it is not already bool *)
+         (if (try Hashtbl.find sorts s = bool_sort with Not_found -> false)
+           then ()
+           else Hashtbl.replace sorts s t.sort);
+         if not (List.mem s !symbols) then symbols := s::!symbols
+       end);
   sorts, arities, !symbols
 
 let sig_version = ref 0  (* version of signature that is computed *)
@@ -230,9 +227,10 @@ module type S =
 (** simple weight for terms *)
 let rec weight_of_term ~so term = match term.term with
   | Var _ -> so#var_weight
-  | Leaf s -> so#weight s
-  | Node l -> List.fold_left
-      (fun sum subterm -> sum + weight_of_term ~so subterm) 0 l
+  | Node (s, l) ->
+    List.fold_left
+      (fun sum subterm -> sum + weight_of_term ~so subterm)
+      (so#weight s) l
 
 (** simple weight for clauses *)
 let compute_clause_weight ~so {clits=lits} =
@@ -249,20 +247,6 @@ let compute_clause_weight ~so {clits=lits} =
       sum + wlit*wlit)
     0 lits 
 
-(** helper to decompose a non-var term into (symbol, list of subterms) *)
-let decompose t =
-  let rec get_head t = match t.term with
-  | Leaf a -> a
-  | Node (hd::_) -> get_head hd
-  | Var _ -> assert false
-  | Node [] -> assert false
-  in
-  match t.term with
-  | Leaf a -> a, []
-  | Node ({term=Leaf a}::l) -> a, l
-  | Node (hd::l) -> get_head hd, l
-  | _ -> assert false
-
 (* Riazanov: p. 40, relation >>>
  * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
@@ -270,19 +254,14 @@ let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
   (* We want to discard any identity equality. *
    * If we give back Eq, no inference rule    *
    * will be applied on this equality          *)
-  | Var i, Var j when i = j ->
-      Eq
+  | Var i, Var j when i = j -> Eq
   (* 1. *)
   | Var _, _
   | _, Var _ -> Incomparable
-  (* 2.a *)
-  | Leaf a1, Leaf a2 ->
-      let cmp = b_compare a1 a2 in
-      if cmp = 0 then Eq else if cmp < 0 then Lt else Gt
-  | Leaf _, Node _ -> Lt
-  | Node _, Leaf _ -> Gt
-  (* 2.b *)
-  | Node l1, Node l2 ->
+  (* 2 *)
+  | Node (a1, l1), Node (a2, l2) ->
+    let cmp = b_compare a1 a2 in
+    if cmp < 0 then Lt else if cmp > 0 then Gt else
     let rec cmp t1 t2 =
       match t1, t2 with
       | [], [] -> Eq
@@ -358,10 +337,9 @@ module KBO = struct
         if pos
           then (add_pos_var balance x; (wb + so#var_weight, x = y))
           else (add_neg_var balance x; (wb - so#var_weight, x = y))
-      | Leaf s ->
-        if pos then (wb + so#weight s, false) else (wb - so#weight s, false)
-      | Node l ->
-        balance_weight_rec wb l y pos false
+      | Node (s, l) ->
+        let wb' = if pos then wb + so#weight s else wb - so#weight s in
+        balance_weight_rec wb' l y pos false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
       | [] -> (wb, res)
@@ -405,9 +383,7 @@ module KBO = struct
         add_neg_var balance y;
         let wb', contains = balance_weight wb t1 y true in
         (wb' - so#var_weight, if contains then Gt else Incomparable)
-      | _ ->
-        let f, ss = decompose t1
-        and g, ts = decompose t2 in
+      | Node (f, ss), Node (g, ts) ->
         (* do the recursive computation of kbo *)
         let wb', recursive = tckbo_rec wb f g ss ts in
         let wb'' = wb' + (so#weight f) - (so#weight g) in
@@ -455,7 +431,7 @@ module RPO = struct
     | Var _, Var _ -> Incomparable
     | _, Var i -> if T.var_occurs t s then Gt else Incomparable
     | Var i,_ -> if T.var_occurs s t then Lt else Incomparable
-    | Node (hd1::tl1), Node (hd2::tl2) ->
+    | Node (hd1, tl1), Node (hd2, tl2) ->
       (* check whether an elemnt of the list is >= t, and
          also returns the list of comparison results *)
       let rec ge_subterm t ol = function
@@ -476,31 +452,26 @@ module RPO = struct
             let rec check_subterms t = function
               | _, [] -> true
               | o::ol, _::tl ->
-                  if o = Lt then check_subterms t (ol,tl) else false
+                if o = Lt then check_subterms t (ol,tl) else false
               | [], x::tl ->
-                  if rpo ~so x t = Lt then check_subterms t ([],tl) else false
+                if rpo ~so x t = Lt then check_subterms t ([],tl) else false
             in
             (* non recursive comparison of function symbols *)
-            match aux_ordering so#compare hd1 hd2 with
-            | Gt -> if check_subterms s (r_ol,tl2) then Gt else Incomparable
-            | Lt -> if check_subterms t (l_ol,tl1) then Lt else Incomparable
-            | Eq -> rpo_rec ~so hd1 tl1 tl2 s t
-            | Incomparable -> Incomparable
+            match so#compare hd1 hd2 with
+            | n when n > 0 -> if check_subterms s (r_ol,tl2) then Gt else Incomparable
+            | n when n < 0 -> if check_subterms t (l_ol,tl1) then Lt else Incomparable
+            | _ -> rpo_rec ~so hd1 tl1 tl2 s t
           end
-    | _,_ -> aux_ordering so#compare s t
   (* recursive comparison of lists of terms (head symbol is hd) *)
   and rpo_rec ~so hd l1 l2 s t =
-    match hd.term with
-    | Var _ | Node _ -> assert false
-    | Leaf f ->
-    if so#multiset_status f
-      then Utils.multiset_partial (rpo ~so) l1 l2
-      else match Utils.lexicograph_partial (rpo ~so) l1 l2 with
-        | Gt ->
-          if List.for_all (fun x -> rpo ~so s x = Gt) l2 then Gt else Incomparable
-        | Lt ->
-          if List.for_all (fun x -> rpo ~so x t = Lt) l1 then Lt else Incomparable
-        | o -> o
+    (if so#multiset_status hd
+    then Utils.multiset_partial (rpo ~so) l1 l2
+    else match Utils.lexicograph_partial (rpo ~so) l1 l2 with
+      | Gt ->
+        if List.for_all (fun x -> rpo ~so s x = Gt) l2 then Gt else Incomparable
+      | Lt ->
+        if List.for_all (fun x -> rpo ~so x t = Lt) l1 then Lt else Incomparable
+      | o -> o)
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(rpo)"
   let compare_terms ~so (x, y) =
@@ -520,28 +491,24 @@ module RPO6 = struct
     | Var _, Var _ -> Incomparable
     | _, Var _ -> if T.var_occurs t s then Gt else Incomparable
     | Var _, _ -> if T.var_occurs s t then Lt else Incomparable
-    | _ -> begin
-      match decompose s, decompose t with
-       | (f, []), (g, []) ->
-          (match so#compare f g with
-           | n when n < 0 -> Lt
-           | n when n > 0 -> Gt
-           | _ -> Eq)
-       | (f, ss), (g, ts) ->
-          (match so#compare f g with
-          | 0 when so#multiset_status f ->
-            cMultiset ~so ss ts (* multiset subterm comparison *)
-          | 0 ->
-            cLMA ~so s t ss ts  (* lexicographic subterm comparison *)
-          | n when n > 0 -> cMA ~so s ts
-          | n when n < 0 -> Utils.not_partial (cMA ~so t ss)
-          | _ -> assert false   (* match exhaustively *)
-          )
-      end
+    | Node (f, []), Node (g, []) ->
+      (match so#compare f g with
+       | n when n < 0 -> Lt
+       | n when n > 0 -> Gt
+       | _ -> Eq)
+    | Node (f, ss), Node (g, ts) ->
+      (match so#compare f g with
+      | 0 when so#multiset_status f ->
+        cMultiset ~so ss ts (* multiset subterm comparison *)
+      | 0 ->
+        cLMA ~so s t ss ts  (* lexicographic subterm comparison *)
+      | n when n > 0 -> cMA ~so s ts
+      | n when n < 0 -> Utils.not_partial (cMA ~so t ss)
+      | _ -> assert false)  (* match exhaustively *)
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
   and cMA ~so s ts = match ts with
-    |[] -> Gt
+    | [] -> Gt
     | t::ts' ->
       (match rpo6 ~so s t with
       | Gt -> cMA ~so s ts'

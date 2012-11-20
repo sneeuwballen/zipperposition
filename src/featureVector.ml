@@ -58,10 +58,11 @@ let feat_size_minus clause =
 let count_symb_lit symb lit =
   let rec count_symb_term t = match t.term with
   | Var _ -> 0
-  | Leaf s -> if s = symb then 1 else 0
-  | Node l -> List.fold_left
-    (fun sum subterm -> sum + (count_symb_term subterm))
-    0 l
+  | Node (s, l) ->
+    let cnt = if s = symb then 1 else 0 in
+    List.fold_left
+      (fun sum subterm -> sum + (count_symb_term subterm))
+      cnt l
   in match lit with
   | Equation (l, r, _, _) -> count_symb_term l + count_symb_term r
 
@@ -81,11 +82,11 @@ let count_symb_minus symb clause =
 let max_depth_lit symb lit =
   let rec max_depth_term t depth = match t.term with
   | Var _ -> -1
-  | Leaf s -> if s = symb then depth else -1
-  | Node l ->
+  | Node (s, l) ->
+    let depth = if s = symb then depth else -1 in
     List.fold_left
       (fun maxdepth subterm -> max maxdepth (max_depth_term subterm (depth+1)))
-      (-1) l
+      depth l
   in match lit with
   | Equation (l, r, _, _) -> max (max_depth_term l 0) (max_depth_term r 0)
 

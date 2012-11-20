@@ -67,11 +67,10 @@ and typed_term = {
 }
 (** content of the term *)
 and term_cell =
-  | Leaf of symbol          (** constant *)
-  | Var of int              (** variable *)
-  | Node of term list       (** term application *)
+  | Var of int                  (** variable *)
+  | Node of symbol * term list  (** term application *)
 
-(** list of variables *)
+(** list of variables TODO replace by T.THashSet? *)
 type varlist = term list            
 
 (** substitution, a list of (variable -> term) *)
@@ -83,10 +82,10 @@ type rewriting_system = term -> term
 (** partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable
 
-(** direction of an equation (for rewriting) *)
+(** direction of an equation (for rewriting) TODO cleanup *)
 type direction = Left2Right | Right2Left | Nodir
 
-(** position in a term *)
+(** position in a term TODO compact positions *)
 type position = int list
 
 (** a literal, that is, a signed equation *)
@@ -94,7 +93,7 @@ type literal =
  | Equation of    term  (* lhs *)
                 * term  (* rhs *)
                 * bool    (* sign *)
-                * comparison (* orientation *)
+                * comparison (* orientation TODO remove (trust the comparison cache) *)
 
 (** a hashconsed first order clause *)
 type hclause = clause

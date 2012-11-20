@@ -35,15 +35,14 @@ let random_lit () =
 
 (** random clause *)
 let random_clause ?(size=4) () =
+  let ord = O.default_ordering () in
   if H.random_in 0 200 >= 198 then
     (* empty clause, from time to time *)
-    let ord = O.dummy_ordering in
     C.mk_clause ~ord [] ~selected:(lazy []) (lazy (Axiom ("", "empty!"))) (lazy [])
   else
     (* build an actual clause *)
     let size = H.random_in 1 size in
     let lits = Utils.times size (fun _ -> random_lit ()) in
-    let ord = O.dummy_ordering in
     C.mk_clause ~ord lits ~selected:(lazy [])(lazy (Axiom ("", "random"))) (lazy [])
 
 (* pair of random clauses *)

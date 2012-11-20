@@ -38,7 +38,6 @@ let rec occurs_check var t =
   | Var _ when not (T.eq_term t (T.get_binding t)) ->
     occurs_check var (T.get_binding t)  (* see in binding *)
   | Var _ -> false
-  | Leaf _ -> assert false
   | Node _ -> List.exists (occurs_check var) t.vars
 
 (** if t is a variable, return its current binding *)
@@ -65,7 +64,7 @@ let unification subst a b =
     | _, Var _ ->
       T.set_binding t (T.expand_bindings s);
       S.update_binding subst t
-    | Node l1, Node l2 when List.length l1 = List.length l2 ->
+    | Node (f, l1), Node (g, l2) when f = g && List.length l1 = List.length l2 ->
       let subst = unify_composites subst l1 l2 in (* unify non-vars *)
       unify_vars subst l1 l2  (* unify vars *)
     | _, _ -> raise UnificationFailure
@@ -109,7 +108,7 @@ let matching_locked ~locked subst a b =
     | Var _, _ ->
       T.set_binding s (T.expand_bindings t);
       S.update_binding subst s
-    | Node l1, Node l2 when List.length l1 = List.length l2 ->
+    | Node (f, l1), Node (g, l2) when f = g && List.length l1 = List.length l2 ->
       List.fold_left2 unif subst l1 l2
     | _ -> raise UnificationFailure
   in
@@ -138,7 +137,7 @@ let alpha_eq s t =
           when (not (List.exists (fun (_,k) -> k=t) subst)) ->
           let subst = S.build_subst s t subst in
             subst
-      | Node l1, Node l2 -> (
+      | Node (f, l1), Node (g, l2) when f = g -> (
           try
             List.fold_left2
               (fun subst' s t -> equiv subst' s t)

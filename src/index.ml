@@ -172,8 +172,8 @@ let process_clause ~restrict op tree c =
 (** apply (op tree) to all subterms, folding the resulting tree *)
 let rec fold_subterms op tree t (c, path) = match t.term with
   | Var _ -> tree  (* variables are not indexed *)
-  | Leaf _ -> op tree t (c, List.rev path, t) (* reverse path now *)
-  | Node (_::l) ->
+  | Node (_, []) -> op tree t (c, List.rev path, t) (* reverse path now *)
+  | Node (_, l) ->
       (* apply the operation on the term itself *)
       let tmp_tree = op tree t (c, List.rev path, t) in
       let _, new_tree = List.fold_left
@@ -182,7 +182,6 @@ let rec fold_subterms op tree t (c, path) = match t.term with
         (fun (idx, tree) t -> idx+1, fold_subterms op tree t (c, idx::path))
         (1, tmp_tree) l
       in new_tree
-  | _ -> assert false
 
 (** apply (op tree) to the root term, after reversing the path *)
 let apply_root_term op tree t (c, path) = op tree t (c, List.rev path, t)

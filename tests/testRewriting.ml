@@ -7,18 +7,18 @@ module S = FoSubst
 module Utils = FoUtils
 module Rw = Rewriting
 
-let a = T.mk_leaf "a" univ_sort
-let b = T.mk_leaf "b" univ_sort
-let c = T.mk_leaf "c" univ_sort
-let d = T.mk_leaf "d" univ_sort
-let f x y = T.mk_apply "f" univ_sort [x; y]
-let g x = T.mk_apply "g" univ_sort [x]
-let h x = T.mk_apply "h" univ_sort [x]
-let zero = T.mk_leaf "0" univ_sort
-let succ n = T.mk_apply "s" univ_sort [n]
-let plus a b = T.mk_apply "+" univ_sort [a; b]
-let minus a = T.mk_apply "-" univ_sort [a]
-let times a b = T.mk_apply "x" univ_sort [a; b]
+let a = T.mk_const "a" univ_sort
+let b = T.mk_const "b" univ_sort
+let c = T.mk_const "c" univ_sort
+let d = T.mk_const "d" univ_sort
+let f x y = T.mk_node "f" univ_sort [x; y]
+let g x = T.mk_node "g" univ_sort [x]
+let h x = T.mk_node "h" univ_sort [x]
+let zero = T.mk_const "0" univ_sort
+let succ n = T.mk_node "s" univ_sort [n]
+let plus a b = T.mk_node "+" univ_sort [a; b]
+let minus a = T.mk_node "-" univ_sort [a]
+let times a b = T.mk_node "x" univ_sort [a; b]
 let x = T.mk_var 1 univ_sort
 let y = T.mk_var 2 univ_sort
 let z = T.mk_var 3 univ_sort
@@ -32,11 +32,10 @@ let rec from_int n =
 
 (** convert Peano term t to int *)
 let peano_to_int t =
-  let s = T.mk_leaf "s" univ_sort in
   let rec count t n =
     match t.term with
     | _ when T.eq_term t zero -> n
-    | Node [t1; t2] when T.eq_term t1 s -> count t2 (n+1)
+    | Node (s, [t2]) when s = "s" -> count t2 (n+1)
     | _ -> failwith "not peano!"
   in count t 0
 
@@ -46,11 +45,10 @@ let rec print_peano_nice formatter t =
     Format.fprintf formatter "%d" (peano_to_int t)
   with Failure _ ->
     match t.term with
-    | Var _ | Leaf _ -> !T.pp_term#pp formatter t
-    | Node (h::l) ->
-      Format.fprintf formatter "@[<h>%a(%a)@]" !T.pp_term#pp h
+    | Var _ -> !T.pp_term#pp formatter t
+    | Node (h, l) ->
+      Format.fprintf formatter "@[<h>%a(%a)@]" !T.pp_term#pp (T.mk_const h univ_sort (* ugly *))
         (Utils.pp_list ~sep:", " print_peano_nice) l
-    | Node [] -> assert false
 
 (** Simple rewriting system for Peano arithmetic with + and x *)
 let peano_trs =

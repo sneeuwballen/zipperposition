@@ -40,14 +40,11 @@ type fingerprint_fun = term -> feature list
 (** compute a feature for a given position *)
 let rec gfpf pos t = match pos, t.term with
   | [], Var _ -> A
-  | [], Leaf s -> S s
-  | [], Node ({term=Leaf s}::_) -> S s
-  | [], _ -> failwith (Utils.sprintf "bad term: %a" !T.pp_term#pp t)
-  | i::pos', Node l ->
+  | [], Node (s, _) -> S s
+  | i::pos', Node (_, l) ->
     (try gfpf pos' (Utils.list_get l i)  (* recurse in subterm *)
     with Not_found -> N)  (* not a position in t *)
   | _::_, Var _ -> B  (* under variable *)
-  | _::_, Leaf _ -> N
 
 (** compute a feature vector for some positions *)
 let fp positions =

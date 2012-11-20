@@ -52,10 +52,10 @@ let heuristic_constraint clauses : ordering_constraint =
   (* update counts with term *)
   let rec update_with_term sign t = match t.term with
     | Var _ -> ()
-    | Leaf s ->
+    | Node (s, l) ->
         let count = try Hashtbl.find table s with Not_found -> 0 in
-        Hashtbl.replace table s (if sign then count-1 else count+1)
-    | Node l -> List.iter (update_with_term sign) l
+        Hashtbl.replace table s (if sign then count-1 else count+1);
+        List.iter (update_with_term sign) l
   (* update counts with clause *)
   and update_with_clause clause =
     List.iter

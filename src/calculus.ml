@@ -158,8 +158,8 @@ let skolem =
       Utils.debug 4 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
       incr count;
       let skolem_term =
-        if vars = [] then T.mk_leaf new_symbol sort
-        else T.mk_apply new_symbol sort vars
+        if vars = [] then T.mk_const new_symbol sort
+        else T.mk_node new_symbol sort vars
       in
       (* update the ordering *)
       ord#refresh ();

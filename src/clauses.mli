@@ -62,6 +62,8 @@ val lit_to_multiset : literal -> term list (** literal to multiset of terms *)
  * clauses
  * ---------------------------------------------------------------------- *)
 
+(* TODO hashconsing module, with optional arguments for clause constructors *)
+
 val eq_clause : clause -> clause -> bool                (** equality of clauses *)
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
 val hash_clause : clause -> int                         (** hash of the clause *)

@@ -107,14 +107,12 @@ let rec rewrite trs t =
 and compute_nf trs t =
   match t.term with
   | Var _ -> t
-  | Leaf _ -> reduce_at_root trs t
-  | Node (hd::l) ->
+  | Node (hd, l) ->
     (* rewrite subterms first *)
     let l' = List.map (rewrite trs) l in
-    let t' = T.mk_node (hd::l') in
+    let t' = T.mk_node hd t.sort l' in
     (* rewrite at root *)
     reduce_at_root trs t'
-  | Node [] -> assert false
 (* assuming subterms are in normal form, reduce the term *)
 and reduce_at_root trs t =
   try

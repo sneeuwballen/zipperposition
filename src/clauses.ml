@@ -174,14 +174,14 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
     assert (l.sort = bool_sort);
     lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
   (* deal with negation *)
-  | Node [{term=Leaf s}; t], _ when s = not_symbol && T.eq_term r T.true_term ->
+  | Node (s, [t]), _ when s = not_symbol && T.eq_term r T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
-  | _, Node [{term=Leaf s}; t] when s = not_symbol && T.eq_term l T.true_term ->
+  | _, Node (s, [t]) when s = not_symbol && T.eq_term l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
   (* deal with equality symbol *)
-  | Node [{term=Leaf s}; a; b], _ when s = eq_symbol && T.eq_term r T.true_term ->
+  | Node (s, [a; b]), _ when s = eq_symbol && T.eq_term r T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)
-  | _, Node [{term=Leaf s}; a; b] when s = eq_symbol && T.eq_term l T.true_term ->
+  | _, Node (s, [a; b]) when s = eq_symbol && T.eq_term l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)
   (* default is just reordering *)
   | _ -> reord_lit ~ord lit
@@ -355,7 +355,7 @@ let get_pos clause pos =
       let lit = get_lit clause idx in
       let rec find_subterm pos t = match (pos, t.term) with
       | [], _ -> t
-      | i::pos', Node l when List.length l > i ->
+      | i::pos', Node (s, l) when List.length l > i ->
           find_subterm pos' (Utils.list_get l i)
       | _ -> invalid_arg "position does not match term"
       in
@@ -605,7 +605,7 @@ let pp_clause_tstp =
         (* quantify all free variables *)
         let vars = t.vars in
         let t = List.fold_left
-          (fun t var -> T.mk_node [T.mk_leaf forall_symbol bool_sort; var; t])
+          (fun t var -> T.mk_node forall_symbol bool_sort [var; t])
           t vars
         in
         T.pp_term_tstp#pp formatter t

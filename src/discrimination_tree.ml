@@ -66,15 +66,10 @@ end
 (* convert into a path string *)
 let path_string_of t =
   let rec aux arity t acc = match t.term with
-    | Leaf a -> (Constant (a, arity)) :: acc
     | Var i -> (* assert (arity = 0); *) Variable :: acc
-    | Node ([] | [ _ ] )
-    (* FIXME : should this be allowed or not ? *)
-    | Node ({term=Var _}::_)
-    | Node ({term=Node _}::_) ->
-      failwith (Utils.sprintf "linearizing %a failed." !T.pp_term#pp t)
-    | Node (hd::tl) ->
-        let acc = aux (List.length tl) hd acc in
+    | Node (a, []) -> (Constant (a, arity)) :: acc
+    | Node (hd, tl) ->
+        let acc = (Constant (hd, List.length tl)) :: acc in
         List.fold_left (fun acc t -> aux 0 t acc) acc tl
   in 
   (* we build the path in reverse order because it should be faster,
