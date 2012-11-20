@@ -479,11 +479,6 @@ let string_of_pos s = match s with
   | _ when s == right_pos -> "right"
   | _ -> assert false
 
-let string_of_direction = function
-    | Left2Right -> "Left to right"
-    | Right2Left -> "Right to left"
-    | Nodir -> "No direction"
-
 let string_of_comparison = function
   | Lt -> "=<="
   | Gt -> "=>="

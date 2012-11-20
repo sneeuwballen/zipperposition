@@ -82,9 +82,6 @@ type rewriting_system = term -> term
 (** partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable
 
-(** direction of an equation (for rewriting) TODO cleanup *)
-type direction = Left2Right | Right2Left | Nodir
-
 (** position in a term TODO compact positions *)
 type position = int list
 

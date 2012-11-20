@@ -158,7 +158,6 @@ open Format
 
 val string_of_comparison : comparison -> string
 val string_of_pos : int -> string
-val string_of_direction : direction -> string
 
 (** pretty printer for literals *)
 class type pprinter_literal =
