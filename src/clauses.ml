@@ -348,6 +348,9 @@ let mk_clause ~cs eqns cproof cparents =
     (fun cnt lit -> if lit.lit_selected then cnt+1 else cnt) 0 clits in
   {clits; cvars; cproof; cselected; cparents; ctag= -1; chkey}
 
+let mk_clause_vec ~cs eqns cproof cparents =
+  mk_clause ~cs (Vector.to_array eqns) cproof cparents
+
 let parents clause = clause.cparents
 
 let clause_of_fof ~cs c =

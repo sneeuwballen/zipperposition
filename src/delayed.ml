@@ -72,53 +72,40 @@ let symbol_constraint _ =
  * elimination rules
  * ---------------------------------------------------------------------- *)
 
-(** to be raised when a simplification is found *)
-exception Elimination of clause list
+(** equation simplified into a disjunction of conjunctions of equations *)
+type tableau_rule =
+  | Alpha of tableau_rule * tableau_rule  (** alpha elimination *)
+  | List of equation list                 (** list of literals, after transformation *)
+  | Keep of equation                      (** keep this equation unchanged *)
 
-(** helper for alpha elimination (remove idx-th literal from
-    clause and adds a and b to two new clauses *)
-let alpha_eliminate ~ord clause idx a signa b signb =
-  assert (a.sort = bool_sort && b.sort = bool_sort);
-  let new_lita = C.mk_eqn a T.true_term signa
-  and new_litb = C.mk_eqn b T.true_term signb in
-  let other_lits = Utils.list_remove clause.clits idx in
-  let proof = lazy (Proof ("α-elim", [clause, [idx], S.id_subst])) in
-  let clauses = [C.mk_clause ~ord (new_lita :: other_lits) ~selected:(lazy []) proof (lazy [clause]);
-                 C.mk_clause ~ord (new_litb :: other_lits) ~selected:(lazy []) proof (lazy [clause])]
-  in raise (Elimination clauses)
+(** helper for alpha elimination *)
+let alpha_eliminate a signa b signb =
+  Alpha (List [C.mk_eqn a T.true_term signa],
+         List [C.mk_eqn b T.true_term signb])
 
-(** helper for beta elimination (remove idx-th literal from
-    clause and adds a and b *)
-let beta_eliminate ~ord clause idx a signa b signb =
-  assert (a.sort = bool_sort && b.sort = bool_sort);
-  let new_lita = C.mk_lit ~ord a T.true_term signa
-  and new_litb = C.mk_lit ~ord b T.true_term signb in
-  let new_lits = new_lita :: new_litb :: (Utils.list_remove clause.clits idx) in
-  let proof = lazy (Proof ("β-elim", [clause, [idx], S.id_subst])) in
-  raise (Elimination [C.mk_clause ~ord new_lits ~selected:(lazy []) proof (lazy [clause])])
+(** helper for beta elimination *)
+let beta_eliminate a signa b signb =
+  List [C.mk_eqn a T.true_term signa; C.mk_eqn b T.true_term signb]
 
-(** helper for gamma elimination (remove idx-th literal from clause
-    and adds t where De Bruijn 0 is replaced by a fresh var) *)
-let gamma_eliminate ~ord clause idx t sign =
-  let maxvar = max (T.max_var clause.cvars) 0 in
+(** helper for gamma elimination *)
+let gamma_eliminate offset t sign =
   assert (t.sort = bool_sort);
+  let i = !offset in
+  incr offset;
   let new_t =
     match T.look_db_sort 0 t with
     | None -> T.db_unlift t (* the variable is not present *)
     | Some sort ->
       (* sort is the sort of the first DB symbol *)
-      let new_var = T.mk_var (maxvar + 1) sort in
+      let new_var = T.mk_var i sort in
       T.db_unlift (T.db_replace t new_var)
   in
-  let new_lit = C.mk_lit ~ord new_t T.true_term sign in
-  let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
-  let proof = lazy (Proof ("γ-elim", [clause, [idx], S.id_subst])) in
-  raise (Elimination [C.mk_clause ~ord new_lits ~selected:(lazy []) proof (lazy [clause])])
+  List [C.mk_eqn new_t T.true_term sign]
 
 (** helper for delta elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a skolem
     of free variables of t) *)
-let delta_eliminate ~ord clause idx t sign =
+let delta_eliminate ~ord t sign =
   assert (t.sort = bool_sort);
   let new_t =
     match T.look_db_sort 0 t with
@@ -127,156 +114,130 @@ let delta_eliminate ~ord clause idx t sign =
       (* sort is the sort of the first DB symbol *)
       skolem ~ord t sort
   in
-  let new_lit = C.mk_lit ~ord new_t T.true_term sign in
-  let new_lits = new_lit :: (Utils.list_remove clause.clits idx) in
-  let proof = lazy (Proof ("δ-elim", [clause, [idx], S.id_subst])) in
-  raise (Elimination [C.mk_clause ~ord new_lits ~selected:(lazy []) proof (lazy [clause])])
+  List [C.mk_eqn new_t T.true_term sign]
 
-(** An elimination rule transforms a clause into a list of new
-    clauses in one step, or return None if it is not applicable *)
-type elimination_rule = ord:ordering -> clause -> clause list option
+(** Just keep the equation as it is *)
+let keep eqn = Keep eqn
 
-(** elimination of unary/binary logic connectives *)
-let connective_elimination ~ord clause =
-  let lits = if C.selected clause = []
-    then C.maxlits clause
-    else C.selected_lits clause in
-  try
-    fold_lits ~both:false ~pos:true ~neg:true
-    (fun () l r sign l_pos ->
-      (* if a literal is true_term, must be r because it is the smallest term *)
-      if not (T.eq_term r T.true_term) then () else
-      let idx = List.hd l_pos in
-      if not (C.eligible_res ~ord clause idx S.id_subst) then () else
-      match l.term with
-      | Node (s, [a; b]) ->
-        (* some alpha/beta eliminations *)
-        if s = and_symbol && sign
-        then alpha_eliminate ~ord clause idx a true b true
-        else if s = and_symbol && (not sign)
-        then beta_eliminate ~ord clause idx a false b false
-        else if s = or_symbol && sign
-        then beta_eliminate ~ord clause idx a true b true
-        else if s = or_symbol && (not sign)
-        then alpha_eliminate ~ord clause idx a false b false
-        else if s = imply_symbol && sign
-        then beta_eliminate ~ord clause idx a false b true
-        else if s = imply_symbol && (not sign)
-        then alpha_eliminate ~ord clause idx a true b false
-      | _ -> ()
-    )
-    () lits;
-    None  (* no simplification *)
-  with Elimination l -> Some l
-
-(** elimination of forall *)
-let forall_elimination ~ord clause =
-  let lits = if C.selected clause = []
-    then C.maxlits clause
-    else C.selected_lits clause in
-  try
-    fold_lits ~both:false ~pos:true ~neg:true
-    (fun () l r sign l_pos -> 
-      if not (T.eq_term r T.true_term) then () else
-      let idx = List.hd l_pos in 
-      if not (C.eligible_res ~ord clause idx S.id_subst) then () else
-      match l.term with
-      | Node (s, [{term=Node (s', [t])}]) when s = forall_symbol && s' = lambda_symbol ->
-        (* we have a forall (lambda t) *)
-        assert (t.sort = bool_sort);
-        if sign
-          then gamma_eliminate ~ord clause idx t true
-          else delta_eliminate ~ord clause idx t false
-      | _ -> ()
-    )
-    () lits; None
-  with Elimination l -> Some l
-
-(** elimination of exists *)
-let exists_elimination ~ord clause =
-  let lits = if C.selected clause = []
-    then C.maxlits clause
-    else C.selected_lits clause in
-  try
-    fold_lits ~both:false ~pos:true ~neg:true
-    (fun acc l r sign l_pos -> 
-      if not (T.eq_term r T.true_term) then () else
-      let idx = List.hd l_pos in 
-      if not (C.eligible_res ~ord clause idx S.id_subst) then () else
-      match l.term with
-      | Node (s, [{term=Node (s', [t])}]) when s = exists_symbol && s' = lambda_symbol ->
-        (* we have an exists (lambda t) *)
-        assert (t.sort = bool_sort);
-        if sign
-          then delta_eliminate ~ord clause idx t true
-          else gamma_eliminate ~ord clause idx t false
-      | _ -> ()
-    )
-    () lits; None
-  with Elimination l -> Some l
-
-(** equivalence elimination *)
-let equivalence_elimination ~ord clause =
-  let lits = if C.selected clause = []
-    then C.maxlits clause
-    else C.selected_lits clause in
-  (* do the inference for positive equations *)
-  let do_inferences_pos l r l_pos =
-    if T.atomic l then () else begin
-      assert (r.sort = bool_sort);
-      assert (ord#compare l r <> Lt);
-      (* ok, do it *)
-      let idx = List.hd l_pos in
-      if not (C.eligible_res ~ord clause idx S.id_subst) then () else
-      let new_lits = Utils.list_remove clause.clits idx in
-      let new_lits1 = (C.mk_neq ~ord l T.true_term) ::
-                      (C.mk_eq ~ord r T.true_term) :: new_lits
-      and proof1 = lazy (Proof ("<=>-elim+", [clause, l_pos, S.id_subst]))
-      and new_lits2 = (C.mk_eq ~ord l T.true_term) ::
-                      (C.mk_neq ~ord r T.true_term) :: new_lits
-      and proof2 = lazy (Proof ("<=>-elim+", [clause, l_pos, S.id_subst]))
-      in
-      let clauses = [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1 (lazy [clause]);
-                     C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2 (lazy [clause])]
-      in raise (Elimination clauses)
-    end
-  (* do the inference for negative equations *)
-  and do_inferences_neg l r l_pos =
-    if not (l.sort = bool_sort) then () else begin
-      assert (r.sort = bool_sort);
-      let idx = List.hd l_pos in
-      if not (C.eligible_res ~ord clause idx S.id_subst) then () else
-      let new_lits = Utils.list_remove clause.clits idx in
-      let new_lits1 = (C.mk_eq ~ord l T.true_term) ::
-                      (C.mk_eq ~ord r T.true_term) :: new_lits
-      and proof1 = lazy (Proof ("<=>-elim-", [clause, l_pos, S.id_subst]))
-      and new_lits2 = (C.mk_neq ~ord l T.true_term) ::
-                      (C.mk_neq ~ord r T.true_term) :: new_lits
-      and proof2 = lazy (Proof ("<=>-elim-", [clause, l_pos, S.id_subst]))
-      in
-      let clauses = [C.mk_clause ~ord new_lits1 ~selected:(lazy []) proof1 (lazy [clause]);
-                     C.mk_clause ~ord new_lits2 ~selected:(lazy []) proof2 (lazy [clause])]
-      in raise (Elimination clauses)
-    end
+(** perform at most one simplification on each literal. It
+    returns an array of tableau_rule. *)
+let eliminate_lits ~cs clause =
+  let offset = ref (T.max_var clause.cvars + 1) in  (* offset to create variables *)
+  (* is the literal eligible? *)
+  let eligible i = C.eligible_res ~cs clause i S.id_subst in
+  (* eliminate propositions (connective and quantifier eliminations) *)
+  let prop eqn p sign =
+    assert (p.sort = bool_sort);
+    match p.term with
+    | Node (s, [a; b]) when s = and_symbol && sign -> alpha_eliminate a true b true
+    | Node (s, [a; b]) when s = and_symbol && not sign -> beta_eliminate a false b false
+    | Node (s, [a; b]) when s = or_symbol && sign -> beta_eliminate a true b true
+    | Node (s, [a; b]) when s = or_symbol && not sign -> alpha_eliminate a false b false
+    | Node (s, [a; b]) when s = imply_symbol && sign -> beta_eliminate a false b true
+    | Node (s, [a; b]) when s = imply_symbol && not sign -> alpha_eliminate a true b false
+    | Node (s, [{term=Node (s', [t])}]) when s = forall_symbol && s' = lambda_symbol && sign ->
+      gamma_eliminate offset t true
+    | Node (s, [{term=Node (s', [t])}]) when s = forall_symbol && s' = lambda_symbol && not sign ->
+      delta_eliminate ~ord:cs#ord t false
+    | Node (s, [{term=Node (s', [t])}]) when s = exists_symbol && s' = lambda_symbol && sign ->
+      delta_eliminate ~ord:cs#ord t true
+    | Node (s, [{term=Node (s', [t])}]) when s = exists_symbol && s' = lambda_symbol && not sign ->
+      gamma_eliminate offset t false
+    | _ -> keep eqn
+  (* eliminate equivalence *)
+  and equiv eqn l r sign =
+    match cs#ord#compare l r with
+    | Gt when not (T.atomic l) && sign -> (* l <=> r -> (l => r) & (r => l)*)
+      Alpha (List [C.mk_neq l T.true_term; C.mk_eq r T.true_term],
+             List [C.mk_neq r T.true_term; C.mk_eq l T.true_term])
+    | Lt when not (T.atomic r) && sign ->
+      Alpha (List [C.mk_neq l T.true_term; C.mk_eq r T.true_term],
+             List [C.mk_neq r T.true_term; C.mk_eq l T.true_term])
+    | Gt when not (T.atomic l) && not sign -> (* not (l <=> r) -> (l | r) & (not l | not r) *)
+      Alpha (List [C.mk_eq l T.true_term; C.mk_eq r T.true_term],
+             List [C.mk_neq r T.true_term; C.mk_neq l T.true_term])
+    | Lt when not (T.atomic r) && not sign ->
+      Alpha (List [C.mk_eq l T.true_term; C.mk_eq r T.true_term],
+             List [C.mk_neq r T.true_term; C.mk_neq l T.true_term])
+    | _ -> keep eqn
   in
-  try
-    fold_lits ~both:true ~pos:true ~neg:true
-      (fun acc l r sign l_pos -> 
-        if T.eq_term r T.true_term || T.eq_term r T.false_term
-        then acc
-        else if sign
-          then do_inferences_pos l r l_pos
-          else do_inferences_neg l r l_pos)
-      () lits;
-      None
-  with Elimination l -> Some l
+  (* try to eliminate each literal that is eligible for resolution *)
+  let tableau_rules =
+    Array.mapi
+      (fun i lit -> 
+        if eligible i
+          then
+            match lit.lit_eqn with
+            | Equation (l, r, sign) when T.eq_term r T.true_term -> prop lit.lit_eqn l sign
+            | Equation (l, r, sign) when T.eq_term l T.true_term -> prop lit.lit_eqn r sign
+            | Equation (l, r, sign) when l.sort = bool_sort -> equiv lit.lit_eqn l r sign
+            | _ -> keep lit.lit_eqn  (* equation between terms *)
+          else keep lit.lit_eqn)
+    clause.clits
+  in
+  tableau_rules
+
+(** Produce a vector of clauses from an array of tableau_rule, or None *)
+let tableau_to_clauses ~cs clause a =
+  if try Array.iter (function | Keep _ -> () | _ -> raise Exit) a; true
+     with Exit -> false
+  then None (* no change, the array contains only Keep *)
+  else begin
+    let clauses = Vector.create 10
+    and eqns = Vector.create (Array.length a * 2) in
+    let proof = lazy (Proof ("elim", [clause, [], S.id_subst]))
+    and parents = [clause] in
+    (* explore all combinations of tableau splits *)
+    let rec explore_splits i =
+      if i = Array.length a
+        then  (* produce new clause *)
+          let clause = C.mk_clause_vec ~cs eqns proof parents in
+          Vector.push clauses clause
+        else begin
+          let len = Vector.size eqns in
+          explore_branch i len a.(i)
+        end
+    (* recurse in sub-tableau *)
+    and explore_branch i len rule =
+      (match rule with
+      | Keep eqn ->  (* push equation *)
+        Vector.push eqns eqn; explore_splits (i+1)
+      | List l ->    (* push equations *)
+        List.iter (Vector.push eqns) l; explore_splits (i+1)
+      | Alpha (left, right) ->  (* explore left, then right *)
+        explore_branch i len left;
+        explore_branch i len right);
+      Vector.shrink eqns len  (* restore state *)
+    in explore_splits 0;
+    (* return the vector of clauses *)
+    Some clauses
+  end
+
+(** Perform eliminations recursively, until no elimination is possible *)
+let recursive_eliminations ~cs c =
+  let clauses = Vector.create 5 in
+  (* process clauses until none of them is simplifiable *)
+  let rec simplify c =
+    let tableau_rules = eliminate_lits ~cs c in
+    match tableau_to_clauses ~cs c tableau_rules with
+    | None -> Vector.push clauses c (* done with this clause *)
+    | Some clauses ->
+      Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
+                    !C.pp_clause#pp c (Utils.pp_vector (fun f _ c -> !C.pp_clause#pp f c)) clauses));
+      Vector.iter clauses simplify  (* simplify recursively new clauses *)
+  in
+  simplify c;
+  if Vector.size clauses = 1 && C.eq_clause c (Vector.get clauses 0)
+    then None         (* no simplification *)
+    else Some clauses (* some simplifications *)
 
 (* ----------------------------------------------------------------------
  * syntactic simplification
  * ---------------------------------------------------------------------- *)
 
 (** Simplify the inner formula (double negation, trivial equalities...) *)
-let simplify_inner ~ord c =
+let simplify_inner ~cs c =
+  let simplified = ref false in
   let mark_simplified t = T.set_flag T.flag_simplified t true in
   (* simplify a term *)
   let rec simp_term t =
@@ -329,13 +290,15 @@ let simplify_inner ~ord c =
         then (mark_simplified t; t)  (* no more simplifications *)
         else simp_term new_t
   (* simplify a lit *)
-  and simp_lit ((Equation (l,r,sign,_)) as lit) =
-    let new_l = simp_term l
-    and new_r = simp_term r in
-    if T.eq_term l new_l && T.eq_term r new_r then lit
-    else C.mk_lit ~ord new_l new_r sign
+  and simp_lit {lit_eqn=Equation (l,r,sign) as eqn} =
+    let eqn' = C.mk_eqn (simp_term l) (simp_term r) sign in
+    (if not (C.eq_eqn eqn eqn') then simplified := true);
+    eqn'
   in
-  C.mk_clause ~ord (List.map simp_lit c.clits) ~selected:(lazy []) c.cproof (lazy [c])
+  let eqns = Array.map simp_lit c.clits in
+  if !simplified
+    then C.mk_clause ~cs eqns c.cproof c.cparents
+    else c  (* no simplification *)
 
 (* ----------------------------------------------------------------------
  * the calculus object
@@ -349,61 +312,29 @@ let delayed : calculus =
     method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
                           "equality_factoring", Sup.infer_equality_factoring; ]
 
-    method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
+    method basic_simplify ~cs c = Sup.basic_simplify ~cs (simplify_inner ~cs c)
 
     method simplify actives c =
-      let ord = actives.PS.a_ord
-      and old_c = c in
-      let c = simplify_inner ~ord (Sup.basic_simplify ~ord c) in
-      let c = Sup.basic_simplify ~ord (Sup.positive_simplify_reflect actives c) in
-      let c = Sup.basic_simplify ~ord (Sup.negative_simplify_reflect actives c) in
-      let c = Sup.basic_simplify ~ord (Sup.demodulate actives c) in
-      let c = simplify_inner ~ord c in
-      if C.eq_clause c old_c
-        then c
-        else self#simplify actives c
+      let cs = actives.PS.a_cs in
+      let c = simplify_inner ~cs (Sup.basic_simplify ~cs c) in
+      let c = Sup.basic_simplify ~cs (Sup.demodulate actives c) in
+      let c = Sup.basic_simplify ~cs (Sup.simplify_reflect actives c) in
+      let c = simplify_inner ~cs c in
+      c
 
     method redundant actives c = Sup.subsumed_by_set actives c
 
     method redundant_set actives c = Sup.subsumed_in_set actives c
 
     (* use elimination rules as simplifications rather than inferences, here *)
-    method list_simplify ~ord ~select c =
-      let all_rules = [connective_elimination; forall_elimination;
-                       exists_elimination; equivalence_elimination; ] in
-      (* try to use the rules to simplify c *)
-      let queue = Queue.create ()
-      and clauses = ref [] in
-      let c = C.select_clause ~select (self#basic_simplify ~ord c) in
-      Queue.push (c, all_rules) queue;
-      while not (Queue.is_empty queue) do
-        (* process a clause *)
-        let c, rules = Queue.pop queue in
-        match rules with 
-        | [] -> clauses := c :: !clauses  (* c is not simplifiable by any rule *)
-        | rule::rules' ->
-          (match rule ~ord c with
-          | None -> Queue.push (c, rules') queue  (* use next rules *)
-          | Some clauses -> 
-            begin
-              Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
-                            !C.pp_clause#pp c (Utils.pp_list !C.pp_clause#pp) clauses));
-              List.iter
-                (fun c' ->  (* simplify the clause with all rules, if not trivial *)
-                  let c' = self#basic_simplify ~ord (simplify_inner ~ord c') in
-                  if not (Sup.is_tautology c')
-                    then Queue.push (C.select_clause ~select c', all_rules) queue)
-                clauses
-            end)
-      done;
-      match !clauses with
-      | [c'] when C.eq_clause c c' -> None
-      | clauses -> Some clauses
+    method list_simplify ~cs c =
+      let c = Sup.basic_simplify ~cs c in
+      recursive_eliminations ~cs c
 
-    method axioms = []
+    method axioms = Vector.create 0
 
     method constr clauses = symbol_constraint clauses
 
-    method preprocess ~ord l =
-      List.map (fun c -> C.reord_clause ~ord (C.clause_of_fof ~ord c)) l
+    method preprocess ~cs v =
+      Vector.map v (fun c -> C.clause_of_fof ~cs c)
   end

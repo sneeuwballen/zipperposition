@@ -52,7 +52,7 @@ class type calculus =
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
-    method list_simplify : cs:Clauses.clause_state -> clause -> clause list option
+    method list_simplify : cs:Clauses.clause_state -> clause -> clause Vector.t option
     (** a list of axioms to add to the Set of Support *)
     method axioms : clause Vector.t
     (** some constraints on the precedence *)

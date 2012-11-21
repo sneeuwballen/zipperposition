@@ -776,19 +776,8 @@ let cnf_of ~cs clause =
       Vector.append va vb;  (* concatenate both lists of clauses *)
       va
     | Node (s, [a; b]) when s = or_symbol ->
-      product (to_cnf a) (to_cnf b)
+      Vector.product (to_cnf a) (to_cnf b)
     | Node _ -> singleton (t, true)
-  (* cartesian product of lists of lists *)
-  and product a b =
-    let v = Vector.create (Vector.size a * Vector.size b) in
-    Vector.iter a
-      (fun va -> Vector.iter b
-        (fun vb ->
-          let vab = Vector.create (Vector.size va + Vector.size vb) in
-          Vector.append vab va;
-          Vector.append vab vb;
-          Vector.push v vab));
-    v
   (* check whether the clause is already in CNF *)
   and is_cnf c =
     try
@@ -813,7 +802,7 @@ let cnf_of ~cs clause =
       assert (Array.length eqn_vec_vec_vec > 0);
       let eqn_vec_vec = ref eqn_vec_vec_vec.(0) in
       for i = 1 to Array.length eqn_vec_vec_vec - 1 do
-        eqn_vec_vec := product !eqn_vec_vec eqn_vec_vec_vec.(i);
+        eqn_vec_vec := Vector.product !eqn_vec_vec eqn_vec_vec_vec.(i);
       done;
       (* build clauses from lits *)
       let proof = lazy (Proof ("to_cnf", [clause, [], S.id_subst])) in
@@ -855,7 +844,7 @@ let superposition : calculus =
     method redundant_set actives c = subsumed_in_set actives c
 
     method list_simplify ~cs c =
-      if is_tautology c then Some [] else None  (* no other list simplification *)
+      if is_tautology c then Some (Vector.create 0) else None  (* no other list simplification *)
 
     method axioms = Vector.create 0
 
