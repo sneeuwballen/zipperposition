@@ -87,6 +87,9 @@ val set : 'a t -> int -> 'a -> unit
 val size : 'a t -> int
   (** number of elements in vector *)
 
+val product : 'a t t -> 'a t t -> 'a t t
+  (** cartesian product of two vectors of vectors *)
+
 val from_array : 'a array -> 'a t
 val from_list : 'a list -> 'a t
 val to_array : 'a t -> 'a array

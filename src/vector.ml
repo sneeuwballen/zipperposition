@@ -172,6 +172,18 @@ let set v i x =
 
 let size v = v.size
 
+(** cartesian product of lists of lists *)
+let product a b =
+  let v = create (a.size * b.size) in
+  iter a
+    (fun va -> iter b
+      (fun vb ->
+        let vab = create (va.size + vb.size) in
+        append vab va;
+        append vab vb;
+        push v vab));
+  v
+
 let from_array a =
   let c = Array.length a in
   let v = create c in
