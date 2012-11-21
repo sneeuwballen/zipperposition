@@ -60,7 +60,7 @@ let heuristic_constraint clauses : ordering_constraint =
         update_with_term sign r)
     clause.clits
   in 
-  List.iter update_with_clause clauses;
+  Vector.iter clauses update_with_clause;
   (* sort symbols by decreasing (neg occurences - pos occurences) *)
   let ordered_symbols = List.sort
     (fun a b ->
@@ -180,8 +180,8 @@ let parse_file ~recursive f =
   | f::tail ->
     let new_clauses, new_includes = parse_this f in
     if recursive
-      then aux (List.rev_append new_includes tail) (List.rev_append new_clauses clauses)
-      else (List.rev_append new_clauses clauses)
+      then aux (List.rev_append new_includes tail) (Vector.append clauses new_clauses; clauses)
+      else (Vector.append clauses new_clauses; clauses)
   (* parse the given file, raise exception in case of error *)
   and parse_this f =
     let input = match f with
@@ -192,7 +192,7 @@ let parse_file ~recursive f =
       Const.cur_filename := f;
       Parser_tptp.parse_file Lexer_tptp.token buf
     with _ as e -> close_in input; raise e
-  in aux [Filename.basename f] []
+  in aux [Filename.basename f] (Vector.create 10)
 
 (** setup index *)
 let setup_index name =
@@ -277,7 +277,7 @@ let () =
   let f = List.hd params.param_files in
   Printf.printf "%% process file %s\n" f;
   let clauses = parse_file ~recursive:true f in
-  Printf.printf "%% parsed %d clauses\n" (List.length clauses);
+  Printf.printf "%% parsed %d clauses\n" (Vector.size clauses);
   (* find the calculus *)
   let calculus = match params.param_calculus with
     | "superposition" -> Sup.superposition
@@ -303,16 +303,15 @@ let () =
   (* clause state *)
   let cs = C.mk_state ~ord ~select in
   (* preprocess clauses, then possibly simplify them *)
-  let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~cs clauses in
   let clauses = if params.param_presimplify
     then Sat.initial_simplifications ~cs ~calculus clauses
     else clauses in
-  Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
-                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
+  Utils.debug 2 (lazy (Utils.sprintf "%% @[<hv> %d clauses processed into:@ @[<v>%a@]@]@."
+                  (Vector.size clauses) (Utils.pp_vector ~sep:"" (fun f _ c -> !C.pp_clause#pp f c)) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
   let state = PS.make_state cs (CQ.default_queues ~ord) in
-  let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
+  let state = {state with PS.passive_set=PS.add_passives_vec state.PS.passive_set clauses} in
   let state = Sat.set_of_support ~calculus state calculus#axioms in
   (* saturate *)
   let state, result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state

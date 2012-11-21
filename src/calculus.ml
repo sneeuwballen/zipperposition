@@ -54,11 +54,11 @@ class type calculus =
         are simplified into the empty list of clauses) *)
     method list_simplify : cs:Clauses.clause_state -> clause -> clause list option
     (** a list of axioms to add to the Set of Support *)
-    method axioms : clause list
+    method axioms : clause Vector.t
     (** some constraints on the precedence *)
-    method constr : clause list -> ordering_constraint
+    method constr : clause Vector.t -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : cs:Clauses.clause_state -> clause list -> clause list
+    method preprocess : cs:Clauses.clause_state -> clause Vector.t -> clause Vector.t
   end
 
 (** do binary inferences that involve the given clause *)

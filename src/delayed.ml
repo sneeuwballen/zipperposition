@@ -63,7 +63,7 @@ let classify =
     | _ -> Function
 
 (** constraint on the ordering *)
-let symbol_constraint clauses =
+let symbol_constraint _ =
   O.compose_constraints
     (fun x y -> order (classify x) (classify y))
     (O.min_constraint special_preds)
@@ -79,8 +79,8 @@ exception Elimination of clause list
     clause and adds a and b to two new clauses *)
 let alpha_eliminate ~ord clause idx a signa b signb =
   assert (a.sort = bool_sort && b.sort = bool_sort);
-  let new_lita = C.mk_lit ~ord a T.true_term signa
-  and new_litb = C.mk_lit ~ord b T.true_term signb in
+  let new_lita = C.mk_eqn a T.true_term signa
+  and new_litb = C.mk_eqn b T.true_term signb in
   let other_lits = Utils.list_remove clause.clits idx in
   let proof = lazy (Proof ("α-elim", [clause, [idx], S.id_subst])) in
   let clauses = [C.mk_clause ~ord (new_lita :: other_lits) ~selected:(lazy []) proof (lazy [clause]);

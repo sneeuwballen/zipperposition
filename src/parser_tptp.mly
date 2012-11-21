@@ -167,13 +167,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token UNKNOWN
 
 %start parse_file
-%type <Types.clause list * string list> parse_file
+%type <Types.clause Vector.t * string list> parse_file
 
 %start term
 %type <Types.term> term
 
 %start cnf_formula
-%type <Types.literal list> cnf_formula
+%type <Types.equation Vector.t> cnf_formula
 
 %%
 
@@ -203,13 +203,13 @@ parse_file:
 file:
   | tptp_input
       { match $1 with
-        | Some clause -> [clause]
-        | None        -> []
+        | Some clause -> let v = Vector.create 10 in Vector.push v clause; v
+        | None        -> let v = Vector.create 10 in v
       }
 
   | tptp_input file
       { match $1 with
-        | Some clause -> clause :: $2
+        | Some clause -> Vector.push $2 clause; $2
         | None        -> $2
       }
 
@@ -244,10 +244,10 @@ fof_annotated:
       let clause = 
         let filename = !Const.cur_filename in  (* ugly *)
         let ord = Orderings.default_ordering () in
+        let cs = C.mk_state ~ord ~select:no_select in
         let sign = not !conjecture in (* if conjecture, negate *)
-        let lit = C.mk_lit ~ord $7 T.true_term sign in
-        C.mk_clause ~ord [lit] ~selected:(lazy [])
-          (lazy (Axiom (filename, $3))) (lazy [])
+        let lit = C.mk_eqn $7 T.true_term sign in
+        C.mk_clause ~cs [|lit|] (lazy (Axiom (filename, $3))) []
       in
         init_clause ();  (* reset global state *)
         clause
@@ -356,10 +356,11 @@ cnf_annotated:
       {
         let clause = 
           let ord = Orderings.default_ordering () in
+          let cs = C.mk_state ~ord ~select:no_select in
+          let eqns = Vector.to_array $7 in
           let filename = !Const.cur_filename in  (* ugly *)
-          let c = C.mk_clause ~ord $7 ~selected:(lazy [])
-            (lazy (Axiom (filename, $3))) (lazy []) in
-          C.clause_of_fof ~ord c
+          let c = C.mk_clause ~cs eqns (lazy (Axiom (filename, $3))) [] in
+          C.clause_of_fof ~cs c
         in
           init_clause ();
           clause
@@ -391,18 +392,18 @@ cnf_formula:
 
 disjunction:
   | literal
-      { [$1] }
+      { let v = Vector.create 10 in Vector.push v $1; v }
 
   | literal OR disjunction
-      { $1 :: $3 }
+      { Vector.push $3 $1; $3 }
 
 
 literal:
   | atomic_formula
-      { C.mk_eq ~ord:(O.default_ordering ()) $1 T.true_term }
+      { C.mk_eq $1 T.true_term }
 
   | NEGATION atomic_formula
-      { C.mk_neq ~ord:(O.default_ordering ()) $2 T.true_term }
+      { C.mk_neq $2 T.true_term }
 
 atomic_formula:
   | plain_atom

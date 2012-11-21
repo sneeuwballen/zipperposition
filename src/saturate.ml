@@ -56,7 +56,7 @@ let set_of_support ~calculus state axioms =
   let cs = state.PS.cs in
   let axioms = calculus#preprocess ~cs axioms in
   (* add the axioms to the active set *)
-  let axioms_set = PS.add_actives state.PS.axioms_set axioms in
+  let axioms_set = PS.add_actives_vec state.PS.axioms_set axioms in
   Utils.debug 1 (lazy (Utils.sprintf "%% added %d clauses to set-of-support"
                   (List.length axioms)));
   {state with PS.axioms_set = axioms_set}
@@ -180,13 +180,14 @@ let all_simplify ~cs ~calculus active_set clause =
 
 (** Simplifications to perform on initial clauses *)
 let initial_simplifications ~cs ~calculus clauses =
-  List.fold_left
-    (fun acc c ->
+  let v' = Vector.create (Vector.size clauses) in
+  Vector.iter clauses
+    (fun c ->
       (* apply list simplifications in a flatMap step *)
       match calculus#list_simplify ~cs c with
-      | None -> c::acc
-      | Some clauses -> List.rev_append clauses acc)
-    [] clauses
+      | None -> Vector.push v' c
+      | Some clauses -> Vector.append v' clauses);
+  v'
 
 let given_clause_step ~calculus state =
   let cs = state.PS.cs in
