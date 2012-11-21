@@ -23,10 +23,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 (** binary inferences. An inference returns a list of conclusions *)
-type binary_inf_rule = ProofState.active_set -> clause -> clause list
+type binary_inf_rule = ProofState.active_set -> clause -> clause Vector.t
 
 (** unary infererences *)
-type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause list
+type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause Vector.t
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -42,7 +42,7 @@ class type calculus =
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
     (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> hclause list
+    method redundant_set : ProofState.active_set -> clause -> hclause Vector.t
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
@@ -58,12 +58,12 @@ class type calculus =
 (** do binary inferences that involve the given clause *)
 val do_binary_inferences : ProofState.active_set ->
                           (string * binary_inf_rule) list -> (** named rules *)
-                          clause -> clause list
+                          clause -> clause Vector.t
 
 (** do unary inferences for the given clause *)
 val do_unary_inferences : cs:Clauses.clause_state ->
                           (string * unary_inf_rule) list ->
-                          clause -> clause list
+                          clause -> clause Vector.t
 
 (* some helpers *)
 val fold_lits :

@@ -158,6 +158,9 @@ let remove_active active_set hc =
 let remove_actives active_set l =
   List.fold_left remove_active active_set l
 
+let remove_actives_vec active_set v =
+  Vector.fold v active_set remove_active
+
 let remove_active_bag active_set bag =
   let active = ref active_set in
   C.iter_bag bag (fun _ hc -> active := remove_active !active hc);

@@ -75,8 +75,13 @@ val fold : 'a t -> 'b -> ('b -> 'a -> 'b) -> 'b
   (** fold on elements of the vector *)
 
 val exists : 'a t -> ('a -> bool) -> bool
+  (** existential test *)
 
 val for_all : 'a t -> ('a -> bool) -> bool
+  (** universal test *)
+
+val find : 'a t -> ('a -> bool) -> 'a
+  (** find an element that satisfies the predicate, or Not_found *)
 
 val get : 'a t -> int -> 'a
   (** access element, or Failure if bad index *)

@@ -76,6 +76,9 @@ let update ~cs dag c =
 let updates ~cs dag l =
   List.fold_left (update ~cs) dag l
 
+let updates_vec ~cs dag v =
+  Vector.fold v dag (update ~cs)
+
 (** get the list of descendants of clause *)
 let descendants ~cs dag parent =
   let parent = C.hashcons_clause (C.normalize_clause ~cs parent) in

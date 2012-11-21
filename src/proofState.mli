@@ -69,6 +69,7 @@ val add_actives_vec : active_set -> clause Vector.t -> active_set
 (** remove clause from the active set *)
 val remove_active : active_set -> hclause -> active_set
 val remove_actives : active_set -> hclause list -> active_set
+val remove_actives_vec : active_set -> hclause Vector.t -> active_set
 val remove_active_bag : active_set -> Clauses.bag -> active_set
 
 (** create an active_set that contains one clause *)

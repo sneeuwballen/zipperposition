@@ -162,6 +162,13 @@ let for_all v p =
     true
   with Exit -> false
 
+let find v p =
+  let rec check i =
+    if i = v.size then raise Not_found
+    else if p v.vec.(i) then v.vec.(i)
+    else check (i+1)
+  in check 0
+
 let get v i =
   (if i < 0 || i >= v.size then failwith "wrong index for vector");
   v.vec.(i)
