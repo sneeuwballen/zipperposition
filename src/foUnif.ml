@@ -127,3 +127,18 @@ let matching subst a b =
   let locked = T.THashSet.from_array b.vars in
   matching_locked ~locked subst a b
 
+(** Find, if it exists, subterms s' and t' such that
+    s = u[s']_p and t = u[t']_p for some context u
+    and such that s' and t' are not variables *)
+let disunify s t =
+  let pairs = ref [] in
+  let rec traverse s t =
+    match s.term, t.term with
+    | _ when T.eq_term s t -> () (* same subtree *)
+    | Var _, _ | _, Var _ -> ()
+    | Node (f, ss), Node (g, ts) when f = g ->
+      List.iter2 traverse ss ts  (* recurse in subterms *)
+    | Node _, Node _ -> pairs := (s, t) :: !pairs (* add this pair *)
+  in
+  traverse s t;
+  !pairs

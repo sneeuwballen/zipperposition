@@ -53,14 +53,13 @@ val is_tautology : clause -> bool
     to see if negative literals imply some positive literal *)
 val is_semantic_tautology : clause -> bool
 
-val basic_simplify : ord:ordering -> clause -> clause   (** basic simplifications *)
+val basic_simplify : cs:Clauses.clause_state -> clause -> clause   (** basic simplifications *)
 
 val demodulate : ProofState.active_set
                 -> clause   (** the clause to simplify *)
 		-> clause   (** the simplified clause *)
 
-val positive_simplify_reflect : ProofState.active_set -> clause -> clause
-val negative_simplify_reflect : ProofState.active_set -> clause -> clause
+val simplify_reflect : ProofState.active_set -> clause -> clause
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : clause -> clause -> bool
@@ -72,8 +71,8 @@ val subsumed_by_set : ProofState.active_set -> clause -> bool
 (** list of clauses in the active set that are subsumed by the clause *)
 val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 
-(** Transform the clause into proper CNF; returns a list of clauses *)
-val cnf_of : ord:ordering -> clause -> clause list
+(** Transform the clause into proper CNF; returns a vector of clauses *)
+val cnf_of : cs:Clauses.clause_state -> clause -> clause Vector.t
 
 (** The superposition calculus *)
 val superposition : Calculus.calculus

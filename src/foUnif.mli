@@ -33,3 +33,7 @@ val matching: substitution -> term -> term -> substitution
     or raise UnificationFailure. *)
 val matching_locked: locked:Terms.THashSet.t -> substitution -> term -> term -> substitution
 
+(** [disunify s t] finds pairs of subterms s' and t' such that
+    s = u[s']_p and t = u[t']_p for some context u and
+    such that s' and t' are not variables *)
+val disunify : term -> term -> (term * term) list
