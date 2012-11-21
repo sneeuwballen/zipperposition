@@ -109,16 +109,16 @@ let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) ~ord f acc lits =
   Array.iteri
     (fun idx ({lit_eqn=Equation (l,r,sign)} as lit) ->
       if sign_ok sign then
-      match ord#compare l r with
+      (match ord#compare l r with
       | Gt -> acc := f !acc lit l r sign [idx; C.left_pos]
       | Lt -> acc := f !acc lit r l sign [idx; C.right_pos]
       | _ ->
         if both
         then (* visit both sides of the equation *)
-          acc := f !acc lit r l sign [idx; C.right_pos];
-          acc := f !acc lit l r sign [idx; C.left_pos]
-        else (* only visit one side (arbitrary) *)
+          (acc := f !acc lit r l sign [idx; C.right_pos];
           acc := f !acc lit l r sign [idx; C.left_pos])
+        else (* only visit one side (arbitrary) *)
+          acc := f !acc lit l r sign [idx; C.left_pos]))
     lits;
   !acc
 

@@ -28,10 +28,10 @@ type 'a t = {
 }
 
 let create i =
-  assert (i > 0);
+  assert (i >= 0);
   { size = 0;
     capacity = i;
-    vec = Array.create i (Obj.magic None);
+    vec = if i = 0 then [||] else Array.create i (Obj.magic None);
   }
 
 (** resize the underlying array so that it can contains the
@@ -106,7 +106,7 @@ let uniq_sort ?(cmp=compare) v =
   (* traverse to remove duplicates. i= current index,
      j=current append index, j<=i *)
   let rec traverse prev i j =
-    if i = v'.size then v' (* done traversing *)
+    if i >= v'.size then v' (* done traversing *)
     else if cmp prev v.vec.(i) = 0
       then (v'.size <- v'.size - 1; traverse prev (i+1) j) (* duplicate, remove it *)
       else (v.vec.(j) <- v.vec.(i); traverse v.vec.(i) (i+1) (j+1)) (* keep it *)

@@ -239,7 +239,7 @@ let compare_clause c1 c2 =
   else (* lexicographic comparison *)
     let ans = ref 0 in
     try
-      for i = 0 to Array.length c1.clits do
+      for i = 0 to Array.length c1.clits - 1 do
         let cmp = compare_lit c1.clits.(i) c2.clits.(i) in
         (* this literal differs from c1 to c2 *)
         if cmp <> 0 then (ans := cmp; raise Exit)
