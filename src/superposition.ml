@@ -59,6 +59,7 @@ let print_stats () =
 let enable = true
 
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
+let prof_simplify_reflect = HExtlib.profile ~enable "simplify_reflect"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
 let prof_subsumption_set = HExtlib.profile ~enable "forward_subsumption"
@@ -161,7 +162,7 @@ let do_superposition ~cs active_clause active_pos passive_clause passive_pos sub
 let infer_active_ actives clause =
   let cs = actives.PS.a_cs in
   let acc = Vector.create 10 in
-  if clause.cselected = 0
+  if clause.cselected > 0
   then acc  (* no literal can be eligible for paramodulation *)
   else begin
     (* do the inferences where clause is active; for this,
@@ -169,7 +170,7 @@ let infer_active_ actives clause =
        non-minimal sides of every positive literal *)
     fold_positive ~both:true ~ord:cs#ord
       (fun () lit s t _ s_pos ->
-        if not lit.lit_maximal then () else
+      if not lit.lit_maximal then Utils.debug 3 (lazy (Utils.sprintf "  avoid lit %a" C.pp_literal#pp lit)) else
         (* rewrite clauses using s *)
         let subterm_idx = actives.PS.idx#subterm_index in
         subterm_idx#retrieve_unifiables s ()
@@ -401,20 +402,21 @@ let demodulate active_set clause =
       C.mk_eqn
         (demod_nf ~ord:cs#ord active_set clauses l)
         (demod_nf ~ord:cs#ord active_set clauses r)
-        sign
-  in
+        sign in
   (* demodulate every literal *)
-  let eqns = Array.mapi demod_lit clause.clits in
-  if C.CHashSet.is_empty clauses
-    then clause (* no rewriting performed *)
-    else begin  (* construct new clause *)
-      let clauses = C.CHashSet.to_list clauses in
-      let clauses_subst = List.map (fun c -> (c, [], S.id_subst)) clauses in
-      let proof = lazy (Proof ("demod", (clause, [], S.id_subst)::clauses_subst)) in
-      (* parents are clauses used to simplify the clause, plus parents of the clause *)
-      let parents = clauses @ clause.cparents in
-      C.mk_clause ~cs:active_set.PS.a_cs eqns proof parents
-    end
+  let do_it () =
+    let eqns = Array.mapi demod_lit clause.clits in
+    if C.CHashSet.is_empty clauses
+      then clause (* no rewriting performed *)
+      else begin  (* construct new clause *)
+        let clauses = C.CHashSet.to_list clauses in
+        let clauses_subst = List.map (fun c -> (c, [], S.id_subst)) clauses in
+        let proof = lazy (Proof ("demod", (clause, [], S.id_subst)::clauses_subst)) in
+        (* parents are clauses used to simplify the clause, plus parents of the clause *)
+        let parents = clauses @ clause.cparents in
+        C.mk_clause ~cs:active_set.PS.a_cs eqns proof parents
+      end
+  in prof_demodulate.HExtlib.profile do_it ()
 
 let is_tautology c =
   try
@@ -510,32 +512,34 @@ let simplify_reflect active_set clause =
       None(* not 1 diff, but 0 or several, do nothing *)
   in
   (* iterate through literals and try to resolve negative ones *)
-  for i = 0 to Array.length clause.clits - 1 do
-    let lit = clause.clits.(i) in
-    match lit.lit_eqn with
-    | Equation (s, t, true) ->
-      (* negative simplify reflect : remove the literal using a negative unit clause *)
-      (match refute_neg s t with
-      | None -> Vector.push eqns lit.lit_eqn  (* keep literal *)
-      | Some hc -> clauses := hc :: !clauses)
-    | Equation (s, t, false) ->
-      (* positive simplify reflect : remove literal using a positive unit clause *)
-      (match refute_pos s t with
-      | None -> Vector.push eqns lit.lit_eqn  (* keep literal *)
-      | Some hc -> clauses := hc :: !clauses)
-  done;
-  (* rebuild clause if different *)
-  if !clauses = []
-    then clause  (* no simplification performed *)
-    else begin
-      let proof = lazy (Proof ("simplify_reflect",
-        (clause, [], S.id_subst)::(List.map (fun c -> (c, [], S.id_subst)) !clauses)))
-      and parents = clause.cparents in
-      let new_clause = C.mk_clause ~cs (Vector.to_array eqns) proof parents in
-      Utils.debug 3 (lazy (Utils.sprintf ("@[<hov 4>@[<h>%a@]@ simplify-reflect "^^
-                      "into @[<h>%a@]@]") !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
-      new_clause
-    end
+  let do_it () =
+    for i = 0 to Array.length clause.clits - 1 do
+      let lit = clause.clits.(i) in
+      match lit.lit_eqn with
+      | Equation (s, t, true) ->
+        (* negative simplify reflect : remove the literal using a negative unit clause *)
+        (match refute_neg s t with
+        | None -> Vector.push eqns lit.lit_eqn  (* keep literal *)
+        | Some hc -> clauses := hc :: !clauses)
+      | Equation (s, t, false) ->
+        (* positive simplify reflect : remove literal using a positive unit clause *)
+        (match refute_pos s t with
+        | None -> Vector.push eqns lit.lit_eqn  (* keep literal *)
+        | Some hc -> clauses := hc :: !clauses)
+    done;
+    (* rebuild clause if different *)
+    if !clauses = []
+      then clause  (* no simplification performed *)
+      else begin
+        let proof = lazy (Proof ("simplify_reflect",
+          (clause, [], S.id_subst)::(List.map (fun c -> (c, [], S.id_subst)) !clauses)))
+        and parents = clause.cparents in
+        let new_clause = C.mk_clause ~cs (Vector.to_array eqns) proof parents in
+        Utils.debug 3 (lazy (Utils.sprintf ("@[<hov 4>@[<h>%a@]@ simplify-reflect "^^
+                        "into @[<h>%a@]@]") !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
+        new_clause
+      end
+  in prof_simplify_reflect.HExtlib.profile do_it ()
 
 (* ----------------------------------------------------------------------
  * subsumption
@@ -829,8 +833,8 @@ let superposition : calculus =
     method simplify actives c =
       let cs = actives.PS.a_cs in
       let c = basic_simplify ~cs c in
-      let c = basic_simplify ~cs (demodulate actives c) in
-      let c = basic_simplify ~cs (simplify_reflect actives c) in
+      let c = demodulate actives c in
+      let c = simplify_reflect actives c in
       c
 
     method redundant actives c = subsumed_by_set actives c

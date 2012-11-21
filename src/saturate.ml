@@ -65,9 +65,9 @@ let set_of_support ~calculus state axioms =
 let simplify ~calculus active_set clause =
   let do_it clause =
     let cs = active_set.PS.a_cs in
-    let old_c = PS.relocate_active active_set clause in
+    let c = calculus#basic_simplify ~cs clause in
+    let old_c = PS.relocate_active active_set c in
     let c = calculus#simplify active_set old_c in
-    let c = calculus#basic_simplify ~cs c in
     (if not (C.eq_clause c old_c)
       then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
                           !C.pp_clause#pp old_c !C.pp_clause#pp c)));

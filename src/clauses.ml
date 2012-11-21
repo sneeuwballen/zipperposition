@@ -463,10 +463,11 @@ let eligible_res ~cs c idx subst =
       let eqn = apply_subst_eqn subst eqn in
       (* check maximality among selected literals of same sign *)
       let rec check_selected i =
-        let lit' = c.clits.(i) in
         if i >= Array.length c.clits
           then true
-        else if i = idx || not lit'.lit_selected || pos_eqn lit.lit_eqn <> pos_eqn lit'.lit_eqn
+        else
+          let lit' = c.clits.(i) in
+          if i = idx || not lit'.lit_selected || pos_eqn lit.lit_eqn <> pos_eqn lit'.lit_eqn
           then check_selected (i+1)  (* no need to compare *)
           else
             let eqn' = apply_subst_eqn subst c.clits.(i).lit_eqn in
