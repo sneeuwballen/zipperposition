@@ -85,15 +85,15 @@ let copy v =
   v'
 
 let shrink v n =
-  if n <= v.size then () else v.size <- n
+  if n > v.size then failwith "cannot shrink to bigger size" else v.size <- n
 
 let member ?(cmp=(=)) v x =
-  try
-    for i = 0 to v.size-1 do
-      if cmp x v.vec.(i) then raise Exit
-    done;
-    false
-  with Exit -> true
+  let n = v.size in
+  let rec check i =
+    if i = n then false
+    else if cmp x v.vec.(i) then true
+    else check (i+1)
+  in check 0
 
 let sort ?(cmp=compare) v =
   (* copy vector (to avoid junk in the array), then sort the array *)
@@ -103,17 +103,19 @@ let sort ?(cmp=compare) v =
 
 let uniq_sort ?(cmp=compare) v =
   let v' = sort ~cmp v in
+  let n = v'.size in
   (* traverse to remove duplicates. i= current index,
-     j=current append index, j<=i *)
+     j=current append index, j<=i. new_size is the size
+     the vector will have after removing duplicates. *)
   let rec traverse prev i j =
-    if i >= v'.size then v' (* done traversing *)
-    else if cmp prev v.vec.(i) = 0
+    if i >= n then v' (* done traversing *)
+    else if cmp prev v'.vec.(i) = 0
       then (v'.size <- v'.size - 1; traverse prev (i+1) j) (* duplicate, remove it *)
-      else (v.vec.(j) <- v.vec.(i); traverse v.vec.(i) (i+1) (j+1)) (* keep it *)
+      else (v'.vec.(j) <- v'.vec.(i); traverse v'.vec.(i) (i+1) (j+1)) (* keep it *)
   in
   if v'.size = 0
     then v'
-    else traverse v'.vec.(0) 1 1  (* start at 1, to get the first element in hand *)
+    else traverse v'.vec.(0) 1 1 (* start at 1, to get the first element in hand *)
 
 let iter v k =
   for i = 0 to v.size -1 do
@@ -147,24 +149,25 @@ let fold v acc f =
   !acc
 
 let exists v p =
-  try
-    for i = 0 to v.size - 1 do
-      if p v.vec.(i) then raise Exit
-    done;
-    false
-  with Exit -> true
+  let n = v.size in
+  let rec check i =
+    if i = n then false
+    else if p v.vec.(i) then true
+    else check (i+1)
+  in check 0
 
 let for_all v p =
-  try
-    for i = 0 to v.size - 1 do
-      if not (p v.vec.(i)) then raise Exit
-    done;
-    true
-  with Exit -> false
+  let n = v.size in
+  let rec check i =
+    if i = n then true
+    else if not (p v.vec.(i)) then false
+    else check (i+1)
+  in check 0
 
 let find v p =
+  let n = v.size in
   let rec check i =
-    if i = v.size then raise Not_found
+    if i = n then raise Not_found
     else if p v.vec.(i) then v.vec.(i)
     else check (i+1)
   in check 0

@@ -293,7 +293,9 @@ let rec pp_array ?(sep=", ") pp_item formatter a =
   | _ ->
     for i = 0 to Array.length a -1 do
       pp_item formatter i a.(i);
-      (if i < Array.length a - 1 then Format.pp_print_string formatter sep);
+      (if i < Array.length a - 1
+        then (Format.pp_print_string formatter sep;
+              Format.pp_print_cut formatter ()));
     done
 
 (** print a vector of items using the printing function *)
@@ -304,5 +306,7 @@ let rec pp_vector ?(sep=", ") pp_item formatter v =
   | _ ->
     for i = 0 to Vector.size v -1 do
       pp_item formatter i (Vector.get v i);
-      (if i < Vector.size v - 1 then Format.pp_print_string formatter sep);
+      (if i < Vector.size v - 1
+        then (Format.pp_print_string formatter sep;
+              Format.pp_print_cut formatter ()));
     done

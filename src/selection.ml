@@ -37,14 +37,16 @@ let select_nothing _ = ()
 
 let select_diff_neg_lit ~ord lits =
   (* find a negative literal with maximal difference between
-     the weights of the sides of the equation *)
-  let idx = ref (-1) and max_diff = ref 0 in
+     the weights of the sides of the equation. Favor maximal lits
+     if some maximal literal is negative. *)
+  let idx = ref (-1) and max_diff = ref 0 and is_max = ref false in
   Array.iteri
     (fun i lit -> match lit.lit_eqn with
      | Equation (l, r, false) ->
        let weightdiff = abs (ord#compute_term_weight l - ord#compute_term_weight r) in
-       if weightdiff > !max_diff (* this literal is better *)
-         then (max_diff := weightdiff; idx := i)
+       if ((weightdiff > !max_diff && (not !is_max || lit.lit_maximal))
+        || (not !is_max &&  lit.lit_maximal)) (* this literal is better *)
+         then (max_diff := weightdiff; idx := i; is_max := lit.lit_maximal)
      | _ -> ())
     lits;
   if !idx > -1  (* found such a negative literal *)

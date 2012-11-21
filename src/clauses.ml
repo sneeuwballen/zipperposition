@@ -48,7 +48,7 @@ let opposite_pos p = match p with
 let eq_eqn l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
-    T.eq_term l1 l2 && T.eq_term r1 r2 && sign1 = sign2
+    sign1 = sign2 && T.eq_term l1 l2 && T.eq_term r1 r2
 
 (* by construction, equations are sorted by term hash *)
 let eq_eqn_com l1 l2 = eq_eqn l1 l2
@@ -121,7 +121,7 @@ let neg_eqn = function
   | Equation (_,_,sign) -> not sign
 
 let check_type a b = if a.sort <> b.sort
-  then raise (SortError "sides of equations of different sorts") else ()
+  then raise (SortError "sides of equation have different sorts") else ()
 
 let mk_eqn a b sign =
   check_type a b;

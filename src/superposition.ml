@@ -467,7 +467,7 @@ let basic_simplify ~cs clause =
   (* remove duplicate literals *)
   let eqns = Vector.uniq_sort ~cmp:C.compare_eqn eqns in
   (* build clause if something changed *)
-  if not !simplified
+  if not !simplified && Vector.size eqns = Array.length clause.clits
     then clause
     else begin
       let parents = clause.cparents in
