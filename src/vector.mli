@@ -74,6 +74,10 @@ val filter : 'a t -> ('a -> bool) -> 'a t
 val fold : 'a t -> 'b -> ('b -> 'a -> 'b) -> 'b
   (** fold on elements of the vector *)
 
+val exists : 'a t -> ('a -> bool) -> bool
+
+val for_all : 'a t -> ('a -> bool) -> bool
+
 val get : 'a t -> int -> 'a
   (** access element, or Failure if bad index *)
 

@@ -295,3 +295,14 @@ let rec pp_array ?(sep=", ") pp_item formatter a =
       (if i < Array.length a - 1 then Format.pp_print_string formatter sep);
       pp_item formatter i a.(i)
     done
+
+(** print a vector of items using the printing function *)
+let rec pp_vector ?(sep=", ") pp_item formatter v =
+  match Vector.size v with
+  | 0 -> ()
+  | 1 -> pp_item formatter 0 (Vector.get v 0)
+  | _ ->
+    for i = 0 to Vector.size v -1 do
+      (if i < Vector.size v - 1 then Format.pp_print_string formatter sep);
+      pp_item formatter i (Vector.get v i)
+    done

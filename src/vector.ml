@@ -146,6 +146,22 @@ let fold v acc f =
   done;
   !acc
 
+let exists v p =
+  try
+    for i = 0 to v.size - 1 do
+      if p v.vec.(i) then raise Exit
+    done;
+    false
+  with Exit -> true
+
+let for_all v p =
+  try
+    for i = 0 to v.size - 1 do
+      if not (p v.vec.(i)) then raise Exit
+    done;
+    true
+  with Exit -> false
+
 let get v i =
   (if i < 0 || i >= v.size then failwith "wrong index for vector");
   v.vec.(i)
