@@ -208,6 +208,12 @@ let eqn_depth (Equation (l, r, _)) = max (T.depth l) (T.depth r)
  * literals
  * ---------------------------------------------------------------------- *)
 
+type oriented_lit = int
+
+let orient_none = 0
+let orient_l2r = 1
+let orient_r2l = 2
+
 (** compare literals, including the selected status *)
 let compare_lit l1 l2 =
   let cmp = compare_eqn l1.lit_eqn l2.lit_eqn in
@@ -223,6 +229,7 @@ let eq_lit l1 l2 = compare_lit l1 l2 = 0
 
 let mk_lit eqn = {
   lit_eqn = eqn;
+  lit_oriented = orient_none;
   lit_selected = false;
   lit_maximal = false;
   lit_hash = hash_eqn eqn;
@@ -316,6 +323,16 @@ let compute_maxlits ~ord lits =
 (** compute which literals are selected *)
 let compute_selected ~select lits = select lits
 
+(** compute orientation of literals *)
+let compute_orientation ~ord lits =
+  Array.iter
+    (fun ({lit_eqn=Equation(l,r,_)} as lit) -> 
+      match ord#compare l r with
+      | Gt -> lit.lit_oriented <- orient_l2r
+      | Lt -> lit.lit_oriented <- orient_r2l
+      | _ -> lit.lit_oriented <- orient_none
+    ) lits
+
 (** compute hash from the list of literals *)
 let compute_hash_clause lits =
   let h = ref 113 in
@@ -337,17 +354,18 @@ let mk_clause ~cs eqns cproof cparents =
   (* hashcons now. *)
   let c = {clits; chkey; cvars=[||]; cselected; cparents; cproof; ctag= -1;} in
   let c' = H.hashcons c in
-  if c != c'
-    then c' (* retrieved an already hashconsed clause *)
-    else begin
+  (if c == c'  (* clause is new, we have some computations to do *)
+    then begin
       (* merge sets of variables *)
       let v = Vector.create 10 in
       Array.iter (fun eqn -> Vector.append v (vars_of_eqn eqn)) eqns;
       Vector.uniq_sort ~cmp:T.compare_term v;
       let cvars = Vector.get_array v in
       c.cvars <- cvars;
-      c
-    end
+      (* orientation of literals *)
+      compute_orientation ~ord:cs#ord clits;
+    end);
+  c'
 
 let mk_clause_vec ~cs eqns cproof cparents =
   mk_clause ~cs (Vector.to_array eqns) cproof cparents

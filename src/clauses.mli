@@ -62,6 +62,11 @@ val eqn_to_multiset : equation -> term list           (** equation to multiset o
  * literals
  * ---------------------------------------------------------------------- *)
 
+type oriented_lit = int
+val orient_none : oriented_lit
+val orient_l2r : oriented_lit   (** left to right orientation (left member is bigger) *)
+val orient_r2l : oriented_lit   (** right to left orientation *)
+
 val eq_lit : literal -> literal -> bool
 val compare_lit : literal -> literal -> int
 

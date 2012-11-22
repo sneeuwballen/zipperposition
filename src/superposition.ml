@@ -836,7 +836,6 @@ let superposition : calculus =
 
     method simplify actives c =
       let cs = actives.PS.a_cs in
-      let c = basic_simplify ~cs c in
       let c = basic_simplify ~cs (demodulate actives c) in
       let c = simplify_reflect actives c in
       c

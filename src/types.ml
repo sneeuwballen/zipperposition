@@ -92,6 +92,7 @@ type equation =
     only to a clause and is therefore copiable. *)
 and literal = {
   lit_eqn : equation;           (** the equation *)
+  mutable lit_oriented : int;   (** orientation of the literal *)
   mutable lit_selected : bool;  (** is the literal selected? *)
   mutable lit_maximal : bool;   (** is the literal maximal in the clause? *)
   mutable lit_hash : int;       (** hash of the literal *)
