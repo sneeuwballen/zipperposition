@@ -346,7 +346,6 @@ let demod_nf ~ord active_set clauses t =
           active_set.PS.idx#unit_root_index#retrieve ~sign:true t'
             (fun l r subst unit_hclause ->
               (* r is the term subterm is going to be rewritten into *)
-              C.CHashSet.add clauses unit_hclause;
               let new_l = t'
               and new_r = S.apply_subst subst r in
               if ord#compare new_l new_r = Gt
@@ -355,6 +354,7 @@ let demod_nf ~ord active_set clauses t =
                   Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
                                  !T.pp_term#pp new_l !T.pp_term#pp new_r
                                  !C.pp_clause#pp_h unit_hclause));
+                  C.CHashSet.add clauses unit_hclause;
                   raise (RewriteInto new_r)
                 end else Utils.debug 4
                   (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
