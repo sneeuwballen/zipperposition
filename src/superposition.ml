@@ -406,19 +406,17 @@ let demodulate active_set clause =
         (demod_nf ~ord:cs#ord active_set clauses r)
         sign in
   (* demodulate every literal *)
-  let do_it () =
-    let eqns = Array.mapi demod_lit clause.clits in
-    if C.CHashSet.is_empty clauses
-      then clause (* no rewriting performed *)
-      else begin  (* construct new clause *)
-        let clauses = C.CHashSet.to_list clauses in
-        let clauses_subst = List.map (fun c -> (c, [], S.id_subst)) clauses in
-        let proof = lazy (Proof ("demod", (clause, [], S.id_subst)::clauses_subst)) in
-        (* parents are clauses used to simplify the clause, plus parents of the clause *)
-        let parents = clauses @ clause.cparents in
-        C.mk_clause ~cs:active_set.PS.a_cs eqns proof parents
-      end
-  in prof_demodulate.HExtlib.profile do_it ()
+  let eqns = Array.mapi demod_lit clause.clits in
+  if C.CHashSet.is_empty clauses
+    then clause (* no rewriting performed *)
+    else begin  (* construct new clause *)
+      let clauses = C.CHashSet.to_list clauses in
+      let clauses_subst = List.map (fun c -> (c, [], S.id_subst)) clauses in
+      let proof = lazy (Proof ("demod", (clause, [], S.id_subst)::clauses_subst)) in
+      (* parents are clauses used to simplify the clause, plus parents of the clause *)
+      let parents = clauses @ clause.cparents in
+      C.mk_clause ~cs:active_set.PS.a_cs eqns proof parents
+    end
 
 let is_tautology c =
   try
@@ -428,10 +426,14 @@ let is_tautology c =
       (match lit.lit_eqn with
        | Equation (l, r, true) when T.eq_term l r -> raise Exit
        | Equation (l, r, sign) -> 
-          let eqn = C.negate_eqn lit.lit_eqn in (* flip equation for tests *)
           for j = i+1 to Array.length c.clits - 1 do
             let eqn' = c.clits.(j).lit_eqn in
-            if C.eq_eqn eqn eqn' then raise Exit
+            match eqn' with
+            | Equation (l', r', sign') ->
+              if sign = not sign' &&
+                 ((T.eq_term l l' && T.eq_term r r')
+                 ||(T.eq_term l r' && T.eq_term r l'))
+                 then raise Exit
           done)
     done;
     false
