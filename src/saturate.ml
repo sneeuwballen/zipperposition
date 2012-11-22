@@ -260,8 +260,8 @@ let given_clause_step ~calculus state =
       let new_clauses = List.fold_left
         (fun new_clauses c ->
           let clauses = all_simplify ~cs ~calculus state.PS.active_set c in
-          let clauses = List.map (C.normalize_clause ~cs) clauses in
           let clauses = List.filter (fun c' -> not (is_redundant ~calculus state.PS.active_set c')) clauses in
+          let clauses = List.map (C.normalize_clause ~cs) clauses in
           List.rev_append clauses new_clauses)
         [] new_clauses
       in
@@ -301,6 +301,7 @@ let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
       begin
         if progress && (num mod 10) = 0 then print_progress num state else ();
         (* do one step *)
+        Utils.debug 4 (lazy (Utils.sprintf "*** current state : %a" PS.debug_state state));
         let new_state, status = given_clause_step ~calculus state in
         match status with
         | Sat | Unsat _ | Error _ -> state, status, num (* finished *)

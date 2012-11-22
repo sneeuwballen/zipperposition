@@ -172,8 +172,8 @@ let compute_vars l =
   let v = Vector.create 10 in
   List.iter (fun t -> Vector.append_array v t.vars) l;
   (* sort and remove duplicates *)
-  let v' = Vector.uniq_sort ~cmp:compare_term v in
-  Vector.to_array v'
+  Vector.uniq_sort ~cmp:compare_term v;
+  Vector.get_array v
 
 let rec compute_db_closed depth t = match t.term with
   | Node (s, []) when s = db_symbol -> depth < 0
@@ -277,8 +277,8 @@ let is_ground_term t = Array.length t.vars = 0
 let merge_varset l1 l2 =
   let v = Vector.copy l1 in
   Vector.append v l2;
-  let v' = Vector.uniq_sort ~cmp:compare_term v in
-  v'
+  Vector.uniq_sort ~cmp:compare_term v;
+  v
 
 let max_var vars =
   let m = ref min_int in

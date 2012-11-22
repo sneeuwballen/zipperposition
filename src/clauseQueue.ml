@@ -52,6 +52,7 @@ let make_hq ~ord ?(accept=(fun _ -> true)) name =
     method is_empty = heap#is_empty
 
     method add hc =
+      assert (hc.ctag <> (-1));
       if accept hc then
         let new_heap = heap#insert hc in
         ({< heap = new_heap >} :> queue)
@@ -95,7 +96,7 @@ let compute_refined_clause_weight ~ord c =
   let weight = Array.fold_left
     (fun sum ({lit_eqn=Equation (l, r, _)} as lit) ->
       let lit_weight = ord#compute_term_weight l + ord#compute_term_weight r in
-      sum + (if lit.lit_selected then 4 * lit_weight else lit_weight))
+      sum + (if lit.lit_maximal then 4 * lit_weight else lit_weight))
     0 c.clits
   in (Array.length c.clits) * weight
 
@@ -113,11 +114,7 @@ let refined_clause_weight ~ord =
 let goals ~ord =
   (* is the clause a goal clause? *)
   let is_goal_clause c =
-    try
-      Array.iter (fun lit -> if C.pos_eqn lit.lit_eqn then raise Exit) c.clits;
-      true
-    with Exit -> false
-  in 
+    Array.fold_left (fun acc lit -> acc && C.neg_eqn lit.lit_eqn) true c.clits in
   let clause_ord =
     object
       method le hc1 hc2 =
@@ -131,11 +128,7 @@ let goals ~ord =
 let non_goals ~ord =
   (* is the clause clause without goals? *)
   let is_non_goal_clause c =
-    try
-      Array.iter (fun lit -> if C.neg_eqn lit.lit_eqn then raise Exit) c.clits;
-      true
-    with Exit -> false
-  in
+    Array.fold_left (fun acc lit -> acc && C.pos_eqn lit.lit_eqn) true c.clits in
   let clause_ord =
     object
       method le hc1 hc2 =

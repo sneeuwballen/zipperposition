@@ -199,7 +199,8 @@ let vars_of_eqn = function
   | Equation (left, right, _) ->
     let v = Vector.from_array left.vars in
     Vector.append_array v right.vars;
-    Vector.uniq_sort ~cmp:T.compare_term v
+    Vector.uniq_sort ~cmp:T.compare_term v;
+    v
 
 let eqn_depth (Equation (l, r, _)) = max (T.depth l) (T.depth r)
 
@@ -332,11 +333,9 @@ let compute_hash_clause lits =
 let mk_clause ~cs eqns cproof cparents =
   (* merge sets of variables *)
   let v = Vector.create 10 in
-  for i = 0 to Array.length eqns - 1 do
-    Vector.append v (vars_of_eqn eqns.(i));
-  done;
-  let v' = Vector.uniq_sort ~cmp:T.compare_term v in
-  let cvars = Vector.to_array v' in
+  Array.iter (fun eqn -> Vector.append v (vars_of_eqn eqn)) eqns;
+  Vector.uniq_sort ~cmp:T.compare_term v;
+  let cvars = Vector.get_array v in
   (* sort literals by hash, after copying them *)
   let clits = Array.map mk_lit eqns in
   Array.sort (fun lit1 lit2 -> lit1.lit_hash - lit2.lit_hash) clits;
@@ -423,18 +422,6 @@ let iter_selected c k =
     let lit = c.clits.(i) in
     if lit.lit_selected then k i lit
   done
-
-let fold_lits ~pos ~neg ~selected ~max c acc k =
-  let acc = ref acc in
-  for i = 0 to Array.length c.clits - 1 do
-    let lit = c.clits.(i) in
-    if (   (not pos || pos_eqn lit.lit_eqn)
-        && (not neg || neg_eqn lit.lit_eqn)
-        && (not selected || lit.lit_selected)
-        && (not max || lit.lit_maximal))
-      then acc := k !acc i lit
-  done;
-  !acc
 
 let fresh_clause ~cs maxvar c =
   let subst = S.relocate_array maxvar c.cvars in

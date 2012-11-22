@@ -156,13 +156,15 @@ let process_unit_lit ~ord ({lit_eqn=Equation (l,r,sign)}) hc op tree =
     process all literals *)
 let process_clause ~restrict ~ord op tree c =
   (* which literals to process? *)
-  let selected, max =
-    if restrict && c.cselected = 0 then false, true
-    else if restrict then true, false
-    else false, false
-  in
-  C.fold_lits ~pos:true ~neg:true ~selected ~max c tree
-    (fun tree pos lit -> process_lit ~ord op c tree (lit, pos))
+  let eligible lit =
+    if restrict && c.cselected = 0 then lit.lit_maximal
+    else if restrict then lit.lit_selected
+    else true in
+  let tree = ref tree in
+  Array.iteri
+    (fun i lit -> if eligible lit then tree := process_lit ~ord op c !tree (lit, i))
+    c.clits;
+  !tree
 
 (** apply (op tree) to all subterms, folding the resulting tree *)
 let rec fold_subterms op tree t (c, path) =

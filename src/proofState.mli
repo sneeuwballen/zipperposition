@@ -64,12 +64,10 @@ val make_state : cs:Clauses.clause_state -> (ClauseQueue.queue * int) list -> st
 (** add clauses to the active set *)
 val add_active : active_set -> clause -> active_set * hclause
 val add_actives : active_set -> clause list -> active_set
-val add_actives_vec : active_set -> clause Vector.t -> active_set
 
 (** remove clause from the active set *)
 val remove_active : active_set -> hclause -> active_set
 val remove_actives : active_set -> hclause list -> active_set
-val remove_actives_vec : active_set -> hclause Vector.t -> active_set
 val remove_active_bag : active_set -> Clauses.bag -> active_set
 
 (** create an active_set that contains one clause *)
@@ -78,7 +76,6 @@ val singleton_active_set : cs:Clauses.clause_state -> clause -> active_set
 (** add clauses to the passive set *)
 val add_passive : passive_set -> clause -> passive_set * hclause
 val add_passives : passive_set -> clause list -> passive_set
-val add_passives_vec : passive_set -> clause Vector.t -> passive_set
 (** remove clause from passive set *)
 val remove_passive : passive_set -> clause -> passive_set
 val remove_passives : passive_set -> clause list -> passive_set

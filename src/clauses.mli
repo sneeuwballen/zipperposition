@@ -124,10 +124,6 @@ val iter_maxlits : clause ->
 val iter_selected: clause ->
                    (int -> literal -> unit) -> unit     (** iterate on selected literals *)
 
-val fold_lits : pos:bool -> neg:bool -> selected:bool -> max:bool
-                -> clause -> 'a -> ('a -> int -> literal -> 'a)
-                -> 'a                                   (** fold over literals that fit the parameters *)
-
 (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
 val fresh_clause : cs:clause_state -> int -> clause -> clause
 (** normalize (vars start at 1) *)

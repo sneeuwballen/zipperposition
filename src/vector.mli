@@ -53,11 +53,11 @@ val shrink : 'a t -> int -> unit
 val member : ?cmp:('a -> 'a -> bool) -> 'a t -> 'a -> bool
   (** is the element a member of the vector? *)
 
-val sort : ?cmp:('a -> 'a -> int) -> 'a t -> 'a t
-  (** sort the array *)
+val sort : ?cmp:('a -> 'a -> int) -> 'a t -> unit
+  (** sort the array in place*)
 
-val uniq_sort : ?cmp:('a -> 'a -> int) -> 'a t -> 'a t
-  (** sort the array and remove duplicates *)
+val uniq_sort : ?cmp:('a -> 'a -> int) -> 'a t -> unit
+  (** sort the array and remove duplicates in place*)
 
 val iter : 'a t -> ('a -> unit) -> unit
   (** iterate on the vector *)
@@ -92,11 +92,9 @@ val set : 'a t -> int -> 'a -> unit
 val size : 'a t -> int
   (** number of elements in vector *)
 
-val product : 'a t t -> 'a t t -> 'a t t
-  (** cartesian product of two vectors of vectors *)
-
 val from_array : 'a array -> 'a t
 val from_list : 'a list -> 'a t
 val to_array : 'a t -> 'a array
+val get_array : 'a t -> 'a array  (*  get underlying *shared* array *)
 val to_list : 'a t -> 'a list
 

@@ -142,9 +142,6 @@ let add_active active_set c =
 let add_actives active_set l =
   List.fold_left (fun b sc -> fst (add_active b sc)) active_set l
 
-let add_actives_vec active_set v =
-  Vector.fold v active_set (fun b sc -> fst (add_active b sc))
-
 let remove_active active_set hc =
   if C.is_in_bag active_set.active_clauses hc.ctag
     then
@@ -157,9 +154,6 @@ let remove_active active_set hc =
 
 let remove_actives active_set l =
   List.fold_left remove_active active_set l
-
-let remove_actives_vec active_set v =
-  Vector.fold v active_set remove_active
 
 let remove_active_bag active_set bag =
   let active = ref active_set in
@@ -184,9 +178,6 @@ let add_passive passive_set c =
 
 let add_passives passive_set l =
   List.fold_left (fun b c -> fst (add_passive b c)) passive_set l
-
-let add_passives_vec passive_set v =
-  Vector.fold v passive_set (fun b c -> fst (add_passive b c)) 
 
 let remove_passive passive_set c =
   let hc = C.hashcons_clause c in

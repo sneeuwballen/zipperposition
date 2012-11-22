@@ -153,8 +153,9 @@ let do_superposition ~cs active_clause active_pos passive_clause passive_pos sub
         Array.iteri
           (fun i lit -> if i <> passive_idx then Vector.push eqns (C.apply_subst_eqn subst lit.lit_eqn))
           passive_clause.clits;
-        let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
-        Vector.push eqns (C.mk_eqn new_u v sign_uv);
+        let new_u = S.apply_subst subst (T.replace_pos u subterm_pos t) (* replace s by t in u|_p *)
+        and new_v = S.apply_subst subst v in
+        Vector.push eqns (C.mk_eqn new_u new_v sign_uv);
         let rule = if sign_uv then "sup+" else "sup-" in
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
@@ -169,25 +170,24 @@ let do_superposition ~cs active_clause active_pos passive_clause passive_pos sub
 let infer_active_ actives clause =
   let cs = actives.PS.a_cs in
   if clause.cselected > 0 then []  (* no literal can be eligible for paramodulation *)
-  else let eligible lit = lit.lit_maximal in
+  else
     (* do the inferences where clause is active; for this,
        we try to rewrite conditionally other clauses using
        non-minimal sides of every positive literal *)
     fold_positive ~both:true ~ord:cs#ord
       (fun acc lit s t _ s_pos ->
-      if not (eligible lit) then acc else
-        (* rewrite clauses using s *)
-        let subterm_idx = actives.PS.idx#subterm_index in
-        subterm_idx#retrieve_unifiables s acc
-          (fun acc u_p set ->
-            try (* rewrite u_p with s, if they are unifiable *)
-              let subst = Unif.unification S.id_subst s u_p in
-              I.ClauseSet.fold
-                (fun (hc, u_pos, u_p) acc ->
-                  do_superposition ~cs clause s_pos hc u_pos subst acc)
-                set acc
-            with
-              UnificationFailure -> acc))
+      (* rewrite clauses using s *)
+      let subterm_idx = actives.PS.idx#subterm_index in
+      subterm_idx#retrieve_unifiables s acc
+        (fun acc u_p set ->
+          try (* rewrite u_p with s, if they are unifiable *)
+            let subst = Unif.unification S.id_subst s u_p in
+            I.ClauseSet.fold
+              (fun (hc, u_pos, u_p) acc ->
+                do_superposition ~cs clause s_pos hc u_pos subst acc)
+              set acc
+          with
+            UnificationFailure -> acc))
       [] clause.clits
 
 let infer_active actives clause =
@@ -470,7 +470,7 @@ let basic_simplify ~cs clause =
   let eqns = Vector.filter eqns
     (function | Equation (l,r,false) when T.eq_term l r -> false | _ -> true) in
   (* remove duplicate literals *)
-  let eqns = Vector.uniq_sort ~cmp:C.compare_eqn eqns in
+  Vector.uniq_sort ~cmp:C.compare_eqn eqns;
   (* build clause if something changed *)
   if Vector.size eqns = Array.length clause.clits
     then clause  (* no literal removed *)
@@ -837,7 +837,7 @@ let superposition : calculus =
     method simplify actives c =
       let cs = actives.PS.a_cs in
       let c = basic_simplify ~cs c in
-      let c = demodulate actives c in
+      let c = basic_simplify ~cs (demodulate actives c) in
       let c = simplify_reflect actives c in
       c
 
@@ -858,7 +858,7 @@ let superposition : calculus =
           (* reduction to CNF *)
           let clauses = cnf_of ~cs c in
           let clauses = List.map
-            (fun c -> C.clause_of_fof ~cs c)
+            (fun c -> C.copy_clause ~cs (C.clause_of_fof ~cs c))
             clauses in
           let clauses = List.filter (fun c -> not (is_tautology c)) clauses in
           List.rev_append clauses acc)

@@ -96,26 +96,25 @@ let member ?(cmp=(=)) v x =
   in check 0
 
 let sort ?(cmp=compare) v =
-  (* copy vector (to avoid junk in the array), then sort the array *)
-  let v' = copy v in
-  Array.fast_sort cmp v'.vec;
-  v'
+  (* copy array (to avoid junk in it), then sort the array *)
+  let a = Array.sub v.vec 0 v.size in
+  Array.fast_sort cmp a;
+  v.vec <- a
 
 let uniq_sort ?(cmp=compare) v =
-  let v' = sort ~cmp v in
-  let n = v'.size in
+  sort ~cmp v;
+  let n = v.size in
   (* traverse to remove duplicates. i= current index,
      j=current append index, j<=i. new_size is the size
      the vector will have after removing duplicates. *)
   let rec traverse prev i j =
-    if i >= n then v' (* done traversing *)
-    else if cmp prev v'.vec.(i) = 0
-      then (v'.size <- v'.size - 1; traverse prev (i+1) j) (* duplicate, remove it *)
-      else (v'.vec.(j) <- v'.vec.(i); traverse v'.vec.(i) (i+1) (j+1)) (* keep it *)
+    if i >= n then () (* done traversing *)
+    else if cmp prev v.vec.(i) = 0
+      then (v.size <- v.size - 1; traverse prev (i+1) j) (* duplicate, remove it *)
+      else (v.vec.(j) <- v.vec.(i); traverse v.vec.(i) (i+1) (j+1)) (* keep it *)
   in
-  if v'.size = 0
-    then v'
-    else traverse v'.vec.(0) 1 1 (* start at 1, to get the first element in hand *)
+  if v.size > 0
+    then traverse v.vec.(0) 1 1 (* start at 1, to get the first element in hand *)
 
 let iter v k =
   for i = 0 to v.size -1 do
@@ -182,18 +181,6 @@ let set v i x =
 
 let size v = v.size
 
-(** cartesian product of lists of lists *)
-let product a b =
-  let v = create (a.size * b.size) in
-  iter a
-    (fun va -> iter b
-      (fun vb ->
-        let vab = create (va.size + vb.size) in
-        append vab va;
-        append vab vb;
-        push v vab));
-  v
-
 let from_array a =
   let c = Array.length a in
   let v = create c in
@@ -207,9 +194,9 @@ let from_list l =
   v
 
 let to_array v =
-  let a = Array.create v.size (Obj.magic None) in
-  Array.blit v.vec 0 a 0 v.size;
-  a
+  Array.sub v.vec 0 v.size
+
+let get_array v = v.vec
 
 let to_list v =
   let l = ref [] in
