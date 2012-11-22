@@ -49,14 +49,12 @@ let var_offset = 50000              (** negative offset for variables in rules *
 
 let add_rule trs (l, r) =
   (* check that the rule does not introduce variables *)
-  assert (List.for_all
-    (fun v -> T.member_term v l)
-    r.vars);
+  assert (Array.fold_left (fun acc v -> acc && T.member_term v l) true r.vars);
   assert (not (T.is_var l));
   assert (l.sort = r.sort);
   (* use low, negative variables *)
   let vars = l.vars in
-  List.iter (fun v ->
+  Array.iter (fun v ->
     match v.term with
     | Var i -> T.set_binding v (T.mk_var (-(i+var_offset)) v.sort)
     | _ -> assert false) vars;

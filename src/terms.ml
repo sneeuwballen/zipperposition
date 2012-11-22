@@ -267,8 +267,8 @@ let depth t =
 
 let var_occurs x t =
   let rec check i =
-    if i > Array.length t.vars then false
-    else if x.vars.(i) == x then true
+    if i >= Array.length t.vars then false
+    else if t.vars.(i) == x then true
     else check (i+1)
   in check 0
 

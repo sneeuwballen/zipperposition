@@ -215,6 +215,8 @@ let compare_lit l1 l2 =
     then cmp
     else if l1.lit_selected && not l2.lit_selected then 1
     else if l2.lit_selected && not l1.lit_selected then -1
+    else if l1.lit_maximal && not l2.lit_maximal then 1
+    else if l2.lit_maximal && not l1.lit_maximal then -1
     else 0
 
 let eq_lit l1 l2 = compare_lit l1 l2 = 0
@@ -233,7 +235,7 @@ let copy_lit lit = {lit with lit_selected=false; lit_maximal=false}
  * clauses
  * ---------------------------------------------------------------------- *)
 
-(* the comparison is sensitive to the selected literals *)
+(* the comparison is sensitive to selected/maximal literals *)
 let compare_clause c1 c2 =
   if Array.length c1.clits < Array.length c2.clits then -1
   else if Array.length c1.clits > Array.length c2.clits then 1
