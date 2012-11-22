@@ -37,6 +37,7 @@ class type queue =
     method is_empty: bool
     method take_first : (queue * hclause)
     method remove : hclause list -> queue  (* slow *)
+    method iter : (hclause -> unit) -> unit
     method name : string
   end
 
@@ -68,6 +69,8 @@ let make_hq ~ord ?(accept=(fun _ -> true)) name =
       match hclauses with
       | [] -> ({< >} :> queue)
       | _ ->  ({< heap = heap#remove hclauses >} :> queue)
+
+    method iter k = heap#iter k
 
     method name = name
   end
@@ -171,8 +174,15 @@ let pp_queue formatter q =
   Format.fprintf formatter "@[<h>queue %s@]" q#name
 
 let pp_queue_weight formatter (q, w) =
-  Format.fprintf formatter "@[<h>queue %s, %d@]" q#name w
+  Format.fprintf formatter "@[<h>queue %s (weight %d)@]" q#name w
+
+let debug_queue_weight formatter (q, w) =
+  let pp_heap formatter h =
+    h#iter (Format.fprintf formatter "%a@;" !C.pp_clause#pp_h) in
+  Format.fprintf formatter "@[<h>queue %s (weight %d) (contains @[<v>%a@])@]" q#name w pp_heap q
 
 let pp_queues formatter qs =
   Format.fprintf formatter "@[<hov>%a@]" (Utils.pp_list ~sep:"; " pp_queue_weight) qs
 
+let debug_queues formatter qs =
+  Format.fprintf formatter "@[<hov>%a@]" (Utils.pp_list ~sep:"; " debug_queue_weight) qs

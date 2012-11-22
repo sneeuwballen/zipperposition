@@ -32,6 +32,7 @@ class type queue =
     method is_empty: bool
     method take_first : (queue * hclause)
     method remove : hclause list -> queue  (* slow *)
+    method iter : (hclause -> unit) -> unit
     method name : string
   end
 
@@ -52,4 +53,5 @@ val default_queues : ord:ordering -> (queue * int) list
 
 val pp_queue : Format.formatter -> queue -> unit
 val pp_queues : Format.formatter -> (queue * int) list -> unit
+val debug_queues : Format.formatter -> (queue * int) list -> unit
 

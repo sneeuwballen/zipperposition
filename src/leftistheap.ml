@@ -40,6 +40,7 @@ sig
   val extract_min : t -> X.t * t
   val merge : t -> t -> t
   val remove: t -> X.t list -> t
+  val iter : (X.t -> unit) -> t -> unit
 end
 =
 struct
@@ -77,6 +78,10 @@ struct
       merge (remove a l) (remove b l)
     | T (_,x,a,b) ->
       make x (remove a l) (remove b l)
+
+  let rec iter f t = match t with
+    | E -> ()
+    | T (_, o, l, r) -> f o; iter f l; iter f r
 
 end
 
@@ -123,6 +128,10 @@ module T = struct
       merge ~ord (remove ~ord a l) (remove ~ord b l)
     | T (_,x,a,b) ->
       make x (remove ~ord a l) (remove ~ord b l)
+
+  let rec iter f t = match t with
+    | E -> ()
+    | T (_, o, l, r) -> f o; iter f l; iter f r
 end
 
 class ['a] leftistheap (ord : 'a ordered) =
@@ -132,6 +141,7 @@ class ['a] leftistheap (ord : 'a ordered) =
     method is_empty = T.is_empty tree
     method insert x = {< tree = T.insert ~ord x tree >}
     method min = T.min tree
+    method iter (f : 'a -> unit) = T.iter f tree
     method extract_min =
       let m, new_tree = T.extract_min ~ord tree
       in m, ({< tree = new_tree >} :> 't)
