@@ -336,5 +336,5 @@ let delayed : calculus =
     method constr clauses = symbol_constraint clauses
 
     method preprocess ~cs l =
-      List.map (fun c -> C.clause_of_fof ~cs c) l
+      List.map (fun c -> Sup.basic_simplify ~cs (C.clause_of_fof ~cs c)) l
   end

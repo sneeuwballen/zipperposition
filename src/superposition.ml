@@ -857,10 +857,13 @@ let superposition : calculus =
         (fun acc c ->
           (* reduction to CNF *)
           let clauses = cnf_of ~cs c in
-          let clauses = List.map
-            (fun c -> C.copy_clause ~cs (C.clause_of_fof ~cs c))
-            clauses in
-          let clauses = List.filter (fun c -> not (is_tautology c)) clauses in
-          List.rev_append clauses acc)
+          List.fold_left
+            (fun acc c ->
+              let c = C.copy_clause ~cs (C.clause_of_fof ~cs c) in
+              let c = basic_simplify ~cs c in
+              if is_tautology c
+                then acc
+                else c :: acc)
+            acc clauses)
         [] l
   end
