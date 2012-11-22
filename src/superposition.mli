@@ -69,7 +69,7 @@ val subsumes_with : clause -> clause -> substitution option   (** returns subsum
 val subsumed_by_set : ProofState.active_set -> clause -> bool
 
 (** list of clauses in the active set that are subsumed by the clause *)
-val subsumed_in_set : ProofState.active_set -> clause -> hclause list
+val subsumed_in_set : ProofState.active_set -> clause -> clause list
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
 val cnf_of : cs:Clauses.clause_state -> clause -> clause list

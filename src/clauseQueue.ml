@@ -33,17 +33,17 @@ module Utils = FoUtils
 (* a queue of clauses *)
 class type queue =
   object
-    method add : hclause -> queue
+    method add : clause -> queue
     method is_empty: bool
-    method take_first : (queue * hclause)
-    method remove : hclause list -> queue  (* slow *)
-    method iter : (hclause -> unit) -> unit
+    method take_first : (queue * clause)
+    method remove : clause list -> queue  (* slow *)
+    method iter : (clause -> unit) -> unit
     method name : string
   end
 
 module LH = Leftistheap
 
-type clause_ord = hclause LH.ordered
+type clause_ord = clause LH.ordered
 
 (** generic clause queue based on some ordering on clauses *)
 let make_hq ~ord ?(accept=(fun _ -> true)) name =
@@ -65,10 +65,10 @@ let make_hq ~ord ?(accept=(fun _ -> true)) name =
       let c,new_h = heap#extract_min in
       (({< heap = new_h >} :> queue), c)
 
-    method remove hclauses =
-      match hclauses with
+    method remove clauses =
+      match clauses with
       | [] -> ({< >} :> queue)
-      | _ ->  ({< heap = heap#remove hclauses >} :> queue)
+      | _ ->  ({< heap = heap#remove clauses >} :> queue)
 
     method iter k = heap#iter k
 
@@ -178,7 +178,7 @@ let pp_queue_weight formatter (q, w) =
 
 let debug_queue_weight formatter (q, w) =
   let pp_heap formatter h =
-    h#iter (Format.fprintf formatter "%a@;" !C.pp_clause#pp_h) in
+    h#iter (Format.fprintf formatter "%a@;" !C.pp_clause#pp) in
   Format.fprintf formatter "@[<h>queue %s (weight %d) (contains @[<v>%a@])@]" q#name w pp_heap q
 
 let pp_queues formatter qs =

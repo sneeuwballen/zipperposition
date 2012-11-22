@@ -35,6 +35,5 @@ val parent_of : cs:Clauses.clause_state -> clause_dag -> clause -> clause -> cla
 val update : cs:Clauses.clause_state -> clause_dag -> clause -> clause_dag
 val updates : cs:Clauses.clause_state -> clause_dag -> clause list -> clause_dag
 
-(** get the list of descendants of clause. Selected literals are not
-    taken into account in hashconsing. *)
-val descendants : cs:Clauses.clause_state -> clause_dag -> clause -> hclause list
+(** get the list of descendants of clause. *)
+val descendants : cs:Clauses.clause_state -> clause_dag -> clause -> clause list

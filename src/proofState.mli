@@ -62,26 +62,26 @@ type state = {
 val make_state : cs:Clauses.clause_state -> (ClauseQueue.queue * int) list -> state
 
 (** add clauses to the active set *)
-val add_active : active_set -> clause -> active_set * hclause
+val add_active : active_set -> clause -> active_set
 val add_actives : active_set -> clause list -> active_set
 
 (** remove clause from the active set *)
-val remove_active : active_set -> hclause -> active_set
-val remove_actives : active_set -> hclause list -> active_set
+val remove_active : active_set -> clause -> active_set
+val remove_actives : active_set -> clause list -> active_set
 val remove_active_bag : active_set -> Clauses.bag -> active_set
 
 (** create an active_set that contains one clause *)
 val singleton_active_set : cs:Clauses.clause_state -> clause -> active_set
 
 (** add clauses to the passive set *)
-val add_passive : passive_set -> clause -> passive_set * hclause
+val add_passive : passive_set -> clause -> passive_set
 val add_passives : passive_set -> clause list -> passive_set
 (** remove clause from passive set *)
 val remove_passive : passive_set -> clause -> passive_set
 val remove_passives : passive_set -> clause list -> passive_set
 
 (** pop the next passive clause, if any *)
-val next_passive_clause : passive_set -> (passive_set * hclause option)
+val next_passive_clause : passive_set -> (passive_set * clause option)
 
 (** relocate clause w.r.t clauses in the active_set *)
 val relocate_active : active_set -> clause -> clause

@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-type data = hclause * position * term
+type data = clause * position * term
 
 (** a set of (hashconsed clause, position in clause, term). *)
 module ClauseSet : Set.S with type elt = data
@@ -62,10 +62,10 @@ class type index =
 class type unit_index = 
   object ('b)
     method name : string
-    method add : term -> term -> bool -> hclause -> 'b    (** add (in)equation (with given ID) *)
-    method remove : term -> term -> bool -> hclause ->'b  (** remove (in)equation (with given ID) *)
+    method add : term -> term -> bool -> clause -> 'b     (** add (in)equation (with given ID) *)
+    method remove : term -> term -> bool -> clause ->'b   (** remove (in)equation (with given ID) *)
     method retrieve : sign:bool -> term ->
-                      (term -> term -> substitution -> hclause -> unit) ->
+                      (term -> term -> substitution -> clause -> unit) ->
                       unit                      (** iter on (in)equations of given sign l=r
                                                     where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit
@@ -74,8 +74,8 @@ class type unit_index =
 (** A global index, that operates on hashconsed clauses *)
 class type clause_index =
   object ('a)
-    method index_clause : ord:ordering -> hclause -> 'a
-    method remove_clause : ord:ordering -> hclause -> 'a
+    method index_clause : ord:ordering -> clause -> 'a
+    method remove_clause : ord:ordering -> clause -> 'a
 
     method root_index : index
     method unit_root_index : unit_index (** for simplifications that only require matching *)

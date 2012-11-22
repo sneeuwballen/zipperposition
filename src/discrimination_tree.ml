@@ -212,7 +212,7 @@ let index : Index.index =
 
     method pp ~all_clauses formatter () =
       let rec print_elt (hc, pos, t) = Format.fprintf formatter "%a@;"
-        !C.pp_clause#pp_h_pos (hc, pos, t)
+        !C.pp_clause#pp_t_pos (hc, pos, t)
       and print t set =
         begin
           Format.fprintf formatter "%a -> @[<v>" !T.pp_term#pp t;

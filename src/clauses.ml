@@ -260,11 +260,9 @@ let hashcons_clause c = c
 
 let stats () = H.stats ()
 
-let eq_hclause hc1 hc2 = hc1 == hc2
-let eq_clause = eq_hclause
+let eq_clause c1 c2 = c1 == c2
 
-let compare_hclause hc1 hc2 = hc1.ctag - hc2.ctag
-let compare_clause = compare_hclause
+let compare_clause c1 c2 = c1.ctag - c2.ctag
 
 module CHashtbl = Hashtbl.Make(HashedClause)
 
@@ -486,17 +484,15 @@ module M = Ptmap
 
 type bag = {
   bag_maxvar : int;           (* index of maximum variable *)
-  bag_clauses : hclause M.t;  (* clause ID -> clause *)
+  bag_clauses : clause M.t;  (* clause ID -> clause *)
 }
 
-let add_hc_to_bag {bag_maxvar=maxvar_b; bag_clauses=clauses_b} hc =
-  let maxvar_hc = T.max_var hc.cvars in
-  {bag_maxvar=(max maxvar_hc maxvar_b);
-   bag_clauses=M.add hc.ctag hc clauses_b}
-
 let add_to_bag bag c =
-  let hc = hashcons_clause c in
-  add_hc_to_bag bag hc, hc
+  assert (c.ctag <> -1);
+  let maxvar_c = T.max_var c.cvars in
+  {bag_maxvar=(max maxvar_c bag.bag_maxvar);
+   bag_clauses=M.add c.ctag c bag.bag_clauses}
+
 
 let remove_from_bag ({bag_clauses=clauses_b} as bag) id =
   let new_clauses = M.remove id clauses_b in
@@ -515,9 +511,9 @@ let partition_bag bag pred =
   let bag_yes = ref empty_bag
   and bag_no = ref empty_bag in
   M.iter
-    (fun _ hc -> if pred hc
-      then bag_yes := add_hc_to_bag !bag_yes hc
-      else bag_no := add_hc_to_bag !bag_no hc)
+    (fun _ c -> if pred c
+      then bag_yes := add_to_bag !bag_yes c
+      else bag_no := add_to_bag !bag_no c)
     bag.bag_clauses;
   !bag_yes, !bag_no
 
@@ -586,9 +582,8 @@ let pp_pos formatter pos =
 class type pprinter_clause =
   object
     method pp : Format.formatter -> clause -> unit      (** print clause *)
-    method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
     method pp_pos : Format.formatter -> (clause * position) -> unit
-    method pp_h_pos : Format.formatter -> (hclause * position * term) -> unit
+    method pp_t_pos : Format.formatter -> (clause * position * term) -> unit
     method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
     method horizontal : bool -> unit                    (** print in horizontal box? *)
   end
@@ -597,12 +592,11 @@ class type pprinter_clause =
 class virtual common_pp_clause =
   object (self)
     method virtual pp : Format.formatter -> clause -> unit
-    method pp_h formatter hc = self#pp formatter hc
     method pp_pos formatter (c, pos) =
       Format.fprintf formatter "@[<h>[%a at %a]@]" self#pp c pp_pos pos
-    method pp_h_pos formatter (hc, pos, t) =
+    method pp_t_pos formatter (hc, pos, t) =
       Format.fprintf formatter "@[<h>[%a at %a with %a]@]"
-        self#pp_h hc pp_pos pos !T.pp_term#pp t
+        self#pp hc pp_pos pos !T.pp_term#pp t
     method pp_pos_subst formatter (c, pos, subst) =
       Format.fprintf formatter "@[<h>[%a at %a with %a]@]"
         self#pp c pp_pos pos S.pp_substitution subst
@@ -753,4 +747,4 @@ let pp_bag formatter bag =
   (* collect clauses in the list by iterating on the map *)
   M.iter (fun _ hc -> clauses := hc :: !clauses) bag.bag_clauses;
   (* print as a list of clauses *)
-  fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) !clauses
+  fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp) !clauses

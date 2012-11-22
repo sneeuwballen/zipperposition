@@ -111,18 +111,18 @@ let max_depth_minus symb clause =
 
 module S = Set.Make(
   struct
-    type t = hclause
+    type t = clause
     let compare t1 t2 = t1.ctag - t2.ctag
   end)
 
-(** a set of hclause *)
-type hclauses = S.t
+(** a set of clauses *)
+type clauses = S.t
 
 (** a trie of ints *)
 module FVTrie = Trie.Make(Ptmap)
 
-(** a feature vector index, based on a trie that contains sets of hclauses *)
-type fv_index = feature list * hclauses FVTrie.t
+(** a feature vector index, based on a trie that contains sets of clauses *)
+type fv_index = feature list * clauses FVTrie.t
 
 let mk_fv_index features = (features, FVTrie.empty)
 
@@ -175,8 +175,8 @@ let retrieve_subsuming (features, trie) clause f =
   let fv = compute_fv features clause in
   let rec iter_lower fv node = match fv, node with
   | [], FVTrie.Node (None, _) -> ()
-  | [], FVTrie.Node (Some hclauses, _) ->
-      S.iter f hclauses
+  | [], FVTrie.Node (Some clauses, _) ->
+      S.iter f clauses
   | i::fv', FVTrie.Node (_, map) ->
     Ptmap.iter
       (fun j subnode -> if j <= i
@@ -193,7 +193,7 @@ let retrieve_subsumed (features, trie) clause f =
   let fv = compute_fv features clause in
   let rec iter_higher fv node = match fv, node with
   | [], FVTrie.Node (None, _) -> ()
-  | [], FVTrie.Node (Some hclauses, _) -> S.iter f hclauses
+  | [], FVTrie.Node (Some clauses, _) -> S.iter f clauses
   | i::fv', FVTrie.Node (_, map) ->
     Ptmap.iter
       (fun j subnode -> if j >= i

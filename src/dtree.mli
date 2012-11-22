@@ -47,7 +47,7 @@ val iter_match : 'a dtree -> term -> (term -> 'a -> substitution -> unit) -> uni
 val iter : 'a dtree -> (term -> 'a -> unit) -> unit
   (** iterate on all (term -> value) in the tree *)
 
-val pp_term_hclause_tree : Format.formatter -> (term * hclause) dtree -> unit
+val pp_term_clause_tree : Format.formatter -> (term * clause) dtree -> unit
   (** pretty print a tree of terms and clauses in ascii *)
 val pp_term_tree : Format.formatter -> term dtree -> unit
   (** pretty print a tree of terms in ascii *)

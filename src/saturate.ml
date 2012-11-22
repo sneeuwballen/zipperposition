@@ -41,7 +41,7 @@ let prof_is_redundant = HExtlib.profile ~enable "is_redundant"
 
 (** the status of a state *)
 type szs_status = 
-  | Unsat of hclause
+  | Unsat of clause
   | Sat
   | Unknown
   | Error of string 
@@ -206,7 +206,7 @@ let given_clause_step ~calculus state =
     | c::new_clauses ->     (* select first clause, the other ones are passive *) 
     (* empty clause found *)
     if c.clits = [||]
-    then state, Unsat (C.hashcons_clause c)
+    then state, Unsat c
     else begin
       assert (not (is_redundant ~calculus state.PS.active_set c));
       Sel.check_selected c;
@@ -236,7 +236,7 @@ let given_clause_step ~calculus state =
                            !C.pp_clause#pp original !C.pp_clause#pp simplified));
               Utils.debug 3 (lazy (Utils.sprintf
                             "@[<hov 4>simplified clause @[<h>%a@]@ has descendants @[<h>%a@]@]"
-                            !C.pp_clause#pp original (Utils.pp_list !C.pp_clause#pp_h)
+                            !C.pp_clause#pp original (Utils.pp_list !C.pp_clause#pp)
                             (CD.descendants ~cs state.PS.dag original)));
               false
             end else true (* no change *)
@@ -252,7 +252,7 @@ let given_clause_step ~calculus state =
       let inferred_clauses = generate ~calculus state c in
       let new_clauses = List.rev_append inferred_clauses new_clauses in
       (* add given clause to active set *)
-      let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~cs c) in
+      let active_set = PS.add_active state.PS.active_set (C.normalize_clause ~cs c) in
       let state = { state with PS.active_set=active_set } in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
@@ -277,7 +277,7 @@ let given_clause_step ~calculus state =
       (* test whether the empty clause has been found *)
       try
         let empty_clause = List.find (fun c -> c.clits = [||]) new_clauses in
-        state, Unsat (C.hashcons_clause empty_clause)
+        state, Unsat empty_clause
       with Not_found ->
       (* empty clause not found, return unknown *)
       state, Unknown

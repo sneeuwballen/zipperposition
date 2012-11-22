@@ -26,7 +26,7 @@ module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
-type data = hclause * position * term
+type data = clause * position * term
 
 (** a set of (hashconsed clause, position in clause, term). *)
 module ClauseSet : Set.S with type elt = data
@@ -37,7 +37,7 @@ module ClauseSet : Set.S with type elt = data
       let compare (c1, p1, t1) (c2, p2, t2) = 
         let c = Pervasives.compare p1 p2 in
         if c <> 0 then c else
-        let c = C.compare_hclause c1 c2 in
+        let c = C.compare_clause c1 c2 in
         if c <> 0 then c else
         (assert (T.eq_term t1 t2); 0)
     end)
@@ -101,10 +101,10 @@ class type index =
 class type unit_index = 
   object ('b)
     method name : string
-    method add : term -> term -> bool -> hclause -> 'b    (** add (in)equation (with given ID) *)
-    method remove : term -> term -> bool -> hclause ->'b  (** remove (in)equation (with given ID) *)
+    method add : term -> term -> bool -> clause -> 'b    (** add (in)equation (with given ID) *)
+    method remove : term -> term -> bool -> clause ->'b  (** remove (in)equation (with given ID) *)
     method retrieve : sign:bool -> term ->
-                      (term -> term -> substitution -> hclause -> unit) ->
+                      (term -> term -> substitution -> clause -> unit) ->
                       unit                      (** iter on (in)equations of given sign l=r
                                                     where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit
@@ -113,8 +113,8 @@ class type unit_index =
 (** A global index, that operates on hashconsed clauses *)
 class type clause_index =
   object ('a)
-    method index_clause : ord:ordering -> hclause -> 'a
-    method remove_clause : ord:ordering -> hclause -> 'a
+    method index_clause : ord:ordering -> clause -> 'a
+    method remove_clause : ord:ordering -> clause -> 'a
 
     method root_index : index
     method unit_root_index : unit_index (** for simplifications that only require matching *)

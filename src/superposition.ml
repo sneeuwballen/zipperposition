@@ -343,7 +343,7 @@ let demod_nf ~ord active_set clauses t =
         (* find equations l=r that match subterm *)
         try
           active_set.PS.idx#unit_root_index#retrieve ~sign:true t'
-            (fun l r subst unit_hclause ->
+            (fun l r subst unit_clause ->
               (* r is the term subterm is going to be rewritten into *)
               let new_l = t'
               and new_r = S.apply_subst subst r in
@@ -352,14 +352,14 @@ let demod_nf ~ord active_set clauses t =
                 then begin
                   Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
                                  !T.pp_term#pp new_l !T.pp_term#pp new_r
-                                 !C.pp_clause#pp_h unit_hclause));
-                  C.CHashSet.add clauses unit_hclause;
+                                 !C.pp_clause#pp unit_clause));
+                  C.CHashSet.add clauses unit_clause;
                   incr_stat stat_demodulate_step;
                   raise (RewriteInto new_r)
                 end else Utils.debug 4
                   (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
                          !T.pp_term#pp new_l !T.pp_term#pp new_r
-                         !C.pp_clause#pp_h unit_hclause)));
+                         !C.pp_clause#pp unit_clause)));
           t' (* not found any match, normal form found *)
         with RewriteInto t'' -> normal_form t''
       end
@@ -483,7 +483,7 @@ let basic_simplify ~cs clause =
       new_clause
     end
 
-exception FoundMatch of (term * hclause)
+exception FoundMatch of (term * clause)
 
 (* Perform simplify reflect on the clause (positive and negative) *)
 let simplify_reflect active_set clause =

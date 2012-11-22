@@ -25,7 +25,7 @@ open Types
 
 (** The SZS status of a state *)
 type szs_status = 
-  | Unsat of hclause
+  | Unsat of clause
   | Sat
   | Unknown
   | Error of string 

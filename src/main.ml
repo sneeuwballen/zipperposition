@@ -218,7 +218,7 @@ let print_stats state =
 let print_state ?name filename (state, result) =
   let state = match result with
     | Sat.Unsat c ->
-      let active, _ = PS.add_active state.PS.active_set c in (* put empty clause in state *)
+      let active = PS.add_active state.PS.active_set c in (* put empty clause in state *)
       {state with PS.active_set = active}
     | _ -> state in
   PS.pp_dot_file ?name filename state

@@ -42,7 +42,7 @@ class type calculus =
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
     (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> hclause list
+    method redundant_set : ProofState.active_set -> clause -> clause list
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)

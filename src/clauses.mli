@@ -76,11 +76,7 @@ val eq_clause : clause -> clause -> bool                (** equality of clauses 
 val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
 val hash_clause : clause -> int                         (** hash of the clause *)
 
-val hashcons_clause : clause -> hclause
 val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
-
-val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
-val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
 module CHashSet : 
   sig
@@ -145,22 +141,21 @@ val eligible_param : cs:clause_state -> clause -> int -> substitution -> bool
 (** set of hashconsed clauses *)
 type bag = {
   bag_maxvar: int;                (** higher bound for the biggest var index *)
-  bag_clauses : hclause Ptmap.t;  (** map tag -> hashconsed clause *)
+  bag_clauses : clause Ptmap.t;   (** map tag -> clause *)
 }
 
-val add_to_bag : bag -> clause -> bag * hclause     (** add the clause to the bag, hashconsing it *)
-val add_hc_to_bag : bag -> hclause -> bag           (** add a hclause to the bag *)
+val add_to_bag : bag -> clause -> bag               (** add the clause to the bag, hashconsing it *)
 
 val remove_from_bag : bag -> int -> bag             (** remove the clause from the bag *)
 
-val get_from_bag : bag -> int -> hclause            (** get a clause by its ID *)
+val get_from_bag : bag -> int -> clause             (** get a clause by its ID *)
 
 val is_in_bag : bag -> int -> bool
 
-val iter_bag : bag -> (int -> hclause -> unit) -> unit  (** iterate on elements of the bag *)
+val iter_bag : bag -> (int -> clause -> unit) -> unit  (** iterate on elements of the bag *)
 
 (** for a predicate p, returns (bag of c s.t. p(c)), (bag of c s.t. not p(c)) *)
-val partition_bag : bag -> (hclause -> bool) -> bag * bag
+val partition_bag : bag -> (clause -> bool) -> bag * bag
 
 val empty_bag : bag
 
@@ -191,9 +186,8 @@ val pp_pos : formatter -> position -> unit
 class type pprinter_clause =
   object
     method pp : Format.formatter -> clause -> unit      (** print clause *)
-    method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
     method pp_pos : Format.formatter -> (clause * position) -> unit
-    method pp_h_pos : Format.formatter -> (hclause * position * term) -> unit
+    method pp_t_pos : Format.formatter -> (clause * position * term) -> unit
     method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
     method horizontal : bool -> unit                    (** print in horizontal box? *)
   end

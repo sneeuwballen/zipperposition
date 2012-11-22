@@ -131,17 +131,16 @@ let next_passive_clause passive_set =
   in try_queue passive_set first_idx first_weight
 
 let add_active active_set c =
-  let hc = C.hashcons_clause c in
-  if C.is_in_bag active_set.active_clauses hc.ctag
-    then active_set, hc  (* already in active set *)
+  if C.is_in_bag active_set.active_clauses c.ctag
+    then active_set  (* already in active set *)
     else
-      let new_bag = C.add_hc_to_bag active_set.active_clauses hc
-      and new_idx = active_set.idx#index_clause ~ord:active_set.a_cs#ord hc
-      and new_fv_idx = FV.index_clause active_set.fv_idx hc in
-      {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}, hc
+      let new_bag = C.add_to_bag active_set.active_clauses c
+      and new_idx = active_set.idx#index_clause ~ord:active_set.a_cs#ord c
+      and new_fv_idx = FV.index_clause active_set.fv_idx c in
+      {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}
 
 let add_actives active_set l =
-  List.fold_left (fun b sc -> fst (add_active b sc)) active_set l
+  List.fold_left (fun b sc -> add_active b sc) active_set l
 
 let remove_active active_set hc =
   if C.is_in_bag active_set.active_clauses hc.ctag
@@ -163,28 +162,26 @@ let remove_active_bag active_set bag =
 
 let singleton_active_set ~cs clause =
   let active_set = mk_active_set ~cs in
-  let active_set, _ = add_active active_set clause in
+  let active_set = add_active active_set clause in
   active_set
   
 let add_passive passive_set c =
-  let hc = C.hashcons_clause c in
-  if C.is_in_bag passive_set.passive_clauses hc.ctag
-    then passive_set, hc  (* already in passive set *)
+  if C.is_in_bag passive_set.passive_clauses c.ctag
+    then passive_set  (* already in passive set *)
     else
-      let new_bag = C.add_hc_to_bag passive_set.passive_clauses hc in
+      let new_bag = C.add_to_bag passive_set.passive_clauses c in
       let new_queues = List.map
-        (fun (q,weight) -> q#add hc, weight)
+        (fun (q,weight) -> q#add c, weight)
         passive_set.queues in
-      {passive_set with passive_clauses=new_bag; queues=new_queues}, hc
+      {passive_set with passive_clauses=new_bag; queues=new_queues}
 
 let add_passives passive_set l =
-  List.fold_left (fun b c -> fst (add_passive b c)) passive_set l
+  List.fold_left (fun b c -> add_passive b c) passive_set l
 
 let remove_passive passive_set c =
-  let hc = C.hashcons_clause c in
   (* just remove from the set of passive clauses *)
   let new_passive_clauses = 
-    C.remove_from_bag passive_set.passive_clauses hc.ctag in
+    C.remove_from_bag passive_set.passive_clauses c.ctag in
   {passive_set with passive_clauses = new_passive_clauses}
 
 let remove_passives passive_set l =

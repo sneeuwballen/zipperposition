@@ -28,11 +28,11 @@ open Types
 (** A priority queue of clauses, purely functional *)
 class type queue =
   object
-    method add : hclause -> queue
+    method add : clause -> queue
     method is_empty: bool
-    method take_first : (queue * hclause)
-    method remove : hclause list -> queue  (* slow *)
-    method iter : (hclause -> unit) -> unit
+    method take_first : (queue * clause)
+    method remove : clause list -> queue  (* slow *)
+    method iter : (clause -> unit) -> unit
     method name : string
   end
 

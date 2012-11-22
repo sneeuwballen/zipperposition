@@ -98,10 +98,8 @@ and literal = {
   mutable lit_depth : int;      (** depth of the literal *)
 }
 
-(** a hashconsed first order clause *)
-type hclause = clause
-(** a first order clause *)
-and clause = {
+(** a first order (hashconsed) clause *)
+type clause = {
   mutable ctag : int;                     (** hashconsing tag *)
   mutable cselected : int;                (** number of selected literals *)
   mutable cvars : term array;             (** the free variables *)
