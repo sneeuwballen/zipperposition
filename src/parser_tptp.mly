@@ -167,13 +167,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token UNKNOWN
 
 %start parse_file
-%type <Types.clause Vector.t * string list> parse_file
+%type <Types.clause list * string list> parse_file
 
 %start term
 %type <Types.term> term
 
 %start cnf_formula
-%type <Types.equation Vector.t> cnf_formula
+%type <Types.equation list> cnf_formula
 
 %%
 
@@ -203,13 +203,13 @@ parse_file:
 file:
   | tptp_input
       { match $1 with
-        | Some clause -> let v = Vector.create 10 in Vector.push v clause; v
-        | None        -> let v = Vector.create 10 in v
+        | Some clause -> [clause]
+        | None        -> []
       }
 
   | tptp_input file
       { match $1 with
-        | Some clause -> Vector.push $2 clause; $2
+        | Some clause -> clause :: $2
         | None        -> $2
       }
 
@@ -357,7 +357,7 @@ cnf_annotated:
         let clause = 
           let ord = Orderings.default_ordering () in
           let cs = C.mk_state ~ord ~select:no_select in
-          let eqns = Vector.to_array $7 in
+          let eqns = Array.of_list $7 in
           let filename = !Const.cur_filename in  (* ugly *)
           let c = C.mk_clause ~cs eqns (lazy (Axiom (filename, $3))) [] in
           C.clause_of_fof ~cs c
@@ -392,10 +392,10 @@ cnf_formula:
 
 disjunction:
   | literal
-      { let v = Vector.create 10 in Vector.push v $1; v }
+      { [$1] }
 
   | literal OR disjunction
-      { Vector.push $3 $1; $3 }
+      { $1 :: $3 }
 
 
 literal:

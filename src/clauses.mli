@@ -106,6 +106,7 @@ val mk_clause : cs:clause_state -> equation array ->
                 clause                                  (** build a clause *)
 val mk_clause_vec : cs:clause_state -> equation Vector.t ->
                 proof Lazy.t -> clause list -> clause
+val copy_clause : cs:clause_state -> clause -> clause   (** copy the clause *)
 
 val clause_of_fof : cs:clause_state -> clause -> clause (** transform eq/not to literals *)
 

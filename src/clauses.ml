@@ -351,6 +351,10 @@ let mk_clause ~cs eqns cproof cparents =
 let mk_clause_vec ~cs eqns cproof cparents =
   mk_clause ~cs (Vector.to_array eqns) cproof cparents
 
+let copy_clause ~cs clause =
+  let eqns = Array.map (fun lit -> lit.lit_eqn) clause.clits in
+  mk_clause ~cs eqns clause.cproof clause.cparents
+
 let parents clause = clause.cparents
 
 let clause_of_fof ~cs c =

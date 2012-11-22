@@ -33,12 +33,12 @@ type szs_status =
 
 (** Add the given axioms to the set of support *)
 val set_of_support: calculus:Calculus.calculus ->
-                    ProofState.state -> clause Vector.t -> ProofState.state
+                    ProofState.state -> clause list -> ProofState.state
 
 (** Simplifications to perform on initial clauses *)
 val initial_simplifications : cs:Clauses.clause_state ->
                               calculus:Calculus.calculus ->
-                              clause Vector.t -> clause Vector.t
+                              clause list -> clause list
 
 (** Perform one step of the given clause algorithm *)
 val given_clause_step : calculus:Calculus.calculus ->

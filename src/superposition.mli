@@ -34,8 +34,8 @@ val stat_demodulate_step : statistics
 
 val print_stats : unit -> unit
 
-val all_positions : position -> term ->     (** useful combinator *)
-                    (term -> position -> unit) -> unit
+val all_positions : position -> term ->  (* combinator *)
+                    (term -> position -> 'b list) -> 'b list
 
 val infer_active: Calculus.binary_inf_rule  (** superposition where given clause is active *)
 
@@ -69,10 +69,10 @@ val subsumes_with : clause -> clause -> substitution option   (** returns subsum
 val subsumed_by_set : ProofState.active_set -> clause -> bool
 
 (** list of clauses in the active set that are subsumed by the clause *)
-val subsumed_in_set : ProofState.active_set -> clause -> hclause Vector.t
+val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 
-(** Transform the clause into proper CNF; returns a vector of clauses *)
-val cnf_of : cs:Clauses.clause_state -> clause -> clause Vector.t
+(** Transform the clause into proper CNF; returns a list of clauses *)
+val cnf_of : cs:Clauses.clause_state -> clause -> clause list
 
 (** The superposition calculus *)
 val superposition : Calculus.calculus

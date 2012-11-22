@@ -23,7 +23,7 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 open Types
 
 (** Precedence constraint *)
-val symbol_constraint : clause Vector.t -> ordering_constraint
+val symbol_constraint : clause list -> ordering_constraint
 
 (** The Delayed superposition calculus itself *)
 val delayed : Calculus.calculus

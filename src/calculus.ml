@@ -29,10 +29,10 @@ module Utils = FoUtils
 module PS = ProofState
 
 (** binary inferences. An inference returns a list of conclusions *)
-type binary_inf_rule = ProofState.active_set -> clause -> clause Vector.t
+type binary_inf_rule = ProofState.active_set -> clause -> clause list
 
 (** unary infererences *)
-type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause Vector.t
+type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -48,47 +48,43 @@ class type calculus =
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
     (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> hclause Vector.t
+    method redundant_set : ProofState.active_set -> clause -> hclause list
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
-    method list_simplify : cs:Clauses.clause_state -> clause -> clause Vector.t option
+    method list_simplify : cs:Clauses.clause_state -> clause -> clause list option
     (** a list of axioms to add to the Set of Support *)
-    method axioms : clause Vector.t
+    method axioms : clause list
     (** some constraints on the precedence *)
-    method constr : clause Vector.t -> ordering_constraint
+    method constr : clause list -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : cs:Clauses.clause_state -> clause Vector.t -> clause Vector.t
+    method preprocess : cs:Clauses.clause_state -> clause list -> clause list
   end
 
 (** do binary inferences that involve the given clause *)
 let do_binary_inferences active_set rules c =
-  let acc = Vector.create 20 in
   (* rename clause to avoid collisions *)
   let c = PS.relocate_active active_set c in
   Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active: %a"
                        C.pp_bag active_set.PS.active_clauses));
   (* apply every inference rule *)
-  List.iter
-    (fun (name, rule) ->
+  List.fold_left
+    (fun acc (name, rule) ->
       Utils.debug 3 (lazy ("#  apply binary rule " ^ name));
       let new_clauses = rule active_set c in
-      Vector.append acc new_clauses)
-    rules;
-  acc
+      List.rev_append new_clauses acc)
+    [] rules
 
 (** do unary inferences for the given clause *)
 let do_unary_inferences ~cs rules c =
-  let acc = Vector.create 10 in
   Utils.debug 3 (lazy "do unary inferences");
   (* apply every inference rule *)
-  List.iter
-    (fun (name, rule) ->
+  List.fold_left
+    (fun acc (name, rule) ->
       Utils.debug 3 (lazy ("#  apply unary rule " ^ name));
       let new_clauses = rule ~cs c in
-      Vector.append acc new_clauses)
-    rules;
-  acc
+      List.rev_append new_clauses acc)
+    [] rules
 
 (** fold f over all literals sides, with their positions.
     f is given (acc, left side, right side, sign, position of left side)

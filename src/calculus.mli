@@ -23,10 +23,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 (** binary inferences. An inference returns a list of conclusions *)
-type binary_inf_rule = ProofState.active_set -> clause -> clause Vector.t
+type binary_inf_rule = ProofState.active_set -> clause -> clause list
 
 (** unary infererences *)
-type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause Vector.t
+type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -42,28 +42,28 @@ class type calculus =
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
     (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> hclause Vector.t
+    method redundant_set : ProofState.active_set -> clause -> hclause list
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
-    method list_simplify : cs:Clauses.clause_state -> clause -> clause Vector.t option
+    method list_simplify : cs:Clauses.clause_state -> clause -> clause list option
     (** a list of axioms to add to the Set of Support *)
-    method axioms : clause Vector.t
+    method axioms : clause list
     (** some constraints on the precedence *)
-    method constr : clause Vector.t -> ordering_constraint
+    method constr : clause list -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : cs:Clauses.clause_state -> clause Vector.t -> clause Vector.t
+    method preprocess : cs:Clauses.clause_state -> clause list -> clause list
   end
 
 (** do binary inferences that involve the given clause *)
 val do_binary_inferences : ProofState.active_set ->
                           (string * binary_inf_rule) list -> (** named rules *)
-                          clause -> clause Vector.t
+                          clause -> clause list
 
 (** do unary inferences for the given clause *)
 val do_unary_inferences : cs:Clauses.clause_state ->
                           (string * unary_inf_rule) list ->
-                          clause -> clause Vector.t
+                          clause -> clause list
 
 (* some helpers *)
 val fold_lits :

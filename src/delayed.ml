@@ -177,13 +177,13 @@ let eliminate_lits ~cs clause =
   in
   tableau_rules
 
-(** Produce a vector of clauses from an array of tableau_rule, or None *)
+(** Produce a list of clauses from an array of tableau_rule, or None *)
 let tableau_to_clauses ~cs clause a =
   if try Array.iter (function | Keep _ -> () | _ -> raise Exit) a; true
      with Exit -> false
   then None (* no change, the array contains only Keep *)
   else begin
-    let clauses = Vector.create 10
+    let clauses = ref []
     and eqns = Vector.create (Array.length a * 2) in
     let proof = lazy (Proof ("elim", [clause, [], S.id_subst]))
     and parents = [clause] in
@@ -192,7 +192,7 @@ let tableau_to_clauses ~cs clause a =
       if i = Array.length a
         then  (* produce new clause *)
           let clause = C.mk_clause_vec ~cs eqns proof parents in
-          Vector.push clauses clause
+          clauses := clause :: !clauses
         else begin
           let len = Vector.size eqns in
           explore_branch i len a.(i)
@@ -210,26 +210,26 @@ let tableau_to_clauses ~cs clause a =
       Vector.shrink eqns len  (* restore state *)
     in explore_splits 0;
     (* return the vector of clauses *)
-    Some clauses
+    Some !clauses
   end
 
 (** Perform eliminations recursively, until no elimination is possible *)
 let recursive_eliminations ~cs c =
-  let clauses = Vector.create 5 in
+  let clauses = ref [] in
   (* process clauses until none of them is simplifiable *)
   let rec simplify c =
     let tableau_rules = eliminate_lits ~cs c in
     match tableau_to_clauses ~cs c tableau_rules with
-    | None -> Vector.push clauses c (* done with this clause *)
+    | None -> clauses := c :: !clauses (* done with this clause *)
     | Some clauses ->
       Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
-                    !C.pp_clause#pp c (Utils.pp_vector (fun f _ c -> !C.pp_clause#pp f c)) clauses));
-      Vector.iter clauses simplify  (* simplify recursively new clauses *)
+                    !C.pp_clause#pp c (Utils.pp_list !C.pp_clause#pp) clauses));
+      List.iter simplify clauses (* simplify recursively new clauses *)
   in
   simplify c;
-  if Vector.size clauses = 1 && C.eq_clause c (Vector.get clauses 0)
-    then None         (* no simplification *)
-    else Some clauses (* some simplifications *)
+  match !clauses with
+  | [c'] when C.eq_clause c c' -> None (* no simplification *)
+  | l -> Some l (* some simplifications *)
 
 (* ----------------------------------------------------------------------
  * syntactic simplification
@@ -331,10 +331,10 @@ let delayed : calculus =
       let c = Sup.basic_simplify ~cs c in
       recursive_eliminations ~cs c
 
-    method axioms = Vector.create 0
+    method axioms = []
 
     method constr clauses = symbol_constraint clauses
 
-    method preprocess ~cs v =
-      Vector.map v (fun c -> C.clause_of_fof ~cs c)
+    method preprocess ~cs l =
+      List.map (fun c -> C.clause_of_fof ~cs c) l
   end
