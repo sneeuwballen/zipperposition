@@ -281,6 +281,12 @@ let eq_clause c1 c2 = c1 == c2
 
 let compare_clause c1 c2 = c1.ctag - c2.ctag
 
+module CSet =
+  Set.Make(struct
+    type t = clause
+    let compare c1 c2 = c1.ctag - c2.ctag
+  end)
+
 module CHashtbl = Hashtbl.Make(HashedClause)
 
 module CHashSet =

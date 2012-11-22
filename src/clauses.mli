@@ -82,6 +82,8 @@ val hash_clause : clause -> int                         (** hash of the clause *
 
 val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
 
+module CSet : Set.S with type elt = clause
+
 module CHashSet : 
   sig
     type t
