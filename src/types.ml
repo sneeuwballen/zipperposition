@@ -104,9 +104,9 @@ type hclause = clause
 and clause = {
   mutable ctag : int;                     (** hashconsing tag *)
   mutable cselected : int;                (** number of selected literals *)
+  mutable cvars : term array;             (** the free variables *)
   chkey : int;                            (** hash of the clause *)
   clits : literal array;                  (** the literals (sorted in increasing hash order, duplicates removed) *)
-  cvars : term array;                     (** the free variables *)
   cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
   cparents : clause list;                 (** clauses used to create this one *)
 }

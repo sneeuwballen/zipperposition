@@ -235,42 +235,36 @@ let copy_lit lit = {lit with lit_selected=false; lit_maximal=false}
  * clauses
  * ---------------------------------------------------------------------- *)
 
-(* the comparison is sensitive to selected/maximal literals *)
-let compare_clause c1 c2 =
-  if Array.length c1.clits < Array.length c2.clits then -1
-  else if Array.length c1.clits > Array.length c2.clits then 1
-  else (* lexicographic comparison *)
-    let ans = ref 0 in
-    try
-      for i = 0 to Array.length c1.clits - 1 do
-        let cmp = compare_lit c1.clits.(i) c2.clits.(i) in
-        (* this literal differs from c1 to c2 *)
-        if cmp <> 0 then (ans := cmp; raise Exit)
-      done;
-      0
-    with Exit -> !ans
-
-let eq_clause c1 c2 = compare_clause c1 c2 = 0
+let eq_clause_struct c1 c2 =
+  Array.length c1.clits = Array.length c2.clits &&
+  try
+    Array.iteri  (* check equality of literals pairwise *)
+      (fun i lit1 -> let lit2 = c2.clits.(i) in if not (eq_lit lit1 lit2) then raise Exit)
+      c1.clits;
+    true
+  with Exit -> false
 
 let hash_clause c = c.chkey
 
 module HashedClause =
   struct
     type t = clause
-    let equal c1 c2 = eq_clause c1 c2
-    let hash c = hash_clause c
+    let equal c1 c2 = eq_clause_struct c1 c2
+    let hash c = c.chkey
     let tag i c = (c.ctag <- i; c)
   end
 
 module H = Hashcons.Make(HashedClause)
 
-let hashcons_clause c = H.hashcons c
+let hashcons_clause c = c
 
 let stats () = H.stats ()
 
 let eq_hclause hc1 hc2 = hc1 == hc2
+let eq_clause = eq_hclause
 
 let compare_hclause hc1 hc2 = hc1.ctag - hc2.ctag
+let compare_clause = compare_hclause
 
 module CHashtbl = Hashtbl.Make(HashedClause)
 
@@ -333,11 +327,6 @@ let compute_hash_clause lits =
   !h
 
 let mk_clause ~cs eqns cproof cparents =
-  (* merge sets of variables *)
-  let v = Vector.create 10 in
-  Array.iter (fun eqn -> Vector.append v (vars_of_eqn eqn)) eqns;
-  Vector.uniq_sort ~cmp:T.compare_term v;
-  let cvars = Vector.get_array v in
   (* sort literals by hash, after copying them *)
   let clits = Array.map mk_lit eqns in
   Array.sort (fun lit1 lit2 -> lit1.lit_hash - lit2.lit_hash) clits;
@@ -347,7 +336,20 @@ let mk_clause ~cs eqns cproof cparents =
   compute_selected ~select:cs#select clits;
   let cselected = Array.fold_left
     (fun cnt lit -> if lit.lit_selected then cnt+1 else cnt) 0 clits in
-  {clits; cvars; cproof; cselected; cparents; ctag= -1; chkey}
+  (* hashcons now. *)
+  let c = {clits; chkey; cvars=[||]; cselected; cparents; cproof; ctag= -1;} in
+  let c' = H.hashcons c in
+  if c != c'
+    then c' (* retrieved an already hashconsed clause *)
+    else begin
+      (* merge sets of variables *)
+      let v = Vector.create 10 in
+      Array.iter (fun eqn -> Vector.append v (vars_of_eqn eqn)) eqns;
+      Vector.uniq_sort ~cmp:T.compare_term v;
+      let cvars = Vector.get_array v in
+      c.cvars <- cvars;
+      c
+    end
 
 let mk_clause_vec ~cs eqns cproof cparents =
   mk_clause ~cs (Vector.to_array eqns) cproof cparents
@@ -624,7 +626,7 @@ let pp_clause_debug =
       in
       (* print in an horizontal box, or not *)
       if !_horizontal
-        then fprintf formatter "@[<h>[%a]@]" lits_printer c.clits
+        then fprintf formatter "@[<h>[%a]:%d@]" lits_printer c.clits c.ctag
         else fprintf formatter "[%a]" lits_printer c.clits
     (* regular printing is printing with no literal selected *)
     inherit common_pp_clause

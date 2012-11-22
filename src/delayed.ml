@@ -122,7 +122,7 @@ let keep eqn = Keep eqn
 (** perform at most one simplification on each literal. It
     returns an array of tableau_rule. *)
 let eliminate_lits ~cs clause =
-  let offset = ref (T.max_var clause.cvars + 1) in  (* offset to create variables *)
+  let offset = ref ((max 0 (T.max_var clause.cvars)) + 1) in  (* offset to create variables *)
   (* is the literal eligible? *)
   let eligible i = C.eligible_res ~cs clause i S.id_subst in
   (* eliminate propositions (connective and quantifier eliminations) *)

@@ -104,10 +104,10 @@ let next_passive_clause passive_set =
     let q, w = U.list_get queues idx in
     if weight >= w || q#is_empty
       then next_idx passive_set (idx+1) (* queue has been used enough time, or is empty *)
-      else 
+      else (
         let new_q, hc = q#take_first in (* pop from this queue *)
         if C.is_in_bag passive_set.passive_clauses hc.ctag
-          then (* the clause is still in the passive set, return it *)
+          then begin (* the clause is still in the passive set, return it *)
             let new_q_state = (idx, weight+1) (* increment weight for the clause *)
             and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.ctag in
             U.debug 3 (lazy (U.sprintf "taken clause from %s" q#name));
@@ -116,9 +116,10 @@ let next_passive_clause passive_set =
                 queue_state=new_q_state}
             in
             passive_set, Some hc
-          else (* we must find another clause, this one has already been pop'd *)
+          end else (* we must find another clause, this one has already been pop'd *)
             let passive_set = {passive_set with queues=U.list_set queues idx (new_q, w)} in
             try_queue passive_set idx weight (* try again *)
+            )
   (* lookup for a non-empty queue to pop *)
   and next_idx passive_set idx = 
     if idx >= len
@@ -187,7 +188,7 @@ let remove_passive passive_set c =
   {passive_set with passive_clauses = new_passive_clauses}
 
 let remove_passives passive_set l =
-  List.fold_left (fun set c -> remove_passive set c) passive_set l
+  List.fold_left remove_passive passive_set l
 
 let relocate_active active_set c =
   let maxvar = active_set.active_clauses.C.bag_maxvar in
