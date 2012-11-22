@@ -153,10 +153,7 @@ let eliminate_lits ~cs clause =
     | Lt when not (T.atomic r) && sign ->
       Alpha (List [C.mk_neq l T.true_term; C.mk_eq r T.true_term],
              List [C.mk_neq r T.true_term; C.mk_eq l T.true_term])
-    | Gt when not (T.atomic l) && not sign -> (* not (l <=> r) -> (l | r) & (not l | not r) *)
-      Alpha (List [C.mk_eq l T.true_term; C.mk_eq r T.true_term],
-             List [C.mk_neq r T.true_term; C.mk_neq l T.true_term])
-    | Lt when not (T.atomic r) && not sign ->
+    | _ when not sign -> (* not (l <=> r) -> (l | r) & (not l | not r) *)
       Alpha (List [C.mk_eq l T.true_term; C.mk_eq r T.true_term],
              List [C.mk_neq r T.true_term; C.mk_neq l T.true_term])
     | _ -> keep eqn
