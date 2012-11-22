@@ -475,7 +475,7 @@ let basic_simplify ~cs clause =
   if Vector.size eqns = Array.length clause.clits
     then clause  (* no literal removed *)
     else begin
-      let parents = clause :: clause.cparents in
+      let parents = clause.cparents in
       let proof = clause.cproof in  (* do not bother printing this *)
       let new_clause = C.mk_clause_vec ~cs eqns proof parents in
       Utils.debug 3 (lazy (Utils.sprintf ("@[<hov 4>@[<h>%a@]@ basic_simplifies "^^

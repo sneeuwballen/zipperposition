@@ -34,6 +34,7 @@ val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *
 val member_term_rec : term -> term -> bool(** same, but follows variable bindings *)
 val eq_term : term -> term -> bool        (** standard equality on terms *)
 val compare_term : term -> term -> int    (** a simple order on terms *)
+val compare_term_alpha : term -> term -> int (** partial order on term which is compatible with alpha-renaming *)
 
 module TSet : Set.S with type elt = term
 module TPairSet : Set.S with type elt = term * term

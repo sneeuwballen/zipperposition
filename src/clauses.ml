@@ -50,17 +50,24 @@ let eq_eqn l1 l2 =
   | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
     sign1 = sign2 && T.eq_term l1 l2 && T.eq_term r1 r2
 
-(* by construction, equations are sorted by term hash *)
-let eq_eqn_com l1 l2 = eq_eqn l1 l2
-
 let compare_eqn l1 l2 =
   match l1, l2 with
-  | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
-    let c = T.compare_term l1 l2 in
-    if c <> 0 then c else
-      let c = T.compare_term r1 r2 in
-      if c <> 0 then c else
-        Pervasives.compare sign1 sign2
+  | Equation (l1,r1,sign1), Equation (l2,r2,sign2) when sign1 = sign2 ->
+    (* l1 <= r1 and l2 <= r2 w.r.t T.compare_term_alpha.
+       we want to see if we can order the literal w.r.t multiset
+       extension of compare_term_alpha.
+    *)
+    let ll = T.compare_term_alpha l1 l2
+    and rr = T.compare_term_alpha r1 r2 in
+    (match () with
+    | _ when rr > 0 -> rr  (* r1 dominates *)
+    | _ when rr = 0 && ll > 0 -> ll (* r1=r2 && l1 dominates *)
+    | _ when rr < 0 -> rr  (* r2 dominates *)
+    | _ when rr = 0 && ll < 0 -> ll (* r1=r2 && l2 dominates *)
+    | _ when ll = 0 && rr = 0 ->
+      2*(l1.tag - l2.tag) + (r1.tag - r2.tag) (* r1=r2, l1=l2, use arbitrary order *)
+    | _ -> assert false)
+  | Equation (_,_,sign1), Equation (_,_,sign2) -> compare sign1 sign2
 
 let eqn_to_multiset = function
   | Equation (l, r, true) -> [l; r]
@@ -125,7 +132,10 @@ let check_type a b = if a.sort <> b.sort
 
 let mk_eqn a b sign =
   check_type a b;
-  if a.tag < b.tag
+  let cmp = T.compare_term_alpha a b in
+  if cmp < 0 then Equation (a, b, sign)
+  else if cmp > 0 then Equation (b, a, sign)
+  else if a.tag < b.tag
     then Equation (a, b, sign)
     else Equation (b, a, sign)
 
@@ -342,9 +352,10 @@ let compute_hash_clause lits =
   !h
 
 let mk_clause ~cs eqns cproof cparents =
-  (* sort literals by hash, after copying them *)
+  (* sort equations using compare_eqn. This is important for the selection
+     function to be deterministic. *)
   let clits = Array.map mk_lit eqns in
-  Array.sort (fun lit1 lit2 -> lit1.lit_hash - lit2.lit_hash) clits;
+  Array.sort compare_lit clits;
   let chkey = compute_hash_clause clits in
   (* select literals and find the maximal ones. Also count selected lits *)
   compute_maxlits ~ord:cs#ord clits;

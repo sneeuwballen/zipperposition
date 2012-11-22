@@ -65,6 +65,24 @@ let eq_term x y = x == y  (* because of hashconsing *)
 
 let compare_term x y = x.tag - y.tag
 
+let rec compare_term_alpha s t =
+  (* recursive lexicographic order *)
+  let rec lexico ss ts = match ss, ts with
+    | [], [] -> 0
+    | _, [] -> 1
+    | [], _ -> -1
+    | s::ss', t::ts' ->
+      let cmp = compare_term_alpha s t in
+      if cmp = 0 then lexico ss' ts' else cmp
+  in
+  match s.term, t.term with
+  | Var _, Var _ -> 0
+  | Var _, _ -> -1
+  | _, Var _ -> 1
+  | Node (f, ss), Node (g, ts) when f = g ->
+    lexico ss ts (* lexicographic comparison *)
+  | Node (f, _), Node (g, _) -> compare f g
+
 module TSet = Set.Make(struct type t = term let compare = compare_term end)
 
 module TPairSet = Set.Make(

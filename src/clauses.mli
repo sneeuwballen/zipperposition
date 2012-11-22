@@ -32,8 +32,7 @@ val right_pos : int
 val opposite_pos : int -> int
 
 val eq_eqn : equation -> equation -> bool             (** equality of equations *)
-val eq_eqn_com : equation -> equation -> bool         (** commutative equality of equations *)
-val compare_eqn : equation -> equation -> int         (** lexicographic comparison of eqns *)
+val compare_eqn : equation -> equation -> int         (** comparison of eqns *)
 val compare_eqn_partial : ord:ordering -> equation
                           -> equation -> comparison   (** partial comparison of eqns *)
 val hash_eqn : equation -> int                        (** hashing of equation *)
