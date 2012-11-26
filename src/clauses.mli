@@ -75,7 +75,8 @@ val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
 val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
 
-module CHashtbl : Hashtbl.S with type key = clause
+module CSet : Set.S with type elt = hclause
+
 module CHashSet : 
   sig
     type t

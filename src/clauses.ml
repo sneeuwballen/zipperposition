@@ -246,6 +246,12 @@ let eq_hclause hc1 hc2 = hc1 == hc2
 
 let compare_hclause hc1 hc2 = Pervasives.compare hc1.ctag hc2.ctag
 
+module CSet = Set.Make(
+  struct
+    type t = hclause
+    let compare hc1 hc2 = hc1.ctag - hc2.ctag
+  end)
+
 module CHashtbl = Hashtbl.Make(
   struct
     type t = clause
