@@ -155,10 +155,14 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                        !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
                        C.pp_pos passive_pos S.pp_substitution subst));
   assert ((Utils.list_inter T.eq_term active_clause.cvars passive_clause.cvars) = []);
+  assert (T.db_closed s);
   if not sign_st 
   then (Utils.debug 3 (lazy "... active literal is negative"); acc)
-  else if not (T.atomic s) || not (T.db_closed s) (* do not rewrite non-atomic formulas *)
+  else if not (T.atomic s) (* do not rewrite non-atomic formulas *)
   then (Utils.debug 3 (lazy "... active term is not atomic or DB-closed"); acc)
+  else if not (T.db_closed (T.at_pos u subterm_pos))
+    && (List.exists (fun x -> S.is_in_subst x subst) passive_clause.cvars)
+  then (Utils.debug 3 (lazy "... narrowing with De Bruijn indices"); acc)
   else
   let t' = S.apply_subst subst t
   and v' = S.apply_subst subst v in
@@ -169,7 +173,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         ord#compare (S.apply_subst subst u) v' = Lt ||
         not (C.eligible_res ~ord passive_clause passive_idx subst) ||
         not (C.eligible_param ~ord active_clause active_idx subst))
-      then acc
+      then (Utils.debug 3 (lazy "... has bad ordering conditions"); acc)
       else begin (* ordering constraints are ok *)
         let new_lits = Utils.list_remove active_clause.clits active_idx in
         let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
@@ -513,30 +517,47 @@ let positive_simplify_reflect active_set clause =
   let rec iterate_lits acc lits clauses = match lits with
   | [] -> List.rev acc, clauses
   | (Equation (s, t, false, _) as lit, idx)::lits' ->
-    begin match parallel_positions [C.left_pos; idx] s t [] equatable_lits with
+    begin match equatable_terms clauses s t with
     | None -> (* keep literal *)
       iterate_lits (lit::acc) lits' clauses
     | Some new_clauses -> (* drop literal, remember clauses *)
-      iterate_lits acc lits' (new_clauses @ clauses)
+      iterate_lits acc lits' new_clauses
     end
   | (lit, _)::lits' -> iterate_lits (lit::acc) lits' clauses
-  (** try to remove the literal using some positive unit clauses
+  (** try to make the terms equal using some positive unit clauses
       from active_set *)
-  and equatable_lits clauses pos t1 t2 =
-    if T.eq_term t1 t2
-      then Some clauses  (* trivial *)
-      else  (* try to solve it with a unit equality *)
-        try active_set.PS.idx#unit_root_index#retrieve ~sign:true t1
-          (fun l r subst hc ->
-            if T.eq_term t2 (S.apply_subst subst r)
-            then begin
-              Utils.debug 4 (lazy (Utils.sprintf "equate %a and %a using %a"
-                          !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp hc));
-              raise (FoundMatch (r, hc)) (* success *)
-            end else ());
-          None (* no match *)
-        with FoundMatch (r, clause) ->
-          Some (clause :: clauses)  (* success *)
+  and equatable_terms clauses t1 t2 =
+    match t1.term, t2.term with
+    | _ when T.eq_term t1 t2 -> Some clauses  (* trivial *)
+    | Node (f, ss), Node (g, ts) when f == g && List.length ss = List.length ts ->
+      (* try to make the terms equal directly *)
+      (match equate_root clauses t1 t2 with
+      | None -> (* otherwise try to make subterms pairwise equal *)
+        let ok, clauses = List.fold_left2
+          (fun (ok, clauses) t1' t2' ->
+            if ok
+              then match equatable_terms clauses t1' t2' with
+              | None -> false, []
+              | Some clauses -> true, clauses
+              else false, [])
+          (true, clauses) ss ts
+        in
+        if ok then Some clauses else None
+      | Some clauses -> Some clauses)
+    | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
+  (** try to equate terms with a positive unit clause that match them *)
+  and equate_root clauses t1 t2 =
+    try active_set.PS.idx#unit_root_index#retrieve ~sign:true t1
+      (fun l r subst hc ->
+        if T.eq_term t2 (S.apply_subst subst r)
+        then begin
+          Utils.debug 4 (lazy (Utils.sprintf "equate %a and %a using %a"
+                      !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp hc));
+          raise (FoundMatch (r, hc)) (* success *)
+        end else ());
+      None (* no match *)
+    with FoundMatch (r, clause) ->
+      Some (clause :: clauses)  (* success *)
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Utils.list_pos clause.clits) [] in
