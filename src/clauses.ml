@@ -371,12 +371,12 @@ let get_pos clause pos =
 let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
-  let maxvar, _, subst = S.relocate ~recursive:false maxvar c.cvars S.id_subst in
+  let subst = S.relocate maxvar c.cvars in
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 
 let relocate_clause ~ord varlist c =
   let idx = T.max_var c.cvars in
-  let _, newvars, subst = S.relocate ~recursive:false idx c.cvars S.id_subst in
+  let subst = S.relocate idx c.cvars in
   apply_subst_cl ~recursive:false ~ord subst c
 
 let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)

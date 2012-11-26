@@ -36,10 +36,6 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
-(* included to have them compiled *)
-module Opaque = Opaque
-module Rewriting = Rewriting
-
 (* TODO move special heuristic to calculus
    TODO generalize it for defined predicates/functions *)
   

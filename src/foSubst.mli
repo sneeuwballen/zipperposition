@@ -22,71 +22,60 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-exception OccurCheck of (term * term)
-
 val id_subst : substitution
+  (** the identity substitution *)
 
-(** add v -> t to the substitution. If recursive is true,
-    then v -> subst(t) is considered instead.
-    If v occurs in t, OccurCheck (v,t) is raised. *)
-val build_subst : ?recursive:bool -> term -> term -> substitution -> substitution
+val build_subst : ?recursive:bool -> substitution -> term -> term -> substitution
+  (** add v -> t to the substitution. If recursive is true,
+      then v -> subst(t) is considered instead.
+      If v occurs in t, OccurCheck (v,t) is raised. *)
 
-(** update the substitution with the current binding of the variable *)
-val update_binding : substitution -> term -> substitution
-(** update the substitution with current binding of the varibles *)
-val update_bindings : substitution -> term list -> substitution
-(** expand bindings in the codomain of subst *)
+val update_binding : ?recursive:bool -> substitution -> term -> substitution
+  (** update the substitution with the current binding of the variable *)
+
+val update_bindings : ?recursive:bool -> substitution -> term list -> substitution
+  (** update the substitution with current binding of the varibles *)
+
 val expand_bindings : substitution -> substitution
+  (** expand bindings in the codomain of subst *)
 
-(** check (naively, ie structurally) whether two substitutions are equal *)
 val eq_subst: substitution -> substitution -> bool
-(** hash a substitution *)
+  (** check (naively, ie structurally) whether two substitutions are equal *)
+
 val hash_subst: substitution -> int
-(** compare substitutions (arbitrary but total order) *)
+  (** hash a substitution *)
+
 val compare_substs: substitution -> substitution -> int
+  (** compare substitutions (arbitrary but total order) *)
 
 module SSet : Set.S with type elt = substitution
 
-(** lookup variable in substitution *)
 val lookup : term -> substitution -> term
+  (** lookup variable in substitution *)
+
 val is_in_subst : term -> substitution -> bool
+  (** check whether the variable is bound by the substitution *)
 
-(** filter out from the varlist the variables bound by subst *)
-val filter : substitution -> varlist -> varlist
-(** restrict the domain to variables not present in term *)
-val restrict_exclude: substitution -> term -> substitution
-
-(** domain of substitution *)
 val domain : substitution -> Terms.THashSet.t
-(** codomain (image terms) of substitution *)
+  (** domain of substitution *)
+
 val codomain : substitution -> Terms.THashSet.t
+  (** codomain (image terms) of substitution *)
 
-(** reset bindings of variables and terms of the substitution *)
 val reset_bindings : substitution -> unit
+  (** reset bindings of variables and terms of the substitution *)
 
-(** for each (v, t) in subst, v.binding <- t *)
 val apply_subst_bind : substitution -> unit
-(** apply substitution to term, replacing variables by the term they are bound to *)
+  (** for each (v, t) in subst, v.binding <- t *)
+
 val apply_subst : ?recursive:bool -> substitution -> term -> term
+  (** apply substitution to term, replacing variables by the term they are bound to *)
 
-(** normalize the substitution, such that subst(subst(v)) = subst(v)
-    for all v. The result is idempotent. *)
-val flat: substitution -> substitution
-val concat: substitution -> substitution -> substitution
+val relocate : int -> varlist -> substitution
+  (** relocate variables in the varset so that they are > int *)
 
-(** perform renaming to get disjoint variables sets,
-    ie the resulting substitution's domain has no common
-    variable with [varlist], and its new domain is newvarlist
-    relocate [maxvar] [varlist] [subst] ->
-    [newmaxvar] * [newvarlist] * [relocsubst] *)
-val relocate : ?recursive:bool -> int -> varlist -> substitution
-            -> (int * varlist * substitution)
-
-val fresh_term : int -> term -> term      (** fresh term, with all variables > maxvar *)
-val relocate_term : varlist -> term -> term (** rename the term so that
-                                                    it has no variable in varlist *)
-val normalize_term : term -> term * substitution  (** unique representation of term t,
-                                                          substitution to get back to t *)
+val normalize_term : term -> term * substitution
+  (** unique representation of term t, substitution to get back to t *)
 
 val pp_substitution : Format.formatter -> substitution -> unit
 val pp_set : Format.formatter -> SSet.t -> unit
