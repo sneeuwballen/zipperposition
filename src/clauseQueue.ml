@@ -33,17 +33,16 @@ module Utils = FoUtils
 (* a queue of clauses *)
 class type queue =
   object
-    method add : clause -> queue
+    method add : hclause -> queue
     method is_empty: bool
-    method take_first : (queue * clause)
-    method remove : clause list -> queue  (* slow *)
-    method iter : (clause -> unit) -> unit
+    method take_first : (queue * hclause)
+    method remove : hclause list -> queue  (* slow *)
     method name : string
   end
 
 module LH = Leftistheap
 
-type clause_ord = clause LH.ordered
+type clause_ord = hclause LH.ordered
 
 (** generic clause queue based on some ordering on clauses *)
 let make_hq ~ord ?(accept=(fun _ -> true)) name =
@@ -53,7 +52,6 @@ let make_hq ~ord ?(accept=(fun _ -> true)) name =
     method is_empty = heap#is_empty
 
     method add hc =
-      assert (hc.ctag <> (-1));
       if accept hc then
         let new_heap = heap#insert hc in
         ({< heap = new_heap >} :> queue)
@@ -65,12 +63,10 @@ let make_hq ~ord ?(accept=(fun _ -> true)) name =
       let c,new_h = heap#extract_min in
       (({< heap = new_h >} :> queue), c)
 
-    method remove clauses =
-      match clauses with
+    method remove hclauses =
+      match hclauses with
       | [] -> ({< >} :> queue)
-      | _ ->  ({< heap = heap#remove clauses >} :> queue)
-
-    method iter k = heap#iter k
+      | _ ->  ({< heap = heap#remove hclauses >} :> queue)
 
     method name = name
   end
@@ -96,12 +92,18 @@ let clause_weight ~ord =
 
 (** compute a clause weight that makes maximal literals bigger *)
 let compute_refined_clause_weight ~ord c =
-  let weight = Array.fold_left
-    (fun sum ({lit_eqn=Equation (l, r, _)} as lit) ->
+  (* is lit maximal in c? *)
+  let is_maxlit c lit =
+    List.exists (fun (lit', _) -> C.eq_literal lit lit') (C.maxlits c)
+  (* weight function that makes maximal literals heavier *)
+  in
+  let weight = List.fold_left
+    (fun sum (Equation (l, r, _, _) as lit) ->
       let lit_weight = ord#compute_term_weight l + ord#compute_term_weight r in
-      sum + (if lit.lit_maximal then 4 * lit_weight else lit_weight))
+      sum + (if is_maxlit c lit
+        then 4 * lit_weight else lit_weight))
     0 c.clits
-  in (Array.length c.clits) * weight
+  in (List.length c.clits) * weight
 
 let refined_clause_weight ~ord =
   let clause_ord =
@@ -115,9 +117,10 @@ let refined_clause_weight ~ord =
   make_hq ~ord:clause_ord name
   
 let goals ~ord =
-  (* is the clause a goal clause? *)
-  let is_goal_clause c =
-    Array.fold_left (fun acc lit -> acc && C.neg_eqn lit.lit_eqn) true c.clits in
+  (* check whether a literal is a goal *)
+  let is_goal_lit lit = match lit with
+  | Equation (_, _, sign, _) -> not sign in
+  let is_goal_clause clause = List.for_all is_goal_lit clause.clits in
   let clause_ord =
     object
       method le hc1 hc2 =
@@ -129,9 +132,10 @@ let goals ~ord =
   make_hq ~ord:clause_ord ~accept:is_goal_clause name
 
 let non_goals ~ord =
-  (* is the clause clause without goals? *)
-  let is_non_goal_clause c =
-    Array.fold_left (fun acc lit -> acc && C.pos_eqn lit.lit_eqn) true c.clits in
+  (* check whether a literal is a goal *)
+  let is_goal_lit lit = match lit with
+  | Equation (_, _, sign, _) -> not sign in
+  let is_non_goal_clause clause = List.for_all (fun x -> not (is_goal_lit x)) clause.clits in
   let clause_ord =
     object
       method le hc1 hc2 =
@@ -146,7 +150,7 @@ let non_goals ~ord =
 
 let pos_unit_clauses ~ord =
   let is_unit_pos c = match c.clits with
-  | [|{lit_eqn=Equation (_,_,true)}|] -> true
+  | [Equation (_,_,true,_)] -> true
   | _ -> false
   in
   let clause_ord =
@@ -174,15 +178,8 @@ let pp_queue formatter q =
   Format.fprintf formatter "@[<h>queue %s@]" q#name
 
 let pp_queue_weight formatter (q, w) =
-  Format.fprintf formatter "@[<h>queue %s (weight %d)@]" q#name w
-
-let debug_queue_weight formatter (q, w) =
-  let pp_heap formatter h =
-    h#iter (Format.fprintf formatter "%a@;" !C.pp_clause#pp) in
-  Format.fprintf formatter "@[<h>queue %s (weight %d) (contains @[<v>%a@])@]" q#name w pp_heap q
+  Format.fprintf formatter "@[<h>queue %s, %d@]" q#name w
 
 let pp_queues formatter qs =
   Format.fprintf formatter "@[<hov>%a@]" (Utils.pp_list ~sep:"; " pp_queue_weight) qs
 
-let debug_queues formatter qs =
-  Format.fprintf formatter "@[<hov>%a@]" (Utils.pp_list ~sep:"; " debug_queue_weight) qs

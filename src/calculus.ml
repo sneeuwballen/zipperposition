@@ -32,7 +32,7 @@ module PS = ProofState
 type binary_inf_rule = ProofState.active_set -> clause -> clause list
 
 (** unary infererences *)
-type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause list
+type unary_inf_rule = ord:ordering -> clause -> clause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -42,23 +42,23 @@ class type calculus =
     (** the unary inference rules *)
     method unary_rules : (string * unary_inf_rule) list
     (** how to simplify a clause *)
-    method basic_simplify : cs:Clauses.clause_state -> clause -> clause
+    method basic_simplify : ord:ordering -> clause -> clause
     (** how to simplify a clause w.r.t a set of clauses *)
     method simplify : ProofState.active_set -> clause -> clause
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
     (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> clause list
+    method redundant_set : ProofState.active_set -> clause -> hclause list
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
-    method list_simplify : cs:Clauses.clause_state -> clause -> clause list option
+    method list_simplify : ord:ordering -> select:selection_fun -> clause -> clause list option
     (** a list of axioms to add to the Set of Support *)
     method axioms : clause list
     (** some constraints on the precedence *)
     method constr : clause list -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : cs:Clauses.clause_state -> clause list -> clause list
+    method preprocess : ord:ordering -> clause list -> clause list
   end
 
 (** do binary inferences that involve the given clause *)
@@ -76,13 +76,13 @@ let do_binary_inferences active_set rules c =
     [] rules
 
 (** do unary inferences for the given clause *)
-let do_unary_inferences ~cs rules c =
+let do_unary_inferences ~ord rules c =
   Utils.debug 3 (lazy "do unary inferences");
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
       Utils.debug 3 (lazy ("#  apply unary rule " ^ name));
-      let new_clauses = rule ~cs c in
+      let new_clauses = rule ~ord c in
       List.rev_append new_clauses acc)
     [] rules
 
@@ -93,46 +93,45 @@ let do_unary_inferences ~cs rules c =
     if both, then both sides of a non-oriented equation
       will be visited
 
-    ?pos:bool -> ?neg:bool -> ?both:bool -> ord:ordering ->
+    ?pos:bool -> ?neg:bool -> ?both:bool
     -> ('a -> Types.term -> Types.term -> bool -> int list -> 'a)
     -> 'a -> (Types.literal * int) list
     -> 'a *)
-let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) ~ord f acc lits =
+let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) f acc lits =
   if (not pos) && (not neg) then acc else
   (* is the sign ok, given the parameters? *)
   let sign_ok sign = if sign then pos else neg in
-  let acc = ref acc in
-  Array.iteri
-    (fun idx ({lit_eqn=Equation (l,r,sign)} as lit) ->
-      if sign_ok sign then
-      (match ord#compare l r with
-      | Gt -> acc := f !acc lit l r sign [idx; C.left_pos]
-      | Lt -> acc := f !acc lit r l sign [idx; C.right_pos]
-      | _ ->
+  List.fold_left
+    (fun acc (lit, idx) ->
+      match lit with
+      | Equation (l,r,sign,Gt) when sign_ok sign ->
+        f acc l r sign [idx; C.left_pos]
+      | Equation (l,r,sign,Lt) when sign_ok sign ->
+        f acc r l sign [idx; C.right_pos]
+      | Equation (l,r,sign,_) when sign_ok sign ->
         if both
         then (* visit both sides of the equation *)
-          (acc := f !acc lit r l sign [idx; C.right_pos];
-          acc := f !acc lit l r sign [idx; C.left_pos])
+          let acc = f acc r l sign [idx; C.right_pos] in
+          f acc l r sign [idx; C.left_pos]
         else (* only visit one side (arbitrary) *)
-          acc := f !acc lit l r sign [idx; C.left_pos]))
-    lits;
-  !acc
+          f acc l r sign [idx; C.left_pos]
+      | _ -> acc)
+    acc lits
 
 (** Visit all non-minimal sides of positive equations *)
-let rec fold_positive ?(both=true) ~ord f acc lits =
-  fold_lits ~pos:true ~neg:false ~both ~ord f acc lits
+let rec fold_positive ?(both=true) f acc lits =
+  fold_lits ~pos:true ~neg:false ~both f acc lits
 
 (** Visit all non-minimal sides of negative equations *)
-let rec fold_negative ?(both=true) ~ord f acc lits =
-  fold_lits ~pos:false ~neg:true ~both ~ord f acc lits
+let rec fold_negative ?(both=true) f acc lits =
+  fold_lits ~pos:false ~neg:true ~both f acc lits
 
 (** decompose the literal at given position *)
-let get_equations_sides clause pos =
-  match pos with
+let get_equations_sides clause pos = match pos with
   | idx::eq_side::[] ->
-    (match clause.clits.(idx).lit_eqn with
-    | Equation (l,r,sign) when eq_side = C.left_pos -> (l, r, sign)
-    | Equation (l,r,sign) when eq_side = C.right_pos -> (r, l, sign)
+    (match Utils.list_get clause.clits idx with
+    | Equation (l,r,sign,_) when eq_side = C.left_pos -> (l, r, sign)
+    | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (expected binary list)"
 
@@ -160,8 +159,8 @@ let skolem =
       incr T.sig_version;  (* update version of signature *)
       incr count;
       let skolem_term =
-        if vars = [||] then T.mk_const new_symbol sort
-        else T.mk_node new_symbol sort (Array.to_list vars)
+        if vars = [] then T.mk_const new_symbol sort
+        else T.mk_node new_symbol sort vars
       in
       (* update the ordering *)
       ord#refresh ();

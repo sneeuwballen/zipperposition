@@ -57,7 +57,7 @@ and typed_term = {
   term : term_cell;             (** the term itself *)
   sort : sort;                  (** the sort of the term *)
   mutable binding : term;       (** binding of the term (if variable), or normal form *)
-  mutable vars : term array;    (** the variables of the term *)
+  mutable vars : term list;     (** the variables of the term TODO use an array *)
   mutable flags : int;
   mutable tsize : int;          (** number of symbol/vars occurrences in the term *)
   mutable tag : int;            (** hashconsing tag *)
@@ -68,8 +68,8 @@ and term_cell =
   | Var of int                  (** variable *)
   | Node of symbol * term list  (** term application *)
 
-(** array of variables *)
-type varset = term Vector.t
+(** list of variables TODO replace by T.THashSet? *)
+type varlist = term list            
 
 (** substitution, a list of (variable -> term) *)
 type substitution = (term * term) list
@@ -83,40 +83,33 @@ type comparison = Lt | Eq | Gt | Incomparable
 (** position in a term TODO compact positions *)
 type position = int list
 
-(** Equation between terms *)
-type equation = 
+(** a literal, that is, a signed equation *)
+type literal = 
  | Equation of    term  (** lhs *)
                 * term  (** rhs *)
                 * bool  (** sign (equality, ie true, or difference) *)
-(** a literal, that is, an equation + metadata. It belongs
-    only to a clause and is therefore copiable. *)
-and literal = {
-  lit_eqn : equation;           (** the equation *)
-  mutable lit_oriented : int;   (** orientation of the literal *)
-  mutable lit_selected : bool;  (** is the literal selected? *)
-  mutable lit_maximal : bool;   (** is the literal maximal in the clause? *)
-  mutable lit_hash : int;       (** hash of the literal *)
-  mutable lit_depth : int;      (** depth of the literal *)
-}
+                * comparison   (* TODO remove *)
 
-(** a first order (hashconsed) clause *)
-type clause = {
-  mutable ctag : int;                     (** hashconsing tag *)
-  mutable cselected : int;                (** number of selected literals *)
-  mutable cvars : term array;             (** the free variables *)
-  chkey : int;                            (** hash of the clause *)
-  clits : literal array;                  (** the literals (sorted in increasing hash order, duplicates removed) *)
+(** a hashconsed first order clause *)
+type hclause = clause
+(** a first order clause *)
+and clause = {
+  ctag : int;                             (** hashconsing tag *)
+  clits : literal list;                   (** the equations *)
+  cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
+  cselected : int list Lazy.t;            (** index of selected literals *)
+  cvars : term list;                      (** the free variables *)
   cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
-  cparents : clause list;                 (** clauses used to create this one *)
+  cparents : clause list Lazy.t;          (** clauses used to create this one *)
 }
 (** a proof step for a clause *)
-and proof = Axiom of string * string      (** file, axiom name *)
+and proof = Axiom of string * string (** file, axiom name *)
           | Proof of string * (clause * position * substitution) list
 
 (** a selection function *)
-type selection_fun = literal array -> unit
+type selection_fun = clause -> int list
 
-let no_select c = ()                      (** selects no literals *)
+let no_select c = []                          (** selects no literals *)
 
 (** an ordering constraint *)
 type ordering_constraint = symbol -> symbol -> int

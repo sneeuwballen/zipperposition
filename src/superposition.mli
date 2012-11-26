@@ -37,9 +37,9 @@ val print_stats : unit -> unit
 val all_positions : position -> term ->  (* combinator *)
                     (term -> position -> 'b list) -> 'b list
 
-val infer_active: Calculus.binary_inf_rule  (** superposition where given clause is active *)
+val infer_active: Calculus.binary_inf_rule (** superposition where given clause is active *)
 
-val infer_passive: Calculus.binary_inf_rule (** superposition where given clause is passive *)
+val infer_passive: Calculus.binary_inf_rule(** superposition where given clause is passive *)
 
 val infer_equality_resolution: Calculus.unary_inf_rule
 
@@ -53,13 +53,14 @@ val is_tautology : clause -> bool
     to see if negative literals imply some positive literal *)
 val is_semantic_tautology : clause -> bool
 
-val basic_simplify : cs:Clauses.clause_state -> clause -> clause   (** basic simplifications *)
+val basic_simplify : ord:ordering -> clause -> clause   (** basic simplifications *)
 
 val demodulate : ProofState.active_set
                 -> clause   (** the clause to simplify *)
 		-> clause   (** the simplified clause *)
 
-val simplify_reflect : ProofState.active_set -> clause -> clause
+val positive_simplify_reflect : ProofState.active_set -> clause -> clause
+val negative_simplify_reflect : ProofState.active_set -> clause -> clause
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : clause -> clause -> bool
@@ -69,10 +70,10 @@ val subsumes_with : clause -> clause -> substitution option   (** returns subsum
 val subsumed_by_set : ProofState.active_set -> clause -> bool
 
 (** list of clauses in the active set that are subsumed by the clause *)
-val subsumed_in_set : ProofState.active_set -> clause -> clause list
+val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
-val cnf_of : cs:Clauses.clause_state -> clause -> clause list
+val cnf_of : ord:ordering -> clause -> clause list
 
 (** The superposition calculus *)
 val superposition : Calculus.calculus

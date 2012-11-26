@@ -26,7 +26,7 @@ open Types
 type binary_inf_rule = ProofState.active_set -> clause -> clause list
 
 (** unary infererences *)
-type unary_inf_rule = cs:Clauses.clause_state -> clause -> clause list
+type unary_inf_rule = ord:ordering -> clause -> clause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -36,23 +36,23 @@ class type calculus =
     (** the unary inference rules *)
     method unary_rules : (string * unary_inf_rule) list
     (** how to simplify a clause *)
-    method basic_simplify : cs:Clauses.clause_state -> clause -> clause
+    method basic_simplify : ord:ordering -> clause -> clause
     (** how to simplify a clause w.r.t a set of clauses *)
     method simplify : ProofState.active_set -> clause -> clause
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
     (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> clause list
+    method redundant_set : ProofState.active_set -> clause -> hclause list
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
-    method list_simplify : cs:Clauses.clause_state -> clause -> clause list option
+    method list_simplify : ord:ordering -> select:selection_fun -> clause -> clause list option
     (** a list of axioms to add to the Set of Support *)
     method axioms : clause list
     (** some constraints on the precedence *)
     method constr : clause list -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : cs:Clauses.clause_state -> clause list -> clause list
+    method preprocess : ord:ordering -> clause list -> clause list
   end
 
 (** do binary inferences that involve the given clause *)
@@ -61,23 +61,21 @@ val do_binary_inferences : ProofState.active_set ->
                           clause -> clause list
 
 (** do unary inferences for the given clause *)
-val do_unary_inferences : cs:Clauses.clause_state ->
+val do_unary_inferences : ord:ordering ->
                           (string * unary_inf_rule) list ->
                           clause -> clause list
 
 (* some helpers *)
 val fold_lits :
-  ?pos:bool -> ?neg:bool -> ?both:bool -> ord:ordering ->
-  ('a -> literal -> term -> term -> bool -> position -> 'a) -> 'a ->
-  literal array -> 'a
+  ?pos:bool -> ?neg:bool -> ?both:bool ->
+  ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
+  (literal * int) list -> 'a
 val fold_positive :
-  ?both:bool -> ord:ordering
-  -> ('a -> literal -> term -> term -> bool -> position -> 'a) -> 'a ->
-  literal array -> 'a
+  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
+  (literal * int) list -> 'a
 val fold_negative :
-  ?both:bool -> ord:ordering
-  -> ('a -> literal -> term -> term -> bool -> position -> 'a) -> 'a ->
-  literal array -> 'a
+  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
+  (literal * int) list -> 'a
 
 val get_equations_sides : clause -> position -> term * term * bool
 

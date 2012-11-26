@@ -26,7 +26,7 @@ module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
-type data = clause * position * term
+type data = hclause * position * term
 
 (** a set of (hashconsed clause, position in clause, term). *)
 module ClauseSet : Set.S with type elt = data
@@ -37,7 +37,7 @@ module ClauseSet : Set.S with type elt = data
       let compare (c1, p1, t1) (c2, p2, t2) = 
         let c = Pervasives.compare p1 p2 in
         if c <> 0 then c else
-        let c = C.compare_clause c1 c2 in
+        let c = C.compare_hclause c1 c2 in
         if c <> 0 then c else
         (assert (T.eq_term t1 t2); 0)
     end)
@@ -101,10 +101,10 @@ class type index =
 class type unit_index = 
   object ('b)
     method name : string
-    method add : term -> term -> bool -> clause -> 'b    (** add (in)equation (with given ID) *)
-    method remove : term -> term -> bool -> clause ->'b  (** remove (in)equation (with given ID) *)
+    method add : term -> term -> bool -> hclause -> 'b    (** add (in)equation (with given ID) *)
+    method remove : term -> term -> bool -> hclause ->'b  (** remove (in)equation (with given ID) *)
     method retrieve : sign:bool -> term ->
-                      (term -> term -> substitution -> clause -> unit) ->
+                      (term -> term -> substitution -> hclause -> unit) ->
                       unit                      (** iter on (in)equations of given sign l=r
                                                     where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit
@@ -113,8 +113,8 @@ class type unit_index =
 (** A global index, that operates on hashconsed clauses *)
 class type clause_index =
   object ('a)
-    method index_clause : ord:ordering -> clause -> 'a
-    method remove_clause : ord:ordering -> clause -> 'a
+    method index_clause : hclause -> 'a
+    method remove_clause : hclause -> 'a
 
     method root_index : index
     method unit_root_index : unit_index (** for simplifications that only require matching *)
@@ -126,49 +126,51 @@ class type clause_index =
 
 
 (** process the literal (only its maximal side(s)) *)
-let process_lit ~ord op c tree ({lit_eqn=Equation (l,r,sign)}, pos) =
-  match ord#compare l r with
-  | Gt -> op tree l (c, [C.left_pos; pos])
-  | Lt -> op tree r (c, [C.right_pos; pos])
-  | Incomparable ->
-    let tmp_tree = op tree l (c, [C.left_pos; pos]) in
-    op tmp_tree r (c, [C.right_pos; pos])
-  | Eq ->
+let process_lit op c tree (lit, pos) =
+  match lit with
+  | Equation (l,_,_,Gt) -> 
+      op tree l (c, [C.left_pos; pos])
+  | Equation (_,r,_,Lt) -> 
+      op tree r (c, [C.right_pos; pos])
+  | Equation (l,r,_,Incomparable) ->
+      let tmp_tree = op tree l (c, [C.left_pos; pos]) in
+      op tmp_tree r (c, [C.right_pos; pos])
+  | Equation (l,r,_,Eq) ->
     Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index"
                    !T.pp_term#pp l !T.pp_term#pp r));
     op tree l (c, [C.left_pos; pos])  (* only index one side *)
 
-let process_unit_lit ~ord ({lit_eqn=Equation (l,r,sign)}) hc op tree =
-  match ord#compare l r with
-  | Gt -> op tree l r sign hc
-  | Lt -> op tree r l sign hc
-  | Incomparable -> 
-    let tree' = op tree l r sign hc in
-    op tree' r l sign hc
-  | Eq ->
+let process_unit_lit lit hc op tree =
+  match lit with
+  | Equation (l,r,sign,Gt) -> 
+      op tree l r sign hc
+  | Equation (l,r,sign,Lt) -> 
+      op tree r l sign hc
+  | Equation (l,r,sign,Incomparable) ->
+      let tree' = op tree l r sign hc in
+      op tree' r l sign hc
+  | Equation (l,r,sign,Eq) ->
     Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to unit index"
                    !T.pp_term#pp l !T.pp_term#pp r));
     op tree l r sign hc  (* only index one side *)
 
 
 (** apply op to the maximal literals of the clause, and only to
-    the maximal side(s) of those, if restrict is true. Otherwise
+    the maximal side(s) of those, if restruct is true. Otherwise
     process all literals *)
-let process_clause ~restrict ~ord op tree c =
+let process_clause ~restrict op tree c =
   (* which literals to process? *)
-  let eligible lit =
-    if restrict && c.cselected = 0 then lit.lit_maximal
-    else if restrict then lit.lit_selected
-    else true in
-  let tree = ref tree in
-  Array.iteri
-    (fun i lit -> if eligible lit then tree := process_lit ~ord op c !tree (lit, i))
-    c.clits;
-  !tree
+  let lits_pos =
+    if restrict && C.selected c = [] then C.maxlits c
+    else if restrict then C.selected_lits c
+    else Utils.list_pos c.clits
+  in
+  (* index literals with their position *)
+  let new_tree = List.fold_left (process_lit op c) tree lits_pos in
+  new_tree
 
 (** apply (op tree) to all subterms, folding the resulting tree *)
-let rec fold_subterms op tree t (c, path) =
-  match t.term with
+let rec fold_subterms op tree t (c, path) = match t.term with
   | Var _ -> tree  (* variables are not indexed *)
   | Node (_, []) -> op tree t (c, List.rev path, t) (* reverse path now *)
   | Node (_, l) ->
@@ -198,40 +200,38 @@ let mk_clause_index (index : index) (unit_index : unit_index) =
     val _ground_rewrite_index = Ptmap.empty
 
     (** add root terms and subterms to respective indexes *)
-    method index_clause ~ord hc =
+    method index_clause hc =
       let op tree = tree#add in
-      let new_subterm_index = process_clause ~ord ~restrict:true (fold_subterms op) _subterm_index hc
+      let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
       and new_unit_root_index = match hc.clits with
-          | [|lit|] -> process_unit_lit ~ord lit hc op _unit_root_index
+          | [lit] -> process_unit_lit lit hc op _unit_root_index
           | _ -> _unit_root_index
-      and new_ground_rewrite_index =
-        match hc.clits with
-        | [|{lit_eqn=Equation (l,r,true)}|] when T.is_ground_term l && ord#compare l r = Gt ->
-            Ptmap.add l.tag (r, (hc, [0; C.left_pos], l)) _ground_rewrite_index
-        | [|{lit_eqn=Equation (l,r,true)}|] when T.is_ground_term r && ord#compare l r = Lt->
-            Ptmap.add r.tag (l, (hc, [0; C.right_pos], r)) _ground_rewrite_index
-        | _ -> _ground_rewrite_index
-      and new_root_index = process_clause ~ord ~restrict:true (apply_root_term op) _root_index hc
+      and new_ground_rewrite_index = match hc.clits with
+          | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
+              Ptmap.add l.tag (r, (hc, [0; C.left_pos], l)) _ground_rewrite_index
+          | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
+              Ptmap.add r.tag (l, (hc, [0; C.right_pos], r)) _ground_rewrite_index
+          | _ -> _ground_rewrite_index
+      and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
             _ground_rewrite_index=new_ground_rewrite_index;
             _subterm_index=new_subterm_index >} :> 'self)
 
     (** remove root terms and subterms from respective indexes *)
-    method remove_clause ~ord hc =
+    method remove_clause hc =
       let op tree = tree#remove in
-      let new_subterm_index = process_clause ~ord ~restrict:true (fold_subterms op) _subterm_index hc
+      let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
       and new_unit_root_index = match hc.clits with
-          | [|lit|] -> process_unit_lit ~ord lit hc op _unit_root_index
+          | [lit] -> process_unit_lit lit hc op _unit_root_index
           | _ -> _unit_root_index
-      and new_ground_rewrite_index =
-        match hc.clits with
-        | [|{lit_eqn=Equation (l,r,true)}|] when T.is_ground_term l && ord#compare l r = Gt ->
-            Ptmap.remove l.tag _ground_rewrite_index
-        | [|{lit_eqn=Equation (l,r,true)}|] when T.is_ground_term r && ord#compare l r = Lt->
-            Ptmap.remove r.tag _ground_rewrite_index
-        | _ -> _ground_rewrite_index
-      and new_root_index = process_clause ~ord ~restrict:true (apply_root_term op) _root_index hc
+      and new_ground_rewrite_index = match hc.clits with
+          | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
+              Ptmap.remove l.tag _ground_rewrite_index
+          | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
+              Ptmap.remove r.tag _ground_rewrite_index
+          | _ -> _ground_rewrite_index
+      and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
             _ground_rewrite_index=new_ground_rewrite_index;

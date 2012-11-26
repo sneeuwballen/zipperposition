@@ -65,24 +65,6 @@ let eq_term x y = x == y  (* because of hashconsing *)
 
 let compare_term x y = x.tag - y.tag
 
-let rec compare_term_alpha s t =
-  (* recursive lexicographic order *)
-  let rec lexico ss ts = match ss, ts with
-    | [], [] -> 0
-    | _, [] -> 1
-    | [], _ -> -1
-    | s::ss', t::ts' ->
-      let cmp = compare_term_alpha s t in
-      if cmp = 0 then lexico ss' ts' else cmp
-  in
-  match s.term, t.term with
-  | Var _, Var _ -> 0
-  | Var _, _ -> -1
-  | _, Var _ -> 1
-  | Node (f, ss), Node (g, ts) when f = g ->
-    lexico ss ts (* lexicographic comparison *)
-  | Node (f, _), Node (g, _) -> compare f g
-
 module TSet = Set.Make(struct type t = term let compare = compare_term end)
 
 module TPairSet = Set.Make(
@@ -108,23 +90,13 @@ module THashSet =
     let member t term = THashtbl.mem t term
     let iter set f = THashtbl.iter (fun t () -> f t) set
     let add set t = THashtbl.replace set t ()
-    let size t = THashtbl.length t
     let merge s1 s2 = iter s2 (add s1)
-    let append_array set a =
-      for i = 0 to Array.length a - 1 do add set a.(i); done
     let to_list set =
       let l = ref [] in
       iter set (fun t -> l := t :: !l); !l
-    let to_vector set =
-      let v = Vector.create (size set) in
-      iter set (Vector.push v);
-      v
     let from_list l =
       let set = create () in
       List.iter (add set) l; set
-    let from_array a =
-      let set = create () in
-      Array.iter (add set) a; set
   end
 
 (* ----------------------------------------------------------------------
@@ -185,13 +157,12 @@ let get_flag flag t = (t.flags land flag) != 0
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
 
-(** compute set of variables from the list of terms *)
 let compute_vars l =
-  let v = Vector.create 10 in
-  List.iter (fun t -> Vector.append_array v t.vars) l;
-  (* sort and remove duplicates *)
-  Vector.uniq_sort ~cmp:compare_term v;
-  Vector.get_array v
+  let set = THashSet.create () in
+  List.iter  (* for each subterm, add its variables to set *)
+    (fun subterm -> List.iter (fun v -> THashSet.add set v) subterm.vars)
+    l;
+  THashSet.to_list set
 
 let rec compute_db_closed depth t = match t.term with
   | Node (s, []) when s = db_symbol -> depth < 0
@@ -203,14 +174,14 @@ let rec compute_db_closed depth t = match t.term with
   | Node (_, l) -> List.for_all (compute_db_closed depth) l
 
 let mk_var idx sort =
-  let rec my_v = {term = Var idx; sort=sort; vars=[|my_v|];
+  let rec my_v = {term = Var idx; sort=sort; vars=[my_v];
                   flags=(flag_db_closed lor flag_simplified lor flag_normal_form);
                   binding=my_v; tsize=1; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
 let mk_node s sort l =
-  let rec my_t = {term=Node (s, l); sort; vars=[||]; flags=0;
+  let rec my_t = {term=Node (s, l); sort; vars=[]; flags=0;
                   binding=my_t; tsize=0; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
   let t = H.hashcons my_t in
@@ -276,45 +247,35 @@ let rec replace_pos t pos new_t = match t.term, pos with
     mk_node s t.sort (Utils.list_set l i new_subterm)
   | _ -> invalid_arg "index too high for subterm"
 
-let depth t =
-  let rec depth t n = match t.term with
-  | Var _ -> n
-  | Node (_, l) ->
-    List.fold_left (fun acc t -> max acc (depth t (n+1))) n l
-  in depth t 1
-
 let var_occurs x t =
-  let rec check i =
-    if i >= Array.length t.vars then false
-    else if t.vars.(i) == x then true
-    else check (i+1)
-  in check 0
+  let rec check l =
+    match l with
+    | [] -> false
+    | y::l' -> if x == y then true else check l'
+  in check t.vars
 
-let is_ground_term t = Array.length t.vars = 0
+let is_ground_term t =
+  match t.vars with
+  | [] -> true
+  | _ -> false
 
-let merge_varset l1 l2 =
-  let v = Vector.copy l1 in
-  Vector.append v l2;
-  Vector.uniq_sort ~cmp:compare_term v;
-  v
+let merge_varlist l1 l2 = Utils.list_union eq_term l1 l2
 
 let max_var vars =
-  let m = ref min_int in
-  for i = 0 to Array.length vars - 1 do
-    match vars.(i).term with
-    | Var idx -> m := max !m idx
-    | _ -> assert false
-  done;
-  !m
+  let rec aux idx = function
+  | [] -> idx
+  | ({term=Var i}::vars) -> aux (max i idx) vars
+  | _::vars -> assert false
+  in
+  aux min_int vars
 
 let min_var vars =
-  let m = ref max_int in
-  for i = 0 to Array.length vars - 1 do
-    match vars.(i).term with
-    | Var idx -> m := min !m idx
-    | _ -> assert false
-  done;
-  !m
+  let rec aux idx = function
+  | [] -> idx
+  | ({term=Var i}::vars) -> aux (min i idx) vars
+  | _ -> assert false
+  in
+  aux max_int vars
 
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
@@ -472,16 +433,6 @@ let reset_binding t = t.binding <- t
 let rec get_binding t = 
   if t.binding == t then t else get_binding t.binding
 
-(** check whether all variables of t are bound to themselves *)
-let no_var_bound t =
-  try
-    for i = 0 to Array.length t.vars - 1 do
-      let x = t.vars.(i) in
-      if x.binding != x then raise Exit
-    done;
-    true
-  with Exit -> false
-
 (** replace variables by their bindings *)
 let expand_bindings ?(recursive=true) t =
   (* recurse to expand bindings, returns new term.  Also keeps track of the
@@ -489,7 +440,7 @@ let expand_bindings ?(recursive=true) t =
     substituted terms. *)
   let rec recurse binder_depth t =
     (* if no variable of t is bound (or t ground), nothing to do *)
-    if is_ground_term t || no_var_bound t then t
+    if is_ground_term t || List.for_all (fun v -> v.binding == v) t.vars then t
     else match t.term with
     | Var _ ->
       if t.binding == t then t
@@ -509,9 +460,10 @@ let expand_bindings ?(recursive=true) t =
 
 (** reset bindings of variables of the term *)
 let reset_vars t =
-  for i = 0 to Array.length t.vars - 1 do
-    reset_binding t.vars.(i);
-  done
+  let rec reset = function
+  | [] -> ()
+  | v::l -> reset_binding v; reset l
+  in reset t.vars
 
 (* ----------------------------------------------------------------------
  * Pretty printing

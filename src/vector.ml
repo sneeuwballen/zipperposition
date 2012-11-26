@@ -28,10 +28,10 @@ type 'a t = {
 }
 
 let create i =
-  assert (i >= 0);
+  assert (i > 0);
   { size = 0;
     capacity = i;
-    vec = if i = 0 then [||] else Array.create i (Obj.magic None);
+    vec = Array.create i (Obj.magic None);
   }
 
 (** resize the underlying array so that it can contains the
@@ -85,36 +85,35 @@ let copy v =
   v'
 
 let shrink v n =
-  if n > v.size then failwith "cannot shrink to bigger size" else v.size <- n
+  if n <= v.size then () else v.size <- n
 
 let member ?(cmp=(=)) v x =
-  let n = v.size in
-  let rec check i =
-    if i = n then false
-    else if cmp x v.vec.(i) then true
-    else check (i+1)
-  in check 0
+  try
+    for i = 0 to v.size-1 do
+      if cmp x v.vec.(i) then raise Exit
+    done;
+    false
+  with Exit -> true
 
 let sort ?(cmp=compare) v =
-  (* copy array (to avoid junk in it), then sort the array *)
-  let a = Array.sub v.vec 0 v.size in
-  Array.fast_sort cmp a;
-  v.vec <- a
+  (* copy vector (to avoid junk in the array), then sort the array *)
+  let v' = copy v in
+  Array.fast_sort cmp v'.vec;
+  v'
 
 let uniq_sort ?(cmp=compare) v =
-  sort ~cmp v;
-  let n = v.size in
+  let v' = sort ~cmp v in
   (* traverse to remove duplicates. i= current index,
-     j=current append index, j<=i. new_size is the size
-     the vector will have after removing duplicates. *)
+     j=current append index, j<=i *)
   let rec traverse prev i j =
-    if i >= n then () (* done traversing *)
+    if i = v'.size then v' (* done traversing *)
     else if cmp prev v.vec.(i) = 0
-      then (v.size <- v.size - 1; traverse prev (i+1) j) (* duplicate, remove it *)
+      then (v'.size <- v'.size - 1; traverse prev (i+1) j) (* duplicate, remove it *)
       else (v.vec.(j) <- v.vec.(i); traverse v.vec.(i) (i+1) (j+1)) (* keep it *)
   in
-  if v.size > 0
-    then traverse v.vec.(0) 1 1 (* start at 1, to get the first element in hand *)
+  if v'.size = 0
+    then v'
+    else traverse v'.vec.(0) 1 1  (* start at 1, to get the first element in hand *)
 
 let iter v k =
   for i = 0 to v.size -1 do
@@ -133,43 +132,12 @@ let map v f =
   done;
   v'
 
-let filter v f =
-  let v' = create v.size in
-  for i = 0 to v.size - 1 do
-    if f v.vec.(i) then push v' v.vec.(i);
-  done;
-  v'
-
 let fold v acc f =
   let acc = ref acc in
   for i = 0 to v.size - 1 do
     acc := f !acc v.vec.(i);
   done;
   !acc
-
-let exists v p =
-  let n = v.size in
-  let rec check i =
-    if i = n then false
-    else if p v.vec.(i) then true
-    else check (i+1)
-  in check 0
-
-let for_all v p =
-  let n = v.size in
-  let rec check i =
-    if i = n then true
-    else if not (p v.vec.(i)) then false
-    else check (i+1)
-  in check 0
-
-let find v p =
-  let n = v.size in
-  let rec check i =
-    if i = n then raise Not_found
-    else if p v.vec.(i) then v.vec.(i)
-    else check (i+1)
-  in check 0
 
 let get v i =
   (if i < 0 || i >= v.size then failwith "wrong index for vector");
@@ -194,9 +162,9 @@ let from_list l =
   v
 
 let to_array v =
-  Array.sub v.vec 0 v.size
-
-let get_array v = v.vec
+  let a = Array.create v.size (Obj.magic None) in
+  Array.blit v.vec 0 a 0 v.size;
+  a
 
 let to_list v =
   let l = ref [] in

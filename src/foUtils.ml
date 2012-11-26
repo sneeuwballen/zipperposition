@@ -278,35 +278,9 @@ let sprintf format =
   fmt
   format
 
-(** print a list of items using the printing function *)
+(* print a list of items using the printing function *)
 let rec pp_list ?(sep=", ") pp_item formatter = function
   | x::y::xs -> Format.fprintf formatter "%a%s@,%a"
       pp_item x sep (pp_list ~sep:sep pp_item) (y::xs)
   | x::[] -> pp_item formatter x
   | [] -> ()
-
-(** print an array of items using the printing function *)
-let rec pp_array ?(sep=", ") pp_item formatter a =
-  match a with
-  | [||] -> ()
-  | [|x|] -> pp_item formatter 0 x
-  | _ ->
-    for i = 0 to Array.length a -1 do
-      pp_item formatter i a.(i);
-      (if i < Array.length a - 1
-        then (Format.pp_print_string formatter sep;
-              Format.pp_print_cut formatter ()));
-    done
-
-(** print a vector of items using the printing function *)
-let rec pp_vector ?(sep=", ") pp_item formatter v =
-  match Vector.size v with
-  | 0 -> ()
-  | 1 -> pp_item formatter 0 (Vector.get v 0)
-  | _ ->
-    for i = 0 to Vector.size v -1 do
-      pp_item formatter i (Vector.get v i);
-      (if i < Vector.size v - 1
-        then (Format.pp_print_string formatter sep;
-              Format.pp_print_cut formatter ()));
-    done

@@ -45,11 +45,11 @@ type fv_index  (** a feature vector index, based on a trie *)
 val mk_fv_index : feature list -> fv_index          (** create an index from features *)
 val mk_fv_index_signature : symbol list -> fv_index (** create an index from signature *)
 
-val index_clause : fv_index -> clause -> fv_index   (** add the clause to the index *)
-val remove_clause : fv_index -> clause -> fv_index  (** remove the clause from the index *)
+val index_clause : fv_index -> hclause -> fv_index  (** add the clause to the index *)
+val remove_clause : fv_index -> hclause -> fv_index (** remove the clause from the index *)
 
 val retrieve_subsuming : fv_index -> clause ->
-                         (clause -> unit) -> unit   (** clauses that subsume c *)
+                         (hclause -> unit) -> unit  (** clauses that subsume c *)
 val retrieve_subsumed : fv_index -> clause ->
-                        (clause -> unit) -> unit    (** clauses subsumed by c *)
+                        (hclause -> unit) -> unit   (** clauses subsumed by c *)
 

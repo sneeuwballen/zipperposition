@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Unification and matching algorithms. *)
+(** Unification and matching algorithms. TODO use var bindings to fasten computation *)
 
 open Types
 
@@ -33,7 +33,7 @@ val matching: substitution -> term -> term -> substitution
     or raise UnificationFailure. *)
 val matching_locked: locked:Terms.THashSet.t -> substitution -> term -> term -> substitution
 
-(** [disunify s t] finds pairs of subterms s' and t' such that
-    s = u[s']_p and t = u[t']_p for some context u and
-    such that s' and t' are not variables *)
-val disunify : term -> term -> (term * term) list
+(* alpha_eq [a] [b] returns sigma with sigma(a) = b, and sigma
+ * a variable renaming, or raise UnificationFailure *)
+val alpha_eq: term -> term -> substitution
+

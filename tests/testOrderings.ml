@@ -12,9 +12,8 @@ module Utils = FoUtils
 
 let instantiate t1 t2 =
   (* find a subst for t1 and t2 *)
-  let vars = T.merge_varset (Vector.from_array t1.vars) (Vector.from_array t2.vars) in
-  let subst = Vector.map vars (fun v -> (v, TT.random_term ~ground:true ())) in
-  let subst = Vector.to_list subst in
+  let vars = T.merge_varlist t1.vars t2.vars in
+  let subst = List.map (fun v -> (v, TT.random_term ~ground:true ())) vars in
   S.apply_subst subst t1, S.apply_subst subst t2
 
 (** generate all pairs (a, b, compare a b) for a, b in list *)
@@ -38,12 +37,11 @@ let more_specific cmp1 cmp2 =
   | Lt, Lt | Gt, Gt -> true
   | _ -> false
 
-let check_more_specific ~ord a b a' b' =
-  let cmp = ord#compare a b
-  and cmp' = ord#compare a' b' in
+let check_more_specific ~ord a b cmp a' b' =
+  let cmp' = ord#compare a' b' in
   if not (more_specific cmp' cmp)
     then begin
-      Format.printf "  more_specific failed on @[<h>%a %s %a (%a %s %a)@]@."
+      Format.printf "  more_specific failed on @[<h>%a %s %a (%a %s %a)@]"
         !T.pp_term#pp a' (C.string_of_comparison cmp') !T.pp_term#pp b' 
         !T.pp_term#pp a (C.string_of_comparison cmp) !T.pp_term#pp b;
       assert false
@@ -55,7 +53,7 @@ let check_properties ~ord (a, b, cmp) =
   (if not (T.is_ground_term a) || not (T.is_ground_term b)
     then begin
       let a', b' = instantiate a b in
-      check_more_specific ~ord a b a' b';
+      check_more_specific ~ord a b cmp a' b';
     end);
   (* subterm property *)
   (if a == b then assert (cmp = Eq));
@@ -94,9 +92,8 @@ let run () =
   Utils.set_debug 2;
   (* generate terms *)
   let terms = Utils.times n (TT.random_term ~ground:false) in
-  incr T.sig_version;
   let so = O.default_symbol_ordering () in
   check "KBO" ~ord:(new O.kbo so) terms;
-  check "RPO6" ~ord:(new O.rpo6 so) terms;
   check "RPO" ~ord:(new O.rpo so) terms;
+  check "RPO6" ~ord:(new O.rpo6 so) terms;
   check_same ~so terms

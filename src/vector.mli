@@ -37,7 +37,6 @@ val push : 'a t -> 'a -> unit
 
 val append : 'a t -> 'a t -> unit
   (** [append a b] adds all elements of b to a *)
-
 val append_array : 'a t -> 'a array -> unit
   (** same as append, with an array *)
 
@@ -53,11 +52,11 @@ val shrink : 'a t -> int -> unit
 val member : ?cmp:('a -> 'a -> bool) -> 'a t -> 'a -> bool
   (** is the element a member of the vector? *)
 
-val sort : ?cmp:('a -> 'a -> int) -> 'a t -> unit
-  (** sort the array in place*)
+val sort : ?cmp:('a -> 'a -> int) -> 'a t -> 'a t
+  (** sort the array *)
 
-val uniq_sort : ?cmp:('a -> 'a -> int) -> 'a t -> unit
-  (** sort the array and remove duplicates in place*)
+val uniq_sort : ?cmp:('a -> 'a -> int) -> 'a t -> 'a t
+  (** sort the array and remove duplicates *)
 
 val iter : 'a t -> ('a -> unit) -> unit
   (** iterate on the vector *)
@@ -68,20 +67,8 @@ val iteri : 'a t -> (int -> 'a -> unit) -> unit
 val map : 'a t -> ('a -> 'b) -> 'b t
   (** map elements of the vector *)
 
-val filter : 'a t -> ('a -> bool) -> 'a t
-  (** filter elements from vector *)
-
 val fold : 'a t -> 'b -> ('b -> 'a -> 'b) -> 'b
   (** fold on elements of the vector *)
-
-val exists : 'a t -> ('a -> bool) -> bool
-  (** existential test *)
-
-val for_all : 'a t -> ('a -> bool) -> bool
-  (** universal test *)
-
-val find : 'a t -> ('a -> bool) -> 'a
-  (** find an element that satisfies the predicate, or Not_found *)
 
 val get : 'a t -> int -> 'a
   (** access element, or Failure if bad index *)
@@ -95,6 +82,5 @@ val size : 'a t -> int
 val from_array : 'a array -> 'a t
 val from_list : 'a list -> 'a t
 val to_array : 'a t -> 'a array
-val get_array : 'a t -> 'a array  (*  get underlying *shared* array *)
 val to_list : 'a t -> 'a list
 

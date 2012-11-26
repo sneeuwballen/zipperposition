@@ -234,14 +234,14 @@ let rec weight_of_term ~so term = match term.term with
 
 (** simple weight for clauses *)
 let compute_clause_weight ~so {clits=lits} =
-  let weight_of_lit l = match l.lit_eqn with
-  | Equation (l,r,_) ->
+  let weight_of_lit l = match l with
+  | Equation (l,r,_,ord) ->
       let wl = weight_of_term ~so l in
       let wr = weight_of_term ~so r in
       wl + wr
   in
   (* sum of squares of weights of literals *)
-  Array.fold_left
+  List.fold_left
     (fun sum lit ->
       let wlit = weight_of_lit lit in
       sum + wlit*wlit)

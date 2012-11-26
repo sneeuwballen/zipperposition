@@ -36,6 +36,10 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
+(* included to have them compiled *)
+module Opaque = Opaque
+module Rewriting = Rewriting
+
 (* TODO move special heuristic to calculus
    TODO generalize it for defined predicates/functions *)
   
@@ -54,8 +58,8 @@ let heuristic_constraint clauses : ordering_constraint =
         List.iter (update_with_term sign) l
   (* update counts with clause *)
   and update_with_clause clause =
-    Array.iter
-      (fun ({lit_eqn=Equation (l, r, sign)}) ->
+    List.iter
+      (fun (Equation (l, r, sign, _)) ->
         update_with_term sign l;
         update_with_term sign r)
     clause.clits
@@ -136,6 +140,7 @@ let parse_args () =
       ("-index", Arg.Set_string index, help_index);
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
       ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
+      ("-print-ord", Arg.Unit (fun () -> C.pp_literal_debug#ord true), "print order of sides of literals");
     ]
   in
   Arg.parse options (fun f -> file := f) "solve problem in first file";
@@ -218,7 +223,7 @@ let print_stats state =
 let print_state ?name filename (state, result) =
   let state = match result with
     | Sat.Unsat c ->
-      let active = PS.add_active state.PS.active_set c in (* put empty clause in state *)
+      let active, _ = PS.add_active state.PS.active_set c in (* put empty clause in state *)
       {state with PS.active_set = active}
     | _ -> state in
   PS.pp_dot_file ?name filename state
@@ -300,18 +305,16 @@ let () =
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
-  (* clause state *)
-  let cs = C.mk_state ~ord ~select in
   (* preprocess clauses, then possibly simplify them *)
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~cs (List.map (C.copy_clause ~cs) clauses) in
+  let clauses = calculus#preprocess ~ord (List.map (C.reord_clause ~ord) clauses) in
   let clauses = if params.param_presimplify
-    then Sat.initial_simplifications ~cs ~calculus clauses
+    then Sat.initial_simplifications ~ord ~calculus ~select clauses
     else clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
-  let state = PS.make_state cs (CQ.default_queues ~ord) in
+  let state = PS.make_state ord (CQ.default_queues ~ord) select in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   let state = Sat.set_of_support ~calculus state calculus#axioms in
   (* saturate *)

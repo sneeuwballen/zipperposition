@@ -258,7 +258,7 @@ let mk_index fp =
       if not all_clauses
         then Format.fprintf formatter "fingerprint for %d clauses" (count trie)
         else
-          let print_elt (hc, pos, t) = Format.fprintf formatter "%a@;" !C.pp_clause#pp_t_pos (hc, pos, t) in
+          let print_elt (hc, pos, t) = Format.fprintf formatter "%a@;" !C.pp_clause#pp_h_pos (hc, pos, t) in
           let print t set =
             begin
               Format.fprintf formatter "%a -> @[<v>" !T.pp_term#pp t;

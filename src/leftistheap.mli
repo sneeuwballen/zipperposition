@@ -49,9 +49,6 @@ sig
 
   val remove: t -> X.t list -> t
     (* runs in O(n), removing all elements in the list (assuming X.le is total) *)
-
-  val iter : (X.t -> unit) -> t -> unit
-    (* run in O(n), iterate on elements in some random order *)
 end
 
 (* -----------------------------------------------------------------------------
@@ -68,7 +65,6 @@ class ['a] leftistheap : 'a ordered ->
     method is_empty : bool
     method insert : 'a -> 't
     method min : 'a
-    method iter : ('a -> unit) -> unit
     method extract_min : 'a * 't
     method remove : 'a list -> 't
   end

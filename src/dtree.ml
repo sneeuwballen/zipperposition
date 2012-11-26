@@ -194,7 +194,7 @@ let iter_match dt t k =
   let rec traverse trie pos subst =
     match trie with
     | Leaf l ->  (* yield all answers *)
-      List.iter (fun (t', v, prio) -> k t' v subst) l
+      List.iter (fun (t', v, _) -> k t' v subst) l
     | Node m ->
       (* "lazy" transformation to flatterm *)
       let t_pos = get_pos t pos in
@@ -244,7 +244,7 @@ let char_to_str = function
 
 module PrintTHCTree = Prtree.Make(
   struct
-    type t = string * (term * clause) trie
+    type t = string * (term * hclause) trie
 
     (* get a list of (key, sub-node) *)
     let get_values map =
@@ -255,7 +255,7 @@ module PrintTHCTree = Prtree.Make(
           l := (key_repr, node) :: !l) map;
       !l
     and pp_rule formatter (_, (_, hc), _) =
-      Format.fprintf formatter "@[<h>%a@]" !Clauses.pp_clause#pp hc
+      Format.fprintf formatter "@[<h>%a@]" !Clauses.pp_clause#pp_h hc
 
     (* recurse in subterms *)
     let decomp (prefix, t) = match t with
@@ -266,7 +266,7 @@ module PrintTHCTree = Prtree.Make(
         rules_repr, []
   end)
 
-let pp_term_clause_tree formatter dt = PrintTHCTree.print formatter ("", dt.tree)
+let pp_term_hclause_tree formatter dt = PrintTHCTree.print formatter ("", dt.tree)
 
 module PrintTTree = Prtree.Make(
   struct
@@ -299,12 +299,12 @@ let pp_term_tree formatter dt = PrintTTree.print formatter ("", dt.tree)
  * -------------------------------------------------------- *)
 
 let unit_index =
-  let eq_term_clause (t1, hc1) (t2, hc2) =
-    T.eq_term t1 t2 && Clauses.eq_clause hc1 hc2
+  let eq_term_hclause (t1, hc1) (t2, hc2) =
+    T.eq_term t1 t2 && Clauses.eq_hclause hc1 hc2
   in
   object (_ : 'self)
-    val pos = empty eq_term_clause
-    val neg = empty eq_term_clause
+    val pos = empty eq_term_hclause
+    val neg = empty eq_term_hclause
 
     method name = "dtree_unit_index"
 
@@ -325,5 +325,5 @@ let unit_index =
 
     method pp formatter () =
       Format.fprintf formatter "@[<hv>pos: %a@.neg:%a@]"
-        pp_term_clause_tree pos pp_term_clause_tree neg
+        pp_term_hclause_tree pos pp_term_hclause_tree neg
   end

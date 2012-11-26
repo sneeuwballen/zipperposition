@@ -56,10 +56,10 @@ let random_pair () = (random_term (), random_term ())
 (** check all variables are subterms *)
 let check_subterm t = 
   match t.vars with
-  | [||] -> H.TestPreconditionFalse
+  | [] -> H.TestPreconditionFalse
   | vars ->
-    if Array.fold_left (fun acc v -> acc && T.member_term v t) true vars
-      then H.TestOk else H.TestFail t
+      if List.for_all (fun v -> T.member_term v t) vars
+        then H.TestOk else H.TestFail t
 
 (** check unification *)
 let check_unif (t1, t2) =

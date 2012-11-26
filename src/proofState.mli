@@ -33,7 +33,7 @@ val names_index : unit -> string list
 
 (** set of active clauses *)
 type active_set = {
-  a_cs : Clauses.clause_state;
+  a_ord : ordering;
   active_clauses : Clauses.bag;       (** set of active clauses *)
   idx : Index.clause_index;           (** term index *)
   fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
@@ -41,7 +41,7 @@ type active_set = {
 
 (** set of passive clauses *)
 type passive_set = {
-  p_cs : Clauses.clause_state;
+  p_ord : ordering;
   passive_clauses : Clauses.bag;
   queues : (ClauseQueue.queue * int) list;
   queue_state : int * int;  (** position in the queue/weight *)
@@ -51,7 +51,8 @@ type passive_set = {
     It contains a set of active clauses, a set of passive clauses,
     and is parametrized by an ordering. *)
 type state = {
-  cs : Clauses.clause_state;
+  ord : ordering;
+  state_select : selection_fun;
   active_set : active_set;      (** active clauses, indexed *)
   axioms_set : active_set;      (** set of support, indexed *)
   passive_set : passive_set;    (** passive clauses *)
@@ -59,29 +60,29 @@ type state = {
 }
 
 (** create a state from the given ordering and selection function*)
-val make_state : cs:Clauses.clause_state -> (ClauseQueue.queue * int) list -> state
+val make_state : ordering -> (ClauseQueue.queue * int) list -> selection_fun -> state
 
 (** add clauses to the active set *)
-val add_active : active_set -> clause -> active_set
+val add_active : active_set -> clause -> active_set * hclause
 val add_actives : active_set -> clause list -> active_set
 
 (** remove clause from the active set *)
-val remove_active : active_set -> clause -> active_set
-val remove_actives : active_set -> clause list -> active_set
+val remove_active : active_set -> hclause -> active_set
+val remove_actives : active_set -> hclause list -> active_set
 val remove_active_bag : active_set -> Clauses.bag -> active_set
 
 (** create an active_set that contains one clause *)
-val singleton_active_set : cs:Clauses.clause_state -> clause -> active_set
+val singleton_active_set : ord:ordering -> clause -> active_set
 
 (** add clauses to the passive set *)
-val add_passive : passive_set -> clause -> passive_set
+val add_passive : passive_set -> clause -> passive_set * hclause
 val add_passives : passive_set -> clause list -> passive_set
 (** remove clause from passive set *)
 val remove_passive : passive_set -> clause -> passive_set
 val remove_passives : passive_set -> clause list -> passive_set
 
 (** pop the next passive clause, if any *)
-val next_passive_clause : passive_set -> (passive_set * clause option)
+val next_passive_clause : passive_set -> (passive_set * hclause option)
 
 (** relocate clause w.r.t clauses in the active_set *)
 val relocate_active : active_set -> clause -> clause

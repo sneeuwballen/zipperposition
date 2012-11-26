@@ -25,7 +25,7 @@ open Types
 
 (** The SZS status of a state *)
 type szs_status = 
-  | Unsat of clause
+  | Unsat of hclause
   | Sat
   | Unknown
   | Error of string 
@@ -36,7 +36,8 @@ val set_of_support: calculus:Calculus.calculus ->
                     ProofState.state -> clause list -> ProofState.state
 
 (** Simplifications to perform on initial clauses *)
-val initial_simplifications : cs:Clauses.clause_state ->
+val initial_simplifications : ord:ordering ->
+                              select:selection_fun ->
                               calculus:Calculus.calculus ->
                               clause list -> clause list
 

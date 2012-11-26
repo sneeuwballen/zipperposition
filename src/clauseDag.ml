@@ -28,8 +28,8 @@ module Utils = FoUtils
 (** a DAG of clauses, in which links represent the 'descendant of'
     and 'descends from' relations *)
 type clause_dag = {
-  dag_down : clause list Ptmap.t;     (** c -> descendants of c *)
-  dag_up : clause list Ptmap.t;       (** c -> parents of c *)
+  dag_down : hclause list Ptmap.t;    (** c -> descendants of c *)
+  dag_up : hclause list Ptmap.t;      (** c -> parents of c *)
 }
 
 (** empty dag *)
@@ -44,40 +44,40 @@ let find_default ~default map hc =
   with Not_found -> default
 
 (** set-like insertion of a clause in a clause list *)
-let insert_clause l c =
-  if List.exists (fun c' -> c'.ctag = c.ctag) l
+let insert_hclause l hc =
+  if List.exists (fun hc' -> hc'.ctag = hc.ctag) l
     then l
-    else c :: l
+    else hc :: l
 
 (** [parent_of dag parent child] means that child descends from parent *)
-let parent_of ~cs dag parent child =
-  let parent = C.normalize_clause ~cs parent
-  and child = C.normalize_clause ~cs child in
-  if C.eq_clause parent child
+let parent_of ~ord dag parent child =
+  let parent = C.hashcons_clause_noselect (C.normalize_clause ~ord parent)
+  and child = C.hashcons_clause_noselect (C.normalize_clause ~ord child) in
+  if C.eq_hclause parent child
     then dag
     else begin
       Utils.debug 4 (lazy (Utils.sprintf "  @[<h>%a parent of %a@]"
-                           !C.pp_clause#pp parent !C.pp_clause#pp child));
+                           !C.pp_clause#pp_h parent !C.pp_clause#pp_h child));
       (* descendants of parent, parents of child *)
       let descendants = find_default ~default:[] dag.dag_down parent
       and parents = find_default ~default:[] dag.dag_up child in
       (* update lists *)
-      let descendants = insert_clause descendants child
-      and parents = insert_clause parents parent in
+      let descendants = insert_hclause descendants child
+      and parents = insert_hclause parents parent in
       {dag_down=Ptmap.add parent.ctag descendants dag.dag_down;
        dag_up=Ptmap.add child.ctag parents dag.dag_up; }
     end
 
 (** update the DAG using the list of parents of the clause *)
-let update ~cs dag c =
+let update ~ord dag c =
   let parents = C.parents c in
-  List.fold_left (fun dag parent -> parent_of ~cs dag parent c) dag parents
+  List.fold_left (fun dag parent -> parent_of ~ord dag parent c) dag parents
 
-let updates ~cs dag l =
-  List.fold_left (update ~cs) dag l
+let updates ~ord dag l =
+  List.fold_left (update ~ord) dag l
 
 (** get the list of descendants of clause *)
-let descendants ~cs dag parent =
-  let parent = C.normalize_clause ~cs parent in
+let descendants ~ord dag parent =
+  let parent = C.hashcons_clause_noselect (C.normalize_clause ~ord parent) in
   let descendants = find_default ~default:[] dag.dag_down parent in
-  Utils.list_uniq C.eq_clause descendants
+  Utils.list_uniq C.eq_hclause descendants

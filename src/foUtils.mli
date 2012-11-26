@@ -102,9 +102,3 @@ val sprintf : ('a, Format.formatter, unit, string) format4 -> 'a
 (* print a list of items using the printing function *)
 val pp_list: ?sep:string -> (Format.formatter -> 'a -> unit)
           -> Format.formatter -> 'a list -> unit
-(* print an array of items using the printing function *)
-val pp_array : ?sep:string -> (Format.formatter -> int -> 'a -> unit)
-            -> Format.formatter -> 'a array -> unit
-(* print an array of items using the printing function *)
-val pp_vector : ?sep:string -> (Format.formatter -> int -> 'a -> unit)
-            -> Format.formatter -> 'a Vector.t -> unit

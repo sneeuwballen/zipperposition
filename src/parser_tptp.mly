@@ -173,7 +173,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %type <Types.term> term
 
 %start cnf_formula
-%type <Types.equation list> cnf_formula
+%type <Types.literal list> cnf_formula
 
 %%
 
@@ -244,10 +244,10 @@ fof_annotated:
       let clause = 
         let filename = !Const.cur_filename in  (* ugly *)
         let ord = Orderings.default_ordering () in
-        let cs = C.mk_state ~ord ~select:no_select in
         let sign = not !conjecture in (* if conjecture, negate *)
-        let lit = C.mk_eqn $7 T.true_term sign in
-        C.mk_clause ~cs [|lit|] (lazy (Axiom (filename, $3))) []
+        let lit = C.mk_lit ~ord $7 T.true_term sign in
+        C.mk_clause ~ord [lit] ~selected:(lazy [])
+          (lazy (Axiom (filename, $3))) (lazy [])
       in
         init_clause ();  (* reset global state *)
         clause
@@ -356,11 +356,10 @@ cnf_annotated:
       {
         let clause = 
           let ord = Orderings.default_ordering () in
-          let cs = C.mk_state ~ord ~select:no_select in
-          let eqns = Array.of_list $7 in
           let filename = !Const.cur_filename in  (* ugly *)
-          let c = C.mk_clause ~cs eqns (lazy (Axiom (filename, $3))) [] in
-          C.clause_of_fof ~cs c
+          let c = C.mk_clause ~ord $7 ~selected:(lazy [])
+            (lazy (Axiom (filename, $3))) (lazy []) in
+          C.clause_of_fof ~ord c
         in
           init_clause ();
           clause
@@ -400,10 +399,10 @@ disjunction:
 
 literal:
   | atomic_formula
-      { C.mk_eq $1 T.true_term }
+      { C.mk_eq ~ord:(O.default_ordering ()) $1 T.true_term }
 
   | NEGATION atomic_formula
-      { C.mk_neq $2 T.true_term }
+      { C.mk_neq ~ord:(O.default_ordering ()) $2 T.true_term }
 
 atomic_formula:
   | plain_atom
