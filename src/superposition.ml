@@ -378,6 +378,7 @@ let demod_nf ~ord active_set clauses t =
                   Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
                                  !T.pp_term#pp new_l !T.pp_term#pp new_r
                                  !C.pp_clause#pp_h unit_hclause));
+                  incr_stat stat_demodulate_step;
                   raise (RewriteInto new_r)
                 end else Utils.debug 4
                   (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
@@ -394,6 +395,7 @@ let demod_nf ~ord active_set clauses t =
           try 
             let t', (hc, _, _) = Ptmap.find t.tag active_set.PS.idx#ground_rewrite_index in
             C.CHashSet.add clauses hc;  (* remember we used this clause *)
+            incr_stat stat_demodulate_step;
             t'
           with Not_found -> t
         in
@@ -414,6 +416,7 @@ let demod_nf ~ord active_set clauses t =
 
 let demodulate active_set clause =
   let ord = active_set.PS.a_ord in
+  incr_stat stat_demodulate_call;
   (* clauses used to rewrite *)
   let clauses = C.CHashSet.create () in
   (* demodulate literals *)

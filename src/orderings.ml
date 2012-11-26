@@ -418,7 +418,7 @@ module KBO = struct
     let _, res = tckbo 0 t1 t2 in res  (* ignore the weight *)
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(kbo)"
-  let compare_terms ~so (x, y) =
+  let compare_terms ~so x y =
     profiler.HExtlib.profile (kbo ~so x) y
 end
 
@@ -474,7 +474,7 @@ module RPO = struct
       | o -> o)
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(rpo)"
-  let compare_terms ~so (x, y) =
+  let compare_terms ~so x y =
     profiler.HExtlib.profile (rpo ~so x) y
 end
 
@@ -542,7 +542,7 @@ module RPO6 = struct
        | Incomparable | Lt -> alpha ~so ss' t)
 
   let profiler = HExtlib.profile ~enable:true "compare_terms(rpo6)"
-  let compare_terms ~so (x, y) =
+  let compare_terms ~so x y =
     profiler.HExtlib.profile (rpo6 ~so x) y
 end
 
@@ -552,10 +552,10 @@ end
 
 module OrdCache = Cache.Make(
   struct
-    type t = (term * term)
-    let hash (t1, t2) = (t1.hkey + 17) lxor t2.hkey
+    type t = term
+    let hash t = t.hkey
       (* non commutative to avoid collision between (t1, t2) and (t2, t1) *)
-    let equal (t1, t2) (t1', t2') = t1 == t1' && t2 == t2'
+    let equal t1 t2 = T.eq_term t1 t2
   end)
 
 class kbo (so : symbol_ordering) : ordering =
@@ -565,7 +565,7 @@ class kbo (so : symbol_ordering) : ordering =
     method refresh () = (OrdCache.clear cache; so#refresh ())
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = OrdCache.lookup cache (a, b)
+    method compare a b = OrdCache.lookup cache a b
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = KBO.name
@@ -578,7 +578,7 @@ class rpo (so : symbol_ordering) : ordering =
     method refresh () = (OrdCache.clear cache; so#refresh ())
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = OrdCache.lookup cache (a, b)
+    method compare a b = OrdCache.lookup cache a b
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = RPO.name
@@ -591,7 +591,7 @@ class rpo6 (so : symbol_ordering) : ordering =
     method refresh () = (OrdCache.clear cache; so#refresh ())
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
-    method compare a b = OrdCache.lookup cache (a, b)
+    method compare a b = OrdCache.lookup cache a b
     method compute_term_weight t = weight_of_term ~so t
     method compute_clause_weight c = compute_clause_weight ~so c
     method name = RPO6.name

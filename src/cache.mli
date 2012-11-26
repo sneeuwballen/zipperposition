@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** An imperative cache of fixed size for memoization *)
+(** An imperative cache of fixed size for memoization of pairs *)
 
 module type S =
   sig 
@@ -27,13 +27,10 @@ module type S =
     type 'a t
 
     (** create a cache with given size *)
-    val create : int -> (key -> 'a) -> 'a t
-
-    (** change the producing function *)
-    val set_fun : 'a t -> (key -> 'a) -> unit
+    val create : int -> (key -> key -> 'a) -> 'a t
 
     (** find a value in the cache *)
-    val lookup : 'a t -> key -> 'a
+    val lookup : 'a t -> key -> key -> 'a
 
     (** clear the cache from its content *)
     val clear : 'a t -> unit

@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** an imperative cache for memoization *)
+(** an imperative cache for memoization of pairs *)
 
 module type S =
   sig 
@@ -27,13 +27,10 @@ module type S =
     type 'a t
 
     (** create a cache with given size *)
-    val create : int -> (key -> 'a) -> 'a t
-
-    (** change the producing function *)
-    val set_fun : 'a t -> (key -> 'a) -> unit
+    val create : int -> (key -> key -> 'a) -> 'a t
 
     (** find a value in the cache *)
-    val lookup : 'a t -> key -> 'a
+    val lookup : 'a t -> key -> key -> 'a
 
     (** clear the cache from its content *)
     val clear : 'a t -> unit
@@ -57,9 +54,9 @@ module Make(HType : CachedType) =
         
         The first slot in the array contains the function
         used to produce the value upon a cache miss. *)
-    type 'a t = (key * 'a * bool) array
+    type 'a t = (key * key * 'a * bool) array
 
-    let my_null = (Obj.magic None, Obj.magic None, false)
+    let my_null = (Obj.magic None, Obj.magic None, Obj.magic None, false)
 
     let set_fun c f = c.(0) <- Obj.magic f
 
@@ -68,16 +65,16 @@ module Make(HType : CachedType) =
       c.(0) <- Obj.magic f;
       c
 
-    let lookup c k =
-      let i = ((HType.hash k) mod (Array.length c -1)) + 1 in
+    let lookup c k1 k2 =
+      let i = (((HType.hash k1 + 17) lxor HType.hash k2) mod (Array.length c -1)) + 1 in
       match c.(i) with
-      | (_, _, false) ->
-        let v = ((Obj.magic c.(0)) : key -> 'a) k in
-        c.(i) <- (k, v, true); v
-      | (k', _, true) when not (HType.equal k k') ->
-        let v = ((Obj.magic c.(0)) : key -> 'a) k in
-        c.(i) <- (k, v, true); v
-      | (_, v, true) -> v
+      | (_, _, _, false) ->
+        let v = ((Obj.magic c.(0)) : key -> key -> 'a) k1 k2 in
+        c.(i) <- (k1, k2, v, true); v
+      | (k1', k2', _, true) when not (HType.equal k1 k1') || not (HType.equal k2 k2')->
+        let v = ((Obj.magic c.(0)) : key -> key -> 'a) k1 k2 in
+        c.(i) <- (k1, k2, v, true); v
+      | (_, _, v, true) -> v
 
     let clear c =
       let f = c.(0) in
