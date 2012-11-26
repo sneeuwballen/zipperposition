@@ -157,16 +157,14 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
   assert ((Utils.list_inter T.eq_term active_clause.cvars passive_clause.cvars) = []);
   if not sign_st 
   then (Utils.debug 3 (lazy "... active literal is negative"); acc)
-  else if T.db_var (T.at_pos u subterm_pos)
-  then (Utils.debug 3 (lazy "... passive subterm is a DB variable"); acc)
+  else if not (T.atomic s) || not (T.db_closed s) (* do not rewrite non-atomic formulas *)
+  then (Utils.debug 3 (lazy "... active term is not atomic or DB-closed"); acc)
   else
   let t' = S.apply_subst subst t
   and v' = S.apply_subst subst v in
   if sign_uv && T.eq_term t' v' && subterm_pos = []
   then (Utils.debug 3 (lazy "... will yield a tautology"); acc)
   else begin
-    assert (T.eq_term (S.apply_subst subst (T.at_pos u subterm_pos))
-                        (S.apply_subst subst s));
     if (ord#compare (S.apply_subst subst s) t' = Lt ||
         ord#compare (S.apply_subst subst u) v' = Lt ||
         not (C.eligible_res ~ord passive_clause passive_idx subst) ||
@@ -175,8 +173,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
       else begin (* ordering constraints are ok *)
         let new_lits = Utils.list_remove active_clause.clits active_idx in
         let new_lits = (Utils.list_remove passive_clause.clits passive_idx) @ new_lits in
-        let new_u = T.replace_pos u subterm_pos t in (* replace s by t in u|_p *)
-        let new_lits = (C.mk_lit ~ord new_u v sign_uv) :: new_lits in
+        let new_u = T.replace_pos u subterm_pos t' in (* replace s by t in u|_p *)
+        let new_lits = (C.mk_lit ~ord new_u v' sign_uv) :: new_lits in
         (* apply substitution *)
         let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
         let rule = if sign_uv then "sup+" else "sup-" in
@@ -359,7 +357,7 @@ let demod_nf ~ord active_set clauses t =
   (* compute normal form of subterm *) 
   let rec normal_form t =
     (* do not rewrite non-atomic formulas *)
-    if t.sort = bool_sort  && not (T.atomic t)
+    if not (T.atomic t)
       then t  (* do not rewrite such formulas *)
       else begin
         (* try to rewrite using unit positive clauses *) 

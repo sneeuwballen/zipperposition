@@ -486,7 +486,6 @@ module RPO6 = struct
 
   (** recursive path ordering *)
   let rec rpo6 ~so s t =
-    Utils.debug 3 (lazy (Utils.sprintf "@[<h>compare %a %a@]" !T.pp_term#pp s !T.pp_term#pp t));
     if T.eq_term s t then Eq else  (* equality test is cheap *)
     match s.term, t.term with
     | Var _, Var _ -> Incomparable
