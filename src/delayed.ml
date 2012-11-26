@@ -344,7 +344,9 @@ let delayed : calculus =
     (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify ~ord ~select c =
       let c = Sup.basic_simplify ~ord c in
-      recursive_eliminations ~ord ~select c
+      match recursive_eliminations ~ord ~select c with
+      | None -> None
+      | Some l -> Some (List.filter (fun c -> not (Sup.is_tautology c)) l)
 
     method axioms = []
 

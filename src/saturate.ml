@@ -264,7 +264,6 @@ let given_clause_step ~calculus state =
         (fun new_clauses c ->
           let cs = all_simplify ~ord ~select ~calculus state.PS.active_set c in
           let cs = List.map (C.normalize_clause ~ord) cs in
-          let cs = List.filter (fun c' -> not (is_redundant ~calculus state.PS.active_set c')) cs in
           List.rev_append cs new_clauses)
         [] new_clauses
       in
