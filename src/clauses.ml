@@ -126,6 +126,9 @@ let pos_lit lit = match lit with
 let neg_lit lit = match lit with
   | Equation (_,_,sign,_) -> not sign
 
+let equational_lit = function
+  | Equation (l, r, _,_) -> l != T.true_term && r != T.true_term
+
 let check_type a b = if a.sort <> b.sort
   then raise (SortError "sides of equations of different sorts") else ()
 

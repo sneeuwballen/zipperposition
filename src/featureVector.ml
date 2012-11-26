@@ -51,6 +51,19 @@ let feat_size_minus clause =
   List.iter (fun (Equation (_,_,sign,_)) -> if not sign then incr cnt) clause.clits;
   !cnt
 
+(* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
+   is at depth 0) *)
+let sum_of_depths_lit lit =
+  let rec sum depth acc t = match t.term with
+  | Var _ -> acc
+  | Node (s, l) -> List.fold_left (sum (depth+1)) (acc+depth) l
+  in
+  match lit with
+  | Equation (l, r, _, _) -> sum 0 (sum 0 0 l) r
+
+let sum_of_depths clause =
+  List.fold_left (fun acc lit -> acc + sum_of_depths_lit lit) 0 clause.clits
+
 (* number of occurrences of symbol in literal *)
 let count_symb_lit symb lit =
   let cnt = ref 0 in
@@ -166,7 +179,7 @@ let max_symbols = 30    (** maximum number of symbols considered for indexing *)
 let mk_fv_index_signature signature =
   (* only consider a bounded number of symbols *)
   let bounded_signature = Utils.list_take max_symbols signature in
-  let features = [feat_size_plus; feat_size_minus] @
+  let features = [feat_size_plus; feat_size_minus; sum_of_depths] @
     List.flatten
       (List.map (fun symb ->
         (* for each symbol, use 4 features *)

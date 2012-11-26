@@ -41,6 +41,7 @@ val hash_literal : literal -> int                   (** hashing of literal *)
 
 val pos_lit : literal -> bool                       (** is the literal positive? *)
 val neg_lit : literal -> bool                       (** is the literal negative? *)
+val equational_lit : literal -> bool                (** is the literal a proper equation? *)
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)

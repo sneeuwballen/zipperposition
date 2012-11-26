@@ -34,6 +34,7 @@ type feature = clause -> int
 (** use some features to compute a feature vector *)
 val compute_fv : feature list -> clause -> feature_vector
 
+val sum_of_depths : feature              (** sum of depths of symbols *)
 val feat_size_plus : feature              (** size of positive clause *)
 val feat_size_minus : feature             (** size of negative clause *)
 val count_symb_plus : symbol -> feature   (** occurrences of symbol in positive clause *)
