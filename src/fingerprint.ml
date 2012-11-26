@@ -18,10 +18,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** fingerprint term indexing (TODO use union-find to do indexing modulo axioms) *)
+(** fingerprint term indexing *)
 
 open Types
-open Hashcons
+open Symbols
 
 module Utils = FoUtils
 module T = Terms
@@ -88,7 +88,7 @@ let compatible_features_unif f1 f2 =
     for compatibility modulo theories *)
 let compatible_features_match f1 f2 =
   match f1, f2 with
-  | S s1, S s2 -> s1 = s2
+  | S s1, S s2 -> s1 == s2
   | B, _ -> true
   | N, N -> true
   | N, _ -> false

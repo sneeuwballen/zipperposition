@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     and backward subsumption *)
 
 open Types
+open Symbols
 
 (** a vector of feature *)
 type feature_vector = int list

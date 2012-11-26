@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 *)
 
 open Types
-open Hashcons
+open Symbols
 open Calculus
 
 module T = Terms

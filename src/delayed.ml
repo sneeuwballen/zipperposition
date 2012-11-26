@@ -21,7 +21,7 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 (** module for superposition with equivalence reasoning and delayed clausal form *)
 
 open Types
-open Hashcons
+open Symbols
 open Calculus
 
 module T = Terms
@@ -53,13 +53,13 @@ let order k1 k2 =
 
 (* classify symbol into categories *)
 let classify =
-  let special_set = Utils.SHashSet.from_list special_preds in 
+  let special_set = SHashSet.from_list special_preds in 
   function s ->
     let sorts, _, _ = O.current_signature () in
     match s with
     | _ when s = succ_db_symbol || s = db_symbol -> DeBruijn
-    | _ when Utils.SHashSet.member special_set s -> Special
-    | _ when Hashtbl.find sorts s = bool_sort -> Predicate
+    | _ when SHashSet.member special_set s -> Special
+    | _ when SHashtbl.find sorts s = bool_sort -> Predicate
     | _ -> Function
 
 (** constraint on the ordering *)

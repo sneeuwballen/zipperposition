@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Some common things for superposition calculi *)
 
 open Types
+open Symbols
 
 module T = Terms
 module C = Clauses
@@ -156,12 +157,9 @@ let skolem =
       (* actual skolemization of normalized_t *)
       let new_symbol = "sk" ^ (string_of_int !count) in
       Utils.debug 4 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
-      incr T.sig_version;  (* update version of signature *)
+      let new_symbol = mk_symbol new_symbol in  (* build symbol *)
       incr count;
-      let skolem_term =
-        if vars = [] then T.mk_const new_symbol sort
-        else T.mk_node new_symbol sort vars
-      in
+      let skolem_term = T.mk_node new_symbol sort vars in
       (* update the ordering *)
       ord#refresh ();
       (* build the skolemized term *)

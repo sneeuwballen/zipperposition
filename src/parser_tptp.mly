@@ -31,8 +31,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     let value counter = !counter
   end
 
-  open Hashcons
   open Types
+  open Symbols
 
   module T = Terms
   module C = Clauses
@@ -101,16 +101,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     try
       Hashtbl.find sort_table constant
     with Not_found -> univ_sort
-
-  (** update signature when news symbols are created *)
-  let update_sig =
-    let sig_table = Utils.SHashSet.create () in
-    fun s ->
-      if not (Utils.SHashSet.member sig_table s)
-        then begin  (* signature just changed *)
-          Utils.SHashSet.add sig_table s;
-          incr T.sig_version
-        end
 
   let set_sort constant sort = Hashtbl.replace sort_table constant sort
 
@@ -330,9 +320,9 @@ quantified_formula:
 
 quantifier:
   | FORALL
-    { update_sig forall_symbol; update_sig lambda_symbol; mk_forall }
+    { mk_forall }
   | EXISTS
-    { update_sig exists_symbol; update_sig lambda_symbol; mk_exists }
+    { mk_exists }
 
 variable_list:
   | variable
@@ -346,7 +336,7 @@ unary_formula:
 
 unary_connective:
   | NEGATION
-    { update_sig not_symbol; T.mk_not }
+    { T.mk_not }
 
 
 cnf_annotated:
@@ -432,15 +422,15 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { update_sig true_symbol; T.true_term }
+      { T.true_term }
 
   | DOLLAR_FALSE
-      { update_sig false_symbol; T.false_term }
+      { T.false_term }
 
   | term EQUALITY term
       { T.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { update_sig not_symbol; T.mk_not (T.mk_eq $1 $3) }
+      { T.mk_not (T.mk_eq $1 $3) }
 
 system_atom:
   | system_term_top
@@ -490,11 +480,11 @@ plain_term:
 
 constant:
   | atomic_word
-      { update_sig $1; $1 }
+      { mk_symbol $1 }
 
 functor_:
   | atomic_word
-      { update_sig $1; $1 }
+      { mk_symbol $1 }
 
 defined_term:
   | number
@@ -528,11 +518,11 @@ system_term:
 
 system_functor:
   | atomic_system_word
-      { update_sig $1; $1 }
+      { mk_symbol $1 }
       
 system_constant:
   | atomic_system_word
-      { update_sig $1; $1 }
+      { mk_symbol $1 }
 
 
 

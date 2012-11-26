@@ -20,8 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (* literals and clauses *)
 
-open Hashcons
 open Types
+open Symbols
 
 module T = Terms
 module S = FoSubst

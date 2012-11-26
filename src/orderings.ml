@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 *)
 
 open Types
-open Hashcons
+open Symbols
 
 module T = Terms
 module C = Clauses
@@ -32,20 +32,19 @@ module Utils = FoUtils
 (** compute the current signature: existing symbols,
     with their arities and sorts *)
 let compute_signature () =
-  let sorts = Hashtbl.create 23
-  and arities  = Hashtbl.create 23
-  and symbols = ref [] in
+  let sorts, arities, symbols = base_signature () in
+  let symbols = ref symbols in
   T.iter_terms
     (fun t -> match t.term with
      | Var _ -> ()
      | Node (s, l) ->
        begin
          (* update the arity only if not already found *)
-         if not (Hashtbl.mem arities s) then Hashtbl.replace arities s (List.length l);
+         if not (SHashtbl.mem arities s) then SHashtbl.replace arities s (List.length l);
          (* update sort only if it is not already bool *)
-         (if (try Hashtbl.find sorts s = bool_sort with Not_found -> false)
+         (if (try SHashtbl.find sorts s == bool_sort with Not_found -> false)
            then ()
-           else Hashtbl.replace sorts s t.sort);
+           else SHashtbl.replace sorts s t.sort);
          if not (List.mem s !symbols) then symbols := s::!symbols
        end);
   sorts, arities, !symbols
@@ -56,14 +55,14 @@ let current_signature =
   (* store the signature, to avoid recomputing it all the time *)
   let cached_signature = ref (compute_signature ()) in
   fun () ->
-    assert (!sig_version <= !T.sig_version);
-    (if !sig_version < !T.sig_version
+    assert (!sig_version <= !Symbols.sig_version);
+    (if !sig_version < !Symbols.sig_version
       then(* recompute signature, it did change *)
         cached_signature := compute_signature ());
     !cached_signature
 
 let cluster_constraint clusters =
-  let table = Hashtbl.create 17
+  let table = SHashtbl.create 17
   and cluster_num = ref 0 in
   (* for each cluster, assign it a (incremented) number, and
      remember symbol->number for every symbol of the cluster *)
@@ -71,32 +70,33 @@ let cluster_constraint clusters =
     (fun cluster ->
       let num = !cluster_num in
       incr cluster_num;
-      List.iter (fun symb -> Hashtbl.add table symb num) cluster)
+      List.iter (fun symb -> SHashtbl.add table symb num) cluster)
     clusters;
   (* compare symbols by their number, if they have. Smaller numbers are bigger symbols *)
   let compare s1 s2 =
     try
-      let s1_num = Hashtbl.find table s1
-      and s2_num = Hashtbl.find table s2 in
+      let s1_num = SHashtbl.find table s1
+      and s2_num = SHashtbl.find table s2 in
       s2_num - s1_num
     with Not_found -> 0 (* at least one is not in the table, we do not order *)
   in compare
 
 let list_constraint l =
   let num = ref  0
-  and table = Hashtbl.create 13 in
+  and table = SHashtbl.create 13 in
   (* give a number to every symbol *)
   List.iter
     (fun symb ->
       let symb_num = !num in
+      assert (symb == mk_symbol (name_symbol symb));
       incr num;
-      Hashtbl.add table symb symb_num)
+      SHashtbl.add table symb symb_num)
     l;
   (* compare symbols by number. Smaller symbols have bigger number *)
   let compare s1 s2 =
     try
-      let s1_num = Hashtbl.find table s1
-      and s2_num = Hashtbl.find table s2 in
+      let s1_num = SHashtbl.find table s1
+      and s2_num = SHashtbl.find table s2 in
       s2_num - s1_num
     with Not_found -> 0 (* at least one is not in the table, we do not order *)
   in compare
@@ -107,39 +107,39 @@ let ordering_to_constraint so =
 let arity_constraint arities =
   let compare s1 s2 =
     try
-      let s1_arity = Hashtbl.find arities s1
-      and s2_arity = Hashtbl.find arities s2 in
+      let s1_arity = SHashtbl.find arities s1
+      and s2_arity = SHashtbl.find arities s2 in
       s1_arity - s2_arity  (* bigger arity is bigger *)
     with Not_found -> 0
   in compare
 
 let max_constraint symbols =
-  let table = Hashtbl.create 11
+  let table = SHashtbl.create 11
   and num = ref 0 in
   (* give number to symbols *)
   List.iter
     (fun symb -> let n = !num in
-      incr num; Hashtbl.add table symb n)
+      incr num; SHashtbl.add table symb n)
     symbols;
   let compare a b =
     (* not found implies the symbol is smaller than maximal symbols *)
-    let a_n = try Hashtbl.find table a with Not_found -> !num
-    and b_n = try Hashtbl.find table b with Not_found -> !num in
+    let a_n = try SHashtbl.find table a with Not_found -> !num
+    and b_n = try SHashtbl.find table b with Not_found -> !num in
     b_n - a_n  (* if a > b then a_n < b_n *)
   in compare
   
 let min_constraint symbols =
-  let table = Hashtbl.create 11
+  let table = SHashtbl.create 11
   and num = ref 0 in
   (* give number to symbols *)
   List.iter
     (fun symb -> let n = !num in
-      incr num; Hashtbl.add table symb n)
+      incr num; SHashtbl.add table symb n)
     symbols;
   let compare a b =
     (* not found implies the symbol is bigger than minimal symbols *)
-    let a_n = try Hashtbl.find table a with Not_found -> -1
-    and b_n = try Hashtbl.find table b with Not_found -> -1 in
+    let a_n = try SHashtbl.find table a with Not_found -> -1
+    and b_n = try SHashtbl.find table b with Not_found -> -1 in
     b_n - a_n  (* if a > b then a_n < b_n *)
   in compare
 
@@ -486,6 +486,7 @@ module RPO6 = struct
 
   (** recursive path ordering *)
   let rec rpo6 ~so s t =
+    Utils.debug 3 (lazy (Utils.sprintf "@[<h>compare %a %a@]" !T.pp_term#pp s !T.pp_term#pp t));
     if T.eq_term s t then Eq else  (* equality test is cheap *)
     match s.term, t.term with
     | Var _, Var _ -> Incomparable

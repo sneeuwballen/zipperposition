@@ -26,18 +26,6 @@ let set_debug l = debug_level_ := l
 let debug l s = if l <= !debug_level_ then print_endline (Lazy.force s) else ()
 let debug_level () = !debug_level_
 
-module SHashSet =
-  struct
-    type t = (string, unit) Hashtbl.t
-    let create () = Hashtbl.create 13
-    let member t s = Hashtbl.mem t s
-    let add t s = Hashtbl.replace t s ()
-    let from_list ss =
-      let t = create () in
-      List.iter (add t) ss;
-      t
-  end
-
 let murmur_hash i =
   let m = 0xd1e995
   and r = 24

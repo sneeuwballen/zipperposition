@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+open Symbols
 open Types
 
 module T = Terms
@@ -240,7 +241,7 @@ let iter dt k =
 
 let char_to_str = function
   | Variable v -> Utils.sprintf "%a" !T.pp_term#pp v
-  | Symbol s -> s
+  | Symbol s -> name_symbol s
 
 module PrintTHCTree = Prtree.Make(
   struct

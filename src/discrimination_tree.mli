@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Term indexing, using non-perfect discrimination trees with no jumplist *)
 
+open Symbols
 open Types
 
 type path_string_elem = 

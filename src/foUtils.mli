@@ -29,16 +29,6 @@ val debug_level : unit -> int             (** current debug level *)
 (** hashing on ints, cf http://en.wikipedia.org/wiki/MurmurHash *)
 val murmur_hash : int -> int
 
-(** Hashset for strings *)
-module SHashSet :
-  sig
-    type t
-    val create : unit -> t
-    val member : t -> string -> bool
-    val add : t -> string -> unit
-    val from_list : string list -> t
-  end
-
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
 (** lexicographic partial order on lists. If lengths are different, returns Incomparable *)

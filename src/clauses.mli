@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Literals and clauses *)
 
 open Types
+open Symbols
 
 (* ----------------------------------------------------------------------
  * literals

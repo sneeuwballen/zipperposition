@@ -19,6 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 *)
 
 open Types
+open Symbols
 
 (** Partial ordering on terms, total ordering on symbols *)
 
@@ -30,7 +31,7 @@ open Types
     map of symbols to sorts, a map of symbols to their arity,
     and the signature (the list of current symbols) *)
 val current_signature : unit ->
-                        (symbol, sort) Hashtbl.t * (symbol, int) Hashtbl.t * symbol list
+                        sort SHashtbl.t * int SHashtbl.t * symbol list
 
 (** ordering constraint by clustering symbols by decreasing order.
     all symbols in the first clusters are bigger than those in the second, etc. *)
@@ -41,7 +42,7 @@ val list_constraint : symbol list -> ordering_constraint
     extend an ordering without breaking it. *)
 val ordering_to_constraint : symbol_ordering -> ordering_constraint
 (** decreasing arity constraint *)
-val arity_constraint : (symbol, int) Hashtbl.t -> ordering_constraint
+val arity_constraint : int SHashtbl.t -> ordering_constraint
 (** maximal symbols, in decreasing order *)
 val max_constraint : symbol list -> ordering_constraint
 (** minimal symbols, in decreasing order *)
