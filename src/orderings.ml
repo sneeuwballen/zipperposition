@@ -191,8 +191,6 @@ let make_ordering constr =
         (* assert (check_constraint self (list_constraint old_signature)) *)
       method signature = !cur_signature
       method compare a b = !cmp a b
-      method weight s = 2
-      method var_weight = 1
       method multiset_status s = !multiset_pred s
       method set_multiset f = multiset_pred := f
     end
@@ -224,13 +222,8 @@ module type S =
     val name : string
   end
 
-(** simple weight for terms *)
-let rec weight_of_term ~so term = match term.term with
-  | Var _ -> so#var_weight
-  | Node (s, l) ->
-    List.fold_left
-      (fun sum subterm -> sum + weight_of_term ~so subterm)
-      (so#weight s) l
+(** simple weight for terms (number of occurrences of variables and symbols) *)
+let rec weight_of_term ~so t = t.tsize
 
 (** simple weight for clauses *)
 let compute_clause_weight ~so {clits=lits} =
@@ -324,6 +317,8 @@ module KBO = struct
       else if n = 1 then balance.pos_counter <- balance.pos_counter - 1);
     balance.balance.(idx) <- n - 1
 
+  let fun_weight = 2  (* var weight = 1 *)
+
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
       It should be linear time. *)
@@ -335,10 +330,10 @@ module KBO = struct
       match t.term with
       | Var x ->
         if pos
-          then (add_pos_var balance x; (wb + so#var_weight, x = y))
-          else (add_neg_var balance x; (wb - so#var_weight, x = y))
+          then (add_pos_var balance x; (wb + 1, x = y))
+          else (add_neg_var balance x; (wb - 1, x = y))
       | Node (s, l) ->
-        let wb' = if pos then wb + so#weight s else wb - so#weight s in
+        let wb' = if pos then wb + fun_weight else wb - fun_weight in
         balance_weight_rec wb' l y pos false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
@@ -378,15 +373,15 @@ module KBO = struct
       | Var x,  _ ->
         add_pos_var balance x;
         let wb', contains = balance_weight wb t2 x false in
-        (wb' + so#var_weight, if contains then Lt else Incomparable)
+        (wb' + 1, if contains then Lt else Incomparable)
       |  _, Var y -> 
         add_neg_var balance y;
         let wb', contains = balance_weight wb t1 y true in
-        (wb' - so#var_weight, if contains then Gt else Incomparable)
+        (wb' - 1, if contains then Gt else Incomparable)
       | Node (f, ss), Node (g, ts) ->
         (* do the recursive computation of kbo *)
         let wb', recursive = tckbo_rec wb f g ss ts in
-        let wb'' = wb' + (so#weight f) - (so#weight g) in
+        let wb'' = wb' in
         (* check variable condition *)
         let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
         and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in

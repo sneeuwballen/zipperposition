@@ -33,9 +33,9 @@ and typed_term = {
   term : term_cell;             (** the term itself *)
   sort : sort;                  (** the sort of the term *)
   mutable binding : term;       (** binding of the term (if variable), or normal form *)
-  mutable vars : term list;     (** the variables of the term TODO use an array *)
+  mutable vars : term list;     (** the variables of the term *)
   mutable flags : int;
-  mutable tsize : int;          (** number of symbol/vars occurrences in the term *)
+  mutable tsize : int;          (** number of symbol/vars occurrences in the term (weight) *)
   mutable tag : int;            (** hashconsing tag *)
   mutable hkey : int;           (** hash *)
 }
@@ -44,7 +44,7 @@ and term_cell =
   | Var of int                  (** variable *)
   | Node of symbol * term list  (** term application *)
 
-(** list of variables TODO replace by T.THashSet? *)
+(** list of variables *)
 type varlist = term list            
 
 (** substitution, a list of (variable -> term) *)
@@ -96,8 +96,6 @@ class type symbol_ordering =
     method refresh : unit -> unit             (** refresh the signature *)
     method signature : symbol list            (** current symbols in decreasing order *)
     method compare : symbol -> symbol -> int  (** total order on symbols *)
-    method weight : symbol -> int             (** weight of symbols *)
-    method var_weight : int                   (** weight of variables *)
     method multiset_status : symbol -> bool   (** does the symbol have a multiset status? *)
     method set_multiset : (symbol -> bool) -> unit  (** set the function that recognized multiset symbols *)
   end
