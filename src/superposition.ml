@@ -43,6 +43,7 @@ let stat_superposition_call = mk_stat "superposition calls"
 let stat_equality_resolution_call = mk_stat "equality_resolution calls"
 let stat_equality_factoring_call = mk_stat "equality_factoring calls"
 let stat_subsumption_call = mk_stat "subsumption calls"
+let stat_eq_subsumption_call = mk_stat "equality subsumption calls"
 let stat_subsumed_in_set_call = mk_stat "subsumed_in_set calls"
 let stat_subsumed_by_set_call = mk_stat "subsumed_by_set calls"
 let stat_demodulate_call = mk_stat "demodulate calls"
@@ -61,6 +62,7 @@ let enable = true
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
+let prof_eq_subsumption = HExtlib.profile ~enable "equality_subsumption"
 let prof_subsumption_set = HExtlib.profile ~enable "forward_subsumption"
 let prof_subsumption_in_set = HExtlib.profile ~enable "backward_subsumption"
 let prof_infer_active = HExtlib.profile ~enable "infer_active"
@@ -733,12 +735,48 @@ let subsumes a b =
   in
   prof_subsumption.HExtlib.profile (check a) b
 
+let eq_subsumes_ a b =
+  (* subsume a literal using a = b *)
+  let rec equate_lit_with a b lit =
+    match lit with
+    | Equation (u, v, true, _) -> equate_terms a b u v
+    | _ -> false
+  (* make u and v equal using a = b (possibly several times) *)
+  and equate_terms a b u v =
+    match u.term, v.term with
+    | _ when T.eq_term u v -> true 
+    | _ when equate_root a b u v -> true
+    | Node (f, ss), Node (g, ts) when f == g && List.length ss = List.length ts ->
+      List.for_all2 (equate_terms a b) ss ts
+    | _ -> false
+  (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
+  and equate_root a b u v =
+        (try let subst = Unif.matching S.id_subst a u in S.apply_subst subst b == v
+         with UnificationFailure -> false)
+    ||  (try let subst = Unif.matching S.id_subst b u in S.apply_subst subst a == v
+         with UnificationFailure -> false)
+  in
+  (* check for each literal *)
+  incr_stat stat_eq_subsumption_call;
+  match a.clits with
+  | [Equation (s, t, true, _)] ->
+    let res = List.exists (equate_lit_with s t) b.clits in
+    (if res then Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a eq-subsumes@ %a@]"
+                                !C.pp_clause#pp a !C.pp_clause#pp b)));
+    res
+  | _ -> false  (* only a positive unit clause unit-subsumes a clause *)
+
+let eq_subsumes a b = prof_eq_subsumption.HExtlib.profile (eq_subsumes_ a) b
+
 let subsumed_by_set_ set c =
   incr_stat stat_subsumed_by_set_call;
+  (* if there is an equation in c, try equality subsumption *)
+  let try_eq_subsumption = List.exists C.equational_lit c.clits in
   (* use feature vector indexing *)
   try
     FV.retrieve_subsuming set.PS.fv_idx c
-      (fun c' -> if subsumes c' c then raise Exit);
+      (fun c' -> if (try_eq_subsumption && eq_subsumes c' c)
+                  || subsumes c' c then raise Exit);
     false
   with Exit ->
     Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumed by active set"
@@ -750,11 +788,16 @@ let subsumed_by_set set clause =
 
 let subsumed_in_set_ set c =
   incr_stat stat_subsumed_in_set_call;
+  (* if c is a single unit clause *)
+  let try_eq_subsumption = match c.clits with
+    | [Equation (_, _, true, _)] -> true
+    | _ -> false in
   (* use feature vector indexing *)
   let l = ref [] in
-    FV.retrieve_subsumed
-      set.PS.fv_idx c
-      (fun c' -> if subsumes c c' then l := c' :: !l);
+  FV.retrieve_subsumed
+    set.PS.fv_idx c
+    (fun c' -> if (try_eq_subsumption && eq_subsumes c c')
+                || subsumes c c' then l := c' :: !l);
   !l
 
 let subsumed_in_set set clause =
