@@ -332,9 +332,10 @@ let mk_clause ~ord lits ~selected proof parents =
   in
   let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
   let all_vars = List.stable_sort T.compare_term all_vars
-  and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
+  and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits))
+  and cweight = List.fold_left (fun acc (Equation (l,r,_,_)) -> acc + l.tsize + r.tsize) 0 lits in
   {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cparents=parents;
-   cmaxlits=maxlits; ctag= -1}
+   cmaxlits=maxlits; cweight; ctag= -1}
 
 let clause_of_fof ~ord c =
   mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits)

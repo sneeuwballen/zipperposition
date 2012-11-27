@@ -72,6 +72,7 @@ type hclause = clause
 and clause = {
   ctag : int;                             (** hashconsing tag *)
   clits : literal list;                   (** the equations *)
+  cweight : int;                          (** weight of clause *)
   cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
   cselected : int list;                   (** index of selected literals *)
   cvars : term list;                      (** the free variables *)
