@@ -143,7 +143,7 @@ let get_equations_sides clause pos = match pos with
     the same way.
 
     It also refreshes the ordering (the signature has changed) *)
-let skolem =
+let classic_skolem =
   let cache = T.THashtbl.create 13 (* global cache for skolemized terms *)
   and count = ref 0 in  (* current symbol counter *)
   fun ~ord t sort ->
@@ -171,3 +171,22 @@ let skolem =
     Utils.debug 4 (lazy (Utils.sprintf "skolem %a gives %a@."
                          !T.pp_term#pp t !T.pp_term#pp new_t));
     new_t
+
+(** Skolemization with a special non-first order symbol. The purpose is
+    not to introduce too many terms. A proposition p is skolemized
+    into $$skolem(p), which makes naturally for inner skolemization.
+
+    The advantage is that it does not modify the signature, and also that
+    rewriting can be performed inside the skolem terms. *)
+let unamed_skolem ~ord t sort =
+  Utils.debug 4 (lazy (Utils.sprintf "@[<h>magic skolem %a@]@." !T.pp_term#pp t));
+  let symb = mk_symbol "$$sk" in
+  (* the existential witness, parametrized by the 'quoted' formula. The
+     lambda is used to keep the formula closed. *)
+  let args = [T.mk_node lambda_symbol t.sort [t]] in
+  let skolem_term = T.mk_node symb sort args in
+  ord#refresh ();  (* skolem symbol may be new *)
+  (* build the skolemized term by replacing first DB index with skolem symbol *)
+  T.db_unlift (T.db_replace t skolem_term)
+
+let skolem = ref classic_skolem

@@ -72,23 +72,6 @@ let symbol_constraint _ =
  * elimination rules
  * ---------------------------------------------------------------------- *)
 
-(** Skolemization with a special non-first order symbol. The purpose is
-    not to introduce too many terms. A proposition p is skolemized
-    into $$skomel(p), which makes naturally for inner skolemization.
-
-    The advantage is that it does not modify the signature, and also that
-    rewriting can be performed inside the skolem terms. *)
-let my_skolem ~ord t sort =
-  Utils.debug 4 (lazy (Utils.sprintf "@[<h>magic skolem %a@]@." !T.pp_term#pp t));
-  let symb = mk_symbol "$$sk" in
-  (* the existential witness, parametrized by the 'quoted' formula. The
-     lambda is used to keep the formula closed. *)
-  let args = [T.mk_node lambda_symbol t.sort [t]] in
-  let skolem_term = T.mk_node symb sort args in
-  ord#refresh ();  (* skolem symbol may be new *)
-  (* build the skolemized term by replacing first DB index with skolem symbol *)
-  T.db_unlift (T.db_replace t skolem_term)
-
 (** equation simplified into a disjunction of conjunctions of equations *)
 type tableau_rule =
   | Alpha of tableau_rule * tableau_rule  (** alpha elimination *)
@@ -130,7 +113,7 @@ let delta_eliminate ~ord t sign =
     | None -> T.db_unlift t (* the variable is not present *)
     | Some sort ->
       (* sort is the sort of the first DB symbol *)
-      my_skolem ~ord t sort
+      !skolem ~ord t sort
   in
   List [C.mk_lit ~ord new_t T.true_term sign]
 

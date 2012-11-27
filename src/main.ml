@@ -104,6 +104,7 @@ let parse_args () =
   and help_index = Utils.sprintf "indexing structure (@[<h>%a@])"
     (Utils.pp_list ~sep:"," Format.pp_print_string)
     (PS.names_index ()) in
+  let unamed_skolem () = Calculus.skolem := Calculus.unamed_skolem in
   (* parameters *)
   let ord = ref "rpo6"
   and steps = ref 0
@@ -124,6 +125,7 @@ let parse_args () =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
       ("-steps", Arg.Set_int steps, "verbose mode");
+      ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
