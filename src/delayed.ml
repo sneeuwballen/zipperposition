@@ -200,12 +200,12 @@ let tableau_to_clauses ~ord clause a =
     let clauses = ref []
     and eqns = Vector.create (List.length a * 2) in
     let proof = lazy (Proof ("elim", [clause, [], S.id_subst]))
-    and parents = lazy [clause] in
+    and parents = [clause] in
     (* explore all combinations of tableau splits *)
     let rec explore_splits i =
       if i = List.length a
         then  (* produce new clause *)
-          let clause = C.mk_clause ~ord (Vector.to_list eqns) ~selected:(lazy []) proof parents in
+          let clause = C.mk_clause ~ord (Vector.to_list eqns) ~selected:[] proof parents in
           clauses := clause :: !clauses
         else begin
           let len = Vector.size eqns in
@@ -311,7 +311,7 @@ let simplify_inner ~ord c =
   in
   let lits = List.map simp_lit c.clits in
   if !simplified
-    then C.mk_clause ~ord ~selected:(lazy []) lits c.cproof c.cparents
+    then C.mk_clause ~ord ~selected:[] lits c.cproof c.cparents
     else c  (* no simplification *)
 
 (* ----------------------------------------------------------------------

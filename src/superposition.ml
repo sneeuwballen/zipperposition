@@ -186,8 +186,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
         let rule = if sign_uv then "sup+" else "sup-" in
         let proof = lazy (Proof (rule, [(active_clause, active_pos, subst);
                                         (passive_clause, passive_pos, subst)])) in
-        let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy [])
-          proof (lazy [active_clause; passive_clause]) in
+        let new_clause = C.mk_clause ~ord new_lits ~selected:[]
+          proof [active_clause; passive_clause] in
         Utils.debug 3 (lazy (Utils.sprintf "... ok, conclusion @[<h>%a@]"
                             !C.pp_clause#pp new_clause));
         new_clause :: acc
@@ -273,8 +273,7 @@ let infer_equality_resolution_ ~ord clause =
             let proof = lazy (Proof ("eq_res", [clause, [pos], subst]))
             and new_lits = Utils.list_remove clause.clits pos in
             let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-            let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy [])
-              proof (lazy [clause]) in
+            let new_clause = C.mk_clause ~ord new_lits ~selected:[] proof [clause] in
             Utils.debug 3 (lazy (Utils.sprintf
                           "equality resolution on @[<h>%a@] yields @[<h>%a@]"
                           !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
@@ -330,8 +329,7 @@ let infer_equality_factoring_ ~ord clause =
         and new_lits = Utils.list_remove clause.clits active_idx in
         let new_lits = (C.mk_neq ~ord t v) :: new_lits in
         let new_lits = List.map (C.apply_subst_lit ~ord subst) new_lits in
-        let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy [])
-          proof (lazy [clause]) in
+        let new_clause = C.mk_clause ~ord new_lits ~selected:[] proof [clause] in
         Utils.debug 3 (lazy (Utils.sprintf
                       "equality factoring on @[<h>%a@] yields @[<h>%a@]"
                       !C.pp_clause#pp clause !C.pp_clause#pp new_clause));
@@ -445,8 +443,8 @@ let demodulate active_set clause =
       let clauses_subst = List.map (fun c -> (c, [], S.id_subst)) clauses in
       let proof = lazy (Proof ("demod", (clause, [], S.id_subst)::clauses_subst)) in
       (* parents are clauses used to simplify the clause, plus parents of the clause *)
-      let parents = lazy (clauses @ (C.parents clause)) in
-      C.mk_clause ~ord lits ~selected:(lazy []) proof parents
+      let parents = clauses @ clause.cparents in
+      C.mk_clause ~ord lits ~selected:[] proof parents
     end
 
 let is_tautology c =
@@ -503,9 +501,9 @@ let basic_simplify ~ord clause =
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
-  let parents = lazy (clause :: C.parents clause) in
+  let parents = clause :: C.parents clause in
   let proof = clause.cproof in  (* do not bother printing this *)
-  let new_clause = C.mk_clause ~ord new_lits ~selected:(lazy []) proof parents in
+  let new_clause = C.mk_clause ~ord new_lits ~selected:[] proof parents in
   (if not (C.eq_clause new_clause clause) then
       (Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
       !C.pp_clause#pp clause !C.pp_clause#pp new_clause))));
@@ -568,7 +566,7 @@ let positive_simplify_reflect active_set clause =
     else 
       let proof = lazy (Proof ("simplify_reflect+",
         (clause, [], S.id_subst)::(List.map (fun c -> (c, [], S.id_subst)) premises))) in
-      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::premises)) in
+      let c = C.mk_clause ~ord lits ~selected:[] proof (clause::premises) in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a pos_simplify_reflect into %a@]"
                     !C.pp_clause#pp clause !C.pp_clause#pp c));
       c
@@ -607,7 +605,7 @@ let negative_simplify_reflect active_set clause =
     else 
       let proof = lazy (Proof ("simplify_reflect-",
         (clause, [], S.id_subst)::(List.map (fun c -> (c, [], S.id_subst)) premises))) in
-      let c = C.mk_clause ~ord lits ~selected:(lazy []) proof (lazy (clause::premises)) in
+      let c = C.mk_clause ~ord lits ~selected:[] proof (clause::premises) in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a neg_simplify_reflect into %a@]"
                     !C.pp_clause#pp clause !C.pp_clause#pp c));
       c
@@ -922,7 +920,7 @@ let cnf_of ~ord clause =
         (fun lits ->
           let clause = C.mk_clause ~ord
               (List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits)
-              ~selected:(lazy []) proof (lazy [clause]) in
+              ~selected:[] proof [clause] in
           Utils.debug 4 (lazy (Utils.sprintf "mk_clause %a@." !C.pp_clause#pp clause));
           C.clause_of_fof ~ord clause)
         lit_list_list

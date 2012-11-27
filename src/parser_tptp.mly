@@ -236,8 +236,8 @@ fof_annotated:
         let ord = Orderings.default_ordering () in
         let sign = not !conjecture in (* if conjecture, negate *)
         let lit = C.mk_lit ~ord $7 T.true_term sign in
-        C.mk_clause ~ord [lit] ~selected:(lazy [])
-          (lazy (Axiom (filename, $3))) (lazy [])
+        C.mk_clause ~ord [lit] ~selected:[]
+          (lazy (Axiom (filename, $3))) []
       in
         init_clause ();  (* reset global state *)
         clause
@@ -347,8 +347,8 @@ cnf_annotated:
         let clause = 
           let ord = Orderings.default_ordering () in
           let filename = !Const.cur_filename in  (* ugly *)
-          let c = C.mk_clause ~ord $7 ~selected:(lazy [])
-            (lazy (Axiom (filename, $3))) (lazy []) in
+          let c = C.mk_clause ~ord $7 ~selected:[]
+            (lazy (Axiom (filename, $3))) [] in
           C.clause_of_fof ~ord c
         in
           init_clause ();

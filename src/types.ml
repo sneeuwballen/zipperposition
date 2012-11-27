@@ -73,10 +73,10 @@ and clause = {
   ctag : int;                             (** hashconsing tag *)
   clits : literal list;                   (** the equations *)
   cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
-  cselected : int list Lazy.t;            (** index of selected literals *)
+  cselected : int list;                   (** index of selected literals *)
   cvars : term list;                      (** the free variables *)
   cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
-  cparents : clause list Lazy.t;          (** clauses used to create this one *)
+  cparents : clause list;                 (** clauses used to create this one *)
 }
 (** a proof step for a clause *)
 and proof = Axiom of string * string (** file, axiom name *)

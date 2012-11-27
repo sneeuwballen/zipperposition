@@ -230,14 +230,14 @@ let hash_clause c =
 
 module H = Hashcons.Make(struct
   type t = clause
-  let equal c1 c2 = eq_clause c1 c2 && (Lazy.force c1.cselected = Lazy.force c2.cselected)
+  let equal c1 c2 = eq_clause c1 c2 && c1.cselected = c2.cselected
   let hash c = hash_clause c
   let tag i c = {c with ctag = i}
 end)
 
 let hashcons_clause c = H.hashcons c
 
-let hashcons_clause_noselect c = H.hashcons {c with cselected=lazy []}
+let hashcons_clause_noselect c = H.hashcons {c with cselected=[]}
 
 let stats () = H.stats ()
 
@@ -280,9 +280,9 @@ let is_maxlit c i =
   | (_,j)::l' -> j = i || check l'
   in check (maxlits c)
 
-let selected clause = Lazy.force clause.cselected
+let selected clause = clause.cselected
 
-let parents clause = Lazy.force clause.cparents
+let parents clause = clause.cparents
 
 let check_maximal_lit_ ~ord clause pos subst =
   let lit = Utils.list_get clause.clits pos in
@@ -345,14 +345,13 @@ let reord_clause ~ord c =
     ~selected:c.cselected c.cproof c.cparents
 
 let select_clause ~select c =
-  {c with cselected = lazy (select c)}
+  {c with cselected = select c}
 
 let rec apply_subst_cl ?(recursive=true) ~ord subst c =
-  if subst = S.id_subst then c
+  if S.is_empty subst then c
   else
-    let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits
-    and new_parents = lazy (List.map (apply_subst_cl ~recursive ~ord subst) (parents c)) in
-    mk_clause ~ord new_lits ~selected:c.cselected c.cproof new_parents
+    let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
+    mk_clause ~ord new_lits ~selected:c.cselected c.cproof c.cparents
   (* TODO modify proof lazily *)
 
 let get_lit clause idx = Utils.list_get clause.clits idx

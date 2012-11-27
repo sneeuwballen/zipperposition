@@ -91,8 +91,8 @@ module CHashSet :
   end
 
 val mk_clause : ord:ordering -> literal list ->
-                selected:int list Lazy.t ->
-                proof Lazy.t -> clause list Lazy.t ->
+                selected:int list ->
+                proof Lazy.t -> clause list ->
                 clause                                  (** build a clause *)
 val clause_of_fof : ord:ordering -> clause -> clause    (** transform eq/not to literals *)
 val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
