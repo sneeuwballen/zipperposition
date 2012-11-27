@@ -165,10 +165,13 @@ let eliminate_lits ~ord clause =
   (* eliminate equivalence *)
   and equiv eqn l r sign =
     match ord#compare l r with
-    | Gt when not (T.atomic l) && sign -> (* l <=> r -> (l => r) & (r => l)*)
+    | Gt when sign && not (T.atomic l) -> (* l <=> r -> (l => r) & (r => l)*)
       Alpha (List [C.mk_neq ~ord l T.true_term; C.mk_eq ~ord r T.true_term],
              List [C.mk_neq ~ord r T.true_term; C.mk_eq ~ord l T.true_term])
-    | Lt when not (T.atomic r) && sign ->
+    | Lt when sign && not (T.atomic r) ->
+      Alpha (List [C.mk_neq ~ord l T.true_term; C.mk_eq ~ord r T.true_term],
+             List [C.mk_neq ~ord r T.true_term; C.mk_eq ~ord l T.true_term])
+    | Incomparable when sign && (not (T.atomic l) || not (T.atomic r)) ->
       Alpha (List [C.mk_neq ~ord l T.true_term; C.mk_eq ~ord r T.true_term],
              List [C.mk_neq ~ord r T.true_term; C.mk_eq ~ord l T.true_term])
     | _ when not sign -> (* not (l <=> r) -> (l | r) & (not l | not r) *)
@@ -193,9 +196,7 @@ let eliminate_lits ~ord clause =
 
 (** Produce a list of clauses from an array of tableau_rule, or None *)
 let tableau_to_clauses ~ord clause a =
-  if try List.iter (function | Keep _ -> () | _ -> raise Exit) a; true
-     with Exit -> false
-  then None (* no change, the array contains only Keep *)
+  if List.for_all (function | Keep _ -> true | _ -> false) a then None (* just keep all literals *)
   else begin
     let clauses = ref []
     and eqns = Vector.create (List.length a * 2) in
@@ -343,7 +344,7 @@ let delayed : calculus =
 
     (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify ~ord ~select c =
-      let c = Sup.basic_simplify ~ord c in
+      let c = C.select_clause ~select (Sup.basic_simplify ~ord c) in
       match recursive_eliminations ~ord ~select c with
       | None -> None
       | Some l -> Some (List.filter (fun c -> not (Sup.is_tautology c)) l)

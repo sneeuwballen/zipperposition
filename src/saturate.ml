@@ -168,6 +168,7 @@ let all_simplify ~ord ~calculus ~select active_set clause =
       (* usual simplifications *)
       let _, c = simplify ~calculus active_set c in
       if Sup.is_tautology c then () else
+      let c = C.select_clause ~select c in
       (* list simplification *)
       match calculus#list_simplify ~ord ~select c with
       | None -> clauses := c :: !clauses (* totally simplified clause *)

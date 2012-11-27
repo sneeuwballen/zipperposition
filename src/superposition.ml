@@ -444,7 +444,7 @@ let demodulate active_set clause =
       let proof = lazy (Proof ("demod", (clause, [], S.id_subst)::clauses_subst)) in
       (* parents are clauses used to simplify the clause, plus parents of the clause *)
       let parents = clauses @ clause.cparents in
-      C.mk_clause ~ord lits ~selected:[] proof parents
+      C.mk_clause ~ord lits ~selected:clause.cselected proof parents
     end
 
 let is_tautology c =
