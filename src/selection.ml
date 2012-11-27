@@ -40,54 +40,46 @@ let select_nothing _ = []
 let select_diff_neg_lit ~ord c =
   (* find a negative literal with maximal difference between
      the weights of the sides of the equation *)
-  let rec find_lit lits = match lits with
-  | [] -> None
-  | (Equation (l, r, false, _), idx)::lits' ->
+  let rec find_lit best_diff best_idx idx lits = match lits with
+  | [] -> best_idx
+  | (Equation (l, r, false, _))::lits' ->
     let weightdiff = abs (l.tsize - r.tsize) in
-    (match find_lit lits' with
-    | None -> Some (weightdiff, idx)
-    | Some (weightdiff', idx') ->
-      if weightdiff > weightdiff'
-        then Some (weightdiff, idx)
-        else Some (weightdiff', idx'))
-  | _::lits' -> find_lit lits'
+    if weightdiff > best_diff
+      then find_lit weightdiff idx (idx+1) lits'
+      else find_lit best_diff best_idx (idx+1) lits'
+  | _::lits' -> find_lit best_diff best_idx (idx+1) lits'
   in
   (* search such a lit among the clause's lits *)
-  match find_lit (Utils.list_pos c.clits) with
-  | None -> []
-  | Some (weightdiff, idx) -> [idx]
+  match find_lit 0 (-1) 0 c.clits with
+  | -1 -> []
+  | n -> [n]
 
 let select_complex ~ord c =
   (* find x!=y in literals *)
-  let rec find_noteqvars lits = match lits with
-  | [] -> None
-  | ((Equation (l, r, false,_)), idx)::lits' ->
-    if T.is_var l && T.is_var r then Some idx else find_noteqvars lits'
-  | _::lits' -> find_noteqvars lits'
+  let rec find_noteqvars idx lits = match lits with
+  | [] -> -1
+  | (Equation (l, r, false,_))::lits' ->
+    if T.is_var l && T.is_var r then idx else find_noteqvars (idx+1) lits'
+  | _::lits' -> find_noteqvars (idx+1) lits'
   (* find ground negative literal *)
-  and find_neg_ground lits = match lits with
-  | [] -> None
-  | ((Equation (l, r, false, _) as lit), idx)::lits' ->
-    if T.is_ground_term l && T.is_ground_term r
-      then begin
-        match find_neg_ground lits' with
-        | None -> Some (lit, idx)  (* no other negative ground literal *)
-        | Some (lit', idx') ->
-          if C.compare_lits_partial ~ord lit lit' = Lt
-            then Some (lit, idx)    (* this one is smaller *)
-            else Some (lit', idx')  (* keep the other one *)
-      end else find_neg_ground lits'
-  | _::lits' -> find_neg_ground lits'
+  and find_neg_ground best_weight best_idx idx lits = match lits with
+  | [] -> best_idx
+  | (Equation (l, r, false, _))::lits' ->
+    let weight = l.tsize + r.tsize in
+    if T.is_ground_term l && T.is_ground_term r && weight < best_weight
+      then find_neg_ground weight idx (idx+1) lits'
+      else find_neg_ground best_weight best_idx (idx+1) lits'
+  | _::lits' -> find_neg_ground best_weight best_idx (idx+1) lits'
   in
   (* try x!=y, else try ground negative, else delegate *)
-  let lits_pos = Utils.list_pos c.clits in
-  match find_noteqvars lits_pos with
-  | Some idx -> [idx]
-  | None ->
-    begin match find_neg_ground lits_pos with
-    | Some (_, idx) -> [idx]
-    | None -> select_diff_neg_lit ~ord c (* delegate to select_diff_neg_lit *)
-    end
+  let i = find_noteqvars 0 c.clits in
+  if i >= 0
+    then [i]
+    else
+      let i = find_neg_ground 0 (-1) 0 c.clits in
+      if i >= 0
+        then [i]
+        else select_diff_neg_lit ~ord c (* delegate to select_diff_neg_lit *)
 
 let select_complex_except_RR_horn ~ord c =
   (* find whether there is exactly one positive literal *)
