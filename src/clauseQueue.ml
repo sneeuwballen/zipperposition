@@ -30,105 +30,84 @@ module C = Clauses
 module O = Orderings
 module Utils = FoUtils
 
-(* a queue of clauses *)
+(** A priority queue of clauses, purely functional *)
 class type queue =
   object
     method add : hclause -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
-    method remove : hclause list -> queue  (* slow *)
     method name : string
   end
 
-module LH = Leftistheap
+(** A heap that compares clauses by their weight *)
+module LH = Leftistheap.Make(
+  struct
+    type t = int * hclause
+    let le (i, _) (j, _) = i <= j
+  end)
 
-type clause_ord = hclause LH.ordered
-
-(** generic clause queue based on some ordering on clauses *)
-let make_hq ~ord ?(accept=(fun _ -> true)) name =
+(** generic clause queue based on some ordering on clauses, given
+    by a weight function (TODO rewrite LH to store weight in tree nodes?) *)
+let make_hq ?(accept=(fun _ -> true)) ~weight name =
   object
-    val heap = new LH.leftistheap ord
+    val heap = LH.empty
     
-    method is_empty = heap#is_empty
+    method is_empty = LH.is_empty heap
 
     method add hc =
       if accept hc then
-        let new_heap = heap#insert hc in
+        let w = weight hc in
+        let new_heap = LH.insert (w, hc) heap in
         ({< heap = new_heap >} :> queue)
       else
         ({<>} :> queue)
 
     method take_first =
-      assert (not (heap#is_empty));
-      let c,new_h = heap#extract_min in
+      assert (not (LH.is_empty heap));
+      let (_, c), new_h = LH.extract_min heap in
       (({< heap = new_h >} :> queue), c)
-
-    method remove hclauses =
-      match hclauses with
-      | [] -> ({< >} :> queue)
-      | _ ->  ({< heap = heap#remove hclauses >} :> queue)
 
     method name = name
   end
 
-let fifo ~ord =
-  let clause_ord =
-    object
-      method le hc1 hc2 =  hc1.ctag <= hc2.ctag
-    end
-  and name = "fifo_queue" in
-  make_hq ~ord:clause_ord name
+let fifo =
+  let name = "fifo_queue" in
+  make_hq ~weight:(fun hc -> hc.ctag) name
 
-let clause_weight ~ord =
-  let clause_ord =
-    object
-      method le hc1 hc2 = hc1.cweight <= hc2.cweight
-    end
-  and name = "clause_weight" in
-  make_hq ~ord:clause_ord name
+let clause_weight =
+  let name = "clause_weight" in
+  make_hq ~weight:(fun hc -> hc.cweight) name
   
-let goals ~ord =
+let goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = match lit with
   | Equation (_, _, sign, _) -> not sign in
   let is_goal_clause clause = List.for_all is_goal_lit clause.clits in
-  let clause_ord =
-    object
-      method le hc1 hc2 = hc1.cweight <= hc2.cweight
-    end
-  and name = "prefer_goals" in
-  make_hq ~ord:clause_ord ~accept:is_goal_clause name
+  let name = "prefer_goals" in
+  make_hq ~accept:is_goal_clause ~weight:(fun c -> c.cweight) name
 
-let non_goals ~ord =
+let non_goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = match lit with
   | Equation (_, _, sign, _) -> not sign in
   let is_non_goal_clause clause = List.for_all (fun x -> not (is_goal_lit x)) clause.clits in
-  let clause_ord =
-    object
-      method le hc1 hc2 = hc1.cweight <= hc2.cweight
-    end
-  and name = "prefer_non_goals" in
-  make_hq ~ord:clause_ord ~accept:is_non_goal_clause name
+  let name = "prefer_non_goals" in
+  make_hq ~accept:is_non_goal_clause ~weight:(fun c -> c.cweight) name
 
-let pos_unit_clauses ~ord =
+let pos_unit_clauses =
   let is_unit_pos c = match c.clits with
   | [Equation (_,_,true,_)] -> true
   | _ -> false
   in
-  let clause_ord =
-    object
-      method le hc1 hc2 = hc1.cweight <= hc2.cweight
-    end
-  and name = "prefer_pos_unit_clauses" in
-  make_hq ~ord:clause_ord ~accept:is_unit_pos name
+  let name = "prefer_pos_unit_clauses" in
+  make_hq ~accept:is_unit_pos ~weight:(fun c -> c.cweight) name
 
-let default_queues ~ord =
-  [ (clause_weight ~ord, 4);
-    (pos_unit_clauses ~ord, 3);
-    (non_goals ~ord, 1);
-    (goals ~ord, 1);
-    (fifo ~ord, 1);
+let default_queues =
+  [ (clause_weight, 4);
+    (pos_unit_clauses, 3);
+    (non_goals, 1);
+    (goals, 1);
+    (fifo, 1);
   ]
 
 let pp_queue formatter q =

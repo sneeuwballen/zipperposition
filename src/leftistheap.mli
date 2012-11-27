@@ -50,22 +50,3 @@ sig
   val remove: t -> X.t list -> t
     (* runs in O(n), removing all elements in the list (assuming X.le is total) *)
 end
-
-(* -----------------------------------------------------------------------------
-  object interface
- ----------------------------------------------------------------------------- *)
-
-class type ['a] ordered =
-  object
-    method le : 'a -> 'a -> bool
-  end
-
-class ['a] leftistheap : 'a ordered ->
-  object ('t)
-    method is_empty : bool
-    method insert : 'a -> 't
-    method min : 'a
-    method extract_min : 'a * 't
-    method remove : 'a list -> 't
-  end
-

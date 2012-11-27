@@ -31,24 +31,23 @@ class type queue =
     method add : hclause -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
-    method remove : hclause list -> queue  (* slow *)
     method name : string
   end
 
 (** select by increasing age (for fairness) *)
-val fifo : ord:ordering -> queue
+val fifo : queue
 
 (** select by increasing weight of clause *)
-val clause_weight : ord:ordering -> queue
+val clause_weight : queue
 
 (** only select goals (clauses with only negative lits) *)
-val goals : ord:ordering -> queue
+val goals : queue
 
 (** only select positive unit clauses *)
-val pos_unit_clauses : ord:ordering -> queue
+val pos_unit_clauses : queue
 
 (** default combination of heuristics *)
-val default_queues : ord:ordering -> (queue * int) list
+val default_queues : (queue * int) list
 
 val pp_queue : Format.formatter -> queue -> unit
 val pp_queues : Format.formatter -> (queue * int) list -> unit
