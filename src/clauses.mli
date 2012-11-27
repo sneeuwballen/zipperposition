@@ -103,6 +103,7 @@ val selected: clause -> int list                        (** indexes of selected 
 val parents : clause -> clause list                     (** list of parents of the clause *)
 val check_maximal_lit : ord:ordering -> clause -> int   (** is the i-th literal *)
                     -> substitution -> bool             (** maximal in subst(clause)? *)
+val is_maxlit : clause -> int -> bool                   (** maximal in clause? *)
 
 val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
 

@@ -25,6 +25,8 @@ module Utils = FoUtils
 
 let id_subst = []
 
+let is_empty s = s = []
+
 let eq_subst s1 s2 =
   try List.for_all2
     (fun (v1, t1) (v2, t2) -> T.eq_term v1 v2 && T.eq_term t1 t2)

@@ -29,6 +29,9 @@ module U = FoUtils
 module CQ = ClauseQueue
 module CD = ClauseDag
 
+let prof_add_passive = HExtlib.profile ~enable:true "add_passives"
+let prof_next_passive = HExtlib.profile ~enable:true "next_passive"
+
 (** Default indexing on terms *)
 let cur_index =
   ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m) Dtree.unit_index)
@@ -94,7 +97,7 @@ let make_state ord queue_list select =
    passive_set=passive_set;
    dag=CD.empty;}
 
-let next_passive_clause passive_set =
+let next_passive_clause_ passive_set =
   (* index of the first queue to consider *)
   let first_idx, first_weight = passive_set.queue_state
   and len = List.length passive_set.queues in
@@ -130,6 +133,8 @@ let next_passive_clause passive_set =
       else try_queue passive_set idx 0
   (* start at current index and weight *)
   in try_queue passive_set first_idx first_weight
+
+let next_passive_clause = prof_next_passive.HExtlib.profile next_passive_clause_
 
 let add_active active_set c =
   let hc = C.hashcons_clause c in
@@ -167,7 +172,7 @@ let singleton_active_set ~ord clause =
   let active_set, _ = add_active active_set clause in
   active_set
   
-let add_passive passive_set c =
+let add_passive_ passive_set c =
   let hc = C.hashcons_clause c in
   if C.is_in_bag passive_set.passive_clauses hc.ctag
     then passive_set, hc  (* already in passive set *)
@@ -177,6 +182,8 @@ let add_passive passive_set c =
         (fun (q,weight) -> q#add hc, weight)
         passive_set.queues in
       {passive_set with passive_clauses=new_bag; queues=new_queues}, hc
+
+let add_passive = prof_add_passive.HExtlib.profile add_passive_
 
 let add_passives passive_set l =
   List.fold_left (fun b c -> fst (add_passive b c)) passive_set l

@@ -152,10 +152,6 @@ let apply_subst_lit ?(recursive=true) ~ord subst lit =
     let new_l = S.apply_subst ~recursive subst l
     and new_r = S.apply_subst ~recursive subst r
     in
-    Utils.debug 4 (lazy (Utils.sprintf "apply %a to %a gives %a"
-        S.pp_substitution subst !T.pp_term#pp l !T.pp_term#pp new_l));
-    Utils.debug 4 (lazy (Utils.sprintf "apply %a to %a gives %a"
-        S.pp_substitution subst !T.pp_term#pp r !T.pp_term#pp new_r));
     mk_lit ~ord new_l new_r sign
 
 let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
@@ -276,23 +272,32 @@ module CHashSet =
       !l
   end
 
+let maxlits clause = Lazy.force clause.cmaxlits
+
+let is_maxlit c i = 
+  let rec check l = match l with
+  | [] -> false
+  | (_,j)::l' -> j = i || check l'
+  in check (maxlits c)
+
+let selected clause = Lazy.force clause.cselected
+
+let parents clause = Lazy.force clause.cparents
+
 let check_maximal_lit_ ~ord clause pos subst =
-  let lits_pos = Utils.list_pos clause.clits in
   let lit = Utils.list_get clause.clits pos in
   let slit = apply_subst_lit ~ord subst lit in
-  List.for_all
-    (fun (lit', idx) ->
-      if idx = pos
-        then (assert (eq_literal lit lit'); true)
-        else
-          let slit' = apply_subst_lit ~ord subst lit' in
-          match compare_lits_partial ~ord slit slit' with
-          | Eq | Gt | Incomparable -> true
-          | Lt -> begin
-            false  (* slit is not maximal *)
-          end
-    )
-    lits_pos
+  (* check all literals for maximality *)
+  let rec check i l = match l with
+    | [] -> true
+    | _::l' when i = pos -> check (i+1) l'
+    | lit'::l' ->
+      let slit' = apply_subst_lit ~ord subst lit' in
+      if compare_lits_partial ~ord slit slit' = Lt
+        then false
+        else check (i+1) l'
+  in
+  check 0 clause.clits
 
 let check_maximal_lit ~ord clause pos subst =
   prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
@@ -330,12 +335,6 @@ let mk_clause ~ord lits ~selected proof parents =
   and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits)) in
   {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cparents=parents;
    cmaxlits=maxlits; ctag= -1}
-
-let maxlits clause = Lazy.force clause.cmaxlits
-
-let selected clause = Lazy.force clause.cselected
-
-let parents clause = Lazy.force clause.cparents
 
 let clause_of_fof ~ord c =
   mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits)

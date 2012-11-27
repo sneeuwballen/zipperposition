@@ -25,6 +25,9 @@ open Types
 val id_subst : substitution
   (** the identity substitution *)
 
+val is_empty : substitution -> bool
+  (** is the substitution empty? *)
+
 val build_subst : ?recursive:bool -> substitution -> term -> term -> substitution
   (** add v -> t to the substitution. If recursive is true,
       then v -> subst(t) is considered instead.
