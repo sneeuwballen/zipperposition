@@ -222,24 +222,6 @@ module type S =
     val name : string
   end
 
-(** simple weight for terms (number of occurrences of variables and symbols) *)
-let rec weight_of_term ~so t = t.tsize
-
-(** simple weight for clauses *)
-let compute_clause_weight ~so {clits=lits} =
-  let weight_of_lit l = match l with
-  | Equation (l,r,_,ord) ->
-      let wl = weight_of_term ~so l in
-      let wr = weight_of_term ~so r in
-      wl + wr
-  in
-  (* sum of squares of weights of literals *)
-  List.fold_left
-    (fun sum lit ->
-      let wlit = weight_of_lit lit in
-      sum + wlit*wlit)
-    0 lits 
-
 (* Riazanov: p. 40, relation >>>
  * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
 let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
@@ -561,8 +543,6 @@ class kbo (so : symbol_ordering) : ordering =
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.lookup cache a b
-    method compute_term_weight t = weight_of_term ~so t
-    method compute_clause_weight c = compute_clause_weight ~so c
     method name = KBO.name
   end
 
@@ -574,8 +554,6 @@ class rpo (so : symbol_ordering) : ordering =
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.lookup cache a b
-    method compute_term_weight t = weight_of_term ~so t
-    method compute_clause_weight c = compute_clause_weight ~so c
     method name = RPO.name
   end
 
@@ -587,8 +565,6 @@ class rpo6 (so : symbol_ordering) : ordering =
     method clear_cache () = OrdCache.clear cache
     method symbol_ordering = so
     method compare a b = OrdCache.lookup cache a b
-    method compute_term_weight t = weight_of_term ~so t
-    method compute_clause_weight c = compute_clause_weight ~so c
     method name = RPO6.name
   end
 
@@ -601,8 +577,5 @@ let dummy_ordering =
     method clear_cache () = ()
     method symbol_ordering = !so
     method compare a b = Incomparable
-    method compute_term_weight t = weight_of_term ~so:!so t
-    method compute_clause_weight c =
-      compute_clause_weight ~so:!so c
     method name = "dummy"
   end

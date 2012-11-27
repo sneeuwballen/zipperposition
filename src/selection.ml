@@ -43,7 +43,7 @@ let select_diff_neg_lit ~ord c =
   let rec find_lit lits = match lits with
   | [] -> None
   | (Equation (l, r, false, _), idx)::lits' ->
-    let weightdiff = abs (ord#compute_term_weight l - ord#compute_term_weight r) in
+    let weightdiff = abs (l.tsize - r.tsize) in
     (match find_lit lits' with
     | None -> Some (weightdiff, idx)
     | Some (weightdiff', idx') ->

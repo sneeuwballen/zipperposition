@@ -82,38 +82,9 @@ let fifo ~ord =
 let clause_weight ~ord =
   let clause_ord =
     object
-      method le hc1 hc2 =
-        let w1 = ord#compute_clause_weight hc1
-        and w2 = ord#compute_clause_weight hc2 in
-        w1 <= w2
+      method le hc1 hc2 = hc1.cweight <= hc2.cweight
     end
   and name = "clause_weight" in
-  make_hq ~ord:clause_ord name
-
-(** compute a clause weight that makes maximal literals bigger *)
-let compute_refined_clause_weight ~ord c =
-  (* is lit maximal in c? *)
-  let is_maxlit c lit =
-    List.exists (fun (lit', _) -> C.eq_literal lit lit') (C.maxlits c)
-  (* weight function that makes maximal literals heavier *)
-  in
-  let weight = List.fold_left
-    (fun sum (Equation (l, r, _, _) as lit) ->
-      let lit_weight = ord#compute_term_weight l + ord#compute_term_weight r in
-      sum + (if is_maxlit c lit
-        then 4 * lit_weight else lit_weight))
-    0 c.clits
-  in (List.length c.clits) * weight
-
-let refined_clause_weight ~ord =
-  let clause_ord =
-    object
-      method le hc1 hc2 =
-        let w1 = compute_refined_clause_weight ~ord hc1
-        and w2 = compute_refined_clause_weight ~ord hc2 in
-        w1 <= w2
-    end
-  and name = "refined_clause_weight" in
   make_hq ~ord:clause_ord name
   
 let goals ~ord =
@@ -123,10 +94,7 @@ let goals ~ord =
   let is_goal_clause clause = List.for_all is_goal_lit clause.clits in
   let clause_ord =
     object
-      method le hc1 hc2 =
-        let w1 = compute_refined_clause_weight ~ord hc1
-        and w2 = compute_refined_clause_weight ~ord hc2 in
-        w1 <= w2
+      method le hc1 hc2 = hc1.cweight <= hc2.cweight
     end
   and name = "prefer_goals" in
   make_hq ~ord:clause_ord ~accept:is_goal_clause name
@@ -138,12 +106,7 @@ let non_goals ~ord =
   let is_non_goal_clause clause = List.for_all (fun x -> not (is_goal_lit x)) clause.clits in
   let clause_ord =
     object
-      method le hc1 hc2 =
-        let w1 = compute_refined_clause_weight ~ord hc1
-        and w2 = compute_refined_clause_weight ~ord hc2 in
-        (* lexicographic comparison that favors clauses with less literals
-           and then clauses with small weight *)
-        w1 <= w2
+      method le hc1 hc2 = hc1.cweight <= hc2.cweight
     end
   and name = "prefer_non_goals" in
   make_hq ~ord:clause_ord ~accept:is_non_goal_clause name
@@ -155,13 +118,7 @@ let pos_unit_clauses ~ord =
   in
   let clause_ord =
     object
-      method le hc1 hc2 =
-        assert (is_unit_pos hc1 && is_unit_pos hc2);
-        let w1 = compute_refined_clause_weight ~ord hc1
-        and w2 = compute_refined_clause_weight ~ord hc2 in
-        (* lexicographic comparison that favors clauses with more goals,
-           and then clauses with small weight *)
-        w1 <= w2
+      method le hc1 hc2 = hc1.cweight <= hc2.cweight
     end
   and name = "prefer_pos_unit_clauses" in
   make_hq ~ord:clause_ord ~accept:is_unit_pos name
