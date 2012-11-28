@@ -25,9 +25,6 @@ open Types
 val select_max_goal : ?strict:bool -> selection_fun
   (** Select a maximal negative literal, if any, or nothing *)
 
-val select_nothing : selection_fun
-  (** no selection *)
-
 val select_diff_neg_lit : ?strict:bool -> ord:ordering -> selection_fun
   (** arbitrary negative literal with maximal weight difference between sides *)
 

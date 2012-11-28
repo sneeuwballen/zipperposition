@@ -44,8 +44,6 @@ let select_max_goal ?(strict=true) c =
   | (_,idx)::_ when strict -> [idx]   (* select one negative max goal *)
   | (_,idx)::_ -> idx :: select_positives c   (* negative max goal + positive lits *)
 
-let select_nothing _ = []
-
 let select_diff_neg_lit ?(strict=true) ~ord c =
   (* find a negative literal with maximal difference between
      the weights of the sides of the equation *)
@@ -92,25 +90,7 @@ let select_complex ?(strict=true) ~ord c =
         else select_diff_neg_lit ~strict ~ord c (* delegate to select_diff_neg_lit *)
 
 let select_complex_except_RR_horn ?(strict=true) ~ord c =
-  (* find whether there is exactly one positive literal *)
-  let rec find_uniq_pos lits = match lits with
-  | [] -> None
-  | (Equation (l,r,true,_) as lit)::lits' ->
-    begin match find_uniq_pos lits' with
-    | None -> Some lit  (* really unique *)
-    | Some _ -> None (* there is another *)
-    end
-  | _::lits' -> find_uniq_pos lits'
-  in
-  (* check whether c is range-restricted Horn clause *)
-  let is_closed_RR_horn c = 
-    match find_uniq_pos c.clits with
-    | None -> false
-    | Some lit ->
-      (* check that all variables of the clause occur in the head *)
-      List.length (C.vars_of_lit lit) = List.length c.cvars
-  in
-  if is_closed_RR_horn c
+  if Theories.is_RR_horn_clause c
     then []  (* do not select (conditional rewrite rule) *)
     else select_complex ~strict ~ord c  (* like select_complex *)
 
@@ -120,7 +100,7 @@ let default_selection ~ord = select_complex ~strict:true ~ord
 (** table of name -> functions *)
 let functions =
   let table = Hashtbl.create 17 in
-  Hashtbl.add table "NoSelection" (fun ~ord c -> select_nothing c);
+  Hashtbl.add table "NoSelection" (fun ~ord c -> no_select c);
   Hashtbl.add table "MaxGoal" (fun ~ord c -> select_max_goal ~strict:true c);
   Hashtbl.add table "MaxGoalNS" (fun ~ord c -> select_max_goal ~strict:false c);
   Hashtbl.add table "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
