@@ -35,48 +35,7 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
-
-(* TODO move special heuristic to calculus
-   TODO generalize it for defined predicates/functions *)
   
-(** special heuristic: an ordering constraint that makes symbols
-    occurring in negative equations bigger than symbols in
-    positive equations in the given list of clauses *)
-let heuristic_constraint clauses : ordering_constraint =
-  let _, _, signature = O.current_signature () in
-  let table = Hashtbl.create 23 in (* symbol -> (neg occurrences - pos occurences) *)
-  (* update counts with term *)
-  let rec update_with_term sign t = match t.term with
-    | Var _ -> ()
-    | Node (s, l) ->
-        let count = try Hashtbl.find table s with Not_found -> 0 in
-        Hashtbl.replace table s (if sign then count-1 else count+1);
-        List.iter (update_with_term sign) l
-  (* update counts with clause *)
-  and update_with_clause clause =
-    List.iter
-      (fun (Equation (l, r, sign, _)) ->
-        update_with_term sign l;
-        update_with_term sign r)
-    clause.clits
-  in 
-  List.iter update_with_clause clauses;
-  (* sort symbols by decreasing (neg occurences - pos occurences) *)
-  let ordered_symbols = List.sort
-    (fun a b ->
-      let count_a = try Hashtbl.find table a with Not_found -> 0
-      and count_b = try Hashtbl.find table b with Not_found -> 0 in
-      count_b - count_a)
-    signature
-  in
-  (* make a constraint out of the ordered signature *)
-  O.list_constraint ordered_symbols
-
-(** create an ordering from the clauses *)
-let heuristic_ordering clauses =
-  let constr = heuristic_constraint clauses in
-  let constr = O.compose_constraints constr O.consts_constraint in
-  O.make_ordering constr
 
 (** parameters for the main procedure *)
 type parameters = {
@@ -288,9 +247,9 @@ let () =
     | x -> failwith ("unknown calculus "^x)
   in
   (* choose an ord now *)
-  let constr = O.compose_constraints
-    (heuristic_constraint clauses) (calculus#constr clauses) in
-  let so = O.make_ordering constr in
+  let constr = Precedence.compose_constraints
+    (Precedence.heuristic_constraint clauses) (calculus#constr clauses) in
+  let so = Precedence.make_ordering constr in
   let ord = match params.param_ord with
     | "rpo" -> new O.rpo so
     | "rpo6" -> new O.rpo6 so
