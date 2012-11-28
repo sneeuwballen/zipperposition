@@ -336,6 +336,18 @@ let delayed : calculus =
 
     method constr clauses = symbol_constraint clauses
 
-    method preprocess ~ord l =
-      List.map (fun c -> Sup.basic_simplify ~ord (C.clause_of_fof ~ord c)) l
+    method preprocess ~ord ~select l =
+      Utils.list_flatmap
+        (fun c ->
+          let c = Sup.basic_simplify ~ord (C.clause_of_fof ~ord c) in
+          let c = C.reord_clause ~ord c in
+          match self#list_simplify ~ord ~select c with
+          | None -> if Sup.is_tautology c then [] else [c]
+          | Some clauses ->
+            List.fold_left
+              (fun clauses c ->
+                let c = C.clause_of_fof ~ord c in
+                if not (Sup.is_tautology c) then c :: clauses else clauses)
+              [] clauses)
+        l
   end

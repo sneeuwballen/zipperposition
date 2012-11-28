@@ -53,7 +53,7 @@ class type calculus =
     (** some constraints on the precedence *)
     method constr : clause list -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : ord:ordering -> clause list -> clause list
+    method preprocess : ord:ordering -> select:selection_fun -> clause list -> clause list
   end
 
 (** do binary inferences that involve the given clause *)

@@ -53,8 +53,9 @@ let check_timeout = function
 
 let set_of_support ~calculus state axioms =
   (* reordonate causes using the ordering of the state *)
-  let ord = state.PS.ord in
-  let axioms = calculus#preprocess ~ord axioms in
+  let ord = state.PS.ord
+  and select = state.PS.state_select in
+  let axioms = calculus#preprocess ~ord ~select axioms in
   (* add the axioms to the active set *)
   let axioms_set = PS.add_actives state.PS.axioms_set axioms in
   Utils.debug 1 (lazy (Utils.sprintf "%% added %d clauses to set-of-support"

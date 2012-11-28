@@ -36,6 +36,9 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
   
+(* random generator initialization *)
+let seed = ref 1928575
+let _ = Random.init !seed
 
 (** parameters for the main procedure *)
 type parameters = {
@@ -246,14 +249,17 @@ let () =
     | "delayed" -> Delayed.delayed
     | x -> failwith ("unknown calculus "^x)
   in
+  (* first preprocessing, with a simple ordering. *)
+  let clauses = calculus#preprocess ~ord:(O.default_ordering ()) ~select:no_select clauses in
+  Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
+                 (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
   (* choose an ord now, using clauses *)
   let ord_factory = match params.param_ord with
     | "rpo" -> O.rpo
     | "rpo6" -> O.rpo6
     | "kbo" -> O.kbo
     | x -> failwith ("unknown ordering " ^ x) in
-  let constr = Precedence.heuristic_constraint ord_factory (calculus#constr clauses) clauses in
-  let so = Precedence.make_ordering constr in
+  let so = Precedence.heuristic_precedence ord_factory (calculus#constr clauses) clauses in
   let ord = ord_factory so in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (* indexing *)
@@ -263,7 +269,7 @@ let () =
   let select = Sel.selection_from_string ~ord params.param_select in
   (* preprocess clauses, then possibly simplify them *)
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~ord (List.map (C.reord_clause ~ord) clauses) in
+  let clauses = calculus#preprocess ~ord ~select (List.map (C.reord_clause ~ord) clauses) in
   let clauses = if params.param_presimplify
     then Sat.initial_simplifications ~ord ~calculus ~select clauses
     else clauses in

@@ -22,6 +22,7 @@ open Types
 open Symbols
 
 module T = Terms
+module C = Clauses
 module Utils = FoUtils
 
 (** Precedence on symbols *)
@@ -145,7 +146,7 @@ let min_constraint symbols =
   in compare
 
 (* regular string ordering *)
-let alpha_constraint a b = Pervasives.compare a b
+let alpha_constraint a b = compare_symbols a b
 
 let compose_constraints c1 c2 =
   (* first we compare using c2, then using c1 if needed, because
@@ -156,62 +157,16 @@ let compose_constraints c1 c2 =
     else c1 a b               (* let c1 decide *)
   in compare
 
-let check_constraint so constr =
+let check_constraint signature constr =
   (* check whether a list is sorted in decreasing order w.r.t constraint *)
   let rec is_sorted l = match l with
   | [] | [_] -> true
-  | x::y::l' ->
+  | x::((y::_) as l') ->
     let cmp_xy = constr x y in
     if cmp_xy >= 0 then is_sorted l'
     else false
   in
-  is_sorted so#signature
-
-
-(* ----------------------------------------------------------------------
- * Heuristic creation of precedences
- * ---------------------------------------------------------------------- *)
-
-(** a weighted constraint is a weight (cost), and a function to check if it's satisfied *)
-type weighted_constr = int * (ordering -> bool)
-
-(** Creates a weighted constraint if the clause is a symbol definition *)
-let check_definition clause = failwith "TODO"
-
-
-
-(** special heuristic: an ordering constraint that makes symbols
-    occurring in negative equations bigger than symbols in
-    positive equations in the given list of clauses *)
-let heuristic_constraint ord_factory constr clauses =
-  let _, _, signature = current_signature () in
-  let table = Hashtbl.create 23 in (* symbol -> (neg occurrences - pos occurences) *)
-  (* update counts with term *)
-  let rec update_with_term sign t = match t.term with
-    | Var _ -> ()
-    | Node (s, l) ->
-        let count = try Hashtbl.find table s with Not_found -> 0 in
-        Hashtbl.replace table s (if sign then count-1 else count+1);
-        List.iter (update_with_term sign) l
-  (* update counts with clause *)
-  and update_with_clause clause =
-    List.iter
-      (fun (Equation (l, r, sign, _)) ->
-        update_with_term sign l;
-        update_with_term sign r)
-    clause.clits
-  in 
-  List.iter update_with_clause clauses;
-  (* sort symbols by decreasing (neg occurences - pos occurences) *)
-  let ordered_symbols = List.sort
-    (fun a b ->
-      let count_a = try Hashtbl.find table a with Not_found -> 0
-      and count_b = try Hashtbl.find table b with Not_found -> 0 in
-      count_b - count_a)
-    signature
-  in
-  (* make a constraint out of the ordered signature *)
-  compose_constraints (list_constraint ordered_symbols) constr
+  is_sorted signature
 
 (* ----------------------------------------------------------------------
  * Creation of a precedence (symbol_ordering) from constraints
@@ -222,30 +177,33 @@ let make_ordering constr =
   (* references that hold current state *)
   let cur_signature = ref []
   and cmp = ref (fun x y -> 0)
-  and multiset_pred = ref (fun s -> s = eq_symbol) in
+  and multiset_pred = ref (fun s -> s == eq_symbol) in
   (* the object itself *)
   let obj = object (self)
     (* refresh computes a new ordering based on the current signature *)
     method refresh () =
       (* the constraint is: keep the current signature in the same order *)
+      assert (check_constraint !cur_signature !cmp);
       let keep_constr = compose_constraints constr !cmp in
       (* the new signature, possibly with more symbols*)
       let _, _, symbols = current_signature () in
       (* sort according to the constraint *)
-        cur_signature := List.stable_sort (fun x y -> -(keep_constr x y)) symbols;
-        (* comparison function is given by the place in the ordered signature *)
-        cmp := list_constraint !cur_signature;
-        Utils.debug 3 (lazy (Utils.sprintf "%% new signature %a" T.pp_signature self#signature));
-        (* assert (check_constraint self (list_constraint old_signature)) *)
-      method signature = !cur_signature
-      method compare a b = !cmp a b
-      method multiset_status s = !multiset_pred s
-      method set_multiset f = multiset_pred := f
-    end
-    in
-    (* do the initial computation and return the object *)
-    obj#refresh ();
-    obj
+      Utils.debug 3 (lazy (Utils.sprintf "%% old signature %a" T.pp_signature self#signature));
+      cur_signature := List.sort (fun x y -> -(keep_constr x y)) symbols;
+      (* comparison function is given by the place in the ordered signature *)
+      assert (check_constraint !cur_signature !cmp);
+      cmp := list_constraint !cur_signature;
+      Utils.debug 3 (lazy (Utils.sprintf "%% new signature %a" T.pp_signature self#signature));
+      (* assert (check_constraint self (list_constraint old_signature)) *)
+    method signature = !cur_signature
+    method compare a b = !cmp a b
+    method multiset_status s = !multiset_pred s
+    method set_multiset f = multiset_pred := f
+  end
+  in
+  (* do the initial computation and return the object *)
+  obj#refresh ();
+  obj
 
 let rec default_symbol_ordering () =
   let _, arities, _ = current_signature () in
@@ -254,3 +212,168 @@ let rec default_symbol_ordering () =
     (arity_constraint arities) (min_constraint [false_symbol; true_symbol]) in
   (* apply the constraints to the dummy symbol ordering *)
   make_ordering constr
+
+(* ----------------------------------------------------------------------
+ * Heuristic constraints to try to reduce search space
+ * ---------------------------------------------------------------------- *)
+
+(** a weighted constraint is a weight (cost), and a function to check if it's satisfied *)
+type weighted_constr = int * (ordering -> bool)
+
+(** Does t contains the symbol f? *)
+let rec contains_symbol f t = match t.term with
+  | Var _ -> false
+  | Node (g, _) when f == g -> true
+  | Node (_, ts) -> List.exists (contains_symbol f) ts
+
+(** create a constraint that a > b holds in the given ordering *)
+let check_gt ~weight a b =
+  (weight, fun ord -> ord#compare a b = Gt)
+
+let weight_def = 5      (** weight of definitions *)
+let weight_RR_horn = 2  (** weight of RR Horn clauses *)
+
+(** Creates a weighted constraint if the clause is a symbol definition,
+    ie an equation/equivalence f(x1,...,xn)=b where f does not occur in b *)
+let check_definition clause =
+  match clause.clits with
+  | [Equation (({term=Node(f,ts)} as l),r,true,_)] when
+    not (contains_symbol f r) && l != T.true_term && r != T.true_term && List.for_all T.is_var ts ->
+    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
+    [check_gt ~weight:weight_def l r]
+  | [Equation (l, ({term=Node(f,ts)} as r),true,_)] when
+    not (contains_symbol f l) && l != T.true_term && r != T.true_term && List.for_all T.is_var ts ->
+    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition: %a --> %a@]" !T.pp_term#pp r !T.pp_term#pp l));
+    [check_gt ~weight:weight_def r l]
+  | _ -> [] (* not a definition *)
+
+(** constraint if the clause is a Range-Restricted Horn clause,
+    that is assumed to be a definition of its head. We therefore seek to
+    make the head maximal (best coupled with SelectComplexExceptRRHorn). *)
+let check_horn_definition c =
+  if Theories.is_RR_horn_clause c && List.length c.clits > 1
+    then begin
+      Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>RR horn definition: %a@]" !C.pp_clause#pp c));
+      (* find head and body of the clause *)
+      let head = List.hd (List.filter C.pos_lit c.clits)
+      and body = List.filter C.neg_lit c.clits in
+      (* constraint: head is not < than any literal of the body *)
+      let constr ord =
+        List.for_all (fun b -> C.compare_lits_partial ~ord head b <> Lt) body in
+      [weight_RR_horn, constr]
+    end else []
+
+(* ----------------------------------------------------------------------
+ * Heuristic creation of precedences (satisfying maximal number of constraints)
+ * ---------------------------------------------------------------------- *)
+
+(** Check whether the two precedences are equal *)
+let eq_precedence c1 c2 =
+  assert (List.length c1#signature = List.length c2#signature);
+  List.for_all2 (==) c1#signature c2#signature
+
+(** Compute a precedence from the signature and the strong constraint *)
+let compute_precedence constr signature : symbol_ordering =
+  let sig_constraint = list_constraint signature in
+  (* XXX note that a total ordering is needed for sound updates of the ordering *)
+  make_ordering (compose_constraints alpha_constraint
+                                     (compose_constraints sig_constraint constr))
+
+(** Compute the cost for the precedence, given a list of constraints
+    and a way to build a term ordering *)
+let compute_cost ord_factory constraints precedence : int =
+  let ord = ord_factory precedence in
+  (* sum up weights of unsatisfied constraints *)
+  let cost = List.fold_left
+    (fun cost (w, constr) -> if constr ord then cost else cost + w)
+    0 constraints
+  in
+  Utils.debug 2 (lazy (Utils.sprintf "@[<h>cost %d for %a@]" cost
+                  T.pp_signature precedence#signature));
+  cost
+
+(** Shuffle the signature by reversing some symbols (uses random).
+    It returns at most [num] modifications of the signature, that differ from
+    it by a swap of two elements) *)
+let perturbate ?(num=10) signature =
+  let new_signatures = ref [] in
+  let len = List.length signature in
+  (* swap indexes i and j in the list *)
+  let swap i j l = 
+    let a = Array.of_list l in
+    let tmp = a.(i) in
+    a.(i) <- a.(j);
+    a.(j) <- tmp;
+    Array.to_list a
+  in
+  (* generate the [num] perturbations *)
+  for i = 0 to num-1 do
+    let i = Random.int len
+    and j = Random.int len in
+    if i != j then
+      let signature' = swap i j signature in
+      new_signatures := signature' :: !new_signatures
+  done;
+  !new_signatures
+
+(** Hill climbing, on the given list of constraints, for at most the
+    given number of steps. It shuffles the signature to try to find
+    one that satisfies more constraints.
+    See http://en.wikipedia.org/wiki/Hill_climbing *)
+let hill_climb ~steps mk_precedence mk_cost signature =
+  (* main loop to follow gradient. Current state is precedence, with cost cost *)
+  let rec follow_gradient ~steps precedence cost =
+    if steps = 0 then precedence, cost else (* done *)
+    (* perturbate current precedence *)
+    let new_signatures = perturbate precedence#signature in
+    (* compute new precedences, and remove the ones which are the same *)
+    let new_precedences = List.map mk_precedence new_signatures in
+    let new_precedences = List.filter (fun p -> not (eq_precedence p precedence)) new_precedences in
+    (* find which new precedence has minimal cost *)
+    let min_cost, min_precedence =
+      List.fold_left
+        (fun (min_cost, min_pre) precedence' ->
+          let cost' = mk_cost precedence' in
+          if cost' < min_cost then cost', precedence' else min_cost, min_pre)
+        (cost, precedence) new_precedences
+    in
+    (* follow gradient, unless we are at a (local) minimum *)
+    if min_cost < cost
+      then follow_gradient ~steps:(steps-1) min_precedence min_cost
+      else precedence, cost  (* local optimum, stop there *)
+  in
+  let precedence = mk_precedence signature in
+  let cost = mk_cost precedence in
+  follow_gradient ~steps precedence cost
+
+(** define a constraint on symbols that is believed to improve
+    the search by enabling as many simplifications as possible. It takes
+    an ordering as a parameter, to be able to decide the orientation of
+    terms in a given precedence, and another constraint to compose  with,
+    so that it can optimize w.r.t stronger constraints. *)
+let heuristic_precedence ord_factory constr clauses =
+  let _, _, signature = current_signature () in
+  (* the constraints *)
+  let constraints = Utils.list_flatmap
+    (fun c -> check_definition c @ check_horn_definition c)
+    clauses in
+  (* helper functions *)
+  let mk_precedence = compute_precedence constr
+  and mk_cost = compute_cost ord_factory constraints in
+  (* randomized hill climbing *)
+  let rec climb_hills ~num precedence cost =
+    if num = 0
+      then precedence  (* done enough restarts *)
+      else begin
+        let signature' = Utils.list_shuffle precedence#signature in
+        Utils.debug 2 (lazy (Utils.sprintf "restart with signature %a" T.pp_signature signature'));
+        let precedence', cost' = hill_climb ~steps:20 mk_precedence mk_cost signature' in
+        if cost' < cost
+          then climb_hills ~num:(num-1) precedence' cost' (* choose new precedence *)
+          else climb_hills ~num:(num-1) precedence cost   (* continue with same precedence, that is better *)
+      end
+  in
+  let precedence = mk_precedence signature in
+  let precedence = climb_hills ~num:5 precedence (mk_cost precedence) in
+  (* yield the precedence *)
+  precedence

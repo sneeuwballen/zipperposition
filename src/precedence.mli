@@ -59,20 +59,8 @@ val alpha_constraint : ordering_constraint
 val compose_constraints : ordering_constraint -> ordering_constraint -> ordering_constraint
   (** compose constraints (the second one is prioritary) *)
 
-val check_constraint : symbol_ordering -> ordering_constraint -> bool
+val check_constraint : symbol list -> ordering_constraint -> bool
   (** check that the constraint is respected by the ordering *)
-
-(* ----------------------------------------------------------------------
- * Heuristic creation of precedences
- * ---------------------------------------------------------------------- *)
-
-val heuristic_constraint : (symbol_ordering -> ordering) -> ordering_constraint
-                           -> clause list -> ordering_constraint
-  (** define a constraint on symbols that is believed to improve
-      the search by enabling as many simplifications as possible. It takes
-      an ordering as a parameter, to be able to decide the orientation of
-      terms in a given precedence, and another constraint to compose  with,
-      so that it can optimize w.r.t stronger constraints. *)
 
 (* ----------------------------------------------------------------------
  * Creation of a precedence (symbol_ordering) from constraints
@@ -83,3 +71,16 @@ val make_ordering : ordering_constraint -> symbol_ordering
 
 val default_symbol_ordering : unit -> symbol_ordering
   (** default ordering on symbols *)
+
+(* ----------------------------------------------------------------------
+ * Heuristic creation of precedences
+ * ---------------------------------------------------------------------- *)
+
+val heuristic_precedence : (symbol_ordering -> ordering) -> ordering_constraint
+                           -> clause list -> symbol_ordering
+  (** define a precedence on symbols that is believed to improve
+      the search by enabling as many simplifications as possible. It takes
+      an ordering as a parameter, to be able to decide the orientation of
+      terms in a given precedence, and another constraint to compose  with,
+      so that it can optimize w.r.t stronger constraints. *)
+

@@ -961,7 +961,7 @@ let superposition : calculus =
 
     method constr _ = Precedence.min_constraint [false_symbol; true_symbol]
 
-    method preprocess ~ord l =
+    method preprocess ~ord ~select l =
       List.fold_left
         (fun acc c ->
           (* reduction to CNF *)
