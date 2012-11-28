@@ -362,7 +362,7 @@ let heuristic_precedence ord_factory constr clauses =
   and mk_cost = compute_cost ord_factory constraints in
   (* randomized hill climbing *)
   let rec climb_hills ~num precedence cost =
-    if num = 0
+    if num = 0 || cost = 0
       then precedence  (* done enough restarts *)
       else begin
         let signature' = Utils.list_shuffle precedence#signature in
