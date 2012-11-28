@@ -158,26 +158,26 @@ let subsumed_by ~calculus active_set clause =
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if redundant or trivial).
     This is used on generated clauses, and on the given clause. *)
+let all_simplify_ ~ord ~calculus ~select active_set clause =
+  let clauses = ref []
+  and queue = Queue.create () in
+  Queue.push clause queue;
+  while not (Queue.is_empty queue) do
+    let c = Queue.pop queue in
+    if Sup.is_tautology c then () else
+    (* usual simplifications *)
+    let _, c = simplify ~calculus active_set c in
+    let c = C.select_clause ~select c in
+    (* list simplification *)
+    match calculus#list_simplify ~ord ~select c with
+    | None -> clauses := c :: !clauses (* totally simplified clause *)
+    | Some clauses ->
+      List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
+  done;
+  !clauses
+
 let all_simplify ~ord ~calculus ~select active_set clause =
-  let do_it clause =
-    let clauses = ref []
-    and queue = Queue.create () in
-    Queue.push clause queue;
-    while not (Queue.is_empty queue) do
-      let c = Queue.pop queue in
-      (* usual simplifications *)
-      let _, c = simplify ~calculus active_set c in
-      if Sup.is_tautology c then () else
-      let c = C.select_clause ~select c in
-      (* list simplification *)
-      match calculus#list_simplify ~ord ~select c with
-      | None -> clauses := c :: !clauses (* totally simplified clause *)
-      | Some clauses ->
-        List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
-    done;
-    !clauses
-  in
-  prof_all_simplify.HExtlib.profile do_it clause
+  prof_all_simplify.HExtlib.profile (all_simplify_ ~ord ~calculus ~select active_set) clause
 
 (** Simplifications to perform on initial clauses *)
 let initial_simplifications ~ord ~select ~calculus clauses =
