@@ -39,6 +39,7 @@ type conclusion = clause
 type inference_rule = ProofState.active_set -> clause -> conclusion list
 
 (* statistics *)
+let stat_basic_simplify = mk_stat "basic_simplify calls"
 let stat_superposition_call = mk_stat "superposition calls"
 let stat_equality_resolution_call = mk_stat "equality_resolution calls"
 let stat_equality_factoring_call = mk_stat "equality_factoring calls"
@@ -54,7 +55,7 @@ let print_stats () =
     (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
     [stat_superposition_call; stat_equality_resolution_call; stat_equality_factoring_call;
      stat_subsumption_call; stat_subsumed_in_set_call; stat_subsumed_by_set_call;
-     stat_demodulate_call; stat_demodulate_step]
+     stat_basic_simplify; stat_demodulate_call; stat_demodulate_step]
 
 (* for profiling *)
 let enable = true
@@ -448,25 +449,19 @@ let demodulate active_set clause =
     end
 
 let is_tautology c =
-  let is_tauto =
-    (* s=s literal *)
-    (List.exists
-      (fun (Equation (l, r, sign, _)) ->
-          (sign && T.eq_term l r))
-      c.clits) ||
-    (* both l=r and l!=r are literals *)
-    (List.exists
-      (fun (Equation (l, r, sign, _)) ->
-        List.exists
-          (fun (Equation (l', r', sign', _)) ->
-              (sign = not sign') &&
-              (((T.eq_term l l') && (T.eq_term r r')) ||
-              ((T.eq_term l r') && (T.eq_term l' r)))
-          )
-        c.clits
-      )
-      c.clits)
+  let rec check lits = match lits with
+  | [] -> false
+  | (Equation (l, r, true, _))::_ when l == r -> true
+  | (Equation (l, r, sign, _))::lits' ->
+    List.exists
+      (fun (Equation (l', r', sign', _)) ->
+          (sign = not sign') &&
+          (((T.eq_term l l') && (T.eq_term r r')) ||
+          ((T.eq_term l r') && (T.eq_term l' r))))
+      c.clits
+   || check lits'
   in
+  let is_tauto = check c.clits in
   (if is_tauto then
     Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] is a tautology" !C.pp_clause#pp c)));
   is_tauto
@@ -476,6 +471,7 @@ let is_tautology c =
 let is_semantic_tautology c = false (* TODO *)
 
 let basic_simplify ~ord clause =
+  incr_stat stat_basic_simplify;
   (* convert some fof to literals *)
   let clause = C.clause_of_fof ~ord clause in
   let absurd_lit lit = match lit with
@@ -504,6 +500,8 @@ let basic_simplify ~ord clause =
   let parents = clause :: C.parents clause in
   let proof = clause.cproof in  (* do not bother printing this *)
   let new_clause = C.mk_clause ~ord new_lits ~selected:[] proof parents in
+  (* XXX note: we should keep same selected literals if no literal has been removed,
+     but it looks like it makes the prover much slower... *)
   (if not (C.eq_clause new_clause clause) then
       (Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
       !C.pp_clause#pp clause !C.pp_clause#pp new_clause))));

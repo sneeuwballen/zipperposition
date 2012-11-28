@@ -47,12 +47,12 @@ let opposite_pos p = match p with
 
 let eq_literal l1 l2 =
   match l1, l2 with
-  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      o1 = o2 && T.eq_term l1 l2 && T.eq_term r1 r2 && sign1 = sign2
+  | Equation (l1,r1,sign1,_), Equation (l2,r2,sign2,_) ->
+      sign1 = sign2 && T.eq_term l1 l2 && T.eq_term r1 r2
 
 let eq_literal_com l1 l2 =
   match l1, l2 with
-  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
+  | Equation (l1,r1,sign1,_), Equation (l2,r2,sign2,_) ->
       sign1 = sign2 &&
       ((T.eq_term l1 l2 && T.eq_term r1 r2) ||
        (T.eq_term l1 r2 && T.eq_term r1 l2))
@@ -338,8 +338,11 @@ let mk_clause ~ord lits ~selected proof parents =
    cmaxlits=maxlits; cweight; ctag= -1}
 
 let clause_of_fof ~ord c =
-  mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits)
-    ~selected:c.cselected c.cproof c.cparents
+  let lits = List.map (lit_of_fof ~ord) c.clits in
+  if List.for_all2 eq_literal lits c.clits
+    then c (* no change, no need to rebuild a clause *)
+    else mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits)
+      ~selected:c.cselected c.cproof c.cparents
 
 let reord_clause ~ord c =
   mk_clause ~ord (List.map (reord_lit ~ord) c.clits)
