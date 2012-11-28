@@ -86,6 +86,9 @@ val list_range : int -> int -> int list
 (** call the function n times with unit *)
 val times : int -> (unit -> 'a) -> 'a list
 
+(** shuffle randomly the list *)
+val list_shuffle : 'a list -> 'a list
+
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string
 val sprintf : ('a, Format.formatter, unit, string) format4 -> 'a

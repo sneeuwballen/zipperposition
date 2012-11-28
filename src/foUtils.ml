@@ -219,7 +219,7 @@ let rec list_inter comp l1 l2 = match l1 with
 let list_flatmap f l =
   let rec recurse acc l = match l with
   | [] -> List.rev acc
-  | x::l' -> recurse ((f x) @ acc) l'
+  | x::l' -> recurse (List.rev_append (f x) acc) l'
   in recurse [] l
 
 let rec list_take n l = match n, l with
@@ -244,6 +244,17 @@ let rec list_range low high =
 let rec times i f =
   if i = 0 then []
   else (f ()) :: (times (i-1) f)
+
+(** Randomly shuffle the list. See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle *)
+let list_shuffle l =
+  let a = Array.of_list l in
+  for i = 1 to Array.length a - 1 do
+    let j = Random.int i in
+    let tmp = a.(i) in
+    a.(i) <- a.(j);
+    a.(j) <- tmp;
+  done;
+  Array.to_list a
 
 let on_buffer ?(margin=80) f t =
   let buff = Buffer.create 100 in
