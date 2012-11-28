@@ -27,19 +27,19 @@ module C = Clauses
 
 (** Recognized whether the clause is a Range-Restricted Horn clause *)
 let is_RR_horn_clause c = 
+  let lit = ref None in
   (* find whether there is exactly one positive literal *)
-  let rec find_uniq_pos lits = match lits with
-  | [] -> None
-  | (Equation (l,r,true,_) as lit)::lits' ->
-    begin match find_uniq_pos lits' with
-    | None -> Some lit  (* really unique *)
-    | Some _ -> None (* there is another *)
-    end
-  | _::lits' -> find_uniq_pos lits'
+  let rec find_uniq_pos n lits = match lits with
+  | [] when n = 1 -> !lit
+  | [] -> None  (* zero or several positive lits *)
+  | (Equation (l,r,true,_) as lit')::lits' ->
+    lit := Some lit';
+    find_uniq_pos (n+1) lits'
+  | _::lits' -> find_uniq_pos n lits'
   in
-  match find_uniq_pos c.clits with
+  match find_uniq_pos 0 c.clits with
   | None -> false
-  | Some lit ->
+  | Some lit' ->
     (* check that all variables of the clause occur in the head *)
-    List.length (C.vars_of_lit lit) = List.length c.cvars
+    List.length (C.vars_of_lit lit') = List.length c.cvars
 
