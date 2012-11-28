@@ -259,7 +259,7 @@ let check_horn_definition c =
       and body = List.filter C.neg_lit c.clits in
       (* constraint: head is not < than any literal of the body *)
       let constr ord =
-        List.for_all (fun b -> C.compare_lits_partial ~ord head b <> Lt) body in
+        List.for_all (fun b -> C.compare_lits_partial ~ord head b <> Gt) body in
       [weight_RR_horn, constr]
     end else []
 
@@ -367,7 +367,7 @@ let heuristic_precedence ord_factory constr clauses =
       else begin
         let signature' = Utils.list_shuffle precedence#signature in
         Utils.debug 2 (lazy (Utils.sprintf "restart with signature %a" T.pp_signature signature'));
-        let precedence', cost' = hill_climb ~steps:20 mk_precedence mk_cost signature' in
+        let precedence', cost' = hill_climb ~steps:10 mk_precedence mk_cost signature' in
         if cost' < cost
           then climb_hills ~num:(num-1) precedence' cost' (* choose new precedence *)
           else climb_hills ~num:(num-1) precedence cost   (* continue with same precedence, that is better *)
