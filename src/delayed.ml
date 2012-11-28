@@ -124,8 +124,6 @@ let keep eqn = Keep eqn
     returns an array of tableau_rule. *)
 let eliminate_lits ~ord clause =
   let offset = ref ((max 0 (T.max_var clause.cvars)) + 1) in  (* offset to create variables *)
-  (* is the literal eligible? *)
-  let eligible i = C.eligible_res ~ord clause i S.id_subst in
   (* eliminate propositions (connective and quantifier eliminations) *)
   let prop eqn p sign =
     assert (p.sort = bool_sort);
@@ -166,14 +164,11 @@ let eliminate_lits ~ord clause =
   let tableau_rules =
     Utils.list_mapi clause.clits
       (fun i lit -> 
-        if eligible i
-          then
-            match lit with
-            | Equation (l, r, sign, _) when T.eq_term r T.true_term -> prop lit l sign
-            | Equation (l, r, sign, _) when T.eq_term l T.true_term -> prop lit r sign
-            | Equation (l, r, sign, _) when l.sort = bool_sort -> equiv lit l r sign
-            | _ -> keep lit  (* equation between terms *)
-          else keep lit)
+        match lit with
+        | Equation (l, r, sign, _) when T.eq_term r T.true_term -> prop lit l sign
+        | Equation (l, r, sign, _) when T.eq_term l T.true_term -> prop lit r sign
+        | Equation (l, r, sign, _) when l.sort = bool_sort -> equiv lit l r sign
+        | _ -> keep lit)  (* equation between terms *)
   in
   tableau_rules
 
