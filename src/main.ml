@@ -47,6 +47,7 @@ type parameters = {
   param_calculus : string;
   param_timeout : float;
   param_files : string list;
+  param_precedence : bool;        (** use heuristic for precedence? *)
   param_select : string;
   param_progress : bool;
   param_proof : bool;
@@ -76,6 +77,7 @@ let parse_args () =
   and index = ref "fp"
   and calculus = ref "superposition"
   and presimplify = ref false
+  and heuristic_precedence = ref true
   and dot_file = ref None
   and select = ref "SelectComplex"  (* TODO choose clause queues? *)
   and progress = ref false
@@ -93,6 +95,7 @@ let parse_args () =
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
       ("-progress", Arg.Set progress, "print progress");
+      ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
@@ -109,7 +112,7 @@ let parse_args () =
     param_timeout = !timeout; param_files = [!file]; param_select = !select;
     param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
     param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
-    param_print_sort = !print_sort; param_print_all = !print_all; }
+    param_print_sort = !print_sort; param_print_all = !print_all; param_precedence= !heuristic_precedence;}
 
 (** find the given file from given directory *)
 let find_file name dir =
@@ -259,7 +262,9 @@ let () =
     | "rpo6" -> O.rpo6
     | "kbo" -> O.kbo
     | x -> failwith ("unknown ordering " ^ x) in
-  let so = Precedence.heuristic_precedence ord_factory (calculus#constr clauses) clauses in
+  let so = if params.param_precedence
+    then Precedence.heuristic_precedence ord_factory (calculus#constr clauses) clauses
+    else Precedence.make_ordering (Precedence.compose_constraints Precedence.alpha_constraint (calculus#constr clauses)) in
   let ord = ord_factory so in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (* indexing *)
