@@ -66,9 +66,13 @@ val check_constraint : symbol_ordering -> ordering_constraint -> bool
  * Heuristic creation of precedences
  * ---------------------------------------------------------------------- *)
 
-val heuristic_constraint : clause list -> ordering_constraint
+val heuristic_constraint : (symbol_ordering -> ordering) -> ordering_constraint
+                           -> clause list -> ordering_constraint
   (** define a constraint on symbols that is believed to improve
-      the search by enabling as many simplifications as possible *)
+      the search by enabling as many simplifications as possible. It takes
+      an ordering as a parameter, to be able to decide the orientation of
+      terms in a given precedence, and another constraint to compose  with,
+      so that it can optimize w.r.t stronger constraints. *)
 
 (* ----------------------------------------------------------------------
  * Creation of a precedence (symbol_ordering) from constraints

@@ -172,10 +172,18 @@ let check_constraint so constr =
  * Heuristic creation of precedences
  * ---------------------------------------------------------------------- *)
 
+(** a weighted constraint is a weight (cost), and a function to check if it's satisfied *)
+type weighted_constr = int * (ordering -> bool)
+
+(** Creates a weighted constraint if the clause is a symbol definition *)
+let check_definition clause = failwith "TODO"
+
+
+
 (** special heuristic: an ordering constraint that makes symbols
     occurring in negative equations bigger than symbols in
     positive equations in the given list of clauses *)
-let heuristic_constraint clauses : ordering_constraint =
+let heuristic_constraint ord_factory constr clauses =
   let _, _, signature = current_signature () in
   let table = Hashtbl.create 23 in (* symbol -> (neg occurrences - pos occurences) *)
   (* update counts with term *)
@@ -203,7 +211,7 @@ let heuristic_constraint clauses : ordering_constraint =
     signature
   in
   (* make a constraint out of the ordered signature *)
-  list_constraint ordered_symbols
+  compose_constraints (list_constraint ordered_symbols) constr
 
 (* ----------------------------------------------------------------------
  * Creation of a precedence (symbol_ordering) from constraints

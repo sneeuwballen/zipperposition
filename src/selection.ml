@@ -26,18 +26,27 @@ module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
-let select_max_goal clause =
+(** Select all positives literals *)
+let select_positives c =
+  let rec find_pos acc i lits = match lits with
+  | [] -> acc
+  | lit::lits' when C.pos_lit lit -> find_pos (i::acc) (i+1) lits'
+  | _::lits' -> find_pos acc (i+1) lits'
+  in find_pos [] 0 c.clits
+
+let select_max_goal ?(strict=true) c =
   (* find negative lits *)
   let negative_lits = List.filter
     (fun ((Equation (_,_,sign,_), _)) -> not sign)
-    (C.maxlits clause) in
+    (C.maxlits c) in
   match negative_lits with
   | [] -> []  (* select nothing *)
-  | (_,idx)::_ -> [idx]  (* select one negative max goal *)
+  | (_,idx)::_ when strict -> [idx]   (* select one negative max goal *)
+  | (_,idx)::_ -> idx :: select_positives c   (* negative max goal + positive lits *)
 
 let select_nothing _ = []
 
-let select_diff_neg_lit ~ord c =
+let select_diff_neg_lit ?(strict=true) ~ord c =
   (* find a negative literal with maximal difference between
      the weights of the sides of the equation *)
   let rec find_lit best_diff best_idx idx lits = match lits with
@@ -52,9 +61,10 @@ let select_diff_neg_lit ~ord c =
   (* search such a lit among the clause's lits *)
   match find_lit 0 (-1) 0 c.clits with
   | -1 -> []
-  | n -> [n]
+  | n when strict -> [n]
+  | n -> n :: select_positives c
 
-let select_complex ~ord c =
+let select_complex ?(strict=true) ~ord c =
   (* find x!=y in literals *)
   let rec find_noteqvars idx lits = match lits with
   | [] -> -1
@@ -74,14 +84,14 @@ let select_complex ~ord c =
   (* try x!=y, else try ground negative, else delegate *)
   let i = find_noteqvars 0 c.clits in
   if i >= 0
-    then [i]
+    then if strict then [i] else i :: select_positives c
     else
       let i = find_neg_ground 0 (-1) 0 c.clits in
       if i >= 0
-        then [i]
-        else select_diff_neg_lit ~ord c (* delegate to select_diff_neg_lit *)
+        then if strict then [i] else i :: select_positives c
+        else select_diff_neg_lit ~strict ~ord c (* delegate to select_diff_neg_lit *)
 
-let select_complex_except_RR_horn ~ord c =
+let select_complex_except_RR_horn ?(strict=true) ~ord c =
   (* find whether there is exactly one positive literal *)
   let rec find_uniq_pos lits = match lits with
   | [] -> None
@@ -102,19 +112,23 @@ let select_complex_except_RR_horn ~ord c =
   in
   if is_closed_RR_horn c
     then []  (* do not select (conditional rewrite rule) *)
-    else select_complex ~ord c  (* like select_complex *)
+    else select_complex ~strict ~ord c  (* like select_complex *)
 
 
-let default_selection ~ord = select_complex ~ord
+let default_selection ~ord = select_complex ~strict:true ~ord
 
 (** table of name -> functions *)
 let functions =
   let table = Hashtbl.create 17 in
   Hashtbl.add table "NoSelection" (fun ~ord c -> select_nothing c);
-  Hashtbl.add table "MaxGoal" (fun ~ord c -> select_max_goal c);
-  Hashtbl.add table "SelectDiffNegLit" select_diff_neg_lit;
-  Hashtbl.add table "SelectComplex" select_complex;
-  Hashtbl.add table "SelectComplexExceptRRHorn" select_complex_except_RR_horn;
+  Hashtbl.add table "MaxGoal" (fun ~ord c -> select_max_goal ~strict:true c);
+  Hashtbl.add table "MaxGoalNS" (fun ~ord c -> select_max_goal ~strict:false c);
+  Hashtbl.add table "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
+  Hashtbl.add table "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
+  Hashtbl.add table "SelectComplex" (select_complex ~strict:true);
+  Hashtbl.add table "SelectComplexNS" (select_complex ~strict:false);
+  Hashtbl.add table "SelectComplexExceptRRHorn" (select_complex_except_RR_horn ~strict:true);
+  Hashtbl.add table "SelectComplexExceptRRHornNS" (select_complex_except_RR_horn ~strict:false);
   table
 
 (** selection function from string (may fail) *)

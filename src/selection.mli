@@ -22,25 +22,30 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-(** Select a maximal negative literal, if any, or nothing *)
-val select_max_goal : selection_fun
-(** no selection *)
+val select_max_goal : ?strict:bool -> selection_fun
+  (** Select a maximal negative literal, if any, or nothing *)
+
 val select_nothing : selection_fun
-(** arbitrary negative literal with maximal weight difference between sides *)
-val select_diff_neg_lit : ord:ordering -> selection_fun
-(** x!=y, or ground negative lit, or like select_diff_neg_lit *)
-val select_complex : ord:ordering -> selection_fun
-(** if clause is a restricted range horn clause, then select nothing;
-    otherwise, like select_complex *)
-val select_complex_except_RR_horn : ord:ordering -> selection_fun
+  (** no selection *)
 
-(** Default selection function *)
+val select_diff_neg_lit : ?strict:bool -> ord:ordering -> selection_fun
+  (** arbitrary negative literal with maximal weight difference between sides *)
+
+val select_complex : ?strict:bool -> ord:ordering -> selection_fun
+  (** x!=y, or ground negative lit, or like select_diff_neg_lit *)
+
+val select_complex_except_RR_horn : ?strict:bool -> ord:ordering -> selection_fun
+  (** if clause is a restricted range horn clause, then select nothing;
+      otherwise, like select_complex *)
+
 val default_selection : ord:ordering -> selection_fun
+  (** Default selection function *)
 
-(** selection function from string (may fail) *)
 val selection_from_string : ord:ordering -> string -> selection_fun
-(** available names for selection functions *)
-val available_selections : unit -> string list
+  (** selection function from string (may fail) *)
 
-(** check that if some literals are selected, at least one is negative *)
+val available_selections : unit -> string list
+  (** available names for selection functions *)
+
 val check_selected : clause -> unit
+  (** check that if some literals are selected, at least one is negative *)

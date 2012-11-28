@@ -252,8 +252,7 @@ let () =
     | "rpo6" -> O.rpo6
     | "kbo" -> O.kbo
     | x -> failwith ("unknown ordering " ^ x) in
-  let constr = Precedence.compose_constraints
-    (Precedence.heuristic_constraint clauses) (calculus#constr clauses) in
+  let constr = Precedence.heuristic_constraint ord_factory (calculus#constr clauses) clauses in
   let so = Precedence.make_ordering constr in
   let ord = ord_factory so in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
