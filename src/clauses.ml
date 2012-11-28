@@ -30,6 +30,7 @@ module Utils = FoUtils
 (* some pretty printers are useful now *)
 open Format
 
+let stat_fresh = mk_stat "fresh_clause"
 let prof_check_max_lit = HExtlib.profile ~enable:true "check_max_lit"
 
 (* ----------------------------------------------------------------------
@@ -383,6 +384,7 @@ let fresh_clause ~ord maxvar c =
   (* prerr_endline 
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
   let subst = S.relocate maxvar c.cvars in
+  incr_stat stat_fresh;
   (apply_subst_cl ~recursive:false ~ord subst c), maxvar
 
 let relocate_clause ~ord varlist c =

@@ -55,7 +55,7 @@ let print_stats () =
     (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
     [stat_superposition_call; stat_equality_resolution_call; stat_equality_factoring_call;
      stat_subsumption_call; stat_subsumed_in_set_call; stat_subsumed_by_set_call;
-     stat_basic_simplify; stat_demodulate_call; stat_demodulate_step]
+     stat_basic_simplify; stat_demodulate_call; stat_demodulate_step; C.stat_fresh]
 
 (* for profiling *)
 let enable = true
