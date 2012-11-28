@@ -25,11 +25,14 @@ open Symbols
     simplification orderings (compatible with substitution,
     with the subterm property, and monotonic) *)
 
-class kbo : symbol_ordering -> ordering
+val kbo : symbol_ordering -> ordering
+  (** Knuth-Bendix ordering *)
 
-class rpo : symbol_ordering -> ordering
+val rpo : symbol_ordering -> ordering
+  (** Recursive Path Ordering *)
 
-class rpo6 : symbol_ordering -> ordering
+val rpo6 : symbol_ordering -> ordering
+  (** Efficient implementation of RPO *)
 
 val default_ordering : unit -> ordering
   (** default ordering on terms (RPO6) *)

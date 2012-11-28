@@ -354,7 +354,7 @@ module OrdCache = Cache.Make(
     let equal t1 t2 = T.eq_term t1 t2
   end)
 
-class kbo (so : symbol_ordering) : ordering =
+let kbo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 4096 (KBO.compare_terms ~so)
     val so = so
@@ -365,7 +365,7 @@ class kbo (so : symbol_ordering) : ordering =
     method name = KBO.name
   end
 
-class rpo (so : symbol_ordering) : ordering =
+let rpo (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 4096 (RPO.compare_terms ~so)
     val so = so
@@ -376,7 +376,7 @@ class rpo (so : symbol_ordering) : ordering =
     method name = RPO.name
   end
 
-class rpo6 (so : symbol_ordering) : ordering =
+let rpo6 (so : symbol_ordering) : ordering =
   object
     val cache = OrdCache.create 4096 (RPO6.compare_terms ~so)
     val so = so
@@ -387,4 +387,4 @@ class rpo6 (so : symbol_ordering) : ordering =
     method name = RPO6.name
   end
 
-let default_ordering () = new rpo6 (Precedence.default_symbol_ordering ())
+let default_ordering () = rpo6 (Precedence.default_symbol_ordering ())

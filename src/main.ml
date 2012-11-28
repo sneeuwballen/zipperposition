@@ -247,15 +247,15 @@ let () =
     | x -> failwith ("unknown calculus "^x)
   in
   (* choose an ord now, using clauses *)
+  let ord_factory = match params.param_ord with
+    | "rpo" -> O.rpo
+    | "rpo6" -> O.rpo6
+    | "kbo" -> O.kbo
+    | x -> failwith ("unknown ordering " ^ x) in
   let constr = Precedence.compose_constraints
     (Precedence.heuristic_constraint clauses) (calculus#constr clauses) in
   let so = Precedence.make_ordering constr in
-  let ord = match params.param_ord with
-    | "rpo" -> new O.rpo so
-    | "rpo6" -> new O.rpo6 so
-    | "kbo" -> new O.kbo so
-    | x -> failwith ("unknown ordering " ^ x)
-  in
+  let ord = ord_factory so in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (* indexing *)
   setup_index params.param_index;
