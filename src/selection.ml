@@ -61,7 +61,7 @@ let select_complex ~ord c =
   | (Equation (l, r, false,_))::lits' ->
     if T.is_var l && T.is_var r then idx else find_noteqvars (idx+1) lits'
   | _::lits' -> find_noteqvars (idx+1) lits'
-  (* find ground negative literal *)
+  (* find the smallest ground negative literal *)
   and find_neg_ground best_weight best_idx idx lits = match lits with
   | [] -> best_idx
   | (Equation (l, r, false, _))::lits' ->

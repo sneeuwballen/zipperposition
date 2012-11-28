@@ -26,10 +26,6 @@ module Utils = FoUtils
 
 (** Precedence on symbols *)
 
-(* ----------------------------------------------------------------------
- * hard constraints on the ordering
- * ---------------------------------------------------------------------- *)
-
 (** compute the current signature: existing symbols,
     with their arities and sorts *)
 let compute_signature () =
@@ -61,6 +57,10 @@ let current_signature =
       then(* recompute signature, it did change *)
         cached_signature := compute_signature ());
     !cached_signature
+
+(* ----------------------------------------------------------------------
+ * hard constraints on the ordering
+ * ---------------------------------------------------------------------- *)
 
 let cluster_constraint clusters =
   let table = SHashtbl.create 17

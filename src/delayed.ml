@@ -55,12 +55,12 @@ let order k1 k2 =
 let classify =
   let special_set = SHashSet.from_list special_preds in 
   function s ->
-    let sorts, _, _ = Precedence.current_signature () in
     match s with
     | _ when s == succ_db_symbol || s == db_symbol -> DeBruijn
     | _ when SHashSet.member special_set s -> Special
-    | _ when SHashtbl.find sorts s = bool_sort -> Predicate
-    | _ -> Function
+    | _ -> (* classify between predicate and function by the sort *)
+      let sorts, _, _ = Precedence.current_signature () in
+      if SHashtbl.find sorts s = bool_sort then Predicate else Function
 
 (** constraint on the ordering *)
 let symbol_constraint _ =

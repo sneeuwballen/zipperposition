@@ -246,7 +246,7 @@ let () =
     | "delayed" -> Delayed.delayed
     | x -> failwith ("unknown calculus "^x)
   in
-  (* choose an ord now *)
+  (* choose an ord now, using clauses *)
   let constr = Precedence.compose_constraints
     (Precedence.heuristic_constraint clauses) (calculus#constr clauses) in
   let so = Precedence.make_ordering constr in
