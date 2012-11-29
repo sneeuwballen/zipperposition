@@ -253,6 +253,8 @@ let given_clause_step ~calculus state =
       let state = { state with PS.active_set = active_set } in
       let state = remove_orphans state !simplified_actives in  (* orphan criterion *)
       let new_clauses = List.rev_append !simplified_actives new_clauses in
+      let new_clauses = List.filter
+        (fun c -> not (is_redundant ~calculus given_active_set c)) new_clauses in
       (* do inferences w.r.t to the active set, SOS, and c itself *)
       let inferred_clauses = generate ~calculus state c in
       let new_clauses = List.rev_append inferred_clauses new_clauses in
@@ -261,7 +263,6 @@ let given_clause_step ~calculus state =
       let state = { state with PS.active_set=active_set } in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
-      let new_clauses = List.rev_append !simplified_actives new_clauses in
       let new_clauses = List.fold_left
         (fun new_clauses c ->
           let cs = all_simplify ~ord ~select ~calculus state.PS.active_set c in

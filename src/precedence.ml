@@ -239,11 +239,11 @@ let check_definition clause =
 let check_rules clause =
   (* otherwise, try to interpret the clause as a rewrite rule *)
   let rules = Theories.is_rewrite_rule clause in
-  List.map
-    (fun (l, r) ->
-      Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>rewrite rule: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
-      check_gt ~weight:weight_rewrite l r)
-    rules
+  match rules with
+  | [l, r] ->
+    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>rewrite rule: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
+    [check_gt ~weight:weight_rewrite l r]
+  | _ -> []  (* not unambiguously a rewrite rule *)
 
 (** Create the constraints for a single clause *)
 let create_constraints clause = check_definition clause @ check_rules clause
@@ -348,7 +348,7 @@ let heuristic_precedence ord_factory constr clauses =
   and mk_cost = compute_cost ord_factory constraints in
   (* randomized hill climbing *)
   let rec climb_hills ~num precedence cost =
-    if num = 3 || cost = 0
+    if num = 5 || cost = 0
       then begin
         Utils.debug 0 (lazy (Utils.sprintf "%% found precedence after %d attempts, cost %d / %d"
                        num cost max_cost));
