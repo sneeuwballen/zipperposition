@@ -1,17 +1,17 @@
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
-
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
+TARGET = zipperposition.native
 
 all:
-	ocamlbuild -libs str,unix -tag debug src/main.native
+	ocamlbuild -libs str,unix -tag debug src/$(TARGET)
 prod:
-	ocamlbuild -libs str,unix -tag noassert src/main.native
+	ocamlbuild -libs str,unix -tag noassert src/$(TARGET)
 
 profile:
-	ocamlbuild -libs str,unix -tags debug,profile src/main.native
+	ocamlbuild -libs str,unix -tags debug,profile src/$(TARGET)
 byte:
-	ocamlbuild -libs str,unix -tags debug src/main.byte
+	ocamlbuild -libs str,unix -tags debug src/zipperposition.byte
 
 tests: all
 	ocamlbuild -libs str,unix -tag debug -I src tests/tests.native
@@ -19,7 +19,7 @@ profile_tests: all
 	ocamlbuild -libs str,unix -tags debug,profile -I src tests/tests.native
 
 doc:
-	ocamlbuild src/main.docdir/index.html
+	ocamlbuild src/zipperposition.docdir/index.html
 
 clean:
 	ocamlbuild -clean

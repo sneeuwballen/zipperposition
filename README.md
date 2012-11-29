@@ -4,7 +4,9 @@
 Zipperposition is intended to be a superposition prover for full first order logic. The accent
 is on flexibility, modularity and simplicity rather than performance, to allow
 quick experimenting on automated theorem proving. It generates TSTP proofs, but I
-don't have a proof checker yet so the proofs may be totally wrong.
+don't have a proof checker yet so the proofs may be totally wrong - the issue is that
+some clauses can contain formulas (lazy reduction to CNF), which complicates proof
+pretty-printing and checking.
 
 Zipperposition is written in the functional and imperative language
 [OCaml](http://caml.inria.fr). The name is a bad play on the words "zipper" (a
@@ -41,8 +43,8 @@ It should build the project files (using ocamlbuild).
 
 Typical usage:
 
-    $ ./main.native problem_file [options]
-    $ ./main.native problem_file -calculus [delayed|superposition]
+    $ ./zipperposition.native problem_file [options]
+    $ ./zipperposition.native problem_file -calculus [delayed|superposition]
 
 to run the prover. Help is available with the option *-help*. The prover
 accepts CNF and FOF files for both calculi `-calculus superposition` and
@@ -52,5 +54,5 @@ for the former case.
 
 For instance,
 
-    $ ./main.native ./pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
+    $ ./zipperposition.native ./pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
 

@@ -32,8 +32,8 @@ def command(fun):
 provers = {
     'spass': "SPASS -TPTP -TimeLimit={time} -Memory=512000000 {file}",
     #'zipperposition': "./prover3.sh {file} -timeout {time}",
-    'zipperposition-cnf': "./main.native {file} -timeout {time} -calculus superposition",
-    'delayed': "./main.native {file} -timeout {time} -calculus delayed"
+    'zipperposition-cnf': "./zipperposition.native {file} -timeout {time} -calculus superposition",
+    'delayed': "./zipperposition.native {file} -timeout {time} -calculus delayed"
 }
 provers_unsat = {
     'spass': "proof found",

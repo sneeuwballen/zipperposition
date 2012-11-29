@@ -5,6 +5,7 @@ Clauses
 Const
 Delayed
 Discrimination_tree
+Dtree
 FeatureVector
 Fingerprint
 FoSubst
@@ -15,9 +16,9 @@ Hashcons
 Index
 Leftistheap
 Lexer_tptp
-Main
 Orderings
 Parser_tptp
+Precedence
 ProofState
 Ptmap
 Ptset
@@ -25,6 +26,8 @@ Saturate
 Selection
 Superposition
 Terms
+Theories
 Trie
 Types
-
+Vector
+Zipperposition
