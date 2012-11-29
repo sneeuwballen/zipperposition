@@ -16,7 +16,7 @@ tags
 *.byte
 .session
 .subdirtouch
-src/main.docdir
+*.docdir
 provers_output.db
 *.tgz
 TPTP-*
