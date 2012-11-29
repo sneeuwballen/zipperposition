@@ -55,8 +55,8 @@ let current_signature =
   fun () ->
     assert (!sig_version <= !Symbols.sig_version);
     (if !sig_version < !Symbols.sig_version
-      then(* recompute signature, it did change *)
-        cached_signature := compute_signature ());
+      then (sig_version := !Symbols.sig_version;(* recompute signature, it did change *)
+            cached_signature := compute_signature ()));
     !cached_signature
 
 (* ----------------------------------------------------------------------
@@ -220,48 +220,33 @@ let rec default_symbol_ordering () =
 (** a weighted constraint is a weight (cost), and a function to check if it's satisfied *)
 type weighted_constr = int * (ordering -> bool)
 
-(** Does t contains the symbol f? *)
-let rec contains_symbol f t = match t.term with
-  | Var _ -> false
-  | Node (g, _) when f == g -> true
-  | Node (_, ts) -> List.exists (contains_symbol f) ts
-
 (** create a constraint that a > b holds in the given ordering *)
 let check_gt ~weight a b =
   (weight, fun ord -> ord#compare a b = Gt)
 
 let weight_def = 5      (** weight of definitions *)
-let weight_RR_horn = 2  (** weight of RR Horn clauses *)
+let weight_rewrite = 2  (** weight of rewriting rule *)
 
 (** Creates a weighted constraint if the clause is a symbol definition,
     ie an equation/equivalence f(x1,...,xn)=b where f does not occur in b *)
 let check_definition clause =
-  match clause.clits with
-  | [Equation (({term=Node(f,ts)} as l),r,true,_)] when
-    not (contains_symbol f r) && l != T.true_term && r != T.true_term && List.for_all T.is_var ts ->
-    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
+  match Theories.is_definition clause with
+  | Some (l,r) -> (* definition of l by r *)
+    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition: %a == %a@]" !T.pp_term#pp l !T.pp_term#pp r));
     [check_gt ~weight:weight_def l r]
-  | [Equation (l, ({term=Node(f,ts)} as r),true,_)] when
-    not (contains_symbol f l) && l != T.true_term && r != T.true_term && List.for_all T.is_var ts ->
-    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition: %a --> %a@]" !T.pp_term#pp r !T.pp_term#pp l));
-    [check_gt ~weight:weight_def r l]
-  | _ -> [] (* not a definition *)
+  | None -> []
 
-(** constraint if the clause is a Range-Restricted Horn clause,
-    that is assumed to be a definition of its head. We therefore seek to
-    make the head maximal (best coupled with SelectComplexExceptRRHorn). *)
-let check_horn_definition c =
-  if Theories.is_RR_horn_clause c && List.length c.clits > 1
-    then begin
-      Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>RR horn definition: %a@]" !C.pp_clause#pp c));
-      (* find head and body of the clause *)
-      let head = List.hd (List.filter C.pos_lit c.clits)
-      and body = List.filter C.neg_lit c.clits in
-      (* constraint: head is not < than any literal of the body *)
-      let constr ord =
-        List.for_all (fun b -> C.compare_lits_partial ~ord head b <> Gt) body in
-      [weight_RR_horn, constr]
-    end else []
+let check_rules clause =
+  (* otherwise, try to interpret the clause as a rewrite rule *)
+  let rules = Theories.is_rewrite_rule clause in
+  List.map
+    (fun (l, r) ->
+      Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>rewrite rule: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
+      check_gt ~weight:weight_rewrite l r)
+    rules
+
+(** Create the constraints for a single clause *)
+let create_constraints clause = check_definition clause @ check_rules clause
 
 (* ----------------------------------------------------------------------
  * Heuristic creation of precedences (satisfying maximal number of constraints)
@@ -288,31 +273,31 @@ let compute_cost ord_factory constraints precedence : int =
     (fun cost (w, constr) -> if constr ord then cost else cost + w)
     0 constraints
   in
-  Utils.debug 2 (lazy (Utils.sprintf "@[<h>cost %d for %a@]" cost
-                  T.pp_signature precedence#signature));
   cost
 
 (** Shuffle the signature by reversing some symbols (uses random).
     It returns at most [num] modifications of the signature, that differ from
-    it by a swap of two elements) *)
+    it by swapping pairs of elements) *)
 let perturbate ?(num=10) signature =
   let new_signatures = ref [] in
-  let len = List.length signature in
   (* swap indexes i and j in the list *)
-  let swap i j l = 
-    let a = Array.of_list l in
+  let rec swap i j a = 
     let tmp = a.(i) in
     a.(i) <- a.(j);
     a.(j) <- tmp;
-    Array.to_list a
+  (* perform n swaps on the array *)
+  and swap_n n a =
+    if n = 0 then a else begin
+      let i = (Random.int (Array.length a - 2)) + 1 in
+      let j = Random.int i in
+      swap i j a;
+      swap_n (n-1) a;
+    end
   in
   (* generate the [num] perturbations *)
   for i = 0 to num-1 do
-    let i = Random.int len
-    and j = Random.int len in
-    if i != j then
-      let signature' = swap i j signature in
-      new_signatures := signature' :: !new_signatures
+    let signature' = Array.to_list (swap_n 3 (Array.of_list signature)) in
+    new_signatures := signature' :: !new_signatures
   done;
   !new_signatures
 
@@ -323,7 +308,8 @@ let perturbate ?(num=10) signature =
 let hill_climb ~steps mk_precedence mk_cost signature =
   (* main loop to follow gradient. Current state is precedence, with cost cost *)
   let rec follow_gradient ~steps precedence cost =
-    if steps = 0 then precedence, cost else (* done *)
+    if steps = 0 || cost = 0 then precedence, cost else begin (* done *)
+    Utils.debug 2 (lazy (Utils.sprintf "> on the hill with cost %d" cost));
     (* perturbate current precedence *)
     let new_signatures = perturbate precedence#signature in
     (* compute new precedences, and remove the ones which are the same *)
@@ -341,6 +327,7 @@ let hill_climb ~steps mk_precedence mk_cost signature =
     if min_cost < cost
       then follow_gradient ~steps:(steps-1) min_precedence min_cost
       else precedence, cost  (* local optimum, stop there *)
+    end
   in
   let precedence = mk_precedence signature in
   let cost = mk_cost precedence in
@@ -354,26 +341,28 @@ let hill_climb ~steps mk_precedence mk_cost signature =
 let heuristic_precedence ord_factory constr clauses =
   let _, _, signature = current_signature () in
   (* the constraints *)
-  let constraints = Utils.list_flatmap
-    (fun c -> check_definition c @ check_horn_definition c)
-    clauses in
+  let constraints = Utils.list_flatmap create_constraints clauses in
+  let max_cost = List.fold_left (fun acc (w,_) -> acc+w) 0 constraints in
   (* helper functions *)
   let mk_precedence = compute_precedence constr
   and mk_cost = compute_cost ord_factory constraints in
   (* randomized hill climbing *)
   let rec climb_hills ~num precedence cost =
-    if num = 0 || cost = 0
-      then precedence  (* done enough restarts *)
-      else begin
+    if num = 3 || cost = 0
+      then begin
+        Utils.debug 0 (lazy (Utils.sprintf "%% found precedence after %d attempts, cost %d / %d"
+                       num cost max_cost));
+        precedence  (* done enough restarts *)
+      end else begin
         let signature' = Utils.list_shuffle precedence#signature in
-        Utils.debug 2 (lazy (Utils.sprintf "restart with signature %a" T.pp_signature signature'));
-        let precedence', cost' = hill_climb ~steps:10 mk_precedence mk_cost signature' in
+        Utils.debug 1 (lazy ">>> restart hill climbing");
+        let precedence', cost' = hill_climb ~steps:8 mk_precedence mk_cost signature' in
         if cost' < cost
-          then climb_hills ~num:(num-1) precedence' cost' (* choose new precedence *)
-          else climb_hills ~num:(num-1) precedence cost   (* continue with same precedence, that is better *)
+          then climb_hills ~num:(num+1) precedence' cost' (* choose new precedence *)
+          else climb_hills ~num:(num+1) precedence cost   (* continue with same precedence, that is better *)
       end
   in
   let precedence = mk_precedence signature in
-  let precedence = climb_hills ~num:5 precedence (mk_cost precedence) in
+  let precedence = climb_hills ~num:0 precedence (mk_cost precedence) in
   (* yield the precedence *)
   precedence
