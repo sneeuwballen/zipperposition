@@ -26,3 +26,14 @@ open Symbols
 val is_RR_horn_clause : clause -> bool
   (** Recognized whether the clause is a Range-Restricted Horn clause *)
 
+val is_definition : clause -> (term * term) option
+  (** Check whether the clause defines a symbol, e.g.
+      subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
+      is a flat symbol with variables, and all variables in RHS
+      are also in LHS *)
+
+val is_rewrite_rule : clause -> (term * term) list
+  (** More general than definition. It means the clause is an
+      equality where all variables in RHS are also in LHS. It
+      can return two rewrite rules if the clause can be oriented
+      in both ways, e.g. associativity axiom. *)
