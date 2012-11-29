@@ -278,7 +278,7 @@ let () =
   let clauses = if params.param_presimplify
     then Sat.initial_simplifications ~ord ~calculus ~select clauses
     else clauses in
-  Utils.debug 2 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
+  Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
   let state = PS.make_state ord CQ.default_queues select in

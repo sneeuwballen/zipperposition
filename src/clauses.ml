@@ -385,7 +385,7 @@ let fresh_clause ~ord maxvar c =
     ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
   let subst = S.relocate maxvar c.cvars in
   incr_stat stat_fresh;
-  (apply_subst_cl ~recursive:false ~ord subst c), maxvar
+  apply_subst_cl ~recursive:false ~ord subst c, maxvar
 
 let relocate_clause ~ord varlist c =
   let idx = T.max_var c.cvars in
