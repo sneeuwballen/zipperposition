@@ -358,7 +358,7 @@ exception RewriteInto of term
 
 (** Compute normal form of term w.r.t active set. Clauses used to
     rewrite are added to the clauses hashset. *)
-let demod_nf ~ord active_set clauses t =
+let demod_nf ?(subterms_only=false) ~ord active_set clauses t =
   (* compute normal form of subterm *) 
   let rec normal_form t =
     (* do not rewrite non-atomic formulas *)
@@ -415,7 +415,10 @@ let demod_nf ~ord active_set clauses t =
       (* rewrite term at root *)
       normal_form t'
   in
-  traverse t
+  match t.term with
+  | Node (f, ts) when subterms_only -> (* rewrite only subterms *)
+    T.mk_node f t.sort (List.map traverse ts)
+  | _ -> traverse t
 
 let demodulate active_set clause =
   let ord = active_set.PS.a_ord in
@@ -425,13 +428,14 @@ let demodulate active_set clause =
   (* demodulate literals *)
   let demod_lit idx lit =
     match lit with
-    | Equation (_, _, true, _) when C.eligible_res ~ord clause idx S.id_subst ->
-      lit (* do not rewrite literals eligible for resolution *)
-    | Equation (l, r, sign, _) ->
-      C.mk_lit ~ord
-        (demod_nf ~ord active_set clauses l)
-        (demod_nf ~ord active_set clauses r)
-        sign
+    | Equation (l, r, false, _) ->
+      C.mk_neq ~ord (demod_nf ~ord active_set clauses l) (demod_nf ~ord active_set clauses r)
+    | Equation (l, r, true, Gt) when C.eligible_res ~ord clause idx S.id_subst ->
+      C.mk_eq ~ord (demod_nf ~subterms_only:true ~ord active_set clauses l) (demod_nf ~ord active_set clauses r)
+    | Equation (l, r, true, Lt) when C.eligible_res ~ord clause idx S.id_subst ->
+      C.mk_eq ~ord (demod_nf ~ord active_set clauses l) (demod_nf ~subterms_only:true ~ord active_set clauses r)
+    | Equation (l, r, true, _) ->  (* rewrite unconditionally *)
+      C.mk_eq ~ord (demod_nf ~ord active_set clauses l) (demod_nf ~ord active_set clauses r)
   in
   (* demodulate every literal *)
   let lits = Utils.list_mapi clause.clits demod_lit in

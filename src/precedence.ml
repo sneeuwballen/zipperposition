@@ -260,8 +260,9 @@ let eq_precedence c1 c2 =
 (** Compute a precedence from the signature and the strong constraint *)
 let compute_precedence constr signature : symbol_ordering =
   let sig_constraint = list_constraint signature in
+  let _, arities, _ = current_signature () in
   (* XXX note that a total ordering is needed for sound updates of the ordering *)
-  make_ordering (compose_constraints alpha_constraint
+  make_ordering (compose_constraints (arity_constraint arities)
                                      (compose_constraints sig_constraint constr))
 
 (** Compute the cost for the precedence, given a list of constraints
