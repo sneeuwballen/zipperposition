@@ -20,7 +20,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (* some constants, apparently (from the TPTP parser of Darwin) *)
 
-exception FOF of bool
 exception PARSE_ERROR
 
 type location = unit
@@ -31,3 +30,19 @@ let make_loc _ = ()
 
 (** name of the file being parsed *)
 let cur_filename = ref ""
+
+(** lexer state *)
+let prev_column_index =
+  ref 1
+
+let current_column_index =
+  ref 1
+
+let prev_line_index =
+  ref 1
+
+let current_line_index =
+  ref 1
+
+let current_token =
+  ref ""

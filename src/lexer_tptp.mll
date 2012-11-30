@@ -24,21 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 { 
 
 open Parser_tptp
-
-let prev_column_index =
-  ref 1
-
-let current_column_index =
-  ref 1
-
-let prev_line_index =
-  ref 1
-
-let current_line_index =
-  ref 1
-
-let current_token =
-  ref ""
+open Const
 
 let update_column_index (value: int) =
   prev_column_index := !current_column_index;
@@ -194,7 +180,7 @@ rule token =
       | "<=>"                        { update_token (Lexing.lexeme lexbuf); BIJECTION }
       | "=>"                         { update_token (Lexing.lexeme lexbuf); LEFT_IMPLICATION }
       | "<="                         { update_token (Lexing.lexeme lexbuf); RIGHT_IMPLICATION }
-      | "<~>"                        { update_token (Lexing.lexeme lexbuf); UNKNOWN }
+      | "<~>"                        { update_token (Lexing.lexeme lexbuf); XOR }
       | negation                     { update_token (Lexing.lexeme lexbuf); NEGATION }
       | "$true"                      { update_token (Lexing.lexeme lexbuf); DOLLAR_TRUE }
       | "$false"                      { update_token (Lexing.lexeme lexbuf); DOLLAR_FALSE }

@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   (** TSTP parser *)
 
+  open Const
+
   (** int counter for variables *)
   module Counter = struct
     type t = int ref
@@ -152,6 +154,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token FORALL
 %token EXISTS
 %token BIJECTION
+%token XOR
 %token LEFT_IMPLICATION
 %token RIGHT_IMPLICATION
 %token UNKNOWN
@@ -268,8 +271,8 @@ binary_connective:
     { T.mk_imply }
   | RIGHT_IMPLICATION
     { fun x y -> T.mk_imply y x }
-  | UNKNOWN
-    { failwith "unknown token" }
+  | XOR
+    { fun x y -> T.mk_not (T.mk_equiv x y) }
   | NEGATION OR
     { fun x y -> T.mk_not (T.mk_or x y) }
   | NEGATION AND
