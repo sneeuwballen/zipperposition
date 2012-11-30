@@ -217,12 +217,22 @@ let rec default_symbol_ordering () =
  * Heuristic constraints to try to reduce search space
  * ---------------------------------------------------------------------- *)
 
-(** a weighted constraint is a weight (cost), and a function to check if it's satisfied *)
-type weighted_constr = int * (ordering -> bool)
+(** a weighted constraint is a weight (cost),
+    a list of symbols to order,
+    and a function to check if it's satisfied *)
+type weighted_constr = int * symbol list * (ordering -> bool)
+
+(** find all symbols of the term *)
+let rec term_symbols acc t =
+  match t.term with
+  | Var _ -> acc
+  | Node (f, ts) ->
+    let acc' = if List.exists ((==) f) acc then acc else f::acc in
+    List.fold_left term_symbols acc' ts
 
 (** create a constraint that a > b holds in the given ordering *)
 let check_gt ~weight a b =
-  (weight, fun ord -> ord#compare a b = Gt)
+  (weight, term_symbols (term_symbols [] a) b, fun ord -> ord#compare a b = Gt)
 
 let weight_def = 5      (** weight of definitions *)
 let weight_rewrite = 2  (** weight of rewriting rule *)
@@ -261,7 +271,7 @@ let eq_precedence c1 c2 =
 let compute_precedence constr signature : symbol_ordering =
   let sig_constraint = list_constraint signature in
   let _, arities, _ = current_signature () in
-  (* XXX note that a total ordering is needed for sound updates of the ordering *)
+  (* note that a total ordering is needed for sound updates of the ordering *)
   make_ordering (compose_constraints (arity_constraint arities)
                                      (compose_constraints sig_constraint constr))
 
@@ -271,7 +281,7 @@ let compute_cost ord_factory constraints precedence : int =
   let ord = ord_factory precedence in
   (* sum up weights of unsatisfied constraints *)
   let cost = List.fold_left
-    (fun cost (w, constr) -> if constr ord then cost else cost + w)
+    (fun cost (w, _, constr) -> if constr ord then cost else cost + w)
     0 constraints
   in
   cost
@@ -340,10 +350,12 @@ let hill_climb ~steps mk_precedence mk_cost signature =
     terms in a given precedence, and another constraint to compose  with,
     so that it can optimize w.r.t stronger constraints. *)
 let heuristic_precedence ord_factory constr clauses =
-  let _, _, signature = current_signature () in
   (* the constraints *)
   let constraints = Utils.list_flatmap create_constraints clauses in
-  let max_cost = List.fold_left (fun acc (w,_) -> acc+w) 0 constraints in
+  let max_cost = List.fold_left (fun acc (w,_,_) -> acc+w) 0 constraints in
+  (* the list of symbols to heuristically order *)
+  let signature = List.fold_left (fun acc (_,symbols,_) -> symbols @ acc) [] constraints in
+  let signature = Utils.list_uniq (==) signature in
   (* helper functions *)
   let mk_precedence = compute_precedence constr
   and mk_cost = compute_cost ord_factory constraints in
