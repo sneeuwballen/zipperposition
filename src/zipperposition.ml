@@ -304,9 +304,9 @@ let () =
                      C.pp_bag state.PS.active_set.PS.active_clauses))
   | Sat.Unsat c ->
       (* print status then proof *)
-      Printf.printf "%% SZS status Theorem\n";
+      Printf.printf "# SZS status Theorem\n";
       if params.param_proof
-        then Format.printf "@.%% SZS output start CNFRefutation@.@[<v>%a@]@." !C.pp_proof#pp c
+        then Format.printf "@.# SZS output start Refutation@.@[<v>%a@]@.# SZS output end Refutation@." !C.pp_proof#pp c
         else ()
 
 let _ =

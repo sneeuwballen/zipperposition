@@ -700,15 +700,18 @@ let pp_proof_tstp =
               num pp_clause_tstp#pp hc f ax_name
           | Proof (name, premises) ->
             let premises = List.map (fun (c,_,_) -> get_num c) premises in
+            let status = if name = "elim" then "esa" else "thm" in
             (* print the inference *)
-            fprintf formatter ("@[<h>fof(%d, derived, %a,@ " ^^
-                               "@[<h>inference(%s, [status(thm)], @[<h>[%a]@])@]).@]@;")
-              num pp_clause_tstp#pp hc name
+            fprintf formatter ("@[<h>fof(%d, plain, %a,@ " ^^
+                               "@[<h>inference('%s', [status(%s)], @[<h>[%a, theory(equality)]@])@]).@]@;")
+              num pp_clause_tstp#pp hc name status
               (Utils.pp_list ~sep:"," pp_print_int) (List.map snd premises);
             (* print every premise *)
             List.iter (fun (hc,num) -> Queue.add (hc, num) to_print) premises
         end
-      done
+      done;
+      fprintf formatter "@[<h>fof(1, plain, ($false), 1, ['proof'])@]@."
+ 
   end
 
 let pp_proof = ref pp_proof_debug

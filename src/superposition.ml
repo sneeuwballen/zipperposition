@@ -411,7 +411,7 @@ let demod_nf ?(subterms_only=false) ~ord active_set clauses t =
     | Node (s, l) ->
       (* rewrite subterms *)
       let l' = List.map traverse l in
-      let t' = T.mk_node s t.sort l' in
+      let t' = if List.for_all2 (==) l l' then t else T.mk_node s t.sort l' in
       (* rewrite term at root *)
       normal_form t'
   in
