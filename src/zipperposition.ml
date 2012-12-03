@@ -40,10 +40,13 @@ module Delayed = Delayed
 let seed = ref 1928575
 let _ = Random.init !seed
 
+let version = "0.1"
+
 (** parameters for the main procedure *)
 type parameters = {
   param_ord : string;
   param_steps : int;
+  param_version : bool;
   param_calculus : string;
   param_timeout : float;
   param_files : string list;
@@ -71,6 +74,7 @@ let parse_args () =
   (* parameters *)
   let ord = ref "rpo6"
   and steps = ref 0
+  and version = ref false
   and timeout = ref 0.
   and proof = ref true
   and output = ref "debug"
@@ -88,6 +92,7 @@ let parse_args () =
   let options =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
+      ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "verbose mode");
       ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
@@ -108,7 +113,7 @@ let parse_args () =
   in
   Arg.parse options (fun f -> file := f) "solve problem in first file";
   (* return parameter structure *)
-  { param_ord = !ord; param_steps = !steps; param_calculus = !calculus;
+  { param_ord = !ord; param_steps = !steps; param_version= !version; param_calculus = !calculus;
     param_timeout = !timeout; param_files = [!file]; param_select = !select;
     param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
     param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
@@ -231,6 +236,7 @@ let get_total_time =
 let () =
   (* parse arguments *)
   let params = parse_args () in
+  (if params.param_version then (Format.printf "%% zipperposition v%s@." version; raise Exit));
   let steps = if params.param_steps = 0
     then None else (Format.printf "%% run for %d steps@." params.param_steps;
                     Some params.param_steps)
