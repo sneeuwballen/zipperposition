@@ -157,7 +157,7 @@ let classic_skolem =
       (* actual skolemization of normalized_t *)
       let new_symbol = "sk" ^ (string_of_int !count) in
       Utils.debug 4 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
-      let new_symbol = mk_symbol new_symbol in  (* build symbol *)
+      let new_symbol = mk_symbol ~attrs:Symbols.attr_skolem new_symbol in  (* build symbol *)
       incr count;
       let skolem_term = T.mk_node new_symbol sort vars in
       (* update the ordering *)
@@ -180,7 +180,7 @@ let classic_skolem =
     rewriting can be performed inside the skolem terms. *)
 let unamed_skolem ~ord t sort =
   Utils.debug 4 (lazy (Utils.sprintf "@[<h>magic skolem %a@]@." !T.pp_term#pp t));
-  let symb = mk_symbol "$$sk" in
+  let symb = mk_symbol ~attrs:Symbols.attr_skolem "$$sk" in
   (* the existential witness, parametrized by the 'quoted' formula. The
      lambda is used to keep the formula closed. *)
   let args = [T.mk_node lambda_symbol t.sort [t]] in

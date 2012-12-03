@@ -20,31 +20,39 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Symbols and signature *)
 
-type symbol = string
+type symbol_attribute = int
 
-let compare_symbols s1 s2 = String.compare s1 s2
+let attr_skolem = 0x1
+let attr_split = 0x2
 
-let hash_symbol s = Hashtbl.hash s
+type symbol = (string * int)
+
+let compare_symbols (s1,_) (s2,_) = String.compare s1 s2
+
+let hash_symbol (s, _) = Hashtbl.hash s
 
 (** weak hash table for symbols *)
 module HashSymbol = Weak.Make(
   struct
-    type t = string
-    let equal s1 s2 = s1 = s2
+    type t = symbol
+    let equal (s1,_) (s2,_) = s1 = s2
     let hash = hash_symbol
   end)
 
 (** the global symbol table *)
-let symb_table = HashSymbol.create 17
+let symb_table = HashSymbol.create 7
 
 let sig_version = ref 0
 
-let mk_symbol s =
+let mk_symbol ?(attrs=0) s =
+  let s = (s, attrs) in
   let s' = HashSymbol.merge symb_table s in
   (if s' == s then incr sig_version); (* update signature *)
   s'
 
-let name_symbol s = s
+let name_symbol (s, _) = s
+
+let attrs_symbol (_, attr) = attr
 
 module SHashtbl = Hashtbl.Make(
   struct

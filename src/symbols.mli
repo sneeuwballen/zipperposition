@@ -32,8 +32,17 @@ val compare_symbols : symbol -> symbol -> int
 val hash_symbol : symbol -> int
   (** hash the symbol *)
 
-val mk_symbol : string -> symbol
+type symbol_attribute = int
+  (** attributes of the symbol *)
+
+val attr_skolem : symbol_attribute     (** skolem symbol? *)
+val attr_split : symbol_attribute      (** symbol used for splitting? *)
+
+val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
   (** construction of a symbol *)
+
+val attrs_symbol : symbol -> symbol_attribute
+  (** access attributes of a symbol *)
 
 val name_symbol : symbol -> string
   (** deconstruction of a symbol *)
