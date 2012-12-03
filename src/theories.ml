@@ -85,3 +85,10 @@ let is_rewrite_rule c =
   | [Equation (l, r, true, _)] ->
     (if check_rule l r then [l, r] else []) @ (if check_rule r l then [r, l] else [])
   | _ -> []
+
+
+let is_pos_eq c =
+  match c.clits with
+  | [Equation (l,r,true,_)] -> Some (l,r)
+  | _ -> None
+  

@@ -37,3 +37,6 @@ val is_rewrite_rule : clause -> (term * term) list
       equality where all variables in RHS are also in LHS. It
       can return two rewrite rules if the clause can be oriented
       in both ways, e.g. associativity axiom. *)
+
+val is_pos_eq : clause -> (term * term) option
+  (** Recognize whether the clause is a positive unit equality. *)
