@@ -128,6 +128,8 @@ val eligible_res : ord:ordering -> clause -> int -> substitution -> bool
 (** check whether a literal is eligible for paramodulation *)
 val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
 
+val is_unit_clause : clause -> bool
+
 (* ----------------------------------------------------------------------
  * bag of clauses
  * ---------------------------------------------------------------------- *)

@@ -435,6 +435,10 @@ let eligible_param ~ord c idx subst =
   else if neg_lit (get_lit c idx) then false (* only positive lits *)
   else check_maximal_lit ~ord c idx subst
 
+let is_unit_clause c = match c.clits with
+  | [_] -> true
+  | _ -> false
+
 (* ----------------------------------------------------------------------
  * bag of clauses
  * ---------------------------------------------------------------------- *)
