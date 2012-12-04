@@ -578,9 +578,13 @@ let pp_term_tstp =
       | Node (s, [{term=Node (s', [t'])}])
         when (s == forall_symbol || s == exists_symbol) ->
         (* use a fresh variable, and convert to a named-variable representation *)
-        let v = mk_var !varindex t'.sort in
-        incr varindex;
-        db_to_var varindex (mk_node s t.sort [v; db_unlift (db_replace t' v)])
+        (match look_db_sort 0 t' with
+        | None -> db_unlift t'  (* just remove quantifier *)
+        | Some sort ->
+          (let v = mk_var !varindex sort in
+          incr varindex;
+          db_to_var varindex (mk_node s t.sort [v; db_unlift (db_replace t' v)]))
+        )
       | Node (_, []) | Var _  -> t
       | Node (s, l) -> mk_node s t.sort (List.map (db_to_var varindex) l)
       (* recursive printing function *)
