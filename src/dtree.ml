@@ -303,11 +303,37 @@ let unit_index =
   let eq_term_hclause (t1, hc1) (t2, hc2) =
     T.eq_term t1 t2 && Clauses.eq_hclause hc1 hc2
   in
-  object (_ : 'self)
+  object (self : 'self)
     val pos = empty eq_term_hclause
     val neg = empty eq_term_hclause
 
     method name = "dtree_unit_index"
+
+    method add_clause hc =
+      match hc.clits with
+      | [Equation (l,r,true,Gt)] -> self#add l r true hc
+      | [Equation (l,r,true,Lt)] -> self#add r l true hc
+      | [Equation (l,r,true,Incomparable)] ->
+        let self' = self#add l r true hc in
+        self'#add r l true hc
+      | [Equation (l,r,true,Eq)] -> (assert (l == r); self)
+      | [Equation (l,r,false,_)] ->
+        let self' = self#add l r false hc in
+        self'#add r l false hc
+      | _ -> self  (* do not add other clauses *)
+
+    method remove_clause hc =
+      match hc.clits with
+      | [Equation (l,r,true,Gt)] -> self#remove l r true hc
+      | [Equation (l,r,true,Lt)] -> self#remove r l true hc
+      | [Equation (l,r,true,Incomparable)] ->
+        let self' = self#remove l r true hc in
+        self'#remove r l true hc
+      | [Equation (l,r,true,Eq)] -> (assert (l == r); self)
+      | [Equation (l,r,false,_)] ->
+        let self' = self#remove l r false hc in
+        self'#remove r l false hc
+      | _ -> self  (* do not remove anything *)
 
     method add l r sign hc =
       if sign

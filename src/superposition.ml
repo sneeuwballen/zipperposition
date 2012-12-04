@@ -359,24 +359,26 @@ exception RewriteInto of term
 (** Compute normal form of term w.r.t active set. Clauses used to
     rewrite are added to the clauses hashset. *)
 let demod_nf ?(subterms_only=false) ~ord active_set clauses t =
+  let oriented_hclause hc = match hc.clits with
+  | [Equation (_,_,true,Gt)] | [Equation (_,_,true,Lt)] -> true (* oriented *)
+  | _ -> false in
   (* compute normal form of subterm *) 
   let rec normal_form t =
     (* do not rewrite non-atomic formulas *)
     if not (T.atomic t)
       then t  (* do not rewrite such formulas *)
       else begin
-        (* try to rewrite using unit positive clauses *) 
-        let t' = ground_rewrite t in
         (* find equations l=r that match subterm *)
         try
-          active_set.PS.idx#unit_root_index#retrieve ~sign:true t'
+          active_set.PS.idx#unit_root_index#retrieve ~sign:true t
             (fun l r subst unit_hclause ->
               (* r is the term subterm is going to be rewritten into *)
-              let new_l = t'
+              let new_l = t
               and new_r = S.apply_subst subst r in
-              if ord#compare new_l new_r = Gt
+              if oriented_hclause unit_hclause || ord#compare new_l new_r = Gt
                 (* subst(l) > subst(r), we can rewrite *)
                 then begin
+                  assert (ord#compare new_l new_r = Gt); (* TODO remove *)
                   Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
                                  !T.pp_term#pp new_l !T.pp_term#pp new_r
                                  !C.pp_clause#pp_h unit_hclause));
@@ -387,23 +389,9 @@ let demod_nf ?(subterms_only=false) ~ord active_set clauses t =
                   (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
                          !T.pp_term#pp new_l !T.pp_term#pp new_r
                          !C.pp_clause#pp_h unit_hclause)));
-          t' (* not found any match, normal form found *)
-        with RewriteInto t'' -> normal_form t''
+          t (* not found any match, normal form found *)
+        with RewriteInto t' -> normal_form t'
       end
-  (* rewrite ground terms *)
-  and ground_rewrite t = 
-    if T.is_ground_term t
-      then
-        let t' =
-          try 
-            let t', (hc, _, _) = Ptmap.find t.tag active_set.PS.idx#ground_rewrite_index in
-            C.CHashSet.add clauses hc;  (* remember we used this clause *)
-            incr_stat stat_demodulate_step;
-            t'
-          with Not_found -> t
-        in
-        if T.eq_term t t' then t else ground_rewrite t' (* continue rewriting *)
-      else t
   (* rewrite innermost-leftmost *)
   and traverse t =
     match t.term with
