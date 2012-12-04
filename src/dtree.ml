@@ -154,6 +154,9 @@ let empty f = {
   tree = Node CharMap.empty;
 }
 
+(** is the dtree empty? *)
+let is_empty f = empty_trie f.tree
+
 (** add a term and a value to the discrimination tree. The priority
     is used to sort index values (by increasing number, the lowest
     are iterated on the first). *)
@@ -308,6 +311,10 @@ let unit_index =
     val neg = empty eq_term_hclause
 
     method name = "dtree_unit_index"
+
+    method maxvar = max (max_var pos) (max_var neg)
+
+    method is_empty = is_empty pos && is_empty neg
 
     method add_clause hc =
       match hc.clits with

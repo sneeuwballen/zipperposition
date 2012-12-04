@@ -101,6 +101,8 @@ class type index =
 class type unit_index = 
   object ('b)
     method name : string
+    method maxvar : int
+    method is_empty : bool
     method add_clause : hclause -> 'b
     method remove_clause : hclause -> 'b
     method add : term -> term -> bool -> hclause -> 'b
@@ -119,7 +121,6 @@ class type clause_index =
     method remove_clause : hclause -> 'a
 
     method root_index : index
-    method unit_root_index : unit_index (** for simplifications that only require matching *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
@@ -178,41 +179,33 @@ let ptmap_size m =
   Ptmap.iter (fun _ _ -> incr size) m;
   !size
 
-let mk_clause_index (index : index) (unit_index : unit_index) =
+let mk_clause_index (index : index) =
   object (_: 'self)
     val _root_index = index
     val _subterm_index = index
-    val _unit_root_index = unit_index
 
     (** add root terms and subterms to respective indexes *)
     method index_clause hc =
       let op tree = tree#add in
       let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = _unit_root_index#add_clause hc
       and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
-            _unit_root_index=new_unit_root_index;
             _subterm_index=new_subterm_index >} :> 'self)
 
     (** remove root terms and subterms from respective indexes *)
     method remove_clause hc =
       let op tree = tree#remove in
       let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = _unit_root_index#remove_clause hc
       and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
-            _unit_root_index=new_unit_root_index;
             _subterm_index=new_subterm_index >} :> 'self)
 
     method root_index = _root_index
-    method unit_root_index = _unit_root_index
     method subterm_index = _subterm_index
 
     method pp ~all_clauses formatter () =
       Format.fprintf formatter
-        ("clause_index:@.root_index=@[<v>%a@]@.unit_root_index=@[<v>%a@]@." ^^
-         "subterm_index=@[<v>%a@]@.")
+        ("clause_index:@.root_index=@[<v>%a@]@.subterm_index=@[<v>%a@]@.")
         (_root_index#pp ~all_clauses) ()
-        _unit_root_index#pp ()
         (_subterm_index#pp ~all_clauses) ()
   end

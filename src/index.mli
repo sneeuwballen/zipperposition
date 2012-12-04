@@ -62,6 +62,8 @@ class type index =
 class type unit_index = 
   object ('b)
     method name : string
+    method maxvar : int
+    method is_empty : bool
     method add_clause : hclause -> 'b
     method remove_clause : hclause -> 'b
     method add : term -> term -> bool -> hclause -> 'b
@@ -73,20 +75,18 @@ class type unit_index =
     method pp : Format.formatter -> unit -> unit
   end
 
-(** A global index, that operates on hashconsed clauses
-    TODO remove unit index*)
+(** A global index, that operates on hashconsed clauses *)
 class type clause_index =
   object ('a)
     method index_clause : hclause -> 'a
     method remove_clause : hclause -> 'a
 
     method root_index : index
-    method unit_root_index : unit_index (** for simplifications that only require matching *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
   end
 
 (** build a clause index from an index and a unit index *)
-val mk_clause_index : index -> unit_index -> clause_index
+val mk_clause_index : index -> clause_index
 

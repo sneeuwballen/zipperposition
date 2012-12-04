@@ -27,6 +27,9 @@ type 'a dtree
 val empty : ('a -> 'a -> bool) -> 'a dtree
   (** empty discrimination tree (with a comparison function) *)
 
+val is_empty : 'a dtree -> bool
+  (** is the dtree empty? *)
+
 val add : 'a dtree -> ?priority:int -> term -> 'a -> 'a dtree
   (** add a term and a value to the discrimination tree. The priority
       is used to sort index values (by increasing number, the lowest
@@ -49,6 +52,7 @@ val iter : 'a dtree -> (term -> 'a -> unit) -> unit
 
 val pp_term_hclause_tree : Format.formatter -> (term * hclause) dtree -> unit
   (** pretty print a tree of terms and clauses in ascii *)
+
 val pp_term_tree : Format.formatter -> term dtree -> unit
   (** pretty print a tree of terms in ascii *)
 
