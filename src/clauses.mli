@@ -152,6 +152,8 @@ val iter_bag : bag -> (int -> hclause -> unit) -> unit  (** iterate on elements 
 (** for a predicate p, returns (bag of c s.t. p(c)), (bag of c s.t. not p(c)) *)
 val partition_bag : bag -> (hclause -> bool) -> bag * bag
 
+val bag_to_list : bag -> hclause list
+
 val empty_bag : bag
 
 val size_bag : bag -> int         (** number of clauses in the bag (linear) *)

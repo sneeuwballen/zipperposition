@@ -478,6 +478,9 @@ let partition_bag bag pred =
     bag.bag_clauses;
   !bag_yes, !bag_no
 
+let bag_to_list bag =
+  Ptmap.fold (fun _ hc acc -> hc :: acc) bag.bag_clauses []
+
 let size_bag bag =
   let count = ref 0 in
   M.iter (fun _ _ -> incr count) bag.bag_clauses;

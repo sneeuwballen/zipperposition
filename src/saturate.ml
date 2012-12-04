@@ -77,6 +77,29 @@ let simplify ~calculus active_set clause =
   in 
   prof_simplify.HExtlib.profile do_it clause
 
+(** Simplify the active set using the given clause. TODO use indexing *)
+let backward_simplify ~calculus state active_set given_active_set =
+  let ord = state.PS.ord in
+  let simplified_actives = ref [] in
+  simplified_actives,
+  C.partition_bag active_set.PS.active_clauses
+    (fun hc ->
+      (* try to simplify hc using the given clause *)
+      let original, simplified = simplify ~calculus given_active_set hc in
+      if not (C.eq_clause original simplified)
+        then begin
+          (* remove the original clause form active_set, save the simplified clause *)
+          simplified_actives := simplified :: !simplified_actives;
+          Utils.debug 2 (lazy (Utils.sprintf
+                       "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
+                       !C.pp_clause#pp original !C.pp_clause#pp simplified));
+          Utils.debug 3 (lazy (Utils.sprintf
+                        "@[<hov 4>simplified clause @[<h>%a@]@ has descendants @[<h>%a@]@]"
+                        !C.pp_clause#pp original (Utils.pp_list !C.pp_clause#pp_h)
+                        (CD.descendants ~ord state.PS.dag original)));
+          false
+        end else true) (* no change *)
+
 (** generate all clauses from binary inferences *)
 let generate_binary ~calculus active_set clause =
   prof_generate_binary.HExtlib.profile
@@ -225,28 +248,9 @@ let given_clause_step ~calculus state =
       let active_set = PS.remove_actives state.PS.active_set subsumed_active in
       let state = { state with PS.active_set = active_set } in
       let state = remove_orphans state subsumed_active in   (* orphan criterion *)
-      (* simplify active set using c TODO write a function for this; TODO use indexing *)
-      let simplified_actives = ref [] in  (* simplified active clauses *)
-      let bag_remain, bag_simplified = C.partition_bag
-        state.PS.active_set.PS.active_clauses
-        (fun hc ->
-          (* try to simplify hc using the given clause *)
-          let original, simplified = simplify ~calculus given_active_set hc in
-          if not (C.eq_clause original simplified)
-            then begin
-              (* remove the original clause form active_set, save the simplified clause *)
-              simplified_actives := simplified :: !simplified_actives;
-              Utils.debug 2 (lazy (Utils.sprintf
-                           "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                           !C.pp_clause#pp original !C.pp_clause#pp simplified));
-              Utils.debug 3 (lazy (Utils.sprintf
-                            "@[<hov 4>simplified clause @[<h>%a@]@ has descendants @[<h>%a@]@]"
-                            !C.pp_clause#pp original (Utils.pp_list !C.pp_clause#pp_h)
-                            (CD.descendants ~ord state.PS.dag original)));
-              false
-            end else true (* no change *)
-        )
-      in
+      (* simplify active set using c *)
+      let simplified_actives, (bag_remain, bag_simplified) =
+        backward_simplify ~calculus state state.PS.active_set given_active_set in
       (* the simplified active clauses are removed from active set and
          added to the set of new clauses. *)
       let active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
