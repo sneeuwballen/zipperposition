@@ -101,12 +101,14 @@ class type index =
 class type unit_index = 
   object ('b)
     method name : string
-    method add : term -> term -> bool -> hclause -> 'b    (** add (in)equation (with given ID) *)
-    method remove : term -> term -> bool -> hclause ->'b  (** remove (in)equation (with given ID) *)
+    method add_clause : hclause -> 'b
+    method remove_clause : hclause -> 'b
+    method add : term -> term -> bool -> hclause -> 'b
+    method remove : term -> term -> bool -> hclause ->'b
     method retrieve : sign:bool -> term ->
                       (term -> term -> substitution -> hclause -> unit) ->
-                      unit                      (** iter on (in)equations of given sign l=r
-                                                    where subst(l) = query term *)
+                      unit        (** iter on (in)equations of given sign l=r
+                                      where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit
   end
 
@@ -118,7 +120,6 @@ class type clause_index =
 
     method root_index : index
     method unit_root_index : unit_index (** for simplifications that only require matching *)
-    method ground_rewrite_index : (term * data) Ptmap.t (** to rewrite ground terms *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
@@ -139,21 +140,6 @@ let process_lit op c tree (lit, pos) =
     Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index"
                    !T.pp_term#pp l !T.pp_term#pp r));
     op tree l (c, [C.left_pos; pos])  (* only index one side *)
-
-let process_unit_lit lit hc op tree =
-  match lit with
-  | Equation (l,r,sign,Gt) -> 
-      op tree l r sign hc
-  | Equation (l,r,sign,Lt) -> 
-      op tree r l sign hc
-  | Equation (l,r,sign,Incomparable) ->
-      let tree' = op tree l r sign hc in
-      op tree' r l sign hc
-  | Equation (l,r,sign,Eq) ->
-    Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to unit index"
-                   !T.pp_term#pp l !T.pp_term#pp r));
-    op tree l r sign hc  (* only index one side *)
-
 
 (** apply op to the maximal literals of the clause, and only to
     the maximal side(s) of those, if restruct is true. Otherwise
@@ -197,57 +183,36 @@ let mk_clause_index (index : index) (unit_index : unit_index) =
     val _root_index = index
     val _subterm_index = index
     val _unit_root_index = unit_index
-    val _ground_rewrite_index = Ptmap.empty
 
     (** add root terms and subterms to respective indexes *)
     method index_clause hc =
       let op tree = tree#add in
       let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = match hc.clits with
-          | [lit] -> process_unit_lit lit hc op _unit_root_index
-          | _ -> _unit_root_index
-      and new_ground_rewrite_index = match hc.clits with
-          | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
-              Ptmap.add l.tag (r, (hc, [0; C.left_pos], l)) _ground_rewrite_index
-          | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
-              Ptmap.add r.tag (l, (hc, [0; C.right_pos], r)) _ground_rewrite_index
-          | _ -> _ground_rewrite_index
+      and new_unit_root_index = _unit_root_index#add_clause hc
       and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
-            _ground_rewrite_index=new_ground_rewrite_index;
             _subterm_index=new_subterm_index >} :> 'self)
 
     (** remove root terms and subterms from respective indexes *)
     method remove_clause hc =
       let op tree = tree#remove in
       let new_subterm_index = process_clause ~restrict:true (fold_subterms op) _subterm_index hc
-      and new_unit_root_index = match hc.clits with
-          | [lit] -> process_unit_lit lit hc op _unit_root_index
-          | _ -> _unit_root_index
-      and new_ground_rewrite_index = match hc.clits with
-          | [(Equation (l,r,true,Gt))] when T.is_ground_term l ->
-              Ptmap.remove l.tag _ground_rewrite_index
-          | [(Equation (l,r,true,Lt))] when T.is_ground_term r ->
-              Ptmap.remove r.tag _ground_rewrite_index
-          | _ -> _ground_rewrite_index
+      and new_unit_root_index = _unit_root_index#remove_clause hc
       and new_root_index = process_clause ~restrict:true (apply_root_term op) _root_index hc
       in ({< _root_index=new_root_index;
             _unit_root_index=new_unit_root_index;
-            _ground_rewrite_index=new_ground_rewrite_index;
             _subterm_index=new_subterm_index >} :> 'self)
 
     method root_index = _root_index
     method unit_root_index = _unit_root_index
-    method ground_rewrite_index = _ground_rewrite_index
     method subterm_index = _subterm_index
 
     method pp ~all_clauses formatter () =
       Format.fprintf formatter
         ("clause_index:@.root_index=@[<v>%a@]@.unit_root_index=@[<v>%a@]@." ^^
-         "ground_rewrite_index=%d rules@.subterm_index=@[<v>%a@]@.")
+         "subterm_index=@[<v>%a@]@.")
         (_root_index#pp ~all_clauses) ()
         _unit_root_index#pp ()
-        (ptmap_size _ground_rewrite_index)
         (_subterm_index#pp ~all_clauses) ()
   end

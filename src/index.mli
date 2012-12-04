@@ -62,16 +62,19 @@ class type index =
 class type unit_index = 
   object ('b)
     method name : string
-    method add : term -> term -> bool -> hclause -> 'b    (** add (in)equation (with given ID) *)
-    method remove : term -> term -> bool -> hclause ->'b  (** remove (in)equation (with given ID) *)
+    method add_clause : hclause -> 'b
+    method remove_clause : hclause -> 'b
+    method add : term -> term -> bool -> hclause -> 'b
+    method remove : term -> term -> bool -> hclause ->'b
     method retrieve : sign:bool -> term ->
                       (term -> term -> substitution -> hclause -> unit) ->
-                      unit                      (** iter on (in)equations of given sign l=r
-                                                    where subst(l) = query term *)
+                      unit        (** iter on (in)equations of given sign l=r
+                                      where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit
   end
 
-(** A global index, that operates on hashconsed clauses *)
+(** A global index, that operates on hashconsed clauses
+    TODO remove unit index*)
 class type clause_index =
   object ('a)
     method index_clause : hclause -> 'a
@@ -79,7 +82,6 @@ class type clause_index =
 
     method root_index : index
     method unit_root_index : unit_index (** for simplifications that only require matching *)
-    method ground_rewrite_index : (term * data) Ptmap.t (** to rewrite ground terms *)
     method subterm_index : index
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
