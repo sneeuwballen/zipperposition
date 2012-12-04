@@ -61,7 +61,7 @@ type character = Symbol of symbol | Variable of term
 
 let compare_char c1 c2 =
   match c1, c2 with
-  | Symbol s1, Symbol s2 -> Pervasives.compare s1 s2
+  | Symbol s1, Symbol s2 -> Symbols.compare_symbols s1 s2
   | Variable v1, Variable v2 -> T.compare_term v1 v2
   | Symbol _, Variable _ -> -1
   | Variable _, Symbol _ -> 1
