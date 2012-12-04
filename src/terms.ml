@@ -585,6 +585,11 @@ let pp_term_tstp =
       | Node (s, l) -> mk_node s t.sort (List.map (db_to_var varindex) l)
       (* recursive printing function *)
       and pp_rec t = match t.term with
+      | Node (s, [{term=Node (s', [a;b])}]) when s == not_symbol
+        && s' == eq_symbol && a.sort == bool_sort ->
+        Format.fprintf formatter "(%a <~> %a)" self#pp a self#pp b
+      | Node (s, [a;b]) when s == eq_symbol && a.sort == bool_sort ->
+        Format.fprintf formatter "(%a <=> %a)" self#pp a self#pp b
       | Node (s, [{term=Node (s', [a; b])}])
         when s == not_symbol && s' == eq_symbol ->
         Format.fprintf formatter "%a != %a" self#pp a self#pp b

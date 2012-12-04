@@ -514,6 +514,10 @@ let pp_literal_gen pp_term formatter lit =
     if sign
       then pp_term#pp formatter r
       else Format.fprintf formatter "¬%a" pp_term#pp r
+  | Equation (l, r, sign, _) when l.sort == bool_sort ->
+    if sign
+      then Format.fprintf formatter "%a <=> %a" pp_term#pp l pp_term#pp r
+      else Format.fprintf formatter "%a <~> %a" pp_term#pp l pp_term#pp r
   | Equation (l, r, sign, _) ->
     if sign
       then Format.fprintf formatter "%a = %a" pp_term#pp l pp_term#pp r
@@ -700,7 +704,7 @@ let pp_proof_tstp =
               num pp_clause_tstp#pp hc f ax_name
           | Proof (name, premises) ->
             let premises = List.map (fun (c,_,_) -> get_num c) premises in
-            let status = if name = "elim" then "esa" else "thm" in
+            let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
             (* print the inference *)
             fprintf formatter ("@[<h>fof(%d, plain, %a,@ " ^^
                                "@[<h>inference('%s', [status(%s)], @[<h>[%a, theory(equality)]@])@]).@]@;")
@@ -710,8 +714,6 @@ let pp_proof_tstp =
             List.iter (fun (hc,num) -> Queue.add (hc, num) to_print) premises
         end
       done;
-      fprintf formatter "@[<h>fof(1, plain, ($false), 1, ['proof'])@]@."
- 
   end
 
 let pp_proof = ref pp_proof_debug
