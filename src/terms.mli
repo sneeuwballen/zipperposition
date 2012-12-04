@@ -57,8 +57,6 @@ module THashSet :
  * access global terms table (hashconsing)
  * ---------------------------------------------------------------------- *)
 
-(* TODO hashconsing module, with optional arguments for term constructors *)
-
 val iter_terms : (term -> unit) -> unit       (** iterate through existing terms *)
 val all_terms : unit -> term list             (** all currently existing terms *)
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
@@ -106,13 +104,20 @@ val is_var : term -> bool
 val is_const : term -> bool
 val is_node : term -> bool
 
-val at_pos : term -> position -> term       (** retrieve subterm at pos, or
-                                                  raise Invalid_argument
-                                                  TODO also return a context? *)
-val replace_pos : term -> position          (** replace t|_p by the second term *)
-               -> term -> term
+val at_pos : term -> position -> term 
+  (** retrieve subterm at pos, or raise Invalid_argument*)
 
-(* TODO compact positions (cf dtree) *)
+val replace_pos : term -> position -> term -> term
+  (** replace t|_p by the second term *)
+
+val at_cpos : term -> compact_position -> term
+  (** retrieve subterm at the compact pos, or raise Invalid_argument*)
+
+val max_cpos : term -> compact_position
+  (** maximum position in the term *)
+
+val pos_to_cpos : position -> compact_position
+val cpos_to_pos : compact_position -> position
 
 val var_occurs : term -> term -> bool       (** [var_occurs x t] true iff x in t *)
 val is_ground_term : term -> bool           (** is the term ground? *)

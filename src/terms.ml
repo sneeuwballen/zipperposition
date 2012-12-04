@@ -246,6 +246,25 @@ let rec replace_pos t pos new_t = match t.term, pos with
     mk_node s t.sort (Utils.list_set l i new_subterm)
   | _ -> invalid_arg "index too high for subterm"
 
+(** get subterm by its position *)
+let at_cpos t pos = 
+  let rec recurse t pos =
+    match t.term, pos with
+    | _, 0 -> t
+    | Node (_, l), _ -> get_subpos l (pos - 1)
+    | _ -> assert false
+  and get_subpos l pos =
+    match l, pos with
+    | t::l', _ when t.tsize > pos -> recurse t pos  (* search inside the term *)
+    | t::l', _ -> get_subpos l' (pos - t.tsize) (* continue to next term *)
+    | [], _ -> assert false
+
+let max_cpos t = t.tsize - 1
+
+let pos_to_cpos pos = failwith "not implemented"
+
+let cpos_to_pos cpos = failwith "not implemented"
+
 let var_occurs x t =
   let rec check l =
     match l with

@@ -31,31 +31,13 @@ module Utils = FoUtils
  * term traversal in prefix order
  * -------------------------------------------------------- *)
 
-(** index of subterm in prefix traversal *)
-type position = int
-
-(** get subterm by its position *)
-let rec get_pos t pos = 
-  match t.term, pos with
-  | _, 0 -> t
-  | Node (_, l), _ -> get_subpos l (pos - 1)
-  | _ -> assert false
-and get_subpos l pos =
-  match l, pos with
-  | t::l', _ when t.tsize > pos -> get_pos t pos  (* search inside the term *)
-  | t::l', _ -> get_subpos l' (pos - t.tsize) (* continue to next term *)
-  | [], _ -> assert false
-
 (** get position of next term *)
 let next t pos = pos+1
 
 (** skip subterms, got to next term that is not a subterm of t|pos *)
 let skip t pos =
-  let t_pos = get_pos t pos in
+  let t_pos = T.at_cpos t pos in
   pos + t_pos.tsize
-
-(** maximum position in the term *)
-let maxpos t = t.tsize - 1
 
 type character = Symbol of symbol | Variable of term
 
@@ -78,8 +60,8 @@ let rec term_to_char t =
 let to_list t =
   let l = ref []
   and pos = ref 0 in
-  for i = 0 to maxpos t do
-    let c = term_to_char (get_pos t !pos) in
+  for i = 0 to T.max_cpos t do
+    let c = term_to_char (T.at_cpos t !pos) in
     l := c :: !l;
     incr pos;
   done;
@@ -201,7 +183,7 @@ let iter_match dt t k =
       List.iter (fun (t', v, _) -> k t' v subst) l
     | Node m ->
       (* "lazy" transformation to flatterm *)
-      let t_pos = get_pos t pos in
+      let t_pos = T.at_cpos t pos in
       let t1 = term_to_char t_pos in
       CharMap.iter
         (fun t1' subtrie ->
