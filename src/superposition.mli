@@ -55,12 +55,15 @@ val is_semantic_tautology : clause -> bool
 
 val basic_simplify : ord:ordering -> clause -> clause   (** basic simplifications *)
 
-val demodulate : ProofState.active_set
-                -> clause   (** the clause to simplify *)
-		-> clause   (** the simplified clause *)
+val demodulate : ord:ordering -> Index.unit_index -> clause -> clause
+  (** rewrite clause using orientable unit equations *)
 
-val positive_simplify_reflect : ProofState.active_set -> clause -> clause
-val negative_simplify_reflect : ProofState.active_set -> clause -> clause
+(* TODO splitting without renaming *)
+(* TODO (forward) contextual literal cutting *)
+(* TODO branch rewriting *)
+
+val positive_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> clause
+val negative_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> clause
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : clause -> clause -> bool

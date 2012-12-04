@@ -34,7 +34,7 @@ let prof_next_passive = HExtlib.profile ~enable:true "next_passive"
 
 (** Default indexing on terms *)
 let cur_index =
-  ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m) Dtree.unit_index)
+  ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m))
   (* ref (I.mk_clause_index Discrimination_tree.index) *)
 
 let _indexes =
@@ -51,6 +51,10 @@ let names_index () =
   let names = ref [] in
   Hashtbl.iter (fun n _ -> names := n :: !names) _indexes;
   !names
+
+(* ----------------------------------------------------------------------
+ * main definitions
+ * ---------------------------------------------------------------------- *)
 
 (** set of active clauses *)
 type active_set = {
@@ -74,8 +78,8 @@ type passive_set = {
 type state = {
   ord : ordering;
   state_select : selection_fun;
+  state_index : Index.unit_index; (** index used for unit simplification *)
   active_set : active_set;      (** active clauses, indexed *)
-  axioms_set : active_set;      (** set of support, indexed *)
   passive_set : passive_set;    (** passive clauses *)
   dag : CD.clause_dag;          (** DAG of clauses *)
 }
@@ -86,16 +90,38 @@ let mk_active_set ~ord =
   let fv_idx = FV.mk_fv_index_signature signature in
   {a_ord=ord; active_clauses=C.empty_bag; idx= !cur_index; fv_idx=fv_idx}
 
-let make_state ord queue_list select =
+let make_state ord queue_list select unit_index =
   let passive_set = {p_ord=ord; passive_clauses=C.empty_bag;
                      queues=queue_list; queue_state=(0,0)}
   and active_set = mk_active_set ~ord in
   {ord=ord;
    state_select=select;
+   state_index = unit_index;
    active_set=active_set;
-   axioms_set=active_set;
    passive_set=passive_set;
    dag=CD.empty;}
+
+(* ----------------------------------------------------------------------
+ * simplification rules (unit clauses)
+ * ---------------------------------------------------------------------- *)
+
+let add_rule state hc =
+  if C.is_unit_clause hc
+    then {state with state_index= state.state_index#add_clause hc}
+    else state
+
+let add_rules state hcs = List.fold_left add_rule state hcs
+
+let remove_rule state hc =
+  if C.is_unit_clause hc
+    then {state with state_index= state.state_index#remove_clause hc}
+    else state
+
+let remove_rules state hcs = List.fold_left remove_rule state hcs
+
+(* ----------------------------------------------------------------------
+ * selection of next active
+ * ---------------------------------------------------------------------- *)
 
 let next_passive_clause_ passive_set =
   (* index of the first queue to consider *)
@@ -136,6 +162,10 @@ let next_passive_clause_ passive_set =
 
 let next_passive_clause = prof_next_passive.HExtlib.profile next_passive_clause_
 
+(* ----------------------------------------------------------------------
+ * active set
+ * ---------------------------------------------------------------------- *)
+
 let add_active active_set c =
   let hc = C.hashcons_clause c in
   if C.is_in_bag active_set.active_clauses hc.ctag
@@ -171,6 +201,10 @@ let singleton_active_set ~ord clause =
   let active_set = mk_active_set ~ord in
   let active_set, _ = add_active active_set clause in
   active_set
+
+(* ----------------------------------------------------------------------
+ * passive set
+ * ---------------------------------------------------------------------- *)
   
 let add_passive_ passive_set c =
   let hc = C.hashcons_clause c in
@@ -198,21 +232,21 @@ let remove_passive passive_set c =
 let remove_passives passive_set l =
   List.fold_left (fun set c -> remove_passive set c) passive_set l
 
-let relocate_active active_set c =
-  let maxvar = active_set.active_clauses.C.bag_maxvar in
-  fst (C.fresh_clause ~ord:active_set.a_ord (maxvar+1) c)
+(* ----------------------------------------------------------------------
+ * utils
+ * ---------------------------------------------------------------------- *)
+
+let maxvar_active active_set = active_set.active_clauses.C.bag_maxvar
 
 (** statistics on the state *)
 type state_stats = {
   stats_active_clauses : int;
-  stats_sos_clauses: int;
   stats_passive_clauses : int;
 }
 
 let stats state =
   {
     stats_active_clauses = C.size_bag state.active_set.active_clauses;
-    stats_sos_clauses = C.size_bag state.axioms_set.active_clauses;
     stats_passive_clauses = C.size_bag state.passive_set.passive_clauses;
   }
 

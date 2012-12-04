@@ -44,8 +44,8 @@ class type calculus =
     method unary_rules : (string * unary_inf_rule) list
     (** how to simplify a clause *)
     method basic_simplify : ord:ordering -> clause -> clause
-    (** how to simplify a clause w.r.t a set of clauses *)
-    method simplify : ProofState.active_set -> clause -> clause
+    (** how to simplify a clause w.r.t a set of unit clauses *)
+    method simplify : ProofState.active_set -> Index.unit_index -> clause -> clause
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> clause -> bool
     (** find redundant clauses in set w.r.t the clause *)
@@ -54,7 +54,7 @@ class type calculus =
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
     method list_simplify : ord:ordering -> select:selection_fun -> clause -> clause list option
-    (** a list of axioms to add to the Set of Support *)
+    (** a list of axioms to add to the problem *)
     method axioms : clause list
     (** some constraints on the precedence *)
     method constr : clause list -> ordering_constraint
@@ -64,8 +64,6 @@ class type calculus =
 
 (** do binary inferences that involve the given clause *)
 let do_binary_inferences active_set rules c =
-  (* rename clause to avoid collisions *)
-  let c = PS.relocate_active active_set c in
   Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active: %a"
                        C.pp_bag active_set.PS.active_clauses));
   (* apply every inference rule *)

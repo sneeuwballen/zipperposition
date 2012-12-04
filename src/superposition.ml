@@ -358,7 +358,7 @@ exception RewriteInto of term
 
 (** Compute normal form of term w.r.t active set. Clauses used to
     rewrite are added to the clauses hashset. *)
-let demod_nf ?(subterms_only=false) ~ord active_set clauses t =
+let demod_nf ?(subterms_only=false) ~ord idx clauses t =
   let oriented_hclause hc = match hc.clits with
   | [Equation (_,_,true,Gt)] | [Equation (_,_,true,Lt)] -> true (* oriented *)
   | _ -> false in
@@ -370,7 +370,7 @@ let demod_nf ?(subterms_only=false) ~ord active_set clauses t =
       else begin
         (* find equations l=r that match subterm *)
         try
-          active_set.PS.idx#unit_root_index#retrieve ~sign:true t
+          idx#retrieve ~sign:true t
             (fun l r subst unit_hclause ->
               (* r is the term subterm is going to be rewritten into *)
               let new_l = t
@@ -408,22 +408,21 @@ let demod_nf ?(subterms_only=false) ~ord active_set clauses t =
     T.mk_node f t.sort (List.map traverse ts)
   | _ -> traverse t
 
-let demodulate active_set clause =
-  let ord = active_set.PS.a_ord in
+let demodulate ~ord idx clause =
   incr_stat stat_demodulate_call;
   (* clauses used to rewrite *)
   let clauses = C.CHashSet.create () in
   (* demodulate literals *)
-  let demod_lit idx lit =
+  let demod_lit i lit =
     match lit with
     | Equation (l, r, false, _) ->
-      C.mk_neq ~ord (demod_nf ~ord active_set clauses l) (demod_nf ~ord active_set clauses r)
-    | Equation (l, r, true, Gt) when C.eligible_res ~ord clause idx S.id_subst ->
-      C.mk_eq ~ord (demod_nf ~subterms_only:true ~ord active_set clauses l) (demod_nf ~ord active_set clauses r)
-    | Equation (l, r, true, Lt) when C.eligible_res ~ord clause idx S.id_subst ->
-      C.mk_eq ~ord (demod_nf ~ord active_set clauses l) (demod_nf ~subterms_only:true ~ord active_set clauses r)
+      C.mk_neq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~ord idx clauses r)
+    | Equation (l, r, true, Gt) when C.eligible_res ~ord clause i S.id_subst ->
+      C.mk_eq ~ord (demod_nf ~subterms_only:true ~ord idx clauses l) (demod_nf ~ord idx clauses r)
+    | Equation (l, r, true, Lt) when C.eligible_res ~ord clause i S.id_subst ->
+      C.mk_eq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~subterms_only:true ~ord idx clauses r)
     | Equation (l, r, true, _) ->  (* rewrite unconditionally *)
-      C.mk_eq ~ord (demod_nf ~ord active_set clauses l) (demod_nf ~ord active_set clauses r)
+      C.mk_eq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~ord idx clauses r)
   in
   (* demodulate every literal *)
   let lits = Utils.list_mapi clause.clits demod_lit in
@@ -501,8 +500,7 @@ let basic_simplify ~ord clause =
 
 exception FoundMatch of (term * hclause)
 
-let positive_simplify_reflect active_set clause =
-  let ord = active_set.PS.a_ord in
+let positive_simplify_reflect ~ord idx clause =
   (* iterate through literals and try to resolve negative ones *)
   let rec iterate_lits acc lits clauses = match lits with
   | [] -> List.rev acc, clauses
@@ -537,7 +535,7 @@ let positive_simplify_reflect active_set clause =
     | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
   (** try to equate terms with a positive unit clause that match them *)
   and equate_root clauses t1 t2 =
-    try active_set.PS.idx#unit_root_index#retrieve ~sign:true t1
+    try idx#retrieve ~sign:true t1
       (fun l r subst hc ->
         if T.eq_term t2 (S.apply_subst subst r)
         then begin
@@ -561,8 +559,7 @@ let positive_simplify_reflect active_set clause =
                     !C.pp_clause#pp clause !C.pp_clause#pp c));
       c
     
-let negative_simplify_reflect active_set clause =
-  let ord = active_set.PS.a_ord in
+let negative_simplify_reflect ~ord idx clause =
   (* iterate through literals and try to resolve positive ones *)
   let rec iterate_lits acc lits clauses = match lits with
   | [] -> List.rev acc, clauses
@@ -576,7 +573,7 @@ let negative_simplify_reflect active_set clause =
   | lit::lits' -> iterate_lits (lit::acc) lits' clauses
   (** try to remove the literal using a negative unit clause *)
   and can_refute s t =
-    try active_set.PS.idx#unit_root_index#retrieve ~sign:false s
+    try idx#retrieve ~sign:false s
       (fun l r subst hc ->
         if T.eq_term t (S.apply_subst subst r)
         then begin
@@ -934,12 +931,12 @@ let superposition : calculus =
 
     method basic_simplify ~ord c = basic_simplify ~ord c
 
-    method simplify actives c =
+    method simplify actives idx c =
       let ord = actives.PS.a_ord in
       let c = basic_simplify ~ord c in
-      let c = basic_simplify ~ord (demodulate actives c) in
-      let c = positive_simplify_reflect actives c in
-      let c = negative_simplify_reflect actives c in
+      let c = basic_simplify ~ord (demodulate ~ord idx c) in
+      let c = positive_simplify_reflect ~ord idx c in
+      let c = negative_simplify_reflect ~ord idx c in
       c
 
     method redundant actives c = subsumed_by_set actives c

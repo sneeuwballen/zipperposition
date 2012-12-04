@@ -31,10 +31,6 @@ type szs_status =
   | Error of string 
   | Timeout
 
-(** Add the given axioms to the set of support *)
-val set_of_support: calculus:Calculus.calculus ->
-                    ProofState.state -> clause list -> ProofState.state
-
 (** Simplifications to perform on initial clauses *)
 val initial_simplifications : ord:ordering ->
                               select:selection_fun ->

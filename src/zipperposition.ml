@@ -169,7 +169,7 @@ let parse_file ~recursive f =
 
 (** setup index *)
 let setup_index name =
-  PS.cur_index := I.mk_clause_index (PS.choose_index name) Dtree.unit_index;
+  PS.cur_index := I.mk_clause_index (PS.choose_index name);
   Format.printf "%% use indexing structure %s@." name
 
 (** print stats *)
@@ -278,7 +278,8 @@ let () =
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
-  (* preprocess clauses, then possibly simplify them *)
+  (* preprocess clauses (including calculus axioms), then possibly simplify them *)
+  let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord ~select (List.map (C.reord_clause ~ord) clauses) in
   let clauses = if params.param_presimplify
@@ -287,9 +288,8 @@ let () =
   Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
-  let state = PS.make_state ord CQ.default_queues select in
+  let state = PS.make_state ord CQ.default_queues select Dtree.unit_index in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
-  let state = Sat.set_of_support ~calculus state calculus#axioms in
   (* saturate *)
   let state, result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in

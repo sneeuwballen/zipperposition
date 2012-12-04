@@ -51,41 +51,34 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Unix.gettimeofday () > timeout
 
-let set_of_support ~calculus state axioms =
-  (* reordonate causes using the ordering of the state *)
-  let ord = state.PS.ord
-  and select = state.PS.state_select in
-  let axioms = calculus#preprocess ~ord ~select axioms in
-  (* add the axioms to the active set *)
-  let axioms_set = PS.add_actives state.PS.axioms_set axioms in
-  Utils.debug 1 (lazy (Utils.sprintf "%% added %d clauses to set-of-support"
-                  (List.length axioms)));
-  {state with PS.axioms_set = axioms_set}
-
 (** simplify the clause using the active_set. Returns
     the (renamed) clause and the simplified clause. *)
-let simplify ~calculus active_set clause =
-  let do_it clause =
-    let ord = active_set.PS.a_ord in
-    let old_c = PS.relocate_active active_set clause in
-    let c = calculus#simplify active_set old_c in
-    let c = calculus#basic_simplify ~ord c in
-    (if not (C.eq_clause c old_c)
-      then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                          !C.pp_clause#pp old_c !C.pp_clause#pp c)));
-    old_c, c
-  in 
-  prof_simplify.HExtlib.profile do_it clause
+let simplify_ ~calculus active_set idx c =
+  let ord = active_set.PS.a_ord in
+  (* rename clause *)
+  let offset = max (PS.maxvar_active active_set) idx#maxvar + 1 in
+  let old_c, _ = C.fresh_clause ~ord offset c in
+  let c = calculus#simplify active_set idx old_c in
+  let c = calculus#basic_simplify ~ord c in
+  (if not (C.eq_clause c old_c)
+    then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
+                        !C.pp_clause#pp old_c !C.pp_clause#pp c)));
+  old_c, c
+
+let simplify ~calculus active_set idx c =
+  prof_simplify.HExtlib.profile (simplify_ ~calculus active_set idx) c
 
 (** Simplify the active set using the given clause. TODO use indexing *)
-let backward_simplify ~calculus state active_set given_active_set =
+let backward_simplify ~calculus state active_set given_active_set given =
   let ord = state.PS.ord in
   let simplified_actives = ref [] in
+  (* unit index just for the clause *)
+  let idx = Dtree.unit_index#add_clause given in
   simplified_actives,
   C.partition_bag active_set.PS.active_clauses
     (fun hc ->
       (* try to simplify hc using the given clause *)
-      let original, simplified = simplify ~calculus given_active_set hc in
+      let original, simplified = simplify ~calculus given_active_set idx hc in
       if not (C.eq_clause original simplified)
         then begin
           (* remove the original clause form active_set, save the simplified clause *)
@@ -116,40 +109,35 @@ let unary_max_depth = ref 2
 
 (** generate all clauses from inferences, updating the state (for the
     parent/descendant relation) *)
+let generate_ ~calculus state c =
+  let ord = state.PS.ord in
+  (* rename the clause *)
+  let offset = PS.maxvar_active state.PS.active_set + 1 in
+  let c, _ = C.fresh_clause ~ord offset c in
+  (* binary clauses *)
+  let binary_clauses = generate_binary ~calculus state.PS.active_set c in
+  (* unary inferences *)
+  let unary_clauses = ref []
+  and unary_queue = Queue.create () in
+  Queue.push (c, 0) unary_queue;
+  while not (Queue.is_empty unary_queue) do
+    let c, depth = Queue.pop unary_queue in
+    let c = calculus#basic_simplify ~ord c in   (* simplify a bit the clause *)
+    if not (Sup.is_tautology c) then begin
+      unary_clauses := c :: !unary_clauses;     (* add the clause to set of inferred clauses *)
+      if depth < !unary_max_depth
+        then begin
+          (* infer clauses from c, add them to the queue *)
+          let new_clauses = generate_unary ~calculus ~ord c in
+          List.iter (fun c' -> Queue.push (c', depth+1) unary_queue) new_clauses
+        end
+    end
+  done;
+  let new_clauses =  List.rev_append !unary_clauses binary_clauses in
+  new_clauses
+
 let generate ~calculus state c =
-  let do_it c =
-    let ord = state.PS.ord in
-    (* an active set containing only the given clause *)
-    let given_active_set = PS.singleton_active_set ~ord (C.normalize_clause ~ord c) in
-    (* binary clauses *)
-    let binary_clauses = [] in
-    let binary_clauses = List.rev_append
-      (generate_binary ~calculus state.PS.axioms_set c) binary_clauses in
-    let binary_clauses = List.rev_append
-      (generate_binary ~calculus state.PS.active_set c) binary_clauses in
-    let binary_clauses = List.rev_append
-      (generate_binary ~calculus given_active_set c) binary_clauses in
-    (* unary inferences *)
-    let unary_clauses = ref []
-    and unary_queue = Queue.create () in
-    Queue.push (c, 0) unary_queue;
-    while not (Queue.is_empty unary_queue) do
-      let c, depth = Queue.pop unary_queue in
-      let c = calculus#basic_simplify ~ord c in   (* simplify a bit the clause *)
-      if not (Sup.is_tautology c) then begin
-        unary_clauses := c :: !unary_clauses;     (* add the clause to set of inferred clauses *)
-        if depth < !unary_max_depth
-          then begin
-            (* infer clauses from c, add them to the queue *)
-            let new_clauses = generate_unary ~calculus ~ord c in
-            List.iter (fun c' -> Queue.push (c', depth+1) unary_queue) new_clauses
-          end
-      end
-    done;
-    let new_clauses =  List.rev_append !unary_clauses binary_clauses in
-    new_clauses
-  in
-  prof_generate.HExtlib.profile do_it c
+  prof_generate.HExtlib.profile (generate_ ~calculus state) c
 
 (** remove direct descendants of the clauses from the passive set *)
 let remove_orphans state removed_clauses =
@@ -169,20 +157,22 @@ let remove_orphans state removed_clauses =
   {state with PS.passive_set = passive}
 
 (** check whether the clause is redundant w.r.t the active_set *)
-let is_redundant ~calculus active_set clause =
+let is_redundant ~calculus active_set c =
   (* forward subsumption check *)
-  let c = PS.relocate_active active_set clause in
+  let offset = PS.maxvar_active active_set + 1 in
+  let c, _ = C.fresh_clause ~ord:active_set.PS.a_ord offset c in
   prof_is_redundant.HExtlib.profile (calculus#redundant active_set) c
 
 (** find redundant clauses in active_set, w.r.t clause c *)
-let subsumed_by ~calculus active_set clause =
-  let c = PS.relocate_active active_set clause in
+let subsumed_by ~calculus active_set c =
+  let offset = PS.maxvar_active active_set + 1 in
+  let c, _ = C.fresh_clause ~ord:active_set.PS.a_ord offset c in
   calculus#redundant_set active_set c
 
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if redundant or trivial).
     This is used on generated clauses, and on the given clause. *)
-let all_simplify_ ~ord ~calculus ~select active_set clause =
+let all_simplify_ ~ord ~calculus ~select active_set idx clause =
   let clauses = ref []
   and queue = Queue.create () in
   Queue.push clause queue;
@@ -190,7 +180,7 @@ let all_simplify_ ~ord ~calculus ~select active_set clause =
     let c = Queue.pop queue in
     if Sup.is_tautology c then () else
     (* usual simplifications *)
-    let _, c = simplify ~calculus active_set c in
+    let _, c = simplify ~calculus active_set idx c in
     let c = C.select_clause ~select c in
     (* list simplification *)
     match calculus#list_simplify ~ord ~select c with
@@ -222,8 +212,7 @@ let given_clause_step ~calculus state =
   | passive_set, Some c ->
     let state = { state with PS.passive_set=passive_set } in
     (* simplify given clause w.r.t. active set and SOS, then remove redundant clauses *)
-    let _, c = simplify ~calculus state.PS.axioms_set c in
-    let c_list = all_simplify ~ord ~calculus ~select state.PS.active_set c in
+    let c_list = all_simplify ~ord ~calculus ~select state.PS.active_set state.PS.state_index c in
     let c_list = List.filter
       (fun c' -> not (is_redundant ~calculus state.PS.active_set c'))
       c_list in
@@ -250,7 +239,7 @@ let given_clause_step ~calculus state =
       let state = remove_orphans state subsumed_active in   (* orphan criterion *)
       (* simplify active set using c *)
       let simplified_actives, (bag_remain, bag_simplified) =
-        backward_simplify ~calculus state state.PS.active_set given_active_set in
+        backward_simplify ~calculus state state.PS.active_set given_active_set c in
       (* the simplified active clauses are removed from active set and
          added to the set of new clauses. *)
       let active_set = PS.remove_active_bag state.PS.active_set bag_simplified in
@@ -259,17 +248,17 @@ let given_clause_step ~calculus state =
       let new_clauses = List.rev_append !simplified_actives new_clauses in
       let new_clauses = List.filter
         (fun c -> not (is_redundant ~calculus given_active_set c)) new_clauses in
-      (* do inferences w.r.t to the active set, SOS, and c itself *)
-      let inferred_clauses = generate ~calculus state c in
-      let new_clauses = List.rev_append inferred_clauses new_clauses in
       (* add given clause to active set *)
       let active_set, _ = PS.add_active state.PS.active_set (C.normalize_clause ~ord c) in
       let state = { state with PS.active_set=active_set } in
+      (* do inferences between c and the active set (including c) *)
+      let inferred_clauses = generate ~calculus state c in
+      let new_clauses = List.rev_append inferred_clauses new_clauses in
       (* simplification of new clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
       let new_clauses = List.fold_left
         (fun new_clauses c ->
-          let cs = all_simplify ~ord ~select ~calculus state.PS.active_set c in
+          let cs = all_simplify ~ord ~select ~calculus state.PS.active_set state.PS.state_index c in
           let cs = List.map (C.normalize_clause ~ord) cs in
           List.rev_append cs new_clauses)
         [] new_clauses
@@ -282,7 +271,9 @@ let given_clause_step ~calculus state =
       let passive_set = PS.add_passives state.PS.passive_set new_clauses in
       (* update the dag *)
       let dag = CD.updates ~ord state.PS.dag new_clauses in
-      let state = {state with PS.passive_set = passive_set; PS.dag = dag} in
+      let state = {state with PS.passive_set = passive_set; PS.dag = dag;} in
+      (* add new clauses to the simplification index *)
+      let state = PS.add_rules state new_clauses in
       (* test whether the empty clause has been found *)
       try
         let empty_clause = List.find (fun c -> c.clits = []) new_clauses in

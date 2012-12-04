@@ -307,12 +307,12 @@ let delayed : calculus =
 
     method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
 
-    method simplify actives c =
+    method simplify actives idx c =
       let ord = actives.PS.a_ord in
-      let c = simplify_inner ~ord (Sup.basic_simplify ~ord c) in
-      let c = Sup.basic_simplify ~ord (Sup.demodulate actives c) in
-      let c = Sup.positive_simplify_reflect actives c in
-      let c = Sup.negative_simplify_reflect actives c in
+      let c = simplify_inner ~ord c in
+      let c = Sup.basic_simplify ~ord (Sup.demodulate ~ord idx c) in
+      let c = Sup.positive_simplify_reflect ~ord idx c in
+      let c = Sup.negative_simplify_reflect ~ord idx c in
       let c = simplify_inner ~ord c in
       c
 

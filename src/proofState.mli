@@ -53,14 +53,20 @@ type passive_set = {
 type state = {
   ord : ordering;
   state_select : selection_fun;
-  active_set : active_set;      (** active clauses, indexed *)
-  axioms_set : active_set;      (** set of support, indexed *)
-  passive_set : passive_set;    (** passive clauses *)
-  dag : ClauseDag.clause_dag;   (** DAG of clauses *)
+  state_index : Index.unit_index; (** index used for unit simplification *)
+  active_set : active_set;        (** active clauses, indexed *)
+  passive_set : passive_set;      (** passive clauses *)
+  dag : ClauseDag.clause_dag;     (** DAG of clauses *)
 }
 
 (** create a state from the given ordering and selection function*)
-val make_state : ordering -> (ClauseQueue.queue * int) list -> selection_fun -> state
+val make_state : ordering -> (ClauseQueue.queue * int) list -> selection_fun -> Index.unit_index -> state
+
+(** add (unit) clause to the index *)
+val add_rule : state -> hclause -> state
+val add_rules : state -> hclause list -> state
+val remove_rule : state -> hclause -> state
+val remove_rules : state -> hclause list -> state
 
 (** add clauses to the active set *)
 val add_active : active_set -> clause -> active_set * hclause
@@ -84,13 +90,12 @@ val remove_passives : passive_set -> clause list -> passive_set
 (** pop the next passive clause, if any *)
 val next_passive_clause : passive_set -> (passive_set * hclause option)
 
-(** relocate clause w.r.t clauses in the active_set *)
-val relocate_active : active_set -> clause -> clause
+(** maximum variable index in the set *)
+val maxvar_active : active_set -> int
 
 (** statistics on the state *)
 type state_stats = {
   stats_active_clauses : int;
-  stats_sos_clauses: int;
   stats_passive_clauses : int;
 }
 val stats : state -> state_stats
