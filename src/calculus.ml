@@ -144,6 +144,12 @@ let get_equations_sides clause pos = match pos with
 let classic_skolem =
   let cache = T.THashtbl.create 13 (* global cache for skolemized terms *)
   and count = ref 0 in  (* current symbol counter *)
+  (* find an unused skolem symbol *)
+  let rec find_skolem () = 
+    let skolem = "sk" ^ (string_of_int !count) in
+    incr count;
+    if Symbols.is_used skolem then find_skolem () else skolem
+  in
   fun ~ord t sort ->
     Utils.debug 4 (lazy (Utils.sprintf "skolem %a@." !T.pp_term#pp t));
     let normalized_t, subst_to_t = S.normalize_term t in
@@ -153,10 +159,9 @@ let classic_skolem =
       T.THashtbl.find cache normalized_t
     with Not_found ->
       (* actual skolemization of normalized_t *)
-      let new_symbol = "sk" ^ (string_of_int !count) in
+      let new_symbol = find_skolem () in
       Utils.debug 4 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
       let new_symbol = mk_symbol ~attrs:Symbols.attr_skolem new_symbol in  (* build symbol *)
-      incr count;
       let skolem_term = T.mk_node new_symbol sort vars in
       (* update the ordering *)
       ord#refresh ();

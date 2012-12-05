@@ -41,6 +41,9 @@ val attr_split : symbol_attribute      (** symbol used for splitting? *)
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
   (** construction of a symbol *)
 
+val is_used : string -> bool
+  (** is the symbol already used? *)
+
 val attrs_symbol : symbol -> symbol_attribute
   (** access attributes of a symbol *)
 
