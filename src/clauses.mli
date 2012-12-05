@@ -40,6 +40,7 @@ val compare_literal : literal -> literal -> int     (** lexicographic comparison
 val compare_lits_partial : ord:ordering -> literal
                           -> literal -> comparison  (** partial comparison of literals *)
 val hash_literal : literal -> int                   (** hashing of literal *)
+val weight_literal : literal -> int                 (** weight of the lit *)
 
 val pos_lit : literal -> bool                       (** is the literal positive? *)
 val neg_lit : literal -> bool                       (** is the literal negative? *)
@@ -66,99 +67,144 @@ val lit_to_multiset : literal -> term list (** literal to multiset of terms *)
  * clauses
  * ---------------------------------------------------------------------- *)
 
-(* TODO hashconsing module, with optional arguments for clause constructors *)
-
-val eq_clause : clause -> clause -> bool                (** equality of clauses *)
-val compare_clause : clause -> clause -> int            (** lexico order on clauses *)
+val eq_clause : clause -> clause -> bool                (** equality of clauses (as lists of literals) *)
+val compare_clause : clause -> clause -> int            (** lexico order on literals of the clauses *)
 val hash_clause : clause -> int                         (** hash of the clause *)
 
-val hashcons_clause : clause -> hclause
-val hashcons_clause_noselect : clause -> hclause        (** hashcons ignoring selected lits *)
+val eq_hclause : 'a hclause -> 'a hclause -> bool       (** equality of hashconsed clauses *)
+val compare_hclause : 'a hclause -> 'a hclause -> int   (** simple order on hclauses (by ID) *)
 val stats : unit -> (int*int*int*int*int*int)           (** hashcons stats *)
-
-val eq_hclause : hclause -> hclause -> bool             (** equality of hashconsed clauses *)
-val compare_hclause : hclause -> hclause -> int         (** simple order on lexico clauses *)
-
-module CSet : Set.S with type elt = hclause
 
 module CHashSet : 
   sig
     type t
     val create : unit -> t
     val is_empty : t -> bool
-    val member : t -> clause -> bool
-    val iter : t -> (clause -> unit) -> unit
-    val add : t -> clause -> unit
-    val to_list : t -> clause list
+    val member : t -> c_ready hclause -> bool
+    val iter : t -> (c_ready hclause -> unit) -> unit
+    val add : t -> c_ready hclause -> unit
+    val to_list : t -> c_ready hclause list
   end
 
-val mk_clause : ord:ordering -> literal list ->
-                selected:int list ->
-                proof Lazy.t -> clause list ->
-                clause                                  (** build a clause *)
-val clause_of_fof : ord:ordering -> clause -> clause    (** transform eq/not to literals *)
-val reord_clause : ord:ordering -> clause -> clause     (** recompute order *)
-val select_clause : select:selection_fun
-                 -> clause -> clause                    (** select literals in clause *)
-val maxlits : clause -> (literal * int) list            (** indexed list of max literals *)
-val selected: clause -> int list                        (** indexes of selected literals *)
-val parents : clause -> clause list                     (** list of parents of the clause *)
-val check_maximal_lit : ord:ordering -> clause -> int   (** is the i-th literal *)
-                    -> substitution -> bool             (** maximal in subst(clause)? *)
-val is_maxlit : clause -> int -> bool                   (** maximal in clause? *)
+val mk_hclause : ord:ordering -> literal list -> proof Lazy.t -> c_ready hclause list -> c_new hclause
+  (** build a clause from literals *)
 
-val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> clause -> clause
+val mk_hclause_a : ord:ordering -> literal array -> proof Lazy.t -> c_ready hclause list -> c_new hclause
+  (** build a clause from an array of literals (destructive on the array) *)
 
-val get_lit : clause -> int -> literal                  (** get the literal at given index *)
-val get_pos : clause -> position -> term              (** get the subterm at position *)
+val clause_of_fof : ord:ordering -> 'a hclause -> c_new hclause
+  (** transform eq/not to literals *)
 
-(** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
-val fresh_clause : ord:ordering -> int -> clause -> clause * int  
-(** rename clause w.r.t. varlist *)
-val relocate_clause : ord:ordering -> varlist -> clause -> clause       
-(** normalize (vars start at 1) *)
-val normalize_clause : ord:ordering -> clause -> clause                 
+val reord_hclause : ord:ordering -> 'a hclause -> c_new hclause
+  (** recompute order of literals in the clause *)
 
-(** check whether a literal is selected *)
-val selected_lit : clause -> int -> bool
-(** get the list of selected literals *)
+val select_clause : ord:ordering -> select:selection_fun -> c_new hclause -> c_ready hclause
+  (** select literals in clause, and computes ordering data *)
+
+val selected: c_ready hclause -> int array
+  (** indexes of selected literals *)
+
+val parents : 'a hclause -> c_ready hclause list
+  (** list of parents of the clause *)
+
+val is_maxlit : clause -> int -> bool
+  (** i-th literal maximal in clause? *)
+
+val check_maximal_lit : ord:ordering -> clause -> int
+                    -> substitution -> bool
+  (** is the i-th literal maximal in subst(clause)? *)
+
+val maxlits : clause -> (literal * int) list
+  (** get the list of maximal literals *)
+
+val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> 'a hclause -> c_new hclause
+  (** apply substitution to the clause *)
+
+val get_lit : clause -> int -> literal
+  (** get the literal at given index *)
+
+val get_pos : clause -> position -> term
+  (** get the subterm at position (TODO also with compact positions?) *)
+
+val fresh_clause : ord:ordering -> int -> c_ready hclause -> clause
+  (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
+
+val is_selected : clause -> int -> bool
+  (** check whether a literal is selected *)
+
 val selected_lits : clause -> (literal * int) list
-(** check whether a literal is eligible for resolution *)
-val eligible_res : ord:ordering -> clause -> int -> substitution -> bool
-(** check whether a literal is eligible for paramodulation *)
-val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
+  (** get the list of selected literals *)
 
-val is_unit_clause : clause -> bool
+val eligible_res : ord:ordering -> clause -> int -> substitution -> bool
+  (** check whether a literal is eligible for resolution *)
+
+val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
+  (** check whether a literal is eligible for paramodulation *)
+
+val is_unit_clause : 'a hclause -> bool
+  (** is the clause a unit clause? *)
 
 (* ----------------------------------------------------------------------
- * bag of clauses
+ * set of hashconsed clauses
  * ---------------------------------------------------------------------- *)
 
-(** set of hashconsed clauses *)
-type bag = {
-  bag_maxvar: int;                (** higher bound for the biggest var index *)
-  bag_clauses : hclause Ptmap.t;  (** map tag -> hashconsed clause *)
-}
+(** Data attached to the set of clauses, from/to which clauses can be
+    removed/added. The purpose is to attach indexes or metadata
+    about clauses. *)
+module type Payload =
+  sig
+    type 'a t 
+    val empty : 'a t
+    val add : 'a t -> 'a hclause -> 'a t
+    val remove : 'a t -> 'a hclause -> 'a t
+  end
 
-val add_to_bag : bag -> clause -> bag * hclause     (** add the clause to the bag, hashconsing it *)
-val add_hc_to_bag : bag -> hclause -> bag           (** add a hclause to the bag *)
+module CSet(P : Payload) :
+  sig
 
-val remove_from_bag : bag -> int -> bag             (** remove the clause from the bag *)
+    (** Set of hashconsed clauses. 'a is the fantom type for hclauses.
+        It also contains a payload that is updated on every addition/
+        removal of clauses. The additional payload is also updated upon
+        addition/deletion. *)
+    type 'a t = {
+      maxvar : int;                 (** index of maximum variable *)
+      clauses : 'a hclause Ptmap.t; (** clause ID -> clause *)
+      payload : 'a P.t;             (** additional data *)
+    }
 
-val get_from_bag : bag -> int -> hclause            (** get a clause by its ID *)
+    val empty : 'a t  (** the empty set *)
+    val is_empty : 'a t -> bool               (** is the set empty? *)
 
-val is_in_bag : bag -> int -> bool
+    val size : 'a t -> int                    (** number of clauses in the set *)
 
-val iter_bag : bag -> (int -> hclause -> unit) -> unit  (** iterate on elements of the bag *)
+    val add : 'a t -> 'a hclause -> 'a t      (** add the clause to the set *)
+    val add_list : 'a t -> 'a hclause list -> 'a t
+    val add_clause : 'a t -> clause -> 'a t   (** add the hclause of this clause to the set *)
 
-(** for a predicate p, returns (bag of c s.t. p(c)), (bag of c s.t. not p(c)) *)
-val partition_bag : bag -> (hclause -> bool) -> bag * bag
+    val union : 'a t -> 'a t -> 'a t          (** union of sets (slow) *)
 
-val bag_to_list : bag -> hclause list
+    val remove : 'a t -> 'a hclause -> 'a t   (** remove hclause *)
+    val remove_list : 'a t -> 'a hclause list -> 'a t
 
-val empty_bag : bag
+    val get : 'a t -> int -> 'a hclause       (** get a clause by its ID *)
 
-val size_bag : bag -> int         (** number of clauses in the bag (linear) *)
+    val mem : 'a t -> 'a hclause -> bool      (** membership test *)
+    val mem_id : 'a t -> int -> bool
+
+    val iter : 'a t -> (int -> 'a hclause -> unit)
+                -> unit                       (** iterate on clauses in the set *)
+
+    val fold : ('b -> int -> 'a hclause -> 'b) -> 'b -> 'a t
+               -> 'b                          (** fold on clauses *)
+
+    val partition : 'a t -> ('a hclause -> bool) -> 'a t * 'a t
+      (** for a predicate p, returns (set of c s.t. p(c)), (set of c s.t. not p(c)) *)
+
+    val to_list : 'a t -> 'a hclause list
+    val of_list : 'a hclause list -> 'a t
+
+    val pp : Format.formatter -> 'a t -> unit
+end
 
 (* ----------------------------------------------------------------------
  * pretty printing
@@ -188,9 +234,9 @@ val pp_pos : formatter -> position -> unit
 class type pprinter_clause =
   object
     method pp : Format.formatter -> clause -> unit      (** print clause *)
-    method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
+    method pp_h : Format.formatter -> 'a hclause -> unit(** print hclause *)
     method pp_pos : Format.formatter -> (clause * position) -> unit
-    method pp_h_pos : Format.formatter -> (hclause * position * term) -> unit
+    method pp_h_pos : Format.formatter -> ('a hclause * position * term) -> unit
     method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
     method horizontal : bool -> unit                    (** print in horizontal box? *)
   end
@@ -208,6 +254,3 @@ class type pprinter_proof =
 val pp_proof : pprinter_proof ref                       (** defaut printing of proofs *)
 val pp_proof_tstp : pprinter_proof
 val pp_proof_debug : pprinter_proof
-
-(** print the content of a bag *)
-val pp_bag : Format.formatter -> bag -> unit

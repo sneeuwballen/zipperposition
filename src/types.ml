@@ -56,35 +56,51 @@ type rewriting_system = term -> term
 (** partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable
 
-(** position in a term TODO compact positions *)
+(** position in a term *)
 type position = int list
+
+(** compact position, as an integer *)
+type compact_position = int
 
 (** a literal, that is, a signed equation *)
 type literal = 
  | Equation of    term  (** lhs *)
                 * term  (** rhs *)
                 * bool  (** sign (equality, ie true, or difference) *)
-                * comparison   (* TODO remove *)
+                * comparison   (* TODO remove? *)
 
-(** a hashconsed first order clause *)
-type hclause = clause
+(** a small bitvector *)
+type bitvector = int
+
 (** a first order clause *)
-and clause = {
-  ctag : int;                             (** hashconsing tag *)
-  clits : literal list;                   (** the equations *)
-  cweight : int;                          (** weight of clause *)
-  cmaxlits : (literal * int) list Lazy.t; (** maximal literals and their index *)
-  cselected : int list;                   (** index of selected literals *)
-  cvars : term list;                      (** the free variables *)
-  cproof : proof Lazy.t;                  (** the proof for this clause (lazy...) *)
-  cparents : clause list;                 (** clauses used to create this one *)
+type clause = {
+  cref : c_ready hclause;                 (** the normalized clause *)
+  clits : literal array;                  (** the equations *)
+  cvars : term list;                      (** the free variables (TODO remove to save ram, but keep in hclause?) *)
 }
-(** a proof step for a clause *)
+(** a hashconsed clause, with additional metadata. The 'state type
+    variable is used to make the distinction between clauses that
+    are initialized*)
+and 'state hclause = {
+  hclits : literal array;                 (** the (normalized) equations *)
+  mutable hctag : int;                    (** hashconsing tag *)
+  mutable hcweight : int;                 (** weight of clause *)
+  mutable hcmaxlits : int array;          (* TODO use bitvector, more compact *)
+  mutable hcselected : int array;
+  mutable hcvars : term list;             (** the free variables *)
+  hcproof : proof Lazy.t;                 (** the proof for this clause (lazy...) *)
+  hcparents : c_ready hclause list;       (** clauses used to create this one *)
+}
+(** states for a hclause *)
+and c_ready = [`Ready]                    (** clause preprocessed, ready to be used *)
+and c_new = [`New]                        (** clause not ready to be used *)
+(** a proof step for a clause
+    TODO share substitution; use compact_position *)
 and proof = Axiom of string * string (** file, axiom name *)
-          | Proof of string * (clause * position * substitution) list
+          | Proof of string * (c_ready hclause * position * substitution) list
 
 (** a selection function *)
-type selection_fun = clause -> int list
+type selection_fun = c_new hclause -> int list
 
 let no_select c = []                          (** selects no literals *)
 

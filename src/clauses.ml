@@ -121,6 +121,9 @@ let hash_literal lit = match lit with
       then Utils.murmur_hash ((Utils.murmur_hash l.hkey) lxor r.hkey)
       else Utils.murmur_hash ((Utils.murmur_hash r.hkey) lxor l.hkey)
 
+let weight_literal = function
+  | Equation (l, r, _ ,_) -> l.tsize + r.tsize
+
 let pos_lit lit = match lit with
   | Equation (_,_,sign,_) -> sign
 
@@ -215,48 +218,57 @@ let vars_of_lit = function
  * clauses
  * ---------------------------------------------------------------------- *)
 
-let eq_clause c1 c2 =
-  try
-    List.for_all2 eq_literal c1.clits c2.clits
-  with
-    Invalid_argument _ -> false
+let eq_clits lits1 lits2 =
+  let rec check i =
+    if i = Array.length lits1 then true else
+    eq_literal lits1.(i) lits2.(i) && check (i+1)
+  in
+  if Array.length lits1 <> Array.length lits2
+    then false
+    else check 0
 
-let compare_clause c1 c2 = FoUtils.lexicograph compare_literal c1.clits c2.clits
+let eq_clause c1 c2 = eq_clits c1.clits c2.clits
 
-let hash_clause c =
-  let rec aux h = function
-  | [] -> h
-  | lit::tail -> aux (Utils.murmur_hash (h lxor hash_literal lit)) tail
-  in aux 113 c.clits
+let compare_clause c1 c2 = 
+  let rec check i =
+    if i = Array.length c1.clits then 0 else
+      let cmp = compare_literal c1.clits.(i) c2.clits.(i) in
+      if cmp = 0 then check (i+1) else cmp
+  in
+  if Array.length c1.clits <> Array.length c2.clits
+    then Array.length c1.clits - Array.length c2.clits
+    else check 0
+
+let hash_lits lits =
+  let rec aux h i =
+    if i = Array.length lits then h else
+    aux (Utils.murmur_hash (h lxor hash_literal lits.(i))) (i+1)
+  in aux 113 0
+
+let hash_clause c = hash_lits c.clits
+
+(* ----------------------------------------------------------------------
+ * hashconsing of clauses, and data structures
+ * ---------------------------------------------------------------------- *)
 
 module H = Hashcons.Make(struct
-  type t = clause
-  let equal c1 c2 = eq_clause c1 c2 && c1.cselected = c2.cselected
-  let hash c = hash_clause c
-  let tag i c = {c with ctag = i}
+  type t = c_new hclause
+  let equal hc1 hc2 = eq_clits hc1.hclits hc2.hclits
+  let hash hc = hash_lits hc.hclits
+  let tag i hc = (hc.hctag <- i; hc)
 end)
-
-let hashcons_clause c = H.hashcons c
-
-let hashcons_clause_noselect c = H.hashcons {c with cselected=[]}
 
 let stats () = H.stats ()
 
 let eq_hclause hc1 hc2 = hc1 == hc2
 
-let compare_hclause hc1 hc2 = Pervasives.compare hc1.ctag hc2.ctag
-
-module CSet = Set.Make(
-  struct
-    type t = hclause
-    let compare hc1 hc2 = hc1.ctag - hc2.ctag
-  end)
+let compare_hclause hc1 hc2 = hc1.ctag - hc2.ctag
 
 module CHashtbl = Hashtbl.Make(
   struct
-    type t = clause
-    let hash c = hash_clause c
-    let equal c1 c2 = eq_clause c1 c2
+    type t = c_ready hclause
+    let hash hc = hash_lits hc.hclits
+    let equal = eq_hclause
   end)
 
 module CHashSet =
@@ -264,231 +276,296 @@ module CHashSet =
     type t = unit CHashtbl.t
     let create () = CHashtbl.create 13
     let is_empty t = CHashtbl.length t = 0
-    let member t c = CHashtbl.mem t c
-    let iter t f = CHashtbl.iter (fun c _ -> f c) t
-    let add t c = CHashtbl.replace t c ()
+    let member t hc = CHashtbl.mem t hc
+    let iter t f = CHashtbl.iter (fun hc _ -> f hc) t
+    let add t hc = CHashtbl.replace t hc ()
     let to_list t =
       let l = ref [] in
-      iter t (fun c -> l := c :: !l);
+      iter t (fun hc -> l := hc :: !l);
       !l
   end
 
-let maxlits clause = Lazy.force clause.cmaxlits
+(* ----------------------------------------------------------------------
+ * useful functions to build and examine clauses
+ * ---------------------------------------------------------------------- *)
 
-let is_maxlit c i = 
-  let rec check l = match l with
-  | [] -> false
-  | (_,j)::l' -> j = i || check l'
-  in check (maxlits c)
+(** Find the maximal literals among lits, returns the list of their index *)
+let find_max_lits ~ord lits =
+  (* examine each literal *)
+  let rec examine acc i =
+    if i = Array.length lits then acc else
+    let acc' = if maximal lits.(i) i 0 then i :: acc else acc in
+    examine acc' (i+1)
+  (* check whether the literal is maximal *)
+  and maximal lit i j =
+    if j = Array.length lits then true
+    else if j = i then maximal lit i (j+1)
+    else if compare_lits_partial ~ord lit lits.(j) = Lt then false
+    else maximal lit i (j+1)
+  in examine [] 0
 
-let selected clause = clause.cselected
+(** Build a new hclause from the given literals *)
+let mk_hclause_a ~ord lits proof parents =
+  (* compute set of vars *)
+  let all_vars = Array.fold_left
+    (fun vars lit -> T.merge_varlist (vars_of_lit lit) vars)
+    [] lits in
+  (* normalize literals *)
+  let subst = S.relocate 0 all_vars in
+  Array.iteri
+    (fun i (Equation (l,r,sign,ord)) -> lits.(i) <- apply_subst_lit ~ord ~recursive:false subst lit)
+    lits;
+  (* sort literals by hash *)
+  Array.sort (fun l1 l2 -> hash_literal l1 - hash_literal l2) lits;
+  (* create the structure *)
+  let hc = {
+    hclits = lits;
+    hctag = -1;
+    hcweight = 0;
+    hcmaxlits = [||];
+    hcselected = [||];
+    hcvars = [];
+    hcproof = proof;
+    hcparents = parents;
+  } in
+  (* hashcons the clause, compute additional data if fresh *)
+  let hc' = H.hashcons hc in
+  (if hc == hc' then begin
+    hc.hcvars <- List.map (S.apply_subst ~recursive:false subst) all_vars;
+    hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
+    hc.hcmaxlits <- Array.of_list (find_max_lits ~ord lits)
+    end);
+  (* return hashconsed clause *)
+  (hc' : c_new hclause)
 
-let parents clause = clause.cparents
+(** build clause from a list *)
+let mk_hclause lits proof parents = mk_hclause_a (Array.of_lit lits) proof parents
 
-let check_maximal_lit_ ~ord clause pos subst =
-  let lit = Utils.list_get clause.clits pos in
+(** simplify literals *)
+let clause_of_fof ~ord hc =
+  let lits = Array.map (lit_of_fof ~ord) hc.hclits in
+  mk_hclause_a lits hc.hcproof hc.hcparents
+
+(** change the ordering of literals *)
+let reord_hclause ~ord hc =
+  let lits = Array.map (reord_lit ~ord) hc.hclits in
+  mk_hclause_a lits hc.hcproof hc.hcparents
+
+(** Compute selected literals. This also cast the clause into a ready clause.
+    Note that selection on a unit clause is a no-op. *)
+let select_clause ~select hc =
+  (if not (is_unit_clause hc) then hc.hcselected <- Array.of_list (select hc));
+  (hc : c_ready hclause)
+
+(** selected literals *)
+let selected hc = hc.hcselected
+
+(** parents of the clause *)
+let parents hc = hc.hcparents
+
+(** Check whether the literal is maximal *)
+let is_maxlit c i =
+  let maxlits = c.cref.hcmaxlits in
+  (* iterate through the array of indexes of maximum literals *)
+  let rec check j =
+    if j = Array.length maxlits then false else
+    maxlits.(j) = i || check (j+1)
+  in check 0
+
+(** Check whether the literal is maximal after applying subst *)
+let check_maximal_lit_ ~ord c pos subst =
+  if not is_maxlit c pos then false else (* cannot be max, even after subst *)
+  let lit = c.clits.(pos) in
   let slit = apply_subst_lit ~ord subst lit in
-  (* check all literals for maximality *)
-  let rec check i l = match l with
-    | [] -> true
-    | _::l' when i = pos -> check (i+1) l'
-    | lit'::l' ->
+  (* check that slit is not < subst(lit') for any lit' maximal in c *)
+  let rec check i = 
+    if i = Array.length c.clits then true
+    else if not (is_maxlit c i) then check (i+1)
+    else
       let slit' = apply_subst_lit ~ord subst lit' in
-      if compare_lits_partial ~ord slit slit' = Lt
-        then false
-        else check (i+1) l'
+      (compare_lits_partial ~ord slit slit' <> Lt) && check (i+1)
   in
-  check 0 clause.clits
+  check 0
 
 let check_maximal_lit ~ord clause pos subst =
   prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
 
-(** find the maximal literals among lits *)
-let find_max_lits ~ord lits_pos =
-  List.filter
-    (fun (lit, idx) ->
-      List.for_all
-        (fun (lit', idx') ->
-          if idx' = idx then true
-          else compare_lits_partial ~ord lit lit' <> Lt
-        )
-        lits_pos
-    )
-    lits_pos
+(** Get an indexed list of maximum literals *)
+let maxlits c =
+  Array.fold_left
+    (fun acc i -> (c.clits.(i), i) :: acc)
+    [] c.cref.hcmaxlits
 
-(** is literal maximal among given literals? *)
-let max_among ~ord lit lits =
-  List.for_all 
-    (fun lit' ->
-      if eq_literal_com lit lit' then true
-      else compare_lits_partial ~ord lit lit' <> Lt)
-    lits
-
-let mk_clause ~ord lits ~selected proof parents =
-  (* merge sets of variables *)
-  let rec merge_vars acc vars1 = match vars1 with
-  | [] -> acc
-  | v::vars1' when List.mem v acc -> merge_vars acc vars1'
-  | v::vars1' -> merge_vars (v::acc) vars1'
-  in
-  let all_vars = List.fold_left merge_vars [] (List.map vars_of_lit lits) in
-  let all_vars = List.stable_sort T.compare_term all_vars
-  and maxlits = lazy (find_max_lits ~ord (Utils.list_pos lits))
-  and cweight = List.fold_left (fun acc (Equation (l,r,_,_)) -> acc + l.tsize + r.tsize) 0 lits in
-  {clits=lits; cvars=all_vars; cproof=proof; cselected=selected; cparents=parents;
-   cmaxlits=maxlits; cweight; ctag= -1}
-
-let clause_of_fof ~ord c =
-  let lits = List.map (lit_of_fof ~ord) c.clits in
-  if List.for_all2 eq_literal lits c.clits
-    then c (* no change, no need to rebuild a clause *)
-    else mk_clause ~ord (List.map (lit_of_fof ~ord) c.clits)
-      ~selected:c.cselected c.cproof c.cparents
-
-let reord_clause ~ord c =
-  mk_clause ~ord (List.map (reord_lit ~ord) c.clits)
-    ~selected:c.cselected c.cproof c.cparents
-
-let select_clause ~select c =
-  {c with cselected = select c}
-
-let rec apply_subst_cl ?(recursive=true) ~ord subst c =
-  if S.is_empty subst then c
+(** Apply substitution to the clause *)
+let rec apply_subst_cl ?(recursive=true) ~ord subst hc =
+  if S.is_empty subst then hc
   else
-    let new_lits = List.map (apply_subst_lit ~recursive ~ord subst) c.clits in
-    mk_clause ~ord new_lits ~selected:c.cselected c.cproof c.cparents
-  (* TODO modify proof lazily *)
+    let lits = Array.map (apply_subst_lit ~recursive ~ord subst) hc.hclits in
+    mk_hclause_a ~ord lits hc.hcproof hc.hcparents
 
-let get_lit clause idx = Utils.list_get clause.clits idx
+(** get literal by index *)
+let get_lit c i = c.clits.(i)
 
-let get_pos clause pos =
+(** get term by position *)
+let get_pos c pos =
   match pos with
   | idx::side::tpos ->
-      let lit = get_lit clause idx in
-      let rec find_subterm pos t = match (pos, t.term) with
-      | [], _ -> t
-      | i::pos', Node (s, l) when List.length l > i ->
-          find_subterm pos' (Utils.list_get l i)
-      | _ -> invalid_arg "position does not match term"
-      in
-      (match lit with
-      | Equation (l, _, _, _) when side = left_pos ->
-          find_subterm tpos l
-      | Equation (_, r, _, _) when side = right_pos ->
-          find_subterm tpos r
-      | _ -> invalid_arg "wrong side in literal"
-      )
+    let lit = c.clits.(idx) in
+    (match lit with
+    | Equation (l, _, _, _) when side = left_pos -> T.at_pos l tpos
+    | Equation (_, r, _, _) when side = right_pos -> T.at_pos r tpos
+    | _ -> invalid_arg "wrong side in literal")
   | _ -> invalid_arg "wrong position for clause"
 
-let fresh_clause ~ord maxvar c =
-  (* prerr_endline 
-    ("varlist = " ^ (String.concat "," (List.map string_of_int varlist)));*)
-  let subst = S.relocate maxvar c.cvars in
-  incr_stat stat_fresh;
-  apply_subst_cl ~recursive:false ~ord subst c, maxvar
+(** Get a variant of the clause, in which variables are all > offset *)
+let fresh_clause ~ord offset hc =
+  let subst = S.relocate offset hc.hcvars in
+  let lits = Array.map (apply_subst_lit ~recursive:false ~ord subst) hc.hclits in
+  let vars = List.map (S.apply_subst ~recursive:false subst) hc.hcvars in
+  { cref=hc; clits=lits; cvars=vars; }
 
-let relocate_clause ~ord varlist c =
-  let idx = T.max_var c.cvars in
-  let subst = S.relocate idx c.cvars in
-  apply_subst_cl ~recursive:false ~ord subst c
+(** Check whether the literal is selected *)
+let is_selected c i =
+  let selected = c.cref.hcselected in
+  (* iterate through the array of indexes of maximum literals *)
+  let rec check j =
+    if j = Array.length selected then false else
+    selected.(j) = i || check (j+1)
+  in check 0
 
-let normalize_clause ~ord c = fst (fresh_clause ~ord 0 c)
-
-(** check whether a literal is selected *)
-let selected_lit c idx =
-  let rec check l = match l with
-  | [] -> false
-  | i::l' -> if i = idx then true else check l'
-  in
-  check (selected c)
-
-(** get the list of selected literals *)
+(** Indexed list of selected literals *)
 let selected_lits c =
-  List.map (fun idx -> get_lit c idx, idx) (selected c)
+  Array.fold_left (fun acc i -> (c.clits.(i), i) :: acc) [] c.cref.hcselected
 
 (** check whether a literal is eligible for resolution *)
 let eligible_res ~ord c idx subst =
-  (* find selected maximal literals with given sign *)
-  let rec gather_slits acc lits_pos sign = match lits_pos with
-  | [] -> acc
-  | (Equation (_, _, sign', _) as lit, idx)::lits_pos' when sign=sign' ->
-    let acc' = if selected_lit c idx
-      then (apply_subst_lit ~ord subst lit) :: acc (* same sign, maximal, selected *)
-      else acc in
-    gather_slits acc' lits_pos' sign
-  | _::lits_pos' ->  gather_slits acc lits_pos' sign  (* goto next *)
-  in 
+  let selected = c.cref.hcselected in
+  (* check maximality among selected literals with given sign *)
+  let check_among_selected slit i sign =
+    if i = Array.length selected then true else
+    let idx' = selected.(i) in
+    if idx = idx' then check_among_selected slit (i+1) sign else (* same lit *)
+    let lit' = c.clits.(idx') in
+    if pos_lit lit' <> sign then check_among_selected slit (i+1) sign else (* bad sign *)
+    let slit' = apply_subst_lit ~ord subst lit' in
+    compare_lits_partial ~ord slit slit' <> Lt && check_among_selected slit (i+1) sign
+  in
   (* if no lit is selected, max lits are eligible *)
-  if selected c = []
-    then check_maximal_lit ~ord c idx subst
-    else begin
-      (* check maximality among selected literals of same sign *)
-      let (Equation (_,_,sign,_) as lit) = get_lit c idx in
-      let slit = apply_subst_lit ~ord subst lit in
-      let set = gather_slits [] (maxlits c) sign in
-      max_among ~ord slit set
-    end
+  if selected c.cref = [||]
+    then check_maximal_lit ~ord c idx subst (* just check maximality *)
+    else if not (is_selected c idx) then false (* some are selected, not lit *)
+    else (* check that slit max among selected literals of same sign *)
+      let slit = apply_subst_lit ~ord subst c.clits.(idx) in
+      let sign = pos_lit slit in
+      check_among_selected slit 0 sign
 
 (** check whether a literal is eligible for paramodulation *)
 let eligible_param ~ord c idx subst =
-  if selected c <> [] then false
-  else if neg_lit (get_lit c idx) then false (* only positive lits *)
+  if c.cref.hcselected <> [||] then false
+  else if neg_lit c.clits.(idx) then false (* only positive lits *)
   else check_maximal_lit ~ord c idx subst
 
-let is_unit_clause c = match c.clits with
-  | [_] -> true
+let is_unit_clause hc = match hc.hclits with
+  | [|_|] -> true
   | _ -> false
 
 (* ----------------------------------------------------------------------
- * bag of clauses
+ * set of hashconsed clauses
  * ---------------------------------------------------------------------- *)
 
-module M = Ptmap
+(** Data attached to the set of clauses, from/to which clauses can be
+    removed/added. The purpose is to attach indexes or metadata
+    about clauses. *)
+module type Payload =
+  sig
+    type 'a t 
+    val empty : 'a t
+    val add : t -> 'a hclause -> t
+    val remove : t -> 'a hclause -> t
+  end
 
-type bag = {
-  bag_maxvar : int;           (* index of maximum variable *)
-  bag_clauses : hclause M.t;  (* clause ID -> clause *)
-}
+module CSet(P : Payload) =
+  struct
 
-let add_hc_to_bag {bag_maxvar=maxvar_b; bag_clauses=clauses_b} hc =
-  let maxvar_hc = T.max_var hc.cvars in
-  {bag_maxvar=(max maxvar_hc maxvar_b);
-   bag_clauses=M.add hc.ctag hc clauses_b}
+    (** Set of hashconsed clauses. 'a is the fantom type for hclauses.
+        It also contains a payload that is updated on every addition/
+        removal of clauses. *)
+    type 'a 'b t = {
+      maxvar : int;               (** index of maximum variable *)
+      clauses : 'a hclause M.t;   (** clause ID -> clause *)
+      payload : 'a P.t;           (** additional data *)
+    }
 
-let add_to_bag bag c =
-  let hc = hashcons_clause c in
-  add_hc_to_bag bag hc, hc
+    let empty = { maxvar=0; clauses = Ptmap.empty; payload=P.empty; }
 
-let remove_from_bag ({bag_clauses=clauses_b} as bag) id =
-  let new_clauses = M.remove id clauses_b in
-  {bag with bag_clauses=new_clauses}
+    let is_empty set = Ptmap.is_empty set.clauses
 
-let get_from_bag bag id =
-  M.find id bag.bag_clauses
+    let size set =
+      let count = ref 0 in
+      Ptmap.iter (fun _ _ -> incr count) set.clauses;
+      !count
 
-let is_in_bag bag id = M.mem id bag.bag_clauses
+    let add set hc =
+      let maxvar = max (T.max_var hc.hcvars) set.maxvar in
+      { maxvar; clauses = Ptmap.add hc.hctag hc set.clauses;
+        payload = P.add payload hc; }
 
-let empty_bag = {bag_maxvar=0; bag_clauses=M.empty}
+    let add_list set hcs =
+      let maxvar, payload, clauses =
+        List.fold_left
+          (fun (m,p,c) hc -> max m (T.max_var hc.hcvars), P.add p hc, Ptmap.add hc.hctag hc c)
+          (set.maxvar, set.payload, set.clauses) hcs in
+      {maxvar; payload; clauses;}
 
-let iter_bag bag f = M.iter f bag.bag_clauses
+    let add_clause set c = add set c.cref
 
-let partition_bag bag pred =
-  let bag_yes = ref empty_bag
-  and bag_no = ref empty_bag in
-  M.iter
-    (fun _ hc -> if pred hc
-      then bag_yes := add_hc_to_bag !bag_yes hc
-      else bag_no := add_hc_to_bag !bag_no hc)
-    bag.bag_clauses;
-  !bag_yes, !bag_no
+    let union s1 s2 =
+      (* merge small into big *)
+      let merge_into small big =
+        let maxvar, payload, clauses =
+          Ptmap.fold
+            (fun _ hc (m,p,c) -> max m (T.max_var hc.hcvars), P.add p hc, Ptmap.add hc.hctag hc c)
+            small.clauses (big.maxvar, big.payload, big.clauses) in
+        {maxvar;payload;clauses;}
+      in
+      if size s1 < size s2 then merge_into s1 s2 else merge_into s2 s1
 
-let bag_to_list bag =
-  Ptmap.fold (fun _ hc acc -> hc :: acc) bag.bag_clauses []
+    let remove set hc =
+      { set with clauses = Ptmap.remove hc.hctag set.clauses;
+                 payload = P.remove set.payload hc; }
 
-let size_bag bag =
-  let count = ref 0 in
-  M.iter (fun _ _ -> incr count) bag.bag_clauses;
-  !count
+    let remove_list set hcs =
+      let payload, clauses =
+        List.fold_left
+          (fun (p,c) hc -> P.remove p hc, Ptmap.remove hc.hctag c)
+          (set.payload, set.clauses) hcs in
+      {set with payload; clauses;}
+
+    let get set i = Ptmap.find i set.clauses
+
+    let mem set hc = Ptmap.mem hc.hctag set.clauses
+
+    let mem_id set i = Ptmap.mem i set.clauses
+
+    let iter set k = Ptmap.iter k set.clauses
+
+    let fold f acc set =
+      let acc = ref acc in
+      iter set (fun i hc -> acc := k !acc i hc);
+      !acc
+
+    let partition set pred =
+      Ptmap.fold
+        (fun _ hc (yes,no) ->
+          if pred hc then add yes hc, no else yes, add no hc)
+        set.clauses (empty set.payload, empty set.payload)
+
+    let to_list set =
+      Ptmap.fold (fun _ hc acc -> hc :: acc) set.clauses []
+
+    let of_list payload l =
+      add_list (empty payload) l
+  end
 
 (* ----------------------------------------------------------------------
  * pretty printing
@@ -725,10 +802,8 @@ let pp_proof_tstp =
 
 let pp_proof = ref pp_proof_debug
 
-(** print the content of a bag *)
-let pp_bag formatter bag =
-  let clauses = ref [] in
-  (* collect clauses in the list by iterating on the map *)
-  M.iter (fun _ hc -> clauses := hc :: !clauses) bag.bag_clauses;
+(** print the content of a clause set *)
+let pp_set formatter set =
+  let clauses = CSet.to_list set in
   (* print as a list of clauses *)
-  fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) !clauses
+  fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) clauses
