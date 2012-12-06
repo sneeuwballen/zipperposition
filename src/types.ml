@@ -74,14 +74,12 @@ type bitvector = int
 
 (** a first order clause *)
 type clause = {
-  cref : c_ready hclause;                 (** the normalized clause *)
+  cref : hclause;                         (** the normalized clause *)
   clits : literal array;                  (** the equations *)
   cvars : term list;                      (** the free variables (TODO remove to save ram, but keep in hclause?) *)
 }
-(** a hashconsed clause, with additional metadata. The 'state type
-    variable is used to make the distinction between clauses that
-    are initialized*)
-and 'state hclause = {
+(** a hashconsed clause, with additional metadata. *)
+and hclause = {
   hclits : literal array;                 (** the (normalized) equations *)
   mutable hctag : int;                    (** hashconsing tag *)
   mutable hcweight : int;                 (** weight of clause *)
@@ -89,18 +87,15 @@ and 'state hclause = {
   mutable hcselected : int array;
   mutable hcvars : term list;             (** the free variables *)
   hcproof : proof Lazy.t;                 (** the proof for this clause (lazy...) *)
-  hcparents : c_ready hclause list;       (** clauses used to create this one *)
+  hcparents : hclause list;               (** clauses used to create this one *)
 }
-(** states for a hclause *)
-and c_ready = [`Ready]                    (** clause preprocessed, ready to be used *)
-and c_new = [`New]                        (** clause not ready to be used *)
 (** a proof step for a clause
     TODO share substitution; use compact_position *)
 and proof = Axiom of string * string (** file, axiom name *)
-          | Proof of string * (c_ready hclause * position * substitution) list
+          | Proof of string * (hclause * position * substitution) list
 
 (** a selection function *)
-type selection_fun = c_new hclause -> int list
+type selection_fun = hclause -> int list
 
 let no_select c = []                          (** selects no literals *)
 

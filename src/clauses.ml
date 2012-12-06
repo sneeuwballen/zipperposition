@@ -252,7 +252,7 @@ let hash_clause c = hash_lits c.clits
  * ---------------------------------------------------------------------- *)
 
 module H = Hashcons.Make(struct
-  type t = c_new hclause
+  type t = hclause
   let equal hc1 hc2 = eq_clits hc1.hclits hc2.hclits
   let hash hc = hash_lits hc.hclits
   let tag i hc = (hc.hctag <- i; hc)
@@ -266,7 +266,7 @@ let compare_hclause hc1 hc2 = hc1.ctag - hc2.ctag
 
 module CHashtbl = Hashtbl.Make(
   struct
-    type t = c_ready hclause
+    type t = hclause
     let hash hc = hash_lits hc.hclits
     let equal = eq_hclause
   end)
@@ -336,7 +336,7 @@ let mk_hclause_a ~ord lits proof parents =
     hc.hcmaxlits <- Array.of_list (find_max_lits ~ord lits)
     end);
   (* return hashconsed clause *)
-  (hc' : c_new hclause)
+  hc'
 
 (** build clause from a list *)
 let mk_hclause lits proof parents = mk_hclause_a (Array.of_lit lits) proof parents
@@ -355,7 +355,7 @@ let reord_hclause ~ord hc =
     Note that selection on a unit clause is a no-op. *)
 let select_clause ~select hc =
   (if not (is_unit_clause hc) then hc.hcselected <- Array.of_list (select hc));
-  (hc : c_ready hclause)
+  hc
 
 (** selected literals *)
 let selected hc = hc.hcselected
@@ -473,30 +473,19 @@ let is_unit_clause hc = match hc.hclits with
  * set of hashconsed clauses
  * ---------------------------------------------------------------------- *)
 
-(** Data attached to the set of clauses, from/to which clauses can be
-    removed/added. The purpose is to attach indexes or metadata
-    about clauses. *)
-module type Payload =
-  sig
-    type 'a t 
-    val empty : 'a t
-    val add : t -> 'a hclause -> t
-    val remove : t -> 'a hclause -> t
-  end
-
-module CSet(P : Payload) =
+module CSet =
   struct
 
     (** Set of hashconsed clauses. 'a is the fantom type for hclauses.
         It also contains a payload that is updated on every addition/
-        removal of clauses. *)
-    type 'a 'b t = {
-      maxvar : int;               (** index of maximum variable *)
-      clauses : 'a hclause M.t;   (** clause ID -> clause *)
-      payload : 'a P.t;           (** additional data *)
+        removal of clauses. The additional payload is also updated upon
+        addition/deletion. *)
+    type t = {
+      maxvar : int;                 (** index of maximum variable *)
+      clauses : hclause Ptmap.t;    (** clause ID -> clause *)
     }
 
-    let empty = { maxvar=0; clauses = Ptmap.empty; payload=P.empty; }
+    let empty = { maxvar=0; clauses = Ptmap.empty; }
 
     let is_empty set = Ptmap.is_empty set.clauses
 
@@ -511,35 +500,34 @@ module CSet(P : Payload) =
         payload = P.add payload hc; }
 
     let add_list set hcs =
-      let maxvar, payload, clauses =
+      let maxvar, clauses =
         List.fold_left
-          (fun (m,p,c) hc -> max m (T.max_var hc.hcvars), P.add p hc, Ptmap.add hc.hctag hc c)
-          (set.maxvar, set.payload, set.clauses) hcs in
-      {maxvar; payload; clauses;}
+          (fun (m,c) hc -> max m (T.max_var hc.hcvars), Ptmap.add hc.hctag hc c)
+          (set.maxvar, set.clauses) hcs in
+      {maxvar; clauses;}
 
     let add_clause set c = add set c.cref
 
     let union s1 s2 =
       (* merge small into big *)
       let merge_into small big =
-        let maxvar, payload, clauses =
+        let maxvar, clauses =
           Ptmap.fold
-            (fun _ hc (m,p,c) -> max m (T.max_var hc.hcvars), P.add p hc, Ptmap.add hc.hctag hc c)
-            small.clauses (big.maxvar, big.payload, big.clauses) in
-        {maxvar;payload;clauses;}
+            (fun _ hc (m,c) -> max m (T.max_var hc.hcvars), Ptmap.add hc.hctag hc c)
+            small.clauses (big.maxvar, big.clauses) in
+        {maxvar;clauses;}
       in
       if size s1 < size s2 then merge_into s1 s2 else merge_into s2 s1
 
     let remove set hc =
-      { set with clauses = Ptmap.remove hc.hctag set.clauses;
-                 payload = P.remove set.payload hc; }
+      { set with clauses = Ptmap.remove hc.hctag set.clauses;}
 
     let remove_list set hcs =
-      let payload, clauses =
+      let clauses =
         List.fold_left
-          (fun (p,c) hc -> P.remove p hc, Ptmap.remove hc.hctag c)
-          (set.payload, set.clauses) hcs in
-      {set with payload; clauses;}
+          (fun c hc -> Ptmap.remove hc.hctag c)
+          set.clauses hcs in
+      {set with clauses;}
 
     let get set i = Ptmap.find i set.clauses
 
@@ -558,13 +546,13 @@ module CSet(P : Payload) =
       Ptmap.fold
         (fun _ hc (yes,no) ->
           if pred hc then add yes hc, no else yes, add no hc)
-        set.clauses (empty set.payload, empty set.payload)
+        set.clauses (empty, empty)
 
     let to_list set =
       Ptmap.fold (fun _ hc acc -> hc :: acc) set.clauses []
 
-    let of_list payload l =
-      add_list (empty payload) l
+    let of_list l =
+      add_list empty l
   end
 
 (* ----------------------------------------------------------------------
