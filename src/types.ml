@@ -92,7 +92,7 @@ and hclause = {
 (** a proof step for a clause
     TODO share substitution; use compact_position *)
 and proof = Axiom of string * string (** file, axiom name *)
-          | Proof of string * (hclause * position * substitution) list
+          | Proof of string * (clause * position * substitution) list
 
 (** a selection function *)
 type selection_fun = hclause -> int list

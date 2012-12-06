@@ -258,6 +258,7 @@ let at_cpos t pos =
     | t::l', _ when t.tsize > pos -> recurse t pos  (* search inside the term *)
     | t::l', _ -> get_subpos l' (pos - t.tsize) (* continue to next term *)
     | [], _ -> assert false
+  in recurse t pos
 
 let max_cpos t = t.tsize - 1
 

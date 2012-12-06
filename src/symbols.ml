@@ -50,7 +50,7 @@ let mk_symbol ?(attrs=0) s =
   (if s' == s then incr sig_version); (* update signature *)
   s'
 
-let is_used s = HashSymbol.mem symb_table s
+let is_used s = HashSymbol.mem symb_table (s, 0)
 
 let name_symbol (s, _) = s
 

@@ -98,7 +98,7 @@ val clause_of_fof : ord:ordering -> hclause -> hclause
 val reord_hclause : ord:ordering -> hclause -> hclause
   (** recompute order of literals in the clause *)
 
-val select_clause : ord:ordering -> select:selection_fun -> hclause -> hclause
+val select_clause : select:selection_fun -> hclause -> hclause
   (** select literals in clause, and computes ordering data *)
 
 val selected: hclause -> int array
@@ -107,7 +107,7 @@ val selected: hclause -> int array
 val parents : hclause -> hclause list
   (** list of parents of the clause *)
 
-val is_maxlit : clause -> int -> bool
+val is_maxlit : hclause -> int -> bool
   (** i-th literal maximal in clause? *)
 
 val check_maximal_lit : ord:ordering -> clause -> int
@@ -129,7 +129,7 @@ val get_pos : clause -> position -> term
 val fresh_clause : ord:ordering -> int -> hclause -> clause
   (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
 
-val is_selected : clause -> int -> bool
+val is_selected : hclause -> int -> bool
   (** check whether a literal is selected *)
 
 val selected_lits : clause -> (literal * int) list
@@ -207,8 +207,6 @@ module CSet :
 
     val to_list : t -> hclause list
     val of_list : hclause list -> t
-
-    val pp : Format.formatter -> t -> unit
 end
 
 (* ----------------------------------------------------------------------
@@ -238,6 +236,7 @@ val pp_pos : formatter -> position -> unit
 (** pretty printer for clauses *)
 class type pprinter_clause =
   object
+    method pp_lits : Format.formatter -> literal array -> hclause -> unit
     method pp : Format.formatter -> clause -> unit      (** print clause *)
     method pp_h : Format.formatter -> hclause -> unit(** print hclause *)
     method pp_pos : Format.formatter -> (clause * position) -> unit
@@ -259,3 +258,5 @@ class type pprinter_proof =
 val pp_proof : pprinter_proof ref                       (** defaut printing of proofs *)
 val pp_proof_tstp : pprinter_proof
 val pp_proof_debug : pprinter_proof
+
+val pp_set : Format.formatter -> CSet.t -> unit
