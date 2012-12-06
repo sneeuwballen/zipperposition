@@ -24,47 +24,57 @@ open Types
 open Symbols
 
 (** binary inferences. An inference returns a list of conclusions *)
-type binary_inf_rule = ProofState.active_set -> clause -> clause list
+type binary_inf_rule = ProofState.active_set -> hclause -> hclause list
 
 (** unary infererences *)
-type unary_inf_rule = ord:ordering -> clause -> clause list
+type unary_inf_rule = ord:ordering -> hclause -> hclause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
   object
-    (** the binary inference rules *)
+
     method binary_rules : (string * binary_inf_rule) list
-    (** the unary inference rules *)
+      (** the binary inference rules *)
+
     method unary_rules : (string * unary_inf_rule) list
-    (** how to simplify a clause *)
-    method basic_simplify : ord:ordering -> clause -> clause
-    (** how to simplify a clause w.r.t a set of clauses *)
-    method simplify : ProofState.active_set -> Index.unit_index -> clause -> clause
-    (** check whether the clause is redundant w.r.t the set *)
-    method redundant : ProofState.active_set -> clause -> bool
-    (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> hclause list
-    (** how to simplify a clause into a (possibly empty) list
-        of clauses. This subsumes the notion of trivial clauses (that
-        are simplified into the empty list of clauses) *)
-    method list_simplify : ord:ordering -> select:selection_fun -> clause -> clause list option
-    (** a list of axioms to add to the problem *)
-    method axioms : clause list
-    (** some constraints on the precedence *)
-    method constr : clause list -> ordering_constraint
-    (** how to preprocess the initial list of clauses *)
-    method preprocess : ord:ordering -> select:selection_fun -> clause list -> clause list
+      (** the unary inference rules *)
+
+    method basic_simplify : ord:ordering -> hclause -> hclause
+      (** how to simplify a clause *)
+
+    method simplify : ProofState.active_set -> Index.unit_index -> hclause -> hclause
+      (** how to simplify a clause w.r.t a set of clauses *)
+
+    method redundant : ProofState.active_set -> hclause -> bool
+      (** check whether the clause is redundant w.r.t the set *)
+
+    method redundant_set : ProofState.active_set -> hclause -> hclause list
+      (** find redundant clauses in set w.r.t the clause *)
+
+    method list_simplify : ord:ordering -> select:selection_fun -> hclause -> hclause list option
+      (** how to simplify a clause into a (possibly empty) list
+          of clauses. This subsumes the notion of trivial clauses (that
+          are simplified into the empty list of clauses) *)
+
+    method axioms : hclause list
+      (** a list of axioms to add to the problem *)
+
+    method constr : hclause list -> ordering_constraint
+      (** some constraints on the precedence *)
+
+    method preprocess : ord:ordering -> select:selection_fun -> hclause list -> hclause list
+      (** how to preprocess the initial list of clauses *)
   end
 
 (** do binary inferences that involve the given clause *)
 val do_binary_inferences : ProofState.active_set ->
                           (string * binary_inf_rule) list -> (** named rules *)
-                          clause -> clause list
+                          hclause -> hclause list
 
 (** do unary inferences for the given clause *)
 val do_unary_inferences : ord:ordering ->
                           (string * unary_inf_rule) list ->
-                          clause -> clause list
+                          hclause -> hclause list
 
 (* some helpers *)
 val fold_lits :
@@ -78,7 +88,7 @@ val fold_negative :
   ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
   (literal * int) list -> 'a
 
-val get_equations_sides : clause -> position -> term * term * bool
+val get_equations_sides : hclause -> position -> term * term * bool
 
 (** Skolemize the given term at root (assumes it occurs just under an
     existential quantifier, whose De Bruijn variable is replaced

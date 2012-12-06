@@ -23,6 +23,7 @@ open Types
 (** Efficient perfect discrimination trees for matching *)
 
 type 'a dtree
+  (** the perfect discrimination tree *)
 
 val empty : ('a -> 'a -> bool) -> 'a dtree
   (** empty discrimination tree (with a comparison function) *)

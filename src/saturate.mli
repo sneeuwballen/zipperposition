@@ -35,7 +35,7 @@ type szs_status =
 val initial_simplifications : ord:ordering ->
                               select:selection_fun ->
                               calculus:Calculus.calculus ->
-                              clause list -> clause list
+                              hclause list -> hclause list
 
 (** Perform one step of the given clause algorithm *)
 val given_clause_step : calculus:Calculus.calculus ->

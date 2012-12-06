@@ -34,7 +34,7 @@ val names_index : unit -> string list
 (** set of active clauses *)
 type active_set = {
   a_ord : ordering;
-  active_clauses : Clauses.bag;       (** set of active clauses *)
+  active_clauses : Clauses.CSet.t;    (** set of active clauses *)
   idx : Index.clause_index;           (** term index *)
   fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
 }
@@ -42,7 +42,7 @@ type active_set = {
 (** set of passive clauses *)
 type passive_set = {
   p_ord : ordering;
-  passive_clauses : Clauses.bag;
+  passive_clauses : Clauses.CSet.t;
   queues : (ClauseQueue.queue * int) list;
   queue_state : int * int;  (** position in the queue/weight *)
 }
@@ -69,23 +69,23 @@ val remove_rule : state -> hclause -> state
 val remove_rules : state -> hclause list -> state
 
 (** add clauses to the active set *)
-val add_active : active_set -> clause -> active_set * hclause
-val add_actives : active_set -> clause list -> active_set
+val add_active : active_set -> hclause -> active_set
+val add_actives : active_set -> hclause list -> active_set
 
 (** remove clause from the active set *)
 val remove_active : active_set -> hclause -> active_set
 val remove_actives : active_set -> hclause list -> active_set
-val remove_active_bag : active_set -> Clauses.bag -> active_set
+val remove_active_set : active_set -> Clauses.CSet.t -> active_set
 
 (** create an active_set that contains one clause *)
-val singleton_active_set : ord:ordering -> clause -> active_set
+val singleton_active_set : ord:ordering -> hclause -> active_set
 
 (** add clauses to the passive set *)
-val add_passive : passive_set -> clause -> passive_set * hclause
-val add_passives : passive_set -> clause list -> passive_set
+val add_passive : passive_set -> hclause -> passive_set
+val add_passives : passive_set -> hclause list -> passive_set
 (** remove clause from passive set *)
-val remove_passive : passive_set -> clause -> passive_set
-val remove_passives : passive_set -> clause list -> passive_set
+val remove_passive : passive_set -> hclause -> passive_set
+val remove_passives : passive_set -> hclause list -> passive_set
 
 (** pop the next passive clause, if any *)
 val next_passive_clause : passive_set -> (passive_set * hclause option)

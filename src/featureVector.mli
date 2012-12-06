@@ -25,16 +25,15 @@ open Types
 open Symbols
 
 (** a vector of feature *)
-type feature_vector = int list
-
+type feature_vector = int array
 
 (** a function that computes a feature *)
-type feature = clause -> int
+type feature = hclause -> int
 
 (** use some features to compute a feature vector *)
-val compute_fv : feature list -> clause -> feature_vector
+val compute_fv : feature array -> hclause -> feature_vector
 
-val sum_of_depths : feature              (** sum of depths of symbols *)
+val sum_of_depths : feature               (** sum of depths of symbols *)
 val feat_size_plus : feature              (** size of positive clause *)
 val feat_size_minus : feature             (** size of negative clause *)
 val count_symb_plus : symbol -> feature   (** occurrences of symbol in positive clause *)
@@ -42,16 +41,16 @@ val count_symb_minus : symbol -> feature  (** occurrences of symbol in negative 
 val max_depth_plus : symbol -> feature    (** maximal depth of symb in positive clause *)
 val max_depth_minus : symbol -> feature   (** maximal depth of symb in negative clause *)
 
-type fv_index  (** a feature vector index, based on a trie *)
+type fv_index                             (** a feature vector index, based on a trie *)
 
-val mk_fv_index : feature list -> fv_index          (** create an index from features *)
-val mk_fv_index_signature : symbol list -> fv_index (** create an index from signature *)
+val mk_fv_index : feature array -> fv_index             (** create an index from features *)
+val mk_fv_index_signature : symbol array -> fv_index    (** create an index from signature *)
 
-val index_clause : fv_index -> clause -> fv_index   (** add the clause to the index *)
-val remove_clause : fv_index -> clause -> fv_index  (** remove the clause from the index *)
+val index_clause : fv_index -> hclause -> fv_index      (** add the clause to the index *)
+val remove_clause : fv_index -> hclause -> fv_index     (** remove the clause from the index *)
 
-val retrieve_subsuming : fv_index -> clause ->
-                         (clause -> unit) -> unit   (** clauses that subsume c *)
-val retrieve_subsumed : fv_index -> clause ->
-                        (clause -> unit) -> unit    (** clauses subsumed by c *)
+val retrieve_subsuming : fv_index -> hclause ->
+                         (hclause -> unit) -> unit      (** clauses that subsume c *)
+val retrieve_subsumed : fv_index -> hclause ->
+                        (hclause -> unit) -> unit       (** clauses subsumed by c *)
 

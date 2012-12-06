@@ -29,8 +29,10 @@ open Types
 class type queue =
   object
     method add : hclause -> queue
+    method add_list : hclause list -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
+    method clean : Clauses.CSet.t -> queue    (** remove all clauses that are not in the set *)
     method name : string
   end
 

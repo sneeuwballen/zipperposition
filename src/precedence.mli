@@ -77,7 +77,7 @@ val default_symbol_ordering : unit -> symbol_ordering
  * ---------------------------------------------------------------------- *)
 
 val heuristic_precedence : (symbol_ordering -> ordering) -> ordering_constraint
-                           -> clause list -> symbol_ordering
+                           -> hclause list -> symbol_ordering
   (** define a precedence on symbols that is believed to improve
       the search by enabling as many simplifications as possible. It takes
       an ordering as a parameter, to be able to decide the orientation of

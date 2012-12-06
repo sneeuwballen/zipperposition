@@ -191,7 +191,7 @@ let print_stats state =
 let print_state ?name filename (state, result) =
   let state = match result with
     | Sat.Unsat c ->
-      let active, _ = PS.add_active state.PS.active_set c in (* put empty clause in state *)
+      let active = PS.add_active state.PS.active_set c in (* put empty clause in state *)
       {state with PS.active_set = active}
     | _ -> state in
   PS.pp_dot_file ?name filename state
@@ -261,7 +261,7 @@ let () =
   (* first preprocessing, with a simple ordering. *)
   let clauses = calculus#preprocess ~ord:(O.default_ordering ()) ~select:no_select clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
-                 (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
+                 (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* choose an ord now, using clauses *)
   let ord_factory = match params.param_ord with
     | "rpo" -> O.rpo
@@ -281,12 +281,12 @@ let () =
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~ord ~select (List.map (C.reord_clause ~ord) clauses) in
+  let clauses = calculus#preprocess ~ord ~select (List.map (C.reord_hclause ~ord) clauses) in
   let clauses = if params.param_presimplify
     then Sat.initial_simplifications ~ord ~calculus ~select clauses
     else clauses in
   Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
-                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp) clauses));
+                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
   let state = PS.make_state ord CQ.default_queues select Dtree.unit_index in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
@@ -307,12 +307,13 @@ let () =
   | Sat.Sat ->
       Printf.printf "%% SZS status CounterSatisfiable\n";
       Utils.debug 1 (lazy (Utils.sprintf "%% saturated set: @[<v>%a@]@."
-                     C.pp_bag state.PS.active_set.PS.active_clauses))
+                     C.CSet.pp state.PS.active_set.PS.active_clauses))
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";
       if params.param_proof
-        then Format.printf "@.# SZS output start Refutation@.@[<v>%a@]@.# SZS output end Refutation@." !C.pp_proof#pp c
+        then Format.printf ("@.# SZS output start Refutation@.@[<v>%a@]@." ^^
+                          "# SZS output end Refutation@.") !C.pp_proof#pp c
         else ()
 
 let _ =
