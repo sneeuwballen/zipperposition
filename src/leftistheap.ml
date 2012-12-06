@@ -39,6 +39,7 @@ sig
   val min : t -> X.t
   val extract_min : t -> X.t * t
   val merge : t -> t -> t
+  val filter: t -> (X.t -> bool) -> t
   val remove: t -> X.t list -> t
 end
 =
@@ -69,6 +70,11 @@ struct
   let extract_min = function
     | E -> raise Empty
     | T (_,x,a,b) -> x, merge a b
+
+  let rec filter t pred = match t with
+    | E -> E
+    | T (_, x, a, b) when pred x -> insert x (merge (filter a pred) (filter b pred))
+    | T (_, _, a, b) -> merge (filter a pred) (filter b pred)
 
   let rec remove t l = match t with
     | E -> E

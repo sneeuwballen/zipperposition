@@ -34,8 +34,10 @@ module Utils = FoUtils
 class type queue =
   object
     method add : hclause -> queue
+    method add_list : hclause list -> queue
     method is_empty: bool
     method take_first : (queue * hclause)
+    method clean : C.CSet.t -> queue    (** remove all clauses that are not in the set *)
     method name : string
   end
 
@@ -62,10 +64,30 @@ let make_hq ?(accept=(fun _ -> true)) ~weight name =
       else
         ({<>} :> queue)
 
+    method add_list hcs =
+      (* add clauses to the heap *)
+      let new_heap = List.fold_left
+        (fun heap hc ->
+          if accept hc
+            then LH.insert (weight hc, hc) heap
+            else heap)
+        heap hcs
+      in 
+      ({< heap = new_heap >} :> queue)
+
     method take_first =
       assert (not (LH.is_empty heap));
       let (_, c), new_h = LH.extract_min heap in
       (({< heap = new_h >} :> queue), c)
+
+    (** Keep only the clauses that are in the set *)
+    method clean set =
+      let heap =
+        LH.filter
+          (fun (_, hc) -> C.CSet.mem hc set)
+          heap
+      in 
+      ({< heap = new_h >} :> queue)
 
     method name = name
   end
