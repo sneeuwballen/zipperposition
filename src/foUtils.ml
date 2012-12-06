@@ -140,6 +140,10 @@ let multiset_partial f l1 l2 =
   | [], [] -> Eq (* all elements removed by multiset_remove_eq *)
   | _ -> find_dominating l1 l2
 
+(* ----------------------------------------------------------------------
+ * lists
+ * ---------------------------------------------------------------------- *)
+
 let rec list_get l i = match l, i with
   | [], i -> raise Not_found
   | x::_, i when i = 0 -> x
@@ -255,6 +259,37 @@ let list_shuffle l =
     a.(j) <- tmp;
   done;
   Array.to_list a
+
+(* ----------------------------------------------------------------------
+ * arrays
+ * ---------------------------------------------------------------------- *)
+
+let array_foldi f acc a =
+  let rec recurse acc i =
+    if i = Array.length a then acc else recurse (f acc i a.(i)) (i+1)
+  in recurse acc 0
+
+let array_forall p a =
+  let rec check i =
+    if i = Array.length a then true else p a.(i) && check (i+1)
+  in check 0
+
+let array_forall2 p a1 a2 =
+  let rec check i =
+    if i = Array.length a1 then true else p a1.(i) a2.(i) && check (i+1)
+  in
+  if Array.length a1 <> Array.length a2
+    then raise (Invalid_argument "array_forall2")
+    else check 0
+
+let array_exists p a =
+  let rec check i =
+    if i = Array.length a then false else p a.(i) || check (i+1)
+  in check 0
+
+(* ----------------------------------------------------------------------
+ * pretty printing
+ * ---------------------------------------------------------------------- *)
 
 let on_buffer ?(margin=80) f t =
   let buff = Buffer.create 100 in

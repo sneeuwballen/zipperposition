@@ -82,47 +82,46 @@ let make_hq ?(accept=(fun _ -> true)) ~weight name =
 
     (** Keep only the clauses that are in the set *)
     method clean set =
-      let heap =
-        LH.filter
-          (fun (_, hc) -> C.CSet.mem hc set)
-          heap
+      let new_heap =
+        LH.filter heap
+          (fun (_, hc) -> C.CSet.mem set hc)
       in 
-      ({< heap = new_h >} :> queue)
+      ({< heap = new_heap >} :> queue)
 
     method name = name
   end
 
 let fifo =
   let name = "fifo_queue" in
-  make_hq ~weight:(fun hc -> hc.ctag) name
+  make_hq ~weight:(fun hc -> hc.hctag) name
 
 let clause_weight =
   let name = "clause_weight" in
-  make_hq ~weight:(fun hc -> hc.cweight) name
+  make_hq ~weight:(fun hc -> hc.hcweight) name
   
 let goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = match lit with
   | Equation (_, _, sign, _) -> not sign in
-  let is_goal_clause clause = List.for_all is_goal_lit clause.clits in
+  let is_goal_clause hc = Utils.array_forall is_goal_lit hc.hclits in
   let name = "prefer_goals" in
-  make_hq ~accept:is_goal_clause ~weight:(fun c -> c.cweight) name
+  make_hq ~accept:is_goal_clause ~weight:(fun hc -> hc.hcweight) name
 
 let non_goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = match lit with
   | Equation (_, _, sign, _) -> not sign in
-  let is_non_goal_clause clause = List.for_all (fun x -> not (is_goal_lit x)) clause.clits in
+  let is_non_goal_clause hc = Utils.array_forall (fun x -> not (is_goal_lit x)) hc.hclits in
   let name = "prefer_non_goals" in
-  make_hq ~accept:is_non_goal_clause ~weight:(fun c -> c.cweight) name
+  make_hq ~accept:is_non_goal_clause ~weight:(fun hc -> hc.hcweight) name
 
 let pos_unit_clauses =
-  let is_unit_pos c = match c.clits with
-  | [Equation (_,_,true,_)] -> true
+  let is_unit_pos hc = match hc.hclits with
+  | [|Equation (_,_,true,_)|] -> true
   | _ -> false
   in
   let name = "prefer_pos_unit_clauses" in
-  make_hq ~accept:is_unit_pos ~weight:(fun c -> c.cweight) name
+  make_hq ~accept:is_unit_pos ~weight:(fun hc -> hc.hcweight) name
 
 let default_queues =
   [ (clause_weight, 4);

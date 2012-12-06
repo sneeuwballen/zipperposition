@@ -299,27 +299,27 @@ let unit_index =
     method is_empty = is_empty pos && is_empty neg
 
     method add_clause hc =
-      match hc.clits with
-      | [Equation (l,r,true,Gt)] -> self#add l r true hc
-      | [Equation (l,r,true,Lt)] -> self#add r l true hc
-      | [Equation (l,r,true,Incomparable)] ->
+      match hc.hclits with
+      | [|Equation (l,r,true,Gt)|] -> self#add l r true hc
+      | [|Equation (l,r,true,Lt)|] -> self#add r l true hc
+      | [|Equation (l,r,true,Incomparable)|] ->
         let self' = self#add l r true hc in
         self'#add r l true hc
-      | [Equation (l,r,true,Eq)] -> (assert (l == r); self)
-      | [Equation (l,r,false,_)] ->
+      | [|Equation (l,r,true,Eq)|] -> (assert (l == r); self)
+      | [|Equation (l,r,false,_)|] ->
         let self' = self#add l r false hc in
         self'#add r l false hc
       | _ -> self  (* do not add other clauses *)
 
     method remove_clause hc =
-      match hc.clits with
-      | [Equation (l,r,true,Gt)] -> self#remove l r true hc
-      | [Equation (l,r,true,Lt)] -> self#remove r l true hc
-      | [Equation (l,r,true,Incomparable)] ->
+      match hc.hclits with
+      | [|Equation (l,r,true,Gt)|] -> self#remove l r true hc
+      | [|Equation (l,r,true,Lt)|] -> self#remove r l true hc
+      | [|Equation (l,r,true,Incomparable)|] ->
         let self' = self#remove l r true hc in
         self'#remove r l true hc
-      | [Equation (l,r,true,Eq)] -> (assert (l == r); self)
-      | [Equation (l,r,false,_)] ->
+      | [|Equation (l,r,true,Eq)|] -> (assert (l == r); self)
+      | [|Equation (l,r,false,_)|] ->
         let self' = self#remove l r false hc in
         self'#remove r l false hc
       | _ -> self  (* do not remove anything *)

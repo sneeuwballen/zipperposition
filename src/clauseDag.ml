@@ -40,19 +40,17 @@ let empty = {
 
 (** search the clause in the map; if not found returns default *)
 let find_default ~default map hc =
-  try Ptmap.find hc.ctag map
+  try Ptmap.find hc.hctag map
   with Not_found -> default
 
 (** set-like insertion of a clause in a clause list *)
 let insert_hclause l hc =
-  if List.exists (fun hc' -> hc'.ctag = hc.ctag) l
+  if List.exists (fun hc' -> hc'.hctag = hc.hctag) l
     then l
     else hc :: l
 
 (** [parent_of dag parent child] means that child descends from parent *)
 let parent_of ~ord dag parent child =
-  let parent = C.hashcons_clause_noselect (C.normalize_clause ~ord parent)
-  and child = C.hashcons_clause_noselect (C.normalize_clause ~ord child) in
   if C.eq_hclause parent child
     then dag
     else begin
@@ -64,8 +62,8 @@ let parent_of ~ord dag parent child =
       (* update lists *)
       let descendants = insert_hclause descendants child
       and parents = insert_hclause parents parent in
-      {dag_down=Ptmap.add parent.ctag descendants dag.dag_down;
-       dag_up=Ptmap.add child.ctag parents dag.dag_up; }
+      {dag_down=Ptmap.add parent.hctag descendants dag.dag_down;
+       dag_up=Ptmap.add child.hctag parents dag.dag_up; }
     end
 
 (** update the DAG using the list of parents of the clause *)
@@ -78,6 +76,5 @@ let updates ~ord dag l =
 
 (** get the list of descendants of clause *)
 let descendants ~ord dag parent =
-  let parent = C.hashcons_clause_noselect (C.normalize_clause ~ord parent) in
   let descendants = find_default ~default:[] dag.dag_down parent in
   Utils.list_uniq C.eq_hclause descendants

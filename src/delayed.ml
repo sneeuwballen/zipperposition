@@ -122,8 +122,8 @@ let keep eqn = Keep eqn
 
 (** perform at most one simplification on each literal. It
     returns an array of tableau_rule. *)
-let eliminate_lits ~ord clause =
-  let offset = ref ((max 0 (T.max_var clause.cvars)) + 1) in  (* offset to create variables *)
+let eliminate_lits ~ord hc =
+  let offset = ref ((max 0 (T.max_var hc.hcvars)) + 1) in  (* offset to create variables *)
   (* eliminate propositions (connective and quantifier eliminations) *)
   let prop eqn p sign =
     assert (p.sort = bool_sort);
@@ -137,7 +137,7 @@ let eliminate_lits ~ord clause =
     | Node (s, [{term=Node (s', [t])}]) when s = forall_symbol && s' = lambda_symbol && sign ->
       gamma_eliminate ~ord offset t true
     | Node (s, [{term=Node (s', [t])}]) when s = forall_symbol && s' = lambda_symbol && not sign ->
-      delta_eliminate ~ord t false
+      delta_eliminate ~ord (T.mk_not t) true
     | Node (s, [{term=Node (s', [t])}]) when s = exists_symbol && s' = lambda_symbol && sign ->
       delta_eliminate ~ord t true
     | Node (s, [{term=Node (s', [t])}]) when s = exists_symbol && s' = lambda_symbol && not sign ->
@@ -162,33 +162,34 @@ let eliminate_lits ~ord clause =
   in
   (* try to eliminate each literal that is eligible for resolution *)
   let tableau_rules =
-    Utils.list_mapi clause.clits
+    Array.mapi
       (fun i lit -> 
         match lit with
         | Equation (l, r, sign, _) when T.eq_term r T.true_term -> prop lit l sign
         | Equation (l, r, sign, _) when T.eq_term l T.true_term -> prop lit r sign
         | Equation (l, r, sign, _) when l.sort = bool_sort -> equiv lit l r sign
         | _ -> keep lit)  (* equation between terms *)
+      hc.hclits
   in
   tableau_rules
 
 (** Produce a list of clauses from an array of tableau_rule, or None *)
-let tableau_to_clauses ~ord clause a =
-  if List.for_all (function | Keep _ -> true | _ -> false) a then None (* just keep all literals *)
+let tableau_to_clauses ~ord hc a =
+  if Utils.array_forall (function | Keep _ -> true | _ -> false) a then None (* just keep all literals *)
   else begin
     let clauses = ref []
-    and eqns = Vector.create (List.length a * 2) in
-    let proof = lazy (Proof ("elim", [clause, [], S.id_subst]))
-    and parents = [clause] in
+    and eqns = Vector.create (Array.length a * 2) in
+    let proof = lazy (Proof ("elim", [C.base_clause hc, [], S.id_subst]))
+    and parents = [hc] in
     (* explore all combinations of tableau splits *)
     let rec explore_splits i =
-      if i = List.length a
+      if i = Array.length a
         then  (* produce new clause *)
-          let clause = C.mk_clause ~ord (Vector.to_list eqns) ~selected:[] proof parents in
+          let clause = C.mk_hclause_a ~ord (Vector.to_array eqns) proof parents in
           clauses := clause :: !clauses
         else begin
           let len = Vector.size eqns in
-          explore_branch i len (Utils.list_get a i)
+          explore_branch i len a.(i)
         end
     (* recurse in sub-tableau *)
     and explore_branch i len rule =
@@ -207,21 +208,21 @@ let tableau_to_clauses ~ord clause a =
   end
 
 (** Perform eliminations recursively, until no elimination is possible *)
-let recursive_eliminations ~ord ~select c =
+let recursive_eliminations ~ord ~select hc =
   let clauses = ref [] in
   (* process clauses until none of them is simplifiable *)
-  let rec simplify c =
-    let tableau_rules = eliminate_lits ~ord c in
-    match tableau_to_clauses ~ord c tableau_rules with
-    | None -> clauses := c :: !clauses (* done with this clause *)
+  let rec simplify hc =
+    let tableau_rules = eliminate_lits ~ord hc in
+    match tableau_to_clauses ~ord hc tableau_rules with
+    | None -> clauses := hc :: !clauses (* done with this clause *)
     | Some clauses ->
       Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
-                    !C.pp_clause#pp c (Utils.pp_list !C.pp_clause#pp) clauses));
-      List.iter (fun c -> simplify (C.select_clause ~select c)) clauses (* simplify recursively new clauses *)
+                    !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) clauses));
+      List.iter (fun hc -> simplify (C.select_clause ~select hc)) clauses (* simplify recursively new clauses *)
   in
-  simplify c;
+  simplify hc;
   match !clauses with
-  | [c'] when C.eq_clause c c' -> None (* no simplification *)
+  | [hc'] when C.eq_hclause hc hc' -> None (* no simplification *)
   | l -> Some l (* some simplifications *)
 
 (* ----------------------------------------------------------------------
@@ -229,7 +230,7 @@ let recursive_eliminations ~ord ~select c =
  * ---------------------------------------------------------------------- *)
 
 (** Simplify the inner formula (double negation, trivial equalities...) *)
-let simplify_inner ~ord c =
+let simplify_inner ~ord hc =
   let simplified = ref false in
   let mark_simplified t = T.set_flag T.flag_simplified t true in
   (* simplify a term *)
@@ -288,10 +289,10 @@ let simplify_inner ~ord c =
     (if not (C.eq_literal_com lit lit') then simplified := true);
     lit'
   in
-  let lits = List.map simp_lit c.clits in
+  let lits = Array.map simp_lit hc.hclits in
   if !simplified
-    then C.mk_clause ~ord ~selected:[] lits c.cproof c.cparents
-    else c  (* no simplification *)
+    then C.mk_hclause_a ~ord lits hc.hcproof hc.hcparents
+    else hc  (* no simplification *)
 
 (* ----------------------------------------------------------------------
  * the calculus object
@@ -305,27 +306,37 @@ let delayed : calculus =
     method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
                           "equality_factoring", Sup.infer_equality_factoring; ]
 
-    method basic_simplify ~ord c = Sup.basic_simplify ~ord (simplify_inner ~ord c)
+    method basic_simplify ~ord hc = Sup.basic_simplify ~ord (simplify_inner ~ord hc)
 
-    method simplify actives idx c =
+    method simplify actives idx hc =
       let ord = actives.PS.a_ord in
-      let c = simplify_inner ~ord c in
-      let c = Sup.basic_simplify ~ord (Sup.demodulate ~ord idx c) in
-      let c = Sup.positive_simplify_reflect ~ord idx c in
-      let c = Sup.negative_simplify_reflect ~ord idx c in
-      let c = simplify_inner ~ord c in
-      c
+      let hc = simplify_inner ~ord (Sup.basic_simplify ~ord hc) in
+      (* rename for demodulation *)
+      let c = PS.relocate_rules ~ord idx hc in
+      let hc = Sup.basic_simplify ~ord (Sup.demodulate ~ord idx c) in
+      let hc = simplify_inner ~ord hc in
+      (* rename for simplify_reflect *)
+      let c = PS.relocate_rules ~ord idx hc in
+      let hc = Sup.positive_simplify_reflect ~ord idx c in
+      (* rename for simplify_reflect *)
+      let c = PS.relocate_rules ~ord idx hc in
+      let hc = Sup.negative_simplify_reflect ~ord idx c in
+      hc
 
-    method redundant actives c = Sup.subsumed_by_set actives c
+    method redundant actives hc =
+      let c = PS.relocate_active actives hc in
+      Sup.subsumed_by_set actives c
 
-    method redundant_set actives c = Sup.subsumed_in_set actives c
+    method redundant_set actives hc =
+      let c = PS.relocate_active actives hc in
+      Sup.subsumed_in_set actives c
 
     (* use elimination rules as simplifications rather than inferences, here *)
-    method list_simplify ~ord ~select c =
-      let c = C.select_clause ~select (Sup.basic_simplify ~ord c) in
-      match recursive_eliminations ~ord ~select c with
+    method list_simplify ~ord ~select hc =
+      let hc = C.select_clause ~select (Sup.basic_simplify ~ord hc) in
+      match recursive_eliminations ~ord ~select hc with
       | None -> None
-      | Some l -> Some (List.filter (fun c -> not (Sup.is_tautology c)) l)
+      | Some l -> Some (List.filter (fun hc -> not (Sup.is_tautology hc)) l)
 
     method axioms = []
 
@@ -333,16 +344,16 @@ let delayed : calculus =
 
     method preprocess ~ord ~select l =
       Utils.list_flatmap
-        (fun c ->
-          let c = Sup.basic_simplify ~ord (C.clause_of_fof ~ord c) in
-          let c = C.reord_clause ~ord c in
-          match self#list_simplify ~ord ~select c with
-          | None -> if Sup.is_tautology c then [] else [c]
+        (fun hc ->
+          let hc = Sup.basic_simplify ~ord (C.clause_of_fof ~ord hc) in
+          let hc = C.reord_hclause ~ord hc in
+          match self#list_simplify ~ord ~select hc with
+          | None -> if Sup.is_tautology hc then [] else [hc]
           | Some clauses ->
             List.fold_left
-              (fun clauses c ->
-                let c = C.clause_of_fof ~ord c in
-                if not (Sup.is_tautology c) then c :: clauses else clauses)
+              (fun clauses hc ->
+                let hc = C.clause_of_fof ~ord hc in
+                if not (Sup.is_tautology hc) then hc :: clauses else clauses)
               [] clauses)
         l
   end

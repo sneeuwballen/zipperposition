@@ -25,13 +25,13 @@ open Types
 open Symbols
 
 (** a vector of feature *)
-type feature_vector = int array
+type feature_vector = int list
 
 (** a function that computes a feature *)
 type feature = hclause -> int
 
 (** use some features to compute a feature vector *)
-val compute_fv : feature array -> hclause -> feature_vector
+val compute_fv : feature list -> hclause -> feature_vector
 
 val sum_of_depths : feature               (** sum of depths of symbols *)
 val feat_size_plus : feature              (** size of positive clause *)
@@ -43,8 +43,8 @@ val max_depth_minus : symbol -> feature   (** maximal depth of symb in negative 
 
 type fv_index                             (** a feature vector index, based on a trie *)
 
-val mk_fv_index : feature array -> fv_index             (** create an index from features *)
-val mk_fv_index_signature : symbol array -> fv_index    (** create an index from signature *)
+val mk_fv_index : feature list -> fv_index              (** create an index from features *)
+val mk_fv_index_signature : symbol list -> fv_index     (** create an index from signature *)
 
 val index_clause : fv_index -> hclause -> fv_index      (** add the clause to the index *)
 val remove_clause : fv_index -> hclause -> fv_index     (** remove the clause from the index *)

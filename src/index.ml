@@ -145,16 +145,17 @@ let process_lit op c tree (lit, pos) =
 (** apply op to the maximal literals of the clause, and only to
     the maximal side(s) of those, if restruct is true. Otherwise
     process all literals *)
-let process_clause ~restrict op tree c =
+let process_clause ~restrict op tree hc =
   (* which literals to process? *)
-  let lits_pos =
-    if restrict && C.selected c = [] then C.maxlits c
-    else if restrict then C.selected_lits c
-    else Utils.list_pos c.clits
+  let must_process i =
+    if restrict && C.selected hc = [||] then C.is_maxlit hc i
+    else if restrict then C.is_selected hc i
+    else true
   in
   (* index literals with their position *)
-  let new_tree = List.fold_left (process_lit op c) tree lits_pos in
-  new_tree
+  Utils.array_foldi
+    (fun t i lit -> if must_process i then process_lit op hc t (lit,i) else t)
+    tree hc.hclits
 
 (** apply (op tree) to all subterms, folding the resulting tree *)
 let rec fold_subterms op tree t (c, path) = match t.term with

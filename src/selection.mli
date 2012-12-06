@@ -44,5 +44,5 @@ val selection_from_string : ord:ordering -> string -> selection_fun
 val available_selections : unit -> string list
   (** available names for selection functions *)
 
-val check_selected : clause -> unit
+val check_selected : hclause -> unit
   (** check that if some literals are selected, at least one is negative *)

@@ -36,19 +36,19 @@ module Utils = FoUtils
 type feature_vector = int list
 
 (** a function that computes a feature *)
-type feature = clause -> int
+type feature = hclause -> int
 
-let compute_fv features clause =
-  List.map (fun feat -> feat clause) features
+let compute_fv features hc =
+  List.map (fun feat -> feat hc) features
 
-let feat_size_plus clause =
+let feat_size_plus hc =
   let cnt = ref 0 in
-  List.iter (fun (Equation (_,_,sign,_)) -> if sign then incr cnt) clause.clits;
+  Array.iter (fun (Equation (_,_,sign,_)) -> if sign then incr cnt) hc.hclits;
   !cnt
 
-let feat_size_minus clause =
+let feat_size_minus hc =
   let cnt = ref 0 in
-  List.iter (fun (Equation (_,_,sign,_)) -> if not sign then incr cnt) clause.clits;
+  Array.iter (fun (Equation (_,_,sign,_)) -> if not sign then incr cnt) hc.hclits;
   !cnt
 
 (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
@@ -61,8 +61,8 @@ let sum_of_depths_lit lit =
   match lit with
   | Equation (l, r, _, _) -> sum 0 (sum 0 0 l) r
 
-let sum_of_depths clause =
-  List.fold_left (fun acc lit -> acc + sum_of_depths_lit lit) 0 clause.clits
+let sum_of_depths hc =
+  Array.fold_left (fun acc lit -> acc + sum_of_depths_lit lit) 0 hc.hclits
 
 (* number of occurrences of symbol in literal *)
 let count_symb_lit symb lit =
@@ -77,18 +77,18 @@ let count_symb_lit symb lit =
   | Equation (l, r, _, _) ->
     count_symb_term l; count_symb_term r; !cnt
 
-let count_symb_plus symb clause =
+let count_symb_plus symb hc =
   let cnt = ref 0 in
-  List.iter
+  Array.iter
     (fun lit -> if C.pos_lit lit
-      then cnt := !cnt + count_symb_lit symb lit) clause.clits;
+      then cnt := !cnt + count_symb_lit symb lit) hc.hclits;
   !cnt
 
-let count_symb_minus symb clause =
+let count_symb_minus symb hc =
   let cnt = ref 0 in
-  List.iter
+  Array.iter
     (fun lit -> if C.neg_lit lit
-      then cnt := !cnt + count_symb_lit symb lit) clause.clits;
+      then cnt := !cnt + count_symb_lit symb lit) hc.hclits;
   !cnt
 
 (* max depth of the symbol in the literal, or -1 *)
@@ -105,18 +105,18 @@ let max_depth_lit symb lit =
   match lit with
   | Equation (l, r, _, _) -> max (max_depth_term l 0) (max_depth_term r 0)
 
-let max_depth_plus symb clause =
+let max_depth_plus symb hc =
   let depth = ref 0 in
-  List.iter
+  Array.iter
     (fun lit -> if C.pos_lit lit
-      then depth := max !depth (max_depth_lit symb lit)) clause.clits;
+      then depth := max !depth (max_depth_lit symb lit)) hc.hclits;
   !depth
 
-let max_depth_minus symb clause =
+let max_depth_minus symb hc =
   let depth = ref 0 in
-  List.iter
+  Array.iter
     (fun lit -> if C.neg_lit lit
-      then depth := max !depth (max_depth_lit symb lit)) clause.clits;
+      then depth := max !depth (max_depth_lit symb lit)) hc.hclits;
   !depth
 
 (* ----------------------------------------------------------------------
@@ -125,7 +125,7 @@ let max_depth_minus symb clause =
 
 type trie =
   | Node of trie Ptmap.t  (** map feature -> trie *)
-  | Leaf of C.CSet.t      (** leaf with a set of clauses *)
+  | Leaf of C.CSet.t      (** leaf with a set of hcs *)
 
 let empty_trie n = match n with
   | Node m when Ptmap.is_empty m -> true
@@ -169,7 +169,7 @@ let goto_leaf trie t k =
 (** a trie of ints *)
 module FVTrie = Trie.Make(Ptmap)
 
-(** a feature vector index, based on a trie that contains sets of clauses *)
+(** a feature vector index, based on a trie that contains sets of hcs *)
 type fv_index = feature list * trie
 
 let mk_fv_index features = (features, Node Ptmap.empty)
@@ -190,27 +190,27 @@ let mk_fv_index_signature signature =
   mk_fv_index features
 
 let index_clause (features, trie) hc =
-  (* feature vector of the clause *)
+  (* feature vector of the hc *)
   let fv = compute_fv features hc in
-  (* add the clause to the trie *)
-  let k set = Leaf (C.CSet.add hc set) in
+  (* add the hc to the trie *)
+  let k set = Leaf (C.CSet.add set hc) in
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
 let remove_clause (features, trie) hc =
-  (* feature vector of the clause *)
+  (* feature vector of the hc *)
   let fv = compute_fv features hc in
-  (* add the clause to the trie *)
-  let k set = Leaf (C.CSet.remove hc set) in
+  (* add the hc to the trie *)
+  let k set = Leaf (C.CSet.remove set hc) in
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
-(** clauses that subsume (potentially) the given clause *)
-let retrieve_subsuming (features, trie) clause f =
-  (* feature vector of the clause *)
-  let fv = compute_fv features clause in
+(** hcs that subsume (potentially) the given hc *)
+let retrieve_subsuming (features, trie) hc f =
+  (* feature vector of the hc *)
+  let fv = compute_fv features hc in
   let rec iter_lower fv node = match fv, node with
-  | [], Leaf set -> C.CSet.iter f set
+  | [], Leaf set -> C.CSet.iter set f
   | i::fv', Node map ->
     Ptmap.iter
       (fun j subnode -> if j <= i
@@ -220,12 +220,12 @@ let retrieve_subsuming (features, trie) clause f =
   in
   iter_lower fv trie
 
-(** clauses that are subsumed (potentially) by the given clause *)
-let retrieve_subsumed (features, trie) clause f =
-  (* feature vector of the clause *)
-  let fv = compute_fv features clause in
+(** hcs that are subsumed (potentially) by the given hc *)
+let retrieve_subsumed (features, trie) hc f =
+  (* feature vector of the hc *)
+  let fv = compute_fv features hc in
   let rec iter_higher fv node = match fv, node with
-  | [], Leaf set -> C.CSet.iter f set
+  | [], Leaf set -> C.CSet.iter set f
   | i::fv', Node map ->
     Ptmap.iter
       (fun j subnode -> if j >= i
@@ -234,4 +234,3 @@ let retrieve_subsumed (features, trie) clause f =
   | _ -> failwith "number of features in feature vector changed"
   in
   iter_higher fv trie
-

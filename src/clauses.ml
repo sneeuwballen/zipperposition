@@ -264,6 +264,8 @@ let eq_hclause hc1 hc2 = hc1 == hc2
 
 let compare_hclause hc1 hc2 = hc1.hctag - hc2.hctag
 
+let hash_hclause hc = hash_lits hc.hclits
+
 module CHashtbl = Hashtbl.Make(
   struct
     type t = hclause
@@ -426,6 +428,10 @@ let fresh_clause ~ord offset hc =
   let vars = List.map (S.apply_subst ~recursive:false subst) hc.hcvars in
   { cref=hc; clits=lits; cvars=vars; }
 
+(** create a clause from a hclause, without renaming *)
+let base_clause hc =
+  { clits = hc.hclits; cvars = hc.hcvars; cref = hc; }
+
 (** Check whether the literal is selected *)
 let is_selected hc i =
   let selected = hc.hcselected in
@@ -536,11 +542,13 @@ module CSet =
 
     let mem_id set i = Ptmap.mem i set.clauses
 
-    let iter set k = Ptmap.iter k set.clauses
+    let iter set k = Ptmap.iter (fun _ hc -> k hc) set.clauses
+
+    let iteri set k = Ptmap.iter k set.clauses
 
     let fold f acc set =
       let acc = ref acc in
-      iter set (fun i hc -> acc := f !acc i hc);
+      iteri set (fun i hc -> acc := f !acc i hc);
       !acc
 
     let partition set pred =
@@ -704,6 +712,11 @@ let pp_clause_tstp =
   end
 
 let pp_clause = ref pp_clause_debug
+
+let pp_lits formatter lits = 
+  Utils.pp_arrayi ~sep:" | "
+    (fun formatter i lit -> fprintf formatter "%a" pp_literal_debug#pp lit)
+    formatter lits
 
 (** pretty printer for proofs *)
 class type pprinter_proof =

@@ -307,7 +307,7 @@ let () =
   | Sat.Sat ->
       Printf.printf "%% SZS status CounterSatisfiable\n";
       Utils.debug 1 (lazy (Utils.sprintf "%% saturated set: @[<v>%a@]@."
-                     C.CSet.pp state.PS.active_set.PS.active_clauses))
+                     C.pp_set state.PS.active_set.PS.active_clauses))
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";

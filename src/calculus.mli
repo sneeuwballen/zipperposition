@@ -24,7 +24,7 @@ open Types
 open Symbols
 
 (** binary inferences. An inference returns a list of conclusions *)
-type binary_inf_rule = ProofState.active_set -> hclause -> hclause list
+type binary_inf_rule = ProofState.active_set -> clause -> hclause list
 
 (** unary infererences *)
 type unary_inf_rule = ord:ordering -> hclause -> hclause list
@@ -76,19 +76,14 @@ val do_unary_inferences : ord:ordering ->
                           (string * unary_inf_rule) list ->
                           hclause -> hclause list
 
-(* some helpers *)
-val fold_lits :
-  ?pos:bool -> ?neg:bool -> ?both:bool ->
-  ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
-val fold_positive :
-  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
-val fold_negative :
-  ?both:bool -> ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
-  (literal * int) list -> 'a
+(** fold on equation sides of literals that satisfy predicate *)
+val fold_lits : ?both:bool -> (int -> literal -> bool) ->
+                ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
+                literal array -> 'a
 
-val get_equations_sides : hclause -> position -> term * term * bool
+(** get the term l at given position in clause, and r such that l ?= r
+    is the literal at the given position *)
+val get_equations_sides : clause -> position -> term * term * bool
 
 (** Skolemize the given term at root (assumes it occurs just under an
     existential quantifier, whose De Bruijn variable is replaced

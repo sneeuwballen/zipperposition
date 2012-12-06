@@ -47,27 +47,30 @@ val infer_equality_factoring: Calculus.unary_inf_rule
 
 (** simplifications *)
 
-val is_tautology : clause -> bool
+val is_tautology : hclause -> bool
 
 (** semantic tautology deletion, using a congruence closure algorithm
     to see if negative literals imply some positive literal *)
-val is_semantic_tautology : clause -> bool
+val is_semantic_tautology : hclause -> bool
 
-val basic_simplify : ord:ordering -> clause -> clause   (** basic simplifications *)
+val basic_simplify : ord:ordering -> hclause -> hclause   (** basic simplifications *)
 
-val demodulate : ord:ordering -> Index.unit_index -> clause -> clause
+val demodulate : ord:ordering -> Index.unit_index -> clause -> hclause
   (** rewrite clause using orientable unit equations *)
 
 (* TODO splitting without renaming *)
 (* TODO (forward) contextual literal cutting *)
 (* TODO branch rewriting *)
 
-val positive_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> clause
-val negative_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> clause
+val positive_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> hclause
+val negative_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> hclause
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
-val subsumes : clause -> clause -> bool
-val subsumes_with : clause -> clause -> substitution option   (** returns subsuming subst *)
+val subsumes : literal array -> literal array -> bool
+val subsumes_with : literal array -> literal array -> substitution option   (** returns subsuming subst *)
+
+(** equality subsumption *)
+val eq_subsumes : literal array -> literal array -> bool
 
 (** check whether the clause is subsumed by any clause in the set *)
 val subsumed_by_set : ProofState.active_set -> clause -> bool
@@ -76,7 +79,7 @@ val subsumed_by_set : ProofState.active_set -> clause -> bool
 val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
-val cnf_of : ord:ordering -> clause -> clause list
+val cnf_of : ord:ordering -> hclause -> hclause list
 
 (** The superposition calculus *)
 val superposition : Calculus.calculus

@@ -160,7 +160,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token UNKNOWN
 
 %start parse_file
-%type <Types.clause list * string list> parse_file
+%type <Types.hclause list * string list> parse_file
 
 %start term
 %type <Types.term> term
@@ -239,8 +239,7 @@ fof_annotated:
         let ord = Orderings.default_ordering () in
         let sign = not !conjecture in (* if conjecture, negate *)
         let lit = C.mk_lit ~ord $7 T.true_term sign in
-        C.mk_clause ~ord [lit] ~selected:[]
-          (lazy (Axiom (filename, $3))) []
+        C.mk_hclause ~ord [lit] (lazy (Axiom (filename, $3))) []
       in
         init_clause ();  (* reset global state *)
         clause
@@ -350,8 +349,7 @@ cnf_annotated:
         let clause = 
           let ord = Orderings.default_ordering () in
           let filename = !Const.cur_filename in  (* ugly *)
-          let c = C.mk_clause ~ord $7 ~selected:[]
-            (lazy (Axiom (filename, $3))) [] in
+          let c = C.mk_hclause ~ord $7 (lazy (Axiom (filename, $3))) [] in
           C.clause_of_fof ~ord c
         in
           init_clause ();

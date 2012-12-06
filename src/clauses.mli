@@ -73,6 +73,7 @@ val hash_clause : clause -> int                   (** hash of the clause *)
 
 val eq_hclause : hclause -> hclause -> bool       (** equality of hashconsed clauses *)
 val compare_hclause : hclause -> hclause -> int   (** simple order on hclauses (by ID) *)
+val hash_hclause : hclause -> int
 val stats : unit -> (int*int*int*int*int*int)     (** hashconsing stats *)
 
 module CHashSet : 
@@ -128,6 +129,9 @@ val get_pos : clause -> position -> term
 
 val fresh_clause : ord:ordering -> int -> hclause -> clause
   (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
+
+val base_clause : hclause -> clause
+  (** create a clause from a hclause, without renaming *)
 
 val is_selected : hclause -> int -> bool
   (** check whether a literal is selected *)
@@ -196,8 +200,11 @@ module CSet :
     val mem_id : t -> int -> bool
       (** membership test by hclause ID *)
 
-    val iter : t -> (int -> hclause -> unit) -> unit
+    val iter : t -> (hclause -> unit) -> unit
       (** iterate on clauses in the set *)
+
+    val iteri : t -> (int -> hclause -> unit) -> unit
+      (** iterate on clauses in the set with their ID *)
 
     val fold : ('b -> int -> hclause -> 'b) -> 'b -> t -> 'b
       (** fold on clauses *)
@@ -238,12 +245,14 @@ class type pprinter_clause =
   object
     method pp_lits : Format.formatter -> literal array -> hclause -> unit
     method pp : Format.formatter -> clause -> unit      (** print clause *)
-    method pp_h : Format.formatter -> hclause -> unit(** print hclause *)
+    method pp_h : Format.formatter -> hclause -> unit   (** print hclause *)
     method pp_pos : Format.formatter -> (clause * position) -> unit
     method pp_h_pos : Format.formatter -> (hclause * position * term) -> unit
     method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
     method horizontal : bool -> unit                    (** print in horizontal box? *)
   end
+
+val pp_lits : Format.formatter -> literal array -> unit
 
 val pp_clause : pprinter_clause ref                     (** uses current term printer *)
 val pp_clause_tstp : pprinter_clause                    (** TSTP syntax *)

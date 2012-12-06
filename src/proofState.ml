@@ -59,7 +59,7 @@ let names_index () =
 (** set of active clauses *)
 type active_set = {
   a_ord : ordering;
-  active_clauses : Clauses.bag;       (** set of active clauses *)
+  active_clauses : C.CSet.t;          (** set of active clauses *)
   idx : Index.clause_index;           (** term index *)
   fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
 }
@@ -67,7 +67,7 @@ type active_set = {
 (** set of passive clauses *)
 type passive_set = {
   p_ord : ordering;
-  passive_clauses : C.bag;
+  passive_clauses : C.CSet.t;
   queues : (ClauseQueue.queue * int) list;
   queue_state : int * int;  (** position in the queue/weight *)
 }
@@ -88,10 +88,10 @@ let mk_active_set ~ord =
   let signature = ord#symbol_ordering#signature in
   (* feature vector index *)
   let fv_idx = FV.mk_fv_index_signature signature in
-  {a_ord=ord; active_clauses=C.empty_bag; idx= !cur_index; fv_idx=fv_idx}
+  {a_ord=ord; active_clauses=C.CSet.empty; idx= !cur_index; fv_idx=fv_idx}
 
 let make_state ord queue_list select unit_index =
-  let passive_set = {p_ord=ord; passive_clauses=C.empty_bag;
+  let passive_set = {p_ord=ord; passive_clauses=C.CSet.empty;
                      queues=queue_list; queue_state=(0,0)}
   and active_set = mk_active_set ~ord in
   {ord=ord;
@@ -137,10 +137,10 @@ let next_passive_clause_ passive_set =
       then next_idx passive_set (idx+1) (* queue has been used enough time, or is empty *)
       else 
         let new_q, hc = q#take_first in (* pop from this queue *)
-        if C.is_in_bag passive_set.passive_clauses hc.ctag
+        if C.CSet.mem passive_set.passive_clauses hc
           then (* the clause is still in the passive set, return it *)
             let new_q_state = (idx, weight+1) (* increment weight for the clause *)
-            and new_clauses = C.remove_from_bag passive_set.passive_clauses hc.ctag in
+            and new_clauses = C.CSet.remove passive_set.passive_clauses hc in
             U.debug 3 (lazy (U.sprintf "taken clause from %s" q#name));
             let passive_set = {passive_set with passive_clauses=new_clauses;
                 queues=U.list_set queues idx (new_q, w);
@@ -166,77 +166,89 @@ let next_passive_clause = prof_next_passive.HExtlib.profile next_passive_clause_
  * active set
  * ---------------------------------------------------------------------- *)
 
-let add_active active_set c =
-  let hc = C.hashcons_clause c in
-  if C.is_in_bag active_set.active_clauses hc.ctag
-    then active_set, hc  (* already in active set *)
+let add_active active_set hc =
+  if C.CSet.mem active_set.active_clauses hc
+    then active_set  (* already in active set *)
     else
-      let new_bag = C.add_hc_to_bag active_set.active_clauses hc
+      let new_set = C.CSet.add active_set.active_clauses hc
       and new_idx = active_set.idx#index_clause hc
       and new_fv_idx = FV.index_clause active_set.fv_idx hc in
-      {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}, hc
+      {active_set with active_clauses=new_set; idx=new_idx; fv_idx=new_fv_idx}
 
 let add_actives active_set l =
-  List.fold_left (fun b sc -> fst (add_active b sc)) active_set l
+  List.fold_left (fun b sc -> add_active b sc) active_set l
+
+let relocate_active active_set hc =
+  let ord = active_set.a_ord
+  and maxvar = active_set.active_clauses.C.CSet.maxvar in
+  C.fresh_clause ~ord maxvar hc
+
+let relocate_rules ~ord idx hc =
+  C.fresh_clause ~ord idx#maxvar hc
 
 let remove_active active_set hc =
-  if C.is_in_bag active_set.active_clauses hc.ctag
+  if C.CSet.mem active_set.active_clauses hc
     then
-      let new_bag = C.remove_from_bag active_set.active_clauses hc.ctag
+      let new_set = C.CSet.remove active_set.active_clauses hc
       and new_idx = active_set.idx#remove_clause hc
       and new_fv_idx = FV.remove_clause active_set.fv_idx hc in
-      {active_set with active_clauses=new_bag; idx=new_idx; fv_idx=new_fv_idx}
+      {active_set with active_clauses=new_set; idx=new_idx; fv_idx=new_fv_idx}
     else
       active_set
 
 let remove_actives active_set l =
   List.fold_left remove_active active_set l
 
-let remove_active_bag active_set bag =
+let remove_active_set active_set set =
   let active = ref active_set in
-  C.iter_bag bag (fun _ hc -> active := remove_active !active hc);
+  C.CSet.iter set (fun hc -> active := remove_active !active hc);
   !active
 
 let singleton_active_set ~ord clause =
   let active_set = mk_active_set ~ord in
-  let active_set, _ = add_active active_set clause in
+  let active_set = add_active active_set clause in
   active_set
 
 (* ----------------------------------------------------------------------
  * passive set
  * ---------------------------------------------------------------------- *)
   
-let add_passive_ passive_set c =
-  let hc = C.hashcons_clause c in
-  if C.is_in_bag passive_set.passive_clauses hc.ctag
-    then passive_set, hc  (* already in passive set *)
+let add_passive_ passive_set hc =
+  if C.CSet.mem passive_set.passive_clauses hc
+    then passive_set  (* already in passive set *)
     else
-      let new_bag = C.add_hc_to_bag passive_set.passive_clauses hc in
+      let new_set = C.CSet.add passive_set.passive_clauses hc in
       let new_queues = List.map
         (fun (q,weight) -> q#add hc, weight)
         passive_set.queues in
-      {passive_set with passive_clauses=new_bag; queues=new_queues}, hc
+      {passive_set with passive_clauses=new_set; queues=new_queues}
 
 let add_passive = prof_add_passive.HExtlib.profile add_passive_
 
 let add_passives passive_set l =
-  List.fold_left (fun b c -> fst (add_passive b c)) passive_set l
+  List.fold_left (fun b c -> add_passive b c) passive_set l
 
-let remove_passive passive_set c =
-  let hc = C.hashcons_clause_noselect c in
+let remove_passive passive_set hc =
   (* just remove from the set of passive clauses *)
   let new_passive_clauses = 
-    C.remove_from_bag passive_set.passive_clauses hc.ctag in
+    C.CSet.remove passive_set.passive_clauses hc in
   {passive_set with passive_clauses = new_passive_clauses}
 
 let remove_passives passive_set l =
   List.fold_left (fun set c -> remove_passive set c) passive_set l
 
+let clean_passive passive_set =
+  (* remove all clauses that are no longer in this set from queues *)
+  let set = passive_set.passive_clauses in
+  let queues =
+    List.map (fun (q, w) -> (q#clean set, w)) passive_set.queues in
+  {passive_set with queues;}
+
 (* ----------------------------------------------------------------------
  * utils
  * ---------------------------------------------------------------------- *)
 
-let maxvar_active active_set = active_set.active_clauses.C.bag_maxvar
+let maxvar_active active_set = active_set.active_clauses.C.CSet.maxvar
 
 (** statistics on the state *)
 type state_stats = {
@@ -246,34 +258,34 @@ type state_stats = {
 
 let stats state =
   {
-    stats_active_clauses = C.size_bag state.active_set.active_clauses;
-    stats_passive_clauses = C.size_bag state.passive_set.passive_clauses;
+    stats_active_clauses = C.CSet.size state.active_set.active_clauses;
+    stats_passive_clauses = C.CSet.size state.passive_set.passive_clauses;
   }
 
 let pp_state formatter state =
   Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
-    (C.size_bag state.active_set.active_clauses)
-    (C.size_bag state.passive_set.passive_clauses)
+    (C.CSet.size state.active_set.active_clauses)
+    (C.CSet.size state.passive_set.passive_clauses)
     CQ.pp_queues state.passive_set.queues
 
 let debug_state formatter state =
   Format.fprintf formatter
     "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
-    (C.size_bag state.active_set.active_clauses)
-    (C.size_bag state.passive_set.passive_clauses)
+    (C.CSet.size state.active_set.active_clauses)
+    (C.CSet.size state.passive_set.passive_clauses)
     CQ.pp_queues state.passive_set.queues
-    C.pp_bag state.active_set.active_clauses
-    C.pp_bag state.passive_set.passive_clauses
+    C.pp_set state.active_set.active_clauses
+    C.pp_set state.passive_set.passive_clauses
 
 
 module DotState = Dot.Make(
   struct
-    type vertex = clause
+    type vertex = hclause
     type edge = string
 
-    let equal = C.eq_clause
-    let hash = C.hash_clause
-    let print_vertex c = U.sprintf "@[<h>%a@]" !C.pp_clause#pp c
+    let equal = C.eq_hclause
+    let hash hc = C.hash_hclause hc
+    let print_vertex hc = U.sprintf "@[<h>%a@]" !C.pp_clause#pp_h hc
     let print_edge s = s
   end)
 
@@ -281,36 +293,36 @@ module DotState = Dot.Make(
     otherwise print the active set and its proof) *)
 let pp_dot ?(name="state") formatter state =
   let graph = DotState.mk_graph ~name
-  and explored = C.CHashSet.create ()
+  and explored = ref C.CSet.empty
   and queue = Queue.create () in
   (* start from empty clause if present, all active clauses otherwise *)
   let empty_clause = ref None in
-  try C.iter_bag state.active_set.active_clauses
-    (fun _ c' -> if c'.clits = [] then (empty_clause := Some c'; raise Exit));
+  try C.CSet.iter state.active_set.active_clauses
+    (fun hc' -> if hc'.hclits = [||] then (empty_clause := Some hc'; raise Exit));
   with Exit -> ();
   (match !empty_clause with
-  | Some c -> Queue.push c queue
-  | None -> C.iter_bag state.active_set.active_clauses
-    (fun _ c -> Queue.push c queue));
+  | Some hc -> Queue.push hc queue
+  | None ->
+    C.CSet.iter state.active_set.active_clauses (fun hc -> Queue.push hc queue));
   (* breadth first exploration of clauses and their parents *)
   while not (Queue.is_empty queue) do
-    let c = Queue.pop queue in
-    if C.CHashSet.member explored c then ()
+    let hc = Queue.pop queue in
+    if C.CSet.mem !explored hc then ()
     else begin
       (* node for this clause *)
-      let n = DotState.get_node graph c in
-      C.CHashSet.add explored c;
+      let n = DotState.get_node graph hc in
+      explored := C.CSet.add !explored hc;
       DotState.add_node_attribute n (DotState.Style "filled");
       DotState.add_node_attribute n (DotState.Shape "box");
-      (if c.clits = [] then DotState.add_node_attribute n (DotState.Color "red"));
-      match Lazy.force c.cproof with
+      (if hc.hclits = [||] then DotState.add_node_attribute n (DotState.Color "red"));
+      match Lazy.force hc.hcproof with
       | Axiom (file, axiom) ->
         DotState.add_node_attribute n (DotState.Color "yellow");
       | Proof (rule, clauses) ->
         List.iter
           (fun (parent, _, _) ->
-            Queue.push parent queue;  (* explore this parent *)
-            let n_parent = DotState.get_node graph parent in
+            Queue.push parent.cref queue;  (* explore this parent *)
+            let n_parent = DotState.get_node graph parent.cref in
             ignore (DotState.add_edge graph n_parent n rule))
           clauses
     end

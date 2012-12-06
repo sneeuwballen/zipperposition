@@ -77,6 +77,11 @@ val remove_active : active_set -> hclause -> active_set
 val remove_actives : active_set -> hclause list -> active_set
 val remove_active_set : active_set -> Clauses.CSet.t -> active_set
 
+(** get a clause that shares no variable with the active set *)
+val relocate_active : active_set -> hclause -> clause
+(** get a clause that shares no variable with the unit index *)
+val relocate_rules : ord:ordering -> Index.unit_index -> hclause -> clause
+
 (** create an active_set that contains one clause *)
 val singleton_active_set : ord:ordering -> hclause -> active_set
 
@@ -86,6 +91,8 @@ val add_passives : passive_set -> hclause list -> passive_set
 (** remove clause from passive set *)
 val remove_passive : passive_set -> hclause -> passive_set
 val remove_passives : passive_set -> hclause list -> passive_set
+(** cleanup memory in passive set *)
+val clean_passive : passive_set -> passive_set
 
 (** pop the next passive clause, if any *)
 val next_passive_clause : passive_set -> (passive_set * hclause option)

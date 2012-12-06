@@ -85,9 +85,17 @@ val list_min : ('a -> 'a -> comparison) -> 'a list -> 'a list
 val list_range : int -> int -> int list
 (** call the function n times with unit *)
 val times : int -> (unit -> 'a) -> 'a list
-
 (** shuffle randomly the list *)
 val list_shuffle : 'a list -> 'a list
+
+(** fold left on array, with index *)
+val array_foldi : ('b -> int -> 'a -> 'b) -> 'b -> 'a array -> 'b
+(** Forall on array *)
+val array_forall : ('a -> bool) -> 'a array -> bool
+(** Forall on pairs of arrays (Invalid_argument if they have distinct lengths) *)
+val array_forall2 : ('a -> 'a -> bool) -> 'a array -> 'a array -> bool
+(** exists on array *)
+val array_exists : ('a -> bool) -> 'a array -> bool
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string

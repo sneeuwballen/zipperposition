@@ -30,10 +30,10 @@ module Utils = FoUtils
 module PS = ProofState
 
 (** binary inferences. An inference returns a list of conclusions *)
-type binary_inf_rule = ProofState.active_set -> clause -> clause list
+type binary_inf_rule = ProofState.active_set -> clause -> hclause list
 
 (** unary infererences *)
-type unary_inf_rule = ord:ordering -> clause -> clause list
+type unary_inf_rule = ord:ordering -> hclause -> hclause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
@@ -43,29 +43,32 @@ class type calculus =
     (** the unary inference rules *)
     method unary_rules : (string * unary_inf_rule) list
     (** how to simplify a clause *)
-    method basic_simplify : ord:ordering -> clause -> clause
+    method basic_simplify : ord:ordering -> hclause -> hclause
     (** how to simplify a clause w.r.t a set of unit clauses *)
-    method simplify : ProofState.active_set -> Index.unit_index -> clause -> clause
+    method simplify : ProofState.active_set -> Index.unit_index -> hclause -> hclause
     (** check whether the clause is redundant w.r.t the set *)
-    method redundant : ProofState.active_set -> clause -> bool
+    method redundant : ProofState.active_set -> hclause -> bool
     (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> clause -> hclause list
+    method redundant_set : ProofState.active_set -> hclause -> hclause list
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
-    method list_simplify : ord:ordering -> select:selection_fun -> clause -> clause list option
+    method list_simplify : ord:ordering -> select:selection_fun -> hclause -> hclause list option
     (** a list of axioms to add to the problem *)
-    method axioms : clause list
+    method axioms : hclause list
     (** some constraints on the precedence *)
-    method constr : clause list -> ordering_constraint
+    method constr : hclause list -> ordering_constraint
     (** how to preprocess the initial list of clauses *)
-    method preprocess : ord:ordering -> select:selection_fun -> clause list -> clause list
+    method preprocess : ord:ordering -> select:selection_fun -> hclause list -> hclause list
   end
 
 (** do binary inferences that involve the given clause *)
-let do_binary_inferences active_set rules c =
-  Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active: %a"
-                       C.pp_bag active_set.PS.active_clauses));
+let do_binary_inferences active_set rules hc =
+  (* relocate clause *)
+  let ord = active_set.PS.a_ord in
+  let c = C.fresh_clause ~ord active_set.PS.active_clauses.C.CSet.maxvar hc in
+  Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active set: %a"
+                       C.pp_set active_set.PS.active_clauses));
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
@@ -75,64 +78,53 @@ let do_binary_inferences active_set rules c =
     [] rules
 
 (** do unary inferences for the given clause *)
-let do_unary_inferences ~ord rules c =
+let do_unary_inferences ~ord rules hc =
   Utils.debug 3 (lazy "do unary inferences");
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
       Utils.debug 3 (lazy ("#  apply unary rule " ^ name));
-      let new_clauses = rule ~ord c in
+      let new_clauses = rule ~ord hc in
       List.rev_append new_clauses acc)
     [] rules
 
 (** fold f over all literals sides, with their positions.
     f is given (acc, left side, right side, sign, position of left side)
-    if pos, then positive literals will be visited.
-    if neg, then negative literals will be visited.
-    if both, then both sides of a non-oriented equation
+    if both=true, then both sides of a non-oriented equation
       will be visited
 
     ?pos:bool -> ?neg:bool -> ?both:bool
     -> ('a -> Types.term -> Types.term -> bool -> int list -> 'a)
     -> 'a -> (Types.literal * int) list
     -> 'a *)
-let rec fold_lits ?(pos=true) ?(neg=true) ?(both=true) f acc lits =
-  if (not pos) && (not neg) then acc else
-  (* is the sign ok, given the parameters? *)
-  let sign_ok sign = if sign then pos else neg in
-  List.fold_left
-    (fun acc (lit, idx) ->
-      match lit with
-      | Equation (l,r,sign,Gt) when sign_ok sign ->
-        f acc l r sign [idx; C.left_pos]
-      | Equation (l,r,sign,Lt) when sign_ok sign ->
-        f acc r l sign [idx; C.right_pos]
-      | Equation (l,r,sign,_) when sign_ok sign ->
+let fold_lits ?(both=true) eligible f acc lits =
+  let rec fold acc i =
+    if i = Array.length lits then acc
+    else if not (eligible i lits.(i)) then fold acc (i+1)
+    else
+      let acc = match lits.(i) with
+      | Equation (l,r,sign,Gt) ->
+        f acc l r sign [i; C.left_pos]
+      | Equation (l,r,sign,Lt) ->
+        f acc r l sign [i; C.right_pos]
+      | Equation (l,r,sign,_) ->
         if both
         then (* visit both sides of the equation *)
-          let acc = f acc r l sign [idx; C.right_pos] in
-          f acc l r sign [idx; C.left_pos]
+          let acc = f acc r l sign [i; C.right_pos] in
+          f acc l r sign [i; C.left_pos]
         else (* only visit one side (arbitrary) *)
-          f acc l r sign [idx; C.left_pos]
-      | _ -> acc)
-    acc lits
-
-(** Visit all non-minimal sides of positive equations *)
-let rec fold_positive ?(both=true) f acc lits =
-  fold_lits ~pos:true ~neg:false ~both f acc lits
-
-(** Visit all non-minimal sides of negative equations *)
-let rec fold_negative ?(both=true) f acc lits =
-  fold_lits ~pos:false ~neg:true ~both f acc lits
+          f acc l r sign [i; C.left_pos]
+      in fold acc (i+1)
+  in fold acc 0
 
 (** decompose the literal at given position *)
-let get_equations_sides clause pos = match pos with
+let get_equations_sides c pos = match pos with
   | idx::eq_side::[] ->
-    (match Utils.list_get clause.clits idx with
+    (match c.clits.(idx) with
     | Equation (l,r,sign,_) when eq_side = C.left_pos -> (l, r, sign)
     | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
-  | _ -> invalid_arg "wrong kind of position (expected binary list)"
+  | _ -> invalid_arg "wrong kind of position (list of >= 2 elements)"
 
 (** Skolemize the given term at root (assumes it occurs just under an
     existential quantifier, whose De Bruijn variable is replaced

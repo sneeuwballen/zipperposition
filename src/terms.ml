@@ -87,7 +87,7 @@ module THashtbl = Hashtbl.Make(
 module THashSet =
   struct
     type t = unit THashtbl.t
-    let create () = THashtbl.create 13
+    let create () = THashtbl.create 5
     let member t term = THashtbl.mem t term
     let iter set f = THashtbl.iter (fun t () -> f t) set
     let add set t = THashtbl.replace set t ()
