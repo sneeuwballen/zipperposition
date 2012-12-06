@@ -24,6 +24,8 @@ open Types
 open Symbols
 
 val stat_fresh : statistics
+val stat_mk_hclause : statistics
+val stat_new_clause : statistics
 
 (* ----------------------------------------------------------------------
  * literals

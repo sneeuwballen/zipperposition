@@ -278,7 +278,11 @@ let is_ground_term t =
   | [] -> true
   | _ -> false
 
-let merge_varlist l1 l2 = Utils.list_union eq_term l1 l2
+(** merge two lists of variables *)
+let rec merge_varlist acc vars1 = match vars1 with
+  | [] -> acc
+  | v::vars1' when List.mem v acc -> merge_varlist acc vars1'
+  | v::vars1' -> merge_varlist (v::acc) vars1'
 
 let max_var vars =
   let rec aux idx = function

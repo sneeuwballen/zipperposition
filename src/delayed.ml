@@ -162,8 +162,8 @@ let eliminate_lits ~ord hc =
   in
   (* try to eliminate each literal that is eligible for resolution *)
   let tableau_rules =
-    Array.mapi
-      (fun i lit -> 
+    Array.map
+      (fun lit -> 
         match lit with
         | Equation (l, r, sign, _) when T.eq_term r T.true_term -> prop lit l sign
         | Equation (l, r, sign, _) when T.eq_term l T.true_term -> prop lit r sign
@@ -220,7 +220,8 @@ let recursive_eliminations ~ord ~select hc =
                     !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) clauses));
       List.iter (fun hc -> simplify (C.select_clause ~select hc)) clauses (* simplify recursively new clauses *)
   in
-  simplify hc;
+  let hc' = C.clause_of_fof ~ord hc in
+  simplify hc';
   match !clauses with
   | [hc'] when C.eq_hclause hc hc' -> None (* no simplification *)
   | l -> Some l (* some simplifications *)
@@ -308,9 +309,10 @@ let delayed : calculus =
 
     method basic_simplify ~ord hc = Sup.basic_simplify ~ord (simplify_inner ~ord hc)
 
-    method simplify actives idx hc =
+    method simplify ~select actives idx hc =
       let ord = actives.PS.a_ord in
       let hc = simplify_inner ~ord (Sup.basic_simplify ~ord hc) in
+      let hc = C.select_clause ~select hc in
       (* rename for demodulation *)
       let c = PS.relocate_rules ~ord idx hc in
       let hc = Sup.basic_simplify ~ord (Sup.demodulate ~ord idx c) in
@@ -321,6 +323,7 @@ let delayed : calculus =
       (* rename for simplify_reflect *)
       let c = PS.relocate_rules ~ord idx hc in
       let hc = Sup.negative_simplify_reflect ~ord idx c in
+      let hc = C.select_clause ~select hc in
       hc
 
     method redundant actives hc =

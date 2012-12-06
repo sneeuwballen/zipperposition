@@ -76,14 +76,14 @@ type bitvector = int
 type clause = {
   cref : hclause;                         (** the normalized clause *)
   clits : literal array;                  (** the equations *)
-  cvars : term list;                      (** the free variables (TODO remove to save ram, but keep in hclause?) *)
+  cvars : term list Lazy.t;               (** set of variables *)
 }
 (** a hashconsed clause, with additional metadata. *)
 and hclause = {
   hclits : literal array;                 (** the (normalized) equations *)
   mutable hctag : int;                    (** hashconsing tag *)
   mutable hcweight : int;                 (** weight of clause *)
-  mutable hcmaxlits : int array;          (* TODO use bitvector, more compact *)
+  hcmaxlits : int array Lazy.t;           (* TODO use bitvector, more compact *)
   mutable hcselected : int array;
   mutable hcvars : term list;             (** the free variables *)
   hcproof : proof Lazy.t;                 (** the proof for this clause (lazy...) *)

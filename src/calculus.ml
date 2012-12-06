@@ -45,7 +45,7 @@ class type calculus =
     (** how to simplify a clause *)
     method basic_simplify : ord:ordering -> hclause -> hclause
     (** how to simplify a clause w.r.t a set of unit clauses *)
-    method simplify : ProofState.active_set -> Index.unit_index -> hclause -> hclause
+    method simplify : select:selection_fun -> ProofState.active_set -> Index.unit_index -> hclause -> hclause
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> hclause -> bool
     (** find redundant clauses in set w.r.t the clause *)

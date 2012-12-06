@@ -54,22 +54,24 @@ let check_timeout = function
 
 (** simplify the hclause using the active_set. Returns both the
     hclause and the simplified hclause. *)
-let simplify_ ~calculus active_set idx old_hc =
+let simplify_ ~calculus ~select active_set idx old_hc =
   let ord = active_set.PS.a_ord in
   (* rename clause *)
-  let hc = calculus#simplify active_set idx old_hc in
+  let hc = calculus#simplify ~select active_set idx old_hc in
   let hc = calculus#basic_simplify ~ord hc in
+  let hc = C.select_clause ~select hc in
   (if not (C.eq_hclause hc old_hc)
     then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
                         !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc)));
   old_hc, hc
 
-let simplify ~calculus active_set idx hc =
-  prof_simplify.HExtlib.profile (simplify_ ~calculus active_set idx) hc
+let simplify ~calculus ~select active_set idx hc =
+  prof_simplify.HExtlib.profile (simplify_ ~calculus ~select active_set idx) hc
 
 (** Simplify the active set using the given clause. TODO use indexing *)
 let backward_simplify ~calculus state active_set given_active_set given =
   let ord = state.PS.ord in
+  let select = state.PS.state_select in
   let simplified_actives = ref [] in
   (* unit index just for the clause *)
   let idx = Dtree.unit_index#add_clause given in
@@ -77,7 +79,7 @@ let backward_simplify ~calculus state active_set given_active_set given =
   C.CSet.partition active_set.PS.active_clauses
     (fun hc ->
       (* try to simplify hc using the given clause *)
-      let original, simplified = simplify ~calculus given_active_set idx hc in
+      let original, simplified = simplify ~calculus ~select given_active_set idx hc in
       if not (C.eq_hclause original simplified)
         then begin
           (* remove the original clause form active_set, save the simplified clause *)
@@ -171,7 +173,7 @@ let all_simplify_ ~ord ~calculus ~select active_set idx clause =
     let c = Queue.pop queue in
     if Sup.is_tautology c then () else
     (* usual simplifications *)
-    let _, c = simplify ~calculus active_set idx c in
+    let _, c = simplify ~calculus ~select active_set idx c in
     let c = C.select_clause ~select c in
     (* list simplification *)
     match calculus#list_simplify ~ord ~select c with
@@ -273,10 +275,10 @@ let given_clause_step ~calculus state =
       state, Unknown
     end
 
-(** print progress *)
+(** print progress (TODO print time since start) *)
 let print_progress steps state =
   let stats = PS.stats state in
-  Format.printf "\r%d steps; %d active; %d passive" steps stats.PS.stats_active_clauses
+  Format.printf "\r%% %d steps; %d active; %d passive" steps stats.PS.stats_active_clauses
     stats.PS.stats_passive_clauses;
   Format.print_flush ()
 
@@ -292,7 +294,7 @@ let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
         (* print progress *)
         if progress && (num mod 10) = 0 then print_progress num state else ();
         (* some cleanup from time to time *)
-        let state = if (num mod 100 = 0)
+        let state = if (num mod 500 = 0)
           then (Utils.debug 1 (lazy "%% perform cleanup of passive set");
                {state with PS.passive_set= PS.clean_passive state.PS.passive_set})
           else state in

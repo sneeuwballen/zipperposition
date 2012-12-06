@@ -31,6 +31,8 @@ module Utils = FoUtils
 open Format
 
 let stat_fresh = mk_stat "fresh_clause"
+let stat_mk_hclause = mk_stat "mk_hclause"
+let stat_new_clause = mk_stat "new_clause"
 let prof_check_max_lit = HExtlib.profile ~enable:true "check_max_lit"
 
 (* ----------------------------------------------------------------------
@@ -306,25 +308,50 @@ let find_max_lits ~ord lits =
     else maximal lit i (j+1)
   in examine [] 0
 
+(** comparison of variables by index *)
+let compare_vars a b =
+  match a.term, b.term with
+  | Var i, Var j -> i - j
+  | _ -> assert false
+
+(** check whether variables are from 0 to n *)
+let check_normal vars =
+  let rec check prev = function
+  | [] -> true
+  | {term=Var n}::l -> n = prev+1 && check n l
+  | _ -> assert false
+  in check (-1) vars
+
+(** compute the set of variables of literals *)
+let rec merge_lit_vars acc lits i = 
+  if i = Array.length lits then acc else
+  match lits.(i) with
+  | Equation (l, r, _, _) ->
+    let acc = T.merge_varlist (T.merge_varlist acc l.vars) r.vars in
+    merge_lit_vars acc lits (i+1)
+
 (** Build a new hclause from the given literals *)
 let mk_hclause_a ~ord lits proof parents =
-  (* compute set of vars *)
-  let all_vars = Array.fold_left
-    (fun vars lit -> T.merge_varlist (vars_of_lit lit) vars)
-    [] lits in
+  incr_stat stat_mk_hclause;
+  let all_vars = merge_lit_vars [] lits 0 in
+  let all_vars = List.sort compare_vars all_vars in
   (* normalize literals *)
-  let subst = S.relocate 0 all_vars in
-  Array.iteri
-    (fun i lit -> lits.(i) <- apply_subst_lit ~ord ~recursive:false subst lit)
-    lits;
-  (* sort literals by hash *)
-  Array.sort (fun l1 l2 -> hash_literal l1 - hash_literal l2) lits;
+  let all_vars =
+    if check_normal all_vars
+    then all_vars
+    else begin
+      let subst = S.relocate 0 all_vars in
+      Array.iteri
+        (fun i lit -> lits.(i) <- apply_subst_lit ~ord ~recursive:false subst lit)
+        lits;
+      List.map (S.apply_subst ~recursive:false subst) all_vars
+    end in
   (* create the structure *)
   let hc = {
     hclits = lits;
     hctag = -1;
     hcweight = 0;
-    hcmaxlits = [||];
+    hcmaxlits = lazy (Array.of_list (find_max_lits ~ord lits));
     hcselected = [||];
     hcvars = [];
     hcproof = proof;
@@ -333,15 +360,16 @@ let mk_hclause_a ~ord lits proof parents =
   (* hashcons the clause, compute additional data if fresh *)
   let hc' = H.hashcons hc in
   (if hc == hc' then begin
-    hc.hcvars <- List.map (S.apply_subst ~recursive:false subst) all_vars;
+    incr_stat stat_new_clause;
+    hc.hcvars <- all_vars;
     hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
-    hc.hcmaxlits <- Array.of_list (find_max_lits ~ord lits)
     end);
   (* return hashconsed clause *)
   hc'
 
 (** build clause from a list *)
-let mk_hclause ~ord lits proof parents = mk_hclause_a ~ord (Array.of_list lits) proof parents
+let mk_hclause ~ord lits proof parents =
+  mk_hclause_a ~ord (Array.of_list lits) proof parents
 
 (** simplify literals *)
 let clause_of_fof ~ord hc =
@@ -369,7 +397,7 @@ let parents hc = hc.hcparents
 
 (** Check whether the literal is maximal *)
 let is_maxlit hc i =
-  let maxlits = hc.hcmaxlits in
+  let maxlits = Lazy.force hc.hcmaxlits in
   (* iterate through the array of indexes of maximum literals *)
   let rec check j =
     if j = Array.length maxlits then false else
@@ -398,7 +426,7 @@ let check_maximal_lit ~ord clause pos subst =
 let maxlits c =
   Array.fold_left
     (fun acc i -> (c.clits.(i), i) :: acc)
-    [] c.cref.hcmaxlits
+    [] (Lazy.force c.cref.hcmaxlits)
 
 (** Apply substitution to the clause *)
 let rec apply_subst_cl ?(recursive=true) ~ord subst hc =
@@ -423,14 +451,16 @@ let get_pos c pos =
 
 (** Get a variant of the clause, in which variables are all > offset *)
 let fresh_clause ~ord offset hc =
-  let subst = S.relocate offset hc.hcvars in
-  let lits = Array.map (apply_subst_lit ~recursive:false ~ord subst) hc.hclits in
-  let vars = List.map (S.apply_subst ~recursive:false subst) hc.hcvars in
-  { cref=hc; clits=lits; cvars=vars; }
+  incr_stat stat_fresh;
+  let subst = S.relocate (offset + 1) hc.hcvars in
+  let clits = Array.map (apply_subst_lit ~recursive:false ~ord subst) hc.hclits in
+  let cvars = lazy (List.map (S.apply_subst ~recursive:false subst) hc.hcvars) in
+  { cref=hc; clits; cvars; }
 
 (** create a clause from a hclause, without renaming *)
 let base_clause hc =
-  { clits = hc.hclits; cvars = hc.hcvars; cref = hc; }
+  incr_stat stat_fresh;
+  { clits = hc.hclits; cref = hc; cvars = Lazy.lazy_from_val hc.hcvars}
 
 (** Check whether the literal is selected *)
 let is_selected hc i =

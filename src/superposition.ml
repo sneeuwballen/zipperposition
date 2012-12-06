@@ -48,7 +48,8 @@ let print_stats () =
     (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
     [stat_superposition_call; stat_equality_resolution_call; stat_equality_factoring_call;
      stat_subsumption_call; stat_subsumed_in_set_call; stat_subsumed_by_set_call;
-     stat_basic_simplify; stat_demodulate_call; stat_demodulate_step; C.stat_fresh]
+     stat_basic_simplify; stat_demodulate_call; stat_demodulate_step;
+     C.stat_fresh; C.stat_mk_hclause; C.stat_new_clause]
 
 (* for profiling *)
 let enable = true
@@ -127,14 +128,14 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
                        !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
                        !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
                        C.pp_pos passive_pos S.pp_substitution subst));
-  assert ((Utils.list_inter T.eq_term active_clause.cvars passive_clause.cvars) = []);
+  assert ((Utils.list_inter T.eq_term (Lazy.force active_clause.cvars) (Lazy.force passive_clause.cvars)) = []);
   assert (T.db_closed s);
   if not sign_st 
   then (Utils.debug 3 (lazy "... active literal is negative"); acc)
   else if not (T.atomic s) (* do not rewrite non-atomic formulas *)
   then (Utils.debug 3 (lazy "... active term is not atomic or DB-closed"); acc)
   else if not (T.db_closed (T.at_pos u subterm_pos))
-    && (List.exists (fun x -> S.is_in_subst x subst) passive_clause.cvars)
+    && (List.exists (fun x -> S.is_in_subst x subst) (Lazy.force passive_clause.cvars))
   then (Utils.debug 3 (lazy "... narrowing with De Bruijn indices"); acc)
   else
   let t' = S.apply_subst subst t
@@ -433,8 +434,6 @@ let is_semantic_tautology c = false (* TODO *)
 
 let basic_simplify ~ord hc =
   incr_stat stat_basic_simplify;
-  (* convert some fof to literals *)
-  let hc = C.clause_of_fof ~ord hc in
   let absurd_lit lit = match lit with
   | Equation (l, r, false, _) when T.eq_term l r -> true
   | _ -> false in
@@ -459,13 +458,16 @@ let basic_simplify ~ord hc =
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
-  let parents = hc :: C.parents hc in
-  let proof = hc.hcproof in  (* do not bother printing this *)
-  let new_clause = C.mk_hclause ~ord new_lits proof parents in
-  (if not (C.eq_hclause new_clause hc) then
-      (Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
-      !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause))));
-  new_clause
+  if List.length new_lits = Array.length hc.hclits
+  then hc (* no change *)
+  else begin
+    let parents = hc :: C.parents hc in
+    let proof = hc.hcproof in  (* do not bother printing this *)
+    let new_clause = C.mk_hclause ~ord new_lits proof parents in
+    Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
+    !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause));
+    new_clause
+  end
 
 exception FoundMatch of (term * hclause * substitution)
 
@@ -908,9 +910,10 @@ let superposition : Calculus.calculus =
 
     method basic_simplify ~ord c = basic_simplify ~ord c
 
-    method simplify actives idx hc =
+    method simplify ~select actives idx hc =
       let ord = actives.PS.a_ord in
       let hc = basic_simplify ~ord hc in
+      let hc = C.select_clause ~select hc in
       (* rename for demodulation *)
       let c = PS.relocate_rules ~ord idx hc in
       let hc = basic_simplify ~ord (demodulate ~ord idx c) in
@@ -920,6 +923,7 @@ let superposition : Calculus.calculus =
       (* rename for simplify reflect *)
       let c = PS.relocate_rules ~ord idx hc in
       let hc = negative_simplify_reflect ~ord idx c in
+      let hc = C.select_clause ~select hc in
       hc
 
     method redundant actives hc =
