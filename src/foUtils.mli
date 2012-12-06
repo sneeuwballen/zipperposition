@@ -92,6 +92,12 @@ val list_shuffle : 'a list -> 'a list
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string
 val sprintf : ('a, Format.formatter, unit, string) format4 -> 'a
-(* print a list of items using the printing function *)
+(** print a list of items using the printing function *)
 val pp_list: ?sep:string -> (Format.formatter -> 'a -> unit)
           -> Format.formatter -> 'a list -> unit
+(** print an array of items with printing function *)
+val pp_array: ?sep:string -> (Format.formatter -> 'a -> unit)
+          -> Format.formatter -> 'a array -> unit
+(** print an array, giving the printing function both index and item *)
+val pp_arrayi: ?sep:string -> (Format.formatter -> int -> 'a -> unit)
+          -> Format.formatter -> 'a array -> unit
