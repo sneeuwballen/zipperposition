@@ -42,9 +42,14 @@ let skip t pos =
 type character = Symbol of symbol | Variable of term
 
 let compare_char c1 c2 =
+  (* compare variables by index *)
+  let compare_vars v1 v2 = match v1.term, v2.term with
+    | Var i, Var j -> i - j
+    | _ -> assert false
+  in
   match c1, c2 with
   | Symbol s1, Symbol s2 -> Symbols.compare_symbols s1 s2
-  | Variable v1, Variable v2 -> T.compare_term v1 v2
+  | Variable v1, Variable v2 -> compare_vars v1 v2
   | Symbol _, Variable _ -> -1
   | Variable _, Symbol _ -> 1
 

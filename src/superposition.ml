@@ -345,12 +345,13 @@ let demod_nf ?(subterms_only=false) ~ord idx clauses t =
           idx#retrieve ~sign:true t
             (fun l r subst unit_hclause ->
               (* r is the term subterm is going to be rewritten into *)
+              assert (C.is_unit_clause unit_hclause);
               let new_l = t
               and new_r = S.apply_subst subst r in
               if oriented_hclause unit_hclause || ord#compare new_l new_r = Gt
                 (* subst(l) > subst(r), we can rewrite *)
                 then begin
-                  assert (ord#compare new_l new_r = Gt); (* TODO remove *)
+                  assert (ord#compare new_l new_r = Gt);
                   Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
                                  !T.pp_term#pp new_l !T.pp_term#pp new_r
                                  !C.pp_clause#pp_h unit_hclause));
@@ -362,7 +363,8 @@ let demod_nf ?(subterms_only=false) ~ord idx clauses t =
                          !T.pp_term#pp new_l !T.pp_term#pp new_r
                          !C.pp_clause#pp_h unit_hclause)));
           t (* not found any match, normal form found *)
-        with RewriteInto t' -> normal_form t'
+        with RewriteInto t' ->
+          normal_form t' (* done one rewriting step, continue *)
       end
   (* rewrite innermost-leftmost *)
   and traverse t =
@@ -393,14 +395,16 @@ let demodulate ~ord idx c =
       C.mk_eq ~ord (demod_nf ~subterms_only:true ~ord idx clauses l) (demod_nf ~ord idx clauses r)
     | Equation (l, r, true, Lt) when C.eligible_res ~ord c i S.id_subst ->
       C.mk_eq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~subterms_only:true ~ord idx clauses r)
-    | Equation (l, r, true, _) ->  (* rewrite unconditionally *)
+    | Equation (l, r, true, _) when C.eligible_res ~ord c i S.id_subst ->
+      C.mk_eq ~ord (demod_nf ~ord ~subterms_only:true idx clauses l) (demod_nf ~ord ~subterms_only:true idx clauses r)
+    | Equation (l, r, true, _) ->
       C.mk_eq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~ord idx clauses r)
   in
   (* demodulate every literal *)
   let lits = Array.mapi demod_lit c.clits in
   if !clauses = []
     then begin (* no rewriting performed *)
-      assert (Utils.array_forall2 C.eq_literal c.clits lits);
+      assert (Utils.array_forall2 C.eq_literal_com c.clits lits);
       c.cref
     end else begin  (* construct new clause *)
       let proof = lazy (Proof ("demod", (c, [], S.id_subst) :: !clauses)) in
@@ -436,6 +440,8 @@ let basic_simplify ~ord hc =
   incr_stat stat_basic_simplify;
   let absurd_lit lit = match lit with
   | Equation (l, r, false, _) when T.eq_term l r -> true
+  | Equation (l, r, true, _) when (l == T.true_term && r == T.false_term)
+                               || (l == T.false_term && r == T.true_term) -> true
   | _ -> false in
   let lits = Array.to_list hc.hclits in
   (* remove s!=s literals *)
@@ -950,9 +956,7 @@ let superposition : Calculus.calculus =
             (fun acc hc ->
               let hc = C.reord_hclause ~ord (C.clause_of_fof ~ord hc) in
               let hc = basic_simplify ~ord hc in
-              if is_tautology hc
-                then acc
-                else hc :: acc)
+              if is_tautology hc then acc else hc :: acc)
             acc clauses)
         [] l
   end

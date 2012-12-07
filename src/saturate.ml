@@ -159,11 +159,12 @@ let all_simplify_ ~ord ~calculus ~select active_set idx hc =
   Queue.push hc queue;
   while not (Queue.is_empty queue) do
     let hc = Queue.pop queue in
-    if Sup.is_tautology hc then () else
     (* usual simplifications *)
     let hc = C.select_clause ~select hc in
     let _, hc = simplify ~calculus ~select active_set idx hc in
     let hc = C.select_clause ~select hc in
+    (* do not keep tautologies *)
+    if Sup.is_tautology hc then () else
     (* list simplification *)
     match calculus#list_simplify ~ord ~select hc with
     | None -> clauses := hc :: !clauses (* totally simplified clause *)
@@ -209,6 +210,7 @@ let given_clause_step ~calculus state =
       (* select literals *)
       let hc = C.select_clause select hc in
       Sel.check_selected hc;
+      C.check_ord_hclause ~ord hc;
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
                     !C.pp_clause#pp_h hc));
@@ -241,6 +243,7 @@ let given_clause_step ~calculus state =
       let new_clauses = List.fold_left
         (fun new_clauses hc ->
           let cs = all_simplify ~ord ~select ~calculus state.PS.active_set state.PS.state_index hc in
+          C.check_ord_hclause ~ord hc;
           List.rev_append cs new_clauses)
         [] new_clauses
       in

@@ -47,15 +47,15 @@ let compute_signature () =
        end);
   sorts, arities, !symbols
 
-let sig_version = ref 0  (* version of signature that is computed *)
-
 let current_signature =
+  (* version of signature that is computed *)
+  let sig_version = ref 0 in
   (* store the signature, to avoid recomputing it all the time *)
   let cached_signature = ref (compute_signature ()) in
   fun () ->
     assert (!sig_version <= !Symbols.sig_version);
     (if !sig_version < !Symbols.sig_version
-      then (sig_version := !Symbols.sig_version;(* recompute signature, it did change *)
+      then (sig_version := !Symbols.sig_version; (* recompute signature, it did change *)
             cached_signature := compute_signature ()));
     !cached_signature
 

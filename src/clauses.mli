@@ -47,6 +47,7 @@ val weight_literal : literal -> int                 (** weight of the lit *)
 val pos_lit : literal -> bool                       (** is the literal positive? *)
 val neg_lit : literal -> bool                       (** is the literal negative? *)
 val equational_lit : literal -> bool                (** is the literal a proper equation? *)
+val orientation_lit : literal -> comparison         (** get the orientation of the literal *)
 
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
@@ -100,6 +101,9 @@ val clause_of_fof : ord:ordering -> hclause -> hclause
 
 val reord_hclause : ord:ordering -> hclause -> hclause
   (** recompute order of literals in the clause *)
+
+val check_ord_hclause : ord:ordering -> hclause -> unit
+  (** checks that the clause is up-to-date w.r.t. the ordering *)
 
 val select_clause : select:selection_fun -> hclause -> hclause
   (** select literals in clause, and computes ordering data *)

@@ -348,14 +348,16 @@ let delayed : calculus =
     method preprocess ~ord ~select l =
       Utils.list_flatmap
         (fun hc ->
-          let hc = Sup.basic_simplify ~ord (C.clause_of_fof ~ord hc) in
           let hc = C.reord_hclause ~ord hc in
+          let hc = Sup.basic_simplify ~ord (C.clause_of_fof ~ord hc) in
+          C.check_ord_hclause ~ord hc;
           match self#list_simplify ~ord ~select hc with
           | None -> if Sup.is_tautology hc then [] else [hc]
           | Some clauses ->
             List.fold_left
               (fun clauses hc ->
                 let hc = C.clause_of_fof ~ord hc in
+                C.check_ord_hclause ~ord hc;
                 if not (Sup.is_tautology hc) then hc :: clauses else clauses)
               [] clauses)
         l

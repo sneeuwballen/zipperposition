@@ -54,10 +54,10 @@ let eq_literal l1 l2 =
 
 let eq_literal_com l1 l2 =
   match l1, l2 with
-  | Equation (l1,r1,sign1,_), Equation (l2,r2,sign2,_) ->
+  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
       sign1 = sign2 &&
-      ((T.eq_term l1 l2 && T.eq_term r1 r2) ||
-       (T.eq_term l1 r2 && T.eq_term r1 l2))
+      ((T.eq_term l1 l2 && T.eq_term r1 r2 && o1 = o2) ||
+       (T.eq_term l1 r2 && T.eq_term r1 l2 && o1 = (Utils.not_partial o2)))
 
 let compare_literal l1 l2 =
   match l1, l2 with
@@ -117,10 +117,10 @@ let compare_lits_partial ~ord l1 l2 =
     | _ -> Incomparable
 
 let hash_literal lit = match lit with
-  | Equation (l, r, sign, _) ->
+  | Equation (l, r, sign, o) ->
     if sign
-      then Utils.murmur_hash ((Utils.murmur_hash l.hkey) lxor r.hkey)
-      else Utils.murmur_hash ((Utils.murmur_hash r.hkey) lxor l.hkey)
+      then Hashtbl.hash o lxor ((Utils.murmur_hash l.hkey) lxor r.hkey)
+      else Hashtbl.hash o lxor ((Utils.murmur_hash r.hkey) lxor l.hkey)
 
 let weight_literal = function
   | Equation (l, r, _ ,_) -> l.tsize + r.tsize
@@ -133,6 +133,9 @@ let neg_lit lit = match lit with
 
 let equational_lit = function
   | Equation (l, r, _,_) -> l != T.true_term && r != T.true_term
+
+let orientation_lit = function
+  | Equation (_, _, _, ord) -> ord
 
 let check_type a b = if a.sort <> b.sort
   then raise (SortError "sides of equations of different sorts") else ()
@@ -150,16 +153,16 @@ let mk_lit ~ord a b sign =
   Equation (a, b, sign, ord#compare a b)
 
 let apply_subst_lit ?(recursive=true) ~ord subst lit =
-  if subst = S.id_subst then lit
-  else match lit with
+  match lit with
   | Equation (l,r,sign,_) ->
-    assert (l.sort = r.sort);
-    let new_l = S.apply_subst ~recursive subst l
-    and new_r = S.apply_subst ~recursive subst r
-    in
-    mk_lit ~ord new_l new_r sign
+    if subst = S.id_subst
+    then mk_lit ~ord l r sign
+    else
+      let new_l = S.apply_subst ~recursive subst l
+      and new_r = S.apply_subst ~recursive subst r in
+      mk_lit ~ord new_l new_r sign
 
-let reord_lit ~ord (Equation (l,r,sign,_)) = Equation (l,r,sign, ord#compare l r)
+let reord_lit ~ord (Equation (l,r,sign,_)) = mk_lit ~ord l r sign
 
 let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
   match l.term, r.term with
@@ -336,15 +339,12 @@ let mk_hclause_a ~ord lits proof parents =
   let all_vars = List.sort compare_vars all_vars in
   (* normalize literals *)
   let all_vars =
-    if check_normal all_vars
-    then all_vars
-    else begin
-      let subst = S.relocate 0 all_vars in
-      Array.iteri
-        (fun i lit -> lits.(i) <- apply_subst_lit ~ord ~recursive:false subst lit)
-        lits;
-      List.map (S.apply_subst ~recursive:false subst) all_vars
-    end in
+    let subst = if check_normal all_vars then S.id_subst else S.relocate 0 all_vars in
+    Array.iteri
+      (fun i lit -> lits.(i) <- apply_subst_lit ~ord ~recursive:false subst lit)
+      lits;
+    List.map (S.apply_subst ~recursive:false subst) all_vars
+  in
   (* create the structure *)
   let hc = {
     hclits = lits;
@@ -383,6 +383,16 @@ let clause_of_fof ~ord hc =
 let reord_hclause ~ord hc =
   let lits = Array.map (reord_lit ~ord) hc.hclits in
   mk_hclause_a ~ord lits hc.hcproof hc.hcparents
+
+(** check the ordering relation of lits (always true after reord_clause ~ord) *)
+let check_ord_hclause ~ord hc =
+  assert (
+  Utils.array_forall
+    (function (Equation (l,r,_,o)) ->
+      let ok = o = ord#compare l r in
+      (if not ok then Format.printf "@[<h>Ord problem: literal %a %a" !T.pp_term#pp l !T.pp_term#pp r);
+      ok)
+    hc.hclits)
 
 (** Compute selected literals. This also cast the clause into a ready clause.
     Note that selection on a unit clause is a no-op. *)
@@ -729,9 +739,12 @@ let pp_clause_tstp =
       (* how to print the list of literals *)
       let lits_printer formatter lits =
         (* convert into a big term *)
-        let t = Array.fold_left
-          (fun t lit -> T.mk_or t (term_of_lit lit))
-          T.false_term lits
+        let t =
+          match lits with
+          | [||] -> T.false_term
+          | _ -> Array.fold_left
+            (fun t lit -> T.mk_or t (term_of_lit lit))
+            (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
         in
         (* quantify all free variables *)
         let vars = t.vars in

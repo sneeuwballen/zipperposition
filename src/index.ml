@@ -140,7 +140,8 @@ let process_lit op c tree (lit, pos) =
   | Equation (l,r,_,Eq) ->
     Utils.debug 4 (lazy (Utils.sprintf "add %a = %a to index"
                    !T.pp_term#pp l !T.pp_term#pp r));
-    op tree l (c, [C.left_pos; pos])  (* only index one side *)
+    let tmp_tree = op tree l (c, [C.left_pos; pos]) in
+    op tmp_tree r (c, [C.right_pos; pos])
 
 (** apply op to the maximal literals of the clause, and only to
     the maximal side(s) of those, if restruct is true. Otherwise

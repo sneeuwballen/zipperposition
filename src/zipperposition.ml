@@ -270,7 +270,8 @@ let () =
     | x -> failwith ("unknown ordering " ^ x) in
   let so = if params.param_precedence
     then Precedence.heuristic_precedence ord_factory (calculus#constr clauses) clauses
-    else Precedence.make_ordering (Precedence.compose_constraints Precedence.alpha_constraint (calculus#constr clauses)) in
+    else Precedence.make_ordering (Precedence.compose_constraints
+                                   Precedence.alpha_constraint (calculus#constr clauses)) in
   let ord = ord_factory so in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (* indexing *)
@@ -281,7 +282,8 @@ let () =
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~ord ~select (List.map (C.reord_hclause ~ord) clauses) in
+  let clauses = calculus#preprocess ~ord ~select clauses in
+  List.iter (C.check_ord_hclause ~ord) clauses;
   let clauses = if params.param_presimplify
     then Sat.initial_simplifications ~ord ~calculus ~select clauses
     else clauses in
