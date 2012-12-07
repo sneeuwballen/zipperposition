@@ -155,7 +155,7 @@ let function_definition ~ord p f =
   and rhs = T.mk_eq (T.mk_node f univ_sort [x;y]) z in
   let axiom_name = Utils.sprintf "function_definition_%s_%s" (name_symbol p) (name_symbol f) in
   (* TODO a proper proof ;) *)
-  let proof = Lazy.lazy_from_val (Axiom (axiom_name, "/dev/null.ax")) in
+  let proof = Lazy.lazy_from_val (Axiom (axiom_name, "'/dev/null'")) in
   C.mk_hclause ~ord [C.mk_eq ~ord lhs rhs] proof []
 
 let detect_total_relations ~ord clauses =
