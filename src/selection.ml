@@ -129,6 +129,7 @@ let available_selections () =
   !l
 
 let check_selected hc =
+  assert hc.hcselected_done;
   if C.selected hc = [||] then ()
   else assert
     (Utils.array_foldi

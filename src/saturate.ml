@@ -165,21 +165,22 @@ let subsumed_by ~calculus active_set hc =
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if redundant or trivial).
     This is used on generated clauses, and on the given clause. *)
-let all_simplify_ ~ord ~calculus ~select active_set idx clause =
+let all_simplify_ ~ord ~calculus ~select active_set idx hc =
   let clauses = ref []
   and queue = Queue.create () in
-  Queue.push clause queue;
+  Queue.push hc queue;
   while not (Queue.is_empty queue) do
-    let c = Queue.pop queue in
-    if Sup.is_tautology c then () else
+    let hc = Queue.pop queue in
+    if Sup.is_tautology hc then () else
     (* usual simplifications *)
-    let _, c = simplify ~calculus ~select active_set idx c in
-    let c = C.select_clause ~select c in
+    let hc = C.select_clause ~select hc in
+    let _, hc = simplify ~calculus ~select active_set idx hc in
+    let hc = C.select_clause ~select hc in
     (* list simplification *)
-    match calculus#list_simplify ~ord ~select c with
-    | None -> clauses := c :: !clauses (* totally simplified clause *)
+    match calculus#list_simplify ~ord ~select hc with
+    | None -> clauses := hc :: !clauses (* totally simplified clause *)
     | Some clauses ->
-      List.iter (fun c' -> Queue.push c' queue) clauses (* process new clauses *)
+      List.iter (fun hc' -> Queue.push hc' queue) clauses (* process new clauses *)
   done;
   !clauses
 

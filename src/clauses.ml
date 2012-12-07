@@ -39,9 +39,8 @@ let prof_check_max_lit = HExtlib.profile ~enable:true "check_max_lit"
  * literals
  * ---------------------------------------------------------------------- *)
 
-let left_pos = 1
-
-let right_pos = 2
+let left_pos = 0
+let right_pos = 1
 
 let opposite_pos p = match p with
   | _ when p = left_pos -> right_pos
@@ -352,6 +351,7 @@ let mk_hclause_a ~ord lits proof parents =
     hctag = -1;
     hcweight = 0;
     hcmaxlits = lazy (Array.of_list (find_max_lits ~ord lits));
+    hcselected_done = false;
     hcselected = [||];
     hcvars = [];
     hcproof = proof;
@@ -385,8 +385,11 @@ let reord_hclause ~ord hc =
     Note that selection on a unit clause is a no-op. *)
 let select_clause ~select hc =
   (match hc.hclits with
-   | [|_|] -> ()  (* selection useless in unit clauses *)
-   | _ -> hc.hcselected <- Array.of_list (select hc));
+   | _ when hc.hcselected_done -> ()  (* already selected *)
+   | [|_|] -> hc.hcselected_done <- true  (* selection useless in unit clauses *)
+   | _ ->
+    (hc.hcselected <- Array.of_list (select hc);
+     hc.hcselected_done <- true));
   hc
 
 (** selected literals *)

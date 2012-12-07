@@ -84,6 +84,7 @@ and hclause = {
   mutable hctag : int;                    (** hashconsing tag *)
   mutable hcweight : int;                 (** weight of clause *)
   hcmaxlits : int array Lazy.t;           (* TODO use bitvector, more compact *)
+  mutable hcselected_done : bool;
   mutable hcselected : int array;
   mutable hcvars : term list;             (** the free variables *)
   hcproof : proof Lazy.t;                 (** the proof for this clause (lazy...) *)
