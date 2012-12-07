@@ -23,6 +23,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 open Symbols
 
+(* ----------------------------------------------------------------------
+ * recognize some shapes of clauses
+ * ---------------------------------------------------------------------- *)
+
 val is_RR_horn_clause : hclause -> bool
   (** Recognized whether the clause is a Range-Restricted Horn clause *)
 
@@ -40,3 +44,22 @@ val is_rewrite_rule : hclause -> (term * term) list
 
 val is_pos_eq : hclause -> (term * term) option
   (** Recognize whether the clause is a positive unit equality. *)
+
+
+val is_functional_symbol : hclause -> [ `Functional of symbol | `None ]
+  (** detect whether the clause is "p(x,y,z) & p(x,y,z') => z=z'", and
+      returns p in this case *)
+
+val is_total_symbol : hclause -> [ `Total of (symbol * symbol) | `None ]
+  (** detect whether the clause is "p(x,y,f(x,y))", and returns (p,f)
+      in this case *)
+
+(* ----------------------------------------------------------------------
+ * add some axioms when detecting some axioms
+ * ---------------------------------------------------------------------- *)
+
+val detect_total_relations : ord:ordering -> hclause list -> hclause list
+  (** adds axioms for all total functional relations:
+      if  p(x,y,f(x,y))  and  p(x,y,z) & p(x,y,z') => z=z
+      we add  p(x,y,z) <=> (z = f(x,y))  as a definition of p *)
+

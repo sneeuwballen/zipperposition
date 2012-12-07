@@ -260,6 +260,9 @@ let () =
   let clauses = calculus#preprocess ~ord:(O.default_ordering ()) ~select:no_select clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
+  (* XXX detect some axioms *)
+  let axioms = Theories.detect_total_relations ~ord:(O.default_ordering ()) clauses in
+  let clauses = List.rev_append axioms clauses in
   (* choose an ord now, using clauses *)
   let ord_factory = match params.param_ord with
     | "rpo" -> O.rpo
