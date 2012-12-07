@@ -50,8 +50,8 @@ let opposite_pos p = match p with
 
 let eq_literal l1 l2 =
   match l1, l2 with
-  | Equation (l1,r1,sign1,_), Equation (l2,r2,sign2,_) ->
-      sign1 = sign2 && T.eq_term l1 l2 && T.eq_term r1 r2
+  | Equation (l1,r1,sign1,ord1), Equation (l2,r2,sign2,ord2) ->
+      sign1 = sign2 && T.eq_term l1 l2 && T.eq_term r1 r2 && ord1 = ord2
 
 let eq_literal_com l1 l2 =
   match l1, l2 with
