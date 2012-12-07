@@ -27,7 +27,6 @@ module FV = FeatureVector
 module C = Clauses
 module U = FoUtils
 module CQ = ClauseQueue
-module CD = ClauseDag
 
 let prof_add_passive = HExtlib.profile ~enable:true "add_passives"
 let prof_next_passive = HExtlib.profile ~enable:true "next_passive"
@@ -81,7 +80,6 @@ type state = {
   state_index : Index.unit_index; (** index used for unit simplification *)
   active_set : active_set;      (** active clauses, indexed *)
   passive_set : passive_set;    (** passive clauses *)
-  dag : CD.clause_dag;          (** DAG of clauses *)
 }
 
 let mk_active_set ~ord =
@@ -98,8 +96,7 @@ let make_state ord queue_list select unit_index =
    state_select=select;
    state_index = unit_index;
    active_set=active_set;
-   passive_set=passive_set;
-   dag=CD.empty;}
+   passive_set=passive_set; }
 
 (* ----------------------------------------------------------------------
  * simplification rules (unit clauses)
@@ -236,6 +233,12 @@ let remove_passive passive_set hc =
 
 let remove_passives passive_set l =
   List.fold_left (fun set c -> remove_passive set c) passive_set l
+
+let remove_passives_set passive_set s =
+  let passive_clauses =
+    Ptset.fold (fun id clauses -> C.CSet.remove_id clauses id)
+      s passive_set.passive_clauses
+  in {passive_set with passive_clauses;}
 
 let clean_passive passive_set =
   (* remove all clauses that are no longer in this set from queues *)

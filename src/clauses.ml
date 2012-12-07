@@ -356,6 +356,7 @@ let mk_hclause_a ~ord lits proof parents =
     hcvars = [];
     hcproof = proof;
     hcparents = parents;
+    hcdescendants = Ptset.empty;
   } in
   (* hashcons the clause, compute additional data if fresh *)
   let hc' = H.hashcons hc in
@@ -363,6 +364,8 @@ let mk_hclause_a ~ord lits proof parents =
     incr_stat stat_new_clause;
     hc.hcvars <- all_vars;
     hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
+    (* update the parent clauses' sets of descendants *)
+    List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
     end);
   (* return hashconsed clause *)
   hc'
@@ -395,8 +398,8 @@ let select_clause ~select hc =
 (** selected literals *)
 let selected hc = hc.hcselected
 
-(** parents of the clause *)
-let parents hc = hc.hcparents
+(** descendants of the clause *)
+let descendants hc = hc.hcdescendants
 
 (** Check whether the literal is maximal *)
 let is_maxlit hc i =
@@ -559,8 +562,10 @@ module CSet =
       in
       if size s1 < size s2 then merge_into s1 s2 else merge_into s2 s1
 
-    let remove set hc =
-      { set with clauses = Ptmap.remove hc.hctag set.clauses;}
+    let remove_id set i =
+      { set with clauses = Ptmap.remove i set.clauses }
+
+    let remove set hc = remove_id set hc.hctag
 
     let remove_list set hcs =
       let clauses =

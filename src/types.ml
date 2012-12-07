@@ -88,7 +88,8 @@ and hclause = {
   mutable hcselected : int array;
   mutable hcvars : term list;             (** the free variables *)
   hcproof : proof Lazy.t;                 (** the proof for this clause (lazy...) *)
-  hcparents : hclause list;               (** clauses used to create this one *)
+  hcparents : hclause list;               (** parents of the clause *)
+  mutable hcdescendants : Ptset.t;        (** the set of descendants of the clause *)
 }
 (** a proof step for a clause
     TODO share substitution; use compact_position *)

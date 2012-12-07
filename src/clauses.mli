@@ -107,8 +107,8 @@ val select_clause : select:selection_fun -> hclause -> hclause
 val selected: hclause -> int array
   (** indexes of selected literals *)
 
-val parents : hclause -> hclause list
-  (** list of parents of the clause *)
+val descendants : hclause -> Ptset.t
+  (** set of ID of descendants of the clause *)
 
 val is_maxlit : hclause -> int -> bool
   (** i-th literal maximal in clause? *)
@@ -186,6 +186,9 @@ module CSet :
 
     val union : t -> t -> t
       (** union of sets (slow) *)
+
+    val remove_id : t -> int -> t
+      (** remove clause by ID *)
 
     val remove : t -> hclause -> t
       (** remove hclause *)

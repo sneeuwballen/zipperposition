@@ -40,7 +40,7 @@ module Delayed = Delayed
 let seed = ref 1928575
 let _ = Random.init !seed
 
-let version = "0.1"
+let version = "0.2"
 
 (** parameters for the main procedure *)
 type parameters = {

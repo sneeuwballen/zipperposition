@@ -25,7 +25,6 @@ open Types
 module C = Clauses
 module O = Orderings
 module PS = ProofState
-module CD = ClauseDag
 module Sup = Superposition
 module Sel = Selection
 module Utils = FoUtils
@@ -70,7 +69,6 @@ let simplify ~calculus ~select active_set idx hc =
 
 (** Simplify the active set using the given clause. TODO use indexing *)
 let backward_simplify ~calculus state active_set given_active_set given =
-  let ord = state.PS.ord in
   let select = state.PS.state_select in
   let simplified_actives = ref [] in
   (* unit index just for the clause *)
@@ -87,10 +85,6 @@ let backward_simplify ~calculus state active_set given_active_set given =
           Utils.debug 2 (lazy (Utils.sprintf
                        "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
                        !C.pp_clause#pp_h original !C.pp_clause#pp_h simplified));
-          Utils.debug 3 (lazy (Utils.sprintf
-                        "@[<hov 4>simplified clause @[<h>%a@]@ has descendants @[<h>%a@]@]"
-                        !C.pp_clause#pp_h original (Utils.pp_list !C.pp_clause#pp_h)
-                        (CD.descendants ~ord state.PS.dag original)));
           false
         end else true) (* no change *)
 
@@ -139,18 +133,12 @@ let generate ~calculus state hc =
 
 (** remove direct descendants of the clauses from the passive set *)
 let remove_orphans state removed_clauses =
-  let passive = state.PS.passive_set
-  and ord = state.PS.ord in
   let passive =
     List.fold_left
       (fun passive removed_clause ->
         (* remove descendnts of removed_clause from the passive set *)
-        let descendants = CD.descendants ~ord state.PS.dag removed_clause in
-        List.iter (fun c ->
-          Utils.debug 3 (lazy (Utils.sprintf "  @[<h>remove orphan clause %a@]"
-                         !C.pp_clause#pp_h c))) descendants;
-        PS.remove_passives passive descendants)
-      passive removed_clauses
+        PS.remove_passives_set passive removed_clause.hcdescendants)
+      state.PS.passive_set removed_clauses
   in
   {state with PS.passive_set = passive}
 
@@ -262,9 +250,7 @@ let given_clause_step ~calculus state =
                                     !C.pp_clause#pp_h new_c))) new_clauses;
       (* add new clauses (including simplified active clauses) to passive set *)
       let passive_set = PS.add_passives state.PS.passive_set new_clauses in
-      (* update the dag *)
-      let dag = CD.updates ~ord state.PS.dag new_clauses in
-      let state = {state with PS.passive_set = passive_set; PS.dag = dag;} in
+      let state = {state with PS.passive_set = passive_set; } in
       (* add new clauses to the simplification index *)
       let state = PS.add_rules state new_clauses in
       (* test whether the empty clause has been found *)

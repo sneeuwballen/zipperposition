@@ -461,7 +461,7 @@ let basic_simplify ~ord hc =
   if List.length new_lits = Array.length hc.hclits
   then hc (* no change *)
   else begin
-    let parents = hc :: C.parents hc in
+    let parents = hc :: hc.hcparents in
     let proof = hc.hcproof in  (* do not bother printing this *)
     let new_clause = C.mk_hclause ~ord new_lits proof parents in
     Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
