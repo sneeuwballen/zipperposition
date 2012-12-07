@@ -38,7 +38,6 @@ module Delayed = Delayed
   
 (* random generator initialization *)
 let seed = ref 1928575
-let _ = Random.init !seed
 
 let version = "0.2"
 
@@ -234,6 +233,7 @@ let get_total_time =
     stop -. start
 
 let () =
+  Random.init !seed;
   (* parse arguments *)
   let params = parse_args () in
   (if params.param_version then (Format.printf "%% zipperposition v%s@." version; raise Exit));

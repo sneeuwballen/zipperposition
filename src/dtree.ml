@@ -302,10 +302,10 @@ let unit_index =
       match hc.hclits with
       | [|Equation (l,r,true,Gt)|] -> self#add l r true hc
       | [|Equation (l,r,true,Lt)|] -> self#add r l true hc
-      | [|Equation (l,r,true,Incomparable)|] ->
+      | [|Equation (l,r,true,Incomparable)|]
+      | [|Equation (l,r,true,Eq)|] -> (* equal modulo symmetry of =, or incomparable *)
         let self' = self#add l r true hc in
         self'#add r l true hc
-      | [|Equation (l,r,true,Eq)|] -> (assert (l == r); self)
       | [|Equation (l,r,false,_)|] ->
         let self' = self#add l r false hc in
         self'#add r l false hc
@@ -315,10 +315,10 @@ let unit_index =
       match hc.hclits with
       | [|Equation (l,r,true,Gt)|] -> self#remove l r true hc
       | [|Equation (l,r,true,Lt)|] -> self#remove r l true hc
-      | [|Equation (l,r,true,Incomparable)|] ->
+      | [|Equation (l,r,true,Incomparable)|]
+      | [|Equation (l,r,true,Eq)|] ->
         let self' = self#remove l r true hc in
         self'#remove r l true hc
-      | [|Equation (l,r,true,Eq)|] -> (assert (l == r); self)
       | [|Equation (l,r,false,_)|] ->
         let self' = self#remove l r false hc in
         self'#remove r l false hc
