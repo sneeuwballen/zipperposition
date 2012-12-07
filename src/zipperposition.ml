@@ -49,6 +49,7 @@ type parameters = {
   param_calculus : string;
   param_timeout : float;
   param_files : string list;
+  param_theories : bool;          (** detect theories *)
   param_precedence : bool;        (** use heuristic for precedence? *)
   param_select : string;
   param_progress : bool;
@@ -78,6 +79,7 @@ let parse_args () =
   and proof = ref true
   and output = ref "debug"
   and index = ref "fp"
+  and theories = ref true
   and calculus = ref "superposition"
   and presimplify = ref false
   and heuristic_precedence = ref true
@@ -99,6 +101,7 @@ let parse_args () =
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
       ("-progress", Arg.Set progress, "print progress");
+      ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
       ("-noproof", Arg.Clear proof, "disable proof printing");
       ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
@@ -113,7 +116,7 @@ let parse_args () =
   Arg.parse options (fun f -> file := f) "solve problem in first file";
   (* return parameter structure *)
   { param_ord = !ord; param_steps = !steps; param_version= !version; param_calculus = !calculus;
-    param_timeout = !timeout; param_files = [!file]; param_select = !select;
+    param_timeout = !timeout; param_files = [!file]; param_select = !select; param_theories= !theories;
     param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
     param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
     param_print_sort = !print_sort; param_print_all = !print_all; param_precedence= !heuristic_precedence;}
@@ -261,8 +264,12 @@ let () =
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* XXX detect some axioms *)
-  let axioms = Theories.detect_total_relations ~ord:(O.default_ordering ()) clauses in
-  let clauses = List.rev_append axioms clauses in
+  let clauses =
+    if params.param_theories then
+      let axioms = Theories.detect_total_relations ~ord:(O.default_ordering ()) clauses in
+      List.rev_append axioms clauses
+    else clauses
+  in
   (* choose an ord now, using clauses *)
   let ord_factory = match params.param_ord with
     | "rpo" -> O.rpo

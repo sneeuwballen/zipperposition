@@ -148,6 +148,8 @@ let is_total_symbol hc =
  * add some axioms when detecting some axioms
  * ---------------------------------------------------------------------- *)
 
+(* TODO detect equivalences in CNF (a => b and b => a) *)
+
 (** define f(x,y)=z as p(x,y,z) *)
 let function_definition ~ord p f =
   let x, y, z = T.mk_var 1 univ_sort, T.mk_var 2 univ_sort, T.mk_var 3 univ_sort in
