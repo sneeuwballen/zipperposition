@@ -48,3 +48,7 @@ val given_clause: ?steps:int -> ?timeout:float -> ?progress:bool ->
                   calculus:Calculus.calculus ->
                   ProofState.state ->
                   ProofState.state * szs_status * int
+
+(** time elapsed since start of program *)
+val get_total_time : unit -> float
+
