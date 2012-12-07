@@ -100,11 +100,8 @@ val next_passive_clause : passive_set -> (passive_set * hclause option)
 (** maximum variable index in the set *)
 val maxvar_active : active_set -> int
 
-(** statistics on the state *)
-type state_stats = {
-  stats_active_clauses : int;
-  stats_passive_clauses : int;
-}
+(** statistics on the state (num active, num passive) *)
+type state_stats = int * int
 val stats : state -> state_stats
 
 (** pretty print the content of the state *)

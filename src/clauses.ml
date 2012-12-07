@@ -543,10 +543,7 @@ module CSet =
 
     let is_empty set = Ptmap.is_empty set.clauses
 
-    let size set =
-      let count = ref 0 in
-      Ptmap.iter (fun _ _ -> incr count) set.clauses;
-      !count
+    let size set = Ptmap.fold (fun _ _ b -> b + 1) set.clauses 0
 
     let add set hc =
       let maxvar = max (T.max_var hc.hcvars) set.maxvar in

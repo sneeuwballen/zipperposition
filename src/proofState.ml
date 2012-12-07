@@ -78,8 +78,8 @@ type state = {
   ord : ordering;
   state_select : selection_fun;
   state_index : Index.unit_index; (** index used for unit simplification *)
-  active_set : active_set;      (** active clauses, indexed *)
-  passive_set : passive_set;    (** passive clauses *)
+  active_set : active_set;        (** active clauses, indexed *)
+  passive_set : passive_set;      (** passive clauses *)
 }
 
 let mk_active_set ~ord =
@@ -254,16 +254,11 @@ let clean_passive passive_set =
 let maxvar_active active_set = active_set.active_clauses.C.CSet.maxvar
 
 (** statistics on the state *)
-type state_stats = {
-  stats_active_clauses : int;
-  stats_passive_clauses : int;
-}
+type state_stats = int * int (* num passive, num active *)
 
 let stats state =
-  {
-    stats_active_clauses = C.CSet.size state.active_set.active_clauses;
-    stats_passive_clauses = C.CSet.size state.passive_set.passive_clauses;
-  }
+  ( C.CSet.size state.active_set.active_clauses
+  , C.CSet.size state.passive_set.passive_clauses)
 
 let pp_state formatter state =
   Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"

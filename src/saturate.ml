@@ -274,9 +274,9 @@ let get_total_time =
 
 (** print progress *)
 let print_progress steps state =
-  let stats = PS.stats state in
-  Format.printf "\r%% %d steps; %d active; %d passive; time %.1f s" steps stats.PS.stats_active_clauses
-    stats.PS.stats_passive_clauses (get_total_time ());
+  let num_active, num_passive = PS.stats state in
+  Format.printf "\r%% %d steps; %d active; %d passive; time %.1f s"
+    steps num_active num_passive (get_total_time ());
   Format.print_flush ()
 
 let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
@@ -293,6 +293,7 @@ let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
         (* some cleanup from time to time *)
         let state = if (num mod 500 = 0)
           then (Utils.debug 1 (lazy "% perform cleanup of passive set");
+               Gc.major ();
                {state with PS.passive_set= PS.clean_passive state.PS.passive_set})
           else state in
         (* do one step *)

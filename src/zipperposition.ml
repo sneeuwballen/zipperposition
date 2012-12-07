@@ -176,11 +176,16 @@ let print_stats state =
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
     Printf.printf "%% hashcons stats for %s: size %d, num %d, sum length %d, buckets: small %d, median %d, big %d\n"
       what sz num sum_length small median big
-  and print_state_stats stats =
+  and print_state_stats (num_active, num_passive) =
     Printf.printf "%% proof state stats:\n";
-    Printf.printf "%%   active clauses   %d\n" stats.PS.stats_active_clauses;
-    Printf.printf "%%   passive clauses  %d\n" stats.PS.stats_passive_clauses
+    Printf.printf "%%   active clauses   %d\n" num_active;
+    Printf.printf "%%   passive clauses  %d\n" num_passive
+  and print_gc () =
+    let stats = Gc.stat () in
+    Printf.printf "%% GC: minor words %.0f; major_words: %.0f; max_heap: %d; minor collections %d; major collections %d\n"
+      stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words stats.Gc.minor_collections stats.Gc.major_collections
   in
+  print_gc ();
   print_hashcons_stats "terms" (T.stats ());
   print_hashcons_stats "clauses" (C.stats ());
   print_state_stats (PS.stats state)
