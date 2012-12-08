@@ -1,6 +1,7 @@
 (** test terms *)
 
 open Types
+open Symbols
 
 module T = Terms
 module TT = TestTerms
@@ -62,8 +63,8 @@ let check_properties ~ord (a, b, cmp) =
   (if T.member_term b a && a != b
     then assert (cmp = Gt));
   (* monotonicity *)
-  let ga = T.mk_node "g" univ_sort [a]
-  and gb = T.mk_node "g" univ_sort [b] in
+  let ga = T.mk_node (mk_symbol "g") univ_sort [a]
+  and gb = T.mk_node (mk_symbol "g") univ_sort [b] in
   assert (cmp = ord#compare ga gb)
 
 (** check invariants on the list of terms *)
@@ -74,8 +75,8 @@ let check ord_name ~ord terms =
 
 (** check similar results for RPO and RPO6 *)
 let check_same ~so terms =
-  let pairs = all_orders ~ord:(new O.rpo so) terms
-  and pairs6 = all_orders ~ord:(new O.rpo6 so) terms in
+  let pairs = all_orders ~ord:(O.rpo so) terms
+  and pairs6 = all_orders ~ord:(O.rpo6 so) terms in
   List.iter2
     (fun (t1, t2, cmp12) (t1', t2', cmp12') ->
       assert (t1 == t1' && t2 == t2');
@@ -92,8 +93,8 @@ let run () =
   Utils.set_debug 2;
   (* generate terms *)
   let terms = Utils.times n (TT.random_term ~ground:false) in
-  let so = O.default_symbol_ordering () in
-  check "KBO" ~ord:(new O.kbo so) terms;
-  check "RPO" ~ord:(new O.rpo so) terms;
-  check "RPO6" ~ord:(new O.rpo6 so) terms;
+  let so = Precedence.default_symbol_ordering () in
+  check "KBO" ~ord:(O.kbo so) terms;
+  check "RPO" ~ord:(O.rpo so) terms;
+  check "RPO6" ~ord:(O.rpo6 so) terms;
   check_same ~so terms

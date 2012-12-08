@@ -1,6 +1,7 @@
 (** test terms *)
 
 open Types
+open Symbols
 
 module T = Terms
 module H = Helpers
@@ -30,22 +31,22 @@ let random_term ?(ground=false) () =
   | 0 -> random_leaf ()
   | n ->
     let head = random_fun_symbol () in
-    let arity = Hashtbl.find arities head in
+    let arity = Hashtbl.find arities (name_symbol head) in
     let subterms =
       Utils.times arity (fun _ -> aux (depth - (H.random_in 1 2)))
     in
     T.mk_node head univ_sort subterms
   and random_leaf () =
     if ground || H.R.bool ()
-      then T.mk_const (H.choose symbols) univ_sort
+      then T.mk_const (mk_symbol (H.choose symbols)) univ_sort
       else T.mk_var (H.random_in 0 3) univ_sort
-  and random_fun_symbol () = H.choose funs
+  and random_fun_symbol () = mk_symbol (H.choose funs)
   in aux depth
 
 (** random bool-sorted term *)
 let random_pred ?(ground=false) () =
-  let p = H.choose preds in
-  let arity = Hashtbl.find arities p in
+  let p = mk_symbol (H.choose preds) in
+  let arity = Hashtbl.find arities (name_symbol p) in
   if arity = 0
     then T.mk_const p bool_sort
     else T.mk_node p bool_sort (Utils.times arity (random_term ~ground))

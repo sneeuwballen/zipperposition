@@ -1,24 +1,25 @@
 (** testing of rewriting *)
 
 open Types
+open Symbols
 
 module T = Terms
 module S = FoSubst
 module Utils = FoUtils
 module Rw = Rewriting
 
-let a = T.mk_const "a" univ_sort
-let b = T.mk_const "b" univ_sort
-let c = T.mk_const "c" univ_sort
-let d = T.mk_const "d" univ_sort
-let f x y = T.mk_node "f" univ_sort [x; y]
-let g x = T.mk_node "g" univ_sort [x]
-let h x = T.mk_node "h" univ_sort [x]
-let zero = T.mk_const "0" univ_sort
-let succ n = T.mk_node "s" univ_sort [n]
-let plus a b = T.mk_node "+" univ_sort [a; b]
-let minus a = T.mk_node "-" univ_sort [a]
-let times a b = T.mk_node "x" univ_sort [a; b]
+let a = T.mk_const (mk_symbol "a") univ_sort
+let b = T.mk_const (mk_symbol "b") univ_sort
+let c = T.mk_const (mk_symbol "c") univ_sort
+let d = T.mk_const (mk_symbol "d") univ_sort
+let f x y = T.mk_node (mk_symbol "f") univ_sort [x; y]
+let g x = T.mk_node (mk_symbol "g") univ_sort [x]
+let h x = T.mk_node (mk_symbol "h") univ_sort [x]
+let zero = T.mk_const (mk_symbol "0") univ_sort
+let succ n = T.mk_node (mk_symbol "s") univ_sort [n]
+let plus a b = T.mk_node (mk_symbol "+") univ_sort [a; b]
+let minus a = T.mk_node (mk_symbol "-") univ_sort [a]
+let times a b = T.mk_node (mk_symbol "x") univ_sort [a; b]
 let x = T.mk_var 1 univ_sort
 let y = T.mk_var 2 univ_sort
 let z = T.mk_var 3 univ_sort
@@ -35,7 +36,7 @@ let peano_to_int t =
   let rec count t n =
     match t.term with
     | _ when T.eq_term t zero -> n
-    | Node (s, [t2]) when s = "s" -> count t2 (n+1)
+    | Node (s, [t2]) when s == (mk_symbol "s") -> count t2 (n+1)
     | _ -> failwith "not peano!"
   in count t 0
 
