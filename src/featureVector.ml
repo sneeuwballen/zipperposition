@@ -36,19 +36,19 @@ module Utils = FoUtils
 type feature_vector = int list
 
 (** a function that computes a feature *)
-type feature = hclause -> int
+type feature = literal array -> int
 
 let compute_fv features hc =
   List.map (fun feat -> feat hc) features
 
-let feat_size_plus hc =
+let feat_size_plus lits =
   let cnt = ref 0 in
-  Array.iter (fun (Equation (_,_,sign,_)) -> if sign then incr cnt) hc.hclits;
+  Array.iter (fun (Equation (_,_,sign,_)) -> if sign then incr cnt) lits;
   !cnt
 
-let feat_size_minus hc =
+let feat_size_minus lits =
   let cnt = ref 0 in
-  Array.iter (fun (Equation (_,_,sign,_)) -> if not sign then incr cnt) hc.hclits;
+  Array.iter (fun (Equation (_,_,sign,_)) -> if not sign then incr cnt) lits;
   !cnt
 
 (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
@@ -61,8 +61,8 @@ let sum_of_depths_lit lit =
   match lit with
   | Equation (l, r, _, _) -> sum 0 (sum 0 0 l) r
 
-let sum_of_depths hc =
-  Array.fold_left (fun acc lit -> acc + sum_of_depths_lit lit) 0 hc.hclits
+let sum_of_depths lits =
+  Array.fold_left (fun acc lit -> acc + sum_of_depths_lit lit) 0 lits
 
 (* number of occurrences of symbol in literal *)
 let count_symb_lit symb lit =
@@ -77,18 +77,18 @@ let count_symb_lit symb lit =
   | Equation (l, r, _, _) ->
     count_symb_term l; count_symb_term r; !cnt
 
-let count_symb_plus symb hc =
+let count_symb_plus symb lits =
   let cnt = ref 0 in
   Array.iter
     (fun lit -> if C.pos_lit lit
-      then cnt := !cnt + count_symb_lit symb lit) hc.hclits;
+      then cnt := !cnt + count_symb_lit symb lit) lits;
   !cnt
 
-let count_symb_minus symb hc =
+let count_symb_minus symb lits =
   let cnt = ref 0 in
   Array.iter
     (fun lit -> if C.neg_lit lit
-      then cnt := !cnt + count_symb_lit symb lit) hc.hclits;
+      then cnt := !cnt + count_symb_lit symb lit) lits;
   !cnt
 
 (* max depth of the symbol in the literal, or -1 *)
@@ -105,18 +105,18 @@ let max_depth_lit symb lit =
   match lit with
   | Equation (l, r, _, _) -> max (max_depth_term l 0) (max_depth_term r 0)
 
-let max_depth_plus symb hc =
+let max_depth_plus symb lits =
   let depth = ref 0 in
   Array.iter
     (fun lit -> if C.pos_lit lit
-      then depth := max !depth (max_depth_lit symb lit)) hc.hclits;
+      then depth := max !depth (max_depth_lit symb lit)) lits;
   !depth
 
-let max_depth_minus symb hc =
+let max_depth_minus symb lits =
   let depth = ref 0 in
   Array.iter
     (fun lit -> if C.neg_lit lit
-      then depth := max !depth (max_depth_lit symb lit)) hc.hclits;
+      then depth := max !depth (max_depth_lit symb lit)) lits;
   !depth
 
 (* ----------------------------------------------------------------------
@@ -191,7 +191,7 @@ let mk_fv_index_signature signature =
 
 let index_clause (features, trie) hc =
   (* feature vector of the hc *)
-  let fv = compute_fv features hc in
+  let fv = compute_fv features hc.hclits in
   (* add the hc to the trie *)
   let k set = Leaf (C.CSet.add set hc) in
   let new_trie = goto_leaf trie fv k in
@@ -199,16 +199,16 @@ let index_clause (features, trie) hc =
 
 let remove_clause (features, trie) hc =
   (* feature vector of the hc *)
-  let fv = compute_fv features hc in
+  let fv = compute_fv features hc.hclits in
   (* add the hc to the trie *)
   let k set = Leaf (C.CSet.remove set hc) in
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
-(** hcs that subsume (potentially) the given hc *)
-let retrieve_subsuming (features, trie) hc f =
+(** hcs that subsume (potentially) the given literals *)
+let retrieve_subsuming (features, trie) lits f =
   (* feature vector of the hc *)
-  let fv = compute_fv features hc in
+  let fv = compute_fv features lits in
   let rec iter_lower fv node = match fv, node with
   | [], Leaf set -> C.CSet.iter set f
   | i::fv', Node map ->
@@ -220,10 +220,10 @@ let retrieve_subsuming (features, trie) hc f =
   in
   iter_lower fv trie
 
-(** hcs that are subsumed (potentially) by the given hc *)
-let retrieve_subsumed (features, trie) hc f =
+(** hcs that are subsumed (potentially) by the given literals *)
+let retrieve_subsumed (features, trie) lits f =
   (* feature vector of the hc *)
-  let fv = compute_fv features hc in
+  let fv = compute_fv features lits in
   let rec iter_higher fv node = match fv, node with
   | [], Leaf set -> C.CSet.iter set f
   | i::fv', Node map ->

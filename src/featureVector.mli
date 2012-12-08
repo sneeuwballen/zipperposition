@@ -28,10 +28,10 @@ open Symbols
 type feature_vector = int list
 
 (** a function that computes a feature *)
-type feature = hclause -> int
+type feature = literal array -> int
 
 (** use some features to compute a feature vector *)
-val compute_fv : feature list -> hclause -> feature_vector
+val compute_fv : feature list -> literal array -> feature_vector
 
 val sum_of_depths : feature               (** sum of depths of symbols *)
 val feat_size_plus : feature              (** size of positive clause *)
@@ -49,8 +49,8 @@ val mk_fv_index_signature : symbol list -> fv_index     (** create an index from
 val index_clause : fv_index -> hclause -> fv_index      (** add the clause to the index *)
 val remove_clause : fv_index -> hclause -> fv_index     (** remove the clause from the index *)
 
-val retrieve_subsuming : fv_index -> hclause ->
+val retrieve_subsuming : fv_index -> literal array ->
                          (hclause -> unit) -> unit      (** clauses that subsume c *)
-val retrieve_subsumed : fv_index -> hclause ->
+val retrieve_subsumed : fv_index -> literal array ->
                         (hclause -> unit) -> unit       (** clauses subsumed by c *)
 

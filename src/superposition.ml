@@ -746,7 +746,7 @@ let subsumed_by_set_ set c =
   let try_eq_subsumption = Utils.array_exists C.equational_lit c.clits in
   (* use feature vector indexing *)
   try
-    FV.retrieve_subsuming set.PS.fv_idx c.cref
+    FV.retrieve_subsuming set.PS.fv_idx c.cref.hclits
       (fun hc' -> if (try_eq_subsumption && eq_subsumes hc'.hclits c.clits)
                   || subsumes hc'.hclits c.clits then raise Exit);
     false
@@ -765,13 +765,20 @@ let subsumed_in_set_ set c =
   (* use feature vector indexing *)
   let l = ref [] in
   FV.retrieve_subsumed
-    set.PS.fv_idx c.cref
+    set.PS.fv_idx c.cref.hclits
     (fun hc' -> if (try_eq_subsumption && eq_subsumes c.clits hc'.hclits)
                 || subsumes c.clits hc'.hclits then l := hc' :: !l);
   !l
 
 let subsumed_in_set set clause =
   prof_subsumption_in_set.HExtlib.profile (subsumed_in_set_ set) clause
+
+(* ----------------------------------------------------------------------
+ * contextual literal cutting
+ * ---------------------------------------------------------------------- *)
+
+(* TODO *)
+let contextual_literal_cutting active_set c = c.cref
 
 (* ----------------------------------------------------------------------
  * reduction to CNF
@@ -929,6 +936,9 @@ let superposition : Calculus.calculus =
       (* rename for simplify reflect *)
       let c = PS.relocate_rules ~ord idx hc in
       let hc = negative_simplify_reflect ~ord idx c in
+      (* rename for contextual literal cutting *)
+      let c = PS.relocate_rules ~ord idx hc in
+      let hc = contextual_literal_cutting actives c in
       let hc = C.select_clause ~select hc in
       hc
 
