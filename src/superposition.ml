@@ -777,8 +777,51 @@ let subsumed_in_set set clause =
  * contextual literal cutting
  * ---------------------------------------------------------------------- *)
 
-(* TODO *)
-let contextual_literal_cutting active_set c = c.cref
+exception RemoveLit of int * hclause
+
+(** Performs successive contextual literal cuttings *)
+let rec contextual_literal_cutting active_set hc =
+  if Array.length hc.hclits <= 1 then hc else
+  let ord = active_set.PS.a_ord in
+  (* do we need to try to use equality subsumption? *)
+  let try_eq_subsumption = Utils.array_exists C.equational_lit hc.hclits in
+  (* rename literals clause *)
+  let c = PS.relocate_active active_set hc in
+  (* try to remove one literal from the literal array *)
+  let rec remove_one_lit lits = 
+    try
+      for i = 0 to Array.length lits - 1 do
+        (* negate literal *)
+        lits.(i) <- C.negate_lit lits.(i);
+        (* test for subsumption *)
+        FV.retrieve_subsuming active_set.PS.fv_idx lits
+          (fun hc' -> if (try_eq_subsumption && eq_subsumes hc'.hclits lits)
+                      || subsumes hc'.hclits lits
+             (* some clause subsumes the literals with i-th literal flipped *)
+             then (lits.(i) <- C.negate_lit lits.(i); raise (RemoveLit (i, hc'))));
+        (* restore literal *)
+        lits.(i) <- C.negate_lit lits.(i);
+      done;
+      None (* no change *)
+    with (RemoveLit (i, hc')) ->
+      (* remove the literal and recurse *)
+      Some (array_except_idx lits i, hc')
+  in
+  match remove_one_lit c.clits with
+  | None -> hc (* no literal removed *)
+  | Some (new_lits, hc') -> begin
+      (* hc' allowed us to cut a literal *)
+      assert (List.length new_lits + 1 = Array.length hc.hclits);
+      let proof = lazy (Proof ("clc", [c, [], S.id_subst;
+                                       C.base_clause hc', [], S.id_subst]))
+      and parents = c.cref :: c.cref.hcparents in
+      let new_hc = C.mk_hclause ~ord new_lits proof parents in
+      Utils.debug 3 (lazy (Utils.sprintf
+                    "@[<h>contextual literal cutting in %a using %a gives %a@]"
+                    !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc' !C.pp_clause#pp_h new_hc));
+      (* try to cut another literal *)
+      contextual_literal_cutting active_set new_hc
+    end
 
 (* ----------------------------------------------------------------------
  * reduction to CNF
@@ -936,9 +979,6 @@ let superposition : Calculus.calculus =
       (* rename for simplify reflect *)
       let c = PS.relocate_rules ~ord idx hc in
       let hc = negative_simplify_reflect ~ord idx c in
-      (* rename for contextual literal cutting *)
-      let c = PS.relocate_rules ~ord idx hc in
-      let hc = contextual_literal_cutting actives c in
       let hc = C.select_clause ~select hc in
       hc
 

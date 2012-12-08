@@ -151,7 +151,7 @@ let subsumed_by ~calculus active_set hc =
   prof_subsumed_by.HExtlib.profile (calculus#redundant_set active_set) hc
 
 (** Use all simplification rules to convert a clause into a list of maximally
-    simplified clauses (possibly empty, if redundant or trivial).
+    simplified clauses (possibly empty, if trivial).
     This is used on generated clauses, and on the given clause. *)
 let all_simplify_ ~ord ~calculus ~select active_set idx hc =
   let clauses = ref []
@@ -207,6 +207,8 @@ let given_clause_step ~calculus state =
     then state, Unsat hc
     else begin
       assert (not (is_redundant ~calculus state.PS.active_set hc));
+      (* contextual literal cutting *)
+      let hc = Sup.contextual_literal_cutting state.PS.active_set hc in
       (* select literals *)
       let hc = C.select_clause select hc in
       Sel.check_selected hc;

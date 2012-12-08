@@ -79,7 +79,7 @@ val subsumed_by_set : ProofState.active_set -> clause -> bool
 val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 
 (** contexual literal cutting *)
-val contextual_literal_cutting : ProofState.active_set -> clause -> hclause
+val contextual_literal_cutting : ProofState.active_set -> hclause -> hclause
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
 val cnf_of : ord:ordering -> hclause -> hclause list
