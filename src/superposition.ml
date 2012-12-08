@@ -55,6 +55,7 @@ let print_stats () =
 let enable = true
 
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
+let prof_clc = HExtlib.profile ~enable "contextual_literal_cutting"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
 let prof_eq_subsumption = HExtlib.profile ~enable "equality_subsumption"
@@ -382,7 +383,7 @@ let demod_nf ?(subterms_only=false) ~ord idx clauses t =
     T.mk_node f t.sort (List.map traverse ts)
   | _ -> traverse t
 
-let demodulate ~ord idx c =
+let demodulate_ ~ord idx c =
   incr_stat stat_demodulate_call;
   (* clauses used to rewrite *)
   let clauses = ref [] in
@@ -412,6 +413,8 @@ let demodulate ~ord idx c =
       let parents = (List.map (fun (c,_,_) -> c.cref) !clauses) @ c.cref.hcparents in
       C.mk_hclause_a ~ord lits proof parents
     end
+
+let demodulate ~ord idx c = prof_demodulate.HExtlib.profile (demodulate_ ~ord idx) c
 
 let is_tautology hc =
   let rec check lits i =
@@ -780,7 +783,7 @@ let subsumed_in_set set clause =
 exception RemoveLit of int * hclause
 
 (** Performs successive contextual literal cuttings *)
-let rec contextual_literal_cutting active_set hc =
+let rec contextual_literal_cutting_ active_set hc =
   if Array.length hc.hclits <= 1 then hc else
   let ord = active_set.PS.a_ord in
   (* do we need to try to use equality subsumption? *)
@@ -820,8 +823,11 @@ let rec contextual_literal_cutting active_set hc =
                     "@[<h>contextual literal cutting in %a using %a gives %a@]"
                     !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc' !C.pp_clause#pp_h new_hc));
       (* try to cut another literal *)
-      contextual_literal_cutting active_set new_hc
+      contextual_literal_cutting_ active_set new_hc
     end
+
+let contextual_literal_cutting active_set hc =
+  prof_clc.HExtlib.profile (contextual_literal_cutting_ active_set) hc
 
 (* ----------------------------------------------------------------------
  * reduction to CNF

@@ -280,14 +280,16 @@ let simplify_inner ~ord hc =
     | Node (s, [a; b]) when s = eq_symbol && T.eq_term a T.false_term ->
       simp_term (T.mk_not b)  (* b = false -> not b *)
     | Node (s, l) ->
-      let new_t = T.mk_node s t.sort (List.map simp_term l) in
-      if T.eq_term t new_t
-        then (mark_simplified t; t)  (* no more simplifications *)
-        else simp_term new_t
+      let l' = List.map simp_term l in
+      if List.for_all2 (==) l l'
+        then (mark_simplified t; t)
+        else 
+          let new_t = T.mk_node s t.sort (List.map simp_term l) in
+          simp_term new_t
   (* simplify a lit *)
   and simp_lit (Equation (l,r,sign,_) as lit) =
     let lit' = C.mk_lit ~ord (simp_term l) (simp_term r) sign in
-    (if not (C.eq_literal_com lit lit') then simplified := true);
+    (if not (C.eq_literal lit lit') then simplified := true);
     lit'
   in
   let lits = Array.map simp_lit hc.hclits in
@@ -307,7 +309,7 @@ let delayed : calculus =
     method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
                           "equality_factoring", Sup.infer_equality_factoring; ]
 
-    method basic_simplify ~ord hc = Sup.basic_simplify ~ord (simplify_inner ~ord hc)
+    method basic_simplify ~ord hc = Sup.basic_simplify ~ord hc
 
     method simplify ~select actives idx hc =
       let ord = actives.PS.a_ord in

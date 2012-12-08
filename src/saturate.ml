@@ -34,6 +34,7 @@ let enable = true
 let prof_generate = HExtlib.profile ~enable "generate"
 let prof_generate_unary = HExtlib.profile ~enable "generate_unary"
 let prof_generate_binary = HExtlib.profile ~enable "generate_binary"
+let prof_back_simplify = HExtlib.profile ~enable "back_simplify"
 let prof_simplify = HExtlib.profile ~enable "simplify"
 let prof_all_simplify = HExtlib.profile ~enable "all_simplify"
 let prof_is_redundant = HExtlib.profile ~enable "is_redundant"
@@ -55,7 +56,6 @@ let check_timeout = function
     hclause and the simplified hclause. *)
 let simplify_ ~calculus ~select active_set idx old_hc =
   let ord = active_set.PS.a_ord in
-  (* rename clause *)
   let hc = calculus#simplify ~select active_set idx old_hc in
   let hc = calculus#basic_simplify ~ord hc in
   let hc = C.select_clause ~select hc in
@@ -67,10 +67,18 @@ let simplify_ ~calculus ~select active_set idx old_hc =
 let simplify ~calculus ~select active_set idx hc =
   prof_simplify.HExtlib.profile (simplify_ ~calculus ~select active_set idx) hc
 
-(** Simplify the active set using the given clause. TODO use indexing *)
-let backward_simplify ~calculus state active_set given_active_set given =
+(** Simplify the active set using the given clause.
+    TODO use indexing (only try to see if one can match a maximal side
+    of the (unit) given clause with a subterm of active clauses; if
+    an active clause is in this case, try to simplify it. Ignore the other
+    active clauses. *)
+let backward_simplify_ ~calculus state active_set given_active_set given =
   let select = state.PS.state_select in
   let simplified_actives = ref [] in
+  (* no simplification is the clause is not unit *)
+  if not (C.is_unit_clause given)
+  then simplified_actives, (active_set.PS.active_clauses, C.CSet.empty)
+  else
   (* unit index just for the clause *)
   let idx = Dtree.unit_index#add_clause given in
   simplified_actives,
@@ -87,6 +95,10 @@ let backward_simplify ~calculus state active_set given_active_set given =
                        !C.pp_clause#pp_h original !C.pp_clause#pp_h simplified));
           false
         end else true) (* no change *)
+
+let backward_simplify ~calculus state active_set given_active_set given =
+  prof_back_simplify.HExtlib.profile (backward_simplify_ ~calculus
+    state active_set given_active_set) given
 
 (** generate all clauses from binary inferences *)
 let generate_binary ~calculus active_set clause =

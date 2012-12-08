@@ -59,7 +59,6 @@ val demodulate : ord:ordering -> Index.unit_index -> clause -> hclause
   (** rewrite clause using orientable unit equations *)
 
 (* TODO splitting without renaming *)
-(* TODO (forward) contextual literal cutting *)
 (* TODO branch rewriting *)
 
 val positive_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> hclause
