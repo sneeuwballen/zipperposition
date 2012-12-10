@@ -581,6 +581,13 @@ module CSet =
           set.clauses hcs in
       {set with clauses;}
 
+    let remove_ids set ids =
+      let clauses =
+        Ptset.fold
+          (fun i set -> Ptmap.remove i set)
+          ids set.clauses in
+      {set with clauses;}
+
     let get set i = Ptmap.find i set.clauses
 
     let mem set hc = Ptmap.mem hc.hctag set.clauses

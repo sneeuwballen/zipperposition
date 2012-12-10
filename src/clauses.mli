@@ -200,6 +200,9 @@ module CSet :
     val remove_list : t -> hclause list -> t
       (** remove hclauses *)
 
+    val remove_ids : t -> Ptset.t -> t
+      (** remove set of IDs *)
+
     val get : t -> int -> hclause
       (** get a clause by its ID *)
 

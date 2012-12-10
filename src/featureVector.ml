@@ -197,6 +197,8 @@ let index_clause (features, trie) hc =
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
+let index_clauses fv hcs = List.fold_left index_clause fv hcs
+
 let remove_clause (features, trie) hc =
   (* feature vector of the hc *)
   let fv = compute_fv features hc.hclits in
@@ -204,6 +206,8 @@ let remove_clause (features, trie) hc =
   let k set = Leaf (C.CSet.remove set hc) in
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
+
+let remove_clauses fv hcs = List.fold_left remove_clause fv hcs
 
 (** hcs that subsume (potentially) the given literals *)
 let retrieve_subsuming (features, trie) lits f =
