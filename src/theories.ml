@@ -25,6 +25,7 @@ open Symbols
 
 module T = Terms
 module C = Clauses
+module S = FoSubst
 module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
@@ -151,13 +152,12 @@ let is_total_symbol hc =
 (* TODO detect equivalences in CNF (a => b and b => a) *)
 
 (** define f(x,y)=z as p(x,y,z) *)
-let function_definition ~ord p f =
+let function_definition ~ord def1 def2 p f =
   let x, y, z = T.mk_var 1 univ_sort, T.mk_var 2 univ_sort, T.mk_var 3 univ_sort in
   let lhs = T.mk_node p bool_sort [x;y;z]
   and rhs = T.mk_eq (T.mk_node f univ_sort [x;y]) z in
-  let axiom_name = Utils.sprintf "function_definition_%s_%s" (name_symbol p) (name_symbol f) in
-  (* TODO a proper proof ;) *)
-  let proof = Lazy.lazy_from_val (Axiom (axiom_name, "'/dev/null'")) in
+  let proof = lazy (Proof ("lemma", [C.base_clause def1, [], S.id_subst;
+                                     C.base_clause def2, [], S.id_subst])) in
   C.mk_hclause ~ord [C.mk_eq ~ord lhs rhs] proof []
 
 let detect_total_relations ~ord clauses =
@@ -167,21 +167,21 @@ let detect_total_relations ~ord clauses =
   List.iter
     (fun hc ->
       match is_functional_symbol hc, is_total_symbol hc with
-      | `Functional p, _ -> functionals := p :: !functionals
-      | _, `Total (p, f) -> totals := (p,f) :: !totals
+      | `Functional p, _ -> functionals := (p, hc) :: !functionals
+      | _, `Total (p, f) -> totals := (p, f, hc) :: !totals
       | `None, `None -> ()
       | _ -> assert false)
     clauses;
   (* perform a join on totals,functionals to find common predicate symbols *)
   let definitions = ref [] in
   List.iter
-    (fun (p,f) ->
+    (fun (p,f,def1) ->
       List.iter
-        (fun p' -> if p == p'
+        (fun (p', def2) -> if p == p'
           then begin
             Utils.debug 0 (lazy (Utils.sprintf "%% symbol %s is a function definition of %s"
                           (name_symbol p) (name_symbol f)));
-            definitions := (function_definition ~ord p f) :: !definitions
+            definitions := (function_definition ~ord def1 def2 p f) :: !definitions
           end)
         !functionals)
     !totals;
