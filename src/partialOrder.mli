@@ -37,8 +37,10 @@ val is_complete : t -> bool
   (** is the ordering total? *)
 
 val complete : t -> (symbol -> symbol -> int) -> unit
-  (** complete the partial order using the given total order on
-      symbols to compare unordered pairs *)
+  (** complete the partial order using the given order on
+      symbols to compare unordered pairs. If the given comparison
+      function is not total, the ordering may still not be
+      complete. *)
 
 val compare : t -> symbol -> symbol -> int
   (** compare two symbols in the ordering. The ordering must be total! *)

@@ -70,8 +70,23 @@ let copy po =
   let signature = Array.copy po.signature in
   { num=SHashtbl.copy po.num; complete=po.complete; size = po.size; cmp; signature; }
 
+(** check whether the ordering is complete *)
+let check_is_complete po =
+  let n = po.size in
+  try
+    for i = 0 to n - 1 do
+      for j = i+1 to n-1 do
+        if (not po.cmp.(i).(j)) && (not po.cmp.(j).(i))
+          then raise Exit  (* pair of not ordered terms *)
+      done;
+    done;
+    true
+  with Exit -> false
+
 (** is the ordering total? *)
-let is_complete po = po.complete
+let is_complete po =
+  po.complete ||
+  (let res = check_is_complete po in (if res then po.complete <- true); res)
 
 (** compute transitive closure of the graph *)
 let transitive_closure po =
@@ -106,8 +121,10 @@ let transitive_closure po =
         else ()
   in fast_exponentiation n
 
-(** complete the partial order using the given total order on
-    symbols to compare unordered pairs *)
+(** complete the partial order using the given order on
+    symbols to compare unordered pairs. If the given comparison
+    function is not total, the ordering may still not be
+    complete. *)
 let complete po cmp_fun =
   if po.complete then ()
   else begin
@@ -123,13 +140,13 @@ let complete po cmp_fun =
           (match cmp_fun po.signature.(i) po.signature.(j) with
           | n when n < 0 -> cmp.(j).(i) <- true
           | n when n > 0 -> cmp.(i).(j) <- true
-          | _ -> failwith "non-total comparison function");
+          | _ -> ());
           (* recompute transitive closure *)
           transitive_closure po;
         end
       done;
     done;
-    po.complete <- true;
+    po.complete <- check_is_complete po;
   end
 
 (** compare two symbols in the partial ordering *)
@@ -199,4 +216,18 @@ let extend po symbs =
   end
 
 (** pretty print the partial order as a boolean matrix *)
-let pp formatter po = failwith "not implemented"
+let pp formatter po =
+  let n = po.size in
+  (* print num -> symbol *)
+  for i = 0 to n-1 do
+    Format.fprintf formatter " @[<h>%2d: %s@]@;" i (name_symbol po.signature.(i))
+  done;
+  (* print the matrix *)
+  for i = 0 to n-1 do
+    Format.fprintf formatter "@[<h>";
+    for j = 0 to n - 1 do
+      Format.fprintf formatter " %d" (if po.cmp.(i).(j) then 1 else 0)
+    done;
+    Format.fprintf formatter "@]@;";
+  done
+
