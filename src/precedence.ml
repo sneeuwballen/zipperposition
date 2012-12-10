@@ -24,6 +24,7 @@ open Symbols
 module T = Terms
 module C = Clauses
 module Utils = FoUtils
+module PO = PartialOrder
 
 (** Precedence on symbols *)
 
