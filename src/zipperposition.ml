@@ -40,7 +40,7 @@ module Delayed = Delayed
 (* random generator initialization *)
 let seed = ref 1928575
 
-let version = "0.2"
+let version = "0.3"
 
 (** parse_args returns parameters *)
 let parse_args () =
@@ -211,7 +211,7 @@ let () =
   Random.init !seed;
   (* parse arguments *)
   let params = parse_args () in
-  (if params.param_version then (Format.printf "%% zipperposition v%s@." version; raise Exit));
+  (if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0));
   let steps = if params.param_steps = 0
     then None else (Format.printf "%% run for %d steps@." params.param_steps;
                     Some params.param_steps)
