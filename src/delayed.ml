@@ -325,6 +325,8 @@ let delayed : calculus =
       (* rename for simplify_reflect *)
       let c = simpl_set#relocate hc in
       let hc = Sup.negative_simplify_reflect simpl_set c in
+      (* condensation *)
+      let hc = Sup.condensation ~ord hc in
       let hc = C.select_clause ~select hc in
       hc
 

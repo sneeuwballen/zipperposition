@@ -56,6 +56,7 @@ let enable = true
 
 let prof_demodulate = HExtlib.profile ~enable "demodulate"
 let prof_clc = HExtlib.profile ~enable "contextual_literal_cutting"
+let prof_condensation = HExtlib.profile ~enable "condensation"
 let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
 let prof_subsumption = HExtlib.profile ~enable "subsumption"
 let prof_eq_subsumption = HExtlib.profile ~enable "equality_subsumption"
@@ -834,6 +835,70 @@ let contextual_literal_cutting active_set hc =
   prof_clc.HExtlib.profile (contextual_literal_cutting_ active_set) hc
 
 (* ----------------------------------------------------------------------
+ * contraction
+ * ---------------------------------------------------------------------- *)
+
+exception CondensedInto of literal array * substitution
+
+(** match literals. Returns 0, 1 or 2 matching substs. *)
+let match_literals lit lit' =
+  match lit, lit' with
+  | Equation (s,t,sign,_), Equation (l,r,sign',_) when sign = sign' ->
+    (try let subst = Unif.matching S.id_subst s l in [Unif.matching subst t r]
+    with UnificationFailure -> [])
+    @
+    (try let subst = Unif.matching S.id_subst s r in [Unif.matching subst t l]
+    with UnificationFailure -> [])
+  | _ -> []
+
+(** performs condensation on the clause. It looks for two literals l1 and l2 of same
+    sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then
+    hc is simplified into hc\sigma \ {l2} *)
+let rec condensation_ ~ord hc =
+  if Array.length hc.hclits <= 1 then hc else
+  (* offset is used to rename literals for subsumption *)
+  let offset = T.max_var hc.hcvars +1 in
+  let lits = hc.hclits in
+  let n = Array.length lits in
+  try
+    for i = 0 to n - 1 do
+      let lit = lits.(i) in
+      for j = i+1 to n - 1 do
+        let lit' = lits.(j) in
+        (* try to match lit with lit', then check if subst(hc) subsumes hc *)
+        let substs = match_literals lit lit' in
+        List.iter
+          (fun subst ->
+            let new_lits = Array.sub lits 0 (n - 1) in
+            (if i <> n-1 then new_lits.(i) <- lits.(n-1));  (* remove i-th lit *)
+            (* rename literals for the subsumption check *)
+            let renaming = S.relocate offset hc.hcvars in
+            (* apply substitution then renaming *)
+            for k = 0 to n-2 do
+              new_lits.(k) <- C.apply_subst_lit ~ord renaming (C.apply_subst_lit ~ord subst new_lits.(k));
+            done;
+            (* check subsumption *)
+            if subsumes new_lits lits
+              then raise (CondensedInto (new_lits, subst)))
+          substs
+      done;
+    done;
+    hc
+  with CondensedInto (new_lits, subst) ->
+    (* clause is simplified *)
+    let proof = lazy (Proof ("condensation", [C.base_clause hc, [], subst]))
+    and parents = hc :: hc.hcparents in
+    let new_hc = C.mk_hclause_a ~ord new_lits proof parents in
+    Utils.debug 3 (lazy (Utils.sprintf
+                  "@[<h>condensation in %a (with %a) gives %a@]"
+                  !C.pp_clause#pp_h hc S.pp_substitution subst !C.pp_clause#pp_h new_hc));
+    (* try to condense further *)
+    condensation_ ~ord new_hc
+
+let condensation ~ord hc =
+  prof_condensation.HExtlib.profile (condensation_ ~ord) hc
+
+(* ----------------------------------------------------------------------
  * reduction to CNF
  * ---------------------------------------------------------------------- *)
 
@@ -989,6 +1054,8 @@ let superposition : Calculus.calculus =
       (* rename for simplify reflect *)
       let c =  simpl#relocate hc in
       let hc = negative_simplify_reflect simpl c in
+      (* condensation *)
+      let hc = condensation ~ord hc in
       let hc = C.select_clause ~select hc in
       hc
 
