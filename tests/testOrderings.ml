@@ -1,4 +1,4 @@
-(** test terms *)
+(** test orderings *)
 
 open Types
 open Symbols
