@@ -59,7 +59,7 @@ type state = {
 }
 
 (** create a state from the given ordering and selection function*)
-val make_state : ordering -> (ClauseQueue.queue * int) list -> selection_fun -> Index.unit_index -> state
+val mk_state : ord:ordering -> Params.parameters -> state
 
 (** add (unit) clause to the index *)
 val add_rule : state -> hclause -> state

@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (* the state of a proof *)
 
 open Types
+open Params
 
 module I = Index
 module FV = FeatureVector
@@ -88,13 +89,16 @@ let mk_active_set ~ord =
   let fv_idx = FV.mk_fv_index_signature signature in
   {a_ord=ord; active_clauses=C.CSet.empty; idx= !cur_index; fv_idx=fv_idx}
 
-let make_state ord queue_list select unit_index =
+let mk_state ~ord params =
+  let queues = ClauseQueue.default_queues
+  and select = Selection.selection_from_string ~ord params.param_select
+  and unit_idx = Dtree.unit_index in
   let passive_set = {p_ord=ord; passive_clauses=C.CSet.empty;
-                     queues=queue_list; queue_state=(0,0)}
+                     queues=queues; queue_state=(0,0)}
   and active_set = mk_active_set ~ord in
   {ord=ord;
    state_select=select;
-   state_index = unit_index;
+   state_index = unit_idx;
    active_set=active_set;
    passive_set=passive_set; }
 

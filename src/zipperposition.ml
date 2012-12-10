@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Main file for the prover *)
 
 open Types
+open Params
 
 module T = Terms
 module O = Orderings
@@ -40,27 +41,6 @@ module Delayed = Delayed
 let seed = ref 1928575
 
 let version = "0.2"
-
-(** parameters for the main procedure *)
-type parameters = {
-  param_ord : string;
-  param_steps : int;
-  param_version : bool;
-  param_calculus : string;
-  param_timeout : float;
-  param_files : string list;
-  param_theories : bool;          (** detect theories *)
-  param_precedence : bool;        (** use heuristic for precedence? *)
-  param_select : string;
-  param_progress : bool;
-  param_proof : bool;
-  param_dot_file : string option; (** file to print the final state in *)
-  param_presimplify : bool;       (** do we simplify the initial set? *)
-  param_output_syntax : string;   (** syntax for output *)
-  param_index : string;           (** indexing structure *)
-  param_print_sort : bool;        (** print sorts of terms *)
-  param_print_all : bool;         (** print desugarized lambda / DB symbols *)
-}
 
 (** parse_args returns parameters *)
 let parse_args () =
@@ -298,7 +278,7 @@ let () =
   Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* create a state, with clauses added to passive_set and axioms to set of support *)
-  let state = PS.make_state ord CQ.default_queues select Dtree.unit_index in
+  let state = PS.mk_state ~ord params in
   let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
   (* saturate *)
   let state, result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
