@@ -149,11 +149,6 @@ let parse_file ~recursive f =
     with _ as e -> close_in input; raise e
   in aux [Filename.basename f] []
 
-(** setup index *)
-let setup_index name =
-  PS.cur_index := I.mk_clause_index (PS.choose_index name);
-  Format.printf "%% use indexing structure %s@." name
-
 (** print stats *)
 let print_stats state =
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
@@ -176,11 +171,10 @@ let print_stats state =
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
 let print_state ?name filename (state, result) =
-  let state = match result with
+  (match result with
     | Sat.Unsat c ->
-      let active = PS.add_active state.PS.active_set c in (* put empty clause in state *)
-      {state with PS.active_set = active}
-    | _ -> state in
+      state#active_set#add [c]; (* put empty clause in state *)
+    | _ -> ());
   PS.pp_dot_file ?name filename state
 
 (** setup an alarm for abrupt stop *)
@@ -262,8 +256,6 @@ let () =
                                    Precedence.alpha_constraint (calculus#constr clauses)) in
   let ord = ord_factory so in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
-  (* indexing *)
-  setup_index params.param_index;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
@@ -271,17 +263,19 @@ let () =
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord ~select clauses in
-  List.iter (C.check_ord_hclause ~ord) clauses;
+  (* create state, and add clauses to the simpl_set *)
+  let state = PS.mk_state ~ord params in
+  state#simpl_set#add clauses;
+  (* maybe perform initial inter-reductions *)
   let clauses = if params.param_presimplify
-    then Sat.initial_simplifications ~ord ~calculus ~select clauses
+    then Sat.initial_simplifications ~ord ~calculus ~select state#active_set state#simpl_set clauses
     else clauses in
   Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
-  (* create a state, with clauses added to passive_set and axioms to set of support *)
-  let state = PS.mk_state ~ord params in
-  let state = {state with PS.passive_set=PS.add_passives state.PS.passive_set clauses} in
+  (* add clauses to passive_set *)
+  state#passive_set#add clauses;
   (* saturate *)
-  let state, result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
+  let result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;
@@ -297,7 +291,7 @@ let () =
   | Sat.Sat ->
       Printf.printf "%% SZS status CounterSatisfiable\n";
       Utils.debug 1 (lazy (Utils.sprintf "%% saturated set: @[<v>%a@]@."
-                     C.pp_set state.PS.active_set.PS.active_clauses))
+                     C.pp_set state#active_set#clauses))
   | Sat.Unsat c ->
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";

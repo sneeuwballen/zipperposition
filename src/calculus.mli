@@ -42,7 +42,7 @@ class type calculus =
     method basic_simplify : ord:ordering -> hclause -> hclause
       (** how to simplify a clause *)
 
-    method simplify : select:selection_fun -> ProofState.active_set -> Index.unit_index -> hclause -> hclause
+    method simplify : select:selection_fun -> ProofState.active_set -> ProofState.simpl_set -> hclause -> hclause
       (** how to simplify a clause w.r.t a set of clauses *)
 
     method redundant : ProofState.active_set -> hclause -> bool

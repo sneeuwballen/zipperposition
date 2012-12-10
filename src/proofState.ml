@@ -29,14 +29,6 @@ module C = Clauses
 module U = FoUtils
 module CQ = ClauseQueue
 
-let prof_add_passive = HExtlib.profile ~enable:true "add_passives"
-let prof_next_passive = HExtlib.profile ~enable:true "next_passive"
-
-(** Default indexing on terms *)
-let cur_index =
-  ref (I.mk_clause_index (Fingerprint.mk_index Fingerprint.fp6m))
-  (* ref (I.mk_clause_index Discrimination_tree.index) *)
-
 let _indexes =
   let table = Hashtbl.create 11 in
   Hashtbl.add table "discr_tree" Discrimination_tree.index;
@@ -53,231 +45,304 @@ let names_index () =
   !names
 
 (* ----------------------------------------------------------------------
- * main definitions
+ * main type definitions
  * ---------------------------------------------------------------------- *)
 
+
 (** set of active clauses *)
-type active_set = {
-  a_ord : ordering;
-  active_clauses : C.CSet.t;          (** set of active clauses *)
-  idx : Index.clause_index;           (** term index *)
-  fv_idx : FeatureVector.fv_index;    (** feature index, for subsumption *)
-}
+type active_set =
+  < ord : ordering;
+    clauses : Clauses.CSet.t;           (** set of active clauses *)
+    idx_sup_into : Index.index;         (** index for superposition into the set *)
+    idx_sup_from : Index.index;         (** index for superposition from the set *)
+    idx_back_demod : Index.index;       (** index for backward demodulation/simplifications *)
+    idx_fv : FeatureVector.fv_index;    (** index for subsumption (TODO allow to update its features?) *)
+
+    add : hclause list -> unit;         (** add clauses *)
+    remove : hclause list -> unit;      (** remove clauses *)
+    relocate : hclause -> clause;       (** rename clause to avoid var collisions with set *)
+  >
+
+(** set of simplifying (unit) clauses *)
+type simpl_set =
+  < ord:ordering;
+    idx_simpl : Index.unit_index;       (** index for forward simplifications TODO split into pos-orientable/others *)
+
+    add : hclause list -> unit;
+    remove : hclause list -> unit;
+    relocate : hclause -> clause;
+  >
 
 (** set of passive clauses *)
-type passive_set = {
-  p_ord : ordering;
-  passive_clauses : C.CSet.t;
-  queues : (ClauseQueue.queue * int) list;
-  queue_state : int * int;  (** position in the queue/weight *)
-}
+type passive_set =
+  < ord:ordering;
+    clauses : Clauses.CSet.t;           (** set of clauses *)
+    queues : (ClauseQueue.queue * int) list;
+
+    add : hclause list -> unit;         (** add clauses *)
+    remove : Ptset.t -> unit;           (** remove clauses *)
+    next : unit -> hclause option;      (** next passive clause, if any *)
+    clean : unit -> unit;               (** cleanup internal queues *)
+  >
 
 (** state of a superposition calculus instance.
     It contains a set of active clauses, a set of passive clauses,
     and is parametrized by an ordering. *)
-type state = {
-  ord : ordering;
-  state_select : selection_fun;
-  state_index : Index.unit_index; (** index used for unit simplification *)
-  active_set : active_set;        (** active clauses, indexed *)
-  passive_set : passive_set;      (** passive clauses *)
-}
-
-let mk_active_set ~ord =
-  let signature = ord#symbol_ordering#signature in
-  (* feature vector index *)
-  let fv_idx = FV.mk_fv_index_signature signature in
-  {a_ord=ord; active_clauses=C.CSet.empty; idx= !cur_index; fv_idx=fv_idx}
-
-let mk_state ~ord params =
-  let queues = ClauseQueue.default_queues
-  and select = Selection.selection_from_string ~ord params.param_select
-  and unit_idx = Dtree.unit_index in
-  let passive_set = {p_ord=ord; passive_clauses=C.CSet.empty;
-                     queues=queues; queue_state=(0,0)}
-  and active_set = mk_active_set ~ord in
-  {ord=ord;
-   state_select=select;
-   state_index = unit_idx;
-   active_set=active_set;
-   passive_set=passive_set; }
+type state =
+  < ord:ordering;
+    select : selection_fun;
+    simpl_set : simpl_set;              (** index for forward demodulation *)
+    active_set : active_set;            (** active clauses *)
+    passive_set : passive_set;          (** passive clauses *)
+  >
 
 (* ----------------------------------------------------------------------
- * simplification rules (unit clauses)
+ * utils for indexing part of a clause
  * ---------------------------------------------------------------------- *)
 
-let add_rule state hc =
-  if C.is_unit_clause hc
-    then {state with state_index= state.state_index#add_clause hc}
-    else state
+(** apply the operation to literals that verify (eligible hc i lit) where
+    i is the index of the literal; if subterm is true then the operation is
+    done on every subterm, otherwise on root *)
+let update_with_clause op acc eligible ~subterms ~both_sides hc =
+  let acc = ref acc in
+  (* process a lit *)
+  let rec process_lit op acc i = function
+    | Equation (l,r,_,_) when both_sides ->
+      let acc = process_term op acc l [C.left_pos; i] in
+      process_term op acc r [C.right_pos; i]
+    | Equation (l,r,_,Gt) ->
+      process_term op acc l [C.left_pos; i]
+    | Equation (l,r,_,Lt) ->
+      process_term op acc r [C.right_pos; i]
+    | Equation (l,r,_,Incomparable)
+    | Equation (l,r,_,Eq) ->
+      let acc = process_term op acc l [C.left_pos; i] in
+      process_term op acc r [C.right_pos; i]
+  (* process a term (maybe recursively). We build positions in the wrong order,
+     so we have to reverse them before giving them to [op acc]. *)
+  and process_term op acc t pos =
+    match t.term with
+    | Var _ -> acc  (* variables are never indexed *)
+    | Node (_, []) -> op acc t (hc, List.rev pos, t)
+    | Node (_, l) ->
+      (* apply the operation on the term itself *)
+      let acc = op acc t (hc, List.rev pos, t) in
+      if subterms
+        then (* recursively process (non-var) subterms *)
+          let _, acc = List.fold_left
+            (fun (i, acc) t -> i+1, process_term op acc t (i::pos))
+            (0, acc) l
+          in acc
+        else acc (* stop after the root literal *)
+  in
+  (* process eligible literals *)
+  Array.iteri
+    (fun i lit -> if eligible hc i lit then acc := process_lit op !acc i lit)
+    hc.hclits;
+  !acc
 
-let add_rules state hcs = List.fold_left add_rule state hcs
+(** update acc using op, on all given clauses *)
+let update_with_clauses op acc eligible ~subterms ~both_sides hcs =
+  let acc = ref acc in
+  List.iter
+    (fun hc -> acc := update_with_clause op !acc eligible ~subterms ~both_sides hc)
+    hcs;
+  !acc
 
-let remove_rule state hc =
-  if C.is_unit_clause hc
-    then {state with state_index= state.state_index#remove_clause hc}
-    else state
+(** process literals that are potentially eligible for resolution *)
+let eligible_res hc i lit =
+  if hc.hcselected = [||] then C.is_maxlit hc i else C.is_selected hc i
 
-let remove_rules state hcs = List.fold_left remove_rule state hcs
+(** process literals that are potentially eligible for paramodulation *)
+let eligible_param hc i lit =
+  if hc.hcselected = [||] then C.pos_lit hc.hclits.(i) && C.is_maxlit hc i else false
 
-(* ----------------------------------------------------------------------
- * selection of next active
- * ---------------------------------------------------------------------- *)
-
-let next_passive_clause_ passive_set =
-  (* index of the first queue to consider *)
-  let first_idx, first_weight = passive_set.queue_state
-  and len = List.length passive_set.queues in
-  assert (len > 0);
-  (* try to get one from the idx-th queue *)
-  let rec try_queue passive_set idx weight =
-    assert (idx < len);
-    let queues = passive_set.queues in
-    let q, w = U.list_get queues idx in
-    if weight >= w || q#is_empty
-      then next_idx passive_set (idx+1) (* queue has been used enough time, or is empty *)
-      else 
-        let new_q, hc = q#take_first in (* pop from this queue *)
-        if C.CSet.mem passive_set.passive_clauses hc
-          then (* the clause is still in the passive set, return it *)
-            let new_q_state = (idx, weight+1) (* increment weight for the clause *)
-            and new_clauses = C.CSet.remove passive_set.passive_clauses hc in
-            U.debug 3 (lazy (U.sprintf "taken clause from %s" q#name));
-            let passive_set = {passive_set with passive_clauses=new_clauses;
-                queues=U.list_set queues idx (new_q, w);
-                queue_state=new_q_state}
-            in
-            passive_set, Some hc
-          else (* we must find another clause, this one has already been pop'd *)
-            let passive_set = {passive_set with queues=U.list_set queues idx (new_q, w)} in
-            try_queue passive_set idx weight (* try again *)
-  (* lookup for a non-empty queue to pop *)
-  and next_idx passive_set idx = 
-    if idx >= len
-      then next_idx passive_set 0 (* back to the first queue *)
-      else if idx = first_idx
-      then (passive_set, None)  (* ran through all queues, stop *)
-      else try_queue passive_set idx 0
-  (* start at current index and weight *)
-  in try_queue passive_set first_idx first_weight
-
-let next_passive_clause = prof_next_passive.HExtlib.profile next_passive_clause_
+(** process all literals *)
+let eligible_always hc i lit = true
 
 (* ----------------------------------------------------------------------
  * active set
  * ---------------------------------------------------------------------- *)
 
-let add_active active_set hc =
-  if C.CSet.mem active_set.active_clauses hc
-    then active_set  (* already in active set *)
-    else
-      let new_set = C.CSet.add active_set.active_clauses hc
-      and new_idx = active_set.idx#index_clause hc
-      and new_fv_idx = FV.index_clause active_set.fv_idx hc in
-      {active_set with active_clauses=new_set; idx=new_idx; fv_idx=new_fv_idx}
+(** Create an active set from the given ord, and indexing structures *)
+let mk_active_set ~ord index =
+  (* create a FeatureVector index from the current signature *)
+  let _,_,signature = Precedence.current_signature () in
+  let fv_idx = FV.mk_fv_index_signature signature in
+  object (self)
+    val mutable m_clauses = C.CSet.empty
+    val mutable m_sup_into = index
+    val mutable m_sup_from = index
+    val mutable m_back_demod = index
+    val mutable m_fv = fv_idx
+    method ord = ord
+    method clauses = m_clauses
+    method idx_sup_into = m_sup_into
+    method idx_sup_from = m_sup_from
+    method idx_back_demod = m_back_demod
+    method idx_fv = m_fv
 
-let add_actives active_set l =
-  List.fold_left (fun b sc -> add_active b sc) active_set l
+    (** update indexes by removing/adding clauses *)
+    method update op hcs =
+      (* sup into: subterms of literals that are eligible for res *)
+      m_sup_into <-
+        update_with_clauses op m_sup_into eligible_res ~subterms:true ~both_sides:false hcs;
+      (* sup from : literals that are eligible for param *)
+      m_sup_from <-
+        update_with_clauses op m_sup_from eligible_param ~subterms:false ~both_sides:false hcs;
+      (* back-demod : all subterms *)
+      m_back_demod <-
+        update_with_clauses op m_back_demod eligible_always ~subterms:true ~both_sides:true hcs
 
-let relocate_active active_set hc =
-  let ord = active_set.a_ord
-  and maxvar = active_set.active_clauses.C.CSet.maxvar in
-  C.fresh_clause ~ord maxvar hc
+    (** add clauses (only process the ones not present in the set) *)
+    method add hcs =
+      let hcs = List.filter (fun hc -> not (C.CSet.mem m_clauses hc)) hcs in
+      m_clauses <- C.CSet.add_list m_clauses hcs;
+      let op tree = tree#add in
+      self#update op hcs;
+      m_fv <- FV.index_clauses m_fv hcs
 
-let relocate_rules ~ord idx hc =
-  C.fresh_clause ~ord idx#maxvar hc
+    (** remove clauses (only process the ones present in the set) *)
+    method remove hcs =
+      let hcs = List.filter (C.CSet.mem m_clauses) hcs in
+      m_clauses <- C.CSet.remove_list m_clauses hcs;
+      let op tree = tree#remove in
+      self#update op hcs;
+      m_fv <- FV.remove_clauses m_fv hcs
 
-let remove_active active_set hc =
-  if C.CSet.mem active_set.active_clauses hc
-    then
-      let new_set = C.CSet.remove active_set.active_clauses hc
-      and new_idx = active_set.idx#remove_clause hc
-      and new_fv_idx = FV.remove_clause active_set.fv_idx hc in
-      {active_set with active_clauses=new_set; idx=new_idx; fv_idx=new_fv_idx}
-    else
-      active_set
+    (** Avoid var collisions with clause *)
+    method relocate hc =
+      C.fresh_clause ~ord m_clauses.C.CSet.maxvar hc
+  end
 
-let remove_actives active_set l =
-  List.fold_left remove_active active_set l
+(* ----------------------------------------------------------------------
+ * simplification set
+ * ---------------------------------------------------------------------- *)
 
-let remove_active_set active_set set =
-  let active = ref active_set in
-  C.CSet.iter set (fun hc -> active := remove_active !active hc);
-  !active
+(** Create a simplification set *)
+let mk_simpl_set ~ord unit_idx =
+  object
+    val mutable m_simpl = unit_idx
+    method ord = ord
+    method idx_simpl = m_simpl
 
-let singleton_active_set ~ord clause =
-  let active_set = mk_active_set ~ord in
-  let active_set = add_active active_set clause in
-  active_set
+    method add hcs =
+      m_simpl <- List.fold_left (fun simpl hc -> simpl#add_clause hc) m_simpl hcs
+
+    method remove hcs =
+      m_simpl <- List.fold_left (fun simpl hc -> simpl#remove_clause hc) m_simpl hcs
+
+    method relocate hc =
+      C.fresh_clause ~ord m_simpl#maxvar hc
+  end
 
 (* ----------------------------------------------------------------------
  * passive set
  * ---------------------------------------------------------------------- *)
-  
-let add_passive_ passive_set hc =
-  if C.CSet.mem passive_set.passive_clauses hc
-    then passive_set  (* already in passive set *)
-    else
-      let new_set = C.CSet.add passive_set.passive_clauses hc in
-      let new_queues = List.map
-        (fun (q,weight) -> q#add hc, weight)
-        passive_set.queues in
-      {passive_set with passive_clauses=new_set; queues=new_queues}
 
-let add_passive = prof_add_passive.HExtlib.profile add_passive_
+let mk_passive_set ~ord queues =
+  assert (queues != []);
+  object
+    val mutable m_clauses = C.CSet.empty
+    val m_queues = Array.of_list queues
+    val m_length = List.length queues
+    val mutable m_state = (0,0)
+    method ord = ord
+    method clauses = m_clauses
+    method queues = Array.to_list m_queues
 
-let add_passives passive_set l =
-  List.fold_left (fun b c -> add_passive b c) passive_set l
+    (** add clauses (not already present in set) to the set *)
+    method add hcs =
+      let hcs = List.filter (fun hc -> not (C.CSet.mem m_clauses hc)) hcs in
+      m_clauses <- C.CSet.add_list m_clauses hcs;
+      for i = 0 to m_length - 1 do
+        (* add to i-th queue *)
+        let (q, w) = m_queues.(i) in
+        m_queues.(i) <- (q#add_list hcs, w)
+      done
 
-let remove_passive passive_set hc =
-  (* just remove from the set of passive clauses *)
-  let new_passive_clauses = 
-    C.CSet.remove passive_set.passive_clauses hc in
-  {passive_set with passive_clauses = new_passive_clauses}
+    (** remove clauses (not from the queues) *)
+    method remove hcs = 
+      m_clauses <- C.CSet.remove_ids m_clauses hcs
 
-let remove_passives passive_set l =
-  List.fold_left (fun set c -> remove_passive set c) passive_set l
+    (** next clause *)
+    method next () =
+      let first_idx, w = m_state in
+      (* search in the idx-th queue *)
+      let rec search idx weight =
+        let q, w = m_queues.(idx) in
+        if weight >= w || q#is_empty then next_idx (idx+1) (* empty queue, go to the next one *)
+        else begin
+          let new_q, hc = q#take_first in (* pop from this queue *)
+          m_queues.(idx) <- new_q, w;
+          if C.CSet.mem m_clauses hc
+            then begin (* done, found a still-valid clause *)
+              U.debug 3 (lazy (U.sprintf "taken clause from %s" q#name));
+              m_clauses <- C.CSet.remove m_clauses hc;
+              m_state <- (idx, weight+1);
+              Some hc
+            end else search idx weight
+        end
+      (* search the next non-empty queue *)
+      and next_idx idx =
+        if idx = first_idx then None (* all queues are empty *)
+        else if idx = m_length then next_idx 0 (* cycle *)
+        else search idx 0 (* search in this queue *)
+      in
+      search first_idx w
 
-let remove_passives_set passive_set s =
-  let passive_clauses =
-    Ptset.fold (fun id clauses -> C.CSet.remove_id clauses id)
-      s passive_set.passive_clauses
-  in {passive_set with passive_clauses;}
+    (* cleanup the clause queues *)
+    method clean () =
+      for i = 0 to m_length - 1 do
+        let q, w = m_queues.(i) in
+        m_queues.(i) <- q#clean m_clauses, w
+      done
+  end
 
-let clean_passive passive_set =
-  (* remove all clauses that are no longer in this set from queues *)
-  let set = passive_set.passive_clauses in
-  let queues =
-    List.map (fun (q, w) -> (q#clean set, w)) passive_set.queues in
-  {passive_set with queues;}
+(* ----------------------------------------------------------------------
+ * global state
+ * ---------------------------------------------------------------------- *)
+
+let mk_state ~ord params =
+  let queues = ClauseQueue.default_queues
+  and select = Selection.selection_from_string ~ord params.param_select
+  and unit_idx = Dtree.unit_index
+  and index = choose_index params.param_index in
+  object
+    val m_active = (mk_active_set ~ord index :> active_set)
+    val m_passive = mk_passive_set ~ord queues
+    val m_simpl = mk_simpl_set ~ord unit_idx
+    method ord = ord
+    method select = select
+    method active_set = m_active
+    method passive_set = m_passive
+    method simpl_set = m_simpl
+  end
 
 (* ----------------------------------------------------------------------
  * utils
  * ---------------------------------------------------------------------- *)
 
-let maxvar_active active_set = active_set.active_clauses.C.CSet.maxvar
-
-(** statistics on the state *)
+(** statistics on the state (TODO stats on the simpl_set) *)
 type state_stats = int * int (* num passive, num active *)
 
 let stats state =
-  ( C.CSet.size state.active_set.active_clauses
-  , C.CSet.size state.passive_set.passive_clauses)
+  ( C.CSet.size state#active_set#clauses
+  , C.CSet.size state#passive_set#clauses)
 
 let pp_state formatter state =
+  let num_active, num_passive = stats state in
   Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
-    (C.CSet.size state.active_set.active_clauses)
-    (C.CSet.size state.passive_set.passive_clauses)
-    CQ.pp_queues state.passive_set.queues
+    num_active num_passive CQ.pp_queues state#passive_set#queues
 
 let debug_state formatter state =
+  let num_active, num_passive = stats state in
   Format.fprintf formatter
     "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
-    (C.CSet.size state.active_set.active_clauses)
-    (C.CSet.size state.passive_set.passive_clauses)
-    CQ.pp_queues state.passive_set.queues
-    C.pp_set state.active_set.active_clauses
-    C.pp_set state.passive_set.passive_clauses
+    num_active num_passive
+    CQ.pp_queues state#passive_set#queues
+    C.pp_set state#active_set#clauses
+    C.pp_set state#passive_set#clauses
 
 
 module DotState = Dot.Make(
@@ -299,13 +364,13 @@ let pp_dot ?(name="state") formatter state =
   and queue = Queue.create () in
   (* start from empty clause if present, all active clauses otherwise *)
   let empty_clause = ref None in
-  try C.CSet.iter state.active_set.active_clauses
+  try C.CSet.iter state#active_set#clauses
     (fun hc' -> if hc'.hclits = [||] then (empty_clause := Some hc'; raise Exit));
   with Exit -> ();
   (match !empty_clause with
   | Some hc -> Queue.push hc queue
   | None ->
-    C.CSet.iter state.active_set.active_clauses (fun hc -> Queue.push hc queue));
+    C.CSet.iter state#active_set#clauses (fun hc -> Queue.push hc queue));
   (* breadth first exploration of clauses and their parents *)
   while not (Queue.is_empty queue) do
     let hc = Queue.pop queue in

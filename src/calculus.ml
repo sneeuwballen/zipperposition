@@ -45,7 +45,7 @@ class type calculus =
     (** how to simplify a clause *)
     method basic_simplify : ord:ordering -> hclause -> hclause
     (** how to simplify a clause w.r.t a set of unit clauses *)
-    method simplify : select:selection_fun -> ProofState.active_set -> Index.unit_index -> hclause -> hclause
+    method simplify : select:selection_fun -> ProofState.active_set -> ProofState.simpl_set -> hclause -> hclause
     (** check whether the clause is redundant w.r.t the set *)
     method redundant : ProofState.active_set -> hclause -> bool
     (** find redundant clauses in set w.r.t the clause *)
@@ -65,10 +65,9 @@ class type calculus =
 (** do binary inferences that involve the given clause *)
 let do_binary_inferences active_set rules hc =
   (* relocate clause *)
-  let ord = active_set.PS.a_ord in
-  let c = C.fresh_clause ~ord active_set.PS.active_clauses.C.CSet.maxvar hc in
+  let c = active_set#relocate hc in
   Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active set: %a"
-                       C.pp_set active_set.PS.active_clauses));
+                       C.pp_set active_set#clauses));
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->

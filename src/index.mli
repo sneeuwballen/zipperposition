@@ -75,18 +75,3 @@ class type unit_index =
     method pp : Format.formatter -> unit -> unit
   end
 
-(** A global index, that operates on hashconsed clauses *)
-class type clause_index =
-  object ('a)
-    method index_clause : hclause -> 'a
-    method remove_clause : hclause -> 'a
-
-    method root_index : index
-    method subterm_index : index
-
-    method pp : all_clauses:bool -> Format.formatter -> unit -> unit
-  end
-
-(** build a clause index from an index and a unit index *)
-val mk_clause_index : index -> clause_index
-

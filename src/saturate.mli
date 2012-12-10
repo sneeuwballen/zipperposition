@@ -31,23 +31,25 @@ type szs_status =
   | Error of string 
   | Timeout
 
-(** Simplifications to perform on initial clauses *)
+(** Simplifications to perform on initial clauses (using a state containing themselves) *)
 val initial_simplifications : ord:ordering ->
                               select:selection_fun ->
                               calculus:Calculus.calculus ->
+                              ProofState.active_set ->
+                              ProofState.simpl_set ->
                               hclause list -> hclause list
 
 (** Perform one step of the given clause algorithm *)
 val given_clause_step : calculus:Calculus.calculus ->
                         ProofState.state ->
-                        ProofState.state * szs_status
+                        szs_status
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns a tuple (new state, result, number of steps done) *)
 val given_clause: ?steps:int -> ?timeout:float -> ?progress:bool ->
                   calculus:Calculus.calculus ->
                   ProofState.state ->
-                  ProofState.state * szs_status * int
+                  szs_status * int
 
 (** time elapsed since start of program *)
 val get_total_time : unit -> float

@@ -311,29 +311,29 @@ let delayed : calculus =
 
     method basic_simplify ~ord hc = Sup.basic_simplify ~ord hc
 
-    method simplify ~select actives idx hc =
-      let ord = actives.PS.a_ord in
+    method simplify ~select actives simpl_set hc =
+      let ord = actives#ord in
       let hc = simplify_inner ~ord (Sup.basic_simplify ~ord hc) in
       let hc = C.select_clause ~select hc in
       (* rename for demodulation *)
-      let c = PS.relocate_rules ~ord idx hc in
-      let hc = Sup.basic_simplify ~ord (Sup.demodulate ~ord idx c) in
+      let c = simpl_set#relocate hc in
+      let hc = Sup.basic_simplify ~ord (Sup.demodulate simpl_set c) in
       let hc = simplify_inner ~ord hc in
       (* rename for simplify_reflect *)
-      let c = PS.relocate_rules ~ord idx hc in
-      let hc = Sup.positive_simplify_reflect ~ord idx c in
+      let c = simpl_set#relocate hc in
+      let hc = Sup.positive_simplify_reflect simpl_set c in
       (* rename for simplify_reflect *)
-      let c = PS.relocate_rules ~ord idx hc in
-      let hc = Sup.negative_simplify_reflect ~ord idx c in
+      let c = simpl_set#relocate hc in
+      let hc = Sup.negative_simplify_reflect simpl_set c in
       let hc = C.select_clause ~select hc in
       hc
 
     method redundant actives hc =
-      let c = PS.relocate_active actives hc in
+      let c = actives#relocate hc in
       Sup.subsumed_by_set actives c
 
     method redundant_set actives hc =
-      let c = PS.relocate_active actives hc in
+      let c = actives#relocate hc in
       Sup.subsumed_in_set actives c
 
     (* use elimination rules as simplifications rather than inferences, here *)

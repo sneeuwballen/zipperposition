@@ -166,8 +166,8 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
       end
   end
 
-let infer_active_ actives clause =
-  let ord = actives.PS.a_ord in
+let infer_active_ (actives : ProofState.active_set) clause : hclause list =
+  let ord = actives#ord in
   (* no literal can be eligible for paramodulation if some are selected *)
   if C.selected clause.cref <> [||] then [] else
   (* perform inferences with i-th literal? *)
@@ -178,8 +178,7 @@ let infer_active_ actives clause =
   Calculus.fold_lits ~both:true eligible_lit
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
-      let subterm_idx = actives.PS.idx#subterm_index in
-      subterm_idx#retrieve_unifiables s acc
+      actives#idx_sup_into#retrieve_unifiables s acc
         (fun acc u_p set ->
           try (* rewrite u_p with s, if they are unifiable *)
             let subst = Unif.unification S.id_subst s u_p in
@@ -196,8 +195,8 @@ let infer_active_ actives clause =
 let infer_active actives clause =
   prof_infer_active.HExtlib.profile (infer_active_ actives) clause
 
-let infer_passive_ actives clause =
-  let ord = actives.PS.a_ord in
+let infer_passive_ (actives:ProofState.active_set) clause : hclause list =
+  let ord = actives#ord in
   let hc = clause.cref in
   (* perform inference on this lit? *)
   let eligible i lit = if C.selected hc = [||] then C.is_maxlit hc i else C.is_selected hc i in
@@ -210,7 +209,7 @@ let infer_passive_ actives clause =
         (fun u_p p ->
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
-          actives.PS.idx#root_index#retrieve_unifiables u_p acc
+          actives#idx_sup_from#retrieve_unifiables u_p acc
             (fun acc s set ->
               try
                 let subst = Unif.unification S.id_subst s u_p in
@@ -331,7 +330,8 @@ exception RewriteInto of term
 
 (** Compute normal form of term w.r.t active set. Clauses used to
     rewrite are added to the clauses hashset. *)
-let demod_nf ?(subterms_only=false) ~ord idx clauses t =
+let demod_nf ?(subterms_only=false) simpl_set clauses t =
+  let ord = simpl_set#ord in
   let oriented_hclause hc = match hc.hclits with
   | [|Equation (_,_,true,Gt)|] | [|Equation (_,_,true,Lt)|] -> true (* oriented *)
   | _ -> false in
@@ -343,7 +343,7 @@ let demod_nf ?(subterms_only=false) ~ord idx clauses t =
       else begin
         (* find equations l=r that match subterm *)
         try
-          idx#retrieve ~sign:true t
+          simpl_set#idx_simpl#retrieve ~sign:true t
             (fun l r subst unit_hclause ->
               (* r is the term subterm is going to be rewritten into *)
               assert (C.is_unit_clause unit_hclause);
@@ -383,23 +383,25 @@ let demod_nf ?(subterms_only=false) ~ord idx clauses t =
     T.mk_node f t.sort (List.map traverse ts)
   | _ -> traverse t
 
-let demodulate_ ~ord idx c =
+let demodulate_ simpl_set c =
   incr_stat stat_demodulate_call;
+  let ord = simpl_set#ord in
   (* clauses used to rewrite *)
   let clauses = ref [] in
   (* demodulate literals *)
   let demod_lit i lit =
     match lit with
     | Equation (l, r, false, _) ->
-      C.mk_neq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~ord idx clauses r)
+      C.mk_neq ~ord (demod_nf simpl_set clauses l) (demod_nf simpl_set clauses r)
     | Equation (l, r, true, Gt) when C.eligible_res ~ord c i S.id_subst ->
-      C.mk_eq ~ord (demod_nf ~subterms_only:true ~ord idx clauses l) (demod_nf ~ord idx clauses r)
+      C.mk_eq ~ord (demod_nf ~subterms_only:true simpl_set clauses l) (demod_nf simpl_set clauses r)
     | Equation (l, r, true, Lt) when C.eligible_res ~ord c i S.id_subst ->
-      C.mk_eq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~subterms_only:true ~ord idx clauses r)
+      C.mk_eq ~ord (demod_nf simpl_set clauses l) (demod_nf ~subterms_only:true simpl_set clauses r)
     | Equation (l, r, true, _) when C.eligible_res ~ord c i S.id_subst ->
-      C.mk_eq ~ord (demod_nf ~ord ~subterms_only:true idx clauses l) (demod_nf ~ord ~subterms_only:true idx clauses r)
+      C.mk_eq ~ord (demod_nf ~subterms_only:true simpl_set clauses l)
+                   (demod_nf ~subterms_only:true simpl_set clauses r)
     | Equation (l, r, true, _) ->
-      C.mk_eq ~ord (demod_nf ~ord idx clauses l) (demod_nf ~ord idx clauses r)
+      C.mk_eq ~ord (demod_nf simpl_set clauses l) (demod_nf simpl_set clauses r)
   in
   (* demodulate every literal *)
   let lits = Array.mapi demod_lit c.clits in
@@ -414,7 +416,7 @@ let demodulate_ ~ord idx c =
       C.mk_hclause_a ~ord lits proof parents
     end
 
-let demodulate ~ord idx c = prof_demodulate.HExtlib.profile (demodulate_ ~ord idx) c
+let demodulate simpl_set c = prof_demodulate.HExtlib.profile (demodulate_ simpl_set) c
 
 let is_tautology hc =
   let rec check lits i =
@@ -480,7 +482,8 @@ let basic_simplify ~ord hc =
 
 exception FoundMatch of (term * hclause * substitution)
 
-let positive_simplify_reflect ~ord idx c =
+let positive_simplify_reflect simpl_set c =
+  let ord = simpl_set#ord in
   (* iterate through literals and try to resolve negative ones *)
   let rec iterate_lits acc lits clauses = match lits with
   | [] -> List.rev acc, clauses
@@ -515,7 +518,7 @@ let positive_simplify_reflect ~ord idx c =
     | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
   (** try to equate terms with a positive unit clause that match them *)
   and equate_root clauses t1 t2 =
-    try idx#retrieve ~sign:true t1
+    try simpl_set#idx_simpl#retrieve ~sign:true t1
       (fun l r subst hc ->
         if T.eq_term t2 (S.apply_subst subst r)
         then begin
@@ -539,7 +542,8 @@ let positive_simplify_reflect ~ord idx c =
                     !C.pp_clause#pp c !C.pp_clause#pp_h new_hc));
       new_hc
     
-let negative_simplify_reflect ~ord idx c =
+let negative_simplify_reflect simpl_set c =
+  let ord = simpl_set#ord in
   (* iterate through literals and try to resolve positive ones *)
   let rec iterate_lits acc lits clauses = match lits with
   | [] -> List.rev acc, clauses
@@ -553,7 +557,7 @@ let negative_simplify_reflect ~ord idx c =
   | lit::lits' -> iterate_lits (lit::acc) lits' clauses
   (** try to remove the literal using a negative unit clause *)
   and can_refute s t =
-    try idx#retrieve ~sign:false s
+    try simpl_set#idx_simpl#retrieve ~sign:false s
       (fun l r subst hc ->
         if T.eq_term t (S.apply_subst subst r)
         then begin
@@ -749,7 +753,7 @@ let subsumed_by_set_ set c =
   let try_eq_subsumption = Utils.array_exists C.equational_lit c.clits in
   (* use feature vector indexing *)
   try
-    FV.retrieve_subsuming set.PS.fv_idx c.cref.hclits
+    FV.retrieve_subsuming set#idx_fv c.cref.hclits
       (fun hc' -> if (try_eq_subsumption && eq_subsumes hc'.hclits c.clits)
                   || subsumes hc'.hclits c.clits then raise Exit);
     false
@@ -768,7 +772,7 @@ let subsumed_in_set_ set c =
   (* use feature vector indexing *)
   let l = ref [] in
   FV.retrieve_subsumed
-    set.PS.fv_idx c.cref.hclits
+    set#idx_fv c.cref.hclits
     (fun hc' -> if (try_eq_subsumption && eq_subsumes c.clits hc'.hclits)
                 || subsumes c.clits hc'.hclits then l := hc' :: !l);
   !l
@@ -785,11 +789,11 @@ exception RemoveLit of int * hclause
 (** Performs successive contextual literal cuttings *)
 let rec contextual_literal_cutting_ active_set hc =
   if Array.length hc.hclits <= 1 then hc else
-  let ord = active_set.PS.a_ord in
+  let ord = active_set#ord in
   (* do we need to try to use equality subsumption? *)
   let try_eq_subsumption = Utils.array_exists C.equational_lit hc.hclits in
   (* rename literals clause *)
-  let c = PS.relocate_active active_set hc in
+  let c = active_set#relocate hc in
   (* try to remove one literal from the literal array *)
   let rec remove_one_lit lits = 
     try
@@ -797,7 +801,7 @@ let rec contextual_literal_cutting_ active_set hc =
         (* negate literal *)
         lits.(i) <- C.negate_lit lits.(i);
         (* test for subsumption *)
-        FV.retrieve_subsuming active_set.PS.fv_idx lits
+        FV.retrieve_subsuming active_set#idx_fv lits
           (fun hc' -> if (try_eq_subsumption && eq_subsumes hc'.hclits lits)
                       || subsumes hc'.hclits lits
              (* some clause subsumes the literals with i-th literal flipped *)
@@ -972,28 +976,28 @@ let superposition : Calculus.calculus =
 
     method basic_simplify ~ord c = basic_simplify ~ord c
 
-    method simplify ~select actives idx hc =
-      let ord = actives.PS.a_ord in
+    method simplify ~select actives simpl hc =
+      let ord = actives#ord in
       let hc = basic_simplify ~ord hc in
       let hc = C.select_clause ~select hc in
       (* rename for demodulation *)
-      let c = PS.relocate_rules ~ord idx hc in
-      let hc = basic_simplify ~ord (demodulate ~ord idx c) in
+      let c = simpl#relocate hc in
+      let hc = basic_simplify ~ord (demodulate simpl c) in
       (* rename for simplify reflect *)
-      let c = PS.relocate_rules ~ord idx hc in
-      let hc = positive_simplify_reflect ~ord idx c in
+      let c = simpl#relocate hc in
+      let hc = positive_simplify_reflect simpl c in
       (* rename for simplify reflect *)
-      let c = PS.relocate_rules ~ord idx hc in
-      let hc = negative_simplify_reflect ~ord idx c in
+      let c =  simpl#relocate hc in
+      let hc = negative_simplify_reflect simpl c in
       let hc = C.select_clause ~select hc in
       hc
 
     method redundant actives hc =
-      let c = PS.relocate_active actives hc in
+      let c = actives#relocate hc in
       subsumed_by_set actives c
 
     method redundant_set actives hc =
-      let c = PS.relocate_active actives hc in
+      let c = actives#relocate hc in
       subsumed_in_set actives c
 
     method list_simplify ~ord ~select hc =

@@ -55,14 +55,16 @@ val is_semantic_tautology : hclause -> bool
 
 val basic_simplify : ord:ordering -> hclause -> hclause   (** basic simplifications *)
 
-val demodulate : ord:ordering -> Index.unit_index -> clause -> hclause
+val demodulate : ProofState.simpl_set -> clause -> hclause
   (** rewrite clause using orientable unit equations *)
 
 (* TODO splitting without renaming *)
 (* TODO branch rewriting *)
 
-val positive_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> hclause
-val negative_simplify_reflect : ord:ordering -> Index.unit_index -> clause -> hclause
+val positive_simplify_reflect : ProofState.simpl_set -> clause -> hclause
+val negative_simplify_reflect : ProofState.simpl_set -> clause -> hclause
+
+(* TODO backward versions of those *)
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : literal array -> literal array -> bool
