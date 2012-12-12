@@ -187,3 +187,24 @@ let detect_total_relations ~ord clauses =
     !totals;
   (* return definitions *)
   !definitions
+
+(* ----------------------------------------------------------------------
+ * generic representation of theories and formulas (persistent)
+ * ---------------------------------------------------------------------- *)
+
+open Sexplib.Std
+
+type tterm =
+  | TVar of int
+  | TNode of string * tterm list
+  with sexp
+
+type tformula =
+  tterm list
+  with sexp
+
+(*
+let _ =
+  let f = [TNode ("foo", []); TNode ("bar", [TVar 0; TVar 1])] in
+  Format.printf "sexp is %a@." Sexplib.Sexp.pp (sexp_of_tformula f)
+*)

@@ -63,3 +63,18 @@ val detect_total_relations : ord:ordering -> hclause list -> hclause list
       if  p(x,y,f(x,y))  and  p(x,y,z) & p(x,y,z') => z=z'
       we add  p(x,y,z) <=> (z = f(x,y))  as a definition of p *)
 
+(* ----------------------------------------------------------------------
+ * generic representation of theories and formulas (persistent)
+ * ---------------------------------------------------------------------- *)
+
+type tterm =
+  | TVar of int
+  | TNode of string * tterm list
+
+val tterm_of_sexp : Sexplib.Sexp.t -> tterm
+val sexp_of_tterm : tterm -> Sexplib.Sexp.t
+
+type tformula = tterm list
+
+val tformula_of_sexp : Sexplib.Sexp.t -> tformula
+val sexp_of_tformula : tformula -> Sexplib.Sexp.t
