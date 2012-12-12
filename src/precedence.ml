@@ -165,6 +165,15 @@ let min_constraint symbols =
 let alpha_constraint a b = compare_symbols a b
 
 (* ----------------------------------------------------------------------
+ * Weight function
+ * ---------------------------------------------------------------------- *)
+
+(** weight of f = arity of f + 4 *)
+let weight_modarity () =
+  let _, arities, _ = current_signature () in
+  fun a -> (SHashtbl.find arities a) + 4
+
+(* ----------------------------------------------------------------------
  * Creation of a precedence (symbol_ordering) from constraints
  * ---------------------------------------------------------------------- *)
 
@@ -172,6 +181,7 @@ let alpha_constraint a b = compare_symbols a b
 let make_ordering constrs =
   let _,_,symbols = current_signature () in
   let po = PartialOrder.mk_partial_order symbols in
+  let weight = ref (weight_modarity ()) in
   let apply_constrs () = List.iter (PartialOrder.complete po) constrs in
   let multiset_pred = ref (fun s -> s == eq_symbol) in
   (* the object itself *)
@@ -187,7 +197,11 @@ let make_ordering constrs =
       apply_constrs ();
       assert (PartialOrder.is_total po);
 
+      (* refresh weight function *)
+      weight := weight_modarity ();
+
       Utils.debug 3 (lazy (Utils.sprintf "%% new signature %a" T.pp_signature self#signature));
+    method weight s = !weight s
     method signature = PartialOrder.signature po
     method compare a b = PartialOrder.compare po a b
     method multiset_status s = !multiset_pred s

@@ -110,6 +110,7 @@ class type symbol_ordering =
     method refresh : unit -> unit             (** refresh the signature *)
     method signature : symbol list            (** current symbols in decreasing order *)
     method compare : symbol -> symbol -> int  (** total order on symbols *)
+    method weight : symbol -> int             (** weight of symbol (for KBO) *)
     method multiset_status : symbol -> bool   (** does the symbol have a multiset status? *)
     method set_multiset : (symbol -> bool) -> unit  (** set the function that recognized multiset symbols *)
   end

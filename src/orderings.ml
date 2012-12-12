@@ -118,8 +118,6 @@ module KBO = struct
       else if n = 1 then balance.pos_counter <- balance.pos_counter - 1);
     balance.balance.(idx) <- n - 1
 
-  let fun_weight = 2  (* var weight = 1 *)
-
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
       It should be linear time. *)
@@ -134,7 +132,7 @@ module KBO = struct
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
       | Node (s, l) ->
-        let wb' = if pos then wb + fun_weight else wb - fun_weight in
+        let wb' = if pos then wb + so#weight s else wb - so#weight s in
         balance_weight_rec wb' l y pos false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
@@ -182,7 +180,7 @@ module KBO = struct
       | Node (f, ss), Node (g, ts) ->
         (* do the recursive computation of kbo *)
         let wb', recursive = tckbo_rec wb f g ss ts in
-        let wb'' = wb' in
+        let wb'' = wb' + so#weight f - so#weight g in
         (* check variable condition *)
         let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
         and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
