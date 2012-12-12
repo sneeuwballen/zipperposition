@@ -33,8 +33,8 @@ type t = {
 }
 
 (** Compute the signature from the symbol table *)
-let compute_signature size num =
-  let signature = Array.make size (Obj.magic None) in
+let compute_signature num =
+  let signature = Array.make (SHashtbl.length num) (Obj.magic None) in
   SHashtbl.iter (fun s i -> signature.(i) <- s) num;
   signature
 
@@ -52,11 +52,9 @@ let mk_partial_order symbs =
     symbs;
   let msize = !size + ((!size + 1) / 2) in
   (* the signature (num -> symbol) *)
-  let signature = compute_signature msize num in
+  let signature = compute_signature num in
   (* the adjacency matrix *)
   let cmp = Array.make_matrix msize msize false in
-  (* no need to GC content of the matrix *)
-  Obj.set_tag (Obj.repr cmp) Obj.no_scan_tag;
   { num; size= !size; total=false; cmp; signature; }
 
 (** copy the partial ordering structure *)
@@ -135,23 +133,21 @@ let complete po cmp_fun =
     (* look for pairs that are not ordered *)
     for i = 0 to n - 1 do
       for j = i + 1 to n - 1 do
-        if (not cmp.(i).(j)) && (not cmp.(j).(i)) then begin
-          (* elements i and j not ordered, order them by cmp_fun *)
-          (match cmp_fun po.signature.(i) po.signature.(j) with
-          | n when n < 0 -> cmp.(j).(i) <- true
-          | n when n > 0 -> cmp.(i).(j) <- true
-          | _ -> ());
-          (* recompute transitive closure *)
-          transitive_closure po;
-        end
+        if (not cmp.(i).(j)) && (not cmp.(j).(i)) then
+          (* elements i and j not ordered, order them by cmp_fun
+             and then re-compute the transitive closure *)
+          match cmp_fun po.signature.(i) po.signature.(j) with
+          | n when n < 0 -> cmp.(j).(i) <- true; transitive_closure po
+          | n when n > 0 -> cmp.(i).(j) <- true; transitive_closure po
+          | _ -> ()
       done;
     done;
-    po.total <- check_is_total po;
+    po.total <- is_total po
   end
 
 (** compare two symbols in the partial ordering *)
 let compare po s t =
-  assert po.total;
+  assert (is_total po);
   let ns = SHashtbl.find po.num s
   and nt = SHashtbl.find po.num t in
   match po.cmp.(ns).(nt), po.cmp.(nt).(ns) with
@@ -162,7 +158,7 @@ let compare po s t =
 
 (** signature, in decreasing order (assuming the ordering is total) *)
 let signature po =
-  assert (po.total);
+  assert (is_total po);
   let s = Array.sub po.signature 0 po.size in
   (* sort by decreasing order *)
   Array.fast_sort (fun x y -> - (compare po x y)) s;
@@ -193,6 +189,7 @@ let add_constraints po constraints =
 
 (** add the given symbols to the partial order *)
 let extend po symbs =
+  FoUtils.debug 3 (lazy (FoUtils.sprintf "extend po with %a" Terms.pp_signature symbs));
   (* add symbols *)
   let old_size = po.size in
   List.iter
@@ -200,11 +197,10 @@ let extend po symbs =
       if not (SHashtbl.mem po.num s)
         then (SHashtbl.add po.num s po.size; po.size <- po.size + 1))
     symbs;
-  (if po.size > old_size then po.total <- false);
+  (if po.size > old_size then (po.total <- false; po.signature <- compute_signature po.num));
   if po.size > old_size && po.size > Array.length po.cmp then begin
     (* extend the matrix and signature in case they are too small for new signature *)
     let n = po.size + ((1 + po.size) lsr 1) in
-    let signature = compute_signature n po.num in
     let cmp = Array.make n po.cmp.(0) in
     for i = 0 to n-1 do
       cmp.(i) <- Array.make n false;
@@ -212,20 +208,20 @@ let extend po symbs =
       (if i < old_size then Array.blit po.cmp.(i) 0 cmp.(i) 0 old_size);
     done;
     po.cmp <- cmp;
-    po.signature <- signature;
   end
 
 (** pretty print the partial order as a boolean matrix *)
 let pp formatter po =
   let n = po.size in
   (* print num -> symbol *)
+  Format.fprintf formatter "total %B;@;" (is_total po);
   for i = 0 to n-1 do
     Format.fprintf formatter " @[<h>%2d: %s@]@;" i (name_symbol po.signature.(i))
   done;
   (* print the matrix *)
   for i = 0 to n-1 do
     Format.fprintf formatter "@[<h>";
-    for j = 0 to n - 1 do
+    for j = 0 to n-1 do
       Format.fprintf formatter " %d" (if po.cmp.(i).(j) then 1 else 0)
     done;
     Format.fprintf formatter "@]@;";
