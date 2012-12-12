@@ -60,6 +60,6 @@ val is_total_symbol : hclause -> [ `Total of (symbol * symbol) | `None ]
 
 val detect_total_relations : ord:ordering -> hclause list -> hclause list
   (** adds axioms for all total functional relations:
-      if  p(x,y,f(x,y))  and  p(x,y,z) & p(x,y,z') => z=z
+      if  p(x,y,f(x,y))  and  p(x,y,z) & p(x,y,z') => z=z'
       we add  p(x,y,z) <=> (z = f(x,y))  as a definition of p *)
 

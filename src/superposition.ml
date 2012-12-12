@@ -170,7 +170,7 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
 let infer_active_ (actives : ProofState.active_set) clause : hclause list =
   let ord = actives#ord in
   (* no literal can be eligible for paramodulation if some are selected *)
-  if C.selected clause.cref <> [||] then [] else
+  if C.has_selected_lits clause.cref then [] else
   (* perform inferences with i-th literal? *)
   let eligible_lit i lit = C.pos_lit lit && C.is_maxlit clause.cref i in
   (* do the inferences where clause is active; for this,
@@ -200,7 +200,7 @@ let infer_passive_ (actives:ProofState.active_set) clause : hclause list =
   let ord = actives#ord in
   let hc = clause.cref in
   (* perform inference on this lit? *)
-  let eligible i lit = if C.selected hc = [||] then C.is_maxlit hc i else C.is_selected hc i in
+  let eligible i lit = if C.has_selected_lits hc then C.is_selected hc i else C.is_maxlit hc i in
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
   Calculus.fold_lits ~both:true eligible
@@ -231,7 +231,7 @@ let infer_equality_resolution_ ~ord hc =
   let clause = C.base_clause hc in
   (* literals that can potentially be eligible for resolution *)
   let eligible i lit =
-    C.neg_lit lit && (if C.selected hc = [||] then C.is_maxlit hc i else C.is_selected hc i) in
+    C.neg_lit lit && (if C.has_selected_lits hc then C.is_selected hc i else C.is_maxlit hc i) in
   (* iterate on those literals *)
   Calculus.fold_lits ~both:false eligible
     (fun acc l r sign l_pos ->
@@ -262,7 +262,7 @@ let infer_equality_resolution ~ord clause =
   prof_infer_equality_resolution.HExtlib.profile (infer_equality_resolution_ ~ord) clause
 
 let infer_equality_factoring_ ~ord hc =
-  if C.selected hc <> [||] then [] else (* no literal is eligible for paramodulation *)
+  if C.has_selected_lits hc then [] else (* no literal is eligible for paramodulation *)
   let clause = C.base_clause hc in
   let eligible i lit = C.pos_lit lit && C.is_maxlit hc i in
   (* find root terms that are unifiable with s and are not in the

@@ -27,7 +27,7 @@ open Symbols
 type t = {
   num : int SHashtbl.t;                   (** symbol -> index *)
   mutable signature : symbol array;       (** num -> symbol *)
-  mutable complete : bool;                (** is the table complete? *)
+  mutable total : bool;                   (** is the order total? *)
   mutable size : int;                     (** number of symbols in the table *)
   mutable cmp : bool array array;         (** adjacency matrix *)
 }
@@ -57,7 +57,7 @@ let mk_partial_order symbs =
   let cmp = Array.make_matrix msize msize false in
   (* no need to GC content of the matrix *)
   Obj.set_tag (Obj.repr cmp) Obj.no_scan_tag;
-  { num; size= !size; complete=false; cmp; signature; }
+  { num; size= !size; total=false; cmp; signature; }
 
 (** copy the partial ordering structure *)
 let copy po =
@@ -68,10 +68,10 @@ let copy po =
   done;
   (* copy array *)
   let signature = Array.copy po.signature in
-  { num=SHashtbl.copy po.num; complete=po.complete; size = po.size; cmp; signature; }
+  { num=SHashtbl.copy po.num; total=po.total; size = po.size; cmp; signature; }
 
-(** check whether the ordering is complete *)
-let check_is_complete po =
+(** check whether the ordering is total *)
+let check_is_total po =
   let n = po.size in
   try
     for i = 0 to n - 1 do
@@ -84,9 +84,9 @@ let check_is_complete po =
   with Exit -> false
 
 (** is the ordering total? *)
-let is_complete po =
-  po.complete ||
-  (let res = check_is_complete po in (if res then po.complete <- true); res)
+let is_total po =
+  po.total ||
+  (let res = check_is_total po in (if res then po.total <- true); res)
 
 (** compute transitive closure of the graph *)
 let transitive_closure po =
@@ -126,7 +126,7 @@ let transitive_closure po =
     function is not total, the ordering may still not be
     complete. *)
 let complete po cmp_fun =
-  if po.complete then ()
+  if po.total then ()
   else begin
     (* ensure the graph is T-closed *)
     transitive_closure po;
@@ -146,12 +146,12 @@ let complete po cmp_fun =
         end
       done;
     done;
-    po.complete <- check_is_complete po;
+    po.total <- check_is_total po;
   end
 
 (** compare two symbols in the partial ordering *)
 let compare po s t =
-  assert po.complete;
+  assert po.total;
   let ns = SHashtbl.find po.num s
   and nt = SHashtbl.find po.num t in
   match po.cmp.(ns).(nt), po.cmp.(nt).(ns) with
@@ -162,7 +162,7 @@ let compare po s t =
 
 (** signature, in decreasing order (assuming the ordering is total) *)
 let signature po =
-  assert (po.complete);
+  assert (po.total);
   let s = Array.sub po.signature 0 po.size in
   (* sort by decreasing order *)
   Array.fast_sort (fun x y -> - (compare po x y)) s;
@@ -200,7 +200,7 @@ let extend po symbs =
       if not (SHashtbl.mem po.num s)
         then (SHashtbl.add po.num s po.size; po.size <- po.size + 1))
     symbs;
-  (if po.size > old_size then po.complete <- false);
+  (if po.size > old_size then po.total <- false);
   if po.size > old_size && po.size > Array.length po.cmp then begin
     (* extend the matrix and signature in case they are too small for new signature *)
     let n = po.size + ((1 + po.size) lsr 1) in

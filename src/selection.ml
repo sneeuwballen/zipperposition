@@ -130,7 +130,7 @@ let available_selections () =
 
 let check_selected hc =
   assert hc.hcselected_done;
-  if C.selected hc = [||] then ()
+  if not (C.has_selected_lits hc) then ()
   else assert
     (Utils.array_foldi
       (fun acc i lit -> acc || C.neg_lit lit && C.is_selected hc i)

@@ -295,20 +295,40 @@ module CHashSet =
  * useful functions to build and examine clauses
  * ---------------------------------------------------------------------- *)
 
-(** Find the maximal literals among lits, returns the list of their index *)
+(** make a bitvector of size n with all bits set *)
+let bv_make n =
+  assert (n <= 31);
+  let rec shift bv n = if n = 0 then bv else shift ((bv lsl 1) lor 1) (n-1)
+  in shift 0 n
+
+(** bitvector n-th element is true? *)
+let bv_get bv n = (bv land (1 lsl n)) <> 0 
+
+(** set n-th element of bitvector *)
+let bv_set bv n = bv lor (1 lsl n)
+
+(** reset n-th element of bitvector *)
+let bv_clear bv n = bv land (lnot (1 lsl n))
+
+(** is bitvector empty? *)
+let bv_empty bv = bv = 0
+
+(** Find the maximal literals among lits, returns a bitvector *)
 let find_max_lits ~ord lits =
-  (* examine each literal *)
-  let rec examine acc i =
-    if i = Array.length lits then acc else
-    let acc' = if maximal lits.(i) i 0 then i :: acc else acc in
-    examine acc' (i+1)
-  (* check whether the literal is maximal *)
-  and maximal lit i j =
-    if j = Array.length lits then true
-    else if j = i then maximal lit i (j+1)
-    else if compare_lits_partial ~ord lit lits.(j) = Lt then false
-    else maximal lit i (j+1)
-  in examine [] 0
+  let n = Array.length lits in
+  let bv = ref (bv_make n) in
+  for i = 0 to n-1 do
+    (* i-th lit is already known not to be max? *)
+    if not (bv_get !bv i) then () else
+    for j = i+1 to n-1 do
+      if not (bv_get !bv j) then () else
+      match compare_lits_partial ~ord lits.(i) lits.(j) with
+      | Incomparable | Eq -> ()     (* no further information about i-th and j-th *)
+      | Gt -> bv := bv_clear !bv j  (* j-th cannot be max *)
+      | Lt -> bv := bv_clear !bv i  (* i-th cannot be max *)
+    done;
+  done;
+  !bv
 
 (** comparison of variables by index *)
 let compare_vars a b =
@@ -332,9 +352,22 @@ let rec merge_lit_vars acc lits i =
     let acc = T.merge_varlist (T.merge_varlist acc l.vars) r.vars in
     merge_lit_vars acc lits (i+1)
 
-(** Build a new hclause from the given literals *)
+(** the tautological empty clause *)
+let true_clause =
+  H.hashcons
+    { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
+      hctag = -1; hcweight=2; hcmaxlits=lazy 0x1; hcselected=0; hcselected_done=true;
+      hcvars=[]; hcproof=lazy (Proof ("trivial", []));
+      hcparents=[]; hcdescendants=Ptset.empty; }
+
+(** Build a new hclause from the given literals. If there are more than 31 literals,
+    the prover becomes incomplete by returning [true] instead. *)
 let mk_hclause_a ~ord lits proof parents =
   incr_stat stat_mk_hclause;
+  if Array.length lits > 31
+  then (Utils.debug 1 (lazy (Utils.sprintf "%% incompleteness: clause of %d lits -> $true"
+      (Array.length lits))); true_clause)
+  else begin
   let all_vars = merge_lit_vars [] lits 0 in
   let all_vars = List.sort compare_vars all_vars in
   (* normalize literals *)
@@ -350,9 +383,9 @@ let mk_hclause_a ~ord lits proof parents =
     hclits = lits;
     hctag = -1;
     hcweight = 0;
-    hcmaxlits = lazy (Array.of_list (find_max_lits ~ord lits));
+    hcmaxlits = lazy (find_max_lits ~ord lits);
     hcselected_done = false;
-    hcselected = [||];
+    hcselected = 0;
     hcvars = [];
     hcproof = proof;
     hcparents = parents;
@@ -369,6 +402,7 @@ let mk_hclause_a ~ord lits proof parents =
     end);
   (* return hashconsed clause *)
   hc'
+  end
 
 (** build clause from a list *)
 let mk_hclause ~ord lits proof parents =
@@ -394,41 +428,42 @@ let check_ord_hclause ~ord hc =
       ok)
     hc.hclits)
 
-(** Compute selected literals. This also cast the clause into a ready clause.
-    Note that selection on a unit clause is a no-op. *)
+(** Compute selected literals. Note that selection on a unit clause is a no-op. *)
 let select_clause ~select hc =
   (match hc.hclits with
    | _ when hc.hcselected_done -> ()  (* already selected *)
    | [|_|] -> hc.hcselected_done <- true  (* selection useless in unit clauses *)
    | _ ->
-    (hc.hcselected <- Array.of_list (select hc);
-     hc.hcselected_done <- true));
+   begin
+      let bv = List.fold_left bv_set 0 (select hc) in
+      (hc.hcselected <- bv;
+       hc.hcselected_done <- true);
+    end);
   hc
 
-(** selected literals *)
-let selected hc = hc.hcselected
+(** are there selected literals in the clause? *)
+let has_selected_lits hc = not (bv_empty hc.hcselected)
 
 (** descendants of the clause *)
 let descendants hc = hc.hcdescendants
 
 (** Check whether the literal is maximal *)
 let is_maxlit hc i =
-  let maxlits = Lazy.force hc.hcmaxlits in
-  (* iterate through the array of indexes of maximum literals *)
-  let rec check j =
-    if j = Array.length maxlits then false else
-    maxlits.(j) = i || check (j+1)
-  in check 0
+  let bv = Lazy.force hc.hcmaxlits in
+  bv_get bv i  (* just check i-th bit *)
 
 (** Check whether the literal is maximal after applying subst *)
 let check_maximal_lit_ ~ord c pos subst =
-  if not (is_maxlit c.cref pos) then false else (* cannot be max, even after subst *)
+  let bv = Lazy.force c.cref.hcmaxlits in
+  let n = Array.length c.clits in
+  (* check if lit already not maximal, before subst *)
+  if not (bv_get bv pos) then false else 
   let lit = c.clits.(pos) in
   let slit = apply_subst_lit ~ord subst lit in
   (* check that slit is not < subst(lit') for any lit' maximal in c *)
   let rec check i = 
-    if i = Array.length c.clits then true
-    else if not (is_maxlit c.cref i) then check (i+1)
+    if i = n then true
+    else if not (bv_get bv i) then check (i+1)
     else
       let slit' = apply_subst_lit ~ord subst c.clits.(i) in
       (compare_lits_partial ~ord slit slit' <> Lt) && check (i+1)
@@ -440,9 +475,10 @@ let check_maximal_lit ~ord clause pos subst =
 
 (** Get an indexed list of maximum literals *)
 let maxlits c =
-  Array.fold_left
-    (fun acc i -> (c.clits.(i), i) :: acc)
-    [] (Lazy.force c.cref.hcmaxlits)
+  let bv = Lazy.force c.cref.hcmaxlits in
+  Utils.array_foldi
+    (fun acc i lit -> if bv_get bv i then (lit, i)::acc else acc)
+    [] c.clits
 
 (** Apply substitution to the clause *)
 let rec apply_subst_cl ?(recursive=true) ~ord subst hc =
@@ -480,32 +516,33 @@ let base_clause hc =
 
 (** Check whether the literal is selected *)
 let is_selected hc i =
-  let selected = hc.hcselected in
-  (* iterate through the array of indexes of maximum literals *)
-  let rec check j =
-    if j = Array.length selected then false else
-    selected.(j) = i || check (j+1)
-  in check 0
+  let bv = hc.hcselected in
+  bv_get bv i
 
 (** Indexed list of selected literals *)
 let selected_lits c =
-  Array.fold_left (fun acc i -> (c.clits.(i), i) :: acc) [] c.cref.hcselected
+  let bv = c.cref.hcselected in
+  Utils.array_foldi
+    (fun acc i lit -> if bv_get bv i then (lit,i)::acc else acc)
+    [] c.clits
 
 (** check whether a literal is eligible for resolution *)
 let eligible_res ~ord c idx subst =
+  (* bitvectors of selected and maximal literals *)
   let selected = c.cref.hcselected in
+  let maximal = Lazy.force c.cref.hcmaxlits in
+  let lits = c.clits in
+  let n = Array.length lits in
   (* check maximality among selected literals with given sign *)
   let rec check_among_selected slit i sign =
-    if i = Array.length selected then true else
-    let idx' = selected.(i) in
-    if idx = idx' then check_among_selected slit (i+1) sign else (* same lit *)
-    let lit' = c.clits.(idx') in
-    if pos_lit lit' <> sign then check_among_selected slit (i+1) sign else (* bad sign *)
-    let slit' = apply_subst_lit ~ord subst lit' in
-    compare_lits_partial ~ord slit slit' <> Lt && check_among_selected slit (i+1) sign
+    if i = n then true
+    else if i <> idx && bv_get maximal i && bv_get selected i && pos_lit lits.(i) = pos_lit slit
+      then let slit' = apply_subst_lit ~ord subst lits.(i) in
+      compare_lits_partial ~ord slit slit' <> Lt && check_among_selected slit (i+1) sign
+      else check_among_selected slit (i+1) sign
   in
   (* if no lit is selected, max lits are eligible *)
-  if c.cref.hcselected = [||]
+  if not (has_selected_lits c.cref)
     then check_maximal_lit ~ord c idx subst (* just check maximality *)
     else if not (is_selected c.cref idx) then false (* some are selected, not lit *)
     else (* check that slit max among selected literals of same sign *)
@@ -515,7 +552,7 @@ let eligible_res ~ord c idx subst =
 
 (** check whether a literal is eligible for paramodulation *)
 let eligible_param ~ord c idx subst =
-  if c.cref.hcselected <> [||] then false
+  if has_selected_lits c.cref then false
   else if neg_lit c.clits.(idx) then false (* only positive lits *)
   else check_maximal_lit ~ord c idx subst
 

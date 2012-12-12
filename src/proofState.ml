@@ -151,11 +151,11 @@ let update_with_clauses op acc eligible ~subterms ~both_sides hcs =
 
 (** process literals that are potentially eligible for resolution *)
 let eligible_res hc i lit =
-  if hc.hcselected = [||] then C.is_maxlit hc i else C.is_selected hc i
+  if not (C.has_selected_lits hc) then C.is_maxlit hc i else C.is_selected hc i
 
 (** process literals that are potentially eligible for paramodulation *)
 let eligible_param hc i lit =
-  if hc.hcselected = [||] then C.pos_lit hc.hclits.(i) && C.is_maxlit hc i else false
+  if not (C.has_selected_lits hc) then C.pos_lit hc.hclits.(i) && C.is_maxlit hc i else false
 
 (** process all literals *)
 let eligible_always hc i lit = true

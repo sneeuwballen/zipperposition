@@ -33,7 +33,7 @@ val mk_partial_order : symbol list -> t
 val copy : t -> t
   (** copy the partial order *)
 
-val is_complete : t -> bool
+val is_total : t -> bool
   (** is the ordering total? *)
 
 val complete : t -> (symbol -> symbol -> int) -> unit

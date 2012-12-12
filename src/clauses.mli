@@ -91,10 +91,13 @@ module CHashSet :
   end
 
 val mk_hclause : ord:ordering -> literal list -> proof Lazy.t -> hclause list -> hclause
-  (** build a clause from literals *)
+  (** Build a new hclause from the given literals. If there are more than 31 literals,
+      the prover becomes incomplete by returning [true] instead. *)
 
 val mk_hclause_a : ord:ordering -> literal array -> proof Lazy.t -> hclause list -> hclause
-  (** build a clause from an array of literals (destructive on the array) *)
+  (** Build a new hclause from the given literals. If there are more than 31 literals,
+      the prover becomes incomplete by returning [true] instead. This function takes
+      ownership of the input array. *)
 
 val clause_of_fof : ord:ordering -> hclause -> hclause
   (** transform eq/not to literals *)
@@ -107,9 +110,6 @@ val check_ord_hclause : ord:ordering -> hclause -> unit
 
 val select_clause : select:selection_fun -> hclause -> hclause
   (** select literals in clause, and computes ordering data *)
-
-val selected: hclause -> int array
-  (** indexes of selected literals *)
 
 val descendants : hclause -> Ptset.t
   (** set of ID of descendants of the clause *)
@@ -138,6 +138,9 @@ val fresh_clause : ord:ordering -> int -> hclause -> clause
 
 val base_clause : hclause -> clause
   (** create a clause from a hclause, without renaming *)
+
+val has_selected_lits : hclause -> bool
+  (** does the clause have some selected literals? *)
 
 val is_selected : hclause -> int -> bool
   (** check whether a literal is selected *)
