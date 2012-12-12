@@ -851,11 +851,20 @@ let match_literals lit lit' =
     with UnificationFailure -> [])
   | _ -> []
 
+(** number of equational lits *)
+let rec num_equational lits i =
+  if i = Array.length lits then 0
+  else if C.equational_lit lits.(i) then 1 + (num_equational lits (i+1))
+  else num_equational lits (i+1)
+
 (** performs condensation on the clause. It looks for two literals l1 and l2 of same
     sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then
-    hc is simplified into hc\sigma \ {l2} *)
+    hc is simplified into hc\sigma \ {l2}.
+    If there are too many equational literals, the simplification is disabled to
+    avoid pathologically expensive subsumption checks.
+    TODO remove this limitation after an efficient subsumption check is implemented. *)
 let rec condensation_ ~ord hc =
-  if Array.length hc.hclits <= 1 then hc else
+  if Array.length hc.hclits <= 1 || (num_equational hc.hclits 0 > 3) then hc else
   (* offset is used to rename literals for subsumption *)
   let offset = T.max_var hc.hcvars +1 in
   let lits = hc.hclits in
