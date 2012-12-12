@@ -21,12 +21,15 @@ let print_order () =
     | "p", "a" -> -1
     | _ -> 0
   in
-
   let s1 = [mk_symbol "a"; mk_symbol "p"; mk_symbol "b"] in
   let po = PO.mk_partial_order s1 in
   Format.printf "@[<v>initial PO:@ %a@]@." PO.pp po;
   PO.complete po partial_cmp;
   Format.printf "after 'a > p': @[<v>%a@]@." PO.pp po;
+  PO.extend po symbs;
+  Format.printf "@[<v>PO after extension:@ %a@]@." PO.pp po;
+  PO.complete po alpha_cmp;
+  Format.printf "@[<v>final PO:@ %a@]@." PO.pp po;
   ()
 
 let run () =

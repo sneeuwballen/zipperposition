@@ -203,13 +203,13 @@ let extend po symbs =
   (if po.size > old_size then po.complete <- false);
   if po.size > old_size && po.size > Array.length po.cmp then begin
     (* extend the matrix and signature in case they are too small for new signature *)
-    let n = 2 * po.size in
+    let n = po.size + ((1 + po.size) lsr 1) in
     let signature = compute_signature n po.num in
     let cmp = Array.make n po.cmp.(0) in
     for i = 0 to n-1 do
-      (* copy i-th line *)
       cmp.(i) <- Array.make n false;
-      Array.blit po.cmp.(i) 0 cmp.(i) 0 old_size;
+      (* copy old lines *)
+      (if i < old_size then Array.blit po.cmp.(i) 0 cmp.(i) 0 old_size);
     done;
     po.cmp <- cmp;
     po.signature <- signature;
