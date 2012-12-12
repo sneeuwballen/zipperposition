@@ -251,9 +251,8 @@ let () =
     | "kbo" -> O.kbo
     | x -> failwith ("unknown ordering " ^ x) in
   let so = if params.param_precedence
-    then Precedence.heuristic_precedence ord_factory (calculus#constr clauses) clauses
-    else Precedence.make_ordering (Precedence.compose_constraints
-                                   Precedence.alpha_constraint (calculus#constr clauses)) in
+    then Precedence.heuristic_precedence ord_factory [Precedence.invfreq_constraint clauses; Precedence.alpha_constraint] (calculus#constr clauses) clauses
+    else Precedence.make_ordering (calculus#constr clauses @ [Precedence.invfreq_constraint clauses; Precedence.alpha_constraint]) in
   let ord = ord_factory so in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (* selection function *)

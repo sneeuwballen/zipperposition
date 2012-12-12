@@ -1072,7 +1072,7 @@ let superposition : Calculus.calculus =
 
     method axioms = []
 
-    method constr _ = Precedence.min_constraint [false_symbol; true_symbol]
+    method constr _ = [Precedence.min_constraint [false_symbol; true_symbol]]
 
     method preprocess ~ord ~select l =
       List.fold_left

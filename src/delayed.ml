@@ -64,9 +64,8 @@ let classify =
 
 (** constraint on the ordering *)
 let symbol_constraint _ =
-  Precedence.compose_constraints
-    (fun x y -> order (classify x) (classify y))
-    (Precedence.min_constraint special_preds)
+  [Precedence.min_constraint special_preds;
+   fun x y -> order (classify x) (classify y)]
 
 (* ----------------------------------------------------------------------
  * elimination rules
