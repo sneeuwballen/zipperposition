@@ -74,7 +74,7 @@ let parse_args () =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
       ("-debug", Arg.Int Utils.set_debug, "debug level");
       ("-version", Arg.Set version, "print version");
-      ("-steps", Arg.Set_int steps, "verbose mode");
+      ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
       ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
       ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
@@ -83,7 +83,7 @@ let parse_args () =
       ("-progress", Arg.Set progress, "print progress");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
-      ("-noproof", Arg.Clear proof, "disable proof printing");
+      ("-no-proof", Arg.Clear proof, "disable proof printing");
       ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
@@ -291,13 +291,15 @@ let () =
       Printf.printf "%% SZS status CounterSatisfiable\n";
       Utils.debug 1 (lazy (Utils.sprintf "%% saturated set: @[<v>%a@]@."
                      C.pp_set state#active_set#clauses))
-  | Sat.Unsat c ->
+  | Sat.Unsat c -> begin
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";
-      if params.param_proof
+      (if params.param_proof
         then Format.printf ("@.# SZS output start Refutation@.@[<v>%a@]@." ^^
-                          "# SZS output end Refutation@.") !C.pp_proof#pp c
-        else ()
+                          "# SZS output end Refutation@.") !C.pp_proof#pp c);
+      let potential_lemmas = Theories.search_lemmas c in
+      List.iter (Format.printf "%% potential lemma : @[<hv>%a@]@." Theories.pp_potential_lemma) potential_lemmas
+    end
 
 let _ =
   at_exit (fun () -> 

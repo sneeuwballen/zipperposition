@@ -198,10 +198,43 @@ type tterm =
   | TVar of int
   | TNode of string * tterm list
   with sexp
+  (** an abstract term *)
 
 type tformula =
   tterm list
   with sexp
+  (** an abstract clause *)
+
+let rec tterm_of_term t = match t.term with
+  | Var i -> TVar i
+  | Node (f, l) -> TNode (name_symbol f, List.map tterm_of_term l)
+
+let rec tformula_of_hclause hc =
+  let convert_lit = function
+  | Equation (l,r,true,_) when r == T.true_term -> tterm_of_term l
+  | Equation (l,r,true,_) when l == T.true_term -> tterm_of_term r
+  | Equation (l,r,false,_) when r == T.true_term -> TNode ("not", [tterm_of_term l])
+  | Equation (l,r,false,_) when l == T.true_term -> TNode ("not", [tterm_of_term r])
+  | Equation (l,r,true,_) -> TNode ("=", [tterm_of_term l; tterm_of_term r])
+  | Equation (l,r,false,_) -> TNode ("!=", [tterm_of_term l; tterm_of_term r])
+  in
+  Array.to_list (Array.map convert_lit hc.hclits)
+
+type potential_lemma =
+  | PotentialLemma of tformula * tformula list
+  with sexp
+  (** a potential lemma is a clause, with some hypothesis *)
+
+(** given an empty clause (and its proof), look in the proof for
+    potential lemma. *)
+let search_lemmas hc =
+  assert (hc.hclits = [||]);
+  let axioms = [[TNode ("true", [])]] in
+  [PotentialLemma (tformula_of_hclause hc, axioms)]  (* TODO *)
+
+let pp_potential_lemma formatter pl =
+  let sexp = sexp_of_potential_lemma pl in
+  Sexplib.Sexp.pp formatter sexp
 
 (*
 let _ =

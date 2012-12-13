@@ -70,11 +70,32 @@ val detect_total_relations : ord:ordering -> hclause list -> hclause list
 type tterm =
   | TVar of int
   | TNode of string * tterm list
+  (** an abstract term *)
+
+type tformula = tterm list
+  (** an abstract clause *)
+
+val tterm_of_term : term -> tterm
+val tformula_of_hclause : hclause -> tformula
+
+type potential_lemma =
+  | PotentialLemma of tformula * tformula list
+  (** a potential lemma is a clause, with some hypothesis *)
+
+val search_lemmas : hclause -> potential_lemma list
+  (** given an empty clause (and its proof), look in the proof for
+      potential lemma. *)
+
+
+(* ----------------------------------------------------------------------
+ * serialization/deserialization for abstract logic structures
+ * ---------------------------------------------------------------------- *)
 
 val tterm_of_sexp : Sexplib.Sexp.t -> tterm
 val sexp_of_tterm : tterm -> Sexplib.Sexp.t
 
-type tformula = tterm list
-
 val tformula_of_sexp : Sexplib.Sexp.t -> tformula
 val sexp_of_tformula : tformula -> Sexplib.Sexp.t
+
+val pp_potential_lemma : Format.formatter -> potential_lemma -> unit
+  (** print the potential lemma as a S-expr *)
