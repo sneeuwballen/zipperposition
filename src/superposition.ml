@@ -330,14 +330,16 @@ let infer_equality_factoring ~ord clause =
 exception RewriteInto of term
 
 (** Compute normal form of term w.r.t active set. Clauses used to
-    rewrite are added to the clauses hashset. *)
-let demod_nf ?(subterms_only=false) simpl_set clauses t =
+    rewrite are added to the clauses hashset.
+    restrict is an option for restricting demodulation in positive maximal terms *)
+let demod_nf ?(restrict=false) simpl_set clauses t =
   let ord = simpl_set#ord in
   let oriented_hclause hc = match hc.hclits with
   | [|Equation (_,_,true,Gt)|] | [|Equation (_,_,true,Lt)|] -> true (* oriented *)
   | _ -> false in
-  (* compute normal form of subterm *) 
-  let rec normal_form t =
+  (* compute normal form of subterm. If restrict is true, substitutions that
+     are variable renamings are forbidden (since we are at root of a max term) *) 
+  let rec normal_form ~restrict t =
     (* do not rewrite non-atomic formulas *)
     if not (T.atomic t)
       then t  (* do not rewrite such formulas *)
@@ -350,8 +352,9 @@ let demod_nf ?(subterms_only=false) simpl_set clauses t =
               assert (C.is_unit_clause unit_hclause);
               let new_l = t
               and new_r = S.apply_subst subst r in
-              if oriented_hclause unit_hclause || ord#compare new_l new_r = Gt
-                (* subst(l) > subst(r), we can rewrite *)
+              if (not restrict || not (S.is_renaming subst))
+              && (oriented_hclause unit_hclause || ord#compare new_l new_r = Gt)
+                (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
                   assert (ord#compare new_l new_r = Gt);
                   Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
@@ -366,23 +369,20 @@ let demod_nf ?(subterms_only=false) simpl_set clauses t =
                          !C.pp_clause#pp_h unit_hclause)));
           t (* not found any match, normal form found *)
         with RewriteInto t' ->
-          normal_form t' (* done one rewriting step, continue *)
+          normal_form ~restrict t' (* done one rewriting step, continue *)
       end
   (* rewrite innermost-leftmost *)
-  and traverse t =
+  and traverse ~restrict t =
     match t.term with
     | Var _ -> t
     | Node (s, l) ->
       (* rewrite subterms *)
-      let l' = List.map traverse l in
+      let l' = List.map (traverse ~restrict:false) l in
       let t' = if List.for_all2 (==) l l' then t else T.mk_node s t.sort l' in
       (* rewrite term at root *)
-      normal_form t'
+      normal_form ~restrict t'
   in
-  match t.term with
-  | Node (f, ts) when subterms_only -> (* rewrite only subterms *)
-    T.mk_node f t.sort (List.map traverse ts)
-  | _ -> traverse t
+  traverse ~restrict t
 
 let demodulate_ simpl_set c =
   incr_stat stat_demodulate_call;
@@ -395,12 +395,12 @@ let demodulate_ simpl_set c =
     | Equation (l, r, false, _) ->
       C.mk_neq ~ord (demod_nf simpl_set clauses l) (demod_nf simpl_set clauses r)
     | Equation (l, r, true, Gt) when C.eligible_res ~ord c i S.id_subst ->
-      C.mk_eq ~ord (demod_nf ~subterms_only:true simpl_set clauses l) (demod_nf simpl_set clauses r)
+      C.mk_eq ~ord (demod_nf ~restrict:true simpl_set clauses l) (demod_nf simpl_set clauses r)
     | Equation (l, r, true, Lt) when C.eligible_res ~ord c i S.id_subst ->
-      C.mk_eq ~ord (demod_nf simpl_set clauses l) (demod_nf ~subterms_only:true simpl_set clauses r)
+      C.mk_eq ~ord (demod_nf simpl_set clauses l) (demod_nf ~restrict:true simpl_set clauses r)
     | Equation (l, r, true, _) when C.eligible_res ~ord c i S.id_subst ->
-      C.mk_eq ~ord (demod_nf ~subterms_only:true simpl_set clauses l)
-                   (demod_nf ~subterms_only:true simpl_set clauses r)
+      C.mk_eq ~ord (demod_nf ~restrict:true simpl_set clauses l)
+                   (demod_nf ~restrict:true simpl_set clauses r)
     | Equation (l, r, true, _) ->
       C.mk_eq ~ord (demod_nf simpl_set clauses l) (demod_nf simpl_set clauses r)
   in
@@ -1092,6 +1092,7 @@ let superposition : Calculus.calculus =
             (fun acc hc ->
               let hc = C.reord_hclause ~ord (C.clause_of_fof ~ord hc) in
               let hc = basic_simplify ~ord hc in
+              let hc = C.select_clause ~select hc in
               if is_tautology hc then acc else hc :: acc)
             acc clauses)
         [] l
