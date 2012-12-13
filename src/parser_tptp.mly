@@ -119,6 +119,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     then T.mk_node exists_symbol bool_sort
         [T.mk_node lambda_symbol bool_sort [T.db_from_var t v]]
     else t
+
+  let ord = O.default_ordering ()
     
 %}
   
@@ -236,7 +238,7 @@ fof_annotated:
     { 
       let clause = 
         let filename = !Const.cur_filename in  (* ugly *)
-        let ord = Orderings.default_ordering () in
+        ord#refresh ();
         let sign = not !conjecture in (* if conjecture, negate *)
         let lit = C.mk_lit ~ord $7 T.true_term sign in
         C.mk_hclause ~ord [lit] (lazy (Axiom (filename, $3))) []
@@ -347,7 +349,7 @@ cnf_annotated:
       // ignore everything except for the formula
       {
         let clause = 
-          let ord = Orderings.default_ordering () in
+          ord#refresh ();
           let filename = !Const.cur_filename in  (* ugly *)
           let c = C.mk_hclause ~ord $7 (lazy (Axiom (filename, $3))) [] in
           C.clause_of_fof ~ord c
@@ -390,10 +392,10 @@ disjunction:
 
 literal:
   | atomic_formula
-      { C.mk_eq ~ord:(O.default_ordering ()) $1 T.true_term }
+      { ord#refresh (); C.mk_eq ~ord $1 T.true_term }
 
   | NEGATION atomic_formula
-      { C.mk_neq ~ord:(O.default_ordering ()) $2 T.true_term }
+      { ord#refresh (); C.mk_neq ~ord $2 T.true_term }
 
 atomic_formula:
   | plain_atom
