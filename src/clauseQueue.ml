@@ -107,6 +107,11 @@ let goals =
   let name = "prefer_goals" in
   make_hq ~accept:is_goal_clause ~weight:(fun hc -> hc.hcweight) name
 
+let ground =
+  let is_ground hc = hc.hcvars = [] in
+  let name = "prefer_ground" in
+  make_hq ~accept:is_ground ~weight:(fun hc -> hc.hcweight) name
+
 let non_goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = match lit with
@@ -125,7 +130,7 @@ let pos_unit_clauses =
 
 let default_queues =
   [ (clause_weight, 4);
-    (pos_unit_clauses, 3);
+    (ground, 1);
     (non_goals, 1);
     (goals, 1);
     (fifo, 1);

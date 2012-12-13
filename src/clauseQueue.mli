@@ -45,6 +45,9 @@ val clause_weight : queue
 (** only select goals (clauses with only negative lits) *)
 val goals : queue
 
+(** only select ground clauses *)
+val ground : queue
+
 (** only select positive unit clauses *)
 val pos_unit_clauses : queue
 
