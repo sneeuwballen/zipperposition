@@ -65,14 +65,16 @@ let rec lookup var subst = match subst with
 let is_in_subst var subst = lookup var subst != var
 
 let domain subst =
-  let set = T.THashSet.create () in
-  List.iter (fun (v, _) -> T.THashSet.add set v) subst;
-  set
+  List.fold_left (fun set (v,_) -> T.TSet.add v set) T.TSet.empty subst
 
 let codomain subst =
-  let set = T.THashSet.create () in
-  List.iter (fun (_, t) -> T.THashSet.add set t) subst;
-  set
+  List.fold_left (fun set (_,t) -> T.TSet.add t set) T.TSet.empty subst
+
+let is_renaming subst =
+  let c = domain subst
+  and cd = codomain subst in
+  (* check that codomain is made of vars, and that domain and codomain have same size *)
+  T.TSet.cardinal c = T.TSet.cardinal cd && T.TSet.for_all T.is_var cd
 
 let rec reset_bindings subst =
   match subst with

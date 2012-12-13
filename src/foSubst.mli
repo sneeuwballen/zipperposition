@@ -59,11 +59,14 @@ val lookup : term -> substitution -> term
 val is_in_subst : term -> substitution -> bool
   (** check whether the variable is bound by the substitution *)
 
-val domain : substitution -> Terms.THashSet.t
+val domain : substitution -> Terms.TSet.t
   (** domain of substitution *)
 
-val codomain : substitution -> Terms.THashSet.t
+val codomain : substitution -> Terms.TSet.t
   (** codomain (image terms) of substitution *)
+
+val is_renaming : substitution -> bool
+  (** check whether the substitution is a renaming *)
 
 val reset_bindings : substitution -> unit
   (** reset bindings of variables and terms of the substitution *)
