@@ -264,7 +264,10 @@ let search_lemmas hc =
  * serialization/deserialization for abstract logic structures
  * ---------------------------------------------------------------------- *)
 
-let read_kb filename =
+exception ReadKB of kb
+
+(* read KB without locking *)
+let read_kb_nolock filename =
   try
     let sexp = Sexplib.Sexp.load_sexp filename in
     let kb = kb_of_sexp sexp in
@@ -273,6 +276,23 @@ let read_kb filename =
   | Failure _ -> empty_kb
   | Sys_error _ -> empty_kb
 
-let save_kb filename kb =
+let read_kb ~lock ~file =
+  Utils.with_lock_file lock
+    (fun () -> read_kb_nolock file)
+
+let save_kb ~lock ~file kb =
   let sexp = sexp_of_kb kb in
-  Sexplib.Sexp.save_hum filename sexp
+  Utils.with_lock_file lock
+    (fun () -> Sexplib.Sexp.save_hum file sexp)
+
+let update_kb ~lock ~file f =
+  Format.printf "%% update knowledge base... ";
+  Format.print_flush ();
+  Utils.with_lock_file lock
+    (fun () ->
+    let kb = read_kb_nolock file in
+    (* transform kb, then save the new version *)
+    let kb = f kb in
+    let sexp = sexp_of_kb kb in
+    Sexplib.Sexp.save_hum file sexp);
+  Format.printf "done@."

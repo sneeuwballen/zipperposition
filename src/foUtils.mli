@@ -98,7 +98,7 @@ val array_forall2 : ('a -> 'a -> bool) -> 'a array -> 'a array -> bool
 val array_exists : ('a -> bool) -> 'a array -> bool
 
 (** perform the action with a lock on the given file *)
-val with_lock_file : string -> (unit -> unit) -> unit
+val with_lock_file : string -> (unit -> 'a) -> 'a
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string

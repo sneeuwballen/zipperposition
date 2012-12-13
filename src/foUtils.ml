@@ -294,13 +294,15 @@ let array_exists p a =
 let with_lock_file filename action =
   let lock_file = Unix.openfile filename [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
   Unix.lockf lock_file Unix.F_LOCK 0;
-  (try
-    action ();
+  try
+    let x = action () in
     Unix.lockf lock_file Unix.F_ULOCK 0;
+    Unix.close lock_file;
+    x
   with e ->
     Unix.lockf lock_file Unix.F_ULOCK 0;
-    raise e);
-  Unix.close lock_file
+    Unix.close lock_file;
+    raise e
 
 (* ----------------------------------------------------------------------
  * pretty printing

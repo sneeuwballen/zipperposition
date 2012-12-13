@@ -120,9 +120,12 @@ val lemma_of_sexp : Sexplib.Sexp.t -> lemma
 val kb_of_sexp : Sexplib.Sexp.t -> kb
 val sexp_of_kb : kb -> Sexplib.Sexp.t
 
-
-val read_kb : string -> kb
+val read_kb : lock:string -> file:string -> kb
   (** parse KB from file (or gives an empty one) *)
 
-val save_kb : string -> kb -> unit
+val save_kb : lock:string -> file:string -> kb -> unit
   (** save the KB to the file *)
+
+val update_kb : lock:string -> file:string -> (kb -> kb) -> unit
+  (** updates the KB located in given file (with given lock file),
+      with the function *)
