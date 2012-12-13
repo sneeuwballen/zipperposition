@@ -262,7 +262,7 @@ let given_clause_step ~calculus state =
         [] inferred_clauses
       in
       let new_clauses = List.rev_append inferred_clauses new_clauses in
-      List.iter (fun new_c -> Utils.debug 1 (lazy (Utils.sprintf
+      List.iter (fun new_c -> Utils.debug 2 (lazy (Utils.sprintf
                 "    inferred new clause @[<hov 3>%a@]" !C.pp_clause#pp_h new_c)))
         new_clauses;
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
