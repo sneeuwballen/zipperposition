@@ -288,6 +288,21 @@ let array_exists p a =
   in check 0
 
 (* ----------------------------------------------------------------------
+ * misc
+ * ---------------------------------------------------------------------- *)
+
+let with_lock_file filename action =
+  let lock_file = Unix.openfile filename [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
+  Unix.lockf lock_file Unix.F_LOCK 0;
+  (try
+    action ();
+    Unix.lockf lock_file Unix.F_ULOCK 0;
+  with e ->
+    Unix.lockf lock_file Unix.F_ULOCK 0;
+    raise e);
+  Unix.close lock_file
+
+(* ----------------------------------------------------------------------
  * pretty printing
  * ---------------------------------------------------------------------- *)
 

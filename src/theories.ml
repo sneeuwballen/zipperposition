@@ -220,24 +220,59 @@ let rec tformula_of_hclause hc =
   in
   Array.to_list (Array.map convert_lit hc.hclits)
 
-type potential_lemma =
-  | PotentialLemma of tformula * tformula list
-  with sexp
-  (** a potential lemma is a clause, with some hypothesis *)
+type lemma = tformula * tformula list with sexp
+  (** a lemma is a clause, with some hypothesis *)
+
+type theory = tformula list with sexp
+  (** a theory is a list of formula *) 
+
+type kb = {
+  kb_lemma_idx : int;
+  kb_potential_lemmas : lemma list;     (** potential lemma, to explore *)
+  kb_lemmas : (int * lemma) list;       (** lemma with their unique ID *)
+  kb_theories : (string * theory) list; (** theories, with their name *)
+} with sexp (** a Knowledge Base for lemma and theories *)
+
+let empty_kb = {
+  kb_lemma_idx = 0;
+  kb_potential_lemmas = [];
+  kb_lemmas = [];
+  kb_theories = [];
+}
+
+let add_potential_lemmas kb pot_lemmas =
+  { kb with kb_potential_lemmas = pot_lemmas @ kb.kb_potential_lemmas }
+
+let add_lemmas kb lemmas =
+  let lemmas, idx = List.fold_left
+    (fun (lemmas, idx) lemma -> ((idx, lemma) :: lemmas, idx+1))
+    (kb.kb_lemmas, kb.kb_lemma_idx) lemmas in
+  { kb with kb_lemma_idx=idx; kb_lemmas=lemmas; }
+
+(* ----------------------------------------------------------------------
+ * (heuristic) search of "interesting" lemma in a proof.
+ * ---------------------------------------------------------------------- *)
 
 (** given an empty clause (and its proof), look in the proof for
     potential lemma. *)
 let search_lemmas hc =
   assert (hc.hclits = [||]);
   let axioms = [[TNode ("true", [])]] in
-  [PotentialLemma (tformula_of_hclause hc, axioms)]  (* TODO *)
+  [(tformula_of_hclause hc, axioms)]  (* TODO *)
 
-let pp_potential_lemma formatter pl =
-  let sexp = sexp_of_potential_lemma pl in
-  Sexplib.Sexp.pp formatter sexp
+(* ----------------------------------------------------------------------
+ * serialization/deserialization for abstract logic structures
+ * ---------------------------------------------------------------------- *)
 
-(*
-let _ =
-  let f = [TNode ("foo", []); TNode ("bar", [TVar 0; TVar 1])] in
-  Format.printf "sexp is %a@." Sexplib.Sexp.pp (sexp_of_tformula f)
-*)
+let read_kb filename =
+  try
+    let sexp = Sexplib.Sexp.load_sexp filename in
+    let kb = kb_of_sexp sexp in
+    kb
+  with
+  | Failure _ -> empty_kb
+  | Sys_error _ -> empty_kb
+
+let save_kb filename kb =
+  let sexp = sexp_of_kb kb in
+  Sexplib.Sexp.save_hum filename sexp

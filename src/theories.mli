@@ -78,14 +78,31 @@ type tformula = tterm list
 val tterm_of_term : term -> tterm
 val tformula_of_hclause : hclause -> tformula
 
-type potential_lemma =
-  | PotentialLemma of tformula * tformula list
-  (** a potential lemma is a clause, with some hypothesis *)
+type lemma = tformula * tformula list
+  (** a lemma is a clause, with some hypothesis *)
 
-val search_lemmas : hclause -> potential_lemma list
+type theory = tformula list
+  (** a theory is a list of formula *) 
+
+type kb = {
+  kb_lemma_idx : int;
+  kb_potential_lemmas : lemma list;     (** potential lemma, to explore *)
+  kb_lemmas : (int * lemma) list;       (** lemma with their unique ID *)
+  kb_theories : (string * theory) list; (** theories, with their name *)
+} (** a Knowledge Base for lemma and theories *)
+
+val empty_kb : kb
+
+val add_potential_lemmas : kb -> lemma list -> kb
+val add_lemmas : kb -> lemma list -> kb
+
+(* ----------------------------------------------------------------------
+ * (heuristic) search of "interesting" lemma in a proof.
+ * ---------------------------------------------------------------------- *)
+
+val search_lemmas : hclause -> lemma list
   (** given an empty clause (and its proof), look in the proof for
       potential lemma. *)
-
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
@@ -97,5 +114,15 @@ val sexp_of_tterm : tterm -> Sexplib.Sexp.t
 val tformula_of_sexp : Sexplib.Sexp.t -> tformula
 val sexp_of_tformula : tformula -> Sexplib.Sexp.t
 
-val pp_potential_lemma : Format.formatter -> potential_lemma -> unit
-  (** print the potential lemma as a S-expr *)
+val sexp_of_lemma : lemma -> Sexplib.Sexp.t
+val lemma_of_sexp : Sexplib.Sexp.t -> lemma
+
+val kb_of_sexp : Sexplib.Sexp.t -> kb
+val sexp_of_kb : kb -> Sexplib.Sexp.t
+
+
+val read_kb : string -> kb
+  (** parse KB from file (or gives an empty one) *)
+
+val save_kb : string -> kb -> unit
+  (** save the KB to the file *)

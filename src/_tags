@@ -1,3 +1,4 @@
 <theories.ml*>: package(sexplib.syntax), package(sexplib), syntax(camlp4o)
+<*.ml>: package(sexplib)
 <**/*.cmx>: inline(15)
 <*.native> or <*.byte>: package(unix), package(str), package(sexplib)
