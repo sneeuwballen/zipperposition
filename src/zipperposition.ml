@@ -299,11 +299,14 @@ let () =
                           "# SZS output end Refutation@.") !C.pp_proof#pp c);
       (* update knowledge base *)
       let potential_lemmas = Theories.search_lemmas c in
+      Format.printf "%% update knowledge base... ";
+      Format.print_flush ();
       Utils.with_lock_file "kb.lock"
         (fun () ->
         let kb = Theories.read_kb "kb.lisp" in
         let kb = Theories.add_potential_lemmas kb potential_lemmas in
         Theories.save_kb "kb.lisp" kb);
+      Format.printf "done@."
     end
 
 let _ =
