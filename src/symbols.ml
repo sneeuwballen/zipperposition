@@ -112,8 +112,8 @@ let table =
 
 (** default signature, containing predefined symbols with their arities and sorts *)
 let base_signature () =
-  let sorts = SHashtbl.create 23
-  and arities  = SHashtbl.create 23
+  let sorts = SHashtbl.create 7
+  and arities  = SHashtbl.create 7
   and symbols = ref [] in
   (* update the tables *)
   List.iter

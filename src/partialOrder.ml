@@ -198,7 +198,7 @@ let extend po symbs =
         then (SHashtbl.add po.num s po.size; po.size <- po.size + 1))
     symbs;
   (if po.size > old_size then (po.total <- false; po.signature <- compute_signature po.num));
-  if po.size > old_size && po.size > Array.length po.cmp then begin
+  (if po.size > old_size && po.size > Array.length po.cmp then begin
     (* extend the matrix and signature in case they are too small for new signature *)
     let n = po.size + ((1 + po.size) lsr 1) in
     let cmp = Array.make n po.cmp.(0) in
@@ -208,7 +208,8 @@ let extend po symbs =
       (if i < old_size then Array.blit po.cmp.(i) 0 cmp.(i) 0 old_size);
     done;
     po.cmp <- cmp;
-  end
+  end);
+  po.size - old_size
 
 (** pretty print the partial order as a boolean matrix *)
 let pp formatter po =

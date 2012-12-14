@@ -159,6 +159,7 @@ let get_calculus ~params =
 (** Compute the ordering from the list of clauses, according to parameters *)
 let compute_ord ~params clauses =
   let calculus = get_calculus ~params in
+  let _, _, signature = Precedence.current_signature () in
   let so = if params.param_precedence
     (* use the heuristic to try to order definitions and rewrite rules *)
     then Precedence.heuristic_precedence params.param_ord
@@ -167,14 +168,14 @@ let compute_ord ~params clauses =
       clauses
     else Precedence.make_ordering
       (calculus#constr clauses @ [Precedence.invfreq_constraint clauses;
-                                  Precedence.alpha_constraint])
+                                  Precedence.alpha_constraint]) signature
   in
   params.param_ord so
 
 (** Enrichment of the initial set of clauses by detecting some theories *)
-let enrich_with_theories ~params clauses =
+let enrich_with_theories ~ord ~params clauses =
   if params.param_theories then
-    let axioms = Theories.detect_total_relations ~ord:(O.default_ordering ()) clauses in
+    let axioms = Theories.detect_total_relations ~ord clauses in
     List.rev_append axioms clauses
   else clauses
 
@@ -195,14 +196,15 @@ let process_file params f =
   (* find the calculus *)
   let calculus = get_calculus ~params in
   (* convert simple clauses to clauses, first with a simple ordering *)
-  let d_ord = O.default_ordering () in
+  let signature = Simple.symbols (List.map fst clauses) in
+  let d_ord = O.default_ordering signature in
   let clauses = List.map (C.from_simple ~ord:d_ord) clauses in
   (* first preprocessing, with a simple ordering. *)
   let clauses = calculus#preprocess ~ord:d_ord ~select:no_select clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* XXX detect some axioms *)
-  let clauses = enrich_with_theories ~params clauses in
+  let clauses = enrich_with_theories ~ord:d_ord ~params clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;

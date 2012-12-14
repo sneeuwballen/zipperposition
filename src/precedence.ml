@@ -177,30 +177,61 @@ let weight_modarity () =
  * Creation of a precedence (symbol_ordering) from constraints
  * ---------------------------------------------------------------------- *)
 
+(** build history by patching old signature to get the new one *)
+let compute_history old_sig new_sig history =
+  let rec compare ?prev old_sig new_sig history =
+    match old_sig, new_sig with
+    | [], [] -> history
+    | [], [s] -> (* s is the new bottom *)
+      let patch = Between (prev, s, None) in patch::history
+    | [], s::s'::new_sig' ->  (* s between prev and s' *)
+      let patch = Between (prev, s, Some s') in
+      compare ~prev:s old_sig (s'::new_sig') (patch::history)
+    | s::old_sig', s'::new_sig' when s == s' ->
+      compare ~prev:s old_sig' new_sig' history
+    | s::old_sig', s'::s''::new_sig' ->
+      (* trickiest case: first deal with the remaining new symbols,
+         then insert s' *)
+      let history' = compare ~prev:s old_sig (s''::new_sig') history in
+      (Between (prev, s', Some s'')) :: history'
+    | _::_, [_] | _::_, [] -> assert false  (* not monotonic increase? *)
+  in compare old_sig new_sig history
+
 (* build an ordering from a list of constraints *)
-let make_ordering constrs =
-  let _,_,symbols = current_signature () in
+let make_ordering constrs symbols =
+  (* add default symbols *)
+  let _,_,base_symbols = base_signature () in
+  let symbols = List.rev_append base_symbols symbols in
+  (* create a partial order, and complete it *)
   let po = PartialOrder.mk_partial_order symbols in
   let weight = ref (weight_modarity ()) in
   let apply_constrs () = List.iter (PartialOrder.complete po) constrs in
   let multiset_pred = ref (fun s -> s == eq_symbol) in
   (* the object itself *)
   let obj = object (self)
+    val mutable m_version = 0
+    val mutable m_history = []
+    method version = m_version
+    method history = m_history
     (* refresh computes a new ordering based on the current signature *)
     method refresh () =
-      Utils.debug 3 (lazy (Utils.sprintf "%% old signature %a" T.pp_signature self#signature));
+      let old_signature = self#signature in
 
       (* the new signature, possibly with more symbols*)
       let _, _, symbols = current_signature () in
-      PartialOrder.extend po symbols;
-      (* complete the ordering with successive constraints *)
-      apply_constrs ();
-      assert (PartialOrder.is_total po);
-
-      (* refresh weight function *)
-      weight := weight_modarity ();
-
-      Utils.debug 3 (lazy (Utils.sprintf "%% new signature %a" T.pp_signature self#signature));
+      let num_added = PartialOrder.extend po symbols in
+      if num_added > 0 then begin
+        Utils.debug 3 (lazy (Utils.sprintf "%% old signature %a" T.pp_signature self#signature));
+        (* complete the ordering with successive constraints *)
+        apply_constrs ();
+        assert (PartialOrder.is_total po);
+        (* new version of the precedence *)
+        m_version <- m_version + 1;
+        m_history <- compute_history old_signature self#signature m_history;
+        (* refresh weight function *)
+        weight := weight_modarity ();
+        Utils.debug 3 (lazy (Utils.sprintf "%% new signature %a" T.pp_signature self#signature));
+      end
     method weight s = !weight s
     method signature = PartialOrder.signature po
     method compare a b = PartialOrder.compare po a b
@@ -213,14 +244,14 @@ let make_ordering constrs =
   obj#refresh ();
   (obj :> symbol_ordering)
 
-let rec default_symbol_ordering () =
+let rec default_symbol_ordering symbols =
   (* two constraints: false, true at end of precedence, and arity constraint *)
   let constrs =
     [min_constraint [false_symbol; true_symbol];
      arity_constraint;
      alpha_constraint] in
   (* apply the constraints to the dummy symbol ordering *)
-  make_ordering constrs
+  make_ordering constrs symbols
 
 (* ----------------------------------------------------------------------
  * Heuristic constraints to try to reduce search space
@@ -277,10 +308,10 @@ let eq_precedence c1 c2 =
   List.for_all2 (==) c1#signature c2#signature
 
 (** Compute a precedence from the signature and the strong constraint *)
-let compute_precedence weak_constrs strong_constrs symbols : symbol_ordering =
+let compute_precedence signature weak_constrs strong_constrs symbols : symbol_ordering =
   let sig_constraint = list_constraint symbols in
   let constrs = strong_constrs @ [sig_constraint] @ weak_constrs in
-  make_ordering constrs
+  make_ordering constrs signature
 
 (** Compute the cost for the precedence, given a list of constraints
     and a way to build a term ordering *)
@@ -361,6 +392,7 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
     respectively weaker/stronger than the optimization (the first one, weaker,
     is applied to break ties, the second one, stronger, is always enforced first) *)
 let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
+  let _, _, signature = current_signature () in
   (* the constraints *)
   let constraints = Utils.list_flatmap create_constraints clauses in
   let max_cost = List.fold_left (fun acc (w,_,_) -> acc+w) 0 constraints in
@@ -368,7 +400,7 @@ let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
   let symbols = List.fold_left (fun acc (_,symbols,_) -> symbols @ acc) [] constraints in
   let symbols = Utils.list_uniq (==) symbols in
   (* helper functions *)
-  let mk_precedence = compute_precedence weak_constrs strong_constrs
+  let mk_precedence = compute_precedence signature weak_constrs strong_constrs
   and mk_cost = compute_cost ord_factory constraints in
   (* Randomized hill climbing on the ordering of symbols. The result is
      the precedence that has the lowest cost. *)

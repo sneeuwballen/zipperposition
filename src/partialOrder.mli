@@ -57,8 +57,9 @@ val add_constraints : t -> (symbol * symbol) list -> int
   (** add constraints whenever possible; returns the number of successful
       ordering extensions *)
 
-val extend : t -> symbol list -> unit
-  (** add the given symbols to the partial order *)
+val extend : t -> symbol list -> int
+  (** Add the given symbols to the partial order. Returns the number of
+      new symbols *)
 
 val pp : Format.formatter -> t -> unit
   (** pretty print the partial order as a boolean matrix *)

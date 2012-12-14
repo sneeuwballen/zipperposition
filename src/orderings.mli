@@ -34,5 +34,5 @@ val rpo : symbol_ordering -> ordering
 val rpo6 : symbol_ordering -> ordering
   (** Efficient implementation of RPO *)
 
-val default_ordering : unit -> ordering
+val default_ordering : symbol list -> ordering
   (** default ordering on terms (RPO6) *)

@@ -63,13 +63,13 @@ val alpha_constraint : ordering_constraint
  * Creation of a precedence (symbol_ordering) from constraints
  * ---------------------------------------------------------------------- *)
 
-val make_ordering : ordering_constraint list -> symbol_ordering
+val make_ordering : ordering_constraint list -> symbol list -> symbol_ordering
   (** make an ordering from the given constraints. First constraints are
       more important than later constraints. Only the very first constraint
       is assured to be totally satisfied. *)
 
-val default_symbol_ordering : unit -> symbol_ordering
-  (** default ordering on symbols *)
+val default_symbol_ordering : symbol list -> symbol_ordering
+  (** default ordering on given symbols *)
 
 (* ----------------------------------------------------------------------
  * Heuristic creation of precedences

@@ -385,4 +385,4 @@ let rpo6 (so : symbol_ordering) : ordering =
     method name = RPO6.name
   end
 
-let default_ordering () = rpo6 (Precedence.default_symbol_ordering ())
+let default_ordering signature = rpo6 (Precedence.default_symbol_ordering signature)

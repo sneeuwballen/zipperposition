@@ -104,10 +104,17 @@ let no_select c = []                          (** selects no literals *)
 (** an ordering constraint *)
 type ordering_constraint = symbol -> symbol -> int
 
+(** A diff between an ordered signature and its update (that has a new symbol in it) *)
+type signature_diff = 
+  | Initial of symbol list                            (** initial signature *)
+  | Between of symbol option * symbol * symbol option (** insert between two other symbols (or top/bottom)*)
+
 (** the interface of a total ordering on symbols *)
 class type symbol_ordering =
   object
-    method refresh : unit -> unit             (** refresh the signature *)
+    method version : int                      (** version of the precedence *)
+    method history : signature_diff list      (** history (length = version) since first precedence *)
+    method refresh : unit -> unit             (** refresh the signature (may update history/version) *)
     method signature : symbol list            (** current symbols in decreasing order *)
     method compare : symbol -> symbol -> int  (** total order on symbols *)
     method weight : symbol -> int             (** weight of symbol (for KBO) *)
