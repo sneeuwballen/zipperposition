@@ -653,3 +653,65 @@ let pp_term = ref (pp_term_debug :> pprinter_term)
 let pp_signature formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]"
     (Utils.pp_list ~sep:" > " !pp_symbol#pp) symbols
+
+(* ----------------------------------------------------------------------
+ * skolem terms
+ * ---------------------------------------------------------------------- *)
+
+(** Skolemize the given term at root (assumes it occurs just under an
+    existential quantifier, whose De Bruijn variable is replaced
+    by a fresh symbol applied to free variables). This also
+    caches symbols, so that the same term is always skolemized
+    the same way.
+
+    It also refreshes the ordering (the signature has changed) *)
+let classic_skolem =
+  let cache = THashtbl.create 13 (* global cache for skolemized terms *)
+  and count = ref 0 in  (* current symbol counter *)
+  (* find an unused skolem symbol *)
+  let rec find_skolem () = 
+    let skolem = "sk" ^ (string_of_int !count) in
+    incr count;
+    if Symbols.is_used skolem then find_skolem () else skolem
+  in
+  fun ~ord t sort ->
+    Utils.debug 4 (lazy (Utils.sprintf "skolem %a@." !pp_term#pp t));
+    let vars = t.vars in
+    (* find the skolemized normalized term *)
+    let t'= try
+      THashtbl.find cache t
+    with Not_found ->
+      (* actual skolemization of normalized_t *)
+      let new_symbol = find_skolem () in
+      Utils.debug 1 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
+      let new_symbol = mk_symbol ~attrs:Symbols.attr_skolem new_symbol in  (* build symbol *)
+      let skolem_term = mk_node new_symbol sort vars in
+      (* update the ordering *)
+      ord#refresh ();
+      (* build the skolemized term *)
+      db_unlift (db_replace t skolem_term)
+    in
+    THashtbl.replace cache t t';
+    (* get back to the variables of the given term *)
+    Utils.debug 4 (lazy (Utils.sprintf "skolem %a gives %a@."
+                         !pp_term#pp t !pp_term#pp t'));
+    t'
+
+(** Skolemization with a special non-first order symbol. The purpose is
+    not to introduce too many terms. A proposition p is skolemized
+    into $$skolem(p), which makes naturally for inner skolemization.
+
+    The advantage is that it does not modify the signature, and also that
+    rewriting can be performed inside the skolem terms. *)
+let unamed_skolem ~ord t sort =
+  Utils.debug 4 (lazy (Utils.sprintf "@[<h>magic skolem %a@]@." !pp_term#pp t));
+  let symb = mk_symbol ~attrs:Symbols.attr_skolem "$$sk" in
+  (* the existential witness, parametrized by the 'quoted' formula. The
+     lambda is used to keep the formula closed. *)
+  let args = [mk_node lambda_symbol t.sort [t]] in
+  let skolem_term = mk_node symb sort args in
+  ord#refresh ();  (* skolem symbol may be new *)
+  (* build the skolemized term by replacing first DB index with skolem symbol *)
+  db_unlift (db_replace t skolem_term)
+
+let skolem = ref classic_skolem

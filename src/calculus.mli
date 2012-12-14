@@ -84,23 +84,3 @@ val fold_lits : ?both:bool -> (int -> literal -> bool) ->
 (** get the term l at given position in clause, and r such that l ?= r
     is the literal at the given position *)
 val get_equations_sides : clause -> position -> term * term * bool
-
-(** Skolemize the given term at root (assumes it occurs just under an
-    existential quantifier, whose De Bruijn variable is replaced
-    by a fresh symbol applied to free variables). This also
-    caches symbols, so that the same term is always skolemized
-    the same way. The sort is the sort of the free De Bruijn symbol in t.
-
-    It also refreshes the ordering (the signature has changed) *)
-val classic_skolem : ord:ordering -> term -> sort -> term
-
-(** Skolemization with a special non-first order symbol. The purpose is
-    not to introduce too many terms. A proposition p is skolemized
-    into $$skolem(p), which makes naturally for inner skolemization.
-
-    The advantage is that it does not modify the signature, and also that
-    rewriting can be performed inside the skolem terms. *)
-val unamed_skolem : ord:ordering -> term -> sort -> term
-
-(** default skolemization function *)
-val skolem : (ord:ordering -> term -> sort -> term) ref

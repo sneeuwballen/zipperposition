@@ -25,17 +25,18 @@ type symbol_attribute = int
 let attr_skolem = 0x1
 let attr_split = 0x2
 
-type symbol = (string * int)
+type symbol = (string * int * int)
+  (** A symbol is a string, a unique ID, and some attributes *)
 
-let compare_symbols (s1,_) (s2,_) = String.compare s1 s2
+let compare_symbols (_, t1,_) (_,t2,_) = t1 - t2
 
-let hash_symbol (s, _) = Hashtbl.hash s
+let hash_symbol (s, _, _) = Hashtbl.hash s
 
 (** weak hash table for symbols *)
 module HashSymbol = Weak.Make(
   struct
     type t = symbol
-    let equal (s1,_) (s2,_) = s1 = s2
+    let equal (s1,_,_) (s2,_,_) = s1 = s2
     let hash = hash_symbol
   end)
 
@@ -43,18 +44,22 @@ module HashSymbol = Weak.Make(
 let symb_table = HashSymbol.create 7
 
 let sig_version = ref 0
+  (** the version of the signature. It also serves as the current
+      index for unique symbols IDs *)
 
 let mk_symbol ?(attrs=0) s =
-  let s = (s, attrs) in
+  let s = (s, !sig_version, attrs) in
   let s' = HashSymbol.merge symb_table s in
-  (if s' == s then incr sig_version); (* update signature *)
+  (if s' == s then incr sig_version);  (* update signature *)
   s'
 
-let is_used s = HashSymbol.mem symb_table (s, 0)
+let is_used s = HashSymbol.mem symb_table (s, 0, 0)
 
-let name_symbol (s, _) = s
+let name_symbol (s, _, _) = s
 
-let attrs_symbol (_, attr) = attr
+let tag_symbol (_, tag, _) = tag
+
+let attrs_symbol (_, _, attr) = attr
 
 module SHashtbl = Hashtbl.Make(
   struct
@@ -63,18 +68,9 @@ module SHashtbl = Hashtbl.Make(
     let hash s = hash_symbol s
   end)
 
-module SHashSet =
-  struct
-    type t = unit SHashtbl.t
-    let create () = SHashtbl.create 7
-    let member t s = SHashtbl.mem t s
-    let add t s = SHashtbl.replace t s ()
-    let from_list ss =
-      let t = create () in
-      List.iter (add t) ss;
-      t
-  end
+module SMap = Map.Make(struct type t = symbol let compare = compare_symbols end)
 
+module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
 
 (* connectives *)
 let true_symbol = mk_symbol "$true"

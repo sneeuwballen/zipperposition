@@ -44,6 +44,9 @@ val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
 val is_used : string -> bool
   (** is the symbol already used? *)
 
+val tag_symbol : symbol -> int
+  (** unique ID of the symbol *)
+
 val attrs_symbol : symbol -> symbol_attribute
   (** access attributes of a symbol *)
 
@@ -55,15 +58,9 @@ val sig_version : int ref
 
 module SHashtbl : Hashtbl.S with type key = symbol
 
-(** Hashset for symbols *)
-module SHashSet :
-  sig
-    type t
-    val create : unit -> t
-    val member : t -> symbol -> bool
-    val add : t -> symbol -> unit
-    val from_list : symbol list -> t
-  end
+module SMap : Map.S with type key = symbol
+
+module SSet : Set.S with type elt = symbol
 
 (* connectives *)
 val true_symbol : symbol
