@@ -9,7 +9,8 @@ some clauses can contain formulas (lazy reduction to CNF), which complicates pro
 pretty-printing and checking.
 
 Zipperposition is written in the functional and imperative language
-[OCaml](http://caml.inria.fr). The name is a bad play on the words "zipper" (a
+[OCaml](http://caml.inria.fr), now using its concurrent variant [JOcaml](http://jocaml.inria.fr).
+The name is a bad play on the words "zipper" (a
 functional data structure) and "superposition" (the calculus used by the
 prover). Superposition-based theorem proving is an active field of research, so
 there is a lot of literature about it; for this implementation my main references
@@ -32,7 +33,7 @@ under GPLv2.
 A copy of the GPLv2 is attached to the project, in the file LICENSE.
 
 ## Build
-You will need ocaml >= 3.12 or higher with ocamlbuild and the standard library. Type in a terminal:
+You will need jocaml >= 3.12 or higher with ocamlbuild and the standard library. Type in a terminal:
 
     $ make
 

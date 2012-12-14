@@ -2,24 +2,23 @@
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 TARGET = zipperposition.native
+OPTIONS = -use-ocamlfind -use-jocaml
 
 all:
-	ocamlbuild -use-ocamlfind -tag debug src/$(TARGET)
+	ocamlbuild $(OPTIONS) -tag debug src/$(TARGET)
 prod:
-	ocamlbuild -use-ocamlfind -tag noassert src/$(TARGET)
+	ocamlbuild $(OPTIONS) -tag noassert src/$(TARGET)
 
-profile:
-	ocamlbuild -use-ocamlfind -tags debug,profile src/$(TARGET)
+profile:ocamlbuild $(OPTIONS)
+	ocamlbuild $(OPTIONS) -tags debug,profile src/$(TARGET)
 byte:
-	ocamlbuild -use-ocamlfind -tags debug src/zipperposition.byte
+	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
 
 tests: all
-	ocamlbuild -use-ocamlfind -tag debug -I src tests/tests.native
-profile_tests: all
-	ocamlbuild -use-ocamlfind -tags debug,profile -I src tests/tests.native
+	ocamlbuild $(OPTIONS) -tag debug -I src tests/tests.native
 
 doc:
-	ocamlbuild -use-ocamlfind src/zipperposition.docdir/index.html
+	ocamlbuild $(OPTIONS) src/zipperposition.docdir/index.html
 
 clean:
 	ocamlbuild -clean
