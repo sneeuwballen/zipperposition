@@ -104,7 +104,8 @@ let print_stats state =
   print_gc ();
   print_hashcons_stats "terms" (T.stats ());
   print_hashcons_stats "clauses" (C.stats ());
-  print_state_stats (PS.stats state)
+  print_state_stats (PS.stats state);
+  print_global_stats ()
 
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
@@ -228,8 +229,8 @@ let process_file params f =
   in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;
+  (* print some statistics *)
   print_stats state;
-  Sup.print_stats ();
   Format.printf "%% final signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (match params.param_dot_file with (* print state *)
   | None -> ()

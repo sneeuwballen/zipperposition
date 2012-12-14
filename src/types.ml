@@ -135,5 +135,18 @@ class type ['a] pp_printer =
 
 (** a statistic object: name and count *)
 type statistics = string * int64 ref
-let mk_stat name = (name, ref Int64.zero)
+
+let mk_stat, print_global_stats =
+  let stats = ref [] in
+  (* create a stat *)
+  (fun name ->
+    let stat = (name, ref 0L) in
+    stats := stat :: !stats;
+    stat),
+  (* print stats *)
+  (fun () ->
+    List.iter
+      (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
+      !stats)
+
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)

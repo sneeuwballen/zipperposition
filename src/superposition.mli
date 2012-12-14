@@ -32,8 +32,6 @@ val stat_subsumed_by_set_call : statistics
 val stat_demodulate_call : statistics
 val stat_demodulate_step : statistics
 
-val print_stats : unit -> unit
-
 val all_positions : position -> term ->  (* combinator *)
                     (term -> position -> 'b list) -> 'b list
 
