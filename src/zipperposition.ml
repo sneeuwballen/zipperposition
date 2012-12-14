@@ -36,70 +36,8 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
-  
-(* random generator initialization *)
-let seed = ref 1928575
 
 let version = "0.3"
-
-(** parse_args returns parameters *)
-let parse_args () =
-  let help_select = Utils.sprintf "selection function (@[<h>%a@])"
-    (Utils.pp_list ~sep:"," Format.pp_print_string)
-    (Sel.available_selections ())
-  and help_index = Utils.sprintf "indexing structure (@[<h>%a@])"
-    (Utils.pp_list ~sep:"," Format.pp_print_string)
-    (PS.names_index ()) in
-  let unamed_skolem () = Calculus.skolem := Calculus.unamed_skolem in
-  (* parameters *)
-  let ord = ref "rpo6"
-  and steps = ref 0
-  and version = ref false
-  and timeout = ref 0.
-  and proof = ref true
-  and output = ref "debug"
-  and index = ref "fp"
-  and theories = ref true
-  and calculus = ref "superposition"
-  and presimplify = ref false
-  and heuristic_precedence = ref true
-  and dot_file = ref None
-  and select = ref "SelectComplex"  (* TODO choose clause queues? *)
-  and progress = ref false
-  and print_sort = ref false
-  and print_all = ref false
-  and file = ref "stdin" in
-  (* options list *) 
-  let options =
-    [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
-      ("-debug", Arg.Int Utils.set_debug, "debug level");
-      ("-version", Arg.Set version, "print version");
-      ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
-      ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
-      ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
-      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
-      ("-timeout", Arg.Set_float timeout, "verbose mode");
-      ("-select", Arg.Set_string select, help_select);
-      ("-progress", Arg.Set progress, "print progress");
-      ("-no-theories", Arg.Clear theories, "do not detect theories in input");
-      ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
-      ("-no-proof", Arg.Clear proof, "disable proof printing");
-      ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
-      ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
-      ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
-      ("-index", Arg.Set_string index, help_index);
-      ("-print-sort", Arg.Set print_sort, "print sorts of terms");
-      ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
-      ("-print-ord", Arg.Unit (fun () -> C.pp_literal_debug#ord true), "print order of sides of literals");
-    ]
-  in
-  Arg.parse options (fun f -> file := f) "solve problem in first file";
-  (* return parameter structure *)
-  { param_ord = !ord; param_steps = !steps; param_version= !version; param_calculus = !calculus;
-    param_timeout = !timeout; param_files = [!file]; param_select = !select; param_theories= !theories;
-    param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
-    param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
-    param_print_sort = !print_sort; param_print_all = !print_all; param_precedence= !heuristic_precedence;}
 
 (** find the given file from given directory *)
 let find_file name dir =
@@ -189,7 +127,7 @@ let setup_alarm timeout =
   Unix.alarm (max 1 (int_of_float timeout))
 
 (** setup output format and details *)
-let setup_output params =
+let setup_output ~params =
   (match params.param_output_syntax with
   | "tstp" ->
     C.pp_clause := C.pp_clause_tstp;
@@ -207,53 +145,62 @@ let setup_output params =
   Format.printf "%% format: %s, print sort: %B, print all: %B@." params.param_output_syntax
     params.param_print_sort params.param_print_all
 
-let () =
-  Random.init !seed;
-  (* parse arguments *)
-  let params = parse_args () in
-  (if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0));
+let print_version ~params =
+  if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0)
+
+(** Get the calculus described in the arguments *)
+let get_calculus ~params =
+  match params.param_calculus with
+  | "superposition" -> Superposition.superposition
+  | "delayed" -> Delayed.delayed
+  | x -> failwith ("unknown calculus " ^ x)
+
+(** Compute the ordering from the list of clauses, according to parameters *)
+let compute_ord ~params clauses =
+  let calculus = get_calculus ~params in
+  let so = if params.param_precedence
+    (* use the heuristic to try to order definitions and rewrite rules *)
+    then Precedence.heuristic_precedence params.param_ord
+      [Precedence.invfreq_constraint clauses; Precedence.alpha_constraint]
+      (calculus#constr clauses)
+      clauses
+    else Precedence.make_ordering
+      (calculus#constr clauses @ [Precedence.invfreq_constraint clauses;
+                                  Precedence.alpha_constraint])
+  in
+  params.param_ord so
+
+(** Enrichment of the initial set of clauses by detecting some theories *)
+let enrich_with_theories ~params clauses =
+  if params.param_theories then
+    let axioms = Theories.detect_total_relations ~ord:(O.default_ordering ()) clauses in
+    List.rev_append axioms clauses
+  else clauses
+
+(** Process the given file (try to solve it) *)
+let process_file params f =
+  Format.printf "%% [[[ process file %s ]]]@." f;
   let steps = if params.param_steps = 0
     then None else (Format.printf "%% run for %d steps@." params.param_steps;
                     Some params.param_steps)
   and timeout = if params.param_timeout = 0.
     then None else (Format.printf "%% run for %f s@." params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
-                    Some (Unix.gettimeofday() +. params.param_timeout -. 0.25))
+                    Some (Sat.get_start_time () +. params.param_timeout -. 0.25))
   and progress = params.param_progress in
-  (* setup printing *)
-  setup_output params;
-  (* parse file *)
-  let f = List.hd params.param_files in
   Printf.printf "%% process file %s\n" f;
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* find the calculus *)
-  let calculus = match params.param_calculus with
-    | "superposition" -> Sup.superposition
-    | "delayed" -> Delayed.delayed
-    | x -> failwith ("unknown calculus "^x)
-  in
+  let calculus = get_calculus ~params in
   (* first preprocessing, with a simple ordering. *)
   let clauses = calculus#preprocess ~ord:(O.default_ordering ()) ~select:no_select clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* XXX detect some axioms *)
-  let clauses =
-    if params.param_theories then
-      let axioms = Theories.detect_total_relations ~ord:(O.default_ordering ()) clauses in
-      List.rev_append axioms clauses
-    else clauses
-  in
+  let clauses = enrich_with_theories ~params clauses in
   (* choose an ord now, using clauses *)
-  let ord_factory = match params.param_ord with
-    | "rpo" -> O.rpo
-    | "rpo6" -> O.rpo6
-    | "kbo" -> O.kbo
-    | x -> failwith ("unknown ordering " ^ x) in
-  let so = if params.param_precedence
-    then Precedence.heuristic_precedence ord_factory [Precedence.invfreq_constraint clauses; Precedence.alpha_constraint] (calculus#constr clauses) clauses
-    else Precedence.make_ordering (calculus#constr clauses @ [Precedence.invfreq_constraint clauses; Precedence.alpha_constraint]) in
-  let ord = ord_factory so in
+  let ord = compute_ord ~params clauses in
   Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
@@ -302,6 +249,16 @@ let () =
       Theories.update_kb ~file:"kb.lisp" ~lock:"kb.lock"
         (fun kb -> Theories.add_potential_lemmas kb potential_lemmas)
     end
+
+let () =
+  (* parse arguments *)
+  let params = Params.parse_args () in
+  Random.init params.param_seed;
+  print_version params;
+  (* setup printing *)
+  setup_output params;
+  (* process files *)
+  List.iter (process_file params) params.param_files
 
 let _ =
   at_exit (fun () -> 

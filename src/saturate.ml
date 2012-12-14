@@ -280,12 +280,13 @@ let given_clause_step ~calculus state =
       Unknown
     end
 
-(** Time elapsed since initialization of the program *)
-let get_total_time =
+(** Time elapsed since initialization of the program, and time of start *)
+let get_total_time, get_start_time =
   let start = Unix.gettimeofday () in
-  function () ->
+  (function () ->
     let stop = Unix.gettimeofday () in
-    stop -. start
+    stop -. start),
+  (function () -> start)
 
 (** print progress *)
 let print_progress steps state =

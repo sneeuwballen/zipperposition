@@ -24,15 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   open Const
 
-  (** int counter for variables *)
-  module Counter = struct
-    type t = int ref
-    let create_with i = ref i
-    let set counter i = counter := i
-    let inc counter = counter := !counter + 1
-    let value counter = !counter
-  end
-
   open Types
   open Symbols
 
@@ -54,8 +45,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
      and have to be invalidated with init_clause for every new clause *)
 
   (* the variable id counter for the currently read term/clause *)
-  let var_id_counter = 
-    Counter.create_with 0
+  let var_id_counter = ref 0
       
   (* mapping of the variable names (e.g. "X") of the currently read term/clause
      to variables. *)
@@ -71,7 +61,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   (* reset everything in order to parse a new term/clause *)
   let init_clause () =
-    Counter.set var_id_counter 0;
+    var_id_counter := 0;
     var_map := [];
     literals := [];
     conjecture := false
@@ -91,9 +81,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     with
       | Not_found ->
           let new_var = 
-            T.mk_var (Counter.value var_id_counter) sort
+            T.mk_var !var_id_counter sort
           in
-            Counter.inc var_id_counter;
+            incr var_id_counter;
             var_map := (var_name, sort, new_var) :: !var_map;
             new_var
 

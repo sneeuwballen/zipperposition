@@ -54,3 +54,6 @@ val given_clause: ?steps:int -> ?timeout:float -> ?progress:bool ->
 (** time elapsed since start of program *)
 val get_total_time : unit -> float
 
+(** time at which the program started *)
+val get_start_time : unit -> float
+

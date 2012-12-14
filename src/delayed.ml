@@ -53,11 +53,11 @@ let order k1 k2 =
 
 (* classify symbol into categories *)
 let classify =
-  let special_set = SHashSet.from_list special_preds in 
+  let special_set = List.fold_left (fun set s -> SSet.add s set) SSet.empty special_preds in 
   function s ->
     match s with
     | _ when s == succ_db_symbol || s == db_symbol -> DeBruijn
-    | _ when SHashSet.member special_set s -> Special
+    | _ when SSet.mem s special_set -> Special
     | _ -> (* classify between predicate and function by the sort *)
       let sorts, _, _ = Precedence.current_signature () in
       if SHashtbl.find sorts s = bool_sort then Predicate else Function
@@ -112,7 +112,7 @@ let delta_eliminate ~ord t sign =
     | None -> T.db_unlift t (* the variable is not present *)
     | Some sort ->
       (* sort is the sort of the first DB symbol *)
-      !skolem ~ord t sort
+      !T.skolem ~ord t sort
   in
   List [C.mk_lit ~ord new_t T.true_term sign]
 

@@ -22,7 +22,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** parameters for the main procedure *)
 type parameters = {
-  param_ord : string;
+  param_ord : Types.symbol_ordering -> Types.ordering;
+  param_seed : int;
   param_steps : int;
   param_version : bool;
   param_calculus : string;
@@ -40,3 +41,68 @@ type parameters = {
   param_print_sort : bool;        (** print sorts of terms *)
   param_print_all : bool;         (** print desugarized lambda / DB symbols *)
 }
+
+(** parse_args returns parameters
+    TODO an arg to describe the pipeline, e.g. with
+    (select|(subsume|subsume)|simpl|gen|back_simpl) *)
+let parse_args () =
+  let help_select = FoUtils.sprintf "selection function (@[<h>%a@])"
+    (FoUtils.pp_list ~sep:"," Format.pp_print_string)
+    (Selection.available_selections ()) in
+  let unamed_skolem () = Terms.skolem := Terms.unamed_skolem in
+  (* parameters *)
+  let ord = ref "rpo6"
+  and seed = ref 1928575
+  and steps = ref 0
+  and version = ref false
+  and timeout = ref 0.
+  and proof = ref true
+  and output = ref "debug"
+  and index = ref "fp"
+  and theories = ref true
+  and calculus = ref "superposition"
+  and presimplify = ref false
+  and heuristic_precedence = ref true
+  and dot_file = ref None
+  and select = ref "SelectComplex"
+  and progress = ref false
+  and print_sort = ref false
+  and print_all = ref false
+  and files = ref [] in
+  (* options list *) 
+  let options =
+    [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
+      ("-debug", Arg.Int FoUtils.set_debug, "debug level");
+      ("-version", Arg.Set version, "print version");
+      ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
+      ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
+      ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
+      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
+      ("-timeout", Arg.Set_float timeout, "verbose mode");
+      ("-select", Arg.Set_string select, help_select);
+      ("-progress", Arg.Set progress, "print progress");
+      ("-no-theories", Arg.Clear theories, "do not detect theories in input");
+      ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
+      ("-no-proof", Arg.Clear proof, "disable proof printing");
+      ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
+      ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
+      ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
+      ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
+      ("-print-sort", Arg.Set print_sort, "print sorts of terms");
+      ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
+      ("-print-ord", Arg.Unit (fun () -> Clauses.pp_literal_debug#ord true), "print order of sides of literals");
+    ]
+  in
+  Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
+  (if !files = [] then files := ["stdin"]);
+  let param_ord = match !ord with
+    | "rpo" -> Orderings.rpo
+    | "rpo6" -> Orderings.rpo6
+    | "kbo" -> Orderings.kbo
+    | x -> failwith ("unknown ordering " ^ x) in
+  (* return parameter structure *)
+  { param_ord; param_seed = !seed; param_steps = !steps; param_version= !version; param_calculus= !calculus;
+    param_timeout = !timeout; param_files = !files; param_select = !select; param_theories= !theories;
+    param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
+    param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
+    param_print_sort = !print_sort; param_print_all = !print_all; param_precedence= !heuristic_precedence;}
