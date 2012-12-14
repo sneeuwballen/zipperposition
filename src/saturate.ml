@@ -141,7 +141,8 @@ let generate_ ~calculus state given =
     let hc, depth = Queue.pop unary_queue in
     let hc = calculus#basic_simplify ~ord hc in (* simplify a bit the clause *)
     if not (Sup.is_tautology hc) then begin
-      unary_clauses := hc :: !unary_clauses;    (* add the clause to set of inferred clauses *)
+      (* add the clause to set of inferred clauses, if it's not the original clause *)
+      (if depth > 0 then unary_clauses := hc :: !unary_clauses);
       if depth < !unary_max_depth
         then begin
           (* infer clauses from c, add them to the queue *)
@@ -231,12 +232,14 @@ let given_clause_step ~calculus state =
       let hc = C.select_clause select hc in
       Sel.check_selected hc;
       C.check_ord_hclause ~ord hc;
+      ignore (Lazy.force hc.hcmaxlits);
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
                     !C.pp_clause#pp_h hc));
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = subsumed_by ~calculus state#active_set hc in
       state#active_set#remove subsumed_active;
+      state#simpl_set#remove subsumed_active;
       remove_orphans state subsumed_active; (* orphan criterion *)
       (* add given clause to simpl_set *)
       state#simpl_set#add [hc];
@@ -247,6 +250,7 @@ let given_clause_step ~calculus state =
          added to the set of new clauses. Their descendants are also removed
          from passive set *)
       state#active_set#remove simplified_actives;
+      state#simpl_set#remove simplified_actives;
       remove_orphans state simplified_actives;
       let new_clauses = List.rev_append simplified_actives new_clauses in
       (* add given clause to active set *)
@@ -267,7 +271,6 @@ let given_clause_step ~calculus state =
         new_clauses;
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
       state#passive_set#add new_clauses;
-      state#simpl_set#add new_clauses;
       (* test whether the empty clause has been found *)
       try
         let empty_clause = List.find (fun hc -> hc.hclits = [||]) new_clauses in
@@ -305,7 +308,7 @@ let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
         (* some cleanup from time to time *)
         (if (num mod 500 = 0)
           then (
-            Utils.debug 1 (lazy "% perform cleanup of passive set");
+            Utils.debug 1 (Lazy.lazy_from_val "% perform cleanup of passive set");
             Gc.major ();
             state#passive_set#clean ()));
         (* do one step *)
