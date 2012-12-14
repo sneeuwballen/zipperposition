@@ -108,15 +108,6 @@ val search_lemmas : hclause -> lemma list
  * serialization/deserialization for abstract logic structures
  * ---------------------------------------------------------------------- *)
 
-val tterm_of_sexp : Sexplib.Sexp.t -> tterm
-val sexp_of_tterm : tterm -> Sexplib.Sexp.t
-
-val tformula_of_sexp : Sexplib.Sexp.t -> tformula
-val sexp_of_tformula : tformula -> Sexplib.Sexp.t
-
-val sexp_of_lemma : lemma -> Sexplib.Sexp.t
-val lemma_of_sexp : Sexplib.Sexp.t -> lemma
-
 val kb_of_sexp : Sexplib.Sexp.t -> kb
 val sexp_of_kb : kb -> Sexplib.Sexp.t
 

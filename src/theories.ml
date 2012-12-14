@@ -241,7 +241,12 @@ let empty_kb = {
 }
 
 let add_potential_lemmas kb pot_lemmas =
-  { kb with kb_potential_lemmas = pot_lemmas @ kb.kb_potential_lemmas }
+  let kb_potential_lemmas = 
+    List.fold_left (fun kb_potential_lemmas lemma ->
+      if List.mem lemma kb_potential_lemmas then kb_potential_lemmas
+        else lemma :: kb_potential_lemmas)
+    kb.kb_potential_lemmas pot_lemmas in
+  { kb with kb_potential_lemmas;  }
 
 let add_lemmas kb lemmas =
   let lemmas, idx = List.fold_left
