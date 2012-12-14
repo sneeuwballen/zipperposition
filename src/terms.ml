@@ -655,6 +655,35 @@ let pp_signature formatter symbols =
     (Utils.pp_list ~sep:" > " !pp_symbol#pp) symbols
 
 (* ----------------------------------------------------------------------
+ * conversions with simple terms/formulas
+ * ---------------------------------------------------------------------- *)
+
+let rec from_simple t = match t with
+  | Simple.Var (i,s) -> mk_var i s
+  | Simple.Node (f, s, l) -> mk_node f s (List.map from_simple l)
+
+let rec from_simple_formula f = match f with
+  | Simple.True -> true_term
+  | Simple.False -> false_term
+  | Simple.Atom t -> from_simple t
+  | Simple.Eq (t1, t2) -> mk_eq (from_simple t1) (from_simple t2)
+  | Simple.Or (x::xs) -> List.fold_left mk_or (from_simple_formula x) (List.map from_simple_formula xs)
+  | Simple.Or [] -> true_term
+  | Simple.And (x::xs) -> List.fold_left mk_and (from_simple_formula x) (List.map from_simple_formula xs)
+  | Simple.And [] -> false_term
+  | Simple.Not f -> mk_not (from_simple_formula f)
+  | Simple.Equiv (f1, f2) -> mk_equiv (from_simple_formula f1) (from_simple_formula f2)
+  | Simple.Forall (v, f) -> mk_forall (db_from_var (from_simple_formula f) (from_simple v))
+  | Simple.Exists (v, f) -> mk_exists (db_from_var (from_simple_formula f) (from_simple v))
+
+let to_simple t =
+  if t.sort == bool_sort then None else
+  let rec build t = match t.term with
+  | Var i -> Simple.mk_var i t.sort
+  | Node (f, l) -> Simple.mk_node f t.sort (List.map build l)
+  in Some (build t)
+
+(* ----------------------------------------------------------------------
  * skolem terms
  * ---------------------------------------------------------------------- *)
 

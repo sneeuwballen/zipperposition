@@ -560,6 +560,25 @@ let is_unit_clause hc = match hc.hclits with
   | [|_|] -> true
   | _ -> false
 
+let rec from_simple ~ord (f,source) =
+  let rec convert f = match f with
+  | Simple.Not (Simple.Atom f) -> [mk_neq ~ord (T.from_simple f) T.true_term]
+  | Simple.Atom f -> [mk_eq ~ord (T.from_simple f) T.true_term]
+  | Simple.Not (Simple.Eq (t1,t2)) -> [mk_neq ~ord (T.from_simple t1) (T.from_simple t2)]
+  | Simple.Eq (t1, t2) -> [mk_eq ~ord (T.from_simple t1) (T.from_simple t2)]
+  | Simple.Not (Simple.Equiv (f1,f2)) -> [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
+  | Simple.Equiv (f1, f2) -> [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
+  | Simple.Or l -> List.concat (List.map convert l)
+  | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
+  in
+  let proof = match source with
+  | Simple.Axiom (a,b) -> Lazy.lazy_from_val (Axiom (a,b))
+  | Simple.Derived (name, fs) -> failwith "unable to convert non-axiom simple clause to hclause"
+  in
+  mk_hclause ~ord (convert f) proof []
+
+let to_simple hc = failwith "not implemented"
+
 (* ----------------------------------------------------------------------
  * set of hashconsed clauses
  * ---------------------------------------------------------------------- *)

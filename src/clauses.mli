@@ -157,6 +157,10 @@ val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
 val is_unit_clause : hclause -> bool
   (** is the clause a unit clause? *)
 
+val from_simple : ord:ordering -> Simple.sourced_formula -> hclause
+val to_simple : hclause -> Simple.formula
+  (** convert to a formula, losing the source information *)
+
 (* ----------------------------------------------------------------------
  * set of hashconsed clauses
  * ---------------------------------------------------------------------- *)

@@ -193,8 +193,11 @@ let process_file params f =
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* find the calculus *)
   let calculus = get_calculus ~params in
+  (* convert simple clauses to clauses, first with a simple ordering *)
+  let d_ord = O.default_ordering () in
+  let clauses = List.map (C.from_simple ~ord:d_ord) clauses in
   (* first preprocessing, with a simple ordering. *)
-  let clauses = calculus#preprocess ~ord:(O.default_ordering ()) ~select:no_select clauses in
+  let clauses = calculus#preprocess ~ord:d_ord ~select:no_select clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* XXX detect some axioms *)

@@ -197,6 +197,14 @@ val pp_term_debug :                                 (** print term in a nice syn
 val pp_signature : Format.formatter -> symbol list -> unit      (** print signature *)
 
 (* ----------------------------------------------------------------------
+ * conversions with simple terms/formulas
+ * ---------------------------------------------------------------------- *)
+
+val from_simple : Simple.term -> term
+val from_simple_formula : Simple.formula -> term
+val to_simple : term -> Simple.term option  (** fails if the term is of bool sort *)
+
+(* ----------------------------------------------------------------------
  * skolem terms
  * ---------------------------------------------------------------------- *)
 

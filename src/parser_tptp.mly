@@ -20,22 +20,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 %{
 
-  (** TSTP parser *)
+  (** TSTP parser. It parses into Simple.term and Simple.formula *)
 
   open Const
-
-  open Types
   open Symbols
 
-  module T = Terms
-  module C = Clauses
-  module O = Orderings
   module Utils = FoUtils
 
-  type term = Types.term
-  type variable = Types.term
-  type literal = Types.literal
-  type clause = Types.clause
+  type term = Simple.term
+  type variable = Simple.term
+  type literal = Simple.formula
+  type clause = Simple.formula
 
   (* includes from input *)
   let include_files: string list ref =
@@ -52,10 +47,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let (var_map: (string * sort * variable) list ref) =
     ref []
 
-  (* the literals of the currently read clause *)
-  let (literals: literal list ref) =
-    ref []
-
   (** is the current clause a conjecture? *)
   let conjecture = ref false
 
@@ -63,7 +54,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let init_clause () =
     var_id_counter := 0;
     var_map := [];
-    literals := [];
     conjecture := false
         
   (* gets the variables associated with a string from the variable mapping
@@ -81,37 +71,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     with
       | Not_found ->
           let new_var = 
-            T.mk_var !var_id_counter sort
+            Simple.mk_var !var_id_counter sort
           in
             incr var_id_counter;
             var_map := (var_name, sort, new_var) :: !var_map;
             new_var
 
-  let sort_table = Hashtbl.create 23
+  (** table that maps symbols into sorts *)
+  let sort_table = SHashtbl.create 5
+
   (* get the infered sort for the given constant *)
   let get_sort constant =
     try
-      Hashtbl.find sort_table constant
+      SHashtbl.find sort_table constant
     with Not_found -> univ_sort
 
-  let set_sort constant sort = Hashtbl.replace sort_table constant sort
-
-  let mk_forall v t =
-    (* only add the quantifier if v is a free var in t *)
-    if T.var_occurs v t
-      then T.mk_node forall_symbol bool_sort
-        [T.mk_node lambda_symbol bool_sort [T.db_from_var t v]]
-      else t
-
-  let mk_exists v t =
-    (* only add the quantifier if v is a free var in t *)
-    if T.var_occurs v t
-    then T.mk_node exists_symbol bool_sort
-        [T.mk_node lambda_symbol bool_sort [T.db_from_var t v]]
-    else t
-
-  let ord = O.default_ordering ()
-    
+  let set_sort constant sort = SHashtbl.replace sort_table constant sort
 %}
   
 %token LEFT_PARENTHESIS
@@ -152,13 +127,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token UNKNOWN
 
 %start parse_file
-%type <Types.hclause list * string list> parse_file
+%type <Simple.sourced_formula list * string list> parse_file
 
 %start term
-%type <Types.term> term
+%type <Simple.term> term
 
 %start cnf_formula
-%type <Types.literal list> cnf_formula
+%type <Simple.formula> cnf_formula
 
 %%
 
@@ -228,13 +203,13 @@ fof_annotated:
     { 
       let clause = 
         let filename = !Const.cur_filename in  (* ugly *)
-        ord#refresh ();
-        let sign = not !conjecture in (* if conjecture, negate *)
-        let lit = C.mk_lit ~ord $7 T.true_term sign in
-        C.mk_hclause ~ord [lit] (lazy (Axiom (filename, $3))) []
+        let source = Simple.Axiom (filename, $3) in
+        if !conjecture
+          then Simple.mk_not $7, source
+          else $7, source
       in
-        init_clause ();  (* reset global state *)
-        clause
+      init_clause ();  (* reset global state *)
+      clause
     }
 
 fof_formula:
@@ -257,17 +232,17 @@ nonassoc_binary:
 
 binary_connective:
   | BIJECTION
-    { T.mk_equiv }
+    { Simple.mk_equiv }
   | LEFT_IMPLICATION
-    { T.mk_imply }
+    { Simple.mk_imply }
   | RIGHT_IMPLICATION
-    { fun x y -> T.mk_imply y x }
+    { fun x y -> Simple.mk_imply y x }
   | XOR
-    { fun x y -> T.mk_not (T.mk_equiv x y) }
+    { Simple.mk_xor }
   | NEGATION OR
-    { fun x y -> T.mk_not (T.mk_or x y) }
+    { fun x y -> Simple.mk_not (Simple.mk_or [x; y]) }
   | NEGATION AND
-    { fun x y -> T.mk_not (T.mk_and x y) }
+    { fun x y -> Simple.mk_not (Simple.mk_and [x; y]) }
 
 assoc_binary:
   | or_formula
@@ -277,23 +252,23 @@ assoc_binary:
 
 or_formula:
   | unitary_formula OR more_or_formula
-    { T.mk_or $1 $3 }
+    { Simple.mk_or ($1 :: $3) }
 
 more_or_formula:
   | unitary_formula
-    { $1 }
+    { [$1] }
   | unitary_formula OR more_or_formula
-    { T.mk_or $1 $3 }
+    { $1 :: $3 }
 
 and_formula:
   | unitary_formula AND more_and_formula
-    { T.mk_and $1 $3 }
+    { Simple.mk_and ($1 :: $3) }
 
 more_and_formula:
   | unitary_formula
-    { $1 }
+    { [$1] }
   | unitary_formula AND more_and_formula
-    { T.mk_and $1 $3 }
+    { $1 :: $3 }
 
 unitary_formula:
   | quantified_formula
@@ -314,9 +289,9 @@ quantified_formula:
 
 quantifier:
   | FORALL
-    { mk_forall }
+    { Simple.mk_forall }
   | EXISTS
-    { mk_exists }
+    { Simple.mk_exists }
 
 variable_list:
   | variable
@@ -330,7 +305,7 @@ unary_formula:
 
 unary_connective:
   | NEGATION
-    { T.mk_not }
+    { Simple.mk_not }
 
 
 cnf_annotated:
@@ -339,13 +314,12 @@ cnf_annotated:
       // ignore everything except for the formula
       {
         let clause = 
-          ord#refresh ();
           let filename = !Const.cur_filename in  (* ugly *)
-          let c = C.mk_hclause ~ord $7 (lazy (Axiom (filename, $3))) [] in
-          C.clause_of_fof ~ord c
+          let source = Simple.Axiom (filename, $3) in
+          $7, source
         in
-          init_clause ();
-          clause
+        init_clause ();
+        clause
       }
 
 formula_role:
@@ -367,10 +341,10 @@ annotations:
 
 cnf_formula:
   | LEFT_PARENTHESIS disjunction RIGHT_PARENTHESIS
-      { $2 }
+      { Simple.mk_or $2 }
 
   | disjunction
-      { $1 }
+      { Simple.mk_or $1 }
 
 disjunction:
   | literal
@@ -382,10 +356,10 @@ disjunction:
 
 literal:
   | atomic_formula
-      { ord#refresh (); C.mk_eq ~ord $1 T.true_term }
+      { $1 }
 
   | NEGATION atomic_formula
-      { ord#refresh (); C.mk_neq ~ord $2 T.true_term }
+      { Simple.mk_not $2 }
 
 atomic_formula:
   | plain_atom
@@ -399,11 +373,11 @@ atomic_formula:
 
 plain_atom:
   | plain_term_top
-      { let t = T.cast $1 bool_sort in (* cast term to bool *)
-        (match t.term with
-        | Node (s, _) -> set_sort s bool_sort
-        | Var _ -> assert false);
-        t
+      { let t = Simple.cast $1 bool_sort in (* cast term to bool *)
+        (match t with
+        | Simple.Node (s, _, _) -> set_sort s bool_sort
+        | Simple.Var _ -> failwith "variable at top level");
+        Simple.mk_atom t
       }
 
 arguments:
@@ -415,23 +389,23 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { T.true_term }
+      { Simple.mk_true }
 
   | DOLLAR_FALSE
-      { T.false_term }
+      { Simple.mk_false }
 
   | term EQUALITY term
-      { T.mk_eq $1 $3 }
+      { Simple.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { T.mk_not (T.mk_eq $1 $3) }
+      { Simple.mk_neq $1 $3 }
 
 system_atom:
   | system_term_top
-      { let t = T.cast $1 bool_sort in
-        (match t.term with
-        | Node (s, _) -> set_sort s bool_sort
-        | Var _ -> assert false);
-        t
+      { let t = Simple.cast $1 bool_sort in
+        (match t with
+        | Simple.Node (s, _, _) -> set_sort s bool_sort
+        | Simple.Var _ -> assert false);
+        Simple.mk_atom t
       }
 
 term:
@@ -454,21 +428,21 @@ function_term:
 plain_term_top:
   | constant
       { let sort = get_sort $1 in
-        T.mk_const $1 sort }
+        Simple.mk_const $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        T.mk_node $1 sort $3
+        Simple.mk_node $1 sort $3
       }
 
 plain_term:
   | constant
       { let sort = get_sort $1 in
-        T.mk_const $1 sort }
+        Simple.mk_const $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        T.mk_node $1 sort $3
+        Simple.mk_node $1 sort $3
       }
 
 constant:
@@ -492,21 +466,21 @@ defined_term:
 system_term_top:
   | system_constant
       { let sort = get_sort $1 in
-        T.mk_const $1 sort }
+        Simple.mk_const $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { 
-        T.mk_node $1 univ_sort $3
+        Simple.mk_node $1 univ_sort $3
       }
 
 system_term:
   | system_constant
       { let sort = get_sort $1 in
-        T.mk_const $1 sort }
+        Simple.mk_const $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        T.mk_node $1 sort $3
+        Simple.mk_node $1 sort $3
       }
 
 system_functor:
