@@ -650,7 +650,7 @@ let pp_term_tstp =
 
 let pp_term = ref (pp_term_debug :> pprinter_term)
 
-let pp_signature formatter symbols =
+let pp_precedence formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]"
     (Utils.pp_list ~sep:" > " !pp_symbol#pp) symbols
 

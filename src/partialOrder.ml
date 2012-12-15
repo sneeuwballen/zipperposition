@@ -26,17 +26,17 @@ open Symbols
 (** the partial order is the adjacency matrix of a DAG *)
 type t = {
   num : int SHashtbl.t;                   (** symbol -> index *)
-  mutable signature : symbol array;       (** num -> symbol *)
+  mutable symbols : symbol array;       (** num -> symbol *)
   mutable total : bool;                   (** is the order total? *)
   mutable size : int;                     (** number of symbols in the table *)
   mutable cmp : bool array array;         (** adjacency matrix *)
 }
 
-(** Compute the signature from the symbol table *)
-let compute_signature num =
-  let signature = Array.make (SHashtbl.length num) (Obj.magic None) in
-  SHashtbl.iter (fun s i -> signature.(i) <- s) num;
-  signature
+(** Compute the symbols from the symbol table *)
+let compute_symbols num =
+  let symbols = Array.make (SHashtbl.length num) (Obj.magic None) in
+  SHashtbl.iter (fun s i -> symbols.(i) <- s) num;
+  symbols
 
 (** build an empty partial order for the list of symbols *)
 let mk_partial_order symbs =
@@ -51,11 +51,11 @@ let mk_partial_order symbs =
       end)
     symbs;
   let msize = !size + ((!size + 1) / 2) in
-  (* the signature (num -> symbol) *)
-  let signature = compute_signature num in
+  (* the symbols (num -> symbol) *)
+  let symbols = compute_symbols num in
   (* the adjacency matrix *)
   let cmp = Array.make_matrix msize msize false in
-  { num; size= !size; total=false; cmp; signature; }
+  { num; size= !size; total=false; cmp; symbols; }
 
 (** copy the partial ordering structure *)
 let copy po =
@@ -65,8 +65,8 @@ let copy po =
     cmp.(i) <- Array.copy po.cmp.(i)
   done;
   (* copy array *)
-  let signature = Array.copy po.signature in
-  { num=SHashtbl.copy po.num; total=po.total; size = po.size; cmp; signature; }
+  let symbols = Array.copy po.symbols in
+  { num=SHashtbl.copy po.num; total=po.total; size = po.size; cmp; symbols; }
 
 (** check whether the ordering is total *)
 let check_is_total po =
@@ -136,7 +136,7 @@ let complete po cmp_fun =
         if (not cmp.(i).(j)) && (not cmp.(j).(i)) then
           (* elements i and j not ordered, order them by cmp_fun
              and then re-compute the transitive closure *)
-          match cmp_fun po.signature.(i) po.signature.(j) with
+          match cmp_fun po.symbols.(i) po.symbols.(j) with
           | n when n < 0 -> cmp.(j).(i) <- true; transitive_closure po
           | n when n > 0 -> cmp.(i).(j) <- true; transitive_closure po
           | _ -> ()
@@ -156,10 +156,10 @@ let compare po s t =
   | false, false when s == t -> 0
   | _ -> assert false  (* non-total ordering *)
 
-(** signature, in decreasing order (assuming the ordering is total) *)
-let signature po =
+(** symbols, in decreasing order (assuming the ordering is total) *)
+let symbols po =
   assert (is_total po);
-  let s = Array.sub po.signature 0 po.size in
+  let s = Array.sub po.symbols 0 po.size in
   (* sort by decreasing order *)
   Array.fast_sort (fun x y -> - (compare po x y)) s;
   Array.to_list s
@@ -189,7 +189,7 @@ let add_constraints po constraints =
 
 (** add the given symbols to the partial order *)
 let extend po symbs =
-  FoUtils.debug 3 (lazy (FoUtils.sprintf "extend po with %a" Terms.pp_signature symbs));
+  FoUtils.debug 3 (lazy (FoUtils.sprintf "extend po with %a" Terms.pp_precedence symbs));
   (* add symbols *)
   let old_size = po.size in
   List.iter
@@ -197,9 +197,9 @@ let extend po symbs =
       if not (SHashtbl.mem po.num s)
         then (SHashtbl.add po.num s po.size; po.size <- po.size + 1))
     symbs;
-  (if po.size > old_size then (po.total <- false; po.signature <- compute_signature po.num));
+  (if po.size > old_size then (po.total <- false; po.symbols <- compute_symbols po.num));
   (if po.size > old_size && po.size > Array.length po.cmp then begin
-    (* extend the matrix and signature in case they are too small for new signature *)
+    (* extend the matrix and symbols in case they are too small for new signature *)
     let n = po.size + ((1 + po.size) lsr 1) in
     let cmp = Array.make n po.cmp.(0) in
     for i = 0 to n-1 do
@@ -217,7 +217,7 @@ let pp formatter po =
   (* print num -> symbol *)
   Format.fprintf formatter "total %B;@;" (is_total po);
   for i = 0 to n-1 do
-    Format.fprintf formatter " @[<h>%2d: %s@]@;" i (name_symbol po.signature.(i))
+    Format.fprintf formatter " @[<h>%2d: %s@]@;" i (name_symbol po.symbols.(i))
   done;
   (* print the matrix *)
   for i = 0 to n-1 do

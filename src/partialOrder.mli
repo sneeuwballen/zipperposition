@@ -45,8 +45,8 @@ val complete : t -> (symbol -> symbol -> int) -> unit
 val compare : t -> symbol -> symbol -> int
   (** compare two symbols in the ordering. The ordering must be total! *)
 
-val signature : t -> symbol list
-  (** signature, in decreasing order (assuming the ordering is total) *)
+val symbols : t -> symbol list
+  (** symbols, in decreasing order (assuming the ordering is total) *)
 
 val add_constraint : t -> symbol -> symbol -> bool
   (** [add_constraint po s t] try to add [s] > [t] to the

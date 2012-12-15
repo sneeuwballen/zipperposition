@@ -63,7 +63,7 @@ let eq_formulas f1 f2 = f1 = f2
 
 let mk_true = True
 let mk_false = False
-let mk_atom t = Atom t
+let mk_atom t = Atom (cast t bool_sort)
 let mk_eq t1 t2 = Eq (t1, t2)
 let mk_neq t1 t2 = Not (Eq (t1, t2))
 let mk_lit t1 t2 sign = if sign then mk_eq t1 t2 else mk_neq t1 t2

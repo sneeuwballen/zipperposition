@@ -28,37 +28,16 @@ module PO = PartialOrder
 
 (** Precedence on symbols *)
 
-(** compute the current signature: existing symbols,
-    with their arities and sorts *)
-let compute_signature () =
-  let sorts, arities, symbols = base_signature () in
-  let symbols = ref symbols in
+(** compute the current signature: map from symbols to (arity, sort) *)
+let current_signature () =
+  let signature = ref base_signature in
   T.iter_terms
     (fun t -> match t.term with
-     | Var _ -> ()
-     | Node (s, l) ->
-       begin
-         (* update the arity only if not already found *)
-         if not (SHashtbl.mem arities s) then SHashtbl.replace arities s (List.length l);
-         (* update sort only if it is not already bool *)
-         (if (try SHashtbl.find sorts s == bool_sort with Not_found -> false)
-           then ()
-           else SHashtbl.replace sorts s t.sort);
-         if not (List.mem s !symbols) then symbols := s::!symbols
-       end);
-  sorts, arities, !symbols
-
-let current_signature =
-  (* version of signature that is computed *)
-  let sig_version = ref 0 in
-  (* store the signature, to avoid recomputing it all the time *)
-  let cached_signature = ref (compute_signature ()) in
-  fun () ->
-    assert (!sig_version <= !Symbols.sig_version);
-    (if !sig_version < !Symbols.sig_version
-      then (sig_version := !Symbols.sig_version; (* recompute signature, it did change *)
-            cached_signature := compute_signature ()));
-    !cached_signature
+      | Var _ -> ()
+      | Node (s, l) when not (SMap.mem s !signature) ->
+        signature := SMap.add s (List.length l, t.sort) !signature
+      | Node _ -> ());
+  !signature
 
 (* ----------------------------------------------------------------------
  * hard constraints on the ordering
@@ -105,12 +84,11 @@ let list_constraint l =
   in compare
 
 let ordering_to_constraint so =
-  list_constraint so#signature 
+  list_constraint so#precedence
 
-let arity_constraint s1 s2 =
-  let _, arities, _ = current_signature () in
-  let s1_arity = SHashtbl.find arities s1
-  and s2_arity = SHashtbl.find arities s2 in
+let arity_constraint signature s1 s2 =
+  let s1_arity, _ = SMap.find s1 signature
+  and s2_arity, _ = SMap.find s2 signature in
   s1_arity - s2_arity  (* bigger arity means bigger symbol *)
 
 let invfreq_constraint clauses =
@@ -133,7 +111,7 @@ let invfreq_constraint clauses =
     freq2 - freq1
 
 let max_constraint symbols =
-  let table = SHashtbl.create 11
+  let table = SHashtbl.create 5
   and num = ref 0 in
   (* give number to symbols *)
   List.iter
@@ -170,8 +148,13 @@ let alpha_constraint a b = compare_symbols a b
 
 (** weight of f = arity of f + 4 *)
 let weight_modarity () =
-  let _, arities, _ = current_signature () in
-  fun a -> (SHashtbl.find arities a) + 4
+  let signature = current_signature () in
+  fun a ->
+    try fst (SMap.find a signature) + 4
+    with Not_found -> 4
+
+(** constant weight *)
+let weight_constant a = 4
 
 (* ----------------------------------------------------------------------
  * Creation of a precedence (symbol_ordering) from constraints
@@ -200,7 +183,7 @@ let compute_history old_sig new_sig history =
 (* build an ordering from a list of constraints *)
 let make_ordering constrs symbols =
   (* add default symbols *)
-  let _,_,base_symbols = base_signature () in
+  let base_symbols = symbols_of_signature base_signature in
   let symbols = List.rev_append base_symbols symbols in
   (* create a partial order, and complete it *)
   let po = PartialOrder.mk_partial_order symbols in
@@ -215,25 +198,27 @@ let make_ordering constrs symbols =
     method history = m_history
     (* refresh computes a new ordering based on the current signature *)
     method refresh () =
-      let old_signature = self#signature in
+      let old_precedence = self#precedence in
 
       (* the new signature, possibly with more symbols*)
-      let _, _, symbols = current_signature () in
-      let num_added = PartialOrder.extend po symbols in
+      let new_signature = current_signature () in
+      let num_added = PartialOrder.extend po (symbols_of_signature new_signature) in
       if num_added > 0 then begin
-        Utils.debug 3 (lazy (Utils.sprintf "%% old signature %a" T.pp_signature self#signature));
+        Utils.debug 3 (lazy (Utils.sprintf "%% old precedence %a"
+                       T.pp_precedence old_precedence));
         (* complete the ordering with successive constraints *)
         apply_constrs ();
         assert (PartialOrder.is_total po);
         (* new version of the precedence *)
         m_version <- m_version + 1;
-        m_history <- compute_history old_signature self#signature m_history;
+        m_history <- compute_history old_precedence self#precedence m_history;
         (* refresh weight function *)
         weight := weight_modarity ();
-        Utils.debug 3 (lazy (Utils.sprintf "%% new signature %a" T.pp_signature self#signature));
+        Utils.debug 3 (lazy (Utils.sprintf "%% new precedence %a"
+                       T.pp_precedence self#precedence));
       end
     method weight s = !weight s
-    method signature = PartialOrder.signature po
+    method precedence = PartialOrder.symbols po
     method compare a b = PartialOrder.compare po a b
     method multiset_status s = !multiset_pred s
     method set_multiset f = multiset_pred := f
@@ -248,7 +233,6 @@ let rec default_symbol_ordering symbols =
   (* two constraints: false, true at end of precedence, and arity constraint *)
   let constrs =
     [min_constraint [false_symbol; true_symbol];
-     arity_constraint;
      alpha_constraint] in
   (* apply the constraints to the dummy symbol ordering *)
   make_ordering constrs symbols
@@ -304,8 +288,8 @@ let create_constraints clause = check_definition clause @ check_rules clause
 
 (** Check whether the two precedences are equal *)
 let eq_precedence c1 c2 =
-  assert (List.length c1#signature = List.length c2#signature);
-  List.for_all2 (==) c1#signature c2#signature
+  assert (List.length c1#precedence = List.length c2#precedence);
+  List.for_all2 (==) c1#precedence c2#precedence
 
 (** Compute a precedence from the signature and the strong constraint *)
 let compute_precedence signature weak_constrs strong_constrs symbols : symbol_ordering =
@@ -392,7 +376,7 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
     respectively weaker/stronger than the optimization (the first one, weaker,
     is applied to break ties, the second one, stronger, is always enforced first) *)
 let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
-  let _, _, signature = current_signature () in
+  let signature = current_signature () in
   (* the constraints *)
   let constraints = Utils.list_flatmap create_constraints clauses in
   let max_cost = List.fold_left (fun acc (w,_,_) -> acc+w) 0 constraints in
@@ -400,7 +384,8 @@ let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
   let symbols = List.fold_left (fun acc (_,symbols,_) -> symbols @ acc) [] constraints in
   let symbols = Utils.list_uniq (==) symbols in
   (* helper functions *)
-  let mk_precedence = compute_precedence signature weak_constrs strong_constrs
+  let mk_precedence = compute_precedence (symbols_of_signature signature)
+    weak_constrs strong_constrs
   and mk_cost = compute_cost ord_factory constraints in
   (* Randomized hill climbing on the ordering of symbols. The result is
      the precedence that has the lowest cost. *)

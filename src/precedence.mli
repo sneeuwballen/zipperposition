@@ -23,11 +23,9 @@ open Symbols
 
 (** Precedence (total ordering) on symbols *)
 
-(** compute the current signature of symbols. It returns a
-    map of symbols to sorts, a map of symbols to their arity,
-    and the signature (the list of current symbols) *)
-val current_signature : unit ->
-                        sort SHashtbl.t * int SHashtbl.t * symbol list
+(** compute the current signature of symbols. It maps symbols
+    to their arity and sort. *)
+val current_signature : unit -> (int * sort) SMap.t
 
 (* ----------------------------------------------------------------------
  * hard constraints on the ordering
@@ -44,7 +42,7 @@ val ordering_to_constraint : symbol_ordering -> ordering_constraint
   (** convert a symbol ordering into an ordering constraint. Useful to
       extend an ordering without breaking it. *)
 
-val arity_constraint : ordering_constraint
+val arity_constraint : (int * sort) SMap.t -> ordering_constraint
   (** decreasing arity constraint *)
 
 val invfreq_constraint : hclause list -> ordering_constraint

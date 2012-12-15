@@ -115,7 +115,7 @@ class type symbol_ordering =
     method version : int                      (** version of the precedence *)
     method history : signature_diff list      (** history (length = version) since first precedence *)
     method refresh : unit -> unit             (** refresh the signature (may update history/version) *)
-    method signature : symbol list            (** current symbols in decreasing order *)
+    method precedence : symbol list           (** current symbols in decreasing order *)
     method compare : symbol -> symbol -> int  (** total order on symbols *)
     method weight : symbol -> int             (** weight of symbol (for KBO) *)
     method multiset_status : symbol -> bool   (** does the symbol have a multiset status? *)

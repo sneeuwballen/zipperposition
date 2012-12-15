@@ -159,7 +159,8 @@ let get_calculus ~params =
 (** Compute the ordering from the list of clauses, according to parameters *)
 let compute_ord ~params clauses =
   let calculus = get_calculus ~params in
-  let _, _, signature = Precedence.current_signature () in
+  let signature = Precedence.current_signature () in
+  let symbols = Symbols.symbols_of_signature signature in
   let so = if params.param_precedence
     (* use the heuristic to try to order definitions and rewrite rules *)
     then Precedence.heuristic_precedence params.param_ord
@@ -168,7 +169,7 @@ let compute_ord ~params clauses =
       clauses
     else Precedence.make_ordering
       (calculus#constr clauses @ [Precedence.invfreq_constraint clauses;
-                                  Precedence.alpha_constraint]) signature
+                                  Precedence.alpha_constraint]) symbols
   in
   params.param_ord so
 
@@ -181,7 +182,7 @@ let enrich_with_theories ~ord ~params clauses =
 
 (** Process the given file (try to solve it) *)
 let process_file params f =
-  Format.printf "%% [[[ process file %s ]]]@." f;
+  Format.printf "%% *** process file %s ***@." f;
   let steps = if params.param_steps = 0
     then None else (Format.printf "%% run for %d steps@." params.param_steps;
                     Some params.param_steps)
@@ -190,7 +191,6 @@ let process_file params f =
                     ignore (setup_alarm params.param_timeout);
                     Some (Sat.get_start_time () +. params.param_timeout -. 0.25))
   and progress = params.param_progress in
-  Printf.printf "%% process file %s\n" f;
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* find the calculus *)
@@ -207,7 +207,7 @@ let process_file params f =
   let clauses = enrich_with_theories ~ord:d_ord ~params clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
-  Format.printf "%% signature: %a@." T.pp_signature ord#symbol_ordering#signature;
+  Format.printf "%% precedence: %a@." T.pp_precedence ord#symbol_ordering#precedence;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
@@ -233,7 +233,7 @@ let process_file params f =
   Printf.printf "%% done %d iterations\n" num;
   (* print some statistics *)
   print_stats state;
-  Format.printf "%% final signature: %a@." T.pp_signature ord#symbol_ordering#signature;
+  Format.printf "%% final precedence: %a@." T.pp_precedence ord#symbol_ordering#precedence;
   (match params.param_dot_file with (* print state *)
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));

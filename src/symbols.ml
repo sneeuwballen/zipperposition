@@ -111,15 +111,11 @@ let table =
    ]
 
 (** default signature, containing predefined symbols with their arities and sorts *)
-let base_signature () =
-  let sorts = SHashtbl.create 7
-  and arities  = SHashtbl.create 7
-  and symbols = ref [] in
-  (* update the tables *)
-  List.iter
-    (fun (symb, sort, arity) ->
-      SHashtbl.add sorts symb sort;
-      SHashtbl.add arities symb arity;
-      symbols := symb :: !symbols)
-    table;
-  sorts, arities, !symbols
+let base_signature =
+  List.fold_left
+    (fun signature (symb,sort,arity) -> SMap.add symb (arity, sort) signature)
+    SMap.empty table
+
+(** extract the list of symbols from the complete signature *)
+let symbols_of_signature signature =
+  SMap.fold (fun s _ l -> s :: l) signature []

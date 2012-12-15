@@ -38,7 +38,7 @@ let special_preds =
    or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
 
 type symbol_kind = 
-  | Predicate | DeBruijn | Function | Special
+  | Predicate | DeBruijn | Skolem | Function | Special
 
 (** order on kinds of symbols *)
 let order k1 k2 =
@@ -48,6 +48,8 @@ let order k1 k2 =
   | _, Predicate -> -1
   | DeBruijn, _ -> 1
   | _, DeBruijn -> -1
+  | Skolem, _ -> 1
+  | _, Skolem -> -1
   | Function, _ -> 1
   | Special, _ -> -1
 
@@ -57,10 +59,12 @@ let classify =
   function s ->
     match s with
     | _ when s == succ_db_symbol || s == db_symbol -> DeBruijn
+    | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
     | _ when SSet.mem s special_set -> Special
     | _ -> (* classify between predicate and function by the sort *)
-      let sorts, _, _ = Precedence.current_signature () in
-      if SHashtbl.find sorts s = bool_sort then Predicate else Function
+      let signature = Precedence.current_signature () in
+      let _, sort = SMap.find s signature in
+      if sort == bool_sort then Predicate else Function
 
 (** constraint on the ordering *)
 let symbol_constraint _ =

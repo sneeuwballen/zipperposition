@@ -167,8 +167,8 @@ let eligible_always hc i lit = true
 (** Create an active set from the given ord, and indexing structures *)
 let mk_active_set ~ord index =
   (* create a FeatureVector index from the current signature *)
-  let _,_,signature = Precedence.current_signature () in
-  let fv_idx = FV.mk_fv_index_signature signature in
+  let signature = Precedence.current_signature () in
+  let fv_idx = FV.mk_fv_index_signature (Symbols.symbols_of_signature signature) in
   object (self)
     val mutable m_clauses = C.CSet.empty
     val mutable m_sup_into = index

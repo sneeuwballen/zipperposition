@@ -83,5 +83,8 @@ val bool_sort : sort
 val type_sort : sort
 val univ_sort : sort
 
-val base_signature : unit -> (sort SHashtbl.t * int SHashtbl.t * symbol list)
+val base_signature : (int * sort) SMap.t
   (** the signature composed of predefined symbols *)
+
+val symbols_of_signature : (int * sort) SMap.t -> symbol list
+  (** extract the list of symbols from the complete signature *)

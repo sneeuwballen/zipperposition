@@ -194,7 +194,7 @@ val pp_term_debug :                                 (** print term in a nice syn
     skip_db : bool -> unit;                         (** nice printing of De Bruijn terms *)
   >
 
-val pp_signature : Format.formatter -> symbol list -> unit      (** print signature *)
+val pp_precedence : Format.formatter -> symbol list -> unit      (** print symbol precedence *)
 
 (* ----------------------------------------------------------------------
  * conversions with simple terms/formulas
