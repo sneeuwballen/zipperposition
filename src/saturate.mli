@@ -31,23 +31,24 @@ type szs_status =
   | Error of string 
   | Timeout
 
-(** Simplifications to perform on initial clauses (using a state containing themselves) *)
-val initial_simplifications : ord:ordering ->
-                              select:selection_fun ->
-                              calculus:Calculus.calculus ->
-                              ProofState.active_set ->
-                              ProofState.simpl_set ->
-                              hclause list -> hclause list
-
-(** Perform one step of the given clause algorithm *)
-val given_clause_step : calculus:Calculus.calculus ->
+(** Perform one step of the given clause algorithm
+    It performs generating inferences only if [generating] is true (default) *)
+val given_clause_step : ?generating:bool ->
+                        calculus:Calculus.calculus ->
                         ProofState.state ->
                         szs_status
 
 (** run the given clause until a timeout occurs or a result
-    is found. It returns a tuple (new state, result, number of steps done) *)
-val given_clause: ?steps:int -> ?timeout:float -> ?progress:bool ->
+    is found. It returns a tuple (new state, result, number of steps done).
+    It performs generating inferences only if [generating] is true (default) *)
+val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float -> ?progress:bool ->
                   calculus:Calculus.calculus ->
+                  ProofState.state ->
+                  szs_status * int
+
+(** Interreduction of the given state, without generating inferences. Returns
+    the number of steps done for presaturation, with status of the set. *)
+val presaturate : calculus:Calculus.calculus ->
                   ProofState.state ->
                   szs_status * int
 

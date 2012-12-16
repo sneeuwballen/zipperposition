@@ -197,16 +197,7 @@ let all_simplify_ ~ord ~calculus ~select active_set simpl_set hc =
 let all_simplify ~ord ~calculus ~select active_set simpl_set clause =
   prof_all_simplify.HExtlib.profile (all_simplify_ ~ord ~calculus ~select active_set simpl_set) clause
 
-(** Simplifications to perform on initial clauses *)
-let initial_simplifications ~ord ~select ~calculus active_set simpl_set clauses =
-  List.fold_left
-    (fun acc c ->
-      let clauses = all_simplify ~ord ~calculus ~select active_set simpl_set c in
-      let clauses = List.filter (fun hc -> not (Sup.is_tautology hc)) clauses in
-      List.rev_append clauses acc)
-    [] clauses
-
-let given_clause_step ~calculus state =
+let given_clause_step ?(generating=true) ~calculus state =
   let ord = state#ord
   and select = state#select in
   (* select next given clause *)
@@ -255,8 +246,8 @@ let given_clause_step ~calculus state =
       let new_clauses = List.rev_append simplified_actives new_clauses in
       (* add given clause to active set *)
       state#active_set#add [hc];
-      (* do inferences between c and the active set (including c) *)
-      let inferred_clauses = generate ~calculus state hc in
+      (* do inferences between c and the active set (including c), if [generate] is set to true *)
+      let inferred_clauses = if generating then generate ~calculus state hc else [] in
       (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
       let inferred_clauses = List.fold_left
@@ -295,7 +286,7 @@ let print_progress steps state =
     steps num_active num_passive (get_total_time ());
   Format.print_flush ()
 
-let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
+let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus state =
   let rec do_step num =
     if check_timeout timeout then Timeout, num else
     begin
@@ -313,7 +304,7 @@ let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
             Gc.major ();
             state#passive_set#clean ()));
         (* do one step *)
-        let status = given_clause_step ~calculus state in
+        let status = given_clause_step ~generating ~calculus state in
         match status with
         | Sat | Unsat _ | Error _ -> status, num (* finished *)
         | Timeout -> assert false
@@ -322,3 +313,7 @@ let given_clause ?steps ?timeout ?(progress=false) ~calculus state =
     end
   in
   do_step 0
+
+(** Simplifications to perform on initial clauses *)
+let presaturate ~calculus state =
+  given_clause ~generating:false ~progress:false ~calculus state

@@ -35,7 +35,7 @@ type parameters = {
   param_progress : bool;          (** print progress during search *)
   param_proof : bool;             (** print proof *)
   param_dot_file : string option; (** file to print the final state in *)
-  param_presimplify : bool;       (** do we simplify the initial set? *)
+  param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
   param_print_sort : bool;        (** print sorts of terms *)
@@ -61,7 +61,7 @@ let parse_args () =
   and index = ref "fp"
   and theories = ref true
   and calculus = ref "superposition"
-  and presimplify = ref false
+  and presaturate = ref false
   and heuristic_precedence = ref true
   and dot_file = ref None
   and select = ref "SelectComplex"
@@ -84,7 +84,7 @@ let parse_args () =
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
       ("-no-proof", Arg.Clear proof, "disable proof printing");
-      ("-presimplify", Arg.Set presimplify, "pre-simplify the initial clause set");
+      ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
@@ -103,6 +103,6 @@ let parse_args () =
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps; param_version= !version; param_calculus= !calculus;
     param_timeout = !timeout; param_files = !files; param_select = !select; param_theories= !theories;
-    param_progress = !progress; param_proof = !proof; param_presimplify = !presimplify;
+    param_progress = !progress; param_proof = !proof; param_presaturate = !presaturate;
     param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
     param_print_sort = !print_sort; param_print_all = !print_all; param_precedence= !heuristic_precedence;}

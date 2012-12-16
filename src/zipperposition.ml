@@ -217,11 +217,19 @@ let process_file params f =
   let clauses = calculus#preprocess ~ord ~select clauses in
   (* create state, and add clauses to the simpl_set *)
   let state = PS.mk_state ~ord params in
-  state#simpl_set#add clauses;
   (* maybe perform initial inter-reductions *)
-  let clauses = if params.param_presimplify
-    then Sat.initial_simplifications ~ord ~calculus ~select state#active_set state#simpl_set clauses
-    else clauses in
+  let clauses = if params.param_presaturate
+    then begin
+      state#passive_set#add clauses;
+      let status, num = Sat.presaturate ~calculus state in
+      Format.printf "%% initial presaturation in %d steps@." num;
+      assert (C.CSet.is_empty state#passive_set#clauses);
+      let clauses = C.CSet.to_list state#active_set#clauses in
+      (* remove clauses from active set *)
+      state#active_set#remove clauses;
+      clauses
+    end else clauses
+  in
   Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* add clauses to passive_set *)
