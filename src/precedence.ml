@@ -162,6 +162,7 @@ let weight_constant a = 4
 
 (** build history by patching old signature to get the new one *)
 let compute_history old_sig new_sig history =
+  let history = if history = [] then [Initial old_sig] else history in
   let rec compare ?prev old_sig new_sig history =
     match old_sig, new_sig with
     | [], [] -> history
@@ -179,6 +180,16 @@ let compute_history old_sig new_sig history =
       (Between (prev, s', Some s'')) :: history'
     | _::_, [_] | _::_, [] -> assert false  (* not monotonic increase? *)
   in compare old_sig new_sig history
+
+let pp_signature_diff formatter step = match step with
+| Initial l -> Format.fprintf formatter "@[<h>initial(%a)@]" (Utils.pp_list !T.pp_symbol#pp) l
+| Between (Some l, x, Some r) -> Format.fprintf formatter "@[<h>between(%a, %a, %a)@]"
+  !T.pp_symbol#pp l !T.pp_symbol#pp x !T.pp_symbol#pp r
+| Between (None, x, Some r) -> Format.fprintf formatter "@[<h>between(_, %a, %a)@]"
+  !T.pp_symbol#pp x !T.pp_symbol#pp r
+| Between (None, x, None) -> Format.fprintf formatter "@[<h>between(_, %a, _)@]" !T.pp_symbol#pp x
+| Between (Some l, x, None) -> Format.fprintf formatter "@[<h>between(%a, %a, _)@]"
+  !T.pp_symbol#pp l !T.pp_symbol#pp x
 
 (* build an ordering from a list of constraints *)
 let make_ordering constrs symbols =
@@ -218,6 +229,8 @@ let make_ordering constrs symbols =
                        T.pp_precedence self#precedence));
       end
     method weight s = !weight s
+    method pp_history formatter = 
+      Utils.pp_list ~sep:", " pp_signature_diff formatter m_history
     method precedence = PartialOrder.symbols po
     method compare a b = PartialOrder.compare po a b
     method multiset_status s = !multiset_pred s
