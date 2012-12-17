@@ -295,23 +295,7 @@ module CHashSet =
  * useful functions to build and examine clauses
  * ---------------------------------------------------------------------- *)
 
-(** make a bitvector of size n with all bits set *)
-let bv_make n =
-  assert (n <= 31);
-  let rec shift bv n = if n = 0 then bv else shift ((bv lsl 1) lor 1) (n-1)
-  in shift 0 n
-
-(** bitvector n-th element is true? *)
-let bv_get bv n = (bv land (1 lsl n)) <> 0 
-
-(** set n-th element of bitvector *)
-let bv_set bv n = bv lor (1 lsl n)
-
-(** reset n-th element of bitvector *)
-let bv_clear bv n = bv land (lnot (1 lsl n))
-
-(** is bitvector empty? *)
-let bv_empty bv = bv = 0
+open Bitvector
 
 (** Find the maximal literals among lits, returns a bitvector *)
 let find_max_lits ~ord lits =

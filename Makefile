@@ -9,7 +9,7 @@ all:
 prod:
 	ocamlbuild $(OPTIONS) -tag noassert src/$(TARGET)
 
-profile:ocamlbuild $(OPTIONS)
+profile:
 	ocamlbuild $(OPTIONS) -tags debug,profile src/$(TARGET)
 byte:
 	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
