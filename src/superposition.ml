@@ -855,7 +855,7 @@ let rec num_equational lits i =
     avoid pathologically expensive subsumption checks.
     TODO remove this limitation after an efficient subsumption check is implemented. *)
 let rec condensation_ ~ord hc =
-  if Array.length hc.hclits <= 1 || (num_equational hc.hclits 0 > 3) then hc else
+  if Array.length hc.hclits <= 1 || num_equational hc.hclits 0 > 3 || Array.length hc.hclits > 8 then hc else
   (* offset is used to rename literals for subsumption *)
   let offset = T.max_var hc.hcvars +1 in
   let lits = hc.hclits in
@@ -865,8 +865,8 @@ let rec condensation_ ~ord hc =
       let lit = lits.(i) in
       for j = i+1 to n - 1 do
         let lit' = lits.(j) in
-        (* try to match lit with lit', then check if subst(hc) subsumes hc *)
-        let substs = match_literals lit lit' in
+        (* try to match lit with lit' (and vice versa), then check if subst(hc) subsumes hc *)
+        let substs = match_literals lit lit' @ match_literals lit' lit in
         List.iter
           (fun subst ->
             let new_lits = Array.sub lits 0 (n - 1) in
