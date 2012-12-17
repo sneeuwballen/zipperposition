@@ -223,7 +223,6 @@ let given_clause_step ?(generating=true) ~calculus state =
       let hc = C.select_clause select hc in
       Sel.check_selected hc;
       C.check_ord_hclause ~ord hc;
-      ignore (Lazy.force hc.hcmaxlits);
       Utils.debug 1 (lazy (Utils.sprintf
                     "============ step with given clause @[<h>%a@] =========="
                     !C.pp_clause#pp_h hc));

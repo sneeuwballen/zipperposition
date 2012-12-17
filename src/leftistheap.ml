@@ -15,9 +15,7 @@
 
 (* Leftist heaps.
 
-   See for instance Chris Okasaki's "Purely Functional Data Structures".
-
-   Simon Cruanes: added a remove (slow) function; OO interface *)
+   See for instance Chris Okasaki's "Purely Functional Data Structures". *)
 
 exception Empty
 

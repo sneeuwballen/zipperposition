@@ -90,11 +90,11 @@ module CHashSet :
     val to_list : t -> hclause list
   end
 
-val mk_hclause : ord:ordering -> literal list -> proof Lazy.t -> hclause list -> hclause
+val mk_hclause : ord:ordering -> literal list -> proof -> hclause list -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
-val mk_hclause_a : ord:ordering -> literal array -> proof Lazy.t -> hclause list -> hclause
+val mk_hclause_a : ord:ordering -> literal array -> proof -> hclause list -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
@@ -195,9 +195,6 @@ module CSet :
     val add_clause : t -> clause -> t
       (** add the hclause of this clause to the set *)
 
-    val union : t -> t -> t
-      (** union of sets (slow) *)
-
     val remove_id : t -> int -> t
       (** remove clause by ID *)
 
@@ -227,9 +224,6 @@ module CSet :
 
     val fold : ('b -> int -> hclause -> 'b) -> 'b -> t -> 'b
       (** fold on clauses *)
-
-    val partition : t -> (hclause -> bool) -> t * t
-      (** for a predicate p, returns (set of c s.t. p(c)), (set of c s.t. not p(c)) *)
 
     val to_list : t -> hclause list
     val of_list : hclause list -> t

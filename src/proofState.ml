@@ -382,7 +382,7 @@ let pp_dot ?(name="state") formatter state =
       DotState.add_node_attribute n (DotState.Style "filled");
       DotState.add_node_attribute n (DotState.Shape "box");
       (if hc.hclits = [||] then DotState.add_node_attribute n (DotState.Color "red"));
-      match Lazy.force hc.hcproof with
+      match hc.hcproof with
       | Axiom (file, axiom) ->
         DotState.add_node_attribute n (DotState.Color "yellow");
       | Proof (rule, clauses) ->

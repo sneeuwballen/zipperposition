@@ -156,8 +156,8 @@ let function_definition ~ord def1 def2 p f =
   let x, y, z = T.mk_var 1 univ_sort, T.mk_var 2 univ_sort, T.mk_var 3 univ_sort in
   let lhs = T.mk_node p bool_sort [x;y;z]
   and rhs = T.mk_eq (T.mk_node f univ_sort [x;y]) z in
-  let proof = lazy (Proof ("lemma", [C.base_clause def1, [], S.id_subst;
-                                     C.base_clause def2, [], S.id_subst])) in
+  let proof = Proof ("lemma", [C.base_clause def1, [], S.id_subst;
+                               C.base_clause def2, [], S.id_subst]) in
   C.mk_hclause ~ord [C.mk_eq ~ord lhs rhs] proof []
 
 let detect_total_relations ~ord clauses =

@@ -43,7 +43,7 @@ let hash_term t =
     in
     let h = Utils.murmur_hash (2749 lxor hash_symbol s) in
     aux h l
-  in (Hashtbl.hash t.sort) lxor (hash t)
+  in abs ((Hashtbl.hash t.sort + 17) * hash t)
 
 (* ----------------------------------------------------------------------
  * comparison, equality, containers
@@ -113,12 +113,12 @@ module H = Hashcons.Make(struct
     let rec eq_subterms a b = match (a, b) with
       | ([],[]) -> true
       | (a::a1, b::b1) ->
-        if eq_term a b then eq_subterms a1 b1 else false
+        if a == b then eq_subterms a1 b1 else false
       | (_, _) -> false
     in
     (* compare sorts, then subterms, if same structure *)
     if x.sort <> y.sort then false
-    else match (x.term, y.term) with
+    else match x.term, y.term with
     | Var i, Var j -> i = j
     | Node (sa, la), Node (sb, lb) -> sa == sb && eq_subterms la lb
     | _ -> false

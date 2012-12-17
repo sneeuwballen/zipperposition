@@ -182,7 +182,7 @@ let tableau_to_clauses ~ord hc a =
   else begin
     let clauses = ref []
     and eqns = Vector.create (Array.length a * 2) in
-    let proof = lazy (Proof ("elim", [C.base_clause hc, [], S.id_subst]))
+    let proof = Proof ("elim", [C.base_clause hc, [], S.id_subst])
     and parents = [hc] in
     (* explore all combinations of tableau splits *)
     let rec explore_splits i =

@@ -340,8 +340,8 @@ let rec merge_lit_vars acc lits i =
 let true_clause =
   H.hashcons
     { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
-      hctag = -1; hcweight=2; hcmaxlits=lazy 0x1; hcselected=0; hcselected_done=true;
-      hcvars=[]; hcproof=lazy (Proof ("trivial", []));
+      hctag = -1; hcweight=2; hcmaxlits=0x1; hcselected=0; hcselected_done=true;
+      hcvars=[]; hcproof=Proof ("trivial", []);
       hcparents=[]; hcdescendants=Ptset.empty; }
 
 (** Build a new hclause from the given literals. If there are more than 31 literals,
@@ -367,7 +367,7 @@ let mk_hclause_a ~ord lits proof parents =
     hclits = lits;
     hctag = -1;
     hcweight = 0;
-    hcmaxlits = lazy (find_max_lits ~ord lits);
+    hcmaxlits = 0;
     hcselected_done = false;
     hcselected = 0;
     hcvars = [];
@@ -380,6 +380,7 @@ let mk_hclause_a ~ord lits proof parents =
   (if hc == hc' then begin
     incr_stat stat_new_clause;
     hc.hcvars <- all_vars;
+    hc.hcmaxlits <- find_max_lits ~ord lits;
     hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
     (* update the parent clauses' sets of descendants *)
     List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
@@ -433,12 +434,12 @@ let descendants hc = hc.hcdescendants
 
 (** Check whether the literal is maximal *)
 let is_maxlit hc i =
-  let bv = Lazy.force hc.hcmaxlits in
+  let bv = hc.hcmaxlits in
   bv_get bv i  (* just check i-th bit *)
 
 (** Check whether the literal is maximal after applying subst *)
 let check_maximal_lit_ ~ord c pos subst =
-  let bv = Lazy.force c.cref.hcmaxlits in
+  let bv = c.cref.hcmaxlits in
   let n = Array.length c.clits in
   (* check if lit already not maximal, before subst *)
   if not (bv_get bv pos) then false else 
@@ -459,7 +460,7 @@ let check_maximal_lit ~ord clause pos subst =
 
 (** Get an indexed list of maximum literals *)
 let maxlits c =
-  let bv = Lazy.force c.cref.hcmaxlits in
+  let bv = c.cref.hcmaxlits in
   Utils.array_foldi
     (fun acc i lit -> if bv_get bv i then (lit, i)::acc else acc)
     [] c.clits
@@ -490,13 +491,13 @@ let fresh_clause ~ord offset hc =
   incr_stat stat_fresh;
   let subst = S.relocate (offset + 1) hc.hcvars in
   let clits = Array.map (apply_subst_lit ~recursive:false ~ord subst) hc.hclits in
-  let cvars = lazy (List.map (S.apply_subst ~recursive:false subst) hc.hcvars) in
+  let cvars = List.map (S.apply_subst ~recursive:false subst) hc.hcvars in
   { cref=hc; clits; cvars; }
 
 (** create a clause from a hclause, without renaming *)
 let base_clause hc =
   incr_stat stat_fresh;
-  { clits = hc.hclits; cref = hc; cvars = Lazy.lazy_from_val hc.hcvars}
+  { clits = hc.hclits; cref = hc; cvars = hc.hcvars}
 
 (** Check whether the literal is selected *)
 let is_selected hc i =
@@ -514,7 +515,7 @@ let selected_lits c =
 let eligible_res ~ord c idx subst =
   (* bitvectors of selected and maximal literals *)
   let selected = c.cref.hcselected in
-  let maximal = Lazy.force c.cref.hcmaxlits in
+  let maximal = c.cref.hcmaxlits in
   let lits = c.clits in
   let n = Array.length lits in
   (* check maximality among selected literals with given sign *)
@@ -556,7 +557,7 @@ let rec from_simple ~ord (f,source) =
   | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
   in
   let proof = match source with
-  | Simple.Axiom (a,b) -> Lazy.lazy_from_val (Axiom (a,b))
+  | Simple.Axiom (a,b) -> Axiom (a,b)
   | Simple.Derived (name, fs) -> failwith "unable to convert non-axiom simple clause to hclause"
   in
   mk_hclause ~ord (convert f) proof []
@@ -598,17 +599,6 @@ module CSet =
 
     let add_clause set c = add set c.cref
 
-    let union s1 s2 =
-      (* merge small into big *)
-      let merge_into small big =
-        let maxvar, clauses =
-          Ptmap.fold
-            (fun _ hc (m,c) -> max m (T.max_var hc.hcvars), Ptmap.add hc.hctag hc c)
-            small.clauses (big.maxvar, big.clauses) in
-        {maxvar;clauses;}
-      in
-      if size s1 < size s2 then merge_into s1 s2 else merge_into s2 s1
-
     let remove_id set i =
       { set with clauses = Ptmap.remove i set.clauses }
 
@@ -642,12 +632,6 @@ module CSet =
       let acc = ref acc in
       iteri set (fun i hc -> acc := f !acc i hc);
       !acc
-
-    let partition set pred =
-      Ptmap.fold
-        (fun _ hc (yes,no) ->
-          if pred hc then add yes hc, no else yes, add no hc)
-        set.clauses (empty, empty)
 
     let to_list set =
       Ptmap.fold (fun _ hc acc -> hc :: acc) set.clauses []
@@ -834,7 +818,7 @@ let pp_proof_debug =
         if Ptset.mem hc.hctag !already_printed then ()
         else begin
           already_printed := Ptset.add hc.hctag !already_printed;
-          match Lazy.force hc.hcproof with
+          match hc.hcproof with
           | Axiom (f, s) ->
               fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>axiom %s in %s@]@]@;"
                 !pp_clause#pp_h hc s f
@@ -875,7 +859,7 @@ let pp_proof_tstp =
         if Ptset.mem hc.hctag !already_printed then ()
         else begin
           already_printed := Ptset.add hc.hctag !already_printed;
-          match Lazy.force hc.hcproof with
+          match hc.hcproof with
           | Axiom (f, ax_name) ->
             fprintf formatter "@[<h>fof(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
               num pp_clause_tstp#pp_h hc f ax_name
