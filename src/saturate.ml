@@ -301,7 +301,7 @@ let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus 
         (if (num mod 500 = 0)
           then (
             Utils.debug 1 (Lazy.lazy_from_val "% perform cleanup of passive set");
-            Gc.major ();
+            Gc.full_major ();
             state#passive_set#clean ()));
         (* do one step *)
         let status = given_clause_step ~generating ~calculus state in
