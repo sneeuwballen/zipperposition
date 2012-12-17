@@ -43,7 +43,7 @@ let hash_term t =
     in
     let h = Utils.murmur_hash (2749 lxor hash_symbol s) in
     aux h l
-  in abs ((Hashtbl.hash t.sort + 17) * hash t)
+  in Hashtbl.hash t.sort lxor (hash t)
 
 (* ----------------------------------------------------------------------
  * comparison, equality, containers
