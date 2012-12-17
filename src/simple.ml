@@ -72,7 +72,7 @@ let mk_and fs = And fs
 let mk_not f = Not f
 let mk_imply f1 f2 = mk_or [mk_not f1; f2]
 let mk_equiv f1 f2 = Equiv (f1, f2)
-let mk_xor f1 f2 = Not (Equiv (f1, f2))
+let mk_xor f1 f2 = Not (mk_equiv f1 f2)
 let mk_forall v f = Forall (v, f)
 let mk_exists v f = Exists (v, f)
 

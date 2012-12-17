@@ -996,7 +996,8 @@ let cnf_of ~ord hc =
   (* check whether the clause is already in CNF *)
   and is_cnf hc =
     Utils.array_forall
-      (fun (Equation (l, r, sign, _)) -> T.atomic_rec l && T.atomic_rec r)
+      (fun (Equation (l, r, sign, _)) -> T.atomic_rec l && T.atomic_rec r &&
+                                        (l.sort != bool_sort || (l == T.true_term || r == T.true_term)))
       hc.hclits
   in
   Utils.debug 3 (lazy (Utils.sprintf "input clause %a@." !C.pp_clause#pp_h hc));
