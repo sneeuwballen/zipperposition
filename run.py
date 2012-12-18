@@ -31,21 +31,27 @@ def command(fun):
 # known provers
 provers = {
     'spass': "SPASS -TPTP -TimeLimit={time} -Memory=512000000 {file}",
-    #'zipperposition': "./prover3.sh {file} -timeout {time}",
-    'zipperposition-cnf': "./zipperposition.native {file} -timeout {time} -calculus superposition",
-    'delayed': "./zipperposition.native {file} -timeout {time} -calculus delayed"
+    #'eprover': "eprover -xAuto -tAuto --cpu-limit={time} --memory-limit=512 --tstp-in {file}",
+    'zipperposition': "./zipperposition.native {file} -timeout {time} -calculus superposition",
+    'delayed': "./zipperposition.native {file} -timeout {time} -calculus delayed",
+    #'delayed-no-heuristic': "./zipperposition.native {file} -timeout {time} -calculus delayed -no-heuristic-precedence",
+    #'iprover': "iproveropt --eprover_path ~/bin --schedule false --instantiation_flag true --time_out_real {time} {file}",
 }
 provers_unsat = {
     'spass': "proof found",
+    'eprover': "# Proof found",
     'zipperposition': "SZS Status Theorem",
-    'zipperposition-cnf': "SZS Status Theorem",
-    'delayed': "SZS Status Theorem"
+    'delayed': "SZS Status Theorem",
+    'delayed-no-heuristic': "SZS Status Theorem",
+    'iprover': "SZS Status (Theorem|Unsatisfiable)",
 }
 provers_sat = {
     'spass': "completion found",
+    'eprover': "# No proof found",
     'zipperposition': "SZS Status CounterSatisfiable",
-    'zipperposition-cnf': "SZS Status CounterSatisfiable",
     'delayed': "SZS Status CounterSatisfiable",
+    'delayed-no-heuristic': "SZS Status Theorem",
+    'iprover': "SZS status CounterSatisfiable",
 }
 
 
@@ -264,8 +270,9 @@ class Run(object):
         print "database contains %d files and %d provers" % (len(s['filenames']), len(s['provers']))
         for prover in s['provers']:
             avg = s[prover]['time'] / s[prover]['solved'] if s[prover]['solved'] > 0 else 0
-            print "prover %-20s: solved %-5d failed %-5d average solving time %-6.3f total time %-6.3f" %\
-                (prover, s[prover]['solved'], s[prover]['failed'], avg, s[prover]['time'])
+            ratio = float(s[prover]['solved']) / (s[prover]['solved'] + s[prover]['failed'])
+            print "prover %-20s: solved %-5d failed %-5d ratio %.2f average solving time %-6.3f total time %-6.3f" %\
+                (prover, s[prover]['solved'], s[prover]['failed'], ratio, avg, s[prover]['time'])
 
     @command
     def list_provers(self):
@@ -291,6 +298,7 @@ def parse_args(args):
     parser.add_argument("command", help="the command to run")
     parser.add_argument("files", nargs="*", help="files to run the provers on")
     parser.add_argument("-j", dest="cores", type=int, default=1, help="number of cores used")
+    parser.add_argument("--db", dest="db", default=DB_FILE, help="db to use")
     args = parser.parse_args(args=args)
     return args
 
@@ -298,7 +306,7 @@ if __name__ == "__main__":
     # parse arguments
     args = parse_args(sys.argv[1:])
     # do actions
-    run = Run(db_name = DB_FILE, cores=args.cores)
+    run = Run(db_name = args.db, cores=args.cores)
     fun = getattr(run, args.command)
     fun(* args.files)
 
