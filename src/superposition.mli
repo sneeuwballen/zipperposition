@@ -22,16 +22,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-(* statistics *)
-val stat_superposition_call : statistics
-val stat_equality_resolution_call : statistics
-val stat_equality_factoring_call : statistics
-val stat_subsumption_call : statistics
-val stat_subsumed_in_set_call : statistics
-val stat_subsumed_by_set_call : statistics
-val stat_demodulate_call : statistics
-val stat_demodulate_step : statistics
-
 val all_positions : position -> term ->  (* combinator *)
                     (term -> position -> 'b list) -> 'b list
 
@@ -43,26 +33,32 @@ val infer_equality_resolution: Calculus.unary_inf_rule
 
 val infer_equality_factoring: Calculus.unary_inf_rule
 
+(* TODO splitting without renaming *)
+(* TODO branch rewriting *)
+
 (** simplifications *)
 
 val is_tautology : hclause -> bool
+  (** Check whether the clause is a (syntactic) tautology, ie whether
+      it contains true or "A" and "not A" *)
 
-(** semantic tautology deletion, using a congruence closure algorithm
-    to see if negative literals imply some positive literal *)
 val is_semantic_tautology : hclause -> bool
+  (** semantic tautology deletion, using a congruence closure algorithm
+      to see if negative literals imply some positive literal *)
 
-val basic_simplify : ord:ordering -> hclause -> hclause   (** basic simplifications *)
+val basic_simplify : ord:ordering -> hclause -> hclause
+  (** basic simplifications (remove duplicate literals, trivial literals,
+      destructive equality resolution...) *)
 
 val demodulate : ProofState.simpl_set -> clause -> hclause
   (** rewrite clause using orientable unit equations *)
 
-(* TODO splitting without renaming *)
-(* TODO branch rewriting *)
+val backward_demodulate : ProofState.active_set -> Clauses.CSet.t -> clause -> Clauses.CSet.t
+  (** backward version of demodulation: add to the set active clauses that
+      can potentially be rewritten by the given clause *)
 
 val positive_simplify_reflect : ProofState.simpl_set -> clause -> hclause
 val negative_simplify_reflect : ProofState.simpl_set -> clause -> hclause
-
-(* TODO backward versions of those *)
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : literal array -> literal array -> bool

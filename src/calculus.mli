@@ -42,16 +42,23 @@ class type calculus =
     method basic_simplify : ord:ordering -> hclause -> hclause
       (** how to simplify a clause *)
 
-    method simplify : select:selection_fun -> ProofState.active_set -> ProofState.simpl_set -> hclause -> hclause
-      (** how to simplify a clause w.r.t a set of clauses *)
+    method rw_simplify : select:selection_fun -> ProofState.simpl_set -> hclause -> hclause
+      (** how to simplify a clause w.r.t a set of unit clauses *)
+
+    method active_simplify : select:selection_fun -> ProofState.active_set -> hclause -> hclause
+      (** how to simplify a clause w.r.t an active set of clauses *)
+
+    method backward_simplify : ProofState.active_set -> hclause -> Clauses.CSet.t
+      (** backward simplification by a unit clause. It returns a set of
+          active clauses that can potentially be simplified by the given clause *)
 
     method redundant : ProofState.active_set -> hclause -> bool
       (** check whether the clause is redundant w.r.t the set *)
 
-    method redundant_set : ProofState.active_set -> hclause -> hclause list
+    method backward_redundant : ProofState.active_set -> hclause -> hclause list
       (** find redundant clauses in set w.r.t the clause *)
 
-    method list_simplify : ord:ordering -> select:selection_fun -> hclause -> hclause list option
+    method list_simplify : ord:ordering -> select:selection_fun -> hclause -> hclause list
       (** how to simplify a clause into a (possibly empty) list
           of clauses. This subsumes the notion of trivial clauses (that
           are simplified into the empty list of clauses) *)
@@ -84,3 +91,9 @@ val fold_lits : ?both:bool -> (int -> literal -> bool) ->
 (** get the term l at given position in clause, and r such that l ?= r
     is the literal at the given position *)
 val get_equations_sides : clause -> position -> term * term * bool
+
+(** Perform backward simplification with the given clause. It returns the CSet of
+    clauses that become redundant, and the list of those clauses after simplification. *)
+val backward_simplify : select:selection_fun -> calculus:calculus ->
+                        ProofState.active_set -> ProofState.simpl_set -> hclause ->
+                        Clauses.CSet.t * hclause list

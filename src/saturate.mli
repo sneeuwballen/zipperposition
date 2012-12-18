@@ -31,11 +31,24 @@ type szs_status =
   | Error of string 
   | Timeout
 
-(** Perform one step of the given clause algorithm
-    It performs generating inferences only if [generating] is true (default) *)
+(** check whether we still have some time w.r.t timeout *)
+val check_timeout : float option -> bool
+
+(** maximum number of nested unary inferences *)
+val unary_max_depth : int ref
+
+(** generation of new clauses (unary inferences are repeated at most !unary_max_depth) *)
+val generate : calculus:Calculus.calculus -> ProofState.active_set -> hclause -> hclause list
+
+(** remove orphans of the clauses *)
+val remove_orphans : ProofState.passive_set -> hclause list -> unit
+
+(** Perform one step of the given clause algorithm.
+    It performs generating inferences only if [generating] is true (default);
+    other parameters are the iteration number, the global state and the calculus *)
 val given_clause_step : ?generating:bool ->
                         calculus:Calculus.calculus ->
-                        ProofState.state ->
+                        int -> ProofState.state ->
                         szs_status
 
 (** run the given clause until a timeout occurs or a result

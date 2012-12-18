@@ -31,14 +31,14 @@ module Utils = FoUtils
 module Delayed = Delayed
 
 let enable = true
-let prof_generate = HExtlib.profile ~enable "generate"
-let prof_generate_unary = HExtlib.profile ~enable "generate_unary"
-let prof_generate_binary = HExtlib.profile ~enable "generate_binary"
-let prof_back_simplify = HExtlib.profile ~enable "back_simplify"
-let prof_simplify = HExtlib.profile ~enable "simplify"
-let prof_all_simplify = HExtlib.profile ~enable "all_simplify"
-let prof_is_redundant = HExtlib.profile ~enable "is_redundant"
-let prof_subsumed_by = HExtlib.profile ~enable "subsumed_by"
+let prof_generate = Utils.mk_profiler "generate"
+let prof_generate_unary = Utils.mk_profiler "generate_unary"
+let prof_generate_binary = Utils.mk_profiler "generate_binary"
+let prof_back_simplify = Utils.mk_profiler "back_simplify"
+let prof_simplify = Utils.mk_profiler "simplify"
+let prof_all_simplify = Utils.mk_profiler "all_simplify"
+let prof_is_redundant = Utils.mk_profiler "is_redundant"
+let prof_subsumed_by = Utils.mk_profiler "subsumed_by"
 
 (** the status of a state *)
 type szs_status = 
@@ -54,85 +54,52 @@ let check_timeout = function
 
 (** simplify the hclause using the active_set. Returns both the
     hclause and the simplified hclause. *)
-let simplify_ ~calculus ~select active_set simpl_set old_hc =
+let simplify ~calculus ~select active_set simpl_set old_hc =
+  Utils.enter_prof prof_simplify;
   let ord = active_set#ord in
-  let hc = calculus#simplify ~select active_set simpl_set old_hc in
+  (* simplify with unit clauses, then all active clauses *)
+  let hc = calculus#rw_simplify ~select simpl_set old_hc in
   let hc = calculus#basic_simplify ~ord hc in
+  let hc = calculus#active_simplify ~select active_set hc in
   let hc = C.select_clause ~select hc in
   (if not (C.eq_hclause hc old_hc)
     then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
                         !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc)));
+  Utils.exit_prof prof_simplify;
   old_hc, hc
 
-let simplify ~calculus ~select active_set simpl_set hc =
-  prof_simplify.HExtlib.profile (simplify_ ~calculus ~select active_set simpl_set) hc
-
-(** Simplify the active set using the given clause. Simplified clauses are
-    removed from the sets, and the function returns
-    list of removed clauses, list of those clauses after simplification *)
-let backward_simplify_ ~calculus ~select (active_set : ProofState.active_set) simpl_set given =
-  let given = active_set#relocate given in
-  (* clauses that can be simplified using given *)
-  let simplified_actives = ref C.CSet.empty
-  and not_simplifiable = ref C.CSet.empty
-  and newly_simplified = ref [] in
-  (* simplify clauses that have a subterm matching t. If a clause
-     can be simplified, it is added to simplified_actives and its
-     simplification is added to newly_simplified *)
-  let gather t =
-    active_set#idx_back_demod#retrieve_specializations t ()
-      (fun () t' clauses ->
-        try
-          let _ = FoUnif.matching FoSubst.id_subst t t' in
-          Index.ClauseSet.iter
-            (fun (hc,_,_) ->
-              if C.CSet.mem !simplified_actives hc then ()  (* already simplified *)
-              else if C.CSet.mem !not_simplifiable hc then () (* could not simplify *)
-              else (* try to simplify the clause *)
-                let _, simplified = simplify ~calculus ~select active_set simpl_set hc in
-                if C.eq_hclause hc simplified
-                  then not_simplifiable := C.CSet.add !not_simplifiable hc
-                  else (
-                    Utils.debug 2 (lazy (Utils.sprintf
-                                 "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                                 !C.pp_clause#pp_h hc !C.pp_clause#pp_h simplified));
-                    simplified_actives := C.CSet.add !simplified_actives hc;
-                    newly_simplified := simplified :: !newly_simplified))
-            clauses
-        with UnificationFailure -> ())
-    in
-    (match given.clits with
-    | [|Equation (l,r,true,Gt)|] -> gather l
-    | [|Equation (l,r,true,Lt)|] -> gather r
-    | [|Equation (l,r,true,_)|] -> gather l; gather r
-    | [|Equation (l,r,false,_)|] -> gather l; gather r
-    | _ -> ());  (* no simplification with non-unit clauses (no backward clc) *)
-    (* list of clauses before simplification, list of clauses after *)
-    C.CSet.to_list !simplified_actives, !newly_simplified
-
-let backward_simplify ~calculus ~select active_set simpl_set given =
-  prof_back_simplify.HExtlib.profile (backward_simplify_ ~calculus ~select active_set simpl_set) given
+(** Perform backward simplification with the given clause *)
+let backward_simplify ~calculus ~select (active_set : ProofState.active_set) simpl_set given =
+  Utils.enter_prof prof_back_simplify;
+  let before, after = Calculus.backward_simplify ~calculus ~select active_set simpl_set given in
+  let after = List.map (C.select_clause ~select) after in
+  Utils.exit_prof prof_back_simplify;
+  before, after
 
 (** generate all clauses from binary inferences *)
 let generate_binary ~calculus active_set clause =
-  prof_generate_binary.HExtlib.profile
-    (Calculus.do_binary_inferences active_set calculus#binary_rules) clause
+  Utils.enter_prof prof_generate_binary;
+  let new_clauses = Calculus.do_binary_inferences active_set calculus#binary_rules clause in
+  Utils.exit_prof prof_generate_binary;
+  new_clauses
 
 (** generate all clauses from unary inferences *)
 let generate_unary ~calculus ~ord clause =
-  prof_generate_unary.HExtlib.profile
-    (Calculus.do_unary_inferences ~ord calculus#unary_rules) clause
+  Utils.enter_prof prof_generate_unary;
+  let new_clauses = Calculus.do_unary_inferences ~ord calculus#unary_rules clause in
+  Utils.exit_prof prof_generate_unary;
+  new_clauses
 
 (** depth at which unary inferences are performed (max number
     of times inferences are applied recursively to a clause) *)
 let unary_max_depth = ref 2
 
-(** generate all clauses from inferences, updating the state (for the
-    parent/descendant relation) *)
-let generate_ ~calculus state given =
-  let ord = state#ord in
+(** generate all clauses from inferences *)
+let generate ~calculus active_set given =
+  Utils.enter_prof prof_generate;
+  let ord = active_set#ord in
   (* binary clauses *)
-  let binary_clauses = generate_binary ~calculus state#active_set given in
+  let binary_clauses = generate_binary ~calculus active_set given in
   (* unary inferences *)
   let unary_clauses = ref []
   and unary_queue = Queue.create () in
@@ -152,52 +119,47 @@ let generate_ ~calculus state given =
     end
   done;
   let new_clauses =  List.rev_append !unary_clauses binary_clauses in
+  Utils.exit_prof prof_generate;
   new_clauses
 
-let generate ~calculus state hc =
-  prof_generate.HExtlib.profile (generate_ ~calculus state) hc
-
 (** remove direct descendants of the clauses from the passive set *)
-let remove_orphans state removed_clauses =
+let remove_orphans passive_set removed_clauses =
   List.iter
-    (fun removed_clause -> state#passive_set#remove removed_clause.hcdescendants)
+    (fun removed_clause -> passive_set#remove removed_clause.hcdescendants)
     removed_clauses
 
 (** check whether the clause is redundant w.r.t the active_set *)
 let is_redundant ~calculus active_set hc =
-  prof_is_redundant.HExtlib.profile (calculus#redundant active_set) hc
+  Utils.enter_prof prof_is_redundant;
+  let res = calculus#redundant active_set hc in
+  Utils.exit_prof prof_is_redundant;
+  res
 
 (** find redundant clauses in active_set, w.r.t clause c *)
 let subsumed_by ~calculus active_set hc =
-  prof_subsumed_by.HExtlib.profile (calculus#redundant_set active_set) hc
+  Utils.enter_prof prof_subsumed_by;
+  let res = calculus#backward_redundant active_set hc in
+  Utils.exit_prof prof_subsumed_by;
+  res
 
 (** Use all simplification rules to convert a clause into a list of maximally
-    simplified clauses (possibly empty, if trivial).
-    This is used on generated clauses, and on the given clause. *)
-let all_simplify_ ~ord ~calculus ~select active_set simpl_set hc =
-  let clauses = ref []
-  and queue = Queue.create () in
-  Queue.push hc queue;
-  while not (Queue.is_empty queue) do
-    let hc = Queue.pop queue in
-    (* usual simplifications *)
-    let hc = C.select_clause ~select hc in
-    let _, hc = simplify ~calculus ~select active_set simpl_set hc in
-    let hc = C.select_clause ~select hc in
-    (* do not keep tautologies *)
-    if Sup.is_tautology hc then () else
-    (* list simplification *)
-    match calculus#list_simplify ~ord ~select hc with
-    | None -> clauses := hc :: !clauses (* totally simplified clause *)
-    | Some clauses ->
-      List.iter (fun hc' -> Queue.push hc' queue) clauses (* process new clauses *)
-  done;
-  !clauses
+    simplified clauses (possibly empty, if trivial). *)
+let all_simplify ~ord ~calculus ~select active_set simpl_set hc =
+  Utils.enter_prof prof_all_simplify;
+  let clauses = calculus#list_simplify ~ord ~select hc in
+  let clauses = List.map
+    (fun hc ->
+      (* simplify this clause *)
+      let _, hc' = simplify ~calculus ~select active_set simpl_set hc in
+      let hc' = C.select_clause ~select hc' in
+      hc')
+    clauses
+  in
+  Utils.exit_prof prof_all_simplify;
+  clauses
 
-let all_simplify ~ord ~calculus ~select active_set simpl_set clause =
-  prof_all_simplify.HExtlib.profile (all_simplify_ ~ord ~calculus ~select active_set simpl_set) clause
-
-let given_clause_step ?(generating=true) ~calculus state =
+(** One iteration of the main loop ("given clause loop") *)
+let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num state =
   let ord = state#ord
   and select = state#select in
   (* select next given clause *)
@@ -224,34 +186,36 @@ let given_clause_step ?(generating=true) ~calculus state =
       Sel.check_selected hc;
       C.check_ord_hclause ~ord hc;
       Utils.debug 1 (lazy (Utils.sprintf
-                    "============ step with given clause @[<h>%a@] =========="
-                    !C.pp_clause#pp_h hc));
+                    "%% ============ step %5d with given clause @[<h>%a@] ============"
+                    num !C.pp_clause#pp_h hc));
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = subsumed_by ~calculus state#active_set hc in
       state#active_set#remove subsumed_active;
       state#simpl_set#remove subsumed_active;
-      remove_orphans state subsumed_active; (* orphan criterion *)
+      remove_orphans state#passive_set subsumed_active; (* orphan criterion *)
       (* add given clause to simpl_set *)
       state#simpl_set#add [hc];
       (* simplify active set using c *)
       let simplified_actives, newly_simplified =
         backward_simplify ~calculus ~select state#active_set state#simpl_set hc in
+      let simplified_actives = C.CSet.to_list simplified_actives in
       (* the simplified active clauses are removed from active set and
          added to the set of new clauses. Their descendants are also removed
          from passive set *)
       state#active_set#remove simplified_actives;
       state#simpl_set#remove simplified_actives;
-      remove_orphans state simplified_actives;
-      let new_clauses = List.rev_append simplified_actives new_clauses in
+      remove_orphans state#passive_set simplified_actives;
+      let new_clauses = List.rev_append newly_simplified new_clauses in
       (* add given clause to active set *)
       state#active_set#add [hc];
       (* do inferences between c and the active set (including c), if [generate] is set to true *)
-      let inferred_clauses = if generating then generate ~calculus state hc else [] in
+      let inferred_clauses = if generating then generate ~calculus state#active_set hc else [] in
       (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
       let inferred_clauses = List.fold_left
         (fun acc hc ->
-          let cs = all_simplify ~ord ~select ~calculus state#active_set state#simpl_set hc in
+          let cs = calculus#list_simplify ~ord ~select hc in
+          let cs = List.map (calculus#rw_simplify ~select state#simpl_set) cs in
           List.rev_append cs acc)
         [] inferred_clauses
       in
@@ -288,8 +252,6 @@ let print_progress steps state =
 let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus state =
   let rec do_step num =
     if check_timeout timeout then Timeout, num else
-    begin
-    Utils.debug 1 (lazy (Format.sprintf "# iteration %d" num));
     match steps with
     | Some i when num >= i -> Unknown, num
     | _ ->
@@ -304,13 +266,12 @@ let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus 
             Gc.full_major ()
           ));
         (* do one step *)
-        let status = given_clause_step ~generating ~calculus state in
+        let status = given_clause_step ~generating ~calculus num state in
         match status with
         | Sat | Unsat _ | Error _ -> status, num (* finished *)
         | Timeout -> assert false
         | Unknown -> do_step (num+1)
       end
-    end
   in
   do_step 0
 

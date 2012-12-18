@@ -43,21 +43,21 @@ let stat_subsumed_by_set_call = mk_stat "subsumed_by_set calls"
 let stat_demodulate_call = mk_stat "demodulate calls"
 let stat_demodulate_step = mk_stat "demodulate steps"
 
-(* for profiling *)
-let enable = true
-
-let prof_demodulate = HExtlib.profile ~enable "demodulate"
-let prof_clc = HExtlib.profile ~enable "contextual_literal_cutting"
-let prof_condensation = HExtlib.profile ~enable "condensation"
-let prof_basic_simplify = HExtlib.profile ~enable "basic_simplify"
-let prof_subsumption = HExtlib.profile ~enable "subsumption"
-let prof_eq_subsumption = HExtlib.profile ~enable "equality_subsumption"
-let prof_subsumption_set = HExtlib.profile ~enable "forward_subsumption"
-let prof_subsumption_in_set = HExtlib.profile ~enable "backward_subsumption"
-let prof_infer_active = HExtlib.profile ~enable "infer_active"
-let prof_infer_passive = HExtlib.profile ~enable "infer_passive"
-let prof_infer_equality_resolution = HExtlib.profile ~enable "infer_equality_resolution"
-let prof_infer_equality_factoring = HExtlib.profile ~enable "infer_equality_factoring"
+let prof_demodulate = Utils.mk_profiler "demodulate"
+let prof_back_demodulate = Utils.mk_profiler "backward_demodulate"
+let prof_pos_simplify_reflect = Utils.mk_profiler "simplify_reflect+"
+let prof_neg_simplify_reflect = Utils.mk_profiler "simplify_reflect-"
+let prof_clc = Utils.mk_profiler "contextual_literal_cutting"
+let prof_condensation = Utils.mk_profiler "condensation"
+let prof_basic_simplify = Utils.mk_profiler "basic_simplify"
+let prof_subsumption = Utils.mk_profiler "subsumption"
+let prof_eq_subsumption = Utils.mk_profiler "equality_subsumption"
+let prof_subsumption_set = Utils.mk_profiler "forward_subsumption"
+let prof_subsumption_in_set = Utils.mk_profiler "backward_subsumption"
+let prof_infer_active = Utils.mk_profiler "infer_active"
+let prof_infer_passive = Utils.mk_profiler "infer_passive"
+let prof_infer_equality_resolution = Utils.mk_profiler "infer_equality_resolution"
+let prof_infer_equality_factoring = Utils.mk_profiler "infer_equality_factoring"
 
 (* ----------------------------------------------------------------------
  * combinators
@@ -159,16 +159,18 @@ let do_superposition ~ord active_clause active_pos passive_clause passive_pos su
       end
   end
 
-let infer_active_ (actives : ProofState.active_set) clause : hclause list =
+let infer_active (actives : ProofState.active_set) clause : hclause list =
+  Utils.enter_prof prof_infer_active;
   let ord = actives#ord in
   (* no literal can be eligible for paramodulation if some are selected *)
-  if C.has_selected_lits clause.cref then [] else
+  if C.has_selected_lits clause.cref
+    then (Utils.exit_prof prof_infer_active; []) else
   (* perform inferences with i-th literal? *)
   let eligible_lit i lit = C.pos_lit lit && C.is_maxlit clause.cref i in
   (* do the inferences where clause is active; for this,
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
-  Calculus.fold_lits ~both:true eligible_lit
+  let new_clauses = Calculus.fold_lits ~both:true eligible_lit
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
       actives#idx_sup_into#retrieve_unifiables s acc
@@ -184,18 +186,19 @@ let infer_active_ (actives : ProofState.active_set) clause : hclause list =
             UnificationFailure -> acc)
     )
     [] clause.clits
+  in
+  Utils.exit_prof prof_infer_active;
+  new_clauses
 
-let infer_active actives clause =
-  prof_infer_active.HExtlib.profile (infer_active_ actives) clause
-
-let infer_passive_ (actives:ProofState.active_set) clause : hclause list =
+let infer_passive (actives:ProofState.active_set) clause : hclause list =
+  Utils.enter_prof prof_infer_passive;
   let ord = actives#ord in
   let hc = clause.cref in
   (* perform inference on this lit? *)
   let eligible i lit = if C.has_selected_lits hc then C.is_selected hc i else C.is_maxlit hc i in
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
-  Calculus.fold_lits ~both:true eligible
+  let new_clauses = Calculus.fold_lits ~both:true eligible
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
       let new_clauses = all_positions u_pos u
@@ -215,17 +218,18 @@ let infer_passive_ (actives:ProofState.active_set) clause : hclause list =
                 UnificationFailure -> acc))
       in List.rev_append new_clauses acc)
     [] clause.clits
+  in
+  Utils.exit_prof prof_infer_passive;
+  new_clauses
 
-let infer_passive actives clause =
-  prof_infer_passive.HExtlib.profile (infer_passive_ actives) clause
-
-let infer_equality_resolution_ ~ord hc =
+let infer_equality_resolution ~ord hc =
+  Utils.enter_prof prof_infer_equality_resolution;
   let clause = C.base_clause hc in
   (* literals that can potentially be eligible for resolution *)
   let eligible i lit =
     C.neg_lit lit && (if C.has_selected_lits hc then C.is_selected hc i else C.is_maxlit hc i) in
   (* iterate on those literals *)
-  Calculus.fold_lits ~both:false eligible
+  let new_clauses = Calculus.fold_lits ~both:false eligible
     (fun acc l r sign l_pos ->
       assert (not sign);
       match l_pos with
@@ -249,12 +253,14 @@ let infer_equality_resolution_ ~ord hc =
             acc
       with UnificationFailure -> acc) (* l and r not unifiable, try next *)
     [] hc.hclits
+  in
+  Utils.exit_prof prof_infer_equality_resolution;
+  new_clauses
 
-let infer_equality_resolution ~ord clause =
-  prof_infer_equality_resolution.HExtlib.profile (infer_equality_resolution_ ~ord) clause
-
-let infer_equality_factoring_ ~ord hc =
-  if C.has_selected_lits hc then [] else (* no literal is eligible for paramodulation *)
+let infer_equality_factoring ~ord hc =
+  Utils.enter_prof prof_infer_equality_factoring;
+  if C.has_selected_lits hc (* no literal is eligible for paramodulation *)
+    then (Utils.exit_prof prof_infer_equality_factoring; []) else
   let clause = C.base_clause hc in
   let eligible i lit = C.pos_lit lit && C.is_maxlit hc i in
   (* find root terms that are unifiable with s and are not in the
@@ -303,7 +309,8 @@ let infer_equality_factoring_ ~ord hc =
       end else
         []
   (* try to do inferences with each positive literal *)
-  in Calculus.fold_lits ~both:true eligible
+  in
+  let new_clauses = Calculus.fold_lits ~both:true eligible
     (fun acc s t _ s_pos -> (* try with s=t *)
       let unifiables = find_unifiable_lits s s_pos in
       List.fold_left
@@ -311,9 +318,9 @@ let infer_equality_factoring_ ~ord hc =
           (do_inference s_pos passive_pos subst) @ acc)
         acc unifiables)
     [] hc.hclits
-
-let infer_equality_factoring ~ord clause =
-  prof_infer_equality_factoring.HExtlib.profile (infer_equality_factoring_ ~ord) clause
+  in
+  Utils.exit_prof prof_infer_equality_factoring;
+  new_clauses
 
 (* ----------------------------------------------------------------------
  * simplifications
@@ -349,16 +356,10 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
                   assert (ord#compare new_l new_r = Gt);
-                  Utils.debug 4 (lazy (Utils.sprintf "rewrite %a into %a using %a"
-                                 !T.pp_term#pp new_l !T.pp_term#pp new_r
-                                 !C.pp_clause#pp_h unit_hclause));
                   clauses := (C.base_clause unit_hclause, [0], subst) :: !clauses;
                   incr_stat stat_demodulate_step;
                   raise (RewriteInto new_r)
-                end else Utils.debug 4
-                  (lazy (Utils.sprintf "could not rewrite %a into %a using %a, bad order"
-                         !T.pp_term#pp new_l !T.pp_term#pp new_r
-                         !C.pp_clause#pp_h unit_hclause)));
+                end);
           t (* not found any match, normal form found *)
         with RewriteInto t' ->
           normal_form ~restrict t' (* done one rewriting step, continue *)
@@ -376,7 +377,8 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
   in
   traverse ~restrict t
 
-let demodulate_ simpl_set c =
+let demodulate simpl_set c =
+  Utils.enter_prof prof_demodulate;
   incr_stat stat_demodulate_call;
   let ord = simpl_set#ord in
   (* clauses used to rewrite *)
@@ -401,15 +403,50 @@ let demodulate_ simpl_set c =
   if !clauses = []
     then begin (* no rewriting performed *)
       assert (Utils.array_forall2 C.eq_literal_com c.clits lits);
+      Utils.exit_prof prof_demodulate;
       c.cref
     end else begin  (* construct new clause *)
       let proof = Proof ("demod", (c, [], S.id_subst) :: !clauses) in
       (* parents are clauses used to simplify the clause, plus parents of the clause *)
-      let parents = (List.map (fun (c,_,_) -> c.cref) !clauses) @ c.cref.hcparents in
-      C.mk_hclause_a ~ord lits proof parents
+      let clauses = List.map (fun (c,_,_) -> c.cref) !clauses in
+      let parents = clauses @ c.cref.hcparents in
+      let new_hc = C.mk_hclause_a ~ord lits proof parents in
+      Utils.debug 3 (lazy (Utils.sprintf "@[<h>demodulate %a into %a using @[<hv>%a@]@]"
+                     !C.pp_clause#pp c !C.pp_clause#pp_h new_hc
+                     (Utils.pp_list !C.pp_clause#pp_h) clauses)); 
+      (* return simplified clause *)
+      Utils.exit_prof prof_demodulate;
+      new_hc
     end
 
-let demodulate simpl_set c = prof_demodulate.HExtlib.profile (demodulate_ simpl_set) c
+(** Find clauses that [given] may demodulate, add them to set *)
+let backward_demodulate (active_set : PS.active_set) set given =
+  Utils.enter_prof prof_back_demodulate;
+  let ord = active_set#ord in
+  (* find clauses that might be rewritten by l -> r *)
+  let recurse ~oriented set l r =
+    active_set#idx_back_demod#retrieve_specializations l set
+      (fun set t' clauses ->
+        try
+          let subst = FoUnif.matching FoSubst.id_subst l t' in
+          (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
+          if oriented || ord#compare (S.apply_subst subst l) (S.apply_subst subst r) = Gt
+            then
+              (* add clauses to the set, they may be rewritten by l -> r *)
+              Index.ClauseSet.fold (fun (hc,_,_) set -> C.CSet.add set hc) clauses set
+            else set
+        with UnificationFailure -> set)
+  in
+  let set' = match given.clits with
+  | [|Equation (l,r,true,Gt)|] -> recurse ~oriented:true set l r
+  | [|Equation (l,r,true,Lt)|] -> recurse ~oriented:true set r l
+  | [|Equation (l,r,true,_)|] ->
+    let set' = recurse ~oriented:false set l r in
+    recurse ~oriented:false set' r l  (* both sides can rewrite, but we need to check ordering *)
+  | _ -> set
+  in
+  Utils.exit_prof prof_back_demodulate;
+  set'
 
 let is_tautology hc =
   let rec check lits i =
@@ -435,6 +472,7 @@ let is_tautology hc =
 let is_semantic_tautology c = false (* TODO *)
 
 let basic_simplify ~ord hc =
+  Utils.enter_prof prof_basic_simplify;
   incr_stat stat_basic_simplify;
   let absurd_lit lit = match lit with
   | Equation (l, r, false, _) when T.eq_term l r -> true
@@ -463,19 +501,21 @@ let basic_simplify ~ord hc =
   and er_check (Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
   if List.length new_lits = Array.length hc.hclits
-  then hc (* no change *)
+  then (Utils.exit_prof prof_basic_simplify; hc) (* no change *)
   else begin
     let parents = hc :: hc.hcparents in
     let proof = hc.hcproof in  (* do not bother printing this *)
     let new_clause = C.mk_hclause ~ord new_lits proof parents in
     Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
-    !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause));
+                   !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause));
+    Utils.exit_prof prof_basic_simplify;
     new_clause
   end
 
 exception FoundMatch of (term * hclause * substitution)
 
 let positive_simplify_reflect simpl_set c =
+  Utils.enter_prof prof_pos_simplify_reflect;
   let ord = simpl_set#ord in
   (* iterate through literals and try to resolve negative ones *)
   let rec iterate_lits acc lits clauses = match lits with
@@ -526,16 +566,18 @@ let positive_simplify_reflect simpl_set c =
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Array.to_list c.clits) [] in
   if List.length lits = Array.length c.clits
-    then c.cref (* no literal removed, same clause *)
+    then (Utils.exit_prof prof_pos_simplify_reflect; c.cref) (* no literal removed, same clause *)
     else 
       let proof = Proof ("simplify_reflect+", (c, [], S.id_subst)::premises) in
       let premises = List.map (fun (c,_,_) -> c.cref) premises in
       let new_hc = C.mk_hclause ~ord lits proof (c.cref::premises) in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a pos_simplify_reflect into %a@]"
                     !C.pp_clause#pp c !C.pp_clause#pp_h new_hc));
+      Utils.exit_prof prof_pos_simplify_reflect;
       new_hc
     
 let negative_simplify_reflect simpl_set c =
+  Utils.enter_prof prof_neg_simplify_reflect;
   let ord = simpl_set#ord in
   (* iterate through literals and try to resolve positive ones *)
   let rec iterate_lits acc lits clauses = match lits with
@@ -565,13 +607,14 @@ let negative_simplify_reflect simpl_set c =
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Array.to_list c.clits) [] in
   if List.length lits = Array.length c.clits
-    then c.cref (* no literal removed *)
+    then (Utils.exit_prof prof_neg_simplify_reflect; c.cref) (* no literal removed *)
     else 
       let proof = Proof ("simplify_reflect-", (c, [], S.id_subst)::premises) in
       let premises = List.map (fun (c,_,_) -> c.cref) premises in
       let new_hc = C.mk_hclause ~ord lits proof (c.cref::premises) in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a neg_simplify_reflect into %a@]"
                     !C.pp_clause#pp c !C.pp_clause#pp_h new_hc));
+      Utils.exit_prof prof_neg_simplify_reflect;
       new_hc
 
 (* ----------------------------------------------------------------------
@@ -701,13 +744,15 @@ let subsumes_with a b =
   with (SubsumptionFound subst) -> Some subst
 
 let subsumes a b =
-  let check a b = match subsumes_with a b with
+  Utils.enter_prof prof_subsumption;
+  let res = match subsumes_with a b with
   | None -> false
   | Some _ -> true
   in
-  prof_subsumption.HExtlib.profile (check a) b
+  Utils.exit_prof prof_subsumption;
+  res
 
-let eq_subsumes_ a b =
+let eq_subsumes a b =
   (* subsume a literal using a = b *)
   let rec equate_lit_with a b lit =
     match lit with
@@ -729,18 +774,21 @@ let eq_subsumes_ a b =
          with UnificationFailure -> false)
   in
   (* check for each literal *)
+  Utils.enter_prof prof_eq_subsumption;
   incr_stat stat_eq_subsumption_call;
-  match a with
+  let res = match a with
   | [|Equation (s, t, true, _)|] ->
     let res = Utils.array_exists (equate_lit_with s t) b in
     (if res then Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a eq-subsumes@ %a@]"
                                 C.pp_lits a C.pp_lits b)));
     res
   | _ -> false  (* only a positive unit clause unit-subsumes a clause *)
+  in
+  Utils.exit_prof prof_eq_subsumption;
+  res
 
-let eq_subsumes a b = prof_eq_subsumption.HExtlib.profile (eq_subsumes_ a) b
-
-let subsumed_by_set_ set c =
+let subsumed_by_set set c =
+  Utils.enter_prof prof_subsumption_set;
   incr_stat stat_subsumed_by_set_call;
   (* if there is an equation in c, try equality subsumption *)
   let try_eq_subsumption = Utils.array_exists C.equational_lit c.clits in
@@ -749,16 +797,16 @@ let subsumed_by_set_ set c =
     FV.retrieve_subsuming set#idx_fv c.cref.hclits
       (fun hc' -> if (try_eq_subsumption && eq_subsumes hc'.hclits c.clits)
                   || subsumes hc'.hclits c.clits then raise Exit);
+    Utils.exit_prof prof_subsumption_set;
     false
   with Exit ->
     Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumed by active set"
                          !C.pp_clause#pp c));
+    Utils.exit_prof prof_subsumption_set;
     true
 
-let subsumed_by_set set clause =
-  prof_subsumption_set.HExtlib.profile (subsumed_by_set_ set) clause
-
-let subsumed_in_set_ set c =
+let subsumed_in_set set c =
+  Utils.enter_prof prof_subsumption_in_set;
   incr_stat stat_subsumed_in_set_call;
   (* if c is a single unit clause *)
   let try_eq_subsumption = C.is_unit_clause c.cref && C.pos_lit c.clits.(0) in
@@ -768,10 +816,8 @@ let subsumed_in_set_ set c =
     set#idx_fv c.cref.hclits
     (fun hc' -> if (try_eq_subsumption && eq_subsumes c.clits hc'.hclits)
                 || subsumes c.clits hc'.hclits then l := hc' :: !l);
+  Utils.exit_prof prof_subsumption_in_set;
   !l
-
-let subsumed_in_set set clause =
-  prof_subsumption_in_set.HExtlib.profile (subsumed_in_set_ set) clause
 
 (* ----------------------------------------------------------------------
  * contextual literal cutting
@@ -780,8 +826,9 @@ let subsumed_in_set set clause =
 exception RemoveLit of int * hclause
 
 (** Performs successive contextual literal cuttings *)
-let rec contextual_literal_cutting_ active_set hc =
-  if Array.length hc.hclits <= 1 then hc else
+let rec contextual_literal_cutting active_set hc =
+  Utils.enter_prof prof_clc;
+  if Array.length hc.hclits <= 1 then (Utils.exit_prof prof_clc; hc) else
   let ord = active_set#ord in
   (* do we need to try to use equality subsumption? *)
   let try_eq_subsumption = Utils.array_exists C.equational_lit hc.hclits in
@@ -808,7 +855,7 @@ let rec contextual_literal_cutting_ active_set hc =
       Some (array_except_idx lits i, hc')
   in
   match remove_one_lit c.clits with
-  | None -> hc (* no literal removed *)
+  | None -> (Utils.exit_prof prof_clc; hc) (* no literal removed *)
   | Some (new_lits, hc') -> begin
       (* hc' allowed us to cut a literal *)
       assert (List.length new_lits + 1 = Array.length hc.hclits);
@@ -819,11 +866,9 @@ let rec contextual_literal_cutting_ active_set hc =
                     "@[<h>contextual literal cutting in %a using %a gives %a@]"
                     !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc' !C.pp_clause#pp_h new_hc));
       (* try to cut another literal *)
-      contextual_literal_cutting_ active_set new_hc
+      Utils.exit_prof prof_clc; 
+      contextual_literal_cutting active_set new_hc
     end
-
-let contextual_literal_cutting active_set hc =
-  prof_clc.HExtlib.profile (contextual_literal_cutting_ active_set) hc
 
 (* ----------------------------------------------------------------------
  * contraction
@@ -854,8 +899,10 @@ let rec num_equational lits i =
     If there are too many equational literals, the simplification is disabled to
     avoid pathologically expensive subsumption checks.
     TODO remove this limitation after an efficient subsumption check is implemented. *)
-let rec condensation_ ~ord hc =
-  if Array.length hc.hclits <= 1 || num_equational hc.hclits 0 > 3 || Array.length hc.hclits > 8 then hc else
+let rec condensation ~ord hc =
+  Utils.enter_prof prof_condensation;
+  if Array.length hc.hclits <= 1 || num_equational hc.hclits 0 > 3 || Array.length hc.hclits > 8
+    then (Utils.exit_prof prof_condensation; hc) else
   (* offset is used to rename literals for subsumption *)
   let offset = T.max_var hc.hcvars +1 in
   let lits = hc.hclits in
@@ -883,6 +930,7 @@ let rec condensation_ ~ord hc =
           substs
       done;
     done;
+    Utils.exit_prof prof_condensation; 
     hc
   with CondensedInto (new_lits, subst) ->
     (* clause is simplified *)
@@ -893,10 +941,8 @@ let rec condensation_ ~ord hc =
                   "@[<h>condensation in %a (with %a) gives %a@]"
                   !C.pp_clause#pp_h hc S.pp_substitution subst !C.pp_clause#pp_h new_hc));
     (* try to condense further *)
-    condensation_ ~ord new_hc
-
-let condensation ~ord hc =
-  prof_condensation.HExtlib.profile (condensation_ ~ord) hc
+    Utils.exit_prof prof_condensation; 
+    condensation ~ord new_hc
 
 (* ----------------------------------------------------------------------
  * reduction to CNF
@@ -1042,9 +1088,8 @@ let superposition : Calculus.calculus =
 
     method basic_simplify ~ord c = basic_simplify ~ord c
 
-    method simplify ~select actives simpl hc =
-      let ord = actives#ord in
-      let hc = basic_simplify ~ord hc in
+    method rw_simplify ~select (simpl : PS.simpl_set) hc =
+      let ord = simpl#ord in
       let hc = C.select_clause ~select hc in
       (* rename for demodulation *)
       let c = simpl#relocate hc in
@@ -1055,21 +1100,32 @@ let superposition : Calculus.calculus =
       (* rename for simplify reflect *)
       let c =  simpl#relocate hc in
       let hc = negative_simplify_reflect simpl c in
-      (* condensation *)
-      let hc = condensation ~ord hc in
       let hc = C.select_clause ~select hc in
       hc
+
+    method active_simplify ~select actives hc =
+      (* condensation *)
+      let hc = condensation ~ord:actives#ord hc in
+      (* contextual literal cutting *)
+      let hc = contextual_literal_cutting actives hc in
+      let hc = C.select_clause ~select hc in
+      hc
+
+    method backward_simplify actives hc =
+      let set = C.CSet.empty in
+      let c = actives#relocate hc in
+      backward_demodulate actives set c
 
     method redundant actives hc =
       let c = actives#relocate hc in
       subsumed_by_set actives c
 
-    method redundant_set actives hc =
+    method backward_redundant actives hc =
       let c = actives#relocate hc in
       subsumed_in_set actives c
 
     method list_simplify ~ord ~select hc =
-      if is_tautology hc then Some [] else None  (* no other list simplification *)
+      if is_tautology hc then [] else [hc]
 
     method axioms = []
 

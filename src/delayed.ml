@@ -32,6 +32,8 @@ module Utils = FoUtils
 module Sup = Superposition
 module PS = ProofState
 
+let prof_elim = Utils.mk_profiler "eliminate"
+
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
   [eq_symbol; imply_symbol; forall_symbol; exists_symbol; lambda_symbol;
@@ -212,22 +214,22 @@ let tableau_to_clauses ~ord hc a =
 
 (** Perform eliminations recursively, until no elimination is possible *)
 let recursive_eliminations ~ord ~select hc =
+  Utils.enter_prof prof_elim;
   let clauses = ref [] in
   (* process clauses until none of them is simplifiable *)
   let rec simplify hc =
-    let tableau_rules = eliminate_lits ~ord hc in
-    match tableau_to_clauses ~ord hc tableau_rules with
-    | None -> clauses := hc :: !clauses (* done with this clause *)
+    let hc' = C.clause_of_fof ~ord hc in
+    let tableau_rules = eliminate_lits ~ord hc' in
+    match tableau_to_clauses ~ord hc' tableau_rules with
+    | None -> clauses := hc' :: !clauses (* done with this clause *)
     | Some clauses ->
       Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
-                    !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) clauses));
+                    !C.pp_clause#pp_h hc' (Utils.pp_list !C.pp_clause#pp_h) clauses));
       List.iter (fun hc -> simplify (C.select_clause ~select hc)) clauses (* simplify recursively new clauses *)
   in
-  let hc' = C.clause_of_fof ~ord hc in
-  simplify hc';
-  match !clauses with
-  | [hc'] when C.eq_hclause hc hc' -> None (* no simplification *)
-  | l -> Some l (* some simplifications *)
+  simplify hc;
+  Utils.exit_prof prof_elim;
+  !clauses
 
 (* ----------------------------------------------------------------------
  * syntactic simplification
@@ -314,39 +316,49 @@ let delayed : calculus =
 
     method basic_simplify ~ord hc = Sup.basic_simplify ~ord hc
 
-    method simplify ~select actives simpl_set hc =
-      let ord = actives#ord in
-      let hc = simplify_inner ~ord (Sup.basic_simplify ~ord hc) in
+    method rw_simplify ~select (simpl : PS.simpl_set) hc =
+      let ord = simpl#ord in
       let hc = C.select_clause ~select hc in
       (* rename for demodulation *)
-      let c = simpl_set#relocate hc in
-      let hc = Sup.basic_simplify ~ord (Sup.demodulate simpl_set c) in
-      let hc = simplify_inner ~ord hc in
-      (* rename for simplify_reflect *)
-      let c = simpl_set#relocate hc in
-      let hc = Sup.positive_simplify_reflect simpl_set c in
-      (* rename for simplify_reflect *)
-      let c = simpl_set#relocate hc in
-      let hc = Sup.negative_simplify_reflect simpl_set c in
-      (* condensation *)
-      let hc = Sup.condensation ~ord hc in
+      let c = simpl#relocate hc in
+      let hc = Sup.basic_simplify ~ord (Sup.demodulate simpl c) in
+      (* rename for simplify reflect *)
+      let c = simpl#relocate hc in
+      let hc = Sup.positive_simplify_reflect simpl c in
+      (* rename for simplify reflect *)
+      let c =  simpl#relocate hc in
+      let hc = Sup.negative_simplify_reflect simpl c in
       let hc = C.select_clause ~select hc in
       hc
+
+    method active_simplify ~select actives hc =
+      (* condensation *)
+      let hc = Sup.condensation ~ord:actives#ord hc in
+      (* contextual literal cutting *)
+      let hc = Sup.contextual_literal_cutting actives hc in
+      let hc = C.select_clause ~select hc in
+      hc
+
+    method backward_simplify actives hc =
+      let set = C.CSet.empty in
+      let c = actives#relocate hc in
+      Sup.backward_demodulate actives set c
 
     method redundant actives hc =
       let c = actives#relocate hc in
       Sup.subsumed_by_set actives c
 
-    method redundant_set actives hc =
+    method backward_redundant actives hc =
       let c = actives#relocate hc in
       Sup.subsumed_in_set actives c
 
     (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify ~ord ~select hc =
       let hc = C.select_clause ~select (Sup.basic_simplify ~ord hc) in
-      match recursive_eliminations ~ord ~select hc with
-      | None -> None
-      | Some l -> Some (List.filter (fun hc -> not (Sup.is_tautology hc)) l)
+      let l = recursive_eliminations ~ord ~select hc in
+      let l = List.filter (fun hc -> not (Sup.is_tautology hc)) l in
+      let l = List.map (C.select_clause ~select) l in
+      l
 
     method axioms = []
 
@@ -358,14 +370,13 @@ let delayed : calculus =
           let hc = C.reord_hclause ~ord hc in
           let hc = Sup.basic_simplify ~ord (C.clause_of_fof ~ord hc) in
           C.check_ord_hclause ~ord hc;
-          match self#list_simplify ~ord ~select hc with
-          | None -> if Sup.is_tautology hc then [] else [hc]
-          | Some clauses ->
-            List.fold_left
-              (fun clauses hc ->
-                let hc = C.clause_of_fof ~ord hc in
-                C.check_ord_hclause ~ord hc;
-                if not (Sup.is_tautology hc) then hc :: clauses else clauses)
-              [] clauses)
+          let clauses = self#list_simplify ~ord ~select hc in
+          List.fold_left
+            (fun clauses hc ->
+              let hc = C.clause_of_fof ~ord hc in
+              C.check_ord_hclause ~ord hc;
+              let hc = C.select_clause ~select hc in
+              if not (Sup.is_tautology hc) then hc :: clauses else clauses)
+            [] clauses)
         l
   end

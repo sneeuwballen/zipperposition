@@ -38,28 +38,44 @@ type unary_inf_rule = ord:ordering -> hclause -> hclause list
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
   object
-    (** the binary inference rules *)
     method binary_rules : (string * binary_inf_rule) list
-    (** the unary inference rules *)
+      (** the binary inference rules *)
+
     method unary_rules : (string * unary_inf_rule) list
-    (** how to simplify a clause *)
+      (** the unary inference rules *)
+
     method basic_simplify : ord:ordering -> hclause -> hclause
-    (** how to simplify a clause w.r.t a set of unit clauses *)
-    method simplify : select:selection_fun -> ProofState.active_set -> ProofState.simpl_set -> hclause -> hclause
-    (** check whether the clause is redundant w.r.t the set *)
+      (** how to simplify a clause *)
+
+    method rw_simplify : select:selection_fun -> ProofState.simpl_set -> hclause -> hclause
+      (** how to simplify a clause w.r.t a set of unit clauses *)
+
+    method active_simplify : select:selection_fun -> ProofState.active_set -> hclause -> hclause
+      (** how to simplify a clause w.r.t an active set of clauses *)
+
+    method backward_simplify : ProofState.active_set -> hclause -> Clauses.CSet.t
+      (** backward simplification by a unit clause. It returns a set of
+          active clauses that can potentially be simplified by the given clause *)
+
     method redundant : ProofState.active_set -> hclause -> bool
-    (** find redundant clauses in set w.r.t the clause *)
-    method redundant_set : ProofState.active_set -> hclause -> hclause list
-    (** how to simplify a clause into a (possibly empty) list
-        of clauses. This subsumes the notion of trivial clauses (that
-        are simplified into the empty list of clauses) *)
-    method list_simplify : ord:ordering -> select:selection_fun -> hclause -> hclause list option
-    (** a list of axioms to add to the problem *)
+      (** check whether the clause is redundant w.r.t the set *)
+
+    method backward_redundant : ProofState.active_set -> hclause -> hclause list
+      (** find redundant clauses in set w.r.t the clause *)
+
+    method list_simplify : ord:ordering -> select:selection_fun -> hclause -> hclause list
+      (** how to simplify a clause into a (possibly empty) list
+          of clauses. This subsumes the notion of trivial clauses (that
+          are simplified into the empty list of clauses) *)
+
     method axioms : hclause list
-    (** some constraints on the precedence *)
+      (** a list of axioms to add to the problem *)
+
     method constr : hclause list -> ordering_constraint list
-    (** how to preprocess the initial list of clauses *)
+      (** some constraints on the precedence *)
+
     method preprocess : ord:ordering -> select:selection_fun -> hclause list -> hclause list
+      (** how to preprocess the initial list of clauses *)
   end
 
 (** do binary inferences that involve the given clause *)
@@ -124,4 +140,28 @@ let get_equations_sides c pos = match pos with
     | Equation (l,r,sign,_) when eq_side = C.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (list of >= 2 elements)"
+
+(** Perform backward simplification with a given clause (belonging to simpl_set).
+    It uses the simpl_set to simplify the candidate clauses
+    that match a maximal side of the given clause (simpler, though not optimal) *)
+let backward_simplify ~select ~calculus active_set simpl_set given =
+  (* set of candidate clauses, that may be unit-simplifiable *)
+  let candidates = calculus#backward_simplify active_set given in
+  (* try to simplify the candidates. Before is the set of clauses that
+     are simplified, after is the list of those clauses after simplification *)
+  let before, after =
+    C.CSet.fold
+      (fun (before, after) _ hc ->
+        let hc' = calculus#rw_simplify ~select simpl_set hc in
+        if not (C.eq_hclause hc hc')
+          (* the active clause has been simplified! *)
+          then begin
+            Utils.debug 2 (lazy (Utils.sprintf
+                           "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
+                           !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc'));
+            C.CSet.add before hc, hc' :: after
+          end else before, after)
+    (C.CSet.empty, []) candidates
+  in
+  before, after
 
