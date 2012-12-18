@@ -298,6 +298,11 @@ let rec list_take n l = match n, l with
   | _, x::xs when n > 0 -> x :: (list_take (n-1) xs)
   | _ -> assert false
 
+let rec list_drop n l = match n, l with
+  | 0, _ -> l
+  | n, [] -> []
+  | n, _::l' -> (assert (n > 0); list_drop (n-1) l')
+
 let rec list_min cmp l =
   match l with
   | [] -> []

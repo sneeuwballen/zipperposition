@@ -124,7 +124,7 @@ let max_constraint symbols =
     and b_n = try SHashtbl.find table b with Not_found -> !num in
     b_n - a_n  (* if a > b then a_n < b_n *)
   in compare
-  
+
 let min_constraint symbols =
   let table = SHashtbl.create 11
   and num = ref 0 in
@@ -162,34 +162,32 @@ let weight_constant a = 4
 
 (** build history by patching old signature to get the new one *)
 let compute_history old_sig new_sig history =
-  let history = if history = [] then [Initial old_sig] else history in
+  let history = if history = []
+    then [Initial (List.map name_symbol old_sig)] else history in
   let rec compare ?prev old_sig new_sig history =
     match old_sig, new_sig with
     | [], [] -> history
     | [], [s] -> (* s is the new bottom *)
-      let patch = Between (prev, s, None) in patch::history
+      let patch = Between (prev, name_symbol s, None) in patch::history
     | [], s::s'::new_sig' ->  (* s between prev and s' *)
-      let patch = Between (prev, s, Some s') in
-      compare ~prev:s old_sig (s'::new_sig') (patch::history)
+      let patch = Between (prev, name_symbol s, Some (name_symbol s')) in
+      compare ~prev:(name_symbol s) old_sig (s'::new_sig') (patch::history)
     | s::old_sig', s'::new_sig' when s == s' ->
-      compare ~prev:s old_sig' new_sig' history
+      compare ~prev:(name_symbol s) old_sig' new_sig' history
     | s::old_sig', s'::s''::new_sig' ->
       (* trickiest case: first deal with the remaining new symbols,
          then insert s' *)
-      let history' = compare ~prev:s old_sig (s''::new_sig') history in
-      (Between (prev, s', Some s'')) :: history'
+      let history' = compare ~prev:(name_symbol s) old_sig (s''::new_sig') history in
+      (Between (prev, name_symbol s', Some (name_symbol s''))) :: history'
     | _::_, [_] | _::_, [] -> assert false  (* not monotonic increase? *)
   in compare old_sig new_sig history
 
 let pp_signature_diff formatter step = match step with
-| Initial l -> Format.fprintf formatter "@[<h>initial(%a)@]" (Utils.pp_list !T.pp_symbol#pp) l
-| Between (Some l, x, Some r) -> Format.fprintf formatter "@[<h>between(%a, %a, %a)@]"
-  !T.pp_symbol#pp l !T.pp_symbol#pp x !T.pp_symbol#pp r
-| Between (None, x, Some r) -> Format.fprintf formatter "@[<h>between(_, %a, %a)@]"
-  !T.pp_symbol#pp x !T.pp_symbol#pp r
-| Between (None, x, None) -> Format.fprintf formatter "@[<h>between(_, %a, _)@]" !T.pp_symbol#pp x
-| Between (Some l, x, None) -> Format.fprintf formatter "@[<h>between(%a, %a, _)@]"
-  !T.pp_symbol#pp l !T.pp_symbol#pp x
+  | Initial l -> Format.fprintf formatter "@[<h>initial(%a)@]" (Utils.pp_list Format.pp_print_string) l
+  | Between (Some l, x, Some r) -> Format.fprintf formatter "@[<h>between(%s, %s, %s)@]" l x r
+  | Between (None, x, Some r) -> Format.fprintf formatter "@[<h>between(_, %s, %s)@]" x r
+  | Between (None, x, None) -> Format.fprintf formatter "@[<h>between(_, %s, _)@]" x
+  | Between (Some l, x, None) -> Format.fprintf formatter "@[<h>between(%s, %s, _)@]" l x
 
 (* build an ordering from a list of constraints *)
 let make_ordering constrs symbols =
@@ -204,9 +202,13 @@ let make_ordering constrs symbols =
   (* the object itself *)
   let obj = object (self)
     val mutable m_version = 0
+
     val mutable m_history = []
+
     method version = m_version
+
     method history = m_history
+
     (* refresh computes a new ordering based on the current signature *)
     method refresh () =
       let old_precedence = self#precedence in
@@ -221,19 +223,56 @@ let make_ordering constrs symbols =
         apply_constrs ();
         assert (PartialOrder.is_total po);
         (* new version of the precedence *)
-        m_version <- m_version + 1;
         m_history <- compute_history old_precedence self#precedence m_history;
+        m_version <- List.length m_history;
         (* refresh weight function *)
         weight := weight_modarity ();
         Utils.debug 3 (lazy (Utils.sprintf "%% new precedence %a"
                        T.pp_precedence self#precedence));
       end
+
+    method replay hist =
+      let len = List.length hist in
+      assert (len >= m_version);
+      (* Apply the patch *)
+      let apply_patch patch =
+        let symbols, cmp =
+          match patch with
+          | Initial l ->
+            let symbols = List.map mk_symbol l in
+            symbols, list_constraint symbols
+          | Between (Some l, x, Some r) ->
+            let l, x, r = mk_symbol l, mk_symbol x, mk_symbol r in
+            [l;x;r], list_constraint [l;x;r]
+          | Between (None, x, Some r) ->
+            let x, r = mk_symbol x, mk_symbol r in
+            [x;r], list_constraint [x;r]
+          | Between (Some l, x, None) ->
+            let l, x = mk_symbol l, mk_symbol x in
+            [l;x], list_constraint [l;x]
+          | Between (None, x, None) -> ([], fun _ _ -> 0)
+        in
+        (* add new symbols, order them as required, then complete *)
+        ignore (PartialOrder.extend po symbols);
+        PartialOrder.complete po cmp;
+        apply_constrs ()
+      in
+      (* take patches in chronological order *)
+      let patches = List.rev hist in
+      let patches = Utils.list_drop len patches in
+      List.iter apply_patch patches
+
     method weight s = !weight s
-    method pp_history formatter = 
+
+    method pp_history formatter =
       Utils.pp_list ~sep:", " pp_signature_diff formatter m_history
+
     method precedence = PartialOrder.symbols po
+
     method compare a b = PartialOrder.compare po a b
+
     method multiset_status s = !multiset_pred s
+
     method set_multiset f = multiset_pred := f
   end
   in
@@ -327,7 +366,7 @@ let compute_cost ord_factory constraints precedence : int =
 let perturbate ?(num=10) symbols =
   let new_symbols = ref [] in
   (* swap indexes i and j in the list *)
-  let rec swap i j a = 
+  let rec swap i j a =
     let tmp = a.(i) in
     a.(i) <- a.(j);
     a.(j) <- tmp;

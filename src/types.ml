@@ -106,27 +106,28 @@ type ordering_constraint = symbol -> symbol -> int
 
 (** A diff between an ordered signature and its update (that has a new symbol in it) *)
 type signature_diff = 
-  | Initial of symbol list                            (** initial signature *)
-  | Between of symbol option * symbol * symbol option (** insert between two other symbols (or top/bottom)*)
+  | Initial of string list                            (** initial signature *)
+  | Between of string option * string * string option (** insert between two other symbols (or top/bottom)*)
 
 (** the interface of a total ordering on symbols *)
 class type symbol_ordering =
   object
-    method version : int                      (** version of the precedence *)
-    method history : signature_diff list      (** history (length = version) since first precedence *)
-    method refresh : unit -> unit             (** refresh the signature (may update history/version) *)
-    method precedence : symbol list           (** current symbols in decreasing order *)
-    method compare : symbol -> symbol -> int  (** total order on symbols *)
-    method weight : symbol -> int             (** weight of symbol (for KBO) *)
-    method multiset_status : symbol -> bool   (** does the symbol have a multiset status? *)
+    method version : int                        (** version of the precedence (length of history) *)
+    method history : signature_diff list        (** history (length = version) since first precedence *)
+    method replay : signature_diff list -> unit (** update the precedence using this history *)
+    method refresh : unit -> unit               (** refresh the signature (may update history/version) *)
+    method precedence : symbol list             (** current symbols in decreasing order *)
+    method compare : symbol -> symbol -> int    (** total order on symbols *)
+    method weight : symbol -> int               (** weight of symbol (for KBO) *)
+    method multiset_status : symbol -> bool     (** does the symbol have a multiset status? *)
     method set_multiset : (symbol -> bool) -> unit  (** set the function that recognized multiset symbols *)
   end
 
 (** the interface of an ordering type *)
 class type ordering =
   object
-    method refresh : unit -> unit             (** refresh the symbol ordering (the signature) *)
-    method clear_cache : unit -> unit         (** clear cache, if any *)
+    method refresh : unit -> unit               (** refresh the symbol ordering (the signature) *)
+    method clear_cache : unit -> unit           (** clear cache, if any *)
     method symbol_ordering : symbol_ordering
     method compare : term -> term -> comparison
     method name : string

@@ -393,6 +393,33 @@ let mk_hclause_a ~ord lits proof parents =
 let mk_hclause ~ord lits proof parents =
   mk_hclause_a ~ord (Array.of_list lits) proof parents
 
+(** Build a hclause with already computed max literals and selected literals.
+    No check is (nor can) be performed. *)
+let mk_hclause_raw ~selected ~maxlits lits proof parents =
+  let hc = {
+    hclits = lits;
+    hctag = -1;
+    hcweight = 0;
+    hcmaxlits = maxlits;
+    hcselected_done = true;
+    hcselected = selected;
+    hcvars = [];
+    hcproof = proof;
+    hcparents = parents;
+    hcdescendants = Ptset.empty;
+  } in
+  (* hashcons the clause, compute additional data if fresh *)
+  let hc' = H.hashcons hc in
+  (if hc == hc' then begin
+    incr_stat stat_new_clause;
+    hc.hcvars <- merge_lit_vars [] lits 0;
+    hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
+    (* update the parent clauses' sets of descendants *)
+    List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
+    end);
+  (* return hashconsed clause *)
+  hc'
+
 (** simplify literals *)
 let clause_of_fof ~ord hc =
   let lits = Array.map (lit_of_fof ~ord) hc.hclits in

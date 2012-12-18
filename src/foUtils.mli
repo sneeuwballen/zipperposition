@@ -88,6 +88,8 @@ val list_find : ('a -> bool) -> 'a list -> (int * 'a) option
 val list_flatmap : ('a -> 'b list) -> 'a list -> 'b list
 (** take n elements *)
 val list_take : int -> 'a list -> 'a list
+(** drop n elements *)
+val list_drop : int -> 'a list -> 'a list
 (** Extract the minimum objects of the list *)
 val list_min : ('a -> 'a -> comparison) -> 'a list -> 'a list
 (** range from i to j *)
