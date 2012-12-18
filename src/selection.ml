@@ -59,7 +59,7 @@ let select_diff_neg_lit ?(strict=true) ~ord hc =
       | _ -> find_lit best_diff best_idx lits (i+1)
   in
   (* search such a lit among the clause's lits *)
-  match find_lit 0 (-1) hc.hclits 0 with
+  match find_lit (-1) (-1) hc.hclits 0 with
   | -1 -> []
   | n when strict -> [n]
   | n -> n :: select_positives hc

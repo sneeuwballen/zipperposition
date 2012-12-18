@@ -26,6 +26,13 @@ val set_debug : int -> unit               (** set the level of debug *)
 val debug : int -> string Lazy.t -> unit  (** debug message with level *)
 val debug_level : unit -> int             (** current debug level *)
 
+(** A profiler (do not call recursively) *)
+type profiler
+val enable_profiling : bool ref           (** Enable/disable profiling *)
+val mk_profiler : string -> profiler      (** Create a named profiler *)
+val enter_prof : profiler -> unit         (** Enter the profiler *)
+val exit_prof : profiler -> unit          (** Exit the profiler *)
+
 (** hashing on ints, cf http://en.wikipedia.org/wiki/MurmurHash *)
 val murmur_hash : int -> int
 
@@ -75,6 +82,8 @@ val list_merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
 val list_union : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 (** list intersection, given the comparison function *)
 val list_inter : ('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
+(** find the first index of element, elemnt s.t. the element satisfies the predicate *)
+val list_find : ('a -> bool) -> 'a list -> (int * 'a) option
 (** flatten map *)
 val list_flatmap : ('a -> 'b list) -> 'a list -> 'b list
 (** take n elements *)

@@ -76,7 +76,7 @@ let parse_args () =
       ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
       ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
-      ("-profile", Arg.Set HExtlib.profiling_enabled, "enable profile");
+      ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);

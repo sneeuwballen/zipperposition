@@ -712,7 +712,6 @@ let classic_skolem =
     with Not_found ->
       (* actual skolemization of normalized_t *)
       let new_symbol = find_skolem () in
-      Utils.debug 1 (lazy (Utils.sprintf "new symbol %s@." new_symbol));
       let new_symbol = mk_symbol ~attrs:Symbols.attr_skolem new_symbol in  (* build symbol *)
       let skolem_term = mk_node new_symbol sort vars in
       (* update the ordering *)

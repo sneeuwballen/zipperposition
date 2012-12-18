@@ -24,11 +24,12 @@ open Hashcons
 
 module T = Terms
 module S = FoSubst
+module Utils = FoUtils
 
 let enable = true
 
-let prof_unification = HExtlib.profile ~enable "unification"
-let prof_matching = HExtlib.profile ~enable "matching"
+let prof_unification = Utils.mk_profiler "unification"
+let prof_matching = Utils.mk_profiler "matching"
 
 (** does var appear in t (even when expanding bindings)? *)
 let rec occurs_check var t =
@@ -47,6 +48,7 @@ let rec get_var_binding t =
     else t
 
 let unification subst a b =
+  Utils.enter_prof prof_unification;
   (* recursive unification *)
   let rec unif subst s t =
     (if s.sort <> t.sort then raise UnificationFailure);
@@ -84,17 +86,21 @@ let unification subst a b =
       let subst = if T.is_var x1 || T.is_var x2 then unif subst x1 x2 else subst in
       unify_vars subst l1' l2'
     | _ -> assert false
-  (* setup and cleanup *)
-  and root_unify () =
-    T.reset_vars a;
-    T.reset_vars b;
-    S.apply_subst_bind subst;
-    let subst = unif subst a b in
-    subst
   in
-  prof_unification.HExtlib.profile root_unify ()
+  (* setup and cleanup *)
+  T.reset_vars a;
+  T.reset_vars b;
+  S.apply_subst_bind subst;
+  try
+    let subst = unif subst a b in
+    Utils.exit_prof prof_unification;
+    subst
+  with UnificationFailure as e ->
+    Utils.exit_prof prof_unification;
+    raise e
 
 let matching_locked ~locked subst a b =
+  Utils.enter_prof prof_matching;
   (* recursive matching *)
   let rec unif subst s t =
     (if s.sort <> t.sort then raise UnificationFailure);
@@ -115,7 +121,13 @@ let matching_locked ~locked subst a b =
   T.reset_vars a;
   T.reset_vars b;
   S.apply_subst_bind subst;
-  prof_matching.HExtlib.profile (unif subst a) b
+  try
+    let subst = unif subst a b in
+    Utils.exit_prof prof_matching;
+    subst
+  with UnificationFailure as e ->
+    Utils.exit_prof prof_matching;
+    raise e
 
 let matching subst a b =
   let locked = T.THashSet.from_list b.vars in

@@ -33,7 +33,7 @@ open Format
 let stat_fresh = mk_stat "fresh_clause"
 let stat_mk_hclause = mk_stat "mk_hclause"
 let stat_new_clause = mk_stat "new_clause"
-let prof_check_max_lit = HExtlib.profile ~enable:true "check_max_lit"
+let prof_check_max_lit = Utils.mk_profiler "check_max_lit"
 
 (* ----------------------------------------------------------------------
  * literals
@@ -438,11 +438,12 @@ let is_maxlit hc i =
   bv_get bv i  (* just check i-th bit *)
 
 (** Check whether the literal is maximal after applying subst *)
-let check_maximal_lit_ ~ord c pos subst =
+let check_maximal_lit ~ord c pos subst =
+  Utils.enter_prof prof_check_max_lit;
   let bv = c.cref.hcmaxlits in
   let n = Array.length c.clits in
   (* check if lit already not maximal, before subst *)
-  if not (bv_get bv pos) then false else 
+  if not (bv_get bv pos) then (Utils.exit_prof prof_check_max_lit; false) else 
   let lit = c.clits.(pos) in
   let slit = apply_subst_lit ~ord subst lit in
   (* check that slit is not < subst(lit') for any lit' maximal in c *)
@@ -453,10 +454,9 @@ let check_maximal_lit_ ~ord c pos subst =
       let slit' = apply_subst_lit ~ord subst c.clits.(i) in
       (compare_lits_partial ~ord slit slit' <> Lt) && check (i+1)
   in
-  check 0
-
-let check_maximal_lit ~ord clause pos subst =
-  prof_check_max_lit.HExtlib.profile (check_maximal_lit_ ~ord clause pos) subst
+  let res = check 0 in
+  Utils.exit_prof prof_check_max_lit; 
+  res
 
 (** Get an indexed list of maximum literals *)
 let maxlits c =

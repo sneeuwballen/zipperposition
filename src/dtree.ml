@@ -172,10 +172,10 @@ let remove dt t v =
   {dt with tree;}
 
 (** maximum variable in the tree *)
-let min_var dt = dt.min_var
+let min_var dt = max dt.min_var 0
 
 (** minimum variable in the tree *)
-let max_var dt = dt.max_var
+let max_var dt = max dt.max_var 0
 
 (** iterate on all (term -> value) such that subst(term) = input_term *)
 let iter_match dt t k =

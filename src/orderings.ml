@@ -25,6 +25,9 @@ module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
+let prof_rpo = Utils.mk_profiler "compare_rpo"
+let prof_rpo6 = Utils.mk_profiler "compare_rpo6"
+let prof_kbo = Utils.mk_profiler "compare_kbo"
 
 (* ----------------------------------------------------------------------
  * module interface for orderings, internal (used to create the different classes)
@@ -211,9 +214,11 @@ module KBO = struct
     in
     let _, res = tckbo 0 t1 t2 in res  (* ignore the weight *)
 
-  let profiler = HExtlib.profile ~enable:true "compare_terms(kbo)"
   let compare_terms ~so x y =
-    profiler.HExtlib.profile (kbo ~so x) y
+    Utils.enter_prof prof_kbo;
+    let cmp = kbo ~so x y in
+    Utils.exit_prof prof_kbo;
+    cmp
 end
 
 module RPO = struct
@@ -267,9 +272,11 @@ module RPO = struct
         if List.for_all (fun x -> rpo ~so x t = Lt) l1 then Lt else Incomparable
       | o -> o)
 
-  let profiler = HExtlib.profile ~enable:true "compare_terms(rpo)"
   let compare_terms ~so x y =
-    profiler.HExtlib.profile (rpo ~so x) y
+    Utils.enter_prof prof_rpo;
+    let cmp = rpo ~so x y in
+    Utils.exit_prof prof_rpo;
+    cmp
 end
 
 (** hopefully more efficient (polynomial) implementation of LPO,
@@ -335,9 +342,11 @@ module RPO6 = struct
        | Eq | Gt -> Gt
        | Incomparable | Lt -> alpha ~so ss' t)
 
-  let profiler = HExtlib.profile ~enable:true "compare_terms(rpo6)"
   let compare_terms ~so x y =
-    profiler.HExtlib.profile (rpo6 ~so x) y
+    Utils.enter_prof prof_rpo6;
+    let cmp = rpo6 ~so x y in
+    Utils.exit_prof prof_rpo6;
+    cmp
 end
 
 (* ----------------------------------------------------------------------

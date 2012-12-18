@@ -26,6 +26,65 @@ let set_debug l = debug_level_ := l
 let debug l s = if l <= !debug_level_ then print_endline (Lazy.force s) else ()
 let debug_level () = !debug_level_
 
+(** A profiler (do not call recursively) *)
+type profiler = {
+  prof_name : string;
+  mutable prof_total : float;   (** total time *)
+  mutable prof_calls : int;     (** number of calls *)
+  mutable prof_max : float;     (** max time in the profiled function *)
+  mutable prof_enter : float;   (** time at which we entered the profiler *)
+}
+
+(** Global switch for profiling *)
+let enable_profiling = ref false
+
+(** all profilers *)
+let profilers = ref []
+
+(** create a named profiler *)
+let mk_profiler name =
+  let prof = {
+    prof_enter = 0.;
+    prof_name = name;
+    prof_total = 0.;
+    prof_calls = 0;
+    prof_max = 0.;
+  } in
+  (* register profiler *)
+  profilers := prof :: !profilers;
+  prof
+
+(** Enter the profiler *)
+let enter_prof profiler =
+  if !enable_profiling then profiler.prof_enter <- Unix.gettimeofday ()
+
+(** Exit the profiled code with a value *)
+let exit_prof profiler =
+  if !enable_profiling then begin
+    let stop = Unix.gettimeofday () in
+    let delta = stop -. profiler.prof_enter in
+    profiler.prof_total <- profiler.prof_total +. delta;
+    profiler.prof_calls <- profiler.prof_calls + 1;
+    (if delta > profiler.prof_max then profiler.prof_max <- delta);
+  end
+
+(** Print profiling data upon exit *)
+let () =
+  at_exit (fun () ->
+    if !enable_profiling && List.exists (fun profiler -> profiler.prof_calls > 0) !profilers
+    then begin
+      Printf.printf "%% %39s ---------- --------- --------- ---------\n" (String.make 39 '-');
+      Printf.printf "%% %-39s %10s %9s %9s %9s\n" "function" "#calls" "total" "max" "average";
+      let profilers = List.sort (fun p1 p2 -> String.compare p1.prof_name p2.prof_name) !profilers in
+      List.iter
+        (fun profiler -> if profiler.prof_calls > 0 then
+          (* print content of the profiler *)
+          Printf.printf "%% %-39s %10d %9.4f %9.4f %9.4f\n"
+            profiler.prof_name profiler.prof_calls profiler.prof_total profiler.prof_max
+            (profiler.prof_total /. (float_of_int profiler.prof_calls)))
+        profilers
+    end)
+
 let murmur_hash i =
   let m = 0xd1e995
   and r = 24
@@ -219,6 +278,13 @@ let rec list_inter comp l1 l2 = match l1 with
   | [] -> []
   | x::xs when list_mem comp x l2 -> x::(list_inter comp xs l2)
   | _::xs -> list_inter comp xs l2
+
+let list_find p l =
+  let rec search i l = match l with
+  | [] -> None
+  | x::_ when p x -> Some (i, x)
+  | _::xs -> search (i+1) xs
+  in search 0 l
 
 let list_flatmap f l =
   let rec recurse acc l = match l with

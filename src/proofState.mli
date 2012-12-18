@@ -77,6 +77,10 @@ type state =
     passive_set : passive_set;          (** passive clauses *)
   >
 
+val mk_active_set : ord:ordering -> Index.index -> active_set
+val mk_simpl_set : ord:ordering -> Index.unit_index -> simpl_set
+val mk_passive_set : ord:ordering -> (ClauseQueue.queue * int) list -> passive_set
+
 (** create a state from the given ordering, and parameters *)
 val mk_state : ord:ordering -> Params.parameters -> state
 

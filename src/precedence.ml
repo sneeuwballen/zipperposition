@@ -410,7 +410,7 @@ let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
         precedence  (* done enough restarts *)
       end else begin
         let symbols' = Utils.list_shuffle symbols in
-        Utils.debug 1 (lazy ">>> restart hill climbing");
+        Utils.debug 1 (Lazy.lazy_from_val "% >>> restart hill climbing");
         let precedence', cost' = hill_climb ~steps:8 mk_precedence mk_cost symbols' in
         if cost' < cost
           then climb_hills ~num:(num+1) symbols' precedence' cost' (* choose new precedence *)

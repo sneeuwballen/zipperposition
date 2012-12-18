@@ -42,10 +42,6 @@ let arity_of = function
   | Bound (_,a) -> a
   | _ -> 0
 
-let prof_dt_generalization = HExtlib.profile ~enable:true "discr_tree.retrieve_generalizations"
-let prof_dt_unifiables = HExtlib.profile ~enable:true "discr_tree.retrieve_unifiables"
-let prof_dt_specializations = HExtlib.profile ~enable:true "discr_tree.retrieve_specializations"
-
 module OrderedPathStringElement = struct
   type t = path_string_elem
   (** compare two path string elements *)
@@ -195,20 +191,17 @@ let index : Index.index =
     method retrieve_generalizations: 'a. term -> 'a ->
       ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
-        prof_dt_generalization.HExtlib.profile
-        (retrieve ~unify_query:false ~unify_indexed:true tree t acc) f
+        retrieve ~unify_query:false ~unify_indexed:true tree t acc f
 
     method retrieve_unifiables : 'a. term -> 'a ->
       ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
-        prof_dt_unifiables.HExtlib.profile
-        (retrieve ~unify_query:true ~unify_indexed:true tree t acc) f
+        retrieve ~unify_query:true ~unify_indexed:true tree t acc f
 
     method retrieve_specializations : 'a. term -> 'a ->
       ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
       fun t acc f ->
-        prof_dt_specializations.HExtlib.profile
-        (retrieve ~unify_query:true ~unify_indexed:false tree t acc) f
+        retrieve ~unify_query:true ~unify_indexed:false tree t acc f
 
     method pp ~all_clauses formatter () =
       let rec print_elt (hc, pos, t) = Format.fprintf formatter "%a@;"

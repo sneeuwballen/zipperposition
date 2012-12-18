@@ -165,11 +165,11 @@ let eligible_always hc i lit = true
  * ---------------------------------------------------------------------- *)
 
 (** Create an active set from the given ord, and indexing structures *)
-let mk_active_set ~ord index =
+let mk_active_set ~ord (index : Index.index) =
   (* create a FeatureVector index from the current signature *)
   let signature = Precedence.current_signature () in
   let fv_idx = FV.mk_fv_index_signature (Symbols.symbols_of_signature signature) in
-  object (self)
+  (object (self)
     val mutable m_clauses = C.CSet.empty
     val mutable m_sup_into = index
     val mutable m_sup_from = index
@@ -213,7 +213,7 @@ let mk_active_set ~ord index =
     (** Avoid var collisions with clause *)
     method relocate hc =
       C.fresh_clause ~ord m_clauses.C.CSet.maxvar hc
-  end
+  end :> active_set)
 
 (* ----------------------------------------------------------------------
  * simplification set
