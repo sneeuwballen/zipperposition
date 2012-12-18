@@ -486,7 +486,7 @@ let basic_simplify ~ord hc =
   let new_lits = Utils.list_uniq C.eq_literal_com new_lits in
   (* destructive equality resolution *)
   let rec er lits =
-    match HExtlib.list_index er_check lits with
+    match Utils.list_find er_check lits with
     | None -> lits
     | Some (i, Equation (l, r, sign, _)) ->
         assert (not sign);
