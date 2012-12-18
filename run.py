@@ -270,9 +270,10 @@ class Run(object):
         print "database contains %d files and %d provers" % (len(s['filenames']), len(s['provers']))
         for prover in s['provers']:
             avg = s[prover]['time'] / s[prover]['solved'] if s[prover]['solved'] > 0 else 0
+            total = s[prover]['solved'] + s[prover]['failed']
             ratio = float(s[prover]['solved']) / (s[prover]['solved'] + s[prover]['failed'])
-            print "prover %-20s: solved %-5d failed %-5d ratio %.2f average solving time %-6.3f total time %-6.3f" %\
-                (prover, s[prover]['solved'], s[prover]['failed'], ratio, avg, s[prover]['time'])
+            print "prover %-20s: solved %5d/%-5d | ratio %.2f | average solving time %-6.3f | total time %-6.3f" %\
+                (prover, s[prover]['solved'], total, ratio, avg, s[prover]['time'])
 
     @command
     def list_provers(self):
