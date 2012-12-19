@@ -284,7 +284,10 @@ let read_kb_nolock filename =
     let kb = (Marshal.from_channel file : kb) in
     close_in file;
     kb
-  with Unix.Unix_error _ -> empty_kb
+  with
+  | Unix.Unix_error _ -> empty_kb
+  | Failure e -> Format.printf "%% [error while reading %s: %s]" filename e; empty_kb
+
 
 let read_kb ~lock ~file =
   Utils.with_lock_file lock
