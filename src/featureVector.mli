@@ -44,7 +44,7 @@ val max_depth_minus : symbol -> feature   (** maximal depth of symb in negative 
 type fv_index                             (** a feature vector index, based on a trie *)
 
 val mk_fv_index : feature list -> fv_index              (** create an index from features *)
-val mk_fv_index_signature : symbol list -> fv_index     (** create an index from signature *)
+val mk_fv_index_signature : signature -> fv_index       (** create an index from signature *)
 
 val index_clause : fv_index -> hclause -> fv_index      (** add the clause to the index *)
 val index_clauses : fv_index -> hclause list -> fv_index
@@ -55,4 +55,3 @@ val retrieve_subsuming : fv_index -> literal array ->
                          (hclause -> unit) -> unit      (** clauses that subsume c *)
 val retrieve_subsumed : fv_index -> literal array ->
                         (hclause -> unit) -> unit       (** clauses subsumed by c *)
-

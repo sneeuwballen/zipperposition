@@ -174,18 +174,36 @@ type fv_index = feature list * trie
 
 let mk_fv_index features = (features, Node Ptmap.empty)
 
-let max_symbols = 30    (** maximum number of symbols considered for indexing *)
+(** maximam number of features in addition to basic ones *)
+let max_features = 25
+
+let pp_feat_triple formatter (_,_,name) = Format.pp_print_string formatter name
 
 let mk_fv_index_signature signature =
-  (* only consider a bounded number of symbols *)
-  let bounded_signature = Utils.list_take max_symbols signature in
-  let features = [feat_size_plus; feat_size_minus; sum_of_depths] @
-    List.flatten
-      (List.map (fun symb ->
-        (* for each symbol, use 4 features *)
-        [count_symb_plus symb; count_symb_minus symb])
-        bounded_signature)
-  in
+  (* list of (salience: float, feature, repr: string) *)
+  let features = ref [] in
+  let pp name s = Utils.sprintf "%s(%s)" name (name_symbol s) in
+  (* create features for the symbols *)
+  SMap.iter
+    (fun s (arity, sort) ->
+      if sort == bool_sort
+        then features := [1 + arity, count_symb_plus s, pp "count+" s;
+                          1 + arity, count_symb_minus s, pp "count-" s]
+                          @ !features
+      else
+        features := [0, max_depth_plus s, pp "max_depth+" s;
+                     0, max_depth_minus s, pp "max_depth-" s;
+                     1 + arity, count_symb_plus s, pp "count+" s;
+                     1 + arity, count_symb_minus s, pp "count-" s]
+                    @ !features)
+    signature;
+  (* only take a limited number of features *)
+  let features = List.sort (fun (s1,_,_) (s2, _,_) -> s2 - s1) !features in
+  let features = Utils.list_take max_features features in
+  Utils.debug 2 (lazy (Utils.sprintf "%% FV index use features @[<h>%a@]"
+                 (Utils.pp_list pp_feat_triple) features));
+  let features = List.map (fun (_, f,_) -> f) features in
+  let features = [feat_size_plus; feat_size_minus; sum_of_depths] @ features in
   (* build an index with those features *)
   mk_fv_index features
 
