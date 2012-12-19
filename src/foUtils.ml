@@ -293,8 +293,8 @@ let list_flatmap f l =
   in recurse [] l
 
 let rec list_take n l = match n, l with
-  | 0, _ -> l
-  | _, [] -> l
+  | 0, _ -> []
+  | _, [] -> []
   | _, x::xs when n > 0 -> x :: (list_take (n-1) xs)
   | _ -> assert false
 

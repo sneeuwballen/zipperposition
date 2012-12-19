@@ -100,6 +100,16 @@ let is_pos_eq hc =
   | [|Equation (l,r,true,_)|] -> Some (l,r)
   | _ -> None
 
+(** Checks whether the clause is "const = ground composite term", e.g.
+    a clause "aIbUc = inter(a, union(b, c))". In this case it returns
+    Some(constant, definition of constant) *)
+let is_const_definition hc =
+  match hc.hclits with
+  | [|Equation (l,r,true,_)|] when T.is_const l && T.is_ground_term r && not (T.member_term l r) ->
+    Some (l,r)
+  | [|Equation (l,r,true,_)|] when T.is_const r && T.is_ground_term l && not (T.member_term r l) ->
+    Some (r,l)
+  | _ -> None
 
 (** detect whether the clause is "p(x,y,z) & p(x,y,z') => z=z'", and
     returns p in this case *)

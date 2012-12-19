@@ -42,9 +42,13 @@ val is_rewrite_rule : hclause -> (term * term) list
       can return two rewrite rules if the clause can be oriented
       in both ways, e.g. associativity axiom. *)
 
+val is_const_definition : hclause -> (term * term) option
+  (** Checks whether the clause is "const = ground composite term", e.g.
+      a clause "aIbUc = inter(a, union(b, c))". In this case it returns
+      Some(constant, definition of constant) *)
+
 val is_pos_eq : hclause -> (term * term) option
   (** Recognize whether the clause is a positive unit equality. *)
-
 
 val is_functional_symbol : hclause -> [ `Functional of symbol | `None ]
   (** detect whether the clause is "p(x,y,z) & p(x,y,z') => z=z'", and

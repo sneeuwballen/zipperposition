@@ -23,10 +23,6 @@ open Symbols
 
 (** Precedence (total ordering) on symbols *)
 
-(** compute the current signature of symbols. It maps symbols
-    to their arity and sort. *)
-val current_signature : unit -> (int * sort) SMap.t
-
 (* ----------------------------------------------------------------------
  * hard constraints on the ordering
  * ---------------------------------------------------------------------- *)
@@ -38,11 +34,7 @@ val cluster_constraint : symbol list list -> ordering_constraint
 val list_constraint : symbol list -> ordering_constraint
   (** symbols in the given list are in decreasing order *)
 
-val ordering_to_constraint : symbol_ordering -> ordering_constraint
-  (** convert a symbol ordering into an ordering constraint. Useful to
-      extend an ordering without breaking it. *)
-
-val arity_constraint : (int * sort) SMap.t -> ordering_constraint
+val arity_constraint : signature -> ordering_constraint
   (** decreasing arity constraint *)
 
 val invfreq_constraint : hclause list -> ordering_constraint
@@ -61,22 +53,22 @@ val alpha_constraint : ordering_constraint
  * Creation of a precedence (symbol_ordering) from constraints
  * ---------------------------------------------------------------------- *)
 
-val make_ordering : ordering_constraint list -> symbol list -> symbol_ordering
-  (** make an ordering from the given constraints. First constraints are
+val mk_precedence : ordering_constraint list -> symbol list -> precedence
+  (** make a precedence from the given constraints. First constraints are
       more important than later constraints. Only the very first constraint
       is assured to be totally satisfied. *)
 
-val default_symbol_ordering : symbol list -> symbol_ordering
-  (** default ordering on given symbols *)
+val default_precedence : signature -> precedence
+  (** default precedence on the given signature *)
 
 (* ----------------------------------------------------------------------
  * Heuristic creation of precedences
  * ---------------------------------------------------------------------- *)
 
-val heuristic_precedence : (symbol_ordering -> ordering)
+val heuristic_precedence : (precedence -> ordering)
                            -> ordering_constraint list
                            -> ordering_constraint list
-                           -> hclause list -> symbol_ordering
+                           -> hclause list -> precedence
   (** define a constraint on symbols that is believed to improve
       the search by enabling as many simplifications as possible. It takes
       an ordering as a parameter, to be able to decide the orientation of

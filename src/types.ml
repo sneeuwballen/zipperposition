@@ -67,7 +67,7 @@ type literal =
  | Equation of    term  (** lhs *)
                 * term  (** rhs *)
                 * bool  (** sign (equality, ie true, or difference) *)
-                * comparison   (* TODO remove? *)
+                * comparison   (* TODO remove? or just orient equations? *)
 
 (** a small bitvector *)
 type bitvector = int
@@ -91,34 +91,28 @@ and hclause = {
   hcparents : hclause list;               (** parents of the clause *)
   mutable hcdescendants : Ptset.t;        (** the set of descendants of the clause *)
 }
-(** a proof step for a clause
-    TODO share substitution; use compact_position *)
+(** a proof step for a clause *)
 and proof = Axiom of string * string (** file, axiom name *)
           | Proof of string * (clause * position * substitution) list
 
 (** a selection function *)
 type selection_fun = hclause -> int list
 
-let no_select c = []                          (** selects no literals *)
+(** selects no literals *)
+let no_select c = []
 
-(** an ordering constraint *)
+(** an ordering constraint (a possibly non-total ordering on symbols) *)
 type ordering_constraint = symbol -> symbol -> int
 
-(** A diff between an ordered signature and its update (that has a new symbol in it) *)
-type signature_diff = 
-  | Initial of string list                            (** initial signature *)
-  | Between of string option * string * string option (** insert between two other symbols (or top/bottom)*)
-
 (** the interface of a total ordering on symbols *)
-class type symbol_ordering =
+class type precedence =
   object
     method version : int                        (** version of the precedence (length of history) *)
-    method history : signature_diff list        (** history (length = version) since first precedence *)
-    method replay : signature_diff list -> unit (** update the precedence using this history *)
-    method refresh : unit -> unit               (** refresh the signature (may update history/version) *)
-    method precedence : symbol list             (** current symbols in decreasing order *)
+    method snapshot : symbol list               (** current symbols in decreasing order *)
+    method add_symbols : symbol list -> int     (** add the given symbols (returns how many were new) *)
     method compare : symbol -> symbol -> int    (** total order on symbols *)
     method weight : symbol -> int               (** weight of symbol (for KBO) *)
+    method set_weight : (symbol -> int) -> unit (** change the weight function *)
     method multiset_status : symbol -> bool     (** does the symbol have a multiset status? *)
     method set_multiset : (symbol -> bool) -> unit  (** set the function that recognized multiset symbols *)
   end
@@ -126,10 +120,9 @@ class type symbol_ordering =
 (** the interface of an ordering type *)
 class type ordering =
   object
-    method refresh : unit -> unit               (** refresh the symbol ordering (the signature) *)
     method clear_cache : unit -> unit           (** clear cache, if any *)
-    method symbol_ordering : symbol_ordering
-    method compare : term -> term -> comparison
+    method precedence : precedence              (** underlying precedence on symbols *)
+    method compare : term -> term -> comparison (** compare two terms *)
     method name : string
   end
 

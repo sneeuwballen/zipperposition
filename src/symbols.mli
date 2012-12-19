@@ -53,14 +53,14 @@ val attrs_symbol : symbol -> symbol_attribute
 val name_symbol : symbol -> string
   (** deconstruction of a symbol *)
 
-val sig_version : int ref
-  (** current version of the signature (updated upon symbol creation) *)
-
 module SHashtbl : Hashtbl.S with type key = symbol
 
 module SMap : Map.S with type key = symbol
 
 module SSet : Set.S with type elt = symbol
+
+(** A signature maps symbols to (sort, arity) *)
+type signature = (int * sort) SMap.t
 
 (* connectives *)
 val true_symbol : symbol
@@ -83,8 +83,8 @@ val bool_sort : sort
 val type_sort : sort
 val univ_sort : sort
 
-val base_signature : (int * sort) SMap.t
+val base_signature : signature
   (** the signature composed of predefined symbols *)
 
-val symbols_of_signature : (int * sort) SMap.t -> symbol list
+val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)

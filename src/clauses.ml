@@ -568,9 +568,30 @@ let eligible_param ~ord c idx subst =
   else if neg_lit c.clits.(idx) then false (* only positive lits *)
   else check_maximal_lit ~ord c idx subst
 
+(** is the clause a unit clause? *)
 let is_unit_clause hc = match hc.hclits with
   | [|_|] -> true
   | _ -> false
+
+(** Compute signature of this set of clauses *)
+let signature clauses =
+  let rec explore_term signature t = match t.term with
+  | Var _ -> signature
+  | Node (f, l) ->
+    begin
+      let arity, sort = List.length l, t.sort in
+      (try (* check consistency with signature *)
+        let arity', sort' = SMap.find f signature in
+        assert (arity = arity' && sort == sort');
+      with Not_found -> ());
+      let signature' = SMap.add f (arity, sort) signature in
+      List.fold_left explore_term signature' l
+    end
+  and explore_lit signature lit = match lit with
+  | Equation (l,r,_,_) -> explore_term (explore_term signature l) r
+  and explore_clause signature hc = Array.fold_left explore_lit signature hc.hclits
+  in
+  List.fold_left explore_clause SMap.empty clauses
 
 let rec from_simple ~ord (f,source) =
   let rec convert f = match f with

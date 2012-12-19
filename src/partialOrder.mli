@@ -30,9 +30,6 @@ type t
 val mk_partial_order : symbol list -> t
   (** build an empty partial order for the list of symbols *)
 
-val copy : t -> t
-  (** copy the partial order *)
-
 val is_total : t -> bool
   (** is the ordering total? *)
 
@@ -40,26 +37,14 @@ val complete : t -> (symbol -> symbol -> int) -> unit
   (** complete the partial order using the given order on
       symbols to compare unordered pairs. If the given comparison
       function is not total, the ordering may still not be
-      complete. *)
+      complete. The comparison function [f] is assumed to be such
+      that [transitive_closure f] is a partial order. *)
 
 val compare : t -> symbol -> symbol -> int
   (** compare two symbols in the ordering. The ordering must be total! *)
 
 val symbols : t -> symbol list
   (** symbols, in decreasing order (assuming the ordering is total) *)
-
-val add_constraint : t -> symbol -> symbol -> bool
-  (** [add_constraint po s t] try to add [s] > [t] to the
-      partial order. It fails (returns false) if doing so
-      breaks the acyclicity property *)
-
-val add_constraints : t -> (symbol * symbol) list -> int
-  (** add constraints whenever possible; returns the number of successful
-      ordering extensions *)
-
-val extend : t -> symbol list -> int
-  (** Add the given symbols to the partial order. Returns the number of
-      new symbols *)
 
 val pp : Format.formatter -> t -> unit
   (** pretty print the partial order as a boolean matrix *)

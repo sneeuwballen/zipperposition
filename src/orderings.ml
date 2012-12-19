@@ -39,7 +39,7 @@ module type S =
      * - stable for instantiation
      * - monotonic
      * - total on ground terms *)
-    val compare_terms : so:symbol_ordering -> term -> term -> comparison
+    val compare_terms : prec:precedence -> term -> term -> comparison
 
     val name : string
   end
@@ -124,7 +124,7 @@ module KBO = struct
   (** the KBO ordering itself. The implementation is borrowed from
       the kbo_5 version of "things to know when implementing KBO".
       It should be linear time. *)
-  let rec kbo ~so t1 t2 =
+  let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
     (** variable balance, weight balance, t contains variable y. pos
         stands for positive (is t the left term) *)
@@ -135,7 +135,7 @@ module KBO = struct
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
       | Node (s, l) ->
-        let wb' = if pos then wb + so#weight s else wb - so#weight s in
+        let wb' = if pos then wb + prec#weight s else wb - prec#weight s in
         balance_weight_rec wb' l y pos false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
@@ -159,7 +159,7 @@ module KBO = struct
         avoid breaking the weight computing invariants *)
     and tckbocommute wb ss ts =
       (* multiset comparison *)
-      let res = Utils.multiset_partial (kbo ~so) ss ts in
+      let res = Utils.multiset_partial (kbo ~prec) ss ts in
       (* also compute weights of subterms *)
       let wb', _ = balance_weight_rec wb ss 0 true false in
       let wb'', _ = balance_weight_rec wb' ts 0 false false in
@@ -183,14 +183,14 @@ module KBO = struct
       | Node (f, ss), Node (g, ts) ->
         (* do the recursive computation of kbo *)
         let wb', recursive = tckbo_rec wb f g ss ts in
-        let wb'' = wb' + so#weight f - so#weight g in
+        let wb'' = wb' + prec#weight f - prec#weight g in
         (* check variable condition *)
         let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
         and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
         (* lexicographic product of weight and precedence *)
         if wb'' > 0 then wb'', g_or_n
         else if wb'' < 0 then wb'', l_or_n
-        else (match so#compare f g with
+        else (match prec#compare f g with
           | n when n > 0 -> wb'', g_or_n
           | n when n < 0 ->  wb'', l_or_n
           | _ ->
@@ -202,7 +202,7 @@ module KBO = struct
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
-        then if so#multiset_status f
+        then if prec#multiset_status f
           (* use multiset or lexicographic comparison *)
           then tckbocommute wb ss ts
           else tckbolex wb ss ts
@@ -214,9 +214,9 @@ module KBO = struct
     in
     let _, res = tckbo 0 t1 t2 in res  (* ignore the weight *)
 
-  let compare_terms ~so x y =
+  let compare_terms ~prec x y =
     Utils.enter_prof prof_kbo;
-    let cmp = kbo ~so x y in
+    let cmp = kbo ~prec x y in
     Utils.exit_prof prof_kbo;
     cmp
 end
@@ -224,7 +224,7 @@ end
 module RPO = struct
   let name = "rpo"
 
-  let rec rpo ~so s t =
+  let rec rpo ~prec s t =
     match s.term, t.term with
     | _, _ when T.eq_term s t -> Eq
     | Var _, Var _ -> Incomparable
@@ -236,7 +236,7 @@ module RPO = struct
       let rec ge_subterm t ol = function
         | [] -> (false, ol)
         | x::tl ->
-            let res = rpo ~so x t in
+            let res = rpo ~prec x t in
             match res with
               | Gt | Eq -> (true, res::ol)
               | o -> ge_subterm t (o::ol) tl
@@ -253,28 +253,28 @@ module RPO = struct
               | o::ol, _::tl ->
                 if o = Lt then check_subterms t (ol,tl) else false
               | [], x::tl ->
-                if rpo ~so x t = Lt then check_subterms t ([],tl) else false
+                if rpo ~prec x t = Lt then check_subterms t ([],tl) else false
             in
             (* non recursive comparison of function symbols *)
-            match so#compare hd1 hd2 with
+            match prec#compare hd1 hd2 with
             | n when n > 0 -> if check_subterms s (r_ol,tl2) then Gt else Incomparable
             | n when n < 0 -> if check_subterms t (l_ol,tl1) then Lt else Incomparable
-            | _ -> rpo_rec ~so hd1 tl1 tl2 s t
+            | _ -> rpo_rec ~prec hd1 tl1 tl2 s t
           end
   (* recursive comparison of lists of terms (head symbol is hd) *)
-  and rpo_rec ~so hd l1 l2 s t =
-    (if so#multiset_status hd
-    then Utils.multiset_partial (rpo ~so) l1 l2
-    else match Utils.lexicograph_partial (rpo ~so) l1 l2 with
+  and rpo_rec ~prec hd l1 l2 s t =
+    (if prec#multiset_status hd
+    then Utils.multiset_partial (rpo ~prec) l1 l2
+    else match Utils.lexicograph_partial (rpo ~prec) l1 l2 with
       | Gt ->
-        if List.for_all (fun x -> rpo ~so s x = Gt) l2 then Gt else Incomparable
+        if List.for_all (fun x -> rpo ~prec s x = Gt) l2 then Gt else Incomparable
       | Lt ->
-        if List.for_all (fun x -> rpo ~so x t = Lt) l1 then Lt else Incomparable
+        if List.for_all (fun x -> rpo ~prec x t = Lt) l1 then Lt else Incomparable
       | o -> o)
 
-  let compare_terms ~so x y =
+  let compare_terms ~prec x y =
     Utils.enter_prof prof_rpo;
-    let cmp = rpo ~so x y in
+    let cmp = rpo ~prec x y in
     Utils.exit_prof prof_rpo;
     cmp
 end
@@ -286,65 +286,65 @@ module RPO6 = struct
   let name = "rpo6"
 
   (** recursive path ordering *)
-  let rec rpo6 ~so s t =
+  let rec rpo6 ~prec s t =
     if T.eq_term s t then Eq else  (* equality test is cheap *)
     match s.term, t.term with
     | Var _, Var _ -> Incomparable
     | _, Var _ -> if T.var_occurs t s then Gt else Incomparable
     | Var _, _ -> if T.var_occurs s t then Lt else Incomparable
     | Node (f, []), Node (g, []) ->
-      (match so#compare f g with
+      (match prec#compare f g with
        | n when n < 0 -> Lt
        | n when n > 0 -> Gt
        | _ -> Eq)
     | Node (f, ss), Node (g, ts) ->
-      (match so#compare f g with
-      | 0 when so#multiset_status f ->
-        cMultiset ~so ss ts (* multiset subterm comparison *)
+      (match prec#compare f g with
+      | 0 when prec#multiset_status f ->
+        cMultiset ~prec ss ts (* multiset subterm comparison *)
       | 0 ->
-        cLMA ~so s t ss ts  (* lexicographic subterm comparison *)
-      | n when n > 0 -> cMA ~so s ts
-      | n when n < 0 -> Utils.not_partial (cMA ~so t ss)
+        cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
+      | n when n > 0 -> cMA ~prec s ts
+      | n when n < 0 -> Utils.not_partial (cMA ~prec t ss)
       | _ -> assert false)  (* match exhaustively *)
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
-  and cMA ~so s ts = match ts with
+  and cMA ~prec s ts = match ts with
     | [] -> Gt
     | t::ts' ->
-      (match rpo6 ~so s t with
-      | Gt -> cMA ~so s ts'
+      (match rpo6 ~prec s t with
+      | Gt -> cMA ~prec s ts'
       | Eq | Lt -> Lt
-      | Incomparable -> Utils.not_partial (alpha ~so ts' s))
+      | Incomparable -> Utils.not_partial (alpha ~prec ts' s))
   (** lexicographic comparison of s=f(ss), and t=f(ts) *)
-  and cLMA ~so s t ss ts = match ss, ts with
+  and cLMA ~prec s t ss ts = match ss, ts with
     | si::ss', ti::ts' ->
-      (match rpo6 ~so si ti with
-        | Eq -> cLMA ~so s t ss' ts'
-        | Gt -> cMA ~so s ts' (* just need s to dominate the remaining elements *)
-        | Lt -> Utils.not_partial (cMA ~so t ss')
-        | Incomparable -> cAA ~so s t ss' ts'
+      (match rpo6 ~prec si ti with
+        | Eq -> cLMA ~prec s t ss' ts'
+        | Gt -> cMA ~prec s ts' (* just need s to dominate the remaining elements *)
+        | Lt -> Utils.not_partial (cMA ~prec t ss')
+        | Incomparable -> cAA ~prec s t ss' ts'
       )
     | [], [] -> Eq
     | _ -> assert false (* different length... *)
   (** multiset comparison of subterms (not optimized) *)
-  and cMultiset ~so ss ts = Utils.multiset_partial (rpo6 ~so) ss ts
+  and cMultiset ~prec ss ts = Utils.multiset_partial (rpo6 ~prec) ss ts
   (** bidirectional comparison by subterm property (bidirectional alpha) *)
-  and cAA ~so s t ss ts =
-    match alpha ~so ss t with
+  and cAA ~prec s t ss ts =
+    match alpha ~prec ss t with
     | Gt -> Gt
-    | Incomparable -> Utils.not_partial (alpha ~so ts s)
+    | Incomparable -> Utils.not_partial (alpha ~prec ts s)
     | _ -> assert false
   (** if some s in ss is >= t, then s > t by subterm property and transitivity *)
-  and alpha ~so ss t = match ss with
+  and alpha ~prec ss t = match ss with
     | [] -> Incomparable
     | s::ss' ->
-      (match rpo6 ~so s t with
+      (match rpo6 ~prec s t with
        | Eq | Gt -> Gt
-       | Incomparable | Lt -> alpha ~so ss' t)
+       | Incomparable | Lt -> alpha ~prec ss' t)
 
-  let compare_terms ~so x y =
+  let compare_terms ~prec x y =
     Utils.enter_prof prof_rpo6;
-    let cmp = rpo6 ~so x y in
+    let cmp = rpo6 ~prec x y in
     Utils.exit_prof prof_rpo6;
     cmp
 end
@@ -361,37 +361,34 @@ module OrdCache = Cache.Make(
     let equal t1 t2 = T.eq_term t1 t2
   end)
 
-let kbo (so : symbol_ordering) : ordering =
+let kbo (prec : precedence) : ordering =
   object
-    val cache = OrdCache.create 4096 (KBO.compare_terms ~so)
-    val so = so
-    method refresh () = (OrdCache.clear cache; so#refresh ())
+    val cache = OrdCache.create 4096 (KBO.compare_terms ~prec)
+    val prec = prec
     method clear_cache () = OrdCache.clear cache
-    method symbol_ordering = so
+    method precedence = prec
     method compare a b = OrdCache.lookup cache a b
     method name = KBO.name
   end
 
-let rpo (so : symbol_ordering) : ordering =
+let rpo (prec : precedence) : ordering =
   object
-    val cache = OrdCache.create 4096 (RPO.compare_terms ~so)
-    val so = so
-    method refresh () = (OrdCache.clear cache; so#refresh ())
+    val cache = OrdCache.create 4096 (RPO.compare_terms ~prec)
+    val prec = prec
     method clear_cache () = OrdCache.clear cache
-    method symbol_ordering = so
+    method precedence = prec
     method compare a b = OrdCache.lookup cache a b
     method name = RPO.name
   end
 
-let rpo6 (so : symbol_ordering) : ordering =
+let rpo6 (prec : precedence) : ordering =
   object
-    val cache = OrdCache.create 4096 (RPO6.compare_terms ~so)
-    val so = so
-    method refresh () = (OrdCache.clear cache; so#refresh ())
+    val cache = OrdCache.create 4096 (RPO6.compare_terms ~prec)
+    val prec = prec
     method clear_cache () = OrdCache.clear cache
-    method symbol_ordering = so
+    method precedence = prec
     method compare a b = OrdCache.lookup cache a b
     method name = RPO6.name
   end
 
-let default_ordering signature = rpo6 (Precedence.default_symbol_ordering signature)
+let default_ordering signature = rpo6 (Precedence.default_precedence signature)

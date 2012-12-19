@@ -50,23 +50,11 @@ let mk_partial_order symbs =
         incr size;
       end)
     symbs;
-  let msize = !size + ((!size + 1) / 2) in
   (* the symbols (num -> symbol) *)
   let symbols = compute_symbols num in
   (* the adjacency matrix *)
-  let cmp = Array.make_matrix msize msize false in
+  let cmp = Array.make_matrix !size !size false in
   { num; size= !size; total=false; cmp; symbols; }
-
-(** copy the partial ordering structure *)
-let copy po =
-  (* copy matrix *)
-  let cmp = Array.copy po.cmp in
-  for i = 0 to po.size - 1 do
-    cmp.(i) <- Array.copy po.cmp.(i)
-  done;
-  (* copy array *)
-  let symbols = Array.copy po.symbols in
-  { num=SHashtbl.copy po.num; total=po.total; size = po.size; cmp; symbols; }
 
 (** check whether the ordering is total *)
 let check_is_total po =
@@ -137,11 +125,12 @@ let complete po cmp_fun =
           (* elements i and j not ordered, order them by cmp_fun
              and then re-compute the transitive closure *)
           match cmp_fun po.symbols.(i) po.symbols.(j) with
-          | n when n < 0 -> cmp.(j).(i) <- true; transitive_closure po
-          | n when n > 0 -> cmp.(i).(j) <- true; transitive_closure po
+          | n when n < 0 -> cmp.(j).(i) <- true
+          | n when n > 0 -> cmp.(i).(j) <- true
           | _ -> ()
       done;
     done;
+    transitive_closure po;
     po.total <- is_total po
   end
 
@@ -163,53 +152,6 @@ let symbols po =
   (* sort by decreasing order *)
   Array.fast_sort (fun x y -> - (compare po x y)) s;
   Array.to_list s
-
-(** [add_constraint po s t] try to add [s] > [t] to the
-    partial order. It fails (returns false) if doing so
-    breaks the acyclicity property *)
-let add_constraint po s t =
-  let ns = SHashtbl.find po.num s
-  and nt = SHashtbl.find po.num t in
-  if s == t then true
-  else if po.cmp.(ns).(nt) then true  (* already enforced *)
-  else if po.cmp.(nt).(ns) then false (* would make a cycle *)
-  else begin
-    (* add the edge, compute transitive closure *)
-    po.cmp.(ns).(nt) <- true; 
-    transitive_closure po;
-    true
-  end
-
-(** add constraints whenever possible; returns the number of successful
-    ordering extensions *)
-let add_constraints po constraints =
-  List.fold_left
-    (fun count (a, b) -> if add_constraint po a b then count+1 else count)
-    0 constraints
-
-(** add the given symbols to the partial order *)
-let extend po symbs =
-  FoUtils.debug 3 (lazy (FoUtils.sprintf "extend po with %a" Terms.pp_precedence symbs));
-  (* add symbols *)
-  let old_size = po.size in
-  List.iter
-    (fun s ->
-      if not (SHashtbl.mem po.num s)
-        then (SHashtbl.add po.num s po.size; po.size <- po.size + 1))
-    symbs;
-  (if po.size > old_size then (po.total <- false; po.symbols <- compute_symbols po.num));
-  (if po.size > old_size && po.size > Array.length po.cmp then begin
-    (* extend the matrix and symbols in case they are too small for new signature *)
-    let n = po.size + ((1 + po.size) lsr 1) in
-    let cmp = Array.make n po.cmp.(0) in
-    for i = 0 to n-1 do
-      cmp.(i) <- Array.make n false;
-      (* copy old lines *)
-      (if i < old_size then Array.blit po.cmp.(i) 0 cmp.(i) 0 old_size);
-    done;
-    po.cmp <- cmp;
-  end);
-  po.size - old_size
 
 (** pretty print the partial order as a boolean matrix *)
 let pp formatter po =

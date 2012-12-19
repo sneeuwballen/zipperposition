@@ -39,6 +39,8 @@ let special_preds =
   [eq_symbol; imply_symbol; forall_symbol; exists_symbol; lambda_symbol;
    or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
 
+let special_set = List.fold_left (fun set s -> SSet.add s set) SSet.empty special_preds
+
 type symbol_kind = 
   | Predicate | DeBruijn | Skolem | Function | Special
 
@@ -56,22 +58,20 @@ let order k1 k2 =
   | Special, _ -> -1
 
 (* classify symbol into categories *)
-let classify =
-  let special_set = List.fold_left (fun set s -> SSet.add s set) SSet.empty special_preds in 
-  function s ->
-    match s with
-    | _ when s == succ_db_symbol || s == db_symbol -> DeBruijn
-    | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
-    | _ when SSet.mem s special_set -> Special
-    | _ -> (* classify between predicate and function by the sort *)
-      let signature = Precedence.current_signature () in
-      let _, sort = SMap.find s signature in
-      if sort == bool_sort then Predicate else Function
+let classify signature s =
+  match s with
+  | _ when s == succ_db_symbol || s == db_symbol -> DeBruijn
+  | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
+  | _ when SSet.mem s special_set -> Special
+  | _ -> (* classify between predicate and function by the sort *)
+    let _, sort = SMap.find s signature in
+    if sort == bool_sort then Predicate else Function
 
 (** constraint on the ordering *)
-let symbol_constraint _ =
+let symbol_constraint clauses =
+  let signature = C.signature clauses in
   [Precedence.min_constraint special_preds;
-   fun x y -> order (classify x) (classify y)]
+   fun x y -> order (classify signature x) (classify signature y)]
 
 (* ----------------------------------------------------------------------
  * elimination rules

@@ -714,8 +714,8 @@ let classic_skolem =
       let new_symbol = find_skolem () in
       let new_symbol = mk_symbol ~attrs:Symbols.attr_skolem new_symbol in  (* build symbol *)
       let skolem_term = mk_node new_symbol sort vars in
-      (* update the ordering *)
-      ord#refresh ();
+      (* update the precedence *)
+      ignore (ord#precedence#add_symbols [new_symbol]);
       (* build the skolemized term *)
       db_unlift (db_replace t skolem_term)
     in
@@ -738,7 +738,8 @@ let unamed_skolem ~ord t sort =
      lambda is used to keep the formula closed. *)
   let args = [mk_node lambda_symbol t.sort [t]] in
   let skolem_term = mk_node symb sort args in
-  ord#refresh ();  (* skolem symbol may be new *)
+  (* update the precedence *)
+  ignore (ord#precedence#add_symbols [symb]);
   (* build the skolemized term by replacing first DB index with skolem symbol *)
   db_unlift (db_replace t skolem_term)
 

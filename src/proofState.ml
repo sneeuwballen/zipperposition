@@ -165,10 +165,9 @@ let eligible_always hc i lit = true
  * ---------------------------------------------------------------------- *)
 
 (** Create an active set from the given ord, and indexing structures *)
-let mk_active_set ~ord (index : Index.index) =
+let mk_active_set ~ord (index : Index.index) signature =
   (* create a FeatureVector index from the current signature *)
-  let signature = Precedence.current_signature () in
-  let fv_idx = FV.mk_fv_index_signature (Symbols.symbols_of_signature signature) in
+  let fv_idx = FV.mk_fv_index_signature signature in
   (object (self)
     val mutable m_clauses = C.CSet.empty
     val mutable m_sup_into = index
@@ -303,13 +302,13 @@ let mk_passive_set ~ord queues =
  * global state
  * ---------------------------------------------------------------------- *)
 
-let mk_state ~ord params =
+let mk_state ~ord params signature =
   let queues = ClauseQueue.default_queues
   and select = Selection.selection_from_string ~ord params.param_select
   and unit_idx = Dtree.unit_index
   and index = choose_index params.param_index in
   object
-    val m_active = (mk_active_set ~ord index :> active_set)
+    val m_active = (mk_active_set ~ord index signature :> active_set)
     val m_passive = mk_passive_set ~ord queues
     val m_simpl = mk_simpl_set ~ord unit_idx
     method ord = ord

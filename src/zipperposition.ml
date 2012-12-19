@@ -159,7 +159,7 @@ let get_calculus ~params =
 (** Compute the ordering from the list of clauses, according to parameters *)
 let compute_ord ~params clauses =
   let calculus = get_calculus ~params in
-  let signature = Precedence.current_signature () in
+  let signature = C.signature clauses in
   let symbols = Symbols.symbols_of_signature signature in
   let so = if params.param_precedence
     (* use the heuristic to try to order definitions and rewrite rules *)
@@ -167,7 +167,7 @@ let compute_ord ~params clauses =
       [Precedence.invfreq_constraint clauses; Precedence.alpha_constraint]
       (calculus#constr clauses)
       clauses
-    else Precedence.make_ordering
+    else Precedence.mk_precedence
       (calculus#constr clauses @ [Precedence.invfreq_constraint clauses;
                                   Precedence.alpha_constraint]) symbols
   in
@@ -196,7 +196,7 @@ let process_file params f =
   (* find the calculus *)
   let calculus = get_calculus ~params in
   (* convert simple clauses to clauses, first with a simple ordering *)
-  let signature = Simple.symbols (List.map fst clauses) in
+  let signature = Simple.signature (List.map fst clauses) in
   let d_ord = O.default_ordering signature in
   let clauses = List.map (C.from_simple ~ord:d_ord) clauses in
   (* first preprocessing, with a simple ordering. *)
@@ -207,7 +207,7 @@ let process_file params f =
   let clauses = enrich_with_theories ~ord:d_ord ~params clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
-  Format.printf "%% precedence: %a@." T.pp_precedence ord#symbol_ordering#precedence;
+  Format.printf "%% precedence: %a@." T.pp_precedence ord#precedence#snapshot;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
@@ -216,7 +216,8 @@ let process_file params f =
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord ~select clauses in
   (* create state, and add clauses to the simpl_set *)
-  let state = PS.mk_state ~ord params in
+  let signature = C.signature clauses in
+  let state = PS.mk_state ~ord params signature in
   (* maybe perform initial inter-reductions *)
   let clauses = if params.param_presaturate
     then begin
@@ -241,7 +242,7 @@ let process_file params f =
   Printf.printf "%% done %d iterations\n" num;
   (* print some statistics *)
   print_stats state;
-  Format.printf "%% final precedence: %a@." T.pp_precedence ord#symbol_ordering#precedence;
+  Format.printf "%% final precedence: %a@." T.pp_precedence ord#precedence#snapshot;
   (match params.param_dot_file with (* print state *)
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));

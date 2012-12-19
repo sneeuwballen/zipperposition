@@ -75,7 +75,7 @@ val mk_exists : term -> formula -> formula
 
 module TMap : Map.S with type key = term
 
-val signature : formula list -> (int * sort) SMap.t
+val signature : formula list -> signature
   (** Signature (map symbol -> arity * sort) of this set of formulas *)
 
 val symbols : formula list -> symbol list

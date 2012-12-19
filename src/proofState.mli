@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     that is used for redundancy elimination. *)
 
 open Types
+open Symbols
 
 (** association name -> index *)
 val choose_index : string -> Index.index
@@ -77,12 +78,12 @@ type state =
     passive_set : passive_set;          (** passive clauses *)
   >
 
-val mk_active_set : ord:ordering -> Index.index -> active_set
+val mk_active_set : ord:ordering -> Index.index -> signature -> active_set
 val mk_simpl_set : ord:ordering -> Index.unit_index -> simpl_set
 val mk_passive_set : ord:ordering -> (ClauseQueue.queue * int) list -> passive_set
 
 (** create a state from the given ordering, and parameters *)
-val mk_state : ord:ordering -> Params.parameters -> state
+val mk_state : ord:ordering -> Params.parameters -> signature -> state
 
 (** statistics on the state (num active, num passive) *)
 type state_stats = int * int

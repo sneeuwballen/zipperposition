@@ -93,7 +93,7 @@ let signature formulas =
   | Node (f, s, l) ->
     begin
       let arity, sort = List.length l, s in
-      (try (* check concistency with signature *)
+      (try (* check consistency with signature *)
         let arity', sort' = SMap.find f signature in
         assert (arity = arity' && sort = sort');
       with Not_found -> ());

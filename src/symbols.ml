@@ -25,8 +25,11 @@ type symbol_attribute = int
 let attr_skolem = 0x1
 let attr_split = 0x2
 
+(** A symbol is a string, a unique ID, and some attributes *)
 type symbol = (string * int * int)
-  (** A symbol is a string, a unique ID, and some attributes *)
+
+(** A sort is just a symbol *)
+type sort = symbol
 
 let compare_symbols (_, t1,_) (_,t2,_) = t1 - t2
 
@@ -43,14 +46,13 @@ module HashSymbol = Weak.Make(
 (** the global symbol table *)
 let symb_table = HashSymbol.create 7
 
-let sig_version = ref 0
-  (** the version of the signature. It also serves as the current
-      index for unique symbols IDs *)
+(** counter for symbols *)
+let symb_count = ref 0
 
 let mk_symbol ?(attrs=0) s =
-  let s = (s, !sig_version, attrs) in
+  let s = (s, !symb_count, attrs) in
   let s' = HashSymbol.merge symb_table s in
-  (if s' == s then incr sig_version);  (* update signature *)
+  (if s' == s then incr symb_count);  (* update signature *)
   s'
 
 let is_used s = HashSymbol.mem symb_table (s, 0, 0)
@@ -72,6 +74,9 @@ module SMap = Map.Make(struct type t = symbol let compare = compare_symbols end)
 
 module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
 
+(** A signature maps symbols to (sort, arity) *)
+type signature = (int * sort) SMap.t
+
 (* connectives *)
 let true_symbol = mk_symbol "$true"
 let false_symbol = mk_symbol "$false"
@@ -87,8 +92,6 @@ let or_symbol = mk_symbol "$$or"
 (* De Bruijn *)
 let db_symbol = mk_symbol "$$db"
 let succ_db_symbol = mk_symbol "$$s"
-
-type sort = symbol
 
 (* default sorts *)
 let type_sort = mk_symbol "$tType"
