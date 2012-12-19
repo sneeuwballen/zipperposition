@@ -63,6 +63,9 @@ class type calculus =
           of clauses. This subsumes the notion of trivial clauses (that
           are simplified into the empty list of clauses) *)
 
+    method is_trivial : hclause -> bool
+      (** single test to detect trivial clauses *)
+
     method axioms : hclause list
       (** a list of axioms to add to the problem *)
 

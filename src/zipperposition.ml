@@ -37,6 +37,10 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
+(*
+module Distributed = Distributed
+*)
+
 let version = "0.3"
 
 (** find the given file from given directory *)
@@ -261,7 +265,8 @@ let process_file params f =
                           "# SZS output end Refutation@.") !C.pp_proof#pp c);
       (* update knowledge base *)
       let potential_lemmas = Theories.search_lemmas c in
-      Theories.update_kb ~file:"kb.lisp" ~lock:"kb.lock"
+      let kb_lock = params.param_kb ^ ".lock" in
+      Theories.update_kb ~file:params.param_kb ~lock:kb_lock
         (fun kb -> Theories.add_potential_lemmas kb potential_lemmas)
     end
 

@@ -1127,6 +1127,8 @@ let superposition : Calculus.calculus =
     method list_simplify ~ord ~select hc =
       if is_tautology hc then [] else [hc]
 
+    method is_trivial hc = is_tautology hc
+
     method axioms = []
 
     method constr _ = [Precedence.min_constraint [false_symbol; true_symbol]]

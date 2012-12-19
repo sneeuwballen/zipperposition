@@ -360,6 +360,8 @@ let delayed : calculus =
       let l = List.map (C.select_clause ~select) l in
       l
 
+    method is_trivial hc = Sup.is_tautology hc
+
     method axioms = []
 
     method constr clauses = symbol_constraint clauses

@@ -202,17 +202,12 @@ let detect_total_relations ~ord clauses =
  * generic representation of theories and formulas (persistent)
  * ---------------------------------------------------------------------- *)
 
-open Sexplib.Std
-
 type tterm =
   | TVar of int
   | TNode of string * tterm list
-  with sexp
   (** an abstract term *)
 
-type tformula =
-  tterm list
-  with sexp
+type tformula = tterm list
   (** an abstract clause *)
 
 let rec tterm_of_term t = match t.term with
@@ -230,10 +225,10 @@ let rec tformula_of_hclause hc =
   in
   Array.to_list (Array.map convert_lit hc.hclits)
 
-type lemma = tformula * tformula list with sexp
+type lemma = tformula * tformula list
   (** a lemma is a clause, with some hypothesis *)
 
-type theory = tformula list with sexp
+type theory = tformula list
   (** a theory is a list of formula *) 
 
 type kb = {
@@ -241,7 +236,7 @@ type kb = {
   kb_potential_lemmas : lemma list;     (** potential lemma, to explore *)
   kb_lemmas : (int * lemma) list;       (** lemma with their unique ID *)
   kb_theories : (string * theory) list; (** theories, with their name *)
-} with sexp (** a Knowledge Base for lemma and theories *)
+} (** a Knowledge Base for lemma and theories *)
 
 let empty_kb = {
   kb_lemma_idx = 0;
@@ -281,24 +276,28 @@ let search_lemmas hc =
 
 exception ReadKB of kb
 
-(* read KB without locking *)
+(* read KB without locking (may crash if wrong format) *)
 let read_kb_nolock filename =
   try
-    let sexp = Sexplib.Sexp.load_sexp filename in
-    let kb = kb_of_sexp sexp in
+    let file = Unix.openfile filename [Unix.O_RDONLY] 0o644 in
+    let file = Unix.in_channel_of_descr file in
+    let kb = (Marshal.from_channel file : kb) in
+    close_in file;
     kb
-  with
-  | Failure _ -> empty_kb
-  | Sys_error _ -> empty_kb
+  with Unix.Unix_error _ -> empty_kb
 
 let read_kb ~lock ~file =
   Utils.with_lock_file lock
     (fun () -> read_kb_nolock file)
 
 let save_kb ~lock ~file kb =
-  let sexp = sexp_of_kb kb in
   Utils.with_lock_file lock
-    (fun () -> Sexplib.Sexp.save_hum file sexp)
+    (fun () ->
+    let out = Unix.openfile file [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
+    let out = Unix.out_channel_of_descr out in
+    Marshal.to_channel out kb [];
+    flush out;
+    close_out out)
 
 let update_kb ~lock ~file f =
   Format.printf "%% update knowledge base... ";
@@ -306,8 +305,12 @@ let update_kb ~lock ~file f =
   Utils.with_lock_file lock
     (fun () ->
     let kb = read_kb_nolock file in
-    (* transform kb, then save the new version *)
+    (* tranform kb with function *)
     let kb = f kb in
-    let sexp = sexp_of_kb kb in
-    Sexplib.Sexp.save_hum file sexp);
+    (* write modified kb to file *)
+    let out = Unix.openfile file [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
+    let out = Unix.out_channel_of_descr out in
+    Marshal.to_channel out kb [];
+    flush out;
+    close_out out);
   Format.printf "done@."

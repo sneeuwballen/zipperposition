@@ -112,9 +112,6 @@ val search_lemmas : hclause -> lemma list
  * serialization/deserialization for abstract logic structures
  * ---------------------------------------------------------------------- *)
 
-val kb_of_sexp : Sexplib.Sexp.t -> kb
-val sexp_of_kb : kb -> Sexplib.Sexp.t
-
 val read_kb : lock:string -> file:string -> kb
   (** parse KB from file (or gives an empty one) *)
 

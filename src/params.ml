@@ -35,6 +35,7 @@ type parameters = {
   param_progress : bool;          (** print progress during search *)
   param_proof : bool;             (** print proof *)
   param_dot_file : string option; (** file to print the final state in *)
+  param_kb : string;              (** file to use for KB *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
@@ -64,6 +65,7 @@ let parse_args () =
   and presaturate = ref false
   and heuristic_precedence = ref true
   and dot_file = ref None
+  and kb = ref "kb"
   and select = ref "SelectComplex"
   and progress = ref false
   and print_sort = ref false
@@ -80,6 +82,7 @@ let parse_args () =
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
+      ("-kb", Arg.Set_string kb, "Knowledge Base file");
       ("-progress", Arg.Set progress, "print progress");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
@@ -104,5 +107,5 @@ let parse_args () =
   { param_ord; param_seed = !seed; param_steps = !steps; param_version= !version; param_calculus= !calculus;
     param_timeout = !timeout; param_files = !files; param_select = !select; param_theories= !theories;
     param_progress = !progress; param_proof = !proof; param_presaturate = !presaturate;
-    param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file;
+    param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file; param_kb = !kb;
     param_print_sort = !print_sort; param_print_all = !print_all; param_precedence= !heuristic_precedence;}
