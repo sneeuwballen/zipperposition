@@ -37,9 +37,7 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
-(*
 module Distributed = Distributed
-*)
 
 let version = "0.3"
 
