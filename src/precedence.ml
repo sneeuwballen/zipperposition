@@ -261,10 +261,11 @@ let check_definition clause =
   | None -> []
 
 let check_rules clause =
-  (* otherwise, try to interpret the clause as a rewrite rule *)
+  (* otherwise, try to interpret the clause as a rewrite rule. It only provides
+     a constraint if the rule is not trivially oriented by the subterm property. *)
   let rules = Theories.is_rewrite_rule clause in
   match rules with
-  | [l, r] ->
+  | [l, r] when not (T.member_term r l) ->
     Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>rewrite rule: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
     [check_gt ~weight:weight_rewrite l r]
   | _ -> []  (* not unambiguously a rewrite rule *)
