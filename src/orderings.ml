@@ -361,6 +361,13 @@ module OrdCache = Cache.Make(
     let equal t1 t2 = T.eq_term t1 t2
   end)
 
+(** Check that new_prec is a compatible superset of old_prec *)
+let check_precedence old_prec new_prec =
+  let rec check l = match l with
+  | [] | [_] -> true
+  | x::((y::_) as l') -> new_prec#compare x y > 0 && check l'
+  in check old_prec#snapshot
+
 let kbo (prec : precedence) : ordering =
   object
     val mutable m_prec = prec
@@ -369,6 +376,7 @@ let kbo (prec : precedence) : ordering =
     method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
     method set_precedence prec =
+      assert (check_precedence m_prec prec);
       m_prec <- prec;
       cache <- OrdCache.create 4096 (KBO.compare_terms ~prec)
     method name = KBO.name
@@ -382,6 +390,7 @@ let rpo (prec : precedence) : ordering =
     method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
     method set_precedence prec =
+      assert (check_precedence m_prec prec);
       m_prec <- prec;
       cache <- OrdCache.create 4096 (RPO.compare_terms ~prec)
     method name = RPO.name
@@ -395,6 +404,7 @@ let rpo6 (prec : precedence) : ordering =
     method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
     method set_precedence prec =
+      assert (check_precedence m_prec prec);
       m_prec <- prec;
       cache <- OrdCache.create 4096 (RPO6.compare_terms ~prec)
     method name = RPO6.name
