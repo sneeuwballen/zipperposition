@@ -363,31 +363,40 @@ module OrdCache = Cache.Make(
 
 let kbo (prec : precedence) : ordering =
   object
-    val cache = OrdCache.create 4096 (KBO.compare_terms ~prec)
-    val prec = prec
+    val mutable m_prec = prec
+    val mutable cache = OrdCache.create 4096 (KBO.compare_terms ~prec)
     method clear_cache () = OrdCache.clear cache
-    method precedence = prec
+    method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
+    method set_precedence prec =
+      m_prec <- prec;
+      cache <- OrdCache.create 4096 (KBO.compare_terms ~prec)
     method name = KBO.name
   end
 
 let rpo (prec : precedence) : ordering =
   object
-    val cache = OrdCache.create 4096 (RPO.compare_terms ~prec)
-    val prec = prec
+    val mutable m_prec = prec
+    val mutable cache = OrdCache.create 4096 (RPO.compare_terms ~prec)
     method clear_cache () = OrdCache.clear cache
-    method precedence = prec
+    method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
+    method set_precedence prec =
+      m_prec <- prec;
+      cache <- OrdCache.create 4096 (RPO.compare_terms ~prec)
     method name = RPO.name
   end
 
 let rpo6 (prec : precedence) : ordering =
   object
-    val cache = OrdCache.create 4096 (RPO6.compare_terms ~prec)
-    val prec = prec
+    val mutable m_prec = prec
+    val mutable cache = OrdCache.create 4096 (RPO6.compare_terms ~prec)
     method clear_cache () = OrdCache.clear cache
-    method precedence = prec
+    method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
+    method set_precedence prec =
+      m_prec <- prec;
+      cache <- OrdCache.create 4096 (RPO6.compare_terms ~prec)
     method name = RPO6.name
   end
 

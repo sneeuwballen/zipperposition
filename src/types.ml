@@ -122,6 +122,7 @@ class type ordering =
   object
     method clear_cache : unit -> unit           (** clear cache, if any *)
     method precedence : precedence              (** underlying precedence on symbols *)
+    method set_precedence : precedence -> unit  (** update the precedence *)
     method compare : term -> term -> comparison (** compare two terms *)
     method name : string
   end
