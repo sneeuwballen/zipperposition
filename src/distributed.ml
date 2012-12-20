@@ -69,6 +69,35 @@ type net_state = {
   ns_new : net_clause list;         (** new clauses produced with given clause *)
 }
 
+(** Hash a net_clause *)
+let hash_net_clause nc =
+  let rec hash_nc_term acc t = match t with
+   | NVar (i, s) -> Hashcons.combine2 acc (Utils.murmur_hash i) (Hashtbl.hash s)
+   | NNode (f, s, l) ->
+     Hashcons.combine3 331 (Hashtbl.hash f) (Hashtbl.hash s) (List.fold_left hash_nc_term acc l)
+  and hash_nc_literal acc = function
+  | NEquation (l,r,sign,_) ->
+    Hashcons.combine3 acc (hash_nc_term 17 l) (hash_nc_term 401 r) (if sign then 14 else 15)
+  in
+  Array.fold_left hash_nc_literal 853 nc.nc_lits
+
+(** Equality for net_clauses *)
+let eq_net_clause nc1 nc2 =
+  let rec check_lits l1 l2 i =
+    if i = Array.length l1 then true else eq_lits l1.(i) l2.(i) && check_lits l1 l2 (i+1)
+  and eq_lits lit1 lit2 = match lit1, lit2 with
+  | NEquation (l1, r1, sign1, ord1), NEquation (l2, r2, sign2, ord2) ->
+    sign1 = sign2 && ord1 = ord2 && eq_term l1 r1 && eq_term l2 r2
+  and eq_term l r = match l, r with
+  | NVar (i, si), NVar (j, sj) -> i = j && si = sj
+  | NNode (f1, s1, l1), NNode (f2,s2,l2) -> f1 = f2 && s1 = s2 && List.for_all2 eq_term l1 l2
+  | _ -> false
+  in
+  Array.length nc1.nc_lits = Array.length nc2.nc_lits && check_lits nc1.nc_lits nc2.nc_lits 0
+
+(** Hashtable of net_clauses *)
+module NHashtbl = Hashtbl.Make(struct type t = net_clause let hash = hash_net_clause let equal = eq_net_clause end)
+
 (* ----------------------------------------------------------------------
  * conversion functions
  * ---------------------------------------------------------------------- *)
@@ -223,23 +252,80 @@ let update_passive ~select ~calculus ~ord passive_set net_state =
   let new_clauses = Utils.list_flatmap (calculus#list_simplify ~ord ~select) new_clauses in
   passive_set#add new_clauses
 
+(** Access to global utils *)
+type globals =
+  < subscribe_redundant: net_clause list Join.chan -> unit;
+    subscribe_exit: unit Join.chan -> unit;
+    convert: novel:bool -> hclause -> net_clause;
+    get_descendants: net_clause -> net_clause list;
+    send_result: net_clause Sat.szs_status -> unit;
+  >
+
 (* ----------------------------------------------------------------------
  * components
  * ---------------------------------------------------------------------- *)
+
+(** Structure used to keep track of parent/descendants and clause/proof
+    relationships *)
+type genealogy = {
+  mutable gen_descendants: net_clause list;
+  mutable gen_proof: net_proof option;
+}
+
+let empty_genealogy = { gen_descendants = []; gen_proof = None; }
+
+(** The process responsible for keeping track of
+    parents and proofs of clauses *)
+let proof_parents_process () =
+  let genealogies = NHashtbl.create 109 in
+  (* get genealogy for this clause *)
+  let rec get_genealogy c =
+    try NHashtbl.find genealogies c
+    with Not_found ->
+      let it = empty_genealogy in
+      NHashtbl.add genealogies c it;
+      it
+  (* add a descendant to the clause *)
+  and add_descendant parent child =
+    let genealogy = get_genealogy parent in
+    genealogy.gen_descendants <- child :: genealogy.gen_descendants
+  (* add a proof to the clause *)
+  and maybe_add_proof clause proof =
+    let genealogy = get_genealogy clause in
+    match genealogy.gen_proof with
+    | None -> genealogy.gen_proof <- proof  (* first proof *)
+    | Some _ -> ()  (* already a proof, do nothing *)
+  in 
+  def ready() & add_parents(clause, parents) =
+    List.iter (fun p -> add_descendant p clause) parents; ready()
+  or  ready() & add_proof(clause, proof) =
+    maybe_add_proof clause proof; ready()
+  or  ready() & get_descendants(clause) =
+    let genealogy = get_genealogy clause in
+    reply genealogy.gen_descendants to get_descendants & ready ()
+  or  ready() & get_proof(clause) =
+    let genealogy = get_genealogy clause in
+    reply genealogy.gen_proof to get_proof & ready ()
+  in
+  spawn ready();
+  add_parents, add_proof, get_descendants, get_proof
 
 (** Create a component dedicated to simplification by rewriting/simplify-reflect.
     It takes as input:
     - get_ord:int -> ordering
     - output: net_state Join.chan
     and returns a synchronous input chan (net_state -> unit) *)
-let rewrite_process ~calculus ~select ~ord ~output unit_idx =
-  let subscribe_exit = get_subscribe_exit () in
-  let convert_clause = get_convert_clause () in
+let rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let last_state = ref (-1) in
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
     ddebug 1 (lazy "process exiting..."); 0
+  (* redundant clauses *)
+  or  ready() & redundant(clauses) =
+    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    simpl_set#remove clauses;
+    ready()
   (* case in which we process the next clause *)
   or  ready() & input(net_state) =
     reply to input & begin
@@ -262,30 +348,36 @@ let rewrite_process ~calculus ~select ~ord ~output unit_idx =
         let net_state =
           if calculus#is_trivial simplified
           then { net_state with ns_given = None } (* stop processing this clause *)
-          else
-            let ns_new = convert_clause ~novel simplified in
+          else begin
+            simpl_set#add [simplified];  (* add the clause to active set *)
+            let ns_new = globals#convert_clause ~novel simplified in
             { net_state with ns_given = Some ns_new }
+          end
         in
         (* forward the state *)
         output(net_state) & ready()
       end
     end
   in
-  subscribe_exit exit;
+  globals#subscribe_exit exit;
+  globals#subscribe_redundant redundant;
   spawn ready();
   input
 
 (** Create a component dedicated to simplification by the active set
     and by means of subsumption. It returns a synchronous input chan (net_state -> unit) *)
-let active_process ~calculus ~select ~ord ~output index =
-  let subscribe_exit = get_subscribe_exit () in
-  let convert_clause = get_convert_clause () in
+let active_process ~calculus ~select ~ord ~output ~globals index signature =
   let last_state = ref (-1) in
   (* XXX possible optim: only retain the fv_index of active_set *)
-  let active_set = PS.mk_active_set ~ord index in
+  let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
   def ready() & exit() =
     ddebug 1 (lazy "process exiting..."); 0
+  (* redundant clauses *)
+  or  ready() & redundant(clauses) =
+    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    active_set#remove clauses;
+    ready()
   (* case in which we process the next clause *)
   or  ready() & input(net_state) =
     reply to input & begin
@@ -306,18 +398,23 @@ let active_process ~calculus ~select ~ord ~output index =
         let simplified = calculus#basic_simplify ~ord simplified in
         let novel = not (C.eq_hclause given simplified) in
         let net_state =
-          if calculus#is_trivial simplified
+          (* check whether the clause is trivial or redundant *)
+          if calculus#is_trivial simplified || calculus#redundant active_set simplified
           then { net_state with ns_given = None } (* stop processing this clause *)
-          else
-            let ns_new = convert_clause ~novel simplified in
+          else begin
+            active_set#add [simplified]; (* add clause to active_set *)
+            let ns_new = globals#convert_clause ~novel simplified in
             { net_state with ns_given = Some ns_new }
+          end
         in
         (* forward the state *)
         output(net_state) & ready()
       end
     end
   in
-  subscribe_exit exit;
+  (* subscribe to some events *)
+  globals#subscribe_exit exit;
+  globals#subscribe_redundant redundant;
   spawn ready();
   input
 
@@ -329,9 +426,7 @@ let pipeline_capacity = ref 10
     to modify the ordering.
     The [result] argument is a szs_status Join.chan on which the answer is
     sent. *)
-let passive_process ~calculus ~select ~ord ~output ~send_result ~get_descendants ?steps queues =
-  let subscribe_exit = get_subscribe_exit () in
-  let convert_clause = get_convert_clause () in
+let passive_process ~calculus ~select ~ord ~output ~globals ?steps queues =
   let passive_set = PS.mk_passive_set ~ord queues in
   (* timestamp of last started loop, last finished loop *)
   let last_start, last_done = ref 0, ref (-1) in
@@ -342,9 +437,11 @@ let passive_process ~calculus ~select ~ord ~output ~send_result ~get_descendants
     let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
     let new_clauses = List.filter (fun hc -> not (calculus#is_trivial hc)) new_clauses in
     passive_set#add new_clauses
-  (* how to process simplified clauses *)
+  (* how to process simplified clauses: remove their orphans (needs to get the
+     descendants and add them to the hclause explicitely before) *)
   and process_simplified net_state =
-    let simplified_descendants = List.map (fun nc -> nc, get_descendants nc) net_state.ns_simplified in
+    let simplified_descendants = List.map
+      (fun nc -> nc, globals#get_descendants nc) net_state.ns_simplified in
     let simplified = List.map
       (fun (nc, descendants) ->
         let hc = hclause_of_net_clause ~ord nc in
@@ -363,11 +460,11 @@ let passive_process ~calculus ~select ~ord ~output ~send_result ~get_descendants
   or  notfull() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
     if !steps_to_go = 0
-    then (ddebug 1 (lazy "reached max number of steps"); send_result(Sat.Unknown))
+    then (ddebug 1 (lazy "reached max number of steps"); globals#send_result(Sat.Unknown))
     else match passive_set#next () with
     | None when !last_done = !last_start ->
       (* all clauses have been processed, none remains in passive *)
-      send_result(Sat.Sat)
+      globals#send_result(Sat.Sat)
     | None ->
       (* wait for an incoming result *)
       assert (!last_start > !last_done);
@@ -381,7 +478,7 @@ let passive_process ~calculus ~select ~ord ~output ~send_result ~get_descendants
       | given::others -> begin
         (* put others back in passive set, and send given in the pipeline! *)
         passive_set#add others;
-        let nc_given = convert_clause ~novel:true given in
+        let nc_given = globals#convert_clause ~novel:true given in
         assert (ord#precedence#version >= old_ord_version);
         (* should we update the ordering? *)
         let ns_ord = if ord#precedence#version = old_ord_version
@@ -425,7 +522,7 @@ let passive_process ~calculus ~select ~ord ~output ~send_result ~get_descendants
         else (ddebug 1 (lazy "enter state full"); notfull())
     end
   in
-  subscribe_exit exit;
+  globals#subscribe_exit exit;
   spawn notfull();
   input
 
