@@ -232,14 +232,14 @@ let update_passive ~select ~calculus ~ord passive_set net_state =
     - get_ord:int -> ordering
     - output: net_state Join.chan
     and returns a synchronous input chan (net_state -> unit) *)
-let rewrite_process ~calculus ~select ~ord ~output unit_idx=
+let rewrite_process ~calculus ~select ~ord ~output unit_idx =
   let subscribe_exit = get_subscribe_exit () in
   let convert_clause = get_convert_clause () in
   let last_state = ref (-1) in
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "process exiting..."); exit()
+    ddebug 1 (lazy "process exiting..."); 0
   (* case in which we process the next clause *)
   or  ready() & input(net_state) =
     reply to input & begin
@@ -257,6 +257,52 @@ let rewrite_process ~calculus ~select ~ord ~output unit_idx=
                  !C.pp_clause#pp_h given));
         (* simplify given clause *)
         let simplified = calculus#rw_simplify ~select simpl_set given in
+        let simplified = calculus#basic_simplify ~ord simplified in
+        let novel = not (C.eq_hclause given simplified) in
+        let net_state =
+          if calculus#is_trivial simplified
+          then { net_state with ns_given = None } (* stop processing this clause *)
+          else
+            let ns_new = convert_clause ~novel simplified in
+            { net_state with ns_given = Some ns_new }
+        in
+        (* forward the state *)
+        output(net_state) & ready()
+      end
+    end
+  in
+  subscribe_exit exit;
+  spawn ready();
+  input
+
+(** Create a component dedicated to simplification by the active set
+    and by means of subsumption. It returns a synchronous input chan (net_state -> unit) *)
+let active_process ~calculus ~select ~ord ~output index =
+  let subscribe_exit = get_subscribe_exit () in
+  let convert_clause = get_convert_clause () in
+  let last_state = ref (-1) in
+  (* XXX possible optim: only retain the fv_index of active_set *)
+  let active_set = PS.mk_active_set ~ord index in
+  (* case in which we exit *)
+  def ready() & exit() =
+    ddebug 1 (lazy "process exiting..."); 0
+  (* case in which we process the next clause *)
+  or  ready() & input(net_state) =
+    reply to input & begin
+      assert (net_state.ns_num = !last_state + 1);
+      last_state := net_state.ns_num;
+      (* obtain given clause, and ordering *)
+      match net_state.ns_given with
+      | None ->
+        update_ord ~ord net_state;
+        output(net_state) & ready()
+      | Some ns_given -> begin
+        let given = hclause_of_net_clause ~ord ns_given in
+        update_ord ~ord net_state;
+        ddebug 1 (lazy (Utils.sprintf "active_process processing given clause @[<h>%a@]"
+                 !C.pp_clause#pp_h given));
+        (* simplify given clause *)
+        let simplified = calculus#active_simplify ~select active_set given in
         let simplified = calculus#basic_simplify ~ord simplified in
         let novel = not (C.eq_hclause given simplified) in
         let net_state =
@@ -358,22 +404,26 @@ let passive_process ~calculus ~select ~ord ~output ~send_result ~get_descendants
       end)
   (* get result back while full *)
   or  input(net_state) & full() =
-    process_simplified net_state;
-    process_new net_state;
-    assert (net_state.ns_num = !last_done + 1);
-    last_done := max !last_done net_state.ns_num;
-    if !last_start - !last_done > !pipeline_capacity
-      then (ddebug 1 (lazy "enter state full"); full())
-      else (ddebug 1 (lazy "enter state full"); notfull())
+    reply to input & begin
+      process_simplified net_state;
+      process_new net_state;
+      assert (net_state.ns_num = !last_done + 1);
+      last_done := max !last_done net_state.ns_num;
+      if !last_start - !last_done > !pipeline_capacity
+        then (ddebug 1 (lazy "enter state full"); full())
+        else (ddebug 1 (lazy "enter state full"); notfull())
+    end
   (* get result back while not full yet (when the passive_set is empty) *)
   or  input(net_state) & wait() =
-    process_simplified net_state;
-    process_new net_state;
-    assert (net_state.ns_num = !last_done + 1);
-    last_done := max !last_done net_state.ns_num;
-    if !last_start - !last_done > !pipeline_capacity
-      then (ddebug 1 (lazy "enter state full"); full())
-      else (ddebug 1 (lazy "enter state full"); notfull())
+    reply to input & begin
+      process_simplified net_state;
+      process_new net_state;
+      assert (net_state.ns_num = !last_done + 1);
+      last_done := max !last_done net_state.ns_num;
+      if !last_start - !last_done > !pipeline_capacity
+        then (ddebug 1 (lazy "enter state full"); full())
+        else (ddebug 1 (lazy "enter state full"); notfull())
+    end
   in
   subscribe_exit exit;
   spawn notfull();
