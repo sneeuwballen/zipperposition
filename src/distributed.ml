@@ -398,7 +398,7 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "rw_process exiting..."); 0
+    ddebug 1 (lazy "rw_process exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -450,7 +450,7 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "active_process exiting..."); 0
+    ddebug 1 (lazy "active_process exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -503,7 +503,7 @@ let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature 
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "bwd_subsume_process exiting..."); 0
+    ddebug 1 (lazy "bwd_subsume_process exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -554,7 +554,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "bwd_rewrite_process exiting..."); 0
+    ddebug 1 (lazy "bwd_rewrite_process exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -607,8 +607,8 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
   input
 
 (** Create a component that performs generating inferences *)
-let generate_process ~calculus ~select ~ord ~output ~globals index signature =
-  failwith "TODO"; 0
+let generate_process ~calculus ~select ~ord ~output ~globals index =
+  fun _ -> ()  (* TODO *)
 
 (** Create a component dedicated to RW simplification of newly generated clauses by
     the active set. *)
@@ -617,7 +617,7 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "new_rewrite_process exiting..."); 0
+    ddebug 1 (lazy "new_rewrite_process exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -665,8 +665,10 @@ let pipeline_capacity = ref 10
     to modify the ordering.
     The [result] argument is a szs_status Join.chan on which the answer is
     sent. *)
-let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queues =
+let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queues clauses =
+  (* initialize passive set with the given clauses *)
   let passive_set = PS.mk_passive_set ~ord queues in
+  passive_set#add (List.map (hclause_of_net_clause ~ord) clauses);
   (* timestamp of last started loop, last finished loop, last transmitted ord *)
   let last_start= ref 0 in
   let last_done = ref (-1) in
@@ -703,7 +705,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   in
   (* cases in which we exit *)
   def exit() =
-    ddebug 1 (lazy "process exiting..."); 0
+    ddebug 1 (lazy "process exiting..."); reply to exit
   (* process a new clause, the network is not full *)
   or  notfull() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);

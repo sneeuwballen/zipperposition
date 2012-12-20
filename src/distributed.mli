@@ -70,13 +70,14 @@ val ddebug : int -> string Lazy.t -> unit
 
 val get_add_parents : unit -> (net_clause * net_clause list) Join.chan
 val get_add_proof : unit -> (net_clause * net_proof) Join.chan
-val get_get_parents : unit -> net_clause -> net_clause list
+val get_get_descendants : unit -> net_clause -> net_clause list
 val get_get_proof : unit -> net_clause -> net_proof option
 val get_publish_redundant : unit -> net_clause list Join.chan
 val get_subscribe_redundant : unit -> net_clause list Join.chan -> unit
 val get_subscribe_exit : unit -> unit Join.chan -> unit
+val get_send_result : unit -> net_clause Saturate.szs_status -> unit
 
-val mk_queue : unit -> 'a Join.chan * ('a -> unit) Join.chan
+val mk_queue : unit -> 'a Join.chan * (('a -> unit) -> unit)
   (** Create a queue. It returns a channel to send input objects (type 'a) in,
       and a channel to send a synchronous chan in to register to the queue.
       
@@ -84,19 +85,112 @@ val mk_queue : unit -> 'a Join.chan * ('a -> unit) Join.chan
       order, and the queue will wait for all recipients to receive a message
       before it processes the next one. *)
 
-val mk_global_queue : string -> 'a Join.chan * ('a -> unit) Join.chan
+val mk_global_queue : string -> 'a Join.chan * (('a -> unit) -> unit)
   (** Same as mk_queue, but registers (send, subscribe) with
       the given global name. *)
+
+val get_queue : string -> 'a Join.chan * (('a -> unit) -> unit)
+  (** Get a handle on the remote queue by name *)
 
 (* ----------------------------------------------------------------------
  * utils
  * ---------------------------------------------------------------------- *)
 
-val get_convert_clause : unit -> novel:bool -> hclause -> net_clause
-  (** Convert the clause in net_clause, also sending its proof and
-      parents to the proof collector if [novel] is true *)
+(** Access to global utils *)
+type globals =
+  < subscribe_redundant: (net_clause list -> unit) -> unit;
+    publish_redundant: net_clause list Join.chan;
+    subscribe_exit: (unit -> unit) -> unit;
+    publish_exit: unit Join.chan;
+    convert: novel:bool -> hclause -> net_clause;
+    get_descendants: net_clause -> net_clause list;
+    send_result: net_clause Saturate.szs_status -> unit;
+  >
+
+val proof_parents_process : unit ->
+                             (net_clause * net_clause list) Join.chan *
+                             (net_clause * net_proof) Join.chan *
+                             (net_clause -> net_clause list) *
+                             (net_clause -> net_proof option)
+  (** The process responsible for keeping track of
+      parents and proofs of clauses *)
+
+val connect : (net_state -> unit) -> string list -> unit
+  (** connects the given input to queues whose names are in the list. *)
+
+val setup_globals : (net_clause Saturate.szs_status -> unit) -> globals
+  (** Setup global components in this process. Also setup the network server.
+      The parameter is the chan to send results on *)
+
+val get_globals : unit -> globals
+  (** Create a globals object, using (possibly remote) components *)
   
 (* ----------------------------------------------------------------------
  * components
  * ---------------------------------------------------------------------- *)
 
+val fwd_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
+                          ord:ordering -> output: net_state Join.chan ->
+                          globals:globals -> Index.unit_index ->
+                          (net_state -> unit)
+
+val fwd_active_process : calculus:Calculus.calculus -> select:selection_fun ->
+                          ord:ordering -> output: net_state Join.chan ->
+                          globals:globals -> Index.index -> signature ->
+                          (net_state -> unit)
+
+val bwd_subsume_process : calculus:Calculus.calculus -> select:selection_fun ->
+                          ord:ordering -> output: net_state Join.chan ->
+                          globals:globals -> Index.index -> signature ->
+                          (net_state -> unit)
+
+val bwd_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
+                          ord:ordering -> output: net_state Join.chan ->
+                          globals:globals -> Index.unit_index -> Index.index ->
+                          signature -> (net_state -> unit)
+
+val generate_process : calculus:Calculus.calculus -> select:selection_fun ->
+                      ord:ordering -> output: net_state Join.chan ->
+                      globals:globals -> Index.index ->
+                      (net_state -> unit)
+
+val post_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
+                          ord:ordering -> output: net_state Join.chan ->
+                          globals:globals -> Index.unit_index ->
+                          (net_state -> unit)
+
+val pipeline_capacity : int ref
+  (** Maximum number of clauses to be sent down the pipeline at the same time *)
+
+val passive_process : calculus:Calculus.calculus -> select:selection_fun ->
+                      ord:ordering -> output: net_state Join.chan ->
+                      globals:globals -> 
+                      ?step:int -> ?timeout:float ->
+                      (ClauseQueue.queue * int) list ->
+                      net_clause list ->
+                      (net_state -> unit)
+
+val layout_one_process : calculus:Calculus.calculus -> select:selection_fun ->
+                        ord:ordering ->
+                        send_result: (net_clause Saturate.szs_status -> unit) ->
+                        ?step:int -> ?timeout:float -> net_clause list ->
+                        (ClauseQueue.queue * int) list ->
+                        unit
+  (** Create a pipeline within the same process, without forking *)
+
+val layout_standard : calculus:Calculus.calculus -> select:selection_fun ->
+                      ord:ordering ->
+                      send_result: (net_clause Saturate.szs_status -> unit) ->
+                      ?step:int -> ?timeout:float -> net_clause list ->
+                      (ClauseQueue.queue * int) list ->
+                      unit
+  (** Create a pipeline with several forked processes *)
+
+val given_clause: ?parallel:bool -> ?steps:int -> ?timeout:float ->
+                  ?progress:bool ->
+                  calculus:Calculus.calculus ->
+                  select:selection_fun -> ord:ordering ->
+                  hclause list ->
+                  hclause Saturate.szs_status
+  (** run the given clause until a timeout occurs or a result
+      is found. It returns the result. *)
