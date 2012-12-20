@@ -271,18 +271,19 @@ let rewrite_process ~calculus ~select ~ord ~output unit_idx=
       end
     end
   in
+  subscribe_exit exit;
   spawn ready();
   input
 
 (** Number of clauses being processed at the same time *)
-let pipeline_capacity = 10
+let pipeline_capacity = ref 10
 
 (** Create a component dedicated to maintaining the passive set. It also
     performs list_simplify on clauses, and is therefore the only process
     to modify the ordering.
     The [result] argument is a szs_status Join.chan on which the answer is
     sent. *)
-let passive_process ~calculus ~select ~ord ~output ~send_result ?steps queues =
+let passive_process ~calculus ~select ~ord ~output ~send_result ~get_descendants ?steps queues =
   let subscribe_exit = get_subscribe_exit () in
   let convert_clause = get_convert_clause () in
   let passive_set = PS.mk_passive_set ~ord queues in
@@ -290,21 +291,47 @@ let passive_process ~calculus ~select ~ord ~output ~send_result ?steps queues =
   let last_start, last_done = ref 0, ref (-1) in
   (* how many remaining steps? *)
   let steps_to_go = ref (match steps with None -> max_int | Some s -> s) in
-  (* case in which we exit *)
-  def ready() & exit() =
-    ddebug 1 (lazy "process exiting..."); exit()
+  (* how to process new clauses *)
+  let process_new net_state =
+    let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
+    let new_clauses = List.filter (fun hc -> not (calculus#is_trivial hc)) new_clauses in
+    passive_set#add new_clauses
+  (* how to process simplified clauses *)
+  and process_simplified net_state =
+    let simplified_descendants = List.map (fun nc -> nc, get_descendants nc) net_state.ns_simplified in
+    let simplified = List.map
+      (fun (nc, descendants) ->
+        let hc = hclause_of_net_clause ~ord nc in
+        List.iter (fun nc' -> let hc' = hclause_of_net_clause ~ord nc in
+          hc.hcdescendants <- Ptset.add hc'.hctag hc.hcdescendants)
+        descendants;
+        hc)
+      simplified_descendants
+    in
+    Sat.remove_orphans passive_set simplified
+  in
+  (* cases in which we exit *)
+  def exit() =
+    ddebug 1 (lazy "process exiting..."); 0
   (* process a new clause, the network is not full *)
-  or  ready() & notfull() =
+  or  notfull() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
-    if !steps_to_go = 0 then send_result(Sat.Unknown) else
-    match passive_set#next () with
-    | None -> send_result(Sat.Sat) & ready()
+    if !steps_to_go = 0
+    then (ddebug 1 (lazy "reached max number of steps"); send_result(Sat.Unknown))
+    else match passive_set#next () with
+    | None when !last_done = !last_start ->
+      (* all clauses have been processed, none remains in passive *)
+      send_result(Sat.Sat)
+    | None ->
+      (* wait for an incoming result *)
+      assert (!last_start > !last_done);
+      wait ()
     | Some given ->
       decr steps_to_go;
       (* preprocess: list_simplify *)
       let old_ord_version = ord#precedence#version in
       (match calculus#list_simplify ~ord ~select given with
-      | [] -> ready() & notfull()
+      | [] -> notfull()
       | given::others -> begin
         (* put others back in passive set, and send given in the pipeline! *)
         passive_set#add others;
@@ -321,15 +348,34 @@ let passive_process ~calculus ~select ~ord ~output ~send_result ?steps queues =
           ns_simplified = [];
           ns_new = [];
         } in
-        (* send in the pipeline, and check whether we have to wait for results *)
+        (* another clause is sent to the pipeline *)
         incr last_start;
-        if !last_start - !last_done > pipeline_capacity
-          then output(net_state) & full() & ready()
-          else output(net_state) & notfull() & ready()
+        output(net_state);
+        (* shall we wait for results to come before we continue? *)
+        if !last_start - !last_done > !pipeline_capacity
+          then full()
+          else notfull()
       end)
   (* get result back while full *)
-  or ready() & full() = failwith "foo";0  (* TODO *)
+  or  input(net_state) & full() =
+    process_simplified net_state;
+    process_new net_state;
+    assert (net_state.ns_num = !last_done + 1);
+    last_done := max !last_done net_state.ns_num;
+    if !last_start - !last_done > !pipeline_capacity
+      then (ddebug 1 (lazy "enter state full"); full())
+      else (ddebug 1 (lazy "enter state full"); notfull())
+  (* get result back while not full yet (when the passive_set is empty) *)
+  or  input(net_state) & wait() =
+    process_simplified net_state;
+    process_new net_state;
+    assert (net_state.ns_num = !last_done + 1);
+    last_done := max !last_done net_state.ns_num;
+    if !last_start - !last_done > !pipeline_capacity
+      then (ddebug 1 (lazy "enter state full"); full())
+      else (ddebug 1 (lazy "enter state full"); notfull())
   in
-  spawn notfull() & ready ();
+  subscribe_exit exit;
+  spawn notfull();
   input
 
