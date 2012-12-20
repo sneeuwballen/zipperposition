@@ -687,6 +687,9 @@ let to_simple t =
  * skolem terms
  * ---------------------------------------------------------------------- *)
 
+(** Prefix used for skolem symbols *)
+let skolem_prefix = ref "sk"
+
 (** Skolemize the given term at root (assumes it occurs just under an
     existential quantifier, whose De Bruijn variable is replaced
     by a fresh symbol applied to free variables). This also
@@ -697,9 +700,9 @@ let to_simple t =
 let classic_skolem =
   let cache = THashtbl.create 13 (* global cache for skolemized terms *)
   and count = ref 0 in  (* current symbol counter *)
-  (* find an unused skolem symbol *)
+  (* find an unused skolem symbol, beginning with [prefix] *)
   let rec find_skolem () = 
-    let skolem = "sk" ^ (string_of_int !count) in
+    let skolem = !skolem_prefix ^ (string_of_int !count) in
     incr count;
     if Symbols.is_used skolem then find_skolem () else skolem
   in

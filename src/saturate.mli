@@ -24,8 +24,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 (** The SZS status of a state *)
-type szs_status = 
-  | Unsat of hclause
+type 'a szs_status = 
+  | Unsat of 'a
   | Sat
   | Unknown
   | Error of string 
@@ -36,6 +36,11 @@ val check_timeout : float option -> bool
 
 (** maximum number of nested unary inferences *)
 val unary_max_depth : int ref
+
+(** perform backward simplification of the active set *)
+val backward_simplify : calculus:Calculus.calculus -> select:selection_fun ->
+                        ProofState.active_set -> ProofState.simpl_set ->
+                        hclause -> Clauses.CSet.t * hclause list
 
 (** generation of new clauses (unary inferences are repeated at most !unary_max_depth) *)
 val generate : calculus:Calculus.calculus -> ProofState.active_set -> hclause -> hclause list
@@ -49,7 +54,7 @@ val remove_orphans : ProofState.passive_set -> hclause list -> unit
 val given_clause_step : ?generating:bool ->
                         calculus:Calculus.calculus ->
                         int -> ProofState.state ->
-                        szs_status
+                        hclause szs_status
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns a tuple (new state, result, number of steps done).
@@ -57,13 +62,13 @@ val given_clause_step : ?generating:bool ->
 val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float -> ?progress:bool ->
                   calculus:Calculus.calculus ->
                   ProofState.state ->
-                  szs_status * int
+                  hclause szs_status * int
 
 (** Interreduction of the given state, without generating inferences. Returns
     the number of steps done for presaturation, with status of the set. *)
 val presaturate : calculus:Calculus.calculus ->
                   ProofState.state ->
-                  szs_status * int
+                  hclause szs_status * int
 
 (** time elapsed since start of program *)
 val get_total_time : unit -> float

@@ -41,8 +41,8 @@ let prof_is_redundant = Utils.mk_profiler "is_redundant"
 let prof_subsumed_by = Utils.mk_profiler "subsumed_by"
 
 (** the status of a state *)
-type szs_status = 
-  | Unsat of hclause
+type 'a szs_status = 
+  | Unsat of 'a
   | Sat
   | Unknown
   | Error of string 

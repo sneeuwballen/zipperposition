@@ -208,6 +208,9 @@ val to_simple : term -> Simple.term option  (** fails if the term is of bool sor
  * skolem terms
  * ---------------------------------------------------------------------- *)
 
+(** Prefix used for skolem symbols *)
+val skolem_prefix : string ref
+
 (** Skolemize the given term at root (assumes it occurs just under an
     existential quantifier, whose De Bruijn variable is replaced
     by a fresh symbol applied to free variables). This also
