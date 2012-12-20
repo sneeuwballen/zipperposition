@@ -166,9 +166,9 @@ let get_add_proof () =
   let ns = Join.Ns.there socketname in
   (Join.Ns.lookup ns "add_proof" : (net_clause * net_proof) Join.chan)
 
-let get_get_parents () =
+let get_get_descendants () =
   let ns = Join.Ns.there socketname in
-  (Join.Ns.lookup ns "get_parents" : net_clause -> net_clause list)
+  (Join.Ns.lookup ns "get_descendants" : net_clause -> net_clause list)
 
 let get_get_proof () =
   let ns = Join.Ns.there socketname in
@@ -186,20 +186,24 @@ let get_subscribe_exit () =
   let ns = Join.Ns.there socketname in
   (Join.Ns.lookup ns "subscribe_exit" : unit Join.chan -> unit)
 
+let get_send_result () =
+  let ns = Join.Ns.there socketname in
+  (Join.Ns.lookup ns "send_result" : net_clause Sat.szs_status -> unit)
+
 (** Create a queue. It returns a channel to send input objects (type 'a) in,
     and a channel to send a synchronous chan in to register to the queue.
     
     The semantics is that subscribers will receive messages in the correct
     order, and the queue will wait for all recipients to receive a message
     before it processes the next one. *)
-let mk_queue () : 'a Join.chan * ('a -> unit) Join.chan =
+let mk_queue () : 'a Join.chan * (('a -> unit) -> unit) =
   (* send message to all subscribers *)
   def send(x) & ready() & subscribers(l) =
     List.iter (fun s -> s(x)) l;
     ready() & subscribers(l)
   (* subscribe *)
   or  subscribe(s) & subscribers(l) =
-    subscribers(s :: l)
+    subscribers(s :: l) & reply to subscribe
   in
   spawn subscribers( [] ) & ready();
   (* return components of the queue *)
@@ -214,24 +218,26 @@ let mk_global_queue name =
   Join.Ns.register ns name (send, subscribe);
   send, subscribe
 
+(** Get a handle on the remote queue by name *)
+let get_queue name =
+  let ns = Join.Ns.there socketname in
+  Join.Ns.lookup ns name
+
 (* ----------------------------------------------------------------------
  * utils
  * ---------------------------------------------------------------------- *)
 
 (** Publish proof and parents for this clause. and convert it
     to a net_clause *)
-let get_convert_clause () =
-  let add_parents = get_add_parents ()
-  and add_proof = get_add_proof () in
-  fun ~novel hc ->
-    (* convert into serializable form *)
-    let nc = net_clause_of_hclause hc in
-    (if novel then
-      let proof = net_proof_of_proof hc.hcproof in
-      let parents = List.map net_clause_of_hclause hc.hcparents in
-      (* send messages *)
-      spawn add_parents(nc, parents) & add_proof(nc, proof));
-    nc
+let convert_clause add_parents add_proof ~novel hc =
+  (* convert into serializable form *)
+  let nc = net_clause_of_hclause hc in
+  (if novel then
+    let proof = net_proof_of_proof hc.hcproof in
+    let parents = List.map net_clause_of_hclause hc.hcparents in
+    (* send messages *)
+    spawn add_parents(nc, parents) & add_proof(nc, proof));
+  nc
 
 (** Update the ordering, using the net_state *)
 let update_ord ~ord net_state =
@@ -241,9 +247,18 @@ let update_ord ~ord net_state =
     let symbols = List.map mk_symbol symbols in
     let constr = Precedence.list_constraint symbols in
     let precedence = Precedence.mk_precedence [constr] symbols in
-    ddebug 1 (lazy (Utils.sprintf "%% new precedence @[<h>%a@]" T.pp_precedence precedence#snapshot));
+    ddebug 1 (lazy (Utils.sprintf "%% new precedence @[<h>%a@]"
+              T.pp_precedence precedence#snapshot));
     ignore (ord#set_precedence precedence)
   end
+
+(** Update the ordering of the net_state. The initial length of the ordering
+    is [old_version], and if the new ordering contains more symbols,
+    the net_state.ns_ord is updated. *)
+let update_precedence ~ord old_version =
+  if ord#precedence#version = old_version
+    then None
+    else Some (List.map name_symbol ord#precedence#snapshot)
 
 (** Update the passive set using the net_state *)
 let update_passive ~select ~calculus ~ord passive_set net_state =
@@ -254,16 +269,14 @@ let update_passive ~select ~calculus ~ord passive_set net_state =
 
 (** Access to global utils *)
 type globals =
-  < subscribe_redundant: net_clause list Join.chan -> unit;
-    subscribe_exit: unit Join.chan -> unit;
+  < subscribe_redundant: (net_clause list -> unit) -> unit;
+    publish_redundant: net_clause list Join.chan;
+    subscribe_exit: (unit -> unit) -> unit;
+    publish_exit: unit Join.chan;
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
-    send_result: net_clause Sat.szs_status -> unit;
+    send_result: net_clause Saturate.szs_status -> unit;
   >
-
-(* ----------------------------------------------------------------------
- * components
- * ---------------------------------------------------------------------- *)
 
 (** Structure used to keep track of parent/descendants and clause/proof
     relationships *)
@@ -293,7 +306,7 @@ let proof_parents_process () =
   and maybe_add_proof clause proof =
     let genealogy = get_genealogy clause in
     match genealogy.gen_proof with
-    | None -> genealogy.gen_proof <- proof  (* first proof *)
+    | None -> genealogy.gen_proof <- Some proof  (* first proof *)
     | Some _ -> ()  (* already a proof, do nothing *)
   in 
   def ready() & add_parents(clause, parents) =
@@ -310,22 +323,87 @@ let proof_parents_process () =
   spawn ready();
   add_parents, add_proof, get_descendants, get_proof
 
+(** connects the given input to queues whose names are in the list. *)
+let connect input queues =
+  (* lookup a queue by name *)
+  let ns = Join.Ns.there socketname in
+  List.iter
+    (fun queue ->
+      let _, subscribe =
+        (Join.Ns.lookup ns queue : net_state Join.chan *
+                                  ((net_state -> unit) -> unit))
+      in
+      subscribe input)
+    queues
+
+(** Setup global components in this process. Also
+    setup the network server. *)
+let setup_globals send_result =
+  let exit, sub_exit = mk_global_queue "exit" in
+  let redundant, sub_redundant = mk_global_queue "redundant" in
+  let add_parents, add_proof, get_descendants, get_proof =
+    proof_parents_process () in
+  (* listen on the address *)
+  Join.Site.listen socketname;
+  (* register global channels *)
+  let ns = Join.Ns.there socketname in
+  Join.Ns.register ns "add_parents" add_parents;
+  Join.Ns.register ns "add_proof" add_proof;
+  Join.Ns.register ns "get_descendants" get_descendants;
+  Join.Ns.register ns "get_proof" get_proof;
+  Join.Ns.register ns "send_result" send_result;
+  (object
+    method subscribe_redundant = sub_redundant
+    method publish_redundant = redundant
+    method subscribe_exit = sub_exit
+    method publish_exit = exit
+    method convert ~novel hc = convert_clause add_parents add_proof ~novel hc 
+    method get_descendants = get_descendants
+    method get_proof = get_proof
+    method send_result = send_result
+  end :> globals)
+
+(** Create a globals object, using (possibly remote) components *)
+let get_globals () =
+  (* register global channels *)
+  let add_parents = get_add_parents () in
+  let add_proof = get_add_proof () in
+  let get_descendants = get_get_descendants () in
+  let get_proof = get_get_proof () in
+  let send_result = get_send_result () in
+  let redundant, sub_redundant = get_queue "redundant" in
+  let exit, sub_exit = get_queue "exit" in
+  (object
+    method subscribe_redundant = sub_redundant
+    method publish_redundant = redundant
+    method subscribe_exit = sub_exit
+    method publish_exit = exit
+    method convert ~novel hc = convert_clause add_parents add_proof ~novel hc 
+    method get_descendants = get_descendants
+    method get_proof = get_proof
+    method send_result = send_result
+  end :> globals)
+
+(* ----------------------------------------------------------------------
+ * components
+ * ---------------------------------------------------------------------- *)
+
 (** Create a component dedicated to simplification by rewriting/simplify-reflect.
     It takes as input:
     - get_ord:int -> ordering
     - output: net_state Join.chan
     and returns a synchronous input chan (net_state -> unit) *)
-let rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
+let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let last_state = ref (-1) in
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "process exiting..."); 0
+    ddebug 1 (lazy "rw_process exiting..."); 0
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
     simpl_set#remove clauses;
-    ready()
+    ready() & reply to redundant
   (* case in which we process the next clause *)
   or  ready() & input(net_state) =
     reply to input & begin
@@ -350,7 +428,7 @@ let rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
           then { net_state with ns_given = None } (* stop processing this clause *)
           else begin
             simpl_set#add [simplified];  (* add the clause to active set *)
-            let ns_new = globals#convert_clause ~novel simplified in
+            let ns_new = globals#convert ~novel simplified in
             { net_state with ns_given = Some ns_new }
           end
         in
@@ -366,31 +444,30 @@ let rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
 
 (** Create a component dedicated to simplification by the active set
     and by means of subsumption. It returns a synchronous input chan (net_state -> unit) *)
-let active_process ~calculus ~select ~ord ~output ~globals index signature =
+let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
   let last_state = ref (-1) in
-  (* XXX possible optim: only retain the fv_index of active_set *)
+  (* XXX possible optim: only retain the fv_index of active_set? *)
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "process exiting..."); 0
+    ddebug 1 (lazy "active_process exiting..."); 0
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
     active_set#remove clauses;
-    ready()
+    ready() & reply to redundant
   (* case in which we process the next clause *)
   or  ready() & input(net_state) =
     reply to input & begin
       assert (net_state.ns_num = !last_state + 1);
       last_state := net_state.ns_num;
+      update_ord ~ord net_state;
       (* obtain given clause, and ordering *)
       match net_state.ns_given with
       | None ->
-        update_ord ~ord net_state;
         output(net_state) & ready()
       | Some ns_given -> begin
         let given = hclause_of_net_clause ~ord ns_given in
-        update_ord ~ord net_state;
         ddebug 1 (lazy (Utils.sprintf "active_process processing given clause @[<h>%a@]"
                  !C.pp_clause#pp_h given));
         (* simplify given clause *)
@@ -403,13 +480,175 @@ let active_process ~calculus ~select ~ord ~output ~globals index signature =
           then { net_state with ns_given = None } (* stop processing this clause *)
           else begin
             active_set#add [simplified]; (* add clause to active_set *)
-            let ns_new = globals#convert_clause ~novel simplified in
+            let ns_new = globals#convert ~novel simplified in
             { net_state with ns_given = Some ns_new }
           end
         in
         (* forward the state *)
         output(net_state) & ready()
       end
+    end
+  in
+  (* subscribe to some events *)
+  globals#subscribe_exit exit;
+  globals#subscribe_redundant redundant;
+  spawn ready();
+  input
+
+(** Create a component dedicated to simplification by the active set
+    and by means of subsumption. It returns a synchronous input chan (net_state -> unit) *)
+let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature =
+  let last_state = ref (-1) in
+  (* XXX possible optim: only retain the fv_index of active_set? *)
+  let active_set = PS.mk_active_set ~ord index signature in
+  (* case in which we exit *)
+  def ready() & exit() =
+    ddebug 1 (lazy "bwd_subsume_process exiting..."); 0
+  (* redundant clauses *)
+  or  ready() & redundant(clauses) =
+    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    active_set#remove clauses;
+    ready() & reply to redundant
+  (* case in which we process the next clause *)
+  or  ready() & input(net_state) =
+    reply to input & begin
+      assert (net_state.ns_num = !last_state + 1);
+      last_state := net_state.ns_num;
+      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      active_set#remove simplified;
+      update_ord ~ord net_state;
+      (* obtain given clause, and ordering *)
+      match net_state.ns_given with
+      | None ->
+        output(net_state) & ready()
+      | Some ns_given -> begin
+        let given = hclause_of_net_clause ~ord ns_given in
+        if not (calculus#is_trivial given) then begin
+          ddebug 1 (lazy (Utils.sprintf "bwd_subsume processing given clause @[<h>%a@]"
+                   !C.pp_clause#pp_h given));
+          (* find subsumed clauses *)
+          let subsumed = calculus#backward_redundant active_set given in
+          (* add clause to active set *)
+          active_set#add [given];
+          (* global broadcast that those close are redundant, and forward state *)
+          let subsumed = List.map net_clause_of_hclause subsumed in
+          let net_state = {net_state with ns_simplified = subsumed @ net_state.ns_simplified } in
+          output(net_state) & ready() & globals#publish_redundant(subsumed)
+          end
+        else output(net_state) & ready()
+      end
+    end
+  in
+  (* subscribe to some events *)
+  globals#subscribe_exit exit;
+  globals#subscribe_redundant redundant;
+  spawn ready();
+  input
+
+(** Create a component dedicated to simplification by the active set
+    and by means of subsumption. It returns a synchronous input chan (net_state -> unit) *)
+let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index signature =
+  let last_state = ref (-1) in
+  (* XXX possible optim: only retain the fv_index of active_set? *)
+  let active_set = PS.mk_active_set ~ord index signature in
+  let simpl_set = PS.mk_simpl_set ~ord unit_idx in
+  (* case in which we exit *)
+  def ready() & exit() =
+    ddebug 1 (lazy "bwd_rewrite_process exiting..."); 0
+  (* redundant clauses *)
+  or  ready() & redundant(clauses) =
+    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    simpl_set#remove clauses;
+    active_set#remove clauses;
+    ready() & reply to redundant
+  (* case in which we process the next clause *)
+  or  ready() & input(net_state) =
+    reply to input & begin
+      assert (net_state.ns_num = !last_state + 1);
+      last_state := net_state.ns_num;
+      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      update_ord ~ord net_state;
+      active_set#remove simplified;
+      simpl_set#remove simplified;
+      (* obtain given clause, and ordering *)
+      match net_state.ns_given with
+      | None ->
+        output(net_state) & ready()
+      | Some ns_given -> begin
+        let given = hclause_of_net_clause ~ord ns_given in
+        if not (calculus#is_trivial given) then begin
+          ddebug 1 (lazy (Utils.sprintf "bwd_rewrite processing given clause @[<h>%a@]"
+                   !C.pp_clause#pp_h given));
+          (* rewrite some clauses *)
+          simpl_set#add [given];
+          let simplified, newly_simplified = Sat.backward_simplify ~select
+            ~calculus active_set simpl_set given in
+          (* add given to active set *)
+          active_set#add [given];
+          (* forward information *)
+          let simplified = C.CSet.to_list simplified in
+          let simplified = List.map net_clause_of_hclause simplified in
+          let newly_simplified = List.map net_clause_of_hclause newly_simplified in
+          (* put simplified clause in ns_simplified, and their simplification
+             in ns_new *)
+          let net_state = {net_state with
+            ns_simplified = simplified @ net_state.ns_simplified;
+            ns_new = newly_simplified @ net_state.ns_new } in
+          output(net_state) & ready()
+          end
+        else output(net_state) & ready()
+      end
+    end
+  in
+  (* subscribe to some events *)
+  globals#subscribe_exit exit;
+  globals#subscribe_redundant redundant;
+  spawn ready();
+  input
+
+(** Create a component that performs generating inferences *)
+let generate_process ~calculus ~select ~ord ~output ~globals index signature =
+  failwith "TODO"; 0
+
+(** Create a component dedicated to RW simplification of newly generated clauses by
+    the active set. *)
+let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
+  let last_state = ref (-1) in
+  let simpl_set = PS.mk_simpl_set ~ord unit_idx in
+  (* case in which we exit *)
+  def ready() & exit() =
+    ddebug 1 (lazy "new_rewrite_process exiting..."); 0
+  (* redundant clauses *)
+  or  ready() & redundant(clauses) =
+    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    simpl_set#remove clauses;
+    ready() & reply to redundant
+  (* case in which we process the next clause *)
+  or  ready() & input(net_state) =
+    reply to input & begin
+      assert (net_state.ns_num = !last_state + 1);
+      last_state := net_state.ns_num;
+      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      update_ord ~ord net_state;
+      simpl_set#remove simplified;
+      (* current version of ordering *)
+      let old_ord_version = ord#precedence#version in
+      ddebug 1 (lazy (Utils.sprintf "new_rewrite processing %d clauses"
+               (List.length net_state.ns_new)));
+      let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
+      let new_clauses = List.fold_left
+        (fun acc hc ->
+          let cs = calculus#list_simplify ~ord ~select hc in
+          let cs = List.map (calculus#rw_simplify ~select simpl_set) cs in
+          List.rev_append cs acc)
+        [] new_clauses
+      in 
+      (* put simplified clauses back in the state *)
+      let new_clauses = List.map net_clause_of_hclause new_clauses in
+      (* maybe we just created new symbols, forward them *)
+      let ns_ord = update_precedence ~ord old_ord_version in
+      let net_state = {net_state with ns_ord; ns_new = new_clauses } in
+      output(net_state) & ready()
     end
   in
   (* subscribe to some events *)
@@ -426,17 +665,26 @@ let pipeline_capacity = ref 10
     to modify the ordering.
     The [result] argument is a szs_status Join.chan on which the answer is
     sent. *)
-let passive_process ~calculus ~select ~ord ~output ~globals ?steps queues =
+let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queues =
   let passive_set = PS.mk_passive_set ~ord queues in
-  (* timestamp of last started loop, last finished loop *)
-  let last_start, last_done = ref 0, ref (-1) in
+  (* timestamp of last started loop, last finished loop, last transmitted ord *)
+  let last_start= ref 0 in
+  let last_done = ref (-1) in
+  let last_ord_version = ref 0 in
   (* how many remaining steps? *)
   let steps_to_go = ref (match steps with None -> max_int | Some s -> s) in
-  (* how to process new clauses *)
+  (* how to process new clauses. Returns Some hc if some hc is empty *)
   let process_new net_state =
+    (* look for the empty clause *)
+    let empty =
+      try Some (List.find (fun nc -> nc.nc_lits = [||]) net_state.ns_new)
+      with Not_found -> None
+    in
+    (* add new clauses to passive set *)
     let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
     let new_clauses = List.filter (fun hc -> not (calculus#is_trivial hc)) new_clauses in
-    passive_set#add new_clauses
+    passive_set#add new_clauses;
+    empty
   (* how to process simplified clauses: remove their orphans (needs to get the
      descendants and add them to the hclause explicitely before) *)
   and process_simplified net_state =
@@ -460,11 +708,13 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps queues =
   or  notfull() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
     if !steps_to_go = 0
-    then (ddebug 1 (lazy "reached max number of steps"); globals#send_result(Sat.Unknown))
+    then (ddebug 1 (lazy "reached max number of steps"); globals#send_result Sat.Unknown; 0)
+    else if not (Sat.check_timeout timeout)
+    then (ddebug 1 (lazy "reached timeout"); globals#send_result Sat.Unknown; 0)
     else match passive_set#next () with
     | None when !last_done = !last_start ->
       (* all clauses have been processed, none remains in passive *)
-      globals#send_result(Sat.Sat)
+      globals#send_result Sat.Sat; 0
     | None ->
       (* wait for an incoming result *)
       assert (!last_start > !last_done);
@@ -472,27 +722,24 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps queues =
     | Some given ->
       decr steps_to_go;
       (* preprocess: list_simplify *)
-      let old_ord_version = ord#precedence#version in
       (match calculus#list_simplify ~ord ~select given with
       | [] -> notfull()
       | given::others -> begin
         (* put others back in passive set, and send given in the pipeline! *)
         passive_set#add others;
-        let nc_given = globals#convert_clause ~novel:true given in
-        assert (ord#precedence#version >= old_ord_version);
-        (* should we update the ordering? *)
-        let ns_ord = if ord#precedence#version = old_ord_version
-          then None
-          else Some (List.map name_symbol ord#precedence#snapshot) in
+        let nc_given = globals#convert ~novel:true given in
+        assert (ord#precedence#version >= !last_ord_version);
         let net_state = {
           ns_num = !last_start;
-          ns_ord;
+          (* update the precedence of the pipeline if needed *)
+          ns_ord = update_precedence ~ord !last_ord_version;
           ns_given = Some nc_given;
           ns_simplified = [];
           ns_new = [];
         } in
         (* another clause is sent to the pipeline *)
         incr last_start;
+        last_ord_version := ord#precedence#version;
         output(net_state);
         (* shall we wait for results to come before we continue? *)
         if !last_start - !last_done > !pipeline_capacity
@@ -502,8 +749,11 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps queues =
   (* get result back while full *)
   or  input(net_state) & full() =
     reply to input & begin
+      update_ord ~ord net_state;
       process_simplified net_state;
-      process_new net_state;
+      (match process_new net_state with
+      | None -> ()
+      | Some nc -> globals#send_result (Sat.Unsat nc));
       assert (net_state.ns_num = !last_done + 1);
       last_done := max !last_done net_state.ns_num;
       if !last_start - !last_done > !pipeline_capacity
@@ -513,8 +763,11 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps queues =
   (* get result back while not full yet (when the passive_set is empty) *)
   or  input(net_state) & wait() =
     reply to input & begin
+      update_ord ~ord net_state;
       process_simplified net_state;
-      process_new net_state;
+      (match process_new net_state with
+      | None -> ()
+      | Some nc -> globals#send_result (Sat.Unsat nc));
       assert (net_state.ns_num = !last_done + 1);
       last_done := max !last_done net_state.ns_num;
       if !last_start - !last_done > !pipeline_capacity
@@ -525,4 +778,42 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps queues =
   globals#subscribe_exit exit;
   spawn notfull();
   input
+
+(** Create a pipeline within the same process, without forking *)
+let layout_one_process ~calculus ~select ~ord ?steps ?timeout clauses queues =
+  ()
+
+(** Create a pipeline with several forked processes *)
+let layout_standard ~calculus ~select ~ord ?steps ?timeout clauses queues =
+  ()
+
+(** Rebuild a hclause with all its proof *)
+let rebuild_proof ~ord ~globals nc =
+  hclause_of_net_clause ~ord nc  (* TODO *)
+
+(** run the given clause until a timeout occurs or a result
+    is found. It returns the result. *)
+let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false)
+  ~calculus ~select ~ord clauses =
+  def send_result(result) & wait() =
+    reply result to wait & reply to send_result
+  in
+  let queues = ClauseQueue.default_queues in
+  (* setup globals *)
+  let globals = setup_globals send_result in
+  (* convert clauses to net_clause *)
+  let clauses = List.map (globals#convert ~novel:true) clauses in
+  (if parallel
+    then layout_one_process ~calculus ~select ~ord ?steps ?timeout clauses queues
+    else layout_standard ~calculus ~select ~ord ?steps ?timeout clauses queues);
+  (* wait for a result *)
+  match wait () with
+  | Sat.Unsat nc ->
+    (* reconstruct a hclause with its proof *)
+    let hc = rebuild_proof ~ord ~globals nc in
+    Sat.Unsat hc
+  | Sat.Sat -> Sat.Sat
+  | Sat.Unknown -> Sat.Unknown
+  | Sat.Error e -> Sat.Error e
+  | Sat.Timeout -> Sat.Timeout
 
