@@ -33,6 +33,8 @@ type parameters = {
   param_precedence : bool;        (** use heuristic for precedence? *)
   param_select : string;          (** name of the selection function *)
   param_progress : bool;          (** print progress during search *)
+  param_pipeline : bool;          (** use the pipelined given clause *)
+  param_pipeline_capacity : int;  (** capacity (in clauses) of the pipeline *)
   param_proof : bool;             (** print proof *)
   param_dot_file : string option; (** file to print the final state in *)
   param_kb : string;              (** file to use for KB *)
@@ -43,9 +45,7 @@ type parameters = {
   param_print_all : bool;         (** print desugarized lambda / DB symbols *)
 }
 
-(** parse_args returns parameters
-    TODO an arg to describe the pipeline, e.g. with
-    (select|(subsume|subsume)|simpl|gen|back_simpl) *)
+(** parse_args returns parameters *)
 let parse_args () =
   let help_select = FoUtils.sprintf "selection function (@[<h>%a@])"
     (FoUtils.pp_list ~sep:"," Format.pp_print_string)
@@ -68,6 +68,8 @@ let parse_args () =
   and kb = ref "kb"
   and select = ref "SelectComplex"
   and progress = ref false
+  and pipeline = ref false
+  and pipeline_capacity = ref 10
   and print_sort = ref false
   and print_all = ref false
   and files = ref [] in
@@ -78,12 +80,14 @@ let parse_args () =
       ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
       ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
-      ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
       ("-kb", Arg.Set_string kb, "Knowledge Base file");
       ("-progress", Arg.Set progress, "print progress");
+      ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
+      ("-pipeline", Arg.Set pipeline, "use pipelined given clause");
+      ("-pipeline-capacity", Arg.Set_int pipeline_capacity, "set capacity of pipeline");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
       ("-no-proof", Arg.Clear proof, "disable proof printing");
@@ -104,8 +108,12 @@ let parse_args () =
     | "kbo" -> Orderings.kbo
     | x -> failwith ("unknown ordering " ^ x) in
   (* return parameter structure *)
-  { param_ord; param_seed = !seed; param_steps = !steps; param_version= !version; param_calculus= !calculus;
-    param_timeout = !timeout; param_files = !files; param_select = !select; param_theories= !theories;
-    param_progress = !progress; param_proof = !proof; param_presaturate = !presaturate;
-    param_output_syntax = !output; param_index= !index; param_dot_file = !dot_file; param_kb = !kb;
-    param_print_sort = !print_sort; param_print_all = !print_all; param_precedence= !heuristic_precedence;}
+  { param_ord; param_seed = !seed; param_steps = !steps; param_version=
+    !version; param_calculus= !calculus; param_timeout = !timeout;
+    param_files = !files; param_select = !select; param_theories = !theories;
+    param_progress = !progress; param_pipeline = !pipeline;
+    param_pipeline_capacity = !pipeline_capacity; param_proof = !proof;
+    param_presaturate = !presaturate; param_output_syntax = !output;
+    param_index= !index; param_dot_file = !dot_file; param_kb = !kb;
+    param_print_sort = !print_sort; param_print_all = !print_all;
+    param_precedence= !heuristic_precedence;}
