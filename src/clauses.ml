@@ -395,13 +395,13 @@ let mk_hclause ~ord lits proof parents =
 
 (** Build a hclause with already computed max literals and selected literals.
     No check is (nor can) be performed. *)
-let mk_hclause_raw ~selected ~maxlits lits proof parents =
+let mk_hclause_raw ~selected ~maxlits ~selected_done lits proof parents =
   let hc = {
     hclits = lits;
     hctag = -1;
     hcweight = 0;
     hcmaxlits = maxlits;
-    hcselected_done = true;
+    hcselected_done = selected_done;
     hcselected = selected;
     hcvars = [];
     hcproof = proof;
@@ -417,6 +417,10 @@ let mk_hclause_raw ~selected ~maxlits lits proof parents =
     (* update the parent clauses' sets of descendants *)
     List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
     end);
+  (* ensure that selection is performed *)
+  (if selected_done then begin
+    hc'.hcselected_done <- true;
+    hc'.hcselected <- selected end);
   (* return hashconsed clause *)
   hc'
 
@@ -448,8 +452,8 @@ let select_clause ~select hc =
    | _ ->
    begin
       let bv = List.fold_left bv_set 0 (select hc) in
-      (hc.hcselected <- bv;
-       hc.hcselected_done <- true);
+      hc.hcselected <- bv;
+      hc.hcselected_done <- true;
     end);
   hc
 

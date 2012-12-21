@@ -49,6 +49,7 @@ type net_term =
 type net_clause = {
   nc_maxlits : int;                 (** bitvector of maximal literals *)
   nc_selected : int;                (** bitvector of selected literals *)
+  nc_selected_done : bool;          (** are literals already selected? *)
   nc_lits : net_literal array;      (** array of literals *)
 }
 (** A serializable literal *)
@@ -132,7 +133,8 @@ and proof_of_net_proof ~ord np = match np with
 and hclause_of_net_clause ~ord nc =
   let lits = Array.map literal_of_net_literal nc.nc_lits in
   let proof = Axiom ("network", "network") in
-  C.mk_hclause_raw ~maxlits:nc.nc_maxlits ~selected:nc.nc_selected lits proof []
+  C.mk_hclause_raw ~maxlits:nc.nc_maxlits ~selected:nc.nc_selected
+    ~selected_done:nc.nc_selected_done lits proof []
   
 let rec net_term_of_term t = match t.term with
   | Var i -> NVar (i, name_symbol t.sort)
@@ -143,13 +145,15 @@ and net_literal_of_literal lit = match lit with
 and net_proof_of_proof proof = match proof with
   | Axiom (s1,s2) -> NpAxiom (s1, s2)
   | Proof (rule, clauses) ->
-    let clauses = List.map (fun (c,pos,_) -> net_clause_of_hclause c.cref, pos) clauses in
+    let clauses = List.map (fun (c,pos,_) ->
+      net_clause_of_hclause ~selected:false c.cref, pos) clauses in
     NpProof (rule, clauses)
-and net_clause_of_hclause hc =
-  assert hc.hcselected_done; (* must select before serialize *)
+and net_clause_of_hclause ?(selected=true) hc =
+  (if selected then Selection.check_selected hc);
   let lits = Array.map net_literal_of_literal hc.hclits in
   { nc_maxlits = hc.hcmaxlits;
     nc_selected = hc.hcselected;
+    nc_selected_done = selected;
     nc_lits = lits; }
 
 (* ----------------------------------------------------------------------
@@ -162,10 +166,10 @@ let socketname =
   Unix.ADDR_UNIX name
 
 (** Process-localized debug *)
-let ddebug level msg =
+let ddebug level who msg =
   if level <= Utils.debug_level ()
-    then Format.printf "%% [%d at %.2f] %s@." (Unix.getpid ())
-      (Sat.get_total_time ()) (Lazy.force msg)
+    then Format.printf "%% [%d at %.3f] (%s) %s@." (Unix.getpid ())
+      (Sat.get_total_time ()) who (Lazy.force msg)
     else ()
 
 let get_add_parents () =
@@ -254,7 +258,7 @@ let convert_clause add_parents add_proof ~novel hc =
   let nc = net_clause_of_hclause hc in
   (if novel then
     let proof = net_proof_of_proof hc.hcproof in
-    let parents = List.map net_clause_of_hclause hc.hcparents in
+    let parents = List.map (net_clause_of_hclause ~selected:false) hc.hcparents in
     (* send messages *)
     spawn add_parents(nc, parents) & add_proof(nc, proof));
   nc
@@ -267,8 +271,6 @@ let update_ord ~ord net_state =
     let symbols = List.map mk_symbol symbols in
     let constr = Precedence.list_constraint symbols in
     let precedence = Precedence.mk_precedence [constr] symbols in
-    ddebug 1 (lazy (Utils.sprintf "%% new precedence @[<h>%a@]"
-              T.pp_precedence precedence#snapshot));
     ignore (ord#set_precedence precedence)
   end
 
@@ -359,12 +361,12 @@ let connect input queues =
 (** Setup global components in this process. Also
     setup the network server. *)
 let setup_globals send_result =
-  ddebug 1 (lazy "setup globals");
+  ddebug 1 "globals" (lazy "setup globals");
   (* listen on the address; remove the socket upon exit *)
   Join.Site.listen socketname;
   at_exit (fun () -> match socketname with
     | Unix.ADDR_UNIX f ->
-      ddebug 0 (lazy (Utils.sprintf "remove socket file %s" f));
+      ddebug 0 "globals" (lazy (Utils.sprintf "remove socket file %s" f));
       Unix.unlink f
     | _ -> ());
   (* create global queues *)
@@ -425,7 +427,7 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "rw_process exiting..."); reply to exit
+    ddebug 1 "fwd_rw" (lazy "exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -445,11 +447,12 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
         output net_state; ready()
       | Some ns_given -> begin
         let given = hclause_of_net_clause ~ord ns_given in
-        ddebug 1 (lazy (Utils.sprintf "rw_process processing given clause @[<h>%a@]"
-                 !C.pp_clause#pp_h given));
+        ddebug 1 "fwd_rw" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
+                           !C.pp_clause#pp_h given));
         (* simplify given clause *)
         let new_given = calculus#rw_simplify ~select simpl_set given in
         let new_given = calculus#basic_simplify ~ord new_given in
+        let new_given = C.select_clause ~select new_given in
         let novel = not (C.eq_hclause given new_given) in
         (* old given clause is redundant *)
         (if novel then spawn (globals#publish_redundant [ns_given]; 0));
@@ -458,13 +461,16 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
           if calculus#is_trivial new_given
           then { net_state with ns_given = None } (* stop processing this clause *)
           else begin
+            (if novel then ddebug 1 "fwd_rw"
+              (lazy (Utils.sprintf "simplified to @[<h>%a@]"
+              !C.pp_clause#pp_h new_given)));
             simpl_set#add [new_given];  (* add the clause to active set *)
             let ns_new = globals#convert ~novel new_given in
             { net_state with ns_given = Some ns_new }
           end
         in
         (* forward the state *)
-        output(net_state);
+        output net_state;
         ready()
       end
     end
@@ -482,7 +488,7 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "active_process exiting..."); reply to exit
+    ddebug 1 "fwd_active" (lazy "exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -500,31 +506,45 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
         output net_state; ready()
       | Some ns_given -> begin
         let given = hclause_of_net_clause ~ord ns_given in
-        ddebug 1 (lazy (Utils.sprintf "active_process processing given clause @[<h>%a@]"
-                 !C.pp_clause#pp_h given));
-        (* simplify given clause *)
-        let simplified = calculus#active_simplify ~select active_set given in
-        let simplified = calculus#basic_simplify ~ord simplified in
-        let novel = not (C.eq_hclause given simplified) in
-        (* old given clause is redundant *)
-        (if novel then spawn (globals#publish_redundant [ns_given]; 0));
-        let net_state =
-          (* check whether the clause is trivial or redundant *)
-          if calculus#is_trivial simplified || calculus#redundant active_set simplified
-          then { net_state with ns_given = None } (* stop processing this clause *)
-          else begin
-            active_set#add [simplified]; (* add clause to active_set *)
-            let ns_new = globals#convert ~novel simplified in
-            { net_state with ns_given = Some ns_new }
-          end
-        in
-        (* forward the state *)
-        output net_state;
-        ready()
+        ddebug 1 "fwd_active" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
+                               !C.pp_clause#pp_h given));
+        Selection.check_selected given;
+        if calculus#redundant active_set given
+        then begin
+          ddebug 1 "fwd_active" (lazy "given clause is redundant");
+          let net_state = { net_state with ns_given = None } in
+          spawn (globals#publish_redundant [ns_given]; 0);
+          output net_state;
+          ready()
+        end else begin
+          (* simplify given clause *)
+          let new_given = calculus#active_simplify ~select active_set given in
+          let new_given = calculus#basic_simplify ~ord new_given in
+          let new_given = C.select_clause ~select new_given in
+          let novel = not (C.eq_hclause given new_given) in
+          (* old given clause is redundant *)
+          (if novel then spawn (globals#publish_redundant [ns_given]; 0));
+          (* forward the given clause and the state *)
+          let net_state =
+            if calculus#is_trivial new_given
+            then { net_state with ns_given = None } (* stop processing this clause *)
+            else begin
+              (if novel then ddebug 1 "fwd_active"
+                (lazy (Utils.sprintf "simplified to @[<h>%a@]"
+                !C.pp_clause#pp_h new_given)));
+              Selection.check_selected new_given;
+              active_set#add [new_given];  (* add the clause to active set *)
+              let ns_new = globals#convert ~novel new_given in
+              { net_state with ns_given = Some ns_new }
+            end
+          in
+          (* forward the state *)
+          output net_state;
+          ready()
+        end
       end
     end
   in
-  (* subscribe to some events *)
   globals#subscribe_exit exit;
   globals#subscribe_redundant redundant;
   spawn ready();
@@ -538,7 +558,7 @@ let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature 
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "bwd_subsume_process exiting..."); reply to exit
+    ddebug 1 "bwd_subsume" (lazy "exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -559,8 +579,8 @@ let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature 
       | Some ns_given -> begin
         let given = hclause_of_net_clause ~ord ns_given in
         if not (calculus#is_trivial given) then begin
-          ddebug 1 (lazy (Utils.sprintf "bwd_subsume processing given clause @[<h>%a@]"
-                   !C.pp_clause#pp_h given));
+          ddebug 1 "bwd_subsume" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
+                                 !C.pp_clause#pp_h given));
           (* find subsumed clauses *)
           let subsumed = calculus#backward_redundant active_set given in
           (* add clause to active set *)
@@ -592,7 +612,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "bwd_rewrite_process exiting..."); reply to exit
+    ddebug 1 "bwd_rw" (lazy "exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -615,8 +635,8 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
       | Some ns_given -> begin
         let given = hclause_of_net_clause ~ord ns_given in
         if not (calculus#is_trivial given) then begin
-          ddebug 1 (lazy (Utils.sprintf "bwd_rewrite processing given clause @[<h>%a@]"
-                   !C.pp_clause#pp_h given));
+          ddebug 1 "bwd_rw" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
+                             !C.pp_clause#pp_h given));
           (* rewrite some clauses *)
           simpl_set#add [given];
           let simplified, newly_simplified = Sat.backward_simplify ~select
@@ -626,6 +646,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
           (* forward information *)
           let simplified = C.CSet.to_list simplified in
           let simplified = List.map net_clause_of_hclause simplified in
+          let newly_simplified = List.map (C.select_clause ~select) newly_simplified in
           let newly_simplified = List.map (globals#convert ~novel:true) newly_simplified in
           (* put simplified clause in ns_simplified, and their simplification
              in ns_new *)
@@ -653,7 +674,7 @@ let generate_process ~calculus ~select ~ord ~output ~globals index signature =
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "generate_process exiting..."); reply to exit
+    ddebug 1 "generate" (lazy "exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     reply to redundant & begin
@@ -676,12 +697,13 @@ let generate_process ~calculus ~select ~ord ~output ~globals index signature =
       | Some ns_given -> begin
         let given = hclause_of_net_clause ~ord ns_given in
         if not (calculus#is_trivial given) then begin
-          ddebug 1 (lazy (Utils.sprintf "generate processing given clause @[<h>%a@]"
-                   !C.pp_clause#pp_h given));
+          ddebug 1 "generate" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
+                              !C.pp_clause#pp_h given));
           (* add given to active set *)
           active_set#add [given];
           (* perform inferences *)
           let new_clauses = Sat.generate ~calculus active_set given in
+          let new_clauses = List.map (C.select_clause ~select) new_clauses in
           let new_clauses = List.map (globals#convert ~novel:true) new_clauses in
           let net_state = {net_state with ns_new = new_clauses @ net_state.ns_new } in
           output net_state;
@@ -706,13 +728,13 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
   def ready() & exit() =
-    ddebug 1 (lazy "new_rewrite_process exiting..."); reply to exit
+    ddebug 1 "post_rw" (lazy "exiting..."); reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
     simpl_set#remove clauses;
     ready() & reply to redundant
-  (* case in which we process the next clause *)
+  (* case in which we process the next state *)
   or  ready() & input(net_state) =
     reply to input & begin
       assert (net_state.ns_num = !last_state + 1);
@@ -728,18 +750,20 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
       | None -> ());
       (* current version of ordering *)
       let old_ord_version = ord#precedence#version in
-      ddebug 1 (lazy (Utils.sprintf "new_rewrite processing %d clauses"
-               (List.length net_state.ns_new)));
+      ddebug 1 "post_rw" (lazy (Utils.sprintf "processing %d clauses"
+                         (List.length net_state.ns_new)));
       let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
+      (* simplify the new clauses *)
       let new_clauses = List.fold_left
         (fun acc hc ->
           let cs = calculus#list_simplify ~ord ~select hc in
           let cs = List.map (calculus#rw_simplify ~select simpl_set) cs in
+          let cs = List.map (C.select_clause ~select) cs in
           List.rev_append cs acc)
         [] new_clauses
       in 
       (* put simplified clauses back in the state *)
-      let new_clauses = List.map net_clause_of_hclause new_clauses in
+      let new_clauses = List.map (globals#convert ~novel:true) new_clauses in
       (* maybe we just created new symbols, forward them *)
       let ns_ord = update_precedence ~ord old_ord_version in
       let net_state = {net_state with ns_ord; ns_new = new_clauses } in
@@ -803,15 +827,15 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   def start () = notfull() & reply to start
   (* cases in which we exit (TODO react with full(), notfull() or wait()? *)
   or  exit() =
-    ddebug 1 (lazy "process exiting..."); reply to exit
+    ddebug 1 "passive" (lazy "exiting..."); reply to exit
   (* process a new clause, the network is not full *)
   or  notfull() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
     if !steps_to_go = 0
-    then (ddebug 1 (lazy "reached max number of steps");
+    then (ddebug 1 "passive" (lazy "reached max number of steps");
           globals#send_result (Sat.Unknown,!last_done); 0)
-    else if not (Sat.check_timeout timeout)
-    then (ddebug 1 (lazy "reached timeout");
+    else if Sat.check_timeout timeout
+    then (ddebug 1 "passive" (lazy "reached timeout");
            globals#send_result (Sat.Unknown, !last_done); 0)
     else match passive_set#next () with
     | None when !last_done = !last_start ->
@@ -826,6 +850,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
       (match calculus#list_simplify ~ord ~select given with
       | [] -> notfull()
       | given::others -> begin
+        let given = C.select_clause ~select given in
         let nc_given = globals#convert ~novel:true given in
         assert (ord#precedence#version >= !last_ord_version);
         let net_state = {
@@ -864,16 +889,17 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     last_done := net_state.ns_num;
     decr steps_to_go;
     if !last_start - !last_done > !pipeline_capacity
-      then (ddebug 1 (lazy "enter state full"); full())
-      else (ddebug 1 (lazy "enter state full"); notfull())
+      then (ddebug 1 "passive" (lazy "enter state full"); full())
+      else (ddebug 1 "passive" (lazy "enter state full"); notfull())
   in
   globals#subscribe_exit exit;
   input, start
 
 (** Create a pipeline within the same process, without forking *)
 let layout_one_process ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature =
-  ddebug 0 (lazy (Utils.sprintf "use single-process pipeline layout (%d clauses)"
-            (List.length clauses)));
+  ddebug 0 "main" (lazy (Utils.sprintf
+                  "use single-process pipeline layout (%d clauses)"
+                  (List.length clauses)));
   let unit_idx = Dtree.unit_index in
   let index = PS.choose_index "fp" in
   (* passive set *)
@@ -913,7 +939,7 @@ let layout_one_process ~calculus ~select ~ord ~globals ?steps ?timeout clauses q
   (* close the loop *)
   q7_subscribe passive_in;
   (* start *)
-  ddebug 0 (lazy "start the single-process pipeline");
+  ddebug 0 "main" (lazy "start the single-process pipeline");
   start ()
 
 (** Create a pipeline with several forked processes *)
@@ -931,17 +957,17 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus st
   and select = state#select
   and clauses = C.CSet.to_list state#passive_set#clauses in
   def send_result(result,num) & wait() =
-    ddebug 1 (lazy "got result from pipeline");
+    ddebug 1 "main" (lazy "got result from pipeline");
     reply (result,num) to wait & reply to send_result
   in
-  ddebug 0 (lazy "start pipelined given clause");
+  ddebug 0 "main" (lazy "start pipelined given clause");
   (* TODO give queues as a parameter? *)
   let queues = ClauseQueue.default_queues in
   let signature = C.signature clauses in
   (* setup globals *)
   let globals = setup_globals send_result in
   (* convert clauses to net_clause *)
-  ddebug 1 (lazy "convert clauses");
+  ddebug 1 "main" (lazy "convert clauses");
   let clauses = List.map (globals#convert ~novel:true) clauses in
   (* create the pipeline and start processing *)
   let layout = if parallel then layout_standard else layout_one_process in
@@ -956,4 +982,3 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus st
   | Sat.Unknown, num -> Sat.Unknown, num
   | Sat.Error e, num -> Sat.Error e, num
   | Sat.Timeout, num -> Sat.Timeout, num
-

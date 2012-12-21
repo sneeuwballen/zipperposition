@@ -38,6 +38,7 @@ type net_term =
 type net_clause = {
   nc_maxlits : int;                 (** bitvector of maximal literals *)
   nc_selected : int;                (** bitvector of selected literals *)
+  nc_selected_done : bool;          (** are literals already selected? *)
   nc_lits : net_literal array;      (** array of literals *)
 }
 (** A serializable literal *)
@@ -65,8 +66,9 @@ type net_state = {
 val socketname : Unix.sockaddr
   (** name for the communication socket *)
 
-val ddebug : int -> string Lazy.t -> unit
-  (** Process-localized debug *)
+val ddebug : int -> string -> string Lazy.t -> unit
+  (** Process-localized debug. A level must be provided, and also a context
+      name that indicates which component is outputing the message. *)
 
 val get_add_parents : unit -> (net_clause * net_clause list) Join.chan
 val get_add_proof : unit -> (net_clause * net_proof) Join.chan

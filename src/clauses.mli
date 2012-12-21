@@ -99,7 +99,8 @@ val mk_hclause_a : ord:ordering -> literal array -> proof -> hclause list -> hcl
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
 
-val mk_hclause_raw : selected:int -> maxlits:int -> literal array -> proof -> hclause list -> hclause
+val mk_hclause_raw : selected:int -> maxlits:int -> selected_done:bool ->
+                     literal array -> proof -> hclause list -> hclause
   (** Build a hclause with already computed max literals and selected literals.
       No check is (nor can) be performed. *)
 
