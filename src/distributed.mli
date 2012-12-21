@@ -77,7 +77,7 @@ val get_subscribe_redundant : unit -> net_clause list Join.chan -> unit
 val get_subscribe_exit : unit -> unit Join.chan -> unit
 val get_send_result : unit -> net_clause Saturate.szs_status -> unit
 
-val mk_queue : unit -> 'a Join.chan * (('a -> unit) -> unit)
+val mk_queue : unit -> ('a -> unit) * (('a -> unit) -> unit)
   (** Create a queue. It returns a channel to send input objects (type 'a) in,
       and a channel to send a synchronous chan in to register to the queue.
       
@@ -85,11 +85,11 @@ val mk_queue : unit -> 'a Join.chan * (('a -> unit) -> unit)
       order, and the queue will wait for all recipients to receive a message
       before it processes the next one. *)
 
-val mk_global_queue : string -> 'a Join.chan * (('a -> unit) -> unit)
+val mk_global_queue : string -> ('a -> unit) * (('a -> unit) -> unit)
   (** Same as mk_queue, but registers (send, subscribe) with
       the given global name. *)
 
-val get_queue : string -> 'a Join.chan * (('a -> unit) -> unit)
+val get_queue : string -> ('a -> unit) * (('a -> unit) -> unit)
   (** Get a handle on the remote queue by name *)
 
 (* ----------------------------------------------------------------------
@@ -99,9 +99,9 @@ val get_queue : string -> 'a Join.chan * (('a -> unit) -> unit)
 (** Access to global utils *)
 type globals =
   < subscribe_redundant: (net_clause list -> unit) -> unit;
-    publish_redundant: net_clause list Join.chan;
+    publish_redundant: net_clause list -> unit;
     subscribe_exit: (unit -> unit) -> unit;
-    publish_exit: unit Join.chan;
+    publish_exit: unit -> unit;
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
     send_result: net_clause Saturate.szs_status -> unit;
@@ -130,32 +130,32 @@ val get_globals : unit -> globals
  * ---------------------------------------------------------------------- *)
 
 val fwd_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
-                          ord:ordering -> output: net_state Join.chan ->
+                          ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.unit_index ->
                           (net_state -> unit)
 
 val fwd_active_process : calculus:Calculus.calculus -> select:selection_fun ->
-                          ord:ordering -> output: net_state Join.chan ->
+                          ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.index -> signature ->
                           (net_state -> unit)
 
 val bwd_subsume_process : calculus:Calculus.calculus -> select:selection_fun ->
-                          ord:ordering -> output: net_state Join.chan ->
+                          ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.index -> signature ->
                           (net_state -> unit)
 
 val bwd_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
-                          ord:ordering -> output: net_state Join.chan ->
+                          ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.unit_index -> Index.index ->
                           signature -> (net_state -> unit)
 
 val generate_process : calculus:Calculus.calculus -> select:selection_fun ->
-                      ord:ordering -> output: net_state Join.chan ->
+                      ord:ordering -> output: (net_state -> unit) ->
                       globals:globals -> Index.index ->
                       (net_state -> unit)
 
 val post_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
-                          ord:ordering -> output: net_state Join.chan ->
+                          ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.unit_index ->
                           (net_state -> unit)
 
@@ -163,12 +163,12 @@ val pipeline_capacity : int ref
   (** Maximum number of clauses to be sent down the pipeline at the same time *)
 
 val passive_process : calculus:Calculus.calculus -> select:selection_fun ->
-                      ord:ordering -> output: net_state Join.chan ->
+                      ord:ordering -> output: (net_state -> unit) ->
                       globals:globals -> 
                       ?steps:int -> ?timeout:float ->
                       (ClauseQueue.queue * int) list ->
                       net_clause list ->
-                      (net_state -> unit)
+                      (net_state -> unit) * (unit -> unit)
 
 val layout_one_process : calculus:Calculus.calculus -> select:selection_fun ->
                         ord:ordering ->
