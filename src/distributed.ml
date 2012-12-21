@@ -158,13 +158,14 @@ and net_clause_of_hclause hc =
 
 (** name for the communication socket *)
 let socketname =
-  let name = Format.sprintf "zipperposition_%d" (Unix.getpid ()) in
+  let name = Format.sprintf "/tmp/zipperposition_%d" (Unix.getpid ()) in
   Unix.ADDR_UNIX name
 
 (** Process-localized debug *)
 let ddebug level msg =
   if level <= Utils.debug_level ()
-    then Format.printf "%% [%d] %s@." (Unix.getpid ()) (Lazy.force msg)
+    then Format.printf "%% [%d at %.2f] %s@." (Unix.getpid ())
+      (Sat.get_total_time ()) (Lazy.force msg)
     else ()
 
 let get_add_parents () =
@@ -358,12 +359,14 @@ let connect input queues =
 (** Setup global components in this process. Also
     setup the network server. *)
 let setup_globals send_result =
+  ddebug 1 (lazy "setup globals");
+  (* listen on the address *)
+  Join.Site.listen socketname;
+  (* create global queues *)
   let exit, sub_exit = mk_global_queue "exit" in
   let redundant, sub_redundant = mk_global_queue "redundant" in
   let add_parents, add_proof, get_descendants, get_proof =
     proof_parents_process () in
-  (* listen on the address *)
-  Join.Site.listen socketname;
   (* register global channels *)
   let ns = Join.Ns.there socketname in
   Join.Ns.register ns "add_parents" add_parents;
@@ -864,6 +867,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
 
 (** Create a pipeline within the same process, without forking *)
 let layout_one_process ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature =
+  ddebug 0 (lazy "use single-process pipeline layout");
   let unit_idx = Dtree.unit_index in
   let index = PS.choose_index "fp" in
   (* passive set *)
@@ -921,14 +925,17 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus st
   and select = state#select
   and clauses = C.CSet.to_list state#passive_set#clauses in
   def send_result(result,num) & wait() =
+    ddebug 1 (lazy "got result from pipeline");
     reply (result,num) to wait & reply to send_result
   in
+  ddebug 0 (lazy "start pipelined given clause");
   (* TODO give queues as a parameter? *)
   let queues = ClauseQueue.default_queues in
   let signature = C.signature clauses in
   (* setup globals *)
   let globals = setup_globals send_result in
   (* convert clauses to net_clause *)
+  ddebug 1 (lazy "convert clauses");
   let clauses = List.map (globals#convert ~novel:true) clauses in
   (* create the pipeline and start processing *)
   let layout = if parallel then layout_standard else layout_one_process in
