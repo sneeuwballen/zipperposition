@@ -165,23 +165,21 @@ val pipeline_capacity : int ref
 val passive_process : calculus:Calculus.calculus -> select:selection_fun ->
                       ord:ordering -> output: net_state Join.chan ->
                       globals:globals -> 
-                      ?step:int -> ?timeout:float ->
+                      ?steps:int -> ?timeout:float ->
                       (ClauseQueue.queue * int) list ->
                       net_clause list ->
                       (net_state -> unit)
 
 val layout_one_process : calculus:Calculus.calculus -> select:selection_fun ->
                         ord:ordering ->
-                        send_result: (net_clause Saturate.szs_status -> unit) ->
-                        ?step:int -> ?timeout:float -> net_clause list ->
+                        ?steps:int -> ?timeout:float -> net_clause list ->
                         (ClauseQueue.queue * int) list ->
                         unit
   (** Create a pipeline within the same process, without forking *)
 
 val layout_standard : calculus:Calculus.calculus -> select:selection_fun ->
                       ord:ordering ->
-                      send_result: (net_clause Saturate.szs_status -> unit) ->
-                      ?step:int -> ?timeout:float -> net_clause list ->
+                      ?steps:int -> ?timeout:float -> net_clause list ->
                       (ClauseQueue.queue * int) list ->
                       unit
   (** Create a pipeline with several forked processes *)

@@ -742,11 +742,10 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
         (* another clause is sent to the pipeline *)
         incr last_start;
         last_ord_version := ord#precedence#version;
-        output(net_state);
         (* shall we wait for results to come before we continue? *)
         if !last_start - !last_done > !pipeline_capacity
-          then full()
-          else notfull()
+          then full() & output(net_state)
+          else notfull() & output(net_state)
       end)
   (* get result back while full *)
   or  input(net_state) & full() =
