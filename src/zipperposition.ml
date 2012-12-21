@@ -37,8 +37,6 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
-module Distributed = Distributed
-
 let version = "0.3"
 
 (** find the given file from given directory *)
@@ -238,7 +236,10 @@ let process_file params f =
   (* add clauses to passive_set *)
   state#passive_set#add clauses;
   (* saturate *)
-  let result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
+  let result, num =
+    if params.param_pipeline
+      then Distributed.given_clause ~parallel:false ?steps ?timeout ~progress ~calculus state
+      else Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;

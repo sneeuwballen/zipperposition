@@ -75,7 +75,7 @@ val get_get_proof : unit -> net_clause -> net_proof option
 val get_publish_redundant : unit -> net_clause list Join.chan
 val get_subscribe_redundant : unit -> net_clause list Join.chan -> unit
 val get_subscribe_exit : unit -> unit Join.chan -> unit
-val get_send_result : unit -> net_clause Saturate.szs_status -> unit
+val get_send_result : unit -> net_clause Saturate.szs_status * int -> unit
 
 val mk_queue : unit -> ('a -> unit) * (('a -> unit) -> unit)
   (** Create a queue. It returns a channel to send input objects (type 'a) in,
@@ -104,7 +104,7 @@ type globals =
     publish_exit: unit -> unit;
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
-    send_result: net_clause Saturate.szs_status -> unit;
+    send_result: net_clause Saturate.szs_status * int -> unit;
   >
 
 val proof_parents_process : unit ->
@@ -118,7 +118,7 @@ val proof_parents_process : unit ->
 val connect : (net_state -> unit) -> string list -> unit
   (** connects the given input to queues whose names are in the list. *)
 
-val setup_globals : (net_clause Saturate.szs_status -> unit) -> globals
+val setup_globals : (net_clause Saturate.szs_status * int -> unit) -> globals
   (** Setup global components in this process. Also setup the network server.
       The parameter is the chan to send results on *)
 
@@ -172,23 +172,24 @@ val passive_process : calculus:Calculus.calculus -> select:selection_fun ->
 
 val layout_one_process : calculus:Calculus.calculus -> select:selection_fun ->
                         ord:ordering ->
+                        globals:globals -> 
                         ?steps:int -> ?timeout:float -> net_clause list ->
-                        (ClauseQueue.queue * int) list ->
+                        (ClauseQueue.queue * int) list -> signature ->
                         unit
   (** Create a pipeline within the same process, without forking *)
 
 val layout_standard : calculus:Calculus.calculus -> select:selection_fun ->
                       ord:ordering ->
+                      globals:globals -> 
                       ?steps:int -> ?timeout:float -> net_clause list ->
-                      (ClauseQueue.queue * int) list ->
+                      (ClauseQueue.queue * int) list -> signature ->
                       unit
   (** Create a pipeline with several forked processes *)
 
 val given_clause: ?parallel:bool -> ?steps:int -> ?timeout:float ->
                   ?progress:bool ->
                   calculus:Calculus.calculus ->
-                  select:selection_fun -> ord:ordering ->
-                  hclause list ->
-                  hclause Saturate.szs_status
+                  ProofState.state ->
+                  hclause Saturate.szs_status * int
   (** run the given clause until a timeout occurs or a result
       is found. It returns the result. *)

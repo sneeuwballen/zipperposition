@@ -197,7 +197,7 @@ let get_subscribe_exit () =
 
 let get_send_result () =
   let ns = Join.Ns.there socketname in
-  (Join.Ns.lookup ns "send_result" : net_clause Sat.szs_status -> unit)
+  (Join.Ns.lookup ns "send_result" : net_clause Sat.szs_status * int -> unit)
 
 (** Create a queue. It returns a channel to send input objects (type 'a) in,
     and a channel to send a synchronous chan in to register to the queue.
@@ -294,7 +294,7 @@ type globals =
     publish_exit: unit -> unit;
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
-    send_result: net_clause Saturate.szs_status -> unit;
+    send_result: net_clause Saturate.szs_status * int -> unit;
   >
 
 (** Structure used to keep track of parent/descendants and clause/proof
@@ -800,13 +800,15 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   or  notfull() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
     if !steps_to_go = 0
-    then (ddebug 1 (lazy "reached max number of steps"); globals#send_result Sat.Unknown; 0)
+    then (ddebug 1 (lazy "reached max number of steps");
+          globals#send_result (Sat.Unknown,!last_done); 0)
     else if not (Sat.check_timeout timeout)
-    then (ddebug 1 (lazy "reached timeout"); globals#send_result Sat.Unknown; 0)
+    then (ddebug 1 (lazy "reached timeout");
+           globals#send_result (Sat.Unknown, !last_done); 0)
     else match passive_set#next () with
     | None when !last_done = !last_start ->
       (* all clauses have been processed, none remains in passive *)
-      globals#send_result Sat.Sat; 0
+      globals#send_result (Sat.Sat,!last_done); 0
     | None ->
       (* wait for an incoming result *)
       assert (!last_start > !last_done);
@@ -849,7 +851,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     process_simplified net_state;
     (match process_new net_state with
     | None -> ()
-    | Some nc -> globals#send_result (Sat.Unsat nc));
+    | Some nc -> globals#send_result (Sat.Unsat nc, !last_done));
     assert (net_state.ns_num = !last_done + 1);
     last_done := net_state.ns_num;
     decr steps_to_go;
@@ -861,11 +863,51 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   input, start
 
 (** Create a pipeline within the same process, without forking *)
-let layout_one_process ~calculus ~select ~ord ?steps ?timeout clauses queues =
-  ()
+let layout_one_process ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature =
+  let unit_idx = Dtree.unit_index in
+  let index = PS.choose_index "fp" in
+  (* passive set *)
+  let q1_in, q1_subscribe = mk_queue () in
+  let passive_in, start = passive_process ~calculus ~select ~ord ~output:q1_in
+    ~globals ?steps ?timeout queues clauses in
+  (* forward rewriting *)
+  let q2_in, q2_subscribe = mk_queue () in
+  let fwd_rw_in = fwd_rewrite_process ~calculus ~select ~ord ~output:q2_in
+    ~globals unit_idx in
+  q1_subscribe fwd_rw_in;
+  (* forward subsumption *)
+  let q3_in, q3_subscribe = mk_queue () in
+  let fwd_subsume_in = fwd_active_process ~calculus ~select ~ord ~output:q3_in
+    ~globals index signature in
+  q2_subscribe fwd_subsume_in;
+  (* backward subsumption *)
+  let q4_in, q4_subscribe = mk_queue () in
+  let bwd_subsume_in = bwd_subsume_process ~calculus ~select ~ord ~output:q4_in
+    ~globals index signature in
+  q3_subscribe bwd_subsume_in;
+  (* backward rewriting *)
+  let q5_in, q5_subscribe = mk_queue () in
+  let bwd_rewrite_in = bwd_rewrite_process ~calculus ~select ~ord ~output:q5_in
+    ~globals unit_idx index signature in
+  q4_subscribe bwd_rewrite_in;
+  (* generate *)
+  let q6_in, q6_subscribe = mk_queue () in
+  let generate_in = generate_process ~calculus ~select ~ord ~output:q6_in
+    ~globals index signature in
+  q5_subscribe generate_in;
+  (* post-simplify *)
+  let q7_in, q7_subscribe = mk_queue () in
+  let post_rw_in = post_rewrite_process ~calculus ~select ~ord ~output:q7_in
+    ~globals unit_idx in
+  q6_subscribe post_rw_in;
+  (* close the loop *)
+  q7_subscribe passive_in;
+  (* start *)
+  ddebug 0 (lazy "%% start the single-process pipeline");
+  start ()
 
 (** Create a pipeline with several forked processes *)
-let layout_standard ~calculus ~select ~ord ?steps ?timeout clauses queues =
+let layout_standard ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature =
   ()
 
 (** Rebuild a hclause with all its proof *)
@@ -874,27 +916,31 @@ let rebuild_proof ~ord ~globals nc =
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns the result. *)
-let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false)
-  ~calculus ~select ~ord clauses =
-  def send_result(result) & wait() =
-    reply result to wait & reply to send_result
+let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus state =
+  let ord = state#ord
+  and select = state#select
+  and clauses = C.CSet.to_list state#passive_set#clauses in
+  def send_result(result,num) & wait() =
+    reply (result,num) to wait & reply to send_result
   in
+  (* TODO give queues as a parameter? *)
   let queues = ClauseQueue.default_queues in
+  let signature = C.signature clauses in
   (* setup globals *)
   let globals = setup_globals send_result in
   (* convert clauses to net_clause *)
   let clauses = List.map (globals#convert ~novel:true) clauses in
-  (if parallel
-    then layout_one_process ~calculus ~select ~ord ?steps ?timeout clauses queues
-    else layout_standard ~calculus ~select ~ord ?steps ?timeout clauses queues);
+  (* create the pipeline and start processing *)
+  let layout = if parallel then layout_standard else layout_one_process in
+  layout ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature;
   (* wait for a result *)
   match wait () with
-  | Sat.Unsat nc ->
+  | Sat.Unsat nc, num ->
     (* reconstruct a hclause with its proof *)
     let hc = rebuild_proof ~ord ~globals nc in
-    Sat.Unsat hc
-  | Sat.Sat -> Sat.Sat
-  | Sat.Unknown -> Sat.Unknown
-  | Sat.Error e -> Sat.Error e
-  | Sat.Timeout -> Sat.Timeout
+    Sat.Unsat hc, num
+  | Sat.Sat, num -> Sat.Sat, num
+  | Sat.Unknown, num -> Sat.Unknown, num
+  | Sat.Error e, num -> Sat.Error e, num
+  | Sat.Timeout, num -> Sat.Timeout, num
 
