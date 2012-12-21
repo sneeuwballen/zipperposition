@@ -151,7 +151,7 @@ val bwd_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
 
 val generate_process : calculus:Calculus.calculus -> select:selection_fun ->
                       ord:ordering -> output: (net_state -> unit) ->
-                      globals:globals -> Index.index ->
+                      globals:globals -> Index.index -> signature ->
                       (net_state -> unit)
 
 val post_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->

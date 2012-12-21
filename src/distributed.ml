@@ -618,7 +618,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
           (* forward information *)
           let simplified = C.CSet.to_list simplified in
           let simplified = List.map net_clause_of_hclause simplified in
-          let newly_simplified = List.map net_clause_of_hclause newly_simplified in
+          let newly_simplified = List.map (globals#convert ~novel:true) newly_simplified in
           (* put simplified clause in ns_simplified, and their simplification
              in ns_new *)
           let net_state = {net_state with
@@ -640,8 +640,56 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
   input
 
 (** Create a component that performs generating inferences *)
-let generate_process ~calculus ~select ~ord ~output ~globals index =
-  fun _ -> ()  (* TODO *)
+let generate_process ~calculus ~select ~ord ~output ~globals index signature =
+  let last_state = ref (-1) in
+  let active_set = PS.mk_active_set ~ord index signature in
+  (* case in which we exit *)
+  def ready() & exit() =
+    ddebug 1 (lazy "generate_process exiting..."); reply to exit
+  (* redundant clauses *)
+  or  ready() & redundant(clauses) =
+    reply to redundant & begin
+      let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+      active_set#remove clauses;
+      ready()
+    end
+  (* case in which we process the next clause *)
+  or  ready() & input(net_state) =
+    reply to input & begin
+      assert (net_state.ns_num = !last_state + 1);
+      last_state := net_state.ns_num;
+      update_ord ~ord net_state;
+      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      active_set#remove simplified;
+      (* obtain given clause, and ordering *)
+      match net_state.ns_given with
+      | None ->
+        output net_state; ready()
+      | Some ns_given -> begin
+        let given = hclause_of_net_clause ~ord ns_given in
+        if not (calculus#is_trivial given) then begin
+          ddebug 1 (lazy (Utils.sprintf "generate processing given clause @[<h>%a@]"
+                   !C.pp_clause#pp_h given));
+          (* add given to active set *)
+          active_set#add [given];
+          (* perform inferences *)
+          let new_clauses = Sat.generate ~calculus active_set given in
+          let new_clauses = List.map (globals#convert ~novel:true) new_clauses in
+          let net_state = {net_state with ns_new = new_clauses @ net_state.ns_new } in
+          output net_state;
+          ready()
+        end else begin
+          output net_state;
+          ready()
+        end
+      end
+    end
+  in
+  (* subscribe to some events *)
+  globals#subscribe_exit exit;
+  globals#subscribe_redundant redundant;
+  spawn ready();
+  input
 
 (** Create a component dedicated to RW simplification of newly generated clauses by
     the active set. *)
