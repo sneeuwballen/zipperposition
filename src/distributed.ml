@@ -360,8 +360,13 @@ let connect input queues =
     setup the network server. *)
 let setup_globals send_result =
   ddebug 1 (lazy "setup globals");
-  (* listen on the address *)
+  (* listen on the address; remove the socket upon exit *)
   Join.Site.listen socketname;
+  at_exit (fun () -> match socketname with
+    | Unix.ADDR_UNIX f ->
+      ddebug 0 (lazy (Utils.sprintf "remove socket file %s" f));
+      Unix.unlink f
+    | _ -> ());
   (* create global queues *)
   let exit, sub_exit = mk_global_queue "exit" in
   let redundant, sub_redundant = mk_global_queue "redundant" in
@@ -867,7 +872,8 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
 
 (** Create a pipeline within the same process, without forking *)
 let layout_one_process ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature =
-  ddebug 0 (lazy "use single-process pipeline layout");
+  ddebug 0 (lazy (Utils.sprintf "use single-process pipeline layout (%d clauses)"
+            (List.length clauses)));
   let unit_idx = Dtree.unit_index in
   let index = PS.choose_index "fp" in
   (* passive set *)
@@ -907,7 +913,7 @@ let layout_one_process ~calculus ~select ~ord ~globals ?steps ?timeout clauses q
   (* close the loop *)
   q7_subscribe passive_in;
   (* start *)
-  ddebug 0 (lazy "%% start the single-process pipeline");
+  ddebug 0 (lazy "start the single-process pipeline");
   start ()
 
 (** Create a pipeline with several forked processes *)
