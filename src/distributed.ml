@@ -790,7 +790,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   let passive_set = PS.mk_passive_set ~ord queues in
   passive_set#add (List.map (hclause_of_net_clause ~ord) clauses);
   (* timestamp of last started loop, last finished loop, last transmitted ord *)
-  let last_start= ref 0 in
+  let last_start= ref (-1) in
   let last_done = ref (-1) in
   let last_ord_version = ref 0 in
   (* how many remaining steps? *)
@@ -799,8 +799,11 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   let process_new net_state =
     (* look for the empty clause *)
     let empty =
-      try Some (List.find (fun nc -> nc.nc_lits = [||]) net_state.ns_new)
-      with Not_found -> None
+      match net_state.ns_given with
+      | Some nc when nc.nc_lits = [||] -> Some nc
+      | _ ->
+      (try Some (List.find (fun nc -> nc.nc_lits = [||]) net_state.ns_new)
+       with Not_found -> None)
     in
     (* add new clauses to passive set *)
     let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
@@ -828,8 +831,8 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   (* cases in which we exit (TODO react with full(), notfull() or wait()? *)
   or  exit() =
     ddebug 1 "passive" (lazy "exiting..."); reply to exit
-  (* process a new clause, the network is not full *)
-  or  notfull() =
+  (* decide the next state *)
+  or  next_state() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
     if !steps_to_go = 0
     then (ddebug 1 "passive" (lazy "reached max number of steps");
@@ -837,14 +840,19 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     else if Sat.check_timeout timeout
     then (ddebug 1 "passive" (lazy "reached timeout");
            globals#send_result (Sat.Unknown, !last_done); 0)
-    else match passive_set#next () with
+    else if !last_start - !last_done > !pipeline_capacity
+    then (ddebug 1 "passive" (lazy "enter state full"); full())
+    else (ddebug 1 "passive" (lazy "enter state notfull"); notfull())
+  (* process a new clause, the network is not full *)
+  or  notfull() =
+    match passive_set#next () with
     | None when !last_done = !last_start ->
       (* all clauses have been processed, none remains in passive *)
       globals#send_result (Sat.Sat,!last_done); 0
     | None ->
       (* wait for an incoming result *)
       assert (!last_start > !last_done);
-      wait ()
+      (ddebug 1 "passive" (lazy "enter state wait"); wait ())
     | Some given ->
       (* preprocess: list_simplify *)
       (match calculus#list_simplify ~ord ~select given with
@@ -853,6 +861,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
         let given = C.select_clause ~select given in
         let nc_given = globals#convert ~novel:true given in
         assert (ord#precedence#version >= !last_ord_version);
+        incr last_start;
         let net_state = {
           ns_num = !last_start;
           (* update the precedence of the pipeline if needed *)
@@ -862,13 +871,11 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
           ns_new = List.map (globals#convert ~novel:true) others;
         } in
         (* another clause is sent to the pipeline *)
-        incr last_start;
+        ddebug 1 "passive" (lazy (Utils.sprintf "*** enter iteration %d" !last_start));
         last_ord_version := ord#precedence#version;
         output net_state;
         (* shall we wait for results to come before we continue? *)
-        if !last_start - !last_done > !pipeline_capacity
-          then full()
-          else notfull()
+        next_state()
       end)
   (* get result back while full *)
   or  input(net_state) & full() =
@@ -887,10 +894,9 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     | Some nc -> globals#send_result (Sat.Unsat nc, !last_done));
     assert (net_state.ns_num = !last_done + 1);
     last_done := net_state.ns_num;
+    ddebug 1 "passive" (lazy (Utils.sprintf "*** exit iteration %d" !last_done));
     decr steps_to_go;
-    if !last_start - !last_done > !pipeline_capacity
-      then (ddebug 1 "passive" (lazy "enter state full"); full())
-      else (ddebug 1 "passive" (lazy "enter state full"); notfull())
+    next_state()
   in
   globals#subscribe_exit exit;
   input, start
