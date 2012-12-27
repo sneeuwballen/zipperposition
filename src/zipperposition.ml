@@ -235,10 +235,11 @@ let process_file params f =
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* add clauses to passive_set *)
   state#passive_set#add clauses;
-  (* saturate *)
+  (* saturate, using a given clause main loop as choosen by the user *)
   let result, num =
+    let parallel = params.param_parallel in
     if params.param_pipeline
-      then Distributed.given_clause ~parallel:false ?steps ?timeout ~progress ~calculus state
+      then Distributed.given_clause ~parallel ?steps ?timeout ~progress ~calculus state
       else Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in
   Printf.printf "%% ===============================================\n";
