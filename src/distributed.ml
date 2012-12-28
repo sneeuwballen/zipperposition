@@ -160,10 +160,11 @@ and net_clause_of_hclause ?(selected=true) hc =
  * access to global variables
  * ---------------------------------------------------------------------- *)
 
+let socketname_file = 
+  Format.sprintf "/tmp/zipperposition_%d" (Unix.getpid ())
+
 (** name for the communication socket *)
-let socketname =
-  let name = Format.sprintf "/tmp/zipperposition_%d" (Unix.getpid ()) in
-  Unix.ADDR_UNIX name
+let socketname = Unix.ADDR_UNIX socketname_file
 
 (** Process-localized debug *)
 let ddebug level who msg =
@@ -242,10 +243,44 @@ let get_queue name =
   let ns = Join.Ns.there socketname in
   Join.Ns.lookup ns name
 
-(** Barrier for n incoming messages. It waits for n incoming messages, merge
+(** Join for n incoming messages. It waits for n incoming messages, merge
     them using [merge], then sends them to all registered outputs *)
-let mk_barrier ~merge n : ('a -> unit) * (('a -> unit) -> unit) =
+let mk_join ~merge n : ('a -> unit) * (('a -> unit) -> unit) =
   assert (n > 0); failwith "not implemented"  (* TODO *)
+
+(** Make a global barrier to synchronize [n] processes. The arguments
+    are the (global) name, and the number of processes involved. The
+    semantics is: [mk_barrier name n] registers a barrier on given name;
+    It returns a function sync which is blocking until [n] calls to [sync]
+    have been made. Then [sync] is ready for [n] other calls, and so on. *)
+let mk_barrier name n =
+  (* count [n] syncs *)
+  def sync() & count(n') =
+    (if n' > 1 then begin
+      (* wait for other processes *)
+      spawn count(n'-1);
+      wait ();
+    end else begin
+      (* unlock the n-1 other processes that are waiting *)
+      for i = 1 to n-1 do
+        cross ();
+      done;
+      (* start next barrier *)
+      spawn count(n);
+    end);
+    reply to sync
+  or wait() & cross() = reply to wait & reply to cross
+  in
+  spawn count(n);
+  (* register *)
+  let ns = Join.Ns.there socketname in
+  Join.Ns.register ns name sync;
+  sync
+
+(** Get the barrier registered under this name *)
+let get_barrier name =
+  let ns = Join.Ns.there socketname in
+  (Join.Ns.lookup ns name : unit -> unit)
 
 (* ----------------------------------------------------------------------
  * utils
@@ -298,6 +333,7 @@ type globals =
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
     send_result: net_clause Saturate.szs_status * int -> unit;
+    sync_barrier: unit -> unit;
   >
 
 (** Structure used to keep track of parent/descendants and clause/proof
@@ -345,35 +381,22 @@ let proof_parents_process () =
   spawn ready();
   add_parents, add_proof, get_descendants, get_proof
 
-(** connects the given input to queues whose names are in the list. *)
-let connect input queues =
-  (* lookup a queue by name *)
-  let ns = Join.Ns.there socketname in
-  List.iter
-    (fun queue ->
-      let _, subscribe =
-        (Join.Ns.lookup ns queue : net_state Join.chan *
-                                  ((net_state -> unit) -> unit))
-      in
-      subscribe input)
-    queues
-
-(** Setup global components in this process. Also
-    setup the network server. *)
-let setup_globals send_result =
+(** Setup global components in this process. Also setup the network server.
+    [num] is the number of components. *)
+let setup_globals send_result num =
   ddebug 1 "globals" (lazy "setup globals");
   (* listen on the address; remove the socket upon exit *)
+  (try Unix.unlink socketname_file with Unix.Unix_error _ -> ());
   Join.Site.listen socketname;
-  at_exit (fun () -> match socketname with
-    | Unix.ADDR_UNIX f ->
-      ddebug 0 "globals" (lazy (Utils.sprintf "remove socket file %s" f));
-      Unix.unlink f
-    | _ -> ());
+  at_exit (fun () -> 
+      ddebug 0 "globals" (lazy (Utils.sprintf "remove socket file %s" socketname_file));
+      Unix.unlink socketname_file);
   (* create global queues *)
   let exit, sub_exit = mk_global_queue "exit" in
   let redundant, sub_redundant = mk_global_queue "redundant" in
   let add_parents, add_proof, get_descendants, get_proof =
     proof_parents_process () in
+  let sync = mk_barrier "barrier" num in
   (* register global channels *)
   let ns = Join.Ns.there socketname in
   Join.Ns.register ns "add_parents" add_parents;
@@ -390,11 +413,12 @@ let setup_globals send_result =
     method get_descendants = get_descendants
     method get_proof = get_proof
     method send_result = send_result
+    method sync_barrier = sync
   end :> globals)
 
 (** Create a globals object, using (possibly remote) components *)
 let get_globals () =
-  (* register global channels *)
+  (* get global channels *)
   let add_parents = get_add_parents () in
   let add_proof = get_add_proof () in
   let get_descendants = get_get_descendants () in
@@ -402,6 +426,8 @@ let get_globals () =
   let send_result = get_send_result () in
   let redundant, sub_redundant = get_queue "redundant" in
   let exit, sub_exit = get_queue "exit" in
+  (* get barrier *)
+  let sync = get_barrier "barrier" in
   (object
     method subscribe_redundant = sub_redundant
     method publish_redundant = redundant
@@ -411,6 +437,7 @@ let get_globals () =
     method get_descendants = get_descendants
     method get_proof = get_proof
     method send_result = send_result
+    method sync_barrier = sync
   end :> globals)
 
 (* ----------------------------------------------------------------------
@@ -426,8 +453,8 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let last_state = ref (-1) in
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
-  def ready() & exit() =
-    ddebug 1 "fwd_rw" (lazy "exiting..."); reply to exit
+  def ready() & exit() & wait_done() =
+    ddebug 1 "fwd_rw" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -474,11 +501,11 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
         ready()
       end
     end
+  or start() = spawn ready(); wait_done (); reply to start
   in
   globals#subscribe_exit exit;
   globals#subscribe_redundant redundant;
-  spawn ready();
-  input
+  input, start
 
 (** Create a component dedicated to simplification by the active set
     and by means of subsumption. It returns a synchronous input chan (net_state -> unit) *)
@@ -487,8 +514,8 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
   (* XXX possible optim: only retain the fv_index of active_set? *)
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
-  def ready() & exit() =
-    ddebug 1 "fwd_active" (lazy "exiting..."); reply to exit
+  def ready() & exit() & wait_done() =
+    ddebug 1 "fwd_active" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -544,11 +571,11 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
         end
       end
     end
+  or start() = spawn ready(); wait_done (); reply to start
   in
   globals#subscribe_exit exit;
   globals#subscribe_redundant redundant;
-  spawn ready();
-  input
+  input, start
 
 (** Create a component dedicated to removal of active clauses that
     are subsumed by the given clause. *)
@@ -557,8 +584,8 @@ let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature 
   (* XXX possible optim: only retain the fv_index of active_set? *)
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
-  def ready() & exit() =
-    ddebug 1 "bwd_subsume" (lazy "exiting..."); reply to exit
+  def ready() & exit() & wait_done() =
+    ddebug 1 "bwd_subsume" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -596,12 +623,12 @@ let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature 
         end
       end
     end
+  or start() = spawn ready(); wait_done (); reply to start
   in
   (* subscribe to some events *)
   globals#subscribe_exit exit;
   globals#subscribe_redundant redundant;
-  spawn ready();
-  input
+  input, start
 
 (** Create a component dedicated to simplification of the active set
     by rewriting using the given clause *)
@@ -611,8 +638,8 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
   let active_set = PS.mk_active_set ~ord index signature in
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
-  def ready() & exit() =
-    ddebug 1 "bwd_rw" (lazy "exiting..."); reply to exit
+  def ready() & exit() & wait_done() =
+    ddebug 1 "bwd_rw" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -661,20 +688,20 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
         end
       end
     end
+  or start() = spawn ready(); wait_done (); reply to start
   in
   (* subscribe to some events *)
   globals#subscribe_exit exit;
   globals#subscribe_redundant redundant;
-  spawn ready();
-  input
+  input, start
 
 (** Create a component that performs generating inferences *)
 let generate_process ~calculus ~select ~ord ~output ~globals index signature =
   let last_state = ref (-1) in
   let active_set = PS.mk_active_set ~ord index signature in
   (* case in which we exit *)
-  def ready() & exit() =
-    ddebug 1 "generate" (lazy "exiting..."); reply to exit
+  def ready() & exit() & wait_done() =
+    ddebug 1 "generate" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     reply to redundant & begin
@@ -714,12 +741,12 @@ let generate_process ~calculus ~select ~ord ~output ~globals index signature =
         end
       end
     end
+  or start() = spawn ready(); wait_done (); reply to start
   in
   (* subscribe to some events *)
   globals#subscribe_exit exit;
   globals#subscribe_redundant redundant;
-  spawn ready();
-  input
+  input, start
 
 (** Create a component dedicated to RW simplification of newly generated clauses by
     the active set. *)
@@ -727,8 +754,8 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
   let last_state = ref (-1) in
   let simpl_set = PS.mk_simpl_set ~ord unit_idx in
   (* case in which we exit *)
-  def ready() & exit() =
-    ddebug 1 "post_rw" (lazy "exiting..."); reply to exit
+  def ready() & exit() & wait_done() =
+    ddebug 1 "post_rw" (lazy "exiting..."); reply to wait_done & reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     let clauses = List.map (hclause_of_net_clause ~ord) clauses in
@@ -770,12 +797,12 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
       output(net_state);
       ready()
     end
+  or start() = spawn ready(); wait_done (); reply to start
   in
   (* subscribe to some events *)
   globals#subscribe_exit exit;
   globals#subscribe_redundant redundant;
-  spawn ready();
-  input
+  input, start
 
 (** Number of clauses being processed at the same time *)
 let pipeline_capacity = ref 10
@@ -826,11 +853,9 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     in
     Sat.remove_orphans passive_set simplified
   in
-  (* trigger to start looping *)
-  def start () = notfull() & reply to start
-  (* cases in which we exit (TODO react with full(), notfull() or wait()? *)
-  or  exit() =
-    ddebug 1 "passive" (lazy "exiting..."); reply to exit
+  (* cases in which we exit *)
+  def  exit() & wait_done() =
+    ddebug 1 "passive" (lazy "exiting..."); reply to wait_done & reply to exit
   (* decide the next state *)
   or  next_state() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
@@ -845,6 +870,8 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     else (ddebug 1 "passive" (lazy "enter state notfull"); notfull())
   (* process a new clause, the network is not full *)
   or  notfull() =
+    ddebug 1 "passive" (lazy (Utils.sprintf "pipeline has %d/%d clauses"
+                        (!last_start - !last_done) !pipeline_capacity));
     match passive_set#next () with
     | None when !last_done = !last_start ->
       (* all clauses have been processed, none remains in passive *)
@@ -897,59 +924,103 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     ddebug 1 "passive" (lazy (Utils.sprintf "*** exit iteration %d" !last_done));
     decr steps_to_go;
     next_state()
+  or start() = spawn notfull(); wait_done (); reply to start
   in
   globals#subscribe_exit exit;
   input, start
 
-(** Create a pipeline within the same process, without forking *)
-let layout_one_process ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature =
+(* ----------------------------------------------------------------------
+ * pipeline setup and wiring
+ * ---------------------------------------------------------------------- *)
+(*
+TODO fix problems with queues when forking
+TODO proof reconstruction
+*)
+
+(** Wrap the given process by creating a global output queue,
+    signaling it's ready(), waiting for everyone to be ready,
+    and then wiring the process to queues.
+    [action] is the process to create, it must be given a ~output parameter
+    and return a subscription channel to be wired to the input.
+    if [create_out] is true, the output queue is created, otherwise it's just
+    looked for.
+    if [fork] is true, then the process and the queue are created within a
+    subprocess.
+    
+    The global barrier is used twice: once for waiting for queues to be created,
+    and once to wait for processes to be linked together before starting them *)
+let wrap_process ~fork ?(create_out=true) in_name out_name action =
+  spawn (if not fork || Unix.fork () = 0 then begin
+    let globals = get_globals () in 
+    (* output queue *)
+    let q_out =
+      if create_out
+      then begin (* create the queue and register it *)
+        let q_out, _ = mk_global_queue out_name in
+        ddebug 1 "wrap_process" (lazy ("create queue " ^ out_name));
+        globals#sync_barrier ();
+        q_out
+      end else begin (* get the already existing queue *)
+        globals#sync_barrier ();
+        let q_out, _ = get_queue out_name in
+        q_out
+      end
+    in
+    let _, q_in_subscribe = (get_queue in_name : (net_state -> unit) *
+                             ((net_state -> unit) -> unit)) in
+    (* create process *)
+    let process_input, process_start = action ~output:q_out in
+    (* wire process' input to the input queue *)
+    q_in_subscribe process_input;
+    (* synchronize before starting process *)
+    globals#sync_barrier ();
+    process_start ()
+  end; 0);
+  ()
+
+(** Create the pipeline. [parallel] determines whether to use several
+    processes or not *)
+let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ?steps ?timeout clauses queues signature =
   ddebug 0 "main" (lazy (Utils.sprintf
-                  "use single-process pipeline layout (%d clauses)"
-                  (List.length clauses)));
+                  "use %s-process pipeline layout (%d clauses)"
+                  (if parallel then "multi" else "single") (List.length clauses)));
+  let fork = parallel in
   let unit_idx = Dtree.unit_index in
   let index = PS.choose_index "fp" in
+  (* setup globals *)
+  let num_processes = 7 in
+  let globals = setup_globals send_result num_processes in
+  (* convert clauses to net_clause *)
+  ddebug 1 "main" (lazy "convert clauses");
+  let clauses = List.map (globals#convert ~novel:true) clauses in
   (* passive set *)
-  let q1_in, q1_subscribe = mk_queue () in
-  let passive_in, start = passive_process ~calculus ~select ~ord ~output:q1_in
-    ~globals ?steps ?timeout queues clauses in
+  wrap_process ~fork:false "q_end" "q_passive"
+    (fun ~output -> passive_process ~calculus ~select ~ord ~output
+      ~globals ?steps ?timeout queues clauses);
   (* forward rewriting *)
-  let q2_in, q2_subscribe = mk_queue () in
-  let fwd_rw_in = fwd_rewrite_process ~calculus ~select ~ord ~output:q2_in
-    ~globals unit_idx in
-  q1_subscribe fwd_rw_in;
+  wrap_process ~fork "q_passive" "q_fwd_rewrite"
+    (fun ~output -> fwd_rewrite_process ~calculus ~select ~ord ~output
+    ~globals unit_idx);
   (* forward subsumption *)
-  let q3_in, q3_subscribe = mk_queue () in
-  let fwd_subsume_in = fwd_active_process ~calculus ~select ~ord ~output:q3_in
-    ~globals index signature in
-  q2_subscribe fwd_subsume_in;
+  wrap_process ~fork "q_fwd_rewrite" "q_fwd_subsume"
+    (fun ~output -> fwd_active_process ~calculus ~select ~ord ~output
+    ~globals index signature);
   (* backward subsumption *)
-  let q4_in, q4_subscribe = mk_queue () in
-  let bwd_subsume_in = bwd_subsume_process ~calculus ~select ~ord ~output:q4_in
-    ~globals index signature in
-  q3_subscribe bwd_subsume_in;
+  wrap_process ~fork "q_fwd_subsume" "q_bwd_subsume"
+    (fun ~output -> bwd_subsume_process ~calculus ~select ~ord ~output
+    ~globals index signature);
   (* backward rewriting *)
-  let q5_in, q5_subscribe = mk_queue () in
-  let bwd_rewrite_in = bwd_rewrite_process ~calculus ~select ~ord ~output:q5_in
-    ~globals unit_idx index signature in
-  q4_subscribe bwd_rewrite_in;
+  wrap_process ~fork "q_bwd_subsume" "q_back_rewrite"
+    (fun ~output -> bwd_rewrite_process ~calculus ~select ~ord ~output
+    ~globals unit_idx index signature);
   (* generate *)
-  let q6_in, q6_subscribe = mk_queue () in
-  let generate_in = generate_process ~calculus ~select ~ord ~output:q6_in
-    ~globals index signature in
-  q5_subscribe generate_in;
+  wrap_process ~fork "q_back_rewrite" "q_generate"
+    (fun ~output -> generate_process ~calculus ~select ~ord ~output
+    ~globals index signature);
   (* post-simplify *)
-  let q7_in, q7_subscribe = mk_queue () in
-  let post_rw_in = post_rewrite_process ~calculus ~select ~ord ~output:q7_in
-    ~globals unit_idx in
-  q6_subscribe post_rw_in;
-  (* close the loop *)
-  q7_subscribe passive_in;
-  (* start *)
-  ddebug 0 "main" (lazy "start the single-process pipeline");
-  start ()
-
-(** Create a pipeline with several forked processes *)
-let layout_standard ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature =
+  wrap_process ~fork "q_generate" "q_end"
+    (fun ~output -> post_rewrite_process ~calculus ~select ~ord ~output
+    ~globals unit_idx);
   ()
 
 (** Rebuild a hclause with all its proof *)
@@ -970,16 +1041,12 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus st
   (* TODO give queues as a parameter? *)
   let queues = ClauseQueue.default_queues in
   let signature = C.signature clauses in
-  (* setup globals *)
-  let globals = setup_globals send_result in
-  (* convert clauses to net_clause *)
-  ddebug 1 "main" (lazy "convert clauses");
-  let clauses = List.map (globals#convert ~novel:true) clauses in
-  (* create the pipeline and start processing *)
-  let layout = if parallel then layout_standard else layout_one_process in
-  layout ~calculus ~select ~ord ~globals ?steps ?timeout clauses queues signature;
+  (* create the pipeline of processes *)
+  mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ?steps ?timeout
+    clauses queues signature;
+  let globals = get_globals () in
   (* wait for a result *)
-  match wait () with
+  let res = match wait () with
   | Sat.Unsat nc, num ->
     (* reconstruct a hclause with its proof *)
     let hc = rebuild_proof ~ord ~globals nc in
@@ -988,3 +1055,6 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus st
   | Sat.Unknown, num -> Sat.Unknown, num
   | Sat.Error e, num -> Sat.Error e, num
   | Sat.Timeout, num -> Sat.Timeout, num
+  in
+  globals#publish_exit ();
+  res

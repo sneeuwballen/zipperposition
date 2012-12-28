@@ -94,6 +94,16 @@ val mk_global_queue : string -> ('a -> unit) * (('a -> unit) -> unit)
 val get_queue : string -> ('a -> unit) * (('a -> unit) -> unit)
   (** Get a handle on the remote queue by name *)
 
+val mk_barrier : string -> int -> (unit -> unit)
+  (** Make a global barrier to synchronize [n] processes. The arguments
+      are the (global) name, and the number of processes involved. The
+      semantics is: [mk_barrier name n] registers a barrier on given name;
+      It returns a function sync which is blocking until [n] calls to [sync]
+      have been made. Then [sync] is ready for [n] other calls, and so on. *)
+
+val get_barrier : string -> (unit -> unit)
+  (** Get the barrier registered under this name *)
+
 (* ----------------------------------------------------------------------
  * utils
  * ---------------------------------------------------------------------- *)
@@ -107,6 +117,7 @@ type globals =
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
     send_result: net_clause Saturate.szs_status * int -> unit;
+    sync_barrier: unit -> unit;
   >
 
 val proof_parents_process : unit ->
@@ -117,10 +128,7 @@ val proof_parents_process : unit ->
   (** The process responsible for keeping track of
       parents and proofs of clauses *)
 
-val connect : (net_state -> unit) -> string list -> unit
-  (** connects the given input to queues whose names are in the list. *)
-
-val setup_globals : (net_clause Saturate.szs_status * int -> unit) -> globals
+val setup_globals : (net_clause Saturate.szs_status * int -> unit) -> int -> globals
   (** Setup global components in this process. Also setup the network server.
       The parameter is the chan to send results on *)
 
@@ -134,32 +142,33 @@ val get_globals : unit -> globals
 val fwd_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
                           ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.unit_index ->
-                          (net_state -> unit)
+                          (net_state -> unit) * (unit -> unit)
 
 val fwd_active_process : calculus:Calculus.calculus -> select:selection_fun ->
                           ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.index -> signature ->
-                          (net_state -> unit)
+                          (net_state -> unit) * (unit -> unit)
 
 val bwd_subsume_process : calculus:Calculus.calculus -> select:selection_fun ->
                           ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.index -> signature ->
-                          (net_state -> unit)
+                          (net_state -> unit) * (unit -> unit)
 
 val bwd_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
                           ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.unit_index -> Index.index ->
-                          signature -> (net_state -> unit)
+                          signature ->
+                          (net_state -> unit) * (unit -> unit)
 
 val generate_process : calculus:Calculus.calculus -> select:selection_fun ->
                       ord:ordering -> output: (net_state -> unit) ->
                       globals:globals -> Index.index -> signature ->
-                      (net_state -> unit)
+                      (net_state -> unit) * (unit -> unit)
 
 val post_rewrite_process : calculus:Calculus.calculus -> select:selection_fun ->
                           ord:ordering -> output: (net_state -> unit) ->
                           globals:globals -> Index.unit_index ->
-                          (net_state -> unit)
+                          (net_state -> unit) * (unit -> unit)
 
 val pipeline_capacity : int ref
   (** Maximum number of clauses to be sent down the pipeline at the same time *)
@@ -172,21 +181,19 @@ val passive_process : calculus:Calculus.calculus -> select:selection_fun ->
                       net_clause list ->
                       (net_state -> unit) * (unit -> unit)
 
-val layout_one_process : calculus:Calculus.calculus -> select:selection_fun ->
-                        ord:ordering ->
-                        globals:globals -> 
-                        ?steps:int -> ?timeout:float -> net_clause list ->
-                        (ClauseQueue.queue * int) list -> signature ->
-                        unit
-  (** Create a pipeline within the same process, without forking *)
+(* ----------------------------------------------------------------------
+ * pipeline setup and wiring
+ * ---------------------------------------------------------------------- *)
 
-val layout_standard : calculus:Calculus.calculus -> select:selection_fun ->
-                      ord:ordering ->
-                      globals:globals -> 
-                      ?steps:int -> ?timeout:float -> net_clause list ->
-                      (ClauseQueue.queue * int) list -> signature ->
-                      unit
-  (** Create a pipeline with several forked processes *)
+val mk_pipeline : calculus:Calculus.calculus -> select:selection_fun ->
+                  ord:ordering ->
+                  parallel:bool ->
+                  send_result:((net_clause Saturate.szs_status * int) -> unit) ->
+                  ?steps:int -> ?timeout:float -> hclause list ->
+                  (ClauseQueue.queue * int) list -> signature ->
+                  unit
+  (** Create a pipeline within the same process. [parallel] determines
+      whether to use several processes or not. *)
 
 val given_clause: ?parallel:bool -> ?steps:int -> ?timeout:float ->
                   ?progress:bool ->
