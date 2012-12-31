@@ -963,7 +963,7 @@ TODO proof reconstruction
     The global barrier is used twice: once for waiting for queues to be created,
     and once to wait for processes to be linked together before starting them *)
 let wrap_process ~fork ?(create_out=true) in_name out_name process_name action =
-  spawn (if (not fork) || (Join.fork () = 0) then begin
+  spawn (if (not fork) || (Unix.fork () = 0) then begin
     (* which nameservice to use? *)
     let ns = if fork then Join.Ns.there socketname else Join.Ns.here in
     ddebug 1 process_name (lazy "try to get globals");
