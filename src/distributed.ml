@@ -387,7 +387,8 @@ let setup_globals send_result num =
   ddebug 1 "globals" (lazy "setup globals");
   (* listen on the address; remove the socket upon exit *)
   (try Unix.unlink socketname_file with Unix.Unix_error _ -> ());
-  (try Join.Site.listen socketname
+  (try Join.Site.listen socketname;
+       Format.printf "%% listen on socket %s@." socketname_file
   with Failure f -> begin
     Format.printf "%% error trying to listen on %s: %s@." socketname_file f;
     (exit 1 : unit);
@@ -396,7 +397,7 @@ let setup_globals send_result num =
       ddebug 0 "globals" (lazy (Utils.sprintf "%% remove socket file %s" socketname_file));
       Unix.unlink socketname_file);
   (* local nameservice *)
-  let ns = Join.Ns.there socketname in
+  let ns = Join.Ns.here in
   (* create global queues *)
   let exit, sub_exit = mk_global_queue ~ns "exit" in
   let redundant, sub_redundant = mk_global_queue ~ns "redundant" in
@@ -962,9 +963,10 @@ TODO proof reconstruction
     The global barrier is used twice: once for waiting for queues to be created,
     and once to wait for processes to be linked together before starting them *)
 let wrap_process ~fork ?(create_out=true) in_name out_name process_name action =
-  spawn (if (not fork) || (Unix.fork () = 0) then begin
+  spawn (if (not fork) || (Join.fork () = 0) then begin
     (* which nameservice to use? *)
     let ns = if fork then Join.Ns.there socketname else Join.Ns.here in
+    ddebug 1 process_name (lazy "try to get globals");
     let globals = get_globals ~ns in 
     ddebug 1 process_name (lazy "got globals");
     (* output queue *)
