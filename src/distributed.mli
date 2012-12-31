@@ -63,21 +63,12 @@ type net_state = {
  * access to global variables
  * ---------------------------------------------------------------------- *)
 
-val socketname : Unix.sockaddr
-  (** name for the communication socket *)
-
 val ddebug : int -> string -> string Lazy.t -> unit
   (** Process-localized debug. A level must be provided, and also a context
       name that indicates which component is outputing the message. *)
 
-val get_add_parents : unit -> (net_clause * net_clause list) Join.chan
-val get_add_proof : unit -> (net_clause * net_proof) Join.chan
-val get_get_descendants : unit -> net_clause -> net_clause list
-val get_get_proof : unit -> net_clause -> net_proof option
-val get_publish_redundant : unit -> net_clause list Join.chan
-val get_subscribe_redundant : unit -> net_clause list Join.chan -> unit
-val get_subscribe_exit : unit -> unit Join.chan -> unit
-val get_send_result : unit -> net_clause Saturate.szs_status * int -> unit
+val socketname : Unix.sockaddr
+  (** name for the communication socket *)
 
 val mk_queue : unit -> ('a -> unit) * (('a -> unit) -> unit)
   (** Create a queue. It returns a channel to send input objects (type 'a) in,
@@ -87,21 +78,21 @@ val mk_queue : unit -> ('a -> unit) * (('a -> unit) -> unit)
       order, and the queue will wait for all recipients to receive a message
       before it processes the next one. *)
 
-val mk_global_queue : string -> ('a -> unit) * (('a -> unit) -> unit)
+val mk_global_queue : ns:Join.Ns.t -> string -> ('a -> unit) * (('a -> unit) -> unit)
   (** Same as mk_queue, but registers (send, subscribe) with
       the given global name. *)
 
-val get_queue : string -> ('a -> unit) * (('a -> unit) -> unit)
+val get_queue : ns:Join.Ns.t -> string -> ('a -> unit) * (('a -> unit) -> unit)
   (** Get a handle on the remote queue by name *)
 
-val mk_barrier : string -> int -> (unit -> unit)
+val mk_barrier : ns:Join.Ns.t -> string -> int -> (unit -> unit)
   (** Make a global barrier to synchronize [n] processes. The arguments
       are the (global) name, and the number of processes involved. The
       semantics is: [mk_barrier name n] registers a barrier on given name;
       It returns a function sync which is blocking until [n] calls to [sync]
       have been made. Then [sync] is ready for [n] other calls, and so on. *)
 
-val get_barrier : string -> (unit -> unit)
+val get_barrier : ns:Join.Ns.t -> string -> (unit -> unit)
   (** Get the barrier registered under this name *)
 
 (* ----------------------------------------------------------------------
@@ -132,7 +123,7 @@ val setup_globals : (net_clause Saturate.szs_status * int -> unit) -> int -> glo
   (** Setup global components in this process. Also setup the network server.
       The parameter is the chan to send results on *)
 
-val get_globals : unit -> globals
+val get_globals : ns:Join.Ns.t -> globals
   (** Create a globals object, using (possibly remote) components *)
   
 (* ----------------------------------------------------------------------

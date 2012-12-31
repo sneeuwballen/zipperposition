@@ -34,6 +34,9 @@ module Utils = FoUtils
     every component has a unique name. Its output is "name_output".
     *)
 
+let prof_hc_of_nc = Utils.mk_profiler "hc_of_nc"
+let prof_nc_of_hc = Utils.mk_profiler "nc_of_hc"
+
 (* ----------------------------------------------------------------------
  * basics
  * ---------------------------------------------------------------------- *)
@@ -131,10 +134,13 @@ and proof_of_net_proof ~ord np = match np with
                             C.base_clause (hclause_of_net_clause ~ord nc), pos, S.id_subst) clauses in
     Proof (rule, clauses)
 and hclause_of_net_clause ~ord nc =
+  Utils.enter_prof prof_hc_of_nc;
   let lits = Array.map literal_of_net_literal nc.nc_lits in
   let proof = Axiom ("network", "network") in
-  C.mk_hclause_raw ~maxlits:nc.nc_maxlits ~selected:nc.nc_selected
-    ~selected_done:nc.nc_selected_done lits proof []
+  let c = C.mk_hclause_raw ~maxlits:nc.nc_maxlits ~selected:nc.nc_selected
+    ~selected_done:nc.nc_selected_done lits proof [] in
+  Utils.exit_prof prof_hc_of_nc;
+  c
   
 let rec net_term_of_term t = match t.term with
   | Var i -> NVar (i, name_symbol t.sort)
@@ -149,12 +155,16 @@ and net_proof_of_proof proof = match proof with
       net_clause_of_hclause ~selected:false c.cref, pos) clauses in
     NpProof (rule, clauses)
 and net_clause_of_hclause ?(selected=true) hc =
+  Utils.enter_prof prof_nc_of_hc;
   (if selected then Selection.check_selected hc);
   let lits = Array.map net_literal_of_literal hc.hclits in
+  let nc =
   { nc_maxlits = hc.hcmaxlits;
     nc_selected = hc.hcselected;
     nc_selected_done = selected;
-    nc_lits = lits; }
+    nc_lits = lits; } in
+  Utils.exit_prof prof_nc_of_hc;
+  nc
 
 (* ----------------------------------------------------------------------
  * access to global variables
@@ -169,40 +179,33 @@ let socketname = Unix.ADDR_UNIX socketname_file
 (** Process-localized debug *)
 let ddebug level who msg =
   if level <= Utils.debug_level ()
-    then Format.printf "%% [%d at %.3f] (%s) %s@." (Unix.getpid ())
-      (Sat.get_total_time ()) who (Lazy.force msg)
+    then Join.debug
+      (Utils.sprintf "%% [%d at %.3f] (%s)" (Unix.getpid ()) (Sat.get_total_time ()) who)
+      "%s" (Lazy.force msg)
     else ()
 
-let get_add_parents () =
-  let ns = Join.Ns.there socketname in
+let get_add_parents ns =
   (Join.Ns.lookup ns "add_parents" : (net_clause * net_clause list) Join.chan)
 
-let get_add_proof () =
-  let ns = Join.Ns.there socketname in
+let get_add_proof ns =
   (Join.Ns.lookup ns "add_proof" : (net_clause * net_proof) Join.chan)
 
-let get_get_descendants () =
-  let ns = Join.Ns.there socketname in
+let get_get_descendants ns =
   (Join.Ns.lookup ns "get_descendants" : net_clause -> net_clause list)
 
-let get_get_proof () =
-  let ns = Join.Ns.there socketname in
+let get_get_proof ns =
   (Join.Ns.lookup ns "get_proof" : net_clause -> net_proof option)
 
-let get_publish_redundant () =
-  let ns = Join.Ns.there socketname in
+let get_publish_redundant ns =
   (Join.Ns.lookup ns "publish_redundant" : net_clause list Join.chan)
 
-let get_subscribe_redundant () =
-  let ns = Join.Ns.there socketname in
+let get_subscribe_redundant ns =
   (Join.Ns.lookup ns "subscribe_redundant" : net_clause list Join.chan -> unit)
   
-let get_subscribe_exit () =
-  let ns = Join.Ns.there socketname in
+let get_subscribe_exit ns =
   (Join.Ns.lookup ns "subscribe_exit" : unit Join.chan -> unit)
 
-let get_send_result () =
-  let ns = Join.Ns.there socketname in
+let get_send_result ns =
   (Join.Ns.lookup ns "send_result" : net_clause Sat.szs_status * int -> unit)
 
 (** Create a queue. It returns a channel to send input objects (type 'a) in,
@@ -231,16 +234,14 @@ let mk_queue () : ('a -> unit) * (('a -> unit) -> unit) =
 
 (** Same as mk_queue, but registers (send, subscribe) with
     the given global name. *)
-let mk_global_queue name = 
+let mk_global_queue ~ns name = 
   let send, subscribe = mk_queue () in
   (* register global name *)
-  let ns = Join.Ns.there socketname in
   Join.Ns.register ns name (send, subscribe);
   send, subscribe
 
 (** Get a handle on the remote queue by name *)
-let get_queue name =
-  let ns = Join.Ns.there socketname in
+let get_queue ~ns name =
   Join.Ns.lookup ns name
 
 (** Join for n incoming messages. It waits for n incoming messages, merge
@@ -253,11 +254,12 @@ let mk_join ~merge n : ('a -> unit) * (('a -> unit) -> unit) =
     semantics is: [mk_barrier name n] registers a barrier on given name;
     It returns a function sync which is blocking until [n] calls to [sync]
     have been made. Then [sync] is ready for [n] other calls, and so on. *)
-let mk_barrier name n =
+let mk_barrier ~ns name n =
   (* count [n] syncs *)
   def sync() & count(n') =
     (if n' > 1 then begin
       (* wait for other processes *)
+      ddebug 1 "barrier" (lazy (Utils.sprintf "wait for %d other processes" (n'-1)));
       spawn count(n'-1);
       wait ();
     end else begin
@@ -273,13 +275,11 @@ let mk_barrier name n =
   in
   spawn count(n);
   (* register *)
-  let ns = Join.Ns.there socketname in
   Join.Ns.register ns name sync;
   sync
 
 (** Get the barrier registered under this name *)
-let get_barrier name =
-  let ns = Join.Ns.there socketname in
+let get_barrier ~ns name =
   (Join.Ns.lookup ns name : unit -> unit)
 
 (* ----------------------------------------------------------------------
@@ -387,23 +387,29 @@ let setup_globals send_result num =
   ddebug 1 "globals" (lazy "setup globals");
   (* listen on the address; remove the socket upon exit *)
   (try Unix.unlink socketname_file with Unix.Unix_error _ -> ());
-  Join.Site.listen socketname;
+  (try Join.Site.listen socketname
+  with Failure f -> begin
+    Format.printf "%% error trying to listen on %s: %s@." socketname_file f;
+    (exit 1 : unit);
+  end);
   at_exit (fun () -> 
-      ddebug 0 "globals" (lazy (Utils.sprintf "remove socket file %s" socketname_file));
+      ddebug 0 "globals" (lazy (Utils.sprintf "%% remove socket file %s" socketname_file));
       Unix.unlink socketname_file);
+  (* local nameservice *)
+  let ns = Join.Ns.there socketname in
   (* create global queues *)
-  let exit, sub_exit = mk_global_queue "exit" in
-  let redundant, sub_redundant = mk_global_queue "redundant" in
+  let exit, sub_exit = mk_global_queue ~ns "exit" in
+  let redundant, sub_redundant = mk_global_queue ~ns "redundant" in
   let add_parents, add_proof, get_descendants, get_proof =
     proof_parents_process () in
-  let sync = mk_barrier "barrier" num in
   (* register global channels *)
-  let ns = Join.Ns.there socketname in
   Join.Ns.register ns "add_parents" add_parents;
   Join.Ns.register ns "add_proof" add_proof;
   Join.Ns.register ns "get_descendants" get_descendants;
   Join.Ns.register ns "get_proof" get_proof;
   Join.Ns.register ns "send_result" send_result;
+  (* global barrier *)
+  let sync = mk_barrier ~ns "barrier" num in
   (object
     method subscribe_redundant = sub_redundant
     method publish_redundant = redundant
@@ -417,17 +423,20 @@ let setup_globals send_result num =
   end :> globals)
 
 (** Create a globals object, using (possibly remote) components *)
-let get_globals () =
+let get_globals ~ns =
   (* get global channels *)
-  let add_parents = get_add_parents () in
-  let add_proof = get_add_proof () in
-  let get_descendants = get_get_descendants () in
-  let get_proof = get_get_proof () in
-  let send_result = get_send_result () in
-  let redundant, sub_redundant = get_queue "redundant" in
-  let exit, sub_exit = get_queue "exit" in
+  let add_parents = Join.Ns.lookup ns "add_parents" in
+  ddebug 1 "get_globals" (lazy "got add_parents");
+  let add_proof = get_add_proof ns in
+  let get_descendants = get_get_descendants ns in
+  let get_proof = get_get_proof ns in
+  let send_result = get_send_result ns in
+  let redundant, sub_redundant = get_queue ~ns "redundant" in
+  let exit, sub_exit = get_queue ~ns "exit" in
+  ddebug 1 "get_globals" (lazy "got queues");
   (* get barrier *)
-  let sync = get_barrier "barrier" in
+  let sync = get_barrier ~ns "barrier" in
+  ddebug 1 "get_globals" (lazy "got barrier");
   (object
     method subscribe_redundant = sub_redundant
     method publish_redundant = redundant
@@ -869,20 +878,21 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     then (ddebug 1 "passive" (lazy "enter state full"); full())
     else (ddebug 1 "passive" (lazy "enter state notfull"); notfull())
   (* process a new clause, the network is not full *)
-  or  notfull() =
+  or  notfull() = begin
     ddebug 1 "passive" (lazy (Utils.sprintf "pipeline has %d/%d clauses"
                         (!last_start - !last_done) !pipeline_capacity));
     match passive_set#next () with
-    | None when !last_done = !last_start ->
-      (* all clauses have been processed, none remains in passive *)
-      globals#send_result (Sat.Sat,!last_done); 0
     | None ->
-      (* wait for an incoming result *)
-      assert (!last_start > !last_done);
-      (ddebug 1 "passive" (lazy "enter state wait"); wait ())
+      if !last_done = !last_start
+        then (* all clauses have been processed, none remains in passive *)
+          (globals#send_result (Sat.Sat, !last_done); 0)
+        else begin (* wait for an incoming result *)
+          assert (!last_start > !last_done);
+          (ddebug 1 "passive" (lazy "enter state wait"); wait ())
+        end
     | Some given ->
       (* preprocess: list_simplify *)
-      (match calculus#list_simplify ~ord ~select given with
+      match calculus#list_simplify ~ord ~select given with
       | [] -> notfull()
       | given::others -> begin
         let given = C.select_clause ~select given in
@@ -903,7 +913,8 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
         output net_state;
         (* shall we wait for results to come before we continue? *)
         next_state()
-      end)
+      end
+    end
   (* get result back while full *)
   or  input(net_state) & full() =
     reply to input & process_input(net_state)
@@ -924,7 +935,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
     ddebug 1 "passive" (lazy (Utils.sprintf "*** exit iteration %d" !last_done));
     decr steps_to_go;
     next_state()
-  or start() = spawn notfull(); wait_done (); reply to start
+  or start() = begin spawn notfull(); wait_done (); reply to start end
   in
   globals#subscribe_exit exit;
   input, start
@@ -932,6 +943,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
 (* ----------------------------------------------------------------------
  * pipeline setup and wiring
  * ---------------------------------------------------------------------- *)
+
 (*
 TODO fix problems with queues when forking
 TODO proof reconstruction
@@ -949,24 +961,29 @@ TODO proof reconstruction
     
     The global barrier is used twice: once for waiting for queues to be created,
     and once to wait for processes to be linked together before starting them *)
-let wrap_process ~fork ?(create_out=true) in_name out_name action =
-  spawn (if not fork || Unix.fork () = 0 then begin
-    let globals = get_globals () in 
+let wrap_process ~fork ?(create_out=true) in_name out_name process_name action =
+  spawn (if (not fork) || (Unix.fork () = 0) then begin
+    (* which nameservice to use? *)
+    let ns = if fork then Join.Ns.there socketname else Join.Ns.here in
+    let globals = get_globals ~ns in 
+    ddebug 1 process_name (lazy "got globals");
     (* output queue *)
     let q_out =
       if create_out
       then begin (* create the queue and register it *)
-        let q_out, _ = mk_global_queue out_name in
-        ddebug 1 "wrap_process" (lazy ("create queue " ^ out_name));
+        ddebug 1 process_name (lazy ("create output queue " ^ out_name));
+        let q_out, _ = mk_global_queue ~ns out_name in
         globals#sync_barrier ();
         q_out
       end else begin (* get the already existing queue *)
         globals#sync_barrier ();
-        let q_out, _ = get_queue out_name in
+        ddebug 1 process_name (lazy ("get output queue " ^ out_name));
+        let q_out, _ = get_queue ~ns out_name in
         q_out
       end
     in
-    let _, q_in_subscribe = (get_queue in_name : (net_state -> unit) *
+    ddebug 1 process_name (lazy ("get input queue " ^ in_name));
+    let _, q_in_subscribe = (get_queue ~ns in_name : (net_state -> unit) *
                              ((net_state -> unit) -> unit)) in
     (* create process *)
     let process_input, process_start = action ~output:q_out in
@@ -994,31 +1011,31 @@ let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ?steps ?timeout cl
   ddebug 1 "main" (lazy "convert clauses");
   let clauses = List.map (globals#convert ~novel:true) clauses in
   (* passive set *)
-  wrap_process ~fork:false "q_end" "q_passive"
+  wrap_process ~fork:false "q_end" "q_passive" "passive"
     (fun ~output -> passive_process ~calculus ~select ~ord ~output
       ~globals ?steps ?timeout queues clauses);
   (* forward rewriting *)
-  wrap_process ~fork "q_passive" "q_fwd_rewrite"
+  wrap_process ~fork "q_passive" "q_fwd_rewrite" "fwd_rewrite"
     (fun ~output -> fwd_rewrite_process ~calculus ~select ~ord ~output
     ~globals unit_idx);
   (* forward subsumption *)
-  wrap_process ~fork "q_fwd_rewrite" "q_fwd_subsume"
+  wrap_process ~fork "q_fwd_rewrite" "q_fwd_subsume" "fwd_subsume"
     (fun ~output -> fwd_active_process ~calculus ~select ~ord ~output
     ~globals index signature);
   (* backward subsumption *)
-  wrap_process ~fork "q_fwd_subsume" "q_bwd_subsume"
+  wrap_process ~fork "q_fwd_subsume" "q_bwd_subsume" "bwd_subsume"
     (fun ~output -> bwd_subsume_process ~calculus ~select ~ord ~output
     ~globals index signature);
   (* backward rewriting *)
-  wrap_process ~fork "q_bwd_subsume" "q_back_rewrite"
+  wrap_process ~fork "q_bwd_subsume" "q_back_rewrite" "bwd_rewrite"
     (fun ~output -> bwd_rewrite_process ~calculus ~select ~ord ~output
     ~globals unit_idx index signature);
   (* generate *)
-  wrap_process ~fork "q_back_rewrite" "q_generate"
+  wrap_process ~fork "q_back_rewrite" "q_generate" "generate"
     (fun ~output -> generate_process ~calculus ~select ~ord ~output
     ~globals index signature);
   (* post-simplify *)
-  wrap_process ~fork "q_generate" "q_end"
+  wrap_process ~fork "q_generate" "q_end" "post_rw"
     (fun ~output -> post_rewrite_process ~calculus ~select ~ord ~output
     ~globals unit_idx);
   ()
@@ -1044,7 +1061,7 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus st
   (* create the pipeline of processes *)
   mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ?steps ?timeout
     clauses queues signature;
-  let globals = get_globals () in
+  let globals = get_globals ~ns:Join.Ns.here in
   (* wait for a result *)
   let res = match wait () with
   | Sat.Unsat nc, num ->
