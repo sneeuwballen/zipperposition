@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Main file for the prover *)
 
 open Types
+open Symbols
 open Params
 
 module T = Terms
@@ -143,8 +144,8 @@ let setup_output ~params =
     then T.pp_term_debug#sort true);
   (if params.param_print_all
     then begin T.pp_term_debug#skip_lambdas false; T.pp_term_debug#skip_db false end);
-  Format.printf "%% format: %s, print sort: %B, print all: %B@." params.param_output_syntax
-    params.param_print_sort params.param_print_all
+  Utils.debug 1 (lazy (Utils.sprintf  "%% format: %s, print sort: %B, print all: %B@."
+    params.param_output_syntax params.param_print_sort params.param_print_all))
 
 let print_version ~params =
   if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0)
@@ -239,7 +240,7 @@ let process_file params f =
   let result, num =
     let parallel = params.param_parallel in
     if params.param_pipeline
-      then Distributed.given_clause ~parallel ?steps ?timeout ~progress ~calculus state
+      then Distributed.given_clause ~parallel ?steps ?timeout ~progress ~calculus ~params state
       else Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in
   Printf.printf "%% ===============================================\n";
@@ -277,8 +278,16 @@ let () =
   print_version params;
   (* setup printing *)
   setup_output params;
-  (* process files *)
-  List.iter (process_file params) params.param_files
+  match params.param_role with
+  | Some role ->
+    (* slave process: assume a role in the pipeline *)
+    let calculus = get_calculus ~params in
+    let ord = params.param_ord (Precedence.default_precedence empty_signature) in
+    let select = Selection.selection_from_string ~ord params.param_select in
+    Distributed.assume_role ~calculus ~ord ~select role
+  | None ->
+    (* master process: process files *)
+    List.iter (process_file params) params.param_files
 
 let _ =
   at_exit (fun () -> 

@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 open Symbols
+open Params
 
 module C = Clauses
 module T = Terms
@@ -256,10 +257,10 @@ let mk_join ~merge n : ('a -> unit) * (('a -> unit) -> unit) =
     have been made. Then [sync] is ready for [n] other calls, and so on. *)
 let mk_barrier ~ns name n =
   (* count [n] syncs *)
-  def sync() & count(n') =
+  def sync(process_name) & count(n') =
     (if n' > 1 then begin
       (* wait for other processes *)
-      ddebug 1 "barrier" (lazy (Utils.sprintf "wait for %d other processes" (n'-1)));
+      ddebug 1 process_name (lazy (Utils.sprintf "wait for %d other processes" (n'-1)));
       spawn count(n'-1);
       wait ();
     end else begin
@@ -280,7 +281,7 @@ let mk_barrier ~ns name n =
 
 (** Get the barrier registered under this name *)
 let get_barrier ~ns name =
-  (Join.Ns.lookup ns name : unit -> unit)
+  (Join.Ns.lookup ns name : string -> unit)
 
 (* ----------------------------------------------------------------------
  * utils
@@ -333,7 +334,7 @@ type globals =
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
     send_result: net_clause Saturate.szs_status * int -> unit;
-    sync_barrier: unit -> unit;
+    sync_barrier: string -> unit;
   >
 
 (** Structure used to keep track of parent/descendants and clause/proof
@@ -424,20 +425,17 @@ let setup_globals send_result num =
   end :> globals)
 
 (** Create a globals object, using (possibly remote) components *)
-let get_globals ~ns =
+let get_globals ~ns process_name =
   (* get global channels *)
   let add_parents = Join.Ns.lookup ns "add_parents" in
-  ddebug 1 "get_globals" (lazy "got add_parents");
   let add_proof = get_add_proof ns in
   let get_descendants = get_get_descendants ns in
   let get_proof = get_get_proof ns in
   let send_result = get_send_result ns in
   let redundant, sub_redundant = get_queue ~ns "redundant" in
   let exit, sub_exit = get_queue ~ns "exit" in
-  ddebug 1 "get_globals" (lazy "got queues");
   (* get barrier *)
   let sync = get_barrier ~ns "barrier" in
-  ddebug 1 "get_globals" (lazy "got barrier");
   (object
     method subscribe_redundant = sub_redundant
     method publish_redundant = redundant
@@ -950,11 +948,75 @@ TODO fix problems with queues when forking
 TODO proof reconstruction
 *)
 
+(** Get or create the output queue of given name *)
+let get_output ~ns ~globals ~process_name ~create_out ~output_name =
+  if create_out
+  then begin (* create the queue and register it *)
+    ddebug 1 process_name (lazy ("create output queue " ^ output_name));
+    let q_out, _ = mk_global_queue ~ns output_name in
+    globals#sync_barrier process_name;
+    q_out
+  end else begin (* get the already existing queue *)
+    globals#sync_barrier process_name;
+    ddebug 1 process_name (lazy ("get output queue " ^ output_name));
+    let q_out, _ = get_queue ~ns output_name in
+    q_out
+  end
+
+(** Run the given role *)
+let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
+~process_name ~role ~input_name ~signature clauses =
+  ddebug 1 process_name (lazy ("run role " ^ role));
+  let unit_idx = Dtree.unit_index in
+  let index = PS.choose_index "fp" in
+  let queues = ClauseQueue.default_queues in
+  (* get output queue *)
+  let output = get_output ~ns ~globals ~process_name ~create_out ~output_name in
+  (* create the process *)
+  let process_input, process_start = match role with
+  | "passive" -> passive_process ~calculus ~select ~ord ~output ~globals queues clauses
+  | "fwd_rewrite" -> fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx
+  | "fwd_subsume" -> fwd_active_process ~calculus ~select ~ord ~output ~globals index signature
+  | "bwd_subsume" -> bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature
+  | "bwd_rewrite" -> bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index signature
+  | "generate" -> generate_process ~calculus ~select ~ord ~output ~globals index signature
+  | "post_rewrite" -> post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx
+  | _ -> failwith ("bad role " ^ role)
+  in
+  (* now get the input queue *)
+  globals#sync_barrier process_name;
+  ddebug 1 process_name (lazy ("get input queue " ^ input_name));
+  let _, q_in_subscribe = (get_queue ~ns input_name : (net_state -> unit) *
+                           ((net_state -> unit) -> unit)) in
+  (* wire process' input to the input queue *)
+  q_in_subscribe process_input;
+  (* synchronize before starting the process *)
+  globals#sync_barrier process_name;
+  ddebug 1 process_name (lazy "start");
+  process_start ()
+
+(** Assume the given role.
+    The role is a string "role,socketname,input_name,output_name,name,bool,signature"
+    where the bool is used to choose whether to create the output or not,
+    the signature is a blob without ',' *)
+let assume_role ~calculus ~select ~ord role_str =
+  match Str.split (Str.regexp ",") role_str with
+  | [role;socketname;input_name;output_name;process_name;create_out;signature] ->
+    let socketname = Unix.ADDR_UNIX socketname in
+    let create_out = bool_of_string create_out in
+    let ns = Join.Ns.there socketname in
+    let globals = get_globals ~ns process_name in
+    (* signature *)
+    let signature = load_signature signature in
+    (* run the process described by role *)
+    run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~process_name
+      ~role ~input_name ~output_name ~signature []
+  | _ -> failwith "wrong role argument"
+
 (** Wrap the given process by creating a global output queue,
     signaling it's ready(), waiting for everyone to be ready,
     and then wiring the process to queues.
-    [action] is the process to create, it must be given a ~output parameter
-    and return a subscription channel to be wired to the input.
+    [role] is the name of the action to perform.
     if [create_out] is true, the output queue is created, otherwise it's just
     looked for.
     if [fork] is true, then the process and the queue are created within a
@@ -962,50 +1024,40 @@ TODO proof reconstruction
     
     The global barrier is used twice: once for waiting for queues to be created,
     and once to wait for processes to be linked together before starting them *)
-let wrap_process ~fork ?(create_out=true) in_name out_name process_name action =
-  spawn (if (not fork) || (Unix.fork () = 0) then begin
-    (* which nameservice to use? *)
-    let ns = if fork then Join.Ns.there socketname else Join.Ns.here in
-    ddebug 1 process_name (lazy "try to get globals");
-    let globals = get_globals ~ns in 
-    ddebug 1 process_name (lazy "got globals");
-    (* output queue *)
-    let q_out =
-      if create_out
-      then begin (* create the queue and register it *)
-        ddebug 1 process_name (lazy ("create output queue " ^ out_name));
-        let q_out, _ = mk_global_queue ~ns out_name in
-        globals#sync_barrier ();
-        q_out
-      end else begin (* get the already existing queue *)
-        globals#sync_barrier ();
-        ddebug 1 process_name (lazy ("get output queue " ^ out_name));
-        let q_out, _ = get_queue ~ns out_name in
-        q_out
-      end
-    in
-    ddebug 1 process_name (lazy ("get input queue " ^ in_name));
-    let _, q_in_subscribe = (get_queue ~ns in_name : (net_state -> unit) *
-                             ((net_state -> unit) -> unit)) in
-    (* create process *)
-    let process_input, process_start = action ~output:q_out in
-    (* wire process' input to the input queue *)
-    q_in_subscribe process_input;
-    (* synchronize before starting process *)
-    globals#sync_barrier ();
-    process_start ()
-  end; 0);
-  ()
+let wrap_process ~fork ?(create_out=true) ~calculus ~ord ~select ~params
+input_name output_name process_name role signature clauses =
+  if fork
+    then if Unix.fork () = 0 then
+      let socketname = match socketname with
+      | Unix.ADDR_UNIX s -> s
+      | Unix.ADDR_INET _ -> assert false
+      in
+      let role = Utils.sprintf "%s,%s,%s,%s,%s,%B,%s"
+        role socketname input_name output_name process_name create_out
+        (dump_signature signature) in
+      let args = [|"-ord"; ord#name;
+                  "-calculus"; params.param_calculus;
+                  "-select"; params.param_select;
+                  "-role"; role
+                  |] in
+      Unix.execv Sys.argv.(0) args
+      else ()
+    else spawn begin
+      let ns = Join.Ns.here in
+      let globals = get_globals ~ns process_name in
+      run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~process_name
+        ~output_name ~input_name ~role ~signature clauses;
+      0
+    end
 
 (** Create the pipeline. [parallel] determines whether to use several
     processes or not *)
-let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ?steps ?timeout clauses queues signature =
+let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params
+?steps ?timeout clauses signature =
   ddebug 0 "main" (lazy (Utils.sprintf
                   "use %s-process pipeline layout (%d clauses)"
                   (if parallel then "multi" else "single") (List.length clauses)));
   let fork = parallel in
-  let unit_idx = Dtree.unit_index in
-  let index = PS.choose_index "fp" in
   (* setup globals *)
   let num_processes = 7 in
   let globals = setup_globals send_result num_processes in
@@ -1013,33 +1065,26 @@ let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ?steps ?timeout cl
   ddebug 1 "main" (lazy "convert clauses");
   let clauses = List.map (globals#convert ~novel:true) clauses in
   (* passive set *)
-  wrap_process ~fork:false "q_end" "q_passive" "passive"
-    (fun ~output -> passive_process ~calculus ~select ~ord ~output
-      ~globals ?steps ?timeout queues clauses);
+  wrap_process ~fork:false ~calculus ~ord ~select ~params
+    "q_end" "q_passive" "passive1" "passive" signature clauses;
   (* forward rewriting *)
-  wrap_process ~fork "q_passive" "q_fwd_rewrite" "fwd_rewrite"
-    (fun ~output -> fwd_rewrite_process ~calculus ~select ~ord ~output
-    ~globals unit_idx);
+  wrap_process ~fork ~calculus ~ord ~select ~params
+    "q_passive" "q_fwd_rewrite" "fwd_rewrite1" "fwd_rewrite" signature [];
   (* forward subsumption *)
-  wrap_process ~fork "q_fwd_rewrite" "q_fwd_subsume" "fwd_subsume"
-    (fun ~output -> fwd_active_process ~calculus ~select ~ord ~output
-    ~globals index signature);
+  wrap_process ~fork ~calculus ~ord ~select ~params
+    "q_fwd_rewrite" "q_fwd_subsume" "fwd_subsume1" "fwd_subsume" signature [];
   (* backward subsumption *)
-  wrap_process ~fork "q_fwd_subsume" "q_bwd_subsume" "bwd_subsume"
-    (fun ~output -> bwd_subsume_process ~calculus ~select ~ord ~output
-    ~globals index signature);
+  wrap_process ~fork ~calculus ~ord ~select ~params
+    "q_fwd_subsume" "q_bwd_subsume" "bwd_subsume1" "bwd_subsume" signature [];
   (* backward rewriting *)
-  wrap_process ~fork "q_bwd_subsume" "q_back_rewrite" "bwd_rewrite"
-    (fun ~output -> bwd_rewrite_process ~calculus ~select ~ord ~output
-    ~globals unit_idx index signature);
+  wrap_process ~fork ~calculus ~ord ~select ~params
+    "q_bwd_rewrite" "q_back_rewrite" "bwd_rewrite1" "bwd_rewrite" signature [];
   (* generate *)
-  wrap_process ~fork "q_back_rewrite" "q_generate" "generate"
-    (fun ~output -> generate_process ~calculus ~select ~ord ~output
-    ~globals index signature);
+  wrap_process ~fork ~calculus ~ord ~select ~params
+    "q_back_rewrite" "q_generate" "generate1" "generate" signature [];
   (* post-simplify *)
-  wrap_process ~fork "q_generate" "q_end" "post_rw"
-    (fun ~output -> post_rewrite_process ~calculus ~select ~ord ~output
-    ~globals unit_idx);
+  wrap_process ~fork ~calculus ~ord ~select ~params
+    "q_generate" "q_end" "post_rw1" "post_rewrite" signature [];
   ()
 
 (** Rebuild a hclause with all its proof *)
@@ -1048,7 +1093,7 @@ let rebuild_proof ~ord ~globals nc =
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns the result. *)
-let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus state =
+let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus ~params state =
   let ord = state#ord
   and select = state#select
   and clauses = C.CSet.to_list state#passive_set#clauses in
@@ -1057,13 +1102,11 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus st
     reply (result,num) to wait & reply to send_result
   in
   ddebug 0 "main" (lazy "start pipelined given clause");
-  (* TODO give queues as a parameter? *)
-  let queues = ClauseQueue.default_queues in
   let signature = C.signature clauses in
   (* create the pipeline of processes *)
-  mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ?steps ?timeout
-    clauses queues signature;
-  let globals = get_globals ~ns:Join.Ns.here in
+  mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params ?steps ?timeout
+    clauses signature;
+  let globals = get_globals ~ns:Join.Ns.here "given_clause" in
   (* wait for a result *)
   let res = match wait () with
   | Sat.Unsat nc, num ->

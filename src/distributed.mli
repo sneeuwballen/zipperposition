@@ -85,14 +85,14 @@ val mk_global_queue : ns:Join.Ns.t -> string -> ('a -> unit) * (('a -> unit) -> 
 val get_queue : ns:Join.Ns.t -> string -> ('a -> unit) * (('a -> unit) -> unit)
   (** Get a handle on the remote queue by name *)
 
-val mk_barrier : ns:Join.Ns.t -> string -> int -> (unit -> unit)
+val mk_barrier : ns:Join.Ns.t -> string -> int -> (string -> unit)
   (** Make a global barrier to synchronize [n] processes. The arguments
       are the (global) name, and the number of processes involved. The
       semantics is: [mk_barrier name n] registers a barrier on given name;
-      It returns a function sync which is blocking until [n] calls to [sync]
+      It returns a function sync which is blocking until [n] calls to [sync name]
       have been made. Then [sync] is ready for [n] other calls, and so on. *)
 
-val get_barrier : ns:Join.Ns.t -> string -> (unit -> unit)
+val get_barrier : ns:Join.Ns.t -> string -> (string -> unit)
   (** Get the barrier registered under this name *)
 
 (* ----------------------------------------------------------------------
@@ -108,7 +108,7 @@ type globals =
     convert: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
     send_result: net_clause Saturate.szs_status * int -> unit;
-    sync_barrier: unit -> unit;
+    sync_barrier: string -> unit;
   >
 
 val proof_parents_process : unit ->
@@ -123,7 +123,7 @@ val setup_globals : (net_clause Saturate.szs_status * int -> unit) -> int -> glo
   (** Setup global components in this process. Also setup the network server.
       The parameter is the chan to send results on *)
 
-val get_globals : ns:Join.Ns.t -> globals
+val get_globals : ns:Join.Ns.t -> string -> globals
   (** Create a globals object, using (possibly remote) components *)
   
 (* ----------------------------------------------------------------------
@@ -176,19 +176,17 @@ val passive_process : calculus:Calculus.calculus -> select:selection_fun ->
  * pipeline setup and wiring
  * ---------------------------------------------------------------------- *)
 
-val mk_pipeline : calculus:Calculus.calculus -> select:selection_fun ->
-                  ord:ordering ->
-                  parallel:bool ->
-                  send_result:((net_clause Saturate.szs_status * int) -> unit) ->
-                  ?steps:int -> ?timeout:float -> hclause list ->
-                  (ClauseQueue.queue * int) list -> signature ->
-                  unit
-  (** Create a pipeline within the same process. [parallel] determines
-      whether to use several processes or not. *)
+val assume_role : calculus:Calculus.calculus ->
+                  select:selection_fun -> ord:ordering ->
+                  string -> unit
+  (** Assume the given role.
+      The role is a string "role,input_name,output_name,name,bool" where
+      the bool is used to choose whether to create the output or not *)
 
 val given_clause: ?parallel:bool -> ?steps:int -> ?timeout:float ->
                   ?progress:bool ->
                   calculus:Calculus.calculus ->
+                  params:Params.parameters ->
                   ProofState.state ->
                   hclause Saturate.szs_status * int
   (** run the given clause until a timeout occurs or a result
