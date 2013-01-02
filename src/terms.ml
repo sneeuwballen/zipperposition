@@ -45,6 +45,8 @@ let hash_term t =
     aux h l
   in Hashtbl.hash t.sort lxor (hash t)
 
+let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
+
 (* ----------------------------------------------------------------------
  * comparison, equality, containers
  * ---------------------------------------------------------------------- *)
@@ -180,6 +182,7 @@ let mk_var idx sort =
   H.hashcons my_v
 
 let mk_node s sort l =
+  Utils.enter_prof prof_mk_node;
   let rec my_t = {term=Node (s, l); sort; vars=[]; flags=0;
                   binding=my_t; tsize=0; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
@@ -190,6 +193,7 @@ let mk_node s sort l =
       t.vars <- compute_vars l;
       t.tsize <- List.fold_left (fun acc subt -> acc + subt.tsize) 1 l;
     end);
+  Utils.exit_prof prof_mk_node;
   t
 
 let mk_const s sort = mk_node s sort []

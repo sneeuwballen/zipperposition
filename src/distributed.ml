@@ -116,6 +116,7 @@ let merge_states s1 s2 =
  * conversion functions
  * ---------------------------------------------------------------------- *)
 
+(* TODO optimize the wire-level format for efficient serialization/deserialization? *)
 let rec term_of_net_term nt = match nt with
   | NVar (i,s) -> T.mk_var i (mk_symbol s)
   | NNode (f, s, l) ->
@@ -218,8 +219,8 @@ let mk_queue () : ('a -> unit) * (('a -> unit) -> unit) =
   def send(x) & waiting(l) =
     waiting(l @ [x]) & reply to send
   (* forward first message to all subscribers *)
-  or waiting(x::l) & subscribers(subs) & ready() =
-    waiting(l) & subscribers(subs) & begin
+  or waiting(x::l') & subscribers(subs) & ready() =
+    waiting(l') & subscribers(subs) & begin
       List.iter (fun sub -> sub x) subs;  (* wait for all subscribers to receive x *)
       ready()
     end
@@ -285,17 +286,19 @@ let get_barrier ~ns name =
  * utils
  * ---------------------------------------------------------------------- *)
 
-(** Publish proof and parents for this clause. and convert it
-    to a net_clause *)
-let convert_clause add_parents add_proof ~novel hc =
-  (* convert into serializable form *)
-  let nc = net_clause_of_hclause hc in
-  (if novel then
-    let proof = net_proof_of_proof hc.hcproof in
-    let parents = List.map (net_clause_of_hclause ~selected:false) hc.hcparents in
-    (* send messages *)
-    spawn add_parents(nc, parents) & add_proof(nc, proof));
-  nc
+(** Publish proof and parents for a list of clauses. and convert them
+    to a list of net_clause *)
+let convert_clauses add_parents_proof ~novel hcs =
+    (* convert into serializable form *)
+    let ncs = List.map net_clause_of_hclause hcs in
+    (if novel then
+      let parentss = List.map
+        (fun hc -> List.map (net_clause_of_hclause ~selected:false) hc.hcparents)
+        hcs in
+      let proofs = List.map (fun hc -> net_proof_of_proof hc.hcproof) hcs in
+      (* push the clauses and their parents, proof in the queue *)
+      add_parents_proof (ncs, parentss, proofs));
+    ncs
 
 (** Update the ordering, using the net_state *)
 let update_ord ~ord net_state =
@@ -329,7 +332,8 @@ type globals =
     publish_redundant: net_clause list -> unit;
     subscribe_exit: (unit -> unit) -> unit;
     publish_exit: unit -> unit;
-    convert: novel:bool -> hclause -> net_clause;
+    convert: novel:bool -> hclause list -> net_clause list;
+    convert_one: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
     send_result: net_clause Saturate.szs_status * int -> unit;
     sync_barrier: string -> unit;
@@ -365,11 +369,20 @@ let proof_parents_process () =
     match genealogy.gen_proof with
     | None -> genealogy.gen_proof <- Some proof  (* first proof *)
     | Some _ -> ()  (* already a proof, do nothing *)
+  (* associate the clauses, lists of parents and proofs together *)
+  and associate_lists ncs parentss proofs = match ncs, parentss, proofs with
+  | [], [], [] -> ()
+  | nc::ncs', parents::parentss', proof::proofs' ->
+    maybe_add_proof nc proof;
+    List.iter (fun parent -> add_descendant parent nc) parents;
+    associate_lists ncs' parentss' proofs'
+  | _ -> assert false
   in 
-  def ready() & add_parents(clause, parents) =
-    List.iter (fun p -> add_descendant p clause) parents; ready()
-  or  ready() & add_proof(clause, proof) =
-    maybe_add_proof clause proof; ready()
+  (* add parents and proofs for this list of clauses *)
+  def queue(l) & add_parents_proof((ncs, parentss, proofs) as tuple) =
+    queue(l @ [tuple]) & reply to add_parents_proof
+  or  ready() & queue((ncs, parentss, proofs)::l) =
+    queue(l) & begin associate_lists ncs parentss proofs; ready() end
   or  ready() & get_descendants(clause) =
     let genealogy = get_genealogy clause in
     reply genealogy.gen_descendants to get_descendants & ready ()
@@ -377,8 +390,8 @@ let proof_parents_process () =
     let genealogy = get_genealogy clause in
     reply genealogy.gen_proof to get_proof & ready ()
   in
-  spawn ready();
-  add_parents, add_proof, get_descendants, get_proof
+  spawn ready() & queue([]);
+  add_parents_proof, get_descendants, get_proof
 
 (** Setup global components in this process. Also setup the network server.
     [num] is the number of components. *)
@@ -400,22 +413,22 @@ let setup_globals send_result num =
   (* create global queues *)
   let exit, sub_exit = mk_global_queue ~ns "exit" in
   let redundant, sub_redundant = mk_global_queue ~ns "redundant" in
-  let add_parents, add_proof, get_descendants, get_proof =
-    proof_parents_process () in
+  let add_parents_proof, get_descendants, get_proof = proof_parents_process () in
   (* register global channels *)
-  Join.Ns.register ns "add_parents" add_parents;
-  Join.Ns.register ns "add_proof" add_proof;
+  Join.Ns.register ns "add_parents_proof" add_parents_proof;
   Join.Ns.register ns "get_descendants" get_descendants;
   Join.Ns.register ns "get_proof" get_proof;
   Join.Ns.register ns "send_result" send_result;
   (* global barrier *)
   let sync = mk_barrier ~ns "barrier" num in
+  let convert = convert_clauses add_parents_proof in
   (object
     method subscribe_redundant = sub_redundant
     method publish_redundant = redundant
     method subscribe_exit = sub_exit
     method publish_exit = exit
-    method convert ~novel hc = convert_clause add_parents add_proof ~novel hc 
+    method convert ~novel hc = convert ~novel hc 
+    method convert_one ~novel hc = match convert ~novel [hc] with [nc] -> nc | _ -> assert false
     method get_descendants = get_descendants
     method get_proof = get_proof
     method send_result = send_result
@@ -425,8 +438,7 @@ let setup_globals send_result num =
 (** Create a globals object, using (possibly remote) components *)
 let get_globals ~ns process_name =
   (* get global channels *)
-  let add_parents = Join.Ns.lookup ns "add_parents" in
-  let add_proof = get_add_proof ns in
+  let add_parents_proof = Join.Ns.lookup ns "add_parents_proof" in
   let get_descendants = get_get_descendants ns in
   let get_proof = get_get_proof ns in
   let send_result = get_send_result ns in
@@ -434,12 +446,14 @@ let get_globals ~ns process_name =
   let exit, sub_exit = get_queue ~ns "exit" in
   (* get barrier *)
   let sync = get_barrier ~ns "barrier" in
+  let convert = convert_clauses add_parents_proof in
   (object
     method subscribe_redundant = sub_redundant
     method publish_redundant = redundant
     method subscribe_exit = sub_exit
     method publish_exit = exit
-    method convert ~novel hc = convert_clause add_parents add_proof ~novel hc 
+    method convert ~novel hcs = convert ~novel hcs
+    method convert_one ~novel hc = match convert ~novel [hc] with [nc] -> nc | _ -> assert false
     method get_descendants = get_descendants
     method get_proof = get_proof
     method send_result = send_result
@@ -498,7 +512,7 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
               (lazy (Utils.sprintf "simplified to @[<h>%a@]"
               !C.pp_clause#pp_h new_given)));
             simpl_set#add [new_given];  (* add the clause to active set *)
-            let ns_new = globals#convert ~novel new_given in
+            let ns_new = globals#convert_one ~novel new_given in
             { net_state with ns_given = Some ns_new }
           end
         in
@@ -567,7 +581,7 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
                 !C.pp_clause#pp_h new_given)));
               Selection.check_selected new_given;
               active_set#add [new_given];  (* add the clause to active set *)
-              let ns_new = globals#convert ~novel new_given in
+              let ns_new = globals#convert_one ~novel new_given in
               { net_state with ns_given = Some ns_new }
             end
           in
@@ -680,7 +694,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
           let simplified = C.CSet.to_list simplified in
           let simplified = List.map net_clause_of_hclause simplified in
           let newly_simplified = List.map (C.select_clause ~select) newly_simplified in
-          let newly_simplified = List.map (globals#convert ~novel:true) newly_simplified in
+          let newly_simplified = globals#convert ~novel:true newly_simplified in
           (* put simplified clause in ns_simplified, and their simplification
              in ns_new *)
           let net_state = {net_state with
@@ -737,7 +751,7 @@ let generate_process ~calculus ~select ~ord ~output ~globals index signature =
           (* perform inferences *)
           let new_clauses = Sat.generate ~calculus active_set given in
           let new_clauses = List.map (C.select_clause ~select) new_clauses in
-          let new_clauses = List.map (globals#convert ~novel:true) new_clauses in
+          let new_clauses = globals#convert ~novel:true new_clauses in
           let net_state = {net_state with ns_new = new_clauses @ net_state.ns_new } in
           output net_state;
           ready()
@@ -796,7 +810,7 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
         [] new_clauses
       in 
       (* put simplified clauses back in the state *)
-      let new_clauses = List.map (globals#convert ~novel:true) new_clauses in
+      let new_clauses = globals#convert ~novel:true new_clauses in
       (* maybe we just created new symbols, forward them *)
       let ns_ord = update_precedence ~ord old_ord_version in
       let net_state = {net_state with ns_ord; ns_new = new_clauses } in
@@ -893,7 +907,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
       | [] -> notfull()
       | given::others -> begin
         let given = C.select_clause ~select given in
-        let nc_given = globals#convert ~novel:true given in
+        let nc_given = globals#convert_one ~novel:true given in
         assert (ord#precedence#version >= !last_ord_version);
         incr last_start;
         let net_state = {
@@ -902,7 +916,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
           ns_ord = update_precedence ~ord !last_ord_version;
           ns_given = Some nc_given;
           ns_simplified = [];
-          ns_new = List.map (globals#convert ~novel:true) others;
+          ns_new = globals#convert ~novel:true others;
         } in
         (* another clause is sent to the pipeline *)
         ddebug 1 "passive" (lazy (Utils.sprintf "*** enter iteration %d" !last_start));
@@ -964,7 +978,7 @@ let get_output ~ns ~globals ~process_name ~create_out ~output_name =
 
 (** Run the given role *)
 let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
-~process_name ~role ~input_name ~signature clauses =
+~process_name ~role ~input_name ~signature ?steps ?timeout clauses =
   let unit_idx = Dtree.unit_index in
   let index = PS.choose_index "fp" in
   let queues = ClauseQueue.default_queues in
@@ -972,7 +986,7 @@ let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
   let output = get_output ~ns ~globals ~process_name ~create_out ~output_name in
   (* create the process *)
   let process_input, process_start = match role with
-  | "passive" -> passive_process ~calculus ~select ~ord ~output ~globals queues clauses
+  | "passive" -> passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queues clauses
   | "fwd_rewrite" -> fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx
   | "fwd_subsume" -> fwd_active_process ~calculus ~select ~ord ~output ~globals index signature
   | "bwd_subsume" -> bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature
@@ -1024,32 +1038,36 @@ let assume_role ~calculus ~select ~ord role_str =
     
     The global barrier is used twice: once for waiting for queues to be created,
     and once to wait for processes to be linked together before starting them *)
-let wrap_process ~fork ?(create_out=true) ~calculus ~ord ~select ~params
+let wrap_process ~fork ?(create_out=true) ~calculus ~ord ~select ~params ?steps ?timeout
 input_name output_name process_name role signature clauses =
   if fork
-    then if Unix.fork () = 0 then begin
-      Format.printf "%% child process %d is %s@." (Unix.getpid ()) process_name;
-      let socketname = match socketname with
-      | Unix.ADDR_UNIX s -> s
-      | Unix.ADDR_INET _ -> assert false
-      in
-      let role = Utils.sprintf "%s,%s,%s,%s,%s,%B,%s"
-        role socketname input_name output_name process_name create_out
-        (dump_signature signature) in
-      let args = [|"-ord"; ord#name;
-                  "-calculus"; params.param_calculus;
-                  "-select"; params.param_select;
-                  "-debug"; string_of_int (Utils.debug_level ());
-                  "-role"; role
-                  |] in
-      Unix.execv Sys.argv.(0) args
-      end else ()
+    then
+      match Unix.fork () with
+      | 0 -> begin
+        Format.printf "%% child process %d is %s@." (Unix.getpid ()) process_name;
+        let socketname = match socketname with
+        | Unix.ADDR_UNIX s -> s
+        | Unix.ADDR_INET _ -> assert false
+        in
+        let role = Utils.sprintf "%s,%s,%s,%s,%s,%B,%s"
+          role socketname input_name output_name process_name create_out
+          (dump_signature signature) in
+        let args = [|Sys.argv.(0);
+                    "-ord"; ord#name;
+                    "-calculus"; params.param_calculus;
+                    "-select"; params.param_select;
+                    "-debug"; string_of_int (Utils.debug_level ());
+                    "-role"; role
+                    |] in
+        Unix.execv Sys.argv.(0) args
+        end
+      | subpid -> at_exit (fun () -> Unix.kill subpid 9)
     else spawn begin
       Format.printf "%% master process runs %s@." process_name;
       let ns = Join.Ns.here in
       let globals = get_globals ~ns process_name in
       run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~process_name
-        ~output_name ~input_name ~role ~signature clauses;
+        ~output_name ~input_name ~role ~signature ?steps ?timeout clauses;
       0
     end
 
@@ -1066,9 +1084,9 @@ let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params
   let globals = setup_globals send_result num_processes in
   (* convert clauses to net_clause *)
   ddebug 1 "main" (lazy "convert clauses");
-  let clauses = List.map (globals#convert ~novel:true) clauses in
+  let clauses = globals#convert ~novel:true clauses in
   (* passive set *)
-  wrap_process ~fork:false ~calculus ~ord ~select ~params
+  wrap_process ~fork:false ~calculus ~ord ~select ~params ?steps ?timeout
     "q_end" "q_passive" "passive1" "passive" signature clauses;
   (* forward rewriting *)
   wrap_process ~fork ~calculus ~ord ~select ~params

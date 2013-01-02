@@ -105,15 +105,15 @@ type globals =
     publish_redundant: net_clause list -> unit;
     subscribe_exit: (unit -> unit) -> unit;
     publish_exit: unit -> unit;
-    convert: novel:bool -> hclause -> net_clause;
+    convert: novel:bool -> hclause list -> net_clause list;
+    convert_one: novel:bool -> hclause -> net_clause;
     get_descendants: net_clause -> net_clause list;
     send_result: net_clause Saturate.szs_status * int -> unit;
     sync_barrier: string -> unit;
   >
 
 val proof_parents_process : unit ->
-                             (net_clause * net_clause list) Join.chan *
-                             (net_clause * net_proof) Join.chan *
+                             ((net_clause list * net_clause list list * net_proof list) -> unit) *
                              (net_clause -> net_clause list) *
                              (net_clause -> net_proof option)
   (** The process responsible for keeping track of
