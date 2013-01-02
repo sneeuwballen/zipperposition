@@ -36,11 +36,11 @@ let compare_symbols (_, t1,_) (_,t2,_) = t1 - t2
 let hash_symbol (s, _, _) = Hashtbl.hash s
 
 (** weak hash table for symbols *)
-module HashSymbol = Weak.Make(
+module HashSymbol = Hashtbl.Make(
   struct
-    type t = symbol
-    let equal (s1,_,_) (s2,_,_) = s1 = s2
-    let hash = hash_symbol
+    type t = string
+    let equal s1 s2 = String.compare s1 s2 = 0
+    let hash = Hashtbl.hash
   end)
 
 (** the global symbol table *)
@@ -50,12 +50,15 @@ let symb_table = HashSymbol.create 7
 let symb_count = ref 0
 
 let mk_symbol ?(attrs=0) s =
-  let s = (s, !symb_count, attrs) in
-  let s' = HashSymbol.merge symb_table s in
-  (if s' == s then incr symb_count);  (* update signature *)
-  s'
+  try
+    HashSymbol.find symb_table s
+  with Not_found ->
+    let s' = (s, !symb_count, attrs) in
+    HashSymbol.replace symb_table s s';
+    incr symb_count;
+    s'
 
-let is_used s = HashSymbol.mem symb_table (s, 0, 0)
+let is_used s = HashSymbol.mem symb_table s
 
 let name_symbol (s, _, _) = s
 
@@ -67,7 +70,7 @@ module SHashtbl = Hashtbl.Make(
   struct
     type t = symbol
     let equal = (==)
-    let hash s = hash_symbol s
+    let hash = hash_symbol
   end)
 
 module SMap = Map.Make(struct type t = symbol let compare = compare_symbols end)
