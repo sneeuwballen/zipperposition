@@ -180,9 +180,7 @@ let socketname = Unix.ADDR_UNIX socketname_file
 (** Process-localized debug *)
 let ddebug level who msg =
   if level <= Utils.debug_level ()
-    then Join.debug
-      (Utils.sprintf "%% [%d at %.3f] (%s)" (Unix.getpid ()) (Sat.get_total_time ()) who)
-      "%s" (Lazy.force msg)
+    then Format.printf "%% [%.3f %s]: %s@." (Sat.get_total_time ()) who (Lazy.force msg)
     else ()
 
 let get_add_parents ns =
@@ -950,23 +948,23 @@ TODO proof reconstruction
 
 (** Get or create the output queue of given name *)
 let get_output ~ns ~globals ~process_name ~create_out ~output_name =
+  ddebug 1 process_name (lazy (Utils.sprintf "get_out %s (create=%B)" output_name create_out));
   if create_out
   then begin (* create the queue and register it *)
-    ddebug 1 process_name (lazy ("create output queue " ^ output_name));
     let q_out, _ = mk_global_queue ~ns output_name in
+    ddebug 1 process_name (lazy ("created output queue " ^ output_name));
     globals#sync_barrier process_name;
     q_out
   end else begin (* get the already existing queue *)
     globals#sync_barrier process_name;
-    ddebug 1 process_name (lazy ("get output queue " ^ output_name));
     let q_out, _ = get_queue ~ns output_name in
+    ddebug 1 process_name (lazy ("got output queue " ^ output_name));
     q_out
   end
 
 (** Run the given role *)
 let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
 ~process_name ~role ~input_name ~signature clauses =
-  ddebug 1 process_name (lazy ("run role " ^ role));
   let unit_idx = Dtree.unit_index in
   let index = PS.choose_index "fp" in
   let queues = ClauseQueue.default_queues in
@@ -988,6 +986,7 @@ let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
   ddebug 1 process_name (lazy ("get input queue " ^ input_name));
   let _, q_in_subscribe = (get_queue ~ns input_name : (net_state -> unit) *
                            ((net_state -> unit) -> unit)) in
+  ddebug 1 process_name (lazy ("got input queue " ^ input_name));
   (* wire process' input to the input queue *)
   q_in_subscribe process_input;
   (* synchronize before starting the process *)
@@ -1002,6 +1001,7 @@ let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
 let assume_role ~calculus ~select ~ord role_str =
   match Str.split (Str.regexp ",") role_str with
   | [role;socketname;input_name;output_name;process_name;create_out;signature] ->
+    (* connect to the master process *)
     let socketname = Unix.ADDR_UNIX socketname in
     let create_out = bool_of_string create_out in
     let ns = Join.Ns.there socketname in
@@ -1027,7 +1027,8 @@ let assume_role ~calculus ~select ~ord role_str =
 let wrap_process ~fork ?(create_out=true) ~calculus ~ord ~select ~params
 input_name output_name process_name role signature clauses =
   if fork
-    then if Unix.fork () = 0 then
+    then if Unix.fork () = 0 then begin
+      Format.printf "%% child process %d is %s@." (Unix.getpid ()) process_name;
       let socketname = match socketname with
       | Unix.ADDR_UNIX s -> s
       | Unix.ADDR_INET _ -> assert false
@@ -1038,11 +1039,13 @@ input_name output_name process_name role signature clauses =
       let args = [|"-ord"; ord#name;
                   "-calculus"; params.param_calculus;
                   "-select"; params.param_select;
+                  "-debug"; string_of_int (Utils.debug_level ());
                   "-role"; role
                   |] in
       Unix.execv Sys.argv.(0) args
-      else ()
+      end else ()
     else spawn begin
+      Format.printf "%% master process runs %s@." process_name;
       let ns = Join.Ns.here in
       let globals = get_globals ~ns process_name in
       run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~process_name
@@ -1078,10 +1081,10 @@ let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params
     "q_fwd_subsume" "q_bwd_subsume" "bwd_subsume1" "bwd_subsume" signature [];
   (* backward rewriting *)
   wrap_process ~fork ~calculus ~ord ~select ~params
-    "q_bwd_rewrite" "q_back_rewrite" "bwd_rewrite1" "bwd_rewrite" signature [];
+    "q_bwd_subsume" "q_bwd_rewrite" "bwd_rewrite1" "bwd_rewrite" signature [];
   (* generate *)
   wrap_process ~fork ~calculus ~ord ~select ~params
-    "q_back_rewrite" "q_generate" "generate1" "generate" signature [];
+    "q_bwd_rewrite" "q_generate" "generate1" "generate" signature [];
   (* post-simplify *)
   wrap_process ~fork ~calculus ~ord ~select ~params
     "q_generate" "q_end" "post_rw1" "post_rewrite" signature [];

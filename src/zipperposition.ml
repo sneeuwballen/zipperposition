@@ -143,9 +143,7 @@ let setup_output ~params =
   (if params.param_print_sort
     then T.pp_term_debug#sort true);
   (if params.param_print_all
-    then begin T.pp_term_debug#skip_lambdas false; T.pp_term_debug#skip_db false end);
-  Utils.debug 1 (lazy (Utils.sprintf  "%% format: %s, print sort: %B, print all: %B@."
-    params.param_output_syntax params.param_print_sort params.param_print_all))
+    then begin T.pp_term_debug#skip_lambdas false; T.pp_term_debug#skip_db false end)
 
 let print_version ~params =
   if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0)
@@ -282,7 +280,7 @@ let () =
   | Some role ->
     (* slave process: assume a role in the pipeline *)
     let calculus = get_calculus ~params in
-    let ord = params.param_ord (Precedence.default_precedence empty_signature) in
+    let ord = params.param_ord (Precedence.mk_precedence ~complete:false [] []) in
     let select = Selection.selection_from_string ~ord params.param_select in
     Distributed.assume_role ~calculus ~ord ~select role
   | None ->
