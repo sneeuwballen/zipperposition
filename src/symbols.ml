@@ -77,6 +77,8 @@ module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
 (** A signature maps symbols to (sort, arity) *)
 type signature = (int * sort) SMap.t
 
+let empty_signature = SMap.empty
+
 (* connectives *)
 let true_symbol = mk_symbol "$true"
 let false_symbol = mk_symbol "$false"
@@ -117,8 +119,37 @@ let table =
 let base_signature =
   List.fold_left
     (fun signature (symb,sort,arity) -> SMap.add symb (arity, sort) signature)
-    SMap.empty table
+    empty_signature table
 
 (** extract the list of symbols from the complete signature *)
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
+
+(** Serialize the signature as a string, with '~' as separators *)
+let dump_signature signature =
+  let b = Buffer.create 128 in
+  let formatter = Format.formatter_of_buffer b in
+  SMap.iter
+    (fun s (arity, sort) ->
+      Format.fprintf formatter "%s:%d:%s~@?" (name_symbol s) arity (name_symbol sort))
+    signature;
+  (* get the whole buffer, except the last '~' *)
+  if Buffer.length b = 0 then "" else Buffer.sub b 0 (Buffer.length b - 1)
+
+(** Deserialize the signature from the string, or raise Invalid_argument *)
+let load_signature str =
+  (* how to parse a single triplet, that describes a symbol *)
+  let parse_triplet signature triplet =
+    match Str.split (Str.regexp ":") triplet with
+    | [symbol; arity; sort] ->
+      let arity = int_of_string arity in
+      let symbol = mk_symbol symbol in
+      let sort = mk_symbol sort in
+      SMap.add symbol (arity, sort) signature
+    | _ -> failwith "bad triplet"
+  in
+  try
+    let triplets = Str.split (Str.regexp "~") str in
+    List.fold_left parse_triplet empty_signature triplets
+  with _ ->
+    raise (Invalid_argument ("failed load_signature of " ^ str))

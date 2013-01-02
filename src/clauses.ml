@@ -595,7 +595,7 @@ let signature clauses =
   | Equation (l,r,_,_) -> explore_term (explore_term signature l) r
   and explore_clause signature hc = Array.fold_left explore_lit signature hc.hclits
   in
-  List.fold_left explore_clause SMap.empty clauses
+  List.fold_left explore_clause empty_signature clauses
 
 let rec from_simple ~ord (f,source) =
   let rec convert f = match f with

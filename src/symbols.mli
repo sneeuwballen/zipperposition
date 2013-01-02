@@ -62,6 +62,9 @@ module SSet : Set.S with type elt = symbol
 (** A signature maps symbols to (sort, arity) *)
 type signature = (int * sort) SMap.t
 
+val empty_signature : signature
+  (** The empty signature *)
+
 (* connectives *)
 val true_symbol : symbol
 val false_symbol : symbol
@@ -88,3 +91,10 @@ val base_signature : signature
 
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
+
+val dump_signature : signature -> string
+  (** Serialize the signature as a string *)
+
+val load_signature : string -> signature
+  (** Try to load a signature from a string, raise Invalid_argument
+      if it fails *)

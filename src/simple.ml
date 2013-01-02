@@ -101,7 +101,7 @@ let signature formulas =
       List.fold_left explore_term signature' l
     end
   in
-  List.fold_left explore SMap.empty formulas
+  List.fold_left explore empty_signature formulas
 
 (** get a list of symbols from a list of (sourced) formulas *)
 let symbols formulas =
