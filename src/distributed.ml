@@ -832,7 +832,8 @@ let pipeline_capacity = ref 10
     to modify the ordering.
     The [result] argument is a szs_status Join.chan on which the answer is
     sent. *)
-let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queues clauses =
+let passive_process ~calculus ~select ~ord ~output ~globals ?steps
+?timeout ?(progress=false) queues clauses =
   (* initialize passive set with the given clauses *)
   let passive_set = PS.mk_passive_set ~ord queues in
   passive_set#add (List.map (hclause_of_net_clause ~ord) clauses);
@@ -879,6 +880,9 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queu
   (* decide the next state *)
   or  next_state() =
     assert (!steps_to_go >= 0 && !last_done <= !last_start);
+    (if progress && (!last_done mod 10) = 0 then
+      Format.printf "\r%% %d steps; %d passive; time %.1f s@?"
+        !last_done (C.CSet.size passive_set#clauses) (Sat.get_total_time ()));
     if !steps_to_go = 0
     then (ddebug 1 "passive" (lazy "reached max number of steps");
           globals#send_result (Sat.Unknown,!last_done); 0)
@@ -978,7 +982,7 @@ let get_output ~ns ~globals ~process_name ~create_out ~output_name =
 
 (** Run the given role *)
 let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
-~process_name ~role ~input_name ~signature ?steps ?timeout clauses =
+~process_name ~role ~input_name ~signature ?steps ?timeout ?progress clauses =
   let unit_idx = Dtree.unit_index in
   let index = PS.choose_index "fp" in
   let queues = ClauseQueue.default_queues in
@@ -986,7 +990,7 @@ let run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~output_name
   let output = get_output ~ns ~globals ~process_name ~create_out ~output_name in
   (* create the process *)
   let process_input, process_start = match role with
-  | "passive" -> passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout queues clauses
+  | "passive" -> passive_process ~calculus ~select ~ord ~output ~globals ?steps ?timeout ?progress queues clauses
   | "fwd_rewrite" -> fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx
   | "fwd_subsume" -> fwd_active_process ~calculus ~select ~ord ~output ~globals index signature
   | "bwd_subsume" -> bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature
@@ -1038,8 +1042,8 @@ let assume_role ~calculus ~select ~ord role_str =
     
     The global barrier is used twice: once for waiting for queues to be created,
     and once to wait for processes to be linked together before starting them *)
-let wrap_process ~fork ?(create_out=true) ~calculus ~ord ~select ~params ?steps ?timeout
-input_name output_name process_name role signature clauses =
+let wrap_process ~fork ?(create_out=true) ~calculus ~ord ~select ~params
+?steps ?timeout ?progress input_name output_name process_name role signature clauses =
   if fork
     then
       match Unix.fork () with
@@ -1067,14 +1071,14 @@ input_name output_name process_name role signature clauses =
       let ns = Join.Ns.here in
       let globals = get_globals ~ns process_name in
       run_role ~calculus ~select ~ord ~ns ~globals ~create_out ~process_name
-        ~output_name ~input_name ~role ~signature ?steps ?timeout clauses;
+        ~output_name ~input_name ~role ~signature ?steps ?timeout ?progress clauses;
       0
     end
 
 (** Create the pipeline. [parallel] determines whether to use several
     processes or not *)
 let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params
-?steps ?timeout clauses signature =
+?steps ?timeout ?progress clauses signature =
   ddebug 0 "main" (lazy (Utils.sprintf
                   "use %s-process pipeline layout (%d clauses)"
                   (if parallel then "multi" else "single") (List.length clauses)));
@@ -1086,7 +1090,7 @@ let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params
   ddebug 1 "main" (lazy "convert clauses");
   let clauses = globals#convert ~novel:true clauses in
   (* passive set *)
-  wrap_process ~fork:false ~calculus ~ord ~select ~params ?steps ?timeout
+  wrap_process ~fork:false ~calculus ~ord ~select ~params ?steps ?timeout ?progress
     "q_end" "q_passive" "passive1" "passive" signature clauses;
   (* forward rewriting *)
   wrap_process ~fork ~calculus ~ord ~select ~params
@@ -1125,8 +1129,8 @@ let given_clause ?(parallel=true) ?steps ?timeout ?(progress=false) ~calculus ~p
   ddebug 0 "main" (lazy "start pipelined given clause");
   let signature = C.signature clauses in
   (* create the pipeline of processes *)
-  mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params ?steps ?timeout
-    clauses signature;
+  mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params
+    ?steps ?timeout ~progress clauses signature;
   let globals = get_globals ~ns:Join.Ns.here "given_clause" in
   (* wait for a result *)
   let res = match wait () with

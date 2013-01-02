@@ -167,7 +167,7 @@ val pipeline_capacity : int ref
 val passive_process : calculus:Calculus.calculus -> select:selection_fun ->
                       ord:ordering -> output: (net_state -> unit) ->
                       globals:globals -> 
-                      ?steps:int -> ?timeout:float ->
+                      ?steps:int -> ?timeout:float -> ?progress:bool ->
                       (ClauseQueue.queue * int) list ->
                       net_clause list ->
                       (net_state -> unit) * (unit -> unit)

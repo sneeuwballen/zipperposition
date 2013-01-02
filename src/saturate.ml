@@ -245,9 +245,8 @@ let get_total_time, get_start_time =
 (** print progress *)
 let print_progress steps state =
   let num_active, num_passive = PS.stats state in
-  Format.printf "\r%% %d steps; %d active; %d passive; time %.1f s"
-    steps num_active num_passive (get_total_time ());
-  Format.print_flush ()
+  Format.printf "\r%% %d steps; %d active; %d passive; time %.1f s@?"
+    steps num_active num_passive (get_total_time ())
 
 let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus state =
   let rec do_step num =
