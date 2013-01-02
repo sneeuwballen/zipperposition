@@ -53,10 +53,13 @@ val alpha_constraint : ordering_constraint
  * Creation of a precedence (symbol_ordering) from constraints
  * ---------------------------------------------------------------------- *)
 
-val mk_precedence : ordering_constraint list -> symbol list -> precedence
+val mk_precedence : ?complete:bool -> ordering_constraint list -> symbol list -> precedence
   (** make a precedence from the given constraints. First constraints are
       more important than later constraints. Only the very first constraint
-      is assured to be totally satisfied. *)
+      is assured to be totally satisfied.
+      
+      If [complete] is true (default) the symbol list is completed using
+      special symbols. *)
 
 val default_precedence : signature -> precedence
   (** default precedence on the given signature *)

@@ -152,8 +152,8 @@ let order_symbols constrs symbols =
   in List.rev symbols  (* decreasing order *)
 
 (** build a precedence on the [symbols] from a list of constraints *)
-let mk_precedence constrs symbols =
-  let symbols = complete_symbols symbols in
+let mk_precedence ?(complete=true) constrs symbols =
+  let symbols = if complete then complete_symbols symbols else symbols in
   let symbols = order_symbols constrs symbols in
   let table = mk_table symbols in
   (* the precedence *)

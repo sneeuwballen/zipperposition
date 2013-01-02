@@ -363,6 +363,8 @@ module OrdCache = Cache.Make(
 
 (** Check that new_prec is a compatible superset of old_prec *)
 let check_precedence old_prec new_prec =
+  Utils.debug 2 (lazy (Utils.sprintf "check compatibility of @[<h>%a@] with @[<h>%a@]"
+                Terms.pp_precedence old_prec#snapshot Terms.pp_precedence new_prec#snapshot));
   let rec check l = match l with
   | [] | [_] -> true
   | x::((y::_) as l') -> new_prec#compare x y > 0 && check l'
