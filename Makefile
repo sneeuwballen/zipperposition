@@ -35,4 +35,5 @@ tags:
 
 datalog:
 	make -C datalog
+
 .PHONY: datalog
