@@ -1,6 +1,4 @@
 E/
-lettre_*
-dossier_bourse/
 .*.swp
 .*.swo
 *.log
@@ -26,4 +24,5 @@ Problems
 *.dot
 learning/
 kb.lock
-kb.lisp
+kb
+TODO
