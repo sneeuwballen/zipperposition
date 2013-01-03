@@ -34,6 +34,8 @@ let stat_fresh = mk_stat "fresh_clause"
 let stat_mk_hclause = mk_stat "mk_hclause"
 let stat_new_clause = mk_stat "new_clause"
 let prof_check_max_lit = Utils.mk_profiler "check_max_lit"
+let prof_mk_hclause = Utils.mk_profiler "mk_hclause"
+let prof_mk_hclause_raw = Utils.mk_profiler "mk_hclause_raw"
 
 (* ----------------------------------------------------------------------
  * literals
@@ -116,11 +118,11 @@ let compare_lits_partial ~ord l1 l2 =
     | Eq, _, Eq, _, true, false -> Lt (* s = u, t = u *)
     | _ -> Incomparable
 
-let hash_literal lit = match lit with
+let hash_literal h lit = match lit with
   | Equation (l, r, sign, o) ->
     if sign
-      then Hashtbl.hash o lxor ((Utils.murmur_hash l.hkey) lxor r.hkey)
-      else Hashtbl.hash o lxor ((Utils.murmur_hash r.hkey) lxor l.hkey)
+      then Hashcons.combine3 h (Hashtbl.hash o) l.hkey r.hkey
+      else Hashcons.combine3 h (Hashtbl.hash o) r.hkey l.hkey
 
 let weight_literal = function
   | Equation (l, r, _ ,_) -> l.tsize + r.tsize
@@ -246,7 +248,7 @@ let compare_clause c1 c2 =
 let hash_lits lits =
   let rec aux h i =
     if i = Array.length lits then h else
-    aux (Utils.murmur_hash (h lxor hash_literal lits.(i))) (i+1)
+    aux (hash_literal h lits.(i)) (i+1)
   in aux 113 0
 
 let hash_clause c = hash_lits c.clits
@@ -348,6 +350,7 @@ let true_clause =
     the prover becomes incomplete by returning [true] instead. *)
 let mk_hclause_a ~ord lits proof parents =
   incr_stat stat_mk_hclause;
+  Utils.enter_prof prof_mk_hclause;
   if Array.length lits > 31
   then (Utils.debug 1 (lazy (Utils.sprintf "%% incompleteness: clause of %d lits -> $true"
       (Array.length lits))); true_clause)
@@ -386,6 +389,7 @@ let mk_hclause_a ~ord lits proof parents =
     List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
     end);
   (* return hashconsed clause *)
+  Utils.exit_prof prof_mk_hclause;
   hc'
   end
 
@@ -396,6 +400,7 @@ let mk_hclause ~ord lits proof parents =
 (** Build a hclause with already computed max literals and selected literals.
     No check is (nor can) be performed. *)
 let mk_hclause_raw ~selected ~maxlits ~selected_done lits proof parents =
+  Utils.enter_prof prof_mk_hclause_raw;
   let hc = {
     hclits = lits;
     hctag = -1;
@@ -416,12 +421,13 @@ let mk_hclause_raw ~selected ~maxlits ~selected_done lits proof parents =
     hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
     (* update the parent clauses' sets of descendants *)
     List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
-    end);
+    end else assert (hc.hcmaxlits = hc'.hcmaxlits));
   (* ensure that selection is performed *)
   (if selected_done then begin
     hc'.hcselected_done <- true;
     hc'.hcselected <- selected end);
   (* return hashconsed clause *)
+  Utils.exit_prof prof_mk_hclause_raw;
   hc'
 
 (** simplify literals *)

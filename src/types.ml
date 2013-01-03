@@ -87,8 +87,8 @@ and hclause = {
   mutable hcselected_done : bool;
   mutable hcselected : int;               (** bitvector for selected literals *)
   mutable hcvars : term list;             (** the free variables *)
-  hcproof : proof;                        (** the proof for this clause (lazy...) *)
-  hcparents : hclause list;               (** parents of the clause *)
+  mutable hcproof : proof;                (** the proof for this clause (lazy...) *)
+  mutable hcparents : hclause list;       (** parents of the clause *)
   mutable hcdescendants : Ptset.t;        (** the set of descendants of the clause *)
 }
 (** a proof step for a clause *)

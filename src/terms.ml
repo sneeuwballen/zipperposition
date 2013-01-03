@@ -33,17 +33,15 @@ let is_infix_symbol s =
 let is_binder_symbol s =
   s == lambda_symbol
 
-let hash_term t =
-  let hash t = match t.term with
-  | Var i -> 17 lxor (Utils.murmur_hash i)
+let hash_term t = match t.term with
+  | Var i -> abs (Hashcons.combine2 17 (hash_symbol t.sort) (Utils.murmur_hash i))
   | Node (s, l) ->
     let rec aux h = function
     | [] -> h
-    | head::tail -> aux (Utils.murmur_hash (head.hkey lxor h)) tail
+    | head::tail -> aux (Hashcons.combine h head.hkey) tail
     in
-    let h = Utils.murmur_hash (2749 lxor hash_symbol s) in
-    aux h l
-  in Hashtbl.hash t.sort lxor (hash t)
+    let h = Hashcons.combine2 2749 (hash_symbol t.sort) (hash_symbol s) in
+    abs (aux h l)
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 
