@@ -129,13 +129,13 @@ and literal_of_net_literal nlit = match nlit with
     and r = term_of_net_term r in
     assert (l.sort == r.sort);
     Equation (l, r, sign, cmp)
-and proof_of_net_proof ~ord np = match np with
+and proof_of_net_proof np = match np with
   | NpAxiom (s1, s2) -> Axiom (s1, s2)
   | NpProof (rule, clauses) ->
     let clauses = List.map (fun (nc, pos) ->
-                            C.base_clause (hclause_of_net_clause ~ord nc), pos, S.id_subst) clauses in
+                            C.base_clause (hclause_of_net_clause nc), pos, S.id_subst) clauses in
     Proof (rule, clauses)
-and hclause_of_net_clause ~ord nc =
+and hclause_of_net_clause nc =
   Utils.enter_prof prof_hc_of_nc;
   let lits = Array.map literal_of_net_literal nc.nc_lits in
   let proof = Axiom ("network", "network") in
@@ -283,7 +283,73 @@ let get_barrier ~ns name =
   (Join.Ns.lookup ns name : string -> unit)
 
 (* ----------------------------------------------------------------------
- * utils
+ * association hclause <-> unique ID
+ * ---------------------------------------------------------------------- *)
+
+module NameCache = struct
+  (* bimap name <-> hclause *)
+  type t = {
+    bimap : bimap;
+    server_get_name : (net_clause -> int);
+    server_get_clause : (int -> net_clause);
+  } and bimap = {
+    mutable hc_of_name : hclause Ptmap.t;
+    mutable name_of_hc : int Ptmap.t;
+  }
+
+  (** Create a name server and register it in the given nameservice *)
+  let mk_server ~ns =
+    let clauses = ref C.CSet.empty in
+    let hc_of_name = ref Ptmap.empty in
+    (* get the name of a clause *)
+    def get_name(nc) & ready() =
+      let hc = hclause_of_net_clause nc in
+      (if not (C.CSet.mem !clauses hc)
+        then begin (* association hc <-> hc.hctag *)
+          clauses := C.CSet.add !clauses hc;
+          hc_of_name := Ptmap.add hc.hctag hc !hc_of_name;
+        end);
+      reply hc.hctag to get_name & ready()
+    (* get a clause from its name *)
+    or  get_clause(name) & ready() =
+      let hc = Ptmap.find name !hc_of_name in
+      reply (net_clause_of_hclause hc) to get_clause & ready()
+    in
+    spawn ready();
+    Join.Ns.register ns "get_name" get_name;
+    Join.Ns.register ns "get_clause" get_clause;
+    ()
+
+  let create ~ns = {
+    bimap = {
+      hc_of_name = Ptmap.empty;
+      name_of_hc = Ptmap.empty;
+    };
+    server_get_name = Join.Ns.lookup ns "get_name";
+    server_get_clause = Join.Ns.lookup ns "get_clause";
+  }
+
+  let associate t hc name =
+    t.bimap.hc_of_name <- Ptmap.add name hc t.bimap.hc_of_name;
+    t.bimap.name_of_hc <- Ptmap.add hc.hctag name t.bimap.name_of_hc
+
+  let get_name t hc =
+    try Ptmap.find hc.hctag t.bimap.name_of_hc
+    with Not_found ->
+      let name = t.server_get_name (net_clause_of_hclause hc) in
+      associate t hc name;
+      name
+
+  let get_clause t name =
+    try Ptmap.find name t.bimap.hc_of_name
+    with Not_found ->
+      let hc = hclause_of_net_clause (t.server_get_clause name) in
+      associate t hc name;
+      hc
+end
+
+(* ----------------------------------------------------------------------
+ * global state
  * ---------------------------------------------------------------------- *)
 
 (** Publish proof and parents for a list of clauses. and convert them
@@ -322,7 +388,7 @@ let update_precedence ~ord old_version =
 (** Update the passive set using the net_state *)
 let update_passive ~select ~calculus ~ord passive_set net_state =
   let new_clauses = net_state.ns_new in
-  let new_clauses = List.map (hclause_of_net_clause ~ord) new_clauses in
+  let new_clauses = List.map hclause_of_net_clause new_clauses in
   let new_clauses = Utils.list_flatmap (calculus#list_simplify ~ord ~select) new_clauses in
   passive_set#add new_clauses
 
@@ -348,8 +414,9 @@ type genealogy = {
 
 let empty_genealogy = { gen_descendants = []; gen_proof = None; }
 
-(** The process responsible for keeping track of
-    parents and proofs of clauses *)
+(* TODO rewrite with hclause locally, and all transmissions using clauses' IDs *)
+
+(** The process responsible for keeping track of parents and proofs of clauses *)
 let proof_parents_process () =
   let genealogies = NHashtbl.create 109 in
   (* get genealogy for this clause *)
@@ -477,7 +544,7 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
     ddebug 1 "fwd_rw" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
-    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    let clauses = List.map hclause_of_net_clause clauses in
     simpl_set#remove clauses;
     ready() & reply to redundant
   (* case in which we process the next clause *)
@@ -486,14 +553,14 @@ let fwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
       assert (net_state.ns_num = !last_state + 1);
       last_state := net_state.ns_num;
       update_ord ~ord net_state;
-      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      let simplified = List.map hclause_of_net_clause net_state.ns_simplified in
       simpl_set#remove simplified;
       (* obtain given clause, and ordering *)
       match net_state.ns_given with
       | None ->
         output net_state; ready()
       | Some ns_given -> begin
-        let given = hclause_of_net_clause ~ord ns_given in
+        let given = hclause_of_net_clause ns_given in
         ddebug 1 "fwd_rw" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
                            !C.pp_clause#pp_h given));
         (* simplify given clause *)
@@ -538,7 +605,7 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
     ddebug 1 "fwd_active" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
-    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    let clauses = List.map hclause_of_net_clause clauses in
     active_set#remove clauses;
     ready() & reply to redundant
   (* case in which we process the next clause *)
@@ -552,7 +619,7 @@ let fwd_active_process ~calculus ~select ~ord ~output ~globals index signature =
       | None ->
         output net_state; ready()
       | Some ns_given -> begin
-        let given = hclause_of_net_clause ~ord ns_given in
+        let given = hclause_of_net_clause ns_given in
         ddebug 1 "fwd_active" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
                                !C.pp_clause#pp_h given));
         Selection.check_selected given;
@@ -608,7 +675,7 @@ let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature 
     ddebug 1 "bwd_subsume" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
-    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    let clauses = List.map hclause_of_net_clause clauses in
     active_set#remove clauses;
     ready() & reply to redundant
   (* case in which we process the next clause *)
@@ -617,14 +684,14 @@ let bwd_subsume_process ~calculus ~select ~ord ~output ~globals index signature 
       assert (net_state.ns_num = !last_state + 1);
       last_state := net_state.ns_num;
       update_ord ~ord net_state;
-      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      let simplified = List.map hclause_of_net_clause net_state.ns_simplified in
       active_set#remove simplified;
       (* obtain given clause, and ordering *)
       match net_state.ns_given with
       | None ->
         output net_state; ready()
       | Some ns_given -> begin
-        let given = hclause_of_net_clause ~ord ns_given in
+        let given = hclause_of_net_clause ns_given in
         if not (calculus#is_trivial given) then begin
           ddebug 1 "bwd_subsume" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
                                  !C.pp_clause#pp_h given));
@@ -662,7 +729,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
     ddebug 1 "bwd_rw" (lazy "exiting..."); reply to exit & reply to wait_done
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
-    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    let clauses = List.map hclause_of_net_clause clauses in
     simpl_set#remove clauses;
     active_set#remove clauses;
     ready() & reply to redundant
@@ -672,7 +739,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
       assert (net_state.ns_num = !last_state + 1);
       last_state := net_state.ns_num;
       update_ord ~ord net_state;
-      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      let simplified = List.map hclause_of_net_clause net_state.ns_simplified in
       active_set#remove simplified;
       simpl_set#remove simplified;
       (* obtain given clause, and ordering *)
@@ -680,7 +747,7 @@ let bwd_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx index s
       | None ->
         output net_state; ready()
       | Some ns_given -> begin
-        let given = hclause_of_net_clause ~ord ns_given in
+        let given = hclause_of_net_clause ns_given in
         if not (calculus#is_trivial given) then begin
           ddebug 1 "bwd_rw" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
                              !C.pp_clause#pp_h given));
@@ -725,7 +792,7 @@ let generate_process ~calculus ~select ~ord ~output ~globals index signature =
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
     reply to redundant & begin
-      let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+      let clauses = List.map hclause_of_net_clause clauses in
       active_set#remove clauses;
       ready()
     end
@@ -735,14 +802,14 @@ let generate_process ~calculus ~select ~ord ~output ~globals index signature =
       assert (net_state.ns_num = !last_state + 1);
       last_state := net_state.ns_num;
       update_ord ~ord net_state;
-      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      let simplified = List.map hclause_of_net_clause net_state.ns_simplified in
       active_set#remove simplified;
       (* obtain given clause, and ordering *)
       match net_state.ns_given with
       | None ->
         output net_state; ready()
       | Some ns_given -> begin
-        let given = hclause_of_net_clause ~ord ns_given in
+        let given = hclause_of_net_clause ns_given in
         if not (calculus#is_trivial given) then begin
           ddebug 1 "generate" (lazy (Utils.sprintf "processing given clause @[<h>%a@]"
                               !C.pp_clause#pp_h given));
@@ -778,7 +845,7 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
     ddebug 1 "post_rw" (lazy "exiting..."); reply to wait_done & reply to exit
   (* redundant clauses *)
   or  ready() & redundant(clauses) =
-    let clauses = List.map (hclause_of_net_clause ~ord) clauses in
+    let clauses = List.map hclause_of_net_clause clauses in
     simpl_set#remove clauses;
     ready() & reply to redundant
   (* case in which we process the next state *)
@@ -787,19 +854,19 @@ let post_rewrite_process ~calculus ~select ~ord ~output ~globals unit_idx =
       assert (net_state.ns_num = !last_state + 1);
       last_state := net_state.ns_num;
       update_ord ~ord net_state;
-      let simplified = List.map (hclause_of_net_clause ~ord) net_state.ns_simplified in
+      let simplified = List.map hclause_of_net_clause net_state.ns_simplified in
       simpl_set#remove simplified;
       (* add given clause to active set *)
       (match net_state.ns_given with
       | Some ns_given ->
-        let given = hclause_of_net_clause ~ord ns_given in
+        let given = hclause_of_net_clause ns_given in
         simpl_set#add [given]
       | None -> ());
       (* current version of ordering *)
       let old_ord_version = ord#precedence#version in
       ddebug 1 "post_rw" (lazy (Utils.sprintf "processing %d clauses"
                          (List.length net_state.ns_new)));
-      let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
+      let new_clauses = List.map hclause_of_net_clause net_state.ns_new in
       (* simplify the new clauses *)
       let new_clauses = List.fold_left
         (fun acc hc ->
@@ -836,7 +903,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps
 ?timeout ?(progress=false) queues clauses =
   (* initialize passive set with the given clauses *)
   let passive_set = PS.mk_passive_set ~ord queues in
-  passive_set#add (List.map (hclause_of_net_clause ~ord) clauses);
+  passive_set#add (List.map hclause_of_net_clause clauses);
   (* timestamp of last started loop, last finished loop, last transmitted ord *)
   let last_start= ref (-1) in
   let last_done = ref (-1) in
@@ -854,7 +921,7 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps
        with Not_found -> None)
     in
     (* add new clauses to passive set *)
-    let new_clauses = List.map (hclause_of_net_clause ~ord) net_state.ns_new in
+    let new_clauses = List.map hclause_of_net_clause net_state.ns_new in
     let new_clauses = List.filter (fun hc -> not (calculus#is_trivial hc)) new_clauses in
     passive_set#add new_clauses;
     empty
@@ -865,8 +932,8 @@ let passive_process ~calculus ~select ~ord ~output ~globals ?steps
       (fun nc -> nc, globals#get_descendants nc) net_state.ns_simplified in
     let simplified = List.map
       (fun (nc, descendants) ->
-        let hc = hclause_of_net_clause ~ord nc in
-        List.iter (fun nc' -> let hc' = hclause_of_net_clause ~ord nc in
+        let hc = hclause_of_net_clause nc in
+        List.iter (fun nc' -> let hc' = hclause_of_net_clause nc in
           hc.hcdescendants <- Ptset.add hc'.hctag hc.hcdescendants)
         descendants;
         hc)
@@ -1114,7 +1181,7 @@ let mk_pipeline ~calculus ~select ~ord ~parallel ~send_result ~params
 
 (** Rebuild a hclause with all its proof *)
 let rebuild_proof ~ord ~globals nc =
-  hclause_of_net_clause ~ord nc  (* TODO *)
+  hclause_of_net_clause nc  (* TODO *)
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns the result. *)

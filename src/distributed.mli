@@ -96,7 +96,28 @@ val get_barrier : ns:Join.Ns.t -> string -> (string -> unit)
   (** Get the barrier registered under this name *)
 
 (* ----------------------------------------------------------------------
- * utils
+ * association hclause <-> unique ID
+ * ---------------------------------------------------------------------- *)
+
+module NameCache : sig
+  type t
+    (** This type stores the relation hclause <-> unique int ID *)
+
+  val mk_server : ns:Join.Ns.t -> unit
+    (** Create a name server and register it in the given nameservice *)
+
+  val create : ns:Join.Ns.t -> t
+    (** Create a local cache of the remote server *)
+
+  val get_name : t -> hclause -> int
+    (** Get the (unique) name of the clause *)
+
+  val get_clause : t -> int -> hclause
+    (** Get the clause whose name is given, or Not_found *)
+end
+
+(* ----------------------------------------------------------------------
+ * global state
  * ---------------------------------------------------------------------- *)
 
 (** Access to global utils *)
