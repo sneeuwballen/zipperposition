@@ -259,6 +259,8 @@ let add_lemmas kb lemmas =
     (kb.kb_lemmas, kb.kb_lemma_idx) lemmas in
   { kb with kb_lemma_idx=idx; kb_lemmas=lemmas; }
 
+module L = Datalog.Logic
+
 (* ----------------------------------------------------------------------
  * (heuristic) search of "interesting" lemma in a proof.
  * ---------------------------------------------------------------------- *)

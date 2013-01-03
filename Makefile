@@ -2,8 +2,9 @@
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 TARGET = zipperposition.native
-OPTIONS = -use-jocaml -lib str
 LIBS = datalog
+PWD = $(shell pwd)
+OPTIONS = -use-jocaml -cflags -I,$(PWD)/datalog/_build/ -lflags -I,$(PWD)/datalog/_build/ -libs str,datalog
 
 all: $(LIBS)
 	ocamlbuild $(OPTIONS) -tag debug src/$(TARGET)
