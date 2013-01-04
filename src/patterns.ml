@@ -113,20 +113,20 @@ let compare_pclause c1 c2 =
 
 (** An abstract substitution maps abstract symbols to symbols, variables and sorts *)
 type mapping = {
-  mutable m_var : int Ptmap.t;
-  mutable m_symbol : symbol Ptmap.t;
+  m_var : int Ptmap.t;
+  m_symbol : symbol Ptmap.t;
 }
 
-let empty_mapping () =
-  let map = {
+let empty_mapping =
+  let map = ref {
     m_var = Ptmap.empty;
     m_symbol = Ptmap.empty;
   } in
   (* default associations *)
   Array.iteri
-    (fun i symb -> map.m_symbol <- Ptmap.add i symb map.m_symbol)
+    (fun i symb -> map := { !map with m_symbol = Ptmap.add i symb !map.m_symbol; })
     special_symbols;
-  map
+  !map
 
 (** Reverse mapping, from concrete vars/symbols/sorts to abstract ones. *)
 type rev_mapping = {
@@ -277,13 +277,74 @@ let instantiate_pclause ~map ~ord pclause proof parents =
     indicated by an empty list, but several mappings can exist for
     literals and clauses. *)
 
-let match_pterm ~map t pt = failwith "not implemented"
+(** Bind [s] to [symbol], returning the new map, or check that the binding
+    of [s] is already [symbol] (otherwise raise Exit) *)
+let check_symbol ~map s symbol =
+  try
+    let symbol' = Ptmap.find s map.m_symbol in
+    if symbol == symbol' then map else raise Exit
+  with Not_found ->
+    { map with m_symbol = Ptmap.add s symbol map.m_symbol; }
 
-let match_plit ~map lit plit = failwith "not implemented"
+(** Matching of a pattern-term and a term. This maps pattern symbols
+    and variables on symbols and variables *)
+let rec match_pterm ~map pt t =
+  match pt, t.term with
+  | PVar (i, s), Var i' ->
+    let map = check_symbol ~map s t.sort in
+    (try
+      let j = Ptmap.find i map.m_var in
+      if j = i' then map else raise Exit
+    with Not_found ->
+      { map with m_var = Ptmap.add i i' map.m_var; })
+  | PNode (f, s, l), Node (f', l') ->
+    (if List.length l <> List.length l' then raise Exit);
+    let map = check_symbol ~map f f' in
+    let map = check_symbol ~map s t.sort in
+    List.fold_left2 (fun map pt t -> match_pterm ~map pt t) map l l'
+  | PVar _, Node _ | PNode _, Var _ -> raise Exit
 
-let match_pclause ?map hc pclause =
-  (* let map = match map with | None -> empty_mapping () | Some m -> m in *)
-  failwith "not implemented"
+let match_plit ~map plit lit =
+  match plit, lit with
+  | { lterm; lweight; rterm; rweight; psign; }, Equation (l, r, sign, _)
+    when psign = sign && rweight + lweight = l.tsize + r.tsize ->
+    (* try both matching, l=l&r=r or l=r&r=l, since both the weight
+       and the sign are correct *)
+    (if lweight = l.tsize && rweight = r.tsize
+      then try let map = match_pterm ~map lterm l in
+        [match_pterm ~map rterm r] with Exit -> []
+      else []) @
+    (if lweight = r.tsize && rweight = l.tsize
+      then try let map = match_pterm ~map rterm l in
+        [match_pterm ~map lterm r] with Exit -> []
+      else [])
+  | _ -> []
+
+let match_pclause ?map pclause hc =
+  let map = match map with | None -> empty_mapping | Some m -> m in
+  (* do all permutations of literals to match together *)
+  let open Bitvector in
+  (* match plits[i...] with literals in lits that are not flag'd in [bv] *)
+  let rec all_matches acc plits lits map i bv =
+    if i < Array.length plits
+      then for j = 0 to Array.length lits - 1 do
+        if not (bv_get bv j) then
+          let bv = bv_set bv j in
+          (* try to match plits[i] with lits[j] *)
+          let maps = match_plit ~map plits.(i) lits.(j) in
+          List.iter (fun map -> all_matches acc plits lits map (i+1) bv) maps
+      done
+  in
+  if List.length pclause <> Array.length hc.hclits
+    then []  (* no matching if lengths are different *)
+    else begin
+      let plits = Array.of_list pclause in
+      let bv = 0 in
+      let acc = ref [] in
+      (* find all matchings *)
+      all_matches acc plits hc.hclits map 0 bv;
+      !acc
+    end
 
 (** An indexing structure that maps pclauses to values *)
 module PMap = Map.Make(struct type t = pclause let compare = compare_pclause end)

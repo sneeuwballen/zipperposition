@@ -48,11 +48,11 @@ type pclause = pliteral list
 
 (** An abstract substitution maps abstract symbols to symbols, variables and sorts *)
 type mapping = {
-  mutable m_var : int Ptmap.t;
-  mutable m_symbol : symbol Ptmap.t;
+  m_var : int Ptmap.t;
+  m_symbol : symbol Ptmap.t;
 }
 
-val empty_mapping : unit -> mapping
+val empty_mapping : mapping
 
 (** Reverse mapping, from concrete vars/symbols/sorts to abstract ones *)
 type rev_mapping = {
@@ -76,13 +76,13 @@ val instantiate_pterm : map:mapping -> pterm -> term
 val instantiate_plit : map:mapping -> ord:ordering -> pliteral -> literal
 val instantiate_pclause : map:mapping -> ord:ordering -> pclause -> proof -> hclause list -> hclause
 
-(*s match an abstract pattern against a term of a clause. Failure is
+(*s match an abstract pattern against a term or a clause. Failure is
     indicated by an empty list, but several mappings can exist for
     literals and clauses. *)
 
-val match_pterm : map:mapping -> term -> pterm -> mapping option
-val match_plit : map:mapping -> literal -> pliteral -> mapping list
-val match_pclause : ?map:mapping -> hclause -> pclause -> mapping list
+val match_pterm : map:mapping -> pterm -> term -> mapping
+val match_plit : map:mapping -> pliteral -> literal -> mapping list
+val match_pclause : ?map:mapping -> pclause -> hclause -> mapping list
 
 (** An indexing structure that maps pclauses to values *)
 module PMap : Map.S with type key = pclause
