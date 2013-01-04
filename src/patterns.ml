@@ -30,6 +30,30 @@ module Utils = FoUtils
 type psymbol = int
 type psort = int
 
+(** Special symbols and their number *)
+let special_symbols =
+  [| true_symbol;   (* Constants *)
+     false_symbol;
+     eq_symbol;     (* Formula *)
+     exists_symbol;
+     forall_symbol;
+     lambda_symbol;
+     not_symbol;
+     imply_symbol;
+     and_symbol;
+     or_symbol;
+     db_symbol;     (* De Bruijn *)
+     succ_db_symbol;
+     bool_sort;     (* Sorts *)
+     univ_sort;
+     type_sort;
+  |]
+
+(* De Bruijn *)
+
+(** Symbols are variable if above this threshold *)
+let symbol_offset = Array.length special_symbols
+
 (** A pattern term. Symbols, sorts and variables can all be bound. *)
 type pterm =
   | PVar of int * psort
@@ -64,6 +88,7 @@ type pliteral = {
 }
 
 let compare_pliteral lit1 lit2 =
+  if lit1.psign <> lit2.psign then compare lit1.psign lit2.psign else
   let weight1 = lit1.lweight + lit1.rweight
   and weight2 = lit2.lweight + lit2.rweight in
   if weight1 <> weight2 then weight1 - weight2
@@ -90,10 +115,16 @@ type mapping = {
   mutable m_symbol : symbol Ptmap.t;
 }
 
-let empty_mapping () = {
-  m_var = Ptmap.empty;
-  m_symbol = Ptmap.empty;
-}
+let empty_mapping () =
+  let map = {
+    m_var = Ptmap.empty;
+    m_symbol = Ptmap.empty;
+  } in
+  (* default associations *)
+  Array.iteri
+    (fun i symb -> map.m_symbol <- Ptmap.add i symb map.m_symbol)
+    special_symbols;
+  map
 
 (** Reverse mapping, from concrete vars/symbols/sorts to abstract ones. *)
 type rev_mapping = {
@@ -103,12 +134,15 @@ type rev_mapping = {
   mutable rm_symbolnum : int;
 }
 
-let empty_rev_mapping () = {
-  rm_var = Ptmap.empty;
-  rm_symbol = SHashtbl.create 3;
-  rm_varnum = 0;
-  rm_symbolnum = 0;
-}
+let empty_rev_mapping () =
+  let rev_map = {
+    rm_var = Ptmap.empty;
+    rm_symbol = SHashtbl.create 7;
+    rm_varnum = 0;
+    rm_symbolnum = symbol_offset;
+  } in
+  Array.iteri (fun i symb -> SHashtbl.add rev_map.rm_symbol symb i) special_symbols;
+  rev_map
 
 (*s canonical patterns for terms, literals and clauses *)
 
@@ -168,13 +202,48 @@ let plit_of_lit ?rev_map lit =
   let rterm = pterm_of_term ~rev_map r in
   { lterm; rterm; lweight = l.tsize; rweight = r.tsize; psign; }
 
+(** Checks whether two literals of the list have same weight *)
+let rec exists_twice l = match l with
+  | [_] | [] -> false
+  | (_, w, _)::l' -> exists_once w l' || exists_twice l'
+and exists_once w l = match l with
+  | [] -> false
+  | (_, w', _)::_ when w = w' -> true
+  | _::l' -> exists_once w l'
+
+(** Sort the literals by weight, or by lexicographic order on their
+    canonical form.
+    Also sort by number of occurrences of plit if several literals have same
+    weight. Cf case of  [p(X) | p(Y) | q(X)], is the pclause
+    [f0(X0) | f0(X1) | f1(X0)], or [f0(X0) | f1(X0) | f1(X1)]? *)
+let rec sort_lits ~by_count lits =
+  let lits = if by_count
+    then List.map (add_count lits) lits
+    else List.map (fun (plit,w,lit) -> (plit,w,lit,1)) lits in
+  let lits = List.sort (fun (plit1, w1, _, n1) (plit2, w2, _, n2) ->
+    if w1 <> w2 then w1 - w2 else
+    let cmp = compare_pliteral (Lazy.force plit1) (Lazy.force plit2) in
+    if cmp <> 0 then cmp else n1 - n2)
+    lits
+  in
+  List.map (fun (_, _, lit, _) -> lit) lits
+and add_count lits (plit, w, lit) =
+  let n = count (Lazy.force plit) lits in
+  (plit, w, lit, n)
+and count plit lits = match lits with
+  | [] -> 0
+  | (plit', _, _)::lits' when compare_pliteral (Lazy.force plit') plit = 0 ->
+    1 + count plit lits'
+  | _::lits' -> count plit lits'
+
 let pclause_of_clause ?rev_map hc =
   let rev_map = match rev_map with | None -> empty_rev_mapping () | Some m -> m in
-  (* sort the literals by weight, or by lexicographic order on their canonical form *)
-  let lits = Array.to_list (Array.map (fun lit -> plit_of_lit lit, lit) hc.hclits) in
-  let lits = List.sort (fun (plit1, _) (plit2, _) -> compare_pliteral plit1 plit2) lits in
+  let lits = Array.map (fun lit -> lazy (plit_of_lit lit), C.weight_literal lit, lit) hc.hclits in
+  let lits = Array.to_list lits in
+  (* sort the literals *)
+  let lits = sort_lits ~by_count:(exists_twice lits) lits in
   (* convert the literals to pliterals using the rev_map *)
-  let lits = List.map (fun (_, lit) -> plit_of_lit ~rev_map lit) lits in
+  let lits = List.map (plit_of_lit ~rev_map) lits in
   lits
 
 (*s instantiate an abstract pattern *)
@@ -214,3 +283,31 @@ let match_pclause ?map hc pclause =
 
 (** An indexing structure that maps pclauses to values *)
 module PMap = Map.Make(struct type t = pclause let compare = compare_pclause end)
+
+let rec pp_pterm formatter t =
+  let pp_symb formatter s = if s < Array.length special_symbols
+    then !T.pp_symbol#pp formatter special_symbols.(s)
+    else Format.fprintf formatter "f%d" (s - symbol_offset)
+  in
+  match t with
+  | PVar (i, s) -> Format.fprintf formatter "X%d:%a" i pp_symb s
+  | PNode (f, s, []) -> Format.fprintf formatter "%a:%a" pp_symb f pp_symb s
+  | PNode (f, s, l) ->
+    Format.fprintf formatter "%a:%a(%a)" pp_symb f pp_symb s
+      (Utils.pp_list ~sep:", " pp_pterm) l
+
+let pp_pclause formatter pclause =
+  let pp_plit formatter lit =
+    match lit.psign, lit.rterm with
+    | true, PNode (0, _, []) -> (* = true *)
+      Format.fprintf formatter "%a" pp_pterm lit.lterm
+    | false, PNode (0, _, []) -> (* != true *)
+      Format.fprintf formatter "¬%a" pp_pterm lit.lterm
+    | true, _ ->
+      Format.fprintf formatter "%a = %a" pp_pterm lit.lterm pp_pterm lit.rterm
+    | false, _ ->
+      Format.fprintf formatter "%a != %a" pp_pterm lit.lterm pp_pterm lit.rterm
+  in
+  Format.fprintf formatter "[";
+  Utils.pp_list ~sep:" | " pp_plit formatter pclause;
+  Format.fprintf formatter "]";

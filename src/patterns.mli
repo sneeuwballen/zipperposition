@@ -87,4 +87,5 @@ val match_pclause : ?map:mapping -> hclause -> pclause -> mapping list
 (** An indexing structure that maps pclauses to values *)
 module PMap : Map.S with type key = pclause
 
-
+val pp_pterm : Format.formatter -> pterm -> unit
+val pp_pclause : Format.formatter -> pclause -> unit
