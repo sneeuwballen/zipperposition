@@ -27,6 +27,8 @@ module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
+let prof_pclause_of_clause = Utils.mk_profiler "mk_pclause"
+
 type psymbol = int
 type psort = int
 
@@ -237,6 +239,7 @@ and count plit lits = match lits with
   | _::lits' -> count plit lits'
 
 let pclause_of_clause ?rev_map hc =
+  Utils.enter_prof prof_pclause_of_clause;
   let rev_map = match rev_map with | None -> empty_rev_mapping () | Some m -> m in
   let lits = Array.map (fun lit -> lazy (plit_of_lit lit), C.weight_literal lit, lit) hc.hclits in
   let lits = Array.to_list lits in
@@ -244,6 +247,7 @@ let pclause_of_clause ?rev_map hc =
   let lits = sort_lits ~by_count:(exists_twice lits) lits in
   (* convert the literals to pliterals using the rev_map *)
   let lits = List.map (plit_of_lit ~rev_map) lits in
+  Utils.exit_prof prof_pclause_of_clause;
   lits
 
 (*s instantiate an abstract pattern *)
