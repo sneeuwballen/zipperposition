@@ -33,8 +33,11 @@ under GPLv2.
 A copy of the GPLv2 is attached to the project, in the file LICENSE.
 
 ## Build
-You will need jocaml >= 3.12 or higher with ocamlbuild and the standard library. Type in a terminal:
+You will need jocaml >= 3.12 or higher with ocamlbuild and the standard
+library. You will also need to fetch submodules. Type in a terminal
+located in the root directory of the project:
 
+    $ git submodule update --init
     $ make
 
 It should build the project files (using ocamlbuild).
