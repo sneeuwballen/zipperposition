@@ -71,34 +71,31 @@ val detect_total_relations : ord:ordering -> hclause list -> hclause list
  * generic representation of theories and formulas (persistent)
  * ---------------------------------------------------------------------- *)
 
-type tterm =
-  | TVar of int
-  | TNode of string * tterm list
-  (** an abstract term *)
+type named_formula = Patterns.pclause * Datalog.Logic.term
+  (** A named formula is a pattern clause, plus a datalog predicate that
+      is instantiated using the pclause *)
 
-type tformula = tterm list
-  (** an abstract clause *)
+type theory = string * named_formula list
+  (** A theory is just a name, plus a list of named formulas *)
 
-val tterm_of_term : term -> tterm
-val tformula_of_hclause : hclause -> tformula
-
-type lemma = tformula * tformula list
-  (** a lemma is a clause, with some hypothesis *)
-
-type theory = tformula list
-  (** a theory is a list of formula *) 
+type lemma = Patterns.pclause * Datalog.Logic.rule
+  (** A lemma is the association of a pattern clause and a datalog rule
+      that triggers the instantiation of the pattern clause. The variable
+      symbols of the pclause are the arguments of the rule's head, so that
+      they are fully instantiated when the rule fires. *)
 
 type kb = {
-  kb_lemma_idx : int;
-  kb_potential_lemmas : lemma list;     (** potential lemma, to explore *)
-  kb_lemmas : (int * lemma) list;       (** lemma with their unique ID *)
-  kb_theories : (string * theory) list; (** theories, with their name *)
+  mutable kb_lemma_idx : int;
+  mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
+  mutable kb_named_formulas : named_formula Patterns.PMap.t;  (** named formulas, indexed by pattern *)
+  kb_theories : (string, theory) Hashtbl.t;           (** theories, with their name *)
+  mutable kb_lemmas : lemma list;                     (** lemma *)
 } (** a Knowledge Base for lemma and theories *)
 
-val empty_kb : kb
+val empty_kb : unit -> kb
 
-val add_potential_lemmas : kb -> lemma list -> kb
-val add_lemmas : kb -> lemma list -> kb
+val add_potential_lemmas : kb -> lemma list -> unit
+val add_lemmas : kb -> lemma list -> unit
 
 (* ----------------------------------------------------------------------
  * (heuristic) search of "interesting" lemma in a proof.

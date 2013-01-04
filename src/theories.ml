@@ -202,64 +202,46 @@ let detect_total_relations ~ord clauses =
  * generic representation of theories and formulas (persistent)
  * ---------------------------------------------------------------------- *)
 
-type tterm =
-  | TVar of int
-  | TNode of string * tterm list
-  (** an abstract term *)
+type named_formula = Patterns.pclause * Datalog.Logic.term
+  (** A named formula is a pattern clause, plus a datalog predicate that
+      is instantiated using the pclause *)
 
-type tformula = tterm list
-  (** an abstract clause *)
+type theory = string * named_formula list
+  (** A theory is just a name, plus a list of named formulas *)
 
-let rec tterm_of_term t = match t.term with
-  | Var i -> TVar i
-  | Node (f, l) -> TNode (name_symbol f, List.map tterm_of_term l)
-
-let rec tformula_of_hclause hc =
-  let convert_lit = function
-  | Equation (l,r,true,_) when r == T.true_term -> tterm_of_term l
-  | Equation (l,r,true,_) when l == T.true_term -> tterm_of_term r
-  | Equation (l,r,false,_) when r == T.true_term -> TNode ("not", [tterm_of_term l])
-  | Equation (l,r,false,_) when l == T.true_term -> TNode ("not", [tterm_of_term r])
-  | Equation (l,r,true,_) -> TNode ("=", [tterm_of_term l; tterm_of_term r])
-  | Equation (l,r,false,_) -> TNode ("!=", [tterm_of_term l; tterm_of_term r])
-  in
-  Array.to_list (Array.map convert_lit hc.hclits)
-
-type lemma = tformula * tformula list
-  (** a lemma is a clause, with some hypothesis *)
-
-type theory = tformula list
-  (** a theory is a list of formula *) 
+type lemma = Patterns.pclause * Datalog.Logic.rule
+  (** A lemma is the association of a pattern clause and a datalog rule
+      that triggers the instantiation of the pattern clause. The variable
+      symbols of the pclause are the arguments of the rule's head, so that
+      they are fully instantiated when the rule fires. *)
 
 type kb = {
-  kb_lemma_idx : int;
-  kb_potential_lemmas : lemma list;     (** potential lemma, to explore *)
-  kb_lemmas : (int * lemma) list;       (** lemma with their unique ID *)
-  kb_theories : (string * theory) list; (** theories, with their name *)
+  mutable kb_lemma_idx : int;
+  mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
+  mutable kb_named_formulas : named_formula Patterns.PMap.t;  (** named formulas, indexed by pattern *)
+  kb_theories : (string, theory) Hashtbl.t;           (** theories, with their name *)
+  mutable kb_lemmas : lemma list;                     (** lemma *)
 } (** a Knowledge Base for lemma and theories *)
 
-let empty_kb = {
+let empty_kb () = {
   kb_lemma_idx = 0;
   kb_potential_lemmas = [];
+  kb_named_formulas = Patterns.PMap.empty;
+  kb_theories = Hashtbl.create 5;
   kb_lemmas = [];
-  kb_theories = [];
 }
 
 let add_potential_lemmas kb pot_lemmas =
-  let kb_potential_lemmas = 
+  let kb_potential_lemmas =
     List.fold_left (fun kb_potential_lemmas lemma ->
       if List.mem lemma kb_potential_lemmas then kb_potential_lemmas
         else lemma :: kb_potential_lemmas)
     kb.kb_potential_lemmas pot_lemmas in
-  { kb with kb_potential_lemmas;  }
+  kb.kb_potential_lemmas <- kb_potential_lemmas
 
 let add_lemmas kb lemmas =
-  let lemmas, idx = List.fold_left
-    (fun (lemmas, idx) lemma -> ((idx, lemma) :: lemmas, idx+1))
-    (kb.kb_lemmas, kb.kb_lemma_idx) lemmas in
-  { kb with kb_lemma_idx=idx; kb_lemmas=lemmas; }
-
-module L = Datalog.Logic
+  let lemmas = List.rev_append lemmas kb.kb_lemmas in
+  kb.kb_lemmas <- lemmas
 
 (* ----------------------------------------------------------------------
  * (heuristic) search of "interesting" lemma in a proof.
@@ -269,8 +251,7 @@ module L = Datalog.Logic
     potential lemma. *)
 let search_lemmas hc =
   assert (hc.hclits = [||]);
-  let axioms = [[TNode ("true", [])]] in
-  [(tformula_of_hclause hc, axioms)]  (* TODO *)
+  []  (* TODO *)
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
@@ -287,8 +268,8 @@ let read_kb_nolock filename =
     close_in file;
     kb
   with
-  | Unix.Unix_error _ -> empty_kb
-  | Failure e -> Format.printf "%% [error while reading %s: %s]" filename e; empty_kb
+  | Unix.Unix_error _ -> empty_kb ()
+  | Failure e -> Format.printf "%% [error while reading %s: %s]" filename e; empty_kb ()
 
 
 let read_kb ~lock ~file =

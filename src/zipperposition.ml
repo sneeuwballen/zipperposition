@@ -266,7 +266,7 @@ let process_file params f =
       let potential_lemmas = Theories.search_lemmas c in
       let kb_lock = params.param_kb ^ ".lock" in
       Theories.update_kb ~file:params.param_kb ~lock:kb_lock
-        (fun kb -> Theories.add_potential_lemmas kb potential_lemmas)
+        (fun kb -> Theories.add_potential_lemmas kb potential_lemmas; kb)
     end
 
 let () =
