@@ -62,6 +62,9 @@ type pclause = {
   pc_canonical : pliteral list;   (* canonical pattern of each literal *)
 }
 
+val pclause_symbols : pclause -> psymbol list
+  (** List of non-special symbols/sort (index) that occur in the clause *)
+
 (* ----------------------------------------------------------------------
  * mapping between regular terms/clauses and pattern terms/clauses
  * ---------------------------------------------------------------------- *)

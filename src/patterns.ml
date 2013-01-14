@@ -144,8 +144,21 @@ let hash_pclause_seed = 2381
 
 (* subtlety: the hash must not depend of the order of the literals. Therefore,
    we compute a commutative hash of the canonical literals. *)
-let hash_pclause c =
-  List.fold_left (fun h lit -> h lxor hash_plit lit) hash_pclause_seed c.pc_canonical
+let hash_pclause pc =
+  List.fold_left (fun h lit -> h lxor hash_plit lit) hash_pclause_seed pc.pc_canonical
+
+(** List of non-special symbols/sort (index) that occur in the clause *)
+let pclause_symbols pc =
+  let rec pterm_symbols acc t = match t with
+  | PVar (_, sort) -> if List.mem sort acc || sort < symbol_offset then acc else sort::acc
+  | PNode (f, sort, l) ->
+    let acc = if List.mem f acc || f < symbol_offset then acc else f :: acc in
+    let acc = if List.mem sort acc || sort < symbol_offset then acc else sort :: acc in
+    List.fold_left pterm_symbols acc l
+  and plit_symbols acc lit =
+    pterm_symbols (pterm_symbols acc lit.lterm) lit.rterm
+  in
+  List.fold_left plit_symbols [] pc.pc_lits
 
 (* ----------------------------------------------------------------------
  * mapping between regular terms/clauses and pattern terms/clauses
