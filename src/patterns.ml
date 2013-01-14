@@ -29,6 +29,10 @@ module Utils = FoUtils
 
 let prof_pclause_of_clause = Utils.mk_profiler "mk_pclause"
 
+(* ----------------------------------------------------------------------
+ * pattern symbol, variables, clauses
+ * ---------------------------------------------------------------------- *)
+
 type psymbol = int
 type psort = int
 
@@ -80,6 +84,15 @@ and lexico l1 l2 = match l1, l2 with
 
 let eq_pterm t1 t2 = compare_pterm t1 t2 = 0
 
+let hash_pterm t =
+  let rec hash h t = match t with
+  | PVar (i, sort) ->
+    Hashcons.combine2 h (Utils.murmur_hash i) (Utils.murmur_hash sort)
+  | PNode (f, sort, l) ->
+    let h = Hashcons.combine2 h (Utils.murmur_hash f) (Utils.murmur_hash sort) in
+    List.fold_left hash h l
+  in hash 113 t
+
 (** A pattern literal is a pair of pattern terms + the sign *)
 type pliteral = {
   lterm: pterm;
@@ -98,8 +111,24 @@ let compare_pliteral lit1 lit2 =
   if cmp_left <> 0 then cmp_left
   else compare_pterm lit1.rterm lit2.rterm
 
-(** A pattern clause is just a list of pliterals *)
-type pclause = pliteral list
+let eq_plit lit1 lit2 = compare_pliteral lit1 lit2 = 0
+
+let hash_plit plit =
+  let lh = hash_pterm plit.lterm
+  and rh = hash_pterm plit.rterm in
+  Hashcons.combine3 3167 lh rh (if plit.psign then 2 else 3)
+
+(** A pattern clause is just a list of pliterals. We also keep the canonical
+    pattern (starting from 0) of each literal.
+    
+    Exemple: the clause  p(X) | q(Y,x)  may have
+    pc_lits = [f0(X0); f1(X1, X0)]
+    pc_canonical = [f0(X0); f0(X0, X1)]
+    *)
+type pclause = {
+  pc_lits : pliteral list;        (* literals that have consistent naming *)
+  pc_canonical : pliteral list;   (* canonical pattern of each literal *)
+}
 
 let compare_pclause c1 c2 =
   let rec lexico l1 l2 = match l1, l2 with
@@ -109,7 +138,18 @@ let compare_pclause c1 c2 =
   | lit1::l1', lit2::l2' ->
     let cmp = compare_pliteral lit1 lit2 in
     if cmp <> 0 then cmp else lexico l1' l2'
-  in lexico c1 c2
+  in lexico c1.pc_lits c2.pc_lits
+
+let hash_pclause_seed = 2381 
+
+(* subtlety: the hash must not depend of the order of the literals. Therefore,
+   we compute a commutative hash of the canonical literals. *)
+let hash_pclause c =
+  List.fold_left (fun h lit -> h lxor hash_plit lit) hash_pclause_seed c.pc_canonical
+
+(* ----------------------------------------------------------------------
+ * mapping between regular terms/clauses and pattern terms/clauses
+ * ---------------------------------------------------------------------- *)
 
 (** An abstract substitution maps abstract symbols to symbols, variables and sorts *)
 type mapping = {
@@ -127,6 +167,13 @@ let empty_mapping =
     (fun i symb -> map := { !map with m_symbol = Ptmap.add i symb !map.m_symbol; })
     special_symbols;
   !map
+
+let bind_symbol mapping ps s =
+  { mapping with m_symbol = Ptmap.add ps s mapping.m_symbol; }
+
+(** Checks whether the mapping binds all symbols in the list *)
+let binds_all mapping symbols =
+  List.for_all (fun s -> Ptmap.mem s mapping.m_symbol) symbols
 
 (** Reverse mapping, from concrete vars/symbols/sorts to abstract ones. *)
 type rev_mapping = {
@@ -146,7 +193,12 @@ let empty_rev_mapping () =
   Array.iteri (fun i symb -> SHashtbl.add rev_map.rm_symbol symb i) special_symbols;
   rev_map
 
-(*s canonical patterns for terms, literals and clauses *)
+(* ----------------------------------------------------------------------
+ * conversion to patterns, instantiation of patterns, match pattern
+ * ---------------------------------------------------------------------- *)
+
+(*s canonical patterns for terms, literals and clauses.
+    The clause pattern is not necessarily unique. *)
 
 (** Get a unique number for this symbol, using the rev_map *)
 let rm_get_symbol ~rev_map symbol =
@@ -204,51 +256,21 @@ let plit_of_lit ?rev_map lit =
   let rterm = pterm_of_term ~rev_map r in
   { lterm; rterm; lweight = l.tsize; rweight = r.tsize; psign; }
 
-(** Checks whether two literals of the list have same weight *)
-let rec exists_twice l = match l with
-  | [_] | [] -> false
-  | (_, w, _)::l' -> exists_once w l' || exists_twice l'
-and exists_once w l = match l with
-  | [] -> false
-  | (_, w', _)::_ when w = w' -> true
-  | _::l' -> exists_once w l'
-
-(** Sort the literals by weight, or by lexicographic order on their
-    canonical form.
-    Also sort by number of occurrences of plit if several literals have same
-    weight. Cf case of  [p(X) | p(Y) | q(X)], is the pclause
-    [f0(X0) | f0(X1) | f1(X0)], or [f0(X0) | f1(X0) | f1(X1)]? *)
-let rec sort_lits ~by_count lits =
-  let lits = if by_count
-    then List.map (add_count lits) lits
-    else List.map (fun (plit,w,lit) -> (plit,w,lit,1)) lits in
-  let lits = List.sort (fun (plit1, w1, _, n1) (plit2, w2, _, n2) ->
-    if w1 <> w2 then w1 - w2 else
-    let cmp = compare_pliteral (Lazy.force plit1) (Lazy.force plit2) in
-    if cmp <> 0 then cmp else n1 - n2)
-    lits
-  in
-  List.map (fun (_, _, lit, _) -> lit) lits
-and add_count lits (plit, w, lit) =
-  let n = count (Lazy.force plit) lits in
-  (plit, w, lit, n)
-and count plit lits = match lits with
-  | [] -> 0
-  | (plit', _, _)::lits' when compare_pliteral (Lazy.force plit') plit = 0 ->
-    1 + count plit lits'
-  | _::lits' -> count plit lits'
-
 let pclause_of_clause ?rev_map hc =
   Utils.enter_prof prof_pclause_of_clause;
   let rev_map = match rev_map with | None -> empty_rev_mapping () | Some m -> m in
-  let lits = Array.map (fun lit -> lazy (plit_of_lit lit), C.weight_literal lit, lit) hc.hclits in
+  let lits = Array.map (fun lit -> plit_of_lit lit, C.weight_literal lit, lit) hc.hclits in
   let lits = Array.to_list lits in
   (* sort the literals *)
-  let lits = sort_lits ~by_count:(exists_twice lits) lits in
+  let lits = List.sort (fun (plit1, w1, lit1) (plit2, w2, lit2) ->
+    if w1 <> w2 then w1 - w2 else compare_pliteral plit1 plit2)
+    lits in
+  let plits = List.map (fun (plit, _, _) -> plit) lits in
+  let lits = List.map (fun (_, _, lit) -> lit) lits in
   (* convert the literals to pliterals using the rev_map *)
   let lits = List.map (plit_of_lit ~rev_map) lits in
   Utils.exit_prof prof_pclause_of_clause;
-  lits
+  { pc_lits=lits; pc_canonical=plits; }
 
 (*s instantiate an abstract pattern *)
 
@@ -270,7 +292,7 @@ let instantiate_plit ~map ~ord plit =
   C.mk_lit ~ord l r plit.psign
 
 let instantiate_pclause ~map ~ord pclause proof parents =
-  let lits = List.map (instantiate_plit ~map ~ord) pclause in
+  let lits = List.map (instantiate_plit ~map ~ord) pclause.pc_lits in
   C.mk_hclause ~ord lits proof parents
 
 (*s match an abstract pattern against a term of a clause. Failure is
@@ -278,7 +300,7 @@ let instantiate_pclause ~map ~ord pclause proof parents =
     literals and clauses. *)
 
 (** Bind [s] to [symbol], returning the new map, or check that the binding
-    of [s] is already [symbol] (otherwise raise Exit) *)
+    of [s] is already [symbol] (otherwise raise Exit). *)
 let check_symbol ~map s symbol =
   try
     let symbol' = Ptmap.find s map.m_symbol in
@@ -335,10 +357,10 @@ let match_pclause ?map pclause hc =
           List.iter (fun map -> all_matches acc plits lits map (i+1) bv) maps
       done
   in
-  if List.length pclause <> Array.length hc.hclits
+  if List.length pclause.pc_lits <> Array.length hc.hclits
     then []  (* no matching if lengths are different *)
     else begin
-      let plits = Array.of_list pclause in
+      let plits = Array.of_list pclause.pc_lits in
       let bv = 0 in
       let acc = ref [] in
       (* find all matchings *)
@@ -346,14 +368,15 @@ let match_pclause ?map pclause hc =
       !acc
     end
 
-(** An indexing structure that maps pclauses to values *)
-module PMap = Map.Make(struct type t = pclause let compare = compare_pclause end)
+(* ----------------------------------------------------------------------
+ * pretty printing
+ * ---------------------------------------------------------------------- *)
+
+let pp_symb formatter s = if s < Array.length special_symbols
+  then !T.pp_symbol#pp formatter special_symbols.(s)
+  else Format.fprintf formatter "f%d" (s - symbol_offset)
 
 let rec pp_pterm formatter t =
-  let pp_symb formatter s = if s < Array.length special_symbols
-    then !T.pp_symbol#pp formatter special_symbols.(s)
-    else Format.fprintf formatter "f%d" (s - symbol_offset)
-  in
   match t with
   | PVar (i, s) -> Format.fprintf formatter "X%d:%a" i pp_symb s
   | PNode (f, s, []) -> Format.fprintf formatter "%a:%a" pp_symb f pp_symb s
@@ -374,5 +397,87 @@ let pp_pclause formatter pclause =
       Format.fprintf formatter "%a != %a" pp_pterm lit.lterm pp_pterm lit.rterm
   in
   Format.fprintf formatter "[";
-  Utils.pp_list ~sep:" | " pp_plit formatter pclause;
-  Format.fprintf formatter "]";
+  Utils.pp_list ~sep:" | " pp_plit formatter pclause.pc_lits;
+  Format.fprintf formatter "]"
+
+let pp_mapping formatter mapping =
+  (* only print symbol binding *)
+  Format.fprintf formatter "@[<hov>";
+  Ptmap.iter
+    (fun s symbol -> Format.fprintf formatter "%a -> %s@;" pp_symb s
+      (name_symbol symbol))
+    mapping.m_symbol;
+  Format.fprintf formatter "@]"
+
+(* ----------------------------------------------------------------------
+ * map from patterns to data, with matching of clauses
+ * ---------------------------------------------------------------------- *)
+
+(* Compute a hash for a hclause. We guarantee that a hclause has the same hash
+   as any of its pattern clauses. *)
+let hash_hclause hc =
+  Array.fold_left
+    (fun h lit -> let plit = plit_of_lit lit in h lxor hash_plit plit)
+    hash_pclause_seed hc.hclits
+
+(** Match hclauses with sets of pattern clauses, with some associated values *)
+module Map =
+  struct
+    module PMap = Map.Make(struct type t = pclause let compare = compare_pclause end)
+
+    type 'a t = 'a PMap.t Ptmap.t ref
+      (** the mapping. It first maps by (commutative) hash on pliterals,
+          then it maps pclauses to values. *)
+
+    let create () = ref Ptmap.empty
+
+    (** add a mapping pattern clause -> value *)
+    let add t pc value =
+      let h = hash_pclause pc in
+      (* map pclause -> value, for all pclauses that have the same hash *)
+      let map =
+        try Ptmap.find h !t
+        with Not_found -> PMap.empty
+      in
+      let map = PMap.add pc value map in
+      t := Ptmap.add h map !t
+
+    (** fold on all stored key->value *)
+    let fold t acc k =
+      Ptmap.fold
+        (fun _ map acc ->
+          PMap.fold
+            (fun pc value acc -> k acc pc value)
+            map acc)
+        !t acc
+
+    (** match the hclause with pattern clauses. The callback, fold-like, is called
+        on every match with both the pattern and the mapping. *)
+    let retrieve t hc acc k =
+      let h = hash_hclause hc in
+      try
+        let map = Ptmap.find h !t in
+        (* fold on pclauses that have same hash *)
+        PMap.fold
+          (fun pc value acc ->
+            (* match the pclause with the given hclause *)
+            let mappings = match_pclause pc hc in
+            List.fold_left
+              (fun acc mapping -> k acc pc mapping value)
+              acc mappings)
+          map acc
+      with Not_found ->
+        acc  (* no pclause with such a hash *)
+
+    (** Pretty print the map *)
+    let pp pp_value formatter t =
+      Format.fprintf formatter "@[<h>pattern clause mapping:@; @[<hov>";
+      Ptmap.iter
+        (fun _ map -> PMap.iter
+          (fun pc value -> (* print this key->value *)
+            Format.fprintf formatter "%a -> %a@;" pp_pclause pc pp_value value)
+          map)
+        !t;
+      Format.fprintf formatter "@]@]"
+  end
+
