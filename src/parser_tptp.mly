@@ -129,11 +129,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %start parse_file
 %type <Simple.sourced_formula list * string list> parse_file
 
-%start term
-%type <Simple.term> term
-
-%start cnf_formula
-%type <Simple.formula> cnf_formula
+%start parse_clause
+%type <Simple.formula> parse_clause
 
 %%
 
@@ -155,9 +152,13 @@ parse_file:
       { print_endline "empty problem specification";
         raise Const.PARSE_ERROR }
 
+parse_clause:
+  | fof_formula EOI { $1 }
+  | EOI { print_endline "could no parse clause";
+          raise Const.PARSE_ERROR }
+
 
 /* parse rules */
-
 
 
 file:

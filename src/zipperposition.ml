@@ -172,12 +172,28 @@ let compute_ord ~params clauses =
   in
   params.param_ord so
 
+(* TODO remove
 (** Enrichment of the initial set of clauses by detecting some theories *)
 let enrich_with_theories ~ord ~params clauses =
   if params.param_theories then
     let axioms = Theories.detect_total_relations ~ord clauses in
     List.rev_append axioms clauses
   else clauses
+*)
+
+(** Initialize the meta-prover *)
+let mk_meta ~ord params =
+  if params.param_theories then
+    (* parse KB *)
+    let kb_lock = params.param_kb ^ ".lock" in
+    let kb = Theories.read_kb ~file:params.param_kb ~lock:kb_lock in
+    (* create meta *)
+    let meta = Theories.create_meta ~ord kb in
+    (* add builtin *)
+    Theories.add_builtin ~ord kb;
+    Format.printf "%% initial kb: %a@." Theories.pp_kb kb;
+    Some meta
+  else None
 
 (** Process the given file (try to solve it) *)
 let process_file params f =
@@ -202,8 +218,10 @@ let process_file params f =
   let clauses = calculus#preprocess ~ord:d_ord ~select:no_select clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
+  (* TODO remove
   (* XXX detect some axioms *)
   let clauses = enrich_with_theories ~ord:d_ord ~params clauses in
+  *)
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
   Format.printf "%% precedence: %a@." T.pp_precedence ord#precedence#snapshot;
@@ -214,9 +232,11 @@ let process_file params f =
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord ~select clauses in
+  (* meta-prover *)
+  let meta = mk_meta ~ord params in
   (* create state, and add clauses to the simpl_set *)
   let signature = C.signature clauses in
-  let state = PS.mk_state ~ord params signature in
+  let state = PS.mk_state ~ord ?meta params signature in
   (* maybe perform initial inter-reductions *)
   let clauses = if params.param_presaturate
     then begin

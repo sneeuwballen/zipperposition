@@ -150,6 +150,7 @@ module Map :
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
+val pp_symb : Format.formatter -> int -> unit
 val pp_pterm : Format.formatter -> pterm -> unit
 val pp_pclause : Format.formatter -> pclause -> unit
 val pp_mapping : Format.formatter -> mapping -> unit

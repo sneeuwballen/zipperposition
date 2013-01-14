@@ -165,7 +165,10 @@ val is_unit_clause : hclause -> bool
 val signature : hclause list -> signature
   (** Compute signature of this set of clauses *)
 
-val from_simple : ord:ordering -> Simple.sourced_formula -> hclause
+val from_simple : ?ord:ordering -> Simple.sourced_formula -> hclause
+  (** conversion to a clause. If no ordering is provided, literals will not
+      be ordered properly! *)
+
 val to_simple : hclause -> Simple.formula
   (** convert to a formula, losing the source information *)
 

@@ -158,6 +158,14 @@ let all_simplify ~ord ~calculus ~select active_set simpl_set hc =
   Utils.exit_prof prof_all_simplify;
   clauses
 
+(** Find the lemmas that can be deduced if we consider this new clause *)
+let find_lemmas state hc = 
+  match state#meta_prover with
+  | None -> []  (* lemmas detection is disabled *)
+  | Some meta ->
+    let lemmas = Theories.scan_clause meta hc in
+    lemmas
+
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num state =
   let ord = state#ord
@@ -188,6 +196,10 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       Utils.debug 1 (lazy (Utils.sprintf
                     "%% ============ step %5d with given clause @[<h>%a@] ============"
                     num !C.pp_clause#pp_h hc));
+      (* scan clause within meta-prover *)
+      let lemmas = find_lemmas state hc in
+      Utils.debug 1 (lazy (Utils.sprintf "%% found %d lemmas" (List.length lemmas)));
+      let new_clauses = List.rev_append lemmas new_clauses in
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = subsumed_by ~calculus state#active_set hc in
       state#active_set#remove subsumed_active;

@@ -603,22 +603,38 @@ let signature clauses =
   in
   List.fold_left explore_clause empty_signature clauses
 
-let rec from_simple ~ord (f,source) =
-  let rec convert f = match f with
+let rec lits_from_simple ~ord f = match f with
   | Simple.Not (Simple.Atom f) -> [mk_neq ~ord (T.from_simple f) T.true_term]
   | Simple.Atom f -> [mk_eq ~ord (T.from_simple f) T.true_term]
   | Simple.Not (Simple.Eq (t1,t2)) -> [mk_neq ~ord (T.from_simple t1) (T.from_simple t2)]
   | Simple.Eq (t1, t2) -> [mk_eq ~ord (T.from_simple t1) (T.from_simple t2)]
   | Simple.Not (Simple.Equiv (f1,f2)) -> [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
   | Simple.Equiv (f1, f2) -> [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-  | Simple.Or l -> List.concat (List.map convert l)
+  | Simple.Or l -> List.concat (List.map (lits_from_simple ~ord) l)
   | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
-  in
+
+let rec lits_from_simple_noord f =
+  let mk_lit a b sign = Equation (a, b, sign, Incomparable) in
+  match f with
+  | Simple.Not (Simple.Atom f) -> [mk_lit (T.from_simple f) T.true_term false]
+  | Simple.Atom f -> [mk_lit (T.from_simple f) T.true_term true]
+  | Simple.Not (Simple.Eq (t1,t2)) -> [mk_lit (T.from_simple t1) (T.from_simple t2) false]
+  | Simple.Eq (t1, t2) -> [mk_lit (T.from_simple t1) (T.from_simple t2) true]
+  | Simple.Not (Simple.Equiv (f1,f2)) ->
+    [mk_lit (T.from_simple_formula f1) (T.from_simple_formula f2) false]
+  | Simple.Equiv (f1, f2) -> [mk_lit (T.from_simple_formula f1) (T.from_simple_formula f2) true]
+  | Simple.Or l -> List.concat (List.map lits_from_simple_noord l)
+  | _ -> [mk_lit (T.from_simple_formula f) T.true_term true]
+
+let rec from_simple ?ord (f,source) =
   let proof = match source with
   | Simple.Axiom (a,b) -> Axiom (a,b)
   | Simple.Derived (name, fs) -> failwith "unable to convert non-axiom simple clause to hclause"
   in
-  mk_hclause ~ord (convert f) proof []
+  match ord with
+  | Some ord -> mk_hclause ~ord (lits_from_simple ~ord f) proof []
+  | None -> mk_hclause_raw ~selected:0 ~maxlits:1 ~selected_done:false
+    (Array.of_list (lits_from_simple_noord f)) proof []
 
 let to_simple hc = failwith "not implemented"
 

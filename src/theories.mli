@@ -71,31 +71,32 @@ val detect_total_relations : ord:ordering -> hclause list -> hclause list
  * generic representation of theories and formulas (persistent)
  * ---------------------------------------------------------------------- *)
 
-type name = string
+type atom_name = string
   (** The name of a formula. If a formula is part of a known axiomatisation
       it can have a specific name, otherwise just "lemmaX" with X a number
       (e.g. f(X,Y)=f(Y,X) is named "commutativity") *)
 
-val string_of_name : name -> string
+val string_of_name : atom_name -> string
+
+type atom = atom_name * [`Var of int | `Symbol of string] list
+  (** An atom in the meta level of reasoning. This represents a fact about
+      the current proof search (presence of a theory, of a clause, of a lemma... *)
 
 type named_formula = {
-  nf_name : name;
-  nf_vars : int list;                   (* symbols (indexes) to bind. Order matters. *)
+  nf_atom : atom;                       (* meta-atom for an instance of the pclause *)
   nf_pclause : Patterns.pclause;        (* the pattern of the formula itself *)
 } (** A named formula is a pattern clause, plus a name (used for the datalog
       representation of instances of this formula *)
 
 type theory = {
-  th_name : name;                       (* name of the theory *)
-  th_vars : int list;                   (* symbols to bind *)
-  th_definition : named_formula list;   (* definition (set of axioms) *)
+  th_atom : atom;                           (* meta-atom for the theory *)
+  th_definition : atom list;                (* definition (set of axioms) *)
 } (** A theory is a named set of formulas (axioms) *)
 
 type lemma = {
-  lemma_name : name;                    (* unique name of the lemma *)
-  lemma_conclusion : named_formula;     (* conclusion of the lemma *)
-  lemma_premises : named_formula list;  (* hypotheses of the lemma *)
-  lemma_vars : int list;                (* symbols to instantiate *)
+  lemma_atom : atom;                        (* atom representing the lemma *)
+  lemma_conclusion : atom;                  (* conclusion of the lemma *)
+  lemma_premises : atom list;               (* hypotheses of the lemma *)
 } (** A lemma is a named formula that can be deduced from a list
       of other named formulas. It will be translated as a datalog rule. *)
 
@@ -103,9 +104,10 @@ type kb = {
   mutable kb_name_idx : int;
   mutable kb_lemma_idx : int;
   mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
-  mutable kb_formulas : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
-  kb_theories : (name, theory) Hashtbl.t;             (** theories, with their name *)
-  mutable kb_lemmas : (name, lemma) Hashtbl.t;        (** lemma *)
+  mutable kb_patterns : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
+  kb_formulas : (atom_name, named_formula) Hashtbl.t; (** formulas, by name *)
+  kb_theories : (atom_name, theory) Hashtbl.t;        (** theories, by name *)
+  kb_lemmas : (atom_name, lemma) Hashtbl.t;           (** lemmas, by name *)
 } (** a Knowledge Base for lemma and theories *)
 
 val empty_kb : unit -> kb
@@ -114,6 +116,9 @@ val empty_kb : unit -> kb
 val add_potential_lemmas : kb -> lemma list -> unit
   (** Add a potential lemma to the KB. The lemma must be checked before
       it is used. *)
+
+val pp_kb : Format.formatter -> kb -> unit
+  (** Pretty print content of KB *)
 
 (* ----------------------------------------------------------------------
  * reasoning over a problem using Datalog
@@ -137,6 +142,13 @@ val scan_clause : meta_prover -> hclause -> hclause list
       It returns lemma that have been discovered by adding the clause. Those
       lemma can be safely added to the problem.
       *)
+
+(* ----------------------------------------------------------------------
+ * Some builtin theories, axioms and lemma
+ * ---------------------------------------------------------------------- *)
+
+val add_builtin : ord:ordering -> kb -> unit
+  (** Add builtin lemma, axioms, theories to the KB *)
 
 (* ----------------------------------------------------------------------
  * (heuristic) search of "interesting" lemma in a proof.
