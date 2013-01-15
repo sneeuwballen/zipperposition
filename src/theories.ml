@@ -279,10 +279,12 @@ let scan_clause meta hc =
       in
       let term = atom_to_term (head, args) in
       let rule = Datalog.Logic.mk_rule term [] in
-      Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a@]"
-                     (Datalog.Logic.pp_rule ?to_s:None) rule));
-      (* add fact *)
-      Datalog.Logic.db_add meta.meta_db rule);
+      if not (Datalog.Logic.db_mem meta.meta_db rule) then begin
+        (* add fact if not already present *)
+        Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a@]"
+                       (Datalog.Logic.pp_rule ?to_s:None) rule));
+        Datalog.Logic.db_add meta.meta_db rule
+      end);
   (* get lemmas, and clear the list for next use *)
   let lemmas = meta.meta_lemmas in
   meta.meta_lemmas <- [];
