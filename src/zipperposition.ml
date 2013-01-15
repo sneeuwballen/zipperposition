@@ -178,11 +178,11 @@ let mk_meta ~ord params =
     (* parse KB *)
     let kb_lock = params.param_kb ^ ".lock" in
     let kb = Theories.read_kb ~file:params.param_kb ~lock:kb_lock in
-    (* create meta *)
-    let meta = Theories.create_meta ~ord kb in
     (* add builtin *)
     Theories.add_builtin ~ord kb;
-    Format.printf "%% initial kb: %a@." Theories.pp_kb kb;
+    (* create meta *)
+    let meta = Theories.create_meta ~ord kb in
+    Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
     Some meta
   else None
 

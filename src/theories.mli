@@ -24,50 +24,6 @@ open Types
 open Symbols
 
 (* ----------------------------------------------------------------------
- * recognize some shapes of clauses
- * ---------------------------------------------------------------------- *)
-
-val is_RR_horn_clause : hclause -> bool
-  (** Recognized whether the clause is a Range-Restricted Horn clause *)
-
-val is_definition : hclause -> (term * term) option
-  (** Check whether the clause defines a symbol, e.g.
-      subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
-      is a flat symbol with variables, and all variables in RHS
-      are also in LHS *)
-
-val is_rewrite_rule : hclause -> (term * term) list
-  (** More general than definition. It means the clause is an
-      equality where all variables in RHS are also in LHS. It
-      can return two rewrite rules if the clause can be oriented
-      in both ways, e.g. associativity axiom. *)
-
-val is_const_definition : hclause -> (term * term) option
-  (** Checks whether the clause is "const = ground composite term", e.g.
-      a clause "aIbUc = inter(a, union(b, c))". In this case it returns
-      Some(constant, definition of constant) *)
-
-val is_pos_eq : hclause -> (term * term) option
-  (** Recognize whether the clause is a positive unit equality. *)
-
-val is_functional_symbol : hclause -> [ `Functional of symbol | `None ]
-  (** detect whether the clause is "p(x,y,z) & p(x,y,z') => z=z'", and
-      returns p in this case *)
-
-val is_total_symbol : hclause -> [ `Total of (symbol * symbol) | `None ]
-  (** detect whether the clause is "p(x,y,f(x,y))", and returns (p,f)
-      in this case *)
-
-(* ----------------------------------------------------------------------
- * add some axioms when detecting some axioms
- * ---------------------------------------------------------------------- *)
-
-val detect_total_relations : ord:ordering -> hclause list -> hclause list
-  (** adds axioms for all total functional relations:
-      if  p(x,y,f(x,y))  and  p(x,y,z) & p(x,y,z') => z=z'
-      we add  p(x,y,z) <=> (z = f(x,y))  as a definition of p *)
-
-(* ----------------------------------------------------------------------
  * generic representation of theories and formulas (persistent)
  * ---------------------------------------------------------------------- *)
 
@@ -76,9 +32,7 @@ type atom_name = string
       it can have a specific name, otherwise just "lemmaX" with X a number
       (e.g. f(X,Y)=f(Y,X) is named "commutativity") *)
 
-val string_of_name : atom_name -> string
-
-type atom = atom_name * [`Var of int | `Symbol of symbol] list
+type atom = atom_name * int list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
@@ -94,7 +48,6 @@ type theory = {
 } (** A theory is a named set of formulas (axioms) *)
 
 type lemma = {
-  lemma_atom : atom;                        (* atom representing the lemma *)
   lemma_conclusion : atom;                  (* conclusion of the lemma *)
   lemma_premises : atom list;               (* hypotheses of the lemma *)
 } (** A lemma is a named formula that can be deduced from a list
@@ -102,12 +55,11 @@ type lemma = {
 
 type kb = {
   mutable kb_name_idx : int;
-  mutable kb_lemma_idx : int;
   mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
   mutable kb_patterns : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
   kb_formulas : (atom_name, named_formula) Hashtbl.t; (** formulas, by name *)
   kb_theories : (atom_name, theory) Hashtbl.t;        (** theories, by name *)
-  kb_lemmas : (atom_name, lemma) Hashtbl.t;           (** lemmas, by name *)
+  mutable kb_lemmas : lemma list;                     (** list of lemmas *)
 } (** a Knowledge Base for lemma and theories *)
 
 val empty_kb : unit -> kb

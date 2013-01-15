@@ -29,176 +29,6 @@ module S = FoSubst
 module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
- * recognize some shapes of clauses
- * ---------------------------------------------------------------------- *)
-
-(** Does t contains the symbol f? *)
-let rec contains_symbol f t =
-  match t.term with
-  | Var _ -> false
-  | Node (g, _) when f == g -> true
-  | Node (_, ts) -> List.exists (contains_symbol f) ts
-
-(** Recognized whether the clause is a Range-Restricted Horn clause *)
-let is_RR_horn_clause hc = 
-  let lit = ref None in
-  (* find whether there is exactly one positive literal *)
-  let rec find_uniq_pos n i =
-    if i = Array.length hc.hclits
-      then if n = 1 then !lit else None
-      else begin
-        match hc.hclits.(i) with
-        | Equation (l,r,true,_) as lit' ->
-          lit := Some lit';
-          find_uniq_pos (n+1) (i+1)
-        | _ -> find_uniq_pos n (i+1)
-      end
-  in
-  match find_uniq_pos 0 0 with
-  | None -> false
-  | Some lit' -> (* check that all variables of the clause occur in the head *)
-    List.length (C.vars_of_lit lit') = List.length hc.hcvars
-
-(** Check whether the clause defines a symbol, e.g.
-    subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
-    is a flat symbol with variables, and all variables in RHS
-    are also in LHS *)
-let is_definition hc =
-  (* check that r is a definition of l=f(x1,...,xn) *)
-  let check_def l r =
-    match l.term with
-    | Var _ -> false
-    | Node (f, ts) ->
-      (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n > 0 *)
-      T.atomic_rec l && ts <> [] && not (contains_symbol f r) && l != T.true_term && r != T.true_term
-      && List.for_all T.is_var ts && List.for_all (fun x -> T.var_occurs x l) r.vars
-  in
-  match hc.hclits with
-  | [|Equation (({term=Node(_, _)} as l), r, true, _)|] when check_def l r -> Some (l, r)
-  | [|Equation (l, ({term=Node(_, _)} as r), true, _)|] when check_def r l -> Some (r, l)
-  | _ -> None
-
-(** More general than definition. It means the clause is an
-    equality where all variables in RHS are also in LHS. It
-    can return two rewrite rules if the clause can be oriented
-    in both ways, e.g. associativity axiom. *)
-let is_rewrite_rule hc =
-  (* check that l -> r is an acceptable rewrite rule *)
-  let check_rule l r =
-    match l.term with
-    | Var _ -> false
-    | Node (_, _) ->
-      T.atomic_rec l && l != T.true_term && r != T.true_term && List.for_all (fun x -> T.var_occurs x l) r.vars
-  in
-  match hc.hclits with
-  | [|Equation (l, r, true, _)|] ->
-    (if check_rule l r then [l, r] else []) @ (if check_rule r l then [r, l] else [])
-  | _ -> []
-
-let is_pos_eq hc =
-  match hc.hclits with
-  | [|Equation (l,r,true,_)|] -> Some (l,r)
-  | _ -> None
-
-(** Checks whether the clause is "const = ground composite term", e.g.
-    a clause "aIbUc = inter(a, union(b, c))". In this case it returns
-    Some(constant, definition of constant) *)
-let is_const_definition hc =
-  match hc.hclits with
-  | [|Equation (l,r,true,_)|] when T.is_const l && T.is_ground_term r && not (T.member_term l r) ->
-    Some (l,r)
-  | [|Equation (l,r,true,_)|] when T.is_const r && T.is_ground_term l && not (T.member_term r l) ->
-    Some (r,l)
-  | _ -> None
-
-(** detect whether the clause is "p(x,y,z) & p(x,y,z') => z=z'", and
-    returns p in this case *)
-let is_functional_symbol hc =
-  (* kind of the literal *)
-  let rec kind = function
-  | Equation (l,r,false,_) when r == T.true_term -> atom_kind l false
-  | Equation (l,r,false,_) when l == T.true_term -> atom_kind r false
-  | Equation ({term=Var i}, {term=Var j},true,_) -> `Eq (i,j)
-  | _ -> `None
-  (* kind of atom, with given sign *)
-  and atom_kind t sign = match t.term with
-  | Node (p, [{term=Var i};{term=Var j}; {term=Var k}]) -> `Ternary (p,i,j,k)
-  | _ -> `None
-  in
-  match hc.hclits with
-  | [|a;b;c|] ->
-    (match kind a, kind b, kind c with
-    | `Ternary (p,i,j,k), `Ternary (p',i',j',k'), `Eq (k1, k2)
-    | `Ternary (p,i,j,k), `Eq (k1, k2), `Ternary (p',i',j',k')
-    | `Eq (k1, k2), `Ternary (p,i,j,k), `Ternary (p',i',j',k') ->
-    if p == p' && i=i' && j=j' && ((k=k1 && k'=k2) || (k=k2 && k'=k1))
-        then begin 
-          Utils.debug 1 (lazy (Utils.sprintf "%% ternary predicate %s is functional" (name_symbol p)));
-          `Functional p
-        end else `None
-    | _ -> `None)
-  | _ -> `None
-
-(** detect whether the clause is "p(x,y,f(x,y))", and returns (p,f)
-    in this case *)
-let is_total_symbol hc =
-  let is_total t = match t.term with
-  | Node (p, [{term=Var i}; {term=Var j}; {term=Node(f, [{term=Var i'}; {term=Var j'}])}])
-    when i = i' && j = j' ->
-    (* total ternary relation detected *)
-    Utils.debug 1 (lazy (Utils.sprintf "%% ternary predicate %s is total" (name_symbol p)));
-    `Total (p, f)
-  | _ -> `None
-  in
-  match hc.hclits with
-  | [| Equation (l, r, true,_) |] when r == T.true_term -> is_total l
-  | [| Equation (l, r, true,_) |] when l == T.true_term -> is_total r
-  | _ -> `None
-
-(* ----------------------------------------------------------------------
- * add some axioms when detecting some axioms
- * ---------------------------------------------------------------------- *)
-
-(* TODO detect equivalences in CNF (a => b and b => a) *)
-
-(** define f(x,y)=z as p(x,y,z) *)
-let function_definition ~ord def1 def2 p f =
-  let x, y, z = T.mk_var 1 univ_sort, T.mk_var 2 univ_sort, T.mk_var 3 univ_sort in
-  let lhs = T.mk_node p bool_sort [x;y;z]
-  and rhs = T.mk_eq (T.mk_node f univ_sort [x;y]) z in
-  let proof = Proof ("lemma", [C.base_clause def1, [], S.id_subst;
-                               C.base_clause def2, [], S.id_subst]) in
-  C.mk_hclause ~ord [C.mk_eq ~ord lhs rhs] proof []
-
-let detect_total_relations ~ord clauses =
-  let totals = ref []
-  and functionals = ref [] in
-  (* detect axioms *)
-  List.iter
-    (fun hc ->
-      match is_functional_symbol hc, is_total_symbol hc with
-      | `Functional p, _ -> functionals := (p, hc) :: !functionals
-      | _, `Total (p, f) -> totals := (p, f, hc) :: !totals
-      | `None, `None -> ()
-      | _ -> assert false)
-    clauses;
-  (* perform a join on totals,functionals to find common predicate symbols *)
-  let definitions = ref [] in
-  List.iter
-    (fun (p,f,def1) ->
-      List.iter
-        (fun (p', def2) -> if p == p'
-          then begin
-            Utils.debug 0 (lazy (Utils.sprintf "%% symbol %s is a function definition of %s"
-                          (name_symbol p) (name_symbol f)));
-            definitions := (function_definition ~ord def1 def2 p f) :: !definitions
-          end)
-        !functionals)
-    !totals;
-  (* return definitions *)
-  !definitions
-
-(* ----------------------------------------------------------------------
  * generic representation of theories and formulas (persistent)
  * ---------------------------------------------------------------------- *)
 
@@ -207,9 +37,7 @@ type atom_name = string
       it can have a specific name, otherwise just "lemma_X" with X a number
       (e.g. f(X,Y)=f(Y,X) is named "commutativity") *)
 
-let string_of_name name = name
-
-type atom = atom_name * [`Var of int | `Symbol of symbol] list
+type atom = atom_name * int list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
@@ -225,7 +53,6 @@ type theory = {
 } (** A theory is a named set of formulas (axioms) *)
 
 type lemma = {
-  lemma_atom : atom;                        (* atom representing the lemma *)
   lemma_conclusion : atom;                  (* conclusion of the lemma *)
   lemma_premises : atom list;               (* hypotheses of the lemma *)
 } (** A lemma is a named formula that can be deduced from a list
@@ -233,23 +60,21 @@ type lemma = {
 
 type kb = {
   mutable kb_name_idx : int;
-  mutable kb_lemma_idx : int;
   mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
   mutable kb_patterns : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
   kb_formulas : (atom_name, named_formula) Hashtbl.t; (** formulas, by name *)
   kb_theories : (atom_name, theory) Hashtbl.t;        (** theories, by name *)
-  kb_lemmas : (atom_name, lemma) Hashtbl.t;           (** lemmas, by name *)
+  mutable kb_lemmas : lemma list;                     (** list of lemmas *)
 } (** a Knowledge Base for lemma and theories *)
   
 (** Create an empty Knowledge Base *)
 let empty_kb () = {
   kb_name_idx = 0;
-  kb_lemma_idx = 0;
   kb_potential_lemmas = [];
   kb_patterns = Patterns.Map.create ();
   kb_formulas = Hashtbl.create 5;
   kb_theories = Hashtbl.create 3;
-  kb_lemmas = Hashtbl.create 3;
+  kb_lemmas = [];
 }
 
 (** Add a potential lemma to the KB. The lemma must be checked before
@@ -263,16 +88,18 @@ let add_potential_lemmas kb pot_lemmas =
   kb.kb_potential_lemmas <- kb_potential_lemmas
 
 let pp_atom formatter (name, args) =
-  let pp_variant formatter = function
-    | `Var x -> Format.fprintf formatter "X%d" (-x)
-    | `Symbol s -> !T.pp_symbol#pp formatter s
+  let pp_arg formatter = function
+    | i when i < 0 -> Format.fprintf formatter "X%d" (-i)
+    | i ->
+      let symbol = mk_symbol (Datalog.Symbols.get_symbol i) in
+      !T.pp_symbol#pp formatter symbol
   in
   Format.fprintf formatter "@[<h>%s(%a)@]"
-    name (Utils.pp_list pp_variant) args
+    name (Utils.pp_list pp_arg) args
 
 let pp_named_formula formatter nf =
-  Format.fprintf formatter "@[<h>%a == %a@]"
-    pp_atom nf.nf_atom Patterns.pp_pclause nf.nf_pclause
+  Format.fprintf formatter "@[<h>%s == %a@]"
+    (fst nf.nf_atom) Patterns.pp_pclause nf.nf_pclause
 
 (** Pretty print content of KB *)
 let pp_kb formatter kb =
@@ -283,9 +110,9 @@ let pp_kb formatter kb =
       pp_atom th.th_atom (Utils.pp_list pp_atom) th.th_definition)
     kb.kb_theories;
   (* print lemma *)
-  Hashtbl.iter
-    (fun _ lemma -> Format.fprintf formatter "  @[<hv 2>lemma %a:@ %a if@ %a@]@;"
-      pp_atom lemma.lemma_atom pp_atom lemma.lemma_conclusion
+  List.iter
+    (fun lemma -> Format.fprintf formatter "  @[<hv 2>lemma:@ %a :-@ %a@]@;"
+      pp_atom lemma.lemma_conclusion
       (Utils.pp_list pp_atom) lemma.lemma_premises)
     kb.kb_lemmas;
   (* print formulas definitions *)
@@ -307,84 +134,81 @@ type meta_prover = {
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
 
-let get_kb_formula kb name =
+let get_kb_formula ~kb name =
   try Hashtbl.find kb.kb_formulas name
   with Not_found -> failwith ("no such formula: " ^ name)
 
-(** When a lemma is discovered, this translates it into a hclause and
-    adds it to the list of lemmas. The [term] is a datalog term whose head
-    symbol is "lemma". *)
-let lemma_handler meta term =
-  assert (Array.length term >= 2);
-  assert (Datalog.Symbols.get_symbol term.(0) = "lemma");
-  let ord = meta.meta_ord in
-  (* extract the name of the lemma, and the list of symbols *)
-  let lemma_name = Datalog.Symbols.get_symbol term.(1) in
-  (* find the definition of the lemma *)
-  let lemma =
-    try Hashtbl.find meta.meta_kb.kb_lemmas lemma_name
-    with Not_found -> failwith ("no such lemma: " ^ lemma_name)
-  in
-  (* bind lemma free symbols to the arguments of the datalog term *)
-  let mapping = Patterns.empty_mapping in
-  let term_args = Array.to_list (Array.sub term 2 (Array.length term - 2)) in
-  let lemma_args = snd lemma.lemma_atom in
-  assert (List.length lemma_args = List.length term_args);
-  let mapping = List.fold_left2
-    (fun mapping v symbol ->
-      let symbol = mk_symbol (Datalog.Symbols.get_symbol symbol) in
-      match v with
-      | `Var i -> Patterns.bind_symbol mapping (-i) symbol
-      | `Symbol s -> (assert (s == symbol); mapping))
-    mapping lemma_args term_args in
-  Utils.debug 0 (lazy (Utils.sprintf "%% instantiate lemma %a with mapping %a"
-                 pp_atom lemma.lemma_atom Patterns.pp_mapping mapping));
-  (* instantiate the premises and conclusion of the lemma *)
-  let parents = List.map
-    (fun (name, args) ->
-      let nf = get_kb_formula meta.meta_kb name in
-      let proof = Axiom ("kb", "kb") and parents = [] in
-      Patterns.instantiate_pclause ~ord ~map:mapping nf.nf_pclause proof parents)
-    lemma.lemma_premises in
-  let premises = List.map (fun pc -> (C.base_clause pc, [], S.id_subst)) parents in
-  let proof = Proof ("lemma", premises) in
-  let conclusion_nf = get_kb_formula meta.meta_kb lemma_name in
-  let conclusion = Patterns.instantiate_pclause ~map:mapping ~ord
-    conclusion_nf.nf_pclause proof parents in
-  (* add the lemma in meta.meta_lemmas *)
-  meta.meta_lemmas <- conclusion :: meta.meta_lemmas
+let get_kb_theory ~kb name =
+  try Hashtbl.find kb.kb_theories name
+  with Not_found -> failwith ("no such theory: " ^ name)
 
-let atom_to_term (head, args) =
-  let args = List.map
-    (function
-     | `Var i -> `Var i
-     | `Symbol s -> `Symbol (name_symbol s))
-    args
+(** Translate back a datalog (ground) term into a hclause.
+    First, the corresponding named formula has to be retrieved
+    from kb, then it is 'matched' against the term.
+    A proof and a list of parent clauses have to be provided. *)
+let term_to_hclause ~ord ~kb term proof parents =
+  let term_name = Datalog.Symbols.get_symbol term.(0)
+  and term_args = Array.to_list (Array.sub term 1 (Array.length term - 1)) in
+  (* get the named formula corresponding to this term *)
+  let nf = get_kb_formula kb term_name in
+  let nf_name, nf_args = nf.nf_atom in
+  (* mapping from free symbols to concrete symbols *)
+  let mapping = List.fold_left2
+    (fun mapping nf_arg term_arg ->
+      assert (nf_arg >= 0);  (* ground atom *)
+      let symbol = mk_symbol (Datalog.Symbols.get_symbol term_arg) in
+      Patterns.bind_symbol mapping nf_arg symbol)
+    Patterns.empty_mapping nf_args term_args
   in
-  Datalog.Logic.mk_term head args
+  Patterns.instantiate_pclause ~ord ~map:mapping nf.nf_pclause proof parents
+
+(** This handler is triggered whenever a named formula is discovered
+    to be true for the current problem. *)
+let handle_formula meta term =
+  let ord = meta.meta_ord in
+  let kb = meta.meta_kb in
+  (* find parents (other formulas) *)
+  let explanation = Datalog.Logic.db_explain meta.meta_db term in
+  let parents = List.map
+    (fun t -> term_to_hclause ~ord ~kb t (Axiom ("kb", "kb")) [])
+    explanation
+  in
+  (* is the clause deduced or merely an axiom? *)
+  if explanation = [term]
+  then ()
+  else begin
+    (* proof and parents of conclusion *)
+    let premises = List.map (fun hc -> (C.base_clause hc, [], S.id_subst)) parents in
+    let proof = Proof ("lemma", premises) in
+    (* build conclusion *)
+    let conclusion = term_to_hclause ~ord ~kb term proof parents in
+    (* yield lemma *)
+    Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
+                  !C.pp_clause#pp_h conclusion));
+    meta.meta_lemmas <- conclusion :: meta.meta_lemmas
+  end
+
+(** Handler triggered when a theory is discovered in the current problem *)
+let handle_theory meta term =
+  Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: theory @[<h>%a@]"
+                 (Datalog.Logic.pp_term ?to_s:None) term));
+  ()
+
+(** Convert an atom to a Datalog term *)
+let atom_to_term (head, args) =
+  let head = Datalog.Symbols.mk_symbol head in
+  Array.of_list (head :: args)
 
 (** Add a lemma to the Datalog engine *)
 let db_add_lemma db lemma =
-  (* add lemma(name, args) :- premise1(args), ..., premise_n(args). *)
-  let () =
-    let head = atom_to_term lemma.lemma_atom in
-    let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
-    let rule = Datalog.Logic.mk_rule head body in
-    Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
-                   (Datalog.Logic.pp_rule ?to_s:None) rule));
-    Datalog.Logic.db_add db rule;
-  in
   (* add conclusion(args) :- premise1(args), ..., premise_n(args), for
      further propagations. *)
-  let () =
-    let head = atom_to_term lemma.lemma_conclusion in
-    let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
-    let rule = Datalog.Logic.mk_rule head body in
-    Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
-                   (Datalog.Logic.pp_rule ?to_s:None) rule));
-    Datalog.Logic.db_add db rule;
-  in
-  ()
+  let head = atom_to_term lemma.lemma_conclusion in
+  let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
+  let rule = Datalog.Logic.mk_rule head body in
+  Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
+                 (Datalog.Logic.pp_rule ?to_s:None) rule));
+  Datalog.Logic.db_add db rule
   
 (** Add the definition of a theory to the Datalog engine *)
 let db_add_theory db theory =
@@ -403,19 +227,32 @@ let create_meta ~ord kb =
     meta_ord = ord;
     meta_lemmas = [];
   } in
-  (* set lemma handler, that captures newly discovered lemma *)
-  let lemma_symbol = Datalog.Symbols.mk_symbol "lemma" in
-  Datalog.Logic.db_subscribe meta.meta_db lemma_symbol (lemma_handler meta);
+  (* handler for new formulas and theories *)
+  let formula_handler = handle_formula meta in
+  let theory_handler = handle_theory meta in
   (* add definitions of lemma *) 
-  Hashtbl.iter (fun _ lemma -> db_add_lemma meta.meta_db lemma) meta.meta_kb.kb_lemmas;
+  List.iter
+    (fun lemma ->
+      (* the lemma is f(X,...) :- g(Y...), ...; we need the index of f *)
+      let s = Datalog.Symbols.mk_symbol (fst lemma.lemma_conclusion) in
+      Datalog.Logic.db_subscribe meta.meta_db s formula_handler;
+      (* also add the lemma as a rule *)
+      db_add_lemma meta.meta_db lemma)
+    meta.meta_kb.kb_lemmas;
   (* add definitions of theories *)
-  Hashtbl.iter (fun _ theory -> db_add_theory meta.meta_db theory) meta.meta_kb.kb_theories; 
+  Hashtbl.iter
+    (fun _ theory ->
+      (* detect theories *)
+      let s = Datalog.Symbols.mk_symbol (fst theory.th_atom) in
+      Datalog.Logic.db_subscribe meta.meta_db s theory_handler;
+      (* also add the theory as a rule *)
+      db_add_theory meta.meta_db theory)
+    meta.meta_kb.kb_theories; 
   (* return the meta-prover *)
   meta
 
 (** Update the ordering used by the meta-prover *)
-let meta_update_ord ~ord meta =
-  meta.meta_ord <- ord
+let meta_update_ord ~ord meta = meta.meta_ord <- ord
 
 (** Scan the given clause to recognize if it matches axioms from the KB;
     if it does, return the lemma that are newly discovered by the Datalog engine.
@@ -431,14 +268,18 @@ let scan_clause meta hc =
       (* a named formula is detected, assert the corresponding datalog
          predicate *)
       let head, args = nf.nf_atom in
-      let args = List.map
+      let open Patterns in
+      let args = List.map 
         (function
-         | `Var i -> `Symbol (name_symbol (Ptmap.find (-i) mapping.Patterns.m_symbol))
-         | `Symbol s -> `Symbol (name_symbol s))
-        args in
-      let term = Datalog.Logic.mk_term head args in
+          | i when i < 0 -> i
+          | i -> (* translate from symbol to datalog symbol *)
+            let symbol = Ptmap.find i mapping.m_symbol in
+            Datalog.Symbols.mk_symbol (name_symbol symbol))
+        args
+      in
+      let term = atom_to_term (head, args) in
       let rule = Datalog.Logic.mk_rule term [] in
-      Utils.debug 0 (lazy (Utils.sprintf "%% detected formula %a in problem"
+      Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a@]"
                      (Datalog.Logic.pp_rule ?to_s:None) rule));
       (* add fact *)
       Datalog.Logic.db_add meta.meta_db rule);
@@ -462,30 +303,28 @@ let add_named kb named =
 
 (** Add a list of lemmas to the KB *)
 let add_lemmas kb lemmas =
+  kb.kb_lemmas <- List.rev_append lemmas kb.kb_lemmas
+
+(*Add a list of theories to the KB *)
+let add_theories kb theories =
   List.iter
-    (fun lemma ->
-      match lemma.lemma_atom with
-      | "lemma", (`Symbol name)::_ ->
-        Hashtbl.replace kb.kb_lemmas (name_symbol name) lemma
-      | _ -> failwith "try to add an invalid lemma")
-    lemmas
+    (fun th ->
+      let th_name = fst th.th_atom in
+      Hashtbl.replace kb.kb_theories th_name th)
+    theories
 
 (** Add builtin lemma, axioms, theories to the KB *)
 let add_builtin ~ord kb =
   (* From a string, extract a pclause *)
   let from_str ~ord name s =
-    Format.printf "for axiom %s parsing %s@." name s;
-    let simple =
-      Parser_tptp.parse_clause Lexer_tptp.token (Lexing.from_string s),
-      Simple.Axiom ("builtin", name) in
-    let hc = C.from_simple ?ord:None simple in
+    let simple = Parser_tptp.parse_clause Lexer_tptp.token (Lexing.from_string s) in
+    let ord = Orderings.default_ordering (Simple.signature [simple]) in
+    let hc = C.from_simple ~ord (simple, Simple.Axiom ("builtin", name)) in
     let pc = Patterns.pclause_of_clause hc in
-    let atom = name, List.map (fun v -> `Var (-v)) (Patterns.pclause_symbols pc) in
-    Utils.debug 2 (lazy (Utils.sprintf "%% axiom %a has pattern @[<h>%a@]"
-                   pp_atom atom Patterns.pp_pclause pc));
-    { nf_atom = atom;
-      nf_pclause = pc;
-    }
+    let atom = name, pc.Patterns.pc_vars in
+    Utils.debug 2 (lazy (Utils.sprintf "%% axiom %s has pattern @[<h>%a@]"
+                   name Patterns.pp_pclause pc));
+    { nf_atom = atom; nf_pclause = pc; }
   in
   let assoc = from_str ~ord "associative" "$$f(X,$$f(Y,Z)) = $$f($$f(X,Y),Z)"
   and commut = from_str ~ord "commutative" "$$f(X,Y) = $$f(Y,X)"
@@ -496,12 +335,19 @@ let add_builtin ~ord kb =
   (* add named formulas *)
   add_named kb [assoc; commut; functional; total; functional_total];
   (* add the functional total lemma *)
+  let mk_var i = -1-i in
   let lemma = {
-    lemma_atom = "lemma", [`Symbol (mk_symbol "functional_total"); `Var (-1); `Var (-2)];
-    lemma_conclusion = "functional_total3", [`Var (-1); `Var (-2)];
-    lemma_premises = ["functional3", [`Var (-1)]; "total3", [`Var (-1); `Var (-2)]];
+    lemma_conclusion = "total_function3", [mk_var 0; mk_var 1;];
+    lemma_premises = ["functional3", [mk_var 0]; "total3", [mk_var 1; mk_var 0]];
   } in
-  add_lemmas kb [lemma]
+  add_lemmas kb [lemma];
+  (* add the AC theory *)
+  let th = {
+    th_atom = "ac", [mk_var 0];
+    th_definition = ["associative", [mk_var 0]; "commutative", [mk_var 0]];
+  } in
+  add_theories kb [th];
+  ()
 
 (* ----------------------------------------------------------------------
  * (heuristic) search of "interesting" lemma in a proof.
@@ -512,7 +358,7 @@ let add_builtin ~ord kb =
 let rate_clause pclause =
   let rate = ref 1. in
   (* many symbols is not simple *)
-  let symbols = Patterns.pclause_symbols pclause in
+  let symbols = pclause.Patterns.pc_vars in
   let num_symbols = List.length symbols in
   rate := !rate +. (float_of_int (num_symbols - 1));
   (* many literals is not simple *)
@@ -523,7 +369,6 @@ let rate_clause pclause =
                 "%% simplicity of @[<h>%a@] is %.2f (%d symbols, %d lits)"
                 Patterns.pp_pclause pclause !rate num_symbols length));
   !rate 
-  
 
 (** given an empty clause (and its proof), look in the proof for
     potential lemma. *)

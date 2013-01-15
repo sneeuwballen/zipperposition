@@ -198,7 +198,6 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
                     num !C.pp_clause#pp_h hc));
       (* scan clause within meta-prover *)
       let lemmas = find_lemmas state hc in
-      Utils.debug 1 (lazy (Utils.sprintf "%% found %d lemmas" (List.length lemmas)));
       let new_clauses = List.rev_append lemmas new_clauses in
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = subsumed_by ~calculus state#active_set hc in
