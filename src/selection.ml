@@ -94,7 +94,7 @@ let select_complex ?(strict=true) ~ord hc =
         else select_diff_neg_lit ~strict ~ord hc (* delegate to select_diff_neg_lit *)
 
 let select_complex_except_RR_horn ?(strict=true) ~ord hc =
-  if Theories.is_RR_horn_clause hc
+  if C.is_RR_horn_clause hc
     then []  (* do not select (conditional rewrite rule) *)
     else select_complex ~strict ~ord hc  (* like select_complex *)
 

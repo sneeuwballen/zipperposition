@@ -603,38 +603,23 @@ let signature clauses =
   in
   List.fold_left explore_clause empty_signature clauses
 
-let rec lits_from_simple ~ord f = match f with
-  | Simple.Not (Simple.Atom f) -> [mk_neq ~ord (T.from_simple f) T.true_term]
-  | Simple.Atom f -> [mk_eq ~ord (T.from_simple f) T.true_term]
-  | Simple.Not (Simple.Eq (t1,t2)) -> [mk_neq ~ord (T.from_simple t1) (T.from_simple t2)]
-  | Simple.Eq (t1, t2) -> [mk_eq ~ord (T.from_simple t1) (T.from_simple t2)]
-  | Simple.Not (Simple.Equiv (f1,f2)) -> [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-  | Simple.Equiv (f1, f2) -> [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-  | Simple.Or l -> List.concat (List.map (lits_from_simple ~ord) l)
-  | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
-
-let rec lits_from_simple_noord f =
-  let mk_lit a b sign = Equation (a, b, sign, Incomparable) in
-  match f with
-  | Simple.Not (Simple.Atom f) -> [mk_lit (T.from_simple f) T.true_term false]
-  | Simple.Atom f -> [mk_lit (T.from_simple f) T.true_term true]
-  | Simple.Not (Simple.Eq (t1,t2)) -> [mk_lit (T.from_simple t1) (T.from_simple t2) false]
-  | Simple.Eq (t1, t2) -> [mk_lit (T.from_simple t1) (T.from_simple t2) true]
-  | Simple.Not (Simple.Equiv (f1,f2)) ->
-    [mk_lit (T.from_simple_formula f1) (T.from_simple_formula f2) false]
-  | Simple.Equiv (f1, f2) -> [mk_lit (T.from_simple_formula f1) (T.from_simple_formula f2) true]
-  | Simple.Or l -> List.concat (List.map lits_from_simple_noord l)
-  | _ -> [mk_lit (T.from_simple_formula f) T.true_term true]
-
-let rec from_simple ?ord (f,source) =
+let rec from_simple ~ord (f,source) =
+  let rec lits_from_simple ~ord f = match f with
+    | Simple.Not (Simple.Atom f) -> [mk_neq ~ord (T.from_simple f) T.true_term]
+    | Simple.Atom f -> [mk_eq ~ord (T.from_simple f) T.true_term]
+    | Simple.Not (Simple.Eq (t1,t2)) -> [mk_neq ~ord (T.from_simple t1) (T.from_simple t2)]
+    | Simple.Eq (t1, t2) -> [mk_eq ~ord (T.from_simple t1) (T.from_simple t2)]
+    | Simple.Not (Simple.Equiv (f1,f2)) -> [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
+    | Simple.Equiv (f1, f2) -> [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
+    | Simple.Or l -> List.concat (List.map (lits_from_simple ~ord) l)
+    | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
+  in
   let proof = match source with
   | Simple.Axiom (a,b) -> Axiom (a,b)
-  | Simple.Derived (name, fs) -> failwith "unable to convert non-axiom simple clause to hclause"
+  | Simple.Derived (name, fs) ->
+    failwith "unable to convert non-axiom simple clause to hclause"
   in
-  match ord with
-  | Some ord -> mk_hclause ~ord (lits_from_simple ~ord f) proof []
-  | None -> mk_hclause_raw ~selected:0 ~maxlits:1 ~selected_done:false
-    (Array.of_list (lits_from_simple_noord f)) proof []
+  mk_hclause ~ord (lits_from_simple ~ord f) proof []
 
 let to_simple hc = failwith "not implemented"
 
@@ -713,6 +698,92 @@ module CSet =
     let of_list l =
       add_list empty l
   end
+
+(* ----------------------------------------------------------------------
+ * recognize some shapes of clauses
+ * ---------------------------------------------------------------------- *)
+
+(** Does t contains the symbol f? *)
+let rec contains_symbol f t =
+  match t.term with
+  | Var _ -> false
+  | Node (g, _) when f == g -> true
+  | Node (_, ts) -> List.exists (contains_symbol f) ts
+
+(** Recognized whether the clause is a Range-Restricted Horn clause *)
+let is_RR_horn_clause hc = 
+  let lit = ref None in
+  (* find whether there is exactly one positive literal *)
+  let rec find_uniq_pos n i =
+    if i = Array.length hc.hclits
+      then if n = 1 then !lit else None
+      else begin
+        match hc.hclits.(i) with
+        | Equation (l,r,true,_) as lit' ->
+          lit := Some lit';
+          find_uniq_pos (n+1) (i+1)
+        | _ -> find_uniq_pos n (i+1)
+      end
+  in
+  match find_uniq_pos 0 0 with
+  | None -> false
+  | Some lit' -> (* check that all variables of the clause occur in the head *)
+    List.length (vars_of_lit lit') = List.length hc.hcvars
+
+(** Check whether the clause defines a symbol, e.g.
+    subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
+    is a flat symbol with variables, and all variables in RHS
+    are also in LHS *)
+let is_definition hc =
+  (* check that r is a definition of l=f(x1,...,xn) *)
+  let check_def l r =
+    match l.term with
+    | Var _ -> false
+    | Node (f, ts) ->
+      (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n > 0 *)
+      T.atomic_rec l && ts <> [] && not (contains_symbol f r) && l != T.true_term && r != T.true_term
+      && List.for_all T.is_var ts && List.for_all (fun x -> T.var_occurs x l) r.vars
+  in
+  match hc.hclits with
+  | [|Equation (({term=Node(_, _)} as l), r, true, _)|] when check_def l r -> Some (l, r)
+  | [|Equation (l, ({term=Node(_, _)} as r), true, _)|] when check_def r l -> Some (r, l)
+  | _ -> None
+
+(** More general than definition. It means the clause is an
+    equality where all variables in RHS are also in LHS. It
+    can return two rewrite rules if the clause can be oriented
+    in both ways, e.g. associativity axiom. *)
+let is_rewrite_rule hc =
+  (* check that l -> r is an acceptable rewrite rule *)
+  let check_rule l r =
+    match l.term with
+    | Var _ -> false
+    | Node (_, _) ->
+      T.atomic_rec l && l != T.true_term && r != T.true_term &&
+      List.for_all (fun x -> T.var_occurs x l) r.vars
+  in
+  match hc.hclits with
+  | [|Equation (l, r, true, _)|] ->
+    (if check_rule l r then [l, r] else []) @ (if check_rule r l then [r, l] else [])
+  | _ -> []
+
+let is_pos_eq hc =
+  match hc.hclits with
+  | [|Equation (l,r,true,_)|] -> Some (l,r)
+  | _ -> None
+
+(** Checks whether the clause is "const = ground composite term", e.g.
+    a clause "aIbUc = inter(a, union(b, c))". In this case it returns
+    Some(constant, definition of constant) *)
+let is_const_definition hc =
+  match hc.hclits with
+  | [|Equation (l,r,true,_)|] when T.is_const l && T.is_ground_term r
+    && not (T.member_term l r) ->
+    Some (l,r)
+  | [|Equation (l,r,true,_)|] when T.is_const r && T.is_ground_term l
+    && not (T.member_term r l) ->
+    Some (r,l)
+  | _ -> None
 
 (* ----------------------------------------------------------------------
  * pretty printing

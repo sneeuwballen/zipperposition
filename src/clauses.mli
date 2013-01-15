@@ -165,9 +165,8 @@ val is_unit_clause : hclause -> bool
 val signature : hclause list -> signature
   (** Compute signature of this set of clauses *)
 
-val from_simple : ?ord:ordering -> Simple.sourced_formula -> hclause
-  (** conversion to a clause. If no ordering is provided, literals will not
-      be ordered properly! *)
+val from_simple : ord:ordering -> Simple.sourced_formula -> hclause
+  (** conversion to a clause. *)
 
 val to_simple : hclause -> Simple.formula
   (** convert to a formula, losing the source information *)
@@ -239,6 +238,33 @@ module CSet :
     val to_list : t -> hclause list
     val of_list : hclause list -> t
 end
+
+(* ----------------------------------------------------------------------
+ * recognize some shapes of clauses
+ * ---------------------------------------------------------------------- *)
+
+val is_RR_horn_clause : hclause -> bool
+  (** Recognized whether the clause is a Range-Restricted Horn clause *)
+
+val is_definition : hclause -> (term * term) option
+  (** Check whether the clause defines a symbol, e.g.
+      subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
+      is a flat symbol with variables, and all variables in RHS
+      are also in LHS *)
+
+val is_rewrite_rule : hclause -> (term * term) list
+  (** More general than definition. It means the clause is an
+      equality where all variables in RHS are also in LHS. It
+      can return two rewrite rules if the clause can be oriented
+      in both ways, e.g. associativity axiom. *)
+
+val is_const_definition : hclause -> (term * term) option
+  (** Checks whether the clause is "const = ground composite term", e.g.
+      a clause "aIbUc = inter(a, union(b, c))". In this case it returns
+      Some(constant, definition of constant) *)
+
+val is_pos_eq : hclause -> (term * term) option
+  (** Recognize whether the clause is a positive unit equality. *)
 
 (* ----------------------------------------------------------------------
  * pretty printing

@@ -254,7 +254,7 @@ let weight_const_def = 1  (** weight of definitions of constants *)
 (** Creates a weighted constraint if the clause is a symbol definition,
     ie an equation/equivalence f(x1,...,xn)=b where f does not occur in b *)
 let check_definition clause =
-  match Theories.is_definition clause with
+  match C.is_definition clause with
   | Some (l,r) -> (* definition of l by r *)
     Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition: %a == %a@]" !T.pp_term#pp l !T.pp_term#pp r));
     [check_gt ~weight:weight_def l r]
@@ -263,7 +263,7 @@ let check_definition clause =
 let check_rules clause =
   (* otherwise, try to interpret the clause as a rewrite rule. It only provides
      a constraint if the rule is not trivially oriented by the subterm property. *)
-  let rules = Theories.is_rewrite_rule clause in
+  let rules = C.is_rewrite_rule clause in
   match rules with
   | [l, r] when not (T.member_term r l) ->
     Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>rewrite rule: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
@@ -271,7 +271,7 @@ let check_rules clause =
   | _ -> []  (* not unambiguously a rewrite rule *)
 
 let check_const_def clause =
-  match Theories.is_const_definition clause with
+  match C.is_const_definition clause with
   | None -> []
   | Some (const, definition) ->
     Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition of constant: %a --> %a@]" !T.pp_term#pp const !T.pp_term#pp definition));
