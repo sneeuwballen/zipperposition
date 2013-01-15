@@ -60,3 +60,11 @@ For instance,
 
     $ ./zipperposition.native ./pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
 
+## Troubleshooting
+
+With the theory recognition features, zipperposition uses an on-disk file
+to store persistent knowledge between invocations. This file, by default, is
+`./kb`. However, if you used a version of zipperposition that is not up-to-date,
+the file format may have changed; since the OCaml module `Marshal` is unsage,
+attempting to load an old `kb` file may lead to a crash/segfault. In this case,
+just `rm kb`.
