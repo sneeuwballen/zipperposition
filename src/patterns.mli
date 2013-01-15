@@ -30,6 +30,11 @@ open Symbols
 type psymbol = int
 type psort = int
 
+val symbol_offset : int
+  (** Above this int, symbols are free (signature independent). Under
+      this threshold, symbols are special symbols (like "true" or "=")
+      *)
+
 (** A pattern term. Symbols, sorts and variables can all be bound. *)
 type pterm =
   | PVar of int * psort
@@ -60,10 +65,8 @@ val hash_plit : pliteral -> int
 type pclause = {
   pc_lits : pliteral list;        (* literals that have consistent naming *)
   pc_canonical : pliteral list;   (* canonical pattern of each literal *)
+  pc_vars : psymbol list;         (* list of free symbols of the pclause *)
 }
-
-val pclause_symbols : pclause -> psymbol list
-  (** List of non-special symbols/sort (index) that occur in the clause *)
 
 (* ----------------------------------------------------------------------
  * mapping between regular terms/clauses and pattern terms/clauses
@@ -76,7 +79,7 @@ type mapping = {
 }
 
 val empty_mapping : mapping
-  (** empty mapping *)
+  (** empty mapping (empty but for the builtin symbols) *)
 
 val binds_all : mapping -> psymbol list -> bool
   (** Checks whether the mapping binds all symbols in the list *)

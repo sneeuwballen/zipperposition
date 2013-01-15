@@ -128,6 +128,7 @@ let hash_plit plit =
 type pclause = {
   pc_lits : pliteral list;        (* literals that have consistent naming *)
   pc_canonical : pliteral list;   (* canonical pattern of each literal *)
+  pc_vars : psymbol list;         (* list of free symbols of the pclause *)
 }
 
 let compare_pclause c1 c2 =
@@ -148,7 +149,7 @@ let hash_pclause pc =
   List.fold_left (fun h lit -> h lxor hash_plit lit) hash_pclause_seed pc.pc_canonical
 
 (** List of non-special symbols/sort (index) that occur in the clause *)
-let pclause_symbols pc =
+let pclause_symbols lits =
   let rec pterm_symbols acc t = match t with
   | PVar (_, sort) -> if List.mem sort acc || sort < symbol_offset then acc else sort::acc
   | PNode (f, sort, l) ->
@@ -158,7 +159,7 @@ let pclause_symbols pc =
   and plit_symbols acc lit =
     pterm_symbols (pterm_symbols acc lit.lterm) lit.rterm
   in
-  List.fold_left plit_symbols [] pc.pc_lits
+  List.fold_left plit_symbols [] lits
 
 (* ----------------------------------------------------------------------
  * mapping between regular terms/clauses and pattern terms/clauses
@@ -282,20 +283,29 @@ let pclause_of_clause ?rev_map hc =
   let lits = List.map (fun (_, _, lit) -> lit) lits in
   (* convert the literals to pliterals using the rev_map *)
   let lits = List.map (plit_of_lit ~rev_map) lits in
+  (* free symbols *)
+  let vars = pclause_symbols lits in
   Utils.exit_prof prof_pclause_of_clause;
-  { pc_lits=lits; pc_canonical=plits; }
+  { pc_lits=lits; pc_canonical=plits; pc_vars=vars; }
 
 (*s instantiate an abstract pattern *)
 
-let rec instantiate_pterm ~map pterm = match pterm with
+let rec instantiate_pterm ~map pterm =
+  (* lookup the concrete symbol for this pattern symbol *)
+  let get_symbol ~map f =
+    try Ptmap.find f map.m_symbol
+    with Not_found ->
+      (Format.eprintf "could not find f%d@." f; assert false)
+  in
+  match pterm with
   | PVar (i, s) ->
     (* we may keep the variable unbounded, in which case it is preserved *)
     let i' = try Ptmap.find i map.m_var with Not_found -> i in
-    let s' = Ptmap.find s map.m_symbol in
+    let s' = get_symbol ~map s in
     T.mk_var i' s'
   | PNode (f, s, l) ->
-    let f' = Ptmap.find f map.m_symbol in
-    let s' = Ptmap.find s map.m_symbol in
+    let f' = get_symbol ~map f in
+    let s' = get_symbol ~map s in
     let l' = List.map (instantiate_pterm ~map) l in
     T.mk_node f' s' l'
 
@@ -369,6 +379,7 @@ let match_pclause ?map pclause hc =
           let maps = match_plit ~map plits.(i) lits.(j) in
           List.iter (fun map -> all_matches acc plits lits map (i+1) bv) maps
       done
+    else acc := map :: !acc
   in
   if List.length pclause.pc_lits <> Array.length hc.hclits
     then []  (* no matching if lengths are different *)
@@ -390,11 +401,14 @@ let pp_symb formatter s = if s < Array.length special_symbols
   else Format.fprintf formatter "f%d" (s - symbol_offset)
 
 let rec pp_pterm formatter t =
+  let pp_sort formatter s =
+    if s >= symbol_offset then Format.fprintf formatter ":%a" pp_symb s else ()
+  in
   match t with
-  | PVar (i, s) -> Format.fprintf formatter "X%d:%a" i pp_symb s
-  | PNode (f, s, []) -> Format.fprintf formatter "%a:%a" pp_symb f pp_symb s
+  | PVar (i, s) -> Format.fprintf formatter "X%d%a" i pp_sort s
+  | PNode (f, s, []) -> Format.fprintf formatter "%a%a" pp_symb f pp_sort s
   | PNode (f, s, l) ->
-    Format.fprintf formatter "%a:%a(%a)" pp_symb f pp_symb s
+    Format.fprintf formatter "%a%a(%a)" pp_symb f pp_sort s
       (Utils.pp_list ~sep:", " pp_pterm) l
 
 let pp_pclause formatter pclause =
@@ -415,12 +429,10 @@ let pp_pclause formatter pclause =
 
 let pp_mapping formatter mapping =
   (* only print symbol binding *)
-  Format.fprintf formatter "@[<hov>";
   Ptmap.iter
-    (fun s symbol -> Format.fprintf formatter "%a -> %s@;" pp_symb s
-      (name_symbol symbol))
-    mapping.m_symbol;
-  Format.fprintf formatter "@]"
+    (fun s symbol -> if s >= symbol_offset
+      then Format.fprintf formatter "%a -> %s@;" pp_symb s (name_symbol symbol))
+    mapping.m_symbol
 
 (* ----------------------------------------------------------------------
  * map from patterns to data, with matching of clauses
@@ -474,7 +486,7 @@ module Map =
         PMap.fold
           (fun pc value acc ->
             (* match the pclause with the given hclause *)
-            Utils.debug 1 (lazy (Utils.sprintf "@[<h>match %a with %a@]"
+            Utils.debug 3 (lazy (Utils.sprintf "%% @[<h>match %a with %a@]"
                           !C.pp_clause#pp_h hc pp_pclause pc));
             let mappings = match_pclause pc hc in
             List.fold_left
