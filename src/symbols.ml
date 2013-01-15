@@ -124,6 +124,9 @@ let base_signature =
     (fun signature (symb,sort,arity) -> SMap.add symb (arity, sort) signature)
     empty_signature table
 
+(** Set of base symbols *)
+let base_symbols = List.fold_left (fun set (s, _, _) -> SSet.add s set) SSet.empty table
+
 (** extract the list of symbols from the complete signature *)
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []

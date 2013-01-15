@@ -89,6 +89,9 @@ val univ_sort : sort
 val base_signature : signature
   (** the signature composed of predefined symbols *)
 
+val base_symbols : SSet.t
+  (** Set of base symbols *)
+
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
 
