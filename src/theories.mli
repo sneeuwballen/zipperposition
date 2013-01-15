@@ -78,7 +78,7 @@ type atom_name = string
 
 val string_of_name : atom_name -> string
 
-type atom = atom_name * [`Var of int | `Symbol of string] list
+type atom = atom_name * [`Var of int | `Symbol of symbol] list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
@@ -127,13 +127,15 @@ val pp_kb : Format.formatter -> kb -> unit
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
-  meta_ord : ordering;
   mutable meta_lemmas : hclause list;
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
 
 val create_meta : ord:ordering -> kb -> meta_prover
   (** Create a meta_prover, using a knowledge base *)
+
+val meta_update_ord : ord:ordering -> meta_prover -> unit
+  (** Update the ordering used by the meta-prover *)
 
 val scan_clause : meta_prover -> hclause -> hclause list
   (** Scan the given clause to recognize if it matches axioms from the KB;

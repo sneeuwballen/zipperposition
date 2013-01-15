@@ -204,12 +204,12 @@ let detect_total_relations ~ord clauses =
 
 type atom_name = string
   (** The name of a formula. If a formula is part of a known axiomatisation
-      it can have a specific name, otherwise just "lemmaX" with X a number
+      it can have a specific name, otherwise just "lemma_X" with X a number
       (e.g. f(X,Y)=f(Y,X) is named "commutativity") *)
 
 let string_of_name name = name
 
-type atom = atom_name * int list
+type atom = atom_name * [`Var of int | `Symbol of symbol] list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
@@ -263,8 +263,12 @@ let add_potential_lemmas kb pot_lemmas =
   kb.kb_potential_lemmas <- kb_potential_lemmas
 
 let pp_atom formatter (name, args) =
+  let pp_variant formatter = function
+    | `Var x -> Format.fprintf formatter "X%d" (-x)
+    | `Symbol s -> !T.pp_symbol#pp formatter s
+  in
   Format.fprintf formatter "@[<h>%s(%a)@]"
-    name (Utils.pp_list Patterns.pp_symb) args
+    name (Utils.pp_list pp_variant) args
 
 let pp_named_formula formatter nf =
   Format.fprintf formatter "@[<h>%a == %a@]"
@@ -298,7 +302,6 @@ let pp_kb formatter kb =
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
-  meta_ord : ordering;
   mutable meta_lemmas : hclause list;
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
@@ -326,10 +329,13 @@ let lemma_handler ~ord meta term =
   let lemma_args = snd lemma.lemma_atom in
   assert (List.length lemma_args = List.length term_args);
   let mapping = List.fold_left2
-    (fun mapping v symbol -> Patterns.bind_symbol mapping v
-      (mk_symbol (Datalog.Symbols.get_symbol symbol)))
+    (fun mapping v symbol ->
+      let symbol = mk_symbol (Datalog.Symbols.get_symbol symbol) in
+      match v with
+      | `Var i -> Patterns.bind_symbol mapping (-i) symbol
+      | `Symbol s -> (assert (s == symbol); mapping))
     mapping lemma_args term_args in
-  Utils.debug 1 (lazy (Utils.sprintf "%% instantiate lemma %a with mapping %a"
+  Utils.debug 0 (lazy (Utils.sprintf "%% instantiate lemma %a with mapping %a"
                  pp_atom lemma.lemma_atom Patterns.pp_mapping mapping));
   (* instantiate the premises and conclusion of the lemma *)
   let parents = List.map
@@ -347,7 +353,12 @@ let lemma_handler ~ord meta term =
   meta.meta_lemmas <- conclusion :: meta.meta_lemmas
 
 let atom_to_term (head, args) =
-  let args = List.map (fun i -> if i < 0 then `Var i else `Symbol i) args in
+  let args = List.map
+    (function
+     | `Var i -> `Var i
+     | `Symbol s -> `Symbol (name_symbol s))
+    args
+  in
   Datalog.Logic.mk_term head args
 
 (** Add a lemma to the Datalog engine *)
@@ -387,7 +398,6 @@ let create_meta ~ord kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
-    meta_ord = ord;
     meta_lemmas = [];
   } in
   (* set lemma handler, that captures newly discovered lemma *)
@@ -399,6 +409,11 @@ let create_meta ~ord kb =
   Hashtbl.iter (fun _ theory -> db_add_theory meta.meta_db theory) meta.meta_kb.kb_theories; 
   (* return the meta-prover *)
   meta
+
+(** Update the ordering used by the meta-prover *)
+let meta_update_ord ~ord meta =
+  let lemma_symbol = Datalog.Symbols.mk_symbol "lemma" in
+  Datalog.Logic.db_subscribe meta.meta_db lemma_symbol (lemma_handler ~ord meta)
 
 (** Scan the given clause to recognize if it matches axioms from the KB;
     if it does, return the lemma that are newly discovered by the Datalog engine.
@@ -415,11 +430,13 @@ let scan_clause meta hc =
          predicate *)
       let head, args = nf.nf_atom in
       let args = List.map
-        (fun s -> `Symbol (name_symbol (Ptmap.find s mapping.Patterns.m_symbol)))
+        (function
+         | `Var i -> `Symbol (name_symbol (Ptmap.find (-i) mapping.Patterns.m_symbol))
+         | `Symbol s -> `Symbol (name_symbol s))
         args in
       let term = Datalog.Logic.mk_term head args in
       let rule = Datalog.Logic.mk_rule term [] in
-      Utils.debug 1 (lazy (Utils.sprintf "%% detected formula %a in problem"
+      Utils.debug 0 (lazy (Utils.sprintf "%% detected formula %a in problem"
                      (Datalog.Logic.pp_rule ?to_s:None) rule));
       (* add fact *)
       Datalog.Logic.db_add meta.meta_db rule);
@@ -446,10 +463,9 @@ let add_lemmas kb lemmas =
   List.iter
     (fun lemma ->
       match lemma.lemma_atom with
-      | "lemma", name::_ when name > 0 ->
-        let name = Datalog.Symbol.get_symbol name in
-        Hashtbl.replace kb.kb_lemmas name lemma
-      | _, [] -> failwith "try to add an invalid lemma")
+      | "lemma", (`Symbol name)::_ ->
+        Hashtbl.replace kb.kb_lemmas (name_symbol name) lemma
+      | _ -> failwith "try to add an invalid lemma")
     lemmas
 
 (** Add builtin lemma, axioms, theories to the KB *)
@@ -462,11 +478,11 @@ let add_builtin ~ord kb =
       Simple.Axiom ("builtin", name) in
     let hc = C.from_simple ?ord:None simple in
     let pc = Patterns.pclause_of_clause hc in
-    Utils.debug 2 (lazy (Utils.sprintf "%% axiom %s has pattern @[<h>%a@]"
-                   name Patterns.pp_pclause pc));
-    { nf_name = name;
+    let atom = name, List.map (fun v -> `Var (-v)) (Patterns.pclause_symbols pc) in
+    Utils.debug 2 (lazy (Utils.sprintf "%% axiom %a has pattern @[<h>%a@]"
+                   pp_atom atom Patterns.pp_pclause pc));
+    { nf_atom = atom;
       nf_pclause = pc;
-      nf_vars = Patterns.pclause_symbols pc;
     }
   in
   let assoc = from_str ~ord "associative" "f(X,f(Y,Z)) = f(f(X,Y),Z)"
@@ -479,10 +495,9 @@ let add_builtin ~ord kb =
   add_named kb [assoc; commut; functional; total; functional_total];
   (* add the functional total lemma *)
   let lemma = {
-    lemma_name = "functional_total";
-    lemma_conclusion = functional_total;
-    lemma_premises = [functional; total];
-    lemma_vars = Patterns.pclause_symbols functional_total.nf_pclause;
+    lemma_atom = "lemma", [`Symbol (mk_symbol "functional_total"); `Var (-1); `Var (-2)];
+    lemma_conclusion = "functional_total3", [`Var (-1); `Var (-2)];
+    lemma_premises = ["functional3", [`Var (-1)]; "total3", [`Var (-1); `Var (-2)]];
   } in
   add_lemmas kb [lemma]
 

@@ -172,15 +172,6 @@ let compute_ord ~params clauses =
   in
   params.param_ord so
 
-(* TODO remove
-(** Enrichment of the initial set of clauses by detecting some theories *)
-let enrich_with_theories ~ord ~params clauses =
-  if params.param_theories then
-    let axioms = Theories.detect_total_relations ~ord clauses in
-    List.rev_append axioms clauses
-  else clauses
-*)
-
 (** Initialize the meta-prover *)
 let mk_meta ~ord params =
   if params.param_theories then
@@ -194,6 +185,17 @@ let mk_meta ~ord params =
     Format.printf "%% initial kb: %a@." Theories.pp_kb kb;
     Some meta
   else None
+
+(** Enrichment of the initial set of clauses by detecting some theories *)
+let enrich_with_theories ~ord meta clauses =
+  match meta with
+  | None -> clauses
+  | Some meta ->
+    List.fold_left
+      (fun acc hc ->
+        let lemmas = Theories.scan_clause meta hc in
+        List.rev_append lemmas acc)
+      clauses clauses
 
 (** Process the given file (try to solve it) *)
 let process_file params f =
@@ -218,12 +220,12 @@ let process_file params f =
   let clauses = calculus#preprocess ~ord:d_ord ~select:no_select clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
-  (* TODO remove
-  (* XXX detect some axioms *)
-  let clauses = enrich_with_theories ~ord:d_ord ~params clauses in
-  *)
+  (* meta-prover *)
+  let meta = mk_meta ~ord:d_ord params in
+  let clauses = enrich_with_theories ~ord:d_ord meta clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
+  (match meta with | None -> () | Some meta -> Theories.meta_update_ord ~ord meta);
   Format.printf "%% precedence: %a@." T.pp_precedence ord#precedence#snapshot;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
@@ -232,8 +234,6 @@ let process_file params f =
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ord ~select clauses in
-  (* meta-prover *)
-  let meta = mk_meta ~ord params in
   (* create state, and add clauses to the simpl_set *)
   let signature = C.signature clauses in
   let state = PS.mk_state ~ord ?meta params signature in
