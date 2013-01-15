@@ -474,6 +474,8 @@ module Map =
         PMap.fold
           (fun pc value acc ->
             (* match the pclause with the given hclause *)
+            Utils.debug 1 (lazy (Utils.sprintf "@[<h>match %a with %a@]"
+                          !C.pp_clause#pp_h hc pp_pclause pc));
             let mappings = match_pclause pc hc in
             List.fold_left
               (fun acc mapping -> k acc pc mapping value)

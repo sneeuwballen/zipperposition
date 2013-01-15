@@ -127,6 +127,7 @@ val pp_kb : Format.formatter -> kb -> unit
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
+  mutable meta_ord : ordering;
   mutable meta_lemmas : hclause list;
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)

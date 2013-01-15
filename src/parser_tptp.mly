@@ -596,8 +596,7 @@ atomic_word:
 
 atomic_system_word:
   | DOLLAR_DOLLAR_WORD
-      { print_endline ("Parser_tptp: <$$word> not supported: " ^ $1);
-        raise Const.PARSE_ERROR  }
+      { $1 }
 
 number:
   | REAL

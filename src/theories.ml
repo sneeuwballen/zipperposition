@@ -302,6 +302,7 @@ let pp_kb formatter kb =
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
+  mutable meta_ord : ordering;
   mutable meta_lemmas : hclause list;
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
@@ -313,9 +314,10 @@ let get_kb_formula kb name =
 (** When a lemma is discovered, this translates it into a hclause and
     adds it to the list of lemmas. The [term] is a datalog term whose head
     symbol is "lemma". *)
-let lemma_handler ~ord meta term =
+let lemma_handler meta term =
   assert (Array.length term >= 2);
   assert (Datalog.Symbols.get_symbol term.(0) = "lemma");
+  let ord = meta.meta_ord in
   (* extract the name of the lemma, and the list of symbols *)
   let lemma_name = Datalog.Symbols.get_symbol term.(1) in
   (* find the definition of the lemma *)
@@ -398,11 +400,12 @@ let create_meta ~ord kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
+    meta_ord = ord;
     meta_lemmas = [];
   } in
   (* set lemma handler, that captures newly discovered lemma *)
   let lemma_symbol = Datalog.Symbols.mk_symbol "lemma" in
-  Datalog.Logic.db_subscribe meta.meta_db lemma_symbol (lemma_handler ~ord meta);
+  Datalog.Logic.db_subscribe meta.meta_db lemma_symbol (lemma_handler meta);
   (* add definitions of lemma *) 
   Hashtbl.iter (fun _ lemma -> db_add_lemma meta.meta_db lemma) meta.meta_kb.kb_lemmas;
   (* add definitions of theories *)
@@ -412,8 +415,7 @@ let create_meta ~ord kb =
 
 (** Update the ordering used by the meta-prover *)
 let meta_update_ord ~ord meta =
-  let lemma_symbol = Datalog.Symbols.mk_symbol "lemma" in
-  Datalog.Logic.db_subscribe meta.meta_db lemma_symbol (lemma_handler ~ord meta)
+  meta.meta_ord <- ord
 
 (** Scan the given clause to recognize if it matches axioms from the KB;
     if it does, return the lemma that are newly discovered by the Datalog engine.
@@ -485,11 +487,11 @@ let add_builtin ~ord kb =
       nf_pclause = pc;
     }
   in
-  let assoc = from_str ~ord "associative" "f(X,f(Y,Z)) = f(f(X,Y),Z)"
-  and commut = from_str ~ord "commutative" "f(X,Y) = f(Y,X)"
-  and functional = from_str ~ord "functional3" "~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2"
-  and total = from_str ~ord "total3" "p(X,Y,f(X,Y))"
-  and functional_total = from_str ~ord "total_function3" "p(X,Y,Z) <=> f(X,Y)=Z"
+  let assoc = from_str ~ord "associative" "$$f(X,$$f(Y,Z)) = $$f($$f(X,Y),Z)"
+  and commut = from_str ~ord "commutative" "$$f(X,Y) = $$f(Y,X)"
+  and functional = from_str ~ord "functional3" "~$$p(X,Y,Z) | ~$$p(X,Y,Z2) | Z=Z2"
+  and total = from_str ~ord "total3" "$$p(X,Y,$$f(X,Y))"
+  and functional_total = from_str ~ord "total_function3" "$$p(X,Y,Z) <=> ($$f(X,Y)=Z)"
   in
   (* add named formulas *)
   add_named kb [assoc; commut; functional; total; functional_total];
