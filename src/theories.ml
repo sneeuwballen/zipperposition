@@ -129,6 +129,8 @@ let pp_kb formatter kb =
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
+  mutable meta_theory_symbols : SSet.t;
+  mutable meta_theory_clauses : C.CSet.t;
   mutable meta_ord : ordering;
   mutable meta_lemmas : hclause list;
 } (** The main type used to reason over the current proof, detecting axioms
@@ -190,8 +192,29 @@ let handle_formula meta term =
 
 (** Handler triggered when a theory is discovered in the current problem *)
 let handle_theory meta term =
+  let ord = meta.meta_ord in
+  let kb = meta.meta_kb in
   Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: theory @[<h>%a@]"
                  (Datalog.Logic.pp_term ?to_s:None) term));
+  (* the clauses that belong to this theory *)
+  let premises = Datalog.Logic.db_premises meta.meta_db term in
+  let premise_clauses = List.map
+    (fun term -> term_to_hclause ~ord ~kb term (Axiom ("kb","kb")) [])
+    premises in
+  (* add the premises of the clause to the set of theory clauses *)
+  List.iter
+    (fun hc ->
+      meta.meta_theory_clauses <- C.CSet.add meta.meta_theory_clauses hc)
+    premise_clauses;
+  (* add the symbols in those clauses to the set of theory symbols *)
+  let signature = C.signature premise_clauses in
+  let symbols = symbols_of_signature signature in
+  meta.meta_theory_symbols <-
+    List.fold_left
+      (fun set s ->
+        (* add the symbol to the theory symbols if it's not a base symbol *)
+        if not (SSet.mem s base_symbols) then SSet.add s set else set)
+      meta.meta_theory_symbols symbols;
   ()
 
 (** Convert an atom to a Datalog term *)
@@ -224,6 +247,8 @@ let create_meta ~ord kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
+    meta_theory_symbols = SSet.empty;
+    meta_theory_clauses = C.CSet.empty;
     meta_ord = ord;
     meta_lemmas = [];
   } in
