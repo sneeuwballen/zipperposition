@@ -82,6 +82,13 @@ val add_potential_lemmas : kb -> lemma list -> unit
   (** Add a potential lemma to the KB. The lemma must be checked before
       it is used. *)
 
+val add_named : kb -> named_formula list -> unit
+val add_lemmas : kb -> lemma list -> unit
+val add_theories : kb -> theory list -> unit
+
+val pp_lemma : Format.formatter -> lemma -> unit
+val pp_theory : Format.formatter -> theory -> unit
+
 val pp_kb : Format.formatter -> kb -> unit
   (** Pretty print content of KB *)
 
@@ -122,27 +129,6 @@ val add_builtin : ord:ordering -> kb -> unit
 
 val parse_theory_file : string -> kb -> unit
   (** Add theories and named formulas from file to the KB *)
-
-(* ----------------------------------------------------------------------
- * (heuristic) search of "interesting" lemma in a proof.
- * ---------------------------------------------------------------------- *)
-
-val rate_pclause : Patterns.pclause -> float
-  (** Heuristic "simplicity and elegance" measure for pclauses. The smaller,
-      the better. *)
-
-val rate_clause : is_theory_symbol:(symbol -> bool) -> hclause -> float
-  (** Heuristic "simplicity and elegance" measure for clauses in a proof. Theory
-      symbols are less 'costly' than other symbols, as are constants.
-      The smaller the result, the better. *)
-
-val search_lemmas : meta_prover -> hclause -> lemma list
-  (** given an empty clause (and its proof), look in the proof for lemmas. *)
-
-val learn_and_update : meta_prover -> hclause -> unit
-  (** Update the KB of this meta-prover by learning from
-      the given (empty) clause's proof. The KB is modified
-      in place. *)
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures

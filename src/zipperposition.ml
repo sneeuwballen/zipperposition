@@ -291,7 +291,7 @@ let process_file params f =
         Theories.update_kb ~file:params.param_kb ~lock:kb_lock
           (fun kb ->
             let new_meta = { meta with Theories.meta_kb=kb; } in
-            Theories.learn_and_update new_meta c;
+            LemmaLearning.learn_and_update new_meta c;
             kb)
       end
     end
