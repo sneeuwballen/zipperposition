@@ -36,7 +36,7 @@ val rate_clause : is_theory_symbol:(symbol -> bool) -> hclause -> float
       symbols are less 'costly' than other symbols, as are constants.
       The smaller the result, the better. *)
 
-val search_lemmas : Theories.meta_prover -> hclause -> Theories.lemma list
+val search_lemmas : Theories.meta_prover -> hclause -> (Theories.lemma * float) list
   (** Given an empty clause (and its proof), look in the proof for lemmas. *)
 
 val learn_and_update : Theories.meta_prover -> hclause -> unit

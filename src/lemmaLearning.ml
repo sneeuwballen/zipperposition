@@ -98,7 +98,7 @@ let proof_depth hc =
 let max_lemmas = ref 3
 
 (** Maximum lemma rate, above which the lemma is discarded *)
-let max_rate = ref 500.
+let max_rate = ref 100.
 
 (** A possible lemma, i.e. a subgraph *)
 type candidate_lemma = {
@@ -276,9 +276,7 @@ let search_lemmas meta hc =
   let lemmas = List.map
     (fun candidate ->
       let lemma = candidate_to_lemma meta.meta_kb candidate in
-      Utils.debug 1 (lazy (Utils.sprintf "%%   keep @[<h>%a with rate %.2f@]"
-                     pp_lemma lemma candidate.cl_rate));
-      lemma)
+      lemma, candidate.cl_rate)
     candidates
   in
   lemmas
@@ -296,9 +294,12 @@ let learn_and_update meta hc =
     (* this proof is not known yet, learn from it *)
     kb.kb_proofs <- ProofHashSet.add h kb.kb_proofs;
     let lemmas = search_lemmas meta hc in
-    List.iter
-      (fun lemma -> Format.printf "%%   learn @[<h>%a@]@." pp_lemma lemma)
-      lemmas;
+    let lemmas = List.map
+      (fun (lemma, rate) ->
+        Format.printf "%%   learn @[<h>%a@], rated %.2f@." pp_lemma lemma rate;
+        lemma)
+      lemmas
+    in
     (* store new lemmas *)
     add_lemmas kb lemmas
   end
