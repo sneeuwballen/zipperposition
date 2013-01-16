@@ -666,6 +666,7 @@ theory_named_formula:
       let pc = {pc with pc_vars = atom_args; } in
       let nf = { nf_pclause = pc; nf_atom = atom; } in
       (* ready for next thing to parse *)
+      SHashtbl.clear sort_table;
       nf
     }
 
