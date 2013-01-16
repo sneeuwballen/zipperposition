@@ -128,11 +128,10 @@ val scan_clause : meta_prover -> hclause -> hclause list
  * Some builtin theories, axioms and lemma
  * ---------------------------------------------------------------------- *)
 
-val add_builtin : ord:ordering -> kb -> unit
-  (** Add builtin lemma, axioms, theories to the KB *)
+type disjunction = Lemma of lemma | Theory of theory | Named of named_formula
 
-val parse_theory_file : string -> kb -> unit
-  (** Add theories and named formulas from file to the KB *)
+val load_theory : kb -> disjunction list -> unit
+  (** Add parsed content to the KB *)
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
@@ -144,9 +143,9 @@ val read_kb : lock:string -> file:string -> kb
 val save_kb : lock:string -> file:string -> kb -> unit
   (** save the KB to the file *)
 
-val update_kb : lock:string -> file:string -> (kb -> kb) -> unit
+val update_kb : lock:string -> file:string -> (kb -> kb) -> kb
   (** updates the KB located in given file (with given lock file),
-      with the function *)
+      with the function. It returns the updated kb. *)
 
 val clear_kb : lock:string -> file:string -> unit
   (** Erase the content of the KB (remove the file) *)

@@ -128,16 +128,14 @@ let next_name ~prefix kb =
 let pp_atom formatter (name, args) =
   let pp_arg formatter = function
     | i when i < 0 -> Format.fprintf formatter "X%d" (-i)
-    | i ->
-      let symbol = mk_symbol (Datalog.Symbols.get_symbol i) in
-      !T.pp_symbol#pp formatter symbol
+    | i -> Patterns.pp_symb formatter i
   in
   Format.fprintf formatter "@[<h>%s(%a)@]"
     name (Utils.pp_list pp_arg) args
 
 let pp_named_formula formatter nf =
-  Format.fprintf formatter "@[<h>%s == %a@]"
-    (fst nf.nf_atom) Patterns.pp_pclause nf.nf_pclause
+  Format.fprintf formatter "@[<h>%a == %a@]"
+    pp_atom nf.nf_atom Patterns.pp_pclause nf.nf_pclause
 
 let pp_theory formatter theory =
   Format.fprintf formatter "theory %a: %a"
@@ -391,7 +389,7 @@ let scan_clause meta hc =
       let rule = Datalog.Logic.mk_rule term [] in
       if not (Datalog.Logic.db_mem meta.meta_db rule) then begin
         (* add fact if not already present *)
-        Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
+        Utils.debug 1 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
                        (Datalog.Logic.pp_rule ?to_s:None) rule pp_named_formula nf));
         Datalog.Logic.db_add meta.meta_db rule
       end);
@@ -404,46 +402,16 @@ let scan_clause meta hc =
  * Some builtin theories, axioms and lemma
  * ---------------------------------------------------------------------- *)
 
-(** Add builtin lemma, axioms, theories to the KB *)
-let add_builtin ~ord kb =
-  (* From a string, extract a pclause *)
-  let from_str ~ord name s =
-    let simple = Parser_tptp.parse_clause Lexer_tptp.token (Lexing.from_string s) in
-    let ord = Orderings.default_ordering (Simple.signature [simple]) in
-    let hc = C.from_simple ~ord (simple, Simple.Axiom ("builtin", name)) in
-    let pc = Patterns.pclause_of_clause hc in
-    let atom = name, pc.Patterns.pc_vars in
-    Utils.debug 2 (lazy (Utils.sprintf "%% axiom %s has pattern @[<h>%a@]"
-                   name Patterns.pp_pclause pc));
-    { nf_atom = atom; nf_pclause = pc; }
-  in
-  let assoc = from_str ~ord "associative" "$$f(X,$$f(Y,Z)) = $$f($$f(X,Y),Z)"
-  and commut = from_str ~ord "commutative" "$$f(X,Y) = $$f(Y,X)"
-  and functional = from_str ~ord "functional3" "~$$p(X,Y,Z) | ~$$p(X,Y,Z2) | Z=Z2"
-  and total = from_str ~ord "total3" "$$p(X,Y,$$f(X,Y))"
-  and functional_total = from_str ~ord "total_function3" "$$p(X,Y,Z) <=> ($$f(X,Y)=Z)"
-  in
-  (* add named formulas *)
-  add_named kb [assoc; commut; functional; total; functional_total];
-  (* add the functional total lemma *)
-  let mk_var i = -1-i in
-  let lemma = {
-    lemma_conclusion = "total_function3", [mk_var 1; mk_var 0;];
-    lemma_premises = ["functional3", [mk_var 0]; "total3", [mk_var 0; mk_var 1]];
-  } in
-  add_lemmas kb [lemma];
-  (* add the AC theory *)
-  let th = {
-    th_atom = "ac", [mk_var 0];
-    th_definition = ["associative", [mk_var 0]; "commutative", [mk_var 0]];
-  } in
-  add_theories kb [th];
-  ()
+type disjunction = Lemma of lemma | Theory of theory | Named of named_formula
 
 (** Add theories and named formulas from file to the KB *)
-let parse_theory_file filename kb =
-  Format.printf "%% load theory file %s@." filename;
-  ()  (* TODO *)
+let load_theory kb disjunctions =
+  List.iter
+    (function
+     | Lemma lemma -> add_lemmas kb [lemma]
+     | Theory th -> add_theories kb [th]
+     | Named n -> add_named kb [n])
+    disjunctions
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
@@ -478,7 +446,7 @@ let save_kb ~lock ~file kb =
 
 let update_kb ~lock ~file f =
   Format.printf "%% update knowledge base...@.";
-  Utils.with_lock_file lock
+  let kb = Utils.with_lock_file lock
     (fun () ->
     let kb = read_kb_nolock file in
     (* tranform kb with function *)
@@ -488,8 +456,11 @@ let update_kb ~lock ~file f =
     let out = Unix.out_channel_of_descr out in
     Marshal.to_channel out kb [];
     flush out;
-    close_out out);
-  Format.printf "%% ... done@."
+    close_out out;
+    kb)
+  in
+  Format.printf "%% ... done@.";
+  kb
 
 let clear_kb ~lock ~file =
   Utils.with_lock_file lock

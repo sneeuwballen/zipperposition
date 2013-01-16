@@ -174,21 +174,37 @@ let compute_ord ~params clauses =
   in
   params.param_ord so
 
-(** Initialize the meta-prover *)
-let mk_meta ~ord params =
-  if params.param_theories then
-    (* parse KB *)
-    let kb_lock = lock_file params.param_kb in
-    let kb = Theories.read_kb ~file:params.param_kb ~lock:kb_lock in
-    (* load required files *)
-    List.iter
-      (fun f -> Theories.parse_theory_file f kb)
-      params.param_kb_load;
-    (* Theories.add_builtin ~ord kb;*)
+(** Parse the theory file and add its content to the KB *)
+let parse_theory_file kb file =
+  Format.printf "%% read content of %s into the Knowledge Base@." file;
+  let input = open_in file in
+  let lexbuf = Lexing.from_channel input in
+  (* parse content *)
+  let disjunctions = Parser_tptp.parse_theory_file Lexer_tptp.token lexbuf in
+  (* load content *)
+  Theories.load_theory kb disjunctions;
+  close_in input
 
+(** Parses and populates the initial Knowledge Base *)
+let initial_kb params =
+  (* parse KB and update it*)
+  let kb_lock = lock_file params.param_kb in
+  let kb = Theories.update_kb ~file:params.param_kb ~lock:kb_lock
+    (fun kb ->
+      (* load required files *)
+      List.iter
+        (fun f -> parse_theory_file kb f)
+        params.param_kb_load;
+      kb)
+  in
+  Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
+  kb
+
+(** Initialize the meta-prover *)
+let mk_meta ~ord ~kb params =
+  if params.param_theories then
     (* create meta *)
     let meta = Theories.create_meta ~ord kb in
-    Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
     Some meta
   else None
 
@@ -204,7 +220,7 @@ let enrich_with_theories ~ord meta clauses =
       clauses clauses
 
 (** Process the given file (try to solve it) *)
-let process_file params f =
+let process_file ~kb params f =
   Format.printf "%% *** process file %s ***@." f;
   let steps = if params.param_steps = 0
     then None else (Format.printf "%% run for %d steps@." params.param_steps;
@@ -227,7 +243,7 @@ let process_file params f =
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* meta-prover *)
-  let meta = mk_meta ~ord:d_ord params in
+  let meta = mk_meta ~ord:d_ord ~kb params in
   let clauses = enrich_with_theories ~ord:d_ord meta clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
@@ -293,20 +309,21 @@ let process_file params f =
       | None -> ()
       | Some meta -> begin
         let kb_lock = lock_file params.param_kb in
-        Theories.update_kb ~file:params.param_kb ~lock:kb_lock
+        ignore (Theories.update_kb ~file:params.param_kb ~lock:kb_lock
           (fun kb ->
             let new_meta = { meta with Theories.meta_kb=kb; } in
             LemmaLearning.learn_and_update new_meta c;
-            kb)
+            kb));
+        ()
       end
     end
 
-let print_kb params =
-  let kb_lock = lock_file params.param_kb in
-  let kb = Theories.read_kb ~lock:kb_lock ~file:params.param_kb in
+(** Print the content of the KB, and exit *)
+let print_kb ~kb =
   Format.printf "%a@." Theories.pp_kb kb;
   exit 0
 
+(** Clear the Knowledge Base and exit *)
 let clear_kb params =
   let kb_lock = lock_file params.param_kb in
   Theories.clear_kb ~lock:kb_lock ~file:params.param_kb;
@@ -318,7 +335,8 @@ let () =
   Random.init params.param_seed;
   print_version params;
   (* operations on knowledge base *)
-  (if params.param_kb_print then print_kb params);
+  let kb = initial_kb params in
+  (if params.param_kb_print then print_kb ~kb);
   (if params.param_kb_clear then clear_kb params);
   (* setup printing *)
   setup_output params;
@@ -331,7 +349,7 @@ let () =
     Distributed.assume_role ~calculus ~ord ~select role
   | None ->
     (* master process: process files *)
-    List.iter (process_file params) params.param_files
+    List.iter (process_file ~kb params) params.param_files
 
 let _ =
   at_exit (fun () -> 
