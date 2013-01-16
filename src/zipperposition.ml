@@ -178,7 +178,8 @@ let mk_meta ~ord params =
     (* parse KB *)
     let kb_lock = params.param_kb ^ ".lock" in
     let kb = Theories.read_kb ~file:params.param_kb ~lock:kb_lock in
-    (* add builtin *)
+    (* add builtin (TODO better to read them from a file?
+       or initialize explicitely by CLI like  -read-theories some_file) *)
     Theories.add_builtin ~ord kb;
     (* create meta *)
     let meta = Theories.create_meta ~ord kb in
@@ -283,10 +284,16 @@ let process_file params f =
         then Format.printf ("@.# SZS output start Refutation@.@[<v>%a@]@." ^^
                           "# SZS output end Refutation@.") !C.pp_proof#pp c);
       (* update knowledge base *)
-      let potential_lemmas = Theories.search_lemmas c in
-      let kb_lock = params.param_kb ^ ".lock" in
-      Theories.update_kb ~file:params.param_kb ~lock:kb_lock
-        (fun kb -> Theories.add_potential_lemmas kb potential_lemmas; kb)
+      match meta with
+      | None -> ()
+      | Some meta -> begin
+        let kb_lock = params.param_kb ^ ".lock" in
+        Theories.update_kb ~file:params.param_kb ~lock:kb_lock
+          (fun kb ->
+            let new_meta = { meta with Theories.meta_kb=kb; } in
+            Theories.learn_and_update new_meta c;
+            kb)
+      end
     end
 
 let () =

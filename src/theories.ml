@@ -29,7 +29,44 @@ module S = FoSubst
 module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
- * generic representation of theories and formulas (persistent)
+ * recognition of proof
+ * ---------------------------------------------------------------------- *)
+
+type proof_hash = Int64.t
+
+(** Get a (probably) unique hash for this proof *)
+let hash_proof hc =
+  assert (hc.hclits = [||]);
+  let explored = ref C.CSet.empty in
+  let h = ref 23029L in
+  let counter = ref 17L in   (* a counter of traversal in the DAG, with offset *)
+  (* recurse in the DAG *)
+  let rec explore hc =
+    if C.CSet.mem !explored hc
+    then ()
+    else begin
+      explored := C.CSet.add !explored hc;
+      (* combine hash with the clause's hash *)
+      let h_clause = Int64.of_int (C.hash_hclause hc) in
+      h := Int64.add !h (Int64.mul !counter  h_clause);
+      counter := Int64.succ !counter;
+      match hc.hcproof with
+      | Axiom _ -> ()
+      | Proof (kind, l) ->
+        (* explore parents of the clause; first hash the inference kind *)
+        let h_kind = Int64.of_int (Hashtbl.hash kind) in
+        h := Int64.add !h (Int64.mul 22571L h_kind);
+        List.iter (fun (c, _, _) -> explore c.cref) l
+    end
+  in
+  explore hc;
+  !h
+
+module ProofHashSet = Set.Make(struct type t = proof_hash let compare = Int64.compare end) 
+  (** Set of proof hashes *)
+
+(* ----------------------------------------------------------------------
+ * generic representation of theories and lemmas (persistent)
  * ---------------------------------------------------------------------- *)
 
 type atom_name = string
@@ -65,6 +102,7 @@ type kb = {
   kb_formulas : (atom_name, named_formula) Hashtbl.t; (** formulas, by name *)
   kb_theories : (atom_name, theory) Hashtbl.t;        (** theories, by name *)
   mutable kb_lemmas : lemma list;                     (** list of lemmas *)
+  mutable kb_proofs : ProofHashSet.t;                 (** proofs already met *)
 } (** a Knowledge Base for lemma and theories *)
   
 (** Create an empty Knowledge Base *)
@@ -75,6 +113,7 @@ let empty_kb () = {
   kb_formulas = Hashtbl.create 5;
   kb_theories = Hashtbl.create 3;
   kb_lemmas = [];
+  kb_proofs = ProofHashSet.empty;
 }
 
 (** Add a potential lemma to the KB. The lemma must be checked before
@@ -101,19 +140,25 @@ let pp_named_formula formatter nf =
   Format.fprintf formatter "@[<h>%s == %a@]"
     (fst nf.nf_atom) Patterns.pp_pclause nf.nf_pclause
 
+let pp_theory formatter theory =
+  Format.fprintf formatter "theory %a: %a"
+    pp_atom theory.th_atom (Utils.pp_list pp_atom) theory.th_definition
+
+let pp_lemma formatter lemma =
+  Format.fprintf formatter "lemma:@ %a :-@ %a"
+    pp_atom lemma.lemma_conclusion
+    (Utils.pp_list pp_atom) lemma.lemma_premises
+
 (** Pretty print content of KB *)
 let pp_kb formatter kb =
   Format.fprintf formatter "@[<v>kb:@;";
   (* print theories *)
   Hashtbl.iter 
-    (fun _ th -> Format.fprintf formatter "  @[<h>theory %a: %a@]@;"
-      pp_atom th.th_atom (Utils.pp_list pp_atom) th.th_definition)
+    (fun _ th -> Format.fprintf formatter "  @[<h>%a@]@;" pp_theory th)
     kb.kb_theories;
-  (* print lemma *)
+  (* print lemmas *)
   List.iter
-    (fun lemma -> Format.fprintf formatter "  @[<hv 2>lemma:@ %a :-@ %a@]@;"
-      pp_atom lemma.lemma_conclusion
-      (Utils.pp_list pp_atom) lemma.lemma_premises)
+    (fun lemma -> Format.fprintf formatter "  @[<hv 2>%a@]@;" pp_lemma lemma)
     kb.kb_lemmas;
   (* print formulas definitions *)
   Hashtbl.iter
@@ -397,11 +442,29 @@ let rate_clause pclause =
                 Patterns.pp_pclause pclause !rate num_symbols length));
   !rate 
 
-(** given an empty clause (and its proof), look in the proof for
-    potential lemma. *)
-let search_lemmas hc =
+(** given an empty clause (and its proof), look in the proof for lemmas. *)
+let search_lemmas meta hc =
   assert (hc.hclits = [||]);
   []  (* TODO *)
+
+(** Update the KB of this meta-prover by learning from
+    the given (empty) clause's proof. The KB is modified
+    in place. *)
+let learn_and_update meta hc =
+  let kb = meta.meta_kb in
+  let h = hash_proof hc in
+  if ProofHashSet.mem h kb.kb_proofs
+  then Utils.debug 0 (lazy (Utils.sprintf "%% proof %Ld already processed" h))
+  else begin
+    (* this proof is not known yet, learn from it *)
+    kb.kb_proofs <- ProofHashSet.add h kb.kb_proofs;
+    let lemmas = search_lemmas meta hc in
+    List.iter
+      (fun lemma -> Format.printf "%%  learn @[<h>%a@]@." pp_lemma lemma)
+      lemmas;
+    (* store new lemmas *)
+    kb.kb_lemmas <- List.rev_append lemmas kb.kb_lemmas
+  end
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
@@ -435,8 +498,7 @@ let save_kb ~lock ~file kb =
     close_out out)
 
 let update_kb ~lock ~file f =
-  Format.printf "%% update knowledge base... ";
-  Format.print_flush ();
+  Format.printf "%% update knowledge base...@.";
   Utils.with_lock_file lock
     (fun () ->
     let kb = read_kb_nolock file in
@@ -448,4 +510,4 @@ let update_kb ~lock ~file f =
     Marshal.to_channel out kb [];
     flush out;
     close_out out);
-  Format.printf "done@."
+  Format.printf "%% ... done@."

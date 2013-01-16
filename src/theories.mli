@@ -24,7 +24,19 @@ open Types
 open Symbols
 
 (* ----------------------------------------------------------------------
- * generic representation of theories and formulas (persistent)
+ * recognition of proof
+ * ---------------------------------------------------------------------- *)
+
+type proof_hash = Int64.t
+
+val hash_proof : hclause -> proof_hash
+  (** Get a (probably) unique hash for this proof *)
+
+module ProofHashSet : Set.S with type elt = proof_hash
+  (** Set of proof hashes *)
+
+(* ----------------------------------------------------------------------
+ * generic representation of theories and lemmas (persistent)
  * ---------------------------------------------------------------------- *)
 
 type atom_name = string
@@ -60,6 +72,7 @@ type kb = {
   kb_formulas : (atom_name, named_formula) Hashtbl.t; (** formulas, by name *)
   kb_theories : (atom_name, theory) Hashtbl.t;        (** theories, by name *)
   mutable kb_lemmas : lemma list;                     (** list of lemmas *)
+  mutable kb_proofs : ProofHashSet.t;                 (** proofs already met *)
 } (** a Knowledge Base for lemma and theories *)
 
 val empty_kb : unit -> kb
@@ -115,9 +128,13 @@ val rate_clause : Patterns.pclause -> float
   (** Heuristic "simplicity and elegance" measure for clauses. The smaller,
       the better. *)
 
-val search_lemmas : hclause -> lemma list
-  (** given an empty clause (and its proof), look in the proof for
-      potential lemma. *)
+val search_lemmas : meta_prover -> hclause -> lemma list
+  (** given an empty clause (and its proof), look in the proof for lemmas. *)
+
+val learn_and_update : meta_prover -> hclause -> unit
+  (** Update the KB of this meta-prover by learning from
+      the given (empty) clause's proof. The KB is modified
+      in place. *)
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
