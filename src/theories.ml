@@ -142,25 +142,31 @@ let pp_theory formatter theory =
     pp_atom theory.th_atom (Utils.pp_list pp_atom) theory.th_definition
 
 let pp_lemma formatter lemma =
-  Format.fprintf formatter "lemma:@ %a :-@ %a"
+  Format.fprintf formatter "lemma:%a :- @;%a"
     pp_atom lemma.lemma_conclusion
     (Utils.pp_list pp_atom) lemma.lemma_premises
 
 (** Pretty print content of KB *)
 let pp_kb formatter kb =
-  Format.fprintf formatter "@[<v>kb:@;";
+  Format.fprintf formatter "@[<v2>kb:@;";
+  Format.fprintf formatter "@[<v2>theories:@;";
   (* print theories *)
   Hashtbl.iter 
     (fun _ th -> Format.fprintf formatter "  @[<h>%a@]@;" pp_theory th)
     kb.kb_theories;
+  Format.fprintf formatter "@]@;";
   (* print lemmas *)
+  Format.fprintf formatter "@[<v2>lemmas:@;";
   List.iter
     (fun lemma -> Format.fprintf formatter "  @[<hv 2>%a@]@;" pp_lemma lemma)
     kb.kb_lemmas;
+  Format.fprintf formatter "@]@;";
   (* print formulas definitions *)
+  Format.fprintf formatter "@[<v2>named formulas:@;";
   Hashtbl.iter
     (fun _ nf -> Format.fprintf formatter "  %a@;" pp_named_formula nf)
     kb.kb_formulas;
+  Format.fprintf formatter "@]@;";
   Format.fprintf formatter "@]"
 
 (** Add a potential lemma to the KB. The lemma must be checked before
