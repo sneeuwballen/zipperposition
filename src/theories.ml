@@ -31,6 +31,8 @@ module Utils = FoUtils
 (* TODO analyse lemmas to replace a subset of their premises by corresponding theory *)
 (* TODO associate induction schema to theories *)
 
+let prof_scan_clause = Utils.mk_profiler "Theories.scan_clause"
+
 (* ----------------------------------------------------------------------
  * recognition of proof
  * ---------------------------------------------------------------------- *)
@@ -162,15 +164,19 @@ let pp_kb formatter kb =
   Format.fprintf formatter "@[<v2>%% kb:@;";
   (* print formulas definitions *)
   Format.fprintf formatter "@[<v2>%% named formulas:@;";
-  Hashtbl.iter
-    (fun _ nf -> Format.fprintf formatter "%a@;" pp_named_formula nf)
-    kb.kb_formulas;
+  let formulas = ref [] in
+  Hashtbl.iter (fun _ nf -> formulas := nf :: !formulas) kb.kb_formulas;
+  List.iter
+    (fun nf -> Format.fprintf formatter "%a@;" pp_named_formula nf)
+    (List.sort (fun nf1 nf2 -> compare nf1.nf_atom nf2.nf_atom) !formulas);
   Format.fprintf formatter "@]@;";
   (* print theories *)
   Format.fprintf formatter "@[<v2>%% theories:@;";
-  Hashtbl.iter 
-    (fun _ th -> Format.fprintf formatter "@[<h>%a@]@;" pp_theory th)
-    kb.kb_theories;
+  let theories = ref [] in
+  Hashtbl.iter (fun _ x -> theories := x :: !theories) kb.kb_theories;
+  List.iter
+    (fun th -> Format.fprintf formatter "@[<h>%a@]@;" pp_theory th)
+    (List.sort (fun th1 th2 -> compare th1.th_atom th2.th_atom) !theories);
   Format.fprintf formatter "@]@;";
   (* print lemmas *)
   Format.fprintf formatter "@[<v2>%% lemmas:@;";
@@ -379,6 +385,7 @@ let meta_update_ord ~ord meta = meta.meta_ord <- ord
     lemma can be safely added to the problem.
     *)
 let scan_clause meta hc =
+  Utils.enter_prof prof_scan_clause;
   meta.meta_lemmas <- [];
   (* retrieve patterns that match this clause *)
   Patterns.Map.retrieve meta.meta_kb.kb_patterns hc ()
@@ -406,6 +413,7 @@ let scan_clause meta hc =
   (* get lemmas, and clear the list for next use *)
   let lemmas = meta.meta_lemmas in
   meta.meta_lemmas <- [];
+  Utils.exit_prof prof_scan_clause;
   lemmas
 
 (* ----------------------------------------------------------------------

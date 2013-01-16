@@ -3,7 +3,11 @@
 
 % generic patterns
 
+eq_1(f,g) is f = g.
+neq_1(f,g) is f != g.
 apply_1(f, g) is f(g).
+apply_2(f, g, h) is f(g, h).
+universal_1(f) is f(X).
 
 % ac
 
@@ -72,8 +76,6 @@ theory subgroup(product, mult, e, inverse, in_subgroup) is
   group(product, mult, e, inverse) and
   subgroup_inverse(in_subgroup, inverse) and
   subgroup_mult(in_subgroup, mult).
-
-element_of_subgroup(in_subgroup, e) is in_subgroup(e).
 
 lemma apply_1(in_subgroup, e) if
   subgroup(product, mult, e, inverse, in_subgroup).
