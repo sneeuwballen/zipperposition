@@ -44,7 +44,7 @@ let rate_pclause pclause =
   let length = List.length pclause.Patterns.pc_lits in
   rate := !rate +. (2. *. float_of_int (length - 1));
   (* result *)
-  Utils.debug 2 (lazy (Utils.sprintf
+  Utils.debug 3 (lazy (Utils.sprintf
                 "%% simplicity of @[<h>%a@] is %.2f (%d symbols, %d lits)"
                 Patterns.pp_pclause pclause !rate num_symbols length));
   !rate 
@@ -72,7 +72,7 @@ let rate_clause ~is_theory_symbol hc =
   let length = Array.length hc.hclits in
   rate := !rate +. (2. *. float_of_int (length - 1));
   (* result *)
-  Utils.debug 2 (lazy (Utils.sprintf
+  Utils.debug 3 (lazy (Utils.sprintf
                 "%% simplicity of @[<h>%a@] is %.2f" !C.pp_clause#pp_h hc !rate));
   !rate 
 
@@ -97,12 +97,80 @@ let proof_depth hc =
 (** Maximum number of lemmas that can be learnt from one proof *)
 let max_lemmas = ref 3
 
+(** Maximum lemma rate, above which the lemma is discarded *)
+let max_rate = ref 500.
+
 (** A possible lemma, i.e. a subgraph *)
 type candidate_lemma = {
   cl_conclusion : hclause;
   cl_premises : hclause list;
   cl_rate : float;
 }
+
+exception GotchaLittlePclause of Theories.named_formula * Patterns.mapping
+
+(** Find a named formula [nf] associated with this hclause. If none is
+    available, create a new named formula.
+    This returns both the named_formula and a mapping from [hc] to the nf.nf_pclause. *)
+let get_nf kb hc =
+  let open Theories in
+  try
+    Patterns.Map.retrieve kb.kb_patterns hc ()
+      (fun () pc mapping nf ->
+        raise (GotchaLittlePclause (nf, mapping)));
+    (* failed to find a matching named_formula *)
+    let name = next_name ~prefix:"formula" kb in
+    (* create a new named_formula for this clause *)
+    let pc = Patterns.pclause_of_clause hc in
+    let atom = name, pc.Patterns.pc_vars in
+    let nf = { nf_atom = atom; nf_pclause = pc; } in
+    (* add the named formula to the KB *)
+    add_named kb [nf];
+    (* find a match *)
+    match Patterns.match_pclause pc hc with
+    | [] -> assert false
+    | mapping::_ -> nf, mapping
+  with GotchaLittlePclause (nf, mapping) ->
+    nf, mapping  (* matched against already existing formula *)
+
+(** Convert a candidate_lemma to a proper lemma. It may have the side-effect
+    to add some named formulas to the KB. *)
+let candidate_to_lemma kb cl =
+  let open Theories in
+  (* map: a list of (symbol, variable number) *)
+  let map = ref [] in
+  let var_idx = ref (-1) in
+  (* get an atom for the named formula with the given mapping *)
+  let atom_of_nf nf mapping =
+    let name, args = nf.nf_atom in
+    (* create an atom, binding concrete symbols to variables *)
+    let args = List.map
+      (fun i -> if i < Patterns.symbol_offset
+        then i (* special constant *)
+        else
+          (* lookup symbol for this pattern symbol, then variable for the symbol *)
+          let symbol = Ptmap.find i mapping.Patterns.m_symbol in
+          try List.assq symbol !map
+          with Not_found ->
+            (* associate a new variable with this symbol *)
+            let n = !var_idx in
+            decr var_idx;
+            map := (symbol, n) :: !map;
+            n)
+      args in
+    name, args
+  in
+  (* atom for conclusion *)
+  let conclusion_nf, conclusion_mapping = get_nf kb cl.cl_conclusion in
+  let conclusion_atom = atom_of_nf conclusion_nf conclusion_mapping in
+  (* atoms for premises *)
+  let premises_atoms = List.map
+    (fun premise ->
+      let nf, mapping = get_nf kb premise in atom_of_nf nf mapping)
+    cl.cl_premises in
+  (* return the lemma *)
+  { lemma_conclusion = conclusion_atom;
+    lemma_premises = premises_atoms; }
 
 module CostMap = Map.Make(
   struct
@@ -154,10 +222,7 @@ let explore_parents meta cost_map distance hc =
   (* return the best choice of premises for this (clause, distance) *)
   compute_best distance hc
 
-(** Convert a candidate_lemma to a proper lemma *)
-let candidate_to_lemma cl = failwith "not implemented"  (* TODO *)
-
-(** given an empty clause (and its proof), look in the proof for lemmas. *)
+(** Given an empty clause (and its proof), look in the proof for lemmas. *)
 let search_lemmas meta hc =
   assert (hc.hclits = [||]);
   let open Theories in
@@ -170,8 +235,12 @@ let search_lemmas meta hc =
   let candidates = ref [] in
   let explored = ref C.CSet.empty in
   let q = Queue.create () in
+  (* push parents of the empty clause in the queue *)
+  (match hc.hcproof with
+  | Axiom _ -> ()
+  | Proof (_, l) ->
+    List.iter (fun (c,_,_) -> Queue.push (c.cref, 1) q) l);
   (* breadth-first exploration of the proof. The depth is kept with the clause *)
-  Queue.push (hc, 0) q;
   while not (Queue.is_empty q) do
     let hc, depth = Queue.pop q in
     if C.CSet.mem !explored hc then () else begin
@@ -188,16 +257,30 @@ let search_lemmas meta hc =
         cl_rate = hc_rate +. premises_rate;
       } in
       candidates := cl :: !candidates;
+      (* explore parent clauses *)
+      match hc.hcproof with
+      | Axiom _ -> ()
+      | Proof (_, l) ->
+        List.iter (fun (c,_,_) -> Queue.push (c.cref, depth+1) q) l
     end
   done;
   (* sort candidate by increasing rate (bad candidates at the end), and take
      only a given amount of them. *)
+  let candidates = List.filter (fun cl -> cl.cl_rate < !max_rate) !candidates in
   let candidates = List.sort
     (fun cl1 cl2 -> int_of_float (cl1.cl_rate -. cl2.cl_rate))
-    !candidates in
+    candidates in
   let candidates = Utils.list_take !max_lemmas candidates in
-  (* convert the candidate lemma to a lemma *)
-  let lemmas = List.map candidate_to_lemma candidates in
+  (* convert the candidate lemma to a lemma. Also keep all the
+     involved named formulas. *)
+  let lemmas = List.map
+    (fun candidate ->
+      let lemma = candidate_to_lemma meta.meta_kb candidate in
+      Utils.debug 1 (lazy (Utils.sprintf "%%   keep @[<h>%a with rate %.2f@]"
+                     pp_lemma lemma candidate.cl_rate));
+      lemma)
+    candidates
+  in
   lemmas
 
 (** Update the KB of this meta-prover by learning from
@@ -214,7 +297,7 @@ let learn_and_update meta hc =
     kb.kb_proofs <- ProofHashSet.add h kb.kb_proofs;
     let lemmas = search_lemmas meta hc in
     List.iter
-      (fun lemma -> Format.printf "%%  learn @[<h>%a@]@." pp_lemma lemma)
+      (fun lemma -> Format.printf "%%   learn @[<h>%a@]@." pp_lemma lemma)
       lemmas;
     (* store new lemmas *)
     add_lemmas kb lemmas
