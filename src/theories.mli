@@ -147,3 +147,6 @@ val save_kb : lock:string -> file:string -> kb -> unit
 val update_kb : lock:string -> file:string -> (kb -> kb) -> unit
   (** updates the KB located in given file (with given lock file),
       with the function *)
+
+val clear_kb : lock:string -> file:string -> unit
+  (** Erase the content of the KB (remove the file) *)

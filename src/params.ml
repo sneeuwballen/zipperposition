@@ -40,6 +40,9 @@ type parameters = {
   param_proof : bool;             (** print proof *)
   param_dot_file : string option; (** file to print the final state in *)
   param_kb : string;              (** file to use for KB *)
+  param_kb_load : string list;    (** theory files to read *)
+  param_kb_clear : bool;          (** do we need to clear the KB? *)
+  param_kb_print : bool;          (** print knowledge base and exit *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
@@ -69,6 +72,9 @@ let parse_args () =
   and heuristic_precedence = ref true
   and dot_file = ref None
   and kb = ref "kb"
+  and kb_load = ref []
+  and kb_clear = ref false
+  and kb_print = ref false
   and select = ref "SelectComplex"
   and progress = ref false
   and pipeline = ref false
@@ -90,7 +96,10 @@ let parse_args () =
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
-      ("-kb", Arg.Set_string kb, "Knowledge Base file");
+      ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
+      ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
+      ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
+      ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
       ("-progress", Arg.Set progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-pipeline", Arg.Set pipeline, "use pipelined given clause");
@@ -123,6 +132,9 @@ let parse_args () =
     param_pipeline_capacity = !pipeline_capacity; param_parallel = !parallel;
     param_proof = !proof;
     param_presaturate = !presaturate; param_output_syntax = !output;
-    param_index= !index; param_dot_file = !dot_file; param_kb = !kb;
+    param_index= !index; param_dot_file = !dot_file;
+    param_kb = !kb; param_kb_load = !kb_load;
+    param_kb_clear = !kb_clear;
+    param_kb_print = !kb_print;
     param_print_sort = !print_sort; param_print_all = !print_all;
     param_precedence= !heuristic_precedence;}

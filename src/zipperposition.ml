@@ -40,6 +40,8 @@ module Delayed = Delayed
 
 let version = "0.3"
 
+let lock_file file = file ^ ".lock"
+
 (** find the given file from given directory *)
 let find_file name dir =
   (* check if the file exists *)
@@ -176,11 +178,14 @@ let compute_ord ~params clauses =
 let mk_meta ~ord params =
   if params.param_theories then
     (* parse KB *)
-    let kb_lock = params.param_kb ^ ".lock" in
+    let kb_lock = lock_file params.param_kb in
     let kb = Theories.read_kb ~file:params.param_kb ~lock:kb_lock in
-    (* add builtin (TODO better to read them from a file?
-       or initialize explicitely by CLI like  -read-theories some_file) *)
-    Theories.add_builtin ~ord kb;
+    (* load required files *)
+    List.iter
+      (fun f -> Theories.parse_theory_file f kb)
+      params.param_kb_load;
+    (* Theories.add_builtin ~ord kb;*)
+
     (* create meta *)
     let meta = Theories.create_meta ~ord kb in
     Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
@@ -287,7 +292,7 @@ let process_file params f =
       match meta with
       | None -> ()
       | Some meta -> begin
-        let kb_lock = params.param_kb ^ ".lock" in
+        let kb_lock = lock_file params.param_kb in
         Theories.update_kb ~file:params.param_kb ~lock:kb_lock
           (fun kb ->
             let new_meta = { meta with Theories.meta_kb=kb; } in
@@ -296,11 +301,25 @@ let process_file params f =
       end
     end
 
+let print_kb params =
+  let kb_lock = lock_file params.param_kb in
+  let kb = Theories.read_kb ~lock:kb_lock ~file:params.param_kb in
+  Format.printf "%a@." Theories.pp_kb kb;
+  exit 0
+
+let clear_kb params =
+  let kb_lock = lock_file params.param_kb in
+  Theories.clear_kb ~lock:kb_lock ~file:params.param_kb;
+  exit 0
+
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
   Random.init params.param_seed;
   print_version params;
+  (* operations on knowledge base *)
+  (if params.param_kb_print then print_kb params);
+  (if params.param_kb_clear then clear_kb params);
   (* setup printing *)
   setup_output params;
   match params.param_role with

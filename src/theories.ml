@@ -442,6 +442,7 @@ let add_builtin ~ord kb =
 
 (** Add theories and named formulas from file to the KB *)
 let parse_theory_file filename kb =
+  Format.printf "%% load theory file %s@." filename;
   ()  (* TODO *)
 
 (* ----------------------------------------------------------------------
@@ -489,3 +490,11 @@ let update_kb ~lock ~file f =
     flush out;
     close_out out);
   Format.printf "%% ... done@."
+
+let clear_kb ~lock ~file =
+  Utils.with_lock_file lock
+    (fun () ->
+      Format.printf "%% clear Knowledge Base stored in %s@." file;
+      try Unix.unlink file
+      with Unix.Unix_error (e,_,_) ->
+        Format.printf "%% error: %s@." (Unix.error_message e))
