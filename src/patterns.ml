@@ -417,15 +417,13 @@ let pp_pclause formatter pclause =
     | true, PNode (0, _, []) -> (* = true *)
       Format.fprintf formatter "%a" pp_pterm lit.lterm
     | false, PNode (0, _, []) -> (* != true *)
-      Format.fprintf formatter "¬%a" pp_pterm lit.lterm
+      Format.fprintf formatter "~%a" pp_pterm lit.lterm
     | true, _ ->
       Format.fprintf formatter "%a = %a" pp_pterm lit.lterm pp_pterm lit.rterm
     | false, _ ->
       Format.fprintf formatter "%a != %a" pp_pterm lit.lterm pp_pterm lit.rterm
   in
-  Format.fprintf formatter "[";
-  Utils.pp_list ~sep:" | " pp_plit formatter pclause.pc_lits;
-  Format.fprintf formatter "]"
+  Utils.pp_list ~sep:" | " pp_plit formatter pclause.pc_lits
 
 let pp_mapping formatter mapping =
   (* only print symbol binding *)

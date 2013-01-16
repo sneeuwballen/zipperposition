@@ -177,13 +177,13 @@ let compute_ord ~params clauses =
 (** Parse the theory file and add its content to the KB *)
 let parse_theory_file kb file =
   Format.printf "%% read content of %s into the Knowledge Base@." file;
-  let input = open_in file in
+  let input = if file = "-" then stdin else open_in file in
   let lexbuf = Lexing.from_channel input in
   (* parse content *)
   let disjunctions = Parser_tptp.parse_theory_file Lexer_tptp.token lexbuf in
   (* load content *)
   Theories.load_theory kb disjunctions;
-  close_in input
+  if file <> "-" then close_in input else ()
 
 (** Parses and populates the initial Knowledge Base *)
 let initial_kb params =
