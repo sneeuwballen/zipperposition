@@ -175,7 +175,7 @@ type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
   mutable meta_theory_symbols : SSet.t;
-  mutable meta_theory_clauses : C.CSet.t;
+  mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ord : ordering;
   mutable meta_lemmas : hclause list;
 } (** The main type used to reason over the current proof, detecting axioms
@@ -246,10 +246,13 @@ let handle_theory meta term =
   let premise_clauses = List.map
     (fun term -> term_to_hclause ~ord ~kb term (Axiom ("kb","kb")) [])
     premises in
-  (* add the premises of the clause to the set of theory clauses *)
+  (* add the premises of the clause to the set of theory clauses. Each of those
+     clauses keeps the list of theories it belongs to. *)
   List.iter
     (fun hc ->
-      meta.meta_theory_clauses <- C.CSet.add meta.meta_theory_clauses hc)
+      let l = try Ptmap.find hc.hctag meta.meta_theory_clauses
+              with Not_found -> [] in
+      meta.meta_theory_clauses <- Ptmap.add hc.hctag (term::l) meta.meta_theory_clauses)
     premise_clauses;
   (* add the symbols in those clauses to the set of theory symbols *)
   let signature = C.signature premise_clauses in
@@ -287,13 +290,13 @@ let db_add_theory db theory =
                  (Datalog.Logic.pp_rule ?to_s:None) rule));
   Datalog.Logic.db_add db rule
 
-(** Create a meta_prover, using a knowledge base *)
+(** Create a meta_prover, using a Knowledge Base *)
 let create_meta ~ord kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
     meta_theory_symbols = SSet.empty;
-    meta_theory_clauses = C.CSet.empty;
+    meta_theory_clauses = Ptmap.empty;
     meta_ord = ord;
     meta_lemmas = [];
   } in
@@ -421,13 +424,17 @@ let add_builtin ~ord kb =
   add_theories kb [th];
   ()
 
+(** Add theories and named formulas from file to the KB *)
+let parse_theory_file filename kb =
+  ()  (* TODO *)
+
 (* ----------------------------------------------------------------------
  * (heuristic) search of "interesting" lemma in a proof.
  * ---------------------------------------------------------------------- *)
 
-(** Heuristic "simplicity and elegance" measure for clauses. The smaller,
+(** Heuristic "simplicity and elegance" measure for pclauses. The smaller,
     the better. *)
-let rate_clause pclause =
+let rate_pclause pclause =
   let rate = ref 1. in
   (* many symbols is not simple *)
   let symbols = pclause.Patterns.pc_vars in
@@ -442,10 +449,156 @@ let rate_clause pclause =
                 Patterns.pp_pclause pclause !rate num_symbols length));
   !rate 
 
+(** 'cost', or handicap, of a symbol *)
+let cost_symbol ~is_theory_symbol signature s =
+  if is_theory_symbol s then 0.2
+  else
+    let arity = try fst (SMap.find s signature) with Not_found -> 0 in
+    if arity = 0 then 1. else 3. *. (float_of_int arity)
+
+(** Heuristic "simplicity and elegance" measure for clauses in a proof. Theory
+    symbols are less 'costly' than other symbols, as are constants.
+    The smaller the result, the better. *)
+let rate_clause ~is_theory_symbol hc = 
+  let rate = ref 1. in
+  (* many symbols is not simple *)
+  let signature = C.signature [hc] in
+  let symbols = symbols_of_signature signature in
+  let symbols = List.filter (fun s -> not (SSet.mem s base_symbols)) symbols in
+  List.iter
+    (fun s -> rate := !rate +. cost_symbol ~is_theory_symbol signature s)
+    symbols;
+  (* many literals is not simple *)
+  let length = Array.length hc.hclits in
+  rate := !rate +. (2. *. float_of_int (length - 1));
+  (* result *)
+  Utils.debug 2 (lazy (Utils.sprintf
+                "%% simplicity of @[<h>%a@] is %.2f" !C.pp_clause#pp_h hc !rate));
+  !rate 
+
+(** Depth of a proof, ie max distance between the empty clause (root) and an axiom *)
+let proof_depth hc =
+  let explored = ref C.CSet.empty in
+  let depth = ref 0 in
+  let q = Queue.create () in
+  Queue.push (hc, 0) q;
+  while not (Queue.is_empty q) do
+    let (hc, d) = Queue.pop q in
+    if C.CSet.mem !explored hc then () else begin
+      explored := C.CSet.add !explored hc;
+      match hc.hcproof with
+      | Axiom _ -> depth := max d !depth
+      | Proof (_, l) -> (* explore parents *)
+        List.iter (fun (c,_,_) -> Queue.push (c.cref, d+1) q) l
+    end
+  done;
+  !depth
+
+(** Maximum number of lemmas that can be learnt from one proof *)
+let max_lemmas = ref 3
+
+(** A possible lemma, i.e. a subgraph *)
+type candidate_lemma = {
+  cl_conclusion : hclause;
+  cl_premises : hclause list;
+  cl_theories : term list;
+  cl_rate : float;
+}
+
+module CostMap = Map.Make(
+  struct
+    type t = hclause * int
+    let compare (hc1,d1) (hc2,d2) = if d1 <> d2 then d1 - d2 else hc1.hctag - hc2.hctag
+  end)
+
+(** Explore parents of the clause, looking for clauses that are simple
+    or for clauses that belong to a theory.
+    [distance] is the distance between [hc] and the root of the proof.
+    [cost_map]: for [c] a hclause, stores the best (rate, list of clauses) where
+       the list of clauses is a proof for [c] (best means with lowest rate
+       but max distance from the clause)
+    It returns a pair (rate, list of premises). *)
+let explore_parents meta cost_map distance hc =
+  let is_theory_symbol s = SSet.mem s meta.meta_theory_symbols in
+  let is_theory_clause hc = Ptmap.mem hc.hctag meta.meta_theory_clauses in
+  (* map (hclause, distance) -> 'a *)
+  (* compute the best list of premises for hc. It may be [hc] itself.
+     distance is the distance from the initial (empty) clause *)
+  let rec compute_best distance hc =
+    (* try to find if it's already been computed *)
+    try CostMap.find (hc, distance) !cost_map
+    with Not_found ->
+      (* cost of returning [hc] *)
+      let cost_hc =
+        if is_theory_clause hc
+          then 0.1 (* theory clauses are cheap *)
+          else rate_clause ~is_theory_symbol hc /. (0.1 +. (float_of_int distance))
+      in
+      let best_cost, best_premises = match hc.hcproof with
+      | Axiom _ -> cost_hc /. 2., [hc]  (* axioms are cheaper *)
+      | Proof (_, l) ->
+        (* cost of recursing into parents *)
+        let cost_parents, premises_parents = List.fold_left
+          (fun (cost,premises) (parent,_,_) ->
+            let cost', premises' = compute_best (distance+1) parent.cref in
+            cost +. cost', premises @ premises')
+          (0., []) l
+        in
+        (* make the choice that gives the lowest cost *)
+        if cost_parents < cost_hc then (cost_parents, premises_parents) else (cost_hc, [hc])
+      in
+      (* memoize and return *)
+      cost_map := CostMap.add (hc, distance) (best_cost, best_premises) !cost_map;
+      (best_cost, best_premises)
+  in
+  (* return the best choice of premises for this (clause, distance) *)
+  compute_best distance hc
+
+(** Convert a candidate_lemma to a proper lemma *)
+let candidate_to_lemma cl = failwith "not implemented"  (* TODO *)
+
 (** given an empty clause (and its proof), look in the proof for lemmas. *)
 let search_lemmas meta hc =
   assert (hc.hclits = [||]);
-  []  (* TODO *)
+  let is_theory_symbol s = SSet.mem s meta.meta_theory_symbols in
+  (* depth of the proof *)
+  let depth = proof_depth hc in
+  Utils.debug 1 (lazy (Utils.sprintf "%% analyse proof of depth %d" depth));
+  (* candidate lemmas *)
+  let cost_map = ref CostMap.empty in
+  let candidates = ref [] in
+  let explored = ref C.CSet.empty in
+  let q = Queue.create () in
+  (* breadth-first exploration of the proof. The depth is kept with the clause *)
+  Queue.push (hc, 0) q;
+  while not (Queue.is_empty q) do
+    let hc, depth = Queue.pop q in
+    if C.CSet.mem !explored hc then () else begin
+      (* clause not already explored *)
+      explored := C.CSet.add !explored hc;
+      (* absolute rate of the clause itself *)
+      let hc_rate = rate_clause ~is_theory_symbol hc in
+      (* choice of premises, with associate cost *)
+      let premises_rate, premises = explore_parents meta cost_map 0 hc in
+      (* build the candidate *)
+      let cl = {
+        cl_conclusion = hc;
+        cl_premises = premises;
+        cl_theories = [];  (* TODO convert some premises to theories *)
+        cl_rate = hc_rate +. premises_rate;
+      } in
+      candidates := cl :: !candidates;
+    end
+  done;
+  (* sort candidate by increasing rate (bad candidates at the end), and take
+     only a given amount of them. *)
+  let candidates = List.sort
+    (fun cl1 cl2 -> int_of_float (cl1.cl_rate -. cl2.cl_rate))
+    !candidates in
+  let candidates = FoUtils.list_take !max_lemmas candidates in
+  (* convert the candidate lemma to a lemma *)
+  let lemmas = List.map candidate_to_lemma candidates in
+  lemmas
 
 (** Update the KB of this meta-prover by learning from
     the given (empty) clause's proof. The KB is modified
@@ -463,7 +616,7 @@ let learn_and_update meta hc =
       (fun lemma -> Format.printf "%%  learn @[<h>%a@]@." pp_lemma lemma)
       lemmas;
     (* store new lemmas *)
-    kb.kb_lemmas <- List.rev_append lemmas kb.kb_lemmas
+    add_lemmas kb lemmas
   end
 
 (* ----------------------------------------------------------------------

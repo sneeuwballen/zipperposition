@@ -93,7 +93,7 @@ type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
   mutable meta_theory_symbols : SSet.t;
-  mutable meta_theory_clauses : Clauses.CSet.t;
+  mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ord : ordering;
   mutable meta_lemmas : hclause list;
 } (** The main type used to reason over the current proof, detecting axioms
@@ -120,13 +120,21 @@ val scan_clause : meta_prover -> hclause -> hclause list
 val add_builtin : ord:ordering -> kb -> unit
   (** Add builtin lemma, axioms, theories to the KB *)
 
+val parse_theory_file : string -> kb -> unit
+  (** Add theories and named formulas from file to the KB *)
+
 (* ----------------------------------------------------------------------
  * (heuristic) search of "interesting" lemma in a proof.
  * ---------------------------------------------------------------------- *)
 
-val rate_clause : Patterns.pclause -> float
-  (** Heuristic "simplicity and elegance" measure for clauses. The smaller,
+val rate_pclause : Patterns.pclause -> float
+  (** Heuristic "simplicity and elegance" measure for pclauses. The smaller,
       the better. *)
+
+val rate_clause : is_theory_symbol:(symbol -> bool) -> hclause -> float
+  (** Heuristic "simplicity and elegance" measure for clauses in a proof. Theory
+      symbols are less 'costly' than other symbols, as are constants.
+      The smaller the result, the better. *)
 
 val search_lemmas : meta_prover -> hclause -> lemma list
   (** given an empty clause (and its proof), look in the proof for lemmas. *)

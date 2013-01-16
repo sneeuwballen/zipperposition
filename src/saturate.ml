@@ -224,7 +224,7 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       (* TODO find lemmas, by matching given clause with pattern clauses *)
       let pclause = Patterns.pclause_of_clause hc in
       Utils.debug 1 (lazy (Utils.sprintf "given clause pattern is @[<h>%a@] (elegance %.2f)"
-                   Patterns.pp_pclause pclause (Theories.rate_clause pclause)));
+                   Patterns.pp_pclause pclause (Theories.rate_pclause pclause)));
       (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
       let inferred_clauses = List.fold_left
