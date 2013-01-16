@@ -1,4 +1,7 @@
 /*
+Zipperposition: a functional superposition prover for prototyping
+Copyright (C) 2012 Simon Cruanes
+
 This file is part of the first order theorem prover Darwin
 Copyright (C) 2006  The University of Iowa
 
@@ -19,7 +22,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 %{
-
   (** TSTP parser. It parses into Simple.term and Simple.formula *)
 
   open Const
@@ -126,11 +128,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token RIGHT_IMPLICATION
 %token UNKNOWN
 
+%token IS
+%token THEORY
+%token LEMMA
+%token IF
+%token AND
+
 %start parse_file
 %type <Simple.sourced_formula list * string list> parse_file
 
 %start parse_clause
 %type <Simple.formula> parse_clause
+
+%start parse_theory_file
+%type <Theories.disjunction list> parse_theory_file
 
 %%
 
@@ -157,9 +168,11 @@ parse_clause:
   | EOI { print_endline "could no parse clause";
           raise Const.PARSE_ERROR }
 
+parse_theory_file:
+  | theory_disjunctions EOI { $1 }
+  | EOI { [] }
 
 /* parse rules */
-
 
 file:
   | tptp_input
@@ -330,6 +343,7 @@ formula_role:
         conjecture := true);
       $1
     }
+  | LEMMA { "lemma" }
 
 annotations:
   | null
@@ -616,6 +630,100 @@ file_name:
 
 null:
       { }
+
+
+/* Theory parsing stuff */
+
+theory_disjunctions:
+  | theory_disjunction { [$1] }
+  | theory_disjunction theory_disjunctions { $1 :: $2 }
+
+theory_disjunction:
+  | theory_named_formula { Theories.Named $1 }
+  | theory_theory { Theories.Theory $1 }
+  | theory_lemma { Theories.Lemma $1 }
+
+theory_named_formula:
+  | datalog_atom IS fof_formula DOT
+    {
+      let open Patterns in let open Theories in
+      let atom_name, atom_args = $1 in
+      let f = $3 in
+      (* transform to hclause *)
+      let ord = Orderings.default_ordering (Simple.signature [f]) in
+      let hc = Clauses.from_simple ~ord (f, Simple.Axiom ("theory", "theory")) in
+      (* transform f into a pattern *)
+      let rev_map = empty_rev_mapping () in
+      let pc = pclause_of_clause ~rev_map hc in
+      (* translate symbols of the atom *)
+      let atom_args = List.map
+        (fun s ->
+          try SHashtbl.find rev_map.rm_symbol s
+          with Not_found -> failwith ("symbol not found " ^ (name_symbol s)))
+        atom_args in
+      let atom = atom_name, atom_args in
+      (* ensure the order of atom symbols is the same as in the pclause *)
+      let pc = {pc with pc_vars = atom_args; } in
+      let nf = { nf_pclause = pc; nf_atom = atom; } in
+      (* ready for next thing to parse *)
+      nf
+    }
+
+theory_theory:
+  | THEORY datalog_atom IS datalog_atoms DOT
+    {
+      let open Theories in
+      (* map symbols to variables *)
+      let get_var =
+        let table = SHashtbl.create 3 in
+        fun name ->
+          try SHashtbl.find table name
+          with Not_found ->
+            let n = -(SHashtbl.length table)-1 in
+            SHashtbl.replace table name n;
+            n
+      in
+      let convert_atom (head, args) = head, List.map get_var args in
+      { th_atom = convert_atom $2;
+        th_definition = List.map convert_atom $4;
+      }
+    }
+
+theory_lemma:
+  | LEMMA datalog_atom IF datalog_atoms DOT
+    {
+      let open Theories in
+      (* map symbols to variables *)
+      let get_var =
+        let table = SHashtbl.create 3 in
+        fun name ->
+          try SHashtbl.find table name
+          with Not_found ->
+            let n = -(SHashtbl.length table)-1 in
+            SHashtbl.replace table name n;
+            n
+      in
+      let convert_atom (head, args) = head, List.map get_var args in
+      { lemma_conclusion = convert_atom $2;
+        lemma_premises = List.map convert_atom $4;
+      }
+    }
+
+datalog_atoms:
+  | datalog_atom { [$1] }
+  | datalog_atom AND datalog_atoms { $1 :: $3 }
+
+datalog_atom:
+  | LOWER_WORD LEFT_PARENTHESIS datalog_args RIGHT_PARENTHESIS
+    { $1, $3 }
+
+datalog_args:
+  | datalog_arg { [$1] }
+  | datalog_arg COMMA datalog_args { $1 :: $3 }
+
+datalog_arg:
+  | LOWER_WORD { let s = mk_symbol $1 in s }
+
 
 %%
 

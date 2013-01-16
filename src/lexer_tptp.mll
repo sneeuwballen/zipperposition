@@ -157,6 +157,13 @@ rule token =
       | "thf"                        { update_token (Lexing.lexeme lexbuf);
                                        failwith "Parser_tptp: tfh syntax not supported." }
       | "include"                    { update_token (Lexing.lexeme lexbuf); INCLUDE }
+
+      | "is"                         { update_token (Lexing.lexeme lexbuf); IS }
+      | "theory"                     { update_token (Lexing.lexeme lexbuf); THEORY }
+      | "lemma"                      { update_token (Lexing.lexeme lexbuf); LEMMA }
+      | "if"                         { update_token (Lexing.lexeme lexbuf); IF }
+      | "and"                        { update_token (Lexing.lexeme lexbuf); AND }
+
       | lower_word                   { update_token (Lexing.lexeme lexbuf); LOWER_WORD(Lexing.lexeme lexbuf) }
       | upper_word                   { update_token (Lexing.lexeme lexbuf); UPPER_WORD(Lexing.lexeme lexbuf) }
       | single_quoted_lower_word     { update_token (Lexing.lexeme lexbuf); 
@@ -183,12 +190,13 @@ rule token =
       | "<~>"                        { update_token (Lexing.lexeme lexbuf); XOR }
       | negation                     { update_token (Lexing.lexeme lexbuf); NEGATION }
       | "$true"                      { update_token (Lexing.lexeme lexbuf); DOLLAR_TRUE }
-      | "$false"                      { update_token (Lexing.lexeme lexbuf); DOLLAR_FALSE }
+      | "$false"                     { update_token (Lexing.lexeme lexbuf); DOLLAR_FALSE }
       | '$'                          { update_token (Lexing.lexeme lexbuf); DOLLAR }
       | '&'                          { update_token (Lexing.lexeme lexbuf); AND }
       | '|'                          { update_token (Lexing.lexeme lexbuf); OR }
       | '!'                          { update_token (Lexing.lexeme lexbuf); FORALL }
       | '?'                          { update_token (Lexing.lexeme lexbuf); EXISTS }
+      
       | _                            { prev_column_index := !current_column_index;
                                        prev_line_index := !current_line_index;
                                        lexing_error "Invalid Input" (Lexing.lexeme lexbuf) }

@@ -1,0 +1,15 @@
+
+% Builtin theories and lemma
+
+associative(f) is f(X,f(Y,Z)) = f(f(X,Y), Z).
+commutative(f) is f(X,Y) = f(Y,X).
+
+theory ac(f) is associative(f) and commutative(f).
+
+functional(p) is ~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2.
+total(p, f) is p(X,Y,f(X,Y)).
+functional_total(p, f) is p(X,Y,Z) <=> Z = f(X,Y).
+
+lemma functional_total(p,f) if functional(p) and total(p, f).
+
+% vim:syntax=ocaml
