@@ -78,6 +78,9 @@ type kb = {
 val empty_kb : unit -> kb
   (** Create an empty Knowledge Base *)
 
+val next_name : prefix:string -> kb -> atom_name
+  (** Find a new name for a formula *)
+
 val add_potential_lemmas : kb -> lemma list -> unit
   (** Add a potential lemma to the KB. The lemma must be checked before
       it is used. *)
@@ -86,6 +89,7 @@ val add_named : kb -> named_formula list -> unit
 val add_lemmas : kb -> lemma list -> unit
 val add_theories : kb -> theory list -> unit
 
+val pp_named_formula : Format.formatter -> named_formula -> unit
 val pp_lemma : Format.formatter -> lemma -> unit
 val pp_theory : Format.formatter -> theory -> unit
 

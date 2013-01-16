@@ -28,7 +28,7 @@ module C = Clauses
 module S = FoSubst
 module Utils = FoUtils
 
-(* TODO analyse lemmas to replace a subset of theiry premises by corresponding theory *)
+(* TODO analyse lemmas to replace a subset of their premises by corresponding theory *)
 (* TODO associate induction schema to theories *)
 
 (* ----------------------------------------------------------------------
@@ -119,36 +119,11 @@ let empty_kb () = {
   kb_proofs = ProofHashSet.empty;
 }
 
-(** Add a potential lemma to the KB. The lemma must be checked before
-    it is used. *)
-let add_potential_lemmas kb pot_lemmas =
-  let kb_potential_lemmas =
-    List.fold_left (fun kb_potential_lemmas lemma ->
-      if List.mem lemma kb_potential_lemmas then kb_potential_lemmas
-        else lemma :: kb_potential_lemmas)
-    kb.kb_potential_lemmas pot_lemmas in
-  kb.kb_potential_lemmas <- kb_potential_lemmas
-
-(** Add a list of named formulas to the KB *)
-let add_named kb named =
-  List.iter
-    (fun nf ->
-      let name, _ = nf.nf_atom in
-      Hashtbl.replace kb.kb_formulas name nf;
-      Patterns.Map.add kb.kb_patterns nf.nf_pclause nf)
-    named
-
-(** Add a list of lemmas to the KB *)
-let add_lemmas kb lemmas =
-  kb.kb_lemmas <- List.rev_append lemmas kb.kb_lemmas
-
-(*Add a list of theories to the KB *)
-let add_theories kb theories =
-  List.iter
-    (fun th ->
-      let th_name = fst th.th_atom in
-      Hashtbl.replace kb.kb_theories th_name th)
-    theories
+(** Find a new name for a formula *)
+let next_name ~prefix kb =
+  let n = kb.kb_name_idx in
+  kb.kb_name_idx <- n + 1;
+  Utils.sprintf "%s_%d" prefix n
 
 let pp_atom formatter (name, args) =
   let pp_arg formatter = function
@@ -190,6 +165,40 @@ let pp_kb formatter kb =
     kb.kb_formulas;
   Format.fprintf formatter "@]"
 
+(** Add a potential lemma to the KB. The lemma must be checked before
+    it is used. *)
+let add_potential_lemmas kb pot_lemmas =
+  let kb_potential_lemmas =
+    List.fold_left (fun kb_potential_lemmas lemma ->
+      if List.mem lemma kb_potential_lemmas then kb_potential_lemmas
+        else lemma :: kb_potential_lemmas)
+    kb.kb_potential_lemmas pot_lemmas in
+  kb.kb_potential_lemmas <- kb_potential_lemmas
+
+(** Add a list of named formulas to the KB *)
+let add_named kb named =
+  List.iter
+    (fun nf ->
+      let name, _ = nf.nf_atom in
+      if Hashtbl.mem kb.kb_formulas name then () else begin
+        (* no formula with this name is already present *)
+        Utils.debug 0 (lazy (Utils.sprintf "%%   add new formula %a" pp_named_formula nf));
+        Hashtbl.replace kb.kb_formulas name nf;
+        Patterns.Map.add kb.kb_patterns nf.nf_pclause nf
+      end)
+    named
+
+(** Add a list of lemmas to the KB *)
+let add_lemmas kb lemmas =
+  kb.kb_lemmas <- List.rev_append lemmas kb.kb_lemmas
+
+(*Add a list of theories to the KB *)
+let add_theories kb theories =
+  List.iter
+    (fun th ->
+      let th_name = fst th.th_atom in
+      Hashtbl.replace kb.kb_theories th_name th)
+    theories
 
 (* ----------------------------------------------------------------------
  * reasoning over a problem using Datalog
@@ -324,6 +333,10 @@ let create_meta ~ord kb =
     meta_ord = ord;
     meta_lemmas = [];
   } in
+  Utils.debug 1 (lazy (Utils.sprintf
+                 "%% meta-prover: kb contains %d lemmas, %d theories, %d named formulas"
+                 (List.length kb.kb_lemmas) (Hashtbl.length kb.kb_theories)
+                 (Hashtbl.length kb.kb_formulas)));
   (* handler for new formulas and theories *)
   let formula_handler = handle_formula meta in
   let theory_handler = handle_theory meta in
@@ -378,8 +391,8 @@ let scan_clause meta hc =
       let rule = Datalog.Logic.mk_rule term [] in
       if not (Datalog.Logic.db_mem meta.meta_db rule) then begin
         (* add fact if not already present *)
-        Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a@]"
-                       (Datalog.Logic.pp_rule ?to_s:None) rule));
+        Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
+                       (Datalog.Logic.pp_rule ?to_s:None) rule pp_named_formula nf));
         Datalog.Logic.db_add meta.meta_db rule
       end);
   (* get lemmas, and clear the list for next use *)
@@ -415,8 +428,8 @@ let add_builtin ~ord kb =
   (* add the functional total lemma *)
   let mk_var i = -1-i in
   let lemma = {
-    lemma_conclusion = "total_function3", [mk_var 0; mk_var 1;];
-    lemma_premises = ["functional3", [mk_var 0]; "total3", [mk_var 1; mk_var 0]];
+    lemma_conclusion = "total_function3", [mk_var 1; mk_var 0;];
+    lemma_premises = ["functional3", [mk_var 0]; "total3", [mk_var 0; mk_var 1]];
   } in
   add_lemmas kb [lemma];
   (* add the AC theory *)

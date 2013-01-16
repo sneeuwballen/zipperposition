@@ -159,7 +159,7 @@ let pclause_symbols lits =
   and plit_symbols acc lit =
     pterm_symbols (pterm_symbols acc lit.lterm) lit.rterm
   in
-  List.fold_left plit_symbols [] lits
+  List.rev (List.fold_left plit_symbols [] lits)
 
 (* ----------------------------------------------------------------------
  * mapping between regular terms/clauses and pattern terms/clauses
