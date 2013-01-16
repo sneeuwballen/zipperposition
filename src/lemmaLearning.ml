@@ -53,7 +53,7 @@ let rate_pclause pclause =
 let cost_symbol ~is_theory_symbol signature s =
   if is_theory_symbol s then 0.2
   else
-    let arity = try fst (SMap.find s signature) with Not_found -> 0 in
+    let arity = try fst (SMap.find s signature) with Not_found -> 3 in
     if arity = 0 then 1. else 3. *. (float_of_int arity)
 
 (** Heuristic "simplicity and elegance" measure for clauses in a proof. Theory
@@ -71,6 +71,8 @@ let rate_clause ~is_theory_symbol hc =
   (* many literals is not simple *)
   let length = Array.length hc.hclits in
   rate := !rate +. (2. *. float_of_int (length - 1));
+  (* weight of clause, as a measure of weight of terms *)
+  rate := !rate +. (float_of_int hc.hcweight) /. 2.;
   (* result *)
   Utils.debug 3 (lazy (Utils.sprintf
                 "%% simplicity of @[<h>%a@] is %.2f" !C.pp_clause#pp_h hc !rate));
@@ -278,6 +280,13 @@ let search_lemmas meta hc =
       let lemma = candidate_to_lemma meta.meta_kb candidate in
       lemma, candidate.cl_rate)
     candidates
+  in
+  (* only keep lemmas that give safe rules *)
+  let lemmas = List.filter
+    (fun (lemma, _) ->
+      let rule = rule_of_lemma lemma in
+      Datalog.Logic.check_safe rule)
+    lemmas
   in
   lemmas
 

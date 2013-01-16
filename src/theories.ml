@@ -81,6 +81,11 @@ type atom = atom_name * int list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
+(** Convert an atom to a Datalog term *)
+let atom_to_term (head, args) =
+  let head = Datalog.Symbols.mk_symbol head in
+  Array.of_list (head :: args)
+
 type named_formula = {
   nf_atom : atom;                       (* meta-atom for an instance of the pclause *)
   nf_pclause : Patterns.pclause;        (* the pattern of the formula itself *)
@@ -97,6 +102,12 @@ type lemma = {
   lemma_premises : atom list;               (* hypotheses of the lemma *)
 } (** A lemma is a named formula that can be deduced from a list
       of other named formulas. It will be translated as a datalog rule. *)
+
+let rule_of_lemma lemma =
+  let head = atom_to_term lemma.lemma_conclusion in
+  let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
+  let rule = Datalog.Logic.mk_rule head body in
+  rule
 
 type kb = {
   mutable kb_name_idx : int;
@@ -302,18 +313,11 @@ let handle_theory meta term =
       meta.meta_theory_symbols symbols;
   ()
 
-(** Convert an atom to a Datalog term *)
-let atom_to_term (head, args) =
-  let head = Datalog.Symbols.mk_symbol head in
-  Array.of_list (head :: args)
-
 (** Add a lemma to the Datalog engine *)
 let db_add_lemma db lemma =
   (* add conclusion(args) :- premise1(args), ..., premise_n(args), for
      further propagations. *)
-  let head = atom_to_term lemma.lemma_conclusion in
-  let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
-  let rule = Datalog.Logic.mk_rule head body in
+  let rule = rule_of_lemma lemma in
   Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
                  (Datalog.Logic.pp_rule ?to_s:None) rule));
   Datalog.Logic.db_add db rule

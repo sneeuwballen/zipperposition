@@ -65,6 +65,9 @@ type lemma = {
 } (** A lemma is a named formula that can be deduced from a list
       of other named formulas. It will be translated as a datalog rule. *)
 
+val rule_of_lemma : lemma -> Datalog.Logic.rule
+  (** Convert the lemma into a datalog rule *)
+
 type kb = {
   mutable kb_name_idx : int;
   mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
