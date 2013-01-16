@@ -1,15 +1,81 @@
 
 % Builtin theories and lemma
 
+% generic patterns
+
+apply_1(f, g) is f(g).
+
+% ac
+
 associative(f) is f(X,f(Y,Z)) = f(f(X,Y), Z).
 commutative(f) is f(X,Y) = f(Y,X).
 
-theory ac(f) is associative(f) and commutative(f).
+theory ac(f) is
+  associative(f) and
+  commutative(f).
+
+% functional relations
 
 functional(p) is ~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2.
 total(p, f) is p(X,Y,f(X,Y)).
-functional_total(p, f) is p(X,Y,Z) <=> Z = f(X,Y).
+total_function(p, f) is p(X,Y,Z) <=> Z = f(X,Y).
 
-lemma functional_total(p,f) if functional(p) and total(p, f).
+lemma total_function(p,f) if functional(p) and total(p, f).
+
+% monoid
+
+left_identity(mult, e) is mult(e, X) = X.
+right_identity(mult, e) is mult(X, e) = X.
+
+theory monoid(product, mult, e) is
+  left_identity(mult, e) and
+  right_identity(mult, e) and
+  total_function(product, mult) and   % need mult to be total
+  associative(mult).
+
+% group
+
+left_inverse(mult, e, inverse) is mult(inverse(X), X) = e.
+right_inverse(mult, e, inverse) is mult(X, inverse(X)) = e.
+
+theory group(product, mult, e, inverse) is
+  monoid(product, mult, e) and
+  left_inverse(mult, e, inverse) and
+  right_inverse(mult, e, inverse).
+
+theory abelian_group(product, mult, e, inverse) is
+  group(product, mult, e, inverse) and
+  commutative(mult).
+
+% basic set
+
+subset_definition(member, subset) is ~member(X,Y) | ~subset(Y,Z) | member(X,Z).
+subset_element(member, subset, sk) is subset(X,Y) | member(sk, X) | ~member(sk, Y).
+set_equal(subset) is ~subset(X,Y) | ~subset(Y,X) | X=Y.
+set_equal1(subset) is subset(X,Y) | X != Y.
+set_equal2(subset) is subset(Y,X) | X != Y.
+
+theory set(member, subset) is
+  subset_definition(member, subset) and
+  subset_element(member, subset, sk) and
+  set_equal(subset) and
+  set_equal1(subset) and
+  set_equal2(subset).
+
+% subgroup theory
+
+subgroup_inverse(in_subgroup, inverse) is ~in_subgroup(X) | in_subgroup(inverse(X)).
+subgroup_mult(in_subgroup, mult) is ~in_subgroup(X) | ~in_subgroup(Y) |
+                                    in_subgroup(mult(X,Y)).
+
+theory subgroup(product, mult, e, inverse, in_subgroup) is
+  group(product, mult, e, inverse) and
+  subgroup_inverse(in_subgroup, inverse) and
+  subgroup_mult(in_subgroup, mult).
+
+element_of_subgroup(in_subgroup, e) is in_subgroup(e).
+
+lemma apply_1(in_subgroup, e) if
+  subgroup(product, mult, e, inverse, in_subgroup).
 
 % vim:syntax=ocaml
