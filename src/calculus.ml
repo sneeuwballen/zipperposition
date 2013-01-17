@@ -74,7 +74,7 @@ class type calculus =
     method axioms : hclause list
       (** a list of axioms to add to the problem *)
 
-    method constr : hclause list -> ordering_constraint list
+    method constr : hclause list -> precedence_constraint list
       (** some constraints on the precedence *)
 
     method preprocess : ord:ordering -> select:selection_fun -> hclause list -> hclause list

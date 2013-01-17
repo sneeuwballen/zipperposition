@@ -147,12 +147,12 @@ let subsumed_by ~calculus active_set hc =
 let all_simplify ~ord ~calculus ~select active_set simpl_set hc =
   Utils.enter_prof prof_all_simplify;
   let clauses = calculus#list_simplify ~ord ~select hc in
-  let clauses = List.map
+  let clauses = Utils.list_flatmap
     (fun hc ->
       (* simplify this clause *)
       let _, hc' = simplify ~calculus ~select active_set simpl_set hc in
       let hc' = C.select_clause ~select hc' in
-      hc')
+      if calculus#is_trivial hc' then [] else [hc'])
     clauses
   in
   Utils.exit_prof prof_all_simplify;

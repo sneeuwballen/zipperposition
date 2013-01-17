@@ -27,33 +27,33 @@ open Symbols
  * hard constraints on the ordering
  * ---------------------------------------------------------------------- *)
 
-val cluster_constraint : symbol list list -> ordering_constraint
+val cluster_constraint : symbol list list -> precedence_constraint
   (** ordering constraint by clustering symbols by decreasing order.
       all symbols in the first clusters are bigger than those in the second, etc. *)
 
-val list_constraint : symbol list -> ordering_constraint
+val list_constraint : symbol list -> precedence_constraint
   (** symbols in the given list are in decreasing order *)
 
-val arity_constraint : signature -> ordering_constraint
+val arity_constraint : signature -> precedence_constraint
   (** decreasing arity constraint *)
 
-val invfreq_constraint : hclause list -> ordering_constraint
+val invfreq_constraint : hclause list -> precedence_constraint
   (** symbols with high frequency are smaller *)
 
-val max_constraint : symbol list -> ordering_constraint
+val max_constraint : symbol list -> precedence_constraint
   (** maximal symbols, in decreasing order *)
 
-val min_constraint : symbol list -> ordering_constraint
+val min_constraint : symbol list -> precedence_constraint
   (** minimal symbols, in decreasing order *)
 
-val alpha_constraint : ordering_constraint
+val alpha_constraint : precedence_constraint
   (** regular (alphabetic) ordering on symbols *)
 
 (* ----------------------------------------------------------------------
  * Creation of a precedence (symbol_ordering) from constraints
  * ---------------------------------------------------------------------- *)
 
-val mk_precedence : ?complete:bool -> ordering_constraint list -> symbol list -> precedence
+val mk_precedence : ?complete:bool -> precedence_constraint list -> symbol list -> precedence
   (** make a precedence from the given constraints. First constraints are
       more important than later constraints. Only the very first constraint
       is assured to be totally satisfied.
@@ -69,8 +69,8 @@ val default_precedence : signature -> precedence
  * ---------------------------------------------------------------------- *)
 
 val heuristic_precedence : (precedence -> ordering)
-                           -> ordering_constraint list
-                           -> ordering_constraint list
+                           -> precedence_constraint list
+                           -> precedence_constraint list
                            -> hclause list -> precedence
   (** define a constraint on symbols that is believed to improve
       the search by enabling as many simplifications as possible. It takes

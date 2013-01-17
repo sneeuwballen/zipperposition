@@ -101,7 +101,7 @@ type selection_fun = hclause -> int list
 let no_select c = []
 
 (** an ordering constraint (a possibly non-total ordering on symbols) *)
-type ordering_constraint = symbol -> symbol -> int
+type precedence_constraint = symbol -> symbol -> int
 
 (** the interface of a total ordering on symbols *)
 class type precedence =
