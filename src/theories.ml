@@ -203,7 +203,7 @@ let add_named kb named =
       let name, _ = nf.nf_atom in
       if Hashtbl.mem kb.kb_formulas name then () else begin
         (* no formula with this name is already present *)
-        Utils.debug 0 (lazy (Utils.sprintf "%%   add new formula %a" pp_named_formula nf));
+        Utils.debug 1 (lazy (Utils.sprintf "%%   add new formula %a" pp_named_formula nf));
         Hashtbl.replace kb.kb_formulas name nf;
         Patterns.Map.add kb.kb_patterns nf.nf_pclause nf
       end)
@@ -235,9 +235,7 @@ type meta_prover = {
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
 
-let get_kb_formula ~kb name =
-  try Hashtbl.find kb.kb_formulas name
-  with Not_found -> failwith ("no such formula: " ^ name)
+let get_kb_formula ~kb name = Hashtbl.find kb.kb_formulas name
 
 let get_kb_theory ~kb name =
   try Hashtbl.find kb.kb_theories name
@@ -297,8 +295,9 @@ let handle_theory meta term =
                  (Datalog.Logic.pp_term ?to_s:None) term));
   (* the clauses that belong to this theory *)
   let premises = Datalog.Logic.db_premises meta.meta_db term in
-  let premise_clauses = List.map
-    (fun term -> term_to_hclause ~ord ~kb term (Axiom ("kb","kb")) [])
+  let premise_clauses = Utils.list_flatmap
+    (fun term -> try [term_to_hclause ~ord ~kb term (Axiom ("kb","kb")) []]
+                 with Not_found -> [])
     premises in
   (* add the premises of the clause to the set of theory clauses. Each of those
      clauses keeps the list of theories it belongs to. *)
