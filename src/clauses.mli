@@ -175,6 +175,10 @@ val to_simple : hclause -> Simple.formula
  * set of hashconsed clauses
  * ---------------------------------------------------------------------- *)
 
+(** Simple set *)
+module ClauseSet : Set.S with type elt = hclause
+
+(** Set with access by ID, bookeeping of maximal var... *)
 module CSet :
   sig
 

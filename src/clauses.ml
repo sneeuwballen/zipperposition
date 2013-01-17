@@ -627,6 +627,14 @@ let to_simple hc = failwith "not implemented"
  * set of hashconsed clauses
  * ---------------------------------------------------------------------- *)
 
+(** Simple set *)
+module ClauseSet = Set.Make(
+  struct
+    type t = hclause
+    let compare hc1 hc2 = hc1.hctag - hc2.hctag
+  end)
+
+(** Set with access by ID, bookeeping of maximal var... *)
 module CSet =
   struct
 

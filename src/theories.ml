@@ -228,11 +228,12 @@ let add_theories kb theories =
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
+  mutable meta_clauses : Clauses.ClauseSet.t;       (* set of clauses sent to datalog *)
   mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
   mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ord : ordering;
-  mutable meta_lemmas : hclause list;
+  mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
 
@@ -285,7 +286,8 @@ let handle_formula meta term =
     (* yield lemma *)
     Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
                   !C.pp_clause#pp_h conclusion));
-    meta.meta_lemmas <- conclusion :: meta.meta_lemmas
+    meta.meta_lemmas <- conclusion :: meta.meta_lemmas;
+    meta.meta_clauses <- C.ClauseSet.add conclusion meta.meta_clauses
   end
 
 (** Handler triggered when a theory is discovered in the current problem *)
@@ -344,6 +346,7 @@ let create_meta ~ord kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
+    meta_clauses = C.ClauseSet.empty;
     meta_theories = [];
     meta_theory_symbols = SSet.empty;
     meta_theory_clauses = Ptmap.empty;
@@ -393,6 +396,8 @@ let scan_clause meta hc =
   (* retrieve patterns that match this clause *)
   Patterns.Map.retrieve meta.meta_kb.kb_patterns hc ()
     (fun () pclause mapping nf ->
+      (* keep this clause in memory, it may be useful later *)
+      meta.meta_clauses <- C.ClauseSet.add hc meta.meta_clauses;
       (* a named formula is detected, assert the corresponding datalog
          predicate *)
       let head, args = nf.nf_atom in

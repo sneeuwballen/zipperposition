@@ -106,11 +106,12 @@ val pp_kb : Format.formatter -> kb -> unit
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
+  mutable meta_clauses : Clauses.ClauseSet.t;       (* set of clauses sent to datalog *)
   mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
   mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ord : ordering;
-  mutable meta_lemmas : hclause list;
+  mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
 

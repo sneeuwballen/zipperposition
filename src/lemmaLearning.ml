@@ -68,11 +68,11 @@ let rate_clause ~is_theory_symbol hc =
   List.iter
     (fun s -> rate := !rate +. cost_symbol ~is_theory_symbol signature s)
     symbols;
-  (* many literals is not simple *)
-  let length = Array.length hc.hclits in
-  rate := !rate +. (2. *. float_of_int (length - 1));
   (* weight of clause, as a measure of weight of terms *)
   rate := !rate +. (float_of_int hc.hcweight) /. 2.;
+  (* many literals is not simple, multiply by length of clause *)
+  let length = Array.length hc.hclits in
+  rate := !rate *. (float_of_int (length - 1));
   (* result *)
   Utils.debug 3 (lazy (Utils.sprintf
                 "%% simplicity of @[<h>%a@] is %.2f" !C.pp_clause#pp_h hc !rate));
@@ -180,13 +180,17 @@ module CostMap = Map.Make(
     let compare (hc1,d1) (hc2,d2) = if d1 <> d2 then d1 - d2 else hc1.hctag - hc2.hctag
   end)
 
+(** Minimum threshold for the max distance between the conclusion of a lemma,
+    and a premise of the lemma. *)
+let min_distance_threshold = 3
+
 (** Explore parents of the clause, looking for clauses that are simple
     or for clauses that belong to a theory.
     [distance] is the distance between [hc] and the root of the proof.
     [cost_map]: for [c] a hclause, stores the best (rate, list of clauses) where
        the list of clauses is a proof for [c] (best means with lowest rate
        but max distance from the clause)
-    It returns a pair (rate, list of premises). *)
+    It returns a tuple (rate, list of premises, max distance). *)
 let explore_parents meta cost_map distance hc =
   let open Theories in
   let is_theory_symbol s = SSet.mem s meta.meta_theory_symbols in
@@ -204,25 +208,30 @@ let explore_parents meta cost_map distance hc =
           then 0.1 (* theory clauses are cheap *)
           else rate_clause ~is_theory_symbol hc /. (0.1 +. (float_of_int distance))
       in
-      let best_cost, best_premises = match hc.hcproof with
-      | Axiom _ -> cost_hc /. 2., [hc]  (* axioms are cheaper *)
+      let best_cost, best_premises, max_dist = match hc.hcproof with
+      | Axiom _ -> cost_hc /. 2., C.ClauseSet.singleton hc, distance  (* axioms are cheaper *)
       | Proof (_, l) ->
         (* cost of recursing into parents *)
-        let cost_parents, premises_parents = List.fold_left
-          (fun (cost,premises) (parent,_,_) ->
-            let cost', premises' = compute_best (distance+1) parent.cref in
-            cost +. cost', premises @ premises')
-          (0., []) l
+        let cost_parents, premises_parents, max_dist = List.fold_left
+          (fun (cost,premises,m) (parent,_,_) ->
+            let cost', premises',m' = compute_best (distance+1) parent.cref in
+            cost +. cost', C.ClauseSet.union premises premises', max m m')
+          (0., C.ClauseSet.empty, 0) l
         in
         (* make the choice that gives the lowest cost *)
-        if cost_parents < cost_hc then (cost_parents, premises_parents) else (cost_hc, [hc])
+        if cost_hc < cost_parents && distance >= min_distance_threshold
+          then (cost_hc, C.ClauseSet.singleton hc, max_dist)
+          else (cost_parents, premises_parents, max_dist)
       in
       (* memoize and return *)
-      cost_map := CostMap.add (hc, distance) (best_cost, best_premises) !cost_map;
-      (best_cost, best_premises)
+      let triple = best_cost, best_premises, max_dist in
+      cost_map := CostMap.add (hc, distance) triple !cost_map;
+      triple
   in
   (* return the best choice of premises for this (clause, distance) *)
-  compute_best distance hc
+  let cost, premises, max_dist = compute_best distance hc in
+  let premises = C.ClauseSet.elements premises in
+  cost, premises, max_dist
 
 (** Given an empty clause (and its proof), look in the proof for lemmas. *)
 let search_lemmas meta hc =
@@ -251,14 +260,16 @@ let search_lemmas meta hc =
       (* absolute rate of the clause itself *)
       let hc_rate = rate_clause ~is_theory_symbol hc in
       (* choice of premises, with associate cost *)
-      let premises_rate, premises = explore_parents meta cost_map 0 hc in
-      (* build the candidate *)
-      let cl = {
-        cl_conclusion = hc;
-        cl_premises = premises;
-        cl_rate = hc_rate +. premises_rate;
-      } in
-      candidates := cl :: !candidates;
+      let premises_rate, premises, max_dist = explore_parents meta cost_map 0 hc in
+      begin if max_dist >= min_distance_threshold then
+        (* build the candidate *)
+        let cl = {
+          cl_conclusion = hc;
+          cl_premises = premises;
+          cl_rate = hc_rate +. premises_rate;
+        } in
+        candidates := cl :: !candidates
+      end;
       (* explore parent clauses *)
       match hc.hcproof with
       | Axiom _ -> ()
