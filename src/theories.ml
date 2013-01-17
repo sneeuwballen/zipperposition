@@ -225,10 +225,13 @@ let add_theories kb theories =
  * reasoning over a problem using Datalog
  * ---------------------------------------------------------------------- *)
 
+module TermMap = Map.Make(
+  struct type t = Datalog.Logic.term let compare = compare end)
+
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
-  mutable meta_clauses : Clauses.ClauseSet.t;       (* set of clauses sent to datalog *)
+  mutable meta_clauses : hclause TermMap.t; (* map terms to hclauses *)
   mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
   mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
@@ -271,7 +274,11 @@ let handle_formula meta term =
   (* find parents (other formulas) *)
   let explanation = Datalog.Logic.db_explain meta.meta_db term in
   let parents = List.map
-    (fun t -> term_to_hclause ~ord ~kb t (Axiom ("kb", "kb")) [])
+    (fun t ->  (* find clause that triggered hypotheses *)
+      try TermMap.find t meta.meta_clauses
+      with Not_found ->
+        failwith (Utils.sprintf "no clause backs term %a"
+                  (Datalog.Logic.pp_term ?to_s:None) t))
     explanation
   in
   (* is the clause deduced or merely an axiom? *)
@@ -287,7 +294,8 @@ let handle_formula meta term =
     Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
                   !C.pp_clause#pp_h conclusion));
     meta.meta_lemmas <- conclusion :: meta.meta_lemmas;
-    meta.meta_clauses <- C.ClauseSet.add conclusion meta.meta_clauses
+    (* remember that the term maps to this clause *)
+    meta.meta_clauses <- TermMap.add term conclusion meta.meta_clauses
   end
 
 (** Handler triggered when a theory is discovered in the current problem *)
@@ -346,7 +354,7 @@ let create_meta ~ord kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
-    meta_clauses = C.ClauseSet.empty;
+    meta_clauses = TermMap.empty;
     meta_theories = [];
     meta_theory_symbols = SSet.empty;
     meta_theory_clauses = Ptmap.empty;
@@ -396,8 +404,6 @@ let scan_clause meta hc =
   (* retrieve patterns that match this clause *)
   Patterns.Map.retrieve meta.meta_kb.kb_patterns hc ()
     (fun () pclause mapping nf ->
-      (* keep this clause in memory, it may be useful later *)
-      meta.meta_clauses <- C.ClauseSet.add hc meta.meta_clauses;
       (* a named formula is detected, assert the corresponding datalog
          predicate *)
       let head, args = nf.nf_atom in
@@ -416,7 +422,10 @@ let scan_clause meta hc =
         (* add fact if not already present *)
         Utils.debug 1 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
                        (Datalog.Logic.pp_rule ?to_s:None) rule pp_named_formula nf));
-        Datalog.Logic.db_add meta.meta_db rule
+        (* remember the clause that made us add the fact to datalog *)
+        meta.meta_clauses <- TermMap.add term hc meta.meta_clauses;
+        (* add the rule to datalog *)
+        Datalog.Logic.db_add meta.meta_db rule;
       end);
   (* get lemmas, and clear the list for next use *)
   let lemmas = meta.meta_lemmas in

@@ -103,10 +103,12 @@ val pp_kb : Format.formatter -> kb -> unit
  * reasoning over a problem using Datalog
  * ---------------------------------------------------------------------- *)
 
+module TermMap : Map.S with type key = Datalog.Logic.term
+
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
-  mutable meta_clauses : Clauses.ClauseSet.t;       (* set of clauses sent to datalog *)
+  mutable meta_clauses : hclause TermMap.t; (* map terms to hclauses *)
   mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
   mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
