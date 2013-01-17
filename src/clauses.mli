@@ -162,6 +162,9 @@ val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
 val is_unit_clause : hclause -> bool
   (** is the clause a unit clause? *)
 
+val is_cnf : hclause -> bool
+  (** Is the clause in CNF? *)
+
 val signature : hclause list -> signature
   (** Compute signature of this set of clauses *)
 

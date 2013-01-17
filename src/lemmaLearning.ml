@@ -205,8 +205,9 @@ let explore_parents meta cost_map distance hc =
       (* cost of returning [hc] *)
       let cost_hc =
         if is_theory_clause hc
-          then 0.1 (* theory clauses are cheap *)
-          else rate_clause ~is_theory_symbol hc /. (0.1 +. (float_of_int distance))
+        then 0.1 (* theory clauses are cheap *)
+        else if not (C.is_cnf hc) then 100. (* non-cnf clauses are to avoid *)
+        else rate_clause ~is_theory_symbol hc /. (0.1 +. (float_of_int distance))
       in
       let best_cost, best_premises, max_dist = match hc.hcproof with
       | Axiom _ -> cost_hc /. 2., C.ClauseSet.singleton hc, distance  (* axioms are cheaper *)

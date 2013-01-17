@@ -1044,15 +1044,9 @@ let cnf_of ~ord hc =
         (fun acc' litsb -> (litsa @ litsb) :: acc')
         acc b)
       [] a
-  (* check whether the clause is already in CNF *)
-  and is_cnf hc =
-    Utils.array_forall
-      (fun (Equation (l, r, sign, _)) -> T.atomic_rec l && T.atomic_rec r &&
-                                        (l.sort != bool_sort || (l == T.true_term || r == T.true_term)))
-      hc.hclits
   in
   Utils.debug 3 (lazy (Utils.sprintf "input clause %a@." !C.pp_clause#pp_h hc));
-  if is_cnf hc
+  if C.is_cnf hc
     then begin
       Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf" !C.pp_clause#pp_h hc));
       [hc] (* already cnf, perfect *)
@@ -1077,7 +1071,7 @@ let cnf_of ~ord hc =
       in
       Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"
                     !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) clauses));
-      List.iter (fun hc -> assert (is_cnf hc)) clauses;
+      List.iter (fun hc -> assert (C.is_cnf hc)) clauses;
       clauses
 
 (* ----------------------------------------------------------------------
