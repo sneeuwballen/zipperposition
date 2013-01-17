@@ -291,6 +291,10 @@ let process_file ~kb params f =
   (match params.param_dot_file with (* print state *)
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));
+  (* print theories *)
+  (match meta with None -> ()
+    | Some meta -> Format.printf "%% detected theories: @[<h>%a@]@."
+    (Utils.pp_list (Datalog.Logic.pp_term ?to_s:None)) meta.Theories.meta_theories);
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
@@ -308,6 +312,7 @@ let process_file ~kb params f =
       match meta with
       | None -> ()
       | Some meta -> begin
+        (* learning *)
         let kb_lock = lock_file params.param_kb in
         ignore (Theories.update_kb ~file:params.param_kb ~lock:kb_lock
           (fun kb ->

@@ -228,6 +228,7 @@ let add_theories kb theories =
 type meta_prover = {
   meta_db : Datalog.Logic.db;
   meta_kb : kb;
+  mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
   mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ord : ordering;
@@ -316,6 +317,8 @@ let handle_theory meta term =
         (* add the symbol to the theory symbols if it's not a base symbol *)
         if not (SSet.mem s base_symbols) then SSet.add s set else set)
       meta.meta_theory_symbols symbols;
+  (* add the theory to the set of detect theories *)
+  meta.meta_theories <- term :: meta.meta_theories;
   ()
 
 (** Add a lemma to the Datalog engine *)
@@ -341,6 +344,7 @@ let create_meta ~ord kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
+    meta_theories = [];
     meta_theory_symbols = SSet.empty;
     meta_theory_clauses = Ptmap.empty;
     meta_ord = ord;
