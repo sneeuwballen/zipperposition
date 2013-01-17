@@ -31,10 +31,9 @@ lemma total_function(p,f) if functional(p) and total(p, f).
 left_identity(mult, e) is mult(e, X) = X.
 right_identity(mult, e) is mult(X, e) = X.
 
-theory monoid(product, mult, e) is
+theory monoid(mult, e) is
   left_identity(mult, e) and
   right_identity(mult, e) and
-  total_function(product, mult) and   % need mult to be total
   associative(mult).
 
 % group
@@ -42,13 +41,13 @@ theory monoid(product, mult, e) is
 left_inverse(mult, e, inverse) is mult(inverse(X), X) = e.
 right_inverse(mult, e, inverse) is mult(X, inverse(X)) = e.
 
-theory group(product, mult, e, inverse) is
-  monoid(product, mult, e) and
+theory group(mult, e, inverse) is
+  monoid(mult, e) and
   left_inverse(mult, e, inverse) and
   right_inverse(mult, e, inverse).
 
-theory abelian_group(product, mult, e, inverse) is
-  group(product, mult, e, inverse) and
+theory abelian_group(mult, e, inverse) is
+  group(mult, e, inverse) and
   commutative(mult).
 
 % basic set
@@ -72,12 +71,46 @@ subgroup_inverse(in_subgroup, inverse) is ~in_subgroup(X) | in_subgroup(inverse(
 subgroup_mult(in_subgroup, mult) is ~in_subgroup(X) | ~in_subgroup(Y) |
                                     in_subgroup(mult(X,Y)).
 
-theory subgroup(product, mult, e, inverse, in_subgroup) is
-  group(product, mult, e, inverse) and
+theory subgroup(mult, e, inverse, in_subgroup) is
+  group(mult, e, inverse) and
   subgroup_inverse(in_subgroup, inverse) and
   subgroup_mult(in_subgroup, mult).
 
 lemma apply_1(in_subgroup, e) if
-  subgroup(product, mult, e, inverse, in_subgroup).
+  subgroup(mult, e, inverse, in_subgroup).
+
+% ring
+
+left_distributive(mult, sum) is mult(X, sum(Y,Z)) = sum(mult(X,Y), mult(X,Z)).
+right_distributive(mult, sum) is mult(sum(X,Y),Z) = sum(mult(X,Z), mult(Y,Z)).
+
+theory ring(mult, one, add, zero, add_inverse) is
+  abelian_group(add, zero, add_inverse) and
+  monoid(mult, one) and
+  left_distributive(mult, sum) and
+  right_distributive(mult, sum).
+
+theory commutative_ring(mult, one, add, zero, add_inverse) is
+  ring(mult, one, add, zero, add_inverse) and
+  commutative(mult).
+
+% boolean algebra
+
+theory bool_algebra(add, zero, mult, one, inverse) is
+  commutative(add) and
+  commutative(mult) and
+  left_inverse(add, inverse, one) and     % X or not(X) = true
+  right_inverse(add, inverse, one) and
+  left_inverse(mult, inverse, zero) and   % X and not(X) = false
+  right_inverse(mult, inverse, zero) and
+  left_distributive(mult, add) and        % X or (Y and Z) = XorY and XorZ
+  right_distributive(mult, add) and
+  left_distributive(add, mult) and        % X and (Y or Z) = XandY or XandZ
+  right_distributive(add, mult) and
+  left_identity(add, zero) and            % X or false = X
+  right_identity(add, zero) and
+  left_identity(mult, one) and            % X and true = X
+  right_identity(mult, one).
+    
 
 % vim:syntax=ocaml
