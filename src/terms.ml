@@ -179,6 +179,10 @@ let mk_var idx sort =
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
+let rec sum_sizes acc l = match l with
+  | [] -> acc
+  | x::l' -> sum_sizes (x.tsize + acc) l'
+
 let mk_node s sort l =
   Utils.enter_prof prof_mk_node;
   let rec my_t = {term=Node (s, l); sort; vars=[]; flags=0;
@@ -189,7 +193,7 @@ let mk_node s sort l =
     then begin  (* compute additional data, the term is new *)
       set_flag flag_db_closed t (compute_db_closed 0 t);
       t.vars <- compute_vars l;
-      t.tsize <- List.fold_left (fun acc subt -> acc + subt.tsize) 1 l;
+      t.tsize <- sum_sizes 1 l;
     end);
   Utils.exit_prof prof_mk_node;
   t

@@ -33,6 +33,10 @@ module Utils = FoUtils
 
 let prof_scan_clause = Utils.mk_profiler "Theories.scan_clause"
 
+let stat_lemma_deduced = mk_stat "lemmas deduced"
+let stat_theory_detected = mk_stat "theory detected"
+let stat_formula_detected = mk_stat "formulas detected"
+
 (* ----------------------------------------------------------------------
  * recognition of proof
  * ---------------------------------------------------------------------- *)
@@ -293,6 +297,7 @@ let handle_formula meta term =
     (* yield lemma *)
     Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
                   !C.pp_clause#pp_h conclusion));
+    incr_stat stat_lemma_deduced;
     meta.meta_lemmas <- conclusion :: meta.meta_lemmas;
     (* remember that the term maps to this clause *)
     meta.meta_clauses <- TermMap.add term conclusion meta.meta_clauses
@@ -304,6 +309,7 @@ let handle_theory meta term =
   let kb = meta.meta_kb in
   Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: theory @[<h>%a@]"
                  (Datalog.Logic.pp_term ?to_s:None) term));
+  incr_stat stat_theory_detected;
   (* the clauses that belong to this theory *)
   let premises = Datalog.Logic.db_premises meta.meta_db term in
   let premise_clauses = Utils.list_flatmap
@@ -422,6 +428,7 @@ let scan_clause meta hc =
         (* add fact if not already present *)
         Utils.debug 1 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
                        (Datalog.Logic.pp_rule ?to_s:None) rule pp_named_formula nf));
+        incr_stat stat_formula_detected;
         (* remember the clause that made us add the fact to datalog *)
         meta.meta_clauses <- TermMap.add term hc meta.meta_clauses;
         (* add the rule to datalog *)

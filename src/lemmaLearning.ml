@@ -69,7 +69,7 @@ let rate_clause ~is_theory_symbol hc =
     (fun s -> rate := !rate +. cost_symbol ~is_theory_symbol signature s)
     symbols;
   (* weight of clause, as a measure of weight of terms *)
-  rate := !rate +. (float_of_int hc.hcweight) /. 2.;
+  rate := !rate *. (float_of_int hc.hcweight) /. 2.;
   (* many literals is not simple, multiply by length of clause *)
   let length = Array.length hc.hclits in
   rate := !rate *. (float_of_int (length - 1));
@@ -100,7 +100,7 @@ let proof_depth hc =
 let max_lemmas = ref 3
 
 (** Maximum lemma rate, above which the lemma is discarded *)
-let max_rate = ref 100.
+let max_rate = ref 25.
 
 (** A possible lemma, i.e. a subgraph *)
 type candidate_lemma = {
