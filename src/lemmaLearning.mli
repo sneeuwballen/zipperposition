@@ -27,6 +27,9 @@ open Symbols
  * (heuristic) search of "interesting" lemma in a proof.
  * ---------------------------------------------------------------------- *)
 
+val max_lemmas : int ref
+  (** Maximal number of lemmas that can be learnt at once *)
+
 val rate_pclause : Patterns.pclause -> float
   (** Heuristic "simplicity and elegance" measure for pclauses. The smaller,
       the better. *)

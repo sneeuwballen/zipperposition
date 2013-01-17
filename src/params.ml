@@ -43,6 +43,7 @@ type parameters = {
   param_kb_load : string list;    (** theory files to read *)
   param_kb_clear : bool;          (** do we need to clear the KB? *)
   param_kb_print : bool;          (** print knowledge base and exit *)
+  param_learn : bool;             (** learn lemmas? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
@@ -75,6 +76,7 @@ let parse_args () =
   and kb_load = ref []
   and kb_clear = ref false
   and kb_print = ref false
+  and learn = ref true
   and select = ref "SelectComplex"
   and progress = ref false
   and pipeline = ref false
@@ -100,6 +102,8 @@ let parse_args () =
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
+      ("-no-learning", Arg.Clear learn, "disable lemma learning");
+      ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
       ("-progress", Arg.Set progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-pipeline", Arg.Set pipeline, "use pipelined given clause");
@@ -135,6 +139,6 @@ let parse_args () =
     param_index= !index; param_dot_file = !dot_file;
     param_kb = !kb; param_kb_load = !kb_load;
     param_kb_clear = !kb_clear;
-    param_kb_print = !kb_print;
+    param_kb_print = !kb_print; param_learn = !learn;
     param_print_sort = !print_sort; param_print_all = !print_all;
     param_precedence= !heuristic_precedence;}

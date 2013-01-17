@@ -310,17 +310,15 @@ let process_file ~kb params f =
                           "# SZS output end Refutation@.") !C.pp_proof#pp c);
       (* update knowledge base *)
       match meta with
-      | None -> ()
-      | Some meta -> begin
+      | Some meta when params.param_learn ->
         (* learning *)
         let kb_lock = lock_file params.param_kb in
         ignore (Theories.update_kb ~file:params.param_kb ~lock:kb_lock
           (fun kb ->
             let new_meta = { meta with Theories.meta_kb=kb; } in
             LemmaLearning.learn_and_update new_meta c;
-            kb));
-        ()
-      end
+            kb))
+      | _ -> ()
     end
 
 (** Print the content of the KB, and exit *)
