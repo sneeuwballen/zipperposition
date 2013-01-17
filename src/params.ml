@@ -71,7 +71,7 @@ let parse_args () =
   and kb_load = ref []
   and kb_clear = ref false
   and kb_print = ref false
-  and learn = ref true
+  and learn = ref false
   and select = ref "SelectComplex"
   and progress = ref false
   and print_sort = ref false
@@ -91,7 +91,7 @@ let parse_args () =
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
-      ("-no-learning", Arg.Clear learn, "disable lemma learning");
+      ("-learning", Arg.Set learn, "enable lemma learning");
       ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
       ("-progress", Arg.Set progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
