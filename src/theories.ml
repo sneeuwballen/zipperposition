@@ -433,7 +433,7 @@ let scan_clause meta hc =
       let rule = Datalog.Logic.mk_rule term [] in
       if not (Datalog.Logic.db_mem meta.meta_db rule) then begin
         (* add fact if not already present *)
-        Utils.debug 1 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
+        Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
                        (Datalog.Logic.pp_rule ?to_s:None) rule pp_named_formula nf));
         incr_stat stat_formula_detected;
         (* remember the clause that made us add the fact to datalog *)

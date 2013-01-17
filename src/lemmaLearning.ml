@@ -100,7 +100,7 @@ let proof_depth hc =
 let max_lemmas = ref 3
 
 (** Maximum lemma rate, above which the lemma is discarded *)
-let max_rate = ref 25.
+let max_rate = ref 100.
 
 (** A possible lemma, i.e. a subgraph *)
 type candidate_lemma = {
@@ -279,17 +279,21 @@ let search_lemmas meta hc =
   done;
   (* sort candidate by increasing rate (bad candidates at the end), and take
      only a given amount of them. *)
-  let candidates = List.filter (fun cl -> cl.cl_rate < !max_rate) !candidates in
   let candidates = List.sort
     (fun cl1 cl2 -> int_of_float (cl1.cl_rate -. cl2.cl_rate))
-    candidates in
+    !candidates in
   let candidates = Utils.list_take !max_lemmas candidates in
   (* convert the candidate lemma to a lemma. Also keep all the
      involved named formulas. *)
-  let lemmas = List.map
-    (fun candidate ->
-      let lemma = candidate_to_lemma meta.meta_kb candidate in
-      lemma, candidate.cl_rate)
+  let lemmas = Utils.list_flatmap
+    (fun cl ->
+      if cl.cl_rate > !max_rate
+        then begin
+          Utils.debug 0 (lazy (Utils.sprintf "%% drop candidate with rate %.2f" cl.cl_rate));
+          []
+        end else
+          let lemma = candidate_to_lemma meta.meta_kb cl in
+          [lemma, cl.cl_rate])
     candidates
   in
   (* only keep lemmas that give safe rules *)
