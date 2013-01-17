@@ -87,7 +87,7 @@ module THashtbl = Hashtbl.Make(
 module THashSet =
   struct
     type t = unit THashtbl.t
-    let create () = THashtbl.create 5
+    let create () = THashtbl.create 3
     let member t term = THashtbl.mem t term
     let iter set f = THashtbl.iter (fun t () -> f t) set
     let add set t = THashtbl.replace set t ()
@@ -141,9 +141,11 @@ let stats () = H.stats ()
  * boolean flags
  * ---------------------------------------------------------------------- *)
 
-let flag_db_closed = 0x1
-and flag_simplified = 0x2
-and flag_normal_form = 0x4
+let flag_db_closed = 1 lsl 0
+and flag_simplified = 1 lsl 1
+and flag_normal_form = 1 lsl 2
+and flag_ground = 1 lsl 3
+and flag_db_closed_computed = 1 lsl 4
 
 let set_flag flag t truth =
   if truth
@@ -156,25 +158,10 @@ let get_flag flag t = (t.flags land flag) != 0
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
 
-let compute_vars l =
-  let set = THashSet.create () in
-  List.iter  (* for each subterm, add its variables to set *)
-    (fun subterm -> List.iter (fun v -> THashSet.add set v) subterm.vars)
-    l;
-  THashSet.to_list set
-
-let rec compute_db_closed depth t = match t.term with
-  | Node (s, []) when s = db_symbol -> depth < 0
-  | Node (s, l) when is_binder_symbol s ->
-    List.for_all (compute_db_closed (depth-1)) l
-  | Node (s, [t']) when s = succ_db_symbol -> 
-    compute_db_closed (depth+1) t'
-  | Var _ -> true
-  | Node (_, l) -> List.for_all (compute_db_closed depth) l
-
 let mk_var idx sort =
-  let rec my_v = {term = Var idx; sort=sort; vars=[my_v];
-                  flags=(flag_db_closed lor flag_simplified lor flag_normal_form);
+  let rec my_v = {term = Var idx; sort=sort;
+                  flags=(flag_db_closed lor flag_db_closed_computed lor
+                         flag_simplified lor flag_normal_form);
                   binding=my_v; tsize=1; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
@@ -183,17 +170,22 @@ let rec sum_sizes acc l = match l with
   | [] -> acc
   | x::l' -> sum_sizes (x.tsize + acc) l'
 
+let rec compute_is_ground l = match l with
+  | [] -> true
+  | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
+
 let mk_node s sort l =
   Utils.enter_prof prof_mk_node;
-  let rec my_t = {term=Node (s, l); sort; vars=[]; flags=0;
+  let rec my_t = {term=Node (s, l); sort; flags=0;
                   binding=my_t; tsize=0; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
   let t = H.hashcons my_t in
   (if t == my_t
-    then begin  (* compute additional data, the term is new *)
-      set_flag flag_db_closed t (compute_db_closed 0 t);
-      t.vars <- compute_vars l;
+    then begin
+      (* compute size of term *)
       t.tsize <- sum_sizes 1 l;
+      (* compute ground-ness of term *)
+      set_flag flag_ground t (compute_is_ground l);
     end);
   Utils.exit_prof prof_mk_node;
   t
@@ -273,22 +265,17 @@ let pos_to_cpos pos = failwith "not implemented"
 let cpos_to_pos cpos = failwith "not implemented"
 
 let var_occurs x t =
-  let rec check l =
+  let rec check x t = match t.term with
+  | Var _ -> x == t
+  | Node (_, l) -> check_list x l
+  and check_list x l =
     match l with
     | [] -> false
-    | y::l' -> if x == y then true else check l'
-  in check t.vars
+    | y::l' -> check x y || check_list x l'
+  in
+  check x t
 
-let is_ground_term t =
-  match t.vars with
-  | [] -> true
-  | _ -> false
-
-(** merge two lists of variables *)
-let rec merge_varlist acc vars1 = match vars1 with
-  | [] -> acc
-  | v::vars1' when List.mem v acc -> merge_varlist acc vars1'
-  | v::vars1' -> merge_varlist (v::acc) vars1'
+let is_ground_term t = get_flag flag_ground t
 
 let max_var vars =
   let rec aux idx = function
@@ -305,6 +292,29 @@ let min_var vars =
   | _ -> assert false
   in
   aux max_int vars
+
+(** add variables of the term to the set *)
+let add_vars set t =
+  let rec add set t = match t.term with
+  | Var _ -> THashSet.add set t
+  | Node (_, l) -> add_list set l
+  and add_list set l = match l with
+  | [] -> ()
+  | x::l' -> add set x; add_list set l'
+  in
+  add set t
+
+(** compute variables of the term *)
+let vars t =
+  let set = THashSet.create () in
+  add_vars set t;
+  THashSet.to_list set
+
+(** Compute variables of terms in the list *)
+let vars_list l =
+  let set = THashSet.create () in
+  List.iter (add_vars set) l;
+  THashSet.to_list set
 
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
@@ -327,8 +337,23 @@ let rec atomic_rec t = match t.term with
     exists_symbol || s == imply_symbol || s == not_symbol || s == eq_symbol)
     && List.for_all atomic_rec l
 
+let rec compute_db_closed depth t = match t.term with
+  | Node (s, []) when s = db_symbol -> depth < 0
+  | Node (s, l) when is_binder_symbol s ->
+    List.for_all (compute_db_closed (depth-1)) l
+  | Node (s, [t']) when s = succ_db_symbol -> 
+    compute_db_closed (depth+1) t'
+  | Var _ -> true
+  | Node (_, l) -> List.for_all (compute_db_closed depth) l
+
 (** check wether the term is closed w.r.t. De Bruijn variables *)
-let db_closed t = get_flag flag_db_closed t
+let db_closed t =
+  (* compute it, if not already computed *)
+  (if not (get_flag flag_db_closed_computed t) then begin
+    set_flag flag_db_closed_computed t true;
+    set_flag flag_db_closed t (compute_db_closed 0 t);
+    end);
+  get_flag flag_db_closed t
 
 let rec db_var t =
   match t.term with
@@ -468,8 +493,8 @@ let expand_bindings ?(recursive=true) t =
     number of binders met so far, for lifting non-closed De Bruijn indexes in
     substituted terms. *)
   let rec recurse binder_depth t =
-    (* if no variable of t is bound (or t ground), nothing to do *)
-    if is_ground_term t || List.for_all (fun v -> v.binding == v) t.vars then t
+    (* if t ground, nothing to do *)
+    if is_ground_term t then t
     else match t.term with
     | Var _ ->
       if t.binding == t then t
@@ -489,10 +514,15 @@ let expand_bindings ?(recursive=true) t =
 
 (** reset bindings of variables of the term *)
 let reset_vars t =
-  let rec reset = function
+  let rec reset t =
+    if is_ground_term t then () else match t.term with
+    | Var _ -> reset_binding t
+    | Node (_, l) -> reset_list l
+  and reset_list l = match l with
   | [] -> ()
-  | v::l -> reset_binding v; reset l
-  in reset t.vars
+  | x::l' -> reset x; reset_list l'
+  in
+  reset t
 
 (* ----------------------------------------------------------------------
  * Pretty printing
@@ -648,7 +678,7 @@ let pp_term_tstp =
             (Utils.pp_list ~sep:", " self#pp) args
       | Var i -> Format.fprintf formatter "X%d" i
       in
-      let maxvar = max (max_var t.vars) 0 in
+      let maxvar = max (max_var (vars t)) 0 in
       let varindex = ref (maxvar+1) in
       (* convert everything to named variables, then print *)
       pp_rec (db_to_var varindex t)
@@ -714,7 +744,7 @@ let classic_skolem =
   in
   fun ~ord t sort ->
     Utils.debug 4 (lazy (Utils.sprintf "skolem %a@." !pp_term#pp t));
-    let vars = t.vars in
+    let vars = vars t in
     (* find the skolemized normalized term *)
     let t'= try
       THashtbl.find cache t

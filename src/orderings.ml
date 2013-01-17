@@ -89,8 +89,8 @@ module KBO = struct
       then
         { offset = 0; pos_counter = 0; neg_counter = 0; balance = Obj.magic None }
       else begin
-        let minvar = min (T.min_var t1.vars) (T.min_var t2.vars)
-        and maxvar = max (T.max_var t1.vars) (T.max_var t2.vars) in
+        let vars = T.vars_list [t1; t2] in
+        let minvar, maxvar = T.min_var vars, T.max_var vars in
         assert (minvar <= maxvar);
         let width = maxvar - minvar + 1 in  (* width between min var and max var *)
         let vb = {

@@ -146,7 +146,7 @@ let normalize_term t =
           build_subst ~recursive:false s_from var new_var,
           build_subst ~recursive:false s_to new_var var
         | _ -> assert false)
-      (id_subst, id_subst) t.vars
+      (id_subst, id_subst) (T.vars t)
   in
   let normalized_t = apply_subst ~recursive:false subst_from_t t in
   normalized_t, subst_to_t

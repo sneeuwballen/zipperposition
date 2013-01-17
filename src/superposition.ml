@@ -626,11 +626,17 @@ exception SubsumptionFound of substitution
 
 (** Hashset containing all variables of the array of literals *)
 let vars_of_lits lits =
+  let rec iter set lits i =
+    if i = Array.length lits then () else begin
+      match lits.(i) with
+      | Equation (l,r,_,_) ->
+        T.add_vars set l;
+        T.add_vars set r;
+        iter set lits (i+1)
+    end
+  in
   let set = T.THashSet.create () in
-  let update_set t = List.iter (T.THashSet.add set) t.vars in
-  Array.iter
-    (function (Equation (l,r,_,_)) -> update_set l; update_set r)
-    lits;
+  iter set lits 0;
   set
 
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
@@ -732,8 +738,8 @@ let subsumes_with a b =
     if j = Array.length a then false else match lit, a.(j) with
     | Equation (l, r, _, _), _ when T.is_ground_term l && T.is_ground_term r -> false
     | Equation (l, r, _, _), Equation (l', r',_,_) ->
-      if (List.exists (fun v -> T.var_occurs v l' || T.var_occurs v r') l.vars ||
-          List.exists (fun v -> T.var_occurs v l' || T.var_occurs v r') r.vars)
+      let vars = T.vars_list [l;r] in
+      if (List.exists (fun v -> T.var_occurs v l' || T.var_occurs v r') vars)
         then true
         else check_vars lit (j+1)
   in

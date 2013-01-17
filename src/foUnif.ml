@@ -31,15 +31,20 @@ let enable = true
 let prof_unification = Utils.mk_profiler "unification"
 let prof_matching = Utils.mk_profiler "matching"
 
-(** does var appear in t (even when expanding bindings)? *)
-let rec occurs_check var t =
-  match t.term with
-  | _ when T.is_ground_term t -> false
-  | Var _ when T.eq_term var t -> true
-  | Var _ when not (T.eq_term t (T.get_binding t)) ->
-    occurs_check var (T.get_binding t)  (* see in binding *)
-  | Var _ -> false
-  | Node _ -> List.exists (occurs_check var) t.vars
+(** does [var] appear in [t] (even when expanding bindings)? *)
+let occurs_check var t =
+  let rec check var t =
+    if T.is_ground_term t then false else match t.term with
+      | Var _ when var == t -> true
+      | Var _ when t != (T.get_binding t) ->
+        check var (T.get_binding t)  (* recurse in binding *)
+      | Var _ -> false
+      | Node (_, l) -> check_list var l
+  and check_list var l = match l with
+  | [] -> false
+  | x::l' -> check var x || check_list var l'
+  in
+  check var t
 
 (** if t is a variable, return its current binding *)
 let rec get_var_binding t =
@@ -130,5 +135,6 @@ let matching_locked ~locked subst a b =
     raise e
 
 let matching subst a b =
-  let locked = T.THashSet.from_list b.vars in
+  let locked = T.THashSet.create () in
+  T.add_vars locked b;
   matching_locked ~locked subst a b

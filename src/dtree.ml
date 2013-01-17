@@ -153,9 +153,10 @@ let add dt ?(priority=0) t v =
     let l' = (t, v, priority)::l in
     Leaf (List.stable_sort (fun (_, _, p1) (_, _, p2) -> p1 - p2) l')
   in
-  let tree = goto_leaf dt.tree chars k
-  and max_var = max (T.max_var t.vars) dt.max_var
-  and min_var = min (T.min_var t.vars) dt.min_var in
+  let tree = goto_leaf dt.tree chars k in
+  let vars = T.vars t in
+  let max_var = max (T.max_var vars) dt.max_var
+  and min_var = min (T.min_var vars) dt.min_var in
   {dt with tree; max_var; min_var;}
 
 (** remove the term -> value from the tree *)
@@ -180,7 +181,9 @@ let max_var dt = max dt.max_var 0
 (** iterate on all (term -> value) such that subst(term) = input_term *)
 let iter_match dt t k =
   (* variable collision check *)
-  assert (T.is_ground_term t || T.max_var t.vars < dt.min_var || T.min_var t.vars > dt.max_var);
+  assert (T.is_ground_term t ||
+          T.max_var (T.vars t) < dt.min_var ||
+          T.min_var (T.vars t) > dt.max_var);
   (* recursive traversal of the trie, following paths compatible with t *)
   let rec traverse trie pos subst =
     match trie with

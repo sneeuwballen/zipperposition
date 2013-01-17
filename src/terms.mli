@@ -68,6 +68,8 @@ val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 val flag_db_closed : int
 val flag_simplified : int
 val flag_normal_form : int
+val flag_ground : int
+val flag_db_closed_computed : int
 
 val set_flag : int -> term -> bool -> unit
   (** set or reset the given flag of the term to bool *)
@@ -121,9 +123,11 @@ val cpos_to_pos : compact_position -> position
 
 val var_occurs : term -> term -> bool       (** [var_occurs x t] true iff x in t *)
 val is_ground_term : term -> bool           (** is the term ground? *)
-val merge_varlist : varlist -> varlist -> varlist (** set union of variable list *)
 val max_var : varlist -> int                (** find the maximum variable index *)
 val min_var : varlist -> int
+val add_vars : THashSet.t -> term -> unit   (** add variables of the term to the set *)
+val vars : term -> varlist                  (** compute variables of the term *)
+val vars_list : term list -> varlist        (** variables of terms in the list *)
 
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas

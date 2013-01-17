@@ -218,7 +218,10 @@ let fmap_lit ~ord f = function
 
 let vars_of_lit = function
   | Equation (left, right, _, _) ->
-    T.merge_varlist left.vars right.vars
+    let set = T.THashSet.create () in
+    T.add_vars set left;
+    T.add_vars set right;
+    T.THashSet.to_list set
 
 (* ----------------------------------------------------------------------
  * clauses
@@ -331,12 +334,18 @@ let check_normal vars =
   in check (-1) vars
 
 (** compute the set of variables of literals *)
-let rec merge_lit_vars acc lits i = 
-  if i = Array.length lits then acc else
+let rec merge_lit_vars set lits i = 
+  if i = Array.length lits then () else
   match lits.(i) with
   | Equation (l, r, _, _) ->
-    let acc = T.merge_varlist (T.merge_varlist acc l.vars) r.vars in
-    merge_lit_vars acc lits (i+1)
+    T.add_vars set l;
+    T.add_vars set r;
+    merge_lit_vars set lits (i+1)
+
+let vars_of_lits lits =
+  let set = T.THashSet.create () in
+  merge_lit_vars set lits 0;
+  T.THashSet.to_list set
 
 (** the tautological empty clause *)
 let true_clause =
@@ -355,7 +364,7 @@ let mk_hclause_a ~ord lits proof parents =
   then (Utils.debug 1 (lazy (Utils.sprintf "%% incompleteness: clause of %d lits -> $true"
       (Array.length lits))); true_clause)
   else begin
-  let all_vars = merge_lit_vars [] lits 0 in
+  let all_vars = vars_of_lits lits in
   let all_vars = List.sort compare_vars all_vars in
   (* normalize literals *)
   let all_vars =
@@ -417,7 +426,7 @@ let mk_hclause_raw ~selected ~maxlits ~selected_done lits proof parents =
   let hc' = H.hashcons hc in
   (if hc == hc' then begin
     incr_stat stat_new_clause;
-    hc.hcvars <- merge_lit_vars [] lits 0;
+    hc.hcvars <- vars_of_lits lits;
     hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
     (* update the parent clauses' sets of descendants *)
     List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
@@ -750,7 +759,8 @@ let is_definition hc =
     | Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n > 0 *)
       T.atomic_rec l && ts <> [] && not (contains_symbol f r) && l != T.true_term && r != T.true_term
-      && List.for_all T.is_var ts && List.for_all (fun x -> T.var_occurs x l) r.vars
+      && List.for_all T.is_var ts
+      && List.for_all (fun x -> T.var_occurs x l) (T.vars r)
   in
   match hc.hclits with
   | [|Equation (({term=Node(_, _)} as l), r, true, _)|] when check_def l r -> Some (l, r)
@@ -768,7 +778,7 @@ let is_rewrite_rule hc =
     | Var _ -> false
     | Node (_, _) ->
       T.atomic_rec l && l != T.true_term && r != T.true_term &&
-      List.for_all (fun x -> T.var_occurs x l) r.vars
+      List.for_all (fun x -> T.var_occurs x l) (T.vars r)
   in
   match hc.hclits with
   | [|Equation (l, r, true, _)|] ->
@@ -928,7 +938,7 @@ let pp_clause_tstp =
             (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
         in
         (* quantify all free variables *)
-        let vars = t.vars in
+        let vars = T.vars t in
         let t = List.fold_left
           (fun t var -> T.mk_node forall_symbol bool_sort [var; t])
           t vars
