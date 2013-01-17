@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** parameters for the main procedure *)
 type parameters = {
   param_ord : Types.precedence -> Types.ordering;
-  param_role : string option;     (** Role of the process *)
   param_seed : int;
   param_steps : int;
   param_version : bool;
@@ -34,9 +33,6 @@ type parameters = {
   param_precedence : bool;        (** use heuristic for precedence? *)
   param_select : string;          (** name of the selection function *)
   param_progress : bool;          (** print progress during search *)
-  param_pipeline : bool;          (** use the pipelined given clause *)
-  param_pipeline_capacity : int;  (** capacity (in clauses) of the pipeline *)
-  param_parallel : bool;          (** is the pipeline parallel, ie multicore? *)
   param_proof : bool;             (** print proof *)
   param_dot_file : string option; (** file to print the final state in *)
   param_kb : string;              (** file to use for KB *)
@@ -59,7 +55,6 @@ let parse_args () =
   let unamed_skolem () = Terms.skolem := Terms.unamed_skolem in
   (* parameters *)
   let ord = ref "rpo6"
-  and role = ref None
   and seed = ref 1928575
   and steps = ref 0
   and version = ref false
@@ -79,18 +74,12 @@ let parse_args () =
   and learn = ref true
   and select = ref "SelectComplex"
   and progress = ref false
-  and pipeline = ref false
-  and pipeline_capacity = ref 10
-  and parallel = ref false
   and print_sort = ref false
   and print_all = ref false
   and files = ref [] in
-  (* some handlers *)
-  let set_parallel () = parallel := true; pipeline := true in
   (* options list *) 
   let options =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
-      ("-role", Arg.String (fun r -> role := Some r), "role of the process (do not use)");
       ("-debug", Arg.Int FoUtils.set_debug, "debug level");
       ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
@@ -106,9 +95,6 @@ let parse_args () =
       ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
       ("-progress", Arg.Set progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
-      ("-pipeline", Arg.Set pipeline, "use pipelined given clause");
-      ("-pipeline-capacity", Arg.Set_int pipeline_capacity, "set capacity of pipeline");
-      ("-parallel", Arg.Unit set_parallel, "fork processes to parallelize the pipeline");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
       ("-no-proof", Arg.Clear proof, "disable proof printing");
@@ -129,11 +115,10 @@ let parse_args () =
     | "kbo" -> Orderings.kbo
     | x -> failwith ("unknown ordering " ^ x) in
   (* return parameter structure *)
-  { param_ord; param_role = !role; param_seed = !seed; param_steps = !steps;
+  { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;
     param_files = !files; param_select = !select; param_theories = !theories;
-    param_progress = !progress; param_pipeline = !pipeline;
-    param_pipeline_capacity = !pipeline_capacity; param_parallel = !parallel;
+    param_progress = !progress;
     param_proof = !proof;
     param_presaturate = !presaturate; param_output_syntax = !output;
     param_index= !index; param_dot_file = !dot_file;

@@ -2,23 +2,24 @@
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 TARGET = zipperposition.native
-LIBS = datalog
+LIBS = datalog,unix,str
+SUBMODULES = datalog
 PWD = $(shell pwd)
-OPTIONS = -use-jocaml -cflags -I,$(PWD)/datalog/_build/ -lflags -I,$(PWD)/datalog/_build/ -libs str,datalog
+OPTIONS = -cflags -I,$(PWD)/datalog/_build/ -lflags -I,$(PWD)/datalog/_build/ -libs $(LIBS)
 
-all: $(LIBS)
+all: $(SUBMODULESS)
 	ocamlbuild $(OPTIONS) -tag debug src/$(TARGET)
 
-prod: $(LIBS)
+prod: $(SUBMODULESS)
 	ocamlbuild $(OPTIONS) -tag noassert src/$(TARGET)
 
-profile: $(LIBS)
+profile: $(SUBMODULESS)
 	ocamlbuild $(OPTIONS) -tags debug,profile src/$(TARGET)
 
-byte: $(LIBS)
+byte: $(SUBMODULESS)
 	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
 
-tests: all $(LIBS)
+tests: all $(SUBMODULESS)
 	ocamlbuild $(OPTIONS) -tag debug -I src tests/tests.native
 
 doc:

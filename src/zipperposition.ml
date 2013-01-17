@@ -278,11 +278,7 @@ let process_file ~kb params f =
   (* add clauses to passive_set *)
   state#passive_set#add clauses;
   (* saturate, using a given clause main loop as choosen by the user *)
-  let result, num =
-    let parallel = params.param_parallel in
-    if params.param_pipeline
-      then Distributed.given_clause ~parallel ?steps ?timeout ~progress ~calculus ~params state
-      else Sat.given_clause ?steps ?timeout ~progress ~calculus state
+  let result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;
@@ -344,16 +340,8 @@ let () =
   (if params.param_kb_clear then clear_kb params);
   (* setup printing *)
   setup_output params;
-  match params.param_role with
-  | Some role ->
-    (* slave process: assume a role in the pipeline *)
-    let calculus = get_calculus ~params in
-    let ord = params.param_ord (Precedence.mk_precedence ~complete:false [] []) in
-    let select = Selection.selection_from_string ~ord params.param_select in
-    Distributed.assume_role ~calculus ~ord ~select role
-  | None ->
-    (* master process: process files *)
-    List.iter (process_file ~kb params) params.param_files
+  (* master process: process files *)
+  List.iter (process_file ~kb params) params.param_files
 
 let _ =
   at_exit (fun () -> 
