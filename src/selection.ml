@@ -65,12 +65,14 @@ let select_diff_neg_lit ?(strict=true) ~ord hc =
   | n -> n :: select_positives hc
 
 let select_complex ?(strict=true) ~ord hc =
-  (* find x!=y in literals *)
+  (* find x!=t in literals *)
   let rec find_noteqvars lits idx =
     if idx = Array.length lits then -1 else
     match lits.(idx) with
     | Equation (l, r, false,_) ->
-      if T.is_var l && T.is_var r then idx else find_noteqvars lits (idx+1)
+      if (T.is_var l && not (T.var_occurs l r)) ||
+         (T.is_var r && not (T.var_occurs r l))
+      then idx else find_noteqvars lits (idx+1)
     | _ -> find_noteqvars lits (idx+1) 
   (* find the smallest ground negative literal *)
   and find_neg_ground best_weight best_idx lits idx =

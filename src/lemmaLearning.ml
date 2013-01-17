@@ -100,7 +100,7 @@ let proof_depth hc =
 let max_lemmas = ref 3
 
 (** Maximum lemma rate, above which the lemma is discarded *)
-let max_rate = ref 100.
+let max_rate = ref 50.
 
 (** A possible lemma, i.e. a subgraph *)
 type candidate_lemma = {
