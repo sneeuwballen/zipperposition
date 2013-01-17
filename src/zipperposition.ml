@@ -197,6 +197,7 @@ let initial_kb params =
         params.param_kb_load;
       kb)
   in
+  Format.printf "%% %a@." Theories.pp_kb_stats kb;
   Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
   kb
 

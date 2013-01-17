@@ -190,6 +190,13 @@ let pp_kb formatter kb =
   Format.fprintf formatter "@]@;";
   Format.fprintf formatter "@]"
 
+(** Print statistics about KB *)
+let pp_kb_stats formatter kb =
+  Format.fprintf formatter "@[<h>KB stats: %d formulas, %d lemmas, %d theories@]"
+    (Hashtbl.length kb.kb_formulas)
+    (List.length kb.kb_lemmas)
+    (Hashtbl.length kb.kb_theories)
+
 (** Add a potential lemma to the KB. The lemma must be checked before
     it is used. *)
 let add_potential_lemmas kb pot_lemmas =

@@ -99,6 +99,9 @@ val pp_theory : Format.formatter -> theory -> unit
 val pp_kb : Format.formatter -> kb -> unit
   (** Pretty print content of KB *)
 
+val pp_kb_stats : Format.formatter -> kb -> unit
+  (** Print statistics about KB *)
+
 (* ----------------------------------------------------------------------
  * reasoning over a problem using Datalog
  * ---------------------------------------------------------------------- *)
