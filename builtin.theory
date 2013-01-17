@@ -111,6 +111,41 @@ theory bool_algebra(add, zero, mult, one, inverse) is
   right_identity(add, zero) and
   left_identity(mult, one) and            % X and true = X
   right_identity(mult, one).
+
+% basic relations
     
+reflexive(r) is r(X,X).
+irreflexive(r) is ~r(X,X).
+transitive(r) is ~r(X,Y) | ~r(Y,Z) | r(X,Z).
+antisymmetric(r) is ~r(X,Y) | ~r(Y,X) | X=Y.
+symmetric(r) is ~r(X,Y) | r(Y,X).
+
+% orders and partial orders
+
+theory partial_order(r) is
+  reflexive(r) and
+  transitive(r) and
+  antisymmetric(r).
+
+theory strict_partial_order(r) is
+  irreflexive(r) and
+  transitive(r) and
+  antisymmetric(r).
+
+% lattices
+
+idempotent(op) is op(X,X) = X.
+
+theory semi_lattice(meet) is
+  ac(meet) and
+  idempotent(meet).
+
+absorption(f1, f2) is f1(X, f2(X, Y)) = X.
+
+theory lattice(meet, join) is
+  semi_lattice(meet) and
+  semi_lattice(join) and
+  absorption(meet, join) and
+  absorption(join, meet).
 
 % vim:syntax=ocaml
