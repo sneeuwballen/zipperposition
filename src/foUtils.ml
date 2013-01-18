@@ -19,6 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 *)
 
 open Types
+open Hash
 
 (* debugging facilities *)
 let debug_level_ = ref 0
@@ -90,19 +91,6 @@ let () =
             (profiler.prof_total /. (float_of_int profiler.prof_calls)))
         profilers
     end)
-
-let murmur_hash i =
-  let m = 0xd1e995
-  and r = 24
-  and seed = 0x47b28c in
-  let hash = seed lxor 32 in
-  let k = i * m in
-  let k = k lxor (k lsr r) in
-  let k = k * m in
-  let hash = (hash * m) lxor k in
-  let hash = hash lxor (hash lsr 13) in
-  let hash = hash lxor (hash lsr 15) in
-  abs hash
 
 let rec lexicograph f l1 l2 =
   match l1, l2 with

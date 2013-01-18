@@ -77,7 +77,7 @@ type net_state = {
 (** Hash a net_clause *)
 let hash_net_clause nc =
   let rec hash_nc_term acc t = match t with
-   | NVar (i, s) -> Hashcons.combine2 acc (Utils.murmur_hash i) (Hashtbl.hash s)
+   | NVar (i, s) -> Hashcons.combine2 acc (Hash.murmur_hash i) (Hashtbl.hash s)
    | NNode (f, s, l) ->
      Hashcons.combine3 331 (Hashtbl.hash f) (Hashtbl.hash s) (List.fold_left hash_nc_term acc l)
   and hash_nc_literal acc = function

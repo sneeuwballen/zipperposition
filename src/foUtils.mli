@@ -33,9 +33,6 @@ val mk_profiler : string -> profiler      (** Create a named profiler *)
 val enter_prof : profiler -> unit         (** Enter the profiler *)
 val exit_prof : profiler -> unit          (** Exit the profiler *)
 
-(** hashing on ints, cf http://en.wikipedia.org/wiki/MurmurHash *)
-val murmur_hash : int -> int
-
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
 (** lexicographic partial order on lists. If lengths are different, returns Incomparable *)

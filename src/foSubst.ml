@@ -37,7 +37,7 @@ let hash_subst s =
   let rec recurse h s = match s with
   | [] -> h
   | (v,t)::s' ->
-    let h' = (Utils.murmur_hash (v.hkey lxor t.hkey)) lxor h in
+    let h' = Hash.hash_int2 v.hkey t.hkey lxor h in
     recurse h' s'
   in recurse 1913 s
 

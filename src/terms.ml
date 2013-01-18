@@ -34,13 +34,14 @@ let is_binder_symbol s =
   s == lambda_symbol
 
 let hash_term t = match t.term with
-  | Var i -> abs (Hashcons.combine2 17 (hash_symbol t.sort) (Utils.murmur_hash i))
+  | Var i -> Hash.hash_int2 (hash_symbol t.sort) i
   | Node (s, l) ->
     let rec aux h = function
     | [] -> h
-    | head::tail -> aux (Hashcons.combine h head.hkey) tail
+    | head::tail ->
+      let h = Hash.hash_int2 h head.hkey in aux h tail
     in
-    let h = Hashcons.combine2 2749 (hash_symbol t.sort) (hash_symbol s) in
+    let h = Hash.hash_int2 (hash_symbol t.sort) (hash_symbol s) in
     abs (aux h l)
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"

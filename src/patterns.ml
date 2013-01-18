@@ -87,9 +87,9 @@ let eq_pterm t1 t2 = compare_pterm t1 t2 = 0
 let hash_pterm t =
   let rec hash h t = match t with
   | PVar (i, sort) ->
-    Hashcons.combine2 h (Utils.murmur_hash i) (Utils.murmur_hash sort)
+    Hash.hash_int3 h i sort
   | PNode (f, sort, l) ->
-    let h = Hashcons.combine2 h (Utils.murmur_hash f) (Utils.murmur_hash sort) in
+    let h = Hash.hash_int3 h f sort in
     List.fold_left hash h l
   in hash 113 t
 

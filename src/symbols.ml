@@ -33,7 +33,7 @@ type sort = symbol
 
 let compare_symbols (_, t1,_) (_,t2,_) = t1 - t2
 
-let hash_symbol (s, _, _) = Hashtbl.hash s
+let hash_symbol (_, i, _) = Hash.hash_int i
 
 (** weak hash table for symbols *)
 module HashSymbol = Hashtbl.Make(
