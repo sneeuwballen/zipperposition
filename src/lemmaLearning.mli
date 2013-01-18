@@ -30,10 +30,6 @@ open Symbols
 val max_lemmas : int ref
   (** Maximal number of lemmas that can be learnt at once *)
 
-val rate_pclause : Patterns.pclause -> float
-  (** Heuristic "simplicity and elegance" measure for pclauses. The smaller,
-      the better. *)
-
 val rate_clause : is_theory_symbol:(symbol -> bool) -> hclause -> float
   (** Heuristic "simplicity and elegance" measure for clauses in a proof. Theory
       symbols are less 'costly' than other symbols, as are constants.

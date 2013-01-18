@@ -32,23 +32,6 @@ module Utils = FoUtils
  * (heuristic) search of "interesting" lemma in a proof.
  * ---------------------------------------------------------------------- *)
 
-(** Heuristic "simplicity and elegance" measure for pclauses. The smaller,
-    the better. *)
-let rate_pclause pclause =
-  let rate = ref 1. in
-  (* many symbols is not simple *)
-  let symbols = pclause.Patterns.pc_vars in
-  let num_symbols = List.length symbols in
-  rate := !rate +. (float_of_int (num_symbols - 1));
-  (* many literals is not simple *)
-  let length = List.length pclause.Patterns.pc_lits in
-  rate := !rate +. (2. *. float_of_int (length - 1));
-  (* result *)
-  Utils.debug 3 (lazy (Utils.sprintf
-                "%% simplicity of @[<h>%a@] is %.2f (%d symbols, %d lits)"
-                Patterns.pp_pclause pclause !rate num_symbols length));
-  !rate 
-
 (** 'cost', or handicap, of a symbol *)
 let cost_symbol ~is_theory_symbol signature s =
   if is_theory_symbol s then 0.2
