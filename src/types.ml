@@ -81,6 +81,7 @@ type clause = {
 and hclause = {
   hclits : literal array;                 (** the (normalized) equations *)
   mutable hctag : int;                    (** hashconsing tag *)
+  mutable hchash : int;                   (** hash of clause *)
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcmaxlits : int;                (** bitvector for maximal literals *)
   mutable hcselected_done : bool;

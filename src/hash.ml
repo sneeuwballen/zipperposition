@@ -31,6 +31,13 @@ let hash_4bytes hash i =
   let hash = hash lxor (hash lsr 15) in
   hash
 
+(* initial hash for a sequence of [len] bytes *)
+let initial_hash len = 
+  let seed = 0x9747b28c in
+  let hash = seed lxor len in
+  hash
+
+(* to call after hashing bytes of the sequence *)
 let finish_hash hash = 
   let m = 0x1bd1e995 in  (* 0x5bd1e995 in 31 bits *)
   let hash = hash lxor (hash lsr 13) in
@@ -40,16 +47,14 @@ let finish_hash hash =
 
 (** Hash a single int *)
 let hash_int i =
-  let seed = 0x9747b28c in
-  let hash = seed lxor 4 in
+  let hash = initial_hash 4 in
   let hash = hash_4bytes hash i in
   let hash = finish_hash hash in
   abs hash
 
 (** Hash two ints *)
 let hash_int2 i j =
-  let seed = 0x9747b28c in
-  let hash = seed lxor 8 in
+  let hash = initial_hash 8 in
   let hash = hash_4bytes hash i in
   let hash = hash_4bytes hash j in
   let hash = finish_hash hash in
@@ -57,18 +62,26 @@ let hash_int2 i j =
 
 (** Hash three ints *)
 let hash_int3 i j k =
-  let seed = 0x9747b28c in
-  let hash = seed lxor 12 in
+  let hash = initial_hash 12 in
   let hash = hash_4bytes hash i in
   let hash = hash_4bytes hash j in
   let hash = hash_4bytes hash k in
   let hash = finish_hash hash in
   abs hash
 
+(** Hash four ints *)
+let hash_int4 i j k l =
+  let hash = initial_hash 16 in
+  let hash = hash_4bytes hash i in
+  let hash = hash_4bytes hash j in
+  let hash = hash_4bytes hash k in
+  let hash = hash_4bytes hash l in
+  let hash = finish_hash hash in
+  abs hash
+
 (** Hash int list *)
 let hash_int_list l =
-  let seed = 0x9747b28c in
-  let hash = seed lxor (List.length l * 4) in
+  let hash = initial_hash (List.length l * 4) in
   let rec aux hash l = match l with
   | [] -> hash
   | x::l' ->

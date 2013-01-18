@@ -116,7 +116,7 @@ let eq_plit lit1 lit2 = compare_pliteral lit1 lit2 = 0
 let hash_plit plit =
   let lh = hash_pterm plit.lterm
   and rh = hash_pterm plit.rterm in
-  Hashcons.combine3 3167 lh rh (if plit.psign then 2 else 3)
+  Hash.hash_int3 lh rh (if plit.psign then 2 else 3)
 
 (** A pattern clause is just a list of pliterals. We also keep the canonical
     pattern (starting from 0) of each literal.

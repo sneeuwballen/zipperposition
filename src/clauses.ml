@@ -118,11 +118,11 @@ let compare_lits_partial ~ord l1 l2 =
     | Eq, _, Eq, _, true, false -> Lt (* s = u, t = u *)
     | _ -> Incomparable
 
-let hash_literal h lit = match lit with
+let hash_literal lit = match lit with
   | Equation (l, r, sign, o) ->
     if sign
-      then Hashcons.combine3 h (Hashtbl.hash o) l.hkey r.hkey
-      else Hashcons.combine3 h (Hashtbl.hash o) r.hkey l.hkey
+      then Hash.hash_int3 (Hash.hash_string o) l.hkey r.hkey
+      else Hash.hash_int3 (Hash.hash_string o) r.hkey l.hkey
 
 let weight_literal = function
   | Equation (l, r, _ ,_) -> l.tsize + r.tsize
@@ -249,10 +249,13 @@ let compare_clause c1 c2 =
     else check 0
 
 let hash_lits lits =
-  let rec aux h i =
-    if i = Array.length lits then h else
-    aux (hash_literal h lits.(i)) (i+1)
-  in aux 113 0
+  let hash = ref (Hash.initial_hash (Array.length lits * 4)) in
+  for i = 0 to Array.length lits - 1 do
+    let j = hash_literal lits.(i) in
+    hash := Hash.hash_4bytes !hash j;
+  done;
+  let hash = Hash.finish_hash !hash in
+  abs hash
 
 let hash_clause c = hash_lits c.clits
 
@@ -262,8 +265,8 @@ let hash_clause c = hash_lits c.clits
 
 module H = Hashcons.Make(struct
   type t = hclause
-  let equal hc1 hc2 = eq_clits hc1.hclits hc2.hclits
-  let hash hc = hash_lits hc.hclits
+  let equal hc1 hc2 = hc1.hchash = hc2.hchash && eq_clits hc1.hclits hc2.hclits
+  let hash hc = hc.hchash
   let tag i hc = (hc.hctag <- i; hc)
 end)
 
@@ -278,7 +281,7 @@ let hash_hclause hc = hash_lits hc.hclits
 module CHashtbl = Hashtbl.Make(
   struct
     type t = hclause
-    let hash hc = hash_lits hc.hclits
+    let hash hc = hc.hchash
     let equal = eq_hclause
   end)
 
@@ -349,11 +352,13 @@ let vars_of_lits lits =
 
 (** the tautological empty clause *)
 let true_clause =
-  H.hashcons
-    { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
-      hctag = -1; hcweight=2; hcmaxlits=0x1; hcselected=0; hcselected_done=true;
+  let hc = { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
+      hctag = -1; hchash = 0; hcweight=2; hcmaxlits=0x1; hcselected=0; hcselected_done=true;
       hcvars=[]; hcproof=Proof ("trivial", []);
       hcparents=[]; hcdescendants=Ptset.empty; }
+  in
+  hc.hchash <- hash_lits hc.hclits;
+  H.hashcons hc
 
 (** Build a new hclause from the given literals. If there are more than 31 literals,
     the prover becomes incomplete by returning [true] instead. *)
@@ -378,6 +383,7 @@ let mk_hclause_a ~ord lits proof parents =
   let hc = {
     hclits = lits;
     hctag = -1;
+    hchash = 0;
     hcweight = 0;
     hcmaxlits = 0;
     hcselected_done = false;
@@ -388,6 +394,7 @@ let mk_hclause_a ~ord lits proof parents =
     hcdescendants = Ptset.empty;
   } in
   (* hashcons the clause, compute additional data if fresh *)
+  hc.hchash <- hash_lits lits;
   let hc' = H.hashcons hc in
   (if hc == hc' then begin
     incr_stat stat_new_clause;
@@ -413,6 +420,7 @@ let mk_hclause_raw ~selected ~maxlits ~selected_done lits proof parents =
   let hc = {
     hclits = lits;
     hctag = -1;
+    hchash = 0;
     hcweight = 0;
     hcmaxlits = maxlits;
     hcselected_done = selected_done;
@@ -423,6 +431,7 @@ let mk_hclause_raw ~selected ~maxlits ~selected_done lits proof parents =
     hcdescendants = Ptset.empty;
   } in
   (* hashcons the clause, compute additional data if fresh *)
+  hc.hchash <- hash_lits lits;
   let hc' = H.hashcons hc in
   (if hc == hc' then begin
     incr_stat stat_new_clause;

@@ -41,7 +41,7 @@ val eq_literal_com : literal -> literal -> bool     (** commutative equality of 
 val compare_literal : literal -> literal -> int     (** lexicographic comparison of literals *)
 val compare_lits_partial : ord:ordering -> literal
                           -> literal -> comparison  (** partial comparison of literals *)
-val hash_literal : int -> literal -> int            (** hashing of literal (with accumulator) *)
+val hash_literal : literal -> int                   (** hashing of literal *)
 val weight_literal : literal -> int                 (** weight of the lit *)
 
 val pos_lit : literal -> bool                       (** is the literal positive? *)
