@@ -89,7 +89,7 @@ module Make(H : Hashtbl.HashedType) =
 
     (** Index of slot, for i-th probing starting from hash [h] in
         a table of length [n] *)
-    let addr h n i = (h + i * i) mod n
+    let addr h n i = (h + i) mod n
       
     (** Insert (key -> value) in buckets, starting with the hash. *)
     let insert buckets h key value =

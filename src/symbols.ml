@@ -36,7 +36,7 @@ let compare_symbols (_, t1,_) (_,t2,_) = t1 - t2
 let hash_symbol (_, i, _) = Hash.hash_int i
 
 (** weak hash table for symbols *)
-module HashSymbol = Hashtbl.Make(
+module HashSymbol = FlatHashtbl.Make(
   struct
     type t = string
     let equal s1 s2 = String.compare s1 s2 = 0
