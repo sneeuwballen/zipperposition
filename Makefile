@@ -7,19 +7,19 @@ SUBMODULES = datalog
 PWD = $(shell pwd)
 OPTIONS = -cflags -I,$(PWD)/datalog/_build/ -lflags -I,$(PWD)/datalog/_build/ -libs $(LIBS)
 
-all: $(SUBMODULESS)
+all: $(SUBMODULES)
 	ocamlbuild $(OPTIONS) -tag debug src/$(TARGET)
 
-prod: $(SUBMODULESS)
+prod: $(SUBMODULES)
 	ocamlbuild $(OPTIONS) -tag noassert src/$(TARGET)
 
-profile: $(SUBMODULESS)
+profile: $(SUBMODULES)
 	ocamlbuild $(OPTIONS) -tags debug,profile src/$(TARGET)
 
-byte: $(SUBMODULESS)
+byte: $(SUBMODULES)
 	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
 
-tests: all $(SUBMODULESS)
+tests: all $(SUBMODULES)
 	ocamlbuild $(OPTIONS) -tag debug -I src tests/tests.native
 
 doc:
