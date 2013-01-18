@@ -318,7 +318,7 @@ let handle_theory meta term =
                  (Datalog.Logic.pp_term ?to_s:None) term));
   incr_stat stat_theory_detected;
   (* the clauses that belong to this theory *)
-  let premises = Datalog.Logic.db_premises meta.meta_db term in
+  let premises = Datalog.Logic.db_explain meta.meta_db term in
   let premise_clauses = Utils.list_flatmap
     (fun term -> try [term_to_hclause ~ord ~kb term (Axiom ("kb","kb")) []]
                  with Not_found -> [])
