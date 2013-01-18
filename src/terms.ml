@@ -118,7 +118,7 @@ module H = Hashcons.Make(struct
       | (_, _) -> false
     in
     (* compare sorts, then subterms, if same structure *)
-    if x.sort <> y.sort then false
+    if x.sort != y.sort then false
     else match x.term, y.term with
     | Var i, Var j -> i = j
     | Node (sa, la), Node (sb, lb) -> sa == sb && eq_subterms la lb

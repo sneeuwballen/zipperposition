@@ -133,7 +133,7 @@ let default_queues =
     (ground, 1);
     (non_goals, 1);
     (goals, 1);
-    (fifo, 3);
+    (fifo, 2);
   ]
 
 let pp_queue formatter q =
