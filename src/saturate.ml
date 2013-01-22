@@ -96,7 +96,7 @@ let generate_unary ~calculus ~ord clause =
 
 (** depth at which unary inferences are performed (max number
     of times inferences are applied recursively to a clause) *)
-let unary_max_depth = ref 2
+let unary_max_depth = ref 1
 
 (** generate all clauses from inferences *)
 let generate ~calculus active_set given =
@@ -199,9 +199,8 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       let hc = C.select_clause select hc in
       Sel.check_selected hc;
       C.check_ord_hclause ~ord hc;
-      Utils.debug 1 (lazy (Utils.sprintf
-                    "%% ============ step %5d with given clause @[<h>%a@] ============"
-                    num !C.pp_clause#pp_h hc));
+      Utils.debug 2 (lazy (Utils.sprintf "%% ============ step %5d  ============" num));
+      Utils.debug 1 (Lazy.from_val (Utils.sprintf "%% @[<h>%a@]" !C.pp_clause#pp_h hc));
       (* scan clause within meta-prover *)
       let lemmas = find_lemmas state hc in
       let new_clauses = List.rev_append lemmas new_clauses in

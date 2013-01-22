@@ -34,6 +34,8 @@ module PS = ProofState
 
 let prof_elim = Utils.mk_profiler "eliminate"
 
+(* TODO miniscoping for CNF reduction *)
+
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
   [eq_symbol; imply_symbol; forall_symbol; exists_symbol; lambda_symbol;

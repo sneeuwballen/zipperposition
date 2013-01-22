@@ -131,8 +131,10 @@ let pos_unit_clauses =
 let default_queues =
   [ (clause_weight, 4);
     (ground, 1);
+    (*
     (non_goals, 1);
     (goals, 1);
+    *)
     (fifo, 2);
   ]
 

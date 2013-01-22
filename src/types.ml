@@ -26,6 +26,18 @@ open Symbols
 (** exception raised when sorts are mismatched *)
 exception SortError of string
 
+(* TODO: better representation of terms:
+  term = | Var of int | Node of symbol * term list | Binder of symbol * term | BoundVar of int *)
+(* TODO: a 'type_' type for simple types, like
+  type_ = Sort of symbol | Arrow of type_t list * type_ *)
+(* TODO: a literal should be (term, term, int) where the int is a set of flags. It's enough
+   to tell well the lit is positive/negative, and if it's oriented (a > b) or eq/incomparable.
+   Always orient with the bigger term on left. *)
+(* TODO: remove proof from clauses, make it external (a proof is a tree of annotated clauses) *)
+(* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
+(* TODO: (maybe) substitutions as list of pairs of *bound* terms,
+  where bound term = (int * term), the int being an offset for renaming vars *)
+
 (** hashconsed term *)
 type term = typed_term
 (** term with a simple sort *)

@@ -30,7 +30,7 @@ module U = FoUtils
 module CQ = ClauseQueue
 
 let _indexes =
-  let table = Hashtbl.create 11 in
+  let table = Hashtbl.create 2 in
   Hashtbl.add table "discr_tree" Discrimination_tree.index;
   Hashtbl.add table "fp" (Fingerprint.mk_index Fingerprint.fp6m);
   table
