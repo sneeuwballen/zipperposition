@@ -825,6 +825,13 @@ let subsumed_in_set set c =
   Utils.exit_prof prof_subsumption_in_set;
   !l
 
+(** Number of equational lits. Used as an estimation for the difficulty of the subsumption
+    check for this clause. *)
+let rec num_equational lits i =
+  if i = Array.length lits then 0
+  else if C.equational_lit lits.(i) then 1 + (num_equational lits (i+1))
+  else num_equational lits (i+1)
+
 (* ----------------------------------------------------------------------
  * contextual literal cutting
  * ---------------------------------------------------------------------- *)
@@ -834,7 +841,8 @@ exception RemoveLit of int * hclause
 (** Performs successive contextual literal cuttings *)
 let rec contextual_literal_cutting active_set hc =
   Utils.enter_prof prof_clc;
-  if Array.length hc.hclits <= 1 then (Utils.exit_prof prof_clc; hc) else
+  if Array.length hc.hclits <= 1 || num_equational hc.hclits 0 > 3 || Array.length hc.hclits > 8
+    then (Utils.exit_prof prof_condensation; hc) else
   let ord = active_set#ord in
   (* do we need to try to use equality subsumption? *)
   let try_eq_subsumption = Utils.array_exists C.equational_lit hc.hclits in
@@ -892,12 +900,6 @@ let match_literals lit lit' =
     (try let subst = Unif.matching S.id_subst s r in [Unif.matching subst t l]
     with UnificationFailure -> [])
   | _ -> []
-
-(** number of equational lits *)
-let rec num_equational lits i =
-  if i = Array.length lits then 0
-  else if C.equational_lit lits.(i) then 1 + (num_equational lits (i+1))
-  else num_equational lits (i+1)
 
 (** performs condensation on the clause. It looks for two literals l1 and l2 of same
     sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then

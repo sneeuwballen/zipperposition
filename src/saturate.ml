@@ -195,8 +195,6 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
     else begin
       assert (not (is_redundant ~calculus state#active_set hc));
       incr_stat stat_processed_given;
-      (* forward contextual literal cutting *)
-      let hc = Sup.contextual_literal_cutting state#active_set hc in
       (* select literals *)
       let hc = C.select_clause select hc in
       Sel.check_selected hc;
