@@ -33,6 +33,7 @@ module type S =
   sig
     type t
     val hashcons : t -> t
+    val mem : t -> bool
     val iter : (t -> unit) -> unit
     val stats : unit -> int * int * int * int * int * int
   end
@@ -52,6 +53,8 @@ struct
     let o = WH.merge htable d in
     if o == d then incr next_tag;
     o
+
+  let mem d = WH.mem htable d
 
   let iter f = WH.iter f htable
 

@@ -106,7 +106,7 @@ module THashSet =
  * ---------------------------------------------------------------------- *)
 
 (** hashconsing for terms *)
-module H = FlatHashtbl.Hashcons(struct
+module H = Hashcons.Make(struct
   type t = typed_term
 
   let equal x y =

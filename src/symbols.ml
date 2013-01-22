@@ -26,45 +26,46 @@ let attr_skolem = 0x1
 let attr_split = 0x2
 
 (** A symbol is a string, a unique ID, and some attributes *)
-type symbol = (string * int * int)
+type symbol = {
+  symb_name: string;
+  mutable symb_id : int;
+  mutable symb_attrs : int;
+}
 
 (** A sort is just a symbol *)
 type sort = symbol
 
-let compare_symbols (_, t1,_) (_,t2,_) = t1 - t2
+let compare_symbols s1 s2 = s1.symb_id - s2.symb_id
 
-let hash_symbol (_, i, _) = Hash.hash_int i
+let hash_symbol s = Hash.hash_int s.symb_id
 
 (** weak hash table for symbols *)
-module HashSymbol = FlatHashtbl.Make(
+module HashSymbol = Hashcons.Make(
   struct
-    type t = string
-    let equal s1 s2 = String.compare s1 s2 = 0
-    let hash = Hashtbl.hash
+    type t = symbol
+    let equal s1 s2 = String.compare s1.symb_name s2.symb_name = 0
+    let hash s = Hash.hash_string s.symb_name
+    let tag t s = (s.symb_id <- t; s)
   end)
-
-(** the global symbol table *)
-let symb_table = HashSymbol.create 7
 
 (** counter for symbols *)
 let symb_count = ref 0
 
 let mk_symbol ?(attrs=0) s =
-  try
-    HashSymbol.find symb_table s
-  with Not_found ->
-    let s' = (s, !symb_count, attrs) in
-    HashSymbol.replace symb_table s s';
-    incr symb_count;
-    s'
+  let s = {
+    symb_name = s;
+    symb_id = 0;
+    symb_attrs = attrs;
+  } in
+  HashSymbol.hashcons s
 
-let is_used s = HashSymbol.mem symb_table s
+let is_used s = HashSymbol.mem {symb_name=s; symb_id=0; symb_attrs=0;}
 
-let name_symbol (s, _, _) = s
+let name_symbol s = s.symb_name
 
-let tag_symbol (_, tag, _) = tag
+let tag_symbol s = s.symb_id
 
-let attrs_symbol (_, _, attr) = attr
+let attrs_symbol s = s.symb_attrs
 
 module SHashtbl = Hashtbl.Make(
   struct

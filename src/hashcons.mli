@@ -53,6 +53,9 @@ module type S =
           the node [n] as first argument and the unique id as second argument.
       *)
 
+    val mem : t -> bool
+      (** Check whether at hashconsed value equal to [t] exists *)
+
     val iter : (t -> unit) -> unit
       (** [iter f] iterates [f] over all elements of the table . *)
     val stats : unit -> int * int * int * int * int * int

@@ -104,7 +104,7 @@ module Make(H : Hashtbl.HashedType) =
       in
       lookup h n 0
 
-    (** Resize the array, by inserting its content into a twice as large array *)
+    (** Resize the array, by inserting its content into twice as large an array *)
     let resize buckets =
       let buckets' = Array.make (Array.length buckets * 2) my_null in
       for i = 0 to Array.length buckets - 1 do
