@@ -44,7 +44,6 @@ type parameters = {
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
   param_print_sort : bool;        (** print sorts of terms *)
-  param_print_all : bool;         (** print desugarized lambda / DB symbols *)
 }
 
 (** parse_args returns parameters *)
@@ -75,7 +74,6 @@ let parse_args () =
   and select = ref "SelectComplex"
   and progress = ref false
   and print_sort = ref false
-  and print_all = ref false
   and files = ref [] in
   (* options list *) 
   let options =
@@ -103,7 +101,6 @@ let parse_args () =
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
-      ("-print-all", Arg.Set print_all, "print desugarized terms (lambdas, De Bruijn terms)");
       ("-print-ord", Arg.Unit (fun () -> Clauses.pp_literal_debug#ord true), "print order of sides of literals");
     ]
   in
@@ -125,5 +122,5 @@ let parse_args () =
     param_kb = !kb; param_kb_load = !kb_load;
     param_kb_clear = !kb_clear;
     param_kb_print = !kb_print; param_learn = !learn;
-    param_print_sort = !print_sort; param_print_all = !print_all;
+    param_print_sort = !print_sort;
     param_precedence= !heuristic_precedence;}

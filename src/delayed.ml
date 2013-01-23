@@ -34,8 +34,6 @@ module PS = ProofState
 
 let prof_elim = Utils.mk_profiler "eliminate"
 
-(* TODO miniscoping for CNF reduction *)
-
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
   [eq_symbol; imply_symbol; forall_symbol; exists_symbol; lambda_symbol;
@@ -62,7 +60,7 @@ let order k1 k2 =
 (* classify symbol into categories *)
 let classify signature s =
   match s with
-  | _ when s == succ_db_symbol || s == db_symbol -> DeBruijn
+  | _ when s == db_symbol -> DeBruijn
   | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
   | _ when SSet.mem s special_set -> Special
   | _ -> (* classify between predicate and function by the sort *)
@@ -127,6 +125,9 @@ let delta_eliminate ~ord t sign =
 (** Just keep the equation as it is *)
 let keep eqn = Keep eqn
 
+(** TODO Miniscoping for reduction to CNF *)
+let miniscope ~ord hc = hc
+
 (** perform at most one simplification on each literal. It
     returns an array of tableau_rule. *)
 let eliminate_lits ~ord hc =
@@ -135,21 +136,22 @@ let eliminate_lits ~ord hc =
   let prop eqn p sign =
     assert (p.sort = bool_sort);
     match p.term with
-    | Node (s, [a; b]) when s = and_symbol && sign -> alpha_eliminate ~ord a true b true
-    | Node (s, [a; b]) when s = and_symbol && not sign -> beta_eliminate ~ord a false b false
-    | Node (s, [a; b]) when s = or_symbol && sign -> beta_eliminate ~ord a true b true
-    | Node (s, [a; b]) when s = or_symbol && not sign -> alpha_eliminate ~ord a false b false
-    | Node (s, [a; b]) when s = imply_symbol && sign -> beta_eliminate ~ord a false b true
-    | Node (s, [a; b]) when s = imply_symbol && not sign -> alpha_eliminate ~ord a true b false
-    | Node (s, [{term=Node (s', [t])}]) when s = forall_symbol && s' = lambda_symbol && sign ->
+    | BoundVar _ | Var _ -> assert false
+    | Node (s, [a; b]) when s == and_symbol && sign -> alpha_eliminate ~ord a true b true
+    | Node (s, [a; b]) when s == and_symbol && not sign -> beta_eliminate ~ord a false b false
+    | Node (s, [a; b]) when s == or_symbol && sign -> beta_eliminate ~ord a true b true
+    | Node (s, [a; b]) when s == or_symbol && not sign -> alpha_eliminate ~ord a false b false
+    | Node (s, [a; b]) when s == imply_symbol && sign -> beta_eliminate ~ord a false b true
+    | Node (s, [a; b]) when s == imply_symbol && not sign -> alpha_eliminate ~ord a true b false
+    | Bind (s, t) when s == forall_symbol && sign ->
       gamma_eliminate ~ord offset t true
-    | Node (s, [{term=Node (s', [t])}]) when s = forall_symbol && s' = lambda_symbol && not sign ->
+    | Bind (s, t) when s == forall_symbol && not sign ->
       delta_eliminate ~ord (T.mk_not t) true
-    | Node (s, [{term=Node (s', [t])}]) when s = exists_symbol && s' = lambda_symbol && sign ->
+    | Bind (s, t) when s == exists_symbol && sign ->
       delta_eliminate ~ord t true
-    | Node (s, [{term=Node (s', [t])}]) when s = exists_symbol && s' = lambda_symbol && not sign ->
+    | Bind (s, t) when s == exists_symbol && not sign ->
       gamma_eliminate ~ord offset t false
-    | _ -> keep eqn
+    | Bind _ | Node _ -> keep eqn
   (* eliminate equivalence *)
   and equiv eqn l r sign =
     match ord#compare l r with
@@ -221,6 +223,9 @@ let recursive_eliminations ~ord ~select hc =
   (* process clauses until none of them is simplifiable *)
   let rec simplify hc =
     let hc' = C.clause_of_fof ~ord hc in
+    (* miniscoping *)
+    let hc' = miniscope ~ord hc' in
+    (* one step of reduction to clauses *)
     let tableau_rules = eliminate_lits ~ord hc' in
     match tableau_to_clauses ~ord hc' tableau_rules with
     | None -> clauses := hc' :: !clauses (* done with this clause *)
@@ -245,7 +250,10 @@ let simplify_inner ~ord hc =
   let rec simp_term t =
     if T.get_flag T.flag_simplified t then t else  (* maybe it's already simplified *)
     match t.term with
-    | Var _ | Node (_, []) -> (mark_simplified t; t)
+    | Var _ | Node (_, []) | BoundVar _ -> (mark_simplified t; t)
+    | Bind (f, t') when not (T.db_contains t' 0) ->
+      simp_term t'  (* eta-reduction: binder binds nothing, remove it *)
+    | Bind (f, t') -> T.mk_bind f (simp_term t')
     | Node (s, [{term=Node (s', [t'])}]) when s = not_symbol && s' = not_symbol ->
       simp_term t'  (* double negation *)
     | Node (s, [t']) when s = not_symbol && T.eq_term t' T.true_term ->

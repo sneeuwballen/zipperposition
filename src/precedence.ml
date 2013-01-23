@@ -80,7 +80,9 @@ let invfreq_constraint clauses =
   let rec clause_freq hc = Array.iter lit_freq hc.hclits
   and lit_freq = function | Equation (l,r,_,_) -> term_freq l; term_freq r
   and term_freq t = match t.term with
-    | Var _ -> ()
+    | Var _ | BoundVar _ -> ()
+    | Bind (_,t') ->
+      term_freq t'  (* do not bother with (special) binder symbols anyway *)
     | Node (s,l) ->
       (let count = try SHashtbl.find freq_table s with Not_found -> 0 in
       SHashtbl.replace freq_table s (count+1);
@@ -238,7 +240,10 @@ type weighted_constr = int * symbol list * (ordering -> bool)
 (** find all symbols of the term *)
 let rec term_symbols acc t =
   match t.term with
-  | Var _ -> acc
+  | Var _ | BoundVar _ -> acc
+  | Bind (f, t') -> 
+    let acc' = if List.exists ((==) f) acc then acc else f::acc in
+    term_symbols acc' t'
   | Node (f, ts) ->
     let acc' = if List.exists ((==) f) acc then acc else f::acc in
     List.fold_left term_symbols acc' ts

@@ -44,32 +44,6 @@ module type S =
     val name : string
   end
 
-(* Riazanov: p. 40, relation >>>
- * if head_only=true then it is not >>> but helps case 2 of 3.14 p 39 *)
-let rec aux_ordering b_compare ?(head_only=false) t1 t2 =
-  match t1.term, t2.term with
-  (* We want to discard any identity equality. *
-   * If we give back Eq, no inference rule    *
-   * will be applied on this equality          *)
-  | Var i, Var j when i = j -> Eq
-  (* 1. *)
-  | Var _, _
-  | _, Var _ -> Incomparable
-  (* 2 *)
-  | Node (a1, l1), Node (a2, l2) ->
-    let cmp = b_compare a1 a2 in
-    if cmp < 0 then Lt else if cmp > 0 then Gt else
-    let rec cmp t1 t2 =
-      match t1, t2 with
-      | [], [] -> Eq
-      | _, [] -> (* Gt *) assert false (* hd symbols were eq *)
-      | [], _ -> (* Lt *) assert false (* hd symbols were eq *)
-      | hd1::tl1, hd2::tl2 ->
-          let o = aux_ordering b_compare ~head_only hd1 hd2 in
-          if o = Eq && not head_only then cmp tl1 tl2 else o
-    in
-    cmp l1 l2
-
 module KBO = struct
   let name = "kbo"
 
@@ -134,6 +108,10 @@ module KBO = struct
         if pos
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
+      | Bind (s, t') ->
+        let wb' = if pos then wb + prec#weight s else wb - prec#weight s in
+        balance_weight wb' t' y pos
+      | BoundVar _ -> (if pos then wb + 1 else wb - 1), false
       | Node (s, l) ->
         let wb' = if pos then wb + prec#weight s else wb - prec#weight s in
         balance_weight_rec wb' l y pos false
@@ -180,25 +158,40 @@ module KBO = struct
         add_neg_var balance y;
         let wb', contains = balance_weight wb t1 y true in
         (wb' - 1, if contains then Gt else Incomparable)
-      | Node (f, ss), Node (g, ts) ->
-        (* do the recursive computation of kbo *)
-        let wb', recursive = tckbo_rec wb f g ss ts in
-        let wb'' = wb' + prec#weight f - prec#weight g in
-        (* check variable condition *)
-        let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
-        and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
-        (* lexicographic product of weight and precedence *)
-        if wb'' > 0 then wb'', g_or_n
-        else if wb'' < 0 then wb'', l_or_n
-        else (match prec#compare f g with
-          | n when n > 0 -> wb'', g_or_n
-          | n when n < 0 ->  wb'', l_or_n
-          | _ ->
-            assert (List.length ss = List.length ts);
-            if recursive = Eq then wb'', Eq
-            else if recursive = Lt then wb'', l_or_n
-            else if recursive = Gt then wb'', g_or_n
-            else wb'', Incomparable)
+      (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
+      | Node (f, ss), Node (g, ts) -> tckbo_composite wb f g ss ts
+      | Bind (f, t1'), Bind (g, t2') -> tckbo_composite wb f g [t1'] [t2']
+      | BoundVar i, BoundVar j ->
+        (wb, if i = j && t1.sort == t2.sort then Eq else Incomparable)
+      (* node and something else *)
+      | Node (f, ss), Bind (g, t2') -> tckbo_composite wb f g ss [t2']
+      | Node (f, ss), BoundVar _ -> tckbo_composite wb f db_symbol ss []
+      | Bind (f, t1'), Node (g, ts) -> tckbo_composite wb f g [t1'] ts
+      | BoundVar _, Node (g, ts) -> tckbo_composite wb db_symbol g [] ts
+      (* De Bruijn with Bind *)
+      | Bind (f, t1'), BoundVar _ -> tckbo_composite wb f db_symbol [t1'] []
+      | BoundVar _, Bind (g, t2') -> tckbo_composite wb db_symbol g [] [t2']
+    (** tckbo, for composite terms (ie non variables). It takes a symbol
+        and a list of subterms. *)
+    and tckbo_composite wb f g ss ts =
+      (* do the recursive computation of kbo *)
+      let wb', recursive = tckbo_rec wb f g ss ts in
+      let wb'' = wb' + prec#weight f - prec#weight g in
+      (* check variable condition *)
+      let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
+      and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
+      (* lexicographic product of weight and precedence *)
+      if wb'' > 0 then wb'', g_or_n
+      else if wb'' < 0 then wb'', l_or_n
+      else (match prec#compare f g with
+        | n when n > 0 -> wb'', g_or_n
+        | n when n < 0 ->  wb'', l_or_n
+        | _ ->
+          assert (List.length ss = List.length ts);
+          if recursive = Eq then wb'', Eq
+          else if recursive = Lt then wb'', l_or_n
+          else if recursive = Gt then wb'', g_or_n
+          else wb'', Incomparable)
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
@@ -230,6 +223,8 @@ module RPO = struct
     | Var _, Var _ -> Incomparable
     | _, Var i -> if T.var_occurs t s then Gt else Incomparable
     | Var i,_ -> if T.var_occurs s t then Lt else Incomparable
+    | Bind _, _ | BoundVar _, _ | _, Bind _ | _, BoundVar _ ->
+      failwith "Bind/BoundVar not handled by old RPO ordering"
     | Node (hd1, tl1), Node (hd2, tl2) ->
       (* check whether an elemnt of the list is >= t, and
          also returns the list of comparison results *)
@@ -292,20 +287,29 @@ module RPO6 = struct
     | Var _, Var _ -> Incomparable
     | _, Var _ -> if T.var_occurs t s then Gt else Incomparable
     | Var _, _ -> if T.var_occurs s t then Lt else Incomparable
-    | Node (f, []), Node (g, []) ->
-      (match prec#compare f g with
-       | n when n < 0 -> Lt
-       | n when n > 0 -> Gt
-       | _ -> Eq)
-    | Node (f, ss), Node (g, ts) ->
-      (match prec#compare f g with
-      | 0 when prec#multiset_status f ->
-        cMultiset ~prec ss ts (* multiset subterm comparison *)
-      | 0 ->
-        cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
-      | n when n > 0 -> cMA ~prec s ts
-      | n when n < 0 -> Utils.not_partial (cMA ~prec t ss)
-      | _ -> assert false)  (* match exhaustively *)
+    (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
+    | Node (f, ss), Node (g, ts) -> rpo6_composite ~prec s t f g ss ts
+    | Bind (f, s'), Bind (g, t') -> rpo6_composite ~prec s t f g [s'] [t']
+    | BoundVar i, BoundVar j ->
+      if i = j && s.sort == t.sort then Eq else Incomparable
+    (* node and something else *)
+    | Node (f, ss), Bind (g, t') -> rpo6_composite ~prec s t f g ss [t']
+    | Node (f, ss), BoundVar _ -> rpo6_composite ~prec s t f db_symbol ss []
+    | Bind (f, s'), Node (g, ts) -> rpo6_composite ~prec s t f g [s'] ts
+    | BoundVar _, Node (g, ts) -> rpo6_composite ~prec s t db_symbol g [] ts
+    (* De Bruijn with Bind *)
+    | Bind (f, s'), BoundVar _ -> rpo6_composite ~prec s t f db_symbol [s'] []
+    | BoundVar _, Bind (g, t') -> rpo6_composite ~prec s t db_symbol g [] [t']
+  (* handle the composite cases *)
+  and rpo6_composite ~prec s t f g ss ts =
+    match prec#compare f g with
+    | 0 when prec#multiset_status f ->
+      cMultiset ~prec ss ts (* multiset subterm comparison *)
+    | 0 ->
+      cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
+    | n when n > 0 -> cMA ~prec s ts
+    | n when n < 0 -> Utils.not_partial (cMA ~prec t ss)
+    | _ -> assert false  (* match exhaustively *)
   (** try to dominate all the terms in ts by s; but by subterm property
       if some t' in ts is >= s then s < t=g(ts) *)
   and cMA ~prec s ts = match ts with

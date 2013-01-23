@@ -24,17 +24,9 @@ open Symbols
 
 module Utils = FoUtils
 
-let is_symmetric_symbol s =
-  s == eq_symbol || s == or_symbol || s == and_symbol
-
-let is_infix_symbol s =
-  s == eq_symbol || s == or_symbol || s == and_symbol || s == imply_symbol
-
-let is_binder_symbol s =
-  s == lambda_symbol
-
 let hash_term t = match t.term with
   | Var i -> Hash.hash_int2 (hash_symbol t.sort) i
+  | BoundVar i -> Hash.hash_int2 113 i
   | Node (s, l) ->
     let rec aux h = function
     | [] -> h
@@ -43,6 +35,8 @@ let hash_term t = match t.term with
     in
     let h = Hash.hash_int2 (hash_symbol t.sort) (hash_symbol s) in
     abs (aux h l)
+  | Bind (s, t) ->
+    Hash.hash_int3 (hash_symbol t.sort) (hash_symbol s) t.hkey
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 
@@ -53,15 +47,17 @@ let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 let rec member_term a b =
   a == b ||
   (match b.term with
-  | Var _ -> false
-  | Node (_, subterms) -> List.exists (member_term a) subterms)
+  | Var _ | BoundVar _ -> false
+  | Node (_, subterms) -> List.exists (member_term a) subterms
+  | Bind (_, b') -> member_term a b')
 
 let rec member_term_rec a b =
   match b.term with
   | _ when a == b -> true
   | Var _ when b.binding != b -> member_term_rec a b.binding
-  | Var _ -> false
+  | Var _ | BoundVar _ -> false
   | Node (s, subterms) -> List.exists (member_term_rec a) subterms
+  | Bind (_, b') -> member_term_rec a b'
 
 let eq_term x y = x == y  (* because of hashconsing *)
 
@@ -107,7 +103,7 @@ module THashSet =
 
 (** hashconsing for terms *)
 module H = Hashcons.Make(struct
-  type t = typed_term
+  type t = term
 
   let equal x y =
     (* pairwise comparison of subterms *)
@@ -120,8 +116,9 @@ module H = Hashcons.Make(struct
     (* compare sorts, then subterms, if same structure *)
     if x.sort != y.sort then false
     else match x.term, y.term with
-    | Var i, Var j -> i = j
+    | Var i, Var j | BoundVar i, BoundVar j -> i = j
     | Node (sa, la), Node (sb, lb) -> sa == sb && eq_subterms la lb
+    | Bind (sa, ta), Bind (sb, tb) -> sa == sb && ta == tb
     | _ -> false
 
   let hash t = t.hkey
@@ -167,6 +164,13 @@ let mk_var idx sort =
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
+let mk_bound_var idx sort =
+  let rec my_v = {term = BoundVar idx; sort=sort;
+                  flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
+                  binding=my_v; tsize=1; tag= -1; hkey=0} in
+  my_v.hkey <- hash_term my_v;
+  H.hashcons my_v
+
 let rec sum_sizes acc l = match l with
   | [] -> acc
   | x::l' -> sum_sizes (x.tsize + acc) l'
@@ -174,6 +178,17 @@ let rec sum_sizes acc l = match l with
 let rec compute_is_ground l = match l with
   | [] -> true
   | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
+
+let mk_bind s t' =
+  assert (has_attr attr_binder s);
+  let rec my_t = {term=Bind (s, t'); sort=t'.sort; flags=0;
+                  binding=my_t; tsize=t'.tsize+1; tag= -1; hkey=0} in
+  my_t.hkey <- hash_term my_t;
+  let t = H.hashcons my_t in
+  (if t == my_t
+    then (* compute ground-ness of term *)
+      set_flag flag_ground t (get_flag flag_ground t'));
+  t
 
 let mk_node s sort l =
   Utils.enter_prof prof_mk_node;
@@ -205,9 +220,9 @@ let mk_or a b = (check_bool a; check_bool b; mk_node or_symbol bool_sort [a; b])
 let mk_imply a b = (check_bool a; check_bool b; mk_node imply_symbol bool_sort [a; b])
 let mk_equiv a b = (check_bool a; check_bool b; mk_node eq_symbol bool_sort [a; b])
 let mk_eq a b = (assert (a.sort = b.sort); mk_node eq_symbol bool_sort [a; b])
-let mk_lambda t = mk_node lambda_symbol t.sort [t]
-let mk_forall t = (check_bool t; mk_node forall_symbol bool_sort [mk_lambda t])
-let mk_exists t = (check_bool t; mk_node exists_symbol bool_sort [mk_lambda t])
+let mk_lambda t = mk_bind lambda_symbol t
+let mk_forall t = (check_bool t; mk_bind forall_symbol t)
+let mk_exists t = (check_bool t; mk_bind exists_symbol t)
 
 let rec cast t sort =
   let new_t = {t with sort=sort} in
@@ -220,6 +235,14 @@ let rec cast t sort =
 
 let is_var t = match t.term with
   | Var _ -> true
+  | _ -> false
+
+let is_bound_var t = match t.term with
+  | BoundVar _ -> true
+  | _ -> false
+
+let is_bind t = match t.term with
+  | Bind _ -> true
   | _ -> false
 
 let is_const t = match t.term with
@@ -251,6 +274,7 @@ let at_cpos t pos =
     match t.term, pos with
     | _, 0 -> t
     | Node (_, l), _ -> get_subpos l (pos - 1)
+    | Bind (_, t'), _ -> recurse t' (pos-1)
     | _ -> assert false
   and get_subpos l pos =
     match l, pos with
@@ -268,6 +292,8 @@ let cpos_to_pos cpos = failwith "not implemented"
 let var_occurs x t =
   let rec check x t = match t.term with
   | Var _ -> x == t
+  | BoundVar _ -> false
+  | Bind (_, t') -> check x t'
   | Node (_, l) -> check_list x l
   and check_list x l =
     match l with
@@ -298,6 +324,8 @@ let min_var vars =
 let add_vars set t =
   let rec add set t = match t.term with
   | Var _ -> THashSet.add set t
+  | BoundVar _ -> ()
+  | Bind (_, t') -> add set t'
   | Node (_, l) -> add_list set l
   and add_list set l = match l with
   | [] -> ()
@@ -324,28 +352,33 @@ let vars_list l =
 (** check whether the term is a term or an atomic proposition *)
 let rec atomic t = match t.term with
   | _ when t.sort != bool_sort -> true
-  | Var _ -> true
+  | Var _ | BoundVar _ -> true
+  | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic t'))
   | Node (s, l) -> not (s == and_symbol || s == or_symbol
-    || s == forall_symbol || s == exists_symbol || s == imply_symbol
-    || s == not_symbol || s == eq_symbol)
+    || s == imply_symbol || s == not_symbol || s == eq_symbol)
 
 (** check whether the term contains connectives or quantifiers *)
 let rec atomic_rec t = match t.term with
   | _ when t.sort <> bool_sort -> true  (* first order *)
-  | Var _ -> true
+  | Var _ | BoundVar _ -> true
+  | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic_rec t'))
   | Node (s, l) ->
-    not (s == and_symbol || s == or_symbol || s == forall_symbol || s ==
-    exists_symbol || s == imply_symbol || s == not_symbol || s == eq_symbol)
+    not (s == and_symbol || s == or_symbol || s == imply_symbol
+      || s == not_symbol || s == eq_symbol)
     && List.for_all atomic_rec l
 
-let rec compute_db_closed depth t = match t.term with
-  | Node (s, []) when s = db_symbol -> depth < 0
-  | Node (s, l) when is_binder_symbol s ->
-    List.for_all (compute_db_closed (depth-1)) l
-  | Node (s, [t']) when s = succ_db_symbol -> 
-    compute_db_closed (depth+1) t'
+(* compute whether the term is closed w.r.t. De Bruijn (bound) variables *)
+let compute_db_closed depth t =
+  let rec recurse depth t = match t.term with
+  | BoundVar i -> i <= depth
+  | Bind (s, t') -> recurse (depth+1) t'
   | Var _ -> true
-  | Node (_, l) -> List.for_all (compute_db_closed depth) l
+  | Node (_, l) -> recurse_list depth l
+  and recurse_list depth l = match l with
+  | [] -> true
+  | x::l' -> recurse depth x && recurse_list depth l'
+  in
+  recurse depth t
 
 (** check wether the term is closed w.r.t. De Bruijn variables *)
 let db_closed t =
@@ -356,64 +389,44 @@ let db_closed t =
     end);
   get_flag flag_db_closed t
 
-let rec db_var t =
-  match t.term with
-  | Node (s, []) when s == db_symbol -> true
-  | Node (s, [t]) when s == succ_db_symbol -> db_var t
-  | _ -> false
-
 (** check whether t contains the De Bruijn symbol n *)
 let rec db_contains t n = match t.term with
-  | Node (s, []) when s == db_symbol -> n = 0
-  | Node (_, []) | Var _ -> false
-  | Node (s, [t']) when is_binder_symbol s -> db_contains t' (n+1)
-  | Node (s, [t']) when s = succ_db_symbol -> db_contains t' (n-1)
+  | BoundVar i -> i = n
+  | Var _ -> false
+  | Bind (_, t') -> db_contains t' (n+1)
   | Node (_, l) -> List.exists (fun t' -> db_contains t' n) l
 
 (** replace 0 by s in t *)
 let db_replace t s =
-  (* lift the De Bruijn symbol *)
-  let mk_succ db = mk_node succ_db_symbol univ_sort [db] in
   (* replace db by s in t *)
-  let rec replace db s t = match t.term with
-  | _ when eq_term t db -> s
+  let rec replace depth s t = match t.term with
+  | BoundVar n -> if n = depth then s else t
   | Var _ -> t
-  | _ when is_const t -> t
-  | Node (symb, l) when is_binder_symbol symb ->
+  | Bind (symb, t') ->
     (* lift the De Bruijn to replace *)
-    mk_node symb t.sort (List.map (replace (mk_succ db) s) l)
-  | Node (f, _) when f == succ_db_symbol || f == db_symbol ->
-    t (* no the good De Bruijn symbol *)
-  | Node (f, l) -> mk_node f t.sort (List.map (replace db s) l)
+    mk_bind symb (replace (depth+1) s t')
+  | Node (_, []) -> t
+  | Node (f, l) -> mk_node f t.sort (List.map (replace depth s) l)
   (* replace the 0 De Bruijn index by s in t *)
   in
-  replace (mk_const db_symbol univ_sort) s t
-
-(** create a De Bruijn variable of index n *)
-let rec db_make n sort = match n with
-  | 0 -> mk_const db_symbol sort
-  | n when n > 0 ->
-    let next = db_make (n-1) sort in
-    mk_node succ_db_symbol sort [next]
-  | _ -> assert false
+  replace 0 s t
 
 (** lift the non-captured De Bruijn indexes in the term by n *)
 let db_lift n t =
   (* traverse the term, looking for non-captured DB indexes.
-     db_balance is (height of DB - number of binders on path) *)
-  let rec recurse db_balance t = 
+     [depth] is the number of binders on the path from the root of the
+     term, to the current position. *)
+  let rec recurse depth t = 
     match t.term with
     | _ when db_closed t -> t  (* closed. *)
-    | Var _ -> t
-    | Node (s, []) when s == db_symbol && db_balance >= 0 ->
-      db_make n t.sort  (* lift by n, term not captured *)
+    | BoundVar i when i >= depth ->
+      mk_bound_var (i+n) t.sort (* lift by n, term not captured *)
+    | Var _ | BoundVar _ -> t
+    | Bind (s, t') ->
+      mk_bind s (recurse (depth+1) t')  (* increase depth and recurse *)
     | Node (_, []) -> t
-    | Node (s, [t']) when s == succ_db_symbol ->
-      mk_node s t.sort [recurse (db_balance + 1) t']  (* ++ db_balance *)
-    | Node (s, l) when is_binder_symbol s ->
-      mk_node s t.sort (List.map (recurse (db_balance - 1)) l)  (* -- db_balance *)
     | Node (s, l) ->
-      let l' = List.map (recurse db_balance) l in
+      let l' = List.map (recurse depth) l in
       mk_node s t.sort l'  (* recurse in subterms *)
   in
   assert (n >= 0);
@@ -421,57 +434,40 @@ let db_lift n t =
 
 (* unlift the term (decrement indices of all De Bruijn variables inside *)
 let db_unlift t =
-  (* int indice of this DB term *)
-  let rec db_index t = match t.term with
-    | Node (s, []) when s == db_symbol -> 0
-    | Node (s, [t']) when s == succ_db_symbol -> (db_index t') + 1
-    | _ -> assert false
-  (* only unlift DB symbol that are free *)
-  and recurse depth t =
+  (* only unlift DB symbol that are free. [depth] is the number of binders
+     on the path from the root term. *)
+  let rec recurse depth t =
     match t.term with
-    | Node (s, []) when s == db_symbol && depth = 0 -> assert false (* cannot unlift this *)
+    | BoundVar i -> if i >= depth then mk_bound_var (i-1) t.sort else t
     | Node (_, []) | Var _ -> t
-    | Node (s, [t']) when s == succ_db_symbol ->
-      if db_index t >= depth then t' else t (* unlift only if not bound *)
-    | Node (s, l) when is_binder_symbol s ->
-      (* unlift, but index of unbound variables is +1 *)
-      mk_node s t.sort (List.map (recurse (depth+1)) l)
+    | Bind (s, t') -> mk_bind s (recurse (depth+1) t')
     | Node (s, l) -> mk_node s t.sort (List.map (recurse depth) l)
   in recurse 0 t
 
-(* replace v by a De Bruijn symbol in t *)
+(* replace [v] by a De Bruijn symbol in [t] *)
 let db_from_var t v =
   assert (is_var v);
-  (* go recursively and replace *)
-  let rec replace_and_lift depth t = match t.term with
-  | Var _ -> if eq_term t v then db_make depth v.sort else t
+  (* recurse and replace [v]. *)
+  let rec replace depth t = match t.term with
+  | Var _ -> if eq_term t v then mk_bound_var depth v.sort else t
+  | Bind (s, t') -> mk_bind s (replace (depth+1) t')
+  | BoundVar _ -> t
   | Node (_, []) -> t
-  | Node (s, l) when is_binder_symbol s ->
-    mk_node s t.sort (List.map (replace_and_lift (depth+1)) l)  (* increment depth *) 
-  | Node (s, l) -> mk_node s t.sort (List.map (replace_and_lift depth) l)
-  (* make De Bruijn index of given index *)
+  | Node (s, l) -> mk_node s t.sort (List.map (replace depth) l)
   in
-  replace_and_lift 0 t
-
-(* index of the De Bruijn symbol *) 
-let rec db_depth t = match t.term with
-  | Node (s, []) when s == db_symbol -> 0
-  | Node (s, [t']) when s == succ_db_symbol -> (db_depth t') + 1
-  | _ -> failwith "not a proper De Bruijn term"
+  replace 0 t
 
 exception FoundSort of sort
 
-(** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
-let look_db_sort index t =
+(** [look_db_sort n t] find the sort of the De Bruijn index [n] in [t].
+    Raise Not_found otherwise. *)
+let look_db_sort i t =
   let rec lookup depth t = match t.term with
-    | Node (s, subterms) when is_binder_symbol s ->
-      List.iter (lookup (depth+1)) subterms  (* increment for binder *)
-    | Node (s, [t]) when s == succ_db_symbol ->
-      lookup (depth-1) t  (* decrement for lifted De Bruijn *)
-    | Node (s, []) when s == db_symbol && depth = 0 -> raise (FoundSort t.sort)
-    | Node (_, l) -> List.iter (lookup depth) l
-    | Var _ -> ()
-  in try lookup index t; None
+  | BoundVar i -> if i = depth then raise (FoundSort t.sort) else ()
+  | Var _ -> ()
+  | Bind (_, t') -> lookup (depth+1) t'
+  | Node (_, l) -> List.iter (lookup depth) l
+  in try lookup i t; None
      with FoundSort s -> Some s
 
 (* ----------------------------------------------------------------------
@@ -492,7 +488,7 @@ let rec get_binding t =
 let expand_bindings ?(recursive=true) t =
   (* recurse to expand bindings, returns new term.  Also keeps track of the
     number of binders met so far, for lifting non-closed De Bruijn indexes in
-    substituted terms. *)
+    substituted terms (of domain of [subst]) by [depth]. *)
   let rec recurse binder_depth t =
     (* if t ground, nothing to do *)
     if is_ground_term t then t
@@ -505,9 +501,8 @@ let expand_bindings ?(recursive=true) t =
           else db_lift binder_depth t.binding in
         if recursive then recurse binder_depth t' else t'
       (* lift open De Bruijn symbols in t.binding by the number of binders encountered *)
-    | Node (s, l) when is_binder_symbol s ->
-      (* increase number of binders met *)
-      mk_node s t.sort (List.map (recurse (binder_depth+1)) l)
+    | BoundVar _ -> t
+    | Bind (s, t') -> mk_bind s (recurse (binder_depth+1) t')
     | Node (s, l) ->
       let l' = List.map (recurse binder_depth) l in
       mk_node s t.sort l' (* recursive replacement in subterms *)
@@ -518,6 +513,8 @@ let reset_vars t =
   let rec reset t =
     if is_ground_term t then () else match t.term with
     | Var _ -> reset_binding t
+    | BoundVar _ -> ()
+    | Bind (_, t') -> reset_binding t'
     | Node (_, l) -> reset_list l
   and reset_list l = match l with
   | [] -> ()
@@ -547,8 +544,7 @@ let pp_symbol_unicode =
       | _ when s == and_symbol -> Format.pp_print_string formatter "•&"
       | _ when s == or_symbol -> Format.pp_print_string formatter "•|"
       | _ when s == imply_symbol -> Format.pp_print_string formatter "•→"
-      | _ when s == db_symbol -> Format.pp_print_string formatter "•0"
-      | _ when s == succ_db_symbol -> Format.pp_print_string formatter "•s"
+      | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
     method infix s = s == or_symbol || s == eq_symbol || s == and_symbol || s == imply_symbol
   end
@@ -565,7 +561,6 @@ let pp_symbol_tstp =
       | _ when s == or_symbol -> Format.pp_print_string formatter "|"
       | _ when s == imply_symbol -> Format.pp_print_string formatter "=>"
       | _ when s == db_symbol -> failwith "no DB symbols in TSTP"
-      | _ when s == succ_db_symbol -> failwith "no DB symbols in TSTP"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
     method infix s = s == or_symbol || s == eq_symbol || s == and_symbol || s == imply_symbol
   end
@@ -579,18 +574,19 @@ class type pprinter_term =
   end
 
 let pp_term_debug =
-  (* print a De Bruijn term as nice unicode *)
-  let rec pp_db formatter t =
-    let n = db_depth t in
-    Format.fprintf formatter "•%d" n in
   let _sort = ref false
   and _bindings = ref false
-  and _skip_lambdas = ref true
-  and _skip_db = ref true in
+  in
   (* printer itself *)
   object (self)
     method pp formatter t =
       (match t.term with
+      | Var i -> if !_bindings && t != t.binding
+        then (_bindings := false;
+              Format.fprintf formatter "X%d → %a" i self#pp t.binding;
+              _bindings := true)
+        else Format.fprintf formatter "X%d" i
+      | BoundVar i -> Format.fprintf formatter "Y%d" i
       | Node (s, [{term=Node (s', [a; b])}])
         when s == not_symbol && s' == eq_symbol ->
         Format.fprintf formatter "%a != %a" self#pp a self#pp b
@@ -598,15 +594,7 @@ let pp_term_debug =
         Format.fprintf formatter "%a = %a" self#pp a self#pp b
       | Node (s, [t]) when s == not_symbol ->
         Format.fprintf formatter "%a%a" pp_symbol_unicode#pp s self#pp t
-      | Node (s, [{term=Node (s', [t'])}])
-        when s == forall_symbol || s == exists_symbol ->
-        assert (s' == lambda_symbol);
-        if !_skip_lambdas
-          then Format.fprintf formatter "%a(%a)" pp_symbol_unicode#pp s self#pp t'
-          else Format.fprintf formatter "%a%a(%a)"
-                pp_symbol_unicode#pp s pp_symbol_unicode#pp s' self#pp t'
-      | Node (s, [_]) when s == succ_db_symbol && !_skip_db ->
-        pp_db formatter t (* print de bruijn symbol *)
+      | Bind (s, t') -> Format.fprintf formatter "%a(%a)" pp_symbol_unicode#pp s self#pp t'
       | Node (s, []) -> pp_symbol_unicode#pp formatter s
       | Node (s, args) ->
         (* general case for nodes *)
@@ -617,18 +605,11 @@ let pp_term_debug =
                 self#pp l pp_symbol_unicode#pp s self#pp r
             | _ -> assert false (* infix and not binary? *)
           end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_symbol_unicode#pp s
-            (Utils.pp_list ~sep:", " self#pp) args
-      | Var i -> if !_bindings && t != t.binding
-        then (_bindings := false;
-              Format.fprintf formatter "X%d → %a" i self#pp t.binding;
-              _bindings := true)
-        else Format.fprintf formatter "X%d" i);
+            (Utils.pp_list ~sep:", " self#pp) args);
       (* also print the sort if needed *)
-      if !_sort then Format.fprintf formatter ":%s" (name_symbol t.sort) else ()
+      if !_sort then Format.fprintf formatter ":%s" (name_symbol t.sort)
     method sort s = _sort := s
     method bindings s = _bindings := s
-    method skip_lambdas s = _skip_lambdas := s
-    method skip_db s = _skip_db := s
   end
 
 let pp_term_tstp =
@@ -636,8 +617,7 @@ let pp_term_tstp =
     method pp formatter t =
       (* convert De Bruijn to regular variables *)
       let rec db_to_var varindex t = match t.term with
-      | Node (s, [{term=Node (s', [t'])}])
-        when (s == forall_symbol || s == exists_symbol) ->
+      | Bind (s, t') ->
         (* use a fresh variable, and convert to a named-variable representation *)
         (match look_db_sort 0 t' with
         | None -> db_unlift t'  (* just remove quantifier *)
@@ -646,7 +626,8 @@ let pp_term_tstp =
           incr varindex;
           db_to_var varindex (mk_node s t.sort [v; db_unlift (db_replace t' v)]))
         )
-      | Node (_, []) | Var _  -> t
+      | Node (_, []) | Var _ -> t
+      | BoundVar _ -> assert false
       | Node (s, l) -> mk_node s t.sort (List.map (db_to_var varindex) l)
       (* recursive printing function *)
       and pp_rec t = match t.term with
@@ -660,12 +641,11 @@ let pp_term_tstp =
         Format.fprintf formatter "%a != %a" self#pp a self#pp b
       | Node (s, [t]) when s == not_symbol ->
         Format.fprintf formatter "%a%a" pp_symbol_tstp#pp s self#pp t
-      | Node (s, [v; t'])
-        when (s == forall_symbol || s == exists_symbol) ->
+      | Node (s, [v; t']) when has_attr attr_binder s ->
         assert (is_var v);
         Format.fprintf formatter "%a[%a]: %a" pp_symbol_tstp#pp s self#pp v self#pp t'
-      | Node (s, _) when s == succ_db_symbol ||  s == db_symbol ->
-        failwith "De Bruijn symbol in term, cannot be printed in TSTP"
+      | BoundVar _ | Bind _ ->
+        failwith "De Bruijn index in term, cannot be printed in TSTP"
       | Node (s, []) -> pp_symbol_tstp#pp formatter s
       | Node (s, args) ->
         (* general case for nodes *)
@@ -704,9 +684,11 @@ let rec from_simple_formula f = match f with
   | Simple.False -> false_term
   | Simple.Atom t -> from_simple t
   | Simple.Eq (t1, t2) -> mk_eq (from_simple t1) (from_simple t2)
-  | Simple.Or (x::xs) -> List.fold_left mk_or (from_simple_formula x) (List.map from_simple_formula xs)
+  | Simple.Or (x::xs) ->
+    List.fold_left mk_or (from_simple_formula x) (List.map from_simple_formula xs)
   | Simple.Or [] -> true_term
-  | Simple.And (x::xs) -> List.fold_left mk_and (from_simple_formula x) (List.map from_simple_formula xs)
+  | Simple.And (x::xs) ->
+    List.fold_left mk_and (from_simple_formula x) (List.map from_simple_formula xs)
   | Simple.And [] -> false_term
   | Simple.Not f -> mk_not (from_simple_formula f)
   | Simple.Equiv (f1, f2) -> mk_equiv (from_simple_formula f1) (from_simple_formula f2)
@@ -717,6 +699,7 @@ let to_simple t =
   if t.sort == bool_sort then None else
   let rec build t = match t.term with
   | Var i -> Simple.mk_var i t.sort
+  | BoundVar _ | Bind _ -> failwith "not implemented"
   | Node (f, l) -> Simple.mk_node f t.sort (List.map build l)
   in Some (build t)
 
@@ -752,7 +735,7 @@ let classic_skolem =
     with Not_found ->
       (* actual skolemization of normalized_t *)
       let new_symbol = find_skolem () in
-      let new_symbol = mk_symbol ~attrs:Symbols.attr_skolem new_symbol in  (* build symbol *)
+      let new_symbol = mk_symbol ~attrs:attr_skolem new_symbol in  (* build symbol *)
       let skolem_term = mk_node new_symbol sort vars in
       (* update the precedence *)
       ignore (ord#precedence#add_symbols [new_symbol]);
@@ -773,7 +756,7 @@ let classic_skolem =
     rewriting can be performed inside the skolem terms. *)
 let unamed_skolem ~ord t sort =
   Utils.debug 4 (lazy (Utils.sprintf "@[<h>magic skolem %a@]@." !pp_term#pp t));
-  let symb = mk_symbol ~attrs:Symbols.attr_skolem "$$sk" in
+  let symb = mk_symbol ~attrs:attr_skolem "$$sk" in
   (* the existential witness, parametrized by the 'quoted' formula. The
      lambda is used to keep the formula closed. *)
   let args = [mk_node lambda_symbol t.sort [t]] in

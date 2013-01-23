@@ -63,10 +63,14 @@ end
 let path_string_of t =
   let rec aux arity t acc = match t.term with
     | Var i -> (* assert (arity = 0); *) Variable :: acc
+    | BoundVar _ -> Variable :: acc
+    | Bind (s, t') ->
+      let acc = Constant (s, 1) :: acc in
+      aux 0 t' acc
     | Node (a, []) -> (Constant (a, arity)) :: acc
     | Node (hd, tl) ->
-        let acc = (Constant (hd, List.length tl)) :: acc in
-        List.fold_left (fun acc t -> aux 0 t acc) acc tl
+      let acc = (Constant (hd, List.length tl)) :: acc in
+      List.fold_left (fun acc t -> aux 0 t acc) acc tl
   in 
   (* we build the path in reverse order because it should be faster,
      only two lists have to be built, and rev is tailrec *)

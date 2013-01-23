@@ -23,14 +23,10 @@ open Symbols
 
 (** Functions on first-order terms *)
 
-(** symbols that are symmetric (that is, order of arguments does not matter) *)
-val is_symmetric_symbol : symbol -> bool
-val is_infix_symbol : symbol -> bool
-val is_binder_symbol : symbol -> bool
-
 (* ----------------------------------------------------------------------
  * comparison, equality, containers
  * ---------------------------------------------------------------------- *)
+
 val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *)
 val member_term_rec : term -> term -> bool(** same, but follows variable bindings *)
 val eq_term : term -> term -> bool        (** standard equality on terms *)
@@ -81,6 +77,8 @@ val get_flag : int -> term -> bool
  * ---------------------------------------------------------------------- *)
 
 val mk_var : int -> sort -> term
+val mk_bound_var : int -> sort -> term
+val mk_bind : symbol -> term -> term
 val mk_node : symbol -> sort -> term list -> term
 val mk_const : symbol -> sort -> term
 
@@ -102,9 +100,12 @@ val cast : term -> sort -> term             (** cast (change sort) *)
 (* ----------------------------------------------------------------------
  * examine term/subterms, positions...
  * ---------------------------------------------------------------------- *)
+
 val is_var : term -> bool
-val is_const : term -> bool
+val is_bound_var : term -> bool
 val is_node : term -> bool
+val is_const : term -> bool
+val is_bind : term -> bool
 
 val at_pos : term -> position -> term 
   (** retrieve subterm at pos, or raise Invalid_argument*)
@@ -132,33 +133,35 @@ val vars_list : term list -> varlist        (** variables of terms in the list *
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
  * ---------------------------------------------------------------------- *)
+
 val atomic : term -> bool                   (** atomic proposition, or term, at root *)
 val atomic_rec : term -> bool               (** does not contain connectives/quantifiers *)
 val db_closed : term -> bool                (** check whether the term is closed *)
-val db_var : term -> bool                   (** is the term a De Bruijn index? *)
 
-(** Does t contains the De Bruijn variable of index n? *)
 val db_contains : term -> int -> bool
-(** Substitution of De Bruijn symbol by a term. [db_replace t s]
-    replaces the De Bruijn symbol 0 by s in t *)
+  (** Does t contains the De Bruijn variable of index n? *)
+
 val db_replace : term -> term -> term
-(** Create a De Bruijn variable of index n *)
-val db_make : int -> sort -> term
-(** lift the non-captured De Bruijn indexes in the term by n *)
+  (** Substitution of De Bruijn symbol by a term. [db_replace t s]
+      replaces the De Bruijn symbol 0 by s in t *)
+
 val db_lift : int -> term -> term
-(** Unlift the term (decrement indices of all De Bruijn variables inside *)
+  (** lift the non-captured De Bruijn indexes in the term by n *)
+
 val db_unlift : term -> term
-(** [db_from_var t v] replace v by a De Bruijn symbol in t *)
+  (** Unlift the term (decrement indices of all De Bruijn variables inside *)
+
 val db_from_var : term -> term -> term
-(** index of the De Bruijn term *)
-val db_depth : term -> int
-(** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
+  (** [db_from_var t v] replace v by a De Bruijn symbol in t *)
+
 val look_db_sort : int -> term -> sort option
+  (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
 
 (* ----------------------------------------------------------------------
  * bindings and normal forms
  * ---------------------------------------------------------------------- *)
-val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding or normal form of t *)
+
+val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding of t *)
 val reset_binding : term -> unit            (** reset variable binding/normal form *)
 val get_binding : term -> term              (** get the binding of variable/normal form of term *)
 val expand_bindings : ?recursive:bool ->
@@ -194,8 +197,6 @@ val pp_term_debug :                                 (** print term in a nice syn
     pp : Format.formatter  -> term -> unit;
     bindings : bool -> unit;                        (** print bindings of variables? *)
     sort : bool -> unit;                            (** print sorts of terms? *)
-    skip_lambdas : bool -> unit;                    (** print lambdas after quantifiers? *)
-    skip_db : bool -> unit;                         (** nice printing of De Bruijn terms *)
   >
 
 val pp_precedence : Format.formatter -> symbol list -> unit      (** print symbol precedence *)

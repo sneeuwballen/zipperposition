@@ -611,21 +611,29 @@ let is_cnf hc =
 
 (** Compute signature of this set of clauses *)
 let signature clauses =
+  (* explore a term *)
   let rec explore_term signature t = match t.term with
-  | Var _ -> signature
+  | Var _ | BoundVar _ -> signature
+  | Bind (s, t') ->
+    let arity, sort = 1, t.sort in
+    let signature' = update_sig signature s arity sort in
+    explore_term signature' t'
   | Node (f, l) ->
-    begin
-      let arity, sort = List.length l, t.sort in
-      (try (* check consistency with signature *)
-        let arity', sort' = SMap.find f signature in
-        assert (arity = arity' && sort == sort');
-      with Not_found -> ());
-      let signature' = SMap.add f (arity, sort) signature in
-      List.fold_left explore_term signature' l
-    end
+    let arity, sort = List.length l, t.sort in
+    let signature' = update_sig signature f arity sort in
+    List.fold_left explore_term signature' l
   and explore_lit signature lit = match lit with
   | Equation (l,r,_,_) -> explore_term (explore_term signature l) r
   and explore_clause signature hc = Array.fold_left explore_lit signature hc.hclits
+  (* Update signature with s -> (arity, sort).
+     Checks consistency with current value, if any. *)
+  and update_sig signature f arity sort =
+    (try
+      let arity', sort' = SMap.find f signature in
+      assert (arity = arity' && sort == sort');
+    with Not_found -> ());
+    let signature' = SMap.add f (arity, sort) signature in
+    signature'
   in
   List.fold_left explore_clause empty_signature clauses
 
@@ -740,9 +748,9 @@ module CSet =
 (** Does t contains the symbol f? *)
 let rec contains_symbol f t =
   match t.term with
-  | Var _ -> false
-  | Node (g, _) when f == g -> true
-  | Node (_, ts) -> List.exists (contains_symbol f) ts
+  | Var _ | BoundVar _ -> false
+  | Bind (s, t') -> s == f || contains_symbol f t'
+  | Node (g, ts) -> g == f || List.exists (contains_symbol f) ts
 
 (** Recognized whether the clause is a Range-Restricted Horn clause *)
 let is_RR_horn_clause hc = 
@@ -772,7 +780,7 @@ let is_definition hc =
   (* check that r is a definition of l=f(x1,...,xn) *)
   let check_def l r =
     match l.term with
-    | Var _ -> false
+    | Var _ | BoundVar _ | Bind _ -> false
     | Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n > 0 *)
       T.atomic_rec l && ts <> [] && not (contains_symbol f r) && l != T.true_term && r != T.true_term
@@ -792,7 +800,7 @@ let is_rewrite_rule hc =
   (* check that l -> r is an acceptable rewrite rule *)
   let check_rule l r =
     match l.term with
-    | Var _ -> false
+    | Var _ | Bind _ | BoundVar _ -> false
     | Node (_, _) ->
       T.atomic_rec l && l != T.true_term && r != T.true_term &&
       List.for_all (fun x -> T.var_occurs x l) (T.vars r)

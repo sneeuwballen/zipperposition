@@ -48,8 +48,6 @@ let special_symbols =
      imply_symbol;
      and_symbol;
      or_symbol;
-     db_symbol;     (* De Bruijn *)
-     succ_db_symbol;
      bool_sort;     (* Sorts *)
      univ_sort;
      type_sort;
@@ -238,10 +236,15 @@ let pterm_of_term ?rev_map t =
   let rev_map = match rev_map with | None -> empty_rev_mapping () | Some m -> m in
   (* recursive conversion *)
   let rec convert t = match t.term with
-  | Var i ->
+  | Var i | BoundVar i ->
     let psort = rm_get_symbol ~rev_map t.sort in
     let i' = rm_get_var ~rev_map i in
     PVar (i', psort)
+  | Bind (f, t') ->
+    let psort = rm_get_symbol ~rev_map t.sort in
+    let psymbol = rm_get_symbol ~rev_map f in
+    let t'' = convert t' in
+    PNode (psymbol, psort, [t''])
   | Node (f, l) ->
     let psort = rm_get_symbol ~rev_map t.sort in
     let psymbol = rm_get_symbol ~rev_map f in
@@ -335,7 +338,8 @@ let check_symbol ~map s symbol =
     and variables on symbols and variables *)
 let rec match_pterm ~map pt t =
   match pt, t.term with
-  | PVar (i, s), Var i' ->
+  | PVar (i, s), Var i'
+  | PVar (i, s), BoundVar i' ->
     let map = check_symbol ~map s t.sort in
     (try
       let j = Ptmap.find i map.m_var in
@@ -347,7 +351,11 @@ let rec match_pterm ~map pt t =
     let map = check_symbol ~map f f' in
     let map = check_symbol ~map s t.sort in
     List.fold_left2 (fun map pt t -> match_pterm ~map pt t) map l l'
-  | PVar _, Node _ | PNode _, Var _ -> raise Exit
+  | PNode (f, s, [pt']), Bind (f', t') ->
+    let map = check_symbol ~map f f' in
+    let map = check_symbol ~map s t.sort in
+    match_pterm ~map pt' t'
+  | _ -> raise Exit
 
 let match_plit ~map plit lit =
   match plit, lit with

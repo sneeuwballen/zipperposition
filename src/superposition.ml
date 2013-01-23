@@ -82,14 +82,17 @@ let rec list_first f = function
     *)
 let all_positions pos t f =
   let rec aux pos t = match t.term with
-  | Var _ -> []
+  | Var _ | BoundVar _ -> []
+  | Bind (_, t') ->
+    let acc = f t pos in  (* apply to term itself *)
+    List.rev_append (aux (pos @ [0]) t') acc
   | Node (hd, tl) ->
     let acc = f t pos in  (* apply to term itself *)
     let acc, _ =
       List.fold_left
       (fun (acc,idx) t ->
-          let acc = List.rev_append (aux (pos @ [idx]) t) acc in (* recurse in subterm *)
-          acc, idx+1)
+        let acc = List.rev_append (aux (pos @ [idx]) t) acc in (* recurse in subterm *)
+        acc, idx+1)
       (acc, 0) tl
     in
     acc
@@ -367,7 +370,12 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
   (* rewrite innermost-leftmost *)
   and traverse ~restrict t =
     match t.term with
-    | Var _ -> t
+    | Var _ | BoundVar _ -> t
+    | Bind (s, t') ->
+      let t'' = traverse ~restrict:false t' in
+      let new_t = T.mk_bind s t'' in
+      (* rewrite term at root *)
+      normal_form ~restrict new_t
     | Node (s, l) ->
       (* rewrite subterms *)
       let l' = List.map (traverse ~restrict:false) l in
@@ -685,7 +693,8 @@ let compare_literals_subsumption lita litb =
   let rec is_ground (Equation (l,r,_,_)) = T.is_ground_term l && T.is_ground_term r
   and depth (Equation (l,r,_,_)) = max (term_depth l) (term_depth r)
   and term_depth t = match t.term with
-    | Var _ -> 1
+    | Var _ | BoundVar _ -> 1
+    | Bind (_, t') -> 1 + term_depth t'
     | Node (_, l) -> 1 + List.fold_left (fun m t' -> max m (term_depth t')) 0 l
   and size (Equation (l,r,_,_)) = l.tsize + r.tsize
   in
@@ -969,7 +978,8 @@ let cnf_of ~ord hc =
   and nnf t =
     if t.sort <> bool_sort then t else
     match t.term with
-    | Var _ | Node (_, []) -> t
+    | Var _ | Node (_, []) | BoundVar _ -> t
+    | Bind (f, t') -> T.mk_bind f (nnf t')
     | Node (s, [{term=Node (s', [a; b])}]) when s = not_symbol && s' = and_symbol ->
       nnf (T.mk_or (T.mk_not a) (T.mk_not b))  (* de morgan *)
     | Node (s, [{term=Node (s', [a; b])}]) when s = not_symbol && s' = or_symbol ->
@@ -988,11 +998,9 @@ let cnf_of ~ord hc =
       nnf (T.mk_or
         (T.mk_and a (T.mk_not b))
         (T.mk_and b (T.mk_not a)))
-    | Node (s, [{term=Node (s', [{term=Node (s'', [t'])}])}]) when s = not_symbol && s' = forall_symbol ->
-      assert (s'' = lambda_symbol);
+    | Node (s, [{term=Bind (s', t')}]) when s = not_symbol && s' = forall_symbol ->
       nnf (T.mk_exists (T.mk_not t')) (* not forall -> exists not *)
-    | Node (s, [{term=Node (s', [{term=Node (s'', [t'])}])}]) when s = not_symbol && s' = exists_symbol ->
-      assert (s'' = lambda_symbol);
+    | Node (s, [{term=Bind (s', t')}]) when s = not_symbol && s' = exists_symbol ->
       nnf (T.mk_forall (T.mk_not t')) (* not exists -> forall not *)
     | Node (s, [{term=Node (s', [t])}]) when s = not_symbol && s' = not_symbol ->
       nnf t (* double negation *)
@@ -1001,11 +1009,10 @@ let cnf_of ~ord hc =
       if T.eq_term t t' then t' else nnf t'
   (* skolemization of existentials, removal of forall *)
   and skolemize t = match t.term with
-    | Var _ | Node (_, []) -> t
+    | Var _ | Node (_, []) | BoundVar _ -> t
     | Node (s, [{term=Node (s', [t])}]) when s = not_symbol && s' = not_symbol ->
       skolemize t (* double negation *)
-    | Node (s, [{term=Node (s', [t'])}]) when s = forall_symbol ->
-      assert (s' = lambda_symbol);
+    | Bind (s, t') when s = forall_symbol ->
       (* a fresh variable *)
       let sort = match T.look_db_sort 0 t with
         | None -> univ_sort
@@ -1014,20 +1021,20 @@ let cnf_of ~ord hc =
       incr varindex;
       let new_t' = T.db_unlift (T.db_replace t' v) in
       skolemize new_t' (* remove forall *)
-    | Node (s, [{term=Node (s', [t'])}]) when s = exists_symbol ->
-      assert (s' = lambda_symbol);
+    | Bind (s, t') when s = exists_symbol ->
       (* make a skolem symbol *)
       let sort = match T.look_db_sort 0 t with
         | None -> univ_sort
         | Some s -> s in
       let new_t' = !T.skolem ~ord t' sort in
       skolemize new_t' (* remove forall *)
+    | Bind (s, t') -> T.mk_bind s (skolemize t')
     | Node (s, l) -> T.mk_node s t.sort (List.map skolemize l)
   (* reduction to cnf using De Morgan. Returns a list of list of terms *)
   and to_cnf t =
     if t.sort <> bool_sort then [[t, true]]
     else match t.term with
-    | Var _ | Node (_, []) -> [[t, true]]
+    | Var _ | Node (_, []) | BoundVar _ -> [[t, true]]
     | Node (s, [t']) when s = not_symbol ->
       assert (T.atomic_rec t' ||
               match t'.term with Node (s', _) when s' = eq_symbol -> true | _ -> false);
@@ -1038,7 +1045,7 @@ let cnf_of ~ord hc =
       List.rev_append ca cb
     | Node (s, [a; b]) when s = or_symbol ->
       product (to_cnf a) (to_cnf b)
-    | Node _ -> [[t, true]]
+    | Node _ | Bind _ -> [[t, true]]
   (* cartesian product of lists of lists *)
   and product a b =
     List.fold_left

@@ -123,7 +123,11 @@ let update_with_clause op acc eligible ~subterms ~both_sides hc =
      so we have to reverse them before giving them to [op acc]. *)
   and process_term op acc t pos =
     match t.term with
-    | Var _ -> acc  (* variables are never indexed *)
+    | Var _ | BoundVar _ -> acc  (* variables are never indexed *)
+    | Bind (s, t') ->
+      (* apply the operation on the term itself *)
+      let acc = op acc t (hc, List.rev pos, t) in
+      if subterms then process_term op acc t' (0::pos) else acc
     | Node (_, []) -> op acc t (hc, List.rev pos, t)
     | Node (_, l) ->
       (* apply the operation on the term itself *)

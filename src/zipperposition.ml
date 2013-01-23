@@ -146,9 +146,7 @@ let setup_output ~params =
     C.pp_proof := C.pp_proof_debug
   | s -> failwith ("unknown output syntax " ^ s));
   (if params.param_print_sort
-    then T.pp_term_debug#sort true);
-  (if params.param_print_all
-    then begin T.pp_term_debug#skip_lambdas false; T.pp_term_debug#skip_db false end)
+    then T.pp_term_debug#sort true)
 
 let print_version ~params =
   if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0)

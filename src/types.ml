@@ -38,10 +38,8 @@ exception SortError of string
 (* TODO: (maybe) substitutions as list of pairs of *bound* terms,
   where bound term = (int * term), the int being an offset for renaming vars *)
 
-(** hashconsed term *)
-type term = typed_term
 (** term with a simple sort *)
-and typed_term = {
+type term = {
   term : term_cell;             (** the term itself *)
   sort : sort;                  (** the sort of the term *)
   mutable binding : term;       (** binding of the term (if variable), or normal form *)
@@ -53,6 +51,8 @@ and typed_term = {
 (** content of the term *)
 and term_cell =
   | Var of int                  (** variable *)
+  | BoundVar of int             (** bound variable (De Bruijn index) *)
+  | Bind of symbol * term       (** bind one variable, with the symbol *)
   | Node of symbol * term list  (** term application *)
 
 (** list of variables *)

@@ -38,7 +38,8 @@ let occurs_check var t =
       | Var _ when var == t -> true
       | Var _ when t != (T.get_binding t) ->
         check var (T.get_binding t)  (* recurse in binding *)
-      | Var _ -> false
+      | Var _ | BoundVar _ -> false
+      | Bind (_, t') -> check var t'
       | Node (_, l) -> check_list var l
   and check_list var l = match l with
   | [] -> false
@@ -71,7 +72,9 @@ let unification subst a b =
     | _, Var _ ->
       T.set_binding t (T.expand_bindings s);
       S.update_binding subst t
-    | Node (f, l1), Node (g, l2) when f = g && List.length l1 = List.length l2 ->
+    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' t2'
+    | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
+    | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       let subst = unify_composites subst l1 l2 in (* unify non-vars *)
       unify_vars subst l1 l2  (* unify vars *)
     | _, _ -> raise UnificationFailure
@@ -119,7 +122,9 @@ let matching_locked ~locked subst a b =
     | Var _, _ ->
       T.set_binding s (T.expand_bindings t);
       S.update_binding subst s
-    | Node (f, l1), Node (g, l2) when f = g && List.length l1 = List.length l2 ->
+    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' t2'
+    | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
+    | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       List.fold_left2 unif subst l1 l2
     | _ -> raise UnificationFailure
   in
