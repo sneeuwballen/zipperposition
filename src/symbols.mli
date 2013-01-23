@@ -35,8 +35,11 @@ val hash_symbol : symbol -> int
 type symbol_attribute = int
   (** attributes of the symbol *)
 
-val attr_skolem : symbol_attribute     (** skolem symbol? *)
-val attr_split : symbol_attribute      (** symbol used for splitting? *)
+val attr_skolem : symbol_attribute      (** skolem symbol? *)
+val attr_split : symbol_attribute       (** symbol used for splitting? *)
+val attr_binder : symbol_attribute      (** is the symbol a binding symbol? *)
+val attr_infix : symbol_attribute       (** symbol is binary infix? *)
+val attr_ac : symbol_attribute          (** symbol is associative-commutative? *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
   (** construction of a symbol *)
@@ -49,6 +52,9 @@ val tag_symbol : symbol -> int
 
 val attrs_symbol : symbol -> symbol_attribute
   (** access attributes of a symbol *)
+
+val has_attr : symbol_attribute -> symbol -> bool
+  (** does the symbol have this attribute? *)
 
 val name_symbol : symbol -> string
   (** deconstruction of a symbol *)
@@ -77,9 +83,7 @@ val imply_symbol : symbol
 val and_symbol : symbol
 val or_symbol : symbol
 
-(* De Bruijn *)
-val db_symbol : symbol
-val succ_db_symbol : symbol
+val db_symbol : symbol  (** pseudo symbol kept for locating bound vars in precedence *)
 
 (* sorts *)
 val bool_sort : sort

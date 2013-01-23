@@ -22,8 +22,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 type symbol_attribute = int
 
-let attr_skolem = 0x1
-let attr_split = 0x2
+let attr_skolem = 1 lsl 0
+let attr_split = 1 lsl 1
+let attr_binder = 1 lsl 2
+let attr_infix = 1 lsl 3
+let attr_ac = 1 lsl 4
 
 (** A symbol is a string, a unique ID, and some attributes *)
 type symbol = {
@@ -67,6 +70,9 @@ let tag_symbol s = s.symb_id
 
 let attrs_symbol s = s.symb_attrs
 
+(** does the symbol have this attribute? *)
+let has_attr attr s = (s.symb_attrs land attr) <> 0
+
 module SHashtbl = Hashtbl.Make(
   struct
     type t = symbol
@@ -86,18 +92,17 @@ let empty_signature = SMap.empty
 (* connectives *)
 let true_symbol = mk_symbol "$true"
 let false_symbol = mk_symbol "$false"
-let eq_symbol = mk_symbol "="
-let exists_symbol = mk_symbol "$$exists"
-let forall_symbol = mk_symbol "$$forall"
-let lambda_symbol = mk_symbol "$$lambda"
-let not_symbol = mk_symbol"$$not"
-let imply_symbol = mk_symbol "$$imply"
-let and_symbol = mk_symbol "$$and"
-let or_symbol = mk_symbol "$$or"
+let eq_symbol = mk_symbol ~attrs:attr_infix "="
+let exists_symbol = mk_symbol ~attrs:attr_binder "$$exists"
+let forall_symbol = mk_symbol ~attrs:attr_binder "$$forall"
+let lambda_symbol = mk_symbol ~attrs:attr_binder "$$lambda"
+let not_symbol = mk_symbol "$$not"
+let imply_symbol = mk_symbol ~attrs:attr_infix "$$imply"
+let and_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac) "$$and"
+let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac) "$$or"
 
-(* De Bruijn *)
-let db_symbol = mk_symbol "$$db"
-let succ_db_symbol = mk_symbol "$$s"
+(** pseudo symbol kept for locating bound vars in precedence *)
+let db_symbol = mk_symbol "$$db_magic_cookie"
 
 (* default sorts *)
 let type_sort = mk_symbol "$tType"
@@ -116,7 +121,6 @@ let table =
    and_symbol, bool_sort, 2;
    or_symbol, bool_sort, 2;
    db_symbol, univ_sort, 0;
-   succ_db_symbol, univ_sort, 1;
    ]
 
 (** default signature, containing predefined symbols with their arities and sorts *)
