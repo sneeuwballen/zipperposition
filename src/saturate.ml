@@ -204,7 +204,7 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       Sel.check_selected hc;
       C.check_ord_hclause ~ord hc;
       Utils.debug 2 (lazy (Utils.sprintf "%% ============ step %5d  ============" num));
-      Utils.debug 1 (Lazy.from_val (Utils.sprintf "%% @[<h>%a@]" !C.pp_clause#pp_h hc));
+      Utils.debug 1 (Lazy.lazy_from_val (Utils.sprintf "%% @[<h>%a@]" !C.pp_clause#pp_h hc));
       (* scan clause within meta-prover *)
       let lemmas = find_lemmas state hc in
       let new_clauses = List.rev_append lemmas new_clauses in
