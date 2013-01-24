@@ -40,6 +40,7 @@ let prof_all_simplify = Utils.mk_profiler "all_simplify"
 let prof_is_redundant = Utils.mk_profiler "is_redundant"
 let prof_subsumed_by = Utils.mk_profiler "subsumed_by"
 
+let stat_killed_orphans = mk_stat "orphan clauses removed"
 let stat_inferred = mk_stat "inferred clauses"
 let stat_redundant_given = mk_stat "redundant given clauses"
 let stat_processed_given = mk_stat "processed given clauses"
@@ -130,7 +131,10 @@ let generate ~calculus active_set given =
 (** remove direct descendants of the clauses from the passive set *)
 let remove_orphans passive_set removed_clauses =
   List.iter
-    (fun removed_clause -> passive_set#remove removed_clause.hcdescendants)
+    (fun removed_clause ->
+      let orphans = removed_clause.hcdescendants in
+      add_stat stat_killed_orphans (Ptset.cardinal orphans);
+      passive_set#remove orphans)
     removed_clauses
 
 (** check whether the clause is redundant w.r.t the active_set *)
