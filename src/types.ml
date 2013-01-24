@@ -34,6 +34,7 @@ exception SortError of string
    Always orient with the bigger term on left. *)
 (* TODO: remove proof from clauses, make it external (a proof is a tree that
    contains clauses). This should allow to disable proof-handling. *)
+(* TODO: parents and descendants for hclause should be arrays, more efficient in ram *)
 (* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
 (* TODO: (maybe) substitutions as list of pairs of *bound* terms,
   where bound term = (int * term), the int being an offset for renaming vars *)
