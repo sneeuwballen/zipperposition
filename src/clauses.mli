@@ -253,6 +253,9 @@ end
 val is_RR_horn_clause : hclause -> bool
   (** Recognized whether the clause is a Range-Restricted Horn clause *)
 
+val is_horn : hclause -> bool
+  (** Recognizes Horn clauses (at most one positive literal) *)
+
 val is_definition : hclause -> (term * term) option
   (** Check whether the clause defines a symbol, e.g.
       subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS

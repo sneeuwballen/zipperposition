@@ -772,6 +772,16 @@ let is_RR_horn_clause hc =
   | Some lit' -> (* check that all variables of the clause occur in the head *)
     List.length (vars_of_lit lit') = List.length hc.hcvars
 
+(** Recognizes Horn clauses (at most one positive literal) *)
+let is_horn hc =
+  (* Iterate on literals, counting the positive ones.
+     [pos]: did we already meet a positive literal *)
+  let rec iter_lits pos lits i =
+    if i = Array.length lits then true else match lits.(i) with
+      | Equation (_, _, true, _) -> if pos then false else iter_lits true lits (i+1)
+      | Equation (_, _, false, _) -> iter_lits pos lits (i+1)
+  in iter_lits false hc.hclits 0
+
 (** Check whether the clause defines a symbol, e.g.
     subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
     is a flat symbol with variables, and all variables in RHS
