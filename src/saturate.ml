@@ -66,6 +66,7 @@ let simplify ~calculus ~select active_set simpl_set old_hc =
   let hc = calculus#rw_simplify ~select simpl_set old_hc in
   let hc = calculus#basic_simplify ~ord hc in
   let hc = calculus#active_simplify ~select active_set hc in
+  let hc = calculus#basic_simplify ~ord hc in
   let hc = C.select_clause ~select hc in
   (if not (C.eq_hclause hc old_hc)
     then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
@@ -228,14 +229,19 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       let new_clauses = List.rev_append newly_simplified new_clauses in
       (* add given clause to active set *)
       state#active_set#add [hc];
-      (* do inferences between c and the active set (including c), if [generate] is set to true *)
-      let inferred_clauses = if generating then generate ~calculus state#active_set hc else [] in
+      (* do inferences between c and the active set (including c),
+         if [generate] is set to true *)
+      let inferred_clauses = if generating
+        then generate ~calculus state#active_set hc
+        else [] in
       (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
       let inferred_clauses = List.fold_left
         (fun acc hc ->
           let cs = calculus#list_simplify ~ord ~select hc in
           let cs = List.map (calculus#rw_simplify ~select state#simpl_set) cs in
+          let cs = List.map (calculus#basic_simplify ~ord) cs in
+          let cs = List.filter (fun hc -> not (calculus#is_trivial hc)) cs in
           List.rev_append cs acc)
         [] inferred_clauses
       in

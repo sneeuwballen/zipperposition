@@ -324,7 +324,7 @@ let delayed : calculus =
     method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
                           "equality_factoring", Sup.infer_equality_factoring; ]
 
-    method basic_simplify ~ord hc = Sup.basic_simplify ~ord hc
+    method basic_simplify ~ord hc = Sup.basic_simplify ~ord (simplify_inner ~ord hc)
 
     method rw_simplify ~select (simpl : PS.simpl_set) hc =
       let ord = simpl#ord in
@@ -364,7 +364,7 @@ let delayed : calculus =
 
     (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify ~ord ~select hc =
-      let hc = C.select_clause ~select (Sup.basic_simplify ~ord hc) in
+      let hc = C.select_clause ~select (self#basic_simplify ~ord hc) in
       let l = recursive_eliminations ~ord ~select hc in
       let l = List.filter (fun hc -> not (Sup.is_tautology hc)) l in
       let l = List.map (C.select_clause ~select) l in
