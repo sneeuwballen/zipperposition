@@ -65,35 +65,22 @@ let select_diff_neg_lit ?(strict=true) ~ord hc =
   | n -> n :: select_positives hc
 
 let select_complex ?(strict=true) ~ord hc =
-  (* find x!=t in literals *)
-  let rec find_noteqvars lits idx =
-    if idx = Array.length lits then -1 else
-    match lits.(idx) with
-    | Equation (l, r, false,_) ->
-      if (T.is_var l && not (T.var_occurs l r)) ||
-         (T.is_var r && not (T.var_occurs r l))
-      then idx else find_noteqvars lits (idx+1)
-    | _ -> find_noteqvars lits (idx+1) 
-  (* find the smallest ground negative literal *)
-  and find_neg_ground best_weight best_idx lits idx =
-    if idx = Array.length lits then best_idx else
-    match lits.(idx) with
-    | Equation (l, r, false, _) ->
-      let weight = l.tsize + r.tsize in
-      if T.is_ground_term l && T.is_ground_term r && weight < best_weight
-        then find_neg_ground weight idx lits (idx+1)
-        else find_neg_ground best_weight best_idx lits (idx+1)
-    | _ -> find_neg_ground best_weight best_idx lits (idx+1)
+  (* find the ground negative literal with highest diff in size *)
+  let rec find_neg_ground best_diff best_i lits i =
+    if i = Array.length lits then best_i else
+    match lits.(i) with
+    | Equation (l, r, false, _) when T.is_ground_term l && T.is_ground_term r ->
+      let diff = abs (l.tsize - r.tsize) in
+      if diff > best_diff
+        then find_neg_ground diff i lits (i+1)
+        else find_neg_ground best_diff best_i lits (i+1)
+    | _ -> find_neg_ground best_diff best_i lits (i+1)
   in
-  (* try x!=y, else try ground negative, else delegate *)
-  let i = find_noteqvars hc.hclits 0 in
+  (* try to find ground negative lit with bigger weight difference, else delegate *)
+  let i = find_neg_ground (-1) (-1) hc.hclits 0 in
   if i >= 0
     then if strict then [i] else i :: select_positives hc
-    else
-      let i = find_neg_ground 0 (-1) hc.hclits 0 in
-      if i >= 0
-        then if strict then [i] else i :: select_positives hc
-        else select_diff_neg_lit ~strict ~ord hc (* delegate to select_diff_neg_lit *)
+    else select_diff_neg_lit ~strict ~ord hc (* delegate to select_diff_neg_lit *)
 
 let select_complex_except_RR_horn ?(strict=true) ~ord hc =
   if C.is_RR_horn_clause hc

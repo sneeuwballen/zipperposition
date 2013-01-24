@@ -128,6 +128,10 @@ let pos_unit_clauses =
   let name = "prefer_pos_unit_clauses" in
   make_hq ~accept:is_unit_pos ~weight:(fun hc -> hc.hcweight) name
 
+let horn =
+  let name = "prefer_horn" in
+  make_hq ~accept:C.is_horn ~weight:(fun hc -> hc.hcweight) name
+
 let default_queues =
   [ (clause_weight, 4);
     (ground, 1);
@@ -136,6 +140,7 @@ let default_queues =
     (goals, 1);
     *)
     (fifo, 2);
+    (horn, 1);  (* FIXME: if just before "fifo", incompleteness on pelletier_problems/pb64.p *)
   ]
 
 let pp_queue formatter q =
