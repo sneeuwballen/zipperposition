@@ -51,11 +51,11 @@ let add_rule trs (l, r) =
   (* check that the rule does not introduce variables *)
   assert (List.for_all
     (fun v -> T.member_term v l)
-    r.vars);
+    (T.vars r));
   assert (not (T.is_var l));
   assert (l.sort = r.sort);
   (* use low, negative variables *)
-  let vars = l.vars in
+  let vars = T.vars l in
   List.iter (fun v ->
     match v.term with
     | Var i -> T.set_binding v (T.mk_var (-(i+var_offset)) v.sort)
@@ -96,7 +96,7 @@ exception RewrittenIn of term
 (** Compute normal form of the term, and set its binding to the normal form *)
 let rec rewrite trs t = 
   match t.term with
-  | Var _ -> t  (* always in normal form *)
+  | Var _ | BoundVar _ -> t  (* always in normal form *)
   | _ when T.get_flag T.flag_normal_form t -> t.binding  (* normal form already computed *)
   | _ -> (* compute normal form, store it, and return it *)
     let normal_form = compute_nf trs t in
@@ -106,13 +106,17 @@ let rec rewrite trs t =
 (* compute normal form of this term *)
 and compute_nf trs t =
   match t.term with
-  | Var _ -> t
+  | Bind (s, t') ->
+    let t'' = rewrite trs t' in
+    let new_t = T.mk_bind s t'' in
+    reduce_at_root trs new_t
   | Node (hd, l) ->
     (* rewrite subterms first *)
     let l' = List.map (rewrite trs) l in
     let t' = T.mk_node hd t.sort l' in
     (* rewrite at root *)
     reduce_at_root trs t'
+  | Var _ | BoundVar _ -> assert false
 (* assuming subterms are in normal form, reduce the term *)
 and reduce_at_root trs t =
   try

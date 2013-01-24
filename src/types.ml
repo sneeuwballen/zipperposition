@@ -26,14 +26,14 @@ open Symbols
 (** exception raised when sorts are mismatched *)
 exception SortError of string
 
-(* TODO: better representation of terms:
-  term = | Var of int | Node of symbol * term list | Binder of symbol * term | BoundVar of int *)
 (* TODO: a 'type_' type for simple types, like
-  type_ = Sort of symbol | Arrow of type_t list * type_ *)
+  type_ = Sort of symbol | Arrow of type_t list * type_. Problem is for "or" and "and"
+  that are n-ary; also, "=" is polymorphic... Maybe polymorphism then? *)
 (* TODO: a literal should be (term, term, int) where the int is a set of flags. It's enough
    to tell well the lit is positive/negative, and if it's oriented (a > b) or eq/incomparable.
    Always orient with the bigger term on left. *)
-(* TODO: remove proof from clauses, make it external (a proof is a tree of annotated clauses) *)
+(* TODO: remove proof from clauses, make it external (a proof is a tree that
+   contains clauses). This should allow to disable proof-handling. *)
 (* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
 (* TODO: (maybe) substitutions as list of pairs of *bound* terms,
   where bound term = (int * term), the int being an offset for renaming vars *)
@@ -81,7 +81,7 @@ type literal =
                 * comparison   (* TODO remove? or just orient equations? *)
 
 (** a small bitvector *)
-type bitvector = int
+type bitvector = Bitvector.bitvector
 
 (** a first order clause *)
 type clause = {
@@ -95,9 +95,9 @@ and hclause = {
   mutable hctag : int;                    (** hashconsing tag *)
   mutable hchash : int;                   (** hash of clause *)
   mutable hcweight : int;                 (** weight of clause *)
-  mutable hcmaxlits : int;                (** bitvector for maximal literals *)
+  mutable hcmaxlits : bitvector;          (** bitvector for maximal literals *)
   mutable hcselected_done : bool;
-  mutable hcselected : int;               (** bitvector for selected literals *)
+  mutable hcselected : bitvector;         (** bitvector for selected literals *)
   mutable hcvars : term list;             (** the free variables *)
   mutable hcproof : proof;                (** the proof for this clause (lazy...) *)
   mutable hcparents : hclause list;       (** parents of the clause *)

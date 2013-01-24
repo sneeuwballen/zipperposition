@@ -15,7 +15,7 @@ module Sup = Superposition
 let print_clause_pair formatter (c1, c2) = 
   Format.fprintf formatter "(%a, %a)" !C.pp_clause#pp_h c1 !C.pp_clause#pp c2
 
-let ord = O.default_ordering ()
+let ord = TT.ord
 
 (** random literal *)
 let random_lit () =
@@ -23,13 +23,11 @@ let random_lit () =
   (* a random predicate *)
   let random_pred () =
     let p = TT.random_pred () in
-    ord#refresh ();
     C.mk_lit ~ord p T.true_term sign
   (* a random equation *)
   and random_eq () =
     let l = TT.random_term ()
     and r = TT.random_term () in
-    ord#refresh ();
     C.mk_lit ~ord l r sign
   in if H.R.bool ()  (* choice between equation and predicate *)
     then random_pred ()
@@ -39,12 +37,12 @@ let random_lit () =
 let random_clause ?(size=4) () =
   if H.random_in 0 200 >= 198 then
     (* empty clause, from time to time *)
-    C.mk_hclause ~ord [] (lazy (Axiom ("", "empty!"))) []
+    C.mk_hclause ~ord [] (Axiom ("", "empty!")) []
   else
     (* build an actual clause *)
     let size = H.random_in 1 size in
     let lits = Utils.times size (fun _ -> random_lit ()) in
-    C.mk_hclause ~ord lits (lazy (Axiom ("", "random"))) []
+    C.mk_hclause ~ord lits (Axiom ("", "random")) []
 
 (* pair of random clauses *)
 let random_clause_pair () = (random_clause ~size:2 (), random_clause ~size:5 ())
@@ -52,9 +50,8 @@ let random_clause_pair () = (random_clause ~size:2 (), random_clause ~size:5 ())
 (** check that renaming works *)
 let check_fresh c =
   let maxvar = T.max_var c.hcvars in
-  let ord = O.default_ordering () in
   let c' = C.fresh_clause ~ord (maxvar+1) c in
-  if Utils.list_inter T.eq_term c.hcvars (Lazy.force c'.cvars) = []
+  if Utils.list_inter T.eq_term c.hcvars c'.cvars = []
     then H.TestOk
     else H.TestFail (c, c')
 

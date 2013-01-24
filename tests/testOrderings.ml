@@ -13,7 +13,7 @@ module Utils = FoUtils
 
 let instantiate t1 t2 =
   (* find a subst for t1 and t2 *)
-  let vars = T.merge_varlist t1.vars t2.vars in
+  let vars = T.vars_list [t1; t2] in
   let subst = List.map (fun v -> (v, TT.random_term ~ground:true ())) vars in
   S.apply_subst subst t1, S.apply_subst subst t2
 
@@ -69,14 +69,14 @@ let check_properties ~ord (a, b, cmp) =
 
 (** check invariants on the list of terms *)
 let check ord_name ~ord terms =
-  Format.printf "  check %s (%a)@." ord_name T.pp_signature ord#symbol_ordering#signature;
+  Format.printf "  check %s (%a)@." ord_name T.pp_precedence ord#precedence#snapshot;
   let pairs = all_orders ~ord terms in
   List.iter (check_properties ~ord) pairs
 
 (** check similar results for RPO and RPO6 *)
-let check_same ~so terms =
-  let pairs = all_orders ~ord:(O.rpo so) terms
-  and pairs6 = all_orders ~ord:(O.rpo6 so) terms in
+let check_same ~precedence terms =
+  let pairs = all_orders ~ord:(O.rpo precedence) terms
+  and pairs6 = all_orders ~ord:(O.rpo6 precedence) terms in
   List.iter2
     (fun (t1, t2, cmp12) (t1', t2', cmp12') ->
       assert (t1 == t1' && t2 == t2');
@@ -93,8 +93,8 @@ let run () =
   Utils.set_debug 2;
   (* generate terms *)
   let terms = Utils.times n (TT.random_term ~ground:false) in
-  let so = Precedence.default_symbol_ordering () in
-  check "KBO" ~ord:(O.kbo so) terms;
-  check "RPO" ~ord:(O.rpo so) terms;
-  check "RPO6" ~ord:(O.rpo6 so) terms;
-  check_same ~so terms
+  let precedence = TT.ord#precedence in
+  check "KBO" ~ord:(O.kbo precedence) terms;
+  check "RPO" ~ord:(O.rpo precedence) terms;
+  check "RPO6" ~ord:(O.rpo6 precedence) terms;
+  check_same ~precedence terms

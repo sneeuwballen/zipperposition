@@ -24,6 +24,14 @@ let arities =
   Hashtbl.add tbl "s" 2;
   tbl
 
+let ord = Orderings.default_ordering base_signature
+
+(** Choose a symbol among the given list *)
+let choose among =
+  let s = mk_symbol (H.choose among) in
+  ignore (ord#precedence#add_symbols [s]);
+  s
+
 (** random term *)
 let random_term ?(ground=false) () =
   let depth = H.random_in 0 4 in
@@ -38,14 +46,16 @@ let random_term ?(ground=false) () =
     T.mk_node head univ_sort subterms
   and random_leaf () =
     if ground || H.R.bool ()
-      then T.mk_const (mk_symbol (H.choose symbols)) univ_sort
+      then T.mk_const (choose symbols) univ_sort
       else T.mk_var (H.random_in 0 3) univ_sort
-  and random_fun_symbol () = mk_symbol (H.choose funs)
+  and random_fun_symbol () =
+    let s = choose funs in
+    s
   in aux depth
 
 (** random bool-sorted term *)
 let random_pred ?(ground=false) () =
-  let p = mk_symbol (H.choose preds) in
+  let p = choose preds in
   let arity = Hashtbl.find arities (name_symbol p) in
   if arity = 0
     then T.mk_const p bool_sort
@@ -56,7 +66,8 @@ let random_pair () = (random_term (), random_term ())
 
 (** check all variables are subterms *)
 let check_subterm t = 
-  match t.vars with
+  let vars = T.vars t in
+  match vars with
   | [] -> H.TestPreconditionFalse
   | vars ->
       if List.for_all (fun v -> T.member_term v t) vars
