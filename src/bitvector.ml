@@ -43,3 +43,35 @@ let clear bv n = bv land (lnot (1 lsl n))
 
 (** is bitvector empty? *)
 let is_empty bv = bv = 0
+
+(** intersection of BV *)
+let inter a b = a land b
+
+(** union of BV *)
+let union a b = a lor b
+
+(** Iterate on set bits (naive) *)
+let iter bv f =
+  for i = 0 to 31 do
+    if get bv i then f i;
+  done
+
+(** From a list of ints *)
+let from_list l = List.fold_left set empty l
+
+(** To a list of ints (naive) *)
+let to_list bv =
+  let l = ref [] in
+  for i = 0 to 31 do
+    if get bv i then l := i :: !l;
+  done;
+  !l
+
+(** select elements of the array, that are flaged as true, into a ('a, int) list *)
+let select bv a =
+  assert (Array.length a <= 31);
+  let rec select i =
+    if i = Array.length a then []
+    else if get bv i then (a.(i), i) :: select (i+1)
+    else select (i+1)
+  in select 0
