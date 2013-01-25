@@ -210,14 +210,16 @@ let check_ord_hclause ~ord hc =
     hc.hclits)
 
 (** Apply substitution to the clause *)
-let rec apply_subst ?(recursive=true) subst hc =
+let rec apply_subst ?(recursive=true) subst (hc,offset) =
   let ctx = hc.hcctx in
-  if S.is_empty subst then hc
+  if offset = 0 && S.is_empty subst then hc
   else begin
     let ord = ctx.ctx_ord in
-    let lits = Array.map (Lits.apply_subst ~recursive ~ord subst) hc.hclits in
+    let lits = Array.map
+      (fun lit -> Lits.apply_subst ~recursive ~ord subst (lit, offset))
+      hc.hclits in
     let descendants = hc.hcdescendants in
-    let new_hc = mk_hclause_a ~ctx lits hc.hcproof in
+    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
     new_hc.hcdescendants <- descendants;
     new_hc
   end
@@ -259,20 +261,21 @@ let maxlits_array ~ord lits =
 
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are maximal under [ord] *)
-let maxlits c subst =
+let maxlits (c, offset) subst =
   let ord = c.hcctx.ctx_ord in
-  let lits = Array.map (Lits.apply_subst ~ord subst) c.hclits in
+  let lits = Lits.apply_subst_lits ~recursive:true ~ord subst (c.hclits, offset) in
   maxlits_array ~ord lits
 
 (** Check whether the literal is maximal *)
-let is_maxlit c subst i = BV.get (maxlits c subst) i
+let is_maxlit (c, offset) subst i =
+  BV.get (maxlits (c, offset) subst) i
 
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are eligible for resolution. *)
-let eligible_res c subst =
+let eligible_res (c, offset) subst =
   let ord = c.hcctx.ctx_ord in
   (* instantiate lits *)
-  let lits = Array.map (Lits.apply_subst ~ord subst) c.hclits in
+  let lits = Lits.apply_subst_lits ~recursive:true ~ord subst (c.hclits, offset) in
   let selected = c.hcselected in
   let n = Array.length lits in
   (* Literals that may be eligible: all of them if none is selected,
@@ -301,35 +304,28 @@ let eligible_res c subst =
 
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are eligible for paramodulation. *)
-let eligible_param c subst =
+let eligible_param (c, offset) subst =
   let ord = c.hcctx.ctx_ord in
   if BV.is_empty c.hcselected then
     (* instantiate lits *)
-    let lits = Array.map (Lits.apply_subst ~ord subst) c.hclits in
+    let lits = Lits.apply_subst_lits ~recursive:true ~ord subst (c.hclits, offset) in
     (* only keep literals that are positive *)
     let bv = maxlits_array ~ord lits in
     BV.inter bv (pos_lits lits)
   else BV.empty  (* no eligible literal when some are selected *)
 
-(** Get a variant of the clause, in which variables are all > offset *)
-let fresh_clause offset hc =
-  let ctx = hc.hcctx in
-  let ord = ctx.ctx_ord in
-  incr_stat stat_fresh;
-  let subst = S.relocate (offset + 1) hc.hcvars in
-  let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
-  let descendants = hc.hcdescendants in
-  let new_hc = mk_hclause_a ~parents:[hc] ~selected:hc.hcselected ~ctx lits hc.hcproof in
-  (* copy children *)
-  new_hc.hcdescendants <- descendants;
-  new_hc
-
 (** Normalize clause by renaming variables from 0 *)
 let normalize hc =
   let ctx = hc.hcctx in
   let ord = ctx.ctx_ord in
-  let subst = S.relocate 0 hc.hcvars in
-  let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
+  (* renaming subst *)
+  let subst, _ = List.fold_left
+    (fun (subst, i) var ->
+      (S.bind subst (var, 0) (T.mk_var i var.sort, 0), i+1))
+    (S.id_subst, 0) hc.hcvars
+  in
+  (* rename variables in literals *)
+  let lits = Lits.apply_subst_lits ~recursive:false ~ord subst (hc.hclits, 0) in
   let descendants = hc.hcdescendants in
   let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
   (* copy children *)
@@ -625,17 +621,18 @@ let pp_clause_debug =
   let _horizontal = ref true in
   let pp_annot selected maxlits i =
     ""^(if BV.get selected i then "+" else "")
-      ^(if BV.get maxlits i then "*" else "") in
+      ^(if BV.get maxlits i then "*" else "")
+  in
   object (self)
     (* print literals with a '*' for maximal, and '+' for selected *)
     method pp_lits formatter lits hc =
       let selected = hc.hcselected
-      and maxlits = maxlits hc S.id_subst in
+      and max = maxlits (hc, 0) S.id_subst in
       (* how to print the list of literals *)
       let lits_printer formatter lits =
         Utils.pp_arrayi ~sep:" | "
           (fun formatter i lit ->
-            let annot = pp_annot selected maxlits i in
+            let annot = pp_annot selected max i in
             Format.fprintf formatter "%a%s" Lits.pp_literal_debug#pp lit annot)
           formatter lits
       in

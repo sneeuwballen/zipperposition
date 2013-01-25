@@ -49,7 +49,7 @@ val reord : ord:ordering -> literal -> literal      (** recompute order *)
 val lit_of_fof : ord:ordering -> literal -> literal (** translate eq/not to literal *)
 val term_of_lit : literal -> term                   (** translate lit to term *)
 
-val apply_subst : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
+val apply_subst : ?recursive:bool -> ord:ordering -> substitution -> literal bind -> literal
 
 val negate : literal -> literal                     (** negate literal *)
 val fmap : ord:ordering -> (term -> term) -> literal -> literal (** fmap in literal *)
@@ -60,6 +60,8 @@ val eq_lits : literal array -> literal array -> bool
 val compare_lits : literal array -> literal array -> int
 val hash_lits : literal array -> int
 val ground_lits : literal array -> bool             (** all the literals are ground? *)
+val apply_subst_lits : ?recursive:bool -> ord:ordering -> substitution ->
+                       literal array bind -> literal array
 
 (** pretty printer for literals *)
 class type pprinter_literal =

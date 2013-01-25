@@ -86,7 +86,7 @@ val update_ctx : ctx:context -> hclause -> hclause
 val check_ord_hclause : ord:ordering -> hclause -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : ?recursive:bool -> substitution -> hclause -> hclause
+val apply_subst : ?recursive:bool -> substitution -> hclause bind -> hclause
   (** apply substitution to the clause *)
 
 val pos_lits : literal array -> Bitvector.t
@@ -95,26 +95,21 @@ val pos_lits : literal array -> Bitvector.t
 val neg_lits : literal array -> Bitvector.t
   (** bitvector of literals that are negative *)
 
-val maxlits : clause -> substitution -> Bitvector.t
+val maxlits : clause bind -> substitution -> Bitvector.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
 
-val is_maxlit : clause -> substitution -> int -> bool
+val is_maxlit : clause bind -> substitution -> int -> bool
   (** Is the i-th literal maximal in subst(clause)? Equivalent to
       Bitvector.get (maxlits ~ord c subst) i *)
 
-val eligible_res : clause -> substitution -> Bitvector.t
+val eligible_res : clause bind -> substitution -> Bitvector.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)
 
-val eligible_param : clause -> substitution -> Bitvector.t
+val eligible_param : clause bind -> substitution -> Bitvector.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
-
-val fresh_clause : int -> hclause -> clause
-  (** [fresh_clause ~ord offset c] renames [c] w.r.t. [offset]
-      (all variables inside will be > maxvar). This preserves the
-      selected literals, and the proof. *)
 
 val normalize : clause -> clause
   (** Normalize clause by renaming variables from 0 *)

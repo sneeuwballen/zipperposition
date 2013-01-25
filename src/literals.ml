@@ -132,15 +132,13 @@ let mk_lit ~ord a b sign =
   check_type a b;
   Equation (a, b, sign, ord#compare a b)
 
-let apply_subst ?(recursive=true) ~ord subst lit =
-  match lit with
+let apply_subst ?(recursive=true) ~ord subst (lit,offset) =
+  if offset = 0 && S.is_empty subst then lit  (* no shifting *)
+  else match lit with
   | Equation (l,r,sign,_) ->
-    if subst = S.id_subst
-    then mk_lit ~ord l r sign
-    else
-      let new_l = S.apply_subst ~recursive subst l
-      and new_r = S.apply_subst ~recursive subst r in
-      mk_lit ~ord new_l new_r sign
+    let new_l = S.apply_subst ~recursive subst (l,offset)
+    and new_r = S.apply_subst ~recursive subst (r,offset) in
+    mk_lit ~ord new_l new_r sign
 
 let reord ~ord (Equation (l,r,sign,_)) = mk_lit ~ord l r sign
 
@@ -238,6 +236,12 @@ let ground_lits lits =
     | Equation (l, r, _, _) ->
       T.is_ground_term l && T.is_ground_term r && check (i+1)
   in check 0
+
+(** Apply the substitution to the array of literals, with offset *)
+let apply_subst_lits ?(recursive=true) ~ord subst (lits,offset) =
+  Array.map
+    (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
+    lits
 
 (** pretty printer for literals *)
 class type pprinter_literal =
