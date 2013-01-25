@@ -464,7 +464,8 @@ let check_ord_hclause ~ord hc =
   Utils.array_forall
     (function (Equation (l,r,_,o)) ->
       let ok = o = ord#compare l r in
-      (if not ok then Format.printf "@[<h>Ord problem: literal %a %a" !T.pp_term#pp l !T.pp_term#pp r);
+      (if not ok then Format.printf "@[<h>Ord problem: literal %a %a"
+                      !T.pp_term#pp l !T.pp_term#pp r);
       ok)
     hc.hclits)
 

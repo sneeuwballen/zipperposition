@@ -37,7 +37,14 @@ exception SortError of string
 (* TODO: parents and descendants for hclause should be arrays, more efficient in ram *)
 (* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
 (* TODO: (maybe) substitutions as list of pairs of *bound* terms,
-  where bound term = (int * term), the int being an offset for renaming vars *)
+  where bound term = (int * term), the int being an offset for renaming vars. *)
+
+(* TODO comparison functions that take terms and substitutions, to avoid instantiating
+   terms just to compare them. XXX OR *)
+(* TODO for eligible_res, just instantiate the clause with subst, with same selected lits, and
+   check on that one (may actually make less comparisons?) *)
+(* TODO for eligible_res, special case where subst is empty (for demodulate), since it's much
+   simpler *)
 
 (** term with a simple sort *)
 type term = {
