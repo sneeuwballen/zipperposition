@@ -70,6 +70,7 @@ val flag_db_closed_computed : int
 
 val set_flag : int -> term -> bool -> unit
   (** set or reset the given flag of the term to bool *)
+
 val get_flag : int -> term -> bool
   (** read the flag *)
 

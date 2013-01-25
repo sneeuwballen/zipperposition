@@ -75,51 +75,44 @@ type rewriting_system = term -> term
 (** partial order comparison *)
 type comparison = Lt | Eq | Gt | Incomparable
 
+let string_of_comparison = function
+  | Lt -> "=<="
+  | Gt -> "=>="
+  | Eq -> "==="
+  | Incomparable -> "=?="
+
 (** position in a term *)
 type position = int list
 
+let left_pos = 0
+let right_pos = 1
+
+let opposite_pos p = match p with
+  | _ when p = left_pos -> right_pos
+  | _ when p = right_pos -> left_pos
+  | _ -> assert false
+
+let string_of_pos s = match s with
+  | _ when s == left_pos -> "left"
+  | _ when s == right_pos -> "right"
+  | _ -> assert false
+
+let pp_pos formatter pos =
+  if pos = []
+    then Format.pp_print_string formatter "ε"
+    else begin
+      let pos = Array.of_list pos in
+      let n = Array.length pos in
+      Format.fprintf formatter "@[<h>";
+      for i = 0 to n-1 do
+        (if i > 0 then Format.fprintf formatter ".");
+        Format.pp_print_int formatter pos.(i);
+      done;
+      Format.fprintf formatter "@]"
+    end
+
 (** compact position, as an integer *)
 type compact_position = int
-
-(** a literal, that is, a signed equation *)
-type literal = 
- | Equation of    term  (** lhs *)
-                * term  (** rhs *)
-                * bool  (** sign (equality, ie true, or difference) *)
-                * comparison   (* TODO remove? or just orient equations? *)
-
-(** a small bitvector *)
-type bitvector = Bitvector.bitvector
-
-(** a first order clause *)
-type clause = {
-  cref : hclause;                         (** the normalized clause *)
-  clits : literal array;                  (** the equations *)
-  cvars : term list;                      (** set of variables *)
-}
-(** a hashconsed clause, with additional metadata. *)
-and hclause = {
-  hclits : literal array;                 (** the (normalized) equations *)
-  mutable hctag : int;                    (** hashconsing tag *)
-  mutable hchash : int;                   (** hash of clause *)
-  mutable hcweight : int;                 (** weight of clause *)
-  mutable hcmaxlits : bitvector;          (** bitvector for maximal literals *)
-  mutable hcselected_done : bool;
-  mutable hcselected : bitvector;         (** bitvector for selected literals *)
-  mutable hcvars : term list;             (** the free variables *)
-  mutable hcproof : proof;                (** the proof for this clause (lazy...) *)
-  mutable hcparents : hclause list;       (** parents of the clause *)
-  mutable hcdescendants : Ptset.t;        (** the set of descendants of the clause *)
-}
-(** a proof step for a clause *)
-and proof = Axiom of string * string (** file, axiom name *)
-          | Proof of string * (clause * position * substitution) list
-
-(** a selection function *)
-type selection_fun = hclause -> int list
-
-(** selects no literals *)
-let no_select c = []
 
 (** an ordering constraint (a possibly non-total ordering on symbols) *)
 type precedence_constraint = symbol -> symbol -> int
@@ -146,6 +139,41 @@ class type ordering =
     method compare : term -> term -> comparison (** compare two terms *)
     method name : string
   end
+
+(** a literal, that is, a signed equation *)
+type literal = 
+ | Equation of    term  (** lhs *)
+                * term  (** rhs *)
+                * bool  (** sign (equality, ie true, or difference) *)
+                * comparison   (* TODO remove? or just orient equations? *)
+
+(** a first order clause *)
+type clause = hclause
+(** a first order clause (TODO rename into clause) *)
+and hclause = {
+  hclits : literal array;                 (** the literals *)
+  hcctx : context;                        (** context of the clause *)
+  mutable hctag : int;                    (** unique ID of the clause *)
+  mutable hcflags : int;                  (** boolean flags for the clause *)
+  mutable hcweight : int;                 (** weight of clause *)
+  mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
+  mutable hcvars : term list;             (** the free variables *)
+  mutable hcproof : proof;                (** the proof for this clause *)
+  mutable hcdescendants : int array;      (** the set of IDs of descendants of the clause *)
+}
+(** A context for clauses. TODO add a structure for local term hashconsing? *)
+and context = {
+  ctx_ord : ordering;                           (** ordering used to build clauses *)
+  ctx_select : selection_fun;                   (** selection function for literals *)
+}
+(** a proof step for a clause *)
+and proof = Axiom of string * string (** file, axiom name *)
+          | Proof of string * (clause * position * substitution) list
+(** a selection function *)
+and selection_fun = hclause -> int list
+
+(** selects no literals *)
+let no_select c = []
 
 exception UnificationFailure
 
