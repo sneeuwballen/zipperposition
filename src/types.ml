@@ -26,6 +26,14 @@ open Symbols
 (** exception raised when sorts are mismatched *)
 exception SortError of string
 
+(* TODO: (maybe) substitutions as list of pairs of *bound* terms,
+  where bound term = (int * term), the int being an offset for renaming vars.
+  mk_hclause would then perform normalization of variables, and renaming of
+  terms/vars would been useless but for normalization and instantiation *)
+
+(* TODO: in Clauses, constructors from clauses for inferences and simplifications,
+         that take care of the parent/child and proof bookeeping *)
+
 (* TODO: a 'type_' type for simple types, like
   type_ = Sort of symbol | Arrow of type_t list * type_. Problem is for "or" and "and"
   that are n-ary; also, "=" is polymorphic... Maybe polymorphism then? *)
@@ -34,10 +42,7 @@ exception SortError of string
    Always orient with the bigger term on left. *)
 (* TODO: remove proof from clauses, make it external (a proof is a tree that
    contains clauses). This should allow to disable proof-handling. *)
-(* TODO: parents and descendants for hclause should be arrays, more efficient in ram *)
 (* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
-(* TODO: (maybe) substitutions as list of pairs of *bound* terms,
-  where bound term = (int * term), the int being an offset for renaming vars. *)
 
 (** term with a simple sort *)
 type term = {
