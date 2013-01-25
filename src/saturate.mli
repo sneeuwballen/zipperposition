@@ -37,6 +37,9 @@ val check_timeout : float option -> bool
 (** maximum number of nested unary inferences *)
 val unary_max_depth : int ref
 
+(** Is splitting enabled? *)
+val enable_split : bool ref
+
 (** perform backward simplification of the active set *)
 val backward_simplify : calculus:Calculus.calculus -> select:selection_fun ->
                         ProofState.active_set -> ProofState.simpl_set ->

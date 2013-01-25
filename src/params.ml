@@ -29,6 +29,7 @@ type parameters = {
   param_calculus : string;
   param_timeout : float;
   param_files : string list;
+  param_split : bool;             (** use splitting *)
   param_theories : bool;          (** detect theories *)
   param_precedence : bool;        (** use heuristic for precedence? *)
   param_select : string;          (** name of the selection function *)
@@ -61,6 +62,7 @@ let parse_args () =
   and proof = ref true
   and output = ref "debug"
   and index = ref "fp"
+  and split = ref false
   and theories = ref true
   and calculus = ref "superposition"
   and presaturate = ref false
@@ -85,6 +87,7 @@ let parse_args () =
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
+      ("-split", Arg.Set split, "enable splitting");
       ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
@@ -116,7 +119,7 @@ let parse_args () =
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;
     param_files = !files; param_select = !select; param_theories = !theories;
     param_progress = !progress;
-    param_proof = !proof;
+    param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate; param_output_syntax = !output;
     param_index= !index; param_dot_file = !dot_file;
     param_kb = !kb; param_kb_load = !kb_load;

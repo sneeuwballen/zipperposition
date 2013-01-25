@@ -89,12 +89,17 @@ let generate_binary ~calculus active_set clause =
   Utils.exit_prof prof_generate_binary;
   new_clauses
 
+(** Is splitting enabled? *)
+let enable_split = ref false
+
 (** generate all clauses from unary inferences *)
 let generate_unary ~calculus ~ord clause =
   Utils.enter_prof prof_generate_unary;
   let new_clauses = Calculus.do_unary_inferences ~ord calculus#unary_rules clause in
   (* also do splitting *)
-  let new_clauses = List.rev_append (Sup.infer_split ~ord clause) new_clauses in
+  let new_clauses = if !enable_split
+    then List.rev_append (Sup.infer_split ~ord clause) new_clauses
+    else new_clauses in
   Utils.exit_prof prof_generate_unary;
   new_clauses
 
@@ -290,11 +295,10 @@ let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus 
         (* print progress *)
         (if progress && (num mod 10) = 0 then print_progress num state);
         (* some cleanup from time to time *)
-        (if (num mod 500 = 0)
+        (if (num mod 1000 = 0)
           then (
             Utils.debug 1 (Lazy.lazy_from_val "% perform cleanup of passive set");
-            state#passive_set#clean ();
-            Gc.full_major ()
+            state#passive_set#clean ()
           ));
         (* do one step *)
         let status = given_clause_step ~generating ~calculus num state in
