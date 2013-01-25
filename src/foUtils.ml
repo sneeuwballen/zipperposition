@@ -101,6 +101,11 @@ let rec lexicograph f l1 l2 =
   | [],_ -> ~-1
   | _,[] -> 1
 
+(** combine comparisons by lexicographic order *)
+let rec lexicograph_combine l = match l with
+  | [] -> 0
+  | cmp::l' -> if cmp = 0 then lexicograph_combine l' else cmp
+
 let rec lexicograph_partial f l1 l2 =
   match l1, l2 with
   | [], [] -> Eq

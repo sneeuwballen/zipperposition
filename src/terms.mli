@@ -32,8 +32,6 @@ val member_term_rec : term -> term -> bool(** same, but follows variable binding
 val eq_term : term -> term -> bool        (** standard equality on terms *)
 val compare_term : term -> term -> int    (** a simple order on terms *)
 
-module TSet : Set.S with type elt = term
-module TPairSet : Set.S with type elt = term * term
 module THashtbl : Hashtbl.S with type key = term
 
 (** Simple hashset for small sets of terms *)

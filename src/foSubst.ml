@@ -23,148 +23,134 @@ open Types
 module T = Terms
 module Utils = FoUtils
 
-let id_subst = []
+let id_subst = SubstEmpty
 
-let is_empty s = s = []
+let is_empty = function
+  | SubstEmpty -> true
+  | SubstBind _ -> false
 
-let eq_subst s1 s2 =
-  try List.for_all2
-    (fun (v1, t1) (v2, t2) -> T.eq_term v1 v2 && T.eq_term t1 t2)
-    s1 s2
-  with Invalid_argument _ -> false
+let rec eq_subst s1 s2 = match s1, s2 with
+  | SubstEmpty, SubstEmpty -> true
+  | SubstBind (v1, o1, t1, o1', s1'), SubstBind (v2, o2, t2, o2', s2') ->
+    o1 = o2 && o1' = o2' && v1 == v2 && t1 == t2 && eq_subst s1' s2'
+  | SubstBind _, SubstEmpty | SubstEmpty, SubstBind _ -> false
 
-let hash_subst s =
-  let rec recurse h s = match s with
-  | [] -> h
-  | (v,t)::s' ->
-    let h' = Hash.hash_int2 v.hkey t.hkey lxor h in
-    recurse h' s'
-  in recurse 1913 s
+let rec compare_substs s1 s2 = match s1, s2 with
+  | SubstEmpty, SubstEmpty -> 0
+  | SubstBind (v1, o1, t1, o1', s1'), SubstBind (v2, o2, t2, o2', s2') ->
+    let cmp = Utils.lexicograph_combine
+      [compare o1 o2; compare o1' o2'; T.compare_term v1 v2; T.compare_term t1 t2] in
+    if cmp <> 0 then cmp else compare_substs s1' s2'
+  | SubstBind _, SubstEmpty -> 1
+  | SubstEmpty, SubstBind _ -> -1
 
-let compare_substs s1 s2 =
-  let h1 = hash_subst s1
-  and h2 = hash_subst s2 in
-  if h1 <> h2  (* first compare hashes *)
-    then h1 - h2
-    else Utils.lexicograph (* else compare by lexicographic order *)
-      (fun (v1,t1) (v2,t2) ->
-        Utils.lexicograph Pervasives.compare [v1.tag; t1.tag] [v2.tag; t2.tag])
-      s1 s2
+(** lookup variable in substitution *)
+let rec lookup subst ((var,offset) as bind_var) = match subst with
+  | SubstEmpty -> raise Not_found
+  | SubstBind (v, o_v, t, o_t, subst') ->
+    if v == var && o_v = offset then (t, o_t) else lookup subst' bind_var
 
-module SSet = Set.Make(
+(** check whether the variable is bound by the substitution *)
+let is_in_subst subst bind_var =
+  try ignore (lookup subst bind_var); true
+  with Not_found -> false
+
+(** Add v -> t to the substitution. Both terms have a context. Raise
+    Invalid_argument if v is already bound in the same context. *)
+let bind subst ((v, o_v) as var_bind) (t, o_t) =
+  assert (v.sort = t.sort);
+  if v == t && o_v = o_t
+    then subst (* bind a variable to itself *)
+    else try
+      let (t', o_t') = lookup subst var_bind in
+      if (t != t' || o_t <> o_t')
+        then raise (Invalid_argument "Subst.bind: inconsistent binding")
+        else subst  (* already bound correctly *)
+    with Not_found -> SubstBind (v, o_v, t, o_t, subst)  (* add binding at front *)
+
+(** Apply substitution to term, replacing variables by the terms they are bound to.
+    The offset (term bind) is applied to variables that are not bound by subst.
+    [recursive] decides whether, when [v] is replaced by [t], [subst] is
+    applied to [t] recursively or not. *)
+let apply_subst ?(recursive=true) subst (t, offset) =
+  (* apply subst to bound term *)
+  let rec replace subst ((t, offset) as bound_t) =
+    if T.is_ground_term t then t (* subst(t) = t, if t ground *)
+    else match t.term with
+    | BoundVar _ -> t
+    | Bind (s, t') -> T.mk_bind s (replace subst (t', offset))
+    | Node (s, l) ->
+      let l' = replace_list subst offset l in
+      T.mk_node s t.sort l'
+    | Var i ->
+      (try let bound_t' = lookup subst bound_t in
+           if recursive
+            then (* replace also in the image of t *)
+              replace subst bound_t'
+            else (* return image, in which variables are shifted *)
+              replace id_subst bound_t' 
+       with Not_found ->
+        if offset = 0
+          then t  (* no shifting *)
+          else T.mk_var (i+offset) t.sort)
+  (* apply subst to the list, all elements of which have the given offset *)
+  and replace_list subst offset l = match l with
+  | [] -> []
+  | t::l' ->
+    let new_t = replace subst (t, offset) in
+    new_t :: replace_list subst offset l'
+  in
+  if is_empty subst && offset = 0
+    then t  (* no shifting, and not variable bound *)
+    else replace subst (t, offset)
+
+(** Set of bound terms *)
+module Domain = Set.Make(
   struct
-    type t = substitution
-    let compare = compare_substs
+    type t = term bind
+    let compare (t1,o1) (t2,o2) =
+      if o1 <> o2 then compare o1 o2 else T.compare_term t1 t2
   end)
 
-let rec lookup var subst = match subst with
-  | [] -> var
-  | ((v,t) :: tail) ->
-    if T.eq_term v var then t else lookup var tail
-
-let is_in_subst var subst = lookup var subst != var
-
+(** Domain of substitution *)
 let domain subst =
-  List.fold_left (fun set (v,_) -> T.TSet.add v set) T.TSet.empty subst
+  let rec gather set subst = match subst with
+  | SubstEmpty -> set
+  | SubstBind (v, o_v, _, _, subst') ->
+    gather (Domain.add (v, o_v) set) subst'
+  in gather Domain.empty subst
 
+(** Codomain (range) of substitution *)
 let codomain subst =
-  List.fold_left (fun set (_,t) -> T.TSet.add t set) T.TSet.empty subst
+  let rec gather set subst = match subst with
+  | SubstEmpty -> set
+  | SubstBind (_, _, t, o_t, subst') ->
+    gather (Domain.add (t, o_t) set) subst'
+  in gather Domain.empty subst
 
+(** Check whether the substitution is a variable renaming *)
 let is_renaming subst =
   let c = domain subst
   and cd = codomain subst in
   (* check that codomain is made of vars, and that domain and codomain have same size *)
-  T.TSet.cardinal c = T.TSet.cardinal cd && T.TSet.for_all T.is_var cd
-
-let rec reset_bindings subst =
-  match subst with
-  | [] -> ()
-  | (v, t) :: subst' ->
-    (T.reset_binding v;
-     T.reset_vars t;
-     reset_bindings subst')
-
-let rec apply_subst_bind subst =
-  match subst with
-  | [] -> ()
-  | (v, t) :: subst' -> (T.set_binding v t; apply_subst_bind subst')
-
-let apply_subst ?(recursive=true) subst t =
-  if subst = [] then t else
-  begin
-    T.reset_vars t;
-    (* reset bindings in codom(subst), we are not interested in them *)
-    List.iter (fun (_, t) -> T.reset_vars t) subst;  
-    apply_subst_bind subst;
-    T.expand_bindings ~recursive t
-  end
-
-let build_subst ?(recursive=false) subst v t =
-  assert (v.sort = t.sort);
-  if recursive
-    then (
-      let new_t = apply_subst ~recursive subst t in
-      (* v -> v, no need to add to subst *)
-      if T.eq_term v new_t then subst
-      (* v -> t[v], not well-formed substitution *)
-      else if T.member_term v new_t then failwith "occur check while building subst"
-      (* append to list *)
-      else (v, new_t) :: subst)
-    else if T.eq_term v t
-      then subst
-      else (v,t) :: subst
-
-let update_binding ?(recursive=false) subst v =
-  assert (T.is_var v);
-  let t = if recursive then T.get_binding v else v.binding in
-  if t == v then subst else (v,t)::subst
-
-let update_bindings ?(recursive=false) subst l =
-  List.fold_left (update_binding ~recursive) subst l
-
-let expand_bindings subst =
-  List.map (fun (v, t) -> (v, T.expand_bindings t)) subst
-
-let relocate offset l =
-  let rec recurse subst offset l = match l with
-  | [] -> subst
-  | v::l' ->
-    let v' = T.mk_var offset v.sort in
-    let subst' = build_subst ~recursive:false subst v v' in
-    recurse subst' (offset+1) l'
-  in recurse id_subst offset l
-
-(** Returns a term t' that is unique for all alpha equivalent
-    representations of t, and a subst s such that s(t') = t *)
-let normalize_term t =
-  let subst_from_t, subst_to_t =
-    List.fold_left
-      (fun (s_from, s_to) var ->
-        match var.term with
-        | Var i ->
-          let new_var = (T.mk_var i var.sort) in
-          build_subst ~recursive:false s_from var new_var,
-          build_subst ~recursive:false s_to new_var var
-        | _ -> assert false)
-      (id_subst, id_subst) (T.vars t)
-  in
-  let normalized_t = apply_subst ~recursive:false subst_from_t t in
-  normalized_t, subst_to_t
+  Domain.cardinal c = Domain.cardinal cd &&
+  Domain.for_all (fun (v,_) -> T.is_var v) cd
 
 let pp_substitution formatter subst = 
-  let pp_pair formatter (v, t) =
-    Format.fprintf formatter "%a → %a" !T.pp_term#pp v !T.pp_term#pp t
+  (* is the binding the last one? *)
+  let is_last subst = match subst with
+  | SubstBind (_, _, _, _, SubstEmpty) -> true
+  | SubstBind _ | SubstEmpty -> false
   in
-  Format.fprintf formatter "@[<h>{%a}@]" (Utils.pp_list ~sep:", " pp_pair) subst
-
-let pp_set formatter set =
-  Format.fprintf formatter "{";
-  let prev = ref false in
-  SSet.iter
-    (fun subst ->
-      (if !prev
-        then Format.fprintf formatter "@[<h>%a@],@ " pp_substitution subst
-        else Format.fprintf formatter "@[<h>%a@]" pp_substitution subst);
-      prev := true)
-    set;
-  Format.fprintf formatter "}"
+  (* print bindings *)
+  let rec pp subst = match subst with
+  | SubstEmpty -> ()
+  | SubstBind (v, o_v, t, o_t, subst') ->
+    (if not (is_last subst) then Format.fprintf formatter ", ");
+    Format.fprintf formatter "%a[%d] → %a[%d]"
+      !T.pp_term#pp v o_v !T.pp_term#pp t o_t;
+    pp subst'
+  in
+  Format.fprintf formatter "@[{";
+  pp subst;
+  Format.fprintf formatter "}@]"

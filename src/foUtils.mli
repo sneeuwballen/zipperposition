@@ -35,6 +35,8 @@ val exit_prof : profiler -> unit          (** Exit the profiler *)
 
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
+(** combine comparisons by lexicographic order *)
+val lexicograph_combine : int list -> int
 (** lexicographic partial order on lists. If lengths are different, returns Incomparable *)
 val lexicograph_partial : ('a -> 'b -> comparison) -> 'a list -> 'b list -> comparison
 

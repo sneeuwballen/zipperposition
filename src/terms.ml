@@ -63,17 +63,6 @@ let eq_term x y = x == y  (* because of hashconsing *)
 
 let compare_term x y = x.tag - y.tag
 
-module TSet = Set.Make(struct type t = term let compare = compare_term end)
-
-module TPairSet = Set.Make(
-  struct
-    type t = term * term
-    let compare (t1, t1') (t2, t2') =
-      if eq_term t1 t2
-        then compare_term t1' t2'
-        else compare_term t1 t2
-  end)
-
 module THashtbl = Hashtbl.Make(
   struct
     type t = term
