@@ -111,9 +111,6 @@ val eligible_param : clause bind -> substitution -> Bitvector.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
 
-val normalize : clause -> clause
-  (** Normalize clause by renaming variables from 0 *)
-
 val has_selected_lits : hclause -> bool
   (** does the clause have some selected literals? *)
 

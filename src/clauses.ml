@@ -144,8 +144,17 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
         Utils.exit_prof prof_mk_hclause;
         true_clause ~ctx)
   else begin
-  (* set of variables *)
+  (* Set of variables. *)
   let all_vars = vars_of_lits lits in
+  (* Renaming subst *)
+  let subst, _ = List.fold_left
+    (fun (subst, i) var ->
+      (S.bind subst (var, 0) (T.mk_var i var.sort, 0), i+1))
+    (S.id_subst, 0) all_vars
+  in
+  (* Normalize literals *)
+  let lits = Lits.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
+  let all_vars = List.map (fun v -> S.apply_subst subst (v, 0)) all_vars in
   (* create the structure *)
   let hc = {
     hclits = lits;
@@ -313,24 +322,6 @@ let eligible_param (c, offset) subst =
     let bv = maxlits_array ~ord lits in
     BV.inter bv (pos_lits lits)
   else BV.empty  (* no eligible literal when some are selected *)
-
-(** Normalize clause by renaming variables from 0 *)
-let normalize hc =
-  let ctx = hc.hcctx in
-  let ord = ctx.ctx_ord in
-  (* renaming subst *)
-  let subst, _ = List.fold_left
-    (fun (subst, i) var ->
-      (S.bind subst (var, 0) (T.mk_var i var.sort, 0), i+1))
-    (S.id_subst, 0) hc.hcvars
-  in
-  (* rename variables in literals *)
-  let lits = Lits.apply_subst_lits ~recursive:false ~ord subst (hc.hclits, 0) in
-  let descendants = hc.hcdescendants in
-  let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
-  (* copy children *)
-  new_hc.hcdescendants <- descendants;
-  new_hc
 
 (** are there selected literals in the clause? *)
 let has_selected_lits hc = not (BV.is_empty hc.hcselected)
