@@ -256,10 +256,6 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       List.iter (fun new_c -> Utils.debug 2 (lazy (Utils.sprintf
                 "    inferred new clause @[<hov 3>%a@]" !C.pp_clause#pp_h new_c)))
         new_clauses;
-      (* scan new clauses within meta-prover. Additional lemmas are added to new_clauses *)
-      let new_clauses = List.fold_left
-        (fun acc hc -> List.rev_append (find_lemmas state hc) acc)
-        new_clauses new_clauses in
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
       state#passive_set#add new_clauses;
       (* test whether the empty clause has been found *)
