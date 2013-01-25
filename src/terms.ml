@@ -51,14 +51,6 @@ let rec member_term a b =
   | Node (_, subterms) -> List.exists (member_term a) subterms
   | Bind (_, b') -> member_term a b')
 
-let rec member_term_rec a b =
-  match b.term with
-  | _ when a == b -> true
-  | Var _ when b.binding != b -> member_term_rec a b.binding
-  | Var _ | BoundVar _ -> false
-  | Node (s, subterms) -> List.exists (member_term_rec a) subterms
-  | Bind (_, b') -> member_term_rec a b'
-
 let eq_term x y = x == y  (* because of hashconsing *)
 
 let compare_term x y = x.tag - y.tag
@@ -150,14 +142,14 @@ let mk_var idx sort =
   let rec my_v = {term = Var idx; sort=sort;
                   flags=(flag_db_closed lor flag_db_closed_computed lor
                          flag_simplified lor flag_normal_form);
-                  binding=my_v; tsize=1; tag= -1; hkey=0} in
+                  tsize=1; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
 let mk_bound_var idx sort =
   let rec my_v = {term = BoundVar idx; sort=sort;
                   flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
-                  binding=my_v; tsize=1; tag= -1; hkey=0} in
+                  tsize=1; tag= -1; hkey=0} in
   my_v.hkey <- hash_term my_v;
   H.hashcons my_v
 
@@ -172,7 +164,7 @@ let rec compute_is_ground l = match l with
 let mk_bind s t' =
   assert (has_attr attr_binder s);
   let rec my_t = {term=Bind (s, t'); sort=t'.sort; flags=0;
-                  binding=my_t; tsize=t'.tsize+1; tag= -1; hkey=0} in
+                  tsize=t'.tsize+1; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
   let t = H.hashcons my_t in
   (if t == my_t
@@ -183,7 +175,7 @@ let mk_bind s t' =
 let mk_node s sort l =
   Utils.enter_prof prof_mk_node;
   let rec my_t = {term=Node (s, l); sort; flags=0;
-                  binding=my_t; tsize=0; tag= -1; hkey=0} in
+                  tsize=0; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
   let t = H.hashcons my_t in
   (if t == my_t
@@ -461,58 +453,6 @@ let look_db_sort i t =
      with FoundSort s -> Some s
 
 (* ----------------------------------------------------------------------
- * bindings and normal forms
- * ---------------------------------------------------------------------- *)
-
-(** [set_binding t d] set variable binding or normal form of t *)
-let set_binding t d = t.binding <- d
-
-(** reset variable binding/normal form *)
-let reset_binding t = t.binding <- t
-
-(** get the binding of variable/normal form of term *)
-let rec get_binding t = 
-  if t.binding == t then t else get_binding t.binding
-
-(** replace variables by their bindings *)
-let expand_bindings ?(recursive=true) t =
-  (* recurse to expand bindings, returns new term.  Also keeps track of the
-    number of binders met so far, for lifting non-closed De Bruijn indexes in
-    substituted terms (of domain of [subst]) by [depth]. *)
-  let rec recurse binder_depth t =
-    (* if t ground, nothing to do *)
-    if is_ground_term t then t
-    else match t.term with
-    | Var _ ->
-      if t.binding == t then t
-      else
-        let t' = if db_closed t.binding  (* maybe have to lift DB vars *)
-          then t.binding
-          else db_lift binder_depth t.binding in
-        if recursive then recurse binder_depth t' else t'
-      (* lift open De Bruijn symbols in t.binding by the number of binders encountered *)
-    | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind s (recurse (binder_depth+1) t')
-    | Node (s, l) ->
-      let l' = List.map (recurse binder_depth) l in
-      mk_node s t.sort l' (* recursive replacement in subterms *)
-  in recurse 0 t
-
-(** reset bindings of variables of the term *)
-let reset_vars t =
-  let rec reset t =
-    if is_ground_term t then () else match t.term with
-    | Var _ -> reset_binding t
-    | BoundVar _ -> ()
-    | Bind (_, t') -> reset_binding t'
-    | Node (_, l) -> reset_list l
-  and reset_list l = match l with
-  | [] -> ()
-  | x::l' -> reset x; reset_list l'
-  in
-  reset t
-
-(* ----------------------------------------------------------------------
  * Pretty printing
  * ---------------------------------------------------------------------- *)
 
@@ -567,17 +507,12 @@ class type pprinter_term =
 
 let pp_term_debug =
   let _sort = ref false
-  and _bindings = ref false
   in
   (* printer itself *)
   object (self)
     method pp formatter t =
       (match t.term with
-      | Var i -> if !_bindings && t != t.binding
-        then (_bindings := false;
-              Format.fprintf formatter "X%d → %a" i self#pp t.binding;
-              _bindings := true)
-        else Format.fprintf formatter "X%d" i
+      | Var i -> Format.fprintf formatter "X%d" i
       | BoundVar i -> Format.fprintf formatter "Y%d" i
       | Node (s, [{term=Node (s', [a; b])}])
         when s == not_symbol && s' == eq_symbol ->
@@ -601,7 +536,6 @@ let pp_term_debug =
       (* also print the sort if needed *)
       if !_sort then Format.fprintf formatter ":%s" (name_symbol t.sort)
     method sort s = _sort := s
-    method bindings s = _bindings := s
   end
 
 let pp_term_tstp =

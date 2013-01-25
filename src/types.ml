@@ -48,7 +48,6 @@ exception SortError of string
 type term = {
   term : term_cell;             (** the term itself *)
   sort : sort;                  (** the sort of the term *)
-  mutable binding : term;       (** binding of the term (if variable), or normal form *)
   mutable flags : int;          (** boolean flags about the term *)
   mutable tsize : int;          (** number of symbol/vars occurrences in the term (weight) *)
   mutable tag : int;            (** hashconsing tag *)

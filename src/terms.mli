@@ -28,7 +28,6 @@ open Symbols
  * ---------------------------------------------------------------------- *)
 
 val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *)
-val member_term_rec : term -> term -> bool(** same, but follows variable bindings *)
 val eq_term : term -> term -> bool        (** standard equality on terms *)
 val compare_term : term -> term -> int    (** a simple order on terms *)
 
@@ -158,18 +157,6 @@ val look_db_sort : int -> term -> sort option
   (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
 
 (* ----------------------------------------------------------------------
- * bindings and normal forms
- * ---------------------------------------------------------------------- *)
-
-val set_binding : term -> term -> unit      (** [set_binding t d] set variable binding of t *)
-val reset_binding : term -> unit            (** reset variable binding/normal form *)
-val get_binding : term -> term              (** get the binding of variable/normal form of term *)
-val expand_bindings : ?recursive:bool ->
-                      term -> term          (** replace variables by their bindings *)
-
-val reset_vars : term -> unit               (** reset bindings of variables of the term *)
-
-(* ----------------------------------------------------------------------
  * Pretty printing
  * ---------------------------------------------------------------------- *)
 
@@ -195,7 +182,6 @@ val pp_term_tstp : pprinter_term                    (** print term in TSTP synta
 val pp_term_debug :                                 (** print term in a nice syntax *)
   <
     pp : Format.formatter  -> term -> unit;
-    bindings : bool -> unit;                        (** print bindings of variables? *)
     sort : bool -> unit;                            (** print sorts of terms? *)
   >
 
