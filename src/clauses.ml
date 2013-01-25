@@ -24,11 +24,9 @@ open Types
 open Symbols
 
 module T = Terms
+module Lits = Literals
 module S = FoSubst
 module Utils = FoUtils
-
-(* some pretty printers are useful now *)
-open Format
 
 let stat_fresh = mk_stat "fresh_clause"
 let stat_mk_hclause = mk_stat "mk_hclause"
@@ -38,251 +36,35 @@ let prof_mk_hclause = Utils.mk_profiler "mk_hclause"
 let prof_mk_hclause_raw = Utils.mk_profiler "mk_hclause_raw"
 
 (* ----------------------------------------------------------------------
- * literals
+ * boolean flags
  * ---------------------------------------------------------------------- *)
 
-let left_pos = 0
-let right_pos = 1
+let flag_ground = 1 lsl 0
+let flag_redundant = 1 lsl 1
+let flag_transient = 1 lsl 2
 
-let opposite_pos p = match p with
-  | _ when p = left_pos -> right_pos
-  | _ when p = right_pos -> left_pos
-  | _ -> assert false
+let set_flag flag c truth =
+  if truth
+    then c.hcflags <- c.hcflags lor flag
+    else c.hcflags <- c.hcflags land (lnot flag)
 
-let eq_literal l1 l2 =
-  match l1, l2 with
-  | Equation (l1,r1,sign1,ord1), Equation (l2,r2,sign2,ord2) ->
-      sign1 = sign2 && T.eq_term l1 l2 && T.eq_term r1 r2 && ord1 = ord2
-
-let eq_literal_com l1 l2 =
-  match l1, l2 with
-  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      sign1 = sign2 &&
-      ((T.eq_term l1 l2 && T.eq_term r1 r2 && o1 = o2) ||
-       (T.eq_term l1 r2 && T.eq_term r1 l2 && o1 = (Utils.not_partial o2)))
-
-let compare_literal l1 l2 =
-  match l1, l2 with
-  | Equation (l1,r1,sign1,o1), Equation (l2,r2,sign2,o2) ->
-      let c = Pervasives.compare o1 o2 in
-      if c <> 0 then c else
-        let c = T.compare_term l1 l2 in
-        if c <> 0 then c else
-          let c = T.compare_term r1 r2 in
-          if c <> 0 then c else
-            Pervasives.compare sign1 sign2
-
-let lit_to_multiset lit = match lit with
-  | Equation (l, r, true, _) -> [l; r]
-  | Equation (l, r, false, _) -> [l; l; r; r]
-
-let compare_lits_partial ~ord l1 l2 =
-  (* Utils.multiset_partial ord#compare (lit_to_multiset l1) (lit_to_multiset l2) *)
-  match l1, l2 with
-  | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
-    let s_u = ord#compare s u
-    and s_v = ord#compare s v
-    and t_u = ord#compare t u
-    and t_v = ord#compare t v in
-    match s_u, s_v, t_u, t_v, sign_st, sign_uv with
-    | Eq, _, _, Eq, _, _
-    | _, Eq, Eq, _, _, _ ->
-      if sign_st = sign_uv then Eq
-      else if sign_st then Lt
-      else (assert sign_uv; Gt)
-    | Gt, Gt, _, _, _, _        (* s dominates *)
-    | _, _, Gt, Gt, _, _ -> Gt  (* t dominates *)
-    | Gt, Eq, _, _, false, true (* s = v & s > u *)
-    | Eq, Gt, _, _, false, true (* s = u & s > v *)
-    | _, _, Gt, Eq, false, true (* t = v & t > u *)
-    | _, _, Eq, Gt, false, true -> Gt (* t = u & t > v *)
-    | Lt, _, Lt, _, _, _        (* u dominates *)
-    | _, Lt, _, Lt, _, _ -> Lt  (* v dominates *)
-    | Eq, _, Lt, _, true, false (* s = u, t < u *)
-    | Lt, _, Eq, _, true, false (* t = u, s < u *)
-    | _, Eq, _, Lt, true, false (* s = v, t < v *)
-    | _, Lt, _, Eq, true, false -> Lt (* t = v, s < v *)
-    | Eq, _, _, Gt, _, _        (* s = u, t > v *)
-    | Gt, _, _, Eq, _, _        (* s > u, t = v *)
-    | _, Eq, Gt, _, _, _        (* s = v, t > u *)
-    | _, Gt, Eq, _, _, _        (* s > v, t = u *)
-      when sign_uv = sign_st -> Gt
-    | Eq, _, _, Lt, _, _        (* s = u, t < v *)
-    | Lt, _, _, Eq, _, _        (* s < u, t = v *)
-    | _, Eq, Lt, _, _, _        (* s = v, t < u *)
-    | _, Lt, Eq, _, _, _        (* s < v, t = u *)
-      when sign_uv = sign_st -> Lt
-    | Eq, Eq, _, _, false, true (* s = u, s = v *)
-    | _, _, Eq, Eq, false, true -> Gt (* t = u, t = v *)
-    | _, Eq, _, Eq, true, false (* s = v, t = v *)
-    | Eq, _, Eq, _, true, false -> Lt (* s = u, t = u *)
-    | _ -> Incomparable
-
-let hash_literal lit = match lit with
-  | Equation (l, r, sign, o) ->
-    if sign
-      then Hash.hash_int3 (Hash.hash_string o) l.hkey r.hkey
-      else Hash.hash_int3 (Hash.hash_string o) r.hkey l.hkey
-
-let weight_literal = function
-  | Equation (l, r, _ ,_) -> l.tsize + r.tsize
-
-let pos_lit lit = match lit with
-  | Equation (_,_,sign,_) -> sign
-
-let neg_lit lit = match lit with
-  | Equation (_,_,sign,_) -> not sign
-
-let equational_lit = function
-  | Equation (l, r, _,_) -> l != T.true_term && r != T.true_term
-
-let orientation_lit = function
-  | Equation (_, _, _, ord) -> ord
-
-let check_type a b = if a.sort <> b.sort
-  then raise (SortError "sides of equations of different sorts") else ()
-
-let mk_eq ~ord a b =
-  check_type a b;
-  Equation (a, b, true, ord#compare a b)
-
-let mk_neq ~ord a b = 
-  check_type a b;
-  Equation (a, b, false, ord#compare a b)
-
-let mk_lit ~ord a b sign =
-  check_type a b;
-  Equation (a, b, sign, ord#compare a b)
-
-let apply_subst_lit ?(recursive=true) ~ord subst lit =
-  match lit with
-  | Equation (l,r,sign,_) ->
-    if subst = S.id_subst
-    then mk_lit ~ord l r sign
-    else
-      let new_l = S.apply_subst ~recursive subst l
-      and new_r = S.apply_subst ~recursive subst r in
-      mk_lit ~ord new_l new_r sign
-
-let reord_lit ~ord (Equation (l,r,sign,_)) = mk_lit ~ord l r sign
-
-let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
-  match l.term, r.term with
-  (* deal with trivial literals *)
-  | _ when T.eq_term l T.true_term && T.eq_term r T.false_term ->
-    mk_lit ~ord T.true_term T.true_term (not sign)
-  | _ when T.eq_term r T.true_term && T.eq_term l T.false_term ->
-    mk_lit ~ord T.true_term T.true_term (not sign)
-  | _ when T.eq_term l r ->
-    mk_lit ~ord T.true_term T.true_term sign
-  (* deal with false/true *)
-  | _ when T.eq_term l T.false_term ->
-    assert (r.sort = bool_sort);
-    lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
-  | _ when T.eq_term r T.false_term ->
-    assert (l.sort = bool_sort);
-    lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
-  (* deal with negation *)
-  | Node (s, [t]), _ when s = not_symbol && T.eq_term r T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
-  | _, Node (s, [t]) when s = not_symbol && T.eq_term l T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
-  (* deal with equality symbol *)
-  | Node (s, [a; b]), _ when s = eq_symbol && T.eq_term r T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
-  | _, Node (s, [a; b]) when s = eq_symbol && T.eq_term l T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
-  (* default is just reordering *)
-  | _ -> reord_lit ~ord lit
-
-let term_of_lit lit =
-  match lit with
-  | Equation (left, right, false, _) when T.eq_term right T.true_term ->
-    T.mk_not left
-  | Equation (left, right, true, _) when T.eq_term right T.true_term ->
-    left
-  | Equation (left, right, true, _) when T.eq_term left T.true_term ->
-    right
-  | Equation (left, right, false, _) when T.eq_term left T.true_term ->
-    T.mk_not right
-  | Equation (left, right, sign, ord) ->
-    if sign then T.mk_eq left right else T.mk_not (T.mk_eq left right)
-
-let negate_lit (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
-
-let fmap_lit ~ord f = function
-  | Equation (left, right, sign, _) ->
-    let new_left = f left
-    and new_right = f right in
-    Equation (new_left, new_right, sign, ord#compare new_left new_right)
-
-let vars_of_lit = function
-  | Equation (left, right, _, _) ->
-    let set = T.THashSet.create () in
-    T.add_vars set left;
-    T.add_vars set right;
-    T.THashSet.to_list set
+let get_flag flag c = (c.hcflags land flag) != 0
 
 (* ----------------------------------------------------------------------
  * clauses
  * ---------------------------------------------------------------------- *)
 
-let eq_clits lits1 lits2 =
-  let rec check i =
-    if i = Array.length lits1 then true else
-    eq_literal lits1.(i) lits2.(i) && check (i+1)
-  in
-  if Array.length lits1 <> Array.length lits2
-    then false
-    else check 0
-
-let eq_clause c1 c2 = eq_clits c1.clits c2.clits
-
-let compare_clause c1 c2 = 
-  let rec check i =
-    if i = Array.length c1.clits then 0 else
-      let cmp = compare_literal c1.clits.(i) c2.clits.(i) in
-      if cmp = 0 then check (i+1) else cmp
-  in
-  if Array.length c1.clits <> Array.length c2.clits
-    then Array.length c1.clits - Array.length c2.clits
-    else check 0
-
-let hash_lits lits =
-  let hash = ref (Hash.initial_hash (Array.length lits * 4)) in
-  for i = 0 to Array.length lits - 1 do
-    let j = hash_literal lits.(i) in
-    hash := Hash.hash_4bytes !hash j;
-  done;
-  let hash = Hash.finish_hash !hash in
-  abs hash
-
-let hash_clause c = hash_lits c.clits
-
-(* ----------------------------------------------------------------------
- * hashconsing of clauses, and data structures
- * ---------------------------------------------------------------------- *)
-
-module H = Hashcons.Make(struct
-  type t = hclause
-  let equal hc1 hc2 = hc1.hchash = hc2.hchash && eq_clits hc1.hclits hc2.hclits
-  let hash hc = hc.hchash
-  let tag i hc = (hc.hctag <- i; hc)
-end)
-
-let stats () = H.stats ()
-
-let eq_hclause hc1 hc2 = hc1 == hc2
+let eq_hclause hc1 hc2 = hc1.hctag = hc2.hctag
 
 let compare_hclause hc1 hc2 = hc1.hctag - hc2.hctag
 
-let hash_hclause hc = hash_lits hc.hclits
+let hash_hclause hc = Lits.hash_lits hc.hclits
 
 module CHashtbl = Hashtbl.Make(
   struct
     type t = hclause
-    let hash hc = hc.hchash
-    let equal = eq_hclause
+    let hash hc = hash_hclause hc
+    let equal c1 c2 = eq_hclause c1 c2
   end)
 
 module CHashSet =
@@ -303,24 +85,7 @@ module CHashSet =
  * useful functions to build and examine clauses
  * ---------------------------------------------------------------------- *)
 
-open Bitvector
-
-(** Find the maximal literals among lits, returns a bitvector *)
-let find_max_lits ~ord lits =
-  let n = Array.length lits in
-  let bv = ref (bv_make n) in
-  for i = 0 to n-1 do
-    (* i-th lit is already known not to be max? *)
-    if not (bv_get !bv i) then () else
-    for j = i+1 to n-1 do
-      if not (bv_get !bv j) then () else
-      match compare_lits_partial ~ord lits.(i) lits.(j) with
-      | Incomparable | Eq -> ()     (* no further information about i-th and j-th *)
-      | Gt -> bv := bv_clear !bv j  (* j-th cannot be max *)
-      | Lt -> bv := bv_clear !bv i  (* i-th cannot be max *)
-    done;
-  done;
-  !bv
+module BV = Bitvector
 
 (** comparison of variables by index *)
 let compare_vars a b =
@@ -336,127 +101,92 @@ let check_normal vars =
   | _ -> assert false
   in check (-1) vars
 
-(** compute the set of variables of literals *)
-let rec merge_lit_vars set lits i = 
-  if i = Array.length lits then () else
-  match lits.(i) with
-  | Equation (l, r, _, _) ->
-    T.add_vars set l;
-    T.add_vars set r;
-    merge_lit_vars set lits (i+1)
-
+(** Compute the set of variables for this array of literals *)
 let vars_of_lits lits =
   let set = T.THashSet.create () in
-  merge_lit_vars set lits 0;
+  for i = 0 to Array.length lits - 1 do
+    Lits.add_vars set lits.(i);
+  done;
   T.THashSet.to_list set
 
+(** Get a fresh ID for a clause *)
+let get_next_tag =
+  let current_tag = ref 1 in
+  fun () ->
+    let n = !current_tag in
+    incr current_tag;
+    n
+
 (** the tautological empty clause *)
-let true_clause =
+let true_clause ~ctx =
+  let hcflags = flag_ground lor flag_redundant in
   let hc = { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
-      hctag = -1; hchash = 0; hcweight=2; hcmaxlits=0x1; hcselected=0; hcselected_done=true;
-      hcvars=[]; hcproof=Proof ("trivial", []);
-      hcparents=[]; hcdescendants=Ptset.empty; }
+      hctag = get_next_tag (); hcweight=2; hcselected=0; hcflags; hcctx=ctx;
+      hcvars=[]; hcproof=Proof ("trivial", []); hcdescendants=[||]; }
   in
-  hc.hchash <- hash_lits hc.hclits;
-  H.hashcons hc
+  hc
 
 (** Build a new hclause from the given literals. If there are more than 31 literals,
     the prover becomes incomplete by returning [true] instead. *)
-let mk_hclause_a ~ord lits proof parents =
+let mk_hclause_a ?selected ~ctx lits proof =
   incr_stat stat_mk_hclause;
   Utils.enter_prof prof_mk_hclause;
   if Array.length lits > 31
-  then (Utils.debug 1 (lazy (Utils.sprintf "%% incompleteness: clause of %d lits -> $true"
-      (Array.length lits))); true_clause)
+  then (Utils.debug 0 (lazy (Utils.sprintf
+            "%% incompleteness: clause of %d lits -> $true" (Array.length lits)));
+        Utils.exit_prof prof_mk_hclause;
+        true_clause ~ctx)
   else begin
+  (* set of variables *)
   let all_vars = vars_of_lits lits in
-  let all_vars = List.sort compare_vars all_vars in
-  (* normalize literals *)
-  let all_vars =
-    let subst = if check_normal all_vars then S.id_subst else S.relocate 0 all_vars in
-    Array.iteri
-      (fun i lit -> lits.(i) <- apply_subst_lit ~ord ~recursive:false subst lit)
-      lits;
-    List.map (S.apply_subst ~recursive:false subst) all_vars
-  in
   (* create the structure *)
   let hc = {
     hclits = lits;
-    hctag = -1;
-    hchash = 0;
-    hcweight = 0;
-    hcmaxlits = 0;
-    hcselected_done = false;
+    hcctx = ctx;
+    hcflags = BV.empty;
+    hctag = get_next_tag ();
+    hcweight = Array.fold_left (fun acc lit -> acc + Lits.weight lit) 0 lits;
     hcselected = 0;
-    hcvars = [];
+    hcvars = all_vars;
     hcproof = proof;
-    hcparents = parents;
-    hcdescendants = Ptset.empty;
+    hcdescendants = [||];
   } in
-  (* hashcons the clause, compute additional data if fresh *)
-  hc.hchash <- hash_lits lits;
-  let hc' = H.hashcons hc in
-  (if hc == hc' then begin
-    incr_stat stat_new_clause;
-    hc.hcvars <- all_vars;
-    hc.hcmaxlits <- find_max_lits ~ord lits;
-    hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
-    (* update the parent clauses' sets of descendants *)
-    List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
-    end);
-  (* return hashconsed clause *)
+  (* select literals, if not already done *)
+  (hc.hcselected <- match selected with
+    | Some bv -> bv
+    | None -> BV.from_list (ctx.ctx_select hc));
+  (* compute flags *)
+  (if Lits.ground_lits lits then set_flag flag_redundant hc true);
+  (* return clause *)
+  incr_stat stat_new_clause;
   Utils.exit_prof prof_mk_hclause;
-  hc'
+  hc
   end
 
-(** build clause from a list *)
-let mk_hclause ~ord lits proof parents =
-  mk_hclause_a ~ord (Array.of_list lits) proof parents
+(** Build clause from a list (delegating to mk_hclause_a) *)
+let mk_hclause ?selected ~ctx lits proof =
+  mk_hclause_a ?selected ~ctx (Array.of_list lits) proof
 
-(** Build a hclause with already computed max literals and selected literals.
-    No check is (nor can) be performed. *)
-let mk_hclause_raw ~selected ~maxlits ~selected_done lits proof parents =
-  Utils.enter_prof prof_mk_hclause_raw;
-  let hc = {
-    hclits = lits;
-    hctag = -1;
-    hchash = 0;
-    hcweight = 0;
-    hcmaxlits = maxlits;
-    hcselected_done = selected_done;
-    hcselected = selected;
-    hcvars = [];
-    hcproof = proof;
-    hcparents = parents;
-    hcdescendants = Ptset.empty;
-  } in
-  (* hashcons the clause, compute additional data if fresh *)
-  hc.hchash <- hash_lits lits;
-  let hc' = H.hashcons hc in
-  (if hc == hc' then begin
-    incr_stat stat_new_clause;
-    hc.hcvars <- vars_of_lits lits;
-    hc.hcweight <- Array.fold_left (fun acc lit -> acc + weight_literal lit) 0 lits;
-    (* update the parent clauses' sets of descendants *)
-    List.iter (fun parent -> parent.hcdescendants <- Ptset.add hc.hctag parent.hcdescendants) parents;
-    end else assert (hc.hcmaxlits = hc'.hcmaxlits));
-  (* ensure that selection is performed *)
-  (if selected_done then begin
-    hc'.hcselected_done <- true;
-    hc'.hcselected <- selected end);
-  (* return hashconsed clause *)
-  Utils.exit_prof prof_mk_hclause_raw;
-  hc'
+(** [is_child_of ~child c] is to be called to remember that [child] is a child
+    of [c], is has been infered/simplified from [c] *)
+let is_child_of ~child c =
+  (* update the parent clauses' sets of descendants by adding [child] *)
+  let descendants = Array.of_list (child.hctag :: Array.to_list c.hcdescendants) in
+  c.hcdescendants <- descendants
+
+(** descendants of the clause *)
+let descendants hc = hc.hcdescendants
 
 (** simplify literals *)
-let clause_of_fof ~ord hc =
-  let lits = Array.map (lit_of_fof ~ord) hc.hclits in
-  mk_hclause_a ~ord lits hc.hcproof hc.hcparents
+let clause_of_fof hc =
+  let ctx = hc.hcctx in
+  let lits = Array.map (Lits.lit_of_fof ~ord:ctx.ctx_ord) hc.hclits in
+  mk_hclause_a ~ctx lits hc.hcproof
 
-(** change the ordering of literals *)
-let reord_hclause ~ord hc =
-  let lits = Array.map (reord_lit ~ord) hc.hclits in
-  mk_hclause_a ~ord lits hc.hcproof hc.hcparents
+(** Change the context of the clause *)
+let update_ctx ~ctx hc =
+  let lits = Array.map (Lits.reord ~ord:ctx.ctx_ord) hc.hclits in
+  mk_hclause_a ~selected:hc.hcselected ~ctx lits hc.hcproof
 
 (** check the ordering relation of lits (always true after reord_clause ~ord) *)
 let check_ord_hclause ~ord hc =
@@ -469,133 +199,131 @@ let check_ord_hclause ~ord hc =
       ok)
     hc.hclits)
 
-(** Compute selected literals. Note that selection on a unit clause is a no-op. *)
-let select_clause ~select hc =
-  (match hc.hclits with
-   | _ when hc.hcselected_done -> ()  (* already selected *)
-   | [|_|] -> hc.hcselected_done <- true  (* selection useless in unit clauses *)
-   | _ ->
-   begin
-      let bv = List.fold_left bv_set 0 (select hc) in
-      hc.hcselected <- bv;
-      hc.hcselected_done <- true;
-    end);
-  hc
-
-(** are there selected literals in the clause? *)
-let has_selected_lits hc = not (bv_empty hc.hcselected)
-
-(** descendants of the clause *)
-let descendants hc = hc.hcdescendants
-
-(** Check whether the literal is maximal *)
-let is_maxlit hc i =
-  let bv = hc.hcmaxlits in
-  bv_get bv i  (* just check i-th bit *)
-
-(** Check whether the literal is maximal after applying subst *)
-let check_maximal_lit ~ord c pos subst =
-  Utils.enter_prof prof_check_max_lit;
-  let bv = c.cref.hcmaxlits in
-  let n = Array.length c.clits in
-  (* check if lit already not maximal, before subst *)
-  if not (bv_get bv pos) then (Utils.exit_prof prof_check_max_lit; false) else 
-  let lit = c.clits.(pos) in
-  let slit = apply_subst_lit ~ord subst lit in
-  (* check that slit is not < subst(lit') for any lit' maximal in c *)
-  let rec check i = 
-    if i = n then true
-    else if not (bv_get bv i) then check (i+1)
-    else
-      let slit' = apply_subst_lit ~ord subst c.clits.(i) in
-      (compare_lits_partial ~ord slit slit' <> Lt) && check (i+1)
-  in
-  let res = check 0 in
-  Utils.exit_prof prof_check_max_lit; 
-  res
-
-(** Get an indexed list of maximum literals *)
-let maxlits c =
-  let bv = c.cref.hcmaxlits in
-  Utils.array_foldi
-    (fun acc i lit -> if bv_get bv i then (lit, i)::acc else acc)
-    [] c.clits
-
 (** Apply substitution to the clause *)
-let rec apply_subst_cl ?(recursive=true) ~ord subst hc =
+let rec apply_subst ?(recursive=true) subst hc =
+  let ctx = hc.hcctx in
   if S.is_empty subst then hc
   else
-    let lits = Array.map (apply_subst_lit ~recursive ~ord subst) hc.hclits in
-    mk_hclause_a ~ord lits hc.hcproof hc.hcparents
+    let ord = ctx.ctx_ord in
+    let lits = Array.map (Lits.apply_subst ~recursive ~ord subst) hc.hclits in
+    mk_hclause_a ~ctx lits hc.hcproof
 
-(** get literal by index *)
-let get_lit c i = c.clits.(i)
+(** bitvector of literals that are positive *)
+let pos_lits lits =
+  let bv = ref BV.empty in
+  for i = 0 to Array.length lits - 1 do
+    if Lits.is_pos lits.(i) then bv := BV.set !bv i
+  done;
+  !bv
 
-(** get term by position *)
-let get_pos c pos =
-  match pos with
-  | idx::side::tpos ->
-    let lit = c.clits.(idx) in
-    (match lit with
-    | Equation (l, _, _, _) when side = left_pos -> T.at_pos l tpos
-    | Equation (_, r, _, _) when side = right_pos -> T.at_pos r tpos
-    | _ -> invalid_arg "wrong side in literal")
-  | _ -> invalid_arg "wrong position for clause"
+(** bitvector of literals that are positive *)
+let neg_lits lits =
+  let bv = ref BV.empty in
+  for i = 0 to Array.length lits - 1 do
+    if Lits.is_neg lits.(i) then bv := BV.set !bv i
+  done;
+  !bv
+
+(** Bitvector that indicates which of the literals are maximal *)
+let maxlits_array ~ord lits =
+  let n = Array.length lits in
+  (* at the beginning, all literals are potentially maximal *)
+  let bv = ref (BV.make n) in
+  for i = 0 to n-1 do
+    (* i-th lit is already known not to be max? *)
+    if not (BV.get !bv i) then () else
+    for j = i+1 to n-1 do
+      if not (BV.get !bv j) then () else
+      match Lits.compare_partial ~ord lits.(i) lits.(j) with
+      | Incomparable | Eq -> ()     (* no further information about i-th and j-th *)
+      | Gt -> bv := BV.clear !bv j  (* j-th cannot be max *)
+      | Lt -> bv := BV.clear !bv i  (* i-th cannot be max *)
+    done;
+  done;
+  (* return bitvector *)
+  !bv
+
+(** Bitvector that indicates which of the literals of [subst(clause)]
+    are maximal under [ord] *)
+let maxlits c subst =
+  let ord = c.hcctx.ctx_ord in
+  let lits = Array.map (Lits.apply_subst ~ord subst) c.hclits in
+  maxlits_array ~ord lits
+
+(** Check whether the literal is maximal *)
+let is_maxlit c subst i = BV.get (maxlits c subst) i
+
+(** Bitvector that indicates which of the literals of [subst(clause)]
+    are eligible for resolution. *)
+let eligible_res c subst =
+  let ord = c.hcctx.ctx_ord in
+  (* instantiate lits *)
+  let lits = Array.map (Lits.apply_subst ~ord subst) c.hclits in
+  let selected = c.hcselected in
+  let n = Array.length lits in
+  (* Literals that may be eligible: all of them if none is selected,
+     selected ones otherwise. *)
+  let check_sign = not (BV.is_empty selected) in
+  let bv = ref (if BV.is_empty selected then BV.make n else selected) in
+  (* Only keep literals that are maximal. If [check_sign] is true, comparisons
+     are only done between same-sign literals. *)
+  for i = 0 to n-1 do
+    (* i-th lit is already known not to be max? *)
+    if not (BV.get !bv i) then () else
+    let lit = lits.(i) in
+    for j = i+1 to n-1 do
+      let lit' = lits.(j) in
+      (* check if both lits are still potentially eligible, and have the same sign 
+         if [check_sign] is true. *)
+      if (check_sign && Lits.is_pos lit <> Lits.is_pos lit')
+        || not (BV.get !bv j) then () else
+      match Lits.compare_partial ~ord lits.(i) lits.(j) with
+      | Incomparable | Eq -> ()     (* no further information about i-th and j-th *)
+      | Gt -> bv := BV.clear !bv j  (* j-th cannot be max *)
+      | Lt -> bv := BV.clear !bv i  (* i-th cannot be max *)
+    done;
+  done;
+  !bv
+
+(** Bitvector that indicates which of the literals of [subst(clause)]
+    are eligible for paramodulation. *)
+let eligible_param c subst =
+  let ord = c.hcctx.ctx_ord in
+  if BV.is_empty c.hcselected then
+    (* instantiate lits *)
+    let lits = Array.map (Lits.apply_subst ~ord subst) c.hclits in
+    (* only keep literals that are positive *)
+    let bv = maxlits_array ~ord lits in
+    BV.inter bv (pos_lits lits)
+  else BV.empty  (* no eligible literal when some are selected *)
 
 (** Get a variant of the clause, in which variables are all > offset *)
-let fresh_clause ~ord offset hc =
+let fresh_clause offset hc =
+  let ctx = hc.hcctx in
+  let ord = ctx.ctx_ord in
   incr_stat stat_fresh;
   let subst = S.relocate (offset + 1) hc.hcvars in
-  let clits = Array.map (apply_subst_lit ~recursive:false ~ord subst) hc.hclits in
-  let cvars = List.map (S.apply_subst ~recursive:false subst) hc.hcvars in
-  { cref=hc; clits; cvars; }
+  let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
+  mk_hclause_a ~ctx lits hc.hcproof
 
-(** create a clause from a hclause, without renaming *)
-let base_clause hc =
-  incr_stat stat_fresh;
-  { clits = hc.hclits; cref = hc; cvars = hc.hcvars}
+(** Normalize clause by renaming variables from 0 *)
+let normalize hc =
+  let ctx = hc.hcctx in
+  let ord = ctx.ctx_ord in
+  let subst = S.relocate 0 hc.hcvars in
+  let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
+  mk_hclause_a ~ctx lits hc.hcproof
+
+(** are there selected literals in the clause? *)
+let has_selected_lits hc = not (BV.is_empty hc.hcselected)
 
 (** Check whether the literal is selected *)
 let is_selected hc i =
   let bv = hc.hcselected in
-  bv_get bv i
+  BV.get bv i
 
 (** Indexed list of selected literals *)
-let selected_lits c =
-  let bv = c.cref.hcselected in
-  Utils.array_foldi
-    (fun acc i lit -> if bv_get bv i then (lit,i)::acc else acc)
-    [] c.clits
-
-(** check whether a literal is eligible for resolution *)
-let eligible_res ~ord c idx subst =
-  (* bitvectors of selected and maximal literals *)
-  let selected = c.cref.hcselected in
-  let maximal = c.cref.hcmaxlits in
-  let lits = c.clits in
-  let n = Array.length lits in
-  (* check maximality among selected literals with given sign *)
-  let rec check_among_selected slit i sign =
-    if i = n then true
-    else if i <> idx && bv_get maximal i && bv_get selected i && pos_lit lits.(i) = pos_lit slit
-      then let slit' = apply_subst_lit ~ord subst lits.(i) in
-      compare_lits_partial ~ord slit slit' <> Lt && check_among_selected slit (i+1) sign
-      else check_among_selected slit (i+1) sign
-  in
-  (* if no lit is selected, max lits are eligible *)
-  if not (has_selected_lits c.cref)
-    then check_maximal_lit ~ord c idx subst (* just check maximality *)
-    else if not (is_selected c.cref idx) then false (* some are selected, not lit *)
-    else (* check that slit max among selected literals of same sign *)
-      let slit = apply_subst_lit ~ord subst c.clits.(idx) in
-      let sign = pos_lit slit in
-      check_among_selected slit 0 sign
-
-(** check whether a literal is eligible for paramodulation *)
-let eligible_param ~ord c idx subst =
-  if has_selected_lits c.cref then false
-  else if neg_lit c.clits.(idx) then false (* only positive lits *)
-  else check_maximal_lit ~ord c idx subst
+let selected_lits c = BV.select c.hcselected c.hclits
 
 (** is the clause a unit clause? *)
 let is_unit_clause hc = match hc.hclits with
@@ -638,14 +366,18 @@ let signature clauses =
   in
   List.fold_left explore_clause empty_signature clauses
 
-let rec from_simple ~ord (f,source) =
+let rec from_simple ~ctx (f, source) =
+  let ord = ctx.ctx_ord in
+  let open Literals in
   let rec lits_from_simple ~ord f = match f with
     | Simple.Not (Simple.Atom f) -> [mk_neq ~ord (T.from_simple f) T.true_term]
     | Simple.Atom f -> [mk_eq ~ord (T.from_simple f) T.true_term]
     | Simple.Not (Simple.Eq (t1,t2)) -> [mk_neq ~ord (T.from_simple t1) (T.from_simple t2)]
     | Simple.Eq (t1, t2) -> [mk_eq ~ord (T.from_simple t1) (T.from_simple t2)]
-    | Simple.Not (Simple.Equiv (f1,f2)) -> [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-    | Simple.Equiv (f1, f2) -> [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
+    | Simple.Not (Simple.Equiv (f1,f2)) ->
+      [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
+    | Simple.Equiv (f1, f2) ->
+      [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
     | Simple.Or l -> List.concat (List.map (lits_from_simple ~ord) l)
     | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
   in
@@ -654,12 +386,10 @@ let rec from_simple ~ord (f,source) =
   | Simple.Derived (name, fs) ->
     failwith "unable to convert non-axiom simple clause to hclause"
   in
-  mk_hclause ~ord (lits_from_simple ~ord f) proof []
-
-let to_simple hc = failwith "not implemented"
+  mk_hclause ~ctx (lits_from_simple ~ord f) proof
 
 (* ----------------------------------------------------------------------
- * set of hashconsed clauses
+ * set of clauses, reachable by ID
  * ---------------------------------------------------------------------- *)
 
 (** Simple set *)
@@ -698,8 +428,6 @@ module CSet =
           (fun (m,c) hc -> max m (T.max_var hc.hcvars), Ptmap.add hc.hctag hc c)
           (set.maxvar, set.clauses) hcs in
       {maxvar; clauses;}
-
-    let add_clause set c = add set c.cref
 
     let remove_id set i =
       { set with clauses = Ptmap.remove i set.clauses }
@@ -771,7 +499,7 @@ let is_RR_horn_clause hc =
   match find_uniq_pos 0 0 with
   | None -> false
   | Some lit' -> (* check that all variables of the clause occur in the head *)
-    List.length (vars_of_lit lit') = List.length hc.hcvars
+    List.length (Lits.vars lit') = List.length hc.hcvars
 
 (** Recognizes Horn clauses (at most one positive literal) *)
 let is_horn hc =
@@ -843,69 +571,6 @@ let is_const_definition hc =
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
-let string_of_pos s = match s with
-  | _ when s == left_pos -> "left"
-  | _ when s == right_pos -> "right"
-  | _ -> assert false
-
-let string_of_comparison = function
-  | Lt -> "=<="
-  | Gt -> "=>="
-  | Eq -> "==="
-  | Incomparable -> "=?="
-
-(** pretty printer for literals *)
-class type pprinter_literal =
-  object
-    method pp : Format.formatter -> literal -> unit     (** print literal *)
-  end
-
-let pp_literal_gen pp_term formatter lit =
-  match lit with
-  | Equation (l, r, sign, _) when T.eq_term r T.true_term ->
-    if sign
-      then pp_term#pp formatter l
-      else Format.fprintf formatter "¬%a" pp_term#pp l
-  | Equation (l, r, sign, _) when T.eq_term l T.true_term ->
-    if sign
-      then pp_term#pp formatter r
-      else Format.fprintf formatter "¬%a" pp_term#pp r
-  | Equation (l, r, sign, _) when l.sort == bool_sort ->
-    if sign
-      then Format.fprintf formatter "%a <=> %a" pp_term#pp l pp_term#pp r
-      else Format.fprintf formatter "%a <~> %a" pp_term#pp l pp_term#pp r
-  | Equation (l, r, sign, _) ->
-    if sign
-      then Format.fprintf formatter "%a = %a" pp_term#pp l pp_term#pp r
-      else Format.fprintf formatter "%a != %a" pp_term#pp l pp_term#pp r
-
-let pp_literal_debug =
-  let print_ord = ref false in
-  object
-    method pp formatter ((Equation (_,_,_,ord)) as lit) =
-      pp_literal_gen T.pp_term_debug formatter lit;
-      if !print_ord
-        then Format.fprintf formatter "(%s)" (string_of_comparison ord)
-        else ()
-
-    method ord b = print_ord := b
-  end
-
-let pp_literal_tstp =
-  object
-    method pp formatter lit = pp_literal_gen T.pp_term_tstp formatter lit
-  end
-
-let pp_literal =
-  object
-    method pp formatter lit = pp_literal_gen !T.pp_term formatter lit
-  end
-
-let pp_pos formatter pos =
-  if pos = []
-    then Format.pp_print_string formatter "ε"
-    else fprintf formatter "@[<h>%a@]" (Utils.pp_list ~sep:"." pp_print_int) pos
-
 (** pretty printer for clauses *)
 class type pprinter_clause =
   object
@@ -922,7 +587,7 @@ class type pprinter_clause =
 class virtual common_pp_clause =
   object (self)
     method virtual pp_lits : Format.formatter -> literal array -> hclause -> unit
-    method pp formatter c = self#pp_lits formatter c.clits c.cref
+    method pp formatter c = self#pp_lits formatter c.hclits c
     method pp_h formatter hc = self#pp_lits formatter hc.hclits hc
     method pp_pos formatter (c, pos) =
       Format.fprintf formatter "@[<h>[%a at %a]@]" self#pp c pp_pos pos
@@ -936,24 +601,26 @@ class virtual common_pp_clause =
 
 let pp_clause_debug =
   let _horizontal = ref true in
-  let pp_annot hc i =
-    ""^(if is_selected hc i then "+" else "")
-      ^(if is_maxlit hc i then "*" else "") in
+  let pp_annot selected maxlits i =
+    ""^(if BV.get selected i then "+" else "")
+      ^(if BV.get maxlits i then "*" else "") in
   object (self)
     (* print literals with a '*' for maximal, and '+' for selected *)
     method pp_lits formatter lits hc =
+      let selected = hc.hcselected
+      and maxlits = maxlits hc S.id_subst in
       (* how to print the list of literals *)
       let lits_printer formatter lits =
         Utils.pp_arrayi ~sep:" | "
           (fun formatter i lit ->
-            let annot = pp_annot hc i in
-            fprintf formatter "%a%s" pp_literal_debug#pp lit annot)
+            let annot = pp_annot selected maxlits i in
+            Format.fprintf formatter "%a%s" Lits.pp_literal_debug#pp lit annot)
           formatter lits
       in
       (* print in an horizontal box, or not *)
       if !_horizontal
-        then fprintf formatter "@[<h>[%a]@]" lits_printer lits
-        else fprintf formatter "[%a]" lits_printer lits
+        then Format.fprintf formatter "@[<h>[%a]@]" lits_printer lits
+        else Format.fprintf formatter "[%a]" lits_printer lits
     (* regular printing is printing with no literal selected *)
     inherit common_pp_clause
     method horizontal s = _horizontal := s
@@ -970,8 +637,8 @@ let pp_clause_tstp =
           match lits with
           | [||] -> T.false_term
           | _ -> Array.fold_left
-            (fun t lit -> T.mk_or t (term_of_lit lit))
-            (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
+            (fun t lit -> T.mk_or t (Lits.term_of_lit lit))
+            (Lits.term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
         in
         (* quantify all free variables *)
         let vars = T.vars t in
@@ -983,18 +650,13 @@ let pp_clause_tstp =
       in
       (* print in an horizontal box, or not *)
       if !_horizontal
-        then fprintf formatter "@[<h>%a@]" lits_printer lits
-        else fprintf formatter "%a" lits_printer lits
+        then Format.fprintf formatter "@[<h>%a@]" lits_printer lits
+        else Format.fprintf formatter "%a" lits_printer lits
     inherit common_pp_clause
     method horizontal s = _horizontal := s
   end
 
 let pp_clause = ref pp_clause_debug
-
-let pp_lits formatter lits = 
-  Utils.pp_arrayi ~sep:" | "
-    (fun formatter i lit -> fprintf formatter "%a" pp_literal_debug#pp lit)
-    formatter lits
 
 (** pretty printer for proofs *)
 class type pprinter_proof =
@@ -1019,15 +681,15 @@ let pp_proof_debug =
           already_printed := Ptset.add hc.hctag !already_printed;
           match hc.hcproof with
           | Axiom (f, s) ->
-              fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>axiom %s in %s@]@]@;"
-                !pp_clause#pp_h hc s f
+            Format.fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>axiom %s in %s@]@]@;"
+              !pp_clause#pp_h hc s f
           | Proof (rule, premises) ->
-              (* print the proof step *)
-              fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>%s with @[<hv>%a@]@]@]@;"
-                !pp_clause#pp_h hc rule
-                (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
-              (* print premises recursively *)
-              List.iter (fun (c, _, _) -> Queue.add c.cref to_print) premises
+            (* print the proof step *)
+            Format.fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>%s with @[<hv>%a@]@]@]@;"
+              !pp_clause#pp_h hc rule
+              (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
+            (* print premises recursively *)
+            List.iter (fun (c, _, _) -> Queue.add c to_print) premises
         end
       done
   end
@@ -1060,16 +722,16 @@ let pp_proof_tstp =
           already_printed := Ptset.add hc.hctag !already_printed;
           match hc.hcproof with
           | Axiom (f, ax_name) ->
-            fprintf formatter "@[<h>fof(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
+            Format.fprintf formatter "@[<h>fof(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
               num pp_clause_tstp#pp_h hc f ax_name
           | Proof (name, premises) ->
-            let premises = List.map (fun (c,_,_) -> get_num c.cref) premises in
+            let premises = List.map (fun (c,_,_) -> get_num c) premises in
             let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
             (* print the inference *)
-            fprintf formatter ("@[<h>fof(%d, plain, %a,@ " ^^
-                               "@[<h>inference('%s', [status(%s)], @[<h>[%a, theory(equality)]@])@]).@]@;")
+            Format.fprintf formatter ("@[<h>fof(%d, plain, %a,@ " ^^
+              "@[<h>inference('%s', [status(%s)], @[<h>[%a, theory(equality)]@])@]).@]@;")
               num pp_clause_tstp#pp_h hc name status
-              (Utils.pp_list ~sep:"," pp_print_int) (List.map snd premises);
+              (Utils.pp_list ~sep:"," Format.pp_print_int) (List.map snd premises);
             (* print every premise *)
             List.iter (fun (hc,num) -> Queue.add (hc, num) to_print) premises
         end
@@ -1082,4 +744,4 @@ let pp_proof = ref pp_proof_debug
 let pp_set formatter set =
   let clauses = CSet.to_list set in
   (* print as a list of clauses *)
-  fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) clauses
+  Format.fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) clauses

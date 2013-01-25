@@ -28,56 +28,24 @@ val stat_mk_hclause : statistics
 val stat_new_clause : statistics
 
 (* ----------------------------------------------------------------------
- * literals
+ * boolean flags
  * ---------------------------------------------------------------------- *)
 
-(** left and right position in equation *)
-val left_pos : int
-val right_pos : int
-val opposite_pos : int -> int
+val flag_ground : int                             (** clause is ground *)
+val flag_redundant : int                          (** clause is now redundant *)
+val flag_transient : int                          (** clause must not be in the proof state *)
 
-val eq_literal : literal -> literal -> bool         (** equality of literals *)
-val eq_literal_com : literal -> literal -> bool     (** commutative equality of lits *)
-val compare_literal : literal -> literal -> int     (** lexicographic comparison of literals *)
-val compare_lits_partial : ord:ordering -> literal
-                          -> literal -> comparison  (** partial comparison of literals *)
-val hash_literal : literal -> int                   (** hashing of literal *)
-val weight_literal : literal -> int                 (** weight of the lit *)
-
-val pos_lit : literal -> bool                       (** is the literal positive? *)
-val neg_lit : literal -> bool                       (** is the literal negative? *)
-val equational_lit : literal -> bool                (** is the literal a proper equation? *)
-val orientation_lit : literal -> comparison         (** get the orientation of the literal *)
-
-(** build literals. If sides so not have the same sort,
-    a SortError will be raised. An ordering must be provided *)
-val mk_eq : ord:ordering -> term -> term -> literal
-val mk_neq : ord:ordering -> term -> term -> literal
-val mk_lit : ord:ordering -> term -> term -> bool -> literal
-val reord_lit : ord:ordering -> literal -> literal  (** recompute order *)
-val lit_of_fof : ord:ordering -> literal -> literal (** translate eq/not to literal *)
-val term_of_lit : literal -> term                 (** translate lit to term *)
-
-val apply_subst_lit : ?recursive:bool -> ord:ordering -> substitution -> literal -> literal
-
-val negate_lit : literal -> literal (** negate literal *)
-val fmap_lit : ord:ordering -> (term -> term) -> literal -> literal (** fmap in literal *)
-val vars_of_lit : literal -> varlist (** gather variables *)
-
-val lit_to_multiset : literal -> term list (** literal to multiset of terms *)
+val set_flag : int -> hclause -> bool -> unit     (** set boolean flag *)
+val get_flag : int -> hclause -> bool             (** get value of boolean flag *)
 
 (* ----------------------------------------------------------------------
  * clauses
  * ---------------------------------------------------------------------- *)
 
-val eq_clause : clause -> clause -> bool          (** equality of clauses (as lists of literals) *)
-val compare_clause : clause -> clause -> int      (** lexico order on literals of the clauses *)
-val hash_clause : clause -> int                   (** hash of the clause *)
+val eq_hclause : hclause -> hclause -> bool       (** equality of clauses *)
+val compare_hclause : hclause -> hclause -> int   (** simple order on clauses (by ID) *)
 
-val eq_hclause : hclause -> hclause -> bool       (** equality of hashconsed clauses *)
-val compare_hclause : hclause -> hclause -> int   (** simple order on hclauses (by ID) *)
-val hash_hclause : hclause -> int
-val stats : unit -> (int*int*int*int*int*int)     (** hashconsing stats *)
+module CHashtbl : Hashtbl.S with type key = clause
 
 module CHashSet : 
   sig
@@ -90,59 +58,63 @@ module CHashSet :
     val to_list : t -> hclause list
   end
 
-val mk_hclause : ord:ordering -> literal list -> proof -> hclause list -> hclause
+val mk_hclause : ?selected:Bitvector.t -> ctx:context -> literal list -> proof -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
-val mk_hclause_a : ord:ordering -> literal array -> proof -> hclause list -> hclause
+val mk_hclause_a : ?selected:Bitvector.t -> ctx:context -> literal array -> proof -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
 
-val mk_hclause_raw : selected:int -> maxlits:int -> selected_done:bool ->
-                     literal array -> proof -> hclause list -> hclause
-  (** Build a hclause with already computed max literals and selected literals.
-      No check is (nor can) be performed. *)
+val is_child_of : child:hclause -> hclause -> unit
+  (** [is_child_of ~child c] is to be called to remember that [child] is a child
+      of [c], is has been infered/simplified from [c] *)
 
-val clause_of_fof : ord:ordering -> hclause -> hclause
+val descendants : hclause -> int array
+  (** set of ID of descendants of the clause *)
+
+val clause_of_fof : hclause -> hclause
   (** transform eq/not to literals *)
 
-val reord_hclause : ord:ordering -> hclause -> hclause
-  (** recompute order of literals in the clause *)
+val update_ctx : ctx:context -> hclause -> hclause
+  (** Change the context of the clause *)
 
 val check_ord_hclause : ord:ordering -> hclause -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val select_clause : select:selection_fun -> hclause -> hclause
-  (** select literals in clause, and computes ordering data *)
-
-val descendants : hclause -> Ptset.t
-  (** set of ID of descendants of the clause *)
-
-val is_maxlit : hclause -> int -> bool
-  (** i-th literal maximal in clause? *)
-
-val check_maximal_lit : ord:ordering -> clause -> int
-                    -> substitution -> bool
-  (** is the i-th literal maximal in subst(clause)? *)
-
-val maxlits : clause -> (literal * int) list
-  (** get the list of maximal literals *)
-
-val apply_subst_cl : ?recursive:bool -> ord:ordering -> substitution -> hclause -> hclause
+val apply_subst : ?recursive:bool -> substitution -> hclause -> hclause
   (** apply substitution to the clause *)
 
-val get_lit : clause -> int -> literal
-  (** get the literal at given index *)
+val pos_lits : literal array -> Bitvector.t
+  (** bitvector of literals that are positive *)
 
-val get_pos : clause -> position -> term
-  (** get the subterm at position (TODO also with compact positions?) *)
+val neg_lits : literal array -> Bitvector.t
+  (** bitvector of literals that are negative *)
 
-val fresh_clause : ord:ordering -> int -> hclause -> clause
-  (** rename a clause w.r.t. maxvar (all variables inside will be > maxvar) *)
+val maxlits : clause -> substitution -> Bitvector.t
+  (** Bitvector that indicates which of the literals of [subst(clause)]
+      are maximal under [ord] *)
 
-val base_clause : hclause -> clause
-  (** create a clause from a hclause, without renaming *)
+val is_maxlit : clause -> substitution -> int -> bool
+  (** Is the i-th literal maximal in subst(clause)? Equivalent to
+      Bitvector.get (maxlits ~ord c subst) i *)
+
+val eligible_res : clause -> substitution -> Bitvector.t
+  (** Bitvector that indicates which of the literals of [subst(clause)]
+      are eligible for resolution. *)
+
+val eligible_param : clause -> substitution -> Bitvector.t
+  (** Bitvector that indicates which of the literals of [subst(clause)]
+      are eligible for paramodulation. *)
+
+val fresh_clause : int -> hclause -> clause
+  (** [fresh_clause ~ord offset c] renames [c] w.r.t. [offset]
+      (all variables inside will be > maxvar). This preserves the
+      selected literals, and the proof. *)
+
+val normalize : clause -> clause
+  (** Normalize clause by renaming variables from 0 *)
 
 val has_selected_lits : hclause -> bool
   (** does the clause have some selected literals? *)
@@ -153,12 +125,6 @@ val is_selected : hclause -> int -> bool
 val selected_lits : clause -> (literal * int) list
   (** get the list of selected literals *)
 
-val eligible_res : ord:ordering -> clause -> int -> substitution -> bool
-  (** check whether a literal is eligible for resolution *)
-
-val eligible_param : ord:ordering -> clause -> int -> substitution -> bool
-  (** check whether a literal is eligible for paramodulation *)
-
 val is_unit_clause : hclause -> bool
   (** is the clause a unit clause? *)
 
@@ -168,14 +134,11 @@ val is_cnf : hclause -> bool
 val signature : hclause list -> signature
   (** Compute signature of this set of clauses *)
 
-val from_simple : ord:ordering -> Simple.sourced_formula -> hclause
+val from_simple : ctx:context -> Simple.sourced_formula -> hclause
   (** conversion to a clause. *)
 
-val to_simple : hclause -> Simple.formula
-  (** convert to a formula, losing the source information *)
-
 (* ----------------------------------------------------------------------
- * set of hashconsed clauses
+ * set of clauses, reachable by ID
  * ---------------------------------------------------------------------- *)
 
 (** Simple set *)
@@ -208,9 +171,6 @@ module CSet :
 
     val add_list : t -> hclause list -> t
       (** add several clauses to the set *)
-
-    val add_clause : t -> clause -> t
-      (** add the hclause of this clause to the set *)
 
     val remove_id : t -> int -> t
       (** remove clause by ID *)
@@ -280,26 +240,6 @@ val is_pos_eq : hclause -> (term * term) option
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
-open Format
-
-val string_of_comparison : comparison -> string
-val string_of_pos : int -> string
-
-(** pretty printer for literals *)
-class type pprinter_literal =
-  object
-    method pp : Format.formatter -> literal -> unit     (** print literal *)
-  end
-
-val pp_literal : pprinter_literal                       (** use current term printer *)
-val pp_literal_debug :                                  (** use debug unicode syntax *)
-  < pp : Format.formatter -> literal -> unit;
-    ord : bool -> unit;                                 (** print orientation of lit *)
-  >
-val pp_literal_tstp : pprinter_literal                  (** use TSTP syntax *)
-
-val pp_pos : formatter -> position -> unit
-
 (** pretty printer for clauses *)
 class type pprinter_clause =
   object
@@ -311,8 +251,6 @@ class type pprinter_clause =
     method pp_pos_subst : Format.formatter -> (clause * position * substitution) -> unit
     method horizontal : bool -> unit                    (** print in horizontal box? *)
   end
-
-val pp_lits : Format.formatter -> literal array -> unit
 
 val pp_clause : pprinter_clause ref                     (** uses current term printer *)
 val pp_clause_tstp : pprinter_clause                    (** TSTP syntax *)
