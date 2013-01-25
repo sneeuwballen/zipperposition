@@ -38,7 +38,7 @@ let occurs_check subst v o_v t o_t =
       else match t.term with
       | Var _ when v == t && o_v = o_t -> true
       | Var _ ->  (* if [t] is a var bound by [subst], check in its image *) 
-        (try let (t', o_t') = S.lookup subst (v, o_v) in
+        (try let (t', o_t') = S.lookup subst (t, o_t) in
               check v o_v t' o_t'
         with Not_found -> false)
       | BoundVar _ -> false
@@ -50,21 +50,14 @@ let occurs_check subst v o_v t o_t =
   in
   check v o_v t o_t
 
-(** Recursively lookup a variable in the substitution, until we get a value
-    that is not a variable or that is not bound *)
-let rec get_var subst (v, o_v) =
-  try let (t, o_t) = S.lookup subst (v, o_v) in
-      if T.is_var t then get_var subst (t, o_t) else t, o_t
-  with Not_found -> v, o_v
-
 (** Unify terms, returns a substitution or raises UnificationFailure *)
 let unification subst (a, o_a) (b, o_b) =
   Utils.enter_prof prof_unification;
   (* recursive unification *)
   let rec unif subst s o_s t o_t =
-    (if s.sort <> t.sort then assert false);
-    let s, o_s = get_var subst (s, o_s)
-    and t, o_t = get_var subst (t, o_t) in
+    (if s.sort <> t.sort then raise UnificationFailure);
+    let s, o_s = S.get_var subst (s, o_s)
+    and t, o_t = S.get_var subst (t, o_t) in
     match s.term, t.term with
     | _ when s == t && (T.is_ground_term s || o_s = o_t) ->
       subst (* the terms are equal under any substitution *)
@@ -94,6 +87,8 @@ let unification subst (a, o_a) (b, o_b) =
   (* try unification, and return solution/exception (with profiler handling) *)
   try
     let subst = unif subst a o_a b o_b in
+    Utils.debug 3 (lazy (Utils.sprintf "unify @[<h>%a and %a@] yields %a"
+                  !T.pp_term#pp a !T.pp_term#pp b S.pp_substitution subst));
     Utils.exit_prof prof_unification;
     subst
   with UnificationFailure as e ->
@@ -105,8 +100,8 @@ let matching subst (a, o_a) (b, o_b) =
   Utils.enter_prof prof_matching;
   (* recursive matching *)
   let rec unif subst s o_s t o_t =
-    (if s.sort <> t.sort then assert false);
-    let s, o_s = get_var subst (s, o_s) in
+    (if s.sort <> t.sort then raise UnificationFailure);
+    let s, o_s = S.get_var subst (s, o_s) in
     match s.term, t.term with
     | _ when s == t && (T.is_ground_term s || o_s = o_t) ->
       subst (* the terms are equal under any substitution *)
@@ -134,6 +129,8 @@ let matching subst (a, o_a) (b, o_b) =
   (* try matching, and return solution/exception (with profiler handling) *)
   try
     let subst = unif subst a o_a b o_b in
+    Utils.debug 3 (lazy (Utils.sprintf "match @[<h>%a and %a@] yields %a"
+                  !T.pp_term#pp a !T.pp_term#pp b S.pp_substitution subst));
     Utils.exit_prof prof_matching;
     subst
   with UnificationFailure as e ->

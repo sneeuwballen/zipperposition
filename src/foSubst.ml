@@ -50,23 +50,28 @@ let rec lookup subst ((var,offset) as bind_var) = match subst with
   | SubstBind (v, o_v, t, o_t, subst') ->
     if v == var && o_v = offset then (t, o_t) else lookup subst' bind_var
 
+(** Recursively lookup a variable in the substitution, until we get a value
+    that is not a variable or that is not bound *)
+let rec get_var subst (v, o_v) =
+  try let (t, o_t) = lookup subst (v, o_v) in
+      if T.is_var t && t != v then get_var subst (t, o_t) else t, o_t
+  with Not_found -> v, o_v
+
 (** check whether the variable is bound by the substitution *)
 let is_in_subst subst bind_var =
   try ignore (lookup subst bind_var); true
   with Not_found -> false
 
 (** Add v -> t to the substitution. Both terms have a context. Raise
-    Invalid_argument if v is already bound in the same context. *)
-let bind subst ((v, o_v) as var_bind) (t, o_t) =
-  assert (v.sort = t.sort);
-  if v == t && o_v = o_t
-    then subst (* bind a variable to itself *)
-    else try
-      let (t', o_t') = lookup subst var_bind in
-      if (t != t' || o_t <> o_t')
-        then raise (Invalid_argument "Subst.bind: inconsistent binding")
-        else subst  (* already bound correctly *)
-    with Not_found -> SubstBind (v, o_v, t, o_t, subst)  (* add binding at front *)
+    Invalid_argument if v is already bound in the same context, to another term. *)
+let bind ?(recursive=true) subst ((v, _) as var_bind) (t, o_t) =
+  assert (v.sort == t.sort && T.is_var v);
+  let (t', o_t') = if recursive then get_var subst var_bind else var_bind in
+  if t' == t && o_t' = o_t
+    then subst (* compatible (absence of) bindings *)
+    else if T.is_var t'
+      then SubstBind (t', o_t', t, o_t, subst)  (* add binding at front *)
+      else raise (Invalid_argument "Subst.bind: inconsistent binding")
 
 (** Apply substitution to term, replacing variables by the terms they are bound to.
     The offset (term bind) is applied to variables that are not bound by subst.
@@ -84,7 +89,7 @@ let apply_subst ?(recursive=true) subst (t, offset) =
       T.mk_node s t.sort l'
     | Var i ->
       (try let bound_t' = lookup subst bound_t in
-           if recursive
+           if recursive && (fst bound_t' != t || snd bound_t' <> offset)
             then (* replace also in the image of t *)
               replace subst bound_t'
             else (* return image, in which variables are shifted *)
@@ -146,9 +151,9 @@ let pp_substitution formatter subst =
   let rec pp subst = match subst with
   | SubstEmpty -> ()
   | SubstBind (v, o_v, t, o_t, subst') ->
-    (if not (is_last subst) then Format.fprintf formatter ", ");
     Format.fprintf formatter "%a[%d] → %a[%d]"
       !T.pp_term#pp v o_v !T.pp_term#pp t o_t;
+    (if not (is_last subst) then Format.fprintf formatter ", ");
     pp subst'
   in
   Format.fprintf formatter "@[{";

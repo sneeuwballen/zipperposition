@@ -37,12 +37,16 @@ val compare_substs: substitution -> substitution -> int
 val lookup : substitution -> term bind -> term bind
   (** Lookup variable in substitution. Raise Not_found if not present. *)
 
+val get_var : substitution -> term bind -> term bind
+  (** Lookup recursively the var in the substitution, until it is not a
+      variable anymore, or it is not bound *)
+
 val is_in_subst : substitution -> term bind -> bool
   (** Check whether the variable is bound by the substitution *)
 
-val bind : substitution -> term bind -> term bind -> substitution
+val bind : ?recursive:bool -> substitution -> term bind -> term bind -> substitution
   (** Add v -> t to the substitution. Both terms have a context. Raise
-      Invalid_argument if v is already bound in the same context. *)
+      Invalid_argument if v is already bound in the same context, to another term. *)
 
 val apply_subst : ?recursive:bool -> substitution -> term bind -> term
   (** Apply substitution to term, replacing variables by the terms they are bound to.

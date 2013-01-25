@@ -149,12 +149,12 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   (* Renaming subst *)
   let subst, _ = List.fold_left
     (fun (subst, i) var ->
-      (S.bind subst (var, 0) (T.mk_var i var.sort, 0), i+1))
+      (S.bind ~recursive:false subst (var, 0) (T.mk_var i var.sort, 0), i+1))
     (S.id_subst, 0) all_vars
   in
   (* Normalize literals *)
   let lits = Lits.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
-  let all_vars = List.map (fun v -> S.apply_subst subst (v, 0)) all_vars in
+  let all_vars = vars_of_lits lits in
   (* create the structure *)
   let hc = {
     hclits = lits;
