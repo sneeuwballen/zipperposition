@@ -171,7 +171,7 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
   | _, Node (s, [a; b]) when s = eq_symbol && T.eq_term l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)
   (* default is just reordering *)
-  | _ -> reord_lit ~ord lit
+  | _ -> reord ~ord lit
 
 let term_of_lit lit =
   match lit with
@@ -207,17 +207,86 @@ let vars lit =
 let eq_lits lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then true else
-    eq_literal lits1.(i) lits2.(i) && check (i+1)
+    eq lits1.(i) lits2.(i) && check (i+1)
   in
   if Array.length lits1 <> Array.length lits2
     then false
     else check 0
 
+let compare_lits lits1 lits2 = 
+  let rec check i =
+    if i = Array.length lits1 then 0 else
+      let cmp = compare lits1.(i) lits2.(i) in
+      if cmp = 0 then check (i+1) else cmp
+  in
+  if Array.length lits1 <> Array.length lits2
+    then Array.length lits1 - Array.length lits2
+    else check 0
+
 let hash_lits lits =
-  let hash = ref (Hash.initial_hash (Array.length lits * 4)) in
+  let h = ref (Hash.initial_hash (Array.length lits * 4)) in
   for i = 0 to Array.length lits - 1 do
-    let j = hash_literal lits.(i) in
-    hash := Hash.hash_4bytes !hash j;
+    let j = hash lits.(i) in
+    h := Hash.hash_4bytes !h j;
   done;
-  let hash = Hash.finish_hash !hash in
-  abs hash
+  let h = Hash.finish_hash !h in
+  abs h
+
+let ground_lits lits =
+  let rec check i = if i = Array.length lits then true
+    else match lits.(i) with
+    | Equation (l, r, _, _) ->
+      T.is_ground_term l && T.is_ground_term r && check (i+1)
+  in check 0
+
+(** pretty printer for literals *)
+class type pprinter_literal =
+  object
+    method pp : Format.formatter -> literal -> unit     (** print literal *)
+  end
+
+let pp_literal_gen pp_term formatter lit =
+  match lit with
+  | Equation (l, r, sign, _) when T.eq_term r T.true_term ->
+    if sign
+      then pp_term#pp formatter l
+      else Format.fprintf formatter "¬%a" pp_term#pp l
+  | Equation (l, r, sign, _) when T.eq_term l T.true_term ->
+    if sign
+      then pp_term#pp formatter r
+      else Format.fprintf formatter "¬%a" pp_term#pp r
+  | Equation (l, r, sign, _) when l.sort == bool_sort ->
+    if sign
+      then Format.fprintf formatter "%a <=> %a" pp_term#pp l pp_term#pp r
+      else Format.fprintf formatter "%a <~> %a" pp_term#pp l pp_term#pp r
+  | Equation (l, r, sign, _) ->
+    if sign
+      then Format.fprintf formatter "%a = %a" pp_term#pp l pp_term#pp r
+      else Format.fprintf formatter "%a != %a" pp_term#pp l pp_term#pp r
+
+let pp_literal_debug =
+  let print_ord = ref false in
+  object
+    method pp formatter ((Equation (_,_,_,ord)) as lit) =
+      pp_literal_gen T.pp_term_debug formatter lit;
+      if !print_ord
+        then Format.fprintf formatter "(%s)" (string_of_comparison ord)
+        else ()
+
+    method ord b = print_ord := b
+  end
+
+let pp_literal_tstp =
+  object
+    method pp formatter lit = pp_literal_gen T.pp_term_tstp formatter lit
+  end
+
+let pp_literal =
+  object
+    method pp formatter lit = pp_literal_gen !T.pp_term formatter lit
+  end
+
+let pp_lits formatter lits = 
+  Utils.pp_arrayi ~sep:" | "
+    (fun formatter i lit -> Format.fprintf formatter "%a" pp_literal_debug#pp lit)
+    formatter lits
