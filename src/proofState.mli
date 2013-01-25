@@ -41,7 +41,6 @@ type active_set =
 
     add : hclause list -> unit;         (** add clauses *)
     remove : hclause list -> unit;      (** remove clauses *)
-    relocate : hclause -> clause;       (** rename clause to avoid var collisions with set *)
   >
 
 (** set of simplifying (unit) clauses *)
@@ -51,7 +50,6 @@ type simpl_set =
 
     add : hclause list -> unit;
     remove : hclause list -> unit;
-    relocate : hclause -> clause;
   >
 
 (** set of passive clauses *)

@@ -35,7 +35,6 @@ val infer_equality_factoring: Calculus.unary_inf_rule
 
 val infer_split : Calculus.unary_inf_rule   (** hyper-splitting *)
 
-(* TODO splitting without renaming *)
 (* TODO branch rewriting *)
 
 (** simplifications *)
@@ -64,7 +63,8 @@ val negative_simplify_reflect : ProofState.simpl_set -> clause -> hclause
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : literal array -> literal array -> bool
-val subsumes_with : literal array -> literal array -> substitution option   (** returns subsuming subst *)
+val subsumes_with : literal array -> literal array ->
+                    substitution option   (** returns subsuming subst *)
 
 (** equality subsumption *)
 val eq_subsumes : literal array -> literal array -> bool

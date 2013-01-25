@@ -212,7 +212,6 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
     then (state#active_set#add [hc]; Unsat hc)
     else begin
       assert (not (is_redundant ~calculus state#active_set hc));
-      let hc = C.normalize hc in
       (* process the given clause! *)
       incr_stat stat_processed_given;
       C.check_ord_hclause ~ord hc;
@@ -262,7 +261,6 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
                 "    inferred new clause @[<hov 3>%a@]" !C.pp_clause#pp_h new_c)))
         new_clauses;
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
-      let new_clauses = List.map C.normalize new_clauses in
       state#passive_set#add new_clauses;
       (* test whether the empty clause has been found *)
       try

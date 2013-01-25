@@ -82,9 +82,7 @@ class type calculus =
   end
 
 (** do binary inferences that involve the given clause *)
-let do_binary_inferences active_set rules hc =
-  (* relocate clause *)
-  let c = active_set#relocate hc in
+let do_binary_inferences active_set rules c =
   Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active set: %a"
                        C.pp_set active_set#clauses));
   (* apply every inference rule *)

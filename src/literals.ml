@@ -230,6 +230,13 @@ let hash_lits lits =
   let h = Hash.finish_hash !h in
   abs h
 
+let vars_lits lits =
+  let set = T.THashSet.create () in
+  for i = 0 to Array.length lits - 1 do
+    add_vars set lits.(i);
+  done;
+  T.THashSet.to_list set
+
 let ground_lits lits =
   let rec check i = if i = Array.length lits then true
     else match lits.(i) with
@@ -240,6 +247,11 @@ let ground_lits lits =
 (** Apply the substitution to the array of literals, with offset *)
 let apply_subst_lits ?(recursive=true) ~ord subst (lits,offset) =
   Array.map
+    (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
+    lits
+
+let apply_subst_list ?(recursive=true) ~ord subst (lits, offset) =
+  List.map
     (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
     lits
 

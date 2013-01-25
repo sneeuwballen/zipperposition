@@ -257,15 +257,9 @@ let delayed : calculus =
     method basic_simplify hc = Sup.basic_simplify (Cnf.simplify hc)
 
     method rw_simplify (simpl : PS.simpl_set) hc =
-      (* rename for demodulation *)
-      let c = simpl#relocate hc in
-      let hc = Sup.basic_simplify (Sup.demodulate simpl c) in
-      (* rename for simplify reflect *)
-      let c = simpl#relocate hc in
-      let hc = Sup.positive_simplify_reflect simpl c in
-      (* rename for simplify reflect *)
-      let c =  simpl#relocate hc in
-      let hc = Sup.negative_simplify_reflect simpl c in
+      let hc = Sup.basic_simplify (Sup.demodulate simpl hc) in
+      let hc = Sup.positive_simplify_reflect simpl hc in
+      let hc = Sup.negative_simplify_reflect simpl hc in
       hc
 
     method active_simplify actives hc =
@@ -277,16 +271,13 @@ let delayed : calculus =
 
     method backward_simplify actives hc =
       let set = C.CSet.empty in
-      let c = actives#relocate hc in
-      Sup.backward_demodulate actives set c
+      Sup.backward_demodulate actives set hc
 
     method redundant actives hc =
-      let c = actives#relocate hc in
-      Sup.subsumed_by_set actives c
+      Sup.subsumed_by_set actives hc
 
     method backward_redundant actives hc =
-      let c = actives#relocate hc in
-      Sup.subsumed_in_set actives c
+      Sup.subsumed_in_set actives hc
 
     (* use elimination rules as simplifications rather than inferences, here *)
     method list_simplify hc =

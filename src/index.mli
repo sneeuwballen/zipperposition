@@ -48,12 +48,9 @@ class type index =
     method iter : (term -> ClauseSet.t -> unit) -> unit
     method fold : 'a. ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
 
-    method retrieve_unifiables : 'a. term -> 'a ->
-                                 ('a -> term -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_generalizations : 'a. term -> 'a ->
-                                      ('a -> term -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_specializations : 'a. term -> 'a ->
-                                      ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_unifiables : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_generalizations : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    method retrieve_specializations : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
 
     method pp : all_clauses:bool -> Format.formatter -> unit -> unit
   end
@@ -68,8 +65,8 @@ class type unit_index =
     method remove_clause : hclause -> 'b
     method add : term -> term -> bool -> hclause -> 'b
     method remove : term -> term -> bool -> hclause ->'b
-    method retrieve : sign:bool -> term ->
-                      (term -> term -> substitution -> hclause -> unit) ->
+    method retrieve : sign:bool -> int -> term bind ->
+                      (term bind -> term bind -> substitution -> hclause -> unit) ->
                       unit        (** iter on (in)equations of given sign l=r
                                       where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit

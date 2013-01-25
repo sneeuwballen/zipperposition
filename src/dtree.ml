@@ -44,12 +44,12 @@ type character = Symbol of symbol | BoundVariable of int * sort | Variable of te
 let compare_char c1 c2 =
   (* compare variables by index *)
   let compare_vars v1 v2 = match v1.term, v2.term with
-    | Var i, Var j -> i - j
+    | Var i, Var j -> if i <> j then i - j else compare_symbols v1.sort v2.sort
     | _ -> assert false
   in
   match c1, c2 with
   | Symbol s1, Symbol s2 -> Symbols.compare_symbols s1 s2
-  | BoundVariable (i, si), BoundVariable (j, sj) when i = j -> Symbols.compare_symbols si sj
+  | BoundVariable (i, si), BoundVariable (j, sj) when i = j -> compare_symbols si sj
   | BoundVariable (i, _), BoundVariable (j, _) -> i - j
   | Variable v1, Variable v2 -> compare_vars v1 v2
   (* symbol < bound_variable < variable *)
@@ -185,16 +185,12 @@ let min_var dt = max dt.min_var 0
 let max_var dt = max dt.max_var 0
 
 (** iterate on all (term -> value) such that subst(term) = input_term *)
-let iter_match dt t k =
-  (* variable collision check *)
-  assert (T.is_ground_term t ||
-          T.max_var (T.vars t) < dt.min_var ||
-          T.min_var (T.vars t) > dt.max_var);
+let iter_match (dt, o_dt) (t, o_t) k =
   (* recursive traversal of the trie, following paths compatible with t *)
   let rec traverse trie pos subst =
     match trie with
     | TrieLeaf l ->  (* yield all answers *)
-      List.iter (fun (t', v, _) -> k t' v subst) l
+      List.iter (fun (t', v, _) -> k (t', o_dt) v subst) l
     | TrieNode m ->
       (* "lazy" transformation to flatterm *)
       let t_pos = T.at_cpos t pos in
@@ -202,27 +198,24 @@ let iter_match dt t k =
       CharMap.iter
         (fun t1' subtrie ->
           (* explore branch that has the same symbol, if any *)
-          (if eq_char t1' t1 then (assert (match t1 with Variable _ -> false | _ -> true);
-                                   traverse subtrie (next t pos) subst));
+          (if eq_char t1' t1 && not (T.is_var t_pos) then
+            traverse subtrie (next t pos) subst);
           (* if variable, try to bind it and continue *)
           (match t1' with
-           | Variable v1' when v1'.sort = t_pos.sort && S.is_in_subst v1' subst ->
+           | Variable v1' when v1'.sort == t_pos.sort && S.is_in_subst subst (v1', o_dt) ->
              (* already bound, check consistency *)
-             let t_matched = T.expand_bindings t_pos
-             and t_bound = T.expand_bindings v1'.binding in
-             if T.eq_term t_matched t_bound
-               then traverse subtrie (skip t pos) subst  (* skip term *)
+             let t_matched = S.apply_subst subst (t_pos, o_t) in
+             let t_bound = S.apply_subst subst (v1', o_dt) in
+             if t_matched == t_bound
+                then traverse subtrie (skip t pos) subst  (* skip term *)
                 else () (* incompatible bindings of the variable *)
-          | Variable v1' when v1'.sort = t_pos.sort ->
+          | Variable v1' when v1'.sort == t_pos.sort ->
             (* t1' not bound, so we bind it and continue in subtree *)
-            T.set_binding v1' (T.expand_bindings t_pos);
-            let subst' = S.update_binding subst v1' in
-            traverse subtrie (skip t pos) subst';
-            T.reset_binding v1'  (* cleanup the variable *)
+            let subst' = S.bind subst (v1', o_dt) (t_pos, o_t) in
+            traverse subtrie (skip t pos) subst'
           | _ -> ()))
         m
   in
-  T.reset_vars t;
   traverse dt.tree 0 S.id_subst
 
 (** iterate on all (term -> value) in the tree *)
@@ -232,7 +225,6 @@ let iter dt k =
     | TrieNode m -> CharMap.iter (fun _ sub_dt -> iter sub_dt) m
     | TrieLeaf l -> List.iter (fun (t, v, _) -> k t v) l
   in iter dt.tree
-  
 
 (* --------------------------------------------------------
  * pretty printing
@@ -349,10 +341,11 @@ let unit_index =
         then ({< pos = remove pos l (r, hc) >} :> 'self)
         else ({< neg = remove neg l (r, hc) >} :> 'self)
 
-    method retrieve ~sign t k =
+    method retrieve ~sign offset (t, o_t) k =
+      let handler l (r, hc) subst = k l (r, offset) subst hc in
       if sign
-        then iter_match pos t (fun l (r, hc) subst -> k l r subst hc)
-        else iter_match neg t (fun l (r, hc) subst -> k l r subst hc)
+        then iter_match (pos, offset) (t, o_t) handler
+        else iter_match (neg, offset) (t, o_t) handler
 
     method pp formatter () =
       Format.fprintf formatter "@[<hv>pos: %a@.neg:%a@]"

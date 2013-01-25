@@ -40,12 +40,13 @@ val remove : 'a dtree -> term -> 'a -> 'a dtree
   (** remove the term -> value from the tree *)
 
 val min_var : 'a dtree -> int
-  (** maximum variable in the tree (surapproximation) *)
+  (** maximum variable in the tree (surapproximation) TODO remove? *)
 
 val max_var : 'a dtree -> int
   (** minimum variable in the tree (surapproximation) *)
 
-val iter_match : 'a dtree -> term -> (term -> 'a -> substitution -> unit) -> unit
+val iter_match : 'a dtree bind -> term bind ->
+                 (term bind -> 'a -> substitution -> unit) -> unit
   (** iterate on all (term -> value) such that subst(term) = input_term *)
 
 val iter : 'a dtree -> (term -> 'a -> unit) -> unit

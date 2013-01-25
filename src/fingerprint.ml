@@ -36,7 +36,6 @@ type feature = A | B | N | S of symbol
 (** a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = term -> feature list
 
-
 (** compute a feature for a given position *)
 let rec gfpf pos t = match pos, t.term with
   | [], Var _ -> A
@@ -114,12 +113,14 @@ module FeatureMap = Map.Make(
       | _, B -> 1
       | A, _ -> -1
       | _, A -> 1
-      | S s1, S s2 -> Pervasives.compare s1 s2
+      | S s1, S s2 -> compare_symbols s1 s2
   end)
 
 (** the fingerprint trie, of constant length *)
 type feature_trie =
-  Empty | Node of feature_trie FeatureMap.t | Leaf of I.index_leaf
+  | Empty
+  | Node of feature_trie FeatureMap.t
+  | Leaf of I.index_leaf
 
 (** add t -> data to the trie *)
 let add fp trie t data =

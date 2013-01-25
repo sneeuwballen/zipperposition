@@ -33,7 +33,10 @@ module CQ = ClauseQueue
 
 let _indexes =
   let table = Hashtbl.create 2 in
+  (* TODO write a Substitution Tree, with the new substitution representation? *)
+  (* TODO enable again...
   Hashtbl.add table "discr_tree" Discrimination_tree.index;
+  *)
   Hashtbl.add table "fp" (Fingerprint.mk_index Fingerprint.fp6m);
   table
 
@@ -58,21 +61,21 @@ type active_set =
     idx_sup_into : Index.index;         (** index for superposition into the set *)
     idx_sup_from : Index.index;         (** index for superposition from the set *)
     idx_back_demod : Index.index;       (** index for backward demodulation/simplifications *)
-    idx_fv : FeatureVector.fv_index;    (** index for subsumption (TODO allow to update its features?) *)
+    idx_fv : FeatureVector.fv_index;    (** index for subsumption
+                                            (TODO allow to update its features?) *)
 
     add : hclause list -> unit;         (** add clauses *)
     remove : hclause list -> unit;      (** remove clauses *)
-    relocate : hclause -> clause;       (** rename clause to avoid var collisions with set *)
   >
 
 (** set of simplifying (unit) clauses *)
 type simpl_set =
   < ctx : context;
-    idx_simpl : Index.unit_index;       (** index for forward simplifications TODO split into pos-orientable/others *)
+    idx_simpl : Index.unit_index;       (** index for forward simplifications
+                                            TODO split into pos-orientable/others *)
 
     add : hclause list -> unit;
     remove : hclause list -> unit;
-    relocate : hclause -> clause;
   >
 
 (** set of passive clauses *)
@@ -159,12 +162,12 @@ let update_with_clauses op acc eligible ~subterms ~both_sides hcs =
 
 (** process literals that are potentially eligible for resolution *)
 let eligible_res hc =
-  let bv = C.eligible_res hc S.id_subst in
+  let bv = C.eligible_res (hc,0) S.id_subst in
   fun i lit -> BV.get bv i
 
 (** process literals that are potentially eligible for paramodulation *)
 let eligible_param hc =
-  let bv = C.eligible_param hc S.id_subst in
+  let bv = C.eligible_param (hc,0) S.id_subst in
   fun i lit -> BV.get bv i
 
 (** process all literals *)
@@ -218,10 +221,6 @@ let mk_active_set ~ctx (index : Index.index) signature =
       let op tree = tree#remove in
       self#update op hcs;
       m_fv <- FV.remove_clauses m_fv hcs
-
-    (** Avoid var collisions with clause *)
-    method relocate hc =
-      C.fresh_clause m_clauses.C.CSet.maxvar hc
   end :> active_set)
 
 (* ----------------------------------------------------------------------
@@ -240,9 +239,6 @@ let mk_simpl_set ~ctx unit_idx =
 
     method remove hcs =
       m_simpl <- List.fold_left (fun simpl hc -> simpl#remove_clause hc) m_simpl hcs
-
-    method relocate hc =
-      C.fresh_clause m_simpl#maxvar hc
   end
 
 (* ----------------------------------------------------------------------

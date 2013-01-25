@@ -39,7 +39,7 @@ let select_positives hc =
   in find_pos [] 0 hc.hclits
 
 let select_max_goal ?(strict=true) hc =
-  let maxlits = C.maxlits hc S.id_subst in
+  let maxlits = C.maxlits (hc,0) S.id_subst in
   (* find negative lits *)
   let rec find_maxneg lits i =
     if i = Array.length lits then [] else (* select nothing *)
