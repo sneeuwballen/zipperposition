@@ -42,6 +42,7 @@ let stat_subsumed_in_set_call = mk_stat "subsumed_in_set calls"
 let stat_subsumed_by_set_call = mk_stat "subsumed_by_set calls"
 let stat_demodulate_call = mk_stat "demodulate calls"
 let stat_demodulate_step = mk_stat "demodulate steps"
+let stat_splits = mk_stat "splits"
 
 let prof_demodulate = Utils.mk_profiler "demodulate"
 let prof_back_demodulate = Utils.mk_profiler "backward_demodulate"
@@ -58,6 +59,7 @@ let prof_infer_active = Utils.mk_profiler "infer_active"
 let prof_infer_passive = Utils.mk_profiler "infer_passive"
 let prof_infer_equality_resolution = Utils.mk_profiler "infer_equality_resolution"
 let prof_infer_equality_factoring = Utils.mk_profiler "infer_equality_factoring"
+let prof_split = Utils.mk_profiler "infer_split"
 
 (* ----------------------------------------------------------------------
  * combinators
@@ -324,6 +326,108 @@ let infer_equality_factoring ~ord hc =
   in
   Utils.exit_prof prof_infer_equality_factoring;
   new_clauses
+
+let split_count = ref 0
+
+(* union-find that maps terms to list of literals *)
+module UF = UnionFind.Make(
+  struct
+    type key = term
+    type value = literal list
+    let equal = (==)
+    let hash t = t.hkey
+    let zero = []
+    let merge = List.rev_append
+  end)
+
+(** Hyper-splitting *)
+let infer_split ~ord hc =
+  if Array.length hc.hclits < 4 then [] else begin
+  Utils.enter_prof prof_split;
+  (* get a fresh split symbol *)
+  let rec next_split_term () = 
+    let s = "$$split_" ^ (string_of_int !split_count) in
+    incr split_count;
+    if Symbols.is_used s
+      then next_split_term ()
+      else T.mk_const (mk_symbol ~attrs:attr_split s) bool_sort
+  in
+  (* is the term made of a split symbol? *)
+  let is_split_term t = match t.term with
+  | Node (s, []) when has_attr attr_split s -> true
+  | _ -> false
+  in
+  (* literals that are ground, or split symbols *)
+  let branch = ref [] in
+  (* maps variables to a list of literals *)
+  let cluster = UF.create hc.hcvars in
+  (* for each literal, merge the list of all variables occurring in
+     the literal *)
+  Array.iter
+    (fun lit ->
+      match C.vars_of_lit lit with
+      | [] -> ()
+      | x::vars' -> List.iter (fun y -> UF.union cluster x y) vars')
+    hc.hclits;
+  (* Divide clause into components (that do not share variables and do not contain
+     any split symbol), and a remaining (branch) part. Ground terms go in the "branch" part.
+     [components] is a list of (vars, literal list ref), *)
+  let rec find_components lits i =
+    if i = Array.length lits then () else begin
+      match lits.(i) with
+      | Equation (l, r, _, _) when ((is_split_term l && r == T.true_term)
+                                  ||(is_split_term r && l == T.true_term)) ->
+        branch := lits.(i) :: !branch;
+        find_components lits (i+1)  (* branch part *)
+      | Equation (l, r, _, _) when T.is_ground_term l && T.is_ground_term r ->
+        branch := lits.(i) :: !branch;
+        find_components lits (i+1)  (* branch part *)
+      | Equation (l, r, _, _) ->
+        (* find which component this literal belongs to *)
+        let vars = T.vars_list [l;r] in
+        assert (vars <> []);
+        let x = List.hd vars in
+        (* Add lit to the list of lits for the given variable. All variables
+           of the lit have the same representative in components. *)
+        UF.add cluster x [lits.(i)];
+        find_components lits (i+1)
+    end
+  in
+  find_components hc.hclits 0;
+  let components = ref [] in
+  UF.iter cluster (fun _ l ->
+    Utils.debug 4 (lazy (Utils.sprintf "component @[<h>%a@]"
+                   (Utils.pp_list C.pp_literal#pp) l));
+    components := l :: !components);
+  let n = List.length !components in
+  if n > 1 && List.for_all (fun l -> List.length l >= 2) !components then begin
+    (* Do the split. But only because we have several components, that contain several
+       literals each. *)
+    incr_stat stat_splits;
+    (* create a list of symbols *)
+    let symbols = Utils.times n next_split_term in
+    let proof = Proof ("split", [C.base_clause hc, [], S.id_subst]) in
+    (* the guard clause, with all negated branches *)
+    let guard =
+      let lits = List.map (C.mk_neq ~ord T.true_term) symbols @ !branch in
+      C.mk_hclause ~ord lits proof [hc]
+    in
+    (* one new clause per component *)
+    let new_clauses = List.map2
+      (fun component split_symbol ->
+        let split_lit = C.mk_eq ~ord split_symbol T.true_term in
+        let lits = split_lit :: (component @ !branch) in
+        C.mk_hclause ~ord lits proof [hc])
+      !components symbols
+    in
+    let new_clauses = guard :: new_clauses in
+    Utils.debug 3 (lazy (Utils.sprintf
+                  "split on @[<h>%a@] yields @[<h>%a@]"
+                  !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) new_clauses));
+    Utils.exit_prof prof_split;
+    new_clauses
+  end else (Utils.exit_prof prof_split; [])
+  end
 
 (* ----------------------------------------------------------------------
  * simplifications
@@ -1140,7 +1244,7 @@ let superposition : Calculus.calculus =
 
     method axioms = []
 
-    method constr _ = [Precedence.min_constraint [false_symbol; true_symbol]]
+    method constr _ = [Precedence.min_constraint [split_symbol; false_symbol; true_symbol]]
 
     method preprocess ~ord ~select l =
       List.fold_left

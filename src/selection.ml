@@ -18,7 +18,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Selection functions *)
+(** Selection functions. Note for splitting: SelectComplex already selects
+    in priority "big" negative literals, ie literals that are not split symbols. *)
 
 open Types
 

@@ -25,13 +25,15 @@ open Types
 val all_positions : position -> term ->  (* combinator *)
                     (term -> position -> 'b list) -> 'b list
 
-val infer_active: Calculus.binary_inf_rule (** superposition where given clause is active *)
+val infer_active: Calculus.binary_inf_rule  (** superposition where given clause is active *)
 
-val infer_passive: Calculus.binary_inf_rule(** superposition where given clause is passive *)
+val infer_passive: Calculus.binary_inf_rule (** superposition where given clause is passive *)
 
 val infer_equality_resolution: Calculus.unary_inf_rule
 
 val infer_equality_factoring: Calculus.unary_inf_rule
+
+val infer_split : Calculus.unary_inf_rule   (** hyper-splitting *)
 
 (* TODO splitting without renaming *)
 (* TODO branch rewriting *)
