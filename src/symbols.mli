@@ -84,6 +84,7 @@ val and_symbol : symbol
 val or_symbol : symbol
 
 val db_symbol : symbol  (** pseudo symbol kept for locating bound vars in precedence *)
+val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
 
 (* sorts *)
 val bool_sort : sort

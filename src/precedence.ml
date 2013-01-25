@@ -206,8 +206,14 @@ let mk_precedence ?(complete=true) constrs symbols =
         new_len - old_len
       end else 0
 
-    (** To compare symbols, compare their index in the decreasing precedence *)
-    method compare a b = SHashtbl.find m_table b - SHashtbl.find m_table a
+    (** To compare symbols, compare their index in the decreasing precedence. Symbols that
+        are split symbols are compared to other symbols like "split_symbol". *)
+    method compare a b =
+      match a, b with
+      | _ when has_attr attr_split a && has_attr attr_split b -> Symbols.compare_symbols a b
+      | _ when has_attr attr_split a -> SHashtbl.find m_table b - SHashtbl.find m_table split_symbol
+      | _ when has_attr attr_split b -> SHashtbl.find m_table split_symbol - SHashtbl.find m_table a
+      | _ -> SHashtbl.find m_table b - SHashtbl.find m_table a
 
     method weight s = m_weight s
 

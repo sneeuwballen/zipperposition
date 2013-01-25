@@ -104,6 +104,9 @@ let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac) "$$or"
 (** pseudo symbol kept for locating bound vars in precedence *)
 let db_symbol = mk_symbol "$$db_magic_cookie"
 
+(** pseudo symbol for locating split symbols in precedence *)
+let split_symbol = mk_symbol "$$split_magic_cookie"
+
 (* default sorts *)
 let type_sort = mk_symbol "$tType"
 let bool_sort = mk_symbol "$o"
@@ -121,6 +124,7 @@ let table =
    and_symbol, bool_sort, 2;
    or_symbol, bool_sort, 2;
    db_symbol, univ_sort, 0;
+   split_symbol, bool_sort, 0;
    ]
 
 (** default signature, containing predefined symbols with their arities and sorts *)
