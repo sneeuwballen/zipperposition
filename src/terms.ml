@@ -85,6 +85,7 @@ module THashSet =
   struct
     type t = unit THashtbl.t
     let create () = THashtbl.create 3
+    let cardinal t = THashtbl.length t
     let member t term = THashtbl.mem t term
     let iter set f = THashtbl.iter (fun t () -> f t) set
     let add set t = THashtbl.replace set t ()
@@ -545,6 +546,7 @@ let pp_symbol_unicode =
       | _ when s == or_symbol -> Format.pp_print_string formatter "•|"
       | _ when s == imply_symbol -> Format.pp_print_string formatter "•→"
       | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
+      | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
     method infix s = s == or_symbol || s == eq_symbol || s == and_symbol || s == imply_symbol
   end
@@ -561,6 +563,7 @@ let pp_symbol_tstp =
       | _ when s == or_symbol -> Format.pp_print_string formatter "|"
       | _ when s == imply_symbol -> Format.pp_print_string formatter "=>"
       | _ when s == db_symbol -> failwith "no DB symbols in TSTP"
+      | _ when s == split_symbol -> failwith "split_symbol is not supposed to be printed outside precedence"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
     method infix s = s == or_symbol || s == eq_symbol || s == and_symbol || s == imply_symbol
   end

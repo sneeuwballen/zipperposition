@@ -41,6 +41,7 @@ module THashSet :
   sig
     type t
     val create : unit -> t
+    val cardinal : t -> int
     val member : t -> term -> bool
     val iter : t -> (term -> unit) -> unit
     val add : t -> term -> unit
