@@ -43,6 +43,7 @@ val get_flag : int -> hclause -> bool             (** get value of boolean flag 
  * ---------------------------------------------------------------------- *)
 
 val eq_hclause : hclause -> hclause -> bool       (** equality of clauses *)
+val hash_hclause : hclause -> int                 (** hash a clause *)
 val compare_hclause : hclause -> hclause -> int   (** simple order on clauses (by ID) *)
 
 module CHashtbl : Hashtbl.S with type key = clause
@@ -58,18 +59,20 @@ module CHashSet :
     val to_list : t -> hclause list
   end
 
-val mk_hclause : ?selected:Bitvector.t -> ctx:context -> literal list -> proof -> hclause
-  (** Build a new hclause from the given literals. If there are more than 31 literals,
-      the prover becomes incomplete by returning [true] instead. *)
-
-val mk_hclause_a : ?selected:Bitvector.t -> ctx:context -> literal array -> proof -> hclause
-  (** Build a new hclause from the given literals. If there are more than 31 literals,
-      the prover becomes incomplete by returning [true] instead. This function takes
-      ownership of the input array. *)
-
 val is_child_of : child:hclause -> hclause -> unit
   (** [is_child_of ~child c] is to be called to remember that [child] is a child
       of [c], is has been infered/simplified from [c] *)
+
+val mk_hclause : ?parents:hclause list -> ?selected:Bitvector.t ->
+                 ctx:context -> literal list -> proof -> hclause
+  (** Build a new hclause from the given literals. If there are more than 31 literals,
+      the prover becomes incomplete by returning [true] instead. *)
+
+val mk_hclause_a : ?parents:hclause list -> ?selected:Bitvector.t ->
+                   ctx:context -> literal array -> proof -> hclause
+  (** Build a new hclause from the given literals. If there are more than 31 literals,
+      the prover becomes incomplete by returning [true] instead. This function takes
+      ownership of the input array. *)
 
 val descendants : hclause -> int array
   (** set of ID of descendants of the clause *)

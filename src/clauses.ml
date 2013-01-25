@@ -126,9 +126,16 @@ let true_clause ~ctx =
   in
   hc
 
+(** [is_child_of ~child c] is to be called to remember that [child] is a child
+    of [c], is has been infered/simplified from [c] *)
+let is_child_of ~child c =
+  (* update the parent clauses' sets of descendants by adding [child] *)
+  let descendants = Array.of_list (child.hctag :: Array.to_list c.hcdescendants) in
+  c.hcdescendants <- descendants
+
 (** Build a new hclause from the given literals. If there are more than 31 literals,
     the prover becomes incomplete by returning [true] instead. *)
-let mk_hclause_a ?selected ~ctx lits proof =
+let mk_hclause_a ?parents ?selected ~ctx lits proof =
   incr_stat stat_mk_hclause;
   Utils.enter_prof prof_mk_hclause;
   if Array.length lits > 31
@@ -157,6 +164,11 @@ let mk_hclause_a ?selected ~ctx lits proof =
     | None -> BV.from_list (ctx.ctx_select hc));
   (* compute flags *)
   (if Lits.ground_lits lits then set_flag flag_redundant hc true);
+  (* parents *)
+  (match parents with
+  | None -> ()
+  | Some parents ->
+    List.iter (fun parent -> is_child_of ~child:hc parent) parents);
   (* return clause *)
   incr_stat stat_new_clause;
   Utils.exit_prof prof_mk_hclause;
@@ -164,15 +176,8 @@ let mk_hclause_a ?selected ~ctx lits proof =
   end
 
 (** Build clause from a list (delegating to mk_hclause_a) *)
-let mk_hclause ?selected ~ctx lits proof =
-  mk_hclause_a ?selected ~ctx (Array.of_list lits) proof
-
-(** [is_child_of ~child c] is to be called to remember that [child] is a child
-    of [c], is has been infered/simplified from [c] *)
-let is_child_of ~child c =
-  (* update the parent clauses' sets of descendants by adding [child] *)
-  let descendants = Array.of_list (child.hctag :: Array.to_list c.hcdescendants) in
-  c.hcdescendants <- descendants
+let mk_hclause ?parents ?selected ~ctx lits proof =
+  mk_hclause_a ?parents ?selected ~ctx (Array.of_list lits) proof
 
 (** descendants of the clause *)
 let descendants hc = hc.hcdescendants
@@ -304,7 +309,7 @@ let fresh_clause offset hc =
   incr_stat stat_fresh;
   let subst = S.relocate (offset + 1) hc.hcvars in
   let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
-  mk_hclause_a ~ctx lits hc.hcproof
+  mk_hclause_a ~selected:hc.hcselected ~ctx lits hc.hcproof
 
 (** Normalize clause by renaming variables from 0 *)
 let normalize hc =
