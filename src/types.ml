@@ -39,13 +39,6 @@ exception SortError of string
 (* TODO: (maybe) substitutions as list of pairs of *bound* terms,
   where bound term = (int * term), the int being an offset for renaming vars. *)
 
-(* TODO comparison functions that take terms and substitutions, to avoid instantiating
-   terms just to compare them. XXX OR *)
-(* TODO for eligible_res, just instantiate the clause with subst, with same selected lits, and
-   check on that one (may actually make less comparisons?) *)
-(* TODO for eligible_res, special case where subst is empty (for demodulate), since it's much
-   simpler *)
-
 (** term with a simple sort *)
 type term = {
   term : term_cell;             (** the term itself *)
