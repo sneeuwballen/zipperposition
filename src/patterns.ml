@@ -25,6 +25,8 @@ open Symbols
 
 module T = Terms
 module C = Clauses
+module BV = Bitvector
+module Lits = Literals
 module Utils = FoUtils
 
 let prof_pclause_of_clause = Utils.mk_profiler "mk_pclause"
@@ -276,7 +278,7 @@ let plit_of_lit ?rev_map lit =
 let pclause_of_clause ?rev_map hc =
   Utils.enter_prof prof_pclause_of_clause;
   let rev_map = match rev_map with | None -> empty_rev_mapping () | Some m -> m in
-  let lits = Array.map (fun lit -> plit_of_lit lit, C.weight_literal lit, lit) hc.hclits in
+  let lits = Array.map (fun lit -> plit_of_lit lit, Lits.weight lit, lit) hc.hclits in
   let lits = Array.to_list lits in
   (* sort the literals *)
   let lits = List.sort (fun (plit1, w1, lit1) (plit2, w2, lit2) ->
@@ -315,11 +317,12 @@ let rec instantiate_pterm ~map pterm =
 let instantiate_plit ~map ~ord plit =
   let l = instantiate_pterm ~map plit.lterm
   and r = instantiate_pterm ~map plit.rterm in
-  C.mk_lit ~ord l r plit.psign
+  Lits.mk_lit ~ord l r plit.psign
 
-let instantiate_pclause ~map ~ord pclause proof parents =
+let instantiate_pclause ~map ~ctx pclause proof =
+  let ord = ctx.ctx_ord in
   let lits = List.map (instantiate_plit ~map ~ord) pclause.pc_lits in
-  C.mk_hclause ~ord lits proof parents
+  C.mk_hclause ~ctx lits proof
 
 (*s match an abstract pattern against a term of a clause. Failure is
     indicated by an empty list, but several mappings can exist for
@@ -381,8 +384,8 @@ let match_pclause ?map pclause hc =
   let rec all_matches acc plits lits map i bv =
     if i < Array.length plits
       then for j = 0 to Array.length lits - 1 do
-        if not (bv_get bv j) then
-          let bv = bv_set bv j in
+        if not (BV.get bv j) then
+          let bv = BV.set bv j in
           (* try to match plits[i] with lits[j] *)
           let maps = match_plit ~map plits.(i) lits.(j) in
           List.iter (fun map -> all_matches acc plits lits map (i+1) bv) maps

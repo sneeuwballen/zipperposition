@@ -24,9 +24,11 @@ open Types
 open Params
 
 module I = Index
-module FV = FeatureVector
+module S = FoSubst
 module C = Clauses
 module U = FoUtils
+module BV = Bitvector
+module FV = FeatureVector
 module CQ = ClauseQueue
 
 let _indexes =
@@ -51,7 +53,7 @@ let names_index () =
 
 (** set of active clauses *)
 type active_set =
-  < ord : ordering;
+  < ctx : context;
     clauses : Clauses.CSet.t;           (** set of active clauses *)
     idx_sup_into : Index.index;         (** index for superposition into the set *)
     idx_sup_from : Index.index;         (** index for superposition from the set *)
@@ -65,7 +67,7 @@ type active_set =
 
 (** set of simplifying (unit) clauses *)
 type simpl_set =
-  < ord:ordering;
+  < ctx : context;
     idx_simpl : Index.unit_index;       (** index for forward simplifications TODO split into pos-orientable/others *)
 
     add : hclause list -> unit;
@@ -75,12 +77,12 @@ type simpl_set =
 
 (** set of passive clauses *)
 type passive_set =
-  < ord:ordering;
+  < ctx : context;
     clauses : Clauses.CSet.t;           (** set of clauses *)
     queues : (ClauseQueue.queue * int) list;
 
     add : hclause list -> unit;         (** add clauses *)
-    remove : Ptset.t -> unit;           (** remove clauses *)
+    remove : int -> unit;               (** remove clause by ID *)
     next : unit -> hclause option;      (** next passive clause, if any *)
     clean : unit -> unit;               (** cleanup internal queues *)
   >
@@ -89,8 +91,7 @@ type passive_set =
     It contains a set of active clauses, a set of passive clauses,
     and is parametrized by an ordering. *)
 type state =
-  < ord:ordering;
-    select : selection_fun;
+  < ctx : context;
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
@@ -106,19 +107,21 @@ type state =
     done on every subterm, otherwise on root *)
 let update_with_clause op acc eligible ~subterms ~both_sides hc =
   let acc = ref acc in
+  (* specialize eligible for the clause *)
+  let eligible = eligible hc in
   (* process a lit *)
   let rec process_lit op acc i = function
     | Equation (l,r,_,_) when both_sides ->
-      let acc = process_term op acc l [C.left_pos; i] in
-      process_term op acc r [C.right_pos; i]
+      let acc = process_term op acc l [left_pos; i] in
+      process_term op acc r [right_pos; i]
     | Equation (l,r,_,Gt) ->
-      process_term op acc l [C.left_pos; i]
+      process_term op acc l [left_pos; i]
     | Equation (l,r,_,Lt) ->
-      process_term op acc r [C.right_pos; i]
+      process_term op acc r [right_pos; i]
     | Equation (l,r,_,Incomparable)
     | Equation (l,r,_,Eq) ->
-      let acc = process_term op acc l [C.left_pos; i] in
-      process_term op acc r [C.right_pos; i]
+      let acc = process_term op acc l [left_pos; i] in
+      process_term op acc r [right_pos; i]
   (* process a term (maybe recursively). We build positions in the wrong order,
      so we have to reverse them before giving them to [op acc]. *)
   and process_term op acc t pos =
@@ -142,7 +145,7 @@ let update_with_clause op acc eligible ~subterms ~both_sides hc =
   in
   (* process eligible literals *)
   Array.iteri
-    (fun i lit -> if eligible hc i lit then acc := process_lit op !acc i lit)
+    (fun i lit -> if eligible i lit then acc := process_lit op !acc i lit)
     hc.hclits;
   !acc
 
@@ -155,12 +158,14 @@ let update_with_clauses op acc eligible ~subterms ~both_sides hcs =
   !acc
 
 (** process literals that are potentially eligible for resolution *)
-let eligible_res hc i lit =
-  if not (C.has_selected_lits hc) then C.is_maxlit hc i else C.is_selected hc i
+let eligible_res hc =
+  let bv = C.eligible_res hc S.id_subst in
+  fun i lit -> BV.get bv i
 
 (** process literals that are potentially eligible for paramodulation *)
-let eligible_param hc i lit =
-  if not (C.has_selected_lits hc) then C.pos_lit hc.hclits.(i) && C.is_maxlit hc i else false
+let eligible_param hc =
+  let bv = C.eligible_param hc S.id_subst in
+  fun i lit -> BV.get bv i
 
 (** process all literals *)
 let eligible_always hc i lit = true
@@ -170,7 +175,7 @@ let eligible_always hc i lit = true
  * ---------------------------------------------------------------------- *)
 
 (** Create an active set from the given ord, and indexing structures *)
-let mk_active_set ~ord (index : Index.index) signature =
+let mk_active_set ~ctx (index : Index.index) signature =
   (* create a FeatureVector index from the current signature *)
   let fv_idx = FV.mk_fv_index_signature signature in
   (object (self)
@@ -179,7 +184,7 @@ let mk_active_set ~ord (index : Index.index) signature =
     val mutable m_sup_from = index
     val mutable m_back_demod = index
     val mutable m_fv = fv_idx
-    method ord = ord
+    method ctx = ctx
     method clauses = m_clauses
     method idx_sup_into = m_sup_into
     method idx_sup_from = m_sup_from
@@ -216,7 +221,7 @@ let mk_active_set ~ord (index : Index.index) signature =
 
     (** Avoid var collisions with clause *)
     method relocate hc =
-      C.fresh_clause ~ord m_clauses.C.CSet.maxvar hc
+      C.fresh_clause m_clauses.C.CSet.maxvar hc
   end :> active_set)
 
 (* ----------------------------------------------------------------------
@@ -224,10 +229,10 @@ let mk_active_set ~ord (index : Index.index) signature =
  * ---------------------------------------------------------------------- *)
 
 (** Create a simplification set *)
-let mk_simpl_set ~ord unit_idx =
+let mk_simpl_set ~ctx unit_idx =
   object
     val mutable m_simpl = unit_idx
-    method ord = ord
+    method ctx = ctx
     method idx_simpl = m_simpl
 
     method add hcs =
@@ -237,21 +242,21 @@ let mk_simpl_set ~ord unit_idx =
       m_simpl <- List.fold_left (fun simpl hc -> simpl#remove_clause hc) m_simpl hcs
 
     method relocate hc =
-      C.fresh_clause ~ord m_simpl#maxvar hc
+      C.fresh_clause m_simpl#maxvar hc
   end
 
 (* ----------------------------------------------------------------------
  * passive set
  * ---------------------------------------------------------------------- *)
 
-let mk_passive_set ~ord queues =
+let mk_passive_set ~ctx queues =
   assert (queues != []);
   object
     val mutable m_clauses = C.CSet.empty
     val m_queues = Array.of_list queues
     val m_length = List.length queues
     val mutable m_state = (0,0)
-    method ord = ord
+    method ctx = ctx
     method clauses = m_clauses
     method queues = Array.to_list m_queues
 
@@ -266,8 +271,8 @@ let mk_passive_set ~ord queues =
       done
 
     (** remove clauses (not from the queues) *)
-    method remove hcs = 
-      m_clauses <- C.CSet.remove_ids m_clauses hcs
+    method remove id = 
+      m_clauses <- C.CSet.remove_id m_clauses id
 
     (** next clause *)
     method next () =
@@ -307,17 +312,15 @@ let mk_passive_set ~ord queues =
  * global state
  * ---------------------------------------------------------------------- *)
 
-let mk_state ~ord ?meta params signature =
+let mk_state ~ctx ?meta params signature =
   let queues = ClauseQueue.default_queues
-  and select = Selection.selection_from_string ~ord params.param_select
   and unit_idx = Dtree.unit_index
   and index = choose_index params.param_index in
   object
-    val m_active = (mk_active_set ~ord index signature :> active_set)
-    val m_passive = mk_passive_set ~ord queues
-    val m_simpl = mk_simpl_set ~ord unit_idx
-    method ord = ord
-    method select = select
+    val m_active = (mk_active_set ~ctx index signature :> active_set)
+    val m_passive = (mk_passive_set ~ctx queues :> passive_set)
+    val m_simpl = (mk_simpl_set ~ctx unit_idx :> simpl_set)
+    method ctx = ctx
     method active_set = m_active
     method passive_set = m_passive
     method simpl_set = m_simpl
@@ -393,8 +396,8 @@ let pp_dot ?(name="state") formatter state =
       | Proof (rule, clauses) ->
         List.iter
           (fun (parent, _, _) ->
-            Queue.push parent.cref queue;  (* explore this parent *)
-            let n_parent = DotState.get_node graph parent.cref in
+            Queue.push parent queue;  (* explore this parent *)
+            let n_parent = DotState.get_node graph parent in
             ignore (DotState.add_edge graph n_parent n rule))
           clauses
     end

@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   open Const
   open Symbols
+  open Types
 
   module Utils = FoUtils
 
@@ -651,7 +652,8 @@ theory_named_formula:
       let f = $3 in
       (* transform to hclause *)
       let ord = Orderings.default_ordering (Simple.signature [f]) in
-      let hc = Clauses.from_simple ~ord (f, Simple.Axiom ("theory", "theory")) in
+      let ctx = {ctx_ord=ord; ctx_select=no_select; } in
+      let hc = Clauses.from_simple ~ctx (f, Simple.Axiom ("theory", "theory")) in
       (* transform f into a pattern *)
       let rev_map = empty_rev_mapping () in
       let pc = pclause_of_clause ~rev_map hc in

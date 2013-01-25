@@ -104,7 +104,7 @@ let parse_args () =
       ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
       ("-print-sort", Arg.Set print_sort, "print sorts of terms");
-      ("-print-ord", Arg.Unit (fun () -> Clauses.pp_literal_debug#ord true), "print order of sides of literals");
+      ("-print-ord", Arg.Unit (fun () -> Literals.pp_literal_debug#ord true), "print order of sides of literals");
     ]
   in
   Arg.parse options (fun f -> files := f :: !files) "solve problems in files";

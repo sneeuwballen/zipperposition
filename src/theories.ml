@@ -65,7 +65,7 @@ let hash_proof hc =
         (* explore parents of the clause; first hash the inference kind *)
         let h_kind = Int64.of_int (Hashtbl.hash kind) in
         h := Int64.add !h (Int64.mul 22571L h_kind);
-        List.iter (fun (c, _, _) -> explore c.cref) l
+        List.iter (fun (c, _, _) -> explore c) l
     end
   in
   explore hc;
@@ -246,7 +246,7 @@ type meta_prover = {
   mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
   mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
-  mutable meta_ord : ordering;
+  mutable meta_ctx : context;
   mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
@@ -261,7 +261,7 @@ let get_kb_theory ~kb name =
     First, the corresponding named formula has to be retrieved
     from kb, then it is 'matched' against the term.
     A proof and a list of parent clauses have to be provided. *)
-let term_to_hclause ~ord ~kb term proof parents =
+let term_to_hclause ~ctx ~kb term proof =
   let term_name = Datalog.Symbols.get_symbol term.(0)
   and term_args = Array.to_list (Array.sub term 1 (Array.length term - 1)) in
   (* get the named formula corresponding to this term *)
@@ -275,12 +275,12 @@ let term_to_hclause ~ord ~kb term proof parents =
       Patterns.bind_symbol mapping nf_arg symbol)
     Patterns.empty_mapping nf_args term_args
   in
-  Patterns.instantiate_pclause ~ord ~map:mapping nf.nf_pclause proof parents
+  Patterns.instantiate_pclause ~ctx ~map:mapping nf.nf_pclause proof
 
 (** This handler is triggered whenever a named formula is discovered
     to be true for the current problem. *)
 let handle_formula meta term =
-  let ord = meta.meta_ord in
+  let ctx = meta.meta_ctx in
   let kb = meta.meta_kb in
   (* find parents (other formulas) *)
   let explanation = Datalog.Logic.db_explain meta.meta_db term in
@@ -297,10 +297,10 @@ let handle_formula meta term =
   then ()
   else begin
     (* proof and parents of conclusion *)
-    let premises = List.map (fun hc -> (C.base_clause hc, [], S.id_subst)) parents in
+    let premises = List.map (fun hc -> (hc, [], S.id_subst)) parents in
     let proof = Proof ("lemma", premises) in
     (* build conclusion *)
-    let conclusion = term_to_hclause ~ord ~kb term proof parents in
+    let conclusion = term_to_hclause ~ctx ~kb term proof in
     (* yield lemma *)
     Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
                   !C.pp_clause#pp_h conclusion));
@@ -312,7 +312,7 @@ let handle_formula meta term =
 
 (** Handler triggered when a theory is discovered in the current problem *)
 let handle_theory meta term =
-  let ord = meta.meta_ord in
+  let ctx = meta.meta_ctx in
   let kb = meta.meta_kb in
   Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: theory @[<h>%a@]"
                  (Datalog.Logic.pp_term ?to_s:None) term));
@@ -320,7 +320,7 @@ let handle_theory meta term =
   (* the clauses that belong to this theory *)
   let premises = Datalog.Logic.db_explain meta.meta_db term in
   let premise_clauses = Utils.list_flatmap
-    (fun term -> try [term_to_hclause ~ord ~kb term (Axiom ("kb","kb")) []]
+    (fun term -> try [term_to_hclause ~ctx ~kb term (Axiom ("kb","kb"))]
                  with Not_found -> [])
     premises in
   (* add the premises of the clause to the set of theory clauses. Each of those
@@ -363,7 +363,7 @@ let db_add_theory db theory =
   Datalog.Logic.db_add db rule
 
 (** Create a meta_prover, using a Knowledge Base *)
-let create_meta ~ord kb =
+let create_meta ~ctx kb =
   let meta = {
     meta_db = Datalog.Logic.db_create ();
     meta_kb = kb;
@@ -371,7 +371,7 @@ let create_meta ~ord kb =
     meta_theories = [];
     meta_theory_symbols = SSet.empty;
     meta_theory_clauses = Ptmap.empty;
-    meta_ord = ord;
+    meta_ctx = ctx;
     meta_lemmas = [];
   } in
   Utils.debug 1 (lazy (Utils.sprintf
@@ -403,7 +403,7 @@ let create_meta ~ord kb =
   meta
 
 (** Update the ordering used by the meta-prover *)
-let meta_update_ord ~ord meta = meta.meta_ord <- ord
+let meta_update_ctx ~ctx meta = meta.meta_ctx <- ctx
 
 (** Scan the given clause to recognize if it matches axioms from the KB;
     if it does, return the lemma that are newly discovered by the Datalog engine.

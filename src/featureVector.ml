@@ -26,6 +26,7 @@ open Symbols
 
 module T = Terms
 module C = Clauses
+module Lits = Literals
 module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
@@ -114,14 +115,14 @@ let count_skolem_symb lits =
 let count_symb_plus symb lits =
   let cnt = ref 0 in
   Array.iter
-    (fun lit -> if C.pos_lit lit
+    (fun lit -> if Lits.is_pos lit
       then cnt := !cnt + count_symb_lit symb lit) lits;
   !cnt
 
 let count_symb_minus symb lits =
   let cnt = ref 0 in
   Array.iter
-    (fun lit -> if C.neg_lit lit
+    (fun lit -> if Lits.is_neg lit
       then cnt := !cnt + count_symb_lit symb lit) lits;
   !cnt
 
@@ -145,14 +146,14 @@ let max_depth_lit symb lit =
 let max_depth_plus symb lits =
   let depth = ref 0 in
   Array.iter
-    (fun lit -> if C.pos_lit lit
+    (fun lit -> if Lits.is_pos lit
       then depth := max !depth (max_depth_lit symb lit)) lits;
   !depth
 
 let max_depth_minus symb lits =
   let depth = ref 0 in
   Array.iter
-    (fun lit -> if C.neg_lit lit
+    (fun lit -> if Lits.is_neg lit
       then depth := max !depth (max_depth_lit symb lit)) lits;
   !depth
 

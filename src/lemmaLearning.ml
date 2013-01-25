@@ -74,7 +74,7 @@ let proof_depth hc =
       match hc.hcproof with
       | Axiom _ -> depth := max d !depth
       | Proof (_, l) -> (* explore parents *)
-        List.iter (fun (c,_,_) -> Queue.push (c.cref, d+1) q) l
+        List.iter (fun (c,_,_) -> Queue.push (c, d+1) q) l
     end
   done;
   !depth
@@ -200,7 +200,7 @@ let explore_parents meta cost_map distance hc =
         (* cost of recursing into parents *)
         let cost_parents, premises_parents, max_dist = List.fold_left
           (fun (cost,premises,m) (parent,_,_) ->
-            let cost', premises',m' = compute_best (distance+1) parent.cref in
+            let cost', premises',m' = compute_best (distance+1) parent in
             cost +. cost', C.ClauseSet.union premises premises', max m m')
           (0., C.ClauseSet.empty, 0) l
         in
@@ -236,7 +236,7 @@ let search_lemmas meta hc =
   (match hc.hcproof with
   | Axiom _ -> ()
   | Proof (_, l) ->
-    List.iter (fun (c,_,_) -> Queue.push (c.cref, 1) q) l);
+    List.iter (fun (c,_,_) -> Queue.push (c, 1) q) l);
   (* breadth-first exploration of the proof. The depth is kept with the clause *)
   while not (Queue.is_empty q) do
     let hc, depth = Queue.pop q in
@@ -260,7 +260,7 @@ let search_lemmas meta hc =
       match hc.hcproof with
       | Axiom _ -> ()
       | Proof (_, l) ->
-        List.iter (fun (c,_,_) -> Queue.push (c.cref, depth+1) q) l
+        List.iter (fun (c,_,_) -> Queue.push (c, depth+1) q) l
     end
   done;
   (* sort candidate by increasing rate (bad candidates at the end), and take

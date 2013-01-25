@@ -27,6 +27,7 @@ open Symbols
 module T = Terms
 module C = Clauses
 module S = FoSubst
+module Lits = Literals
 module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
@@ -91,17 +92,18 @@ let rec simplify_term t =
         simplify_term new_t
 
 (** Simplify the inner formula (double negation, trivial equalities...) *)
-let simplify ~ord hc =
+let simplify hc =
+  let ctx = hc.hcctx in
   let simplified = ref false in
   (* simplify a lit *)
   let simp_lit (Equation (l,r,sign,_) as lit) =
-    let lit' = C.mk_lit ~ord (simplify_term l) (simplify_term r) sign in
-    (if not (C.eq_literal lit lit') then simplified := true);
+    let lit' = Lits.mk_lit ~ord:ctx.ctx_ord (simplify_term l) (simplify_term r) sign in
+    (if not (Lits.eq lit lit') then simplified := true);
     lit'
   in
   let lits = Array.map simp_lit hc.hclits in
   if !simplified
-    then C.mk_hclause_a ~ord lits hc.hcproof hc.hcparents
+    then C.mk_hclause_a ~ctx lits hc.hcproof
     else hc  (* no simplification *)
 
 (* ----------------------------------------------------------------------
@@ -144,19 +146,20 @@ let rec miniscope_term t =
   | BoundVar _ | Var _ | Node _ -> t
 
 (** Apply miniscoping transformation to the clause *)
-let miniscope ~ord hc =
+let miniscope hc =
+  let ctx = hc.hcctx in
   let simplified = ref false in
   (* simplify a lit *)
   let miniscope_lit (Equation (l,r,sign,_) as lit) =
-    let lit' = C.mk_lit ~ord (miniscope_term l) (miniscope_term r) sign in
-    (if not (C.eq_literal lit lit') then simplified := true);
+    let lit' = Lits.mk_lit ~ord:ctx.ctx_ord (miniscope_term l) (miniscope_term r) sign in
+    (if not (Lits.eq lit lit') then simplified := true);
     lit'
   in
   let lits = Array.map miniscope_lit hc.hclits in
   if !simplified
     then (* mark the miniscoping as a proof step, and produce a new clause *)
-      let proof = Proof ("miniscope", [C.base_clause hc, [], S.id_subst]) in
-      let hc' = C.mk_hclause_a ~ord lits proof [hc] in
+      let proof = Proof ("miniscope", [hc, [], S.id_subst]) in
+      let hc' = C.mk_hclause_a ~parents:[hc] ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "miniscoped @[<h>%a@] into @[<h>%a@]"
                     !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc'));
       hc'
@@ -246,7 +249,9 @@ and product a b =
     [] a
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
-let cnf_of ~ord hc =
+let cnf_of hc =
+  let ctx = hc.hcctx in
+  let ord = ctx.ctx_ord in
   let var_index = ref 0 in
   (* unique counter for variable indexes *)
   Utils.debug 3 (lazy (Utils.sprintf "input clause %a@." !C.pp_clause#pp_h hc));
@@ -256,10 +261,10 @@ let cnf_of ~ord hc =
       [hc] (* already cnf, perfect *)
     end else
       (* simplify clause *)
-      let hc = simplify ~ord hc in
+      let hc = simplify hc in
       (* steps of CNF reduction *)
       let lits = Array.to_list hc.hclits in
-      let nnf_lits = List.map (fun lit -> nnf (C.term_of_lit lit)) lits in
+      let nnf_lits = List.map (fun lit -> nnf (Lits.term_of_lit lit)) lits in
       let miniscoped_lits = List.map miniscope_term nnf_lits in
       let skolem_lits = List.map (fun t -> skolemize ~ord ~var_index t) miniscoped_lits in
       let clauses_of_lits = List.map to_cnf skolem_lits in
@@ -268,13 +273,13 @@ let cnf_of ~ord hc =
         | [] -> assert false  (* is in cnf ;) *)
         | hd::tl -> List.fold_left product hd tl in
       (* build clauses from lits *)
-      let proof = Proof ("to_cnf", [C.base_clause hc, [], S.id_subst]) in
+      let proof = Proof ("to_cnf", [hc, [], S.id_subst]) in
       let clauses = List.map
         (fun lits ->
-          let lits = List.map (fun (t, sign) -> C.mk_lit ~ord t T.true_term sign) lits in
-          let new_hc = C.mk_hclause ~ord lits proof [hc] in
+          let lits = List.map (fun (t, sign) -> Lits.mk_lit ~ord t T.true_term sign) lits in
+          let new_hc = C.mk_hclause ~parents:[hc] ~ctx lits proof in
           Utils.debug 4 (lazy (Utils.sprintf "mk_clause %a@." !C.pp_clause#pp_h new_hc));
-          C.clause_of_fof ~ord new_hc)
+          C.clause_of_fof new_hc)
         lit_list_list
       in
       Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"

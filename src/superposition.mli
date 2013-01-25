@@ -48,7 +48,7 @@ val is_semantic_tautology : hclause -> bool
   (** semantic tautology deletion, using a congruence closure algorithm
       to see if negative literals imply some positive literal *)
 
-val basic_simplify : ord:ordering -> hclause -> hclause
+val basic_simplify : hclause -> hclause
   (** basic simplifications (remove duplicate literals, trivial literals,
       destructive equality resolution...) *)
 
@@ -79,7 +79,7 @@ val subsumed_in_set : ProofState.active_set -> clause -> hclause list
 val contextual_literal_cutting : ProofState.active_set -> hclause -> hclause
 
 (** condensation *)
-val condensation : ord:ordering -> hclause -> hclause
+val condensation : hclause -> hclause
 
 (** The superposition calculus *)
 val superposition : Calculus.calculus

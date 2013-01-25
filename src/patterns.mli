@@ -112,7 +112,7 @@ val pclause_of_clause : ?rev_map:rev_mapping -> hclause -> pclause
 
 val instantiate_pterm : map:mapping -> pterm -> term
 val instantiate_plit : map:mapping -> ord:ordering -> pliteral -> literal
-val instantiate_pclause : map:mapping -> ord:ordering -> pclause -> proof -> hclause list -> hclause
+val instantiate_pclause : map:mapping -> ctx:context-> pclause -> proof -> hclause
 
 (*s match an abstract pattern against a term or a clause. Failure is
     indicated by an empty list, but several mappings can exist for

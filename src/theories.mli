@@ -115,15 +115,15 @@ type meta_prover = {
   mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
   mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
-  mutable meta_ord : ordering;
+  mutable meta_ctx : context;
   mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
 
-val create_meta : ord:ordering -> kb -> meta_prover
+val create_meta : ctx:context -> kb -> meta_prover
   (** Create a meta_prover, using a knowledge base *)
 
-val meta_update_ord : ord:ordering -> meta_prover -> unit
+val meta_update_ctx : ctx:context -> meta_prover -> unit
   (** Update the ordering used by the meta-prover *)
 
 val scan_clause : meta_prover -> hclause -> hclause list

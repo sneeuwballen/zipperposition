@@ -109,7 +109,6 @@ let print_stats state =
   in
   print_gc ();
   print_hashcons_stats "terms" (T.stats ());
-  print_hashcons_stats "clauses" (C.stats ());
   print_state_stats (PS.stats state);
   print_global_stats ()
 
@@ -203,15 +202,15 @@ let initial_kb params =
   kb
 
 (** Initialize the meta-prover *)
-let mk_meta ~ord ~kb params =
+let mk_meta ~ctx ~kb params =
   if params.param_theories then
     (* create meta *)
-    let meta = Theories.create_meta ~ord kb in
+    let meta = Theories.create_meta ~ctx kb in
     Some meta
   else None
 
 (** Enrichment of the initial set of clauses by detecting some theories *)
-let enrich_with_theories ~ord meta clauses =
+let enrich_with_theories ~ctx meta clauses =
   match meta with
   | None -> clauses
   | Some meta ->
@@ -238,29 +237,31 @@ let process_file ~kb params f =
   let calculus = get_calculus ~params in
   (* convert simple clauses to clauses, first with a simple ordering *)
   let signature = Simple.signature (List.map fst clauses) in
-  let d_ord = O.default_ordering signature in
-  let clauses = List.map (C.from_simple ~ord:d_ord) clauses in
+  let d_ctx = {ctx_ord=O.default_ordering signature; ctx_select=no_select; } in
+  let clauses = List.map (C.from_simple ~ctx:d_ctx) clauses in
   (* first preprocessing, with a simple ordering. *)
-  let clauses = calculus#preprocess ~ord:d_ord ~select:no_select clauses in
+  let clauses = calculus#preprocess ~ctx:d_ctx clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* meta-prover *)
-  let meta = mk_meta ~ord:d_ord ~kb params in
-  let clauses = enrich_with_theories ~ord:d_ord meta clauses in
+  let meta = mk_meta ~ctx:d_ctx ~kb params in
+  let clauses = enrich_with_theories ~ctx:d_ctx meta clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
-  (match meta with | None -> () | Some meta -> Theories.meta_update_ord ~ord meta);
   Format.printf "%% precedence: %a@." T.pp_precedence ord#precedence#snapshot;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
+  (* at least, the context *)
+  let ctx = { ctx_ord=ord; ctx_select=select; } in
+  (match meta with | None -> () | Some meta -> Theories.meta_update_ctx ~ctx meta);
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
-  let clauses = calculus#preprocess ~ord ~select clauses in
+  let clauses = calculus#preprocess ~ctx clauses in
   (* create state, and add clauses to the simpl_set *)
   let signature = C.signature clauses in
-  let state = PS.mk_state ~ord ?meta params signature in
+  let state = PS.mk_state ~ctx ?meta params signature in
   (* maybe perform initial inter-reductions *)
   let result, clauses = if params.param_presaturate
     then begin

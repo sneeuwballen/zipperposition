@@ -41,7 +41,7 @@ val unary_max_depth : int ref
 val enable_split : bool ref
 
 (** perform backward simplification of the active set *)
-val backward_simplify : calculus:Calculus.calculus -> select:selection_fun ->
+val backward_simplify : calculus:Calculus.calculus ->
                         ProofState.active_set -> ProofState.simpl_set ->
                         hclause -> Clauses.CSet.t * hclause list
 

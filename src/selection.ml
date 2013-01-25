@@ -25,21 +25,25 @@ open Types
 
 module T = Terms
 module C = Clauses
+module S = FoSubst
+module BV = Bitvector
+module Lits = Literals
 module Utils = FoUtils
 
 (** Select all positives literals *)
 let select_positives hc =
   let rec find_pos acc i lits =
     if i = Array.length lits then acc
-    else if C.pos_lit lits.(i) then find_pos (i::acc) (i+1) lits
+    else if Lits.is_pos lits.(i) then find_pos (i::acc) (i+1) lits
     else find_pos acc (i+1) lits
   in find_pos [] 0 hc.hclits
 
 let select_max_goal ?(strict=true) hc =
+  let maxlits = C.maxlits hc S.id_subst in
   (* find negative lits *)
   let rec find_maxneg lits i =
     if i = Array.length lits then [] else (* select nothing *)
-    if C.neg_lit lits.(i) && C.is_maxlit hc i
+    if Lits.is_neg lits.(i) && BV.get maxlits i
       then if strict
         then [i] (* select one negative max goal *)
         else i :: select_positives hc (* negative max goal + positive lits *)
@@ -117,11 +121,3 @@ let available_selections () =
   let l = ref [] in
   Hashtbl.iter (fun name select -> l := name :: !l) functions;
   !l
-
-let check_selected hc =
-  assert hc.hcselected_done;
-  if not (C.has_selected_lits hc) then ()
-  else assert
-    (Utils.array_foldi
-      (fun acc i lit -> acc || C.neg_lit lit && C.is_selected hc i)
-      false hc.hclits)

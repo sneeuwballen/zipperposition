@@ -28,13 +28,13 @@ open Types
 val simplify_term : term -> term
 
 (** Simplify the inner formula (double negation, trivial equalities...) *)
-val simplify : ord:ordering -> hclause -> hclause
+val simplify : hclause -> hclause
 
 (** Apply miniscoping (push quantifiers as deep as possible in the formula) to the term *)
 val miniscope_term : term -> term
 
 (** Apply miniscoping transformation to the clause *)
-val miniscope : ord:ordering -> hclause -> hclause
+val miniscope : hclause -> hclause
 
 (** Transform the clause into proper CNF; returns a list of clauses *)
-val cnf_of : ord:ordering -> hclause -> hclause list
+val cnf_of : hclause -> hclause list

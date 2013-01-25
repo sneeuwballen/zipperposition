@@ -27,25 +27,24 @@ open Symbols
 type binary_inf_rule = ProofState.active_set -> clause -> hclause list
 
 (** unary infererences *)
-type unary_inf_rule = ord:ordering -> hclause -> hclause list
+type unary_inf_rule = hclause -> hclause list
 
 (** The type of a calculus for first order reasoning with equality *) 
 class type calculus =
   object
-
     method binary_rules : (string * binary_inf_rule) list
       (** the binary inference rules *)
 
     method unary_rules : (string * unary_inf_rule) list
       (** the unary inference rules *)
 
-    method basic_simplify : ord:ordering -> hclause -> hclause
+    method basic_simplify : hclause -> hclause
       (** how to simplify a clause *)
 
-    method rw_simplify : select:selection_fun -> ProofState.simpl_set -> hclause -> hclause
+    method rw_simplify : ProofState.simpl_set -> hclause -> hclause
       (** how to simplify a clause w.r.t a set of unit clauses *)
 
-    method active_simplify : select:selection_fun -> ProofState.active_set -> hclause -> hclause
+    method active_simplify : ProofState.active_set -> hclause -> hclause
       (** how to simplify a clause w.r.t an active set of clauses *)
 
     method backward_simplify : ProofState.active_set -> hclause -> Clauses.CSet.t
@@ -58,7 +57,7 @@ class type calculus =
     method backward_redundant : ProofState.active_set -> hclause -> hclause list
       (** find redundant clauses in set w.r.t the clause *)
 
-    method list_simplify : ord:ordering -> select:selection_fun -> hclause -> hclause list
+    method list_simplify : hclause -> hclause list
       (** how to simplify a clause into a (possibly empty) list
           of clauses. This subsumes the notion of trivial clauses (that
           are simplified into the empty list of clauses) *)
@@ -72,7 +71,7 @@ class type calculus =
     method constr : hclause list -> precedence_constraint list
       (** some constraints on the precedence *)
 
-    method preprocess : ord:ordering -> select:selection_fun -> hclause list -> hclause list
+    method preprocess : ctx:context -> hclause list -> hclause list
       (** how to preprocess the initial list of clauses *)
   end
 
@@ -82,8 +81,7 @@ val do_binary_inferences : ProofState.active_set ->
                           hclause -> hclause list
 
 (** do unary inferences for the given clause *)
-val do_unary_inferences : ord:ordering ->
-                          (string * unary_inf_rule) list ->
+val do_unary_inferences : (string * unary_inf_rule) list ->
                           hclause -> hclause list
 
 (** fold on equation sides of literals that satisfy predicate *)
@@ -97,6 +95,6 @@ val get_equations_sides : clause -> position -> term * term * bool
 
 (** Perform backward simplification with the given clause. It returns the CSet of
     clauses that become redundant, and the list of those clauses after simplification. *)
-val backward_simplify : select:selection_fun -> calculus:calculus ->
+val backward_simplify : calculus:calculus ->
                         ProofState.active_set -> ProofState.simpl_set -> hclause ->
                         Clauses.CSet.t * hclause list

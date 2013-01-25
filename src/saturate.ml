@@ -59,26 +59,24 @@ let check_timeout = function
 
 (** simplify the hclause using the active_set. Returns both the
     hclause and the simplified hclause. *)
-let simplify ~calculus ~select active_set simpl_set old_hc =
+let simplify ~calculus active_set simpl_set old_hc =
   Utils.enter_prof prof_simplify;
-  let ord = active_set#ord in
   (* simplify with unit clauses, then all active clauses *)
-  let hc = calculus#rw_simplify ~select simpl_set old_hc in
-  let hc = calculus#basic_simplify ~ord hc in
-  let hc = calculus#active_simplify ~select active_set hc in
-  let hc = calculus#basic_simplify ~ord hc in
-  let hc = C.select_clause ~select hc in
+  let hc = calculus#rw_simplify simpl_set old_hc in
+  let hc = calculus#basic_simplify hc in
+  let hc = calculus#active_simplify active_set hc in
+  let hc = calculus#basic_simplify hc in
   (if not (C.eq_hclause hc old_hc)
-    then Utils.debug 2 (lazy (Utils.sprintf "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
+    then Utils.debug 2 (lazy (Utils.sprintf
+                        "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
                         !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc)));
   Utils.exit_prof prof_simplify;
   old_hc, hc
 
 (** Perform backward simplification with the given clause *)
-let backward_simplify ~calculus ~select (active_set : ProofState.active_set) simpl_set given =
+let backward_simplify ~calculus (active_set : ProofState.active_set) simpl_set given =
   Utils.enter_prof prof_back_simplify;
-  let before, after = Calculus.backward_simplify ~calculus ~select active_set simpl_set given in
-  let after = List.map (C.select_clause ~select) after in
+  let before, after = Calculus.backward_simplify ~calculus active_set simpl_set given in
   Utils.exit_prof prof_back_simplify;
   before, after
 
@@ -93,12 +91,12 @@ let generate_binary ~calculus active_set clause =
 let enable_split = ref false
 
 (** generate all clauses from unary inferences *)
-let generate_unary ~calculus ~ord clause =
+let generate_unary ~calculus clause =
   Utils.enter_prof prof_generate_unary;
-  let new_clauses = Calculus.do_unary_inferences ~ord calculus#unary_rules clause in
+  let new_clauses = Calculus.do_unary_inferences calculus#unary_rules clause in
   (* also do splitting *)
   let new_clauses = if !enable_split
-    then List.rev_append (Sup.infer_split ~ord clause) new_clauses
+    then List.rev_append (Sup.infer_split clause) new_clauses
     else new_clauses in
   Utils.exit_prof prof_generate_unary;
   new_clauses
@@ -110,7 +108,6 @@ let unary_max_depth = ref 1
 (** generate all clauses from inferences *)
 let generate ~calculus active_set given =
   Utils.enter_prof prof_generate;
-  let ord = active_set#ord in
   (* binary clauses *)
   let binary_clauses = generate_binary ~calculus active_set given in
   (* unary inferences *)
@@ -119,14 +116,14 @@ let generate ~calculus active_set given =
   Queue.push (given, 0) unary_queue;
   while not (Queue.is_empty unary_queue) do
     let hc, depth = Queue.pop unary_queue in
-    let hc = calculus#basic_simplify ~ord hc in (* simplify a bit the clause *)
+    let hc = calculus#basic_simplify hc in (* simplify a bit the clause *)
     if not (Sup.is_tautology hc) then begin
       (* add the clause to set of inferred clauses, if it's not the original clause *)
       (if depth > 0 then unary_clauses := hc :: !unary_clauses);
       if depth < !unary_max_depth
         then begin
           (* infer clauses from c, add them to the queue *)
-          let new_clauses = generate_unary ~calculus ~ord hc in
+          let new_clauses = generate_unary ~calculus hc in
           List.iter (fun hc' -> Queue.push (hc', depth+1) unary_queue) new_clauses
         end
     end
@@ -138,12 +135,22 @@ let generate ~calculus active_set given =
 
 (** remove direct descendants of the clauses from the passive set *)
 let remove_orphans passive_set removed_clauses =
-  List.iter
-    (fun removed_clause ->
-      let orphans = removed_clause.hcdescendants in
-      add_stat stat_killed_orphans (Ptset.cardinal orphans);
-      passive_set#remove orphans)
-    removed_clauses
+  (* remove descendants of the clause. If the descendants are redundant
+     (cf C.flag_redundant) their descendants are also removed *)
+  let rec remove_descendants hc =
+    let orphans = hc.hcdescendants in
+    add_stat stat_killed_orphans (Array.length orphans);
+    (* remove orphans from passive set *)
+    Array.iter
+      (fun orphan_id ->
+        (try let c = C.CSet.get passive_set#clauses orphan_id in
+            if C.get_flag C.flag_redundant c then remove_descendants c
+              (* recursively destroy descendants of [c] *)
+        with Not_found -> ());
+        passive_set#remove orphan_id)
+      orphans
+  in
+  List.iter remove_descendants removed_clauses
 
 (** check whether the clause is redundant w.r.t the active_set *)
 let is_redundant ~calculus active_set hc =
@@ -161,14 +168,13 @@ let subsumed_by ~calculus active_set hc =
 
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if trivial). *)
-let all_simplify ~ord ~calculus ~select active_set simpl_set hc =
+let all_simplify ~calculus active_set simpl_set hc =
   Utils.enter_prof prof_all_simplify;
-  let clauses = calculus#list_simplify ~ord ~select hc in
+  let clauses = calculus#list_simplify hc in
   let clauses = Utils.list_flatmap
     (fun hc ->
       (* simplify this clause *)
-      let _, hc' = simplify ~calculus ~select active_set simpl_set hc in
-      let hc' = C.select_clause ~select hc' in
+      let _, hc' = simplify ~calculus active_set simpl_set hc in
       if calculus#is_trivial hc' then [] else [hc'])
     clauses
   in
@@ -185,14 +191,14 @@ let find_lemmas state hc =
 
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num state =
-  let ord = state#ord
-  and select = state#select in
+  let ctx = state#ctx in
+  let ord = ctx.ctx_ord in
   (* select next given clause *)
   match state#passive_set#next () with
   | None -> Sat (* passive set is empty *)
   | Some hc ->
     (* simplify given clause w.r.t. active set, then remove redundant clauses *)
-    let c_list = all_simplify ~ord ~calculus ~select state#active_set state#simpl_set hc in
+    let c_list = all_simplify ~calculus state#active_set state#simpl_set hc in
     let c_list = List.filter
       (fun hc' -> not (is_redundant ~calculus state#active_set hc'))
       c_list in
@@ -206,10 +212,8 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
     then (state#active_set#add [hc]; Unsat hc)
     else begin
       assert (not (is_redundant ~calculus state#active_set hc));
+      (* process the given clause! *)
       incr_stat stat_processed_given;
-      (* select literals *)
-      let hc = C.select_clause select hc in
-      Sel.check_selected hc;
       C.check_ord_hclause ~ord hc;
       Utils.debug 2 (lazy (Utils.sprintf "%% ============ step %5d  ============" num));
       Utils.debug 1 (Lazy.lazy_from_val (Utils.sprintf "%% @[<h>%a@]" !C.pp_clause#pp_h hc));
@@ -225,7 +229,7 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       state#simpl_set#add [hc];
       (* simplify active set using c *)
       let simplified_actives, newly_simplified =
-        backward_simplify ~calculus ~select state#active_set state#simpl_set hc in
+        backward_simplify ~calculus state#active_set state#simpl_set hc in
       let simplified_actives = C.CSet.to_list simplified_actives in
       (* the simplified active clauses are removed from active set and
          added to the set of new clauses. Their descendants are also removed
@@ -245,9 +249,9 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
          are kept (by list-simplify) *)
       let inferred_clauses = List.fold_left
         (fun acc hc ->
-          let cs = calculus#list_simplify ~ord ~select hc in
-          let cs = List.map (calculus#rw_simplify ~select state#simpl_set) cs in
-          let cs = List.map (calculus#basic_simplify ~ord) cs in
+          let cs = calculus#list_simplify hc in
+          let cs = List.map (calculus#rw_simplify state#simpl_set) cs in
+          let cs = List.map calculus#basic_simplify cs in
           let cs = List.filter (fun hc -> not (calculus#is_trivial hc)) cs in
           List.rev_append cs acc)
         [] inferred_clauses

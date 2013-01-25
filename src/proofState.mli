@@ -32,7 +32,7 @@ val names_index : unit -> string list
 
 (** set of active clauses *)
 type active_set =
-  < ord : ordering;
+  < ctx : context;
     clauses : Clauses.CSet.t;           (** set of active clauses *)
     idx_sup_into : Index.index;         (** index for superposition into the set *)
     idx_sup_from : Index.index;         (** index for superposition from the set *)
@@ -46,7 +46,7 @@ type active_set =
 
 (** set of simplifying (unit) clauses *)
 type simpl_set =
-  < ord:ordering;
+  < ctx : context;
     idx_simpl : Index.unit_index;       (** index for forward simplifications TODO split into pos-orientable/others *)
 
     add : hclause list -> unit;
@@ -56,12 +56,12 @@ type simpl_set =
 
 (** set of passive clauses *)
 type passive_set =
-  < ord:ordering;
+  < ctx : context;
     clauses : Clauses.CSet.t;           (** set of clauses *)
     queues : (ClauseQueue.queue * int) list;
 
     add : hclause list -> unit;         (** add clauses *)
-    remove : Ptset.t -> unit;           (** remove clauses *)
+    remove : int -> unit;               (** remove clause by ID *)
     next : unit -> hclause option;      (** next passive clause, if any *)
     clean : unit -> unit;               (** cleanup internal queues *)
   >
@@ -71,20 +71,19 @@ type passive_set =
     It contains a set of active clauses, a set of passive clauses,
     and is parametrized by an ordering. *)
 type state =
-  < ord:ordering;
-    select : selection_fun;
+  < ctx : context;
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
     meta_prover : Theories.meta_prover option;
   >
 
-val mk_active_set : ord:ordering -> Index.index -> signature -> active_set
-val mk_simpl_set : ord:ordering -> Index.unit_index -> simpl_set
-val mk_passive_set : ord:ordering -> (ClauseQueue.queue * int) list -> passive_set
+val mk_active_set : ctx:context -> Index.index -> signature -> active_set
+val mk_simpl_set : ctx:context -> Index.unit_index -> simpl_set
+val mk_passive_set : ctx:context -> (ClauseQueue.queue * int) list -> passive_set
 
 (** create a state from the given ordering, and parameters *)
-val mk_state : ord:ordering -> ?meta:Theories.meta_prover ->
+val mk_state : ctx:context -> ?meta:Theories.meta_prover ->
                Params.parameters -> signature -> state
 
 (** statistics on the state (num active, num passive) *)
