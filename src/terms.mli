@@ -75,8 +75,8 @@ val get_flag : int -> term -> bool
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
 
-val mk_var : int -> sort -> term
-val mk_bound_var : int -> sort -> term
+val mk_var : int -> sort -> term            (** Create a variable. The index must be >= 0 *)
+val mk_bound_var : int -> sort -> term      (** De Bruijn index, must be >= 0 *)
 val mk_bind : symbol -> term -> term
 val mk_node : symbol -> sort -> term list -> term
 val mk_const : symbol -> sort -> term
@@ -123,7 +123,7 @@ val cpos_to_pos : compact_position -> position
 
 val var_occurs : term -> term -> bool       (** [var_occurs x t] true iff x in t *)
 val is_ground_term : term -> bool           (** is the term ground? *)
-val max_var : varlist -> int                (** find the maximum variable index *)
+val max_var : varlist -> int                (** find the maximum variable index, >= 0 *)
 val min_var : varlist -> int
 val add_vars : THashSet.t -> term -> unit   (** add variables of the term to the set *)
 val vars : term -> varlist                  (** compute variables of the term *)

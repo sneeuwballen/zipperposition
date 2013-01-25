@@ -139,6 +139,7 @@ let get_flag flag t = (t.flags land flag) != 0
  * ---------------------------------------------------------------------- *)
 
 let mk_var idx sort =
+  assert (idx >= 0);
   let rec my_v = {term = Var idx; sort=sort;
                   flags=(flag_db_closed lor flag_db_closed_computed lor
                          flag_simplified lor flag_normal_form);
@@ -147,6 +148,7 @@ let mk_var idx sort =
   H.hashcons my_v
 
 let mk_bound_var idx sort =
+  assert (idx >= 0);
   let rec my_v = {term = BoundVar idx; sort=sort;
                   flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
                   tsize=1; tag= -1; hkey=0} in
@@ -292,7 +294,7 @@ let max_var vars =
   | ({term=Var i}::vars) -> aux (max i idx) vars
   | _::vars -> assert false
   in
-  aux min_int vars
+  aux 0 vars
 
 let min_var vars =
   let rec aux idx = function
