@@ -22,14 +22,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
-(* unify terms, returns a substitution or raise an exception *)
-val unification: substitution -> term -> term -> substitution
+(** Unify terms, returns a substitution or raises UnificationFailure *)
+val unification: substitution -> term bind -> term bind -> substitution
 
-(* [matching a b] returns sigma such that sigma(a) = b *)
-val matching: substitution -> term -> term -> substitution
-
-(** [matching_locked ~locked subst a b] returns sigma such that sigma(a) = b
-    and sigma does not bind any variable in locked and subst \in sigma,
-    or raise UnificationFailure. *)
-val matching_locked: locked:Terms.THashSet.t -> substitution -> term -> term -> substitution
-
+(** [matching a b] returns sigma such that sigma(a) = b, or raises
+    UnificationFailure. Only variables from the context of [a] can
+    be bound in the substitution. *)
+val matching: substitution -> term bind -> term bind -> substitution
