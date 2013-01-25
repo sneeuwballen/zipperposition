@@ -262,24 +262,28 @@ let process_file ~kb params f =
   let signature = C.signature clauses in
   let state = PS.mk_state ~ord ?meta params signature in
   (* maybe perform initial inter-reductions *)
-  let clauses = if params.param_presaturate
+  let result, clauses = if params.param_presaturate
     then begin
       state#passive_set#add clauses;
-      let status, num = Sat.presaturate ~calculus state in
+      let result, num = Sat.presaturate ~calculus state in
       Format.printf "%% initial presaturation in %d steps@." num;
-      assert (C.CSet.is_empty state#passive_set#clauses);
+      assert (not (result = Sat.Sat || result = Sat.Unknown) ||
+              C.CSet.is_empty state#passive_set#clauses);
       let clauses = C.CSet.to_list state#active_set#clauses in
       (* remove clauses from active set *)
       state#active_set#remove clauses;
-      clauses
-    end else clauses
+      result, clauses
+    end else Sat.Unknown, clauses
   in
   Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
   (* add clauses to passive_set *)
   state#passive_set#add clauses;
   (* saturate, using a given clause main loop as choosen by the user *)
-  let result, num = Sat.given_clause ?steps ?timeout ~progress ~calculus state
+  (if params.param_split then Sat.enable_split := true);
+  let result, num = match result with
+    | Sat.Unsat _ -> result, 0  (* already found unsat during presaturation *)
+    | _ -> Sat.given_clause ?steps ?timeout ~progress ~calculus state
   in
   Printf.printf "%% ===============================================\n";
   Printf.printf "%% done %d iterations\n" num;
