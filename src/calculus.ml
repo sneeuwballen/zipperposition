@@ -156,7 +156,7 @@ let backward_simplify ~calculus active_set simpl_set given =
     C.CSet.fold
       (fun (before, after) _ hc ->
         let hc' = calculus#rw_simplify simpl_set hc in
-        if not (C.eq_hclause hc hc')
+        if not (Literals.eq_lits hc.hclits hc'.hclits)
           (* the active clause has been simplified! *)
           then begin
             Utils.debug 2 (lazy (Utils.sprintf

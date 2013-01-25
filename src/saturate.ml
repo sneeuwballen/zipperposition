@@ -66,7 +66,7 @@ let simplify ~calculus active_set simpl_set old_hc =
   let hc = calculus#basic_simplify hc in
   let hc = calculus#active_simplify active_set hc in
   let hc = calculus#basic_simplify hc in
-  (if not (C.eq_hclause hc old_hc)
+  (if not (Literals.eq_lits hc.hclits old_hc.hclits)
     then Utils.debug 2 (lazy (Utils.sprintf
                         "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
                         !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc)));

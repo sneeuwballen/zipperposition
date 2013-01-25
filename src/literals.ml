@@ -30,7 +30,7 @@ module Utils = FoUtils
 let eq l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1,ord1), Equation (l2,r2,sign2,ord2) ->
-      sign1 = sign2 && T.eq_term l1 l2 && T.eq_term r1 r2 && ord1 = ord2
+      sign1 = sign2 && l1 == l2 && r1 == r2 && ord1 = ord2
 
 let eq_com l1 l2 =
   match l1, l2 with
@@ -207,7 +207,7 @@ let vars lit =
 let eq_lits lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then true else
-    eq lits1.(i) lits2.(i) && check (i+1)
+    eq_com lits1.(i) lits2.(i) && check (i+1)
   in
   if Array.length lits1 <> Array.length lits2
     then false
