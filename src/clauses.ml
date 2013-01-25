@@ -309,7 +309,7 @@ let fresh_clause offset hc =
   incr_stat stat_fresh;
   let subst = S.relocate (offset + 1) hc.hcvars in
   let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
-  mk_hclause_a ~selected:hc.hcselected ~ctx lits hc.hcproof
+  mk_hclause_a ~parents:[hc] ~selected:hc.hcselected ~ctx lits hc.hcproof
 
 (** Normalize clause by renaming variables from 0 *)
 let normalize hc =

@@ -160,7 +160,8 @@ let do_superposition ~ctx active_clause active_pos passive_clause passive_pos su
         let rule = if sign_uv then "sup+" else "sup-" in
         let proof = Proof (rule, [(active_clause, active_pos, subst);
                                   (passive_clause, passive_pos, subst)]) in
-        let new_clause = C.mk_hclause ~ctx new_lits proof in
+        let parents = [active_clause; passive_clause] in
+        let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
         Utils.debug 3 (lazy (Utils.sprintf "... ok, conclusion @[<h>%a@]"
                             !C.pp_clause#pp_h new_clause));
         new_clause :: acc
