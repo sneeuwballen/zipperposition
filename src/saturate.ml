@@ -93,6 +93,8 @@ let generate_binary ~calculus active_set clause =
 let generate_unary ~calculus ~ord clause =
   Utils.enter_prof prof_generate_unary;
   let new_clauses = Calculus.do_unary_inferences ~ord calculus#unary_rules clause in
+  (* also do splitting *)
+  let new_clauses = List.rev_append (Sup.infer_split ~ord clause) new_clauses in
   Utils.exit_prof prof_generate_unary;
   new_clauses
 
