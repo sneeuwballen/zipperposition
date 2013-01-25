@@ -125,9 +125,6 @@ let delta_eliminate ~ord t sign =
 (** Just keep the equation as it is *)
 let keep eqn = Keep eqn
 
-(** TODO Miniscoping for reduction to CNF *)
-let miniscope ~ord hc = hc
-
 (** perform at most one simplification on each literal. It
     returns an array of tableau_rule. *)
 let eliminate_lits ~ord hc =
@@ -222,95 +219,23 @@ let recursive_eliminations ~ord ~select hc =
   let clauses = ref [] in
   (* process clauses until none of them is simplifiable *)
   let rec simplify hc =
-    let hc' = C.clause_of_fof ~ord hc in
+    let hc' = C.clause_of_fof ~ord (Cnf.simplify ~ord hc) in
     (* miniscoping *)
-    let hc' = miniscope ~ord hc' in
+    let hc' = Cnf.miniscope ~ord hc' in
     (* one step of reduction to clauses *)
     let tableau_rules = eliminate_lits ~ord hc' in
     match tableau_to_clauses ~ord hc' tableau_rules with
     | None -> clauses := hc' :: !clauses (* done with this clause *)
     | Some clauses ->
-      Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
+      Utils.debug 3 (lazy (Utils.sprintf
+                    "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
                     !C.pp_clause#pp_h hc' (Utils.pp_list !C.pp_clause#pp_h) clauses));
-      List.iter (fun hc -> simplify (C.select_clause ~select hc)) clauses (* simplify recursively new clauses *)
+      (* simplify recursively new clauses *)
+      List.iter (fun hc -> simplify (C.select_clause ~select hc)) clauses
   in
   simplify hc;
   Utils.exit_prof prof_elim;
   !clauses
-
-(* ----------------------------------------------------------------------
- * syntactic simplification
- * ---------------------------------------------------------------------- *)
-
-(** Simplify the inner formula (double negation, trivial equalities...) *)
-let simplify_inner ~ord hc =
-  let simplified = ref false in
-  let mark_simplified t = T.set_flag T.flag_simplified t true in
-  (* simplify a term *)
-  let rec simp_term t =
-    if T.get_flag T.flag_simplified t then t else  (* maybe it's already simplified *)
-    match t.term with
-    | Var _ | Node (_, []) | BoundVar _ -> (mark_simplified t; t)
-    | Bind (f, t') when not (T.db_contains t' 0) ->
-      simp_term t'  (* eta-reduction: binder binds nothing, remove it *)
-    | Bind (f, t') -> T.mk_bind f (simp_term t')
-    | Node (s, [{term=Node (s', [t'])}]) when s = not_symbol && s' = not_symbol ->
-      simp_term t'  (* double negation *)
-    | Node (s, [t']) when s = not_symbol && T.eq_term t' T.true_term ->
-      T.false_term  (* not true -> false *)
-    | Node (s, [t']) when s = not_symbol && T.eq_term t' T.false_term ->
-      T.true_term   (* not false -> true *)
-    | Node (s, [{term=Node (s', [t'])}])
-      when (s = forall_symbol || s = exists_symbol) && s' = lambda_symbol
-        && not (T.db_contains t' 0) ->
-        simp_term (T.db_unlift t') (* eta-reduction *)
-    | Node (s, [a; b]) when s = and_symbol && (T.eq_term a T.false_term || T.eq_term b T.false_term) ->
-      T.false_term  (* a and false -> false *)
-    | Node (s, [a; b]) when s = or_symbol && (T.eq_term a T.true_term || T.eq_term b T.true_term) ->
-      T.true_term  (* a or true -> true *)
-    | Node (s, [a; b]) when s = or_symbol && T.eq_term a T.false_term ->
-      simp_term b  (* b or false -> b *)
-    | Node (s, [a; b]) when s = or_symbol && T.eq_term b T.false_term ->
-      simp_term a  (* a or false -> a *)
-    | Node (s, [a; b]) when s = and_symbol && T.eq_term a T.true_term ->
-      simp_term b  (* b and true -> b *)
-    | Node (s, [a; b]) when s = and_symbol && T.eq_term b T.true_term ->
-      simp_term a  (* a and true -> a *)
-    | Node (s, [a; b]) when s = imply_symbol && (T.eq_term a T.false_term || T.eq_term b T.true_term) ->
-      T.true_term  (* (false => a) or (a => true) -> true *)
-    | Node (s, [a; b]) when s = imply_symbol && T.eq_term a T.true_term ->
-      simp_term b  (* (true => a) -> a *)
-    | Node (s, [a; b]) when s = eq_symbol && T.eq_term a b ->
-      T.true_term  (* a = a -> true *)
-    | Node (s, [a; b]) when s = eq_symbol && 
-      ((T.eq_term a T.true_term && T.eq_term b T.false_term) ||
-       (T.eq_term b T.true_term && T.eq_term a T.false_term)) ->
-      T.false_term (* true = false -> false *)
-    | Node (s, [a; b]) when s = eq_symbol && T.eq_term b T.true_term ->
-      simp_term a  (* a = true -> a *)
-    | Node (s, [a; b]) when s = eq_symbol && T.eq_term a T.true_term ->
-      simp_term b  (* b = true -> b *)
-    | Node (s, [a; b]) when s = eq_symbol && T.eq_term b T.false_term ->
-      simp_term (T.mk_not a)  (* a = false -> not a *)
-    | Node (s, [a; b]) when s = eq_symbol && T.eq_term a T.false_term ->
-      simp_term (T.mk_not b)  (* b = false -> not b *)
-    | Node (s, l) ->
-      let l' = List.map simp_term l in
-      if List.for_all2 (==) l l'
-        then (mark_simplified t; t)
-        else 
-          let new_t = T.mk_node s t.sort (List.map simp_term l) in
-          simp_term new_t
-  (* simplify a lit *)
-  and simp_lit (Equation (l,r,sign,_) as lit) =
-    let lit' = C.mk_lit ~ord (simp_term l) (simp_term r) sign in
-    (if not (C.eq_literal lit lit') then simplified := true);
-    lit'
-  in
-  let lits = Array.map simp_lit hc.hclits in
-  if !simplified
-    then C.mk_hclause_a ~ord lits hc.hcproof hc.hcparents
-    else hc  (* no simplification *)
 
 (* ----------------------------------------------------------------------
  * the calculus object
@@ -324,7 +249,7 @@ let delayed : calculus =
     method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
                           "equality_factoring", Sup.infer_equality_factoring; ]
 
-    method basic_simplify ~ord hc = Sup.basic_simplify ~ord (simplify_inner ~ord hc)
+    method basic_simplify ~ord hc = Sup.basic_simplify ~ord (Cnf.simplify ~ord hc)
 
     method rw_simplify ~select (simpl : PS.simpl_set) hc =
       let ord = simpl#ord in

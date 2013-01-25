@@ -24,5 +24,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+(** Simplify a boolean term (a formula) *)
+val simplify_term : term -> term
+
+(** Simplify the inner formula (double negation, trivial equalities...) *)
+val simplify : ord:ordering -> hclause -> hclause
+
+(** Apply miniscoping (push quantifiers as deep as possible in the formula) to the term *)
+val miniscope_term : term -> term
+
+(** Apply miniscoping transformation to the clause *)
+val miniscope : ord:ordering -> hclause -> hclause
+
 (** Transform the clause into proper CNF; returns a list of clauses *)
 val cnf_of : ord:ordering -> hclause -> hclause list

@@ -30,8 +30,137 @@ module S = FoSubst
 module Utils = FoUtils
 
 (* ----------------------------------------------------------------------
+ * syntactic simplification
+ * ---------------------------------------------------------------------- *)
+
+(** Simplify a boolean term (a formula) *)
+let rec simplify_term t =
+  let mark_simplified t = T.set_flag T.flag_simplified t true in
+  if T.get_flag T.flag_simplified t then t else  (* maybe it's already simplified *)
+  match t.term with
+  | Var _ | Node (_, []) | BoundVar _ -> (mark_simplified t; t)
+  | Bind (f, t') when not (T.db_contains t' 0) ->
+    simplify_term t'  (* eta-reduction: binder binds nothing, remove it *)
+  | Bind (f, t') -> T.mk_bind f (simplify_term t')
+  | Node (s, [{term=Bind (s', t')}]) when s == not_symbol && s' == forall_symbol ->
+    simplify_term (T.mk_exists (T.mk_not t'))  (* not forall t -> exists (not t) *)
+  | Node (s, [{term=Bind (s', t')}]) when s == not_symbol && s' == exists_symbol ->
+    simplify_term (T.mk_forall (T.mk_not t'))  (* not exists t -> forall (not t) *)
+  | Node (s, [{term=Node (s', [t'])}]) when s == not_symbol && s' == not_symbol ->
+    simplify_term t'  (* double negation *)
+  | Node (s, [t']) when s == not_symbol && t' == T.true_term ->
+    T.false_term  (* not true -> false *)
+  | Node (s, [t']) when s == not_symbol && t' == T.false_term ->
+    T.true_term   (* not false -> true *)
+  | Node (s, [a; b]) when s == and_symbol && (a == T.false_term || b == T.false_term) ->
+    T.false_term  (* a and false -> false *)
+  | Node (s, [a; b]) when s == or_symbol && (a == T.true_term || b == T.true_term) ->
+    T.true_term  (* a or true -> true *)
+  | Node (s, [a; b]) when s == or_symbol && a == T.false_term ->
+    simplify_term b  (* b or false -> b *)
+  | Node (s, [a; b]) when s == or_symbol && b == T.false_term ->
+    simplify_term a  (* a or false -> a *)
+  | Node (s, [a; b]) when s == and_symbol && a == T.true_term ->
+    simplify_term b  (* b and true -> b *)
+  | Node (s, [a; b]) when s == and_symbol && b == T.true_term ->
+    simplify_term a  (* a and true -> a *)
+  | Node (s, [a; b]) when s == imply_symbol && (a == T.false_term || b == T.true_term) ->
+    T.true_term  (* (false => a) or (a => true) -> true *)
+  | Node (s, [a; b]) when s == imply_symbol && a == T.true_term ->
+    simplify_term b  (* (true => a) -> a *)
+  | Node (s, [a; b]) when s == eq_symbol && a == b ->
+    T.true_term  (* a = a -> true *)
+  | Node (s, [a; b]) when s == eq_symbol && 
+    ((a == T.true_term && b == T.false_term) ||
+     (b == T.true_term && a == T.false_term)) ->
+    T.false_term (* true = false -> false *)
+  | Node (s, [a; b]) when s == eq_symbol && b == T.true_term ->
+    simplify_term a  (* a = true -> a *)
+  | Node (s, [a; b]) when s == eq_symbol && a == T.true_term ->
+    simplify_term b  (* b = true -> b *)
+  | Node (s, [a; b]) when s == eq_symbol && b == T.false_term ->
+    simplify_term (T.mk_not a)  (* a = false -> not a *)
+  | Node (s, [a; b]) when s == eq_symbol && a == T.false_term ->
+    simplify_term (T.mk_not b)  (* b = false -> not b *)
+  | Node (s, l) ->
+    let l' = List.map simplify_term l in
+    if List.for_all2 (==) l l'
+      then (mark_simplified t; t)
+      else 
+        let new_t = T.mk_node s t.sort (List.map simplify_term l) in
+        simplify_term new_t
+
+(** Simplify the inner formula (double negation, trivial equalities...) *)
+let simplify ~ord hc =
+  let simplified = ref false in
+  (* simplify a lit *)
+  let simp_lit (Equation (l,r,sign,_) as lit) =
+    let lit' = C.mk_lit ~ord (simplify_term l) (simplify_term r) sign in
+    (if not (C.eq_literal lit lit') then simplified := true);
+    lit'
+  in
+  let lits = Array.map simp_lit hc.hclits in
+  if !simplified
+    then C.mk_hclause_a ~ord lits hc.hcproof hc.hcparents
+    else hc  (* no simplification *)
+
+(* ----------------------------------------------------------------------
  * reduction to CNF
  * ---------------------------------------------------------------------- *)
+
+(** Apply miniscoping (push quantifiers as deep as possible in the formula) to the term *)
+let rec miniscope_term t =
+  (* build a n-ary and/or *)
+  let rec mk_n_ary s l = match l with
+  | [] -> assert false
+  | x::[] -> x
+  | x::y::l' ->  (* pop x, y from stack *)
+    let t = T.mk_node s bool_sort [x;y] in
+    mk_n_ary s (t::l')  (* push back (x op y) on stack *)
+  in
+  (* simplify the term *)
+  let t = simplify_term t in
+  (* recursive miniscoping *)
+  match t.term with
+  | Bind (s, {term=Node (s', l)})
+    when (s == forall_symbol || s == exists_symbol) && (s' == and_symbol || s' == or_symbol) ->
+    (* Q x. a and/or b -> (Q x. a) and/or b  if x \not\in vars(b) *)
+    let a, b = List.partition (fun f -> T.db_contains f 0) l in
+    assert (a <> []);  (* eta-reduction should have worked! *)
+    if b <> []
+      then
+        (* distribute forall over and, or exists over or; otherwise keep it outside *)
+        let a =
+          if ((s == forall_symbol && s' == and_symbol)
+            || (s == exists_symbol && s' == or_symbol))
+          then mk_n_ary s' (List.map (fun t -> miniscope_term (T.mk_bind s t)) a)
+          else T.mk_bind s (mk_n_ary s' a)
+        in
+        (* some subformulas do not contain x, put them outside of quantifier *)
+        let b = mk_n_ary s' (List.map (fun t -> miniscope_term (T.db_unlift t)) b) in
+        simplify_term (T.mk_node s' bool_sort [a; b])
+      else t
+  | Bind (_, _) -> t
+  | BoundVar _ | Var _ | Node _ -> t
+
+(** Apply miniscoping transformation to the clause *)
+let miniscope ~ord hc =
+  let simplified = ref false in
+  (* simplify a lit *)
+  let miniscope_lit (Equation (l,r,sign,_) as lit) =
+    let lit' = C.mk_lit ~ord (miniscope_term l) (miniscope_term r) sign in
+    (if not (C.eq_literal lit lit') then simplified := true);
+    lit'
+  in
+  let lits = Array.map miniscope_lit hc.hclits in
+  if !simplified
+    then (* mark the miniscoping as a proof step, and produce a new clause *)
+      let proof = Proof ("miniscope", [C.base_clause hc, [], S.id_subst]) in
+      let hc' = C.mk_hclause_a ~ord lits proof [hc] in
+      Utils.debug 3 (lazy (Utils.sprintf "miniscoped @[<h>%a@] into @[<h>%a@]"
+                    !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc'));
+      hc'
+    else hc  (* no miniscoping done *)
 
 (** negation normal form (also remove equivalence and implications) *) 
 let rec nnf t =
@@ -126,9 +255,13 @@ let cnf_of ~ord hc =
       Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf" !C.pp_clause#pp_h hc));
       [hc] (* already cnf, perfect *)
     end else
+      (* simplify clause *)
+      let hc = simplify ~ord hc in
+      (* steps of CNF reduction *)
       let lits = Array.to_list hc.hclits in
       let nnf_lits = List.map (fun lit -> nnf (C.term_of_lit lit)) lits in
-      let skolem_lits = List.map (fun t -> skolemize ~ord ~var_index t) nnf_lits in
+      let miniscoped_lits = List.map miniscope_term nnf_lits in
+      let skolem_lits = List.map (fun t -> skolemize ~ord ~var_index t) miniscoped_lits in
       let clauses_of_lits = List.map to_cnf skolem_lits in
       (* list of list of literals, by or-product *)
       let lit_list_list = match clauses_of_lits with
