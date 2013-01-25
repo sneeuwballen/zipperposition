@@ -423,20 +423,20 @@ let infer_split hc =
        literals each. *)
     incr_stat stat_splits;
     (* create a list of symbols *)
-    let symbols = Utils.times n next_split_term in
+    let symbols = Utils.times (n-1) next_split_term in
     let proof = Proof ("split", [hc, [], S.id_subst]) in
-    (* the guard clause, with all negated branches *)
+    (* the guard clause, plus the first component, plus all negated split symbols *)
     let guard =
-      let lits = List.map (Lits.mk_neq ~ord T.true_term) symbols @ !branch in
+      let lits = List.map (Lits.mk_neq ~ord T.true_term) symbols @ List.hd !components @ !branch in
       C.mk_hclause ~parents:[hc] ~ctx lits proof
     in
-    (* one new clause per component *)
+    (* one new clause for each other component *)
     let new_clauses = List.map2
       (fun component split_symbol ->
         let split_lit = Lits.mk_eq ~ord split_symbol T.true_term in
         let lits = split_lit :: (component @ !branch) in
         C.mk_hclause ~parents:[hc] ~ctx lits proof)
-      !components symbols
+      (List.tl !components) symbols
     in
     let new_clauses = guard :: new_clauses in
     Utils.debug 3 (lazy (Utils.sprintf
