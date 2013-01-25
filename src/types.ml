@@ -64,8 +64,15 @@ and term_cell =
 (** list of variables *)
 type varlist = term list            
 
+(** A logical first order object, with a context for its free variables.
+    The context is an offset, so that X_i inside the 'a really is X_{i+offset} *)
+type 'a bind = ('a * int)
+let bind_with x offset = (x, offset)
+
 (** substitution, a list of (variable -> term) *)
-type substitution = (term * term) list
+type substitution =
+  | SubstBind of (term * int * term * int * substitution)
+  | SubstEmpty
 
 (** (Church-Rosser) term rewriting system *)
 type rewriting_system = term -> term
