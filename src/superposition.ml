@@ -342,6 +342,7 @@ let infer_equality_factoring hc =
   new_clauses
 
 let split_count = ref 0
+let split_limit = ref 100
 
 (* union-find that maps terms to list of literals *)
 module UF = UnionFind.Make(
@@ -359,7 +360,7 @@ let infer_split hc =
   let ctx = hc.hcctx in
   let ord = ctx.ctx_ord in
   (* only do splitting on large clauses *)
-  if Array.length hc.hclits < 4 then [] else begin
+  if Array.length hc.hclits < 4 || !split_count >= !split_limit then [] else begin
   Utils.enter_prof prof_split;
   (* get a fresh split symbol *)
   let rec next_split_term () = 
