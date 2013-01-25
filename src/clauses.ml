@@ -186,7 +186,12 @@ let descendants hc = hc.hcdescendants
 let clause_of_fof hc =
   let ctx = hc.hcctx in
   let lits = Array.map (Lits.lit_of_fof ~ord:ctx.ctx_ord) hc.hclits in
-  mk_hclause_a ~ctx lits hc.hcproof
+  if Lits.eq_lits lits hc.hclits then hc (* keep the same *)
+  else begin
+    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
+    new_hc.hcdescendants <- hc.hcdescendants;
+    new_hc
+  end
 
 (** Change the context of the clause *)
 let update_ctx ~ctx hc =
@@ -208,10 +213,14 @@ let check_ord_hclause ~ord hc =
 let rec apply_subst ?(recursive=true) subst hc =
   let ctx = hc.hcctx in
   if S.is_empty subst then hc
-  else
+  else begin
     let ord = ctx.ctx_ord in
     let lits = Array.map (Lits.apply_subst ~recursive ~ord subst) hc.hclits in
-    mk_hclause_a ~ctx lits hc.hcproof
+    let descendants = hc.hcdescendants in
+    let new_hc = mk_hclause_a ~ctx lits hc.hcproof in
+    new_hc.hcdescendants <- descendants;
+    new_hc
+  end
 
 (** bitvector of literals that are positive *)
 let pos_lits lits =
@@ -309,7 +318,11 @@ let fresh_clause offset hc =
   incr_stat stat_fresh;
   let subst = S.relocate (offset + 1) hc.hcvars in
   let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
-  mk_hclause_a ~parents:[hc] ~selected:hc.hcselected ~ctx lits hc.hcproof
+  let descendants = hc.hcdescendants in
+  let new_hc = mk_hclause_a ~parents:[hc] ~selected:hc.hcselected ~ctx lits hc.hcproof in
+  (* copy children *)
+  new_hc.hcdescendants <- descendants;
+  new_hc
 
 (** Normalize clause by renaming variables from 0 *)
 let normalize hc =
@@ -317,7 +330,11 @@ let normalize hc =
   let ord = ctx.ctx_ord in
   let subst = S.relocate 0 hc.hcvars in
   let lits = Array.map (Lits.apply_subst ~recursive:false ~ord subst) hc.hclits in
-  mk_hclause_a ~ctx lits hc.hcproof
+  let descendants = hc.hcdescendants in
+  let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
+  (* copy children *)
+  new_hc.hcdescendants <- descendants;
+  new_hc
 
 (** are there selected literals in the clause? *)
 let has_selected_lits hc = not (BV.is_empty hc.hcselected)
