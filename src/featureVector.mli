@@ -36,6 +36,8 @@ val compute_fv : feature list -> literal array -> feature_vector
 val sum_of_depths : feature               (** sum of depths of symbols *)
 val feat_size_plus : feature              (** size of positive clause *)
 val feat_size_minus : feature             (** size of negative clause *)
+val count_split_symb : feature            (** count number of distinct split symbols *)
+val count_skolem_symb : feature           (** count number of distinct skolem symbols *)
 val count_symb_plus : symbol -> feature   (** occurrences of symbol in positive clause *)
 val count_symb_minus : symbol -> feature  (** occurrences of symbol in negative clause *)
 val max_depth_plus : symbol -> feature    (** maximal depth of symb in positive clause *)

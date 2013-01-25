@@ -81,6 +81,36 @@ let count_symb_lit symb lit =
   | Equation (l, r, _, _) ->
     count_symb_term l; count_symb_term r; !cnt
 
+(** Count the number of distinct split symbols *)
+let count_split_symb lits =
+  let table = SHashtbl.create 3 in
+  let rec gather t = match t.term with
+  | Node (s, l) ->
+    (if has_attr attr_split s then SHashtbl.replace table s ());
+    List.iter gather l
+  | BoundVar _ | Var _ -> ()
+  | Bind (s, t') ->
+    (if has_attr attr_split s then SHashtbl.replace table s ());
+    gather t'
+  in
+  Array.iter (function | Equation (l, r,_,_) -> gather l; gather r) lits;
+  SHashtbl.length table
+
+(** Count the number of distinct skolem symbols *)
+let count_skolem_symb lits =
+  let table = SHashtbl.create 3 in
+  let rec gather t = match t.term with
+  | Node (s, l) ->
+    (if has_attr attr_skolem s then SHashtbl.replace table s ());
+    List.iter gather l
+  | BoundVar _ | Var _ -> ()
+  | Bind (s, t') ->
+    (if has_attr attr_skolem s then SHashtbl.replace table s ());
+    gather t'
+  in
+  Array.iter (function | Equation (l, r,_,_) -> gather l; gather r) lits;
+  SHashtbl.length table
+
 let count_symb_plus symb lits =
   let cnt = ref 0 in
   Array.iter
@@ -210,7 +240,8 @@ let mk_fv_index_signature signature =
   Utils.debug 2 (lazy (Utils.sprintf "%% FV index use features @[<h>%a@]"
                  (Utils.pp_list pp_feat_triple) features));
   let features = List.map (fun (_, f,_) -> f) features in
-  let features = [feat_size_plus; feat_size_minus; sum_of_depths] @ features in
+  let features = [feat_size_plus; feat_size_minus; count_skolem_symb;
+                  count_split_symb; sum_of_depths] @ features in
   (* build an index with those features *)
   mk_fv_index features
 
