@@ -845,13 +845,12 @@ let compare_literals_subsumption lita litb =
 
 (** Check whether [a] subsumes [b], and if it does, return the
     corresponding substitution *)
-let subsumes_with a b =
+let subsumes_with (a,o_a) (b,o_b) =
   incr_stat stat_subsumption_call;
   (* a must not have more literals *)
   if Array.length a > Array.length b then None else
   (* variables that cannot be bound during subsumption *)
-  let offset = T.max_var (Lits.vars_lits a) + 1 in
-  if not (all_lits_match (a,0) (b,offset)) then None else
+  if not (all_lits_match (a,o_a) (b,o_b)) then None else
   (* sort a copy of [a] by decreasing difficulty *)
   let a = Array.copy a in
   (* try to subsumes literals of b whose index are not in bv, with [subst] *)
@@ -866,7 +865,7 @@ let subsumes_with a b =
     else if BV.get bv j then find_matched lita i subst bv (j+1) else begin
     let litb = b.(j) in
     (* match lita and litb, then flag litb as used, and try with next literal of a *)
-    let substs = match_lits subst (lita,0) (litb,offset) in
+    let substs = match_lits subst (lita,o_a) (litb,o_b) in
     let bv' = BV.set bv j in
     List.iter (fun subst' -> try_permutations (i+1) subst' bv') substs;
     (* some variable of lita occur in a[j+1...], try another literal of b *)
@@ -886,13 +885,14 @@ let subsumes_with a b =
   in
   try
     Array.sort compare_literals_subsumption a;
-    try_permutations 0 S.id_subst 0;
+    try_permutations 0 S.id_subst BV.empty;
     None
   with (SubsumptionFound subst) -> Some subst
 
 let subsumes a b =
   Utils.enter_prof prof_subsumption;
-  let res = match subsumes_with a b with
+  let offset = T.max_var (Lits.vars_lits a) + 1 in
+  let res = match subsumes_with (a,0) (b,offset) with
   | None -> false
   | Some _ -> true
   in

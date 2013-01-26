@@ -63,7 +63,7 @@ val negative_simplify_reflect : ProofState.simpl_set -> clause -> hclause
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : literal array -> literal array -> bool
-val subsumes_with : literal array -> literal array ->
+val subsumes_with : literal array bind -> literal array bind ->
                     substitution option   (** returns subsuming subst *)
 
 (** equality subsumption *)
