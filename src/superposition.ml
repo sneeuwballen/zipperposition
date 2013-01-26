@@ -475,7 +475,7 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
       else begin
         (* find equations l=r that match subterm *)
         try
-          simpl_set#idx_simpl#retrieve ~sign:true 0 (t,0)
+          simpl_set#idx_simpl#retrieve ~sign:true 1 (t,0)
             (fun l r subst unit_hclause ->
               (* r is the term subterm is going to be rewritten into *)
               assert (C.is_unit_clause unit_hclause);
