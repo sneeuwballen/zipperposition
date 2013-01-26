@@ -54,13 +54,6 @@ let add_rule trs (l, r) =
     (T.vars r));
   assert (not (T.is_var l));
   assert (l.sort = r.sort);
-  (* use low, negative variables *)
-  let vars = T.vars l in
-  List.iter (fun v ->
-    match v.term with
-    | Var i -> T.set_binding v (T.mk_var (-(i+var_offset)) v.sort)
-    | _ -> assert false) vars;
-  let l, r = T.expand_bindings l, T.expand_bindings r in
   (* add rule to the discrimination tree *)
   (* now add the rule to the index *)
   trs.index <- DT.add trs.index l r;
@@ -94,44 +87,35 @@ let pp_trs formatter trs =
 exception RewrittenIn of term
 
 (** Compute normal form of the term, and set its binding to the normal form *)
-let rec rewrite trs t = 
-  match t.term with
-  | Var _ | BoundVar _ -> t  (* always in normal form *)
-  | _ when T.get_flag T.flag_normal_form t -> t.binding  (* normal form already computed *)
-  | _ -> (* compute normal form, store it, and return it *)
-    let normal_form = compute_nf trs t in
-    T.set_binding t normal_form;
-    T.set_flag T.flag_normal_form t true;
-    normal_form
-(* compute normal form of this term *)
-and compute_nf trs t =
-  match t.term with
-  | Bind (s, t') ->
-    let t'' = rewrite trs t' in
-    let new_t = T.mk_bind s t'' in
-    reduce_at_root trs new_t
-  | Node (hd, l) ->
-    (* rewrite subterms first *)
-    let l' = List.map (rewrite trs) l in
-    let t' = T.mk_node hd t.sort l' in
-    (* rewrite at root *)
-    reduce_at_root trs t'
-  | Var _ | BoundVar _ -> assert false
-(* assuming subterms are in normal form, reduce the term *)
-and reduce_at_root trs t =
-  try
-    DT.iter_match trs.index t (rewrite_with t);
-    t  (* not rewritten *)
-  with (RewrittenIn t') ->
-    rewrite trs t' (* rewritten in t', continue *)
-(* attempt to use one of the rules to rewrite t *)
-and rewrite_with t l r subst =
-  try
-    T.reset_vars r;
-    S.apply_subst_bind subst;
-    let t' = T.expand_bindings r in  (* variables in r that are bound, are by subst *)
+let rewrite trs t = 
+  (* compute normal form of this term *)
+  let rec compute_nf offset trs t =
+    match t.term with
+    | Bind (s, t') ->
+      let t'' = compute_nf offset trs t' in
+      let new_t = T.mk_bind s t'' in
+      reduce_at_root offset trs new_t
+    | Node (hd, l) ->
+      (* rewrite subterms first *)
+      let l' = List.map (compute_nf offset trs) l in
+      let t' = T.mk_node hd t.sort l' in
+      (* rewrite at root *)
+      reduce_at_root offset trs t'
+    | Var _ | BoundVar _ -> assert false
+  (* assuming subterms are in normal form, reduce the term *)
+  and reduce_at_root offset trs t =
+    try
+      DT.iter_match (trs.index,offset) (t,0) rewrite_handler;
+      t  (* normal form *)
+    with (RewrittenIn t') ->
+      compute_nf offset trs t' (* rewritten in t', continue *)
+  (* attempt to use one of the rules to rewrite t *)
+  and rewrite_handler (l,o) r subst =
+    let t' = S.apply_subst subst (r,o) in (* all vars in [r] are bound in [subst] *)
     raise (RewrittenIn t')
-  with UnificationFailure -> ()
-
+  in
+  (* any offset will do, as long as it's <> 0, because no variable of the TRS
+     should remain free during instantiation (vars(r) \subset vars(l) for all rules) *)
+  compute_nf 1 trs t
 
 let pp_trs_index formatter trs = DT.pp_term_tree formatter trs.index
