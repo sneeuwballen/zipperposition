@@ -102,14 +102,9 @@ let benchmark_count = 1  (* with caching, not accurate to do it several times *)
 let benchmark ?(count=benchmark_count) trs a b =
   (* rewrite to normal form *)
   let one_step () =
-    a.binding <- a; 
-    T.set_flag T.flag_normal_form a false;
-    b.binding <- b;
-    T.set_flag T.flag_normal_form b false;
-    Gc.major ();
     let a' = Rw.rewrite trs a
     and b' = Rw.rewrite trs b in
-    assert (T.eq_term a' b')
+    assert (a' == b')
   in
   Gc.major ();
   let start = Unix.gettimeofday () in

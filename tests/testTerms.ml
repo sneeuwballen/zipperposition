@@ -75,9 +75,10 @@ let check_subterm t =
 
 (** check unification *)
 let check_unif (t1, t2) =
+  let offset = T.max_var (T.vars t1) + 1 in
   try
-    let subst = Unif.unification S.id_subst t1 t2 in
-    if T.eq_term (S.apply_subst subst t1) (S.apply_subst subst t2)
+    let subst = Unif.unification S.id_subst (t1,0) (t2,offset) in
+    if S.apply_subst subst (t1,0) == S.apply_subst subst (t2,offset)
       then H.TestOk else H.TestFail (t1, t2)
   with UnificationFailure -> H.TestPreconditionFalse
 

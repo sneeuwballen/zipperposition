@@ -11,11 +11,20 @@ module C = Clauses
 module O = Orderings
 module Utils = FoUtils
 
-let instantiate t1 t2 =
+let instantiate (t1,o1) (t2,o2) =
   (* find a subst for t1 and t2 *)
-  let vars = T.vars_list [t1; t2] in
-  let subst = List.map (fun v -> (v, TT.random_term ~ground:true ())) vars in
-  S.apply_subst subst t1, S.apply_subst subst t2
+  let subst = List.fold_left
+    (fun subst v -> S.bind subst (v,o1) (TT.random_term ~ground:true (), H.choose [o1;o2]))
+    S.id_subst (T.vars t1)
+  in
+  let subst = List.fold_left
+    (fun subst v -> S.bind subst (v,o2) (TT.random_term ~ground:true (), H.choose [o1;o2]))
+    subst (T.vars t2)
+  in
+  S.apply_subst S.id_subst (t1,o1),
+  S.apply_subst S.id_subst (t2,o2),
+  S.apply_subst subst (t1,o1),
+  S.apply_subst subst (t2,o2)
 
 (** generate all pairs (a, b, compare a b) for a, b in list *)
 let all_orders ~ord l =
@@ -43,8 +52,8 @@ let check_more_specific ~ord a b cmp a' b' =
   if not (more_specific cmp' cmp)
     then begin
       Format.printf "  more_specific failed on @[<h>%a %s %a (%a %s %a)@]"
-        !T.pp_term#pp a' (C.string_of_comparison cmp') !T.pp_term#pp b' 
-        !T.pp_term#pp a (C.string_of_comparison cmp) !T.pp_term#pp b;
+        !T.pp_term#pp a' (string_of_comparison cmp') !T.pp_term#pp b' 
+        !T.pp_term#pp a (string_of_comparison cmp) !T.pp_term#pp b;
       assert false
     end
 
@@ -53,8 +62,9 @@ let check_properties ~ord (a, b, cmp) =
   (* invariant by substitution *)
   (if not (T.is_ground_term a) || not (T.is_ground_term b)
     then begin
-      let a', b' = instantiate a b in
-      check_more_specific ~ord a b cmp a' b';
+      let oa, ob = 0, T.max_var (T.vars a) + 1 in
+      let a, b, a', b' = instantiate (a,oa) (b,ob) in
+      check_more_specific ~ord a b (ord#compare a b) a' b';
     end);
   (* subterm property *)
   (if a == b then assert (cmp = Eq));
@@ -82,8 +92,8 @@ let check_same ~precedence terms =
       assert (t1 == t1' && t2 == t2');
       if not (cmp12 = cmp12')
         then Format.printf "@[<h>on %a %a, RPO gave %s and RPO6 gave %s@]@."
-          !T.pp_term#pp t1 !T.pp_term#pp t2 (C.string_of_comparison cmp12)
-          (C.string_of_comparison cmp12'))
+          !T.pp_term#pp t1 !T.pp_term#pp t2 (string_of_comparison cmp12)
+          (string_of_comparison cmp12'))
     pairs pairs6
 
 let n = 500
