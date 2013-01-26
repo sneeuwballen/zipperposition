@@ -87,8 +87,8 @@ let unification subst (a, o_a) (b, o_b) =
   (* try unification, and return solution/exception (with profiler handling) *)
   try
     let subst = unif subst a o_a b o_b in
-    Utils.debug 3 (lazy (Utils.sprintf "unify @[<h>%a and %a@] yields %a"
-                  !T.pp_term#pp a !T.pp_term#pp b S.pp_substitution subst));
+    Utils.debug 4 (lazy (Utils.sprintf "unify @[<h>%a[%d] and %a[%d]@] yields %a"
+                  !T.pp_term#pp a o_a !T.pp_term#pp b o_b S.pp_substitution subst));
     Utils.exit_prof prof_unification;
     subst
   with UnificationFailure as e ->
@@ -129,8 +129,8 @@ let matching subst (a, o_a) (b, o_b) =
   (* try matching, and return solution/exception (with profiler handling) *)
   try
     let subst = unif subst a o_a b o_b in
-    Utils.debug 3 (lazy (Utils.sprintf "match @[<h>%a and %a@] yields %a"
-                  !T.pp_term#pp a !T.pp_term#pp b S.pp_substitution subst));
+    Utils.debug 4 (lazy (Utils.sprintf "match @[<h>%a[%d] and %a[%d]@] yields %a"
+                  !T.pp_term#pp a o_a !T.pp_term#pp b o_b S.pp_substitution subst));
     Utils.exit_prof prof_matching;
     subst
   with UnificationFailure as e ->

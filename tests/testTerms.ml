@@ -82,9 +82,27 @@ let check_unif (t1, t2) =
       then H.TestOk else H.TestFail (t1, t2)
   with UnificationFailure -> H.TestPreconditionFalse
 
+(** special cases *)
+let check_special () =
+  let x = T.mk_var 1 univ_sort in
+  let t1 = T.mk_bind lambda_symbol
+    (T.mk_bind lambda_symbol
+      (T.mk_node (mk_symbol "f") univ_sort [
+        T.mk_node (mk_symbol "f") univ_sort [x; T.mk_bound_var 1 univ_sort]
+        ; T.mk_bound_var 0 univ_sort]))
+  in
+  let t2 = T.mk_node (mk_symbol "g") univ_sort [T.mk_bound_var 0 univ_sort] in
+  let subst = S.bind S.id_subst (x,0) (t2,0) in
+  let t1' = S.apply_subst subst (t1,0) in
+  Format.printf "apply @[<h>%a to %a[%d] yields %a @]@."
+    S.pp_substitution subst !T.pp_term#pp t1 0 !T.pp_term#pp t1';
+  ()
+
 let run () =
   Format.printf "run terms test@.";
   let pp_pair formater (t1,t2) = Format.fprintf formater "(%a, %a)"
     !T.pp_term#pp t1 !T.pp_term#pp t2 in
   H.check_and_print ~name:"check_subterm" check_subterm random_term !T.pp_term#pp 5000;
-  H.check_and_print ~name:"check_unif" check_unif random_pair pp_pair 5000
+  H.check_and_print ~name:"check_unif" check_unif random_pair pp_pair 5000;
+  check_special ();
+  ()

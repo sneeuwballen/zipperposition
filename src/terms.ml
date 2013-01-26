@@ -354,7 +354,7 @@ let rec atomic_rec t = match t.term with
 (* compute whether the term is closed w.r.t. De Bruijn (bound) variables *)
 let compute_db_closed depth t =
   let rec recurse depth t = match t.term with
-  | BoundVar i -> i <= depth
+  | BoundVar i -> i < depth
   | Bind (s, t') -> recurse (depth+1) t'
   | Var _ -> true
   | Node (_, l) -> recurse_list depth l

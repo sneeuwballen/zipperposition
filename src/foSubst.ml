@@ -84,7 +84,8 @@ let apply_subst ?(recursive=true) subst (t, offset) =
      how many binders are on the path to the variable, because of non-DB-closed
      terms that may occur in the codomain of [subst] *)
   let rec replace binder_depth subst ((t, offset) as bound_t) =
-    if T.is_ground_term t then t (* subst(t) = t, if t ground *)
+    if T.is_ground_term t || (is_empty subst && offset = 0)
+    then t (* subst(t) = t, if t ground or subst empty with no shifting *)
     else match t.term with
     | BoundVar _ -> t
     | Bind (s, t') -> T.mk_bind s (replace (binder_depth+1) subst (t', offset))
@@ -93,16 +94,17 @@ let apply_subst ?(recursive=true) subst (t, offset) =
       T.mk_node s t.sort l'
     | Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
-      (try let ((t', o_t') as bound_t') = lookup subst bound_t in
+      (try let (t', o_t') = lookup subst bound_t in
            (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
-           let t' = if T.db_closed t' then t' else T.db_lift binder_depth t' in
+           let t' = if T.db_closed t'
+            then t' else T.db_lift binder_depth t' in
            (* also apply [subst] to [t']? *)
            if recursive && (t' != t || o_t' <> offset)
             then (* replace also in the image of t *)
-              replace binder_depth subst bound_t'
+              replace binder_depth subst (t', o_t')
             else (* return image, in which variables are shifted *)
-              replace binder_depth id_subst bound_t' 
-       with Not_found ->
+              replace binder_depth id_subst (t', o_t') 
+       with Not_found -> (* variable not bound by [subst] *)
         if offset = 0
           then t  (* no shifting *)
           else T.mk_var (i+offset) t.sort) (* shift by offset *)
@@ -113,9 +115,7 @@ let apply_subst ?(recursive=true) subst (t, offset) =
     let new_t = replace binder_depth subst (t, offset) in
     new_t :: replace_list binder_depth subst offset l'
   in
-  if is_empty subst && offset = 0
-    then t  (* no shifting, and not variable bound *)
-    else replace 0 subst (t, offset)
+  replace 0 subst (t, offset)
 
 (** Set of bound terms *)
 module Domain = Set.Make(
