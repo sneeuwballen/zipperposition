@@ -95,7 +95,9 @@ let unification subst (a, o_a) (b, o_b) =
     Utils.exit_prof prof_unification;
     raise e
 
-(** [matching a b] returns sigma such that sigma(a) = b, or raises UnificationFailure *)
+(** [matching a b] returns sigma such that sigma(a) = b, or raises
+    UnificationFailure. Only variables from the context of [a] can
+    be bound in the substitution. *)
 let matching subst (a, o_a) (b, o_b) =
   Utils.enter_prof prof_matching;
   (* recursive matching *)

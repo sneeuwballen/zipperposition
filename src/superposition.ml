@@ -783,25 +783,10 @@ let match_lits subst (lit_a, o_a) (lit_b, o_b) =
     try let subst' = Unif.matching subst (t1,o_a) (t2,o_b) in
         [Unif.matching subst' (t1',o_a) (t2',o_b)]
     with UnificationFailure -> []
-  and match2 subst t1 t2 =
-    try [Unif.matching subst (t1,o_a) (t2,o_b)]
-    with UnificationFailure -> []
   in
   match lit_a, lit_b with
   | Equation (_, _, signa, _), Equation (_, _, signb, _)
     when signa <> signb -> [] (* different sign *)
-  | Equation (la, ra, _, _), Equation (lb, rb, _, _)
-    when la == lb && ra == rb -> [S.id_subst]
-  | Equation (la, ra, _, _), Equation (lb, rb, _, _)
-    when la == rb && ra == lb -> [S.id_subst]
-  | Equation (la, ra, _, _), Equation (lb, rb, _, _)
-    when la == lb -> match2 subst ra rb
-  | Equation (la, ra, _, _), Equation (lb, rb, _, _)
-    when la == rb -> match2 subst ra lb
-  | Equation (la, ra, _, _), Equation (lb, rb, _, _)
-    when ra == rb -> match2 subst la lb
-  | Equation (la, ra, _, _), Equation (lb, rb, _, _)
-    when ra == lb -> match2 subst la rb
   | Equation (la, ra, _, Lt), Equation (lb, rb, _, Lt)
   | Equation (la, ra, _, Gt), Equation (lb, rb, _, Gt) -> (* use monotonicity *)
     match4 subst la lb ra rb
@@ -896,11 +881,13 @@ let subsumes a b =
   | None -> false
   | Some _ -> true
   in
+  Utils.debug 2 (lazy (Utils.sprintf "%% @[<h>%a subsumes %a@]"
+                Lits.pp_lits a Lits.pp_lits b));
   Utils.exit_prof prof_subsumption;
   res
 
 let eq_subsumes a b =
-  let offset = T.max_var (Lits.vars_lits a) + 1 in
+  let offset = T.max_var (Lits.vars_lits b) + 1 in
   (* subsume a literal using a = b *)
   let rec equate_lit_with a b lit =
     match lit with
@@ -916,11 +903,11 @@ let eq_subsumes a b =
     | _ -> false
   (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
   and equate_root a b u v =
-        (try let subst = Unif.matching S.id_subst (a,0) (u,offset) in
-              S.apply_subst subst (b,0) == v
+        (try let subst = Unif.matching S.id_subst (a,offset) (u,0) in
+              S.apply_subst subst (b,offset) == v
          with UnificationFailure -> false)
-    ||  (try let subst = Unif.matching S.id_subst (b,0) (u,offset) in
-              S.apply_subst subst (a,0) == v
+    ||  (try let subst = Unif.matching S.id_subst (b,offset) (u,0) in
+              S.apply_subst subst (a,offset) == v
          with UnificationFailure -> false)
   in
   (* check for each literal *)
