@@ -38,9 +38,7 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
-let version = "0.3"
-
-let lock_file file = file ^ ".lock"
+let version = "0.1"
 
 (** find the given file from given directory *)
 let find_file name dir =
