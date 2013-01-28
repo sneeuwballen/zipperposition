@@ -2,10 +2,10 @@
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 TARGET = zipperposition.native
-LIBS = datalog,unix,str
-SUBMODULES = datalog
+LIBS = unix,str
+SUBMODULES = 
 PWD = $(shell pwd)
-OPTIONS = -cflags -I,$(PWD)/datalog/_build/ -lflags -I,$(PWD)/datalog/_build/ -libs $(LIBS)
+OPTIONS = -libs $(LIBS)
 
 # switch compilation module
 MODE = debug
@@ -38,9 +38,3 @@ tags:
 
 .PHONY: all profile clean tags doc tests
 
-# libraries
-
-datalog:
-	make -C datalog
-
-.PHONY: datalog

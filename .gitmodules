@@ -1,3 +1,0 @@
-[submodule "datalog"]
-	path = datalog
-	url = git@github.com:/c-cube/datalog
