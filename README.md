@@ -3,25 +3,27 @@
 ## Short summary
 Zipperposition is intended to be a superposition prover for full first order logic. The accent
 is on flexibility, modularity and simplicity rather than performance, to allow
-quick experimenting on automated theorem proving. It generates TSTP proofs, but I
-don't have a proof checker yet so the proofs may be totally wrong - the issue is that
-some clauses can contain formulas (lazy reduction to CNF), which complicates proof
-pretty-printing and checking.
+quick experimenting on automated theorem proving. It generates TSTP traces; I did
+not find a free proof checker so I wrote a simple one (available on
+[a github repository](https://github.com/c-cube/tstp-proof-checker "proof checker"))
+that uses external provers (E and SPASS) to check each deduction step. You still
+have to trust the (possibly lazy) CNF reduction steps, sadly.
 
 Zipperposition is written in the functional and imperative language
-[OCaml](http://caml.inria.fr), now using its concurrent variant [JOcaml](http://jocaml.inria.fr).
-The name is a bad play on the words "zipper" (a
+[OCaml](http://caml.inria.fr). The name is a bad play on the words "zipper" (a
 functional data structure) and "superposition" (the calculus used by the
-prover). Superposition-based theorem proving is an active field of research, so
+prover), although the current implementation is written in quite an imperative style.
+Superposition-based theorem proving is an active field of research, so
 there is a lot of literature about it; for this implementation my main references
-are
+are:
 
 * the chapter _paramodulation-based theorem proving_ of the _handbook of automated reasoning_,
 * the paper _E: a brainiac theorem prover_ that describes the [E](http://eprover.org) prover by S.Schulz,
 * the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H.Ganzinger and J.Stuber
 
 **Disclaimer**: Note that the prover is currently a prototype and is
-likely not correct nor complete.
+likely not correct nor complete. Please don't use it to drive your personal
+nuclear power plant, nor as a trusted tool for critical applications.
 
 ## License
 Some files come from [matita](http://matita.cs.unibo.it/), the TPTP
