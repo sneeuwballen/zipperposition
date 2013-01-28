@@ -98,7 +98,6 @@ type state =
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
-    meta_prover : Theories.meta_prover option;
   >
 
 (* ----------------------------------------------------------------------
@@ -308,7 +307,7 @@ let mk_passive_set ~ctx queues =
  * global state
  * ---------------------------------------------------------------------- *)
 
-let mk_state ~ctx ?meta params signature =
+let mk_state ~ctx params signature =
   let queues = ClauseQueue.default_queues
   and unit_idx = Dtree.unit_index
   and index = choose_index params.param_index in
@@ -320,7 +319,6 @@ let mk_state ~ctx ?meta params signature =
     method active_set = m_active
     method passive_set = m_passive
     method simpl_set = m_simpl
-    method meta_prover = meta
   end
 
 (* ----------------------------------------------------------------------

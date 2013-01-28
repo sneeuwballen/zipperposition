@@ -36,11 +36,6 @@ type parameters = {
   param_progress : bool;          (** print progress during search *)
   param_proof : bool;             (** print proof *)
   param_dot_file : string option; (** file to print the final state in *)
-  param_kb : string;              (** file to use for KB *)
-  param_kb_load : string list;    (** theory files to read *)
-  param_kb_clear : bool;          (** do we need to clear the KB? *)
-  param_kb_print : bool;          (** print knowledge base and exit *)
-  param_learn : bool;             (** learn lemmas? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
@@ -68,11 +63,6 @@ let parse_args () =
   and presaturate = ref false
   and heuristic_precedence = ref true
   and dot_file = ref None
-  and kb = ref "kb"
-  and kb_load = ref []
-  and kb_clear = ref false
-  and kb_print = ref false
-  and learn = ref false
   and select = ref "SelectComplex"
   and progress = ref false
   and print_sort = ref false
@@ -88,12 +78,6 @@ let parse_args () =
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
       ("-split", Arg.Set split, "enable splitting");
-      ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
-      ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
-      ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
-      ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
-      ("-learning", Arg.Set learn, "enable lemma learning");
-      ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
       ("-progress", Arg.Set progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
@@ -122,8 +106,5 @@ let parse_args () =
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate; param_output_syntax = !output;
     param_index= !index; param_dot_file = !dot_file;
-    param_kb = !kb; param_kb_load = !kb_load;
-    param_kb_clear = !kb_clear;
-    param_kb_print = !kb_print; param_learn = !learn;
     param_print_sort = !print_sort;
     param_precedence= !heuristic_precedence;}

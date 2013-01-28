@@ -174,54 +174,8 @@ let compute_ord ~params clauses =
   in
   params.param_ord so
 
-(** Parse the theory file and add its content to the KB *)
-let parse_theory_file kb file =
-  Format.printf "%% read content of %s into the Knowledge Base@." file;
-  let input = if file = "-" then stdin else open_in file in
-  let lexbuf = Lexing.from_channel input in
-  (* parse content *)
-  let disjunctions = Parser_tptp.parse_theory_file Lexer_tptp.token lexbuf in
-  (* load content *)
-  Theories.load_theory kb disjunctions;
-  if file <> "-" then close_in input else ()
-
-(** Parses and populates the initial Knowledge Base *)
-let initial_kb params =
-  (* parse KB and update it*)
-  let kb_lock = lock_file params.param_kb in
-  let kb = Theories.update_kb ~file:params.param_kb ~lock:kb_lock
-    (fun kb ->
-      (* load required files *)
-      List.iter
-        (fun f -> parse_theory_file kb f)
-        params.param_kb_load;
-      kb)
-  in
-  Format.printf "%% %a@." Theories.pp_kb_stats kb;
-  Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
-  kb
-
-(** Initialize the meta-prover *)
-let mk_meta ~ctx ~kb params =
-  if params.param_theories then
-    (* create meta *)
-    let meta = Theories.create_meta ~ctx kb in
-    Some meta
-  else None
-
-(** Enrichment of the initial set of clauses by detecting some theories *)
-let enrich_with_theories ~ctx meta clauses =
-  match meta with
-  | None -> clauses
-  | Some meta ->
-    List.fold_left
-      (fun acc hc ->
-        let lemmas = Theories.scan_clause meta hc in
-        List.rev_append lemmas acc)
-      clauses clauses
-
 (** Process the given file (try to solve it) *)
-let process_file ~kb params f =
+let process_file params f =
   Format.printf "%% *** process file %s ***@." f;
   let steps = if params.param_steps = 0
     then None else (Format.printf "%% run for %d steps@." params.param_steps;
@@ -243,9 +197,6 @@ let process_file ~kb params f =
   let clauses = calculus#preprocess ~ctx:d_ctx clauses in
   Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
                  (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
-  (* meta-prover *)
-  let meta = mk_meta ~ctx:d_ctx ~kb params in
-  let clauses = enrich_with_theories ~ctx:d_ctx meta clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
   Format.printf "%% precedence: %a@." T.pp_precedence ord#precedence#snapshot;
@@ -254,14 +205,13 @@ let process_file ~kb params f =
   let select = Sel.selection_from_string ~ord params.param_select in
   (* at least, the context *)
   let ctx = { ctx_ord=ord; ctx_select=select; } in
-  (match meta with | None -> () | Some meta -> Theories.meta_update_ctx ~ctx meta);
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
   let clauses = calculus#preprocess ~ctx clauses in
   (* create state, and add clauses to the simpl_set *)
   let signature = C.signature clauses in
-  let state = PS.mk_state ~ctx ?meta params signature in
+  let state = PS.mk_state ~ctx params signature in
   (* maybe perform initial inter-reductions *)
   let result, clauses = if params.param_presaturate
     then begin
@@ -294,10 +244,6 @@ let process_file ~kb params f =
   (match params.param_dot_file with (* print state *)
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));
-  (* print theories *)
-  (match meta with None -> ()
-    | Some meta -> Format.printf "%% detected theories: @[<h>%a@]@."
-    (Utils.pp_list (Datalog.Logic.pp_term ?to_s:None)) meta.Theories.meta_theories);
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
@@ -311,43 +257,17 @@ let process_file ~kb params f =
       (if params.param_proof
         then Format.printf ("@.# SZS output start Refutation@.@[<v>%a@]@." ^^
                           "# SZS output end Refutation@.") !C.pp_proof#pp c);
-      (* update knowledge base *)
-      match meta with
-      | Some meta when params.param_learn ->
-        (* learning *)
-        let kb_lock = lock_file params.param_kb in
-        ignore (Theories.update_kb ~file:params.param_kb ~lock:kb_lock
-          (fun kb ->
-            let new_meta = { meta with Theories.meta_kb=kb; } in
-            LemmaLearning.learn_and_update new_meta c;
-            kb))
-      | _ -> ()
     end
-
-(** Print the content of the KB, and exit *)
-let print_kb ~kb =
-  Format.printf "%a@." Theories.pp_kb kb;
-  exit 0
-
-(** Clear the Knowledge Base and exit *)
-let clear_kb params =
-  let kb_lock = lock_file params.param_kb in
-  Theories.clear_kb ~lock:kb_lock ~file:params.param_kb;
-  exit 0
 
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
   Random.init params.param_seed;
   print_version params;
-  (* operations on knowledge base *)
-  let kb = initial_kb params in
-  (if params.param_kb_print then print_kb ~kb);
-  (if params.param_kb_clear then clear_kb params);
   (* setup printing *)
   setup_output params;
   (* master process: process files *)
-  List.iter (process_file ~kb params) params.param_files
+  List.iter (process_file params) params.param_files
 
 let _ =
   at_exit (fun () -> 
