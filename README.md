@@ -33,22 +33,28 @@ under GPLv2.
 A copy of the GPLv2 is attached to the project, in the file LICENSE.
 
 ## Build
-You will need jocaml >= 3.12 or higher with ocamlbuild and the standard
-library. You will also need to fetch submodules. Type in a terminal
-located in the root directory of the project:
+You will need OCaml >= 3.12 or higher with ocamlbuild and the standard
+library.
 
-    $ git submodule update --init
     $ make
 
 It should build the project files (using ocamlbuild).
+The executable is `zipperposition.native`. If you want to install the prover
+in your global path, type:
 
+    $ make install
+
+or, if you want to change the installation directory (default is `/usr/bin/`), type:
+
+    $ make INSTALLDIR=/foo/bar/ install
 
 ## Use
 
 Typical usage:
 
-    $ ./zipperposition.native problem_file [options]
-    $ ./zipperposition.native problem_file -calculus [delayed|superposition]
+    $ zipperposition -help
+    $ zipperposition problem_file [options]
+    $ zipperposition problem_file -calculus [delayed|superposition]
 
 to run the prover. Help is available with the option *-help*. The prover
 accepts CNF and FOF files for both calculi `-calculus superposition` and
@@ -58,13 +64,5 @@ for the former case.
 
 For instance,
 
-    $ ./zipperposition.native ./pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
+    $ zipperposition pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
 
-## Troubleshooting
-
-With the theory recognition features, zipperposition uses an on-disk file
-to store persistent knowledge between invocations. This file, by default, is
-`./kb`. However, if you used a version of zipperposition that is not up-to-date,
-the file format may have changed; since the OCaml module `Marshal` is unsage,
-attempting to load an old `kb` file may lead to a crash/segfault. In this case,
-just `rm kb`.
