@@ -98,6 +98,9 @@ class Run(object):
 
         print "solve %-30s with prover %-20s... " % (filename, prover),
         sys.stdout.flush()
+
+        # limit memory (address space)
+        resource.setrlimit(resource.RLIMIT_AS, (MEMORY * 1024, MEMORY * 1024))
       
         cmd = pstring.format(time=TIMEOUT, file=filename)
         start = time.time()
@@ -299,6 +302,7 @@ def parse_args(args):
     parser.add_argument("command", help="the command to run")
     parser.add_argument("files", nargs="*", help="files to run the provers on")
     parser.add_argument("-j", dest="cores", type=int, default=1, help="number of cores used")
+    parser.add_argument("-m", dest="memory", type=int, default=MEMORY, help="memory limit (in kbytes)")
     parser.add_argument("--db", dest="db", default=DB_FILE, help="db to use")
     args = parser.parse_args(args=args)
     return args
@@ -307,6 +311,7 @@ if __name__ == "__main__":
     # parse arguments
     args = parse_args(sys.argv[1:])
     # do actions
+    MEMORY = args.memory
     run = Run(db_name = args.db, cores=args.cores)
     fun = getattr(run, args.command)
     fun(* args.files)
