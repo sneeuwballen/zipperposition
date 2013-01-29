@@ -2,11 +2,10 @@
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 TARGETS = src/zipperposition.native tests/tests.native
-LIBS = datalog,uutf,jsonm,sequence,str,unix
-SUBMODULES = datalog sequence
+LIBS = datalog,unix,str
+SUBMODULES = datalog
 PWD = $(shell pwd)
-INCLUDES = -I,$(PWD)/datalog/_build/,-I,$(PWD)/sequence/_build/,-I,$(shell ocamlfind query jsonm),-I,$(shell ocamlfind query uutf)
-OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -I src -libs $(LIBS)
+OPTIONS = -cflags -I,$(PWD)/datalog/_build/ -lflags -I,$(PWD)/datalog/_build/ -libs $(LIBS) -I src
 
 # switch compilation module
 MODE ?= debug
