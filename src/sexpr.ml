@@ -42,6 +42,8 @@ let traverse s = Sequence.from_iter (fun k -> iter k s)
 (** Lex: create a sequence of tokens from the given in_channel. *)
 let lex input =
   let seq_fun k =
+    let in_word = ref false in
+    let buf = Buffer.create 128 in
     (* loop. TODO handle escaping of () *)
     let rec next () =
       (match input_char input with
@@ -55,21 +57,27 @@ let lex input =
           in_word := false;
           k (`Atom word)
         end
-      | c -> in_word := true; Buffer.add_char c buf);
+      | c -> in_word := true; Buffer.add_char buf c);
       next ()
     in
-    try next (); assert false  (* should raise an exception *)
+    try next (); (* should raise an exception *)
     with End_of_file -> ()
-  in { seq_fun; }
+  in 
+  Sequence.from_iter seq_fun
 
 (** Build a Sexpr from a sequence of tokens *)
 let of_seq seq =
   let stack = ref [] in
   (* called on every token *)
-  let k token = match token with
+  let rec k token = match token with
     | `Open -> stack := `Open :: !stack
-    | `Close -> stack := close [] !stack
+    | `Close -> stack := collapse [] !stack
     | `Atom a -> stack := (`Expr (Atom a)) :: !stack
+  (* collapse last list into an `Expr *)
+  and collapse acc stack = match stack with
+  | `Open::stack' -> `Expr (List acc) :: stack'
+  | `Expr a::stack' -> collapse (a :: acc) stack'
+  | _ -> assert false
   in
   (* iterate on the sequence *)
   Sequence.iter k seq;
@@ -87,11 +95,19 @@ let pp_token formatter token = match token with
 
 (** Print a sequence of Sexpr tokens on the given formatter *)
 let pp_tokens formatter tokens =
-  Sequence.pp_seq ~sep:" " pp_token formatter tokens
+  let first = ref true in
+  Sequence.iter
+    (fun token ->
+      (match token with
+      | `Open -> (if not !first then Format.fprintf formatter " "); first := true
+      | `Close -> first := false
+      | _ -> if !first then first := false else Format.fprintf formatter " ");
+      pp_token formatter token)
+    tokens
 
 (** Pretty-print the S-expr. If [indent] is true, the S-expression
     is printed with indentation. *)
-let ?(indent=false) pp_sexpr formatter s =
+let pp_sexpr ?(indent=false) formatter s =
   if indent
     then Format.fprintf formatter "@[<hov 4>%a@]" pp_tokens (traverse s)
     else pp_tokens formatter (traverse s)
