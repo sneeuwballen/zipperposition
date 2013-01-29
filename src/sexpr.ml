@@ -48,17 +48,19 @@ let lex input =
     let rec next () =
       (match input_char input with
       | '(' -> k `Open
-      | ')' -> k `Close
-      | ' ' | '\t' | '\n' ->
-        if !in_word then begin
-          (* this whitespace follows a word *)
-          let word = Buffer.contents buf in
-          Buffer.clear buf;
-          in_word := false;
-          k (`Atom word)
-        end
+      | ')' -> flush_word(); k `Close
+      | ' ' | '\t' | '\n' -> flush_word ()
       | c -> in_word := true; Buffer.add_char buf c);
       next ()
+    (* finish the previous word token *)
+    and flush_word () =
+      if !in_word then begin
+        (* this whitespace follows a word *)
+        let word = Buffer.contents buf in
+        Buffer.clear buf;
+        in_word := false;
+        k (`Atom word)
+      end
     in
     try next (); (* should raise an exception *)
     with End_of_file -> ()
@@ -67,22 +69,21 @@ let lex input =
 
 (** Build a Sexpr from a sequence of tokens *)
 let of_seq seq =
-  let stack = ref [] in
   (* called on every token *)
-  let rec k token = match token with
-    | `Open -> stack := `Open :: !stack
-    | `Close -> stack := collapse [] !stack
-    | `Atom a -> stack := (`Expr (Atom a)) :: !stack
+  let rec k stack token = match token with
+    | `Open -> `Open :: stack
+    | `Close -> collapse [] stack
+    | `Atom a -> (`Expr (Atom a)) :: stack
   (* collapse last list into an `Expr *)
   and collapse acc stack = match stack with
   | `Open::stack' -> `Expr (List acc) :: stack'
   | `Expr a::stack' -> collapse (a :: acc) stack'
   | _ -> assert false
   in
-  (* iterate on the sequence *)
-  Sequence.iter k seq;
+  (* iterate on the sequence, given an empty initial stack *)
+  let stack = Sequence.fold k [] seq in
   (* stack should contain exactly one expression *)
-  match !stack with
+  match stack with
   | [`Expr expr] -> expr
   | [] -> failwith "no Sexpr could be parsed"
   | _ -> failwith "too many elements on the stack"
