@@ -1,37 +1,31 @@
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
-INSTALLDIR := /usr/bin/
-TARGET = zipperposition.native
+INSTALLDIR ?= /usr/bin/
+BINARY = zipperposition.native
+TARGETS = src/zipperposition.native tests/tests.native zipperposition.docdir/index.html
 LIBS = unix,str
 SUBMODULES = 
 PWD = $(shell pwd)
-OPTIONS = -libs $(LIBS)
+OPTIONS = -libs $(LIBS) -I src
 
 # switch compilation module
 MODE := prod
 
-all: $(MODE) tests doc
+all: $(MODE)
 
 debug: $(SUBMODULES)
-	ocamlbuild $(OPTIONS) -tag debug src/$(TARGET)
+	ocamlbuild $(OPTIONS) -tag debug $(TARGETS)
 
 prod: $(SUBMODULES) tests
-	ocamlbuild $(OPTIONS) -tag noassert src/$(TARGET)
+	ocamlbuild $(OPTIONS) -tag noassert $(TARGETS)
 
 profile: $(SUBMODULES) tests
-	ocamlbuild $(OPTIONS) -tags debug,profile src/$(TARGET)
+	ocamlbuild $(OPTIONS) -tags debug,profile $(TARGETS)
 
+# just build bytecode
 byte: $(SUBMODULES) tests
 	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
-
-# build tests
-tests: $(SUBMODULES)
-	ocamlbuild $(OPTIONS) -tag debug -I src tests/tests.native
-
-# build documentation
-doc:
-	ocamlbuild $(OPTIONS) -I src zipperposition.docdir/index.html
 
 # cleanup build
 clean:
@@ -39,7 +33,7 @@ clean:
 
 # install the main binary
 install: all
-	cp $(TARGET) $(INSTALLDIR)/zipperposition
+	cp $(BINARY) $(INSTALLDIR)/zipperposition
 
 tags:
 	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
