@@ -33,7 +33,7 @@ let hash_4bytes hash i =
 
 (* initial hash for a sequence of [len] bytes *)
 let initial_hash len = 
-  let seed = 0x9747b28c in
+  let seed = 0x1747b28c in  (* 0x9747b28c in 31 bits *)
   let hash = seed lxor len in
   hash
 
