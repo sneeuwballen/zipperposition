@@ -107,8 +107,7 @@ let get_nf kb hc =
     let name = next_name ~prefix:"formula" kb in
     (* create a new named_formula for this clause *)
     let pc = Patterns.pclause_of_clause hc in
-    let atom = name, pc.Patterns.pc_vars in
-    let nf = { nf_atom = atom; nf_pclause = pc; } in
+    let nf = { Patterns.np_name = name; Patterns.np_pattern = pc; } in
     (* add the named formula to the KB *)
     add_named kb [nf];
     (* find a match *)
@@ -121,27 +120,28 @@ let get_nf kb hc =
 (** Convert a candidate_lemma to a proper lemma. It may have the side-effect
     to add some named formulas to the KB. *)
 let candidate_to_lemma kb cl =
-  let open Theories in
+  let module Th = Theories in
+  let module Pat = Patterns in
   (* map: a list of (symbol, variable number) *)
   let map = ref [] in
   let var_idx = ref (-1) in
   (* get an atom for the named formula with the given mapping *)
   let atom_of_nf nf mapping =
-    let name, args = nf.nf_atom in
+    let name, args = nf.Pat.np_name, nf.Pat.np_pattern.Pat.pc_vars in
     (* create an atom, binding concrete symbols to variables *)
     let args = List.map
       (fun i -> if i < Patterns.symbol_offset
-        then i (* special constant *)
+        then `Symbol (Patterns.special_symbols.(i)) (* special constant *)
         else
           (* lookup symbol for this pattern symbol, then variable for the symbol *)
-          let symbol = Ptmap.find i mapping.Patterns.m_symbol in
-          try List.assq symbol !map
+          let symbol = Ptmap.find i mapping.Pat.m_symbol in
+          try `Var (List.assq symbol !map)
           with Not_found ->
             (* associate a new variable with this symbol *)
             let n = !var_idx in
             decr var_idx;
             map := (symbol, n) :: !map;
-            n)
+            `Var n)
       args in
     name, args
   in
@@ -154,8 +154,8 @@ let candidate_to_lemma kb cl =
       let nf, mapping = get_nf kb premise in atom_of_nf nf mapping)
     cl.cl_premises in
   (* return the lemma *)
-  { lemma_conclusion = conclusion_atom;
-    lemma_premises = premises_atoms; }
+  { Th.lemma_conclusion = conclusion_atom;
+    Th.lemma_premises = premises_atoms; }
 
 module CostMap = Map.Make(
   struct
@@ -286,7 +286,7 @@ let search_lemmas meta hc =
   let lemmas = List.filter
     (fun (lemma, _) ->
       let rule = rule_of_lemma lemma in
-      Datalog.Logic.check_safe rule)
+      Logic.check_safe rule)
     lemmas
   in
   lemmas

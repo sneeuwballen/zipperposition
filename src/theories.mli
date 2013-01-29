@@ -39,19 +39,19 @@ module ProofHashSet : Set.S with type elt = proof_hash
  * generic representation of theories and lemmas (persistent)
  * ---------------------------------------------------------------------- *)
 
-type atom_name = string
+module Logic : Datalog.Logic.S with type symbol = symbol
+
+type atom_name = symbol
   (** The name of a formula. If a formula is part of a known axiomatisation
       it can have a specific name, otherwise just "lemmaX" with X a number
       (e.g. f(X,Y)=f(Y,X) is named "commutativity") *)
 
-type atom = atom_name * int list
+type atom = atom_name * [`Var of int | `Symbol of atom_name] list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
-type named_formula = {
-  nf_atom : atom;                       (* meta-atom for an instance of the pclause *)
-  nf_pclause : Patterns.pclause;        (* the pattern of the formula itself *)
-} (** A named formula is a pattern clause, plus a name (used for the datalog
+type named_formula = Patterns.named_pattern
+  (** A named formula is a pattern clause, plus a name (used for the datalog
       representation of instances of this formula *)
 
 type theory = {
@@ -65,15 +65,15 @@ type lemma = {
 } (** A lemma is a named formula that can be deduced from a list
       of other named formulas. It will be translated as a datalog rule. *)
 
-val rule_of_lemma : lemma -> Datalog.Logic.rule
+val rule_of_lemma : lemma -> Logic.rule
   (** Convert the lemma into a datalog rule *)
 
 type kb = {
   mutable kb_name_idx : int;
   mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
   mutable kb_patterns : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
-  kb_formulas : (atom_name, named_formula) Hashtbl.t; (** formulas, by name *)
-  kb_theories : (atom_name, theory) Hashtbl.t;        (** theories, by name *)
+  kb_formulas : named_formula SHashtbl.t;             (** formulas, by name *)
+  kb_theories : theory SHashtbl.t;                    (** theories, by name *)
   mutable kb_lemmas : lemma list;                     (** list of lemmas *)
   mutable kb_proofs : ProofHashSet.t;                 (** proofs already met *)
 } (** a Knowledge Base for lemma and theories *)
@@ -106,15 +106,15 @@ val pp_kb_stats : Format.formatter -> kb -> unit
  * reasoning over a problem using Datalog
  * ---------------------------------------------------------------------- *)
 
-module TermMap : Map.S with type key = Datalog.Logic.term
+module TermMap : Map.S with type key = Logic.term
 
 type meta_prover = {
-  meta_db : Datalog.Logic.db;
+  meta_db : Logic.db;
   meta_kb : kb;
   mutable meta_clauses : hclause TermMap.t; (* map terms to hclauses *)
-  mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
+  mutable meta_theories : Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
-  mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
+  mutable meta_theory_clauses : Logic.term list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ctx : context;
   mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms

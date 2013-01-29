@@ -404,6 +404,47 @@ let match_pclause ?map pclause hc =
     end
 
 (* ----------------------------------------------------------------------
+ * named patterns with Datalog representations
+ * ---------------------------------------------------------------------- *)
+
+(** A pattern with a name associated to it. *)
+type named_pattern = {
+  np_name : symbol;
+  np_pattern : pclause;
+}
+(** A Datalog-like atom for instances of a named pattern. The list of
+    strings corresponds to a binding of the pattern symbols. *)
+and np_atom = symbol * [`Symbol of symbol] list
+
+(** Given the mapping from psymbols to symbols, abstract the named pattern
+    to a Datalog-like atom *)
+let abstract_np ~map np =
+  (* map pattern symbols to concrete symbols *)
+  let args = List.map
+    (fun i -> `Symbol (Ptmap.find i map.m_symbol))
+    np.np_pattern.pc_vars
+  in np.np_name, args
+
+(** match a clause with a named pattern, yielding zero or more concrete
+    instances of the named pattern. *)
+let match_np np hc =
+  let mappings = match_pclause np.np_pattern hc in
+  List.map (fun map -> abstract_np ~map np) mappings
+  
+(** Build a concrete clause from a named pattern and an associated
+    atom that describes how to instantiate it *)
+let instantiate_np ~ctx np (head, args) proof =
+  assert (head = np.np_name);
+  assert (List.length args = List.length np.np_pattern.pc_vars);
+  (* map pattern symbols to proper symbols *)
+  let map = List.fold_left2
+    (fun mapping var (`Symbol symb) ->
+      bind_symbol mapping var symb)
+    empty_mapping np.np_pattern.pc_vars args in
+  (* instantiate pclause *)
+  instantiate_pclause ~map ~ctx np.np_pattern proof
+
+(* ----------------------------------------------------------------------
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
@@ -442,6 +483,10 @@ let pp_mapping formatter mapping =
     (fun s symbol -> if s >= symbol_offset
       then Format.fprintf formatter "%a -> %s@;" pp_symb s (name_symbol symbol))
     mapping.m_symbol
+
+let pp_named_pattern formatter np =
+  Format.fprintf formatter "@[<h>%a(%a) is %a@]"
+    !T.pp_symbol#pp np.np_name (Utils.pp_list pp_symb) np.np_pattern.pc_vars pp_pclause np.np_pattern
 
 (* ----------------------------------------------------------------------
  * map from patterns to data, with matching of clauses

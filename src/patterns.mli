@@ -30,10 +30,13 @@ open Symbols
 type psymbol = int
 type psort = int
 
+
+val special_symbols : symbol array
+  (** Maps positive integers to special symbols *)
+
 val symbol_offset : int
   (** Above this int, symbols are free (signature independent). Under
-      this threshold, symbols are special symbols (like "true" or "=")
-      *)
+      this threshold, symbols are special symbols (like "true" or "=") *)
 
 (** A pattern term. Symbols, sorts and variables can all be bound. *)
 type pterm =
@@ -123,6 +126,31 @@ val match_plit : map:mapping -> pliteral -> literal -> mapping list
 val match_pclause : ?map:mapping -> pclause -> hclause -> mapping list
 
 (* ----------------------------------------------------------------------
+ * named patterns with Datalog representations
+ * ---------------------------------------------------------------------- *)
+
+(** A pattern with a name associated to it. *)
+type named_pattern = {
+  np_name : symbol;
+  np_pattern : pclause;
+}
+(** A Datalog-like atom for instances of a named pattern. The list of
+    strings corresponds to a binding of the pattern symbols. *)
+and np_atom = symbol * [`Symbol of symbol] list
+
+val abstract_np : map:mapping -> named_pattern -> np_atom
+  (** Given the mapping from psymbols to symbols, abstract the named pattern
+      to a Datalog-like atom *)
+
+val match_np : named_pattern -> hclause -> np_atom list
+  (** match a clause with a named pattern, yielding zero or more concrete
+      instances of the named pattern. *)
+  
+val instantiate_np : ctx:context -> named_pattern -> np_atom -> proof -> hclause
+  (** Build a concrete clause from a named pattern and an associated
+      atom that describes how to instantiate it *)
+
+(* ----------------------------------------------------------------------
  * map from patterns to data, with matching of clauses
  * ---------------------------------------------------------------------- *)
 
@@ -157,3 +185,4 @@ val pp_symb : Format.formatter -> int -> unit
 val pp_pterm : Format.formatter -> pterm -> unit
 val pp_pclause : Format.formatter -> pclause -> unit
 val pp_mapping : Format.formatter -> mapping -> unit
+val pp_named_pattern : Format.formatter -> named_pattern -> unit

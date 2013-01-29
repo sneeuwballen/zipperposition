@@ -78,24 +78,32 @@ module ProofHashSet = Set.Make(struct type t = proof_hash let compare = Int64.co
  * generic representation of theories and lemmas (persistent)
  * ---------------------------------------------------------------------- *)
 
-type atom_name = string
+(** Datalog engine using same symbols as the rest of the prover *)
+module Logic = Datalog.Logic.Make(
+  struct
+    type t = symbol
+    let equal s1 s2 = s1 == s2
+    let hash s = hash_symbol s
+    let to_string s = name_symbol s
+    let of_string s = mk_symbol s
+  end)
+
+type atom_name = symbol
   (** The name of a formula. If a formula is part of a known axiomatisation
       it can have a specific name, otherwise just "lemma_X" with X a number
       (e.g. f(X,Y)=f(Y,X) is named "commutativity") *)
 
-type atom = atom_name * int list
+module SHashtbl = Symbols.SHashtbl
+
+type atom = atom_name * [`Var of int | `Symbol of atom_name] list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
 (** Convert an atom to a Datalog term *)
-let atom_to_term (head, args) =
-  let head = Datalog.Symbols.mk_symbol head in
-  Array.of_list (head :: args)
+let atom_to_term (head, args) = Logic.mk_term head args
 
-type named_formula = {
-  nf_atom : atom;                       (* meta-atom for an instance of the pclause *)
-  nf_pclause : Patterns.pclause;        (* the pattern of the formula itself *)
-} (** A named formula is a pattern clause, plus a name (used for the datalog
+type named_formula = Patterns.named_pattern
+  (** A named formula is a pattern clause, plus a name (used for the datalog
       representation of instances of this formula *)
 
 type theory = {
@@ -112,15 +120,15 @@ type lemma = {
 let rule_of_lemma lemma =
   let head = atom_to_term lemma.lemma_conclusion in
   let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
-  let rule = Datalog.Logic.mk_rule head body in
+  let rule = Logic.mk_rule head body in
   rule
 
 type kb = {
   mutable kb_name_idx : int;
   mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
   mutable kb_patterns : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
-  kb_formulas : (atom_name, named_formula) Hashtbl.t; (** formulas, by name *)
-  kb_theories : (atom_name, theory) Hashtbl.t;        (** theories, by name *)
+  kb_formulas : named_formula SHashtbl.t;             (** formulas, by name *)
+  kb_theories : theory SHashtbl.t;                    (** theories, by name *)
   mutable kb_lemmas : lemma list;                     (** list of lemmas *)
   mutable kb_proofs : ProofHashSet.t;                 (** proofs already met *)
 } (** a Knowledge Base for lemma and theories *)
@@ -130,8 +138,8 @@ let empty_kb () = {
   kb_name_idx = 0;
   kb_potential_lemmas = [];
   kb_patterns = Patterns.Map.create ();
-  kb_formulas = Hashtbl.create 5;
-  kb_theories = Hashtbl.create 3;
+  kb_formulas = SHashtbl.create 5;
+  kb_theories = SHashtbl.create 3;
   kb_lemmas = [];
   kb_proofs = ProofHashSet.empty;
 }
@@ -140,19 +148,17 @@ let empty_kb () = {
 let next_name ~prefix kb =
   let n = kb.kb_name_idx in
   kb.kb_name_idx <- n + 1;
-  Utils.sprintf "%s_%d" prefix n
+  mk_symbol (Utils.sprintf "%s_%d" prefix n)
 
 let pp_atom formatter (name, args) =
   let pp_arg formatter = function
-    | i when i < 0 -> Format.fprintf formatter "X%d" (-i)
-    | i -> Patterns.pp_symb formatter i
+    | `Var i -> Format.fprintf formatter "X%d" (-i)
+    | `Symbol s -> !T.pp_symbol#pp formatter s
   in
-  Format.fprintf formatter "@[<h>%s(%a)@]"
-    name (Utils.pp_list pp_arg) args
+  Format.fprintf formatter "@[<h>%a(%a)@]"
+    !T.pp_symbol#pp name (Utils.pp_list pp_arg) args
 
-let pp_named_formula formatter nf =
-  Format.fprintf formatter "@[<h>%a is %a.@]"
-    pp_atom nf.nf_atom Patterns.pp_pclause nf.nf_pclause
+let pp_named_formula formatter nf = Patterns.pp_named_pattern formatter nf
 
 let pp_theory formatter theory =
   Format.fprintf formatter "theory %a is %a."
@@ -169,15 +175,15 @@ let pp_kb formatter kb =
   (* print formulas definitions *)
   Format.fprintf formatter "@[<v2>%% named formulas:@;";
   let formulas = ref [] in
-  Hashtbl.iter (fun _ nf -> formulas := nf :: !formulas) kb.kb_formulas;
+  SHashtbl.iter (fun _ nf -> formulas := nf :: !formulas) kb.kb_formulas;
   List.iter
     (fun nf -> Format.fprintf formatter "%a@;" pp_named_formula nf)
-    (List.sort (fun nf1 nf2 -> compare nf1.nf_atom nf2.nf_atom) !formulas);
+    (List.sort (fun nf1 nf2 -> compare nf1.Patterns.np_name nf2.Patterns.np_name) !formulas);
   Format.fprintf formatter "@]@;";
   (* print theories *)
   Format.fprintf formatter "@[<v2>%% theories:@;";
   let theories = ref [] in
-  Hashtbl.iter (fun _ x -> theories := x :: !theories) kb.kb_theories;
+  SHashtbl.iter (fun _ x -> theories := x :: !theories) kb.kb_theories;
   List.iter
     (fun th -> Format.fprintf formatter "@[<h>%a@]@;" pp_theory th)
     (List.sort (fun th1 th2 -> compare th1.th_atom th2.th_atom) !theories);
@@ -193,9 +199,9 @@ let pp_kb formatter kb =
 (** Print statistics about KB *)
 let pp_kb_stats formatter kb =
   Format.fprintf formatter "@[<h>KB stats: %d formulas, %d lemmas, %d theories@]"
-    (Hashtbl.length kb.kb_formulas)
+    (SHashtbl.length kb.kb_formulas)
     (List.length kb.kb_lemmas)
-    (Hashtbl.length kb.kb_theories)
+    (SHashtbl.length kb.kb_theories)
 
 (** Add a potential lemma to the KB. The lemma must be checked before
     it is used. *)
@@ -211,12 +217,12 @@ let add_potential_lemmas kb pot_lemmas =
 let add_named kb named =
   List.iter
     (fun nf ->
-      let name, _ = nf.nf_atom in
-      if Hashtbl.mem kb.kb_formulas name then () else begin
+      let name = nf.Patterns.np_name in
+      if SHashtbl.mem kb.kb_formulas name then () else begin
         (* no formula with this name is already present *)
         Utils.debug 1 (lazy (Utils.sprintf "%%   add new formula %a" pp_named_formula nf));
-        Hashtbl.replace kb.kb_formulas name nf;
-        Patterns.Map.add kb.kb_patterns nf.nf_pclause nf
+        SHashtbl.replace kb.kb_formulas name nf;
+        Patterns.Map.add kb.kb_patterns nf.Patterns.np_pattern nf
       end)
     named
 
@@ -229,53 +235,49 @@ let add_theories kb theories =
   List.iter
     (fun th ->
       let th_name = fst th.th_atom in
-      Hashtbl.replace kb.kb_theories th_name th)
+      SHashtbl.replace kb.kb_theories th_name th)
     theories
 
 (* ----------------------------------------------------------------------
  * reasoning over a problem using Datalog
  * ---------------------------------------------------------------------- *)
 
-module TermMap = Map.Make(
-  struct type t = Datalog.Logic.term let compare = compare end)
+module TermMap = Map.Make(struct type t = Logic.term let compare = Logic.compare_term end)
 
 type meta_prover = {
-  meta_db : Datalog.Logic.db;
+  meta_db : Logic.db;
   meta_kb : kb;
   mutable meta_clauses : hclause TermMap.t; (* map terms to hclauses *)
-  mutable meta_theories : Datalog.Logic.term list;  (* detected theories *)
+  mutable meta_theories : Logic.term list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
-  mutable meta_theory_clauses : Datalog.Logic.term list Ptmap.t; (* clause -> list of theory terms *)
+  mutable meta_theory_clauses : Logic.term list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ctx : context;
   mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms
       and theories, inferring lemma... *)
 
-let get_kb_formula ~kb name = Hashtbl.find kb.kb_formulas name
+let get_kb_formula ~kb name = SHashtbl.find kb.kb_formulas name
 
 let get_kb_theory ~kb name =
-  try Hashtbl.find kb.kb_theories name
-  with Not_found -> failwith ("no such theory: " ^ name)
+  try SHashtbl.find kb.kb_theories name
+  with Not_found -> failwith ("no such theory: " ^ (name_symbol name))
 
 (** Translate back a datalog (ground) term into a hclause.
     First, the corresponding named formula has to be retrieved
     from kb, then it is 'matched' against the term.
     A proof and a list of parent clauses have to be provided. *)
 let term_to_hclause ~ctx ~kb term proof =
-  let term_name = Datalog.Symbols.get_symbol term.(0)
-  and term_args = Array.to_list (Array.sub term 1 (Array.length term - 1)) in
+  let term_name, term_args = Logic.open_term term in
+  let term_args = List.map
+    (function
+     | `Var _ -> assert false
+     | `Symbol s -> `Symbol s)
+    term_args
+  in
   (* get the named formula corresponding to this term *)
   let nf = get_kb_formula kb term_name in
-  let nf_name, nf_args = nf.nf_atom in
-  (* mapping from free symbols to concrete symbols *)
-  let mapping = List.fold_left2
-    (fun mapping nf_arg term_arg ->
-      assert (nf_arg >= 0);  (* ground atom *)
-      let symbol = mk_symbol (Datalog.Symbols.get_symbol term_arg) in
-      Patterns.bind_symbol mapping nf_arg symbol)
-    Patterns.empty_mapping nf_args term_args
-  in
-  Patterns.instantiate_pclause ~ctx ~map:mapping nf.nf_pclause proof
+  (* instantiate the named formula *)
+  Patterns.instantiate_np ~ctx nf (term_name, term_args) proof
 
 (** This handler is triggered whenever a named formula is discovered
     to be true for the current problem. *)
@@ -283,13 +285,12 @@ let handle_formula meta term =
   let ctx = meta.meta_ctx in
   let kb = meta.meta_kb in
   (* find parents (other formulas) *)
-  let explanation = Datalog.Logic.db_explain meta.meta_db term in
+  let explanation = Logic.db_explain meta.meta_db term in
   let parents = List.map
     (fun t ->  (* find clause that triggered hypotheses *)
       try TermMap.find t meta.meta_clauses
       with Not_found ->
-        failwith (Utils.sprintf "no clause backs term %a"
-                  (Datalog.Logic.pp_term ?to_s:None) t))
+        failwith (Utils.sprintf "no clause backs term %a" Logic.pp_term t))
     explanation
   in
   (* is the clause deduced or merely an axiom? *)
@@ -315,10 +316,10 @@ let handle_theory meta term =
   let ctx = meta.meta_ctx in
   let kb = meta.meta_kb in
   Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: theory @[<h>%a@]"
-                 (Datalog.Logic.pp_term ?to_s:None) term));
+                 Logic.pp_term term));
   incr_stat stat_theory_detected;
   (* the clauses that belong to this theory *)
-  let premises = Datalog.Logic.db_explain meta.meta_db term in
+  let premises = Logic.db_explain meta.meta_db term in
   let premise_clauses = Utils.list_flatmap
     (fun term -> try [term_to_hclause ~ctx ~kb term (Axiom ("kb","kb"))]
                  with Not_found -> [])
@@ -350,22 +351,22 @@ let db_add_lemma db lemma =
      further propagations. *)
   let rule = rule_of_lemma lemma in
   Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
-                 (Datalog.Logic.pp_rule ?to_s:None) rule));
-  Datalog.Logic.db_add db rule
+                 Logic.pp_rule rule));
+  Logic.db_add db rule
   
 (** Add the definition of a theory to the Datalog engine *)
 let db_add_theory db theory =
   let head = atom_to_term theory.th_atom in
   let body = List.map atom_to_term theory.th_definition in
-  let rule = Datalog.Logic.mk_rule head body in
+  let rule = Logic.mk_rule head body in
   Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
-                 (Datalog.Logic.pp_rule ?to_s:None) rule));
-  Datalog.Logic.db_add db rule
+                 Logic.pp_rule rule));
+  Logic.db_add db rule
 
 (** Create a meta_prover, using a Knowledge Base *)
 let create_meta ~ctx kb =
   let meta = {
-    meta_db = Datalog.Logic.db_create ();
+    meta_db = Logic.db_create ();
     meta_kb = kb;
     meta_clauses = TermMap.empty;
     meta_theories = [];
@@ -376,8 +377,8 @@ let create_meta ~ctx kb =
   } in
   Utils.debug 1 (lazy (Utils.sprintf
                  "%% meta-prover: kb contains %d lemmas, %d theories, %d named formulas"
-                 (List.length kb.kb_lemmas) (Hashtbl.length kb.kb_theories)
-                 (Hashtbl.length kb.kb_formulas)));
+                 (List.length kb.kb_lemmas) (SHashtbl.length kb.kb_theories)
+                 (SHashtbl.length kb.kb_formulas)));
   (* handler for new formulas and theories *)
   let formula_handler = handle_formula meta in
   let theory_handler = handle_theory meta in
@@ -385,17 +386,17 @@ let create_meta ~ctx kb =
   List.iter
     (fun lemma ->
       (* the lemma is f(X,...) :- g(Y...), ...; we need the index of f *)
-      let s = Datalog.Symbols.mk_symbol (fst lemma.lemma_conclusion) in
-      Datalog.Logic.db_subscribe meta.meta_db s formula_handler;
+      let s = fst lemma.lemma_conclusion in
+      Logic.db_subscribe meta.meta_db s formula_handler;
       (* also add the lemma as a rule *)
       db_add_lemma meta.meta_db lemma)
     meta.meta_kb.kb_lemmas;
   (* add definitions of theories *)
-  Hashtbl.iter
+  SHashtbl.iter
     (fun _ theory ->
       (* detect theories *)
-      let s = Datalog.Symbols.mk_symbol (fst theory.th_atom) in
-      Datalog.Logic.db_subscribe meta.meta_db s theory_handler;
+      let s = fst theory.th_atom in
+      Logic.db_subscribe meta.meta_db s theory_handler;
       (* also add the theory as a rule *)
       db_add_theory meta.meta_db theory)
     meta.meta_kb.kb_theories; 
@@ -417,29 +418,23 @@ let scan_clause meta hc =
   (* retrieve patterns that match this clause *)
   Patterns.Map.retrieve meta.meta_kb.kb_patterns hc ()
     (fun () pclause mapping nf ->
-      (* a named formula is detected, assert the corresponding datalog
-         predicate *)
-      let head, args = nf.nf_atom in
-      let open Patterns in
-      let args = List.map 
-        (function
-          | i when i < 0 -> i
-          | i -> (* translate from symbol to datalog symbol *)
-            let symbol = Ptmap.find i mapping.m_symbol in
-            Datalog.Symbols.mk_symbol (name_symbol symbol))
-        args
-      in
+      (* abstract the named pattern into a Datalog term *)
+      let (head, args) = Patterns.abstract_np ~map:mapping nf in
+      let args = List.map
+        (fun (`Symbol s) -> `Symbol s)
+        args in
       let term = atom_to_term (head, args) in
-      let rule = Datalog.Logic.mk_rule term [] in
-      if not (Datalog.Logic.db_mem meta.meta_db rule) then begin
+      (* assert the fact in the Datalog engine *)
+      let rule = Logic.mk_rule term [] in
+      if not (Logic.db_mem meta.meta_db rule) then begin
         (* add fact if not already present *)
         Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
-                       (Datalog.Logic.pp_rule ?to_s:None) rule pp_named_formula nf));
+                       Logic.pp_rule rule pp_named_formula nf));
         incr_stat stat_formula_detected;
         (* remember the clause that made us add the fact to datalog *)
         meta.meta_clauses <- TermMap.add term hc meta.meta_clauses;
         (* add the rule to datalog *)
-        Datalog.Logic.db_add meta.meta_db rule;
+        Logic.db_add meta.meta_db rule;
       end);
   (* get lemmas, and clear the list for next use *)
   let lemmas = meta.meta_lemmas in

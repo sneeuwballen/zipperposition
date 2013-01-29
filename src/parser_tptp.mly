@@ -663,10 +663,9 @@ theory_named_formula:
           try SHashtbl.find rev_map.rm_symbol s
           with Not_found -> failwith ("symbol not found " ^ (name_symbol s)))
         atom_args in
-      let atom = atom_name, atom_args in
       (* ensure the order of atom symbols is the same as in the pclause *)
-      let pc = {pc with pc_vars = atom_args; } in
-      let nf = { nf_pclause = pc; nf_atom = atom; } in
+      let pc = { pc with pc_vars = atom_args; } in
+      let nf = { np_pattern = pc; np_name = atom_name; } in
       (* ready for next thing to parse *)
       SHashtbl.clear sort_table;
       nf
@@ -680,11 +679,11 @@ theory_theory:
       let get_var =
         let table = SHashtbl.create 3 in
         fun name ->
-          try SHashtbl.find table name
+          try `Var (SHashtbl.find table name)
           with Not_found ->
             let n = -(SHashtbl.length table)-1 in
             SHashtbl.replace table name n;
-            n
+            `Var n
       in
       let convert_atom (head, args) = head, List.map get_var args in
       { th_atom = convert_atom $2;
@@ -700,11 +699,11 @@ theory_lemma:
       let get_var =
         let table = SHashtbl.create 3 in
         fun name ->
-          try SHashtbl.find table name
+          try `Var (SHashtbl.find table name)
           with Not_found ->
             let n = -(SHashtbl.length table)-1 in
             SHashtbl.replace table name n;
-            n
+            `Var n
       in
       let convert_atom (head, args) = head, List.map get_var args in
       { lemma_conclusion = convert_atom $2;
@@ -718,7 +717,7 @@ datalog_atoms:
 
 datalog_atom:
   | LOWER_WORD LEFT_PARENTHESIS datalog_args RIGHT_PARENTHESIS
-    { $1, $3 }
+    { mk_symbol $1, $3 }
 
 datalog_args:
   | datalog_arg { [$1] }
