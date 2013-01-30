@@ -38,7 +38,8 @@ module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
 
-let version = "0.1"
+(** Version, updated by the Makefile *)
+let version = "ZIPPERPOSITION_VERSION"
 
 (** find the given file from given directory *)
 let find_file name dir =

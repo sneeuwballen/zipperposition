@@ -1,4 +1,7 @@
 
+VERSION=0.1.1
+PP = 'sed -r s/ZIPPERPOSITION_VERSION/$(VERSION)/g'
+
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 INSTALLDIR ?= /usr/bin/
@@ -7,7 +10,7 @@ TARGETS = src/zipperposition.native tests/tests.native zipperposition.docdir/ind
 LIBS = unix,str
 SUBMODULES = 
 PWD = $(shell pwd)
-OPTIONS = -libs $(LIBS) -I src
+OPTIONS = -libs $(LIBS) -I src -pp $(PP)
 
 # switch compilation module
 MODE := prod
