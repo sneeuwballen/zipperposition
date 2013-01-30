@@ -104,7 +104,7 @@ let get_nf kb hc =
       (fun () pc mapping nf ->
         raise (GotchaLittlePclause (nf, mapping)));
     (* failed to find a matching named_formula *)
-    let name = next_name ~prefix:"formula" kb in
+    let name = next_name kb in
     (* create a new named_formula for this clause *)
     let pc = Patterns.pclause_of_clause hc in
     let nf = { Patterns.np_name = name; Patterns.np_pattern = pc; } in
@@ -297,19 +297,13 @@ let search_lemmas meta hc =
 let learn_and_update meta hc =
   let open Theories in
   let kb = meta.meta_kb in
-  let h = hash_proof hc in
-  if ProofHashSet.mem h kb.kb_proofs
-  then Utils.debug 0 (lazy (Utils.sprintf "%% proof %Ld already processed" h))
-  else begin
-    (* this proof is not known yet, learn from it *)
-    kb.kb_proofs <- ProofHashSet.add h kb.kb_proofs;
-    let lemmas = search_lemmas meta hc in
-    let lemmas = List.map
-      (fun (lemma, rate) ->
-        Format.printf "%%   learn @[<h>%a@], rated %.2f@." pp_lemma lemma rate;
-        lemma)
-      lemmas
-    in
-    (* store new lemmas *)
-    add_lemmas kb lemmas
-  end
+  (* learn from this proof *)
+  let lemmas = search_lemmas meta hc in
+  let lemmas = List.map
+    (fun (lemma, rate) ->
+      Format.printf "%%   learn @[<h>%a@], rated %.2f@." pp_lemma lemma rate;
+      lemma)
+    lemmas
+  in
+  (* store new lemmas *)
+  add_lemmas kb lemmas

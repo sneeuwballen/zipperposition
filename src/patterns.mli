@@ -41,6 +41,8 @@ val symbol_offset : int
 (** A pattern term. Symbols, sorts and variables can all be bound. *)
 type pterm =
   | PVar of int * psort
+  | PBoundVar of int * psort
+  | PBind of psymbol * pterm
   | PNode of psymbol * psort * pterm list
 
 val compare_pterm : pterm -> pterm -> int
@@ -181,8 +183,6 @@ module Map :
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
-val pp_symb : Format.formatter -> int -> unit
-val pp_pterm : Format.formatter -> pterm -> unit
 val pp_pclause : Format.formatter -> pclause -> unit
 val pp_mapping : Format.formatter -> mapping -> unit
 val pp_named_pattern : Format.formatter -> named_pattern -> unit

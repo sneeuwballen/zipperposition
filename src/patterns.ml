@@ -63,31 +63,18 @@ let symbol_offset = Array.length special_symbols
 (** A pattern term. Symbols, sorts and variables can all be bound. *)
 type pterm =
   | PVar of int * psort
+  | PBoundVar of int * psort
+  | PBind of psymbol * pterm
   | PNode of psymbol * psort * pterm list
 
-let rec compare_pterm t1 t2 =
-  match t1, t2 with
-  | PVar _, PNode _ -> -1
-  | PNode _, PVar _ -> 1
-  | PVar (i1, s1), PVar (i2, s2) -> if i1 <> i2 then i1 - i2 else s1 - s2
-  | PNode (f1, s1, l1), PNode (f2, s2, l2) ->
-    if f1 <> f2 then f1 - f2
-    else if s1 <> s2 then s1 - s2
-    else lexico l1 l2
-and lexico l1 l2 = match l1, l2 with
-  | [], [] -> 0
-  | [], _ -> -1
-  | _, [] -> 1
-  | x1::l1', x2::l2' ->
-    let cmp = compare_pterm x1 x2 in
-    if cmp <> 0 then cmp else lexico l1' l2'
+let compare_pterm t1 t2 = Pervasives.compare t1 t2
 
-let eq_pterm t1 t2 = compare_pterm t1 t2 = 0
+let eq_pterm t1 t2 = t1 = t2
 
 let hash_pterm t =
   let rec hash h t = match t with
-  | PVar (i, sort) ->
-    Hash.hash_int3 h i sort
+  | PVar (i, sort) | PBoundVar (i, sort) -> Hash.hash_int3 h i sort
+  | PBind (f, t') -> hash (Hash.hash_int2 h f) t'
   | PNode (f, sort, l) ->
     let h = Hash.hash_int3 h f sort in
     List.fold_left hash h l
@@ -151,7 +138,11 @@ let hash_pclause pc =
 (** List of non-special symbols/sort (index) that occur in the clause *)
 let pclause_symbols lits =
   let rec pterm_symbols acc t = match t with
-  | PVar (_, sort) -> if List.mem sort acc || sort < symbol_offset then acc else sort::acc
+  | PVar (_, sort) | PBoundVar (_, sort) ->
+    if List.mem sort acc || sort < symbol_offset then acc else sort::acc
+  | PBind (f, t') ->
+    let acc = if List.mem f acc || f < symbol_offset then acc else f :: acc in
+    pterm_symbols acc t'
   | PNode (f, sort, l) ->
     let acc = if List.mem f acc || f < symbol_offset then acc else f :: acc in
     let acc = if List.mem sort acc || sort < symbol_offset then acc else sort :: acc in
@@ -160,6 +151,18 @@ let pclause_symbols lits =
     pterm_symbols (pterm_symbols acc lit.lterm) lit.rterm
   in
   List.rev (List.fold_left plit_symbols [] lits)
+
+(** Maxvar of the pclause (used for printing) *)
+let pclause_maxvar pclause =
+  let rec term_maxvar acc t = match t with
+  | PVar (i, _) -> max acc i
+  | PBoundVar _ -> acc
+  | PBind (_, t') -> term_maxvar acc t'
+  | PNode (_, _, l) -> List.fold_left (fun acc t' -> term_maxvar acc t') acc l
+  and lit_maxvar acc lit =
+    term_maxvar (term_maxvar acc lit.lterm) lit.rterm
+  in
+  List.fold_left lit_maxvar 0 pclause.pc_lits
 
 (* ----------------------------------------------------------------------
  * mapping between regular terms/clauses and pattern terms/clauses
@@ -238,15 +241,17 @@ let pterm_of_term ?rev_map t =
   let rev_map = match rev_map with | None -> empty_rev_mapping () | Some m -> m in
   (* recursive conversion *)
   let rec convert t = match t.term with
-  | Var i | BoundVar i ->
+  | Var i ->
     let psort = rm_get_symbol ~rev_map t.sort in
     let i' = rm_get_var ~rev_map i in
     PVar (i', psort)
-  | Bind (f, t') ->
+  | BoundVar i ->
     let psort = rm_get_symbol ~rev_map t.sort in
+    PBoundVar (i, psort)
+  | Bind (f, t') ->
     let psymbol = rm_get_symbol ~rev_map f in
     let t'' = convert t' in
-    PNode (psymbol, psort, [t''])
+    PBind (psymbol, t'')
   | Node (f, l) ->
     let psort = rm_get_symbol ~rev_map t.sort in
     let psymbol = rm_get_symbol ~rev_map f in
@@ -308,6 +313,13 @@ let rec instantiate_pterm ~map pterm =
     let i' = try Ptmap.find i map.m_var with Not_found -> i in
     let s' = get_symbol ~map s in
     T.mk_var i' s'
+  | PBoundVar (i, s) ->
+    let s' = get_symbol ~map s in
+    T.mk_bound_var i s'
+  | PBind (f, t') ->
+    let f' = get_symbol ~map f in
+    let t'' = instantiate_pterm ~map t' in
+    T.mk_bind f' t''
   | PNode (f, s, l) ->
     let f' = get_symbol ~map f in
     let s' = get_symbol ~map s in
@@ -341,23 +353,23 @@ let check_symbol ~map s symbol =
     and variables on symbols and variables *)
 let rec match_pterm ~map pt t =
   match pt, t.term with
-  | PVar (i, s), Var i'
-  | PVar (i, s), BoundVar i' ->
+  | PVar (i, s), Var i' ->
     let map = check_symbol ~map s t.sort in
     (try
       let j = Ptmap.find i map.m_var in
       if j = i' then map else raise Exit
     with Not_found ->
       { map with m_var = Ptmap.add i i' map.m_var; })
+  | PBoundVar (i, s), BoundVar i' ->
+    if i = i' then check_symbol ~map s t.sort else raise Exit
+  | PBind (f, t''), Bind (f', t') ->
+    let map = check_symbol ~map f f' in
+    match_pterm ~map t'' t'
   | PNode (f, s, l), Node (f', l') ->
     (if List.length l <> List.length l' then raise Exit);
     let map = check_symbol ~map f f' in
     let map = check_symbol ~map s t.sort in
     List.fold_left2 (fun map pt t -> match_pterm ~map pt t) map l l'
-  | PNode (f, s, [pt']), Bind (f', t') ->
-    let map = check_symbol ~map f f' in
-    let map = check_symbol ~map s t.sort in
-    match_pterm ~map pt' t'
   | _ -> raise Exit
 
 let match_plit ~map plit lit =
@@ -449,31 +461,72 @@ let instantiate_np ~ctx np (head, args) proof =
  * ---------------------------------------------------------------------- *)
 
 let pp_symb formatter s = if s < Array.length special_symbols
-  then !T.pp_symbol#pp formatter special_symbols.(s)
+  then T.pp_symbol_tstp#pp formatter special_symbols.(s)
   else Format.fprintf formatter "f%d" (s - symbol_offset)
 
-let rec pp_pterm formatter t =
+let pp_pterm varindex formatter t =
   let pp_sort formatter s =
     if s >= symbol_offset then Format.fprintf formatter ":%a" pp_symb s else ()
   in
-  match t with
-  | PVar (i, s) -> Format.fprintf formatter "X%d%a" i pp_sort s
-  | PNode (f, s, []) -> Format.fprintf formatter "%a%a" pp_symb f pp_sort s
-  | PNode (f, s, l) ->
-    Format.fprintf formatter "%a%a(%a)" pp_symb f pp_sort s
-      (Utils.pp_list ~sep:", " pp_pterm) l
+  (* check whether [s] is the index of the special symbol [symb] *)
+  let is_symb s symb = s < symbol_offset && special_symbols.(s) == symb in
+  (* check whether [s] is a special symbol with given attribute *)
+  let has_attr s attr = s < symbol_offset && has_attr attr special_symbols.(s) in
+  (* is the sort of the term [t] the special sort [sort]? *)
+  let rec has_sort t sort = match t with
+    | PVar (_, s) | PBoundVar (_, s) | PNode (_, s, _) -> is_symb s sort
+    | PBind (_, t') -> has_sort t' sort
+  in
+  (* names for De Bruijn variables *)
+  let names = ref [] in
+  (* recursive printing function *)
+  let rec pp_pterm formatter t = 
+    match t with
+    | PNode (s, _, [PNode (s', _, [a;b])]) when is_symb s not_symbol
+      && is_symb s' eq_symbol && has_sort a bool_sort ->
+      Format.fprintf formatter "(%a <~> %a)" pp_pterm a pp_pterm b
+    | PNode (s, _, [a;b]) when is_symb s eq_symbol && has_sort a  bool_sort ->
+      Format.fprintf formatter "(%a <=> %a)" pp_pterm a pp_pterm b
+    | PNode (s, _, [PNode (s', _, [a; b])])
+      when is_symb s not_symbol && is_symb s' eq_symbol ->
+      Format.fprintf formatter "%a != %a" pp_pterm a pp_pterm b
+    | PNode (s, _, [t]) when is_symb s not_symbol ->
+      Format.fprintf formatter "~%a" pp_pterm t
+    | PBind (s, t') ->
+      (* push new name on stack *)
+      let name = !varindex in
+      incr varindex;
+      names := name :: !names;
+      (* recurse to print *)
+      Format.fprintf formatter "%a[X%d]: %a" pp_symb s name pp_pterm t';
+      names := List.tl !names  (* pop name *)
+    | PBoundVar (i, s) ->
+      let name = List.nth !names i in
+      Format.fprintf formatter "X%d%a" name pp_sort s
+    | PVar (i, s) ->
+      Format.fprintf formatter "X%d%a" i pp_sort s
+    | PNode (f, s, []) -> Format.fprintf formatter "%a%a" pp_symb f pp_sort s
+    | PNode (f, s, [l;r]) when has_attr attr_infix s ->
+      Format.fprintf formatter "@[<h>(%a %a %a)@]"
+        pp_pterm l pp_symb f pp_pterm r
+    | PNode (f, s, l) -> (* general case for nodes *)
+      Format.fprintf formatter "%a%a(%a)" pp_symb f pp_sort s
+        (Utils.pp_list ~sep:", " pp_pterm) l
+  in
+  pp_pterm formatter t
 
 let pp_pclause formatter pclause =
+  let varindex = ref (pclause_maxvar pclause + 1) in
   let pp_plit formatter lit =
     match lit.psign, lit.rterm with
     | true, PNode (0, _, []) -> (* = true *)
-      Format.fprintf formatter "%a" pp_pterm lit.lterm
+      Format.fprintf formatter "%a" (pp_pterm varindex) lit.lterm
     | false, PNode (0, _, []) -> (* != true *)
-      Format.fprintf formatter "~%a" pp_pterm lit.lterm
-    | true, _ ->
-      Format.fprintf formatter "%a = %a" pp_pterm lit.lterm pp_pterm lit.rterm
-    | false, _ ->
-      Format.fprintf formatter "%a != %a" pp_pterm lit.lterm pp_pterm lit.rterm
+      Format.fprintf formatter "~%a" (pp_pterm varindex) lit.lterm
+    | true, _ -> Format.fprintf formatter "%a = %a"
+        (pp_pterm varindex) lit.lterm (pp_pterm varindex) lit.rterm
+    | false, _ -> Format.fprintf formatter "%a != %a"
+        (pp_pterm varindex) lit.lterm (pp_pterm varindex) lit.rterm
   in
   Utils.pp_list ~sep:" | " pp_plit formatter pclause.pc_lits
 

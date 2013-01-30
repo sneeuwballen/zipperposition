@@ -177,26 +177,28 @@ let compute_ord ~params clauses =
 (** Parse the theory file and add its content to the KB *)
 let parse_theory_file kb file =
   Format.printf "%% read content of %s into the Knowledge Base@." file;
-  let input = if file = "-" then stdin else open_in file in
-  let lexbuf = Lexing.from_channel input in
-  (* parse content *)
-  let disjunctions = Parser_tptp.parse_theory_file Lexer_tptp.token lexbuf in
-  (* load content *)
-  Theories.load_theory kb disjunctions;
-  if file <> "-" then close_in input else ()
+  let kb_parser input =
+    let lexbuf = Lexing.from_channel input in
+    let tokens = Parser_tptp.parse_theory_file Lexer_tptp.token lexbuf in
+    Sequence.List.to_seq tokens
+  in
+  Theories.read_kb ~file ~kb_parser kb
 
 (** Parses and populates the initial Knowledge Base *)
 let initial_kb params =
-  (* parse KB and update it*)
-  let kb_lock = lock_file params.param_kb in
-  let kb = Theories.update_kb ~file:params.param_kb ~lock:kb_lock
-    (fun kb ->
+  (* parse file into an initial empty KB *)
+  let kb = Theories.empty_kb () in
+  let file = params.param_kb in
+  let kb_lock = lock_file file in
+  (* parse file, with a lock *)
+  Utils.with_lock_file kb_lock
+    (fun () ->
+      parse_theory_file kb file;
       (* load required files *)
-      List.iter
-        (fun f -> parse_theory_file kb f)
-        params.param_kb_load;
-      kb)
-  in
+      List.iter (fun f -> parse_theory_file kb f) params.param_kb_load;
+      (* save new KB *)
+      Theories.save_kb ~file ~kb_printer:Theories.pp_disjunctions kb);
+  (* return KB *)
   Format.printf "%% %a@." Theories.pp_kb_stats kb;
   Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
   kb
@@ -314,13 +316,18 @@ let process_file ~kb params f =
       (* update knowledge base *)
       match meta with
       | Some meta when params.param_learn ->
-        (* learning *)
-        let kb_lock = lock_file params.param_kb in
-        ignore (Theories.update_kb ~file:params.param_kb ~lock:kb_lock
-          (fun kb ->
-            let new_meta = { meta with Theories.meta_kb=kb; } in
-            LemmaLearning.learn_and_update new_meta c;
-            kb))
+        (* learning new lemmas *)
+        LemmaLearning.learn_and_update meta c;
+        (* merge with current file *)
+        let file = params.param_kb in
+        let kb_lock = lock_file file in
+        (* do the update atomically *)
+        Utils.with_lock_file kb_lock
+          (fun () ->
+            (* read content of file (concurrent updates?) *)
+            parse_theory_file kb file;
+            (* save the union of both files *)
+            Theories.save_kb ~file ~kb_printer:Theories.pp_disjunctions kb)
       | _ -> ()
     end
 

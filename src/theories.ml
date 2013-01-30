@@ -38,43 +38,6 @@ let stat_theory_detected = mk_stat "theory detected"
 let stat_formula_detected = mk_stat "formulas detected"
 
 (* ----------------------------------------------------------------------
- * recognition of proof
- * ---------------------------------------------------------------------- *)
-
-type proof_hash = Int64.t
-
-(** Get a (probably) unique hash for this proof *)
-let hash_proof hc =
-  assert (hc.hclits = [||]);
-  let explored = ref C.CSet.empty in
-  let h = ref 23029L in
-  let counter = ref 17L in   (* a counter of traversal in the DAG, with offset *)
-  (* recurse in the DAG *)
-  let rec explore hc =
-    if C.CSet.mem !explored hc
-    then ()
-    else begin
-      explored := C.CSet.add !explored hc;
-      (* combine hash with the clause's hash *)
-      let h_clause = Int64.of_int (C.hash_hclause hc) in
-      h := Int64.add !h (Int64.mul !counter  h_clause);
-      counter := Int64.succ !counter;
-      match hc.hcproof with
-      | Axiom _ -> ()
-      | Proof (kind, l) ->
-        (* explore parents of the clause; first hash the inference kind *)
-        let h_kind = Int64.of_int (Hashtbl.hash kind) in
-        h := Int64.add !h (Int64.mul 22571L h_kind);
-        List.iter (fun (c, _, _) -> explore c) l
-    end
-  in
-  explore hc;
-  !h
-
-module ProofHashSet = Set.Make(struct type t = proof_hash let compare = Int64.compare end) 
-  (** Set of proof hashes *)
-
-(* ----------------------------------------------------------------------
  * generic representation of theories and lemmas (persistent)
  * ---------------------------------------------------------------------- *)
 
@@ -99,6 +62,16 @@ type atom = atom_name * [`Var of int | `Symbol of atom_name] list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
 
+let compare_atom (n1, args1) (n2, args2) =
+  let compare_args a1 a2 = match a1, a2 with
+  | `Var i, `Var j -> i - j
+  | `Symbol s1, `Symbol s2 -> Symbols.compare_symbols s1 s2
+  | `Var _, `Symbol _ -> -1
+  | `Symbol _, `Var _ -> 1
+  in
+  if n1 != n2 then Symbols.compare_symbols n1 n2
+  else Utils.lexicograph compare_args args1 args2
+
 (** Convert an atom to a Datalog term *)
 let atom_to_term (head, args) = Logic.mk_term head args
 
@@ -117,38 +90,106 @@ type lemma = {
 } (** A lemma is a named formula that can be deduced from a list
       of other named formulas. It will be translated as a datalog rule. *)
 
+(** Arbitrary lexicographic comparison of lemmas *)
+let compare_lemma l1 l2 =
+  let cmp = compare_atom l1.lemma_conclusion l2.lemma_conclusion in
+  if cmp <> 0 then cmp
+  else Utils.lexicograph compare_atom l1.lemma_premises l2.lemma_premises
+
 let rule_of_lemma lemma =
   let head = atom_to_term lemma.lemma_conclusion in
   let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
   let rule = Logic.mk_rule head body in
   rule
 
+(** Set of lemmas *)
+module LemmaSet = Set.Make(struct type t = lemma let compare = compare_lemma end)
+module LemmaSetSeq = Sequence.Set(LemmaSet)
+
 type kb = {
   mutable kb_name_idx : int;
-  mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
   mutable kb_patterns : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
   kb_formulas : named_formula SHashtbl.t;             (** formulas, by name *)
   kb_theories : theory SHashtbl.t;                    (** theories, by name *)
-  mutable kb_lemmas : lemma list;                     (** list of lemmas *)
-  mutable kb_proofs : ProofHashSet.t;                 (** proofs already met *)
+  mutable kb_lemmas : LemmaSet.t;                     (** set of lemmas *)
 } (** a Knowledge Base for lemma and theories *)
   
 (** Create an empty Knowledge Base *)
 let empty_kb () = {
   kb_name_idx = 0;
-  kb_potential_lemmas = [];
   kb_patterns = Patterns.Map.create ();
   kb_formulas = SHashtbl.create 5;
   kb_theories = SHashtbl.create 3;
-  kb_lemmas = [];
-  kb_proofs = ProofHashSet.empty;
+  kb_lemmas = LemmaSet.empty;
 }
 
+(** Prefix for formulas that do not have a name added by a user *)
+let prefix = "anon_f_"
+
+(** Update the name-idx, if some named formula has a bigger number *)
+let update_name_idx kb named =
+  try Scanf.sscanf (name_symbol named.Patterns.np_name) "anon_f_%d"
+    (fun i -> kb.kb_name_idx <- max kb.kb_name_idx (i+1))
+  with Scanf.Scan_failure _ -> ()
+
 (** Find a new name for a formula *)
-let next_name ~prefix kb =
+let next_name kb =
   let n = kb.kb_name_idx in
   kb.kb_name_idx <- n + 1;
-  mk_symbol (Utils.sprintf "%s_%d" prefix n)
+  mk_symbol (Utils.sprintf "%s%d" prefix n)
+
+(** Add a list of named formulas to the KB *)
+let add_named kb named =
+  List.iter
+    (fun nf ->
+      let name = nf.Patterns.np_name in
+      (* if formula is anonymous, update fresh name index *)
+      update_name_idx kb nf;
+      if SHashtbl.mem kb.kb_formulas name then () else begin
+        (* no formula with this name is already present *)
+        SHashtbl.replace kb.kb_formulas name nf;
+        Patterns.Map.add kb.kb_patterns nf.Patterns.np_pattern nf
+      end)
+    named
+
+(** Add a list of lemmas to the KB *)
+let add_lemmas kb lemmas =
+  kb.kb_lemmas <- List.fold_left
+    (fun set lemma -> LemmaSet.add lemma set)
+    kb.kb_lemmas lemmas
+
+(*Add a list of theories to the KB *)
+let add_theories kb theories =
+  List.iter
+    (fun th ->
+      let th_name = fst th.th_atom in
+      SHashtbl.replace kb.kb_theories th_name th)
+    theories
+
+type disjunction =
+  | Lemma of lemma
+  | Theory of theory
+  | Named of named_formula
+  (** Type of an entry in a Knowledge Base file *)
+
+(** Add parsed content to the KB *)
+let load_kb kb disjunctions =
+  Sequence.iter
+    (function
+     | Lemma lemma -> add_lemmas kb [lemma]
+     | Theory th -> add_theories kb [th]
+     | Named n -> add_named kb [n])
+    disjunctions
+
+(** Dump content of the KB as a sequence of disjunctions *)
+let dump_kb kb =
+  let iter k =
+    SHashtbl.iter (fun _ nf -> k (Named nf)) kb.kb_formulas;
+    SHashtbl.iter (fun _ th -> k (Theory th)) kb.kb_theories;
+    LemmaSet.iter (fun lemma -> k (Lemma lemma)) kb.kb_lemmas; 
+    ()
+  in
+  Sequence.from_iter iter
 
 let pp_atom formatter (name, args) =
   let pp_arg formatter = function
@@ -158,7 +199,8 @@ let pp_atom formatter (name, args) =
   Format.fprintf formatter "@[<h>%a(%a)@]"
     !T.pp_symbol#pp name (Utils.pp_list pp_arg) args
 
-let pp_named_formula formatter nf = Patterns.pp_named_pattern formatter nf
+let pp_named_formula formatter nf =
+  Format.fprintf formatter "@[<hv>%a@]." Patterns.pp_named_pattern nf
 
 let pp_theory formatter theory =
   Format.fprintf formatter "theory %a is %a."
@@ -169,74 +211,28 @@ let pp_lemma formatter lemma =
     pp_atom lemma.lemma_conclusion
     (Utils.pp_list ~sep:" and " pp_atom) lemma.lemma_premises
 
+(** Print the disjunction in a human readable form *)
+let pp_disjunction formatter = function
+  | Lemma l -> pp_lemma formatter l
+  | Theory th -> pp_theory formatter th
+  | Named n -> pp_named_formula formatter n
+
+let pp_disjunctions formatter seq =
+  Format.fprintf formatter "%% vim:syntax=ocaml@;";
+  Sequence.pp_seq ~sep:"" pp_disjunction formatter seq
+
 (** Pretty print content of KB *)
 let pp_kb formatter kb =
-  Format.fprintf formatter "@[<v2>%% kb:@;";
-  (* print formulas definitions *)
-  Format.fprintf formatter "@[<v2>%% named formulas:@;";
-  let formulas = ref [] in
-  SHashtbl.iter (fun _ nf -> formulas := nf :: !formulas) kb.kb_formulas;
-  List.iter
-    (fun nf -> Format.fprintf formatter "%a@;" pp_named_formula nf)
-    (List.sort (fun nf1 nf2 -> compare nf1.Patterns.np_name nf2.Patterns.np_name) !formulas);
-  Format.fprintf formatter "@]@;";
-  (* print theories *)
-  Format.fprintf formatter "@[<v2>%% theories:@;";
-  let theories = ref [] in
-  SHashtbl.iter (fun _ x -> theories := x :: !theories) kb.kb_theories;
-  List.iter
-    (fun th -> Format.fprintf formatter "@[<h>%a@]@;" pp_theory th)
-    (List.sort (fun th1 th2 -> compare th1.th_atom th2.th_atom) !theories);
-  Format.fprintf formatter "@]@;";
-  (* print lemmas *)
-  Format.fprintf formatter "@[<v2>%% lemmas:@;";
-  List.iter
-    (fun lemma -> Format.fprintf formatter "@[<hv 2>%a@]@;" pp_lemma lemma)
-    kb.kb_lemmas;
-  Format.fprintf formatter "@]@;";
+  Format.fprintf formatter "@[<v>%% kb:@;";
+  pp_disjunctions formatter (dump_kb kb);
   Format.fprintf formatter "@]"
 
 (** Print statistics about KB *)
 let pp_kb_stats formatter kb =
   Format.fprintf formatter "@[<h>KB stats: %d formulas, %d lemmas, %d theories@]"
     (SHashtbl.length kb.kb_formulas)
-    (List.length kb.kb_lemmas)
+    (LemmaSet.cardinal kb.kb_lemmas)
     (SHashtbl.length kb.kb_theories)
-
-(** Add a potential lemma to the KB. The lemma must be checked before
-    it is used. *)
-let add_potential_lemmas kb pot_lemmas =
-  let kb_potential_lemmas =
-    List.fold_left (fun kb_potential_lemmas lemma ->
-      if List.mem lemma kb_potential_lemmas then kb_potential_lemmas
-        else lemma :: kb_potential_lemmas)
-    kb.kb_potential_lemmas pot_lemmas in
-  kb.kb_potential_lemmas <- kb_potential_lemmas
-
-(** Add a list of named formulas to the KB *)
-let add_named kb named =
-  List.iter
-    (fun nf ->
-      let name = nf.Patterns.np_name in
-      if SHashtbl.mem kb.kb_formulas name then () else begin
-        (* no formula with this name is already present *)
-        Utils.debug 1 (lazy (Utils.sprintf "%%   add new formula %a" pp_named_formula nf));
-        SHashtbl.replace kb.kb_formulas name nf;
-        Patterns.Map.add kb.kb_patterns nf.Patterns.np_pattern nf
-      end)
-    named
-
-(** Add a list of lemmas to the KB *)
-let add_lemmas kb lemmas =
-  kb.kb_lemmas <- List.rev_append lemmas kb.kb_lemmas
-
-(*Add a list of theories to the KB *)
-let add_theories kb theories =
-  List.iter
-    (fun th ->
-      let th_name = fst th.th_atom in
-      SHashtbl.replace kb.kb_theories th_name th)
-    theories
 
 (* ----------------------------------------------------------------------
  * reasoning over a problem using Datalog
@@ -377,13 +373,13 @@ let create_meta ~ctx kb =
   } in
   Utils.debug 1 (lazy (Utils.sprintf
                  "%% meta-prover: kb contains %d lemmas, %d theories, %d named formulas"
-                 (List.length kb.kb_lemmas) (SHashtbl.length kb.kb_theories)
+                 (LemmaSet.cardinal kb.kb_lemmas) (SHashtbl.length kb.kb_theories)
                  (SHashtbl.length kb.kb_formulas)));
   (* handler for new formulas and theories *)
   let formula_handler = handle_formula meta in
   let theory_handler = handle_theory meta in
   (* add definitions of lemma *) 
-  List.iter
+  LemmaSet.iter
     (fun lemma ->
       (* the lemma is f(X,...) :- g(Y...), ...; we need the index of f *)
       let s = fst lemma.lemma_conclusion in
@@ -410,8 +406,7 @@ let meta_update_ctx ~ctx meta = meta.meta_ctx <- ctx
     if it does, return the lemma that are newly discovered by the Datalog engine.
 
     It returns lemma that have been discovered by adding the clause. Those
-    lemma can be safely added to the problem.
-    *)
+    lemma can be safely added to the problem. *)
 let scan_clause meta hc =
   Utils.enter_prof prof_scan_clause;
   meta.meta_lemmas <- [];
@@ -443,68 +438,37 @@ let scan_clause meta hc =
   lemmas
 
 (* ----------------------------------------------------------------------
- * Some builtin theories, axioms and lemma
- * ---------------------------------------------------------------------- *)
-
-type disjunction = Lemma of lemma | Theory of theory | Named of named_formula
-
-(** Add theories and named formulas from file to the KB *)
-let load_theory kb disjunctions =
-  List.iter
-    (function
-     | Lemma lemma -> add_lemmas kb [lemma]
-     | Theory th -> add_theories kb [th]
-     | Named n -> add_named kb [n])
-    disjunctions
-
-(* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
  * ---------------------------------------------------------------------- *)
 
-exception ReadKB of kb
+type kb_parser = in_channel -> disjunction Sequence.t
+  (** A parser reads a sequence of disjunctions from a channel *)
 
-(* read KB without locking (may crash if wrong format) *)
-let read_kb_nolock filename =
+type kb_printer = Format.formatter -> disjunction Sequence.t -> unit
+  (** A printer prints a sequence of disjunction on a channel *)
+
+(** parse content of the file (as a list of disjunctions), and add it to the KB *)
+let read_kb ~file ~kb_parser kb =
   try
-    let file = Unix.openfile filename [Unix.O_RDONLY] 0o644 in
-    let file = Unix.in_channel_of_descr file in
-    let kb = (Marshal.from_channel file : kb) in
-    close_in file;
-    kb
+    let input = Unix.openfile file [Unix.O_RDONLY] 0o644 in
+    let input = Unix.in_channel_of_descr input in
+    let disjunctions = kb_parser input in
+    load_kb kb disjunctions;
+    close_in input
   with
-  | Unix.Unix_error _ -> empty_kb ()
-  | Failure e -> Format.printf "%% [error while reading %s: %s]" filename e; empty_kb ()
+  | Unix.Unix_error _ -> () (* TODO more error handling *)
+  | Failure e -> Format.printf "%% [error while reading %s: %s]@." file e; ()
 
-let read_kb ~lock ~file =
-  Utils.with_lock_file lock
-    (fun () -> read_kb_nolock file)
-
-let save_kb ~lock ~file kb =
-  Utils.with_lock_file lock
-    (fun () ->
-    let out = Unix.openfile file [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
-    let out = Unix.out_channel_of_descr out in
-    Marshal.to_channel out kb [];
-    flush out;
-    close_out out)
-
-let update_kb ~lock ~file f =
-  Format.printf "%% update knowledge base...@.";
-  let kb = Utils.with_lock_file lock
-    (fun () ->
-    let kb = read_kb_nolock file in
-    (* tranform kb with function *)
-    let kb = f kb in
-    (* write modified kb to file *)
-    let out = Unix.openfile file [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
-    let out = Unix.out_channel_of_descr out in
-    Marshal.to_channel out kb [];
-    flush out;
-    close_out out;
-    kb)
-  in
-  Format.printf "%% ... done@.";
-  kb
+(** save the KB to the file *)
+let save_kb ~file ~kb_printer kb =
+  let out = Unix.openfile file [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
+  let out = Unix.out_channel_of_descr out in
+  let formatter = Format.formatter_of_out_channel out in
+  (* use given printer to print each disjunction *)
+  let sequence = dump_kb kb in
+  Format.fprintf formatter "@[<v>%a@]@." kb_printer sequence;
+  flush out;
+  close_out out
 
 let clear_kb ~lock ~file =
   Utils.with_lock_file lock

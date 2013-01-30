@@ -24,18 +24,6 @@ open Types
 open Symbols
 
 (* ----------------------------------------------------------------------
- * recognition of proof
- * ---------------------------------------------------------------------- *)
-
-type proof_hash = Int64.t
-
-val hash_proof : hclause -> proof_hash
-  (** Get a (probably) unique hash for this proof *)
-
-module ProofHashSet : Set.S with type elt = proof_hash
-  (** Set of proof hashes *)
-
-(* ----------------------------------------------------------------------
  * generic representation of theories and lemmas (persistent)
  * ---------------------------------------------------------------------- *)
 
@@ -49,6 +37,8 @@ type atom_name = symbol
 type atom = atom_name * [`Var of int | `Symbol of atom_name] list
   (** An atom in the meta level of reasoning. This represents a fact about
       the current proof search (presence of a theory, of a clause, of a lemma... *)
+
+val compare_atom : atom -> atom -> int
 
 type named_formula = Patterns.named_pattern
   (** A named formula is a pattern clause, plus a name (used for the datalog
@@ -65,28 +55,40 @@ type lemma = {
 } (** A lemma is a named formula that can be deduced from a list
       of other named formulas. It will be translated as a datalog rule. *)
 
+val compare_lemma : lemma -> lemma -> int
+  (** Arbitrary lexicographic comparison of lemmas *)
+
 val rule_of_lemma : lemma -> Logic.rule
   (** Convert the lemma into a datalog rule *)
 
+module LemmaSet : Set.S with type elt = lemma
+  (** Set of lemmas *)
+
 type kb = {
   mutable kb_name_idx : int;
-  mutable kb_potential_lemmas : lemma list;           (** potential lemma, to explore *)
   mutable kb_patterns : named_formula Patterns.Map.t; (** named formulas, indexed by pattern *)
   kb_formulas : named_formula SHashtbl.t;             (** formulas, by name *)
   kb_theories : theory SHashtbl.t;                    (** theories, by name *)
-  mutable kb_lemmas : lemma list;                     (** list of lemmas *)
-  mutable kb_proofs : ProofHashSet.t;                 (** proofs already met *)
+  mutable kb_lemmas : LemmaSet.t;                     (** set of lemmas *)
 } (** a Knowledge Base for lemma and theories *)
+
+type disjunction =
+  | Lemma of lemma
+  | Theory of theory
+  | Named of named_formula
+  (** Type of an entry in a Knowledge Base file *)
 
 val empty_kb : unit -> kb
   (** Create an empty Knowledge Base *)
 
-val next_name : prefix:string -> kb -> atom_name
+val next_name : kb -> atom_name
   (** Find a new name for a formula *)
 
-val add_potential_lemmas : kb -> lemma list -> unit
-  (** Add a potential lemma to the KB. The lemma must be checked before
-      it is used. *)
+val load_kb : kb -> disjunction Sequence.t -> unit
+  (** Add parsed content to the KB *)
+
+val dump_kb : kb -> disjunction Sequence.t
+  (** Dump content of the KB as a sequence of disjunctions *)
 
 val add_named : kb -> named_formula list -> unit
 val add_lemmas : kb -> lemma list -> unit
@@ -96,8 +98,12 @@ val pp_named_formula : Format.formatter -> named_formula -> unit
 val pp_lemma : Format.formatter -> lemma -> unit
 val pp_theory : Format.formatter -> theory -> unit
 
+val pp_disjunction : Format.formatter -> disjunction -> unit
+  (** Print the disjunction in a human readable form *)
+val pp_disjunctions : Format.formatter -> disjunction Sequence.t -> unit
+
 val pp_kb : Format.formatter -> kb -> unit
-  (** Pretty print content of KB *)
+  (** Print the content of the KB in a human readable form *)
 
 val pp_kb_stats : Format.formatter -> kb -> unit
   (** Print statistics about KB *)
@@ -131,31 +137,23 @@ val scan_clause : meta_prover -> hclause -> hclause list
       if it does, return the lemma that are newly discovered by the Datalog engine.
 
       It returns lemma that have been discovered by adding the clause. Those
-      lemma can be safely added to the problem.
-      *)
-
-(* ----------------------------------------------------------------------
- * Some builtin theories, axioms and lemma
- * ---------------------------------------------------------------------- *)
-
-type disjunction = Lemma of lemma | Theory of theory | Named of named_formula
-
-val load_theory : kb -> disjunction list -> unit
-  (** Add parsed content to the KB *)
+      lemma can be safely added to the problem. *)
 
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
  * ---------------------------------------------------------------------- *)
 
-val read_kb : lock:string -> file:string -> kb
-  (** parse KB from file (or gives an empty one) *)
+type kb_parser = in_channel -> disjunction Sequence.t
+  (** A parser reads a sequence of disjunctions from a channel *)
 
-val save_kb : lock:string -> file:string -> kb -> unit
+type kb_printer = Format.formatter -> disjunction Sequence.t -> unit
+  (** A printer prints a disjunction on a channel *)
+
+val read_kb : file:string -> kb_parser:kb_parser -> kb -> unit
+  (** parse content of the file (as a list of disjunctions), and add it to the KB *)
+
+val save_kb : file:string -> kb_printer:kb_printer -> kb -> unit
   (** save the KB to the file *)
-
-val update_kb : lock:string -> file:string -> (kb -> kb) -> kb
-  (** updates the KB located in given file (with given lock file),
-      with the function. It returns the updated kb. *)
 
 val clear_kb : lock:string -> file:string -> unit
   (** Erase the content of the KB (remove the file) *)
