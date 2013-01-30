@@ -191,9 +191,9 @@ let dump_kb kb =
   in
   Sequence.from_iter iter
 
-let pp_atom formatter (name, args) =
+let pp_atom ?(var_prefix="X") formatter (name, args) =
   let pp_arg formatter = function
-    | `Var i -> Format.fprintf formatter "X%d" (-i)
+    | `Var i -> Format.fprintf formatter "%s%d" var_prefix (-i)
     | `Symbol s -> !T.pp_symbol#pp formatter s
   in
   Format.fprintf formatter "@[<h>%a(%a)@]"
@@ -203,13 +203,16 @@ let pp_named_formula formatter nf =
   Format.fprintf formatter "@[<hv>%a@]." Patterns.pp_named_pattern nf
 
 let pp_theory formatter theory =
-  Format.fprintf formatter "theory %a is %a."
-    pp_atom theory.th_atom (Utils.pp_list ~sep:" and " pp_atom) theory.th_definition
+  let var_prefix = "f" in
+  Format.fprintf formatter "theory @[<h>%a@] is@ @[<hv2>%a@]."
+    (pp_atom ~var_prefix) theory.th_atom
+    (Utils.pp_list ~sep:" and " (pp_atom ~var_prefix)) theory.th_definition
 
 let pp_lemma formatter lemma =
-  Format.fprintf formatter "lemma %a if @;%a."
-    pp_atom lemma.lemma_conclusion
-    (Utils.pp_list ~sep:" and " pp_atom) lemma.lemma_premises
+  let var_prefix = "f" in
+  Format.fprintf formatter "lemma @[<h>%a@] if@ @[<hv2>%a@]."
+    (pp_atom ~var_prefix) lemma.lemma_conclusion
+    (Utils.pp_list ~sep:" and " (pp_atom ~var_prefix)) lemma.lemma_premises
 
 (** Print the disjunction in a human readable form *)
 let pp_disjunction formatter = function
@@ -456,8 +459,9 @@ let read_kb ~file ~kb_parser kb =
     load_kb kb disjunctions;
     close_in input
   with
-  | Unix.Unix_error _ -> () (* TODO more error handling *)
-  | Failure e -> Format.printf "%% [error while reading %s: %s]@." file e; ()
+  | Unix.Unix_error (e,_,_) ->
+    Format.printf "%% Unix error while reading %s: %s@." file (Unix.error_message e)
+  | Failure e -> Format.printf "%% error while reading %s: %s@." file e; ()
 
 (** save the KB to the file *)
 let save_kb ~file ~kb_printer kb =

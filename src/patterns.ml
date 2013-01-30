@@ -460,22 +460,22 @@ let instantiate_np ~ctx np (head, args) proof =
  * pretty printing
  * ---------------------------------------------------------------------- *)
 
-let pp_symb formatter s = if s < Array.length special_symbols
+let pp_symb formatter s = if s < symbol_offset
   then T.pp_symbol_tstp#pp formatter special_symbols.(s)
   else Format.fprintf formatter "f%d" (s - symbol_offset)
+
+(* check whether [s] is the index of the special symbol [symb] *)
+let is_symb s symb = s < symbol_offset && special_symbols.(s) == symb
+(* check whether [s] is a special symbol with given attribute *)
+let has_attr attr s = s < symbol_offset && has_attr attr special_symbols.(s)
+(* is the sort of the term [t] the special sort [sort]? *)
+let rec has_sort t sort = match t with
+  | PVar (_, s) | PBoundVar (_, s) | PNode (_, s, _) -> is_symb s sort
+  | PBind (_, t') -> has_sort t' sort
 
 let pp_pterm varindex formatter t =
   let pp_sort formatter s =
     if s >= symbol_offset then Format.fprintf formatter ":%a" pp_symb s else ()
-  in
-  (* check whether [s] is the index of the special symbol [symb] *)
-  let is_symb s symb = s < symbol_offset && special_symbols.(s) == symb in
-  (* check whether [s] is a special symbol with given attribute *)
-  let has_attr s attr = s < symbol_offset && has_attr attr special_symbols.(s) in
-  (* is the sort of the term [t] the special sort [sort]? *)
-  let rec has_sort t sort = match t with
-    | PVar (_, s) | PBoundVar (_, s) | PNode (_, s, _) -> is_symb s sort
-    | PBind (_, t') -> has_sort t' sort
   in
   (* names for De Bruijn variables *)
   let names = ref [] in
@@ -498,7 +498,7 @@ let pp_pterm varindex formatter t =
       incr varindex;
       names := name :: !names;
       (* recurse to print *)
-      Format.fprintf formatter "%a[X%d]: %a" pp_symb s name pp_pterm t';
+      Format.fprintf formatter "(%a[X%d]: %a)" pp_symb s name pp_pterm t';
       names := List.tl !names  (* pop name *)
     | PBoundVar (i, s) ->
       let name = List.nth !names i in
@@ -506,7 +506,7 @@ let pp_pterm varindex formatter t =
     | PVar (i, s) ->
       Format.fprintf formatter "X%d%a" i pp_sort s
     | PNode (f, s, []) -> Format.fprintf formatter "%a%a" pp_symb f pp_sort s
-    | PNode (f, s, [l;r]) when has_attr attr_infix s ->
+    | PNode (f, s, [l;r]) when has_attr attr_infix f ->
       Format.fprintf formatter "@[<h>(%a %a %a)@]"
         pp_pterm l pp_symb f pp_pterm r
     | PNode (f, s, l) -> (* general case for nodes *)
@@ -523,10 +523,14 @@ let pp_pclause formatter pclause =
       Format.fprintf formatter "%a" (pp_pterm varindex) lit.lterm
     | false, PNode (0, _, []) -> (* != true *)
       Format.fprintf formatter "~%a" (pp_pterm varindex) lit.lterm
-    | true, _ -> Format.fprintf formatter "%a = %a"
-        (pp_pterm varindex) lit.lterm (pp_pterm varindex) lit.rterm
-    | false, _ -> Format.fprintf formatter "%a != %a"
-        (pp_pterm varindex) lit.lterm (pp_pterm varindex) lit.rterm
+    | true, _ -> Format.fprintf formatter "%a %s %a"
+        (pp_pterm varindex) lit.lterm
+        (if has_sort lit.lterm bool_sort then "<=>" else "=")
+        (pp_pterm varindex) lit.rterm
+    | false, _ -> Format.fprintf formatter "%a %s %a"
+        (pp_pterm varindex) lit.lterm
+        (if has_sort lit.lterm bool_sort then "<~>" else "!=")
+        (pp_pterm varindex) lit.rterm
   in
   Utils.pp_list ~sep:" | " pp_plit formatter pclause.pc_lits
 
