@@ -156,22 +156,21 @@ parse_file:
 
         (* reset for next parser run *)
         include_files := [];
+        Const.reset ();
         
         clauses, includes
       }
 
   | EOI
-      { print_endline "empty problem specification";
-        raise Const.PARSE_ERROR }
+      { Const.parse_error "empty problem specification" }
 
 parse_clause:
-  | fof_formula EOI { $1 }
-  | EOI { print_endline "could no parse clause";
-          raise Const.PARSE_ERROR }
+  | fof_formula EOI { Const.reset(); $1 }
+  | EOI { Const.parse_error "could no parse clause" }
 
 parse_theory_file:
-  | theory_disjunctions EOI { $1 }
-  | EOI { [] }
+  | theory_disjunctions EOI { Const.reset (); $1 }
+  | EOI { Const.reset(); [] }
 
 /* parse rules */
 
@@ -471,13 +470,10 @@ functor_:
 
 defined_term:
   | number
-      { print_endline ("Parser_tptp: <defined_term: number> not supported: "
-                      ^ $1);
-        raise Const.PARSE_ERROR }
+      { Const.parse_error ("<defined_term: number> not supported: " ^ $1) }
 
   | DISTINCT_OBJECT
-      { print_endline ("Parser_tptp: <defined_term: distinct_object> not supported: " ^ $1);
-        raise Const.PARSE_ERROR }
+      { Const.parse_error ("<defined_term: distinct_object> not supported: " ^ $1) }
 
 system_term_top:
   | system_constant

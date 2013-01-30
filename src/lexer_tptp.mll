@@ -36,7 +36,6 @@ let update_line_index () =
   current_line_index := !current_line_index + 1;
   update_column_index 1
 
-
 let count_new_lines (string: string) : unit =
   String.iter
     (fun char ->
@@ -51,20 +50,8 @@ let update_token (token: string) =
   current_token := token;
   update_column_index (!current_column_index + String.length token)
 
-
 let lexing_error (error: string) (token: string) =
-  print_endline (error
-            ^ " at line " ^ string_of_int !current_line_index
-            ^ " column " ^ string_of_int !current_column_index
-            ^ ":\n" ^ token);
-  raise Const.PARSE_ERROR
-
-let parse_error () =
-  print_endline ("Parse error"
-            ^ " at line " ^ string_of_int !current_line_index
-            ^ " column " ^ string_of_int !current_column_index
-            ^ ":\n" ^ !current_token);
-  raise Const.PARSE_ERROR
+  parse_error (error ^ " at " ^ token)
 
 }
 
