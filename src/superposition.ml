@@ -879,10 +879,11 @@ let subsumes a b =
   let offset = T.max_var (Lits.vars_lits a) + 1 in
   let res = match subsumes_with (a,0) (b,offset) with
   | None -> false
-  | Some _ -> true
+  | Some _ ->
+    Utils.debug 2 (lazy (Utils.sprintf "%% @[<h>%a subsumes %a@]"
+                  Lits.pp_lits a Lits.pp_lits b));
+    true
   in
-  Utils.debug 2 (lazy (Utils.sprintf "%% @[<h>%a subsumes %a@]"
-                Lits.pp_lits a Lits.pp_lits b));
   Utils.exit_prof prof_subsumption;
   res
 
