@@ -242,6 +242,7 @@ let rec at_pos t pos = match t.term, pos with
   | Var _, _::_ -> invalid_arg "wrong position in term"
   | Node (_, l), i::subpos when i < List.length l ->
     at_pos (Utils.list_get l i) subpos
+  | Bind (_, t'), 0::subpos -> at_pos t' subpos
   | _ -> invalid_arg "index too high for subterm"
 
 let rec replace_pos t pos new_t = match t.term, pos with
@@ -250,6 +251,7 @@ let rec replace_pos t pos new_t = match t.term, pos with
   | Node (s, l), i::subpos when i < List.length l ->
     let new_subterm = replace_pos (Utils.list_get l i) subpos new_t in
     mk_node s t.sort (Utils.list_set l i new_subterm)
+  | Bind (_, t'), 0::subpos -> replace_pos t' subpos new_t
   | _ -> invalid_arg "index too high for subterm"
 
 (** get subterm by its position *)
