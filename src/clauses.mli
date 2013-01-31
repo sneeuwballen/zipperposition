@@ -32,8 +32,6 @@ val stat_new_clause : statistics
  * ---------------------------------------------------------------------- *)
 
 val flag_ground : int                             (** clause is ground *)
-val flag_redundant : int                          (** clause is now redundant *)
-val flag_transient : int                          (** clause must not be in the proof state *)
 
 val set_flag : int -> hclause -> bool -> unit     (** set boolean flag *)
 val get_flag : int -> hclause -> bool             (** get value of boolean flag *)
@@ -74,7 +72,9 @@ val mk_hclause_a : ?parents:hclause list -> ?selected:Bitvector.t ->
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
 
-val descendants : hclause -> int array
+val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
+
+val descendants : hclause -> Ptset.t
   (** set of ID of descendants of the clause *)
 
 val clause_of_fof : hclause -> hclause

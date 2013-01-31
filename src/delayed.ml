@@ -195,8 +195,8 @@ let tableau_to_clauses hc a =
     let rec explore_splits i =
       if i = Array.length a
         then  (* produce new clause *)
-          let clause = C.mk_hclause_a ~parents:[hc] ~ctx (Vector.to_array eqns) proof in
-          C.set_flag C.flag_redundant hc true;
+          let parents = hc :: hc.hcparents in
+          let clause = C.mk_hclause_a ~parents ~ctx (Vector.to_array eqns) proof in
           clauses := clause :: !clauses
         else begin
           let len = Vector.size eqns in

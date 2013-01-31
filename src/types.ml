@@ -163,7 +163,8 @@ and hclause = {
   mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
   mutable hcvars : term list;             (** the free variables *)
   mutable hcproof : proof;                (** the proof for this clause *)
-  mutable hcdescendants : int array;      (** the set of IDs of descendants of the clause *)
+  mutable hcparents : hclause list;       (** parents of the clause *)
+  mutable hcdescendants : Ptset.t;        (** the set of IDs of descendants of the clause *)
 }
 (** A context for clauses. TODO add a structure for local term hashconsing? *)
 and context = {

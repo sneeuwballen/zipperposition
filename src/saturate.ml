@@ -139,14 +139,10 @@ let remove_orphans passive_set removed_clauses =
      (cf C.flag_redundant) their descendants are also removed *)
   let rec remove_descendants hc =
     let orphans = hc.hcdescendants in
-    add_stat stat_killed_orphans (Array.length orphans);
     (* remove orphans from passive set *)
-    Array.iter
+    Ptset.iter
       (fun orphan_id ->
-        (try let c = C.CSet.get passive_set#clauses orphan_id in
-            if C.get_flag C.flag_redundant c then remove_descendants c
-              (* recursively destroy descendants of [c] *)
-        with Not_found -> ());
+        incr_stat stat_killed_orphans;
         passive_set#remove orphan_id)
       orphans
   in

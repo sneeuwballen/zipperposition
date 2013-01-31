@@ -550,8 +550,8 @@ let demodulate simpl_set c =
       c
     end else begin  (* construct new clause *)
       let proof = Proof ("demod", (c, [], S.id_subst) :: !clauses) in
-      let new_hc = C.mk_hclause_a ~parents:[c] ~ctx lits proof in
-      C.set_flag C.flag_redundant c true;
+      let parents = c :: c.hcparents in
+      let new_hc = C.mk_hclause_a ~parents ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>demodulate %a into %a using @[<hv>%a@]@]"
                      !C.pp_clause#pp c !C.pp_clause#pp_h new_hc
                      (Utils.pp_list !C.pp_clause#pp_h)
@@ -652,8 +652,8 @@ let basic_simplify hc =
   then (Utils.exit_prof prof_basic_simplify; hc) (* no change *)
   else begin
     let proof = hc.hcproof in  (* do not bother printing this *)
-    let new_clause = C.mk_hclause ~parents:[hc] ~ctx new_lits proof in
-    C.set_flag C.flag_redundant new_clause true;
+    let parents = hc :: hc.hcparents in
+    let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
     Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
                    !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause));
     Utils.exit_prof prof_basic_simplify;
@@ -718,8 +718,8 @@ let positive_simplify_reflect simpl_set c =
     then (Utils.exit_prof prof_pos_simplify_reflect; c) (* no literal removed, keep c *)
     else 
       let proof = Proof ("simplify_reflect+", (c, [], S.id_subst)::premises) in
-      let new_hc = C.mk_hclause ~parents:[c] ~ctx lits proof in
-      C.set_flag C.flag_redundant c true;
+      let parents = c :: c.hcparents in
+      let new_hc = C.mk_hclause ~parents ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a pos_simplify_reflect into %a@]"
                     !C.pp_clause#pp c !C.pp_clause#pp_h new_hc));
       Utils.exit_prof prof_pos_simplify_reflect;
@@ -760,8 +760,8 @@ let negative_simplify_reflect simpl_set c =
     then (Utils.exit_prof prof_neg_simplify_reflect; c) (* no literal removed *)
     else 
       let proof = Proof ("simplify_reflect-", (c, [], S.id_subst)::premises) in
-      let new_hc = C.mk_hclause ~parents:[c] ~ctx lits proof in
-      C.set_flag C.flag_redundant c true;
+      let parents = c :: c.hcparents in
+      let new_hc = C.mk_hclause ~parents ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a neg_simplify_reflect into %a@]"
                     !C.pp_clause#pp c !C.pp_clause#pp_h new_hc));
       Utils.exit_prof prof_neg_simplify_reflect;
@@ -1004,8 +1004,8 @@ let rec contextual_literal_cutting active_set c =
       (* hc' allowed us to cut a literal *)
       assert (List.length new_lits + 1 = Array.length c.hclits);
       let proof = Proof ("clc", [c, [], S.id_subst; c', [], S.id_subst]) in
-      let new_hc = C.mk_hclause ~parents:[c] ~ctx new_lits proof in
-      C.set_flag C.flag_redundant c true;
+      let parents = c :: c.hcparents in
+      let new_hc = C.mk_hclause ~parents ~ctx new_lits proof in
       Utils.debug 3 (lazy (Utils.sprintf
                     "@[<h>contextual literal cutting in %a using %a gives %a@]"
                     !C.pp_clause#pp_h c !C.pp_clause#pp_h c' !C.pp_clause#pp_h new_hc));
@@ -1058,8 +1058,8 @@ let rec condensation hc =
   with CondensedInto (new_lits, subst) ->
     (* clause is simplified *)
     let proof = Proof ("condensation", [hc, [], subst]) in
-    let new_hc = C.mk_hclause_a ~parents:[hc] ~ctx new_lits proof in
-    C.set_flag C.flag_redundant hc true;
+    let parents = hc :: hc.hcparents in
+    let new_hc = C.mk_hclause_a ~parents ~ctx new_lits proof in
     Utils.debug 3 (lazy (Utils.sprintf
                   "@[<h>condensation in %a (with %a) gives %a@]"
                   !C.pp_clause#pp_h hc S.pp_substitution subst !C.pp_clause#pp_h new_hc));

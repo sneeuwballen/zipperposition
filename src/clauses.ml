@@ -40,8 +40,6 @@ let prof_mk_hclause_raw = Utils.mk_profiler "mk_hclause_raw"
  * ---------------------------------------------------------------------- *)
 
 let flag_ground = 1 lsl 0
-let flag_redundant = 1 lsl 1
-let flag_transient = 1 lsl 2
 
 let set_flag flag c truth =
   if truth
@@ -119,10 +117,11 @@ let get_next_tag =
 
 (** the tautological empty clause *)
 let true_clause ~ctx =
-  let hcflags = flag_ground lor flag_redundant in
+  let hcflags = flag_ground in
   let hc = { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
       hctag = get_next_tag (); hcweight=2; hcselected=0; hcflags; hcctx=ctx;
-      hcvars=[]; hcproof=Proof ("trivial", []); hcdescendants=[||]; }
+      hcvars=[]; hcproof=Proof ("trivial", []);
+      hcparents=[]; hcdescendants=Ptset.empty; }
   in
   hc
 
@@ -130,8 +129,16 @@ let true_clause ~ctx =
     of [c], is has been infered/simplified from [c] *)
 let is_child_of ~child c =
   (* update the parent clauses' sets of descendants by adding [child] *)
-  let descendants = Array.of_list (child.hctag :: Array.to_list c.hcdescendants) in
+  let descendants = Ptset.add child.hctag c.hcdescendants in
   c.hcdescendants <- descendants
+
+module CHashcons = Hashcons.Make(
+  struct
+    type t = hclause
+    let hash c = Lits.hash_lits c.hclits
+    let equal  c1 c2 = Lits.eq_lits c1.hclits c2.hclits
+    let tag i c = c.hctag <- i; c
+  end)
 
 (** Build a new hclause from the given literals. If there are more than 31 literals,
     the prover becomes incomplete by returning [true] instead. *)
@@ -160,24 +167,31 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
     hclits = lits;
     hcctx = ctx;
     hcflags = BV.empty;
-    hctag = get_next_tag ();
-    hcweight = Array.fold_left (fun acc lit -> acc + Lits.weight lit) 0 lits;
+    hctag = 0;
+    hcweight = 0;
     hcselected = 0;
     hcvars = all_vars;
     hcproof = proof;
-    hcdescendants = [||];
+    hcparents = [];
+    hcdescendants = Ptset.empty;
   } in
-  (* select literals, if not already done *)
-  (hc.hcselected <- match selected with
-    | Some bv -> bv
-    | None -> BV.from_list (ctx.ctx_select hc));
-  (* compute flags *)
-  (if Lits.ground_lits lits then set_flag flag_ground hc true);
-  (* parents *)
-  (match parents with
-  | None -> ()
-  | Some parents ->
-    List.iter (fun parent -> is_child_of ~child:hc parent) parents);
+  let old_hc, hc = hc, CHashcons.hashcons hc in
+  if hc == old_hc then begin
+    (* select literals, if not already done *)
+    (hc.hcselected <- match selected with
+      | Some bv -> bv
+      | None -> BV.from_list (ctx.ctx_select hc));
+    (* compute weight *)
+    hc.hcweight <- Array.fold_left (fun acc lit -> acc + Lits.weight lit) 0 lits;
+    (* compute flags *)
+    (if Lits.ground_lits lits then set_flag flag_ground hc true);
+    (* parents *)
+    (match parents with
+    | None -> ()
+    | Some parents ->
+      hc.hcparents <- parents;
+      List.iter (fun parent -> is_child_of ~child:hc parent) parents);
+  end;
   (* return clause *)
   incr_stat stat_new_clause;
   Utils.exit_prof prof_mk_hclause;
@@ -187,6 +201,8 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
 (** Build clause from a list (delegating to mk_hclause_a) *)
 let mk_hclause ?parents ?selected ~ctx lits proof =
   mk_hclause_a ?parents ?selected ~ctx (Array.of_list lits) proof
+
+let stats () = CHashcons.stats ()
 
 (** descendants of the clause *)
 let descendants hc = hc.hcdescendants

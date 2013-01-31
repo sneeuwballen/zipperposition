@@ -108,6 +108,7 @@ let print_stats state =
   in
   print_gc ();
   print_hashcons_stats "terms" (T.stats ());
+  print_hashcons_stats "clauses" (C.stats ());
   print_state_stats (PS.stats state);
   print_global_stats ()
 
