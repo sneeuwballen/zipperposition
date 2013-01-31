@@ -137,7 +137,7 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
   else if not (T.atomic s) (* do not rewrite non-atomic formulas *)
   then (Utils.debug 3 (lazy "... active term is not atomic or DB-closed"); acc)
   else if not (T.db_closed (T.at_pos u subterm_pos))
-    && (List.exists (fun x -> S.is_in_subst subst (x,o_p)) passive_clause.hcvars)
+    && (List.exists (fun x -> S.is_in_subst subst (x,o_p)) (T.vars (T.at_pos u subterm_pos)))
   then (Utils.debug 3 (lazy "... narrowing with De Bruijn indices"); acc)
   else
   let t' = S.apply_subst subst (t, o_a)
@@ -479,7 +479,7 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
             (fun l r subst unit_hclause ->
               (* r is the term subterm is going to be rewritten into *)
               assert (C.is_unit_clause unit_hclause);
-              let new_l = t
+              let new_l = S.apply_subst subst l
               and new_r = S.apply_subst subst r in
               if (not restrict || not (S.is_renaming subst))
               && (oriented_hclause unit_hclause || ord#compare new_l new_r = Gt)
@@ -535,9 +535,6 @@ let demodulate simpl_set c =
       Lits.mk_eq ~ord
         (demod_nf simpl_set clauses l)
         (demod_nf ~restrict:true simpl_set clauses r)
-    | Equation (l, r, true, _) when BV.get eligible_res i ->
-      Lits.mk_eq ~ord (demod_nf ~restrict:true simpl_set clauses l)
-                   (demod_nf ~restrict:true simpl_set clauses r)
     | Equation (l, r, true, _) ->
       Lits.mk_eq ~ord (demod_nf simpl_set clauses l) (demod_nf simpl_set clauses r)
   in
