@@ -172,7 +172,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
     | Some bv -> bv
     | None -> BV.from_list (ctx.ctx_select hc));
   (* compute flags *)
-  (if Lits.ground_lits lits then set_flag flag_redundant hc true);
+  (if Lits.ground_lits lits then set_flag flag_ground hc true);
   (* parents *)
   (match parents with
   | None -> ()
