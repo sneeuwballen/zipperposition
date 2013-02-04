@@ -454,6 +454,20 @@ let look_db_sort i t =
   in try lookup i t; None
      with FoundSort s -> Some s
 
+(** Bind all free variables by 'forall' *)
+let close_forall t =
+  let vars = vars t in
+  List.fold_left
+    (fun t var -> mk_bind forall_symbol (db_from_var t var))
+    t vars
+
+(** Bind all free variables by 'exists' *)
+let close_exists t =
+  let vars = vars t in
+  List.fold_left
+    (fun t var -> mk_bind exists_symbol (db_from_var t var))
+    t vars
+
 (* ----------------------------------------------------------------------
  * Pretty printing
  * ---------------------------------------------------------------------- *)

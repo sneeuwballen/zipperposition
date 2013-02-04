@@ -659,19 +659,9 @@ let pp_clause_tstp =
       (* how to print the list of literals *)
       let lits_printer formatter lits =
         (* convert into a big term *)
-        let t =
-          match lits with
-          | [||] -> T.false_term
-          | _ -> Array.fold_left
-            (fun t lit -> T.mk_or t (Lits.term_of_lit lit))
-            (Lits.term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
-        in
+        let t = Lits.term_of_lits hc.hclits in
         (* quantify all free variables *)
-        let vars = T.vars t in
-        let t = List.fold_left
-          (fun t var -> T.mk_node forall_symbol bool_sort [var; t])
-          t vars
-        in
+        let t = T.close_forall t in
         T.pp_term_tstp#pp formatter t
       in
       (* print in an horizontal box, or not *)

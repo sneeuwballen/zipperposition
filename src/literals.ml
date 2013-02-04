@@ -244,6 +244,13 @@ let ground_lits lits =
       T.is_ground_term l && T.is_ground_term r && check (i+1)
   in check 0
 
+let term_of_lits lits =
+  match lits with
+  | [||] -> T.false_term
+  | _ -> Array.fold_left
+    (fun t lit -> T.mk_or t (term_of_lit lit))
+    (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
+
 (** Apply the substitution to the array of literals, with offset *)
 let apply_subst_lits ?(recursive=true) ~ord subst (lits,offset) =
   Array.map

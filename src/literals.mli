@@ -61,6 +61,7 @@ val compare_lits : literal array -> literal array -> int
 val hash_lits : literal array -> int
 val vars_lits : literal array -> varlist
 val ground_lits : literal array -> bool             (** all the literals are ground? *)
+val term_of_lits : literal array -> term
 val apply_subst_lits : ?recursive:bool -> ord:ordering -> substitution ->
                        literal array bind -> literal array
 val apply_subst_list : ?recursive:bool -> ord:ordering -> substitution ->

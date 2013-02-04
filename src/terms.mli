@@ -156,6 +156,9 @@ val db_from_var : term -> term -> term
 val look_db_sort : int -> term -> sort option
   (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
 
+val close_forall : term -> term             (** Bind all free variables by 'forall' *)
+val close_exists : term -> term             (** Bind all free variables by 'exists' *)
+
 (* ----------------------------------------------------------------------
  * Pretty printing
  * ---------------------------------------------------------------------- *)
