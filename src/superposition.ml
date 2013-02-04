@@ -163,8 +163,8 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
           (Literals.apply_subst_list ~ord subst (lits_p, o_p))
         in
         let rule = if sign_uv then "sup+" else "sup-" in
-        let proof = Proof (rule, [(active_clause, active_pos, subst);
-                                  (passive_clause, passive_pos, subst)]) in
+        let proof c = Proof (c, rule, [active_clause.hcproof;
+                                       passive_clause.hcproof]) in
         let parents = [active_clause; passive_clause] in
         let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
         Utils.debug 3 (lazy (Utils.sprintf "... ok, conclusion @[<h>%a@]"
@@ -262,7 +262,7 @@ let infer_equality_resolution clause =
           (* subst(lit) is maximal, we can do the inference *)
           then begin
             incr_stat stat_equality_resolution_call;
-            let proof = Proof ("eq_res", [clause, [pos], subst])
+            let proof c = Proof (c, "eq_res", [clause.hcproof])
             and new_lits = array_except_idx clause.hclits pos in
             let new_lits = Lits.apply_subst_list ~ord:ctx.ctx_ord subst (new_lits, 0) in
             let new_clause = C.mk_hclause ~parents:[clause] ~ctx new_lits proof in
@@ -318,8 +318,7 @@ let infer_equality_factoring clause =
        BV.get (C.eligible_param (clause,0) subst) active_idx
       then begin
         incr_stat stat_equality_factoring_call;
-        let proof = Proof ("eq_fact",
-          [(clause, active_pos, subst); (clause, passive_pos, subst)])
+        let proof c = Proof (c, "eq_fact", [clause.hcproof])
         (* new_lits: literals of the new clause. remove active literal
            and replace it by a t!=v one, and apply subst *)
         and new_lits = array_except_idx clause.hclits active_idx in
@@ -420,7 +419,7 @@ let infer_split hc =
   let components = ref [] in
   UF.iter cluster (fun _ l ->
     Utils.debug 4 (lazy (Utils.sprintf "component @[<h>%a@]"
-                   (Utils.pp_list Lits.pp_literal#pp) l));
+                   (Utils.pp_list Lits.pp_literal) l));
     components := l :: !components);
   let n = List.length !components in
   if n > 1 && List.for_all (fun l -> List.length l >= 2) !components then begin
@@ -429,7 +428,7 @@ let infer_split hc =
     incr_stat stat_splits;
     (* create a list of symbols *)
     let symbols = Utils.times (n-1) next_split_term in
-    let proof = Proof ("split", [hc, [], S.id_subst]) in
+    let proof c = Proof (c, "split", [hc.hcproof]) in
     (* the guard clause, plus the first component, plus all negated split symbols *)
     let guard =
       let lits = List.map (Lits.mk_neq ~ord T.true_term) symbols @ List.hd !components @ !branch in
@@ -486,7 +485,7 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
                   assert (ord#compare new_l new_r = Gt);
-                  clauses := (unit_hclause, [0], subst) :: !clauses;
+                  clauses := unit_hclause :: !clauses;
                   incr_stat stat_demodulate_step;
                   raise (RewriteInto new_r)
                 end);
@@ -546,13 +545,12 @@ let demodulate simpl_set c =
       Utils.exit_prof prof_demodulate;
       c
     end else begin  (* construct new clause *)
-      let proof = Proof ("demod", (c, [], S.id_subst) :: !clauses) in
+      let proof c' = Proof (c', "demod", c.hcproof :: List.map (fun hc -> hc.hcproof) !clauses) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause_a ~parents ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>demodulate %a into %a using @[<hv>%a@]@]"
                      !C.pp_clause#pp c !C.pp_clause#pp_h new_hc
-                     (Utils.pp_list !C.pp_clause#pp_h)
-                     (List.map (fun (c,_,_) -> c) !clauses)));
+                     (Utils.pp_list !C.pp_clause#pp_h) !clauses));
       (* return simplified clause *)
       Utils.exit_prof prof_demodulate;
       new_hc
@@ -648,7 +646,7 @@ let basic_simplify hc =
   if List.length new_lits = Array.length hc.hclits
   then (Utils.exit_prof prof_basic_simplify; hc) (* no change *)
   else begin
-    let proof = hc.hcproof in  (* do not bother printing this *)
+    let proof = C.adapt_proof hc.hcproof in  (* do not bother printing this *)
     let parents = hc :: hc.hcparents in
     let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
     Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
@@ -707,14 +705,14 @@ let positive_simplify_reflect simpl_set c =
         end else ());
       None (* no match *)
     with FoundMatch (r, hc, subst) ->
-      Some ((hc, [0], subst) :: clauses)  (* success *)
+      Some (hc.hcproof :: clauses)  (* success *)
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Array.to_list c.hclits) [] in
   if List.length lits = Array.length c.hclits
     then (Utils.exit_prof prof_pos_simplify_reflect; c) (* no literal removed, keep c *)
     else 
-      let proof = Proof ("simplify_reflect+", (c, [], S.id_subst)::premises) in
+      let proof c' = Proof (c', "simplify_reflect+", c.hcproof::premises) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a pos_simplify_reflect into %a@]"
@@ -749,14 +747,14 @@ let negative_simplify_reflect simpl_set c =
         end else ());
       None (* no match *)
     with FoundMatch (r, hc, subst) ->
-      Some (hc, [0], subst)  (* success *)
+      Some hc.hcproof  (* success *)
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Array.to_list c.hclits) [] in
   if List.length lits = Array.length c.hclits
     then (Utils.exit_prof prof_neg_simplify_reflect; c) (* no literal removed *)
     else 
-      let proof = Proof ("simplify_reflect-", (c, [], S.id_subst)::premises) in
+      let proof c' = Proof (c', "simplify_reflect-", c.hcproof::premises) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a neg_simplify_reflect into %a@]"
@@ -999,7 +997,7 @@ let rec contextual_literal_cutting active_set c =
   | Some (new_lits, c') -> begin
       (* hc' allowed us to cut a literal *)
       assert (List.length new_lits + 1 = Array.length c.hclits);
-      let proof = Proof ("clc", [c, [], S.id_subst; c', [], S.id_subst]) in
+      let proof c'' = Proof (c'', "clc", [c.hcproof; c'.hcproof]) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx new_lits proof in
       Utils.debug 3 (lazy (Utils.sprintf
@@ -1053,7 +1051,7 @@ let rec condensation hc =
     hc
   with CondensedInto (new_lits, subst) ->
     (* clause is simplified *)
-    let proof = Proof ("condensation", [hc, [], subst]) in
+    let proof c = Proof (c, "condensation", [hc.hcproof]) in
     let parents = hc :: hc.hcparents in
     let new_hc = C.mk_hclause_a ~parents ~ctx new_lits proof in
     Utils.debug 3 (lazy (Utils.sprintf

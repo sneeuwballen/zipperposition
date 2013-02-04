@@ -61,24 +61,6 @@ let rate_clause ~is_theory_symbol hc =
                 "%% simplicity of @[<h>%a@] is %.2f" !C.pp_clause#pp_h hc !rate));
   !rate 
 
-(** Depth of a proof, ie max distance between the empty clause (root) and an axiom *)
-let proof_depth hc =
-  let explored = ref C.CSet.empty in
-  let depth = ref 0 in
-  let q = Queue.create () in
-  Queue.push (hc, 0) q;
-  while not (Queue.is_empty q) do
-    let (hc, d) = Queue.pop q in
-    if C.CSet.mem !explored hc then () else begin
-      explored := C.CSet.add !explored hc;
-      match hc.hcproof with
-      | Axiom _ -> depth := max d !depth
-      | Proof (_, l) -> (* explore parents *)
-        List.iter (fun (c,_,_) -> Queue.push (c, d+1) q) l
-    end
-  done;
-  !depth
-
 (** Maximum number of lemmas that can be learnt from one proof *)
 let max_lemmas = ref 3
 
@@ -196,7 +178,7 @@ let explore_parents meta cost_map distance hc =
       let cost_hc = cost_hc /. (0.1 +. (float_of_int distance)) in
       let best_cost, best_premises, max_dist = match hc.hcproof with
       | Axiom _ -> cost_hc /. 2., C.ClauseSet.singleton hc, distance  (* axioms are cheaper *)
-      | Proof (_, l) ->
+      | Proof (_, _, l) ->
         (* cost of recursing into parents *)
         let cost_parents, premises_parents, max_dist = List.fold_left
           (fun (cost,premises,m) (parent,_,_) ->
@@ -225,7 +207,7 @@ let search_lemmas meta hc =
   let open Theories in
   let is_theory_symbol s = SSet.mem s meta.meta_theory_symbols in
   (* depth of the proof *)
-  let depth = proof_depth hc in
+  let depth = Proof.depth hc.hcproof in
   Utils.debug 1 (lazy (Utils.sprintf "%% analyse proof of depth %d" depth));
   (* candidate lemmas *)
   let cost_map = ref CostMap.empty in

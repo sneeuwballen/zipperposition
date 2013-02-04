@@ -103,7 +103,7 @@ let simplify hc =
   in
   let lits = Array.map simp_lit hc.hclits in
   if !simplified
-    then C.mk_hclause_a ~ctx lits hc.hcproof
+    then C.mk_hclause_a ~ctx lits (C.adapt_proof hc.hcproof)
     else hc  (* no simplification *)
 
 (* ----------------------------------------------------------------------
@@ -158,7 +158,7 @@ let miniscope hc =
   let lits = Array.map miniscope_lit hc.hclits in
   if !simplified
     then (* mark the miniscoping as a proof step, and produce a new clause *)
-      let proof = Proof ("miniscope", [hc, [], S.id_subst]) in
+      let proof c = Proof (c, "miniscope", [hc.hcproof]) in
       let hc' = C.mk_hclause_a ~parents:[hc] ~ctx lits proof in
       Utils.debug 3 (lazy (Utils.sprintf "miniscoped @[<h>%a@] into @[<h>%a@]"
                     !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc'));
@@ -273,7 +273,7 @@ let cnf_of hc =
         | [] -> assert false  (* is in cnf ;) *)
         | hd::tl -> List.fold_left product hd tl in
       (* build clauses from lits *)
-      let proof = Proof ("to_cnf", [hc, [], S.id_subst]) in
+      let proof c = Proof (c, "to_cnf", [hc.hcproof]) in
       let clauses = List.map
         (fun lits ->
           let lits = List.map (fun (t, sign) -> Lits.mk_lit ~ord t T.true_term sign) lits in

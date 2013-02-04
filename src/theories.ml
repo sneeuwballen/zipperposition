@@ -265,7 +265,7 @@ let get_kb_theory ~kb name =
     First, the corresponding named formula has to be retrieved
     from kb, then it is 'matched' against the term.
     A proof and a list of parent clauses have to be provided. *)
-let term_to_hclause ~ctx ~kb term proof =
+let term_to_hclause ~ctx ~kb term =
   let term_name, term_args = Logic.open_term term in
   let term_args = List.map
     (function
@@ -276,7 +276,8 @@ let term_to_hclause ~ctx ~kb term proof =
   (* get the named formula corresponding to this term *)
   let nf = get_kb_formula kb term_name in
   (* instantiate the named formula *)
-  Patterns.instantiate_np ~ctx nf (term_name, term_args) proof
+  let hc = Patterns.instantiate_np ~ctx nf (term_name, term_args) in
+  hc
 
 (** This handler is triggered whenever a named formula is discovered
     to be true for the current problem. *)
@@ -297,9 +298,9 @@ let handle_formula meta term =
   then ()
   else begin
     (* proof and parents of conclusion *)
-    let premises = List.map (fun hc -> (hc, [], S.id_subst)) parents in
-    let proof = Proof ("lemma", premises) in
+    let premises = List.map (fun hc -> hc.hcproof) parents in
     (* build conclusion *)
+    let proof c = Proof.mk_proof c "lemma" premises in
     let conclusion = term_to_hclause ~ctx ~kb term proof in
     (* yield lemma *)
     Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
@@ -319,8 +320,9 @@ let handle_theory meta term =
   incr_stat stat_theory_detected;
   (* the clauses that belong to this theory *)
   let premises = Logic.db_explain meta.meta_db term in
+  let proof c = Proof.mk_axiom c "kb" "kb" in
   let premise_clauses = Utils.list_flatmap
-    (fun term -> try [term_to_hclause ~ctx ~kb term (Axiom ("kb","kb"))]
+    (fun term -> try [term_to_hclause ~ctx ~kb term proof]
                  with Not_found -> [])
     premises in
   (* add the premises of the clause to the set of theory clauses. Each of those

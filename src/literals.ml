@@ -262,54 +262,26 @@ let apply_subst_list ?(recursive=true) ~ord subst (lits, offset) =
     (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
     lits
 
-(** pretty printer for literals *)
-class type pprinter_literal =
-  object
-    method pp : Format.formatter -> literal -> unit     (** print literal *)
-  end
-
-let pp_literal_gen pp_term formatter lit =
+let pp_literal formatter lit =
   match lit with
   | Equation (l, r, sign, _) when T.eq_term r T.true_term ->
     if sign
-      then pp_term#pp formatter l
-      else Format.fprintf formatter "¬%a" pp_term#pp l
+      then !T.pp_term#pp formatter l
+      else Format.fprintf formatter "¬%a" !T.pp_term#pp l
   | Equation (l, r, sign, _) when T.eq_term l T.true_term ->
     if sign
-      then pp_term#pp formatter r
-      else Format.fprintf formatter "¬%a" pp_term#pp r
+      then !T.pp_term#pp formatter r
+      else Format.fprintf formatter "¬%a" !T.pp_term#pp r
   | Equation (l, r, sign, _) when l.sort == bool_sort ->
     if sign
-      then Format.fprintf formatter "%a <=> %a" pp_term#pp l pp_term#pp r
-      else Format.fprintf formatter "%a <~> %a" pp_term#pp l pp_term#pp r
+      then Format.fprintf formatter "%a <=> %a" !T.pp_term#pp l !T.pp_term#pp r
+      else Format.fprintf formatter "%a <~> %a" !T.pp_term#pp l !T.pp_term#pp r
   | Equation (l, r, sign, _) ->
     if sign
-      then Format.fprintf formatter "%a = %a" pp_term#pp l pp_term#pp r
-      else Format.fprintf formatter "%a != %a" pp_term#pp l pp_term#pp r
-
-let pp_literal_debug =
-  let print_ord = ref false in
-  object
-    method pp formatter ((Equation (_,_,_,ord)) as lit) =
-      pp_literal_gen T.pp_term_debug formatter lit;
-      if !print_ord
-        then Format.fprintf formatter "(%s)" (string_of_comparison ord)
-        else ()
-
-    method ord b = print_ord := b
-  end
-
-let pp_literal_tstp =
-  object
-    method pp formatter lit = pp_literal_gen T.pp_term_tstp formatter lit
-  end
-
-let pp_literal =
-  object
-    method pp formatter lit = pp_literal_gen !T.pp_term formatter lit
-  end
+      then Format.fprintf formatter "%a = %a" !T.pp_term#pp l !T.pp_term#pp r
+      else Format.fprintf formatter "%a != %a" !T.pp_term#pp l !T.pp_term#pp r
 
 let pp_lits formatter lits = 
   Utils.pp_arrayi ~sep:" | "
-    (fun formatter i lit -> Format.fprintf formatter "%a" pp_literal_debug#pp lit)
+    (fun formatter i lit -> Format.fprintf formatter "%a" pp_literal lit)
     formatter lits

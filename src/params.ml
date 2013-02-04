@@ -34,7 +34,7 @@ type parameters = {
   param_precedence : bool;        (** use heuristic for precedence? *)
   param_select : string;          (** name of the selection function *)
   param_progress : bool;          (** print progress during search *)
-  param_proof : bool;             (** print proof *)
+  param_proof : string;           (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
   param_kb : string;              (** file to use for KB *)
   param_kb_load : string list;    (** theory files to read *)
@@ -42,9 +42,7 @@ type parameters = {
   param_kb_print : bool;          (** print knowledge base and exit *)
   param_learn : bool;             (** learn lemmas? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
-  param_output_syntax : string;   (** syntax for output *)
   param_index : string;           (** indexing structure *)
-  param_print_sort : bool;        (** print sorts of terms *)
 }
 
 (** parse_args returns parameters *)
@@ -59,8 +57,7 @@ let parse_args () =
   and steps = ref 0
   and version = ref false
   and timeout = ref 0.
-  and proof = ref true
-  and output = ref "debug"
+  and proof = ref "debug"
   and index = ref "fp"
   and split = ref false
   and theories = ref true
@@ -75,7 +72,6 @@ let parse_args () =
   and learn = ref false
   and select = ref "SelectComplex"
   and progress = ref false
-  and print_sort = ref false
   and files = ref [] in
   (* options list *) 
   let options =
@@ -93,18 +89,17 @@ let parse_args () =
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
       ("-learning", Arg.Set learn, "enable lemma learning");
+      (* TODO
       ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
+      *)
       ("-progress", Arg.Set progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
-      ("-no-proof", Arg.Clear proof, "disable proof printing");
+      ("-proof", Arg.Set_string proof, "choose proof printing (none, debug or tstp)");
       ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
-      ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
-      ("-print-sort", Arg.Set print_sort, "print sorts of terms");
-      ("-print-ord", Arg.Unit (fun () -> Literals.pp_literal_debug#ord true), "print order of sides of literals");
     ]
   in
   Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
@@ -120,10 +115,9 @@ let parse_args () =
     param_files = !files; param_select = !select; param_theories = !theories;
     param_progress = !progress;
     param_proof = !proof; param_split = !split;
-    param_presaturate = !presaturate; param_output_syntax = !output;
+    param_presaturate = !presaturate;
     param_index= !index; param_dot_file = !dot_file;
     param_kb = !kb; param_kb_load = !kb_load;
     param_kb_clear = !kb_clear;
     param_kb_print = !kb_print; param_learn = !learn;
-    param_print_sort = !print_sort;
     param_precedence= !heuristic_precedence;}

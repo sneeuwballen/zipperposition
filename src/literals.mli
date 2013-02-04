@@ -68,16 +68,6 @@ val apply_subst_list : ?recursive:bool -> ord:ordering -> substitution ->
                         literal list bind -> literal list
 
 (** pretty printer for literals *)
-class type pprinter_literal =
-  object
-    method pp : Format.formatter -> literal -> unit     (** print literal *)
-  end
 
-val pp_literal : pprinter_literal                       (** use current term printer *)
-val pp_literal_debug :                                  (** use debug unicode syntax *)
-  < pp : Format.formatter -> literal -> unit;
-    ord : bool -> unit;                                 (** print orientation of lit *)
-  >
-val pp_literal_tstp : pprinter_literal                  (** use TSTP syntax *)
-
+val pp_literal : Format.formatter -> literal -> unit
 val pp_lits : Format.formatter -> literal array -> unit

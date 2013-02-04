@@ -62,15 +62,20 @@ val is_child_of : child:hclause -> hclause -> unit
       of [c], is has been infered/simplified from [c] *)
 
 val mk_hclause : ?parents:hclause list -> ?selected:Bitvector.t ->
-                 ctx:context -> literal list -> proof -> hclause
+                 ctx:context -> literal list ->
+                  (compact_clause -> compact_clause proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
 val mk_hclause_a : ?parents:hclause list -> ?selected:Bitvector.t ->
-                   ctx:context -> literal array -> proof -> hclause
+                   ctx:context -> literal array ->
+                   (compact_clause -> compact_clause proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
+
+val adapt_proof : compact_clause proof -> compact_clause -> compact_clause proof
+  (** Adapt an old proof to the new compact_clause *)
 
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
@@ -250,15 +255,5 @@ class type pprinter_clause =
 val pp_clause : pprinter_clause ref                     (** uses current term printer *)
 val pp_clause_tstp : pprinter_clause                    (** TSTP syntax *)
 val pp_clause_debug : pprinter_clause                   (** nice unicode syntax *)
-
-(** pretty printer for proofs *)
-class type pprinter_proof =
-  object
-    method pp : Format.formatter -> hclause -> unit     (** pretty print proof from clause *)
-  end
-
-val pp_proof : pprinter_proof ref                       (** defaut printing of proofs *)
-val pp_proof_tstp : pprinter_proof
-val pp_proof_debug : pprinter_proof
 
 val pp_set : Format.formatter -> CSet.t -> unit

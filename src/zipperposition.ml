@@ -116,11 +116,9 @@ let print_stats state =
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
 let print_state ?name filename (state, result) =
-  (match result with
-    | Sat.Unsat c ->
-      state#active_set#add [c]; (* put empty clause in state *)
-    | _ -> ());
-  PS.pp_dot_file ?name filename state
+  match result with
+  | Sat.Unsat c -> Proof.pp_dot_file ?name filename c.hcproof
+  | _ -> Utils.debug 1 (lazy "%% no empty clause; do not print state")
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -132,21 +130,6 @@ let setup_alarm timeout =
   in
   ignore (Sys.signal Sys.sigalrm (Sys.Signal_handle handler));
   Unix.alarm (max 1 (int_of_float timeout))
-
-(** setup output format and details *)
-let setup_output ~params =
-  (match params.param_output_syntax with
-  | "tstp" ->
-    C.pp_clause := C.pp_clause_tstp;
-    T.pp_term := T.pp_term_tstp;
-    C.pp_proof := C.pp_proof_tstp
-  | "debug" ->
-    C.pp_clause := C.pp_clause_debug;
-    T.pp_term := (T.pp_term_debug :> T.pprinter_term);
-    C.pp_proof := C.pp_proof_debug
-  | s -> failwith ("unknown output syntax " ^ s));
-  (if params.param_print_sort
-    then T.pp_term_debug#sort true)
 
 let print_version ~params =
   if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0)
@@ -311,14 +294,16 @@ let process_file ~kb params f =
   | Sat.Unsat c -> begin
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";
-      (if params.param_proof
-        then Format.printf ("@.# SZS output start Refutation@.@[<v>%a@]@." ^^
-                          "# SZS output end Refutation@.") !C.pp_proof#pp c);
+      Format.printf ("@.# SZS output start Refutation@.@[<v>%a@]@." ^^
+                          "# SZS output end Refutation@.")
+                    (Proof.pp_proof params.param_proof) c.hcproof;
       (* update knowledge base *)
       match meta with
       | Some meta when params.param_learn ->
         (* learning new lemmas *)
+        (*  TODO
         LemmaLearning.learn_and_update meta c;
+        *)
         (* merge with current file *)
         let file = params.param_kb in
         let kb_lock = lock_file file in
@@ -352,8 +337,6 @@ let () =
   let kb = initial_kb params in
   (if params.param_kb_print then print_kb ~kb);
   (if params.param_kb_clear then clear_kb params);
-  (* setup printing *)
-  setup_output params;
   (* master process: process files *)
   List.iter (process_file ~kb params) params.param_files
 

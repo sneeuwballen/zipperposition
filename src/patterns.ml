@@ -334,7 +334,8 @@ let instantiate_plit ~map ~ord plit =
 let instantiate_pclause ~map ~ctx pclause proof =
   let ord = ctx.ctx_ord in
   let lits = List.map (instantiate_plit ~map ~ord) pclause.pc_lits in
-  C.mk_hclause ~ctx lits proof
+  let hc = C.mk_hclause ~ctx lits proof in
+  hc
 
 (*s match an abstract pattern against a term of a clause. Failure is
     indicated by an empty list, but several mappings can exist for

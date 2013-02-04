@@ -190,7 +190,7 @@ let tableau_to_clauses hc a =
   else begin
     let clauses = ref []
     and eqns = Vector.create (Array.length a * 2) in
-    let proof = Proof ("elim", [hc, [], S.id_subst]) in
+    let proof c = Proof (c, "elim", [hc.hcproof]) in
     (* explore all combinations of tableau splits *)
     let rec explore_splits i =
       if i = Array.length a

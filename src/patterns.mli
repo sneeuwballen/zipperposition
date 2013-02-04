@@ -117,7 +117,8 @@ val pclause_of_clause : ?rev_map:rev_mapping -> hclause -> pclause
 
 val instantiate_pterm : map:mapping -> pterm -> term
 val instantiate_plit : map:mapping -> ord:ordering -> pliteral -> literal
-val instantiate_pclause : map:mapping -> ctx:context-> pclause -> proof -> hclause
+val instantiate_pclause : map:mapping -> ctx:context-> pclause ->
+                          (compact_clause -> compact_clause proof) -> hclause
 
 (*s match an abstract pattern against a term or a clause. Failure is
     indicated by an empty list, but several mappings can exist for
@@ -148,7 +149,8 @@ val match_np : named_pattern -> hclause -> np_atom list
   (** match a clause with a named pattern, yielding zero or more concrete
       instances of the named pattern. *)
   
-val instantiate_np : ctx:context -> named_pattern -> np_atom -> proof -> hclause
+val instantiate_np : ctx:context -> named_pattern -> np_atom ->
+                    (compact_clause -> compact_clause proof) -> hclause
   (** Build a concrete clause from a named pattern and an associated
       atom that describes how to instantiate it *)
 

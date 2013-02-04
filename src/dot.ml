@@ -74,7 +74,7 @@ module type S =
     val pp_graph : Format.formatter -> graph -> unit
   end
 
-module Make(G: Graph) =
+module Make(G: Graph) : S with module G = G =
   struct
     module G = G
 

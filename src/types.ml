@@ -162,20 +162,26 @@ and hclause = {
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
   mutable hcvars : term list;             (** the free variables *)
-  mutable hcproof : proof;                (** the proof for this clause *)
+  mutable hcproof : compact_clause proof; (** Proof of the clause *)
   mutable hcparents : hclause list;       (** parents of the clause *)
   mutable hcdescendants : Ptset.t;        (** the set of IDs of descendants of the clause *)
 }
 (** A context for clauses. TODO add a structure for local term hashconsing? *)
 and context = {
-  ctx_ord : ordering;                           (** ordering used to build clauses *)
-  ctx_select : selection_fun;                   (** selection function for literals *)
+  ctx_ord : ordering;                     (** ordering used to build clauses *)
+  ctx_select : selection_fun;             (** selection function for literals *)
 }
-(** a proof step for a clause *)
-and proof = Axiom of string * string (** file, axiom name *)
-          | Proof of string * (clause * position * substitution) list
+(** A compact clause: ID and literals *)
+and compact_clause = int * literal array
+(** A proof step for a 'a. This allows for genericity of proofs. *)
+and 'a proof =
+  | Axiom of 'a * string * string (** file, axiom name *)
+  | Proof of 'a * string * 'a proof list
 (** a selection function *)
 and selection_fun = hclause -> int list
+
+(** Create a compact clause from a clause *)
+let compact_clause hc = (hc.hctag, hc.hclits)
 
 (** selects no literals *)
 let no_select c = []

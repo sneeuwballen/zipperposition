@@ -107,24 +107,6 @@ let vars_of_lits lits =
   done;
   T.THashSet.to_list set
 
-(** Get a fresh ID for a clause *)
-let get_next_tag =
-  let current_tag = ref 1 in
-  fun () ->
-    let n = !current_tag in
-    incr current_tag;
-    n
-
-(** the tautological empty clause *)
-let true_clause ~ctx =
-  let hcflags = flag_ground in
-  let hc = { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
-      hctag = get_next_tag (); hcweight=2; hcselected=0; hcflags; hcctx=ctx;
-      hcvars=[]; hcproof=Proof ("trivial", []);
-      hcparents=[]; hcdescendants=Ptset.empty; }
-  in
-  hc
-
 (** [is_child_of ~child c] is to be called to remember that [child] is a child
     of [c], is has been infered/simplified from [c] *)
 let is_child_of ~child c =
@@ -140,7 +122,20 @@ module CHashcons = Hashcons.Make(
     let tag i c = c.hctag <- i; c
   end)
 
-(** Build a new hclause from the given literals. If there are more than 31 literals,
+(** the tautological empty clause *)
+let true_clause ~ctx =
+  let hcflags = flag_ground in
+  let hclits = [| Equation (T.true_term, T.true_term, true, Eq) |] in
+  let hc = { hclits; hcproof = Obj.magic 0;
+      hctag = -1; hcweight=2; hcselected=0; hcflags; hcctx=ctx;
+      hcvars=[]; hcparents=[]; hcdescendants=Ptset.empty; }
+  in
+  let hc = CHashcons.hashcons hc in
+  hc.hcproof <- Proof (compact_clause hc, "trivial", []);
+  hc
+
+(** Build a new hclause from the given literals.
+    If there are more than 31 literals,
     the prover becomes incomplete by returning [true] instead. *)
 let mk_hclause_a ?parents ?selected ~ctx lits proof =
   incr_stat stat_mk_hclause;
@@ -163,7 +158,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   let lits = Lits.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
   let all_vars = vars_of_lits lits in
   (* create the structure *)
-  let hc = {
+  let rec hc = {
     hclits = lits;
     hcctx = ctx;
     hcflags = BV.empty;
@@ -171,12 +166,15 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
     hcweight = 0;
     hcselected = 0;
     hcvars = all_vars;
-    hcproof = proof;
+    hcproof = Obj.magic 0;
     hcparents = [];
     hcdescendants = Ptset.empty;
   } in
   let old_hc, hc = hc, CHashcons.hashcons hc in
   if hc == old_hc then begin
+    (* update proof *)
+    let proof' = proof (compact_clause hc) in
+    hc.hcproof <- proof';
     (* select literals, if not already done *)
     (hc.hcselected <- match selected with
       | Some bv -> bv
@@ -202,6 +200,11 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
 let mk_hclause ?parents ?selected ~ctx lits proof =
   mk_hclause_a ?parents ?selected ~ctx (Array.of_list lits) proof
 
+(** Adapt a proof to a new clause *)
+let adapt_proof proof c = match proof with
+  | Axiom (_, f, a) -> Axiom (c, f, a)
+  | Proof (_, r, l) -> Proof (c, r, l)
+
 let stats () = CHashcons.stats ()
 
 (** descendants of the clause *)
@@ -213,7 +216,8 @@ let clause_of_fof hc =
   let lits = Array.map (Lits.lit_of_fof ~ord:ctx.ctx_ord) hc.hclits in
   if Lits.eq_lits lits hc.hclits then hc (* keep the same *)
   else begin
-    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
+    let proof = adapt_proof hc.hcproof in
+    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
     new_hc.hcdescendants <- hc.hcdescendants;
     new_hc
   end
@@ -221,7 +225,9 @@ let clause_of_fof hc =
 (** Change the context of the clause *)
 let update_ctx ~ctx hc =
   let lits = Array.map (Lits.reord ~ord:ctx.ctx_ord) hc.hclits in
-  mk_hclause_a ~selected:hc.hcselected ~ctx lits hc.hcproof
+  let proof = adapt_proof hc.hcproof in
+  let hc' =  mk_hclause_a ~selected:hc.hcselected ~ctx lits proof in
+  hc'
 
 (** check the ordering relation of lits (always true after reord_clause ~ord) *)
 let check_ord_hclause ~ord hc =
@@ -244,7 +250,8 @@ let rec apply_subst ?(recursive=true) subst (hc,offset) =
       (fun lit -> Lits.apply_subst ~recursive ~ord subst (lit, offset))
       hc.hclits in
     let descendants = hc.hcdescendants in
-    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
+    let proof = adapt_proof hc.hcproof in
+    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
     new_hc.hcdescendants <- descendants;
     new_hc
   end
@@ -406,12 +413,13 @@ let rec from_simple ~ctx (f, source) =
     | Simple.Or l -> List.concat (List.map (lits_from_simple ~ord) l)
     | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
   in
-  let proof = match source with
-  | Simple.Axiom (a,b) -> Axiom (a,b)
+  let proof c = match source with
+  | Simple.Axiom (a,b) -> Axiom (c, a, b)
   | Simple.Derived (name, fs) ->
     failwith "unable to convert non-axiom simple clause to hclause"
   in
-  mk_hclause ~ctx (lits_from_simple ~ord f) proof
+  let hc = mk_hclause ~ctx (lits_from_simple ~ord f) proof in
+  hc
 
 (* ----------------------------------------------------------------------
  * set of clauses, reachable by ID
@@ -640,7 +648,7 @@ let pp_clause_debug =
         Utils.pp_arrayi ~sep:" | "
           (fun formatter i lit ->
             let annot = pp_annot selected max i in
-            Format.fprintf formatter "%a%s" Lits.pp_literal_debug#pp lit annot)
+            Format.fprintf formatter "%a%s" Lits.pp_literal lit annot)
           formatter lits
       in
       (* print in an horizontal box, or not *)
@@ -673,88 +681,6 @@ let pp_clause_tstp =
   end
 
 let pp_clause = ref pp_clause_debug
-
-(** pretty printer for proofs *)
-class type pprinter_proof =
-  object
-    method pp : Format.formatter -> hclause -> unit      (** pretty print proof from clause *)
-  end
-
-let pp_proof_debug =
-  object (self)
-    method pp formatter hc =
-      assert (hc.hclits = [||]);
-      (* already_printed is a set of clauses already printed. *)
-      let already_printed = ref Ptset.empty
-      and to_print = Queue.create () in
-      (* initialize queue *)
-      Queue.add hc to_print; 
-      (* print every clause in the queue, if not already printed *)
-      while not (Queue.is_empty to_print) do
-        let hc = Queue.take to_print in
-        if Ptset.mem hc.hctag !already_printed then ()
-        else begin
-          already_printed := Ptset.add hc.hctag !already_printed;
-          match hc.hcproof with
-          | Axiom (f, s) ->
-            Format.fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>axiom %s in %s@]@]@;"
-              !pp_clause#pp_h hc s f
-          | Proof (rule, premises) ->
-            (* print the proof step *)
-            Format.fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>%s with @[<hv>%a@]@]@]@;"
-              !pp_clause#pp_h hc rule
-              (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
-            (* print premises recursively *)
-            List.iter (fun (c, _, _) -> Queue.add c to_print) premises
-        end
-      done
-  end
-
-let pp_proof_tstp =
-  object (self)
-    method pp formatter hc =
-      assert (hc.hclits = [||]);
-      (* already_printed is a set of clauses already printed. *)
-      let already_printed = ref Ptset.empty
-      and clause_num = ref Ptmap.empty
-      and counter = ref 1
-      and to_print = Queue.create () in
-      (* c -> hashconsed c, unique number for c *)
-      let get_num hc = 
-        try hc, Ptmap.find hc.hctag !clause_num
-        with Not_found ->
-          clause_num := Ptmap.add hc.hctag !counter !clause_num;
-          incr counter;
-          hc, Ptmap.find hc.hctag !clause_num
-      in
-      (* initialize queue *)
-      let hc, num = get_num hc in
-      Queue.add (hc, num) to_print; 
-      (* print every clause in the queue, if not already printed *)
-      while not (Queue.is_empty to_print) do
-        let hc, num = Queue.take to_print in
-        if Ptset.mem hc.hctag !already_printed then ()
-        else begin
-          already_printed := Ptset.add hc.hctag !already_printed;
-          match hc.hcproof with
-          | Axiom (f, ax_name) ->
-            Format.fprintf formatter "@[<h>fof(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
-              num pp_clause_tstp#pp_h hc f ax_name
-          | Proof (name, premises) ->
-            let premises = List.map (fun (c,_,_) -> get_num c) premises in
-            let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
-            (* print the inference *)
-            Format.fprintf formatter ("@[<h>fof(%d, plain, %a,@ " ^^
-              "@[<h>inference('%s', [status(%s)], @[<h>[%a, theory(equality)]@])@]).@]@;")
-              num pp_clause_tstp#pp_h hc name status
-              (Utils.pp_list ~sep:"," Format.pp_print_int) (List.map snd premises);
-            (* print every premise *)
-            List.iter (fun (hc,num) -> Queue.add (hc, num) to_print) premises
-        end
-      done;
-  end
-
-let pp_proof = ref pp_proof_debug
 
 (** print the content of a clause set *)
 let pp_set formatter set =
