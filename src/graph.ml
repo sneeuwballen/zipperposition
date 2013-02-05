@@ -35,9 +35,13 @@ module type S = sig
     (** Add an edge between two vertices *)
 
   val add_seq : 'e t -> (vertex * 'e * vertex) Sequence.t -> 'e t
+    (** Add the vertices to the graph *)
 
   val next : 'e t -> vertex -> ('e * vertex) Sequence.t
+    (** Outgoing edges *)
+
   val prev : 'e t -> vertex -> ('e * vertex) Sequence.t
+    (** Incoming edges *)
 
   val between : 'e t -> vertex -> vertex -> 'e Sequence.t
 
@@ -61,6 +65,7 @@ module type S = sig
   ] (** Dot attribute *)
 
   type 'e dot_printer
+    (** Helper to print a graph to DOT *)
 
   val mk_dot_printer : 
      print_edge:(vertex -> 'e -> vertex -> attribute list) ->
