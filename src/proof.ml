@@ -159,50 +159,41 @@ let pp_proof switch formatter proof = match switch with
   | "debug" -> pp_proof_debug formatter proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
-module DotProof = Dot.Make(
-  struct
-    type vertex = compact_clause proof
-    type edge = string
+module ProofDot = Graph.DotMake(ProofGraph)
 
-    let equal p1 p2 = proof_id p1 = proof_id p2
-    let hash proof = Lits.hash_lits (proof_lits proof)
-    let print_vertex proof =
-      Utils.sprintf "@[<h>%a@]" Lits.pp_lits (proof_lits proof)
-    let print_edge s = s
-  end)
+(** Create a DOT graph printer *)
+let mk_dot ~name =
+  let print_vertex proof =
+    let attributes =
+      [`Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (proof_lits proof));
+     `Shape "box";
+     `Style "filled"] in
+    let attributes =
+      if proof_lits proof = [||] then (`Color "red") :: attributes
+      else if is_axiom proof then (`Color "yellow") :: attributes
+      else attributes in
+    attributes
+  and print_edge v1 e v2 =
+    [`Label e]
+  in
+  ProofDot.make ~name ~print_edge ~print_vertex
 
-(** print to dot (if empty clause is present, only print a proof,
-    otherwise print the active set and its proof) *)
-let add_dot graph proof =
-  traverse proof
-    (fun proof ->
-      (* node for this clause *)
-      let n = DotProof.get_node graph proof in
-      DotProof.add_node_attribute n (DotProof.Style "filled");
-      DotProof.add_node_attribute n (DotProof.Shape "box");
-      (if proof_lits proof = [||]
-        then DotProof.add_node_attribute n (DotProof.Color "red"));
-      match proof with
-      | Axiom (c, file, axiom) ->
-        DotProof.add_node_attribute n (DotProof.Color "yellow");
-      | Proof (c, rule, premises) ->
-        List.iter
-          (fun proof' ->
-            let n' = DotProof.get_node graph proof' in
-            ignore (DotProof.add_edge graph n' n rule))
-          premises)
+(** Add the proof to the given graph *)
+let add_dot dot proof =
+  let graph = to_graph proof in
+  ProofDot.add dot graph
 
 (** print to dot into a file *)
 let pp_dot_file ?(name="proof") filename proof =
   (* add to a fresh graph *)
-  let graph = DotProof.mk_graph ~name in
-  add_dot graph proof;
+  let dot = mk_dot ~name in
+  add_dot dot proof;
   (* print graph on file *)
   let out = open_out filename in
   try
     (* write on the opened out channel *)
     let formatter = Format.formatter_of_out_channel out in
-    Format.printf "%% print state to %s@." filename;
-    Format.fprintf formatter "%a@." DotProof.pp_graph graph;
+    Format.printf "%% print proof to %s@." filename;
+    Format.fprintf formatter "%a@." ProofDot.pp dot;
     close_out out
   with _ -> close_out out

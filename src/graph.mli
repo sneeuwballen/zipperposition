@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 module type S = sig
   type vertex
 
+  module M : Map.S with type key = vertex
+
   type 'e t
     (** Graph parametrized by a type for edges *)
 
@@ -37,6 +39,8 @@ module type S = sig
   val next : 'e t -> vertex -> ('e * vertex) Sequence.t
   val prev : 'e t -> vertex -> ('e * vertex) Sequence.t
 
+  val between : 'e t -> vertex -> vertex -> 'e Sequence.t
+
   val iter_vertices : 'e t -> (vertex -> unit) -> unit
   val vertices : 'e t -> vertex Sequence.t
       (** Iterate on vertices *)
@@ -47,3 +51,35 @@ module type S = sig
 end
 
 module Make(V : Map.OrderedType) : S with type vertex = V.t
+
+(** Signature of a module designed to print graphs into DOT *)
+module type Dot = sig
+  module G : S
+    (** A graph module *)
+
+  type attribute = [ `Color of string
+  | `Shape of string
+  | `Weight of int
+  | `Style of string
+  | `Label of string
+  | `Other of string * string
+  ] (** Dot attribute *)
+
+  type 'e t
+    (** Dot printer for graphs of type ['e G.t] *)
+
+  val make : name:string ->
+             print_edge:(G.vertex -> 'e -> G.vertex -> attribute list) ->
+             print_vertex:(G.vertex -> attribute list) -> 'e t
+    (** Create a Dot graph printer. Functions to convert edges and vertices
+        to Dot attributes must be provided. *)
+
+  val add : 'e t -> 'e G.t -> unit
+    (** Add the content of the graph to the Dot printer *)
+
+  val pp : Format.formatter -> 'e t -> unit
+    (** Print the content of the graph printer on the formatter. *)
+end
+
+(** Create a Dot printing module from a Graph structure *)
+module DotMake(G : S) : Dot with module G = G

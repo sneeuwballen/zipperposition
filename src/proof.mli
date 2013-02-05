@@ -64,10 +64,13 @@ val pp_proof_debug : Format.formatter -> compact_clause proof -> unit
 val pp_proof : string -> Format.formatter -> compact_clause proof -> unit
   (** Prints the proof according to the given input switch *)
 
-module DotProof : Dot.S
+module ProofDot : Graph.Dot with module G = ProofGraph
   (** Module for Dot graphs labelled by proofs *)
 
-val add_dot : DotProof.graph -> compact_clause proof -> unit
+val mk_dot : name:string -> string ProofDot.t
+  (** Create a DOT graph printer *)
+
+val add_dot : string ProofDot.t -> compact_clause proof -> unit
   (** Add the proof to the given graph *)
 
 val pp_dot_file : ?name:string -> string -> compact_clause proof -> unit
