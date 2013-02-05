@@ -20,8 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 A simple persistent directed graph.} *)
 
-module Graph(V : Map.OrderedType) : sig
-  type vertex = V.t
+module type S = sig
+  type vertex
 
   type 'e t
     (** Graph parametrized by a type for edges *)
@@ -45,3 +45,5 @@ module Graph(V : Map.OrderedType) : sig
   val to_seq : 'e t -> (vertex * 'e * vertex) Sequence.t
     (** Dump the graph as a sequence of vertices *)
 end
+
+module Make(V : Map.OrderedType) : S with type vertex = V.t

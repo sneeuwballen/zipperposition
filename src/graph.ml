@@ -20,15 +20,44 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 A simple persistent directed graph.} *)
 
-module Graph(V : Map.OrderedType) = struct
+module type S = sig
+  type vertex
+
+  type 'e t
+    (** Graph parametrized by a type for edges *)
+
+  val empty : 'e t
+    (** Create an empty graph. *)
+
+  val add : 'e t -> vertex -> 'e -> vertex -> 'e t
+    (** Add an edge between two vertices *)
+
+  val add_seq : 'e t -> (vertex * 'e * vertex) Sequence.t -> 'e t
+
+  val next : 'e t -> vertex -> ('e * vertex) Sequence.t
+  val prev : 'e t -> vertex -> ('e * vertex) Sequence.t
+
+  val iter_vertices : 'e t -> (vertex -> unit) -> unit
+  val vertices : 'e t -> vertex Sequence.t
+      (** Iterate on vertices *)
+
+  val iter : 'e t -> (vertex * 'e * vertex -> unit) -> unit 
+  val to_seq : 'e t -> (vertex * 'e * vertex) Sequence.t
+    (** Dump the graph as a sequence of vertices *)
+end
+
+module Make(V : Map.OrderedType) = struct
   module M = Map.Make(V)
 
+  type vertex = V.t
+
   type 'e t = 'e node M.t
+    (** Graph parametrized by a type for edges *)
   and 'e node = {
-    n_vertex : vertices;
+    n_vertex : vertex;
     n_next : ('e * vertex) list;
     n_prev : ('e * vertex) list;
-  } (** Graph parametrized by a type for edges *)
+  } (** A node of the graph *)
 
   let empty = M.empty
 
@@ -42,8 +71,10 @@ module Graph(V : Map.OrderedType) = struct
     let n1 = try M.find v1 t with Not_found -> empty_node v1
     and n2 = try M.find v2 t with Not_found -> empty_node v2 in
     let n1 = { n1 with n_next = (e,v2) :: n1.n_next; }
-    and n2 = { n2 with n_prev = (e,v1) :: n2.n_prev; }
+    and n2 = { n2 with n_prev = (e,v1) :: n2.n_prev; } in
     M.add v1 n1 (M.add v2 n2 t)
+
+  let add_seq t seq = Sequence.fold (fun t (v1,e,v2) -> add t v1 e v2) t seq
 
   let next t v = Sequence.List.to_seq (M.find v t).n_next
 

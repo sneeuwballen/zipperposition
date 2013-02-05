@@ -50,6 +50,13 @@ val to_seq : (int * 'a) proof -> (int * 'a) proof Sequence.t
 val depth : (int * 'a) proof -> int
   (** Max depth of the proof *)
 
+(** {2 Conversion to a graph of proofs} *)
+
+module ProofGraph : Graph.S with type vertex = compact_clause proof
+
+val to_graph : compact_clause proof -> string ProofGraph.t
+  (** Get a graph of the proof *)
+
 (** {2 Pretty printer for proofs} *)
 
 val pp_proof_tstp : Format.formatter -> compact_clause proof -> unit

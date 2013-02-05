@@ -95,6 +95,23 @@ let depth proof =
   done;
   !depth
 
+(** {2 Conversion to a graph of proofs} *)
+
+module ProofGraph = Graph.Make(struct
+  type t = compact_clause proof
+  let compare p1 p2 = proof_id p1 - proof_id p2
+end)
+
+(** Get a graph of the proof *)
+let to_graph proof =
+  let g = ref ProofGraph.empty in
+  traverse proof
+    (fun p -> match p with
+     | Axiom _ -> ()
+     | Proof (_, rule, l) ->
+       List.iter (fun p' -> g := ProofGraph.add !g p rule p') l);
+  !g
+
 (** {2 Pretty printer for proofs} *)
 
 let pp_proof_debug formatter proof =
