@@ -136,7 +136,8 @@ end
 module DotMake(G : S) = struct
   module G = G
 
-  type attribute = [ `Color of string
+  type attribute = [
+  | `Color of string
   | `Shape of string
   | `Weight of int
   | `Style of string

@@ -57,7 +57,8 @@ module type Dot = sig
   module G : S
     (** A graph module *)
 
-  type attribute = [ `Color of string
+  type attribute = [
+  | `Color of string
   | `Shape of string
   | `Weight of int
   | `Style of string

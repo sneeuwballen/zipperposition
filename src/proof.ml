@@ -109,7 +109,7 @@ let to_graph proof =
     (fun p -> match p with
      | Axiom _ -> ()
      | Proof (_, rule, l) ->
-       List.iter (fun p' -> g := ProofGraph.add !g p rule p') l);
+       List.iter (fun p' -> g := ProofGraph.add !g p' rule p) l);
   !g
 
 (** {2 Pretty printer for proofs} *)
@@ -164,14 +164,12 @@ module ProofDot = Graph.DotMake(ProofGraph)
 (** Create a DOT graph printer *)
 let mk_dot ~name =
   let print_vertex proof =
+    let label = `Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (proof_lits proof)) in
+    let attributes = [`Shape "box"; `Style "filled"] in
     let attributes =
-      [`Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (proof_lits proof));
-     `Shape "box";
-     `Style "filled"] in
-    let attributes =
-      if proof_lits proof = [||] then (`Color "red") :: attributes
-      else if is_axiom proof then (`Color "yellow") :: attributes
-      else attributes in
+      if proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
+      else if is_axiom proof then label :: `Color "yellow" :: attributes
+      else label :: attributes in
     attributes
   and print_edge v1 e v2 =
     [`Label e]
