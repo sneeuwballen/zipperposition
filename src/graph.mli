@@ -21,9 +21,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** {1 A simple persistent directed graph.} *)
 
 module type S = sig
+  (** {2 Basics} *)
+
   type vertex
 
   module M : Map.S with type key = vertex
+  module S : Set.S with type elt = vertex
 
   type 'e t
     (** Graph parametrized by a type for edges *)
@@ -52,6 +55,33 @@ module type S = sig
   val iter : 'e t -> (vertex * 'e * vertex -> unit) -> unit 
   val to_seq : 'e t -> (vertex * 'e * vertex) Sequence.t
     (** Dump the graph as a sequence of vertices *)
+
+  (** {2 Global operations} *)
+
+  val roots : 'e t -> vertex Sequence.t
+    (** Roots, ie vertices with no incoming edges *)
+
+  val leaves : 'e t -> vertex Sequence.t
+    (** Leaves, ie vertices with no outgoing edges *)
+
+  val rev : 'e t -> 'e t
+    (** Reverse all edges *)
+
+  val is_dag : 'e t -> bool
+    (** Is the graph acyclic? *)
+
+  (** {2 Path operations} *)
+
+  type 'e path = (vertex * 'e * vertex) list
+
+  val path : 'e t -> vertex -> vertex -> 'e path option
+    (** Find a path between the two vertices *)
+
+  val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path option
+    (** Minimal path from first vertex to second, given the cost function *)
+
+  val paths : 'e t -> vertex -> vertex -> 'e path Sequence.t
+    (** [paths g v1 v2] iterates on all paths from [v1] to [v2] *)
 
   (** {2 Print to DOT} *)
 

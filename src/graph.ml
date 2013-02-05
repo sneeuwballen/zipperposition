@@ -21,9 +21,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** {1 A simple persistent directed graph.} *)
 
 module type S = sig
+  (** {2 Basics} *)
+
   type vertex
 
   module M : Map.S with type key = vertex
+  module S : Set.S with type elt = vertex
 
   type 'e t
     (** Graph parametrized by a type for edges *)
@@ -52,6 +55,17 @@ module type S = sig
   val iter : 'e t -> (vertex * 'e * vertex -> unit) -> unit 
   val to_seq : 'e t -> (vertex * 'e * vertex) Sequence.t
     (** Dump the graph as a sequence of vertices *)
+
+  (** {2 Global operations} *)
+
+  val roots : 'e t -> vertex Sequence.t
+    (** Roots, ie vertices with no incoming edges *)
+
+  val leaves : 'e t -> vertex Sequence.t
+    (** Leaves, ie vertices with no outgoing edges *)
+
+  val rev : 'e t -> 'e t
+    (** Reverse all edges *)
 
   (** {2 Print to DOT} *)
 
@@ -84,6 +98,7 @@ end
 
 module Make(V : Map.OrderedType) = struct
   module M = Map.Make(V)
+  module S = Set.Make(V)
 
   type vertex = V.t
 
@@ -133,6 +148,37 @@ module Make(V : Map.OrderedType) = struct
       t
 
   let to_seq t = Sequence.from_iter (iter t)
+
+  (** {2 Global operations} *)
+
+  (** Roots, ie vertices with no incoming edges *)
+  let roots g =
+    let vertices = vertices g in
+    Sequence.filter (fun v -> Sequence.is_empty (prev g v)) vertices
+
+  (** Leaves, ie vertices with no outgoing edges *)
+  let leaves g =
+    let vertices = vertices g in
+    Sequence.filter (fun v -> Sequence.is_empty (next g v)) vertices
+
+  (** Reverse all edges *)
+  let rev g =
+    let edges = to_seq g in
+    let edges = Sequence.map (fun (v1, e, v2) -> (v2, e, v1)) edges in
+    add_seq empty edges
+
+  (** Is the graph acyclic? *)
+  let is_dag g = false (* TODO *)
+
+  (** {2 Path operations} *)
+
+  type 'e path = (vertex * 'e * vertex) list
+
+  (** Minimal path from first vertex to second, given the cost function *)
+  let min_path graph ~cost v1 v2 = failwith "not implemented"
+
+  (** [paths g v1 v2] iterates on all paths from [v1] to [v2] *)
+  let paths graph v1 v2 = []  (* TODO *)
 
   (** {2 Print to DOT} *)
 
