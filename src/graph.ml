@@ -67,6 +67,19 @@ module type S = sig
   val rev : 'e t -> 'e t
     (** Reverse all edges *)
 
+  val is_dag : 'e t -> bool
+    (** Is the graph acyclic? *)
+
+  (** {2 Path operations} *)
+
+  type 'e path = (vertex * 'e * vertex) list
+
+  val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path option
+    (** Minimal path from first vertex to second, given the cost function *)
+
+  val paths : 'e t -> vertex -> vertex -> 'e path Sequence.t
+    (** [paths g v1 v2] iterates on all paths from [v1] to [v2] *)
+
   (** {2 Print to DOT} *)
 
   type attribute = [
@@ -178,7 +191,20 @@ module Make(V : Map.OrderedType) = struct
   let min_path graph ~cost v1 v2 = failwith "not implemented"
 
   (** [paths g v1 v2] iterates on all paths from [v1] to [v2] *)
-  let paths graph v1 v2 = []  (* TODO *)
+  let paths graph v1 v2 =
+    let seq k =
+      (* recursive function that looks for paths *)
+      let rec explore explored path v =
+        if V.compare v v2 = 0 then k (List.rev path)
+        else Sequence.iter
+          (fun (e, v') ->
+            if S.mem v' explored then () else
+              (* follow the edge (v,e,v') *)
+              let explored' = S.add v' explored in
+              explore explored' ((v,e,v')::path) v')
+          (next graph v)
+      in explore (S.singleton v1) [] v1
+    in Sequence.from_iter seq
 
   (** {2 Print to DOT} *)
 

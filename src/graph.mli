@@ -74,9 +74,6 @@ module type S = sig
 
   type 'e path = (vertex * 'e * vertex) list
 
-  val path : 'e t -> vertex -> vertex -> 'e path option
-    (** Find a path between the two vertices *)
-
   val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path option
     (** Minimal path from first vertex to second, given the cost function *)
 
