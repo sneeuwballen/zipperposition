@@ -48,14 +48,8 @@ module type S = sig
   val iter : 'e t -> (vertex * 'e * vertex -> unit) -> unit 
   val to_seq : 'e t -> (vertex * 'e * vertex) Sequence.t
     (** Dump the graph as a sequence of vertices *)
-end
 
-module Make(V : Map.OrderedType) : S with type vertex = V.t
-
-(** Signature of a module designed to print graphs into DOT *)
-module type Dot = sig
-  module G : S
-    (** A graph module *)
+  (** {2 Print to DOT} *)
 
   type attribute = [
   | `Color of string
@@ -66,21 +60,22 @@ module type Dot = sig
   | `Other of string * string
   ] (** Dot attribute *)
 
-  type 'e t
-    (** Dot printer for graphs of type ['e G.t] *)
+  type 'e dot_printer
 
-  val make : name:string ->
-             print_edge:(G.vertex -> 'e -> G.vertex -> attribute list) ->
-             print_vertex:(G.vertex -> attribute list) -> 'e t
+  val mk_dot_printer : 
+     print_edge:(vertex -> 'e -> vertex -> attribute list) ->
+     print_vertex:(vertex -> attribute list) ->
+     'e dot_printer
     (** Create a Dot graph printer. Functions to convert edges and vertices
         to Dot attributes must be provided. *)
 
-  val add : 'e t -> 'e G.t -> unit
-    (** Add the content of the graph to the Dot printer *)
-
-  val pp : Format.formatter -> 'e t -> unit
-    (** Print the content of the graph printer on the formatter. *)
+  val pp : 'e dot_printer -> name:string ->
+            Format.formatter ->
+            (vertex Sequence.t * (vertex * 'e * vertex) Sequence.t) -> unit
+    (** Pretty print the graph in DOT, on given formatter. Using sequences
+        allows to easily select which edges and vertices are important,
+        or to combine several graphs with [Sequence.append].
+        All vertices used in edges must appear in the vertices sequence. *)
 end
 
-(** Create a Dot printing module from a Graph structure *)
-module DotMake(G : S) : Dot with module G = G
+module Make(V : Map.OrderedType) : S with type vertex = V.t

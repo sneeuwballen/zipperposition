@@ -159,10 +159,8 @@ let pp_proof switch formatter proof = match switch with
   | "debug" -> pp_proof_debug formatter proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
-module ProofDot = Graph.DotMake(ProofGraph)
-
-(** Create a DOT graph printer *)
-let mk_dot ~name =
+(** DOT printer of proof graphs *)
+let dot_printer =
   let print_vertex proof =
     let label = `Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (proof_lits proof)) in
     let attributes = [`Shape "box"; `Style "filled"] in
@@ -174,24 +172,23 @@ let mk_dot ~name =
   and print_edge v1 e v2 =
     [`Label e]
   in
-  ProofDot.make ~name ~print_edge ~print_vertex
+  ProofGraph.mk_dot_printer ~print_vertex ~print_edge
 
 (** Add the proof to the given graph *)
-let add_dot dot proof =
+let pp_dot ~name formatter proof =
   let graph = to_graph proof in
-  ProofDot.add dot graph
+  let vertices = ProofGraph.vertices graph
+  and edges = ProofGraph.to_seq graph in
+  ProofGraph.pp dot_printer ~name formatter (vertices, edges)
 
 (** print to dot into a file *)
 let pp_dot_file ?(name="proof") filename proof =
-  (* add to a fresh graph *)
-  let dot = mk_dot ~name in
-  add_dot dot proof;
   (* print graph on file *)
   let out = open_out filename in
   try
     (* write on the opened out channel *)
     let formatter = Format.formatter_of_out_channel out in
     Format.printf "%% print proof to %s@." filename;
-    Format.fprintf formatter "%a@." ProofDot.pp dot;
+    Format.fprintf formatter "%a@." (pp_dot ~name) proof;
     close_out out
   with _ -> close_out out

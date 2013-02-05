@@ -48,6 +48,33 @@ module type S = sig
   val iter : 'e t -> (vertex * 'e * vertex -> unit) -> unit 
   val to_seq : 'e t -> (vertex * 'e * vertex) Sequence.t
     (** Dump the graph as a sequence of vertices *)
+
+  (** {2 Print to DOT} *)
+
+  type attribute = [
+  | `Color of string
+  | `Shape of string
+  | `Weight of int
+  | `Style of string
+  | `Label of string
+  | `Other of string * string
+  ] (** Dot attribute *)
+
+  type 'e dot_printer
+
+  val mk_dot_printer : 
+     print_edge:(vertex -> 'e -> vertex -> attribute list) ->
+     print_vertex:(vertex -> attribute list) ->
+     'e dot_printer
+    (** Create a Dot graph printer. Functions to convert edges and vertices
+        to Dot attributes must be provided. *)
+
+  val pp : 'e dot_printer -> name:string ->
+            Format.formatter ->
+            (vertex Sequence.t * (vertex * 'e * vertex) Sequence.t) -> unit
+    (** Pretty print the graph in DOT, on given formatter. Using a sequence
+        allows to easily select which edges are important, or to combine
+        several graphs with [Sequence.append] *)
 end
 
 module Make(V : Map.OrderedType) = struct
@@ -101,40 +128,8 @@ module Make(V : Map.OrderedType) = struct
       t
 
   let to_seq t = Sequence.from_iter (iter t)
-end
 
-(** Signature of a module designed to print graphs into DOT *)
-module type Dot = sig
-  module G : S
-    (** A graph module *)
-
-  type attribute = [ `Color of string
-  | `Shape of string
-  | `Weight of int
-  | `Style of string
-  | `Label of string
-  | `Other of string * string
-  ] (** Dot attribute *)
-
-  type 'e t
-    (** Dot printer for graphs of type ['e G.t] *)
-
-  val make : name:string ->
-            print_edge:(G.vertex -> 'e -> G.vertex -> attribute list) ->
-             print_vertex:(G.vertex -> attribute list) -> 'e t
-    (** Create a Dot graph printer. Functions to convert edges and vertices
-        to Dot attributes must be provided. *)
-
-  val add : 'e t -> 'e G.t -> unit
-    (** Add the content of the graph to the Dot printer *)
-
-  val pp : Format.formatter -> 'e t -> unit
-    (** Print the content of the graph printer on the formatter. *)
-end
-
-(** Create a Dot printing module from a Graph structure *)
-module DotMake(G : S) = struct
-  module G = G
+  (** {2 Print to DOT} *)
 
   type attribute = [
   | `Color of string
@@ -145,59 +140,36 @@ module DotMake(G : S) = struct
   | `Other of string * string
   ] (** Dot attribute *)
 
-  type 'e t = {
-    name : string;
-    print_edge : G.vertex -> 'e -> G.vertex -> attribute list;
-    print_vertex : G.vertex -> attribute list;
-    mutable count_map : int G.M.t;
-    mutable count : int;
-    mutable edges : (int * int * attribute list) list;
-    mutable vertices : (int * attribute list) list;
+  type 'e dot_printer = {
+    print_edge : vertex -> 'e -> vertex -> attribute list;
+    print_vertex : vertex -> attribute list;
   } (** Dot printer for graphs of type ['e G.t] *)
 
   (** Create a Dot graph printer. Functions to convert edges and vertices
       to Dot attributes must be provided. *)
-  let make ~name ~print_edge ~print_vertex = {
-    name;
+  let mk_dot_printer ~print_edge ~print_vertex = {
     print_vertex;
     print_edge;
-    count_map = G.M.empty;
-    count = 0;
-    edges = [];
-    vertices = [];
   }
 
-  (** Add the content of the graph to the Dot printer *)
-  let add dot graph =
+  (** Pretty print the graph in DOT, on given formatter. Using sequences
+      allows to easily select which edges and vertices are important,
+      or to combine several graphs with [Sequence.append].
+      All vertices used in edges must appear in the vertices sequence. *)
+  let pp printer ~name formatter (vertices,edges) =
     (* map from vertices to integers *)
-    let get_id vertex =
-      try G.M.find vertex dot.count_map
-      with Not_found ->
-        let n = dot.count in
-        dot.count <- dot.count + 1;
-        dot.count_map <- G.M.add vertex n dot.count_map;
-        n
-    in
-    (* add vertices *)
-    Sequence.iter
-      (fun v ->
-        let attributes = dot.print_vertex v in
-        dot.vertices <- (get_id v, attributes) :: dot.vertices)
-      (G.vertices graph);
-    (* add edges *)
-    Sequence.iter
-      (fun (v1, e, v2) ->
-        let attributes = dot.print_edge v1 e v2 in
-        dot.edges <- (get_id v1, get_id v2, attributes) :: dot.edges)
-      (G.to_seq graph);
-    ()
-
-
-  (** Print the given graph on the formatter, using the graph printer.
-      All vertices and nodes of the graph are iterated on. *)
-  let pp formatter dot = 
+    let get_id =
+      let count_map = ref M.empty
+      and count = ref 0 in
+      fun vertex ->
+        try M.find vertex !count_map
+        with Not_found ->
+          let n = !count in
+          incr count;
+          count_map := M.add vertex n !count_map;
+          n
     (* print an attribute *)
-    let print_attribute formatter attr =
+    and print_attribute formatter attr =
       match attr with
       | `Color c -> Format.fprintf formatter "color=%s" c
       | `Shape s -> Format.fprintf formatter "shape=%s" s
@@ -207,22 +179,25 @@ module DotMake(G : S) = struct
       | `Other (name, value) -> Format.fprintf formatter "%s=\"%s\"" name value
     in
     (* the name of a vertex *)
-    let pp_vertex formatter i = Format.fprintf formatter "vertex_%d" i in
+    let pp_vertex formatter v = Format.fprintf formatter "vertex_%d" (get_id v) in
     (* print preamble *)
-    Format.fprintf formatter "@[<v2>digraph %s {@;" dot.name;
+    Format.fprintf formatter "@[<v2>digraph %s {@;" name;
     (* print vertices *)
-    List.iter
-      (fun (i, attributes) ->
-        Format.fprintf formatter "  @[<h>%a [%a];@]@." pp_vertex i
+    Sequence.iter
+      (fun v ->
+        let attributes = printer.print_vertex v in
+        Format.fprintf formatter "  @[<h>%a [%a];@]@." pp_vertex v
           (FoUtils.pp_list ~sep:"," print_attribute) attributes)
-      dot.vertices;
+      vertices;
     (* print edges *)
-    List.iter
-      (fun (i1, i2, attributes) ->
+    Sequence.iter
+      (fun (v1, e, v2) ->
+        let attributes = printer.print_edge v1 e v2 in
         Format.fprintf formatter "  @[<h>%a -> %a [%a];@]@."
-          pp_vertex i1 pp_vertex i2
+          pp_vertex v1 pp_vertex v2
           (FoUtils.pp_list ~sep:"," print_attribute) attributes)
-      dot.edges;
+      edges;
     (* close *)
-    Format.fprintf formatter "}@]@;"
+    Format.fprintf formatter "}@]@;";
+    ()
 end
