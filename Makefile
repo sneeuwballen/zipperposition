@@ -49,4 +49,4 @@ datalog:
 sequence:
 	make -C sequence
 
-.PHONY: datalog
+.PHONY: datalog sequence
