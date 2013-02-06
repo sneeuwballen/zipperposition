@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Extracting lemmas from proofs *)
+(** {1 Extracting lemmas from proofs} *)
 
 open Types
 open Symbols
@@ -26,74 +26,39 @@ open Symbols
 module T = Terms
 module C = Clauses
 module S = FoSubst
+module Lits = Literals
 module Utils = FoUtils
 
-(* ----------------------------------------------------------------------
- * (heuristic) search of "interesting" lemma in a proof.
- * ---------------------------------------------------------------------- *)
+(** {2 Utils to build lemmas} *)
 
-(** 'cost', or handicap, of a symbol *)
-let cost_symbol ~is_theory_symbol signature s =
-  if is_theory_symbol s then 0.2
-  else
-    let arity = try fst (SMap.find s signature) with Not_found -> 3 in
-    if arity = 0 then 1. else 3. *. (float_of_int arity)
-
-(** Heuristic "simplicity and elegance" measure for clauses in a proof. Theory
-    symbols are less 'costly' than other symbols, as are constants.
-    The smaller the result, the better. *)
-let rate_clause ~is_theory_symbol hc = 
-  let rate = ref 1. in
-  (* many symbols is not simple *)
-  let signature = C.signature [hc] in
-  let symbols = symbols_of_signature signature in
-  let symbols = List.filter (fun s -> not (SSet.mem s base_symbols)) symbols in
-  List.iter
-    (fun s -> rate := !rate +. cost_symbol ~is_theory_symbol signature s)
-    symbols;
-  (* weight of clause, as a measure of weight of terms *)
-  rate := !rate *. (float_of_int hc.hcweight) /. 2.;
-  (* many literals is not simple, multiply by length of clause *)
-  let length = Array.length hc.hclits in
-  rate := !rate *. (float_of_int (length - 1));
-  (* result *)
-  Utils.debug 3 (lazy (Utils.sprintf
-                "%% simplicity of @[<h>%a@] is %.2f" !C.pp_clause#pp_h hc !rate));
-  !rate 
-
-(** Maximum number of lemmas that can be learnt from one proof *)
-let max_lemmas = ref 3
-
-(** Maximum lemma rate, above which the lemma is discarded *)
-let max_rate = ref 50.
-
-(** A possible lemma, i.e. a subgraph *)
+(** A possible lemma, i.e. a cut of the graph *)
 type candidate_lemma = {
-  cl_conclusion : hclause;
-  cl_premises : hclause list;
+  cl_conclusion : literal array;
+  cl_premises : literal array list;
   cl_rate : float;
 }
 
 exception GotchaLittlePclause of Theories.named_formula * Patterns.mapping
 
-(** Find a named formula [nf] associated with this hclause. If none is
+(** Find a named formula [nf] associated with those literals. If none is
     available, create a new named formula.
-    This returns both the named_formula and a mapping from [hc] to the nf.nf_pclause. *)
-let get_nf kb hc =
+    This returns both the named_formula and a mapping from [lits]
+    to the nf.nf_pclause. *)
+let get_nf kb lits =
   let open Theories in
   try
-    Patterns.Map.retrieve kb.kb_patterns hc ()
+    Patterns.Map.retrieve kb.kb_patterns lits ()
       (fun () pc mapping nf ->
         raise (GotchaLittlePclause (nf, mapping)));
     (* failed to find a matching named_formula *)
     let name = next_name kb in
     (* create a new named_formula for this clause *)
-    let pc = Patterns.pclause_of_clause hc in
+    let pc = Patterns.pclause_of_lits lits in
     let nf = { Patterns.np_name = name; Patterns.np_pattern = pc; } in
     (* add the named formula to the KB *)
     add_named kb [nf];
     (* find a match *)
-    match Patterns.match_pclause pc hc with
+    match Patterns.match_pclause pc lits with
     | [] -> assert false
     | mapping::_ -> nf, mapping
   with GotchaLittlePclause (nf, mapping) ->
@@ -139,70 +104,112 @@ let candidate_to_lemma kb cl =
   { Th.lemma_conclusion = conclusion_atom;
     Th.lemma_premises = premises_atoms; }
 
-module CostMap = Map.Make(
-  struct
-    type t = hclause * int
-    let compare (hc1,d1) (hc2,d2) = if d1 <> d2 then d1 - d2 else hc1.hctag - hc2.hctag
-  end)
+(** 'simplicity' heuristic for a list of literals. The lower, the better. *)
+let simplicity lits =
+  let w = Lits.weight_lits lits
+  and d = Lits.depth_lits lits
+  and n = Array.length lits in
+  if not (C.is_cnf lits) then max_float /. 10.
+  else float_of_int (n * d + w)
 
-(** Minimum threshold for the max distance between the conclusion of a lemma,
-    and a premise of the lemma. *)
-let min_distance_threshold = 3
+(** {2 Cut extraction} *)
 
-(** Explore parents of the clause, looking for clauses that are simple
-    or for clauses that belong to a theory.
-    [distance] is the distance between [hc] and the root of the proof.
-    [cost_map]: for [c] a hclause, stores the best (rate, list of clauses) where
-       the list of clauses is a proof for [c] (best means with lowest rate
-       but max distance from the clause)
-    It returns a tuple (rate, list of premises, max distance). *)
-let explore_parents meta cost_map distance hc =
-  let open Theories in
-  let is_theory_symbol s = SSet.mem s meta.meta_theory_symbols in
-  let is_theory_clause hc = Ptmap.mem hc.hctag meta.meta_theory_clauses in
-  (* map (hclause, distance) -> 'a *)
-  (* compute the best list of premises for hc. It may be [hc] itself.
-     distance is the distance from the initial (empty) clause *)
-  let rec compute_best distance hc =
-    (* try to find if it's already been computed *)
-    try CostMap.find (hc, distance) !cost_map
-    with Not_found ->
-      (* cost of returning [hc] *)
-      let cost_hc =
-        if is_theory_clause hc
-        then 0.1 (* theory clauses are cheap *)
-        else if not (C.is_cnf hc) then 100. (* non-cnf clauses are to avoid *)
-        else rate_clause ~is_theory_symbol hc
-      in
-      (* the further from conclusion, the better *)
-      let cost_hc = cost_hc /. (0.1 +. (float_of_int distance)) in
-      let best_cost, best_premises, max_dist = match hc.hcproof with
-      | Axiom _ -> cost_hc /. 2., C.ClauseSet.singleton hc, distance  (* axioms are cheaper *)
-      | Proof (_, _, l) ->
-        (* cost of recursing into parents *)
-        let cost_parents, premises_parents, max_dist = List.fold_left
-          (fun (cost,premises,m) (parent,_,_) ->
-            let cost', premises',m' = compute_best (distance+1) parent in
-            cost +. cost', C.ClauseSet.union premises premises', max m m')
-          (0., C.ClauseSet.empty, 0) l
+(** The idea here is, given a clause [c] in a proof graph, to find
+    a cut [P] of the subgraph composed of ancestors of [c], such
+    that any path from an axiom [a] to [c] contains at least one
+    clause of [P].
+    That means that from the conjunction of clauses in [P], [c] is provable. *)
+
+(** Combine two float heuristics (both of them beeing low for
+    interesting cases) *)
+let combine_heuristics simplicity depth =
+  (simplicity ** 1.2) *. depth
+
+(** Find a cut for the given proof, from its ancestors. *)
+let cut proof =
+  let module G = Proof.ProofGraph in
+  (* graph of reversed inference edges: [c] -> [c'] if [c'] is a premise
+     in the inference that proves [c] *)
+  let graph = Proof.to_graph proof in
+  let graph = G.rev graph in
+  assert (G.is_dag graph);
+  (* leaves are axioms, they have no premises *)
+  let leaves = Sequence.to_set
+    (module G.S : Set.S with type elt = compact_clause proof 
+                         and type t = G.S.t)
+    (G.leaves graph) in 
+  (* set of selected nodes (clauses) of the graph, to eventually form a cut *)
+  let cut = ref G.S.empty in
+  (* explore paths from [proof] to [leaves] and that contain no clause from [cut] *)
+  let rec explore path v =
+    if G.S.mem v !cut then ()
+    else if G.S.mem v leaves then cut_path path (* cut path *)
+    else Sequence.iter
+      (fun (e, v') -> explore ((v',e,v)::path) v')
+      (G.next graph v)
+  (* select an element of the path, and add it to [cut] *)
+  and cut_path path =
+    let length = List.length path in
+    (* heuristic cost of the proof, at given distance from axioms? *)
+    let heuristic p depth =
+      if depth = length
+        then infinity
+        else combine_heuristics
+          (simplicity (Proof.proof_lits p))
+          (float_of_int depth)
+    in
+    match path with
+    | [] -> assert false
+    | (p,_,_)::path' ->
+      (* by default, choose the first clause *)
+      try
+        let best = ref (p, heuristic p 1) in
+        let _ = List.fold_left
+          (fun depth (p,_,_) ->
+            (* the path has been closed by cut, meanwhile *)
+            (if G.S.mem p !cut then raise Exit);
+            (* [p] is a proof in the path *)
+            let h = heuristic p depth in
+            let best_proof, best_h = !best in
+            (if h < best_h then
+              best := (p, h));
+            depth+1)
+          2 path'
         in
-        (* make the choice that gives the lowest cost *)
-        if cost_hc < cost_parents && distance >= min_distance_threshold
-          then (cost_hc, C.ClauseSet.singleton hc, max_dist)
-          else (cost_parents, premises_parents, max_dist)
-      in
-      (* memoize and return *)
-      let triple = best_cost, best_premises, max_dist in
-      cost_map := CostMap.add (hc, distance) triple !cost_map;
-      triple
+        cut := G.S.add (fst !best) !cut
+      with Exit -> ()  (* already cut *)
   in
-  (* return the best choice of premises for this (clause, distance) *)
-  let cost, premises, max_dist = compute_best distance hc in
-  let premises = C.ClauseSet.elements premises in
-  cost, premises, max_dist
+  explore [] proof;
+  (* convert the cut to a list *)
+  G.S.elements !cut
+
+(** {2 Lemma learning} *)
+
+(** From the given proof of the empty clause, find a cut [P] of
+    its premises, and learn p_1 & p_2 & ... & p_{n-1} => p_n *)
+let learn_empty proof = None (* TODO *)
+
+(** From the given proof [c], find a cut [P] of its premises,
+    and learn the lemma p_1 & p_2 & ... & p_n => c *)
+let learn_subproof proof = None (* TODO *)
+
+(** {2 Search for salient clauses *)
+
+(** Find a list of {b salient} clauses in the given proof. Salient clauses
+    are small clauses that have many descendants in the proof, and are
+    close to the conclusion. Those clauses should be good candidates
+    for [learn_subproof].
+    Implementation should rely on PageRank on the reverse graph. *)
+let salient_clauses proof = failwith "not implemented"
+
+(** {2 Batteries-included lemma learning} *)
+
+(** Maximum number of lemmas that can be learnt from one proof *)
+let max_lemmas = ref 3
 
 (** Given an empty clause (and its proof), look in the proof for lemmas. *)
-let search_lemmas meta hc =
+let search_lemmas meta hc = failwith "not implemented"
+(*
   assert (hc.hclits = [||]);
   let open Theories in
   let is_theory_symbol s = SSet.mem s meta.meta_theory_symbols in
@@ -272,6 +279,7 @@ let search_lemmas meta hc =
     lemmas
   in
   lemmas
+*)
 
 (** Update the KB of this meta-prover by learning from
     the given (empty) clause's proof. The KB is modified
