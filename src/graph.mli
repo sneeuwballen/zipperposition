@@ -106,9 +106,6 @@ module type S = sig
   val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path option
     (** Minimal path from first vertex to second, given the cost function *)
 
-  val paths : 'e t -> vertex -> vertex -> 'e path Sequence.t
-    (** [paths g v1 v2] iterates on all paths from [v1] to [v2] *)
-
   (** {2 Print to DOT} *)
 
   type attribute = [

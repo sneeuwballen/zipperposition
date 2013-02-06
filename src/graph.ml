@@ -106,9 +106,6 @@ module type S = sig
   val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path option
     (** Minimal path from first vertex to second, given the cost function *)
 
-  val paths : 'e t -> vertex -> vertex -> 'e path Sequence.t
-    (** [paths g v1 v2] iterates on all paths from [v1] to [v2] *)
-
   (** {2 Print to DOT} *)
 
   type attribute = [
@@ -174,12 +171,12 @@ module Make(V : Map.OrderedType) = struct
 
   let add_seq t seq = Sequence.fold (fun t (v1,e,v2) -> add t v1 e v2) t seq
 
-  let next t v = Sequence.List.to_seq (M.find v t).n_next
+  let next t v = Sequence.of_list (M.find v t).n_next
 
-  let prev t v = Sequence.List.to_seq (M.find v t).n_prev
+  let prev t v = Sequence.of_list (M.find v t).n_prev
 
   let between t v1 v2 =
-    let edges = Sequence.List.to_seq (M.find v1 t).n_prev in
+    let edges = Sequence.of_list (M.find v1 t).n_prev in
     let edges = Sequence.filter (fun (e, v2') -> V.compare v2 v2' = 0) edges in
     Sequence.map fst edges
 
@@ -302,22 +299,6 @@ module Make(V : Map.OrderedType) = struct
 
   (** Minimal path from first vertex to second, given the cost function *)
   let min_path graph ~cost v1 v2 = failwith "not implemented"
-
-  (** [paths g v1 v2] iterates on all paths from [v1] to [v2] *)
-  let paths graph v1 v2 =
-    let seq k =
-      (* recursive function that looks for paths *)
-      let rec explore explored path v =
-        if V.compare v v2 = 0 then k (List.rev path)
-        else Sequence.iter
-          (fun (e, v') ->
-            if S.mem v' explored then () else
-              (* follow the edge (v,e,v') *)
-              let explored' = S.add v' explored in
-              explore explored' ((v,e,v')::path) v')
-          (next graph v)
-      in explore (S.singleton v1) [] v1
-    in Sequence.from_iter seq
 
   (** {2 Print to DOT} *)
 
