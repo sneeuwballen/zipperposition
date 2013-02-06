@@ -61,10 +61,8 @@ val max_lemmas : int ref
   (** Maximal number of lemmas that can be learnt at once *)
 
 val search_lemmas : Theories.meta_prover -> compact_clause proof ->
-                    (Theories.lemma * float) list
-  (** Given an empty clause (and its proof), learn a list of
-      lemmas. The float describes a heuristic 'cost' for the lemma,
-      the lower, the better. *)
+                    Theories.lemma list
+  (** Given an empty clause (and its proof), learn a list of lemmas *)
 
 val learn_and_update : Theories.meta_prover -> hclause -> unit
   (** Update the KB of this meta-prover by learning from

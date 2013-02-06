@@ -257,78 +257,24 @@ let salient_clauses proof = []  (* TODO *)
 let max_lemmas = ref 3
 
 (** Given an empty clause (and its proof), look in the proof for lemmas. *)
-let search_lemmas meta hc = failwith "not implemented"
-(*
-  assert (hc.hclits = [||]);
+let search_lemmas meta proof =
+  assert (Proof.proof_lits proof = [||]);
   let open Theories in
-  let is_theory_symbol s = SSet.mem s meta.meta_theory_symbols in
-  (* depth of the proof *)
-  let depth = Proof.depth hc.hcproof in
-  Utils.debug 1 (lazy (Utils.sprintf "%% analyse proof of depth %d" depth));
-  (* candidate lemmas *)
-  let cost_map = ref CostMap.empty in
-  let candidates = ref [] in
-  let explored = ref C.CSet.empty in
-  let q = Queue.create () in
-  (* push parents of the empty clause in the queue *)
-  (match hc.hcproof with
-  | Axiom _ -> ()
-  | Proof (_, l) ->
-    List.iter (fun (c,_,_) -> Queue.push (c, 1) q) l);
-  (* breadth-first exploration of the proof. The depth is kept with the clause *)
-  while not (Queue.is_empty q) do
-    let hc, depth = Queue.pop q in
-    if C.CSet.mem !explored hc then () else begin
-      (* clause not already explored *)
-      explored := C.CSet.add !explored hc;
-      (* absolute rate of the clause itself *)
-      let hc_rate = rate_clause ~is_theory_symbol hc in
-      (* choice of premises, with associate cost *)
-      let premises_rate, premises, max_dist = explore_parents meta cost_map 0 hc in
-      begin if max_dist >= min_distance_threshold then
-        (* build the candidate *)
-        let cl = {
-          cl_conclusion = hc;
-          cl_premises = premises;
-          cl_rate = hc_rate +. premises_rate;
-        } in
-        candidates := cl :: !candidates
-      end;
-      (* explore parent clauses *)
-      match hc.hcproof with
-      | Axiom _ -> ()
-      | Proof (_, l) ->
-        List.iter (fun (c,_,_) -> Queue.push (c, depth+1) q) l
-    end
-  done;
-  (* sort candidate by increasing rate (bad candidates at the end), and take
-     only a given amount of them. *)
-  let candidates = List.sort
-    (fun cl1 cl2 -> int_of_float (cl1.cl_rate -. cl2.cl_rate))
-    !candidates in
-  let candidates = Utils.list_take !max_lemmas candidates in
-  (* convert the candidate lemma to a lemma. Also keep all the
-     involved named formulas. *)
-  let lemmas = Utils.list_flatmap
-    (fun cl ->
-      if cl.cl_rate > !max_rate
-        then begin
-          Utils.debug 0 (lazy (Utils.sprintf "%% drop candidate with rate %.2f" cl.cl_rate));
-          []
-        end else
-          let lemma = candidate_to_lemma meta.meta_kb cl in
-          [lemma, cl.cl_rate])
-    candidates
-  in
+  (* learn subproofs *)
+  let salient = Utils.list_take !max_lemmas (salient_clauses proof) in
+  let lemmas = List.map (learn_subproof ~meta) salient in
+  (* learn from empty clause (full proof) *)
+  let lemmas = learn_empty ~meta proof :: lemmas in
+  (* flatten ('a option list -> 'a list) *)
+  let lemmas = Utils.list_flatmap (function None -> [] | Some x -> [x]) lemmas in
   (* only keep lemmas that give safe rules *)
   let lemmas = List.filter
-    (fun (lemma, _) ->
+    (fun lemma ->
       let rule = rule_of_lemma lemma in
       Logic.check_safe rule)
     lemmas
   in
   lemmas
-*)
 
 (** Update the KB of this meta-prover by learning from
     the given (empty) clause's proof. The KB is modified
@@ -337,10 +283,10 @@ let learn_and_update meta hc =
   let open Theories in
   let kb = meta.meta_kb in
   (* learn from this proof *)
-  let lemmas = search_lemmas meta hc in
+  let lemmas = search_lemmas meta hc.hcproof in
   let lemmas = List.map
-    (fun (lemma, rate) ->
-      Format.printf "%%   learn @[<h>%a@], rated %.2f@." pp_lemma lemma rate;
+    (fun lemma ->
+      Format.printf "%%   learn @[<h>%a@]@." pp_lemma lemma;
       lemma)
     lemmas
   in
