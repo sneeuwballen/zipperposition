@@ -332,6 +332,7 @@ module Make(V : Map.OrderedType) = struct
   let min_path_full graph ?(cost=fun _ _ _ -> 1) ?(ignore=fun _ -> false) ~goal v =
     let q = Queue.create () in
     let explored = ref S.empty in
+    Queue.push (v, []) q;
     let best_path = ref [] in
     try
       while not (Queue.is_empty q) do
