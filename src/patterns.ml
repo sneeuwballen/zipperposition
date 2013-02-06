@@ -280,10 +280,10 @@ let plit_of_lit ?rev_map lit =
   let rterm = pterm_of_term ~rev_map r in
   { lterm; rterm; lweight = l.tsize; rweight = r.tsize; psign; }
 
-let pclause_of_clause ?rev_map hc =
+let pclause_of_lits ?rev_map lits =
   Utils.enter_prof prof_pclause_of_clause;
   let rev_map = match rev_map with | None -> empty_rev_mapping () | Some m -> m in
-  let lits = Array.map (fun lit -> plit_of_lit lit, Lits.weight lit, lit) hc.hclits in
+  let lits = Array.map (fun lit -> plit_of_lit lit, Lits.weight lit, lit) lits in
   let lits = Array.to_list lits in
   (* sort the literals *)
   let lits = List.sort (fun (plit1, w1, lit1) (plit2, w2, lit2) ->
@@ -297,6 +297,8 @@ let pclause_of_clause ?rev_map hc =
   let vars = pclause_symbols lits in
   Utils.exit_prof prof_pclause_of_clause;
   { pc_lits=lits; pc_canonical=plits; pc_vars=vars; }
+
+let pclause_of_clause ?rev_map hc = pclause_of_lits ?rev_map hc.hclits
 
 (*s instantiate an abstract pattern *)
 
@@ -389,7 +391,7 @@ let match_plit ~map plit lit =
       else [])
   | _ -> []
 
-let match_pclause ?map pclause hc =
+let match_pclause ?map pclause lits =
   let map = match map with | None -> empty_mapping | Some m -> m in
   (* do all permutations of literals to match together *)
   let open Bitvector in
@@ -405,14 +407,14 @@ let match_pclause ?map pclause hc =
       done
     else acc := map :: !acc
   in
-  if List.length pclause.pc_lits <> Array.length hc.hclits
+  if List.length pclause.pc_lits <> Array.length lits
     then []  (* no matching if lengths are different *)
     else begin
       let plits = Array.of_list pclause.pc_lits in
       let bv = 0 in
       let acc = ref [] in
       (* find all matchings *)
-      all_matches acc plits hc.hclits map 0 bv;
+      all_matches acc plits lits map 0 bv;
       !acc
     end
 
@@ -438,10 +440,11 @@ let abstract_np ~map np =
     np.np_pattern.pc_vars
   in np.np_name, args
 
-(** match a clause with a named pattern, yielding zero or more concrete
+(** match a clause (as literals) with a named pattern,
+    yielding zero or more concrete
     instances of the named pattern. *)
-let match_np np hc =
-  let mappings = match_pclause np.np_pattern hc in
+let match_np np lits =
+  let mappings = match_pclause np.np_pattern lits in
   List.map (fun map -> abstract_np ~map np) mappings
   
 (** Build a concrete clause from a named pattern and an associated
@@ -550,12 +553,12 @@ let pp_named_pattern formatter np =
  * map from patterns to data, with matching of clauses
  * ---------------------------------------------------------------------- *)
 
-(* Compute a hash for a hclause. We guarantee that a hclause has the same hash
-   as any of its pattern clauses. *)
-let hash_hclause hc =
+(* Compute a hash for an array of literals. We guarantee that the hash is the
+   same as any of the pattern clauses that come from those lits. *)
+let hash_lits lits =
   Array.fold_left
     (fun h lit -> let plit = plit_of_lit lit in h lxor hash_plit plit)
-    hash_pclause_seed hc.hclits
+    hash_pclause_seed lits
 
 (** Match hclauses with sets of pattern clauses, with some associated values *)
 module Map =
@@ -588,10 +591,10 @@ module Map =
             map acc)
         !t acc
 
-    (** match the hclause with pattern clauses. The callback, fold-like, is called
+    (** match the literals against pattern clauses. The callback, fold-like, is called
         on every match with both the pattern and the mapping. *)
-    let retrieve t hc acc k =
-      let h = hash_hclause hc in
+    let retrieve t lits acc k =
+      let h = hash_lits lits in
       try
         let map = Ptmap.find h !t in
         (* fold on pclauses that have same hash *)
@@ -599,8 +602,8 @@ module Map =
           (fun pc value acc ->
             (* match the pclause with the given hclause *)
             Utils.debug 3 (lazy (Utils.sprintf "%% @[<h>match %a with %a@]"
-                          !C.pp_clause#pp_h hc pp_pclause pc));
-            let mappings = match_pclause pc hc in
+                          Lits.pp_lits lits pp_pclause pc));
+            let mappings = match_pclause pc lits in
             List.fold_left
               (fun acc mapping -> k acc pc mapping value)
               acc mappings)

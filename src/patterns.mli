@@ -111,6 +111,7 @@ val empty_rev_mapping : unit -> rev_mapping
 
 val pterm_of_term : ?rev_map:rev_mapping -> term -> pterm
 val plit_of_lit : ?rev_map:rev_mapping -> literal -> pliteral
+val pclause_of_lits : ?rev_map:rev_mapping -> literal array -> pclause
 val pclause_of_clause : ?rev_map:rev_mapping -> hclause -> pclause
 
 (*s instantiate an abstract pattern *)
@@ -126,7 +127,7 @@ val instantiate_pclause : map:mapping -> ctx:context-> pclause ->
 
 val match_pterm : map:mapping -> pterm -> term -> mapping
 val match_plit : map:mapping -> pliteral -> literal -> mapping list
-val match_pclause : ?map:mapping -> pclause -> hclause -> mapping list
+val match_pclause : ?map:mapping -> pclause -> literal array -> mapping list
 
 (* ----------------------------------------------------------------------
  * named patterns with Datalog representations
@@ -145,8 +146,9 @@ val abstract_np : map:mapping -> named_pattern -> np_atom
   (** Given the mapping from psymbols to symbols, abstract the named pattern
       to a Datalog-like atom *)
 
-val match_np : named_pattern -> hclause -> np_atom list
-  (** match a clause with a named pattern, yielding zero or more concrete
+val match_np : named_pattern -> literal array -> np_atom list
+  (** match a clause (as literals) with a named pattern,
+      yielding zero or more concrete
       instances of the named pattern. *)
   
 val instantiate_np : ctx:context -> named_pattern -> np_atom ->
@@ -173,8 +175,9 @@ module Map :
     val fold : 'a t -> 'b -> ('b -> pclause -> 'a -> 'b) -> 'b
       (** fold on all stored key->value *)
 
-    val retrieve : 'a t -> hclause -> 'b -> ('b -> pclause -> mapping -> 'a -> 'b) -> 'b
-      (** match the hclause with pattern clauses. The callback, fold-like, is called
+    val retrieve : 'a t -> literal array -> 'b ->
+                  ('b -> pclause -> mapping -> 'a -> 'b) -> 'b
+      (** match the literals against pattern clauses. The callback, fold-like, is called
           on every match with both the pattern and the mapping. *)
 
     val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit

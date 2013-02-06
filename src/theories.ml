@@ -104,7 +104,6 @@ let rule_of_lemma lemma =
 
 (** Set of lemmas *)
 module LemmaSet = Set.Make(struct type t = lemma let compare = compare_lemma end)
-module LemmaSetSeq = Sequence.Set(LemmaSet)
 
 type kb = {
   mutable kb_name_idx : int;
@@ -416,7 +415,7 @@ let scan_clause meta hc =
   Utils.enter_prof prof_scan_clause;
   meta.meta_lemmas <- [];
   (* retrieve patterns that match this clause *)
-  Patterns.Map.retrieve meta.meta_kb.kb_patterns hc ()
+  Patterns.Map.retrieve meta.meta_kb.kb_patterns hc.hclits ()
     (fun () pclause mapping nf ->
       (* abstract the named pattern into a Datalog term *)
       let (head, args) = Patterns.abstract_np ~map:mapping nf in

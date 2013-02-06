@@ -89,7 +89,7 @@ let parse_args () =
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
       ("-learning", Arg.Set learn, "enable lemma learning");
-      (* TODO
+      (*
       ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
       *)
       ("-progress", Arg.Set progress, "print progress");

@@ -164,7 +164,7 @@ let parse_theory_file kb file =
   let kb_parser input =
     let lexbuf = Lexing.from_channel input in
     let tokens = Parser_tptp.parse_theory_file Lexer_tptp.token lexbuf in
-    Sequence.List.to_seq tokens
+    Sequence.of_list tokens
   in
   Theories.read_kb ~file ~kb_parser kb
 
@@ -301,7 +301,7 @@ let process_file ~kb params f =
       match meta with
       | Some meta when params.param_learn ->
         (* learning new lemmas *)
-        (*  TODO
+        (*
         LemmaLearning.learn_and_update meta c;
         *)
         (* merge with current file *)
