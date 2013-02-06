@@ -34,6 +34,12 @@ module type S = sig
   val empty : 'e t
     (** Create an empty graph. *)
 
+  val is_empty : 'e t -> bool
+    (** Is the graph empty? *)
+
+  val length : 'e t -> int
+    (** Number of vertices *)
+
   val add : 'e t -> vertex -> 'e -> vertex -> 'e t
     (** Add an edge between two vertices *)
 
@@ -64,8 +70,31 @@ module type S = sig
   val leaves : 'e t -> vertex Sequence.t
     (** Leaves, ie vertices with no outgoing edges *)
 
+  val choose : 'e t -> vertex
+    (** Pick a vertex, or raise Not_found *)
+
   val rev : 'e t -> 'e t
     (** Reverse all edges *)
+
+  (** {2 Traversals} *)
+
+  val bfs : 'e t -> vertex -> (vertex -> unit) -> unit
+    (** Breadth-first search, from given vertex *)
+
+  val dfs_full : 'e t ->
+                 ?labels:int M.t ref ->
+                 ?enter:((vertex * int) list -> unit) ->
+                 ?exit:((vertex * int) list -> unit) ->
+                 ?tree_edge:((vertex * 'e * vertex) -> unit) ->
+                 ?fwd_edge:((vertex * 'e * vertex) -> unit) ->
+                 ?back_edge:((vertex * 'e * vertex) -> unit) ->
+                 vertex -> 
+                 unit
+    (** DFS, with callbacks called on each encountered node and edge *)
+
+  val dfs : 'e t -> vertex -> ((vertex * int) -> unit) -> unit
+    (** Depth-first search, from given vertex. Each vertex is labelled
+        with its index in the traversal order. *)
 
   val is_dag : 'e t -> bool
     (** Is the graph acyclic? *)

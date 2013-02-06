@@ -34,6 +34,12 @@ module type S = sig
   val empty : 'e t
     (** Create an empty graph. *)
 
+  val is_empty : 'e t -> bool
+    (** Is the graph empty? *)
+
+  val length : 'e t -> int
+    (** Number of vertices *)
+
   val add : 'e t -> vertex -> 'e -> vertex -> 'e t
     (** Add an edge between two vertices *)
 
@@ -64,8 +70,31 @@ module type S = sig
   val leaves : 'e t -> vertex Sequence.t
     (** Leaves, ie vertices with no outgoing edges *)
 
+  val choose : 'e t -> vertex
+    (** Pick a vertex, or raise Not_found *)
+
   val rev : 'e t -> 'e t
     (** Reverse all edges *)
+
+  (** {2 Traversals} *)
+
+  val bfs : 'e t -> vertex -> (vertex -> unit) -> unit
+    (** Breadth-first search, from given vertex *)
+
+  val dfs_full : 'e t ->
+                 ?labels:int M.t ref ->
+                 ?enter:((vertex * int) list -> unit) ->
+                 ?exit:((vertex * int) list -> unit) ->
+                 ?tree_edge:((vertex * 'e * vertex) -> unit) ->
+                 ?fwd_edge:((vertex * 'e * vertex) -> unit) ->
+                 ?back_edge:((vertex * 'e * vertex) -> unit) ->
+                 vertex -> 
+                 unit
+    (** DFS, with callbacks called on each encountered node and edge *)
+
+  val dfs : 'e t -> vertex -> ((vertex * int) -> unit) -> unit
+    (** Depth-first search, from given vertex. Each vertex is labelled
+        with its index in the traversal order. *)
 
   val is_dag : 'e t -> bool
     (** Is the graph acyclic? *)
@@ -126,6 +155,10 @@ module Make(V : Map.OrderedType) = struct
 
   let empty = M.empty
 
+  let is_empty graph = M.is_empty graph
+
+  let length graph = M.cardinal graph
+
   let empty_node v = {
     n_vertex = v;
     n_next = [];
@@ -175,14 +208,93 @@ module Make(V : Map.OrderedType) = struct
     let vertices = vertices g in
     Sequence.filter (fun v -> Sequence.is_empty (next g v)) vertices
 
+  (** Pick a vertex, or raise Not_found *)
+  let choose g = fst (M.choose g)
+
   (** Reverse all edges *)
   let rev g =
     let edges = to_seq g in
     let edges = Sequence.map (fun (v1, e, v2) -> (v2, e, v1)) edges in
     add_seq empty edges
 
+  (** {2 Traversals} *)
+
+  (** Breadth-first search *)
+  let bfs graph first k =
+    let q = Queue.create ()
+    and explored = ref (S.singleton first) in
+    Queue.push first q;
+    while not (Queue.is_empty q) do
+      let v = Queue.pop q in
+      (* yield current node *)
+      k v;
+      (* explore children *)
+      Sequence.iter
+        (fun (e, v') -> if not (S.mem v !explored)
+          then (explored := S.add v' !explored; Queue.push v' q))
+        (next graph v)
+    done
+
+  (** DFS, with callbacks called on each encountered node and edge *)
+  let dfs_full graph ?(labels=ref M.empty)
+  ?(enter=fun _ -> ()) ?(exit=fun _ -> ())
+  ?(tree_edge=fun _ -> ()) ?(fwd_edge=fun _ -> ()) ?(back_edge=fun _ -> ())
+  first
+  =
+    (* next free number for traversal *)
+    let count = ref (-1) in
+    M.iter (fun _ i -> count := max i !count) !labels;
+    (* explore the vertex. trail is the reverse path from v to first *)
+    let rec explore trail v =
+      if M.mem v !labels then () else begin
+        (* first time we explore this node! give it an index, put it in trail *)
+        let n = (incr count; !count) in
+        labels := M.add v n !labels;
+        let trail' = (v, n) :: trail in
+        (* enter the node *)
+        enter trail';
+        (* explore edges *)
+        Sequence.iter
+          (fun (e, v') ->
+            try let n' = M.find v' !labels in
+                if n' < n && List.exists (fun (_,n'') -> n' = n'') trail'
+                  then back_edge (v,e,v')  (* back edge, cycle *)
+                else
+                  fwd_edge (v,e,v')   (* forward or cross edge *)
+            with Not_found ->
+              tree_edge (v,e,v'); (* tree edge *)
+              explore trail' v')  (* explore the subnode *)
+          (next graph v);
+        (* exit the node *)
+        exit trail'
+      end
+    in
+    explore [] first
+
+  (** Depth-first search, from given vertex. Each vertex is labelled
+      with its index in the traversal order. *)
+  let dfs graph first k =
+    (* callback upon entering node *)
+    let enter = function
+    | [] -> assert false
+    | (v,n)::_ -> k (v,n)
+    in
+    dfs_full graph ~enter first
+
   (** Is the graph acyclic? *)
-  let is_dag g = false (* TODO *)
+  let is_dag g =
+    if is_empty g then true
+    else if Sequence.is_empty (roots g) then false  (* DAGs have roots *)
+    else try
+      let labels = ref M.empty in
+      (* do a DFS from each root; any back edge indicates a cycle *)
+      Sequence.iter
+        (fun v ->
+          dfs_full g ~labels ~back_edge:(fun _ -> raise Exit) v)
+        (roots g);
+      true   (* complete traversal without back edge *)
+    with Exit ->
+      false  (* back edge detected! *)
 
   (** {2 Path operations} *)
 

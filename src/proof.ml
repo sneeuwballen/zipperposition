@@ -177,6 +177,7 @@ let dot_printer =
 (** Add the proof to the given graph *)
 let pp_dot ~name formatter proof =
   let graph = to_graph proof in
+  assert (ProofGraph.is_dag graph);
   let edges = ProofGraph.to_seq graph in
   ProofGraph.pp dot_printer ~name formatter edges
 
