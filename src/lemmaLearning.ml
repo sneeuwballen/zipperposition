@@ -127,11 +127,10 @@ let combine_heuristics simplicity depth =
 (** Find a cut for the given proof, from its ancestors, or
     raise Not_found if no cut that covers a big enough portion
     of the proof can be found. *)
-let cut proof =
+let cut graph proof =
   let module G = Proof.ProofGraph in
   (* graph of reversed inference edges: [c] -> [c'] if [c'] is a premise
      in the inference that proves [c] *)
-  let graph = Proof.to_graph proof in
   let graph = G.rev graph in
   assert (G.is_dag graph);
   (* leaves are axioms, they have no premises *)
@@ -184,6 +183,42 @@ let cut proof =
   (* convert the cut to a list *)
   G.S.elements !cut
 
+(** Pretty print the graph, including the cut, in given file *)
+let pp_cut_dot ~name filename (graph, cut) = 
+  (* DOT printer of this [cut] of the graph *)
+  let cut_dot_printer =
+    (* convert to set *)
+    let module G = Proof.ProofGraph in
+    let cut = Sequence.to_set
+      (module G.S : Set.S with type elt = compact_clause proof 
+                           and type t = G.S.t)
+      cut in
+    let print_vertex proof =
+      let label = `Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (Proof.proof_lits proof)) in
+      let attributes = [`Shape "box"; `Style "filled"] in
+      let attributes =
+        if Proof.proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
+        else if G.S.mem proof cut then `Color "green" :: label :: attributes
+        else if Proof.is_axiom proof then label :: `Color "yellow" :: attributes
+        else label :: attributes in
+      attributes
+    and print_edge v1 e v2 =
+      [`Label e]
+    in
+    Proof.ProofGraph.mk_dot_printer ~print_vertex ~print_edge
+  in
+  (* print graph on file *)
+  let out = open_out filename in
+  try
+    (* write on the opened out channel *)
+    let formatter = Format.formatter_of_out_channel out in
+    Format.printf "%% print cut-graph to %s@." filename;
+    Proof.ProofGraph.pp cut_dot_printer ~name formatter
+      (Proof.ProofGraph.to_seq graph);
+    Format.fprintf formatter "@.";
+    close_out out
+  with _ -> close_out out
+
 (** {2 Lemma learning} *)
 
 (** From the given proof of the empty clause, find a cut [P] of
@@ -192,7 +227,9 @@ let learn_empty ~meta proof =
   let kb = meta.Theories.meta_kb in
   try
     (* find a good cut of the proof of $false *)
-    let proofs = cut proof in
+    let graph = Proof.to_graph proof in
+    let proofs = cut graph proof in
+    pp_cut_dot ~name:"cut" "learn_empty.dot" (graph, Sequence.of_list proofs);
     (* favor unit clauses, their negation is still a clause *)
     let heuristic p = 
       let h = simplicity (Proof.proof_lits p) in
@@ -231,7 +268,8 @@ let learn_subproof ~meta proof =
   let kb = meta.Theories.meta_kb in
   try
     (* find a good cut of [proof] *)
-    let proofs = cut proof in
+    let graph = Proof.to_graph proof in
+    let proofs = cut graph proof in
     (* premises: clauses of the cut *)
     let premises = List.map Proof.proof_lits proofs in
     (* conclusion: negation of chosen clause *)

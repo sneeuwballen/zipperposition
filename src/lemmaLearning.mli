@@ -31,8 +31,9 @@ open Symbols
     clause of [P].
     That means that from the conjunction of clauses in [P], [c] is provable. *)
 
-val cut : compact_clause proof -> compact_clause proof list
-  (** Find a cut for the given proof, from its ancestors, or
+val cut : string Proof.ProofGraph.t -> compact_clause proof ->
+          compact_clause proof list
+  (** Find a cut for the given proof in the graph, from its ancestors, or
       raise Not_found if no cut that covers a big enough portion
       of the proof can be found. *)
 
