@@ -103,8 +103,27 @@ module type S = sig
 
   type 'e path = (vertex * 'e * vertex) list
 
-  val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path option
-    (** Minimal path from first vertex to second, given the cost function *)
+  val rev_path : 'e path -> 'e path
+    (** Reverse the path *)
+
+  val min_path_full : 'e t ->
+                 ?cost:(vertex -> 'e -> vertex -> int) ->
+                 ?ignore:(vertex -> bool) ->
+                 goal:(vertex -> 'e path -> bool) ->
+                 vertex ->
+                 'e path
+    (** Find the minimal path, from the given [vertex], that does not contain
+        any vertex satisfying [ignore], and that reaches a vertex
+        that satisfies [goal]. It raises Not_found if no reachable node
+        satisfies [goal]. *)
+
+  val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path
+    (** Minimal path from first vertex to second, given the cost function,
+        or raises Not_found *)
+
+  val diameter : 'e t -> vertex -> int
+    (** Maximal distance between the given vertex, and any other vertex
+        in the graph that is reachable from it. *)
 
   (** {2 Print to DOT} *)
 
@@ -297,8 +316,65 @@ module Make(V : Map.OrderedType) = struct
 
   type 'e path = (vertex * 'e * vertex) list
 
+  (** Reverse the path *)
+  let rev_path p =
+    let rec rev acc p = match p with
+    | [] -> acc
+    | (v,e,v')::p' -> rev ((v',e,v)::acc) p'
+    in rev [] p
+
+  exception ExitBfs
+
+  (** Find the minimal path, from the given [vertex], that does not contain
+      any vertex satisfying [ignore], and that reaches a vertex
+      that satisfies [goal]. It raises Not_found if no reachable node
+      satisfies [goal]. *)
+  let min_path_full graph ?(cost=fun _ _ _ -> 1) ?(ignore=fun _ -> false) ~goal v =
+    let q = Queue.create () in
+    let explored = ref S.empty in
+    let best_path = ref [] in
+    try
+      while not (Queue.is_empty q) do
+        let (v, path) = Queue.pop q in
+        if S.mem v !explored then ()  (* a shorter path is known *)
+        else if ignore v then ()      (* ignore the node. *)
+        else if goal v path           (* shortest path to goal node! *)
+          then (best_path := path; raise ExitBfs)
+        else begin
+          explored := S.add v !explored;
+          (* explore successors *)
+          Sequence.iter
+            (fun (e, v') ->
+              if S.mem v' !explored then ()
+              else Queue.push (v', (v',e,v)::path) q)
+            (next graph v)
+        end
+      done;
+      (* if a satisfying path was found, Exit would have been raised *)
+      raise Not_found
+    with ExitBfs -> (* found shortest satisfying path *)
+      !best_path
+
   (** Minimal path from first vertex to second, given the cost function *)
-  let min_path graph ~cost v1 v2 = failwith "not implemented"
+  let min_path graph ~cost v1 v2 =
+    let cost _ e _ = cost e in
+    let goal v' _ = V.compare v' v2 = 0 in
+    let path = min_path_full graph ~cost ~goal v1 in
+    path
+
+  (** Maximal distance between the given vertex, and any other vertex
+      in the graph that is reachable from it. *)
+  let diameter graph v =
+    let diameter = ref 0 in
+    let cost _ _ _ = 1 in
+    (* no path is a goal, but we can use its length to update diameter *)
+    let goal _ path =
+      diameter := max !diameter (List.length path);
+      false
+    in
+    try ignore (min_path_full graph ~cost ~goal v); assert false
+    with Not_found ->
+      !diameter  (* explored every shortest path *)
 
   (** {2 Print to DOT} *)
 

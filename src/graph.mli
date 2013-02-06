@@ -103,8 +103,27 @@ module type S = sig
 
   type 'e path = (vertex * 'e * vertex) list
 
-  val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path option
-    (** Minimal path from first vertex to second, given the cost function *)
+  val rev_path : 'e path -> 'e path
+    (** Reverse the path *)
+
+  val min_path_full : 'e t ->
+                 ?cost:(vertex -> 'e -> vertex -> int) ->
+                 ?ignore:(vertex -> bool) ->
+                 goal:(vertex -> 'e path -> bool) ->
+                 vertex ->
+                 'e path
+    (** Find the minimal path, from the given [vertex], that does not contain
+        any vertex satisfying [ignore], and that reaches a vertex
+        that satisfies [goal]. It raises Not_found if no reachable node
+        satisfies [goal]. *)
+
+  val min_path : 'e t -> cost:('e -> int) -> vertex -> vertex -> 'e path
+    (** Minimal path from first vertex to second, given the cost function,
+        or raises Not_found *)
+
+  val diameter : 'e t -> vertex -> int
+    (** Maximal distance between the given vertex, and any other vertex
+        in the graph that is reachable from it. *)
 
   (** {2 Print to DOT} *)
 
