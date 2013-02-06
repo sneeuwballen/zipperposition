@@ -255,7 +255,7 @@ let cnf_of hc =
   let var_index = ref 0 in
   (* unique counter for variable indexes *)
   Utils.debug 3 (lazy (Utils.sprintf "input clause %a@." !C.pp_clause#pp_h hc));
-  if C.is_cnf hc
+  if C.is_cnf hc.hclits
     then begin
       Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf" !C.pp_clause#pp_h hc));
       [hc] (* already cnf, perfect *)
@@ -284,5 +284,5 @@ let cnf_of hc =
       in
       Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"
                     !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) clauses));
-      List.iter (fun hc -> assert (C.is_cnf hc)) clauses;
+      List.iter (fun hc -> assert (C.is_cnf hc.hclits)) clauses;
       clauses

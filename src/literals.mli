@@ -34,6 +34,7 @@ val to_multiset : literal -> term list      (** literal to multiset of terms *)
 
 val hash : literal -> int                   (** hashing of literal *)
 val weight : literal -> int                 (** weight of the lit *)
+val depth : literal -> int                  (** depth of literal *)
 
 val is_pos : literal -> bool                (** is the literal positive? *)
 val is_neg : literal -> bool                (** is the literal negative? *)
@@ -59,6 +60,8 @@ val vars : literal -> varlist                       (** gather variables *)
 val eq_lits : literal array -> literal array -> bool
 val compare_lits : literal array -> literal array -> int
 val hash_lits : literal array -> int
+val weight_lits : literal array -> int
+val depth_lits : literal array -> int
 val vars_lits : literal array -> varlist
 val ground_lits : literal array -> bool             (** all the literals are ground? *)
 val term_of_lits : literal array -> term

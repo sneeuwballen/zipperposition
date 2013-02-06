@@ -329,6 +329,17 @@ let vars_list l =
   List.iter (add_vars set) l;
   THashSet.to_list set
 
+(** depth of term *)
+let depth t =
+  let rec depth t = match t.term with
+  | Var _ | BoundVar _ -> 1
+  | Bind (_, t') -> 1 + depth t'
+  | Node (_, l) -> 1 + depth_list 0 l
+  and depth_list m l = match l with
+  | [] -> m
+  | t::l' -> depth_list (max m (depth t)) l'
+  in depth t
+
 (* ----------------------------------------------------------------------
  * De Bruijn terms, and dotted formulas
  * ---------------------------------------------------------------------- *)

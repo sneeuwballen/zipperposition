@@ -105,6 +105,9 @@ let hash lit = match lit with
 let weight = function
   | Equation (l, r, _ ,_) -> l.tsize + r.tsize
 
+let depth = function
+  | Equation (l, r, _ ,_) -> max (T.depth l) (T.depth r)
+
 let is_pos lit = match lit with
   | Equation (_,_,sign,_) -> sign
 
@@ -229,6 +232,12 @@ let hash_lits lits =
   done;
   let h = Hash.finish_hash !h in
   abs h
+
+let weight_lits lits =
+  Array.fold_left (fun w lit -> w + weight lit) 0 lits
+
+let depth_lits lits =
+  Array.fold_left (fun d lit -> max d (depth lit)) 0 lits
 
 let vars_lits lits =
   let set = T.THashSet.create () in

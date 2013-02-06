@@ -363,12 +363,12 @@ let is_unit_clause hc = match hc.hclits with
   | _ -> false
 
 (** check whether the clause is already in CNF *)
-let is_cnf hc =
+let is_cnf lits =
   Utils.array_forall
     (fun (Equation (l, r, sign, _)) ->
       T.atomic_rec l && T.atomic_rec r && (l.sort != bool_sort ||
                                           (l == T.true_term || r == T.true_term)))
-    hc.hclits
+    lits
 
 (** Compute signature of this set of clauses *)
 let signature clauses =
