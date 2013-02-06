@@ -345,7 +345,7 @@ module Make(V : Map.OrderedType) = struct
           (* explore successors *)
           Sequence.iter
             (fun (e, v') ->
-              if S.mem v' !explored then ()
+              if S.mem v' !explored || ignore v' then ()
               else Queue.push (v', (v',e,v)::path) q)
             (next graph v)
         end
