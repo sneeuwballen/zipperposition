@@ -73,6 +73,7 @@ module type S = sig
   val choose : 'e t -> vertex
     (** Pick a vertex, or raise Not_found *)
 
+  val rev_edge : (vertex * 'e * vertex) -> (vertex * 'e * vertex)
   val rev : 'e t -> 'e t
     (** Reverse all edges *)
 
@@ -227,10 +228,11 @@ module Make(V : Map.OrderedType) = struct
   (** Pick a vertex, or raise Not_found *)
   let choose g = fst (M.choose g)
 
+  let rev_edge (v,e,v') = (v',e,v)
+
   (** Reverse all edges *)
   let rev g =
-    let edges = to_seq g in
-    let edges = Sequence.map (fun (v1, e, v2) -> (v2, e, v1)) edges in
+    let edges = Sequence.map rev_edge (to_seq g) in
     add_seq empty edges
 
   (** {2 Traversals} *)

@@ -73,6 +73,7 @@ module type S = sig
   val choose : 'e t -> vertex
     (** Pick a vertex, or raise Not_found *)
 
+  val rev_edge : (vertex * 'e * vertex) -> (vertex * 'e * vertex)
   val rev : 'e t -> 'e t
     (** Reverse all edges *)
 
