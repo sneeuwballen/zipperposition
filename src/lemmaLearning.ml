@@ -35,7 +35,6 @@ module Utils = FoUtils
 type candidate_lemma = {
   cl_conclusion : literal array;
   cl_premises : literal array list;
-  cl_rate : float;
 }
 
 exception GotchaLittlePclause of Theories.named_formula * Patterns.mapping
@@ -125,7 +124,9 @@ let simplicity lits =
 let combine_heuristics simplicity depth =
   (simplicity ** 1.2) *. depth
 
-(** Find a cut for the given proof, from its ancestors. *)
+(** Find a cut for the given proof, from its ancestors, or
+    raise Not_found if no cut that covers a big enough portion
+    of the proof can be found. *)
 let cut proof =
   let module G = Proof.ProofGraph in
   (* graph of reversed inference edges: [c] -> [c'] if [c'] is a premise
@@ -187,11 +188,59 @@ let cut proof =
 
 (** From the given proof of the empty clause, find a cut [P] of
     its premises, and learn p_1 & p_2 & ... & p_{n-1} => p_n *)
-let learn_empty proof = None (* TODO *)
+let learn_empty ~meta proof =
+  let kb = meta.Theories.meta_kb in
+  try
+    (* find a good cut of the proof of $false *)
+    let proofs = cut proof in
+    (* favor unit clauses, their negation is still a clause *)
+    let heuristic p = 
+      let h = simplicity (Proof.proof_lits p) in
+      let h = if Array.length (Proof.proof_lits p) <= 1 then h else h *. 3. in
+      h
+    in
+    match proofs with
+    | [] -> failwith "empty proof cut?"
+    | p::proofs' ->
+      (* select the most suitable clause to serve as the conclusion of the lemma *)
+      let _, best_i, best_p, _ = List.fold_left
+        (fun (cur_i, best_i, best_p, best_h) p' ->
+          let h = heuristic p' in
+          if h < best_h
+            then (cur_i+1, cur_i, p', h)
+            else (cur_i+1, best_i, best_p, best_h))
+        (1, 0,  p, heuristic p) proofs'
+      in
+      (* premises: all other clauses *)
+      let premises = Utils.list_remove proofs best_i in
+      let premises = List.map Proof.proof_lits premises in
+      (* conclusion: negation of chosen clause *)
+      let ord = meta.Theories.meta_ctx.ctx_ord in
+      let conclusion = Lits.term_of_lits (Proof.proof_lits best_p) in
+      let conclusion = [|Lits.mk_neq ~ord (T.close_forall conclusion) T.true_term|] in
+      (* build lemma *)
+      let candidate = { cl_premises=premises; cl_conclusion=conclusion; } in
+      let lemma = candidate_to_lemma kb candidate in
+      Some lemma
+  with Not_found ->
+    None  (* no good cut *)
 
 (** From the given proof [c], find a cut [P] of its premises,
     and learn the lemma p_1 & p_2 & ... & p_n => c *)
-let learn_subproof proof = None (* TODO *)
+let learn_subproof ~meta proof =
+  let kb = meta.Theories.meta_kb in
+  try
+    (* find a good cut of [proof] *)
+    let proofs = cut proof in
+    (* premises: clauses of the cut *)
+    let premises = List.map Proof.proof_lits proofs in
+    (* conclusion: negation of chosen clause *)
+    let conclusion = Proof.proof_lits proof in
+    let candidate = { cl_premises=premises; cl_conclusion=conclusion; } in
+    let lemma = candidate_to_lemma kb candidate in
+    Some lemma
+  with Not_found ->
+    None  (* no good cut *)
 
 (** {2 Search for salient clauses *)
 
@@ -200,7 +249,7 @@ let learn_subproof proof = None (* TODO *)
     close to the conclusion. Those clauses should be good candidates
     for [learn_subproof].
     Implementation should rely on PageRank on the reverse graph. *)
-let salient_clauses proof = failwith "not implemented"
+let salient_clauses proof = []  (* TODO *)
 
 (** {2 Batteries-included lemma learning} *)
 

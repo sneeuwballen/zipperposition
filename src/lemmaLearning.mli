@@ -32,15 +32,17 @@ open Symbols
     That means that from the conjunction of clauses in [P], [c] is provable. *)
 
 val cut : compact_clause proof -> compact_clause proof list
-  (** Find a cut for the given proof, from its ancestors. *)
+  (** Find a cut for the given proof, from its ancestors, or
+      raise Not_found if no cut that covers a big enough portion
+      of the proof can be found. *)
 
 (** {2 Lemma learning} *)
 
-val learn_empty : compact_clause proof -> Theories.lemma option
+val learn_empty : meta:Theories.meta_prover -> compact_clause proof -> Theories.lemma option
   (** From the given proof of the empty clause, find a cut [P] of
       its premises, and learn p_1 & p_2 & ... & p_{n-1} => p_n *)
 
-val learn_subproof : compact_clause proof -> Theories.lemma option
+val learn_subproof : meta:Theories.meta_prover -> compact_clause proof -> Theories.lemma option
   (** From the given proof [c], find a cut [P] of its premises,
       and learn the lemma p_1 & p_2 & ... & p_n => c *)
 
