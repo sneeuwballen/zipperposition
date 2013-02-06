@@ -121,8 +121,17 @@ let simplicity lits =
 
 (** Combine two float heuristics (both of them beeing low for
     interesting cases) *)
-let combine_heuristics simplicity depth =
-  (simplicity ** 1.2) /. (depth *. 5.)
+let combine_heuristics simplicity closeness =
+  (simplicity ** 1.2) *. closeness
+
+(** In a path of given [length], a clause at given [depth], counting
+    from the beginning of the path (last of the path is the empty clause
+    or conclusion [c] of lemma), compute a 'closeness' between clause and [c] *)
+let closeness depth length =
+  let alpha = 5. in
+  (* exp( 1 + alpha depth/length), so that it increases exponentially
+     when we are close to the conclusion *)
+  exp (1. +. alpha *. (float_of_int depth /. (float_of_int length +. 0.1)))
 
 (** Find a cut for the given proof, from its ancestors, or
     raise Not_found if no cut that covers a big enough portion
@@ -133,68 +142,58 @@ let cut graph proof =
      in the inference that proves [c] *)
   let graph = G.rev graph in
   assert (G.is_dag graph);
-  (* leaves are axioms, they have no premises *)
-  let leaves = Sequence.to_set
-    (module G.S : Set.S with type elt = compact_clause proof 
-                         and type t = G.S.t)
-    (G.leaves graph) in 
   (* set of selected nodes (clauses) of the graph, to eventually form a cut *)
   let cut = ref G.S.empty in
-  (* explore paths from [proof] to [leaves] and that contain no clause from [cut] *)
-  let rec explore path v =
-    if G.S.mem v !cut then ()
-    else if G.S.mem v leaves then cut_path path (* cut path *)
-    else Sequence.iter
-      (fun (e, v') -> explore ((v',e,v)::path) v')
-      (G.next graph v)
-  (* explore repeatedly, until no open path is found *)
-  and repeat () =
-    try explore [] proof  (* no path is open, stop *)
-    with Exit ->
-      repeat ()  (* some path has been closed *)
+  let ignore v = G.S.mem v !cut in
+  let goal v _ = Proof.is_axiom v in
+  (* search for the shortest open path from [proof] to an axiom, then
+     cut the path and loop *)
+  let rec next_path () =
+    let progress = try
+      let path = G.min_path_full graph ~ignore ~goal proof in
+      cut_path path;
+      true
+    with Not_found ->
+      false  (* success, all paths are closed *)
+    in if progress then next_path () else ()
   (* select an element of the path, and add it to [cut] *)
   and cut_path path =
     let length = List.length path in
-    (* heuristic cost of the proof, at given distance from axioms? *)
+    Utils.debug 1 (lazy (Utils.sprintf "%% cut path of length %d" length));
+    (* heuristic cost of the proof, at given closeness from [proof] *)
     let heuristic p depth =
-      if depth = length
-        then infinity
-        else combine_heuristics
-          (simplicity (Proof.proof_lits p))
-          (float_of_int depth)
+      combine_heuristics
+        (simplicity (Proof.proof_lits p))
+        (closeness depth length)
     in
     match path with
     | [] -> assert false
     | (p,_,_)::path' ->
       (* by default, choose the first clause *)
-      try
-        let best = ref (p, heuristic p 1) in
-        let _ = List.fold_left
-          (fun depth (p,_,_) ->
-            (* the path has been closed by cut, meanwhile *)
-            (if G.S.mem p !cut then raise Exit);
-            (* [p] is a proof in the path *)
-            let h = heuristic p depth in
-            let best_proof, best_h = !best in
-            (if h < best_h then
-              best := (p, h));
-            depth+1)
-          2 path'
-        in
-        cut := G.S.add (fst !best) !cut;
-        raise Exit  (* notify that a path has been closed *)
-      with Exit -> ()  (* already cut *)
+      let best = ref (p, heuristic p 1) in
+      let _ = List.fold_left
+        (fun depth (p,_,_) ->
+          assert (not (G.S.mem p !cut));
+          (* [p] is a proof in the path *)
+          let h = heuristic p depth in
+          let best_proof, best_h = !best in
+          (if h < best_h then
+            best := (p, h));
+          depth+1)
+        2 path'
+      in
+      cut := G.S.add (fst !best) !cut
   in
-  repeat ();
+  next_path ();
   (* convert the cut to a list *)
   G.S.elements !cut
 
 (** Pretty print the graph, including the cut, in given file *)
 let pp_cut_dot ~name filename (graph, cut) = 
+  let module G = Proof.ProofGraph in
   (* DOT printer of this [cut] of the graph *)
   let cut_dot_printer =
     (* convert to set *)
-    let module G = Proof.ProofGraph in
     let cut = Sequence.to_set
       (module G.S : Set.S with type elt = compact_clause proof 
                            and type t = G.S.t)
@@ -213,7 +212,7 @@ let pp_cut_dot ~name filename (graph, cut) =
     and print_edge v1 e v2 =
       [`Label e]
     in
-    Proof.ProofGraph.mk_dot_printer ~print_vertex ~print_edge
+    G.mk_dot_printer ~print_vertex ~print_edge
   in
   (* print graph on file *)
   let out = open_out filename in
@@ -221,8 +220,8 @@ let pp_cut_dot ~name filename (graph, cut) =
     (* write on the opened out channel *)
     let formatter = Format.formatter_of_out_channel out in
     Format.printf "%% print cut-graph to %s@." filename;
-    Proof.ProofGraph.pp cut_dot_printer ~name formatter
-      (Proof.ProofGraph.to_seq graph);
+    G.pp cut_dot_printer ~name formatter
+      (Sequence.map G.rev_edge (G.to_seq graph));
     Format.fprintf formatter "@.";
     close_out out
   with _ -> close_out out
