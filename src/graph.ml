@@ -101,12 +101,13 @@ module type S = sig
     (** Create a Dot graph printer. Functions to convert edges and vertices
         to Dot attributes must be provided. *)
 
-  val pp : 'e dot_printer -> name:string ->
+  val pp : 'e dot_printer -> ?vertices:S.t -> name:string ->
             Format.formatter ->
-            (vertex Sequence.t * (vertex * 'e * vertex) Sequence.t) -> unit
+            (vertex * 'e * vertex) Sequence.t -> unit
     (** Pretty print the graph in DOT, on given formatter. Using a sequence
-        allows to easily select which edges are important, or to combine
-        several graphs with [Sequence.append] *)
+        allows to easily select which edges are important,
+        or to combine several graphs with [Sequence.append].
+        An optional set of additional vertices to print can be given. *)
 end
 
 module Make(V : Map.OrderedType) = struct
@@ -229,11 +230,10 @@ module Make(V : Map.OrderedType) = struct
     print_edge;
   }
 
-  (** Pretty print the graph in DOT, on given formatter. Using sequences
-      allows to easily select which edges and vertices are important,
-      or to combine several graphs with [Sequence.append].
-      All vertices used in edges must appear in the vertices sequence. *)
-  let pp printer ~name formatter (vertices,edges) =
+  (** Pretty print the graph in DOT, on given formatter. Using a sequence
+      allows to easily select which edges are important,
+      or to combine several graphs with [Sequence.append]. *)
+  let pp printer ?(vertices=S.empty) ~name formatter edges =
     (* map from vertices to integers *)
     let get_id =
       let count_map = ref M.empty
@@ -245,6 +245,8 @@ module Make(V : Map.OrderedType) = struct
           incr count;
           count_map := M.add vertex n !count_map;
           n
+    (* accumulate vertices *)
+    and vertices = ref vertices
     (* print an attribute *)
     and print_attribute formatter attr =
       match attr with
@@ -259,21 +261,23 @@ module Make(V : Map.OrderedType) = struct
     let pp_vertex formatter v = Format.fprintf formatter "vertex_%d" (get_id v) in
     (* print preamble *)
     Format.fprintf formatter "@[<v2>digraph %s {@;" name;
-    (* print vertices *)
-    Sequence.iter
-      (fun v ->
-        let attributes = printer.print_vertex v in
-        Format.fprintf formatter "  @[<h>%a [%a];@]@." pp_vertex v
-          (FoUtils.pp_list ~sep:"," print_attribute) attributes)
-      vertices;
     (* print edges *)
     Sequence.iter
       (fun (v1, e, v2) ->
+        (* add v1 and v2 to set of vertices *)
+        vertices := S.add v1 (S.add v2 !vertices);
         let attributes = printer.print_edge v1 e v2 in
         Format.fprintf formatter "  @[<h>%a -> %a [%a];@]@."
           pp_vertex v1 pp_vertex v2
           (FoUtils.pp_list ~sep:"," print_attribute) attributes)
       edges;
+    (* print vertices *)
+    S.iter
+      (fun v ->
+        let attributes = printer.print_vertex v in
+        Format.fprintf formatter "  @[<h>%a [%a];@]@." pp_vertex v
+          (FoUtils.pp_list ~sep:"," print_attribute) attributes)
+      !vertices;
     (* close *)
     Format.fprintf formatter "}@]@;";
     ()

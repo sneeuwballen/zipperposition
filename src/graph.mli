@@ -101,13 +101,13 @@ module type S = sig
     (** Create a Dot graph printer. Functions to convert edges and vertices
         to Dot attributes must be provided. *)
 
-  val pp : 'e dot_printer -> name:string ->
+  val pp : 'e dot_printer -> ?vertices:S.t -> name:string ->
             Format.formatter ->
-            (vertex Sequence.t * (vertex * 'e * vertex) Sequence.t) -> unit
-    (** Pretty print the graph in DOT, on given formatter. Using sequences
-        allows to easily select which edges and vertices are important,
+            (vertex * 'e * vertex) Sequence.t -> unit
+    (** Pretty print the graph in DOT, on given formatter. Using a sequence
+        allows to easily select which edges are important,
         or to combine several graphs with [Sequence.append].
-        All vertices used in edges must appear in the vertices sequence. *)
+        An optional set of additional vertices to print can be given. *)
 end
 
 module Make(V : Map.OrderedType) : S with type vertex = V.t

@@ -177,9 +177,8 @@ let dot_printer =
 (** Add the proof to the given graph *)
 let pp_dot ~name formatter proof =
   let graph = to_graph proof in
-  let vertices = ProofGraph.vertices graph
-  and edges = ProofGraph.to_seq graph in
-  ProofGraph.pp dot_printer ~name formatter (vertices, edges)
+  let edges = ProofGraph.to_seq graph in
+  ProofGraph.pp dot_printer ~name formatter edges
 
 (** print to dot into a file *)
 let pp_dot_file ?(name="proof") filename proof =
