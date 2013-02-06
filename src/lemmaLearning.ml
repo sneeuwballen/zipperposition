@@ -122,7 +122,7 @@ let simplicity lits =
 (** Combine two float heuristics (both of them beeing low for
     interesting cases) *)
 let combine_heuristics simplicity depth =
-  (simplicity ** 1.2) *. depth
+  (simplicity ** 1.2) /. (depth *. 5.)
 
 (** Find a cut for the given proof, from its ancestors, or
     raise Not_found if no cut that covers a big enough portion
@@ -147,6 +147,11 @@ let cut graph proof =
     else Sequence.iter
       (fun (e, v') -> explore ((v',e,v)::path) v')
       (G.next graph v)
+  (* explore repeatedly, until no open path is found *)
+  and repeat () =
+    try explore [] proof  (* no path is open, stop *)
+    with Exit ->
+      repeat ()  (* some path has been closed *)
   (* select an element of the path, and add it to [cut] *)
   and cut_path path =
     let length = List.length path in
@@ -176,10 +181,11 @@ let cut graph proof =
             depth+1)
           2 path'
         in
-        cut := G.S.add (fst !best) !cut
+        cut := G.S.add (fst !best) !cut;
+        raise Exit  (* notify that a path has been closed *)
       with Exit -> ()  (* already cut *)
   in
-  explore [] proof;
+  repeat ();
   (* convert the cut to a list *)
   G.S.elements !cut
 
@@ -194,7 +200,9 @@ let pp_cut_dot ~name filename (graph, cut) =
                            and type t = G.S.t)
       cut in
     let print_vertex proof =
-      let label = `Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (Proof.proof_lits proof)) in
+      let lits = Proof.proof_lits proof in
+      let label = `Label (Utils.sprintf "@[<h>%a (%.2F)@]"
+        Lits.pp_lits lits (simplicity lits)) in
       let attributes = [`Shape "box"; `Style "filled"] in
       let attributes =
         if Proof.proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
