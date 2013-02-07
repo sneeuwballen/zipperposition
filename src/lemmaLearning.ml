@@ -289,6 +289,8 @@ let max_lemmas = ref 3
 (** Given an empty clause (and its proof), look in the proof for lemmas. *)
 let search_lemmas meta proof =
   assert (Proof.proof_lits proof = [||]);
+  (* trivial proof? *)
+  if Proof.is_axiom proof then [] else
   let open Theories in
   (* learn subproofs *)
   let salient = Utils.list_take !max_lemmas (salient_clauses proof) in
