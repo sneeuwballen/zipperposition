@@ -99,6 +99,7 @@ let candidate_to_lemma kb cl =
     (fun premise ->
       let nf, mapping = get_nf kb premise in atom_of_nf nf mapping)
     cl.cl_premises in
+  let premises_atoms = List.sort Th.compare_atom premises_atoms in
   (* return the lemma *)
   { Th.lemma_conclusion = conclusion_atom;
     Th.lemma_premises = premises_atoms; }
