@@ -536,7 +536,9 @@ let pp_pclause formatter pclause =
         (if has_sort lit.lterm bool_sort then "<~>" else "!=")
         (pp_pterm varindex) lit.rterm
   in
-  Utils.pp_list ~sep:" | " pp_plit formatter pclause.pc_lits
+  match pclause.pc_lits with
+  | [] -> Format.fprintf formatter "$false"
+  | lits -> Utils.pp_list ~sep:" | " pp_plit formatter lits
 
 let pp_mapping formatter mapping =
   (* only print symbol binding *)
@@ -546,8 +548,13 @@ let pp_mapping formatter mapping =
     mapping.m_symbol
 
 let pp_named_pattern formatter np =
+  let args = np.np_pattern.pc_vars in
+  match args with
+  | [] -> Format.fprintf formatter "@[<h>%a is %a@]"
+    !T.pp_symbol#pp np.np_name pp_pclause np.np_pattern
+  | _ ->
   Format.fprintf formatter "@[<h>%a(%a) is %a@]"
-    !T.pp_symbol#pp np.np_name (Utils.pp_list pp_symb) np.np_pattern.pc_vars pp_pclause np.np_pattern
+    !T.pp_symbol#pp np.np_name (Utils.pp_list pp_symb) args pp_pclause np.np_pattern
 
 (* ----------------------------------------------------------------------
  * map from patterns to data, with matching of clauses

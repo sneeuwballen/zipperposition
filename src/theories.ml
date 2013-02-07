@@ -195,7 +195,9 @@ let pp_atom ?(var_prefix="X") formatter (name, args) =
     | `Var i -> Format.fprintf formatter "%s%d" var_prefix (-i)
     | `Symbol s -> !T.pp_symbol#pp formatter s
   in
-  Format.fprintf formatter "@[<h>%a(%a)@]"
+  match args with
+  | [] -> Format.fprintf formatter "@[<h>%a@]" !T.pp_symbol#pp name
+  | args -> Format.fprintf formatter "@[<h>%a(%a)@]"
     !T.pp_symbol#pp name (Utils.pp_list pp_arg) args
 
 let pp_named_formula formatter nf =

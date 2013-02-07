@@ -712,6 +712,7 @@ datalog_atoms:
   | datalog_atom AND datalog_atoms { $1 :: $3 }
 
 datalog_atom:
+  | LOWER_WORD { mk_symbol $1, [] }
   | LOWER_WORD LEFT_PARENTHESIS datalog_args RIGHT_PARENTHESIS
     { mk_symbol $1, $3 }
 
