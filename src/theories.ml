@@ -266,7 +266,7 @@ let get_kb_theory ~kb name =
     First, the corresponding named formula has to be retrieved
     from kb, then it is 'matched' against the term.
     A proof and a list of parent clauses have to be provided. *)
-let term_to_hclause ~ctx ~kb term =
+let term_to_hclause ~ctx ~kb term proof =
   let term_name, term_args = Logic.open_term term in
   let term_args = List.map
     (function
@@ -277,7 +277,7 @@ let term_to_hclause ~ctx ~kb term =
   (* get the named formula corresponding to this term *)
   let nf = get_kb_formula kb term_name in
   (* instantiate the named formula *)
-  let hc = Patterns.instantiate_np ~ctx nf (term_name, term_args) in
+  let hc = Patterns.instantiate_np ~ctx nf (term_name, term_args) proof in
   hc
 
 (** This handler is triggered whenever a named formula is discovered
