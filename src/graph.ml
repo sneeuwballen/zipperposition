@@ -331,14 +331,19 @@ module Make(V : Map.OrderedType) = struct
       any vertex satisfying [ignore], and that reaches a vertex
       that satisfies [goal]. It raises Not_found if no reachable node
       satisfies [goal]. *)
-  let min_path_full graph ?(cost=fun _ _ _ -> 1) ?(ignore=fun _ -> false) ~goal v =
-    let q = Queue.create () in
+  let min_path_full (type e) graph ?(cost=fun _ _ _ -> 1) ?(ignore=fun _ -> false) ~goal v =
+    let module HQ = Leftistheap.Make(struct
+      type t = vertex * int * e path
+      let le (_,i,_) (_,j,_) = i <= j
+    end) in
+    let q = ref HQ.empty in
     let explored = ref S.empty in
-    Queue.push (v, []) q;
+    q := HQ.insert (v, 0, []) !q;
     let best_path = ref [] in
     try
-      while not (Queue.is_empty q) do
-        let (v, path) = Queue.pop q in
+      while not (HQ.is_empty !q) do
+        let (v, cost_v, path), q' = HQ.extract_min !q in
+        q := q';
         if S.mem v !explored then ()  (* a shorter path is known *)
         else if ignore v then ()      (* ignore the node. *)
         else if goal v path           (* shortest path to goal node! *)
@@ -349,7 +354,10 @@ module Make(V : Map.OrderedType) = struct
           Sequence.iter
             (fun (e, v') ->
               if S.mem v' !explored || ignore v' then ()
-              else Queue.push (v', (v',e,v)::path) q)
+              else
+                let cost_v' = (cost v e v') + cost_v in
+                let path' = (v',e,v) :: path in
+                q := HQ.insert (v', cost_v', path') !q)
             (next graph v)
         end
       done;
