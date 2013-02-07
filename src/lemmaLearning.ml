@@ -108,8 +108,11 @@ let simplicity lits =
   let w = Lits.weight_lits lits
   and d = Lits.depth_lits lits
   and n = Array.length lits in
-  if not (C.is_cnf lits) then max_float /. 10.
-  else float_of_int (n * d + w)
+  (* first estimation of heuristic *)
+  let h = float_of_int (n * d + w) in
+  if Cnf.is_cnf lits then h  (* good *)
+  else if Cnf.is_quasi_cnf lits then h *. 2. (* so-so *)
+  else max_float /. 10.  (* very bad *)
 
 (** {2 Cut extraction} *)
 

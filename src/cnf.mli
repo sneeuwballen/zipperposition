@@ -24,6 +24,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Types
 
+val is_cnf : literal array -> bool
+  (** Is the clause in CNF? *)
+
+val is_quasi_cnf : literal array -> bool
+  (** Is the clause almost in CNF (i.e. some equivalences between
+      an atomic prop and a prop remain)? *)
+
 (** Simplify a boolean term (a formula) *)
 val simplify_term : term -> term
 

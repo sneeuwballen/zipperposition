@@ -128,9 +128,6 @@ val selected_lits : clause -> (literal * int) list
 val is_unit_clause : hclause -> bool
   (** is the clause a unit clause? *)
 
-val is_cnf : literal array -> bool
-  (** Is the clause in CNF? *)
-
 val signature : hclause list -> signature
   (** Compute signature of this set of clauses *)
 
