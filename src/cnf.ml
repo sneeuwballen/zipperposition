@@ -44,7 +44,20 @@ let is_cnf lits =
 
 (** Is the clause almost in CNF (i.e. some equivalences between
     an atomic prop and a prop remain)? *)
-let is_quasi_cnf lits = failwith "not implemented"
+let is_quasi_cnf lits =
+  let is_equiv = function
+    | Equation (l, r, true, Gt) ->
+      r != T.true_term && r != T.false_term && T.atomic_rec l && l.sort == bool_sort
+    | Equation (l, r, true, Lt) ->
+      l != T.true_term && l != T.false_term && T.atomic_rec r && r.sort == bool_sort
+    | _ -> false
+  and is_atomic = function
+    | Equation (l, r, _, _) ->
+      l.sort != bool_sort || (T.atomic_rec l && T.atomic_rec r)
+  in
+  Utils.array_forall
+    (fun lit -> is_atomic lit || is_equiv lit)
+    lits
 
 (* ----------------------------------------------------------------------
  * syntactic simplification
