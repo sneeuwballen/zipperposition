@@ -232,7 +232,7 @@ let pp_cut_dot ~name filename (graph, cut) =
 (** {2 Lemma learning} *)
 
 (** From the given proof of the empty clause, find a cut [P] of
-    its premises, and learn p_1 & p_2 & ... & p_{n-1} => p_n *)
+    its premises, and learn p_1 & p_2 & ... & p_n => empty *)
 let learn_empty ~meta proof =
   let kb = meta.Theories.meta_kb in
   try
@@ -240,31 +240,13 @@ let learn_empty ~meta proof =
     let graph = Proof.to_graph proof in
     let proofs = cut graph proof in
     pp_cut_dot ~name:"cut" "learn_empty.dot" (graph, Sequence.of_list proofs);
-    (* favor unit clauses, their negation is still a clause *)
-    let heuristic p = 
-      let h = simplicity (Proof.proof_lits p) in
-      let h = if Array.length (Proof.proof_lits p) <= 1 then h else h *. 3. in
-      h
-    in
     match proofs with
     | [] -> failwith "empty proof cut?"
-    | p::proofs' ->
-      (* select the most suitable clause to serve as the conclusion of the lemma *)
-      let _, best_i, best_p, _ = List.fold_left
-        (fun (cur_i, best_i, best_p, best_h) p' ->
-          let h = heuristic p' in
-          if h < best_h
-            then (cur_i+1, cur_i, p', h)
-            else (cur_i+1, best_i, best_p, best_h))
-        (1, 0,  p, heuristic p) proofs'
-      in
+    | _ ->
       (* premises: all other clauses *)
-      let premises = Utils.list_remove proofs best_i in
-      let premises = List.map Proof.proof_lits premises in
-      (* conclusion: negation of chosen clause *)
-      let ord = meta.Theories.meta_ctx.ctx_ord in
-      let conclusion = Lits.term_of_lits (Proof.proof_lits best_p) in
-      let conclusion = [|Lits.mk_neq ~ord (T.close_forall conclusion) T.true_term|] in
+      let premises = List.map Proof.proof_lits proofs in
+      (* conclusion: empty clause *)
+      let conclusion = [||] in
       (* build lemma *)
       let candidate = { cl_premises=premises; cl_conclusion=conclusion; } in
       let lemma = candidate_to_lemma kb candidate in
@@ -334,7 +316,7 @@ let learn_and_update meta hc =
   let lemmas = search_lemmas meta hc.hcproof in
   let lemmas = List.map
     (fun lemma ->
-      Format.printf "%%   learn @[<h>%a@]@." pp_lemma lemma;
+      Format.printf "%%@[<h>   learn %a@]@." pp_lemma lemma;
       lemma)
     lemmas
   in
