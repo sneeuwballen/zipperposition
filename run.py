@@ -35,6 +35,7 @@ provers = {
     #'eprover': "eprover -xAuto -tAuto --cpu-limit={time} --memory-limit=512 --tstp-in {file}",
     'zipperposition': "./zipperposition.native {file} -timeout {time} -calculus superposition",
     'delayed': "./zipperposition.native {file} -timeout {time} -calculus delayed",
+    'delayed-learning': "./zipperposition.native {file} -timeout {time} -calculus delayed -kb kb_test -learning",
     #'delayed-no-heuristic': "./zipperposition.native {file} -timeout {time} -calculus delayed -no-heuristic-precedence",
     #'iprover': "iproveropt --eprover_path ~/bin --schedule false --instantiation_flag true --time_out_real {time} {file}",
 }
@@ -43,6 +44,7 @@ provers_unsat = {
     'eprover': "# Proof found",
     'zipperposition': "SZS Status Theorem",
     'delayed': "SZS Status Theorem",
+    'delayed-learning' : "SZS Status Theorem",
     'delayed-no-heuristic': "SZS Status Theorem",
     'iprover': "SZS Status (Theorem|Unsatisfiable)",
 }
@@ -51,6 +53,7 @@ provers_sat = {
     'eprover': "# No proof found",
     'zipperposition': "SZS Status CounterSatisfiable",
     'delayed': "SZS Status CounterSatisfiable",
+    'delayed-learning': "SZS Status CounterSatisfiable",
     'delayed-no-heuristic': "SZS Status Theorem",
     'iprover': "SZS status CounterSatisfiable",
 }
