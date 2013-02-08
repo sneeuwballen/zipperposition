@@ -23,6 +23,6 @@ Problems
 *.svg
 *.dot
 learning/
-kb.lock
-kb
+kb*.lock
+kb*
 TODO
