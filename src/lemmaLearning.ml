@@ -154,7 +154,7 @@ let cut graph proof =
      cut the path and loop *)
   let rec next_path () =
     let progress = try
-      let path = G.min_path_full graph ~ignore ~goal proof in
+      let _, _, path = G.min_path_full graph ~ignore ~goal proof in
       cut_path path;
       true
     with Not_found ->
@@ -193,7 +193,7 @@ let cut graph proof =
   G.S.elements !cut
 
 (** Pretty print the graph, including the cut, in given file *)
-let pp_cut_dot ~name filename (graph, cut) = 
+let pp_cut_dot ~name filename (graph, cut, conclusion) = 
   let module G = Proof.ProofGraph in
   (* DOT printer of this [cut] of the graph *)
   let cut_dot_printer =
@@ -209,6 +209,8 @@ let pp_cut_dot ~name filename (graph, cut) =
       let attributes = [`Shape "box"; `Style "filled"] in
       let attributes =
         if Proof.proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
+        else if Proof.proof_id conclusion = Proof.proof_id proof
+          then `Color "cyan" :: label :: attributes
         else if G.S.mem proof cut then `Color "green" :: label :: attributes
         else if Proof.is_axiom proof then label :: `Color "yellow" :: attributes
         else label :: attributes in
@@ -240,7 +242,7 @@ let learn_empty ~meta proof =
     (* find a good cut of the proof of $false *)
     let graph = Proof.to_graph proof in
     let proofs = cut graph proof in
-    pp_cut_dot ~name:"cut" "learn_empty.dot" (graph, Sequence.of_list proofs);
+    pp_cut_dot ~name:"cut" "learn_empty.dot" (graph, Sequence.of_list proofs,proof);
     match proofs with
     | [] -> failwith "empty proof cut?"
     | _ ->
@@ -255,14 +257,21 @@ let learn_empty ~meta proof =
   with Not_found ->
     None  (* no good cut *)
 
+let learn_subproof_idx = ref 0
+
 (** From the given proof [c], find a cut [P] of its premises,
     and learn the lemma p_1 & p_2 & ... & p_n => c *)
 let learn_subproof ~meta proof =
+  Utils.debug 1 (lazy (Utils.sprintf "%% try to learn lemma with conclusion @[<h>%a@]"
+                Lits.pp_lits (Proof.proof_lits proof)));
   let kb = meta.Theories.meta_kb in
   try
     (* find a good cut of [proof] *)
     let graph = Proof.to_graph proof in
     let proofs = cut graph proof in
+    let filename = Utils.sprintf "learn_subproof%d.dot" !learn_subproof_idx in
+    incr learn_subproof_idx;
+    pp_cut_dot ~name:"cut" filename (graph, Sequence.of_list proofs,proof);
     (* premises: clauses of the cut *)
     let premises = List.map Proof.proof_lits proofs in
     (* conclusion: negation of chosen clause *)
@@ -275,17 +284,34 @@ let learn_subproof ~meta proof =
 
 (** {2 Search for salient clauses *)
 
+let subgraph_min_diameter = ref 4     (** Min distance conclusion <-> axioms *)
+let simplicity_threshold = ref 100.   (** Max handicap for conclusion *)
+let max_lemmas = ref 2                (** Max number of lemmas *)
+
 (** Find a list of {b salient} clauses in the given proof. Salient clauses
     are small clauses that have many descendants in the proof, and are
     close to the conclusion. Those clauses should be good candidates
     for [learn_subproof].
     Implementation should rely on PageRank on the reverse graph. *)
-let salient_clauses proof = []  (* TODO *)
+let salient_clauses proof =
+  let module G = Proof.ProofGraph in
+  let graph = Proof.to_graph proof in
+  let graph = G.rev graph in
+  (* check whether the subgraph is big enough *)
+  let check_big_subgraph proof =
+    let diameter = G.diameter graph proof in
+    diameter >= !subgraph_min_diameter
+  in
+  (* explore clauses, starting from the empty clause but ignoring it *)
+  let candidates = Sequence.drop 1 (G.bfs_seq graph proof) in
+  (* only retain simple clauses, far away from axioms, and keep a few of them *)
+  let candidates = Sequence.filter
+    (fun proof -> simplicity (Proof.proof_lits proof) < !simplicity_threshold
+               && check_big_subgraph proof)
+    candidates in
+  Sequence.to_list candidates
 
 (** {2 Batteries-included lemma learning} *)
-
-(** Maximum number of lemmas that can be learnt from one proof *)
-let max_lemmas = ref 3
 
 (** Given an empty clause (and its proof), look in the proof for lemmas. *)
 let search_lemmas meta proof =
