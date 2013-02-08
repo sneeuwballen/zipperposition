@@ -39,7 +39,10 @@ clean:
 tags:
 	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
-.PHONY: all profile clean tags doc tests
+dot:
+	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
+
+.PHONY: all profile clean tags doc tests dot
 
 # libraries
 
