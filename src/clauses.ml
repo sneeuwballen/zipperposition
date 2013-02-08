@@ -119,7 +119,7 @@ module CHashcons = Hashcons.Make(
   struct
     type t = hclause
     let hash c = Lits.hash_lits c.hclits
-    let equal  c1 c2 = Lits.eq_lits c1.hclits c2.hclits
+    let equal c1 c2 = Lits.eq_lits c1.hclits c2.hclits && c1.hcctx == c2.hcctx
     let tag i c = c.hctag <- i; c
   end)
 
@@ -234,10 +234,11 @@ let update_ctx ~ctx hc =
 let check_ord_hclause ~ord hc =
   assert (
   Utils.array_forall
-    (function (Equation (l,r,_,o)) ->
+    (function (Equation (l,r,sign,o)) as lit ->
       let ok = o = ord#compare l r in
-      (if not ok then Format.printf "@[<h>Ord problem: literal %a %a"
-                      !T.pp_term#pp l !T.pp_term#pp r);
+      (if not ok then Format.printf "@[<h>Ord problem: literal %a, ord %s is not %s@]@."
+                      Lits.pp_literal lit (string_of_comparison o)
+                      (string_of_comparison (ord#compare l r)));
       ok)
     hc.hclits)
 
