@@ -51,6 +51,12 @@ val ground : queue
 (** only select positive unit clauses *)
 val pos_unit_clauses : queue
 
+(** select horn clauses *)
+val horn : queue
+
+(** only select lemmas *)
+val lemmas : queue
+
 (** default combination of heuristics *)
 val default_queues : (queue * int) list
 

@@ -304,6 +304,7 @@ let handle_formula meta term =
     (* build conclusion *)
     let proof c = Proof.mk_proof c "lemma" premises in
     let conclusion = term_to_hclause ~ctx ~kb term proof in
+    C.set_flag C.flag_lemma conclusion true;
     (* yield lemma *)
     Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
                   !C.pp_clause#pp_h conclusion));

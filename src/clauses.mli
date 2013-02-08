@@ -32,6 +32,7 @@ val stat_new_clause : statistics
  * ---------------------------------------------------------------------- *)
 
 val flag_ground : int                             (** clause is ground *)
+val flag_lemma : int                              (** clause is a lemma *)
 
 val set_flag : int -> hclause -> bool -> unit     (** set boolean flag *)
 val get_flag : int -> hclause -> bool             (** get value of boolean flag *)
