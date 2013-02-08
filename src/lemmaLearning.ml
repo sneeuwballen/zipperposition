@@ -264,6 +264,17 @@ let learn_empty ~meta proof =
     None  (* no good cut *)
 
 let learn_subproof_idx = ref 0
+let cut_max_cost_factor = 50.
+
+let cut_too_costly proofs =
+  (* Sum of 'simplicity' of the cut *)
+  let cut_cost proofs =
+    List.fold_left
+      (fun sum proof -> sum +. simplicity (Proof.proof_lits proof))
+      0. proofs
+  in
+  let len = float_of_int (List.length proofs) in
+  cut_cost proofs > cut_max_cost_factor *. len
 
 (** From the given proof [c], find a cut [P] of its premises,
     and learn the lemma p_1 & p_2 & ... & p_n => c *)
@@ -275,16 +286,20 @@ let learn_subproof ~meta proof =
     (* find a good cut of [proof] *)
     let graph = Proof.to_graph proof in
     let proofs = cut graph proof in
-    let filename = Utils.sprintf "learn_subproof%d.dot" !learn_subproof_idx in
-    incr learn_subproof_idx;
-    pp_cut_dot ~name:"cut" filename (graph, Sequence.of_list proofs,proof);
-    (* premises: clauses of the cut *)
-    let premises = List.map Proof.proof_lits proofs in
-    (* conclusion: negation of chosen clause *)
-    let conclusion = Proof.proof_lits proof in
-    let candidate = { cl_premises=premises; cl_conclusion=conclusion; } in
-    let lemma = candidate_to_lemma kb candidate in
-    Some lemma
+    if cut_too_costly proofs
+    then None  (* some premise is too expensive *)
+    else begin
+      let filename = Utils.sprintf "learn_subproof%d.dot" !learn_subproof_idx in
+      incr learn_subproof_idx;
+      pp_cut_dot ~name:"cut" filename (graph, Sequence.of_list proofs,proof);
+      (* premises: clauses of the cut *)
+      let premises = List.map Proof.proof_lits proofs in
+      (* conclusion: negation of chosen clause *)
+      let conclusion = Proof.proof_lits proof in
+      let candidate = { cl_premises=premises; cl_conclusion=conclusion; } in
+      let lemma = candidate_to_lemma kb candidate in
+      Some lemma
+    end
   with Not_found ->
     None  (* no good cut *)
 
