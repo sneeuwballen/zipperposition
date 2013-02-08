@@ -250,7 +250,7 @@ module Make(V : Map.OrderedType) = struct
       k v;
       (* explore children *)
       Sequence.iter
-        (fun (e, v') -> if not (S.mem v !explored)
+        (fun (e, v') -> if not (S.mem v' !explored)
           then (explored := S.add v' !explored; Queue.push v' q))
         (next graph v)
     done
