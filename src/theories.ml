@@ -222,8 +222,9 @@ let pp_disjunction formatter = function
   | Named n -> pp_named_formula formatter n
 
 let pp_disjunctions formatter seq =
-  Format.fprintf formatter "%% vim:syntax=ocaml@;";
-  Sequence.pp_seq ~sep:"" pp_disjunction formatter seq
+  Format.fprintf formatter "@[<v>%% vim:syntax=ocaml@;";
+  Sequence.pp_seq ~sep:"" pp_disjunction formatter seq;
+  Format.fprintf formatter "@]@."
 
 (** Pretty print content of KB *)
 let pp_kb formatter kb =
@@ -468,7 +469,7 @@ let read_kb ~file ~kb_parser kb =
 
 (** save the KB to the file *)
 let save_kb ~file ~kb_printer kb =
-  let out = Unix.openfile file [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
+  let out = Unix.openfile file [Unix.O_CREAT; Unix.O_WRONLY; Unix.O_TRUNC] 0o644 in
   let out = Unix.out_channel_of_descr out in
   let formatter = Format.formatter_of_out_channel out in
   (* use given printer to print each disjunction *)
