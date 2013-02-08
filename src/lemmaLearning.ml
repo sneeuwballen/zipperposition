@@ -29,6 +29,12 @@ module S = FoSubst
 module Lits = Literals
 module Utils = FoUtils
 
+(** {2 Parameters} *)
+
+let subgraph_min_diameter = ref 4     (** Min distance conclusion <-> axioms *)
+let simplicity_threshold = ref 100.   (** Max handicap for conclusion *)
+let max_lemmas = ref 2                (** Max number of lemmas *)
+
 (** {2 Utils to build lemmas} *)
 
 (** A possible lemma, i.e. a cut of the graph *)
@@ -246,7 +252,7 @@ let learn_empty ~meta proof =
     match proofs with
     | [] -> failwith "empty proof cut?"
     | _ ->
-      (* premises: all other clauses *)
+      (* premises: all clauses in cut *)
       let premises = List.map Proof.proof_lits proofs in
       (* conclusion: empty clause *)
       let conclusion = [||] in
@@ -283,10 +289,6 @@ let learn_subproof ~meta proof =
     None  (* no good cut *)
 
 (** {2 Search for salient clauses *)
-
-let subgraph_min_diameter = ref 4     (** Min distance conclusion <-> axioms *)
-let simplicity_threshold = ref 100.   (** Max handicap for conclusion *)
-let max_lemmas = ref 2                (** Max number of lemmas *)
 
 (** Find a list of {b salient} clauses in the given proof. Salient clauses
     are small clauses that have many descendants in the proof, and are

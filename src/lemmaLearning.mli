@@ -23,6 +23,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 open Symbols
 
+(** {2 Parameters} *)
+
+val subgraph_min_diameter : int ref     (** Min distance conclusion <-> axioms *)
+val simplicity_threshold : float ref    (** Max handicap for conclusion *)
+val max_lemmas : int ref                (** Max number of lemmas *)
+
 (** {2 Cut extraction} *)
 
 (** The idea here is, given a clause [c] in a proof graph, to find
