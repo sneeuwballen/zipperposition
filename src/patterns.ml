@@ -526,11 +526,11 @@ let pp_pclause formatter pclause =
       Format.fprintf formatter "%a" (pp_pterm varindex) lit.lterm
     | false, PNode (0, _, []) -> (* != true *)
       Format.fprintf formatter "~%a" (pp_pterm varindex) lit.lterm
-    | true, _ -> Format.fprintf formatter "%a %s %a"
+    | true, _ -> Format.fprintf formatter "(%a %s %a)"
         (pp_pterm varindex) lit.lterm
         (if has_sort lit.lterm bool_sort then "<=>" else "=")
         (pp_pterm varindex) lit.rterm
-    | false, _ -> Format.fprintf formatter "%a %s %a"
+    | false, _ -> Format.fprintf formatter "(%a %s %a)"
         (pp_pterm varindex) lit.lterm
         (if has_sort lit.lterm bool_sort then "<~>" else "!=")
         (pp_pterm varindex) lit.rterm
