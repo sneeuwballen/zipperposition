@@ -232,8 +232,9 @@ module Make(V : Map.OrderedType) = struct
 
   (** Reverse all edges *)
   let rev g =
-    let edges = Sequence.map rev_edge (to_seq g) in
-    add_seq empty edges
+    M.map
+      (fun node -> {node with n_prev=node.n_next; n_next=node.n_prev})
+      g
 
   (** {2 Traversals} *)
 
