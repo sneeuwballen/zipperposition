@@ -407,16 +407,15 @@ let match_pclause ?map pclause lits =
       done
     else acc := map :: !acc
   in
-  if List.length pclause.pc_lits <> Array.length lits
-    then []  (* no matching if lengths are different *)
-    else begin
-      let plits = Array.of_list pclause.pc_lits in
-      let bv = 0 in
-      let acc = ref [] in
-      (* find all matchings *)
-      all_matches acc plits lits map 0 bv;
-      !acc
-    end
+  if List.length pclause.pc_lits <> Array.length lits then []
+  else begin
+    let plits = Array.of_list pclause.pc_lits in
+    let bv = 0 in
+    let acc = ref [] in
+    (* find all matchings *)
+    all_matches acc plits lits map 0 bv;
+    !acc
+  end
 
 (* ----------------------------------------------------------------------
  * named patterns with Datalog representations
