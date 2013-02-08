@@ -80,6 +80,7 @@ module type S = sig
   (** {2 Traversals} *)
 
   val bfs : 'e t -> vertex -> (vertex -> unit) -> unit
+  val bfs_seq : 'e t -> vertex -> vertex Sequence.t
     (** Breadth-first search, from given vertex *)
 
   val dfs_full : 'e t ->
@@ -112,7 +113,7 @@ module type S = sig
                  ?ignore:(vertex -> bool) ->
                  goal:(vertex -> 'e path -> bool) ->
                  vertex ->
-                 'e path
+                 vertex * int * 'e path
     (** Find the minimal path, from the given [vertex], that does not contain
         any vertex satisfying [ignore], and that reaches a vertex
         that satisfies [goal]. It raises Not_found if no reachable node

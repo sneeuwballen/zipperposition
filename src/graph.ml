@@ -80,6 +80,7 @@ module type S = sig
   (** {2 Traversals} *)
 
   val bfs : 'e t -> vertex -> (vertex -> unit) -> unit
+  val bfs_seq : 'e t -> vertex -> vertex Sequence.t
     (** Breadth-first search, from given vertex *)
 
   val dfs_full : 'e t ->
@@ -112,7 +113,7 @@ module type S = sig
                  ?ignore:(vertex -> bool) ->
                  goal:(vertex -> 'e path -> bool) ->
                  vertex ->
-                 'e path
+                 vertex * int * 'e path
     (** Find the minimal path, from the given [vertex], that does not contain
         any vertex satisfying [ignore], and that reaches a vertex
         that satisfies [goal]. It raises Not_found if no reachable node
@@ -254,6 +255,8 @@ module Make(V : Map.OrderedType) = struct
         (next graph v)
     done
 
+  let bfs_seq graph first = Sequence.from_iter (fun k -> bfs graph first k)
+
   (** DFS, with callbacks called on each encountered node and edge *)
   let dfs_full graph ?(labels=ref M.empty)
   ?(enter=fun _ -> ()) ?(exit=fun _ -> ())
@@ -340,7 +343,7 @@ module Make(V : Map.OrderedType) = struct
     let q = ref HQ.empty in
     let explored = ref S.empty in
     q := HQ.insert (v, 0, []) !q;
-    let best_path = ref [] in
+    let best_path = ref (v,0,[]) in
     try
       while not (HQ.is_empty !q) do
         let (v, cost_v, path), q' = HQ.extract_min !q in
@@ -348,7 +351,7 @@ module Make(V : Map.OrderedType) = struct
         if S.mem v !explored then ()  (* a shorter path is known *)
         else if ignore v then ()      (* ignore the node. *)
         else if goal v path           (* shortest path to goal node! *)
-          then (best_path := path; raise ExitBfs)
+          then (best_path := v, cost_v, path; raise ExitBfs)
         else begin
           explored := S.add v !explored;
           (* explore successors *)
@@ -371,20 +374,19 @@ module Make(V : Map.OrderedType) = struct
   let min_path graph ~cost v1 v2 =
     let cost _ e _ = cost e in
     let goal v' _ = V.compare v' v2 = 0 in
-    let path = min_path_full graph ~cost ~goal v1 in
+    let _,_,path = min_path_full graph ~cost ~goal v1 in
     path
 
   (** Maximal distance between the given vertex, and any other vertex
       in the graph that is reachable from it. *)
   let diameter graph v =
     let diameter = ref 0 in
-    let cost _ _ _ = 1 in
     (* no path is a goal, but we can use its length to update diameter *)
     let goal _ path =
       diameter := max !diameter (List.length path);
       false
     in
-    try ignore (min_path_full graph ~cost ~goal v); assert false
+    try ignore (min_path_full graph ~goal v); assert false
     with Not_found ->
       !diameter  (* explored every shortest path *)
 
