@@ -1,6 +1,0 @@
-[submodule "datalog"]
-	path = datalog
-	url = git@github.com:/c-cube/datalog
-[submodule "sequence"]
-	path = sequence
-	url = https://github.com/c-cube/sequence.git
