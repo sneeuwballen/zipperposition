@@ -343,11 +343,11 @@ let search_lemmas meta proof =
   let lemmas = learn_empty ~meta proof :: lemmas in
   (* flatten ('a option list -> 'a list) *)
   let lemmas = Utils.list_flatmap (function None -> [] | Some x -> [x]) lemmas in
-  (* only keep lemmas that give safe rules *)
+  (* only keep lemmas that give safe clauses *)
   let lemmas = List.filter
     (fun lemma ->
-      let rule = rule_of_lemma lemma in
-      Logic.check_safe rule)
+      let clause = clause_of_lemma lemma in
+      Logic.check_safe clause)
     lemmas
   in
   lemmas

@@ -1,1 +1,3 @@
 <**/*.cmx>: inline(15)
+<**/*.ml*>: package(sequence), package(datalog)
+<*.native> or <*.byte>: package(sequence), package(datalog)

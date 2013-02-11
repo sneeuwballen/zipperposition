@@ -283,7 +283,7 @@ let process_file ~kb params f =
   (* print theories *)
   (match meta with None -> ()
     | Some meta -> Format.printf "%% detected theories: @[<h>%a@]@."
-    (Utils.pp_list Theories.Logic.pp_term) meta.Theories.meta_theories);
+    (Utils.pp_list Theories.Logic.pp_literal) meta.Theories.meta_theories);
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s

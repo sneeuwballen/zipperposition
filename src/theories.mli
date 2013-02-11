@@ -53,13 +53,13 @@ type lemma = {
   lemma_conclusion : atom;                  (* conclusion of the lemma *)
   lemma_premises : atom list;               (* hypotheses of the lemma *)
 } (** A lemma is a named formula that can be deduced from a list
-      of other named formulas. It will be translated as a datalog rule. *)
+      of other named formulas. It will be translated as a datalog clause. *)
 
 val compare_lemma : lemma -> lemma -> int
   (** Arbitrary lexicographic comparison of lemmas *)
 
-val rule_of_lemma : lemma -> Logic.rule
-  (** Convert the lemma into a datalog rule *)
+val clause_of_lemma : lemma -> Logic.clause
+  (** Convert the lemma into a datalog clause *)
 
 module LemmaSet : Set.S with type elt = lemma
   (** Set of lemmas *)
@@ -112,15 +112,15 @@ val pp_kb_stats : Format.formatter -> kb -> unit
  * reasoning over a problem using Datalog
  * ---------------------------------------------------------------------- *)
 
-module TermMap : Map.S with type key = Logic.term
+module TermMap : Map.S with type key = Logic.literal
 
 type meta_prover = {
   meta_db : Logic.db;
   meta_kb : kb;
-  mutable meta_clauses : hclause TermMap.t; (* map terms to hclauses *)
-  mutable meta_theories : Logic.term list;  (* detected theories *)
+  mutable meta_clauses : hclause TermMap.t;     (* map terms to hclauses *)
+  mutable meta_theories : Logic.literal list;   (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
-  mutable meta_theory_clauses : Logic.term list Ptmap.t; (* clause -> list of theory terms *)
+  mutable meta_theory_clauses : Logic.literal list Ptmap.t; (* clause -> list of theory literals *)
   mutable meta_ctx : context;
   mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms

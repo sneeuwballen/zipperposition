@@ -72,8 +72,8 @@ let compare_atom (n1, args1) (n2, args2) =
   if n1 != n2 then Symbols.compare_symbols n1 n2
   else Utils.lexicograph compare_args args1 args2
 
-(** Convert an atom to a Datalog term *)
-let atom_to_term (head, args) = Logic.mk_term head args
+(** Convert an atom to a Datalog literal *)
+let atom_to_literal (head, args) = Logic.mk_literal head args
 
 type named_formula = Patterns.named_pattern
   (** A named formula is a pattern clause, plus a name (used for the datalog
@@ -88,7 +88,7 @@ type lemma = {
   lemma_conclusion : atom;                  (* conclusion of the lemma *)
   lemma_premises : atom list;               (* hypotheses of the lemma *)
 } (** A lemma is a named formula that can be deduced from a list
-      of other named formulas. It will be translated as a datalog rule. *)
+      of other named formulas. It will be translated as a datalog clause. *)
 
 (** Arbitrary lexicographic comparison of lemmas *)
 let compare_lemma l1 l2 =
@@ -96,11 +96,11 @@ let compare_lemma l1 l2 =
   if cmp <> 0 then cmp
   else Utils.lexicograph compare_atom l1.lemma_premises l2.lemma_premises
 
-let rule_of_lemma lemma =
-  let head = atom_to_term lemma.lemma_conclusion in
-  let body = List.map (fun premise -> atom_to_term premise) lemma.lemma_premises in
-  let rule = Logic.mk_rule head body in
-  rule
+let clause_of_lemma lemma =
+  let head = atom_to_literal lemma.lemma_conclusion in
+  let body = List.map (fun premise -> atom_to_literal premise) lemma.lemma_premises in
+  let clause = Logic.mk_clause head body in
+  clause
 
 (** Set of lemmas *)
 module LemmaSet = Set.Make(struct type t = lemma let compare = compare_lemma end)
@@ -243,15 +243,15 @@ let pp_kb_stats formatter kb =
  * reasoning over a problem using Datalog
  * ---------------------------------------------------------------------- *)
 
-module TermMap = Map.Make(struct type t = Logic.term let compare = Logic.compare_term end)
+module TermMap = Map.Make(struct type t = Logic.literal let compare = Logic.compare_literal end)
 
 type meta_prover = {
   meta_db : Logic.db;
   meta_kb : kb;
   mutable meta_clauses : hclause TermMap.t; (* map terms to hclauses *)
-  mutable meta_theories : Logic.term list;  (* detected theories *)
+  mutable meta_theories : Logic.literal list;  (* detected theories *)
   mutable meta_theory_symbols : SSet.t;
-  mutable meta_theory_clauses : Logic.term list Ptmap.t; (* clause -> list of theory terms *)
+  mutable meta_theory_clauses : Logic.literal list Ptmap.t; (* clause -> list of theory terms *)
   mutable meta_ctx : context;
   mutable meta_lemmas : hclause list; (* temp buffer of deduced lemmas *)
 } (** The main type used to reason over the current proof, detecting axioms
@@ -263,47 +263,47 @@ let get_kb_theory ~kb name =
   try SHashtbl.find kb.kb_theories name
   with Not_found -> failwith ("no such theory: " ^ (name_symbol name))
 
-(** Translate back a datalog (ground) term into a hclause.
+(** Translate back a datalog (ground) literal into a hclause.
     First, the corresponding named formula has to be retrieved
-    from kb, then it is 'matched' against the term.
+    from kb, then it is 'matched' against the literal.
     A proof and a list of parent clauses have to be provided. *)
-let term_to_hclause ~ctx ~kb term proof =
-  let term_name, term_args = Logic.open_term term in
-  let term_args = List.map
+let lit_to_hclause ~ctx ~kb literal proof =
+  let lit_name, lit_args = Logic.open_literal literal in
+  let lit_args = List.map
     (function
      | `Var _ -> assert false
      | `Symbol s -> `Symbol s)
-    term_args
+    lit_args
   in
-  (* get the named formula corresponding to this term *)
-  let nf = get_kb_formula kb term_name in
+  (* get the named formula corresponding to this literal *)
+  let nf = get_kb_formula kb lit_name in
   (* instantiate the named formula *)
-  let hc = Patterns.instantiate_np ~ctx nf (term_name, term_args) proof in
+  let hc = Patterns.instantiate_np ~ctx nf (lit_name, lit_args) proof in
   hc
 
 (** This handler is triggered whenever a named formula is discovered
     to be true for the current problem. *)
-let handle_formula meta term =
+let handle_formula meta lit =
   let ctx = meta.meta_ctx in
   let kb = meta.meta_kb in
   (* find parents (other formulas) *)
-  let explanation = Logic.db_explain meta.meta_db term in
+  let explanation = Logic.db_explain meta.meta_db lit in
   let parents = List.map
     (fun t ->  (* find clause that triggered hypotheses *)
       try TermMap.find t meta.meta_clauses
       with Not_found ->
-        failwith (Utils.sprintf "no clause backs term %a" Logic.pp_term t))
+        failwith (Utils.sprintf "no clause justifies literal %a" Logic.pp_literal t))
     explanation
   in
   (* is the clause deduced or merely an axiom? *)
-  if explanation = [term]
+  if explanation = [lit]
   then ()
   else begin
     (* proof and parents of conclusion *)
     let premises = List.map (fun hc -> hc.hcproof) parents in
     (* build conclusion *)
     let proof c = Proof.mk_proof c "lemma" premises in
-    let conclusion = term_to_hclause ~ctx ~kb term proof in
+    let conclusion = lit_to_hclause ~ctx ~kb lit proof in
     C.set_flag C.flag_lemma conclusion true;
     (* yield lemma *)
     Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
@@ -311,21 +311,21 @@ let handle_formula meta term =
     incr_stat stat_lemma_deduced;
     meta.meta_lemmas <- conclusion :: meta.meta_lemmas;
     (* remember that the term maps to this clause *)
-    meta.meta_clauses <- TermMap.add term conclusion meta.meta_clauses
+    meta.meta_clauses <- TermMap.add lit conclusion meta.meta_clauses
   end
 
 (** Handler triggered when a theory is discovered in the current problem *)
-let handle_theory meta term =
+let handle_theory meta lit =
   let ctx = meta.meta_ctx in
   let kb = meta.meta_kb in
   Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: theory @[<h>%a@]"
-                 Logic.pp_term term));
+                 Logic.pp_literal lit));
   incr_stat stat_theory_detected;
   (* the clauses that belong to this theory *)
-  let premises = Logic.db_explain meta.meta_db term in
+  let premises = Logic.db_explain meta.meta_db lit in
   let proof c = Proof.mk_axiom c "kb" "kb" in
   let premise_clauses = Utils.list_flatmap
-    (fun term -> try [term_to_hclause ~ctx ~kb term proof]
+    (fun lit -> try [lit_to_hclause ~ctx ~kb lit proof]
                  with Not_found -> [])
     premises in
   (* add the premises of the clause to the set of theory clauses. Each of those
@@ -334,7 +334,7 @@ let handle_theory meta term =
     (fun hc ->
       let l = try Ptmap.find hc.hctag meta.meta_theory_clauses
               with Not_found -> [] in
-      meta.meta_theory_clauses <- Ptmap.add hc.hctag (term::l) meta.meta_theory_clauses)
+      meta.meta_theory_clauses <- Ptmap.add hc.hctag (lit::l) meta.meta_theory_clauses)
     premise_clauses;
   (* add the symbols in those clauses to the set of theory symbols *)
   let signature = C.signature premise_clauses in
@@ -346,26 +346,26 @@ let handle_theory meta term =
         if not (SSet.mem s base_symbols) then SSet.add s set else set)
       meta.meta_theory_symbols symbols;
   (* add the theory to the set of detect theories *)
-  meta.meta_theories <- term :: meta.meta_theories;
+  meta.meta_theories <- lit :: meta.meta_theories;
   ()
 
 (** Add a lemma to the Datalog engine *)
 let db_add_lemma db lemma =
   (* add conclusion(args) :- premise1(args), ..., premise_n(args), for
      further propagations. *)
-  let rule = rule_of_lemma lemma in
-  Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
-                 Logic.pp_rule rule));
-  Logic.db_add db rule
+  let clause = clause_of_lemma lemma in
+  Utils.debug 2 (lazy (Utils.sprintf "%% add clause @[<h>%a@] to meta-prover"
+                 Logic.pp_clause clause));
+  Logic.db_add db clause
   
 (** Add the definition of a theory to the Datalog engine *)
 let db_add_theory db theory =
-  let head = atom_to_term theory.th_atom in
-  let body = List.map atom_to_term theory.th_definition in
-  let rule = Logic.mk_rule head body in
-  Utils.debug 2 (lazy (Utils.sprintf "%% add rule @[<h>%a@] to meta-prover"
-                 Logic.pp_rule rule));
-  Logic.db_add db rule
+  let head = atom_to_literal theory.th_atom in
+  let body = List.map atom_to_literal theory.th_definition in
+  let clause = Logic.mk_clause head body in
+  Utils.debug 2 (lazy (Utils.sprintf "%% add clause @[<h>%a@] to meta-prover"
+                 Logic.pp_clause clause));
+  Logic.db_add db clause 
 
 (** Create a meta_prover, using a Knowledge Base *)
 let create_meta ~ctx kb =
@@ -392,7 +392,7 @@ let create_meta ~ctx kb =
       (* the lemma is f(X,...) :- g(Y...), ...; we need the index of f *)
       let s = fst lemma.lemma_conclusion in
       Logic.db_subscribe meta.meta_db s formula_handler;
-      (* also add the lemma as a rule *)
+      (* also add the lemma as a clause *)
       db_add_lemma meta.meta_db lemma)
     meta.meta_kb.kb_lemmas;
   (* add definitions of theories *)
@@ -426,18 +426,18 @@ let scan_clause meta hc =
       let args = List.map
         (fun (`Symbol s) -> `Symbol s)
         args in
-      let term = atom_to_term (head, args) in
+      let term = atom_to_literal (head, args) in
       (* assert the fact in the Datalog engine *)
-      let rule = Logic.mk_rule term [] in
-      if not (Logic.db_mem meta.meta_db rule) then begin
+      let clause = Logic.mk_clause term [] in
+      if not (Logic.db_mem meta.meta_db clause) then begin
         (* add fact if not already present *)
         Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
-                       Logic.pp_rule rule pp_named_formula nf));
+                       Logic.pp_clause clause pp_named_formula nf));
         incr_stat stat_formula_detected;
         (* remember the clause that made us add the fact to datalog *)
         meta.meta_clauses <- TermMap.add term hc meta.meta_clauses;
-        (* add the rule to datalog *)
-        Logic.db_add meta.meta_db rule;
+        (* add the clause to datalog *)
+        Logic.db_add meta.meta_db clause;
       end);
   (* get lemmas, and clear the list for next use *)
   let lemmas = meta.meta_lemmas in
