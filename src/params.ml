@@ -94,7 +94,7 @@ let parse_args () =
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
-      ("-proof", Arg.Set_string proof, "choose proof printing (none, debug or tstp)");
+      ("-proof", Arg.Set_string proof, "choose proof printing (none, debug, json or tstp)");
       ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");

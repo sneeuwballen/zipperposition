@@ -57,10 +57,13 @@ module ProofGraph : Graph.S with type vertex = compact_clause proof
 val to_graph : compact_clause proof -> string ProofGraph.t
   (** Get a graph of the proof *)
 
+val to_json : ((int*'a) -> json) -> (int*'a) proof -> json Sequence.t
+
 (** {2 Pretty printer for proofs} *)
 
 val pp_proof_tstp : Format.formatter -> compact_clause proof -> unit
 val pp_proof_debug : Format.formatter -> compact_clause proof -> unit
+val pp_proof_json : Format.formatter -> compact_clause proof -> unit
 val pp_proof : string -> Format.formatter -> compact_clause proof -> unit
   (** Prints the proof according to the given input switch *)
 
@@ -73,5 +76,3 @@ val pp_dot : name:string -> Format.formatter -> compact_clause proof -> unit
 val pp_dot_file : ?name:string -> string -> compact_clause proof -> unit
   (** print to dot into a file *)
 
-val to_json : ('a -> json) -> 'a proof -> json
-val of_json : (json -> 'a) -> json -> 'a proof

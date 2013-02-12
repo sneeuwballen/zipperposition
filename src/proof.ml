@@ -112,6 +112,26 @@ let to_graph proof =
        List.iter (fun p' -> g := ProofGraph.add !g p' rule p) l);
   !g
 
+let to_json json_key proof =
+  (* how to translate the proof step *)
+  let pp_step proof = 
+    match proof with
+    | Axiom (c, filename, name) ->
+      `List [`String "axiom"; json_key c; `String filename; `String name]
+    | Proof (c, rule, l) ->
+      let premises = List.map (fun proof -> `Int (proof_id proof)) l in
+      `List [`String "proof"; json_key c; `String rule; `List premises]
+  in
+  (* sequence *)
+  let seq (k : json -> unit) =
+    traverse proof
+      (fun proof ->
+        let step = `List [`Int (proof_id proof); pp_step proof] in
+        k step)
+  in Sequence.from_iter seq
+
+let rec of_json json_key json = failwith "not implemented"
+
 (** {2 Pretty printer for proofs} *)
 
 let pp_proof_debug formatter proof =
@@ -152,11 +172,19 @@ let pp_proof_tstp formatter proof =
           (fst c) T.pp_term_tstp#pp t name status
           (Utils.pp_list ~sep:"," Format.pp_print_int) premises)
 
+let pp_proof_json formatter proof =
+  (* how to print a single element *)
+  let pp_item formatter json = Format.pp_print_string formatter (Json.to_string json) in
+  let seq = to_json C.compact_to_json proof in
+  Format.fprintf formatter "@[<hv>%a@]@;"
+    (Sequence.pp_seq pp_item) seq
+
 (** Prints the proof according to the given input switch *)
 let pp_proof switch formatter proof = match switch with
   | "none" -> Utils.debug 1 (lazy "%% proof printing disabled")
   | "tstp" -> pp_proof_tstp formatter proof
   | "debug" -> pp_proof_debug formatter proof
+  | "json" -> pp_proof_json formatter proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
 (** DOT printer of proof graphs *)
@@ -192,21 +220,3 @@ let pp_dot_file ?(name="proof") filename proof =
     Format.fprintf formatter "%a@." (pp_dot ~name) proof;
     close_out out
   with _ -> close_out out
-
-let rec to_json json_key proof =
-  match proof with
-  | Axiom (c, filename, name) ->
-    `List [`String "axiom"; json_key c; `String filename; `String name]
-  | Proof (c, rule, l) ->
-    `List [`String "proof"; json_key c; `String rule; `List (List.map (to_json json_key) l)]
-
-let rec of_json json_key json =
-  match json with
-  | `List [`String "axiom"; c; `String filename; `String name] ->
-    let c = json_key c in
-    mk_axiom c filename name
-  | `List [`String "proof"; c; `String rule; `List l] ->
-    let c = json_key c in
-    let l = List.map (of_json json_key) l in
-    mk_proof c rule l
-  | _ -> raise (Json.Util.Type_error ("expected proof", json))
