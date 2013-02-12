@@ -199,6 +199,11 @@ val from_simple : Simple.term -> term
 val from_simple_formula : Simple.formula -> term
 val to_simple : term -> Simple.term option  (** fails if the term is of bool sort *)
 
+(** {2 JSON} *)
+
+val to_json : term -> json
+val of_json : json -> term
+
 (* ----------------------------------------------------------------------
  * skolem terms
  * ---------------------------------------------------------------------- *)

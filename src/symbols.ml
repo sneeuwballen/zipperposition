@@ -81,6 +81,7 @@ module SHashtbl = Hashtbl.Make(
   end)
 
 module SMap = Map.Make(struct type t = symbol let compare = compare_symbols end)
+module SMapSeq = Sequence.Map.Adapt(SMap)
 
 module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
 
@@ -140,31 +141,38 @@ let base_symbols = List.fold_left (fun set (s, _, _) -> SSet.add s set) SSet.emp
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
 
-(** Serialize the signature as a string, with '~' as separators *)
-let dump_signature signature =
-  let b = Buffer.create 128 in
-  let formatter = Format.formatter_of_buffer b in
-  SMap.iter
-    (fun s (arity, sort) ->
-      Format.fprintf formatter "%s:%d:%s~@?" (name_symbol s) arity (name_symbol sort))
-    signature;
-  (* get the whole buffer, except the last '~' *)
-  if Buffer.length b = 0 then "" else Buffer.sub b 0 (Buffer.length b - 1)
+let sig_to_seq signature =
+  Sequence.map
+    (fun (symb, (i,sort)) -> (symb,i,sort))
+    (SMapSeq.to_seq signature)
 
-(** Deserialize the signature from the string, or raise Invalid_argument *)
-let load_signature str =
-  (* how to parse a single triplet, that describes a symbol *)
-  let parse_triplet signature triplet =
-    match Str.split (Str.regexp ":") triplet with
-    | [symbol; arity; sort] ->
-      let arity = int_of_string arity in
-      let symbol = mk_symbol symbol in
-      let sort = mk_symbol sort in
-      SMap.add symbol (arity, sort) signature
-    | _ -> failwith "bad triplet"
+let sig_of_seq seq =
+  SMapSeq.of_seq
+    (Sequence.map (fun (symb,i,sort) -> (symb,(i,sort))) seq)
+
+module Json = Yojson.Basic
+
+let to_json s : Json.json = `String (name_symbol s)
+
+let of_json json =
+  let s = Json.Util.to_string json in
+  mk_symbol s
+
+let sig_to_json signature =
+  let items = Sequence.map
+    (fun (s,i,sort) -> `List [to_json s; `Int i; to_json sort])
+    (sig_to_seq signature)
   in
-  try
-    let triplets = Str.split (Str.regexp "~") str in
-    List.fold_left parse_triplet empty_signature triplets
-  with _ ->
-    raise (Invalid_argument ("failed load_signature of " ^ str))
+  `List (Sequence.to_list items)
+
+let sig_of_json json =
+  let triple_of_json json =
+    match json with
+    | `List [a;b;c] ->
+      (of_json a, Json.Util.to_int b, of_json c)
+    | _ -> let msg = "expected signature triple" in
+         raise (Json.Util.Type_error (msg, json))
+  in
+  let l = Json.Util.to_list json in
+  let seq = Sequence.map triple_of_json (Sequence.of_list l) in
+  sig_of_seq seq

@@ -34,8 +34,12 @@ A copy of the GPLv2 is attached to the project, in the file LICENSE.
 ## Build
 
 You will need OCaml >= 3.12 or higher with ocamlbuild and the standard
-library. Required libraries are `datalog>=0.2` and `sequence>=0.3`.
-Type in a terminal located in the root directory of the project:
+library. Required libraries are `datalog>=0.2`, `yojson` and `sequence>=0.3`.
+You can install  them with [opam](http://opam.ocamlpro.com/) by typing:
+
+    $ opam install datalog yojson sequence
+
+Then, type in a terminal located in the root directory of the project:
 
     $ make
 

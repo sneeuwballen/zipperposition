@@ -100,9 +100,11 @@ val base_symbols : SSet.t
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
 
-val dump_signature : signature -> string
-  (** Serialize the signature as a string *)
+val sig_to_seq : signature -> (symbol * int * sort) Sequence.t
+val sig_of_seq : (symbol * int * sort) Sequence.t -> signature
 
-val load_signature : string -> signature
-  (** Try to load a signature from a string, raise Invalid_argument
-      if it fails *)
+val to_json : symbol -> Yojson.Basic.json
+val of_json : Yojson.Basic.json -> symbol
+
+val sig_to_json : signature -> Yojson.Basic.json
+val sig_of_json : Yojson.Basic.json -> signature

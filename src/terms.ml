@@ -656,6 +656,44 @@ let to_simple t =
   | Node (f, l) -> Simple.mk_node f t.sort (List.map build l)
   in Some (build t)
 
+(** {2 JSON} *)
+
+let rec to_json t =
+  match t.term with
+  | BoundVar i ->
+    `List [`String "bound"; `Int i; Symbols.to_json t.sort]
+  | Var i ->
+    `List [`String "var"; `Int i; Symbols.to_json t.sort]
+  | Bind (s, t') ->
+    `List [`String "bind"; Symbols.to_json s; to_json t']
+  | Node (f, l) ->
+    let l' = `List (List.map to_json l) in
+    let f' = Symbols.to_json f in
+    let sort' = Symbols.to_json t.sort in
+    `List [`String "node"; f'; sort'; l']
+
+let of_json json =
+  let module Json = Yojson.Basic in
+  let rec of_json json = 
+    match json with
+    | `List [`String "bound"; `Int i; sort] ->
+      let sort = Symbols.of_json sort in mk_bound_var i sort
+    | `List [`String "var"; `Int i; sort] ->
+      let sort = Symbols.of_json sort in mk_var i sort
+    | `List [`String "bind"; s; t'] ->
+      let s = Symbols.of_json s in
+      let t' = of_json t' in
+      mk_bind s t'
+    | `List [`String "node"; f; sort; `List l] ->
+      let f = Symbols.of_json f in
+      let sort = Symbols.of_json sort in
+      let l = List.map of_json l in
+      mk_node f sort l
+    | _ -> let msg = "expected term" in
+      raise (Json.Util.Type_error (msg, json))
+  in
+  of_json json
+
 (* ----------------------------------------------------------------------
  * skolem terms
  * ---------------------------------------------------------------------- *)

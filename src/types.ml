@@ -44,6 +44,9 @@ exception SortError of string
    contains clauses). This should allow to disable proof-handling. *)
 (* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
 
+type json = Yojson.Basic.json
+exception JsonError
+
 (** term with a simple sort *)
 type term = {
   term : term_cell;             (** the term itself *)
