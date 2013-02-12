@@ -255,3 +255,12 @@ val pp_clause_tstp : pprinter_clause                    (** TSTP syntax *)
 val pp_clause_debug : pprinter_clause                   (** nice unicode syntax *)
 
 val pp_set : Format.formatter -> CSet.t -> unit
+
+val compact_to_json : compact_clause -> json
+val compact_of_json : ord:ordering -> json -> compact_clause
+
+val to_json : hclause -> json
+val of_json : ctx:context -> json -> hclause
+
+val set_to_json : CSet.t -> json
+val set_of_json : ctx:context -> CSet.t -> json -> CSet.t

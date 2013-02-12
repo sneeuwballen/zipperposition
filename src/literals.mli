@@ -74,3 +74,9 @@ val apply_subst_list : ?recursive:bool -> ord:ordering -> substitution ->
 
 val pp_literal : Format.formatter -> literal -> unit
 val pp_lits : Format.formatter -> literal array -> unit
+
+val to_json : literal -> json
+val of_json : ord:ordering -> json -> literal
+
+val lits_to_json : literal array -> json
+val lits_of_json : ord:ordering -> json -> literal array

@@ -67,3 +67,9 @@ val is_renaming : substitution -> bool
   (** Check whether the substitution is a variable renaming *)
 
 val pp_substitution : Format.formatter -> substitution -> unit
+
+val to_seq : substitution -> (term bind * term bind) Sequence.t
+val of_seq : ?recursive:bool -> (term bind * term bind) Sequence.t -> substitution
+
+val to_json : substitution -> json
+val of_json : ?recursive:bool -> json -> substitution

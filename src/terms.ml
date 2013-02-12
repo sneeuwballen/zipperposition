@@ -673,7 +673,6 @@ let rec to_json t =
     `List [`String "node"; f'; sort'; l']
 
 let of_json json =
-  let module Json = Yojson.Basic in
   let rec of_json json = 
     match json with
     | `List [`String "bound"; `Int i; sort] ->

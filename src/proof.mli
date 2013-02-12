@@ -72,3 +72,6 @@ val pp_dot : name:string -> Format.formatter -> compact_clause proof -> unit
 
 val pp_dot_file : ?name:string -> string -> compact_clause proof -> unit
   (** print to dot into a file *)
+
+val to_json : ('a -> json) -> 'a proof -> json
+val of_json : (json -> 'a) -> json -> 'a proof

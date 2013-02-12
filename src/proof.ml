@@ -192,3 +192,21 @@ let pp_dot_file ?(name="proof") filename proof =
     Format.fprintf formatter "%a@." (pp_dot ~name) proof;
     close_out out
   with _ -> close_out out
+
+let rec to_json json_key proof =
+  match proof with
+  | Axiom (c, filename, name) ->
+    `List [`String "axiom"; json_key c; `String filename; `String name]
+  | Proof (c, rule, l) ->
+    `List [`String "proof"; json_key c; `String rule; `List (List.map (to_json json_key) l)]
+
+let rec of_json json_key json =
+  match json with
+  | `List [`String "axiom"; c; `String filename; `String name] ->
+    let c = json_key c in
+    mk_axiom c filename name
+  | `List [`String "proof"; c; `String rule; `List l] ->
+    let c = json_key c in
+    let l = List.map (of_json json_key) l in
+    mk_proof c rule l
+  | _ -> raise (Json.Util.Type_error ("expected proof", json))
