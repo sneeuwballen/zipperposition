@@ -19,6 +19,7 @@ Literals
 Orderings
 Parser_tptp
 Precedence
+Proof
 ProofState
 Ptmap
 Ptset
