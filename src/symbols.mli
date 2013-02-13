@@ -88,6 +88,8 @@ val or_symbol : symbol
 
 (** {2 Magic symbols} *)
 
+val at_symbol : symbol    (** higher order curryfication symbol *)
+
 val db_symbol : symbol    (** pseudo symbol kept for locating bound vars in precedence *)
 val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
 val const_symbol : symbol (** pseudo symbol for locating magic constants in precedence *)

@@ -208,6 +208,8 @@ let mk_lambda t = mk_bind lambda_symbol t
 let mk_forall t = (check_bool t; mk_bind forall_symbol t)
 let mk_exists t = (check_bool t; mk_bind exists_symbol t)
 
+let mk_at t1 t2 = mk_node at_symbol t1.sort [t1; t2]
+
 let rec cast t sort =
   let new_t = {t with sort=sort} in
   new_t.hkey <- hash_term new_t;
@@ -465,6 +467,8 @@ let look_db_sort i t =
   in try lookup i t; None
      with FoundSort s -> Some s
 
+(** {2 High-level transformations} *)
+
 (** Bind all free variables by 'forall' *)
 let close_forall t =
   let vars = vars t in
@@ -478,6 +482,53 @@ let close_exists t =
   List.fold_left
     (fun t var -> mk_bind exists_symbol (db_from_var t var))
     t vars
+
+(** Currify all subterms *)
+let rec curry t =
+  match t.term with
+  | Var _ | BoundVar _ -> t
+  | Bind (s, t') -> mk_bind s (curry t')
+  | Node (f, []) -> t
+  | Node (f, [t']) -> mk_at (mk_const f t.sort) (curry t')
+  | Node (f, l) ->
+    List.fold_left
+      (fun left t' -> mk_at left (curry t'))
+      (mk_const f t.sort) l
+
+(** Uncurrify all subterms *)
+let uncurry t =
+  (* uncurry any kind of term, except the '@' terms that are
+     handled over to unfold_left *)
+  let rec uncurry t =
+    match t.term with
+    | Var _ | BoundVar _ -> t
+    | Bind (s, t') -> mk_bind s (uncurry t')
+    | Node (_, []) -> t  (* constant *)
+    | Node (f, [a;b]) when f == at_symbol ->
+      unfold_left a [uncurry b]  (* remove the '@' *)
+    | Node (f, l) -> mk_node f t.sort (List.map uncurry l)
+  (* transform "(((f @ a) @ b) @ c) into f(a,b,c)". Here, we
+     deconstruct "f @ a" into "unfold f (a :: args)"*)
+  and unfold_left head args = match head.term with
+    | Node (f, []) -> (* totally unfolded *)
+      mk_node f head.sort args 
+    | Node (f, [a;b]) when f == at_symbol ->
+      unfold_left a (uncurry b :: args)
+    | _ -> failwith "not a curryfied term"
+  in
+  uncurry t
+
+(** Beta reduce the (curryfied) term *)
+let rec beta_reduce t =
+  match t.term with
+  | Var _ | BoundVar _ -> t
+  | Bind (s, t') -> mk_bind s (beta_reduce t')
+  | Node (a, [{term=Bind (s, t1)}; t2]) when a == at_symbol && s == lambda_symbol ->
+    (* a beta-redex! Fire!! *)
+    let t1' = db_replace t1 t2  in
+    let t1' = db_unlift t1' in
+    beta_reduce t1'
+  | Node (f, l) -> mk_node f t.sort (List.map beta_reduce l)
 
 (* ----------------------------------------------------------------------
  * Pretty printing
@@ -504,7 +555,7 @@ let pp_symbol_unicode =
       | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
       | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
-    method infix s = s == or_symbol || s == eq_symbol || s == and_symbol || s == imply_symbol
+    method infix s = has_attr attr_infix s
   end
 
 let pp_symbol_tstp =
@@ -521,7 +572,7 @@ let pp_symbol_tstp =
       | _ when s == db_symbol -> failwith "no DB symbols in TSTP"
       | _ when s == split_symbol -> failwith "split_symbol is not supposed to be printed outside precedence"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
-    method infix s = s == or_symbol || s == eq_symbol || s == and_symbol || s == imply_symbol
+    method infix s = has_attr attr_infix s
   end
 
 let pp_symbol = ref pp_symbol_unicode

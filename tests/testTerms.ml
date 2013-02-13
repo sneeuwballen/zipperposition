@@ -82,6 +82,37 @@ let check_unif (t1, t2) =
       then H.TestOk else H.TestFail (t1, t2)
   with UnificationFailure -> H.TestPreconditionFalse
 
+(** Check curry/uncurry *)
+let check_curry t =
+  let t' = T.curry t in
+  Format.printf "@[<h>curry %a = %a@]@." !T.pp_term#pp t !T.pp_term#pp t';
+  let t'' = T.uncurry t' in
+  Format.printf "@[<h>uncurry %a = %a@]@." !T.pp_term#pp t' !T.pp_term#pp t'';
+  if t'' == t then H.TestOk else H.TestFail (T.mk_eq t' t'')
+
+let check_beta () =
+  let t1 = T.mk_lambda
+    (T.mk_at
+      (T.mk_at
+        (T.mk_const (mk_symbol "f") univ_sort)
+        (T.mk_const (mk_symbol "a") univ_sort))
+      (T.mk_at
+        (T.mk_bound_var 0 univ_sort)
+        (T.mk_const (mk_symbol "b") univ_sort)))
+  and t2 =
+    T.mk_lambda
+      (T.mk_at
+        (T.mk_bound_var 0 univ_sort)
+        (T.mk_at
+          (T.mk_bound_var 0 univ_sort)
+          (T.mk_const (mk_symbol "c") univ_sort)))
+  in
+  let redex = T.mk_at t1 t2 in
+  let reduced = T.beta_reduce redex in
+  Format.printf "beta reduce @[<h>%a@]@ yields @[<h>%a@]@."
+    !T.pp_term#pp redex !T.pp_term#pp reduced;
+  ()
+
 (** special cases *)
 let check_special () =
   let x = T.mk_var 1 univ_sort in
@@ -104,5 +135,7 @@ let run () =
     !T.pp_term#pp t1 !T.pp_term#pp t2 in
   H.check_and_print ~name:"check_subterm" check_subterm random_term !T.pp_term#pp 5000;
   H.check_and_print ~name:"check_unif" check_unif random_pair pp_pair 5000;
+  H.check_and_print ~name:"check_curry" check_curry random_term !T.pp_term#pp 20;
+  check_beta ();
   check_special ();
   ()
