@@ -43,11 +43,21 @@ val dp_combine : dp -> dp -> dp
   (** Combine two decision procedures into a new one, that decides
       the combination of their theories, assuming they are compatible. *)
 
+val dp_canonize : dp -> term -> term
+  (** Get the normal form of the term *)
+
+val dp_equal : dp -> term -> term -> bool
+  (** Check whether the terms are equal modulo theory *)
+
 val dp_is_redundant : dp -> hclause -> bool
   (** Decide whether this clause is redundant *)
 
-val dp_simplify : dp -> hclause -> hclause
+val dp_simplify : ctx:context -> dp -> hclause -> hclause
   (** Simplify the clause *)
+
+val dp_clauses : dp -> hclause list
+  (** Get a list of clauses this DP needs to be present in the
+      superposition prover for it to be complete *)
 
 (** {2 Ground joinable sets of equations} *)
 
@@ -81,6 +91,3 @@ val gc_of_json : ctx:context -> json -> gnd_convergent
 
 val ac : symbol -> dp
   (** Theory of Associative-Commutative symbols, for the given symbol *)
-
-val assoc : symbol -> dp
-  (** Theory of Associative symbols *)

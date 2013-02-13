@@ -37,6 +37,7 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 module Delayed = Delayed
+module DP = DecisionProcedures
 
 let version = "0.3"
 
