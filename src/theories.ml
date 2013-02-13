@@ -32,6 +32,7 @@ module Utils = FoUtils
 (* TODO associate induction schema to theories *)
 
 let prof_scan_clause = Utils.mk_profiler "Theories.scan_clause"
+let prof_datalog = Utils.mk_profiler "datalog_add"
 
 let stat_lemma_deduced = mk_stat "lemmas deduced"
 let stat_theory_detected = mk_stat "theory detected"
@@ -437,7 +438,9 @@ let scan_clause meta hc =
         (* remember the clause that made us add the fact to datalog *)
         meta.meta_clauses <- TermMap.add term hc meta.meta_clauses;
         (* add the clause to datalog *)
+        Utils.enter_prof prof_datalog;
         Logic.db_add meta.meta_db clause;
+        Utils.exit_prof prof_datalog;
       end);
   (* get lemmas, and clear the list for next use *)
   let lemmas = meta.meta_lemmas in

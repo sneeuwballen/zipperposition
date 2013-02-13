@@ -282,8 +282,11 @@ let process_file ~kb params f =
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));
   (* print theories *)
   (match meta with None -> ()
-    | Some meta -> Format.printf "%% detected theories: @[<h>%a@]@."
-    (Utils.pp_list Theories.Logic.pp_literal) meta.Theories.meta_theories);
+    | Some meta ->
+      Format.printf "%% detected theories: @[<h>%a@]@."
+        (Utils.pp_list Theories.Logic.pp_literal) meta.Theories.meta_theories;
+      Format.printf "%% datalog contains %d clauses@."
+        (Theories.Logic.db_size meta.Theories.meta_db));
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
