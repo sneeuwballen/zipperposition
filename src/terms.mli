@@ -170,9 +170,21 @@ val db_to_classic : ?varindex:int ref -> term -> term
       names to De Bruijn indexes. *)
 
 val curry : term -> term                    (** Currify all subterms *)
-val uncurry : term -> term                  (** Uncurrify all subterms *)
+val uncurry : term -> term                  (** Un-currify all subterms *)
 
-val beta_reduce : term -> term              (** Beta reduce the (curryfied) term *)
+val beta_reduce : term -> term              (** Beta-reduce the (curryfied) term *)
+
+val eta_reduce : term -> term               (** Eta-reduce the (curryfied) term *)
+
+val eta_lift : term -> term -> term
+  (** [eta_lift t sub_t], applied to a currified term [t], and a
+      subterm [sub_t] of [t], gives [t'] such that
+      [beta_reduce (t' @ sub_t) == t] holds.
+      It basically abstracts out [sub_t] with a lambda. If [sub_t] is not
+      a subterm of [t], then [t' == ^[X]: t].
+
+      For instance (@ are omitted), [eta_lift f(a,g @ b,c) g] will return
+      the term [^[X]: f(a, X @ b, c)] *)
 
 (* ----------------------------------------------------------------------
  * Pretty printing

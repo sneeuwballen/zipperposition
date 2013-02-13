@@ -542,7 +542,8 @@ let uncurry t =
   in
   uncurry t
 
-(** Beta reduce the (curryfied) term *)
+(** Beta reduce the (curryfied) term, ie [(^[X]: t) @ t']
+    becomes [subst(X -> t')(t)] *)
 let rec beta_reduce t =
   match t.term with
   | Var _ | BoundVar _ -> t
@@ -553,6 +554,37 @@ let rec beta_reduce t =
     let t1' = db_unlift t1' in
     beta_reduce t1'
   | Node (f, l) -> mk_node f t.sort (List.map beta_reduce l)
+
+(** Eta-reduce the (curryfied) term, ie [^[X]: (t @ X)]
+    becomes [t] if [X] does not occur in [t]. *)
+let rec eta_reduce t =
+  match t.term with
+  | Var _ | BoundVar _ -> t
+  | Bind (s, {term=Node (a, [t'; {term=BoundVar 0}])})
+    when s == lambda_symbol && not (db_contains t' 0) ->
+    eta_reduce (db_unlift t')  (* remove the lambda and variable *)
+  | Bind (s, t') ->
+    mk_bind s (eta_reduce t')
+  | Node (f, l) ->
+    mk_node f t.sort (List.map eta_reduce l)
+
+(** [eta_lift t sub_t], applied to a currified term [t], and a
+    subterm [sub_t] of [t], gives [t'] such that
+    [beta_reduce (t' @ sub_t) == t] holds.
+    It basically abstracts out [sub_t] with a lambda.
+
+    For instance (@ are omitted), [eta_lift f(a,g @ b,c) g] will return
+    the term [^[X]: f(a, X @ b, c)] *)
+let eta_lift t sub_t =
+  (* replaces [sub_t] by a De Bruijn variable *)
+  let rec replace depth t =
+    match t.term with
+    | _ when t == sub_t -> mk_bound_var depth t.sort
+    | Var _ | BoundVar _ -> t
+    | Bind (s, t') -> mk_bind s (replace (depth+1) t')
+    | Node (f, l) -> mk_node f t.sort (List.map (replace depth) l)
+  in
+  mk_lambda (db_lift 1 (replace 0 t))
 
 (* ----------------------------------------------------------------------
  * Pretty printing
