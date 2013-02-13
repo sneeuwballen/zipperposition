@@ -75,11 +75,16 @@ val get_flag : int -> term -> bool
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
 
-val mk_var : int -> sort -> term            (** Create a variable. The index must be >= 0 *)
-val mk_bound_var : int -> sort -> term      (** De Bruijn index, must be >= 0 *)
-val mk_bind : symbol -> term -> term
-val mk_node : symbol -> sort -> term list -> term
-val mk_const : symbol -> sort -> term
+(** In this section, term smart constructors are defined. Some of them
+    accept a [?old] optional argument. This argument is an already existing
+    term that the caller believes is likely to be equal to the result.
+    This makes hashconsing faster if the result is equal to [old]. *)
+
+val mk_var : ?old:term -> int -> sort -> term       (** Create a variable. The index must be >= 0 *)
+val mk_bound_var : ?old:term -> int -> sort -> term (** De Bruijn index, must be >= 0 *)
+val mk_bind : ?old:term -> symbol -> term -> term
+val mk_node : ?old:term -> symbol -> sort -> term list -> term
+val mk_const : ?old:term -> symbol -> sort -> term
 
 val true_term : term                        (** tautology symbol *)
 val false_term : term                       (** antilogy symbol *)
@@ -94,7 +99,7 @@ val mk_lambda : term -> term
 val mk_forall : term -> term
 val mk_exists : term -> term
 
-val mk_at : term -> term -> term            (** t1 t2 -> t1 @ t2 *)
+val mk_at : ?old:term -> term -> term -> term   (** t1 t2 -> t1 @ t2 *)
 
 val cast : term -> sort -> term             (** cast (change sort) *)
 

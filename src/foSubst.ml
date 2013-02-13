@@ -88,10 +88,11 @@ let apply_subst ?(recursive=true) subst (t, offset) =
     then t (* subst(t) = t, if t ground or subst empty with no shifting *)
     else match t.term with
     | BoundVar _ -> t
-    | Bind (s, t') -> T.mk_bind s (replace (binder_depth+1) subst (t', offset))
+    | Bind (s, t') ->
+      T.mk_bind ~old:t s (replace (binder_depth+1) subst (t', offset))
     | Node (s, l) ->
       let l' = replace_list binder_depth subst offset l in
-      T.mk_node s t.sort l'
+      T.mk_node ~old:t s t.sort l'
     | Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       (try let (t', o_t') = lookup subst bound_t in

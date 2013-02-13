@@ -83,25 +83,27 @@ module THashSet =
  * access global terms table (hashconsing)
  * ---------------------------------------------------------------------- *)
 
+let hashcons_equal x y =
+  (* pairwise comparison of subterms *)
+  let rec eq_subterms a b = match (a, b) with
+    | ([],[]) -> true
+    | (a::a1, b::b1) ->
+      if a == b then eq_subterms a1 b1 else false
+    | (_, _) -> false
+  in
+  (* compare sorts, then subterms, if same structure *)
+  if x.sort != y.sort then false
+  else match x.term, y.term with
+  | Var i, Var j | BoundVar i, BoundVar j -> i = j
+  | Node (sa, la), Node (sb, lb) -> sa == sb && eq_subterms la lb
+  | Bind (sa, ta), Bind (sb, tb) -> sa == sb && ta == tb
+  | _ -> false
+
 (** hashconsing for terms *)
 module H = Hashcons.Make(struct
   type t = term
 
-  let equal x y =
-    (* pairwise comparison of subterms *)
-    let rec eq_subterms a b = match (a, b) with
-      | ([],[]) -> true
-      | (a::a1, b::b1) ->
-        if a == b then eq_subterms a1 b1 else false
-      | (_, _) -> false
-    in
-    (* compare sorts, then subterms, if same structure *)
-    if x.sort != y.sort then false
-    else match x.term, y.term with
-    | Var i, Var j | BoundVar i, BoundVar j -> i = j
-    | Node (sa, la), Node (sb, lb) -> sa == sb && eq_subterms la lb
-    | Bind (sa, ta), Bind (sb, tb) -> sa == sb && ta == tb
-    | _ -> false
+  let equal x y = hashcons_equal x y
 
   let hash t = t.hkey
 
@@ -138,22 +140,34 @@ let get_flag flag t = (t.flags land flag) != 0
  * smart constructors, with a bit of type-checking
  * ---------------------------------------------------------------------- *)
 
-let mk_var idx sort =
+(** In this section, term smart constructors are defined. Some of them
+    accept a [?old] optional argument. This argument is an already existing
+    term that the caller believes is likely to be equal to the result.
+    This makes hashconsing faster if the result is equal to [old]. *)
+
+(** Compare [t] with [old], returning [old] if they are equal. Otherwise
+    it hashconses [t] and returns the result *)
+let hashcons ?old t =
+  match old with
+  | Some old when hashcons_equal old t -> old
+  | _ ->  (* [old] is not correct, return [hashcons t] *)
+    t.hkey <- hash_term t;
+    H.hashcons t
+
+let mk_var ?old idx sort =
   assert (idx >= 0);
   let rec my_v = {term = Var idx; sort=sort;
                   flags=(flag_db_closed lor flag_db_closed_computed lor
                          flag_simplified lor flag_normal_form);
                   tsize=1; tag= -1; hkey=0} in
-  my_v.hkey <- hash_term my_v;
-  H.hashcons my_v
+  hashcons ?old my_v
 
-let mk_bound_var idx sort =
+let mk_bound_var ?old idx sort =
   assert (idx >= 0);
   let rec my_v = {term = BoundVar idx; sort=sort;
                   flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
                   tsize=1; tag= -1; hkey=0} in
-  my_v.hkey <- hash_term my_v;
-  H.hashcons my_v
+  hashcons ?old my_v
 
 let rec sum_sizes acc l = match l with
   | [] -> acc
@@ -163,23 +177,22 @@ let rec compute_is_ground l = match l with
   | [] -> true
   | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
 
-let mk_bind s t' =
+let mk_bind ?old s t' =
   assert (has_attr attr_binder s);
   let rec my_t = {term=Bind (s, t'); sort=t'.sort; flags=0;
                   tsize=t'.tsize+1; tag= -1; hkey=0} in
-  my_t.hkey <- hash_term my_t;
-  let t = H.hashcons my_t in
+  let t = hashcons ?old my_t in
   (if t == my_t
     then (* compute ground-ness of term *)
       set_flag flag_ground t (get_flag flag_ground t'));
   t
 
-let mk_node s sort l =
+let mk_node ?old s sort l =
   Utils.enter_prof prof_mk_node;
   let rec my_t = {term=Node (s, l); sort; flags=0;
                   tsize=0; tag= -1; hkey=0} in
   my_t.hkey <- hash_term my_t;
-  let t = H.hashcons my_t in
+  let t = hashcons ?old my_t in
   (if t == my_t
     then begin
       (* compute size of term *)
@@ -190,7 +203,7 @@ let mk_node s sort l =
   Utils.exit_prof prof_mk_node;
   t
 
-let mk_const s sort = mk_node s sort []
+let mk_const ?old s sort = mk_node ?old s sort []
 
 let true_term = mk_const true_symbol bool_sort
 let false_term = mk_const false_symbol bool_sort
@@ -208,7 +221,7 @@ let mk_lambda t = mk_bind lambda_symbol t
 let mk_forall t = (check_bool t; mk_bind forall_symbol t)
 let mk_exists t = (check_bool t; mk_bind exists_symbol t)
 
-let mk_at t1 t2 = mk_node at_symbol t1.sort [t1; t2]
+let mk_at ?old t1 t2 = mk_node ?old at_symbol t1.sort [t1; t2]
 
 let rec cast t sort =
   let new_t = {t with sort=sort} in
@@ -401,9 +414,10 @@ let db_replace t s =
   | Var _ -> t
   | Bind (symb, t') ->
     (* lift the De Bruijn to replace *)
-    mk_bind symb (replace (depth+1) s t')
+    mk_bind ~old:t symb (replace (depth+1) s t')
   | Node (_, []) -> t
-  | Node (f, l) -> mk_node f t.sort (List.map (replace depth s) l)
+  | Node (f, l) ->
+    mk_node ~old:t f t.sort (List.map (replace depth s) l)
   (* replace the 0 De Bruijn index by s in t *)
   in
   replace 0 s t
@@ -420,11 +434,11 @@ let db_lift n t =
       mk_bound_var (i+n) t.sort (* lift by n, term not captured *)
     | Var _ | BoundVar _ -> t
     | Bind (s, t') ->
-      mk_bind s (recurse (depth+1) t')  (* increase depth and recurse *)
+      mk_bind ~old:t s (recurse (depth+1) t')  (* increase depth and recurse *)
     | Node (_, []) -> t
     | Node (s, l) ->
       let l' = List.map (recurse depth) l in
-      mk_node s t.sort l'  (* recurse in subterms *)
+      mk_node ~old:t s t.sort l'  (* recurse in subterms *)
   in
   assert (n >= 0);
   if n = 0 then t else recurse 0 t
@@ -437,8 +451,10 @@ let db_unlift t =
     match t.term with
     | BoundVar i -> if i >= depth then mk_bound_var (i-1) t.sort else t
     | Node (_, []) | Var _ -> t
-    | Bind (s, t') -> mk_bind s (recurse (depth+1) t')
-    | Node (s, l) -> mk_node s t.sort (List.map (recurse depth) l)
+    | Bind (s, t') ->
+      mk_bind ~old:t s (recurse (depth+1) t')
+    | Node (s, l) ->
+      mk_node ~old:t s t.sort (List.map (recurse depth) l)
   in recurse 0 t
 
 (* replace [v] by a De Bruijn symbol in [t] *)
@@ -447,10 +463,10 @@ let db_from_var t v =
   (* recurse and replace [v]. *)
   let rec replace depth t = match t.term with
   | Var _ -> if eq_term t v then mk_bound_var depth v.sort else t
-  | Bind (s, t') -> mk_bind s (replace (depth+1) t')
+  | Bind (s, t') -> mk_bind ~old:t s (replace (depth+1) t')
   | BoundVar _ -> t
   | Node (_, []) -> t
-  | Node (s, l) -> mk_node s t.sort (List.map (replace depth) l)
+  | Node (s, l) -> mk_node ~old:t s t.sort (List.map (replace depth) l)
   in
   replace 0 t
 
@@ -547,13 +563,13 @@ let uncurry t =
 let rec beta_reduce t =
   match t.term with
   | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind s (beta_reduce t')
+  | Bind (s, t') -> mk_bind ~old:t s (beta_reduce t')
   | Node (a, [{term=Bind (s, t1)}; t2]) when a == at_symbol && s == lambda_symbol ->
     (* a beta-redex! Fire!! *)
     let t1' = db_replace t1 t2  in
     let t1' = db_unlift t1' in
     beta_reduce t1'
-  | Node (f, l) -> mk_node f t.sort (List.map beta_reduce l)
+  | Node (f, l) -> mk_node ~old:t f t.sort (List.map beta_reduce l)
 
 (** Eta-reduce the (curryfied) term, ie [^[X]: (t @ X)]
     becomes [t] if [X] does not occur in [t]. *)
@@ -564,9 +580,9 @@ let rec eta_reduce t =
     when s == lambda_symbol && not (db_contains t' 0) ->
     eta_reduce (db_unlift t')  (* remove the lambda and variable *)
   | Bind (s, t') ->
-    mk_bind s (eta_reduce t')
+    mk_bind ~old:t s (eta_reduce t')
   | Node (f, l) ->
-    mk_node f t.sort (List.map eta_reduce l)
+    mk_node ~old:t f t.sort (List.map eta_reduce l)
 
 (** [eta_lift t sub_t], applied to a currified term [t], and a
     subterm [sub_t] of [t], gives [t'] such that
@@ -581,8 +597,8 @@ let eta_lift t sub_t =
     match t.term with
     | _ when t == sub_t -> mk_bound_var depth t.sort
     | Var _ | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind s (replace (depth+1) t')
-    | Node (f, l) -> mk_node f t.sort (List.map (replace depth) l)
+    | Bind (s, t') -> mk_bind ~old:t s (replace (depth+1) t')
+    | Node (f, l) -> mk_node ~old:t f t.sort (List.map (replace depth) l)
   in
   mk_lambda (db_lift 1 (replace 0 t))
 

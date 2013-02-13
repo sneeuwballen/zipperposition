@@ -499,7 +499,7 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
     | Var _ | BoundVar _ -> t
     | Bind (s, t') ->
       let t'' = traverse ~restrict:false t' in
-      let new_t = T.mk_bind s t'' in
+      let new_t = T.mk_bind ~old:t s t'' in
       (* rewrite term at root *)
       normal_form ~restrict new_t
     | Node (s, l) ->
