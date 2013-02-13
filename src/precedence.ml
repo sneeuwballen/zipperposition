@@ -157,49 +157,39 @@ let order_symbols constrs symbols =
 let mk_precedence ?(complete=true) constrs symbols =
   let symbols = if complete then complete_symbols symbols else symbols in
   let symbols = order_symbols constrs symbols in
-  let table = mk_table symbols in
+  let symbols = ref symbols in
+  let table = ref (mk_table !symbols) in
+  let weight = ref weight_constant in
   (* the precedence *)
   let obj = object (self)
-    val mutable m_version = List.length symbols
-
-    val mutable m_weight = weight_constant
-
-    val mutable m_symbols = symbols
-
-    val mutable m_table = table
-
-    method version = m_version
-
-    method snapshot = m_symbols
+    method snapshot = !symbols
 
     (** Add the given symbols to the precedence. Returns how many of them
         are new and have effectively been added *)
     method add_symbols new_symbols =
-      let old_len = m_version in
-      assert (old_len = List.length m_symbols);
-      let symbols = Utils.list_union (==) new_symbols m_symbols in
-      let new_len = List.length symbols in
+      let old_len = List.length !symbols in
+      let all_symbols = Utils.list_union (==) new_symbols !symbols in
+      let new_len = List.length all_symbols in
       if new_len > old_len then begin
         (* some symbols have been added *)
         Utils.debug 3 (lazy (Utils.sprintf "%% add @[<h>%a@] to the precedence"
                       (Utils.pp_list ~sep:", " !T.pp_symbol#pp) new_symbols));
         Utils.debug 3 (lazy (Utils.sprintf "%% old precedence %a"
-                       T.pp_precedence m_symbols));
+                       T.pp_precedence !symbols));
 
         (* build a partial order that respects the current ordering *)
-        let po = PartialOrder.mk_partial_order symbols in
-        PartialOrder.complete po (list_constraint m_symbols);
+        let po = PartialOrder.mk_partial_order all_symbols in
+        PartialOrder.complete po (list_constraint !symbols);
         (* complete it with the constraints *)
         List.iter (fun constr -> PartialOrder.complete po constr) constrs;
         assert (PartialOrder.is_total po);
         (* get the new precedence from the completed partial order *)
-        let symbols = PartialOrder.symbols po in
-        m_symbols <- symbols;
-        m_table <- mk_table symbols;
-        m_version <- List.length symbols;
+        let all_symbols = PartialOrder.symbols po in
+        symbols := all_symbols;
+        table := mk_table !symbols;
 
         Utils.debug 3 (lazy (Utils.sprintf "%% new precedence %a"
-                       T.pp_precedence m_symbols));
+                       T.pp_precedence !symbols));
         (* return number of new symbols *)
         new_len - old_len
       end else 0
@@ -207,15 +197,24 @@ let mk_precedence ?(complete=true) constrs symbols =
     (** To compare symbols, compare their index in the decreasing precedence. Symbols that
         are split symbols are compared to other symbols like "split_symbol". *)
     method compare a b =
-      match a, b with
-      | _ when has_attr attr_split a && has_attr attr_split b -> Symbols.compare_symbols a b
-      | _ when has_attr attr_split a -> SHashtbl.find m_table b - SHashtbl.find m_table split_symbol
-      | _ when has_attr attr_split b -> SHashtbl.find m_table split_symbol - SHashtbl.find m_table a
-      | _ -> SHashtbl.find m_table b - SHashtbl.find m_table a
+      (* some symbols are not explicitely in the signature. Instead, they
+         are represented by 'generic' symbols *)
+      let transform_symbol s = match s with
+        | _ when has_attr attr_split s -> split_symbol
+        | _ when has_attr attr_fresh_const s -> const_symbol
+        | _ -> s
+      in
+      let a' = transform_symbol a
+      and b' = transform_symbol b in
+      if a' == b' && a != b
+        then (* both are in the same symbol family (e.g. split symbols). Any
+                arbitrary but total ordering on them is ok, as long as it's stable. *)
+          String.compare (name_symbol a) (name_symbol b)
+        else SHashtbl.find !table b' - SHashtbl.find !table a'
 
-    method weight s = m_weight s
+    method weight s = !weight s
 
-    method set_weight f = m_weight <- f
+    method set_weight f = weight := f
   end
   in
   (obj :> precedence)

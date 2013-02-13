@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Symbols and signature *)
+(** {1 Symbols and signature} *)
 
 type symbol
   (** abstract type of a symbol *)
@@ -35,12 +35,19 @@ val hash_symbol : symbol -> int
 type symbol_attribute = int
   (** attributes of the symbol *)
 
+(** {2 Boolean attributes} *)
+
+(** Boolean attributes are flags that can be attached to symbols. Since
+    symbols are perfectly shared, a flag is system-wide. Flags can
+    be combined using the {s lor} operator. *)
+
 val attr_skolem : symbol_attribute      (** skolem symbol? *)
 val attr_split : symbol_attribute       (** symbol used for splitting? *)
 val attr_binder : symbol_attribute      (** is the symbol a binding symbol? *)
 val attr_infix : symbol_attribute       (** symbol is binary infix? *)
 val attr_ac : symbol_attribute          (** symbol is associative-commutative? *)
 val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *)
+val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
   (** construction of a symbol *)
@@ -66,13 +73,8 @@ module SMap : Map.S with type key = symbol
 
 module SSet : Set.S with type elt = symbol
 
-(** A signature maps symbols to (sort, arity) *)
-type signature = (int * sort) SMap.t
+(** {2 connectives} *)
 
-val empty_signature : signature
-  (** The empty signature *)
-
-(* connectives *)
 val true_symbol : symbol
 val false_symbol : symbol
 val eq_symbol : symbol
@@ -84,13 +86,28 @@ val imply_symbol : symbol
 val and_symbol : symbol
 val or_symbol : symbol
 
-val db_symbol : symbol  (** pseudo symbol kept for locating bound vars in precedence *)
-val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
+(** {2 Magic symbols} *)
 
-(* sorts *)
+val db_symbol : symbol    (** pseudo symbol kept for locating bound vars in precedence *)
+val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
+val const_symbol : symbol (** pseudo symbol for locating magic constants in precedence *)
+
+val mk_fresh_const : int -> symbol
+  (** Infinite set of symbols, accessed by index, that will not collide with
+      the signature of the problem *)
+
+(** {2 sorts} *)
 val bool_sort : sort
 val type_sort : sort
 val univ_sort : sort
+
+(** {2 Signature} *)
+
+(** A signature maps symbols to (sort, arity) *)
+type signature = (int * sort) SMap.t
+
+val empty_signature : signature
+  (** The empty signature *)
 
 val base_signature : signature
   (** the signature composed of predefined symbols *)
@@ -100,6 +117,8 @@ val base_symbols : SSet.t
 
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
+
+(** {2 Conversions and printing} *)
 
 val sig_to_seq : signature -> (symbol * int * sort) Sequence.t
 val sig_of_seq : (symbol * int * sort) Sequence.t -> signature

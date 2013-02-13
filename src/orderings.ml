@@ -214,6 +214,7 @@ module KBO = struct
     cmp
 end
 
+(* XXX this is more or less deprecated code. *)
 module RPO = struct
   let name = "rpo"
 
@@ -374,18 +375,18 @@ let check_precedence old_prec new_prec =
   | x::((y::_) as l') -> new_prec#compare x y > 0 && check l'
   in check old_prec#snapshot
 
-let kbo (prec : precedence) : ordering =
+let kbo (p : precedence) : ordering =
+  let prec = ref p in
+  let cache = OrdCache.create 4096
+    (fun a b -> KBO.compare_terms ~prec:!prec a b) in
   object
-    val mutable m_prec = prec
-    val mutable cache = OrdCache.create 4096 (KBO.compare_terms ~prec)
-    method clear_cache () = OrdCache.clear cache
-    method precedence = m_prec
+    method clear_cache () = OrdCache.clear cache;
+    method precedence = !prec
     method compare a b = OrdCache.lookup cache a b
-    method compare_vars a b = failwith "not implemented"
-    method set_precedence prec =
-      assert (check_precedence m_prec prec);
-      m_prec <- prec;
-      cache <- OrdCache.create 4096 (KBO.compare_terms ~prec)
+    method set_precedence prec' =
+      assert (check_precedence !prec prec');
+      prec := prec';
+      OrdCache.clear cache
     method name = KBO.name
   end
 
@@ -396,7 +397,6 @@ let rpo (prec : precedence) : ordering =
     method clear_cache () = OrdCache.clear cache
     method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
-    method compare_vars a b = failwith "not implemented"
     method set_precedence prec =
       assert (check_precedence m_prec prec);
       m_prec <- prec;
@@ -404,24 +404,26 @@ let rpo (prec : precedence) : ordering =
     method name = RPO.name
   end
 
-let rpo6 (prec : precedence) : ordering =
+let rpo6 (p : precedence) : ordering =
+  let prec = ref p in
+  let cache = OrdCache.create 4096
+    (fun a b -> RPO6.compare_terms ~prec:!prec a b) in
   object
-    val mutable m_prec = prec
-    val mutable cache = OrdCache.create 4096 (RPO6.compare_terms ~prec)
     method clear_cache () = OrdCache.clear cache
-    method precedence = m_prec
+    method precedence = !prec
     method compare a b = OrdCache.lookup cache a b
-    method compare_vars a b = failwith "not implemented"
-    method set_precedence prec =
-      assert (check_precedence m_prec prec);
-      m_prec <- prec;
-      cache <- OrdCache.create 4096 (RPO6.compare_terms ~prec)
+    method set_precedence prec' =
+      assert (check_precedence !prec prec');
+      prec := prec';
+      OrdCache.clear cache
     method name = RPO6.name
   end
 
 let choose name prec =
   match name with
-  | "rpo" -> rpo prec
+  | "rpo" ->
+    Utils.debug 0 (lazy (Utils.sprintf "%% warning: rpo is deprecated"));
+    rpo prec
   | "rpo6" -> rpo6 prec
   | "kbo" -> kbo prec
   | _ -> failwith ("unknown ordering: " ^ name)

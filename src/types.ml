@@ -127,7 +127,6 @@ type precedence_constraint = symbol -> symbol -> int
 (** the interface of a total ordering on symbols *)
 class type precedence =
   object
-    method version : int                        (** version of the precedence (length of history) *)
     method snapshot : symbol list               (** current symbols in decreasing order *)
     method add_symbols : symbol list -> int     (** add the given symbols (returns how many were new) *)
     method compare : symbol -> symbol -> int    (** total order on symbols *)
@@ -142,7 +141,6 @@ class type ordering =
     method precedence : precedence              (** underlying precedence on symbols *)
     method set_precedence : precedence -> unit  (** update the precedence *)
     method compare : term -> term -> comparison (** compare two terms *)
-    method compare_vars : term -> term -> comparison (** compare two terms. Variables are considered as constants. *)
     method name : string
   end
 

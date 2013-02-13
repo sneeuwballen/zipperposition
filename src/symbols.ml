@@ -18,9 +18,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Symbols and signature *)
+(** {1 Symbols and signature} *)
 
 type symbol_attribute = int
+
+(** {2 Boolean attributes} *)
 
 let attr_skolem = 1 lsl 0
 let attr_split = 1 lsl 1
@@ -28,6 +30,7 @@ let attr_binder = 1 lsl 2
 let attr_infix = 1 lsl 3
 let attr_ac = 1 lsl 4
 let attr_multiset = 1 lsl 5
+let attr_fresh_const = 1 lsl 6
 
 (** A symbol is a string, a unique ID, and some attributes *)
 type symbol = {
@@ -86,15 +89,11 @@ module SMapSeq = Sequence.Map.Adapt(SMap)
 
 module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
 
-(** A signature maps symbols to (sort, arity) *)
-type signature = (int * sort) SMap.t
+(** {2 connectives} *)
 
-let empty_signature = SMap.empty
-
-(* connectives *)
 let true_symbol = mk_symbol "$true"
 let false_symbol = mk_symbol "$false"
-let eq_symbol = mk_symbol ~attrs:attr_infix "="
+let eq_symbol = mk_symbol ~attrs:(attr_infix lor attr_multiset) "="
 let exists_symbol = mk_symbol ~attrs:attr_binder "$$exists"
 let forall_symbol = mk_symbol ~attrs:attr_binder "$$forall"
 let lambda_symbol = mk_symbol ~attrs:attr_binder "$$lambda"
@@ -103,16 +102,40 @@ let imply_symbol = mk_symbol ~attrs:attr_infix "$$imply"
 let and_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac) "$$and"
 let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac) "$$or"
 
-(** pseudo symbol kept for locating bound vars in precedence *)
+(** {2 Magic symbols} *)
+
+(** pseudo symbol kept for locating bound vars in precedence. Bound
+    vars are grouped in the precedence together w.r.t other symbols,
+    but compare to each other by their index. *)
 let db_symbol = mk_symbol "$$db_magic_cookie"
 
-(** pseudo symbol for locating split symbols in precedence *)
+(** pseudo symbol for locating split symbols in precedence. Split
+    symbols compare lexicographically with other split symbols,
+    but are in a fixed location in precedence w.r.t other kinds of
+    symbols. *)
 let split_symbol = mk_symbol "$$split_magic_cookie"
 
-(* default sorts *)
+(** pseudo symbol for locating magic constants in precedence.
+    This is useful for keeping the precedence finite while managing
+    an infinite set of fresh constants, that are used for
+    testing terms for ground joinability (replacing variables
+    with such constants) *)
+let const_symbol = mk_symbol "$$const_magic_cookie"
+
+(** {2 sorts} *)
 let type_sort = mk_symbol "$tType"
 let bool_sort = mk_symbol "$o"
 let univ_sort = mk_symbol "$i"
+
+(** Infinite set of symbols, accessed by index, that will not collide with
+    the signature of the problem *)
+let mk_fresh_const i =
+  mk_symbol ~attrs:attr_fresh_const ("$$const_" ^ string_of_int i)
+
+(** A signature maps symbols to (sort, arity) *)
+type signature = (int * sort) SMap.t
+
+let empty_signature = SMap.empty
 
 let table =
   [true_symbol, bool_sort, 0;
@@ -127,6 +150,7 @@ let table =
    or_symbol, bool_sort, 2;
    db_symbol, univ_sort, 0;
    split_symbol, bool_sort, 0;
+   const_symbol, univ_sort, 0;
    ]
 
 (** default signature, containing predefined symbols with their arities and sorts *)
@@ -141,6 +165,8 @@ let base_symbols = List.fold_left (fun set (s, _, _) -> SSet.add s set) SSet.emp
 (** extract the list of symbols from the complete signature *)
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
+
+(** {2 Conversions and printing} *)
 
 let sig_to_seq signature =
   Sequence.map
