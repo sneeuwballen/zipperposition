@@ -593,8 +593,6 @@ let pp_symbol_tstp =
       | _ when s == and_symbol -> Format.pp_print_string formatter "&"
       | _ when s == or_symbol -> Format.pp_print_string formatter "|"
       | _ when s == imply_symbol -> Format.pp_print_string formatter "=>"
-      | _ when s == db_symbol -> failwith "no DB symbols in TSTP"
-      | _ when s == split_symbol -> failwith "tried to print split_symbol"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
     method infix s = has_attr attr_infix s
   end
