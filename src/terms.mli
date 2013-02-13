@@ -94,6 +94,8 @@ val mk_lambda : term -> term
 val mk_forall : term -> term
 val mk_exists : term -> term
 
+val mk_at : term -> term -> term            (** t1 t2 -> t1 @ t2 *)
+
 val cast : term -> sort -> term             (** cast (change sort) *)
 
 (* ----------------------------------------------------------------------
@@ -156,6 +158,15 @@ val db_from_var : term -> term -> term
 val look_db_sort : int -> term -> sort option
   (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
 
+(** {2 High-level transformations} *)
+
+val close_forall : term -> term             (** Bind all free variables by 'forall' *)
+val close_exists : term -> term             (** Bind all free variables by 'exists' *)
+
+val curry : term -> term                    (** Currify all subterms *)
+val uncurry : term -> term                  (** Uncurrify all subterms *)
+
+val beta_reduce : term -> term              (** Beta reduce the (curryfied) term *)
 (* ----------------------------------------------------------------------
  * Pretty printing
  * ---------------------------------------------------------------------- *)

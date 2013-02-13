@@ -83,7 +83,11 @@ val imply_symbol : symbol
 val and_symbol : symbol
 val or_symbol : symbol
 
-val db_symbol : symbol  (** pseudo symbol kept for locating bound vars in precedence *)
+(** {2 Magic symbols} *)
+
+val at_symbol : symbol    (** higher order curryfication symbol *)
+
+val db_symbol : symbol    (** pseudo symbol kept for locating bound vars in precedence *)
 val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
 
 (* sorts *)

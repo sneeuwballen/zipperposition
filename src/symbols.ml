@@ -101,7 +101,14 @@ let imply_symbol = mk_symbol ~attrs:attr_infix "$$imply"
 let and_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac) "$$and"
 let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac) "$$or"
 
-(** pseudo symbol kept for locating bound vars in precedence *)
+(** {2 Magic symbols} *)
+
+(** higher order curryfication symbol *)
+let at_symbol = mk_symbol ~attrs:attr_infix "@"
+
+(** pseudo symbol kept for locating bound vars in precedence. Bound
+    vars are grouped in the precedence together w.r.t other symbols,
+    but compare to each other by their index. *)
 let db_symbol = mk_symbol "$$db_magic_cookie"
 
 (** pseudo symbol for locating split symbols in precedence *)
@@ -123,6 +130,7 @@ let table =
    imply_symbol, bool_sort, 2;
    and_symbol, bool_sort, 2;
    or_symbol, bool_sort, 2;
+   at_symbol, univ_sort, 2;   (* FIXME: this really ought to be polymorphic *)
    db_symbol, univ_sort, 0;
    split_symbol, bool_sort, 0;
    ]
