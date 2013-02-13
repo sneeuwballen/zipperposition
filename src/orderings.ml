@@ -381,6 +381,7 @@ let kbo (prec : precedence) : ordering =
     method clear_cache () = OrdCache.clear cache
     method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
+    method compare_vars a b = failwith "not implemented"
     method set_precedence prec =
       assert (check_precedence m_prec prec);
       m_prec <- prec;
@@ -395,6 +396,7 @@ let rpo (prec : precedence) : ordering =
     method clear_cache () = OrdCache.clear cache
     method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
+    method compare_vars a b = failwith "not implemented"
     method set_precedence prec =
       assert (check_precedence m_prec prec);
       m_prec <- prec;
@@ -409,11 +411,19 @@ let rpo6 (prec : precedence) : ordering =
     method clear_cache () = OrdCache.clear cache
     method precedence = m_prec
     method compare a b = OrdCache.lookup cache a b
+    method compare_vars a b = failwith "not implemented"
     method set_precedence prec =
       assert (check_precedence m_prec prec);
       m_prec <- prec;
       cache <- OrdCache.create 4096 (RPO6.compare_terms ~prec)
     method name = RPO6.name
   end
+
+let choose name prec =
+  match name with
+  | "rpo" -> rpo prec
+  | "rpo6" -> rpo6 prec
+  | "kbo" -> kbo prec
+  | _ -> failwith ("unknown ordering: " ^ name)
 
 let default_ordering signature = rpo6 (Precedence.default_precedence signature)

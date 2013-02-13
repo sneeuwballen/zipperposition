@@ -102,11 +102,7 @@ let parse_args () =
   in
   Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
   (if !files = [] then files := ["stdin"]);
-  let param_ord = match !ord with
-    | "rpo" -> Orderings.rpo
-    | "rpo6" -> Orderings.rpo6
-    | "kbo" -> Orderings.kbo
-    | x -> failwith ("unknown ordering " ^ x) in
+  let param_ord = Orderings.choose !ord in
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;

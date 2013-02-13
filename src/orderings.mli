@@ -34,5 +34,8 @@ val rpo : precedence -> ordering
 val rpo6 : precedence -> ordering
   (** Efficient implementation of RPO *)
 
+val choose : string -> precedence -> ordering
+  (** Choose ordering by name, or raise Failure *)
+
 val default_ordering : signature -> ordering
   (** default ordering on terms (RPO6) *)

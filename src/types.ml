@@ -144,6 +144,7 @@ class type ordering =
     method precedence : precedence              (** underlying precedence on symbols *)
     method set_precedence : precedence -> unit  (** update the precedence *)
     method compare : term -> term -> comparison (** compare two terms *)
+    method compare_vars : term -> term -> int   (** compare two terms. Variables are considered as constants. *)
     method name : string
   end
 
@@ -190,12 +191,6 @@ let compact_clause hc = (hc.hctag, hc.hclits)
 let no_select c = []
 
 exception UnificationFailure
-
-(** A pretty printer of 'a values *)
-class type ['a] pp_printer =
-  object
-    method pp : Format.formatter -> 'a -> unit
-  end
 
 (** a statistic object: name and count *)
 type statistics = string * int64 ref

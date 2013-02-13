@@ -41,6 +41,7 @@ let prof_mk_hclause_raw = Utils.mk_profiler "mk_hclause_raw"
 
 let flag_ground = 1 lsl 0
 let flag_lemma = 1 lsl 1
+let flag_persistent = 1 lsl 2
 
 let set_flag flag c truth =
   if truth
