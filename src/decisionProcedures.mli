@@ -25,15 +25,8 @@ open Symbols
 
 (** {2 General interface} *)
 
-type dp = {
-  dp_name : string;                 (** Theory this procedures decides *)
-  dp_descr : string;                (** Description of the procedure *)
-  dp_equal : term -> term -> bool;  (** Check whether two terms are equal *)
-  dp_sig : SSet.t;                  (** Symbols of the theory *)
-  dp_clauses : hclause list;        (** Clauses to add to the problem *)
-  dp_canonize : term -> term;       (** Get a canonical form of the term *)
-  dp_solve : (term -> term -> substitution) option;
-}
+type dp
+  (** A decision procedure for some theory *)
 
 val dp_compatible : dp -> dp -> bool
   (** Simple syntaxic criterion to decide whether two decision procedures

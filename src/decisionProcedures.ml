@@ -39,10 +39,11 @@ type dp = {
   dp_solve : (term -> term -> substitution) option;
 }
 
-(* TODO ensure that clauses in the dp have flag_persistent *)
-
 (** Simple syntaxic criterion to decide whether two decision procedures
-    are compatibles: check whether they have no symbol in common. *)
+    are compatibles: check whether they have no symbol in common.
+
+    TODO: more elaborate checks, for instance with ground-joinability of all
+    critical pairs *)
 let dp_compatible dp1 dp2 =
   SSet.is_empty (SSet.union dp1.dp_sig dp2.dp_sig)
 
