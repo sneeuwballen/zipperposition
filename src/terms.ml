@@ -483,6 +483,30 @@ let close_exists t =
     (fun t var -> mk_bind exists_symbol (db_from_var t var))
     t vars
 
+(** Transform binders and De Bruijn indexes into regular variables.
+    [varindex] is a variable counter used to give fresh variables
+    names to De Bruijn indexes. *)
+let rec db_to_classic ?(varindex=ref 0) t =
+  match t.term with
+  | Bind (s, t') ->
+    (* use a fresh variable, and convert to a named-variable representation *)
+    begin match look_db_sort 0 t' with
+    | None ->
+      db_to_classic (db_unlift t')  (* just remove binder (eta-reduction) *)
+    | Some sort ->  (* change representation of variable *)
+      let v = mk_var !varindex sort in
+      incr varindex;
+      let new_t = mk_node s t.sort [v; db_unlift (db_replace t' v)] in
+      db_to_classic ~varindex new_t
+    end
+  | Node (_, []) | Var _ -> t
+  | BoundVar _ ->  (* free variable *)
+    let n = !varindex in
+    incr varindex;
+    mk_var n t.sort
+  | Node (s, l) ->
+    mk_node s t.sort (List.map (db_to_classic ~varindex) l)
+
 (** Currify all subterms *)
 let rec curry t =
   match t.term with
@@ -563,14 +587,14 @@ let pp_symbol_tstp =
     method pp formatter s = match s with
       | _ when s == not_symbol -> Format.pp_print_string formatter "~"
       | _ when s == eq_symbol -> Format.pp_print_string formatter "="
-      | _ when s == lambda_symbol -> failwith "no lambdas in TSTP"
+      | _ when s == lambda_symbol -> failwith "^"
       | _ when s == exists_symbol -> Format.pp_print_string formatter "?"
       | _ when s == forall_symbol -> Format.pp_print_string formatter "!"
       | _ when s == and_symbol -> Format.pp_print_string formatter "&"
       | _ when s == or_symbol -> Format.pp_print_string formatter "|"
       | _ when s == imply_symbol -> Format.pp_print_string formatter "=>"
       | _ when s == db_symbol -> failwith "no DB symbols in TSTP"
-      | _ when s == split_symbol -> failwith "split_symbol is not supposed to be printed outside precedence"
+      | _ when s == split_symbol -> failwith "tried to print split_symbol"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
     method infix s = has_attr attr_infix s
   end
@@ -589,17 +613,23 @@ let pp_term_debug =
   (* printer itself *)
   object (self)
     method pp formatter t =
+      let maxvar = max (max_var (vars t)) 0 in
+      let varindex = ref (maxvar+1) in
+      let t = db_to_classic ~varindex t in
       (match t.term with
       | Var i -> Format.fprintf formatter "X%d" i
-      | BoundVar i -> Format.fprintf formatter "Y%d" i
+      | BoundVar _ -> assert false
+      | Bind _ -> assert false
       | Node (s, [{term=Node (s', [a; b])}])
         when s == not_symbol && s' == eq_symbol ->
         Format.fprintf formatter "%a != %a" self#pp a self#pp b
       | Node (s, [a; b]) when s == eq_symbol ->
         Format.fprintf formatter "%a = %a" self#pp a self#pp b
+      | Node (s, [v; t']) when has_attr attr_binder s ->
+        assert (is_var v);
+        Format.fprintf formatter "%a[%a]: %a" pp_symbol_unicode#pp s self#pp v self#pp t'
       | Node (s, [t]) when s == not_symbol ->
         Format.fprintf formatter "%a%a" pp_symbol_unicode#pp s self#pp t
-      | Bind (s, t') -> Format.fprintf formatter "%a(%a)" pp_symbol_unicode#pp s self#pp t'
       | Node (s, []) -> pp_symbol_unicode#pp formatter s
       | Node (s, args) ->
         (* general case for nodes *)
@@ -619,22 +649,8 @@ let pp_term_debug =
 let pp_term_tstp =
   object (self)
     method pp formatter t =
-      (* convert De Bruijn to regular variables *)
-      let rec db_to_var varindex t = match t.term with
-      | Bind (s, t') ->
-        (* use a fresh variable, and convert to a named-variable representation *)
-        (match look_db_sort 0 t' with
-        | None -> db_unlift t'  (* just remove quantifier *)
-        | Some sort ->
-          (let v = mk_var !varindex sort in
-          incr varindex;
-          db_to_var varindex (mk_node s t.sort [v; db_unlift (db_replace t' v)]))
-        )
-      | Node (_, []) | Var _ -> t
-      | BoundVar _ -> assert false
-      | Node (s, l) -> mk_node s t.sort (List.map (db_to_var varindex) l)
       (* recursive printing function *)
-      and pp_rec t = match t.term with
+      let rec pp_rec t = match t.term with
       | Node (s, [{term=Node (s', [a;b])}]) when s == not_symbol
         && s' == eq_symbol && a.sort == bool_sort ->
         Format.fprintf formatter "(%a <~> %a)" self#pp a self#pp b
@@ -666,7 +682,7 @@ let pp_term_tstp =
       let maxvar = max (max_var (vars t)) 0 in
       let varindex = ref (maxvar+1) in
       (* convert everything to named variables, then print *)
-      pp_rec (db_to_var varindex t)
+      pp_rec (db_to_classic ~varindex t)
   end
 
 let pp_term = ref (pp_term_debug :> pprinter_term)

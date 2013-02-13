@@ -164,6 +164,11 @@ val look_db_sort : int -> term -> sort option
 val close_forall : term -> term             (** Bind all free variables by 'forall' *)
 val close_exists : term -> term             (** Bind all free variables by 'exists' *)
 
+val db_to_classic : ?varindex:int ref -> term -> term
+  (** Transform binders and De Bruijn indexes into regular variables.
+      [varindex] is a variable counter used to give fresh variables
+      names to De Bruijn indexes. *)
+
 val curry : term -> term                    (** Currify all subterms *)
 val uncurry : term -> term                  (** Uncurrify all subterms *)
 
