@@ -27,6 +27,7 @@ let attr_split = 1 lsl 1
 let attr_binder = 1 lsl 2
 let attr_infix = 1 lsl 3
 let attr_ac = 1 lsl 4
+let attr_multiset = 1 lsl 5
 
 (** A symbol is a string, a unique ID, and some attributes *)
 type symbol = {

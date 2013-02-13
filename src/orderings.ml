@@ -195,7 +195,7 @@ module KBO = struct
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
-        then if prec#multiset_status f
+        then if has_attr attr_multiset f
           (* use multiset or lexicographic comparison *)
           then tckbocommute wb ss ts
           else tckbolex wb ss ts
@@ -258,7 +258,7 @@ module RPO = struct
           end
   (* recursive comparison of lists of terms (head symbol is hd) *)
   and rpo_rec ~prec hd l1 l2 s t =
-    (if prec#multiset_status hd
+    (if has_attr attr_multiset hd
     then Utils.multiset_partial (rpo ~prec) l1 l2
     else match Utils.lexicograph_partial (rpo ~prec) l1 l2 with
       | Gt ->
@@ -303,7 +303,7 @@ module RPO6 = struct
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match prec#compare f g with
-    | 0 when prec#multiset_status f ->
+    | 0 when has_attr attr_multiset f ->
       cMultiset ~prec ss ts (* multiset subterm comparison *)
     | 0 ->
       cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)

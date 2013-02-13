@@ -40,6 +40,7 @@ val attr_split : symbol_attribute       (** symbol used for splitting? *)
 val attr_binder : symbol_attribute      (** is the symbol a binding symbol? *)
 val attr_infix : symbol_attribute       (** symbol is binary infix? *)
 val attr_ac : symbol_attribute          (** symbol is associative-commutative? *)
+val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
   (** construction of a symbol *)

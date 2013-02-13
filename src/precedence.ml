@@ -162,8 +162,6 @@ let mk_precedence ?(complete=true) constrs symbols =
   let obj = object (self)
     val mutable m_version = List.length symbols
 
-    val mutable m_multiset = fun s -> s == eq_symbol
-
     val mutable m_weight = weight_constant
 
     val mutable m_symbols = symbols
@@ -218,10 +216,6 @@ let mk_precedence ?(complete=true) constrs symbols =
     method weight s = m_weight s
 
     method set_weight f = m_weight <- f
-
-    method multiset_status s = m_multiset s
-
-    method set_multiset f = m_multiset <- f
   end
   in
   (obj :> precedence)

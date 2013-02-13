@@ -133,8 +133,6 @@ class type precedence =
     method compare : symbol -> symbol -> int    (** total order on symbols *)
     method weight : symbol -> int               (** weight of symbol (for KBO) *)
     method set_weight : (symbol -> int) -> unit (** change the weight function *)
-    method multiset_status : symbol -> bool     (** does the symbol have a multiset status? *)
-    method set_multiset : (symbol -> bool) -> unit  (** set the function that recognized multiset symbols *)
   end
 
 (** the interface of an ordering type *)
@@ -144,7 +142,7 @@ class type ordering =
     method precedence : precedence              (** underlying precedence on symbols *)
     method set_precedence : precedence -> unit  (** update the precedence *)
     method compare : term -> term -> comparison (** compare two terms *)
-    method compare_vars : term -> term -> int   (** compare two terms. Variables are considered as constants. *)
+    method compare_vars : term -> term -> comparison (** compare two terms. Variables are considered as constants. *)
     method name : string
   end
 
