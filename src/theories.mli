@@ -139,6 +139,19 @@ val scan_clause : meta_prover -> hclause -> hclause list
       It returns lemma that have been discovered by adding the clause. Those
       lemma can be safely added to the problem. *)
 
+(** {2 Json encoding} *)
+
+val lemma_to_json : lemma -> json
+val lemma_of_json : json -> lemma
+
+val theory_to_json : theory -> json
+val theory_of_json : json -> theory
+
+val kb_to_json : kb -> json
+val kb_of_json : json -> kb -> unit
+
+val kb_printer_json : Format.formatter -> disjunction Sequence.t -> unit
+
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
  * ---------------------------------------------------------------------- *)

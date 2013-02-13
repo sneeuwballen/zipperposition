@@ -629,3 +629,13 @@ module Map =
       Format.fprintf formatter "@]@]"
   end
 
+(** {2 Json encoding} *)
+
+let pclause_to_json pclause = failwith "nope"
+
+let pclause_of_json json = failwith "nope"
+
+let np_to_json np = failwith "nope"
+
+let np_of_json json = failwith "nope"
+

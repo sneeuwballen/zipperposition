@@ -368,3 +368,5 @@ let learn_and_update meta hc =
   in
   (* store new lemmas *)
   add_lemmas kb lemmas
+
+

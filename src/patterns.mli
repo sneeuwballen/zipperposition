@@ -191,3 +191,11 @@ module Map :
 val pp_pclause : Format.formatter -> pclause -> unit
 val pp_mapping : Format.formatter -> mapping -> unit
 val pp_named_pattern : Format.formatter -> named_pattern -> unit
+
+(** {2 Json encoding} *)
+
+val pclause_to_json : pclause -> json
+val pclause_of_json : json -> pclause
+
+val np_to_json : named_pattern -> json
+val np_of_json : json -> named_pattern

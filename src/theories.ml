@@ -445,6 +445,22 @@ let scan_clause meta hc =
   Utils.exit_prof prof_scan_clause;
   lemmas
 
+(** {2 Json encoding} *)
+
+let lemma_to_json lemma = failwith "nope"
+
+let lemma_of_json json = failwith "nope"
+
+let theory_to_json th = failwith "nope"
+
+let theory_of_json json = failwith "nope"
+
+let kb_to_json kb = failwith "nope"
+
+let kb_of_json kb = failwith "nope"
+
+let kb_printer_json formatter disjunctions = failwith "nope"
+
 (* ----------------------------------------------------------------------
  * serialization/deserialization for abstract logic structures
  * ---------------------------------------------------------------------- *)
