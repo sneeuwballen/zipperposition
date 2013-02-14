@@ -43,11 +43,11 @@ let random_term ?(ground=false) () =
     let subterms =
       Utils.times arity (fun _ -> aux (depth - (H.random_in 1 2)))
     in
-    T.mk_node head univ_sort subterms
+    T.mk_node head univ_ subterms
   and random_leaf () =
     if ground || H.R.bool ()
-      then T.mk_const (choose symbols) univ_sort
-      else T.mk_var (H.random_in 0 3) univ_sort
+      then T.mk_const (choose symbols) univ_
+      else T.mk_var (H.random_in 0 3) univ_
   and random_fun_symbol () =
     let s = choose funs in
     s
@@ -58,8 +58,8 @@ let random_pred ?(ground=false) () =
   let p = choose preds in
   let arity = Hashtbl.find arities (name_symbol p) in
   if arity = 0
-    then T.mk_const p bool_sort
-    else T.mk_node p bool_sort (Utils.times arity (random_term ~ground))
+    then T.mk_const p bool_
+    else T.mk_node p bool_ (Utils.times arity (random_term ~ground))
 
 (** random pairs of terms *)
 let random_pair () = (random_term (), random_term ())
@@ -91,22 +91,24 @@ let check_curry t =
   if t'' == t then H.TestOk else H.TestFail (T.mk_eq t' t'')
 
 let check_beta () =
-  let t1 = T.mk_lambda
-    (T.mk_at
+  let t1 =
+    T.mk_at
       (T.mk_at
-        (T.mk_const (mk_symbol "f") univ_sort)
-        (T.mk_const (mk_symbol "a") univ_sort))
+        (T.mk_const (mk_symbol "f") ((univ_ <=. univ_) <=. univ_))
+        (T.mk_const (mk_symbol "a") univ_))
       (T.mk_at
-        (T.mk_bound_var 0 univ_sort)
-        (T.mk_const (mk_symbol "b") univ_sort)))
+        (T.mk_bound_var 0 (univ_ <=. univ_))
+        (T.mk_const (mk_symbol "b") univ_))
   and t2 =
-    T.mk_lambda
+    T.mk_lambda (univ_ <=. univ_)
       (T.mk_at
-        (T.mk_bound_var 0 univ_sort)
+        (T.mk_bound_var 0 (univ_ <=. univ_))
         (T.mk_at
-          (T.mk_bound_var 0 univ_sort)
-          (T.mk_const (mk_symbol "c") univ_sort)))
+          (T.mk_bound_var 0 (univ_ <=. univ_))
+          (T.mk_const (mk_symbol "c") univ_)))
   in
+  let t1 = T.mk_lambda (t1.sort <=. t2.sort) t1 in
+  Format.printf "beta reduce @[<h>%a@]@ @@ @[<h>%a@]@." !T.pp_term#pp t1 !T.pp_term#pp t2;
   let redex = T.mk_at t1 t2 in
   let reduced = T.beta_reduce redex in
   Format.printf "beta reduce @[<h>%a@]@ yields @[<h>%a@]@."
@@ -115,14 +117,14 @@ let check_beta () =
 
 (** special cases *)
 let check_special () =
-  let x = T.mk_var 1 univ_sort in
-  let t1 = T.mk_bind lambda_symbol
-    (T.mk_bind lambda_symbol
-      (T.mk_node (mk_symbol "f") univ_sort [
-        T.mk_node (mk_symbol "f") univ_sort [x; T.mk_bound_var 1 univ_sort]
-        ; T.mk_bound_var 0 univ_sort]))
+  let x = T.mk_var 1 univ_ in
+  let t1 = T.mk_lambda univ_
+    (T.mk_lambda univ_
+      (T.mk_node (mk_symbol "f") univ_ [
+        T.mk_node (mk_symbol "f") univ_ [x; T.mk_bound_var 1 univ_]
+        ; T.mk_bound_var 0 univ_]))
   in
-  let t2 = T.mk_node (mk_symbol "g") univ_sort [T.mk_bound_var 0 univ_sort] in
+  let t2 = T.mk_node (mk_symbol "g") univ_ [T.mk_bound_var 0 univ_] in
   let subst = S.bind S.id_subst (x,0) (t2,0) in
   let t1' = S.apply_subst subst (t1,0) in
   Format.printf "apply @[<h>%a to %a[%d] yields %a @]@."

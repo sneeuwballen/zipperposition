@@ -25,7 +25,7 @@ open Symbols
 module Utils = FoUtils
 
 let hash_term t = match t.term with
-  | Var i -> Hash.hash_int2 (hash_symbol t.sort) i
+  | Var i -> Hash.hash_int2 (hash_sort t.sort) i
   | BoundVar i -> Hash.hash_int2 113 i
   | Node (s, l) ->
     let rec aux h = function
@@ -33,10 +33,10 @@ let hash_term t = match t.term with
     | head::tail ->
       let h = Hash.hash_int2 h head.hkey in aux h tail
     in
-    let h = Hash.hash_int2 (hash_symbol t.sort) (hash_symbol s) in
+    let h = Hash.hash_int2 (hash_sort t.sort) (hash_symbol s) in
     abs (aux h l)
   | Bind (s, t) ->
-    Hash.hash_int3 (hash_symbol t.sort) (hash_symbol s) t.hkey
+    Hash.hash_int3 (hash_sort t.sort) (hash_symbol s) t.hkey
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 
@@ -177,9 +177,9 @@ let rec compute_is_ground l = match l with
   | [] -> true
   | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
 
-let mk_bind ?old s t' =
+let mk_bind ?old s sort t' =
   assert (has_attr attr_binder s);
-  let rec my_t = {term=Bind (s, t'); sort=t'.sort; flags=0;
+  let rec my_t = {term=Bind (s, t'); sort=sort; flags=0;
                   tsize=t'.tsize+1; tag= -1; hkey=0} in
   let t = hashcons ?old my_t in
   (if t == my_t
@@ -205,23 +205,51 @@ let mk_node ?old s sort l =
 
 let mk_const ?old s sort = mk_node ?old s sort []
 
-let true_term = mk_const true_symbol bool_sort
-let false_term = mk_const false_symbol bool_sort
+let true_term = mk_const true_symbol bool_
+let false_term = mk_const false_symbol bool_
+
+let pp_symbol_tstp =
+  object
+    method pp formatter s = match s with
+      | _ when s == not_symbol -> Format.pp_print_string formatter "~"
+      | _ when s == eq_symbol -> Format.pp_print_string formatter "="
+      | _ when s == lambda_symbol -> failwith "^"
+      | _ when s == exists_symbol -> Format.pp_print_string formatter "?"
+      | _ when s == forall_symbol -> Format.pp_print_string formatter "!"
+      | _ when s == and_symbol -> Format.pp_print_string formatter "&"
+      | _ when s == or_symbol -> Format.pp_print_string formatter "|"
+      | _ when s == imply_symbol -> Format.pp_print_string formatter "=>"
+      | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
+    method infix s = has_attr attr_infix s
+  end
+
+let rec pp_sort formatter sort = match sort with
+  | Sort s -> pp_symbol_tstp#pp formatter s
+  | Fun (s, l) ->
+    Format.fprintf formatter "(%a) > %a"
+      (Utils.pp_list ~sep:" * " pp_sort) l pp_sort s
 
 (* constructors for terms *)
-let check_bool t = assert (t.sort = bool_sort)
+let check_bool t = assert (t.sort == bool_)
+let check_same t1 t2 =
+  (if t1.sort != t2.sort then Format.printf "different sort %a and %a@." pp_sort t1.sort pp_sort t2.sort);
+  assert (t1.sort == t2.sort)
 
-let mk_not t = (check_bool t; mk_node not_symbol bool_sort [t])
-let mk_and a b = (check_bool a; check_bool b; mk_node and_symbol bool_sort [a; b])
-let mk_or a b = (check_bool a; check_bool b; mk_node or_symbol bool_sort [a; b])
-let mk_imply a b = (check_bool a; check_bool b; mk_node imply_symbol bool_sort [a; b])
-let mk_equiv a b = (check_bool a; check_bool b; mk_node eq_symbol bool_sort [a; b])
-let mk_eq a b = (assert (a.sort = b.sort); mk_node eq_symbol bool_sort [a; b])
-let mk_lambda t = mk_bind lambda_symbol t
-let mk_forall t = (check_bool t; mk_bind forall_symbol t)
-let mk_exists t = (check_bool t; mk_bind exists_symbol t)
+let mk_not t = (check_bool t; mk_node not_symbol bool_ [t])
+let mk_and a b = (check_bool a; check_bool b; mk_node and_symbol bool_ [a; b])
+let mk_or a b = (check_bool a; check_bool b; mk_node or_symbol bool_ [a; b])
+let mk_imply a b = (check_bool a; check_bool b; mk_node imply_symbol bool_ [a; b])
+let mk_equiv a b = (check_bool a; check_bool b; mk_node eq_symbol bool_ [a; b])
+let mk_eq a b = (check_same a b; mk_node eq_symbol bool_ [a; b])
+let mk_lambda sort t = mk_bind lambda_symbol sort t
+let mk_forall t = (check_bool t; mk_bind forall_symbol bool_ t)
+let mk_exists t = (check_bool t; mk_bind exists_symbol bool_ t)
 
-let mk_at ?old t1 t2 = mk_node ?old at_symbol t1.sort [t1; t2]
+let mk_at ?old t1 t2 =
+  match t1.sort, t2.sort with
+  | Fun (a, [b]), b' when b == b' ->
+    mk_node ?old at_symbol a [t1; t2]
+  | _ -> raise (SortError "incompatible types for @")
 
 let rec cast t sort =
   let new_t = {t with sort=sort} in
@@ -361,7 +389,7 @@ let depth t =
 
 (** check whether the term is a term or an atomic proposition *)
 let rec atomic t = match t.term with
-  | _ when t.sort != bool_sort -> true
+  | _ when t.sort != bool_ -> true
   | Var _ | BoundVar _ -> true
   | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic t'))
   | Node (s, l) -> not (s == and_symbol || s == or_symbol
@@ -369,7 +397,7 @@ let rec atomic t = match t.term with
 
 (** check whether the term contains connectives or quantifiers *)
 let rec atomic_rec t = match t.term with
-  | _ when t.sort <> bool_sort -> true  (* first order *)
+  | _ when t.sort != bool_ -> true  (* first order *)
   | Var _ | BoundVar _ -> true
   | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic_rec t'))
   | Node (s, l) ->
@@ -414,7 +442,7 @@ let db_replace t s =
   | Var _ -> t
   | Bind (symb, t') ->
     (* lift the De Bruijn to replace *)
-    mk_bind ~old:t symb (replace (depth+1) s t')
+    mk_bind ~old:t symb t.sort (replace (depth+1) s t')
   | Node (_, []) -> t
   | Node (f, l) ->
     mk_node ~old:t f t.sort (List.map (replace depth s) l)
@@ -434,7 +462,7 @@ let db_lift n t =
       mk_bound_var (i+n) t.sort (* lift by n, term not captured *)
     | Var _ | BoundVar _ -> t
     | Bind (s, t') ->
-      mk_bind ~old:t s (recurse (depth+1) t')  (* increase depth and recurse *)
+      mk_bind ~old:t s t.sort (recurse (depth+1) t')  (* increase depth and recurse *)
     | Node (_, []) -> t
     | Node (s, l) ->
       let l' = List.map (recurse depth) l in
@@ -452,7 +480,7 @@ let db_unlift t =
     | BoundVar i -> if i >= depth then mk_bound_var (i-1) t.sort else t
     | Node (_, []) | Var _ -> t
     | Bind (s, t') ->
-      mk_bind ~old:t s (recurse (depth+1) t')
+      mk_bind ~old:t s t.sort (recurse (depth+1) t')
     | Node (s, l) ->
       mk_node ~old:t s t.sort (List.map (recurse depth) l)
   in recurse 0 t
@@ -463,7 +491,8 @@ let db_from_var t v =
   (* recurse and replace [v]. *)
   let rec replace depth t = match t.term with
   | Var _ -> if eq_term t v then mk_bound_var depth v.sort else t
-  | Bind (s, t') -> mk_bind ~old:t s (replace (depth+1) t')
+  | Bind (s, t') ->
+    mk_bind ~old:t s t.sort (replace (depth+1) t')
   | BoundVar _ -> t
   | Node (_, []) -> t
   | Node (s, l) -> mk_node ~old:t s t.sort (List.map (replace depth) l)
@@ -489,14 +518,18 @@ let look_db_sort i t =
 let close_forall t =
   let vars = vars t in
   List.fold_left
-    (fun t var -> mk_bind forall_symbol (db_from_var t var))
+    (fun t var ->
+      let sort = bool_ in
+      mk_bind forall_symbol sort (db_from_var t var))
     t vars
 
 (** Bind all free variables by 'exists' *)
 let close_exists t =
   let vars = vars t in
   List.fold_left
-    (fun t var -> mk_bind exists_symbol (db_from_var t var))
+    (fun t var ->
+      let sort = bool_ in
+      mk_bind exists_symbol sort (db_from_var t var))
     t vars
 
 (** Transform binders and De Bruijn indexes into regular variables.
@@ -527,14 +560,20 @@ let rec db_to_classic ?(varindex=ref 0) t =
 let rec curry t =
   match t.term with
   | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind s (curry t')
+  | Bind (s, t') -> mk_bind s t.sort (curry t')
   | Node (f, [a;b]) when f == at_symbol -> mk_at ~old:t (curry a) (curry b)
   | Node (f, []) -> t
-  | Node (f, [t']) -> mk_at (mk_const f t.sort) (curry t')
+  | Node (f, [t']) ->
+    let sort = t.sort <=. t'.sort in
+    mk_at (mk_const f sort) (curry t')
   | Node (f, l) ->
+    (* compute sort of [f] *)
+    let sorts = List.map (fun x -> x.sort) l in
+    let sort = List.fold_right (fun arg res -> res <=. arg) sorts t.sort in
+    (* build the curryfied application of [f] to [l] *)
     List.fold_left
       (fun left t' -> mk_at left (curry t'))
-      (mk_const f t.sort) l
+      (mk_const f sort) l
 
 (** Uncurrify all subterms *)
 let uncurry t =
@@ -543,7 +582,7 @@ let uncurry t =
   let rec uncurry t =
     match t.term with
     | Var _ | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind s (uncurry t')
+    | Bind (s, t') -> mk_bind s t.sort (uncurry t')
     | Node (_, []) -> t  (* constant *)
     | Node (f, [a;b]) when f == at_symbol ->
       unfold_left a [uncurry b]  (* remove the '@' *)
@@ -551,11 +590,18 @@ let uncurry t =
   (* transform "(((f @ a) @ b) @ c) into f(a,b,c)". Here, we
      deconstruct "f @ a" into "unfold f (a :: args)"*)
   and unfold_left head args = match head.term with
-    | Node (f, []) -> (* totally unfolded *)
-      mk_node f head.sort args 
+    | Node (f, []) ->
+      (* totally unfolded, compute the resulting sort and build node *)
+      let fun_sort = uncurry_sort [] head.sort in
+      let sort = fun_sort @@ (List.map (fun x -> x.sort) args) in
+      mk_node f sort args 
     | Node (f, [a;b]) when f == at_symbol ->
       unfold_left a (uncurry b :: args)
     | _ -> failwith "not a curryfied term"
+  and uncurry_sort args sort = match sort with
+    | Sort _ -> sort <== args
+    | Fun (s, [l]) -> uncurry_sort (l::args) s
+    | _ -> failwith "not a curryfied sort"
   in
   uncurry t
 
@@ -578,24 +624,28 @@ let signature seq =
 let rec beta_reduce t =
   match t.term with
   | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind ~old:t s (beta_reduce t')
-  | Node (a, [{term=Bind (s, t1)}; t2]) when a == at_symbol && s == lambda_symbol ->
+  | Bind (s, t') -> mk_bind ~old:t s t.sort (beta_reduce t')
+  | Node (a, [{term=Bind (s, t1)} as fun_; t2])
+    when a == at_symbol && s == lambda_symbol ->
     (* a beta-redex! Fire!! *)
+    let _ = fun_.sort @@ [t2.sort] in
     let t1' = db_replace t1 t2  in
     let t1' = db_unlift t1' in
     beta_reduce t1'
-  | Node (f, l) -> mk_node ~old:t f t.sort (List.map beta_reduce l)
+  | Node (f, l) ->
+    mk_node ~old:t f t.sort (List.map beta_reduce l)
 
 (** Eta-reduce the (curryfied) term, ie [^[X]: (t @ X)]
     becomes [t] if [X] does not occur in [t]. *)
 let rec eta_reduce t =
   match t.term with
   | Var _ | BoundVar _ -> t
-  | Bind (s, {term=Node (a, [t'; {term=BoundVar 0}])})
+  | Bind (s, {term=Node (a, [t'; {term=BoundVar 0} as x])})
     when s == lambda_symbol && not (db_contains t' 0) ->
+    let _ = t.sort @@ [x.sort] in
     eta_reduce (db_unlift t')  (* remove the lambda and variable *)
   | Bind (s, t') ->
-    mk_bind ~old:t s (eta_reduce t')
+    mk_bind ~old:t s t.sort (eta_reduce t')
   | Node (f, l) ->
     mk_node ~old:t f t.sort (List.map eta_reduce l)
 
@@ -612,10 +662,11 @@ let eta_lift t sub_t =
     match t.term with
     | _ when t == sub_t -> mk_bound_var depth t.sort
     | Var _ | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind ~old:t s (replace (depth+1) t')
+    | Bind (s, t') -> mk_bind ~old:t s t.sort (replace (depth+1) t')
     | Node (f, l) -> mk_node ~old:t f t.sort (List.map (replace depth) l)
   in
-  mk_lambda (db_lift 1 (replace 0 t))
+  let sort = t.sort <=. sub_t.sort in
+  mk_lambda sort (db_lift 1 (replace 0 t))
 
 (* ----------------------------------------------------------------------
  * Pretty printing
@@ -662,6 +713,12 @@ let pp_symbol_tstp =
 
 let pp_symbol = ref pp_symbol_unicode
 
+let rec pp_sort formatter sort = match sort with
+  | Sort s -> pp_symbol_tstp#pp formatter s
+  | Fun (s, l) ->
+    Format.fprintf formatter "(%a) > %a"
+      (Utils.pp_list ~sep:" * " pp_sort) l pp_sort s
+
 (** type of a pretty printer for terms *)
 class type pprinter_term =
   object
@@ -703,7 +760,7 @@ let pp_term_debug =
           end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_symbol_unicode#pp s
             (Utils.pp_list ~sep:", " self#pp) args);
       (* also print the sort if needed *)
-      if !_sort then Format.fprintf formatter ":%s" (name_symbol t.sort)
+      if !_sort then Format.fprintf formatter ":%a" pp_sort t.sort
     method sort s = _sort := s
   end
 
@@ -713,9 +770,9 @@ let pp_term_tstp =
       (* recursive printing function *)
       let rec pp_rec t = match t.term with
       | Node (s, [{term=Node (s', [a;b])}]) when s == not_symbol
-        && s' == eq_symbol && a.sort == bool_sort ->
+        && s' == eq_symbol && a.sort == bool_ ->
         Format.fprintf formatter "(%a <~> %a)" self#pp a self#pp b
-      | Node (s, [a;b]) when s == eq_symbol && a.sort == bool_sort ->
+      | Node (s, [a;b]) when s == eq_symbol && a.sort == bool_ ->
         Format.fprintf formatter "(%a <=> %a)" self#pp a self#pp b
       | Node (s, [{term=Node (s', [a; b])}])
         when s == not_symbol && s' == eq_symbol ->
@@ -777,7 +834,7 @@ let rec from_simple_formula f = match f with
   | Simple.Exists (v, f) -> mk_exists (db_from_var (from_simple_formula f) (from_simple v))
 
 let to_simple t =
-  if t.sort == bool_sort then None else
+  if t.sort == bool_ then None else
   let rec build t = match t.term with
   | Var i -> Simple.mk_var i t.sort
   | BoundVar _ | Bind _ -> failwith "not implemented"
@@ -789,31 +846,32 @@ let to_simple t =
 let rec to_json t =
   match t.term with
   | BoundVar i ->
-    `List [`String "bound"; `Int i; Symbols.to_json t.sort]
+    `List [`String "bound"; `Int i; Symbols.sort_to_json t.sort]
   | Var i ->
-    `List [`String "var"; `Int i; Symbols.to_json t.sort]
+    `List [`String "var"; `Int i; Symbols.sort_to_json t.sort]
   | Bind (s, t') ->
-    `List [`String "bind"; Symbols.to_json s; to_json t']
+    `List [`String "bind"; Symbols.to_json s; Symbols.sort_to_json t.sort; to_json t']
   | Node (f, l) ->
     let l' = `List (List.map to_json l) in
     let f' = Symbols.to_json f in
-    let sort' = Symbols.to_json t.sort in
+    let sort' = Symbols.sort_to_json t.sort in
     `List [`String "node"; f'; sort'; l']
 
 let of_json json =
   let rec of_json json = 
     match json with
     | `List [`String "bound"; `Int i; sort] ->
-      let sort = Symbols.of_json sort in mk_bound_var i sort
+      let sort = Symbols.sort_of_json sort in mk_bound_var i sort
     | `List [`String "var"; `Int i; sort] ->
-      let sort = Symbols.of_json sort in mk_var i sort
-    | `List [`String "bind"; s; t'] ->
+      let sort = Symbols.sort_of_json sort in mk_var i sort
+    | `List [`String "bind"; s; sort; t'] ->
       let s = Symbols.of_json s in
+      let sort = Symbols.sort_of_json sort in
       let t' = of_json t' in
-      mk_bind s t'
+      mk_bind s sort t'
     | `List [`String "node"; f; sort; `List l] ->
       let f = Symbols.of_json f in
-      let sort = Symbols.of_json sort in
+      let sort = Symbols.sort_of_json sort in
       let l = List.map of_json l in
       mk_node f sort l
     | _ -> let msg = "expected term" in

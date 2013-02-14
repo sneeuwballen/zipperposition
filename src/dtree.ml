@@ -44,12 +44,12 @@ type character = Symbol of symbol | BoundVariable of int * sort | Variable of te
 let compare_char c1 c2 =
   (* compare variables by index *)
   let compare_vars v1 v2 = match v1.term, v2.term with
-    | Var i, Var j -> if i <> j then i - j else compare_symbols v1.sort v2.sort
+    | Var i, Var j -> if i <> j then i - j else compare_sort v1.sort v2.sort
     | _ -> assert false
   in
   match c1, c2 with
   | Symbol s1, Symbol s2 -> Symbols.compare_symbols s1 s2
-  | BoundVariable (i, si), BoundVariable (j, sj) when i = j -> compare_symbols si sj
+  | BoundVariable (i, si), BoundVariable (j, sj) when i = j -> compare_sort si sj
   | BoundVariable (i, _), BoundVariable (j, _) -> i - j
   | Variable v1, Variable v2 -> compare_vars v1 v2
   (* symbol < bound_variable < variable *)

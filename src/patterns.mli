@@ -28,8 +28,7 @@ open Symbols
  * ---------------------------------------------------------------------- *)
 
 type psymbol = int
-type psort = int
-
+type psort = PSort of int | PFun of psort * psort list
 
 val special_symbols : symbol array
   (** Maps positive integers to special symbols *)
@@ -42,7 +41,7 @@ val symbol_offset : int
 type pterm =
   | PVar of int * psort
   | PBoundVar of int * psort
-  | PBind of psymbol * pterm
+  | PBind of psymbol * psort * pterm
   | PNode of psymbol * psort * pterm list
 
 val compare_pterm : pterm -> pterm -> int

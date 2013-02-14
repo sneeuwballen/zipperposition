@@ -156,10 +156,10 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
     mk_lit ~ord T.true_term T.true_term sign
   (* deal with false/true *)
   | _ when T.eq_term l T.false_term ->
-    assert (r.sort = bool_sort);
+    assert (r.sort = bool_);
     lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
   | _ when T.eq_term r T.false_term ->
-    assert (l.sort = bool_sort);
+    assert (l.sort = bool_);
     lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
   (* deal with negation *)
   | Node (s, [t]), _ when s = not_symbol && T.eq_term r T.true_term ->
@@ -281,7 +281,7 @@ let pp_literal formatter lit =
     if sign
       then !T.pp_term#pp formatter r
       else Format.fprintf formatter "¬%a" !T.pp_term#pp r
-  | Equation (l, r, sign, _) when l.sort == bool_sort ->
+  | Equation (l, r, sign, _) when l.sort == bool_ ->
     if sign
       then Format.fprintf formatter "%a <=> %a" !T.pp_term#pp l !T.pp_term#pp r
       else Format.fprintf formatter "%a <~> %a" !T.pp_term#pp l !T.pp_term#pp r

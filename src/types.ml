@@ -23,9 +23,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** a symbol is just a string *)
 open Symbols
 
-(** exception raised when sorts are mismatched *)
-exception SortError of string
-
 (* TODO: (maybe) substitutions as list of pairs of *bound* terms,
   where bound term = (int * term), the int being an offset for renaming vars.
   mk_hclause would then perform normalization of variables, and renaming of

@@ -36,7 +36,7 @@ let prof_pclause_of_clause = Utils.mk_profiler "mk_pclause"
  * ---------------------------------------------------------------------- *)
 
 type psymbol = int
-type psort = int
+type psort = PSort of int | PFun of psort * psort list
 
 (** Special symbols and their number *)
 let special_symbols =
@@ -50,9 +50,9 @@ let special_symbols =
      imply_symbol;
      and_symbol;
      or_symbol;
-     bool_sort;     (* Sorts *)
-     univ_sort;
-     type_sort;
+     bool_symbol;     (* Sorts *)
+     univ_symbol;
+     type_symbol;
   |]
 
 (* De Bruijn *)
@@ -64,7 +64,7 @@ let symbol_offset = Array.length special_symbols
 type pterm =
   | PVar of int * psort
   | PBoundVar of int * psort
-  | PBind of psymbol * pterm
+  | PBind of psymbol * psort * pterm
   | PNode of psymbol * psort * pterm list
 
 let compare_pterm t1 t2 = Pervasives.compare t1 t2
@@ -73,11 +73,14 @@ let eq_pterm t1 t2 = t1 = t2
 
 let hash_pterm t =
   let rec hash h t = match t with
-  | PVar (i, sort) | PBoundVar (i, sort) -> Hash.hash_int3 h i sort
-  | PBind (f, t') -> hash (Hash.hash_int2 h f) t'
+  | PVar (i, sort) | PBoundVar (i, sort) -> Hash.hash_int3 h i (hash_psort sort)
+  | PBind (f, _, t') -> hash (Hash.hash_int2 h f) t'
   | PNode (f, sort, l) ->
-    let h = Hash.hash_int3 h f sort in
+    let h = Hash.hash_int3 h f (hash_psort sort) in
     List.fold_left hash h l
+  and hash_psort = function
+  | PSort i -> i
+  | PFun (i, l) -> hash_psort i (* TODO *)
   in hash 113 t
 
 (** A pattern literal is a pair of pattern terms + the sign *)
@@ -138,17 +141,23 @@ let hash_pclause pc =
 (** List of non-special symbols/sort (index) that occur in the clause *)
 let pclause_symbols lits =
   let rec pterm_symbols acc t = match t with
-  | PVar (_, sort) | PBoundVar (_, sort) ->
-    if List.mem sort acc || sort < symbol_offset then acc else sort::acc
-  | PBind (f, t') ->
+  | PVar (_, sort) | PBoundVar (_, sort) -> update_sort acc sort
+  | PBind (f, sort, t') ->
+    let acc = update_sort acc sort in
     let acc = if List.mem f acc || f < symbol_offset then acc else f :: acc in
     pterm_symbols acc t'
   | PNode (f, sort, l) ->
+    let acc = update_sort acc sort in
     let acc = if List.mem f acc || f < symbol_offset then acc else f :: acc in
-    let acc = if List.mem sort acc || sort < symbol_offset then acc else sort :: acc in
     List.fold_left pterm_symbols acc l
   and plit_symbols acc lit =
     pterm_symbols (pterm_symbols acc lit.lterm) lit.rterm
+  and update_sort acc sort = match sort with
+    | PSort s when s < symbol_offset || List.mem s acc -> acc
+    | PSort s -> s :: acc
+    | PFun (s, l) ->
+      let acc = update_sort acc s in
+      List.fold_left update_sort acc l
   in
   List.rev (List.fold_left plit_symbols [] lits)
 
@@ -157,7 +166,7 @@ let pclause_maxvar pclause =
   let rec term_maxvar acc t = match t with
   | PVar (i, _) -> max acc i
   | PBoundVar _ -> acc
-  | PBind (_, t') -> term_maxvar acc t'
+  | PBind (_, _, t') -> term_maxvar acc t'
   | PNode (_, _, l) -> List.fold_left (fun acc t' -> term_maxvar acc t') acc l
   and lit_maxvar acc lit =
     term_maxvar (term_maxvar acc lit.lterm) lit.rterm
@@ -242,21 +251,28 @@ let pterm_of_term ?rev_map t =
   (* recursive conversion *)
   let rec convert t = match t.term with
   | Var i ->
-    let psort = rm_get_symbol ~rev_map t.sort in
+    let psort = convert_sort t.sort in
     let i' = rm_get_var ~rev_map i in
     PVar (i', psort)
   | BoundVar i ->
-    let psort = rm_get_symbol ~rev_map t.sort in
+    let psort = convert_sort t.sort in
     PBoundVar (i, psort)
   | Bind (f, t') ->
     let psymbol = rm_get_symbol ~rev_map f in
+    let psort = convert_sort t.sort in
     let t'' = convert t' in
-    PBind (psymbol, t'')
+    PBind (psymbol, psort, t'')
   | Node (f, l) ->
-    let psort = rm_get_symbol ~rev_map t.sort in
+    let psort = convert_sort t.sort in
     let psymbol = rm_get_symbol ~rev_map f in
     let l' = List.map convert l in
     PNode (psymbol, psort, l')
+  and convert_sort sort = match sort with
+  | Sort s -> PSort (rm_get_symbol ~rev_map s)
+  | Fun (s, l) ->
+    let s' = convert_sort s in
+    let l' = List.map convert_sort l in
+    PFun (s', l')
   in
   convert t
 
@@ -304,27 +320,32 @@ let pclause_of_clause ?rev_map hc = pclause_of_lits ?rev_map hc.hclits
 
 let rec instantiate_pterm ~map pterm =
   (* lookup the concrete symbol for this pattern symbol *)
-  let get_symbol ~map f =
+  let rec get_symbol ~map f =
     try Ptmap.find f map.m_symbol
     with Not_found ->
       (Format.eprintf "could not find f%d@." f; assert false)
+  (* construct sort *)
+  and get_sort psort = match psort with
+  | PSort i -> mk_sort (get_symbol ~map i)
+  | PFun (s, l) -> (get_sort s) <== (List.map get_sort l)
   in
   match pterm with
   | PVar (i, s) ->
     (* we may keep the variable unbounded, in which case it is preserved *)
     let i' = try Ptmap.find i map.m_var with Not_found -> i in
-    let s' = get_symbol ~map s in
+    let s' = get_sort s in
     T.mk_var i' s'
   | PBoundVar (i, s) ->
-    let s' = get_symbol ~map s in
+    let s' = get_sort s in
     T.mk_bound_var i s'
-  | PBind (f, t') ->
+  | PBind (f, s, t') ->
     let f' = get_symbol ~map f in
+    let s' = get_sort s in
     let t'' = instantiate_pterm ~map t' in
-    T.mk_bind f' t''
+    T.mk_bind f' s' t''
   | PNode (f, s, l) ->
     let f' = get_symbol ~map f in
-    let s' = get_symbol ~map s in
+    let s' = get_sort s in
     let l' = List.map (instantiate_pterm ~map) l in
     T.mk_node f' s' l'
 
@@ -352,26 +373,35 @@ let check_symbol ~map s symbol =
   with Not_found ->
     { map with m_symbol = Ptmap.add s symbol map.m_symbol; }
 
+let rec check_sort ~map psort sort = match sort, psort with
+  | Sort s, PSort i -> check_symbol ~map i s
+  | Fun (s, l), PFun (i, li) ->
+    let map = check_sort ~map i s in
+    (try List.fold_left2 (fun map -> check_sort ~map) map li l
+     with Invalid_argument _ -> raise Exit)
+  | _ -> raise Exit
+
 (** Matching of a pattern-term and a term. This maps pattern symbols
     and variables on symbols and variables *)
 let rec match_pterm ~map pt t =
   match pt, t.term with
   | PVar (i, s), Var i' ->
-    let map = check_symbol ~map s t.sort in
+    let map = check_sort ~map s t.sort in
     (try
       let j = Ptmap.find i map.m_var in
       if j = i' then map else raise Exit
     with Not_found ->
       { map with m_var = Ptmap.add i i' map.m_var; })
   | PBoundVar (i, s), BoundVar i' ->
-    if i = i' then check_symbol ~map s t.sort else raise Exit
-  | PBind (f, t''), Bind (f', t') ->
+    if i = i' then check_sort ~map s t.sort else raise Exit
+  | PBind (f, s, t''), Bind (f', t') ->
+    let map = check_sort ~map s t.sort in
     let map = check_symbol ~map f f' in
     match_pterm ~map t'' t'
   | PNode (f, s, l), Node (f', l') ->
     (if List.length l <> List.length l' then raise Exit);
     let map = check_symbol ~map f f' in
-    let map = check_symbol ~map s t.sort in
+    let map = check_sort ~map s t.sort in
     List.fold_left2 (fun map pt t -> match_pterm ~map pt t) map l l'
   | _ -> raise Exit
 
@@ -473,12 +503,15 @@ let is_symb s symb = s < symbol_offset && special_symbols.(s) == symb
 let has_attr attr s = s < symbol_offset && has_attr attr special_symbols.(s)
 (* is the sort of the term [t] the special sort [sort]? *)
 let rec has_sort t sort = match t with
-  | PVar (_, s) | PBoundVar (_, s) | PNode (_, s, _) -> is_symb s sort
-  | PBind (_, t') -> has_sort t' sort
+  | PVar (_, s) | PBoundVar (_, s) | PNode (_, s, _) | PBind (_, s, _) ->
+    (match s, sort with | PSort s, Sort symb -> is_symb s symb | _ -> false)
 
 let pp_pterm varindex formatter t =
-  let pp_sort formatter s =
-    if s >= symbol_offset then Format.fprintf formatter ":%a" pp_symb s else ()
+  let rec pp_sort formatter s = match s with
+    | PSort s when s >= symbol_offset -> Format.fprintf formatter ":%a" pp_symb s
+    | PSort _ -> ()
+    | PFun (s, l) -> Format.fprintf formatter "(%a) > %a"
+      (Utils.pp_list ~sep:"*" pp_sort) l pp_sort s
   in
   (* names for De Bruijn variables *)
   let names = ref [] in
@@ -486,16 +519,16 @@ let pp_pterm varindex formatter t =
   let rec pp_pterm formatter t = 
     match t with
     | PNode (s, _, [PNode (s', _, [a;b])]) when is_symb s not_symbol
-      && is_symb s' eq_symbol && has_sort a bool_sort ->
+      && is_symb s' eq_symbol && has_sort a bool_ ->
       Format.fprintf formatter "(%a <~> %a)" pp_pterm a pp_pterm b
-    | PNode (s, _, [a;b]) when is_symb s eq_symbol && has_sort a  bool_sort ->
+    | PNode (s, _, [a;b]) when is_symb s eq_symbol && has_sort a  bool_ ->
       Format.fprintf formatter "(%a <=> %a)" pp_pterm a pp_pterm b
     | PNode (s, _, [PNode (s', _, [a; b])])
       when is_symb s not_symbol && is_symb s' eq_symbol ->
       Format.fprintf formatter "%a != %a" pp_pterm a pp_pterm b
     | PNode (s, _, [t]) when is_symb s not_symbol ->
       Format.fprintf formatter "~%a" pp_pterm t
-    | PBind (s, t') ->
+    | PBind (s, _, t') ->
       (* push new name on stack *)
       let name = !varindex in
       incr varindex;
@@ -528,11 +561,11 @@ let pp_pclause formatter pclause =
       Format.fprintf formatter "~%a" (pp_pterm varindex) lit.lterm
     | true, _ -> Format.fprintf formatter "(%a %s %a)"
         (pp_pterm varindex) lit.lterm
-        (if has_sort lit.lterm bool_sort then "<=>" else "=")
+        (if has_sort lit.lterm bool_ then "<=>" else "=")
         (pp_pterm varindex) lit.rterm
     | false, _ -> Format.fprintf formatter "(%a %s %a)"
         (pp_pterm varindex) lit.lterm
-        (if has_sort lit.lterm bool_sort then "<~>" else "!=")
+        (if has_sort lit.lterm bool_ then "<~>" else "!=")
         (pp_pterm varindex) lit.rterm
   in
   match pclause.pc_lits with

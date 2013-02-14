@@ -23,8 +23,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 type symbol
   (** abstract type of a symbol *)
 
-type sort = symbol
-  (** a sort for terms (only the return sort is kept) *)
+type sort =
+  | Sort of symbol          (** Atomic sort *)
+  | Fun of sort * sort list (** Function sort (first is return type) *)
+  (** simple types *)
+
+(** exception raised when sorts are mismatched *)
+exception SortError of string
 
 val compare_symbols : symbol -> symbol -> int
   (** total ordering on symbols (equality is ==) *)
@@ -48,6 +53,7 @@ val attr_infix : symbol_attribute       (** symbol is binary infix? *)
 val attr_ac : symbol_attribute          (** symbol is associative-commutative? *)
 val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *)
 val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
+val attr_commut : symbol_attribute      (** symbol that is commutative (not ac) *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
   (** construction of a symbol *)
@@ -99,14 +105,42 @@ val mk_fresh_const : int -> symbol
       the signature of the problem *)
 
 (** {2 sorts} *)
-val bool_sort : sort
-val type_sort : sort
-val univ_sort : sort
+
+val bool_symbol : symbol
+val type_symbol : symbol
+val univ_symbol : symbol
+
+(** Sorts are simple types. Note that equality on sorts is (==),
+    because sorts are hashconsed (to save memory) *)
+
+val compare_sort : sort -> sort -> int
+
+val hash_sort : sort -> int
+
+val mk_sort : symbol -> sort
+
+val (<==) : sort -> sort list -> sort
+  (** [s <== args] build the sort of functions that take arguments
+      of sort [args], and has return type [s] *)
+
+val (<=.) : sort -> sort -> sort
+  (** Helper for unary function sort. Left-associative, ie
+      [a <=. b <=. c] is like [(a <=. b) <=. c] *)
+
+val (@@) : sort -> sort list -> sort
+  (** [s @@ args] applies the sort [s] to arguments [args]. Types must match *)
+
+val bool_ : sort
+val type_ : sort
+val univ_ : sort
+
+val arity : sort -> int
+  (** Arity of a sort, ie nunber of arguments of the function, or 0 *)
 
 (** {2 Signature} *)
 
-(** A signature maps symbols to (sort, arity) *)
-type signature = (int * sort) SMap.t
+(** A signature maps symbols to their sort *)
+type signature = sort SMap.t
 
 val empty_signature : signature
   (** The empty signature *)
@@ -122,11 +156,14 @@ val symbols_of_signature : signature -> symbol list
 
 (** {2 Conversions and printing} *)
 
-val sig_to_seq : signature -> (symbol * int * sort) Sequence.t
-val sig_of_seq : (symbol * int * sort) Sequence.t -> signature
+val sig_to_seq : signature -> (symbol * sort) Sequence.t
+val sig_of_seq : (symbol * sort) Sequence.t -> signature
 
 val to_json : symbol -> Yojson.Basic.json
 val of_json : Yojson.Basic.json -> symbol
+
+val sort_to_json : sort -> Yojson.Basic.json
+val sort_of_json : Yojson.Basic.json -> sort
 
 val sig_to_json : signature -> Yojson.Basic.json
 val sig_of_json : Yojson.Basic.json -> signature

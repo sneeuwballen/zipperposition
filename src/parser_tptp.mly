@@ -61,7 +61,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         
   (* gets the variables associated with a string from the variable mapping
      creates a new mapping for a new variable with the given sort *)
-  let get_var ?(sort=univ_sort) (var_name: string) =
+  let get_var ?(sort=univ_) (var_name: string) =
     try 
       (* way faster than List.assoc *)
       match (
@@ -87,7 +87,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let get_sort constant =
     try
       SHashtbl.find sort_table constant
-    with Not_found -> univ_sort
+    with Not_found -> univ_
 
   let set_sort constant sort = SHashtbl.replace sort_table constant sort
 %}
@@ -388,9 +388,9 @@ atomic_formula:
 
 plain_atom:
   | plain_term_top
-      { let t = Simple.cast $1 bool_sort in (* cast term to bool *)
+      { let t = Simple.cast $1 bool_ in (* cast term to bool *)
         (match t with
-        | Simple.Node (s, _, _) -> set_sort s bool_sort
+        | Simple.Node (s, _, _) -> set_sort s bool_
         | Simple.Var _ -> failwith "variable at top level");
         Simple.mk_atom t
       }
@@ -416,9 +416,9 @@ defined_atom:
 
 system_atom:
   | system_term_top
-      { let t = Simple.cast $1 bool_sort in
+      { let t = Simple.cast $1 bool_ in
         (match t with
-        | Simple.Node (s, _, _) -> set_sort s bool_sort
+        | Simple.Node (s, _, _) -> set_sort s bool_
         | Simple.Var _ -> assert false);
         Simple.mk_atom t
       }
@@ -482,7 +482,7 @@ system_term_top:
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { 
-        Simple.mk_node $1 univ_sort $3
+        Simple.mk_node $1 univ_ $3
       }
 
 system_term:

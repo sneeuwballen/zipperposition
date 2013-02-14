@@ -67,8 +67,8 @@ let classify signature s =
   | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
   | _ when SSet.mem s special_set -> Special
   | _ -> (* classify between predicate and function by the sort *)
-    let _, sort = SMap.find s signature in
-    if sort == bool_sort then Predicate else Function
+    let sort = SMap.find s signature in
+    if sort == bool_ then Predicate else Function
 
 (** constraint on the ordering *)
 let symbol_constraint clauses =
@@ -98,7 +98,7 @@ let beta_eliminate ~ord a signa b signb =
 
 (** helper for gamma elimination *)
 let gamma_eliminate ~ord offset t sign =
-  assert (t.sort = bool_sort);
+  assert (t.sort == bool_);
   let i = !offset in
   incr offset;
   let new_t =
@@ -115,7 +115,7 @@ let gamma_eliminate ~ord offset t sign =
     and adds t where De Bruijn 0 is replaced by a skolem
     of free variables of t) *)
 let delta_eliminate ~ord t sign =
-  assert (t.sort = bool_sort);
+  assert (t.sort == bool_);
   let new_t =
     match T.look_db_sort 0 t with
     | None -> T.db_unlift t (* the variable is not present *)
@@ -135,7 +135,7 @@ let eliminate_lits hc =
   let offset = ref ((max 0 (T.max_var hc.hcvars)) + 1) in  (* offset to create variables *)
   (* eliminate propositions (connective and quantifier eliminations) *)
   let prop eqn p sign =
-    assert (p.sort = bool_sort);
+    assert (p.sort == bool_);
     match p.term with
     | BoundVar _ | Var _ -> assert false
     | Node (s, [a; b]) when s == and_symbol && sign -> alpha_eliminate ~ord a true b true
@@ -177,7 +177,7 @@ let eliminate_lits hc =
         match lit with
         | Equation (l, r, sign, _) when T.eq_term r T.true_term -> prop lit l sign
         | Equation (l, r, sign, _) when T.eq_term l T.true_term -> prop lit r sign
-        | Equation (l, r, sign, _) when l.sort = bool_sort -> equiv lit l r sign
+        | Equation (l, r, sign, _) when l.sort == bool_ -> equiv lit l r sign
         | _ -> keep lit)  (* equation between terms *)
       hc.hclits
   in

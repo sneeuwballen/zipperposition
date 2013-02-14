@@ -73,8 +73,8 @@ let check_properties ~ord (a, b, cmp) =
   (if T.member_term b a && a != b
     then assert (cmp = Gt));
   (* monotonicity *)
-  let ga = T.mk_node (mk_symbol "g") univ_sort [a]
-  and gb = T.mk_node (mk_symbol "g") univ_sort [b] in
+  let ga = T.mk_node (mk_symbol "g") univ_ [a]
+  and gb = T.mk_node (mk_symbol "g") univ_ [b] in
   assert (cmp = ord#compare ga gb)
 
 (** check invariants on the list of terms *)

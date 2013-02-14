@@ -9,7 +9,7 @@ let symbs = List.map mk_symbol ["a"; "b"; "c"; "p"; "q"; "r"]
 
 (* cheat : build some term not to have problems with signature *)
 let my_term = Terms.mk_node (mk_symbol "a")
-  univ_sort (List.map (fun s -> Terms.mk_node s univ_sort []) symbs)
+  univ_ (List.map (fun s -> Terms.mk_node s univ_ []) symbs)
 
 let alpha_cmp x y = compare (name_symbol x) (name_symbol y)
 

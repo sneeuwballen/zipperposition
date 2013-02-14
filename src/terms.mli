@@ -82,7 +82,7 @@ val get_flag : int -> term -> bool
 
 val mk_var : ?old:term -> int -> sort -> term       (** Create a variable. The index must be >= 0 *)
 val mk_bound_var : ?old:term -> int -> sort -> term (** De Bruijn index, must be >= 0 *)
-val mk_bind : ?old:term -> symbol -> term -> term
+val mk_bind : ?old:term -> symbol -> sort -> term -> term
 val mk_node : ?old:term -> symbol -> sort -> term list -> term
 val mk_const : ?old:term -> symbol -> sort -> term
 
@@ -95,7 +95,7 @@ val mk_or : term -> term -> term
 val mk_imply : term -> term -> term
 val mk_equiv : term -> term -> term
 val mk_eq : term -> term -> term
-val mk_lambda : term -> term
+val mk_lambda : sort -> term -> term        (** Like mk_bind, the result sort is needed *)
 val mk_forall : term -> term
 val mk_exists : term -> term
 
@@ -208,6 +208,8 @@ class type pprinter_symbol =
 val pp_symbol : pprinter_symbol ref                 (** default pp for symbols *)
 val pp_symbol_unicode : pprinter_symbol             (** print with unicode special symbols*)
 val pp_symbol_tstp : pprinter_symbol                (** tstp convention (raw) *)
+
+val pp_sort : Format.formatter -> sort -> unit
 
 (** type of a pretty printer for terms *)
 class type pprinter_term =
