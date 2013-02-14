@@ -35,8 +35,13 @@ type symbol = {
   mutable symb_attrs : int;
 }
 
-(** A sort is just a symbol *)
-type sort = symbol
+type sort =
+  | Sort of symbol          (** Atomic sort *)
+  | Fun of sort * sort list (** Function sort *)
+  (** simple types *)
+
+(** exception raised when sorts are mismatched *)
+exception SortError of string
 
 let compare_symbols s1 s2 = s1.symb_id - s2.symb_id
 
@@ -86,11 +91,6 @@ module SMap = Map.Make(struct type t = symbol let compare = compare_symbols end)
 
 module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
 
-(** A signature maps symbols to (sort, arity) *)
-type signature = (int * sort) SMap.t
-
-let empty_signature = SMap.empty
-
 (* connectives *)
 let true_symbol = mk_symbol "$true"
 let false_symbol = mk_symbol "$false"
@@ -116,65 +116,100 @@ let db_symbol = mk_symbol "$$db_magic_cookie"
 (** pseudo symbol for locating split symbols in precedence *)
 let split_symbol = mk_symbol "$$split_magic_cookie"
 
-(* default sorts *)
-let type_sort = mk_symbol "$tType"
-let bool_sort = mk_symbol "$o"
-let univ_sort = mk_symbol "$i"
+(** {2 sorts} *)
+
+let bool_symbol = mk_symbol "$o"
+let type_symbol = mk_symbol "$tType"
+let univ_symbol = mk_symbol "$i"
+
+let rec compare_sort s1 s2 = match s1, s2 with
+  | Sort a, Sort b -> compare_symbols a b
+  | Fun (a, la), Fun (b, lb) ->
+    let cmp = compare_sort a b in
+    if cmp <> 0 then cmp else compare_sorts la lb
+  | Sort _, Fun _ -> -1
+  | Fun _, Sort _ -> 1
+and compare_sorts l1 l2 = match l1, l2 with
+  | [], [] -> 0
+  | x1::l1', x2::l2' ->
+    let cmp = compare_sort x1 x2 in
+    if cmp <> 0 then cmp else compare_sorts l1' l2'
+  | [], _ -> -1
+  | _, [] -> 1
+
+let rec hash_sort s = match s with
+  | Sort s -> Hash.hash_string s.symb_name
+  | Fun (s, l) -> hash_sorts (hash_sort s) l
+and hash_sorts h l = match l with
+  | [] -> h
+  | x::l' -> hash_sorts (Hash.hash_int2 (hash_sort x) h) l'
+
+(** weak hash table for sorts *)
+module HashSort = Hashcons.Make(
+  struct
+    type t = sort
+    let equal a b = compare_sort a b = 0
+    let hash s = hash_sort s
+    let tag t s = s  (* ignore tag *)
+  end)
+
+let mk_sort symb = HashSort.hashcons (Sort symb)
+
+let (<==) s l = match l with
+  | [] -> s  (* collapse 0-ary functions *)
+  | _ -> HashSort.hashcons (Fun (s, l))
+
+let (<=.) s1 s2 = s1 <== [s2]
+
+let can_apply l args =
+  try List.for_all2 (==) l args
+  with Invalid_argument _ -> false
+
+(** [s @@ args] applies the sort [s] to arguments [args]. Types must match *)
+let (@@) s args = match s, args with
+  | Sort _, [] -> s
+  | Fun (s', l), _ when can_apply l args -> s'
+  | _ -> raise (SortError "cannot apply sort")
+
+let type_ = mk_sort type_symbol
+let bool_ = mk_sort bool_symbol
+let univ_ = mk_sort univ_symbol
+
+(** Arity of a sort, ie nunber of arguments of the function, or 0 *)
+let arity = function
+  | Sort _ -> 0
+  | Fun (_, l) -> List.length l
 
 let table =
-  [true_symbol, bool_sort, 0;
-   false_symbol, bool_sort, 0;
-   eq_symbol, bool_sort, 2;
-   exists_symbol, bool_sort, 1;
-   forall_symbol, bool_sort, 1;
-   lambda_symbol, univ_sort, 1;
-   not_symbol, bool_sort, 1;
-   imply_symbol, bool_sort, 2;
-   and_symbol, bool_sort, 2;
-   or_symbol, bool_sort, 2;
-   at_symbol, univ_sort, 2;   (* FIXME: this really ought to be polymorphic *)
-   db_symbol, univ_sort, 0;
-   split_symbol, bool_sort, 0;
+  [true_symbol, bool_;
+   false_symbol, bool_;
+   eq_symbol, bool_ <== [univ_; univ_];
+   exists_symbol, bool_ <=. (bool_ <=. univ_);
+   forall_symbol, bool_ <=. (bool_ <=. univ_);
+   lambda_symbol, univ_ <=. (univ_ <=. univ_);
+   not_symbol, bool_ <=. bool_;
+   imply_symbol, bool_ <== [bool_; bool_];
+   and_symbol, bool_ <== [bool_; bool_];
+   or_symbol, bool_ <== [bool_; bool_];
+   at_symbol, univ_ <== [univ_; univ_];   (* FIXME: this really ought to be polymorphic *)
+   db_symbol, univ_;
+   split_symbol, bool_;
    ]
+
+(** A signature maps symbols to (sort, arity) *)
+type signature = sort SMap.t
+
+let empty_signature = SMap.empty
 
 (** default signature, containing predefined symbols with their arities and sorts *)
 let base_signature =
   List.fold_left
-    (fun signature (symb,sort,arity) -> SMap.add symb (arity, sort) signature)
+    (fun signature (symb,sort) -> SMap.add symb sort signature)
     empty_signature table
 
 (** Set of base symbols *)
-let base_symbols = List.fold_left (fun set (s, _, _) -> SSet.add s set) SSet.empty table
+let base_symbols = List.fold_left (fun set (s, _) -> SSet.add s set) SSet.empty table
 
 (** extract the list of symbols from the complete signature *)
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
-
-(** Serialize the signature as a string, with '~' as separators *)
-let dump_signature signature =
-  let b = Buffer.create 128 in
-  let formatter = Format.formatter_of_buffer b in
-  SMap.iter
-    (fun s (arity, sort) ->
-      Format.fprintf formatter "%s:%d:%s~@?" (name_symbol s) arity (name_symbol sort))
-    signature;
-  (* get the whole buffer, except the last '~' *)
-  if Buffer.length b = 0 then "" else Buffer.sub b 0 (Buffer.length b - 1)
-
-(** Deserialize the signature from the string, or raise Invalid_argument *)
-let load_signature str =
-  (* how to parse a single triplet, that describes a symbol *)
-  let parse_triplet signature triplet =
-    match Str.split (Str.regexp ":") triplet with
-    | [symbol; arity; sort] ->
-      let arity = int_of_string arity in
-      let symbol = mk_symbol symbol in
-      let sort = mk_symbol sort in
-      SMap.add symbol (arity, sort) signature
-    | _ -> failwith "bad triplet"
-  in
-  try
-    let triplets = Str.split (Str.regexp "~") str in
-    List.fold_left parse_triplet empty_signature triplets
-  with _ ->
-    raise (Invalid_argument ("failed load_signature of " ^ str))

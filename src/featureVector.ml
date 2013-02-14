@@ -223,8 +223,9 @@ let mk_fv_index_signature signature =
   let pp name s = Utils.sprintf "%s(%s)" name (name_symbol s) in
   (* create features for the symbols *)
   SMap.iter
-    (fun s (arity, sort) ->
-      if sort == bool_sort
+    (fun s sort ->
+      let arity = arity sort in
+      if sort == bool_
         then features := [1 + arity, count_symb_plus s, pp "count+" s;
                           1 + arity, count_symb_minus s, pp "count-" s]
                           @ !features

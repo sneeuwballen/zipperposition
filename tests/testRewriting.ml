@@ -8,22 +8,22 @@ module S = FoSubst
 module Utils = FoUtils
 module Rw = Rewriting
 
-let a = T.mk_const (mk_symbol "a") univ_sort
-let b = T.mk_const (mk_symbol "b") univ_sort
-let c = T.mk_const (mk_symbol "c") univ_sort
-let d = T.mk_const (mk_symbol "d") univ_sort
-let f x y = T.mk_node (mk_symbol "f") univ_sort [x; y]
-let g x = T.mk_node (mk_symbol "g") univ_sort [x]
-let h x = T.mk_node (mk_symbol "h") univ_sort [x]
-let zero = T.mk_const (mk_symbol "0") univ_sort
-let succ n = T.mk_node (mk_symbol "s") univ_sort [n]
-let plus a b = T.mk_node (mk_symbol "+") univ_sort [a; b]
-let minus a = T.mk_node (mk_symbol "-") univ_sort [a]
-let times a b = T.mk_node (mk_symbol "x") univ_sort [a; b]
-let x = T.mk_var 1 univ_sort
-let y = T.mk_var 2 univ_sort
-let z = T.mk_var 3 univ_sort
-let u = T.mk_var 4 univ_sort
+let a = T.mk_const (mk_symbol "a") univ_
+let b = T.mk_const (mk_symbol "b") univ_
+let c = T.mk_const (mk_symbol "c") univ_
+let d = T.mk_const (mk_symbol "d") univ_
+let f x y = T.mk_node (mk_symbol "f") univ_ [x; y]
+let g x = T.mk_node (mk_symbol "g") univ_ [x]
+let h x = T.mk_node (mk_symbol "h") univ_ [x]
+let zero = T.mk_const (mk_symbol "0") univ_
+let succ n = T.mk_node (mk_symbol "s") univ_ [n]
+let plus a b = T.mk_node (mk_symbol "+") univ_ [a; b]
+let minus a = T.mk_node (mk_symbol "-") univ_ [a]
+let times a b = T.mk_node (mk_symbol "x") univ_ [a; b]
+let x = T.mk_var 1 univ_
+let y = T.mk_var 2 univ_
+let z = T.mk_var 3 univ_
+let u = T.mk_var 4 univ_
 
 let _ = Utils.set_debug 3
 
@@ -50,7 +50,7 @@ let rec print_peano_nice formatter t =
     | Bind (s, t') ->
       Format.fprintf formatter "%a(%a)" !T.pp_symbol#pp s print_peano_nice t'
     | Node (h, l) ->
-      Format.fprintf formatter "@[<h>%a(%a)@]" !T.pp_term#pp (T.mk_const h univ_sort (* ugly *))
+      Format.fprintf formatter "@[<h>%a(%a)@]" !T.pp_term#pp (T.mk_const h univ_ (* ugly *))
         (Utils.pp_list ~sep:", " print_peano_nice) l
 
 (** Simple rewriting system for Peano arithmetic with + and x *)

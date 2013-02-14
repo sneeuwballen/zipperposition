@@ -153,10 +153,10 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
     mk_lit ~ord T.true_term T.true_term sign
   (* deal with false/true *)
   | _ when T.eq_term l T.false_term ->
-    assert (r.sort = bool_sort);
+    assert (r.sort = bool_);
     lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
   | _ when T.eq_term r T.false_term ->
-    assert (l.sort = bool_sort);
+    assert (l.sort = bool_);
     lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
   (* deal with negation *)
   | Node (s, [t]), _ when s = not_symbol && T.eq_term r T.true_term ->
@@ -243,6 +243,13 @@ let ground_lits lits =
       T.is_ground_term l && T.is_ground_term r && check (i+1)
   in check 0
 
+let term_of_lits lits =
+  match lits with
+  | [||] -> T.false_term
+  | _ -> Array.fold_left
+    (fun t lit -> T.mk_or t (term_of_lit lit))
+    (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
+
 (** Apply the substitution to the array of literals, with offset *)
 let apply_subst_lits ?(recursive=true) ~ord subst (lits,offset) =
   Array.map
@@ -268,9 +275,9 @@ let pp_literal_gen pp_term formatter lit =
       else Format.fprintf formatter "¬%a" pp_term#pp l
   | Equation (l, r, sign, _) when T.eq_term l T.true_term ->
     if sign
-      then pp_term#pp formatter r
-      else Format.fprintf formatter "¬%a" pp_term#pp r
-  | Equation (l, r, sign, _) when l.sort == bool_sort ->
+      then !T.pp_term#pp formatter r
+      else Format.fprintf formatter "¬%a" !T.pp_term#pp r
+  | Equation (l, r, sign, _) when l.sort == bool_ ->
     if sign
       then Format.fprintf formatter "%a <=> %a" pp_term#pp l pp_term#pp r
       else Format.fprintf formatter "%a <~> %a" pp_term#pp l pp_term#pp r

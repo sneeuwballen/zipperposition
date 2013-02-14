@@ -373,7 +373,7 @@ let infer_split hc =
     incr split_count;
     if Symbols.is_used s
       then next_split_term ()
-      else T.mk_const (mk_symbol ~attrs:attr_split s) bool_sort
+      else T.mk_const (mk_symbol ~attrs:attr_split s) bool_
   in
   (* is the term made of a split symbol? *)
   let is_split_term t = match t.term with
@@ -500,7 +500,7 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
     | Var _ | BoundVar _ -> t
     | Bind (s, t') ->
       let t'' = traverse ~restrict:false t' in
-      let new_t = T.mk_bind s t'' in
+      let new_t = T.mk_bind ~old:t s t.sort t'' in
       (* rewrite term at root *)
       normal_form ~restrict new_t
     | Node (s, l) ->

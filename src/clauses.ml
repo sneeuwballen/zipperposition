@@ -360,7 +360,7 @@ let is_unit_clause hc = match hc.hclits with
 let is_cnf hc =
   Utils.array_forall
     (fun (Equation (l, r, sign, _)) ->
-      T.atomic_rec l && T.atomic_rec r && (l.sort != bool_sort ||
+      T.atomic_rec l && T.atomic_rec r && (l.sort != bool_ ||
                                           (l == T.true_term || r == T.true_term)))
     hc.hclits
 
@@ -370,24 +370,24 @@ let signature clauses =
   let rec explore_term signature t = match t.term with
   | Var _ | BoundVar _ -> signature
   | Bind (s, t') ->
-    let arity, sort = 1, t.sort in
-    let signature' = update_sig signature s arity sort in
+    let sort = t.sort in
+    let signature' = update_sig signature s sort in
     explore_term signature' t'
   | Node (f, l) ->
-    let arity, sort = List.length l, t.sort in
-    let signature' = update_sig signature f arity sort in
+    let sort = t.sort <== (List.map (fun x -> x.sort) l) in
+    let signature' = update_sig signature f sort in
     List.fold_left explore_term signature' l
   and explore_lit signature lit = match lit with
   | Equation (l,r,_,_) -> explore_term (explore_term signature l) r
   and explore_clause signature hc = Array.fold_left explore_lit signature hc.hclits
-  (* Update signature with s -> (arity, sort).
+  (* Update signature with s -> sort.
      Checks consistency with current value, if any. *)
-  and update_sig signature f arity sort =
+  and update_sig signature f sort =
     (try
-      let arity', sort' = SMap.find f signature in
-      assert (arity = arity' && sort == sort');
+      let sort' = SMap.find f signature in
+      assert (sort == sort');
     with Not_found -> ());
-    let signature' = SMap.add f (arity, sort) signature in
+    let signature' = SMap.add f sort signature in
     signature'
   in
   List.fold_left explore_clause empty_signature clauses
@@ -670,7 +670,7 @@ let pp_clause_tstp =
         (* quantify all free variables *)
         let vars = T.vars t in
         let t = List.fold_left
-          (fun t var -> T.mk_node forall_symbol bool_sort [var; t])
+          (fun t var -> T.mk_node forall_symbol bool_ [var; t])
           t vars
         in
         T.pp_term_tstp#pp formatter t

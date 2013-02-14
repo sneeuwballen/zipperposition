@@ -93,7 +93,7 @@ let rewrite trs t =
     match t.term with
     | Bind (s, t') ->
       let t'' = compute_nf offset trs t' in
-      let new_t = T.mk_bind s t'' in
+      let new_t = T.mk_bind s t.sort t'' in
       reduce_at_root offset trs new_t
     | Node (hd, l) ->
       (* rewrite subterms first *)

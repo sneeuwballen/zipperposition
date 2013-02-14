@@ -63,9 +63,9 @@ let eq_formulas f1 f2 = f1 = f2
 
 let mk_true = True
 let mk_false = False
-let mk_atom t = Atom (cast t bool_sort)
-let mk_eq t1 t2 = Eq (t1, t2)
-let mk_neq t1 t2 = Not (Eq (t1, t2))
+let mk_atom t = assert (term_sort t == bool_); Atom t
+let mk_eq t1 t2 = assert (term_sort t1 == term_sort t2); Eq (t1, t2)
+let mk_neq t1 t2 = Not (mk_eq t1 t2)
 let mk_lit t1 t2 sign = if sign then mk_eq t1 t2 else mk_neq t1 t2
 let mk_or fs = Or fs
 let mk_and fs = And fs
@@ -78,7 +78,7 @@ let mk_exists v f = Exists (v, f)
 
 module TMap = Map.Make(struct type t = term let compare = compare_terms end)
 
-(** Signature (map symbol -> arity * sort) for this set of formulas *)
+(** Signature (map symbol -> sort) for this set of formulas *)
 let signature formulas =
   let rec explore signature f = match f with
   | True | False -> signature
@@ -87,17 +87,18 @@ let signature formulas =
   | Or fs | And fs -> List.fold_left explore signature fs
   | Equiv (f1, f2) -> explore (explore signature f1) f2
   | Not f -> explore signature f
-  | Forall (v,f) | Exists (v, f) -> assert (is_var v); explore signature f
+  | Forall (v, f) | Exists (v, f) -> assert (is_var v); explore signature f
   and explore_term signature t = match t with
   | Var _ -> signature
-  | Node (f, s, l) ->
+  | Node (f, sort, l) ->
     begin
-      let arity, sort = List.length l, s in
+      (* build a function sort *)
+      let sort = sort <== (List.map term_sort l) in
       (try (* check consistency with signature *)
-        let arity', sort' = SMap.find f signature in
-        assert (arity = arity' && sort = sort');
+        let sort' = SMap.find f signature in
+        assert (sort == sort');
       with Not_found -> ());
-      let signature' = SMap.add f (arity, sort) signature in
+      let signature' = SMap.add f sort signature in
       List.fold_left explore_term signature' l
     end
   in

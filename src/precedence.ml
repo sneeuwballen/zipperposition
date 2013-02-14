@@ -69,9 +69,9 @@ let list_constraint l =
 
 let arity_constraint signature s1 s2 =
   try
-    let s1_arity, _ = SMap.find s1 signature
-    and s2_arity, _ = SMap.find s2 signature in
-    s1_arity - s2_arity  (* bigger arity means bigger symbol *)
+    let s1sort = SMap.find s1 signature
+    and s2sort = SMap.find s2 signature in
+    (arity s1sort) - (arity s2sort)  (* bigger arity means bigger symbol *)
   with Not_found -> 0
 
 let invfreq_constraint clauses =
@@ -329,8 +329,8 @@ let perturbate ?(num=10) symbols =
     a.(j) <- tmp;
   (* perform n swaps on the array *)
   and swap_n n a =
-    if n = 0 then a else begin
-      let i = (Random.int (Array.length a - 2)) + 1 in
+    if n = 0 || Array.length a <= 1 then a else begin
+      let i = max 1 (Random.int (Array.length a - 1)) in
       let j = Random.int i in
       swap i j a;
       swap_n (n-1) a;
