@@ -25,18 +25,14 @@ open Symbols
 module Utils = FoUtils
 
 let hash_term t = match t.term with
-  | Var i -> Hash.hash_int2 (hash_sort t.sort) i
-  | BoundVar i -> Hash.hash_int2 113 i
+  | Var i -> Hash.hash_int2 i (hash_sort t.sort)
+  | BoundVar i -> Hash.hash_int2 i (hash_sort t.sort)
   | Node (s, l) ->
-    let rec aux h = function
-    | [] -> h
-    | head::tail ->
-      let h = Hash.hash_int2 h head.hkey in aux h tail
-    in
-    let h = Hash.hash_int2 (hash_sort t.sort) (hash_symbol s) in
-    abs (aux h l)
+    let h = Hash.hash_list (fun x -> x.hkey) 0 l in
+    let h = Hash.combine h (hash_symbol s) in
+    Hash.combine h (hash_sort t.sort)
   | Bind (s, t) ->
-    Hash.hash_int3 (hash_sort t.sort) (hash_symbol s) t.hkey
+    Hash.combine (hash_symbol s) t.hkey
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 
@@ -285,6 +281,7 @@ let rec at_pos t pos = match t.term, pos with
   | Var _, _::_ -> invalid_arg "wrong position in term"
   | Node (_, l), i::subpos when i < List.length l ->
     at_pos (Utils.list_get l i) subpos
+  | Bind (_, t'), 0::subpos -> at_pos t' subpos
   | _ -> invalid_arg "index too high for subterm"
 
 let rec replace_pos t pos new_t = match t.term, pos with
@@ -293,6 +290,7 @@ let rec replace_pos t pos new_t = match t.term, pos with
   | Node (s, l), i::subpos when i < List.length l ->
     let new_subterm = replace_pos (Utils.list_get l i) subpos new_t in
     mk_node s t.sort (Utils.list_set l i new_subterm)
+  | Bind (_, t'), 0::subpos -> replace_pos t' subpos new_t
   | _ -> invalid_arg "index too high for subterm"
 
 (** get subterm by its position *)
@@ -701,7 +699,7 @@ let pp_symbol_tstp =
     method pp formatter s = match s with
       | _ when s == not_symbol -> Format.pp_print_string formatter "~"
       | _ when s == eq_symbol -> Format.pp_print_string formatter "="
-      | _ when s == lambda_symbol -> failwith "^"
+      | _ when s == lambda_symbol -> Format.pp_print_string formatter "^"
       | _ when s == exists_symbol -> Format.pp_print_string formatter "?"
       | _ when s == forall_symbol -> Format.pp_print_string formatter "!"
       | _ when s == and_symbol -> Format.pp_print_string formatter "&"

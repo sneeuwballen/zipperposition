@@ -225,13 +225,12 @@ let compare_lits lits1 lits2 =
     else check 0
 
 let hash_lits lits =
-  let h = ref (Hash.initial_hash (Array.length lits * 4)) in
-  for i = 0 to Array.length lits - 1 do
-    let j = hash lits.(i) in
-    h := Hash.hash_4bytes !h j;
-  done;
-  let h = Hash.finish_hash !h in
-  abs h
+  let h = ref 0 in
+  Array.iter
+    (fun (Equation (l, r, sign, _)) ->
+      h := Hash.combine (Hash.combine !h l.hkey) r.hkey)
+    lits;
+  !h
 
 let weight_lits lits =
   Array.fold_left (fun w lit -> w + weight lit) 0 lits
