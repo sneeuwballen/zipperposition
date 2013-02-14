@@ -42,6 +42,8 @@ let compare_symbols s1 s2 = s1.symb_id - s2.symb_id
 
 let hash_symbol s = Hash.hash_int s.symb_id
 
+let hash_sort s = hash_symbol s
+
 (** weak hash table for symbols *)
 module HashSymbol = Hashcons.Make(
   struct

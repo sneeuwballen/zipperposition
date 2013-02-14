@@ -32,6 +32,8 @@ val compare_symbols : symbol -> symbol -> int
 val hash_symbol : symbol -> int
   (** hash the symbol *)
 
+val hash_sort : sort -> int
+
 type symbol_attribute = int
   (** attributes of the symbol *)
 

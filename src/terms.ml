@@ -25,18 +25,14 @@ open Symbols
 module Utils = FoUtils
 
 let hash_term t = match t.term with
-  | Var i -> Hash.hash_int2 (hash_symbol t.sort) i
-  | BoundVar i -> Hash.hash_int2 113 i
+  | Var i -> Hash.hash_int2 i (hash_sort t.sort)
+  | BoundVar i -> Hash.hash_int2 i (hash_sort t.sort)
   | Node (s, l) ->
-    let rec aux h = function
-    | [] -> h
-    | head::tail ->
-      let h = Hash.hash_int2 h head.hkey in aux h tail
-    in
-    let h = Hash.hash_int2 (hash_symbol t.sort) (hash_symbol s) in
-    abs (aux h l)
+    let h = Hash.hash_list (fun x -> x.hkey) 0 l in
+    let h = Hash.combine h (hash_symbol s) in
+    Hash.combine h (hash_sort t.sort)
   | Bind (s, t) ->
-    Hash.hash_int3 (hash_symbol t.sort) (hash_symbol s) t.hkey
+    Hash.combine (hash_symbol s) t.hkey
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 
