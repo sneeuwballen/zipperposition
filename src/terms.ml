@@ -528,6 +528,7 @@ let rec curry t =
   match t.term with
   | Var _ | BoundVar _ -> t
   | Bind (s, t') -> mk_bind s (curry t')
+  | Node (f, [a;b]) when f == at_symbol -> mk_at ~old:t (curry a) (curry b)
   | Node (f, []) -> t
   | Node (f, [t']) -> mk_at (mk_const f t.sort) (curry t')
   | Node (f, l) ->
@@ -557,6 +558,20 @@ let uncurry t =
     | _ -> failwith "not a curryfied term"
   in
   uncurry t
+
+let rec curryfied t =
+  failwith "not implemented" (* TODO *)
+
+(** All symbols of the term, without assumptions on arity *)
+let signature seq =
+  let rec explore set t = 
+    match t.term with
+    | Var _ | BoundVar _ -> set
+    | Bind (s, t') -> explore (SSet.add s set) t'
+    | Node (f, l) ->
+      List.fold_left explore (SSet.add f set) l
+  in
+  Sequence.fold explore SSet.empty seq
 
 (** Beta reduce the (curryfied) term, ie [(^[X]: t) @ t']
     becomes [subst(X -> t')(t)] *)
@@ -805,6 +820,12 @@ let of_json json =
       raise (Json.Util.Type_error (msg, json))
   in
   of_json json
+
+let varlist_to_json l =
+  `List (List.map to_json l)
+
+let varlist_of_json json =
+  List.map of_json (Json.Util.to_list json)
 
 (* ----------------------------------------------------------------------
  * skolem terms

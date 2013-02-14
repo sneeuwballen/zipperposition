@@ -176,6 +176,9 @@ val db_to_classic : ?varindex:int ref -> term -> term
 
 val curry : term -> term                    (** Currify all subterms *)
 val uncurry : term -> term                  (** Un-currify all subterms *)
+val curryfied : term -> bool                (** Is the term already curryfied? *)
+
+val signature : term Sequence.t -> SSet.t   (** All symbols, without assumptions on arity *)
 
 val beta_reduce : term -> term              (** Beta-reduce the (curryfied) term *)
 
@@ -234,6 +237,9 @@ val to_simple : term -> Simple.term option  (** fails if the term is of bool sor
 
 val to_json : term -> json
 val of_json : json -> term
+
+val varlist_to_json : varlist -> json
+val varlist_of_json : json -> varlist
 
 (* ----------------------------------------------------------------------
  * skolem terms

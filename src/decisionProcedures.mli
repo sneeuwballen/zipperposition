@@ -36,11 +36,19 @@ val dp_combine : dp -> dp -> dp
   (** Combine two decision procedures into a new one, that decides
       the combination of their theories, assuming they are compatible. *)
 
+val dp_more_specific : dp -> dp -> bool
+  (** [dp_more_specific dp1 dp2] returns true if [dp1] decides a theory
+      whose symbols are included in the theory of [dp2]. Heuristically, that
+      means that we can ignore [dp1] and focus on [dp2] *)
+
 val dp_canonize : dp -> term -> term
   (** Get the normal form of the term *)
 
 val dp_equal : dp -> term -> term -> bool
   (** Check whether the terms are equal modulo theory *)
+
+val dp_sig : dp -> SSet.t
+  (** Symbols of the theory associated to the Decision Procedure *)
 
 val dp_is_redundant : dp -> hclause -> bool
   (** Decide whether this clause is redundant *)
@@ -61,7 +69,7 @@ val dp_clauses : dp -> hclause list
 
 type gnd_convergent = {
   gc_ord : string;                    (** name of the ordering *)
-  gc_prec : precedence;               (** Precedence *)
+  gc_prec : symbol list;              (** Precedence *)
   gc_sig : SSet.t;                    (** Symbols of the theory *)
   gc_equations : literal array list;  (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)

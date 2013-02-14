@@ -68,10 +68,19 @@ let dp_combine dp1 dp2 =
     dp_solve = None;
   }
 
+(** [dp_more_specific dp1 dp2] returns true if [dp1] decides a theory
+    whose symbols are included in the theory of [dp2]. Heuristically, that
+    means that we can ignore [dp1] and focus on [dp2] *)
+let dp_more_specific dp1 dp2 =
+  SSet.subset dp1.dp_sig dp2.dp_sig &&
+  not (SSet.equal dp1.dp_sig dp2.dp_sig)
+
 (** Get the normal form of the term *)
 let dp_canonize dp t = dp.dp_canonize t
 
 let dp_equal dp t1 t2 = dp.dp_equal t1 t2
+
+let dp_sig dp = dp.dp_sig
 
 (** Decide whether this clause is redundant *)
 let dp_is_redundant dp hc =
@@ -124,7 +133,7 @@ let dp_clauses dp =
 
 type gnd_convergent = {
   gc_ord : string;                    (** name of the ordering *)
-  gc_prec : precedence;               (** Precedence *)
+  gc_prec : symbol list;              (** Precedence *)
   gc_sig : SSet.t;                    (** Symbols of the theory *)
   gc_equations : literal array list;  (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
