@@ -20,22 +20,38 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {2 Persistent Knowledge Base} *)
 
-type t
+open Types
 
-val empty : t
+(* TODO *)
 
-val add_item : t -> Pattern.item -> t
+module Utils = FoUtils
 
-val to_seq : t -> Pattern.item Sequence.t
-val of_seq : t -> Pattern.item Sequence.t -> t
+type t = Pattern.item list
 
-val to_json : t -> json
-val of_json : t -> json -> t
+let empty = []
 
-val pp : Format.formatter -> t -> unit
+let add_item kb i = i :: kb
+
+let to_seq kb = Sequence.of_list kb
+
+let of_seq kb items =
+  Sequence.fold add_item kb items
+
+let to_json kb : json = `List (List.map Pattern.item_to_json kb)
+
+let of_json kb (json : json) : t =
+  let l = Json.Util.to_list json in
+  of_seq kb (Sequence.map Pattern.item_of_json (Sequence.of_list l))
+
+let pp formatter kb =
+  Utils.pp_list Pattern.pp_item formatter kb 
 
 (** {2 Saving/restoring KB from disk} *)
 
-val save : file:string -> t -> unit
+let save ~file kb =
+  let json = to_json kb in
+  Json.to_file file json
 
-val restore : file:string -> t -> t
+let restore ~file kb =
+  let json = Json.from_file file in
+  of_json kb json

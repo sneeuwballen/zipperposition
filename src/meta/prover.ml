@@ -20,14 +20,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {2 The meta-prover itself} *)
 
-type t
+open Types
+
+type t = ProverOfDoom
   (** A meta-prover, reasoning at the theory/lemma level *)
 
-val create : ctx:context -> KB.t -> t
-  (** Fresh meta-prover, using the given KB *)
+(** Fresh meta-prover, using the given KB *)
+let create ~ctx kb = failwith "todo: Meta.Prover.create"
 
-val get_kb : t -> KB.t
-  (** Get the current Knowledge Base of the prover *)
+(** Get the current Knowledge Base of the prover *)
+let get_kb prover = failwith "no KB here yet"
 
 type result =
   | Deduced of literal array
@@ -37,14 +39,14 @@ type result =
 
 (* TODO: call calculus#preprocess on resulting clauses (CNF, etc.) *)
 
-val scan_clause : t -> literal array -> result list
-  (** Match the clause against patterns known to the KB. Matches
-      are added to the Datalog engine, and if some theories and lemma
-      are detected they are returned *)
+(** Match the clause against patterns known to the KB. Matches
+    are added to the Datalog engine, and if some theories and lemma
+    are detected they are returned *)
+let scan_clause prover lits = [] (* TODO *)
 
-val theories : t -> (string * term list) Sequence.t
-  (** List of theories detected so far *)
+(** List of theories detected so far *)
+let theories prover = Sequence.of_list []  (* TODO *)
 
-val experts : t -> Experts.expert list
-  (** Current list of experts that can be used *)
+(** Current list of experts that can be used *)
+let experts prover = [] (* TODO *)
 

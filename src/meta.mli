@@ -86,13 +86,10 @@ module Pattern : sig
         gc_ord and gc_prec, once instantiated, give a constraint on the ordering
         that must be satisfied for the system to be a decision procedure. *)
 
-  val pp_lemma : Format.formatter -> lemma -> unit
-  val pp_theory : Format.formatter -> theory -> unit
-  val pp_gnd_convergent : Format.formatter -> gnd_convergent -> unit
-
   type item = [lemma | theory | gnd_convergent]
     (** Any meta-object *)
 
+  val pp_item : Format.formatter -> [< item] -> unit
   val item_to_json : [< item] -> json
   val item_of_json : json -> [> item]
 
@@ -119,7 +116,7 @@ end
 
 (** {2 Indexing on patterns} *)
 
-module Map : sig
+module PMap : sig
   type +'a t
     (** the type of the map that has values of type 'a *)
 
