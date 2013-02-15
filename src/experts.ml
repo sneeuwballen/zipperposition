@@ -39,7 +39,7 @@ type expert = {
   expert_solve : ((term*term) list -> substitution list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
-}
+} (** An expert for some theory *)
 
 (** Simple syntaxic criterion to decide whether two decision procedures
     are compatibles: check whether they have no symbol in common.
@@ -137,17 +137,27 @@ type gnd_convergent = {
   gc_ord : string;                    (** name of the ordering *)
   gc_prec : symbol list;              (** Precedence *)
   gc_sig : SSet.t;                    (** Symbols of the theory *)
-  gc_equations : literal array list;  (** Equations of the system *)
+  gc_equations : literal list;        (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
-let mk_gc ~ord clauses = failwith "nope"
+let mk_gc name prec lits =
+  let set = List.fold_left
+    (fun set (Equation (l,r,_,_)) ->
+      SSet.union (T.signature l (SSet.union set (T.signature r))))
+    SSet.empty lits
+  in
+  { gc_ord = name;
+    gc_prec = prec;
+    gc_sig = set;
+    gc_equations = lits;
+  }
 
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
-let gc_expert gc = failwith "nope"
+let gc_expert gc = failwith "todo: Experts.gc_expert"
 
 (** Pretty-print the system of ground convergent equations *)
-let pp_gc formatter gc = failwith "nope"
+let pp_gc formatter gc = failwith "todo: Experts.pp_gc"
 
 (** {3 JSON encoding} *)
 
