@@ -141,10 +141,11 @@ type gnd_convergent = {
 } (** A set of ground convergent equations, for some order+precedence *)
 
 let mk_gc name prec lits =
-  let set = List.fold_left
-    (fun set (Equation (l,r,_,_)) ->
-      SSet.union (T.signature l (SSet.union set (T.signature r))))
-    SSet.empty lits
+  let set = T.signature
+    (Sequence.concat
+      (Sequence.map 
+        (fun (Equation (l,r,_,_)) -> Sequence.of_list [l;r])
+        (Sequence.of_list lits)))
   in
   { gc_ord = name;
     gc_prec = prec;
