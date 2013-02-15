@@ -30,8 +30,10 @@ open Symbols
 val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *)
 val eq_term : term -> term -> bool        (** standard equality on terms *)
 val compare_term : term -> term -> int    (** a simple order on terms *)
+val hash_term : term -> int
 
 module THashtbl : Hashtbl.S with type key = term
+module TSet : Sequence.Set.S with type elt = term
 
 (** Simple hashset for small sets of terms *)
 module THashSet :
@@ -119,6 +121,10 @@ val at_pos : term -> position -> term
 val replace_pos : term -> position -> term -> term
   (** replace t|_p by the second term *)
 
+val replace : term -> old:term -> by:term -> term
+  (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
+      in [t] by the term [by]. *)
+
 val at_cpos : term -> compact_position -> term
   (** retrieve subterm at the compact pos, or raise Invalid_argument*)
 
@@ -177,6 +183,8 @@ val db_to_classic : ?varindex:int ref -> term -> term
 val curry : term -> term                    (** Currify all subterms *)
 val uncurry : term -> term                  (** Un-currify all subterms *)
 val curryfied : term -> bool                (** Is the term already curryfied? *)
+
+val is_fo : term -> bool                    (** Check that the (curryfied) term is first-order *)
 
 val signature : term Sequence.t -> SSet.t   (** All symbols, without assumptions on arity *)
 

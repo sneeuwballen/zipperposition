@@ -76,6 +76,7 @@ val name_symbol : symbol -> string
 module SHashtbl : Hashtbl.S with type key = symbol
 
 module SMap : Map.S with type key = symbol
+module SMapSeq : Sequence.Map.S with type key = symbol
 
 module SSet : Set.S with type elt = symbol
 

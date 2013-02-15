@@ -58,6 +58,11 @@ module THashtbl = Hashtbl.Make(
     let equal t1 t2 = eq_term t1 t2
   end)
 
+module TSet = Sequence.Set.Make(struct
+  type t = term
+  let compare = compare_term
+end)
+
 module THashSet =
   struct
     type t = unit THashtbl.t
@@ -292,6 +297,17 @@ let rec replace_pos t pos new_t = match t.term, pos with
     mk_node s t.sort (Utils.list_set l i new_subterm)
   | Bind (_, t'), 0::subpos -> replace_pos t' subpos new_t
   | _ -> invalid_arg "index too high for subterm"
+
+(** [replace t ~old ~by] syntactically replaces all occurrences of [old]
+    in [t] by the term [by]. *)
+let rec replace t ~old ~by = match t.term with
+  | _ when t == old -> by
+  | Var _ | BoundVar _ -> t
+  | Bind (s, t') ->
+    mk_bind ~old:t s t.sort (replace t' ~old ~by)
+  | Node (s, l) ->
+    let l' = List.map (fun t' -> replace t' ~old ~by) l in
+    mk_node ~old:t s t.sort l'
 
 (** get subterm by its position *)
 let at_cpos t pos = 
@@ -605,6 +621,12 @@ let uncurry t =
 
 let rec curryfied t =
   failwith "not implemented" (* TODO *)
+
+let rec is_fo t = match t.term with
+  | Var _ | BoundVar _ -> true
+  | Bind (s, t') when s == lambda_symbol -> false
+  | Bind (_, t') -> is_fo t'
+  | Node (_, l) -> List.for_all is_fo l
 
 (** All symbols of the term, without assumptions on arity *)
 let signature seq =
