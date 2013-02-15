@@ -37,6 +37,8 @@ type dp = {
   dp_clauses : hclause list;        (** Clauses to add to the problem *)
   dp_canonize : term -> term;       (** Get a canonical form of the term *)
   dp_solve : (term -> term -> substitution) option;
+  (* TODO dp_solve : ((term*term) list -> substitution list) option
+    for simplex-like solvers? *)
 }
 
 (** Simple syntaxic criterion to decide whether two decision procedures

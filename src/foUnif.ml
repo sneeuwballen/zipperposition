@@ -55,7 +55,7 @@ let unification subst (a, o_a) (b, o_b) =
   Utils.enter_prof prof_unification;
   (* recursive unification *)
   let rec unif subst s o_s t o_t =
-    (if s.sort <> t.sort then raise UnificationFailure);
+    (if s.sort != t.sort then raise UnificationFailure);
     let s, o_s = S.get_var subst (s, o_s)
     and t, o_t = S.get_var subst (t, o_t) in
     match s.term, t.term with
@@ -102,7 +102,7 @@ let matching subst (a, o_a) (b, o_b) =
   Utils.enter_prof prof_matching;
   (* recursive matching *)
   let rec unif subst s o_s t o_t =
-    (if s.sort <> t.sort then raise UnificationFailure);
+    (if s.sort != t.sort then raise UnificationFailure);
     let s, o_s = S.get_var subst (s, o_s) in
     match s.term, t.term with
     | _ when s == t && (T.is_ground_term s || o_s = o_t) ->

@@ -100,13 +100,13 @@ module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
 let true_symbol = mk_symbol "$true"
 let false_symbol = mk_symbol "$false"
 let eq_symbol = mk_symbol ~attrs:(attr_infix lor attr_multiset lor attr_commut) "="
-let exists_symbol = mk_symbol ~attrs:attr_binder "$$exists"
-let forall_symbol = mk_symbol ~attrs:attr_binder "$$forall"
-let lambda_symbol = mk_symbol ~attrs:attr_binder "$$lambda"
-let not_symbol = mk_symbol "$$not"
-let imply_symbol = mk_symbol ~attrs:attr_infix "$$imply"
-let and_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac lor attr_multiset) "$$and"
-let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac lor attr_multiset) "$$or"
+let exists_symbol = mk_symbol ~attrs:attr_binder "?"
+let forall_symbol = mk_symbol ~attrs:attr_binder "!"
+let lambda_symbol = mk_symbol ~attrs:attr_binder "^"
+let not_symbol = mk_symbol "~"
+let imply_symbol = mk_symbol ~attrs:attr_infix "=>"
+let and_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac lor attr_multiset) "&"
+let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac lor attr_multiset) "|"
 
 (** {2 Magic symbols} *)
 

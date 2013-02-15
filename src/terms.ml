@@ -696,16 +696,7 @@ let pp_symbol_unicode =
 
 let pp_symbol_tstp =
   object
-    method pp formatter s = match s with
-      | _ when s == not_symbol -> Format.pp_print_string formatter "~"
-      | _ when s == eq_symbol -> Format.pp_print_string formatter "="
-      | _ when s == lambda_symbol -> Format.pp_print_string formatter "^"
-      | _ when s == exists_symbol -> Format.pp_print_string formatter "?"
-      | _ when s == forall_symbol -> Format.pp_print_string formatter "!"
-      | _ when s == and_symbol -> Format.pp_print_string formatter "&"
-      | _ when s == or_symbol -> Format.pp_print_string formatter "|"
-      | _ when s == imply_symbol -> Format.pp_print_string formatter "=>"
-      | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
+    method pp formatter s = Format.pp_print_string formatter (name_symbol s)
     method infix s = has_attr attr_infix s
   end
 
