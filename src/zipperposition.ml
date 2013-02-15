@@ -36,8 +36,8 @@ module Unif = FoUnif
 module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
-module Delayed = Delayed
-module DP = DecisionProcedures
+
+module Meta = Meta (* XXX be sure it compiles *)
 
 let version = "0.3"
 

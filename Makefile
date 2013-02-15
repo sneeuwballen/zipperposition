@@ -8,10 +8,11 @@ LIBS = datalog,sequence,unix,str
 SUBMODULES =
 PWD = $(shell pwd)
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
+INCLUDES = -I,src
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind -libs $(LIBS) -I src
+OPTIONS = -use-ocamlfind -libs $(LIBS) -I src -cflags $(INCLUDES) 
 #OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
-OPTIONS_LIB = -use-ocamlfind -I src
+OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
 
 # switch compilation module
 MODE ?= debug

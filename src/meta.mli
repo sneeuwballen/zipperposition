@@ -17,6 +17,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
+
 (** {1 Types and basic functions for the meta-prover} *)
 
 open Types
@@ -89,11 +90,11 @@ module Pattern : sig
   val pp_theory : Format.formatter -> theory -> unit
   val pp_gnd_convergent : Format.formatter -> gnd_convergent -> unit
 
-  type item : [<lemma | theory | gnd_convergent]
+  type item = [lemma | theory | gnd_convergent]
     (** Any meta-object *)
 
-  val item_to_json : item -> json
-  val item_of_json : json -> item
+  val item_to_json : [< item] -> json
+  val item_of_json : json -> [> item]
 
   (** {2 Conversion pattern <-> clause, and matching *)
 
@@ -109,7 +110,7 @@ module Pattern : sig
         and uncurry the term back. It will fail if the result is not
         first-order. *)
 
-  val matching : pattern -> literal array -> pattern list list
+  val matching : pattern -> literal array -> term list list
     (** [matching p lits] attempts to match the literals against the pattern.
         It yields a list of solutions, each solution [s1,...,sn] satisfying
         [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
@@ -124,19 +125,19 @@ module Map : sig
 
   val empty : 'a t
 
-  val add : pattern -> 'a -> 'a t -> 'a t
+  val add : Pattern.pattern -> 'a -> 'a t -> 'a t
 
-  val fold : (pattern -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val fold : (Pattern.pattern -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
   val retrieve : 'a t -> literal array ->
-                 (pattern -> pattern list -> 'a -> unit) -> unit
-    (** [retrieve map lits k] calls [k] on every list [l] of patterns
+                 (Pattern.pattern -> term list -> 'a -> unit) -> unit
+    (** [retrieve map lits k] calls [k] on every list [l] of terms
         such that [l = matching lits p] for some [p] that is a key of [map].
         [k] receives as arguments the pattern [p], the arguments [l]
         and the value associated to [p] *)
 
-  val to_seq : 'a t -> (pattern * 'a) Sequence.t
-  val of_seq : 'a t -> (pattern * 'a) Sequence.t -> 'a t
+  val to_seq : 'a t -> (Pattern.pattern * 'a) Sequence.t
+  val of_seq : 'a t -> (Pattern.pattern * 'a) Sequence.t -> 'a t
 
   val to_json : ('a -> json) -> 'a t -> json
   val of_json : (json -> 'a) -> 'a t -> json -> 'a t
@@ -151,10 +152,10 @@ module KB : sig
 
   val empty : t
 
-  val add_item : t -> Meta.item -> t
+  val add_item : t -> Pattern.item -> t
 
-  val to_seq : t -> Meta.item Sequence.t
-  val of_seq : t -> Meta.item Sequence.t -> t
+  val to_seq : t -> Pattern.item Sequence.t
+  val of_seq : t -> Pattern.item Sequence.t -> t
 
   val to_json : t -> json
   val of_json : t -> json -> t
