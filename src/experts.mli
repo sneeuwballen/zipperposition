@@ -18,47 +18,52 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Decision procedures for theories *)
+(** {1 Experts for theories} *)
+
+(** The "experts" are programs that have specific knowledge of some theory,
+    and that are able to perform some reasoning over terms that belong to
+    this theory. They must be correct, but not necessarily complete, on
+    the theory. *)
 
 open Types
 open Symbols
 
 (** {2 General interface} *)
 
-type dp
-  (** A decision procedure for some theory *)
+type expert
+  (** An expert for some theory *)
 
-val dp_compatible : dp -> dp -> bool
-  (** Simple syntaxic criterion to decide whether two decision procedures
+val expert_compatible : expert -> expert -> bool
+  (** Simple syntaxic criterion to decide whether two experts
       are compatibles: check whether they have no symbol in common. *)
 
-val dp_combine : dp -> dp -> dp
-  (** Combine two decision procedures into a new one, that decides
+val expert_combine : expert -> expert -> expert
+  (** Combine two experts into a new one, that works on
       the combination of their theories, assuming they are compatible. *)
 
-val dp_more_specific : dp -> dp -> bool
-  (** [dp_more_specific dp1 dp2] returns true if [dp1] decides a theory
-      whose symbols are included in the theory of [dp2]. Heuristically, that
-      means that we can ignore [dp1] and focus on [dp2] *)
+val expert_more_specific : expert -> expert -> bool
+  (** [expert_more_specific e1 e2] returns true if [e1] decides a theory
+      whose symbols are included in the theory of [e2]. Heuristically, that
+      means that we can ignore [e1] and focus on [e2] *)
 
-val dp_canonize : dp -> term -> term
+val expert_canonize : expert -> term -> term
   (** Get the normal form of the term *)
 
-val dp_equal : dp -> term -> term -> bool
+val expert_equal : expert -> term -> term -> bool
   (** Check whether the terms are equal modulo theory *)
 
-val dp_sig : dp -> SSet.t
-  (** Symbols of the theory associated to the Decision Procedure *)
+val expert_sig : expert -> SSet.t
+  (** Symbols of the theory associated to the expert *)
 
-val dp_is_redundant : dp -> hclause -> bool
+val expert_is_redundant : expert -> hclause -> bool
   (** Decide whether this clause is redundant *)
 
-val dp_simplify : ctx:context -> dp -> hclause -> hclause
+val expert_simplify : ctx:context -> expert -> hclause -> hclause
   (** Simplify the clause *)
 
-val dp_clauses : dp -> hclause list
-  (** Get a list of clauses this DP needs to be present in the
-      superposition prover for it to be complete *)
+val expert_clauses : expert -> hclause list
+  (** Get a list of clauses this expert needs to be present in the
+      superposition prover (additional axioms). *)
 
 (** {2 Ground joinable sets of equations} *)
 
@@ -76,9 +81,9 @@ type gnd_convergent = {
 
 val mk_gc : ord:ordering -> hclause list -> gnd_convergent
 
-val gc_to_dp : gnd_convergent -> dp
-  (** From a set of ground convergent equations, make a decision
-      procedure that can be used by the prover *)
+val gc_expert : gnd_convergent -> expert
+  (** From a set of ground convergent equations, create an expert for
+      the associated theory. *)
 
 val pp_gc : Format.formatter -> gnd_convergent -> unit
   (** Pretty-print the system of ground convergent equations *)
@@ -90,5 +95,5 @@ val gc_of_json : ctx:context -> json -> gnd_convergent
 
 (** {2 Some builtin theories} *)
 
-val ac : symbol -> dp
+val ac : symbol -> expert
   (** Theory of Associative-Commutative symbols, for the given symbol *)
