@@ -837,7 +837,7 @@ let classic_skolem =
     if Symbols.is_used skolem then find_skolem () else skolem
   in
   fun ~ord t sort ->
-    Utils.debug 4 (lazy (Utils.sprintf "skolem %a@." !pp_term#pp t));
+    Utils.debug 4 "skolem %a@." !pp_term#pp t;
     let vars = vars t in
     (* find the skolemized normalized term *)
     let t'= try
@@ -854,8 +854,7 @@ let classic_skolem =
     in
     THashtbl.replace cache t t';
     (* get back to the variables of the given term *)
-    Utils.debug 4 (lazy (Utils.sprintf "skolem %a gives %a@."
-                         !pp_term#pp t !pp_term#pp t'));
+    Utils.debug 4 "skolem %a gives %a@." !pp_term#pp t !pp_term#pp t';
     t'
 
 (** Skolemization with a special non-first order symbol. The purpose is
@@ -865,7 +864,7 @@ let classic_skolem =
     The advantage is that it does not modify the signature, and also that
     rewriting can be performed inside the skolem terms. *)
 let unamed_skolem ~ord t sort =
-  Utils.debug 4 (lazy (Utils.sprintf "@[<h>magic skolem %a@]@." !pp_term#pp t));
+  Utils.debug 4 "@[<h>magic skolem %a@]@." !pp_term#pp t;
   let symb = mk_symbol ~attrs:attr_skolem "$$sk" in
   (* the existential witness, parametrized by the 'quoted' formula. The
      lambda is used to keep the formula closed. *)

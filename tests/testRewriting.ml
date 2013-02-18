@@ -72,11 +72,11 @@ let group_trs =
 
 (** check equality of normal forms *)
 let test trs t1 t2 =
-  Utils.debug 2 (lazy (Utils.sprintf "use TRS %a" Rw.pp_trs trs));
+  Utils.debug 2 "use TRS %a" Rw.pp_trs trs;
   let t1' = Rw.rewrite trs t1 in
   let t2' = Rw.rewrite trs t2 in
-  Utils.debug 1 (lazy (Utils.sprintf "normal form of %a = normal form of %a (ie %a)"
-                print_peano_nice t1 print_peano_nice t2 print_peano_nice t1'));
+  Utils.debug 1 "normal form of %a = normal form of %a (ie %a)"
+                print_peano_nice t1 print_peano_nice t2 print_peano_nice t1';
   assert (T.eq_term t1' t2');
   ()
 

@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 
 val set_debug : int -> unit               (** set the level of debug *)
-val debug : int -> string Lazy.t -> unit  (** debug message with level *)
+val debug : int ->  ('a, Format.formatter, unit) format -> 'a  (** debug message with level *)
 val debug_level : unit -> int             (** current debug level *)
 
 (** A profiler (do not call recursively) *)

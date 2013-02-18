@@ -24,13 +24,14 @@ open Hash
 (* debugging facilities *)
 let debug_level_ = ref 0
 let set_debug l = debug_level_ := l
-let debug l s =
-  if l <= !debug_level_ then begin
-    (* cleanup possible progress bar *)
-    (if l = 0 then (print_string "\r                                          ";
-                    print_string "                                        \r"));
-    print_endline (Lazy.force s) 
-  end
+let debug l format =
+  if l <= !debug_level_
+    then
+      Format.kfprintf
+        (fun fmt -> Format.fprintf fmt "@.")
+      Format.std_formatter
+      format
+    else Format.ifprintf Format.std_formatter format 
 let debug_level () = !debug_level_
 
 (** A profiler (do not call recursively) *)

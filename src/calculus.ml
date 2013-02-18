@@ -83,23 +83,23 @@ class type calculus =
 
 (** do binary inferences that involve the given clause *)
 let do_binary_inferences active_set rules c =
-  Utils.debug 3 (lazy (Utils.sprintf "do binary inferences with current active set: %a"
-                       C.pp_set active_set#clauses));
+  Utils.debug 3 "do binary inferences with current active set: %a"
+                C.pp_set active_set#clauses;
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
-      Utils.debug 3 (lazy ("#  apply binary rule " ^ name));
+      Utils.debug 3 "%%  apply binary rule %s" name;
       let new_clauses = rule active_set c in
       List.rev_append new_clauses acc)
     [] rules
 
 (** do unary inferences for the given clause *)
 let do_unary_inferences rules hc =
-  Utils.debug 3 (lazy "do unary inferences");
+  Utils.debug 3 "do unary inferences";
   (* apply every inference rule *)
   List.fold_left
     (fun acc (name, rule) ->
-      Utils.debug 3 (lazy ("#  apply unary rule " ^ name));
+      Utils.debug 3 "%%  apply unary rule %s" name;
       let new_clauses = rule hc in
       List.rev_append new_clauses acc)
     [] rules
@@ -157,9 +157,8 @@ let backward_simplify ~calculus active_set simpl_set given =
         if not (Literals.eq_lits hc.hclits hc'.hclits)
           (* the active clause has been simplified! *)
           then begin
-            Utils.debug 2 (lazy (Utils.sprintf
-                           "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                           !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc'));
+            Utils.debug 2 "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
+                          !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc';
             C.CSet.add before hc, hc' :: after
           end else before, after)
     (C.CSet.empty, []) candidates

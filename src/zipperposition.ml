@@ -48,8 +48,8 @@ let find_file name dir =
     try ignore (Unix.stat name); true
     with Unix.Unix_error (e, _, _) when e = Unix.ENOENT -> false
   (* search recursively from dir *)
-  and search path cur_name =
-    Utils.debug 3 (lazy (Utils.sprintf "%% search %s as %s@." name cur_name));
+  and search path cur_name = begin
+    Utils.debug 3 "%% search %s as %s" name cur_name;
     match path with
     | _ when file_exists cur_name -> cur_name (* found *)
     | [] -> failwith ("unable to find file " ^ name)
@@ -57,6 +57,7 @@ let find_file name dir =
       let new_dir = List.fold_left Filename.concat "" (List.rev path') in
       let new_name = Filename.concat new_dir name in
       search path' new_name
+  end
   in
   if Filename.is_relative name
     then
@@ -174,7 +175,6 @@ let compute_ord ~params clauses =
   in
   params.param_ord so
 
-(** Process the given file (try to solve it) *)
 let process_file params f =
   Format.printf "%% *** process file %s ***@." f;
   let steps = if params.param_steps = 0
@@ -195,8 +195,8 @@ let process_file params f =
   let clauses = List.map (C.from_simple ~ctx:d_ctx) clauses in
   (* first preprocessing, with a simple ordering. *)
   let clauses = calculus#preprocess ~ctx:d_ctx clauses in
-  Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
-                 (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
+  Utils.debug 2 "%% clauses first-preprocessed into: @[<v>%a@]@."
+                 (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
   Format.printf "%% precedence: %a@." T.pp_precedence ord#precedence#snapshot;
@@ -226,8 +226,8 @@ let process_file params f =
       result, clauses
     end else Sat.Unknown, clauses
   in
-  Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
-                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
+  Utils.debug 1 "%% %d clauses processed into: @[<v>%a@]@."
+                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
   (* add clauses to passive_set *)
   state#passive_set#add clauses;
   (* saturate, using a given clause main loop as choosen by the user *)
@@ -249,8 +249,7 @@ let process_file params f =
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
   | Sat.Sat ->
       Printf.printf "%% SZS status CounterSatisfiable\n";
-      Utils.debug 1 (lazy (Utils.sprintf "%% saturated set: @[<v>%a@]@."
-                     C.pp_set state#active_set#clauses))
+      Utils.debug 1 "%% saturated set: @[<v>%a@]@." C.pp_set state#active_set#clauses
   | Sat.Unsat c -> begin
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";

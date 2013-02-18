@@ -232,9 +232,8 @@ let recursive_eliminations hc =
     match tableau_to_clauses hc' tableau_rules with
     | None -> clauses := hc' :: !clauses (* done with this clause *)
     | Some clauses ->
-      Utils.debug 3 (lazy (Utils.sprintf
-                    "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
-                    !C.pp_clause#pp_h hc' (Utils.pp_list !C.pp_clause#pp_h) clauses));
+      Utils.debug 3 "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
+                    !C.pp_clause#pp_h hc' (Utils.pp_list !C.pp_clause#pp_h) clauses;
       (* simplify recursively new clauses *)
       List.iter (fun hc -> simplify hc) clauses
   in
