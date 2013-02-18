@@ -199,14 +199,14 @@ let instantiate (p : pattern) terms =
     It yields a list of solutions, each solution [s1,...,sn] satisfying
     [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
     of "or" and "=". *)
-let matching p lits =
+let matching (p : pattern) lits =
   let left, vars = p in
   let right = Lits.term_of_lits lits in
   let substs = Unif.matching_ac S.id_subst (left,0) (right,1) in
   (* now apply the substitution to the list of variables *)
   let substs = Sequence.map
     (fun subst ->
-      let vars = List.map (S.apply_subst subst) vars in
+      let vars = List.map (fun v -> S.apply_subst subst (v,0)) vars in
       (* restriction: only bind function symbols to constants for now *)
       if List.for_all T.is_const vars
         then Sequence.of_list [vars]

@@ -42,7 +42,7 @@ let retrieve l lits k =
   List.iter
     (fun (p, value) ->
       let lists = Pattern.matching p lits in
-      List.iter
+      Sequence.iter
         (fun term_list -> k p term_list value)
         lists)
     l
