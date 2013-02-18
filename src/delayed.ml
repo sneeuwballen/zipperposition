@@ -38,8 +38,8 @@ let prof_elim = Utils.mk_profiler "eliminate"
 
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
-  [at_symbol; split_symbol; const_symbol; eq_symbol; imply_symbol; forall_symbol;
-   exists_symbol; lambda_symbol;
+  [at_symbol; num_symbol; split_symbol; const_symbol; eq_symbol; imply_symbol;
+   forall_symbol; exists_symbol; lambda_symbol;
    or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
 
 let special_set = List.fold_left (fun set s -> SSet.add s set) SSet.empty special_preds

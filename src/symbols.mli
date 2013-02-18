@@ -20,16 +20,19 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Symbols and signature} *)
 
-type symbol
-  (** abstract type of a symbol *)
+(** {2 Definition of symbols and sorts} *)
 
-type sort =
-  | Sort of symbol          (** Atomic sort *)
-  | Fun of sort * sort list (** Function sort (first is return type) *)
-  (** simple types *)
-
-(** exception raised when sorts are mismatched *)
-exception SortError of string
+type symbol = {
+  symb_val : symbol_val;
+  mutable symb_id : int;
+  mutable symb_attrs : int;
+} (** A symbol is a string, a unique ID, and some attributes *)
+and symbol_val =
+  | Const of string
+  | Distinct of string
+  | Num of Num.num
+  | Real of float
+  (** A symbol value is a string, a quoted string, or a number *)
 
 val compare_symbols : symbol -> symbol -> int
   (** total ordering on symbols (equality is ==) *)
@@ -56,7 +59,10 @@ val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
 val attr_commut : symbol_attribute      (** symbol that is commutative (not ac) *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
-  (** construction of a symbol *)
+val mk_distinct : ?attrs:symbol_attribute -> string -> symbol
+val mk_num : ?attrs:symbol_attribute -> Num.num -> symbol
+val mk_int : ?attrs:symbol_attribute -> int -> symbol
+val mk_real : ?attrs:symbol_attribute -> float -> symbol
 
 val is_used : string -> bool
   (** is the symbol already used? *)
@@ -71,7 +77,7 @@ val has_attr : symbol_attribute -> symbol -> bool
   (** does the symbol have this attribute? *)
 
 val name_symbol : symbol -> string
-  (** deconstruction of a symbol *)
+  (** Printable form of a symbol *)
 
 module SHashtbl : Hashtbl.S with type key = symbol
 
@@ -100,6 +106,7 @@ val at_symbol : symbol    (** higher order curryfication symbol *)
 val db_symbol : symbol    (** pseudo symbol kept for locating bound vars in precedence *)
 val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
 val const_symbol : symbol (** pseudo symbol for locating magic constants in precedence *)
+val num_symbol : symbol   (** pseudo symbol to locate numbers in the precedence *)
 
 val mk_fresh_const : int -> symbol
   (** Infinite set of symbols, accessed by index, that will not collide with
@@ -107,9 +114,20 @@ val mk_fresh_const : int -> symbol
 
 (** {2 sorts} *)
 
-val bool_symbol : symbol
-val type_symbol : symbol
-val univ_symbol : symbol
+type sort =
+  | Sort of string (** Atomic sort *)
+  | Fun of sort * sort list (** Function sort (first is return type) *)
+  (** simple types *)
+
+(** exception raised when sorts are mismatched *)
+exception SortError of string
+
+val bool_symbol : string
+val type_symbol : string
+val univ_symbol : string
+val int_symbol : string
+val rat_symbol : string
+val real_symbol : string
 
 (** Sorts are simple types. Note that equality on sorts is (==),
     because sorts are hashconsed (to save memory) *)
@@ -118,7 +136,8 @@ val compare_sort : sort -> sort -> int
 
 val hash_sort : sort -> int
 
-val mk_sort : symbol -> sort
+val mk_sort : string -> sort
+  (** Build an atomic sort *)
 
 val (<==) : sort -> sort list -> sort
   (** [s <== args] build the sort of functions that take arguments
@@ -134,6 +153,9 @@ val (@@) : sort -> sort list -> sort
 val bool_ : sort
 val type_ : sort
 val univ_ : sort
+val int_ : sort
+val rat_ : sort
+val real_ : sort
 
 val arity : sort -> int
   (** Arity of a sort, ie nunber of arguments of the function, or 0 *)

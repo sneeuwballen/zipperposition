@@ -33,48 +33,92 @@ let attr_multiset = 1 lsl 5
 let attr_fresh_const = 1 lsl 6
 let attr_commut = 1 lsl 7
 
-(** A symbol is a string, a unique ID, and some attributes *)
+(** {2 Definition of symbols and sorts} *)
+
 type symbol = {
-  symb_name: string;
+  symb_val : symbol_val;
   mutable symb_id : int;
   mutable symb_attrs : int;
-}
+} (** A symbol is a string, a unique ID, and some attributes *)
+and symbol_val =
+  | Const of string
+  | Distinct of string
+  | Num of Num.num
+  | Real of float
+  (** A symbol value is a string, a quoted string, or a number *)
 
-type sort =
-  | Sort of symbol          (** Atomic sort *)
-  | Fun of sort * sort list (** Function sort *)
-  (** simple types *)
-
-(** exception raised when sorts are mismatched *)
-exception SortError of string
+let compare_symbol_val sv1 sv2 = match sv1, sv2 with
+  | Const s1, Const s2 -> String.compare s1 s2
+  | Distinct s1, Distinct s2 -> String.compare s1 s2
+  | Num n1, Num n2 -> Num.compare_num n1 n2
+  | Real f1, Real f2 -> compare f1 f2
+  | Const _, _ -> 1
+  | Distinct _, _ -> 1
+  | Num _, _ -> 1
+  | Real _, _ -> -1
 
 let compare_symbols s1 s2 = s1.symb_id - s2.symb_id
+  (** Comparison after hashconsing *)
 
-let hash_symbol s = Hash.hash_int s.symb_id
+let hash_symbol s = s.symb_id
 
 (** weak hash table for symbols *)
 module HashSymbol = Hashcons.Make(
   struct
     type t = symbol
-    let equal s1 s2 = String.compare s1.symb_name s2.symb_name = 0
-    let hash s = Hash.hash_string s.symb_name
+    let equal s1 s2 = compare_symbol_val s1.symb_val s2.symb_val = 0
+    let hash s = Hashtbl.hash s.symb_val
     let tag t s = (s.symb_id <- t; s)
   end)
 
-(** counter for symbols *)
-let symb_count = ref 0
-
 let mk_symbol ?(attrs=0) s =
   let s = {
-    symb_name = s;
+    symb_val = Const s;
     symb_id = 0;
     symb_attrs = attrs;
   } in
   HashSymbol.hashcons s
 
-let is_used s = HashSymbol.mem {symb_name=s; symb_id=0; symb_attrs=0;}
+let mk_distinct ?(attrs=0) s =
+  let s = {
+    symb_val = Distinct s;
+    symb_id = 0;
+    symb_attrs = attrs;
+  } in
+  HashSymbol.hashcons s
 
-let name_symbol s = s.symb_name
+let mk_num ?(attrs=0) n =
+  let s = {
+    symb_val = Num n;
+    symb_id = 0;
+    symb_attrs = attrs;
+  } in
+  HashSymbol.hashcons s
+
+let mk_int ?(attrs=0) i =
+  let s = {
+    symb_val = Num (Num.num_of_int i);
+    symb_id = 0;
+    symb_attrs = attrs;
+  } in
+  HashSymbol.hashcons s
+
+let mk_real ?(attrs=0) f =
+  let s = {
+    symb_val = Real f;
+    symb_id = 0;
+    symb_attrs = attrs;
+  } in
+  HashSymbol.hashcons s
+
+let is_used s = HashSymbol.mem {symb_val=Const s; symb_id=0; symb_attrs=0;}
+
+(** Printable form of a symbol *)
+let name_symbol s = match s.symb_val with
+  | Const s -> s
+  | Distinct s -> s
+  | Num n -> Num.string_of_num n
+  | Real f -> string_of_float f
 
 let tag_symbol s = s.symb_id
 
@@ -131,14 +175,28 @@ let split_symbol = mk_symbol "$$split_magic_cookie"
     with such constants) *)
 let const_symbol = mk_symbol "$$const_magic_cookie"
 
+(** pseudo symbol to locate numbers in the precedence *)
+let num_symbol = mk_symbol "$$num_magic_cookie"
+
 (** {2 sorts} *)
 
-let bool_symbol = mk_symbol "$o"
-let type_symbol = mk_symbol "$tType"
-let univ_symbol = mk_symbol "$i"
+type sort =
+  | Sort of string  (** Atomic sort *)
+  | Fun of sort * sort list (** Function sort *)
+  (** simple types *)
+
+(** exception raised when sorts are mismatched *)
+exception SortError of string
+
+let bool_symbol = "$o"
+let type_symbol = "$tType"
+let univ_symbol = "$i"
+let int_symbol = "$int"
+let rat_symbol = "$rat"
+let real_symbol = "$real"
 
 let rec compare_sort s1 s2 = match s1, s2 with
-  | Sort a, Sort b -> compare_symbols a b
+  | Sort a, Sort b -> String.compare a b
   | Fun (a, la), Fun (b, lb) ->
     let cmp = compare_sort a b in
     if cmp <> 0 then cmp else compare_sorts la lb
@@ -153,7 +211,7 @@ and compare_sorts l1 l2 = match l1, l2 with
   | _, [] -> 1
 
 let rec hash_sort s = match s with
-  | Sort s -> Hash.hash_string s.symb_name
+  | Sort s -> Hash.hash_string s
   | Fun (s, l) -> hash_sorts (hash_sort s) l
 and hash_sorts h l = match l with
   | [] -> h
@@ -168,7 +226,7 @@ module HashSort = Hashcons.Make(
     let tag t s = s  (* ignore tag *)
   end)
 
-let mk_sort symb = HashSort.hashcons (Sort symb)
+let mk_sort s = HashSort.hashcons (Sort s)
 
 let (<==) s l = match l with
   | [] -> s  (* collapse 0-ary functions *)
@@ -189,6 +247,9 @@ let (@@) s args = match s, args with
 let type_ = mk_sort type_symbol
 let bool_ = mk_sort bool_symbol
 let univ_ = mk_sort univ_symbol
+let int_ = mk_sort int_symbol
+let rat_ = mk_sort rat_symbol
+let real_ = mk_sort real_symbol
 
 (** Arity of a sort, ie nunber of arguments of the function, or 0 *)
 let arity = function
@@ -220,6 +281,7 @@ let table =
    db_symbol, univ_;
    split_symbol, bool_;
    const_symbol, univ_;
+   num_symbol, univ_;
    ]
 
 (** default signature, containing predefined symbols with their arities and sorts *)
@@ -243,18 +305,25 @@ let sig_of_seq seq = SMapSeq.of_seq seq
 
 module Json = Yojson.Basic
 
-let to_json s : Json.json = `String (name_symbol s)
+let to_json s : Json.json = match s.symb_val with
+  | Const s -> `String s
+  | Distinct s -> `List [`String "distinct"; `String s]
+  | Num n -> `List [`String "num"; `String (Num.string_of_num n)]
+  | Real f -> `List [`String "real"; `String (string_of_float f)]
 
-let of_json json =
-  let s = Json.Util.to_string json in
-  mk_symbol s
+let of_json json = match json with
+  | `String s -> mk_symbol s
+  | `List [`String "distinct"; `String s] -> mk_distinct s
+  | `List [`String "num"; `String n] -> mk_num (Num.num_of_string n)
+  | `List [`String "real"; `String f] -> mk_real (float_of_string f)
+  | _ -> raise (Json.Util.Type_error ("expected symbol", json))
 
 let rec sort_to_json = function
-  | Sort s -> to_json s
+  | Sort s -> `String s
   | Fun (s,l) -> `List (sort_to_json s :: List.map sort_to_json l)
 
 let rec sort_of_json json = match json with
-  | `String s -> mk_sort (of_json json)
+  | `String s -> mk_sort s
   | `List (s::l) -> (sort_of_json s) <== (List.map sort_of_json l)
   | _ -> raise (Json.Util.Type_error ("expected sort", json))
 

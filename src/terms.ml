@@ -225,7 +225,7 @@ let pp_symbol_tstp =
   end
 
 let rec pp_sort formatter sort = match sort with
-  | Sort s -> pp_symbol_tstp#pp formatter s
+  | Sort s -> Format.pp_print_string formatter s
   | Fun (s, l) ->
     Format.fprintf formatter "(%a) > %a"
       (Utils.pp_list ~sep:" * " pp_sort) l pp_sort s
@@ -757,14 +757,6 @@ class type pprinter_symbol =
 let pp_symbol_unicode =
   object
     method pp formatter s = match s with
-      | _ when s == not_symbol -> Format.pp_print_string formatter "•¬"
-      | _ when s == eq_symbol -> Format.pp_print_string formatter "•="
-      | _ when s == lambda_symbol -> Format.pp_print_string formatter "•λ"
-      | _ when s == exists_symbol -> Format.pp_print_string formatter "•∃"
-      | _ when s == forall_symbol -> Format.pp_print_string formatter "•∀"
-      | _ when s == and_symbol -> Format.pp_print_string formatter "•&"
-      | _ when s == or_symbol -> Format.pp_print_string formatter "•|"
-      | _ when s == imply_symbol -> Format.pp_print_string formatter "•→"
       | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
       | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
@@ -780,7 +772,7 @@ let pp_symbol_tstp =
 let pp_symbol = ref pp_symbol_unicode
 
 let rec pp_sort formatter sort = match sort with
-  | Sort s -> pp_symbol_tstp#pp formatter s
+  | Sort s -> Format.pp_print_string formatter s
   | Fun (s, l) ->
     Format.fprintf formatter "(%a) > %a"
       (Utils.pp_list ~sep:" * " pp_sort) l pp_sort s
