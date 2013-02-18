@@ -282,7 +282,7 @@ let mk_passive_set ~ctx queues =
           m_queues.(idx) <- new_q, w;
           if C.CSet.mem m_clauses hc
             then begin (* done, found a still-valid clause *)
-              U.debug 3 (lazy (U.sprintf "taken clause from %s" q#name));
+              U.debug 3 "taken clause from %s" q#name;
               m_clauses <- C.CSet.remove m_clauses hc;
               m_state <- (idx, weight+1);
               Some hc

@@ -189,8 +189,8 @@ let miniscope hc =
     then (* mark the miniscoping as a proof step, and produce a new clause *)
       let proof c = Proof (c, "miniscope", [hc.hcproof]) in
       let hc' = C.mk_hclause_a ~parents:[hc] ~ctx lits proof in
-      Utils.debug 3 (lazy (Utils.sprintf "miniscoped @[<h>%a@] into @[<h>%a@]"
-                    !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc'));
+      Utils.debug 3 "miniscoped @[<h>%a@] into @[<h>%a@]"
+                    !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc';
       hc'
     else hc  (* no miniscoping done *)
 
@@ -283,10 +283,10 @@ let cnf_of hc =
   let ord = ctx.ctx_ord in
   let var_index = ref 0 in
   (* unique counter for variable indexes *)
-  Utils.debug 3 (lazy (Utils.sprintf "input clause %a@." !C.pp_clause#pp_h hc));
+  Utils.debug 3 "input clause %a@." !C.pp_clause#pp_h hc;
   if is_cnf hc.hclits
     then begin
-      Utils.debug 3 (lazy (Utils.sprintf "clause @[<h>%a@] is cnf" !C.pp_clause#pp_h hc));
+      Utils.debug 3 "clause @[<h>%a@] is cnf" !C.pp_clause#pp_h hc;
       [hc] (* already cnf, perfect *)
     end else
       (* simplify clause *)
@@ -307,11 +307,11 @@ let cnf_of hc =
         (fun lits ->
           let lits = List.map (fun (t, sign) -> Lits.mk_lit ~ord t T.true_term sign) lits in
           let new_hc = C.mk_hclause ~parents:[hc] ~ctx lits proof in
-          Utils.debug 4 (lazy (Utils.sprintf "mk_clause %a@." !C.pp_clause#pp_h new_hc));
+          Utils.debug 4 "mk_clause %a@." !C.pp_clause#pp_h new_hc;
           C.clause_of_fof new_hc)
         lit_list_list
       in
-      Utils.debug 3 (lazy (Utils.sprintf "%% clause @[<h>%a@] to_cnf -> @[<h>%a@]"
-                    !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) clauses));
+      Utils.debug 3"%% clause @[<h>%a@] to_cnf -> @[<h>%a@]" !C.pp_clause#pp_h
+                  hc (Utils.pp_list !C.pp_clause#pp_h) clauses;
       List.iter (fun hc -> assert (is_cnf hc.hclits)) clauses;
       clauses

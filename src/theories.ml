@@ -307,8 +307,7 @@ let handle_formula meta lit =
     let conclusion = lit_to_hclause ~ctx ~kb lit proof in
     C.set_flag C.flag_lemma conclusion true;
     (* yield lemma *)
-    Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: deduced @[<h>%a@]"
-                  !C.pp_clause#pp_h conclusion));
+    Utils.debug 0 "%% meta-prover: deduced @[<h>%a@]" !C.pp_clause#pp_h conclusion;
     incr_stat stat_lemma_deduced;
     meta.meta_lemmas <- conclusion :: meta.meta_lemmas;
     (* remember that the term maps to this clause *)
@@ -319,8 +318,7 @@ let handle_formula meta lit =
 let handle_theory meta lit =
   let ctx = meta.meta_ctx in
   let kb = meta.meta_kb in
-  Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: theory @[<h>%a@]"
-                 Logic.pp_literal lit));
+  Utils.debug 0 "%% meta-prover: theory @[<h>%a@]" Logic.pp_literal lit;
   incr_stat stat_theory_detected;
   (* the clauses that belong to this theory *)
   let premises = Logic.db_explain meta.meta_db lit in
@@ -355,8 +353,8 @@ let db_add_lemma db lemma =
   (* add conclusion(args) :- premise1(args), ..., premise_n(args), for
      further propagations. *)
   let clause = clause_of_lemma lemma in
-  Utils.debug 2 (lazy (Utils.sprintf "%% add clause @[<h>%a@] to meta-prover"
-                 Logic.pp_clause clause));
+  Utils.debug 2 "%% add clause @[<h>%a@] to meta-prover"
+                 Logic.pp_clause clause;
   Logic.db_add db clause
   
 (** Add the definition of a theory to the Datalog engine *)
@@ -364,8 +362,7 @@ let db_add_theory db theory =
   let head = atom_to_literal theory.th_atom in
   let body = List.map atom_to_literal theory.th_definition in
   let clause = Logic.mk_clause head body in
-  Utils.debug 2 (lazy (Utils.sprintf "%% add clause @[<h>%a@] to meta-prover"
-                 Logic.pp_clause clause));
+  Utils.debug 2 "%% add clause @[<h>%a@] to meta-prover" Logic.pp_clause clause;
   Logic.db_add db clause 
 
 (** Create a meta_prover, using a Knowledge Base *)
@@ -380,10 +377,9 @@ let create_meta ~ctx kb =
     meta_ctx = ctx;
     meta_lemmas = [];
   } in
-  Utils.debug 1 (lazy (Utils.sprintf
-                 "%% meta-prover: kb contains %d lemmas, %d theories, %d named formulas"
+  Utils.debug 1 "%% meta-prover: kb contains %d lemmas, %d theories, %d named formulas"
                  (LemmaSet.cardinal kb.kb_lemmas) (SHashtbl.length kb.kb_theories)
-                 (SHashtbl.length kb.kb_formulas)));
+                 (SHashtbl.length kb.kb_formulas);
   (* handler for new formulas and theories *)
   let formula_handler = handle_formula meta in
   let theory_handler = handle_theory meta in
@@ -432,8 +428,8 @@ let scan_clause meta hc =
       let clause = Logic.mk_clause term [] in
       if not (Logic.db_mem meta.meta_db clause) then begin
         (* add fact if not already present *)
-        Utils.debug 0 (lazy (Utils.sprintf "%% meta-prover: property @[<h>%a where %a@]"
-                       Logic.pp_clause clause pp_named_formula nf));
+        Utils.debug 0 "%% meta-prover: property @[<h>%a where %a@]"
+                       Logic.pp_clause clause pp_named_formula nf;
         incr_stat stat_formula_detected;
         (* remember the clause that made us add the fact to datalog *)
         meta.meta_clauses <- TermMap.add term hc meta.meta_clauses;

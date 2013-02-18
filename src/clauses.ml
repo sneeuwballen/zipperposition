@@ -143,8 +143,8 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   incr_stat stat_mk_hclause;
   Utils.enter_prof prof_mk_hclause;
   if Array.length lits > 31
-  then (Utils.debug 0 (lazy (Utils.sprintf
-            "%% incompleteness: clause of %d lits -> $true" (Array.length lits)));
+  then (Utils.debug 0 "%% incompleteness: clause of %d lits -> $true"
+           (Array.length lits);
         Utils.exit_prof prof_mk_hclause;
         true_clause ~ctx)
   else begin

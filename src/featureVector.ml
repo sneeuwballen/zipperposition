@@ -239,8 +239,8 @@ let mk_fv_index_signature signature =
   (* only take a limited number of features *)
   let features = List.sort (fun (s1,_,_) (s2, _,_) -> s2 - s1) !features in
   let features = Utils.list_take max_features features in
-  Utils.debug 2 (lazy (Utils.sprintf "%% FV index use features @[<h>%a@]"
-                 (Utils.pp_list pp_feat_triple) features));
+  Utils.debug 2 "%% FV index use features @[<h>%a@]"
+                 (Utils.pp_list pp_feat_triple) features;
   let features = List.map (fun (_, f,_) -> f) features in
   let features = [feat_size_plus; feat_size_minus; count_skolem_symb;
                   count_split_symb; sum_of_depths] @ features in

@@ -169,7 +169,7 @@ let cut graph proof =
   (* select an element of the path, and add it to [cut] *)
   and cut_path path =
     let length = List.length path in
-    Utils.debug 1 (lazy (Utils.sprintf "%% cut path of length %d" length));
+    Utils.debug 1 "%% cut path of length %d" length;
     (* heuristic cost of the proof, at given closeness from [proof] *)
     let heuristic p depth =
       combine_heuristics
@@ -279,8 +279,8 @@ let cut_too_costly proofs =
 (** From the given proof [c], find a cut [P] of its premises,
     and learn the lemma p_1 & p_2 & ... & p_n => c *)
 let learn_subproof ~meta proof =
-  Utils.debug 1 (lazy (Utils.sprintf "%% try to learn lemma with conclusion @[<h>%a@]"
-                Lits.pp_lits (Proof.proof_lits proof)));
+  Utils.debug 1 "%% try to learn lemma with conclusion @[<h>%a@]"
+                Lits.pp_lits (Proof.proof_lits proof);
   let kb = meta.Theories.meta_kb in
   try
     (* find a good cut of [proof] *)
@@ -368,5 +368,3 @@ let learn_and_update meta hc =
   in
   (* store new lemmas *)
   add_lemmas kb lemmas
-
-

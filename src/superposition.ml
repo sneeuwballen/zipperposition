@@ -126,30 +126,30 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
   let active_idx = List.hd active_pos
   and u, v, sign_uv = Calculus.get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = Calculus.get_equations_sides active_clause active_pos in
-  Utils.debug 3 (lazy (Utils.sprintf ("sup @[<hov>@[<h>%a s=%a t=%a@]@ @[<h>%a " ^^
+  Utils.debug 3 ("sup @[<hov>@[<h>%a s=%a t=%a@]@ @[<h>%a " ^^
                                       "u=%a v=%a p=%a@]@ subst=%a@]")
                        !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
                        !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
-                       pp_pos passive_pos S.pp_substitution subst));
+                       pp_pos passive_pos S.pp_substitution subst;
   assert (T.db_closed s);
   if not sign_st 
-  then (Utils.debug 3 (lazy "... active literal is negative"); acc)
+  then (Utils.debug 3 "... active literal is negative"; acc)
   else if not (T.atomic s) (* do not rewrite non-atomic formulas *)
-  then (Utils.debug 3 (lazy "... active term is not atomic or DB-closed"); acc)
+  then (Utils.debug 3 "... active term is not atomic or DB-closed"; acc)
   else if not (T.db_closed (T.at_pos u subterm_pos))
     && (List.exists (fun x -> S.is_in_subst subst (x,o_p)) (T.vars (T.at_pos u subterm_pos)))
-  then (Utils.debug 3 (lazy "... narrowing with De Bruijn indices"); acc)
+  then (Utils.debug 3 "... narrowing with De Bruijn indices"; acc)
   else
   let t' = S.apply_subst subst (t, o_a)
   and v' = S.apply_subst subst (v, o_p) in
   if sign_uv && t' == v' && subterm_pos = []
-  then (Utils.debug 3 (lazy "... will yield a tautology"); acc)
+  then (Utils.debug 3 "... will yield a tautology"; acc)
   else begin
     if (ord#compare (S.apply_subst subst (s, o_a)) t' = Lt ||
         ord#compare (S.apply_subst subst (u, o_p)) v' = Lt ||
         not (BV.get (C.eligible_res (passive_clause, o_p) subst) passive_idx) ||
         not (BV.get (C.eligible_param (active_clause, o_a) subst) active_idx))
-      then (Utils.debug 3 (lazy "... has bad ordering conditions"); acc)
+      then (Utils.debug 3 "... has bad ordering conditions"; acc)
       else begin (* ordering constraints are ok *)
         let lits_a = array_except_idx active_clause.hclits active_idx in
         let lits_p = array_except_idx passive_clause.hclits passive_idx in
@@ -167,8 +167,7 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
                                        passive_clause.hcproof]) in
         let parents = [active_clause; passive_clause] in
         let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
-        Utils.debug 3 (lazy (Utils.sprintf "... ok, conclusion @[<h>%a@]"
-                            !C.pp_clause#pp_h new_clause));
+        Utils.debug 3 "... ok, conclusion @[<h>%a@]" !C.pp_clause#pp_h new_clause;
         new_clause :: acc
       end
   end
@@ -266,9 +265,8 @@ let infer_equality_resolution clause =
             and new_lits = array_except_idx clause.hclits pos in
             let new_lits = Lits.apply_subst_list ~ord:ctx.ctx_ord subst (new_lits, 0) in
             let new_clause = C.mk_hclause ~parents:[clause] ~ctx new_lits proof in
-            Utils.debug 3 (lazy (Utils.sprintf
-                          "equality resolution on @[<h>%a@] yields @[<h>%a@]"
-                          !C.pp_clause#pp clause !C.pp_clause#pp_h new_clause));
+            Utils.debug 3 "equality resolution on @[<h>%a@] yields @[<h>%a@]"
+                          !C.pp_clause#pp clause !C.pp_clause#pp_h new_clause;
             new_clause::acc
           end else
             acc
@@ -325,9 +323,8 @@ let infer_equality_factoring clause =
         let new_lits = (Lits.mk_neq ~ord t v) :: new_lits in
         let new_lits = Lits.apply_subst_list ~ord subst (new_lits,0) in
         let new_clause = C.mk_hclause ~parents:[clause] ~ctx new_lits proof in
-        Utils.debug 3 (lazy (Utils.sprintf
-                      "equality factoring on @[<h>%a@] yields @[<h>%a@]"
-                      !C.pp_clause#pp clause !C.pp_clause#pp_h new_clause));
+        Utils.debug 3 "equality factoring on @[<h>%a@] yields @[<h>%a@]"
+                      !C.pp_clause#pp clause !C.pp_clause#pp_h new_clause;
         [new_clause]
       end else
         []
@@ -418,8 +415,8 @@ let infer_split hc =
   find_components hc.hclits 0;
   let components = ref [] in
   UF.iter cluster (fun _ l ->
-    Utils.debug 4 (lazy (Utils.sprintf "component @[<h>%a@]"
-                   (Utils.pp_list Lits.pp_literal) l));
+    Utils.debug 4 "component @[<h>%a@]"
+                   (Utils.pp_list Lits.pp_literal) l;
     components := l :: !components);
   let n = List.length !components in
   if n > 1 && List.for_all (fun l -> List.length l >= 2) !components then begin
@@ -443,9 +440,8 @@ let infer_split hc =
       (List.tl !components) symbols
     in
     let new_clauses = guard :: new_clauses in
-    Utils.debug 3 (lazy (Utils.sprintf
-                  "split on @[<h>%a@] yields @[<h>%a@]"
-                  !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) new_clauses));
+    Utils.debug 3 "split on @[<h>%a@] yields @[<h>%a@]"
+                  !C.pp_clause#pp_h hc (Utils.pp_list !C.pp_clause#pp_h) new_clauses;
     Utils.exit_prof prof_split;
     new_clauses
   end else (Utils.exit_prof prof_split; [])
@@ -548,9 +544,9 @@ let demodulate simpl_set c =
       let proof c' = Proof (c', "demod", c.hcproof :: List.map (fun hc -> hc.hcproof) !clauses) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause_a ~parents ~ctx lits proof in
-      Utils.debug 3 (lazy (Utils.sprintf "@[<h>demodulate %a into %a using @[<hv>%a@]@]"
+      Utils.debug 3 "@[<h>demodulate %a into %a using @[<hv>%a@]@]"
                      !C.pp_clause#pp c !C.pp_clause#pp_h new_hc
-                     (Utils.pp_list !C.pp_clause#pp_h) !clauses));
+                     (Utils.pp_list !C.pp_clause#pp_h) !clauses;
       (* return simplified clause *)
       Utils.exit_prof prof_demodulate;
       new_hc
@@ -605,7 +601,7 @@ let is_tautology hc =
   in
   let is_tauto = check hc.hclits 0 in
   (if is_tauto then
-    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] is a tautology" !C.pp_clause#pp_h hc)));
+    Utils.debug 3 "@[<h>%a@] is a tautology" !C.pp_clause#pp_h hc);
   is_tauto
 
 (** semantic tautology deletion, using a congruence closure algorithm
@@ -649,8 +645,8 @@ let basic_simplify hc =
     let proof = C.adapt_proof hc.hcproof in  (* do not bother printing this *)
     let parents = hc :: hc.hcparents in
     let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
-    Utils.debug 3 (lazy (Utils.sprintf "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
-                   !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause));
+    Utils.debug 3 "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
+                   !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause;
     Utils.exit_prof prof_basic_simplify;
     new_clause
   end
@@ -699,8 +695,8 @@ let positive_simplify_reflect simpl_set c =
       (fun l (r,_) subst hc ->
         if t2 == (S.apply_subst subst (r,offset))
         then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
-          Utils.debug 4 (lazy (Utils.sprintf "equate %a and %a using %a"
-                      !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp_h hc));
+          Utils.debug 4 "equate %a and %a using %a"
+                      !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp_h hc;
           raise (FoundMatch (r, hc, subst)) (* success *)
         end else ());
       None (* no match *)
@@ -715,8 +711,8 @@ let positive_simplify_reflect simpl_set c =
       let proof c' = Proof (c', "simplify_reflect+", c.hcproof::premises) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a pos_simplify_reflect into %a@]"
-                    !C.pp_clause#pp c !C.pp_clause#pp_h new_hc));
+      Utils.debug 3 "@[<h>%a pos_simplify_reflect into %a@]"
+                    !C.pp_clause#pp c !C.pp_clause#pp_h new_hc;
       Utils.exit_prof prof_pos_simplify_reflect;
       new_hc
     
@@ -741,8 +737,8 @@ let negative_simplify_reflect simpl_set c =
       (fun l (r,_) subst hc ->
         if t == (S.apply_subst subst (r,offset))
         then begin
-          Utils.debug 3 (lazy (Utils.sprintf "neg_reflect eliminates %a=%a with %a"
-                         !T.pp_term#pp s !T.pp_term#pp t !C.pp_clause#pp_h hc));
+          Utils.debug 3 "neg_reflect eliminates %a=%a with %a"
+                         !T.pp_term#pp s !T.pp_term#pp t !C.pp_clause#pp_h hc;
           raise (FoundMatch (r, hc, subst)) (* success *)
         end else ());
       None (* no match *)
@@ -757,8 +753,8 @@ let negative_simplify_reflect simpl_set c =
       let proof c' = Proof (c', "simplify_reflect-", c.hcproof::premises) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a neg_simplify_reflect into %a@]"
-                    !C.pp_clause#pp c !C.pp_clause#pp_h new_hc));
+      Utils.debug 3 "@[<h>%a neg_simplify_reflect into %a@]"
+                    !C.pp_clause#pp c !C.pp_clause#pp_h new_hc;
       Utils.exit_prof prof_neg_simplify_reflect;
       new_hc
 
@@ -876,8 +872,7 @@ let subsumes a b =
   | None -> false
   | Some _ -> true
   in
-  Utils.debug 2 (lazy (Utils.sprintf "%% @[<h>%a subsumes %a@]"
-                Lits.pp_lits a Lits.pp_lits b));
+  Utils.debug 2 "%% @[<h>%a subsumes %a@]" Lits.pp_lits a Lits.pp_lits b;
   Utils.exit_prof prof_subsumption;
   res
 
@@ -911,8 +906,8 @@ let eq_subsumes a b =
   let res = match a with
   | [|Equation (s, t, true, _)|] ->
     let res = Utils.array_exists (equate_lit_with s t) b in
-    (if res then Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a eq-subsumes@ %a@]"
-                                Lits.pp_lits a Lits.pp_lits b)));
+    (if res then Utils.debug 3 "@[<h>%a eq-subsumes@ %a@]"
+                                Lits.pp_lits a Lits.pp_lits b);
     res
   | _ -> false  (* only a positive unit clause unit-subsumes a clause *)
   in
@@ -932,8 +927,7 @@ let subsumed_by_set set c =
     Utils.exit_prof prof_subsumption_set;
     false
   with Exit ->
-    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a@] subsumed by active set"
-                         !C.pp_clause#pp c));
+    Utils.debug 3 "@[<h>%a@] subsumed by active set" !C.pp_clause#pp c;
     Utils.exit_prof prof_subsumption_set;
     true
 
@@ -1000,9 +994,8 @@ let rec contextual_literal_cutting active_set c =
       let proof c'' = Proof (c'', "clc", [c.hcproof; c'.hcproof]) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx new_lits proof in
-      Utils.debug 3 (lazy (Utils.sprintf
-                    "@[<h>contextual literal cutting in %a using %a gives %a@]"
-                    !C.pp_clause#pp_h c !C.pp_clause#pp_h c' !C.pp_clause#pp_h new_hc));
+      Utils.debug 3 "@[<h>contextual literal cutting in %a using %a gives %a@]"
+                    !C.pp_clause#pp_h c !C.pp_clause#pp_h c' !C.pp_clause#pp_h new_hc;
       (* try to cut another literal *)
       Utils.exit_prof prof_clc; 
       contextual_literal_cutting active_set new_hc
@@ -1054,9 +1047,8 @@ let rec condensation hc =
     let proof c = Proof (c, "condensation", [hc.hcproof]) in
     let parents = hc :: hc.hcparents in
     let new_hc = C.mk_hclause_a ~parents ~ctx new_lits proof in
-    Utils.debug 3 (lazy (Utils.sprintf
-                  "@[<h>condensation in %a (with %a) gives %a@]"
-                  !C.pp_clause#pp_h hc S.pp_substitution subst !C.pp_clause#pp_h new_hc));
+    Utils.debug 3 "@[<h>condensation in %a (with %a) gives %a@]"
+                  !C.pp_clause#pp_h hc S.pp_substitution subst !C.pp_clause#pp_h new_hc;
     (* try to condense further *)
     Utils.exit_prof prof_condensation; 
     condensation new_hc

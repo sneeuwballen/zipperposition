@@ -175,8 +175,8 @@ let abstract_clause lits : pattern =
     t vars in
   let vars = List.map snd vars in
   let p = t, vars in
-  Utils.debug 2 (lazy (Utils.sprintf "%% @[<h>%a@] abstracted into @[<h>%a@]"
-                Lits.pp_lits lits pp_pattern p));
+  Utils.debug 2 "%% @[<h>%a@] abstracted into @[<h>%a@]"
+                Lits.pp_lits lits pp_pattern p;
   p
 
 (** number of arguments that have to be provided

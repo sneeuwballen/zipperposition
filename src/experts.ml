@@ -94,8 +94,7 @@ let expert_is_redundant expert hc =
     hc.hclits
   in
   (if ans then
-    Utils.debug 3 (lazy (Utils.sprintf "@[<h>%a redundant with %s@]"
-                   !C.pp_clause#pp_h hc expert.expert_name)));
+    Utils.debug 3 "@[<h>%a redundant with %s@]" !C.pp_clause#pp_h hc expert.expert_name);
   ans
 
 (** Simplify the clause *)
@@ -113,8 +112,8 @@ let expert_simplify ~ctx expert hc =
       let proof c' = Proof (c', rule, [hc.hcproof]) in
       let parents = hc :: hc.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      Utils.debug 3 (lazy (Utils.sprintf "@[<h>theory-simplified %a into %a with %s@]"
-                     !C.pp_clause#pp hc !C.pp_clause#pp_h new_hc expert.expert_name));
+      Utils.debug 3 "@[<h>theory-simplified %a into %a with %s@]"
+                     !C.pp_clause#pp hc !C.pp_clause#pp_h new_hc expert.expert_name;
       (* return simplified clause *)
       new_hc
     end

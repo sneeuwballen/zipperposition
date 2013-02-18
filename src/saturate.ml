@@ -67,9 +67,8 @@ let simplify ~calculus active_set simpl_set old_hc =
   let hc = calculus#active_simplify active_set hc in
   let hc = calculus#basic_simplify hc in
   (if not (Literals.eq_lits hc.hclits old_hc.hclits)
-    then Utils.debug 2 (lazy (Utils.sprintf
-                        "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                        !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc)));
+    then Utils.debug 2 "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
+                        !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc);
   Utils.exit_prof prof_simplify;
   old_hc, hc
 
@@ -211,8 +210,8 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       (* process the given clause! *)
       incr_stat stat_processed_given;
       C.check_ord_hclause ~ord hc;
-      Utils.debug 2 (lazy (Utils.sprintf "%% ============ step %5d  ============" num));
-      Utils.debug 1 (Lazy.lazy_from_val (Utils.sprintf "%% @[<h>%a@]" !C.pp_clause#pp_h hc));
+      Utils.debug 2 "%% ============ step %5d  ============" num;
+      Utils.debug 1 "%% @[<h>%a@]" !C.pp_clause#pp_h hc;
       (* scan clause within meta-prover *)
       let lemmas = find_lemmas state hc in
       let new_clauses = List.rev_append lemmas new_clauses in
@@ -253,8 +252,8 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
         [] inferred_clauses
       in
       let new_clauses = List.rev_append inferred_clauses new_clauses in
-      List.iter (fun new_c -> Utils.debug 2 (lazy (Utils.sprintf
-                "    inferred new clause @[<hov 3>%a@]" !C.pp_clause#pp_h new_c)))
+      List.iter (fun new_c -> Utils.debug 2
+                "    inferred new clause @[<hov 3>%a@]" !C.pp_clause#pp_h new_c)
         new_clauses;
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
       state#passive_set#add new_clauses;
@@ -293,7 +292,7 @@ let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus 
         (* some cleanup from time to time *)
         (if (num mod 1000 = 0)
           then (
-            Utils.debug 1 (Lazy.lazy_from_val "% perform cleanup of passive set");
+            Utils.debug 1 "%% perform cleanup of passive set";
             state#passive_set#clean ()
           ));
         (* do one step *)

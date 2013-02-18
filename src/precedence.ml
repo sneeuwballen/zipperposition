@@ -172,10 +172,10 @@ let mk_precedence ?(complete=true) constrs symbols =
       let new_len = List.length all_symbols in
       if new_len > old_len then begin
         (* some symbols have been added *)
-        Utils.debug 3 (lazy (Utils.sprintf "%% add @[<h>%a@] to the precedence"
-                      (Utils.pp_list ~sep:", " !T.pp_symbol#pp) new_symbols));
-        Utils.debug 3 (lazy (Utils.sprintf "%% old precedence %a"
-                       T.pp_precedence !symbols));
+        Utils.debug 3 "%% add @[<h>%a@] to the precedence"
+                      (Utils.pp_list ~sep:", " !T.pp_symbol#pp) new_symbols;
+        Utils.debug 3 "%% old precedence %a"
+                       T.pp_precedence !symbols;
 
         (* build a partial order that respects the current ordering *)
         let po = PartialOrder.mk_partial_order all_symbols in
@@ -188,8 +188,7 @@ let mk_precedence ?(complete=true) constrs symbols =
         symbols := all_symbols;
         table := mk_table !symbols;
 
-        Utils.debug 3 (lazy (Utils.sprintf "%% new precedence %a"
-                       T.pp_precedence !symbols));
+        Utils.debug 3 "%% new precedence %a" T.pp_precedence !symbols;
         (* return number of new symbols *)
         new_len - old_len
       end else 0
@@ -260,7 +259,7 @@ let weight_const_def = 1  (** weight of definitions of constants *)
 let check_definition clause =
   match C.is_definition clause with
   | Some (l,r) -> (* definition of l by r *)
-    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition: %a == %a@]" !T.pp_term#pp l !T.pp_term#pp r));
+    Utils.debug 0 "%% @[<h>definition: %a == %a@]" !T.pp_term#pp l !T.pp_term#pp r;
     [check_gt ~weight:weight_def l r]
   | None -> []
 
@@ -270,7 +269,7 @@ let check_rules clause =
   let rules = C.is_rewrite_rule clause in
   match rules with
   | [l, r] when not (T.member_term r l) ->
-    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>rewrite rule: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r));
+    Utils.debug 0 "%% @[<h>rewrite rule: %a --> %a@]" !T.pp_term#pp l !T.pp_term#pp r;
     [check_gt ~weight:weight_rewrite l r]
   | _ -> []  (* not unambiguously a rewrite rule *)
 
@@ -278,7 +277,8 @@ let check_const_def clause =
   match C.is_const_definition clause with
   | None -> []
   | Some (const, definition) ->
-    Utils.debug 0 (lazy (Utils.sprintf "%% @[<h>definition of constant: %a --> %a@]" !T.pp_term#pp const !T.pp_term#pp definition));
+    Utils.debug 0 "%% @[<h>definition of constant: %a --> %a@]"
+                !T.pp_term#pp const !T.pp_term#pp definition;
     [check_gt ~weight:weight_const_def const definition]
 
 (** Create the constraints for a single clause *)
@@ -344,7 +344,7 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
   (* main loop to follow gradient. Current state is precedence, with cost cost *)
   let rec follow_gradient ~steps precedence cost =
     if steps = 0 || cost = 0 then precedence, cost else begin (* done *)
-    Utils.debug 2 (lazy (Utils.sprintf "> on the hill with cost %d" cost));
+    Utils.debug 2 "> on the hill with cost %d" cost;
     (* perturbate current precedence *)
     let new_symbols_list = perturbate symbols in
     (* find which new precedence has minimal cost *)
@@ -394,12 +394,12 @@ let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
   let rec climb_hills ~num symbols precedence cost =
     if num = 5 || cost = 0
       then begin
-        Utils.debug 0 (lazy (Utils.sprintf "%% found precedence after %d attempts, cost %d / %d"
-                       num cost max_cost));
+        Utils.debug 0 "%% found precedence after %d attempts, cost %d / %d"
+                       num cost max_cost;
         precedence  (* done enough restarts *)
       end else begin
         let symbols' = Utils.list_shuffle symbols in
-        Utils.debug 1 (Lazy.lazy_from_val "% >>> restart hill climbing");
+        Utils.debug 1 "%% >>> restart hill climbing";
         let precedence', cost' = hill_climb ~steps:8 mk_precedence mk_cost symbols' in
         if cost' < cost
           then climb_hills ~num:(num+1) symbols' precedence' cost' (* choose new precedence *)

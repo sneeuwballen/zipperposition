@@ -181,7 +181,7 @@ let pp_proof_json formatter proof =
 
 (** Prints the proof according to the given input switch *)
 let pp_proof switch formatter proof = match switch with
-  | "none" -> Utils.debug 1 (lazy "%% proof printing disabled")
+  | "none" -> Utils.debug 1 "%% proof printing disabled"
   | "tstp" -> pp_proof_tstp formatter proof
   | "debug" -> pp_proof_debug formatter proof
   | "json" -> pp_proof_json formatter proof

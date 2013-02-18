@@ -51,7 +51,7 @@ let find_file name dir =
     with Unix.Unix_error (e, _, _) when e = Unix.ENOENT -> false
   (* search recursively from dir *)
   and search path cur_name =
-    Utils.debug 3 (lazy (Utils.sprintf "%% search %s as %s@." name cur_name));
+    Utils.debug 3 "%% search %s as %s@." name cur_name;
     match path with
     | _ when file_exists cur_name -> cur_name (* found *)
     | [] -> failwith ("unable to find file " ^ name)
@@ -119,7 +119,7 @@ let print_stats state =
 let print_state ?name filename (state, result) =
   match result with
   | Sat.Unsat c -> Proof.pp_dot_file ?name filename c.hcproof
-  | _ -> Utils.debug 1 (lazy "%% no empty clause; do not print state")
+  | _ -> Utils.debug 1 "%% no empty clause; do not print state"
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -185,7 +185,7 @@ let initial_kb params =
       Theories.save_kb ~file ~kb_printer:Theories.pp_disjunctions kb);
   (* return KB *)
   Format.printf "%% %a@." Theories.pp_kb_stats kb;
-  Utils.debug 2 (lazy (Utils.sprintf "initial kb: %a@." Theories.pp_kb kb));
+  Utils.debug 2 "initial kb: %a@." Theories.pp_kb kb;
   kb
 
 (** Initialize the meta-prover *)
@@ -228,8 +228,8 @@ let process_file ~kb params f =
   let clauses = List.map (C.from_simple ~ctx:d_ctx) clauses in
   (* first preprocessing, with a simple ordering. *)
   let clauses = calculus#preprocess ~ctx:d_ctx clauses in
-  Utils.debug 2 (lazy (Utils.sprintf "%% clauses first-preprocessed into: @[<v>%a@]@."
-                 (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
+  Utils.debug 2 "%% clauses first-preprocessed into: @[<v>%a@]@."
+                 (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
   (* meta-prover *)
   let meta = mk_meta ~ctx:d_ctx ~kb params in
   let clauses = enrich_with_theories ~ctx:d_ctx meta clauses in
@@ -263,8 +263,8 @@ let process_file ~kb params f =
       result, clauses
     end else Sat.Unknown, clauses
   in
-  Utils.debug 1 (lazy (Utils.sprintf "%% %d clauses processed into: @[<v>%a@]@."
-                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses));
+  Utils.debug 1 "%% %d clauses processed into: @[<v>%a@]@."
+                 num_clauses (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
   (* add clauses to passive_set *)
   state#passive_set#add clauses;
   (* saturate, using a given clause main loop as choosen by the user *)
@@ -293,8 +293,7 @@ let process_file ~kb params f =
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
   | Sat.Sat ->
       Printf.printf "%% SZS status CounterSatisfiable\n";
-      Utils.debug 1 (lazy (Utils.sprintf "%% saturated set: @[<v>%a@]@."
-                     C.pp_set state#active_set#clauses))
+      Utils.debug 1 "%% saturated set: @[<v>%a@]@." C.pp_set state#active_set#clauses
   | Sat.Unsat c -> begin
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";
