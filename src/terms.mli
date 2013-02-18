@@ -202,6 +202,23 @@ val eta_lift : term -> term -> term
       For instance (@ are omitted), [eta_lift f(a,g @ b,c) g] will return
       the term [^[X]: f(a, X @ b, c)] *)
 
+(** {2 Some AC-utils} *)
+
+val flatten_ac : symbol -> term list -> term list
+  (** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
+      elements that have [f] as head symbol. For instance, if l=[1+2; 3+(4+5)]
+      with f="+", this will return [1;2;3;4;5], perhaps in a different order *)
+
+val ac_normal_form : ?is_ac:(symbol -> bool) -> ?is_com:(symbol -> bool) ->
+                      term -> term
+  (** normal form of the term modulo AC *)
+
+val ac_eq : ?is_ac:(symbol -> bool) -> ?is_com:(symbol -> bool) ->
+            term -> term -> bool
+  (** Check whether the two terms are AC-equal. Optional arguments specify
+      which symbols are AC or commutative (by default by looking at
+      attr_ac and attr_commut). *)
+
 (* ----------------------------------------------------------------------
  * Pretty printing
  * ---------------------------------------------------------------------- *)

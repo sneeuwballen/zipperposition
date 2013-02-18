@@ -688,6 +688,58 @@ let eta_lift t sub_t =
   let sort = t.sort <=. sub_t.sort in
   mk_lambda sort (db_lift 1 (replace 0 t))
 
+(** {2 Some AC-utils} *)
+
+(** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
+    elements that have [f] as head symbol. For instance, if l=[1+2; 3+(4+5)]
+    with f="+", this will return [1;2;3;4;5], perhaps in a different order *)
+let flatten_ac f l =
+  let rec flatten acc l = match l with
+  | [] -> acc
+  | x::l' -> flatten (deconstruct acc x) l'
+  and deconstruct acc t = match t.term with
+  | Node (f', l') when f == f' ->
+    flatten acc l'
+  | _ -> t::acc
+  in flatten [] l
+
+(** normal form of the term modulo AC *)
+let ac_normal_form ?(is_ac=fun s -> has_attr attr_ac s)
+                   ?(is_com=fun s -> has_attr attr_commut s)
+                   t =
+  let rec normalize t = match t.term with
+    | Var _ -> t
+    | BoundVar _ -> t
+    | Bind (s, t') -> mk_bind ~old:t s t.sort (normalize t')
+    | Node (f, ([_;_] as l)) when is_ac f ->
+      let l = flatten_ac f l in
+      let l = List.map normalize l in
+      let l = List.sort compare_term l in
+      (match l with
+        | x::l' -> List.fold_left
+          (fun subt x -> mk_node f t.sort [x;subt])
+          x l'
+        | [] -> assert false)
+    | Node (f, [a;b]) when is_com f ->
+      if compare_term a b > 0
+        then mk_node f t.sort [b; a]
+        else t
+    | Node (f, l) ->
+      let l = List.map normalize l in
+      mk_node ~old:t f t.sort l
+  in
+  normalize t
+
+(** Check whether the two terms are AC-equal. Optional arguments specify
+    which symbols are AC or commutative (by default by looking at
+    attr_ac and attr_commut) *)
+let ac_eq ?(is_ac=fun s -> has_attr attr_ac s)
+          ?(is_com=fun s -> has_attr attr_commut s)
+          t1 t2 =
+  let t1' = ac_normal_form ~is_ac ~is_com t1
+  and t2' = ac_normal_form ~is_ac ~is_com t2 in
+  t1' == t2'
+
 (* ----------------------------------------------------------------------
  * Pretty printing
  * ---------------------------------------------------------------------- *)

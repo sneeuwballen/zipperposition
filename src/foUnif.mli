@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Unification and matching algorithms. TODO use var bindings to fasten computation *)
 
+open Symbols
 open Types
 
 (** Unify terms, returns a substitution or raises UnificationFailure *)
@@ -29,3 +30,10 @@ val unification: substitution -> term bind -> term bind -> substitution
     UnificationFailure. Only variables from the context of [a] can
     be bound in the substitution. *)
 val matching: substitution -> term bind -> term bind -> substitution
+
+(** [matching_ac a b] returns substitutions such that [subst(a) =_AC b]. It
+    is much more costly than [matching]. By default [is_ac] returns true only
+    for symbols that have [attr_ac], and [is_com] only for [attr_commut] *)
+val matching_ac : ?is_ac:(symbol -> bool) -> ?is_com:(symbol -> bool) ->
+                  substitution -> term bind -> term bind ->
+                  substitution Sequence.t
