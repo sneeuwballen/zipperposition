@@ -207,6 +207,7 @@ let matching p lits =
   let substs = Sequence.map
     (fun subst ->
       let vars = List.map (S.apply_subst subst) vars in
+      (* restriction: only bind function symbols to constants for now *)
       if List.for_all T.is_const vars
         then Sequence.of_list [vars]
         else Sequence.of_list [])

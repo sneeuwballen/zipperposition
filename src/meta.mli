@@ -89,10 +89,6 @@ module Pattern : sig
   type item = [lemma | theory | gnd_convergent]
     (** Any meta-object *)
 
-  val pp_item : Format.formatter -> [< item] -> unit
-  val item_to_json : [< item] -> json
-  val item_of_json : json -> [> item]
-
   (** {2 Conversion pattern <-> clause, and matching *)
 
   val abstract_clause : literal array -> pattern
@@ -102,16 +98,22 @@ module Pattern : sig
     (** number of arguments that have to be provided
         to instantiate the pattern *)
 
-  val instantiate : ctx:context -> pattern -> term list -> term
+  val instantiate : pattern -> term list -> term
     (** This applies the pattern to the given arguments, beta-reduces,
         and uncurry the term back. It will fail if the result is not
         first-order. *)
 
-  val matching : pattern -> literal array -> term list list
+  val matching : pattern -> literal array -> term list Sequence.t
     (** [matching p lits] attempts to match the literals against the pattern.
         It yields a list of solutions, each solution [s1,...,sn] satisfying
         [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
         of "or" and "=". *)
+
+  (** {2 Printing/parsing} *)
+
+  val pp_item : Format.formatter -> [< item] -> unit
+  val item_to_json : [< item] -> json
+  val item_of_json : json -> [> item]
 end
 
 (** {2 Indexing on patterns} *)
