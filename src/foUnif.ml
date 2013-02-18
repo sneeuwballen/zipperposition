@@ -141,19 +141,22 @@ let matching subst (a, o_a) (b, o_b) =
 
 (** [matching_ac a b] returns substitutions such that [subst(a) =_AC b]. It
     is much more costly than [matching]. By default [is_ac] returns true only
-    for symbols that have [attr_ac], and [is_com] only for [attr_commut] *)
+    for symbols that have [attr_ac], and [is_com] only for [attr_commut].
+    [offset] is used to create new variables. *)
 let matching_ac ?(is_ac=fun s -> has_attr attr_ac s)
                 ?(is_com=fun s -> has_attr attr_commut s)
+                ?offset
                 subst (a, o_a) (b, o_b) =
   (* function to get fresh variables *)
-  let offset = max (T.max_var (T.vars a) + o_a + 1)
-                   (T.max_var (T.vars b) + o_b + 1) in
+  let offset = match offset with
+    | Some o -> o
+    | None -> ref (max (T.max_var (T.vars a) + o_a + 1)
+                       (T.max_var (T.vars b) + o_b + 1)) in
   let fresh_var =
     (* avoid index collisions *)
-    let count = ref offset in
     fun sort ->
-      let v = T.mk_var !count sort in
-      incr count;
+      let v = T.mk_var !offset sort in
+      incr offset;
       v
   in
   (* recursive matching. [k] is called with solutions *)

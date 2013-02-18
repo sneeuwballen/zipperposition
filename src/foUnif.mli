@@ -33,7 +33,9 @@ val matching: substitution -> term bind -> term bind -> substitution
 
 (** [matching_ac a b] returns substitutions such that [subst(a) =_AC b]. It
     is much more costly than [matching]. By default [is_ac] returns true only
-    for symbols that have [attr_ac], and [is_com] only for [attr_commut] *)
+    for symbols that have [attr_ac], and [is_com] only for [attr_commut].
+    [offset] is used to create new variables. *)
 val matching_ac : ?is_ac:(symbol -> bool) -> ?is_com:(symbol -> bool) ->
+                  ?offset:int ref ->
                   substitution -> term bind -> term bind ->
                   substitution Sequence.t
