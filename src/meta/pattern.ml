@@ -26,6 +26,7 @@ open Types
 module T = Terms
 module S = FoSubst
 module Utils = FoUtils
+module Unif = FoUnif
 module Lits = Literals
 
 (** The datalog provers reasons over first-order formulas. However, to make
@@ -86,9 +87,16 @@ let pp_atom formatter a = match a with
   | MPattern p -> pp_pattern formatter p
   | MTerm t -> T.pp_term_debug#pp formatter t
 
-let atom_to_json a = failwith "todo: Pattern.atom_to_json"
+let atom_to_json a : json = match a with
+  | MString s -> `String s
+  | MPattern p -> `Assoc ["pattern", pattern_to_json p]
+  | MTerm t -> `Assoc ["term", T.to_json t]
 
-let atom_of_json json = failwith "todo: Pattern.atom_of_json"
+let atom_of_json (json : json) : atom = match json with
+  | `String s -> MString s
+  | `Assoc ["pattern", p] -> MPattern (pattern_of_json p)
+  | `Assoc ["term", t] -> MTerm (T.of_json t)
+  | _ -> raise (Json.Util.Type_error ("expected atom", json))
 
 (** The Datalog prover that reasons over atoms. *)
 module Logic = Datalog.Logic.Make(struct
@@ -96,7 +104,7 @@ module Logic = Datalog.Logic.Make(struct
   let equal = equal_atom
   let hash = hash_atom
   let to_string a = Utils.sprintf "%a" pp_atom a
-  let of_string s = atom_of_json s  (* XXX should not happen *)
+  let of_string s = atom_of_json (Json.from_string s)  (* XXX should not happen *)
 end)
 
 type lemma =
@@ -130,18 +138,6 @@ and gnd_convergent_spec = {
 
 type item = [lemma | theory | gnd_convergent]
   (** Any meta-object *)
-
-(* TODO *)
-let pp_item formatter (item : [< item]) = match item with
-  | `Lemma l -> ()
-  | `Theory _ -> ()
-  | `GndConvergent _ -> ()
-
-(* TODO *)
-let item_to_json (item : [< item]) = failwith "todo: Pattern.item_to_json"
-
-(* TODO *)
-let item_of_json json : [> item] = failwith "todo: Pattern.item_of_json"
 
 (** {2 Conversion pattern <-> clause, and matching *)
 
@@ -186,7 +182,7 @@ let arity (p : pattern)  = List.length (snd p)
 (** This applies the pattern to the given arguments, beta-reduces,
     and uncurry the term back. It will fail if the result is not
     first-order. *)
-let instantiate ~ctx (p : pattern) terms =
+let instantiate (p : pattern) terms =
   assert (List.length terms = arity p);
   let t, vars = p in
   let offset = T.max_var (T.vars t) + 1 in
@@ -203,4 +199,54 @@ let instantiate ~ctx (p : pattern) terms =
     It yields a list of solutions, each solution [s1,...,sn] satisfying
     [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
     of "or" and "=". *)
-let matching p lits = []  (* TODO *)
+let matching p lits =
+  let left, vars = p in
+  let right = Lits.term_of_lits lits in
+  let substs = Unif.matching_ac S.id_subst (left,0) (right,1) in
+  (* now apply the substitution to the list of variables *)
+  let substs = Sequence.map
+    (fun subst ->
+      let vars = List.map (S.apply_subst subst) vars in
+      if List.for_all T.is_const vars
+        then Sequence.of_list [vars]
+        else Sequence.of_list [])
+    substs in
+  Sequence.concat substs
+
+(** {2 Printing/parsing} *)
+
+(* TODO *)
+let pp_item formatter (item : [< item]) = match item with
+  | `Lemma l -> ()
+  | `Theory _ -> ()
+  | `GndConvergent _ -> ()
+
+let item_to_json (item : [< item]) =
+  let pp_inst_pattern (pat, args) =
+    `List (pattern_to_json pat :: List.map T.to_json args)
+  in
+  failwith "bleh" (*
+  match item with
+  | `Lemma (concl,premises) ->
+    `Assoc ["conclusion", pp_inst_pattern concl;
+            "premises", `List (List.map pp_inst_pattern premises);]
+  | `Theory (th, th_args, premises) ->
+    `Assoc ["theory", `List (`String th :: List.map T.to_json th_args);
+            "premises", `List (List.map pp_inst_pattern premises);]
+  | `GndConvergent gc -> failwith "todo: Pattern.item_to_json"
+  *)
+
+(* TODO *)
+let item_of_json json : [> item] =
+  let inst_pattern_of = function
+  | `List (pat::args) -> (pattern_of_json pat, List.map T.of_json args)
+  | json -> raise (Json.Util.Type_error ("expected pattern", json))
+  in
+  failwith "bleh" (*
+  match json with
+  | `Assoc ["conclusion", concl; "premises", `List premises] ->
+    `Lemma (inst_pattern_of concl, List.map inst_pattern_of premises)
+  | `Assoc ["theory", `List (`String th :: args); "premises", `List premises] ->
+    `Theory (th, List.map T.of_json args, List.map inst_pattern_of premises)
+  | _ -> failwith "todo: Pattern.item_of_json"  (* TODO GndConvergent *)
+  *)

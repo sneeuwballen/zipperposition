@@ -626,6 +626,9 @@ let rec is_fo t = match t.term with
   | Var _ | BoundVar _ -> true
   | Bind (s, t') when s == lambda_symbol -> false
   | Bind (_, t') -> is_fo t'
+  | Node (s, [a;b]) when s == at_symbol ->
+    (* X @ _ is not first-order  *)
+    not (is_var a) && is_fo a && is_fo b
   | Node (_, l) -> List.for_all is_fo l
 
 (** All symbols of the term, without assumptions on arity *)
