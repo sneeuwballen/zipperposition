@@ -73,7 +73,7 @@ type state =
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
-    meta_prover : Theories.meta_prover option;
+    meta_prover : Meta.Prover.t option;
   >
 
 val mk_active_set : ctx:context -> Index.index -> signature -> active_set
@@ -81,7 +81,7 @@ val mk_simpl_set : ctx:context -> Index.unit_index -> simpl_set
 val mk_passive_set : ctx:context -> (ClauseQueue.queue * int) list -> passive_set
 
 (** create a state from the given ordering, and parameters *)
-val mk_state : ctx:context -> ?meta:Theories.meta_prover ->
+val mk_state : ctx:context -> ?meta:Meta.Prover.t ->
                Params.parameters -> signature -> state
 
 (** statistics on the state (num active, num passive) *)

@@ -162,37 +162,32 @@ let compute_ord ~params clauses =
 (** Parse the theory file and add its content to the KB *)
 let parse_theory_file kb file =
   Format.printf "%% read content of %s into the Knowledge Base@." file;
-  let kb_parser input =
-    let lexbuf = Lexing.from_channel input in
-    let tokens = Parser_tptp.parse_theory_file Lexer_tptp.token lexbuf in
-    Sequence.of_list tokens
-  in
-  Theories.read_kb ~file ~kb_parser kb
+  Meta.KB.restore ~file kb
 
 (** Parses and populates the initial Knowledge Base *)
 let initial_kb params =
   (* parse file into an initial empty KB *)
-  let kb = Theories.empty_kb () in
+  let kb = Meta.KB.empty in
   let file = params.param_kb in
-  let kb_lock = lock_file file in
   (* parse file, with a lock *)
-  Utils.with_lock_file kb_lock
+  (* TODO
+  let kb = Utils.with_lock_file file
     (fun () ->
-      parse_theory_file kb file;
+      let kb = parse_theory_file kb file in
       (* load required files *)
-      List.iter (fun f -> parse_theory_file kb f) params.param_kb_load;
+      let kb = List.fold_left parse_theory_file kb params.param_kb_load in
       (* save new KB *)
-      Theories.save_kb ~file ~kb_printer:Theories.pp_disjunctions kb);
+      Meta.KB.save ~file kb;
+      kb) in
+  *)
   (* return KB *)
-  Format.printf "%% %a@." Theories.pp_kb_stats kb;
-  Utils.debug 2 "initial kb: %a@." Theories.pp_kb kb;
   kb
 
 (** Initialize the meta-prover *)
 let mk_meta ~ctx ~kb params =
   if params.param_theories then
     (* create meta *)
-    let meta = Theories.create_meta ~ctx kb in
+    let meta = Meta.Prover.create ~ctx kb in
     Some meta
   else None
 
@@ -203,7 +198,7 @@ let enrich_with_theories ~ctx meta clauses =
   | Some meta ->
     List.fold_left
       (fun acc hc ->
-        let lemmas = Theories.scan_clause meta hc in
+        let lemmas = Saturate.find_lemmas ~ctx (Some meta) hc in
         List.rev_append lemmas acc)
       clauses clauses
 
@@ -241,7 +236,9 @@ let process_file ~kb params f =
   let select = Sel.selection_from_string ~ord params.param_select in
   (* at least, the context *)
   let ctx = { ctx_ord=ord; ctx_select=select; } in
+  (* TODO
   (match meta with | None -> () | Some meta -> Theories.meta_update_ctx ~ctx meta);
+  *)
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
@@ -282,12 +279,14 @@ let process_file ~kb params f =
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));
   (* print theories *)
+  (* TODO
   (match meta with None -> ()
     | Some meta ->
       Format.printf "%% detected theories: @[<h>%a@]@."
         (Utils.pp_list Theories.Logic.pp_literal) meta.Theories.meta_theories;
       Format.printf "%% datalog contains %d clauses@."
         (Theories.Logic.db_size meta.Theories.meta_db));
+  *)
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
@@ -301,6 +300,7 @@ let process_file ~kb params f =
                           "# SZS output end Refutation@.")
                     (Proof.pp_proof params.param_proof) c.hcproof;
       (* update knowledge base *)
+      (*
       match meta with
       | Some meta when params.param_learn ->
         (* learning new lemmas *)
@@ -316,17 +316,22 @@ let process_file ~kb params f =
             (* save the union of both files *)
             Theories.save_kb ~file ~kb_printer:Theories.pp_disjunctions kb)
       | _ -> ()
+      *)
     end
 
 (** Print the content of the KB, and exit *)
 let print_kb ~kb =
+  (* TODO
   Format.printf "%a@." Theories.pp_kb kb;
+  *)
   exit 0
 
 (** Clear the Knowledge Base and exit *)
 let clear_kb params =
-  let kb_lock = lock_file params.param_kb in
-  Theories.clear_kb ~lock:kb_lock ~file:params.param_kb;
+  let file = params.param_kb in
+  Utils.with_lock_file file
+    (fun () ->  (* write an empty KB to file *)
+      Meta.KB.save ~file Meta.KB.empty);
   exit 0
 
 let () =

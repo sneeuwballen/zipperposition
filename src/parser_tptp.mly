@@ -142,7 +142,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %type <Simple.formula> parse_clause
 
 %start parse_theory_file
-%type <Theories.disjunction list> parse_theory_file
+%type <Meta.Pattern.item list> parse_theory_file
 
 %%
 
@@ -632,6 +632,9 @@ null:
 /* Theory parsing stuff */
 
 theory_disjunctions:
+  | EOI { [] }  /* TODO */
+
+/*
   | theory_disjunction { [$1] }
   | theory_disjunction theory_disjunctions { $1 :: $2 }
 
@@ -723,6 +726,8 @@ datalog_args:
 
 datalog_arg:
   | LOWER_WORD { let s = mk_symbol $1 in s }
+
+*/
 
 
 %%

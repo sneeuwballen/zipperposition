@@ -177,12 +177,20 @@ let all_simplify ~calculus active_set simpl_set hc =
   clauses
 
 (** Find the lemmas that can be deduced if we consider this new clause *)
-let find_lemmas state hc = 
-  match state#meta_prover with
+let find_lemmas ~ctx prover hc = 
+  match prover with
   | None -> []  (* lemmas detection is disabled *)
   | Some meta ->
-    let lemmas = Theories.scan_clause meta hc in
-    lemmas
+    let results = Meta.Prover.scan_clause meta hc.hclits in
+    Utils.list_flatmap
+      (function
+      | Meta.Prover.Deduced (lits,parents) ->
+        let premises = List.map (fun hc -> hc.hcproof) parents in
+        let hc = C.mk_hclause_a ~ctx lits ~parents
+          (fun c -> Proof.mk_proof c "lemma" premises) in
+        [hc]
+      | _ -> [])
+      results
 
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num state =
@@ -213,7 +221,7 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       Utils.debug 2 "%% ============ step %5d  ============" num;
       Utils.debug 1 "%% @[<h>%a@]" !C.pp_clause#pp_h hc;
       (* scan clause within meta-prover *)
-      let lemmas = find_lemmas state hc in
+      let lemmas = find_lemmas ~ctx state#meta_prover hc in
       let new_clauses = List.rev_append lemmas new_clauses in
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = subsumed_by ~calculus state#active_set hc in

@@ -98,7 +98,7 @@ type state =
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
-    meta_prover : Theories.meta_prover option;
+    meta_prover : Meta.Prover.t option;
   >
 
 (* ----------------------------------------------------------------------

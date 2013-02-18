@@ -181,7 +181,7 @@ module Prover : sig
     (** Get the current Knowledge Base of the prover *)
 
   type result =
-    | Deduced of literal array
+    | Deduced of literal array * hclause list
     | Theory of string * term list
     | Expert of Experts.expert
     (** Feedback from the meta-prover *)

@@ -26,13 +26,13 @@ type t = ProverOfDoom
   (** A meta-prover, reasoning at the theory/lemma level *)
 
 (** Fresh meta-prover, using the given KB *)
-let create ~ctx kb = failwith "todo: Meta.Prover.create"
+let create ~ctx kb = ProverOfDoom (* TODO *)
 
 (** Get the current Knowledge Base of the prover *)
 let get_kb prover = failwith "no KB here yet"
 
 type result =
-  | Deduced of literal array
+  | Deduced of literal array * hclause list
   | Theory of string * term list
   | Expert of Experts.expert
   (** Feedback from the meta-prover *)
