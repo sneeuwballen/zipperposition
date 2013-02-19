@@ -23,23 +23,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** a symbol is just a string *)
 open Symbols
 
-(* TODO: (maybe) substitutions as list of pairs of *bound* terms,
-  where bound term = (int * term), the int being an offset for renaming vars.
-  mk_hclause would then perform normalization of variables, and renaming of
-  terms/vars would been useless but for normalization and instantiation *)
-
-(* TODO: in Clauses, constructors from clauses for inferences and simplifications,
-         that take care of the parent/child and proof bookeeping *)
-
-(* TODO: a 'type_' type for simple types, like
-  type_ = Sort of symbol | Arrow of type_t list * type_. Problem is for "or" and "and"
-  that are n-ary; also, "=" is polymorphic... Maybe polymorphism then? *)
 (* TODO: a literal should be (term, term, int) where the int is a set of flags. It's enough
    to tell well the lit is positive/negative, and if it's oriented (a > b) or eq/incomparable.
    Always orient with the bigger term on left. *)
-(* TODO: remove proof from clauses, make it external (a proof is a tree that
-   contains clauses). This should allow to disable proof-handling. *)
-(* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
 
 module Json = Yojson.Basic
 type json = Json.json
@@ -66,7 +52,11 @@ type varlist = term list
 (** A logical first order object, with a context for its free variables.
     The context is an offset, so that X_i inside the 'a really is X_{i+offset} *)
 type 'a bind = ('a * int)
-let bind_with x offset = (x, offset)
+
+(** An object parametrized by a list of variables *)
+type 'a parametrized = ('a * varlist)
+type 'a parametrize = 'a -> 'a parametrized
+type 'a specialize = 'a parametrized -> term list -> 'a
 
 (** substitution, a list of (variable -> term) *)
 type substitution =
