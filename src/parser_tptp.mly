@@ -145,7 +145,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %type <Simple.formula> parse_clause
 
 %start parse_theory_file
-%type <Meta.Pattern.item list> parse_theory_file
+%type <Meta.KB.item list> parse_theory_file
 
 %%
 

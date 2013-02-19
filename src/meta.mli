@@ -33,21 +33,25 @@ open Symbols
     is "\F. ((= @ ((F @ x) @ y)) @ ((F @ y) @ x))" *)
 
 module Pattern : sig
-  type pattern = term parametrized
+  type t = term parametrized
     (** A pattern is a curryfied formula, along with a list of variables
         whose order matters. *)
 
-  val pp_pattern : Format.formatter -> pattern -> unit
-  val pattern_to_json : pattern -> json
-  val pattern_of_json : json -> pattern
+  val pp_pattern : Format.formatter -> t -> unit
+  val to_json : t -> json
+  val of_json : json -> t
 
   type atom =
     | MString of string     (** Just a string *)
-    | MPattern of pattern   (** A pattern, ie a signature-independent formula *)
+    | MPattern of t         (** A pattern, ie a signature-independent formula *)
     | MTerm of term         (** A ground term (constant...) *)
+    | MList of atom list    (** List of atoms *)
     (** A Datalog atom, in which we may want to fit any structure we want *)
 
-  val equal_atom : atom -> atom -> bool
+  val eq_pattern : t -> t -> bool
+  val hash_pattern : t -> int
+
+  val eq_atom : atom -> atom -> bool
   val hash_atom : atom -> int
   val pp_atom : Format.formatter -> atom -> unit
 
@@ -57,80 +61,79 @@ module Pattern : sig
   module Logic : Datalog.Logic.S with type symbol = atom
     (** The Datalog prover that reasons over atoms. *)
 
-  type lemma =
-    [ `Lemma of pattern parametrized * pattern parametrized list ]
+  (** {2 Conversion pattern <-> clause, and matching *)
+
+  val abstract_clause : literal array -> t
+    (** Abstracts the clause out *)
+
+  val arity : t -> int
+    (** number of arguments that have to be provided
+        to instantiate the pattern *)
+
+  val instantiate : t -> term list -> term
+    (** This applies the pattern to the given arguments, beta-reduces,
+        and uncurry the term back. It will fail if the result is not
+        first-order. *)
+
+  val matching : t -> literal array -> term list Sequence.t
+    (** [matching p lits] attempts to match the literals against the pattern.
+        It yields a list of solutions, each solution [s1,...,sn] satisfying
+        [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
+        of "or" and "=". *)
+end
+
+(** {2 Persistent Knowledge Base} *)
+
+module KB : sig
+  (** {2 Knowledge Item} *)
+
+  (** Assertions at the meta-level, that respectively state that
+      a lemma is true, that define a theory, or that bind a ground
+      convergent system to a theory *)
+  type item =
+  | Lemma of Pattern.t parametrized * Pattern.t parametrized list
     (** A lemma is the implication of a pattern by other patterns,
         but with some variable renamings to correlate the
         bindings of the distinct patterns. For instance,
         (F(x,y)=x, [F], [Mult]) may be implied by
         (F(y,x)=y, [F], [MyMult]) and
         (F(x,y)=G(y,x), [F,G], [Mult,MyMult]). *)
-
-  type theory =
-    [ `Theory of string parametrized * pattern parametrized list ]
+  | Theory of string parametrized * Pattern.t parametrized list
     (** A theory, like a lemma, needs to correlate the variables
         in several patterns via renaming. It outputs an assertion
         about the theory being present for some symbols. *)
-
-  type gnd_convergent =
-    [ `GndConvergent of gnd_convergent_spec parametrized ]
+  | GC of gnd_convergent_spec parametrized * string parametrized
   and gnd_convergent_spec = {
     gc_ord : string;
     gc_prec : varlist;
-    gc_eqns : pattern list;
+    gc_eqns : Pattern.t list;
   } (** Abstract equations that form a ground convergent rewriting system
-        when instantiated.
-        gc_ord and gc_prec, once instantiated, give a constraint on the ordering
+        when instantiated. It is parametrized by the theory it decides.
+        gc_ord and gc_prec (once instantiated), give a constraint on the ordering
         that must be satisfied for the system to be a decision procedure. *)
 
-  type item = [lemma | theory | gnd_convergent]
-    (** Any meta-object *)
+  (** {2 Knowledge Base} *)
 
-  (** {2 Conversion pattern <-> clause, and matching *)
-
-  val abstract_clause : literal array -> pattern
-    (** Abstracts the clause out *)
-
-  val arity : pattern -> int
-    (** number of arguments that have to be provided
-        to instantiate the pattern *)
-
-  val instantiate : pattern -> term list -> term
-    (** This applies the pattern to the given arguments, beta-reduces,
-        and uncurry the term back. It will fail if the result is not
-        first-order. *)
-
-  val matching : pattern -> literal array -> term list Sequence.t
-    (** [matching p lits] attempts to match the literals against the pattern.
-        It yields a list of solutions, each solution [s1,...,sn] satisfying
-        [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
-        of "or" and "=". *)
-
-  (** {2 Printing/parsing} *)
-
-  val pp_item : Format.formatter -> [< item] -> unit
-  val item_to_json : [< item] -> json
-  val item_of_json : json -> [> item]
-end
-
-(** {2 Persistent Knowledge Base} *)
-
-module KB : sig
   type t
 
   val empty : t
 
-  val add_item : t -> Pattern.item -> t
+  val add_item : t -> item -> t
 
-  val to_seq : t -> Pattern.item Sequence.t
-  val of_seq : t -> Pattern.item Sequence.t -> t
+  val to_seq : t -> item Sequence.t
+  val of_seq : t -> item Sequence.t -> t
 
+  (** {2 Printing/parsing} *)
+
+  val pp_item : Format.formatter -> item -> unit
+  val pp : Format.formatter -> t -> unit
+
+  val item_to_json : item -> json
+  val item_of_json : json -> item
   val to_json : t -> json
   val of_json : t -> json -> t
 
-  val pp : Format.formatter -> t -> unit
-
-  (** {2 Saving/restoring KB from disk} *)
+  (** {2 Saving/restoring from/to disk} *)
 
   val save : file:string -> t -> unit
 

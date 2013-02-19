@@ -36,28 +36,28 @@ module Lits = Literals
     This way, the pattern for "f(X,Y)=f(Y,X)"
     is "\F. ((= @ ((F @ x) @ y)) @ ((F @ y) @ x))" *)
 
-type pattern = term parametrized
+type t = term parametrized
   (** A pattern is a curryfied formula, along with a list of variables
       whose order matters. *)
 
-let eq_pattern (t1,v1) (t2, v2) =
+let eq_pattern ((t1,v1) : t) ((t2, v2) : t) =
   t1 == t2 &&
     try List.for_all2 (==) v1 v2 with Invalid_argument _ -> false
 
-let hash_pattern (t,vars) =
+let hash_pattern ((t,vars) : t) =
   let h = T.hash_term t in
   Hash.hash_list T.hash_term h vars
 
-let pp_pattern formatter (p:pattern) =
+let pp_pattern formatter (p:t) =
   Format.fprintf formatter "@[<h>(%a)[%a]@]"
     !T.pp_term#pp (fst p) (Utils.pp_list !T.pp_term#pp) (snd p)
 
-let pattern_to_json (p : pattern) : json =
+let to_json (p : t) : json =
   `Assoc [
     "term", T.to_json (fst p);
     "vars", `List (List.map T.to_json (snd p))]
 
-let pattern_of_json (json : json) : pattern = match json with
+let of_json (json : json) : t = match json with
   | `Assoc ["term", t; "vars", `List vars]
   | `Assoc ["vars", `List vars; "term", t] ->
     let t = T.of_json t
@@ -67,74 +67,53 @@ let pattern_of_json (json : json) : pattern = match json with
 
 type atom =
   | MString of string     (** Just a string *)
-  | MPattern of pattern   (** A pattern, ie a signature-independent formula *)
+  | MPattern of t         (** A pattern, ie a signature-independent formula *)
   | MTerm of term         (** A ground term (constant...) *)
+  | MList of atom list    (** List of atoms *)
   (** A Datalog atom, in which we may want to fit any structure we want *)
 
-let equal_atom a1 a2 = match a1, a2 with
+let rec eq_atom a1 a2 = match a1, a2 with
   | MString s1, MString s2 -> s1 = s2
   | MPattern p1, MPattern p2 -> eq_pattern p1 p2
   | MTerm t1, MTerm t2 -> t1 == t2
+  | MList l1, MList l2 ->
+    (try List.for_all2 eq_atom l1 l2 with Invalid_argument _ -> false)
   | _ -> false
 
-let hash_atom = function
+let rec hash_atom = function
   | MString s -> Hash.hash_string s
   | MPattern p -> hash_pattern p
   | MTerm t -> T.hash_term t
+  | MList l -> Hash.hash_list hash_atom 0 l
 
-let pp_atom formatter a = match a with
+let rec pp_atom formatter a = match a with
   | MString s -> Format.pp_print_string formatter s
   | MPattern p -> pp_pattern formatter p
   | MTerm t -> T.pp_term_debug#pp formatter t
+  | MList l ->
+    Format.fprintf formatter "[%a]" (Utils.pp_list pp_atom) l
 
-let atom_to_json a : json = match a with
+let rec atom_to_json a : json = match a with
   | MString s -> `String s
-  | MPattern p -> `Assoc ["pattern", pattern_to_json p]
+  | MPattern p -> `Assoc ["pattern", to_json p]
   | MTerm t -> `Assoc ["term", T.to_json t]
+  | MList l -> `List (List.map atom_to_json l)
 
-let atom_of_json (json : json) : atom = match json with
+let rec atom_of_json (json : json) : atom = match json with
   | `String s -> MString s
-  | `Assoc ["pattern", p] -> MPattern (pattern_of_json p)
+  | `Assoc ["pattern", p] -> MPattern (of_json p)
   | `Assoc ["term", t] -> MTerm (T.of_json t)
+  | `List l -> MList (List.map atom_of_json l)
   | _ -> raise (Json.Util.Type_error ("expected atom", json))
 
 (** The Datalog prover that reasons over atoms. *)
 module Logic = Datalog.Logic.Make(struct
   type t = atom
-  let equal = equal_atom
+  let equal = eq_atom
   let hash = hash_atom
   let to_string a = Utils.sprintf "%a" pp_atom a
   let of_string s = atom_of_json (Json.from_string s)  (* XXX should not happen *)
 end)
-
-type lemma =
-  [ `Lemma of pattern parametrized * pattern parametrized list ]
-  (** A lemma is the implication of a pattern by other patterns,
-      but with some variable renamings to correlate the
-      bindings of the distinct patterns. For instance,
-      (F(x,y)=x, [F], [Mult]) may be implied by
-      (F(y,x)=y, [F], [MyMult]) and
-      (F(x,y)=G(y,x), [F,G], [Mult,MyMult]). *)
-
-type theory =
-  [ `Theory of string parametrized * pattern parametrized list ]
-  (** A theory, like a lemma, needs to correlate the variables
-      in several patterns via renaming. It outputs an assertion
-      about the theory being present for some symbols. *)
-
-type gnd_convergent =
-  [ `GndConvergent of gnd_convergent_spec parametrized ]
-and gnd_convergent_spec = {
-  gc_ord : string;
-  gc_prec : varlist;
-  gc_eqns : pattern list;
-} (** Abstract equations that form a ground convergent rewriting system
-      when instantiated.
-      gc_ord and gc_prec, once instantiated, give a constraint on the ordering
-      that must be satisfied for the system to be a decision procedure. *)
-
-type item = [lemma | theory | gnd_convergent]
-  (** Any meta-object *)
 
 (** {2 Conversion pattern <-> clause, and matching *)
 
@@ -152,7 +131,7 @@ let find_symbols t =
   in search T.TSet.empty t
 
 (** Abstracts the clause out *)
-let abstract_clause lits : pattern =
+let abstract_clause lits : t =
   let t = Lits.term_of_lits lits in
   let t = T.curry t in
   (* now replace symbols by variables *)
@@ -174,12 +153,12 @@ let abstract_clause lits : pattern =
 
 (** number of arguments that have to be provided
     to instantiate the pattern *)
-let arity (p : pattern)  = List.length (snd p)
+let arity (p : t)  = List.length (snd p)
 
 (** This applies the pattern to the given arguments, beta-reduces,
     and uncurry the term back. It will fail if the result is not
     first-order. *)
-let instantiate (p : pattern) terms =
+let instantiate (p : t) terms =
   assert (List.length terms = arity p);
   let t, vars = p in
   let offset = T.max_var (T.vars t) + 1 in
@@ -196,7 +175,7 @@ let instantiate (p : pattern) terms =
     It yields a list of solutions, each solution [s1,...,sn] satisfying
     [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
     of "or" and "=". *)
-let matching (p : pattern) lits =
+let matching (p : t) lits =
   let left, vars = p in
   let right = Lits.term_of_lits lits in
   let substs = Unif.matching_ac S.id_subst (left,0) (right,1) in
@@ -210,41 +189,3 @@ let matching (p : pattern) lits =
         else Sequence.of_list [])
     substs in
   Sequence.concat substs
-
-(** {2 Printing/parsing} *)
-
-(* TODO *)
-let pp_item formatter (item : [< item]) = match item with
-  | `Lemma l -> ()
-  | `Theory _ -> ()
-  | `GndConvergent _ -> ()
-
-let item_to_json (item : [< item]) =
-  let pp_inst_pattern (pat, args) =
-    `List (pattern_to_json pat :: List.map T.to_json args)
-  in
-  failwith "bleh" (*
-  match item with
-  | `Lemma (concl,premises) ->
-    `Assoc ["conclusion", pp_inst_pattern concl;
-            "premises", `List (List.map pp_inst_pattern premises);]
-  | `Theory (th, th_args, premises) ->
-    `Assoc ["theory", `List (`String th :: List.map T.to_json th_args);
-            "premises", `List (List.map pp_inst_pattern premises);]
-  | `GndConvergent gc -> failwith "todo: Pattern.item_to_json"
-  *)
-
-(* TODO *)
-let item_of_json json : [> item] =
-  let inst_pattern_of = function
-  | `List (pat::args) -> (pattern_of_json pat, List.map T.of_json args)
-  | json -> raise (Json.Util.Type_error ("expected pattern", json))
-  in
-  failwith "bleh" (*
-  match json with
-  | `Assoc ["conclusion", concl; "premises", `List premises] ->
-    `Lemma (inst_pattern_of concl, List.map inst_pattern_of premises)
-  | `Assoc ["theory", `List (`String th :: args); "premises", `List premises] ->
-    `Theory (th, List.map T.of_json args, List.map inst_pattern_of premises)
-  | _ -> failwith "todo: Pattern.item_of_json"  (* TODO GndConvergent *)
-  *)
