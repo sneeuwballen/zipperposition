@@ -176,6 +176,8 @@ rule token =
       | "<="                         { update_token (Lexing.lexeme lexbuf); RIGHT_IMPLICATION }
       | "<~>"                        { update_token (Lexing.lexeme lexbuf); XOR }
       | negation                     { update_token (Lexing.lexeme lexbuf); NEGATION }
+      | "-->"                        { update_token (Lexing.lexeme lexbuf); GENTZEN_ARROW }
+      | "/"                          { update_token (Lexing.lexeme lexbuf); SLASH }
       | "$true"                      { update_token (Lexing.lexeme lexbuf); DOLLAR_TRUE }
       | "$false"                     { update_token (Lexing.lexeme lexbuf); DOLLAR_FALSE }
       | '$'                          { update_token (Lexing.lexeme lexbuf); DOLLAR }

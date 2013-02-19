@@ -127,13 +127,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token XOR
 %token LEFT_IMPLICATION
 %token RIGHT_IMPLICATION
-%token UNKNOWN
+%token GENTZEN_ARROW
+%token SLASH
 
 %token IS
 %token THEORY
 %token LEMMA
 %token IF
 %token AND
+
+%token UNKNOWN
 
 %start parse_file
 %type <Simple.sourced_formula list * string list> parse_file
