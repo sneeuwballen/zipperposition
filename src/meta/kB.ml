@@ -33,7 +33,7 @@ module Utils = FoUtils
 type item =
 | Named of string * Pattern.t
   (** Named formula *)
-| Lemma of Pattern.t * Pattern.t list
+| Lemma of Pattern.t parametrized * Pattern.t parametrized list
   (** A lemma is the implication of a pattern by other patterns,
       but with some variable renamings to correlate the
       bindings of the distinct patterns. For instance,
@@ -44,8 +44,10 @@ type item =
   (** A theory, like a lemma, needs to correlate the variables
       in several patterns via renaming. It outputs an assertion
       about the theory being present for some symbols. *)
+| Pattern of Pattern.t parametrized
+  (** A pattern that is true in the current problem *)
 | GC of gnd_convergent_spec
-| Rule of item * item list
+| Rule of item parametrized * item parametrized list
   (** Assertion that depends on other assertions *)
 and gnd_convergent_spec = {
   gc_vars : varlist;

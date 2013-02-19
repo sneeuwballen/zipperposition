@@ -121,7 +121,7 @@ end)
 
 (** Given a curryfied term, find the symbols that occur as head constants
     (ie "f" in "f @ _" where f is not a "_@_") *)
-let find_symbols ?(symbols=T.TSet.empty) t =
+let find_symbols ?(symbols=SSet.empty) t =
   (* traverse term *)
   let rec search set t = match t.term with
   | Var _ | BoundVar _ -> set
@@ -129,16 +129,16 @@ let find_symbols ?(symbols=T.TSet.empty) t =
   | Node (s, [a;b]) when s == at_symbol ->
     search (search set a) b
   | Node (s, []) when not (SMap.mem s base_signature) ->
-    T.TSet.add t set  (* found symbol *)
+    SSet.add s set  (* found symbol *)
   | Node _ -> assert false
   in search symbols t
 
 (** [find_functions t (s1,...,sn)] where t is currified
     maps s1,...,sn to constants that have the correct sort *)
-let find_functions t symbols =
+let find_functions t (symbols : symbol list) =
   let signature = T.signature (Sequence.singleton t) in
   assert (List.for_all (fun s -> SMap.mem s signature) symbols);
-  List.map (fun s -> SMap.find s signature) symbols
+  List.map (fun s -> T.mk_const s (SMap.find s signature)) symbols
 
 (** Abstracts the given constants out, in the given order. *)
 let of_term_with t symbols : (t * term list) =
@@ -148,16 +148,17 @@ let of_term_with t symbols : (t * term list) =
       let sort = t.sort <=. const.sort in
       T.mk_lambda sort (T.db_from_term t const))
     t constants in
-  t, constants
+  let sorts = List.map (fun x -> x.sort) constants in
+  (t, sorts), constants
 
 (** Convert a term into a pattern *)
-let of_term t : t =
+let of_term t : t * term list =
   let symbols = find_symbols t in
-  let symbols = Sequence.to_list (T.TSet.to_seq symbols) in
+  let symbols = Sequence.to_list (SSetSeq.to_seq symbols) in
   of_term_with t symbols
 
 (** Abstracts the clause out *)
-let abstract_clause lits : t =
+let abstract_clause lits : t * term list =
   let t = Lits.term_of_lits lits in
   let p, consts = of_term t in
   Utils.debug 2 "%% @[<h>%a@] abstracted into @[<h>%a@]"
@@ -190,33 +191,40 @@ let instantiate (p : t) terms =
     then T.uncurry t'
     else failwith "non-FO pattern instantiation"
 
+(** Apply the substitution to variables that parametrize the pattern,
+    then [instantiate] the pattern (beta-reduced and uncurryfied).
+    [apply_subst (p,vars) subst] is equivalent to
+    [instantiate p (List.map (S.apply_subst subst) vars)]. *)
+let apply_subst (((p, args),offset) : t parametrized bind) subst =
+  let args = List.map
+    (fun arg -> match arg.term with
+      | Var _ -> S.apply_subst subst (arg,offset)
+      | _ -> arg)
+    args in
+  instantiate p args
+
 (** [matching p lits] attempts to match the literals against the pattern.
     It yields a list of solutions, each solution [s1,...,sn] satisfying
     [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
     of "or" and "=". *)
 let matching (p : t) lits =
-  let left, vars = p in
+  let _, sorts = p in
   let right = Lits.term_of_lits lits in
-  let substs = Unif.matching_ac S.id_subst (left,0) (right,1) in
+  (* apply the pattern to a list of new variables *)
+  let offset = T.max_var (T.vars right) + 1 in
+  let vars = List.mapi T.mk_var sorts in
+  let left = instantiate p vars in
+  (* match pattern against [right] *)
+  let substs = Unif.matching_ac S.id_subst (left,1) (right,0) in
   (* now apply the substitution to the list of variables *)
   let substs = Sequence.map
     (fun subst ->
-      let vars = List.map (fun v -> S.apply_subst subst (v,0)) vars in
+      (* convert variables back to terms *)
+      let args = List.map (fun v -> S.apply_subst subst (v,1)) vars in
       (* restriction: only bind function symbols to constants for now *)
-      if List.for_all T.is_const vars
-        then Sequence.of_list [vars]
+      if List.for_all T.is_const args
+        then Sequence.of_list [args]
         else Sequence.of_list [])
     substs in
   Sequence.concat substs
-
-(** Rename the variables in the pattern. The provided list of variables
-    must be of the same length as [arity pattern]. *)
-let rename p vars : t =
-  assert (List.length vars = arity p);
-  let subst = List.fold_left2
-    (fun subst old_v new_v ->
-      S.bind ~recursive:false subst (old_v,1) (new_v,0))
-    S.id_subst (snd p) vars in
-  let t = S.apply_subst ~recursive:false subst ((fst p),1) in
-  t, vars
 

@@ -72,7 +72,7 @@ module Pattern : sig
 
   (** {2 Conversion pattern <-> clause, and matching *)
 
-  val find_symbols : ?symbols:Terms.TSet.set -> term -> Terms.TSet.set
+  val find_symbols : ?symbols:SSet.t -> term -> SSet.t
     (** Given a curryfied term, find the symbols that occur as head constants
         (ie "f" in "f @ _" where f is not a "_@_") *)
 
@@ -103,7 +103,7 @@ module Pattern : sig
         and uncurry the term back. It will fail if the result is not
         first-order. *)
 
-  val apply_subst : t parametrized -> substitution -> term
+  val apply_subst : t parametrized bind -> substitution -> term
     (** Apply the substitution to variables that parametrize the pattern,
         then [instantiate] the pattern (beta-reduced and uncurryfied).
         [apply_subst (p,vars) subst] is equivalent to
@@ -138,6 +138,8 @@ module KB : sig
     (** A theory, like a lemma, needs to correlate the variables
         in several patterns via renaming. It states that some symbols
         are an instance of the theory *)
+  | Pattern of Pattern.t parametrized
+    (** A pattern that is true in the current problem *)
   | GC of gnd_convergent_spec
     (** Ground Convergent system of equations *)
   | Rule of item parametrized * item parametrized list
