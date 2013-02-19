@@ -69,6 +69,8 @@ val apply_subst_lits : ?recursive:bool -> ord:ordering -> substitution ->
                        literal array bind -> literal array
 val apply_subst_list : ?recursive:bool -> ord:ordering -> substitution ->
                         literal list bind -> literal list
+val lits_to_seq : literal array -> (term * term * bool) Sequence.t
+  (** Convert the lits into a sequence of equations *)
 
 (** pretty printer for literals *)
 

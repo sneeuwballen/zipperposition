@@ -270,6 +270,14 @@ let apply_subst_list ?(recursive=true) ~ord subst (lits, offset) =
     (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
     lits
 
+(** Convert the lits into a sequence of equations *)
+let lits_to_seq lits =
+  Sequence.from_iter
+    (fun k ->
+      for i = 0 to Array.length lits - 1 do
+        match lits.(i) with | Equation (l,r,sign,_) -> k (l,r,sign)
+      done)
+
 let pp_literal formatter lit =
   match lit with
   | Equation (l, r, sign, _) when T.eq_term r T.true_term ->

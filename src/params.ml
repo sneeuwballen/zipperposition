@@ -92,6 +92,7 @@ let parse_args () =
       (*
       ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
       *)
+      ("-print-sort", Arg.Unit (fun () -> Terms.pp_term_debug#sort true), "print sorts");
       ("-progress", Arg.Set progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");

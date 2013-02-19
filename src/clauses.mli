@@ -133,8 +133,8 @@ val is_unit_clause : hclause -> bool
 val signature : hclause list -> signature
   (** Compute signature of this set of clauses *)
 
-val from_simple : ctx:context -> Simple.sourced_formula -> hclause
-  (** conversion to a clause. *)
+val from_term : ctx:context -> sourced_term -> hclause
+  (** Conversion of a (boolean) term to a clause. *)
 
 (* ----------------------------------------------------------------------
  * set of clauses, reachable by ID

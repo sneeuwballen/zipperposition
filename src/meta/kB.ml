@@ -31,19 +31,24 @@ module Utils = FoUtils
     a lemma is true, that define a theory, or that bind a ground
     convergent system to a theory *)
 type item =
-| Lemma of Pattern.t parametrized * Pattern.t parametrized list
+| Named of string * Pattern.t
+  (** Named formula *)
+| Lemma of Pattern.t * Pattern.t list
   (** A lemma is the implication of a pattern by other patterns,
       but with some variable renamings to correlate the
       bindings of the distinct patterns. For instance,
       (F(x,y)=x, [F], [Mult]) may be implied by
       (F(y,x)=y, [F], [MyMult]) and
       (F(x,y)=G(y,x), [F,G], [Mult,MyMult]). *)
-| Theory of string parametrized * Pattern.t parametrized list
+| Theory of string parametrized
   (** A theory, like a lemma, needs to correlate the variables
       in several patterns via renaming. It outputs an assertion
       about the theory being present for some symbols. *)
-| GC of gnd_convergent_spec parametrized * string parametrized
+| GC of gnd_convergent_spec
+| Rule of item * item list
+  (** Assertion that depends on other assertions *)
 and gnd_convergent_spec = {
+  gc_vars : varlist;
   gc_ord : string;
   gc_prec : varlist;
   gc_eqns : Pattern.t list;
@@ -51,6 +56,9 @@ and gnd_convergent_spec = {
       when instantiated. It is parametrized by the theory it decides.
       gc_ord and gc_prec (once instantiated), give a constraint on the ordering
       that must be satisfied for the system to be a decision procedure. *)
+
+(* TODO *)
+let rename item vars = failwith "todo: KB.rename"
 
 (** {3 Knowledge Base} *)
 
@@ -73,54 +81,36 @@ let pp_item formatter item =
   let open Format in
   match item with
   | Lemma (concl, premises) ->
-    fprintf formatter "@[<hov2>%a(%a) if@ %a@]" Pattern.pp_pattern (fst concl)
-      (Utils.pp_list !T.pp_term#pp) (snd concl)
-      (Utils.pp_list
-        (fun formatter (pat,vars) ->
-          fprintf formatter "%a(%a)" Pattern.pp_pattern pat
-            (Utils.pp_list !T.pp_term#pp) vars))
-        premises
-  | Theory ((name,args), premises) ->
-    fprintf formatter "@[<hov2>theory %s(%a) is@ %a@]" name
+    fprintf formatter "@[<hov2>%a if@ %a@]"
+      Pattern.pp_pattern concl
+      (Utils.pp_list Pattern.pp_pattern) premises
+  | Theory (name,args) ->
+    fprintf formatter "@[<hov2>theory %s(%a)@]" name
       (Utils.pp_list !T.pp_term#pp) args
-      (Utils.pp_list
-        (fun formatter (pat,vars) ->
-          fprintf formatter "%a(%a)" Pattern.pp_pattern pat
-            (Utils.pp_list !T.pp_term#pp) vars))
-      premises
-  | GC ((gc,gc_vars),(th,th_vars)) ->
+  | GC gc ->
     fprintf formatter
-      "@[<hov2>gc [%a]@ @[<h>when ord %s and prec %a@]@ if @[<h>%s(%a)@]@]"
-      (Utils.pp_list Pattern.pp_pattern) gc.gc_eqns
+      "@[<hov2>gc %a@ @[<h>with %s(%a)@]@]"
+      (Utils.pp_list ~sep:" and " Pattern.pp_pattern) gc.gc_eqns
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
-      th (Utils.pp_list !T.pp_term#pp) th_vars
 
 let pp formatter kb =
   Utils.pp_list pp_item formatter kb 
 
 let item_to_json item : json =
-  let pp_inst_pattern (pat, args) =
-    `List (Pattern.to_json pat :: List.map T.to_json args)
-  in
   match item with
   | Lemma (concl,premises) ->
-    `Assoc ["conclusion", pp_inst_pattern concl;
-            "premises", `List (List.map pp_inst_pattern premises);]
-  | Theory ((th, th_args), premises) ->
-    `Assoc ["theory", `List (`String th :: List.map T.to_json th_args);
-            "premises", `List (List.map pp_inst_pattern premises);]
-  | GC (gc,th) -> failwith "todo: item_to_json"
+    `Assoc ["conclusion", Pattern.to_json concl;
+            "premises", `List (List.map Pattern.to_json premises);]
+  | Theory (th, args) ->
+    `List (`String "theory" :: `String th :: List.map T.to_json args)
+  | _ -> failwith "todo: item to json"
 
 let item_of_json (json : json) =
-  let inst_pattern_of = function
-  | `List (pat::args) -> (Pattern.of_json pat, List.map T.of_json args)
-  | json -> raise (Json.Util.Type_error ("expected pattern", json))
-  in
   match json with
   | `Assoc ["conclusion", concl; "premises", `List premises] ->
-    Lemma (inst_pattern_of concl, List.map inst_pattern_of premises)
-  | `Assoc ["theory", `List (`String th :: args); "premises", `List premises] ->
-    Theory ((th, List.map T.of_json args), List.map inst_pattern_of premises)
+    Lemma (Pattern.of_json concl, List.map Pattern.of_json premises)
+  | `List (`String "theory" :: `String th :: args) ->
+    Theory (th, List.map T.of_json args)
   | _ -> failwith "todo: item_of_json"  (* TODO GndConvergent *)
 
 let to_json kb : json = `List (List.map item_to_json kb)

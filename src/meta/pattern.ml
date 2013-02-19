@@ -130,9 +130,8 @@ let find_symbols t =
   | Node _ -> assert false
   in search T.TSet.empty t
 
-(** Abstracts the clause out *)
-let abstract_clause lits : t =
-  let t = Lits.term_of_lits lits in
+(** Convert a term into a pattern *)
+let of_term t : t =
   let t = T.curry t in
   (* now replace symbols by variables *)
   let set = find_symbols t in
@@ -147,6 +146,12 @@ let abstract_clause lits : t =
     t vars in
   let vars = List.map snd vars in
   let p = t, vars in
+  p
+
+(** Abstracts the clause out *)
+let abstract_clause lits : t =
+  let t = Lits.term_of_lits lits in
+  let p = of_term t in
   Utils.debug 2 "%% @[<h>%a@] abstracted into @[<h>%a@]"
                 Lits.pp_lits lits pp_pattern p;
   p
@@ -189,3 +194,15 @@ let matching (p : t) lits =
         else Sequence.of_list [])
     substs in
   Sequence.concat substs
+
+(** Rename the variables in the pattern. The provided list of variables
+    must be of the same length as [arity pattern]. *)
+let rename p vars : t =
+  assert (List.length vars = arity p);
+  let subst = List.fold_left2
+    (fun subst old_v new_v ->
+      S.bind ~recursive:false subst (old_v,1) (new_v,0))
+    S.id_subst (snd p) vars in
+  let t = S.apply_subst ~recursive:false subst ((fst p),1) in
+  t, vars
+

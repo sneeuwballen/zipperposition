@@ -22,6 +22,8 @@ open Hashcons
 open Types
 open Symbols
 
+(** {1 First-order terms} *)
+
 module Utils = FoUtils
 
 let hash_term t = match t.term with
@@ -36,9 +38,7 @@ let hash_term t = match t.term with
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 
-(* ----------------------------------------------------------------------
- * comparison, equality, containers
- * ---------------------------------------------------------------------- *)
+(** {2 Comparison, equality, containers} *)
 
 let rec member_term a b =
   a == b ||
@@ -63,6 +63,8 @@ module TSet = Sequence.Set.Make(struct
   let compare = compare_term
 end)
 
+(** {2 Hashset of terms} *)
+
 module THashSet =
   struct
     type t = unit THashtbl.t
@@ -80,9 +82,7 @@ module THashSet =
       List.iter (add set) l; set
   end
 
-(* ----------------------------------------------------------------------
- * access global terms table (hashconsing)
- * ---------------------------------------------------------------------- *)
+(** {2 Global terms table (hashconsing)} *)
 
 let hashcons_equal x y =
   (* pairwise comparison of subterms *)
@@ -120,9 +120,7 @@ let all_terms () =
   
 let stats () = H.stats ()
 
-(* ----------------------------------------------------------------------
- * boolean flags
- * ---------------------------------------------------------------------- *)
+(** {2 Boolean flags} *)
 
 let flag_db_closed = 1 lsl 0
 and flag_simplified = 1 lsl 1
@@ -137,9 +135,7 @@ let set_flag flag t truth =
 
 let get_flag flag t = (t.flags land flag) != 0
 
-(* ----------------------------------------------------------------------
- * smart constructors, with a bit of type-checking
- * ---------------------------------------------------------------------- *)
+(** {2 Smart constructors} *)
 
 (** In this section, term smart constructors are defined. Some of them
     accept a [?old] optional argument. This argument is an already existing
@@ -241,10 +237,12 @@ let mk_and a b = (check_bool a; check_bool b; mk_node and_symbol bool_ [a; b])
 let mk_or a b = (check_bool a; check_bool b; mk_node or_symbol bool_ [a; b])
 let mk_imply a b = (check_bool a; check_bool b; mk_node imply_symbol bool_ [a; b])
 let mk_equiv a b = (check_bool a; check_bool b; mk_node eq_symbol bool_ [a; b])
+let mk_xor a b = mk_not (mk_equiv a b)
 let mk_eq a b = (check_same a b; mk_node eq_symbol bool_ [a; b])
+let mk_neq a b = mk_not (mk_eq a b)
 let mk_lambda sort t = mk_bind lambda_symbol sort t
 let mk_forall t = (check_bool t; mk_bind forall_symbol bool_ t)
-let mk_exists t = (check_bool t; mk_bind exists_symbol bool_ t)
+let mk_exists t = (check_bool t; mk_bind exists_symbol bool_ t) 
 
 let mk_at ?old t1 t2 =
   match t1.sort, t2.sort with
@@ -257,9 +255,7 @@ let rec cast t sort =
   new_t.hkey <- hash_term new_t;
   H.hashcons new_t
 
-(* ----------------------------------------------------------------------
- * examine term/subterms, positions...
- * ---------------------------------------------------------------------- *)
+(** {2 Subterms and positions} *)
 
 let is_var t = match t.term with
   | Var _ -> true
@@ -397,9 +393,7 @@ let depth t =
   | t::l' -> depth_list (max m (depth t)) l'
   in depth t
 
-(* ----------------------------------------------------------------------
- * De Bruijn terms, and dotted formulas
- * ---------------------------------------------------------------------- *)
+(** {2 De Bruijn indexes} *)
 
 (** check whether the term is a term or an atomic proposition *)
 let rec atomic t = match t.term with
@@ -526,7 +520,62 @@ let look_db_sort i t =
   in try lookup i t; None
      with FoundSort s -> Some s
 
-(** {2 High-level transformations} *)
+(** {2 High-level operations} *)
+
+(** constructors with free variables. The first argument is the
+    list of variables that is bound, then the quantified/abstracted
+    term. *)
+
+let mk_lambda_var vars t =
+  List.fold_right
+    (fun var t ->
+      let sort = t.sort <=. var.sort in
+      mk_lambda sort (db_from_var t var))
+    vars t
+
+let mk_forall_var vars t =
+  List.fold_right
+    (fun var t -> mk_forall (db_from_var t var))
+    vars t
+
+let mk_exists_var vars t =
+  List.fold_right
+    (fun var t -> mk_exists (db_from_var t var))
+    vars t
+
+(** Compute the signature of the set of terms *)
+let signature seq =
+  (* explore a term *)
+  let rec explore_term signature t = match t.term with
+  | Var _ | BoundVar _ -> signature
+  | Bind (s, t') ->
+    let sort = t.sort in
+    let signature' = update_sig signature s sort in
+    explore_term signature' t'
+  | Node (s, l) when s == at_symbol || s == eq_symbol ->
+    (* ad-hoc polymorphism *)
+    List.fold_left explore_term signature l
+  | Node (f, l) ->
+    let sort = t.sort <== (List.map (fun x -> x.sort) l) in
+    let signature' = update_sig signature f sort in
+    List.fold_left explore_term signature' l
+  (* Update signature with s -> sort.
+     Checks consistency with current value, if any. *)
+  and update_sig signature f sort =
+    (try
+      let sort' = SMap.find f signature in
+      if sort != sort' then Format.printf "sort %a != %a@." pp_sort sort pp_sort sort';
+      assert (sort == sort');
+    with Not_found -> ());
+    let signature' = SMap.add f sort signature in
+    signature'
+  in
+  Sequence.fold explore_term empty_signature seq
+
+let symbols seq =
+  let s = signature seq in
+  let keys = SMapSeq.keys s in
+  SSetSeq.of_seq keys
 
 (** Bind all free variables by 'forall' *)
 let close_forall t =
@@ -631,17 +680,6 @@ let rec is_fo t = match t.term with
     not (is_var a) && is_fo a && is_fo b
   | Node (_, l) -> List.for_all is_fo l
 
-(** All symbols of the term, without assumptions on arity *)
-let signature seq =
-  let rec explore set t = 
-    match t.term with
-    | Var _ | BoundVar _ -> set
-    | Bind (s, t') -> explore (SSet.add s set) t'
-    | Node (f, l) ->
-      List.fold_left explore (SSet.add f set) l
-  in
-  Sequence.fold explore SSet.empty seq
-
 (** Beta reduce the (curryfied) term, ie [(^[X]: t) @ t']
     becomes [subst(X -> t')(t)] *)
 let rec beta_reduce t =
@@ -743,9 +781,7 @@ let ac_eq ?(is_ac=fun s -> has_attr attr_ac s)
   and t2' = ac_normal_form ~is_ac ~is_com t2 in
   t1' == t2'
 
-(* ----------------------------------------------------------------------
- * Pretty printing
- * ---------------------------------------------------------------------- *)
+(** {2 Pretty printing} *)
 
 (** type of a pretty printer for symbols *)
 class type pprinter_symbol =
@@ -759,6 +795,8 @@ let pp_symbol_unicode =
     method pp formatter s = match s with
       | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
       | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
+      | _ when s == num_symbol -> Format.pp_print_string formatter "[num]"
+      | _ when s == const_symbol -> Format.pp_print_string formatter "[const]"
       | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
     method infix s = has_attr attr_infix s
   end
@@ -796,11 +834,16 @@ let pp_term_debug =
       | Var i -> Format.fprintf formatter "X%d" i
       | BoundVar _ -> assert false
       | Bind _ -> assert false
+      | Node (s, [{term=Node (s', [a;b])}]) when s == not_symbol
+        && s' == eq_symbol && a.sort == bool_ ->
+        Format.fprintf formatter "(%a <~> %a)" self#pp a self#pp b
+      | Node (s, [a;b]) when s == eq_symbol && a.sort == bool_ ->
+        Format.fprintf formatter "(%a <=> %a)" self#pp a self#pp b
       | Node (s, [{term=Node (s', [a; b])}])
         when s == not_symbol && s' == eq_symbol ->
         Format.fprintf formatter "%a != %a" self#pp a self#pp b
       | Node (s, [a; b]) when s == eq_symbol ->
-        Format.fprintf formatter "%a = %a" self#pp a self#pp b
+        Format.fprintf formatter "(%a = %a)" self#pp a self#pp b
       | Node (s, [v; t']) when has_attr attr_binder s ->
         assert (is_var v);
         Format.fprintf formatter "%a[%a]: %a" pp_symbol_unicode#pp s self#pp v self#pp t'
@@ -867,38 +910,6 @@ let pp_precedence formatter symbols =
   Format.fprintf formatter "@[<h>sig %a@]"
     (Utils.pp_list ~sep:" > " !pp_symbol#pp) symbols
 
-(* ----------------------------------------------------------------------
- * conversions with simple terms/formulas
- * ---------------------------------------------------------------------- *)
-
-let rec from_simple t = match t with
-  | Simple.Var (i,s) -> mk_var i s
-  | Simple.Node (f, s, l) -> mk_node f s (List.map from_simple l)
-
-let rec from_simple_formula f = match f with
-  | Simple.True -> true_term
-  | Simple.False -> false_term
-  | Simple.Atom t -> from_simple t
-  | Simple.Eq (t1, t2) -> mk_eq (from_simple t1) (from_simple t2)
-  | Simple.Or (x::xs) ->
-    List.fold_left mk_or (from_simple_formula x) (List.map from_simple_formula xs)
-  | Simple.Or [] -> true_term
-  | Simple.And (x::xs) ->
-    List.fold_left mk_and (from_simple_formula x) (List.map from_simple_formula xs)
-  | Simple.And [] -> false_term
-  | Simple.Not f -> mk_not (from_simple_formula f)
-  | Simple.Equiv (f1, f2) -> mk_equiv (from_simple_formula f1) (from_simple_formula f2)
-  | Simple.Forall (v, f) -> mk_forall (db_from_var (from_simple_formula f) (from_simple v))
-  | Simple.Exists (v, f) -> mk_exists (db_from_var (from_simple_formula f) (from_simple v))
-
-let to_simple t =
-  if t.sort == bool_ then None else
-  let rec build t = match t.term with
-  | Var i -> Simple.mk_var i t.sort
-  | BoundVar _ | Bind _ -> failwith "not implemented"
-  | Node (f, l) -> Simple.mk_node f t.sort (List.map build l)
-  in Some (build t)
-
 (** {2 JSON} *)
 
 let rec to_json t =
@@ -943,9 +954,7 @@ let varlist_to_json l =
 let varlist_of_json json =
   List.map of_json (Json.Util.to_list json)
 
-(* ----------------------------------------------------------------------
- * skolem terms
- * ---------------------------------------------------------------------- *)
+(** {2 Skolem terms} *)
 
 (** Prefix used for skolem symbols *)
 let skolem_prefix = ref "sk"

@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 %{
-  (** TSTP parser. It parses into Simple.term and Simple.formula *)
+  (** TSTP parser. It parses into terms *)
 
   open Const
   open Symbols
@@ -30,17 +30,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   module Utils = FoUtils
 
-  type term = Simple.term
-  type variable = Simple.term
-  type literal = Simple.formula
-  type clause = Simple.formula
+  type term = Types.term
+  type variable = Types.term
+  type literal = Types.term
+  type clause = Types.term
 
   (* includes from input *)
   let include_files: string list ref =
     ref []
 
   (* these are only valid for the current clause
-     and have to be invalidated with init_clause for every new clause *)
+     and have to be invalidated with init for every new clause *)
 
   (* the variable id counter for the currently read term/clause *)
   let var_id_counter = ref 0
@@ -54,7 +54,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let conjecture = ref false
 
   (* reset everything in order to parse a new term/clause *)
-  let init_clause () =
+  let init () =
     var_id_counter := 0;
     var_map := [];
     conjecture := false
@@ -64,17 +64,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let get_var ?(sort=univ_) (var_name: string) =
     try 
       (* way faster than List.assoc *)
-      match (
+      match
         List.find
           (fun (var_name', var_sort, _) ->
-             var_name = var_name' && var_sort == sort
-          )
+             var_name = var_name' && var_sort == sort)
           !var_map
-      ) with (_, _, t) -> t
+      with (_, _, t) -> t
     with
       | Not_found ->
           let new_var = 
-            Simple.mk_var !var_id_counter sort
+            Terms.mk_var !var_id_counter sort
           in
             incr var_id_counter;
             var_map := (var_name, sort, new_var) :: !var_map;
@@ -83,11 +82,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   (** table that maps symbols into sorts *)
   let sort_table = SHashtbl.create 5
 
-  (* get the infered sort for the given constant *)
-  let get_sort constant =
+  (* Get the infered sort for the given symbol and list of arguments.
+     The supposed return type can be passed. *)
+  let get_sort ?(sort=univ_) symb =
     try
-      SHashtbl.find sort_table constant
-    with Not_found -> univ_
+      SHashtbl.find sort_table symb
+    with Not_found ->
+      SHashtbl.replace sort_table symb sort;
+      sort
 
   let set_sort constant sort = SHashtbl.replace sort_table constant sort
 %}
@@ -106,6 +108,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token FOF
 %token CNF
 %token THF
+%token TFF
 %token INCLUDE
 %token <string> SINGLE_QUOTED
 %token <string> DOLLAR_WORD
@@ -135,17 +138,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token LEMMA
 %token IF
 %token AND
+%token GC
+%token WITH
 
 %token UNKNOWN
 
 %start parse_file
-%type <Simple.sourced_formula list * string list> parse_file
+%type <Types.sourced_term list * string list> parse_file
 
-%start parse_clause
-%type <Simple.formula> parse_clause
+%start parse_formula
+%type <Types.term> parse_formula
 
-%start parse_theory_file
-%type <Meta.KB.item list> parse_theory_file
+%start parse_meta
+%type <Meta.KB.item list> parse_meta
 
 %%
 
@@ -167,12 +172,12 @@ parse_file:
   | EOI
       { Const.parse_error "empty problem specification" }
 
-parse_clause:
+parse_formula:
   | fof_formula EOI { Const.reset(); $1 }
   | EOI { Const.parse_error "could no parse clause" }
 
-parse_theory_file:
-  | theory_disjunctions EOI { Const.reset (); $1 }
+parse_meta :
+  | meta_items EOI { Const.reset (); $1 }
   | EOI { Const.reset(); [] }
 
 /* parse rules */
@@ -180,53 +185,53 @@ parse_theory_file:
 file:
   | tptp_input
       { match $1 with
-        | Some clause -> [clause]
-        | None        -> []
+        | Some formula -> [formula]
+        | None -> []
       }
-
   | tptp_input file
       { match $1 with
-        | Some clause -> clause :: $2
-        | None        -> $2
+        | Some formula -> formula :: $2
+        | None -> $2
       }
 
 tptp_input:
   | annotated_formula
       { Some $1 }
-
   | include_
       { None }
 
-
-
 annotated_formula:
   | fof_annotated
-      { $1 }
-
+    { $1 }
   | cnf_annotated
-      { $1 }
-
+    { $1 }
+  | tff_annotated
+    { $1 }
   | thf_annotated
-      { $1 }
+    { $1 }
 
 thf_annotated:
   | THF LEFT_PARENTHESIS name COMMA formula_role COMMA
     fof_formula annotations RIGHT_PARENTHESIS DOT
     { failwith "Parser_tptp: tfh syntax not supported." }
 
+tff_annotated:
+  | TFF LEFT_PARENTHESIS name COMMA formula_role COMMA
+    fof_formula annotations RIGHT_PARENTHESIS DOT
+    { failwith "Parser_tptp: tff syntax not (yet) supported." }
+
 fof_annotated:
   | FOF LEFT_PARENTHESIS name COMMA formula_role COMMA
     fof_formula annotations RIGHT_PARENTHESIS DOT
     { 
-      let clause = 
+      let formula = 
         let filename = !Const.cur_filename in  (* ugly *)
-        let source = Simple.Axiom (filename, $3) in
         if !conjecture
-          then Simple.mk_not $7, source
-          else $7, source
+          then Terms.mk_not $7, filename, $3
+          else $7, filename, $3
       in
-      init_clause ();  (* reset global state *)
-      clause
+      init ();  (* reset global state *)
+      formula
     }
 
 fof_formula:
@@ -235,11 +240,9 @@ fof_formula:
   | unitary_formula
     { $1 }
 
-
 binary_formula:
   | nonassoc_binary
     { $1 }
-
   | assoc_binary
     { $1 }
 
@@ -249,17 +252,17 @@ nonassoc_binary:
 
 binary_connective:
   | BIJECTION
-    { Simple.mk_equiv }
+    { fun x y -> Terms.mk_equiv (Terms.cast x bool_) (Terms.cast y bool_) }
   | LEFT_IMPLICATION
-    { Simple.mk_imply }
+    { fun x y -> Terms.mk_imply (Terms.cast x bool_) (Terms.cast y bool_) }
   | RIGHT_IMPLICATION
-    { fun x y -> Simple.mk_imply y x }
+    { fun x y -> Terms.mk_imply (Terms.cast y bool_) (Terms.cast x bool_) }
   | XOR
-    { Simple.mk_xor }
+    { fun x y -> Terms.mk_xor (Terms.cast x bool_) (Terms.cast y bool_) }
   | NEGATION OR
-    { fun x y -> Simple.mk_not (Simple.mk_or [x; y]) }
+    { fun x y -> Terms.mk_not (Terms.mk_or (Terms.cast x bool_) (Terms.cast y bool_)) }
   | NEGATION AND
-    { fun x y -> Simple.mk_not (Simple.mk_and [x; y]) }
+    { fun x y -> Terms.mk_not (Terms.mk_and (Terms.cast x bool_) (Terms.cast y bool_)) }
 
 assoc_binary:
   | or_formula
@@ -269,46 +272,44 @@ assoc_binary:
 
 or_formula:
   | unitary_formula OR more_or_formula
-    { Simple.mk_or ($1 :: $3) }
+    { Terms.mk_or (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 more_or_formula:
   | unitary_formula
-    { [$1] }
+    { (Terms.cast $1 bool_) }
   | unitary_formula OR more_or_formula
-    { $1 :: $3 }
+    { Terms.mk_or (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 and_formula:
   | unitary_formula AND more_and_formula
-    { Simple.mk_and ($1 :: $3) }
+    { Terms.mk_and (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 more_and_formula:
   | unitary_formula
-    { [$1] }
+    { (Terms.cast $1 bool_) }
   | unitary_formula AND more_and_formula
-    { $1 :: $3 }
+    { Terms.mk_and (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 unitary_formula:
   | quantified_formula
-    { $1 }
+    { (Terms.cast $1 bool_) }
   | unary_formula
-    { $1 }
+    { (Terms.cast $1 bool_) }
   | LEFT_PARENTHESIS fof_formula RIGHT_PARENTHESIS
-    { $2 }
+    { (Terms.cast $2 bool_) }
   | atomic_formula
-    { $1 }
+    { (Terms.cast $1 bool_) }
 
 quantified_formula:
   | quantifier LEFT_BRACKET variable_list RIGHT_BRACKET
     COLON unitary_formula
-    { 
-      List.fold_left (fun form v -> $1 v form) $6 $3
-    }
+    { $1 $3 (Terms.cast $6 bool_) }
 
 quantifier:
   | FORALL
-    { Simple.mk_forall }
+    { Terms.mk_forall_var }
   | EXISTS
-    { Simple.mk_exists }
+    { Terms.mk_exists_var }
 
 variable_list:
   | variable
@@ -322,7 +323,7 @@ unary_formula:
 
 unary_connective:
   | NEGATION
-    { Simple.mk_not }
+    { Terms.mk_not }
 
 
 cnf_annotated:
@@ -330,13 +331,12 @@ cnf_annotated:
   cnf_formula annotations RIGHT_PARENTHESIS DOT
       // ignore everything except for the formula
       {
-        let clause = 
+        let formula = 
           let filename = !Const.cur_filename in  (* ugly *)
-          let source = Simple.Axiom (filename, $3) in
-          $7, source
+          $7, filename, $3
         in
-        init_clause ();
-        clause
+        init ();
+        formula
       }
 
 formula_role:
@@ -351,51 +351,46 @@ formula_role:
 annotations:
   | null
       { "" }
-
   | COMMA source optional_info
       { "" }
 
 
-
 cnf_formula:
   | LEFT_PARENTHESIS disjunction RIGHT_PARENTHESIS
-      { Simple.mk_or $2 }
-
+      { $2 }
   | disjunction
-      { Simple.mk_or $1 }
+      { $1 }
 
 disjunction:
   | literal
-      { [$1] }
-
+      { (Terms.cast $1 bool_) }
   | literal OR disjunction
-      { $1 :: $3 }
+      { Terms.mk_or (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 
 literal:
   | atomic_formula
-      { $1 }
-
+      { (Terms.cast $1 bool_) }
   | NEGATION atomic_formula
-      { Simple.mk_not $2 }
+      { Terms.mk_not (Terms.cast $2 bool_) }
 
 atomic_formula:
   | plain_atom
       { $1 }
-
   | defined_atom
       { $1 }
-
   | system_atom
       { $1 }
 
 plain_atom:
   | plain_term_top
-      { let t = Simple.cast $1 bool_ in (* cast term to bool *)
-        (match t with
-        | Simple.Node (s, _, _) -> set_sort s bool_
-        | Simple.Var _ -> failwith "variable at top level");
-        Simple.mk_atom t
+      { let t = Terms.cast $1 bool_ in (* cast term to bool *)
+        (* Some type inference now *)
+        (match t.term with
+        | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
+        | Bind (s, l) -> set_sort s t.sort
+        | Var _ | BoundVar _ -> failwith "variable at top level");
+        t
       }
 
 arguments:
@@ -407,60 +402,58 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { Simple.mk_true }
+      { Terms.true_term }
 
   | DOLLAR_FALSE
-      { Simple.mk_false }
+      { Terms.false_term }
 
   | term EQUALITY term
-      { Simple.mk_eq $1 $3 }
+      { Terms.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { Simple.mk_neq $1 $3 }
+      { Terms.mk_neq $1 $3 }
 
 system_atom:
   | system_term_top
-      { let t = Simple.cast $1 bool_ in
-        (match t with
-        | Simple.Node (s, _, _) -> set_sort s bool_
-        | Simple.Var _ -> assert false);
-        Simple.mk_atom t
+      { let t = Terms.cast $1 bool_ in
+        (* Some type inference now *)
+        (match t.term with
+        | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
+        | Bind (s, t') -> set_sort s t.sort
+        | Var _ | BoundVar _ -> failwith "variable at top level");
+        t
       }
 
 term:
   | function_term
       { $1 }
-
   | variable
       { $1 }
 
 function_term:
   | plain_term
       { $1 }
-
   | defined_term
       { $1 }
-
   | system_term
       { $1 }
 
 plain_term_top:
   | constant
       { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
-
+        Terms.mk_const $1 sort }
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        Simple.mk_node $1 sort $3
+        Terms.mk_node $1 sort $3
       }
 
 plain_term:
   | constant
       { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
+        Terms.mk_const $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        Simple.mk_node $1 sort $3
+        Terms.mk_node $1 sort $3
       }
 
 constant:
@@ -473,45 +466,47 @@ functor_:
 
 defined_term:
   | number
-      { Const.parse_error ("<defined_term: number> not supported: " ^ $1) }
-
+    {
+      let n = Num.num_of_string $1 in
+      let symbol = Symbols.mk_num n in
+      let sort = match n with
+        | Num.Int _ | Num.Big_int _ -> int_
+        | Num.Ratio _ -> rat_
+      in
+      Terms.mk_const symbol sort }
   | DISTINCT_OBJECT
-      { Const.parse_error ("<defined_term: distinct_object> not supported: " ^ $1) }
+    { let sort = univ_ in
+      let symbol = Symbols.mk_distinct $1 in
+      Terms.mk_const symbol sort }
 
 system_term_top:
   | system_constant
-      { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
-
+      { let sort = get_sort $1 in  (* FIXME: is the sort univ_ ? *)
+        Terms.mk_const $1 sort }
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { 
-        Simple.mk_node $1 univ_ $3
-      }
+      { let sort = get_sort $1 in
+        Terms.mk_node $1 sort $3 }
 
 system_term:
   | system_constant
       { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
+        Terms.mk_const $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        Simple.mk_node $1 sort $3
-      }
+        Terms.mk_node $1 sort $3 }
 
 system_functor:
   | atomic_system_word
       { mk_symbol $1 }
-      
+
 system_constant:
   | atomic_system_word
       { mk_symbol $1 }
 
-
-
 variable:
   | UPPER_WORD
       { get_var $1 }
-
 
 source:
   | general_term
@@ -536,75 +531,61 @@ include_:
 formula_selection:
   | COMMA '[' name_list ']'
       { $3 }
-
   | null
       { [] }
 
 name_list:
   | name
       { [$1] }
-
   | name COMMA name_list
       { $1 :: $3 }
-
 
 
 general_term:
   | general_data
       { "" }
-
   | general_data COLON general_term
       { "" }
-
   | general_list
       { "" }
 
 general_data:
   | atomic_word
       { "" }
-
   | atomic_word LEFT_PARENTHESIS general_arguments RIGHT_PARENTHESIS
       { "" }
-
   | number
       { "" }
-
   | DISTINCT_OBJECT
       { "" }
 
 general_arguments:
   | general_term
       { [$1] }
-
   | general_term COMMA general_arguments
       { $1 :: $3 }
 
 general_list:
   | '[' ']'
       { [] }
-
   | '[' general_term_list ']'
       { $2 }
 
 general_term_list:
   | general_term
       { [$1] }
-
   | general_term COMMA general_term_list
       { $1 :: $3 }
-
 
 name:
   | atomic_word
       { $1 }
-
   | UNSIGNED_INTEGER
       { $1 }
 
 atomic_word:
   | LOWER_WORD
       { $1 }
-
   | SINGLE_QUOTED
       { $1 }
 
@@ -615,10 +596,8 @@ atomic_system_word:
 number:
   | REAL
       { $1 }
-
   | SIGNED_INTEGER
       { $1 }
-
   | UNSIGNED_INTEGER
       { $1 }
 
@@ -632,20 +611,23 @@ null:
       { }
 
 
-/* Theory parsing stuff */
+/* Meta-prover parsing */
 
-theory_disjunctions:
-  | EOI { [] }  /* TODO */
+meta_items:
+  | meta_item_dot { [$1] }
+  | meta_item_dot meta_items { $1 :: $2 }
+
+meta_item_dot:
+  | meta_item DOT { $1 }
+
+meta_item:
+  | meta_theory { $1 }
+  | meta_lemma { $1 }
+  | meta_gc { $1 }
+  | LEFT_PARENTHESIS meta_item RIGHT_PARENTHESIS { $2 }
+  | meta_rule { $1 }
 
 /*
-  | theory_disjunction { [$1] }
-  | theory_disjunction theory_disjunctions { $1 :: $2 }
-
-theory_disjunction:
-  | theory_named_formula { Theories.Named $1 }
-  | theory_theory { Theories.Theory $1 }
-  | theory_lemma { Theories.Lemma $1 }
-
 theory_named_formula:
   | datalog_atom IS fof_formula DOT
     {
@@ -673,64 +655,70 @@ theory_named_formula:
       SHashtbl.clear sort_table;
       nf
     }
-
-theory_theory:
-  | THEORY datalog_atom IS datalog_atoms DOT
-    {
-      let open Theories in
-      (* map symbols to variables *)
-      let get_var =
-        let table = SHashtbl.create 3 in
-        fun name ->
-          try `Var (SHashtbl.find table name)
-          with Not_found ->
-            let n = -(SHashtbl.length table)-1 in
-            SHashtbl.replace table name n;
-            `Var n
-      in
-      let convert_atom (head, args) = head, List.map get_var args in
-      { th_atom = convert_atom $2;
-        th_definition = List.map convert_atom $4;
-      }
-    }
-
-theory_lemma:
-  | LEMMA datalog_atom IF datalog_atoms DOT
-    {
-      let open Theories in
-      (* map symbols to variables *)
-      let get_var =
-        let table = SHashtbl.create 3 in
-        fun name ->
-          try `Var (SHashtbl.find table name)
-          with Not_found ->
-            let n = -(SHashtbl.length table)-1 in
-            SHashtbl.replace table name n;
-            `Var n
-      in
-      let convert_atom (head, args) = head, List.map get_var args in
-      { lemma_conclusion = convert_atom $2;
-        lemma_premises = List.map convert_atom $4;
-      }
-    }
-
-datalog_atoms:
-  | datalog_atom { [$1] }
-  | datalog_atom AND datalog_atoms { $1 :: $3 }
-
-datalog_atom:
-  | LOWER_WORD { mk_symbol $1, [] }
-  | LOWER_WORD LEFT_PARENTHESIS datalog_args RIGHT_PARENTHESIS
-    { mk_symbol $1, $3 }
-
-datalog_args:
-  | datalog_arg { [$1] }
-  | datalog_arg COMMA datalog_args { $1 :: $3 }
-
-datalog_arg:
-  | LOWER_WORD { let s = mk_symbol $1 in s }
-
 */
+
+meta_rule:
+  | meta_item IF meta_item_list { Meta.KB.Rule ($1, $3) }
+
+meta_item_list:
+  | meta_item { [$1] }
+  | meta_item AND meta_item_list { $1 :: $3 }
+
+meta_theory:
+  | THEORY LOWER_WORD
+    { Meta.KB.Theory ($2, []) }
+  | THEORY LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { Meta.KB.Theory ($2, $4) }
+
+meta_lemma:
+  | LEMMA meta_pattern IF meta_patterns
+    { Meta.KB.Lemma ($2, $4) }
+
+meta_gc:
+  | GC meta_patterns
+    WITH LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { let open Meta.KB in
+      let gc_vars = [] in (* TODO: renaming and gathering of vars *)
+      let gc_ord = $4 in
+      let gc_prec = $6 in
+      let gc_eqns = $2 in
+      Meta.KB.GC {
+        gc_vars;
+        gc_ord;
+        gc_prec;
+        gc_eqns;
+      }
+    }
+
+meta_theory:
+  | THEORY LOWER_WORD
+    { Meta.KB.Theory ($2, []) }
+  | THEORY LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { Meta.KB.Theory ($2, $4) }
+
+meta_rule:
+  | meta_item IF meta_item_list
+    { Meta.KB.Rule ($1, $3) }
+
+meta_patterns:
+  | meta_pattern { [$1] }
+  | meta_pattern AND meta_patterns { $1 :: $3 }
+
+meta_pattern:
+  | fof_formula
+    { let t = $1 in
+      Meta.Pattern.of_term t
+    }
+
+meta_variables:
+  | meta_variable { [$1] }
+  | meta_variable COMMA meta_variables { $1 :: $3 }
+
+meta_variable:
+  | UPPER_WORD
+    { (* FIXME: type inference??*)
+      get_var $1
+    }
 
 
 %%

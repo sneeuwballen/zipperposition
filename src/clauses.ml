@@ -367,53 +367,37 @@ let is_unit_clause hc = match hc.hclits with
 
 (** Compute signature of this set of clauses *)
 let signature clauses =
-  (* explore a term *)
-  let rec explore_term signature t = match t.term with
-  | Var _ | BoundVar _ -> signature
-  | Bind (s, t') ->
-    let sort = t.sort in
-    let signature' = update_sig signature s sort in
-    explore_term signature' t'
-  | Node (f, l) ->
-    let sort = t.sort <== (List.map (fun x -> x.sort) l) in
-    let signature' = update_sig signature f sort in
-    List.fold_left explore_term signature' l
-  and explore_lit signature lit = match lit with
-  | Equation (l,r,_,_) -> explore_term (explore_term signature l) r
-  and explore_clause signature hc = Array.fold_left explore_lit signature hc.hclits
-  (* Update signature with s -> sort.
-     Checks consistency with current value, if any. *)
-  and update_sig signature f sort =
-    (try
-      let sort' = SMap.find f signature in
-      assert (sort == sort');
-    with Not_found -> ());
-    let signature' = SMap.add f sort signature in
-    signature'
-  in
-  List.fold_left explore_clause empty_signature clauses
+  let clauses = Sequence.of_list clauses in
+  let clauses = Sequence.map (fun hc -> Lits.lits_to_seq hc.hclits) clauses in
+  let lits = Sequence.concat clauses in
+  let terms = Sequence.map (fun (l,r,_) -> Sequence.of_list [l;r]) lits in
+  let terms = Sequence.concat terms in
+  T.signature terms
 
-let rec from_simple ~ctx (f, source) =
+(** Conversion of a (boolean) term to a clause. *)
+let rec from_term ~ctx (t, file, name) =
+  assert (t.sort == bool_);
   let ord = ctx.ctx_ord in
   let open Literals in
-  let rec lits_from_simple ~ord f = match f with
-    | Simple.Not (Simple.Atom f) -> [mk_neq ~ord (T.from_simple f) T.true_term]
-    | Simple.Atom f -> [mk_eq ~ord (T.from_simple f) T.true_term]
-    | Simple.Not (Simple.Eq (t1,t2)) -> [mk_neq ~ord (T.from_simple t1) (T.from_simple t2)]
-    | Simple.Eq (t1, t2) -> [mk_eq ~ord (T.from_simple t1) (T.from_simple t2)]
-    | Simple.Not (Simple.Equiv (f1,f2)) ->
-      [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-    | Simple.Equiv (f1, f2) ->
-      [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-    | Simple.Or l -> List.concat (List.map (lits_from_simple ~ord) l)
-    | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
+  let rec lits_from_term t = match t.term with
+  | Node (n, [{term=Node (eq, [a;b])}]) when n == not_symbol && eq == eq_symbol ->
+    [mk_neq ~ord a b]
+  | Node (eq, [a;b]) when eq == eq_symbol ->
+    [mk_eq ~ord a b]
+  | Node (or_, l) when or_ == or_symbol ->
+    let l' = T.flatten_ac or_symbol l in
+    (* flatten the or, and convert each element to a list of literals *)
+    List.concat (List.map lits_from_term l')
+  | Node (n, [f]) when n == not_symbol ->
+    [mk_neq ~ord f T.true_term]
+  | Node _ ->
+    [mk_eq ~ord t T.true_term]
+  | Bind _ ->
+    [mk_eq ~ord t T.true_term]
+  | Var _ | BoundVar _ -> failwith "variable should not occur at the formula level"
   in
-  let proof c = match source with
-  | Simple.Axiom (a,b) -> Axiom (c, a, b)
-  | Simple.Derived (name, fs) ->
-    failwith "unable to convert non-axiom simple clause to hclause"
-  in
-  let hc = mk_hclause ~ctx (lits_from_simple ~ord f) proof in
+  let proof c = Axiom (c, file, name) in
+  let hc = mk_hclause ~ctx (lits_from_term t) proof in
   hc
 
 (* ----------------------------------------------------------------------

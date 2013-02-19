@@ -45,6 +45,8 @@ and term_cell =
   | BoundVar of int             (** bound variable (De Bruijn index) *)
   | Bind of symbol * term       (** bind one variable, with the symbol *)
   | Node of symbol * term list  (** term application *)
+and sourced_term =
+  term * string * string        (** Term + file,name *)
 
 (** list of variables *)
 type varlist = term list            

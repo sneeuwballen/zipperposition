@@ -218,9 +218,11 @@ let process_file ~kb params f =
   (* find the calculus *)
   let calculus = get_calculus ~params in
   (* convert simple clauses to clauses, first with a simple ordering *)
-  let signature = Simple.signature (List.map fst clauses) in
+  List.iter (fun (t,_,_) -> Utils.debug 1 "%% formula @[<h>%a@]" !T.pp_term#pp t) clauses;
+  let signature = T.signature
+    (Sequence.map (fun (x,_,_) -> x) (Sequence.of_list clauses)) in
   let d_ctx = {ctx_ord=O.default_ordering signature; ctx_select=no_select; } in
-  let clauses = List.map (C.from_simple ~ctx:d_ctx) clauses in
+  let clauses = List.map (C.from_term ~ctx:d_ctx) clauses in
   (* first preprocessing, with a simple ordering. *)
   let clauses = calculus#preprocess ~ctx:d_ctx clauses in
   Utils.debug 2 "%% clauses first-preprocessed into: @[<v>%a@]@."

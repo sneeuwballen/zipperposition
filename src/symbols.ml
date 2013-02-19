@@ -138,6 +138,7 @@ module SMap = Map.Make(struct type t = symbol let compare = compare_symbols end)
 module SMapSeq = Sequence.Map.Adapt(SMap)
 
 module SSet = Set.Make(struct type t = symbol let compare = compare_symbols end)
+module SSetSeq = Sequence.Set.Adapt(SSet)
 
 (** {2 connectives} *)
 

@@ -21,11 +21,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 open Symbols
 
-(** Functions on first-order terms *)
+(** {1 First-order terms} *)
 
-(* ----------------------------------------------------------------------
- * comparison, equality, containers
- * ---------------------------------------------------------------------- *)
+(** {2 Comparison, equality, containers} *)
 
 val member_term : term -> term -> bool    (** [a] [b] checks if a subterm of b *)
 val eq_term : term -> term -> bool        (** standard equality on terms *)
@@ -35,7 +33,7 @@ val hash_term : term -> int
 module THashtbl : Hashtbl.S with type key = term
 module TSet : Sequence.Set.S with type elt = term
 
-(** Simple hashset for small sets of terms *)
+(** {2 Hashset of terms} *)
 module THashSet :
   sig
     type t
@@ -49,17 +47,13 @@ module THashSet :
     val from_list : term list -> t          (** build a set from the list *)
   end
 
-(* ----------------------------------------------------------------------
- * access global terms table (hashconsing)
- * ---------------------------------------------------------------------- *)
+(** {2 Global terms table (hashconsing)} *)
 
 val iter_terms : (term -> unit) -> unit       (** iterate through existing terms *)
 val all_terms : unit -> term list             (** all currently existing terms *)
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
-(* ----------------------------------------------------------------------
- * boolean flags
- * ---------------------------------------------------------------------- *)
+(** {2 Boolean flags} *)
 
 val flag_db_closed : int
 val flag_simplified : int
@@ -73,9 +67,7 @@ val set_flag : int -> term -> bool -> unit
 val get_flag : int -> term -> bool
   (** read the flag *)
 
-(* ----------------------------------------------------------------------
- * smart constructors, with a bit of type-checking
- * ---------------------------------------------------------------------- *)
+(** {2 Smart constructors} *)
 
 (** In this section, term smart constructors are defined. Some of them
     accept a [?old] optional argument. This argument is an already existing
@@ -96,7 +88,9 @@ val mk_and : term -> term -> term
 val mk_or : term -> term -> term
 val mk_imply : term -> term -> term
 val mk_equiv : term -> term -> term
+val mk_xor : term -> term -> term
 val mk_eq : term -> term -> term
+val mk_neq : term -> term -> term
 val mk_lambda : sort -> term -> term        (** Like mk_bind, the result sort is needed *)
 val mk_forall : term -> term
 val mk_exists : term -> term
@@ -105,9 +99,7 @@ val mk_at : ?old:term -> term -> term -> term   (** t1 t2 -> t1 @ t2 *)
 
 val cast : term -> sort -> term             (** cast (change sort) *)
 
-(* ----------------------------------------------------------------------
- * examine term/subterms, positions...
- * ---------------------------------------------------------------------- *)
+(** {2 Subterms and positions} *)
 
 val is_var : term -> bool
 val is_bound_var : term -> bool
@@ -143,9 +135,7 @@ val vars : term -> varlist                  (** compute variables of the term *)
 val vars_list : term list -> varlist        (** variables of terms in the list *)
 val depth : term -> int                     (** depth of the term *)
 
-(* ----------------------------------------------------------------------
- * De Bruijn terms, and dotted formulas
- * ---------------------------------------------------------------------- *)
+(** {2 De Bruijn indexes} *)
 
 val atomic : term -> bool                   (** atomic proposition, or term, at root *)
 val atomic_rec : term -> bool               (** does not contain connectives/quantifiers *)
@@ -170,10 +160,21 @@ val db_from_var : term -> term -> term
 val look_db_sort : int -> term -> sort option
   (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)
 
-(** {2 High-level transformations} *)
+(** {2 High-level operations} *)
+
+(** constructors with free variables. The first argument is the
+    list of variables that is bound, then the quantified/abstracted
+    term. *)
+
+val mk_lambda_var : term list -> term -> term   (** (lambda v1,...,vn. t). *)
+val mk_forall_var : term list -> term -> term
+val mk_exists_var : term list -> term -> term
 
 val close_forall : term -> term             (** Bind all free variables by 'forall' *)
 val close_exists : term -> term             (** Bind all free variables by 'exists' *)
+
+val signature : term Sequence.t -> signature  (** Signature of the terms *)
+val symbols : term Sequence.t -> SSet.t       (** Symbols of the terms (keys of signature) *)
 
 val db_to_classic : ?varindex:int ref -> term -> term
   (** Transform binders and De Bruijn indexes into regular variables.
@@ -185,8 +186,6 @@ val uncurry : term -> term                  (** Un-currify all subterms *)
 val curryfied : term -> bool                (** Is the term already curryfied? *)
 
 val is_fo : term -> bool                    (** Check that the (curryfied) term is first-order *)
-
-val signature : term Sequence.t -> SSet.t   (** All symbols, without assumptions on arity *)
 
 val beta_reduce : term -> term              (** Beta-reduce the (curryfied) term *)
 
@@ -219,9 +218,7 @@ val ac_eq : ?is_ac:(symbol -> bool) -> ?is_com:(symbol -> bool) ->
       which symbols are AC or commutative (by default by looking at
       attr_ac and attr_commut). *)
 
-(* ----------------------------------------------------------------------
- * Pretty printing
- * ---------------------------------------------------------------------- *)
+(** {2 Pretty printing} *)
 
 (** type of a pretty printer for symbols *)
 class type pprinter_symbol =
@@ -252,14 +249,6 @@ val pp_term_debug :                                 (** print term in a nice syn
 
 val pp_precedence : Format.formatter -> symbol list -> unit      (** print symbol precedence *)
 
-(* ----------------------------------------------------------------------
- * conversions with simple terms/formulas
- * ---------------------------------------------------------------------- *)
-
-val from_simple : Simple.term -> term
-val from_simple_formula : Simple.formula -> term
-val to_simple : term -> Simple.term option  (** fails if the term is of bool sort *)
-
 (** {2 JSON} *)
 
 val to_json : term -> json
@@ -268,9 +257,7 @@ val of_json : json -> term
 val varlist_to_json : varlist -> json
 val varlist_of_json : json -> varlist
 
-(* ----------------------------------------------------------------------
- * skolem terms
- * ---------------------------------------------------------------------- *)
+(** {2 Skolem terms} *)
 
 (** Prefix used for skolem symbols *)
 val skolem_prefix : string ref

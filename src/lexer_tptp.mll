@@ -141,8 +141,8 @@ rule token =
       | eof                          { update_token (Lexing.lexeme lexbuf); EOI }
       | "fof"                        { update_token (Lexing.lexeme lexbuf); FOF }
       | "cnf"                        { update_token (Lexing.lexeme lexbuf); CNF }
-      | "thf"                        { update_token (Lexing.lexeme lexbuf);
-                                       failwith "Parser_tptp: tfh syntax not supported." }
+      | "tff"                        { update_token (Lexing.lexeme lexbuf); TFF }
+      | "thf"                        { update_token (Lexing.lexeme lexbuf); THF }
       | "include"                    { update_token (Lexing.lexeme lexbuf); INCLUDE }
 
       | "is"                         { update_token (Lexing.lexeme lexbuf); IS }
@@ -150,6 +150,8 @@ rule token =
       | "lemma"                      { update_token (Lexing.lexeme lexbuf); LEMMA }
       | "if"                         { update_token (Lexing.lexeme lexbuf); IF }
       | "and"                        { update_token (Lexing.lexeme lexbuf); AND }
+      | "gc"                         { update_token (Lexing.lexeme lexbuf); GC }
+      | "with"                       { update_token (Lexing.lexeme lexbuf); WITH }
 
       | lower_word                   { update_token (Lexing.lexeme lexbuf); LOWER_WORD(Lexing.lexeme lexbuf) }
       | upper_word                   { update_token (Lexing.lexeme lexbuf); UPPER_WORD(Lexing.lexeme lexbuf) }

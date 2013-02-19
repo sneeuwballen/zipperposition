@@ -82,9 +82,10 @@ val name_symbol : symbol -> string
 module SHashtbl : Hashtbl.S with type key = symbol
 
 module SMap : Map.S with type key = symbol
-module SMapSeq : Sequence.Map.S with type key = symbol
+module SMapSeq : Sequence.Map.S with type key = symbol and type 'a map = 'a SMap.t
 
 module SSet : Set.S with type elt = symbol
+module SSetSeq : Sequence.Set.S with type elt = symbol and type set = SSet.t
 
 (** {2 connectives} *)
 

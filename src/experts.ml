@@ -140,7 +140,7 @@ type gnd_convergent = {
 } (** A set of ground convergent equations, for some order+precedence *)
 
 let mk_gc name prec lits =
-  let set = T.signature
+  let set = T.symbols
     (Sequence.concat
       (Sequence.map 
         (fun (Equation (l,r,_,_)) -> Sequence.of_list [l;r])
