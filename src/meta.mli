@@ -33,7 +33,7 @@ open Symbols
     is "\F. ((= @ ((F @ x) @ y)) @ ((F @ y) @ x))" *)
 
 module Pattern : sig
-  type pattern = term * varlist
+  type pattern = term parametrized
     (** A pattern is a curryfied formula, along with a list of variables
         whose order matters. *)
 
@@ -58,7 +58,7 @@ module Pattern : sig
     (** The Datalog prover that reasons over atoms. *)
 
   type lemma =
-    [ `Lemma of (pattern * varlist) * ((pattern * varlist) list) ]
+    [ `Lemma of pattern parametrized * pattern parametrized list ]
     (** A lemma is the implication of a pattern by other patterns,
         but with some variable renamings to correlate the
         bindings of the distinct patterns. For instance,
@@ -67,22 +67,19 @@ module Pattern : sig
         (F(x,y)=G(y,x), [F,G], [Mult,MyMult]). *)
 
   type theory =
-    [ `Theory of string * varlist * ((pattern * varlist) list) ]
+    [ `Theory of string parametrized * pattern parametrized list ]
     (** A theory, like a lemma, needs to correlate the variables
         in several patterns via renaming. It outputs an assertion
         about the theory being present for some symbols. *)
 
   type gnd_convergent =
-    [ `GndConvergent of gnd_convergent_spec ]
+    [ `GndConvergent of gnd_convergent_spec parametrized ]
   and gnd_convergent_spec = {
-    gc_vars : varlist;
     gc_ord : string;
     gc_prec : varlist;
     gc_eqns : pattern list;
   } (** Abstract equations that form a ground convergent rewriting system
-        when instantiated. They contain free variables, listed in gc_vars,
-        such that replacing variables by symbols yields first-order equations.
-        The order of variables matter.
+        when instantiated.
         gc_ord and gc_prec, once instantiated, give a constraint on the ordering
         that must be satisfied for the system to be a decision procedure. *)
 
@@ -114,34 +111,6 @@ module Pattern : sig
   val pp_item : Format.formatter -> [< item] -> unit
   val item_to_json : [< item] -> json
   val item_of_json : json -> [> item]
-end
-
-(** {2 Indexing on patterns} *)
-
-module PMap : sig
-  type +'a t
-    (** the type of the map that has values of type 'a *)
-
-  val empty : 'a t
-
-  val add : Pattern.pattern -> 'a -> 'a t -> 'a t
-
-  val fold : (Pattern.pattern -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-
-  val retrieve : 'a t -> literal array ->
-                 (Pattern.pattern -> term list -> 'a -> unit) -> unit
-    (** [retrieve map lits k] calls [k] on every list [l] of terms
-        such that [l = matching lits p] for some [p] that is a key of [map].
-        [k] receives as arguments the pattern [p], the arguments [l]
-        and the value associated to [p] *)
-
-  val to_seq : 'a t -> (Pattern.pattern * 'a) Sequence.t
-  val of_seq : 'a t -> (Pattern.pattern * 'a) Sequence.t -> 'a t
-
-  val to_json : ('a -> json) -> 'a t -> json
-  val of_json : (json -> 'a) -> 'a t -> json -> 'a t
-
-  val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 end
 
 (** {2 Persistent Knowledge Base} *)

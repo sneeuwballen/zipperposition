@@ -36,7 +36,7 @@ module Lits = Literals
     This way, the pattern for "f(X,Y)=f(Y,X)"
     is "\F. ((= @ ((F @ x) @ y)) @ ((F @ y) @ x))" *)
 
-type pattern = term * varlist
+type pattern = term parametrized
   (** A pattern is a curryfied formula, along with a list of variables
       whose order matters. *)
 
@@ -108,7 +108,7 @@ module Logic = Datalog.Logic.Make(struct
 end)
 
 type lemma =
-  [ `Lemma of (pattern * varlist) * ((pattern * varlist) list) ]
+  [ `Lemma of pattern parametrized * pattern parametrized list ]
   (** A lemma is the implication of a pattern by other patterns,
       but with some variable renamings to correlate the
       bindings of the distinct patterns. For instance,
@@ -117,22 +117,19 @@ type lemma =
       (F(x,y)=G(y,x), [F,G], [Mult,MyMult]). *)
 
 type theory =
-  [ `Theory of string * varlist * ((pattern * varlist) list) ]
+  [ `Theory of string parametrized * pattern parametrized list ]
   (** A theory, like a lemma, needs to correlate the variables
       in several patterns via renaming. It outputs an assertion
       about the theory being present for some symbols. *)
 
 type gnd_convergent =
-  [ `GndConvergent of gnd_convergent_spec ]
+  [ `GndConvergent of gnd_convergent_spec parametrized ]
 and gnd_convergent_spec = {
-  gc_vars : varlist;
   gc_ord : string;
   gc_prec : varlist;
   gc_eqns : pattern list;
 } (** Abstract equations that form a ground convergent rewriting system
-      when instantiated. They contain free variables, listed in gc_vars,
-      such that replacing variables by symbols yields first-order equations.
-      The order of variables matter.
+      when instantiated.
       gc_ord and gc_prec, once instantiated, give a constraint on the ordering
       that must be satisfied for the system to be a decision procedure. *)
 

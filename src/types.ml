@@ -55,8 +55,6 @@ type 'a bind = ('a * int)
 
 (** An object parametrized by a list of variables *)
 type 'a parametrized = ('a * varlist)
-type 'a parametrize = 'a -> 'a parametrized
-type 'a specialize = 'a parametrized -> term list -> 'a
 
 (** substitution, a list of (variable -> term) *)
 type substitution =
