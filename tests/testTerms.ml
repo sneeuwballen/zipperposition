@@ -95,6 +95,10 @@ let check_ac_matching () =
   let x = T.mk_var 1 bool_
   and y = T.mk_var 2 bool_
   and z = T.mk_var 3 bool_
+  and x4 = T.mk_var 4 univ_ in
+  let t1 = T.mk_node (mk_symbol "f1") univ_ [T.mk_const (mk_symbol "a1") univ_]
+  and t2 = T.mk_node (mk_symbol "f1") univ_ [T.mk_const (mk_symbol "b1") univ_]
+  and t3 = T.mk_node (mk_symbol "f1") univ_ [x4]
   and p1 = T.mk_const (mk_symbol "p1") bool_
   and p2 = T.mk_const (mk_symbol "p2") bool_
   and p3 = T.mk_const (mk_symbol "p3") bool_ in
@@ -102,11 +106,11 @@ let check_ac_matching () =
     T.mk_or
       (T.mk_or
         (T.mk_or x y)
-        z)
+        (T.mk_or z (T.mk_eq t1 t3)))
       p1
   and t2 =
     T.mk_or
-      p1
+      (T.mk_or p1 (T.mk_eq t2 t1))
       (T.mk_or
         (T.mk_or p1 p2)
         (T.mk_or y p3))
