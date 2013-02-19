@@ -493,12 +493,11 @@ let db_unlift t =
       mk_node ~old:t s t.sort (List.map (recurse depth) l)
   in recurse 0 t
 
-(* replace [v] by a De Bruijn symbol in [t] *)
-let db_from_var t v =
-  assert (is_var v);
-  (* recurse and replace [v]. *)
+(** Replace [t'] by a fresh De Bruijn index in [t]. *)
+let db_from_term t t' =
+  (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
-  | Var _ -> if eq_term t v then mk_bound_var depth v.sort else t
+  | Var _ -> if eq_term t t' then mk_bound_var depth t'.sort else t
   | Bind (s, t') ->
     mk_bind ~old:t s t.sort (replace (depth+1) t')
   | BoundVar _ -> t
@@ -506,6 +505,12 @@ let db_from_var t v =
   | Node (s, l) -> mk_node ~old:t s t.sort (List.map (replace depth) l)
   in
   replace 0 t
+
+  (** [db_from_var t v] replace v by a De Bruijn symbol in t.
+    Same as db_from_term. *)
+let db_from_var t v =
+  assert (is_var v);
+  db_from_term t v
 
 exception FoundSort of sort
 

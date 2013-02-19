@@ -34,9 +34,13 @@ open Symbols
 
 module Pattern : sig
   (** {2 Basic type definitions} *)
-  type t = term parametrized
-    (** A pattern is a curryfied formula, along with a list of variables
-        whose order matters. *)
+
+  type t = term * sort list
+    (** A pattern is a curryfied formula, whose symbols are abstracted into
+        lambda-bound variables. The list is the list of the sorts of
+        the bound variables, such that if [t1,...,tn] are terms whose sorts
+        pairwise match the list of sort, then [instantiate p t1...tn] will
+        be well-typed. *)
 
   type atom =
     | MString of string     (** Just a string *)
@@ -68,12 +72,27 @@ module Pattern : sig
 
   (** {2 Conversion pattern <-> clause, and matching *)
 
-  val of_term : term -> t
-    (** Finds which variables in the (curryfied) term are symbols
-        that should be put in the parameters *)
+  val find_symbols : ?symbols:Terms.TSet.set -> term -> Terms.TSet.set
+    (** Given a curryfied term, find the symbols that occur as head constants
+        (ie "f" in "f @ _" where f is not a "_@_") *)
 
-  val abstract_clause : literal array -> t
+  val find_functions : term -> symbol list -> term list
+    (** [find_functions t (s1,...,sn)] where t is currified
+        maps s1,...,sn to constants that have the correct sort *)
+
+  val of_term_with : term -> symbol list -> t * term list
+    (** Abstracts the given constants out, in the given order. The
+        term must be curryfied. *)
+
+  val of_term : term -> t * term list
+    (** Abstract over constants in the (curryfied) term. Also returns
+        the ordered list of such constants, such. *)
+
+  val abstract_clause : literal array -> t * term list
     (** Abstracts the clause out *)
+
+  val sorts : t -> sort list
+    (** Sorts of arguments that are accepted by the pattern *)
 
   val arity : t -> int
     (** number of arguments that have to be provided
@@ -84,15 +103,17 @@ module Pattern : sig
         and uncurry the term back. It will fail if the result is not
         first-order. *)
 
+  val apply_subst : t parametrized -> substitution -> term
+    (** Apply the substitution to variables that parametrize the pattern,
+        then [instantiate] the pattern (beta-reduced and uncurryfied).
+        [apply_subst (p,vars) subst] is equivalent to
+        [instantiate p (List.map (S.apply_subst subst) vars)]. *)
+
   val matching : t -> literal array -> term list Sequence.t
     (** [matching p lits] attempts to match the literals against the pattern.
         It yields a list of solutions, each solution [s1,...,sn] satisfying
         [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
         of "or" and "=". *)
-
-  val rename : t -> varlist -> t
-    (** Rename the variables in the pattern. The provided list of variables
-        must be of the same length as [arity pattern]. *)
 end
 
 (** {2 Persistent Knowledge Base} *)
@@ -106,7 +127,7 @@ module KB : sig
   type item =
   | Named of string * Pattern.t
     (** Named formula *)
-  | Lemma of Pattern.t * Pattern.t list
+  | Lemma of Pattern.t parametrized * Pattern.t parametrized list
     (** A lemma is the implication of a pattern by other patterns,
         but with some variable renamings to correlate the
         bindings of the distinct patterns. For instance,
@@ -119,20 +140,17 @@ module KB : sig
         are an instance of the theory *)
   | GC of gnd_convergent_spec
     (** Ground Convergent system of equations *)
-  | Rule of item * item list
+  | Rule of item parametrized * item parametrized list
     (** Assertion that depends on other assertions *)
   and gnd_convergent_spec = {
     gc_vars : varlist;
     gc_ord : string;
     gc_prec : varlist;
-    gc_eqns : Pattern.t list;
+    gc_eqns : Pattern.t parametrized list;
   } (** Abstract equations that form a ground convergent rewriting system
         when instantiated. It is parametrized by the theory it decides.
         gc_ord and gc_prec (once instantiated), give a constraint on the ordering
         that must be satisfied for the system to be a decision procedure. *)
-
-  val rename : item -> varlist -> item
-    (** Rename non-bound variables in the item *)
 
   (** {2 Knowledge Base} *)
 

@@ -621,41 +621,11 @@ meta_item_dot:
   | meta_item DOT { $1 }
 
 meta_item:
+  | meta_named { $1 }
   | meta_theory { $1 }
   | meta_lemma { $1 }
   | meta_gc { $1 }
-  | LEFT_PARENTHESIS meta_item RIGHT_PARENTHESIS { $2 }
   | meta_rule { $1 }
-
-/*
-theory_named_formula:
-  | datalog_atom IS fof_formula DOT
-    {
-      let open Patterns in let open Theories in
-      let atom_name, atom_args = $1 in
-      let f = $3 in
-      (* transform to hclause *)
-      let ord = Orderings.default_ordering (Simple.signature [f]) in
-      let ctx = {ctx_ord=ord; ctx_select=no_select; } in
-      let hc = Clauses.from_simple ~ctx (f, Simple.Axiom ("theory", "theory")) in
-      let hc = Superposition.basic_simplify (Clauses.clause_of_fof hc) in
-      (* transform f into a pattern *)
-      let rev_map = empty_rev_mapping () in
-      let pc = pclause_of_clause ~rev_map hc in
-      (* translate symbols of the atom *)
-      let atom_args = List.map
-        (fun s ->
-          try SHashtbl.find rev_map.rm_symbol s
-          with Not_found -> failwith ("symbol not found " ^ (name_symbol s)))
-        atom_args in
-      (* ensure the order of atom symbols is the same as in the pclause *)
-      let pc = { pc with pc_vars = atom_args; } in
-      let nf = { np_pattern = pc; np_name = atom_name; } in
-      (* ready for next thing to parse *)
-      SHashtbl.clear sort_table;
-      nf
-    }
-*/
 
 meta_rule:
   | meta_item IF meta_item_list { Meta.KB.Rule ($1, $3) }
@@ -675,7 +645,7 @@ meta_lemma:
     { Meta.KB.Lemma ($2, $4) }
 
 meta_gc:
-  | GC meta_patterns
+  | GC meta_formulas
     WITH LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
     { let open Meta.KB in
       let gc_vars = [] in (* TODO: renaming and gathering of vars *)
@@ -690,6 +660,20 @@ meta_gc:
       }
     }
 
+meta_named:
+  | LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS IS fof_formula
+    { let name = $1 in
+      let vars = $3 in
+      let t = $6 in
+      (* map symbols to constants of the correct sort *)
+      let signature = Terms.signature (Sequence.singleton t) in 
+      let vars = List.map (fun s -> T.mk_const s (SMap.find s signature)) vars in
+      (* lift constants in the given order in curryfied term, -> pattern *)
+      let pattern = Meta.Pattern.of_term_with
+        (T.curryfy t) vars in
+      Meta.KB.Named (name, pattern)
+    }
+
 meta_theory:
   | THEORY LOWER_WORD
     { Meta.KB.Theory ($2, []) }
@@ -697,17 +681,16 @@ meta_theory:
     { Meta.KB.Theory ($2, $4) }
 
 meta_rule:
-  | meta_item IF meta_item_list
+  | LEFT_PARENTHESIS meta_item RIGHT_PARENTHESIS IF meta_item_list
     { Meta.KB.Rule ($1, $3) }
 
-meta_patterns:
-  | meta_pattern { [$1] }
-  | meta_pattern AND meta_patterns { $1 :: $3 }
+meta_formulas:
+  | meta_formula { [$1] }
+  | meta_formula AND meta_formulas { $1 :: $3 }
 
-meta_pattern:
+meta_formula:
   | fof_formula
-    { let t = $1 in
-      Meta.Pattern.of_term t
+    { $1 (* right now, just first order formulas *)
     }
 
 meta_variables:
@@ -716,10 +699,8 @@ meta_variables:
 
 meta_variable:
   | UPPER_WORD
-    { (* FIXME: type inference??*)
-      get_var $1
+    { mk_symbol $1 (* meta-variables really are symbols *)
     }
-
 
 %%
 

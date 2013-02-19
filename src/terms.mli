@@ -154,8 +154,12 @@ val db_lift : int -> term -> term
 val db_unlift : term -> term
   (** Unlift the term (decrement indices of all De Bruijn variables inside *)
 
+val db_from_term : term -> term -> term
+  (** Replace [t'] by a fresh De Bruijn index in [t]. *)
+
 val db_from_var : term -> term -> term
-  (** [db_from_var t v] replace v by a De Bruijn symbol in t *)
+  (** [db_from_var t v] replace v by a De Bruijn symbol in t.
+      Same as db_from_term. *)
 
 val look_db_sort : int -> term -> sort option
   (** [look_db_sort n t] find the sort of the De Bruijn index n in t *)

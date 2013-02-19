@@ -36,33 +36,35 @@ module Lits = Literals
     This way, the pattern for "f(X,Y)=f(Y,X)"
     is "\F. ((= @ ((F @ x) @ y)) @ ((F @ y) @ x))" *)
 
-type t = term parametrized
-  (** A pattern is a curryfied formula, along with a list of variables
-      whose order matters. *)
+type t = term * sort list
+  (** A pattern is a curryfied formula, whose symbols are abstracted into
+      lambda-bound variables. The list is the list of the sorts of
+      the bound variables, such that if [t1,...,tn] are terms whose sorts
+      pairwise match the list of sort, then [instantiate p t1...tn] will
+      be well-typed. *)
 
-let eq_pattern ((t1,v1) : t) ((t2, v2) : t) =
+let eq_pattern ((t1,sorts1) : t) ((t2, sorts2) : t) =
   t1 == t2 &&
-    try List.for_all2 (==) v1 v2 with Invalid_argument _ -> false
+    try List.for_all2 (==) sorts1 sorts2 with Invalid_argument _ -> false
 
-let hash_pattern ((t,vars) : t) =
+let hash_pattern ((t,sorts) : t) =
   let h = T.hash_term t in
-  Hash.hash_list T.hash_term h vars
+  Hash.hash_list hash_sort h sorts
 
 let pp_pattern formatter (p:t) =
-  Format.fprintf formatter "@[<h>(%a)[%a]@]"
-    !T.pp_term#pp (fst p) (Utils.pp_list !T.pp_term#pp) (snd p)
+  Format.fprintf formatter "@[<h>%a@]" !T.pp_term#pp (fst p)
 
 let to_json (p : t) : json =
   `Assoc [
     "term", T.to_json (fst p);
-    "vars", `List (List.map T.to_json (snd p))]
+    "vars", `List (List.map sort_to_json (snd p))]
 
 let of_json (json : json) : t = match json with
-  | `Assoc ["term", t; "vars", `List vars]
-  | `Assoc ["vars", `List vars; "term", t] ->
+  | `Assoc ["term", t; "sorts", `List sorts]
+  | `Assoc ["sorts", `List sorts; "term", t] ->
     let t = T.of_json t
-    and vars = List.map T.of_json vars in
-    (t, vars)
+    and sorts = List.map sort_of_json sorts in
+    (t, sorts)
   | _ -> raise (Json.Util.Type_error ("expected pattern", json))
 
 type atom =
@@ -117,8 +119,9 @@ end)
 
 (** {2 Conversion pattern <-> clause, and matching *)
 
-(** Find constant/function symbols in the term *)
-let find_symbols t =
+(** Given a curryfied term, find the symbols that occur as head constants
+    (ie "f" in "f @ _" where f is not a "_@_") *)
+let find_symbols ?(symbols=T.TSet.empty) t =
   (* traverse term *)
   let rec search set t = match t.term with
   | Var _ | BoundVar _ -> set
@@ -128,52 +131,63 @@ let find_symbols t =
   | Node (s, []) when not (SMap.mem s base_signature) ->
     T.TSet.add t set  (* found symbol *)
   | Node _ -> assert false
-  in search T.TSet.empty t
+  in search symbols t
+
+(** [find_functions t (s1,...,sn)] where t is currified
+    maps s1,...,sn to constants that have the correct sort *)
+let find_functions t symbols =
+  let signature = T.signature (Sequence.singleton t) in
+  assert (List.for_all (fun s -> SMap.mem s signature) symbols);
+  List.map (fun s -> SMap.find s signature) symbols
+
+(** Abstracts the given constants out, in the given order. *)
+let of_term_with t symbols : (t * term list) =
+  let constants = find_functions t symbols in
+  let t = List.fold_left
+    (fun t const ->
+      let sort = t.sort <=. const.sort in
+      T.mk_lambda sort (T.db_from_term t const))
+    t constants in
+  t, constants
 
 (** Convert a term into a pattern *)
 let of_term t : t =
-  let t = T.curry t in
-  (* now replace symbols by variables *)
-  let set = find_symbols t in
-  let offset = T.max_var (T.vars t) + 1 in
-  (* list of symbol,variable to replace the symbol *)
-  let vars = Sequence.to_list
-    (Sequence.mapi
-      (fun i t' -> t', T.mk_var (i+offset) t'.sort)
-      (T.TSet.to_seq set)) in
-  let t = List.fold_left
-    (fun t (symb,var) -> T.replace t ~old:symb ~by:var)
-    t vars in
-  let vars = List.map snd vars in
-  let p = t, vars in
-  p
+  let symbols = find_symbols t in
+  let symbols = Sequence.to_list (T.TSet.to_seq symbols) in
+  of_term_with t symbols
 
 (** Abstracts the clause out *)
 let abstract_clause lits : t =
   let t = Lits.term_of_lits lits in
-  let p = of_term t in
+  let p, consts = of_term t in
   Utils.debug 2 "%% @[<h>%a@] abstracted into @[<h>%a@]"
                 Lits.pp_lits lits pp_pattern p;
-  p
+  p, consts
+
+(** Sorts of arguments that are accepted by the pattern *)
+let sorts (p : t) = snd p
 
 (** number of arguments that have to be provided
     to instantiate the pattern *)
-let arity (p : t)  = List.length (snd p)
+let arity (p : t)  = List.length (sorts p)
 
 (** This applies the pattern to the given arguments, beta-reduces,
     and uncurry the term back. It will fail if the result is not
     first-order. *)
 let instantiate (p : t) terms =
-  assert (List.length terms = arity p);
-  let t, vars = p in
-  let offset = T.max_var (T.vars t) + 1 in
-  (* build the substitution that replaces variables by the given terms *)
-  let subst = List.fold_left2
-    (fun subst v t' -> S.bind subst (v,0) (t',offset))
-    S.id_subst vars terms in
-  let t = S.apply_subst ~recursive:true subst (t,0) in
-  if T.is_fo t
-    then T.uncurry t
+  (* check compatibility *)
+  (try
+    let ok = List.for_all2 (fun t sort -> t.sort == sort) terms (sorts p) in
+    if not ok then failwith "sort mismatch for instantiate"
+  with Invalid_argument _ -> failwith "bad arity for instantiate");
+  let t, _ = p in
+  (* apply constants from the right *)
+  let t' = List.fold_right
+    (fun t const -> T.mk_at t const)
+    terms t in
+  let t' = T.beta_reduce t' in
+  if T.is_fo t'
+    then T.uncurry t'
     else failwith "non-FO pattern instantiation"
 
 (** [matching p lits] attempts to match the literals against the pattern.
