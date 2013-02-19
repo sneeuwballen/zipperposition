@@ -1,0 +1,7 @@
+S src/
+S src/meta/
+B _build/
+B _build/src/
+PKG datalog
+PKG sequence
+PKG yojson
