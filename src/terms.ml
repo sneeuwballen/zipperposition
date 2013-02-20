@@ -382,6 +382,12 @@ let vars_list l =
   List.iter (add_vars set) l;
   THashSet.to_list set
 
+(** Compute variables of terms in the sequence *)
+let vars_seq seq =
+  let set = THashSet.create () in
+  Sequence.iter (add_vars set) seq;
+  THashSet.to_list set
+
 (** depth of term *)
 let depth t =
   let rec depth t = match t.term with

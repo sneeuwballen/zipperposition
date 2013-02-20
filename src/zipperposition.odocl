@@ -16,6 +16,10 @@ Hashcons
 Index
 Leftistheap
 Lexer_tptp
+Meta
+Meta.KB
+Meta.Pattern
+Meta.Prover
 Orderings
 Parser_tptp
 Precedence

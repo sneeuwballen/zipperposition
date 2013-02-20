@@ -133,6 +133,7 @@ val min_var : varlist -> int
 val add_vars : THashSet.t -> term -> unit   (** add variables of the term to the set *)
 val vars : term -> varlist                  (** compute variables of the term *)
 val vars_list : term list -> varlist        (** variables of terms in the list *)
+val vars_seq : term Sequence.t -> varlist   (** variables of terms in the sequence *)
 val depth : term -> int                     (** depth of the term *)
 
 (** {2 De Bruijn indexes} *)

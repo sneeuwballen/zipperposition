@@ -298,6 +298,17 @@ let base_symbols = List.fold_left (fun set (s, _) -> SSet.add s set) SSet.empty 
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
 
+(** Merge two signatures. raises Failure if they are incompatible. *)
+let merge_signatures s1 s2 =
+  SMap.merge
+    (fun s sort1 sort2 -> match sort1, sort2 with
+      | None, None -> None (* ?? *)
+      | Some s1, Some s2 ->
+        if s1 == s2 then Some s1 else failwith "merge_signatures: incompatible sorts"
+      | Some s1, None -> Some s1
+      | None, Some s2 -> Some s2)
+    s1 s2
+
 (** {2 Conversions and printing} *)
 
 let sig_to_seq signature = SMapSeq.to_seq signature
