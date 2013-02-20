@@ -53,11 +53,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   (** is the current clause a conjecture? *)
   let conjecture = ref false
 
+  (** Table that maps names to Meta definitions *)
+  let meta_table : (string, Meta.KB.definition) =
+    Hashtbl.create 5
+
   (* reset everything in order to parse a new term/clause *)
   let init () =
     var_id_counter := 0;
     var_map := [];
-    conjecture := false
+    conjecture := false;
+    Hashtbl.clear meta_table;
+    ()
         
   (* gets the variables associated with a string from the variable mapping
      creates a new mapping for a new variable with the given sort *)
@@ -92,6 +98,51 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       sort
 
   let set_sort constant sort = SHashtbl.replace sort_table constant sort
+
+  (** Given a list of meta premises, obtain the corresponding list of meta
+      items, and their signature (symbol -> sort) *)
+  let items_of_premises premises = 
+    let items, signature = Sequence.fold
+      (fun (items, signature) premise ->
+        match premise with
+        | `Theory (name, symbols) ->
+          (match Hashtbl.find meta_table name with
+          | Meta.KB.Theory (th_name, th_sorts) as th ->
+            let signature = List.fold_left2
+              (fun signature s sort -> SMap.add s sort signature)
+              signature symbols th_sorts in
+            ((th, symbols), signature)
+          | _ -> assert false)
+        | `Named (name, symbols) ->
+          (match Hashtbl.find meta_table name with
+          | Meta.KB.Named (name, (p,sorts)) as named ->
+            let signature = List.fold_left2
+              (fun signature s sort -> SMap.add s sort signature)
+              signature symbols sorts in
+            ((named, symbols), signature)
+          | _ -> assert false)
+        | `Formula f ->
+          let signature' = Terms.signature (Sequence.singleton f) in
+          let symbols = SMap.keys signature' in
+          let p, _ = Meta.Pattern.of_term_with f symbols in
+          (Meta.KB.Pattern p, symbols), merge_signatures signature signature'
+      )
+      ([], empty_signature) in
+    let items = List.rev items in
+    items, signature
+
+    (* gather all symbols *)
+    let symbols = Sequence.of_list premises in
+    let symbols = Sequence.flatMap
+      (function
+        | `Theory (_, symbs) ->
+        | `Named (_, symbs) -> Sequence.of_list symbs
+        | `Formula f -> SSetSeq.to_seq (Terms.signature (Sequence.singleton f)))
+      symbols in
+    if not (List.for_all (fun s -> List.mem_assq s
+      (Sequence.concat symbols) (Sequence.of_list th_symbols) in
+    let symbols = SSetSeq.of_seq symbols in
+    let symbols = SSet.to_list symbols in
 %}
   
 %token LEFT_PARENTHESIS
@@ -136,6 +187,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token IS
 %token THEORY
 %token LEMMA
+%token AXIOM
 %token IF
 %token AND
 %token GC
@@ -150,7 +202,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %type <Types.term> parse_formula
 
 %start parse_meta
-%type <Meta.KB.item list> parse_meta
+%type <Meta.KB.definition list> parse_meta
 
 %%
 
@@ -347,6 +399,7 @@ formula_role:
       $1
     }
   | LEMMA { "lemma" }
+  | AXIOM { "axiom" }
 
 annotations:
   | null
@@ -621,68 +674,116 @@ meta_item_dot:
   | meta_item DOT { $1 }
 
 meta_item:
-  | meta_named { $1 }
-  | meta_theory { $1 }
-  | meta_lemma { $1 }
+  | meta_named_def { $1 }
+  | meta_theory_def { $1 }
   | meta_gc { $1 }
-  | meta_rule { $1 }
-
-meta_rule:
-  | meta_item IF meta_item_list { Meta.KB.Rule ($1, $3) }
-
-meta_item_list:
-  | meta_item { [$1] }
-  | meta_item AND meta_item_list { $1 :: $3 }
+  | meta_lemma { $1 }
 
 meta_theory:
   | THEORY LOWER_WORD
     { Meta.KB.Theory ($2, []) }
   | THEORY LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
     { Meta.KB.Theory ($2, $4) }
-
-meta_lemma:
-  | LEMMA meta_pattern IF meta_patterns
-    { Meta.KB.Lemma ($2, $4) }
 
 meta_gc:
   | GC meta_formulas
     WITH LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
-    { let open Meta.KB in
-      let gc_vars = [] in (* TODO: renaming and gathering of vars *)
-      let gc_ord = $4 in
-      let gc_prec = $6 in
+    IF meta_theory DOT
+    { (* name of theory, and symbols the theory binds *)
+      let th_name, th_symbols = $9 in
+      (* map symbols to types *)
       let gc_eqns = $2 in
-      Meta.KB.GC {
+      let gc_eqns = List.map Terms.curry gc_eqns in
+      let signature = Terms.signature (Sequence.of_list gc_eqns) in
+      let consts = Meta.Pattern.find_functions
+        (Sequence.of_list gc_eqns) th_symbols in
+      (* abstract equations *)
+      let gc_eqns = List.map Meta.Pattern.of_term gc_eqns in
+      (* now map constants to variables! *)
+      let var_map = List.mapi
+        (fun i const -> const, Terms.mk_var i const.sort)
+        consts in
+      let gc_eqns = List.map
+        (fun eqn,eqn_consts ->
+          let eqn_vars = List.map (fun c -> List.assq c var_map) eqn_consts in
+          eqn, eqn_vars)
+        gc_eqns in
+      (* now equations are properly parametrized *)
+      let gc_vars = List.map snd var_map in
+      let gc_ord = $4 in
+      (* precedence *)
+      let gc_prec = $6 in
+      let gc_prec = List.map
+        (fun s -> List.assq (SMap.find s signature) var_map)
+        gc_prec in
+      (* sorts of theory *)
+      let th_sorts = List.map (fun s -> SMap.find s signature) th_symbols in
+      let th_vars = List.map
+        (fun s -> List.assq (SMap.find s signature) var_map)
+        th_symbols in
+      (* build GC system *)
+      let gc = Meta.KB.GC {
         gc_vars;
         gc_ord;
         gc_prec;
         gc_eqns;
-      }
+      } and theory = Meta.KB.Theory (th_name, th_sorts) in
+      Meta.KB.Rule ((gc, gc.gc_vars), [theory, th_vars]) 
+    }
+
+meta_lemma:
+  | LEMMA meta_pattern IF meta_premises DOT
+    { Meta.KB.Lemma ($2, $4) (* TODO *) }
+
+meta_named_def:
+  | meta_named IS fof_formula DOT
+    { let name, symbols = $1 in
+      let t = $3 in
+      let t = Terms.curry t in
+      (* lift constants in the given order in curryfied term, -> pattern *)
+      let pattern = Meta.Pattern.of_term_with t symbols in
+      let named = Meta.KB.Named (name, pattern) in
+      (* remember name -> definition *)
+      Hashtbl.replace meta_table name named;
+      named
+    }
+
+meta_theory_def:
+  | meta_theory IS meta_premises DOT
+    { let th_name, th_symbols = $1 in
+      let premises = $3 in
+      (* obtain list of (item,symbol), and signature of the premises *)
+      let items, signature = items_of_premises premises in
+      (* map symbols to variables of the correct sort *)
+      let var_map = List.mapi
+        (fun i (s,sort) -> s, Terms.mk_var i sort)
+        (Sequence.to_list (SMapSeq.to_seq signature)) in
+      (* TODO recover sorts of premises with meta_table *)
+      let theory = failwith "TODO" in
+      (* remember name -> definition *)
+      Hashtbl.replace meta_table th_name theory;
+      theory
     }
 
 meta_named:
-  | LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS IS fof_formula
-    { let name = $1 in
-      let vars = $3 in
-      let t = $6 in
-      (* map symbols to constants of the correct sort *)
-      let signature = Terms.signature (Sequence.singleton t) in 
-      let vars = List.map (fun s -> T.mk_const s (SMap.find s signature)) vars in
-      (* lift constants in the given order in curryfied term, -> pattern *)
-      let pattern = Meta.Pattern.of_term_with
-        (T.curryfy t) vars in
-      Meta.KB.Named (name, pattern)
-    }
+  | AXIOM LOWER_WORD
+    { ($2, []) }
+  | AXIOM LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { ($2, $4) }
 
 meta_theory:
   | THEORY LOWER_WORD
-    { Meta.KB.Theory ($2, []) }
+    { ($2, []) }
   | THEORY LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
-    { Meta.KB.Theory ($2, $4) }
+    { ($2, $4) }
 
-meta_rule:
-  | LEFT_PARENTHESIS meta_item RIGHT_PARENTHESIS IF meta_item_list
-    { Meta.KB.Rule ($1, $3) }
+meta_premises:
+  | meta_premise { [$1] }
+  | meta_premise AND meta_premises { $1 :: $3 }
+
+meta_premise:
+  | meta_theory { `Theory $1 }
+  | meta_named { `Named $1 }
 
 meta_formulas:
   | meta_formula { [$1] }

@@ -67,61 +67,11 @@ let of_json (json : json) : t = match json with
     (t, sorts)
   | _ -> raise (Json.Util.Type_error ("expected pattern", json))
 
-type atom =
-  | MString of string     (** Just a string *)
-  | MPattern of t         (** A pattern, ie a signature-independent formula *)
-  | MTerm of term         (** A ground term (constant...) *)
-  | MList of atom list    (** List of atoms *)
-  (** A Datalog atom, in which we may want to fit any structure we want *)
-
-let rec eq_atom a1 a2 = match a1, a2 with
-  | MString s1, MString s2 -> s1 = s2
-  | MPattern p1, MPattern p2 -> eq_pattern p1 p2
-  | MTerm t1, MTerm t2 -> t1 == t2
-  | MList l1, MList l2 ->
-    (try List.for_all2 eq_atom l1 l2 with Invalid_argument _ -> false)
-  | _ -> false
-
-let rec hash_atom = function
-  | MString s -> Hash.hash_string s
-  | MPattern p -> hash_pattern p
-  | MTerm t -> T.hash_term t
-  | MList l -> Hash.hash_list hash_atom 0 l
-
-let rec pp_atom formatter a = match a with
-  | MString s -> Format.pp_print_string formatter s
-  | MPattern p -> pp_pattern formatter p
-  | MTerm t -> T.pp_term_debug#pp formatter t
-  | MList l ->
-    Format.fprintf formatter "[%a]" (Utils.pp_list pp_atom) l
-
-let rec atom_to_json a : json = match a with
-  | MString s -> `String s
-  | MPattern p -> `Assoc ["pattern", to_json p]
-  | MTerm t -> `Assoc ["term", T.to_json t]
-  | MList l -> `List (List.map atom_to_json l)
-
-let rec atom_of_json (json : json) : atom = match json with
-  | `String s -> MString s
-  | `Assoc ["pattern", p] -> MPattern (of_json p)
-  | `Assoc ["term", t] -> MTerm (T.of_json t)
-  | `List l -> MList (List.map atom_of_json l)
-  | _ -> raise (Json.Util.Type_error ("expected atom", json))
-
-(** The Datalog prover that reasons over atoms. *)
-module Logic = Datalog.Logic.Make(struct
-  type t = atom
-  let equal = eq_atom
-  let hash = hash_atom
-  let to_string a = Utils.sprintf "%a" pp_atom a
-  let of_string s = atom_of_json (Json.from_string s)  (* XXX should not happen *)
-end)
-
 (** {2 Conversion pattern <-> clause, and matching *)
 
 (** Given a curryfied term, find the symbols that occur as head constants
     (ie "f" in "f @ _" where f is not a "_@_") *)
-let find_symbols ?(symbols=SSet.empty) t =
+let find_symbols ?(symbols=SSet.empty) seq =
   (* traverse term *)
   let rec search set t = match t.term with
   | Var _ | BoundVar _ -> set
@@ -131,18 +81,19 @@ let find_symbols ?(symbols=SSet.empty) t =
   | Node (s, []) when not (SMap.mem s base_signature) ->
     SSet.add s set  (* found symbol *)
   | Node _ -> assert false
-  in search symbols t
+  in
+  Sequence.fold search symbols seq
 
 (** [find_functions t (s1,...,sn)] where t is currified
     maps s1,...,sn to constants that have the correct sort *)
-let find_functions t (symbols : symbol list) =
-  let signature = T.signature (Sequence.singleton t) in
+let find_functions seq (symbols : symbol list) =
+  let signature = T.signature seq in
   assert (List.for_all (fun s -> SMap.mem s signature) symbols);
   List.map (fun s -> T.mk_const s (SMap.find s signature)) symbols
 
 (** Abstracts the given constants out, in the given order. *)
 let of_term_with t symbols : (t * term list) =
-  let constants = find_functions t symbols in
+  let constants = find_functions (Sequence.singleton t) symbols in
   let t = List.fold_left
     (fun t const ->
       let sort = t.sort <=. const.sort in
@@ -153,7 +104,7 @@ let of_term_with t symbols : (t * term list) =
 
 (** Convert a term into a pattern *)
 let of_term t : t * term list =
-  let symbols = find_symbols t in
+  let symbols = find_symbols (Sequence.singleton t) in
   let symbols = Sequence.to_list (SSetSeq.to_seq symbols) in
   of_term_with t symbols
 

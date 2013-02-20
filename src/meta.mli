@@ -42,41 +42,22 @@ module Pattern : sig
         pairwise match the list of sort, then [instantiate p t1...tn] will
         be well-typed. *)
 
-  type atom =
-    | MString of string     (** Just a string *)
-    | MPattern of t         (** A pattern, ie a signature-independent formula *)
-    | MTerm of term         (** A ground term (constant...) *)
-    | MList of atom list    (** List of atoms *)
-    (** A Datalog atom, in which we may want to fit any structure we want *)
-
   val eq_pattern : t -> t -> bool
   val hash_pattern : t -> int
-
-  val eq_atom : atom -> atom -> bool
-  val hash_atom : atom -> int
 
   (** {2 Printing/conversion to JSON} *)
 
   val pp_pattern : Format.formatter -> t -> unit
-  val pp_atom : Format.formatter -> atom -> unit
-
   val to_json : t -> json
   val of_json : json -> t
-  val atom_to_json : atom -> json
-  val atom_of_json : json -> atom
-
-  (** {2 Datalog atoms} *)
-
-  module Logic : Datalog.Logic.S with type symbol = atom
-    (** The Datalog prover that reasons over atoms. *)
 
   (** {2 Conversion pattern <-> clause, and matching *)
 
-  val find_symbols : ?symbols:SSet.t -> term -> SSet.t
+  val find_symbols : ?symbols:SSet.t -> term Sequence.t -> SSet.t
     (** Given a curryfied term, find the symbols that occur as head constants
         (ie "f" in "f @ _" where f is not a "_@_") *)
 
-  val find_functions : term -> symbol list -> term list
+  val find_functions : term Sequence.t -> symbol list -> term list
     (** [find_functions t (s1,...,sn)] where t is currified
         maps s1,...,sn to constants that have the correct sort *)
 
@@ -85,8 +66,7 @@ module Pattern : sig
         term must be curryfied. *)
 
   val of_term : term -> t * term list
-    (** Abstract over constants in the (curryfied) term. Also returns
-        the ordered list of such constants, such. *)
+    (** Abstract over constants in the (curryfied) term. *)
 
   val abstract_clause : literal array -> t * term list
     (** Abstracts the clause out *)
@@ -121,38 +101,66 @@ end
 module KB : sig
   (** {2 Knowledge Item} *)
 
-  (** Assertions at the meta-level, that respectively state that
+  (** Definitions at the meta-level, that respectively state that
       a lemma is true, that define a theory, or that bind a ground
       convergent system to a theory *)
-  type item =
+  type definition =
   | Named of string * Pattern.t
-    (** Named formula *)
-  | Lemma of Pattern.t parametrized * Pattern.t parametrized list
-    (** A lemma is the implication of a pattern by other patterns,
-        but with some variable renamings to correlate the
-        bindings of the distinct patterns. For instance,
-        (F(x,y)=x, [F], [Mult]) may be implied by
-        (F(y,x)=y, [F], [MyMult]) and
-        (F(x,y)=G(y,x), [F,G], [Mult,MyMult]). *)
-  | Theory of string parametrized
-    (** A theory, like a lemma, needs to correlate the variables
-        in several patterns via renaming. It states that some symbols
-        are an instance of the theory *)
-  | Pattern of Pattern.t parametrized
-    (** A pattern that is true in the current problem *)
-  | GC of gnd_convergent_spec
-    (** Ground Convergent system of equations *)
-  | Rule of item parametrized * item parametrized list
-    (** Assertion that depends on other assertions *)
+  | Theory of string parametrized * premise list
+  | Lemma of Pattern.t parametrized * premise list
+  | GC of gnd_convergent_spec * premise list
+  (** Condition for some meta-level assertion *)
+  and premise =
+  | IfNamed of string parametrized
+  | IfTheory of string parametrized
+  | IfPattern of Pattern.t parametrized
+  (** Assertions about the problem *)
+  and fact =
+  | ThenPattern of Pattern.t parametrized
+  | ThenTheory of string parametrized
   and gnd_convergent_spec = {
     gc_vars : varlist;
     gc_ord : string;
     gc_prec : varlist;
-    gc_eqns : Pattern.t parametrized list;
+    gc_eqns : Pattern.t list;
   } (** Abstract equations that form a ground convergent rewriting system
         when instantiated. It is parametrized by the theory it decides.
         gc_ord and gc_prec (once instantiated), give a constraint on the ordering
         that must be satisfied for the system to be a decision procedure. *)
+
+  (** {2 Printing/parsing} *)
+
+  val pp_definition : Format.formatter -> definition -> unit
+  val pp_premise : Format.formatter -> premise -> unit
+  val pp_fact : Format.formatter -> fact -> unit
+
+  val definition_to_json : definition -> json
+  val definition_of_json : json -> definition
+
+  (** {2 Datalog atoms} *)
+
+  type atom =
+  | MString of string
+  | MPattern of Pattern.t
+  | MTerm of term
+
+  val eq_atom : atom -> atom -> bool
+  val hash_atom : atom -> int
+
+  val pp_atom : Format.formatter -> atom -> unit
+  val atom_to_json : atom -> json
+  val atom_of_json : json -> atom
+
+  module Logic : Datalog.Logic.S with type symbol = atom
+    (** The Datalog prover that reasons over atoms. *)
+  
+  (** {2 Conversion to Datalog} *)
+
+  val to_datalog : definition -> Logic.soft_clause
+    (** Translate a definition into a Datalog clause *)
+
+  val of_datalog : Logic.soft_lit -> fact option
+    (** Try to convert back a Datalog fact into a meta-fact *)
 
   (** {2 Knowledge Base} *)
 
@@ -160,18 +168,12 @@ module KB : sig
 
   val empty : t
 
-  val add_item : t -> item -> t
+  val add_definition : t -> definition -> t
 
-  val to_seq : t -> item Sequence.t
-  val of_seq : t -> item Sequence.t -> t
+  val to_seq : t -> definition Sequence.t
+  val of_seq : t -> definition Sequence.t -> t
 
-  (** {2 Printing/parsing} *)
-
-  val pp_item : Format.formatter -> item -> unit
   val pp : Format.formatter -> t -> unit
-
-  val item_to_json : item -> json
-  val item_of_json : json -> item
   val to_json : t -> json
   val of_json : t -> json -> t
 
