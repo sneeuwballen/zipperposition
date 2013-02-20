@@ -2,6 +2,7 @@ S .
 S ./meta/
 B ../_build/
 B ../_build/src/
+B ../_build/src/meta/
 PKG datalog
 PKG sequence
 PKG yojson
