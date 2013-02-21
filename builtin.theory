@@ -81,7 +81,7 @@ theory subgroup(mult, e, inverse, in_subgroup) is
   axiom subgroup_inverse(in_subgroup, inverse) and
   axiom subgroup_mult(in_subgroup, mult).
 
-lemma apply_1(in_subgroup, e) if
+lemma in_subgroup(e) if
   subgroup(mult, e, inverse, in_subgroup).
 
 % ring
