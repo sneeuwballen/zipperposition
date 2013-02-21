@@ -175,6 +175,9 @@ val base_signature : signature
 val base_symbols : SSet.t
   (** Set of base symbols *)
 
+val add_signature : signature -> symbol -> sort -> signature
+  (** Add a symbol to the signature, failing if it is incompatible *)
+
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
 
@@ -184,7 +187,7 @@ val merge_signatures : signature -> signature -> signature
 (** {2 Conversions and printing} *)
 
 val sig_to_seq : signature -> (symbol * sort) Sequence.t
-val sig_of_seq : (symbol * sort) Sequence.t -> signature
+val sig_of_seq : ?signature:signature -> (symbol * sort) Sequence.t -> signature
 
 val to_json : symbol -> Yojson.Basic.json
 val of_json : Yojson.Basic.json -> symbol
@@ -193,4 +196,4 @@ val sort_to_json : sort -> Yojson.Basic.json
 val sort_of_json : Yojson.Basic.json -> sort
 
 val sig_to_json : signature -> Yojson.Basic.json
-val sig_of_json : Yojson.Basic.json -> signature
+val sig_of_json : ?signature:signature -> Yojson.Basic.json -> signature

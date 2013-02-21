@@ -181,7 +181,7 @@ let find_lemmas ~ctx prover hc =
   match prover with
   | None -> []  (* lemmas detection is disabled *)
   | Some meta ->
-    let results = Meta.Prover.scan_clause meta hc.hclits in
+    let results = Meta.Prover.scan_clause meta hc in
     Utils.list_flatmap
       (function
       | Meta.Prover.Deduced (lits,parents) ->

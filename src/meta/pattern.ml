@@ -166,12 +166,12 @@ let matching (p : t) lits =
   let vars = List.mapi T.mk_var sorts in
   let left = instantiate p vars in
   (* match pattern against [right] *)
-  let substs = Unif.matching_ac S.id_subst (left,1) (right,0) in
+  let substs = Unif.matching_ac S.id_subst (left,offset) (right,0) in
   (* now apply the substitution to the list of variables *)
   let substs = Sequence.map
     (fun subst ->
       (* convert variables back to terms *)
-      let args = List.map (fun v -> S.apply_subst subst (v,1)) vars in
+      let args = List.map (fun v -> S.apply_subst subst (v,offset)) vars in
       (* restriction: only bind function symbols to constants for now *)
       if List.for_all T.is_const args
         then Sequence.of_list [args]

@@ -294,6 +294,12 @@ let base_signature =
 (** Set of base symbols *)
 let base_symbols = List.fold_left (fun set (s, _) -> SSet.add s set) SSet.empty table
 
+(** Add a symbol to the signature, failing if it is incompatible *)
+let add_signature signature symb sort =
+  try let sort' = SMap.find symb signature in
+      if sort == sort' then signature else failwith "imcompatible sort"
+  with Not_found -> SMap.add symb sort signature
+
 (** extract the list of symbols from the complete signature *)
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
@@ -313,7 +319,10 @@ let merge_signatures s1 s2 =
 
 let sig_to_seq signature = SMapSeq.to_seq signature
 
-let sig_of_seq seq = SMapSeq.of_seq seq
+let sig_of_seq ?(signature=empty_signature) seq =
+  Sequence.fold
+    (fun s (symb,sort) -> add_signature s symb sort)
+    signature seq
 
 module Json = Yojson.Basic
 
@@ -346,7 +355,7 @@ let sig_to_json signature =
   in
   `List (Sequence.to_list items)
 
-let sig_of_json json =
+let sig_of_json ?(signature=empty_signature) json =
   let pair_of_json json =
     match json with
     | `List [a;b] ->
@@ -356,4 +365,4 @@ let sig_of_json json =
   in
   let l = Json.Util.to_list json in
   let seq = Sequence.map pair_of_json (Sequence.of_list l) in
-  sig_of_seq seq
+  sig_of_seq ~signature seq
