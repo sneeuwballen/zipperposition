@@ -175,6 +175,7 @@ module KB : sig
   val empty : t
 
   val add_definition : t -> definition -> t
+  val add_definitions : t -> definition Sequence.t -> t
 
   val to_seq : t -> definition Sequence.t
   val of_seq : t -> definition Sequence.t -> t
@@ -198,6 +199,9 @@ module Prover : sig
 
   val create : ctx:context -> KB.t -> t
     (** Fresh meta-prover, using the given KB *)
+
+  val update_ctx : ctx:context -> t -> unit
+    (** Change the underlying context of the prover *)
 
   val get_kb : t -> KB.t
     (** Get the current Knowledge Base of the prover *)
@@ -227,6 +231,15 @@ module Prover : sig
 
   val experts : t -> Experts.expert Sequence.t
     (** Current list of experts that can be used *)
+
+  val results : t -> result Sequence.t
+    (** All results *)
+
+  val db : t -> KB.Logic.db
+    (** Underlying Datalog base *)
+
+  val pp_result : Format.formatter -> result -> unit
+  val pp_results : Format.formatter -> result Sequence.t -> unit
 end
 
 (** {2 Parsing utils} *)

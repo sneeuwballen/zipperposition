@@ -148,6 +148,7 @@ rule token =
       | "is"                         { update_token (Lexing.lexeme lexbuf); IS }
       | "theory"                     { update_token (Lexing.lexeme lexbuf); THEORY }
       | "lemma"                      { update_token (Lexing.lexeme lexbuf); LEMMA }
+      | "axiom"                      { update_token (Lexing.lexeme lexbuf); AXIOM }
       | "if"                         { update_token (Lexing.lexeme lexbuf); IF }
       | "and"                        { update_token (Lexing.lexeme lexbuf); AND }
       | "gc"                         { update_token (Lexing.lexeme lexbuf); GC }

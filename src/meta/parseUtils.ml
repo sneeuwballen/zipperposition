@@ -173,6 +173,7 @@ let mk_named ~table (name, (symbols : symbol list)) t =
     then failwith ("wrong number of symbols in the definition of " ^name));
   (* abstract formula in the same order as the given symbol list *)
   let pattern, _ = Pattern.of_term_with (T.curry t) symbols in
+  define_named ~table name pattern;
   KB.Named (name, pattern)
 
 let mk_theory ~table (name, (symbols : symbol list)) premises =
@@ -184,6 +185,7 @@ let mk_theory ~table (name, (symbols : symbol list)) premises =
   let premises = List.map (convert_premise ~table s_to_t) premises in
   (* convert theory *)
   let args = symbs_to_terms s_to_t symbols in
+  define_th ~table name (List.map (fun x -> x.sort) args);
   KB.Theory ((name, args), premises)
 
 let mk_gc ~table eqns (gc_ord,(prec : symbol list)) premises =

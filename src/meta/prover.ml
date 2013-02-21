@@ -39,7 +39,7 @@ end)
 type t = {
   kb : KB.t;
   db : KB.Logic.db;
-  ctx : context;
+  mutable ctx : context;
   mutable patterns : Pattern.t list;      (** patterns to match *)
   mutable clauses : hclause LitMap.t;     (** for reconstructing proofs *)
   mutable results : result list;
@@ -51,6 +51,9 @@ and result =
   | Theory of string * term list
   | Expert of Experts.expert
   (** Feedback from the meta-prover *)
+
+let update_ctx ~ctx prover =
+  prover.ctx <- ctx
 
 (** Goal handler *)
 let goal_handler prover lit =
@@ -188,3 +191,19 @@ let experts prover =
       | _ -> Sequence.empty)
     results
 
+let results prover = Sequence.of_list prover.results
+
+(** Underlying Datalog base *)
+let db prover = prover.db
+
+let pp_result formatter result =
+  match result with
+  | Deduced (lits, _) ->
+    Format.fprintf formatter "deduced %a" Literals.pp_lits lits
+  | Theory (name, args) ->
+    Format.fprintf formatter "theory %s(%a)" name (Utils.pp_list !T.pp_term#pp) args
+  | Expert expert ->
+    Format.fprintf formatter "expert %a" Experts.pp_expert expert
+
+let pp_results formatter results =
+  Sequence.pp_seq pp_result formatter results

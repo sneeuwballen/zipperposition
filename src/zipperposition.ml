@@ -37,8 +37,6 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 
-module Meta = Meta (* XXX be sure it compiles *)
-
 let version = "0.3"
 
 let lock_file file = file ^ ".lock"
@@ -162,7 +160,14 @@ let compute_ord ~params clauses =
 (** Parse the theory file and add its content to the KB *)
 let parse_theory_file kb file =
   Format.printf "%% read content of %s into the Knowledge Base@." file;
-  Meta.KB.restore ~file kb
+  let ic = open_in file in
+  try
+    let lexbuf = Lexing.from_channel ic in
+    let definitions = Parser_tptp.parse_meta (Lexer_tptp.token) lexbuf in
+    Meta.KB.add_definitions kb (Sequence.of_list definitions)
+  with e ->
+    close_in ic;
+    raise e
 
 (** Parses and populates the initial Knowledge Base *)
 let initial_kb params =
@@ -170,16 +175,15 @@ let initial_kb params =
   let kb = Meta.KB.empty in
   let file = params.param_kb in
   (* parse file, with a lock *)
-  (* TODO
   let kb = Utils.with_lock_file file
     (fun () ->
-      let kb = parse_theory_file kb file in
+      let kb = try parse_theory_file kb file
+               with Yojson.Json_error _ -> Meta.KB.empty in
       (* load required files *)
       let kb = List.fold_left parse_theory_file kb params.param_kb_load in
       (* save new KB *)
       Meta.KB.save ~file kb;
       kb) in
-  *)
   (* return KB *)
   kb
 
@@ -238,9 +242,7 @@ let process_file ~kb params f =
   let select = Sel.selection_from_string ~ord params.param_select in
   (* at least, the context *)
   let ctx = { ctx_ord=ord; ctx_select=select; } in
-  (* TODO
-  (match meta with | None -> () | Some meta -> Theories.meta_update_ctx ~ctx meta);
-  *)
+  (match meta with | None -> () | Some meta -> Meta.Prover.update_ctx ~ctx meta);
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append calculus#axioms clauses in
   let num_clauses = List.length clauses in
@@ -281,14 +283,12 @@ let process_file ~kb params f =
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));
   (* print theories *)
-  (* TODO
   (match meta with None -> ()
     | Some meta ->
-      Format.printf "%% detected theories: @[<h>%a@]@."
-        (Utils.pp_list Theories.Logic.pp_literal) meta.Theories.meta_theories;
+      Utils.debug 1 "%% @[<hov2>meta-prover:@ %a@]"
+        Meta.Prover.pp_results (Meta.Prover.results meta);
       Format.printf "%% datalog contains %d clauses@."
-        (Theories.Logic.db_size meta.Theories.meta_db));
-  *)
+        (Meta.KB.Logic.db_size (Meta.Prover.db meta)));
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
@@ -323,9 +323,7 @@ let process_file ~kb params f =
 
 (** Print the content of the KB, and exit *)
 let print_kb ~kb =
-  (* TODO
-  Format.printf "%a@." Theories.pp_kb kb;
-  *)
+  Format.printf "%a@." Meta.KB.pp kb;
   exit 0
 
 (** Clear the Knowledge Base and exit *)

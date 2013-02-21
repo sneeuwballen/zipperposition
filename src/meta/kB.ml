@@ -291,6 +291,8 @@ let empty = []
 
 let add_definition kb d = d :: kb
 
+let add_definitions kb seq = Sequence.fold add_definition kb seq
+
 let to_seq kb = Sequence.of_list kb
 
 let of_seq kb definitions =

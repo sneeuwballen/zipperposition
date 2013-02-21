@@ -65,6 +65,8 @@ val expert_clauses : expert -> hclause list
   (** Get a list of clauses this expert needs to be present in the
       superposition prover (additional axioms). *)
 
+val pp_expert : Format.formatter -> expert -> unit
+
 (** {2 Ground joinable sets of equations} *)
 
 (** We use ground convergent sets of equations to decide some equational

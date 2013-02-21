@@ -125,6 +125,10 @@ let expert_clauses expert =
   List.iter (fun hc -> C.set_flag C.flag_persistent hc true) clauses;
   clauses
 
+let pp_expert formatter expert =
+  Format.fprintf formatter "[expert on %s (%s)]"
+    expert.expert_name expert.expert_descr
+
 (** {2 Ground joinable sets of equations} *)
 
 (** We use ground convergent sets of equations to decide some equational
