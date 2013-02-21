@@ -227,3 +227,40 @@ module Prover : sig
   val experts : t -> Experts.expert Sequence.t
     (** Current list of experts that can be used *)
 end
+
+(** {2 Parsing utils} *)
+module ParseUtils : sig
+  (** {2 Table of definitions} *)
+
+  type table
+
+  val create : unit -> table
+  val clear : table -> unit
+
+  val lookup_th : table:table -> string -> sort list
+  val lookup_named : table:table -> string -> Pattern.t
+
+  val define_th : table:table -> string -> sort list -> unit
+  val define_named : table:table -> string -> Pattern.t -> unit
+
+  (** {2 Premise for a definition} *)
+
+  type premise =
+    [ `Theory of string * symbol list
+    | `Named of string * symbol list
+    | `Term of term
+    ]
+
+  (** Lookup (symbol,sort) for the given premise(s) *)
+
+  val lookup_premise : table:table -> premise -> (symbol * sort) Sequence.t
+  val lookup_premises : table:table -> premise list -> (symbol * sort) Sequence.t
+
+  (** {2 Build definitions from raw parsing data} *)
+
+  val mk_lemma_term : table:table -> term -> premise list -> KB.definition
+  val mk_lemma_named : table:table -> string * symbol list -> premise list -> KB.definition
+  val mk_named : table:table -> string* symbol list -> term -> KB.definition
+  val mk_theory : table:table -> string * symbol list -> premise list -> KB.definition
+  val mk_gc : table:table -> term list -> string * symbol list -> premise list -> KB.definition
+end
