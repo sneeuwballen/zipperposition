@@ -225,19 +225,6 @@ val ac_eq : ?is_ac:(symbol -> bool) -> ?is_com:(symbol -> bool) ->
 
 (** {2 Pretty printing} *)
 
-(** type of a pretty printer for symbols *)
-class type pprinter_symbol =
-  object
-    method pp : Format.formatter -> symbol -> unit  (** pretty print a symbol *)
-    method infix : symbol -> bool                   (** which symbol is infix? *)
-  end
-
-val pp_symbol : pprinter_symbol ref                 (** default pp for symbols *)
-val pp_symbol_unicode : pprinter_symbol             (** print with unicode special symbols*)
-val pp_symbol_tstp : pprinter_symbol                (** tstp convention (raw) *)
-
-val pp_sort : Format.formatter -> sort -> unit
-
 (** type of a pretty printer for terms *)
 class type pprinter_term =
   object
@@ -251,8 +238,6 @@ val pp_term_debug :                                 (** print term in a nice syn
     pp : Format.formatter  -> term -> unit;
     sort : bool -> unit;                            (** print sorts of terms? *)
   >
-
-val pp_precedence : Format.formatter -> symbol list -> unit      (** print symbol precedence *)
 
 (** {2 JSON} *)
 

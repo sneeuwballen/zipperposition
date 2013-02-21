@@ -236,7 +236,7 @@ let process_file ~kb params f =
   let clauses = enrich_with_theories ~ctx:d_ctx meta clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
-  Format.printf "%% precedence: %a@." T.pp_precedence ord#precedence#snapshot;
+  Format.printf "%% precedence: %a@." pp_precedence ord#precedence#snapshot;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
@@ -278,7 +278,7 @@ let process_file ~kb params f =
   Printf.printf "%% done %d iterations\n" num;
   (* print some statistics *)
   print_stats state;
-  Format.printf "%% final precedence: %a@." T.pp_precedence ord#precedence#snapshot;
+  Format.printf "%% final precedence: %a@." pp_precedence ord#precedence#snapshot;
   (match params.param_dot_file with (* print state *)
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));

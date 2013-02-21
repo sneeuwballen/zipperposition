@@ -78,8 +78,10 @@ let find_symbols ?(symbols=SSet.empty) seq =
   | Bind (s, t') -> search set t'
   | Node (s, [a;b]) when s == at_symbol ->
     search (search set a) b
-  | Node (s, []) when not (SMap.mem s base_signature) ->
+  | Node (s, []) when not (is_base_symbol s) ->
     SSet.add s set  (* found symbol *)
+  | Node (s, l) when is_base_symbol s ->
+    List.fold_left search set l
   | Node _ -> assert false
   in
   Sequence.fold search symbols seq

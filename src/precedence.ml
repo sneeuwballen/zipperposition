@@ -173,9 +173,9 @@ let mk_precedence ?(complete=true) constrs symbols =
       if new_len > old_len then begin
         (* some symbols have been added *)
         Utils.debug 3 "%% add @[<h>%a@] to the precedence"
-                      (Utils.pp_list ~sep:", " !T.pp_symbol#pp) new_symbols;
+                      (Utils.pp_list ~sep:", " pp_symbol) new_symbols;
         Utils.debug 3 "%% old precedence %a"
-                       T.pp_precedence !symbols;
+                       pp_precedence !symbols;
 
         (* build a partial order that respects the current ordering *)
         let po = PartialOrder.mk_partial_order all_symbols in
@@ -188,7 +188,7 @@ let mk_precedence ?(complete=true) constrs symbols =
         symbols := all_symbols;
         table := mk_table !symbols;
 
-        Utils.debug 3 "%% new precedence %a" T.pp_precedence !symbols;
+        Utils.debug 3 "%% new precedence %a" pp_precedence !symbols;
         (* return number of new symbols *)
         new_len - old_len
       end else 0

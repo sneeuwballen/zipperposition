@@ -175,6 +175,8 @@ val base_signature : signature
 val base_symbols : SSet.t
   (** Set of base symbols *)
 
+val is_base_symbol : symbol -> bool
+
 val add_signature : signature -> symbol -> sort -> signature
   (** Add a symbol to the signature, failing if it is incompatible *)
 
@@ -197,3 +199,8 @@ val sort_of_json : Yojson.Basic.json -> sort
 
 val sig_to_json : signature -> Yojson.Basic.json
 val sig_of_json : ?signature:signature -> Yojson.Basic.json -> signature
+
+val pp_symbol : Format.formatter -> symbol -> unit
+val pp_sort : Format.formatter -> sort -> unit
+val pp_signature : Format.formatter -> signature -> unit
+val pp_precedence : Format.formatter -> symbol list -> unit

@@ -79,7 +79,7 @@ let check_properties ~ord (a, b, cmp) =
 
 (** check invariants on the list of terms *)
 let check ord_name ~ord terms =
-  Format.printf "  check %s (%a)@." ord_name T.pp_precedence ord#precedence#snapshot;
+  Format.printf "  check %s (%a)@." ord_name pp_precedence ord#precedence#snapshot;
   let pairs = all_orders ~ord terms in
   List.iter (check_properties ~ord) pairs
 

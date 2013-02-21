@@ -294,6 +294,8 @@ let base_signature =
 (** Set of base symbols *)
 let base_symbols = List.fold_left (fun set (s, _) -> SSet.add s set) SSet.empty table
 
+let is_base_symbol s = SSet.mem s base_symbols
+
 (** Add a symbol to the signature, failing if it is incompatible *)
 let add_signature signature symb sort =
   try let sort' = SMap.find symb signature in
@@ -366,3 +368,27 @@ let sig_of_json ?(signature=empty_signature) json =
   let l = Json.Util.to_list json in
   let seq = Sequence.map pair_of_json (Sequence.of_list l) in
   sig_of_seq ~signature seq
+
+let pp_symbol formatter s = match s with
+  | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
+  | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
+  | _ when s == num_symbol -> Format.pp_print_string formatter "[num]"
+  | _ when s == const_symbol -> Format.pp_print_string formatter "[const]"
+  | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
+
+let rec pp_sort formatter sort = match sort with
+  | Sort s -> Format.pp_print_string formatter s
+  | Fun (s, l) ->
+    Format.fprintf formatter "(%a) > %a"
+      (Sequence.pp_seq ~sep:" * " pp_sort) (Sequence.of_list l) pp_sort s
+
+let pp_signature formatter signature =
+  Format.fprintf formatter "@[<h>%a@]"
+    (Sequence.pp_seq
+      (fun formatter (s, sort) ->
+        Format.fprintf formatter "%a:%a" pp_symbol s pp_sort sort))
+    (sig_to_seq signature)
+
+let pp_precedence formatter symbols =
+  Format.fprintf formatter "@[<h>%a@]"
+    (Sequence.pp_seq ~sep:" > " pp_symbol) (Sequence.of_list symbols)

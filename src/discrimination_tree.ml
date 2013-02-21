@@ -80,7 +80,7 @@ let path_string_of t =
 let string_of_path l =
   let str_of_elem = function
   | Variable -> "*"
-  | Constant (a, ar) -> Utils.on_buffer !T.pp_symbol#pp a
+  | Constant (a, ar) -> Utils.on_buffer pp_symbol a
   | _ -> "?"
   in String.concat "." (List.map str_of_elem l)
 

@@ -31,7 +31,7 @@ let print_order () =
   Format.printf "@[<v>PO after extension:@ %a@]@." PO.pp po;
   PO.complete po alpha_cmp;
   Format.printf "@[<v>final PO:@ %a@]@." PO.pp po;
-  Format.printf "signature: @[<h>%a@]@." Terms.pp_precedence (PO.symbols po);
+  Format.printf "signature: @[<h>%a@]@." pp_precedence (PO.symbols po);
   ()
 
 let run () =

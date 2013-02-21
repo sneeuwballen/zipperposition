@@ -90,6 +90,14 @@ let lookup_premises ~table premises =
 let signature_of_premises ~table premises =
   sig_of_seq (lookup_premises ~table premises)
 
+let signature_of_term t =
+  let signature = T.signature (Sequence.singleton t) in
+  SMap.filter (fun s _ -> not (is_base_symbol s)) signature
+
+let signature_of_terms seq =
+  let signature = T.signature seq in
+  SMap.filter (fun s _ -> not (is_base_symbol s)) signature
+
 (** {2 Conversion utils} *)
 
 (** Maps a list of symbols to terms, using [s_to_t] *)
@@ -165,7 +173,10 @@ let mk_lemma_named ~table (name,symbols) premises =
 
 (** Build the definition of a named pattern by a formula *)
 let mk_named ~table (name, (symbols : symbol list)) t =
-  let signature = T.signature (Sequence.singleton (T.curry t)) in
+  let signature = signature_of_term (T.curry t) in
+  Utils.debug 1 "%% @[<h>define %s(%a) with %a@]" name
+    (Utils.pp_list pp_symbol) symbols !T.pp_term#pp t;
+  Utils.debug 1 "%% signature is %a" pp_signature signature;
   (* safety checks *)
   (if not (List.for_all (fun s -> SMap.mem s signature) symbols)
     then failwith ("some symbol does not appear in the definition of " ^ name));

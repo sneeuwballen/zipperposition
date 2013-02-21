@@ -794,38 +794,6 @@ let ac_eq ?(is_ac=fun s -> has_attr attr_ac s)
 
 (** {2 Pretty printing} *)
 
-(** type of a pretty printer for symbols *)
-class type pprinter_symbol =
-  object
-    method pp : Format.formatter -> symbol -> unit    (** pretty print a symbol *)
-    method infix : symbol -> bool                     (** which symbol is infix? *)
-  end
-
-let pp_symbol_unicode =
-  object
-    method pp formatter s = match s with
-      | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
-      | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
-      | _ when s == num_symbol -> Format.pp_print_string formatter "[num]"
-      | _ when s == const_symbol -> Format.pp_print_string formatter "[const]"
-      | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
-    method infix s = has_attr attr_infix s
-  end
-
-let pp_symbol_tstp =
-  object
-    method pp formatter s = Format.pp_print_string formatter (name_symbol s)
-    method infix s = has_attr attr_infix s
-  end
-
-let pp_symbol = ref pp_symbol_unicode
-
-let rec pp_sort formatter sort = match sort with
-  | Sort s -> Format.pp_print_string formatter s
-  | Fun (s, l) ->
-    Format.fprintf formatter "(%a) > %a"
-      (Utils.pp_list ~sep:" * " pp_sort) l pp_sort s
-
 (** type of a pretty printer for terms *)
 class type pprinter_term =
   object
@@ -857,19 +825,19 @@ let pp_term_debug =
         Format.fprintf formatter "(%a = %a)" self#pp a self#pp b
       | Node (s, [v; t']) when has_attr attr_binder s ->
         assert (is_var v);
-        Format.fprintf formatter "%a[%a]: %a" pp_symbol_unicode#pp s self#pp v self#pp t'
+        Format.fprintf formatter "%a[%a]: %a" pp_symbol s self#pp v self#pp t'
       | Node (s, [t]) when s == not_symbol ->
-        Format.fprintf formatter "%a%a" pp_symbol_unicode#pp s self#pp t
-      | Node (s, []) -> pp_symbol_unicode#pp formatter s
+        Format.fprintf formatter "%a%a" pp_symbol s self#pp t
+      | Node (s, []) -> pp_symbol formatter s
       | Node (s, args) ->
         (* general case for nodes *)
-        if pp_symbol_unicode#infix s
+        if has_attr attr_infix s
           then begin
             match args with
             | [l;r] -> Format.fprintf formatter "@[<h>(%a %a %a)@]"
-                self#pp l pp_symbol_unicode#pp s self#pp r
+                self#pp l pp_symbol s self#pp r
             | _ -> assert false (* infix and not binary? *)
-          end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_symbol_unicode#pp s
+          end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_symbol s
             (Utils.pp_list ~sep:", " self#pp) args);
       (* also print the sort if needed *)
       if !_sort then Format.fprintf formatter ":%a" pp_sort t.sort
@@ -890,22 +858,22 @@ let pp_term_tstp =
         when s == not_symbol && s' == eq_symbol ->
         Format.fprintf formatter "%a != %a" self#pp a self#pp b
       | Node (s, [t]) when s == not_symbol ->
-        Format.fprintf formatter "%a%a" pp_symbol_tstp#pp s self#pp t
+        Format.fprintf formatter "%a%a" pp_symbol s self#pp t
       | Node (s, [v; t']) when has_attr attr_binder s ->
         assert (is_var v);
-        Format.fprintf formatter "%a[%a]: %a" pp_symbol_tstp#pp s self#pp v self#pp t'
+        Format.fprintf formatter "%a[%a]: %a" pp_symbol s self#pp v self#pp t'
       | BoundVar _ | Bind _ ->
         failwith "De Bruijn index in term, cannot be printed in TSTP"
-      | Node (s, []) -> pp_symbol_tstp#pp formatter s
+      | Node (s, []) -> pp_symbol formatter s
       | Node (s, args) ->
         (* general case for nodes *)
-        if pp_symbol_tstp#infix s
+        if has_attr attr_infix s
           then begin
             match args with
             | [l;r] -> Format.fprintf formatter "@[<h>(%a %a %a)@]"
-                self#pp l pp_symbol_tstp#pp s self#pp r
+                self#pp l pp_symbol s self#pp r
             | _ -> assert false (* infix and not binary? *)
-          end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_symbol_tstp#pp s
+          end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_symbol s
             (Utils.pp_list ~sep:", " self#pp) args
       | Var i -> Format.fprintf formatter "X%d" i
       in
@@ -916,10 +884,6 @@ let pp_term_tstp =
   end
 
 let pp_term = ref (pp_term_debug :> pprinter_term)
-
-let pp_precedence formatter symbols =
-  Format.fprintf formatter "@[<h>sig %a@]"
-    (Utils.pp_list ~sep:" > " !pp_symbol#pp) symbols
 
 (** {2 JSON} *)
 
