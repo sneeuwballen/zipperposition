@@ -206,8 +206,6 @@ module Prover : sig
     | Expert of Experts.expert
     (** Feedback from the meta-prover *)
 
-  (* TODO: call calculus#preprocess on resulting clauses (CNF, etc.) *)
-
   val scan_clause : t -> hclause -> result list
     (** Match the clause against patterns known to the KB. Matches
         are added to the Datalog engine, and if some theories and lemma
