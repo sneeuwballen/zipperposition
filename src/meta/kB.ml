@@ -45,7 +45,7 @@ and fact =
 | ThenPattern of Pattern.t parametrized
 | ThenTheory of string parametrized
 | ThenNamed of string parametrized
-| ThenGC of gnd_convergent_spec parametrized
+| ThenGC of gnd_convergent_spec
 and gnd_convergent_spec = {
   gc_vars : varlist;
   gc_ord : string;
@@ -181,6 +181,7 @@ let atom_pattern pat args =
 
 let atom_gc ?(offset=(-1)) gc =
   let args = [`Symbol (MString gc.gc_ord)] in
+  let args = args @ List.map encode_term gc.gc_prec in
   let args = args @ List.map (fun pat -> `Symbol (MPattern pat)) gc.gc_eqns in
   let args = args @ List.map encode_term gc.gc_vars in
   Logic.mk_literal (MString "gc") args
@@ -209,6 +210,13 @@ let extract_consts args =
       | _ -> assert false)
     args
 
+(** Translate a premise to a Datalog literal *)
+let premise_to_datalog premise =
+  match premise with
+  | IfNamed (name, args) -> atom_named name (List.map encode_term args)
+  | IfTheory (name, args) -> atom_theory name (List.map encode_term args)
+  | IfPattern (p, args) -> atom_pattern p (List.map encode_term args)
+
 (** Translate a definition into a Datalog clause *)
 let definition_to_datalog definition =
   match definition with
@@ -217,9 +225,18 @@ let definition_to_datalog definition =
     let concl = atom_named name vars in
     let premises = [atom_pattern pattern vars] in
     Logic.mk_clause concl premises
-  | Lemma ((concl, args), premises) -> failwith "TODO"
-  | Theory ((name, args), premises) -> failwith "TODO"
-  | GC (gc, premises) -> failwith "TODO"  (*  TODO *)
+  | Lemma ((p, args), premises) ->
+    let premises = List.map premise_to_datalog premises in 
+    let concl = atom_pattern p (List.map encode_term args) in
+    Logic.mk_clause concl premises
+  | Theory ((name, args), premises) ->
+    let premises = List.map premise_to_datalog premises in 
+    let concl = atom_theory name (List.map encode_term args) in
+    Logic.mk_clause concl premises
+  | GC (gc, premises) ->
+    let premises = List.map premise_to_datalog premises in 
+    let concl = atom_gc gc in
+    Logic.mk_clause concl premises
 
 (** Convert a meta-fact to a Datalog fact *)
 let fact_to_datalog fact =
@@ -243,8 +260,17 @@ let of_datalog lit =
   | MString "theory", (`Symbol (MString name) :: args) ->
     let terms = extract_consts args in
     Some (ThenTheory (name, terms))
-  | MString "gc", args ->
-    failwith "TODO: of datalog" (* TODO *)
+  | MString "gc", (`Symbol (MString gc_ord) :: args) ->
+    (* extract (list of terms, list of patterns, list of terms) *) 
+    let rec extract at_prec (prec,pats,vars) l = match l with
+    | [] -> List.rev prec, List.rev pats, List.rev vars
+    | (`Symbol (MPattern p))::l' -> extract false (prec,p::pats,vars) l'
+    | (`Symbol (MTerm t))::l' when at_prec -> extract true (t::prec,pats,vars) l'
+    | (`Symbol (MTerm t))::l' -> extract false (prec,pats,t::vars) l'
+    | _ -> assert false
+    in
+    let gc_prec, gc_eqns, gc_vars = extract true ([],[],[]) args in
+    Some (ThenGC { gc_prec; gc_eqns; gc_vars; gc_ord; })
   | _ -> None 
 
 (** {2 Knowledge Base} *)

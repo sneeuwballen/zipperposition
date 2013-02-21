@@ -119,7 +119,7 @@ module KB : sig
   | ThenPattern of Pattern.t parametrized
   | ThenTheory of string parametrized
   | ThenNamed of string parametrized
-  | ThenGC of gnd_convergent_spec parametrized
+  | ThenGC of gnd_convergent_spec
   and gnd_convergent_spec = {
     gc_vars : varlist;
     gc_ord : string;
