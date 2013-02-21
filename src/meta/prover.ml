@@ -52,82 +52,51 @@ and result =
   | Expert of Experts.expert
   (** Feedback from the meta-prover *)
 
-(** Convert the arguments into terms. Expected sorts are given and
-    must match. *)
-let extract_terms sorts args =
-  assert (List.length sorts = List.length args);
-  let terms = List.fold_left2
-    (fun acc sort arg -> match arg with
-      | `Symbol (KB.MPattern _)
-      | `Symbol (KB.MString _) -> assert false
-      | `Symbol (KB.MTerm t) ->
-        assert (t.sort == sort);
-        t::acc
-      | `Var i -> (T.mk_var i sort) :: acc)
-    [] sorts args in
-  List.rev terms
-
-(** Extract only constant terms. It expects a list of
-    `Symbol (MTerm constant). *)
-let extract_consts args =
-  List.map
-    (function
-      | `Symbol (KB.MTerm t) when not (T.is_var t) -> t
-      | _ -> assert false)
-    args
-
 (** Goal handler *)
 let goal_handler prover lit =
   Utils.debug 2 "%% meta-prover: new goal %a" Logic.pp_literal lit;
-  match Logic.open_literal lit with
-  | KB.MString "pattern", (`Symbol (KB.MPattern p) :: args) ->
-    (* new goal: match clauses against this pattern.
+  match KB.of_datalog lit with
+  | Some (KB.ThenPattern (p, terms)) ->
+    (* new goal: match clauses against this (partially instantiated) pattern.
        XXX should we match clauses against the pattern, or
            the partial pattern obtained by instantiation? *)
-    let terms = extract_terms (snd p) args in
-    (* partial instantiation (there may be constants in arguments) *)
     let t = Pattern.instantiate p terms in
     let new_pattern, new_args = Pattern.of_term t in
     prover.patterns <- new_pattern :: prover.patterns;
     prover.new_patterns <- new_pattern :: prover.new_patterns;
     ()
-  | _ -> ()
+  | Some (KB.ThenTheory _) -> () (* XXX: try to prove axioms of the theory? *)
+  | Some _ -> ()
+  | None -> ()  (* not a known goal *)
 
 (** Handler called on facts *)
 let fact_handler prover lit =
   Utils.debug 2 "%% meta-prover: new fact %a" Logic.pp_literal lit;
-  match Logic.open_literal lit with
-  | KB.MString "pattern", (`Symbol (KB.MPattern p) :: args) ->
-    if LitMap.mem lit prover.clauses
-      then ()  (* a clause we already know *)
-      else begin
-        let terms = extract_terms (snd p) args in
-        assert (not (List.exists T.is_var terms));
-        (* a formula is true! *)
-        let t = Pattern.instantiate p terms in
-        let lits = [| Literals.mk_eq ~ord:prover.ctx.ctx_ord t T.true_term |] in
-        (* explanations: find the ones which are in fact clauses. *)
-        let premises = Logic.db_explain prover.db lit in
-        let premises = Utils.list_flatmap
-          (fun lit -> try [LitMap.find lit prover.clauses]
-                      with Not_found -> [])
-          premises in
-        (* XXX: call calculus#preprocess on resulting clauses (CNF, etc.)?? *)
-        (* result: "conclusion because of premises" *)
-        let result = Deduced (lits, premises) in
-        prover.results <- result :: prover.results;
-        prover.new_results <- result :: prover.new_results
-      end
-  | KB.MString "named", (`Symbol (KB.MString name) :: args) ->
-    (* log it *)
-    let args = extract_consts args in
-    Utils.debug 0 "%% meta-prover: axiom %s(%a)"
-      name (Utils.pp_list !T.pp_term#pp) args
-  | KB.MString "gc", args ->
-    failwith "TODO: Meta.Prover.fact_handler for GC"  (* TODO *)
-  | _ -> ()  (* nothing to do *) 
-
-(** Fact handler *)
+  if LitMap.mem lit prover.clauses
+    then ()  (* a clause we already know *)
+    else match KB.of_datalog lit with
+    | Some (KB.ThenPattern (p, args)) ->
+      (* a formula is true! *)
+      let t = Pattern.instantiate p args in
+      assert (T.is_fo t);
+      let lits = [| Literals.mk_eq ~ord:prover.ctx.ctx_ord t T.true_term |] in
+      (* explanations: find the ones which are in fact clauses. *)
+      let premises = Logic.db_explain prover.db lit in
+      let premises = Utils.list_flatmap
+        (fun lit -> try [LitMap.find lit prover.clauses]
+                    with Not_found -> [])
+        premises in
+      (* XXX: call calculus#preprocess on resulting clauses (CNF, etc.)?? *)
+      (* result: "conclusion because of premises" *)
+      let result = Deduced (lits, premises) in
+      prover.results <- result :: prover.results;
+      prover.new_results <- result :: prover.new_results
+    | Some (KB.ThenNamed (name, terms)) ->
+      Utils.debug 0 "%% meta-prover: axiom @[<h>%s(%a)@]" name
+        (Utils.pp_list !T.pp_term#pp) terms
+    | Some (KB.ThenTheory _) -> failwith "TODO"
+    | Some (KB.ThenGC _) -> failwith "TODO"
+    | None -> ()  (* not a proper fact *)
 
 (** Fresh meta-prover, using the given KB *)
 let create ~ctx kb =

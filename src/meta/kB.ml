@@ -44,6 +44,7 @@ and premise =
 and fact =
 | ThenPattern of Pattern.t parametrized
 | ThenTheory of string parametrized
+| ThenNamed of string parametrized
 | ThenGC of gnd_convergent_spec parametrized
 and gnd_convergent_spec = {
   gc_vars : varlist;
@@ -152,6 +153,23 @@ end)
   
 (** {2 Conversion to Datalog} *)
 
+(** Encode term into a Datalog atom *)
+let encode_term t = match t.term with
+  | Var i when i >= 0 -> `Var (-(i*2)-1)
+  | Var i when i < 0 -> `Var (i*2)
+  | _ -> `Symbol (MTerm t)
+
+(** Convert a Datalog atom back to a term of given sort, or raise Failure *)
+let deencode_term t sort = match t with
+  | `Var i when (i mod 2) = 0 -> T.mk_var (i/2) sort
+  | `Var i -> T.mk_var (-(i+1)/2) sort
+  | `Symbol (MTerm t) ->
+    assert (t.sort == sort);
+    t
+  | `Symbol s -> failwith (Utils.sprintf "Datalog atom %a not a term" pp_atom s)
+
+(** {3 Construction of atoms} *)
+
 let atom_named name args =
   Logic.mk_literal (MString "named") (`Symbol (MString name) :: args)
 
@@ -164,38 +182,70 @@ let atom_pattern pat args =
 let atom_gc ?(offset=(-1)) gc =
   let args = [`Symbol (MString gc.gc_ord)] in
   let args = args @ List.map (fun pat -> `Symbol (MPattern pat)) gc.gc_eqns in
-  let args = args @ List.map (fun t -> match t.term with
-    | Var i -> `Var (-i+offset)
-    | _ -> `Symbol (MTerm t)) gc.gc_vars in
+  let args = args @ List.map encode_term gc.gc_vars in
   Logic.mk_literal (MString "gc") args
+
+(** Convert the arguments into terms. Expected sorts are given and
+    must match. *)
+let extract_terms sorts args =
+  assert (List.length sorts = List.length args);
+  let terms = List.fold_left2
+    (fun acc sort arg -> match arg with
+      | `Symbol (MPattern _)
+      | `Symbol (MString _) -> assert false
+      | `Symbol (MTerm t) ->
+        assert (t.sort == sort);
+        t::acc
+      | `Var i -> (T.mk_var i sort) :: acc)
+    [] sorts args in
+  List.rev terms
+
+(** Extract only constant terms. It expects a list of
+    `Symbol (MTerm constant). *)
+let extract_consts args =
+  List.map
+    (function
+      | `Symbol (MTerm t) when not (T.is_var t) -> t
+      | _ -> assert false)
+    args
 
 (** Translate a definition into a Datalog clause *)
 let definition_to_datalog definition =
   match definition with
   | Named (name, ((p, sorts) as pattern)) ->
-    let vars = List.mapi (fun i _ -> `Var (-i-1)) sorts in
+    let vars = List.mapi (fun i sort -> encode_term (T.mk_var i sort)) sorts in
     let concl = atom_named name vars in
     let premises = [atom_pattern pattern vars] in
     Logic.mk_clause concl premises
-  | _ -> failwith "TODO"
+  | Lemma ((concl, args), premises) -> failwith "TODO"
+  | Theory ((name, args), premises) -> failwith "TODO"
+  | GC (gc, premises) -> failwith "TODO"  (*  TODO *)
 
 (** Convert a meta-fact to a Datalog fact *)
 let fact_to_datalog fact =
-  let convert_arg t = match t.term with
-  | Var i -> `Var i
-  | _ -> `Symbol (MTerm t)
-  in
   match fact with
-  | ThenPattern (p, args) -> atom_pattern p (List.map convert_arg args)
-  | ThenTheory (name, args) -> atom_theory name (List.map convert_arg args)
-  | ThenGC _ -> failwith "TODO: Meta.KB.fact_to_datalog"
+  | ThenPattern (p, args) -> atom_pattern p (List.map encode_term args)
+  | ThenTheory (name, args) -> atom_theory name (List.map encode_term args)
+  | ThenGC _ ->
+    failwith "Meta.KB.fact_to_datalog makes no sense for ThenGC"
+  | ThenNamed _ ->
+    failwith "Meta.KB.fact_to_datalog makes no sense for ThenNamed"
 
 (** Try to convert back a Datalog fact into a meta-fact *)
 let of_datalog lit =
   match Logic.open_literal lit with
-  | MString "lemma", (`Symbol (MString "pattern") :: args) ->
-    failwith "TODO: of_datalog"
-  | _ -> failwith "TODO"
+  | MString "pattern", (`Symbol (MPattern p) :: args) ->
+    let terms = extract_terms (snd p) args in
+    Some (ThenPattern (p, terms))
+  | MString "named", (`Symbol (MString name) :: args) ->
+    let terms = extract_consts args in
+    Some (ThenNamed (name, terms))
+  | MString "theory", (`Symbol (MString name) :: args) ->
+    let terms = extract_consts args in
+    Some (ThenTheory (name, terms))
+  | MString "gc", args ->
+    failwith "TODO: of datalog" (* TODO *)
+  | _ -> None 
 
 (** {2 Knowledge Base} *)
 
