@@ -170,15 +170,16 @@ let gc_of_json ~ctx json = failwith "nope"
 (** Theory of Associative-Commutative symbols, for the given symbol *)
 let ac f = 
   (* function that computes the AC(f)-normal form of the term *)
-  let nf t = failwith "AC not implemented"
-  in
+  let is_ac s = s == f in
+  let expert_canonize t = T.ac_normal_form ~is_ac t in
+  let expert_equal t1 t2 = T.ac_eq ~is_ac t1 t2 in
   let expert = {
     expert_name = Utils.sprintf "AC_%s" (name_symbol f);
     expert_descr = Utils.sprintf "AC for symbol %s" (name_symbol f);
-    expert_equal = (fun t1 t2 -> nf t1 == nf t2);
+    expert_equal;
     expert_sig = SSet.singleton f;
     expert_clauses = []; (* TODO *)
-    expert_canonize = nf;
+    expert_canonize;
     expert_solve = None;
   } in
   expert
