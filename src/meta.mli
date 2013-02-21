@@ -124,7 +124,7 @@ module KB : sig
     gc_vars : varlist;
     gc_ord : string;
     gc_prec : varlist;
-    gc_eqns : Pattern.t list;
+    gc_eqns : Pattern.t parametrized list;
   } (** Abstract equations that form a ground convergent rewriting system
         when instantiated. It is parametrized by the theory it decides.
         gc_ord and gc_prec (once instantiated), give a constraint on the ordering
@@ -144,6 +144,7 @@ module KB : sig
   type atom =
   | MString of string
   | MPattern of Pattern.t
+  | MPatternVars of Pattern.t parametrized
   | MTerm of term
 
   val eq_atom : atom -> atom -> bool

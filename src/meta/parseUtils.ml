@@ -79,7 +79,7 @@ let lookup_premise ~table (premise : premise) : (symbol * sort) Sequence.t =
     let (p, sorts) = lookup_named ~table name in
     Sequence.of_list (List.combine symbols sorts)
   | `Term t ->
-    let signature = T.signature (Sequence.singleton t) in
+    let signature = T.signature (Sequence.singleton (T.curry t)) in
     SMapSeq.to_seq signature
 
 let lookup_premises ~table premises =
@@ -133,19 +133,20 @@ let convert_premise ~table s_to_t premise =
   | `Term t ->
     let symbols = SSet.elements (T.symbols (Sequence.singleton t)) in
     let vars = symbs_to_terms s_to_t symbols in
-    let p, _ = Pattern.of_term_with t symbols in 
+    let p, _ = Pattern.of_term_with (T.curry t) symbols in 
     KB.IfPattern (p, vars)
 
 (** {2 Build definitions from raw parsing data} *)
 
 (** Build a lemma that has a non-named conclusion [t] *)
 let mk_lemma_term ~table t premises =
+  let t = T.curry t in
   let signature = signature_of_premises ~table premises in
   let s_to_t = map_symbols_to_vars signature in
   (* convert premises *)
   let premises = List.map (convert_premise ~table s_to_t) premises in
   (* convert conclusion *)
-  let pattern, consts = Pattern.of_term t in
+  let pattern, consts = Pattern.of_term (T.curry t) in
   let args = consts_to_terms s_to_t consts in
   (* build lemma *)
   KB.Lemma ((pattern, args), premises)
@@ -164,77 +165,44 @@ let mk_lemma_named ~table (name,symbols) premises =
 
 (** Build the definition of a named pattern by a formula *)
 let mk_named ~table (name, (symbols : symbol list)) t =
-  let signature = T.signature (Sequence.singleton t) in
+  let signature = T.signature (Sequence.singleton (T.curry t)) in
   (* safety checks *)
   (if not (List.for_all (fun s -> SMap.mem s signature) symbols)
     then failwith ("some symbol does not appear in the definition of " ^ name));
   (if not (SMap.cardinal signature = List.length symbols)
     then failwith ("wrong number of symbols in the definition of " ^name));
   (* abstract formula in the same order as the given symbol list *)
-  let pattern, _ = Pattern.of_term_with t symbols in
+  let pattern, _ = Pattern.of_term_with (T.curry t) symbols in
   KB.Named (name, pattern)
 
-let mk_theory ~table (name, symbols) premises =
-  failwith "TODO" (* TODO *)
+let mk_theory ~table (name, (symbols : symbol list)) premises =
+  let signature = signature_of_premises ~table premises in
+  (if not (List.for_all (fun s -> SMap.mem s signature) symbols)
+    then failwith ("some symbol does not appear in def of theory " ^ name));
+  let s_to_t = map_symbols_to_vars signature in
+  (* convert premises *)
+  let premises = List.map (convert_premise ~table s_to_t) premises in
+  (* convert theory *)
+  let args = symbs_to_terms s_to_t symbols in
+  KB.Theory ((name, args), premises)
 
-(* theory
-  let th_name, th_symbols = $1 in
-  let premises = $3 in
-  (* obtain list of (item,symbol), and signature of the premises *)
-  let items, signature = items_of_premises premises in
-  (* map symbols to variables of the correct sort *)
-  let var_map = List.mapi
-    (fun i (s,sort) -> s, Terms.mk_var i sort)
-    (Sequence.to_list (SMapSeq.to_seq signature)) in
-  (* TODO recover sorts of premises with meta_table *)
-  let theory = failwith "TODO" in
-  (* remember name -> definition *)
-  Hashtbl.replace meta_table th_name theory;
-  theory
-*)
-
-let mk_gc ~table eqns (ord,prec) premises =
-  failwith "TODO"  (* TODO *)
-
-(* GC
-  (* name of theory, and symbols the theory binds *)
-  let th_name, th_symbols = $9 in
-  (* map symbols to types *)
-  let gc_eqns = $2 in
-  let gc_eqns = List.map Terms.curry gc_eqns in
-  let signature = Terms.signature (Sequence.of_list gc_eqns) in
-  let consts = Meta.Pattern.find_functions
-    (Sequence.of_list gc_eqns) th_symbols in
-  (* abstract equations *)
-  let gc_eqns = List.map Meta.Pattern.of_term gc_eqns in
-  (* now map constants to variables! *)
-  let var_map = List.mapi
-    (fun i const -> const, Terms.mk_var i const.sort)
-    consts in
+let mk_gc ~table eqns (gc_ord,(prec : symbol list)) premises =
+  let signature = signature_of_premises ~table premises in
+  (if not (List.for_all (fun s -> SMap.mem s signature) prec)
+    then failwith ("some symbol does not appear in precedence of GC"));
+  (* TODO more safety checks *) 
+  (* mapping to variables *)
+  let s_to_t = map_symbols_to_vars signature in
+  (* convert precedence *)
+  let gc_prec = symbs_to_terms s_to_t prec in
+  (* convert equations *)
   let gc_eqns = List.map
-    (fun eqn,eqn_consts ->
-      let eqn_vars = List.map (fun c -> List.assq c var_map) eqn_consts in
-      eqn, eqn_vars)
-    gc_eqns in
-  (* now equations are properly parametrized *)
-  let gc_vars = List.map snd var_map in
-  let gc_ord = $4 in
-  (* precedence *)
-  let gc_prec = $6 in
-  let gc_prec = List.map
-    (fun s -> List.assq (SMap.find s signature) var_map)
-    gc_prec in
-  (* sorts of theory *)
-  let th_sorts = List.map (fun s -> SMap.find s signature) th_symbols in
-  let th_vars = List.map
-    (fun s -> List.assq (SMap.find s signature) var_map)
-    th_symbols in
-  (* build GC system *)
-  let gc = Meta.KB.GC {
-    gc_vars;
-    gc_ord;
-    gc_prec;
-    gc_eqns;
-  } and theory = Meta.KB.Theory (th_name, th_sorts) in
-  Meta.KB.Rule ((gc, gc.gc_vars), [theory, th_vars]) 
-*)
+    (fun eqn ->
+      let p, consts = Pattern.of_term (T.curry eqn) in
+      let args = consts_to_terms s_to_t consts in
+      p, args)
+    eqns in
+  let gc_vars = List.map snd s_to_t in
+  (* convert premises *)
+  let premises = List.map (convert_premise ~table s_to_t) premises in
+  KB.GC ({ KB.gc_eqns; KB.gc_vars; KB.gc_ord; KB.gc_prec; }, premises)

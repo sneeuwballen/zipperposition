@@ -50,7 +50,7 @@ and gnd_convergent_spec = {
   gc_vars : varlist;
   gc_ord : string;
   gc_prec : varlist;
-  gc_eqns : Pattern.t list;
+  gc_eqns : Pattern.t parametrized list;
 } (** Abstract equations that form a ground convergent rewriting system
       when instantiated. It is parametrized by the theory it decides.
       gc_ord and gc_prec (once instantiated), give a constraint on the ordering
@@ -74,7 +74,8 @@ let rec pp_definition formatter definition =
   | GC (gc, premises) ->
     Format.fprintf formatter
       "@[<hov2>gc %a@ @[<h>with %s(%a) if@ %a@]@]"
-      (Utils.pp_list ~sep:" and " Pattern.pp_pattern) gc.gc_eqns
+      (Utils.pp_list ~sep:" and " !T.pp_term#pp)
+      (List.map (fun (p,args) -> Pattern.instantiate p args) gc.gc_eqns)
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
       (Utils.pp_list pp_premise) premises
 and pp_premise formatter premise =
@@ -111,6 +112,7 @@ let definition_of_json (json : json) : definition =
 type atom =
 | MString of string
 | MPattern of Pattern.t
+| MPatternVars of Pattern.t parametrized
 | MTerm of term
 
 let rec eq_atom a1 a2 = match a1, a2 with
@@ -122,16 +124,22 @@ let rec eq_atom a1 a2 = match a1, a2 with
 let rec hash_atom = function
   | MString s -> Hash.hash_string s
   | MPattern p -> Pattern.hash_pattern p
+  | MPatternVars (p, vars) ->
+    Hash.hash_list T.hash_term (Pattern.hash_pattern p) vars
   | MTerm t -> T.hash_term t
 
 let rec pp_atom formatter a = match a with
   | MString s -> Format.pp_print_string formatter s
   | MPattern p -> Pattern.pp_pattern formatter p
+  | MPatternVars (p,vars) ->
+    Format.fprintf formatter "@[<h>%a[%a]@]" Pattern.pp_pattern p
+      (Utils.pp_list !T.pp_term#pp) vars
   | MTerm t -> T.pp_term_debug#pp formatter t
 
 let rec atom_to_json a : json = match a with
   | MString s -> `String s
   | MPattern p -> `Assoc ["pattern", Pattern.to_json p]
+  | MPatternVars (p, vars) -> assert false (* TODO *)
   | MTerm t -> `Assoc ["term", T.to_json t]
 
 let rec atom_of_json (json : json) : atom = match json with
@@ -182,7 +190,7 @@ let atom_pattern pat args =
 let atom_gc ?(offset=(-1)) gc =
   let args = [`Symbol (MString gc.gc_ord)] in
   let args = args @ List.map encode_term gc.gc_prec in
-  let args = args @ List.map (fun pat -> `Symbol (MPattern pat)) gc.gc_eqns in
+  let args = args @ List.map (fun (pat,vars) -> `Symbol (MPatternVars (pat, vars))) gc.gc_eqns in
   let args = args @ List.map encode_term gc.gc_vars in
   Logic.mk_literal (MString "gc") args
 
@@ -193,6 +201,7 @@ let extract_terms sorts args =
   let terms = List.fold_left2
     (fun acc sort arg -> match arg with
       | `Symbol (MPattern _)
+      | `Symbol (MPatternVars _)
       | `Symbol (MString _) -> assert false
       | `Symbol (MTerm t) ->
         assert (t.sort == sort);
@@ -264,7 +273,7 @@ let of_datalog lit =
     (* extract (list of terms, list of patterns, list of terms) *) 
     let rec extract at_prec (prec,pats,vars) l = match l with
     | [] -> List.rev prec, List.rev pats, List.rev vars
-    | (`Symbol (MPattern p))::l' -> extract false (prec,p::pats,vars) l'
+    | (`Symbol (MPatternVars (p,vars)))::l' -> extract false (prec,(p,vars)::pats,vars) l'
     | (`Symbol (MTerm t))::l' when at_prec -> extract true (t::prec,pats,vars) l'
     | (`Symbol (MTerm t))::l' -> extract false (prec,pats,t::vars) l'
     | _ -> assert false
