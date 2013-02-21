@@ -118,6 +118,7 @@ module KB : sig
   and fact =
   | ThenPattern of Pattern.t parametrized
   | ThenTheory of string parametrized
+  | ThenGC of gnd_convergent_spec parametrized
   and gnd_convergent_spec = {
     gc_vars : varlist;
     gc_ord : string;
@@ -156,10 +157,13 @@ module KB : sig
   
   (** {2 Conversion to Datalog} *)
 
-  val to_datalog : definition -> Logic.soft_clause
+  val definition_to_datalog : definition -> Logic.clause
     (** Translate a definition into a Datalog clause *)
 
-  val of_datalog : Logic.soft_lit -> fact option
+  val fact_to_datalog : fact -> Logic.literal
+    (** Convert a meta-fact to a Datalog fact *)
+
+  val of_datalog : Logic.literal -> fact option
     (** Try to convert back a Datalog fact into a meta-fact *)
 
   (** {2 Knowledge Base} *)
@@ -204,14 +208,23 @@ module Prover : sig
 
   (* TODO: call calculus#preprocess on resulting clauses (CNF, etc.) *)
 
-  val scan_clause : t -> literal array -> result list
+  val scan_clause : t -> hclause -> result list
     (** Match the clause against patterns known to the KB. Matches
         are added to the Datalog engine, and if some theories and lemma
         are detected they are returned *)
 
+  val has_new_patterns : t -> bool
+    (** Are there some new patterns? *)
+
+  val scan_set : t -> Clauses.CSet.t -> result list
+    (** Scan the set of clauses for patterns that are new. This should
+        be called on the active set every time [has_new_patterns prover]
+        returns true. After this, [has_new_patterns prover] returns false
+        at least until the next call to [scan_clause]. *)
+
   val theories : t -> (string * term list) Sequence.t
     (** List of theories detected so far *)
 
-  val experts : t -> Experts.expert list
+  val experts : t -> Experts.expert Sequence.t
     (** Current list of experts that can be used *)
 end

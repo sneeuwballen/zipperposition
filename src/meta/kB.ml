@@ -44,6 +44,7 @@ and premise =
 and fact =
 | ThenPattern of Pattern.t parametrized
 | ThenTheory of string parametrized
+| ThenGC of gnd_convergent_spec parametrized
 and gnd_convergent_spec = {
   gc_vars : varlist;
   gc_ord : string;
@@ -78,6 +79,8 @@ let rec pp_definition formatter definition =
 and pp_premise formatter premise =
   match premise with
   | _ -> failwith "TODO: kb.pp_premise"
+and pp_fact formatter fact =
+  failwith "TODO: kb.pp_fact"
 
 let definition_to_json definition : json =
   match definition with
@@ -167,7 +170,7 @@ let atom_gc ?(offset=(-1)) gc =
   Logic.mk_literal (MString "gc") args
 
 (** Translate a definition into a Datalog clause *)
-let to_datalog definition =
+let definition_to_datalog definition =
   match definition with
   | Named (name, ((p, sorts) as pattern)) ->
     let vars = List.mapi (fun i _ -> `Var (-i-1)) sorts in
@@ -176,10 +179,21 @@ let to_datalog definition =
     Logic.mk_clause concl premises
   | _ -> failwith "TODO"
 
+(** Convert a meta-fact to a Datalog fact *)
+let fact_to_datalog fact =
+  let convert_arg t = match t.term with
+  | Var i -> `Var i
+  | _ -> `Symbol (MTerm t)
+  in
+  match fact with
+  | ThenPattern (p, args) -> atom_pattern p (List.map convert_arg args)
+  | ThenTheory (name, args) -> atom_theory name (List.map convert_arg args)
+  | ThenGC _ -> failwith "TODO: Meta.KB.fact_to_datalog"
+
 (** Try to convert back a Datalog fact into a meta-fact *)
 let of_datalog lit =
-  match lit with
-  | MString "lemma", (`Symbol (MString "pattern" :: args)) ->
+  match Logic.open_literal lit with
+  | MString "lemma", (`Symbol (MString "pattern") :: args) ->
     failwith "TODO: of_datalog"
   | _ -> failwith "TODO"
 
