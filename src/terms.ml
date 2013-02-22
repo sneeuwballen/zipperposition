@@ -504,7 +504,8 @@ let db_unlift t =
 let db_from_term t t' =
   (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
-  | Var _ -> if eq_term t t' then mk_bound_var depth t'.sort else t
+  | _ when t == t' -> mk_bound_var depth t'.sort
+  | Var _ -> t
   | Bind (s, a_sort, t') ->
     mk_bind ~old:t s t.sort a_sort (replace (depth+1) t')
   | BoundVar _ -> t
@@ -797,7 +798,10 @@ let pp_term_debug =
       let varindex = ref (maxvar+1) in
       let t = db_to_classic ~varindex t in
       (match t.term with
-      | Var i -> Format.fprintf formatter "X%d" i
+      | Var i ->
+        (match t.sort with
+        | Sort _ -> Format.fprintf formatter "X%d" i
+        | Fun _ -> Format.fprintf formatter "F%d" i)
       | BoundVar _ -> assert false
       | Bind _ -> assert false
       | Node (s, [{term=Node (s', [a;b])}]) when s == not_symbol
@@ -862,7 +866,10 @@ let pp_term_tstp =
             | _ -> assert false (* infix and not binary? *)
           end else Format.fprintf formatter "@[<h>%a(%a)@]" pp_symbol s
             (Utils.pp_list ~sep:", " self#pp) args
-      | Var i -> Format.fprintf formatter "X%d" i
+      | Var i ->
+        (match t.sort with
+        | Sort _ -> Format.fprintf formatter "X%d" i
+        | Fun _ -> Format.fprintf formatter "F%d" i)
       in
       let maxvar = max (max_var (vars t)) 0 in
       let varindex = ref (maxvar+1) in
