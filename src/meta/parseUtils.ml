@@ -109,6 +109,10 @@ let signature_of_terms seq =
   let signature = T.signature seq in
   SMap.filter (fun s _ -> not (is_base_symbol s)) signature
 
+let symbols_of_term t =
+  let signature = signature_of_term t in
+  Sequence.to_list (SMapSeq.keys signature)
+
 (** Compute the index of the maximal variable occurring in premises *)
 let offset_of_premises (premises : premise Sequence.t) =
   1 + Sequence.fold
@@ -161,7 +165,7 @@ let convert_premise ~table s_to_t premise =
     let vars = symbs_to_terms s_to_t symbols in
     KB.IfNamed (name, vars)
   | `Term t ->
-    let symbols = SSet.elements (T.symbols (Sequence.singleton t)) in
+    let symbols = symbols_of_term t in
     let vars = symbs_to_terms s_to_t symbols in
     let p, _ = Pattern.of_term_with (T.curry t) symbols in 
     KB.IfPattern (p, vars)

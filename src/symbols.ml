@@ -291,7 +291,8 @@ let add_signature signature symb sort =
         then signature
         else failwith (
           let b = Buffer.create 20 in
-          Format.bprintf b "incompatible sorts %a, %a" pp_sort sort pp_sort sort';
+          Format.bprintf b "incompatible sorts %a, %a for %a"
+            pp_sort sort pp_sort sort' pp_symbol symb;
           Buffer.contents b)
   with Not_found -> SMap.add symb sort signature
 

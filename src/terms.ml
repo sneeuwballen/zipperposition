@@ -633,6 +633,8 @@ let rec curry t =
   | Bind (s, a_sort, t') -> mk_bind s t.sort a_sort (curry t')
   | Node (f, [a;b]) when f == at_symbol -> mk_at ~old:t (curry a) (curry b)
   | Node (f, []) -> t
+  | Node (f, l) when is_base_symbol f ->
+    mk_node f t.sort (List.map curry l)
   | Node (f, [t']) ->
     let sort = t.sort <=. t'.sort in
     mk_at (mk_const f sort) (curry t')
