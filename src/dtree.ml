@@ -64,7 +64,7 @@ let rec term_to_char t =
   match t.term with
   | Var _ -> Variable t
   | BoundVar i -> BoundVariable (i, t.sort)
-  | Bind (f, _) -> Symbol f
+  | Bind (f, _, _) -> Symbol f
   | Node (f, _) -> Symbol f
 
 (** convert term to list of var/symbol *)

@@ -138,14 +138,14 @@ let check_beta () =
         (T.mk_bound_var 0 (univ_ <=. univ_))
         (T.mk_const (mk_symbol "b") univ_))
   and t2 =
-    T.mk_lambda (univ_ <=. univ_)
+    T.mk_lambda (univ_ <=. univ_) univ_
       (T.mk_at
         (T.mk_bound_var 0 (univ_ <=. univ_))
         (T.mk_at
           (T.mk_bound_var 0 (univ_ <=. univ_))
           (T.mk_const (mk_symbol "c") univ_)))
   in
-  let t1 = T.mk_lambda (t1.sort <=. t2.sort) t1 in
+  let t1 = T.mk_lambda (t1.sort <=. t2.sort) t2.sort t1 in
   Format.printf "beta reduce @[<h>%a@]@ @@ @[<h>%a@]@." !T.pp_term#pp t1 !T.pp_term#pp t2;
   let redex = T.mk_at t1 t2 in
   let reduced = T.beta_reduce redex in
@@ -156,8 +156,8 @@ let check_beta () =
 (** special cases *)
 let check_special () =
   let x = T.mk_var 1 univ_ in
-  let t1 = T.mk_lambda univ_
-    (T.mk_lambda univ_
+  let t1 = T.mk_lambda univ_ univ_
+    (T.mk_lambda univ_ univ_
       (T.mk_node (mk_symbol "f") univ_ [
         T.mk_node (mk_symbol "f") univ_ [x; T.mk_bound_var 1 univ_]
         ; T.mk_bound_var 0 univ_]))

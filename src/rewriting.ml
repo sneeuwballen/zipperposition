@@ -91,14 +91,14 @@ let rewrite trs t =
   (* compute normal form of this term *)
   let rec compute_nf offset trs t =
     match t.term with
-    | Bind (s, t') ->
+    | Bind (s, a_sort, t') ->
       let t'' = compute_nf offset trs t' in
-      let new_t = T.mk_bind s t.sort t'' in
+      let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
       reduce_at_root offset trs new_t
     | Node (hd, l) ->
       (* rewrite subterms first *)
       let l' = List.map (compute_nf offset trs) l in
-      let t' = T.mk_node hd t.sort l' in
+      let t' = T.mk_node ~old:t hd t.sort l' in
       (* rewrite at root *)
       reduce_at_root offset trs t'
     | Var _ | BoundVar _ -> assert false

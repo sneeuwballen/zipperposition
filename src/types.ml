@@ -43,7 +43,7 @@ type term = {
 and term_cell =
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Bind of symbol * term       (** bind one variable, with the symbol *)
+  | Bind of symbol * sort * term(** bind one variable (of given sort), with the symbol *)
   | Node of symbol * term list  (** term application *)
 and sourced_term =
   term * string * string        (** Term + file,name *)

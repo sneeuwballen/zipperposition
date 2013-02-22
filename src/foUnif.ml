@@ -42,7 +42,7 @@ let occurs_check subst v o_v t o_t =
               check v o_v t' o_t'
         with Not_found -> false)
       | BoundVar _ -> false
-      | Bind (_, t') -> check v o_v t' o_t
+      | Bind (_, _, t') -> check v o_v t' o_t
       | Node (_, l) -> check_list v o_v l o_t
   and check_list v o_v l o_l = match l with
   | [] -> false
@@ -71,7 +71,7 @@ let unification subst (a, o_a) (b, o_b) =
       if occurs_check subst t o_t s o_s
         then raise UnificationFailure (* occur check *)
         else S.bind subst (t, o_t) (s, o_s) (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' o_s t2' o_t
+    | Bind (f, _, t1'), Bind (g, _, t2') when f == g -> unif subst t1' o_s t2' o_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 o_s l2 o_t
@@ -115,7 +115,7 @@ let matching subst (a, o_a) (b, o_b) =
           (* occur check, or [s] is not in the initial
              context [o_a] in which variables can be bound. *)
         else S.bind subst (s, o_s) (t, o_t) (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' o_s t2' o_t
+    | Bind (f, _, t1'), Bind (g, _, t2') when f == g -> unif subst t1' o_s t2' o_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 o_s l2 o_t
@@ -170,7 +170,7 @@ let matching_ac ?(is_ac=fun s -> has_attr attr_ac s)
             (* occur check, or [s] is not in the initial
                context [o_a] in which variables can be bound. *)
           else k (S.bind subst (s, o_s) (t, o_t)) (* bind s and continue *)
-      | Bind (f, t1'), Bind (g, t2') when f == g ->
+      | Bind (f, _, t1'), Bind (g, _, t2') when f == g ->
         unif subst t1' o_s t2' o_t k
       | BoundVar i, BoundVar j -> if i = j then k subst
       | Node (f, l1), Node (g, l2) when f == g && is_ac f ->

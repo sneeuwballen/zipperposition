@@ -108,7 +108,7 @@ module KBO = struct
         if pos
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
-      | Bind (s, t') ->
+      | Bind (s, _, t') ->
         let wb' = if pos then wb + prec#weight s else wb - prec#weight s in
         balance_weight wb' t' y pos
       | BoundVar _ -> (if pos then wb + 1 else wb - 1), false
@@ -160,17 +160,17 @@ module KBO = struct
         (wb' - 1, if contains then Gt else Incomparable)
       (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
       | Node (f, ss), Node (g, ts) -> tckbo_composite wb f g ss ts
-      | Bind (f, t1'), Bind (g, t2') -> tckbo_composite wb f g [t1'] [t2']
+      | Bind (f, _, t1'), Bind (g, _, t2') -> tckbo_composite wb f g [t1'] [t2']
       | BoundVar i, BoundVar j ->
         (wb, if i = j && t1.sort == t2.sort then Eq else Incomparable)
       (* node and something else *)
-      | Node (f, ss), Bind (g, t2') -> tckbo_composite wb f g ss [t2']
+      | Node (f, ss), Bind (g, _, t2') -> tckbo_composite wb f g ss [t2']
       | Node (f, ss), BoundVar _ -> tckbo_composite wb f db_symbol ss []
-      | Bind (f, t1'), Node (g, ts) -> tckbo_composite wb f g [t1'] ts
+      | Bind (f, _, t1'), Node (g, ts) -> tckbo_composite wb f g [t1'] ts
       | BoundVar _, Node (g, ts) -> tckbo_composite wb db_symbol g [] ts
       (* De Bruijn with Bind *)
-      | Bind (f, t1'), BoundVar _ -> tckbo_composite wb f db_symbol [t1'] []
-      | BoundVar _, Bind (g, t2') -> tckbo_composite wb db_symbol g [] [t2']
+      | Bind (f, _, t1'), BoundVar _ -> tckbo_composite wb f db_symbol [t1'] []
+      | BoundVar _, Bind (g, _, t2') -> tckbo_composite wb db_symbol g [] [t2']
     (** tckbo, for composite terms (ie non variables). It takes a symbol
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
@@ -290,17 +290,17 @@ module RPO6 = struct
     | Var _, _ -> if T.var_occurs s t then Lt else Incomparable
     (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
     | Node (f, ss), Node (g, ts) -> rpo6_composite ~prec s t f g ss ts
-    | Bind (f, s'), Bind (g, t') -> rpo6_composite ~prec s t f g [s'] [t']
+    | Bind (f, _, s'), Bind (g, _, t') -> rpo6_composite ~prec s t f g [s'] [t']
     | BoundVar i, BoundVar j ->
       if i = j && s.sort == t.sort then Eq else Incomparable
     (* node and something else *)
-    | Node (f, ss), Bind (g, t') -> rpo6_composite ~prec s t f g ss [t']
+    | Node (f, ss), Bind (g, _, t') -> rpo6_composite ~prec s t f g ss [t']
     | Node (f, ss), BoundVar _ -> rpo6_composite ~prec s t f db_symbol ss []
-    | Bind (f, s'), Node (g, ts) -> rpo6_composite ~prec s t f g [s'] ts
+    | Bind (f, _, s'), Node (g, ts) -> rpo6_composite ~prec s t f g [s'] ts
     | BoundVar _, Node (g, ts) -> rpo6_composite ~prec s t db_symbol g [] ts
     (* De Bruijn with Bind *)
-    | Bind (f, s'), BoundVar _ -> rpo6_composite ~prec s t f db_symbol [s'] []
-    | BoundVar _, Bind (g, t') -> rpo6_composite ~prec s t db_symbol g [] [t']
+    | Bind (f, _, s'), BoundVar _ -> rpo6_composite ~prec s t f db_symbol [s'] []
+    | BoundVar _, Bind (g, _, t') -> rpo6_composite ~prec s t db_symbol g [] [t']
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match prec#compare f g with

@@ -490,7 +490,7 @@ module CSet =
 let rec contains_symbol f t =
   match t.term with
   | Var _ | BoundVar _ -> false
-  | Bind (s, t') -> s == f || contains_symbol f t'
+  | Bind (s, _, t') -> s == f || contains_symbol f t'
   | Node (g, ts) -> g == f || List.exists (contains_symbol f) ts
 
 (** Recognized whether the clause is a Range-Restricted Horn clause *)

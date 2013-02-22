@@ -87,7 +87,7 @@ let rec list_first f = function
 let all_positions pos t f =
   let rec aux pos t = match t.term with
   | Var _ | BoundVar _ -> []
-  | Bind (_, t') ->
+  | Bind (_, _, t') ->
     let acc = f t pos in  (* apply to term itself *)
     List.rev_append (aux (pos @ [0]) t') acc
   | Node (hd, tl) ->
@@ -493,9 +493,9 @@ let demod_nf ?(restrict=false) simpl_set clauses t =
   and traverse ~restrict t =
     match t.term with
     | Var _ | BoundVar _ -> t
-    | Bind (s, t') ->
+    | Bind (s, a_sort, t') ->
       let t'' = traverse ~restrict:false t' in
-      let new_t = T.mk_bind ~old:t s t.sort t'' in
+      let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
       (* rewrite term at root *)
       normal_form ~restrict new_t
     | Node (s, l) ->
@@ -804,7 +804,7 @@ let compare_literals_subsumption lita litb =
   and depth (Equation (l,r,_,_)) = max (term_depth l) (term_depth r)
   and term_depth t = match t.term with
     | Var _ | BoundVar _ -> 1
-    | Bind (_, t') -> 1 + term_depth t'
+    | Bind (_, _, t') -> 1 + term_depth t'
     | Node (_, l) -> 1 + List.fold_left (fun m t' -> max m (term_depth t')) 0 l
   and size (Equation (l,r,_,_)) = l.tsize + r.tsize
   in

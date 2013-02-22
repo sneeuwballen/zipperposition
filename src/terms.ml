@@ -33,7 +33,7 @@ let hash_term t = match t.term with
     let h = Hash.hash_list (fun x -> x.hkey) 0 l in
     let h = Hash.combine h (hash_symbol s) in
     Hash.combine h (hash_sort t.sort)
-  | Bind (s, t) ->
+  | Bind (s, sort, t) ->
     Hash.combine (hash_symbol s) t.hkey
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
@@ -45,7 +45,7 @@ let rec member_term a b =
   (match b.term with
   | Var _ | BoundVar _ -> false
   | Node (_, subterms) -> List.exists (member_term a) subterms
-  | Bind (_, b') -> member_term a b')
+  | Bind (_, _, b') -> member_term a b')
 
 let eq_term x y = x == y  (* because of hashconsing *)
 
@@ -97,7 +97,8 @@ let hashcons_equal x y =
   else match x.term, y.term with
   | Var i, Var j | BoundVar i, BoundVar j -> i = j
   | Node (sa, la), Node (sb, lb) -> sa == sb && eq_subterms la lb
-  | Bind (sa, ta), Bind (sb, tb) -> sa == sb && ta == tb
+  | Bind (sa, sorta, ta), Bind (sb, sortb, tb) ->
+    sa == sb && sorta == sortb && ta == tb
   | _ -> false
 
 (** hashconsing for terms *)
@@ -174,9 +175,9 @@ let rec compute_is_ground l = match l with
   | [] -> true
   | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
 
-let mk_bind ?old s sort t' =
+let mk_bind ?old s r_sort arg_sort t' =
   assert (has_attr attr_binder s);
-  let rec my_t = {term=Bind (s, t'); sort=sort; flags=0;
+  let rec my_t = {term=Bind (s, arg_sort, t'); sort=r_sort; flags=0;
                   tsize=t'.tsize+1; tag= -1; hkey=0} in
   let t = hashcons ?old my_t in
   (if t == my_t
@@ -240,9 +241,9 @@ let mk_equiv a b = (check_bool a; check_bool b; mk_node eq_symbol bool_ [a; b])
 let mk_xor a b = mk_not (mk_equiv a b)
 let mk_eq a b = (check_same a b; mk_node eq_symbol bool_ [a; b])
 let mk_neq a b = mk_not (mk_eq a b)
-let mk_lambda sort t = mk_bind lambda_symbol sort t
-let mk_forall t = (check_bool t; mk_bind forall_symbol bool_ t)
-let mk_exists t = (check_bool t; mk_bind exists_symbol bool_ t) 
+let mk_lambda sort a_sort t = mk_bind lambda_symbol sort a_sort t
+let mk_forall a_sort t = (check_bool t; mk_bind forall_symbol bool_ a_sort t)
+let mk_exists a_sort t = (check_bool t; mk_bind exists_symbol bool_ a_sort t) 
 
 let mk_at ?old t1 t2 =
   match t1.sort, t2.sort with
@@ -282,7 +283,7 @@ let rec at_pos t pos = match t.term, pos with
   | Var _, _::_ -> invalid_arg "wrong position in term"
   | Node (_, l), i::subpos when i < List.length l ->
     at_pos (Utils.list_get l i) subpos
-  | Bind (_, t'), 0::subpos -> at_pos t' subpos
+  | Bind (_, _, t'), 0::subpos -> at_pos t' subpos
   | _ -> invalid_arg "index too high for subterm"
 
 let rec replace_pos t pos new_t = match t.term, pos with
@@ -291,7 +292,7 @@ let rec replace_pos t pos new_t = match t.term, pos with
   | Node (s, l), i::subpos when i < List.length l ->
     let new_subterm = replace_pos (Utils.list_get l i) subpos new_t in
     mk_node s t.sort (Utils.list_set l i new_subterm)
-  | Bind (_, t'), 0::subpos -> replace_pos t' subpos new_t
+  | Bind (_, _, t'), 0::subpos -> replace_pos t' subpos new_t
   | _ -> invalid_arg "index too high for subterm"
 
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
@@ -299,8 +300,8 @@ let rec replace_pos t pos new_t = match t.term, pos with
 let rec replace t ~old ~by = match t.term with
   | _ when t == old -> by
   | Var _ | BoundVar _ -> t
-  | Bind (s, t') ->
-    mk_bind ~old:t s t.sort (replace t' ~old ~by)
+  | Bind (s, a_sort, t') ->
+    mk_bind ~old:t s t.sort a_sort (replace t' ~old ~by)
   | Node (s, l) ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     mk_node ~old:t s t.sort l'
@@ -311,7 +312,7 @@ let at_cpos t pos =
     match t.term, pos with
     | _, 0 -> t
     | Node (_, l), _ -> get_subpos l (pos - 1)
-    | Bind (_, t'), _ -> recurse t' (pos-1)
+    | Bind (_, _, t'), _ -> recurse t' (pos-1)
     | _ -> assert false
   and get_subpos l pos =
     match l, pos with
@@ -330,7 +331,7 @@ let var_occurs x t =
   let rec check x t = match t.term with
   | Var _ -> x == t
   | BoundVar _ -> false
-  | Bind (_, t') -> check x t'
+  | Bind (_, _, t') -> check x t'
   | Node (_, l) -> check_list x l
   and check_list x l =
     match l with
@@ -362,7 +363,7 @@ let add_vars set t =
   let rec add set t = match t.term with
   | Var _ -> THashSet.add set t
   | BoundVar _ -> ()
-  | Bind (_, t') -> add set t'
+  | Bind (_, _, t') -> add set t'
   | Node (_, l) -> add_list set l
   and add_list set l = match l with
   | [] -> ()
@@ -392,7 +393,7 @@ let vars_seq seq =
 let depth t =
   let rec depth t = match t.term with
   | Var _ | BoundVar _ -> 1
-  | Bind (_, t') -> 1 + depth t'
+  | Bind (_, _, t') -> 1 + depth t'
   | Node (_, l) -> 1 + depth_list 0 l
   and depth_list m l = match l with
   | [] -> m
@@ -405,7 +406,7 @@ let depth t =
 let rec atomic t = match t.term with
   | _ when t.sort != bool_ -> true
   | Var _ | BoundVar _ -> true
-  | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic t'))
+  | Bind (s, _, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic t'))
   | Node (s, l) -> not (s == and_symbol || s == or_symbol
     || s == imply_symbol || s == not_symbol || s == eq_symbol)
 
@@ -413,7 +414,7 @@ let rec atomic t = match t.term with
 let rec atomic_rec t = match t.term with
   | _ when t.sort != bool_ -> true  (* first order *)
   | Var _ | BoundVar _ -> true
-  | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic_rec t'))
+  | Bind (s, _, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic_rec t'))
   | Node (s, l) ->
     not (s == and_symbol || s == or_symbol || s == imply_symbol
       || s == not_symbol || s == eq_symbol)
@@ -423,7 +424,7 @@ let rec atomic_rec t = match t.term with
 let compute_db_closed depth t =
   let rec recurse depth t = match t.term with
   | BoundVar i -> i < depth
-  | Bind (s, t') -> recurse (depth+1) t'
+  | Bind (s, _, t') -> recurse (depth+1) t'
   | Var _ -> true
   | Node (_, l) -> recurse_list depth l
   and recurse_list depth l = match l with
@@ -445,7 +446,7 @@ let db_closed t =
 let rec db_contains t n = match t.term with
   | BoundVar i -> i = n
   | Var _ -> false
-  | Bind (_, t') -> db_contains t' (n+1)
+  | Bind (_, _, t') -> db_contains t' (n+1)
   | Node (_, l) -> List.exists (fun t' -> db_contains t' n) l
 
 (** replace 0 by s in t *)
@@ -454,9 +455,9 @@ let db_replace t s =
   let rec replace depth s t = match t.term with
   | BoundVar n -> if n = depth then s else t
   | Var _ -> t
-  | Bind (symb, t') ->
+  | Bind (symb, a_sort, t') ->
     (* lift the De Bruijn to replace *)
-    mk_bind ~old:t symb t.sort (replace (depth+1) s t')
+    mk_bind ~old:t symb t.sort a_sort (replace (depth+1) s t')
   | Node (_, []) -> t
   | Node (f, l) ->
     mk_node ~old:t f t.sort (List.map (replace depth s) l)
@@ -475,8 +476,8 @@ let db_lift n t =
     | BoundVar i when i >= depth ->
       mk_bound_var (i+n) t.sort (* lift by n, term not captured *)
     | Var _ | BoundVar _ -> t
-    | Bind (s, t') ->
-      mk_bind ~old:t s t.sort (recurse (depth+1) t')  (* increase depth and recurse *)
+    | Bind (s, a_sort, t') ->
+      mk_bind ~old:t s t.sort a_sort (recurse (depth+1) t')  (* increase depth and recurse *)
     | Node (_, []) -> t
     | Node (s, l) ->
       let l' = List.map (recurse depth) l in
@@ -493,8 +494,8 @@ let db_unlift t =
     match t.term with
     | BoundVar i -> if i >= depth then mk_bound_var (i-1) t.sort else t
     | Node (_, []) | Var _ -> t
-    | Bind (s, t') ->
-      mk_bind ~old:t s t.sort (recurse (depth+1) t')
+    | Bind (s, a_sort, t') ->
+      mk_bind ~old:t s t.sort a_sort (recurse (depth+1) t')
     | Node (s, l) ->
       mk_node ~old:t s t.sort (List.map (recurse depth) l)
   in recurse 0 t
@@ -504,8 +505,8 @@ let db_from_term t t' =
   (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
   | Var _ -> if eq_term t t' then mk_bound_var depth t'.sort else t
-  | Bind (s, t') ->
-    mk_bind ~old:t s t.sort (replace (depth+1) t')
+  | Bind (s, a_sort, t') ->
+    mk_bind ~old:t s t.sort a_sort (replace (depth+1) t')
   | BoundVar _ -> t
   | Node (_, []) -> t
   | Node (s, l) -> mk_node ~old:t s t.sort (List.map (replace depth) l)
@@ -526,7 +527,7 @@ let look_db_sort i t =
   let rec lookup depth t = match t.term with
   | BoundVar i -> if i = depth then raise (FoundSort t.sort) else ()
   | Var _ -> ()
-  | Bind (_, t') -> lookup (depth+1) t'
+  | Bind (_, _, t') -> lookup (depth+1) t'
   | Node (_, l) -> List.iter (lookup depth) l
   in try lookup i t; None
      with FoundSort s -> Some s
@@ -541,17 +542,17 @@ let mk_lambda_var vars t =
   List.fold_right
     (fun var t ->
       let sort = t.sort <=. var.sort in
-      mk_lambda sort (db_from_var t var))
+      mk_lambda sort var.sort (db_from_var t var))
     vars t
 
 let mk_forall_var vars t =
   List.fold_right
-    (fun var t -> mk_forall (db_from_var t var))
+    (fun var t -> mk_forall var.sort (db_from_var t var))
     vars t
 
 let mk_exists_var vars t =
   List.fold_right
-    (fun var t -> mk_exists (db_from_var t var))
+    (fun var t -> mk_exists var.sort (db_from_var t var))
     vars t
 
 (** Compute the signature of the set of terms *)
@@ -559,7 +560,7 @@ let signature seq =
   (* explore a term *)
   let rec explore_term signature t = match t.term with
   | Var _ | BoundVar _ -> signature
-  | Bind (s, t') ->
+  | Bind (s, _, t') ->
     let sort = t.sort in
     let signature' = update_sig signature s sort in
     explore_term signature' t'
@@ -594,7 +595,7 @@ let close_forall t =
   List.fold_left
     (fun t var ->
       let sort = bool_ in
-      mk_bind forall_symbol sort (db_from_var t var))
+      mk_bind forall_symbol sort var.sort (db_from_var t var))
     t vars
 
 (** Bind all free variables by 'exists' *)
@@ -603,7 +604,7 @@ let close_exists t =
   List.fold_left
     (fun t var ->
       let sort = bool_ in
-      mk_bind exists_symbol sort (db_from_var t var))
+      mk_bind exists_symbol sort var.sort (db_from_var t var))
     t vars
 
 (** Transform binders and De Bruijn indexes into regular variables.
@@ -611,17 +612,11 @@ let close_exists t =
     names to De Bruijn indexes. *)
 let rec db_to_classic ?(varindex=ref 0) t =
   match t.term with
-  | Bind (s, t') ->
-    (* use a fresh variable, and convert to a named-variable representation *)
-    begin match look_db_sort 0 t' with
-    | None ->
-      db_to_classic (db_unlift t')  (* just remove binder (eta-reduction) *)
-    | Some sort ->  (* change representation of variable *)
-      let v = mk_var !varindex sort in
-      incr varindex;
-      let new_t = mk_node s t.sort [v; db_unlift (db_replace t' v)] in
-      db_to_classic ~varindex new_t
-    end
+  | Bind (s, a_sort, t') ->
+    let v = mk_var !varindex a_sort in
+    incr varindex;
+    let new_t = mk_node s t.sort [v; db_unlift (db_replace t' v)] in
+    db_to_classic ~varindex new_t
   | Node (_, []) | Var _ -> t
   | BoundVar _ ->  (* free variable *)
     let n = !varindex in
@@ -634,7 +629,7 @@ let rec db_to_classic ?(varindex=ref 0) t =
 let rec curry t =
   match t.term with
   | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind s t.sort (curry t')
+  | Bind (s, a_sort, t') -> mk_bind s t.sort a_sort (curry t')
   | Node (f, [a;b]) when f == at_symbol -> mk_at ~old:t (curry a) (curry b)
   | Node (f, []) -> t
   | Node (f, [t']) ->
@@ -656,7 +651,7 @@ let uncurry t =
   let rec uncurry t =
     match t.term with
     | Var _ | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind s t.sort (uncurry t')
+    | Bind (s, a_sort, t') -> mk_bind s t.sort a_sort (uncurry t')
     | Node (_, []) -> t  (* constant *)
     | Node (f, [a;b]) when f == at_symbol ->
       unfold_left a [uncurry b]  (* remove the '@' *)
@@ -684,8 +679,8 @@ let rec curryfied t =
 
 let rec is_fo t = match t.term with
   | Var _ | BoundVar _ -> true
-  | Bind (s, t') when s == lambda_symbol -> false
-  | Bind (_, t') -> is_fo t'
+  | Bind (s, _, t') when s == lambda_symbol -> false
+  | Bind (_, _, t') -> is_fo t'
   | Node (s, [a;b]) when s == at_symbol ->
     (* X @ _ is not first-order  *)
     not (is_var a) && is_fo a && is_fo b
@@ -696,8 +691,8 @@ let rec is_fo t = match t.term with
 let rec beta_reduce t =
   match t.term with
   | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind ~old:t s t.sort (beta_reduce t')
-  | Node (a, [{term=Bind (s, t1)} as fun_; t2])
+  | Bind (s, a_sort, t') -> mk_bind ~old:t s t.sort a_sort (beta_reduce t')
+  | Node (a, [{term=Bind (s, _, t1)} as fun_; t2])
     when a == at_symbol && s == lambda_symbol ->
     (* a beta-redex! Fire!! *)
     let _ = fun_.sort @@ [t2.sort] in
@@ -712,12 +707,12 @@ let rec beta_reduce t =
 let rec eta_reduce t =
   match t.term with
   | Var _ | BoundVar _ -> t
-  | Bind (s, {term=Node (a, [t'; {term=BoundVar 0} as x])})
+  | Bind (s, _, {term=Node (a, [t'; {term=BoundVar 0} as x])})
     when s == lambda_symbol && not (db_contains t' 0) ->
     let _ = t.sort @@ [x.sort] in
     eta_reduce (db_unlift t')  (* remove the lambda and variable *)
-  | Bind (s, t') ->
-    mk_bind ~old:t s t.sort (eta_reduce t')
+  | Bind (s, a_sort, t') ->
+    mk_bind ~old:t s t.sort a_sort (eta_reduce t')
   | Node (f, l) ->
     mk_node ~old:t f t.sort (List.map eta_reduce l)
 
@@ -729,16 +724,8 @@ let rec eta_reduce t =
     For instance (@ are omitted), [eta_lift f(a,g @ b,c) g] will return
     the term [^[X]: f(a, X @ b, c)] *)
 let eta_lift t sub_t =
-  (* replaces [sub_t] by a De Bruijn variable *)
-  let rec replace depth t =
-    match t.term with
-    | _ when t == sub_t -> mk_bound_var depth t.sort
-    | Var _ | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind ~old:t s t.sort (replace (depth+1) t')
-    | Node (f, l) -> mk_node ~old:t f t.sort (List.map (replace depth) l)
-  in
   let sort = t.sort <=. sub_t.sort in
-  mk_lambda sort (db_lift 1 (replace 0 t))
+  mk_lambda sort sub_t.sort (db_from_term t sub_t)
 
 (** {2 Some AC-utils} *)
 
@@ -762,7 +749,7 @@ let ac_normal_form ?(is_ac=fun s -> has_attr attr_ac s)
   let rec normalize t = match t.term with
     | Var _ -> t
     | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind ~old:t s t.sort (normalize t')
+    | Bind (s, a_sort, t') -> mk_bind ~old:t s t.sort a_sort (normalize t')
     | Node (f, ([_;_] as l)) when is_ac f ->
       let l = flatten_ac f l in
       let l = List.map normalize l in
@@ -890,11 +877,12 @@ let pp_term = ref (pp_term_debug :> pprinter_term)
 let rec to_json t =
   match t.term with
   | BoundVar i ->
-    `List [`String "bound"; `Int i; Symbols.sort_to_json t.sort]
+    `List [`String "bound"; `Int i; sort_to_json t.sort]
   | Var i ->
-    `List [`String "var"; `Int i; Symbols.sort_to_json t.sort]
-  | Bind (s, t') ->
-    `List [`String "bind"; Symbols.to_json s; Symbols.sort_to_json t.sort; to_json t']
+    `List [`String "var"; `Int i; sort_to_json t.sort]
+  | Bind (s, a_sort, t') ->
+    `List [`String "bind"; Symbols.to_json s;
+      sort_to_json t.sort; sort_to_json a_sort; to_json t']
   | Node (f, l) ->
     let l' = `List (List.map to_json l) in
     let f' = Symbols.to_json f in
@@ -905,14 +893,15 @@ let of_json json =
   let rec of_json json = 
     match json with
     | `List [`String "bound"; `Int i; sort] ->
-      let sort = Symbols.sort_of_json sort in mk_bound_var i sort
+      let sort = sort_of_json sort in mk_bound_var i sort
     | `List [`String "var"; `Int i; sort] ->
-      let sort = Symbols.sort_of_json sort in mk_var i sort
-    | `List [`String "bind"; s; sort; t'] ->
+      let sort = sort_of_json sort in mk_var i sort
+    | `List [`String "bind"; s; sort; a_sort; t'] ->
       let s = Symbols.of_json s in
-      let sort = Symbols.sort_of_json sort in
+      let sort = sort_of_json sort in
+      let a_sort = sort_of_json a_sort in
       let t' = of_json t' in
-      mk_bind s sort t'
+      mk_bind s sort a_sort t'
     | `List [`String "node"; f; sort; `List l] ->
       let f = Symbols.of_json f in
       let sort = Symbols.sort_of_json sort in

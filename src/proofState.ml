@@ -130,7 +130,7 @@ let update_with_clause op acc eligible ~subterms ~both_sides hc =
   and process_term op acc t pos =
     match t.term with
     | Var _ | BoundVar _ -> acc  (* variables are never indexed *)
-    | Bind (s, t') ->
+    | Bind (s, _, t') ->
       (* apply the operation on the term itself *)
       let acc = op acc t (hc, List.rev pos, t) in
       if subterms then process_term op acc t' (0::pos) else acc

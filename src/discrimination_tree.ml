@@ -64,7 +64,7 @@ let path_string_of t =
   let rec aux arity t acc = match t.term with
     | Var i -> (* assert (arity = 0); *) Variable :: acc
     | BoundVar _ -> Variable :: acc
-    | Bind (s, t') ->
+    | Bind (s, _, t') ->
       let acc = Constant (s, 1) :: acc in
       aux 0 t' acc
     | Node (a, []) -> (Constant (a, arity)) :: acc

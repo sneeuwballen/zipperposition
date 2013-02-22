@@ -76,7 +76,11 @@ val get_flag : int -> term -> bool
 
 val mk_var : ?old:term -> int -> sort -> term       (** Create a variable. The index must be >= 0 *)
 val mk_bound_var : ?old:term -> int -> sort -> term (** De Bruijn index, must be >= 0 *)
-val mk_bind : ?old:term -> symbol -> sort -> term -> term
+
+val mk_bind : ?old:term -> symbol -> sort -> sort -> term -> term
+  (** [mk_bind s r a t] binds the De Bruijn 0 in [t] with type [a].
+      The resulting term has type [r] *)
+
 val mk_node : ?old:term -> symbol -> sort -> term list -> term
 val mk_const : ?old:term -> symbol -> sort -> term
 
@@ -91,9 +95,9 @@ val mk_equiv : term -> term -> term
 val mk_xor : term -> term -> term
 val mk_eq : term -> term -> term
 val mk_neq : term -> term -> term
-val mk_lambda : sort -> term -> term        (** Like mk_bind, the result sort is needed *)
-val mk_forall : term -> term
-val mk_exists : term -> term
+val mk_lambda : sort -> sort -> term -> term  (** Like mk_bind, the result sort is needed *)
+val mk_forall : sort -> term -> term
+val mk_exists : sort -> term -> term
 
 val mk_at : ?old:term -> term -> term -> term   (** t1 t2 -> t1 @ t2 *)
 

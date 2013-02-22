@@ -47,7 +47,7 @@ let rec print_peano_nice formatter t =
   with Failure _ ->
     match t.term with
     | Var _ | BoundVar _ -> !T.pp_term#pp formatter t
-    | Bind (s, t') ->
+    | Bind (s, _, t') ->
       Format.fprintf formatter "%a(%a)" pp_symbol s print_peano_nice t'
     | Node (h, l) ->
       Format.fprintf formatter "@[<h>%a(%a)@]" !T.pp_term#pp (T.mk_const h univ_ (* ugly *))

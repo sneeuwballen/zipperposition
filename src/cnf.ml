@@ -69,13 +69,13 @@ let rec simplify_term t =
   if T.get_flag T.flag_simplified t then t else  (* maybe it's already simplified *)
   match t.term with
   | Var _ | Node (_, []) | BoundVar _ -> (mark_simplified t; t)
-  | Bind (f, t') when not (T.db_contains t' 0) ->
+  | Bind (f, _, t') when not (T.db_contains t' 0) ->
     simplify_term t'  (* eta-reduction: binder binds nothing, remove it *)
-  | Bind (f, t') -> T.mk_bind ~old:t f t.sort (simplify_term t')
-  | Node (s, [{term=Bind (s', t')}]) when s == not_symbol && s' == forall_symbol ->
-    simplify_term (T.mk_exists (T.mk_not t'))  (* not forall t -> exists (not t) *)
-  | Node (s, [{term=Bind (s', t')}]) when s == not_symbol && s' == exists_symbol ->
-    simplify_term (T.mk_forall (T.mk_not t'))  (* not exists t -> forall (not t) *)
+  | Bind (f, a_sort, t') -> T.mk_bind ~old:t f t.sort a_sort (simplify_term t')
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s == not_symbol && s' == forall_symbol ->
+    simplify_term (T.mk_exists a_sort (T.mk_not t'))  (* not forall t -> exists (not t) *)
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s == not_symbol && s' == exists_symbol ->
+    simplify_term (T.mk_forall a_sort (T.mk_not t'))  (* not exists t -> forall (not t) *)
   | Node (s, [{term=Node (s', [t'])}]) when s == not_symbol && s' == not_symbol ->
     simplify_term t'  (* double negation *)
   | Node (s, [t']) when s == not_symbol && t' == T.true_term ->
@@ -153,7 +153,7 @@ let rec miniscope_term t =
   let t = simplify_term t in
   (* recursive miniscoping *)
   match t.term with
-  | Bind (s, {term=Node (s', l)})
+  | Bind (s, a_sort, {term=Node (s', l)})
     when (s == forall_symbol || s == exists_symbol) && (s' == and_symbol || s' == or_symbol) ->
     (* Q x. a and/or b -> (Q x. a) and/or b  if x \not\in vars(b) *)
     let a, b = List.partition (fun f -> T.db_contains f 0) l in
@@ -164,14 +164,14 @@ let rec miniscope_term t =
         let a =
           if ((s == forall_symbol && s' == and_symbol)
             || (s == exists_symbol && s' == or_symbol))
-          then mk_n_ary s' (List.map (fun t -> miniscope_term (T.mk_bind s bool_ t)) a)
-          else T.mk_bind s bool_ (mk_n_ary s' a)
+          then mk_n_ary s' (List.map (fun t -> miniscope_term (T.mk_bind s bool_ a_sort t)) a)
+          else T.mk_bind s bool_ a_sort (mk_n_ary s' a)
         in
         (* some subformulas do not contain x, put them outside of quantifier *)
         let b = mk_n_ary s' (List.map (fun t -> miniscope_term (T.db_unlift t)) b) in
         simplify_term (T.mk_node s' bool_ [a; b])
       else t
-  | Bind (_, _) -> t
+  | Bind (_, _, _) -> t
   | BoundVar _ | Var _ | Node _ -> t
 
 (** Apply miniscoping transformation to the clause *)
@@ -199,7 +199,7 @@ let rec nnf t =
   if t.sort != bool_ then t else
   match t.term with
   | Var _ | Node (_, []) | BoundVar _ -> t
-  | Bind (f, t') -> T.mk_bind f t.sort (nnf t')
+  | Bind (f, a_sort, t') -> T.mk_bind f t.sort a_sort (nnf t')
   | Node (s, [{term=Node (s', [a; b])}]) when s = not_symbol && s' = and_symbol ->
     nnf (T.mk_or (T.mk_not a) (T.mk_not b))  (* de morgan *)
   | Node (s, [{term=Node (s', [a; b])}]) when s = not_symbol && s' = or_symbol ->
@@ -219,10 +219,10 @@ let rec nnf t =
     nnf (T.mk_or
       (T.mk_and a (T.mk_not b))
       (T.mk_and b (T.mk_not a)))
-  | Node (s, [{term=Bind (s', t')}]) when s = not_symbol && s' = forall_symbol ->
-    nnf (T.mk_exists (T.mk_not t')) (* not forall -> exists not *)
-  | Node (s, [{term=Bind (s', t')}]) when s = not_symbol && s' = exists_symbol ->
-    nnf (T.mk_forall (T.mk_not t')) (* not exists -> forall not *)
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s = not_symbol && s' = forall_symbol ->
+    nnf (T.mk_exists a_sort (T.mk_not t')) (* not forall -> exists not *)
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s = not_symbol && s' = exists_symbol ->
+    nnf (T.mk_forall a_sort (T.mk_not t')) (* not exists -> forall not *)
   | Node (s, [{term=Node (s', [t])}]) when s = not_symbol && s' = not_symbol ->
     nnf t (* double negation *)
   | Node (s, l) ->
@@ -234,23 +234,17 @@ let rec skolemize ~ord ~var_index t = match t.term with
   | Var _ | Node (_, []) | BoundVar _ -> t
   | Node (s, [{term=Node (s', [t])}]) when s = not_symbol && s' = not_symbol ->
     skolemize ~ord ~var_index t (* double negation *)
-  | Bind (s, t') when s = forall_symbol ->
+  | Bind (s, a_sort, t') when s = forall_symbol ->
     (* a fresh variable *)
-    let sort = match T.look_db_sort 0 t with
-      | None -> univ_
-      | Some s -> s in
-    let v = T.mk_var (!var_index) sort in
+    let v = T.mk_var (!var_index) a_sort in
     incr var_index;
     let new_t' = T.db_unlift (T.db_replace t' v) in
     skolemize ~ord ~var_index new_t' (* remove forall *)
-  | Bind (s, t') when s = exists_symbol ->
+  | Bind (s, a_sort, t') when s = exists_symbol ->
     (* make a skolem symbol *)
-    let sort = match T.look_db_sort 0 t with
-      | None -> univ_
-      | Some s -> s in
-    let new_t' = !T.skolem ~ord t' sort in
+    let new_t' = !T.skolem ~ord t' a_sort in
     skolemize ~ord ~var_index new_t' (* remove forall *)
-  | Bind (s, t') -> T.mk_bind s t.sort (skolemize ~ord ~var_index t')
+  | Bind (s, a_sort, t') -> T.mk_bind s t.sort a_sort (skolemize ~ord ~var_index t')
   | Node (s, l) -> T.mk_node s t.sort (List.map (skolemize ~ord ~var_index) l)
 
 (** reduction to cnf using De Morgan laws. Returns a list of list of terms *)

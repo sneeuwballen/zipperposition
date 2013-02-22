@@ -179,12 +179,27 @@ let const_symbol = mk_symbol "$$const_magic_cookie"
 (** pseudo symbol to locate numbers in the precedence *)
 let num_symbol = mk_symbol "$$num_magic_cookie"
 
+let pp_symbol formatter s = match s with
+  | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
+  | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
+  | _ when s == num_symbol -> Format.pp_print_string formatter "[num]"
+  | _ when s == const_symbol -> Format.pp_print_string formatter "[const]"
+  | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
+
 (** {2 sorts} *)
 
 type sort =
   | Sort of string  (** Atomic sort *)
   | Fun of sort * sort list (** Function sort *)
   (** simple types *)
+
+let rec pp_sort formatter sort = match sort with
+  | Sort s -> Format.pp_print_string formatter s
+  | Fun (s, [s']) ->
+    Format.fprintf formatter "%a > %a" pp_sort s' pp_sort s
+  | Fun (s, l) ->
+    Format.fprintf formatter "(%a) > %a"
+      (Sequence.pp_seq ~sep:" * " pp_sort) (Sequence.of_list l) pp_sort s
 
 (** exception raised when sorts are mismatched *)
 exception SortError of string
@@ -262,10 +277,41 @@ let arity = function
 let mk_fresh_const i =
   mk_symbol ~attrs:attr_fresh_const ("$$const_" ^ string_of_int i)
 
+(** {2 Signature of a set of symbols} *)
+
 (** A signature maps symbols to their sort *)
 type signature = sort SMap.t
 
 let empty_signature = SMap.empty
+
+(** Add a symbol to the signature, failing if it is incompatible *)
+let add_signature signature symb sort =
+  try let sort' = SMap.find symb signature in
+      if sort == sort'
+        then signature
+        else failwith (
+          let b = Buffer.create 20 in
+          Format.bprintf b "incompatible sorts %a, %a" pp_sort sort pp_sort sort';
+          Buffer.contents b)
+  with Not_found -> SMap.add symb sort signature
+
+let sig_to_seq signature = SMapSeq.to_seq signature
+
+let sig_of_seq ?(signature=empty_signature) seq =
+  Sequence.fold
+    (fun s (symb,sort) -> add_signature s symb sort)
+    signature seq
+
+let pp_signature formatter signature =
+  Format.fprintf formatter "@[<h>%a@]"
+    (Sequence.pp_seq
+      (fun formatter (s, sort) ->
+        Format.fprintf formatter "%a:%a" pp_symbol s pp_sort sort))
+    (sig_to_seq signature)
+
+let pp_precedence formatter symbols =
+  Format.fprintf formatter "@[<h>%a@]"
+    (Sequence.pp_seq ~sep:" > " pp_symbol) (Sequence.of_list symbols)
 
 let table =
   [true_symbol, bool_;
@@ -296,12 +342,6 @@ let base_symbols = List.fold_left (fun set (s, _) -> SSet.add s set) SSet.empty 
 
 let is_base_symbol s = SSet.mem s base_symbols
 
-(** Add a symbol to the signature, failing if it is incompatible *)
-let add_signature signature symb sort =
-  try let sort' = SMap.find symb signature in
-      if sort == sort' then signature else failwith "imcompatible sort"
-  with Not_found -> SMap.add symb sort signature
-
 (** extract the list of symbols from the complete signature *)
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
@@ -318,13 +358,6 @@ let merge_signatures s1 s2 =
     s1 s2
 
 (** {2 Conversions and printing} *)
-
-let sig_to_seq signature = SMapSeq.to_seq signature
-
-let sig_of_seq ?(signature=empty_signature) seq =
-  Sequence.fold
-    (fun s (symb,sort) -> add_signature s symb sort)
-    signature seq
 
 module Json = Yojson.Basic
 
@@ -368,27 +401,3 @@ let sig_of_json ?(signature=empty_signature) json =
   let l = Json.Util.to_list json in
   let seq = Sequence.map pair_of_json (Sequence.of_list l) in
   sig_of_seq ~signature seq
-
-let pp_symbol formatter s = match s with
-  | _ when s == db_symbol -> Format.pp_print_string formatter "[db]"
-  | _ when s == split_symbol -> Format.pp_print_string formatter "[split]"
-  | _ when s == num_symbol -> Format.pp_print_string formatter "[num]"
-  | _ when s == const_symbol -> Format.pp_print_string formatter "[const]"
-  | _ -> Format.pp_print_string formatter (name_symbol s) (* default *)
-
-let rec pp_sort formatter sort = match sort with
-  | Sort s -> Format.pp_print_string formatter s
-  | Fun (s, l) ->
-    Format.fprintf formatter "(%a) > %a"
-      (Sequence.pp_seq ~sep:" * " pp_sort) (Sequence.of_list l) pp_sort s
-
-let pp_signature formatter signature =
-  Format.fprintf formatter "@[<h>%a@]"
-    (Sequence.pp_seq
-      (fun formatter (s, sort) ->
-        Format.fprintf formatter "%a:%a" pp_symbol s pp_sort sort))
-    (sig_to_seq signature)
-
-let pp_precedence formatter symbols =
-  Format.fprintf formatter "@[<h>%a@]"
-    (Sequence.pp_seq ~sep:" > " pp_symbol) (Sequence.of_list symbols)

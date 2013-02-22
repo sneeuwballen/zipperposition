@@ -150,7 +150,7 @@ rule token =
       | "lemma"                      { update_token (Lexing.lexeme lexbuf); LEMMA }
       | "axiom"                      { update_token (Lexing.lexeme lexbuf); AXIOM }
       | "if"                         { update_token (Lexing.lexeme lexbuf); IF }
-      | "and"                        { update_token (Lexing.lexeme lexbuf); AND }
+      | "and"                        { update_token (Lexing.lexeme lexbuf); AND_THEN }
       | "gc"                         { update_token (Lexing.lexeme lexbuf); GC }
       | "with"                       { update_token (Lexing.lexeme lexbuf); WITH }
 

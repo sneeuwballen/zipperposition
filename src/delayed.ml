@@ -144,13 +144,13 @@ let eliminate_lits hc =
     | Node (s, [a; b]) when s == or_symbol && not sign -> alpha_eliminate ~ord a false b false
     | Node (s, [a; b]) when s == imply_symbol && sign -> beta_eliminate ~ord a false b true
     | Node (s, [a; b]) when s == imply_symbol && not sign -> alpha_eliminate ~ord a true b false
-    | Bind (s, t) when s == forall_symbol && sign ->
+    | Bind (s, _, t) when s == forall_symbol && sign ->
       gamma_eliminate ~ord offset t true
-    | Bind (s, t) when s == forall_symbol && not sign ->
+    | Bind (s, _, t) when s == forall_symbol && not sign ->
       delta_eliminate ~ord (T.mk_not t) true
-    | Bind (s, t) when s == exists_symbol && sign ->
+    | Bind (s, _, t) when s == exists_symbol && sign ->
       delta_eliminate ~ord t true
-    | Bind (s, t) when s == exists_symbol && not sign ->
+    | Bind (s, _, t) when s == exists_symbol && not sign ->
       gamma_eliminate ~ord offset t false
     | Bind _ | Node _ -> keep eqn
   (* eliminate equivalence *)

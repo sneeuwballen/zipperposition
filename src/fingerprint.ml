@@ -40,9 +40,9 @@ type fingerprint_fun = term -> feature list
 let rec gfpf pos t = match pos, t.term with
   | [], Var _ -> A
   | [], BoundVar _ -> S db_symbol
-  | [], Bind (s, _) -> S s
+  | [], Bind (s, _, _) -> S s
   | [], Node (s, _) -> S s
-  | 0::pos', Bind (_, t') -> gfpf pos' t'  (* recurse in subterm *)
+  | 0::pos', Bind (_, _, t') -> gfpf pos' t'  (* recurse in subterm *)
   | i::pos', Node (_, l) ->
     (try gfpf pos' (Utils.list_get l i)  (* recurse in subterm *)
     with Not_found -> N)  (* not a position in t *)
