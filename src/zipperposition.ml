@@ -330,8 +330,8 @@ let print_kb ~kb =
 let clear_kb params =
   let file = params.param_kb in
   Utils.with_lock_file file
-    (fun () ->  (* write an empty KB to file *)
-      Meta.KB.save ~file Meta.KB.empty);
+    (fun () ->  (* remove file *)
+      Unix.unlink file);
   exit 0
 
 let () =

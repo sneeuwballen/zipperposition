@@ -353,17 +353,20 @@ let of_json kb (json : json Stream.t) : t =
 (** {2 Saving/restoring KB from disk} *)
 
 let save ~file kb =
-  let out = Gzip.open_out file in
-  Gc.finalise Gzip.close_out out;
-  let data = Json.stream_to_string (to_json kb) in
-  Gzip.output out data 0 (String.length data);
-  Gzip.flush out;
-  Gzip.close_out out
+  try
+    let out = Gzip.open_out file in
+    let data = Json.stream_to_string (to_json kb) in
+    Utils.debug 1 "%% %d bytes for storing the raw KB" (String.length data);
+    Gzip.output out data 0 (String.length data);
+    Utils.debug 1 "%% wrote KB";
+    Gzip.close_out out
+  with Gzip.Error e | Zlib.Error (e, _) ->
+    Utils.debug 0 "%% error trying to write KB to %s: %s" file e;
+    ()
 
 let restore ~file kb =
   try
     let input = Gzip.open_in file in
-    Gc.finalise Gzip.close_in input;
     (* parse JSON steam *)
     let lexbuf = Lexing.from_function (fun s len -> Gzip.input input s 0 len) in
     let lexer = Json.init_lexer () in
@@ -371,7 +374,7 @@ let restore ~file kb =
     let kb = of_json kb stream in
     Gzip.close_in input;
     kb
-  with Zlib.Error (e,_) ->
+  with Gzip.Error e | Zlib.Error (e, _) ->
     Utils.debug 0 "%% error trying to read KB from %s: %s" file e;
     kb
     
