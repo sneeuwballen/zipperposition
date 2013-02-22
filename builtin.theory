@@ -99,10 +99,10 @@ theory commutative_ring(mult, one, add, zero, add_inverse) is
 theory bool_algebra(add, zero, mult, one, inverse) is
   commutative(add) and
   commutative(mult) and
-  left_inverse(add, inverse, one) and     % X or not(X) = true
-  right_inverse(add, inverse, one) and
-  left_inverse(mult, inverse, zero) and   % X and not(X) = false
-  right_inverse(mult, inverse, zero) and
+  left_inverse(add, one, inverse) and     % X or not(X) = true
+  right_inverse(add, one, inverse) and
+  left_inverse(mult, zero, inverse) and   % X and not(X) = false
+  right_inverse(mult, zero, inverse) and
   left_distributive(mult, add) and        % X or (Y and Z) = XorY and XorZ
   right_distributive(mult, add) and
   left_distributive(add, mult) and        % X and (Y or Z) = XandY or XandZ
@@ -165,7 +165,7 @@ gc f(f(X,Y),Z)=f(X,f(Y,Z)) and
    f(X,f(Y,Z))=f(Y,f(Z,X)) and
    f(X,e) = X and
    f(e,X) = X
-   with rpo6()
+   with rpo6(f)
    if monoid(f,e).
 
 % vim:syntax=ocaml
