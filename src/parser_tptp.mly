@@ -144,11 +144,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token LEMMA
 %token AXIOM
 %token IF
-%token AND
+%token AND_THEN
 %token GC
 %token WITH
 
 %token UNKNOWN
+
+%left AND
+%left OR
 
 %start parse_file
 %type <Types.sourced_term list * string list> parse_file
@@ -396,7 +399,7 @@ plain_atom:
         (* Some type inference now *)
         (match t.term with
         | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
-        | Bind (s, l) -> set_sort s t.sort
+        | Bind (s, _, l) -> set_sort s t.sort
         | Var _ | BoundVar _ -> failwith "variable at top level");
         t
       }
@@ -426,7 +429,7 @@ system_atom:
         (* Some type inference now *)
         (match t.term with
         | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
-        | Bind (s, t') -> set_sort s t.sort
+        | Bind (s, _, t') -> set_sort s t.sort
         | Var _ | BoundVar _ -> failwith "variable at top level");
         t
       }
@@ -637,16 +640,16 @@ meta_lemma_def:
       let premises = $4 in
       Meta.ParseUtils.mk_lemma_term ~table:meta_table t premises
     }
-  | LEMMA meta_named IF meta_premises DOT
-    { let named = $2 in
-      let premises = $4 in
+  | meta_named IF meta_premises DOT
+    { let named = $1 in
+      let premises = $3 in
       Meta.ParseUtils.mk_lemma_named ~table:meta_table named premises
     }
 
 meta_named_def:
-  | meta_named IS meta_term DOT
+  | meta_named IS AXIOM meta_term DOT
     { let named = $1 in
-      let t = $3 in
+      let t = $4 in
       Meta.ParseUtils.mk_named ~table:meta_table named t
     }
 
@@ -669,10 +672,10 @@ meta_gc_def:
     }
 
 meta_named:
-  | AXIOM LOWER_WORD
-    { ($2, []) }
-  | AXIOM LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
-    { ($2, $4) }
+  | LOWER_WORD
+    { ($1, []) }
+  | LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { ($1, $3) }
 
 meta_theory:
   | THEORY LOWER_WORD
@@ -680,18 +683,26 @@ meta_theory:
   | THEORY LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
     { ($2, $4) }
 
+meta_theory_or_named:
+  | LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { ($1, $3) }
+
 meta_premises:
   | meta_premise { [$1] }
-  | meta_premise AND meta_premises { $1 :: $3 }
+  | meta_premise AND_THEN meta_premises { $1 :: $3 }
 
 meta_premise:
-  | meta_theory { `Theory $1 }
-  | meta_named { `Named $1 }
-  | meta_term { `Term $1 }
+  | AXIOM meta_term { `Term $2 }
+  | meta_theory_or_named
+    { let name, args = $1 in  (* could be a theory or an axiom *)
+      match Meta.ParseUtils.lookup ~table:meta_table name with
+      | Meta.ParseUtils.TableNamed _ -> `Named (name, args)
+      | Meta.ParseUtils.TableTheory _ -> `Theory (name, args)
+    }
 
 meta_terms:
   | meta_term { [$1] }
-  | meta_term AND meta_terms { $1 :: $3 }
+  | meta_term AND_THEN meta_terms { $1 :: $3 }
 
 meta_term:
   | fof_formula
