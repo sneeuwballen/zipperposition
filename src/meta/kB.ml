@@ -63,7 +63,7 @@ let rec pp_definition formatter definition =
   | Named (name, p) ->
     Format.fprintf formatter "@[<h>%s is %a@]." name Pattern.pp_pattern p
   | Lemma ((concl, vars), premises) ->
-    Format.fprintf formatter "@[<hov2>@[<h>%a(%a)@] if@ %a@]"
+    Format.fprintf formatter "@[<hov2>lemma @[<h>%a(%a)@] if@ %a@]"
       Pattern.pp_pattern concl
       (Utils.pp_list !T.pp_term#pp) vars
       (Utils.pp_list pp_premise) premises

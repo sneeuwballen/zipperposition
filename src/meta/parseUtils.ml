@@ -184,7 +184,9 @@ let mk_lemma_term ~table t premises =
   let pattern, consts = Pattern.of_term (T.curry t) in
   let args = consts_to_terms s_to_t consts in
   (* build lemma *)
-  KB.Lemma ((pattern, args), premises)
+  let lemma = KB.Lemma ((pattern, args), premises) in
+  Utils.debug 1 "%% @[<hov2>%a@]" KB.pp_definition lemma;
+  lemma
 
 (** Build a lemma that has a named conclusion [named] *)
 let mk_lemma_named ~table (name,symbols) premises =
@@ -196,7 +198,9 @@ let mk_lemma_named ~table (name,symbols) premises =
   let pattern = lookup_named ~table name in
   let args = symbs_to_terms s_to_t symbols in
   (* build lemma *)
-  KB.Lemma ((pattern, args), premises)
+  let lemma = KB.Lemma ((pattern, args), premises) in
+  Utils.debug 1 "%% @[<hov2>%a@]" KB.pp_definition lemma;
+  lemma
 
 (** Build the definition of a named pattern by a formula *)
 let mk_named ~table (name, (symbols : symbol list)) t =
