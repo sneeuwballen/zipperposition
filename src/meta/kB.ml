@@ -107,17 +107,32 @@ and pp_fact formatter fact =
       (List.map (fun (p,args) -> Pattern.instantiate p args) gc.gc_eqns)
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
 
-let definition_to_json definition : json =
+let rec definition_to_json definition : json =
   match definition with
-  | _ -> `Null (* TODO *)
-  (*
-  | Lemma (concl,premises) ->
-    `Assoc ["conclusion", Pattern.to_json concl;
-            "premises", `List (List.map Pattern.to_json premises);]
-  | Theory ((th, args), premises) ->
-    `List (`String "theory" :: `String th :: List.map T.to_json args)
-  | _ -> failwith "todo: definition to json"
-  *)
+  | Named (name, pat) ->
+    `List [`String "named"; `String name; Pattern.to_json pat]
+  | Theory ((name, args), premises) ->
+    `List (`String "theory" :: `String name :: `List (List.map T.to_json args) ::
+          List.map premise_to_json premises)
+  | Lemma ((pat, args), premises) ->
+    `List (`String "lemma" :: `List (Pattern.to_json pat :: List.map T.to_json args) ::
+          List.map premise_to_json premises)
+  | GC (gc, premises) ->
+      `Assoc ["gc", `Bool true;
+              "vars", `List (List.map T.to_json gc.gc_vars);
+              "ord", `String gc.gc_ord;
+              "prec", `List (List.map T.to_json gc.gc_prec);
+              "eqns", `List (List.map
+                (fun (pat, args) -> `List (Pattern.to_json pat :: List.map T.to_json args))
+                gc.gc_eqns);]
+and premise_to_json (premise : premise) : json =
+  match premise with
+  | IfNamed (name, args) ->
+    `List (`String "named" :: `String name :: List.map T.to_json args)
+  | IfTheory (name, args) ->
+    `List (`String "theory" :: `String name :: List.map T.to_json args)
+  | IfPattern (pat, args) ->
+    `List (`String "pattern" :: Pattern.to_json pat :: List.map T.to_json args)
 
 let definition_of_json (json : json) : definition =
   match json with
@@ -326,18 +341,37 @@ let of_seq kb definitions =
 let pp formatter kb =
   Utils.pp_list pp_definition formatter kb 
 
-let to_json kb : json = `List (List.map definition_to_json kb)
+let to_json kb : json Stream.t =
+  let definitions = List.map definition_to_json kb in
+  Stream.of_list definitions
 
-let of_json kb (json : json) : t =
-  let l = Json.Util.to_list json in
-  of_seq kb (Sequence.map definition_of_json (Sequence.of_list l))
+let of_json kb (json : json Stream.t) : t =
+  let seq = Sequence.of_stream json in
+  let seq = Sequence.map definition_of_json seq in
+  of_seq kb seq
 
 (** {2 Saving/restoring KB from disk} *)
 
 let save ~file kb =
-  let json = to_json kb in
-  Json.to_file file json
+  let out = Gzip.open_out file in
+  Gc.finalise Gzip.close_out out;
+  let data = Json.stream_to_string (to_json kb) in
+  Gzip.output out data 0 (String.length data);
+  Gzip.flush out;
+  Gzip.close_out out
 
 let restore ~file kb =
-  let json = Json.from_file file in
-  of_json kb json
+  try
+    let input = Gzip.open_in file in
+    Gc.finalise Gzip.close_in input;
+    (* parse JSON steam *)
+    let lexbuf = Lexing.from_function (fun s len -> Gzip.input input s 0 len) in
+    let lexer = Json.init_lexer () in
+    let stream : json Stream.t = Json.stream_from_lexbuf lexer lexbuf in
+    let kb = of_json kb stream in
+    Gzip.close_in input;
+    kb
+  with Zlib.Error (e,_) ->
+    Utils.debug 0 "%% error trying to read KB from %s: %s" file e;
+    kb
+    

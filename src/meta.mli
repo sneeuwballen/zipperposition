@@ -181,8 +181,8 @@ module KB : sig
   val of_seq : t -> definition Sequence.t -> t
 
   val pp : Format.formatter -> t -> unit
-  val to_json : t -> json
-  val of_json : t -> json -> t
+  val to_json : t -> json Stream.t
+  val of_json : t -> json Stream.t -> t
 
   (** {2 Saving/restoring from/to disk} *)
 

@@ -177,7 +177,7 @@ let initial_kb params =
   (* parse file, with a lock *)
   let kb = Utils.with_lock_file file
     (fun () ->
-      let kb = try parse_theory_file kb file
+      let kb = try Meta.KB.restore ~file kb
                with Yojson.Json_error _ -> Meta.KB.empty in
       (* load required files *)
       let kb = List.fold_left parse_theory_file kb params.param_kb_load in
