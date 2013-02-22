@@ -247,12 +247,16 @@ module ParseUtils : sig
   (** {2 Table of definitions} *)
 
   type table
+  and table_val =
+    | TableNamed of Pattern.t
+    | TableTheory of sort list
 
   val create : unit -> table
   val clear : table -> unit
 
   val lookup_th : table:table -> string -> sort list
   val lookup_named : table:table -> string -> Pattern.t
+  val lookup : table:table -> string -> table_val
 
   val define_th : table:table -> string -> sort list -> unit
   val define_named : table:table -> string -> Pattern.t -> unit

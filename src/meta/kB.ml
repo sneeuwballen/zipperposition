@@ -61,28 +61,51 @@ and gnd_convergent_spec = {
 let rec pp_definition formatter definition =
   match definition with
   | Named (name, p) ->
-    Format.fprintf formatter "@[<h>%s is %a]@." name Pattern.pp_pattern p
+    Format.fprintf formatter "@[<h>%s is %a@]." name Pattern.pp_pattern p
   | Lemma ((concl, vars), premises) ->
-    Format.fprintf formatter "@[<hov2>%a(%a) if@ %a@]"
+    Format.fprintf formatter "@[<hov2>@[<h>%a(%a)@] if@ %a@]"
       Pattern.pp_pattern concl
       (Utils.pp_list !T.pp_term#pp) vars
       (Utils.pp_list pp_premise) premises
   | Theory ((name,args), premises) ->
-    Format.fprintf formatter "@[<hov2>theory %s(%a) if@ %a@]" name
+    Format.fprintf formatter "@[<hov2>@[<h>theory %s(%a)@] if@ %a@]" name
       (Utils.pp_list !T.pp_term#pp) args
       (Utils.pp_list pp_premise) premises
   | GC (gc, premises) ->
     Format.fprintf formatter
-      "@[<hov2>gc %a@ @[<h>with %s(%a) if@ %a@]@]"
+      "@[<hov2>gc @[<hov2>%a@]@ @[<h>with %s(%a) if@ %a@]@]"
       (Utils.pp_list ~sep:" and " !T.pp_term#pp)
       (List.map (fun (p,args) -> Pattern.instantiate p args) gc.gc_eqns)
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
       (Utils.pp_list pp_premise) premises
 and pp_premise formatter premise =
   match premise with
-  | _ -> failwith "TODO: kb.pp_premise"
+  | IfNamed (name, args) | IfTheory(name, args) ->
+    if args = []
+      then Format.fprintf formatter "%s" name
+      else Format.fprintf formatter "@[<h>%s(%a)@]" name (Utils.pp_list !T.pp_term#pp) args
+  | IfPattern (p, args) ->
+    Format.fprintf formatter "@[<h>%a applied to %a@]" Pattern.pp_pattern p
+      (Utils.pp_list !T.pp_term#pp) args
+    (*
+    let t = Pattern.instantiate p args in
+    !T.pp_term#pp formatter t
+    *)
 and pp_fact formatter fact =
-  failwith "TODO: kb.pp_fact"
+  match fact with
+  | ThenPattern (p, args) ->
+    let t = Pattern.instantiate p args in
+    !T.pp_term#pp formatter t
+  | ThenTheory (name, args) | ThenNamed (name, args) ->
+    if args = []
+      then Format.fprintf formatter "%s" name
+      else Format.fprintf formatter "@[<h>%s(%a)@]" name (Utils.pp_list !T.pp_term#pp) args
+  | ThenGC gc ->
+    Format.fprintf formatter
+      "@[<hov2>gc %a@ @[<h>with %s(%a)@]@]"
+      (Utils.pp_list ~sep:" and " !T.pp_term#pp)
+      (List.map (fun (p,args) -> Pattern.instantiate p args) gc.gc_eqns)
+      gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
 
 let definition_to_json definition : json =
   match definition with

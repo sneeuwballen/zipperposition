@@ -54,6 +54,11 @@ let lookup_named ~table name =
   with Not_found ->
     failwith ("no such axiom: " ^ name)
 
+let lookup ~table name =
+  try Hashtbl.find table name
+  with Not_found ->
+    failwith ("no such axiom/theory: " ^ name)
+
 let define_th ~table name sorts =
   Hashtbl.replace table name (TableTheory sorts)
 
@@ -67,6 +72,12 @@ type premise =
   | `Named of string * symbol list
   | `Term of term
   ]
+
+let pp_premise formatter premise =
+  match premise with
+  | `Theory (name, args) | `Named (name, args) ->
+    Format.fprintf formatter "%s(%a)" name (Utils.pp_list pp_symbol) args
+  | `Term t -> !T.pp_term#pp formatter t
 
 (** Lookup (symbol,sort) for the given premise(s) *)
 
@@ -98,6 +109,14 @@ let signature_of_terms seq =
   let signature = T.signature seq in
   SMap.filter (fun s _ -> not (is_base_symbol s)) signature
 
+(** Compute the index of the maximal variable occurring in premises *)
+let offset_of_premises (premises : premise Sequence.t) =
+  1 + Sequence.fold
+    (fun offset premise -> match premise with
+      | `Theory _ | `Named _ -> offset
+      | `Term t -> max (T.max_var (T.vars t)) offset)
+    0 premises
+
 (** {2 Conversion utils} *)
 
 (** Maps a list of symbols to terms, using [s_to_t] *)
@@ -113,18 +132,21 @@ let consts_to_terms s_to_t consts =
   List.map
     (fun const -> match const.term with
       | Node (s, []) ->
-        (try List.assoc s s_to_t
+        (try  let t' = List.assoc s s_to_t in
+              (if t'.sort != const.sort
+                then failwith "consts_to_terms: incompatible sorts");
+              t'
          with Not_found -> failwith ("undefined symbol: "^name_symbol s))
       | _ -> failwith (Utils.sprintf "not a const: %a" !T.pp_term#pp const))
     consts
 
 (** Given a signature, maps symbols of the signature to variables
     in an association list. *)
-let map_symbols_to_vars signature =
+let map_symbols_to_vars ?(offset=0) signature =
   let seq = sig_to_seq signature in
   let seq = Sequence.mapi
     (fun i (symb, sort) ->
-      let var = T.mk_var i sort in
+      let var = T.mk_var (i+offset) sort in
       symb, var)
     seq in
   Sequence.to_list seq
@@ -150,7 +172,8 @@ let convert_premise ~table s_to_t premise =
 let mk_lemma_term ~table t premises =
   let t = T.curry t in
   let signature = signature_of_premises ~table premises in
-  let s_to_t = map_symbols_to_vars signature in
+  let offset = offset_of_premises (Sequence.of_list premises) in
+  let s_to_t = map_symbols_to_vars ~offset signature in
   (* convert premises *)
   let premises = List.map (convert_premise ~table s_to_t) premises in
   (* convert conclusion *)
@@ -185,19 +208,26 @@ let mk_named ~table (name, (symbols : symbol list)) t =
   (* abstract formula in the same order as the given symbol list *)
   let pattern, _ = Pattern.of_term_with (T.curry t) symbols in
   define_named ~table name pattern;
-  KB.Named (name, pattern)
+  let named = KB.Named (name, pattern) in
+  Utils.debug 1 "%% @[<hov2>%a@]" KB.pp_definition named;
+  named
 
 let mk_theory ~table (name, (symbols : symbol list)) premises =
   let signature = signature_of_premises ~table premises in
   (if not (List.for_all (fun s -> SMap.mem s signature) symbols)
     then failwith ("some symbol does not appear in def of theory " ^ name));
-  let s_to_t = map_symbols_to_vars signature in
+  Utils.debug 1 "%% @[<h>define theory %s(%a) with %a@]" name
+    (Utils.pp_list pp_symbol) symbols (Utils.pp_list pp_premise) premises;
+  let offset = offset_of_premises (Sequence.of_list premises) in
+  let s_to_t = map_symbols_to_vars ~offset signature in
   (* convert premises *)
   let premises = List.map (convert_premise ~table s_to_t) premises in
   (* convert theory *)
   let args = symbs_to_terms s_to_t symbols in
   define_th ~table name (List.map (fun x -> x.sort) args);
-  KB.Theory ((name, args), premises)
+  let th = KB.Theory ((name, args), premises) in
+  Utils.debug 1 "%% theory is @[<hov2>%a@]" KB.pp_definition th;
+  th
 
 let mk_gc ~table eqns (gc_ord,(prec : symbol list)) premises =
   let signature = signature_of_premises ~table premises in
@@ -205,7 +235,11 @@ let mk_gc ~table eqns (gc_ord,(prec : symbol list)) premises =
     then failwith ("some symbol does not appear in precedence of GC"));
   (* TODO more safety checks *) 
   (* mapping to variables *)
-  let s_to_t = map_symbols_to_vars signature in
+  let offset = offset_of_premises (Sequence.of_list premises) in
+  let offset = List.fold_left
+    (fun offset eqn -> max offset (T.max_var (T.vars eqn)))
+    offset eqns in
+  let s_to_t = map_symbols_to_vars ~offset signature in
   (* convert precedence *)
   let gc_prec = symbs_to_terms s_to_t prec in
   (* convert equations *)

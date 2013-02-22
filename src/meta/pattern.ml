@@ -75,7 +75,7 @@ let find_symbols ?(symbols=SSet.empty) seq =
   (* traverse term *)
   let rec search set t = match t.term with
   | Var _ | BoundVar _ -> set
-  | Bind (s, t') -> search set t'
+  | Bind (s, _, t') -> search set t'
   | Node (s, [a;b]) when s == at_symbol ->
     search (search set a) b
   | Node (s, []) when not (is_base_symbol s) ->
@@ -97,9 +97,7 @@ let find_functions seq (symbols : symbol list) =
 let of_term_with t symbols : (t * term list) =
   let constants = find_functions (Sequence.singleton t) symbols in
   let t = List.fold_left
-    (fun t const ->
-      let sort = t.sort <=. const.sort in
-      T.mk_lambda sort (T.db_from_term t const))
+    (fun t const -> T.eta_lift t const)
     t constants in
   let sorts = List.map (fun x -> x.sort) constants in
   (t, sorts), constants
@@ -137,9 +135,10 @@ let instantiate (p : t) terms =
   let t, _ = p in
   (* apply constants from the right *)
   let t' = List.fold_right
-    (fun t const -> T.mk_at t const)
-    terms t in
-  let t' = T.beta_reduce t' in
+    (fun const t ->
+      Utils.debug 3 "instantiate: @[<h>%a @ %a@]" !T.pp_term#pp t !T.pp_term#pp const;
+      T.beta_reduce (T.mk_at t const))
+    terms (T.beta_reduce t) in
   if T.is_fo t'
     then T.uncurry t'
     else failwith "non-FO pattern instantiation"
