@@ -48,6 +48,7 @@ module Pattern : sig
   (** {2 Printing/conversion to JSON} *)
 
   val pp_pattern : Format.formatter -> t -> unit
+  val pp_pattern_p : Format.formatter -> t parametrized -> unit
   val to_json : t -> json
   val of_json : json -> t
 

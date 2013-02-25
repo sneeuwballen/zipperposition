@@ -54,10 +54,18 @@ let hash_pattern ((t,sorts) : t) =
 let pp_pattern formatter (p:t) =
   Format.fprintf formatter "@[<h>%a@]" !T.pp_term#pp (fst p)
 
+let pp_pattern_p formatter ((p, args) : t parametrized) =
+  let t, _ = p in
+  (* apply constants from the right *)
+  let t' = List.fold_right
+    (fun const t -> T.beta_reduce (T.mk_at t const))
+    args (T.beta_reduce t) in
+  !T.pp_term#pp formatter t'
+
 let to_json (p : t) : json =
   `Assoc [
     "term", T.to_json (fst p);
-    "vars", `List (List.map sort_to_json (snd p))]
+    "sorts", `List (List.map sort_to_json (snd p))]
 
 let of_json (json : json) : t = match json with
   | `Assoc ["term", t; "sorts", `List sorts]

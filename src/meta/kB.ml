@@ -61,11 +61,10 @@ and gnd_convergent_spec = {
 let rec pp_definition formatter definition =
   match definition with
   | Named (name, p) ->
-    Format.fprintf formatter "@[<h>%s is %a@]." name Pattern.pp_pattern p
+    Format.fprintf formatter "@[<h>%s is %a@]" name Pattern.pp_pattern p
   | Lemma ((concl, vars), premises) ->
-    Format.fprintf formatter "@[<hov2>lemma @[<h>%a(%a)@] if@ %a@]"
-      Pattern.pp_pattern concl
-      (Utils.pp_list !T.pp_term#pp) vars
+    Format.fprintf formatter "@[<hov2>lemma @[<h>%a@] if@ %a@]"
+      Pattern.pp_pattern_p (concl, vars)
       (Utils.pp_list pp_premise) premises
   | Theory ((name,args), premises) ->
     Format.fprintf formatter "@[<hov2>@[<h>theory %s(%a)@] if@ %a@]" name
@@ -74,8 +73,7 @@ let rec pp_definition formatter definition =
   | GC (gc, premises) ->
     Format.fprintf formatter
       "@[<hov2>gc @[<hov2>%a@]@ @[<h>with %s(%a) if@ %a@]@]"
-      (Utils.pp_list ~sep:" and " !T.pp_term#pp)
-      (List.map (fun (p,args) -> Pattern.instantiate p args) gc.gc_eqns)
+      (Utils.pp_list ~sep:" and " Pattern.pp_pattern_p) gc.gc_eqns
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
       (Utils.pp_list pp_premise) premises
 and pp_premise formatter premise =
@@ -85,17 +83,11 @@ and pp_premise formatter premise =
       then Format.fprintf formatter "%s" name
       else Format.fprintf formatter "@[<h>%s(%a)@]" name (Utils.pp_list !T.pp_term#pp) args
   | IfPattern (p, args) ->
-    Format.fprintf formatter "@[<h>%a applied to %a@]" Pattern.pp_pattern p
-      (Utils.pp_list !T.pp_term#pp) args
-    (*
-    let t = Pattern.instantiate p args in
-    !T.pp_term#pp formatter t
-    *)
+    Pattern.pp_pattern_p formatter (p, args)
 and pp_fact formatter fact =
   match fact with
   | ThenPattern (p, args) ->
-    let t = Pattern.instantiate p args in
-    !T.pp_term#pp formatter t
+    Pattern.pp_pattern_p formatter (p, args)
   | ThenTheory (name, args) | ThenNamed (name, args) ->
     if args = []
       then Format.fprintf formatter "%s" name
@@ -122,6 +114,7 @@ let rec definition_to_json definition : json =
               "vars", `List (List.map T.to_json gc.gc_vars);
               "ord", `String gc.gc_ord;
               "prec", `List (List.map T.to_json gc.gc_prec);
+              "premises", `List (List.map premise_to_json premises);
               "eqns", `List (List.map
                 (fun (pat, args) -> `List (Pattern.to_json pat :: List.map T.to_json args))
                 gc.gc_eqns);]
@@ -134,16 +127,37 @@ and premise_to_json (premise : premise) : json =
   | IfPattern (pat, args) ->
     `List (`String "pattern" :: Pattern.to_json pat :: List.map T.to_json args)
 
-let definition_of_json (json : json) : definition =
+let rec definition_of_json (json : json) : definition =
   match json with
-  | _ -> failwith "TODO: KB.definition_of_json" (* TODO *)
-  (*
-  | `Assoc ["conclusion", concl; "premises", `List premises] ->
-    Lemma (Pattern.of_json concl, List.map Pattern.of_json premises)
-  | `List (`String "theory" :: `String th :: args) ->
-    Theory (th, List.map T.of_json args)
-  | _ -> failwith "todo: item_of_json"
-  *)
+  | `List [`String "named"; `String name; pat] ->
+    Named (name, Pattern.of_json pat)
+  | `List (`String "theory" :: `String name :: `List args :: premises) ->
+    Theory ((name, List.map T.of_json args), List.map premise_of_json premises)
+  | `List (`String "lemma" :: `List (pat :: args) :: premises) ->
+    Lemma ((Pattern.of_json pat, List.map T.of_json args),
+           List.map premise_of_json premises)
+  | `Assoc l when List.mem_assoc "gc" l ->
+    let gc_vars = List.map T.of_json (Json.Util.to_list (List.assoc "vars" l)) in
+    let gc_ord = Json.Util.to_string (List.assoc "ord" l) in
+    let gc_prec = List.map T.of_json (Json.Util.to_list (List.assoc "prec" l)) in
+    let premises = List.map premise_of_json
+      (Json.Util.to_list (List.assoc "premises" l)) in
+    let gc_eqns = List.map
+      (function
+        | `List (pat::args) -> (Pattern.of_json pat, List.map T.of_json args)
+        | json -> raise (Json.Util.Type_error ("expected (pattern,terms)", json)))
+      (Json.Util.to_list (List.assoc "eqns" l)) in
+    GC ({ gc_ord; gc_vars; gc_prec; gc_eqns; }, premises)
+  | _ -> raise (Json.Util.Type_error ("expected KB.definition", json))
+and premise_of_json (json : json) : premise =
+  match json with
+  | `List (`String "named" :: `String name :: args) ->
+    IfNamed (name, List.map T.of_json args)
+  | `List (`String "theory" :: `String name :: args) ->
+    IfTheory (name, List.map T.of_json args)
+  | `List (`String "pattern" :: pat :: args) ->
+    IfPattern (Pattern.of_json pat, List.map T.of_json args)
+  | _ -> raise (Json.Util.Type_error ("expected KB.premise", json))
 
 (** {2 Datalog atoms} *)
 
@@ -339,7 +353,8 @@ let of_seq kb definitions =
 (** {2 Printing/parsing} *)
 
 let pp formatter kb =
-  Utils.pp_list pp_definition formatter kb 
+  Format.fprintf formatter "@[<v2>KB:@;%a@]"
+    (Utils.pp_list ~sep:"" pp_definition) kb 
 
 let to_json kb : json Stream.t =
   let definitions = List.map definition_to_json kb in
