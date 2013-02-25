@@ -49,7 +49,7 @@ type t = {
 and result =
   | Deduced of literal array * hclause list
   | Theory of string * term list
-  | Expert of Experts.expert
+  | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
 let update_ctx ~ctx prover =
@@ -60,16 +60,15 @@ let goal_handler prover lit =
   Utils.debug 2 "%% meta-prover: new goal %a" Logic.pp_literal lit;
   match KB.of_datalog lit with
   | Some (KB.ThenPattern (p, terms)) ->
-    (* new goal: match clauses against this (partially instantiated) pattern.
+    (* new goal: match clauses against this pattern.
        XXX should we match clauses against the pattern, or
            the partial pattern obtained by instantiation? *)
-    let t = Pattern.instantiate p terms in
-    let new_pattern, new_args = Pattern.of_term t in
-    prover.patterns <- new_pattern :: prover.patterns;
-    prover.new_patterns <- new_pattern :: prover.new_patterns;
-    ()
-  | Some (KB.ThenTheory _) -> () (* XXX: try to prove axioms of the theory? *)
-  | Some _ -> ()
+    prover.patterns <- p :: prover.patterns;
+    prover.new_patterns <- p :: prover.new_patterns
+  | Some ((KB.ThenTheory _) as fact) ->
+    Utils.debug 3 "%% meta-prover: goal @[<h>%a@]" KB.pp_fact fact
+  | Some _ ->
+    Utils.debug 3 "%% meta-prover: ignored goal @[<h>%a@]" Logic.pp_literal lit
   | None -> ()  (* not a known goal *)
 
 (** Handler called on facts *)
@@ -89,7 +88,6 @@ let fact_handler prover lit =
         (fun lit -> try [LitMap.find lit prover.clauses]
                     with Not_found -> [])
         premises in
-      (* XXX: call calculus#preprocess on resulting clauses (CNF, etc.)?? *)
       (* result: "conclusion because of premises" *)
       let result = Deduced (lits, premises) in
       prover.results <- result :: prover.results;
@@ -97,9 +95,24 @@ let fact_handler prover lit =
     | Some (KB.ThenNamed (name, terms)) ->
       Utils.debug 0 "%% meta-prover: axiom @[<h>%s(%a)@]" name
         (Utils.pp_list !T.pp_term#pp) terms
-    | Some (KB.ThenTheory _) -> failwith "TODO"
-    | Some (KB.ThenGC _) -> failwith "TODO"
+    | Some (KB.ThenTheory (name, args)) ->
+      let result = Theory (name, args) in
+      prover.results <- result :: prover.results;
+      prover.new_results <- result :: prover.new_results
+    | Some (KB.ThenGC _) ->
+      failwith "TODO: Prover.fact_handler(GC)"
+      (* TODO: instantiate GC into an expert *)
     | None -> ()  (* not a proper fact *)
+
+(** Add a KB definition to the prover *)
+let add_kb_definition prover definition =
+  (* Add a goal that will make the prover search for instances of
+     this definition *)
+  let goals = KB.definition_to_goals definition in
+  List.iter (Logic.db_goal prover.db) goals;
+  (* add the definition *)
+  let clause = KB.definition_to_datalog definition in
+  Logic.db_add prover.db clause
 
 (** Fresh meta-prover, using the given KB *)
 let create ~ctx kb =
@@ -115,7 +128,13 @@ let create ~ctx kb =
   } in
   (* add handlers *)
   Logic.db_subscribe_goal prover.db (goal_handler prover);
-  Logic.db_subscribe_fact prover.db (KB.MString "pattern") (fact_handler prover);
+  let handler = fact_handler prover in
+  Logic.db_subscribe_fact prover.db (KB.MString "pattern") handler;
+  Logic.db_subscribe_fact prover.db (KB.MString "theory") handler;
+  Logic.db_subscribe_fact prover.db (KB.MString "named") handler;
+  Logic.db_subscribe_fact prover.db (KB.MString "gc") handler;
+  (* add the content of the KB to the prover *)
+  Sequence.iter (add_kb_definition prover) (KB.to_seq kb);
   (* return prover *)
   prover
 
@@ -137,6 +156,9 @@ let match_patterns patterns lits k =
 (** To call when a pattern matches a clause. It assert the corresponding
     fact in Datalog. *)
 let found_pattern prover hc pattern args =
+  Utils.debug 1 "%% meta-prover: matched pattern @[<h>%a(%a) with %a@]"
+    Pattern.pp_pattern_p (pattern, args) 
+    (Utils.pp_list !T.pp_term#pp) args !C.pp_clause#pp_h hc;
   let fact = KB.ThenPattern (pattern, args) in
   let lit = KB.fact_to_datalog fact in
   (* remember that [hc] is the explanation for this fact *)
@@ -148,6 +170,7 @@ let found_pattern prover hc pattern args =
     are added to the Datalog engine, and if some theories and lemma
     are detected they are returned *)
 let scan_clause prover hc =
+  Utils.debug 2 "%% meta-prover: scan @[<h>%a@]" !C.pp_clause#pp_h hc;
   (* match [hc] against patterns *)
   match_patterns prover.patterns hc.hclits (found_pattern prover hc);
   (* get results *)
@@ -168,7 +191,9 @@ let scan_set prover set =
   prover.new_patterns <- [];
   (* for each clause in the set, match it against pattern *)
   C.CSet.iter set
-    (fun hc -> match_patterns patterns hc.hclits (found_pattern prover hc));
+    (fun hc ->
+      Utils.debug 2 "%% meta-prover: scan @[<h>%a@]" !C.pp_clause#pp_h hc;
+      match_patterns patterns hc.hclits (found_pattern prover hc));
   let results = prover.new_results in
   prover.new_results <- [];
   results

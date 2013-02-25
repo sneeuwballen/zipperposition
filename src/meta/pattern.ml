@@ -134,34 +134,40 @@ let arity (p : t)  = List.length (sorts p)
 (** This applies the pattern to the given arguments, beta-reduces,
     and uncurry the term back. It will fail if the result is not
     first-order. *)
-let instantiate (p : t) terms =
+let instantiate ?(uncurry=true) (p : t) terms =
   (* check compatibility *)
   (try
     let ok = List.for_all2 (fun t sort -> t.sort == sort) terms (sorts p) in
     if not ok then failwith "sort mismatch for instantiate"
   with Invalid_argument _ -> failwith "bad arity for instantiate");
   let t, _ = p in
+  Utils.debug 3 "instantiate: @[<h>%a @ [%a]@]" !T.pp_term#pp t
+    (Utils.pp_list !T.pp_term#pp) terms;
   (* apply constants from the right *)
   let t' = List.fold_right
     (fun const t ->
-      Utils.debug 3 "instantiate: @[<h>%a @ %a@]" !T.pp_term#pp t !T.pp_term#pp const;
       T.beta_reduce (T.mk_at t const))
     terms (T.beta_reduce t) in
-  if T.is_fo t'
-    then T.uncurry t'
-    else failwith "non-FO pattern instantiation"
+  if uncurry
+    then if T.is_fo t' then T.uncurry t' else failwith "non-FO pattern instantiation"
+    else t'
 
 (** Apply the substitution to variables that parametrize the pattern,
     then [instantiate] the pattern (beta-reduced and uncurryfied).
     [apply_subst (p,vars) subst] is equivalent to
     [instantiate p (List.map (S.apply_subst subst) vars)]. *)
-let apply_subst (((p, args),offset) : t parametrized bind) subst =
+let apply_subst ?(uncurry=true) (((p, args),offset) : t parametrized bind) subst =
   let args = List.map
     (fun arg -> match arg.term with
       | Var _ -> S.apply_subst subst (arg,offset)
       | _ -> arg)
     args in
-  instantiate p args
+  instantiate ~uncurry p args
+
+(* FIXME: what if we match F(X) against f(a)? should be rejected, because the
+   axiom is much weaker than expected! Need some guard to distinguish between
+   variables and constants on the matching side, like encoding constant [c] by
+   [constant @ X] rather than [X]...*)
 
 (** [matching p lits] attempts to match the literals against the pattern.
     It yields a list of solutions, each solution [s1,...,sn] satisfying
@@ -169,22 +175,23 @@ let apply_subst (((p, args),offset) : t parametrized bind) subst =
     of "or" and "=". *)
 let matching (p : t) lits =
   let _, sorts = p in
-  let right = Lits.term_of_lits lits in
+  let right = T.curry (Lits.term_of_lits lits) in
   (* apply the pattern to a list of new variables *)
   let offset = T.max_var (T.vars right) + 1 in
-  let vars = List.mapi T.mk_var sorts in
-  let left = instantiate p vars in
+  let vars = List.mapi (fun i sort -> T.mk_var (i+offset) sort) sorts in
+  let left = instantiate ~uncurry:false p vars in
   (* match pattern against [right] *)
   let substs = Unif.matching_ac S.id_subst (left,offset) (right,0) in
   (* now apply the substitution to the list of variables *)
-  let substs = Sequence.map
+  let substs = Sequence.flatMap
     (fun subst ->
+      Format.printf "subst @[<h>%a@], vars @[<h>%a@]@." S.pp_substitution subst
+        (Utils.pp_list !T.pp_term#pp) vars;
       (* convert variables back to terms *)
       let args = List.map (fun v -> S.apply_subst subst (v,offset)) vars in
-      (* restriction: only bind function symbols to constants for now *)
-      if List.for_all T.is_const args
-        then Sequence.of_list [args]
-        else Sequence.of_list [])
+      (* TODO: check that abstracted variables map to constants, and regular
+        variables map to variables *)
+      Sequence.of_list [args])
     substs in
-  Sequence.concat substs
+  substs
 

@@ -79,12 +79,12 @@ module Pattern : sig
     (** number of arguments that have to be provided
         to instantiate the pattern *)
 
-  val instantiate : t -> term list -> term
+  val instantiate : ?uncurry:bool -> t -> term list -> term
     (** This applies the pattern to the given arguments, beta-reduces,
-        and uncurry the term back. It will fail if the result is not
+        and uncurry the term back (by default). It will fail if the result is not
         first-order. *)
 
-  val apply_subst : t parametrized bind -> substitution -> term
+  val apply_subst : ?uncurry:bool -> t parametrized bind -> substitution -> term
     (** Apply the substitution to variables that parametrize the pattern,
         then [instantiate] the pattern (beta-reduced and uncurryfied).
         [apply_subst (p,vars) subst] is equivalent to
@@ -163,6 +163,9 @@ module KB : sig
   val definition_to_datalog : definition -> Logic.clause
     (** Translate a definition into a Datalog clause *)
 
+  val definition_to_goals : definition -> Logic.literal list
+    (** Find the most general goal that activates this definition *)
+
   val fact_to_datalog : fact -> Logic.literal
     (** Convert a meta-fact to a Datalog fact *)
 
@@ -210,7 +213,7 @@ module Prover : sig
   type result =
     | Deduced of literal array * hclause list
     | Theory of string * term list
-    | Expert of Experts.expert
+    | Expert of Experts.t
     (** Feedback from the meta-prover *)
 
   val scan_clause : t -> hclause -> result list
@@ -230,7 +233,7 @@ module Prover : sig
   val theories : t -> (string * term list) Sequence.t
     (** List of theories detected so far *)
 
-  val experts : t -> Experts.expert Sequence.t
+  val experts : t -> Experts.t Sequence.t
     (** Current list of experts that can be used *)
 
   val results : t -> result Sequence.t

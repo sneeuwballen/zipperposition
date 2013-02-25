@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** {1 Persistent Knowledge Base} *)
 
 open Types
+open Symbols
 
 module T = Terms
 module Utils = FoUtils
@@ -206,9 +207,7 @@ module Logic = Datalog.Logic.Make(struct
   let equal = eq_atom
   let hash = hash_atom
   let to_string a = Utils.sprintf "%a" pp_atom a
-  let of_string s = atom_of_json (Json.from_string s)  (* XXX should not happen *)
-  let lock () = ()
-  let unlock () = ()
+  let of_string s = atom_of_json (Json.from_string s)  (* should not happen *)
 end)
   
 (** {2 Conversion to Datalog} *)
@@ -258,17 +257,19 @@ let extract_terms sorts args =
       | `Symbol (MTerm t) ->
         assert (t.sort == sort);
         t::acc
-      | `Var i -> (T.mk_var i sort) :: acc)
+      | `Var i -> (T.mk_var (-i) sort) :: acc)
     [] sorts args in
   List.rev terms
 
-(** Extract only constant terms. It expects a list of
-    `Symbol (MTerm constant). *)
-let extract_consts args =
+(** Convert the arguments into terms. Sorts are guessed/by default *)
+let extract_terms_unsafe args =
   List.map
     (function
-      | `Symbol (MTerm t) when not (T.is_var t) -> t
-      | _ -> assert false)
+      | `Symbol (MPattern _)
+      | `Symbol (MPatternVars _)
+      | `Symbol (MString _) -> assert false
+      | `Symbol (MTerm t) -> t
+      | `Var i -> T.mk_var (-i) univ_)
     args
 
 (** Translate a premise to a Datalog literal *)
@@ -299,6 +300,22 @@ let definition_to_datalog definition =
     let concl = atom_gc gc in
     Logic.mk_clause concl premises
 
+let definition_to_goals definition =
+  let convert_list l = List.mapi (fun i _ -> `Var (-i-2)) l in
+  match definition with
+  | Named (name, (p, sorts)) -> []
+  | Lemma ((_, args), _) ->
+    [Logic.mk_literal (MString "pattern") ((`Var (-1)) :: convert_list args)]
+  | Theory ((_, args), _) ->
+    [Logic.mk_literal (MString "theory") ((`Var (-1)) :: convert_list args)]
+  | GC (gc,_) ->
+    let n = List.length gc.gc_eqns + List.length gc.gc_vars +
+      List.length gc.gc_prec + 1 in
+    let args = Sequence.unfoldr
+      (fun i -> if i >= n then None else Some (`Var (-i-2), i+1))
+      0 in
+    [Logic.mk_literal (MString "gc") ((`Var (-1)) :: Sequence.to_list args)]
+
 (** Convert a meta-fact to a Datalog fact *)
 let fact_to_datalog fact =
   match fact with
@@ -316,10 +333,11 @@ let of_datalog lit =
     let terms = extract_terms (snd p) args in
     Some (ThenPattern (p, terms))
   | MString "named", (`Symbol (MString name) :: args) ->
-    let terms = extract_consts args in
+    let terms = extract_terms_unsafe args in
     Some (ThenNamed (name, terms))
   | MString "theory", (`Symbol (MString name) :: args) ->
-    let terms = extract_consts args in
+    Utils.debug 4 "KB.of_datalog %a" Logic.pp_literal lit;
+    let terms = extract_terms_unsafe args in
     Some (ThenTheory (name, terms))
   | MString "gc", (`Symbol (MString gc_ord) :: args) ->
     (* extract (list of terms, list of patterns, list of terms) *) 
