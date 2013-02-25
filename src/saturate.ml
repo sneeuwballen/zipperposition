@@ -189,8 +189,42 @@ let find_lemmas ~ctx prover hc =
         let hc = C.mk_hclause_a ~ctx lits ~parents
           (fun c -> Proof.mk_proof c "lemma" premises) in
         [hc]
-      | _ -> [])
+      | _ -> [])  (* TODO more powerful handling of results *)
       results
+
+(** Do one step of the meta-prover. The current given clause and active set
+    are provided. This returns a list of new clauses. *)
+let meta_step state hc =
+  match state#meta_prover with
+  | None -> []
+  | Some prover -> begin
+    (* forward scanning *)
+    let results = Meta.Prover.scan_clause prover hc in
+    (* backward scanning, if needed *)
+    let results' =
+      if Meta.Prover.has_new_patterns prover
+        then Meta.Prover.scan_set prover state#active_set#clauses
+        else [] in
+    let results = List.rev_append results' results in
+    (* use results *)
+    Utils.list_flatmap
+      (fun result -> match result with
+        | Meta.Prover.Deduced (lits,parents) ->
+          (* found a lemma *)
+          let premises = List.map (fun hc -> hc.hcproof) parents in
+          let lemma = C.mk_hclause_a ~ctx:state#ctx lits ~parents
+            (fun c -> Proof.mk_proof c "lemma" premises) in
+          Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp lemma;
+          [lemma]
+        | Meta.Prover.Theory (th_name, th_args) ->
+          Utils.debug 1 "%% meta-prover: theory @[<h>%a@]" Meta.Prover.pp_result result;
+          []
+        | Meta.Prover.Expert expert ->
+          Utils.debug 1 "%% meta-prover: expert @[<h>%a@]" Experts.pp_expert expert;
+          state#add_expert expert;
+          [])
+      results
+    end
 
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num state =
@@ -220,9 +254,8 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       C.check_ord_hclause ~ord hc;
       Utils.debug 2 "%% ============ step %5d  ============" num;
       Utils.debug 1 "%% @[<h>%a@]" !C.pp_clause#pp_h hc;
-      (* scan clause within meta-prover *)
-      let lemmas = find_lemmas ~ctx state#meta_prover hc in
-      let new_clauses = List.rev_append lemmas new_clauses in
+      (* yield control to meta-prover *)
+      let new_clauses = List.rev_append (meta_step state hc) new_clauses in
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = subsumed_by ~calculus state#active_set hc in
       state#active_set#remove subsumed_active;

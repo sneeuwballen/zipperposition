@@ -74,6 +74,9 @@ type state =
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
     meta_prover : Meta.Prover.t option;
+    experts : Experts.t list;           (** List of current experts *)
+
+    add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
 val mk_active_set : ctx:context -> Index.index -> signature -> active_set
