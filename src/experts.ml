@@ -29,7 +29,7 @@ module Utils = FoUtils
 
 (** {2 General interface} *)
 
-type expert = {
+type t = {
   expert_name : string;                 (** Theory the expert works on *)
   expert_descr : string;                (** Description of the expert *)
   expert_equal : term -> term -> bool;  (** Check whether two terms are equal *)
@@ -46,13 +46,13 @@ type expert = {
 
     TODO: more elaborate checks, for instance with ground-joinability of all
     critical pairs *)
-let expert_compatible e1 e2 =
+let compatible e1 e2 =
   SSet.is_empty (SSet.union e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
     the combination of their theories, assuming they are compatible. *)
-let expert_combine e1 e2 =
-  assert (expert_compatible e1 e2);
+let combine e1 e2 =
+  assert (compatible e1 e2);
   (* compute normal form using both systems *)
   let rec nf t =
     let t' = e1.expert_canonize t in
@@ -73,19 +73,19 @@ let expert_combine e1 e2 =
 (** [expert_more_specific e1 e2] returns true if [e1] decides a theory
     whose symbols are included in the theory of [e2]. Heuristically, that
     means that we can ignore [e1] and focus on [e2] *)
-let expert_more_specific e1 e2 =
+let more_specific e1 e2 =
   SSet.subset e1.expert_sig e2.expert_sig &&
   not (SSet.equal e1.expert_sig e2.expert_sig)
 
 (** Get the normal form of the term *)
-let expert_canonize expert t = expert.expert_canonize t
+let canonize expert t = expert.expert_canonize t
 
-let expert_equal expert t1 t2 = expert.expert_equal t1 t2
+let equal expert t1 t2 = expert.expert_equal t1 t2
 
-let expert_sig expert = expert.expert_sig
+let signature expert = expert.expert_sig
 
 (** Decide whether this clause is redundant *)
-let expert_is_redundant expert hc =
+let is_redundant expert hc =
   if C.get_flag C.flag_persistent hc then false else
   let ans = Utils.array_exists
     (fun lit -> match lit with
@@ -98,7 +98,7 @@ let expert_is_redundant expert hc =
   ans
 
 (** Simplify the clause *)
-let expert_simplify ~ctx expert hc =
+let simplify ~ctx expert hc =
   let lits = Array.to_list hc.hclits in
   let lits = List.filter
     (fun lit -> match lit with
@@ -120,7 +120,7 @@ let expert_simplify ~ctx expert hc =
 
 (** Get a list of clauses this DP needs to be present in the
     superposition prover for it to be complete *)
-let expert_clauses expert = 
+let clauses expert = 
   let clauses = expert.expert_clauses in
   List.iter (fun hc -> C.set_flag C.flag_persistent hc true) clauses;
   clauses

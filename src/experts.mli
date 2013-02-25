@@ -30,42 +30,42 @@ open Symbols
 
 (** {2 General interface} *)
 
-type expert
+type t
   (** An expert for some theory *)
 
-val expert_compatible : expert -> expert -> bool
+val compatible : t -> t -> bool
   (** Simple syntaxic criterion to decide whether two experts
       are compatibles: check whether they have no symbol in common. *)
 
-val expert_combine : expert -> expert -> expert
+val combine : t -> t -> t
   (** Combine two experts into a new one, that works on
       the combination of their theories, assuming they are compatible. *)
 
-val expert_more_specific : expert -> expert -> bool
+val more_specific : t -> t -> bool
   (** [expert_more_specific e1 e2] returns true if [e1] decides a theory
       whose symbols are included in the theory of [e2]. Heuristically, that
       means that we can ignore [e1] and focus on [e2] *)
 
-val expert_canonize : expert -> term -> term
+val canonize : t -> term -> term
   (** Get the normal form of the term *)
 
-val expert_equal : expert -> term -> term -> bool
+val equal : t -> term -> term -> bool
   (** Check whether the terms are equal modulo theory *)
 
-val expert_sig : expert -> SSet.t
+val signature : t -> SSet.t
   (** Symbols of the theory associated to the expert *)
 
-val expert_is_redundant : expert -> hclause -> bool
+val is_redundant : t -> hclause -> bool
   (** Decide whether this clause is redundant *)
 
-val expert_simplify : ctx:context -> expert -> hclause -> hclause
+val simplify : ctx:context -> t -> hclause -> hclause
   (** Simplify the clause *)
 
-val expert_clauses : expert -> hclause list
+val clauses : t -> hclause list
   (** Get a list of clauses this expert needs to be present in the
       superposition prover (additional axioms). *)
 
-val pp_expert : Format.formatter -> expert -> unit
+val pp_expert : Format.formatter -> t -> unit
 
 (** {2 Ground joinable sets of equations} *)
 
@@ -85,7 +85,7 @@ val mk_gc : string -> symbol list -> literal list -> gnd_convergent
   (** Create a ground-convergent system from a list of equations
       and informations on the ordering. *)
 
-val gc_expert : gnd_convergent -> expert
+val gc_expert : gnd_convergent -> t
   (** From a set of ground convergent equations, create an expert for
       the associated theory. *)
 
@@ -99,5 +99,5 @@ val gc_of_json : ctx:context -> json -> gnd_convergent
 
 (** {2 Some builtin theories} *)
 
-val ac : symbol -> expert
+val ac : symbol -> t
   (** Theory of Associative-Commutative symbols, for the given symbol *)
