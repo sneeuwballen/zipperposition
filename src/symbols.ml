@@ -32,6 +32,7 @@ let attr_ac = 1 lsl 4
 let attr_multiset = 1 lsl 5
 let attr_fresh_const = 1 lsl 6
 let attr_commut = 1 lsl 7
+let attr_polymorphic = 1 lsl 8
 
 (** {2 Definition of symbols and sorts} *)
 
@@ -144,7 +145,8 @@ module SSetSeq = Sequence.Set.Adapt(SSet)
 
 let true_symbol = mk_symbol "$true"
 let false_symbol = mk_symbol "$false"
-let eq_symbol = mk_symbol ~attrs:(attr_infix lor attr_multiset lor attr_commut) "="
+let eq_symbol = mk_symbol ~attrs:(attr_infix lor attr_multiset lor
+                                  attr_commut lor attr_polymorphic) "="
 let exists_symbol = mk_symbol ~attrs:attr_binder "?"
 let forall_symbol = mk_symbol ~attrs:attr_binder "!"
 let lambda_symbol = mk_symbol ~attrs:attr_binder "^"
@@ -156,7 +158,7 @@ let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac lor attr_multiset) "|"
 (** {2 Magic symbols} *)
 
 (** higher order curryfication symbol *)
-let at_symbol = mk_symbol ~attrs:attr_infix "@"
+let at_symbol = mk_symbol ~attrs:(attr_infix lor attr_polymorphic) "@"
 
 (** pseudo symbol kept for locating bound vars in precedence. Bound
     vars are grouped in the precedence together w.r.t other symbols,

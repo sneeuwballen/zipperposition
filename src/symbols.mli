@@ -57,6 +57,7 @@ val attr_ac : symbol_attribute          (** symbol is associative-commutative? *
 val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *)
 val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
 val attr_commut : symbol_attribute      (** symbol that is commutative (not ac) *)
+val attr_polymorphic : symbol_attribute (** symbol that is ad-hoc polymorphic *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
 val mk_distinct : ?attrs:symbol_attribute -> string -> symbol

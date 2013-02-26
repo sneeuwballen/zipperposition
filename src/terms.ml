@@ -565,7 +565,7 @@ let signature seq =
     let sort = t.sort in
     let signature' = update_sig signature s sort in
     explore_term signature' t'
-  | Node (s, l) when s == at_symbol || s == eq_symbol ->
+  | Node (s, l) when has_attr attr_polymorphic s ->
     (* ad-hoc polymorphism *)
     List.fold_left explore_term signature l
   | Node (f, l) ->
@@ -719,14 +719,15 @@ let rec eta_reduce t =
   | Node (f, l) ->
     mk_node ~old:t f t.sort (List.map eta_reduce l)
 
-(** [eta_lift t sub_t], applied to a currified term [t], and a
+(** [lambda_abstract t sub_t], applied to a currified term [t], and a
     subterm [sub_t] of [t], gives [t'] such that
     [beta_reduce (t' @ sub_t) == t] holds.
-    It basically abstracts out [sub_t] with a lambda.
+    It basically abstracts out [sub_t] with a lambda. If [sub_t] is not
+    a subterm of [t], then [t' == ^[X]: t].
 
-    For instance (@ are omitted), [eta_lift f(a,g @ b,c) g] will return
+    For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
     the term [^[X]: f(a, X @ b, c)] *)
-let eta_lift t sub_t =
+let lambda_abstract t sub_t =
   let sort = t.sort <=. sub_t.sort in
   mk_lambda sort sub_t.sort (db_from_term t sub_t)
 
