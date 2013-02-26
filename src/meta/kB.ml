@@ -24,6 +24,8 @@ open Types
 open Symbols
 
 module T = Terms
+module C = Clauses
+module S = FoSubst
 module Utils = FoUtils
 
 (** {2 Knowledge Item} *)
@@ -46,7 +48,7 @@ and fact =
 | ThenPattern of Pattern.t parametrized
 | ThenTheory of string parametrized
 | ThenNamed of string parametrized
-| ThenGC of gnd_convergent_spec
+| ThenGC of gnd_convergent_spec parametrized
 and gnd_convergent_spec = {
   gc_vars : varlist;
   gc_ord : string;
@@ -118,8 +120,39 @@ end)
 
 (** Convert a ground-convergent abstract specification to a concrete
     system, if possible (ie, if fully instantiated) *)
-let gc_spec_to_gc (gc_spec, terms) =
-  None (* TODO *)
+let gc_spec_to_gc ~ctx ((gc,args) : gnd_convergent_spec parametrized) =
+  assert (List.length args == List.length gc.gc_vars);
+  assert (List.for_all2 (fun t1 t2 -> t1.sort == t2.sort) gc.gc_vars args);
+  (* create the substitution that will allow to ground equations *)
+  let subst = List.fold_left2
+    (fun subst var t -> S.bind subst (var,1) (t,0))
+    S.id_subst gc.gc_vars args in
+  try
+    (* instantiate equations *)
+    let eqns = List.map
+      (fun p -> Pattern.apply_subst (p,1) subst)
+      gc.gc_eqns in
+    let eqns = List.map
+      (fun t ->
+        (* make a clause from the term, and simplify it (back to CNF) *)
+        let lits = [Literals.mk_eq ~ord:ctx.ctx_ord t T.true_term] in
+        let proof c = Proof.mk_proof c "gc_system" [] in
+        let hc = C.mk_hclause ~ctx lits proof in
+        Cnf.simplify hc)
+      eqns in
+    (* recover precedence *)
+    let prec = List.map (fun v -> S.apply_subst subst (v,1)) gc.gc_prec in
+    let prec = List.map
+      (fun t -> match t.term with
+        | Node (s, []) -> s
+        | _ -> failwith "invalid precedence")
+      prec in
+    let gc = Experts.mk_gc gc.gc_ord prec eqns in
+    (* success *)
+    Some gc
+  with Failure s ->
+    Utils.debug 1 "%% failed to instantiate GndConvergent system: %s" s;
+    None
 
 (** {2 Printing/parsing} *)
 
@@ -157,12 +190,13 @@ and pp_fact formatter fact =
     if args = []
       then Format.fprintf formatter "%s" name
       else Format.fprintf formatter "@[<h>%s(%a)@]" name (Utils.pp_list !T.pp_term#pp) args
-  | ThenGC gc ->
+  | ThenGC (gc, args) ->
     Format.fprintf formatter
-      "@[<hov2>gc %a@ @[<h>with %s(%a)@]@]"
+      "@[<hov2>gc {%a@ @[<h>with %s(%a)}(%a)@]@]"
       (Utils.pp_list ~sep:" and " !T.pp_term#pp)
       (List.map (fun (p,args) -> Pattern.instantiate p args) gc.gc_eqns)
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
+      (Utils.pp_list ~sep:" and " !T.pp_term#pp) args
 
 let rec definition_to_json definition : json =
   match definition with
@@ -302,11 +336,12 @@ let atom_theory name args =
 let atom_pattern pat args =
   Logic.mk_literal (MString "pattern") (`Symbol (MPattern pat) :: args)
 
-let atom_gc ?(offset=(-1)) gc =
+let atom_gc ?(offset=(-1)) gc terms =
   let args = [`Symbol (MString gc.gc_ord)] in
   let args = args @ List.map encode_term gc.gc_prec in
   let args = args @ List.map (fun (pat,vars) -> `Symbol (MPatternVars (pat, vars))) gc.gc_eqns in
   let args = args @ List.map encode_term gc.gc_vars in
+  let args = args @ List.map encode_term terms in
   Logic.mk_literal (MString "gc") args
 
 (** Convert the arguments into terms. Expected sorts are given and
@@ -361,7 +396,7 @@ let definition_to_datalog definition =
     Logic.mk_clause concl premises
   | GC (gc, premises) ->
     let premises = List.map premise_to_datalog premises in 
-    let concl = atom_gc gc in
+    let concl = atom_gc gc gc.gc_vars in
     Logic.mk_clause concl premises
 
 let definition_to_goals definition =
@@ -400,7 +435,6 @@ let of_datalog lit =
     let terms = extract_terms_unsafe args in
     Some (ThenNamed (name, terms))
   | MString "theory", (`Symbol (MString name) :: args) ->
-    Utils.debug 4 "KB.of_datalog %a" Logic.pp_literal lit;
     let terms = extract_terms_unsafe args in
     Some (ThenTheory (name, terms))
   | MString "gc", (`Symbol (MString gc_ord) :: args) ->
@@ -412,8 +446,13 @@ let of_datalog lit =
     | (`Symbol (MTerm t))::l' -> extract false (prec,pats,t::vars) l'
     | _ -> assert false
     in
-    let gc_prec, gc_eqns, gc_vars = extract true ([],[],[]) args in
-    Some (ThenGC { gc_prec; gc_eqns; gc_vars; gc_ord; })
+    let gc_prec, gc_eqns, terms = extract true ([],[],[]) args in
+    (* split gc_vars into proper variables, and their arguments *)
+    let n = List.length terms in
+    assert ((n mod 2) = 0);
+    let gc_vars = Utils.list_take (n/2) terms
+    and args = Utils.list_drop (n/2) terms in
+    Some (ThenGC ({ gc_prec; gc_eqns; gc_vars; gc_ord; }, args))
   | _ -> None 
 
 (** {2 Knowledge Base} *)

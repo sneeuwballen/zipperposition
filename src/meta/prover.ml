@@ -73,6 +73,7 @@ let goal_handler prover lit =
 
 (** Handler called on facts *)
 let fact_handler prover lit =
+  let ctx = prover.ctx in
   Utils.debug 2 "%% meta-prover: new fact %a" Logic.pp_literal lit;
   if LitMap.mem lit prover.clauses
     then ()  (* a clause we already know *)
@@ -81,7 +82,7 @@ let fact_handler prover lit =
       (* a formula is true! *)
       let t = Pattern.instantiate p args in
       assert (T.is_fo t);
-      let lits = [| Literals.mk_eq ~ord:prover.ctx.ctx_ord t T.true_term |] in
+      let lits = [| Literals.mk_eq ~ord:ctx.ctx_ord t T.true_term |] in
       (* explanations: find the ones which are in fact clauses. *)
       let premises = Logic.db_explain prover.db lit in
       let premises = Utils.list_flatmap
@@ -99,9 +100,16 @@ let fact_handler prover lit =
       let result = Theory (name, args) in
       prover.results <- result :: prover.results;
       prover.new_results <- result :: prover.new_results
-    | Some (KB.ThenGC _) ->
-      failwith "TODO: Prover.fact_handler(GC)"
-      (* TODO: instantiate GC into an expert *)
+    | Some (KB.ThenGC gc_spec) ->
+      (match KB.gc_spec_to_gc ~ctx gc_spec with
+        | None -> Utils.debug 1 "%% meta-prover: got non-FO gnd_convergent"
+        | Some gc ->
+          Utils.debug 0 "%% meta-prover: new @[<h>gnd_convergent %a@]"
+            Experts.pp_gc gc;
+          let expert = Experts.gc_expert ~ord:ctx.ctx_ord gc in
+          let result = Expert expert in
+          prover.results <- result :: prover.results;
+          prover.new_results <- result :: prover.new_results)
     | None -> ()  (* not a proper fact *)
 
 (** Add a KB definition to the prover *)

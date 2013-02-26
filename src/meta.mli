@@ -121,7 +121,7 @@ module KB : sig
   | ThenPattern of Pattern.t parametrized
   | ThenTheory of string parametrized
   | ThenNamed of string parametrized
-  | ThenGC of gnd_convergent_spec
+  | ThenGC of gnd_convergent_spec parametrized
   and gnd_convergent_spec = {
     gc_vars : varlist;
     gc_ord : string;
@@ -138,7 +138,8 @@ module KB : sig
 
   module DefSet : Set.S with type elt = definition
 
-  val gc_spec_to_gc : gnd_convergent_spec parametrized ->
+  val gc_spec_to_gc : ctx:context ->
+                      gnd_convergent_spec parametrized ->
                       Experts.gnd_convergent option
     (** Convert a ground-convergent abstract specification to a concrete
         system, if possible (ie, if fully instantiated) *)
