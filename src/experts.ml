@@ -37,14 +37,16 @@ type t = {
   expert_sig : SSet.t;                  (** Symbols of the theory *)
   expert_clauses : hclause list;        (** Additional axioms *)
   expert_canonize : term -> term;       (** Get a canonical form of the term *)
+  expert_ord : ordering -> bool;        (** Compatible with ord? *)
   expert_solve : ((term*term) list -> substitution list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
 } (** An expert for some theory *)
 
-(** Simple syntaxic criterion to decide whether two decision procedures
-    are compatibles: check whether they have no symbol in common.
+let compatible_ord e ord = e.expert_ord ord
 
+(** Simple syntactic criterion to decide whether two decision procedures
+    are compatibles: check whether they have no symbol in common.
     TODO: more elaborate checks, for instance with ground-joinability of all
     critical pairs *)
 let compatible e1 e2 =
@@ -68,6 +70,7 @@ let combine e1 e2 =
     expert_sig = SSet.union e1.expert_sig e2.expert_sig;
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
     expert_canonize = nf;
+    expert_ord = (fun o -> e1.expert_ord o && e2.expert_ord o);
     expert_solve = None;
   }
 
@@ -188,7 +191,6 @@ let compatible_gc ~ord gc =
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
 let gc_expert ~ord gc =
-  assert (compatible_gc ~ord gc);
   (* make a rewriting system from the clauses *)
   let trs = Rewriting.OrderedTRS.create ~ord in
   let expert_clauses = gc.gc_eqns in
@@ -207,6 +209,7 @@ let gc_expert ~ord gc =
     expert_sig;
     expert_clauses;
     expert_canonize;
+    expert_ord = (fun o -> compatible_gc ~ord:o gc);
     expert_solve=None;
   }
 
@@ -237,6 +240,7 @@ let ac f =
     expert_sig = SSet.singleton f;
     expert_clauses = []; (* TODO *)
     expert_canonize;
+    expert_ord = (fun _ -> true);
     expert_solve = None;
   } in
   expert

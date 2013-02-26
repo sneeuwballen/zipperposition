@@ -33,6 +33,9 @@ open Symbols
 type t
   (** An expert for some theory *)
 
+val compatible_ord : t -> ordering -> bool
+  (** Check whether using this expert is possible in the given ordering *)
+
 val compatible : t -> t -> bool
   (** Simple syntaxic criterion to decide whether two experts
       are compatibles: check whether they have no symbol in common. *)
