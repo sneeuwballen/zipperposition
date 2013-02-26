@@ -29,9 +29,6 @@ module Utils = FoUtils
 module Unif = FoUnif
 module Lits = Literals
 
-(* TODO: replace curry/uncurry by an encoding as apply_0(f), apply_1(f,x),
-   apply_2(f,x,y), etc. that allows to distinguish variables from constants *)
-
 let __function_symbol = mk_symbol ~attrs:attr_polymorphic "$$function"
 
 (** Encoding of term, in a form that allows to distinguish variables from
@@ -200,11 +197,6 @@ let apply_subst ?(uncurry=true) (((p, args),offset) : t parametrized bind) subst
       | _ -> arg)
     args in
   instantiate ~uncurry p args
-
-(* FIXME: what if we match F(X) against f(a)? should be rejected, because the
-   axiom is much weaker than expected! Need some guard to distinguish between
-   variables and constants on the matching side, like encoding constant [c] by
-   [constant @ X] rather than [X]...*)
 
 (** [matching p lits] attempts to match the literals against the pattern.
     It yields a list of solutions, each solution [s1,...,sn] satisfying
