@@ -75,6 +75,11 @@ let eq_pattern ((t1,sorts1) : t) ((t2, sorts2) : t) =
   t1 == t2 &&
     try List.for_all2 (==) sorts1 sorts2 with Invalid_argument _ -> false
 
+let compare_pattern ((t1,sorts1) : t) ((t2, sorts2) : t) =
+  if t1 != t2
+    then T.compare_term t1 t2
+    else Utils.lexicograph compare_sort sorts1 sorts2
+
 let hash_pattern ((t,sorts) : t) =
   let h = T.hash_term t in
   Hash.hash_list hash_sort h sorts

@@ -57,6 +57,70 @@ and gnd_convergent_spec = {
       gc_ord and gc_prec (once instantiated), give a constraint on the ordering
       that must be satisfied for the system to be a decision procedure. *)
 
+(** {2 Utils} *)
+
+let rec compare_definitions d1 d2 =
+  match d1, d2 with
+  | Named (n1,p1), Named (n2,p2) ->
+    Utils.lexicograph_combine
+      [String.compare n1 n2;
+       Pattern.compare_pattern p1 p2]
+  | Theory ((th1,args1),premises1), Theory ((th2,args2), premises2) ->
+    Utils.lexicograph_combine
+      [String.compare th1 th2;
+       Utils.lexicograph T.compare_term args1 args2;
+       Utils.lexicograph compare_premise premises1 premises2]
+  | Lemma ((p1,args1),premises1), Lemma ((p2,args2),premises2) ->
+    Utils.lexicograph_combine
+      [Pattern.compare_pattern p1 p2;
+       Utils.lexicograph T.compare_term args1 args2;
+       Utils.lexicograph compare_premise premises1 premises2]
+  | GC (gc1,premises1), GC (gc2, premises2) ->
+    Utils.lexicograph_combine
+      [Utils.lexicograph
+        (fun (p1,a1) (p2,a2) ->
+          Utils.lexicograph_combine
+            [Pattern.compare_pattern p1 p2;
+             Utils.lexicograph T.compare_term a1 a2])
+        gc1.gc_eqns gc2.gc_eqns;
+       String.compare gc1.gc_ord gc2.gc_ord;
+       Utils.lexicograph T.compare_term gc1.gc_prec gc2.gc_prec;
+       Utils.lexicograph compare_premise premises1 premises2]
+  | Named _, _ -> 1
+  | _, Named _ -> -1
+  | Theory _, _ -> 1
+  | _, Theory _ -> -1
+  | Lemma _, _ -> 1
+  | _, Lemma _ -> -1
+and compare_premise p1 p2 =
+  match p1, p2 with
+  | IfNamed (n1,args1), IfNamed (n2,args2) ->
+    Utils.lexicograph_combine
+      [String.compare n1 n2;
+       Utils.lexicograph T.compare_term args1 args2]
+  | IfTheory (n1,args1), IfTheory (n2,args2) ->
+    Utils.lexicograph_combine
+      [String.compare n1 n2;
+       Utils.lexicograph T.compare_term args1 args2]
+  | IfPattern (p1, args1), IfPattern (p2, args2) ->
+    Utils.lexicograph_combine
+      [Pattern.compare_pattern p1 p2;
+       Utils.lexicograph T.compare_term args1 args2]
+  | IfNamed _, _ -> 1
+  | _, IfNamed _ -> -1
+  | IfTheory _, _ -> 1
+  | _, IfTheory _ -> -1
+
+module DefSet = Set.Make(struct
+  type t = definition
+  let compare = compare_definitions
+end)
+
+(** Convert a ground-convergent abstract specification to a concrete
+    system, if possible (ie, if fully instantiated) *)
+let gc_spec_to_gc (gc_spec, terms) =
+  None (* TODO *)
+
 (** {2 Printing/parsing} *)
 
 let rec pp_definition formatter definition =

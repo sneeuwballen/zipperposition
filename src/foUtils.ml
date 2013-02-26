@@ -99,7 +99,7 @@ let rec lexicograph f l1 l2 =
   | x::xs, y::ys ->
      let c = f x y in
      if c <> 0 then c else lexicograph f xs ys
-  | [],_ -> ~-1
+  | [],_ -> (-1)
   | _,[] -> 1
 
 (** combine comparisons by lexicographic order *)

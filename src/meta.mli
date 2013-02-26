@@ -43,6 +43,7 @@ module Pattern : sig
         be well-typed. *)
 
   val eq_pattern : t -> t -> bool
+  val compare_pattern : t -> t -> int
   val hash_pattern : t -> int
 
   (** {2 Printing/conversion to JSON} *)
@@ -130,6 +131,17 @@ module KB : sig
         when instantiated. It is parametrized by the theory it decides.
         gc_ord and gc_prec (once instantiated), give a constraint on the ordering
         that must be satisfied for the system to be a decision procedure. *)
+
+  (** {2 Utils} *)
+
+  val compare_definitions : definition -> definition -> int
+
+  module DefSet : Set.S with type elt = definition
+
+  val gc_spec_to_gc : gnd_convergent_spec parametrized ->
+                      Experts.gnd_convergent option
+    (** Convert a ground-convergent abstract specification to a concrete
+        system, if possible (ie, if fully instantiated) *)
 
   (** {2 Printing/parsing} *)
 
