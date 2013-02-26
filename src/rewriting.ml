@@ -18,104 +18,209 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Term rewriting *)
+(** {1 Term rewriting} *)
 
 open Types
 
 module T = Terms
+module C = Clauses
 module S = FoSubst
 module DT = Dtree
 module Unif = FoUnif
 module Utils = FoUtils
 
-type rule = (term * term)
+(** {2 Ordered rewriting} *)
 
-(* ----------------------------------------------------------------------
- * Definition of TRS
- * ---------------------------------------------------------------------- *)
+module OrderedTRS = struct
+  type t = {
+    ord : ordering;
+    mutable tree : rule Dtree.dtree;
+  } (** Ordered rewriting system *)
+  and rule = {
+    rule_clause : hclause;
+    rule_left : term;       (** Pattern *)
+    rule_right : term;      (** Result *)
+    rule_oriented : bool;
+  } (** A rule, oriented or not *)
 
-(** Term Rewriting System *)
-type trs = {
-  mutable index : term DT.dtree;    (** index of rules *)
-  mutable nbr_rules : int;          (** number of rules *)
-}
+  let eq_rule r1 r2 =
+    (C.eq_hclause r1.rule_clause r2.rule_clause) &&
+    (r1.rule_oriented = r2.rule_oriented)
 
-let create () = {
-  index = DT.empty T.eq_term;
-  nbr_rules = 0;
-}
+  let rule_priority rule =
+    (* better priority for oriented rules *)
+    if rule.rule_oriented then 1 else 2
 
-let var_offset = 50000              (** negative offset for variables in rules *)
+  let create ~ord =
+    { ord;
+      tree = Dtree.empty eq_rule;
+    }
 
-let add_rule trs (l, r) =
-  (* check that the rule does not introduce variables *)
-  assert (List.for_all
-    (fun v -> T.member_term v l)
-    (T.vars r));
-  assert (not (T.is_var l));
-  assert (l.sort = r.sort);
-  (* add rule to the discrimination tree *)
-  (* now add the rule to the index *)
-  trs.index <- DT.add trs.index l r;
-  trs.nbr_rules <- trs.nbr_rules + 1
+  let mk_rule hc l r oriented =
+    { rule_clause=hc; rule_left=l; rule_right=r; rule_oriented=oriented; }
 
-let add_rules trs l = List.iter (add_rule trs) l
+  (** Extract a list of rules from the clause *)
+  let rules_of_hc hc =
+    match hc.hclits with
+    | [| Equation (l,r,true,Gt) |] ->
+      [mk_rule hc l r true]
+    | [| Equation (l,r,true,Lt) |] ->
+      [mk_rule hc r l true]
+    | [| Equation (l,r,true,Incomparable) |] ->
+      [mk_rule hc l r false; mk_rule hc r l false]
+    | _ -> []
 
-let from_list l =
-  let trs = create () in
-  add_rules trs l;
-  trs
+  let add_clause trs hc =
+    assert (hc.hcctx.ctx_ord == trs.ord);
+    let rules = rules_of_hc hc in
+    List.iter
+      (fun rule ->
+        (* add the rule to the index *)
+        let priority = rule_priority rule in
+        trs.tree <- Dtree.add trs.tree ~priority rule.rule_left rule)
+      rules
 
-let size trs = trs.nbr_rules
+  let add_seq trs seq =
+    Sequence.iter (add_clause trs) seq
 
-let iter trs k =
-  DT.iter trs.index (fun l r -> k (l, r))
+  let to_seq trs =
+    let tree = trs.tree in
+    Sequence.from_iter
+      (fun k -> Dtree.iter tree (fun _ rule -> k rule.rule_clause))
 
-let pp_rule formatter (l, r) =
-  Format.fprintf formatter "@[<h>%a → %a@]" !T.pp_term#pp l !T.pp_term#pp r
+  let size trs =
+    let s = ref 0 in
+    Dtree.iter trs.tree (fun _ _ -> incr s);
+    !s
+  
+  exception RewrittenInto of term
 
-let pp_trs formatter trs =
-  let rules = ref [] in
-  iter trs (fun rule -> rules := rule :: !rules);
-  Format.fprintf formatter "{@[<hv>%a@]}"
-    (Utils.pp_list ~sep:";" pp_rule) !rules
-
-(* ----------------------------------------------------------------------
- * Computation of normal forms
- * ---------------------------------------------------------------------- *)
-
-exception RewrittenIn of term
-
-(** Compute normal form of the term, and set its binding to the normal form *)
-let rewrite trs t = 
-  (* compute normal form of this term *)
-  let rec compute_nf offset trs t =
-    match t.term with
-    | Bind (s, a_sort, t') ->
-      let t'' = compute_nf offset trs t' in
-      let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
-      reduce_at_root offset trs new_t
-    | Node (hd, l) ->
-      (* rewrite subterms first *)
-      let l' = List.map (compute_nf offset trs) l in
-      let t' = T.mk_node ~old:t hd t.sort l' in
-      (* rewrite at root *)
-      reduce_at_root offset trs t'
-    | Var _ | BoundVar _ -> assert false
-  (* assuming subterms are in normal form, reduce the term *)
-  and reduce_at_root offset trs t =
-    try
-      DT.iter_match (trs.index,offset) (t,0) rewrite_handler;
-      t  (* normal form *)
-    with (RewrittenIn t') ->
-      compute_nf offset trs t' (* rewritten in t', continue *)
-  (* attempt to use one of the rules to rewrite t *)
-  and rewrite_handler (l,o) r subst =
-    let t' = S.apply_subst subst (r,o) in (* all vars in [r] are bound in [subst] *)
-    raise (RewrittenIn t')
+  (** Rewrite a term into its normal form *)
+  let rewrite trs t =
+    (* reduce to normal form *)
+    let rec reduce t =
+      match t.term with
+      | Var _ | BoundVar _ -> t
+      | Bind (s, a_sort, t') ->
+        let t' = reduce t' in
+        T.mk_bind ~old:t s t.sort a_sort t'
+      | Node (s, l) ->
+        let l = List.map reduce l in
+        let t = T.mk_node ~old:t s t.sort l in
+        (* now rewrite the term itself *)
+        rewrite_here t
+    (* rewrite once at this position. If it succeeds,
+       yields back to [reduce]. *)
+    and rewrite_here t =
+      try
+        Dtree.iter_match (trs.tree,1) (t,0)
+          (fun (l,_) rule subst ->
+            let l' = S.apply_subst subst (l,1) in
+            let r = rule.rule_right in
+            let r' = S.apply_subst subst (r,1) in
+            assert (trs.ord#compare l' r' = Gt);
+            Utils.debug 2 "%% rewrite @[<h>%a into %a@]"
+              !T.pp_term#pp l' !T.pp_term#pp r';
+            raise (RewrittenInto r'));
+        t (* could not rewrite t *)
+      with RewrittenInto t' ->
+        reduce t'  (* term is rewritten, reduce it again *)
   in
-  (* any offset will do, as long as it's <> 0, because no variable of the TRS
-     should remain free during instantiation (vars(r) \subset vars(l) for all rules) *)
-  compute_nf 1 trs t
+  reduce t
 
-let pp_trs_index formatter trs = DT.pp_term_tree formatter trs.index
+  let pp formatter trs =
+    Format.fprintf formatter "@[<hov2>%a@]"
+      (Sequence.pp_seq ~sep:" and " !C.pp_clause#pp_h)
+      (to_seq trs)
+end
+
+(** {2 Regular rewriting} *)
+
+module TRS = struct
+  type rule = (term * term)
+
+  type t = {
+    mutable index : term DT.dtree;    (** index of rules *)
+    mutable nbr_rules : int;          (** number of rules *)
+  } (** Term Rewriting System *)
+
+  let create () = {
+    index = DT.empty T.eq_term;
+    nbr_rules = 0;
+  }
+
+  let var_offset = 50000              (** negative offset for variables in rules *)
+
+  let add_rule trs (l, r) =
+    (* check that the rule does not introduce variables *)
+    assert (List.for_all
+      (fun v -> T.member_term v l)
+      (T.vars r));
+    assert (not (T.is_var l));
+    assert (l.sort = r.sort);
+    (* add rule to the discrimination tree *)
+    (* now add the rule to the index *)
+    trs.index <- DT.add trs.index l r;
+    trs.nbr_rules <- trs.nbr_rules + 1
+
+  let add_rules trs l = List.iter (add_rule trs) l
+
+  let from_list l =
+    let trs = create () in
+    add_rules trs l;
+    trs
+
+  let size trs = trs.nbr_rules
+
+  let iter trs k =
+    DT.iter trs.index (fun l r -> k (l, r))
+
+  let pp_rule formatter (l, r) =
+    Format.fprintf formatter "@[<h>%a → %a@]" !T.pp_term#pp l !T.pp_term#pp r
+
+  let pp_trs formatter trs =
+    let rules = ref [] in
+    iter trs (fun rule -> rules := rule :: !rules);
+    Format.fprintf formatter "{@[<hv>%a@]}"
+      (Utils.pp_list ~sep:";" pp_rule) !rules
+
+  (* ----------------------------------------------------------------------
+   * Computation of normal forms
+   * ---------------------------------------------------------------------- *)
+
+  exception RewrittenIn of term
+
+  (** Compute normal form of the term, and set its binding to the normal form *)
+  let rewrite trs t = 
+    (* compute normal form of this term *)
+    let rec compute_nf offset trs t =
+      match t.term with
+      | Bind (s, a_sort, t') ->
+        let t'' = compute_nf offset trs t' in
+        let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
+        reduce_at_root offset trs new_t
+      | Node (hd, l) ->
+        (* rewrite subterms first *)
+        let l' = List.map (compute_nf offset trs) l in
+        let t' = T.mk_node ~old:t hd t.sort l' in
+        (* rewrite at root *)
+        reduce_at_root offset trs t'
+      | Var _ | BoundVar _ -> assert false
+    (* assuming subterms are in normal form, reduce the term *)
+    and reduce_at_root offset trs t =
+      try
+        DT.iter_match (trs.index,offset) (t,0) rewrite_handler;
+        t  (* normal form *)
+      with (RewrittenIn t') ->
+        compute_nf offset trs t' (* rewritten in t', continue *)
+    (* attempt to use one of the rules to rewrite t *)
+    and rewrite_handler (l,o) r subst =
+      let t' = S.apply_subst subst (r,o) in (* all vars in [r] are bound in [subst] *)
+      raise (RewrittenIn t')
+    in
+    (* any offset will do, as long as it's <> 0, because no variable of the TRS
+       should remain free during instantiation (vars(r) \subset vars(l) for all rules) *)
+    compute_nf 1 trs t
+
+  let pp_trs_index formatter trs = DT.pp_term_tree formatter trs.index
+end

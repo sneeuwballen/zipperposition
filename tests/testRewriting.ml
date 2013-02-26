@@ -6,7 +6,7 @@ open Symbols
 module T = Terms
 module S = FoSubst
 module Utils = FoUtils
-module Rw = Rewriting
+module Rw = Rewriting.TRS
 
 let a = T.mk_const (mk_symbol "a") univ_
 let b = T.mk_const (mk_symbol "b") univ_

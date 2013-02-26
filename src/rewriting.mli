@@ -18,25 +18,47 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Term rewriting *)
+(** {1 Term rewriting} *)
 
 open Types
 
-type rule = (term * term)
+(** {2 Ordered rewriting} *)
 
-(** Term Rewriting System *)
-type trs
+module OrderedTRS : sig
+  type t
 
-val create : unit -> trs
-val add_rule : trs -> rule -> unit
-val add_rules : trs -> rule list -> unit
-val from_list : rule list -> trs
+  val create : ord:ordering -> t
+  
+  val add_clause : t -> hclause -> unit
+  val add_seq : t -> hclause Sequence.t -> unit
+  
+  val to_seq : t -> hclause Sequence.t
 
-val size : trs -> int
-val iter : trs -> (rule -> unit) -> unit
+  val size : t -> int
+  
+  val rewrite : t -> term -> term
 
-val pp_trs : Format.formatter -> trs -> unit
-val pp_trs_index : Format.formatter -> trs -> unit
+  val pp : Format.formatter -> t -> unit
+end
 
-(** Compute normal form of the term, and set its binding to the normal form *)
-val rewrite : trs -> term -> term
+(** {2 Regular rewriting} *)
+
+module TRS : sig
+  type rule = (term * term)
+
+  type t
+
+  val create : unit -> t
+  val add_rule : t -> rule -> unit
+  val add_rules : t -> rule list -> unit
+  val from_list : rule list -> t
+
+  val size : t -> int
+  val iter : t -> (rule -> unit) -> unit
+
+  val pp_trs : Format.formatter -> t -> unit
+  val pp_trs_index : Format.formatter -> t -> unit
+
+  val rewrite : t -> term -> term
+    (** Compute normal form of the term *)
+end
