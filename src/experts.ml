@@ -25,6 +25,7 @@ open Symbols
 
 module T = Terms
 module C = Clauses
+module S = FoSubst
 module Utils = FoUtils
 
 (** {2 General interface} *)
@@ -140,34 +141,74 @@ type gnd_convergent = {
   gc_ord : string;                    (** name of the ordering *)
   gc_prec : symbol list;              (** Precedence *)
   gc_sig : SSet.t;                    (** Symbols of the theory *)
-  gc_equations : literal list;        (** Equations of the system *)
+  gc_eqns : hclause list;             (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
-let mk_gc name prec lits =
-  let set = T.symbols
-    (Sequence.concat
-      (Sequence.map 
-        (fun (Equation (l,r,_,_)) -> Sequence.of_list [l;r])
-        (Sequence.of_list lits)))
-  in
+let mk_gc name prec hclauses =
+  let signature = C.signature hclauses in
+  (* check that every clause is a positive equation *)
+  assert (List.for_all
+    (fun hc -> match hc.hclits with 
+     | [| Equation (_,_,true,_)|] -> true | _ -> false) hclauses);
+  let set = symbols_of_signature signature in
+  let set = SSetSeq.of_seq (Sequence.of_list set) in
   { gc_ord = name;
     gc_prec = prec;
     gc_sig = set;
-    gc_equations = lits;
+    gc_eqns = hclauses;
   }
+
+(** Instantiate variables in the pairs of terms with fresh constants *)
+let ground_pair t1 t2 =
+  (* build a grounding substitution *)
+  let vars = T.vars_list [t1; t2] in
+  let _, subst = List.fold_left
+    (fun (i,subst) v ->
+      (* bind [v] to a fresh constant *)
+      let const = T.mk_const (mk_fresh_const i) v.sort in
+      let subst' = S.bind subst (v,0) (const,0) in
+      (i+1, subst'))
+    (0, S.id_subst) vars in
+  let t1' = S.apply_subst subst (t1,0) in
+  let t2' = S.apply_subst subst (t2,0) in
+  t1', t2'
 
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
-let gc_expert gc = failwith "todo: Experts.gc_expert"
+let gc_expert ~ord gc =
+  (* TODO: check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
+  (* make a rewriting system from the clauses *)
+  let trs = Rewriting.OrderedTRS.create ~ord in
+  let expert_clauses = gc.gc_eqns in
+  Rewriting.OrderedTRS.add_seq trs (Sequence.of_list expert_clauses);
+  (* compute normal form using the rewriting system *)
+  let nf t = Rewriting.OrderedTRS.rewrite trs t in
+  (* equality is equality of grounded normal forms *)
+  let expert_equal t1 t2 =
+    let t1', t2' = ground_pair t1 t2 in
+    nf t1' == nf t2' in
+  let expert_canonize t = nf t in
+  let expert_sig = gc.gc_sig in
+  { expert_name="gnd_convergent";
+    expert_descr="ground convergent system of equations";
+    expert_equal;
+    expert_sig;
+    expert_clauses;
+    expert_canonize;
+    expert_solve=None;
+  }
 
 (** Pretty-print the system of ground convergent equations *)
-let pp_gc formatter gc = failwith "todo: Experts.pp_gc"
+let pp_gc formatter gc =
+  Format.fprintf formatter "@[<h>%d equations (ord %s[%a])@]"
+    (List.length gc.gc_eqns) gc.gc_ord
+    (Utils.pp_list pp_symbol) gc.gc_prec
 
 (** {3 JSON encoding} *)
 
-let gc_to_json gc = failwith "nope"
+let gc_to_json gc = failwith "TODO: Experts.gc_to_json" (* TODO *)
 
-let gc_of_json ~ctx json = failwith "nope"
+let gc_of_json ~ctx json = failwith "TODO: Experts.gc_of_json" (* TODO *)
 
 (** {2 Some builtin theories} *)
 

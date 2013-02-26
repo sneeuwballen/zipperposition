@@ -149,8 +149,6 @@ module TRS = struct
     nbr_rules = 0;
   }
 
-  let var_offset = 50000              (** negative offset for variables in rules *)
-
   let add_rule trs (l, r) =
     (* check that the rule does not introduce variables *)
     assert (List.for_all
