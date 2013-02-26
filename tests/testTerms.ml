@@ -115,6 +115,35 @@ let check_ac_matching () =
         (T.mk_or p1 p2)
         (T.mk_or y p3))
   in
+  (* big *)
+  Format.printf "AC-match @[<h>%a and %a@]@." !T.pp_term#pp t1 !T.pp_term#pp t2;
+  Sequence.iter
+    (fun subst -> 
+      Format.printf "-----------------------------------------@.";
+      Format.printf "  --> @[<h>%a@]@." S.pp_substitution subst;
+      let t1' = S.apply_subst subst (t1,0)
+      and t2' = S.apply_subst subst (t2,1) in
+      let ok = T.ac_eq t1' t2' in
+      Format.printf "@[<h>%a =_AC %a? %B@]@." !T.pp_term#pp t1' !T.pp_term#pp t2' ok)
+    (Unif.matching_ac S.id_subst (t1,0) (t2,1));
+  (* small *)
+  let t1 =
+    T.mk_eq
+      (T.mk_at
+        (T.mk_var 0 (univ_ <=. univ_))
+        (T.mk_var 1 univ_))
+      (T.mk_at
+        (T.mk_var 2 (univ_ <=. univ_))
+        (T.mk_var 1 univ_))
+  and t2 = 
+    T.mk_eq
+      (T.mk_at
+        (T.mk_const (mk_symbol "f1") (univ_ <=. univ_))
+        (T.mk_var 3 univ_))
+      (T.mk_at
+        (T.mk_const (mk_symbol "f2") (univ_ <=. univ_))
+        (T.mk_var 3 univ_))
+  in
   Format.printf "AC-match @[<h>%a and %a@]@." !T.pp_term#pp t1 !T.pp_term#pp t2;
   Sequence.iter
     (fun subst -> 
@@ -126,7 +155,6 @@ let check_ac_matching () =
       Format.printf "@[<h>%a =_AC %a? %B@]@." !T.pp_term#pp t1' !T.pp_term#pp t2' ok)
     (Unif.matching_ac S.id_subst (t1,0) (t2,1));
   ()
-
 
 let check_beta () =
   let t1 =

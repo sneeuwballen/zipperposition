@@ -152,18 +152,19 @@ let matching_ac ?(is_ac=fun s -> has_attr attr_ac s)
     | Some o -> o
     | None -> ref (max (T.max_var (T.vars a) + o_a + 1)
                        (T.max_var (T.vars b) + o_b + 1)) in
-  let fresh_var =
-    (* avoid index collisions *)
-    fun sort ->
-      let v = T.mk_var !offset sort in
-      incr offset;
-      v
+  (* avoid index collisions *)
+  let fresh_var sort =
+    let v = T.mk_var !offset sort in
+    incr offset;
+    v
   in
   (* recursive matching. [k] is called with solutions *)
   let rec unif subst s o_s t o_t k =
+    Utils.debug 4 "try unif @[<h>%a[%d] and %a[%d]@]" !T.pp_term#pp s o_s !T.pp_term#pp t o_t;
     if s.sort != t.sort then ()
     else let s, o_s = S.get_var subst (s, o_s) in
       match s.term, t.term with
+      | Var _, Var _ when s == t && o_s = o_t -> k subst (* trivial success *)
       | Var _, _ ->
         if occurs_check subst s o_s t o_t || o_s <> o_a
           then ()
@@ -239,3 +240,4 @@ let matching_ac ?(is_ac=fun s -> has_attr attr_ac s)
      of [a]. *)
   let seq k = unif subst a o_a b o_b k in
   Sequence.from_iter seq
+
