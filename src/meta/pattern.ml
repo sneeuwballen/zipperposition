@@ -220,13 +220,13 @@ let matching (p : t) lits =
   let vars = List.mapi (fun i sort -> T.mk_var (i+offset) sort) sorts in
   let left = instantiate ~uncurry:false p vars in
   (* match pattern against [right] *)
-  Utils.debug 3 "%% meta-prover: match @[<h>%a with %a@]@."
+  Utils.debug 3 "%% meta-prover: match @[<h>%a with %a@]"
     !T.pp_term#pp left !T.pp_term#pp right;
   let substs = Unif.matching_ac S.id_subst (left,offset) (right,0) in
   (* now apply the substitution to the list of variables *)
   let substs = Sequence.flatMap
     (fun subst ->
-      Utils.debug 2 "%% meta-prover: subst @[<h>%a@], vars @[<h>%a@]@."
+      Utils.debug 2 "%% meta-prover: subst @[<h>%a@], vars @[<h>%a@]"
         S.pp_substitution subst (Utils.pp_list !T.pp_term#pp) vars;
       (* convert variables back to terms *)
       let args = List.map (fun v -> S.apply_subst subst (v,offset)) vars in
