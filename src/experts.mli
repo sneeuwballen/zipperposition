@@ -85,6 +85,9 @@ val mk_gc : string -> symbol list -> hclause list -> gnd_convergent
   (** Create a ground-convergent system from a list of equations
       and informations on the ordering. *)
 
+val compatible_gc : ord:ordering -> gnd_convergent -> bool
+  (** check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
+
 val gc_expert : ord:ordering -> gnd_convergent -> t
   (** From a set of ground convergent equations, create an expert for
       the associated theory. *)

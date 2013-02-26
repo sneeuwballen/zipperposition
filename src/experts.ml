@@ -173,10 +173,22 @@ let ground_pair t1 t2 =
   let t2' = S.apply_subst subst (t2,0) in
   t1', t2'
 
+(** check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
+let compatible_gc ~ord gc =
+  (* Checks that the precedence of [ord] is compatible with
+     the list of symbols [prec] being decreasing *)
+  let rec compatible_prec ord prec =
+    match prec with
+    | [] | [_] -> true
+    | x::((y::_) as prec') ->
+      ord#precedence#compare x y > 0 && compatible_prec ord prec'
+  in
+  ord#name = gc.gc_ord && compatible_prec ord gc.gc_prec
+
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
 let gc_expert ~ord gc =
-  (* TODO: check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
+  assert (compatible_gc ~ord gc);
   (* make a rewriting system from the clauses *)
   let trs = Rewriting.OrderedTRS.create ~ord in
   let expert_clauses = gc.gc_eqns in
