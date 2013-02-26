@@ -29,6 +29,37 @@ module Utils = FoUtils
 module Unif = FoUnif
 module Lits = Literals
 
+(* TODO: replace curry/uncurry by an encoding as apply_0(f), apply_1(f,x),
+   apply_2(f,x,y), etc. that allows to distinguish variables from constants *)
+
+let __function_symbol = mk_symbol ~attrs:attr_polymorphic "$$function"
+
+(** Encoding of term, in a form that allows to distinguish variables from
+    constants even after abstracting symbols *)
+let rec encode t =
+  match t.term with
+  | Var _ | BoundVar _ -> t
+  | Bind (s, a_sort, t') -> T.mk_bind ~old:t s t.sort a_sort (encode t')
+  | Node (s, []) ->
+    (* this is the curryfication of a constant or function symbol. We add a
+       special symbol in front, to prevent it from matching a pattern
+       variable. So for instance f(X,a) is encoded as
+      "((function @ f) @ X) @ (function @ a)" *)
+    let head = T.mk_const __function_symbol (t.sort <=. t.sort) in
+    T.mk_at head t
+  | Node (s, l) -> T.mk_node ~old:t s t.sort (List.map encode l)
+
+(** Inverse operation for [encode] *)
+let rec decode t =
+  match t.term with
+  | Var _ | BoundVar _ -> t
+  | Bind (s, a_sort, t') -> T.mk_bind ~old:t s t.sort a_sort (decode t')
+  | Node (s, [{term=Node (a, [])}; t']) 
+    when s == at_symbol && a == __function_symbol ->
+    assert (t.sort == t'.sort);
+    decode t' (* remove the leading function symbol *)
+  | Node (s, l) -> T.mk_node ~old:t s t.sort (List.map decode l)
+
 (** The datalog provers reasons over first-order formulas. However, to make
     those formulas signature-independent, we curryfy them and abstract their
     symbols into lambda-bound variables.
@@ -52,7 +83,7 @@ let hash_pattern ((t,sorts) : t) =
   Hash.hash_list hash_sort h sorts
 
 let pp_pattern formatter (p:t) =
-  Format.fprintf formatter "@[<h>%a@]" !T.pp_term#pp (fst p)
+  Format.fprintf formatter "@[<h>%a@]" !T.pp_term#pp (decode (fst p))
 
 let pp_pattern_p formatter ((p, args) : t parametrized) =
   let t, _ = p in
@@ -60,7 +91,7 @@ let pp_pattern_p formatter ((p, args) : t parametrized) =
   let t' = List.fold_right
     (fun const t -> T.beta_reduce (T.mk_at t const))
     args (T.beta_reduce t) in
-  !T.pp_term#pp formatter t'
+  !T.pp_term#pp formatter (decode t')
 
 let to_json (p : t) : json =
   `Assoc [
@@ -104,8 +135,11 @@ let find_functions seq (symbols : symbol list) =
 (** Abstracts the given constants out, in the given order. *)
 let of_term_with t symbols : (t * term list) =
   let constants = find_functions (Sequence.singleton t) symbols in
+  (* encoding of symbols *)
+  let t = encode t in
+  (* lambda abstraction *)
   let t = List.fold_left
-    (fun t const -> T.eta_lift t const)
+    (fun t const -> T.lambda_abstract t const)
     t constants in
   let sorts = List.map (fun x -> x.sort) constants in
   (t, sorts), constants
@@ -141,15 +175,18 @@ let instantiate ?(uncurry=true) (p : t) terms =
     if not ok then failwith "sort mismatch for instantiate"
   with Invalid_argument _ -> failwith "bad arity for instantiate");
   let t, _ = p in
-  Utils.debug 3 "instantiate: @[<h>%a @ [%a]@]" !T.pp_term#pp t
+  Utils.debug 4 "%% meta-prover: instantiate: @[<h>%a @ [%a]@]" !T.pp_term#pp t
     (Utils.pp_list !T.pp_term#pp) terms;
   (* apply constants from the right *)
   let t' = List.fold_right
     (fun const t ->
       T.beta_reduce (T.mk_at t const))
     terms (T.beta_reduce t) in
+  (* decoding of function symbols *)
   if uncurry
-    then if T.is_fo t' then T.uncurry t' else failwith "non-FO pattern instantiation"
+    then
+      let t' = decode t' in
+      if T.is_fo t' then T.uncurry t' else failwith "non-FO pattern instantiation"
     else t'
 
 (** Apply the substitution to variables that parametrize the pattern,
@@ -176,22 +213,28 @@ let apply_subst ?(uncurry=true) (((p, args),offset) : t parametrized bind) subst
 let matching (p : t) lits =
   let _, sorts = p in
   let right = T.curry (Lits.term_of_lits lits) in
+  (* apply encoding to the matched term as well *)
+  let right = encode right in
   (* apply the pattern to a list of new variables *)
-  let offset = T.max_var (T.vars right) + 1 in
+  let offset = max (T.max_var (T.vars (fst p))) (T.max_var (T.vars right)) + 1 in
   let vars = List.mapi (fun i sort -> T.mk_var (i+offset) sort) sorts in
   let left = instantiate ~uncurry:false p vars in
   (* match pattern against [right] *)
+  Utils.debug 3 "%% meta-prover: match @[<h>%a with %a@]@."
+    !T.pp_term#pp left !T.pp_term#pp right;
   let substs = Unif.matching_ac S.id_subst (left,offset) (right,0) in
   (* now apply the substitution to the list of variables *)
   let substs = Sequence.flatMap
     (fun subst ->
-      Format.printf "subst @[<h>%a@], vars @[<h>%a@]@." S.pp_substitution subst
-        (Utils.pp_list !T.pp_term#pp) vars;
+      Utils.debug 2 "%% meta-prover: subst @[<h>%a@], vars @[<h>%a@]@."
+        S.pp_substitution subst (Utils.pp_list !T.pp_term#pp) vars;
       (* convert variables back to terms *)
       let args = List.map (fun v -> S.apply_subst subst (v,offset)) vars in
-      (* TODO: check that abstracted variables map to constants, and regular
+      (* check that abstracted variables map to constants, and regular
         variables map to variables *)
-      Sequence.of_list [args])
+      if List.for_all T.is_const args
+        then Sequence.of_list [args]
+        else Sequence.of_list [])
     substs in
   substs
 

@@ -157,7 +157,7 @@ let match_patterns patterns lits k =
     fact in Datalog. *)
 let found_pattern prover hc pattern args =
   Utils.debug 1 "%% meta-prover: matched pattern @[<h>%a(%a) with %a@]"
-    Pattern.pp_pattern_p (pattern, args) 
+    Pattern.pp_pattern pattern
     (Utils.pp_list !T.pp_term#pp) args !C.pp_clause#pp_h hc;
   let fact = KB.ThenPattern (pattern, args) in
   let lit = KB.fact_to_datalog fact in
