@@ -115,15 +115,21 @@ module OrderedTRS = struct
       try
         Dtree.iter_match (trs.tree,1) (t,0)
           (fun (l,_) rule subst ->
-            let l' = S.apply_subst subst (l,1) in
+            (* right-hand part *)
             let r = rule.rule_right in
             let r' = S.apply_subst subst (r,1) in
-            assert (trs.ord#compare l' r' = Gt);
-            Utils.debug 2 "%% rewrite @[<h>%a into %a@]"
-              !T.pp_term#pp l' !T.pp_term#pp r';
-            raise (RewrittenInto r'));
+            if rule.rule_oriented
+              then raise (RewrittenInto r')  (* we know that t > r' *)
+              else (
+                let l' = S.apply_subst subst (l,1) in
+                assert (l' == t);
+                if trs.ord#compare l' r' = Gt
+                  then raise (RewrittenInto r')
+                  else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
+        Utils.debug 2 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
+        assert (trs.ord#compare t t' = Gt);
         reduce t'  (* term is rewritten, reduce it again *)
   in
   reduce t
