@@ -133,6 +133,42 @@ let pp_expert formatter expert =
   Format.fprintf formatter "[expert on %s (%s)]"
     expert.expert_name expert.expert_descr
 
+(** {2 Set of experts} *)
+
+module Set = struct
+  type expert = t (* alias *)
+
+  type t = expert list
+    (** A set of experts *)
+
+  let empty = []
+
+  let add experts e =
+    (* traverse [experts], trying to find one that is compatible with e *)
+    let rec add left right e =
+      match right with
+      | [] -> e::left (* add the expert *)
+      | e'::right' ->
+        if compatible e e'
+          then (* combine both, and add the combination *)
+            add [] (left @ right) (combine e e')
+          else (* go further *)
+            add (e'::left) right' e
+    in
+    add [] experts e
+
+  let is_redundant experts hc =
+    List.exists (fun e -> is_redundant e hc) experts
+
+  let simplify ~ctx experts hc =
+    List.fold_left
+      (fun hc e -> simplify ~ctx e hc)
+      hc experts
+
+  let pp formatter experts =
+    Utils.pp_list pp_expert formatter experts
+end
+
 (** {2 Ground joinable sets of equations} *)
 
 (** We use ground convergent sets of equations to decide some equational

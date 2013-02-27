@@ -70,6 +70,25 @@ val clauses : t -> hclause list
 
 val pp_expert : Format.formatter -> t -> unit
 
+(** {2 Set of experts} *)
+
+module Set : sig
+  type expert = t (* alias *)
+
+  type t
+    (** A set of experts *)
+
+  val empty : t
+
+  val add : t -> expert -> t
+
+  val is_redundant : t -> hclause -> bool
+
+  val simplify : ctx:context -> t -> hclause -> hclause
+
+  val pp : Format.formatter -> t -> unit
+end
+
 (** {2 Ground joinable sets of equations} *)
 
 (** We use ground convergent sets of equations to decide some equational
