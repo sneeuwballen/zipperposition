@@ -120,6 +120,7 @@ let add_kb_definition prover definition =
   List.iter (Logic.db_goal prover.db) goals;
   (* add the definition *)
   let clause = KB.definition_to_datalog definition in
+  Utils.debug 2 "%% meta-prover: @[<h>add Datalog clause %a@]" Logic.pp_clause clause;
   Logic.db_add prover.db clause
 
 (** Fresh meta-prover, using the given KB *)

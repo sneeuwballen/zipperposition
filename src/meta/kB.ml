@@ -310,10 +310,11 @@ end)
   
 (** {2 Conversion to Datalog} *)
 
-(** Encode term into a Datalog atom *)
-let encode_term t = match t.term with
-  | Var i when i >= 0 -> `Var (-(i*2)-1)
-  | Var i when i < 0 -> `Var (i*2)
+(** Encode term into a Datalog atom. If [to_var] is true, then variables
+    will be encoded into Datalog variables (otherwise to terms) *)
+let encode_term ~to_var t = match t.term with
+  | Var i when to_var && i >= 0 -> `Var (-(i*2)-1)
+  | Var i when to_var && i < 0 -> `Var (i*2)
   | _ -> `Symbol (MTerm t)
 
 (** Convert a Datalog atom back to a term of given sort, or raise Failure *)
@@ -337,11 +338,12 @@ let atom_pattern pat args =
   Logic.mk_literal (MString "pattern") (`Symbol (MPattern pat) :: args)
 
 let atom_gc ?(offset=(-1)) gc terms =
+  assert (List.length gc.gc_vars = List.length terms);
   let args = [`Symbol (MString gc.gc_ord)] in
-  let args = args @ List.map encode_term gc.gc_prec in
+  let args = args @ List.map (encode_term ~to_var:false) gc.gc_prec in
   let args = args @ List.map (fun (pat,vars) -> `Symbol (MPatternVars (pat, vars))) gc.gc_eqns in
-  let args = args @ List.map encode_term gc.gc_vars in
-  let args = args @ List.map encode_term terms in
+  let args = args @ List.map (encode_term ~to_var:false) gc.gc_vars in
+  let args = args @ List.map (encode_term ~to_var:true) terms in
   Logic.mk_literal (MString "gc") args
 
 (** Convert the arguments into terms. Expected sorts are given and
@@ -373,31 +375,71 @@ let extract_terms_unsafe args =
 
 (** Translate a premise to a Datalog literal *)
 let premise_to_datalog premise =
+  let map_args args = List.map (encode_term ~to_var:true) args in
   match premise with
-  | IfNamed (name, args) -> atom_named name (List.map encode_term args)
-  | IfTheory (name, args) -> atom_theory name (List.map encode_term args)
-  | IfPattern (p, args) -> atom_pattern p (List.map encode_term args)
+  | IfNamed (name, args) -> atom_named name (map_args args)
+  | IfTheory (name, args) -> atom_theory name (map_args args)
+  | IfPattern (p, args) -> atom_pattern p (map_args args)
+
+let vars_of_premise premise =
+  let seq =
+    match premise with
+    | IfNamed (_, args) -> Sequence.of_list args
+    | IfTheory (_, args) -> Sequence.of_list args
+    | IfPattern (_, args) -> Sequence.of_list args
+  in Sequence.filter T.is_var seq
+
+let apply_subst_to_premise subst offset premise =
+  let map_args args = List.map
+    (fun t -> S.apply_subst ~recursive:false subst (t,offset))
+    args in
+  match premise with
+  | IfNamed (name, args) -> IfNamed (name, map_args args)
+  | IfTheory (name, args) -> IfTheory (name, map_args args)
+  | IfPattern (p, args) -> IfPattern (p, map_args args)
+
+(** Rename variables in gc and premises, return the list of variables
+    that map to [gc.gc_vars] and the new list of premises. *)
+let rename_gc gc premises =
+  let offset = T.max_var
+    (Sequence.to_list (Sequence.flatMap vars_of_premise
+      (Sequence.of_list premises))) + 1 in
+  (* subst that maps variables to fresh variables *)
+  let _, subst = List.fold_left
+    (fun (i,subst) v ->
+      let v' = T.mk_var i v.sort in
+      i+1, S.bind ~recursive:false subst (v,1) (v',0))
+    (offset,S.id_subst) gc.gc_vars in
+  (* fresh variables *)
+  let vars = List.map
+    (fun v -> S.apply_subst ~recursive:false subst (v,1))
+    gc.gc_vars in
+  (* rename variables in premises *)
+  let premises' = List.map (apply_subst_to_premise subst 1) premises in
+  vars, premises'
 
 (** Translate a definition into a Datalog clause *)
 let definition_to_datalog definition =
   match definition with
   | Named (name, ((p, sorts) as pattern)) ->
-    let vars = List.mapi (fun i sort -> encode_term (T.mk_var i sort)) sorts in
+    let vars = List.mapi (fun i sort -> encode_term ~to_var:true (T.mk_var i sort)) sorts in
     let concl = atom_named name vars in
     let premises = [atom_pattern pattern vars] in
     Logic.mk_clause concl premises
   | Lemma ((p, args), premises) ->
     let premises = List.map premise_to_datalog premises in 
-    let concl = atom_pattern p (List.map encode_term args) in
+    let concl = atom_pattern p (List.map (encode_term ~to_var:true) args) in
     Logic.mk_clause concl premises
   | Theory ((name, args), premises) ->
     let premises = List.map premise_to_datalog premises in 
-    let concl = atom_theory name (List.map encode_term args) in
+    let concl = atom_theory name (List.map (encode_term ~to_var:true) args) in
     Logic.mk_clause concl premises
   | GC (gc, premises) ->
-    let premises = List.map premise_to_datalog premises in 
-    let concl = atom_gc gc gc.gc_vars in
-    Logic.mk_clause concl premises
+    (* rename variables, apply renaming to premises *)
+    let vars, premises' = rename_gc gc premises in
+    let premises' = List.map premise_to_datalog premises' in 
+    let concl = atom_gc gc vars in
+    Logic.mk_clause concl premises'
 
 let definition_to_goals definition =
   let convert_list l = List.mapi (fun i _ -> `Var (-i-2)) l in
@@ -418,8 +460,10 @@ let definition_to_goals definition =
 (** Convert a meta-fact to a Datalog fact *)
 let fact_to_datalog fact =
   match fact with
-  | ThenPattern (p, args) -> atom_pattern p (List.map encode_term args)
-  | ThenTheory (name, args) -> atom_theory name (List.map encode_term args)
+  | ThenPattern (p, args) ->
+    atom_pattern p (List.map (encode_term ~to_var:true) args)
+  | ThenTheory (name, args) ->
+    atom_theory name (List.map (encode_term ~to_var:true) args)
   | ThenGC _ ->
     failwith "Meta.KB.fact_to_datalog makes no sense for ThenGC"
   | ThenNamed _ ->
@@ -438,15 +482,21 @@ let of_datalog lit =
     let terms = extract_terms_unsafe args in
     Some (ThenTheory (name, terms))
   | MString "gc", (`Symbol (MString gc_ord) :: args) ->
-    (* extract (list of terms, list of patterns, list of terms) *) 
+    (* extract (list of terms, list of patterns, list of terms) . [at_prec]
+       is true if we are reading the first sequence of terms, ie
+       the precedence. *) 
     let rec extract at_prec (prec,pats,vars) l = match l with
     | [] -> List.rev prec, List.rev pats, List.rev vars
-    | (`Symbol (MPatternVars (p,vars)))::l' -> extract false (prec,(p,vars)::pats,vars) l'
+    | (`Symbol (MPatternVars (p,p_vars)))::l' -> extract false (prec,(p,p_vars)::pats,vars) l'
     | (`Symbol (MTerm t))::l' when at_prec -> extract true (t::prec,pats,vars) l'
     | (`Symbol (MTerm t))::l' -> extract false (prec,pats,t::vars) l'
-    | _ -> assert false
+    | (`Symbol atom)::_ -> failwith (Utils.sprintf "bad atom %a" pp_atom atom)
+    | (`Var _)::_ -> failwith "unexpected variable"
     in
     let gc_prec, gc_eqns, terms = extract true ([],[],[]) args in
+    Utils.debug 2 "got @[<h>prec %a, args %a@]"
+      (Utils.pp_list !T.pp_term#pp) gc_prec
+      (Utils.pp_list !T.pp_term#pp) terms;
     (* split gc_vars into proper variables, and their arguments *)
     let n = List.length terms in
     assert ((n mod 2) = 0);

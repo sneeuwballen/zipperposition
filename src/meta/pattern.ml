@@ -223,7 +223,7 @@ let matching (p : t) lits =
   (* now apply the substitution to the list of variables *)
   let substs = Sequence.flatMap
     (fun subst ->
-      Utils.debug 2 "%% meta-prover: subst @[<h>%a@], vars @[<h>%a@]"
+      Utils.debug 2 "%% meta-prover: subst @[<h>%a, vars %a@]"
         S.pp_substitution subst (Utils.pp_list !T.pp_term#pp) vars;
       (* convert variables back to terms *)
       let args = List.map (fun v -> S.apply_subst subst (v,offset)) vars in
