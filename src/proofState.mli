@@ -74,7 +74,7 @@ type state =
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
     meta_prover : Meta.Prover.t option;
-    experts : Experts.t list;           (** List of current experts *)
+    experts : Experts.Set.t;            (** Set of current experts *)
 
     add_expert : Experts.t -> unit;     (** Add an expert *)
   >

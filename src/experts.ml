@@ -56,6 +56,8 @@ let compatible e1 e2 =
     the combination of their theories, assuming they are compatible. *)
 let combine e1 e2 =
   assert (compatible e1 e2);
+  Utils.debug 1 "%% experts: @[<h>combine %s and %s@]"
+    e1.expert_name e2.expert_name;
   (* compute normal form using both systems *)
   let rec nf t =
     let t' = e1.expert_canonize t in

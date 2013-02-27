@@ -163,14 +163,17 @@ let subsumed_by ~calculus active_set hc =
 
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if trivial). *)
-let all_simplify ~calculus active_set simpl_set hc =
+let all_simplify ~calculus ~experts active_set simpl_set hc =
   Utils.enter_prof prof_all_simplify;
+  let ctx = active_set#ctx in
   let clauses = calculus#list_simplify hc in
   let clauses = Utils.list_flatmap
     (fun hc ->
       (* simplify this clause *)
       let _, hc' = simplify ~calculus active_set simpl_set hc in
-      if calculus#is_trivial hc' then [] else [hc'])
+      let hc' = Experts.Set.simplify ~ctx experts hc' in
+      if calculus#is_trivial hc' || Experts.Set.is_redundant experts hc'
+        then [] else [hc'])
     clauses
   in
   Utils.exit_prof prof_all_simplify;
@@ -230,12 +233,13 @@ let meta_step state hc =
 let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num state =
   let ctx = state#ctx in
   let ord = ctx.ctx_ord in
+  let experts = state#experts in
   (* select next given clause *)
   match state#passive_set#next () with
   | None -> Sat (* passive set is empty *)
   | Some hc ->
     (* simplify given clause w.r.t. active set, then remove redundant clauses *)
-    let c_list = all_simplify ~calculus state#active_set state#simpl_set hc in
+    let c_list = all_simplify ~calculus ~experts state#active_set state#simpl_set hc in
     let c_list = List.filter
       (fun hc' -> not (is_redundant ~calculus state#active_set hc'))
       c_list in
@@ -288,7 +292,10 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
           let cs = calculus#list_simplify hc in
           let cs = List.map (calculus#rw_simplify state#simpl_set) cs in
           let cs = List.map calculus#basic_simplify cs in
-          let cs = List.filter (fun hc -> not (calculus#is_trivial hc)) cs in
+          let cs = List.map (Experts.Set.simplify ~ctx state#experts) cs in
+          let cs = List.filter (fun hc ->
+            not (calculus#is_trivial hc
+              || Experts.Set.is_redundant state#experts hc)) cs in
           List.rev_append cs acc)
         [] inferred_clauses
       in

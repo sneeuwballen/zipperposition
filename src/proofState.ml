@@ -99,7 +99,7 @@ type state =
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
     meta_prover : Meta.Prover.t option;
-    experts : Experts.t list;           (** List of current experts *)
+    experts : Experts.Set.t;            (** Set of experts *)
 
     add_expert : Experts.t -> unit;     (** Add an expert *)
   >
@@ -315,7 +315,7 @@ let mk_state ~ctx ?meta params signature =
   let queues = ClauseQueue.default_queues
   and unit_idx = Dtree.unit_index
   and index = choose_index params.param_index
-  and _experts = ref [] in
+  and _experts = ref Experts.Set.empty in
   object
     val m_active = (mk_active_set ~ctx index signature :> active_set)
     val m_passive = (mk_passive_set ~ctx queues :> passive_set)
@@ -326,7 +326,7 @@ let mk_state ~ctx ?meta params signature =
     method simpl_set = m_simpl
     method meta_prover = meta
     method experts = !_experts
-    method add_expert e = _experts := e :: !_experts
+    method add_expert e = _experts := Experts.Set.add !_experts e
   end
 
 (* ----------------------------------------------------------------------
