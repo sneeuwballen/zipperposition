@@ -132,6 +132,9 @@ let clauses expert =
   clauses
 
 let pp_expert formatter expert =
+  Format.pp_print_string formatter expert.expert_name
+
+let pp_expert_detailed formatter expert =
   Format.fprintf formatter "[expert on %s (%s)]"
     expert.expert_name expert.expert_descr
 
@@ -179,21 +182,24 @@ end
     Avenhaus, Hillenbrand, Lochner *)
 
 type gnd_convergent = {
-  gc_ord : string;                    (** name of the ordering *)
-  gc_prec : symbol list;              (** Precedence *)
-  gc_sig : SSet.t;                    (** Symbols of the theory *)
-  gc_eqns : hclause list;             (** Equations of the system *)
+  gc_ord : string;              (** name of the ordering *)
+  gc_theory : string;           (** Theory that is decided *)
+  gc_prec : symbol list;        (** Precedence *)
+  gc_sig : SSet.t;              (** Symbols of the theory *)
+  gc_eqns : hclause list;       (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
-let mk_gc name prec hclauses =
+let mk_gc ~theory ~ord ~prec hclauses =
   let signature = C.signature hclauses in
+  let signature = SMap.filter (fun s _ -> not (is_base_symbol s)) signature in
   (* check that every clause is a positive equation *)
   assert (List.for_all
     (fun hc -> match hc.hclits with 
      | [| Equation (_,_,true,_)|] -> true | _ -> false) hclauses);
   let set = symbols_of_signature signature in
   let set = SSetSeq.of_seq (Sequence.of_list set) in
-  { gc_ord = name;
+  { gc_ord = ord;
+    gc_theory = theory;
     gc_prec = prec;
     gc_sig = set;
     gc_eqns = hclauses;
@@ -241,8 +247,10 @@ let gc_expert ~ord gc =
     nf t1' == nf t2' in
   let expert_canonize t = nf t in
   let expert_sig = gc.gc_sig in
-  { expert_name="gnd_convergent";
-    expert_descr="ground convergent system of equations";
+  let theory = Utils.sprintf "@[<h>%s(%a)@]" gc.gc_theory
+    (Sequence.pp_seq pp_symbol) (SSetSeq.to_seq expert_sig) in
+  { expert_name= (Utils.sprintf "gc(%s)" theory);
+    expert_descr=("ground convergent system of equations for the theory " ^ theory);
     expert_equal;
     expert_sig;
     expert_clauses;

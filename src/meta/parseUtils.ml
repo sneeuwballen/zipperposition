@@ -185,7 +185,7 @@ let mk_lemma_term ~table t premises =
   let args = consts_to_terms s_to_t consts in
   (* build lemma *)
   let lemma = KB.Lemma ((pattern, args), premises) in
-  Utils.debug 1 "%% @[<hov2>%a@]" KB.pp_definition lemma;
+  Utils.debug 2 "%% @[<hov2>%a@]" KB.pp_definition lemma;
   lemma
 
 (** Build a lemma that has a named conclusion [named] *)
@@ -199,15 +199,14 @@ let mk_lemma_named ~table (name,symbols) premises =
   let args = symbs_to_terms s_to_t symbols in
   (* build lemma *)
   let lemma = KB.Lemma ((pattern, args), premises) in
-  Utils.debug 1 "%% @[<hov2>%a@]" KB.pp_definition lemma;
+  Utils.debug 2 "%% @[<hov2>%a@]" KB.pp_definition lemma;
   lemma
 
 (** Build the definition of a named pattern by a formula *)
 let mk_named ~table (name, (symbols : symbol list)) t =
   let signature = signature_of_term (T.curry t) in
-  Utils.debug 1 "%% @[<h>define %s(%a) with %a@]" name
+  Utils.debug 3 "%% @[<h>define %s(%a) with %a@]" name
     (Utils.pp_list pp_symbol) symbols !T.pp_term#pp t;
-  Utils.debug 1 "%% signature is %a" pp_signature signature;
   (* safety checks *)
   (if not (List.for_all (fun s -> SMap.mem s signature) symbols)
     then failwith ("some symbol does not appear in the definition of " ^ name));
@@ -217,14 +216,14 @@ let mk_named ~table (name, (symbols : symbol list)) t =
   let pattern, _ = Pattern.of_term_with (T.curry t) symbols in
   define_named ~table name pattern;
   let named = KB.Named (name, pattern) in
-  Utils.debug 1 "%% @[<hov2>%a@]" KB.pp_definition named;
+  Utils.debug 2 "%% @[<hov2>%a@]" KB.pp_definition named;
   named
 
 let mk_theory ~table (name, (symbols : symbol list)) premises =
   let signature = signature_of_premises ~table premises in
   (if not (List.for_all (fun s -> SMap.mem s signature) symbols)
     then failwith ("some symbol does not appear in def of theory " ^ name));
-  Utils.debug 1 "%% @[<h>define theory %s(%a) with %a@]" name
+  Utils.debug 3 "%% @[<h>define theory %s(%a) with %a@]" name
     (Utils.pp_list pp_symbol) symbols (Utils.pp_list pp_premise) premises;
   let offset = offset_of_premises (Sequence.of_list premises) in
   let s_to_t = map_symbols_to_vars ~offset signature in
@@ -234,10 +233,10 @@ let mk_theory ~table (name, (symbols : symbol list)) premises =
   let args = symbs_to_terms s_to_t symbols in
   define_th ~table name (List.map (fun x -> x.sort) args);
   let th = KB.Theory ((name, args), premises) in
-  Utils.debug 1 "%% theory is @[<hov2>%a@]" KB.pp_definition th;
+  Utils.debug 2 "%% theory is @[<hov2>%a@]" KB.pp_definition th;
   th
 
-let mk_gc ~table eqns (gc_ord,(prec : symbol list)) premises =
+let mk_gc ~table eqns (gc_theory,gc_ord,(prec : symbol list)) premises =
   let signature = signature_of_premises ~table premises in
   (if not (List.for_all (fun s -> SMap.mem s signature) prec)
     then failwith ("some symbol does not appear in precedence of GC"));
@@ -260,4 +259,4 @@ let mk_gc ~table eqns (gc_ord,(prec : symbol list)) premises =
   let gc_vars = List.map snd s_to_t in
   (* convert premises *)
   let premises = List.map (convert_premise ~table s_to_t) premises in
-  KB.GC ({ KB.gc_eqns; KB.gc_vars; KB.gc_ord; KB.gc_prec; }, premises)
+  KB.GC ({ KB.gc_eqns; KB.gc_theory; KB.gc_vars; KB.gc_ord; KB.gc_prec; }, premises)

@@ -661,14 +661,15 @@ meta_theory_def:
     }
 
 meta_gc_def:
-  | GC meta_terms
+  | GC LEFT_PARENTHESIS LOWER_WORD RIGHT_PARENTHESIS meta_terms
     WITH LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
     IF meta_premises DOT
-    { let ord = $4 in
-      let prec = $6 in
-      let premises = $9 in
-      let eqns = $2 in
-      Meta.ParseUtils.mk_gc ~table:meta_table eqns (ord,prec) premises
+    { let ord = $7 in
+      let theory = $3 in
+      let prec = $9 in
+      let premises = $12 in
+      let eqns = $5 in
+      Meta.ParseUtils.mk_gc ~table:meta_table eqns (theory,ord,prec) premises
     }
 
 meta_named:

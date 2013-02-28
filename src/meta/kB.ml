@@ -52,6 +52,7 @@ and fact =
 and gnd_convergent_spec = {
   gc_vars : varlist;
   gc_ord : string;
+  gc_theory : string;
   gc_prec : varlist;
   gc_eqns : Pattern.t parametrized list;
 } (** Abstract equations that form a ground convergent rewriting system
@@ -147,7 +148,7 @@ let gc_spec_to_gc ~ctx ((gc,args) : gnd_convergent_spec parametrized) =
         | Node (s, []) -> s
         | _ -> failwith "invalid precedence")
       prec in
-    let gc = Experts.mk_gc gc.gc_ord prec eqns in
+    let gc = Experts.mk_gc ~theory:gc.gc_theory ~ord:gc.gc_ord ~prec eqns in
     (* success *)
     Some gc
   with Failure s ->
@@ -170,8 +171,8 @@ let rec pp_definition formatter definition =
       (Utils.pp_list pp_premise) premises
   | GC (gc, premises) ->
     Format.fprintf formatter
-      "@[<hov2>gc @[<hov2>%a@]@ @[<h>with %s(%a) if@ %a@]@]"
-      (Utils.pp_list ~sep:" and " Pattern.pp_pattern_p) gc.gc_eqns
+      "@[<hov2>gc for %s @[<hov2>%a@]@ @[<h>with %s(%a) if@ %a@]@]"
+      gc.gc_theory (Utils.pp_list ~sep:" and " Pattern.pp_pattern_p) gc.gc_eqns
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
       (Utils.pp_list pp_premise) premises
 and pp_premise formatter premise =
@@ -210,6 +211,7 @@ let rec definition_to_json definition : json =
           List.map premise_to_json premises)
   | GC (gc, premises) ->
       `Assoc ["gc", `Bool true;
+              "theory", `String gc.gc_theory;
               "vars", `List (List.map T.to_json gc.gc_vars);
               "ord", `String gc.gc_ord;
               "prec", `List (List.map T.to_json gc.gc_prec);
@@ -237,6 +239,7 @@ let rec definition_of_json (json : json) : definition =
            List.map premise_of_json premises)
   | `Assoc l when List.mem_assoc "gc" l ->
     let gc_vars = List.map T.of_json (Json.Util.to_list (List.assoc "vars" l)) in
+    let gc_theory = Json.Util.to_string (List.assoc "theory" l) in
     let gc_ord = Json.Util.to_string (List.assoc "ord" l) in
     let gc_prec = List.map T.of_json (Json.Util.to_list (List.assoc "prec" l)) in
     let premises = List.map premise_of_json
@@ -246,7 +249,7 @@ let rec definition_of_json (json : json) : definition =
         | `List (pat::args) -> (Pattern.of_json pat, List.map T.of_json args)
         | json -> raise (Json.Util.Type_error ("expected (pattern,terms)", json)))
       (Json.Util.to_list (List.assoc "eqns" l)) in
-    GC ({ gc_ord; gc_vars; gc_prec; gc_eqns; }, premises)
+    GC ({ gc_ord; gc_theory; gc_vars; gc_prec; gc_eqns; }, premises)
   | _ -> raise (Json.Util.Type_error ("expected KB.definition", json))
 and premise_of_json (json : json) : premise =
   match json with
@@ -339,7 +342,7 @@ let atom_pattern pat args =
 
 let atom_gc ?(offset=(-1)) gc terms =
   assert (List.length gc.gc_vars = List.length terms);
-  let args = [`Symbol (MString gc.gc_ord)] in
+  let args = [`Symbol (MString gc.gc_ord); `Symbol (MString gc.gc_theory)] in
   let args = args @ List.map (encode_term ~to_var:false) gc.gc_prec in
   let args = args @ List.map (fun (pat,vars) -> `Symbol (MPatternVars (pat, vars))) gc.gc_eqns in
   let args = args @ List.map (encode_term ~to_var:false) gc.gc_vars in
@@ -481,7 +484,7 @@ let of_datalog lit =
   | MString "theory", (`Symbol (MString name) :: args) ->
     let terms = extract_terms_unsafe args in
     Some (ThenTheory (name, terms))
-  | MString "gc", (`Symbol (MString gc_ord) :: args) ->
+  | MString "gc", (`Symbol (MString gc_ord) :: `Symbol (MString gc_theory) :: args) ->
     (* extract (list of terms, list of patterns, list of terms) . [at_prec]
        is true if we are reading the first sequence of terms, ie
        the precedence. *) 
@@ -494,7 +497,7 @@ let of_datalog lit =
     | (`Var _)::_ -> failwith "unexpected variable"
     in
     let gc_prec, gc_eqns, terms = extract true ([],[],[]) args in
-    Utils.debug 2 "got @[<h>prec %a, args %a@]"
+    Utils.debug 4 "got @[<h>prec %a, args %a@]"
       (Utils.pp_list !T.pp_term#pp) gc_prec
       (Utils.pp_list !T.pp_term#pp) terms;
     (* split gc_vars into proper variables, and their arguments *)
@@ -502,7 +505,7 @@ let of_datalog lit =
     assert ((n mod 2) = 0);
     let gc_vars = Utils.list_take (n/2) terms
     and args = Utils.list_drop (n/2) terms in
-    Some (ThenGC ({ gc_prec; gc_eqns; gc_vars; gc_ord; }, args))
+    Some (ThenGC ({ gc_prec; gc_theory; gc_eqns; gc_vars; gc_ord; }, args))
   | _ -> None 
 
 (** {2 Knowledge Base} *)

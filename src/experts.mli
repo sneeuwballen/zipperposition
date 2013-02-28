@@ -97,13 +97,14 @@ end
     Avenhaus, Hillenbrand, Lochner *)
 
 type gnd_convergent = {
-  gc_ord : string;                    (** name of the ordering *)
-  gc_prec : symbol list;              (** Precedence *)
-  gc_sig : SSet.t;                    (** Symbols of the theory *)
-  gc_eqns : hclause list;             (** Equations of the system *)
+  gc_ord : string;              (** name of the ordering *)
+  gc_theory : string;           (** Theory that is decided *)
+  gc_prec : symbol list;        (** Precedence *)
+  gc_sig : SSet.t;              (** Symbols of the theory *)
+  gc_eqns : hclause list;       (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
-val mk_gc : string -> symbol list -> hclause list -> gnd_convergent
+val mk_gc : theory:string -> ord:string -> prec:symbol list -> hclause list -> gnd_convergent
   (** Create a ground-convergent system from a list of equations
       and informations on the ordering. *)
 

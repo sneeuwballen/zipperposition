@@ -102,7 +102,7 @@ let fact_handler prover lit =
       prover.new_results <- result :: prover.new_results
     | Some (KB.ThenGC gc_spec) ->
       (match KB.gc_spec_to_gc ~ctx gc_spec with
-        | None -> Utils.debug 1 "%% meta-prover: got non-FO gnd_convergent"
+        | None -> Utils.debug 0 "%% meta-prover: got non-FO gnd_convergent"
         | Some gc ->
           Utils.debug 0 "%% meta-prover: new @[<h>gnd_convergent %a@]"
             Experts.pp_gc gc;
@@ -165,7 +165,7 @@ let match_patterns patterns lits k =
 (** To call when a pattern matches a clause. It assert the corresponding
     fact in Datalog. *)
 let found_pattern prover hc pattern args =
-  Utils.debug 1 "%% meta-prover: matched pattern @[<h>%a(%a) with %a@]"
+  Utils.debug 3 "%% meta-prover: matched pattern @[<h>%a(%a) with %a@]"
     Pattern.pp_pattern pattern
     (Utils.pp_list !T.pp_term#pp) args !C.pp_clause#pp_h hc;
   let fact = KB.ThenPattern (pattern, args) in

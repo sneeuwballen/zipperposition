@@ -125,6 +125,7 @@ module KB : sig
   and gnd_convergent_spec = {
     gc_vars : varlist;
     gc_ord : string;
+    gc_theory : string;
     gc_prec : varlist;
     gc_eqns : Pattern.t parametrized list;
   } (** Abstract equations that form a ground convergent rewriting system
@@ -297,5 +298,7 @@ module ParseUtils : sig
   val mk_lemma_named : table:table -> string * symbol list -> premise list -> KB.definition
   val mk_named : table:table -> string* symbol list -> term -> KB.definition
   val mk_theory : table:table -> string * symbol list -> premise list -> KB.definition
-  val mk_gc : table:table -> term list -> string * symbol list -> premise list -> KB.definition
+  val mk_gc : table:table -> term list ->
+              string * string * symbol list ->
+              premise list -> KB.definition
 end

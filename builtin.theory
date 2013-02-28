@@ -148,7 +148,8 @@ theory lattice(meet, join) is
 
 % rewrite system for ac
 
-gc f(f(X,Y),Z)=f(X,f(Y,Z)) and 
+gc(ac)
+   f(f(X,Y),Z)=f(X,f(Y,Z)) and 
    f(X,Y) = f(Y,X) and
    f(X,f(Y,Z))=f(Y,f(X,Y)) and
    f(X,f(Y,Z))=f(Z,f(Y,X)) and
@@ -158,7 +159,8 @@ gc f(f(X,Y),Z)=f(X,f(Y,Z)) and
 
 % rewrite system for monoids
 
-gc f(f(X,Y),Z)=f(X,f(Y,Z)) and 
+gc(monoid)
+   f(f(X,Y),Z)=f(X,f(Y,Z)) and 
    f(X,Y) = f(Y,X) and
    f(X,f(Y,Z))=f(Y,f(X,Y)) and
    f(X,f(Y,Z))=f(Z,f(Y,X)) and
