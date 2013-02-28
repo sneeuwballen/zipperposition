@@ -127,6 +127,7 @@ let simplify hc =
   (* simplify a lit *)
   let simp_lit (Equation (l,r,sign,_) as lit) =
     let lit' = Lits.mk_lit ~ord:ctx.ctx_ord (simplify_term l) (simplify_term r) sign in
+    let lit' = Lits.lit_of_fof ~ord:ctx.ctx_ord lit' in
     (if not (Lits.eq lit lit') then simplified := true);
     lit'
   in

@@ -133,7 +133,7 @@ let goto_leaf trie t k =
       
 (** the tree itself, with metadata *)
 type 'a dtree = {
-  min_var : int;
+  min_var : int;  (* TODO remove, useless now *)
   max_var : int;
   cmp : 'a -> 'a -> bool;
   tree : 'a trie;
@@ -206,6 +206,7 @@ let iter_match (dt, o_dt) (t, o_t) k =
              (* already bound, check consistency *)
              let t_matched = S.apply_subst subst (t_pos, o_t) in
              let t_bound = S.apply_subst subst (v1', o_dt) in
+             Utils.debug 1 "  bind @[<h>%a to %a@]" !T.pp_term#pp v1' !T.pp_term#pp t_pos;
              if t_matched == t_bound
                 then traverse subtrie (skip t pos) subst  (* skip term *)
                 else () (* incompatible bindings of the variable *)

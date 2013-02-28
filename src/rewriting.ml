@@ -34,7 +34,7 @@ module Utils = FoUtils
 module OrderedTRS = struct
   type t = {
     ord : ordering;
-    mutable tree : rule Dtree.dtree;
+    mutable rules : (rule * int) list;
   } (** Ordered rewriting system *)
   and rule = {
     rule_clause : hclause;
@@ -44,8 +44,10 @@ module OrderedTRS = struct
   } (** A rule, oriented or not *)
 
   let eq_rule r1 r2 =
-    (C.eq_hclause r1.rule_clause r2.rule_clause) &&
-    (r1.rule_oriented = r2.rule_oriented)
+    C.eq_hclause r1.rule_clause r2.rule_clause &&
+    r1.rule_oriented = r2.rule_oriented &&
+    r1.rule_left == r2.rule_left &&
+    r1.rule_right == r2.rule_right
 
   let rule_priority rule =
     (* better priority for oriented rules *)
@@ -53,7 +55,7 @@ module OrderedTRS = struct
 
   let create ~ord =
     { ord;
-      tree = Dtree.empty eq_rule;
+      rules = [];
     }
 
   let mk_rule hc l r oriented =
@@ -73,30 +75,32 @@ module OrderedTRS = struct
   let add_clause trs hc =
     assert (hc.hcctx.ctx_ord == trs.ord);
     let rules = rules_of_hc hc in
-    List.iter
-      (fun rule ->
-        (* add the rule to the index *)
+    trs.rules <- List.fold_left
+      (fun rules rule ->
+        (* add the rule to the list of rules *)
         let priority = rule_priority rule in
-        trs.tree <- Dtree.add trs.tree ~priority rule.rule_left rule)
-      rules
+        let rules = (rule, priority) :: rules in
+        (* sort by increasing priority (oriented first) *)
+        List.sort (fun (_,p1) (_,p2) -> p1 - p2) rules)
+      trs.rules rules
 
   let add_seq trs seq =
     Sequence.iter (add_clause trs) seq
 
   let to_seq trs =
-    let tree = trs.tree in
+    let rules = trs.rules in
     Sequence.from_iter
-      (fun k -> Dtree.iter tree (fun _ rule -> k rule.rule_clause))
+      (fun k -> List.iter (fun (rule,_) -> k rule.rule_clause) rules)
 
-  let size trs =
-    let s = ref 0 in
-    Dtree.iter trs.tree (fun _ _ -> incr s);
-    !s
+  let size trs = List.length trs.rules
   
   exception RewrittenInto of term
 
   (** Rewrite a term into its normal form *)
   let rewrite trs t =
+    Utils.debug 4 "@[<h>rewrite %a with %a@]"
+      !T.pp_term#pp t  (Sequence.pp_seq ~sep:" and " !C.pp_clause#pp_h)
+      (to_seq trs);
     (* reduce to normal form *)
     let rec reduce t =
       match t.term with
@@ -113,21 +117,24 @@ module OrderedTRS = struct
        yields back to [reduce]. *)
     and rewrite_here t =
       try
-        Dtree.iter_match (trs.tree,1) (t,0)
-          (fun (l,_) rule subst ->
-            Utils.debug 1 "match @[<h>%a with %a (rule %a)@]"
-              !T.pp_term#pp t !T.pp_term#pp l !C.pp_clause#pp rule.rule_clause;
-            (* right-hand part *)
-            let r = rule.rule_right in
-            let r' = S.apply_subst subst (r,1) in
-            if rule.rule_oriented
-              then raise (RewrittenInto r')  (* we know that t > r' *)
-              else (
-                let l' = S.apply_subst subst (l,1) in
-                assert (l' == t);
-                if trs.ord#compare l' r' = Gt
-                  then raise (RewrittenInto r')
-                  else ()));
+        List.iter
+          (fun (rule, _) ->
+            Utils.debug 4 "match @[<h>%a with %a (rule %a)@]"
+              !T.pp_term#pp t !T.pp_term#pp rule.rule_left !C.pp_clause#pp rule.rule_clause;
+            try
+              let subst = Unif.matching S.id_subst (rule.rule_left,1) (t,0) in
+              (* right-hand part *)
+              let r = rule.rule_right in
+              let r' = S.apply_subst subst (r,1) in
+              if rule.rule_oriented
+                then raise (RewrittenInto r')  (* we know that t > r' *)
+                else (
+                  assert (t == S.apply_subst subst (rule.rule_left,1));
+                  if trs.ord#compare t r' = Gt
+                    then raise (RewrittenInto r')
+                    else ())
+            with UnificationFailure -> ())
+          trs.rules;
         t (* could not rewrite t *)
       with RewrittenInto t' ->
         Utils.debug 1 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
