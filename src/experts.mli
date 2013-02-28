@@ -36,8 +36,8 @@ type t
 val compatible_ord : t -> ord:ordering -> bool
   (** Check whether using this expert is possible in the given ordering *)
 
-val update_ord : t -> ord:ordering -> t
-  (** Copy of the expert, that uses the new ordering *)
+val update_ctx : t -> ctx:context -> t
+  (** Copy of the expert, that uses the new context *)
 
 val compatible : t -> t -> bool
   (** Simple syntaxic criterion to decide whether two experts
@@ -64,7 +64,7 @@ val signature : t -> SSet.t
 val is_redundant : t -> hclause -> bool
   (** Decide whether this clause is redundant *)
 
-val simplify : ctx:context -> t -> hclause -> hclause
+val simplify : t -> hclause -> hclause
   (** Simplify the clause *)
 
 val clauses : t -> hclause list
@@ -85,11 +85,11 @@ module Set : sig
 
   val add : t -> expert -> t
 
-  val update_ord : t -> ord:ordering -> t
+  val update_ctx : t -> ctx:context -> t
 
-  val is_redundant : ctx:context -> t -> hclause -> bool
+  val is_redundant : t -> hclause -> bool
 
-  val simplify : ctx:context -> t -> hclause -> hclause
+  val simplify : t -> hclause -> hclause
 
   val pp : Format.formatter -> t -> unit
 end
@@ -119,7 +119,7 @@ val compatible_gc : ord:ordering -> gnd_convergent -> bool
 val ground_pair : term -> term -> term * term
   (** Replace variables of terms by fresh constants *)
 
-val gc_expert : ord:ordering -> gnd_convergent -> t
+val gc_expert : ctx:context -> gnd_convergent -> t
   (** From a set of ground convergent equations, create an expert for
       the associated theory. *)
 
@@ -133,5 +133,5 @@ val gc_of_json : ctx:context -> json -> gnd_convergent
 
 (** {2 Some builtin theories} *)
 
-val ac : symbol -> t
+val ac : ctx:context -> symbol -> t
   (** Theory of Associative-Commutative symbols, for the given symbol *)

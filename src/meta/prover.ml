@@ -114,7 +114,7 @@ let fact_handler prover lit =
           Utils.debug 0 "%% meta-prover: new @[<h>gnd_convergent %a@]"
             Experts.pp_gc gc;
           (* build an Expert from the GC system *)
-          let expert = Experts.gc_expert ~ord:ctx.ctx_ord gc in
+          let expert = Experts.gc_expert ~ctx gc in
           let result = Expert expert in
           prover.results <- result :: prover.results;
           prover.new_results <- result :: prover.new_results)

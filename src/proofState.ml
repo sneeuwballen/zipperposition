@@ -327,6 +327,7 @@ let mk_state ~ctx ?meta params signature =
     method meta_prover = meta
     method experts = !_experts
     method add_expert e =
+      let e = Experts.update_ctx e ~ctx in
       _experts := Experts.Set.add !_experts e;
       m_passive#add (Experts.clauses e)  (* add clauses of the expert *)
   end

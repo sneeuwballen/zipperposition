@@ -38,7 +38,8 @@ type t = {
   expert_clauses : hclause list;        (** Additional axioms *)
   expert_canonize : term -> term;       (** Get a canonical form of the term *)
   expert_ord : ordering -> bool;        (** Compatible with ord? *)
-  expert_update_ord : ordering -> t;    (** How to update the ordering *)
+  expert_update_ctx : context -> t;     (** How to update the context *)
+  expert_ctx : context;                 (** Context used by the expert *)
   expert_solve : ((term*term) list -> substitution list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
@@ -46,13 +47,14 @@ type t = {
 
 let compatible_ord e ~ord = e.expert_ord ord
 
-let update_ord e ~ord = e.expert_update_ord ord
+let update_ctx e ~ctx = e.expert_update_ctx ctx
 
 (** Simple syntactic criterion to decide whether two decision procedures
     are compatibles: check whether they have no symbol in common.
     TODO: more elaborate checks, for instance with ground-joinability of all
     critical pairs *)
 let compatible e1 e2 =
+  e1.expert_ctx == e2.expert_ctx &&
   SSet.is_empty (SSet.union e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
@@ -75,8 +77,9 @@ let rec combine e1 e2 =
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
     expert_canonize = nf;
     expert_ord = (fun o -> e1.expert_ord o && e2.expert_ord o);
-    expert_update_ord = (fun o ->
-      combine (e1.expert_update_ord o) (e2.expert_update_ord o));
+    expert_update_ctx = (fun ctx ->
+      combine (e1.expert_update_ctx ctx) (e2.expert_update_ctx ctx));
+    expert_ctx = e1.expert_ctx;
     expert_solve = None;
   }
 
@@ -96,6 +99,7 @@ let signature expert = expert.expert_sig
 
 (** Decide whether this clause is redundant *)
 let is_redundant expert hc =
+  assert (hc.hcctx == expert.expert_ctx);
   if C.get_flag C.flag_persistent hc then false else
   let ans = Utils.array_exists
     (fun lit -> match lit with
@@ -108,7 +112,8 @@ let is_redundant expert hc =
   ans
 
 (** Simplify the clause *)
-let simplify ~ctx expert hc =
+let simplify expert hc =
+  let ctx = expert.expert_ctx in
   let lits = Array.to_list hc.hclits in
   let lits = List.filter
     (fun lit -> match lit with
@@ -166,19 +171,21 @@ module Set = struct
     in
     add [] experts e
 
-  let update_ord experts ~ord =
+  let update_ctx experts ~ctx =
     List.fold_left
-      (fun experts' e -> add experts' (update_ord e ~ord))
+      (fun experts' e -> add experts' (update_ctx e ~ctx))
       empty experts
 
-  let is_redundant ~ctx experts hc =
-    let ord = ctx.ctx_ord in
-    List.exists (fun e -> compatible_ord e ~ord && is_redundant e hc) experts
+  let is_redundant experts hc =
+    List.exists
+      (fun e -> compatible_ord e ~ord:e.expert_ctx.ctx_ord && is_redundant e hc)
+      experts
 
-  let simplify ~ctx experts hc =
-    let ord = ctx.ctx_ord in
+  let simplify experts hc =
     List.fold_left
-      (fun hc e -> if compatible_ord e ~ord then simplify ~ctx e hc else hc)
+      (fun hc e ->
+        if compatible_ord e ~ord:e.expert_ctx.ctx_ord
+          then simplify e hc else hc)
       hc experts
 
   let pp formatter experts =
@@ -245,16 +252,17 @@ let compatible_gc ~ord gc =
 
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
-let rec gc_expert ~ord gc =
+let rec gc_expert ~ctx gc =
   (* name and printing stuff *)
   let expert_sig = gc.gc_sig in
   let theory = Utils.sprintf "@[<h>%s(%a)@]" gc.gc_theory
     (Sequence.pp_seq pp_symbol) (SSetSeq.to_seq expert_sig) in
   let expert_name = Utils.sprintf "gc(%s)" theory in
-  (* make a rewriting system from the clauses *)
-  let trs = Rewriting.OrderedTRS.create ~ord in
-  let expert_clauses = gc.gc_eqns in
+  (* update clauses with the context *)
+  let expert_clauses = List.map (C.update_ctx ~ctx) gc.gc_eqns in
   List.iter (fun c -> C.set_flag C.flag_persistent c true) expert_clauses;
+  (* make a rewriting system from the clauses *)
+  let trs = Rewriting.OrderedTRS.create ~ord:ctx.ctx_ord in
   Rewriting.OrderedTRS.add_seq trs (Sequence.of_list expert_clauses);
   (* compute normal form using the rewriting system *)
   let nf t = Rewriting.OrderedTRS.rewrite trs t in
@@ -263,9 +271,9 @@ let rec gc_expert ~ord gc =
     let t1', t2' = ground_pair t1 t2 in
     Utils.debug 1 "%% %s: check equal @[<h>%a,%a (%s): normal forms %a,%a (%s)@]"
       expert_name !T.pp_term#pp t1 !T.pp_term#pp t2
-      (string_of_comparison (ord#compare t1 t2))
+      (string_of_comparison (ctx.ctx_ord#compare t1 t2))
       !T.pp_term#pp t1' !T.pp_term#pp t2'
-      (string_of_comparison (ord#compare t1' t2'));
+      (string_of_comparison (ctx.ctx_ord#compare t1' t2'));
     nf t1' == nf t2' in
   let expert_canonize t = nf t in
   { expert_name= (Utils.sprintf "gc(%s)" theory);
@@ -275,7 +283,8 @@ let rec gc_expert ~ord gc =
     expert_clauses;
     expert_canonize;
     expert_ord = (fun o -> compatible_gc ~ord:o gc);
-    expert_update_ord = (fun o -> gc_expert ~ord:o gc);
+    expert_update_ctx = (fun ctx' -> gc_expert ~ctx:ctx' gc);
+    expert_ctx = ctx;
     expert_solve=None;
   }
 
@@ -294,12 +303,12 @@ let gc_of_json ~ctx json = failwith "TODO: Experts.gc_of_json" (* TODO *)
 (** {2 Some builtin theories} *)
 
 (** Theory of Associative-Commutative symbols, for the given symbol *)
-let ac f = 
+let ac ~ctx f = 
   (* function that computes the AC(f)-normal form of the term *)
   let is_ac s = s == f in
   let expert_canonize t = T.ac_normal_form ~is_ac t in
   let expert_equal t1 t2 = T.ac_eq ~is_ac t1 t2 in
-  let rec expert = {
+  let rec expert ctx = {
     expert_name = Utils.sprintf "AC_%s" (name_symbol f);
     expert_descr = Utils.sprintf "AC for symbol %s" (name_symbol f);
     expert_equal;
@@ -307,7 +316,8 @@ let ac f =
     expert_clauses = []; (* TODO *)
     expert_canonize;
     expert_ord = (fun _ -> true);
-    expert_update_ord = (fun ord -> expert);
+    expert_update_ctx = (fun ctx' -> expert ctx');
+    expert_ctx = ctx;
     expert_solve = None;
   } in
-  expert
+  expert ctx
