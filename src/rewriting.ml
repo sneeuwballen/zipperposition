@@ -115,6 +115,8 @@ module OrderedTRS = struct
       try
         Dtree.iter_match (trs.tree,1) (t,0)
           (fun (l,_) rule subst ->
+            Utils.debug 1 "match @[<h>%a with %a (rule %a)@]"
+              !T.pp_term#pp t !T.pp_term#pp l !C.pp_clause#pp rule.rule_clause;
             (* right-hand part *)
             let r = rule.rule_right in
             let r' = S.apply_subst subst (r,1) in
@@ -128,7 +130,7 @@ module OrderedTRS = struct
                   else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
-        Utils.debug 2 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
+        Utils.debug 1 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
         assert (trs.ord#compare t t' = Gt);
         reduce t'  (* term is rewritten, reduce it again *)
   in

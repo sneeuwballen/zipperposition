@@ -38,12 +38,15 @@ type t = {
   expert_clauses : hclause list;        (** Additional axioms *)
   expert_canonize : term -> term;       (** Get a canonical form of the term *)
   expert_ord : ordering -> bool;        (** Compatible with ord? *)
+  expert_update_ord : ordering -> t;    (** How to update the ordering *)
   expert_solve : ((term*term) list -> substitution list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
 } (** An expert for some theory *)
 
-let compatible_ord e ord = e.expert_ord ord
+let compatible_ord e ~ord = e.expert_ord ord
+
+let update_ord e ~ord = e.expert_update_ord ord
 
 (** Simple syntactic criterion to decide whether two decision procedures
     are compatibles: check whether they have no symbol in common.
@@ -54,9 +57,9 @@ let compatible e1 e2 =
 
 (** Combine two decision procedures into a new one, that decides
     the combination of their theories, assuming they are compatible. *)
-let combine e1 e2 =
+let rec combine e1 e2 =
   assert (compatible e1 e2);
-  Utils.debug 1 "%% experts: @[<h>combine %s and %s@]"
+  Utils.debug 3 "%% experts: @[<h>combine %s and %s@]"
     e1.expert_name e2.expert_name;
   (* compute normal form using both systems *)
   let rec nf t =
@@ -64,8 +67,7 @@ let combine e1 e2 =
     let t' = e2.expert_canonize t' in
     if t == t' then t' else nf t'
   in
-  {
-    expert_name = Utils.sprintf "%s_U_%s" e1.expert_name e2.expert_name;
+  { expert_name = Utils.sprintf "(%s)_U_(%s)" e1.expert_name e2.expert_name;
     expert_descr =
       Utils.sprintf "@[<hov2>union of@ %s and@ %s@]" e1.expert_descr e2.expert_descr;
     expert_equal = (fun t1 t2 -> nf t1 == nf t2);
@@ -73,6 +75,8 @@ let combine e1 e2 =
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
     expert_canonize = nf;
     expert_ord = (fun o -> e1.expert_ord o && e2.expert_ord o);
+    expert_update_ord = (fun o ->
+      combine (e1.expert_update_ord o) (e2.expert_update_ord o));
     expert_solve = None;
   }
 
@@ -100,7 +104,7 @@ let is_redundant expert hc =
     hc.hclits
   in
   (if ans then
-    Utils.debug 3 "@[<h>%a redundant with %s@]" !C.pp_clause#pp_h hc expert.expert_name);
+    Utils.debug 1 "%%@[<h>%a redundant with %s@]" !C.pp_clause#pp_h hc expert.expert_name);
   ans
 
 (** Simplify the clause *)
@@ -118,7 +122,7 @@ let simplify ~ctx expert hc =
       let proof c' = Proof (c', rule, [hc.hcproof]) in
       let parents = hc :: hc.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      Utils.debug 3 "@[<h>theory-simplified %a into %a with %s@]"
+      Utils.debug 1 "%%@[<h>theory-simplified %a into %a with %s@]"
                      !C.pp_clause#pp hc !C.pp_clause#pp_h new_hc expert.expert_name;
       (* return simplified clause *)
       new_hc
@@ -135,7 +139,7 @@ let pp_expert formatter expert =
   Format.pp_print_string formatter expert.expert_name
 
 let pp_expert_detailed formatter expert =
-  Format.fprintf formatter "[expert on %s (%s)]"
+  Format.fprintf formatter "[expert %s (%s)]"
     expert.expert_name expert.expert_descr
 
 (** {2 Set of experts} *)
@@ -162,12 +166,19 @@ module Set = struct
     in
     add [] experts e
 
-  let is_redundant experts hc =
-    List.exists (fun e -> is_redundant e hc) experts
+  let update_ord experts ~ord =
+    List.fold_left
+      (fun experts' e -> add experts' (update_ord e ~ord))
+      empty experts
+
+  let is_redundant ~ctx experts hc =
+    let ord = ctx.ctx_ord in
+    List.exists (fun e -> compatible_ord e ~ord && is_redundant e hc) experts
 
   let simplify ~ctx experts hc =
+    let ord = ctx.ctx_ord in
     List.fold_left
-      (fun hc e -> simplify ~ctx e hc)
+      (fun hc e -> if compatible_ord e ~ord then simplify ~ctx e hc else hc)
       hc experts
 
   let pp formatter experts =
@@ -234,21 +245,29 @@ let compatible_gc ~ord gc =
 
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
-let gc_expert ~ord gc =
+let rec gc_expert ~ord gc =
+  (* name and printing stuff *)
+  let expert_sig = gc.gc_sig in
+  let theory = Utils.sprintf "@[<h>%s(%a)@]" gc.gc_theory
+    (Sequence.pp_seq pp_symbol) (SSetSeq.to_seq expert_sig) in
+  let expert_name = Utils.sprintf "gc(%s)" theory in
   (* make a rewriting system from the clauses *)
   let trs = Rewriting.OrderedTRS.create ~ord in
   let expert_clauses = gc.gc_eqns in
+  List.iter (fun c -> C.set_flag C.flag_persistent c true) expert_clauses;
   Rewriting.OrderedTRS.add_seq trs (Sequence.of_list expert_clauses);
   (* compute normal form using the rewriting system *)
   let nf t = Rewriting.OrderedTRS.rewrite trs t in
   (* equality is equality of grounded normal forms *)
   let expert_equal t1 t2 =
     let t1', t2' = ground_pair t1 t2 in
+    Utils.debug 1 "%% %s: check equal @[<h>%a,%a (%s): normal forms %a,%a (%s)@]"
+      expert_name !T.pp_term#pp t1 !T.pp_term#pp t2
+      (string_of_comparison (ord#compare t1 t2))
+      !T.pp_term#pp t1' !T.pp_term#pp t2'
+      (string_of_comparison (ord#compare t1' t2'));
     nf t1' == nf t2' in
   let expert_canonize t = nf t in
-  let expert_sig = gc.gc_sig in
-  let theory = Utils.sprintf "@[<h>%s(%a)@]" gc.gc_theory
-    (Sequence.pp_seq pp_symbol) (SSetSeq.to_seq expert_sig) in
   { expert_name= (Utils.sprintf "gc(%s)" theory);
     expert_descr=("ground convergent system of equations for the theory " ^ theory);
     expert_equal;
@@ -256,6 +275,7 @@ let gc_expert ~ord gc =
     expert_clauses;
     expert_canonize;
     expert_ord = (fun o -> compatible_gc ~ord:o gc);
+    expert_update_ord = (fun o -> gc_expert ~ord:o gc);
     expert_solve=None;
   }
 
@@ -279,7 +299,7 @@ let ac f =
   let is_ac s = s == f in
   let expert_canonize t = T.ac_normal_form ~is_ac t in
   let expert_equal t1 t2 = T.ac_eq ~is_ac t1 t2 in
-  let expert = {
+  let rec expert = {
     expert_name = Utils.sprintf "AC_%s" (name_symbol f);
     expert_descr = Utils.sprintf "AC for symbol %s" (name_symbol f);
     expert_equal;
@@ -287,6 +307,7 @@ let ac f =
     expert_clauses = []; (* TODO *)
     expert_canonize;
     expert_ord = (fun _ -> true);
+    expert_update_ord = (fun ord -> expert);
     expert_solve = None;
   } in
   expert

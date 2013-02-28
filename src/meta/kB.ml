@@ -120,8 +120,9 @@ module DefSet = Set.Make(struct
 end)
 
 (** Convert a ground-convergent abstract specification to a concrete
-    system, if possible (ie, if fully instantiated) *)
-let gc_spec_to_gc ~ctx ((gc,args) : gnd_convergent_spec parametrized) =
+    system, if possible (ie, if fully instantiated). It also takes a list
+    of clauses that "justify" the truth of the GC. *)
+let gc_spec_to_gc ~ctx ((gc,args) : gnd_convergent_spec parametrized) parents =
   assert (List.length args == List.length gc.gc_vars);
   assert (List.for_all2 (fun t1 t2 -> t1.sort == t2.sort) gc.gc_vars args);
   (* create the substitution that will allow to ground equations *)
@@ -137,7 +138,8 @@ let gc_spec_to_gc ~ctx ((gc,args) : gnd_convergent_spec parametrized) =
       (fun t ->
         (* make a clause from the term, and simplify it (back to CNF) *)
         let lits = [Literals.mk_eq ~ord:ctx.ctx_ord t T.true_term] in
-        let proof c = Proof.mk_proof c "gc_system" [] in
+        let premises = List.map (fun hc -> hc.hcproof) parents in
+        let proof c = Proof.mk_proof c ("gc_" ^ gc.gc_theory) premises in
         let hc = C.mk_hclause ~ctx lits proof in
         Cnf.simplify hc)
       eqns in

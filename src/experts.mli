@@ -33,8 +33,11 @@ open Symbols
 type t
   (** An expert for some theory *)
 
-val compatible_ord : t -> ordering -> bool
+val compatible_ord : t -> ord:ordering -> bool
   (** Check whether using this expert is possible in the given ordering *)
+
+val update_ord : t -> ord:ordering -> t
+  (** Copy of the expert, that uses the new ordering *)
 
 val compatible : t -> t -> bool
   (** Simple syntaxic criterion to decide whether two experts
@@ -82,7 +85,9 @@ module Set : sig
 
   val add : t -> expert -> t
 
-  val is_redundant : t -> hclause -> bool
+  val update_ord : t -> ord:ordering -> t
+
+  val is_redundant : ctx:context -> t -> hclause -> bool
 
   val simplify : ctx:context -> t -> hclause -> hclause
 
@@ -110,6 +115,9 @@ val mk_gc : theory:string -> ord:string -> prec:symbol list -> hclause list -> g
 
 val compatible_gc : ord:ordering -> gnd_convergent -> bool
   (** check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
+
+val ground_pair : term -> term -> term * term
+  (** Replace variables of terms by fresh constants *)
 
 val gc_expert : ord:ordering -> gnd_convergent -> t
   (** From a set of ground convergent equations, create an expert for

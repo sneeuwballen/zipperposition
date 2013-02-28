@@ -141,6 +141,7 @@ module KB : sig
 
   val gc_spec_to_gc : ctx:context ->
                       gnd_convergent_spec parametrized ->
+                      hclause list ->
                       Experts.gnd_convergent option
     (** Convert a ground-convergent abstract specification to a concrete
         system, if possible (ie, if fully instantiated) *)

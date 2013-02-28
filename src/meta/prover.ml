@@ -101,11 +101,19 @@ let fact_handler prover lit =
       prover.results <- result :: prover.results;
       prover.new_results <- result :: prover.new_results
     | Some (KB.ThenGC gc_spec) ->
-      (match KB.gc_spec_to_gc ~ctx gc_spec with
+      (* explanations: find the ones which are in fact clauses. *)
+      let premises = Logic.db_explain prover.db lit in
+      let premises = Utils.list_flatmap
+        (fun lit -> try [LitMap.find lit prover.clauses]
+                    with Not_found -> [])
+        premises in
+      (* build a GC system from the abstract GC spec *)
+      (match KB.gc_spec_to_gc ~ctx gc_spec premises with
         | None -> Utils.debug 0 "%% meta-prover: got non-FO gnd_convergent"
         | Some gc ->
           Utils.debug 0 "%% meta-prover: new @[<h>gnd_convergent %a@]"
             Experts.pp_gc gc;
+          (* build an Expert from the GC system *)
           let expert = Experts.gc_expert ~ord:ctx.ctx_ord gc in
           let result = Expert expert in
           prover.results <- result :: prover.results;
