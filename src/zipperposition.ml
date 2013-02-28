@@ -250,6 +250,9 @@ let process_file ~kb params f =
   (* create state, and add clauses to the simpl_set *)
   let signature = C.signature clauses in
   let state = PS.mk_state ~ctx ?meta params signature in
+  (* add already discovered experts *)
+  (match meta with | None -> ()
+  | Some meta -> Sequence.iter state#add_expert (Meta.Prover.experts meta));
   (* maybe perform initial inter-reductions *)
   let result, clauses = if params.param_presaturate
     then begin

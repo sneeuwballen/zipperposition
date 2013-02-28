@@ -172,7 +172,7 @@ let all_simplify ~calculus ~experts active_set simpl_set hc =
       (* simplify this clause *)
       let _, hc' = simplify ~calculus active_set simpl_set hc in
       let hc' = Experts.Set.simplify ~ctx experts hc' in
-      if calculus#is_trivial hc' || Experts.Set.is_redundant experts hc'
+      if calculus#is_trivial hc' || Experts.Set.is_redundant ~ctx experts hc'
         then [] else [hc'])
     clauses
   in
@@ -293,12 +293,12 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       let inferred_clauses = List.fold_left
         (fun acc hc ->
           let cs = calculus#list_simplify hc in
+          let cs = List.map (Experts.Set.simplify ~ctx state#experts) cs in
           let cs = List.map (calculus#rw_simplify state#simpl_set) cs in
           let cs = List.map calculus#basic_simplify cs in
-          let cs = List.map (Experts.Set.simplify ~ctx state#experts) cs in
           let cs = List.filter (fun hc ->
             not (calculus#is_trivial hc
-              || Experts.Set.is_redundant state#experts hc)) cs in
+              || Experts.Set.is_redundant ~ctx state#experts hc)) cs in
           List.rev_append cs acc)
         [] inferred_clauses
       in
