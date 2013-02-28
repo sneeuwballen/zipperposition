@@ -191,8 +191,9 @@ let find_lemmas ~ctx prover hc =
         let premises = List.map (fun hc -> hc.hcproof) parents in
         let hc = C.mk_hclause_a ~ctx lits ~parents
           (fun c -> Proof.mk_proof c "lemma" premises) in
+        Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp_h hc;
         [hc]
-      | _ -> [])  (* TODO more powerful handling of results *)
+      | _ -> [])
       results
 
 (** Do one step of the meta-prover. The current given clause and active set

@@ -285,7 +285,7 @@ let process_file ~kb params f =
   (* print theories *)
   (match meta with None -> ()
     | Some meta ->
-      Utils.debug 1 "%% @[<hov2>meta-prover results (%d):@ %a@]"
+      Utils.debug 1 "%% @[<h>meta-prover results (%d):@ %a@]"
         (Sequence.length (Meta.Prover.results meta))
         Meta.Prover.pp_results (Meta.Prover.results meta);
       Format.printf "%% datalog contains %d clauses@."
