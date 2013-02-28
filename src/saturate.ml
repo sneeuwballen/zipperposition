@@ -179,6 +179,13 @@ let all_simplify ~calculus ~experts active_set simpl_set hc =
   Utils.exit_prof prof_all_simplify;
   clauses
 
+(** Make a clause out of a 'Deduced' result *)
+let clause_of_deduced ~ctx lits parents = 
+  let premises = List.map (fun hc -> hc.hcproof) parents in
+  let hc = C.mk_hclause_a ~ctx lits ~parents
+    (fun c -> Proof.mk_proof c "lemma" premises) in
+  Sup.basic_simplify hc
+
 (** Find the lemmas that can be deduced if we consider this new clause *)
 let find_lemmas ~ctx prover hc = 
   match prover with
@@ -188,9 +195,7 @@ let find_lemmas ~ctx prover hc =
     Utils.list_flatmap
       (function
       | Meta.Prover.Deduced (lits,parents) ->
-        let premises = List.map (fun hc -> hc.hcproof) parents in
-        let hc = C.mk_hclause_a ~ctx lits ~parents
-          (fun c -> Proof.mk_proof c "lemma" premises) in
+        let hc = clause_of_deduced ~ctx lits parents in
         Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp_h hc;
         [hc]
       | _ -> [])
@@ -214,10 +219,7 @@ let meta_step state hc =
     Utils.list_flatmap
       (fun result -> match result with
         | Meta.Prover.Deduced (lits,parents) ->
-          (* found a lemma *)
-          let premises = List.map (fun hc -> hc.hcproof) parents in
-          let lemma = C.mk_hclause_a ~ctx:state#ctx lits ~parents
-            (fun c -> Proof.mk_proof c "lemma" premises) in
+          let lemma = clause_of_deduced ~ctx:state#ctx lits parents in
           Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp lemma;
           [lemma]
         | Meta.Prover.Theory (th_name, th_args) ->
