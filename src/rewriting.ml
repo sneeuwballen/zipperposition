@@ -137,7 +137,7 @@ module OrderedTRS = struct
           trs.rules;
         t (* could not rewrite t *)
       with RewrittenInto t' ->
-        Utils.debug 1 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
+        Utils.debug 3 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
         assert (trs.ord#compare t t' = Gt);
         reduce t'  (* term is rewritten, reduce it again *)
   in

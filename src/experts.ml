@@ -30,6 +30,9 @@ module Utils = FoUtils
 
 (** {2 General interface} *)
 
+let stat_expert_redundant = mk_stat "expert_redundant"
+let stat_expert_simplify = mk_stat "expert_simplify"
+
 type t = {
   expert_name : string;                 (** Theory the expert works on *)
   expert_descr : string;                (** Description of the expert *)
@@ -108,7 +111,9 @@ let is_redundant expert hc =
     hc.hclits
   in
   (if ans then
-    Utils.debug 1 "%%@[<h>%a redundant with %s@]" !C.pp_clause#pp_h hc expert.expert_name);
+    incr_stat stat_expert_redundant;
+    Utils.debug 2 "%% @[<h>%a redundant with %s@]"
+      !C.pp_clause#pp_h hc expert.expert_name);
   ans
 
 (** Simplify the clause *)
@@ -127,7 +132,8 @@ let simplify expert hc =
       let proof c' = Proof (c', rule, [hc.hcproof]) in
       let parents = hc :: hc.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      Utils.debug 1 "%%@[<h>theory-simplified %a into %a with %s@]"
+      incr_stat stat_expert_simplify;
+      Utils.debug 2 "%% @[<h>theory-simplified %a into %a with %s@]"
                      !C.pp_clause#pp hc !C.pp_clause#pp_h new_hc expert.expert_name;
       (* return simplified clause *)
       new_hc
@@ -269,12 +275,11 @@ let rec gc_expert ~ctx gc =
   (* equality is equality of grounded normal forms *)
   let expert_equal t1 t2 =
     let t1', t2' = ground_pair t1 t2 in
-    Utils.debug 1 "%% %s: check equal @[<h>%a,%a (%s): normal forms %a,%a (%s)@]"
-      expert_name !T.pp_term#pp t1 !T.pp_term#pp t2
-      (string_of_comparison (ctx.ctx_ord#compare t1 t2))
-      !T.pp_term#pp t1' !T.pp_term#pp t2'
-      (string_of_comparison (ctx.ctx_ord#compare t1' t2'));
-    nf t1' == nf t2' in
+    let t1' = nf t1' in
+    let t2' = nf t2' in
+    Utils.debug 3 "%% %s: check equal @[<h>%a,%a@]"
+      expert_name !T.pp_term#pp t1 !T.pp_term#pp t2;
+    t1' == t2' in
   let expert_canonize t = nf t in
   { expert_name= (Utils.sprintf "gc(%s)" theory);
     expert_descr=("ground convergent system of equations for the theory " ^ theory);
