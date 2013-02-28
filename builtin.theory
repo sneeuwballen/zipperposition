@@ -151,7 +151,7 @@ theory lattice(meet, join) is
 gc(ac)
    f(f(X,Y),Z)=f(X,f(Y,Z)) and 
    f(X,Y) = f(Y,X) and
-   f(X,f(Y,Z))=f(Y,f(X,Y)) and
+   f(X,f(Y,Z))=f(Y,f(X,Z)) and
    f(X,f(Y,Z))=f(Z,f(Y,X)) and
    f(X,f(Y,Z))=f(Y,f(Z,X))
    with rpo6(f)
