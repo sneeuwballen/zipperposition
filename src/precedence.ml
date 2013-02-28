@@ -208,7 +208,7 @@ let mk_precedence ?(complete=true) constrs symbols =
       if a' == b' && a != b
         then (* both are in the same symbol family (e.g. split symbols). Any
                 arbitrary but total ordering on them is ok, as long as it's stable. *)
-          String.compare (name_symbol a) (name_symbol b)
+          Symbols.compare_symbols a b
         else SHashtbl.find !table b' - SHashtbl.find !table a'
 
     method weight s = !weight s

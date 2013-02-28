@@ -181,6 +181,16 @@ let check_beta () =
     !T.pp_term#pp redex !T.pp_term#pp reduced;
   ()
 
+(** Constants *)
+let check_consts (t1, t2) =
+  let t1', t2' = Experts.ground_pair t1 t2 in
+  assert (T.is_ground_term t1' && T.is_ground_term t2');
+  Format.printf "grounded terms : @[<h>%a %s %a@]@."
+    !T.pp_term#pp t1' (string_of_comparison (ord#compare t1' t2')) !T.pp_term#pp t2';
+  if ord#compare t1' t2' = Incomparable
+    then H.TestFail (t1, t2)
+    else H.TestOk
+
 (** special cases *)
 let check_special () =
   let x = T.mk_var 1 univ_ in
@@ -203,6 +213,7 @@ let run () =
     !T.pp_term#pp t1 !T.pp_term#pp t2 in
   H.check_and_print ~name:"check_subterm" check_subterm random_term !T.pp_term#pp 5000;
   H.check_and_print ~name:"check_unif" check_unif random_pair pp_pair 5000;
+  H.check_and_print ~name:"check_consts" check_consts random_pair pp_pair 20;
   H.check_and_print ~name:"check_curry" check_curry random_term !T.pp_term#pp 20;
   check_ac_matching ();
   check_beta ();

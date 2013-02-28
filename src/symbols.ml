@@ -277,7 +277,7 @@ let arity = function
 (** Infinite set of symbols, accessed by index, that will not collide with
     the signature of the problem *)
 let mk_fresh_const i =
-  mk_symbol ~attrs:attr_fresh_const ("$$const_" ^ string_of_int i)
+  mk_symbol ~attrs:attr_fresh_const ("$$c_" ^ string_of_int i)
 
 (** {2 Signature of a set of symbols} *)
 
