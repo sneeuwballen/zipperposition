@@ -29,6 +29,8 @@ module DT = Dtree
 module Unif = FoUnif
 module Utils = FoUtils
 
+let prof_ordered_rewriting = Utils.mk_profiler "rewriting.ordered"
+
 (** {2 Ordered rewriting} *)
 
 module OrderedTRS = struct
@@ -98,9 +100,7 @@ module OrderedTRS = struct
 
   (** Rewrite a term into its normal form *)
   let rewrite trs t =
-    Utils.debug 4 "@[<h>rewrite %a with %a@]"
-      !T.pp_term#pp t  (Sequence.pp_seq ~sep:" and " !C.pp_clause#pp_h)
-      (to_seq trs);
+    Utils.enter_prof prof_ordered_rewriting;
     (* reduce to normal form *)
     let rec reduce t =
       match t.term with
@@ -119,8 +119,6 @@ module OrderedTRS = struct
       try
         List.iter
           (fun (rule, _) ->
-            Utils.debug 4 "match @[<h>%a with %a (rule %a)@]"
-              !T.pp_term#pp t !T.pp_term#pp rule.rule_left !C.pp_clause#pp rule.rule_clause;
             try
               let subst = Unif.matching S.id_subst (rule.rule_left,1) (t,0) in
               (* right-hand part *)
@@ -141,7 +139,9 @@ module OrderedTRS = struct
         assert (trs.ord#compare t t' = Gt);
         reduce t'  (* term is rewritten, reduce it again *)
   in
-  reduce t
+  let t' = reduce t in
+  Utils.exit_prof prof_ordered_rewriting;
+  t'
 
   let pp formatter trs =
     Format.fprintf formatter "@[<hov2>%a@]"
