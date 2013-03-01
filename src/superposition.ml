@@ -131,8 +131,9 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
                        !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
                        !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
                        pp_pos passive_pos S.pp_substitution subst;
-  assert (T.db_closed s);
-  if not sign_st 
+  if not (T.db_closed s)
+  then (Utils.debug 3 "... active term is not DB-closed"; acc)
+  else if not sign_st 
   then (Utils.debug 3 "... active literal is negative"; acc)
   else if not (T.atomic s) (* do not rewrite non-atomic formulas *)
   then (Utils.debug 3 "... active term is not atomic or DB-closed"; acc)
