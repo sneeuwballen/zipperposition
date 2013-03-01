@@ -183,7 +183,7 @@ let clause_of_deduced ~ctx lits parents =
   let premises = List.map (fun hc -> hc.hcproof) parents in
   let hc = C.mk_hclause_a ~ctx lits ~parents
     (fun c -> Proof.mk_proof c "lemma" premises) in
-  Sup.basic_simplify hc
+  Sup.basic_simplify (C.clause_of_fof hc)
 
 (** Find the lemmas that can be deduced if we consider this new clause *)
 let find_lemmas ~ctx prover hc = 
