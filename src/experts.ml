@@ -167,7 +167,7 @@ module Set = struct
   let add experts e =
     (* traverse [experts], trying to find one that is compatible with e *)
     let rec add left right e =
-      match right with
+      match right with  (* TODO if e is more specific than e' in list, drop e *)
       | [] -> e::left (* add the expert *)
       | e'::right' ->
         if compatible e e'

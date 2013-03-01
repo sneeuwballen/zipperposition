@@ -216,6 +216,9 @@ let matching (p : t) lits =
   let offset = max (T.max_var (T.vars (fst p))) (T.max_var (T.vars right)) + 1 in
   let vars = List.mapi (fun i sort -> T.mk_var (i+offset) sort) sorts in
   let left = instantiate ~uncurry:false p vars in
+  (* proper (ie, first-order) variables of the pattern *)
+  let proper_vars = T.vars (fst p) in
+  let proper_vars = List.filter (fun v -> not (List.memq v vars)) proper_vars in
   (* match pattern against [right] *)
   Utils.debug 3 "%% meta-prover: match @[<h>%a with %a@]"
     !T.pp_term#pp left !T.pp_term#pp right;
@@ -227,9 +230,10 @@ let matching (p : t) lits =
         S.pp_substitution subst (Utils.pp_list !T.pp_term#pp) vars;
       (* convert variables back to terms *)
       let args = List.map (fun v -> S.apply_subst subst (v,offset)) vars in
+      let proper_args = List.map (fun v -> S.apply_subst subst (v,offset)) proper_vars in
       (* check that abstracted variables map to constants, and regular
         variables map to variables *)
-      if List.for_all T.is_const args
+      if List.for_all T.is_const args && List.for_all T.is_var proper_args
         then Sequence.of_list [args]
         else Sequence.of_list [])
     substs in
