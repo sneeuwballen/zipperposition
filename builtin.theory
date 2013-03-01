@@ -168,6 +168,6 @@ gc(monoid)
    f(X,e) = X and
    f(e,X) = X
    with rpo6(f)
-   if monoid(f,e).
+   if monoid(f,e) and commutative(f).
 
 % vim:syntax=ocaml
