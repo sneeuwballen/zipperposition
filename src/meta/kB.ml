@@ -512,29 +512,34 @@ let of_datalog lit =
 
 (** {2 Knowledge Base} *)
 
-type t = definition list
+module DefinitionSet = Sequence.Set.Make(struct
+  type t = definition
+  let compare = compare_definitions
+end)
+
+type t = DefinitionSet.set
   (** The knowledge base. *)
 
-let empty = []
+let empty = DefinitionSet.empty
 
-let add_definition kb d = d :: kb
+let add_definition kb d = DefinitionSet.add d kb
 
 let add_definitions kb seq = Sequence.fold add_definition kb seq
 
-let to_seq kb = Sequence.of_list kb
+let to_seq kb = DefinitionSet.to_seq kb
 
 let of_seq kb definitions =
-  Sequence.fold add_definition kb definitions
+  DefinitionSet.union kb (DefinitionSet.of_seq definitions)
 
 (** {2 Printing/parsing} *)
 
 let pp formatter kb =
   Format.fprintf formatter "@[<v2>KB:@;%a@]"
-    (Utils.pp_list ~sep:"" pp_definition) kb 
+    (Sequence.pp_seq ~sep:"" pp_definition) (to_seq kb)
 
 let to_json kb : json Stream.t =
-  let definitions = List.map definition_to_json kb in
-  Stream.of_list definitions
+  let definitions = Sequence.map definition_to_json (to_seq kb) in
+  Sequence.to_stream definitions
 
 let of_json kb (json : json Stream.t) : t =
   let seq = Sequence.of_stream json in
