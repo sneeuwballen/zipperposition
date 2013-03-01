@@ -162,7 +162,7 @@ gc(ac)
 gc(monoid)
    f(f(X,Y),Z)=f(X,f(Y,Z)) and 
    f(X,Y) = f(Y,X) and
-   f(X,f(Y,Z))=f(Y,f(X,Y)) and
+   f(X,f(Y,Z))=f(Y,f(X,Z)) and
    f(X,f(Y,Z))=f(Z,f(Y,X)) and
    f(X,f(Y,Z))=f(Y,f(Z,X)) and
    f(X,e) = X and
