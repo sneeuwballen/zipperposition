@@ -337,22 +337,25 @@ let mk_state ~ctx ?meta params signature =
  * ---------------------------------------------------------------------- *)
 
 (** statistics on the state (TODO stats on the simpl_set) *)
-type state_stats = int * int (* num passive, num active *)
+type state_stats = int * int * int (* num passive, num active, num simplification *)
 
 let stats state =
   ( C.CSet.size state#active_set#clauses
-  , C.CSet.size state#passive_set#clauses)
+  , C.CSet.size state#passive_set#clauses
+  , state#simpl_set#idx_simpl#size)
 
 let pp_state formatter state =
-  let num_active, num_passive = stats state in
-  Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
-    num_active num_passive CQ.pp_queues state#passive_set#queues
+  let num_active, num_passive, num_simpl = stats state in
+  Format.fprintf formatter
+    "@[<h>state {%d active clauses; %d passive_clauses; %d simplification_rules;@;%a}@]"
+    num_active num_passive num_simpl CQ.pp_queues state#passive_set#queues
 
 let debug_state formatter state =
-  let num_active, num_passive = stats state in
+  let num_active, num_passive, num_simpl = stats state in
   Format.fprintf formatter
-    "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
-    num_active num_passive
+    ("@[<v 2>state {%d active clauses; %d passive_clauses; %d simplification_rules;" ^^
+      "@;%a@;active:%a@;passive:%a@]@;")
+    num_active num_passive num_simpl
     CQ.pp_queues state#passive_set#queues
     C.pp_set state#active_set#clauses
     C.pp_set state#passive_set#clauses

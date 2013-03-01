@@ -341,6 +341,12 @@ let unit_index =
         then ({< pos = remove pos l (r, hc) >} :> 'self)
         else ({< neg = remove neg l (r, hc) >} :> 'self)
 
+    method size =
+      let n = ref 0 in
+      iter pos (fun _ _ -> incr n);
+      iter neg (fun _ _ -> incr n);
+      !n
+
     method retrieve ~sign offset (t, o_t) k =
       let handler l (r, hc) subst = k l (r, offset) subst hc in
       if sign

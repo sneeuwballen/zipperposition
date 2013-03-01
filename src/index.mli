@@ -65,6 +65,7 @@ class type unit_index =
     method remove_clause : hclause -> 'b
     method add : term -> term -> bool -> hclause -> 'b
     method remove : term -> term -> bool -> hclause ->'b
+    method size : int
     method retrieve : sign:bool -> int -> term bind ->
                       (term bind -> term bind -> substitution -> hclause -> unit) ->
                       unit        (** iter on (in)equations of given sign l=r

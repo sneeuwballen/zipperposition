@@ -87,8 +87,8 @@ val mk_passive_set : ctx:context -> (ClauseQueue.queue * int) list -> passive_se
 val mk_state : ctx:context -> ?meta:Meta.Prover.t ->
                Params.parameters -> signature -> state
 
-(** statistics on the state (num active, num passive) *)
-type state_stats = int * int
+(** statistics on the state (num active, num passive, num simplification) *)
+type state_stats = int * int * int
 val stats : state -> state_stats
 
 (** pretty print the content of the state *)

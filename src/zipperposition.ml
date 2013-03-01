@@ -95,10 +95,11 @@ let print_stats state =
     Printf.printf ("%% hashcons stats for %s: size %d, num %d, sum length %d, "
                 ^^ "buckets: small %d, median %d, big %d\n")
       what sz num sum_length small median big
-  and print_state_stats (num_active, num_passive) =
+  and print_state_stats (num_active, num_passive, num_simpl) =
     Printf.printf "%% proof state stats:\n";
-    Printf.printf "%%   active clauses   %d\n" num_active;
-    Printf.printf "%%   passive clauses  %d\n" num_passive
+    Printf.printf "%%   active clauses          %d\n" num_active;
+    Printf.printf "%%   passive clauses         %d\n" num_passive;
+    Printf.printf "%%   simplification clauses  %d\n" num_simpl
   and print_gc () =
     let stats = Gc.stat () in
     Printf.printf ("%% GC: minor words %.0f; major_words: %.0f; max_heap: %d; "
@@ -288,7 +289,7 @@ let process_file ~kb params f =
   (* print theories *)
   (match meta with None -> ()
     | Some meta ->
-      Utils.debug 1 "%% @[<h>meta-prover results (%d):@ %a@]"
+      Utils.debug 0 "%% @[<h>meta-prover results (%d):@ %a@]"
         (Sequence.length (Meta.Prover.results meta))
         Meta.Prover.pp_results (Meta.Prover.results meta);
       Format.printf "%% datalog contains %d clauses@."
