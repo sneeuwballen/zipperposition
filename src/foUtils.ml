@@ -21,16 +21,24 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 open Hash
 
-(* debugging facilities *)
+(** Terminal facilities *)
+
+let clear_line () =
+  output_string Pervasives.stdout
+    "\r                                                         \r";
+  flush Pervasives.stdout
+
+(** debugging facilities *)
 let debug_level_ = ref 0
 let set_debug l = debug_level_ := l
 let debug l format =
   if l <= !debug_level_
-    then
+    then (
+      clear_line ();
       Format.kfprintf
         (fun fmt -> Format.fprintf fmt "@.")
       Format.std_formatter
-      format
+      format )
     else Format.ifprintf Format.std_formatter format 
 let debug_level () = !debug_level_
 
