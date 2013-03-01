@@ -295,9 +295,12 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
           let cs = List.map (Experts.Set.simplify state#experts) cs in
           let cs = List.map (calculus#rw_simplify state#simpl_set) cs in
           let cs = List.map calculus#basic_simplify cs in
-          let cs = List.filter (fun hc ->
-            not (calculus#is_trivial hc
-              || Experts.Set.is_redundant state#experts hc)) cs in
+          let simpl, cs = List.partition
+            (Experts.Set.is_redundant state#experts) cs in
+          (* simpl: redundant clauses that may still be useful for simplification *)
+          state#simpl_set#add simpl;
+          (* keep clauses  that are not redundant *)
+          let cs = List.filter (fun hc -> not (calculus#is_trivial hc)) cs in
           List.rev_append cs acc)
         [] inferred_clauses
       in
@@ -326,9 +329,9 @@ let get_total_time, get_start_time =
 
 (** print progress *)
 let print_progress steps state =
-  let num_active, num_passive = PS.stats state in
-  Format.printf "\r%% %d steps; %d active; %d passive; time %.1f s@?"
-    steps num_active num_passive (get_total_time ())
+  let num_active, num_passive, num_simpl = PS.stats state in
+  Format.printf "\r%% %d steps; %d active; %d passive; %d simpl; time %.1f s@?"
+    steps num_active num_passive num_simpl (get_total_time ())
 
 let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus state =
   let rec do_step num =
