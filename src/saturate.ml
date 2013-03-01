@@ -171,7 +171,7 @@ let all_simplify ~calculus ~experts active_set simpl_set hc =
       (* simplify this clause *)
       let _, hc' = simplify ~calculus active_set simpl_set hc in
       let hc' = Experts.Set.simplify experts hc' in
-      if calculus#is_trivial hc' || Experts.Set.is_redundant experts hc'
+      if calculus#is_trivial hc'
         then [] else [hc'])
     clauses
   in
@@ -251,8 +251,9 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       Unknown  (* all simplifications are redundant *)
     | hc::new_clauses ->     (* select first clause, the other ones are passive *) 
     (* empty clause found *)
-    if hc.hclits = [||]
-    then (state#active_set#add [hc]; Unsat hc)
+    if hc.hclits = [||] then (state#active_set#add [hc]; Unsat hc)
+    (* redundant modulo theory, still keep it for simplifications *)
+    else if Experts.Set.is_redundant experts hc then (state#simpl_set#add [hc]; Unknown)
     else begin
       assert (not (is_redundant ~calculus state#active_set hc));
       (* process the given clause! *)
@@ -295,12 +296,11 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
           let cs = List.map (Experts.Set.simplify state#experts) cs in
           let cs = List.map (calculus#rw_simplify state#simpl_set) cs in
           let cs = List.map calculus#basic_simplify cs in
-          let simpl, cs = List.partition
-            (Experts.Set.is_redundant state#experts) cs in
-          (* simpl: redundant clauses that may still be useful for simplification *)
-          state#simpl_set#add simpl;
           (* keep clauses  that are not redundant *)
-          let cs = List.filter (fun hc -> not (calculus#is_trivial hc)) cs in
+          let cs = List.filter
+            (fun hc -> not (calculus#is_trivial hc
+                      || Experts.Set.is_redundant state#experts hc))
+            cs in
           List.rev_append cs acc)
         [] inferred_clauses
       in

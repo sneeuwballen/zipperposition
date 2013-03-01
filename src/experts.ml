@@ -110,10 +110,10 @@ let is_redundant expert hc =
       | _ -> false)
     hc.hclits
   in
-  (if ans then
+  (if ans then begin
     incr_stat stat_expert_redundant;
     Utils.debug 2 "%% @[<h>%a redundant with %s@]"
-      !C.pp_clause#pp_h hc expert.expert_name);
+      !C.pp_clause#pp_h hc expert.expert_name end);
   ans
 
 (** Simplify the clause *)
@@ -296,9 +296,9 @@ let rec gc_expert ~ctx gc =
 
 (** Pretty-print the system of ground convergent equations *)
 let pp_gc formatter gc =
-  Format.fprintf formatter "@[<h>%d equations (ord %s[%a])@]"
-    (List.length gc.gc_eqns) gc.gc_ord
-    (Utils.pp_list pp_symbol) gc.gc_prec
+  Format.fprintf formatter "@[<h>%s(%d equations, ord %s(%a))@]"
+    gc.gc_theory (List.length gc.gc_eqns) gc.gc_ord
+    (Utils.pp_list ~sep:">" pp_symbol) gc.gc_prec
 
 (** {3 JSON encoding} *)
 

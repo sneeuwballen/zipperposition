@@ -99,7 +99,9 @@ let fact_handler prover lit =
     | Some (KB.ThenTheory (name, args)) ->
       let result = Theory (name, args) in
       prover.results <- result :: prover.results;
-      prover.new_results <- result :: prover.new_results
+      prover.new_results <- result :: prover.new_results;
+      Utils.debug 0 "%% meta-prover: theory @[<h>%s(%a)@]" name
+        (Utils.pp_list !T.pp_term#pp) args
     | Some (KB.ThenGC gc_spec) ->
       (* explanations: find the ones which are in fact clauses. *)
       let premises = Logic.db_explain prover.db lit in
@@ -111,7 +113,7 @@ let fact_handler prover lit =
       (match KB.gc_spec_to_gc ~ctx gc_spec premises with
         | None -> Utils.debug 0 "%% meta-prover: got non-FO gnd_convergent"
         | Some gc ->
-          Utils.debug 0 "%% meta-prover: new @[<h>gnd_convergent %a@]"
+          Utils.debug 0 "%% meta-prover: @[<h>new gnd_convergent : %a@]"
             Experts.pp_gc gc;
           (* build an Expert from the GC system *)
           let expert = Experts.gc_expert ~ctx gc in
