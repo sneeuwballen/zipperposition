@@ -146,6 +146,13 @@ theory lattice(meet, join) is
   absorption(meet, join) and
   absorption(join, meet).
 
+theory complete_lattice(meet, join, top, bottom) is
+  lattice(meet, join) and
+  axiom meet(X,top) = X and
+  axiom join(X,top) = top and
+  axiom meet(X,bottom) = bottom and
+  axiom join(X,bottom) = X.
+
 % rewrite system for ac
 
 gc(ac)
