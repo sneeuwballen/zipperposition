@@ -565,9 +565,6 @@ let signature seq =
     let sort = t.sort in
     let signature' = update_sig signature s sort in
     explore_term signature' t'
-  | Node (s, l) when has_attr attr_polymorphic s ->
-    (* ad-hoc polymorphism *)
-    List.fold_left explore_term signature l
   | Node (f, l) ->
     let sort = t.sort <== (List.map (fun x -> x.sort) l) in
     let signature' = update_sig signature f sort in
@@ -575,13 +572,16 @@ let signature seq =
   (* Update signature with s -> sort.
      Checks consistency with current value, if any. *)
   and update_sig signature f sort =
-    (try
-      let sort' = SMap.find f signature in
-      if sort != sort' then Format.printf "sort %a != %a@." pp_sort sort pp_sort sort';
-      assert (sort == sort');
-    with Not_found -> ());
-    let signature' = SMap.add f sort signature in
-    signature'
+    if has_attr attr_polymorphic f then signature
+    else begin
+      (try
+        let sort' = SMap.find f signature in
+        if sort != sort' then Format.printf "sort %a != %a@." pp_sort sort pp_sort sort';
+        assert (sort == sort');
+      with Not_found -> ());
+      let signature' = SMap.add f sort signature in
+      signature'
+    end
   in
   Sequence.fold explore_term empty_signature seq
 

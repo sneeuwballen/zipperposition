@@ -156,25 +156,43 @@ theory complete_lattice(meet, join, top, bottom) is
 % rewrite system for ac
 
 gc(ac)
-   f(f(X,Y),Z)=f(X,f(Y,Z)) and 
-   f(X,Y) = f(Y,X) and
-   f(X,f(Y,Z))=f(Y,f(X,Z)) and
-   f(X,f(Y,Z))=f(Z,f(Y,X)) and
-   f(X,f(Y,Z))=f(Y,f(Z,X))
-   with rpo6(f)
-   if ac(f).
+  f(f(X,Y),Z)=f(X,f(Y,Z)) and 
+  f(X,Y) = f(Y,X) and
+  f(X,f(Y,Z))=f(Y,f(X,Z)) and
+  f(X,f(Y,Z))=f(Z,f(Y,X)) and
+  f(X,f(Y,Z))=f(Y,f(Z,X))
+  with rpo6(f)
+  if ac(f).
 
 % rewrite system for monoids
 
 gc(monoid)
-   f(f(X,Y),Z)=f(X,f(Y,Z)) and 
-   f(X,Y) = f(Y,X) and
-   f(X,f(Y,Z))=f(Y,f(X,Z)) and
-   f(X,f(Y,Z))=f(Z,f(Y,X)) and
-   f(X,f(Y,Z))=f(Y,f(Z,X)) and
-   f(X,e) = X and
-   f(e,X) = X
-   with rpo6(f)
-   if monoid(f,e) and commutative(f).
+  f(f(X,Y),Z)=f(X,f(Y,Z)) and 
+  f(X,Y) = f(Y,X) and
+  f(X,f(Y,Z))=f(Y,f(X,Z)) and
+  f(X,f(Y,Z))=f(Z,f(Y,X)) and
+  f(X,f(Y,Z))=f(Y,f(Z,X)) and
+  f(X,e) = X and
+  f(e,X) = X
+  with rpo6(f)
+  if monoid(f,e) and commutative(f).
+
+% rewrite system for abelian groups
+
+gc(abelian_group)
+  plus(plus(X,Y),Z)=plus(X,plus(Y,Z)) and % AC 
+  plus(X,Y) = plus(Y,X) and
+  plus(X,plus(Y,Z))=plus(Y,plus(X,Z)) and
+  plus(X,plus(Y,Z))=plus(Z,plus(Y,X)) and
+  plus(X,plus(Y,Z))=plus(Y,plus(Z,X)) and
+  minus(zero) = zero and % group
+  minus(minus(X)) = X and
+  plus(X,minus(X)) = zero and
+  plus(minus(X),Y) = minus(plus(X,minus(Y))) and
+  plus(X,minus(plus(X,Y))) = minus(Y) and
+  minus(plus(X,minus(Y))) = plus(Y,minus(X)) and
+  plus(X,minus(plus(Y,Z))) = minus(plus(Y,minus(plus(X,minus(Z)))))
+  with rpo6(plus,minus,zero)
+  if abelian_group(plus,zero,minus).
 
 % vim:syntax=ocaml
