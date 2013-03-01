@@ -26,6 +26,9 @@ module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
+let prof_scan_clause = Utils.mk_profiler "meta.scan_clause"
+let prof_scan_set = Utils.mk_profiler "meta.scan_set"
+
 (** {2 Type definitions} *)
 
 module Logic = KB.Logic
@@ -190,11 +193,13 @@ let found_pattern prover hc pattern args =
     are detected they are returned *)
 let scan_clause prover hc =
   Utils.debug 2 "%% meta-prover: scan @[<h>%a@]" !C.pp_clause#pp_h hc;
+  Utils.enter_prof prof_scan_clause;
   (* match [hc] against patterns *)
   match_patterns prover.patterns hc.hclits (found_pattern prover hc);
   (* get results *)
   let results = prover.new_results in
   prover.new_results <- [];
+  Utils.exit_prof prof_scan_clause;
   results
 
 (** Are there some new patterns? *)
@@ -205,6 +210,7 @@ let has_new_patterns prover = prover.new_patterns <> []
     returns true. After this, [has_new_patterns prover] returns false
     at least until the next call to [scan_clause]. *)
 let scan_set prover set =
+  Utils.enter_prof prof_scan_set;
   (* patterns to search for *)
   let patterns = prover.new_patterns in
   prover.new_patterns <- [];
@@ -215,6 +221,7 @@ let scan_set prover set =
       match_patterns patterns hc.hclits (found_pattern prover hc));
   let results = prover.new_results in
   prover.new_results <- [];
+  Utils.exit_prof prof_scan_set;
   results
 
 (** List of theories detected so far *)

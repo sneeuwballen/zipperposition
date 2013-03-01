@@ -29,6 +29,8 @@ module Utils = FoUtils
 module Unif = FoUnif
 module Lits = Literals
 
+let prof_matching = Utils.mk_profiler "meta.pattern.matching"
+
 let __function_symbol = mk_symbol ~attrs:attr_polymorphic "$$function"
 
 (** Encoding of term, in a form that allows to distinguish variables from
@@ -208,6 +210,7 @@ let apply_subst ?(uncurry=true) (((p, args),offset) : t parametrized bind) subst
     [instantiate p [s1,...,sn] =_AC c] modulo associativity and commutativity
     of "or" and "=". *)
 let matching (p : t) lits =
+  Utils.enter_prof prof_matching;
   let _, sorts = p in
   let right = T.curry (Lits.term_of_lits lits) in
   (* apply encoding to the matched term as well *)
@@ -237,5 +240,6 @@ let matching (p : t) lits =
         then Sequence.of_list [args]
         else Sequence.of_list [])
     substs in
+  Utils.exit_prof prof_matching;
   substs
 

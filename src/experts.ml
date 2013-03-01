@@ -30,8 +30,11 @@ module Utils = FoUtils
 
 (** {2 General interface} *)
 
-let stat_expert_redundant = mk_stat "expert_redundant"
-let stat_expert_simplify = mk_stat "expert_simplify"
+let stat_expert_redundant = mk_stat "experts.redundant"
+let stat_expert_simplify = mk_stat "experts.simplify"
+
+let prof_simplify_expert = Utils.mk_profiler "experts.simplify"
+let prof_redundant_expert = Utils.mk_profiler "experts.redundant"
 
 type t = {
   expert_name : string;                 (** Theory the expert works on *)
@@ -103,10 +106,11 @@ let signature expert = expert.expert_sig
 (** Decide whether this clause is redundant *)
 let is_redundant expert hc =
   assert (hc.hcctx == expert.expert_ctx);
+  Utils.enter_prof prof_redundant_expert;
   if C.get_flag C.flag_persistent hc then false else
   let ans = Utils.array_exists
     (fun lit -> match lit with
-      | Equation (l, r, true, _) -> expert.expert_equal l r
+      | Equation (l, r, true, _) when l.sort != bool_ -> expert.expert_equal l r
       | _ -> false)
     hc.hclits
   in
@@ -114,10 +118,12 @@ let is_redundant expert hc =
     incr_stat stat_expert_redundant;
     Utils.debug 2 "%% @[<h>%a redundant with %s@]"
       !C.pp_clause#pp_h hc expert.expert_name end);
+  Utils.exit_prof prof_redundant_expert;
   ans
 
 (** Simplify the clause *)
 let simplify expert hc =
+  Utils.enter_prof prof_simplify_expert;
   let ctx = expert.expert_ctx in
   let lits = Array.to_list hc.hclits in
   let lits = List.filter
@@ -126,7 +132,7 @@ let simplify expert hc =
       | _ -> true)
     lits in
   if List.length lits = Array.length hc.hclits
-    then hc  (* no simplification *)
+    then (Utils.exit_prof prof_simplify_expert; hc)  (* no simplification *)
     else begin
       let rule = "expert_" ^ expert.expert_name in
       let premises = List.map (fun hc -> hc.hcproof) expert.expert_clauses in
@@ -137,6 +143,7 @@ let simplify expert hc =
       Utils.debug 2 "%% @[<h>theory-simplified %a into %a with %s@]"
                      !C.pp_clause#pp hc !C.pp_clause#pp_h new_hc expert.expert_name;
       (* return simplified clause *)
+      Utils.exit_prof prof_simplify_expert;
       new_hc
     end
 
