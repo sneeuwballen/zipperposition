@@ -129,7 +129,8 @@ let simplify expert hc =
     then hc  (* no simplification *)
     else begin
       let rule = "expert_" ^ expert.expert_name in
-      let proof c' = Proof (c', rule, [hc.hcproof]) in
+      let premises = List.map (fun hc -> hc.hcproof) expert.expert_clauses in
+      let proof c' = Proof (c', rule, hc.hcproof :: premises) in
       let parents = hc :: hc.hcparents in
       let new_hc = C.mk_hclause ~parents ~ctx lits proof in
       incr_stat stat_expert_simplify;
@@ -261,9 +262,9 @@ let compatible_gc ~ord gc =
 let rec gc_expert ~ctx gc =
   (* name and printing stuff *)
   let expert_sig = gc.gc_sig in
-  let theory = Utils.sprintf "@[<h>%s(%a)@]" gc.gc_theory
-    (Sequence.pp_seq pp_symbol) (SSetSeq.to_seq expert_sig) in
-  let expert_name = Utils.sprintf "gc(%s)" theory in
+  let theory = Utils.sprintf "@[<h>%s_%a@]" gc.gc_theory
+    (Sequence.pp_seq ~sep:"_" pp_symbol) (SSetSeq.to_seq expert_sig) in
+  let expert_name = Utils.sprintf "gc_%s" theory in
   (* update clauses with the context *)
   let expert_clauses = List.map (C.update_ctx ~ctx) gc.gc_eqns in
   List.iter (fun c -> C.set_flag C.flag_persistent c true) expert_clauses;
@@ -281,7 +282,7 @@ let rec gc_expert ~ctx gc =
       expert_name !T.pp_term#pp t1 !T.pp_term#pp t2;
     t1' == t2' in
   let expert_canonize t = nf t in
-  { expert_name= (Utils.sprintf "gc(%s)" theory);
+  { expert_name;
     expert_descr=("ground convergent system of equations for the theory " ^ theory);
     expert_equal;
     expert_sig;
