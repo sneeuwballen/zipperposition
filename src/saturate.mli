@@ -51,10 +51,8 @@ val generate : calculus:Calculus.calculus -> ProofState.active_set -> hclause ->
 (** remove orphans of the clauses *)
 val remove_orphans : ProofState.passive_set -> hclause list -> unit
 
+(** Use the meta-prover (if any) to prove new lemmas *)
 val find_lemmas : ctx:context -> Meta.Prover.t option -> hclause -> hclause list
-  (** Use the meta-prover (if any) to prove new lemmas *)
-
-(* TODO: also use meta-prover to simplify clauses (list of experts) *)
 
 (** Perform one step of the given clause algorithm.
     It performs generating inferences only if [generating] is true (default);

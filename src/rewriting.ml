@@ -109,10 +109,12 @@ module OrderedTRS = struct
         let t' = reduce t' in
         T.mk_bind ~old:t s t.sort a_sort t'
       | Node (s, l) ->
-        let l = List.map reduce l in
-        let t = T.mk_node ~old:t s t.sort l in
+        let l' = List.map reduce l in
+        let t' = if List.for_all2 (==) l l'
+          then t
+          else T.mk_node s t.sort l' in
         (* now rewrite the term itself *)
-        rewrite_here t
+        rewrite_here t'
     (* rewrite once at this position. If it succeeds,
        yields back to [reduce]. *)
     and rewrite_here t =
