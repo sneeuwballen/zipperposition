@@ -352,7 +352,7 @@ module UF = UnionFind.Make(
     type key = term
     type value = literal list
     let equal = (==)
-    let hash t = t.hkey
+    let hash t = t.tag
     let zero = []
     let merge = List.rev_append
   end)

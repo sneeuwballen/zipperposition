@@ -37,7 +37,6 @@ type term = {
   mutable flags : int;          (** boolean flags about the term *)
   mutable tsize : int;          (** number of symbol/vars occurrences in the term (weight) *)
   mutable tag : int;            (** hashconsing tag *)
-  mutable hkey : int;           (** hash *)
 }
 (** content of the term *)
 and term_cell =

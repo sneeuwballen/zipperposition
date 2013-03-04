@@ -361,7 +361,7 @@ end
 module OrdCache = Cache.Make(
   struct
     type t = term
-    let hash t = t.hkey
+    let hash t = t.tag
       (* non commutative to avoid collision between (t1, t2) and (t2, t1) *)
     let equal t1 t2 = T.eq_term t1 t2
   end)

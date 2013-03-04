@@ -99,8 +99,8 @@ let compare_partial ~ord l1 l2 =
 let hash lit = match lit with
   | Equation (l, r, sign, o) ->
     if sign
-      then Hash.hash_int3 (Hash.hash_string o) l.hkey r.hkey
-      else Hash.hash_int3 (Hash.hash_string o) r.hkey l.hkey
+      then Hash.hash_int3 (Hash.hash_string o) l.tag r.tag
+      else Hash.hash_int3 (Hash.hash_string o) r.tag l.tag
 
 let weight = function
   | Equation (l, r, _ ,_) -> l.tsize + r.tsize
@@ -228,7 +228,7 @@ let hash_lits lits =
   let h = ref 0 in
   Array.iter
     (fun (Equation (l, r, sign, _)) ->
-      h := Hash.combine (Hash.combine !h l.hkey) r.hkey)
+      h := Hash.combine (Hash.combine !h l.tag) r.tag)
     lits;
   !h
 

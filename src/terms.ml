@@ -30,11 +30,11 @@ let hash_term t = match t.term with
   | Var i -> Hash.hash_int2 i (hash_sort t.sort)
   | BoundVar i -> Hash.hash_int2 i (hash_sort t.sort)
   | Node (s, l) ->
-    let h = Hash.hash_list (fun x -> x.hkey) 0 l in
+    let h = Hash.hash_list (fun x -> x.tag) 0 l in
     let h = Hash.combine h (hash_symbol s) in
     Hash.combine h (hash_sort t.sort)
   | Bind (s, sort, t) ->
-    Hash.combine (hash_symbol s) t.hkey
+    Hash.combine (hash_symbol s) t.tag
 
 let prof_mk_node = Utils.mk_profiler "Terms.mk_node"
 
@@ -54,7 +54,7 @@ let compare_term x y = x.tag - y.tag
 module THashtbl = Hashtbl.Make(
   struct
     type t = term
-    let hash t = t.hkey
+    let hash t = t.tag
     let equal t1 t2 = eq_term t1 t2
   end)
 
@@ -107,7 +107,7 @@ module H = Hashcons.Make(struct
 
   let equal x y = hashcons_equal x y
 
-  let hash t = t.hkey
+  let hash t = hash_term t
 
   let tag i t = (t.tag <- i; t)
 end)
@@ -143,29 +143,28 @@ let get_flag flag t = (t.flags land flag) != 0
     term that the caller believes is likely to be equal to the result.
     This makes hashconsing faster if the result is equal to [old]. *)
 
-(** Compare [t] with [old], returning [old] if they are equal. Otherwise
-    it hashconses [t] and returns the result *)
-let hashcons ?old t =
-  match old with
-  | Some old when hashcons_equal old t -> old
-  | _ ->  (* [old] is not correct, return [hashcons t] *)
-    t.hkey <- hash_term t;
-    H.hashcons t
-
 let mk_var ?old idx sort =
-  assert (idx >= 0);
-  let rec my_v = {term = Var idx; sort=sort;
-                  flags=(flag_db_closed lor flag_db_closed_computed lor
-                         flag_simplified lor flag_normal_form);
-                  tsize=1; tag= -1; hkey=0} in
-  hashcons ?old my_v
+  match old with
+  | Some ({term=Var idx'} as t') when idx = idx' && t'.sort == sort ->
+    t' (* same term *)
+  | _ ->
+    assert (idx >= 0);
+    let my_v = {term = Var idx; sort=sort;
+                flags=(flag_db_closed lor flag_db_closed_computed lor
+                       flag_simplified lor flag_normal_form);
+                tsize=1; tag= -1} in
+    H.hashcons my_v
 
 let mk_bound_var ?old idx sort =
-  assert (idx >= 0);
-  let rec my_v = {term = BoundVar idx; sort=sort;
-                  flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
-                  tsize=1; tag= -1; hkey=0} in
-  hashcons ?old my_v
+  match old with
+  | Some ({term=BoundVar idx'} as t') when idx = idx' && t'.sort == sort ->
+    t' (* same term as old *)
+  | _ ->
+    assert (idx >= 0);
+    let my_v = {term = BoundVar idx; sort=sort;
+                flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
+                tsize=1; tag= -1} in
+    H.hashcons my_v
 
 let rec sum_sizes acc l = match l with
   | [] -> acc
@@ -176,30 +175,39 @@ let rec compute_is_ground l = match l with
   | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
 
 let mk_bind ?old s r_sort arg_sort t' =
-  assert (has_attr attr_binder s);
-  let rec my_t = {term=Bind (s, arg_sort, t'); sort=r_sort; flags=0;
-                  tsize=t'.tsize+1; tag= -1; hkey=0} in
-  let t = hashcons ?old my_t in
-  (if t == my_t
-    then (* compute ground-ness of term *)
-      set_flag flag_ground t (get_flag flag_ground t'));
-  t
+  match old with
+  | Some ({term=Bind (s', arg_sort', t'')} as t_old) when s == s'
+    && arg_sort == arg_sort' && t'' == t' ->
+    t_old (* same term as old *)
+  | _ ->
+    assert (has_attr attr_binder s);
+    let my_t = {term=Bind (s, arg_sort, t'); sort=r_sort; flags=0;
+                tsize=t'.tsize+1; tag= -1} in
+    let t = H.hashcons my_t in
+    (if t == my_t
+      then (* compute ground-ness of term *)
+        set_flag flag_ground t (get_flag flag_ground t'));
+    t
 
 let mk_node ?old s sort l =
   Utils.enter_prof prof_mk_node;
-  let rec my_t = {term=Node (s, l); sort; flags=0;
-                  tsize=0; tag= -1; hkey=0} in
-  my_t.hkey <- hash_term my_t;
-  let t = hashcons ?old my_t in
-  (if t == my_t
-    then begin
-      (* compute size of term *)
-      t.tsize <- sum_sizes 1 l;
-      (* compute ground-ness of term *)
-      set_flag flag_ground t (compute_is_ground l);
-    end);
-  Utils.exit_prof prof_mk_node;
-  t
+  match old with
+  | Some ({term=Node (s', l')} as t') when s == s' && t'.sort == sort
+    && (try (List.for_all2 (==) l l') with Invalid_argument _ -> false) ->
+    Utils.exit_prof prof_mk_node;
+    t'  (* same term *)
+  | _ ->
+    let my_t = {term=Node (s, l); sort; flags=0; tsize=0; tag= -1} in
+    let t = H.hashcons my_t in
+    (if t == my_t
+      then begin
+        (* compute size of term *)
+        t.tsize <- sum_sizes 1 l;
+        (* compute ground-ness of term *)
+        set_flag flag_ground t (compute_is_ground l);
+      end);
+    Utils.exit_prof prof_mk_node;
+    t
 
 let mk_const ?old s sort = mk_node ?old s sort []
 
@@ -253,7 +261,6 @@ let mk_at ?old t1 t2 =
 
 let rec cast t sort =
   let new_t = {t with sort=sort} in
-  new_t.hkey <- hash_term new_t;
   H.hashcons new_t
 
 (** {2 Subterms and positions} *)

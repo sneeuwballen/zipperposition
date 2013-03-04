@@ -89,10 +89,15 @@ let apply_subst ?(recursive=true) subst (t, offset) =
     else match t.term with
     | BoundVar _ -> t
     | Bind (s, a_sort, t') ->
-      T.mk_bind ~old:t s t.sort a_sort (replace (binder_depth+1) subst (t', offset))
+      let t'' = replace (binder_depth + 1) subst (t',offset) in
+      if t' == t''
+        then t
+        else T.mk_bind s t.sort a_sort t''
     | Node (s, l) ->
       let l' = replace_list binder_depth subst offset l in
-      T.mk_node ~old:t s t.sort l'
+      if List.for_all2 (==) l l'
+        then t
+        else T.mk_node s t.sort l'
     | Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       (try let (t', o_t') = lookup subst bound_t in
