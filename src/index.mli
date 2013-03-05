@@ -71,5 +71,6 @@ class type unit_index =
                       unit        (** iter on (in)equations of given sign l=r
                                       where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit
+    method to_dot : string -> unit
   end
 

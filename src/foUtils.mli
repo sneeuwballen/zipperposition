@@ -18,20 +18,25 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Some helpers *)
+(** {1 Some helpers} *)
 
 open Types
+
+(** {2 debugging facilities} *)
 
 val set_debug : int -> unit               (** set the level of debug *)
 val debug : int ->  ('a, Format.formatter, unit) format -> 'a  (** debug message with level *)
 val debug_level : unit -> int             (** current debug level *)
 
-(** A profiler (do not call recursively) *)
+(** {2 profiling facilities} *)
+
 type profiler
 val enable_profiling : bool ref           (** Enable/disable profiling *)
 val mk_profiler : string -> profiler      (** Create a named profiler *)
 val enter_prof : profiler -> unit         (** Enter the profiler *)
 val exit_prof : profiler -> unit          (** Exit the profiler *)
+
+(** {2 Ordering utils} *)
 
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)
 val lexicograph : ('a -> 'b -> int) -> 'a list -> 'b list -> int
@@ -55,7 +60,7 @@ val multiset_eq : ('a -> 'a -> comparison) -> 'a list -> 'a list -> bool
 (** multiset order on lists which elements are ordered by f *)
 val multiset_partial : ('a -> 'a -> comparison) -> 'a list -> 'a list -> comparison
 
-(* TODO merge this and hExtlib *)
+(** {2 List utils} *)
 
 (** get n-th element of list (linear), or Not_found *)
 val list_get : 'a list -> int -> 'a
@@ -98,6 +103,8 @@ val times : int -> (unit -> 'a) -> 'a list
 (** shuffle randomly the list *)
 val list_shuffle : 'a list -> 'a list
 
+(** {2 Array utils} *)
+
 (** fold left on array, with index *)
 val array_foldi : ('b -> int -> 'a -> 'b) -> 'b -> 'a array -> 'b
 (** Forall on array *)
@@ -107,8 +114,20 @@ val array_forall2 : ('a -> 'a -> bool) -> 'a array -> 'a array -> bool
 (** exists on array *)
 val array_exists : ('a -> bool) -> 'a array -> bool
 
+(** {2 File utils} *)
+
 (** perform the action with a lock on the given file *)
 val with_lock_file : string -> (unit -> 'a) -> 'a
+
+(** Open the given file for reading, and returns
+    the result of the action applied to the input channel *)
+val with_input : string -> (in_channel -> 'a) -> 'a option
+
+(** Open the given file for writing, and returns
+    the result of the action applied to the output channel *)
+val with_output : string -> (out_channel -> 'a) -> 'a option
+
+(** {2 Pretty-printing utils} *)
 
 (** pretty-print into a string *)
 val on_buffer: ?margin:int -> (Format.formatter -> 'a -> 'b) -> 'a -> string

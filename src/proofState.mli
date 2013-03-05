@@ -46,7 +46,8 @@ type active_set =
 (** set of simplifying (unit) clauses *)
 type simpl_set =
   < ctx : context;
-    idx_simpl : Index.unit_index;       (** index for forward simplifications TODO split into pos-orientable/others *)
+    idx_simpl : Index.unit_index;       (** index for forward simplifications
+                                            TODO split into pos-orientable/others *)
 
     add : hclause list -> unit;
     remove : hclause list -> unit;

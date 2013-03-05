@@ -21,14 +21,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Types
 open Hash
 
-(** Terminal facilities *)
+(** {1 Some helpers} *)
+
+(** {2 debugging facilities} *)
 
 let clear_line () =
   output_string Pervasives.stdout
     "\r                                                         \r";
   flush Pervasives.stdout
 
-(** debugging facilities *)
 let debug_level_ = ref 0
 let set_debug l = debug_level_ := l
 let debug l format =
@@ -41,6 +42,8 @@ let debug l format =
       format )
     else Format.ifprintf Format.std_formatter format 
 let debug_level () = !debug_level_
+
+(** {2 profiling facilities} *)
 
 (** A profiler (do not call recursively) *)
 type profiler = {
@@ -100,6 +103,8 @@ let () =
             (profiler.prof_total /. (float_of_int profiler.prof_calls)))
         profilers
     end)
+
+(** {2 Ordering utils} *)
 
 let rec lexicograph f l1 l2 =
   match l1, l2 with
@@ -207,9 +212,7 @@ let multiset_partial f l1 l2 =
   | [], [] -> Eq (* all elements removed by multiset_remove_eq *)
   | _ -> find_dominating l1 l2
 
-(* ----------------------------------------------------------------------
- * lists
- * ---------------------------------------------------------------------- *)
+(** {2 List utils} *)
 
 let rec list_get l i = match l, i with
   | [], i -> raise Not_found
@@ -339,9 +342,7 @@ let list_shuffle l =
   done;
   Array.to_list a
 
-(* ----------------------------------------------------------------------
- * arrays
- * ---------------------------------------------------------------------- *)
+(** {2 Array utils} *)
 
 let array_foldi f acc a =
   let rec recurse acc i =
@@ -366,9 +367,7 @@ let array_exists p a =
     if i = Array.length a then false else p a.(i) || check (i+1)
   in check 0
 
-(* ----------------------------------------------------------------------
- * misc
- * ---------------------------------------------------------------------- *)
+(** {2 File utils} *)
 
 let with_lock_file filename action =
   let lock_file = Unix.openfile filename [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
@@ -383,9 +382,33 @@ let with_lock_file filename action =
     Unix.close lock_file;
     raise e
 
-(* ----------------------------------------------------------------------
- * pretty printing
- * ---------------------------------------------------------------------- *)
+let with_input filename action =
+  try
+    let ic = open_in filename in
+    (try
+      let res = Some (action ic) in
+      close_in ic;
+      res
+    with Sys_error _ ->
+      close_in ic;
+      None)
+  with Sys_error _ ->
+    None
+
+let with_output filename action =
+  try
+    let oc = open_out filename in
+    (try
+      let res = Some (action oc) in
+      close_out oc;
+      res
+    with Sys_error s ->
+      close_out oc;
+      None)
+  with Sys_error s ->
+    None
+
+(** {2 Pretty-printing utils} *)
 
 let on_buffer ?(margin=80) f t =
   let buff = Buffer.create 100 in

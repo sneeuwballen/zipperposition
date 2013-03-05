@@ -207,6 +207,15 @@ let enrich_with_theories ~ctx meta clauses =
         List.rev_append lemmas acc)
       clauses clauses
 
+(** Print some content of the state, based on environment variables *)
+let print_dots state =
+  (try (* write simplification index into the given file *)
+    let dot_simpl = Sys.getenv "DOT_SIMPL" in
+    Utils.debug 0 "%% print simplification index to %s" dot_simpl;
+    state#simpl_set#idx_simpl#to_dot dot_simpl
+   with Not_found -> ());
+  ()
+
 (** Process the given file (try to solve it) *)
 let process_file ~kb params f =
   Format.printf "%% *** process file %s ***@." f;
@@ -283,6 +292,7 @@ let process_file ~kb params f =
   (* print some statistics *)
   print_stats state;
   Format.printf "%% final precedence: %a@." pp_precedence ord#precedence#snapshot;
+  print_dots state;
   (match params.param_dot_file with (* print state *)
   | None -> ()
   | Some dot_f -> print_state ~name:("\""^f^"\"") dot_f (state, result));
