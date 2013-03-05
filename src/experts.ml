@@ -57,19 +57,20 @@ let compatible_ord e ~ord = e.expert_ord ord
 
 let update_ctx e ~ctx = e.expert_update_ctx ctx
 
-(** Simple syntactic criterion to decide whether two decision procedures
-    are compatibles: check whether they have no symbol in common.
-    TODO: more elaborate checks, for instance with ground-joinability of all
+(* TODO also check that ordering constraint of e1 and e2 are compatible *)
+(* TODO: more elaborate checks, for instance with ground-joinability of all
     critical pairs *)
+(** Simple syntactic criterion to decide whether two decision procedures
+    are compatibles: check whether they have no symbol in common. *)
 let compatible e1 e2 =
   e1.expert_ctx == e2.expert_ctx &&
-  SSet.is_empty (SSet.union e1.expert_sig e2.expert_sig)
+  SSet.is_empty (SSet.inter e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
     the combination of their theories, assuming they are compatible. *)
 let rec combine e1 e2 =
   assert (compatible e1 e2);
-  Utils.debug 3 "%% experts: @[<h>combine %s and %s@]"
+  Utils.debug 1 "%% @[<h>experts: combine %s and %s@]"
     e1.expert_name e2.expert_name;
   (* compute normal form using both systems *)
   let rec nf t =
@@ -91,12 +92,21 @@ let rec combine e1 e2 =
     expert_solve = None;
   }
 
+(* TODO also check that ordering constraint of e2 is less constraining than
+   the one of e1 (at least in given ctx) *)
+
 (** [expert_more_specific e1 e2] returns true if [e1] decides a theory
     whose symbols are included in the theory of [e2]. Heuristically, that
     means that we can ignore [e1] and focus on [e2] *)
 let more_specific e1 e2 =
-  SSet.subset e1.expert_sig e2.expert_sig &&
-  not (SSet.equal e1.expert_sig e2.expert_sig)
+  let res =
+    e1.expert_ctx == e2.expert_ctx &&
+    SSet.subset e1.expert_sig e2.expert_sig &&
+    not (SSet.equal e1.expert_sig e2.expert_sig)
+  in
+  (if res then Utils.debug 1 "%% expert %s more specific than %s"
+    e1.expert_name e2.expert_name);
+  res
 
 (** Get the normal form of the term *)
 let canonize expert t = expert.expert_canonize t
@@ -181,11 +191,16 @@ module Set = struct
       | e'::right' ->
         if compatible e e'
           then (* combine both, and add the combination *)
-            add [] (left @ right) (combine e e')
+            add [] (left @ right') (combine e e')
           else (* go further *)
             add (e'::left) right' e
     in
-    add [] experts e
+    if List.exists (fun e' -> more_specific e e') experts
+      then (* check whether [e] is more specific than some expert *)
+        experts
+      else (* remove experts more specific than [e] *)
+        let experts = List.filter (fun e' -> more_specific e' e) experts in
+        add [] experts e
 
   let update_ctx experts ~ctx =
     List.fold_left
