@@ -35,6 +35,8 @@ let stat_expert_simplify = mk_stat "experts.simplify"
 
 let prof_simplify_expert = Utils.mk_profiler "experts.simplify"
 let prof_redundant_expert = Utils.mk_profiler "experts.redundant"
+let prof_ground_pair = Utils.mk_profiler "experts.ground_pair"
+let prof_normal_form = Utils.mk_profiler "experts.normal_form"
 
 type t = {
   expert_name : string;                 (** Theory the expert works on *)
@@ -282,9 +284,13 @@ let rec gc_expert ~ctx gc =
   let nf t = Rewriting.OrderedTRS.rewrite trs t in
   (* equality is equality of grounded normal forms *)
   let expert_equal t1 t2 =
+    Utils.enter_prof prof_ground_pair;
     let t1', t2' = ground_pair t1 t2 in
+    Utils.exit_prof prof_ground_pair;
+    Utils.enter_prof prof_normal_form;
     let t1' = nf t1' in
     let t2' = nf t2' in
+    Utils.exit_prof prof_normal_form;
     Utils.debug 3 "%% %s: check equal @[<h>%a,%a@]"
       expert_name !T.pp_term#pp t1 !T.pp_term#pp t2;
     t1' == t2' in

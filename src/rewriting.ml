@@ -31,12 +31,14 @@ module Utils = FoUtils
 
 let prof_ordered_rewriting = Utils.mk_profiler "rewriting.ordered"
 
+let stat_ordered_rewriting = mk_stat "rewriting.ordered.steps"
+
 (** {2 Ordered rewriting} *)
 
 module OrderedTRS = struct
   type t = {
     ord : ordering;
-    mutable rules : (rule * int) list;
+    mutable rules : rule Dtree.dtree;
   } (** Ordered rewriting system *)
   and rule = {
     rule_clause : hclause;
@@ -57,7 +59,7 @@ module OrderedTRS = struct
 
   let create ~ord =
     { ord;
-      rules = [];
+      rules = Dtree.empty eq_rule;
     }
 
   let mk_rule hc l r oriented =
@@ -81,9 +83,8 @@ module OrderedTRS = struct
       (fun rules rule ->
         (* add the rule to the list of rules *)
         let priority = rule_priority rule in
-        let rules = (rule, priority) :: rules in
-        (* sort by increasing priority (oriented first) *)
-        List.sort (fun (_,p1) (_,p2) -> p1 - p2) rules)
+        let rules = Dtree.add rules ~priority rule.rule_left rule in
+        rules)
       trs.rules rules
 
   let add_seq trs seq =
@@ -92,9 +93,13 @@ module OrderedTRS = struct
   let to_seq trs =
     let rules = trs.rules in
     Sequence.from_iter
-      (fun k -> List.iter (fun (rule,_) -> k rule.rule_clause) rules)
+      (fun k ->
+        Dtree.iter rules (fun _ rule -> k rule.rule_clause))
 
-  let size trs = List.length trs.rules
+  let size trs =
+    let r = ref 0 in
+    Dtree.iter trs.rules (fun _ _ -> incr r);
+    !r
   
   exception RewrittenInto of term
 
@@ -119,25 +124,22 @@ module OrderedTRS = struct
        yields back to [reduce]. *)
     and rewrite_here t =
       try
-        List.iter
-          (fun (rule, _) ->
-            try
-              let subst = Unif.matching S.id_subst (rule.rule_left,1) (t,0) in
-              (* right-hand part *)
-              let r = rule.rule_right in
-              let r' = S.apply_subst subst (r,1) in
-              if rule.rule_oriented
-                then raise (RewrittenInto r')  (* we know that t > r' *)
-                else (
-                  assert (t == S.apply_subst subst (rule.rule_left,1));
-                  if trs.ord#compare t r' = Gt
-                    then raise (RewrittenInto r')
-                    else ())
-            with UnificationFailure -> ())
-          trs.rules;
+        Dtree.iter_match (trs.rules,1) (t,0)
+          (fun _ rule subst ->
+            (* right-hand part *)
+            let r = rule.rule_right in
+            let r' = S.apply_subst subst (r,1) in
+            if rule.rule_oriented
+              then raise (RewrittenInto r')  (* we know that t > r' *)
+              else (
+                assert (t == S.apply_subst subst (rule.rule_left,1));
+                if trs.ord#compare t r' = Gt
+                  then raise (RewrittenInto r')
+                  else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
         Utils.debug 3 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
+        incr_stat stat_ordered_rewriting;
         assert (trs.ord#compare t t' = Gt);
         reduce t'  (* term is rewritten, reduce it again *)
   in
