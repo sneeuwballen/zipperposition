@@ -52,9 +52,7 @@ val depth : (int * 'a) proof -> int
 
 (** {2 Conversion to a graph of proofs} *)
 
-module ProofGraph : Graph.S with type vertex = compact_clause proof
-
-val to_graph : compact_clause proof -> string ProofGraph.t
+val to_graph : compact_clause proof -> (compact_clause proof, string) Graph.t
   (** Get a graph of the proof *)
 
 val to_json : ((int*'a) -> json) -> (int*'a) proof -> json Sequence.t
@@ -66,9 +64,6 @@ val pp_proof_debug : Format.formatter -> compact_clause proof -> unit
 val pp_proof_json : Format.formatter -> compact_clause proof -> unit
 val pp_proof : string -> Format.formatter -> compact_clause proof -> unit
   (** Prints the proof according to the given input switch *)
-
-val dot_printer : string ProofGraph.dot_printer
-  (** DOT printer of proof graphs *)
 
 val pp_dot : name:string -> Format.formatter -> compact_clause proof -> unit
   (** Pretty print the proof as a DOT graph *)

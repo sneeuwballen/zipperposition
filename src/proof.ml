@@ -97,20 +97,22 @@ let depth proof =
 
 (** {2 Conversion to a graph of proofs} *)
 
-module ProofGraph = Graph.Make(struct
-  type t = compact_clause proof
-  let compare p1 p2 = proof_id p1 - proof_id p2
-end)
+let mk_graph () =
+  Graph.empty
+    ~hash:(fun p -> proof_id p)
+    ~eq:(fun p1 p2 -> proof_id p1 = proof_id p2)
+    10
 
 (** Get a graph of the proof *)
 let to_graph proof =
-  let g = ref ProofGraph.empty in
+  let g = mk_graph () in
   traverse proof
     (fun p -> match p with
      | Axiom _ -> ()
      | Proof (_, rule, l) ->
-       List.iter (fun p' -> g := ProofGraph.add !g p' rule p) l);
-  !g
+       List.iter (fun p' ->
+        Graph.add g p' rule p) l);
+  g
 
 let to_json json_key proof =
   (* how to translate the proof step *)
@@ -187,27 +189,22 @@ let pp_proof switch formatter proof = match switch with
   | "json" -> pp_proof_json formatter proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
-(** DOT printer of proof graphs *)
-let dot_printer =
-  let print_vertex proof =
-    let label = `Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (proof_lits proof)) in
-    let attributes = [`Shape "box"; `Style "filled"] in
-    let attributes =
-      if proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
-      else if is_axiom proof then label :: `Color "yellow" :: attributes
-      else label :: attributes in
-    attributes
-  and print_edge v1 e v2 =
-    [`Label e]
-  in
-  ProofGraph.mk_dot_printer ~print_vertex ~print_edge
+let print_vertex proof =
+  let label = `Label (Utils.sprintf "@[<h>%a@]" Lits.pp_lits (proof_lits proof)) in
+  let attributes = [`Shape "box"; `Style "filled"] in
+  let attributes =
+    if proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
+    else if is_axiom proof then label :: `Color "yellow" :: attributes
+    else label :: attributes in
+  attributes
+and print_edge v1 e v2 =
+  [`Label e]
 
 (** Add the proof to the given graph *)
 let pp_dot ~name formatter proof =
   let graph = to_graph proof in
-  assert (ProofGraph.is_dag graph);
-  let edges = ProofGraph.to_seq graph in
-  ProofGraph.pp dot_printer ~name formatter edges
+  assert (Graph.is_dag graph);
+  Graph.pp ~name ~print_vertex ~print_edge formatter graph
 
 (** print to dot into a file *)
 let pp_dot_file ?(name="proof") filename proof =

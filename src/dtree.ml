@@ -39,7 +39,10 @@ let skip t pos =
   let t_pos = T.at_cpos t pos in
   pos + t_pos.tsize
 
-type character = Symbol of symbol | BoundVariable of int * sort | Variable of term
+type character =
+  | Symbol of symbol
+  | BoundVariable of int * sort
+  | Variable of term
 
 let compare_char c1 c2 =
   (* compare variables by index *)
@@ -84,13 +87,18 @@ module CharMap = Map.Make(
     let compare = compare_char
   end)
 
+let char_to_str c = match c with
+  | Symbol s -> Utils.sprintf "%a" pp_symbol s
+  | BoundVariable (i, sort) -> Utils.sprintf "Y%d" i
+  | Variable t -> Utils.sprintf "%a" !T.pp_term#pp t
+
 (* --------------------------------------------------------
  * discrimination tree
  * -------------------------------------------------------- *)
 
 type 'a trie =
-  | TrieNode of 'a trie CharMap.t        (** map atom -> trie *)
-  | TrieLeaf of (term * 'a * int) list      (** leaf with (term, value, priority) list *)
+  | TrieNode of 'a trie CharMap.t       (** map atom -> trie *)
+  | TrieLeaf of (term * 'a * int) list  (** leaf with (term, value, priority) list *)
 
 let empty_trie n = match n with
   | TrieNode m when CharMap.is_empty m -> true
@@ -357,3 +365,51 @@ let unit_index =
       Format.fprintf formatter "@[<hv>pos: %a@.neg:%a@]"
         pp_term_hclause_tree pos pp_term_hclause_tree neg
   end
+
+(** {2 Printing to DOT} *)
+
+let hash_trie = function
+  | TrieNode map -> CharMap.fold
+    (fun c sub h -> Hash.combine (Hashtbl.hash c) h) map 0
+  | TrieLeaf l -> Hash.hash_list (fun (t, _, _) -> t.tag) 0 l
+
+let rec eq_trie t1 t2 =
+  match t1, t2 with
+  | TrieLeaf _, TrieNode _
+  | TrieNode _, TrieLeaf _ -> false
+  | TrieLeaf l1, TrieLeaf l2 -> l1 = l2
+  | TrieNode m1, TrieNode m2 ->
+    CharMap.equal eq_trie m1 m2
+
+(** Convert the trie to a graph *)
+let trie_to_graph trie =
+  let g = Graph.empty ~hash:hash_trie ~eq:eq_trie 10 in
+  (* iterate through the trie *)
+  let rec iter trie =
+    match trie with
+    | TrieLeaf _ -> ()
+    | TrieNode m ->
+      CharMap.iter
+        (fun c trie' -> Graph.add g trie c trie')
+        m
+  in
+  iter trie;
+  g
+
+(** Print the index as a tree *)
+let pp_dot ?(name="dtree") to_string formatter dtree =
+  (* convert to graph *)
+  let g = trie_to_graph dtree.tree in
+  let rec print_edge t1 char_ t2 =
+    [`Label (char_to_str char_); ]
+  and print_vertex trie =
+    match trie with
+    | TrieNode _ -> [`Shape "circle"]
+    | TrieLeaf l ->
+      let label = Utils.sprintf "@[<h>%a@]" (Utils.pp_list pp_triple) l in
+      [`Label label; `Shape "box"; `Color "grey"]
+  and pp_triple formatter (t, value, _) =
+    Format.fprintf formatter "@[<h>%a: %s@]" !T.pp_term#pp t (to_string value)
+  in
+  Graph.pp ~print_edge ~print_vertex ~name formatter g
+  
