@@ -358,13 +358,14 @@ end
  * class interface
  * ---------------------------------------------------------------------- *)
 
-module OrdCache = Cache.Make(
-  struct
-    type t = term
-    let hash t = t.tag
-      (* non commutative to avoid collision between (t1, t2) and (t2, t1) *)
-    let equal t1 t2 = T.eq_term t1 t2
-  end)
+module TermHASH = struct
+  type t = term
+  let hash t = t.tag
+    (* non commutative to avoid collision between (t1, t2) and (t2, t1) *)
+  let equal t1 t2 = T.eq_term t1 t2
+end
+
+module OrdCache = Cache.Replacing2(TermHASH)(TermHASH)
 
 (** Check that new_prec is a compatible superset of old_prec *)
 let check_precedence old_prec new_prec =
@@ -378,12 +379,12 @@ let check_precedence old_prec new_prec =
 
 let kbo (p : precedence) : ordering =
   let prec = ref p in
-  let cache = OrdCache.create 4096
-    (fun a b -> KBO.compare_terms ~prec:!prec a b) in
+  let cache = OrdCache.create 4096 in
+  let compare a b = KBO.compare_terms ~prec:!prec a b in
   object
     method clear_cache () = OrdCache.clear cache;
     method precedence = !prec
-    method compare a b = OrdCache.lookup cache a b
+    method compare a b = OrdCache.with_cache cache compare a b
     method set_precedence prec' =
       assert (check_precedence !prec prec');
       prec := prec';
@@ -391,28 +392,29 @@ let kbo (p : precedence) : ordering =
     method name = KBO.name
   end
 
-let rpo (prec : precedence) : ordering =
+let rpo (p : precedence) : ordering =
+  let prec = ref p in
+  let cache = OrdCache.create 4096 in
+  let compare a b = RPO.compare_terms ~prec:!prec a b in
   object
-    val mutable m_prec = prec
-    val mutable cache = OrdCache.create 4096 (RPO.compare_terms ~prec)
-    method clear_cache () = OrdCache.clear cache
-    method precedence = m_prec
-    method compare a b = OrdCache.lookup cache a b
-    method set_precedence prec =
-      assert (check_precedence m_prec prec);
-      m_prec <- prec;
-      cache <- OrdCache.create 4096 (RPO.compare_terms ~prec)
+    method clear_cache () = OrdCache.clear cache;
+    method precedence = !prec
+    method compare a b = OrdCache.with_cache cache compare a b
+    method set_precedence prec' =
+      assert (check_precedence !prec prec');
+      prec := prec';
+      OrdCache.clear cache
     method name = RPO.name
   end
 
 let rpo6 (p : precedence) : ordering =
   let prec = ref p in
-  let cache = OrdCache.create 4096
-    (fun a b -> RPO6.compare_terms ~prec:!prec a b) in
+  let cache = OrdCache.create 4096 in
+  let compare a b = RPO6.compare_terms ~prec:!prec a b in
   object
-    method clear_cache () = OrdCache.clear cache
+    method clear_cache () = OrdCache.clear cache;
     method precedence = !prec
-    method compare a b = OrdCache.lookup cache a b
+    method compare a b = OrdCache.with_cache cache compare a b
     method set_precedence prec' =
       assert (check_precedence !prec prec');
       prec := prec';
