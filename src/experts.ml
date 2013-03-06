@@ -46,7 +46,7 @@ type t = {
   expert_clauses : hclause list;        (** Additional axioms *)
   expert_canonize : term -> term;       (** Get a canonical form of the term *)
   expert_ord : ordering -> bool;        (** Compatible with ord? *)
-  expert_update_ctx : context -> t;     (** How to update the context *)
+  expert_update_ctx : context -> t list;(** How to update the context *)
   expert_ctx : context;                 (** Context used by the expert *)
   expert_solve : ((term*term) list -> substitution list) option;
     (** The expert may be able to solve systems of equations, returning
@@ -55,6 +55,9 @@ type t = {
 
 let compatible_ord e ~ord = e.expert_ord ord
 
+(** Copy of the expert, that uses the new context. The expert
+    can be broken into several experts (in case it was a combination
+    that is no longer possible with the new ordering) *)
 let update_ctx e ~ctx = e.expert_update_ctx ctx
 
 (* TODO also check that ordering constraint of e1 and e2 are compatible *)
@@ -87,7 +90,7 @@ let rec combine e1 e2 =
     expert_canonize = nf;
     expert_ord = (fun o -> e1.expert_ord o && e2.expert_ord o);
     expert_update_ctx = (fun ctx ->
-      combine (e1.expert_update_ctx ctx) (e2.expert_update_ctx ctx));
+      e1.expert_update_ctx ctx @ e2.expert_update_ctx ctx);
     expert_ctx = e1.expert_ctx;
     expert_solve = None;
   }
@@ -178,15 +181,24 @@ let pp_expert_detailed formatter expert =
 module Set = struct
   type expert = t (* alias *)
 
-  type t = expert list
+  type t = {
+    active : expert list;
+    inactive : expert list;
+    ctx : context;
+  }
+
     (** A set of experts *)
 
-  let empty = []
+  let empty ~ctx = {
+    active = [];
+    inactive = [];
+    ctx;
+  }
 
-  let add experts e =
-    (* traverse [experts], trying to find one that is compatible with e *)
+  let add_list set experts =
+    (* traverse [right], trying to find one that is compatible with e *)
     let rec add left right e =
-      match right with  (* TODO if e is more specific than e' in list, drop e *)
+      match right with
       | [] -> e::left (* add the expert *)
       | e'::right' ->
         if compatible e e'
@@ -195,32 +207,49 @@ module Set = struct
           else (* go further *)
             add (e'::left) right' e
     in
-    if List.exists (fun e' -> more_specific e e') experts
-      then (* check whether [e] is more specific than some expert *)
-        experts
-      else (* remove experts more specific than [e] *)
-        let experts = List.filter (fun e' -> more_specific e' e) experts in
-        add [] experts e
-
-  let update_ctx experts ~ctx =
+    (* update context of experts *)
+    let experts = Utils.list_flatmap
+      (fun e -> update_ctx ~ctx:set.ctx e) experts in
     List.fold_left
-      (fun experts' e -> add experts' (update_ctx e ~ctx))
-      empty experts
+      (fun set e ->
+        if List.exists (fun e' -> more_specific e e') set.active
+        || not (compatible_ord e ~ord:set.ctx.ctx_ord)
+          then (* check whether [e] is more specific than some active expert *)
+            {set with inactive = e :: set.inactive; }
+          else
+            (* move experts more specific than [e] from active to inactive *)
+            let disable, keep = List.partition
+              (fun e' -> more_specific e' e) set.active in
+            let inactive = disable @ set.inactive in
+            (* add [e] to the active experts *)
+            let active = add [] keep e in
+            {set with active; inactive; })
+      set experts
 
-  let is_redundant experts hc =
+  let add set e = add_list set [e]
+
+  let update_ctx set ~ctx =
+    let set' = {ctx; active=[]; inactive=[]; } in
+    let set' = add_list set' set.active in
+    let set' = add_list set' set.inactive in
+    set'
+
+  let is_redundant set hc =
     List.exists
       (fun e -> compatible_ord e ~ord:e.expert_ctx.ctx_ord && is_redundant e hc)
-      experts
+      set.active
 
-  let simplify experts hc =
+  let simplify set hc =
     List.fold_left
       (fun hc e ->
         if compatible_ord e ~ord:e.expert_ctx.ctx_ord
           then simplify e hc else hc)
-      hc experts
+      hc set.active
 
-  let pp formatter experts =
-    Utils.pp_list pp_expert formatter experts
+  let pp formatter set =
+    Format.fprintf formatter "{active: %a,@ inactive: %a}"
+      (Utils.pp_list pp_expert) set.active
+      (Utils.pp_list pp_expert) set.inactive
 end
 
 (** {2 Ground joinable sets of equations} *)
@@ -268,6 +297,19 @@ let ground_pair t1 t2 =
   let t1' = S.apply_subst subst (t1,0) in
   let t2' = S.apply_subst subst (t2,0) in
   t1', t2'
+
+module TermHASH = struct
+  type t = term
+  let equal = (==)
+  let hash t = t.tag
+end
+module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
+
+(** Same as [ground_pair], but with a cache *)
+let cached_ground_pair =
+  let cache = T2Cache.create 256 in
+  fun t1 t2 ->
+    T2Cache.with_cache cache ground_pair t1 t2
 
 (** check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
 let compatible_gc ~ord gc =
@@ -317,7 +359,7 @@ let rec gc_expert ~ctx gc =
     expert_clauses;
     expert_canonize;
     expert_ord = (fun o -> compatible_gc ~ord:o gc);
-    expert_update_ctx = (fun ctx' -> gc_expert ~ctx:ctx' gc);
+    expert_update_ctx = (fun ctx' -> [gc_expert ~ctx:ctx' gc]);
     expert_ctx = ctx;
     expert_solve=None;
   }
@@ -350,7 +392,7 @@ let ac ~ctx f =
     expert_clauses = []; (* TODO *)
     expert_canonize;
     expert_ord = (fun _ -> true);
-    expert_update_ctx = (fun ctx' -> expert ctx');
+    expert_update_ctx = (fun ctx' -> [expert ctx']);
     expert_ctx = ctx;
     expert_solve = None;
   } in

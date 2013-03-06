@@ -36,8 +36,10 @@ type t
 val compatible_ord : t -> ord:ordering -> bool
   (** Check whether using this expert is possible in the given ordering *)
 
-val update_ctx : t -> ctx:context -> t
-  (** Copy of the expert, that uses the new context *)
+val update_ctx : t -> ctx:context -> t list
+  (** Copy of the expert, that uses the new context. The expert
+      can be broken into several experts (in case it was a combination
+      that is no longer possible with the new ordering) *)
 
 val compatible : t -> t -> bool
   (** Simple syntaxic criterion to decide whether two experts
@@ -81,9 +83,11 @@ module Set : sig
   type t
     (** A set of experts *)
 
-  val empty : t
+  val empty : ctx:context -> t
 
   val add : t -> expert -> t
+
+  val add_list : t -> expert list -> t
 
   val update_ctx : t -> ctx:context -> t
 
