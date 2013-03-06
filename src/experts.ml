@@ -338,11 +338,11 @@ let rec gc_expert ~ctx gc =
   let trs = Rewriting.OrderedTRS.create ~ord:ctx.ctx_ord in
   Rewriting.OrderedTRS.add_seq trs (Sequence.of_list expert_clauses);
   (* compute normal form using the rewriting system *)
-  let nf t = Rewriting.OrderedTRS.rewrite trs t in
+  let nf = Rewriting.OrderedTRS.mk_rewrite trs ~size:1024 in
   (* equality is equality of grounded normal forms *)
   let expert_equal t1 t2 =
     Utils.enter_prof prof_ground_pair;
-    let t1', t2' = ground_pair t1 t2 in
+    let t1', t2' = cached_ground_pair t1 t2 in
     Utils.exit_prof prof_ground_pair;
     Utils.enter_prof prof_normal_form;
     let t1' = nf t1' in

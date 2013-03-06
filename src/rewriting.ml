@@ -35,6 +35,15 @@ let stat_ordered_rewriting = mk_stat "rewriting.ordered.steps"
 
 (** {2 Ordered rewriting} *)
 
+module TermHASH = struct
+  type t = term
+  let equal = (==)
+  let hash t = t.tag
+end
+
+(** Memoization cache for rewriting *)
+module TCache = Cache.Replacing(TermHASH)
+
 module OrderedTRS = struct
   type t = {
     ord : ordering;
@@ -103,26 +112,26 @@ module OrderedTRS = struct
   
   exception RewrittenInto of term
 
-  (** Rewrite a term into its normal form *)
-  let rewrite trs t =
-    Utils.enter_prof prof_ordered_rewriting;
-    (* reduce to normal form *)
-    let rec reduce t =
+  (** Given a TRS and a cache size, build a memoized function that
+      performs term rewriting *)
+  let mk_rewrite trs ~size =
+    (* reduce to normal form. [reduce'] is the memoized version of reduce. *)
+    let rec reduce reduce' t =
       match t.term with
       | Var _ | BoundVar _ -> t
       | Bind (s, a_sort, t') ->
-        let t' = reduce t' in
+        let t' = reduce' t' in
         T.mk_bind ~old:t s t.sort a_sort t'
       | Node (s, l) ->
-        let l' = List.map reduce l in
+        let l' = List.map reduce' l in
         let t' = if List.for_all2 (==) l l'
           then t
           else T.mk_node s t.sort l' in
         (* now rewrite the term itself *)
-        rewrite_here t'
+        rewrite_here reduce' t'
     (* rewrite once at this position. If it succeeds,
        yields back to [reduce]. *)
-    and rewrite_here t =
+    and rewrite_here reduce' t =
       try
         Dtree.iter_match (trs.rules,1) (t,0)
           (fun _ rule subst ->
@@ -141,11 +150,17 @@ module OrderedTRS = struct
         Utils.debug 3 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
         incr_stat stat_ordered_rewriting;
         assert (trs.ord#compare t t' = Gt);
-        reduce t'  (* term is rewritten, reduce it again *)
-  in
-  let t' = reduce t in
-  Utils.exit_prof prof_ordered_rewriting;
-  t'
+        reduce reduce' t'  (* term is rewritten, reduce it again *)
+    in
+    let _cache, reduce = TCache.with_cache_rec size reduce in
+    (* The main rewriting function *)
+    let rewrite t =
+      Utils.enter_prof prof_ordered_rewriting;
+      let t' = reduce t in
+      Utils.exit_prof prof_ordered_rewriting;
+      t'
+    in
+    rewrite
 
   let pp formatter trs =
     Format.fprintf formatter "@[<hov2>%a@]"

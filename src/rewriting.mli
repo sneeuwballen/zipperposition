@@ -36,7 +36,9 @@ module OrderedTRS : sig
 
   val size : t -> int
   
-  val rewrite : t -> term -> term
+  val mk_rewrite : t -> size:int -> (term -> term)
+    (** Given a TRS and a cache size, build a memoized function that
+        performs term rewriting *)
 
   val pp : Format.formatter -> t -> unit
 end
