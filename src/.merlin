@@ -1,8 +1,10 @@
 S .
 S ./meta/
+S ../containers/
 B ../_build/
 B ../_build/src/
 B ../_build/src/meta/
+B ../_build/containers
 PKG datalog
 PKG sequence
 PKG yojson
