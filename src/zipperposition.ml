@@ -304,6 +304,7 @@ let process_file ~kb params f =
         Meta.Prover.pp_results (Meta.Prover.results meta);
       Format.printf "%% datalog contains %d clauses@."
         (Meta.KB.Logic.db_size (Meta.Prover.db meta)));
+  Utils.debug 0 "%% @[<h>experts: %a@]" Experts.Set.pp state#experts;
   match result with
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
