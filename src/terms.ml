@@ -51,17 +51,21 @@ let eq_term x y = x == y  (* because of hashconsing *)
 
 let compare_term x y = x.tag - y.tag
 
-module THashtbl = Hashtbl.Make(
-  struct
-    type t = term
-    let hash t = t.tag
-    let equal t1 t2 = eq_term t1 t2
-  end)
+module TermHASH = struct
+  type t = term
+  let equal t1 t2 = t1 == t2
+  let hash t = t.tag
+end
+
+module THashtbl = Hashtbl.Make(TermHASH)
 
 module TSet = Sequence.Set.Make(struct
   type t = term
   let compare = compare_term
 end)
+
+module TCache = Cache.Replacing(TermHASH)
+module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
 
 (** {2 Hashset of terms} *)
 

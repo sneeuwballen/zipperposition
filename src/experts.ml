@@ -298,18 +298,11 @@ let ground_pair t1 t2 =
   let t2' = S.apply_subst subst (t2,0) in
   t1', t2'
 
-module TermHASH = struct
-  type t = term
-  let equal = (==)
-  let hash t = t.tag
-end
-module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
-
 (** Same as [ground_pair], but with a cache *)
 let cached_ground_pair =
-  let cache = T2Cache.create 256 in
+  let cache = T.T2Cache.create 256 in
   fun t1 t2 ->
-    T2Cache.with_cache cache ground_pair t1 t2
+    T.T2Cache.with_cache cache ground_pair t1 t2
 
 (** check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
 let compatible_gc ~ord gc =

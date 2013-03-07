@@ -33,6 +33,9 @@ val hash_term : term -> int
 module THashtbl : Hashtbl.S with type key = term
 module TSet : Sequence.Set.S with type elt = term
 
+module TCache : Cache.S with type key = term
+module T2Cache : Cache.S2 with type key1 = term and type key2 = term
+
 (** {2 Hashset of terms} *)
 module THashSet :
   sig

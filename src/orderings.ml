@@ -358,15 +358,6 @@ end
  * class interface
  * ---------------------------------------------------------------------- *)
 
-module TermHASH = struct
-  type t = term
-  let hash t = t.tag
-    (* non commutative to avoid collision between (t1, t2) and (t2, t1) *)
-  let equal t1 t2 = T.eq_term t1 t2
-end
-
-module OrdCache = Cache.Replacing2(TermHASH)(TermHASH)
-
 (** Check that new_prec is a compatible superset of old_prec *)
 let check_precedence old_prec new_prec =
   Utils.debug 2 "check compatibility of @[<h>%a@] with @[<h>%a@]"
@@ -379,46 +370,46 @@ let check_precedence old_prec new_prec =
 
 let kbo (p : precedence) : ordering =
   let prec = ref p in
-  let cache = OrdCache.create 4096 in
+  let cache = T.T2Cache.create 4096 in
   let compare a b = KBO.compare_terms ~prec:!prec a b in
   object
-    method clear_cache () = OrdCache.clear cache;
+    method clear_cache () = T.T2Cache.clear cache;
     method precedence = !prec
-    method compare a b = OrdCache.with_cache cache compare a b
+    method compare a b = T.T2Cache.with_cache cache compare a b
     method set_precedence prec' =
       assert (check_precedence !prec prec');
       prec := prec';
-      OrdCache.clear cache
+      T.T2Cache.clear cache
     method name = KBO.name
   end
 
 let rpo (p : precedence) : ordering =
   let prec = ref p in
-  let cache = OrdCache.create 4096 in
+  let cache = T.T2Cache.create 4096 in
   let compare a b = RPO.compare_terms ~prec:!prec a b in
   object
-    method clear_cache () = OrdCache.clear cache;
+    method clear_cache () = T.T2Cache.clear cache;
     method precedence = !prec
-    method compare a b = OrdCache.with_cache cache compare a b
+    method compare a b = T.T2Cache.with_cache cache compare a b
     method set_precedence prec' =
       assert (check_precedence !prec prec');
       prec := prec';
-      OrdCache.clear cache
+      T.T2Cache.clear cache
     method name = RPO.name
   end
 
 let rpo6 (p : precedence) : ordering =
   let prec = ref p in
-  let cache = OrdCache.create 4096 in
+  let cache = T.T2Cache.create 4096 in
   let compare a b = RPO6.compare_terms ~prec:!prec a b in
   object
-    method clear_cache () = OrdCache.clear cache;
+    method clear_cache () = T.T2Cache.clear cache;
     method precedence = !prec
-    method compare a b = OrdCache.with_cache cache compare a b
+    method compare a b = T.T2Cache.with_cache cache compare a b
     method set_precedence prec' =
       assert (check_precedence !prec prec');
       prec := prec';
-      OrdCache.clear cache
+      T.T2Cache.clear cache
     method name = RPO6.name
   end
 
