@@ -137,12 +137,12 @@ let true_clause ~ctx =
   hc
 
 (** Build a new hclause from the given literals.
-    If there are more than 31 literals,
+    If there are more than [BV.max_len] literals,
     the prover becomes incomplete by returning [true] instead. *)
 let mk_hclause_a ?parents ?selected ~ctx lits proof =
   incr_stat stat_mk_hclause;
   Utils.enter_prof prof_mk_hclause;
-  if Array.length lits > 31
+  if Array.length lits > BV.max_len
   then (Utils.debug 0 "%% incompleteness: clause of %d lits -> $true"
            (Array.length lits);
         Utils.exit_prof prof_mk_hclause;
