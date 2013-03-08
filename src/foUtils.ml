@@ -43,6 +43,16 @@ let debug l format =
     else Format.ifprintf Format.std_formatter format 
 let debug_level () = !debug_level_
 
+(** {2 Time facilities} *)
+
+(** Time elapsed since initialization of the program, and time of start *)
+let get_total_time, get_start_time =
+  let start = Unix.gettimeofday () in
+  (function () ->
+    let stop = Unix.gettimeofday () in
+    stop -. start),
+  (function () -> start)
+
 (** {2 profiling facilities} *)
 
 (** A profiler (do not call recursively) *)
@@ -92,14 +102,21 @@ let () =
   at_exit (fun () ->
     if !enable_profiling && List.exists (fun profiler -> profiler.prof_calls > 0) !profilers
     then begin
-      Printf.printf "%% %39s ---------- --------- --------- ---------\n" (String.make 39 '-');
-      Printf.printf "%% %-39s %10s %9s %9s %9s\n" "function" "#calls" "total" "max" "average";
-      let profilers = List.sort (fun p1 p2 -> String.compare p1.prof_name p2.prof_name) !profilers in
+      Printf.printf "%% %39s ---------- --------- --------- --------- ---------\n"
+        (String.make 39 '-');
+      Printf.printf "%% %-39s %10s %9s %9s %9s %9s\n" "function" "#calls"
+        "total" "% total" "max" "average";
+      (* sort profilers by name *)
+      let profilers = List.sort
+        (fun p1 p2 -> String.compare p1.prof_name p2.prof_name)
+        !profilers in
+      let tot = get_total_time () in
       List.iter
         (fun profiler -> if profiler.prof_calls > 0 then
           (* print content of the profiler *)
-          Printf.printf "%% %-39s %10d %9.4f %9.4f %9.4f\n"
-            profiler.prof_name profiler.prof_calls profiler.prof_total profiler.prof_max
+          Printf.printf "%% %-39s %10d %9.4f %9.2f %9.4f %9.4f\n"
+            profiler.prof_name profiler.prof_calls profiler.prof_total
+            (profiler.prof_total *. 100. /. tot) profiler.prof_max
             (profiler.prof_total /. (float_of_int profiler.prof_calls)))
         profilers
     end)

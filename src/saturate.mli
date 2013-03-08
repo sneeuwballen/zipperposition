@@ -76,9 +76,3 @@ val presaturate : calculus:Calculus.calculus ->
                   ProofState.state ->
                   hclause szs_status * int
 
-(** time elapsed since start of program *)
-val get_total_time : unit -> float
-
-(** time at which the program started *)
-val get_start_time : unit -> float
-

@@ -225,7 +225,7 @@ let process_file ~kb params f =
   and timeout = if params.param_timeout = 0.
     then None else (Format.printf "%% run for %f s@." params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
-                    Some (Sat.get_start_time () +. params.param_timeout -. 0.25))
+                    Some (Utils.get_start_time () +. params.param_timeout -. 0.25))
   and progress = params.param_progress in
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
@@ -364,4 +364,4 @@ let () =
 
 let _ =
   at_exit (fun () -> 
-    Printf.printf "\n%% run time: %.3f\n" (Sat.get_total_time ()))
+    Printf.printf "\n%% run time: %.3f\n" (Utils.get_total_time ()))

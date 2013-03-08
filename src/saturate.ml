@@ -319,19 +319,11 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       Unknown
     end
 
-(** Time elapsed since initialization of the program, and time of start *)
-let get_total_time, get_start_time =
-  let start = Unix.gettimeofday () in
-  (function () ->
-    let stop = Unix.gettimeofday () in
-    stop -. start),
-  (function () -> start)
-
 (** print progress *)
 let print_progress steps state =
   let num_active, num_passive, num_simpl = PS.stats state in
   Format.printf "\r%% %d steps; %d active; %d passive; %d simpl; time %.1f s@?"
-    steps num_active num_passive num_simpl (get_total_time ())
+    steps num_active num_passive num_simpl (Utils.get_total_time ())
 
 let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus state =
   let rec do_step num =

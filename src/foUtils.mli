@@ -28,6 +28,14 @@ val set_debug : int -> unit               (** set the level of debug *)
 val debug : int ->  ('a, Format.formatter, unit) format -> 'a  (** debug message with level *)
 val debug_level : unit -> int             (** current debug level *)
 
+(** {2 Time facilities} *)
+
+(** time elapsed since start of program *)
+val get_total_time : unit -> float
+
+(** time at which the program started *)
+val get_start_time : unit -> float
+
 (** {2 profiling facilities} *)
 
 type profiler
