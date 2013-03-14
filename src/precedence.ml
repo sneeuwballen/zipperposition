@@ -314,6 +314,7 @@ let compute_cost ord_factory constraints precedence : int =
     It returns at most [num] modifications of the list, that differ from
     it by swapping pairs of elements) *)
 let perturbate ?(num=10) symbols =
+  Utils.debug 4 "perturbate @[<h>[%a]@]" (Utils.pp_list pp_symbol) symbols;
   let new_symbols = ref [] in
   (* swap indexes i and j in the list *)
   let rec swap i j a =
@@ -352,6 +353,7 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
       List.fold_left
         (fun (min_cost, min_symbols) symbols' ->
           let precedence' = mk_precedence symbols' in
+          Utils.debug 3 "try precedence @[<h>%a@]" pp_precedence precedence'#snapshot;
           (* only compare with new precedence if it is not the same *)
           if eq_precedence precedence precedence' then (min_cost, min_symbols)
           else

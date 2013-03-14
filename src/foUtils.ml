@@ -25,6 +25,8 @@ open Hash
 
 (** {2 debugging facilities} *)
 
+let need_cleanup = ref false
+
 let clear_line () =
   output_string Pervasives.stdout
     "\r                                                         \r";
@@ -35,7 +37,7 @@ let set_debug l = debug_level_ := l
 let debug l format =
   if l <= !debug_level_
     then (
-      clear_line ();
+      (if !need_cleanup then clear_line ());
       Format.kfprintf
         (fun fmt -> Format.fprintf fmt "@.")
       Format.std_formatter

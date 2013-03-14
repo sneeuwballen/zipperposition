@@ -73,6 +73,11 @@ let parse_args () =
   and select = ref "SelectComplex"
   and progress = ref false
   and files = ref [] in
+  (* special handlers *)
+  let set_progress () =
+    FoUtils.need_cleanup := true;
+    progress := true
+  in
   (* options list *) 
   let options =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
@@ -93,7 +98,7 @@ let parse_args () =
       ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
       *)
       ("-print-sort", Arg.Unit (fun () -> Terms.pp_term_debug#sort true), "print sorts");
-      ("-progress", Arg.Set progress, "print progress");
+      ("-progress", Arg.Unit set_progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");

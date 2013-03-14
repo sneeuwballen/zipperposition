@@ -28,6 +28,8 @@ val set_debug : int -> unit               (** set the level of debug *)
 val debug : int ->  ('a, Format.formatter, unit) format -> 'a  (** debug message with level *)
 val debug_level : unit -> int             (** current debug level *)
 
+val need_cleanup : bool ref               (** Is cleanup of current line necessary? *)
+
 (** {2 Time facilities} *)
 
 (** time elapsed since start of program *)
