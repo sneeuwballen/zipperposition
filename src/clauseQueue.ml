@@ -139,6 +139,11 @@ let lemmas =
   make_hq ~accept ~weight:(fun _ -> 1) name
 
 let default_queues =
+  [ fifo, 2;
+    clause_weight, 2;
+    lemmas, 1;
+  ]
+  (*
   [ (clause_weight, 4);
     (ground, 1);
     (*
@@ -149,6 +154,7 @@ let default_queues =
     (horn, 1);  (* FIXME: if just before "fifo", incompleteness on pelletier_problems/pb64.p *)
     (lemmas, 1);
   ]
+  *)
 
 let pp_queue formatter q =
   Format.fprintf formatter "@[<h>queue %s@]" q#name
