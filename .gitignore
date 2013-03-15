@@ -15,7 +15,7 @@ tags
 .session
 .subdirtouch
 *.docdir
-provers_output.db
+*.db
 *.tgz
 TPTP-*
 Axioms
@@ -26,3 +26,4 @@ learning/
 kb*.lock
 kb*
 TODO
+TAGS
