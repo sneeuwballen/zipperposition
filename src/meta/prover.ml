@@ -247,6 +247,9 @@ let results prover = Sequence.of_list prover.results
 (** Underlying Datalog base *)
 let db prover = prover.db
 
+let pp_theory formatter (name,terms) =
+  Format.fprintf formatter "@[<h>%s(%a)@]" name (Utils.pp_list !T.pp_term#pp) terms
+
 let pp_result formatter result =
   match result with
   | Deduced (lits, _) ->

@@ -257,6 +257,7 @@ module Prover : sig
   val db : t -> KB.Logic.db
     (** Underlying Datalog base *)
 
+  val pp_theory : Format.formatter -> (string * term list) -> unit
   val pp_result : Format.formatter -> result -> unit
   val pp_results : Format.formatter -> result Sequence.t -> unit
 end

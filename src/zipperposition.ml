@@ -113,6 +113,26 @@ let print_stats state =
   print_state_stats (PS.stats state);
   print_global_stats ()
 
+let print_json_stats state meta =
+  let open Sequence.Infix in
+  let encode_hashcons (x1,x2,x3,x4,x5,x6) =
+    `List [`Int x1; `Int x2; `Int x3; `Int x4; `Int x5; `Int x6] in
+  let theories = match meta with None -> []
+    | Some meta -> Meta.Prover.theories meta
+      |> Sequence.map (fun th -> Utils.sprintf "%a" Meta.Prover.pp_theory th)
+      |> Sequence.map (fun x -> `String x) |> Sequence.to_list in
+  let experts = match meta with None -> 0
+    | Some meta -> Sequence.length (Meta.Prover.experts meta) in
+  let (o : json) =
+    `Assoc [
+      "terms", encode_hashcons (T.stats ());
+      "clauses", encode_hashcons (C.stats ());
+      "theories", `List theories;
+      "experts", `Int experts;
+    ]
+  in
+  Utils.debug 0 "%% json_stats: %s" (Yojson.Basic.to_string o)
+
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
 let print_state ?name filename (state, result) =
@@ -291,6 +311,7 @@ let process_file ~kb params f =
   Printf.printf "%% done %d iterations\n" num;
   (* print some statistics *)
   print_stats state;
+  print_json_stats state meta;
   Format.printf "%% final precedence: %a@." pp_precedence ord#precedence#snapshot;
   print_dots state;
   (match params.param_dot_file with (* print state *)
