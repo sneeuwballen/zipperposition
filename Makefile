@@ -41,7 +41,7 @@ clean:
 	ocamlbuild -clean
 
 tags:
-	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
+	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
 dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
