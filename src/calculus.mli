@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Some common things for superposition calculi *)
 
-open Types
+open Basic
 open Symbols
 
 (** binary inferences. An inference returns a list of conclusions *)

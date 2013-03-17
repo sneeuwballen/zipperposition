@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 The meta-prover itself} *)
 
-open Types
+open Basic
 
 module T = Terms
 module C = Clauses

@@ -256,7 +256,7 @@ let can_apply l args =
   try List.for_all2 (==) l args
   with Invalid_argument _ -> false
 
-(** [s @@ args] applies the sort [s] to arguments [args]. Types must match *)
+(** [s @@ args] applies the sort [s] to arguments [args]. Basic must match *)
 let (@@) s args = match s, args with
   | Sort _, [] -> s
   | Fun (s', l), _ when can_apply l args -> s'

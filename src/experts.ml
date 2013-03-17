@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Decision procedures for theories *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms

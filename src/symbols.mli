@@ -150,7 +150,7 @@ val (<=.) : sort -> sort -> sort
       [a <=. b <=. c] is like [(a <=. b) <=. c] *)
 
 val (@@) : sort -> sort list -> sort
-  (** [s @@ args] applies the sort [s] to arguments [args]. Types must match *)
+  (** [s @@ args] applies the sort [s] to arguments [args]. Basic must match *)
 
 val bool_ : sort
 val type_ : sort

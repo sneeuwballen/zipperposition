@@ -1,6 +1,6 @@
 (** test terms *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms

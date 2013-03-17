@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Literals and clauses *)
 
-open Types
+open Basic
 open Symbols
 
 val stat_fresh : statistics

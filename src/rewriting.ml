@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Term rewriting} *)
 
-open Types
+open Basic
 
 module T = Terms
 module C = Clauses
@@ -152,7 +152,8 @@ module OrderedTRS = struct
         assert (trs.ord#compare t t' = Gt);
         reduce reduce' t'  (* term is rewritten, reduce it again *)
     in
-    let _cache, reduce = TCache.with_cache_rec size reduce in
+    let cache = TCache.create size in
+    let reduce = TCache.with_cache_rec cache reduce in
     (* The main rewriting function *)
     let rewrite t =
       Utils.enter_prof prof_ordered_rewriting;

@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     in "handbook of automated reasoning". *)
 
 
-open Types
+open Basic
 
 val is_cnf : literal array -> bool
   (** Is the clause in CNF? *)

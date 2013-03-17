@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     (for completeness). Anyway, a fifo queue should always be present,
     and presents this property. *)
 
-open Types
+open Basic
 open Hashcons
 
 module C = Clauses

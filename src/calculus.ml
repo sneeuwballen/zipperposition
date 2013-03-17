@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Some common things for superposition calculi *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
@@ -110,8 +110,8 @@ let do_unary_inferences rules hc =
       will be visited
 
     ?pos:bool -> ?neg:bool -> ?both:bool
-    -> ('a -> Types.term -> Types.term -> bool -> int list -> 'a)
-    -> 'a -> (Types.literal * int) list
+    -> ('a -> Basic.term -> Basic.term -> bool -> int list -> 'a)
+    -> 'a -> (Basic.literal * int) list
     -> 'a *)
 let fold_lits ?(both=true) eligible f acc lits =
   let rec fold acc i =

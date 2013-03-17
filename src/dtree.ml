@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 *)
 
 open Symbols
-open Types
+open Basic
 
 module T = Terms
 module S = FoSubst

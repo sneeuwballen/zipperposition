@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Main file for the prover *)
 
-open Types
+open Basic
 open Symbols
 open Params
 

@@ -1,0 +1,18 @@
+#use "topfind";;
+#require "yojson";;
+#require "datalog";;
+#require "num";;
+#require "unix";;
+#require "zip";;
+#directory "_build/src/"
+#load "lib.cma";;
+(* pretty printing *)
+let debug_pp_term = !Terms.pp_term#pp;;
+#install_printer debug_pp_term;;
+#install_printer Literals.pp_literal;;
+let debug_pp_clause = Clauses.pp_clause_debug#pp;;
+#install_printer debug_pp_clause;;
+#install_printer FoSubst.pp_substitution;;
+#install_printer Proof.pp_proof_debug;;
+#install_printer Symbols.pp_symbol;;
+#install_printer Symbols.pp_sort;;

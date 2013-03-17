@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (* main saturation algorithm *)
 
-open Types
+open Basic
 
 module C = Clauses
 module O = Orderings

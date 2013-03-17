@@ -3,16 +3,16 @@ INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 TARGETS_LIB = src/lib.cmxa src/lib.cma 
 TARGETS = src/zipperposition.native tests/tests.native
-LIBS = datalog,sequence,str,nums
+LIBS = datalog,str,nums
 #SUBMODULES = datalog sequence
 SUBMODULES =
 PWD = $(shell pwd)
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
-INCLUDES = -I,src,-I,containers
+INCLUDES = -I,src
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind -libs $(LIBS) -I src -I containers -cflags $(INCLUDES) -lflags $(INCLUDES)
+OPTIONS = -use-ocamlfind -libs $(LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 #OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
-OPTIONS_LIB = -use-ocamlfind -I src -I containers -cflags $(INCLUDES) 
+OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
 
 # switch compilation module
 MODE ?= debug
@@ -53,7 +53,4 @@ dot:
 datalog:
 	make -C datalog
 
-sequence:
-	make -C sequence
-
-.PHONY: datalog sequence
+.PHONY: datalog

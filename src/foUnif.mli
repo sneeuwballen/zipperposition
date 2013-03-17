@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Unification and matching algorithms. TODO use var bindings to fasten computation *)
 
 open Symbols
-open Types
+open Basic
 
 (** Unify terms, returns a substitution or raises UnificationFailure *)
 val unification: substitution -> term bind -> term bind -> substitution

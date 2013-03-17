@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Extracting lemmas from proofs} *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms

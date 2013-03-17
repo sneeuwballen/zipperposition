@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** parameters for the main procedure *)
 type parameters = {
-  param_ord : Types.precedence -> Types.ordering;
+  param_ord : Basic.precedence -> Basic.ordering;
   param_seed : int;
   param_steps : int;
   param_version : bool;
