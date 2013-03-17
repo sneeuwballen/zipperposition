@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Main saturation algorithm. It uses inference rules and
     simplification rules from Superposition. *)
 
-open Types
+open Basic
 
 (** The SZS status of a state *)
 type 'a szs_status = 

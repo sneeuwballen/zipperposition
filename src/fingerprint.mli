@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** fingerprint term indexing *)
 
-open Types
+open Basic
 
 type fingerprint_fun
 

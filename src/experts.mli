@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     this theory. They must be correct, but not necessarily complete, on
     the theory. *)
 
-open Types
+open Basic
 open Symbols
 
 (** {2 General interface} *)

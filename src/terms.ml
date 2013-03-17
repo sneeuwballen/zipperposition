@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 *)
 
 open Hashcons
-open Types
+open Basic
 open Symbols
 
 (** {1 First-order terms} *)

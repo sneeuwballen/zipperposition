@@ -1,6 +1,6 @@
 (** test clauses *)
 
-open Types
+open Basic
 open Symbols
 
 module C = Clauses

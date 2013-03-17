@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Reduction to CNF, and simplifications. See "computing small normal forms",
     in "handbook of automated reasoning". *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms

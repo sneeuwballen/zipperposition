@@ -26,14 +26,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   open Const
   open Symbols
-  open Types
+  open Basic
 
   module Utils = FoUtils
 
-  type term = Types.term
-  type variable = Types.term
-  type literal = Types.term
-  type clause = Types.term
+  type term = Basic.term
+  type variable = Basic.term
+  type literal = Basic.term
+  type clause = Basic.term
 
   (* includes from input *)
   let include_files: string list ref =
@@ -154,10 +154,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %left OR
 
 %start parse_file
-%type <Types.sourced_term list * string list> parse_file
+%type <Basic.sourced_term list * string list> parse_file
 
 %start parse_formula
-%type <Types.term> parse_formula
+%type <Basic.term> parse_formula
 
 %start parse_meta
 %type <Meta.KB.definition list> parse_meta

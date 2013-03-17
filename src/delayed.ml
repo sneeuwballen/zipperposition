@@ -20,7 +20,7 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 
 (** module for superposition with equivalence reasoning and delayed clausal form *)
 
-open Types
+open Basic
 open Symbols
 open Calculus
 

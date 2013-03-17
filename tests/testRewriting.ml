@@ -1,6 +1,6 @@
 (** testing of rewriting *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms

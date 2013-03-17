@@ -18,9 +18,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** {1 Types and basic functions for the meta-prover} *)
+(** {1 Basic and basic functions for the meta-prover} *)
 
-open Types
+open Basic
 open Symbols
 
 (** {2 Representation of patterns: higher-order terms} *)

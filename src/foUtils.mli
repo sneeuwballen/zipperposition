@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Some helpers} *)
 
-open Types
+open Basic
 
 (** {2 debugging facilities} *)
 

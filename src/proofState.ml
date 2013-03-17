@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (* the state of a proof *)
 
-open Types
+open Basic
 open Params
 
 module I = Index

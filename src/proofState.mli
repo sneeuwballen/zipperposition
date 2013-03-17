@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     a set of passive clauses (to be processed), and an ordering
     that is used for redundancy elimination. *)
 
-open Types
+open Basic
 open Symbols
 
 (** association name -> index *)

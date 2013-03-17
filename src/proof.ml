@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Manipulate proofs} *)
 
-open Types
+open Basic
 
 module T = Terms
 module S = FoSubst

@@ -1,6 +1,6 @@
 (** test partial orderings *)
 
-open Types
+open Basic
 open Symbols
 
 module PO = PartialOrder

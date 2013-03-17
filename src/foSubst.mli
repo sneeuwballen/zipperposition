@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Operations on substitutions *)
 
-open Types
+open Basic
 
 val id_subst : substitution
   (** The identity substitution *)

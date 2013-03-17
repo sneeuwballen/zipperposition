@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 open Symbols
 
 (** Partial ordering on terms. This provides several
