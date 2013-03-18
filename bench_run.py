@@ -354,7 +354,7 @@ def read_config(config_file):
     if args.memory:
         config[MAIN_SECTION]['memory'] = args.memory
     if args.db:
-        config[MAIN_SECTION]['db'] = args.db
+        config[MAIN_SECTION]['db_file'] = args.db
     if args.profile:
         config[MAIN_SECTION]['profile'] = args.profile
     if args.timeout:
