@@ -59,8 +59,10 @@ class Run(object):
         self.db_name = config[MAIN_SECTION].get('db_file', DB_FILE)
         log.debug('use DB %s', self.db_name)
         self.profile = config[MAIN_SECTION].get('profile')
-        self.memory = int(config[MAIN_SECTION].get('memory', None) \
-                        or config[self.profile].get('memory') or MEMORY)
+        self.memory = int(config[CLI].get('memory', None) \
+                        or config[self.profile].get('memory', None)
+                        or config[MAIN_SECTION].get('memory', None) \
+                        or MEMORY)
         self.provers = \
             config[CLI].get('provers', None) \
             or config[self.profile].get('provers')
@@ -352,7 +354,7 @@ def read_config(config_file):
     if args.profile:
         config
     if args.memory:
-        config[MAIN_SECTION]['memory'] = args.memory
+        config[CLI]['memory'] = args.memory
     if args.db:
         config[MAIN_SECTION]['db_file'] = args.db
     if args.profile:
