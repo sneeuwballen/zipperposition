@@ -26,6 +26,7 @@ DB_FILE = "./benchs.db"
 TIMEOUT = 120
 LOG_LEVEL = 'info'
 MEMORY = 1024 * 1024
+CLI = '__cli'  # config section for CLI arguments
 
 log = logging.getLogger("benchmark")
 log.addHandler(logging.StreamHandler())
@@ -55,15 +56,19 @@ class Run(object):
         [profile] is the benchmark profile to use.
         """
         self.config = config
-        self.db_name = config.get(MAIN_SECTION, 'db_file')
+        self.db_name = config[MAIN_SECTION].get('db_file', DB_FILE)
         log.debug('use DB %s', self.db_name)
-        self.profile = config.get(MAIN_SECTION, 'profile')
-        self.provers = config.get(MAIN_SECTION, 'provers') \
-            if config.has_option(MAIN_SECTION, 'provers')
-            else config.get(self.profile, 'provers', vars=)
-        self.timeout = config.getint(self.profile, 'timeout') \
-            if config.has_option(self.profile, 'timeout') \
-            else config.getint(MAIN_SECTION, 'timeout')
+        self.profile = config[MAIN_SECTION].get('profile')
+        self.memory = int(config[MAIN_SECTION].get('memory', None) \
+                        or config[self.profile].get('memory') or MEMORY)
+        self.provers = \
+            config[CLI].get('provers', None) \
+            or config[self.profile].get('provers')
+        self.timeout = int( \
+            config[CLI].get('timeout', None) \
+            or config[self.profile].get('timeout', None) \
+            or config[MAIN_SECTION].get('timeout', None) \
+            or TIMEOUT)
         # connect to the Database
         self.conn = sqlite3.connect(self.db_name)
         try:
@@ -91,16 +96,16 @@ class Run(object):
 
     def solve_with(self, filename, prover, verbose=False):
         """Run the prover on the given file. Returns (result, time, output)."""
-        if prover not in self.config.sections():
+        if prover not in self.config:
             log.error('prover not known: %s', prover)
             sys.exit(1) # unknown prover
 
-        cmd = self.config.get(prover, 'cmd')
-        unsat = self.config.get(prover, 'unsat')
-        sat = self.config.get(prover, 'sat')
+        cmd = self.config[prover].get('cmd')
+        unsat = self.config[prover].get('unsat')
+        sat = self.config[prover].get('sat')
 
         # limit memory (address space)
-        memory = self.config.getint(MAIN_SECTION, 'memory')
+        memory = self.memory
         log.debug('memory limit is %d', memory)
         resource.setrlimit(resource.RLIMIT_AS, (memory * 1024, memory * 1024))
 
@@ -112,8 +117,12 @@ class Run(object):
         # run prover and wait for result
         cmd = cmd.format(time=self.timeout, file=filename)
         start = time.time()
-        p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-        out, _ = p.communicate()
+        try:
+            p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+            out, _ = p.communicate()
+        except MemoryError:
+            log.debug('memory error while invoking %s', prover)
+            out = ''
         stop = time.time()
 
         result = "failure"
@@ -156,7 +165,7 @@ class Run(object):
     @command
     def solve(self, *filenames):
         """Run all provers against the given files"""
-        provers = self.config.get(self.profile, 'provers')
+        provers = self.provers
         provers = provers.strip().split(',')
         return self.raw_solve(provers, filenames)
 
@@ -237,14 +246,15 @@ class Run(object):
     @command
     def json_dump(self):
         "dumps the table in json format"
-        query = """select filename, prover, result, time from results;"""
+        query = """select filename, prover, result, time, output from results;"""
         rows = self.conn.execute(query)
         # print as a big json array
         obj = [ { 'filename': filename
                 , 'prover': prover
                 , 'result': result
                 , 'time': time
-                } for filename, prover, result, time in rows]
+                , 'output' : output
+                } for filename, prover, result, time, output in rows]
         json.dump(obj, sys.stdout, indent=2)
 
     @command
@@ -262,7 +272,8 @@ class Run(object):
             prover = row['prover']
             result = row['result']
             time = float(row['time'])
-            self.save(filename, prover, result, time)
+            output = row['output'].encode('utf8')
+            self.save(filename, prover, result, time, output)
 
     @command
     def stats(self):
@@ -320,8 +331,8 @@ def arg_parser():
     parser.add_argument("--provers", dest="provers", default=None, help="provers")
     parser.add_argument("-j", dest="cores", type=int, default=1, help="number of cores used")
     parser.add_argument("--timeout", "-t", dest="timeout", type=int, default=None, help="timeout (in seconds)")
-    parser.add_argument("-m", dest="memory", type=int, default=MEMORY, help="memory limit (in kbytes)")
-    parser.add_argument("--db", dest="db", default=DB_FILE, help="db to use")
+    parser.add_argument("--memory", "-m", dest="memory", type=int, default=None, help="memory limit (in kbytes)")
+    parser.add_argument("--db", dest="db", default=None, help="db to use")
     return parser
 
 def parse_args(args):
@@ -329,6 +340,28 @@ def parse_args(args):
     parser = arg_parser()
     args = parser.parse_args(args=args)
     return args
+
+def read_config(config_file):
+    """Read the config into a dict of dicts"""
+    log.debug('parse config file %s', config_file)
+    config = ConfigParser.ConfigParser()
+    config.read(config_file)
+    config = dict((section,dict(config.items(section))) for section in config.sections())
+    config[CLI] = {}
+    config['cores'] = args.cores
+    if args.profile:
+        config
+    if args.memory:
+        config[MAIN_SECTION]['memory'] = args.memory
+    if args.db:
+        config[MAIN_SECTION]['db'] = args.db
+    if args.profile:
+        config[MAIN_SECTION]['profile'] = args.profile
+    if args.timeout:
+        config[CLI]['timeout'] = str(args.timeout)
+    if args.provers:
+        config[CLI]['provers'] = args.provers
+    return config
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
@@ -339,20 +372,7 @@ if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
     log.setLevel(levels.get(args.level, logging.INFO))
     # parse config (my_config contains default values)
-    log.debug('parse config file %s', args.config)
-    my_config = {
-        'memory': str(args.memory),
-        'db': args.db,
-        'cores': args.cores
-    }
-    if args.profile:
-        my_config['profile'] = args.profile
-    if args.timeout:
-        my_config['timeout'] = str(args.timeout)
-    if args.provers:
-        my_config['provers'] = args.provers
-    config = ConfigParser.ConfigParser(my_config)
-    config.read(args.config)
+    config = read_config(args.config)
     # do actions
     run = Run(config)
     fun = getattr(run, args.command)
