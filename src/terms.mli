@@ -52,6 +52,8 @@ module THashSet :
 
 (** {2 Global terms table (hashconsing)} *)
 
+module H : Hashcons.S with type t = term
+
 val iter_terms : (term -> unit) -> unit       (** iterate through existing terms *)
 val all_terms : unit -> term list             (** all currently existing terms *)
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)

@@ -58,6 +58,10 @@ module type S =
 
     val iter : (t -> unit) -> unit
       (** [iter f] iterates [f] over all elements of the table . *)
+
+    val clean : unit -> unit
+      (** Clean the content *)
+
     val stats : unit -> int * int * int * int * int * int
       (** Return statistics on the table.  The numbers are, in order:
           table length, number of entries, sum of bucket lengths,

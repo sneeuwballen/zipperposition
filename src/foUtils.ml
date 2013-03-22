@@ -231,6 +231,55 @@ let multiset_partial f l1 l2 =
   | [], [] -> Eq (* all elements removed by multiset_remove_eq *)
   | _ -> find_dominating l1 l2
 
+(** {2 Hashconsing with non-weak semantic} *)
+
+(** Hashconsed elements are kept forever by default;  *)
+
+module KeepHashcons(H : Hashcons.HashedType) = struct
+  type t = H.t
+
+  module Tbl = Hashtbl.Make(H)
+
+  let __table = Tbl.create 5003
+  let __count = ref 0
+
+  let hashcons x =
+    try Tbl.find __table x
+    with Not_found ->
+      (* new tag for new representant *)
+      let y = H.tag !__count x in
+      incr __count;
+      Tbl.add __table y y;
+      y  (* [y] is the representant of [x] now *)
+
+  let mem x = Tbl.mem __table x
+
+  let iter f = Tbl.iter (fun x _ -> f x) __table
+
+  let clean () =
+    let n = Tbl.length __table in
+    let a = Weak.create n in
+    (* copy elements in the array *)
+    let r = ref 0 in
+    Tbl.iter (fun x _ -> Weak.set a !r (Some x); incr r) __table;
+    Tbl.clear __table;
+    (* collect useless elements *)
+    Gc.full_major ();
+    (* copy elements back *)
+    for i = 0 to n-1 do
+      match Weak.get a i with
+      | None -> ()
+      | Some x -> Tbl.add __table x x
+    done
+
+  let stats () =
+    let open Hashtbl in
+    let stats = Tbl.stats __table in
+    (* TODO compute median and min bucket size *)
+    (stats.num_buckets, stats.num_bindings, stats.num_bindings, 0, 0, stats.max_bucket_length)
+end
+
+
 (** {2 List utils} *)
 
 let rec list_get l i = match l, i with
@@ -350,15 +399,20 @@ let rec times i f =
   if i = 0 then []
   else (f ()) :: (times (i-1) f)
 
-(** Randomly shuffle the list. See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle *)
-let list_shuffle l =
-  let a = Array.of_list l in
+(** Randomly shuffle the array, in place.
+    See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle *)
+let array_shuffle a = 
   for i = 1 to Array.length a - 1 do
     let j = Random.int i in
     let tmp = a.(i) in
     a.(i) <- a.(j);
     a.(j) <- tmp;
-  done;
+  done
+
+(** Randomly shuffle the list *)
+let list_shuffle l =
+  let a = Array.of_list l in
+  array_shuffle a;
   Array.to_list a
 
 (** {2 Array utils} *)

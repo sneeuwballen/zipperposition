@@ -70,6 +70,12 @@ val multiset_eq : ('a -> 'a -> comparison) -> 'a list -> 'a list -> bool
 (** multiset order on lists which elements are ordered by f *)
 val multiset_partial : ('a -> 'a -> comparison) -> 'a list -> 'a list -> comparison
 
+(** {2 Hashconsing with non-weak semantic} *)
+
+(** Hashconsed elements are kept forever by default;  *)
+
+module KeepHashcons(H : Hashcons.HashedType) : Hashcons.S with type t = H.t
+
 (** {2 List utils} *)
 
 (** get n-th element of list (linear), or Not_found *)
@@ -110,6 +116,9 @@ val list_min : ('a -> 'a -> comparison) -> 'a list -> 'a list
 val list_range : int -> int -> int list
 (** call the function n times with unit *)
 val times : int -> (unit -> 'a) -> 'a list
+
+(** shuffle randomly the array, in place *)
+val array_shuffle : 'a array -> unit
 (** shuffle randomly the list *)
 val list_shuffle : 'a list -> 'a list
 

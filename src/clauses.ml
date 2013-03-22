@@ -116,12 +116,13 @@ let is_child_of ~child c =
   let descendants = Ptset.add child.hctag c.hcdescendants in
   c.hcdescendants <- descendants
 
-module CHashcons = Hashcons.Make(
+(* module CHashcons = Hashcons.Make( *)
+module CHashcons = FoUtils.KeepHashcons(
   struct
     type t = hclause
     let hash c = Lits.hash_lits c.hclits
     let equal c1 c2 = Lits.eq_lits c1.hclits c2.hclits && c1.hcctx == c2.hcctx
-    let tag i c = c.hctag <- i; c
+    let tag i c = (assert (c.hctag = (-1)); c.hctag <- i; c)
   end)
 
 (** the tautological empty clause *)
@@ -135,6 +136,7 @@ let true_clause ~ctx =
   let hc = CHashcons.hashcons hc in
   hc.hcproof <- Proof (compact_clause hc, "trivial", []);
   hc
+
 
 (** Build a new hclause from the given literals.
     If there are more than [BV.max_len] literals,
@@ -164,7 +166,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
     hclits = lits;
     hcctx = ctx;
     hcflags = BV.empty;
-    hctag = 0;
+    hctag = (-1);
     hcweight = 0;
     hcselected = 0;
     hcvars = all_vars;

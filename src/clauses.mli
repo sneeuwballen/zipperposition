@@ -63,6 +63,8 @@ val is_child_of : child:hclause -> hclause -> unit
   (** [is_child_of ~child c] is to be called to remember that [child] is a child
       of [c], is has been infered/simplified from [c] *)
 
+module CHashcons : Hashcons.S with type t = hclause
+
 val mk_hclause : ?parents:hclause list -> ?selected:Bitvector.t ->
                  ctx:context -> literal list ->
                   (compact_clause -> compact_clause proof) -> hclause

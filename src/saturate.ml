@@ -142,7 +142,18 @@ let remove_orphans passive_set removed_clauses =
     Ptset.iter
       (fun orphan_id ->
         incr_stat stat_killed_orphans;
-        passive_set#remove orphan_id)
+        passive_set#remove orphan_id
+        (*
+        try
+          let c = C.CSet.get passive_set#clauses orphan_id in
+          if Ptset.is_empty c.hcdescendants then begin
+            (* only kill orphans that have never participated in inferences *)
+            incr_stat stat_killed_orphans;
+            passive_set#remove orphan_id
+          end
+        with Not_found -> ())
+        *)
+        )
       orphans
   in
   List.iter remove_descendants removed_clauses
@@ -337,7 +348,9 @@ let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus 
         (* some cleanup from time to time *)
         (if (num mod 1000 = 0)
           then (
-            Utils.debug 1 "%% perform cleanup of passive set";
+            Utils.debug 1 "%% perform cleanup of hashcons and passive set";
+            Clauses.CHashcons.clean ();
+            Terms.H.clean ();
             state#passive_set#clean ()
           ));
         (* do one step *)

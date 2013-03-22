@@ -106,14 +106,15 @@ let hashcons_equal x y =
   | _ -> false
 
 (** hashconsing for terms *)
-module H = Hashcons.Make(struct
+(* module H  = Hashcons.Make(struct *)
+module H = FoUtils.KeepHashcons(struct
   type t = term
 
   let equal x y = hashcons_equal x y
 
   let hash t = hash_term t
 
-  let tag i t = (t.tag <- i; t)
+  let tag i t = (assert (t.tag = -1); t.tag <- i; t)
 end)
 
 let iter_terms f = H.iter f
@@ -264,7 +265,7 @@ let mk_at ?old t1 t2 =
   | _ -> raise (SortError "incompatible types for @")
 
 let rec cast t sort =
-  let new_t = {t with sort=sort} in
+  let new_t = {t with sort=sort; tag= -1;} in
   H.hashcons new_t
 
 (** {2 Subterms and positions} *)
