@@ -316,23 +316,9 @@ let compute_cost ord_factory constraints precedence : int =
 let perturbate ?(num=10) symbols =
   Utils.debug 4 "perturbate @[<h>[%a]@]" (Utils.pp_list pp_symbol) symbols;
   let new_symbols = ref [] in
-  (* swap indexes i and j in the list *)
-  let rec swap i j a =
-    let tmp = a.(i) in
-    a.(i) <- a.(j);
-    a.(j) <- tmp;
-  (* perform n swaps on the array *)
-  and swap_n n a =
-    if n = 0 || Array.length a <= 1 then a else begin
-      let i = max 1 (Random.int (Array.length a - 1)) in
-      let j = Random.int i in
-      swap i j a;
-      swap_n (n-1) a;
-    end
-  in
   (* generate the [num] perturbations *)
   for i = 0 to num-1 do
-    let symbols' = Array.to_list (swap_n 3 (Array.of_list symbols)) in
+    let symbols' = Utils.list_shuffle symbols in
     new_symbols := symbols' :: !new_symbols
   done;
   !new_symbols

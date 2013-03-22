@@ -105,6 +105,7 @@ let parse_args () =
       ("-proof", Arg.Set_string proof, "choose proof printing (none, debug, json or tstp)");
       ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
+      ("-seed", Arg.Set_int seed, "set random seed");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
     ]
   in

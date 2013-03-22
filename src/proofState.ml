@@ -31,6 +31,8 @@ module BV = Bitvector
 module FV = FeatureVector
 module CQ = ClauseQueue
 
+let stat_passive_cleanup = mk_stat "cleanup of passive set"
+
 let _indexes =
   let table = Hashtbl.create 2 in
   (* TODO write a Substitution Tree, with the new substitution representation? *)
@@ -301,6 +303,7 @@ let mk_passive_set ~ctx queues =
 
     (* cleanup the clause queues *)
     method clean () =
+      incr_stat stat_passive_cleanup;
       for i = 0 to m_length - 1 do
         let q, w = m_queues.(i) in
         m_queues.(i) <- q#clean m_clauses, w
