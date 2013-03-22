@@ -3,14 +3,19 @@ INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 TARGETS_LIB = src/lib.cmxa src/lib.cma 
 TARGETS = src/zipperposition.native tests/tests.native
-LIBS = datalog,str,nums
+LIBS = datalog
 #SUBMODULES = datalog sequence
-SUBMODULES =
+SUBMODULES = containers
+PACKAGES = batteries yojson zip
+
+WITH_LIBS = $(addprefix -lib ,$(LIBS))
+WITH_PACKAGES = $(addprefix -package ,$(PACKAGES))
+
 PWD = $(shell pwd)
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
 INCLUDES = -I,src
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind -libs $(LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
+OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 #OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
 
@@ -52,11 +57,11 @@ tags:
 dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
-.PHONY: all profile clean tags doc tests dot
+.PHONY: all debug profile clean tags doc tests dot
 
 # libraries
 
-datalog:
-	make -C datalog
+containers:
+	make -C containers
 
-.PHONY: datalog
+.PHONY: containers
