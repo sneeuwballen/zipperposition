@@ -53,7 +53,7 @@ module Pattern : sig
   val to_json : t -> json
   val of_json : json -> t
 
-  (** {2 Conversion pattern <-> clause, and matching *)
+  (** {2 Conversion pattern <-> clause, and matching} *)
 
   val find_symbols : ?symbols:SSet.t -> term Sequence.t -> SSet.t
     (** Given a curryfied term, find the symbols that occur as head constants
