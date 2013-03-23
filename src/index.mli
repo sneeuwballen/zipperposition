@@ -18,59 +18,40 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Generic term indexing *)
+(** {1 Generic term indexing} *)
 
 open Basic
 
-type data = hclause * position * term
+type 'a t
+  (** Abstract type for an index with payload of type 'a *)
 
-(** a set of (hashconsed clause, position in clause, term). *)
-module ClauseSet : Set.S with type elt = data
+val empty : name:string -> cmp:('a -> 'a -> int) -> 'a t
+  (** Empty index, with the given comparison function on payload *)
 
-(** a leaf of an index is generally a map of terms to data *)
-type index_leaf
+val add : 'a t -> term -> 'a -> 'a t
+  (** Add the payload for this term *)
 
-val empty_leaf : index_leaf
-val add_leaf : index_leaf -> term -> data -> index_leaf
-val remove_leaf : index_leaf -> term -> data -> index_leaf
-val is_empty_leaf : index_leaf -> bool
-val iter_leaf : index_leaf -> (term -> ClauseSet.t -> unit) -> unit
-val fold_leaf : index_leaf -> ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
-val size_leaf : index_leaf -> int
+val remove : 'a t -> term -> 'a -> 'a t
+  (** Remove the payload *)
 
-(** A term index *)
-class type index =
-  object ('b)
-    method name : string
-    method add : term -> data -> 'b
-    method remove: term -> data -> 'b
+val iter : (term -> 'a -> unit) -> 'a t -> unit
+  (** Iterate on bindings *)
 
-    method iter : (term -> ClauseSet.t -> unit) -> unit
-    method fold : 'a. ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
+val fold : ('b -> term -> 'a -> 'b) -> 'b -> 'a t -> 'b
+  (** Fold on bindings *)
 
-    method retrieve_unifiables : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_generalizations : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_specializations : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
+val retrieve_unifiables : 'a t bind -> term bind -> 'b ->
+                          ('b -> term -> subst -> 'a -> 'b) -> 'b
+  (** Retrieve terms unifiable with the query *)
 
-    method pp : all_clauses:bool -> Format.formatter -> unit -> unit
-  end
+val retrieve_generalizations : 'a t bind -> term bind -> 'b ->
+                              ('b -> term -> subst -> 'a -> 'b) -> 'b
+  (** Retrieve terms matching the query *)
 
-(** A simplification index *)
-class type unit_index = 
-  object ('b)
-    method name : string
-    method maxvar : int
-    method is_empty : bool
-    method add_clause : hclause -> 'b
-    method remove_clause : hclause -> 'b
-    method add : term -> term -> bool -> hclause -> 'b
-    method remove : term -> term -> bool -> hclause ->'b
-    method size : int
-    method retrieve : sign:bool -> int -> term bind ->
-                      (term bind -> term bind -> substitution -> hclause -> unit) ->
-                      unit        (** iter on (in)equations of given sign l=r
-                                      where subst(l) = query term *)
-    method pp : Format.formatter -> unit -> unit
-    method to_dot : string -> unit
-  end
+val retrieve_specializations : 'a t bind -> term bind -> 'b ->
+                              ('b -> term -> subst -> 'a -> 'b) -> 'b
+  (** Retrieve terms matched by the query *)
+
+val to_dot : ('a -> string) -> Format.formatter -> 'a t -> unit
+  (** Print the structure to DOT *)
 
