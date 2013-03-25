@@ -214,19 +214,29 @@ class Run(object):
     @command
     def clear(self):
         "clear database of results"
-        self.conn.execute("""delete from results;""")
+        print "erase the database. Are you sure?"
+        while True:
+            l = raw_input("[y/n]")
+            if l == 'y':
+                self.conn.execute("""delete from results;""")
+                self.conn.commit()
+                break
+            elif l == 'n':
+                break
 
     @command
     def clear_files(self, *filenames):
         "remove results relative to the given files"
         self.conn.execute("""delete from results where filename in (%s); """ % \
             ','.join('"'+f+'"' for f in filenames))
+        self.conn.commit()
 
     @command
     def clear_provers(self, *provers):
         "remove results relative to the given provers"
         self.conn.executemany("""delete from results where prover like ?; """,
             [(prover,) for prover in provers])
+        self.conn.commit()
 
     @command
     def normalize(self):
@@ -234,6 +244,7 @@ class Run(object):
         query = """update results set time={time} where time > {time};""".format(
             time = TIMEOUT)
         self.conn.execute(query)
+        self.conn.commit()
 
     @command
     def disagree(self, display=True):
