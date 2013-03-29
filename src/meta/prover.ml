@@ -94,6 +94,7 @@ let fact_handler prover lit =
         premises in
       (* result: "conclusion because of premises" *)
       let result = Deduced (lits, premises) in
+      Utils.debug 0 "%% meta-prover: lemma @[<h>[%a]@]" Literals.pp_lits lits;
       prover.results <- result :: prover.results;
       prover.new_results <- result :: prover.new_results
     | Some (KB.ThenNamed (name, terms)) ->
