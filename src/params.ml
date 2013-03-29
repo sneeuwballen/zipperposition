@@ -38,7 +38,7 @@ let parse_args () =
   and index = ref "fp"
   and split = ref false
   and theories = ref true
-  and calculus = ref "superposition"
+  and calculus = ref "delayed"
   and presaturate = ref false
   and heuristic_precedence = ref true
   and dot_file = ref None
@@ -62,7 +62,7 @@ let parse_args () =
       ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
       ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
-      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
+      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
       ("-split", Arg.Set split, "enable splitting");
