@@ -20,30 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Parameters for the prover, the calculus, etc. *)
 
-(** parameters for the main procedure *)
-type parameters = {
-  param_ord : Basic.precedence -> Basic.ordering;
-  param_seed : int;
-  param_steps : int;
-  param_version : bool;
-  param_calculus : string;
-  param_timeout : float;
-  param_files : string list;
-  param_split : bool;             (** use splitting *)
-  param_theories : bool;          (** detect theories *)
-  param_precedence : bool;        (** use heuristic for precedence? *)
-  param_select : string;          (** name of the selection function *)
-  param_progress : bool;          (** print progress during search *)
-  param_proof : string;           (** how to print proof? *)
-  param_dot_file : string option; (** file to print the final state in *)
-  param_kb : string;              (** file to use for KB *)
-  param_kb_load : string list;    (** theory files to read *)
-  param_kb_clear : bool;          (** do we need to clear the KB? *)
-  param_kb_print : bool;          (** print knowledge base and exit *)
-  param_learn : bool;             (** learn lemmas? *)
-  param_presaturate : bool;       (** initial interreduction of proof state? *)
-  param_index : string;           (** indexing structure *)
-}
+open Basic
 
 (** parse_args returns parameters *)
 let parse_args () =

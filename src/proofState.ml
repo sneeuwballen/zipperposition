@@ -97,6 +97,7 @@ type passive_set =
     and is parametrized by an ordering. *)
 type state =
   < ctx : context;
+    params : parameters;
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
@@ -324,6 +325,7 @@ let mk_state ~ctx ?meta params signature =
     val m_passive = (mk_passive_set ~ctx queues :> passive_set)
     val m_simpl = (mk_simpl_set ~ctx unit_idx :> simpl_set)
     method ctx = ctx
+    method params = params
     method active_set = m_active
     method passive_set = m_passive
     method simpl_set = m_simpl

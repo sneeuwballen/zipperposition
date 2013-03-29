@@ -71,6 +71,7 @@ type passive_set =
     and is parametrized by an ordering. *)
 type state =
   < ctx : context;
+    params : parameters;
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
@@ -86,7 +87,7 @@ val mk_passive_set : ctx:context -> (ClauseQueue.queue * int) list -> passive_se
 
 (** create a state from the given ordering, and parameters *)
 val mk_state : ctx:context -> ?meta:Meta.Prover.t ->
-               Params.parameters -> signature -> state
+               parameters -> signature -> state
 
 (** statistics on the state (num active, num passive, num simplification) *)
 type state_stats = int * int * int
