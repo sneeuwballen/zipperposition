@@ -214,67 +214,6 @@ module KBO = struct
     cmp
 end
 
-(* XXX this is more or less deprecated code. *)
-module RPO = struct
-  let name = "rpo"
-
-  let rec rpo ~prec s t =
-    match s.term, t.term with
-    | _, _ when T.eq_term s t -> Eq
-    | Var _, Var _ -> Incomparable
-    | _, Var i -> if T.var_occurs t s then Gt else Incomparable
-    | Var i,_ -> if T.var_occurs s t then Lt else Incomparable
-    | Bind _, _ | BoundVar _, _ | _, Bind _ | _, BoundVar _ ->
-      failwith "Bind/BoundVar not handled by old RPO ordering"
-    | Node (hd1, tl1), Node (hd2, tl2) ->
-      (* check whether an elemnt of the list is >= t, and
-         also returns the list of comparison results *)
-      let rec ge_subterm t ol = function
-        | [] -> (false, ol)
-        | x::tl ->
-            let res = rpo ~prec x t in
-            match res with
-              | Gt | Eq -> (true, res::ol)
-              | o -> ge_subterm t (o::ol) tl
-      in
-      (* try the subterm property (when s in t or t in s) *)
-      let (res, l_ol) = ge_subterm t [] tl1 in
-        if res then Gt
-        else let (res, r_ol) = ge_subterm s [] tl2 in
-          if res then Lt
-          else begin
-            (* check whether all terms of the list are smaller than t *)
-            let rec check_subterms t = function
-              | _, [] -> true
-              | o::ol, _::tl ->
-                if o = Lt then check_subterms t (ol,tl) else false
-              | [], x::tl ->
-                if rpo ~prec x t = Lt then check_subterms t ([],tl) else false
-            in
-            (* non recursive comparison of function symbols *)
-            match prec#compare hd1 hd2 with
-            | n when n > 0 -> if check_subterms s (r_ol,tl2) then Gt else Incomparable
-            | n when n < 0 -> if check_subterms t (l_ol,tl1) then Lt else Incomparable
-            | _ -> rpo_rec ~prec hd1 tl1 tl2 s t
-          end
-  (* recursive comparison of lists of terms (head symbol is hd) *)
-  and rpo_rec ~prec hd l1 l2 s t =
-    (if has_attr attr_multiset hd
-    then Utils.multiset_partial (rpo ~prec) l1 l2
-    else match Utils.lexicograph_partial (rpo ~prec) l1 l2 with
-      | Gt ->
-        if List.for_all (fun x -> rpo ~prec s x = Gt) l2 then Gt else Incomparable
-      | Lt ->
-        if List.for_all (fun x -> rpo ~prec x t = Lt) l1 then Lt else Incomparable
-      | o -> o)
-
-  let compare_terms ~prec x y =
-    Utils.enter_prof prof_rpo;
-    let cmp = rpo ~prec x y in
-    Utils.exit_prof prof_rpo;
-    cmp
-end
-
 (** hopefully more efficient (polynomial) implementation of LPO,
     following the paper "things to know when implementing LPO" by Löchner.
     We adapt here the implementation clpo6 with some multiset symbols (=) *)
@@ -383,21 +322,6 @@ let kbo (p : precedence) : ordering =
     method name = KBO.name
   end
 
-let rpo (p : precedence) : ordering =
-  let prec = ref p in
-  let cache = T.T2Cache.create 4096 in
-  let compare a b = RPO.compare_terms ~prec:!prec a b in
-  object
-    method clear_cache () = T.T2Cache.clear cache;
-    method precedence = !prec
-    method compare a b = T.T2Cache.with_cache cache compare a b
-    method set_precedence prec' =
-      assert (check_precedence !prec prec');
-      prec := prec';
-      T.T2Cache.clear cache
-    method name = RPO.name
-  end
-
 let rpo6 (p : precedence) : ordering =
   let prec = ref p in
   let cache = T.T2Cache.create 4096 in
@@ -415,9 +339,6 @@ let rpo6 (p : precedence) : ordering =
 
 let choose name prec =
   match name with
-  | "rpo" ->
-    Utils.debug 0 "%% warning: rpo is deprecated";
-    rpo prec
   | "rpo6" -> rpo6 prec
   | "kbo" -> kbo prec
   | _ -> failwith ("unknown ordering: " ^ name)

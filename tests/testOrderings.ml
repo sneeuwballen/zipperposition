@@ -83,19 +83,6 @@ let check ord_name ~ord terms =
   let pairs = all_orders ~ord terms in
   List.iter (check_properties ~ord) pairs
 
-(** check similar results for RPO and RPO6 *)
-let check_same ~precedence terms =
-  let pairs = all_orders ~ord:(O.rpo precedence) terms
-  and pairs6 = all_orders ~ord:(O.rpo6 precedence) terms in
-  List.iter2
-    (fun (t1, t2, cmp12) (t1', t2', cmp12') ->
-      assert (t1 == t1' && t2 == t2');
-      if not (cmp12 = cmp12')
-        then Format.printf "@[<h>on %a %a, RPO gave %s and RPO6 gave %s@]@."
-          !T.pp_term#pp t1 !T.pp_term#pp t2 (string_of_comparison cmp12)
-          (string_of_comparison cmp12'))
-    pairs pairs6
-
 let n = 500
 
 let run () =
@@ -105,6 +92,5 @@ let run () =
   let terms = Utils.times n (TT.random_term ~ground:false) in
   let precedence = TT.ord#precedence in
   check "KBO" ~ord:(O.kbo precedence) terms;
-  check "RPO" ~ord:(O.rpo precedence) terms;
   check "RPO6" ~ord:(O.rpo6 precedence) terms;
-  check_same ~precedence terms
+  ()

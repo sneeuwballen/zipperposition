@@ -26,6 +26,8 @@ let first_pos () = 0
 let last_pos () = 0
 let make_loc _ = ()
 
+let incompleteness = ref false
+
 (** name of the file being parsed *)
 let cur_filename = ref ""
 

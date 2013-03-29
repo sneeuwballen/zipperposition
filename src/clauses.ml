@@ -137,7 +137,6 @@ let true_clause ~ctx =
   hc.hcproof <- Proof (compact_clause hc, "trivial", []);
   hc
 
-
 (** Build a new hclause from the given literals.
     If there are more than [BV.max_len] literals,
     the prover becomes incomplete by returning [true] instead. *)
@@ -147,6 +146,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   if Array.length lits > BV.max_len
   then (Utils.debug 0 "%% incompleteness: clause of %d lits -> $true"
            (Array.length lits);
+        Const.incompleteness := true;
         Utils.exit_prof prof_mk_hclause;
         true_clause ~ctx)
   else begin

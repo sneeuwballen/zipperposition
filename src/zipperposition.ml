@@ -330,7 +330,9 @@ let process_file ~kb params f =
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
   | Sat.Sat ->
-      Printf.printf "%% SZS status CounterSatisfiable\n";
+      (if !Const.incompleteness
+        then Printf.printf "%% SZS status GaveUp\n"
+        else Printf.printf "%% SZS status CounterSatisfiable\n");
       Utils.debug 1 "%% saturated set: @[<v>%a@]@." C.pp_set state#active_set#clauses
   | Sat.Unsat c -> begin
       (* print status then proof *)

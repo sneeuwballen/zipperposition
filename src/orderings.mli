@@ -28,9 +28,6 @@ open Symbols
 val kbo : precedence -> ordering
   (** Knuth-Bendix ordering *)
 
-val rpo : precedence -> ordering
-  (** Recursive Path Ordering *)
-
 val rpo6 : precedence -> ordering
   (** Efficient implementation of RPO *)
 
