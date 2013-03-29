@@ -71,6 +71,15 @@ class Run(object):
             or config[self.profile].get('timeout', None) \
             or config[MAIN_SECTION].get('timeout', None) \
             or TIMEOUT)
+        # tasks file
+        if 'tasks' in config[CLI]:
+            import shelve
+            log.info('store done tasks in file %s', config[CLI]['tasks'])
+            s = shelve.open(config[CLI]['tasks'], writeback=True)
+            self.tasks = s
+            atexit.register(lambda:s.close())
+        else:
+            self.tasks = None
         # connect to the Database
         self.conn = sqlite3.connect(self.db_name)
         try:
@@ -93,6 +102,12 @@ class Run(object):
                 values (?, ?, ?, ?, ?);""",
                 [filename.strip(), prover.strip(), result.strip(), time, output])
             self.conn.commit()
+            # remember that we solved this task
+            if self.tasks is not None:
+                solved = self.tasks.get('solved', set())
+                solved.add((filename,prover))
+                self.tasks['solved'] = solved
+                self.tasks.sync()
         except sqlite3.Error as e:
             log.error("sqlite error while saving: %s", e)
 
@@ -141,11 +156,15 @@ class Run(object):
     def raw_solve(self, provers, filenames):
         """Run the provers on the files"""
         # TODO use the self.cores argument to run those in parallel
+        already_done = self.tasks['solved'] if self.tasks else set(())
         rows = []
         for filename in filenames:
             results = []
             print '-' * 70
             for prover_name in provers:
+                if (filename, prover_name) in already_done:
+                    log.info('skip already executed task (%s,%s)', filename, prover_name)
+                    continue
                 result, t, out = self.solve_with(filename, prover_name)
                 self.save(filename, prover_name, result, t, out)
                 results.append( [prover_name, result] )
@@ -166,7 +185,8 @@ class Run(object):
 
     @command
     def solve(self, *filenames):
-        """Run all provers against the given files"""
+        """Run all provers against the given files. If --tasks is given, problems
+        already solved are not tried again."""
         provers = self.provers
         provers = provers.strip().split(',')
         return self.raw_solve(provers, filenames)
@@ -345,6 +365,7 @@ def arg_parser():
     parser.add_argument("-j", dest="cores", type=int, default=1, help="number of cores used")
     parser.add_argument("--timeout", "-t", dest="timeout", type=int, default=None, help="timeout (in seconds)")
     parser.add_argument("--memory", "-m", dest="memory", type=int, default=None, help="memory limit (in kbytes)")
+    parser.add_argument("--tasks", dest="tasks", default=None, help="use a file to store the queue of tasks")
     parser.add_argument("--db", dest="db", default=None, help="db to use")
     return parser
 
@@ -374,6 +395,8 @@ def read_config(config_file):
         config[CLI]['timeout'] = str(args.timeout)
     if args.provers:
         config[CLI]['provers'] = args.provers
+    if args.tasks:
+        config[CLI]['tasks'] = args.tasks
     return config
 
 if __name__ == "__main__":
