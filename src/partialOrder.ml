@@ -92,38 +92,28 @@ let pp formatter po =
   done;
   Format.fprintf formatter "@]@;"
 
-(** compute transitive closure of the graph *)
-let transitive_closure po =
+(** Compute the transitive closure where i>j has just been added. *)
+let propagate po i j =
+  assert (i <> j);
   let n = po.size in
   let cmp = po.cmp in
-  (* compute the value at i,j after self-product *)
-  let rec product cmp n i j k =
-    if k = n then false
-    else if cmp.(i).(k) && cmp.(k).(j) then true
-    else product cmp n i j (k+1)
-  in
-  (* compute all products *)
-  let self_product cmp = 
-    let count = ref 0 in  (* number of added edges *)
-    for i = 0 to n-1 do
-      for j = 0 to n-1 do
-        if i=j || cmp.(i).(j) then ()  (* trivial, or already an edge *)
-        else if product cmp n i j 0 then (incr count; cmp.(i).(j) <- true)
-        else ()
+  (* propagate recursively *)
+  let rec propagate i j =
+    if cmp.(i).(j) then () (* stop *)
+    else begin
+      cmp.(i).(j) <- true;
+      (* k > i and i > j -> k -> j *)
+      for k = 0 to n-1 do
+        if k <> i && cmp.(k).(i)
+          then propagate k j
       done;
-    done;
-    !count
-  in
-  (* approximate fast exponentiation: for a matrix of size n
-     where 2^(k-1) < n <= 2^k, does self-product of matrix k times. *)
-  let rec fast_exponentiation n =
-    if n <= 1 then ()
-    else
-      let count = self_product cmp in
-      if count > 0
-        then fast_exponentiation (n / 2) (* not reached fixpoint yet *)
-        else ()
-  in fast_exponentiation n
+      (* i > j and j > k -> i -> k *)
+      for k = 0 to n-1 do
+        if k <> j && cmp.(j).(k)
+          then propagate i k
+      done;
+    end
+  in propagate i j
 
 (** complete the partial order using the given order on
     symbols to compare unordered pairs. If the given comparison
@@ -132,8 +122,6 @@ let transitive_closure po =
 let complete po cmp_fun =
   if po.total then ()
   else begin
-    (* ensure the graph is closed under transitivity *)
-    transitive_closure po;
     let n = po.size in
     let cmp = po.cmp in
     (* look for pairs that are not ordered *)
@@ -143,11 +131,9 @@ let complete po cmp_fun =
           (* elements i and j not ordered, order them by cmp_fun
              and then re-compute the transitive closure *)
           (match cmp_fun po.symbols.(i) po.symbols.(j) with
-          | n when n < 0 -> cmp.(j).(i) <- true
-          | n when n > 0 -> cmp.(i).(j) <- true
+          | n when n < 0 -> propagate po j i
+          | n when n > 0 -> propagate po i j
           | _ -> ());
-          (* close now *)
-          transitive_closure po;
       done;
     done;
     po.total <- check_is_total po
