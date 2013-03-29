@@ -149,9 +149,12 @@ let complete_symbols symbols =
 
 (** Order the list of symbols using the constraints *)
 let order_symbols constrs symbols =
-  let symbols = List.fold_right
-    (fun constr symbols -> List.stable_sort constr symbols) constrs symbols
-  in List.rev symbols  (* decreasing order *)
+  let po = PartialOrder.mk_partial_order symbols in
+  (* complete the partial order using constraints, starting with the
+     strongest ones *)
+  List.iter (fun constr -> PartialOrder.complete po constr) constrs;
+  assert (PartialOrder.is_total po);
+  PartialOrder.symbols po
 
 (** build a precedence on the [symbols] from a list of constraints *)
 let mk_precedence ?(complete=true) constrs symbols =
