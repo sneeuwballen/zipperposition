@@ -215,6 +215,23 @@ val lambda_abstract : term -> term -> term
       For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
       the term [^[X]: f(a, X @ b, c)] *)
 
+(** {2 Congruence Closure} *)
+
+type curry_leaf =
+  | CurrySymbol of symbol * sort
+  | CurryVar of term
+  | CurryQuote of term
+
+module Curryfied : CC.CurryfiedTerm with type symbol = curry_leaf
+  (** Curryfied terms with compatible symbols *)
+
+val cc_curry : term -> Curryfied.t
+
+val cc_uncurry : Curryfied.t -> term
+
+module TCC : CC.S with module CT = Curryfied
+  (** Congruence closure on (curryfied) terms *)
+
 (** {2 Some AC-utils} *)
 
 val flatten_ac : symbol -> term list -> term list

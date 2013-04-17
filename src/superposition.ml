@@ -45,12 +45,14 @@ let stat_subsumed_by_set_call = mk_stat "subsumed_by_set calls"
 let stat_demodulate_call = mk_stat "demodulate calls"
 let stat_demodulate_step = mk_stat "demodulate steps"
 let stat_splits = mk_stat "splits"
+let stat_semantic_tautology = mk_stat "semantic_tautologies"
 
 let prof_demodulate = Utils.mk_profiler "demodulate"
 let prof_back_demodulate = Utils.mk_profiler "backward_demodulate"
 let prof_pos_simplify_reflect = Utils.mk_profiler "simplify_reflect+"
 let prof_neg_simplify_reflect = Utils.mk_profiler "simplify_reflect-"
 let prof_clc = Utils.mk_profiler "contextual_literal_cutting"
+let prof_semantic_tautology = Utils.mk_profiler "semantic_tautology"
 let prof_condensation = Utils.mk_profiler "condensation"
 let prof_basic_simplify = Utils.mk_profiler "basic_simplify"
 let prof_subsumption = Utils.mk_profiler "subsumption"
@@ -607,7 +609,32 @@ let is_tautology hc =
 
 (** semantic tautology deletion, using a congruence closure algorithm
     to see if negative literals imply some positive literal *)
-let is_semantic_tautology c = false (* TODO *)
+let is_semantic_tautology c =
+  Utils.enter_prof prof_semantic_tautology;
+  (* create the congruence closure of all negative equations of [c] *)
+  let cc = T.TCC.create 5 in
+  let cc =
+    Array.fold_left
+      (fun cc lit -> match lit with
+        | Equation (l, r, false, _) ->
+          T.TCC.merge cc (T.cc_curry l) (T.cc_curry r)
+        | _ -> cc)
+      cc c.hclits in
+  let res =
+    Utils.array_exists
+      (function
+        | Equation (_, _, false, _) -> false
+        | Equation (l, r, true, _) ->
+          (* if l=r is implied by the congruence, then the clause is redundant *)
+          T.TCC.eq cc (T.cc_curry l) (T.cc_curry r))
+      c.hclits
+  in
+  (if res then begin
+    incr_stat stat_semantic_tautology;
+    Utils.debug 2 "@[<h>%a is a semantic tautology@]" !C.pp_clause#pp_h c;
+    end);
+  Utils.exit_prof prof_semantic_tautology;
+  res
 
 let basic_simplify hc =
   Utils.enter_prof prof_basic_simplify;

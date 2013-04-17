@@ -743,6 +743,56 @@ let lambda_abstract t sub_t =
   let sort = t.sort <=. sub_t.sort in
   mk_lambda sort sub_t.sort (db_from_term t sub_t)
 
+(** {2 Congruence Closure} *)
+
+type curry_leaf =
+  | CurrySymbol of symbol * sort
+  | CurryVar of term
+  | CurryQuote of term
+
+module Curryfied = CC.Curryfy(struct
+  type t = curry_leaf
+  let equal cl1 cl2 = match cl1, cl2 with
+    | CurrySymbol (s1,sort1), CurrySymbol (s2,sort2) -> s1 == s2 && sort1 == sort2
+    | CurryVar t1, CurryVar t2 
+    | CurryQuote t1, CurryQuote t2 -> t1 == t2
+    | _ -> false
+  let hash cl = match cl with
+    | CurrySymbol (s, sort) -> Symbols.hash_symbol s
+    | CurryVar t
+    | CurryQuote t -> hash_term t
+end) (** Curryfied terms with compatible symbols *)
+
+let rec cc_curry t = match t.term with
+  | Var _ -> Curryfied.mk_const (CurryVar t)
+  | BoundVar _
+  | Bind _ -> Curryfied.mk_const (CurryQuote t)  (* TODO: go inside? *)
+  | Node (s, l) ->
+    let head = Curryfied.mk_const (CurrySymbol (s, t.sort)) in
+    List.fold_left
+      (fun head t' ->
+        let t'' = cc_curry t' in
+        Curryfied.mk_app head t'')
+      head l
+
+let cc_uncurry t =
+  let open Curryfied in
+  let rec uncurry t args =
+    match t.shape, args with
+    | Const (CurryQuote t), [] -> t
+    | Const (CurryVar v), [] -> v
+    | Const (CurrySymbol (s, sort)), args ->
+      mk_node s sort args   (* apply to args *)
+    | Apply (t1, t2), args ->
+      let t2' = uncurry t2 [] in
+      uncurry t1 (t2' :: args)
+    | _ -> assert false
+  in
+  uncurry t []
+
+module TCC = CC.Make(Curryfied)
+  (** Congruence closure on (curryfied) terms *)
+
 (** {2 Some AC-utils} *)
 
 (** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its

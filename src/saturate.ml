@@ -182,7 +182,7 @@ let all_simplify ~calculus ~experts active_set simpl_set hc =
       (* simplify this clause *)
       let _, hc' = simplify ~calculus active_set simpl_set hc in
       let hc' = Experts.Set.simplify experts hc' in
-      if calculus#is_trivial hc'
+      if calculus#is_trivial hc' (* XXX: does not seem very useful? || Sup.is_semantic_tautology hc' *)
         then [] else [hc'])
     clauses
   in
