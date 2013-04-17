@@ -188,6 +188,20 @@ let parse_theory_file kb file =
     close_in ic;
     raise e
 
+(** Load plugins *)
+let load_plugins ~params =
+  Utils.list_flatmap
+    (fun filename ->
+      match Extensions.dyn_load filename with
+      | None ->  (* Could not load plugin *)
+        Utils.debug 0 "%% could not load plugin %s" filename;
+        []
+      | Some factory ->
+        let ext = factory () in
+        Utils.debug 0 "%% loaded extension %s" ext.Extensions.name;
+        [ext])
+    params.param_plugins
+
 (** Parses and populates the initial Knowledge Base *)
 let initial_kb params =
   (* parse file into an initial empty KB *)
@@ -235,7 +249,7 @@ let print_dots state =
   ()
 
 (** Process the given file (try to solve it) *)
-let process_file ~kb params f =
+let process_file ~kb ~plugins params f =
   Format.printf "%% *** process file %s ***@." f;
   let steps = if params.param_steps = 0
     then None else (Format.printf "%% run for %d steps@." params.param_steps;
@@ -245,6 +259,7 @@ let process_file ~kb params f =
                     ignore (setup_alarm params.param_timeout);
                     Some (Utils.get_start_time () +. params.param_timeout -. 0.25))
   and progress = params.param_progress in
+  Format.printf "%% got %d plugins@." (List.length plugins);  (* TODO use plugins *)
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* find the calculus *)
@@ -376,12 +391,14 @@ let () =
   let params = Params.parse_args () in
   Random.init params.param_seed;
   print_version params;
+  (* plugins *)
+  let plugins = load_plugins ~params in
   (* operations on knowledge base *)
   let kb = initial_kb params in
   (if params.param_kb_print then print_kb ~kb);
   (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)
-  List.iter (process_file ~kb params) params.param_files
+  List.iter (process_file ~kb ~plugins params) params.param_files
 
 let _ =
   at_exit (fun () -> 

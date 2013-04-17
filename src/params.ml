@@ -42,6 +42,7 @@ let parse_args () =
   and presaturate = ref false
   and heuristic_precedence = ref true
   and dot_file = ref None
+  and plugins = ref []
   and kb = ref "kb"
   and kb_load = ref []
   and kb_clear = ref false
@@ -54,6 +55,7 @@ let parse_args () =
   let set_progress () =
     FoUtils.need_cleanup := true;
     progress := true
+  and add_plugin s = plugins := s :: !plugins
   in
   (* options list *) 
   let options =
@@ -66,6 +68,7 @@ let parse_args () =
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
       ("-split", Arg.Set split, "enable splitting");
+      ("-plugin", Arg.String add_plugin, "load given plugin (.cmxs)");
       ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
@@ -96,7 +99,7 @@ let parse_args () =
     param_progress = !progress;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
-    param_index= !index; param_dot_file = !dot_file;
+    param_index= !index; param_dot_file = !dot_file; param_plugins= !plugins;
     param_kb = !kb; param_kb_load = !kb_load;
     param_kb_clear = !kb_clear;
     param_kb_print = !kb_print; param_learn = !learn;

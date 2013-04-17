@@ -209,6 +209,7 @@ type parameters = {
   param_progress : bool;          (** print progress during search *)
   param_proof : string;           (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
+  param_plugins : string list;    (** plugins to load *)
   param_kb : string;              (** file to use for KB *)
   param_kb_load : string list;    (** theory files to read *)
   param_kb_clear : bool;          (** do we need to clear the KB? *)
