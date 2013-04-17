@@ -584,6 +584,16 @@ let is_const_definition hc =
     Some (r,l)
   | _ -> None
 
+(** {2 Positions in clauses} *)
+
+type clause_pos = clause * position * term
+let compare_clause_pos (c1, p1, t1) (c2, p2, t2) =
+  let c = Pervasives.compare p1 p2 in
+  if c <> 0 then c else
+  let c = compare_hclause c1 c2 in
+  if c <> 0 then c else
+  (assert (T.eq_term t1 t2); 0)
+
 (* ----------------------------------------------------------------------
  * pretty printing
  * ---------------------------------------------------------------------- *)

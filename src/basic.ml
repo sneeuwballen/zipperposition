@@ -53,6 +53,7 @@ type varlist = term list
 (** A logical first order object, with a context for its free variables.
     The context is an offset, so that X_i inside the 'a really is X_{i+offset} *)
 type 'a bind = ('a * int)
+and offset = int
 
 (** An object parametrized by a list of variables *)
 type 'a parametrized = ('a * varlist)

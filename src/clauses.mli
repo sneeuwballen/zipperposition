@@ -237,6 +237,12 @@ val is_const_definition : hclause -> (term * term) option
 val is_pos_eq : hclause -> (term * term) option
   (** Recognize whether the clause is a positive unit equality. *)
 
+(** {2 Positions in clauses} *)
+
+type clause_pos = clause * position * term
+
+val compare_clause_pos : clause_pos -> clause_pos -> int
+
 (* ----------------------------------------------------------------------
  * pretty printing
  * ---------------------------------------------------------------------- *)
