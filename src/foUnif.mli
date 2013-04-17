@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Unification and matching algorithms. TODO use var bindings to fasten computation *)
+(** {1 Unification and matching algorithms} *)
 
 open Symbols
 open Basic

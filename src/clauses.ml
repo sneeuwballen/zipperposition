@@ -137,6 +137,9 @@ let true_clause ~ctx =
   hc.hcproof <- Proof (compact_clause hc, "trivial", []);
   hc
 
+(* TODO: use a (var, offset) -> int  hashtable to always produce
+   normalized clauses, by construction (see renaming in logic-terms) *)
+
 (** Build a new hclause from the given literals.
     If there are more than [BV.max_len] literals,
     the prover becomes incomplete by returning [true] instead. *)

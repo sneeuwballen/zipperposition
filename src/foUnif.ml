@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+(** {1 Unification and matching algorithms} *)
 
 open Basic
 open Symbols
