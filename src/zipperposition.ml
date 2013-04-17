@@ -192,6 +192,12 @@ let parse_theory_file kb file =
 let load_plugins ~params =
   Utils.list_flatmap
     (fun filename ->
+      let n = String.length filename in
+      let filename =  (* plugin name, or file? *)
+        if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
+          then filename
+          else FoUtils.sprintf "plugins/std/ext_%s.cmxs" filename
+      in
       match Extensions.dyn_load filename with
       | None ->  (* Could not load plugin *)
         Utils.debug 0 "%% could not load plugin %s" filename;
