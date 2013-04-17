@@ -1,12 +1,14 @@
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
+PLUGIN_FILES = $(shell find plugins -name '*.ml')
 TARGETS_LIB = src/lib.cmxa src/lib.cma 
 TARGETS = src/zipperposition.native tests/tests.native
+PLUGINS = $(PLUGIN_FILES:%.ml=%.cmxs)
 LIBS = datalog
 #SUBMODULES = datalog sequence
 SUBMODULES = containers
-PACKAGES = batteries yojson zip
+PACKAGES = yojson zip num str dynlink
 
 WITH_LIBS = $(addprefix -lib ,$(LIBS))
 WITH_PACKAGES = $(addprefix -package ,$(PACKAGES))
@@ -21,23 +23,27 @@ OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES)
 
 # switch compilation module
 MODE ?= debug
+ifeq ($(MODE),debug)
+	TAGS=-tag debug
+endif
+ifeq ($(MODE),profile)
+	TAGS=-tags debug,profile
+endif
+ifeq ($(MODE),prod)
+	TAGS=-tag noassert
+endif
 
-all: $(MODE)
+all: native $(PLUGINS)
 
-debug: $(SUBMODULES)
-	ocamlbuild $(OPTIONS_LIB) -tag debug $(TARGETS_LIB)
-	ocamlbuild $(OPTIONS) -tag debug $(TARGETS)
+%.cmxs:
+	ocamlbuild $(TAGS) $(OPTIONS_LIB) $@
 
-prod: $(SUBMODULES)
-	ocamlbuild $(OPTIONS_LIB) -tag noassert $(TARGETS_LIB)
-	ocamlbuild $(OPTIONS) -tag noassert $(TARGETS)
-
-profile: $(SUBMODULES)
-	ocamlbuild $(OPTIONS_LIB) -tag debug,profile $(TARGETS_LIB)
-	ocamlbuild $(OPTIONS) -tag debug,profile $(TARGETS)
+native: $(SUBMODULES)
+	ocamlbuild $(TAGS) $(OPTIONS_LIB) $(TARGETS_LIB)
+	ocamlbuild $(TAGS) $(OPTIONS) $(TARGETS)
 
 byte: $(SUBMODULES)
-	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
+	ocamlbuild $(TAGS) $(OPTIONS) src/zipperposition.byte
 
 doc:
 	ocamlbuild $(OPTIONS) src/zipperposition.docdir/index.html

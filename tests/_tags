@@ -1,3 +1,3 @@
-<**/*.ml*>: package(sequence), package(datalog)
-<*.native> or <*.byte>: package(sequence), package(datalog), package(yojson), package(zip)
+<**/*.ml*>: package(datalog)
+<*.native> or <*.byte>: package(datalog), package(yojson), package(zip)
 
