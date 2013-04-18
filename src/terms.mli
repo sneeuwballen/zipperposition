@@ -285,7 +285,7 @@ val skolem_prefix : string ref
     the same way. The sort is the sort of the free De Bruijn symbol in t.
 
     It also refreshes the ordering (the signature has changed) *)
-val classic_skolem : ord:ordering -> term -> sort -> term
+val classic_skolem : ctx:context -> term -> sort -> term
 
 (** Skolemization with a special non-first order symbol. The purpose is
     not to introduce too many terms. A proposition p is skolemized
@@ -293,7 +293,7 @@ val classic_skolem : ord:ordering -> term -> sort -> term
 
     The advantage is that it does not modify the signature, and also that
     rewriting can be performed inside the skolem terms. *)
-val unamed_skolem : ord:ordering -> term -> sort -> term
+val unamed_skolem : ctx:context -> term -> sort -> term
 
 (** default skolemization function *)
-val skolem : (ord:ordering -> term -> sort -> term) ref
+val skolem : (ctx:context -> term -> sort -> term) ref

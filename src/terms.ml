@@ -1011,7 +1011,7 @@ let classic_skolem =
     incr count;
     if Symbols.is_used skolem then find_skolem () else skolem
   in
-  fun ~ord t sort ->
+  fun ~ctx t sort ->
     Utils.debug 4 "skolem %a@." !pp_term#pp t;
     let vars = vars t in
     (* find the skolemized normalized term *)
@@ -1023,7 +1023,12 @@ let classic_skolem =
       let new_symbol = mk_symbol ~attrs:attr_skolem new_symbol in  (* build symbol *)
       let skolem_term = mk_node new_symbol sort vars in
       (* update the precedence *)
-      ignore (ord#precedence#add_symbols [new_symbol]);
+      (* update the precedence *)
+      let ord = ctx.ctx_ord in
+      let prec = ord.ord_precedence in
+      let prec', _ = prec.prec_add_symbols [new_symbol] in
+      let ord' = ord.ord_set_precedence prec' in
+      ctx.ctx_ord <- ord';
       (* build the skolemized term *)
       db_unlift (db_replace t skolem_term)
     in
@@ -1038,7 +1043,7 @@ let classic_skolem =
 
     The advantage is that it does not modify the signature, and also that
     rewriting can be performed inside the skolem terms. *)
-let unamed_skolem ~ord t sort =
+let unamed_skolem ~ctx t sort =
   Utils.debug 4 "@[<h>magic skolem %a@]@." !pp_term#pp t;
   let symb = mk_symbol ~attrs:attr_skolem "$$sk" in
   (* the existential witness, parametrized by the 'quoted' formula. The
@@ -1046,7 +1051,11 @@ let unamed_skolem ~ord t sort =
   let args = [mk_node lambda_symbol t.sort [t]] in
   let skolem_term = mk_node symb sort args in
   (* update the precedence *)
-  ignore (ord#precedence#add_symbols [symb]);
+  let ord = ctx.ctx_ord in
+  let prec = ord.ord_precedence in
+  let prec', _ = prec.prec_add_symbols [symb] in
+  let ord' = ord.ord_set_precedence prec' in
+  ctx.ctx_ord <- ord';
   (* build the skolemized term by replacing first DB index with skolem symbol *)
   db_unlift (db_replace t skolem_term)
 

@@ -114,16 +114,16 @@ let gamma_eliminate ~ord offset t sign =
 (** helper for delta elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a skolem
     of free variables of t) *)
-let delta_eliminate ~ord t sign =
+let delta_eliminate ~ctx t sign =
   assert (t.sort == bool_);
   let new_t =
     match T.look_db_sort 0 t with
     | None -> T.db_unlift t (* the variable is not present *)
     | Some sort ->
       (* sort is the sort of the first DB symbol *)
-      !T.skolem ~ord t sort
+      !T.skolem ~ctx t sort
   in
-  List [Lits.mk_lit ~ord new_t T.true_term sign]
+  List [Lits.mk_lit ~ord:ctx.ctx_ord new_t T.true_term sign]
 
 (** Just keep the equation as it is *)
 let keep eqn = Keep eqn
@@ -147,15 +147,15 @@ let eliminate_lits hc =
     | Bind (s, _, t) when s == forall_symbol && sign ->
       gamma_eliminate ~ord offset t true
     | Bind (s, _, t) when s == forall_symbol && not sign ->
-      delta_eliminate ~ord (T.mk_not t) true
+      delta_eliminate ~ctx:hc.hcctx (T.mk_not t) true
     | Bind (s, _, t) when s == exists_symbol && sign ->
-      delta_eliminate ~ord t true
+      delta_eliminate ~ctx:hc.hcctx t true
     | Bind (s, _, t) when s == exists_symbol && not sign ->
       gamma_eliminate ~ord offset t false
     | Bind _ | Node _ -> keep eqn
   (* eliminate equivalence *)
   and equiv eqn l r sign =
-    match ord#compare l r with
+    match ord.ord_compare l r with
     | Gt when sign && not (T.atomic l) -> (* l <=> r -> (l => r) & (r => l)*)
       Alpha (List [Lits.mk_neq ~ord l T.true_term; Lits.mk_eq ~ord r T.true_term],
              List [Lits.mk_neq ~ord r T.true_term; Lits.mk_eq ~ord l T.true_term])

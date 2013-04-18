@@ -243,10 +243,10 @@ let check_ord_hclause ~ord hc =
   assert (
   Utils.array_forall
     (function (Equation (l,r,sign,o)) as lit ->
-      let ok = o = ord#compare l r in
+      let ok = o = ord.ord_compare l r in
       (if not ok then Format.printf "@[<h>Ord problem: literal %a, ord %s is not %s@]@."
                       Lits.pp_literal lit (string_of_comparison o)
-                      (string_of_comparison (ord#compare l r)));
+                      (string_of_comparison (ord.ord_compare l r)));
       ok)
     hc.hclits)
 

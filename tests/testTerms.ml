@@ -24,12 +24,16 @@ let arities =
   Hashtbl.add tbl "s" 2;
   tbl
 
-let ord = Orderings.default_ordering base_signature
+let ctx =
+  { ctx_ord=Orderings.default_ordering base_signature;
+    ctx_select=no_select;
+  }
 
 (** Choose a symbol among the given list *)
 let choose among =
   let s = mk_symbol (H.choose among) in
-  ignore (ord#precedence#add_symbols [s]);
+  let prec', _ = ctx.ctx_ord.ord_precedence.prec_add_symbols [s] in
+  ctx.ctx_ord <- ctx.ctx_ord.ord_set_precedence prec';
   s
 
 (** random term *)
@@ -186,8 +190,9 @@ let check_consts (t1, t2) =
   let t1', t2' = Experts.ground_pair t1 t2 in
   assert (T.is_ground_term t1' && T.is_ground_term t2');
   Format.printf "grounded terms : @[<h>%a %s %a@]@."
-    !T.pp_term#pp t1' (string_of_comparison (ord#compare t1' t2')) !T.pp_term#pp t2';
-  if ord#compare t1' t2' = Incomparable
+    !T.pp_term#pp t1'
+      (string_of_comparison (ctx.ctx_ord.ord_compare t1' t2')) !T.pp_term#pp t2';
+  if ctx.ctx_ord.ord_compare t1' t2' = Incomparable
     then H.TestFail (t1, t2)
     else H.TestOk
 

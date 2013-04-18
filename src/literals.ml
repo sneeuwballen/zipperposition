@@ -58,10 +58,10 @@ let compare_partial ~ord l1 l2 =
   (* Utils.multiset_partial ord#compare (lit_to_multiset l1) (lit_to_multiset l2) *)
   match l1, l2 with
   | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
-    let s_u = ord#compare s u
-    and s_v = ord#compare s v
-    and t_u = ord#compare t u
-    and t_v = ord#compare t v in
+    let s_u = ord.ord_compare s u
+    and s_v = ord.ord_compare s v
+    and t_u = ord.ord_compare t u
+    and t_v = ord.ord_compare t v in
     match s_u, s_v, t_u, t_v, sign_st, sign_uv with
     | Eq, _, _, Eq, _, _
     | _, Eq, Eq, _, _, _ ->
@@ -125,15 +125,15 @@ let check_type a b = if a.sort <> b.sort
 
 let mk_eq ~ord a b =
   check_type a b;
-  Equation (a, b, true, ord#compare a b)
+  Equation (a, b, true, ord.ord_compare a b)
 
 let mk_neq ~ord a b = 
   check_type a b;
-  Equation (a, b, false, ord#compare a b)
+  Equation (a, b, false, ord.ord_compare a b)
 
 let mk_lit ~ord a b sign =
   check_type a b;
-  Equation (a, b, sign, ord#compare a b)
+  Equation (a, b, sign, ord.ord_compare a b)
 
 let apply_subst ?(recursive=true) ?renaming ~ord subst (lit,offset) =
   match lit with
@@ -192,7 +192,7 @@ let fmap ~ord f = function
   | Equation (left, right, sign, _) ->
     let new_left = f left
     and new_right = f right in
-    Equation (new_left, new_right, sign, ord#compare new_left new_right)
+    Equation (new_left, new_right, sign, ord.ord_compare new_left new_right)
 
 let add_vars set = function
   | Equation (l, r, _, _) ->

@@ -25,8 +25,6 @@ let y = T.mk_var 2 univ_
 let z = T.mk_var 3 univ_
 let u = T.mk_var 4 univ_
 
-let _ = Utils.set_debug 3
-
 let rec from_int n =
   assert (n >= 0);
   if n = 0 then zero else succ (from_int (n-1))
@@ -128,7 +126,6 @@ let benchmarks = [ benchmark_peano 2; benchmark_peano 4;
                    benchmark_peano 100; benchmark_peano 1000;
                    benchmark_peano_bis 2; benchmark_peano_bis 4;
                    benchmark_peano_bis 50; benchmark_peano_bis 500 ]
-
 
 let run () =
   Utils.set_debug 3;

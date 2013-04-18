@@ -16,8 +16,7 @@ module Sup = Superposition
 let print_clause_pair formatter (c1, c2) = 
   Format.fprintf formatter "(%a, %a)" !C.pp_clause#pp_h c1 !C.pp_clause#pp c2
 
-let ord = TT.ord
-let ctx = {ctx_ord=ord; ctx_select=no_select;}
+let ctx = TT.ctx
 
 (** random literal *)
 let random_lit () =
@@ -25,12 +24,12 @@ let random_lit () =
   (* a random predicate *)
   let random_pred () =
     let p = TT.random_pred () in
-    Lits.mk_lit ~ord p T.true_term sign
+    Lits.mk_lit ~ord:ctx.ctx_ord p T.true_term sign
   (* a random equation *)
   and random_eq () =
     let l = TT.random_term ()
     and r = TT.random_term () in
-    Lits.mk_lit ~ord l r sign
+    Lits.mk_lit ~ord:ctx.ctx_ord l r sign
   in if H.R.bool ()  (* choice between equation and predicate *)
     then random_pred ()
     else random_eq ()
@@ -54,6 +53,7 @@ let random_clause_pair () =
 
 (** check subsumption property *)
 let check_subsumption ((c1,o1), (c2,o2)) =
+  let ord = ctx.ctx_ord in
   (* check whether a clause is a subset of another clause *)
   let rec clause_subset ~ord (c1,o1) (c2,o2) subst =
     lits_subset

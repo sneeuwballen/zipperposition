@@ -142,14 +142,14 @@ module OrderedTRS = struct
               then raise (RewrittenInto r')  (* we know that t > r' *)
               else (
                 assert (t == S.apply_subst subst (rule.rule_left,1));
-                if trs.ord#compare t r' = Gt
+                if trs.ord.ord_compare t r' = Gt
                   then raise (RewrittenInto r')
                   else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
         Utils.debug 3 "%% rewrite @[<h>%a into %a@]" !T.pp_term#pp t !T.pp_term#pp t';
         incr_stat stat_ordered_rewriting;
-        assert (trs.ord#compare t t' = Gt);
+        assert (trs.ord.ord_compare t t' = Gt);
         reduce reduce' t'  (* term is rewritten, reduce it again *)
     in
     let cache = TCache.create size in

@@ -289,7 +289,7 @@ let process_file ~kb ~plugins params f =
   let clauses = enrich_with_theories ~ctx:d_ctx meta clauses in
   (* choose an ord now, using clauses *)
   let ord = compute_ord ~params clauses in
-  Format.printf "%% precedence: %a@." pp_precedence ord#precedence#snapshot;
+  Format.printf "%% precedence: %a@." pp_precedence ord.ord_precedence.prec_snapshot;
   (* selection function *)
   Format.printf "%% selection function: %s@." params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
@@ -335,7 +335,7 @@ let process_file ~kb ~plugins params f =
   (* print some statistics *)
   print_stats state;
   print_json_stats state meta;
-  Format.printf "%% final precedence: %a@." pp_precedence ord#precedence#snapshot;
+  Format.printf "%% final precedence: %a@." pp_precedence ord.ord_precedence.prec_snapshot;
   print_dots state;
   (match params.param_dot_file with (* print state *)
   | None -> ()

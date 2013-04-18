@@ -149,8 +149,8 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
   if sign_uv && t' == v' && subterm_pos = []
   then (Utils.debug 3 "... will yield a tautology"; acc)
   else begin
-    if (ord#compare (S.apply_subst ~renaming subst (s, o_a)) t' = Lt ||
-        ord#compare (S.apply_subst ~renaming subst (u, o_p)) v' = Lt ||
+    if (ord.ord_compare (S.apply_subst ~renaming subst (s, o_a)) t' = Lt ||
+        ord.ord_compare (S.apply_subst ~renaming subst (u, o_p)) v' = Lt ||
         not (BV.get (C.eligible_res (passive_clause, o_p) subst) passive_idx) ||
         not (BV.get (C.eligible_param (active_clause, o_a) subst) active_idx))
       then (Utils.debug 3 "... has bad ordering conditions"; acc)
@@ -302,7 +302,7 @@ let infer_equality_factoring clause =
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
-    if ord#compare  (S.apply_subst subst (s,0))
+    if ord.ord_compare  (S.apply_subst subst (s,0))
                     (S.apply_subst subst (t,0)) <> Lt &&
        BV.get (C.eligible_param (clause,0) subst) active_idx
       then begin
@@ -469,10 +469,10 @@ let demod_nf ?(restrict=false) (simpl_set : PS.simpl_set) clauses t =
               let new_l = S.apply_subst subst l
               and new_r = S.apply_subst subst r in
               if (not restrict || not (S.is_renaming subst))
-              && (oriented_hclause unit_hclause || ord#compare new_l new_r = Gt)
+              && (oriented_hclause unit_hclause || ord.ord_compare new_l new_r = Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
-                  assert (ord#compare new_l new_r = Gt);
+                  assert (ord.ord_compare new_l new_r = Gt);
                   clauses := unit_hclause :: !clauses;
                   incr_stat stat_demodulate_step;
                   raise (RewriteInto new_r)
@@ -559,8 +559,8 @@ let backward_demodulate (active_set : PS.active_set) set given =
     active_set#idx_back_demod#retrieve_specializations offset (l,0) set
       (fun set t' (hc, _, _) subst ->
         (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
-        if oriented || ord#compare (S.apply_subst subst (l,0))
-                                   (S.apply_subst subst (r,0)) = Gt
+        if oriented
+        || ord.ord_compare (S.apply_subst subst (l,0)) (S.apply_subst subst (r,0)) = Gt
           then  (* add the clause to the set, it may be rewritten by l -> r *)
             C.CSet.add set hc
           else set)

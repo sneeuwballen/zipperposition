@@ -109,11 +109,11 @@ module KBO = struct
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
       | Bind (s, _, t') ->
-        let wb' = if pos then wb + prec#weight s else wb - prec#weight s in
+        let wb' = if pos then wb + prec.prec_weight s else wb - prec.prec_weight s in
         balance_weight wb' t' y pos
       | BoundVar _ -> (if pos then wb + 1 else wb - 1), false
       | Node (s, l) ->
-        let wb' = if pos then wb + prec#weight s else wb - prec#weight s in
+        let wb' = if pos then wb + prec.prec_weight s else wb - prec.prec_weight s in
         balance_weight_rec wb' l y pos false
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
@@ -176,14 +176,14 @@ module KBO = struct
     and tckbo_composite wb f g ss ts =
       (* do the recursive computation of kbo *)
       let wb', recursive = tckbo_rec wb f g ss ts in
-      let wb'' = wb' + prec#weight f - prec#weight g in
+      let wb'' = wb' + prec.prec_weight f - prec.prec_weight g in
       (* check variable condition *)
       let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
       and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
       (* lexicographic product of weight and precedence *)
       if wb'' > 0 then wb'', g_or_n
       else if wb'' < 0 then wb'', l_or_n
-      else (match prec#compare f g with
+      else (match prec.prec_compare f g with
         | n when n > 0 -> wb'', g_or_n
         | n when n < 0 ->  wb'', l_or_n
         | _ ->
@@ -242,7 +242,7 @@ module RPO6 = struct
     | BoundVar _, Bind (g, _, t') -> rpo6_composite ~prec s t db_symbol g [] [t']
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
-    match prec#compare f g with
+    match prec.prec_compare f g with
     | 0 when has_attr attr_multiset f ->
       cMultiset ~prec ss ts (* multiset subterm comparison *)
     | 0 ->
@@ -294,48 +294,52 @@ module RPO6 = struct
 end
 
 (* ----------------------------------------------------------------------
- * class interface
+ * ordering records
  * ---------------------------------------------------------------------- *)
 
 (** Check that new_prec is a compatible superset of old_prec *)
 let check_precedence old_prec new_prec =
-  Utils.debug 2 "check compatibility of @[<h>%a@] with @[<h>%a@]"
-                pp_precedence old_prec#snapshot
-                pp_precedence new_prec#snapshot;
+  Utils.debug 3 "check compatibility of @[<h>%a@] with @[<h>%a@]"
+                pp_precedence old_prec.prec_snapshot
+                pp_precedence new_prec.prec_snapshot;
   let rec check l = match l with
   | [] | [_] -> true
-  | x::((y::_) as l') -> new_prec#compare x y > 0 && check l'
-  in check old_prec#snapshot
+  | x::((y::_) as l') -> new_prec.prec_compare x y > 0 && check l'
+  in check old_prec.prec_snapshot
 
-let kbo (p : precedence) : ordering =
-  let prec = ref p in
+let kbo (prec : precedence) : ordering =
   let cache = T.T2Cache.create 4096 in
-  let compare a b = KBO.compare_terms ~prec:!prec a b in
-  object
-    method clear_cache () = T.T2Cache.clear cache;
-    method precedence = !prec
-    method compare a b = T.T2Cache.with_cache cache compare a b
-    method set_precedence prec' =
-      assert (check_precedence !prec prec');
-      prec := prec';
-      T.T2Cache.clear cache
-    method name = KBO.name
-  end
+  let rec mk_ord prec =
+    let compare a b = KBO.compare_terms ~prec:prec a b in
+    let ord_compare a b = T.T2Cache.with_cache cache compare a b in
+    let ord_set_precedence prec' =
+      assert (check_precedence prec prec');
+      mk_ord prec'
+    in
+    { ord_name = "kbo";
+      ord_compare;
+      ord_clear_cache = (fun () -> T.T2Cache.clear cache);
+      ord_precedence = prec;
+      ord_set_precedence;
+    }
+  in mk_ord prec
 
-let rpo6 (p : precedence) : ordering =
-  let prec = ref p in
+let rpo6 (prec : precedence) : ordering =
   let cache = T.T2Cache.create 4096 in
-  let compare a b = RPO6.compare_terms ~prec:!prec a b in
-  object
-    method clear_cache () = T.T2Cache.clear cache;
-    method precedence = !prec
-    method compare a b = T.T2Cache.with_cache cache compare a b
-    method set_precedence prec' =
-      assert (check_precedence !prec prec');
-      prec := prec';
-      T.T2Cache.clear cache
-    method name = RPO6.name
-  end
+  let rec mk_ord prec =
+    let compare a b = RPO6.compare_terms ~prec:prec a b in
+    let ord_compare a b = T.T2Cache.with_cache cache compare a b in
+    let ord_set_precedence prec' =
+      assert (check_precedence prec prec');
+      mk_ord prec'
+    in
+    { ord_name = "kbo";
+      ord_compare;
+      ord_clear_cache = (fun () -> T.T2Cache.clear cache);
+      ord_precedence = prec;
+      ord_set_precedence;
+    }
+  in mk_ord prec
 
 let choose name prec =
   match name with
@@ -344,3 +348,13 @@ let choose name prec =
   | _ -> failwith ("unknown ordering: " ^ name)
 
 let default_ordering signature = rpo6 (Precedence.default_precedence signature)
+
+let no_ordering =
+  let rec ord =
+    { ord_name = "no_ord";
+      ord_compare = (fun t1 t2 -> if t1 == t2 then Eq else Incomparable);
+      ord_set_precedence = (fun _ -> ord);
+      ord_precedence = Precedence.default_precedence empty_signature;
+      ord_clear_cache = (fun () -> ());
+    } in
+  ord

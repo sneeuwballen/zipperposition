@@ -312,9 +312,9 @@ let compatible_gc ~ord gc =
     match prec with
     | [] | [_] -> true
     | x::((y::_) as prec') ->
-      ord#precedence#compare x y > 0 && compatible_prec ord prec'
+      ord.ord_precedence.prec_compare x y > 0 && compatible_prec ord prec'
   in
-  ord#name = gc.gc_ord && compatible_prec ord gc.gc_prec
+  ord.ord_name = gc.gc_ord && compatible_prec ord gc.gc_prec
 
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
