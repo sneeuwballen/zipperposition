@@ -2,6 +2,7 @@ Basic
 Bitvector
 Cache
 Calculus
+CC
 ClauseQueue
 Clauses
 Cnf
@@ -27,6 +28,7 @@ Meta
 Orderings
 Parser_tptp
 PartialOrder
+PersistentHashtbl
 Precedence
 Proof
 ProofState
@@ -34,6 +36,7 @@ PHashtbl
 Prtree
 Ptmap
 Ptset
+Puf
 Rewriting
 Saturate
 Sequence
