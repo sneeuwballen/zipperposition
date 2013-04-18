@@ -303,8 +303,7 @@ let maxlits_array ~ord lits =
     are maximal under [ord] *)
 let maxlits (c, offset) subst =
   let ord = c.hcctx.ctx_ord in
-  let renaming = S.Renaming.create 3 in
-  let lits = Lits.apply_subst_lits ~recursive:true ~renaming ~ord
+  let lits = Lits.apply_subst_lits ~recursive:true ~ord
     subst (c.hclits, offset) in
   maxlits_array ~ord lits
 

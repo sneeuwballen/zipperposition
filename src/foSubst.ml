@@ -107,16 +107,18 @@ module Renaming = struct
 end
 
 (** Apply substitution to term, replacing variables by the terms they are bound to.
-    The optional renaming is used to rename free variables (not bound
+    The [renaming] is used to rename free variables (not bound
     by [subst]) while avoiding collisions.
     [recursive] decides whether, when [v] is replaced by [t], [subst] is
     applied to [t] recursively or not (default true). *)
-let apply_subst ?(recursive=true) ?(renaming=Renaming.create 3) subst (t, offset) =
+let apply_subst ?(recursive=true) ?renaming subst (t, offset) =
   (* apply subst to bound term. We need to keep track of
      how many binders are on the path to the variable, because of non-DB-closed
      terms that may occur in the codomain of [subst] *)
   let rec replace binder_depth subst ((t, offset) as bound_t) =
-    if T.is_ground_term t then t (* subst(t) = t, if t ground *)
+    if T.is_ground_term t
+    || (renaming == None && is_empty subst && offset = 0)
+    then t (* subst(t) = t, if t ground *)
     else match t.term with
     | BoundVar _ -> t
     | Bind (s, a_sort, t') ->
@@ -143,7 +145,10 @@ let apply_subst ?(recursive=true) ?(renaming=Renaming.create 3) subst (t, offset
             else (* return image, in which variables are shifted *)
               replace binder_depth id_subst (t', o_t') 
       with Not_found -> (* variable not bound by [subst], rename it *)
-        Renaming.rename renaming (t,offset)
+        match renaming with
+        | None when offset = 0 -> t
+        | None -> T.mk_var (i+offset) t.sort        (* shift *)
+        | Some r -> Renaming.rename r (t,offset)    (* rename *)
       end
   (* apply subst to the list, all elements of which have the given offset *)
   and replace_list binder_depth subst offset l = match l with

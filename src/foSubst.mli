@@ -54,7 +54,8 @@ module Renaming : sig
     (** A renaming, from (variable,offset) to variable *)
   
   val create : int -> t
-    (** Create a new renaming *)
+    (** Create a new general-purpose renaming, which manages to rename
+        variables of any number of contexts without ambiguities *)
 
   val clear : t -> unit
     (** Clear the content of the renaming *)
@@ -66,8 +67,9 @@ end
 val apply_subst : ?recursive:bool -> ?renaming:Renaming.t ->
                    substitution -> term bind -> term
   (** Apply substitution to term, replacing variables by the terms they are bound to.
-      The optional renaming is used to rename free variables (not bound
-      by [subst]) while avoiding collisions.
+      The [renaming] is used to rename free variables (not bound
+      by [subst]) while avoiding collisions. Otherwise variables are shifted
+      by [offset].
       [recursive] decides whether, when [v] is replaced by [t], [subst] is
       applied to [t] recursively or not (default true). *)
 
