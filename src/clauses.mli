@@ -95,8 +95,9 @@ val update_ctx : ctx:context -> hclause -> hclause
 val check_ord_hclause : ord:ordering -> hclause -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : ?recursive:bool -> substitution -> hclause bind -> hclause
-  (** apply substitution to the clause *)
+val apply_subst : ?recursive:bool -> ?renaming:FoSubst.Renaming.t ->
+                  substitution -> hclause bind -> hclause
+  (** apply the substitution to the clause *)
 
 val pos_lits : literal array -> Bitvector.t
   (** bitvector of literals that are positive *)

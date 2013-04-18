@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Operations on substitutions *)
+(** {1 Operations on substitutions} *)
 
 open Basic
 
@@ -48,9 +48,26 @@ val bind : ?recursive:bool -> substitution -> term bind -> term bind -> substitu
   (** Add v -> t to the substitution. Both terms have a context. Raise
       Invalid_argument if v is already bound in the same context, to another term. *)
 
-val apply_subst : ?recursive:bool -> substitution -> term bind -> term
+(** Disambiguation of variables between different contexts *)
+module Renaming : sig
+  type t
+    (** A renaming, from (variable,offset) to variable *)
+  
+  val create : int -> t
+    (** Create a new renaming *)
+
+  val clear : t -> unit
+    (** Clear the content of the renaming *)
+
+  val rename : t -> term bind -> term
+    (** Rename the given variable, scoped by the given context *)
+end
+
+val apply_subst : ?recursive:bool -> ?renaming:Renaming.t ->
+                   substitution -> term bind -> term
   (** Apply substitution to term, replacing variables by the terms they are bound to.
-      The offset (term bind) is applied to variables that are not bound by subst.
+      The optional renaming is used to rename free variables (not bound
+      by [subst]) while avoiding collisions.
       [recursive] decides whether, when [v] is replaced by [t], [subst] is
       applied to [t] recursively or not (default true). *)
 

@@ -155,6 +155,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   else begin
   (* Set of variables. *)
   let all_vars = vars_of_lits lits in
+  (*
   (* Renaming subst *)
   let subst, _ = List.fold_left
     (fun (subst, i) var ->
@@ -164,6 +165,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   (* Normalize literals *)
   let lits = Lits.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
   let all_vars = vars_of_lits lits in
+  *)
   (* create the structure *)
   let rec hc = {
     hclits = lits;
@@ -248,21 +250,19 @@ let check_ord_hclause ~ord hc =
       ok)
     hc.hclits)
 
-(** Apply substitution to the clause *)
-let rec apply_subst ?(recursive=true) subst (hc,offset) =
+(** Apply substitution to the clause. Note that using the same renaming for all
+    literals is important. *)
+let rec apply_subst ?(recursive=true) ?(renaming=FoSubst.Renaming.create 5) subst (hc,offset) =
   let ctx = hc.hcctx in
-  if offset = 0 && S.is_empty subst then hc
-  else begin
-    let ord = ctx.ctx_ord in
-    let lits = Array.map
-      (fun lit -> Lits.apply_subst ~recursive ~ord subst (lit, offset))
-      hc.hclits in
-    let descendants = hc.hcdescendants in
-    let proof = adapt_proof hc.hcproof in
-    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
-    new_hc.hcdescendants <- descendants;
-    new_hc
-  end
+  let ord = ctx.ctx_ord in
+  let lits = Array.map
+    (fun lit -> Lits.apply_subst ~recursive ~renaming ~ord subst (lit, offset))
+    hc.hclits in
+  let descendants = hc.hcdescendants in
+  let proof = adapt_proof hc.hcproof in
+  let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
+  new_hc.hcdescendants <- descendants;
+  new_hc
 
 (** bitvector of literals that are positive *)
 let pos_lits lits =
@@ -303,7 +303,9 @@ let maxlits_array ~ord lits =
     are maximal under [ord] *)
 let maxlits (c, offset) subst =
   let ord = c.hcctx.ctx_ord in
-  let lits = Lits.apply_subst_lits ~recursive:true ~ord subst (c.hclits, offset) in
+  let renaming = S.Renaming.create 3 in
+  let lits = Lits.apply_subst_lits ~recursive:true ~renaming ~ord
+    subst (c.hclits, offset) in
   maxlits_array ~ord lits
 
 (** Check whether the literal is maximal *)

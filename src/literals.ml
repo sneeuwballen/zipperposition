@@ -135,12 +135,11 @@ let mk_lit ~ord a b sign =
   check_type a b;
   Equation (a, b, sign, ord#compare a b)
 
-let apply_subst ?(recursive=true) ~ord subst (lit,offset) =
-  if offset = 0 && S.is_empty subst then lit  (* no shifting *)
-  else match lit with
+let apply_subst ?(recursive=true) ?(renaming=S.Renaming.create 3) ~ord subst (lit,offset) =
+  match lit with
   | Equation (l,r,sign,_) ->
-    let new_l = S.apply_subst ~recursive subst (l,offset)
-    and new_r = S.apply_subst ~recursive subst (r,offset) in
+    let new_l = S.apply_subst ~recursive ~renaming subst (l,offset)
+    and new_r = S.apply_subst ~recursive ~renaming subst (r,offset) in
     mk_lit ~ord new_l new_r sign
 
 let reord ~ord (Equation (l,r,sign,_)) = mk_lit ~ord l r sign
@@ -260,14 +259,16 @@ let term_of_lits lits =
     (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
 
 (** Apply the substitution to the array of literals, with offset *)
-let apply_subst_lits ?(recursive=true) ~ord subst (lits,offset) =
+let apply_subst_lits ?(recursive=true) ?(renaming=S.Renaming.create 3)
+~ord subst (lits,offset) =
   Array.map
-    (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
+    (fun lit -> apply_subst ~recursive ~renaming ~ord subst (lit, offset))
     lits
 
-let apply_subst_list ?(recursive=true) ~ord subst (lits, offset) =
+let apply_subst_list ?(recursive=true) ?(renaming=S.Renaming.create 3)
+~ord subst (lits, offset) =
   List.map
-    (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
+    (fun lit -> apply_subst ~recursive ~renaming ~ord subst (lit, offset))
     lits
 
 (** Convert the lits into a sequence of equations *)

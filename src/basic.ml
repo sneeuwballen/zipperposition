@@ -152,7 +152,7 @@ and hclause = {
   mutable hcproof : compact_clause proof; (** Proof of the clause *)
   mutable hcparents : hclause list;       (** parents of the clause *)
   mutable hcdescendants : Ptset.t;        (** the set of IDs of descendants of the clause *)
-}
+}  (* TODO: use int SmallSet.t instead of Ptset.t *)
 (** A context for clauses. TODO add a structure for local term hashconsing? *)
 and context = {
   ctx_ord : ordering;                     (** ordering used to build clauses *)
