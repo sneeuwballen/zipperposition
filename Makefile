@@ -3,7 +3,8 @@ INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 PLUGIN_FILES = $(shell find plugins -name '*.ml')
 TARGETS_LIB = src/lib.cmxa src/lib.cma 
-TARGETS = src/zipperposition.native tests/tests.native
+TARGETS_BIN = src/zipperposition.native tests/tests.native
+TARGETS_TEST = tests/tests.native
 PLUGINS = $(PLUGIN_FILES:%.ml=%.cmxs)
 LIBS = datalog
 #SUBMODULES = datalog sequence
@@ -40,7 +41,10 @@ all: native $(PLUGINS)
 
 native: $(SUBMODULES)
 	ocamlbuild $(TAGS) $(OPTIONS_LIB) $(TARGETS_LIB)
-	ocamlbuild $(TAGS) $(OPTIONS) $(TARGETS)
+	ocamlbuild $(TAGS) $(OPTIONS) $(TARGETS_BIN)
+
+test: $(SUBMODULES)
+	ocamlbuild $(TAGS) $(OPTIONS) $(TARGETS_TEST)
 
 byte: $(SUBMODULES)
 	ocamlbuild $(TAGS) $(OPTIONS) src/zipperposition.byte
