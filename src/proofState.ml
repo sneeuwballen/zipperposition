@@ -18,7 +18,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* the state of a proof *)
+(** {1 The state of a proof, contains a set of active clauses (processed),
+    a set of passive clauses (to be processed), and an ordering
+    that is used for redundancy elimination.} *)
 
 open Basic
 open Params
@@ -33,13 +35,18 @@ module CQ = ClauseQueue
 
 let stat_passive_cleanup = mk_stat "cleanup of passive set"
 
+type index = Clauses.clause_pos Index.t
+  (** An index for positions in clauses *)
+
 let _indexes =
   let table = Hashtbl.create 2 in
   (* TODO write a Substitution Tree, with the new substitution representation? *)
-  (* TODO enable again...
-  Hashtbl.add table "discr_tree" Discrimination_tree.index;
-  *)
-  Hashtbl.add table "fp" (Fingerprint.mk_index Fingerprint.fp6m);
+  (* TODO rewrite a general purpose discrimination tree *)
+  let mk_fingerprint fp = 
+    Fingerprint.mk_index ~cmp:Clauses.compare_clause_pos fp in
+  Hashtbl.add table "fp" (mk_fingerprint Fingerprint.fp6m);
+  Hashtbl.add table "fp7m" (mk_fingerprint Fingerprint.fp7m);
+  Hashtbl.add table "fp16" (mk_fingerprint Fingerprint.fp16);
   table
 
 let choose_index name =
@@ -60,11 +67,10 @@ let names_index () =
 type active_set =
   < ctx : context;
     clauses : Clauses.CSet.t;           (** set of active clauses *)
-    idx_sup_into : Index.index;         (** index for superposition into the set *)
-    idx_sup_from : Index.index;         (** index for superposition from the set *)
-    idx_back_demod : Index.index;       (** index for backward demodulation/simplifications *)
-    idx_fv : FeatureVector.fv_index;    (** index for subsumption
-                                            (TODO allow to update its features?) *)
+    idx_sup_into : index;               (** index for superposition into the set *)
+    idx_sup_from : index;               (** index for superposition from the set *)
+    idx_back_demod : index;             (** index for backward demodulation/simplifications *)
+    idx_fv : Index.subsumption_t;       (** index for subsumption *)
 
     add : hclause list -> unit;         (** add clauses *)
     remove : hclause list -> unit;      (** remove clauses *)
@@ -73,7 +79,7 @@ type active_set =
 (** set of simplifying (unit) clauses *)
 type simpl_set =
   < ctx : context;
-    idx_simpl : Index.unit_index;       (** index for forward simplifications
+    idx_simpl : Index.unit_t;           (** index for forward simplifications
                                             TODO split into pos-orientable/others *)
 
     add : hclause list -> unit;
@@ -102,7 +108,7 @@ type state =
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
     meta_prover : Meta.Prover.t option;
-    experts : Experts.Set.t;            (** Set of experts *)
+    experts : Experts.Set.t;            (** Set of current experts *)
 
     add_expert : Experts.t -> unit;     (** Add an expert *)
   >
@@ -184,9 +190,10 @@ let eligible_always hc i lit = true
  * ---------------------------------------------------------------------- *)
 
 (** Create an active set from the given ord, and indexing structures *)
-let mk_active_set ~ctx (index : Index.index) signature =
+let mk_active_set ~ctx (index : index) signature =
   (* create a FeatureVector index from the current signature *)
-  let fv_idx = FV.mk_fv_index_signature signature in
+  let features = FV.mk_features signature in
+  let fv_idx = FV.mk_index features in
   (object (self)
     val mutable m_clauses = C.CSet.empty
     val mutable m_sup_into = index
@@ -218,7 +225,7 @@ let mk_active_set ~ctx (index : Index.index) signature =
       m_clauses <- C.CSet.add_list m_clauses hcs;
       let op tree = tree#add in
       self#update op hcs;
-      m_fv <- FV.index_clauses m_fv hcs
+      m_fv <- m_fv#add_clauses hcs
 
     (** remove clauses (only process the ones present in the set) *)
     method remove hcs =
@@ -226,7 +233,7 @@ let mk_active_set ~ctx (index : Index.index) signature =
       m_clauses <- C.CSet.remove_list m_clauses hcs;
       let op tree = tree#remove in
       self#update op hcs;
-      m_fv <- FV.remove_clauses m_fv hcs
+      m_fv <- m_fv#remove_clauses hcs
   end :> active_set)
 
 (* ----------------------------------------------------------------------

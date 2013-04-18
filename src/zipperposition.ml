@@ -246,11 +246,15 @@ let enrich_with_theories ~ctx meta clauses =
       clauses clauses
 
 (** Print some content of the state, based on environment variables *)
-let print_dots state =
+let print_dots (state : PS.state) =
   (try (* write simplification index into the given file *)
     let dot_simpl = Sys.getenv "DOT_SIMPL" in
     Utils.debug 0 "%% print simplification index to %s" dot_simpl;
-    state#simpl_set#idx_simpl#to_dot dot_simpl
+    ignore (Utils.with_output dot_simpl
+      (fun out ->
+        let fmt = Format.formatter_of_out_channel out in
+        state#simpl_set#idx_simpl#to_dot fmt;
+        Format.pp_print_flush fmt ()))
    with Not_found -> ());
   ()
 

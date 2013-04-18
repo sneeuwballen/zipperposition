@@ -248,7 +248,8 @@ module TRS = struct
         compute_nf offset trs t' (* rewritten in t', continue *)
     (* attempt to use one of the rules to rewrite t *)
     and rewrite_handler (l,o) r subst =
-      let t' = S.apply_subst subst (r,o) in (* all vars in [r] are bound in [subst] *)
+      (* all vars in [r] are bound in [subst] *)
+      let t' = S.apply_subst subst (r,o) in
       raise (RewrittenIn t')
     in
     (* any offset will do, as long as it's <> 0, because no variable of the TRS
