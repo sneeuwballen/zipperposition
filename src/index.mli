@@ -33,6 +33,16 @@ module Leaf : sig
   val iter : 'a t -> (term -> 'a SmallSet.t -> unit) -> unit
   val fold : 'a t -> ('b -> term -> 'a SmallSet.t -> 'b) -> 'b -> 'b
   val size : _ t -> int
+
+  val fold_unify : 'a t bind -> term bind -> 'b ->
+                    ('b -> term -> 'a -> substitution -> 'b) -> 'b
+  val fold_match: 'a t bind -> term bind -> 'b ->
+                  ('b -> term -> 'a -> substitution -> 'b) -> 'b
+    (** Match the indexed terms against the given query term *)
+
+  val fold_matched: 'a t bind -> term bind -> 'b ->
+                    ('b -> term -> 'a -> substitution -> 'b) -> 'b
+    (** Match the query term against the indexed terms *)
 end
 
 (** A term index, that contains values of type 'a in its leaves *)
@@ -81,7 +91,7 @@ type unit_t =
     remove : term -> term -> bool -> hclause -> unit_t ;
     size : int ;
     retrieve : 'a. sign:bool -> offset -> term bind -> 'a ->
-              ('a -> term bind -> term bind -> substitution -> hclause -> 'a) -> 'a;
+              ('a -> term bind -> term bind -> hclause -> substitution -> 'a) -> 'a;
       (** fold on (in)equations of given sign l=r where subst(l) = query term *)
 
     pp : Format.formatter -> unit -> unit ;

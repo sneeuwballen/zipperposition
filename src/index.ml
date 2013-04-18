@@ -76,6 +76,39 @@ module Leaf = struct
     let cnt = ref 0 in
     IntMap.iter (fun _ (_, set) -> cnt := !cnt + SmallSet.size set) leaf.map;
     !cnt
+
+  let fold_unify (leaf,o_leaf) (t,o_t) acc k =
+    IntMap.fold
+      (fun _ (t', set) acc ->
+        try
+          let subst = FoUnif.unification FoSubst.id_subst (t',o_leaf) (t,o_t) in
+          SmallSet.fold
+            (fun acc data -> k acc t' data subst)
+            acc set
+        with UnificationFailure -> acc)
+      leaf.map acc
+
+  let fold_match (leaf,o_leaf) (t,o_t) acc k =
+    IntMap.fold
+      (fun _ (t', set) acc ->
+        try
+          let subst = FoUnif.matching FoSubst.id_subst (t',o_leaf) (t,o_t) in
+          SmallSet.fold
+            (fun acc data -> k acc t' data subst)
+            acc set
+        with UnificationFailure -> acc)
+      leaf.map acc
+
+  let fold_matched (leaf,o_leaf) (t,o_t) acc k =
+    IntMap.fold
+      (fun _ (t', set) acc ->
+        try
+          let subst = FoUnif.matching FoSubst.id_subst (t,o_t) (t',o_leaf) in
+          SmallSet.fold
+            (fun acc data -> k acc t' data subst)
+            acc set
+        with UnificationFailure -> acc)
+      leaf.map acc
 end
 
 (** A term index, that contains values of type 'a in its leaves *)
@@ -124,7 +157,7 @@ type unit_t =
     remove : term -> term -> bool -> hclause -> unit_t ;
     size : int ;
     retrieve : 'a. sign:bool -> offset -> term bind -> 'a ->
-              ('a -> term bind -> term bind -> substitution -> hclause -> 'a) -> 'a;
+              ('a -> term bind -> term bind -> hclause -> substitution -> 'a) -> 'a;
       (** fold on (in)equations of given sign l=r where subst(l) = query term *)
 
     pp : Format.formatter -> unit -> unit ;
@@ -187,10 +220,10 @@ let mk_unit_index (idx : (term * hclause) t) =
         !r
 
       method retrieve :'a. sign:bool -> offset -> term bind -> 'a ->
-              ('a -> term bind -> term bind -> substitution -> hclause -> 'a) -> 'a
+              ('a -> term bind -> term bind -> hclause -> substitution -> 'a) -> 'a
       = fun ~sign offset (t, o_t) acc k ->
         let handler acc l (r, hc) subst =
-          k acc (l,offset) (r,offset) subst hc
+          k acc (l,offset) (r,offset) hc subst
         in
         if sign
           then pos#retrieve_generalizations offset (t, o_t) acc handler

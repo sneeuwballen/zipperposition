@@ -57,3 +57,5 @@ val retrieve_subsuming : fv_index -> literal array ->
                          (hclause -> unit) -> unit      (** clauses that subsume c *)
 val retrieve_subsumed : fv_index -> literal array ->
                         (hclause -> unit) -> unit       (** clauses subsumed by c *)
+
+val mk_index : feature list -> Index.subsumption_t

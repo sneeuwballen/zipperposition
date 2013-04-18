@@ -296,3 +296,23 @@ let retrieve_subsumed (features, trie) lits f =
   | _ -> failwith "number of features in feature vector changed"
   in
   iter_higher fv trie
+
+let mk_index features =
+  (* an object able to return updates of itself. Its state is [idx]. *)
+  let rec mk_idx idx =
+    (object
+      method name = "feature_vector_index"
+      method add hc =
+        let idx' = index_clause idx hc in
+        mk_idx idx'
+      method remove hc =
+        let idx' = remove_clause idx hc in
+        mk_idx idx'
+      method retrieve_subsuming lits k =
+        retrieve_subsuming idx lits k
+      method retrieve_subsumed lits k =
+        retrieve_subsumed idx lits k
+    end : Index.subsumption_t)
+  in
+  let idx = mk_fv_index features in
+  mk_idx idx
