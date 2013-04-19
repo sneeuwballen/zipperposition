@@ -1,6 +1,9 @@
+# Main makefile for zipperposition
 
 VERSION=0.2
-PP = 'sed -r s/ZIPPERPOSITION_VERSION/$(VERSION)/g'
+
+PP = 'sed s/ZIPPERPOSITION_VERSION/$(VERSION)/g'
+
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
@@ -20,7 +23,7 @@ PWD = $(shell pwd)
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
 INCLUDES = -I,src
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
+OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES) -pp $(PP)
 #OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
 
