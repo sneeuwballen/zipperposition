@@ -1,8 +1,9 @@
 # Main makefile for zipperposition
 
 VERSION=0.2
+ZIPPERPOSITION_HOME ?= $(HOME)/.zipperposition/
 
-PP = 'sed s/ZIPPERPOSITION_VERSION/$(VERSION)/g'
+PP = 'sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" -e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g"'
 
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
@@ -10,7 +11,8 @@ IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 INSTALLDIR ?= /usr/bin/
 BINARY = zipperposition.native
 TARGETS_LIB = src/lib.cmxa src/lib.cma 
-TARGETS = src/zipperposition.native tests/tests.native
+TARGETS_BIN = src/zipperposition.native
+TARGETS_TEST = tests/tests.native
 LIBS = datalog
 #SUBMODULES = datalog sequence
 SUBMODULES = containers
@@ -29,20 +31,26 @@ OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES)
 
 # switch compilation module
 MODE ?= debug
+ifeq ($(MODE),debug)
+	TAGS=-tag debug
+endif
+ifeq ($(MODE),profile)
+	TAGS=-tags debug,profile
+endif
+ifeq ($(MODE),prod)
+	TAGS=-tag noassert
+endif
 
-all: $(MODE)
+all: native lib tests
 
-debug:
-	ocamlbuild $(OPTIONS_LIB) -tag debug $(TARGETS_LIB)
-	ocamlbuild $(OPTIONS) -tag debug $(TARGETS)
+lib:
+	ocamlbuild $(OPTIONS_LIB) $(TAGS) $(TARGETS_LIB)
 
-prod:
-	ocamlbuild $(OPTIONS_LIB) -tag noassert $(TARGETS_LIB)
-	ocamlbuild $(OPTIONS) -tag noassert $(TARGETS)
+native:
+	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_BIN)
 
-profile:
-	ocamlbuild $(OPTIONS_LIB) -tag debug,profile $(TARGETS_LIB)
-	ocamlbuild $(OPTIONS) -tag debug,profile $(TARGETS)
+tests: lib
+	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_TEST)
 
 byte:
 	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
@@ -60,7 +68,9 @@ clean:
 	ocamlbuild -clean
 
 # install the main binary
-install: all
+install: native
+	mkdir -p $(ZIPPERPOSITION_HOME)
+	cp builtin.theory $(ZIPPERPOSITION_HOME)/
 	cp $(BINARY) $(INSTALLDIR)/zipperposition
 
 tags:
