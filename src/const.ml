@@ -63,3 +63,6 @@ let parse_error msg =
   Format.printf "%% Parse error (%s,%d,%d): %s@."
     !cur_filename !current_line_index !current_column_index msg;
   raise Parsing.Parse_error
+
+(* place for storage *)
+let home = "ZIPPERPOSITION_HOME"

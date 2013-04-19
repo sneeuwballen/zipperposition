@@ -195,15 +195,20 @@ let initial_kb params =
   let kb = Meta.KB.empty in
   let file = params.param_kb in
   (* parse file, with a lock *)
-  let kb = Utils.with_lock_file file
+  let kb = 
+    try Utils.with_lock_file file
     (fun () ->
       let kb = try Meta.KB.restore ~file kb
-               with Yojson.Json_error _ -> Meta.KB.empty in
+               with Yojson.Json_error _
+               | Unix.Unix_error _ -> Meta.KB.empty in
       (* load required files *)
       let kb = List.fold_left parse_theory_file kb params.param_kb_load in
       (* save new KB *)
       Meta.KB.save ~file kb;
-      kb) in
+      kb)
+    with Unix.Unix_error _ ->
+      kb
+  in
   (* return KB *)
   kb
 
