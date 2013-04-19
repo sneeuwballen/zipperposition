@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Equational literals *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
@@ -99,11 +99,14 @@ let compare_partial ~ord l1 l2 =
 let hash lit = match lit with
   | Equation (l, r, sign, o) ->
     if sign
-      then Hash.hash_int3 (Hash.hash_string o) l.hkey r.hkey
-      else Hash.hash_int3 (Hash.hash_string o) r.hkey l.hkey
+      then Hash.hash_int3 (Hash.hash_string o) l.tag r.tag
+      else Hash.hash_int3 (Hash.hash_string o) r.tag l.tag
 
 let weight = function
   | Equation (l, r, _ ,_) -> l.tsize + r.tsize
+
+let depth = function
+  | Equation (l, r, _ ,_) -> max (T.depth l) (T.depth r)
 
 let is_pos lit = match lit with
   | Equation (_,_,sign,_) -> sign
@@ -225,9 +228,15 @@ let hash_lits lits =
   let h = ref 0 in
   Array.iter
     (fun (Equation (l, r, sign, _)) ->
-      h := Hash.combine (Hash.combine !h l.hkey) r.hkey)
+      h := Hash.combine (Hash.combine !h l.tag) r.tag)
     lits;
   !h
+
+let weight_lits lits =
+  Array.fold_left (fun w lit -> w + weight lit) 0 lits
+
+let depth_lits lits =
+  Array.fold_left (fun d lit -> max d (depth lit)) 0 lits
 
 let vars_lits lits =
   let set = T.THashSet.create () in
@@ -261,54 +270,55 @@ let apply_subst_list ?(recursive=true) ~ord subst (lits, offset) =
     (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
     lits
 
-(** pretty printer for literals *)
-class type pprinter_literal =
-  object
-    method pp : Format.formatter -> literal -> unit     (** print literal *)
-  end
+(** Convert the lits into a sequence of equations *)
+let lits_to_seq lits =
+  Sequence.from_iter
+    (fun k ->
+      for i = 0 to Array.length lits - 1 do
+        match lits.(i) with | Equation (l,r,sign,_) -> k (l,r,sign)
+      done)
 
-let pp_literal_gen pp_term formatter lit =
+let pp_literal formatter lit =
   match lit with
   | Equation (l, r, sign, _) when T.eq_term r T.true_term ->
     if sign
-      then pp_term#pp formatter l
-      else Format.fprintf formatter "¬%a" pp_term#pp l
+      then !T.pp_term#pp formatter l
+      else Format.fprintf formatter "¬%a" !T.pp_term#pp l
   | Equation (l, r, sign, _) when T.eq_term l T.true_term ->
     if sign
       then !T.pp_term#pp formatter r
       else Format.fprintf formatter "¬%a" !T.pp_term#pp r
   | Equation (l, r, sign, _) when l.sort == bool_ ->
     if sign
-      then Format.fprintf formatter "%a <=> %a" pp_term#pp l pp_term#pp r
-      else Format.fprintf formatter "%a <~> %a" pp_term#pp l pp_term#pp r
+      then Format.fprintf formatter "%a <=> %a" !T.pp_term#pp l !T.pp_term#pp r
+      else Format.fprintf formatter "%a <~> %a" !T.pp_term#pp l !T.pp_term#pp r
   | Equation (l, r, sign, _) ->
     if sign
-      then Format.fprintf formatter "%a = %a" pp_term#pp l pp_term#pp r
-      else Format.fprintf formatter "%a != %a" pp_term#pp l pp_term#pp r
-
-let pp_literal_debug =
-  let print_ord = ref false in
-  object
-    method pp formatter ((Equation (_,_,_,ord)) as lit) =
-      pp_literal_gen T.pp_term_debug formatter lit;
-      if !print_ord
-        then Format.fprintf formatter "(%s)" (string_of_comparison ord)
-        else ()
-
-    method ord b = print_ord := b
-  end
-
-let pp_literal_tstp =
-  object
-    method pp formatter lit = pp_literal_gen T.pp_term_tstp formatter lit
-  end
-
-let pp_literal =
-  object
-    method pp formatter lit = pp_literal_gen !T.pp_term formatter lit
-  end
+      then Format.fprintf formatter "%a = %a" !T.pp_term#pp l !T.pp_term#pp r
+      else Format.fprintf formatter "%a != %a" !T.pp_term#pp l !T.pp_term#pp r
 
 let pp_lits formatter lits = 
   Utils.pp_arrayi ~sep:" | "
-    (fun formatter i lit -> Format.fprintf formatter "%a" pp_literal_debug#pp lit)
+    (fun formatter i lit -> Format.fprintf formatter "%a" pp_literal lit)
     formatter lits
+
+let to_json lit = match lit with
+  | Equation (l, r, sign, _) ->
+    `List [T.to_json l; T.to_json r; `Bool sign]
+
+let of_json ~ord json =
+  match json with
+  | `List [l; r; `Bool sign] ->
+    let l = T.of_json l
+    and r = T.of_json r in
+    mk_lit ~ord l r sign
+  | _ -> raise (Json.Util.Type_error ("expected literal", json))
+
+let lits_to_json lits =
+  let items = List.map to_json (Array.to_list lits) in
+  `List items
+
+let lits_of_json ~ord json =
+  let l = Json.Util.to_list json in
+  let lits = List.map (of_json ~ord) l in
+  Array.of_list lits

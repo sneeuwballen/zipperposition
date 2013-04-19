@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption *)
 
-open Types
+open Basic
 open Symbols
 
 (** a vector of feature *)

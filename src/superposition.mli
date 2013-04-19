@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Inference and simplification rules for the superposition calculus *)
 
-open Types
+open Basic
 
 val all_positions : position -> term ->  (* combinator *)
                     (term -> position -> 'b list) -> 'b list

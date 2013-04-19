@@ -1,0 +1,201 @@
+
+% Builtin theories and lemma
+
+% ac
+
+associative(f) is axiom f(X,f(Y,Z)) = f(f(X,Y), Z).
+commutative(f) is axiom f(X,Y) = f(Y,X).
+
+theory ac(f) is
+  associative(f) and
+  commutative(f).
+
+% a few general definitions (mostly form "rewriting, solving, proving")
+
+involutive(f) is axiom f(f(X)) = X.
+idempotent(f) is axiom f(X,X) = X.
+
+endomorphism(h, mult) is axiom h(mult(X,Y)) = mult(h(X), h(Y)).
+unit_endomorphism(h, e) is axiom h(e) = e.
+anti_endomorphism(h, mult) is axiom h(mult(X,Y)) = mult(h(Y),h(X)).
+
+homomorphism(h, mult, add) is axiom h(mult(X,Y)) = add(h(X), h(Y)).
+
+left_identity(mult, e) is axiom mult(e, X) = X.
+right_identity(mult, e) is axiom mult(X, e) = X.
+
+left_inverse(mult, e, inverse) is axiom mult(inverse(X), X) = e.
+right_inverse(mult, e, inverse) is axiom mult(X, inverse(X)) = e.
+
+left_absorb(mult,e) is axiom mult(e,X) = e.
+right_absorb(mult,e) is axiom mult(X,e) = e.
+
+% functional relations
+
+functional1(p) is axiom ~p(X,Y) | ~p(X,Y2) | Y=Y2.
+total1(p, f) is axiom p(X,f(X)).
+functional2(p) is axiom ~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2.
+total2(p, f) is axiom p(X,Y,f(X,Y)).
+
+lemma p(X,Y) <=> Y=f(X) if functional1(p) and total1(p, f).
+lemma p(X,Y,Z) <=> Z = f(X,Y) if functional2(p) and total2(p, f).
+
+% monoid
+
+theory monoid(mult, e) is
+  left_identity(mult, e) and
+  right_identity(mult, e) and
+  associative(mult).
+
+% group
+
+theory group(mult, e, inverse) is
+  monoid(mult, e) and
+  left_inverse(mult, e, inverse) and
+  right_inverse(mult, e, inverse).
+
+theory abelian_group(mult, e, inverse) is
+  group(mult, e, inverse) and
+  commutative(mult).
+
+% basic set
+
+theory set(member, subset) is
+  axiom ~member(X,Y) | ~subset(Y,Z) | member(X,Z) and
+  axiom subset(X,Y) | member(sk, X) | ~member(sk, Y) and
+  axiom ~subset(X,Y) | ~subset(Y,X) | X=Y and
+  axiom subset(X,Y) | X != Y and
+  axiom subset(Y,X) | X != Y.
+
+% subgroup theory
+
+subgroup_inverse(in_subgroup, inverse) is
+  axiom ~in_subgroup(X) | in_subgroup(inverse(X)).
+subgroup_mult(in_subgroup, mult) is
+  axiom ~in_subgroup(X) | ~in_subgroup(Y) | in_subgroup(mult(X,Y)).
+
+theory subgroup(mult, e, inverse, in_subgroup) is
+  group(mult, e, inverse) and
+  subgroup_inverse(in_subgroup, inverse) and
+  subgroup_mult(in_subgroup, mult).
+
+lemma in_subgroup(e) if
+  subgroup(mult, e, inverse, in_subgroup).
+
+% ring
+
+left_distributive(mult, sum) is axiom mult(X, sum(Y,Z)) = sum(mult(X,Y), mult(X,Z)).
+right_distributive(mult, sum) is axiom mult(sum(X,Y),Z) = sum(mult(X,Z), mult(Y,Z)).
+
+theory ring(mult, one, add, zero, add_inverse) is
+  abelian_group(add, zero, add_inverse) and
+  monoid(mult, one) and
+  left_distributive(mult, sum) and
+  right_distributive(mult, sum).
+
+theory commutative_ring(mult, one, add, zero, add_inverse) is
+  ring(mult, one, add, zero, add_inverse) and
+  commutative(mult).
+
+% boolean algebra
+
+theory bool_algebra(add, zero, mult, one, inverse) is
+  commutative(add) and
+  commutative(mult) and
+  left_inverse(add, one, inverse) and     % X or not(X) = true
+  right_inverse(add, one, inverse) and
+  left_inverse(mult, zero, inverse) and   % X and not(X) = false
+  right_inverse(mult, zero, inverse) and
+  left_distributive(mult, add) and        % X or (Y and Z) = XorY and XorZ
+  right_distributive(mult, add) and
+  left_distributive(add, mult) and        % X and (Y or Z) = XandY or XandZ
+  right_distributive(add, mult) and
+  left_identity(add, zero) and            % X or false = X
+  right_identity(add, zero) and
+  left_identity(mult, one) and            % X and true = X
+  right_identity(mult, one).
+
+% basic relations
+    
+reflexive(r) is axiom r(X,X).
+irreflexive(r) is axiom ~r(X,X).
+transitive(r) is axiom ~r(X,Y) | ~r(Y,Z) | r(X,Z).
+antisymmetric(r) is axiom ~r(X,Y) | ~r(Y,X) | X=Y.
+symmetric(r) is axiom ~r(X,Y) | r(Y,X).
+
+% orders and partial orders
+
+theory partial_order(r) is
+  reflexive(r) and
+  transitive(r) and
+  antisymmetric(r).
+
+theory strict_partial_order(r) is
+  irreflexive(r) and
+  transitive(r) and
+  antisymmetric(r).
+
+% lattices
+
+theory semi_lattice(meet) is
+  ac(meet) and
+  idempotent(meet).
+
+absorption(f1, f2) is axiom f1(X, f2(X, Y)) = X.
+
+theory lattice(meet, join) is
+  semi_lattice(meet) and
+  semi_lattice(join) and
+  absorption(meet, join) and
+  absorption(join, meet).
+
+theory complete_lattice(meet, join, top, bottom) is
+  lattice(meet, join) and
+  axiom meet(X,top) = X and
+  axiom join(X,top) = top and
+  axiom meet(X,bottom) = bottom and
+  axiom join(X,bottom) = X.
+
+% rewrite system for ac
+
+gc(ac)
+  f(f(X,Y),Z)=f(X,f(Y,Z)) and 
+  f(X,Y) = f(Y,X) and
+  f(X,f(Y,Z))=f(Y,f(X,Z)) and
+  f(X,f(Y,Z))=f(Z,f(Y,X)) and
+  f(X,f(Y,Z))=f(Y,f(Z,X))
+  with rpo6(f)
+  if ac(f).
+
+% rewrite system for monoids
+
+gc(monoid)
+  f(f(X,Y),Z)=f(X,f(Y,Z)) and 
+  f(X,Y) = f(Y,X) and
+  f(X,f(Y,Z))=f(Y,f(X,Z)) and
+  f(X,f(Y,Z))=f(Z,f(Y,X)) and
+  f(X,f(Y,Z))=f(Y,f(Z,X)) and
+  f(X,e) = X and
+  f(e,X) = X
+  with rpo6(f)
+  if monoid(f,e) and commutative(f).
+
+% rewrite system for abelian groups
+
+gc(abelian_group)
+  plus(plus(X,Y),Z)=plus(X,plus(Y,Z)) and % AC 
+  plus(X,Y) = plus(Y,X) and
+  plus(X,plus(Y,Z))=plus(Y,plus(X,Z)) and
+  plus(X,plus(Y,Z))=plus(Z,plus(Y,X)) and
+  plus(X,plus(Y,Z))=plus(Y,plus(Z,X)) and
+  minus(zero) = zero and % group
+  minus(minus(X)) = X and
+  plus(X,minus(X)) = zero and
+  plus(minus(X),Y) = minus(plus(X,minus(Y))) and
+  plus(X,minus(plus(X,Y))) = minus(Y) and
+  minus(plus(X,minus(Y))) = plus(Y,minus(X)) and
+  plus(X,minus(plus(Y,Z))) = minus(plus(Y,minus(plus(X,minus(Z)))))
+  with rpo6(plus,minus,zero)
+  if abelian_group(plus,zero,minus).
+
+% vim:syntax=ocaml

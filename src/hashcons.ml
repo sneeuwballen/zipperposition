@@ -35,6 +35,7 @@ module type S =
     val hashcons : t -> t
     val mem : t -> bool
     val iter : (t -> unit) -> unit
+    val clean : unit -> unit
     val stats : unit -> int * int * int * int * int * int
   end
 
@@ -57,6 +58,8 @@ struct
   let mem d = WH.mem htable d
 
   let iter f = WH.iter f htable
+
+  let clean () = ()
 
   let stats () = WH.stats htable
 end

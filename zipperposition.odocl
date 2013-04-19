@@ -1,4 +1,5 @@
 Bitvector
+Basic
 Cache
 Calculus
 ClauseQueue
@@ -9,6 +10,7 @@ Deque
 Discrimination_tree
 Dot
 Dtree
+Experts
 FeatureVector
 Fingerprint
 FoSubst
@@ -20,6 +22,7 @@ Index
 Leftistheap
 Lexer_tptp
 Literals
+Meta
 Orderings
 Parser_tptp
 PartialOrder

@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Generic term indexing *)
 
-open Types
+open Basic
 
 module T = Terms
 module C = Clauses
@@ -104,9 +104,11 @@ class type unit_index =
     method remove_clause : hclause -> 'b
     method add : term -> term -> bool -> hclause -> 'b
     method remove : term -> term -> bool -> hclause ->'b
+    method size : int
     method retrieve : sign:bool -> int -> term bind ->
                       (term bind -> term bind -> substitution -> hclause -> unit) ->
                       unit        (** iter on (in)equations of given sign l=r
                                       where subst(l) = query term *)
     method pp : Format.formatter -> unit -> unit
+    method to_dot : string -> unit
   end

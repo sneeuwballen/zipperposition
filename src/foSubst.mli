@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Operations on substitutions *)
 
-open Types
+open Basic
 
 val id_subst : substitution
   (** The identity substitution *)
@@ -67,3 +67,9 @@ val is_renaming : substitution -> bool
   (** Check whether the substitution is a variable renaming *)
 
 val pp_substitution : Format.formatter -> substitution -> unit
+
+val to_seq : substitution -> (term bind * term bind) Sequence.t
+val of_seq : ?recursive:bool -> (term bind * term bind) Sequence.t -> substitution
+
+val to_json : substitution -> json
+val of_json : ?recursive:bool -> json -> substitution

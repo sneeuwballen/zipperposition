@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (* literals and clauses *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
@@ -40,6 +40,8 @@ let prof_mk_hclause_raw = Utils.mk_profiler "mk_hclause_raw"
  * ---------------------------------------------------------------------- *)
 
 let flag_ground = 1 lsl 0
+let flag_lemma = 1 lsl 1
+let flag_persistent = 1 lsl 2
 
 let set_flag flag c truth =
   if truth
@@ -107,24 +109,6 @@ let vars_of_lits lits =
   done;
   T.THashSet.to_list set
 
-(** Get a fresh ID for a clause *)
-let get_next_tag =
-  let current_tag = ref 1 in
-  fun () ->
-    let n = !current_tag in
-    incr current_tag;
-    n
-
-(** the tautological empty clause *)
-let true_clause ~ctx =
-  let hcflags = flag_ground in
-  let hc = { hclits = [| Equation (T.true_term, T.true_term, true, Eq) |];
-      hctag = get_next_tag (); hcweight=2; hcselected=0; hcflags; hcctx=ctx;
-      hcvars=[]; hcproof=Proof ("trivial", []);
-      hcparents=[]; hcdescendants=Ptset.empty; }
-  in
-  hc
-
 (** [is_child_of ~child c] is to be called to remember that [child] is a child
     of [c], is has been infered/simplified from [c] *)
 let is_child_of ~child c =
@@ -132,22 +116,37 @@ let is_child_of ~child c =
   let descendants = Ptset.add child.hctag c.hcdescendants in
   c.hcdescendants <- descendants
 
-module CHashcons = Hashcons.Make(
+(* module CHashcons = Hashcons.Make( *)
+module CHashcons = FoUtils.KeepHashcons(
   struct
     type t = hclause
     let hash c = Lits.hash_lits c.hclits
     let equal c1 c2 = Lits.eq_lits c1.hclits c2.hclits && c1.hcctx == c2.hcctx
-    let tag i c = c.hctag <- i; c
+    let tag i c = (assert (c.hctag = (-1)); c.hctag <- i; c)
   end)
 
-(** Build a new hclause from the given literals. If there are more than 31 literals,
+(** the tautological empty clause *)
+let true_clause ~ctx =
+  let hcflags = flag_ground in
+  let hclits = [| Equation (T.true_term, T.true_term, true, Eq) |] in
+  let hc = { hclits; hcproof = Obj.magic 0;
+      hctag = -1; hcweight=2; hcselected=0; hcflags; hcctx=ctx;
+      hcvars=[]; hcparents=[]; hcdescendants=Ptset.empty; }
+  in
+  let hc = CHashcons.hashcons hc in
+  hc.hcproof <- Proof (compact_clause hc, "trivial", []);
+  hc
+
+(** Build a new hclause from the given literals.
+    If there are more than [BV.max_len] literals,
     the prover becomes incomplete by returning [true] instead. *)
 let mk_hclause_a ?parents ?selected ~ctx lits proof =
   incr_stat stat_mk_hclause;
   Utils.enter_prof prof_mk_hclause;
-  if Array.length lits > 31
+  if Array.length lits > BV.max_len
   then (Utils.debug 0 "%% incompleteness: clause of %d lits -> $true"
            (Array.length lits);
+        Const.incompleteness := true;
         Utils.exit_prof prof_mk_hclause;
         true_clause ~ctx)
   else begin
@@ -163,20 +162,23 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   let lits = Lits.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
   let all_vars = vars_of_lits lits in
   (* create the structure *)
-  let hc = {
+  let rec hc = {
     hclits = lits;
     hcctx = ctx;
     hcflags = BV.empty;
-    hctag = 0;
+    hctag = (-1);
     hcweight = 0;
     hcselected = 0;
     hcvars = all_vars;
-    hcproof = proof;
+    hcproof = Obj.magic 0;
     hcparents = [];
     hcdescendants = Ptset.empty;
   } in
   let old_hc, hc = hc, CHashcons.hashcons hc in
   if hc == old_hc then begin
+    (* update proof *)
+    let proof' = proof (compact_clause hc) in
+    hc.hcproof <- proof';
     (* select literals, if not already done *)
     (hc.hcselected <- match selected with
       | Some bv -> bv
@@ -202,6 +204,11 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
 let mk_hclause ?parents ?selected ~ctx lits proof =
   mk_hclause_a ?parents ?selected ~ctx (Array.of_list lits) proof
 
+(** Adapt a proof to a new clause *)
+let adapt_proof proof c = match proof with
+  | Axiom (_, f, a) -> Axiom (c, f, a)
+  | Proof (_, r, l) -> Proof (c, r, l)
+
 let stats () = CHashcons.stats ()
 
 (** descendants of the clause *)
@@ -213,7 +220,8 @@ let clause_of_fof hc =
   let lits = Array.map (Lits.lit_of_fof ~ord:ctx.ctx_ord) hc.hclits in
   if Lits.eq_lits lits hc.hclits then hc (* keep the same *)
   else begin
-    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
+    let proof = adapt_proof hc.hcproof in
+    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
     new_hc.hcdescendants <- hc.hcdescendants;
     new_hc
   end
@@ -221,7 +229,9 @@ let clause_of_fof hc =
 (** Change the context of the clause *)
 let update_ctx ~ctx hc =
   let lits = Array.map (Lits.reord ~ord:ctx.ctx_ord) hc.hclits in
-  mk_hclause_a ~selected:hc.hcselected ~ctx lits hc.hcproof
+  let proof = adapt_proof hc.hcproof in
+  let hc' =  mk_hclause_a ~selected:hc.hcselected ~ctx lits proof in
+  hc'
 
 (** check the ordering relation of lits (always true after reord_clause ~ord) *)
 let check_ord_hclause ~ord hc =
@@ -230,7 +240,7 @@ let check_ord_hclause ~ord hc =
     (function (Equation (l,r,sign,o)) as lit ->
       let ok = o = ord#compare l r in
       (if not ok then Format.printf "@[<h>Ord problem: literal %a, ord %s is not %s@]@."
-                      Lits.pp_literal#pp lit (string_of_comparison o)
+                      Lits.pp_literal lit (string_of_comparison o)
                       (string_of_comparison (ord#compare l r)));
       ok)
     hc.hclits)
@@ -245,7 +255,8 @@ let rec apply_subst ?(recursive=true) subst (hc,offset) =
       (fun lit -> Lits.apply_subst ~recursive ~ord subst (lit, offset))
       hc.hclits in
     let descendants = hc.hcdescendants in
-    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits hc.hcproof in
+    let proof = adapt_proof hc.hcproof in
+    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
     new_hc.hcdescendants <- descendants;
     new_hc
   end
@@ -356,63 +367,40 @@ let is_unit_clause hc = match hc.hclits with
   | [|_|] -> true
   | _ -> false
 
-(** check whether the clause is already in CNF *)
-let is_cnf hc =
-  Utils.array_forall
-    (fun (Equation (l, r, sign, _)) ->
-      T.atomic_rec l && T.atomic_rec r && (l.sort != bool_ ||
-                                          (l == T.true_term || r == T.true_term)))
-    hc.hclits
-
 (** Compute signature of this set of clauses *)
 let signature clauses =
-  (* explore a term *)
-  let rec explore_term signature t = match t.term with
-  | Var _ | BoundVar _ -> signature
-  | Bind (s, t') ->
-    let sort = t.sort in
-    let signature' = update_sig signature s sort in
-    explore_term signature' t'
-  | Node (f, l) ->
-    let sort = t.sort <== (List.map (fun x -> x.sort) l) in
-    let signature' = update_sig signature f sort in
-    List.fold_left explore_term signature' l
-  and explore_lit signature lit = match lit with
-  | Equation (l,r,_,_) -> explore_term (explore_term signature l) r
-  and explore_clause signature hc = Array.fold_left explore_lit signature hc.hclits
-  (* Update signature with s -> sort.
-     Checks consistency with current value, if any. *)
-  and update_sig signature f sort =
-    (try
-      let sort' = SMap.find f signature in
-      assert (sort == sort');
-    with Not_found -> ());
-    let signature' = SMap.add f sort signature in
-    signature'
-  in
-  List.fold_left explore_clause empty_signature clauses
+  let clauses = Sequence.of_list clauses in
+  let clauses = Sequence.map (fun hc -> Lits.lits_to_seq hc.hclits) clauses in
+  let lits = Sequence.concat clauses in
+  let terms = Sequence.map (fun (l,r,_) -> Sequence.of_list [l;r]) lits in
+  let terms = Sequence.concat terms in
+  T.signature terms
 
-let rec from_simple ~ctx (f, source) =
+(** Conversion of a (boolean) term to a clause. *)
+let rec from_term ~ctx (t, file, name) =
+  assert (t.sort == bool_);
   let ord = ctx.ctx_ord in
   let open Literals in
-  let rec lits_from_simple ~ord f = match f with
-    | Simple.Not (Simple.Atom f) -> [mk_neq ~ord (T.from_simple f) T.true_term]
-    | Simple.Atom f -> [mk_eq ~ord (T.from_simple f) T.true_term]
-    | Simple.Not (Simple.Eq (t1,t2)) -> [mk_neq ~ord (T.from_simple t1) (T.from_simple t2)]
-    | Simple.Eq (t1, t2) -> [mk_eq ~ord (T.from_simple t1) (T.from_simple t2)]
-    | Simple.Not (Simple.Equiv (f1,f2)) ->
-      [mk_neq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-    | Simple.Equiv (f1, f2) ->
-      [mk_eq ~ord (T.from_simple_formula f1) (T.from_simple_formula f2)]
-    | Simple.Or l -> List.concat (List.map (lits_from_simple ~ord) l)
-    | _ -> [mk_eq ~ord (T.from_simple_formula f) T.true_term]
+  let rec lits_from_term t = match t.term with
+  | Node (n, [{term=Node (eq, [a;b])}]) when n == not_symbol && eq == eq_symbol ->
+    [mk_neq ~ord a b]
+  | Node (eq, [a;b]) when eq == eq_symbol ->
+    [mk_eq ~ord a b]
+  | Node (or_, l) when or_ == or_symbol ->
+    let l' = T.flatten_ac or_symbol l in
+    (* flatten the or, and convert each element to a list of literals *)
+    List.concat (List.map lits_from_term l')
+  | Node (n, [f]) when n == not_symbol ->
+    [mk_neq ~ord f T.true_term]
+  | Node _ ->
+    [mk_eq ~ord t T.true_term]
+  | Bind _ ->
+    [mk_eq ~ord t T.true_term]
+  | Var _ | BoundVar _ -> failwith "variable should not occur at the formula level"
   in
-  let proof = match source with
-  | Simple.Axiom (a,b) -> Axiom (a,b)
-  | Simple.Derived (name, fs) ->
-    failwith "unable to convert non-axiom simple clause to hclause"
-  in
-  mk_hclause ~ctx (lits_from_simple ~ord f) proof
+  let proof c = Axiom (c, file, name) in
+  let hc = mk_hclause ~ctx (lits_from_term t) proof in
+  hc
 
 (* ----------------------------------------------------------------------
  * set of clauses, reachable by ID
@@ -504,7 +492,7 @@ module CSet =
 let rec contains_symbol f t =
   match t.term with
   | Var _ | BoundVar _ -> false
-  | Bind (s, t') -> s == f || contains_symbol f t'
+  | Bind (s, _, t') -> s == f || contains_symbol f t'
   | Node (g, ts) -> g == f || List.exists (contains_symbol f) ts
 
 (** Recognized whether the clause is a Range-Restricted Horn clause *)
@@ -641,7 +629,7 @@ let pp_clause_debug =
         Utils.pp_arrayi ~sep:" | "
           (fun formatter i lit ->
             let annot = pp_annot selected max i in
-            Format.fprintf formatter "%a%s" Lits.pp_literal_debug#pp lit annot)
+            Format.fprintf formatter "%a%s" Lits.pp_literal lit annot)
           formatter lits
       in
       (* print in an horizontal box, or not *)
@@ -660,19 +648,9 @@ let pp_clause_tstp =
       (* how to print the list of literals *)
       let lits_printer formatter lits =
         (* convert into a big term *)
-        let t =
-          match lits with
-          | [||] -> T.false_term
-          | _ -> Array.fold_left
-            (fun t lit -> T.mk_or t (Lits.term_of_lit lit))
-            (Lits.term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
-        in
+        let t = Lits.term_of_lits hc.hclits in
         (* quantify all free variables *)
-        let vars = T.vars t in
-        let t = List.fold_left
-          (fun t var -> T.mk_node forall_symbol bool_ [var; t])
-          t vars
-        in
+        let t = T.close_forall t in
         T.pp_term_tstp#pp formatter t
       in
       (* print in an horizontal box, or not *)
@@ -685,90 +663,42 @@ let pp_clause_tstp =
 
 let pp_clause = ref pp_clause_debug
 
-(** pretty printer for proofs *)
-class type pprinter_proof =
-  object
-    method pp : Format.formatter -> hclause -> unit      (** pretty print proof from clause *)
-  end
-
-let pp_proof_debug =
-  object (self)
-    method pp formatter hc =
-      assert (hc.hclits = [||]);
-      (* already_printed is a set of clauses already printed. *)
-      let already_printed = ref Ptset.empty
-      and to_print = Queue.create () in
-      (* initialize queue *)
-      Queue.add hc to_print; 
-      (* print every clause in the queue, if not already printed *)
-      while not (Queue.is_empty to_print) do
-        let hc = Queue.take to_print in
-        if Ptset.mem hc.hctag !already_printed then ()
-        else begin
-          already_printed := Ptset.add hc.hctag !already_printed;
-          match hc.hcproof with
-          | Axiom (f, s) ->
-            Format.fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>axiom %s in %s@]@]@;"
-              !pp_clause#pp_h hc s f
-          | Proof (rule, premises) ->
-            (* print the proof step *)
-            Format.fprintf formatter "@[<hov 4>@[<h>%a@]@ <--- @[<h>%s with @[<hv>%a@]@]@]@;"
-              !pp_clause#pp_h hc rule
-              (Utils.pp_list ~sep:", " !pp_clause#pp_pos_subst) premises;
-            (* print premises recursively *)
-            List.iter (fun (c, _, _) -> Queue.add c to_print) premises
-        end
-      done
-  end
-
-let pp_proof_tstp =
-  object (self)
-    method pp formatter hc =
-      assert (hc.hclits = [||]);
-      (* already_printed is a set of clauses already printed. *)
-      let already_printed = ref Ptset.empty
-      and clause_num = ref Ptmap.empty
-      and counter = ref 1
-      and to_print = Queue.create () in
-      (* c -> hashconsed c, unique number for c *)
-      let get_num hc = 
-        try hc, Ptmap.find hc.hctag !clause_num
-        with Not_found ->
-          clause_num := Ptmap.add hc.hctag !counter !clause_num;
-          incr counter;
-          hc, Ptmap.find hc.hctag !clause_num
-      in
-      (* initialize queue *)
-      let hc, num = get_num hc in
-      Queue.add (hc, num) to_print; 
-      (* print every clause in the queue, if not already printed *)
-      while not (Queue.is_empty to_print) do
-        let hc, num = Queue.take to_print in
-        if Ptset.mem hc.hctag !already_printed then ()
-        else begin
-          already_printed := Ptset.add hc.hctag !already_printed;
-          match hc.hcproof with
-          | Axiom (f, ax_name) ->
-            Format.fprintf formatter "@[<h>fof(%d, axiom, %a,@ @[<h>file('%s', %s)@]).@]@;"
-              num pp_clause_tstp#pp_h hc f ax_name
-          | Proof (name, premises) ->
-            let premises = List.map (fun (c,_,_) -> get_num c) premises in
-            let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
-            (* print the inference *)
-            Format.fprintf formatter ("@[<h>fof(%d, plain, %a,@ " ^^
-              "@[<h>inference('%s', [status(%s)], @[<h>[%a, theory(equality)]@])@]).@]@;")
-              num pp_clause_tstp#pp_h hc name status
-              (Utils.pp_list ~sep:"," Format.pp_print_int) (List.map snd premises);
-            (* print every premise *)
-            List.iter (fun (hc,num) -> Queue.add (hc, num) to_print) premises
-        end
-      done;
-  end
-
-let pp_proof = ref pp_proof_debug
-
 (** print the content of a clause set *)
 let pp_set formatter set =
   let clauses = CSet.to_list set in
   (* print as a list of clauses *)
   Format.fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) clauses
+
+let compact_to_json (i,lits) =
+  `Assoc ["id", `Int i;
+          "lits", Lits.lits_to_json lits]
+
+let compact_of_json ~ord json =
+  let pairs = Json.Util.to_assoc json in
+  let i = Json.Util.to_int (List.assoc "id" pairs) in
+  let lits = Lits.lits_of_json ~ord (List.assoc "lits" pairs) in
+  (i, lits)
+
+let to_json c =
+  `Assoc ["id", `Int c.hctag;
+          "lits", Lits.lits_to_json c.hclits]
+
+let of_json ~ctx json =
+  let pairs = Json.Util.to_assoc json in
+  let lits = Lits.lits_of_json ~ord:ctx.ctx_ord (List.assoc "lits" pairs) in
+  let proof c = Axiom (c, "json", "json") in
+  mk_hclause_a ~ctx lits proof
+  
+let set_to_json set =
+  let items = CSet.fold (fun acc _ hc -> to_json hc :: acc)
+    [] set in
+  `List items
+
+let set_of_json ~ctx set json =
+  let l = Json.Util.to_list json in
+  List.fold_left
+    (fun set json ->
+      let hc = of_json ~ctx json in
+      CSet.add set hc)
+    set l
+

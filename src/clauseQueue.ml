@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     (for completeness). Anyway, a fifo queue should always be present,
     and presents this property. *)
 
-open Types
+open Basic
 open Hashcons
 
 module C = Clauses
@@ -132,7 +132,18 @@ let horn =
   let name = "prefer_horn" in
   make_hq ~accept:C.is_horn ~weight:(fun hc -> hc.hcweight) name
 
+let lemmas =
+  let name = "lemmas" in
+  let accept hc = C.get_flag C.flag_lemma hc in
+  (* use a fifo on lemmas *)
+  make_hq ~accept ~weight:(fun _ -> 1) name
+
 let default_queues =
+  [ fifo, 2;
+    clause_weight, 2;
+    lemmas, 1;
+  ]
+  (*
   [ (clause_weight, 4);
     (ground, 1);
     (*
@@ -141,7 +152,9 @@ let default_queues =
     *)
     (fifo, 2);
     (horn, 1);  (* FIXME: if just before "fifo", incompleteness on pelletier_problems/pb64.p *)
+    (lemmas, 1);
   ]
+  *)
 
 let pp_queue formatter q =
   Format.fprintf formatter "@[<h>queue %s@]" q#name

@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 
 (** Management of opaque terms, that are terms modulo some congruence *)
 

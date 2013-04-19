@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
@@ -108,7 +108,7 @@ module KBO = struct
         if pos
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
-      | Bind (s, t') ->
+      | Bind (s, _, t') ->
         let wb' = if pos then wb + prec#weight s else wb - prec#weight s in
         balance_weight wb' t' y pos
       | BoundVar _ -> (if pos then wb + 1 else wb - 1), false
@@ -160,17 +160,17 @@ module KBO = struct
         (wb' - 1, if contains then Gt else Incomparable)
       (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
       | Node (f, ss), Node (g, ts) -> tckbo_composite wb f g ss ts
-      | Bind (f, t1'), Bind (g, t2') -> tckbo_composite wb f g [t1'] [t2']
+      | Bind (f, _, t1'), Bind (g, _, t2') -> tckbo_composite wb f g [t1'] [t2']
       | BoundVar i, BoundVar j ->
         (wb, if i = j && t1.sort == t2.sort then Eq else Incomparable)
       (* node and something else *)
-      | Node (f, ss), Bind (g, t2') -> tckbo_composite wb f g ss [t2']
+      | Node (f, ss), Bind (g, _, t2') -> tckbo_composite wb f g ss [t2']
       | Node (f, ss), BoundVar _ -> tckbo_composite wb f db_symbol ss []
-      | Bind (f, t1'), Node (g, ts) -> tckbo_composite wb f g [t1'] ts
+      | Bind (f, _, t1'), Node (g, ts) -> tckbo_composite wb f g [t1'] ts
       | BoundVar _, Node (g, ts) -> tckbo_composite wb db_symbol g [] ts
       (* De Bruijn with Bind *)
-      | Bind (f, t1'), BoundVar _ -> tckbo_composite wb f db_symbol [t1'] []
-      | BoundVar _, Bind (g, t2') -> tckbo_composite wb db_symbol g [] [t2']
+      | Bind (f, _, t1'), BoundVar _ -> tckbo_composite wb f db_symbol [t1'] []
+      | BoundVar _, Bind (g, _, t2') -> tckbo_composite wb db_symbol g [] [t2']
     (** tckbo, for composite terms (ie non variables). It takes a symbol
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
@@ -195,7 +195,7 @@ module KBO = struct
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
-        then if prec#multiset_status f
+        then if has_attr attr_multiset f
           (* use multiset or lexicographic comparison *)
           then tckbocommute wb ss ts
           else tckbolex wb ss ts
@@ -214,66 +214,6 @@ module KBO = struct
     cmp
 end
 
-module RPO = struct
-  let name = "rpo"
-
-  let rec rpo ~prec s t =
-    match s.term, t.term with
-    | _, _ when T.eq_term s t -> Eq
-    | Var _, Var _ -> Incomparable
-    | _, Var i -> if T.var_occurs t s then Gt else Incomparable
-    | Var i,_ -> if T.var_occurs s t then Lt else Incomparable
-    | Bind _, _ | BoundVar _, _ | _, Bind _ | _, BoundVar _ ->
-      failwith "Bind/BoundVar not handled by old RPO ordering"
-    | Node (hd1, tl1), Node (hd2, tl2) ->
-      (* check whether an elemnt of the list is >= t, and
-         also returns the list of comparison results *)
-      let rec ge_subterm t ol = function
-        | [] -> (false, ol)
-        | x::tl ->
-            let res = rpo ~prec x t in
-            match res with
-              | Gt | Eq -> (true, res::ol)
-              | o -> ge_subterm t (o::ol) tl
-      in
-      (* try the subterm property (when s in t or t in s) *)
-      let (res, l_ol) = ge_subterm t [] tl1 in
-        if res then Gt
-        else let (res, r_ol) = ge_subterm s [] tl2 in
-          if res then Lt
-          else begin
-            (* check whether all terms of the list are smaller than t *)
-            let rec check_subterms t = function
-              | _, [] -> true
-              | o::ol, _::tl ->
-                if o = Lt then check_subterms t (ol,tl) else false
-              | [], x::tl ->
-                if rpo ~prec x t = Lt then check_subterms t ([],tl) else false
-            in
-            (* non recursive comparison of function symbols *)
-            match prec#compare hd1 hd2 with
-            | n when n > 0 -> if check_subterms s (r_ol,tl2) then Gt else Incomparable
-            | n when n < 0 -> if check_subterms t (l_ol,tl1) then Lt else Incomparable
-            | _ -> rpo_rec ~prec hd1 tl1 tl2 s t
-          end
-  (* recursive comparison of lists of terms (head symbol is hd) *)
-  and rpo_rec ~prec hd l1 l2 s t =
-    (if prec#multiset_status hd
-    then Utils.multiset_partial (rpo ~prec) l1 l2
-    else match Utils.lexicograph_partial (rpo ~prec) l1 l2 with
-      | Gt ->
-        if List.for_all (fun x -> rpo ~prec s x = Gt) l2 then Gt else Incomparable
-      | Lt ->
-        if List.for_all (fun x -> rpo ~prec x t = Lt) l1 then Lt else Incomparable
-      | o -> o)
-
-  let compare_terms ~prec x y =
-    Utils.enter_prof prof_rpo;
-    let cmp = rpo ~prec x y in
-    Utils.exit_prof prof_rpo;
-    cmp
-end
-
 (** hopefully more efficient (polynomial) implementation of LPO,
     following the paper "things to know when implementing LPO" by Löchner.
     We adapt here the implementation clpo6 with some multiset symbols (=) *)
@@ -289,21 +229,21 @@ module RPO6 = struct
     | Var _, _ -> if T.var_occurs s t then Lt else Incomparable
     (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
     | Node (f, ss), Node (g, ts) -> rpo6_composite ~prec s t f g ss ts
-    | Bind (f, s'), Bind (g, t') -> rpo6_composite ~prec s t f g [s'] [t']
+    | Bind (f, _, s'), Bind (g, _, t') -> rpo6_composite ~prec s t f g [s'] [t']
     | BoundVar i, BoundVar j ->
       if i = j && s.sort == t.sort then Eq else Incomparable
     (* node and something else *)
-    | Node (f, ss), Bind (g, t') -> rpo6_composite ~prec s t f g ss [t']
+    | Node (f, ss), Bind (g, _, t') -> rpo6_composite ~prec s t f g ss [t']
     | Node (f, ss), BoundVar _ -> rpo6_composite ~prec s t f db_symbol ss []
-    | Bind (f, s'), Node (g, ts) -> rpo6_composite ~prec s t f g [s'] ts
+    | Bind (f, _, s'), Node (g, ts) -> rpo6_composite ~prec s t f g [s'] ts
     | BoundVar _, Node (g, ts) -> rpo6_composite ~prec s t db_symbol g [] ts
     (* De Bruijn with Bind *)
-    | Bind (f, s'), BoundVar _ -> rpo6_composite ~prec s t f db_symbol [s'] []
-    | BoundVar _, Bind (g, t') -> rpo6_composite ~prec s t db_symbol g [] [t']
+    | Bind (f, _, s'), BoundVar _ -> rpo6_composite ~prec s t f db_symbol [s'] []
+    | BoundVar _, Bind (g, _, t') -> rpo6_composite ~prec s t db_symbol g [] [t']
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match prec#compare f g with
-    | 0 when prec#multiset_status f ->
+    | 0 when has_attr attr_multiset f ->
       cMultiset ~prec ss ts (* multiset subterm comparison *)
     | 0 ->
       cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)
@@ -357,64 +297,50 @@ end
  * class interface
  * ---------------------------------------------------------------------- *)
 
-module OrdCache = Cache.Make(
-  struct
-    type t = term
-    let hash t = t.hkey
-      (* non commutative to avoid collision between (t1, t2) and (t2, t1) *)
-    let equal t1 t2 = T.eq_term t1 t2
-  end)
-
 (** Check that new_prec is a compatible superset of old_prec *)
 let check_precedence old_prec new_prec =
   Utils.debug 2 "check compatibility of @[<h>%a@] with @[<h>%a@]"
-                Terms.pp_precedence old_prec#snapshot
-                Terms.pp_precedence new_prec#snapshot;
+                pp_precedence old_prec#snapshot
+                pp_precedence new_prec#snapshot;
   let rec check l = match l with
   | [] | [_] -> true
   | x::((y::_) as l') -> new_prec#compare x y > 0 && check l'
   in check old_prec#snapshot
 
-let kbo (prec : precedence) : ordering =
+let kbo (p : precedence) : ordering =
+  let prec = ref p in
+  let cache = T.T2Cache.create 4096 in
+  let compare a b = KBO.compare_terms ~prec:!prec a b in
   object
-    val mutable m_prec = prec
-    val mutable cache = OrdCache.create 4096 (KBO.compare_terms ~prec)
-    method clear_cache () = OrdCache.clear cache
-    method precedence = m_prec
-    method compare a b = OrdCache.lookup cache a b
-    method set_precedence prec =
-      assert (check_precedence m_prec prec);
-      m_prec <- prec;
-      cache <- OrdCache.create 4096 (KBO.compare_terms ~prec)
+    method clear_cache () = T.T2Cache.clear cache;
+    method precedence = !prec
+    method compare a b = T.T2Cache.with_cache cache compare a b
+    method set_precedence prec' =
+      assert (check_precedence !prec prec');
+      prec := prec';
+      T.T2Cache.clear cache
     method name = KBO.name
   end
 
-let rpo (prec : precedence) : ordering =
+let rpo6 (p : precedence) : ordering =
+  let prec = ref p in
+  let cache = T.T2Cache.create 4096 in
+  let compare a b = RPO6.compare_terms ~prec:!prec a b in
   object
-    val mutable m_prec = prec
-    val mutable cache = OrdCache.create 4096 (RPO.compare_terms ~prec)
-    method clear_cache () = OrdCache.clear cache
-    method precedence = m_prec
-    method compare a b = OrdCache.lookup cache a b
-    method set_precedence prec =
-      assert (check_precedence m_prec prec);
-      m_prec <- prec;
-      cache <- OrdCache.create 4096 (RPO.compare_terms ~prec)
-    method name = RPO.name
-  end
-
-let rpo6 (prec : precedence) : ordering =
-  object
-    val mutable m_prec = prec
-    val mutable cache = OrdCache.create 4096 (RPO6.compare_terms ~prec)
-    method clear_cache () = OrdCache.clear cache
-    method precedence = m_prec
-    method compare a b = OrdCache.lookup cache a b
-    method set_precedence prec =
-      assert (check_precedence m_prec prec);
-      m_prec <- prec;
-      cache <- OrdCache.create 4096 (RPO6.compare_terms ~prec)
+    method clear_cache () = T.T2Cache.clear cache;
+    method precedence = !prec
+    method compare a b = T.T2Cache.with_cache cache compare a b
+    method set_precedence prec' =
+      assert (check_precedence !prec prec');
+      prec := prec';
+      T.T2Cache.clear cache
     method name = RPO6.name
   end
+
+let choose name prec =
+  match name with
+  | "rpo6" -> rpo6 prec
+  | "kbo" -> kbo prec
+  | _ -> failwith ("unknown ordering: " ^ name)
 
 let default_ordering signature = rpo6 (Precedence.default_precedence signature)

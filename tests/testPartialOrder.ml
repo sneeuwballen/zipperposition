@@ -1,6 +1,6 @@
 (** test partial orderings *)
 
-open Types
+open Basic
 open Symbols
 
 module PO = PartialOrder
@@ -19,7 +19,9 @@ let print_order () =
   let partial_cmp x y =
     match name_symbol x, name_symbol y with
     | "a", "p" -> 1
+    | "p", "c" -> 1
     | "p", "a" -> -1
+    | "c", "p" -> -1
     | _ -> 0
   in
   let s1 = [mk_symbol "a"; mk_symbol "p"; mk_symbol "b"] in
@@ -28,10 +30,11 @@ let print_order () =
   PO.complete po partial_cmp;
   Format.printf "after 'a > p': @[<v>%a@]@." PO.pp po;
   let po = PO.mk_partial_order symbs in
-  Format.printf "@[<v>PO after extension:@ %a@]@." PO.pp po;
+  PO.complete po partial_cmp;
+  Format.printf "@[<v>PO after partial extension:@ %a@]@." PO.pp po;
   PO.complete po alpha_cmp;
   Format.printf "@[<v>final PO:@ %a@]@." PO.pp po;
-  Format.printf "signature: @[<h>%a@]@." Terms.pp_precedence (PO.symbols po);
+  Format.printf "signature: @[<h>%a@]@." pp_precedence (PO.symbols po);
   ()
 
 let run () =

@@ -23,23 +23,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** a symbol is just a string *)
 open Symbols
 
-(* TODO: (maybe) substitutions as list of pairs of *bound* terms,
-  where bound term = (int * term), the int being an offset for renaming vars.
-  mk_hclause would then perform normalization of variables, and renaming of
-  terms/vars would been useless but for normalization and instantiation *)
-
-(* TODO: in Clauses, constructors from clauses for inferences and simplifications,
-         that take care of the parent/child and proof bookeeping *)
-
-(* TODO: a 'type_' type for simple types, like
-  type_ = Sort of symbol | Arrow of type_t list * type_. Problem is for "or" and "and"
-  that are n-ary; also, "=" is polymorphic... Maybe polymorphism then? *)
 (* TODO: a literal should be (term, term, int) where the int is a set of flags. It's enough
    to tell well the lit is positive/negative, and if it's oriented (a > b) or eq/incomparable.
    Always orient with the bigger term on left. *)
-(* TODO: remove proof from clauses, make it external (a proof is a tree that
-   contains clauses). This should allow to disable proof-handling. *)
-(* TODO: do not compute set of variables for clause, only groundness and max variable (offset) *)
+
+module Json = Yojson.Basic
+type json = Json.json
 
 (** term with a simple sort *)
 type term = {
@@ -48,14 +37,15 @@ type term = {
   mutable flags : int;          (** boolean flags about the term *)
   mutable tsize : int;          (** number of symbol/vars occurrences in the term (weight) *)
   mutable tag : int;            (** hashconsing tag *)
-  mutable hkey : int;           (** hash *)
 }
 (** content of the term *)
 and term_cell =
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Bind of symbol * term       (** bind one variable, with the symbol *)
+  | Bind of symbol * sort * term(** bind one variable (of given sort), with the symbol *)
   | Node of symbol * term list  (** term application *)
+and sourced_term =
+  term * string * string        (** Term + file,name *)
 
 (** list of variables *)
 type varlist = term list            
@@ -63,7 +53,9 @@ type varlist = term list
 (** A logical first order object, with a context for its free variables.
     The context is an offset, so that X_i inside the 'a really is X_{i+offset} *)
 type 'a bind = ('a * int)
-let bind_with x offset = (x, offset)
+
+(** An object parametrized by a list of variables *)
+type 'a parametrized = ('a * varlist)
 
 (** substitution, a list of (variable -> term) *)
 type substitution =
@@ -121,14 +113,11 @@ type precedence_constraint = symbol -> symbol -> int
 (** the interface of a total ordering on symbols *)
 class type precedence =
   object
-    method version : int                        (** version of the precedence (length of history) *)
     method snapshot : symbol list               (** current symbols in decreasing order *)
     method add_symbols : symbol list -> int     (** add the given symbols (returns how many were new) *)
     method compare : symbol -> symbol -> int    (** total order on symbols *)
     method weight : symbol -> int               (** weight of symbol (for KBO) *)
     method set_weight : (symbol -> int) -> unit (** change the weight function *)
-    method multiset_status : symbol -> bool     (** does the symbol have a multiset status? *)
-    method set_multiset : (symbol -> bool) -> unit  (** set the function that recognized multiset symbols *)
   end
 
 (** the interface of an ordering type *)
@@ -159,31 +148,31 @@ and hclause = {
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
   mutable hcvars : term list;             (** the free variables *)
-  mutable hcproof : proof;                (** the proof for this clause *)
+  mutable hcproof : compact_clause proof; (** Proof of the clause *)
   mutable hcparents : hclause list;       (** parents of the clause *)
   mutable hcdescendants : Ptset.t;        (** the set of IDs of descendants of the clause *)
 }
 (** A context for clauses. TODO add a structure for local term hashconsing? *)
 and context = {
-  ctx_ord : ordering;                           (** ordering used to build clauses *)
-  ctx_select : selection_fun;                   (** selection function for literals *)
+  ctx_ord : ordering;                     (** ordering used to build clauses *)
+  ctx_select : selection_fun;             (** selection function for literals *)
 }
-(** a proof step for a clause *)
-and proof = Axiom of string * string (** file, axiom name *)
-          | Proof of string * (clause * position * substitution) list
+(** A compact clause: ID and literals *)
+and compact_clause = int * literal array
+(** A proof step for a 'a. This allows for genericity of proofs. *)
+and 'a proof =
+  | Axiom of 'a * string * string (** file, axiom name *)
+  | Proof of 'a * string * 'a proof list
 (** a selection function *)
 and selection_fun = hclause -> int list
+
+(** Create a compact clause from a clause *)
+let compact_clause hc = (hc.hctag, hc.hclits)
 
 (** selects no literals *)
 let no_select c = []
 
 exception UnificationFailure
-
-(** A pretty printer of 'a values *)
-class type ['a] pp_printer =
-  object
-    method pp : Format.formatter -> 'a -> unit
-  end
 
 (** a statistic object: name and count *)
 type statistics = string * int64 ref
@@ -203,3 +192,27 @@ let mk_stat, print_global_stats =
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
 let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
+
+(** parameters for the main procedure *)
+type parameters = {
+  param_ord : precedence -> ordering;
+  param_seed : int;
+  param_steps : int;
+  param_version : bool;
+  param_calculus : string;
+  param_timeout : float;
+  param_files : string list;
+  param_split : bool;             (** use splitting *)
+  param_theories : bool;          (** detect theories *)
+  param_precedence : bool;        (** use heuristic for precedence? *)
+  param_select : string;          (** name of the selection function *)
+  param_progress : bool;          (** print progress during search *)
+  param_proof : string;           (** how to print proof? *)
+  param_dot_file : string option; (** file to print the final state in *)
+  param_kb : string;              (** file to use for KB *)
+  param_kb_load : string list;    (** theory files to read *)
+  param_kb_clear : bool;          (** do we need to clear the KB? *)
+  param_kb_print : bool;          (** print knowledge base and exit *)
+  param_presaturate : bool;       (** initial interreduction of proof state? *)
+  param_index : string;           (** indexing structure *)
+}

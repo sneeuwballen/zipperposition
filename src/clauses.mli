@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Literals and clauses *)
 
-open Types
+open Basic
 open Symbols
 
 val stat_fresh : statistics
@@ -32,6 +32,8 @@ val stat_new_clause : statistics
  * ---------------------------------------------------------------------- *)
 
 val flag_ground : int                             (** clause is ground *)
+val flag_lemma : int                              (** clause is a lemma *)
+val flag_persistent : int                         (** clause cannot be redundant *)
 
 val set_flag : int -> hclause -> bool -> unit     (** set boolean flag *)
 val get_flag : int -> hclause -> bool             (** get value of boolean flag *)
@@ -61,16 +63,23 @@ val is_child_of : child:hclause -> hclause -> unit
   (** [is_child_of ~child c] is to be called to remember that [child] is a child
       of [c], is has been infered/simplified from [c] *)
 
+module CHashcons : Hashcons.S with type t = hclause
+
 val mk_hclause : ?parents:hclause list -> ?selected:Bitvector.t ->
-                 ctx:context -> literal list -> proof -> hclause
+                 ctx:context -> literal list ->
+                  (compact_clause -> compact_clause proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
 val mk_hclause_a : ?parents:hclause list -> ?selected:Bitvector.t ->
-                   ctx:context -> literal array -> proof -> hclause
+                   ctx:context -> literal array ->
+                   (compact_clause -> compact_clause proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
+
+val adapt_proof : compact_clause proof -> compact_clause -> compact_clause proof
+  (** Adapt an old proof to the new compact_clause *)
 
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
@@ -123,14 +132,11 @@ val selected_lits : clause -> (literal * int) list
 val is_unit_clause : hclause -> bool
   (** is the clause a unit clause? *)
 
-val is_cnf : hclause -> bool
-  (** Is the clause in CNF? *)
-
 val signature : hclause list -> signature
   (** Compute signature of this set of clauses *)
 
-val from_simple : ctx:context -> Simple.sourced_formula -> hclause
-  (** conversion to a clause. *)
+val from_term : ctx:context -> sourced_term -> hclause
+  (** Conversion of a (boolean) term to a clause. *)
 
 (* ----------------------------------------------------------------------
  * set of clauses, reachable by ID
@@ -251,14 +257,13 @@ val pp_clause : pprinter_clause ref                     (** uses current term pr
 val pp_clause_tstp : pprinter_clause                    (** TSTP syntax *)
 val pp_clause_debug : pprinter_clause                   (** nice unicode syntax *)
 
-(** pretty printer for proofs *)
-class type pprinter_proof =
-  object
-    method pp : Format.formatter -> hclause -> unit     (** pretty print proof from clause *)
-  end
-
-val pp_proof : pprinter_proof ref                       (** defaut printing of proofs *)
-val pp_proof_tstp : pprinter_proof
-val pp_proof_debug : pprinter_proof
-
 val pp_set : Format.formatter -> CSet.t -> unit
+
+val compact_to_json : compact_clause -> json
+val compact_of_json : ord:ordering -> json -> compact_clause
+
+val to_json : hclause -> json
+val of_json : ctx:context -> json -> hclause
+
+val set_to_json : CSet.t -> json
+val set_of_json : ctx:context -> CSet.t -> json -> CSet.t

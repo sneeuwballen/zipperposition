@@ -15,7 +15,7 @@ tags
 .session
 .subdirtouch
 *.docdir
-provers_output.db
+*.db
 *.tgz
 TPTP-*
 Axioms
@@ -23,6 +23,8 @@ Problems
 *.svg
 *.dot
 learning/
-kb.lock
-kb
-TODO
+kb*.lock
+kb*
+TODO.md
+TAGS
+src/man/

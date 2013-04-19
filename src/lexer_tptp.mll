@@ -36,7 +36,6 @@ let update_line_index () =
   current_line_index := !current_line_index + 1;
   update_column_index 1
 
-
 let count_new_lines (string: string) : unit =
   String.iter
     (fun char ->
@@ -51,20 +50,8 @@ let update_token (token: string) =
   current_token := token;
   update_column_index (!current_column_index + String.length token)
 
-
 let lexing_error (error: string) (token: string) =
-  print_endline (error
-            ^ " at line " ^ string_of_int !current_line_index
-            ^ " column " ^ string_of_int !current_column_index
-            ^ ":\n" ^ token);
-  raise Const.PARSE_ERROR
-
-let parse_error () =
-  print_endline ("Parse error"
-            ^ " at line " ^ string_of_int !current_line_index
-            ^ " column " ^ string_of_int !current_column_index
-            ^ ":\n" ^ !current_token);
-  raise Const.PARSE_ERROR
+  parse_error (error ^ " at " ^ token)
 
 }
 
@@ -154,15 +141,18 @@ rule token =
       | eof                          { update_token (Lexing.lexeme lexbuf); EOI }
       | "fof"                        { update_token (Lexing.lexeme lexbuf); FOF }
       | "cnf"                        { update_token (Lexing.lexeme lexbuf); CNF }
-      | "thf"                        { update_token (Lexing.lexeme lexbuf);
-                                       failwith "Parser_tptp: tfh syntax not supported." }
+      | "tff"                        { update_token (Lexing.lexeme lexbuf); TFF }
+      | "thf"                        { update_token (Lexing.lexeme lexbuf); THF }
       | "include"                    { update_token (Lexing.lexeme lexbuf); INCLUDE }
 
       | "is"                         { update_token (Lexing.lexeme lexbuf); IS }
       | "theory"                     { update_token (Lexing.lexeme lexbuf); THEORY }
       | "lemma"                      { update_token (Lexing.lexeme lexbuf); LEMMA }
+      | "axiom"                      { update_token (Lexing.lexeme lexbuf); AXIOM }
       | "if"                         { update_token (Lexing.lexeme lexbuf); IF }
-      | "and"                        { update_token (Lexing.lexeme lexbuf); AND }
+      | "and"                        { update_token (Lexing.lexeme lexbuf); AND_THEN }
+      | "gc"                         { update_token (Lexing.lexeme lexbuf); GC }
+      | "with"                       { update_token (Lexing.lexeme lexbuf); WITH }
 
       | lower_word                   { update_token (Lexing.lexeme lexbuf); LOWER_WORD(Lexing.lexeme lexbuf) }
       | upper_word                   { update_token (Lexing.lexeme lexbuf); UPPER_WORD(Lexing.lexeme lexbuf) }
@@ -189,6 +179,8 @@ rule token =
       | "<="                         { update_token (Lexing.lexeme lexbuf); RIGHT_IMPLICATION }
       | "<~>"                        { update_token (Lexing.lexeme lexbuf); XOR }
       | negation                     { update_token (Lexing.lexeme lexbuf); NEGATION }
+      | "-->"                        { update_token (Lexing.lexeme lexbuf); GENTZEN_ARROW }
+      | "/"                          { update_token (Lexing.lexeme lexbuf); SLASH }
       | "$true"                      { update_token (Lexing.lexeme lexbuf); DOLLAR_TRUE }
       | "$false"                     { update_token (Lexing.lexeme lexbuf); DOLLAR_FALSE }
       | '$'                          { update_token (Lexing.lexeme lexbuf); DOLLAR }

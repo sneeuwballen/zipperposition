@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (* the state of a proof *)
 
-open Types
+open Basic
 open Params
 
 module I = Index
@@ -30,6 +30,8 @@ module U = FoUtils
 module BV = Bitvector
 module FV = FeatureVector
 module CQ = ClauseQueue
+
+let stat_passive_cleanup = mk_stat "cleanup of passive set"
 
 let _indexes =
   let table = Hashtbl.create 2 in
@@ -95,9 +97,14 @@ type passive_set =
     and is parametrized by an ordering. *)
 type state =
   < ctx : context;
+    params : parameters;
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
+    meta_prover : Meta.Prover.t option;
+    experts : Experts.Set.t;            (** Set of experts *)
+
+    add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
 (* ----------------------------------------------------------------------
@@ -129,7 +136,7 @@ let update_with_clause op acc eligible ~subterms ~both_sides hc =
   and process_term op acc t pos =
     match t.term with
     | Var _ | BoundVar _ -> acc  (* variables are never indexed *)
-    | Bind (s, t') ->
+    | Bind (s, _, t') ->
       (* apply the operation on the term itself *)
       let acc = op acc t (hc, List.rev pos, t) in
       if subterms then process_term op acc t' (0::pos) else acc
@@ -297,6 +304,7 @@ let mk_passive_set ~ctx queues =
 
     (* cleanup the clause queues *)
     method clean () =
+      incr_stat stat_passive_cleanup;
       for i = 0 to m_length - 1 do
         let q, w = m_queues.(i) in
         m_queues.(i) <- q#clean m_clauses, w
@@ -307,18 +315,27 @@ let mk_passive_set ~ctx queues =
  * global state
  * ---------------------------------------------------------------------- *)
 
-let mk_state ~ctx params signature =
+let mk_state ~ctx ?meta params signature =
   let queues = ClauseQueue.default_queues
   and unit_idx = Dtree.unit_index
-  and index = choose_index params.param_index in
+  and index = choose_index params.param_index
+  and _experts = ref (Experts.Set.empty ~ctx) in
   object
     val m_active = (mk_active_set ~ctx index signature :> active_set)
     val m_passive = (mk_passive_set ~ctx queues :> passive_set)
     val m_simpl = (mk_simpl_set ~ctx unit_idx :> simpl_set)
     method ctx = ctx
+    method params = params
     method active_set = m_active
     method passive_set = m_passive
     method simpl_set = m_simpl
+    method meta_prover = meta
+    method experts = !_experts
+    method add_expert e =
+      let es = Experts.update_ctx e ~ctx in
+      _experts := Experts.Set.add_list !_experts es;
+      (* add clauses of each expert to the set of passive clauses *)
+      List.iter (fun e -> m_passive#add (Experts.clauses e)) es
   end
 
 (* ----------------------------------------------------------------------
@@ -326,85 +343,25 @@ let mk_state ~ctx params signature =
  * ---------------------------------------------------------------------- *)
 
 (** statistics on the state (TODO stats on the simpl_set) *)
-type state_stats = int * int (* num passive, num active *)
+type state_stats = int * int * int (* num passive, num active, num simplification *)
 
 let stats state =
   ( C.CSet.size state#active_set#clauses
-  , C.CSet.size state#passive_set#clauses)
+  , C.CSet.size state#passive_set#clauses
+  , state#simpl_set#idx_simpl#size)
 
 let pp_state formatter state =
-  let num_active, num_passive = stats state in
-  Format.fprintf formatter "@[<h>state {%d active clauses; %d passive_clauses;@;%a}@]"
-    num_active num_passive CQ.pp_queues state#passive_set#queues
+  let num_active, num_passive, num_simpl = stats state in
+  Format.fprintf formatter
+    "@[<h>state {%d active clauses; %d passive_clauses; %d simplification_rules;@;%a}@]"
+    num_active num_passive num_simpl CQ.pp_queues state#passive_set#queues
 
 let debug_state formatter state =
-  let num_active, num_passive = stats state in
+  let num_active, num_passive, num_simpl = stats state in
   Format.fprintf formatter
-    "@[<v 2>state {%d active clauses; %d passive_clauses;@;%a@;active:%a@;passive:%a@]@;"
-    num_active num_passive
+    ("@[<v 2>state {%d active clauses; %d passive_clauses; %d simplification_rules;" ^^
+      "@;%a@;active:%a@;passive:%a@]@;")
+    num_active num_passive num_simpl
     CQ.pp_queues state#passive_set#queues
     C.pp_set state#active_set#clauses
     C.pp_set state#passive_set#clauses
-
-
-module DotState = Dot.Make(
-  struct
-    type vertex = hclause
-    type edge = string
-
-    let equal = C.eq_hclause
-    let hash hc = C.hash_hclause hc
-    let print_vertex hc = U.sprintf "@[<h>%a@]" !C.pp_clause#pp_h hc
-    let print_edge s = s
-  end)
-
-(** print to dot (if empty clause is present, only print a proof,
-    otherwise print the active set and its proof) *)
-let pp_dot ?(name="state") formatter state =
-  let graph = DotState.mk_graph ~name
-  and explored = ref C.CSet.empty
-  and queue = Queue.create () in
-  (* start from empty clause if present, all active clauses otherwise *)
-  let empty_clause = ref None in
-  try C.CSet.iter state#active_set#clauses
-    (fun hc' -> if hc'.hclits = [||] then (empty_clause := Some hc'; raise Exit));
-  with Exit -> ();
-  (match !empty_clause with
-  | Some hc -> Queue.push hc queue
-  | None ->
-    C.CSet.iter state#active_set#clauses (fun hc -> Queue.push hc queue));
-  (* breadth first exploration of clauses and their parents *)
-  while not (Queue.is_empty queue) do
-    let hc = Queue.pop queue in
-    if C.CSet.mem !explored hc then ()
-    else begin
-      (* node for this clause *)
-      let n = DotState.get_node graph hc in
-      explored := C.CSet.add !explored hc;
-      DotState.add_node_attribute n (DotState.Style "filled");
-      DotState.add_node_attribute n (DotState.Shape "box");
-      (if hc.hclits = [||] then DotState.add_node_attribute n (DotState.Color "red"));
-      match hc.hcproof with
-      | Axiom (file, axiom) ->
-        DotState.add_node_attribute n (DotState.Color "yellow");
-      | Proof (rule, clauses) ->
-        List.iter
-          (fun (parent, _, _) ->
-            Queue.push parent queue;  (* explore this parent *)
-            let n_parent = DotState.get_node graph parent in
-            ignore (DotState.add_edge graph n_parent n rule))
-          clauses
-    end
-  done;
-  DotState.pp_graph formatter graph
-
-(** print to dot into a file *)
-let pp_dot_file ?name filename state =
-  let out = open_out filename in
-  try
-    (* write on the opened out channel *)
-    let formatter = Format.formatter_of_out_channel out in
-    Format.printf "%% print state to %s@." filename;
-    pp_dot ?name formatter state;
-    close_out out
-  with _ -> close_out out

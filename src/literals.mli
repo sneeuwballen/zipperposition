@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Equational literals *)
 
-open Types
+open Basic
 open Symbols
 
 val eq : literal -> literal -> bool         (** equality of literals *)
@@ -34,6 +34,7 @@ val to_multiset : literal -> term list      (** literal to multiset of terms *)
 
 val hash : literal -> int                   (** hashing of literal *)
 val weight : literal -> int                 (** weight of the lit *)
+val depth : literal -> int                  (** depth of literal *)
 
 val is_pos : literal -> bool                (** is the literal positive? *)
 val is_neg : literal -> bool                (** is the literal negative? *)
@@ -59,24 +60,25 @@ val vars : literal -> varlist                       (** gather variables *)
 val eq_lits : literal array -> literal array -> bool
 val compare_lits : literal array -> literal array -> int
 val hash_lits : literal array -> int
+val weight_lits : literal array -> int
+val depth_lits : literal array -> int
 val vars_lits : literal array -> varlist
 val ground_lits : literal array -> bool             (** all the literals are ground? *)
+val term_of_lits : literal array -> term
 val apply_subst_lits : ?recursive:bool -> ord:ordering -> substitution ->
                        literal array bind -> literal array
 val apply_subst_list : ?recursive:bool -> ord:ordering -> substitution ->
                         literal list bind -> literal list
+val lits_to_seq : literal array -> (term * term * bool) Sequence.t
+  (** Convert the lits into a sequence of equations *)
 
 (** pretty printer for literals *)
-class type pprinter_literal =
-  object
-    method pp : Format.formatter -> literal -> unit     (** print literal *)
-  end
 
-val pp_literal : pprinter_literal                       (** use current term printer *)
-val pp_literal_debug :                                  (** use debug unicode syntax *)
-  < pp : Format.formatter -> literal -> unit;
-    ord : bool -> unit;                                 (** print orientation of lit *)
-  >
-val pp_literal_tstp : pprinter_literal                  (** use TSTP syntax *)
-
+val pp_literal : Format.formatter -> literal -> unit
 val pp_lits : Format.formatter -> literal array -> unit
+
+val to_json : literal -> json
+val of_json : ord:ordering -> json -> literal
+
+val lits_to_json : literal array -> json
+val lits_of_json : ord:ordering -> json -> literal array

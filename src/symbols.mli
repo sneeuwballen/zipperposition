@@ -18,18 +18,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Symbols and signature *)
+(** {1 Symbols and signature} *)
 
-type symbol
-  (** abstract type of a symbol *)
+(** {2 Definition of symbols and sorts} *)
 
-type sort =
-  | Sort of symbol          (** Atomic sort *)
-  | Fun of sort * sort list (** Function sort (first is return type) *)
-  (** simple types *)
-
-(** exception raised when sorts are mismatched *)
-exception SortError of string
+type symbol = {
+  symb_val : symbol_val;
+  mutable symb_id : int;
+  mutable symb_attrs : int;
+} (** A symbol is a string, a unique ID, and some attributes *)
+and symbol_val =
+  | Const of string
+  | Distinct of string
+  | Num of Num.num
+  | Real of float
+  (** A symbol value is a string, a quoted string, or a number *)
 
 val compare_symbols : symbol -> symbol -> int
   (** total ordering on symbols (equality is ==) *)
@@ -37,19 +40,30 @@ val compare_symbols : symbol -> symbol -> int
 val hash_symbol : symbol -> int
   (** hash the symbol *)
 
-val hash_sort : sort -> int
-
 type symbol_attribute = int
   (** attributes of the symbol *)
+
+(** {2 Boolean attributes} *)
+
+(** Boolean attributes are flags that can be attached to symbols. Since
+    symbols are perfectly shared, a flag is system-wide. Flags can
+    be combined using the {s lor} operator. *)
 
 val attr_skolem : symbol_attribute      (** skolem symbol? *)
 val attr_split : symbol_attribute       (** symbol used for splitting? *)
 val attr_binder : symbol_attribute      (** is the symbol a binding symbol? *)
 val attr_infix : symbol_attribute       (** symbol is binary infix? *)
 val attr_ac : symbol_attribute          (** symbol is associative-commutative? *)
+val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *)
+val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
+val attr_commut : symbol_attribute      (** symbol that is commutative (not ac) *)
+val attr_polymorphic : symbol_attribute (** symbol that is ad-hoc polymorphic *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
-  (** construction of a symbol *)
+val mk_distinct : ?attrs:symbol_attribute -> string -> symbol
+val mk_num : ?attrs:symbol_attribute -> Num.num -> symbol
+val mk_int : ?attrs:symbol_attribute -> int -> symbol
+val mk_real : ?attrs:symbol_attribute -> float -> symbol
 
 val is_used : string -> bool
   (** is the symbol already used? *)
@@ -64,15 +78,18 @@ val has_attr : symbol_attribute -> symbol -> bool
   (** does the symbol have this attribute? *)
 
 val name_symbol : symbol -> string
-  (** deconstruction of a symbol *)
+  (** Printable form of a symbol *)
 
 module SHashtbl : Hashtbl.S with type key = symbol
 
 module SMap : Map.S with type key = symbol
+module SMapSeq : Sequence.Map.S with type key = symbol and type 'a map = 'a SMap.t
 
 module SSet : Set.S with type elt = symbol
+module SSetSeq : Sequence.Set.S with type elt = symbol and type set = SSet.t
 
-(* connectives *)
+(** {2 connectives} *)
+
 val true_symbol : symbol
 val false_symbol : symbol
 val eq_symbol : symbol
@@ -90,12 +107,29 @@ val at_symbol : symbol    (** higher order curryfication symbol *)
 
 val db_symbol : symbol    (** pseudo symbol kept for locating bound vars in precedence *)
 val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
+val const_symbol : symbol (** pseudo symbol for locating magic constants in precedence *)
+val num_symbol : symbol   (** pseudo symbol to locate numbers in the precedence *)
+
+val mk_fresh_const : int -> symbol
+  (** Infinite set of symbols, accessed by index, that will not collide with
+      the signature of the problem *)
 
 (** {2 sorts} *)
 
-val bool_symbol : symbol
-val type_symbol : symbol
-val univ_symbol : symbol
+type sort =
+  | Sort of string (** Atomic sort *)
+  | Fun of sort * sort list (** Function sort (first is return type) *)
+  (** simple types *)
+
+(** exception raised when sorts are mismatched *)
+exception SortError of string
+
+val bool_symbol : string
+val type_symbol : string
+val univ_symbol : string
+val int_symbol : string
+val rat_symbol : string
+val real_symbol : string
 
 (** Sorts are simple types. Note that equality on sorts is (==),
     because sorts are hashconsed (to save memory) *)
@@ -104,7 +138,8 @@ val compare_sort : sort -> sort -> int
 
 val hash_sort : sort -> int
 
-val mk_sort : symbol -> sort
+val mk_sort : string -> sort
+  (** Build an atomic sort *)
 
 val (<==) : sort -> sort list -> sort
   (** [s <== args] build the sort of functions that take arguments
@@ -115,11 +150,14 @@ val (<=.) : sort -> sort -> sort
       [a <=. b <=. c] is like [(a <=. b) <=. c] *)
 
 val (@@) : sort -> sort list -> sort
-  (** [s @@ args] applies the sort [s] to arguments [args]. Types must match *)
+  (** [s @@ args] applies the sort [s] to arguments [args]. Basic must match *)
 
 val bool_ : sort
 val type_ : sort
 val univ_ : sort
+val int_ : sort
+val rat_ : sort
+val real_ : sort
 
 val arity : sort -> int
   (** Arity of a sort, ie nunber of arguments of the function, or 0 *)
@@ -138,5 +176,32 @@ val base_signature : signature
 val base_symbols : SSet.t
   (** Set of base symbols *)
 
+val is_base_symbol : symbol -> bool
+
+val add_signature : signature -> symbol -> sort -> signature
+  (** Add a symbol to the signature, failing if it is incompatible *)
+
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
+
+val merge_signatures : signature -> signature -> signature
+  (** Merge two signatures. raises Failure if they are incompatible. *)
+
+(** {2 Conversions and printing} *)
+
+val sig_to_seq : signature -> (symbol * sort) Sequence.t
+val sig_of_seq : ?signature:signature -> (symbol * sort) Sequence.t -> signature
+
+val to_json : symbol -> Yojson.Basic.json
+val of_json : Yojson.Basic.json -> symbol
+
+val sort_to_json : sort -> Yojson.Basic.json
+val sort_of_json : Yojson.Basic.json -> sort
+
+val sig_to_json : signature -> Yojson.Basic.json
+val sig_of_json : ?signature:signature -> Yojson.Basic.json -> signature
+
+val pp_symbol : Format.formatter -> symbol -> unit
+val pp_sort : Format.formatter -> sort -> unit
+val pp_signature : Format.formatter -> signature -> unit
+val pp_precedence : Format.formatter -> symbol list -> unit

@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Main saturation algorithm. It uses inference rules and
     simplification rules from Superposition. *)
 
-open Types
+open Basic
 
 (** The SZS status of a state *)
 type 'a szs_status = 
@@ -51,6 +51,9 @@ val generate : calculus:Calculus.calculus -> ProofState.active_set -> hclause ->
 (** remove orphans of the clauses *)
 val remove_orphans : ProofState.passive_set -> hclause list -> unit
 
+(** Use the meta-prover (if any) to prove new lemmas *)
+val find_lemmas : ctx:context -> Meta.Prover.t option -> hclause -> hclause list
+
 (** Perform one step of the given clause algorithm.
     It performs generating inferences only if [generating] is true (default);
     other parameters are the iteration number, the global state and the calculus *)
@@ -72,10 +75,4 @@ val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float -> ?progress:
 val presaturate : calculus:Calculus.calculus ->
                   ProofState.state ->
                   hclause szs_status * int
-
-(** time elapsed since start of program *)
-val get_total_time : unit -> float
-
-(** time at which the program started *)
-val get_start_time : unit -> float
 

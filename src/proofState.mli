@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     a set of passive clauses (to be processed), and an ordering
     that is used for redundancy elimination. *)
 
-open Types
+open Basic
 open Symbols
 
 (** association name -> index *)
@@ -46,7 +46,8 @@ type active_set =
 (** set of simplifying (unit) clauses *)
 type simpl_set =
   < ctx : context;
-    idx_simpl : Index.unit_index;       (** index for forward simplifications TODO split into pos-orientable/others *)
+    idx_simpl : Index.unit_index;       (** index for forward simplifications
+                                            TODO split into pos-orientable/others *)
 
     add : hclause list -> unit;
     remove : hclause list -> unit;
@@ -70,9 +71,14 @@ type passive_set =
     and is parametrized by an ordering. *)
 type state =
   < ctx : context;
+    params : parameters;
     simpl_set : simpl_set;              (** index for forward demodulation *)
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
+    meta_prover : Meta.Prover.t option;
+    experts : Experts.Set.t;            (** Set of current experts *)
+
+    add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
 val mk_active_set : ctx:context -> Index.index -> signature -> active_set
@@ -80,19 +86,14 @@ val mk_simpl_set : ctx:context -> Index.unit_index -> simpl_set
 val mk_passive_set : ctx:context -> (ClauseQueue.queue * int) list -> passive_set
 
 (** create a state from the given ordering, and parameters *)
-val mk_state : ctx:context -> Params.parameters -> signature -> state
+val mk_state : ctx:context -> ?meta:Meta.Prover.t ->
+               parameters -> signature -> state
 
-(** statistics on the state (num active, num passive) *)
-type state_stats = int * int
+(** statistics on the state (num active, num passive, num simplification) *)
+type state_stats = int * int * int
 val stats : state -> state_stats
 
 (** pretty print the content of the state *)
 val pp_state : Format.formatter -> state -> unit
 (** debug functions: much more detailed printing *)
 val debug_state : Format.formatter -> state -> unit
-
-(** print to dot (if empty clause is present, only print a proof,
-    otherwise print the active set and its proof) *)
-val pp_dot : ?name:string -> Format.formatter -> state -> unit
-(** print to dot into a file *)
-val pp_dot_file : ?name:string -> string -> state -> unit

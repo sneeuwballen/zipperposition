@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 open Symbols
 
 (** A partial ordering on symbols, as a matrix. It computes the
@@ -26,6 +26,9 @@ open Symbols
 
 type t
   (** the partial order *)
+
+val pp : Format.formatter -> t -> unit
+  (** pretty print the partial order as a boolean matrix *)
 
 val mk_partial_order : symbol list -> t
   (** build an empty partial order for the list of symbols *)
@@ -45,6 +48,3 @@ val compare : t -> symbol -> symbol -> int
 
 val symbols : t -> symbol list
   (** symbols, in decreasing order (assuming the ordering is total) *)
-
-val pp : Format.formatter -> t -> unit
-  (** pretty print the partial order as a boolean matrix *)

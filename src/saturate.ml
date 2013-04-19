@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (* main saturation algorithm *)
 
-open Types
+open Basic
 
 module C = Clauses
 module O = Orderings
@@ -142,7 +142,18 @@ let remove_orphans passive_set removed_clauses =
     Ptset.iter
       (fun orphan_id ->
         incr_stat stat_killed_orphans;
-        passive_set#remove orphan_id)
+        passive_set#remove orphan_id
+        (*
+        try
+          let c = C.CSet.get passive_set#clauses orphan_id in
+          if Ptset.is_empty c.hcdescendants then begin
+            (* only kill orphans that have never participated in inferences *)
+            incr_stat stat_killed_orphans;
+            passive_set#remove orphan_id
+          end
+        with Not_found -> ())
+        *)
+        )
       orphans
   in
   List.iter remove_descendants removed_clauses
@@ -163,29 +174,85 @@ let subsumed_by ~calculus active_set hc =
 
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if trivial). *)
-let all_simplify ~calculus active_set simpl_set hc =
+let all_simplify ~calculus ~experts active_set simpl_set hc =
   Utils.enter_prof prof_all_simplify;
   let clauses = calculus#list_simplify hc in
   let clauses = Utils.list_flatmap
     (fun hc ->
       (* simplify this clause *)
       let _, hc' = simplify ~calculus active_set simpl_set hc in
-      if calculus#is_trivial hc' then [] else [hc'])
+      let hc' = Experts.Set.simplify experts hc' in
+      if calculus#is_trivial hc'
+        then [] else [hc'])
     clauses
   in
   Utils.exit_prof prof_all_simplify;
   clauses
 
+(** Make a clause out of a 'Deduced' result *)
+let clause_of_deduced ~ctx lits parents = 
+  let premises = List.map (fun hc -> hc.hcproof) parents in
+  let hc = C.mk_hclause_a ~ctx lits ~parents
+    (fun c -> Proof.mk_proof c "lemma" premises) in
+  Sup.basic_simplify (C.clause_of_fof hc)
+
+(** Find the lemmas that can be deduced if we consider this new clause *)
+let find_lemmas ~ctx prover hc = 
+  match prover with
+  | None -> []  (* lemmas detection is disabled *)
+  | Some meta ->
+    let results = Meta.Prover.scan_clause meta hc in
+    Utils.list_flatmap
+      (function
+      | Meta.Prover.Deduced (lits,parents) ->
+        let hc = clause_of_deduced ~ctx lits parents in
+        Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp_h hc;
+        [hc]
+      | _ -> [])
+      results
+
+(** Do one step of the meta-prover. The current given clause and active set
+    are provided. This returns a list of new clauses. *)
+let meta_step state hc =
+  match state#meta_prover with
+  | None -> []
+  | Some prover -> begin
+    (* forward scanning *)
+    let results = Meta.Prover.scan_clause prover hc in
+    (* backward scanning, if needed *)
+    let results' =
+      if Meta.Prover.has_new_patterns prover
+        then Meta.Prover.scan_set prover state#active_set#clauses
+        else [] in
+    let results = List.rev_append results' results in
+    (* use results *)
+    Utils.list_flatmap
+      (fun result -> match result with
+        | Meta.Prover.Deduced (lits,parents) ->
+          let lemma = clause_of_deduced ~ctx:state#ctx lits parents in
+          Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp lemma;
+          [lemma]
+        | Meta.Prover.Theory (th_name, th_args) ->
+          Utils.debug 1 "%% meta-prover: theory @[<h>%a@]" Meta.Prover.pp_result result;
+          []
+        | Meta.Prover.Expert expert ->
+          Utils.debug 1 "%% meta-prover: expert @[<h>%a@]" Experts.pp_expert expert;
+          state#add_expert expert;
+          [])
+      results
+    end
+
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num state =
   let ctx = state#ctx in
   let ord = ctx.ctx_ord in
+  let experts = state#experts in
   (* select next given clause *)
   match state#passive_set#next () with
   | None -> Sat (* passive set is empty *)
   | Some hc ->
     (* simplify given clause w.r.t. active set, then remove redundant clauses *)
-    let c_list = all_simplify ~calculus state#active_set state#simpl_set hc in
+    let c_list = all_simplify ~calculus ~experts state#active_set state#simpl_set hc in
     let c_list = List.filter
       (fun hc' -> not (is_redundant ~calculus state#active_set hc'))
       c_list in
@@ -195,8 +262,9 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       Unknown  (* all simplifications are redundant *)
     | hc::new_clauses ->     (* select first clause, the other ones are passive *) 
     (* empty clause found *)
-    if hc.hclits = [||]
-    then (state#active_set#add [hc]; Unsat hc)
+    if hc.hclits = [||] then (state#active_set#add [hc]; Unsat hc)
+    (* redundant modulo theory, still keep it for simplifications *)
+    else if Experts.Set.is_redundant experts hc then (state#simpl_set#add [hc]; Unknown)
     else begin
       assert (not (is_redundant ~calculus state#active_set hc));
       (* process the given clause! *)
@@ -204,6 +272,8 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       C.check_ord_hclause ~ord hc;
       Utils.debug 2 "%% ============ step %5d  ============" num;
       Utils.debug 1 "%% @[<h>%a@]" !C.pp_clause#pp_h hc;
+      (* yield control to meta-prover *)
+      let new_clauses = List.rev_append (meta_step state hc) new_clauses in
       (* find clauses that are subsumed by given in active_set *)
       let subsumed_active = subsumed_by ~calculus state#active_set hc in
       state#active_set#remove subsumed_active;
@@ -234,9 +304,14 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       let inferred_clauses = List.fold_left
         (fun acc hc ->
           let cs = calculus#list_simplify hc in
+          let cs = List.map (Experts.Set.simplify state#experts) cs in
           let cs = List.map (calculus#rw_simplify state#simpl_set) cs in
           let cs = List.map calculus#basic_simplify cs in
-          let cs = List.filter (fun hc -> not (calculus#is_trivial hc)) cs in
+          (* keep clauses  that are not redundant *)
+          let cs = List.filter
+            (fun hc -> not (calculus#is_trivial hc
+                      || Experts.Set.is_redundant state#experts hc))
+            cs in
           List.rev_append cs acc)
         [] inferred_clauses
       in
@@ -255,19 +330,11 @@ let given_clause_step ?(generating=true) ~(calculus : Calculus.calculus) num sta
       Unknown
     end
 
-(** Time elapsed since initialization of the program, and time of start *)
-let get_total_time, get_start_time =
-  let start = Unix.gettimeofday () in
-  (function () ->
-    let stop = Unix.gettimeofday () in
-    stop -. start),
-  (function () -> start)
-
 (** print progress *)
 let print_progress steps state =
-  let num_active, num_passive = PS.stats state in
-  Format.printf "\r%% %d steps; %d active; %d passive; time %.1f s@?"
-    steps num_active num_passive (get_total_time ())
+  let num_active, num_passive, num_simpl = PS.stats state in
+  Format.printf "\r%% %d steps; %d active; %d passive; %d simpl; time %.1f s@?"
+    steps num_active num_passive num_simpl (Utils.get_total_time ())
 
 let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus state =
   let rec do_step num =
@@ -281,7 +348,9 @@ let given_clause ?(generating=true) ?steps ?timeout ?(progress=false) ~calculus 
         (* some cleanup from time to time *)
         (if (num mod 1000 = 0)
           then (
-            Utils.debug 1 "%% perform cleanup of passive set";
+            Utils.debug 1 "%% perform cleanup of hashcons and passive set";
+            Clauses.CHashcons.clean ();
+            Terms.H.clean ();
             state#passive_set#clean ()
           ));
         (* do one step *)

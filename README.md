@@ -35,8 +35,19 @@ under GPLv2.
 A copy of the GPLv2 is attached to the project, in the file LICENSE.
 
 ## Build
+
 You will need OCaml >= 3.12 or higher with ocamlbuild and the standard
 library.
+Required libraries are `datalog>=0.3`, `yojson` and `camlzip`.
+You can install  them with [opam](http://opam.ocamlpro.com/) by typing:
+
+    $ opam install datalog yojson camlzip
+
+Submodules are also used:
+
+    $ git submodule update --init
+
+Then, type in a terminal located in the root directory of the project:
 
     $ make
 
@@ -68,3 +79,9 @@ For instance,
 
     $ zipperposition pelletier_problems/pb47.p -calculus delayed -ord kbo -progress -timeout 30
 
+## Knowledge Base
+
+Zipperposition now uses a `Knowledge Base` that contains information about theories,
+lemmas, rewriting systems, etc. By default it tries to access `$PWD/kb`, and loads
+the theory file `builtin.theory` (written in a human-readable syntax). If you
+wish to deactivate this feature, use `-no-theories` or `-kb /dev/null`.

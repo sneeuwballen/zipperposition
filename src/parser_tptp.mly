@@ -22,25 +22,25 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 %{
-  (** TSTP parser. It parses into Simple.term and Simple.formula *)
+  (** TSTP parser. It parses into terms *)
 
   open Const
   open Symbols
-  open Types
+  open Basic
 
   module Utils = FoUtils
 
-  type term = Simple.term
-  type variable = Simple.term
-  type literal = Simple.formula
-  type clause = Simple.formula
+  type term = Basic.term
+  type variable = Basic.term
+  type literal = Basic.term
+  type clause = Basic.term
 
   (* includes from input *)
   let include_files: string list ref =
     ref []
 
   (* these are only valid for the current clause
-     and have to be invalidated with init_clause for every new clause *)
+     and have to be invalidated with init for every new clause *)
 
   (* the variable id counter for the currently read term/clause *)
   let var_id_counter = ref 0
@@ -53,28 +53,33 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   (** is the current clause a conjecture? *)
   let conjecture = ref false
 
+  (** Table that maps names to Meta definitions *)
+  let meta_table =
+    Meta.ParseUtils.create ()
+
   (* reset everything in order to parse a new term/clause *)
-  let init_clause () =
+  let init () =
     var_id_counter := 0;
     var_map := [];
-    conjecture := false
+    conjecture := false;
+    Meta.ParseUtils.clear meta_table;
+    ()
         
   (* gets the variables associated with a string from the variable mapping
      creates a new mapping for a new variable with the given sort *)
   let get_var ?(sort=univ_) (var_name: string) =
     try 
       (* way faster than List.assoc *)
-      match (
+      match
         List.find
           (fun (var_name', var_sort, _) ->
-             var_name = var_name' && var_sort == sort
-          )
+             var_name = var_name' && var_sort == sort)
           !var_map
-      ) with (_, _, t) -> t
+      with (_, _, t) -> t
     with
       | Not_found ->
           let new_var = 
-            Simple.mk_var !var_id_counter sort
+            Terms.mk_var !var_id_counter sort
           in
             incr var_id_counter;
             var_map := (var_name, sort, new_var) :: !var_map;
@@ -83,11 +88,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   (** table that maps symbols into sorts *)
   let sort_table = SHashtbl.create 5
 
-  (* get the infered sort for the given constant *)
-  let get_sort constant =
+  (* Get the infered sort for the given symbol and list of arguments.
+     The supposed return type can be passed. *)
+  let get_sort ?(sort=univ_) symb =
     try
-      SHashtbl.find sort_table constant
-    with Not_found -> univ_
+      SHashtbl.find sort_table symb
+    with Not_found ->
+      SHashtbl.replace sort_table symb sort;
+      sort
 
   let set_sort constant sort = SHashtbl.replace sort_table constant sort
 %}
@@ -106,6 +114,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token FOF
 %token CNF
 %token THF
+%token TFF
 %token INCLUDE
 %token <string> SINGLE_QUOTED
 %token <string> DOLLAR_WORD
@@ -127,19 +136,31 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token XOR
 %token LEFT_IMPLICATION
 %token RIGHT_IMPLICATION
-%token UNKNOWN
+%token GENTZEN_ARROW
+%token SLASH
 
 %token IS
 %token THEORY
 %token LEMMA
+%token AXIOM
 %token IF
-%token AND
+%token AND_THEN
+%token GC
+%token WITH
+
+%token UNKNOWN
+
+%left AND
+%left OR
 
 %start parse_file
-%type <Simple.sourced_formula list * string list> parse_file
+%type <Basic.sourced_term list * string list> parse_file
 
-%start parse_clause
-%type <Simple.formula> parse_clause
+%start parse_formula
+%type <Basic.term> parse_formula
+
+%start parse_meta
+%type <Meta.KB.definition list> parse_meta
 
 %%
 
@@ -153,71 +174,74 @@ parse_file:
 
         (* reset for next parser run *)
         include_files := [];
+        Const.reset ();
         
         clauses, includes
       }
 
   | EOI
-      { print_endline "empty problem specification";
-        raise Const.PARSE_ERROR }
+      { Const.parse_error "empty problem specification" }
 
-parse_clause:
-  | fof_formula EOI { $1 }
-  | EOI { print_endline "could no parse clause";
-          raise Const.PARSE_ERROR }
+parse_formula:
+  | fof_formula EOI { Const.reset(); $1 }
+  | EOI { Const.parse_error "could no parse clause" }
+
+parse_meta :
+  | meta_definitions EOI { Const.reset (); $1 }
+  | EOI { Const.reset(); [] }
 
 /* parse rules */
 
 file:
   | tptp_input
       { match $1 with
-        | Some clause -> [clause]
-        | None        -> []
+        | Some formula -> [formula]
+        | None -> []
       }
-
   | tptp_input file
       { match $1 with
-        | Some clause -> clause :: $2
-        | None        -> $2
+        | Some formula -> formula :: $2
+        | None -> $2
       }
 
 tptp_input:
   | annotated_formula
       { Some $1 }
-
   | include_
       { None }
 
-
-
 annotated_formula:
   | fof_annotated
-      { $1 }
-
+    { $1 }
   | cnf_annotated
-      { $1 }
-
+    { $1 }
+  | tff_annotated
+    { $1 }
   | thf_annotated
-      { $1 }
+    { $1 }
 
 thf_annotated:
   | THF LEFT_PARENTHESIS name COMMA formula_role COMMA
     fof_formula annotations RIGHT_PARENTHESIS DOT
     { failwith "Parser_tptp: tfh syntax not supported." }
 
+tff_annotated:
+  | TFF LEFT_PARENTHESIS name COMMA formula_role COMMA
+    fof_formula annotations RIGHT_PARENTHESIS DOT
+    { failwith "Parser_tptp: tff syntax not (yet) supported." }
+
 fof_annotated:
   | FOF LEFT_PARENTHESIS name COMMA formula_role COMMA
     fof_formula annotations RIGHT_PARENTHESIS DOT
     { 
-      let clause = 
+      let formula = 
         let filename = !Const.cur_filename in  (* ugly *)
-        let source = Simple.Axiom (filename, $3) in
         if !conjecture
-          then Simple.mk_not $7, source
-          else $7, source
+          then Terms.mk_not $7, filename, $3
+          else $7, filename, $3
       in
-      init_clause ();  (* reset global state *)
-      clause
+      init ();  (* reset global state *)
+      formula
     }
 
 fof_formula:
@@ -226,11 +250,9 @@ fof_formula:
   | unitary_formula
     { $1 }
 
-
 binary_formula:
   | nonassoc_binary
     { $1 }
-
   | assoc_binary
     { $1 }
 
@@ -240,17 +262,17 @@ nonassoc_binary:
 
 binary_connective:
   | BIJECTION
-    { Simple.mk_equiv }
+    { fun x y -> Terms.mk_equiv (Terms.cast x bool_) (Terms.cast y bool_) }
   | LEFT_IMPLICATION
-    { Simple.mk_imply }
+    { fun x y -> Terms.mk_imply (Terms.cast x bool_) (Terms.cast y bool_) }
   | RIGHT_IMPLICATION
-    { fun x y -> Simple.mk_imply y x }
+    { fun x y -> Terms.mk_imply (Terms.cast y bool_) (Terms.cast x bool_) }
   | XOR
-    { Simple.mk_xor }
+    { fun x y -> Terms.mk_xor (Terms.cast x bool_) (Terms.cast y bool_) }
   | NEGATION OR
-    { fun x y -> Simple.mk_not (Simple.mk_or [x; y]) }
+    { fun x y -> Terms.mk_not (Terms.mk_or (Terms.cast x bool_) (Terms.cast y bool_)) }
   | NEGATION AND
-    { fun x y -> Simple.mk_not (Simple.mk_and [x; y]) }
+    { fun x y -> Terms.mk_not (Terms.mk_and (Terms.cast x bool_) (Terms.cast y bool_)) }
 
 assoc_binary:
   | or_formula
@@ -260,46 +282,44 @@ assoc_binary:
 
 or_formula:
   | unitary_formula OR more_or_formula
-    { Simple.mk_or ($1 :: $3) }
+    { Terms.mk_or (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 more_or_formula:
   | unitary_formula
-    { [$1] }
+    { (Terms.cast $1 bool_) }
   | unitary_formula OR more_or_formula
-    { $1 :: $3 }
+    { Terms.mk_or (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 and_formula:
   | unitary_formula AND more_and_formula
-    { Simple.mk_and ($1 :: $3) }
+    { Terms.mk_and (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 more_and_formula:
   | unitary_formula
-    { [$1] }
+    { (Terms.cast $1 bool_) }
   | unitary_formula AND more_and_formula
-    { $1 :: $3 }
+    { Terms.mk_and (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 unitary_formula:
   | quantified_formula
-    { $1 }
+    { (Terms.cast $1 bool_) }
   | unary_formula
-    { $1 }
+    { (Terms.cast $1 bool_) }
   | LEFT_PARENTHESIS fof_formula RIGHT_PARENTHESIS
-    { $2 }
+    { (Terms.cast $2 bool_) }
   | atomic_formula
-    { $1 }
+    { (Terms.cast $1 bool_) }
 
 quantified_formula:
   | quantifier LEFT_BRACKET variable_list RIGHT_BRACKET
     COLON unitary_formula
-    { 
-      List.fold_left (fun form v -> $1 v form) $6 $3
-    }
+    { $1 $3 (Terms.cast $6 bool_) }
 
 quantifier:
   | FORALL
-    { Simple.mk_forall }
+    { Terms.mk_forall_var }
   | EXISTS
-    { Simple.mk_exists }
+    { Terms.mk_exists_var }
 
 variable_list:
   | variable
@@ -313,7 +333,7 @@ unary_formula:
 
 unary_connective:
   | NEGATION
-    { Simple.mk_not }
+    { Terms.mk_not }
 
 
 cnf_annotated:
@@ -321,13 +341,12 @@ cnf_annotated:
   cnf_formula annotations RIGHT_PARENTHESIS DOT
       // ignore everything except for the formula
       {
-        let clause = 
+        let formula = 
           let filename = !Const.cur_filename in  (* ugly *)
-          let source = Simple.Axiom (filename, $3) in
-          $7, source
+          $7, filename, $3
         in
-        init_clause ();
-        clause
+        init ();
+        formula
       }
 
 formula_role:
@@ -338,55 +357,51 @@ formula_role:
       $1
     }
   | LEMMA { "lemma" }
+  | AXIOM { "axiom" }
 
 annotations:
   | null
       { "" }
-
   | COMMA source optional_info
       { "" }
 
 
-
 cnf_formula:
   | LEFT_PARENTHESIS disjunction RIGHT_PARENTHESIS
-      { Simple.mk_or $2 }
-
+      { $2 }
   | disjunction
-      { Simple.mk_or $1 }
+      { $1 }
 
 disjunction:
   | literal
-      { [$1] }
-
+      { (Terms.cast $1 bool_) }
   | literal OR disjunction
-      { $1 :: $3 }
+      { Terms.mk_or (Terms.cast $1 bool_) (Terms.cast $3 bool_) }
 
 
 literal:
   | atomic_formula
-      { $1 }
-
+      { (Terms.cast $1 bool_) }
   | NEGATION atomic_formula
-      { Simple.mk_not $2 }
+      { Terms.mk_not (Terms.cast $2 bool_) }
 
 atomic_formula:
   | plain_atom
       { $1 }
-
   | defined_atom
       { $1 }
-
   | system_atom
       { $1 }
 
 plain_atom:
   | plain_term_top
-      { let t = Simple.cast $1 bool_ in (* cast term to bool *)
-        (match t with
-        | Simple.Node (s, _, _) -> set_sort s bool_
-        | Simple.Var _ -> failwith "variable at top level");
-        Simple.mk_atom t
+      { let t = Terms.cast $1 bool_ in (* cast term to bool *)
+        (* Some type inference now *)
+        (match t.term with
+        | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
+        | Bind (s, _, l) -> set_sort s t.sort
+        | Var _ | BoundVar _ -> failwith "variable at top level");
+        t
       }
 
 arguments:
@@ -398,60 +413,58 @@ arguments:
 
 defined_atom:
   | DOLLAR_TRUE
-      { Simple.mk_true }
+      { Terms.true_term }
 
   | DOLLAR_FALSE
-      { Simple.mk_false }
+      { Terms.false_term }
 
   | term EQUALITY term
-      { Simple.mk_eq $1 $3 }
+      { Terms.mk_eq $1 $3 }
   | term DISEQUALITY term
-      { Simple.mk_neq $1 $3 }
+      { Terms.mk_neq $1 $3 }
 
 system_atom:
   | system_term_top
-      { let t = Simple.cast $1 bool_ in
-        (match t with
-        | Simple.Node (s, _, _) -> set_sort s bool_
-        | Simple.Var _ -> assert false);
-        Simple.mk_atom t
+      { let t = Terms.cast $1 bool_ in
+        (* Some type inference now *)
+        (match t.term with
+        | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
+        | Bind (s, _, t') -> set_sort s t.sort
+        | Var _ | BoundVar _ -> failwith "variable at top level");
+        t
       }
 
 term:
   | function_term
       { $1 }
-
   | variable
       { $1 }
 
 function_term:
   | plain_term
       { $1 }
-
   | defined_term
       { $1 }
-
   | system_term
       { $1 }
 
 plain_term_top:
   | constant
       { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
-
+        Terms.mk_const $1 sort }
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        Simple.mk_node $1 sort $3
+        Terms.mk_node $1 sort $3
       }
 
 plain_term:
   | constant
       { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
+        Terms.mk_const $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        Simple.mk_node $1 sort $3
+        Terms.mk_node $1 sort $3
       }
 
 constant:
@@ -464,48 +477,47 @@ functor_:
 
 defined_term:
   | number
-      { print_endline ("Parser_tptp: <defined_term: number> not supported: "
-                      ^ $1);
-        raise Const.PARSE_ERROR }
-
+    {
+      let n = Num.num_of_string $1 in
+      let symbol = Symbols.mk_num n in
+      let sort = match n with
+        | Num.Int _ | Num.Big_int _ -> int_
+        | Num.Ratio _ -> rat_
+      in
+      Terms.mk_const symbol sort }
   | DISTINCT_OBJECT
-      { print_endline ("Parser_tptp: <defined_term: distinct_object> not supported: " ^ $1);
-        raise Const.PARSE_ERROR }
+    { let sort = univ_ in
+      let symbol = Symbols.mk_distinct $1 in
+      Terms.mk_const symbol sort }
 
 system_term_top:
   | system_constant
-      { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
-
+      { let sort = get_sort $1 in  (* FIXME: is the sort univ_ ? *)
+        Terms.mk_const $1 sort }
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { 
-        Simple.mk_node $1 univ_ $3
-      }
+      { let sort = get_sort $1 in
+        Terms.mk_node $1 sort $3 }
 
 system_term:
   | system_constant
       { let sort = get_sort $1 in
-        Simple.mk_const $1 sort }
+        Terms.mk_const $1 sort }
 
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
       { let sort = get_sort $1 in
-        Simple.mk_node $1 sort $3
-      }
+        Terms.mk_node $1 sort $3 }
 
 system_functor:
   | atomic_system_word
       { mk_symbol $1 }
-      
+
 system_constant:
   | atomic_system_word
       { mk_symbol $1 }
 
-
-
 variable:
   | UPPER_WORD
       { get_var $1 }
-
 
 source:
   | general_term
@@ -530,75 +542,61 @@ include_:
 formula_selection:
   | COMMA '[' name_list ']'
       { $3 }
-
   | null
       { [] }
 
 name_list:
   | name
       { [$1] }
-
   | name COMMA name_list
       { $1 :: $3 }
-
 
 
 general_term:
   | general_data
       { "" }
-
   | general_data COLON general_term
       { "" }
-
   | general_list
       { "" }
 
 general_data:
   | atomic_word
       { "" }
-
   | atomic_word LEFT_PARENTHESIS general_arguments RIGHT_PARENTHESIS
       { "" }
-
   | number
       { "" }
-
   | DISTINCT_OBJECT
       { "" }
 
 general_arguments:
   | general_term
       { [$1] }
-
   | general_term COMMA general_arguments
       { $1 :: $3 }
 
 general_list:
   | '[' ']'
       { [] }
-
   | '[' general_term_list ']'
       { $2 }
 
 general_term_list:
   | general_term
       { [$1] }
-
   | general_term COMMA general_term_list
       { $1 :: $3 }
-
 
 name:
   | atomic_word
       { $1 }
-
   | UNSIGNED_INTEGER
       { $1 }
 
 atomic_word:
   | LOWER_WORD
       { $1 }
-
   | SINGLE_QUOTED
       { $1 }
 
@@ -609,10 +607,8 @@ atomic_system_word:
 number:
   | REAL
       { $1 }
-
   | SIGNED_INTEGER
       { $1 }
-
   | UNSIGNED_INTEGER
       { $1 }
 
@@ -624,6 +620,102 @@ file_name:
 
 null:
       { }
+
+
+/* Meta-prover parsing */
+
+meta_definitions:
+  | meta_definition { [$1] }
+  | meta_definition meta_definitions { $1 :: $2 }
+
+meta_definition:
+  | meta_named_def { $1 }
+  | meta_theory_def { $1 }
+  | meta_lemma_def { $1 }
+  | meta_gc_def { $1 }
+      
+meta_lemma_def:
+  | LEMMA meta_term IF meta_premises DOT
+    { let t = $2 in
+      let premises = $4 in
+      Meta.ParseUtils.mk_lemma_term ~table:meta_table t premises
+    }
+  | meta_named IF meta_premises DOT
+    { let named = $1 in
+      let premises = $3 in
+      Meta.ParseUtils.mk_lemma_named ~table:meta_table named premises
+    }
+
+meta_named_def:
+  | meta_named IS AXIOM meta_term DOT
+    { let named = $1 in
+      let t = $4 in
+      Meta.ParseUtils.mk_named ~table:meta_table named t
+    }
+
+meta_theory_def:
+  | meta_theory IS meta_premises DOT
+    { let th = $1 in
+      let premises = $3 in
+      Meta.ParseUtils.mk_theory ~table:meta_table th premises
+    }
+
+meta_gc_def:
+  | GC LEFT_PARENTHESIS LOWER_WORD RIGHT_PARENTHESIS meta_terms
+    WITH LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    IF meta_premises DOT
+    { let ord = $7 in
+      let theory = $3 in
+      let prec = $9 in
+      let premises = $12 in
+      let eqns = $5 in
+      Meta.ParseUtils.mk_gc ~table:meta_table eqns (theory,ord,prec) premises
+    }
+
+meta_named:
+  | LOWER_WORD
+    { ($1, []) }
+  | LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { ($1, $3) }
+
+meta_theory:
+  | THEORY LOWER_WORD
+    { ($2, []) }
+  | THEORY LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { ($2, $4) }
+
+meta_theory_or_named:
+  | LOWER_WORD LEFT_PARENTHESIS meta_variables RIGHT_PARENTHESIS
+    { ($1, $3) }
+
+meta_premises:
+  | meta_premise { [$1] }
+  | meta_premise AND_THEN meta_premises { $1 :: $3 }
+
+meta_premise:
+  | AXIOM meta_term { `Term $2 }
+  | meta_theory_or_named
+    { let name, args = $1 in  (* could be a theory or an axiom *)
+      match Meta.ParseUtils.lookup ~table:meta_table name with
+      | Meta.ParseUtils.TableNamed _ -> `Named (name, args)
+      | Meta.ParseUtils.TableTheory _ -> `Theory (name, args)
+    }
+
+meta_terms:
+  | meta_term { [$1] }
+  | meta_term AND_THEN meta_terms { $1 :: $3 }
+
+meta_term:
+  | fof_formula
+    { $1 }
+
+meta_variables:
+  | meta_variable { [$1] }
+  | meta_variable COMMA meta_variables { $1 :: $3 }
+
+meta_variable:
+  | LOWER_WORD
+    { mk_symbol $1 }
 
 %%
 

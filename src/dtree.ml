@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 *)
 
 open Symbols
-open Types
+open Basic
 
 module T = Terms
 module S = FoSubst
@@ -27,9 +27,10 @@ module Utils = FoUtils
 
 (** Efficient perfect discrimination trees for matching *)
 
-(* --------------------------------------------------------
- * term traversal in prefix order
- * -------------------------------------------------------- *)
+(** {2 Term traversal} *)
+
+(** Term traversal in prefix order. This is akin to lazy transformation
+    to a flatterm. *)
 
 (** get position of next term *)
 let next t pos = pos+1
@@ -39,7 +40,10 @@ let skip t pos =
   let t_pos = T.at_cpos t pos in
   pos + t_pos.tsize
 
-type character = Symbol of symbol | BoundVariable of int * sort | Variable of term
+type character =
+  | Symbol of symbol
+  | BoundVariable of int * sort
+  | Variable of term
 
 let compare_char c1 c2 =
   (* compare variables by index *)
@@ -64,7 +68,7 @@ let rec term_to_char t =
   match t.term with
   | Var _ -> Variable t
   | BoundVar i -> BoundVariable (i, t.sort)
-  | Bind (f, _) -> Symbol f
+  | Bind (f, _, _) -> Symbol f
   | Node (f, _) -> Symbol f
 
 (** convert term to list of var/symbol *)
@@ -84,13 +88,16 @@ module CharMap = Map.Make(
     let compare = compare_char
   end)
 
-(* --------------------------------------------------------
- * discrimination tree
- * -------------------------------------------------------- *)
+let char_to_str c = match c with
+  | Symbol s -> Utils.sprintf "%a" pp_symbol s
+  | BoundVariable (i, sort) -> Utils.sprintf "Y%d" i
+  | Variable t -> Utils.sprintf "%a" !T.pp_term#pp t
+
+(** {2 Discrimination tree} *)
 
 type 'a trie =
-  | TrieNode of 'a trie CharMap.t        (** map atom -> trie *)
-  | TrieLeaf of (term * 'a * int) list      (** leaf with (term, value, priority) list *)
+  | TrieNode of 'a trie CharMap.t       (** map atom -> trie *)
+  | TrieLeaf of (term * 'a * int) list  (** leaf with (term, value, priority) list *)
 
 let empty_trie n = match n with
   | TrieNode m when CharMap.is_empty m -> true
@@ -133,7 +140,7 @@ let goto_leaf trie t k =
       
 (** the tree itself, with metadata *)
 type 'a dtree = {
-  min_var : int;
+  min_var : int;  (* TODO remove, useless now *)
   max_var : int;
   cmp : 'a -> 'a -> bool;
   tree : 'a trie;
@@ -226,9 +233,7 @@ let iter dt k =
     | TrieLeaf l -> List.iter (fun (t, v, _) -> k t v) l
   in iter dt.tree
 
-(* --------------------------------------------------------
- * pretty printing
- * -------------------------------------------------------- *)
+(** {2 Pretty printing} *)
 
 let char_to_str = function
   | Variable v -> Utils.sprintf "%a" !T.pp_term#pp v
@@ -287,9 +292,49 @@ module PrintTTree = Prtree.Make(
 
 let pp_term_tree formatter dt = PrintTTree.print formatter ("", dt.tree)
 
-(* --------------------------------------------------------
- * index
- * -------------------------------------------------------- *)
+(** {2 Printing to DOT} *)
+
+let hash_trie = function
+  | TrieNode map -> CharMap.fold
+    (fun c sub h -> Hash.combine (Hashtbl.hash c) h) map 0
+  | TrieLeaf l -> Hash.hash_list (fun (t, _, _) -> t.tag) 0 l
+
+let eq_trie t1 t2 = t1 == t2
+
+(** Convert the trie to a graph *)
+let trie_to_graph trie =
+  let g = Graph.empty ~hash:hash_trie ~eq:eq_trie 10 in
+  (* iterate through the trie *)
+  let rec iter trie =
+    match trie with
+    | TrieLeaf _ -> ()
+    | TrieNode m ->
+      CharMap.iter
+        (fun c trie' -> Graph.add g trie c trie'; iter trie')
+        m
+  in
+  iter trie;
+  g
+
+(** Print the index as a tree *)
+let pp_dot ?(name="dtree") to_string formatter dtree =
+  (* convert to graph *)
+  let g = trie_to_graph dtree.tree in
+  let rec print_edge t1 char_ t2 =
+    [`Label (char_to_str char_); ]
+  and print_vertex trie =
+    match trie with
+    | TrieNode _ ->
+      [`Shape "circle"; `Label ""]
+    | TrieLeaf l ->
+      let label = Utils.sprintf "@[<h>%a@]" (Utils.pp_list ~sep:"\\l" pp_triple) l in
+      [`Label label; `Shape "box"; `Color "grey"]
+  and pp_triple formatter (t, value, _) =
+    Format.fprintf formatter "@[<h>%a: %s@]" !T.pp_term#pp t (to_string value)
+  in
+  Graph.pp ~print_edge ~print_vertex ~name formatter g
+  
+(** {2 Unit Index object} *)
 
 let unit_index =
   let eq_term_hclause (t1, hc1) (t2, hc2) =
@@ -341,6 +386,12 @@ let unit_index =
         then ({< pos = remove pos l (r, hc) >} :> 'self)
         else ({< neg = remove neg l (r, hc) >} :> 'self)
 
+    method size =
+      let n = ref 0 in
+      iter pos (fun _ _ -> incr n);
+      iter neg (fun _ _ -> incr n);
+      !n
+
     method retrieve ~sign offset (t, o_t) k =
       let handler l (r, hc) subst = k l (r, offset) subst hc in
       if sign
@@ -350,4 +401,12 @@ let unit_index =
     method pp formatter () =
       Format.fprintf formatter "@[<hv>pos: %a@.neg:%a@]"
         pp_term_hclause_tree pos pp_term_hclause_tree neg
+
+    method to_dot filename =
+      let to_string (t, hc) = Utils.sprintf "@[<h>%a@]" !Clauses.pp_clause#pp_h hc in
+      ignore (Utils.with_output filename
+        (fun oc ->
+          let formatter = Format.formatter_of_out_channel oc in
+          pp_dot to_string formatter pos;
+          Format.pp_print_flush formatter ()))
   end

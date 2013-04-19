@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Selection functions. Note for splitting: SelectComplex already selects
     in priority "big" negative literals, ie literals that are not split symbols. *)
 
-open Types
+open Basic
 
 module T = Terms
 module C = Clauses

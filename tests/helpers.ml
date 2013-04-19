@@ -1,6 +1,6 @@
 (** helpers for tests *)
 
-open Types
+open Basic
 
 module R = Random
 module Utils = FoUtils

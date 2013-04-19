@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     (for completeness). Anyway, a fifo queue should always be present,
     and presents this property. *)
 
-open Types
+open Basic
 
 (** A priority queue of clauses, purely functional *)
 class type queue =
@@ -50,6 +50,12 @@ val ground : queue
 
 (** only select positive unit clauses *)
 val pos_unit_clauses : queue
+
+(** select horn clauses *)
+val horn : queue
+
+(** only select lemmas *)
+val lemmas : queue
 
 (** default combination of heuristics *)
 val default_queues : (queue * int) list

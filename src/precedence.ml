@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
@@ -81,7 +81,7 @@ let invfreq_constraint clauses =
   and lit_freq = function | Equation (l,r,_,_) -> term_freq l; term_freq r
   and term_freq t = match t.term with
     | Var _ | BoundVar _ -> ()
-    | Bind (_,t') ->
+    | Bind (_, _, t') ->
       term_freq t'  (* do not bother with (special) binder symbols anyway *)
     | Node (s,l) ->
       (let count = try SHashtbl.find freq_table s with Not_found -> 0 in
@@ -149,57 +149,49 @@ let complete_symbols symbols =
 
 (** Order the list of symbols using the constraints *)
 let order_symbols constrs symbols =
-  let symbols = List.fold_right
-    (fun constr symbols -> List.stable_sort constr symbols) constrs symbols
-  in List.rev symbols  (* decreasing order *)
+  let po = PartialOrder.mk_partial_order symbols in
+  (* complete the partial order using constraints, starting with the
+     strongest ones *)
+  List.iter (fun constr -> PartialOrder.complete po constr) constrs;
+  assert (PartialOrder.is_total po);
+  PartialOrder.symbols po
 
 (** build a precedence on the [symbols] from a list of constraints *)
 let mk_precedence ?(complete=true) constrs symbols =
   let symbols = if complete then complete_symbols symbols else symbols in
   let symbols = order_symbols constrs symbols in
-  let table = mk_table symbols in
+  let symbols = ref symbols in
+  let table = ref (mk_table !symbols) in
+  let weight = ref weight_constant in
   (* the precedence *)
   let obj = object (self)
-    val mutable m_version = List.length symbols
-
-    val mutable m_multiset = fun s -> s == eq_symbol
-
-    val mutable m_weight = weight_constant
-
-    val mutable m_symbols = symbols
-
-    val mutable m_table = table
-
-    method version = m_version
-
-    method snapshot = m_symbols
+    method snapshot = !symbols
 
     (** Add the given symbols to the precedence. Returns how many of them
         are new and have effectively been added *)
     method add_symbols new_symbols =
-      let old_len = m_version in
-      assert (old_len = List.length m_symbols);
-      let symbols = Utils.list_union (==) new_symbols m_symbols in
-      let new_len = List.length symbols in
+      let old_len = List.length !symbols in
+      let all_symbols = Utils.list_union (==) new_symbols !symbols in
+      let new_len = List.length all_symbols in
       if new_len > old_len then begin
         (* some symbols have been added *)
         Utils.debug 3 "%% add @[<h>%a@] to the precedence"
-                      (Utils.pp_list ~sep:", " !T.pp_symbol#pp) new_symbols;
-        Utils.debug 3 "%% old precedence %a" T.pp_precedence m_symbols;
+                      (Utils.pp_list ~sep:", " pp_symbol) new_symbols;
+        Utils.debug 3 "%% old precedence %a"
+                       pp_precedence !symbols;
 
         (* build a partial order that respects the current ordering *)
-        let po = PartialOrder.mk_partial_order symbols in
-        PartialOrder.complete po (list_constraint m_symbols);
+        let po = PartialOrder.mk_partial_order all_symbols in
+        PartialOrder.complete po (list_constraint !symbols);
         (* complete it with the constraints *)
         List.iter (fun constr -> PartialOrder.complete po constr) constrs;
         assert (PartialOrder.is_total po);
         (* get the new precedence from the completed partial order *)
-        let symbols = PartialOrder.symbols po in
-        m_symbols <- symbols;
-        m_table <- mk_table symbols;
-        m_version <- List.length symbols;
+        let all_symbols = PartialOrder.symbols po in
+        symbols := all_symbols;
+        table := mk_table !symbols;
 
-        Utils.debug 3 "%% new precedence %a" T.pp_precedence m_symbols;
+        Utils.debug 3 "%% new precedence %a" pp_precedence !symbols;
         (* return number of new symbols *)
         new_len - old_len
       end else 0
@@ -207,19 +199,24 @@ let mk_precedence ?(complete=true) constrs symbols =
     (** To compare symbols, compare their index in the decreasing precedence. Symbols that
         are split symbols are compared to other symbols like "split_symbol". *)
     method compare a b =
-      match a, b with
-      | _ when has_attr attr_split a && has_attr attr_split b -> Symbols.compare_symbols a b
-      | _ when has_attr attr_split a -> SHashtbl.find m_table b - SHashtbl.find m_table split_symbol
-      | _ when has_attr attr_split b -> SHashtbl.find m_table split_symbol - SHashtbl.find m_table a
-      | _ -> SHashtbl.find m_table b - SHashtbl.find m_table a
+      (* some symbols are not explicitely in the signature. Instead, they
+         are represented by 'generic' symbols *)
+      let transform_symbol s = match s with
+        | _ when has_attr attr_split s -> split_symbol
+        | _ when has_attr attr_fresh_const s -> const_symbol
+        | _ -> s
+      in
+      let a' = transform_symbol a
+      and b' = transform_symbol b in
+      if a' == b' && a != b
+        then (* both are in the same symbol family (e.g. split symbols). Any
+                arbitrary but total ordering on them is ok, as long as it's stable. *)
+          Symbols.compare_symbols a b
+        else SHashtbl.find !table b' - SHashtbl.find !table a'
 
-    method weight s = m_weight s
+    method weight s = !weight s
 
-    method set_weight f = m_weight <- f
-
-    method multiset_status s = m_multiset s
-
-    method set_multiset f = m_multiset <- f
+    method set_weight f = weight := f
   end
   in
   (obj :> precedence)
@@ -245,7 +242,7 @@ type weighted_constr = int * symbol list * (ordering -> bool)
 let rec term_symbols acc t =
   match t.term with
   | Var _ | BoundVar _ -> acc
-  | Bind (f, t') -> 
+  | Bind (f, _, t') -> 
     let acc' = if List.exists ((==) f) acc then acc else f::acc in
     term_symbols acc' t'
   | Node (f, ts) ->
@@ -320,24 +317,11 @@ let compute_cost ord_factory constraints precedence : int =
     It returns at most [num] modifications of the list, that differ from
     it by swapping pairs of elements) *)
 let perturbate ?(num=10) symbols =
+  Utils.debug 4 "perturbate @[<h>[%a]@]" (Utils.pp_list pp_symbol) symbols;
   let new_symbols = ref [] in
-  (* swap indexes i and j in the list *)
-  let rec swap i j a =
-    let tmp = a.(i) in
-    a.(i) <- a.(j);
-    a.(j) <- tmp;
-  (* perform n swaps on the array *)
-  and swap_n n a =
-    if n = 0 || Array.length a <= 1 then a else begin
-      let i = max 1 (Random.int (Array.length a - 1)) in
-      let j = Random.int i in
-      swap i j a;
-      swap_n (n-1) a;
-    end
-  in
   (* generate the [num] perturbations *)
   for i = 0 to num-1 do
-    let symbols' = Array.to_list (swap_n 3 (Array.of_list symbols)) in
+    let symbols' = Utils.list_shuffle symbols in
     new_symbols := symbols' :: !new_symbols
   done;
   !new_symbols
@@ -358,6 +342,7 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
       List.fold_left
         (fun (min_cost, min_symbols) symbols' ->
           let precedence' = mk_precedence symbols' in
+          Utils.debug 3 "try precedence @[<h>%a@]" pp_precedence precedence'#snapshot;
           (* only compare with new precedence if it is not the same *)
           if eq_precedence precedence precedence' then (min_cost, min_symbols)
           else

@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
@@ -57,7 +57,7 @@ let feat_size_minus lits =
 let sum_of_depths_lit lit =
   let rec sum depth acc t = match t.term with
   | Var _ | BoundVar _ -> acc
-  | Bind (_, t') -> sum (depth+1) (acc+depth) t'
+  | Bind (_, _, t') -> sum (depth+1) (acc+depth) t'
   | Node (s, l) -> List.fold_left (sum (depth+1)) (acc+depth) l
   in
   match lit with
@@ -71,7 +71,7 @@ let count_symb_lit symb lit =
   let cnt = ref 0 in
   let rec count_symb_term t = match t.term with
   | Var _ | BoundVar _ -> ()
-  | Bind (s, t') -> 
+  | Bind (s, _, t') -> 
     (if s = symb then incr cnt);
     count_symb_term t'
   | Node (s, l) ->
@@ -90,7 +90,7 @@ let count_split_symb lits =
     (if has_attr attr_split s then SHashtbl.replace table s ());
     List.iter gather l
   | BoundVar _ | Var _ -> ()
-  | Bind (s, t') ->
+  | Bind (s, _, t') ->
     (if has_attr attr_split s then SHashtbl.replace table s ());
     gather t'
   in
@@ -105,7 +105,7 @@ let count_skolem_symb lits =
     (if has_attr attr_skolem s then SHashtbl.replace table s ());
     List.iter gather l
   | BoundVar _ | Var _ -> ()
-  | Bind (s, t') ->
+  | Bind (s, _, t') ->
     (if has_attr attr_skolem s then SHashtbl.replace table s ());
     gather t'
   in
@@ -131,7 +131,7 @@ let max_depth_lit symb lit =
   let rec max_depth_term t depth =
     match t.term with
     | Var _ | BoundVar _ -> -1
-    | Bind (s, t') ->
+    | Bind (s, _, t') ->
       let cur_depth = if s = symb then depth else -1 in
       max cur_depth (max_depth_term t' (depth+1))
     | Node (s, l) ->

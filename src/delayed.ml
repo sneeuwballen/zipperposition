@@ -20,7 +20,7 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 
 (** module for superposition with equivalence reasoning and delayed clausal form *)
 
-open Types
+open Basic
 open Symbols
 open Calculus
 
@@ -38,7 +38,8 @@ let prof_elim = Utils.mk_profiler "eliminate"
 
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
-  [split_symbol; at_symbol; eq_symbol; imply_symbol; forall_symbol; exists_symbol; lambda_symbol;
+  [at_symbol; num_symbol; split_symbol; const_symbol; eq_symbol; imply_symbol;
+   forall_symbol; exists_symbol; lambda_symbol;
    or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
 
 let special_set = List.fold_left (fun set s -> SSet.add s set) SSet.empty special_preds
@@ -143,13 +144,13 @@ let eliminate_lits hc =
     | Node (s, [a; b]) when s == or_symbol && not sign -> alpha_eliminate ~ord a false b false
     | Node (s, [a; b]) when s == imply_symbol && sign -> beta_eliminate ~ord a false b true
     | Node (s, [a; b]) when s == imply_symbol && not sign -> alpha_eliminate ~ord a true b false
-    | Bind (s, t) when s == forall_symbol && sign ->
+    | Bind (s, _, t) when s == forall_symbol && sign ->
       gamma_eliminate ~ord offset t true
-    | Bind (s, t) when s == forall_symbol && not sign ->
+    | Bind (s, _, t) when s == forall_symbol && not sign ->
       delta_eliminate ~ord (T.mk_not t) true
-    | Bind (s, t) when s == exists_symbol && sign ->
+    | Bind (s, _, t) when s == exists_symbol && sign ->
       delta_eliminate ~ord t true
-    | Bind (s, t) when s == exists_symbol && not sign ->
+    | Bind (s, _, t) when s == exists_symbol && not sign ->
       gamma_eliminate ~ord offset t false
     | Bind _ | Node _ -> keep eqn
   (* eliminate equivalence *)
@@ -190,7 +191,7 @@ let tableau_to_clauses hc a =
   else begin
     let clauses = ref []
     and eqns = Vector.create (Array.length a * 2) in
-    let proof = Proof ("elim", [hc, [], S.id_subst]) in
+    let proof c = Proof (c, "elim", [hc.hcproof]) in
     (* explore all combinations of tableau splits *)
     let rec explore_splits i =
       if i = Array.length a

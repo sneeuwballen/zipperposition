@@ -23,9 +23,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** a bitvector is just an int *)
 type t = int
 
+let max_len = Sys.word_size - 1
+
 (** make a bitvector of size n with all bits set *)
 let make n =
-  assert (n <= 31);
+  assert (n <= max_len);
   let rec shift bv n = if n = 0 then bv else shift ((bv lsl 1) lor 1) (n-1)
   in shift 0 n
 
@@ -52,7 +54,7 @@ let union a b = a lor b
 
 (** Iterate on set bits (naive) *)
 let iter bv f =
-  for i = 0 to 31 do
+  for i = 0 to max_len do
     if get bv i then f i;
   done
 
@@ -62,14 +64,14 @@ let from_list l = List.fold_left set empty l
 (** To a list of ints (naive) *)
 let to_list bv =
   let l = ref [] in
-  for i = 0 to 31 do
+  for i = 0 to max_len do
     if get bv i then l := i :: !l;
   done;
   !l
 
 (** select elements of the array, that are flaged as true, into a ('a, int) list *)
 let select bv a =
-  assert (Array.length a <= 31);
+  assert (Array.length a <= max_len);
   let rec select i =
     if i = Array.length a then []
     else if get bv i then (a.(i), i) :: select (i+1)

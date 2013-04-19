@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 
 (** Efficient perfect discrimination trees for matching *)
 
@@ -60,3 +60,6 @@ val pp_term_tree : Format.formatter -> term dtree -> unit
 
 val unit_index : Index.unit_index
   (** Indexing structure for simplifications *)
+
+val pp_dot : ?name:string -> ('a -> string) -> Format.formatter -> 'a dtree -> unit
+  (** Print the index as a tree. *)

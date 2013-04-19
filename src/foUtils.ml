@@ -18,21 +18,44 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 open Hash
 
-(* debugging facilities *)
+(** {1 Some helpers} *)
+
+(** {2 debugging facilities} *)
+
+let need_cleanup = ref false
+
+let clear_line () =
+  output_string Pervasives.stdout
+    "\r                                                         \r";
+  flush Pervasives.stdout
+
 let debug_level_ = ref 0
 let set_debug l = debug_level_ := l
 let debug l format =
   if l <= !debug_level_
-    then
+    then (
+      (if !need_cleanup then clear_line ());
       Format.kfprintf
         (fun fmt -> Format.fprintf fmt "@.")
       Format.std_formatter
-      format
+      format )
     else Format.ifprintf Format.std_formatter format 
 let debug_level () = !debug_level_
+
+(** {2 Time facilities} *)
+
+(** Time elapsed since initialization of the program, and time of start *)
+let get_total_time, get_start_time =
+  let start = Unix.gettimeofday () in
+  (function () ->
+    let stop = Unix.gettimeofday () in
+    stop -. start),
+  (function () -> start)
+
+(** {2 profiling facilities} *)
 
 (** A profiler (do not call recursively) *)
 type profiler = {
@@ -81,17 +104,26 @@ let () =
   at_exit (fun () ->
     if !enable_profiling && List.exists (fun profiler -> profiler.prof_calls > 0) !profilers
     then begin
-      Printf.printf "%% %39s ---------- --------- --------- ---------\n" (String.make 39 '-');
-      Printf.printf "%% %-39s %10s %9s %9s %9s\n" "function" "#calls" "total" "max" "average";
-      let profilers = List.sort (fun p1 p2 -> String.compare p1.prof_name p2.prof_name) !profilers in
+      Printf.printf "%% %39s ---------- --------- --------- --------- ---------\n"
+        (String.make 39 '-');
+      Printf.printf "%% %-39s %10s %9s %9s %9s %9s\n" "function" "#calls"
+        "total" "% total" "max" "average";
+      (* sort profilers by name *)
+      let profilers = List.sort
+        (fun p1 p2 -> String.compare p1.prof_name p2.prof_name)
+        !profilers in
+      let tot = get_total_time () in
       List.iter
         (fun profiler -> if profiler.prof_calls > 0 then
           (* print content of the profiler *)
-          Printf.printf "%% %-39s %10d %9.4f %9.4f %9.4f\n"
-            profiler.prof_name profiler.prof_calls profiler.prof_total profiler.prof_max
+          Printf.printf "%% %-39s %10d %9.4f %9.2f %9.4f %9.4f\n"
+            profiler.prof_name profiler.prof_calls profiler.prof_total
+            (profiler.prof_total *. 100. /. tot) profiler.prof_max
             (profiler.prof_total /. (float_of_int profiler.prof_calls)))
         profilers
     end)
+
+(** {2 Ordering utils} *)
 
 let rec lexicograph f l1 l2 =
   match l1, l2 with
@@ -99,7 +131,7 @@ let rec lexicograph f l1 l2 =
   | x::xs, y::ys ->
      let c = f x y in
      if c <> 0 then c else lexicograph f xs ys
-  | [],_ -> ~-1
+  | [],_ -> (-1)
   | _,[] -> 1
 
 (** combine comparisons by lexicographic order *)
@@ -199,9 +231,56 @@ let multiset_partial f l1 l2 =
   | [], [] -> Eq (* all elements removed by multiset_remove_eq *)
   | _ -> find_dominating l1 l2
 
-(* ----------------------------------------------------------------------
- * lists
- * ---------------------------------------------------------------------- *)
+(** {2 Hashconsing with non-weak semantic} *)
+
+(** Hashconsed elements are kept forever by default;  *)
+
+module KeepHashcons(H : Hashcons.HashedType) = struct
+  type t = H.t
+
+  module Tbl = Hashtbl.Make(H)
+
+  let __table = Tbl.create 5003
+  let __count = ref 0
+
+  let hashcons x =
+    try Tbl.find __table x
+    with Not_found ->
+      (* new tag for new representant *)
+      let y = H.tag !__count x in
+      incr __count;
+      Tbl.add __table y y;
+      y  (* [y] is the representant of [x] now *)
+
+  let mem x = Tbl.mem __table x
+
+  let iter f = Tbl.iter (fun x _ -> f x) __table
+
+  let clean () =
+    let n = Tbl.length __table in
+    let a = Weak.create n in
+    (* copy elements in the array *)
+    let r = ref 0 in
+    Tbl.iter (fun x _ -> Weak.set a !r (Some x); incr r) __table;
+    Tbl.clear __table;
+    (* collect useless elements *)
+    Gc.full_major ();
+    (* copy elements back *)
+    for i = 0 to n-1 do
+      match Weak.get a i with
+      | None -> ()
+      | Some x -> Tbl.add __table x x
+    done
+
+  let stats () =
+    let open Hashtbl in
+    let stats = Tbl.stats __table in
+    (* TODO compute median and min bucket size *)
+    (stats.num_buckets, stats.num_bindings, stats.num_bindings, 0, 0, stats.max_bucket_length)
+end
+
+
+(** {2 List utils} *)
 
 let rec list_get l i = match l, i with
   | [], i -> raise Not_found
@@ -320,20 +399,23 @@ let rec times i f =
   if i = 0 then []
   else (f ()) :: (times (i-1) f)
 
-(** Randomly shuffle the list. See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle *)
-let list_shuffle l =
-  let a = Array.of_list l in
+(** Randomly shuffle the array, in place.
+    See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle *)
+let array_shuffle a = 
   for i = 1 to Array.length a - 1 do
     let j = Random.int i in
     let tmp = a.(i) in
     a.(i) <- a.(j);
     a.(j) <- tmp;
-  done;
+  done
+
+(** Randomly shuffle the list *)
+let list_shuffle l =
+  let a = Array.of_list l in
+  array_shuffle a;
   Array.to_list a
 
-(* ----------------------------------------------------------------------
- * arrays
- * ---------------------------------------------------------------------- *)
+(** {2 Array utils} *)
 
 let array_foldi f acc a =
   let rec recurse acc i =
@@ -358,9 +440,7 @@ let array_exists p a =
     if i = Array.length a then false else p a.(i) || check (i+1)
   in check 0
 
-(* ----------------------------------------------------------------------
- * misc
- * ---------------------------------------------------------------------- *)
+(** {2 File utils} *)
 
 let with_lock_file filename action =
   let lock_file = Unix.openfile filename [Unix.O_CREAT; Unix.O_WRONLY] 0o644 in
@@ -375,9 +455,33 @@ let with_lock_file filename action =
     Unix.close lock_file;
     raise e
 
-(* ----------------------------------------------------------------------
- * pretty printing
- * ---------------------------------------------------------------------- *)
+let with_input filename action =
+  try
+    let ic = open_in filename in
+    (try
+      let res = Some (action ic) in
+      close_in ic;
+      res
+    with Sys_error _ ->
+      close_in ic;
+      None)
+  with Sys_error _ ->
+    None
+
+let with_output filename action =
+  try
+    let oc = open_out filename in
+    (try
+      let res = Some (action oc) in
+      close_out oc;
+      res
+    with Sys_error s ->
+      close_out oc;
+      None)
+  with Sys_error s ->
+    None
+
+(** {2 Pretty-printing utils} *)
 
 let on_buffer ?(margin=80) f t =
   let buff = Buffer.create 100 in

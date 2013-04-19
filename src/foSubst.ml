@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-open Types
+open Basic
 
 module T = Terms
 module Utils = FoUtils
@@ -88,11 +88,16 @@ let apply_subst ?(recursive=true) subst (t, offset) =
     then t (* subst(t) = t, if t ground or subst empty with no shifting *)
     else match t.term with
     | BoundVar _ -> t
-    | Bind (s, t') ->
-      T.mk_bind ~old:t s t.sort (replace (binder_depth+1) subst (t', offset))
+    | Bind (s, a_sort, t') ->
+      let t'' = replace (binder_depth + 1) subst (t',offset) in
+      if t' == t''
+        then t
+        else T.mk_bind s t.sort a_sort t''
     | Node (s, l) ->
       let l' = replace_list binder_depth subst offset l in
-      T.mk_node s t.sort l'
+      if List.for_all2 (==) l l'
+        then t
+        else T.mk_node s t.sort l'
     | Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       (try let (t', o_t') = lookup subst bound_t in
@@ -168,3 +173,40 @@ let pp_substitution formatter subst =
   Format.fprintf formatter "@[{";
   pp subst;
   Format.fprintf formatter "}@]"
+
+(** Sequence of pairs of bound terms *)
+let to_seq subst =
+  let seq k =
+    let rec iter subst = match subst with
+    | SubstEmpty -> ()
+    | SubstBind (v, o_v, t, o_t, subst') ->
+      k ((v, o_v), (t, o_t));
+      iter subst'
+    in iter subst
+  in Sequence.from_iter seq
+
+let of_seq ?(recursive=true) seq =
+  Sequence.fold
+    (fun subst (v, t) ->
+      bind ~recursive subst v t)
+    id_subst seq
+
+let to_json subst =
+  let items = Sequence.map
+    (fun ((v, o_v), (t, o_t)) ->
+      `List [T.to_json v; `Int o_v; T.to_json v; `Int o_t])
+    (to_seq subst)
+  in
+  `List (Sequence.to_list items)
+
+let of_json ?(recursive=true) json =
+  let l = Json.Util.to_list json in
+  let seq = Sequence.map
+    (fun json -> match json with
+      | `List [v; `Int o_v; t; `Int o_t] ->
+        let v = T.of_json v in
+        let t = T.of_json t in
+        ((v, o_v), (t, o_t))
+      | _ -> raise (Json.Util.Type_error ("expected subst", json)))
+    (Sequence.of_list l) in
+  of_seq ~recursive seq

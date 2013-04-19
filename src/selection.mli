@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Selection functions. See "E: a brainiac theorem prover". *)
 
-open Types
+open Basic
 
 val select_max_goal : ?strict:bool -> selection_fun
   (** Select a maximal negative literal, if any, or nothing *)

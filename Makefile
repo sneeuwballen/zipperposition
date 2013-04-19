@@ -1,36 +1,58 @@
 
-VERSION=0.1.1
+VERSION=0.2
 PP = 'sed -r s/ZIPPERPOSITION_VERSION/$(VERSION)/g'
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 INSTALLDIR ?= /usr/bin/
 BINARY = zipperposition.native
-TARGETS = src/zipperposition.native tests/tests.native zipperposition.docdir/index.html
-LIBS = unix,str
-SUBMODULES = 
+TARGETS_LIB = src/lib.cmxa src/lib.cma 
+TARGETS = src/zipperposition.native tests/tests.native
+LIBS = datalog
+#SUBMODULES = datalog sequence
+SUBMODULES = containers
+PACKAGES = yojson zip str num
+
+WITH_LIBS = $(addprefix -lib ,$(LIBS))
+WITH_PACKAGES = $(addprefix -package ,$(PACKAGES))
+
 PWD = $(shell pwd)
-OPTIONS = -libs $(LIBS) -I src -pp $(PP)
+#INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
+INCLUDES = -I,src
+#OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
+OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
+#OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
+OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
 
 # switch compilation module
-MODE := prod
+MODE ?= debug
 
 all: $(MODE)
 
-debug: $(SUBMODULES)
+debug:
+	ocamlbuild $(OPTIONS_LIB) -tag debug $(TARGETS_LIB)
 	ocamlbuild $(OPTIONS) -tag debug $(TARGETS)
 
-prod: $(SUBMODULES) tests
+prod:
+	ocamlbuild $(OPTIONS_LIB) -tag noassert $(TARGETS_LIB)
 	ocamlbuild $(OPTIONS) -tag noassert $(TARGETS)
 
-profile: $(SUBMODULES) tests
-	ocamlbuild $(OPTIONS) -tags debug,profile $(TARGETS)
+profile:
+	ocamlbuild $(OPTIONS_LIB) -tag debug,profile $(TARGETS_LIB)
+	ocamlbuild $(OPTIONS) -tag debug,profile $(TARGETS)
 
-# just build bytecode
-byte: $(SUBMODULES) tests
+byte:
 	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
 
-# cleanup build
+doc:
+	ocamlbuild $(OPTIONS) src/zipperposition.docdir/index.html
+	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
+		-I ../_build/src -I ../_build/containers -I ../_build/meta \
+		-package yojson -package datalog -dot -o modules.dot
+	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
+		-I ../_build/src -I ../_build/containers -I ../_build/meta \
+		-package yojson -package datalog -man -d man/
+
 clean:
 	ocamlbuild -clean
 
@@ -39,7 +61,16 @@ install: all
 	cp $(BINARY) $(INSTALLDIR)/zipperposition
 
 tags:
-	ctags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
+	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
-.PHONY: all debug prod profile clean tags doc tests install
+dot:
+	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
+.PHONY: all debug prod profile clean tags doc tests install dot
+
+# libraries
+
+containers:
+	make -C containers
+
+.PHONY: containers

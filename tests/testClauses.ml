@@ -1,6 +1,6 @@
 (** test clauses *)
 
-open Types
+open Basic
 open Symbols
 
 module C = Clauses
@@ -39,12 +39,12 @@ let random_lit () =
 let random_clause ?(size=4) () =
   if H.random_in 0 200 >= 198 then
     (* empty clause, from time to time *)
-    C.mk_hclause ~ctx [] (Axiom ("", "empty!"))
+    C.mk_hclause ~ctx [] (fun c -> Axiom (c, "", "empty!"))
   else
     (* build an actual clause *)
     let size = H.random_in 1 size in
     let lits = Utils.times size (fun _ -> random_lit ()) in
-    C.mk_hclause ~ctx lits (Axiom ("", "random"))
+    C.mk_hclause ~ctx lits (fun c -> Axiom (c, "", "random"))
 
 (* pair of random clauses *)
 let random_clause_pair () =

@@ -1,12 +1,12 @@
 (** testing of rewriting *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
 module S = FoSubst
 module Utils = FoUtils
-module Rw = Rewriting
+module Rw = Rewriting.TRS
 
 let a = T.mk_const (mk_symbol "a") univ_
 let b = T.mk_const (mk_symbol "b") univ_
@@ -47,8 +47,8 @@ let rec print_peano_nice formatter t =
   with Failure _ ->
     match t.term with
     | Var _ | BoundVar _ -> !T.pp_term#pp formatter t
-    | Bind (s, t') ->
-      Format.fprintf formatter "%a(%a)" !T.pp_symbol#pp s print_peano_nice t'
+    | Bind (s, _, t') ->
+      Format.fprintf formatter "%a(%a)" pp_symbol s print_peano_nice t'
     | Node (h, l) ->
       Format.fprintf formatter "@[<h>%a(%a)@]" !T.pp_term#pp (T.mk_const h univ_ (* ugly *))
         (Utils.pp_list ~sep:", " print_peano_nice) l

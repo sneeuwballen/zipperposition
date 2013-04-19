@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Reduction to CNF, and simplifications. See "computing small normal forms",
     in "handbook of automated reasoning". *)
 
-open Types
+open Basic
 open Symbols
 
 module T = Terms
@@ -29,6 +29,35 @@ module C = Clauses
 module S = FoSubst
 module Lits = Literals
 module Utils = FoUtils
+
+(* ----------------------------------------------------------------------
+ * Recognize clauses
+ * ---------------------------------------------------------------------- *)
+
+(** check whether the clause is already in CNF *)
+let is_cnf lits =
+  Utils.array_forall
+    (fun (Equation (l, r, sign, _)) ->
+      T.atomic_rec l && T.atomic_rec r && (l.sort != bool_ ||
+                                          (l == T.true_term || r == T.true_term)))
+    lits
+
+(** Is the clause almost in CNF (i.e. some equivalences between
+    an atomic prop and a prop remain)? *)
+let is_quasi_cnf lits =
+  let is_equiv = function
+    | Equation (l, r, true, Gt) ->
+      r != T.true_term && r != T.false_term && T.atomic_rec l && l.sort == bool_
+    | Equation (l, r, true, Lt) ->
+      l != T.true_term && l != T.false_term && T.atomic_rec r && r.sort == bool_
+    | _ -> false
+  and is_atomic = function
+    | Equation (l, r, _, _) ->
+      l.sort != bool_ || (T.atomic_rec l && T.atomic_rec r)
+  in
+  Utils.array_forall
+    (fun lit -> is_atomic lit || is_equiv lit)
+    lits
 
 (* ----------------------------------------------------------------------
  * syntactic simplification
@@ -40,13 +69,13 @@ let rec simplify_term t =
   if T.get_flag T.flag_simplified t then t else  (* maybe it's already simplified *)
   match t.term with
   | Var _ | Node (_, []) | BoundVar _ -> (mark_simplified t; t)
-  | Bind (f, t') when not (T.db_contains t' 0) ->
+  | Bind (f, _, t') when not (T.db_contains t' 0) ->
     simplify_term t'  (* eta-reduction: binder binds nothing, remove it *)
-  | Bind (f, t') -> T.mk_bind ~old:t f t.sort (simplify_term t')
-  | Node (s, [{term=Bind (s', t')}]) when s == not_symbol && s' == forall_symbol ->
-    simplify_term (T.mk_exists (T.mk_not t'))  (* not forall t -> exists (not t) *)
-  | Node (s, [{term=Bind (s', t')}]) when s == not_symbol && s' == exists_symbol ->
-    simplify_term (T.mk_forall (T.mk_not t'))  (* not exists t -> forall (not t) *)
+  | Bind (f, a_sort, t') -> T.mk_bind ~old:t f t.sort a_sort (simplify_term t')
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s == not_symbol && s' == forall_symbol ->
+    simplify_term (T.mk_exists a_sort (T.mk_not t'))  (* not forall t -> exists (not t) *)
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s == not_symbol && s' == exists_symbol ->
+    simplify_term (T.mk_forall a_sort (T.mk_not t'))  (* not exists t -> forall (not t) *)
   | Node (s, [{term=Node (s', [t'])}]) when s == not_symbol && s' == not_symbol ->
     simplify_term t'  (* double negation *)
   | Node (s, [t']) when s == not_symbol && t' == T.true_term ->
@@ -98,12 +127,13 @@ let simplify hc =
   (* simplify a lit *)
   let simp_lit (Equation (l,r,sign,_) as lit) =
     let lit' = Lits.mk_lit ~ord:ctx.ctx_ord (simplify_term l) (simplify_term r) sign in
+    let lit' = Lits.lit_of_fof ~ord:ctx.ctx_ord lit' in
     (if not (Lits.eq lit lit') then simplified := true);
     lit'
   in
   let lits = Array.map simp_lit hc.hclits in
   if !simplified
-    then C.mk_hclause_a ~ctx lits hc.hcproof
+    then C.mk_hclause_a ~ctx lits (C.adapt_proof hc.hcproof)
     else hc  (* no simplification *)
 
 (* ----------------------------------------------------------------------
@@ -124,7 +154,7 @@ let rec miniscope_term t =
   let t = simplify_term t in
   (* recursive miniscoping *)
   match t.term with
-  | Bind (s, {term=Node (s', l)})
+  | Bind (s, a_sort, {term=Node (s', l)})
     when (s == forall_symbol || s == exists_symbol) && (s' == and_symbol || s' == or_symbol) ->
     (* Q x. a and/or b -> (Q x. a) and/or b  if x \not\in vars(b) *)
     let a, b = List.partition (fun f -> T.db_contains f 0) l in
@@ -135,14 +165,14 @@ let rec miniscope_term t =
         let a =
           if ((s == forall_symbol && s' == and_symbol)
             || (s == exists_symbol && s' == or_symbol))
-          then mk_n_ary s' (List.map (fun t -> miniscope_term (T.mk_bind s bool_ t)) a)
-          else T.mk_bind s bool_ (mk_n_ary s' a)
+          then mk_n_ary s' (List.map (fun t -> miniscope_term (T.mk_bind s bool_ a_sort t)) a)
+          else T.mk_bind s bool_ a_sort (mk_n_ary s' a)
         in
         (* some subformulas do not contain x, put them outside of quantifier *)
         let b = mk_n_ary s' (List.map (fun t -> miniscope_term (T.db_unlift t)) b) in
         simplify_term (T.mk_node s' bool_ [a; b])
       else t
-  | Bind (_, _) -> t
+  | Bind (_, _, _) -> t
   | BoundVar _ | Var _ | Node _ -> t
 
 (** Apply miniscoping transformation to the clause *)
@@ -158,7 +188,7 @@ let miniscope hc =
   let lits = Array.map miniscope_lit hc.hclits in
   if !simplified
     then (* mark the miniscoping as a proof step, and produce a new clause *)
-      let proof = Proof ("miniscope", [hc, [], S.id_subst]) in
+      let proof c = Proof (c, "miniscope", [hc.hcproof]) in
       let hc' = C.mk_hclause_a ~parents:[hc] ~ctx lits proof in
       Utils.debug 3 "miniscoped @[<h>%a@] into @[<h>%a@]"
                     !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc';
@@ -170,7 +200,7 @@ let rec nnf t =
   if t.sort != bool_ then t else
   match t.term with
   | Var _ | Node (_, []) | BoundVar _ -> t
-  | Bind (f, t') -> T.mk_bind f t.sort (nnf t')
+  | Bind (f, a_sort, t') -> T.mk_bind f t.sort a_sort (nnf t')
   | Node (s, [{term=Node (s', [a; b])}]) when s = not_symbol && s' = and_symbol ->
     nnf (T.mk_or (T.mk_not a) (T.mk_not b))  (* de morgan *)
   | Node (s, [{term=Node (s', [a; b])}]) when s = not_symbol && s' = or_symbol ->
@@ -190,10 +220,10 @@ let rec nnf t =
     nnf (T.mk_or
       (T.mk_and a (T.mk_not b))
       (T.mk_and b (T.mk_not a)))
-  | Node (s, [{term=Bind (s', t')}]) when s = not_symbol && s' = forall_symbol ->
-    nnf (T.mk_exists (T.mk_not t')) (* not forall -> exists not *)
-  | Node (s, [{term=Bind (s', t')}]) when s = not_symbol && s' = exists_symbol ->
-    nnf (T.mk_forall (T.mk_not t')) (* not exists -> forall not *)
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s = not_symbol && s' = forall_symbol ->
+    nnf (T.mk_exists a_sort (T.mk_not t')) (* not forall -> exists not *)
+  | Node (s, [{term=Bind (s', a_sort, t')}]) when s = not_symbol && s' = exists_symbol ->
+    nnf (T.mk_forall a_sort (T.mk_not t')) (* not exists -> forall not *)
   | Node (s, [{term=Node (s', [t])}]) when s = not_symbol && s' = not_symbol ->
     nnf t (* double negation *)
   | Node (s, l) ->
@@ -205,23 +235,17 @@ let rec skolemize ~ord ~var_index t = match t.term with
   | Var _ | Node (_, []) | BoundVar _ -> t
   | Node (s, [{term=Node (s', [t])}]) when s = not_symbol && s' = not_symbol ->
     skolemize ~ord ~var_index t (* double negation *)
-  | Bind (s, t') when s = forall_symbol ->
+  | Bind (s, a_sort, t') when s = forall_symbol ->
     (* a fresh variable *)
-    let sort = match T.look_db_sort 0 t with
-      | None -> univ_
-      | Some s -> s in
-    let v = T.mk_var (!var_index) sort in
+    let v = T.mk_var (!var_index) a_sort in
     incr var_index;
     let new_t' = T.db_unlift (T.db_replace t' v) in
     skolemize ~ord ~var_index new_t' (* remove forall *)
-  | Bind (s, t') when s = exists_symbol ->
+  | Bind (s, a_sort, t') when s = exists_symbol ->
     (* make a skolem symbol *)
-    let sort = match T.look_db_sort 0 t with
-      | None -> univ_
-      | Some s -> s in
-    let new_t' = !T.skolem ~ord t' sort in
+    let new_t' = !T.skolem ~ord t' a_sort in
     skolemize ~ord ~var_index new_t' (* remove forall *)
-  | Bind (s, t') -> T.mk_bind s t.sort (skolemize ~ord ~var_index t')
+  | Bind (s, a_sort, t') -> T.mk_bind s t.sort a_sort (skolemize ~ord ~var_index t')
   | Node (s, l) -> T.mk_node s t.sort (List.map (skolemize ~ord ~var_index) l)
 
 (** reduction to cnf using De Morgan laws. Returns a list of list of terms *)
@@ -255,7 +279,7 @@ let cnf_of hc =
   let var_index = ref 0 in
   (* unique counter for variable indexes *)
   Utils.debug 3 "input clause %a@." !C.pp_clause#pp_h hc;
-  if C.is_cnf hc
+  if is_cnf hc.hclits
     then begin
       Utils.debug 3 "clause @[<h>%a@] is cnf" !C.pp_clause#pp_h hc;
       [hc] (* already cnf, perfect *)
@@ -273,7 +297,7 @@ let cnf_of hc =
         | [] -> assert false  (* is in cnf ;) *)
         | hd::tl -> List.fold_left product hd tl in
       (* build clauses from lits *)
-      let proof = Proof ("to_cnf", [hc, [], S.id_subst]) in
+      let proof c = Proof (c, "to_cnf", [hc.hcproof]) in
       let clauses = List.map
         (fun lits ->
           let lits = List.map (fun (t, sign) -> Lits.mk_lit ~ord t T.true_term sign) lits in
@@ -284,5 +308,5 @@ let cnf_of hc =
       in
       Utils.debug 3"%% clause @[<h>%a@] to_cnf -> @[<h>%a@]" !C.pp_clause#pp_h
                   hc (Utils.pp_list !C.pp_clause#pp_h) clauses;
-      List.iter (fun hc -> assert (C.is_cnf hc)) clauses;
+      List.iter (fun hc -> assert (is_cnf hc.hclits)) clauses;
       clauses

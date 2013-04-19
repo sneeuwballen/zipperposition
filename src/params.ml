@@ -20,27 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Parameters for the prover, the calculus, etc. *)
 
-(** parameters for the main procedure *)
-type parameters = {
-  param_ord : Types.precedence -> Types.ordering;
-  param_seed : int;
-  param_steps : int;
-  param_version : bool;
-  param_calculus : string;
-  param_timeout : float;
-  param_files : string list;
-  param_split : bool;             (** use splitting *)
-  param_theories : bool;          (** detect theories *)
-  param_precedence : bool;        (** use heuristic for precedence? *)
-  param_select : string;          (** name of the selection function *)
-  param_progress : bool;          (** print progress during search *)
-  param_proof : bool;             (** print proof *)
-  param_dot_file : string option; (** file to print the final state in *)
-  param_presaturate : bool;       (** initial interreduction of proof state? *)
-  param_output_syntax : string;   (** syntax for output *)
-  param_index : string;           (** indexing structure *)
-  param_print_sort : bool;        (** print sorts of terms *)
-}
+open Basic
 
 (** parse_args returns parameters *)
 let parse_args () =
@@ -54,19 +34,26 @@ let parse_args () =
   and steps = ref 0
   and version = ref false
   and timeout = ref 0.
-  and proof = ref true
-  and output = ref "debug"
+  and proof = ref "debug"
   and index = ref "fp"
   and split = ref false
   and theories = ref true
-  and calculus = ref "superposition"
+  and calculus = ref "delayed"
   and presaturate = ref false
   and heuristic_precedence = ref true
+  and kb = ref "kb"
+  and kb_load = ref []
+  and kb_clear = ref false
+  and kb_print = ref false
   and dot_file = ref None
   and select = ref "SelectComplex"
   and progress = ref false
-  and print_sort = ref false
   and files = ref [] in
+  (* special handlers *)
+  let set_progress () =
+    FoUtils.need_cleanup := true;
+    progress := true
+  in
   (* options list *) 
   let options =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
@@ -74,37 +61,38 @@ let parse_args () =
       ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
       ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
-      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed')");
+      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))");
       ("-timeout", Arg.Set_float timeout, "verbose mode");
       ("-select", Arg.Set_string select, help_select);
       ("-split", Arg.Set split, "enable splitting");
-      ("-progress", Arg.Set progress, "print progress");
+      ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
+      ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
+      ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
+      ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
+      ("-print-sort", Arg.Unit (fun () -> Terms.pp_term_debug#sort true), "print sorts");
+      ("-progress", Arg.Unit set_progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
-      ("-no-proof", Arg.Clear proof, "disable proof printing");
+      ("-proof", Arg.Set_string proof, "choose proof printing (none, debug, json or tstp)");
       ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
-      ("-output", Arg.Set_string output, "output syntax ('debug', 'tstp')");
+      ("-seed", Arg.Set_int seed, "set random seed");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
-      ("-print-sort", Arg.Set print_sort, "print sorts of terms");
-      ("-print-ord", Arg.Unit (fun () -> Literals.pp_literal_debug#ord true), "print order of sides of literals");
     ]
   in
   Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
   (if !files = [] then files := ["stdin"]);
-  let param_ord = match !ord with
-    | "rpo" -> Orderings.rpo
-    | "rpo6" -> Orderings.rpo6
-    | "kbo" -> Orderings.kbo
-    | x -> failwith ("unknown ordering " ^ x) in
+  let param_ord = Orderings.choose !ord in
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;
     param_files = !files; param_select = !select; param_theories = !theories;
     param_progress = !progress;
     param_proof = !proof; param_split = !split;
-    param_presaturate = !presaturate; param_output_syntax = !output;
+    param_presaturate = !presaturate;
     param_index= !index; param_dot_file = !dot_file;
-    param_print_sort = !print_sort;
+    param_kb = !kb; param_kb_load = !kb_load;
+    param_kb_clear = !kb_clear;
+    param_kb_print = !kb_print; 
     param_precedence= !heuristic_precedence;}
