@@ -228,6 +228,19 @@ module Set = struct
 
   let add set e = add_list set [e]
 
+  let iter e f =
+    List.iter f e.active;
+    List.iter f e.inactive
+
+  let to_seq e = Sequence.append
+    (Sequence.of_list e.active)
+    (Sequence.of_list e.inactive)
+
+  let of_seq e seq =
+    Sequence.fold add e seq
+
+  let size e = Sequence.length (to_seq e)
+
   let update_ctx set ~ctx =
     let set' = {ctx; active=[]; inactive=[]; } in
     let set' = add_list set' set.active in

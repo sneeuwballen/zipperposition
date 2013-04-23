@@ -30,74 +30,79 @@ module C = Clauses
 module O = Orderings
 module Utils = FoUtils
 
-(** A priority queue of clauses, purely functional *)
-class type queue =
-  object
-    method add : hclause -> queue
-    method add_list : hclause list -> queue
-    method is_empty: bool
-    method take_first : (queue * hclause)
-    method clean : C.CSet.t -> queue    (** remove all clauses that are not in the set *)
-    method name : string
-  end
-
-(** A heap that compares clauses by their weight *)
+(* TODO get rid of GPL implementation of heap *)
+(** A heap that compares (int,clauses) by the int *)
 module LH = Leftistheap.Make(
   struct
     type t = int * hclause
-    let le (i, _) (j, _) = i <= j
+    let le (i, hci) (j, hcj) = i <= j || (i = j && hci.hctag <= hcj.hctag)
   end)
 
+type t = {
+  heap : LH.t;
+  functions : functions;
+} (** A priority queue of clauses, purely functional *)
+and functions = {
+  weight : hclause -> int;
+  accept : hclause -> bool;
+  name : string;
+}
+
 (** generic clause queue based on some ordering on clauses, given
-    by a weight function (TODO rewrite LH to store weight in tree nodes?) *)
-let make_hq ?(accept=(fun _ -> true)) ~weight name =
-  object
-    val heap = LH.empty
-    
-    method is_empty = LH.is_empty heap
+    by a weight function *)
+let mk_queue ?(accept=(fun _ -> true)) ~weight name =
+  let functions = {
+    weight;
+    accept;
+    name;
+  } in
+  { heap = LH.empty;
+    functions;
+  }
 
-    method add hc =
-      if accept hc then
-        let w = weight hc in
-        let new_heap = LH.insert (w, hc) heap in
-        ({< heap = new_heap >} :> queue)
-      else
-        ({<>} :> queue)
+let is_empty q =
+  LH.is_empty q.heap
 
-    method add_list hcs =
-      (* add clauses to the heap *)
-      let new_heap = List.fold_left
-        (fun heap hc ->
-          if accept hc
-            then LH.insert (weight hc, hc) heap
-            else heap)
-        heap hcs
-      in 
-      ({< heap = new_heap >} :> queue)
+let add q hc =
+  if q.functions.accept hc
+    then
+      let w = q.functions.weight hc in
+      let heap = LH.insert (w, hc) q.heap in
+      { q with heap; }
+    else q
 
-    method take_first =
-      assert (not (LH.is_empty heap));
-      let (_, c), new_h = LH.extract_min heap in
-      (({< heap = new_h >} :> queue), c)
+let adds q hcs =
+  let heap =
+    Sequence.fold
+      (fun heap hc ->
+        if q.functions.accept hc
+          then
+            let w = q.functions.weight hc in
+            LH.insert (w,hc) heap
+          else heap)
+      q.heap hcs in
+  { q with heap; }
 
-    (** Keep only the clauses that are in the set *)
-    method clean set =
-      let new_heap =
-        LH.filter heap
-          (fun (_, hc) -> C.CSet.mem set hc)
-      in 
-      ({< heap = new_heap >} :> queue)
+let take_first q =
+  (if is_empty q then raise Not_found);
+  let (_, hc), new_h = LH.extract_min q.heap in
+  let q' = { q with heap=new_h; } in
+  q', hc 
 
-    method name = name
-  end
+(** Keep only the clauses that are in the set *)
+let clean q set =
+  let new_heap = LH.filter q.heap (fun (_, hc) -> C.CSet.mem set hc) in
+  { q with heap=new_heap; }
+
+let name q = q.functions.name
 
 let fifo =
   let name = "fifo_queue" in
-  make_hq ~weight:(fun hc -> hc.hctag) name
+  mk_queue ~weight:(fun hc -> hc.hctag) name
 
 let clause_weight =
   let name = "clause_weight" in
-  make_hq ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~weight:(fun hc -> hc.hcweight) name
   
 let goals =
   (* check whether a literal is a goal *)
@@ -105,12 +110,12 @@ let goals =
   | Equation (_, _, sign, _) -> not sign in
   let is_goal_clause hc = Utils.array_forall is_goal_lit hc.hclits in
   let name = "prefer_goals" in
-  make_hq ~accept:is_goal_clause ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_goal_clause ~weight:(fun hc -> hc.hcweight) name
 
 let ground =
   let is_ground hc = hc.hcvars = [] in
   let name = "prefer_ground" in
-  make_hq ~accept:is_ground ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_ground ~weight:(fun hc -> hc.hcweight) name
 
 let non_goals =
   (* check whether a literal is a goal *)
@@ -118,7 +123,7 @@ let non_goals =
   | Equation (_, _, sign, _) -> not sign in
   let is_non_goal_clause hc = Utils.array_forall (fun x -> not (is_goal_lit x)) hc.hclits in
   let name = "prefer_non_goals" in
-  make_hq ~accept:is_non_goal_clause ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_non_goal_clause ~weight:(fun hc -> hc.hcweight) name
 
 let pos_unit_clauses =
   let is_unit_pos hc = match hc.hclits with
@@ -126,17 +131,17 @@ let pos_unit_clauses =
   | _ -> false
   in
   let name = "prefer_pos_unit_clauses" in
-  make_hq ~accept:is_unit_pos ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_unit_pos ~weight:(fun hc -> hc.hcweight) name
 
 let horn =
   let name = "prefer_horn" in
-  make_hq ~accept:C.is_horn ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:C.is_horn ~weight:(fun hc -> hc.hcweight) name
 
 let lemmas =
   let name = "lemmas" in
   let accept hc = C.get_flag C.flag_lemma hc in
   (* use a fifo on lemmas *)
-  make_hq ~accept ~weight:(fun _ -> 1) name
+  mk_queue ~accept ~weight:(fun _ -> 1) name
 
 let default_queues =
   [ fifo, 2;
@@ -157,11 +162,12 @@ let default_queues =
   *)
 
 let pp_queue formatter q =
-  Format.fprintf formatter "@[<h>queue %s@]" q#name
+  Format.fprintf formatter "@[<h>queue %s@]" (name q)
 
 let pp_queue_weight formatter (q, w) =
-  Format.fprintf formatter "@[<h>queue %s, %d@]" q#name w
+  Format.fprintf formatter "@[<h>queue %s, %d@]" (name q) w
 
 let pp_queues formatter qs =
-  Format.fprintf formatter "@[<hov>%a@]" (Utils.pp_list ~sep:"; " pp_queue_weight) qs
+  Format.fprintf formatter "@[<hov>%a@]"
+    (Sequence.pp_seq ~sep:"; " pp_queue_weight) qs
 

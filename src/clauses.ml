@@ -113,7 +113,7 @@ let vars_of_lits lits =
     of [c], is has been infered/simplified from [c] *)
 let is_child_of ~child c =
   (* update the parent clauses' sets of descendants by adding [child] *)
-  let descendants = Ptset.add child.hctag c.hcdescendants in
+  let descendants = SmallSet.add c.hcdescendants child.hctag in
   c.hcdescendants <- descendants
 
 (* module CHashcons = Hashcons.Make( *)
@@ -131,7 +131,8 @@ let true_clause ~ctx =
   let hclits = [| Equation (T.true_term, T.true_term, true, Eq) |] in
   let hc = { hclits; hcproof = Obj.magic 0;
       hctag = -1; hcweight=2; hcselected=0; hcflags; hcctx=ctx;
-      hcvars=[]; hcparents=[]; hcdescendants=Ptset.empty; }
+      hcvars=[]; hcparents=[];
+      hcdescendants=SmallSet.empty ~cmp:(fun i j -> i-j); }
   in
   let hc = CHashcons.hashcons hc in
   hc.hcproof <- Proof (compact_clause hc, "trivial", []);
@@ -177,7 +178,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
     hcvars = all_vars;
     hcproof = Obj.magic 0;
     hcparents = [];
-    hcdescendants = Ptset.empty;
+    hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
   } in
   let old_hc, hc = hc, CHashcons.hashcons hc in
   if hc == old_hc then begin
@@ -208,6 +209,8 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
 (** Build clause from a list (delegating to mk_hclause_a) *)
 let mk_hclause ?parents ?selected ~ctx lits proof =
   mk_hclause_a ?parents ?selected ~ctx (Array.of_list lits) proof
+
+let is_empty hc = Array.length hc.hclits = 0
 
 (** Adapt a proof to a new clause *)
 let adapt_proof proof c = match proof with
@@ -410,6 +413,8 @@ let rec from_term ~ctx (t, file, name) =
  * set of clauses, reachable by ID
  * ---------------------------------------------------------------------- *)
 
+(* TODO suppress maxvar, useless *)
+
 (** Simple set *)
 module ClauseSet = Set.Make(
   struct
@@ -421,60 +426,62 @@ module ClauseSet = Set.Make(
 module CSet =
   struct
 
+    module IntMap = Map.Make(struct
+      type t = int
+      let compare i j = i - j
+    end)
+
     (** Set of hashconsed clauses. 'a is the fantom type for hclauses.
         It also contains a payload that is updated on every addition/
         removal of clauses. The additional payload is also updated upon
         addition/deletion. *)
     type t = {
       maxvar : int;                 (** index of maximum variable *)
-      clauses : hclause Ptmap.t;    (** clause ID -> clause *)
+      clauses : hclause IntMap.t;    (** clause ID -> clause *)
     }
 
-    let empty = { maxvar=0; clauses = Ptmap.empty; }
+    let empty = { maxvar=0; clauses = IntMap.empty; }
 
-    let is_empty set = Ptmap.is_empty set.clauses
+    let is_empty set = IntMap.is_empty set.clauses
 
-    let size set = Ptmap.fold (fun _ _ b -> b + 1) set.clauses 0
+    let size set = IntMap.fold (fun _ _ b -> b + 1) set.clauses 0
 
     let add set hc =
       let maxvar = max (T.max_var hc.hcvars) set.maxvar in
-      { maxvar; clauses = Ptmap.add hc.hctag hc set.clauses; }
+      { maxvar; clauses = IntMap.add hc.hctag hc set.clauses; }
 
     let add_list set hcs =
       let maxvar, clauses =
         List.fold_left
-          (fun (m,c) hc -> max m (T.max_var hc.hcvars), Ptmap.add hc.hctag hc c)
+          (fun (m,c) hc -> max m (T.max_var hc.hcvars), IntMap.add hc.hctag hc c)
           (set.maxvar, set.clauses) hcs in
       {maxvar; clauses;}
 
     let remove_id set i =
-      { set with clauses = Ptmap.remove i set.clauses }
+      { set with clauses = IntMap.remove i set.clauses }
 
     let remove set hc = remove_id set hc.hctag
 
     let remove_list set hcs =
       let clauses =
         List.fold_left
-          (fun c hc -> Ptmap.remove hc.hctag c)
+          (fun c hc -> IntMap.remove hc.hctag c)
           set.clauses hcs in
       {set with clauses;}
 
-    let remove_ids set ids =
-      let clauses =
-        Ptset.fold
-          (fun i set -> Ptmap.remove i set)
-          ids set.clauses in
-      {set with clauses;}
+    let get set i = IntMap.find i set.clauses
 
-    let get set i = Ptmap.find i set.clauses
+    let mem set hc = IntMap.mem hc.hctag set.clauses
 
-    let mem set hc = Ptmap.mem hc.hctag set.clauses
+    let mem_id set i = IntMap.mem i set.clauses
 
-    let mem_id set i = Ptmap.mem i set.clauses
+    let choose set =
+      try Some (snd (IntMap.choose set.clauses))
+      with Not_found -> None
 
-    let iter set k = Ptmap.iter (fun _ hc -> k hc) set.clauses
+    let iter set k = IntMap.iter (fun _ hc -> k hc) set.clauses
 
-    let iteri set k = Ptmap.iter k set.clauses
+    let iteri set k = IntMap.iter k set.clauses
 
     let fold f acc set =
       let acc = ref acc in
@@ -482,10 +489,24 @@ module CSet =
       !acc
 
     let to_list set =
-      Ptmap.fold (fun _ hc acc -> hc :: acc) set.clauses []
+      IntMap.fold (fun _ hc acc -> hc :: acc) set.clauses []
 
     let of_list l =
       add_list empty l
+
+    let to_seq set =
+      Sequence.from_iter
+        (fun k -> iter set k)
+
+    let of_seq set seq = Sequence.fold add set seq
+
+    let remove_seq set seq =
+      let clauses = Sequence.fold
+        (fun c hc -> IntMap.remove hc.hctag c)
+        set.clauses seq in
+      {set with clauses;}
+
+    let remove_id_seq set seq = Sequence.fold remove_id set seq
   end
 
 (* ----------------------------------------------------------------------

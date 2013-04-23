@@ -143,8 +143,8 @@ and hclause = {
   mutable hcvars : term list;             (** the free variables *)
   mutable hcproof : compact_clause proof; (** Proof of the clause *)
   mutable hcparents : hclause list;       (** parents of the clause *)
-  mutable hcdescendants : Ptset.t;        (** the set of IDs of descendants of the clause *)
-}  (* TODO: use int SmallSet.t instead of Ptset.t *)
+  mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
+} 
 (** A context for clauses. TODO add a structure for local term hashconsing? *)
 and context = {
   mutable ctx_ord : ordering;             (** current ordering on terms *)
@@ -158,6 +158,8 @@ and 'a proof =
   | Proof of 'a * string * 'a proof list
 (** a selection function *)
 and selection_fun = hclause -> int list
+
+let mk_ctx ord select = { ctx_ord=ord; ctx_select=select; }
 
 (** Create a compact clause from a clause *)
 let compact_clause hc = (hc.hctag, hc.hclits)
@@ -209,5 +211,6 @@ type parameters = {
   param_kb_print : bool;          (** print knowledge base and exit *)
   param_learn : bool;             (** learn lemmas? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
+  param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
   param_index : string;           (** indexing structure *)
 }

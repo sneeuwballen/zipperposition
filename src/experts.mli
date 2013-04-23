@@ -89,6 +89,13 @@ module Set : sig
 
   val add_list : t -> expert list -> t
 
+  val size : t -> int
+
+  val to_seq : t -> expert Sequence.t
+  val of_seq : t -> expert Sequence.t -> t
+
+  val iter : t -> (expert -> unit) -> unit
+
   val update_ctx : t -> ctx:context -> t
 
   val is_redundant : t -> hclause -> bool

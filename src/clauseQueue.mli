@@ -26,40 +26,53 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Basic
 
 (** A priority queue of clauses, purely functional *)
-class type queue =
-  object
-    method add : hclause -> queue
-    method add_list : hclause list -> queue
-    method is_empty: bool
-    method take_first : (queue * hclause)
-    method clean : Clauses.CSet.t -> queue    (** remove all clauses that are not in the set *)
-    method name : string
-  end
+type t
 
-(** select by increasing age (for fairness) *)
-val fifo : queue
+val add : t -> hclause -> t
+  (** Add a clause to the Queue *)
 
-(** select by increasing weight of clause *)
-val clause_weight : queue
+val adds : t -> hclause Sequence.t -> t
+  (** Add clauses to the queue *)
 
-(** only select goals (clauses with only negative lits) *)
-val goals : queue
+val is_empty : t -> bool
+  (** check whether the queue is empty *)
 
-(** only select ground clauses *)
-val ground : queue
+val take_first : t -> (t * hclause)
+  (** Take first element of the queue, or raise Not_found *)
 
-(** only select positive unit clauses *)
-val pos_unit_clauses : queue
+val clean : t -> Clauses.CSet.t -> t
+  (** remove all clauses that are not in the set *)
 
-(** select horn clauses *)
-val horn : queue
+val name : t -> string
+  (** Name of the implementation/role of the queue *)
 
-(** only select lemmas *)
-val lemmas : queue
+val fifo : t
+  (** select by increasing age (for fairness) *)
+
+val clause_weight : t
+  (** select by increasing weight of clause *)
+
+val goals : t
+  (** only select goals (clauses with only negative lits) *)
+
+val ground : t
+  (** only select ground clauses *)
+
+val pos_unit_clauses : t
+  (** only select positive unit clauses *)
+
+val horn : t
+  (** select horn clauses *)
+
+val lemmas : t
+  (** only select lemmas *)
+
+val mk_queue : ?accept:(hclause -> bool) -> weight:(hclause -> int) -> string -> t
+  (** Bring your own implementation of queue *)
 
 (** default combination of heuristics *)
-val default_queues : (queue * int) list
+val default_queues : (t * int) list  (* TODO array *)
 
-val pp_queue : Format.formatter -> queue -> unit
-val pp_queues : Format.formatter -> (queue * int) list -> unit
+val pp_queue : Format.formatter -> t -> unit
+val pp_queues : Format.formatter -> (t * int) Sequence.t -> unit
 

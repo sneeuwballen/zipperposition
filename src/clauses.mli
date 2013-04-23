@@ -83,7 +83,10 @@ val adapt_proof : compact_clause proof -> compact_clause -> compact_clause proof
 
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
-val descendants : hclause -> Ptset.t
+val is_empty : hclause -> bool
+  (** Is the clause an empty clause? *)
+
+val descendants : hclause -> int SmallSet.t
   (** set of ID of descendants of the clause *)
 
 val clause_of_fof : hclause -> hclause
@@ -154,10 +157,7 @@ module CSet :
         It also contains a payload that is updated on every addition/
         removal of clauses. The additional payload is also updated upon
         addition/deletion. *)
-    type t = {
-      maxvar : int;                 (** index of maximum variable *)
-      clauses : hclause Ptmap.t;    (** clause ID -> hclause *)
-    }
+    type t
 
     val empty : t
       (** the empty set *)
@@ -183,9 +183,6 @@ module CSet :
     val remove_list : t -> hclause list -> t
       (** remove hclauses *)
 
-    val remove_ids : t -> Ptset.t -> t
-      (** remove set of IDs *)
-
     val get : t -> int -> hclause
       (** get a clause by its ID *)
 
@@ -194,6 +191,9 @@ module CSet :
 
     val mem_id : t -> int -> bool
       (** membership test by hclause ID *)
+
+    val choose : t -> hclause option
+      (** Choose a clause in the set *)
 
     val iter : t -> (hclause -> unit) -> unit
       (** iterate on clauses in the set *)
@@ -206,6 +206,11 @@ module CSet :
 
     val to_list : t -> hclause list
     val of_list : hclause list -> t
+
+    val to_seq : t -> hclause Sequence.t
+    val of_seq : t -> hclause Sequence.t -> t
+    val remove_seq : t -> hclause Sequence.t -> t
+    val remove_id_seq : t -> int Sequence.t -> t
 end
 
 (* ----------------------------------------------------------------------
