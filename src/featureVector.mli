@@ -50,9 +50,9 @@ val mk_fv_index : feature list -> fv_index              (** create an index from
 val mk_fv_index_signature : signature -> fv_index       (** create an index from signature *)
 
 val index_clause : fv_index -> hclause -> fv_index      (** add the clause to the index *)
-val index_clauses : fv_index -> hclause list -> fv_index
+val index_clauses : fv_index -> hclause Sequence.t -> fv_index
 val remove_clause : fv_index -> hclause -> fv_index     (** remove the clause from the index *)
-val remove_clauses : fv_index -> hclause list -> fv_index
+val remove_clauses : fv_index -> hclause Sequence.t -> fv_index
 
 val retrieve_subsuming : fv_index -> literal array ->
                          (hclause -> unit) -> unit      (** clauses that subsume c *)

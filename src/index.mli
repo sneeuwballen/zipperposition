@@ -74,9 +74,9 @@ type 'a t =
 type subsumption_t =
   < name : string;
     add : clause -> subsumption_t ;
-    add_clauses : clause list -> subsumption_t;
+    add_clauses : clause Sequence.t -> subsumption_t;
     remove : clause -> subsumption_t ;
-    remove_clauses : clause list -> subsumption_t;
+    remove_clauses : clause Sequence.t -> subsumption_t;
     retrieve_subsuming : literal array -> (hclause -> unit) -> unit ;
     retrieve_subsumed : literal array -> (hclause -> unit) -> unit ;
   >

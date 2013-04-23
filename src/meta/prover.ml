@@ -134,7 +134,7 @@ let add_kb_definition prover definition =
   List.iter (Logic.db_goal prover.db) goals;
   (* add the definition *)
   let clause = KB.definition_to_datalog definition in
-  Utils.debug 2 "%% meta-prover: @[<h>add Datalog clause %a@]" Logic.pp_clause clause;
+  Utils.debug 3 "%% meta-prover: @[<h>add Datalog clause %a@]" Logic.pp_clause clause;
   Logic.db_add prover.db clause
 
 (** Fresh meta-prover, using the given KB *)
@@ -193,7 +193,7 @@ let found_pattern prover hc pattern args =
     are added to the Datalog engine, and if some theories and lemma
     are detected they are returned *)
 let scan_clause prover hc =
-  Utils.debug 2 "%% meta-prover: scan @[<h>%a@]" !C.pp_clause#pp_h hc;
+  Utils.debug 3 "%% meta-prover: scan @[<h>%a@]" !C.pp_clause#pp_h hc;
   Utils.enter_prof prof_scan_clause;
   (* match [hc] against patterns *)
   match_patterns prover.patterns hc.hclits (found_pattern prover hc);
@@ -218,7 +218,7 @@ let scan_set prover set =
   (* for each clause in the set, match it against pattern *)
   C.CSet.iter set
     (fun hc ->
-      Utils.debug 2 "%% meta-prover: scan @[<h>%a@]" !C.pp_clause#pp_h hc;
+      Utils.debug 3 "%% meta-prover: scan @[<h>%a@]" !C.pp_clause#pp_h hc;
       match_patterns patterns hc.hclits (found_pattern prover hc));
   let results = prover.new_results in
   prover.new_results <- [];

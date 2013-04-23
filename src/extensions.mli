@@ -34,3 +34,6 @@ val register : factory -> unit
 
 val dyn_load : string -> factory option
   (** Try to load the extension located in the given file *)
+
+(* TODO: factory should take a Env.t and return unit (register functions,
+   inference rules, etc.) *)

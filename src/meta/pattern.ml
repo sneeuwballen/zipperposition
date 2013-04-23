@@ -158,7 +158,7 @@ let of_term t : t * term list =
 let abstract_clause lits : t * term list =
   let t = Lits.term_of_lits lits in
   let p, consts = of_term t in
-  Utils.debug 2 "%% @[<h>%a@] abstracted into @[<h>%a@]"
+  Utils.debug 4 "%% @[<h>%a@] abstracted into @[<h>%a@]"
                 Lits.pp_lits lits pp_pattern p;
   p, consts
 
@@ -223,13 +223,13 @@ let matching (p : t) lits =
   let proper_vars = T.vars (fst p) in
   let proper_vars = List.filter (fun v -> not (List.memq v vars)) proper_vars in
   (* match pattern against [right] *)
-  Utils.debug 3 "%% meta-prover: match @[<h>%a with %a@]"
+  Utils.debug 4 "%% meta-prover: match @[<h>%a with %a@]"
     !T.pp_term#pp left !T.pp_term#pp right;
   let substs = Unif.matching_ac S.id_subst (left,offset) (right,0) in
   (* now apply the substitution to the list of variables *)
   let substs = Sequence.flatMap
     (fun subst ->
-      Utils.debug 2 "%% meta-prover: subst @[<h>%a, vars %a@]"
+      Utils.debug 4 "%% meta-prover: subst @[<h>%a, vars %a@]"
         S.pp_substitution subst (Utils.pp_list !T.pp_term#pp) vars;
       (* convert variables back to terms *)
       let args = List.map (fun v -> S.apply_subst subst (v,offset)) vars in

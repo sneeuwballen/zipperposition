@@ -205,7 +205,11 @@ let mk_precedence ?(complete=true) constrs symbols =
         (* both are in the same symbol family (e.g. split symbols). Any
            arbitrary but total ordering on them is ok, as long as it's stable. *)
         then Symbols.compare_symbols a b
-        else SHashtbl.find table b' - SHashtbl.find table a'
+        else
+          try SHashtbl.find table b' - SHashtbl.find table a'
+          with Not_found ->
+            let msg = Utils.sprintf "tried to compare %a and %a" pp_symbol a' pp_symbol b' in
+            failwith msg
     in
     let prec_weight s = weight s in
     let prec_set_weight weight' = mk_prec symbols table weight' in
@@ -366,8 +370,9 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
     terms in a given precedence, and ordering constraints that are
     respectively weaker/stronger than the optimization (the first one, weaker,
     is applied to break ties, the second one, stronger, is always enforced first) *)
-let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
-  let signature = C.signature clauses in
+let heuristic_precedence ?(initial_signature=Symbols.empty_signature)
+ord_factory weak_constrs strong_constrs clauses =
+  let signature = Symbols.merge_signatures initial_signature (C.signature clauses) in
   (* the constraints *)
   let constraints = Utils.list_flatmap create_constraints clauses in
   let max_cost = List.fold_left (fun acc (w,_,_) -> acc+w) 0 constraints in

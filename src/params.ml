@@ -50,6 +50,7 @@ let parse_args () =
   and learn = ref false
   and select = ref "SelectComplex"
   and progress = ref false
+  and unary_depth = ref 1
   and files = ref [] in
   (* special handlers *)
   let set_progress () =
@@ -86,6 +87,7 @@ let parse_args () =
       ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
       ("-seed", Arg.Set_int seed, "set random seed");
+      ("-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
     ]
   in
@@ -101,6 +103,6 @@ let parse_args () =
     param_presaturate = !presaturate;
     param_index= !index; param_dot_file = !dot_file; param_plugins= !plugins;
     param_kb = !kb; param_kb_load = !kb_load;
-    param_kb_clear = !kb_clear;
+    param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
     param_kb_print = !kb_print; param_learn = !learn;
     param_precedence= !heuristic_precedence;}

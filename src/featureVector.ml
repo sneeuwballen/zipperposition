@@ -225,7 +225,9 @@ let mk_features signature =
   SMap.iter
     (fun s sort ->
       let arity = arity sort in
-      if sort == bool_
+      if SSet.mem s Symbols.base_symbols
+        then ()  (* base symbols don't count *)
+      else if sort == bool_
         then features := [1 + arity, count_symb_plus s, pp "count+" s;
                           1 + arity, count_symb_minus s, pp "count-" s]
                           @ !features
@@ -258,7 +260,8 @@ let index_clause (features, trie) hc =
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
-let index_clauses fv hcs = List.fold_left index_clause fv hcs
+let index_clauses fv hcs =
+  Sequence.fold index_clause fv hcs
 
 let remove_clause (features, trie) hc =
   (* feature vector of the hc *)
@@ -268,7 +271,8 @@ let remove_clause (features, trie) hc =
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
-let remove_clauses fv hcs = List.fold_left remove_clause fv hcs
+let remove_clauses fv hcs =
+  Sequence.fold remove_clause fv hcs
 
 (** hcs that subsume (potentially) the given literals *)
 let retrieve_subsuming (features, trie) lits f =

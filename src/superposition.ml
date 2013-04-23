@@ -105,6 +105,44 @@ let all_positions pos t f =
   in
   aux pos t
 
+(** fold f over all literals sides, with their positions.
+    f is given (acc, left side, right side, sign, position of left side)
+    if both=true, then both sides of a non-oriented equation
+      will be visited
+
+    ?pos:bool -> ?neg:bool -> ?both:bool
+    -> ('a -> Basic.term -> Basic.term -> bool -> int list -> 'a)
+    -> 'a -> (Basic.literal * int) list
+    -> 'a *)
+let fold_lits ?(both=true) eligible f acc lits =
+  let rec fold acc i =
+    if i = Array.length lits then acc
+    else if not (eligible i lits.(i)) then fold acc (i+1)
+    else
+      let acc = match lits.(i) with
+      | Equation (l,r,sign,Gt) ->
+        f acc l r sign [i; left_pos]
+      | Equation (l,r,sign,Lt) ->
+        f acc r l sign [i; right_pos]
+      | Equation (l,r,sign,_) ->
+        if both
+        then (* visit both sides of the equation *)
+          let acc = f acc r l sign [i; right_pos] in
+          f acc l r sign [i; left_pos]
+        else (* only visit one side (arbitrary) *)
+          f acc l r sign [i; left_pos]
+      in fold acc (i+1)
+  in fold acc 0
+
+(** decompose the literal at given position *)
+let get_equations_sides c pos = match pos with
+  | idx::eq_side::[] ->
+    (match c.hclits.(idx) with
+    | Equation (l,r,sign,_) when eq_side = left_pos -> (l, r, sign)
+    | Equation (l,r,sign,_) when eq_side = right_pos -> (r, l, sign)
+    | _ -> invalid_arg "wrong side")
+  | _ -> invalid_arg "wrong kind of position (list of >= 2 elements)"
+
 (* ----------------------------------------------------------------------
  * inferences
  * ---------------------------------------------------------------------- *)
@@ -126,8 +164,8 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
   | [] | _::[] -> assert false
   | passive_idx::passive_side::subterm_pos ->
   let active_idx = List.hd active_pos
-  and u, v, sign_uv = Calculus.get_equations_sides passive_clause [passive_idx; passive_side]
-  and s, t, sign_st = Calculus.get_equations_sides active_clause active_pos in
+  and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
+  and s, t, sign_st = get_equations_sides active_clause active_pos in
   Utils.debug 3 ("sup @[<hov>@[<h>%a s=%a t=%a@]@ @[<h>%a " ^^
                                       "u=%a v=%a p=%a@]@ subst=%a@]")
                        !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
@@ -189,7 +227,7 @@ let infer_active (actives : ProofState.active_set) clause : hclause list =
   (* do the inferences where clause is active; for this,
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
-  let new_clauses = Calculus.fold_lits ~both:true eligible_lit
+  let new_clauses = fold_lits ~both:true eligible_lit
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
       actives#idx_sup_into#retrieve_unifiables offset (s,0) acc
@@ -213,7 +251,7 @@ let infer_passive (actives:ProofState.active_set) clause : hclause list =
   in
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
-  let new_clauses = Calculus.fold_lits ~both:true eligible
+  let new_clauses = fold_lits ~both:true eligible
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
       let new_clauses = all_positions u_pos u
@@ -239,7 +277,7 @@ let infer_equality_resolution clause =
     fun i lit -> Lits.is_neg lit && BV.get bv i
   in
   (* iterate on those literals *)
-  let new_clauses = Calculus.fold_lits ~both:false eligible
+  let new_clauses = fold_lits ~both:false eligible
     (fun acc l r sign l_pos ->
       assert (not sign);
       match l_pos with
@@ -297,8 +335,8 @@ let infer_equality_factoring clause =
   (* do the inference between given positions, if ordering
      conditions are respected *)
   and do_inference active_pos passive_pos subst =
-    let s, t, sign_st = Calculus.get_equations_sides clause active_pos
-    and u, v, sign_uv = Calculus.get_equations_sides clause passive_pos
+    let s, t, sign_st = get_equations_sides clause active_pos
+    and u, v, sign_uv = get_equations_sides clause passive_pos
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
@@ -322,7 +360,7 @@ let infer_equality_factoring clause =
         []
   (* try to do inferences with each positive literal *)
   in
-  let new_clauses = Calculus.fold_lits ~both:true eligible
+  let new_clauses = fold_lits ~both:true eligible
     (fun acc s t _ s_pos -> (* try with s=t *)
       let unifiables = find_unifiable_lits s s_pos in
       List.fold_left
@@ -1071,62 +1109,55 @@ let rec condensation hc =
     Utils.exit_prof prof_condensation; 
     condensation new_hc
 
-(* ----------------------------------------------------------------------
- * the Calculus object
- * ---------------------------------------------------------------------- *)
+(** {2 Contributions to Env} *)
 
-let superposition : Calculus.calculus =
-  object
-    method binary_rules = ["superposition_active", infer_active;
-                           "superposition_passive", infer_passive]
-
-    method unary_rules = ["equality_resolution", infer_equality_resolution;
-                          "equality_factoring", infer_equality_factoring]
-
-    method basic_simplify c = basic_simplify c
-
-    method rw_simplify (simpl : PS.simpl_set) hc =
-      let hc = basic_simplify (demodulate simpl hc) in
-      let hc = positive_simplify_reflect simpl hc in
-      let hc = negative_simplify_reflect simpl hc in
-      hc
-
-    method active_simplify actives hc =
-      (* condensation *)
-      let hc = condensation hc in
-      (* contextual literal cutting *)
-      let hc = contextual_literal_cutting actives hc in
-      hc
-
-    method backward_simplify actives hc =
-      let set = C.CSet.empty in
-      backward_demodulate actives set hc
-
-    method redundant actives hc =
-      subsumed_by_set actives hc
-
-    method backward_redundant actives hc =
-      subsumed_in_set actives hc
-
-    method list_simplify hc =
-      if is_tautology hc then [] else [hc]
-
-    method is_trivial hc = is_tautology hc
-
-    method axioms = []
-
-    method constr _ = [Precedence.min_constraint [split_symbol; false_symbol; true_symbol]]
-
-    method preprocess ~ctx l =
-      List.fold_left
-        (fun acc hc ->
-          (* reduction to CNF *)
-          let clauses = Cnf.cnf_of hc in
-          List.fold_left
-            (fun acc hc ->
-              let hc = C.clause_of_fof (C.update_ctx ~ctx hc) in
-              let hc = basic_simplify hc in
-              if is_tautology hc then acc else hc :: acc)
-            acc clauses)
-        [] l
-  end
+let setup_env ~env =
+  let rw_simplify (simpl : PS.simpl_set) hc =
+    let hc = basic_simplify (demodulate simpl hc) in
+    let hc = positive_simplify_reflect simpl hc in
+    let hc = negative_simplify_reflect simpl hc in
+    hc
+  and active_simplify actives hc =
+    (* condensation *)
+    let hc = condensation hc in
+    (* contextual literal cutting *)
+    let hc = contextual_literal_cutting actives hc in
+    hc
+  and backward_simplify actives hc =
+    let set = C.CSet.empty in
+    backward_demodulate actives set hc
+  and redundant = subsumed_by_set
+  and backward_redundant = subsumed_in_set
+  and list_simplify hc =
+    if is_tautology hc then [] else [hc]
+  and is_trivial = is_tautology
+  and constrs =
+    [Precedence.min_constraint [split_symbol; false_symbol; true_symbol]]
+  and preprocess ~ctx l =
+    List.fold_left
+      (fun acc hc ->
+        (* reduction to CNF *)
+        let clauses = Cnf.cnf_of hc in
+        List.fold_left
+          (fun acc hc ->
+            let hc = C.clause_of_fof (C.update_ctx ~ctx hc) in
+            let hc = basic_simplify hc in
+            if is_tautology hc then acc else hc :: acc)
+          acc clauses)
+      [] l
+  in
+  Env.add_binary_inf ~env "superposition_passive" infer_passive;
+  Env.add_binary_inf ~env "superposition_active" infer_active;
+  Env.add_unary_inf ~env "equality_factoring" infer_equality_factoring;
+  Env.add_unary_inf ~env "equality_resolution" infer_equality_resolution;
+  env.Env.rw_simplify <- rw_simplify;
+  env.Env.basic_simplify <- basic_simplify;
+  env.Env.active_simplify <- active_simplify;
+  env.Env.backward_simplify <- backward_simplify;
+  env.Env.redundant <- redundant;
+  env.Env.backward_redundant <- backward_redundant;
+  env.Env.list_simplify <- list_simplify;
+  env.Env.is_trivial <- is_trivial;
+  Env.add_constrs env (Sequence.of_list constrs);
+  env.Env.preprocess <- preprocess;
+  ()

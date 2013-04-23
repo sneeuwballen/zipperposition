@@ -18,11 +18,10 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 02110-1301 usa.
 *)
 
-(** module for superposition with equivalence reasoning and delayed clausal form *)
+(** {1 Superposition with equivalence reasoning and delayed clausal form} *)
 
 open Basic
 open Symbols
-open Calculus
 
 module T = Terms
 module C = Clauses
@@ -67,7 +66,7 @@ let classify signature s =
   | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
   | _ when SSet.mem s special_set -> Special
   | _ -> (* classify between predicate and function by the sort *)
-    let sort = SMap.find s signature in
+    let sort = try SMap.find s signature with Not_found -> univ_ in
     if sort == bool_ then Predicate else Function
 
 (** constraint on the ordering *)
@@ -242,68 +241,38 @@ let recursive_eliminations hc =
   Utils.exit_prof prof_elim;
   !clauses
 
-(* ----------------------------------------------------------------------
- * the calculus object
- * ---------------------------------------------------------------------- *)
-
-let delayed : calculus =
-  object (self)
-    method binary_rules = ["superposition_active", Sup.infer_active;
-                           "superposition_passive", Sup.infer_passive]
-
-    method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
-                          "equality_factoring", Sup.infer_equality_factoring; ]
-
-    method basic_simplify hc = Sup.basic_simplify (Cnf.simplify hc)
-
-    method rw_simplify (simpl : PS.simpl_set) hc =
-      let hc = Sup.basic_simplify (Sup.demodulate simpl hc) in
-      let hc = Sup.positive_simplify_reflect simpl hc in
-      let hc = Sup.negative_simplify_reflect simpl hc in
-      hc
-
-    method active_simplify actives hc =
-      (* condensation *)
-      let hc = Sup.condensation hc in
-      (* contextual literal cutting *)
-      let hc = Sup.contextual_literal_cutting actives hc in
-      hc
-
-    method backward_simplify actives hc =
-      let set = C.CSet.empty in
-      Sup.backward_demodulate actives set hc
-
-    method redundant actives hc =
-      Sup.subsumed_by_set actives hc
-
-    method backward_redundant actives hc =
-      Sup.subsumed_in_set actives hc
-
-    (* use elimination rules as simplifications rather than inferences, here *)
-    method list_simplify hc =
-      let hc = self#basic_simplify hc in
+(** Setup the environment for superposition with equivalence reasoning *)
+let setup_env ~env =
+  Sup.setup_env ~env;
+  (* specific changes *)
+  let basic_simplify' = env.Env.basic_simplify in
+  env.Env.basic_simplify <-
+    (fun hc -> basic_simplify' (Cnf.simplify hc));
+  env.Env.list_simplify <-
+    (fun hc ->
+      let hc = env.Env.basic_simplify hc in
       let l = recursive_eliminations hc in
-      let l = List.filter (fun hc -> not (Sup.is_tautology hc)) l in
-      l
-
-    method is_trivial hc = Sup.is_tautology hc
-
-    method axioms = []
-
-    method constr clauses = symbol_constraint clauses
-
-    method preprocess ~ctx l =
+      let l = List.filter (fun hc -> not (Env.is_trivial ~env hc)) l in
+      l);
+  env.Env.constr <- [];
+  Env.add_mk_constr env symbol_constraint;
+  env.Env.preprocess <-
+    (fun ~ctx l ->
       Utils.list_flatmap
         (fun hc ->
           let hc = C.update_ctx ~ctx hc in
+          (* simplify the clause *)
           let hc = Sup.basic_simplify (C.clause_of_fof hc) in
-          C.check_ord_hclause ~ord:ctx.ctx_ord hc;
-          let clauses = self#list_simplify hc in
+          C.check_ord_hclause ~ord:env.Env.ctx.ctx_ord hc;
+          let clauses = env.Env.list_simplify hc in
           List.fold_left
             (fun clauses hc ->
               let hc = C.clause_of_fof hc in
               C.check_ord_hclause ~ord:ctx.ctx_ord hc;
-              if not (Sup.is_tautology hc) then hc :: clauses else clauses)
+              (* keep only non-trivial clauses *)
+              if not (Env.is_trivial ~env hc)
+                then hc :: clauses
+                else clauses)
             [] clauses)
-        l
-  end
+        l);
+  ()

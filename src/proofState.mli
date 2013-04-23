@@ -43,8 +43,8 @@ type active_set =
     idx_back_demod : index;             (** index for backward demodulation/simplifications *)
     idx_fv : Index.subsumption_t;       (** index for subsumption *)
 
-    add : hclause list -> unit;         (** add clauses *)
-    remove : hclause list -> unit;      (** remove clauses *)
+    add : hclause Sequence.t -> unit;   (** add clauses *)
+    remove : hclause Sequence.t -> unit;(** remove clauses *)
   >
 
 (** set of simplifying (unit) clauses *)
@@ -53,17 +53,17 @@ type simpl_set =
     idx_simpl : Index.unit_t;           (** index for forward simplifications
                                             TODO split into pos-orientable/others *)
 
-    add : hclause list -> unit;
-    remove : hclause list -> unit;
+    add : hclause Sequence.t -> unit;
+    remove : hclause Sequence.t -> unit;
   >
 
 (** set of passive clauses *)
 type passive_set =
   < ctx : context;
     clauses : Clauses.CSet.t;           (** set of clauses *)
-    queues : (ClauseQueue.queue * int) list;
+    queues : (ClauseQueue.t * int) list;
 
-    add : hclause list -> unit;         (** add clauses *)
+    add : hclause Sequence.t -> unit;   (** add clauses *)
     remove : int -> unit;               (** remove clause by ID *)
     next : unit -> hclause option;      (** next passive clause, if any *)
     clean : unit -> unit;               (** cleanup internal queues *)
@@ -86,7 +86,7 @@ type state =
 
 val mk_active_set : ctx:context -> index -> signature -> active_set
 val mk_simpl_set : ctx:context -> Index.unit_t -> simpl_set
-val mk_passive_set : ctx:context -> (ClauseQueue.queue * int) list -> passive_set
+val mk_passive_set : ctx:context -> (ClauseQueue.t * int) list -> passive_set
 
 (** create a state from the given ordering, and parameters *)
 val mk_state : ctx:context -> ?meta:Meta.Prover.t ->

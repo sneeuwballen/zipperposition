@@ -34,45 +34,19 @@ type 'a szs_status =
 (** check whether we still have some time w.r.t timeout *)
 val check_timeout : float option -> bool
 
-(** maximum number of nested unary inferences *)
-val unary_max_depth : int ref
-
-(** Is splitting enabled? *)
-val enable_split : bool ref
-
-(** perform backward simplification of the active set *)
-val backward_simplify : calculus:Calculus.calculus ->
-                        ProofState.active_set -> ProofState.simpl_set ->
-                        hclause -> Clauses.CSet.t * hclause list
-
-(** generation of new clauses (unary inferences are repeated at most !unary_max_depth) *)
-val generate : calculus:Calculus.calculus -> ProofState.active_set -> hclause -> hclause list
-
-(** remove orphans of the clauses *)
-val remove_orphans : ProofState.passive_set -> hclause list -> unit
-
-(** Use the meta-prover (if any) to prove new lemmas *)
-val find_lemmas : ctx:context -> Meta.Prover.t option -> hclause -> hclause list
-
 (** Perform one step of the given clause algorithm.
     It performs generating inferences only if [generating] is true (default);
-    other parameters are the iteration number, the global state and the calculus *)
-val given_clause_step : ?generating:bool ->
-                        calculus:Calculus.calculus ->
-                        int -> ProofState.state ->
+    other parameters are the iteration number and the environment *)
+val given_clause_step : ?generating:bool -> env:Env.t -> int ->
                         hclause szs_status
 
 (** run the given clause until a timeout occurs or a result
     is found. It returns a tuple (new state, result, number of steps done).
     It performs generating inferences only if [generating] is true (default) *)
-val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float -> ?progress:bool ->
-                  calculus:Calculus.calculus ->
-                  ProofState.state ->
-                  hclause szs_status * int
+val given_clause: ?generating:bool -> ?steps:int -> ?timeout:float ->
+                  env:Env.t -> hclause szs_status * int
 
 (** Interreduction of the given state, without generating inferences. Returns
     the number of steps done for presaturation, with status of the set. *)
-val presaturate : calculus:Calculus.calculus ->
-                  ProofState.state ->
-                  hclause szs_status * int
+val presaturate : env:Env.t -> hclause szs_status * int
 
