@@ -46,7 +46,7 @@ let mem set x =
     | Node (y, node') ->
       let c = cmp x y in
       if c = 0 then true
-      else if c < 0 then explore node'
+      else if c > 0 then explore node'
       else false
   in
   explore set.nodes
@@ -58,7 +58,7 @@ let add set x =
     | Node (y, node') ->
       let c = cmp x y in
       if c = 0 then node  (* already there *)
-      else if c < 0
+      else if c > 0
         then
           let node'' = insert node' in
           if node' == node'' then node else Node (y, node'')
@@ -76,7 +76,7 @@ let rec remove set x =
     | Node (y, node') ->
       let c = cmp x y in
       if c = 0 then node'
-      else if c < 0
+      else if c > 0
         then
           let node'' = remove node' in
           if node' == node'' then node else Node (y, node'')
