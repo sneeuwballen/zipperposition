@@ -105,6 +105,10 @@ module OrderedTRS = struct
       (fun k ->
         Dtree.iter rules (fun _ rule -> k rule.rule_clause))
 
+  let signature trs =
+    C.signature
+      (Sequence.to_rev_list (to_seq trs))
+
   let size trs =
     let r = ref 0 in
     Dtree.iter trs.rules (fun _ _ -> incr r);
@@ -207,6 +211,13 @@ module TRS = struct
 
   let iter trs k =
     DT.iter trs.index (fun l r -> k (l, r))
+
+  let to_seq trs =
+    Sequence.from_iter
+      (fun k -> iter trs k)
+
+  let signature trs =
+    T.signature (Sequence.flatMap (fun (l,r) -> Sequence.of_list [l;r]) (to_seq trs))
 
   let pp_rule formatter (l, r) =
     Format.fprintf formatter "@[<h>%a → %a@]" !T.pp_term#pp l !T.pp_term#pp r

@@ -34,6 +34,8 @@ module OrderedTRS : sig
   
   val to_seq : t -> hclause Sequence.t
 
+  val signature : t -> Symbols.signature
+
   val size : t -> int
   
   val mk_rewrite : t -> size:int -> (term -> term)
@@ -54,6 +56,10 @@ module TRS : sig
   val add_rule : t -> rule -> unit
   val add_rules : t -> rule list -> unit
   val from_list : rule list -> t
+
+  val to_seq : t -> rule Sequence.t
+
+  val signature : t -> Symbols.signature
 
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit

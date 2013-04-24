@@ -184,6 +184,9 @@ val add_signature : signature -> symbol -> sort -> signature
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
 
+val set_of_signature : signature -> SSet.t
+  (** Set of symbols of the signature *)
+
 val merge_signatures : signature -> signature -> signature
   (** Merge two signatures. raises Failure if they are incompatible. *)
 

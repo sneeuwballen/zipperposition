@@ -349,6 +349,9 @@ let is_base_symbol s = SSet.mem s base_symbols
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
 
+let set_of_signature signature =
+  SMap.fold (fun s _ set -> SSet.add s set) signature SSet.empty
+
 (** Merge two signatures. raises Failure if they are incompatible. *)
 let merge_signatures s1 s2 =
   SMap.merge

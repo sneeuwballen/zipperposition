@@ -30,8 +30,20 @@ open Symbols
 
 (** {2 General interface} *)
 
-type t
-  (** An expert for some theory *)
+type t = {
+  expert_name : string;                 (** Theory the expert works on *)
+  expert_descr : string;                (** Description of the expert *)
+  expert_equal : term -> term -> bool;  (** Check whether two terms are equal *)
+  expert_sig : SSet.t;                  (** Symbols of the theory *)
+  expert_clauses : hclause list;        (** Additional axioms *)
+  expert_canonize : term -> term;       (** Get a canonical form of the term *)
+  expert_ord : ordering -> bool;        (** Compatible with ord? *)
+  expert_update_ctx : context -> t list;(** How to update the context *)
+  expert_ctx : context;                 (** Context used by the expert *)
+  expert_solve : ((term*term) list -> substitution list) option;
+    (** The expert may be able to solve systems of equations, returning
+        a list of substitutions. Example: the simplex. *)
+} (** An expert for some theory *)
 
 val compatible_ord : t -> ord:ordering -> bool
   (** Check whether using this expert is possible in the given ordering *)
