@@ -211,12 +211,13 @@ let load_plugins ~params =
         if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
           then filename
         else
-          let filename = FoUtils.sprintf "plugins/ext_%s.cmxs" filename in
+          let local_filename = FoUtils.sprintf "plugins/std/ext_%s.cmxs" filename in
           try
-            ignore (Unix.stat filename);
-            filename
+            ignore (Unix.stat local_filename);
+            local_filename
           with Unix.Unix_error _ ->
-            Filename.concat Const.home filename
+            let home_filename = FoUtils.sprintf "plugins/ext_%s.cmxs" filename in
+            Filename.concat Const.home home_filename
       in
       match Extensions.dyn_load filename with
       | Extensions.Ext_failure msg -> (* Could not load plugin *)
