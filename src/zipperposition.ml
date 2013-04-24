@@ -47,23 +47,22 @@ let find_file name dir =
   let rec file_exists name =
     try ignore (Unix.stat name); true
     with Unix.Unix_error (e, _, _) when e = Unix.ENOENT -> false
-  (* search recursively from dir *)
-  and search path cur_name =
-    Utils.debug 3 "%% search %s as %s@." name cur_name;
-    match path with
-    | _ when file_exists cur_name -> cur_name (* found *)
-    | [] -> failwith ("unable to find file " ^ name)
-    | _::path' ->
-      let new_dir = List.fold_left Filename.concat "" (List.rev path') in
-      let new_name = Filename.concat new_dir name in
-      search path' new_name
+  (* search in [dir], and its parents recursively *)
+  and search dir =
+    let cur_name = Filename.concat dir name in
+    Utils.debug 2 "%% search %s as %s" name cur_name;
+    if file_exists cur_name then cur_name
+    else
+      let dir' = Filename.dirname dir in
+      if dir = dir'
+        then failwith "unable to find file"
+        else search dir'
   in
   if Filename.is_relative name
-    then
-      let r = Str.regexp Filename.dir_sep in
-      let path = List.rev (Str.split r dir) in
-      search path (Filename.concat dir name)
-    else if file_exists name then name else failwith ("unable to find file " ^ name)
+    then search dir  (* search by relative path, in parent dirs *)
+    else if file_exists name
+      then name  (* found *)
+      else failwith ("unable to find file " ^ name)
 
 (** parse given tptp file *)
 let parse_file ~recursive f =
@@ -228,15 +227,20 @@ let initial_kb params =
   let kb = Meta.KB.empty in
   let file = params.param_kb in
   (* parse file, with a lock *)
-  let kb = Utils.with_lock_file file
+  let kb = 
+    try Utils.with_lock_file file
     (fun () ->
       let kb = try Meta.KB.restore ~file kb
-               with Yojson.Json_error _ -> Meta.KB.empty in
+               with Yojson.Json_error _
+               | Unix.Unix_error _ -> Meta.KB.empty in
       (* load required files *)
       let kb = List.fold_left parse_theory_file kb params.param_kb_load in
       (* save new KB *)
       Meta.KB.save ~file kb;
-      kb) in
+      kb)
+    with Unix.Unix_error _ ->
+      kb
+  in
   (* return KB *)
   kb
 
@@ -425,6 +429,10 @@ let clear_kb params =
       Unix.unlink file);
   exit 0
 
+let print_kb_where params =
+  Format.printf "%% KB located at %s@." params.param_kb;
+  exit 0
+
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
@@ -434,6 +442,7 @@ let () =
   let plugins = load_plugins ~params in
   (* operations on knowledge base *)
   let kb = initial_kb params in
+  (if params.param_kb_where then print_kb_where params);
   (if params.param_kb_print then print_kb ~kb);
   (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)

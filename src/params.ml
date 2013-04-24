@@ -43,10 +43,11 @@ let parse_args () =
   and heuristic_precedence = ref true
   and dot_file = ref None
   and plugins = ref []
-  and kb = ref "kb"
+  and kb = ref (Filename.concat Const.home "kb")
   and kb_load = ref []
   and kb_clear = ref false
   and kb_print = ref false
+  and kb_where = ref false
   and learn = ref false
   and select = ref "SelectComplex"
   and progress = ref false
@@ -74,6 +75,7 @@ let parse_args () =
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
+      ("-kb-where", Arg.Set kb_where, "print default dir that is search for KB");
       ("-learning", Arg.Set learn, "enable lemma learning");
       (*
       ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once");
@@ -102,7 +104,7 @@ let parse_args () =
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
     param_index= !index; param_dot_file = !dot_file; param_plugins= !plugins;
-    param_kb = !kb; param_kb_load = !kb_load;
+    param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
     param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
     param_kb_print = !kb_print; param_learn = !learn;
     param_precedence= !heuristic_precedence;}
