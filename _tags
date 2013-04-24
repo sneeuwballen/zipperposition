@@ -1,0 +1,7 @@
+<src/>: include
+<tests/>: include
+<**/*.cmx>: inline(15)
+<src/**/*.ml*>: package(datalog), package(yojson)
+<src/meta_KB.*>: package(zip)
+<**/*.native> or <**/*.byte>: package(datalog), package(yojson), package(zip), package(num), package(str), package(dynlink)
+<tests/*.native> or <tests/*.byte>: package(datalog), package(yojson), package(zip)

@@ -25,6 +25,8 @@ open Basic
 module T = Terms
 module C = Clauses
 module Utils = FoUtils
+module Pattern = Meta_Pattern
+module KB = Meta_KB
 
 let prof_scan_clause = Utils.mk_profiler "meta.scan_clause"
 let prof_scan_set = Utils.mk_profiler "meta.scan_set"

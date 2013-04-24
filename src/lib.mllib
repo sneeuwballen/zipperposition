@@ -9,11 +9,13 @@ Const
 Delayed
 Dtree
 Experts
+Extensions
 FeatureVector
 Fingerprint
 FoSubst
 FoUnif
 FoUtils
+Gen
 Graph
 Hash
 Hashset
@@ -24,6 +26,10 @@ Leftistheap
 Lexer_tptp
 Literals
 Meta
+Meta_KB
+Meta_Pattern
+Meta_Prover
+Meta_ParseUtils
 Orderings
 Parser_tptp
 PartialOrder

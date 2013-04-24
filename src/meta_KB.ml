@@ -27,6 +27,7 @@ module T = Terms
 module C = Clauses
 module S = FoSubst
 module Utils = FoUtils
+module Pattern = Meta_Pattern
 
 (** {2 Knowledge Item} *)
 
