@@ -20,12 +20,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Exemple of plugin} *)
 
-let factory () =
+let ext =
   let open Extensions in
-  { init = (fun () -> FoUtils.debug 0 "%% plugin foo loaded");
-    exit = (fun () -> ());
-    name = "foo";
+  let action = Ext_general (fun _ -> FoUtils.debug 0 "%% call to plugin foo") in
+  { name = "foo";
+    actions = [action];
   }
 
 let _ =
-  Extensions.register factory
+  Extensions.register ext

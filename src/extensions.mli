@@ -20,20 +20,32 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Dynamic extensions} *)
 
-type t = {
-  init : unit -> unit;
-  exit : unit -> unit;
-  name : string;
-} (** Type of an extension *)
-and factory = unit -> t
-  (** Type of an extension generator (For stateful extension) *)
+open Basic
 
-val register : factory -> unit
+type t = {
+  name : string;
+  actions : action list;
+} (** An extension *)
+and action =
+  | Ext_general of (Env.t -> unit)
+  | Ext_expert of Experts.t
+  | Ext_binary_inf_rule of string * Env.binary_inf_rule
+  | Ext_unary_inf_rule of string * Env.unary_inf_rule
+  | Ext_simplification_rule of (hclause -> hclause list)
+  (** Action that can be performed by an extension *)
+
+val register : t -> unit
   (** Register an extension to the (current) prover. Plugins should call this
       when they are loaded. *)
 
-val dyn_load : string -> factory option
+type load_result =
+  | Ext_success of t
+  | Ext_failure of string
+  (** Result of an attempt to load a plugin *)
+
+val dyn_load : string -> load_result
   (** Try to load the extension located in the given file *)
 
-(* TODO: factory should take a Env.t and return unit (register functions,
-   inference rules, etc.) *)
+val apply_ext : env:Env.t -> t -> unit
+  (** Apply the extension to the Env.t, adding rules, modifying the env
+      in place. *)

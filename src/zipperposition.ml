@@ -211,14 +211,13 @@ let load_plugins ~params =
       let filename =  (* plugin name, or file? *)
         if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
           then filename
-          else FoUtils.sprintf "plugins/std/ext_%s.cmxs" filename
+          else FoUtils.sprintf "plugins/std/ext_%s.cmxs" filename  (* FIXME: use home var *)
       in
       match Extensions.dyn_load filename with
-      | None ->  (* Could not load plugin *)
-        Utils.debug 0 "%% could not load plugin %s" filename;
+      | Extensions.Ext_failure msg -> (* Could not load plugin *)
+        Utils.debug 0 "%% could not load plugin %s: %s" filename msg;
         []
-      | Some factory ->
-        let ext = factory () in
+      | Extensions.Ext_success ext ->
         Utils.debug 0 "%% loaded extension %s" ext.Extensions.name;
         [ext])
     params.param_plugins
@@ -371,6 +370,7 @@ let process_file ~kb ~plugins params f =
   (* build an environment that takes parameters and clauses into account
     (choice of ordering, etc.) *)
   let env = build_env ~kb ~params clauses in
+  List.iter (Extensions.apply_ext ~env) plugins;
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append env.Env.axioms clauses in
   let clauses = List.map (C.update_ctx ~ctx:env.Env.ctx) clauses in

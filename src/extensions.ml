@@ -20,28 +20,36 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Dynamic extensions} *)
 
+open Basic
+
 type t = {
-  init : unit -> unit;
-  exit : unit -> unit;
   name : string;
-} (** Type of an extension *)
-and factory = unit -> t
-  (** Type of an extension generator (For stateful extension) *)
+  actions : action list;
+} (** An extension *)
+and action =
+  | Ext_general of (Env.t -> unit)
+  | Ext_expert of Experts.t
+  | Ext_binary_inf_rule of string * Env.binary_inf_rule
+  | Ext_unary_inf_rule of string * Env.unary_inf_rule
+  | Ext_simplification_rule of (hclause -> hclause list)
+  (** Action that can be performed by an extension *)
 
-let __current = ref None
+type load_result =
+  | Ext_success of t
+  | Ext_failure of string
+  (** Result of an attempt to load a plugin *)
 
+let (__current : load_result ref) = ref (Ext_failure "could not load plugin")
 
-(*
-let __mutex = Mutex.create ()
-*)
+(* TODO: use a mutex? *)
 
-let register (self : factory) =
-  __current := Some self
+let register self =
+  __current := Ext_success self
 
-let dyn_load filename : factory option =
+let dyn_load filename =
   let filename = Dynlink.adapt_filename filename in
   (* be sure no previous plugin remains *)
-  __current := None;
+  __current := Ext_failure ("could not load file " ^ filename);
   (* load the plugin, that should have called [register] *)
   let current =
     try
@@ -50,18 +58,21 @@ let dyn_load filename : factory option =
     with Dynlink.Error e ->
       let s = Dynlink.error_message e in
       FoUtils.debug 0 "%% error loading plugin %s: %s" filename s;
-      None
-  (*
-  Mutex.acquire __mutex;
-  let current =
-    try
-      Dynlink.loadfile filename;
-      let c = !__current in
-      Mutex.release __mutex;
-      c
-    with e ->
-      Mutex.release __mutex;
-      None
-  *)
+      let msg = "could not load " ^ filename ^ ": " ^ s in
+      Ext_failure msg
   in
   current
+
+(** Apply the extension to the Env.t *)
+let apply_ext ~env ext =
+  let apply_action action = match action with
+  | Ext_general f -> f env
+  | Ext_expert e -> Env.add_expert ~env e
+  | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
+  | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
+  | Ext_simplification_rule r ->
+    let list_simplify' = env.Env.list_simplify in
+    env.Env.list_simplify <-
+      (fun hc -> FoUtils.list_flatmap list_simplify' (r hc))
+  in
+  List.iter apply_action ext.actions
