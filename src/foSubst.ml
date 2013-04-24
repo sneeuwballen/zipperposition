@@ -77,6 +77,13 @@ let bind ?(recursive=true) subst ((v, _) as var_bind) (t, o_t) =
       then SubstBind (t', o_t', t, o_t, subst)  (* add binding at front *)
       else raise (Invalid_argument "Subst.bind: inconsistent binding")
 
+let rec append s1 s2 =
+  match s1 with
+  | SubstEmpty -> s2
+  | SubstBind (t1, o1, t2, o2, s1') ->
+    let s2' = bind ~recursive:true s2 (t1, o1) (t2, o2) in
+    append s1' s2'
+
 (** Disambiguation of variables between different contexts *)
 module Renaming = struct
   module H = Hashtbl.Make(struct

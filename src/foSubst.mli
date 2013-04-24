@@ -48,6 +48,9 @@ val bind : ?recursive:bool -> substitution -> term bind -> term bind -> substitu
   (** Add v -> t to the substitution. Both terms have a context. Raise
       Invalid_argument if v is already bound in the same context, to another term. *)
 
+val append : substitution -> substitution -> substitution
+  (** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
+
 (** Disambiguation of variables between different contexts *)
 module Renaming : sig
   type t

@@ -221,40 +221,39 @@ module TRS = struct
    * Computation of normal forms
    * ---------------------------------------------------------------------- *)
 
-  exception RewrittenIn of term
+  exception RewrittenIn of term * substitution
 
   (** Compute normal form of the term, and set its binding to the normal form *)
   let rewrite trs t = 
-    (* compute normal form of this term *)
-    let rec compute_nf offset trs t =
+    (* compute normal form of [subst(t, 1)] *)
+    let rec compute_nf subst t =
       match t.term with
       | Bind (s, a_sort, t') ->
-        let t'' = compute_nf offset trs t' in
+        let t'' = compute_nf subst t' in
         let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
-        reduce_at_root offset trs new_t
+        reduce_at_root new_t
       | Node (hd, l) ->
         (* rewrite subterms first *)
-        let l' = List.map (compute_nf offset trs) l in
+        let l' = List.map (fun t' -> compute_nf subst t') l in
         let t' = T.mk_node ~old:t hd t.sort l' in
         (* rewrite at root *)
-        reduce_at_root offset trs t'
-      | Var _ | BoundVar _ -> assert false
-    (* assuming subterms are in normal form, reduce the term *)
-    and reduce_at_root offset trs t =
+        reduce_at_root t'
+      | Var _ -> S.apply_subst subst (t, 1)  (* normal form in subst *)
+      | BoundVar _ -> t
+    (* assuming subterms of [t] are in normal form, reduce the term *)
+    and reduce_at_root t =
       try
-        DT.iter_match (trs.index,offset) (t,0) rewrite_handler;
+        DT.iter_match (trs.index,1) (t,0) rewrite_handler;
         t  (* normal form *)
-      with (RewrittenIn t') ->
-        compute_nf offset trs t' (* rewritten in t', continue *)
+      with (RewrittenIn (t', subst)) ->
+        compute_nf subst t'  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
     and rewrite_handler (l,o) r subst =
-      (* all vars in [r] are bound in [subst] *)
-      let t' = S.apply_subst subst (r,o) in
-      raise (RewrittenIn t')
+      let t' = r in
+      raise (RewrittenIn (t', subst))
     in
-    (* any offset will do, as long as it's <> 0, because no variable of the TRS
-       should remain free during instantiation (vars(r) \subset vars(l) for all rules) *)
-    compute_nf 1 trs t
+    let t' = compute_nf S.id_subst t in
+    t'
 
   let pp_trs_index formatter trs = DT.pp_term_tree formatter trs.index
 end
