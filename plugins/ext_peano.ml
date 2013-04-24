@@ -71,7 +71,7 @@ let rec expert ~ctx =
 
 let ext =
   let open Extensions in
-  let actions = [Ext_expert expert] in
+  let actions = [Ext_expert expert; Ext_signal_incompleteness] in
   { name = "peano";
     actions;
   }

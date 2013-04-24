@@ -149,6 +149,7 @@ and hclause = {
 and context = {
   mutable ctx_ord : ordering;             (** current ordering on terms *)
   mutable ctx_select : selection_fun;     (** selection function for literals *)
+  mutable ctx_complete : bool;            (** Completeness preserved? *)
 }
 (** A compact clause: ID and literals *)
 and compact_clause = int * literal array
@@ -159,7 +160,7 @@ and 'a proof =
 (** a selection function *)
 and selection_fun = hclause -> int list
 
-let mk_ctx ord select = { ctx_ord=ord; ctx_select=select; }
+let mk_ctx ord select = { ctx_ord=ord; ctx_select=select; ctx_complete = true; }
 
 (** Create a compact clause from a clause *)
 let compact_clause hc = (hc.hctag, hc.hclits)

@@ -27,6 +27,7 @@ let arities =
 let ctx =
   { ctx_ord=Orderings.default_ordering base_signature;
     ctx_select=no_select;
+    ctx_complete = true;
   }
 
 (** Choose a symbol among the given list *)

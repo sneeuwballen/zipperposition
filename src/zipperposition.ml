@@ -286,9 +286,9 @@ let print_szs_result ~env result =
   | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
   | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
   | Sat.Sat ->
-      (if !Const.incompleteness
-        then Printf.printf "%% SZS status GaveUp\n"
-        else Printf.printf "%% SZS status CounterSatisfiable\n");
+      (if env.Env.ctx.ctx_complete
+        then Printf.printf "%% SZS status CounterSatisfiable\n"
+        else Printf.printf "%% SZS status GaveUp\n" );
       Utils.debug 1 "%% saturated set: @[<v>%a@]@."
       C.pp_set (C.CSet.of_seq C.CSet.empty (Env.get_active ~env))
   | Sat.Unsat c -> begin
@@ -359,7 +359,6 @@ let process_file ~kb ~plugins params f =
                     ignore (setup_alarm params.param_timeout);
                     Some (Utils.get_start_time () +. params.param_timeout -. 0.25))
   in
-  Format.printf "%% got %d plugins@." (List.length plugins);  (* TODO use plugins *)
   (* parse clauses *)
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);

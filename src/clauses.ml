@@ -150,7 +150,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   if Array.length lits > BV.max_len
   then (Utils.debug 0 "%% incompleteness: clause of %d lits -> $true"
            (Array.length lits);
-        Const.incompleteness := true;
+        ctx.ctx_complete <- false;
         Utils.exit_prof prof_mk_hclause;
         true_clause ~ctx)
   else begin

@@ -31,6 +31,7 @@ and action =
   | Ext_expert of (ctx:context -> Experts.t)
   | Ext_binary_inf_rule of string * Env.binary_inf_rule
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
+  | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
   | Ext_simplification_rule of (hclause -> hclause list)
   (** Action that can be performed by an extension *)
 
@@ -70,6 +71,7 @@ let apply_ext ~env ext =
   | Ext_expert e -> Env.add_expert ~env (e ~ctx:env.Env.ctx)
   | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
   | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
+  | Ext_signal_incompleteness -> env.Env.ctx.ctx_complete <- false
   | Ext_simplification_rule r ->
     let list_simplify' = env.Env.list_simplify in
     env.Env.list_simplify <-
