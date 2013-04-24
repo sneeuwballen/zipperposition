@@ -3,7 +3,7 @@
 VERSION=0.2
 ZIPPERPOSITION_HOME ?= $(HOME)/.zipperposition/
 
-PP = 'sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" -e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g"'
+PP ?= -pp 'sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" -e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g"'
 
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
@@ -21,7 +21,7 @@ INSTALLDIR=/usr/bin/
 
 PWD = $(shell pwd)
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind -I src -pp $(PP)
+OPTIONS = -use-ocamlfind -I src $(PP)
 
 # switch compilation module
 MODE ?= debug
@@ -47,7 +47,7 @@ tests:
 
 BUILD_PATH = $(PWD)/_build/src/
 PLUGIN_OPTIONS = -I src/ -cflags -I,$(BUILD_PATH) -lflags -I,$(BUILD_PATH) -lib lib
-plugins:
+plugins: bin
 	ocamlbuild -use-ocamlfind $(TAGS) $(PLUGIN_OPTIONS) $(TARGET_PLUGINS)
 
 doc:
