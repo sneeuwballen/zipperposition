@@ -28,7 +28,7 @@ type t = {
 } (** An extension *)
 and action =
   | Ext_general of (Env.t -> unit)
-  | Ext_expert of Experts.t
+  | Ext_expert of (ctx:context -> Experts.t)
   | Ext_binary_inf_rule of string * Env.binary_inf_rule
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
   | Ext_simplification_rule of (hclause -> hclause list)

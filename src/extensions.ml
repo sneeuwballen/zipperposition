@@ -28,7 +28,7 @@ type t = {
 } (** An extension *)
 and action =
   | Ext_general of (Env.t -> unit)
-  | Ext_expert of Experts.t
+  | Ext_expert of (ctx:context -> Experts.t)
   | Ext_binary_inf_rule of string * Env.binary_inf_rule
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
   | Ext_simplification_rule of (hclause -> hclause list)
@@ -67,7 +67,7 @@ let dyn_load filename =
 let apply_ext ~env ext =
   let apply_action action = match action with
   | Ext_general f -> f env
-  | Ext_expert e -> Env.add_expert ~env e
+  | Ext_expert e -> Env.add_expert ~env (e ~ctx:env.Env.ctx)
   | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
   | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
   | Ext_simplification_rule r ->

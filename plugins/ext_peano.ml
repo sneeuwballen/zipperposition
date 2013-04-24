@@ -54,37 +54,24 @@ let trs =
 let rewrite_peano t =
   Rewriting.TRS.rewrite trs t
 
-let rewrite_peano_lit ~ctx lit =
-  match lit with
-  | Equation (l, r, sign, _) ->
-    let l' = rewrite_peano l in
-    let r' = rewrite_peano r in
-    if l == l' && r == r'
-      then lit  (* same literal *)
-      else Literals.mk_lit ~ord:ctx.ctx_ord l' r' sign
-
-(** Simplification rule that reduces arithmetic expressions *)
-let rewrite_peano_clause hc =
-  FoUtils.debug 1 "%% try to Peano evaluate %a" !C.pp_clause#pp_h hc;
-  let ctx = hc.hcctx in
-  let lits = hc.hclits in
-  let lits' = Array.map (rewrite_peano_lit ~ctx:hc.hcctx) lits in
-  if Literals.eq_lits lits lits'
-    then [hc]  (* same clause *)
-    else begin  (* construct new clause *)
-      let proof c' = Proof (c', "peano", [hc.hcproof]) in
-      let parents = [hc] in
-      let new_hc = C.mk_hclause_a ~parents ~ctx lits' proof in
-      FoUtils.debug 3 "@[<h>rewrite with peano %a into %a@]"
-                     !C.pp_clause#pp hc !C.pp_clause#pp_h new_hc;
-      (* return simplified clause *)
-      [new_hc]
-    end
+let rec expert ~ctx =
+  let open Experts in
+  let signature = Symbols.set_of_signature (Rewriting.TRS.signature trs) in
+  { expert_name = "peano_arith";
+    expert_descr = "evaluation for Peano arithmetic";
+    expert_equal = (fun t1 t2 -> rewrite_peano t1 == rewrite_peano t2);
+    expert_sig = signature;
+    expert_clauses = [];
+    expert_canonize = rewrite_peano;
+    expert_ord = (fun _ -> true);
+    expert_ctx = ctx;
+    expert_update_ctx = (fun ctx -> [expert ~ctx]);
+    expert_solve = None;
+  }
 
 let ext =
   let open Extensions in
-  Format.printf "@[<hov2>TRS:@; %a@]@." Rewriting.TRS.pp_trs trs;
-  let actions = [Ext_simplification_rule rewrite_peano_clause] in
+  let actions = [Ext_expert expert] in
   { name = "peano";
     actions;
   }
