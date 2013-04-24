@@ -67,37 +67,47 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         
   (* gets the variables associated with a string from the variable mapping
      creates a new mapping for a new variable with the given sort *)
-  let get_var ?(sort=univ_) (var_name: string) =
+  let get_var ?sort (var_name: string) =
     try 
-      (* way faster than List.assoc *)
-      match
+      let entry = 
         List.find
-          (fun (var_name', var_sort, _) ->
-             var_name = var_name' && var_sort == sort)
-          !var_map
-      with (_, _, t) -> t
+          (fun (var_name', var_sort, _) -> var_name = var_name') !var_map in
+      begin match entry, sort with
+      | (_, var_sort, t), None -> t
+      | (_, var_sort, t), Some sort -> assert (var_sort == sort); t
+      end
     with
       | Not_found ->
-          let new_var = 
-            Terms.mk_var !var_id_counter sort
-          in
-            incr var_id_counter;
-            var_map := (var_name, sort, new_var) :: !var_map;
-            new_var
+        let sort = match sort with | None -> univ_ | Some s -> s in
+        let new_var = Terms.mk_var !var_id_counter sort in
+        incr var_id_counter;
+        var_map := (var_name, sort, new_var) :: !var_map;
+        new_var
 
   (** table that maps symbols into sorts *)
   let sort_table = SHashtbl.create 5
 
   (* Get the infered sort for the given symbol and list of arguments.
      The supposed return type can be passed. *)
-  let get_sort ?(sort=univ_) symb =
+  let get_sort ?(sort=univ_) symb args =
+    let open Symbols in
+    let arg_sorts = List.map (fun t -> t.sort) args in
     try
-      SHashtbl.find sort_table symb
+      let sort' = SHashtbl.find sort_table symb in
+      begin try
+        sort' @@ arg_sorts
+      with Symbols.SortError(msg) ->
+        Const.parse_error
+          (FoUtils.sprintf "%% could not type %a with (%a)(%a): %s"
+            pp_symbol symb pp_sort sort' (FoUtils.pp_list pp_sort) arg_sorts msg)
+      end
     with Not_found ->
-      SHashtbl.replace sort_table symb sort;
-      sort
+      let s_sort = sort <== arg_sorts in
+      SHashtbl.add sort_table symb s_sort;
+      sort (* return sort *)
 
-  let set_sort constant sort = SHashtbl.replace sort_table constant sort
+  let set_sort constant sort =
+    SHashtbl.replace sort_table constant sort
 %}
   
 %token LEFT_PARENTHESIS
@@ -116,6 +126,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token THF
 %token TFF
 %token INCLUDE
+%token INFERENCE
+%token THEORY
+%token FILE
+%token TYPE
+%token ARROW
+%token PRODUCT
 %token <string> SINGLE_QUOTED
 %token <string> DOLLAR_WORD
 %token <string> DOLLAR_DOLLAR_WORD
@@ -138,6 +154,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token RIGHT_IMPLICATION
 %token GENTZEN_ARROW
 %token SLASH
+%token LET
+%token DISTINCT
 
 %token IS
 %token THEORY
@@ -207,6 +225,8 @@ file:
 tptp_input:
   | annotated_formula
       { Some $1 }
+  | tff_type_declaration
+      { None }
   | include_
       { None }
 
@@ -225,10 +245,26 @@ thf_annotated:
     fof_formula annotations RIGHT_PARENTHESIS DOT
     { failwith "Parser_tptp: tfh syntax not supported." }
 
+tff_type_declaration:
+  | TFF LEFT_PARENTHESIS name COMMA TYPE COMMA
+    tff_typed_atom annotations RIGHT_PARENTHESIS DOT
+    { let (t, sort) = $7 in
+      set_sort t sort  (* declare the sort of this symbol *)
+    }
+
 tff_annotated:
   | TFF LEFT_PARENTHESIS name COMMA formula_role COMMA
     fof_formula annotations RIGHT_PARENTHESIS DOT
-    { failwith "Parser_tptp: tff syntax not (yet) supported." }
+    {
+      let formula = 
+        let filename = !Const.cur_filename in  (* ugly *)
+        if !conjecture
+          then Terms.mk_not $7, filename, $3
+          else $7, filename, $3
+      in
+      init ();  (* reset global state *)
+      formula
+    }
 
 fof_annotated:
   | FOF LEFT_PARENTHESIS name COMMA formula_role COMMA
@@ -386,12 +422,18 @@ literal:
       { Terms.mk_not (Terms.cast $2 bool_) }
 
 atomic_formula:
+  | typed_atom
+      { $1 }
   | plain_atom
       { $1 }
   | defined_atom
       { $1 }
   | system_atom
       { $1 }
+
+typed_atom:
+  | plain_term_top COLON tff_type
+    { Terms.cast $1 $3 }
 
 plain_atom:
   | plain_term_top
@@ -403,6 +445,8 @@ plain_atom:
         | Var _ | BoundVar _ -> failwith "variable at top level");
         t
       }
+  | defined_term
+    { $1 }
 
 arguments:
   | term
@@ -414,12 +458,10 @@ arguments:
 defined_atom:
   | DOLLAR_TRUE
       { Terms.true_term }
-
   | DOLLAR_FALSE
       { Terms.false_term }
-
   | term EQUALITY term
-      { Terms.mk_eq $1 $3 }
+      { Terms.mk_eq $1 (Terms.cast $3 $1.sort) }
   | term DISEQUALITY term
       { Terms.mk_neq $1 $3 }
 
@@ -450,20 +492,20 @@ function_term:
 
 plain_term_top:
   | constant
-      { let sort = get_sort $1 in
+      { let sort = get_sort $1 [] in
         Terms.mk_const $1 sort }
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let sort = get_sort $1 in
+      { let sort = get_sort $1 $3 in
         Terms.mk_node $1 sort $3
       }
 
 plain_term:
   | constant
-      { let sort = get_sort $1 in
+      { let sort = get_sort $1 [] in
         Terms.mk_const $1 sort }
 
   | functor_ LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let sort = get_sort $1 in
+      { let sort = get_sort $1 $3 in
         Terms.mk_node $1 sort $3
       }
 
@@ -478,33 +520,76 @@ functor_:
 defined_term:
   | number
     {
-      let n = Num.num_of_string $1 in
-      let symbol = Symbols.mk_num n in
-      let sort = match n with
-        | Num.Int _ | Num.Big_int _ -> int_
-        | Num.Ratio _ -> rat_
+      let symbol = $1 in
+      let sort = match Symbols.get_val symbol with
+        | Symbols.Num (Num.Int _ | Num.Big_int _) -> int_
+        | Symbols.Num (Num.Ratio _) -> rat_
+        | Symbols.Real _ -> real_
+        | _ -> assert false
       in
       Terms.mk_const symbol sort }
   | DISTINCT_OBJECT
     { let sort = univ_ in
       let symbol = Symbols.mk_distinct $1 in
       Terms.mk_const symbol sort }
+  | DOLLAR_WORD LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
+    { let open Symbols in
+      (* function to make a polymorphic symbol *)
+      let mk_poly = mk_symbol ~attrs:attr_polymorphic in
+      match $1, $3 with
+      | "$to_int", [t] ->
+        Terms.mk_node (mk_poly $1) int_ [t]
+      | "$to_rat", [t] ->
+        Terms.mk_node (mk_poly $1) rat_ [t]
+      | "$to_real", [t] ->
+        Terms.mk_node (mk_poly $1) real_ [t]
+      | "$distinct", ((t::_) as l) ->
+        Terms.mk_node (mk_poly $1) bool_ l
+      | "$is_int", [a]
+      | "$is_rat", [a] ->
+        Terms.mk_node (mk_poly $1) bool_ [a]
+      | "$greater", [a;b]
+      | "$greatereq", [a;b]
+      | "$less", [a;b]
+      | "$lesseq", [a;b]
+      | "$sum", [a;b]
+      | "$product", [a;b]
+      | "$quotient", [a;b]
+      | "$quotient_e", [a;b]
+      | "$quotient_t", [a;b]
+      | "$quotient_f", [a;b]
+      | "$remainder_e", [a;b]
+      | "$remainder_f", [a;b]
+      | "$remainder_t", [a;b]
+      | "$difference", [a;b] ->
+        Terms.mk_node (mk_poly $1) a.sort [a; b]
+      | "$floor", [a]
+      | "$ceiling", [a]
+      | "$round", [a]
+      | "$truncate", [a]
+      | "$uminus", [a] ->
+        Terms.mk_node (mk_poly $1) a.sort [a]
+      | _, _ ->  (* default case *)
+        let sort = get_sort (mk_symbol $1) $3 in
+        Terms.mk_node (mk_symbol $1) sort $3
+    }
+  | DOLLAR_WORD
+    { Terms.mk_const (mk_symbol $1) (get_sort (mk_symbol $1) []) }
 
 system_term_top:
   | system_constant
-      { let sort = get_sort $1 in  (* FIXME: is the sort univ_ ? *)
+      { let sort = get_sort $1 [] in  (* FIXME: is the sort univ_ ? *)
         Terms.mk_const $1 sort }
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let sort = get_sort $1 in
+      { let sort = get_sort $1 $3 in
         Terms.mk_node $1 sort $3 }
 
 system_term:
   | system_constant
-      { let sort = get_sort $1 in
+      { let sort = get_sort $1 [] in
         Terms.mk_const $1 sort }
-
   | system_functor LEFT_PARENTHESIS arguments RIGHT_PARENTHESIS
-      { let sort = get_sort $1 in
+      { let sort = get_sort $1 $3 in
         Terms.mk_node $1 sort $3 }
 
 system_functor:
@@ -516,8 +601,46 @@ system_constant:
       { mk_symbol $1 }
 
 variable:
+  | UPPER_WORD COLON tff_type
+      { get_var ~sort:$3 $1 }
   | UPPER_WORD
       { get_var $1 }
+
+tff_typed_atom:
+  | atomic_word COLON tff_type
+    { (* type declaration *)
+      let sort = $3 in
+      let s = Symbols.mk_symbol $1 in
+      s, sort
+    }
+  | LEFT_PARENTHESIS tff_typed_atom RIGHT_PARENTHESIS
+    { $2 }
+
+tff_type:
+  | tff_atomic_type
+    { $1 }
+  | tff_unitary_type ARROW tff_atomic_type
+    { let open Symbols in
+      $3 <== $1
+    }
+
+tff_unitary_type:
+  | tff_atomic_type
+    { [$1] }
+  | LEFT_PARENTHESIS tff_prod_type RIGHT_PARENTHESIS
+    { $2 }
+
+tff_prod_type:
+  | tff_type
+    { [$1] }
+  | tff_type PRODUCT tff_prod_type
+    { $1 :: $3 }
+
+tff_atomic_type:
+  | atomic_word
+    { Symbols.mk_sort $1 }
+  | DOLLAR_WORD
+    { Symbols.mk_sort $1 }
 
 source:
   | general_term
@@ -606,11 +729,17 @@ atomic_system_word:
 
 number:
   | REAL
-      { $1 }
+    { Symbols.mk_real (float_of_string $1) }
   | SIGNED_INTEGER
-      { $1 }
+    { Symbols.parse_num $1 }
   | UNSIGNED_INTEGER
-      { $1 }
+    { Symbols.parse_num $1 }
+  | SIGNED_INTEGER SLASH UNSIGNED_INTEGER
+    { let open Num in
+      Symbols.mk_num (num_of_string $1 // num_of_string $3) }
+  | UNSIGNED_INTEGER SLASH UNSIGNED_INTEGER
+    { let open Num in
+      Symbols.mk_num (num_of_string $1 // num_of_string $3) }
 
 file_name:
   | SINGLE_QUOTED
@@ -622,7 +751,7 @@ null:
       { }
 
 
-/* Meta-prover parsing */
+/* Meta-prover parsing  TODO: move to separate file/format */
 
 meta_definitions:
   | meta_definition { [$1] }

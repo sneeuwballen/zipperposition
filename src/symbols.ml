@@ -33,6 +33,7 @@ let attr_multiset = 1 lsl 5
 let attr_fresh_const = 1 lsl 6
 let attr_commut = 1 lsl 7
 let attr_polymorphic = 1 lsl 8
+let attr_num = 1 lsl 9
 
 (** {2 Definition of symbols and sorts} *)
 
@@ -92,15 +93,19 @@ let mk_num ?(attrs=0) n =
   let s = {
     symb_val = Num n;
     symb_id = 0;
-    symb_attrs = attrs;
+    symb_attrs = attrs lor attr_polymorphic lor attr_num;
   } in
   HashSymbol.hashcons s
+
+let parse_num ?attrs str =
+  let n = Num.num_of_string str in
+  mk_num ?attrs n
 
 let mk_int ?(attrs=0) i =
   let s = {
     symb_val = Num (Num.num_of_int i);
     symb_id = 0;
-    symb_attrs = attrs;
+    symb_attrs = attrs lor attr_polymorphic lor attr_num;
   } in
   HashSymbol.hashcons s
 
@@ -108,7 +113,7 @@ let mk_real ?(attrs=0) f =
   let s = {
     symb_val = Real f;
     symb_id = 0;
-    symb_attrs = attrs;
+    symb_attrs = attrs lor attr_polymorphic lor attr_num;
   } in
   HashSymbol.hashcons s
 
@@ -120,6 +125,8 @@ let name_symbol s = match s.symb_val with
   | Distinct s -> s
   | Num n -> Num.string_of_num n
   | Real f -> string_of_float f
+
+let get_val s = s.symb_val
 
 let tag_symbol s = s.symb_id
 
@@ -252,9 +259,12 @@ let (<==) s l = match l with
 
 let (<=.) s1 s2 = s1 <== [s2]
 
-let can_apply l args =
-  try List.for_all2 (==) l args
-  with Invalid_argument _ -> false
+let rec can_apply l args =
+  match l, args with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | s1::l', s2::args' -> s1 == s2 && can_apply l' args'
 
 (** [s @@ args] applies the sort [s] to arguments [args]. Basic must match *)
 let (@@) s args = match s, args with

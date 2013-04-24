@@ -201,15 +201,9 @@ let mk_precedence ?(complete=true) constrs symbols =
       in
       let a' = transform_symbol a
       and b' = transform_symbol b in
-      if a' == b' && a != b
-        (* both are in the same symbol family (e.g. split symbols). Any
-           arbitrary but total ordering on them is ok, as long as it's stable. *)
-        then Symbols.compare_symbols a b
-        else
-          try SHashtbl.find table b' - SHashtbl.find table a'
-          with Not_found ->
-            let msg = Utils.sprintf "tried to compare %a and %a" pp_symbol a' pp_symbol b' in
-            failwith msg
+      try SHashtbl.find table b' - SHashtbl.find table a'
+      with Not_found ->
+        Symbols.compare_symbols a' b'
     in
     let prec_weight s = weight s in
     let prec_set_weight weight' = mk_prec symbols table weight' in

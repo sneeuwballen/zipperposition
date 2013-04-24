@@ -584,12 +584,15 @@ let signature seq =
   (* Update signature with s -> sort.
      Checks consistency with current value, if any. *)
   and update_sig signature f sort =
-    if has_attr attr_polymorphic f then signature
+    if has_attr attr_num f then signature
     else begin
       (try
         let sort' = SMap.find f signature in
-        if sort != sort' then Format.printf "sort %a != %a@." pp_sort sort pp_sort sort';
-        assert (sort == sort');
+        if sort != sort' && not (has_attr attr_polymorphic f)
+          then begin Format.printf "%% sort for %a: %a != %a@."
+            Symbols.pp_symbol f pp_sort sort pp_sort sort';
+            failwith "inconsistent signature"
+          end;
       with Not_found -> ());
       let signature' = SMap.add f sort signature in
       signature'

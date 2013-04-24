@@ -58,10 +58,12 @@ val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *
 val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
 val attr_commut : symbol_attribute      (** symbol that is commutative (not ac) *)
 val attr_polymorphic : symbol_attribute (** symbol that is ad-hoc polymorphic *)
+val attr_num : symbol_attribute         (** symbol that is numeric *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
 val mk_distinct : ?attrs:symbol_attribute -> string -> symbol
 val mk_num : ?attrs:symbol_attribute -> Num.num -> symbol
+val parse_num : ?attrs:symbol_attribute -> string -> symbol
 val mk_int : ?attrs:symbol_attribute -> int -> symbol
 val mk_real : ?attrs:symbol_attribute -> float -> symbol
 
@@ -79,6 +81,9 @@ val has_attr : symbol_attribute -> symbol -> bool
 
 val name_symbol : symbol -> string
   (** Printable form of a symbol *)
+
+val get_val : symbol -> symbol_val
+  (** Access the definition of this symbol *)
 
 module SHashtbl : Hashtbl.S with type key = symbol
 

@@ -79,10 +79,18 @@ let fp16 = fp [[]; [1]; [2]; [3]; [4]; [1;1]; [1;2]; [1;3]; [2;1];
  * index
  * ---------------------------------------------------------------------- *)
 
+let eq_feature f1 f2 =
+  match f1, f2 with
+  | S s1, S s2 -> s1 == s2
+  | B, B
+  | N, N
+  | A, A -> true
+  | _ -> false
+
 (** check whether two features are compatible for unification. *)
 let compatible_features_unif f1 f2 =
   match f1, f2 with
-  | S s1, S s2 -> s1 = s2
+  | S s1, S s2 -> s1 == s2
   | B, _ | _, B -> true
   | A, N | N, A -> false
   | A, _ | _, A -> true
@@ -107,7 +115,7 @@ module FeatureMap = Map.Make(
     type t = feature
     let compare f1 f2 = match f1, f2 with
       (* N < B < A < S, S are ordered by symbols *)
-      | _, _ when f1 = f2 -> 0
+      | _, _ when eq_feature f1 f2 -> 0
       | N, _ -> -1
       | _, N -> 1
       | B, _ -> -1
