@@ -210,11 +210,16 @@ let load_plugins ~params =
       let filename =  (* plugin name, or file? *)
         if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
           then filename
-          else FoUtils.sprintf "plugins/std/ext_%s.cmxs" filename  (* FIXME: use home var *)
+        else
+          let filename = FoUtils.sprintf "plugins/ext_%s.cmxs" filename in
+          try
+            ignore (Unix.stat filename);
+            filename
+          with Unix.Unix_error _ ->
+            Filename.concat Const.home filename
       in
       match Extensions.dyn_load filename with
       | Extensions.Ext_failure msg -> (* Could not load plugin *)
-        Utils.debug 0 "%% could not load plugin %s: %s" filename msg;
         []
       | Extensions.Ext_success ext ->
         Utils.debug 0 "%% loaded extension %s" ext.Extensions.name;
