@@ -120,4 +120,9 @@ let to_seq set =
 let of_seq set seq =
   Sequence.fold add set seq
 
+let to_list set =
+  Sequence.to_rev_list (to_seq set)
+
+let of_list set l =
+  of_seq set (Sequence.of_list l)
 
