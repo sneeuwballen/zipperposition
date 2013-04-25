@@ -26,8 +26,10 @@ open Basic
 open Symbols
 
 module T = Terms
+module C = Clauses
+module S = FoSubst
 
-(* simplification function for arithmetic *)
+(** simplification function for arithmetic *)
 let rec arith_canonize t =
   match t.term with
   | Var _
@@ -49,7 +51,7 @@ let rec arith_canonize t =
   | Node (s, l) ->
     let l' = List.map arith_canonize l in
     T.mk_node s t.sort l'
-(* unary builtins *)
+(** unary builtins *)
 and try_reduce_unary s sort a =
   match Symbols.get_val s, a.term with
   | Const "$uminus", Node (n, []) when is_numeric n ->
@@ -70,7 +72,7 @@ and try_reduce_unary s sort a =
     if is_real n then T.true_term else T.false_term
   | _ ->
     T.mk_node s sort [a]  (* default case *)
-(* binary builtins *)
+(** binary builtins *)
 and try_reduce_binary s sort a b =
   match Symbols.get_val s, a.term, b.term with
   | Const "$sum", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
@@ -104,6 +106,7 @@ and try_reduce_binary s sort a b =
   | _ ->
     T.mk_node s sort [a; b]  (* default case *)
   
+(** Expert that evaluates arithmetic expressions *)
 let rec expert ~ctx =
   let open Experts in
   let signature = SSet.empty in
@@ -119,9 +122,87 @@ let rec expert ~ctx =
     expert_solve = None;
   }
 
+(** Instantiate [hc], minus its i-th component, with given bindings *)
+let rebuild ?(rule="arith") hc i bindings =
+  let ctx = hc.hcctx in
+  let subst = List.fold_left
+    (fun s (x,t) -> S.bind s (x,0) (t,0)) S.id_subst bindings in
+  let lits = FoUtils.array_except_idx hc.hclits i in
+  let lits = Literals.apply_subst_list ~ord:ctx.ctx_ord subst (lits,0) in
+  let proof c = Proof (c, rule, [hc.hcproof]) in
+  let parents = [hc] in
+  let new_clause = C.mk_hclause ~parents ~ctx lits proof in
+  FoUtils.debug 3 "%% arith deduction (%s with @[<h>%a@]): @[<h>%a@]"
+    rule S.pp_substitution subst !C.pp_clause#pp_h new_clause;
+  new_clause
+
+let plus a b = T.mk_node (mk_symbol "$sum") a.sort [a; b]
+let minus a b = T.mk_node (mk_symbol "$difference") a.sort [a; b]
+
+let succ a =
+  if a.sort == real_
+    then plus a (T.mk_const Arith.one_f real_)
+    else plus a (T.mk_const Arith.one_i a.sort)
+
+let pred a =
+  if a.sort == real_
+    then minus a (T.mk_const Arith.one_f real_)
+    else minus a (T.mk_const Arith.one_i a.sort)
+
+(** Propose some clauses, derived from [hc], where the [i-th] literal is
+    removed (and proposition [t] is satisfied) *)
+let try_satisfy hc i t =
+  match t.term with
+  | Node ({symb_val=Const "$less"}, [{term=Var _} as v; b])
+  | Node ({symb_val=Const "$lesseq"}, [{term=Var _} as v; b]) 
+  | Node ({symb_val=Const "$greater"}, [b; {term=Var _} as v]) 
+  | Node ({symb_val=Const "$greatereqeq"}, [b; {term=Var _} as v]) when not (T.var_occurs v b) ->
+    [rebuild hc i [v, pred b]]
+  | Node ({symb_val=Const "$less"}, [b; {term=Var _} as v])
+  | Node ({symb_val=Const "$lesseq"}, [b; {term=Var _} as v])
+  | Node ({symb_val=Const "$greater"}, [{term=Var _} as v; b])
+  | Node ({symb_val=Const "$greatereq"}, [{term=Var _} as v; b]) when not (T.var_occurs v b) ->
+    [rebuild hc i [v, succ b]]
+  | _ -> []
+
+let try_contradict hc i t =
+  []  (* TODO *)
+
+let try_make_eq hc i l r =
+  []  (* TODO *)
+
+let try_make_neq hc i l r =
+  [] (* TODO *)
+
+(** inference rule that tries some basic hacks *)
+let unary_inf_rule hc =
+  (* try to eliminate one literal *)
+  let basic_solve_lit acc i lit = match lit with
+  | Equation (t, true_, false, _) when true_ == T.true_term ->
+    try_satisfy hc i t @ acc
+  | Equation (true_, t, false, _) when true_ == T.true_term ->
+    try_satisfy hc i t @ acc
+  | Equation (t, true_, true, _) when true_ == T.true_term ->
+    try_contradict hc i t @ acc
+  | Equation (true_, t, true, _) when true_ == T.true_term ->
+    try_contradict hc i t @ acc
+  | Equation (l, r, false, _) when l.sort != bool_ ->
+    try_make_eq hc i l r
+  | Equation (l, r, true, _) when l.sort != bool_ ->
+    try_make_neq hc i l r @ acc
+  | _ -> acc
+  in
+  FoUtils.array_foldi basic_solve_lit [] hc.hclits
+
+(** The extension itself *)
 let ext =
   let open Extensions in
-  let actions = [Ext_expert expert; Ext_signal_incompleteness] in
+  let actions =
+    [ Ext_expert expert;
+      Ext_unary_inf_rule ("arith_inst", unary_inf_rule);
+      Ext_term_rewrite ("arith_eval", arith_canonize);
+      Ext_signal_incompleteness]
+  in
   { name = "arith";
     actions;
   }

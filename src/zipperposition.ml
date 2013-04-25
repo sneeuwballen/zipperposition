@@ -293,14 +293,15 @@ let print_meta ~env =
 
 let print_szs_result ~env result =
   match result with
-  | Sat.Unknown | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
-  | Sat.Error s -> Printf.printf "%% error occurred: %s\n" s
+  | Sat.Unknown | Sat.Timeout -> Format.printf "%% SZS status ResourceOut@."
+  | Sat.Error s -> Format.printf "%% error occurred: %s@." s
   | Sat.Sat ->
       (if env.Env.ctx.ctx_complete
-        then Printf.printf "%% SZS status CounterSatisfiable\n"
-        else Printf.printf "%% SZS status GaveUp\n" );
-      Utils.debug 1 "%% saturated set: @[<v>%a@]@."
-      C.pp_set (C.CSet.of_seq C.CSet.empty (Env.get_active ~env))
+        then Format.printf "%% SZS status CounterSatisfiable@."
+        else Format.printf "%% SZS status GaveUp@." );
+      (if Utils.debug_level () >= 1
+        then Format.printf "%% saturated set: @[<v>%a@]@."
+          C.pp_set (C.CSet.of_seq C.CSet.empty (Env.get_active ~env)));
   | Sat.Unsat c -> begin
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";

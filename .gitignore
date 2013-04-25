@@ -9,6 +9,7 @@ docs/*.pdf
 *.aux
 *.out
 _build
+plugins/std/
 tags
 *.native
 **/*.native

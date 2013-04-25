@@ -87,6 +87,14 @@ module Arith : sig
   val truncate : symbol -> symbol
   val round : symbol -> symbol
 
+  val prec : symbol -> symbol
+  val succ : symbol -> symbol
+
+  val one_i : symbol
+  val zero_i : symbol
+  val one_f : symbol
+  val zero_f : symbol
+
   val sum : symbol -> symbol -> symbol
   val difference : symbol -> symbol -> symbol
   val uminus : symbol -> symbol

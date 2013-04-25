@@ -172,6 +172,21 @@ module Arith = struct
     mk_num (num_of_int i)
   | _ -> raise TypeMismatch
 
+  let prec s = match s.symb_val with
+  | Num n -> mk_num (pred_num n)
+  | Real f -> mk_real (f -. 1.)
+  | _ -> raise TypeMismatch
+
+  let succ s = match s.symb_val with
+  | Num n -> mk_num (succ_num n)
+  | Real f -> mk_real (f +. 1.)
+  | _ -> raise TypeMismatch
+
+  let one_i = mk_num (num_of_int 1)
+  let zero_i = mk_num (num_of_int 0)
+  let one_f = mk_real 1.
+  let zero_f = mk_real 0.
+
   let sum s1 s2 = match s1.symb_val, s2.symb_val with
   | Num n1, Num n2 -> mk_num (n1 +/ n2)
   | Real f1, Real f2 -> mk_real (f1 +. f2)
