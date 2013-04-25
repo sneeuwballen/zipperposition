@@ -440,6 +440,12 @@ let array_exists p a =
     if i = Array.length a then false else p a.(i) || check (i+1)
   in check 0
 
+(** all the elements of a, but the i-th, into a list *)
+let array_except_idx a i =
+  array_foldi
+    (fun acc j elt -> if i = j then acc else elt::acc)
+    [] a
+
 (** {2 File utils} *)
 
 let with_lock_file filename action =

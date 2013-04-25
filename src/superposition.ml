@@ -147,12 +147,6 @@ let get_equations_sides c pos = match pos with
  * inferences
  * ---------------------------------------------------------------------- *)
 
-(** all the elements of a, but the i-th, into a list *)
-let array_except_idx a i =
-  Utils.array_foldi
-    (fun acc j elt -> if i = j then acc else elt::acc)
-    [] a
-
 (* Helper that does one or zero superposition inference, with all
    the given parameters. Clauses have an offset. *)
 let do_superposition ~ctx (active_clause, o_a) active_pos
@@ -193,8 +187,8 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
         not (BV.get (C.eligible_param (active_clause, o_a) subst) active_idx))
       then (Utils.debug 3 "... has bad ordering conditions"; acc)
       else begin (* ordering constraints are ok *)
-        let lits_a = array_except_idx active_clause.hclits active_idx in
-        let lits_p = array_except_idx passive_clause.hclits passive_idx in
+        let lits_a = Utils.array_except_idx active_clause.hclits active_idx in
+        let lits_p = Utils.array_except_idx passive_clause.hclits passive_idx in
         (* replace s\sigma by t\sigma in u|_p\sigma *)
         let u' = S.apply_subst ~renaming subst (u, o_p) in
         let new_u = T.replace_pos u' subterm_pos t' in
@@ -290,7 +284,7 @@ let infer_equality_resolution clause =
           then begin
             incr_stat stat_equality_resolution_call;
             let proof c = Proof (c, "eq_res", [clause.hcproof])
-            and new_lits = array_except_idx clause.hclits pos in
+            and new_lits = Utils.array_except_idx clause.hclits pos in
             let new_lits = Lits.apply_subst_list ~ord:ctx.ctx_ord subst (new_lits, 0) in
             let new_clause = C.mk_hclause ~parents:[clause] ~ctx new_lits proof in
             Utils.debug 3 "equality resolution on @[<h>%a@] yields @[<h>%a@]"
@@ -348,7 +342,7 @@ let infer_equality_factoring clause =
         let proof c = Proof (c, "eq_fact", [clause.hcproof])
         (* new_lits: literals of the new clause. remove active literal
            and replace it by a t!=v one, and apply subst *)
-        and new_lits = array_except_idx clause.hclits active_idx in
+        and new_lits = Utils.array_except_idx clause.hclits active_idx in
         let new_lits = (Lits.mk_neq ~ord t v) :: new_lits in
         let renaming = S.Renaming.create 3 in
         let new_lits = Lits.apply_subst_list ~renaming ~ord subst (new_lits,0) in
@@ -1038,7 +1032,7 @@ let rec contextual_literal_cutting active_set c =
       None (* no change *)
     with (RemoveLit (i, c')) ->
       (* remove the literal and recurse *)
-      Some (array_except_idx lits i, c')
+      Some (Utils.array_except_idx lits i, c')
   in
   match remove_one_lit c.hclits with
   | None -> (Utils.exit_prof prof_clc; c) (* no literal removed *)

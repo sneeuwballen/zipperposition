@@ -132,6 +132,8 @@ val array_forall : ('a -> bool) -> 'a array -> bool
 val array_forall2 : ('a -> 'a -> bool) -> 'a array -> 'a array -> bool
 (** exists on array *)
 val array_exists : ('a -> bool) -> 'a array -> bool
+(** Elements of array except the one at given index (reverse list) *)
+val array_except_idx : 'a array -> int -> 'a list
 
 (** {2 File utils} *)
 
