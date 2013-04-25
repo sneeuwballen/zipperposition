@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 open Basic
 open Symbols
 
+module T = Terms
 module C = Clauses
 module Utils = FoUtils
 
@@ -41,6 +42,9 @@ type t = {
   
   mutable unary_rules : (string * unary_inf_rule) list;
     (** the unary inference rules *)
+
+  mutable rewrite_rules : (string * (term -> term)) list;
+    (** Rules to apply to term *)
   
   mutable basic_simplify : hclause -> hclause;
     (** how to simplify a clause *)
@@ -100,6 +104,7 @@ let mk_env ?meta ~ctx params signature =
     ctx;
     binary_rules = [];
     unary_rules = [];
+    rewrite_rules = [];
     basic_simplify = (fun hc -> hc);
     rw_simplify = (fun _ hc -> hc);
     active_simplify = (fun _ hc -> hc);
@@ -186,6 +191,9 @@ let list_simplify ~env hc =
 
 let add_expert ~env expert =
   env.state#add_expert expert
+
+let add_rewrite_rule ~env name rule =
+  env.rewrite_rules <- (name, rule) :: env.rewrite_rules
 
 let get_experts ~env =
   env.state#experts
@@ -276,11 +284,49 @@ let do_unary_inferences ~env hc =
 let is_trivial ~env hc =
   env.is_trivial hc || Experts.Set.is_redundant (get_experts ~env) hc
 
+(** Apply rewrite rules *)
+let rewrite ~env hc =
+  let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
+  let rec reduce_term rules t =
+    match rules with
+    | [] -> t
+    | (name, r)::rules' ->
+      let t' = r t in
+      if t != t'
+        then begin
+          applied_rules := SmallSet.add !applied_rules name;
+          reduce_term env.rewrite_rules t'  (* re-apply all rules *)
+        end else reduce_term rules' t  (* try next rule *)
+  in
+  (* reduce every literal *)
+  let lits' = Array.map
+    (function (Equation (l, r, sign, _) as lit) ->
+      let l' = reduce_term env.rewrite_rules l
+      and r' = reduce_term env.rewrite_rules r in
+      if l == l' && r == r'
+        then lit  (* same lit *)
+        else Literals.mk_lit ~ord:env.ctx.ctx_ord l' r' sign)
+    hc.hclits
+  in
+  if SmallSet.is_empty !applied_rules
+    then hc (* no simplification *)
+    else begin
+      let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
+      let proof c = Proof (c, rule, [hc.hcproof]) in
+      let parents = [hc] in
+      let new_clause = C.mk_hclause_a ~parents ~ctx:env.ctx lits' proof in
+      Utils.debug 3 "rewritten @[<h>%a into %a@]"
+        !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause;
+      new_clause
+    end
+
 (** Simplify the hclause. Returns both the hclause and its simplification. *)
 let simplify ~env old_hc =
   Utils.enter_prof prof_simplify;
+  let hc = old_hc in
   (* simplify with unit clauses, then all active clauses *)
-  let hc = env.rw_simplify env.state#simpl_set old_hc in
+  let hc = rewrite ~env hc in
+  let hc = env.rw_simplify env.state#simpl_set hc in
   let hc = env.basic_simplify hc in
   let hc = Experts.Set.simplify (get_experts env) hc in
   let hc = env.active_simplify env.state#active_set hc in
@@ -317,6 +363,7 @@ let backward_simplify ~env given =
 
 (** Simplify the clause w.r.t to the active set and experts *)
 let forward_simplify ~env hc =
+  let hc = rewrite ~env hc in
   let cs = list_simplify ~env hc in
   let cs = List.map (Experts.Set.simplify (get_experts ~env)) cs in
   let cs = List.map (env.rw_simplify env.state#simpl_set) cs in

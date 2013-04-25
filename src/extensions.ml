@@ -32,6 +32,7 @@ and action =
   | Ext_binary_inf_rule of string * Env.binary_inf_rule
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
   | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
+  | Ext_term_rewrite of string * (term -> term)
   | Ext_simplification_rule of (hclause -> hclause list)
   (** Action that can be performed by an extension *)
 
@@ -72,7 +73,9 @@ let apply_ext ~env ext =
   | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
   | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
   | Ext_signal_incompleteness -> env.Env.ctx.ctx_complete <- false
-  | Ext_simplification_rule r ->
+  | Ext_term_rewrite (name, rule) ->  (* add rewrite rule *)
+    Env.add_rewrite_rule ~env name rule
+  | Ext_simplification_rule r ->  (* add simplifcation rule *)
     let list_simplify' = env.Env.list_simplify in
     env.Env.list_simplify <-
       (fun hc -> FoUtils.list_flatmap list_simplify' (r hc))

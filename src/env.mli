@@ -38,6 +38,9 @@ type t = {
   
   mutable unary_rules : (string * unary_inf_rule) list;
     (** the unary inference rules *)
+
+  mutable rewrite_rules : (string * (term -> term)) list;
+    (** Rules to apply to term *)
   
   mutable basic_simplify : hclause -> hclause;
     (** how to simplify a clause *)
@@ -124,6 +127,8 @@ val add_binary_inf : env:t -> string -> binary_inf_rule -> unit
 val add_unary_inf : env:t -> string -> unary_inf_rule -> unit
 
 val add_expert : env:t -> Experts.t -> unit
+
+val add_rewrite_rule : env:t -> string -> (term -> term) -> unit
 
 val list_simplify : env:t -> hclause -> hclause list
 
