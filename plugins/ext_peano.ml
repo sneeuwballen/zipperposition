@@ -24,7 +24,6 @@ open Basic
 open Symbols
 
 module T = Terms
-module C = Clauses
 
 (* term rewriting system for Peano *)
 let trs =

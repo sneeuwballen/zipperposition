@@ -80,11 +80,14 @@ let rec combine e1 e2 =
     let t' = e1.expert_canonize t in
     let t' = e2.expert_canonize t' in
     if t == t' then t' else nf t'
+  and expert_equal t1 t2 =
+    let t1' = nf t1 and t2' = nf t2 in
+    t1' == t2' || e1.expert_equal t1' t2 || e2.expert_equal t1' t2'
   in
   { expert_name = Utils.sprintf "(%s)_U_(%s)" e1.expert_name e2.expert_name;
     expert_descr =
       Utils.sprintf "@[<hov2>union of@ %s and@ %s@]" e1.expert_descr e2.expert_descr;
-    expert_equal = (fun t1 t2 -> nf t1 == nf t2);
+    expert_equal;
     expert_sig = SSet.union e1.expert_sig e2.expert_sig;
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
     expert_canonize = nf;
@@ -114,7 +117,11 @@ let more_specific e1 e2 =
 (** Get the normal form of the term *)
 let canonize expert t = expert.expert_canonize t
 
-let equal expert t1 t2 = expert.expert_equal t1 t2
+let equal expert t1 t2 =
+  let t1' = canonize expert t1
+  and t2' = canonize expert t2 in
+  (* expert.expert_equal may be more than just == of canonized forms *)
+  t1' == t2' || expert.expert_equal t1' t2' 
 
 let signature expert = expert.expert_sig
 
@@ -125,7 +132,7 @@ let is_redundant expert hc =
   if C.get_flag C.flag_persistent hc then false else
   let ans = Utils.array_exists
     (fun lit -> match lit with
-      | Equation (l, r, true, _) when l.sort != bool_ -> expert.expert_equal l r
+      | Equation (l, r, true, _) when l.sort != bool_ -> equal expert l r
       | _ -> false)
     hc.hclits
   in
@@ -143,7 +150,7 @@ let simplify expert hc =
   let lits = Array.to_list hc.hclits in
   let lits = List.filter
     (fun lit -> match lit with
-      | Equation (l, r, false, _) when expert.expert_equal l r -> false
+      | Equation (l, r, false, _) when equal expert l r -> false
       | _ -> true)
     lits in
   if List.length lits = Array.length hc.hclits
@@ -194,6 +201,8 @@ module Set = struct
     inactive = [];
     ctx;
   }
+
+  (* TODO investigate possible bug: some experts are disabled? *)
 
   let add_list set experts =
     (* traverse [right], trying to find one that is compatible with e *)
