@@ -117,6 +117,131 @@ let mk_real ?(attrs=0) f =
   } in
   HashSymbol.hashcons s
 
+let is_const s = match s.symb_val with
+  | Const _ -> true | _ -> false
+
+let is_int s = match s.symb_val with
+  | Num n -> Num.is_integer_num n | _ -> false
+
+let is_rat s = match s.symb_val with
+  | Num n -> not (Num.is_integer_num n) | _ -> false
+
+let is_real s = match s.symb_val with
+  | Real f -> true | _ -> false
+
+let is_numeric s = match s.symb_val with
+  | Real _ | Num _ -> true | _ -> false
+
+let is_distinct s = match s.symb_val with
+  | Distinct _ -> true | _ -> false
+
+(** Arithmetic (assumes the symbols verify {!is_numeric}) *)
+module Arith = struct
+  exception TypeMismatch
+
+  open Num
+
+  let sign s = match s.symb_val with
+  | Num n -> sign_num n
+  | Real f when f > 0. -> 1
+  | Real f when f < 0. -> 1
+  | Real f -> 0
+  | _ -> raise TypeMismatch
+
+  let floor s = match s.symb_val with
+  | Num n -> mk_num (floor_num n)
+  | Real f -> mk_real (floor f)
+  | _ -> raise TypeMismatch
+
+  let ceiling s = match s.symb_val with
+  | Num n -> mk_num (ceiling_num n)
+  | Real f -> mk_real (ceil f)
+  | _ -> raise TypeMismatch
+
+  let truncate s = match s.symb_val with
+  | Num n when sign_num n >= 0 -> mk_num (floor_num n)
+  | Num n -> mk_num (minus_num (floor_num (abs_num n)))
+  | Real f -> mk_num (num_of_int (truncate f))
+  | _ -> raise TypeMismatch
+
+  let round s = match s.symb_val with
+  | Num n -> mk_num (round_num n)
+  | Real f ->
+    let f' = Pervasives.floor f in
+    let i = if f -. f' > 0.5 then int_of_float f' else (int_of_float f') + 1 in
+    mk_num (num_of_int i)
+  | _ -> raise TypeMismatch
+
+  let sum s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> mk_num (n1 +/ n2)
+  | Real f1, Real f2 -> mk_real (f1 +. f2)
+  | _ -> raise TypeMismatch
+
+  let difference s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> mk_num (n1 -/ n2)
+  | Real f1, Real f2 -> mk_real (f1 -. f2)
+  | _ -> raise TypeMismatch
+
+  let uminus s = match s.symb_val with
+  | Num n -> mk_num (minus_num n)
+  | Real f -> mk_real (~-. f)
+  | _ -> raise TypeMismatch
+
+  let product s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> mk_num (n1 */ n2)
+  | Real f1, Real f2 -> mk_real (f1 *. f2)
+  | _ -> raise TypeMismatch
+
+  let quotient s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 ->
+    (try mk_num (n1 // n2) with Failure _ -> raise Division_by_zero)
+  | Real f1, Real f2 ->
+    let f = f1 /. f2 in if f == infinity then raise Division_by_zero else mk_real f
+  | _ -> raise TypeMismatch
+
+  let quotient_e s1 s2 =
+    if sign s2 >= 0 then floor (quotient s1 s2) else ceiling (quotient s1 s2)
+
+  let quotient_t s1 s2 = truncate (quotient s1 s2)
+
+  let quotient_f s1 s2 = floor (quotient s1 s2)
+
+  let remainder_e s1 s2 = difference s1 (product (quotient_e s1 s2) s2)
+
+  let remainder_t s1 s2 = difference s1 (product (quotient_t s1 s2) s2)
+
+  let remainder_f s1 s2 = difference s1 (product (quotient_f s1 s2) s2)
+
+  let to_int s = floor s
+
+  let to_rat s = s  (* XXX not fully specified *)
+
+  let to_real s = match s.symb_val with
+  | Num n -> mk_real (float_of_num n)
+  | Real _ -> s
+  | _ -> raise TypeMismatch
+
+  let less s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 </ n2
+  | Real f1, Real f2 -> f1 < f2
+  | _ -> raise TypeMismatch
+
+  let lesseq s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 <=/ n2
+  | Real f1, Real f2 -> f1 <= f2
+  | _ -> raise TypeMismatch
+
+  let greater s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 >/ n2
+  | Real f1, Real f2 -> f1 > f1
+  | _ -> raise TypeMismatch
+
+  let greatereq s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 >=/ n2
+  | Real f1, Real f2 -> f1 >= f2
+  | _ -> raise TypeMismatch
+end
+
 let is_used s = HashSymbol.mem {symb_val=Const s; symb_id=0; symb_attrs=0;}
 
 (** Printable form of a symbol *)

@@ -67,6 +67,49 @@ val parse_num : ?attrs:symbol_attribute -> string -> symbol
 val mk_int : ?attrs:symbol_attribute -> int -> symbol
 val mk_real : ?attrs:symbol_attribute -> float -> symbol
 
+val is_const : symbol -> bool
+val is_int : symbol -> bool
+val is_rat : symbol -> bool
+val is_real : symbol -> bool
+val is_numeric : symbol -> bool  (* any of the 3 above *)
+val is_distinct : symbol -> bool
+
+(** Arithmetic (assumes the symbols verify {!is_numeric}) *)
+module Arith : sig
+  exception TypeMismatch
+
+  (* some functions may raise Division_by_zero *)
+
+  val sign : symbol -> int   (* -1, 0 or 1 *)
+
+  val floor : symbol -> symbol
+  val ceiling : symbol -> symbol
+  val truncate : symbol -> symbol
+  val round : symbol -> symbol
+
+  val sum : symbol -> symbol -> symbol
+  val difference : symbol -> symbol -> symbol
+  val uminus : symbol -> symbol
+  val product : symbol -> symbol -> symbol
+  val quotient : symbol -> symbol -> symbol
+
+  val quotient_e : symbol -> symbol -> symbol
+  val quotient_t : symbol -> symbol -> symbol
+  val quotient_f : symbol -> symbol -> symbol
+  val remainder_e : symbol -> symbol -> symbol
+  val remainder_t : symbol -> symbol -> symbol
+  val remainder_f : symbol -> symbol -> symbol
+
+  val to_int : symbol -> symbol
+  val to_rat : symbol -> symbol
+  val to_real : symbol -> symbol
+
+  val less : symbol -> symbol -> bool
+  val lesseq : symbol -> symbol -> bool
+  val greater : symbol -> symbol -> bool
+  val greatereq : symbol -> symbol -> bool
+end
+
 val is_used : string -> bool
   (** is the symbol already used? *)
 
