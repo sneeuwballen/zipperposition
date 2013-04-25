@@ -149,6 +149,8 @@ let pred a =
     then minus a (T.mk_const Arith.one_f real_)
     else minus a (T.mk_const Arith.one_i a.sort)
 
+(* TODO canonization function for sums of monomial, then eliminate a variable *)
+
 (** Propose some clauses, derived from [hc], where the [i-th] literal is
     removed (and proposition [t] is satisfied) *)
 let try_satisfy hc i t =

@@ -135,6 +135,10 @@ val array_exists : ('a -> bool) -> 'a array -> bool
 (** Elements of array except the one at given index (reverse list) *)
 val array_except_idx : 'a array -> int -> 'a list
 
+(** {2 String utils} *)
+
+val str_split : by:string -> string -> string list
+
 (** {2 File utils} *)
 
 (** perform the action with a lock on the given file *)

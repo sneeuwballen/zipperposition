@@ -58,6 +58,7 @@ let parse_args () =
     FoUtils.need_cleanup := true;
     progress := true
   and add_plugin s = plugins := s :: !plugins
+  and add_plugins s = plugins := (FoUtils.str_split ~by:"," s) @ !plugins
   in
   (* options list *) 
   let options =
@@ -71,6 +72,7 @@ let parse_args () =
       ("-select", Arg.Set_string select, help_select);
       ("-split", Arg.Set split, "enable splitting");
       ("-plugin", Arg.String add_plugin, "load given plugin (.cmxs)");
+      ("-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated");
       ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
