@@ -11,7 +11,12 @@ docs/*.pdf
 _build
 tags
 *.native
-*.byte
+**/*.native
+**/*.byte
+**/*.cmi
+**/*.cmx
+**/*.o
+**/*.cmo
 .session
 .subdirtouch
 *.docdir
