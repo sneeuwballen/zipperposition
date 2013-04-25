@@ -54,9 +54,9 @@ PLUGIN_OPTIONS = -cflags -I,$(BUILD_PATH) -lib lib
 plugins: bin
 	mkdir -p plugins/std/
 	for f in $(wildcard plugins/*.ml) ; do \
-	    ocamlopt $(CAMLOPTS) -I _build/src $$f -o plugins/$$(basename $$f .ml).cmx; \
+	    ocamlopt $(CAMLOPTS) -c -I _build/src $$f -o plugins/$$(basename $$f .ml).cmx; \
 	    ocamlopt $(CAMLOPTS) -shared plugins/$$(basename $$f .ml).cmx -o plugins/std/$$(basename $$f .ml).cmxs; \
-	done 2>/dev/null;
+	done
 	@echo plugins compiled.
 
 doc:
