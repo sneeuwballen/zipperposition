@@ -21,18 +21,22 @@ INSTALLDIR=/usr/bin/
 
 PWD = $(shell pwd)
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind -I src $(PP)
+#OPTIONS = -use-ocamlfind -I src $(PP) -classic-display
+OPTIONS = -use-ocamlfind -I src $(PP) -X plugins
 
 # switch compilation module
 MODE ?= debug
 ifeq ($(MODE),debug)
 	TAGS=-tag debug
+	CAMLOPTS = -g
 endif
 ifeq ($(MODE),profile)
 	TAGS=-tags debug,profile
+	CAMLOPTS = -g -p
 endif
 ifeq ($(MODE),prod)
 	TAGS=-tag noassert
+	CAMLOPTS = -noassert
 endif
 
 # all: bin + tests + plugins
@@ -46,9 +50,14 @@ tests:
 	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_TEST)
 
 BUILD_PATH = $(PWD)/_build/src/
-PLUGIN_OPTIONS = -I src/ -cflags -I,$(BUILD_PATH) -lflags -I,$(BUILD_PATH) -lib lib
+PLUGIN_OPTIONS = -cflags -I,$(BUILD_PATH) -lib lib
 plugins: bin
-	ocamlbuild -use-ocamlfind $(TAGS) $(PLUGIN_OPTIONS) $(TARGET_PLUGINS)
+	mkdir -p plugins/std/
+	for f in $(wildcard plugins/*.ml) ; do \
+	    ocamlopt $(CAMLOPTS) -I _build/src $$f -o plugins/$$(basename $$f .ml).cmx; \
+	    ocamlopt $(CAMLOPTS) -shared plugins/$$(basename $$f .ml).cmx -o plugins/std/$$(basename $$f .ml).cmxs; \
+	done 2>/dev/null;
+	@echo plugins compiled.
 
 doc:
 	ocamlbuild $(OPTIONS) src/zipperposition.docdir/index.html
@@ -61,6 +70,7 @@ doc:
 
 clean:
 	ocamlbuild -clean
+	rm plugins/*.cm* plugins/std/*.cmxs
 
 # install the main binary
 install: bin plugins
