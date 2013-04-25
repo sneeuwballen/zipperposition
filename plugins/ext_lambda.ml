@@ -25,7 +25,7 @@ open Basic
 module T = Terms
 
 let lambda_canonize t =
-  T.uncurry (T.eta_reduce (T.beta_reduce t))
+  T.eta_reduce (T.beta_reduce t)
 
 let ext =
   let open Extensions in
