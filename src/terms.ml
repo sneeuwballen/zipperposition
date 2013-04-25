@@ -265,8 +265,12 @@ let mk_at ?old t1 t2 =
   | _ -> raise (SortError "incompatible types for @")
 
 let rec cast t sort =
-  let new_t = {t with sort=sort; tag= -1;} in
-  H.hashcons new_t
+  match t.term with
+  | Bind (s, a_sort, t') ->
+    mk_bind s a_sort sort (cast t' sort)
+  | _ ->
+    let new_t = {t with sort=sort; tag= -1;} in
+    H.hashcons new_t
 
 (** {2 Subterms and positions} *)
 
