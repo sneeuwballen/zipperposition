@@ -156,6 +156,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 %token SLASH
 %token LET
 %token DISTINCT
+%token LAMBDA
+%token AT
 
 %token IS
 %token THEORY
@@ -481,6 +483,10 @@ term:
       { $1 }
   | variable
       { $1 }
+  | lambda_term
+      { $1 }
+  | LEFT_PARENTHESIS term AT term RIGHT_PARENTHESIS
+      { Terms.mk_at $2 $4 }
 
 function_term:
   | plain_term
@@ -490,6 +496,10 @@ function_term:
   | system_term
       { $1 }
 
+lambda_term:
+  | LAMBDA LEFT_BRACKET variable_list RIGHT_BRACKET COLON term
+    { Terms.mk_lambda_var $3 $6 }
+
 plain_term_top:
   | constant
       { let sort = get_sort $1 [] in
@@ -498,6 +508,8 @@ plain_term_top:
       { let sort = get_sort $1 $3 in
         Terms.mk_node $1 sort $3
       }
+  | term AT term
+    { Terms.mk_at $1 $3 }
 
 plain_term:
   | constant

@@ -208,6 +208,8 @@ rule token =
       | '|'                          { update_token (Lexing.lexeme lexbuf); OR }
       | '!'                          { update_token (Lexing.lexeme lexbuf); FORALL }
       | '?'                          { update_token (Lexing.lexeme lexbuf); EXISTS }
+      | '^'                          { update_token (Lexing.lexeme lexbuf); LAMBDA }
+      | '@'                          { update_token (Lexing.lexeme lexbuf); AT }
       
       | _                            { prev_column_index := !current_column_index;
                                        prev_line_index := !current_line_index;
