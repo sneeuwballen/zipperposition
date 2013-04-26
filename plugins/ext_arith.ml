@@ -28,110 +28,6 @@ open Symbols
 module T = Terms
 module C = Clauses
 module S = FoSubst
-
-(** {2 Evaluation} *)
-
-(** simplification function for arithmetic *)
-let rec arith_canonize_rec t =
-  match t.term with
-  | Var _
-  | BoundVar _ -> t
-  | Bind (s, a_sort, t') ->
-    let new_t' = arith_canonize_rec t' in
-    T.mk_bind s t.sort a_sort new_t'
-  | Node (s, [a]) ->
-    let a' = arith_canonize_rec a in
-    try_reduce_unary s t.sort a'
-  | Node (s, [a; b]) ->
-    let a' = arith_canonize_rec a
-    and b' = arith_canonize_rec b in
-    try_reduce_binary s t.sort a' b'
-  (*
-  | Node (s, l) when Symbols.symbol_val s == Const "$distinct" ->
-    try_reduce_distinct l
-  *)
-  | Node (s, l) ->
-    let l' = List.map arith_canonize_rec l in
-    T.mk_node s t.sort l'
-(** unary builtins *)
-and try_reduce_unary s sort a =
-  match Symbols.get_val s, a.term with
-  | Const "$uminus", Node (n, []) when is_numeric n ->
-    T.mk_const (Arith.uminus n) a.sort
-  | Const "$floor", Node (n, []) when is_numeric n ->
-    T.mk_const (Arith.floor n) int_
-  | Const "$ceiling", Node (n, []) when is_numeric n ->
-    T.mk_const (Arith.ceiling n) int_
-  | Const "$round", Node (n, []) when is_numeric n ->
-    T.mk_const (Arith.round n) int_
-  | Const "$truncate", Node (n, []) when is_numeric n ->
-    T.mk_const (Arith.truncate n) int_
-  | Const "$is_int", Node (n, []) when is_numeric n ->
-    if is_int n then T.true_term else T.false_term
-  | Const "$is_rat", Node (n, []) when is_numeric n ->
-    if is_rat n then T.true_term else T.false_term
-  | Const "$is_real", Node (n, []) when is_numeric n ->
-    if is_real n then T.true_term else T.false_term
-  | Const "$to_rat", Node (n, []) when is_numeric n ->
-    begin match get_val n with
-    | Num _ -> T.cast a rat_  (* conversion trivial *)
-    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
-    end
-  | Const "$to_real", Node (n, []) when is_numeric n ->
-    begin match get_val n with
-    | Num n -> T.mk_const (mk_real (Num.float_of_num n)) real_  (* conversion ok *)
-    | Real _ -> a  (* conversion trivial *)
-    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
-    end
-  | Const "$to_int", Node (n, []) when is_numeric n ->
-    begin match get_val n with
-    | Num n -> T.mk_const (mk_num (Num.floor_num n)) int_  (* conversion ok *)
-    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
-      (* XXX note: for reals, round? problem with very big ints *)
-    end
-  | _ ->
-    T.mk_node s sort [a]  (* default case *)
-(** binary builtins *)
-and try_reduce_binary s sort a b =
-  match Symbols.get_val s, a.term, b.term with
-  | Const "$sum", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.sum na nb) sort
-  | Const "$difference", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.difference na nb) sort
-  | Const "$product", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.product na nb) sort
-  | Const "$quotient", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.quotient na nb) sort
-  | Const "$quotient_e", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.quotient_e na nb) sort
-  | Const "$quotient_t", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.quotient_t na nb) sort
-  | Const "$quotient_f", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.quotient_f na nb) sort
-  | Const "$remainder_e", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.remainder_e na nb) sort
-  | Const "$remainder_t", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.remainder_t na nb) sort
-  | Const "$remainder_f", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    T.mk_const (Arith.remainder_f na nb) sort
-  | Const "$less", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    if Arith.less na nb then T.true_term else T.false_term
-  | Const "$lesseq", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    if Arith.lesseq na nb then T.true_term else T.false_term
-  | Const "$greater", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    if Arith.greater na nb then T.true_term else T.false_term
-  | Const "$greatereq", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
-    if Arith.greatereq na nb then T.true_term else T.false_term
-  | _ ->
-    T.mk_node s sort [a; b]  (* default case *)
-
-(** Main evaluation function *)
-let arith_canonize t =
-  let t' = arith_canonize_rec t in
-  (if t != t'
-    then FoUtils.debug 3 "%% @[<h>arith_canonize %a to %a@]"
-      !T.pp_term#pp t !T.pp_term#pp t');
-  t'
     
 (** {2 Helpers} *)
 
@@ -189,10 +85,141 @@ let one sort =
 let to_int t =
   if t.sort == int_ then t else T.mk_node (mk_symbol "$to_int") int_ [t]
 
+let is_zero t = match t.term with
+  | Node (n, []) when is_numeric n -> Arith.is_zero n
+  | _ -> false
+
+let is_one t = match t.term with
+  | Node ({symb_val=Num n}, []) ->
+    n = Num.num_of_int 1
+  | Node ({symb_val=Real f}, []) ->
+    f = 1.
+  | _ -> false
+
 (** Is [t] a number? *)
 let rec is_number t = match t.term with
   | Node (s, []) when Symbols.is_numeric s -> true
   | _ -> false
+
+(** {2 Evaluation} *)
+
+(** simplification function for arithmetic *)
+let rec arith_canonize_rec t =
+  match t.term with
+  | Var _
+  | BoundVar _ -> t
+  | Bind (s, a_sort, t') ->
+    let new_t' = arith_canonize_rec t' in
+    T.mk_bind s t.sort a_sort new_t'
+  | Node (s, [a]) ->
+    let a' = arith_canonize_rec a in
+    try_reduce_unary s t.sort a'
+  | Node (s, [a; b]) ->
+    let a' = arith_canonize_rec a
+    and b' = arith_canonize_rec b in
+    try_reduce_binary s t.sort a' b'
+  (*
+  | Node (s, l) when Symbols.symbol_val s == Const "$distinct" ->
+    try_reduce_distinct l
+  *)
+  | Node (s, l) ->
+    let l' = List.map arith_canonize_rec l in
+    T.mk_node s t.sort l'
+(** unary builtins *)
+and try_reduce_unary s sort a =
+  match Symbols.get_val s, a.term with
+  | Const "$uminus", Node (n, []) when is_numeric n ->
+    T.mk_const (Arith.uminus n) a.sort
+  | Const "$uminus", Node ({symb_val=Const "$uminus"}, [x]) -> x
+  | Const "$floor", Node (n, []) when is_numeric n ->
+    T.mk_const (Arith.floor n) int_
+  | Const "$ceiling", Node (n, []) when is_numeric n ->
+    T.mk_const (Arith.ceiling n) int_
+  | Const "$round", Node (n, []) when is_numeric n ->
+    T.mk_const (Arith.round n) int_
+  | Const "$truncate", Node (n, []) when is_numeric n ->
+    T.mk_const (Arith.truncate n) int_
+  | Const "$is_int", Node (n, []) when is_numeric n ->
+    if is_int n then T.true_term else T.false_term
+  | Const "$is_rat", Node (n, []) when is_numeric n ->
+    if is_rat n then T.true_term else T.false_term
+  | Const "$is_real", Node (n, []) when is_numeric n ->
+    if is_real n then T.true_term else T.false_term
+  | Const "$to_rat", Node (n, []) when is_numeric n ->
+    begin match get_val n with
+    | Num _ -> T.cast a rat_  (* conversion trivial *)
+    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
+    end
+  | Const "$to_real", Node (n, []) when is_numeric n ->
+    begin match get_val n with
+    | Num n -> T.mk_const (mk_real (Num.float_of_num n)) real_  (* conversion ok *)
+    | Real _ -> a  (* conversion trivial *)
+    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
+    end
+  | Const "$to_int", Node (n, []) when is_numeric n ->
+    begin match get_val n with
+    | Num n -> T.mk_const (mk_num (Num.floor_num n)) int_  (* conversion ok *)
+    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
+      (* XXX note: for reals, round? problem with very big ints *)
+    end
+  | _ ->
+    T.mk_node s sort [a]  (* default case *)
+(** binary builtins *)
+and try_reduce_binary s sort a b =
+  try begin match Symbols.get_val s, a.term, b.term with
+  | Const "$sum", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.sum na nb) sort
+  | Const "$difference", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.difference na nb) sort
+  | Const "$product", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.product na nb) sort
+  | Const "$quotient", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.quotient na nb) sort
+  | Const "$quotient_e", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.quotient_e na nb) sort
+  | Const "$quotient_t", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.quotient_t na nb) sort
+  | Const "$quotient_f", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.quotient_f na nb) sort
+  | Const "$remainder_e", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.remainder_e na nb) sort
+  | Const "$remainder_t", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.remainder_t na nb) sort
+  | Const "$remainder_f", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    T.mk_const (Arith.remainder_f na nb) sort
+  | Const "$less", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    if Arith.less na nb then T.true_term else T.false_term
+  | Const "$lesseq", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    if Arith.lesseq na nb then T.true_term else T.false_term
+  | Const "$greater", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    if Arith.greater na nb then T.true_term else T.false_term
+  | Const "$greatereq", Node (na, []), Node (nb, []) when is_numeric na && is_numeric nb ->
+    if Arith.greatereq na nb then T.true_term else T.false_term
+  | Const "$sum", _, _ when is_zero (arith_canonize_rec b) -> a
+  | Const "$sum", _, _ when is_zero (arith_canonize_rec a) -> b
+  | Const "$difference", _, _ when is_zero (arith_canonize_rec b) -> a
+  | Const "$difference", _, _ when is_zero (arith_canonize_rec a) ->
+    arith_canonize_rec (T.mk_node (mk_symbol "$uminus") b.sort [b])
+  | Const "$difference", _, _ when arith_canonize_rec a == arith_canonize_rec b ->
+    zero a.sort
+  | Const "$product", _, _ when is_one (arith_canonize_rec b) -> a
+  | Const "$product", _, _ when is_one (arith_canonize_rec a) -> b
+  | Const "$quotient", _, _ when is_one (arith_canonize_rec b) -> a
+  | Const "$quotient", _, _ when is_zero (arith_canonize_rec a) -> zero a.sort
+  | _ ->
+    T.mk_node s sort [a; b]  (* default case *)
+  end with Division_by_zero ->
+    T.mk_node s sort [a; b]
+
+(* TODO associativity/distributivity? *)
+
+(** Main evaluation function *)
+let arith_canonize t =
+  let t' = arith_canonize_rec t in
+  (if t != t'
+    then FoUtils.debug 3 "%% @[<h>arith_canonize %a to %a@]"
+      !T.pp_term#pp t !T.pp_term#pp t');
+  t'
 
 (** {2 Expert for arithmetic} *)
 
@@ -347,6 +374,9 @@ let mk_smaller_eq hc i e1 e2 =
   List.fold_left
     (fun acc v ->  (* eliminate [v] *)
       match elim_var ~var:v e1, elim_var ~var:v e2 with
+      | ElimOk (a1, _, _), ElimOk (a2, _, _)
+        when is_zero (arith_canonize (minus a1 a2)) ->
+        acc  (* impossible constraint *)
       | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2) ->
         (* a1 x + b1 <= a2 x + b2 ---> 
            x <= or >= (b2 - b1)/(a1 - a2) --->
@@ -367,8 +397,8 @@ let mk_smaller_eq hc i e1 e2 =
           then [v, next (to_int (over (minus b2 b1) (minus a1 a2)))]
           else [v, next (over (minus b2 b1) (minus a1 a2))]
         in
-        rebuild ~rule:"arith_lesseq_inst_if_neg" ~conditions ~i hc bindings :: acc)
-        @ acc
+        rebuild ~rule:"arith_lesseq_inst_if_neg" ~conditions ~i hc bindings) ::
+        acc
       | _ -> acc)
     [] vars
 
@@ -378,6 +408,9 @@ let mk_eq hc i e1 e2 =
   List.fold_left
     (fun acc v ->  (* eliminate [v] *)
       match elim_var ~var:v e1, elim_var ~var:v e2 with
+      | ElimOk (a1, _, _), ElimOk (a2, _, _)
+        when is_zero (arith_canonize (minus a1 a2)) ->
+        acc  (* impossible constraint *)
       | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2) ->
         (* a1 x + b1 = a2 x + b2 ---> 
            x = (b2 - b1)/(a1 - a2) *)

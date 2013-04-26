@@ -95,6 +95,8 @@ module Arith : sig
   val one_f : symbol
   val zero_f : symbol
 
+  val is_zero : symbol -> bool
+
   val sum : symbol -> symbol -> symbol
   val difference : symbol -> symbol -> symbol
   val uminus : symbol -> symbol

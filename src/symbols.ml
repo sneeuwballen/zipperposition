@@ -187,6 +187,11 @@ module Arith = struct
   let one_f = mk_real 1.
   let zero_f = mk_real 0.
 
+  let is_zero s = match s.symb_val with
+  | Num n -> Num.sign_num n = 0
+  | Real f -> f = 0.
+  | _ -> raise TypeMismatch
+
   let sum s1 s2 = match s1.symb_val, s2.symb_val with
   | Num n1, Num n2 -> mk_num (n1 +/ n2)
   | Real f1, Real f2 -> mk_real (f1 +. f2)
