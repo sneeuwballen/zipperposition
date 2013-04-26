@@ -136,7 +136,7 @@ let eliminate_lits hc =
   let prop eqn p sign =
     assert (p.sort == bool_);
     match p.term with
-    | BoundVar _ | Var _ -> assert false
+    | BoundVar _ | Var _ -> keep eqn
     | Node (s, [a; b]) when s == and_symbol && sign -> alpha_eliminate ~ord a true b true
     | Node (s, [a; b]) when s == and_symbol && not sign -> beta_eliminate ~ord a false b false
     | Node (s, [a; b]) when s == or_symbol && sign -> beta_eliminate ~ord a true b true

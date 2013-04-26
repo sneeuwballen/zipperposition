@@ -172,6 +172,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 %left AND
 %left OR
+%left AT
+%right ARROW
 
 %start parse_file
 %type <Basic.sourced_term list * string list> parse_file
@@ -227,7 +229,7 @@ file:
 tptp_input:
   | annotated_formula
       { Some $1 }
-  | tff_type_declaration
+  | type_declaration
       { None }
   | include_
       { None }
@@ -245,10 +247,24 @@ annotated_formula:
 thf_annotated:
   | THF LEFT_PARENTHESIS name COMMA formula_role COMMA
     fof_formula annotations RIGHT_PARENTHESIS DOT
-    { failwith "Parser_tptp: tfh syntax not supported." }
+    {
+      let formula = 
+        let filename = !Const.cur_filename in  (* ugly *)
+        if !conjecture
+          then Terms.mk_not $7, filename, $3
+          else $7, filename, $3
+      in
+      init ();  (* reset global state *)
+      formula
+    }
 
-tff_type_declaration:
+type_declaration:
   | TFF LEFT_PARENTHESIS name COMMA TYPE COMMA
+    tff_typed_atom annotations RIGHT_PARENTHESIS DOT
+    { let (t, sort) = $7 in
+      set_sort t sort  (* declare the sort of this symbol *)
+    }
+  | THF LEFT_PARENTHESIS name COMMA TYPE COMMA
     tff_typed_atom annotations RIGHT_PARENTHESIS DOT
     { let (t, sort) = $7 in
       set_sort t sort  (* declare the sort of this symbol *)
@@ -444,7 +460,7 @@ plain_atom:
         (match t.term with
         | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
         | Bind (s, _, l) -> set_sort s t.sort
-        | Var _ | BoundVar _ -> failwith "variable at top level");
+        | Var _ | BoundVar _ -> ());
         t
       }
   | defined_term
@@ -474,7 +490,7 @@ system_atom:
         (match t.term with
         | Node (s, l) -> set_sort s (bool_ <== List.map (fun x -> x.sort) l)
         | Bind (s, _, t') -> set_sort s t.sort
-        | Var _ | BoundVar _ -> failwith "variable at top level");
+        | Var _ | BoundVar _ -> ());
         t
       }
 
@@ -485,8 +501,8 @@ term:
       { $1 }
   | lambda_term
       { $1 }
-  | LEFT_PARENTHESIS term AT term RIGHT_PARENTHESIS
-      { Terms.mk_at $2 $4 }
+  | term AT term
+      { Terms.mk_at $1 $3 }
 
 function_term:
   | plain_term
@@ -510,6 +526,8 @@ plain_term_top:
       }
   | term AT term
     { Terms.mk_at $1 $3 }
+  | variable
+    { $1 (* THF only *) }
 
 plain_term:
   | constant
@@ -631,7 +649,7 @@ tff_typed_atom:
 tff_type:
   | tff_atomic_type
     { $1 }
-  | tff_unitary_type ARROW tff_atomic_type
+  | tff_unitary_type ARROW tff_type
     { let open Symbols in
       $3 <== $1
     }

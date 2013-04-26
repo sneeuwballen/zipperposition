@@ -413,7 +413,7 @@ let rec can_apply l args =
 
 (** [s @@ args] applies the sort [s] to arguments [args]. Basic must match *)
 let (@@) s args = match s, args with
-  | Sort _, [] -> s
+  | _, [] -> s
   | Fun (s', l), _ when can_apply l args -> s'
   | _ -> raise (SortError "cannot apply sort")
 
