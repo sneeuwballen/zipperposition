@@ -64,3 +64,5 @@ let parse_error msg =
 
 (* place for storage *)
 let home = "ZIPPERPOSITION_HOME"
+
+let version = "ZIPPERPOSITION_VERSION"

@@ -37,10 +37,6 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 
-let version = "0.2"
-
-(* FIXME: bug in the path traversal (initial '/' is removed but shouldn't) *)
-
 (** find the given file from given directory *)
 let find_file name dir =
   (* check if the file exists *)
@@ -143,7 +139,8 @@ let setup_alarm timeout =
   Unix.alarm (max 1 (int_of_float timeout))
 
 let print_version ~params =
-  if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0)
+  if params.param_version
+    then (Format.printf "%% zipperposition v%s@." Const.version; exit 0)
 
 let setup_calculus ~env =
   match (Env.get_params ~env).param_calculus with
