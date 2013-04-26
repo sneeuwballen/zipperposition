@@ -70,6 +70,23 @@ and try_reduce_unary s sort a =
     if is_rat n then T.true_term else T.false_term
   | Const "$is_real", Node (n, []) when is_numeric n ->
     if is_real n then T.true_term else T.false_term
+  | Const "$to_rat", Node (n, []) when is_numeric n ->
+    begin match get_val n with
+    | Num _ -> T.cast a rat_  (* conversion trivial *)
+    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
+    end
+  | Const "$to_real", Node (n, []) when is_numeric n ->
+    begin match get_val n with
+    | Num n -> T.mk_const (mk_real (Num.float_of_num n)) real_  (* conversion ok *)
+    | Real _ -> a  (* conversion trivial *)
+    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
+    end
+  | Const "$to_int", Node (n, []) when is_numeric n ->
+    begin match get_val n with
+    | Num n -> T.mk_const (mk_num (Num.floor_num n)) int_  (* conversion ok *)
+    | _ -> T.mk_node s rat_ [a]  (* no conversion *)
+      (* XXX note: for reals, round? problem with very big ints *)
+    end
   | _ ->
     T.mk_node s sort [a]  (* default case *)
 (** binary builtins *)
@@ -110,34 +127,38 @@ and try_reduce_binary s sort a b =
 let rec expert ~ctx =
   let open Experts in
   let signature = SSet.empty in
+  let expert_canonize t =
+    let t' = arith_canonize t in
+    (if t != t' then
+      FoUtils.debug 2 "%% @[<h>arith_canonize %a to %a@]"
+      !T.pp_term#pp t !T.pp_term#pp t');
+    t'
+  in
   { expert_name = "arith";
     expert_descr = "evaluation for TSTP arithmetic";
     expert_equal = (fun t1 t2 -> arith_canonize t1 == arith_canonize t2);
     expert_sig = signature;
     expert_clauses = [];
-    expert_canonize = arith_canonize;
+    expert_canonize;
     expert_ord = (fun _ -> true);
     expert_ctx = ctx;
     expert_update_ctx = (fun ctx -> [expert ~ctx]);
     expert_solve = None;
   }
-
-(** Instantiate [hc], minus its i-th component, with given bindings *)
-let rebuild ?(rule="arith") hc i bindings =
-  let ctx = hc.hcctx in
-  let subst = List.fold_left
-    (fun s (x,t) -> S.bind s (x,0) (t,0)) S.id_subst bindings in
-  let lits = FoUtils.array_except_idx hc.hclits i in
-  let lits = Literals.apply_subst_list ~ord:ctx.ctx_ord subst (lits,0) in
-  let proof c = Proof (c, rule, [hc.hcproof]) in
-  let parents = [hc] in
-  let new_clause = C.mk_hclause ~parents ~ctx lits proof in
-  FoUtils.debug 3 "%% arith deduction (%s with @[<h>%a@]): @[<h>%a@]"
-    rule S.pp_substitution subst !C.pp_clause#pp_h new_clause;
-  new_clause
+    
+(** {2 Helpers} *)
 
 let plus a b = T.mk_node (mk_symbol "$sum") a.sort [a; b]
 let minus a b = T.mk_node (mk_symbol "$difference") a.sort [a; b]
+let times a b = T.mk_node (mk_symbol "$product") a.sort [a; b]
+let over a b =
+  if a.sort == int_
+    then  (* to_int (quotient (to_rat a, to_rat b)) *)
+      T.mk_node (mk_symbol "to_int") int_
+        [T.mk_node (mk_symbol "quotient") rat_
+          [T.mk_node (mk_symbol "to_rat") rat_ [a];
+           T.mk_node (mk_symbol "to_rat") rat_ [b]]]
+    else T.mk_node (mk_symbol "$quotient") a.sort [a; b]
 
 let succ a =
   if a.sort == real_
@@ -149,32 +170,226 @@ let pred a =
     then minus a (T.mk_const Arith.one_f real_)
     else minus a (T.mk_const Arith.one_i a.sort)
 
-(* TODO canonization function for sums of monomial, then eliminate a variable *)
+let epsilon_real =
+  T.mk_const (mk_real (epsilon_float *. 50.)) real_ (* not too small *)
+
+let epsilon_rat =
+  let open Num in
+  T.mk_const (mk_num (num_of_int 1 // num_of_int 100_000_000)) rat_ (* not too small *)
+
+(* some term slightly bigger than t *)
+let next t =
+  if t.sort == int_ then succ t
+  else if t.sort == rat_ then plus t epsilon_rat
+  else plus t epsilon_real
+
+(* some term slightly smaller than t *)
+let prev t =
+  if t.sort == int_ then pred t
+  else if t.sort == rat_ then minus t epsilon_rat
+  else minus t epsilon_real
+
+let zero sort =
+  if sort == real_
+    then T.mk_const Arith.zero_f sort
+    else T.mk_const Arith.zero_i sort
+
+let one sort =
+  if sort == real_
+    then T.mk_const Arith.one_f sort
+    else T.mk_const Arith.one_i sort
+
+let to_int t =
+  if t.sort == int_ then t else T.mk_node (mk_symbol "$to_int") int_ [t]
+
+(** Is [t] a number? *)
+let rec is_number t = match t.term with
+  | Node (s, []) when Symbols.is_numeric s -> true
+  | _ -> false
+
+(** {2 Canonization of term} *)
+
+type condition =
+  | EqZero of term
+  | NeqZero of term
+  | LessZero of term  (* t < 0 *)
+
+type elim_result =
+  | ElimOk of term * term * condition list  (* a, b, conditions *)
+  | ElimFail
+
+(** Try to eliminate [x] in [e], returning a monomial (a,b) representing
+    [a*x + b] where [x] does not occur in [a] nor [b]. Also returns a list
+    of side conditions. *)
+let elim_var ~var:x e =
+  assert (x.sort == e.sort);
+  assert (T.is_var x);
+  let sort = e.sort in
+  (* conditions required for elimination *)
+  let conditions = ref [] in
+  (* recursive elimination *)
+  let rec elim e = match e.term with
+    | Var _ when x == e -> one sort, zero sort  (* (1,0) *)
+    | Var _
+    | BoundVar _ -> zero sort, e  (* (0,e) *)
+    | _ when not (T.var_occurs x e) -> zero sort, e  (* (0, e) *)
+    | Bind _ -> raise Exit   (* [x] occurs in binder, too difficult *)
+    | Node ({symb_val=Const "$sum"}, [e1; e2]) ->
+      let a1, b1 = elim e1 in
+      let a2, b2 = elim e2 in
+      plus a1 a2, plus b1 b2  (* a1+a2, b1+b2 *)
+    | Node ({symb_val=Const "$difference"}, [e1; e2]) ->
+      let a1, b1 = elim e1 in
+      let a2, b2 = elim e2 in
+      minus a1 a2, minus b1 b2  (* a1-a2, b1-b2 *)
+    | Node ({symb_val=Const "$product"}, [e1; e2]) ->
+      let a1, b1 = elim e1 in
+      let a2, b2 = elim e2 in
+      (* a1 * a2 = 0 necessary for keeping a monomial (otherwise polynomial) *)
+      (if zero sort != arith_canonize (times a1 a2)
+        then conditions := (EqZero (times a1 a2)) :: !conditions);
+      plus (times a1 b2) (times a2 b1), times b1 b2  (* a1b2+a2b1, b1b2 *)
+    | Node ({symb_val=Const "$quotient"}, [e1; e2]) ->
+      let a1, b1 = elim e1 in
+      let a2, b2 = elim e2 in
+      (* a2 = zero necessary *)
+      (if zero sort != arith_canonize a2
+        then conditions := (EqZero a2) :: !conditions);
+      (* b2 != zero necessary *)
+      conditions := (NeqZero b2) :: !conditions;
+      over a1 b2, over b1 b2  (* a1/b2, b1/b2 *)
+    | _ ->
+      raise Exit  (* other cases not handled *)
+  in
+  try
+    let a, b = elim e in
+    ElimOk (arith_canonize a, arith_canonize b, !conditions)
+  with Exit ->
+    ElimFail
+
+(** Instantiate [hc], minus its i-th component, with given binding
+    and side-conditions *)
+let rebuild ?(rule="arith") ?(conditions=[]) ?i hc bindings =
+  let ctx = hc.hcctx in
+  let subst = List.fold_left
+    (fun s (x,t) -> S.bind s (x,0) (arith_canonize t,0)) S.id_subst bindings in
+  (* literals from [hc], excepted the [i-th] one if [i] is specified *)
+  let hc_lits =
+    match i with
+    | None -> Array.to_list hc.hclits
+    | Some i -> FoUtils.array_except_idx hc.hclits i in
+  (* literals for side conditions *)
+  let lits' =
+    List.map
+      (function
+        | EqZero e -> Literals.mk_neq ~ord:ctx.ctx_ord e (zero e.sort)
+        | NeqZero e -> Literals.mk_eq ~ord:ctx.ctx_ord e (zero e.sort)
+        | LessZero e -> (* e < 0 ---> literal e >= 0 *)
+          Literals.mk_eq ~ord:ctx.ctx_ord
+            (T.mk_node (mk_symbol "$greatereq") bool_ [e; zero e.sort])
+            T.true_term)
+    conditions
+  in
+  let lits = hc_lits @ lits' in
+  (* make a new clause *)
+  let lits = Literals.apply_subst_list ~ord:ctx.ctx_ord subst (lits,0) in
+  let proof c = Proof (c, rule, [hc.hcproof]) in
+  let parents = [hc] in
+  let new_clause = C.mk_hclause ~parents ~ctx lits proof in
+  FoUtils.debug 3 "%% arith deduction (%s with @[<h>%a@]): @[<h>%a@]"
+    rule S.pp_substitution subst !C.pp_clause#pp_h new_clause;
+  new_clause
+
+(** Make [e1] <= [e2], please. *)
+let mk_smaller_eq hc i e1 e2 =
+  let vars = T.vars_list [e1; e2] in
+  List.fold_left
+    (fun acc v ->  (* eliminate [v] *)
+      match elim_var ~var:v e1, elim_var ~var:v e2 with
+      | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2) ->
+        (* a1 x + b1 <= a2 x + b2 ---> 
+           x <= or >= (b2 - b1)/(a1 - a2) --->
+           x = prev ((b2 - b1)/(a1 - a2)) if a1-a2 > 0
+           x = next ((b2 - b1)/(a1 - a2)) if a1-a2 < 0 *)
+        (* a1 - a2 > 0 *)
+        (let conditions = (LessZero (minus a2 a1)) :: conds1 @ conds2 in
+        let bindings =
+          if e1.sort == int_
+          then [v, prev (to_int (over (minus b2 b1) (minus a1 a2)))]
+          else [v, prev (over (minus b2 b1) (minus a1 a2))]
+        in
+        rebuild ~rule:"arith_lesseq_inst" ~conditions ~i hc bindings) ::
+        (* a1 - a2 < 0 *)
+        (let conditions = (LessZero (minus a1 a2)) :: conds1 @ conds2 in
+        let bindings =
+          if e1.sort == int_
+          then [v, next (to_int (over (minus b2 b1) (minus a1 a2)))]
+          else [v, next (over (minus b2 b1) (minus a1 a2))]
+        in
+        rebuild ~rule:"arith_lesseq_inst" ~conditions ~i hc bindings :: acc)
+        @ acc
+      | _ -> acc)
+    [] vars
+
+(** Would you be so kind as to make [e1] = [e2]? *)
+let mk_eq hc i e1 e2 =
+  let vars = T.vars_list [e1; e2] in
+  List.fold_left
+    (fun acc v ->  (* eliminate [v] *)
+      match elim_var ~var:v e1, elim_var ~var:v e2 with
+      | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2) ->
+        (* a1 x + b1 = a2 x + b2 ---> 
+           x = (b2 - b1)/(a1 - a2) *)
+        let conditions = (NeqZero (minus a1 a2)) :: conds1 @ conds2 in
+        let bindings, i =
+          if e1.sort == int_  (* not sure it will be right *)
+            then [v, to_int (over (minus b2 b1) (minus a1 a2))], None
+          else if e1.sort == rat_
+            then [v, over (minus b2 b1) (minus a1 a2)], Some i
+          else
+            [v, over (minus b2 b1) (minus a1 a2)], Some i
+        in
+        rebuild ~rule:"arith_eq_inst" ~conditions ?i hc bindings :: acc
+      | _ -> acc)
+    [] vars
 
 (** Propose some clauses, derived from [hc], where the [i-th] literal is
     removed (and proposition [t] is satisfied) *)
 let try_satisfy hc i t =
   match t.term with
-  | Node ({symb_val=Const "$less"}, [{term=Var _} as v; b])
-  | Node ({symb_val=Const "$lesseq"}, [{term=Var _} as v; b]) 
-  | Node ({symb_val=Const "$greater"}, [b; {term=Var _} as v]) 
-  | Node ({symb_val=Const "$greatereqeq"}, [b; {term=Var _} as v]) when not (T.var_occurs v b) ->
-    [rebuild hc i [v, pred b]]
-  | Node ({symb_val=Const "$less"}, [b; {term=Var _} as v])
-  | Node ({symb_val=Const "$lesseq"}, [b; {term=Var _} as v])
-  | Node ({symb_val=Const "$greater"}, [{term=Var _} as v; b])
-  | Node ({symb_val=Const "$greatereq"}, [{term=Var _} as v; b]) when not (T.var_occurs v b) ->
-    [rebuild hc i [v, succ b]]
+  | Node ({symb_val=Const "$lesseq"}, [a; b]) 
+  | Node ({symb_val=Const "$greatereq"}, [b; a])
+    when (not (T.is_ground_term a) || not (T.is_ground_term b)) ->
+    mk_smaller_eq hc i a b
+  | Node ({symb_val=Const "$less"}, [a; b])
+  | Node ({symb_val=Const "$greater"}, [b; a]) 
+    when (not (T.is_ground_term a) || not (T.is_ground_term b)) ->
+    (* a < b is implied by (next a) <= b. Careful with the ordering relation. *)
+    mk_smaller_eq hc i (next a) b
   | _ -> []
 
+(** Propose some clauses, derived from [hc], where the [i-th] literal is
+    removed (and proposition [t] is insatisfiable) *)
 let try_contradict hc i t =
-  []  (* TODO *)
+  match t.term with
+  | Node ({symb_val=Const "$lesseq"}, [a; b]) 
+  | Node ({symb_val=Const "$greatereq"}, [b; a])
+    when (not (T.is_ground_term a) || not (T.is_ground_term b)) ->
+    (* a <= b is insatisfiable if a > b, which is implied by b <= prev a *)
+    mk_smaller_eq hc i b (prev a)
+  | Node ({symb_val=Const "$less"}, [a; b])
+  | Node ({symb_val=Const "$greater"}, [b; a]) 
+    when (not (T.is_ground_term a) || not (T.is_ground_term b)) ->
+    (* a < b insatifiable if a >= b *)
+    mk_smaller_eq hc i b a
+  | _ -> []
 
 let try_make_eq hc i l r =
-  []  (* TODO *)
+  mk_eq hc i l r
 
 let try_make_neq hc i l r =
-  [] (* TODO *)
+  (* l != r  is implied by l = r+1 *)
+  mk_eq hc i l (succ r)
 
 (** inference rule that tries some basic hacks *)
 let unary_inf_rule hc =
