@@ -248,7 +248,7 @@ module Arith = struct
 
   let greater s1 s2 = match s1.symb_val, s2.symb_val with
   | Num n1, Num n2 -> n1 >/ n2
-  | Real f1, Real f2 -> f1 > f1
+  | Real f1, Real f2 -> f1 > f2
   | _ -> raise TypeMismatch
 
   let greatereq s1 s2 = match s1.symb_val, s2.symb_val with
