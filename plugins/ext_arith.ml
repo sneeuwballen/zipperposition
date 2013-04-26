@@ -29,6 +29,8 @@ module T = Terms
 module C = Clauses
 module S = FoSubst
 
+(** {2 Evaluation} *)
+
 (** simplification function for arithmetic *)
 let rec arith_canonize_rec t =
   match t.term with
@@ -123,28 +125,13 @@ and try_reduce_binary s sort a b =
   | _ ->
     T.mk_node s sort [a; b]  (* default case *)
 
+(** Main evaluation function *)
 let arith_canonize t =
   let t' = arith_canonize_rec t in
   (if t != t'
     then FoUtils.debug 3 "%% @[<h>arith_canonize %a to %a@]"
       !T.pp_term#pp t !T.pp_term#pp t');
   t'
-  
-(** Expert that evaluates arithmetic expressions *)
-let rec expert ~ctx =
-  let open Experts in
-  let signature = SSet.empty in
-  { expert_name = "arith";
-    expert_descr = "evaluation for TSTP arithmetic";
-    expert_equal = (fun t1 t2 -> arith_canonize t1 == arith_canonize t2);
-    expert_sig = signature;
-    expert_clauses = [];
-    expert_canonize = arith_canonize;
-    expert_ord = (fun _ -> true);
-    expert_ctx = ctx;
-    expert_update_ctx = (fun ctx -> [expert ~ctx]);
-    expert_solve = None;
-  }
     
 (** {2 Helpers} *)
 
@@ -207,12 +194,59 @@ let rec is_number t = match t.term with
   | Node (s, []) when Symbols.is_numeric s -> true
   | _ -> false
 
+(** {2 Expert for arithmetic} *)
+
+(** Some basic axioms to help *)
+let axioms ~ctx =
+  let module Lits = Literals in
+  let mk_proof name c = Axiom (c, "axiom_arith", name) in
+  [ C.mk_hclause ~ctx
+      [ Lits.mk_neq ~ord:ctx.ctx_ord (zero int_) (one int_) ]
+    (mk_proof "not_0_eq_1_int");
+    C.mk_hclause ~ctx
+      [ Lits.mk_neq ~ord:ctx.ctx_ord (zero rat_) (one rat_) ]
+    (mk_proof "not_0_eq_1_rat");
+    C.mk_hclause ~ctx
+      [ Lits.mk_neq ~ord:ctx.ctx_ord (zero real_) (one real_) ]
+    (mk_proof "not_0_eq_1_reat");
+    C.mk_hclause ~ctx
+      [ Lits.mk_eq ~ord:ctx.ctx_ord
+        (T.mk_node (mk_symbol "$greater") bool_ [one int_; zero int_]) T.true_term ]
+    (mk_proof "smaller_0_1_int");
+    C.mk_hclause ~ctx
+      [ Lits.mk_eq ~ord:ctx.ctx_ord
+        (T.mk_node (mk_symbol "$greater") bool_ [one rat_; zero rat_]) T.true_term ]
+    (mk_proof "smaller_0_1_rat");
+    C.mk_hclause ~ctx
+      [ Lits.mk_eq ~ord:ctx.ctx_ord
+        (T.mk_node (mk_symbol "$greater") bool_ [one real_; zero real_]) T.true_term ]
+    (mk_proof "smaller_0_1_real");
+  ]
+
+  
+(** Expert that evaluates arithmetic expressions *)
+let rec expert ~ctx =
+  let open Experts in
+  let signature = SSet.empty in
+  { expert_name = "arith";
+    expert_descr = "evaluation for TSTP arithmetic";
+    expert_equal = (fun t1 t2 -> arith_canonize t1 == arith_canonize t2);
+    expert_sig = signature;
+    expert_clauses = axioms ~ctx;
+    expert_canonize = arith_canonize;
+    expert_ord = (fun _ -> true);
+    expert_ctx = ctx;
+    expert_update_ctx = (fun ctx -> [expert ~ctx]);
+    expert_solve = None;
+  }
+
 (** {2 Canonization of term} *)
 
 type condition =
   | EqZero of term
   | NeqZero of term
   | LessZero of term  (* t < 0 *)
+  | BiggerZero of term
 
 type elim_result =
   | ElimOk of term * term * condition list  (* a, b, conditions *)
@@ -289,7 +323,12 @@ let rebuild ?(rule="arith") ?(conditions=[]) ?i hc bindings =
         | LessZero e -> (* e < 0 ---> literal e >= 0 *)
           Literals.mk_eq ~ord:ctx.ctx_ord
             (T.mk_node (mk_symbol "$greatereq") bool_ [arith_canonize e; zero e.sort])
-            T.true_term)
+            T.true_term
+        | BiggerZero e -> (* e > 0 ---> literal e <= 0 *)
+          Literals.mk_eq ~ord:ctx.ctx_ord
+            (T.mk_node (mk_symbol "$lesseq") bool_ [arith_canonize e; zero e.sort])
+            T.true_term
+      )
     conditions
   in
   let lits = hc_lits @ lits' in
@@ -314,13 +353,13 @@ let mk_smaller_eq hc i e1 e2 =
            x = prev ((b2 - b1)/(a1 - a2)) if a1-a2 > 0
            x = next ((b2 - b1)/(a1 - a2)) if a1-a2 < 0 *)
         (* a1 - a2 > 0 *)
-        (let conditions = (LessZero (minus a2 a1)) :: conds1 @ conds2 in
+        (let conditions = (BiggerZero (minus a1 a2)) :: conds1 @ conds2 in
         let bindings =
           if e1.sort == int_
           then [v, prev (to_int (over (minus b2 b1) (minus a1 a2)))]
           else [v, prev (over (minus b2 b1) (minus a1 a2))]
         in
-        rebuild ~rule:"arith_lesseq_inst" ~conditions ~i hc bindings) ::
+        rebuild ~rule:"arith_lesseq_inst_if_pos" ~conditions ~i hc bindings) ::
         (* a1 - a2 < 0 *)
         (let conditions = (LessZero (minus a1 a2)) :: conds1 @ conds2 in
         let bindings =
@@ -328,7 +367,7 @@ let mk_smaller_eq hc i e1 e2 =
           then [v, next (to_int (over (minus b2 b1) (minus a1 a2)))]
           else [v, next (over (minus b2 b1) (minus a1 a2))]
         in
-        rebuild ~rule:"arith_lesseq_inst" ~conditions ~i hc bindings :: acc)
+        rebuild ~rule:"arith_lesseq_inst_if_neg" ~conditions ~i hc bindings :: acc)
         @ acc
       | _ -> acc)
     [] vars
@@ -387,11 +426,16 @@ let try_contradict hc i t =
   | _ -> []
 
 let try_make_eq hc i l r =
-  mk_eq hc i l r
+  if l == r
+    then [rebuild ~rule:"arith_basic" ~i hc []]  (* n == m is trivial *)
+    else mk_eq hc i l r
 
 let try_make_neq hc i l r =
-  (* l != r  is implied by l = r+1 *)
-  mk_eq hc i l (succ r)
+  if is_number l && is_number r && l != r
+    then [rebuild ~rule:"arith_basic" ~i hc []] (* n != m is trivial *)
+    else
+      (* l != r  is implied by l = r+1, try to make l = r+1 *)
+      mk_eq hc i l (succ r)
 
 (** inference rule that tries some basic hacks *)
 let unary_inf_rule hc =
@@ -413,6 +457,23 @@ let unary_inf_rule hc =
   in
   FoUtils.array_foldi basic_solve_lit [] hc.hclits
 
+(** Literal rewrite rule *)
+let lit_rewrite ~ctx lit =
+  match lit with
+  | Equation (l, r, true, _) when l.sort != bool_ ->
+    let l' = arith_canonize l
+    and r' = arith_canonize r in
+    if is_number l' && is_number r' &&  l != r
+      then Literals.mk_eq ~ord:ctx.ctx_ord T.false_term T.true_term  (* false lit *)
+      else lit
+  | Equation (l, r, false, _) when l.sort != bool_ ->
+    let l' = arith_canonize l
+    and r' = arith_canonize r in
+    if is_number l' && is_number r' &&  l == r
+      then Literals.mk_eq ~ord:ctx.ctx_ord T.false_term T.true_term  (* false lit *)
+      else lit
+  | _ -> lit
+
 (** The extension itself *)
 let ext =
   let open Extensions in
@@ -420,6 +481,7 @@ let ext =
     [ Ext_expert expert;
       Ext_unary_inf_rule ("arith_inst", unary_inf_rule);
       Ext_term_rewrite ("arith_eval", arith_canonize);
+      Ext_lit_rewrite ("arith_lit", lit_rewrite);
       Ext_signal_incompleteness]
   in
   { name = "arith";
