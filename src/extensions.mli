@@ -33,6 +33,7 @@ and action =
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
   | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
   | Ext_term_rewrite of string * (term -> term)
+  | Ext_lit_rewrite of string * (ctx:context -> literal -> literal)
   | Ext_simplification_rule of (hclause -> hclause list)
   (** Action that can be performed by an extension *)
 

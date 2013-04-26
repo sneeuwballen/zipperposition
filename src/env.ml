@@ -33,6 +33,9 @@ type binary_inf_rule = ProofState.active_set -> clause -> hclause list
 type unary_inf_rule = hclause -> hclause list
   (** unary infererences *)
 
+type lit_rewrite_rule = ctx:context -> literal -> literal
+  (** Rewrite rule on literals *)
+
 type t = {
   mutable params : Basic.parameters;
   mutable ctx : Basic.context;
@@ -45,6 +48,9 @@ type t = {
 
   mutable rewrite_rules : (string * (term -> term)) list;
     (** Rules to apply to term *)
+
+  mutable lit_rules : (string * lit_rewrite_rule) list;
+    (** Rules to be applied to literals *)
   
   mutable basic_simplify : hclause -> hclause;
     (** how to simplify a clause *)
@@ -105,6 +111,7 @@ let mk_env ?meta ~ctx params signature =
     binary_rules = [];
     unary_rules = [];
     rewrite_rules = [];
+    lit_rules = [];
     basic_simplify = (fun hc -> hc);
     rw_simplify = (fun _ hc -> hc);
     active_simplify = (fun _ hc -> hc);
@@ -194,6 +201,9 @@ let add_expert ~env expert =
 
 let add_rewrite_rule ~env name rule =
   env.rewrite_rules <- (name, rule) :: env.rewrite_rules
+
+let add_lit_rule ~env name rule =
+  env.lit_rules <- (name, rule) :: env.lit_rules
 
 let get_experts ~env =
   env.state#experts
@@ -320,6 +330,42 @@ let rewrite ~env hc =
       new_clause
     end
 
+(** Apply literal rewrite rules *)
+let rewrite_lits ~env hc =
+  let ctx = env.ctx in
+  let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
+  let rec rewrite_lit rules lit = match rules with
+  | [] -> lit
+  | (name,r)::rules' ->
+    let lit' = r ~ctx lit in  (* apply the rule *)
+    if Literals.eq lit lit'
+      then rewrite_lit rules' lit
+      else begin
+        applied_rules := SmallSet.add !applied_rules name;
+        rewrite_lit env.lit_rules lit'
+      end
+  in
+  (* apply lit rules *)
+  let lits = Array.map (fun lit -> rewrite_lit env.lit_rules lit) hc.hclits in
+  if SmallSet.is_empty !applied_rules then hc
+  else begin  (* simplifications occurred! *)
+    let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
+    let proof c = Proof (c, rule, [hc.hcproof]) in
+    let parents = [hc] in
+    let new_clause = C.mk_hclause_a ~parents ~ctx:env.ctx lits proof in
+    Utils.debug 3 "lit rewritten @[<h>%a into %a@]"
+      !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause;
+    new_clause
+  end
+
+(** All basic simplification of the clause itself *)
+let basic_simplify ~env hc =
+  if env.lit_rules = []
+    then env.basic_simplify hc
+    else  (* rewrite lits, then simplify *)
+      let hc' = rewrite_lits ~env hc in
+      env.basic_simplify hc'
+
 (** Simplify the hclause. Returns both the hclause and its simplification. *)
 let simplify ~env old_hc =
   Utils.enter_prof prof_simplify;
@@ -327,10 +373,10 @@ let simplify ~env old_hc =
   (* simplify with unit clauses, then all active clauses *)
   let hc = rewrite ~env hc in
   let hc = env.rw_simplify env.state#simpl_set hc in
-  let hc = env.basic_simplify hc in
+  let hc = basic_simplify ~env hc in
   let hc = Experts.Set.simplify (get_experts env) hc in
   let hc = env.active_simplify env.state#active_set hc in
-  let hc = env.basic_simplify hc in
+  let hc = basic_simplify ~env hc in
   (if not (Literals.eq_lits hc.hclits old_hc.hclits)
     then Utils.debug 2 "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
                         !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc);
@@ -367,7 +413,7 @@ let forward_simplify ~env hc =
   let cs = list_simplify ~env hc in
   let cs = List.map (Experts.Set.simplify (get_experts ~env)) cs in
   let cs = List.map (env.rw_simplify env.state#simpl_set) cs in
-  let cs = List.map env.basic_simplify cs in
+  let cs = List.map (basic_simplify ~env) cs in
   Sequence.of_list cs
 
 (** generate all clauses from inferences *)
@@ -381,7 +427,7 @@ let generate ~env given =
   Queue.push (given, 0) unary_queue;
   while not (Queue.is_empty unary_queue) do
     let hc, depth = Queue.pop unary_queue in
-    let hc = env.basic_simplify hc in (* simplify a bit the clause *)
+    let hc = (basic_simplify ~env) hc in (* simplify a bit the clause *)
     if not (is_trivial ~env hc) then begin
       (* add the clause to set of inferred clauses, if it's not the original clause *)
       (if depth > 0 then unary_clauses := hc :: !unary_clauses);
@@ -461,7 +507,7 @@ let clause_of_deduced ~env lits parents =
   let premises = List.map (fun hc -> hc.hcproof) parents in
   let hc = C.mk_hclause_a ~ctx:env.ctx lits ~parents
     (fun c -> Proof.mk_proof c "lemma" premises) in
-  env.basic_simplify (C.clause_of_fof hc)
+  basic_simplify ~env (C.clause_of_fof hc)
 
 (** Find the lemmas that can be deduced if we consider this new clause *)
 let find_lemmas ~env hc = 

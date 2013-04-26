@@ -29,6 +29,9 @@ type binary_inf_rule = ProofState.active_set -> clause -> hclause list
 type unary_inf_rule = hclause -> hclause list
   (** unary infererences *)
 
+type lit_rewrite_rule = ctx:context -> literal -> literal
+  (** Rewrite rule on literals *)
+
 type t = {
   mutable params : Basic.parameters;
   mutable ctx : Basic.context;
@@ -41,6 +44,9 @@ type t = {
 
   mutable rewrite_rules : (string * (term -> term)) list;
     (** Rules to apply to term *)
+
+  mutable lit_rules : (string * lit_rewrite_rule) list;
+    (** Rules to be applied to literals *)
   
   mutable basic_simplify : hclause -> hclause;
     (** how to simplify a clause *)
@@ -129,6 +135,8 @@ val add_unary_inf : env:t -> string -> unary_inf_rule -> unit
 val add_expert : env:t -> Experts.t -> unit
 
 val add_rewrite_rule : env:t -> string -> (term -> term) -> unit
+
+val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
 
 val list_simplify : env:t -> hclause -> hclause list
 
