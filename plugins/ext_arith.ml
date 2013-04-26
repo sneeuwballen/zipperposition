@@ -30,26 +30,26 @@ module C = Clauses
 module S = FoSubst
 
 (** simplification function for arithmetic *)
-let rec arith_canonize t =
+let rec arith_canonize_rec t =
   match t.term with
   | Var _
   | BoundVar _ -> t
   | Bind (s, a_sort, t') ->
-    let new_t' = arith_canonize t' in
+    let new_t' = arith_canonize_rec t' in
     T.mk_bind s t.sort a_sort new_t'
   | Node (s, [a]) ->
-    let a' = arith_canonize a in
+    let a' = arith_canonize_rec a in
     try_reduce_unary s t.sort a'
   | Node (s, [a; b]) ->
-    let a' = arith_canonize a
-    and b' = arith_canonize b in
+    let a' = arith_canonize_rec a
+    and b' = arith_canonize_rec b in
     try_reduce_binary s t.sort a' b'
   (*
   | Node (s, l) when Symbols.symbol_val s == Const "$distinct" ->
     try_reduce_distinct l
   *)
   | Node (s, l) ->
-    let l' = List.map arith_canonize l in
+    let l' = List.map arith_canonize_rec l in
     T.mk_node s t.sort l'
 (** unary builtins *)
 and try_reduce_unary s sort a =
@@ -122,24 +122,24 @@ and try_reduce_binary s sort a b =
     if Arith.greatereq na nb then T.true_term else T.false_term
   | _ ->
     T.mk_node s sort [a; b]  (* default case *)
+
+let arith_canonize t =
+  let t' = arith_canonize_rec t in
+  (if t != t'
+    then FoUtils.debug 3 "%% @[<h>arith_canonize %a to %a@]"
+      !T.pp_term#pp t !T.pp_term#pp t');
+  t'
   
 (** Expert that evaluates arithmetic expressions *)
 let rec expert ~ctx =
   let open Experts in
   let signature = SSet.empty in
-  let expert_canonize t =
-    let t' = arith_canonize t in
-    (if t != t' then
-      FoUtils.debug 2 "%% @[<h>arith_canonize %a to %a@]"
-      !T.pp_term#pp t !T.pp_term#pp t');
-    t'
-  in
   { expert_name = "arith";
     expert_descr = "evaluation for TSTP arithmetic";
     expert_equal = (fun t1 t2 -> arith_canonize t1 == arith_canonize t2);
     expert_sig = signature;
     expert_clauses = [];
-    expert_canonize;
+    expert_canonize = arith_canonize;
     expert_ord = (fun _ -> true);
     expert_ctx = ctx;
     expert_update_ctx = (fun ctx -> [expert ~ctx]);
@@ -154,10 +154,10 @@ let times a b = T.mk_node (mk_symbol "$product") a.sort [a; b]
 let over a b =
   if a.sort == int_
     then  (* to_int (quotient (to_rat a, to_rat b)) *)
-      T.mk_node (mk_symbol "to_int") int_
-        [T.mk_node (mk_symbol "quotient") rat_
-          [T.mk_node (mk_symbol "to_rat") rat_ [a];
-           T.mk_node (mk_symbol "to_rat") rat_ [b]]]
+      T.mk_node (mk_symbol "$to_int") int_
+        [T.mk_node (mk_symbol "$quotient") rat_
+          [T.mk_node (mk_symbol "$to_rat") rat_ [a];
+           T.mk_node (mk_symbol "$to_rat") rat_ [b]]]
     else T.mk_node (mk_symbol "$quotient") a.sort [a; b]
 
 let succ a =
@@ -282,11 +282,13 @@ let rebuild ?(rule="arith") ?(conditions=[]) ?i hc bindings =
   let lits' =
     List.map
       (function
-        | EqZero e -> Literals.mk_neq ~ord:ctx.ctx_ord e (zero e.sort)
-        | NeqZero e -> Literals.mk_eq ~ord:ctx.ctx_ord e (zero e.sort)
+        | EqZero e ->
+          Literals.mk_neq ~ord:ctx.ctx_ord (arith_canonize e) (zero e.sort)
+        | NeqZero e ->
+          Literals.mk_eq ~ord:ctx.ctx_ord (arith_canonize e) (zero e.sort)
         | LessZero e -> (* e < 0 ---> literal e >= 0 *)
           Literals.mk_eq ~ord:ctx.ctx_ord
-            (T.mk_node (mk_symbol "$greatereq") bool_ [e; zero e.sort])
+            (T.mk_node (mk_symbol "$greatereq") bool_ [arith_canonize e; zero e.sort])
             T.true_term)
     conditions
   in
@@ -296,7 +298,7 @@ let rebuild ?(rule="arith") ?(conditions=[]) ?i hc bindings =
   let proof c = Proof (c, rule, [hc.hcproof]) in
   let parents = [hc] in
   let new_clause = C.mk_hclause ~parents ~ctx lits proof in
-  FoUtils.debug 3 "%% arith deduction (%s with @[<h>%a@]): @[<h>%a@]"
+  FoUtils.debug 3 "%%  arith deduction (%s with @[<h>%a@]): @[<h>%a@]"
     rule S.pp_substitution subst !C.pp_clause#pp_h new_clause;
   new_clause
 
