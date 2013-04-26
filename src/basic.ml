@@ -213,6 +213,7 @@ type parameters = {
   param_kb_load : string list;    (** theory files to read *)
   param_kb_clear : bool;          (** do we need to clear the KB? *)
   param_kb_print : bool;          (** print knowledge base and exit *)
+  param_kb_where : bool;          (** print where is the KB? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_index : string;           (** indexing structure *)
 }

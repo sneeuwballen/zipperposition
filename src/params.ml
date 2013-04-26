@@ -45,6 +45,7 @@ let parse_args () =
   and kb_load = ref []
   and kb_clear = ref false
   and kb_print = ref false
+  and kb_where = ref false
   and dot_file = ref None
   and select = ref "SelectComplex"
   and progress = ref false
@@ -69,6 +70,7 @@ let parse_args () =
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
+      ("-kb-where", Arg.Set kb_where, "print default dir that is search for KB");
       ("-print-sort", Arg.Unit (fun () -> Terms.pp_term_debug#sort true), "print sorts");
       ("-progress", Arg.Unit set_progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
@@ -92,7 +94,7 @@ let parse_args () =
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
     param_index= !index; param_dot_file = !dot_file;
-    param_kb = !kb; param_kb_load = !kb_load;
+    param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
     param_kb_clear = !kb_clear;
     param_kb_print = !kb_print; 
     param_precedence= !heuristic_precedence;}

@@ -37,9 +37,6 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 
-(** Version, updated by the Makefile *)
-let version = "ZIPPERPOSITION_VERSION"
-
 (** find the given file from given directory *)
 let find_file name dir =
   (* check if the file exists *)
@@ -150,7 +147,7 @@ let setup_alarm timeout =
   Unix.alarm (max 1 (int_of_float timeout))
 
 let print_version ~params =
-  if params.param_version then (Format.printf "%% zipperposition v%s@." version; exit 0)
+  if params.param_version then (Format.printf "%% zipperposition v%s@." Const.version; exit 0)
 
 (** Get the calculus described in the arguments *)
 let get_calculus ~params =
@@ -358,6 +355,10 @@ let clear_kb params =
       Unix.unlink file);
   exit 0
 
+let print_kb_where params = 
+  Format.printf "%% KB located at %s@." params.param_kb;
+  exit 0
+
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
@@ -365,6 +366,7 @@ let () =
   print_version params;
   (* operations on knowledge base *)
   let kb = initial_kb params in
+  (if params.param_kb_where then print_kb_where params);
   (if params.param_kb_print then print_kb ~kb);
   (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)

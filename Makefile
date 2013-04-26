@@ -3,8 +3,9 @@
 VERSION=0.2
 ZIPPERPOSITION_HOME ?= $(HOME)/.zipperposition/
 
-PP = 'sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" -e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g"'
-
+%.ml: %.mlp
+	sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" \
+		-e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g" $< > $@
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
@@ -25,7 +26,7 @@ PWD = $(shell pwd)
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
 INCLUDES = -I,src
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES) -pp $(PP)
+OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 #OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
 
@@ -43,10 +44,10 @@ endif
 
 all: native lib tests
 
-lib:
+lib: src/const.ml
 	ocamlbuild $(OPTIONS_LIB) $(TAGS) $(TARGETS_LIB)
 
-native:
+native: src/const.ml
 	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_BIN)
 
 tests: lib
