@@ -3,8 +3,9 @@
 VERSION=0.2
 ZIPPERPOSITION_HOME ?= $(HOME)/.zipperposition/
 
-PP ?= -pp 'sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" -e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g"'
-
+%.ml: %.mlp
+	sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" \
+		-e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g" $< > $@
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
@@ -43,7 +44,7 @@ endif
 
 all: bin tests plugins
 
-bin:
+bin: src/const.ml
 	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_LIB) $(TARGETS_BIN)
 
 tests:
