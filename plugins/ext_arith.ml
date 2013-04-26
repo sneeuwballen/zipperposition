@@ -204,6 +204,8 @@ and try_reduce_binary s sort a b =
     zero a.sort
   | Const "$product", _, _ when is_one (arith_canonize_rec b) -> a
   | Const "$product", _, _ when is_one (arith_canonize_rec a) -> b
+  | Const "$product", _, _
+    when is_zero (arith_canonize_rec a) || is_zero (arith_canonize_rec b) -> zero a.sort
   | Const "$quotient", _, _ when is_one (arith_canonize_rec b) -> a
   | Const "$quotient", _, _ when is_zero (arith_canonize_rec a) -> zero a.sort
   | _ ->
