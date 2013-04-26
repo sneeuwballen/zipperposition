@@ -267,7 +267,7 @@ let mk_at ?old t1 t2 =
 let rec cast t sort =
   match t.term with
   | Bind (s, a_sort, t') ->
-    mk_bind s a_sort sort (cast t' sort)
+    mk_bind s sort a_sort (cast t' sort)
   | _ ->
     let new_t = {t with sort=sort; tag= -1;} in
     H.hashcons new_t
