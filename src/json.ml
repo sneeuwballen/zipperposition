@@ -35,6 +35,8 @@ type t =
 exception Type_error of string * t
   (** Signal a type error during decoding *)
 
+exception Json_error of string
+
 let type_error s t = raise (Type_error (s, t))
 
 (* conversion to Yojson type *)
@@ -98,7 +100,10 @@ let map_stream f stream =
 (** {2 Parsing/Printing} *)
 
 let from_string s =
-  of_yojson (Yojson.Basic.from_string s)
+  try
+    of_yojson (Yojson.Basic.from_string s)
+  with Yojson.Json_error s ->
+    raise (Json_error s)
 
 let string_of t =
   Yojson.Basic.to_string (to_yojson t)

@@ -35,6 +35,8 @@ type t =
 exception Type_error of string * t
   (** Signal a type error during decoding *)
 
+exception Json_error of string
+
 val type_error : string -> t -> 'a
   (** Raise a type error *)
 
