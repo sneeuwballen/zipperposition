@@ -175,11 +175,12 @@ let pp_proof_tstp formatter proof =
           (Utils.pp_list ~sep:"," Format.pp_print_int) premises)
 
 let pp_proof_json formatter proof =
-  (* how to print a single element *)
-  let pp_item formatter json = Format.pp_print_string formatter (Json.string_of json) in
-  let seq = to_json proof in
-  Format.fprintf formatter "@[<hv>%a@]@;"
-    (Sequence.pp_seq pp_item) seq
+  Format.fprintf formatter "@[<hv2>{ \"proof\":@; ";
+  Sequence.iter
+    (fun json -> Format.fprintf formatter "@[<h>%s@]@;" (Json.string_of json))
+    (to_json proof);
+  Format.fprintf formatter "}@]";
+  ()
 
 (** Prints the proof according to the given input switch *)
 let pp_proof switch formatter proof = match switch with

@@ -61,5 +61,8 @@ val mk_assoc : (string * t) list -> t
 val from_string : string -> t
 val string_of : t -> string
 
+val out_pretty : out_channel -> t -> unit
+val pp_pretty : Format.formatter -> t -> unit
+
 val stream_to_string : t Stream.t -> string
 val stream_from_lexbuf : Lexing.lexbuf -> t Stream.t

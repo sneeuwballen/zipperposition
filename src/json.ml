@@ -103,6 +103,13 @@ let from_string s =
 let string_of t =
   Yojson.Basic.to_string (to_yojson t)
 
+let out_pretty oc s =
+  Yojson.Basic.pretty_to_channel oc (to_yojson s)
+
+let pp_pretty fmt s =
+  let str = Yojson.Basic.pretty_to_string (to_yojson s) in
+  Format.pp_print_string fmt str
+
 let stream_to_string s =
   let s = map_stream to_yojson s in
   Yojson.Basic.stream_to_string s
