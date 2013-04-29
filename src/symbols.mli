@@ -217,6 +217,9 @@ val int_ : sort
 val rat_ : sort
 val real_ : sort
 
+val is_atomic_sort : sort -> bool
+val is_fun_sort : sort -> bool
+
 val arity : sort -> int
   (** Arity of a sort, ie nunber of arguments of the function, or 0 *)
 
@@ -252,6 +255,9 @@ val merge_signatures : signature -> signature -> signature
 
 val sig_to_seq : signature -> (symbol * sort) Sequence.t
 val sig_of_seq : ?signature:signature -> (symbol * sort) Sequence.t -> signature
+
+val sort_to_string : sort -> string
+val sort_of_string : string -> sort  (* or Failure *)
 
 val to_json : symbol -> Json.t
 val of_json : Json.t -> symbol

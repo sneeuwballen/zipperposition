@@ -22,6 +22,7 @@ Hashset
 Hashcons
 Heap
 Index
+Json
 Leftistheap
 Lexer_tptp
 Literals
@@ -46,6 +47,7 @@ Rewriting
 Saturate
 Sequence
 Selection
+SmallSet
 SplayTree
 Superposition
 Symbols

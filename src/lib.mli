@@ -22,6 +22,7 @@ module Hashset : module type of Hashset
 module Hashcons : module type of Hashcons
 module Heap : module type of Heap
 module Index : module type of Index
+module Json : module type of Json
 module Leftistheap : module type of Leftistheap
 module Lexer_tptp : module type of Lexer_tptp
 module Literals : module type of Literals
@@ -46,6 +47,7 @@ module Rewriting : module type of Rewriting
 module Saturate : module type of Saturate
 module Sequence : module type of Sequence
 module Selection : module type of Selection
+module SmallSet : module type of SmallSet
 module SplayTree : module type of SplayTree
 module Superposition : module type of Superposition
 module Symbols : module type of Symbols

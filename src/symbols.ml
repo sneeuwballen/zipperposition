@@ -349,6 +349,8 @@ type sort =
 
 let rec pp_sort formatter sort = match sort with
   | Sort s -> Format.pp_print_string formatter s
+  | Fun (s, [Fun _ as s']) ->
+    Format.fprintf formatter "(%a) > %a" pp_sort s' pp_sort s
   | Fun (s, [s']) ->
     Format.fprintf formatter "%a > %a" pp_sort s' pp_sort s
   | Fun (s, l) ->
@@ -423,6 +425,65 @@ let univ_ = mk_sort univ_symbol
 let int_ = mk_sort int_symbol
 let rat_ = mk_sort rat_symbol
 let real_ = mk_sort real_symbol
+
+let is_atomic_sort = function | Sort _ -> true | Fun _ -> false
+let is_fun_sort = function | Sort _ -> false | Fun _ -> true
+
+let rec serialize_sort buf = function
+  | Sort s -> Buffer.add_string buf s
+  | Fun (s, l) ->
+    Printf.bprintf buf "(%a %a)" serialize_sort s serialize_sorts l
+and serialize_sorts buf l = match l with
+  | [] -> ()
+  | [x] -> serialize_sort buf x
+  | x::l' -> serialize_sort buf x; Buffer.add_char buf ' '; serialize_sorts buf l'
+
+let sort_to_string s =
+  let b = Buffer.create 15 in
+  serialize_sort b s;
+  Buffer.contents b
+
+(* parse a sort, using stream parser *)
+let sort_of_string =
+  let lexer = Genlex.make_lexer ["("; ")"; "$"] in
+  (* parse the stream [s] *)
+  let rec parse s =
+    match Stream.peek s with
+    | Some (Genlex.Kwd "(") ->
+      Stream.junk s;
+      let sort = parse s in
+      let sorts = parse_sorts [] s in
+      (match Stream.peek s with
+       | Some (Genlex.Kwd ")") ->
+        Stream.junk s;
+        sort <== sorts
+       | _ -> failwith "parse_sort: expected ')'")
+    | Some (Genlex.Ident ident) ->
+      Stream.junk s;
+      mk_sort ident
+    | Some (Genlex.Kwd "$") ->
+      Stream.junk s;
+      (match Stream.peek s with
+      | Some (Genlex.Ident ident) ->
+        Stream.junk s;
+        mk_sort ("$" ^ ident)
+      | _ -> failwith "parse_sort: expected ident")
+    | Some _ -> failwith "parse_sort: expected sort"
+    | None ->  failwith "parse_sort: unexpected end of input"
+  and parse_sorts l s = match Stream.peek s with
+    | Some (Genlex.Kwd ")") ->
+      List.rev l 
+    | Some _ ->
+      let sort = parse s in
+      parse_sorts (sort :: l) s
+    | None ->  failwith "parse_sorts: unexpected end of input"
+  in
+  fun str ->
+    try
+      parse (lexer (Stream.of_string str))
+    with (Failure msg) as e ->
+      Printf.eprintf "%% could not read sort %s: %s\n" str msg;
+      raise e
 
 (** Arity of a sort, ie nunber of arguments of the function, or 0 *)
 let arity = function
@@ -533,13 +594,11 @@ let of_json json = match json with
   | Json.List [Json.String "real"; Json.String f] -> mk_real (float_of_string f)
   | _ -> Json.type_error "expected symbol" json
 
-let rec sort_to_json = function
-  | Sort s -> Json.String s
-  | Fun (s,l) -> Json.List (sort_to_json s :: List.map sort_to_json l)
+let sort_to_json s =
+  Json.String (sort_to_string s)
 
-let rec sort_of_json json = match json with
-  | Json.String s -> mk_sort s
-  | Json.List (s::l) -> (sort_of_json s) <== (List.map sort_of_json l)
+let sort_of_json json = match json with
+  | Json.String s -> sort_of_string s
   | _ -> Json.type_error "expected sort" json
 
 let sig_to_json signature =

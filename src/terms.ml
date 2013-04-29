@@ -955,35 +955,70 @@ let pp_term = ref (pp_term_debug :> pprinter_term)
 
 let rec to_json t =
   match t.term with
+  | BoundVar i when t.sort == univ_ ->
+    Json.String ("Y" ^ string_of_int i) 
   | BoundVar i ->
-    Json.List [Json.String "bound"; Json.Int i; sort_to_json t.sort]
+    Json.String (Printf.sprintf "Y%d:%s" i (sort_to_string t.sort))
+  | Var i when t.sort == univ_ ->
+    Json.String ("X" ^ string_of_int i) 
   | Var i ->
-    Json.List [Json.String "var"; Json.Int i; sort_to_json t.sort]
+    Json.String (Printf.sprintf "X%d:%s" i (sort_to_string t.sort))
   | Bind (s, a_sort, t') ->
-    Json.List [Json.String "bind"; Symbols.to_json s;
-      sort_to_json t.sort; sort_to_json a_sort; to_json t']
+    let args = Json.List
+      [Symbols.to_json s; sort_to_json t.sort; sort_to_json a_sort; to_json t'] in
+    Json.Assoc ["bind", args]
   | Node (f, l) ->
-    let l' = Json.List (List.map to_json l) in
-    let f' = Symbols.to_json f in
-    let sort' = Symbols.sort_to_json t.sort in
-    Json.List [Json.String "node"; f'; sort'; l']
+    let l' = List.map to_json l in
+    let head =
+      if t.sort == univ_
+        then Utils.sprintf "%a" pp_symbol f
+        else Utils.sprintf "%a:%s" pp_symbol f (sort_to_string t.sort)
+    in
+    if l' = []
+      then Json.String head
+      else Json.List (Json.String head :: l')
 
 let of_json json =
   let rec of_json json = 
     match json with
-    | Json.List [Json.String "bound"; Json.Int i; sort] ->
-      let sort = sort_of_json sort in mk_bound_var i sort
-    | Json.List [Json.String "var"; Json.Int i; sort] ->
-      let sort = sort_of_json sort in mk_var i sort
-    | Json.List [Json.String "bind"; s; sort; a_sort; t'] ->
+    | Json.String "" -> assert false
+    | Json.String s when s.[0] = 'X' ->
+      let i, sort =
+        if String.contains s ':'
+          then Scanf.sscanf s "X%d:%s@>%!"
+            (fun d sort -> d, sort_of_string sort)
+          else Scanf.sscanf s "X%d" (fun d -> d, univ_)
+      in
+      mk_var i sort
+    | Json.String s when s.[0] = 'Y' ->
+      let i, sort =
+        if String.contains s ':'
+          then Scanf.sscanf s "Y%d:%s@>%!"
+            (fun d sort -> d, sort_of_string  sort)
+          else Scanf.sscanf s "Y%d" (fun d -> d, univ_)
+      in
+      mk_bound_var i sort
+    | Json.Assoc ["bind", Json.List [s; sort; a_sort; t']] ->
       let s = Symbols.of_json s in
       let sort = sort_of_json sort in
       let a_sort = sort_of_json a_sort in
       let t' = of_json t' in
       mk_bind s sort a_sort t'
-    | Json.List [Json.String "node"; f; sort; Json.List l] ->
-      let f = Symbols.of_json f in
-      let sort = Symbols.sort_of_json sort in
+    | Json.String s ->
+      let s, sort =
+        if String.contains s ':'
+          then Scanf.sscanf s "%s@:%s@>%!"
+            (fun s sort -> Symbols.mk_symbol s, sort_of_string sort)
+          else Scanf.sscanf s "%s" (fun s -> Symbols.mk_symbol s, univ_)
+      in
+      mk_const s sort
+    | Json.List (Json.String s :: l) ->
+      let f, sort =
+        if String.contains s ':'
+          then Scanf.sscanf s "%s@:%s@>%!"
+            (fun s sort -> Symbols.mk_symbol s, sort_of_string sort)
+          else Scanf.sscanf s "%s" (fun s -> Symbols.mk_symbol s, univ_)
+      in
       let l = List.map of_json l in
       mk_node f sort l
     | _ -> let msg = "expected term" in
