@@ -59,7 +59,7 @@ val mk_assoc : (string * t) list -> t
 (** {2 Parsing/Printing} *)
 
 val from_string : string -> t
-val to_string : t -> string
+val string_of : t -> string
 
 val stream_to_string : t Stream.t -> string
 val stream_from_lexbuf : Lexing.lexbuf -> t Stream.t

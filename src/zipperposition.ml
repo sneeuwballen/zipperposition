@@ -125,7 +125,7 @@ let print_json_stats ~env =
       "experts", Json.Int experts;
     ]
   in
-  Utils.debug 0 "%% json_stats: %s" (Json.to_string o)
+  Utils.debug 0 "%% json_stats: %s" (Json.string_of o)
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =

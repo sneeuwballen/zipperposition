@@ -100,7 +100,7 @@ let map_stream f stream =
 let from_string s =
   of_yojson (Yojson.Basic.from_string s)
 
-let to_string t =
+let string_of t =
   Yojson.Basic.to_string (to_yojson t)
 
 let stream_to_string s =
