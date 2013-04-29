@@ -376,9 +376,9 @@ quantifier:
     { Terms.mk_exists_var }
 
 variable_list:
-  | variable
+  | typed_variable
     { [$1] }
-  | variable COMMA variable_list
+  | typed_variable COMMA variable_list
     { $1 :: $3 }
 
 unary_formula:
@@ -631,10 +631,14 @@ system_constant:
       { mk_symbol $1 }
 
 variable:
-  | UPPER_WORD COLON tff_type
-      { get_var ~sort:$3 $1 }
   | UPPER_WORD
       { get_var $1 }
+
+typed_variable:
+  | UPPER_WORD
+      { get_var $1 }
+  | UPPER_WORD COLON tff_type
+    { get_var ~sort:$3 $1 }
 
 tff_typed_atom:
   | atomic_word COLON tff_type

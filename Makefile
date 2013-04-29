@@ -23,7 +23,7 @@ INSTALLDIR=/usr/bin/
 PWD = $(shell pwd)
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
 #OPTIONS = -use-ocamlfind -I src $(PP) -classic-display
-OPTIONS = -use-ocamlfind -I src $(PP) -X plugins
+OPTIONS = -use-ocamlfind -I src $(PP) -X plugins -yaccflag -v
 
 # switch compilation module
 MODE ?= debug
@@ -71,7 +71,7 @@ doc:
 
 clean:
 	ocamlbuild -clean
-	rm plugins/*.cm* plugins/std/*.cmxs
+	rm plugins/*.cm* plugins/std/*.cmxs || true
 
 # install the main binary
 install: bin plugins
