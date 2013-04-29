@@ -114,15 +114,15 @@ let to_graph proof =
         Graph.add g p' rule p) l);
   g
 
-let to_json json_key proof =
+let to_json proof =
   (* how to translate the proof step *)
   let pp_step proof = 
     match proof with
     | Axiom (c, filename, name) ->
-      Json.List [Json.String "axiom"; json_key c; Json.String filename; Json.String name]
+      Json.List [Json.String "axiom"; C.compact_to_json c; Json.String filename; Json.String name]
     | Proof (c, rule, l) ->
       let premises = List.map (fun proof -> Json.Int (proof_id proof)) l in
-      Json.List [Json.String "proof"; json_key c; Json.String rule; Json.List premises]
+      Json.List [Json.String "proof"; C.compact_to_json c; Json.String rule; Json.List premises]
   in
   (* sequence *)
   let seq k =
@@ -176,8 +176,8 @@ let pp_proof_tstp formatter proof =
 
 let pp_proof_json formatter proof =
   (* how to print a single element *)
-  let pp_item formatter json = Format.pp_print_string formatter (Json.to_string json) in
-  let seq = to_json C.compact_to_json proof in
+  let pp_item formatter json = Format.pp_print_string formatter (Json.string_of json) in
+  let seq = to_json proof in
   Format.fprintf formatter "@[<hv>%a@]@;"
     (Sequence.pp_seq pp_item) seq
 

@@ -24,50 +24,49 @@ open Basic
 
 (** {2 Constructors and utils} *)
 
-val mk_axiom : 'a -> string -> string -> 'a proof
-val mk_proof : 'a -> string -> 'a proof list -> 'a proof
+val mk_axiom : compact_clause -> string -> string -> proof
+val mk_proof : compact_clause -> string -> proof list -> proof
 
-val is_axiom : 'a proof -> bool
-val is_proof : 'a proof -> bool
+val is_axiom : proof -> bool
+val is_proof : proof -> bool
 
-val proof_clause : compact_clause proof -> compact_clause  (** Clause this is a proof of *)
-val proof_id : compact_clause proof -> int                 (** Id of the clause *)
-val proof_lits : compact_clause proof -> literal array     (** literals of the clause *)
+val proof_clause : proof -> compact_clause  (** Clause this is a proof of *)
+val proof_id : proof -> int                 (** Id of the clause *)
+val proof_lits : proof -> literal array     (** literals of the clause *)
 
-val is_proof_of : compact_clause proof -> hclause -> bool
+val is_proof_of : proof -> hclause -> bool
   (** Is the proof a proof of the clause? *)
 
-val recover_clause : ctx:context -> compact_clause proof -> hclause
+val recover_clause : ctx:context -> proof -> hclause
   (** Re-build a clause from its proof *)
 
-val traverse : ?traversed:Ptset.t ref -> (int * 'a) proof ->
-                ((int * 'a) proof -> unit) -> unit
+val traverse : ?traversed:Ptset.t ref -> proof -> (proof -> unit) -> unit
   (** Traverse the proof. Each proof node is traversed only once,
       using the integer to recognize already traversed proofs. *)
 
-val to_seq : (int * 'a) proof -> (int * 'a) proof Sequence.t
+val to_seq : proof -> proof Sequence.t
 
-val depth : (int * 'a) proof -> int
+val depth : proof -> int
   (** Max depth of the proof *)
 
 (** {2 Conversion to a graph of proofs} *)
 
-val to_graph : compact_clause proof -> (compact_clause proof, string) Graph.t
+val to_graph : proof -> (proof, string) Graph.t
   (** Get a graph of the proof *)
 
-val to_json : ((int*'a) -> Json.t) -> (int*'a) proof -> Json.t Sequence.t
+val to_json : proof -> Json.t Sequence.t
 
 (** {2 Pretty printer for proofs} *)
 
-val pp_proof_tstp : Format.formatter -> compact_clause proof -> unit
-val pp_proof_debug : Format.formatter -> compact_clause proof -> unit
-val pp_proof_json : Format.formatter -> compact_clause proof -> unit
-val pp_proof : string -> Format.formatter -> compact_clause proof -> unit
+val pp_proof_tstp : Format.formatter -> proof -> unit
+val pp_proof_debug : Format.formatter -> proof -> unit
+val pp_proof_json : Format.formatter -> proof -> unit
+val pp_proof : string -> Format.formatter -> proof -> unit
   (** Prints the proof according to the given input switch *)
 
-val pp_dot : name:string -> Format.formatter -> compact_clause proof -> unit
+val pp_dot : name:string -> Format.formatter -> proof -> unit
   (** Pretty print the proof as a DOT graph *)
 
-val pp_dot_file : ?name:string -> string -> compact_clause proof -> unit
+val pp_dot_file : ?name:string -> string -> proof -> unit
   (** print to dot into a file *)
 

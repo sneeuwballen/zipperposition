@@ -67,18 +67,18 @@ module CHashcons : Hashcons.S with type t = hclause
 
 val mk_hclause : ?parents:hclause list -> ?selected:Bitvector.t ->
                  ctx:context -> literal list ->
-                  (compact_clause -> compact_clause proof) -> hclause
+                  (compact_clause -> proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
 val mk_hclause_a : ?parents:hclause list -> ?selected:Bitvector.t ->
                    ctx:context -> literal array ->
-                   (compact_clause -> compact_clause proof) -> hclause
+                   (compact_clause -> proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
 
-val adapt_proof : compact_clause proof -> compact_clause -> compact_clause proof
+val adapt_proof : proof -> compact_clause -> proof
   (** Adapt an old proof to the new compact_clause *)
 
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)

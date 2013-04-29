@@ -138,7 +138,7 @@ and hclause = {
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
   mutable hcvars : term list;             (** the free variables *)
-  mutable hcproof : compact_clause proof; (** Proof of the clause *)
+  mutable hcproof : proof;                (** Proof of the clause *)
   mutable hcparents : hclause list;       (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
 } 
@@ -150,10 +150,10 @@ and context = {
 }
 (** A compact clause: ID and literals *)
 and compact_clause = int * literal array
-(** A proof step for a 'a. This allows for genericity of proofs. *)
-and 'a proof =
-  | Axiom of 'a * string * string (** file, axiom name *)
-  | Proof of 'a * string * 'a proof list
+(** A proof step *)
+and proof =
+  | Axiom of compact_clause * string * string (** file, axiom name *)
+  | Proof of compact_clause * string * proof list
 (** a selection function *)
 and selection_fun = hclause -> int list
 
