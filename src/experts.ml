@@ -107,6 +107,7 @@ let rec combine e1 e2 =
 let more_specific e1 e2 =
   let res =
     e1.expert_ctx == e2.expert_ctx &&
+    not (SSet.is_empty e1.expert_sig) &&  (* empty sig == universal *)
     SSet.subset e1.expert_sig e2.expert_sig &&
     not (SSet.equal e1.expert_sig e2.expert_sig)
   in
