@@ -235,6 +235,7 @@ let initial_kb params =
     (fun () ->
       let kb = try Meta.KB.restore ~file kb
                with Json.Json_error _
+               | Json.Type_error _
                | Unix.Unix_error _ -> Meta.KB.empty in
       (* load required files *)
       let kb = List.fold_left parse_theory_file kb params.param_kb_load in
