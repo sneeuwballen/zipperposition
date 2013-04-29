@@ -57,14 +57,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   let meta_table =
     Meta.ParseUtils.create ()
 
-  (* reset everything in order to parse a new term/clause *)
-  let init () =
-    var_id_counter := 0;
-    var_map := [];
-    conjecture := false;
-    Meta.ParseUtils.clear meta_table;
-    ()
-        
   (* gets the variables associated with a string from the variable mapping
      creates a new mapping for a new variable with the given sort *)
   let get_var ?sort (var_name: string) =
@@ -98,7 +90,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         sort' @@ arg_sorts
       with Symbols.SortError(msg) ->
         Const.parse_error
-          (FoUtils.sprintf "%% could not type %a with (%a)(%a): %s"
+          (FoUtils.sprintf "%% @[<h>could not type %a with (%a)(%a):@; %s@]"
             pp_symbol symb pp_sort sort' (FoUtils.pp_list pp_sort) arg_sorts msg)
       end
     with Not_found ->
@@ -108,6 +100,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
   let set_sort constant sort =
     SHashtbl.replace sort_table constant sort
+
+  (* reset everything in order to parse a new term/clause *)
+  let init () =
+    var_id_counter := 0;
+    var_map := [];
+    conjecture := false;
+    SHashtbl.clear sort_table;
+    ()
+        
 %}
   
 %token LEFT_PARENTHESIS
@@ -801,11 +802,13 @@ meta_lemma_def:
   | LEMMA meta_term IF meta_premises DOT
     { let t = $2 in
       let premises = $4 in
+      init ();
       Meta.ParseUtils.mk_lemma_term ~table:meta_table t premises
     }
   | meta_named IF meta_premises DOT
     { let named = $1 in
       let premises = $3 in
+      init ();
       Meta.ParseUtils.mk_lemma_named ~table:meta_table named premises
     }
 
@@ -813,6 +816,7 @@ meta_named_def:
   | meta_named IS AXIOM meta_term DOT
     { let named = $1 in
       let t = $4 in
+      init ();
       Meta.ParseUtils.mk_named ~table:meta_table named t
     }
 
@@ -820,6 +824,7 @@ meta_theory_def:
   | meta_theory IS meta_premises DOT
     { let th = $1 in
       let premises = $3 in
+      init ();
       Meta.ParseUtils.mk_theory ~table:meta_table th premises
     }
 
@@ -832,6 +837,7 @@ meta_gc_def:
       let prec = $9 in
       let premises = $12 in
       let eqns = $5 in
+      init ();
       Meta.ParseUtils.mk_gc ~table:meta_table eqns (theory,ord,prec) premises
     }
 
