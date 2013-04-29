@@ -119,16 +119,16 @@ let to_json json_key proof =
   let pp_step proof = 
     match proof with
     | Axiom (c, filename, name) ->
-      `List [`String "axiom"; json_key c; `String filename; `String name]
+      Json.List [Json.String "axiom"; json_key c; Json.String filename; Json.String name]
     | Proof (c, rule, l) ->
-      let premises = List.map (fun proof -> `Int (proof_id proof)) l in
-      `List [`String "proof"; json_key c; `String rule; `List premises]
+      let premises = List.map (fun proof -> Json.Int (proof_id proof)) l in
+      Json.List [Json.String "proof"; json_key c; Json.String rule; Json.List premises]
   in
   (* sequence *)
-  let seq (k : json -> unit) =
+  let seq k =
     traverse proof
       (fun proof ->
-        let step = `List [`Int (proof_id proof); pp_step proof] in
+        let step = Json.List [Json.Int (proof_id proof); pp_step proof] in
         k step)
   in Sequence.from_iter seq
 

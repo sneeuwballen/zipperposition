@@ -202,67 +202,67 @@ and pp_fact formatter fact =
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
       (Utils.pp_list ~sep:" and " !T.pp_term#pp) args
 
-let rec definition_to_json definition : json =
+let rec definition_to_json definition =
   match definition with
   | Named (name, pat) ->
-    `List [`String "named"; `String name; Pattern.to_json pat]
+    Json.List [Json.String "named"; Json.String name; Pattern.to_json pat]
   | Theory ((name, args), premises) ->
-    `List (`String "theory" :: `String name :: `List (List.map T.to_json args) ::
+    Json.List (Json.String "theory" :: Json.String name :: Json.List (List.map T.to_json args) ::
           List.map premise_to_json premises)
   | Lemma ((pat, args), premises) ->
-    `List (`String "lemma" :: `List (Pattern.to_json pat :: List.map T.to_json args) ::
+    Json.List (Json.String "lemma" :: Json.List (Pattern.to_json pat :: List.map T.to_json args) ::
           List.map premise_to_json premises)
   | GC (gc, premises) ->
-      `Assoc ["gc", `Bool true;
-              "theory", `String gc.gc_theory;
-              "vars", `List (List.map T.to_json gc.gc_vars);
-              "ord", `String gc.gc_ord;
-              "prec", `List (List.map T.to_json gc.gc_prec);
-              "premises", `List (List.map premise_to_json premises);
-              "eqns", `List (List.map
-                (fun (pat, args) -> `List (Pattern.to_json pat :: List.map T.to_json args))
+      Json.Assoc ["gc", Json.Bool true;
+              "theory", Json.String gc.gc_theory;
+              "vars", Json.List (List.map T.to_json gc.gc_vars);
+              "ord", Json.String gc.gc_ord;
+              "prec", Json.List (List.map T.to_json gc.gc_prec);
+              "premises", Json.List (List.map premise_to_json premises);
+              "eqns", Json.List (List.map
+                (fun (pat, args) -> Json.List (Pattern.to_json pat :: List.map T.to_json args))
                 gc.gc_eqns);]
-and premise_to_json (premise : premise) : json =
+and premise_to_json premise =
   match premise with
   | IfNamed (name, args) ->
-    `List (`String "named" :: `String name :: List.map T.to_json args)
+    Json.List (Json.String "named" :: Json.String name :: List.map T.to_json args)
   | IfTheory (name, args) ->
-    `List (`String "theory" :: `String name :: List.map T.to_json args)
+    Json.List (Json.String "theory" :: Json.String name :: List.map T.to_json args)
   | IfPattern (pat, args) ->
-    `List (`String "pattern" :: Pattern.to_json pat :: List.map T.to_json args)
+    Json.List (Json.String "pattern" :: Pattern.to_json pat :: List.map T.to_json args)
 
-let rec definition_of_json (json : json) : definition =
+let rec definition_of_json json =
   match json with
-  | `List [`String "named"; `String name; pat] ->
+  | Json.List [Json.String "named"; Json.String name; pat] ->
     Named (name, Pattern.of_json pat)
-  | `List (`String "theory" :: `String name :: `List args :: premises) ->
+  | Json.List (Json.String "theory" :: Json.String name :: Json.List args :: premises) ->
     Theory ((name, List.map T.of_json args), List.map premise_of_json premises)
-  | `List (`String "lemma" :: `List (pat :: args) :: premises) ->
+  | Json.List (Json.String "lemma" :: Json.List (pat :: args) :: premises) ->
     Lemma ((Pattern.of_json pat, List.map T.of_json args),
            List.map premise_of_json premises)
-  | `Assoc l when List.mem_assoc "gc" l ->
-    let gc_vars = List.map T.of_json (Json.Util.to_list (List.assoc "vars" l)) in
-    let gc_theory = Json.Util.to_string (List.assoc "theory" l) in
-    let gc_ord = Json.Util.to_string (List.assoc "ord" l) in
-    let gc_prec = List.map T.of_json (Json.Util.to_list (List.assoc "prec" l)) in
+  | Json.Assoc l when List.mem_assoc "gc" l ->
+    let gc_vars = List.map T.of_json (Json.to_list (List.assoc "vars" l)) in
+    let gc_theory = Json.to_string (List.assoc "theory" l) in
+    let gc_ord = Json.to_string (List.assoc "ord" l) in
+    let gc_prec = List.map T.of_json (Json.to_list (List.assoc "prec" l)) in
     let premises = List.map premise_of_json
-      (Json.Util.to_list (List.assoc "premises" l)) in
+      (Json.to_list (List.assoc "premises" l)) in
     let gc_eqns = List.map
       (function
-        | `List (pat::args) -> (Pattern.of_json pat, List.map T.of_json args)
-        | json -> raise (Json.Util.Type_error ("expected (pattern,terms)", json)))
-      (Json.Util.to_list (List.assoc "eqns" l)) in
+        | Json.List (pat::args) -> (Pattern.of_json pat, List.map T.of_json args)
+        | json -> Json.type_error "expected (pattern,terms)" json)
+      (Json.to_list (List.assoc "eqns" l)) in
     GC ({ gc_ord; gc_theory; gc_vars; gc_prec; gc_eqns; }, premises)
-  | _ -> raise (Json.Util.Type_error ("expected KB.definition", json))
-and premise_of_json (json : json) : premise =
+  | _ -> Json.type_error "expected KB.definition" json
+and premise_of_json json =
   match json with
-  | `List (`String "named" :: `String name :: args) ->
+  | Json.List (Json.String "named" :: Json.String name :: args) ->
     IfNamed (name, List.map T.of_json args)
-  | `List (`String "theory" :: `String name :: args) ->
+  | Json.List (Json.String "theory" :: Json.String name :: args) ->
     IfTheory (name, List.map T.of_json args)
-  | `List (`String "pattern" :: pat :: args) ->
+  | Json.List (Json.String "pattern" :: pat :: args) ->
     IfPattern (Pattern.of_json pat, List.map T.of_json args)
-  | _ -> raise (Json.Util.Type_error ("expected KB.premise", json))
+  | _ -> Json.type_error "expected KB.premise" json
 
 (** {2 Datalog atoms} *)
 
@@ -293,17 +293,17 @@ let rec pp_atom formatter a = match a with
       (Utils.pp_list !T.pp_term#pp) vars
   | MTerm t -> T.pp_term_debug#pp formatter t
 
-let rec atom_to_json a : json = match a with
-  | MString s -> `String s
-  | MPattern p -> `Assoc ["pattern", Pattern.to_json p]
+let rec atom_to_json a = match a with
+  | MString s -> Json.String s
+  | MPattern p -> Json.Assoc ["pattern", Pattern.to_json p]
   | MPatternVars (p, vars) -> assert false (* TODO *)
-  | MTerm t -> `Assoc ["term", T.to_json t]
+  | MTerm t -> Json.Assoc ["term", T.to_json t]
 
-let rec atom_of_json (json : json) : atom = match json with
-  | `String s -> MString s
-  | `Assoc ["pattern", p] -> MPattern (Pattern.of_json p)
-  | `Assoc ["term", t] -> MTerm (T.of_json t)
-  | _ -> raise (Json.Util.Type_error ("expected atom", json))
+let rec atom_of_json json = match json with
+  | Json.String s -> MString s
+  | Json.Assoc ["pattern", p] -> MPattern (Pattern.of_json p)
+  | Json.Assoc ["term", t] -> MTerm (T.of_json t)
+  | _ -> Json.type_error "expected atom" json
 
 (** The Datalog prover that reasons over atoms. *)
 module Logic = Datalog.Logic.Make(struct
@@ -538,11 +538,11 @@ let pp formatter kb =
   Format.fprintf formatter "@[<v2>KB:@;%a@]"
     (Sequence.pp_seq ~sep:"" pp_definition) (to_seq kb)
 
-let to_json kb : json Stream.t =
+let to_json kb =
   let definitions = Sequence.map definition_to_json (to_seq kb) in
   Sequence.to_stream definitions
 
-let of_json kb (json : json Stream.t) : t =
+let of_json kb json =
   let seq = Sequence.of_stream json in
   let seq = Sequence.map definition_of_json seq in
   of_seq kb seq
@@ -566,8 +566,7 @@ let restore ~file kb =
     let input = Gzip.open_in file in
     (* parse JSON steam *)
     let lexbuf = Lexing.from_function (fun s len -> Gzip.input input s 0 len) in
-    let lexer = Json.init_lexer () in
-    let stream : json Stream.t = Json.stream_from_lexbuf lexer lexbuf in
+    let stream = Json.stream_from_lexbuf lexbuf in
     let kb = of_json kb stream in
     Gzip.close_in input;
     kb

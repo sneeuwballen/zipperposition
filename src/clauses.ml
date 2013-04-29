@@ -705,21 +705,19 @@ let pp_set formatter set =
   Format.fprintf formatter "@[<v>%a@]" (Utils.pp_list ~sep:"" !pp_clause#pp_h) clauses
 
 let compact_to_json (i,lits) =
-  `Assoc ["id", `Int i;
-          "lits", Lits.lits_to_json lits]
+  Json.Assoc ["id", Json.Int i; "lits", Lits.lits_to_json lits]
 
 let compact_of_json ~ord json =
-  let pairs = Json.Util.to_assoc json in
-  let i = Json.Util.to_int (List.assoc "id" pairs) in
+  let pairs = Json.to_assoc json in
+  let i = Json.to_int (List.assoc "id" pairs) in
   let lits = Lits.lits_of_json ~ord (List.assoc "lits" pairs) in
   (i, lits)
 
 let to_json c =
-  `Assoc ["id", `Int c.hctag;
-          "lits", Lits.lits_to_json c.hclits]
+  Json.Assoc ["id", Json.Int c.hctag; "lits", Lits.lits_to_json c.hclits]
 
 let of_json ~ctx json =
-  let pairs = Json.Util.to_assoc json in
+  let pairs = Json.to_assoc json in
   let lits = Lits.lits_of_json ~ord:ctx.ctx_ord (List.assoc "lits" pairs) in
   let proof c = Axiom (c, "json", "json") in
   mk_hclause_a ~ctx lits proof
@@ -727,10 +725,10 @@ let of_json ~ctx json =
 let set_to_json set =
   let items = CSet.fold (fun acc _ hc -> to_json hc :: acc)
     [] set in
-  `List items
+  Json.List items
 
 let set_of_json ~ctx set json =
-  let l = Json.Util.to_list json in
+  let l = Json.to_list json in
   List.fold_left
     (fun set json ->
       let hc = of_json ~ctx json in

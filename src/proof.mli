@@ -55,7 +55,7 @@ val depth : (int * 'a) proof -> int
 val to_graph : compact_clause proof -> (compact_clause proof, string) Graph.t
   (** Get a graph of the proof *)
 
-val to_json : ((int*'a) -> json) -> (int*'a) proof -> json Sequence.t
+val to_json : ((int*'a) -> Json.t) -> (int*'a) proof -> Json.t Sequence.t
 
 (** {2 Pretty printer for proofs} *)
 

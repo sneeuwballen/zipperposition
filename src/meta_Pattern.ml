@@ -97,18 +97,18 @@ let pp_pattern_p formatter ((p, args) : t parametrized) =
     args (T.beta_reduce t) in
   !T.pp_term#pp formatter (decode t')
 
-let to_json (p : t) : json =
-  `Assoc [
+let to_json p =
+  Json.Assoc [
     "term", T.to_json (fst p);
-    "sorts", `List (List.map sort_to_json (snd p))]
+    "sorts", Json.List (List.map sort_to_json (snd p))]
 
-let of_json (json : json) : t = match json with
-  | `Assoc ["term", t; "sorts", `List sorts]
-  | `Assoc ["sorts", `List sorts; "term", t] ->
+let of_json json = match json with
+  | Json.Assoc ["term", t; "sorts", Json.List sorts]
+  | Json.Assoc ["sorts", Json.List sorts; "term", t] ->
     let t = T.of_json t
     and sorts = List.map sort_of_json sorts in
     (t, sorts)
-  | _ -> raise (Json.Util.Type_error ("expected pattern", json))
+  | _ -> Json.type_error "expected pattern" json
 
 (** {2 Conversion pattern <-> clause, and matching *)
 

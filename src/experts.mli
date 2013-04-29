@@ -151,8 +151,8 @@ val pp_gc : Format.formatter -> gnd_convergent -> unit
 
 (** {3 JSON encoding} *)
 
-val gc_to_json : gnd_convergent -> json
-val gc_of_json : ctx:context -> json -> gnd_convergent
+val gc_to_json : gnd_convergent -> Json.t
+val gc_of_json : ctx:context -> Json.t -> gnd_convergent
 
 (** {2 Some builtin theories} *)
 

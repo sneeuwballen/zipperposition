@@ -303,21 +303,21 @@ let pp_lits formatter lits =
 
 let to_json lit = match lit with
   | Equation (l, r, sign, _) ->
-    `List [T.to_json l; T.to_json r; `Bool sign]
+    Json.List [T.to_json l; T.to_json r; Json.Bool sign]
 
 let of_json ~ord json =
   match json with
-  | `List [l; r; `Bool sign] ->
+  | Json.List [l; r; Json.Bool sign] ->
     let l = T.of_json l
     and r = T.of_json r in
     mk_lit ~ord l r sign
-  | _ -> raise (Json.Util.Type_error ("expected literal", json))
+  | _ -> Json.type_error "expected literal" json
 
 let lits_to_json lits =
   let items = List.map to_json (Array.to_list lits) in
-  `List items
+  Json.List items
 
 let lits_of_json ~ord json =
-  let l = Json.Util.to_list json in
+  let l = Json.to_list json in
   let lits = List.map (of_json ~ord) l in
   Array.of_list lits

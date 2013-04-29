@@ -520,45 +520,43 @@ let merge_signatures s1 s2 =
 
 (** {2 Conversions and printing} *)
 
-module Json = Yojson.Basic
-
-let to_json s : Json.json = match s.symb_val with
-  | Const s -> `String s
-  | Distinct s -> `List [`String "distinct"; `String s]
-  | Num n -> `List [`String "num"; `String (Num.string_of_num n)]
-  | Real f -> `List [`String "real"; `String (string_of_float f)]
+let to_json s = match s.symb_val with
+  | Const s -> Json.String s
+  | Distinct s -> Json.List [Json.String "distinct"; Json.String s]
+  | Num n -> Json.List [Json.String "num"; Json.String (Num.string_of_num n)]
+  | Real f -> Json.List [Json.String "real"; Json.String (string_of_float f)]
 
 let of_json json = match json with
-  | `String s -> mk_symbol s
-  | `List [`String "distinct"; `String s] -> mk_distinct s
-  | `List [`String "num"; `String n] -> mk_num (Num.num_of_string n)
-  | `List [`String "real"; `String f] -> mk_real (float_of_string f)
-  | _ -> raise (Json.Util.Type_error ("expected symbol", json))
+  | Json.String s -> mk_symbol s
+  | Json.List [Json.String "distinct"; Json.String s] -> mk_distinct s
+  | Json.List [Json.String "num"; Json.String n] -> mk_num (Num.num_of_string n)
+  | Json.List [Json.String "real"; Json.String f] -> mk_real (float_of_string f)
+  | _ -> Json.type_error "expected symbol" json
 
 let rec sort_to_json = function
-  | Sort s -> `String s
-  | Fun (s,l) -> `List (sort_to_json s :: List.map sort_to_json l)
+  | Sort s -> Json.String s
+  | Fun (s,l) -> Json.List (sort_to_json s :: List.map sort_to_json l)
 
 let rec sort_of_json json = match json with
-  | `String s -> mk_sort s
-  | `List (s::l) -> (sort_of_json s) <== (List.map sort_of_json l)
-  | _ -> raise (Json.Util.Type_error ("expected sort", json))
+  | Json.String s -> mk_sort s
+  | Json.List (s::l) -> (sort_of_json s) <== (List.map sort_of_json l)
+  | _ -> Json.type_error "expected sort" json
 
 let sig_to_json signature =
   let items = Sequence.map
-    (fun (s,sort) -> `List [to_json s; sort_to_json sort])
+    (fun (s,sort) -> Json.List [to_json s; sort_to_json sort])
     (sig_to_seq signature)
   in
-  `List (Sequence.to_list items)
+  Json.mk_list_seq items
 
 let sig_of_json ?(signature=empty_signature) json =
   let pair_of_json json =
     match json with
-    | `List [a;b] ->
+    | Json.List [a;b] ->
       (of_json a, sort_of_json b)
     | _ -> let msg = "expected signature pair" in
-         raise (Json.Util.Type_error (msg, json))
+          Json.type_error msg json
   in
-  let l = Json.Util.to_list json in
+  let l = Json.to_list json in
   let seq = Sequence.map pair_of_json (Sequence.of_list l) in
   sig_of_seq ~signature seq

@@ -237,19 +237,19 @@ let of_seq ?(recursive=true) seq =
 let to_json subst =
   let items = Sequence.map
     (fun ((v, o_v), (t, o_t)) ->
-      `List [T.to_json v; `Int o_v; T.to_json v; `Int o_t])
+      Json.mk_list [T.to_json v; Json.Int o_v; T.to_json v; Json.Int o_t])
     (to_seq subst)
   in
-  `List (Sequence.to_list items)
+  Json.mk_list_seq items
 
 let of_json ?(recursive=true) json =
-  let l = Json.Util.to_list json in
+  let l = Json.to_list json in
   let seq = Sequence.map
     (fun json -> match json with
-      | `List [v; `Int o_v; t; `Int o_t] ->
+      | Json.List [v; Json.Int o_v; t; Json.Int o_t] ->
         let v = T.of_json v in
         let t = T.of_json t in
         ((v, o_v), (t, o_t))
-      | _ -> raise (Json.Util.Type_error ("expected subst", json)))
+      | _ -> raise (Json.Type_error ("expected subst", json)))
     (Sequence.of_list l) in
   of_seq ~recursive seq

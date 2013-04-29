@@ -267,11 +267,11 @@ val pp_term_debug :                                 (** print term in a nice syn
 
 (** {2 JSON} *)
 
-val to_json : term -> json
-val of_json : json -> term
+val to_json : term -> Json.t
+val of_json : Json.t -> term
 
-val varlist_to_json : varlist -> json
-val varlist_of_json : json -> varlist
+val varlist_to_json : varlist -> Json.t
+val varlist_of_json : Json.t -> varlist
 
 (** {2 Skolem terms} *)
 

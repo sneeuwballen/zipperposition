@@ -111,21 +111,21 @@ let print_stats ~env =
 let print_json_stats ~env =
   let open Sequence.Infix in
   let encode_hashcons (x1,x2,x3,x4,x5,x6) =
-    `List [`Int x1; `Int x2; `Int x3; `Int x4; `Int x5; `Int x6] in
+    Json.List [Json.Int x1; Json.Int x2; Json.Int x3; Json.Int x4; Json.Int x5; Json.Int x6] in
   let theories = match (Env.get_meta ~env) with None -> []
     | Some meta -> Meta.Prover.theories meta
       |> Sequence.map (fun th -> Utils.sprintf "%a" Meta.Prover.pp_theory th)
-      |> Sequence.map (fun x -> `String x) |> Sequence.to_list in
+      |> Sequence.map (fun x -> Json.String x) |> Sequence.to_list in
   let experts = Experts.Set.size (Env.get_experts ~env) in
-  let (o : json) =
-    `Assoc [
+  let o =
+    Json.Assoc [
       "terms", encode_hashcons (T.stats ());
       "clauses", encode_hashcons (C.stats ());
-      "theories", `List theories;
-      "experts", `Int experts;
+      "theories", Json.List theories;
+      "experts", Json.Int experts;
     ]
   in
-  Utils.debug 0 "%% json_stats: %s" (Yojson.Basic.to_string o)
+  Utils.debug 0 "%% json_stats: %s" (Json.to_string o)
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =

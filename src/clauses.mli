@@ -271,11 +271,11 @@ val pp_clause_debug : pprinter_clause                   (** nice unicode syntax 
 
 val pp_set : Format.formatter -> CSet.t -> unit
 
-val compact_to_json : compact_clause -> json
-val compact_of_json : ord:ordering -> json -> compact_clause
+val compact_to_json : compact_clause -> Json.t
+val compact_of_json : ord:ordering -> Json.t -> compact_clause
 
-val to_json : hclause -> json
-val of_json : ctx:context -> json -> hclause
+val to_json : hclause -> Json.t
+val of_json : ctx:context -> Json.t -> hclause
 
-val set_to_json : CSet.t -> json
-val set_of_json : ctx:context -> CSet.t -> json -> CSet.t
+val set_to_json : CSet.t -> Json.t
+val set_of_json : ctx:context -> CSet.t -> Json.t -> CSet.t

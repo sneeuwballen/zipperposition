@@ -80,8 +80,8 @@ val lits_to_seq : literal array -> (term * term * bool) Sequence.t
 val pp_literal : Format.formatter -> literal -> unit
 val pp_lits : Format.formatter -> literal array -> unit
 
-val to_json : literal -> json
-val of_json : ord:ordering -> json -> literal
+val to_json : literal -> Json.t
+val of_json : ord:ordering -> Json.t -> literal
 
-val lits_to_json : literal array -> json
-val lits_of_json : ord:ordering -> json -> literal array
+val lits_to_json : literal array -> Json.t
+val lits_of_json : ord:ordering -> Json.t -> literal array
