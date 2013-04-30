@@ -61,11 +61,6 @@ val combine : t -> t -> t
   (** Combine two experts into a new one, that works on
       the combination of their theories, assuming they are compatible. *)
 
-val more_specific : t -> t -> bool
-  (** [expert_more_specific e1 e2] returns true if [e1] decides a theory
-      whose symbols are included in the theory of [e2]. Heuristically, that
-      means that we can ignore [e1] and focus on [e2] *)
-
 val canonize : t -> term -> term
   (** Get the normal form of the term *)
 

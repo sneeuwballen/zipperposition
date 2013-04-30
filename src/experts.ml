@@ -67,6 +67,7 @@ let update_ctx e ~ctx = e.expert_update_ctx ctx
     are compatibles: check whether they have no symbol in common. *)
 let compatible e1 e2 =
   e1.expert_ctx == e2.expert_ctx &&
+  compatible_ord e1 ~ord:e1.expert_ctx.ctx_ord = compatible_ord e2 ~ord:e2.expert_ctx.ctx_ord &&
   SSet.is_empty (SSet.inter e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
@@ -82,7 +83,7 @@ let rec combine e1 e2 =
     if t == t' then t' else nf t'
   and expert_equal t1 t2 =
     let t1' = nf t1 and t2' = nf t2 in
-    t1' == t2' || e1.expert_equal t1' t2 || e2.expert_equal t1' t2'
+    t1' == t2' || e1.expert_equal t1' t2' || e2.expert_equal t1' t2'
   in
   { expert_name = Utils.sprintf "(%s)_U_(%s)" e1.expert_name e2.expert_name;
     expert_descr =
@@ -97,23 +98,6 @@ let rec combine e1 e2 =
     expert_ctx = e1.expert_ctx;
     expert_solve = None;
   }
-
-(* TODO also check that ordering constraint of e2 is less constraining than
-   the one of e1 (at least in given ctx) *)
-
-(** [expert_more_specific e1 e2] returns true if [e1] decides a theory
-    whose symbols are included in the theory of [e2]. Heuristically, that
-    means that we can ignore [e1] and focus on [e2] *)
-let more_specific e1 e2 =
-  let res =
-    e1.expert_ctx == e2.expert_ctx &&
-    not (SSet.is_empty e1.expert_sig) &&  (* empty sig == universal *)
-    SSet.subset e1.expert_sig e2.expert_sig &&
-    not (SSet.equal e1.expert_sig e2.expert_sig)
-  in
-  (if res then Utils.debug 1 "%% expert %s more specific than %s"
-    e1.expert_name e2.expert_name);
-  res
 
 (** Get the normal form of the term *)
 let canonize expert t = expert.expert_canonize t
@@ -206,7 +190,8 @@ module Set = struct
   (* TODO investigate possible bug: some experts are disabled? *)
 
   let add_list set experts =
-    (* traverse [right], trying to find one that is compatible with e *)
+    (* traverse [right], trying to find one that is compatible with [e].
+      [left] contains experts that have been already traversed. *)
     let rec add left right e =
       match right with
       | [] -> e::left (* add the expert *)
@@ -222,18 +207,15 @@ module Set = struct
       (fun e -> update_ctx ~ctx:set.ctx e) experts in
     List.fold_left
       (fun set e ->
-        if List.exists (fun e' -> more_specific e e') set.active
-        || not (compatible_ord e ~ord:set.ctx.ctx_ord)
-          then (* check whether [e] is more specific than some active expert *)
+        if not (compatible_ord e ~ord:set.ctx.ctx_ord)
+          then (* [e] is disabled, not compatible with [ctx] *)
+            let _ = Utils.debug 2 "%% expert %a disabled" pp_expert e in
             {set with inactive = e :: set.inactive; }
           else
-            (* move experts more specific than [e] from active to inactive *)
-            let disable, keep = List.partition
-              (fun e' -> more_specific e' e) set.active in
-            let inactive = disable @ set.inactive in
             (* add [e] to the active experts *)
-            let active = add [] keep e in
-            {set with active; inactive; })
+            let _ = Utils.debug 2 "%% expert %a enabled" pp_expert e in
+            let active = add [] set.active e in
+            {set with active; })
       set experts
 
   let add set e = add_list set [e]
@@ -259,14 +241,16 @@ module Set = struct
 
   let is_redundant set hc =
     List.exists
-      (fun e -> compatible_ord e ~ord:e.expert_ctx.ctx_ord && is_redundant e hc)
+      (fun e ->
+        assert (compatible_ord e ~ord:e.expert_ctx.ctx_ord);
+        is_redundant e hc)
       set.active
 
   let simplify set hc =
     List.fold_left
       (fun hc e ->
-        if compatible_ord e ~ord:e.expert_ctx.ctx_ord
-          then simplify e hc else hc)
+        assert (compatible_ord e ~ord:e.expert_ctx.ctx_ord);
+        simplify e hc)
       hc set.active
 
   let pp formatter set =
