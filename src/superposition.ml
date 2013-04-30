@@ -475,7 +475,7 @@ let infer_split hc =
  * simplifications
  * ---------------------------------------------------------------------- *)
 
-exception RewriteInto of term
+exception RewriteInto of term * substitution
 
 (** Compute normal form of term w.r.t active set. Clauses used to
     rewrite are added to the clauses hashset.
@@ -495,43 +495,45 @@ let demod_nf ?(restrict=false) (simpl_set : PS.simpl_set) clauses t =
         (* find equations l=r that match subterm *)
         try
           simpl_set#idx_simpl#retrieve ~sign:true 1 (t,0) ()
-            (fun () l r unit_hclause subst ->
+            (fun () (l,_) (r,_) unit_hclause subst ->
               (* r is the term subterm is going to be rewritten into *)
               assert (C.is_unit_clause unit_hclause);
-              let new_l = S.apply_subst subst l
-              and new_r = S.apply_subst subst r in
               if (not restrict || not (S.is_renaming subst))
-              && (oriented_hclause unit_hclause || ord.ord_compare new_l new_r = Gt)
+              && (oriented_hclause unit_hclause ||
+                 ord.ord_compare (S.apply_subst subst (l,1)) (S.apply_subst subst (r,1)) = Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
-                  assert (ord.ord_compare new_l new_r = Gt);
                   clauses := unit_hclause :: !clauses;
                   incr_stat stat_demodulate_step;
-                  raise (RewriteInto new_r)
+                  raise (RewriteInto (r, subst))
                 end);
           t (* not found any match, normal form found *)
-        with RewriteInto t' ->
-          traverse ~restrict t' (* done one rewriting step, continue *)
+        with RewriteInto (t', subst) ->
+          traverse ~restrict subst t' 1 (* done one rewriting step, continue *)
       end
-  (* rewrite innermost-leftmost *)
-  and traverse ~restrict t =
+  (* rewrite innermost-leftmost of [subst(t,offset)]. The initial offset is
+     0, but then we traverse terms in which variables are really the variables
+     of the RHS of a previously applied rule (in context 1); all those
+     variables are bound to terms in context 0 *)
+  and traverse ~restrict subst t offset =
     match t.term with
-    | Var _ | BoundVar _ -> t
+    | Var _ -> S.apply_subst subst (t, offset)
+    | BoundVar _ -> t
     | Bind (s, a_sort, t') ->
-      let t'' = traverse ~restrict:false t' in
+      let t'' = traverse ~restrict subst t' offset in
       let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
       (* rewrite term at root *)
       normal_form ~restrict new_t
     | Node (s, l) ->
       (* rewrite subterms *)
-      let l' = List.map (traverse ~restrict:false) l in
+      let l' = List.map (fun t' -> traverse ~restrict:false subst t' offset) l in
       let t' = if List.for_all2 (==) l l'
         then t
         else T.mk_node s t.sort l' in
       (* rewrite term at root *)
       normal_form ~restrict t'
   in
-  traverse ~restrict t
+  traverse ~restrict S.id_subst t 0
 
 (** Demodulate the clause, with restrictions on which terms to rewrite *)
 let demodulate (simpl_set : PS.simpl_set) c =
@@ -566,11 +568,10 @@ let demodulate (simpl_set : PS.simpl_set) c =
   (* demodulate every literal *)
   let lits = Array.mapi demod_lit c.hclits in
   if !clauses = []
-    then begin (* no rewriting performed *)
-      assert (Utils.array_forall2 Lits.eq_com c.hclits lits);
-      Utils.exit_prof prof_demodulate;
+    then (* no rewriting performed *)
+      let _ = Utils.exit_prof prof_demodulate in
       c
-    end else begin  (* construct new clause *)
+    else begin  (* construct new clause *)
       let proof c' = Proof (c', "demod", c.hcproof :: List.map (fun hc -> hc.hcproof) !clauses) in
       let parents = c :: c.hcparents in
       let new_hc = C.mk_hclause_a ~parents ~ctx lits proof in
