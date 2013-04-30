@@ -236,20 +236,20 @@ module TRS = struct
 
   (** Compute normal form of the term, and set its binding to the normal form *)
   let rewrite trs t = 
-    (* compute normal form of [subst(t, 1)] *)
-    let rec compute_nf subst t =
+    (* compute normal form of [subst(t, offset)] *)
+    let rec compute_nf subst t offset =
       match t.term with
       | Bind (s, a_sort, t') ->
-        let t'' = compute_nf subst t' in
+        let t'' = compute_nf subst t' offset in
         let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
         reduce_at_root new_t
       | Node (hd, l) ->
         (* rewrite subterms first *)
-        let l' = List.map (fun t' -> compute_nf subst t') l in
+        let l' = List.map (fun t' -> compute_nf subst t' offset) l in
         let t' = T.mk_node ~old:t hd t.sort l' in
         (* rewrite at root *)
         reduce_at_root t'
-      | Var _ -> S.apply_subst subst (t, 1)  (* normal form in subst *)
+      | Var _ -> S.apply_subst subst (t, offset)  (* normal form in subst *)
       | BoundVar _ -> t
     (* assuming subterms of [t] are in normal form, reduce the term *)
     and reduce_at_root t =
@@ -257,13 +257,13 @@ module TRS = struct
         DT.iter_match (trs.index,1) (t,0) rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst)) ->
-        compute_nf subst t'  (* rewritten into subst(t',1), continue *)
+        compute_nf subst t' 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
     and rewrite_handler (l,o) r subst =
       let t' = r in
       raise (RewrittenIn (t', subst))
     in
-    let t' = compute_nf S.id_subst t in
+    let t' = compute_nf S.id_subst t 0 in
     t'
 
   let pp_trs_index formatter trs = DT.pp_term_tree formatter trs.index
