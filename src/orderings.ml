@@ -333,7 +333,7 @@ let rpo6 (prec : precedence) : ordering =
       assert (check_precedence prec prec');
       mk_ord prec'
     in
-    { ord_name = "kbo";
+    { ord_name = "rpo6";
       ord_compare;
       ord_clear_cache = (fun () -> T.T2Cache.clear cache);
       ord_precedence = prec;
