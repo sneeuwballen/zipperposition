@@ -511,7 +511,7 @@ let demod_nf ?(restrict=false) (simpl_set : PS.simpl_set) clauses t =
                 end);
           t (* not found any match, normal form found *)
         with RewriteInto t' ->
-          normal_form ~restrict t' (* done one rewriting step, continue *)
+          traverse ~restrict t' (* done one rewriting step, continue *)
       end
   (* rewrite innermost-leftmost *)
   and traverse ~restrict t =
@@ -525,7 +525,9 @@ let demod_nf ?(restrict=false) (simpl_set : PS.simpl_set) clauses t =
     | Node (s, l) ->
       (* rewrite subterms *)
       let l' = List.map (traverse ~restrict:false) l in
-      let t' = if List.for_all2 (==) l l' then t else T.mk_node s t.sort l' in
+      let t' = if List.for_all2 (==) l l'
+        then t
+        else T.mk_node s t.sort l' in
       (* rewrite term at root *)
       normal_form ~restrict t'
   in
