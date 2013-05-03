@@ -277,6 +277,8 @@ type condition =
   | LessZero of term  (* t < 0 *)
   | BiggerZero of term
 
+(* TODO: use is_int as a constraint rather than (to_int(to_rat(...)) ? *)
+
 type elim_result =
   | ElimOk of term * term * condition list  (* a, b, conditions *)
   | ElimFail
@@ -371,21 +373,22 @@ let rebuild ?(rule="arith") ?(conditions=[]) ?i hc bindings =
   new_clause
 
 (** Make [e1] <= [e2], please. *)
-let mk_smaller_eq hc i e1 e2 =
+let rec mk_smaller_eq ?(conds=[]) hc i e1 e2 =
   let vars = T.vars_list [e1; e2] in
   List.fold_left
     (fun acc v ->  (* eliminate [v] *)
       match elim_var ~var:v e1, elim_var ~var:v e2 with
-      | ElimOk (a1, _, _), ElimOk (a2, _, _)
+      | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2)
         when is_zero (arith_canonize (minus a1 a2)) ->
-        acc  (* impossible constraint *)
+        (* solve ax + b1 <= ax + b2 --> solve b1 <= b2 *)
+        (mk_smaller_eq ~conds:(conds1 @ conds2 @ conds) hc i b1 b2) @ acc  
       | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2) ->
         (* a1 x + b1 <= a2 x + b2 ---> 
            x <= or >= (b2 - b1)/(a1 - a2) --->
            x = prev ((b2 - b1)/(a1 - a2)) if a1-a2 > 0
            x = next ((b2 - b1)/(a1 - a2)) if a1-a2 < 0 *)
         (* a1 - a2 > 0 *)
-        (let conditions = (BiggerZero (minus a1 a2)) :: conds1 @ conds2 in
+        (let conditions = (BiggerZero (minus a1 a2)) :: conds1 @ conds2 @ conds in
         let bindings =
           if e1.sort == int_
           then [v, prev (to_int (over (minus b2 b1) (minus a1 a2)))]
@@ -405,18 +408,19 @@ let mk_smaller_eq hc i e1 e2 =
     [] vars
 
 (** Would you be so kind as to make [e1] = [e2]? *)
-let mk_eq hc i e1 e2 =
+let rec mk_eq ?(conds=[]) hc i e1 e2 =
   let vars = T.vars_list [e1; e2] in
   List.fold_left
     (fun acc v ->  (* eliminate [v] *)
       match elim_var ~var:v e1, elim_var ~var:v e2 with
-      | ElimOk (a1, _, _), ElimOk (a2, _, _)
+      | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2)
         when is_zero (arith_canonize (minus a1 a2)) ->
-        acc  (* impossible constraint *)
+        (* solve ax + b1 = ax + b2 --> solve b1 = b2 *)
+        (mk_eq ~conds:(conds1 @ conds2 @ conds) hc i b1 b2) @ acc
       | ElimOk (a1, b1, conds1), ElimOk (a2, b2, conds2) ->
         (* a1 x + b1 = a2 x + b2 ---> 
            x = (b2 - b1)/(a1 - a2) *)
-        let conditions = (NeqZero (minus a1 a2)) :: conds1 @ conds2 in
+        let conditions = (NeqZero (minus a1 a2)) :: conds1 @ conds2 @ conds in
         let bindings, i =
           if e1.sort == int_  (* not sure it will be right *)
             then [v, to_int (over (minus b2 b1) (minus a1 a2))], None
