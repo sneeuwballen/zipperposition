@@ -201,67 +201,50 @@ and pp_fact formatter fact =
       gc.gc_ord (Utils.pp_list !T.pp_term#pp) gc.gc_prec
       (Utils.pp_list ~sep:" and " !T.pp_term#pp) args
 
-let rec definition_to_json definition : json =
-  match definition with
-  | Named (name, pat) ->
-    `List [`String "named"; `String name; Pattern.to_json pat]
-  | Theory ((name, args), premises) ->
-    `List (`String "theory" :: `String name :: `List (List.map T.to_json args) ::
-          List.map premise_to_json premises)
-  | Lemma ((pat, args), premises) ->
-    `List (`String "lemma" :: `List (Pattern.to_json pat :: List.map T.to_json args) ::
-          List.map premise_to_json premises)
-  | GC (gc, premises) ->
-      `Assoc ["gc", `Bool true;
-              "theory", `String gc.gc_theory;
-              "vars", `List (List.map T.to_json gc.gc_vars);
-              "ord", `String gc.gc_ord;
-              "prec", `List (List.map T.to_json gc.gc_prec);
-              "premises", `List (List.map premise_to_json premises);
-              "eqns", `List (List.map
-                (fun (pat, args) -> `List (Pattern.to_json pat :: List.map T.to_json args))
-                gc.gc_eqns);]
-and premise_to_json (premise : premise) : json =
-  match premise with
-  | IfNamed (name, args) ->
-    `List (`String "named" :: `String name :: List.map T.to_json args)
-  | IfTheory (name, args) ->
-    `List (`String "theory" :: `String name :: List.map T.to_json args)
-  | IfPattern (pat, args) ->
-    `List (`String "pattern" :: Pattern.to_json pat :: List.map T.to_json args)
-
-let rec definition_of_json (json : json) : definition =
-  match json with
-  | `List [`String "named"; `String name; pat] ->
-    Named (name, Pattern.of_json pat)
-  | `List (`String "theory" :: `String name :: `List args :: premises) ->
-    Theory ((name, List.map T.of_json args), List.map premise_of_json premises)
-  | `List (`String "lemma" :: `List (pat :: args) :: premises) ->
-    Lemma ((Pattern.of_json pat, List.map T.of_json args),
-           List.map premise_of_json premises)
-  | `Assoc l when List.mem_assoc "gc" l ->
-    let gc_vars = List.map T.of_json (Json.Util.to_list (List.assoc "vars" l)) in
-    let gc_theory = Json.Util.to_string (List.assoc "theory" l) in
-    let gc_ord = Json.Util.to_string (List.assoc "ord" l) in
-    let gc_prec = List.map T.of_json (Json.Util.to_list (List.assoc "prec" l)) in
-    let premises = List.map premise_of_json
-      (Json.Util.to_list (List.assoc "premises" l)) in
-    let gc_eqns = List.map
-      (function
-        | `List (pat::args) -> (Pattern.of_json pat, List.map T.of_json args)
-        | json -> raise (Json.Util.Type_error ("expected (pattern,terms)", json)))
-      (Json.Util.to_list (List.assoc "eqns" l)) in
-    GC ({ gc_ord; gc_theory; gc_vars; gc_prec; gc_eqns; }, premises)
-  | _ -> raise (Json.Util.Type_error ("expected KB.definition", json))
-and premise_of_json (json : json) : premise =
-  match json with
-  | `List (`String "named" :: `String name :: args) ->
-    IfNamed (name, List.map T.of_json args)
-  | `List (`String "theory" :: `String name :: args) ->
-    IfTheory (name, List.map T.of_json args)
-  | `List (`String "pattern" :: pat :: args) ->
-    IfPattern (Pattern.of_json pat, List.map T.of_json args)
-  | _ -> raise (Json.Util.Type_error ("expected KB.premise", json))
+let bij_definition =
+  let open Bij in
+  (* Helpers *)
+  let s_args = pair string_ (list_ T.bij) in
+  let p_args = pair Pattern.bij (list_ T.bij) in
+  (* bijection for premises *)
+  let bij_premise =
+    switch
+      ~inject:(function
+        | IfNamed (s, args) -> 'n', BranchTo (s_args, (s, args))
+        | IfTheory (s, args) -> 't', BranchTo (s_args, (s, args))
+        | IfPattern (p, args) -> 'p', BranchTo (p_args, (p, args)))
+      ~extract:(function
+        | 'n' -> BranchFrom (s_args, fun (s, args) -> IfNamed (s, args))
+        | 't' -> BranchFrom (s_args, fun (s, args) -> IfTheory (s, args))
+        | 'p' -> BranchFrom (p_args, fun (p, args) -> IfPattern (p, args))
+        | _ -> raise (DecodingError "expected premise"))
+  (* bijection for GC spec *)
+  and bij_gc_spec =
+    map
+      ~inject:(fun spec ->
+        spec.gc_vars, spec.gc_ord, spec.gc_theory, spec.gc_prec, spec.gc_eqns)
+      ~extract:(fun
+        (gc_vars, gc_ord, gc_theory, gc_prec, gc_eqns) ->
+        { gc_vars; gc_ord; gc_theory; gc_prec; gc_eqns; })
+      (quint T.bij_varlist string_ string_ T.bij_varlist
+        (list_ (pair Pattern.bij (list_ T.bij))))
+  in
+  (* bijection for definition *)
+  let bij_theory = triple string_ (list_ T.bij) (list_ bij_premise) in
+  let bij_lemma = triple Pattern.bij (list_ T.bij) (list_ bij_premise) in
+  let bij_gc = pair bij_gc_spec (list_ bij_premise) in
+  switch
+    ~inject:(function
+      | Named (s, p) -> 'n', BranchTo (pair string_ Pattern.bij, (s,p))
+      | Theory ((s, args), premises) -> 't', BranchTo (bij_theory, (s, args, premises))
+      | Lemma ((p, args), premises) -> 'l', BranchTo (bij_lemma, (p, args, premises))
+      | GC (spec, premises) -> 'g', BranchTo (bij_gc, (spec, premises)))
+    ~extract:(function
+      | 'n' -> BranchFrom (pair string_ Pattern.bij, fun (s,p) -> Named (s,p))
+      | 't' -> BranchFrom (bij_theory, fun (s,args,premises) -> Theory ((s, args), premises))
+      | 'l' -> BranchFrom (bij_lemma, fun (p,args,premises) -> Lemma ((p, args), premises))
+      | 'g' -> BranchFrom (bij_gc, fun (spec,premises) -> GC (spec, premises))
+      | _ -> raise (DecodingError "expected definition"))
 
 (** {2 Datalog atoms} *)
 
@@ -292,17 +275,21 @@ let rec pp_atom formatter a = match a with
       (Utils.pp_list !T.pp_term#pp) vars
   | MTerm t -> T.pp_term_debug#pp formatter t
 
-let rec atom_to_json a : json = match a with
-  | MString s -> `String s
-  | MPattern p -> `Assoc ["pattern", Pattern.to_json p]
-  | MPatternVars (p, vars) -> assert false (* TODO *)
-  | MTerm t -> `Assoc ["term", T.to_json t]
-
-let rec atom_of_json (json : json) : atom = match json with
-  | `String s -> MString s
-  | `Assoc ["pattern", p] -> MPattern (Pattern.of_json p)
-  | `Assoc ["term", t] -> MTerm (T.of_json t)
-  | _ -> raise (Json.Util.Type_error ("expected atom", json))
+let bij_atom =
+  let open Bij in
+  let bij_pvars = pair Pattern.bij (list_ T.bij) in
+  switch
+    ~inject:(function
+    | MString s -> 's', BranchTo (string_, s)
+    | MPattern p -> 'p', BranchTo (Pattern.bij, p)
+    | MPatternVars (p, vars) -> 'v', BranchTo (bij_pvars, (p, vars))
+    | MTerm t -> 't', BranchTo (T.bij, t))
+    ~extract:(function
+    | 's' -> BranchFrom (string_, fun s -> MString s)
+    | 'p' -> BranchFrom (Pattern.bij, fun p -> MPattern p)
+    | 'v' -> BranchFrom (bij_pvars, fun (p,vars) -> MPatternVars (p,vars))
+    | 't' -> BranchFrom (T.bij, fun t -> MTerm t)
+    | _ -> raise (DecodingError "expected atom"))
 
 (** The Datalog prover that reasons over atoms. *)
 module Logic = Datalog.Logic.Make(struct
@@ -310,7 +297,7 @@ module Logic = Datalog.Logic.Make(struct
   let equal = eq_atom
   let hash = hash_atom
   let to_string a = Utils.sprintf "%a" pp_atom a
-  let of_string s = atom_of_json (Json.from_string s)  (* should not happen *)
+  let of_string s = Bij.SexpStr.of_string ~bij:bij_atom s  (* should not happen *)
 end)
   
 (** {2 Conversion to Datalog} *)
@@ -537,40 +524,42 @@ let pp formatter kb =
   Format.fprintf formatter "@[<v2>KB:@;%a@]"
     (Sequence.pp_seq ~sep:"" pp_definition) (to_seq kb)
 
-let to_json kb : json Stream.t =
-  let definitions = Sequence.map definition_to_json (to_seq kb) in
-  Sequence.to_stream definitions
-
-let of_json kb (json : json Stream.t) : t =
-  let seq = Sequence.of_stream json in
-  let seq = Sequence.map definition_of_json seq in
-  of_seq kb seq
+let bij =
+  let open Bij in
+  map
+    ~inject:(fun kb -> Sequence.to_list (DefinitionSet.to_seq kb))
+    ~extract:(fun l -> DefinitionSet.of_seq (Sequence.of_list l))
+    (list_ bij_definition)
 
 (** {2 Saving/restoring KB from disk} *)
 
+let format_version = "simple"
+
 let save ~file kb =
+  let bij = Bij.with_version format_version bij in
   try
-    let out = Gzip.open_out file in
-    let data = Json.stream_to_string (to_json kb) in
-    Utils.debug 1 "%% %d bytes for storing the raw KB" (String.length data);
-    Gzip.output out data 0 (String.length data);
+    let oc = open_out file in
+    Bij.SexpChan.encode ~bij oc kb;
     Utils.debug 1 "%% wrote KB";
-    Gzip.close_out out
-  with Gzip.Error e | Zlib.Error (e, _) ->
-    Utils.debug 0 "%% error trying to write KB to %s: %s" file e;
-    ()
+    close_out oc
+  with Unix.Unix_error (e, _, _) ->
+    Utils.debug 0 "%% error trying to write KB to %s: %s" file (Unix.error_message e);
+  | Bij.EncodingError msg ->
+    Utils.debug 0 "%% error trying to encode KB to %s: %s" file msg
 
 let restore ~file kb =
+  let bij = Bij.with_version format_version bij in
   try
-    let input = Gzip.open_in file in
-    (* parse JSON steam *)
-    let lexbuf = Lexing.from_function (fun s len -> Gzip.input input s 0 len) in
-    let lexer = Json.init_lexer () in
-    let stream : json Stream.t = Json.stream_from_lexbuf lexer lexbuf in
-    let kb = of_json kb stream in
-    Gzip.close_in input;
+    let ic = open_in file in
+    let kb' = Bij.SexpChan.decode ~bij (Bij.SourceChan.create ic) in
+    (* union *)
+    let kb = DefinitionSet.union kb' kb in
+    close_in ic;
     kb
-  with Gzip.Error e | Zlib.Error (e, _) ->
-    Utils.debug 0 "%% error trying to read KB from %s: %s" file e;
+  with Unix.Unix_error (e, _, _) ->
+    Utils.debug 0 "%% error trying to read KB from %s: %s" file (Unix.error_message e);
+    kb
+  | Bij.DecodingError msg ->
+    Utils.debug 0 "%% error trying to read KB from %s: %s" file msg;
     kb
     

@@ -55,13 +55,14 @@ val depth : (int * 'a) proof -> int
 val to_graph : compact_clause proof -> (compact_clause proof, string) Graph.t
   (** Get a graph of the proof *)
 
-val to_json : ((int*'a) -> json) -> (int*'a) proof -> json Sequence.t
+val bij : ord:ordering -> compact_clause proof Bij.t
+  (** Bijection. A global table of proof steps is maintained! Use a fresh
+      bijection to get a fresh proof steps table. *)
 
 (** {2 Pretty printer for proofs} *)
 
 val pp_proof_tstp : Format.formatter -> compact_clause proof -> unit
 val pp_proof_debug : Format.formatter -> compact_clause proof -> unit
-val pp_proof_json : Format.formatter -> compact_clause proof -> unit
 val pp_proof : string -> Format.formatter -> compact_clause proof -> unit
   (** Prints the proof according to the given input switch *)
 

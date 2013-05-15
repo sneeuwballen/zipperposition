@@ -50,8 +50,7 @@ module Pattern : sig
 
   val pp_pattern : Format.formatter -> t -> unit
   val pp_pattern_p : Format.formatter -> t parametrized -> unit
-  val to_json : t -> json
-  val of_json : json -> t
+  val bij : t Bij.t
 
   (** {2 Conversion pattern <-> clause, and matching} *)
 
@@ -152,8 +151,7 @@ module KB : sig
   val pp_premise : Format.formatter -> premise -> unit
   val pp_fact : Format.formatter -> fact -> unit
 
-  val definition_to_json : definition -> json
-  val definition_of_json : json -> definition
+  val bij_definition : definition Bij.t
 
   (** {2 Datalog atoms} *)
 
@@ -167,8 +165,7 @@ module KB : sig
   val hash_atom : atom -> int
 
   val pp_atom : Format.formatter -> atom -> unit
-  val atom_to_json : atom -> json
-  val atom_of_json : json -> atom
+  val bij_atom : atom Bij.t
 
   module Logic : Datalog.Logic.S with type symbol = atom
     (** The Datalog prover that reasons over atoms. *)
@@ -200,10 +197,12 @@ module KB : sig
   val of_seq : t -> definition Sequence.t -> t
 
   val pp : Format.formatter -> t -> unit
-  val to_json : t -> json Stream.t
-  val of_json : t -> json Stream.t -> t
+
+  val bij : t Bij.t
 
   (** {2 Saving/restoring from/to disk} *)
+
+  val format_version : string   (* version guard *)
 
   val save : file:string -> t -> unit
 

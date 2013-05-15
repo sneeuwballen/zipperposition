@@ -943,51 +943,31 @@ let pp_term_tstp =
 
 let pp_term = ref (pp_term_debug :> pprinter_term)
 
-(** {2 JSON} *)
+(** {2 Bijection} *)
 
-let rec to_json t =
-  match t.term with
-  | BoundVar i ->
-    `List [`String "bound"; `Int i; sort_to_json t.sort]
-  | Var i ->
-    `List [`String "var"; `Int i; sort_to_json t.sort]
-  | Bind (s, a_sort, t') ->
-    `List [`String "bind"; Symbols.to_json s;
-      sort_to_json t.sort; sort_to_json a_sort; to_json t']
-  | Node (f, l) ->
-    let l' = `List (List.map to_json l) in
-    let f' = Symbols.to_json f in
-    let sort' = Symbols.sort_to_json t.sort in
-    `List [`String "node"; f'; sort'; l']
+let bij =
+  let open Bij in
+  fix
+    (fun bij ->
+      let bij_bind () = quad Symbols.bij Symbols.bij_sort Symbols.bij_sort (bij ()) in
+      let bij_node () = triple Symbols.bij Symbols.bij_sort (list_ (bij ())) in
+      switch
+        ~inject:(fun t -> match t.term with
+        | BoundVar i -> 'd', BranchTo (pair Symbols.bij_sort int_, (t.sort, i))
+        | Var i -> 'v', BranchTo (pair bij_sort int_, (t.sort, i))
+        | Bind (s, a_sort, t') -> 'b',
+          BranchTo (bij_bind (), (s, t.sort, a_sort, t'))
+        | Node (s, l) -> 'n', BranchTo (bij_node (), (s, t.sort, l)))
+        ~extract:(function
+        | 'd' -> BranchFrom (pair bij_sort int_, fun (s,i) -> mk_bound_var i s)
+        | 'v' -> BranchFrom (pair bij_sort int_, fun (s,i) -> mk_var i s)
+        | 'b' -> BranchFrom (bij_bind (),
+          fun (s,r_sort,a_sort,t') -> mk_bind s r_sort a_sort t')
+        | 'n' -> BranchFrom (bij_node (), fun (s,sort,l) -> mk_node s sort l)
+        | _ -> raise (DecodingError "expected Term")))
 
-let of_json json =
-  let rec of_json json = 
-    match json with
-    | `List [`String "bound"; `Int i; sort] ->
-      let sort = sort_of_json sort in mk_bound_var i sort
-    | `List [`String "var"; `Int i; sort] ->
-      let sort = sort_of_json sort in mk_var i sort
-    | `List [`String "bind"; s; sort; a_sort; t'] ->
-      let s = Symbols.of_json s in
-      let sort = sort_of_json sort in
-      let a_sort = sort_of_json a_sort in
-      let t' = of_json t' in
-      mk_bind s sort a_sort t'
-    | `List [`String "node"; f; sort; `List l] ->
-      let f = Symbols.of_json f in
-      let sort = Symbols.sort_of_json sort in
-      let l = List.map of_json l in
-      mk_node f sort l
-    | _ -> let msg = "expected term" in
-      raise (Json.Util.Type_error (msg, json))
-  in
-  of_json json
 
-let varlist_to_json l =
-  `List (List.map to_json l)
-
-let varlist_of_json json =
-  List.map of_json (Json.Util.to_list json)
+let bij_varlist = Bij.list_ bij
 
 (** {2 Skolem terms} *)
 

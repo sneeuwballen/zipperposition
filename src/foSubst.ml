@@ -191,22 +191,9 @@ let of_seq ?(recursive=true) seq =
       bind ~recursive subst v t)
     id_subst seq
 
-let to_json subst =
-  let items = Sequence.map
-    (fun ((v, o_v), (t, o_t)) ->
-      `List [T.to_json v; `Int o_v; T.to_json v; `Int o_t])
-    (to_seq subst)
-  in
-  `List (Sequence.to_list items)
-
-let of_json ?(recursive=true) json =
-  let l = Json.Util.to_list json in
-  let seq = Sequence.map
-    (fun json -> match json with
-      | `List [v; `Int o_v; t; `Int o_t] ->
-        let v = T.of_json v in
-        let t = T.of_json t in
-        ((v, o_v), (t, o_t))
-      | _ -> raise (Json.Util.Type_error ("expected subst", json)))
-    (Sequence.of_list l) in
-  of_seq ~recursive seq
+let bij =
+  let open Bij in
+  map
+    ~inject:(fun s -> Sequence.to_list (to_seq s))
+    ~extract:(fun l -> of_seq (Sequence.of_list l))
+    (list_ (pair (pair Terms.bij int_) (pair Terms.bij int_)))

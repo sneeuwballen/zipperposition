@@ -252,13 +252,11 @@ val pp_term_debug :                                 (** print term in a nice syn
     sort : bool -> unit;                            (** print sorts of terms? *)
   >
 
-(** {2 JSON} *)
+(** {2 Bijection} *)
 
-val to_json : term -> json
-val of_json : json -> term
+val bij : term Bij.t
 
-val varlist_to_json : varlist -> json
-val varlist_of_json : json -> varlist
+val bij_varlist : varlist Bij.t
 
 (** {2 Skolem terms} *)
 

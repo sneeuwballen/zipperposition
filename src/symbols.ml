@@ -366,45 +366,37 @@ let merge_signatures s1 s2 =
 
 (** {2 Conversions and printing} *)
 
-module Json = Yojson.Basic
+let bij =
+  let open Bij in
+  switch
+    ~inject:(fun s -> match s.symb_val with
+      | Const s -> 's', BranchTo (string_, s)
+      | Distinct s -> 'd', BranchTo (string_, s)
+      | Num n -> 'n', BranchTo (string_, Num.string_of_num n)
+      | Real f -> 'f', BranchTo (float_, f))
+    ~extract:(fun c -> match c with
+      | 's' -> BranchFrom (string_, mk_symbol)
+      | 'd' -> BranchFrom (string_, mk_distinct)
+      | 'n' -> BranchFrom (string_, fun n -> mk_num (Num.num_of_string n))
+      | 'f' -> BranchFrom (float_, mk_real)
+      | _ -> raise (DecodingError "expected symbol"))
 
-let to_json s : Json.json = match s.symb_val with
-  | Const s -> `String s
-  | Distinct s -> `List [`String "distinct"; `String s]
-  | Num n -> `List [`String "num"; `String (Num.string_of_num n)]
-  | Real f -> `List [`String "real"; `String (string_of_float f)]
+let bij_sort =
+  let open Bij in
+  fix (fun bij ->
+    switch
+      ~inject:(function
+        | Sort s -> 's', BranchTo (string_, s)
+        | Fun (s,l) -> 'f', BranchTo (pair (bij ()) (list_ (bij ())), (s, l)))
+      ~extract:(function
+        | 's' -> BranchFrom (string_, mk_sort)
+        | 'f' -> BranchFrom (pair (bij ()) (list_ (bij ())), fun (s,l) -> s <== l)
+        | _ -> raise (DecodingError "expected sort")))
 
-let of_json json = match json with
-  | `String s -> mk_symbol s
-  | `List [`String "distinct"; `String s] -> mk_distinct s
-  | `List [`String "num"; `String n] -> mk_num (Num.num_of_string n)
-  | `List [`String "real"; `String f] -> mk_real (float_of_string f)
-  | _ -> raise (Json.Util.Type_error ("expected symbol", json))
+let bij_sig =
+  let open Bij in
+  map
+    ~inject:(fun signature -> Sequence.to_list (sig_to_seq signature))
+    ~extract:(fun l -> sig_of_seq (Sequence.of_list l))
+    (list_ (pair bij bij_sort))
 
-let rec sort_to_json = function
-  | Sort s -> `String s
-  | Fun (s,l) -> `List (sort_to_json s :: List.map sort_to_json l)
-
-let rec sort_of_json json = match json with
-  | `String s -> mk_sort s
-  | `List (s::l) -> (sort_of_json s) <== (List.map sort_of_json l)
-  | _ -> raise (Json.Util.Type_error ("expected sort", json))
-
-let sig_to_json signature =
-  let items = Sequence.map
-    (fun (s,sort) -> `List [to_json s; sort_to_json sort])
-    (sig_to_seq signature)
-  in
-  `List (Sequence.to_list items)
-
-let sig_of_json ?(signature=empty_signature) json =
-  let pair_of_json json =
-    match json with
-    | `List [a;b] ->
-      (of_json a, sort_of_json b)
-    | _ -> let msg = "expected signature pair" in
-         raise (Json.Util.Type_error (msg, json))
-  in
-  let l = Json.Util.to_list json in
-  let seq = Sequence.map pair_of_json (Sequence.of_list l) in
-  sig_of_seq ~signature seq

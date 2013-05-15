@@ -192,14 +192,9 @@ val merge_signatures : signature -> signature -> signature
 val sig_to_seq : signature -> (symbol * sort) Sequence.t
 val sig_of_seq : ?signature:signature -> (symbol * sort) Sequence.t -> signature
 
-val to_json : symbol -> Yojson.Basic.json
-val of_json : Yojson.Basic.json -> symbol
-
-val sort_to_json : sort -> Yojson.Basic.json
-val sort_of_json : Yojson.Basic.json -> sort
-
-val sig_to_json : signature -> Yojson.Basic.json
-val sig_of_json : ?signature:signature -> Yojson.Basic.json -> signature
+val bij : symbol Bij.t
+val bij_sort : sort Bij.t
+val bij_sig : signature Bij.t
 
 val pp_symbol : Format.formatter -> symbol -> unit
 val pp_sort : Format.formatter -> sort -> unit

@@ -65,12 +65,13 @@ let traverse ?(traversed=ref Ptset.empty) proof k =
     if Ptset.mem (proof_id proof) !traversed then ()
     else begin
       traversed := Ptset.add (proof_id proof) !traversed;
-      (* call [k] on the proof *)
-      k proof;
-      match proof with
+      (* traverse premises first *)
+      (match proof with
       | Axiom _ -> ()
       | Proof (_, _, l) ->
-        List.iter (fun proof' -> Queue.push proof' queue) l
+        List.iter (fun proof' -> Queue.push proof' queue) l);
+      (* call [k] on the proof *)
+      k proof;
     end
   done
 
@@ -114,25 +115,35 @@ let to_graph proof =
         Graph.add g p' rule p) l);
   g
 
-let to_json json_key proof =
-  (* how to translate the proof step *)
-  let pp_step proof = 
-    match proof with
-    | Axiom (c, filename, name) ->
-      `List [`String "axiom"; json_key c; `String filename; `String name]
-    | Proof (c, rule, l) ->
-      let premises = List.map (fun proof -> `Int (proof_id proof)) l in
-      `List [`String "proof"; json_key c; `String rule; `List premises]
+let bij ~ord =
+  let open Bij in
+  let tbl = Hashtbl.create 15 in
+  (* bijection for a step. [tbl] is used during parsing, for retrieving steps
+      by their ID. *)
+  let bij_step =
+    let bij_axiom = triple (C.bij_compact ~ord) string_ string_ in
+    let bij_proof = triple (C.bij_compact ~ord) string_ (list_ int_) in
+    switch
+      ~inject:(function
+      | Axiom (c, file, name) -> 'a', BranchTo (bij_axiom, (c,file,name))
+      | Proof (c, rule, l) -> 'p',
+        BranchTo (bij_proof, (c, rule, List.map proof_id l)))
+      ~extract:(function
+      | 'a' -> BranchFrom (bij_axiom, (fun (c,file,name) ->
+        let proof = mk_axiom c file name in
+        Hashtbl.replace tbl (proof_id proof) proof;  (* save *)
+        proof))
+      | 'p' -> BranchFrom (bij_proof, (fun (c,rule,ids) ->
+        let premises = List.map (fun i -> Hashtbl.find tbl i) ids in
+        let proof = mk_proof c rule premises in
+        Hashtbl.replace tbl (proof_id proof) proof;  (* save *)
+        proof))
+      | _ -> raise (DecodingError "expected proof step"))
   in
-  (* sequence *)
-  let seq (k : json -> unit) =
-    traverse proof
-      (fun proof ->
-        let step = `List [`Int (proof_id proof); pp_step proof] in
-        k step)
-  in Sequence.from_iter seq
-
-let rec of_json json_key json = failwith "not implemented"
+  map
+    ~inject:(fun p -> Sequence.to_list (traverse p), p)
+    ~extract:(fun (l,p) -> p)
+    (pair (list_ bij_step) bij_step)
 
 (** {2 Pretty printer for proofs} *)
 
@@ -174,19 +185,12 @@ let pp_proof_tstp formatter proof =
           (fst c) T.pp_term_tstp#pp t name status
           (Utils.pp_list ~sep:"," Format.pp_print_int) premises)
 
-let pp_proof_json formatter proof =
-  (* how to print a single element *)
-  let pp_item formatter json = Format.pp_print_string formatter (Json.to_string json) in
-  let seq = to_json C.compact_to_json proof in
-  Format.fprintf formatter "@[<hv>%a@]@;"
-    (Sequence.pp_seq pp_item) seq
-
 (** Prints the proof according to the given input switch *)
 let pp_proof switch formatter proof = match switch with
   | "none" -> Utils.debug 1 "%% proof printing disabled"
   | "tstp" -> pp_proof_tstp formatter proof
   | "debug" -> pp_proof_debug formatter proof
-  | "json" -> pp_proof_json formatter proof
+  | "json" -> failwith "printing proofs in JSON is not implemented, sorry."
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
 let print_vertex proof =

@@ -302,23 +302,16 @@ let pp_lits formatter lits =
     (fun formatter i lit -> Format.fprintf formatter "%a" pp_literal lit)
     formatter lits
 
-let to_json lit = match lit with
-  | Equation (l, r, sign, _) ->
-    `List [T.to_json l; T.to_json r; `Bool sign]
+let bij ~ord =
+  let open Bij in
+  map
+    ~inject:(fun (Equation (l,r,sign,_)) -> l,r,sign)
+    ~extract:(fun (l,r,sign) -> mk_lit ~ord l r sign)
+    (triple Terms.bij Terms.bij bool_)
 
-let of_json ~ord json =
-  match json with
-  | `List [l; r; `Bool sign] ->
-    let l = T.of_json l
-    and r = T.of_json r in
-    mk_lit ~ord l r sign
-  | _ -> raise (Json.Util.Type_error ("expected literal", json))
-
-let lits_to_json lits =
-  let items = List.map to_json (Array.to_list lits) in
-  `List items
-
-let lits_of_json ~ord json =
-  let l = Json.Util.to_list json in
-  let lits = List.map (of_json ~ord) l in
-  Array.of_list lits
+let bij_lits ~ord =
+  let open Bij in
+  map
+    ~inject:(fun a -> Array.to_list a)
+    ~extract:(fun l -> Array.of_list l)
+    (list_ (bij ~ord))
