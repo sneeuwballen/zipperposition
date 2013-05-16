@@ -17,7 +17,7 @@ TARGETS_TEST = tests/tests.native
 LIBS = datalog
 #SUBMODULES = datalog sequence
 SUBMODULES = containers
-PACKAGES = yojson zip str num
+PACKAGES = str num
 
 WITH_LIBS = $(addprefix -lib ,$(LIBS))
 WITH_PACKAGES = $(addprefix -package ,$(PACKAGES))
@@ -60,10 +60,10 @@ doc:
 	ocamlbuild $(OPTIONS) src/zipperposition.docdir/index.html
 	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
 		-I ../_build/src -I ../_build/containers -I ../_build/meta \
-		-package yojson -package datalog -dot -o modules.dot
+		-package datalog -dot -o modules.dot
 	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
 		-I ../_build/src -I ../_build/containers -I ../_build/meta \
-		-package yojson -package datalog -man -d man/
+		-package datalog -man -d man/
 
 clean:
 	ocamlbuild -clean

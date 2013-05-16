@@ -1,6 +1,5 @@
 <**/*.cmx>: inline(15)
-<**/*.ml*>: package(datalog), package(yojson)
-<meta/kB.*>: package(zip)
-<*.native> or <*.byte>: package(datalog), package(yojson), package(zip)
+<**/*.ml*>: package(datalog)
+<*.native> or <*.byte>: package(datalog), package(unix), package(str), package(num)
 <meta>: include
 <meta/*.cmx>: for-pack(Meta)

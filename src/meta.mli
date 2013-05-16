@@ -46,7 +46,7 @@ module Pattern : sig
   val compare_pattern : t -> t -> int
   val hash_pattern : t -> int
 
-  (** {2 Printing/conversion to JSON} *)
+  (** {2 Printing} *)
 
   val pp_pattern : Format.formatter -> t -> unit
   val pp_pattern_p : Format.formatter -> t parametrized -> unit

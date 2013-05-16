@@ -363,12 +363,6 @@ let pp_gc formatter gc =
     gc.gc_theory (List.length gc.gc_eqns) gc.gc_ord
     (Utils.pp_list ~sep:">" pp_symbol) gc.gc_prec
 
-(** {3 JSON encoding} *)
-
-let gc_to_json gc = failwith "TODO: Experts.gc_to_json" (* TODO *)
-
-let gc_of_json ~ctx json = failwith "TODO: Experts.gc_of_json" (* TODO *)
-
 (** {2 Some builtin theories} *)
 
 (** Theory of Associative-Commutative symbols, for the given symbol *)

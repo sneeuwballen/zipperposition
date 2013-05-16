@@ -111,22 +111,20 @@ let print_stats state =
 let print_json_stats state meta =
   let open Sequence.Infix in
   let encode_hashcons (x1,x2,x3,x4,x5,x6) =
-    `List [`Int x1; `Int x2; `Int x3; `Int x4; `Int x5; `Int x6] in
-  let theories = match meta with None -> []
-    | Some meta -> Meta.Prover.theories meta
-      |> Sequence.map (fun th -> Utils.sprintf "%a" Meta.Prover.pp_theory th)
-      |> Sequence.map (fun x -> `String x) |> Sequence.to_list in
+    Utils.sprintf "[%d, %d, %d, %d, %d, %d]" x1 x2 x3 x4 x5 x6 in
+  let theories = match meta with
+    | None -> "[]"
+    | Some meta ->
+      let seq = Meta.Prover.theories meta in
+      Utils.sprintf "[%a]" (Sequence.pp_seq Meta.Prover.pp_theory) seq
+  in
   let experts = match meta with None -> 0
     | Some meta -> Sequence.length (Meta.Prover.experts meta) in
-  let (o : json) =
-    `Assoc [
-      "terms", encode_hashcons (T.stats ());
-      "clauses", encode_hashcons (C.stats ());
-      "theories", `List theories;
-      "experts", `Int experts;
-    ]
+  let o = Utils.sprintf
+    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }"
+    (encode_hashcons (T.stats ())) (encode_hashcons (C.stats ())) theories experts
   in
-  Utils.debug 0 "%% json_stats: %s" (Yojson.Basic.to_string o)
+  Utils.debug 0 "%% json_stats: %s" o
 
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
@@ -195,8 +193,7 @@ let initial_kb params =
     try Utils.with_lock_file file
     (fun () ->
       let kb = try Meta.KB.restore ~file kb
-               with Yojson.Json_error _
-               | Unix.Unix_error _ -> Meta.KB.empty in
+               with Unix.Unix_error _ -> Meta.KB.empty in
       (* load required files *)
       let kb = List.fold_left parse_theory_file kb params.param_kb_load in
       (* save new KB *)

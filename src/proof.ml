@@ -190,7 +190,6 @@ let pp_proof switch formatter proof = match switch with
   | "none" -> Utils.debug 1 "%% proof printing disabled"
   | "tstp" -> pp_proof_tstp formatter proof
   | "debug" -> pp_proof_debug formatter proof
-  | "json" -> failwith "printing proofs in JSON is not implemented, sorry."
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
 let print_vertex proof =

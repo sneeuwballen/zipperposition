@@ -130,11 +130,6 @@ val gc_expert : ctx:context -> gnd_convergent -> t
 val pp_gc : Format.formatter -> gnd_convergent -> unit
   (** Pretty-print the system of ground convergent equations *)
 
-(** {3 JSON encoding} *)
-
-val gc_to_json : gnd_convergent -> json
-val gc_of_json : ctx:context -> json -> gnd_convergent
-
 (** {2 Some builtin theories} *)
 
 val ac : ctx:context -> symbol -> t

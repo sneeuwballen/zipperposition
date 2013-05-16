@@ -678,7 +678,7 @@ let bij ~ctx =
   map
     ~inject:(fun c -> c.hclits)
     ~extract:(fun lits ->
-      let proof c = Axiom (c, "json", "json") in
+      let proof c = Axiom (c, "bij", "bij") in
       mk_hclause_a ~ctx lits proof)
     (Lits.bij_lits ~ord:ctx.ctx_ord)
 

@@ -27,9 +27,6 @@ open Symbols
    to tell well the lit is positive/negative, and if it's oriented (a > b) or eq/incomparable.
    Always orient with the bigger term on left. *)
 
-module Json = Yojson.Basic
-type json = Json.json
-
 (** term with a simple sort *)
 type term = {
   term : term_cell;             (** the term itself *)
