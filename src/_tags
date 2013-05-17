@@ -1,5 +1,4 @@
 <**/*.cmx>: inline(15)
-<**/*.ml*>: package(datalog)
-<*.native> or <*.byte>: package(datalog), package(unix), package(str), package(num)
+<*.native> or <*.byte>: package(unix), package(str), package(num)
 <meta>: include
 <meta/*.cmx>: for-pack(Meta)
