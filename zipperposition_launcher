@@ -5,4 +5,4 @@
 FILE=$1
 TIMEOUT=$2
 
-exec ${PWD}/zipperposition "$FILE" -timeout "$TIMEOUT" -proof tstp
+exec $( dirname $0 )/zipperposition "$FILE" -timeout "$TIMEOUT" -proof tstp
