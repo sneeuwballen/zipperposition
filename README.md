@@ -1,5 +1,33 @@
 # Zipperposition
 
+## CASC
+
+Note for CASC: to install Zipperposition, you need OCaml >= 4.00.1.
+follow those steps:
+
+    $ cd zipperposition-0.2-casc
+    $ ./configure
+
+with options `--bindir` for the binaries location, and `--datadir` for the
+knowledge files.
+
+    $ make
+    $ make install
+
+Make install may require root permissions. Then, you can launch Zipperposition using
+
+    $ zipperposition_launcher $FILE $TIMEOUT
+
+where FILE is the problem file, and TIMEOUT a timeout in seconds. Zipperposition
+is standalone, except for the `kb` file that stores some (basic) knowledge
+about theories. Solutions, when they are found, (try to) follow
+the SZS Ontology and TSTP output format (with FOF refutations). Outputing
+solutions into graphs (in the DOT format) is also possible by giving the
+prover itself (not the launcher) the option `-dot file.dot`. Then, for
+instance, `dot -Txlib file.dot` can be used to display the graph.
+
+The regular `README` content follows, you can ignore it.
+
 ## Short summary
 Zipperposition is intended to be a superposition prover for full first order logic. The accent
 is on flexibility, modularity and simplicity rather than performance, to allow
@@ -22,7 +50,7 @@ are:
 * the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H.Ganzinger and J.Stuber
 
 **Disclaimer**: Note that the prover is currently a prototype and is
-likely not correct nor complete. Please don't use it to drive your personal
+likely not complete. Please don't use it to drive your personal
 nuclear power plant, nor as a trusted tool for critical applications.
 
 ## License
@@ -34,16 +62,12 @@ under GPLv2.
 
 A copy of the GPLv2 is attached to the project, in the file LICENSE.
 
-## Build
+## Regular build
 
-You will need OCaml >= 3.12 or higher with ocamlbuild and the standard
+You will need OCaml >= 4.00.1 or higher with ocamlbuild and the standard
 library.
-Required libraries are `datalog>=0.3`, `yojson` and `camlzip`.
-You can install  them with [opam](http://opam.ocamlpro.com/) by typing:
 
-    $ opam install datalog yojson camlzip
-
-Submodules are also used:
+Some submodules are used:
 
     $ git submodule update --init
 
@@ -82,6 +106,7 @@ For instance,
 ## Knowledge Base
 
 Zipperposition now uses a `Knowledge Base` that contains information about theories,
-lemmas, rewriting systems, etc. By default it tries to access `$PWD/kb`, and loads
+lemmas, rewriting systems, etc. By default it tries to access
+`$ZIPPERPOSITION_HOME/kb`, and loads
 the theory file `builtin.theory` (written in a human-readable syntax). If you
 wish to deactivate this feature, use `-no-theories` or `-kb /dev/null`.
