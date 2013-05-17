@@ -1,16 +1,22 @@
 # Main makefile for zipperposition
 
-VERSION=0.2
-ZIPPERPOSITION_HOME ?= $(HOME)/.zipperposition/
+prefix = @prefix@
+exec_prefix = $(prefix)
+bindir = @bindir@
+datadir = @datadir@
 
-%.ml: %.mlp
+VERSION=0.2-casc
+ZIPPERPOSITION_HOME = $(datadir)/zipperposition/
+
+%.ml: %.mlp Makefile
 	sed -e "s/ZIPPERPOSITION_VERSION/$(VERSION)/g" \
 		-e "s+ZIPPERPOSITION_HOME+$(ZIPPERPOSITION_HOME)+g" $< > $@
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
-INSTALLDIR ?= /usr/bin/
+INSTALLDIR = $(bindir)
 BINARY = zipperposition.native
+LAUNCHER = zipperposition_launcher
 TARGETS_LIB = src/lib.cmxa src/lib.cma 
 TARGETS_BIN = src/zipperposition.native
 TARGETS_TEST = tests/tests.native
@@ -31,7 +37,7 @@ OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES
 OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
 
 # switch compilation module
-MODE ?= debug
+MODE = @MODE@
 ifeq ($(MODE),debug)
 	TAGS=-tag debug
 endif
@@ -44,13 +50,13 @@ endif
 
 all: native lib tests
 
-lib: src/const.ml
+lib: Makefile src/const.ml
 	ocamlbuild $(OPTIONS_LIB) $(TAGS) $(TARGETS_LIB)
 
-native: src/const.ml
+native: Makefile src/const.ml
 	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_BIN)
 
-tests: lib
+tests: Makefile lib
 	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_TEST)
 
 byte:
@@ -73,6 +79,9 @@ install: native
 	mkdir -p $(ZIPPERPOSITION_HOME)
 	cp builtin.theory $(ZIPPERPOSITION_HOME)/
 	cp $(BINARY) $(INSTALLDIR)/zipperposition
+	cp $(LAUNCHER) $(INSTALLDIR)/
+	$(INSTALLDIR)/zipperposition -kb-load builtin.theory -kb-print > /dev/null
+	@echo done
 
 tags:
 	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)

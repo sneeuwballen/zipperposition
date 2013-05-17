@@ -29,3 +29,6 @@ TODO.md
 TAGS
 src/man/
 src/const.ml
+Makefile
+config.status
+autom4te.cache
