@@ -63,7 +63,7 @@ let parse_args () =
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
       ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))");
-      ("-timeout", Arg.Set_float timeout, "verbose mode");
+      ("-timeout", Arg.Set_float timeout, "timeout (in seconds)");
       ("-select", Arg.Set_string select, help_select);
       ("-split", Arg.Set split, "enable splitting");
       ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
