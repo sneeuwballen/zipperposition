@@ -116,15 +116,15 @@ let print_json_stats state meta =
     | None -> "[]"
     | Some meta ->
       let seq = Meta.Prover.theories meta in
-      Utils.sprintf "[%a]" (Sequence.pp_seq Meta.Prover.pp_theory) seq
+      Utils.sprintf "@[<h>[%a]@]" (Sequence.pp_seq Meta.Prover.pp_theory) seq
   in
   let experts = match meta with None -> 0
     | Some meta -> Sequence.length (Meta.Prover.experts meta) in
   let o = Utils.sprintf
-    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }"
+    "@[<h>{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }@]"
     (encode_hashcons (T.stats ())) (encode_hashcons (C.stats ())) theories experts
   in
-  Utils.debug 0 "%% json_stats: %s" o
+  Utils.debug 0 "%% @[<h>json_stats: %s@]" o
 
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
