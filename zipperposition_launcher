@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Launcher for Zipperposition
+
+FILE=$1
+TIMEOUT=$2
+
+exec ${PWD}/zipperposition "$FILE" -timeout "$TIMEOUT" -proof tstp
