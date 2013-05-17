@@ -20,21 +20,20 @@ LAUNCHER = zipperposition_launcher
 TARGETS_LIB = src/lib.cmxa src/lib.cma 
 TARGETS_BIN = src/zipperposition.native
 TARGETS_TEST = tests/tests.native
-LIBS = datalog
-#SUBMODULES = datalog sequence
-SUBMODULES = containers
-PACKAGES = str num
+SUBMODULES = containers datalog
+PACKAGES = 
+LIBS = str nums unix
 
 WITH_LIBS = $(addprefix -lib ,$(LIBS))
 WITH_PACKAGES = $(addprefix -package ,$(PACKAGES))
 
 PWD = $(shell pwd)
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
-INCLUDES = -I,src
+INCLUDES = -I,src,-I,datalog
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = -use-ocamlfind $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
+OPTIONS = $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 #OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
-OPTIONS_LIB = -use-ocamlfind -I src -cflags $(INCLUDES) 
+OPTIONS_LIB = -I src -cflags $(INCLUDES) 
 
 # switch compilation module
 MODE = @MODE@
@@ -66,10 +65,10 @@ doc:
 	ocamlbuild $(OPTIONS) src/zipperposition.docdir/index.html
 	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
 		-I ../_build/src -I ../_build/containers -I ../_build/meta \
-		-package datalog -dot -o modules.dot
+		-dot -o modules.dot
 	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
 		-I ../_build/src -I ../_build/containers -I ../_build/meta \
-		-package datalog -man -d man/
+		-man -d man/
 
 clean:
 	ocamlbuild -clean
@@ -96,4 +95,7 @@ dot:
 containers:
 	make -C containers
 
-.PHONY: containers
+datalog:
+	make -C datalog
+
+.PHONY: containers datalog
