@@ -55,7 +55,12 @@ let find_file name dir =
         else search dir'
   in
   if Filename.is_relative name
-    then search dir  (* search by relative path, in parent dirs *)
+    then try
+      search dir  (* search by relative path, in parent dirs *)
+    with (Failure _) as e ->
+      (try let dir' = Sys.getenv "TPTP" in
+        search dir'
+      with Not_found -> raise e)
     else if file_exists name
       then name  (* found *)
       else failwith ("unable to find file " ^ name)
