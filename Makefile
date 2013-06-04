@@ -1,6 +1,6 @@
 # Main makefile for zipperposition
 
-VERSION=0.2
+VERSION=0.3
 ZIPPERPOSITION_HOME ?= $(HOME)/.zipperposition/
 
 %.ml: %.mlp
@@ -65,6 +65,7 @@ doc:
 		-man -d man/
 
 clean:
+	rm -f src/const.ml || true
 	ocamlbuild -clean
 
 # install the main binary
