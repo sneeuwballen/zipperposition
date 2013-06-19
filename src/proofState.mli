@@ -57,7 +57,7 @@ type simpl_set =
 type passive_set =
   < ctx : context;
     clauses : Clauses.CSet.t;           (** set of clauses *)
-    queues : (ClauseQueue.queue * int) list;
+    queues : (ClauseQueue.t * int) list;
 
     add : hclause list -> unit;         (** add clauses *)
     remove : int -> unit;               (** remove clause by ID *)
@@ -83,7 +83,7 @@ type state =
 
 val mk_active_set : ctx:context -> Index.index -> signature -> active_set
 val mk_simpl_set : ctx:context -> Index.unit_index -> simpl_set
-val mk_passive_set : ctx:context -> (ClauseQueue.queue * int) list -> passive_set
+val mk_passive_set : ctx:context -> (ClauseQueue.t * int) list -> passive_set
 
 (** create a state from the given ordering, and parameters *)
 val mk_state : ctx:context -> ?meta:Meta.Prover.t ->

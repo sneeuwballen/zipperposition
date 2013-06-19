@@ -84,7 +84,7 @@ type simpl_set =
 type passive_set =
   < ctx : context;
     clauses : Clauses.CSet.t;           (** set of clauses *)
-    queues : (ClauseQueue.queue * int) list;
+    queues : (ClauseQueue.t * int) list;
 
     add : hclause list -> unit;         (** add clauses *)
     remove : int -> unit;               (** remove clause by ID *)
@@ -269,7 +269,7 @@ let mk_passive_set ~ctx queues =
       for i = 0 to m_length - 1 do
         (* add to i-th queue *)
         let (q, w) = m_queues.(i) in
-        m_queues.(i) <- (q#add_list hcs, w)
+        m_queues.(i) <- (CQ.adds q (Sequence.of_list hcs), w)
       done
 
     (** remove clauses (not from the queues) *)
@@ -282,13 +282,13 @@ let mk_passive_set ~ctx queues =
       (* search in the idx-th queue *)
       let rec search idx weight =
         let q, w = m_queues.(idx) in
-        if weight >= w || q#is_empty then next_idx (idx+1) (* empty queue, go to the next one *)
+        if weight >= w || CQ.is_empty q then next_idx (idx+1) (* empty queue, go to the next one *)
         else begin
-          let new_q, hc = q#take_first in (* pop from this queue *)
+          let new_q, hc = CQ.take_first q in (* pop from this queue *)
           m_queues.(idx) <- new_q, w;
           if C.CSet.mem m_clauses hc
             then begin (* done, found a still-valid clause *)
-              U.debug 3 "taken clause from %s" q#name;
+              U.debug 3 "taken clause from %s" (CQ.name q);
               m_clauses <- C.CSet.remove m_clauses hc;
               m_state <- (idx, weight+1);
               Some hc
@@ -307,7 +307,7 @@ let mk_passive_set ~ctx queues =
       incr_stat stat_passive_cleanup;
       for i = 0 to m_length - 1 do
         let q, w = m_queues.(i) in
-        m_queues.(i) <- q#clean m_clauses, w
+        m_queues.(i) <- CQ.clean q m_clauses, w
       done
   end
 
@@ -354,7 +354,7 @@ let pp_state formatter state =
   let num_active, num_passive, num_simpl = stats state in
   Format.fprintf formatter
     "@[<h>state {%d active clauses; %d passive_clauses; %d simplification_rules;@;%a}@]"
-    num_active num_passive num_simpl CQ.pp_queues state#passive_set#queues
+    num_active num_passive num_simpl CQ.pp_queues (Sequence.of_list state#passive_set#queues)
 
 let debug_state formatter state =
   let num_active, num_passive, num_simpl = stats state in
@@ -362,6 +362,6 @@ let debug_state formatter state =
     ("@[<v 2>state {%d active clauses; %d passive_clauses; %d simplification_rules;" ^^
       "@;%a@;active:%a@;passive:%a@]@;")
     num_active num_passive num_simpl
-    CQ.pp_queues state#passive_set#queues
+    CQ.pp_queues (Sequence.of_list state#passive_set#queues)
     C.pp_set state#active_set#clauses
     C.pp_set state#passive_set#clauses
