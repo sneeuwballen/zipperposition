@@ -181,7 +181,7 @@ let pp_proof_tstp formatter proof =
         let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
         (* print the inference *)
         Format.fprintf formatter ("@[<h>fof(%d, plain, %a,@ " ^^
-          "@[<h>inference('%s', [status(%s)], @[<h>[%a, theory(equality)]@])@]).@]@;")
+          "@[<h>inference('%s', [status(%s), theory(equality)], @[<h>[%a]@])@]).@]@;")
           (fst c) T.pp_term_tstp#pp t name status
           (Utils.pp_list ~sep:"," Format.pp_print_int) premises)
 
