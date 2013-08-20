@@ -51,7 +51,7 @@ val depth : proof -> int
 
 (** {2 Conversion to a graph of proofs} *)
 
-val to_graph : proof -> (proof, string) Graph.t
+val to_graph : proof -> (proof, string) PersistentGraph.t
   (** Get a graph of the proof *)
 
 val bij : ord:ordering -> proof Bij.t

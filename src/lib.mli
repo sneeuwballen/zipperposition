@@ -16,7 +16,7 @@ module FoSubst : module type of FoSubst
 module FoUnif : module type of FoUnif
 module FoUtils : module type of FoUtils
 module Gen : module type of Gen
-module Graph : module type of Graph
+module PersistentGraph : module type of PersistentGraph
 module Hash : module type of Hash
 module Hashset : module type of Hashset
 module Hashcons : module type of Hashcons

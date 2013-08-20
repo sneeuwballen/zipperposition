@@ -99,7 +99,7 @@ let depth proof =
 (** {2 Conversion to a graph of proofs} *)
 
 let mk_graph () =
-  Graph.empty
+  PersistentGraph.empty
     ~hash:(fun p -> proof_id p)
     ~eq:(fun p1 p2 -> proof_id p1 = proof_id p2)
     10
@@ -112,7 +112,7 @@ let to_graph proof =
      | Axiom _ -> ()
      | Proof (_, rule, l) ->
        List.iter (fun p' ->
-        Graph.add g p' rule p) l);
+        PersistentGraph.add g p' rule p) l);
   g
 
 let bij ~ord =
@@ -206,8 +206,8 @@ and print_edge v1 e v2 =
 (** Add the proof to the given graph *)
 let pp_dot ~name formatter proof =
   let graph = to_graph proof in
-  assert (Graph.is_dag graph);
-  Graph.pp ~name ~print_vertex ~print_edge formatter graph
+  assert (PersistentGraph.is_dag graph);
+  PersistentGraph.pp ~name ~print_vertex ~print_edge formatter graph
 
 (** print to dot into a file *)
 let pp_dot_file ?(name="proof") filename proof =

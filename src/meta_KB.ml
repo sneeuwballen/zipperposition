@@ -505,7 +505,7 @@ module DefinitionSet = Sequence.Set.Make(struct
   let compare = compare_definitions
 end)
 
-type t = DefinitionSet.set
+type t = DefinitionSet.t
   (** The knowledge base. *)
 
 let empty = DefinitionSet.empty

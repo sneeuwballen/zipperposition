@@ -16,7 +16,7 @@ FoSubst
 FoUnif
 FoUtils
 Gen
-Graph
+PersistentGraph
 Hash
 Hashset
 Hashcons

@@ -310,14 +310,14 @@ let eq_trie t1 t2 = t1 == t2
 
 (** Convert the trie to a graph *)
 let trie_to_graph trie =
-  let g = Graph.empty ~hash:hash_trie ~eq:eq_trie 10 in
+  let g = PersistentGraph.empty ~hash:hash_trie ~eq:eq_trie 10 in
   (* iterate through the trie *)
   let rec iter trie =
     match trie with
     | TrieLeaf _ -> ()
     | TrieNode m ->
       CharMap.iter
-        (fun c trie' -> Graph.add g trie c trie'; iter trie')
+        (fun c trie' -> PersistentGraph.add g trie c trie'; iter trie')
         m
   in
   iter trie;
@@ -339,7 +339,7 @@ let pp_dot ?(name="dtree") to_string formatter dtree =
   and pp_triple formatter (t, value, _) =
     Format.fprintf formatter "@[<h>%a: %s@]" !T.pp_term#pp t (to_string value)
   in
-  Graph.pp ~print_edge ~print_vertex ~name formatter g
+  PersistentGraph.pp ~print_edge ~print_vertex ~name formatter g
   
 (** {2 Unit Index object} *)
 

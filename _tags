@@ -1,4 +1,5 @@
 <src>: include
+<containers>: include
 <tests>: include
 <datalog>: include
 <**/*.cmx>: inline(15)

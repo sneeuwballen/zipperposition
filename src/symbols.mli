@@ -141,10 +141,10 @@ val get_val : symbol -> symbol_val
 module SHashtbl : Hashtbl.S with type key = symbol
 
 module SMap : Map.S with type key = symbol
-module SMapSeq : Sequence.Map.S with type key = symbol and type 'a map = 'a SMap.t
+module SMapSeq : Sequence.Map.S with type key = symbol and type 'a t = 'a SMap.t
 
 module SSet : Set.S with type elt = symbol
-module SSetSeq : Sequence.Set.S with type elt = symbol and type set = SSet.t
+module SSetSeq : Sequence.Set.S with type elt = symbol and type t = SSet.t
 
 (** {2 connectives} *)
 
