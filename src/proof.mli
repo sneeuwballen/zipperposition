@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Basic
 
+module IntSet : Set.S with type elt = int
+
 (** {2 Constructors and utils} *)
 
 val mk_axiom : compact_clause -> string -> string -> proof
@@ -40,7 +42,7 @@ val is_proof_of : proof -> hclause -> bool
 val recover_clause : ctx:context -> proof -> hclause
   (** Re-build a clause from its proof *)
 
-val traverse : ?traversed:Ptset.t ref -> proof -> (proof -> unit) -> unit
+val traverse : ?traversed:IntSet.t ref -> proof -> (proof -> unit) -> unit
   (** Traverse the proof. Each proof node is traversed only once,
       using the integer to recognize already traversed proofs. *)
 

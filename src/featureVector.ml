@@ -161,12 +161,17 @@ let max_depth_minus symb lits =
  * FV index
  * ---------------------------------------------------------------------- *)
 
+module IntMap = Map.Make(struct
+  type t = int
+  let compare i j = i - j
+end)
+
 type trie =
-  | TrieNode of trie Ptmap.t  (** map feature -> trie *)
+  | TrieNode of trie IntMap.t  (** map feature -> trie *)
   | TrieLeaf of C.CSet.t      (** leaf with a set of hcs *)
 
 let empty_trie n = match n with
-  | TrieNode m when Ptmap.is_empty m -> true
+  | TrieNode m when IntMap.is_empty m -> true
   | TrieLeaf set when C.CSet.is_empty set -> true
   | _ -> false
 
@@ -186,17 +191,17 @@ let goto_leaf trie t k =
       | new_leaf -> rebuild new_leaf)           (* replace by new leaf *)
     | TrieNode m, c::t' ->
       (try  (* insert in subtrie *)
-        let subtrie = Ptmap.find c m in
+        let subtrie = IntMap.find c m in
         let rebuild' subtrie = match subtrie with
-          | _ when empty_trie subtrie -> rebuild (TrieNode (Ptmap.remove c m))
-          | _ -> rebuild (TrieNode (Ptmap.add c subtrie m))
+          | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
+          | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
         in
         goto subtrie t' rebuild'
       with Not_found -> (* no subtrie found *)
-        let subtrie = if t' = [] then TrieLeaf C.CSet.empty else TrieNode Ptmap.empty
+        let subtrie = if t' = [] then TrieLeaf C.CSet.empty else TrieNode IntMap.empty
         and rebuild' subtrie = match subtrie with
-          | _ when empty_trie subtrie -> rebuild (TrieNode (Ptmap.remove c m))
-          | _ -> rebuild (TrieNode (Ptmap.add c subtrie m))
+          | _ when empty_trie subtrie -> rebuild (TrieNode (IntMap.remove c m))
+          | _ -> rebuild (TrieNode (IntMap.add c subtrie m))
         in
         goto subtrie t' rebuild')
     | TrieNode _, [] -> assert false (* ill-formed term *)
@@ -204,13 +209,10 @@ let goto_leaf trie t k =
   in
   goto trie t (fun t -> t)
 
-(** a trie of ints *)
-module FVTrie = Trie.Make(Ptmap)
-
 (** a feature vector index, based on a trie that contains sets of hcs *)
 type fv_index = feature list * trie
 
-let mk_fv_index features = (features, TrieNode Ptmap.empty)
+let mk_fv_index features = (features, TrieNode IntMap.empty)
 
 (** maximam number of features in addition to basic ones *)
 let max_features = 25
@@ -281,7 +283,7 @@ let retrieve_subsuming (features, trie) lits f =
   let rec iter_lower fv node = match fv, node with
   | [], TrieLeaf set -> C.CSet.iter set f
   | i::fv', TrieNode map ->
-    Ptmap.iter
+    IntMap.iter
       (fun j subnode -> if j <= i
         then iter_lower fv' subnode)  (* go in the branch *)
       map
@@ -296,7 +298,7 @@ let retrieve_subsumed (features, trie) lits f =
   let rec iter_higher fv node = match fv, node with
   | [], TrieLeaf set -> C.CSet.iter set f
   | i::fv', TrieNode map ->
-    Ptmap.iter
+    IntMap.iter
       (fun j subnode -> if j >= i
         then iter_higher fv' subnode)  (* go in the branch *)
       map

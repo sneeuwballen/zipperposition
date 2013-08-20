@@ -28,6 +28,11 @@ module C = Clauses
 module Lits = Literals
 module Utils = FoUtils
 
+module IntSet = Set.Make(struct
+  type t = int
+  let compare i j = i - j
+end)
+
 (** {2 Constructors and utils} *)
 
 let mk_axiom x filename clause_name = Axiom (x, filename, clause_name)
@@ -55,16 +60,16 @@ let recover_clause ~ctx proof =
   C.mk_hclause_a ~ctx lits proof
 
 (** Traverse the proof. Each proof node is traversed only once. *)
-let traverse ?(traversed=ref Ptset.empty) proof k =
+let traverse ?(traversed=ref IntSet.empty) proof k =
   (* set of already traversed proof nodes; queue of proof nodes
      yet to traverse *)
   let queue = Queue.create () in
   Queue.push proof queue;
   while not (Queue.is_empty queue) do
     let proof = Queue.take queue in
-    if Ptset.mem (proof_id proof) !traversed then ()
+    if IntSet.mem (proof_id proof) !traversed then ()
     else begin
-      traversed := Ptset.add (proof_id proof) !traversed;
+      traversed := IntSet.add (proof_id proof) !traversed;
       (* traverse premises first *)
       (match proof with
       | Axiom _ -> ()
@@ -79,15 +84,15 @@ let to_seq proof = Sequence.from_iter (fun k -> traverse proof k)
 
 (** Depth of a proof, ie max distance between the root and any axiom *)
 let depth proof =
-  let explored = ref Ptset.empty in
+  let explored = ref IntSet.empty in
   let depth = ref 0 in
   let q = Queue.create () in
   Queue.push (proof, 0) q;
   while not (Queue.is_empty q) do
     let (p, d) = Queue.pop q in
     let i = proof_id p in
-    if Ptset.mem i !explored then () else begin
-      explored := Ptset.add i !explored;
+    if IntSet.mem i !explored then () else begin
+      explored := IntSet.add i !explored;
       match p with
       | Axiom _ -> depth := max d !depth
       | Proof (_, _, l) -> (* explore parents *)

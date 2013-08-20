@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-"""Build lib.cmi from build.mllib"""
+"""Build lib.mli from build.mllib"""
 
 def generate(mllib, mli):
     mllib = open(mllib, 'r')

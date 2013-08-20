@@ -15,7 +15,6 @@ module Fingerprint : module type of Fingerprint
 module FoSubst : module type of FoSubst
 module FoUnif : module type of FoUnif
 module FoUtils : module type of FoUtils
-module Gen : module type of Gen
 module PersistentGraph : module type of PersistentGraph
 module Hash : module type of Hash
 module Hashset : module type of Hashset
@@ -39,18 +38,14 @@ module Proof : module type of Proof
 module ProofState : module type of ProofState
 module PHashtbl : module type of PHashtbl
 module Prtree : module type of Prtree
-module Ptmap : module type of Ptmap
-module Ptset : module type of Ptset
 module Puf : module type of Puf
 module Rewriting : module type of Rewriting
 module Saturate : module type of Saturate
 module Sequence : module type of Sequence
 module Selection : module type of Selection
 module SmallSet : module type of SmallSet
-module SplayTree : module type of SplayTree
 module Superposition : module type of Superposition
 module Symbols : module type of Symbols
 module Terms : module type of Terms
-module Trie : module type of Trie
 module UnionFind : module type of UnionFind
 module Vector : module type of Vector

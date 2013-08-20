@@ -29,16 +29,12 @@ module C = Clauses
 module O = Orderings
 module Utils = FoUtils
 
-(* TODO get rid of GPL implementation of heap *)
-(** A heap that compares (int,clauses) by the int *)
-module LH = Leftistheap.Make(
-  struct
-    type t = int * hclause
-    let le (i, hci) (j, hcj) = i <= j || (i = j && hci.hctag <= hcj.hctag)
-  end)
+let empty_heap =
+  let leq (i, hci) (j, hcj) = i <= j || (i = j && hci.hctag <= hcj.hctag) in
+  Leftistheap.empty_with ~leq
 
 type t = {
-  heap : LH.t;
+  heap : (int * hclause) Leftistheap.t;
   functions : functions;
 } (** A priority queue of clauses, purely functional *)
 and functions = {
@@ -55,18 +51,16 @@ let mk_queue ?(accept=(fun _ -> true)) ~weight name =
     accept;
     name;
   } in
-  { heap = LH.empty;
-    functions;
-  }
+  { heap = empty_heap; functions; }
 
 let is_empty q =
-  LH.is_empty q.heap
+  Leftistheap.is_empty q.heap
 
 let add q hc =
   if q.functions.accept hc
     then
       let w = q.functions.weight hc in
-      let heap = LH.insert (w, hc) q.heap in
+      let heap = Leftistheap.insert q.heap (w, hc) in
       { q with heap; }
     else q
 
@@ -77,20 +71,20 @@ let adds q hcs =
         if q.functions.accept hc
           then
             let w = q.functions.weight hc in
-            LH.insert (w,hc) heap
+            Leftistheap.insert heap (w,hc)
           else heap)
       q.heap hcs in
   { q with heap; }
 
 let take_first q =
   (if is_empty q then raise Not_found);
-  let (_, hc), new_h = LH.extract_min q.heap in
+  let new_h, (_, hc) = Leftistheap.extract_min q.heap in
   let q' = { q with heap=new_h; } in
   q', hc 
 
 (** Keep only the clauses that are in the set *)
 let clean q set =
-  let new_heap = LH.filter q.heap (fun (_, hc) -> C.CSet.mem set hc) in
+  let new_heap = Leftistheap.filter q.heap (fun (_, hc) -> C.CSet.mem set hc) in
   { q with heap=new_heap; }
 
 let name q = q.functions.name
