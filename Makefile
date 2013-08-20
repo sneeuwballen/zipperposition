@@ -9,6 +9,7 @@ ZIPPERPOSITION_HOME ?= $(HOME)/.zipperposition/
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
+PLUGIN_FILES = $(shell find plugins/ -name '*.ml')
 INSTALLDIR ?= /usr/bin/
 BINARY = zipperposition.native
 SUBMODULES = containers datalog
@@ -99,8 +100,10 @@ install: bin plugins
 	cp builtin.theory $(ZIPPERPOSITION_HOME)/
 	cp $(BINARY) $(INSTALLDIR)/zipperposition
 	cp $(LIBS) $(ZIPPERPOSITION_HOME)/
-	cp $(PLUGINS) $(ZIPPERPOSITION_HOME)/plugins/
-	./$(BINARY) -kb $(ZIPPERPOSITION_HOME)/kb -kb-load builtin.theory /dev/null || true
+	for p in $(wildcard plugins/std/*.cmxs) ; do \
+	    cp "$$p" $(ZIPPERPOSITION_HOME)/plugins/ ; \
+	done
+	./$(BINARY) -kb $(ZIPPERPOSITION_HOME)/kb -kb-load builtin.theory /dev/null >/dev/null 2>&1|| true
 	@echo done.
 
 tags:
