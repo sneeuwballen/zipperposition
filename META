@@ -1,6 +1,0 @@
-name="logtk"
-version="0.1"
-description="Logic toolkit, designed primarily for first-order automated reasoning"
-requires=""
-archive(byte) = "logtk.cma"
-archive(native) = "logtk.cmxa"

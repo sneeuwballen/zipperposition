@@ -1,0 +1,27 @@
+OASISFormat: 0.3
+Name:        logtk
+Version:     0.1
+Synopsis:    Logic toolkit, designed primarily for first-order automated reasoning.
+Homepage:    https://github.com/c-cube/logtk
+Authors:     Simon Cruanes
+License:     BSD3
+Plugins:     META (0.3)
+BuildTools:  ocamlbuild
+
+Library logtk
+  Path:             src/
+  CompiledObject:   native
+  Pack:             true
+  Findlibname:      logtk
+  Modules:          Symbol, Hash, Hashcons, Term, Util, Unif, Typing, Substs, lib/Sequence, lib/Bij
+  InternalModules:  lib/Cache
+  BuildDepends:     unix,num
+  Install:          true
+
+Document logtk
+  Title:                Logtk docs
+  Type:                 ocamlbuild (0.3)
+  BuildTools+:          ocamldoc
+  Install:              true
+  XOCamlbuildPath:      .
+  XOCamlbuildLibraries: logtk

@@ -1,3 +1,0 @@
-[submodule "ocaml-containers"]
-	path = ocaml-containers
-	url = http://github.com/c-cube/ocaml-containers.git

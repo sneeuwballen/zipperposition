@@ -11,15 +11,15 @@ CAML_OPTS =
 CAML_LIBS = str nums unix
 
 # build targets
-TARGETS_LIB = src/logtk.cmxa src/logtk.cma src/logtk.cmi
-TARGETS_TEST = tests/run_tests.native
+TARGETS_LIB = logtk.cmxa logtk.cma logtk.cmi
+TARGETS_TEST = run_tests.native
 
 # output, ready to install
 LIBS = $(addprefix _build/,$(TARGETS_LIB))
 INSTALL = $(LIBS)
 PWD = $(shell pwd)
 
-OPTIONS = -use-ocamlfind
+OPTIONS = -use-ocamlfind -classic-display
 
 # switch compilation module
 MODE ?= debug
@@ -33,25 +33,19 @@ ifeq ($(MODE),prod)
 	TAGS=-tag noassert
 endif
 
-all: lib tests doc
+all: bin tests doc
 
-lib:
-	ocamlbuild $(OPTIONS) $(TARGETS_LIB)
+bin:
+	ocaml setup.ml -build
 
 tests:
-	ocamlbuild $(OPTIONS) $(TARGETS_TEST)
+	ocaml setup.ml -test
 
 doc:
-	ocamlbuild $(OPTIONS) src/logtk.docdir/index.html
-	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
-		-I ../_build/src -I ../_build/containers \
-		-dot -o modules.dot
-	cd src; find . -iname '*.ml{,i}' | xargs ocamlfind ocamldoc \
-		-I ../_build/src -I ../_build/containers \
-		-man -d man/
+	ocaml setup.ml -doc
 
 clean:
-	ocamlbuild -clean
+	ocaml setup.ml -clean
 
 # install the main binary
 install: lib 
