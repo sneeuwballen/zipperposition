@@ -18,13 +18,16 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 02110-1301 usa.
 *)
 
-(** module for superposition with equivalence reasoning and delayed clausal form *)
+(** {1 Superposition with equivalence reasoning and delayed clausal form} *)
 
 open Basic
 
-(** Precedence constraint *)
 val symbol_constraint : hclause list -> precedence_constraint list
+  (** Precedence constraint *)
 
-(** The Delayed superposition calculus itself *)
-val delayed : Calculus.calculus
+val recursive_eliminations : hclause -> hclause list
+  (** Eliminate connectives *)
+
+val setup_env : env:Env.t -> unit
+  (** Setup the environment for superposition with equivalence reasoning *)
 

@@ -58,10 +58,10 @@ let compare_partial ~ord l1 l2 =
   (* Utils.multiset_partial ord#compare (lit_to_multiset l1) (lit_to_multiset l2) *)
   match l1, l2 with
   | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
-    let s_u = ord#compare s u
-    and s_v = ord#compare s v
-    and t_u = ord#compare t u
-    and t_v = ord#compare t v in
+    let s_u = ord.ord_compare s u
+    and s_v = ord.ord_compare s v
+    and t_u = ord.ord_compare t u
+    and t_v = ord.ord_compare t v in
     match s_u, s_v, t_u, t_v, sign_st, sign_uv with
     | Eq, _, _, Eq, _, _
     | _, Eq, Eq, _, _, _ ->
@@ -125,22 +125,21 @@ let check_type a b = if a.sort <> b.sort
 
 let mk_eq ~ord a b =
   check_type a b;
-  Equation (a, b, true, ord#compare a b)
+  Equation (a, b, true, ord.ord_compare a b)
 
 let mk_neq ~ord a b = 
   check_type a b;
-  Equation (a, b, false, ord#compare a b)
+  Equation (a, b, false, ord.ord_compare a b)
 
 let mk_lit ~ord a b sign =
   check_type a b;
-  Equation (a, b, sign, ord#compare a b)
+  Equation (a, b, sign, ord.ord_compare a b)
 
-let apply_subst ?(recursive=true) ~ord subst (lit,offset) =
-  if offset = 0 && S.is_empty subst then lit  (* no shifting *)
-  else match lit with
+let apply_subst ?(recursive=true) ?renaming ~ord subst (lit,offset) =
+  match lit with
   | Equation (l,r,sign,_) ->
-    let new_l = S.apply_subst ~recursive subst (l,offset)
-    and new_r = S.apply_subst ~recursive subst (r,offset) in
+    let new_l = S.apply_subst ~recursive ?renaming subst (l,offset)
+    and new_r = S.apply_subst ~recursive ?renaming subst (r,offset) in
     mk_lit ~ord new_l new_r sign
 
 let reord ~ord (Equation (l,r,sign,_)) = mk_lit ~ord l r sign
@@ -193,7 +192,7 @@ let fmap ~ord f = function
   | Equation (left, right, sign, _) ->
     let new_left = f left
     and new_right = f right in
-    Equation (new_left, new_right, sign, ord#compare new_left new_right)
+    Equation (new_left, new_right, sign, ord.ord_compare new_left new_right)
 
 let add_vars set = function
   | Equation (l, r, _, _) ->
@@ -260,14 +259,14 @@ let term_of_lits lits =
     (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
 
 (** Apply the substitution to the array of literals, with offset *)
-let apply_subst_lits ?(recursive=true) ~ord subst (lits,offset) =
+let apply_subst_lits ?(recursive=true) ?renaming ~ord subst (lits,offset) =
   Array.map
-    (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
+    (fun lit -> apply_subst ~recursive ?renaming ~ord subst (lit, offset))
     lits
 
-let apply_subst_list ?(recursive=true) ~ord subst (lits, offset) =
+let apply_subst_list ?(recursive=true) ?renaming ~ord subst (lits, offset) =
   List.map
-    (fun lit -> apply_subst ~recursive ~ord subst (lit, offset))
+    (fun lit -> apply_subst ~recursive ?renaming ~ord subst (lit, offset))
     lits
 
 (** Convert the lits into a sequence of equations *)

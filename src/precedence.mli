@@ -68,7 +68,8 @@ val default_precedence : signature -> precedence
  * Heuristic creation of precedences
  * ---------------------------------------------------------------------- *)
 
-val heuristic_precedence : (precedence -> ordering)
+val heuristic_precedence : ?initial_signature:signature
+                           -> (precedence -> ordering)
                            -> precedence_constraint list
                            -> precedence_constraint list
                            -> hclause list -> precedence

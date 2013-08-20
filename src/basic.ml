@@ -50,6 +50,7 @@ type varlist = term list
 (** A logical first order object, with a context for its free variables.
     The context is an offset, so that X_i inside the 'a really is X_{i+offset} *)
 type 'a bind = ('a * int)
+and offset = int
 
 (** An object parametrized by a list of variables *)
 type 'a parametrized = ('a * varlist)
@@ -90,16 +91,9 @@ let string_of_pos s = match s with
 let pp_pos formatter pos =
   if pos = []
     then Format.pp_print_string formatter "ε"
-    else begin
-      let pos = Array.of_list pos in
-      let n = Array.length pos in
-      Format.fprintf formatter "@[<h>";
-      for i = 0 to n-1 do
-        (if i > 0 then Format.fprintf formatter ".");
-        Format.pp_print_int formatter pos.(i);
-      done;
-      Format.fprintf formatter "@]"
-    end
+    else
+      Format.fprintf formatter "@[<h>%a@]"
+        (Sequence.pp_seq ~sep:"." Format.pp_print_int) (Sequence.of_list pos)
 
 (** compact position, as an integer *)
 type compact_position = int
@@ -107,25 +101,24 @@ type compact_position = int
 (** an ordering constraint (a possibly non-total ordering on symbols) *)
 type precedence_constraint = symbol -> symbol -> int
 
-(** the interface of a total ordering on symbols *)
-class type precedence =
-  object
-    method snapshot : symbol list               (** current symbols in decreasing order *)
-    method add_symbols : symbol list -> int     (** add the given symbols (returns how many were new) *)
-    method compare : symbol -> symbol -> int    (** total order on symbols *)
-    method weight : symbol -> int               (** weight of symbol (for KBO) *)
-    method set_weight : (symbol -> int) -> unit (** change the weight function *)
-  end
+(** A total ordering on symbols *)
+type precedence = {
+  prec_snapshot : symbol list;  (** symbols in decreasing order *)
+  prec_add_symbols : symbol list -> precedence * int;
+    (** add the given symbols (returns how many were new) *)
+  prec_compare : symbol -> symbol -> int;       (** Compare symbols *)
+  prec_weight : symbol -> int;
+  prec_set_weight : (symbol -> int) -> precedence;
+}
 
-(** the interface of an ordering type *)
-class type ordering =
-  object
-    method clear_cache : unit -> unit           (** clear cache, if any *)
-    method precedence : precedence              (** underlying precedence on symbols *)
-    method set_precedence : precedence -> unit  (** update the precedence *)
-    method compare : term -> term -> comparison (** compare two terms *)
-    method name : string
-  end
+(** A reduction ordering on terms *)
+type ordering = {
+  ord_clear_cache : unit -> unit;               (** Clear underlying cache *)
+  ord_compare : term -> term -> comparison;     (** Compare two terms *)
+  ord_precedence : precedence;                  (** Current precedence *)
+  ord_set_precedence : precedence -> ordering;  (** Change the precedence *)
+  ord_name : string;                            (** Name of the ordering *)
+}
 
 (** a literal, that is, a signed equation *)
 type literal = 
@@ -145,23 +138,26 @@ and hclause = {
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
   mutable hcvars : term list;             (** the free variables *)
-  mutable hcproof : compact_clause proof; (** Proof of the clause *)
+  mutable hcproof : proof;                (** Proof of the clause *)
   mutable hcparents : hclause list;       (** parents of the clause *)
-  mutable hcdescendants : Ptset.t;        (** the set of IDs of descendants of the clause *)
-}
+  mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
+} 
 (** A context for clauses. TODO add a structure for local term hashconsing? *)
 and context = {
-  ctx_ord : ordering;                     (** ordering used to build clauses *)
-  ctx_select : selection_fun;             (** selection function for literals *)
+  mutable ctx_ord : ordering;             (** current ordering on terms *)
+  mutable ctx_select : selection_fun;     (** selection function for literals *)
+  mutable ctx_complete : bool;            (** Completeness preserved? *)
 }
 (** A compact clause: ID and literals *)
 and compact_clause = int * literal array
-(** A proof step for a 'a. This allows for genericity of proofs. *)
-and 'a proof =
-  | Axiom of 'a * string * string (** file, axiom name *)
-  | Proof of 'a * string * 'a proof list
+(** A proof step *)
+and proof =
+  | Axiom of compact_clause * string * string (** file, axiom name *)
+  | Proof of compact_clause * string * proof list
 (** a selection function *)
 and selection_fun = hclause -> int list
+
+let mk_ctx ord select = { ctx_ord=ord; ctx_select=select; ctx_complete = true; }
 
 (** Create a compact clause from a clause *)
 let compact_clause hc = (hc.hctag, hc.hclits)
@@ -206,11 +202,14 @@ type parameters = {
   param_progress : bool;          (** print progress during search *)
   param_proof : string;           (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
+  param_plugins : string list;    (** plugins to load *)
   param_kb : string;              (** file to use for KB *)
+  param_kb_where : bool;          (** print where is the KB? *)
   param_kb_load : string list;    (** theory files to read *)
   param_kb_clear : bool;          (** do we need to clear the KB? *)
   param_kb_print : bool;          (** print knowledge base and exit *)
-  param_kb_where : bool;          (** print where is the KB? *)
+  param_learn : bool;             (** try to learn from successful proofs? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
+  param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
   param_index : string;           (** indexing structure *)
 }

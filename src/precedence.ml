@@ -160,45 +160,38 @@ let order_symbols constrs symbols =
 let mk_precedence ?(complete=true) constrs symbols =
   let symbols = if complete then complete_symbols symbols else symbols in
   let symbols = order_symbols constrs symbols in
-  let symbols = ref symbols in
-  let table = ref (mk_table !symbols) in
-  let weight = ref weight_constant in
-  (* the precedence *)
-  let obj = object (self)
-    method snapshot = !symbols
-
+  let table = mk_table symbols in
+  let weight = weight_constant in
+  (* how to build a precedence *)
+  let rec mk_prec symbols table weight =
     (** Add the given symbols to the precedence. Returns how many of them
         are new and have effectively been added *)
-    method add_symbols new_symbols =
-      let old_len = List.length !symbols in
-      let all_symbols = Utils.list_union (==) new_symbols !symbols in
+    let prec_add_symbols new_symbols = 
+      let old_len = List.length symbols in
+      let all_symbols = Utils.list_union (==) new_symbols symbols in
       let new_len = List.length all_symbols in
       if new_len > old_len then begin
         (* some symbols have been added *)
         Utils.debug 3 "%% add @[<h>%a@] to the precedence"
                       (Utils.pp_list ~sep:", " pp_symbol) new_symbols;
-        Utils.debug 3 "%% old precedence %a"
-                       pp_precedence !symbols;
+        Utils.debug 3 "%% old precedence %a" pp_precedence symbols;
 
         (* build a partial order that respects the current ordering *)
         let po = PartialOrder.mk_partial_order all_symbols in
-        PartialOrder.complete po (list_constraint !symbols);
+        PartialOrder.complete po (list_constraint symbols);
         (* complete it with the constraints *)
         List.iter (fun constr -> PartialOrder.complete po constr) constrs;
         assert (PartialOrder.is_total po);
         (* get the new precedence from the completed partial order *)
         let all_symbols = PartialOrder.symbols po in
-        symbols := all_symbols;
-        table := mk_table !symbols;
-
-        Utils.debug 3 "%% new precedence %a" pp_precedence !symbols;
+        let table' = mk_table all_symbols in
+        let prec' = mk_prec all_symbols table' weight in
+        Utils.debug 3 "%% new precedence %a" pp_precedence all_symbols;
         (* return number of new symbols *)
-        new_len - old_len
-      end else 0
-
-    (** To compare symbols, compare their index in the decreasing precedence. Symbols that
-        are split symbols are compared to other symbols like "split_symbol". *)
-    method compare a b =
+        prec', new_len - old_len
+      end else mk_prec symbols table weight, 0
+    in
+    let prec_compare a b = 
       (* some symbols are not explicitely in the signature. Instead, they
          are represented by 'generic' symbols *)
       let transform_symbol s = match s with
@@ -208,18 +201,21 @@ let mk_precedence ?(complete=true) constrs symbols =
       in
       let a' = transform_symbol a
       and b' = transform_symbol b in
-      if a' == b' && a != b
-        then (* both are in the same symbol family (e.g. split symbols). Any
-                arbitrary but total ordering on them is ok, as long as it's stable. *)
-          Symbols.compare_symbols a b
-        else SHashtbl.find !table b' - SHashtbl.find !table a'
-
-    method weight s = !weight s
-
-    method set_weight f = weight := f
-  end
+      try SHashtbl.find table b' - SHashtbl.find table a'
+      with Not_found ->
+        Symbols.compare_symbols a' b'
+    in
+    let prec_weight s = weight s in
+    let prec_set_weight weight' = mk_prec symbols table weight' in
+    { prec_snapshot = symbols;
+      prec_add_symbols;
+      prec_compare;
+      prec_weight;
+      prec_set_weight;
+    }
   in
-  (obj :> precedence)
+  (* initial precedence *)
+  mk_prec symbols table weight
 
 let rec default_precedence signature =
   (* two constraints: false, true at end of precedence, and arity constraint *)
@@ -251,7 +247,7 @@ let rec term_symbols acc t =
 
 (** create a constraint that a > b holds in the given ordering *)
 let check_gt ~weight a b =
-  (weight, term_symbols (term_symbols [] a) b, fun ord -> ord#compare a b = Gt)
+  (weight, term_symbols (term_symbols [] a) b, fun ord -> ord.ord_compare a b = Gt)
 
 let weight_def = 5        (** weight of definitions *)
 let weight_rewrite = 2    (** weight of rewriting rule *)
@@ -293,8 +289,8 @@ let create_constraints clause = check_definition clause @ check_rules clause
 
 (** Check whether the two precedences are equal *)
 let eq_precedence c1 c2 =
-  assert (List.length c1#snapshot = List.length c2#snapshot);
-  List.for_all2 (==) c1#snapshot c2#snapshot
+  assert (List.length c1.prec_snapshot = List.length c2.prec_snapshot);
+  List.for_all2 (==) c1.prec_snapshot c2.prec_snapshot
 
 (** Compute a precedence from the signature and the strong constraint *)
 let compute_precedence signature weak_constrs strong_constrs symbols : precedence =
@@ -342,7 +338,7 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
       List.fold_left
         (fun (min_cost, min_symbols) symbols' ->
           let precedence' = mk_precedence symbols' in
-          Utils.debug 3 "try precedence @[<h>%a@]" pp_precedence precedence'#snapshot;
+          Utils.debug 3 "try precedence @[<h>%a@]" pp_precedence precedence'.prec_snapshot;
           (* only compare with new precedence if it is not the same *)
           if eq_precedence precedence precedence' then (min_cost, min_symbols)
           else
@@ -368,8 +364,9 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
     terms in a given precedence, and ordering constraints that are
     respectively weaker/stronger than the optimization (the first one, weaker,
     is applied to break ties, the second one, stronger, is always enforced first) *)
-let heuristic_precedence ord_factory weak_constrs strong_constrs clauses =
-  let signature = C.signature clauses in
+let heuristic_precedence ?(initial_signature=Symbols.empty_signature)
+ord_factory weak_constrs strong_constrs clauses =
+  let signature = Symbols.merge_signatures initial_signature (C.signature clauses) in
   (* the constraints *)
   let constraints = Utils.list_flatmap create_constraints clauses in
   let max_cost = List.fold_left (fun acc (w,_,_) -> acc+w) 0 constraints in

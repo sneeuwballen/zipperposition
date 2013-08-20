@@ -11,21 +11,32 @@ INTERFACE_FILES = $(shell find src -name '*.mli')
 IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 INSTALLDIR ?= /usr/bin/
 BINARY = zipperposition.native
-TARGETS_LIB = src/lib.cmxa src/lib.cma 
-TARGETS_BIN = src/zipperposition.native
-TARGETS_TEST = tests/tests.native
 SUBMODULES = containers datalog
 PACKAGES = 
-LIBS = str nums unix
+CAML_OPTS = 
+CAML_LIBS = str nums unix
 
-WITH_LIBS = $(addprefix -lib ,$(LIBS))
-WITH_PACKAGES = $(addprefix -package ,$(PACKAGES))
+# build targets
+TARGETS_LIB = src/lib.cmxa src/lib.cma src/lib.cmi
+TARGETS_BIN = src/zipperposition.native
+TARGETS_TEST = tests/tests.native
+TARGET_PLUGINS = $(PLUGIN_FILES:%.ml=%.cmxs)
+
+# output, ready to install
+BINARY = zipperposition.native
+LIBS = $(addprefix _build/,$(TARGETS_LIB))
+PLUGINS = $(addprefix _build/,$(TARGET_PLUGINS))
+INSTALLDIR=/usr/bin/
 
 PWD = $(shell pwd)
+
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
-INCLUDES = -I,src,-I,datalog
+INCLUDES = -I,src,-I,datalog,-I,containers
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
-OPTIONS = $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
+#OPTIONS = $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
+#OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
+#OPTIONS = -use-ocamlfind -I src $(PP) -classic-display
+OPTIONS = -use-ocamlfind -I src $(PP) -X plugins -yaccflag -v
 #OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 OPTIONS_LIB = -I src -cflags $(INCLUDES) 
 
@@ -33,27 +44,39 @@ OPTIONS_LIB = -I src -cflags $(INCLUDES)
 MODE ?= debug
 ifeq ($(MODE),debug)
 	TAGS=-tag debug
+	CAML_OPTS = -g
 endif
 ifeq ($(MODE),profile)
 	TAGS=-tags debug,profile
+	CAML_OPTS = -g -p
 endif
 ifeq ($(MODE),prod)
 	TAGS=-tag noassert
+	CAML_OPTS = -noassert
 endif
 
-all: native lib tests
+# all: bin + tests + plugins
 
-lib: src/const.ml
-	ocamlbuild $(OPTIONS_LIB) $(TAGS) $(TARGETS_LIB)
+all: bin tests plugins
 
-native: src/const.ml
-	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_BIN)
+bin: src/const.ml
+	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_LIB) $(TARGETS_BIN)
 
-tests: lib
+tests: bin
 	ocamlbuild $(OPTIONS) $(TAGS) $(TARGETS_TEST)
 
 byte:
 	ocamlbuild $(OPTIONS) -tags debug src/zipperposition.byte
+
+BUILD_PATH = $(PWD)/_build/src/
+PLUGIN_OPTIONS = -cflags -I,$(BUILD_PATH) -lib lib
+plugins: bin
+	mkdir -p plugins/std/
+	for f in $(wildcard plugins/*.ml) ; do \
+	    ocamlopt $(CAML_OPTS) -c -I _build/src $$f -o plugins/$$(basename $$f .ml).cmx; \
+	    ocamlopt $(CAML_OPTS) -shared plugins/$$(basename $$f .ml).cmx -o plugins/std/$$(basename $$f .ml).cmxs; \
+	done
+	@echo plugins compiled.
 
 doc:
 	ocamlbuild $(OPTIONS) src/zipperposition.docdir/index.html
@@ -67,12 +90,18 @@ doc:
 clean:
 	rm -f src/const.ml || true
 	ocamlbuild -clean
+	rm plugins/*.cm* plugins/std/*.cmxs || true
 
 # install the main binary
-install: native
+install: bin plugins
 	mkdir -p $(ZIPPERPOSITION_HOME)
+	mkdir -p $(ZIPPERPOSITION_HOME)/plugins/
 	cp builtin.theory $(ZIPPERPOSITION_HOME)/
 	cp $(BINARY) $(INSTALLDIR)/zipperposition
+	cp $(LIBS) $(ZIPPERPOSITION_HOME)/
+	cp $(PLUGINS) $(ZIPPERPOSITION_HOME)/plugins/
+	./$(BINARY) -kb $(ZIPPERPOSITION_HOME)/kb -kb-load builtin.theory /dev/null || true
+	@echo done.
 
 tags:
 	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
@@ -80,7 +109,7 @@ tags:
 dot:
 	for i in *.dot; do dot -Tsvg "$$i" > "$$( basename $$i .dot )".svg; done
 
-.PHONY: all debug prod profile clean tags doc tests install dot
+.PHONY: all debug prod profile clean tags doc tests install plugins dot
 
 # libraries
 

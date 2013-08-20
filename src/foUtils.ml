@@ -440,6 +440,37 @@ let array_exists p a =
     if i = Array.length a then false else p a.(i) || check (i+1)
   in check 0
 
+(** all the elements of a, but the i-th, into a list *)
+let array_except_idx a i =
+  array_foldi
+    (fun acc j elt -> if i = j then acc else elt::acc)
+    [] a
+
+(** {2 String utils} *)
+
+(* note: quite inefficient *)
+let str_split ~by s =
+  let len_by = String.length by in
+  assert (len_by > 0);
+  let l = ref [] in
+  let n = String.length s in
+  let rec search prev i =
+    if i >= n
+      then List.rev (String.sub s prev (n-prev) :: !l)  (* done *)
+    else if is_prefix i 0
+      then begin
+        l := (String.sub s prev (i-prev)) :: !l;  (* save substring *)
+        search (i+len_by) (i+len_by)
+      end
+    else search prev (i+1)
+  and is_prefix i j =
+    if j = len_by
+      then true
+    else if i = n
+      then false
+    else s.[i] = by.[j] && is_prefix (i+1) (j+1)
+  in search 0 0
+
 (** {2 File utils} *)
 
 let with_lock_file filename action =

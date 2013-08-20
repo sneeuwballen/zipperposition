@@ -34,5 +34,5 @@ val fp7 : fingerprint_fun
 val fp7m : fingerprint_fun
 val fp16 : fingerprint_fun
 
-val mk_index : fingerprint_fun -> Index.index
+val mk_index : cmp:('a -> 'a -> int) -> fingerprint_fun -> 'a Index.t
   (** Index for terms *)

@@ -67,6 +67,7 @@ let update_ctx e ~ctx = e.expert_update_ctx ctx
     are compatibles: check whether they have no symbol in common. *)
 let compatible e1 e2 =
   e1.expert_ctx == e2.expert_ctx &&
+  compatible_ord e1 ~ord:e1.expert_ctx.ctx_ord = compatible_ord e2 ~ord:e2.expert_ctx.ctx_ord &&
   SSet.is_empty (SSet.inter e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
@@ -80,11 +81,14 @@ let rec combine e1 e2 =
     let t' = e1.expert_canonize t in
     let t' = e2.expert_canonize t' in
     if t == t' then t' else nf t'
+  and expert_equal t1 t2 =
+    let t1' = nf t1 and t2' = nf t2 in
+    t1' == t2' || e1.expert_equal t1' t2' || e2.expert_equal t1' t2'
   in
   { expert_name = Utils.sprintf "(%s)_U_(%s)" e1.expert_name e2.expert_name;
     expert_descr =
       Utils.sprintf "@[<hov2>union of@ %s and@ %s@]" e1.expert_descr e2.expert_descr;
-    expert_equal = (fun t1 t2 -> nf t1 == nf t2);
+    expert_equal;
     expert_sig = SSet.union e1.expert_sig e2.expert_sig;
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
     expert_canonize = nf;
@@ -95,26 +99,14 @@ let rec combine e1 e2 =
     expert_solve = None;
   }
 
-(* TODO also check that ordering constraint of e2 is less constraining than
-   the one of e1 (at least in given ctx) *)
-
-(** [expert_more_specific e1 e2] returns true if [e1] decides a theory
-    whose symbols are included in the theory of [e2]. Heuristically, that
-    means that we can ignore [e1] and focus on [e2] *)
-let more_specific e1 e2 =
-  let res =
-    e1.expert_ctx == e2.expert_ctx &&
-    SSet.subset e1.expert_sig e2.expert_sig &&
-    not (SSet.equal e1.expert_sig e2.expert_sig)
-  in
-  (if res then Utils.debug 1 "%% expert %s more specific than %s"
-    e1.expert_name e2.expert_name);
-  res
-
 (** Get the normal form of the term *)
 let canonize expert t = expert.expert_canonize t
 
-let equal expert t1 t2 = expert.expert_equal t1 t2
+let equal expert t1 t2 =
+  let t1' = canonize expert t1
+  and t2' = canonize expert t2 in
+  (* expert.expert_equal may be more than just == of canonized forms *)
+  t1' == t2' || expert.expert_equal t1' t2' 
 
 let signature expert = expert.expert_sig
 
@@ -125,7 +117,7 @@ let is_redundant expert hc =
   if C.get_flag C.flag_persistent hc then false else
   let ans = Utils.array_exists
     (fun lit -> match lit with
-      | Equation (l, r, true, _) when l.sort != bool_ -> expert.expert_equal l r
+      | Equation (l, r, true, _) when l.sort != bool_ -> equal expert l r
       | _ -> false)
     hc.hclits
   in
@@ -143,7 +135,7 @@ let simplify expert hc =
   let lits = Array.to_list hc.hclits in
   let lits = List.filter
     (fun lit -> match lit with
-      | Equation (l, r, false, _) when expert.expert_equal l r -> false
+      | Equation (l, r, false, _) when equal expert l r -> false
       | _ -> true)
     lits in
   if List.length lits = Array.length hc.hclits
@@ -195,8 +187,11 @@ module Set = struct
     ctx;
   }
 
+  (* TODO investigate possible bug: some experts are disabled? *)
+
   let add_list set experts =
-    (* traverse [right], trying to find one that is compatible with e *)
+    (* traverse [right], trying to find one that is compatible with [e].
+      [left] contains experts that have been already traversed. *)
     let rec add left right e =
       match right with
       | [] -> e::left (* add the expert *)
@@ -212,21 +207,31 @@ module Set = struct
       (fun e -> update_ctx ~ctx:set.ctx e) experts in
     List.fold_left
       (fun set e ->
-        if List.exists (fun e' -> more_specific e e') set.active
-        || not (compatible_ord e ~ord:set.ctx.ctx_ord)
-          then (* check whether [e] is more specific than some active expert *)
+        if not (compatible_ord e ~ord:set.ctx.ctx_ord)
+          then (* [e] is disabled, not compatible with [ctx] *)
+            let _ = Utils.debug 2 "%% expert %a disabled" pp_expert e in
             {set with inactive = e :: set.inactive; }
           else
-            (* move experts more specific than [e] from active to inactive *)
-            let disable, keep = List.partition
-              (fun e' -> more_specific e' e) set.active in
-            let inactive = disable @ set.inactive in
             (* add [e] to the active experts *)
-            let active = add [] keep e in
-            {set with active; inactive; })
+            let _ = Utils.debug 2 "%% expert %a enabled" pp_expert e in
+            let active = add [] set.active e in
+            {set with active; })
       set experts
 
   let add set e = add_list set [e]
+
+  let iter e f =
+    List.iter f e.active;
+    List.iter f e.inactive
+
+  let to_seq e = Sequence.append
+    (Sequence.of_list e.active)
+    (Sequence.of_list e.inactive)
+
+  let of_seq e seq =
+    Sequence.fold add e seq
+
+  let size e = Sequence.length (to_seq e)
 
   let update_ctx set ~ctx =
     let set' = {ctx; active=[]; inactive=[]; } in
@@ -236,14 +241,16 @@ module Set = struct
 
   let is_redundant set hc =
     List.exists
-      (fun e -> compatible_ord e ~ord:e.expert_ctx.ctx_ord && is_redundant e hc)
+      (fun e ->
+        assert (compatible_ord e ~ord:e.expert_ctx.ctx_ord);
+        is_redundant e hc)
       set.active
 
   let simplify set hc =
     List.fold_left
       (fun hc e ->
-        if compatible_ord e ~ord:e.expert_ctx.ctx_ord
-          then simplify e hc else hc)
+        assert (compatible_ord e ~ord:e.expert_ctx.ctx_ord);
+        simplify e hc)
       hc set.active
 
   let pp formatter set =
@@ -312,9 +319,9 @@ let compatible_gc ~ord gc =
     match prec with
     | [] | [_] -> true
     | x::((y::_) as prec') ->
-      ord#precedence#compare x y > 0 && compatible_prec ord prec'
+      ord.ord_precedence.prec_compare x y > 0 && compatible_prec ord prec'
   in
-  ord#name = gc.gc_ord && compatible_prec ord gc.gc_prec
+  ord.ord_name = gc.gc_ord && compatible_prec ord gc.gc_prec
 
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
@@ -331,7 +338,7 @@ let rec gc_expert ~ctx gc =
   let trs = Rewriting.OrderedTRS.create ~ord:ctx.ctx_ord in
   Rewriting.OrderedTRS.add_seq trs (Sequence.of_list expert_clauses);
   (* compute normal form using the rewriting system *)
-  let nf = Rewriting.OrderedTRS.mk_rewrite trs ~size:1024 in
+  let nf = Rewriting.OrderedTRS.mk_rewrite trs ~size:2048 in
   (* equality is equality of grounded normal forms *)
   let expert_equal t1 t2 =
     Utils.enter_prof prof_ground_pair;

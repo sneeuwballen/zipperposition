@@ -217,6 +217,23 @@ val lambda_abstract : term -> term -> term
       For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
       the term [^[X]: f(a, X @ b, c)] *)
 
+(** {2 Congruence Closure} *)
+
+type curry_leaf =
+  | CurrySymbol of symbol * sort
+  | CurryVar of term
+  | CurryQuote of term
+
+module Curryfied : CC.CurryfiedTerm with type symbol = curry_leaf
+  (** Curryfied terms with compatible symbols *)
+
+val cc_curry : term -> Curryfied.t
+
+val cc_uncurry : Curryfied.t -> term
+
+module TCC : CC.S with module CT = Curryfied
+  (** Congruence closure on (curryfied) terms *)
+
 (** {2 Some AC-utils} *)
 
 val flatten_ac : symbol -> term list -> term list
@@ -255,7 +272,6 @@ val pp_term_debug :                                 (** print term in a nice syn
 (** {2 Bijection} *)
 
 val bij : term Bij.t
-
 val bij_varlist : varlist Bij.t
 
 (** {2 Skolem terms} *)
@@ -270,7 +286,7 @@ val skolem_prefix : string ref
     the same way. The sort is the sort of the free De Bruijn symbol in t.
 
     It also refreshes the ordering (the signature has changed) *)
-val classic_skolem : ord:ordering -> term -> sort -> term
+val classic_skolem : ctx:context -> term -> sort -> term
 
 (** Skolemization with a special non-first order symbol. The purpose is
     not to introduce too many terms. A proposition p is skolemized
@@ -278,7 +294,7 @@ val classic_skolem : ord:ordering -> term -> sort -> term
 
     The advantage is that it does not modify the signature, and also that
     rewriting can be performed inside the skolem terms. *)
-val unamed_skolem : ord:ordering -> term -> sort -> term
+val unamed_skolem : ctx:context -> term -> sort -> term
 
 (** default skolemization function *)
-val skolem : (ord:ordering -> term -> sort -> term) ref
+val skolem : (ctx:context -> term -> sort -> term) ref

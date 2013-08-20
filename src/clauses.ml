@@ -113,7 +113,7 @@ let vars_of_lits lits =
     of [c], is has been infered/simplified from [c] *)
 let is_child_of ~child c =
   (* update the parent clauses' sets of descendants by adding [child] *)
-  let descendants = Ptset.add child.hctag c.hcdescendants in
+  let descendants = SmallSet.add c.hcdescendants child.hctag in
   c.hcdescendants <- descendants
 
 (* module CHashcons = Hashcons.Make( *)
@@ -131,11 +131,15 @@ let true_clause ~ctx =
   let hclits = [| Equation (T.true_term, T.true_term, true, Eq) |] in
   let hc = { hclits; hcproof = Obj.magic 0;
       hctag = -1; hcweight=2; hcselected=0; hcflags; hcctx=ctx;
-      hcvars=[]; hcparents=[]; hcdescendants=Ptset.empty; }
+      hcvars=[]; hcparents=[];
+      hcdescendants=SmallSet.empty ~cmp:(fun i j -> i-j); }
   in
   let hc = CHashcons.hashcons hc in
   hc.hcproof <- Proof (compact_clause hc, "trivial", []);
   hc
+
+(* TODO: use a (var, offset) -> int  hashtable to always produce
+   normalized clauses, by construction (see renaming in logic-terms) *)
 
 (** Build a new hclause from the given literals.
     If there are more than [BV.max_len] literals,
@@ -146,12 +150,13 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   if Array.length lits > BV.max_len
   then (Utils.debug 0 "%% incompleteness: clause of %d lits -> $true"
            (Array.length lits);
-        Const.incompleteness := true;
+        ctx.ctx_complete <- false;
         Utils.exit_prof prof_mk_hclause;
         true_clause ~ctx)
   else begin
   (* Set of variables. *)
   let all_vars = vars_of_lits lits in
+  (*
   (* Renaming subst *)
   let subst, _ = List.fold_left
     (fun (subst, i) var ->
@@ -161,6 +166,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
   (* Normalize literals *)
   let lits = Lits.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
   let all_vars = vars_of_lits lits in
+  *)
   (* create the structure *)
   let rec hc = {
     hclits = lits;
@@ -172,7 +178,7 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
     hcvars = all_vars;
     hcproof = Obj.magic 0;
     hcparents = [];
-    hcdescendants = Ptset.empty;
+    hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
   } in
   let old_hc, hc = hc, CHashcons.hashcons hc in
   if hc == old_hc then begin
@@ -203,6 +209,8 @@ let mk_hclause_a ?parents ?selected ~ctx lits proof =
 (** Build clause from a list (delegating to mk_hclause_a) *)
 let mk_hclause ?parents ?selected ~ctx lits proof =
   mk_hclause_a ?parents ?selected ~ctx (Array.of_list lits) proof
+
+let is_empty hc = Array.length hc.hclits = 0
 
 (** Adapt a proof to a new clause *)
 let adapt_proof proof c = match proof with
@@ -238,28 +246,26 @@ let check_ord_hclause ~ord hc =
   assert (
   Utils.array_forall
     (function (Equation (l,r,sign,o)) as lit ->
-      let ok = o = ord#compare l r in
+      let ok = o = ord.ord_compare l r in
       (if not ok then Format.printf "@[<h>Ord problem: literal %a, ord %s is not %s@]@."
                       Lits.pp_literal lit (string_of_comparison o)
-                      (string_of_comparison (ord#compare l r)));
+                      (string_of_comparison (ord.ord_compare l r)));
       ok)
     hc.hclits)
 
-(** Apply substitution to the clause *)
-let rec apply_subst ?(recursive=true) subst (hc,offset) =
+(** Apply substitution to the clause. Note that using the same renaming for all
+    literals is important. *)
+let rec apply_subst ?(recursive=true) ?(renaming=FoSubst.Renaming.create 5) subst (hc,offset) =
   let ctx = hc.hcctx in
-  if offset = 0 && S.is_empty subst then hc
-  else begin
-    let ord = ctx.ctx_ord in
-    let lits = Array.map
-      (fun lit -> Lits.apply_subst ~recursive ~ord subst (lit, offset))
-      hc.hclits in
-    let descendants = hc.hcdescendants in
-    let proof = adapt_proof hc.hcproof in
-    let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
-    new_hc.hcdescendants <- descendants;
-    new_hc
-  end
+  let ord = ctx.ctx_ord in
+  let lits = Array.map
+    (fun lit -> Lits.apply_subst ~recursive ~renaming ~ord subst (lit, offset))
+    hc.hclits in
+  let descendants = hc.hcdescendants in
+  let proof = adapt_proof hc.hcproof in
+  let new_hc = mk_hclause_a ~parents:[hc] ~ctx lits proof in
+  new_hc.hcdescendants <- descendants;
+  new_hc
 
 (** bitvector of literals that are positive *)
 let pos_lits lits =
@@ -300,7 +306,8 @@ let maxlits_array ~ord lits =
     are maximal under [ord] *)
 let maxlits (c, offset) subst =
   let ord = c.hcctx.ctx_ord in
-  let lits = Lits.apply_subst_lits ~recursive:true ~ord subst (c.hclits, offset) in
+  let lits = Lits.apply_subst_lits ~recursive:true ~ord
+    subst (c.hclits, offset) in
   maxlits_array ~ord lits
 
 (** Check whether the literal is maximal *)
@@ -406,6 +413,8 @@ let rec from_term ~ctx (t, file, name) =
  * set of clauses, reachable by ID
  * ---------------------------------------------------------------------- *)
 
+(* TODO suppress maxvar, useless *)
+
 (** Simple set *)
 module ClauseSet = Set.Make(
   struct
@@ -417,60 +426,62 @@ module ClauseSet = Set.Make(
 module CSet =
   struct
 
+    module IntMap = Map.Make(struct
+      type t = int
+      let compare i j = i - j
+    end)
+
     (** Set of hashconsed clauses. 'a is the fantom type for hclauses.
         It also contains a payload that is updated on every addition/
         removal of clauses. The additional payload is also updated upon
         addition/deletion. *)
     type t = {
       maxvar : int;                 (** index of maximum variable *)
-      clauses : hclause Ptmap.t;    (** clause ID -> clause *)
+      clauses : hclause IntMap.t;    (** clause ID -> clause *)
     }
 
-    let empty = { maxvar=0; clauses = Ptmap.empty; }
+    let empty = { maxvar=0; clauses = IntMap.empty; }
 
-    let is_empty set = Ptmap.is_empty set.clauses
+    let is_empty set = IntMap.is_empty set.clauses
 
-    let size set = Ptmap.fold (fun _ _ b -> b + 1) set.clauses 0
+    let size set = IntMap.fold (fun _ _ b -> b + 1) set.clauses 0
 
     let add set hc =
       let maxvar = max (T.max_var hc.hcvars) set.maxvar in
-      { maxvar; clauses = Ptmap.add hc.hctag hc set.clauses; }
+      { maxvar; clauses = IntMap.add hc.hctag hc set.clauses; }
 
     let add_list set hcs =
       let maxvar, clauses =
         List.fold_left
-          (fun (m,c) hc -> max m (T.max_var hc.hcvars), Ptmap.add hc.hctag hc c)
+          (fun (m,c) hc -> max m (T.max_var hc.hcvars), IntMap.add hc.hctag hc c)
           (set.maxvar, set.clauses) hcs in
       {maxvar; clauses;}
 
     let remove_id set i =
-      { set with clauses = Ptmap.remove i set.clauses }
+      { set with clauses = IntMap.remove i set.clauses }
 
     let remove set hc = remove_id set hc.hctag
 
     let remove_list set hcs =
       let clauses =
         List.fold_left
-          (fun c hc -> Ptmap.remove hc.hctag c)
+          (fun c hc -> IntMap.remove hc.hctag c)
           set.clauses hcs in
       {set with clauses;}
 
-    let remove_ids set ids =
-      let clauses =
-        Ptset.fold
-          (fun i set -> Ptmap.remove i set)
-          ids set.clauses in
-      {set with clauses;}
+    let get set i = IntMap.find i set.clauses
 
-    let get set i = Ptmap.find i set.clauses
+    let mem set hc = IntMap.mem hc.hctag set.clauses
 
-    let mem set hc = Ptmap.mem hc.hctag set.clauses
+    let mem_id set i = IntMap.mem i set.clauses
 
-    let mem_id set i = Ptmap.mem i set.clauses
+    let choose set =
+      try Some (snd (IntMap.choose set.clauses))
+      with Not_found -> None
 
-    let iter set k = Ptmap.iter (fun _ hc -> k hc) set.clauses
+    let iter set k = IntMap.iter (fun _ hc -> k hc) set.clauses
 
-    let iteri set k = Ptmap.iter k set.clauses
+    let iteri set k = IntMap.iter k set.clauses
 
     let fold f acc set =
       let acc = ref acc in
@@ -478,10 +489,24 @@ module CSet =
       !acc
 
     let to_list set =
-      Ptmap.fold (fun _ hc acc -> hc :: acc) set.clauses []
+      IntMap.fold (fun _ hc acc -> hc :: acc) set.clauses []
 
     let of_list l =
       add_list empty l
+
+    let to_seq set =
+      Sequence.from_iter
+        (fun k -> iter set k)
+
+    let of_seq set seq = Sequence.fold add set seq
+
+    let remove_seq set seq =
+      let clauses = Sequence.fold
+        (fun c hc -> IntMap.remove hc.hctag c)
+        set.clauses seq in
+      {set with clauses;}
+
+    let remove_id_seq set seq = Sequence.fold remove_id set seq
   end
 
 (* ----------------------------------------------------------------------
@@ -580,6 +605,16 @@ let is_const_definition hc =
     && not (T.member_term r l) ->
     Some (r,l)
   | _ -> None
+
+(** {2 Positions in clauses} *)
+
+type clause_pos = clause * position * term
+let compare_clause_pos (c1, p1, t1) (c2, p2, t2) =
+  let c = Pervasives.compare p1 p2 in
+  if c <> 0 then c else
+  let c = compare_hclause c1 c2 in
+  if c <> 0 then c else
+  (assert (T.eq_term t1 t2); 0)
 
 (* ----------------------------------------------------------------------
  * pretty printing

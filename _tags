@@ -1,2 +1,6 @@
-<datalog>: include
 <src>: include
+<tests>: include
+<datalog>: include
+<**/*.cmx>: inline(15)
+<**/*.native> or <**/*.byte>: package(num), package(dynlink), package(str), package(unix)
+<tests/*.native> or <tests/*.byte>: package(dynlink), package(str), package(unix)

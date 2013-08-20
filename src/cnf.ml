@@ -231,22 +231,22 @@ let rec nnf t =
     if T.eq_term t t' then t' else nnf t'
 
 (** skolemization of existentials, removal of forall *)
-let rec skolemize ~ord ~var_index t = match t.term with
+let rec skolemize ~ctx ~var_index t = match t.term with
   | Var _ | Node (_, []) | BoundVar _ -> t
   | Node (s, [{term=Node (s', [t])}]) when s = not_symbol && s' = not_symbol ->
-    skolemize ~ord ~var_index t (* double negation *)
+    skolemize ~ctx ~var_index t (* double negation *)
   | Bind (s, a_sort, t') when s = forall_symbol ->
     (* a fresh variable *)
     let v = T.mk_var (!var_index) a_sort in
     incr var_index;
     let new_t' = T.db_unlift (T.db_replace t' v) in
-    skolemize ~ord ~var_index new_t' (* remove forall *)
+    skolemize ~ctx ~var_index new_t' (* remove forall *)
   | Bind (s, a_sort, t') when s = exists_symbol ->
     (* make a skolem symbol *)
-    let new_t' = !T.skolem ~ord t' a_sort in
-    skolemize ~ord ~var_index new_t' (* remove forall *)
-  | Bind (s, a_sort, t') -> T.mk_bind s t.sort a_sort (skolemize ~ord ~var_index t')
-  | Node (s, l) -> T.mk_node s t.sort (List.map (skolemize ~ord ~var_index) l)
+    let new_t' = !T.skolem ~ctx t' a_sort in
+    skolemize ~ctx ~var_index new_t' (* remove forall *)
+  | Bind (s, a_sort, t') -> T.mk_bind s t.sort a_sort (skolemize ~ctx ~var_index t')
+  | Node (s, l) -> T.mk_node s t.sort (List.map (skolemize ~ctx ~var_index) l)
 
 (** reduction to cnf using De Morgan laws. Returns a list of list of terms *)
 let rec to_cnf t =
@@ -290,7 +290,7 @@ let cnf_of hc =
       let lits = Array.to_list hc.hclits in
       let nnf_lits = List.map (fun lit -> nnf (Lits.term_of_lit lit)) lits in
       let miniscoped_lits = List.map miniscope_term nnf_lits in
-      let skolem_lits = List.map (fun t -> skolemize ~ord ~var_index t) miniscoped_lits in
+      let skolem_lits = List.map (fun t -> skolemize ~ctx ~var_index t) miniscoped_lits in
       let clauses_of_lits = List.map to_cnf skolem_lits in
       (* list of list of literals, by or-product *)
       let lit_list_list = match clauses_of_lits with

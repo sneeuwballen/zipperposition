@@ -45,6 +45,10 @@ val min_var : 'a dtree -> int
 val max_var : 'a dtree -> int
   (** minimum variable in the tree (surapproximation) *)
 
+val fold_match : 'a dtree bind -> term bind -> 'b ->
+                 ('b -> term bind -> 'a -> substitution -> 'b) -> 'b
+  (** iterate on all (term -> value) such that subst(term) = input_term *)
+
 val iter_match : 'a dtree bind -> term bind ->
                  (term bind -> 'a -> substitution -> unit) -> unit
   (** iterate on all (term -> value) such that subst(term) = input_term *)
@@ -58,7 +62,7 @@ val pp_term_hclause_tree : Format.formatter -> (term * hclause) dtree -> unit
 val pp_term_tree : Format.formatter -> term dtree -> unit
   (** pretty print a tree of terms in ascii *)
 
-val unit_index : Index.unit_index
+val unit_index : Index.unit_t
   (** Indexing structure for simplifications *)
 
 val pp_dot : ?name:string -> ('a -> string) -> Format.formatter -> 'a dtree -> unit

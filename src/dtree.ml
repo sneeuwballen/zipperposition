@@ -196,7 +196,7 @@ let iter_match (dt, o_dt) (t, o_t) k =
   (* recursive traversal of the trie, following paths compatible with t *)
   let rec traverse trie pos subst =
     match trie with
-    | TrieLeaf l ->  (* yield all answers *)
+    | TrieLeaf l ->  (* yield all answers that do match *)
       List.iter (fun (t', v, _) -> k (t', o_dt) v subst) l
     | TrieNode m ->
       (* "lazy" transformation to flatterm *)
@@ -224,6 +224,13 @@ let iter_match (dt, o_dt) (t, o_t) k =
         m
   in
   traverse dt.tree 0 S.id_subst
+
+let fold_match (dt, o_dt) (t, o_t) acc k =
+  let acc = ref acc in
+  iter_match (dt, o_dt) (t, o_t)
+    (fun t'_bind data subst ->
+      acc := k !acc t'_bind data subst);
+  !acc
 
 (** iterate on all (term -> value) in the tree *)
 let iter dt k =
@@ -340,13 +347,13 @@ let unit_index =
   let eq_term_hclause (t1, hc1) (t2, hc2) =
     T.eq_term t1 t2 && Clauses.eq_hclause hc1 hc2
   in
-  object (self : 'self)
+  (object (self : 'self)
     val pos = empty eq_term_hclause
     val neg = empty eq_term_hclause
 
     method name = "dtree_unit_index"
 
-    method maxvar = max (max_var pos) (max_var neg)
+    method maxvar = failwith "Dtree.maxvar: deprecated"  (* TODO remove *)
 
     method is_empty = is_empty pos && is_empty neg
 
@@ -392,21 +399,20 @@ let unit_index =
       iter neg (fun _ _ -> incr n);
       !n
 
-    method retrieve ~sign offset (t, o_t) k =
-      let handler l (r, hc) subst = k l (r, offset) subst hc in
+    method retrieve :'b. sign:bool -> offset -> term bind -> 'b ->
+    ('b -> term bind -> term bind -> hclause -> substitution -> 'b) -> 'b
+    = fun ~sign offset (t, o_t) acc k ->
+      let handler acc l (r, hc) subst = k acc l (r, offset) hc subst in
       if sign
-        then iter_match (pos, offset) (t, o_t) handler
-        else iter_match (neg, offset) (t, o_t) handler
+        then fold_match (pos, offset) (t, o_t) acc handler
+        else fold_match (neg, offset) (t, o_t) acc handler
 
     method pp formatter () =
       Format.fprintf formatter "@[<hv>pos: %a@.neg:%a@]"
         pp_term_hclause_tree pos pp_term_hclause_tree neg
 
-    method to_dot filename =
+    method to_dot fmt =
       let to_string (t, hc) = Utils.sprintf "@[<h>%a@]" !Clauses.pp_clause#pp_h hc in
-      ignore (Utils.with_output filename
-        (fun oc ->
-          let formatter = Format.formatter_of_out_channel oc in
-          pp_dot to_string formatter pos;
-          Format.pp_print_flush formatter ()))
-  end
+      pp_dot to_string fmt pos;
+      Format.pp_print_flush fmt ()
+  end :> Index.unit_t)

@@ -18,6 +18,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
+(** {1 Operations on substitutions} *)
+
 open Basic
 
 module T = Terms
@@ -75,17 +77,55 @@ let bind ?(recursive=true) subst ((v, _) as var_bind) (t, o_t) =
       then SubstBind (t', o_t', t, o_t, subst)  (* add binding at front *)
       else raise (Invalid_argument "Subst.bind: inconsistent binding")
 
+let rec append s1 s2 =
+  match s1 with
+  | SubstEmpty -> s2
+  | SubstBind (t1, o1, t2, o2, s1') ->
+    let s2' = bind ~recursive:true s2 (t1, o1) (t2, o2) in
+    append s1' s2'
+
+(** Disambiguation of variables between different contexts *)
+module Renaming = struct
+  module H = Hashtbl.Make(struct
+    type t = (term * offset)
+    let equal (t1,o1) (t2,o2) = t1 == t2 && o1 = o2
+    let hash (t,o) = t.tag lxor o
+  end)
+
+  type t = term H.t   (* hashtable (term,offset) -> term *)
+
+  let create size = H.create size
+
+  let clear ren = H.clear ren
+
+  let rename ren (t, offset) =
+    match t.term with
+    | Var _ ->
+      begin try
+        H.find ren (t, offset)
+      with Not_found ->
+        (* new name *)
+        let n = H.length ren in
+        let t' = T.mk_var n t.sort in
+        H.add ren (t, offset) t';
+        t'
+      end
+    | _ -> assert false
+end
+
 (** Apply substitution to term, replacing variables by the terms they are bound to.
-    The offset (term bind) is applied to variables that are not bound by subst.
+    The [renaming] is used to rename free variables (not bound
+    by [subst]) while avoiding collisions.
     [recursive] decides whether, when [v] is replaced by [t], [subst] is
-    applied to [t] recursively or not. *)
-let apply_subst ?(recursive=true) subst (t, offset) =
+    applied to [t] recursively or not (default true). *)
+let apply_subst ?(recursive=true) ?renaming subst (t, offset) =
   (* apply subst to bound term. We need to keep track of
      how many binders are on the path to the variable, because of non-DB-closed
      terms that may occur in the codomain of [subst] *)
   let rec replace binder_depth subst ((t, offset) as bound_t) =
-    if T.is_ground_term t || (is_empty subst && offset = 0)
-    then t (* subst(t) = t, if t ground or subst empty with no shifting *)
+    if T.is_ground_term t
+    || (renaming == None && is_empty subst && offset = 0)
+    then t (* subst(t) = t, if t ground *)
     else match t.term with
     | BoundVar _ -> t
     | Bind (s, a_sort, t') ->
@@ -100,20 +140,23 @@ let apply_subst ?(recursive=true) subst (t, offset) =
         else T.mk_node s t.sort l'
     | Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
-      (try let (t', o_t') = lookup subst bound_t in
-           (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
-           let t' = if T.db_closed t'
+      begin try
+        let (t', o_t') = lookup subst bound_t in
+          (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
+          let t' = if T.db_closed t'
             then t' else T.db_lift binder_depth t' in
-           (* also apply [subst] to [t']? *)
-           if recursive && (t' != t || o_t' <> offset)
+          (* also apply [subst] to [t']? *)
+          if recursive && (t' != t || o_t' <> offset)
             then (* replace also in the image of t *)
               replace binder_depth subst (t', o_t')
             else (* return image, in which variables are shifted *)
               replace binder_depth id_subst (t', o_t') 
-       with Not_found -> (* variable not bound by [subst] *)
-        if offset = 0
-          then t  (* no shifting *)
-          else T.mk_var (i+offset) t.sort) (* shift by offset *)
+      with Not_found -> (* variable not bound by [subst], rename it *)
+        match renaming with
+        | None when offset = 0 -> t
+        | None -> T.mk_var (i+offset) t.sort        (* shift *)
+        | Some r -> Renaming.rename r (t,offset)    (* rename *)
+      end
   (* apply subst to the list, all elements of which have the given offset *)
   and replace_list binder_depth subst offset l = match l with
   | [] -> []

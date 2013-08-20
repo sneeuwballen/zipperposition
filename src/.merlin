@@ -1,6 +1,8 @@
 S .
 S ./meta/
 S ../containers/
+S ../plugins/
+B ../plugins/
 B ../_build/
 B ../_build/src/
 B ../_build/src/meta/

@@ -51,7 +51,18 @@ let update_token (token: string) =
   update_column_index (!current_column_index + String.length token)
 
 let lexing_error (error: string) (token: string) =
-  parse_error (error ^ " at " ^ token)
+  print_endline (error
+            ^ " at line " ^ string_of_int !current_line_index
+            ^ " column " ^ string_of_int !current_column_index
+            ^ ":\n" ^ token);
+  raise Parsing.Parse_error
+
+let parse_error () =
+  print_endline ("Parse error"
+            ^ " at line " ^ string_of_int !current_line_index
+            ^ " column " ^ string_of_int !current_column_index
+            ^ ":\n" ^ !current_token);
+  raise Parsing.Parse_error
 
 }
 
@@ -65,6 +76,7 @@ let non_zero_numeric = ['1' - '9']
 let lower_alpha = ['a' - 'z']
 let upper_alpha = ['A' - 'Z']
 let alpha_numeric = ( lower_alpha | upper_alpha | numeric | '_' )
+let dollar = "$"
 let dollar_dollar = "$$"
 (*let printable_char = _*)
 let vline = '|'
@@ -74,11 +86,12 @@ let unsigned_decimal = ('0' | non_zero_numeric numeric* )
 let signed_decimal = sign unsigned_decimal
 let unsigned_integer = unsigned_decimal
 let signed_integer = sign unsigned_integer
-let fraction_decimal = '.' numeric numeric*
+let fraction_decimal = '.' numeric numeric* (['E' 'e'] ('-')? numeric+)?
 let real = ( signed_decimal | unsigned_decimal ) fraction_decimal
 
 let upper_word = upper_alpha alpha_numeric*
 let lower_word = lower_alpha alpha_numeric*
+let dollar_word = dollar lower_word
 let dollar_dollar_word = dollar_dollar lower_word
 
 (*let single_quoted = "'" ([^ '\\' '''] | "\'" | "\\")* "'"*)
@@ -93,7 +106,7 @@ let comment_block = "/*" not_star_slash '*' '*'* '/'
 let comment = comment_line | comment_block
 *)
 let one_line_comment =
-  '%' [^ '\n' '\r']* ('\n' | "\r\n")
+  ('%' | '#') [^ '\n' '\r']* ('\n' | "\r\n")
 
 let multi_line_comment =
   "/*" ( [^ '*'] | ('*' [^ '/']) )* "*/"
@@ -144,6 +157,9 @@ rule token =
       | "tff"                        { update_token (Lexing.lexeme lexbuf); TFF }
       | "thf"                        { update_token (Lexing.lexeme lexbuf); THF }
       | "include"                    { update_token (Lexing.lexeme lexbuf); INCLUDE }
+      | "inference"                  { update_token (Lexing.lexeme lexbuf); INFERENCE }
+      | "file"                       { update_token (Lexing.lexeme lexbuf); FILE }
+      | "type"                       { update_token (Lexing.lexeme lexbuf); TYPE }
 
       | "is"                         { update_token (Lexing.lexeme lexbuf); IS }
       | "theory"                     { update_token (Lexing.lexeme lexbuf); THEORY }
@@ -161,6 +177,7 @@ rule token =
                                          SINGLE_QUOTED(String.sub s 1 (String.length s - 2)) }
       | single_quoted                { update_token (Lexing.lexeme lexbuf); SINGLE_QUOTED(Lexing.lexeme lexbuf) }
       | distinct_object              { update_token (Lexing.lexeme lexbuf); DISTINCT_OBJECT(Lexing.lexeme lexbuf) }
+      | dollar_word                  { update_token (Lexing.lexeme lexbuf); DOLLAR_WORD (Lexing.lexeme lexbuf) }
       | dollar_dollar_word           { update_token (Lexing.lexeme lexbuf); DOLLAR_DOLLAR_WORD(Lexing.lexeme lexbuf) }
       | unsigned_integer             { update_token (Lexing.lexeme lexbuf); UNSIGNED_INTEGER(Lexing.lexeme lexbuf) }
       | signed_integer               { update_token (Lexing.lexeme lexbuf); SIGNED_INTEGER(Lexing.lexeme lexbuf) }
@@ -180,14 +197,19 @@ rule token =
       | "<~>"                        { update_token (Lexing.lexeme lexbuf); XOR }
       | negation                     { update_token (Lexing.lexeme lexbuf); NEGATION }
       | "-->"                        { update_token (Lexing.lexeme lexbuf); GENTZEN_ARROW }
+      | "*"                          { update_token (Lexing.lexeme lexbuf); PRODUCT }
+      | ">"                          { update_token (Lexing.lexeme lexbuf); ARROW }
       | "/"                          { update_token (Lexing.lexeme lexbuf); SLASH }
+      | "$let"                       { update_token (Lexing.lexeme lexbuf); LET }
       | "$true"                      { update_token (Lexing.lexeme lexbuf); DOLLAR_TRUE }
       | "$false"                     { update_token (Lexing.lexeme lexbuf); DOLLAR_FALSE }
-      | '$'                          { update_token (Lexing.lexeme lexbuf); DOLLAR }
+      | "$distinct"                  { update_token (Lexing.lexeme lexbuf); DISTINCT }
       | '&'                          { update_token (Lexing.lexeme lexbuf); AND }
       | '|'                          { update_token (Lexing.lexeme lexbuf); OR }
       | '!'                          { update_token (Lexing.lexeme lexbuf); FORALL }
       | '?'                          { update_token (Lexing.lexeme lexbuf); EXISTS }
+      | '^'                          { update_token (Lexing.lexeme lexbuf); LAMBDA }
+      | '@'                          { update_token (Lexing.lexeme lexbuf); AT }
       
       | _                            { prev_column_index := !current_column_index;
                                        prev_line_index := !current_line_index;

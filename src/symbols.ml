@@ -33,6 +33,7 @@ let attr_multiset = 1 lsl 5
 let attr_fresh_const = 1 lsl 6
 let attr_commut = 1 lsl 7
 let attr_polymorphic = 1 lsl 8
+let attr_num = 1 lsl 9
 
 (** {2 Definition of symbols and sorts} *)
 
@@ -94,15 +95,19 @@ let mk_num ?(attrs=0) n =
   let s = {
     symb_val = Num n;
     symb_id = 0;
-    symb_attrs = attrs;
+    symb_attrs = attrs lor attr_polymorphic lor attr_num;
   } in
   HashSymbol.hashcons s
+
+let parse_num ?attrs str =
+  let n = Num.num_of_string str in
+  mk_num ?attrs n
 
 let mk_int ?(attrs=0) i =
   let s = {
     symb_val = Num (Num.num_of_int i);
     symb_id = 0;
-    symb_attrs = attrs;
+    symb_attrs = attrs lor attr_polymorphic lor attr_num;
   } in
   HashSymbol.hashcons s
 
@@ -110,9 +115,154 @@ let mk_real ?(attrs=0) f =
   let s = {
     symb_val = Real f;
     symb_id = 0;
-    symb_attrs = attrs;
+    symb_attrs = attrs lor attr_polymorphic lor attr_num;
   } in
   HashSymbol.hashcons s
+
+let is_const s = match s.symb_val with
+  | Const _ -> true | _ -> false
+
+let is_int s = match s.symb_val with
+  | Num n -> Num.is_integer_num n | _ -> false
+
+let is_rat s = match s.symb_val with
+  | Num n -> not (Num.is_integer_num n) | _ -> false
+
+let is_real s = match s.symb_val with
+  | Real f -> true | _ -> false
+
+let is_numeric s = match s.symb_val with
+  | Real _ | Num _ -> true | _ -> false
+
+let is_distinct s = match s.symb_val with
+  | Distinct _ -> true | _ -> false
+
+(** Arithmetic (assumes the symbols verify {!is_numeric}) *)
+module Arith = struct
+  exception TypeMismatch
+
+  open Num
+
+  let sign s = match s.symb_val with
+  | Num n -> sign_num n
+  | Real f when f > 0. -> 1
+  | Real f when f < 0. -> 1
+  | Real f -> 0
+  | _ -> raise TypeMismatch
+
+  let floor s = match s.symb_val with
+  | Num n -> mk_num (floor_num n)
+  | Real f -> mk_real (floor f)
+  | _ -> raise TypeMismatch
+
+  let ceiling s = match s.symb_val with
+  | Num n -> mk_num (ceiling_num n)
+  | Real f -> mk_real (ceil f)
+  | _ -> raise TypeMismatch
+
+  let truncate s = match s.symb_val with
+  | Num n when sign_num n >= 0 -> mk_num (floor_num n)
+  | Num n -> mk_num (minus_num (floor_num (abs_num n)))
+  | Real f -> mk_num (num_of_int (truncate f))
+  | _ -> raise TypeMismatch
+
+  let round s = match s.symb_val with
+  | Num n -> mk_num (round_num n)
+  | Real f ->
+    let f' = Pervasives.floor f in
+    let i = if f -. f' > 0.5 then int_of_float f' else (int_of_float f') + 1 in
+    mk_num (num_of_int i)
+  | _ -> raise TypeMismatch
+
+  let prec s = match s.symb_val with
+  | Num n -> mk_num (pred_num n)
+  | Real f -> mk_real (f -. 1.)
+  | _ -> raise TypeMismatch
+
+  let succ s = match s.symb_val with
+  | Num n -> mk_num (succ_num n)
+  | Real f -> mk_real (f +. 1.)
+  | _ -> raise TypeMismatch
+
+  let one_i = mk_num (num_of_int 1)
+  let zero_i = mk_num (num_of_int 0)
+  let one_f = mk_real 1.
+  let zero_f = mk_real 0.
+
+  let is_zero s = match s.symb_val with
+  | Num n -> Num.sign_num n = 0
+  | Real f -> f = 0.
+  | _ -> raise TypeMismatch
+
+  let sum s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> mk_num (n1 +/ n2)
+  | Real f1, Real f2 -> mk_real (f1 +. f2)
+  | _ -> raise TypeMismatch
+
+  let difference s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> mk_num (n1 -/ n2)
+  | Real f1, Real f2 -> mk_real (f1 -. f2)
+  | _ -> raise TypeMismatch
+
+  let uminus s = match s.symb_val with
+  | Num n -> mk_num (minus_num n)
+  | Real f -> mk_real (~-. f)
+  | _ -> raise TypeMismatch
+
+  let product s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> mk_num (n1 */ n2)
+  | Real f1, Real f2 -> mk_real (f1 *. f2)
+  | _ -> raise TypeMismatch
+
+  let quotient s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 ->
+    (try mk_num (n1 // n2) with Failure _ -> raise Division_by_zero)
+  | Real f1, Real f2 ->
+    let f = f1 /. f2 in if f == infinity then raise Division_by_zero else mk_real f
+  | _ -> raise TypeMismatch
+
+  let quotient_e s1 s2 =
+    if sign s2 >= 0 then floor (quotient s1 s2) else ceiling (quotient s1 s2)
+
+  let quotient_t s1 s2 = truncate (quotient s1 s2)
+
+  let quotient_f s1 s2 = floor (quotient s1 s2)
+
+  let remainder_e s1 s2 = difference s1 (product (quotient_e s1 s2) s2)
+
+  let remainder_t s1 s2 = difference s1 (product (quotient_t s1 s2) s2)
+
+  let remainder_f s1 s2 = difference s1 (product (quotient_f s1 s2) s2)
+
+  let to_int s = floor s
+
+  let to_rat s = s  (* XXX not fully specified *)
+
+  let to_real s = match s.symb_val with
+  | Num n -> mk_real (float_of_num n)
+  | Real _ -> s
+  | _ -> raise TypeMismatch
+
+  let less s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 </ n2
+  | Real f1, Real f2 -> f1 < f2
+  | _ -> raise TypeMismatch
+
+  let lesseq s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 <=/ n2
+  | Real f1, Real f2 -> f1 <= f2
+  | _ -> raise TypeMismatch
+
+  let greater s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 >/ n2
+  | Real f1, Real f2 -> f1 > f2
+  | _ -> raise TypeMismatch
+
+  let greatereq s1 s2 = match s1.symb_val, s2.symb_val with
+  | Num n1, Num n2 -> n1 >=/ n2
+  | Real f1, Real f2 -> f1 >= f2
+  | _ -> raise TypeMismatch
+end
 
 let is_used s = HashSymbol.mem {symb_val=Const s; symb_id=0; symb_attrs=0;}
 
@@ -122,6 +272,8 @@ let name_symbol s = match s.symb_val with
   | Distinct s -> s
   | Num n -> Num.string_of_num n
   | Real f -> string_of_float f
+
+let get_val s = s.symb_val
 
 let tag_symbol s = s.symb_id
 
@@ -199,6 +351,8 @@ type sort =
 
 let rec pp_sort formatter sort = match sort with
   | Sort s -> Format.pp_print_string formatter s
+  | Fun (s, [Fun _ as s']) ->
+    Format.fprintf formatter "(%a) > %a" pp_sort s' pp_sort s
   | Fun (s, [s']) ->
     Format.fprintf formatter "%a > %a" pp_sort s' pp_sort s
   | Fun (s, l) ->
@@ -254,13 +408,16 @@ let (<==) s l = match l with
 
 let (<=.) s1 s2 = s1 <== [s2]
 
-let can_apply l args =
-  try List.for_all2 (==) l args
-  with Invalid_argument _ -> false
+let rec can_apply l args =
+  match l, args with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | s1::l', s2::args' -> s1 == s2 && can_apply l' args'
 
 (** [s @@ args] applies the sort [s] to arguments [args]. Basic must match *)
 let (@@) s args = match s, args with
-  | Sort _, [] -> s
+  | _, [] -> s
   | Fun (s', l), _ when can_apply l args -> s'
   | _ -> raise (SortError "cannot apply sort")
 
@@ -270,6 +427,65 @@ let univ_ = mk_sort univ_symbol
 let int_ = mk_sort int_symbol
 let rat_ = mk_sort rat_symbol
 let real_ = mk_sort real_symbol
+
+let is_atomic_sort = function | Sort _ -> true | Fun _ -> false
+let is_fun_sort = function | Sort _ -> false | Fun _ -> true
+
+let rec serialize_sort buf = function
+  | Sort s -> Buffer.add_string buf s
+  | Fun (s, l) ->
+    Printf.bprintf buf "(%a %a)" serialize_sort s serialize_sorts l
+and serialize_sorts buf l = match l with
+  | [] -> ()
+  | [x] -> serialize_sort buf x
+  | x::l' -> serialize_sort buf x; Buffer.add_char buf ' '; serialize_sorts buf l'
+
+let sort_to_string s =
+  let b = Buffer.create 15 in
+  serialize_sort b s;
+  Buffer.contents b
+
+(* parse a sort, using stream parser *)
+let sort_of_string =
+  let lexer = Genlex.make_lexer ["("; ")"; "$"] in
+  (* parse the stream [s] *)
+  let rec parse s =
+    match Stream.peek s with
+    | Some (Genlex.Kwd "(") ->
+      Stream.junk s;
+      let sort = parse s in
+      let sorts = parse_sorts [] s in
+      (match Stream.peek s with
+       | Some (Genlex.Kwd ")") ->
+        Stream.junk s;
+        sort <== sorts
+       | _ -> failwith "parse_sort: expected ')'")
+    | Some (Genlex.Ident ident) ->
+      Stream.junk s;
+      mk_sort ident
+    | Some (Genlex.Kwd "$") ->
+      Stream.junk s;
+      (match Stream.peek s with
+      | Some (Genlex.Ident ident) ->
+        Stream.junk s;
+        mk_sort ("$" ^ ident)
+      | _ -> failwith "parse_sort: expected ident")
+    | Some _ -> failwith "parse_sort: expected sort"
+    | None ->  failwith "parse_sort: unexpected end of input"
+  and parse_sorts l s = match Stream.peek s with
+    | Some (Genlex.Kwd ")") ->
+      List.rev l 
+    | Some _ ->
+      let sort = parse s in
+      parse_sorts (sort :: l) s
+    | None ->  failwith "parse_sorts: unexpected end of input"
+  in
+  fun str ->
+    try
+      parse (lexer (Stream.of_string str))
+    with (Failure msg) as e ->
+      Printf.eprintf "%% could not read sort %s: %s\n" str msg;
+      raise e
 
 (** Arity of a sort, ie nunber of arguments of the function, or 0 *)
 let arity = function
@@ -352,6 +568,9 @@ let is_base_symbol s = SSet.mem s base_symbols
 (** extract the list of symbols from the complete signature *)
 let symbols_of_signature signature =
   SMap.fold (fun s _ l -> s :: l) signature []
+
+let set_of_signature signature =
+  SMap.fold (fun s _ set -> SSet.add s set) signature SSet.empty
 
 (** Merge two signatures. raises Failure if they are incompatible. *)
 let merge_signatures s1 s2 =

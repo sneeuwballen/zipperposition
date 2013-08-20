@@ -18,7 +18,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* the state of a proof *)
+(** {1 The state of a proof, contains a set of active clauses (processed),
+    a set of passive clauses (to be processed), and an ordering
+    that is used for redundancy elimination.} *)
 
 open Basic
 open Params
@@ -33,13 +35,18 @@ module CQ = ClauseQueue
 
 let stat_passive_cleanup = mk_stat "cleanup of passive set"
 
+type index = Clauses.clause_pos Index.t
+  (** An index for positions in clauses *)
+
 let _indexes =
   let table = Hashtbl.create 2 in
   (* TODO write a Substitution Tree, with the new substitution representation? *)
-  (* TODO enable again...
-  Hashtbl.add table "discr_tree" Discrimination_tree.index;
-  *)
-  Hashtbl.add table "fp" (Fingerprint.mk_index Fingerprint.fp6m);
+  (* TODO rewrite a general purpose discrimination tree *)
+  let mk_fingerprint fp = 
+    Fingerprint.mk_index ~cmp:Clauses.compare_clause_pos fp in
+  Hashtbl.add table "fp" (mk_fingerprint Fingerprint.fp6m);
+  Hashtbl.add table "fp7m" (mk_fingerprint Fingerprint.fp7m);
+  Hashtbl.add table "fp16" (mk_fingerprint Fingerprint.fp16);
   table
 
 let choose_index name =
@@ -60,24 +67,23 @@ let names_index () =
 type active_set =
   < ctx : context;
     clauses : Clauses.CSet.t;           (** set of active clauses *)
-    idx_sup_into : Index.index;         (** index for superposition into the set *)
-    idx_sup_from : Index.index;         (** index for superposition from the set *)
-    idx_back_demod : Index.index;       (** index for backward demodulation/simplifications *)
-    idx_fv : FeatureVector.fv_index;    (** index for subsumption
-                                            (TODO allow to update its features?) *)
+    idx_sup_into : index;               (** index for superposition into the set *)
+    idx_sup_from : index;               (** index for superposition from the set *)
+    idx_back_demod : index;             (** index for backward demodulation/simplifications *)
+    idx_fv : Index.subsumption_t;       (** index for subsumption *)
 
-    add : hclause list -> unit;         (** add clauses *)
-    remove : hclause list -> unit;      (** remove clauses *)
+    add : hclause Sequence.t -> unit;   (** add clauses *)
+    remove : hclause Sequence.t -> unit;(** remove clauses *)
   >
 
 (** set of simplifying (unit) clauses *)
 type simpl_set =
   < ctx : context;
-    idx_simpl : Index.unit_index;       (** index for forward simplifications
+    idx_simpl : Index.unit_t;           (** index for forward simplifications
                                             TODO split into pos-orientable/others *)
 
-    add : hclause list -> unit;
-    remove : hclause list -> unit;
+    add : hclause Sequence.t -> unit;
+    remove : hclause Sequence.t -> unit;
   >
 
 (** set of passive clauses *)
@@ -86,7 +92,7 @@ type passive_set =
     clauses : Clauses.CSet.t;           (** set of clauses *)
     queues : (ClauseQueue.t * int) list;
 
-    add : hclause list -> unit;         (** add clauses *)
+    add : hclause Sequence.t -> unit;   (** add clauses *)
     remove : int -> unit;               (** remove clause by ID *)
     next : unit -> hclause option;      (** next passive clause, if any *)
     clean : unit -> unit;               (** cleanup internal queues *)
@@ -102,7 +108,7 @@ type state =
     active_set : active_set;            (** active clauses *)
     passive_set : passive_set;          (** passive clauses *)
     meta_prover : Meta.Prover.t option;
-    experts : Experts.Set.t;            (** Set of experts *)
+    experts : Experts.Set.t;            (** Set of current experts *)
 
     add_expert : Experts.t -> unit;     (** Add an expert *)
   >
@@ -161,7 +167,7 @@ let update_with_clause op acc eligible ~subterms ~both_sides hc =
 (** update acc using op, on all given clauses *)
 let update_with_clauses op acc eligible ~subterms ~both_sides hcs =
   let acc = ref acc in
-  List.iter
+  Sequence.iter
     (fun hc -> acc := update_with_clause op !acc eligible ~subterms ~both_sides hc)
     hcs;
   !acc
@@ -184,9 +190,10 @@ let eligible_always hc i lit = true
  * ---------------------------------------------------------------------- *)
 
 (** Create an active set from the given ord, and indexing structures *)
-let mk_active_set ~ctx (index : Index.index) signature =
+let mk_active_set ~ctx (index : index) signature =
   (* create a FeatureVector index from the current signature *)
-  let fv_idx = FV.mk_fv_index_signature signature in
+  let features = FV.mk_features signature in
+  let fv_idx = FV.mk_index features in
   (object (self)
     val mutable m_clauses = C.CSet.empty
     val mutable m_sup_into = index
@@ -214,19 +221,21 @@ let mk_active_set ~ctx (index : Index.index) signature =
 
     (** add clauses (only process the ones not present in the set) *)
     method add hcs =
-      let hcs = List.filter (fun hc -> not (C.CSet.mem m_clauses hc)) hcs in
-      m_clauses <- C.CSet.add_list m_clauses hcs;
+      let hcs = Sequence.filter (fun hc -> not (C.CSet.mem m_clauses hc)) hcs in
+      let hcs = Sequence.persistent hcs in
+      m_clauses <- C.CSet.of_seq m_clauses hcs;
       let op tree = tree#add in
       self#update op hcs;
-      m_fv <- FV.index_clauses m_fv hcs
+      m_fv <- m_fv#add_clauses hcs
 
     (** remove clauses (only process the ones present in the set) *)
     method remove hcs =
-      let hcs = List.filter (C.CSet.mem m_clauses) hcs in
-      m_clauses <- C.CSet.remove_list m_clauses hcs;
+      let hcs = Sequence.filter (C.CSet.mem m_clauses) hcs in
+      let hcs = Sequence.persistent hcs in
+      m_clauses <- C.CSet.remove_seq m_clauses hcs;
       let op tree = tree#remove in
       self#update op hcs;
-      m_fv <- FV.remove_clauses m_fv hcs
+      m_fv <- m_fv#remove_clauses hcs
   end :> active_set)
 
 (* ----------------------------------------------------------------------
@@ -241,10 +250,10 @@ let mk_simpl_set ~ctx unit_idx =
     method idx_simpl = m_simpl
 
     method add hcs =
-      m_simpl <- List.fold_left (fun simpl hc -> simpl#add_clause hc) m_simpl hcs
+      m_simpl <- Sequence.fold (fun simpl hc -> simpl#add_clause hc) m_simpl hcs
 
     method remove hcs =
-      m_simpl <- List.fold_left (fun simpl hc -> simpl#remove_clause hc) m_simpl hcs
+      m_simpl <- Sequence.fold (fun simpl hc -> simpl#remove_clause hc) m_simpl hcs
   end
 
 (* ----------------------------------------------------------------------
@@ -253,10 +262,10 @@ let mk_simpl_set ~ctx unit_idx =
 
 let mk_passive_set ~ctx queues =
   assert (queues != []);
+  let length = List.length queues in
   object
     val mutable m_clauses = C.CSet.empty
     val m_queues = Array.of_list queues
-    val m_length = List.length queues
     val mutable m_state = (0,0)
     method ctx = ctx
     method clauses = m_clauses
@@ -264,12 +273,13 @@ let mk_passive_set ~ctx queues =
 
     (** add clauses (not already present in set) to the set *)
     method add hcs =
-      let hcs = List.filter (fun hc -> not (C.CSet.mem m_clauses hc)) hcs in
-      m_clauses <- C.CSet.add_list m_clauses hcs;
-      for i = 0 to m_length - 1 do
+      let hcs = Sequence.filter (fun hc -> not (C.CSet.mem m_clauses hc)) hcs in
+      let hcs = Sequence.persistent hcs in
+      m_clauses <- C.CSet.of_seq m_clauses hcs;
+      for i = 0 to length - 1 do
         (* add to i-th queue *)
         let (q, w) = m_queues.(i) in
-        m_queues.(i) <- (CQ.adds q (Sequence.of_list hcs), w)
+        m_queues.(i) <- (CQ.adds q hcs, w)
       done
 
     (** remove clauses (not from the queues) *)
@@ -282,7 +292,8 @@ let mk_passive_set ~ctx queues =
       (* search in the idx-th queue *)
       let rec search idx weight =
         let q, w = m_queues.(idx) in
-        if weight >= w || CQ.is_empty q then next_idx (idx+1) (* empty queue, go to the next one *)
+        if weight >= w || CQ.is_empty q
+        then next_idx (idx+1) (* empty queue, go to the next one *)
         else begin
           let new_q, hc = CQ.take_first q in (* pop from this queue *)
           m_queues.(idx) <- new_q, w;
@@ -297,7 +308,7 @@ let mk_passive_set ~ctx queues =
       (* search the next non-empty queue *)
       and next_idx idx =
         if idx = first_idx then None (* all queues are empty *)
-        else if idx = m_length then next_idx 0 (* cycle *)
+        else if idx = length then next_idx 0 (* cycle *)
         else search idx 0 (* search in this queue *)
       in
       search first_idx w
@@ -305,7 +316,7 @@ let mk_passive_set ~ctx queues =
     (* cleanup the clause queues *)
     method clean () =
       incr_stat stat_passive_cleanup;
-      for i = 0 to m_length - 1 do
+      for i = 0 to length - 1 do
         let q, w = m_queues.(i) in
         m_queues.(i) <- CQ.clean q m_clauses, w
       done
@@ -335,7 +346,10 @@ let mk_state ~ctx ?meta params signature =
       let es = Experts.update_ctx e ~ctx in
       _experts := Experts.Set.add_list !_experts es;
       (* add clauses of each expert to the set of passive clauses *)
-      List.iter (fun e -> m_passive#add (Experts.clauses e)) es
+      let clauses = Sequence.flatMap
+        (fun e -> Sequence.of_list (Experts.clauses e))
+        (Sequence.of_list es) in
+      m_passive#add clauses
   end
 
 (* ----------------------------------------------------------------------
@@ -354,7 +368,8 @@ let pp_state formatter state =
   let num_active, num_passive, num_simpl = stats state in
   Format.fprintf formatter
     "@[<h>state {%d active clauses; %d passive_clauses; %d simplification_rules;@;%a}@]"
-    num_active num_passive num_simpl CQ.pp_queues (Sequence.of_list state#passive_set#queues)
+    num_active num_passive num_simpl
+    CQ.pp_queues (Sequence.of_list state#passive_set#queues)
 
 let debug_state formatter state =
   let num_active, num_passive, num_simpl = stats state in

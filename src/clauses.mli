@@ -67,23 +67,26 @@ module CHashcons : Hashcons.S with type t = hclause
 
 val mk_hclause : ?parents:hclause list -> ?selected:Bitvector.t ->
                  ctx:context -> literal list ->
-                  (compact_clause -> compact_clause proof) -> hclause
+                  (compact_clause -> proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
 val mk_hclause_a : ?parents:hclause list -> ?selected:Bitvector.t ->
                    ctx:context -> literal array ->
-                   (compact_clause -> compact_clause proof) -> hclause
+                   (compact_clause -> proof) -> hclause
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
 
-val adapt_proof : compact_clause proof -> compact_clause -> compact_clause proof
+val adapt_proof : proof -> compact_clause -> proof
   (** Adapt an old proof to the new compact_clause *)
 
 val stats : unit -> (int*int*int*int*int*int) (** hashcons stats *)
 
-val descendants : hclause -> Ptset.t
+val is_empty : hclause -> bool
+  (** Is the clause an empty clause? *)
+
+val descendants : hclause -> int SmallSet.t
   (** set of ID of descendants of the clause *)
 
 val clause_of_fof : hclause -> hclause
@@ -95,8 +98,9 @@ val update_ctx : ctx:context -> hclause -> hclause
 val check_ord_hclause : ord:ordering -> hclause -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : ?recursive:bool -> substitution -> hclause bind -> hclause
-  (** apply substitution to the clause *)
+val apply_subst : ?recursive:bool -> ?renaming:FoSubst.Renaming.t ->
+                  substitution -> hclause bind -> hclause
+  (** apply the substitution to the clause *)
 
 val pos_lits : literal array -> Bitvector.t
   (** bitvector of literals that are positive *)
@@ -153,10 +157,7 @@ module CSet :
         It also contains a payload that is updated on every addition/
         removal of clauses. The additional payload is also updated upon
         addition/deletion. *)
-    type t = {
-      maxvar : int;                 (** index of maximum variable *)
-      clauses : hclause Ptmap.t;    (** clause ID -> hclause *)
-    }
+    type t
 
     val empty : t
       (** the empty set *)
@@ -182,9 +183,6 @@ module CSet :
     val remove_list : t -> hclause list -> t
       (** remove hclauses *)
 
-    val remove_ids : t -> Ptset.t -> t
-      (** remove set of IDs *)
-
     val get : t -> int -> hclause
       (** get a clause by its ID *)
 
@@ -193,6 +191,9 @@ module CSet :
 
     val mem_id : t -> int -> bool
       (** membership test by hclause ID *)
+
+    val choose : t -> hclause option
+      (** Choose a clause in the set *)
 
     val iter : t -> (hclause -> unit) -> unit
       (** iterate on clauses in the set *)
@@ -205,6 +206,11 @@ module CSet :
 
     val to_list : t -> hclause list
     val of_list : hclause list -> t
+
+    val to_seq : t -> hclause Sequence.t
+    val of_seq : t -> hclause Sequence.t -> t
+    val remove_seq : t -> hclause Sequence.t -> t
+    val remove_id_seq : t -> int Sequence.t -> t
 end
 
 (* ----------------------------------------------------------------------
@@ -236,6 +242,12 @@ val is_const_definition : hclause -> (term * term) option
 
 val is_pos_eq : hclause -> (term * term) option
   (** Recognize whether the clause is a positive unit equality. *)
+
+(** {2 Positions in clauses} *)
+
+type clause_pos = clause * position * term
+
+val compare_clause_pos : clause_pos -> clause_pos -> int
 
 (* ----------------------------------------------------------------------
  * pretty printing

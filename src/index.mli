@@ -18,59 +18,88 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Generic term indexing *)
+(** {1 Generic term indexing} *)
 
 open Basic
 
-type data = hclause * position * term
+(** A leaf maps terms to a set of 'a *)
+module Leaf : sig
+  type 'a t
 
-(** a set of (hashconsed clause, position in clause, term). *)
-module ClauseSet : Set.S with type elt = data
+  val empty : cmp:('a -> 'a -> int) -> 'a t
+  val add : 'a t -> term -> 'a -> 'a t
+  val remove : 'a t -> term -> 'a -> 'a t
+  val is_empty : _ t -> bool
+  val iter : 'a t -> (term -> 'a SmallSet.t -> unit) -> unit
+  val fold : 'a t -> ('b -> term -> 'a SmallSet.t -> 'b) -> 'b -> 'b
+  val size : _ t -> int
 
-(** a leaf of an index is generally a map of terms to data *)
-type index_leaf
+  val fold_unify : 'a t bind -> term bind -> 'b ->
+                    ('b -> term -> 'a -> substitution -> 'b) -> 'b
+  val fold_match: 'a t bind -> term bind -> 'b ->
+                  ('b -> term -> 'a -> substitution -> 'b) -> 'b
+    (** Match the indexed terms against the given query term *)
 
-val empty_leaf : index_leaf
-val add_leaf : index_leaf -> term -> data -> index_leaf
-val remove_leaf : index_leaf -> term -> data -> index_leaf
-val is_empty_leaf : index_leaf -> bool
-val iter_leaf : index_leaf -> (term -> ClauseSet.t -> unit) -> unit
-val fold_leaf : index_leaf -> ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
-val size_leaf : index_leaf -> int
+  val fold_matched: 'a t bind -> term bind -> 'b ->
+                    ('b -> term -> 'a -> substitution -> 'b) -> 'b
+    (** Match the query term against the indexed terms *)
+end
 
-(** A term index *)
-class type index =
-  object ('b)
-    method name : string
-    method add : term -> data -> 'b
-    method remove: term -> data -> 'b
+(** A term index, that contains values of type 'a in its leaves *)
+type 'a t =
+  <
+    name : string ;
+    add : term -> 'a -> 'a t ;
+    remove: term -> 'a -> 'a t ;
+    is_empty : bool ;
 
-    method iter : (term -> ClauseSet.t -> unit) -> unit
-    method fold : 'a. ('a -> term -> ClauseSet.t -> 'a) -> 'a -> 'a
+    iter : (term -> 'a SmallSet.t -> unit) -> unit ;
+    fold : 'b. ('b -> term -> 'a SmallSet.t -> 'b) -> 'b -> 'b ;
 
-    method retrieve_unifiables : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_generalizations : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
-    method retrieve_specializations : 'a. term -> 'a -> ('a -> term -> ClauseSet.t -> 'a) -> 'a
+    retrieve_unifiables : 'b. offset -> term bind -> 'b ->
+                          ('b -> term -> 'a -> substitution -> 'b) -> 'b ;
+    retrieve_generalizations : 'b. offset -> term bind -> 'b ->
+                                ('b -> term -> 'a -> substitution -> 'b) -> 'b ;
+    retrieve_specializations : 'b. offset -> term bind -> 'b ->
+                              ('b -> term -> 'a -> substitution -> 'b) -> 'b ;
 
-    method pp : all_clauses:bool -> Format.formatter -> unit -> unit
-  end
+    pp : ?all_clauses:bool ->
+          (Format.formatter -> 'a -> unit) ->
+          Format.formatter -> unit -> unit ;
+    to_dot : ('a -> string) -> Format.formatter -> unit
+      (** print oneself in DOT into the given file *)
+  >
+
+(** A subsumption index (non perfect!) *)
+type subsumption_t =
+  < name : string;
+    add : clause -> subsumption_t ;
+    add_clauses : clause Sequence.t -> subsumption_t;
+    remove : clause -> subsumption_t ;
+    remove_clauses : clause Sequence.t -> subsumption_t;
+    retrieve_subsuming : literal array -> (hclause -> unit) -> unit ;
+    retrieve_subsumed : literal array -> (hclause -> unit) -> unit ;
+  >
 
 (** A simplification index *)
-class type unit_index = 
-  object ('b)
-    method name : string
-    method maxvar : int
-    method is_empty : bool
-    method add_clause : hclause -> 'b
-    method remove_clause : hclause -> 'b
-    method add : term -> term -> bool -> hclause -> 'b
-    method remove : term -> term -> bool -> hclause ->'b
-    method size : int
-    method retrieve : sign:bool -> int -> term bind ->
-                      (term bind -> term bind -> substitution -> hclause -> unit) ->
-                      unit        (** iter on (in)equations of given sign l=r
-                                      where subst(l) = query term *)
-    method pp : Format.formatter -> unit -> unit
-    method to_dot : string -> unit
-  end
+type unit_t =
+  <
+    name : string ;
+    maxvar : int ;
+    is_empty : bool ;
+    add_clause : hclause -> unit_t ;
+    remove_clause : hclause -> unit_t ;
+    add : term -> term -> bool -> hclause -> unit_t ;
+    remove : term -> term -> bool -> hclause -> unit_t ;
+    size : int ;
+    retrieve : 'a. sign:bool -> offset -> term bind -> 'a ->
+              ('a -> term bind -> term bind -> hclause -> substitution -> 'a) -> 'a;
+      (** fold on (in)equations of given sign l=r where subst(l) = query term *)
 
+    pp : Format.formatter -> unit -> unit ;
+    to_dot : Format.formatter -> unit
+      (** print oneself in DOT into the given file *)
+  >
+
+val mk_unit_index : (term * hclause) t -> unit_t
+  (** From an implementation of a general index, make a unit index. *)

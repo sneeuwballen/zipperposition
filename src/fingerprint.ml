@@ -28,13 +28,13 @@ module T = Terms
 module C = Clauses
 module I = Index
 
-type data = I.data
-
 (** a feature *)
 type feature = A | B | N | S of symbol
 
 (** a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = term -> feature list
+
+(* TODO: use a feature array, rather than a list *)
 
 (** compute a feature for a given position *)
 let rec gfpf pos t = match pos, t.term with
@@ -48,6 +48,9 @@ let rec gfpf pos t = match pos, t.term with
     with Not_found -> N)  (* not a position in t *)
   | _::_, Bind _ | _::_, BoundVar _ -> N
   | _::_, Var _ -> B  (* under variable *)
+
+(* TODO more efficient way to compute a vector of features: if the fingerprint
+   is in BFS, compute features during only one traversal of the term? *)
 
 (** compute a feature vector for some positions *)
 let fp positions =
@@ -76,19 +79,25 @@ let fp16 = fp [[]; [1]; [2]; [3]; [4]; [1;1]; [1;2]; [1;3]; [2;1];
  * index
  * ---------------------------------------------------------------------- *)
 
-(** check whether two features are compatible for unification. TODO union find
-    for compatibility modulo theories *)
+let eq_feature f1 f2 =
+  match f1, f2 with
+  | S s1, S s2 -> s1 == s2
+  | B, B
+  | N, N
+  | A, A -> true
+  | _ -> false
+
+(** check whether two features are compatible for unification. *)
 let compatible_features_unif f1 f2 =
   match f1, f2 with
-  | S s1, S s2 -> s1 = s2
+  | S s1, S s2 -> s1 == s2
   | B, _ | _, B -> true
   | A, N | N, A -> false
   | A, _ | _, A -> true
   | N, S _ | S _, N -> false
   | N, N -> true
 
-(** check whether two features are compatible for matching. TODO union find
-    for compatibility modulo theories *)
+(** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =
   match f1, f2 with
   | S s1, S s2 -> s1 == s2
@@ -106,7 +115,7 @@ module FeatureMap = Map.Make(
     type t = feature
     let compare f1 f2 = match f1, f2 with
       (* N < B < A < S, S are ordered by symbols *)
-      | _, _ when f1 = f2 -> 0
+      | _, _ when eq_feature f1 f2 -> 0
       | N, _ -> -1
       | _, N -> 1
       | B, _ -> -1
@@ -116,19 +125,35 @@ module FeatureMap = Map.Make(
       | S s1, S s2 -> compare_symbols s1 s2
   end)
 
-(** the fingerprint trie, of constant length *)
-type feature_trie =
+type 'a t = {
+  cmp : 'a -> 'a -> int;
+  trie : 'a feature_trie;
+} (** The index *)
+and 'a feature_trie =
   | Empty
-  | Node of feature_trie FeatureMap.t
-  | Leaf of I.index_leaf
+  | Node of 'a feature_trie FeatureMap.t
+  | Leaf of 'a I.Leaf.t
+  (** the fingerprint trie, of uniform depth *)
+
+let empty ~cmp =
+  { cmp;
+    trie = Empty;
+  }
+
+let rec is_empty trie =
+  match trie with
+  | Empty -> true
+  | Leaf l -> I.Leaf.is_empty l
+  | Node map -> FeatureMap.for_all (fun _ trie' -> is_empty trie') map
 
 (** add t -> data to the trie *)
-let add fp trie t data =
+let add fp idx t data =
   (* recursive insertion *)
   let rec recurse trie features =
     match trie, features with
     | Empty, [] ->
-      let leaf = I.add_leaf I.empty_leaf t data in
+      let leaf = I.Leaf.empty ~cmp:idx.cmp in
+      let leaf = I.Leaf.add leaf t data in
       Leaf leaf (* creation of new leaf *)
     | Empty, f::features' ->
       let subtrie = recurse Empty features' in
@@ -143,16 +168,16 @@ let add fp trie t data =
       let map = FeatureMap.add f subtrie map in
       Node map  (* point to new subtrie *)
     | Leaf leaf, [] ->
-      let leaf = I.add_leaf leaf t data in
+      let leaf = I.Leaf.add leaf t data in
       Leaf leaf (* addition to set *)
     | Node _, [] | Leaf _, _::_ ->
       failwith "different feature length in fingerprint trie"
   in
   let features = fp t in  (* features of term *)
-  recurse trie features
+  { idx with trie = recurse idx.trie features; }
 
 (** remove t -> data from the trie *)
-let remove fp trie t data =
+let remove fp idx t data =
   (* recursive deletion *)
   let rec recurse trie features =
     match trie, features with
@@ -174,25 +199,25 @@ let remove fp trie t data =
         then Empty
         else Node map
     | Leaf leaf, [] ->
-      let leaf = I.remove_leaf leaf t data in
-      if I.is_empty_leaf leaf
+      let leaf = I.Leaf.remove leaf t data in
+      if I.Leaf.is_empty leaf
         then Empty
         else Leaf leaf
     | Node _, [] | Leaf _, _::_ ->
       failwith "different feature length in fingerprint trie"
   in
   let features = fp t in  (* features of term *)
-  recurse trie features
+  { idx with trie = recurse idx.trie features; }
 
 let rec iter trie f = match trie with
   | Empty -> ()
   | Node map -> FeatureMap.iter (fun _ subtrie -> iter subtrie f) map
-  | Leaf leaf -> I.iter_leaf leaf f
+  | Leaf leaf -> I.Leaf.iter leaf f
 
-let fold trie f acc =
-  let acc = ref acc in
-  iter trie (fun t set -> acc := f !acc t set);
-  !acc
+let rec fold trie f acc = match trie with
+  | Empty -> acc
+  | Node map -> FeatureMap.fold (fun _ subtrie acc -> fold subtrie f acc) map acc
+  | Leaf leaf -> I.Leaf.fold leaf f acc
 
 (** number of indexed terms *)
 let count trie =
@@ -201,14 +226,13 @@ let count trie =
   !n
 
 (** fold on parts of the trie that are compatible with features *)
-let traverse ~compatible trie features f acc =
+let traverse ~compatible idx features acc k =
   (* fold on the trie *)
   let rec recurse trie features acc =
     match trie, features with
     | Empty, _ -> acc
     | Leaf leaf, [] ->
-      (* fold on the set of data *)
-      I.fold_leaf leaf f acc
+      k acc leaf  (* give the leaf to [k] *)
     | Node map, f::features' ->
       (* fold on any subtrie that is compatible with current feature *)
       FeatureMap.fold
@@ -220,60 +244,72 @@ let traverse ~compatible trie features f acc =
     | Node _, [] | Leaf _, _::_ ->
       failwith "different feature length in fingerprint trie"
   in
-  recurse trie features acc
+  recurse idx.trie features acc
 
-let mk_index fp =
-  object (_: 'self)
-    val trie = Empty    (** the trie of features *)
-    val fp = fp         (** fingerprint function used *)
+let mk_index ~(cmp:('a -> 'a -> int)) fp : 'a Index.t =
+  (object
+    val idx = empty ~cmp      (** the index (a trie of features) *)
+    val fp = fp               (** fingerprint function used *)
 
     method name = "fingerprint_index"
 
     method add t data =
-      let new_trie = add fp trie t data in
-      ({< trie = new_trie >} :> 'self)
+      let idx' = add fp idx t data in
+      ({< idx=idx' >} :> 'a Index.t)
 
     method remove t data =
-      let new_trie = remove fp trie t data in
-      ({< trie = new_trie >} :> 'self)
+      let idx' = remove fp idx t data in
+      ({< idx=idx' >} :> 'a Index.t)
 
-    method iter f = iter trie f
+    method is_empty = is_empty idx.trie
 
-    method fold : 'a. ('a -> term -> I.ClauseSet.t -> 'a) -> 'a -> 'a =
-      fun f acc -> fold trie f acc
+    method iter f = iter idx.trie f
 
-    method retrieve_unifiables: 'a. term -> 'a -> ('a -> term -> I.ClauseSet.t -> 'a) -> 'a  =
-      fun t acc f ->
+    method fold : 'b. ('b -> term -> 'a SmallSet.t -> 'b) -> 'b -> 'b =
+      fun f acc -> fold idx.trie f acc
+
+    method retrieve_unifiables: 'b. offset -> term bind -> 'b ->
+    ('b -> term -> 'a -> substitution -> 'b) -> 'b  =
+      fun offset (t,o_t) acc f ->
         let features = fp t in
-        traverse ~compatible:compatible_features_unif trie features f acc
+        let compatible = compatible_features_unif in
+        traverse ~compatible idx features acc
+          (fun acc leaf -> I.Leaf.fold_unify (leaf,offset) (t,o_t) acc f)
 
-    method retrieve_generalizations: 'a. term -> 'a -> ('a -> term -> I.ClauseSet.t -> 'a) -> 'a =
-      fun t acc f ->
+    method retrieve_generalizations: 'b. offset -> term bind -> 'b ->
+    ('b -> term -> 'a -> substitution -> 'b) -> 'b  =
+      fun offset (t,o_t) acc f ->
         let features = fp t in
         (* compatible t1 t2 if t2 can match t1 *)
         let compatible f1 f2 = compatible_features_match f2 f1 in
-        traverse ~compatible trie features f acc
+        traverse ~compatible idx features acc
+          (fun acc leaf -> I.Leaf.fold_match (leaf,offset) (t,o_t) acc f)
 
-    method retrieve_specializations: 'a. term -> 'a -> ('a -> term -> I.ClauseSet.t -> 'a) -> 'a = 
-      fun t acc f ->
+    method retrieve_specializations: 'b. offset -> term bind -> 'b ->
+    ('b -> term -> 'a -> substitution -> 'b) -> 'b =
+      fun offset (t,o_t) acc f ->
         let features = fp t in
-        traverse ~compatible:compatible_features_match trie features f acc
+        let compatible = compatible_features_match in
+        traverse ~compatible idx features acc
+          (fun acc leaf -> I.Leaf.fold_matched (leaf,offset) (t,o_t) acc f)
 
-    method pp ~all_clauses formatter () =
+    method pp ?(all_clauses=false) pp_a formatter () =
       if not all_clauses
-        then Format.fprintf formatter "fingerprint for %d clauses" (count trie)
+        then Format.fprintf formatter "fingerprint for %d clauses" (count idx.trie)
         else
-          let print_elt (hc, pos, t) = Format.fprintf formatter "%a@;" !C.pp_clause#pp_h_pos (hc, pos, t) in
+          let print_elt data = Format.fprintf formatter "%a@;" pp_a data in
           let print t set =
             begin
               Format.fprintf formatter "%a -> @[<v>" !T.pp_term#pp t;
-              I.ClauseSet.iter print_elt set;
+              SmallSet.iter print_elt set;
               Format.fprintf formatter "@]@;"
             end
           in begin
             Format.fprintf formatter "fingerprint for %d clauses: @[<v>"
-              (count trie);
-            iter trie print;
+              (count idx.trie);
+            iter idx.trie print;
             Format.fprintf formatter "@]"
           end
-  end
+
+    method to_dot pp_a fmt = failwith "fingerprint_to_dot: not implemented"
+  end :> 'a Index.t)

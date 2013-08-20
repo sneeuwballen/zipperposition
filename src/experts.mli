@@ -30,8 +30,20 @@ open Symbols
 
 (** {2 General interface} *)
 
-type t
-  (** An expert for some theory *)
+type t = {
+  expert_name : string;                 (** Theory the expert works on *)
+  expert_descr : string;                (** Description of the expert *)
+  expert_equal : term -> term -> bool;  (** Check whether two terms are equal *)
+  expert_sig : SSet.t;                  (** Symbols of the theory *)
+  expert_clauses : hclause list;        (** Additional axioms *)
+  expert_canonize : term -> term;       (** Get a canonical form of the term *)
+  expert_ord : ordering -> bool;        (** Compatible with ord? *)
+  expert_update_ctx : context -> t list;(** How to update the context *)
+  expert_ctx : context;                 (** Context used by the expert *)
+  expert_solve : ((term*term) list -> substitution list) option;
+    (** The expert may be able to solve systems of equations, returning
+        a list of substitutions. Example: the simplex. *)
+} (** An expert for some theory *)
 
 val compatible_ord : t -> ord:ordering -> bool
   (** Check whether using this expert is possible in the given ordering *)
@@ -48,11 +60,6 @@ val compatible : t -> t -> bool
 val combine : t -> t -> t
   (** Combine two experts into a new one, that works on
       the combination of their theories, assuming they are compatible. *)
-
-val more_specific : t -> t -> bool
-  (** [expert_more_specific e1 e2] returns true if [e1] decides a theory
-      whose symbols are included in the theory of [e2]. Heuristically, that
-      means that we can ignore [e1] and focus on [e2] *)
 
 val canonize : t -> term -> term
   (** Get the normal form of the term *)
@@ -88,6 +95,13 @@ module Set : sig
   val add : t -> expert -> t
 
   val add_list : t -> expert list -> t
+
+  val size : t -> int
+
+  val to_seq : t -> expert Sequence.t
+  val of_seq : t -> expert Sequence.t -> t
+
+  val iter : t -> (expert -> unit) -> unit
 
   val update_ctx : t -> ctx:context -> t
 

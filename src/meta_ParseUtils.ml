@@ -23,6 +23,8 @@ open Symbols
 
 module T = Terms
 module Utils = FoUtils
+module Pattern = Meta_Pattern
+module KB = Meta_KB
 
 (** {1 Utils for parsing theory files} *)
 

@@ -18,39 +18,43 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** The state of a proof, contains a set of active clauses (processed),
+(** {1 The state of a proof, contains a set of active clauses (processed),
     a set of passive clauses (to be processed), and an ordering
-    that is used for redundancy elimination. *)
+    that is used for redundancy elimination.} *)
 
 open Basic
 open Symbols
 
-(** association name -> index *)
-val choose_index : string -> Index.index
-(** list of index names *)
+type index = Clauses.clause_pos Index.t
+  (** An index for positions in clauses *)
+
+val choose_index : string -> index
+  (** association name -> index *)
+
 val names_index : unit -> string list
+  (** list of index names *)
 
 (** set of active clauses *)
 type active_set =
   < ctx : context;
     clauses : Clauses.CSet.t;           (** set of active clauses *)
-    idx_sup_into : Index.index;         (** index for superposition into the set *)
-    idx_sup_from : Index.index;         (** index for superposition from the set *)
-    idx_back_demod : Index.index;       (** index for backward demodulation/simplifications *)
-    idx_fv : FeatureVector.fv_index;    (** index for subsumption *)
+    idx_sup_into : index;               (** index for superposition into the set *)
+    idx_sup_from : index;               (** index for superposition from the set *)
+    idx_back_demod : index;             (** index for backward demodulation/simplifications *)
+    idx_fv : Index.subsumption_t;       (** index for subsumption *)
 
-    add : hclause list -> unit;         (** add clauses *)
-    remove : hclause list -> unit;      (** remove clauses *)
+    add : hclause Sequence.t -> unit;   (** add clauses *)
+    remove : hclause Sequence.t -> unit;(** remove clauses *)
   >
 
 (** set of simplifying (unit) clauses *)
 type simpl_set =
   < ctx : context;
-    idx_simpl : Index.unit_index;       (** index for forward simplifications
+    idx_simpl : Index.unit_t;           (** index for forward simplifications
                                             TODO split into pos-orientable/others *)
 
-    add : hclause list -> unit;
-    remove : hclause list -> unit;
+    add : hclause Sequence.t -> unit;
+    remove : hclause Sequence.t -> unit;
   >
 
 (** set of passive clauses *)
@@ -59,12 +63,11 @@ type passive_set =
     clauses : Clauses.CSet.t;           (** set of clauses *)
     queues : (ClauseQueue.t * int) list;
 
-    add : hclause list -> unit;         (** add clauses *)
+    add : hclause Sequence.t -> unit;   (** add clauses *)
     remove : int -> unit;               (** remove clause by ID *)
     next : unit -> hclause option;      (** next passive clause, if any *)
     clean : unit -> unit;               (** cleanup internal queues *)
   >
-
 
 (** state of a superposition calculus instance.
     It contains a set of active clauses, a set of passive clauses,
@@ -81,8 +84,8 @@ type state =
     add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
-val mk_active_set : ctx:context -> Index.index -> signature -> active_set
-val mk_simpl_set : ctx:context -> Index.unit_index -> simpl_set
+val mk_active_set : ctx:context -> index -> signature -> active_set
+val mk_simpl_set : ctx:context -> Index.unit_t -> simpl_set
 val mk_passive_set : ctx:context -> (ClauseQueue.t * int) list -> passive_set
 
 (** create a state from the given ordering, and parameters *)

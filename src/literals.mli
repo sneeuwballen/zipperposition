@@ -50,7 +50,8 @@ val reord : ord:ordering -> literal -> literal      (** recompute order *)
 val lit_of_fof : ord:ordering -> literal -> literal (** translate eq/not to literal *)
 val term_of_lit : literal -> term                   (** translate lit to term *)
 
-val apply_subst : ?recursive:bool -> ord:ordering -> substitution -> literal bind -> literal
+val apply_subst : ?recursive:bool -> ?renaming:FoSubst.Renaming.t ->
+                  ord:ordering -> substitution -> literal bind -> literal
 
 val negate : literal -> literal                     (** negate literal *)
 val fmap : ord:ordering -> (term -> term) -> literal -> literal (** fmap in literal *)
@@ -65,9 +66,11 @@ val depth_lits : literal array -> int
 val vars_lits : literal array -> varlist
 val ground_lits : literal array -> bool             (** all the literals are ground? *)
 val term_of_lits : literal array -> term
-val apply_subst_lits : ?recursive:bool -> ord:ordering -> substitution ->
+val apply_subst_lits : ?recursive:bool -> ?renaming:FoSubst.Renaming.t ->
+                       ord:ordering -> substitution ->
                        literal array bind -> literal array
-val apply_subst_list : ?recursive:bool -> ord:ordering -> substitution ->
+val apply_subst_list : ?recursive:bool -> ?renaming:FoSubst.Renaming.t ->
+                        ord:ordering -> substitution ->
                         literal list bind -> literal list
 val lits_to_seq : literal array -> (term * term * bool) Sequence.t
   (** Convert the lits into a sequence of equations *)

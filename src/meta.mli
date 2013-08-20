@@ -50,6 +50,7 @@ module Pattern : sig
 
   val pp_pattern : Format.formatter -> t -> unit
   val pp_pattern_p : Format.formatter -> t parametrized -> unit
+
   val bij : t Bij.t
 
   (** {2 Conversion pattern <-> clause, and matching} *)
@@ -165,6 +166,7 @@ module KB : sig
   val hash_atom : atom -> int
 
   val pp_atom : Format.formatter -> atom -> unit
+
   val bij_atom : atom Bij.t
 
   module Logic : Datalog.Logic.S with type symbol = atom

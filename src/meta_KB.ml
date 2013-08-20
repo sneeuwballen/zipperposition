@@ -27,6 +27,7 @@ module T = Terms
 module C = Clauses
 module S = FoSubst
 module Utils = FoUtils
+module Pattern = Meta_Pattern
 
 (** {2 Knowledge Item} *)
 
@@ -381,9 +382,9 @@ let vars_of_premise premise =
     | IfPattern (_, args) -> Sequence.of_list args
   in Sequence.filter T.is_var seq
 
-let apply_subst_to_premise subst offset premise =
+let apply_subst_to_premise ?renaming subst offset premise =
   let map_args args = List.map
-    (fun t -> S.apply_subst ~recursive:false subst (t,offset))
+    (fun t -> S.apply_subst ?renaming ~recursive:false subst (t,offset))
     args in
   match premise with
   | IfNamed (name, args) -> IfNamed (name, map_args args)

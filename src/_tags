@@ -1,4 +1,0 @@
-<**/*.cmx>: inline(15)
-<*.native> or <*.byte>: pkg_unix, pkg_str, pkg_num
-<meta>: include
-<meta/*.cmx>: for-pack(Meta)

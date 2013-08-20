@@ -282,8 +282,12 @@ let mk_at ?old t1 t2 =
   | _ -> raise (SortError "incompatible types for @")
 
 let rec cast t sort =
-  let new_t = {t with sort=sort; tag= -1;} in
-  H.hashcons new_t
+  match t.term with
+  | Bind (s, a_sort, t') ->
+    mk_bind s sort a_sort (cast t' sort)
+  | _ ->
+    let new_t = {t with sort=sort; tag= -1;} in
+    H.hashcons new_t
 
 (** {2 Subterms and positions} *)
 
@@ -601,12 +605,15 @@ let signature seq =
   (* Update signature with s -> sort.
      Checks consistency with current value, if any. *)
   and update_sig signature f sort =
-    if has_attr attr_polymorphic f then signature
+    if has_attr attr_num f then signature
     else begin
       (try
         let sort' = SMap.find f signature in
-        if sort != sort' then Format.printf "sort %a != %a@." pp_sort sort pp_sort sort';
-        assert (sort == sort');
+        if sort != sort' && not (has_attr attr_polymorphic f)
+          then begin Format.printf "%% sort for %a: %a != %a@."
+            Symbols.pp_symbol f pp_sort sort pp_sort sort';
+            failwith "inconsistent signature"
+          end;
       with Not_found -> ());
       let signature' = SMap.add f sort signature in
       signature'
@@ -791,6 +798,56 @@ let rec eta_reduce t =
 let lambda_abstract t sub_t =
   let sort = t.sort <=. sub_t.sort in
   mk_lambda sort sub_t.sort (db_from_term t sub_t)
+
+(** {2 Congruence Closure} *)
+
+type curry_leaf =
+  | CurrySymbol of symbol * sort
+  | CurryVar of term
+  | CurryQuote of term
+
+module Curryfied = CC.Curryfy(struct
+  type t = curry_leaf
+  let equal cl1 cl2 = match cl1, cl2 with
+    | CurrySymbol (s1,sort1), CurrySymbol (s2,sort2) -> s1 == s2 && sort1 == sort2
+    | CurryVar t1, CurryVar t2 
+    | CurryQuote t1, CurryQuote t2 -> t1 == t2
+    | _ -> false
+  let hash cl = match cl with
+    | CurrySymbol (s, sort) -> Symbols.hash_symbol s
+    | CurryVar t
+    | CurryQuote t -> hash_term t
+end) (** Curryfied terms with compatible symbols *)
+
+let rec cc_curry t = match t.term with
+  | Var _ -> Curryfied.mk_const (CurryVar t)
+  | BoundVar _
+  | Bind _ -> Curryfied.mk_const (CurryQuote t)  (* TODO: go inside? *)
+  | Node (s, l) ->
+    let head = Curryfied.mk_const (CurrySymbol (s, t.sort)) in
+    List.fold_left
+      (fun head t' ->
+        let t'' = cc_curry t' in
+        Curryfied.mk_app head t'')
+      head l
+
+let cc_uncurry t =
+  let open Curryfied in
+  let rec uncurry t args =
+    match t.shape, args with
+    | Const (CurryQuote t), [] -> t
+    | Const (CurryVar v), [] -> v
+    | Const (CurrySymbol (s, sort)), args ->
+      mk_node s sort args   (* apply to args *)
+    | Apply (t1, t2), args ->
+      let t2' = uncurry t2 [] in
+      uncurry t1 (t2' :: args)
+    | _ -> assert false
+  in
+  uncurry t []
+
+module TCC = CC.Make(Curryfied)
+  (** Congruence closure on (curryfied) terms *)
 
 (** {2 Some AC-utils} *)
 
@@ -990,7 +1047,7 @@ let classic_skolem =
     incr count;
     if Symbols.is_used skolem then find_skolem () else skolem
   in
-  fun ~ord t sort ->
+  fun ~ctx t sort ->
     Utils.debug 4 "skolem %a@." !pp_term#pp t;
     let vars = vars t in
     (* find the skolemized normalized term *)
@@ -1002,7 +1059,12 @@ let classic_skolem =
       let new_symbol = mk_symbol ~attrs:attr_skolem new_symbol in  (* build symbol *)
       let skolem_term = mk_node new_symbol sort vars in
       (* update the precedence *)
-      ignore (ord#precedence#add_symbols [new_symbol]);
+      (* update the precedence *)
+      let ord = ctx.ctx_ord in
+      let prec = ord.ord_precedence in
+      let prec', _ = prec.prec_add_symbols [new_symbol] in
+      let ord' = ord.ord_set_precedence prec' in
+      ctx.ctx_ord <- ord';
       (* build the skolemized term *)
       db_unlift (db_replace t skolem_term)
     in
@@ -1017,7 +1079,7 @@ let classic_skolem =
 
     The advantage is that it does not modify the signature, and also that
     rewriting can be performed inside the skolem terms. *)
-let unamed_skolem ~ord t sort =
+let unamed_skolem ~ctx t sort =
   Utils.debug 4 "@[<h>magic skolem %a@]@." !pp_term#pp t;
   let symb = mk_symbol ~attrs:attr_skolem "$$sk" in
   (* the existential witness, parametrized by the 'quoted' formula. The
@@ -1025,7 +1087,11 @@ let unamed_skolem ~ord t sort =
   let args = [mk_node lambda_symbol t.sort [t]] in
   let skolem_term = mk_node symb sort args in
   (* update the precedence *)
-  ignore (ord#precedence#add_symbols [symb]);
+  let ord = ctx.ctx_ord in
+  let prec = ord.ord_precedence in
+  let prec', _ = prec.prec_add_symbols [symb] in
+  let ord' = ord.ord_set_precedence prec' in
+  ctx.ctx_ord <- ord';
   (* build the skolemized term by replacing first DB index with skolem symbol *)
   db_unlift (db_replace t skolem_term)
 

@@ -58,12 +58,67 @@ val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *
 val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
 val attr_commut : symbol_attribute      (** symbol that is commutative (not ac) *)
 val attr_polymorphic : symbol_attribute (** symbol that is ad-hoc polymorphic *)
+val attr_num : symbol_attribute         (** symbol that is numeric *)
 
 val mk_symbol : ?attrs:symbol_attribute -> string -> symbol
 val mk_distinct : ?attrs:symbol_attribute -> string -> symbol
 val mk_num : ?attrs:symbol_attribute -> Num.num -> symbol
+val parse_num : ?attrs:symbol_attribute -> string -> symbol
 val mk_int : ?attrs:symbol_attribute -> int -> symbol
 val mk_real : ?attrs:symbol_attribute -> float -> symbol
+
+val is_const : symbol -> bool
+val is_int : symbol -> bool
+val is_rat : symbol -> bool
+val is_real : symbol -> bool
+val is_numeric : symbol -> bool  (* any of the 3 above *)
+val is_distinct : symbol -> bool
+
+(** Arithmetic (assumes the symbols verify {!is_numeric}) *)
+module Arith : sig
+  exception TypeMismatch
+
+  (* some functions may raise Division_by_zero *)
+
+  val sign : symbol -> int   (* -1, 0 or 1 *)
+
+  val floor : symbol -> symbol
+  val ceiling : symbol -> symbol
+  val truncate : symbol -> symbol
+  val round : symbol -> symbol
+
+  val prec : symbol -> symbol
+  val succ : symbol -> symbol
+
+  val one_i : symbol
+  val zero_i : symbol
+  val one_f : symbol
+  val zero_f : symbol
+
+  val is_zero : symbol -> bool
+
+  val sum : symbol -> symbol -> symbol
+  val difference : symbol -> symbol -> symbol
+  val uminus : symbol -> symbol
+  val product : symbol -> symbol -> symbol
+  val quotient : symbol -> symbol -> symbol
+
+  val quotient_e : symbol -> symbol -> symbol
+  val quotient_t : symbol -> symbol -> symbol
+  val quotient_f : symbol -> symbol -> symbol
+  val remainder_e : symbol -> symbol -> symbol
+  val remainder_t : symbol -> symbol -> symbol
+  val remainder_f : symbol -> symbol -> symbol
+
+  val to_int : symbol -> symbol
+  val to_rat : symbol -> symbol
+  val to_real : symbol -> symbol
+
+  val less : symbol -> symbol -> bool
+  val lesseq : symbol -> symbol -> bool
+  val greater : symbol -> symbol -> bool
+  val greatereq : symbol -> symbol -> bool
+end
 
 val is_used : string -> bool
   (** is the symbol already used? *)
@@ -79,6 +134,9 @@ val has_attr : symbol_attribute -> symbol -> bool
 
 val name_symbol : symbol -> string
   (** Printable form of a symbol *)
+
+val get_val : symbol -> symbol_val
+  (** Access the definition of this symbol *)
 
 module SHashtbl : Hashtbl.S with type key = symbol
 
@@ -159,6 +217,9 @@ val int_ : sort
 val rat_ : sort
 val real_ : sort
 
+val is_atomic_sort : sort -> bool
+val is_fun_sort : sort -> bool
+
 val arity : sort -> int
   (** Arity of a sort, ie nunber of arguments of the function, or 0 *)
 
@@ -183,6 +244,9 @@ val add_signature : signature -> symbol -> sort -> signature
 
 val symbols_of_signature : signature -> symbol list
   (** extract the list of symbols from the complete signature *)
+
+val set_of_signature : signature -> SSet.t
+  (** Set of symbols of the signature *)
 
 val merge_signatures : signature -> signature -> signature
   (** Merge two signatures. raises Failure if they are incompatible. *)

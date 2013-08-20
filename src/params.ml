@@ -41,19 +41,24 @@ let parse_args () =
   and calculus = ref "delayed"
   and presaturate = ref false
   and heuristic_precedence = ref true
+  and dot_file = ref None
+  and plugins = ref []
   and kb = ref (Filename.concat Const.home "kb")
   and kb_load = ref []
   and kb_clear = ref false
   and kb_print = ref false
   and kb_where = ref false
-  and dot_file = ref None
+  and learn = ref false
   and select = ref "SelectComplex"
   and progress = ref false
+  and unary_depth = ref 1
   and files = ref [] in
   (* special handlers *)
   let set_progress () =
     FoUtils.need_cleanup := true;
     progress := true
+  and add_plugin s = plugins := s :: !plugins
+  and add_plugins s = plugins := (FoUtils.str_split ~by:"," s) @ !plugins
   in
   (* options list *) 
   let options =
@@ -66,11 +71,15 @@ let parse_args () =
       ("-timeout", Arg.Set_float timeout, "timeout (in seconds)");
       ("-select", Arg.Set_string select, help_select);
       ("-split", Arg.Set split, "enable splitting");
+      ("-plugin", Arg.String add_plugin, "load given plugin (.cmxs)");
+      ("-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated");
       ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
       ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
       ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
       ("-kb-where", Arg.Set kb_where, "print default dir that is search for KB");
+      ("-learning", Arg.Set learn, "enable lemma learning");
+      (* ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once"); *)
       ("-print-sort", Arg.Unit (fun () -> Terms.pp_term_debug#sort true), "print sorts");
       ("-progress", Arg.Unit set_progress, "print progress");
       ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
@@ -80,6 +89,7 @@ let parse_args () =
       ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
       ("-seed", Arg.Set_int seed, "set random seed");
+      ("-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences");
       ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
     ]
   in
@@ -93,8 +103,8 @@ let parse_args () =
     param_progress = !progress;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
-    param_index= !index; param_dot_file = !dot_file;
+    param_index= !index; param_dot_file = !dot_file; param_plugins= !plugins;
     param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
-    param_kb_clear = !kb_clear;
-    param_kb_print = !kb_print; 
+    param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
+    param_kb_print = !kb_print; param_learn = !learn;
     param_precedence= !heuristic_precedence;}

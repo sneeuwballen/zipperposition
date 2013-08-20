@@ -36,3 +36,6 @@ val choose : string -> precedence -> ordering
 
 val default_ordering : signature -> ordering
   (** default ordering on terms (RPO6) *)
+
+val no_ordering : ordering
+  (** All terms are incomparable *)

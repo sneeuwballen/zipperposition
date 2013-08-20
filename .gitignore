@@ -9,9 +9,15 @@ docs/*.pdf
 *.aux
 *.out
 _build
+plugins/std/
 tags
 *.native
-*.byte
+**/*.native
+**/*.byte
+**/*.cmi
+**/*.cmx
+**/*.o
+**/*.cmo
 .session
 .subdirtouch
 *.docdir

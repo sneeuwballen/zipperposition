@@ -18,26 +18,39 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(** Inference and simplification rules for the superposition calculus *)
+(** {1 Inference and simplification rules for the superposition calculus} *)
 
 open Basic
+
+(** {2 Helpers} *)
 
 val all_positions : position -> term ->  (* combinator *)
                     (term -> position -> 'b list) -> 'b list
 
-val infer_active: Calculus.binary_inf_rule  (** superposition where given clause is active *)
+(** fold on equation sides of literals that satisfy predicate *)
+val fold_lits : ?both:bool -> (int -> literal -> bool) ->
+                ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
+                literal array -> 'a
 
-val infer_passive: Calculus.binary_inf_rule (** superposition where given clause is passive *)
+(** get the term l at given position in clause, and r such that l ?= r
+    is the literal at the given position *)
+val get_equations_sides : clause -> position -> term * term * bool
 
-val infer_equality_resolution: Calculus.unary_inf_rule
+(** {2 Inference rules} *)
 
-val infer_equality_factoring: Calculus.unary_inf_rule
+val infer_active: Env.binary_inf_rule  (** superposition where given clause is active *)
 
-val infer_split : Calculus.unary_inf_rule   (** hyper-splitting *)
+val infer_passive: Env.binary_inf_rule (** superposition where given clause is passive *)
+
+val infer_equality_resolution: Env.unary_inf_rule
+
+val infer_equality_factoring: Env.unary_inf_rule
+
+val infer_split : Env.unary_inf_rule   (** hyper-splitting *)
 
 (* TODO branch rewriting *)
 
-(** simplifications *)
+(** {2 Simplifications rules} *)
 
 val is_tautology : hclause -> bool
   (** Check whether the clause is a (syntactic) tautology, ie whether
@@ -81,5 +94,7 @@ val contextual_literal_cutting : ProofState.active_set -> hclause -> hclause
 (** condensation *)
 val condensation : hclause -> hclause
 
-(** The superposition calculus *)
-val superposition : Calculus.calculus
+(** {2 Contributions to Env} *)
+
+val setup_env : env:Env.t -> unit
+  (** Add rules to the environment. *)

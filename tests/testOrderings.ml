@@ -11,6 +11,8 @@ module C = Clauses
 module O = Orderings
 module Utils = FoUtils
 
+let ctx = TT.ctx
+
 let instantiate (t1,o1) (t2,o2) =
   (* find a subst for t1 and t2 *)
   let subst = List.fold_left
@@ -33,7 +35,7 @@ let all_orders ~ord l =
     match l' with
     | [] -> ()
     | t::l'' -> 
-      List.iter (fun t' -> all := (t, t', ord#compare t t') :: !all) l';
+      List.iter (fun t' -> all := (t, t', ord.ord_compare t t') :: !all) l';
       recurse l''
   in
   recurse l;
@@ -48,7 +50,7 @@ let more_specific cmp1 cmp2 =
   | _ -> false
 
 let check_more_specific ~ord a b cmp a' b' =
-  let cmp' = ord#compare a' b' in
+  let cmp' = ord.ord_compare a' b' in
   if not (more_specific cmp' cmp)
     then begin
       Format.printf "  more_specific failed on @[<h>%a %s %a (%a %s %a)@]"
@@ -64,7 +66,7 @@ let check_properties ~ord (a, b, cmp) =
     then begin
       let oa, ob = 0, T.max_var (T.vars a) + 1 in
       let a, b, a', b' = instantiate (a,oa) (b,ob) in
-      check_more_specific ~ord a b (ord#compare a b) a' b';
+      check_more_specific ~ord a b (ord.ord_compare a b) a' b';
     end);
   (* subterm property *)
   (if a == b then assert (cmp = Eq));
@@ -75,11 +77,11 @@ let check_properties ~ord (a, b, cmp) =
   (* monotonicity *)
   let ga = T.mk_node (mk_symbol "g") univ_ [a]
   and gb = T.mk_node (mk_symbol "g") univ_ [b] in
-  assert (cmp = ord#compare ga gb)
+  assert (cmp = ord.ord_compare ga gb)
 
 (** check invariants on the list of terms *)
 let check ord_name ~ord terms =
-  Format.printf "  check %s (%a)@." ord_name pp_precedence ord#precedence#snapshot;
+  Format.printf "  check %s (%a)@." ord_name pp_precedence ord.ord_precedence.prec_snapshot;
   let pairs = all_orders ~ord terms in
   List.iter (check_properties ~ord) pairs
 
@@ -90,7 +92,7 @@ let run () =
   Utils.set_debug 2;
   (* generate terms *)
   let terms = Utils.times n (TT.random_term ~ground:false) in
-  let precedence = TT.ord#precedence in
+  let precedence = ctx.ctx_ord.ord_precedence in
   check "KBO" ~ord:(O.kbo precedence) terms;
   check "RPO6" ~ord:(O.rpo6 precedence) terms;
   ()

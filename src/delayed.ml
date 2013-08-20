@@ -18,11 +18,10 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 02110-1301 usa.
 *)
 
-(** module for superposition with equivalence reasoning and delayed clausal form *)
+(** {1 Superposition with equivalence reasoning and delayed clausal form} *)
 
 open Basic
 open Symbols
-open Calculus
 
 module T = Terms
 module C = Clauses
@@ -67,7 +66,7 @@ let classify signature s =
   | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
   | _ when SSet.mem s special_set -> Special
   | _ -> (* classify between predicate and function by the sort *)
-    let sort = SMap.find s signature in
+    let sort = try SMap.find s signature with Not_found -> univ_ in
     if sort == bool_ then Predicate else Function
 
 (** constraint on the ordering *)
@@ -114,16 +113,16 @@ let gamma_eliminate ~ord offset t sign =
 (** helper for delta elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a skolem
     of free variables of t) *)
-let delta_eliminate ~ord t sign =
+let delta_eliminate ~ctx t sign =
   assert (t.sort == bool_);
   let new_t =
     match T.look_db_sort 0 t with
     | None -> T.db_unlift t (* the variable is not present *)
     | Some sort ->
       (* sort is the sort of the first DB symbol *)
-      !T.skolem ~ord t sort
+      !T.skolem ~ctx t sort
   in
-  List [Lits.mk_lit ~ord new_t T.true_term sign]
+  List [Lits.mk_lit ~ord:ctx.ctx_ord new_t T.true_term sign]
 
 (** Just keep the equation as it is *)
 let keep eqn = Keep eqn
@@ -137,7 +136,7 @@ let eliminate_lits hc =
   let prop eqn p sign =
     assert (p.sort == bool_);
     match p.term with
-    | BoundVar _ | Var _ -> assert false
+    | BoundVar _ | Var _ -> keep eqn
     | Node (s, [a; b]) when s == and_symbol && sign -> alpha_eliminate ~ord a true b true
     | Node (s, [a; b]) when s == and_symbol && not sign -> beta_eliminate ~ord a false b false
     | Node (s, [a; b]) when s == or_symbol && sign -> beta_eliminate ~ord a true b true
@@ -147,15 +146,15 @@ let eliminate_lits hc =
     | Bind (s, _, t) when s == forall_symbol && sign ->
       gamma_eliminate ~ord offset t true
     | Bind (s, _, t) when s == forall_symbol && not sign ->
-      delta_eliminate ~ord (T.mk_not t) true
+      delta_eliminate ~ctx:hc.hcctx (T.mk_not t) true
     | Bind (s, _, t) when s == exists_symbol && sign ->
-      delta_eliminate ~ord t true
+      delta_eliminate ~ctx:hc.hcctx t true
     | Bind (s, _, t) when s == exists_symbol && not sign ->
       gamma_eliminate ~ord offset t false
     | Bind _ | Node _ -> keep eqn
   (* eliminate equivalence *)
   and equiv eqn l r sign =
-    match ord#compare l r with
+    match ord.ord_compare l r with
     | Gt when sign && not (T.atomic l) -> (* l <=> r -> (l => r) & (r => l)*)
       Alpha (List [Lits.mk_neq ~ord l T.true_term; Lits.mk_eq ~ord r T.true_term],
              List [Lits.mk_neq ~ord r T.true_term; Lits.mk_eq ~ord l T.true_term])
@@ -242,68 +241,38 @@ let recursive_eliminations hc =
   Utils.exit_prof prof_elim;
   !clauses
 
-(* ----------------------------------------------------------------------
- * the calculus object
- * ---------------------------------------------------------------------- *)
-
-let delayed : calculus =
-  object (self)
-    method binary_rules = ["superposition_active", Sup.infer_active;
-                           "superposition_passive", Sup.infer_passive]
-
-    method unary_rules = ["equality_resolution", Sup.infer_equality_resolution;
-                          "equality_factoring", Sup.infer_equality_factoring; ]
-
-    method basic_simplify hc = Sup.basic_simplify (Cnf.simplify hc)
-
-    method rw_simplify (simpl : PS.simpl_set) hc =
-      let hc = Sup.basic_simplify (Sup.demodulate simpl hc) in
-      let hc = Sup.positive_simplify_reflect simpl hc in
-      let hc = Sup.negative_simplify_reflect simpl hc in
-      hc
-
-    method active_simplify actives hc =
-      (* condensation *)
-      let hc = Sup.condensation hc in
-      (* contextual literal cutting *)
-      let hc = Sup.contextual_literal_cutting actives hc in
-      hc
-
-    method backward_simplify actives hc =
-      let set = C.CSet.empty in
-      Sup.backward_demodulate actives set hc
-
-    method redundant actives hc =
-      Sup.subsumed_by_set actives hc
-
-    method backward_redundant actives hc =
-      Sup.subsumed_in_set actives hc
-
-    (* use elimination rules as simplifications rather than inferences, here *)
-    method list_simplify hc =
-      let hc = self#basic_simplify hc in
+(** Setup the environment for superposition with equivalence reasoning *)
+let setup_env ~env =
+  Sup.setup_env ~env;
+  (* specific changes *)
+  let basic_simplify' = env.Env.basic_simplify in
+  env.Env.basic_simplify <-
+    (fun hc -> basic_simplify' (Cnf.simplify hc));
+  env.Env.list_simplify <-
+    (fun hc ->
+      let hc = env.Env.basic_simplify hc in
       let l = recursive_eliminations hc in
-      let l = List.filter (fun hc -> not (Sup.is_tautology hc)) l in
-      l
-
-    method is_trivial hc = Sup.is_tautology hc
-
-    method axioms = []
-
-    method constr clauses = symbol_constraint clauses
-
-    method preprocess ~ctx l =
+      let l = List.filter (fun hc -> not (Env.is_trivial ~env hc)) l in
+      l);
+  env.Env.constr <- [];
+  Env.add_mk_constr env symbol_constraint;
+  env.Env.preprocess <-
+    (fun ~ctx l ->
       Utils.list_flatmap
         (fun hc ->
           let hc = C.update_ctx ~ctx hc in
+          (* simplify the clause *)
           let hc = Sup.basic_simplify (C.clause_of_fof hc) in
-          C.check_ord_hclause ~ord:ctx.ctx_ord hc;
-          let clauses = self#list_simplify hc in
+          C.check_ord_hclause ~ord:env.Env.ctx.ctx_ord hc;
+          let clauses = env.Env.list_simplify hc in
           List.fold_left
             (fun clauses hc ->
               let hc = C.clause_of_fof hc in
               C.check_ord_hclause ~ord:ctx.ctx_ord hc;
-              if not (Sup.is_tautology hc) then hc :: clauses else clauses)
+              (* keep only non-trivial clauses *)
+              if not (Env.is_trivial ~env hc)
+                then hc :: clauses
+                else clauses)
             [] clauses)
-        l
-  end
+        l);
+  ()

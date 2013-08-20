@@ -217,7 +217,7 @@ let max_features = 25
 
 let pp_feat_triple formatter (_,_,name) = Format.pp_print_string formatter name
 
-let mk_fv_index_signature signature =
+let mk_features signature =
   (* list of (salience: float, feature, repr: string) *)
   let features = ref [] in
   let pp name s = Utils.sprintf "%s(%s)" name (name_symbol s) in
@@ -225,7 +225,9 @@ let mk_fv_index_signature signature =
   SMap.iter
     (fun s sort ->
       let arity = arity sort in
-      if sort == bool_
+      if SSet.mem s Symbols.base_symbols
+        then ()  (* base symbols don't count *)
+      else if sort == bool_
         then features := [1 + arity, count_symb_plus s, pp "count+" s;
                           1 + arity, count_symb_minus s, pp "count-" s]
                           @ !features
@@ -244,7 +246,10 @@ let mk_fv_index_signature signature =
   let features = List.map (fun (_, f,_) -> f) features in
   let features = [feat_size_plus; feat_size_minus; count_skolem_symb;
                   count_split_symb; sum_of_depths] @ features in
-  (* build an index with those features *)
+  features
+
+let mk_fv_index_signature signature =
+  let features = mk_features signature in
   mk_fv_index features
 
 let index_clause (features, trie) hc =
@@ -255,7 +260,8 @@ let index_clause (features, trie) hc =
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
-let index_clauses fv hcs = List.fold_left index_clause fv hcs
+let index_clauses fv hcs =
+  Sequence.fold index_clause fv hcs
 
 let remove_clause (features, trie) hc =
   (* feature vector of the hc *)
@@ -265,7 +271,8 @@ let remove_clause (features, trie) hc =
   let new_trie = goto_leaf trie fv k in
   (features, new_trie)
 
-let remove_clauses fv hcs = List.fold_left remove_clause fv hcs
+let remove_clauses fv hcs =
+  Sequence.fold remove_clause fv hcs
 
 (** hcs that subsume (potentially) the given literals *)
 let retrieve_subsuming (features, trie) lits f =
@@ -296,3 +303,29 @@ let retrieve_subsumed (features, trie) lits f =
   | _ -> failwith "number of features in feature vector changed"
   in
   iter_higher fv trie
+
+let mk_index features =
+  (* an object able to return updates of itself. Its state is [idx]. *)
+  let rec mk_idx idx =
+    (object
+      method name = "feature_vector_index"
+      method add hc =
+        let idx' = index_clause idx hc in
+        mk_idx idx'
+      method add_clauses hcs =
+        let idx' = index_clauses idx hcs in
+        mk_idx idx'
+      method remove hc =
+        let idx' = remove_clause idx hc in
+        mk_idx idx'
+      method remove_clauses hcs =
+        let idx' = remove_clauses idx hcs in
+        mk_idx idx'
+      method retrieve_subsuming lits k =
+        retrieve_subsuming idx lits k
+      method retrieve_subsumed lits k =
+        retrieve_subsumed idx lits k
+    end : Index.subsumption_t)
+  in
+  let idx = mk_fv_index features in
+  mk_idx idx
