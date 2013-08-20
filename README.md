@@ -1,5 +1,8 @@
 # LogTK
 
+Logic toolkit, designed primarily for first-order automated reasoning. It aims
+at providing basic types and algorithms (terms, unification, orderings,
+indexing, etc.) that can be factored out of several applications.
 
 ## License
 
@@ -18,3 +21,8 @@ Then, type in a terminal located in the root directory of the project:
 
     $ make
 
+If you use `ocamlfind` (which you should), installation is just
+
+    $ make install
+
+    
