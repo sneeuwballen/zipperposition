@@ -115,11 +115,13 @@ val equiv_symbol : t
 val and_symbol : t
 val or_symbol : t
 
-val ty_symbol : t       (** Type of types *)
-val tuple_symbol : t    (** Tuple of types *)
-val arrow_symbol : t    (** Function type *)
 
 (** {2 Magic symbols} *)
+
+val db_symbol : symbol    (** pseudo symbol kept for locating bound vars in precedence *)
+val split_symbol : symbol (** pseudo symbol for locating split symbols in precedence *)
+val const_symbol : symbol (** pseudo symbol for locating magic constants in precedence *)
+val num_symbol : symbol   (** pseudo symbol to locate numbers in the precedence *)
 
 val mk_fresh_const : int -> t
   (** Infinite set of symbols, accessed by index, that will not collide with
@@ -137,6 +139,9 @@ val base_symbols : SSet.t
   (** Set of base symbols *)
 
 val is_base_symbol : t -> bool
+
+(* TODO: simple and handy arithmetic system; need to change the representation
+         of symbols *)
 
 (** {2 IO} *)
 

@@ -840,10 +840,6 @@ let pp_tstp buf t =
   | Node (s, [v; t']) when Symbol.has_attr Symbol.attr_binder s ->
     assert (is_var v);
     Printf.bprintf buf "%a[%a]: (%a)" Symbol.pp s pp_rec v pp_rec t'
-  | Node (s, [l;r]) when Symbol.eq s Symbol.arrow_symbol ->
-    Printf.bprintf buf "%a > %a" pp_rec l pp_rec r
-  | Node (s, ((_::_) as l)) when Symbol.eq s Symbol.tuple_symbol ->
-    Printf.bprintf buf "(%a)" (Util.pp_list ~sep:"*" pp_rec) l
   | BoundVar _ | Bind _ ->
     failwith "De Bruijn index in term, cannot be printed in TSTP"
   | Node (s, body1::body) when Symbol.has_attr Symbol.attr_infix s ->
@@ -876,10 +872,6 @@ let rec pp_debug buf t =
     Printf.bprintf buf "%a[%a]: %a" Symbol.pp s pp_var v pp_rec t'
   | BoundVar _ | Bind _ ->
     failwith "De Bruijn index in term, cannot be printed in TSTP"
-  | Node (s, [l;r]) when Symbol.eq s Symbol.arrow_symbol ->
-    Printf.bprintf buf "%a > %a" pp_rec l pp_rec r
-  | Node (s, ((_::_) as l)) when Symbol.eq s Symbol.tuple_symbol ->
-    Printf.bprintf buf "(%a)" (Util.pp_list ~sep:"*" pp_rec) l
   | Node (s, body1::body) when Symbol.has_attr Symbol.attr_infix s ->
     Printf.bprintf buf "%a %a %a" pp_rec body1 Symbol.pp s (Util.pp_list pp_rec) body
   | Node (s, []) -> Symbol.pp buf s

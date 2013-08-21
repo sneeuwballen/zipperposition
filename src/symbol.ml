@@ -181,13 +181,28 @@ let equiv_symbol = mk_symbol ~attrs:(attr_infix lor attr_commut) "<=>"
 let and_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac lor attr_multiset) "&"
 let or_symbol = mk_symbol ~attrs:(attr_infix lor attr_ac lor attr_multiset) "|"
 
-let ty_symbol = mk_symbol "$tType"
-let tuple_symbol = mk_symbol ~attrs:attr_infix "*"
-let arrow_symbol = mk_symbol ~attrs:attr_infix ">"
-
 (** {2 Magic symbols} *)
 
-(** higher order curryfication symbol *)
+(** pseudo symbol kept for locating bound vars in precedence. Bound
+    vars are grouped in the precedence together w.r.t other symbols,
+    but compare to each other by their index. *)
+let db_symbol = mk_symbol "$$db_magic_cookie"
+
+(** pseudo symbol for locating split symbols in precedence. Split
+    symbols compare lexicographically with other split symbols,
+    but are in a fixed location in precedence w.r.t other kinds of
+    symbols. *)
+let split_symbol = mk_symbol "$$split_magic_cookie"
+
+(** pseudo symbol for locating magic constants in precedence.
+    This is useful for keeping the precedence finite while managing
+    an infinite set of fresh constants, that are used for
+    testing terms for ground joinability (replacing variables
+    with such constants) *)
+let const_symbol = mk_symbol "$$const_magic_cookie"
+
+(** pseudo symbol to locate numbers in the precedence *)
+let num_symbol = mk_symbol "$$num_magic_cookie"
 
 (** Infinite set of symbols, accessed by index, that will not collide with
     the signature of the problem *)

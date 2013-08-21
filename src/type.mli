@@ -61,7 +61,7 @@ val rat : t
 val real : t
 
 val var : int -> t
-  (** Build a type variable *)
+  (** Build a type variable. The integer must be >= 0 *)
 
 val app : string -> t list -> t
   (** Parametrized type *)
@@ -100,12 +100,22 @@ module Subst : sig
 
   val apply_not_rec : t -> ty -> ty
     (** Replace bound variables, at most once *)
+  
+  val to_seq : t -> (int * ty) Sequence.t
+  val pp : Buffer.t -> t -> unit
+  val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
 end
 
 val free_vars : ?init:VarSet.t -> t -> VarSet.t
   (** List of free variables *)
 
-val ground : t -> bool
+val max_var : t -> int
+
+val arity : t -> int
+  (** Number of arguments of the type (If it's a function, else 0)*)
+
+val is_ground : t -> bool
   (** Is the type ground? *)
 
 val normalize : t -> t
@@ -118,3 +128,6 @@ val rename : int -> t -> t
 val unify : ?subst:Subst.t -> t -> t -> Subst.t
   (** Unify two types.
       @raise Error if the types are not unifiable *)
+
+val alpha_equiv : t -> t -> bool
+  (** Are the types alpha equivalent? *)
