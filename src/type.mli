@@ -39,6 +39,10 @@ val hash : t -> int
 exception Error of string
   (** Type error *)
 
+val is_var : t -> bool
+val is_app : t -> bool
+val is_fun : t -> bool
+
 (** {2 Infix constructors} *)
 
 module Infix : sig

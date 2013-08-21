@@ -56,6 +56,12 @@ val is_ground : t -> bool
 val merge : t -> t -> t
   (** Merge two signatures together *)
 
+val map : t -> (Symbol.t -> Type.t -> Type.t) -> t
+  (** Transform types *)
+
+val filter : t -> (Symbol.t -> Type.t -> bool) -> t
+  (** Only keep part of the signature *)
+
 val to_seq : t -> (Symbol.t * Type.t) Sequence.t
 val of_seq : (Symbol.t * Type.t) Sequence.t -> t
 

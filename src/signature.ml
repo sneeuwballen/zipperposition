@@ -80,6 +80,10 @@ let merge s1 s2 =
       | None, Some t2 -> Some t2)
     s1 s2
 
+let map s f = SMap.mapi f s
+
+let filter s p = SMap.filter p s
+
 let pp buf s =
   let pp_pair buf (s,ty) = Printf.bprintf buf "%a: %a" Symbol.pp s Type.pp ty in
   Printf.bprintf buf "{";

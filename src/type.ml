@@ -54,6 +54,10 @@ let cmp t1 t2 = compare_struct t1 t2
 exception Error of string
   (** Type error *)
 
+let is_var = function | Var _ -> true | _ -> false
+let is_app = function | App _ -> true | _ -> false
+let is_fun = function | Fun _ -> true | _ -> false
+
 (** {2 Infix constructors} *)
 
 module Infix = struct
@@ -74,7 +78,9 @@ let const s = H.hashcons (App (s, []))
 
 let app s args = H.hashcons (App (s, args))
 
-let var i = H.hashcons (Var i)
+let var i =
+  assert (i >= 0);
+  H.hashcons (Var i)
 
 let mk_fun = Infix.(<==)
 
@@ -131,7 +137,7 @@ module VarSet = Sequence.Set.Make(struct
 end)
 
 module Subst = struct
-  module IntMap = Map.Make(struct
+  module IntMap = Sequence.Map.Make(struct
     type t = int
     let compare i j = i - j
   end)
@@ -166,6 +172,25 @@ module Subst = struct
     | App (s, l) -> app s (List.map (apply_not_rec subst) l)
     | Fun (ret, l) ->
       mk_fun (apply_not_rec subst ret) (List.map (apply_not_rec subst) l)
+
+  let to_seq = IntMap.to_seq
+
+  let pp buf subst =
+    let pp_pair buf (a,b) = Printf.bprintf buf "%a -> %a" pp a pp b in
+    let open Sequence.Infix in
+    Buffer.add_char buf '{';
+    to_seq subst
+      |> Sequence.map (fun (i, v) -> var i, v)
+      |> Util.pp_seq pp_pair buf;
+    Buffer.add_char buf '}'
+
+  let to_string subst =
+    let b = Buffer.create 20 in
+    pp b subst;
+    Buffer.contents b
+
+  let fmt fmt subst =
+    Format.pp_print_string fmt (to_string subst)
 end
 
 let free_vars ?(init=VarSet.empty) t =
@@ -176,10 +201,22 @@ let free_vars ?(init=VarSet.empty) t =
   in
   find init t
 
-let rec ground t = match t with
+let max_var t =
+  let rec find acc t = match t with
+  | Var i -> max acc i
+  | App (_, l) -> List.fold_left find acc l
+  | Fun (ret, l) -> List.fold_left find (find acc ret) l
+  in find 0 t
+
+let arity ty = match ty with
+  | Fun (_, l) -> List.length l
+  | Var _
+  | App _ -> 0
+
+let rec is_ground t = match t with
   | Var _ -> false
-  | App (_, l) -> List.for_all ground l
-  | Fun (ret, l) -> ground ret && List.for_all ground l
+  | App (_, l) -> List.for_all is_ground l
+  | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
 
 let normalize t =
   let vars = free_vars t in
@@ -208,5 +245,50 @@ let rename offset t =
         in
         Subst.apply_not_rec subst t
 
+(* occur-check *)
+let rec _occur_check i t = match t with
+  | Var j -> i = j
+  | App (_, l) -> List.exists (_occur_check i) l
+  | Fun (ret, l) ->
+    _occur_check i ret || List.exists (_occur_check i) l
+
+(* unification *)
+let rec unify_rec subst t1 t2 =
+  let t1 = Subst.apply subst t1 in
+  let t2 = Subst.apply subst t2 in
+  match t1, t2 with
+  | Var i, _ when not (_occur_check i t2) ->
+    Subst.bind subst i t2
+  | _, Var j when not (_occur_check j t1) ->
+    Subst.bind subst j t1
+  | App (s1, l1), App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->
+    List.fold_left2 unify_rec subst l1 l2
+  | Fun (ret1, l1), Fun (ret2, l2) when List.length l1 = List.length l2 ->
+    let subst = unify_rec subst ret1 ret2 in
+    List.fold_left2 unify_rec subst l1 l2
+  | _, _ -> raise (Error "unification error")
+
 let unify ?(subst=Subst.empty) t1 t2 =
-  assert false
+  unify_rec subst t1 t2
+
+(* alpha-equivalence check *)
+let rec alpha_equiv_unify subst t1 t2 =
+  let t1 = Subst.apply subst t1 in
+  let t2 = Subst.apply subst t2 in
+  match t1, t2 with
+  | Var i, Var j -> Subst.bind subst i t2
+  | App (s1, l1), App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->
+    List.fold_left2 alpha_equiv_unify subst l1 l2
+  | Fun (ret1, l1), Fun (ret2, l2) when List.length l1 = List.length l2 ->
+    let subst = alpha_equiv_unify subst ret1 ret2 in
+    List.fold_left2 alpha_equiv_unify subst l1 l2
+  | _, _ -> raise (Error "not alpha equivalent")
+
+let alpha_equiv t1 t2 =
+  let offset = max_var t1 in
+  let t2 = rename offset t2 in
+  try
+    ignore (alpha_equiv_unify Subst.empty t1 t2);
+    true
+  with Error _ ->
+    false
