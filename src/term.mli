@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** term *)
 type t = private {
   term : term_cell;             (** the term itself *)
-  type_ : t option;             (** optional type (as a term) *)
+  type_ : Type.t option;        (** optional type *)
   mutable flags : int;          (** boolean flags about the term *)
   mutable tag : int;            (** hashconsing tag *)
 }
@@ -97,8 +97,8 @@ val get_flag : int -> t -> bool
 
 (** {2 Smart constructors} *)
 
-val mk_var : ?ty:t -> int -> t        (** Create a variable. The index must be >= 0 *)
-val mk_bound_var : ?ty:t -> int -> t  (** De Bruijn index, must be >= 0 *)
+val mk_var : ?ty:Type.t -> int -> t        (** Create a variable. The index must be >= 0 *)
+val mk_bound_var : ?ty:Type.t -> int -> t  (** De Bruijn index, must be >= 0 *)
 
 val mk_bind : Symbol.t -> t -> t
   (** [mk_bind s t] binds the De Bruijn 0 in [t]. *)
@@ -126,36 +126,6 @@ val mk_exists : t -> t
 
 val mk_and_list : t list -> t
 val mk_or_list : t list -> t
-
-(** {2 Types} *)
-
-(** The basic type constructors:
-
-    - ty_type is the "type of type"
-    - ty_i for individuals
-    - ty_o for booleans
-    - ty_arr for arrow type
-    - ty_tuple for tuples
-    - ty_sort for basic sorts (constants)
-    - ty_var for type variables (universally quantified)
-*)
-
-val ty_type : t
-val ty_i : t
-val ty_o : t
-val ty_int : t
-val ty_rat : t
-val ty_real : t
-val ty_arr : t -> t -> t
-val ty_tuple : t list -> t
-val ty_sort : Symbol.t -> t
-val ty_var : int -> t
-
-val is_kind : t -> bool
-val is_type : t -> bool
-
-val with_type : ty:t -> t -> t
-  (** Change the type of this term *)
 
 (** {2 Subterms and positions} *)
 
@@ -209,7 +179,7 @@ val db_replace : t -> t -> t
   (** Substitution of De Bruijn symbol by a term. [db_replace t s]
       replaces the De Bruijn symbol 0 by s in t *)
 
-val db_type : t -> int -> t option
+val db_type : t -> int -> Type.t option
   (** [db_type t n] returns the type of the [n]-th De Bruijn index in [t] *)
 
 val db_lift : int -> t -> t

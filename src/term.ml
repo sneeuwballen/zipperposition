@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** term *)
 type t = {
   term : term_cell;             (** the term itself *)
-  type_ : t option;             (** optional type (as a term) *)
+  type_ : Type.t option;        (** optional type *)
   mutable flags : int;          (** boolean flags about the term *)
   mutable tag : int;            (** hashconsing tag *)
 }
@@ -179,17 +179,17 @@ let get_flag flag t = (t.flags land flag) != 0
     term that the caller believes is likely to be equal to the result.
     This makes hashconsing faster if the result is equal to [old]. *)
 
-let mk_var ?ty idx =
+let mk_var ?(ty=Type.i) idx =
   assert (idx >= 0);
-  let my_v = {term = Var idx; type_=ty;
+  let my_v = {term = Var idx; type_= Some ty;
               flags=(flag_db_closed lor flag_db_closed_computed lor
                      flag_simplified lor flag_normal_form);
               tag= -1} in
   H.hashcons my_v
 
-let mk_bound_var ?ty idx =
+let mk_bound_var ?(ty=Type.i) idx =
   assert (idx >= 0);
-  let my_v = {term = BoundVar idx; type_=ty;
+  let my_v = {term = BoundVar idx; type_=Some ty;
               flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
               tag= -1} in
   H.hashcons my_v
@@ -259,27 +259,6 @@ let rec mk_or_list l = match l with
   | [] -> true_term
   | [x] -> x
   | x::l' -> mk_or x (mk_or_list l')
-
-(** {2 Typing} *)
-
-let with_type ~ty t = H.hashcons {t with type_ = Some ty; tag= ~-1;}
-
-let ty_type = mk_const Symbol.ty_symbol
-let ty_i = with_type ~ty:ty_type (mk_const (Symbol.mk_symbol "$i"))
-let ty_o = with_type ~ty:ty_type (mk_const (Symbol.mk_symbol "$o"))
-let ty_int = with_type ~ty:ty_type (mk_const (Symbol.mk_symbol "$int"))
-let ty_rat = with_type ~ty:ty_type (mk_const (Symbol.mk_symbol "$rat"))
-let ty_real = with_type ~ty:ty_type (mk_const (Symbol.mk_symbol "$real"))
-let ty_arr t1 t2 = with_type ~ty:ty_type (mk_node Symbol.arrow_symbol [t1; t2])
-let ty_tuple l = with_type ~ty:ty_type (mk_node Symbol.tuple_symbol l)
-let ty_sort s = with_type ~ty:ty_type (mk_const s)
-let ty_var i = mk_var ~ty:ty_type i
-
-let is_kind t = t == ty_type
-let is_type t =
-  match t.type_ with
-  | Some t' when t' == ty_type -> true
-  | Some _ | None -> false
 
 (** {2 Subterms and positions} *)
 
@@ -916,7 +895,7 @@ let rec pp_debug buf t =
   | Var i -> 
     begin match t.type_ with
     | None -> Printf.bprintf buf "X%d" i
-    | Some ty -> Printf.bprintf buf "X%d:%a" i pp_rec ty
+    | Some ty -> Printf.bprintf buf "X%d:%a" i Type.pp ty
     end
   | _ -> assert false
   (* complex term? *)
@@ -954,13 +933,12 @@ let bij =
     (fun bij ->
       let bij_bind () = pair Symbol.bij (bij ()) in
       let bij_node () = pair Symbol.bij (list_ (bij ())) in
-      let bij_var () = pair int_ (opt (bij ())) in
+      let bij_var () = pair int_ (opt Type.bij) in
       switch
         ~inject:(fun t -> match t.term with
         | BoundVar i -> 'd', BranchTo (bij_var (), (i, t.type_))
         | Var i -> 'v', BranchTo (bij_var (), (i, t.type_))
-        | Bind (s, t') -> 'b',
-          BranchTo (bij_bind (), (s, t'))
+        | Bind (s, t') -> 'b', BranchTo (bij_bind (), (s, t'))
         | Node (s, l) -> 'n', BranchTo (bij_node (), (s, l))
         | At (t1, t2) -> 'a', BranchTo (pair (bij ()) (bij ()), (t1, t2)))
         ~extract:(function

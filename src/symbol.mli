@@ -125,26 +125,35 @@ val mk_fresh_const : int -> t
   (** Infinite set of symbols, accessed by index, that will not collide with
       the signature of the problem *)
 
-(** {2 Misc} *)
+(** {2 Base symbols} *)
+
+(** A set of specific symbols, representing FOL special operators
+    and values (truth, connectives, etc.) *)
 
 val table : t list
+  (** Table of base symbols *)
 
 val base_symbols : SSet.t
   (** Set of base symbols *)
 
 val is_base_symbol : t -> bool
 
+(** {2 IO} *)
+
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
+
 val bij : t Bij.t
 
 (** {2 Generation of symbols} *)
 
 module Gensym : sig
   type t
+    (** Generator of fresh symbols *)
 
   val create : ?prefix:string -> unit -> t
+    (** New generator of fresh symbols *)
 
   val new_ : t -> symbol
     (** Fresh symbol *)

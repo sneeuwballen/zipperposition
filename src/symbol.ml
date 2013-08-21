@@ -215,7 +215,7 @@ let base_symbols =
 let is_base_symbol s =
   SSet.mem s base_symbols
 
-(** {2 Conversions and printing} *)
+(** {2 IO} *)
 
 let pp buf s = Buffer.add_string buf (name_symbol s)
 
