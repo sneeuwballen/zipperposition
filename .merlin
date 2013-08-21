@@ -1,4 +1,6 @@
 S src/
+S src/lib
 S containers/
 B _build
 B _build/containers/
+B _build/src/lib/

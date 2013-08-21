@@ -1,0 +1,18 @@
+# OASIS_START
+# DO NOT EDIT (digest: ab002c3430cade6f73f8bfaa4434573e)
+src/Symbol
+src/Hash
+src/Hashcons
+src/Term
+src/Util
+src/Unif
+src/Type
+src/Substs
+src/Signature
+src/TypeInference
+src/Lex_tptp
+src/Ast_tptp
+src/Parse_tptp
+src/lib/Sequence
+src/lib/Bij
+# OASIS_STOP

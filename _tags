@@ -1,0 +1,39 @@
+# OASIS_START
+# DO NOT EDIT (digest: 3fee9b28d714bb2da9ed5f2a1f0539e2)
+# Ignore VCS directories, you can use the same kind of rule outside 
+# OASIS_START/STOP if you want to exclude directories that contains 
+# useless stuff for the build process
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+".bzr": -traverse
+".bzr": not_hygienic
+".hg": -traverse
+".hg": not_hygienic
+".git": -traverse
+".git": not_hygienic
+"_darcs": -traverse
+"_darcs": not_hygienic
+# Library logtk
+"src/logtk.cmxs": use_logtk
+"src/symbol.cmx": for-pack(Logtk)
+"src/hash.cmx": for-pack(Logtk)
+"src/hashcons.cmx": for-pack(Logtk)
+"src/term.cmx": for-pack(Logtk)
+"src/util.cmx": for-pack(Logtk)
+"src/unif.cmx": for-pack(Logtk)
+"src/type.cmx": for-pack(Logtk)
+"src/substs.cmx": for-pack(Logtk)
+"src/signature.cmx": for-pack(Logtk)
+"src/typeInference.cmx": for-pack(Logtk)
+"src/lex_tptp.cmx": for-pack(Logtk)
+"src/ast_tptp.cmx": for-pack(Logtk)
+"src/parse_tptp.cmx": for-pack(Logtk)
+"src/lib/sequence.cmx": for-pack(Logtk)
+"src/lib/bij.cmx": for-pack(Logtk)
+"src/lib/cache.cmx": for-pack(Logtk)
+<src/*.ml{,i}>: pkg_unix
+<src/*.ml{,i}>: pkg_num
+<src/lib/*.ml{,i}>: pkg_unix
+<src/lib/*.ml{,i}>: pkg_num
+# OASIS_STOP
+true: use_menhir
