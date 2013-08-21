@@ -33,7 +33,8 @@ ifeq ($(MODE),prod)
 	TAGS=-tag noassert
 endif
 
-all: bin tests doc
+all:
+	ocaml setup.ml -all
 
 bin:
 	ocaml setup.ml -build
