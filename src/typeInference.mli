@@ -44,6 +44,9 @@ module Ctx : sig
   val unify : t -> Type.t -> Type.t -> t
     (** Unify the two types *)
 
+  val new_var : t -> t * Type.t
+  val new_vars : t -> int -> t * Type.t list
+
   val rename_type : t -> Type.t -> t * Type.t
     (** Rename variables of the given type to fresh variables *)
 
@@ -75,3 +78,6 @@ val infer : Ctx.t -> Term.t -> Type.t
 
 val check_type : Ctx.t -> Term.t -> Type.t -> bool
   (** Check whether this term can be used with this type *)
+
+val same_type : Ctx.t -> Term.t -> Term.t -> Ctx.t
+  (** Force the two terms to have the same type *)

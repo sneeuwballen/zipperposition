@@ -94,7 +94,7 @@ let real = const "$real"
 
 (* printing var *)
 let pp_var buf i =
-  if i >= 0 && i < Char.code 'z'
+  if i >= 0 && i < Char.code 'z' - Char.code 'a'
     then Printf.bprintf buf "'%c" (Char.chr (Char.code 'a' + i))
     else Printf.bprintf buf "'a%d" i
 
@@ -257,6 +257,7 @@ let rec unify_rec subst t1 t2 =
   let t1 = Subst.apply subst t1 in
   let t2 = Subst.apply subst t2 in
   match t1, t2 with
+  | Var i, Var j when i = j -> subst
   | Var i, _ when not (_occur_check i t2) ->
     Subst.bind subst i t2
   | _, Var j when not (_occur_check j t1) ->
@@ -266,7 +267,9 @@ let rec unify_rec subst t1 t2 =
   | Fun (ret1, l1), Fun (ret2, l2) when List.length l1 = List.length l2 ->
     let subst = unify_rec subst ret1 ret2 in
     List.fold_left2 unify_rec subst l1 l2
-  | _, _ -> raise (Error "unification error")
+  | _, _ ->
+    let msg = Util.sprintf "unification error: %a and %a" pp t1 pp t2 in
+    raise (Error msg)
 
 let unify ?(subst=Subst.empty) t1 t2 =
   unify_rec subst t1 t2
@@ -276,6 +279,7 @@ let rec alpha_equiv_unify subst t1 t2 =
   let t1 = Subst.apply subst t1 in
   let t2 = Subst.apply subst t2 in
   match t1, t2 with
+  | Var i, Var j when i = j -> subst
   | Var i, Var j -> Subst.bind subst i t2
   | App (s1, l1), App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->
     List.fold_left2 alpha_equiv_unify subst l1 l2

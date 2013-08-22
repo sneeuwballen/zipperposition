@@ -53,13 +53,22 @@ module Ctx = struct
     { ctx with signature = Signature.merge ctx.signature signature; }
 
   (* allocate a new type variable *)
-  let _new_var ctx =
+  let new_var ctx =
     let ty = Type.var ctx.offset in
     { ctx with offset = ctx.offset + 1; }, ty
 
+  (* allocate [n] new type variables *)
+  let rec new_vars ctx n =
+    if n = 0
+      then ctx, []
+      else
+        let ctx, l = new_vars ctx (n-1) in
+        let ctx, v = new_var ctx in
+        ctx, v :: l
+
   (* push variable on  the bound vars stack *)
   let enter_binder ctx =
-    let ctx, v = _new_var ctx in
+    let ctx, v = new_var ctx in
     let ctx = { ctx with db = v :: ctx.db; } in
     ctx, v
       
@@ -70,10 +79,12 @@ module Ctx = struct
     | _::db' -> { ctx with db = db'; }
 
   let unify ctx t1 t2 =
+    Util.printf "Ctx.unify %a %a\n" Type.pp t1 Type.pp t2;
     let varsubst = Type.unify ~subst:ctx.varsubst t1 t2 in
     { ctx with varsubst; }
 
   let rename_type ctx ty =
+    Util.printf "Ctx.rename_type %a\n" Type.pp ty;
     let mv = Type.max_var ty in
     let ty' = Type.rename ctx.offset ty in
     let offset = ctx.offset + mv in
@@ -88,11 +99,11 @@ module Ctx = struct
   let type_of_symbol ctx s =
     try
       let ty = eval_type ctx (Signature.find ctx.signature s) in
-      let ctx, ty = rename_type ctx ty in
       ctx, ty
     with Not_found ->
       (* give a new type variable to this symbol *)
-      let ctx, ty = _new_var ctx in
+      let ctx, ty = new_var ctx in
+      Util.printf "Ctx: new type %a for symbol %a\n" Type.pp ty Symbol.pp s;
       let ctx = { ctx with signature = Signature.declare ctx.signature s ty; } in
       ctx, ty
 
@@ -120,18 +131,10 @@ let rec infer_update ctx t =
       let ctx, ty1 = infer_update ctx t1 in
       let ctx, ty2 = infer_update ctx t2 in
       (* t1 : ty1, t2 : ty2. Now we must also have
-         ty1 = a -> b, with t2 = a, and the resulting type is b. *)
-      begin match ty1 with
-      | Type.Fun (ty1_ret, [ty1_arg]) -> 
-        let ctx = Ctx.unify ctx ty1_arg ty2 in
-        ctx, ty1_ret
-      | _ ->
-        let msg =
-          Util.sprintf "%a should have type 'a -> 'b but has type %a"
-          T.pp t1 Type.pp ty1
-        in
-        raise (Type.Error msg)
-      end
+         ty1 = ty2 -> ty1_ret, ty1_ret being the result type *)
+      let ctx, ty1_ret = Ctx.new_var ctx in
+      let ctx = Ctx.unify ctx ty1 (ty1_ret <=. ty2) in
+      ctx, ty1_ret
     | T.Bind (s, t') ->
       let ctx, ty_s = Ctx.type_of_symbol ctx s in
       let ctx, v = Ctx.enter_binder ctx in
@@ -152,17 +155,9 @@ let rec infer_update ctx t =
       in
       (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
           The result is 'a. *)
-      begin match ty_s with
-      | Type.Fun (ty_ret, ty_l') when List.length ty_l' = List.length l ->
-        let ctx = List.fold_left2 Ctx.unify ctx ty_l ty_l' in
-        ctx, ty_ret
-      | _ ->
-        let msg =
-          Util.sprintf "%a should be a %d-ary function, but has type %a"
-          Symbol.pp s (List.length l) Type.pp ty_s
-        in
-        raise (Type.Error msg)
-      end
+      let ctx, ty_ret = Ctx.new_var ctx in
+      let ctx = Ctx.unify ctx ty_s (ty_ret <== ty_l) in
+      ctx, ty_ret
     end
 
 let infer ctx t =
@@ -170,52 +165,15 @@ let infer ctx t =
   ty
 
 let check_type ctx t ty =
-  failwith "check_type: not implemented"
+  let ctx, ty_t = infer_update ctx t in
+  try
+    ignore (Ctx.unify ctx ty_t ty);
+    true
+  with Type.Error _ ->
+    false
 
-(*
-
-(* recursive type inference for this term, in the given typing environment.
-    It returns a type, and an offset (scope) that binds the variables
-    in this type. *)
-let rec infer_env ~newvars env t =
-  match t.T.type_, t.T.term with
-  | Some ty, _ -> ty, mk_scope env
-  | None, T.Var _ -> T.Types.Type.i  (* if not specified, default is individual *)
-  | None, T.BoundVar _ -> get_bound_type env
-  | None, T.At (t1, t2) ->
-    let o = mk_scope env in
-    let ty1, o1 = infer_env env t1 in
-    let ty2, o2 = infer_env env t2 in
-    (* unify ty1 with (v1 <= v2), then unify ty2 with v2, and return v1 *)
-    let v1 = T.Types.ty_var 0 in
-    let v2 = T.Types.ty_var 1 in
-    let ty1' = T.Types.(v1 <=. v2) in
-    env.subst <- Unif.unification env.subst ty1 o1 ty1' o;
-    env.subst <- Unif.unification env.subst ty2 o2 v2 o;
-    v1, o
-  | None, T.Node (s, l) ->
-    begin try
-      Signature.find env.signature s
-    with Not_found ->
-      (* build an arrow type for [s], with arguments' types *)
-      let v = T.Types.ty_var 0 in
-      let args = List.map (infer_env ~newvars env) l in
-      let ty = T.Types.(v <== args) in
-      let o = mk_scope env in
-      (* remember to save this symbol's type afterwards! *)
-      (if not (List.mem_assq s !newvars)
-        then newvars := (s, ty) :: !newvars);
-      ty, o
-    end
-  | None, T.Bind (s, t') ->
-
-let infer signature t =
-  let env = mk_env signature in
-  let ty, offset = infer_env env t in
-  (* rename variables *)
-  let renaming = Substs.Renaming.create 5 in
-  Substs.apply_subst ~recursive:true ~renaming env.subst ty offset
-
-let infer_update signature t =
-  failwith "Typing.infer_update: not implemented"
-*)
+let same_type ctx t1 t2 =
+  let ctx, ty1 = infer_update ctx t1 in
+  let ctx, ty2 = infer_update ctx t2 in
+  let ctx = Ctx.unify ctx ty1 ty2 in
+  ctx
