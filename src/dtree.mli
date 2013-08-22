@@ -23,26 +23,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Reduction to CNF and simplifications} *)
+(** {1 Perfect Discrimination Tree} *)
 
-(** See "computing small normal forms", in the handbook of automated reasoning.
-    All transformations are made on curried terms and formulas. *)
+(** This module provides a simplification index, based on a
+    perfect discrimination tree (see "the handbook of automated reasoning",
+    chapter "term indexing", for instance).
+    *)
 
-val is_cnf : Term.t -> bool
-  (** Is the clause in CNF? *)
+module Make(E : Index.EQUATION) : Index.UNIT_IDX with module E = E
 
-val simplify : Term.t -> Term.t
-  (** Simplify the inner formula (double negation, trivial equalities...) *)
-
-val miniscope : Term.t -> Term.t
-  (** Apply miniscoping transformation to the term *)
-
-type skolem_ctx
-  (** State for the skolemization phase (allows to re-use same skolem symbols) *)
-
-val mk_skolem_ctx : ?prefix:string -> unit -> skolem_ctx
-
-val cnf_of : ?ctx:skolem_ctx -> Term.t -> Term.t list
-  (** Transform the clause into proper CNF; returns a list of clauses *)
-
-val cnf_of_list : ?ctx:skolem_ctx -> Term.t list -> Term.t list

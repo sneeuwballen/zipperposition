@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type t = {
   term : term_cell;             (** the term itself *)
   type_ : Type.t option;        (** optional type *)
+  mutable tsize : int;          (** size (number of subterms) *)
   mutable flags : int;          (** boolean flags about the term *)
   mutable tag : int;            (** hashconsing tag *)
 }
@@ -41,9 +42,6 @@ and term_cell =
   | At of t * t                 (** HO application (curried) *)
 and sourced_term =
   t * string * string        (** Term + file,name *)
-
-type position = int list
-  (** Position in a term *)
 
 type term = t
 
@@ -92,6 +90,12 @@ let same_type t1 t2 = match t1.type_, t2.type_ with
   | Some ty1, Some ty2 -> Type.alpha_equiv ty1 ty2
   | _ -> false
 
+let compare_type t1 t2 = match t1.type_, t2.type_ with
+  | Some ty1, Some ty2 -> Type.cmp ty1 ty2
+  | Some _, None -> 1
+  | None, Some _ -> -1
+  | None, None -> 0
+
 module TermHASH = struct
   type t = term
   let equal t1 t2 = t1 == t2
@@ -115,22 +119,21 @@ module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
 
 (** {2 Hashset of terms} *)
 
-module THashSet =
-  struct
-    type t = unit THashtbl.t
-    let create () = THashtbl.create 3
-    let cardinal t = THashtbl.length t
-    let member t term = THashtbl.mem t term
-    let iter set f = THashtbl.iter (fun t () -> f t) set
-    let add set t = THashtbl.replace set t ()
-    let merge s1 s2 = iter s2 (add s1)
-    let to_list set =
-      let l = ref [] in
-      iter set (fun t -> l := t :: !l); !l
-    let from_list l =
-      let set = create () in
-      List.iter (add set) l; set
-  end
+module THashSet = struct
+  type t = unit THashtbl.t
+  let create () = THashtbl.create 3
+  let cardinal t = THashtbl.length t
+  let member t term = THashtbl.mem t term
+  let iter set f = THashtbl.iter (fun t () -> f t) set
+  let add set t = THashtbl.replace set t ()
+  let merge s1 s2 = iter s2 (add s1)
+  let to_list set =
+    let l = ref [] in
+    iter set (fun t -> l := t :: !l); !l
+  let from_list l =
+    let set = create () in
+    List.iter (add set) l; set
+end
 
 (** {2 Global terms table (hashconsing)} *)
 
@@ -193,7 +196,7 @@ let get_flag flag t = (t.flags land flag) != 0
 
 let mk_var ?(ty=Type.i) idx =
   assert (idx >= 0);
-  let my_v = {term = Var idx; type_= Some ty;
+  let my_v = {term = Var idx; type_= Some ty; tsize = 1;
               flags=(flag_db_closed lor flag_db_closed_computed lor
                      flag_simplified lor flag_normal_form);
               tag= -1} in
@@ -201,7 +204,7 @@ let mk_var ?(ty=Type.i) idx =
 
 let mk_bound_var ?(ty=Type.i) idx =
   assert (idx >= 0);
-  let my_v = {term = BoundVar idx; type_=Some ty;
+  let my_v = {term = BoundVar idx; type_=Some ty; tsize = 1;
               flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
               tag= -1} in
   H.hashcons my_v
@@ -210,34 +213,44 @@ let rec compute_is_ground l = match l with
   | [] -> true
   | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
 
+let rec compute_tsize l = match l with
+  | [] -> 1  (* with the initial symbol! *)
+  | x::l' -> x.tsize + compute_tsize l'
+
 let mk_bind s t' =
   assert (Symbol.has_attr Symbol.attr_binder s);
-  let my_t = {term=Bind (s, t'); type_=None; flags=0; tag= -1} in
+  let my_t = {term=Bind (s, t'); type_=None; flags=0; tsize=0; tag= -1} in
   let t = H.hashcons my_t in
   (if t == my_t
-    then (* compute ground-ness of term *)
-      set_flag flag_ground t (get_flag flag_ground t'));
+    then begin (* compute ground-ness of term *)
+      set_flag flag_ground t (get_flag flag_ground t');
+      t.tsize <- t'.tsize + 1;
+    end);
   t
 
 let mk_node s l =
   Util.enter_prof prof_mk_node;
-  let my_t = {term=Node (s, l); type_ = None; flags=0; tag= -1} in
+  let my_t = {term=Node (s, l); type_ = None; flags=0; tsize=0; tag= -1} in
   let t = H.hashcons my_t in
   (if t == my_t
     then begin
       (* compute ground-ness of term *)
       set_flag flag_ground t (compute_is_ground l);
+      t.tsize <- compute_tsize l;
     end);
   Util.exit_prof prof_mk_node;
   t
 
 let mk_at t1 t2 =
-  let my_t = {term=At (t1,t2); type_=None; flags=0; tag= -1} in
+  let my_t = {term=At (t1,t2); type_=None; tsize=0; flags=0; tag= -1} in
   let t = H.hashcons my_t in
-  (if t == my_t then
-    (* compute ground-ness of term *)
-    let is_ground = get_flag flag_ground t1 && get_flag flag_ground t2 in
-    set_flag flag_ground t is_ground);
+  (if t == my_t
+    then begin
+      (* compute ground-ness of term *)
+      let is_ground = get_flag flag_ground t1 && get_flag flag_ground t2 in
+      set_flag flag_ground t is_ground;
+      t.tsize <- t1.tsize + t2.tsize;
+    end);
   t
 
 let mk_at_list t l =
@@ -302,7 +315,7 @@ let rec at_pos t pos = match t.term, pos with
   | _, [] -> t
   | Var _, _::_ -> invalid_arg "wrong position in term"
   | Node (_, l), i::subpos when i < List.length l ->
-    at_pos (Util.list_get l i) subpos
+    at_pos (List.nth l i) subpos
   | Bind (_, t'), 0::subpos -> at_pos t' subpos
   | At (t1, _), 0::subpos -> at_pos t1 subpos
   | At (_, t2), 1::subpos -> at_pos t2 subpos

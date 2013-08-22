@@ -23,26 +23,27 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Reduction to CNF and simplifications} *)
+(** {1 Fingerprint term indexing} *)
 
-(** See "computing small normal forms", in the handbook of automated reasoning.
-    All transformations are made on curried terms and formulas. *)
+type fingerprint_fun
 
-val is_cnf : Term.t -> bool
-  (** Is the clause in CNF? *)
+val fp3d : fingerprint_fun
+val fp3w : fingerprint_fun
+val fp4d : fingerprint_fun
+val fp4w : fingerprint_fun
+val fp5m : fingerprint_fun
+val fp6m : fingerprint_fun
+val fp7 : fingerprint_fun
+val fp7m : fingerprint_fun
+val fp16 : fingerprint_fun
 
-val simplify : Term.t -> Term.t
-  (** Simplify the inner formula (double negation, trivial equalities...) *)
+module Make(X : Set.OrderedType) : sig
+  include Index.TERM_IDX with type elt = X.t
 
-val miniscope : Term.t -> Term.t
-  (** Apply miniscoping transformation to the term *)
+  val default_fp : fingerprint_fun
 
-type skolem_ctx
-  (** State for the skolemization phase (allows to re-use same skolem symbols) *)
+  val empty_with : fingerprint_fun -> t
+    (** Empty index, using the given fingerprint function *)
 
-val mk_skolem_ctx : ?prefix:string -> unit -> skolem_ctx
-
-val cnf_of : ?ctx:skolem_ctx -> Term.t -> Term.t list
-  (** Transform the clause into proper CNF; returns a list of clauses *)
-
-val cnf_of_list : ?ctx:skolem_ctx -> Term.t list -> Term.t list
+  val get_fingerprint : t -> fingerprint_fun
+end

@@ -24,6 +24,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 type t =
   | SubstBind of (Term.t * int * Term.t * int * t)
   | SubstEmpty
+and scope = int
+and 'a scoped = 'a * int
+  (** A scope is an integer. Variables can only be bound in one scope,
+      and variables from distinct scopes are distinct too. *)
 
 module T = Term
 

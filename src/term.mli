@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type t = private {
   term : term_cell;             (** the term itself *)
   type_ : Type.t option;        (** optional type *)
+  mutable tsize : int;          (** size (number of subterms) *)
   mutable flags : int;          (** boolean flags about the term *)
   mutable tag : int;            (** hashconsing tag *)
 }
@@ -41,9 +42,6 @@ and term_cell = private
   | At of t * t                 (** HO application (curried) *)
 and sourced_term =
   t * string * string        (** Term + file,name *)
-
-type position = int list
-  (** Position in a term *)
 
 type term = t
 
@@ -60,6 +58,7 @@ val hash : t -> int
 val has_type : t -> bool              (** Has a known type *)
 val compatible_type : t -> t -> bool  (** Unifiable types? false if type missing *)
 val same_type : t -> t -> bool        (** Alpha-equiv types? false if type missing *)
+val compare_type : t -> t -> int      (** Comparison of types *)
 
 module THashtbl : Hashtbl.S with type key = t
 module TSet : Sequence.Set.S with type elt = t
@@ -140,10 +139,10 @@ val is_const : t -> bool
 val is_at : t -> bool
 val is_bind : t -> bool
 
-val at_pos : t -> position -> t 
+val at_pos : t -> Position.t -> t 
   (** retrieve subterm at pos, or raise Invalid_argument*)
 
-val replace_pos : t -> position -> t -> t
+val replace_pos : t -> Position.t -> t -> t
   (** replace t|_p by the second term *)
 
 val replace : t -> old:term -> by:term -> t
@@ -154,7 +153,7 @@ val at_cpos : term -> int -> term
   (** retrieve subterm at the compact pos, or raise Invalid_argument*)
 
 val max_cpos : term -> int
-  (** maximum position in the term *)
+  (** maximum compact position in the term *)
 
 val subterm : t -> t -> bool             (** [subterm s t] true if [s] subterm of [t] *) 
 val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)

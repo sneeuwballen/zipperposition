@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 97c77dd1d958bc76ab17a1a29b942e3a)
+# DO NOT EDIT (digest: 1f44a8d90dd366f409f63d05216449d8)
 Symbol
 Hash
 Hashcons
@@ -17,6 +17,11 @@ Comparison
 PartialOrder
 Precedence
 Orderings
+Position
+Cnf
+Index
+Dtree
+Fingerprint
 lib/Sequence
 lib/Bij
 lib/Cache

@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,26 +24,28 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Reduction to CNF and simplifications} *)
+(** {1 Positions in terms, clauses...} *)
 
-(** See "computing small normal forms", in the handbook of automated reasoning.
-    All transformations are made on curried terms and formulas. *)
+type t = int list
+  (** A position is a path in a tree *)
 
-val is_cnf : Term.t -> bool
-  (** Is the clause in CNF? *)
+let left_pos = 0
+let right_pos = 1
 
-val simplify : Term.t -> Term.t
-  (** Simplify the inner formula (double negation, trivial equalities...) *)
+(** Opposite position in a literal *)
+let opp p = match p with
+  | _ when p = left_pos -> right_pos
+  | _ when p = right_pos -> left_pos
+  | _ -> assert false
 
-val miniscope : Term.t -> Term.t
-  (** Apply miniscoping transformation to the term *)
+let pp buf pos = match pos with
+  | [] -> Buffer.add_string buf "ε"
+  | _::_ -> Util.pp_list ~sep:"." (fun b i -> Printf.bprintf buf "%d" i) buf pos
 
-type skolem_ctx
-  (** State for the skolemization phase (allows to re-use same skolem symbols) *)
+let to_string pos =
+  let b = Buffer.create 16 in
+  pp b pos;
+  Buffer.contents b
 
-val mk_skolem_ctx : ?prefix:string -> unit -> skolem_ctx
-
-val cnf_of : ?ctx:skolem_ctx -> Term.t -> Term.t list
-  (** Transform the clause into proper CNF; returns a list of clauses *)
-
-val cnf_of_list : ?ctx:skolem_ctx -> Term.t list -> Term.t list
+let fmt fmt pos =
+  Format.pp_print_string fmt (to_string pos)
