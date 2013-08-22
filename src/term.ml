@@ -80,6 +80,18 @@ let compare x y = x.tag - y.tag
 
 let hash x = x.tag
 
+let has_type t = match t.type_ with
+  | None -> false
+  | Some _ -> true
+
+let compatible_type t1 t2 = match t1.type_, t2.type_ with
+  | Some ty1, Some ty2 -> Type.unifiable ty1 ty2
+  | _ -> false
+
+let same_type t1 t2 = match t1.type_, t2.type_ with
+  | Some ty1, Some ty2 -> Type.alpha_equiv ty1 ty2
+  | _ -> false
+
 module TermHASH = struct
   type t = term
   let equal t1 t2 = t1 == t2

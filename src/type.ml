@@ -296,3 +296,12 @@ let alpha_equiv t1 t2 =
     true
   with Error _ ->
     false
+
+let unifiable t1 t2 =
+  let offset = max_var t1 in
+  let t2 = rename offset t2 in
+  try
+    ignore (unify_rec Subst.empty t1 t2);
+    true
+  with Error _ ->
+    false

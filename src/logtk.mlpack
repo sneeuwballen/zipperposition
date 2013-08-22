@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 21572e352e0964ca2ea3b94ff2ae9466)
+# DO NOT EDIT (digest: 97c77dd1d958bc76ab17a1a29b942e3a)
 Symbol
 Hash
 Hashcons
@@ -13,6 +13,10 @@ TypeInference
 Lex_tptp
 Ast_tptp
 Parse_tptp
+Comparison
+PartialOrder
+Precedence
+Orderings
 lib/Sequence
 lib/Bij
 lib/Cache

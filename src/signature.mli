@@ -62,6 +62,12 @@ val map : t -> (Symbol.t -> Type.t -> Type.t) -> t
 val filter : t -> (Symbol.t -> Type.t -> bool) -> t
   (** Only keep part of the signature *)
 
+val to_symbols : t -> Symbol.t list
+  (** extract the list of symbols from the complete signature *)
+
+val to_set : t -> Symbol.SSet.t
+  (** Set of symbols of the signature *)
+
 val to_seq : t -> (Symbol.t * Type.t) Sequence.t
 val of_seq : (Symbol.t * Type.t) Sequence.t -> t
 

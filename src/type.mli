@@ -135,3 +135,6 @@ val unify : ?subst:Subst.t -> t -> t -> Subst.t
 
 val alpha_equiv : t -> t -> bool
   (** Are the types alpha equivalent? *)
+
+val unifiable : t -> t -> bool
+  (** Are the terms unifiable after renaming? *)

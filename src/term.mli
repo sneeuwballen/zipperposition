@@ -57,6 +57,10 @@ val eq : t -> t -> bool             (** standard equality on terms *)
 val compare : t -> t -> int         (** a simple order on terms *)
 val hash : t -> int
 
+val has_type : t -> bool              (** Has a known type *)
+val compatible_type : t -> t -> bool  (** Unifiable types? false if type missing *)
+val same_type : t -> t -> bool        (** Alpha-equiv types? false if type missing *)
+
 module THashtbl : Hashtbl.S with type key = t
 module TSet : Sequence.Set.S with type elt = t
 module TMap : Sequence.Map.S with type key = t

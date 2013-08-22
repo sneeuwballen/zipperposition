@@ -34,8 +34,11 @@ val get_total_time : unit -> float
 val get_start_time : unit -> float
 
 (** {2 Misc} *)
+ 
+val set_debug : int -> unit     (** Set debug level *)
+val get_debug : unit -> int     (** Current debug level *)
 
-val debug : ?who:string -> ('a, Buffer.t, unit) format -> 'a
+val debug : int -> ('a, Buffer.t, unit, unit) format4 -> 'a
   (** debug message *)
 
 val pp_pos : Lexing.position -> string

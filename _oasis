@@ -13,6 +13,7 @@ Library logtk
   Pack:             true
   Modules:          Symbol, Hash, Hashcons, Term, Util, Unif, Type, Substs,
                     Signature, TypeInference, Lex_tptp, Ast_tptp, Parse_tptp,
+                    Comparison, PartialOrder, Precedence, Orderings,
                     lib/Sequence, lib/Bij
   InternalModules:  lib/Cache
   BuildDepends:     unix,num

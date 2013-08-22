@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: ab002c3430cade6f73f8bfaa4434573e)
+# DO NOT EDIT (digest: bfa190c52cdd498084e2b561526db7d4)
 src/Symbol
 src/Hash
 src/Hashcons
@@ -13,6 +13,10 @@ src/TypeInference
 src/Lex_tptp
 src/Ast_tptp
 src/Parse_tptp
+src/Comparison
+src/PartialOrder
+src/Precedence
+src/Orderings
 src/lib/Sequence
 src/lib/Bij
 # OASIS_STOP

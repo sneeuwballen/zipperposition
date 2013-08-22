@@ -10,10 +10,11 @@
 #install_printer Logtk.Signature.fmt;;
 #install_printer Logtk.Substs.fmt;;
 #install_printer Logtk.Symbol.fmt;;
+#install_printer Logtk.Precedence.fmt;;
+#install_printer Logtk.Orderings.fmt;;
 #install_printer Logtk.Ast_tptp.fmt_general;;
 #install_printer Logtk.Ast_tptp.fmt_role;;
 #install_printer Logtk.Ast_tptp.fmt_declaration;;
-#install_printer Logtk.Ast_theory.fmt;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type.Infix;;
 module T = Logtk.Term;;

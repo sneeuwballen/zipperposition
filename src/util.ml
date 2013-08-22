@@ -37,15 +37,19 @@ let get_total_time, get_start_time =
 
 (** {2 Misc} *)
 
-let debug ?who format =
+let debug_level_ = ref 0
+let set_debug l = debug_level_ := l
+let get_debug () = !debug_level_
+let debug l format =
   let b = Buffer.create 15 in
-  Printf.bprintf b "[%.3f] " (get_total_time ());
-  (match who with
-  | None -> ()
-  | Some w -> Buffer.add_string b w; Buffer.add_string b ": ");
-  Printf.kbprintf
-    (fun b -> print_endline (Buffer.contents b))
-    b format
+  if l <= !debug_level_
+    then (
+      Printf.bprintf b "[%.3f] " (get_total_time ());
+      Printf.kbprintf
+        (fun b -> print_endline (Buffer.contents b))
+        b format)
+    else
+      Printf.kbprintf (fun _ -> ()) b format
 
 let pp_pos pos =
   let open Lexing in

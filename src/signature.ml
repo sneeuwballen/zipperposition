@@ -84,6 +84,12 @@ let map s f = SMap.mapi f s
 
 let filter s p = SMap.filter p s
 
+let to_symbols signature =
+  SMap.fold (fun s _ l -> s :: l) signature []
+
+let to_set signature =
+  SMap.fold (fun s _ set -> Symbol.SSet.add s set) signature Symbol.SSet.empty
+
 let pp buf s =
   let pp_pair buf (s,ty) = Printf.bprintf buf "%a: %a" Symbol.pp s Type.pp ty in
   Printf.bprintf buf "{";
