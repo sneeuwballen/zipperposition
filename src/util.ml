@@ -133,6 +133,26 @@ let () =
         profilers
     end)
 
+(** {2 Runtime statistics} *)
+
+type stat = string * int64 ref 
+
+let mk_stat, print_global_stats =
+  let stats = ref [] in
+  (* create a stat *)
+  (fun name ->
+    let stat = (name, ref 0L) in
+    stats := stat :: !stats;
+    stat),
+  (* print stats *)
+  (fun () ->
+    List.iter
+      (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
+      !stats)
+
+let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
+let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
+
 (** {2 Ordering utils} *)
 
 let rec lexicograph f l1 l2 =

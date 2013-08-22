@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 1f44a8d90dd366f409f63d05216449d8)
+# DO NOT EDIT (digest: f984a72f06b494897535c8f09f6906a5)
 Symbol
 Hash
 Hashcons
@@ -22,6 +22,7 @@ Cnf
 Index
 Dtree
 Fingerprint
+Rewriting
 lib/Sequence
 lib/Bij
 lib/Cache

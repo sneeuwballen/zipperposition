@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 62b922842e147e4132a279b34ab2b3bb)
+# DO NOT EDIT (digest: e58b6cb2b5c6f6967ee08f90081f7c0b)
 src/Symbol
 src/Hash
 src/Hashcons
@@ -22,6 +22,7 @@ src/Cnf
 src/Index
 src/Dtree
 src/Fingerprint
+src/Rewriting
 src/lib/Sequence
 src/lib/Bij
 # OASIS_STOP

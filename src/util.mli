@@ -64,6 +64,15 @@ val mk_profiler : string -> profiler      (** Create a named profiler *)
 val enter_prof : profiler -> unit         (** Enter the profiler *)
 val exit_prof : profiler -> unit          (** Exit the profiler *)
 
+(** {2 Runtime statistics} *)
+
+type stat
+
+val mk_stat : string -> stat
+val print_global_stats : unit -> unit
+val incr_stat : stat -> unit
+val add_stat : stat -> int -> unit
+
 (** {2 Ordering utils} *)
 
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)

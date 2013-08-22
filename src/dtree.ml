@@ -97,7 +97,6 @@ let char_to_str c = match c with
 (** {2 Discrimination tree} *)
 
 module Make(E : Index.EQUATION) = struct
-
   module E = E
 
   type trie =
