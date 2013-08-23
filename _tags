@@ -1,7 +1,6 @@
 <src>: include
-<containers>: include
 <tests>: include
-<datalog>: include
+<containers>: include
+<**/*.cm*> or <**/*.ml*>: package(logtk), package(datalog)
 <**/*.cmx>: inline(15)
-<**/*.native> or <**/*.byte>: package(num), package(dynlink), package(str), package(unix)
-<tests/*.native> or <tests/*.byte>: package(dynlink), package(str), package(unix)
+<**/*.native> or <**/*.byte>: package(num), package(dynlink), package(str), package(unix), package(logtk), package(datalog)

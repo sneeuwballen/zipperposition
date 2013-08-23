@@ -169,7 +169,7 @@ module KB : sig
 
   val bij_atom : atom Bij.t
 
-  module Logic : Datalog.Logic.S with type symbol = atom
+  module Logic : Datalog.S with type symbol = atom
     (** The Datalog prover that reasons over atoms. *)
   
   (** {2 Conversion to Datalog} *)

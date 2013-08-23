@@ -38,7 +38,7 @@ module Logic = KB.Logic
 
 module LitMap = Map.Make(struct
   type t = Logic.literal
-  let compare = Logic.compare_literal
+  let compare = Pervasives.compare
 end)
 
 type t = {

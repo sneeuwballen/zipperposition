@@ -293,7 +293,7 @@ let bij_atom =
     | _ -> raise (DecodingError "expected atom"))
 
 (** The Datalog prover that reasons over atoms. *)
-module Logic = Datalog.Logic.Make(struct
+module Logic = Datalog.Make(struct
   type t = atom
   let equal = eq_atom
   let hash = hash_atom
@@ -306,35 +306,35 @@ end)
 (** Encode term into a Datalog atom. If [to_var] is true, then variables
     will be encoded into Datalog variables (otherwise to terms) *)
 let encode_term ~to_var t = match t.term with
-  | Var i when to_var && i >= 0 -> `Var (-(i*2)-1)
-  | Var i when to_var && i < 0 -> `Var (i*2)
-  | _ -> `Symbol (MTerm t)
+  | Var i when to_var && i >= 0 -> Logic.mk_var (-(i*2)-1)
+  | Var i when to_var && i < 0 -> Logic.mk_var (i*2)
+  | _ -> Logic.mk_const (MTerm t)
 
 (** Convert a Datalog atom back to a term of given sort, or raise Failure *)
 let deencode_term t sort = match t with
-  | `Var i when (i mod 2) = 0 -> T.mk_var (i/2) sort
-  | `Var i -> T.mk_var (-(i+1)/2) sort
-  | `Symbol (MTerm t) ->
+  | Logic.Var i when (i mod 2) = 0 -> T.mk_var (i/2) sort
+  | Logic.Var i -> T.mk_var (-(i+1)/2) sort
+  | Logic.Const (MTerm t) ->
     assert (t.sort == sort);
     t
-  | `Symbol s -> failwith (Utils.sprintf "Datalog atom %a not a term" pp_atom s)
+  | Logic.Const s -> failwith (Utils.sprintf "Datalog atom %a not a term" pp_atom s)
 
 (** {3 Construction of atoms} *)
 
 let atom_named name args =
-  Logic.mk_literal (MString "named") (`Symbol (MString name) :: args)
+  Logic.mk_literal (MString "named") (Logic.mk_const (MString name) :: args)
 
 let atom_theory name args =
-  Logic.mk_literal (MString "theory") (`Symbol (MString name) :: args)
+  Logic.mk_literal (MString "theory") (Logic.mk_const (MString name) :: args)
 
 let atom_pattern pat args =
-  Logic.mk_literal (MString "pattern") (`Symbol (MPattern pat) :: args)
+  Logic.mk_literal (MString "pattern") (Logic.mk_const (MPattern pat) :: args)
 
 let atom_gc ?(offset=(-1)) gc terms =
   assert (List.length gc.gc_vars = List.length terms);
-  let args = [`Symbol (MString gc.gc_ord); `Symbol (MString gc.gc_theory)] in
+  let args = [Logic.mk_const (MString gc.gc_ord); Logic.mk_const (MString gc.gc_theory)] in
   let args = args @ List.map (encode_term ~to_var:false) gc.gc_prec in
-  let args = args @ List.map (fun (pat,vars) -> `Symbol (MPatternVars (pat, vars))) gc.gc_eqns in
+  let args = args @ List.map (fun (pat,vars) -> Logic.mk_const (MPatternVars (pat, vars))) gc.gc_eqns in
   let args = args @ List.map (encode_term ~to_var:false) gc.gc_vars in
   let args = args @ List.map (encode_term ~to_var:true) terms in
   Logic.mk_literal (MString "gc") args
@@ -345,13 +345,13 @@ let extract_terms sorts args =
   assert (List.length sorts = List.length args);
   let terms = List.fold_left2
     (fun acc sort arg -> match arg with
-      | `Symbol (MPattern _)
-      | `Symbol (MPatternVars _)
-      | `Symbol (MString _) -> assert false
-      | `Symbol (MTerm t) ->
+      | Logic.Const  (MPattern _)
+      | Logic.Const (MPatternVars _)
+      | Logic.Const (MString _) -> assert false
+      | Logic.Const (MTerm t) ->
         assert (t.sort == sort);
         t::acc
-      | `Var i -> (T.mk_var (-i) sort) :: acc)
+      | Logic.Var i -> (T.mk_var (-i) sort) :: acc)
     [] sorts args in
   List.rev terms
 
@@ -359,11 +359,11 @@ let extract_terms sorts args =
 let extract_terms_unsafe args =
   List.map
     (function
-      | `Symbol (MPattern _)
-      | `Symbol (MPatternVars _)
-      | `Symbol (MString _) -> assert false
-      | `Symbol (MTerm t) -> t
-      | `Var i -> T.mk_var (-i) univ_)
+      | Logic.Const (MPattern _)
+      | Logic.Const (MPatternVars _)
+      | Logic.Const (MString _) -> assert false
+      | Logic.Const (MTerm t) -> t
+      | Logic.Var i -> T.mk_var (-i) univ_)
     args
 
 (** Translate a premise to a Datalog literal *)
@@ -435,20 +435,20 @@ let definition_to_datalog definition =
     Logic.mk_clause concl premises'
 
 let definition_to_goals definition =
-  let convert_list l = List.mapi (fun i _ -> `Var (-i-2)) l in
+  let convert_list l = List.mapi (fun i _ -> Logic.mk_var (-i-2)) l in
   match definition with
   | Named (name, (p, sorts)) -> []
   | Lemma ((_, args), _) ->
-    [Logic.mk_literal (MString "pattern") ((`Var (-1)) :: convert_list args)]
+    [Logic.mk_literal (MString "pattern") ((Logic.mk_var (-1)) :: convert_list args)]
   | Theory ((_, args), _) ->
-    [Logic.mk_literal (MString "theory") ((`Var (-1)) :: convert_list args)]
+    [Logic.mk_literal (MString "theory") ((Logic.mk_var (-1)) :: convert_list args)]
   | GC (gc,_) ->
     let n = List.length gc.gc_eqns + List.length gc.gc_vars +
       List.length gc.gc_prec + 1 in
     let args = Sequence.unfoldr
-      (fun i -> if i >= n then None else Some (`Var (-i-2), i+1))
+      (fun i -> if i >= n then None else Some (Logic.mk_var (-i-2), i+1))
       0 in
-    [Logic.mk_literal (MString "gc") ((`Var (-1)) :: Sequence.to_list args)]
+    [Logic.mk_literal (MString "gc") ((Logic.mk_var (-1)) :: Sequence.to_list args)]
 
 (** Convert a meta-fact to a Datalog fact *)
 let fact_to_datalog fact =
@@ -465,26 +465,26 @@ let fact_to_datalog fact =
 (** Try to convert back a Datalog fact into a meta-fact *)
 let of_datalog lit =
   match Logic.open_literal lit with
-  | MString "pattern", (`Symbol (MPattern p) :: args) ->
+  | MString "pattern", (Logic.Const (MPattern p) :: args) ->
     let terms = extract_terms (snd p) args in
     Some (ThenPattern (p, terms))
-  | MString "named", (`Symbol (MString name) :: args) ->
+  | MString "named", (Logic.Const (MString name) :: args) ->
     let terms = extract_terms_unsafe args in
     Some (ThenNamed (name, terms))
-  | MString "theory", (`Symbol (MString name) :: args) ->
+  | MString "theory", (Logic.Const (MString name) :: args) ->
     let terms = extract_terms_unsafe args in
     Some (ThenTheory (name, terms))
-  | MString "gc", (`Symbol (MString gc_ord) :: `Symbol (MString gc_theory) :: args) ->
+  | MString "gc", (Logic.Const (MString gc_ord) :: Logic.Const (MString gc_theory) :: args) ->
     (* extract (list of terms, list of patterns, list of terms) . [at_prec]
        is true if we are reading the first sequence of terms, ie
        the precedence. *) 
     let rec extract at_prec (prec,pats,vars) l = match l with
     | [] -> List.rev prec, List.rev pats, List.rev vars
-    | (`Symbol (MPatternVars (p,p_vars)))::l' -> extract false (prec,(p,p_vars)::pats,vars) l'
-    | (`Symbol (MTerm t))::l' when at_prec -> extract true (t::prec,pats,vars) l'
-    | (`Symbol (MTerm t))::l' -> extract false (prec,pats,t::vars) l'
-    | (`Symbol atom)::_ -> failwith (Utils.sprintf "bad atom %a" pp_atom atom)
-    | (`Var _)::_ -> failwith "unexpected variable"
+    | (Logic.Const (MPatternVars (p,p_vars)))::l' -> extract false (prec,(p,p_vars)::pats,vars) l'
+    | (Logic.Const (MTerm t))::l' when at_prec -> extract true (t::prec,pats,vars) l'
+    | (Logic.Const (MTerm t))::l' -> extract false (prec,pats,t::vars) l'
+    | (Logic.Const atom)::_ -> failwith (Utils.sprintf "bad atom %a" pp_atom atom)
+    | (Logic.Var _)::_ -> failwith "unexpected variable"
     in
     let gc_prec, gc_eqns, terms = extract true ([],[],[]) args in
     Utils.debug 4 "got @[<h>prec %a, args %a@]"

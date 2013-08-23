@@ -12,7 +12,7 @@ IMPLEMENTATION_FILES = $(shell find src -name '*.ml')
 PLUGIN_FILES = $(shell find plugins/ -name '*.ml')
 INSTALLDIR ?= /usr/bin/
 BINARY = zipperposition.native
-SUBMODULES = containers datalog
+SUBMODULES = containers
 PACKAGES = 
 CAML_OPTS = 
 CAML_LIBS = str nums unix
@@ -32,14 +32,12 @@ INSTALLDIR=/usr/bin/
 PWD = $(shell pwd)
 
 #INCLUDES = -I,$(PWD)/datalog/_build,-I,$(PWD)/sequence/_build/
-INCLUDES = -I,src,-I,datalog,-I,containers
+INCLUDES = -I,src,-I,containers
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
 #OPTIONS = $(WITH_PACKAGES) $(WITH_LIBS) -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
 #OPTIONS = -cflags $(INCLUDES) -lflags $(INCLUDES) -libs $(LIBS) -I src
 #OPTIONS = -use-ocamlfind -I src $(PP) -classic-display
-OPTIONS = -use-ocamlfind -I src $(PP) -X plugins -yaccflag -v
-#OPTIONS_LIB = -I src -cflags $(INCLUDES) -lflags $(INCLUDES)
-OPTIONS_LIB = -I src -cflags $(INCLUDES) 
+OPTIONS = -use-ocamlfind $(PP) -X plugins -yaccflag -v
 
 # switch compilation module
 MODE ?= debug
@@ -119,7 +117,4 @@ dot:
 containers:
 	make -C containers
 
-datalog:
-	make -C datalog
-
-.PHONY: containers datalog
+.PHONY: containers
