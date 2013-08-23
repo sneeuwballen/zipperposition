@@ -49,11 +49,17 @@ clean:
 	ocaml setup.ml -clean
 
 # install the main binary
-install: lib 
-	ocamlfind install $(NAME) META $(INSTALL)
-	@echo done.
+install: all
+	ocaml setup.ml -install
+	#ocamlfind install $(NAME) META $(INSTALL)
+
+reinstall: all
+	ocaml setup.ml -reinstall
+
+uninstall:
+	ocaml setup.ml -uninstall
 
 tags:
 	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
-.PHONY: all lib tests doc clean install tags
+.PHONY: all lib tests doc clean install reinstall uninstall tags

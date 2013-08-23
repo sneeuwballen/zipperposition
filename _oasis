@@ -23,6 +23,6 @@ Document logtk
   Title:                Logtk docs
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install:              true
+  Install:              false
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk
