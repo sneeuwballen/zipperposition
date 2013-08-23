@@ -27,20 +27,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 exception UnificationFailure
 
-val unification : ?subst:Substs.t -> Term.t -> int -> Term.t -> int -> Substs.t
+val unification : ?subst:Substs.t -> Term.t -> Substs.scope ->
+                  Term.t -> Substs.scope -> Substs.t
   (** Unify terms, returns a Substs.t or raises UnificationFailure *)
 
-val matching : ?subst:Substs.t -> Term.t -> int -> Term.t -> int -> Substs.t
-  (** [matching a b] returns sigma such that sigma(a) = b, or raises
-      UnificationFailure. Only variables from the context of [a] can
+val matching : ?subst:Substs.t -> Term.t -> Substs.scope ->
+                Term.t -> Substs.scope -> Substs.t
+  (** [matching a scope_a b scope_b] returns sigma such that sigma(a) = b, or raises
+      UnificationFailure. Only variables from the scope of [a] can
       be bound in the Substs.t. *)
 
-val variant : ?subst:Substs.t -> Term.t -> int -> Term.t -> int -> Substs.t
+val variant : ?subst:Substs.t -> Term.t -> Substs.scope ->
+              Term.t -> Substs.scope -> Substs.t
   (** Succeeds iff the first term is a variant of the second *)
 
 val matching_ac : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
                   ?offset:int ref -> ?subst:Substs.t ->
-                  Term.t -> int -> Term.t -> int ->
+                  Term.t -> Substs.scope -> Term.t -> Substs.scope ->
                   Substs.t Sequence.t
   (** [matching_ac a b] returns Substs.ts such that [subst(a) =_AC b]. It
       is much more costly than [matching]. By default [is_ac] returns true only

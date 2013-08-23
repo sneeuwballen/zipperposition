@@ -37,13 +37,21 @@ let get_total_time, get_start_time =
 
 (** {2 Misc} *)
 
+let clear_line () =
+  output_string Pervasives.stdout
+    "\r                                                         \r";
+  flush Pervasives.stdout
+
+
 let debug_level_ = ref 0
 let set_debug l = debug_level_ := l
 let get_debug () = !debug_level_
+let need_cleanup = ref false
 let debug l format =
   let b = Buffer.create 15 in
   if l <= !debug_level_
     then (
+      (if !need_cleanup then clear_line ());
       Printf.bprintf b "[%.3f] " (get_total_time ());
       Printf.kbprintf
         (fun b -> print_endline (Buffer.contents b))
@@ -516,6 +524,11 @@ let fprintf oc format =
 
 let printf format = fprintf stdout format
 let eprintf format = fprintf stderr format
+
+let on_buffer pp x =
+  let buf = Buffer.create 24 in
+  pp buf x;
+  Buffer.contents buf
 
 let pp_pair ?(sep=" ") px py buf (x,y) =
   px buf x;

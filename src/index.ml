@@ -100,33 +100,33 @@ module MakeLeaf(X : Set.OrderedType) = struct
     T.TMap.iter (fun _ set -> cnt := !cnt + S.cardinal set) leaf;
     !cnt
 
-  let fold_unify (leaf,o_leaf) (t,o_t) acc k =
+  let fold_unify (leaf,sc_leaf) (t,sc_t) acc k =
     T.TMap.fold
       (fun t' set acc ->
         try
-          let subst = Unif.unification t' o_leaf t o_t in
+          let subst = Unif.unification t' sc_leaf t sc_t in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
         with Unif.UnificationFailure -> acc)
       leaf acc
 
-  let fold_match (leaf,o_leaf) (t,o_t) acc k =
+  let fold_match (leaf,sc_leaf) (t,sc_t) acc k =
     T.TMap.fold
       (fun t' set acc ->
         try
-          let subst = Unif.matching t' o_leaf t o_t in
+          let subst = Unif.matching t' sc_leaf t sc_t in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
         with Unif.UnificationFailure -> acc)
       leaf acc
 
-  let fold_matched (leaf,o_leaf) (t,o_t) acc k =
+  let fold_matched (leaf,sc_leaf) (t,sc_t) acc k =
     T.TMap.fold
       (fun t' set acc ->
         try
-          let subst = Unif.matching t o_t t' o_leaf in
+          let subst = Unif.matching t sc_t t' sc_leaf in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc

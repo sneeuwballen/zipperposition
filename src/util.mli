@@ -37,6 +37,7 @@ val get_start_time : unit -> float
  
 val set_debug : int -> unit     (** Set debug level *)
 val get_debug : unit -> int     (** Current debug level *)
+val need_cleanup : bool ref     (** Cleanup line before printing? *)
 
 val debug : int -> ('a, Buffer.t, unit, unit) format4 -> 'a
   (** debug message *)
@@ -205,6 +206,7 @@ val fprintf : out_channel -> ('a, Buffer.t, unit, unit) format4 -> 'a
 
 val printf : ('a, Buffer.t, unit, unit) format4 -> 'a
 val eprintf : ('a, Buffer.t, unit, unit) format4 -> 'a
+val on_buffer : (Buffer.t -> 'a -> unit) -> 'a -> string
 
 val pp_pair: ?sep:string -> (Buffer.t -> 'a -> unit) ->
               (Buffer.t -> 'b -> unit) -> Buffer.t -> ('a * 'b) -> unit

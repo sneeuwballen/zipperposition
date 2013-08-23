@@ -36,64 +36,64 @@ let prof_matching = Util.mk_profiler "matching"
 exception UnificationFailure
 
 (** Does [v] appear in [t] if we apply the substitution? *)
-let occurs_check subst v o_v t o_t =
-  let rec check v o_v t o_t =
+let occurs_check subst v sc_v t sc_t =
+  let rec check v sc_v t sc_t =
     if T.is_ground_term t then false
       else match t.term with
-      | Var _ when v == t && o_v = o_t -> true
+      | Var _ when v == t && sc_v = sc_t -> true
       | Var _ ->  (* if [t] is a var bound by [subst], check in its image *) 
-        (try let (t', o_t') = S.lookup subst t o_t in
-              check v o_v t' o_t'
+        (try let (t', sc_t') = S.lookup subst t sc_t in
+              check v sc_v t' sc_t'
         with Not_found -> false)
       | BoundVar _ -> false
-      | Bind (_, t') -> check v o_v t' o_t
-      | Node (_, l) -> check_list v o_v l o_t
-      | At (t1, t2) -> check v o_v t1 o_t || check v o_v t2 o_t
-  and check_list v o_v l o_l = match l with
+      | Bind (_, t') -> check v sc_v t' sc_t
+      | Node (_, l) -> check_list v sc_v l sc_t
+      | At (t1, t2) -> check v sc_v t1 sc_t || check v sc_v t2 sc_t
+  and check_list v sc_v l sc_l = match l with
   | [] -> false
-  | t::l' -> check v o_v t o_l || check_list v o_v l' o_l
+  | t::l' -> check v sc_v t sc_l || check_list v sc_v l' sc_l
   in
-  check v o_v t o_t
+  check v sc_v t sc_t
 
 (** Unify terms, returns a substitution or raises UnificationFailure *)
-let unification ?(subst=S.empty) a o_a b o_b =
+let unification ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_unification;
   (* recursive unification *)
-  let rec unif subst s o_s t o_t =
-    let s, o_s = S.get_var subst s o_s
-    and t, o_t = S.get_var subst t o_t in
+  let rec unif subst s sc_s t sc_t =
+    let s, sc_s = S.get_var subst s sc_s
+    and t, sc_t = S.get_var subst t sc_t in
     match s.term, t.term with
-    | _ when s == t && (T.is_ground_term s || o_s = o_t) ->
+    | _ when s == t && (T.is_ground_term s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground_term s && T.is_ground_term t ->
       raise UnificationFailure (* terms are not equal, and ground. failure. *)
     | Var _, _ ->
-      if occurs_check subst s o_s t o_t
+      if occurs_check subst s sc_s t sc_t
         then raise UnificationFailure (* occur check *)
-        else S.bind subst s o_s t o_t (* bind s *)
+        else S.bind subst s sc_s t sc_t (* bind s *)
     | _, Var _ ->
-      if occurs_check subst t o_t s o_s
+      if occurs_check subst t sc_t s sc_s
         then raise UnificationFailure (* occur check *)
-        else S.bind subst t o_t s o_s (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' o_s t2' o_t
+        else S.bind subst t sc_t s sc_s (* bind s *)
+    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
-      unif_list subst l1 o_s l2 o_t
+      unif_list subst l1 sc_s l2 sc_t
     | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 o_s t1 o_t in
-      unif subst s2 o_s t2 o_t
+      let subst = unif subst s1 sc_s t1 sc_t in
+      unif subst s2 sc_s t2 sc_t
     | _, _ -> raise UnificationFailure
   (* unify pair of lists of terms *)
-  and unif_list subst l1 o_1 l2 o_2 = match l1, l2 with
+  and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
   | [], [] -> subst
   | [], _ | _, [] -> raise UnificationFailure
   | t1::l1', t2::l2' ->
-    let subst = unif subst t1 o_1 t2 o_2 in
-    unif_list subst l1' o_1 l2' o_2
+    let subst = unif subst t1 sc_1 t2 sc_2 in
+    unif_list subst l1' sc_1 l2' sc_2
   in
   (* try unification, and return solution/exception (with profiler handling) *)
   try
-    let subst = unif subst a o_a b o_b in
+    let subst = unif subst a sc_a b sc_b in
     Util.exit_prof prof_unification;
     subst
   with UnificationFailure as e ->
@@ -103,75 +103,75 @@ let unification ?(subst=S.empty) a o_a b o_b =
 (** [matching a b] returns sigma such that sigma(a) = b, or raises
     UnificationFailure. Only variables from the context of [a] can
     be bound in the substitution. *)
-let matching ?(subst=S.empty) a o_a b o_b =
+let matching ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_matching;
   (* recursive matching *)
-  let rec unif subst s o_s t o_t =
-    let s, o_s = S.get_var subst s o_s in
+  let rec unif subst s sc_s t sc_t =
+    let s, sc_s = S.get_var subst s sc_s in
     match s.term, t.term with
-    | _ when s == t && (T.is_ground_term s || o_s = o_t) ->
+    | _ when s == t && (T.is_ground_term s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground_term s && T.is_ground_term t ->
       raise UnificationFailure (* terms are not equal, and ground. failure. *)
     | Var _, _ ->
-      if occurs_check subst s o_s t o_t || o_s <> o_a
+      if occurs_check subst s sc_s t sc_t || sc_s <> sc_a
         then raise UnificationFailure
           (* occur check, or [s] is not in the initial
-             context [o_a] in which variables can be bound. *)
-        else S.bind subst s o_s t o_t (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' o_s t2' o_t
+             context [sc_a] in which variables can be bound. *)
+        else S.bind subst s sc_s t sc_t (* bind s *)
+    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
-      unif_list subst l1 o_s l2 o_t
+      unif_list subst l1 sc_s l2 sc_t
     | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 o_s t1 o_t in
-      unif subst s2 o_s t2 o_t
+      let subst = unif subst s1 sc_s t1 sc_t in
+      unif subst s2 sc_s t2 sc_t
     | _, _ -> raise UnificationFailure
   (* unify pair of lists of terms *)
-  and unif_list subst l1 o_1 l2 o_2 = match l1, l2 with
+  and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
   | [], [] -> subst
   | [], _ | _, [] -> raise UnificationFailure
   | t1::l1', t2::l2' ->
-    let subst = unif subst t1 o_1 t2 o_2 in
-    unif_list subst l1' o_1 l2' o_2
+    let subst = unif subst t1 sc_1 t2 sc_2 in
+    unif_list subst l1' sc_1 l2' sc_2
   in
   (* try matching, and return solution/exception (with profiler handling) *)
   try
-    let subst = unif subst a o_a b o_b in
+    let subst = unif subst a sc_a b sc_b in
     Util.exit_prof prof_matching;
     subst
   with UnificationFailure as e ->
     Util.exit_prof prof_matching;
     raise e
 
-let variant ?(subst=S.empty) a o_a b o_b =
+let variant ?(subst=S.empty) a sc_a b sc_b =
   (* recursive variant checking *)
-  let rec unif subst s o_s t o_t =
-    let s, o_s = S.get_var subst s o_s in
-    let t, o_t = S.get_var subst t o_t in
+  let rec unif subst s sc_s t sc_t =
+    let s, sc_s = S.get_var subst s sc_s in
+    let t, sc_t = S.get_var subst t sc_t in
     match s.term, t.term with
-    | _ when s == t && (T.is_ground_term s || o_s = o_t) ->
+    | _ when s == t && (T.is_ground_term s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground_term s && T.is_ground_term t ->
       raise UnificationFailure (* terms are not equal, and ground. failure. *)
-    | Var _, Var _ -> S.bind subst s o_s t o_t (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' o_s t2' o_t
+    | Var _, Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
+    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
-      unif_list subst l1 o_s l2 o_t
+      unif_list subst l1 sc_s l2 sc_t
     | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 o_s t1 o_t in
-      unif subst s2 o_s t2 o_t
+      let subst = unif subst s1 sc_s t1 sc_t in
+      unif subst s2 sc_s t2 sc_t
     | _, _ -> raise UnificationFailure
   (* unify pair of lists of terms *)
-  and unif_list subst l1 o_1 l2 o_2 = match l1, l2 with
+  and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
   | [], [] -> subst
   | [], _ | _, [] -> raise UnificationFailure
   | t1::l1', t2::l2' ->
-    let subst = unif subst t1 o_1 t2 o_2 in
-    unif_list subst l1' o_1 l2' o_2
+    let subst = unif subst t1 sc_1 t2 sc_2 in
+    unif_list subst l1' sc_1 l2' sc_2
   in
-  unif subst a o_a b o_b
+  unif subst a sc_a b sc_b
 
 (** [matching_ac a b] returns substitutions such that [subst(a) =_AC b]. It
     is much more costly than [matching]. By default [is_ac] returns true only
@@ -179,12 +179,12 @@ let variant ?(subst=S.empty) a o_a b o_b =
     [offset] is used to create new variables. *)
 let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
                 ?(is_com=fun s -> Symbol.has_attr Symbol.attr_commut s)
-                ?offset ?(subst=S.empty) a o_a b o_b =
+                ?offset ?(subst=S.empty) a sc_a b sc_b =
   (* function to get fresh variables *)
   let offset = match offset with
     | Some o -> o
-    | None -> ref (max (T.max_var (T.vars a) + o_a + 1)
-                       (T.max_var (T.vars b) + o_b + 1)) in
+    | None -> ref (max (T.max_var (T.vars a) + sc_a + 1)
+                       (T.max_var (T.vars b) + sc_b + 1)) in
   (* avoid index collisions *)
   let fresh_var () =
     let v = T.mk_var !offset in
@@ -192,18 +192,18 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
     v
   in
   (* recursive matching. [k] is called with solutions *)
-  let rec unif subst s o_s t o_t k =
-    let s, o_s = S.get_var subst s o_s in
+  let rec unif subst s sc_s t sc_t k =
+    let s, sc_s = S.get_var subst s sc_s in
       match s.term, t.term with
-      | Var _, Var _ when s == t && o_s = o_t -> k subst (* trivial success *)
+      | Var _, Var _ when s == t && sc_s = sc_t -> k subst (* trivial success *)
       | Var _, _ ->
-        if occurs_check subst s o_s t o_t || o_s <> o_a
+        if occurs_check subst s sc_s t sc_t || sc_s <> sc_a
           then ()
             (* occur check, or [s] is not in the initial
-               context [o_a] in which variables can be bound. *)
-          else k (S.bind subst s o_s t o_t) (* bind s and continue *)
+               context [sc_a] in which variables can be bound. *)
+          else k (S.bind subst s sc_s t sc_t) (* bind s and continue *)
       | Bind (f, t1'), Bind (g, t2') when f == g ->
-        unif subst t1' o_s t2' o_t k
+        unif subst t1' sc_s t2' sc_t k
       | BoundVar i, BoundVar j -> if i = j then k subst
       | Node (f, l1), Node (g, l2) when f == g && is_ac f ->
         (* flatten into a list of terms that do not have [f] as head symbol *)
@@ -212,54 +212,54 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
         (* eliminate terms that are common to l1 and l2 *)
         let l1, l2 = eliminate_common l1 l2 in
         (* permutative matching *)
-        unif_ac subst f l1 o_s [] l2 o_t k
+        unif_ac subst f l1 sc_s [] l2 sc_t k
       | Node (f, [x1;y1]), Node (g, [x2;y2]) when f == g && is_com f ->
-        unif_com subst x1 y1 o_s x2 y2 o_t k
+        unif_com subst x1 y1 sc_s x2 y2 sc_t k
       | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
-        unif_list subst l1 o_s l2 o_t k  (* regular decomposition *)
+        unif_list subst l1 sc_s l2 sc_t k  (* regular decomposition *)
       | At (s1, s2), At (t1, t2) ->
-        unif subst s1 o_s t1 o_t
-          (fun subst' -> unif subst' s2 o_s t2 o_t k)
+        unif subst s1 sc_s t1 sc_t
+          (fun subst' -> unif subst' s2 sc_s t2 sc_t k)
       | _, _ -> ()  (* failure, close branch *)
   (* unify pair of lists of terms, with given continuation. *)
-  and unif_list subst l1 o_1 l2 o_2 k =
+  and unif_list subst l1 sc_1 l2 sc_2 k =
     match l1, l2 with
     | [], [] -> k subst  (* success *)
     | t1::l1', t2::l2' ->
-      unif subst t1 o_1 t2 o_2
-        (fun subst -> unif_list subst l1' o_1 l2' o_2 k)
+      unif subst t1 sc_1 t2 sc_2
+        (fun subst -> unif_list subst l1' sc_1 l2' sc_2 k)
     | [], _ | _, [] -> assert false
   (* unify terms under a commutative symbol (try both sides) *)
-  and unif_com subst x1 y1 o_1 x2 y2 o_2 k =
-    unif subst x1 o_1 x2 o_2 (fun subst -> unif subst y1 o_1 y2 o_2 k);
-    unif subst x1 o_1 y2 o_2 (fun subst -> unif subst y1 o_1 x2 o_2 k);
+  and unif_com subst x1 y1 sc_1 x2 y2 sc_2 k =
+    unif subst x1 sc_1 x2 sc_2 (fun subst -> unif subst y1 sc_1 y2 sc_2 k);
+    unif subst x1 sc_1 y2 sc_2 (fun subst -> unif subst y1 sc_1 x2 sc_2 k);
     ()
   (* try all permutations of [left@right] against [l1]. [left,right] is a
      zipper over terms to be matched against [l1]. *)
-  and unif_ac subst f l1 o_1 left right o_2 k =
+  and unif_ac subst f l1 sc_1 left right sc_2 k =
     match l1, left, right with
     | [], [], [] -> k subst  (* success *)
     | _ when List.length l1 > List.length left + List.length right ->
       ()  (* failure, too many patterns *)
     | x1::l1', left, x2::right' ->
       (* try one-to-one of x1 against x2 *)
-      unif subst x1 o_1 x2 o_2
+      unif subst x1 sc_1 x2 sc_2
         (fun subst ->
           (* continue without x1 and x2 *)
-          unif_ac subst f l1' o_1 [] (left @ right') o_2 k);
+          unif_ac subst f l1' sc_1 [] (left @ right') sc_2 k);
       (* try x1 against right', keeping x2 on the side *)
-      unif_ac subst f l1 o_1 (x2::left) right' o_2 k;
+      unif_ac subst f l1 sc_1 (x2::left) right' sc_2 k;
       (* try to bind x1 to [x2+z] where [z] is fresh,
          if len(l1) < len(left+right) *)
       if T.is_var x1 && List.length l1 < List.length left + List.length right then
         let z = fresh_var () in
-        (* offset trick: we need [z] in both contexts o_1 and o_2, so we
-           bind it so that (z,o_2) -> (z,o_1), and use (z,o_1) to continue
+        (* offset trick: we need [z] in both contexts sc_1 and sc_2, so we
+           bind it so that (z,sc_2) -> (z,sc_1), and use (z,sc_1) to continue
            the matching *)
-        let subst' = S.bind subst z o_2 z o_1 in
+        let subst' = S.bind subst z sc_2 z sc_1 in
         let x2' = T.mk_node f [x2; z] in
-        let subst' = S.bind subst' x1 o_1 x2' o_2 in
-        unif_ac subst' f (z::l1') o_1 left right' o_2 k
+        let subst' = S.bind subst' x1 sc_1 x2' sc_2 in
+        unif_ac subst' f (z::l1') sc_1 left right' sc_2 k
     | x1::l1', left, [] -> ()
     | [], _, _ -> ()  (* failure, some terms are not matched *)
   (* eliminate common occurrences of terms in [l1] and [l2] *)
@@ -267,6 +267,6 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
   in
   (* sequence of solutions. Substsitutions are restricted to the variables
      of [a]. *)
-  let seq k = unif subst a o_a b o_b k in
+  let seq k = unif subst a sc_a b sc_b k in
   Sequence.from_iter seq
 

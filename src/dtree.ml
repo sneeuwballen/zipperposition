@@ -170,7 +170,7 @@ module Make(E : Index.EQUATION) = struct
     let tree = goto_leaf dt chars k in
     tree
 
-  let retrieve ~sign (dt, o_dt) (t, o_t) acc k =
+  let retrieve ~sign (dt, sc_dt) (t, sc_t) acc k =
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc pos subst =
       match trie with
@@ -196,16 +196,16 @@ module Make(E : Index.EQUATION) = struct
             (* if variable, try to bind it and continue *)
             match t1' with
             | Variable v1' when (not (T.has_type t_pos) || T.compatible_type v1' t_pos)
-            && S.is_in_subst subst v1' o_dt ->
+            && S.is_in_subst subst v1' sc_dt ->
                (* already bound, check consistency *)
-               let t_matched = S.apply_subst subst t_pos o_t in
-               let t_bound = S.apply_subst subst v1' o_dt in
+               let t_matched = S.apply_subst subst t_pos sc_t in
+               let t_bound = S.apply_subst subst v1' sc_dt in
                if t_matched == t_bound
                   then traverse subtrie acc (skip t pos) subst  (* skip term *)
                   else acc (* incompatible bindings of the variable *)
             | Variable v1' when not (T.has_type t_pos) || T.compatible_type v1' t_pos ->
               (* t1' not bound, so we bind it and continue in subtree *)
-              let subst' = S.bind subst v1' o_dt t_pos o_t in
+              let subst' = S.bind subst v1' sc_dt t_pos sc_t in
               traverse subtrie acc (skip t pos) subst'
             | _ -> acc)
           m acc
