@@ -49,6 +49,8 @@ module type S = sig
 
   val hashcons : ?table:t -> elt -> elt
     (** Hashcons the elements *)
+
+  val stats : ?table:t -> unit -> int*int*int*int*int*int
 end
 
 module Make(X : HashedType) : S with type elt = X.t
