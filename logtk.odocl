@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e58b6cb2b5c6f6967ee08f90081f7c0b)
+# DO NOT EDIT (digest: 5d88742811d1642597f6a6dbcbae151a)
 src/Symbol
 src/Hash
 src/Hashcons
@@ -16,7 +16,7 @@ src/Parse_tptp
 src/Comparison
 src/PartialOrder
 src/Precedence
-src/Orderings
+src/Ordering
 src/Position
 src/Cnf
 src/Index

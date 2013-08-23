@@ -4,7 +4,7 @@ open OUnit
 let suite = 
   "all_tests" >:::
     [ TestTerm.suite
-    ; TestOrderings.suite
+    ; TestOrdering.suite
     ; TestRewriting.suite
     ]
 

@@ -48,7 +48,7 @@ module type ORDERED = sig
 
   module E : Index.EQUATION
 
-  val empty : ord:Orderings.t -> t
+  val empty : ord:Ordering.t -> t
   
   val add : t -> E.t -> t
   val add_seq : t -> E.t Sequence.t -> t
@@ -91,7 +91,7 @@ module MakeOrdered(E : Index.EQUATION) = struct
   end)
 
   type t = {
-    ord : Orderings.t;
+    ord : Ordering.t;
     mutable rules : DT.t;
   } (** Ordered rewriting system *)
 
@@ -109,7 +109,7 @@ module MakeOrdered(E : Index.EQUATION) = struct
     if sign
       then
         let open Comparison.Infix in
-        match Orderings.compare trs.ord l r with
+        match Ordering.compare trs.ord l r with
         | Gt -> [ mk_rule eqn l r true ]
         | Lt -> [ mk_rule eqn r l true ]
         | Eq -> []
@@ -178,14 +178,14 @@ module MakeOrdered(E : Index.EQUATION) = struct
               then raise (RewrittenInto r')  (* we know that t > r' *)
               else (
                 assert (t == S.apply_subst subst rule.rule_left 1);
-                if Orderings.compare trs.ord t r' = Gt
+                if Ordering.compare trs.ord t r' = Gt
                   then raise (RewrittenInto r')
                   else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
         Util.debug 3 "%% rewrite @[<h>%a into %a@]" T.pp t T.pp t';
         Util.incr_stat stat_ordered_rewriting;
-        assert (Orderings.compare trs.ord t t' = Gt);
+        assert (Ordering.compare trs.ord t t' = Gt);
         reduce reduce' t'  (* term is rewritten, reduce it again *)
     in
     let cache = TCache.create size in

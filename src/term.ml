@@ -187,6 +187,20 @@ let set_flag flag t truth =
 
 let get_flag flag t = (t.flags land flag) != 0
 
+(** {2 Typing} *)
+
+let cast t ty =
+  H.hashcons { t with type_ = Some ty; tag = ~-1; }
+
+let is_bool t = match t.type_ with
+  | Some ty when Type.eq ty Type.o -> true
+  | _ -> false
+
+let arity t = match t.term with
+  | Node (_, l) -> List.length l
+  | At (_, _) -> 1
+  | _ -> 0
+
 (** {2 Smart constructors} *)
 
 (** In this section, term smart constructors are defined. Some of them
@@ -258,8 +272,8 @@ let mk_at_list t l =
 
 let mk_const s = mk_node s []
 
-let true_term = mk_const Symbol.true_symbol 
-let false_term = mk_const Symbol.false_symbol
+let true_term = cast (mk_const Symbol.true_symbol) Type.o
+let false_term = cast (mk_const Symbol.false_symbol) Type.o
 
 (* constructors for terms *)
 

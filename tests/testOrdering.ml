@@ -31,7 +31,7 @@ module T = Term
 module TT = TestTerm
 module H = Helpers
 module S = Substs
-module O = Orderings
+module O = Ordering
 
 let suite =
   "test_ordering" >:::

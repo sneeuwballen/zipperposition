@@ -130,6 +130,12 @@ val mk_exists : t -> t
 val mk_and_list : t list -> t
 val mk_or_list : t list -> t
 
+(** {2 Typing} *)
+
+val is_bool : t -> bool               (** Boolean typed? *)
+val cast : t -> Type.t -> t           (** Set the type *)
+val arity : t -> int                  (** Arity, or 0 if it makes no sense *)
+
 (** {2 Subterms and positions} *)
 
 val is_var : t -> bool

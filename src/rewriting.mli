@@ -36,7 +36,7 @@ module type ORDERED = sig
 
   module E : Index.EQUATION
 
-  val empty : ord:Orderings.t -> t
+  val empty : ord:Ordering.t -> t
   
   val add : t -> E.t -> t
   val add_seq : t -> E.t Sequence.t -> t

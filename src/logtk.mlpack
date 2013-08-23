@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: f984a72f06b494897535c8f09f6906a5)
+# DO NOT EDIT (digest: aff9f62e8023c7870afa60d299af38b6)
 Symbol
 Hash
 Hashcons
@@ -16,7 +16,7 @@ Parse_tptp
 Comparison
 PartialOrder
 Precedence
-Orderings
+Ordering
 Position
 Cnf
 Index
