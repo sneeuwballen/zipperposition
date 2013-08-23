@@ -106,8 +106,6 @@ val mk_exists : sort -> term -> term
 
 val mk_at : ?old:term -> term -> term -> term   (** t1 t2 -> t1 @ t2 *)
 
-val mk_at : ?old:term -> term -> term -> term   (** t1 t2 -> t1 @ t2 *)
-
 val cast : term -> sort -> term             (** cast (change sort) *)
 
 (** {2 Subterms and positions} *)

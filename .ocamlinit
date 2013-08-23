@@ -24,3 +24,6 @@ let debug_pp_json fmt json = Format.pp_print_string fmt (Yojson.Basic.to_string 
 #load "testTerms.cmo";;
 #load "testClauses.cmo";;
 Printf.printf "finished loading\n";;
+
+(* vim:syntax=ocaml
+*)
