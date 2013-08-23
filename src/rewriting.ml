@@ -220,9 +220,7 @@ module TRS = struct
 
   let add trs (l, r) =
     (* check that the rule does not introduce variables *)
-    assert (List.for_all
-      (fun v -> T.member_term v l)
-      (T.vars r));
+    assert (List.for_all (fun v -> T.member_term v l) (T.vars r));
     assert (not (T.is_var l));
     (* add rule to the discrimination tree *)
     let trs = DT.add trs (l, r) in
@@ -281,6 +279,7 @@ module TRS = struct
         DT.retrieve ~sign:true (trs,1) (t,0) () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst)) ->
+        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' Substs.pp subst;
         compute_nf subst t' 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
     and rewrite_handler () l r rule subst =

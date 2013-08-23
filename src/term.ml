@@ -346,18 +346,7 @@ let rec replace t ~old ~by = match t.term with
     mk_at (replace t1 ~old ~by) (replace t2 ~old ~by)
 
 (** Size of the term (number of subterms) *)
-let size t =
-  let rec size acc t = match t.term with
-    | Var _
-    | BoundVar _ -> acc+1
-    | Bind (_, t') -> size (acc+1) t'
-    | Node (_, l) -> size_list acc l
-    | At (t1, t2) -> size (size acc t1) t2
-  and size_list acc l = match l with
-    | [] -> acc
-    | x::l' -> size_list (size acc x) l'
-  in
-  size 0 t
+let size t = t.tsize
 
 (** get subterm by its position *)
 let at_cpos t pos = 

@@ -20,5 +20,6 @@ open Logtk.Type.Infix;;
 module T = Logtk.Term;;
 let pterm s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token
     (Lexing.from_string s);;
+open Logtk;;
 (* vim:syntax=ocaml
 *)

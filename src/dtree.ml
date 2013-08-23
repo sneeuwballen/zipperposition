@@ -195,14 +195,15 @@ module Make(E : Index.EQUATION) = struct
             in
             (* if variable, try to bind it and continue *)
             match t1' with
-            | Variable v1' when T.compatible_type v1' t_pos && S.is_in_subst subst v1' o_dt ->
+            | Variable v1' when (not (T.has_type t_pos) || T.compatible_type v1' t_pos)
+            && S.is_in_subst subst v1' o_dt ->
                (* already bound, check consistency *)
                let t_matched = S.apply_subst subst t_pos o_t in
                let t_bound = S.apply_subst subst v1' o_dt in
                if t_matched == t_bound
                   then traverse subtrie acc (skip t pos) subst  (* skip term *)
                   else acc (* incompatible bindings of the variable *)
-            | Variable v1' when T.compatible_type v1' t_pos ->
+            | Variable v1' when not (T.has_type t_pos) || T.compatible_type v1' t_pos ->
               (* t1' not bound, so we bind it and continue in subtree *)
               let subst' = S.bind subst v1' o_dt t_pos o_t in
               traverse subtrie acc (skip t pos) subst'

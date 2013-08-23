@@ -93,11 +93,12 @@ let group_trs =
 
 (** check equality of normal forms *)
 let test trs t1 t2 =
+  Util.debug 3 "test with %a %a" T.pp t1 T.pp t2;
   let t1' = Rw.rewrite trs t1 in
   let t2' = Rw.rewrite trs t2 in
   Util.debug 3 "normal form of %a = normal form of %a (ie %a)"
                 print_peano_nice t1 print_peano_nice t2 print_peano_nice t1';
-  OUnit.assert_equal ~cmp:T.eq t1' t2';
+  OUnit.assert_equal ~printer:T.to_string ~cmp:T.eq t1' t2';
   ()
 
 (** compute normal form of (n+n) in peano TRS *)
@@ -124,7 +125,7 @@ let benchmark ?(count=benchmark_count) trs a b =
   let one_step () =
     let a' = Rw.rewrite trs a
     and b' = Rw.rewrite trs b in
-    OUnit.assert_equal ~cmp:T.eq a' b';
+    OUnit.assert_equal ~printer:T.to_string ~cmp:T.eq a' b';
   in
   Gc.major ();
   let start = Unix.gettimeofday () in

@@ -30,5 +30,6 @@ Document logtk
 Executable run_tests
   Path: tests/
   Install: false
+  CompiledObject: native
   MainIs: run_tests.ml
   BuildDepends: logtk, oUnit
