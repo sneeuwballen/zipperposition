@@ -243,6 +243,12 @@ module TRS = struct
     Sequence.from_iter
       (fun k -> iter trs k)
 
+  let of_seq seq =
+    add_seq empty seq
+
+  let of_list l =
+    add_list empty l
+
   (** {2 Computation of normal forms} *)
 
   exception RewrittenIn of Term.t * Substs.t

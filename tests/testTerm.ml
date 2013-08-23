@@ -23,57 +23,15 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Term rewriting} *)
+(** Test terms *)
 
-(** {2 Ordered rewriting} *)
+open OUnit
 
-(** Although this module is parametrized by an EQUATION
-    module, it only deals with positive equations. Negative
-    equations will be discarded. *)
+module T = Term
+module H = Helpers
+module S = Substs
 
-module type ORDERED = sig
-  type t
+let suite =
+  "test_term" >:::
+    []
 
-  module E : Index.EQUATION
-
-  val empty : ord:Orderings.t -> t
-  
-  val add : t -> E.t -> t
-  val add_seq : t -> E.t Sequence.t -> t
-  val add_list : t -> E.t list -> t
-  
-  val to_seq : t -> E.t Sequence.t
-
-  val size : t -> int
-  
-  val mk_rewrite : t -> size:int -> (Term.t -> Term.t)
-    (** Given a TRS and a cache size, build a memoized function that
-        performs term rewriting *)
-end
-
-module MakeOrdered(E : Index.EQUATION) : ORDERED with module E = E
-
-(** {2 Regular rewriting} *)
-
-module TRS : sig
-  type t
-
-  type rule = Term.t * Term.t
-    (** rewrite rule, from left to right *)
-
-  val empty : t 
-
-  val add : t -> rule -> t
-  val add_seq : t -> rule Sequence.t -> t
-  val add_list : t -> rule list -> t
-
-  val to_seq : t -> rule Sequence.t
-  val of_seq : rule Sequence.t -> t
-  val of_list : rule list -> t
-
-  val size : t -> int
-  val iter : t -> (rule -> unit) -> unit
-
-  val rewrite : t -> Term.t -> Term.t
-    (** Compute normal form of the term *)
-end

@@ -26,3 +26,9 @@ Document logtk
   Install:              false
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk
+
+Executable run_tests
+  Path: tests/
+  Install: false
+  MainIs: run_tests.ml
+  BuildDepends: logtk, oUnit

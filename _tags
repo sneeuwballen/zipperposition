@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6762ef3a1d1840716b2904863491d5c3)
+# DO NOT EDIT (digest: b12300012f2fe822de0fea0e70677632)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -45,5 +45,14 @@
 <src/*.ml{,i}>: pkg_num
 <src/lib/*.ml{,i}>: pkg_unix
 <src/lib/*.ml{,i}>: pkg_num
+# Executable run_tests
+"tests/run_tests.byte": use_logtk
+"tests/run_tests.byte": pkg_oUnit
+"tests/run_tests.byte": pkg_unix
+"tests/run_tests.byte": pkg_num
+<tests/*.ml{,i}>: use_logtk
+<tests/*.ml{,i}>: pkg_oUnit
+<tests/*.ml{,i}>: pkg_unix
+<tests/*.ml{,i}>: pkg_num
 # OASIS_STOP
 true: use_menhir
