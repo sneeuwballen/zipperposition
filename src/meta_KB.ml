@@ -351,7 +351,7 @@ let extract_terms sorts args =
       | Logic.Const (MTerm t) ->
         assert (t.sort == sort);
         t::acc
-      | Logic.Var i -> (T.mk_var (-i) sort) :: acc)
+      | Logic.Var i -> T.mk_var (if i < 0 then 2* ~-i else 2*i+1) sort :: acc)
     [] sorts args in
   List.rev terms
 
@@ -363,7 +363,8 @@ let extract_terms_unsafe args =
       | Logic.Const (MPatternVars _)
       | Logic.Const (MString _) -> assert false
       | Logic.Const (MTerm t) -> t
-      | Logic.Var i -> T.mk_var (-i) univ_)
+      | Logic.Var i ->
+        if i < 0 then T.mk_var (2 * ~-i) univ_ else T.mk_var (2*i+1) univ_)
     args
 
 (** Translate a premise to a Datalog literal *)
