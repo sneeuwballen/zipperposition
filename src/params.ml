@@ -20,14 +20,41 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** Parameters for the prover, the calculus, etc. *)
 
-open Basic
+open Logtk
+
+type t = {
+  param_ord : Precedence.t -> Ordering.t;
+  param_seed : int;
+  param_steps : int;
+  param_version : bool;
+  param_calculus : string;
+  param_timeout : float;
+  param_files : string list;
+  param_split : bool;             (** use splitting *)
+  param_theories : bool;          (** detect theories *)
+  param_precedence : bool;        (** use heuristic for precedence? *)
+  param_select : string;          (** name of the selection function *)
+  param_progress : bool;          (** print progress during search *)
+  param_proof : string;           (** how to print proof? *)
+  param_dot_file : string option; (** file to print the final state in *)
+  param_plugins : string list;    (** plugins to load *)
+  param_kb : string;              (** file to use for KB *)
+  param_kb_where : bool;          (** print where is the KB? *)
+  param_kb_load : string list;    (** theory files to read *)
+  param_kb_clear : bool;          (** do we need to clear the KB? *)
+  param_kb_print : bool;          (** print knowledge base and exit *)
+  param_learn : bool;             (** try to learn from successful proofs? *)
+  param_presaturate : bool;       (** initial interreduction of proof state? *)
+  param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
+  param_index : string;           (** indexing structure *)
+}
 
 (** parse_args returns parameters *)
 let parse_args () =
-  let help_select = FoUtils.sprintf "selection function (@[<h>%a@])"
-    (FoUtils.pp_list ~sep:"," Format.pp_print_string)
-    (Selection.available_selections ()) in
-  let unamed_skolem () = Terms.skolem := Terms.unamed_skolem in
+  let help_select = Util.sprintf "selection function (%a)"
+    (Util.pp_list ~sep:"," Buffer.add_string)
+    (Selection.available_selections ())
+  in
   (* parameters *)
   let ord = ref "rpo6"
   and seed = ref 1928575
@@ -55,18 +82,17 @@ let parse_args () =
   and files = ref [] in
   (* special handlers *)
   let set_progress () =
-    FoUtils.need_cleanup := true;
+    Util.need_cleanup := true;
     progress := true
   and add_plugin s = plugins := s :: !plugins
-  and add_plugins s = plugins := (FoUtils.str_split ~by:"," s) @ !plugins
+  and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
   in
   (* options list *) 
   let options =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
-      ("-debug", Arg.Int FoUtils.set_debug, "debug level");
+      ("-debug", Arg.Int Util.set_debug, "debug level");
       ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
-      ("-unamed-skolem", Arg.Unit unamed_skolem, "unamed skolem symbols");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))");
       ("-timeout", Arg.Set_float timeout, "timeout (in seconds)");
       ("-select", Arg.Set_string select, help_select);
@@ -82,7 +108,7 @@ let parse_args () =
       (* ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once"); *)
       ("-print-sort", Arg.Unit (fun () -> Terms.pp_term_debug#sort true), "print sorts");
       ("-progress", Arg.Unit set_progress, "print progress");
-      ("-profile", Arg.Set FoUtils.enable_profiling, "enable profiling of code");
+      ("-profile", Arg.Set Util.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
       ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
       ("-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)");
@@ -95,7 +121,7 @@ let parse_args () =
   in
   Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
   (if !files = [] then files := ["stdin"]);
-  let param_ord = Orderings.choose !ord in
+  let param_ord = Ordering.choose !ord in
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;

@@ -1,96 +1,104 @@
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** Selection functions. Note for splitting: SelectComplex already selects
     in priority "big" negative literals, ie literals that are not split symbols. *)
 
-open Basic
+open Logtk
 
-module T = Terms
-module C = Clauses
-module S = FoSubst
+module T = Term
+module S = Substs
 module BV = Bitvector
-module Lits = Literals
-module Utils = FoUtils
+module Lit = Literal
+
+type t = Literal.t array -> int list
+
+let no_select _ = []
 
 (** Select all positives literals *)
-let select_positives hc =
+let select_positives lits =
   let rec find_pos acc i lits =
     if i = Array.length lits then acc
-    else if Lits.is_pos lits.(i) then find_pos (i::acc) (i+1) lits
+    else if Literal.is_pos lits.(i) then find_pos (i::acc) (i+1) lits
     else find_pos acc (i+1) lits
-  in find_pos [] 0 hc.hclits
+  in find_pos [] 0 lits
 
-let select_max_goal ?(strict=true) hc =
-  let maxlits = C.maxlits (hc,0) S.id_subst in
+let select_max_goal ~strict ~ord lits =
+  let maxlits = Literal.maxlits ~ord lits in
   (* find negative lits *)
   let rec find_maxneg lits i =
     if i = Array.length lits then [] else (* select nothing *)
-    if Lits.is_neg lits.(i) && BV.get maxlits i
+    if Literal.is_neg lits.(i) && BV.get maxlits i
       then if strict
         then [i] (* select one negative max goal *)
-        else i :: select_positives hc (* negative max goal + positive lits *)
+        else i :: select_positives lits (* negative max goal + positive lits *)
       else []
-  in find_maxneg hc.hclits 0
+  in find_maxneg lits 0
 
-let select_diff_neg_lit ?(strict=true) ~ord hc =
+let select_diff_neg_lit ~strict ~ord lits =
   (* find a negative literal with maximal difference between
      the weights of the sides of the equation *)
   let rec find_lit best_diff best_idx lits i =
     if i = Array.length lits then best_idx
     else match lits.(i) with
-      | Equation (l, r, false, _) ->
-        let weightdiff = abs (l.tsize - r.tsize) in
+      | Literal.Equation (l, r, false, _) ->
+        let weightdiff = abs (T.size l - T.size r) in
         if weightdiff > best_diff
           then find_lit weightdiff i lits (i+1) (* prefer this lit *)
           else find_lit best_diff best_idx lits (i+1)
       | _ -> find_lit best_diff best_idx lits (i+1)
   in
   (* search such a lit among the clause's lits *)
-  match find_lit (-1) (-1) hc.hclits 0 with
+  match find_lit (-1) (-1) lits 0 with
   | -1 -> []
   | n when strict -> [n]
-  | n -> n :: select_positives hc
+  | n -> n :: select_positives lits
 
-let select_complex ?(strict=true) ~ord hc =
+let select_complex ~strict ~ord lits =
   (* find the ground negative literal with highest diff in size *)
   let rec find_neg_ground best_diff best_i lits i =
     if i = Array.length lits then best_i else
     match lits.(i) with
-    | Equation (l, r, false, _) when T.is_ground_term l && T.is_ground_term r ->
-      let diff = abs (l.tsize - r.tsize) in
+    | Literal.Equation (l, r, false, _) when T.is_ground_term l && T.is_ground_term r ->
+      let diff = abs (T.size l - T.size r) in
       if diff > best_diff
         then find_neg_ground diff i lits (i+1)
         else find_neg_ground best_diff best_i lits (i+1)
     | _ -> find_neg_ground best_diff best_i lits (i+1)
   in
   (* try to find ground negative lit with bigger weight difference, else delegate *)
-  let i = find_neg_ground (-1) (-1) hc.hclits 0 in
+  let i = find_neg_ground (-1) (-1) lits 0 in
   if i >= 0
-    then if strict then [i] else i :: select_positives hc
-    else select_diff_neg_lit ~strict ~ord hc (* delegate to select_diff_neg_lit *)
+    then if strict then [i] else i :: select_positives lits
+    else select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
 
-let select_complex_except_RR_horn ?(strict=true) ~ord hc =
-  if C.is_RR_horn_clause hc
+let select_complex_except_RR_horn ~strict ~ord lits =
+  if Literal.is_RR_horn_clause lits
     then []  (* do not select (conditional rewrite rule) *)
-    else select_complex ~strict ~ord hc  (* like select_complex *)
+    else select_complex ~strict ~ord lits  (* like select_complex *)
 
 let default_selection ~ord = select_complex ~strict:true ~ord
 
@@ -98,8 +106,8 @@ let default_selection ~ord = select_complex ~strict:true ~ord
 let functions =
   let table = Hashtbl.create 17 in
   Hashtbl.add table "NoSelection" (fun ~ord c -> no_select c);
-  Hashtbl.add table "MaxGoal" (fun ~ord c -> select_max_goal ~strict:true c);
-  Hashtbl.add table "MaxGoalNS" (fun ~ord c -> select_max_goal ~strict:false c);
+  Hashtbl.add table "MaxGoal" (select_max_goal ~strict:true);
+  Hashtbl.add table "MaxGoalNS" (select_max_goal ~strict:false);
   Hashtbl.add table "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
   Hashtbl.add table "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
   Hashtbl.add table "SelectComplex" (select_complex ~strict:true);

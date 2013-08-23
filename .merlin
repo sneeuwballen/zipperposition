@@ -7,5 +7,4 @@ B _build/containers/
 B _build/src/meta/
 PKG datalog
 PKG sequence
-PKG yojson
-PKG zip
+PKG logtk

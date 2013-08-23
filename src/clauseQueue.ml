@@ -1,45 +1,53 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
+
+(** {1 Priority Queue of clauses} *)
 
 (** Heuristic selection of clauses, using queues. Note that some
     queues do not need accept all clauses, as long as one of them does
     (for completeness). Anyway, a fifo queue should always be present,
     and presents this property. *)
 
-open Basic
+open Logtk
 
-module C = Clauses
-module O = Orderings
-module Utils = FoUtils
+module C = Clause
+module O = Ordering
 
 let empty_heap =
   let leq (i, hci) (j, hcj) = i <= j || (i = j && hci.hctag <= hcj.hctag) in
   Leftistheap.empty_with ~leq
 
 type t = {
-  heap : (int * hclause) Leftistheap.t;
+  heap : (int * Clause.t) Leftistheap.t;
   functions : functions;
 } (** A priority queue of clauses, purely functional *)
 and functions = {
-  weight : hclause -> int;
-  accept : hclause -> bool;
+  weight : Clause.t -> int;
+  accept : Clause.t -> bool;
   name : string;
 }
 
@@ -154,13 +162,19 @@ let default_queues =
   ]
   *)
 
-let pp_queue formatter q =
-  Format.fprintf formatter "@[<h>queue %s@]" (name q)
+let pp buf q =
+  Printf.bprintf buf "queue %s" (name q)
 
-let pp_queue_weight formatter (q, w) =
-  Format.fprintf formatter "@[<h>queue %s, %d@]" (name q) w
+let to_string q =
+  let buf = Buffer.create 15 in
+  pp buf q;
+  Buffer.contents buf
 
-let pp_queues formatter qs =
-  Format.fprintf formatter "@[<hov>%a@]"
-    (Sequence.pp_seq ~sep:"; " pp_queue_weight) qs
+let pp_list buf qs =
+  Buffer.add_char buf '[';
+  Util.pp_list pp buf qs;
+  Buffer.add_char buf ']';
+  ()
 
+let fmt fmt q =
+  Format.pp_print_string fmt (to_string q)

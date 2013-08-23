@@ -1,75 +1,83 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** {1 Manipulate proofs} *)
 
-open Basic
+open Logtk
 
-module IntSet : Set.S with type elt = int
+type t = private
+  | Axiom of CompactClause.t * string * string (** file, axiom name *)
+  | Proof of CompactClause.t * string * t list
 
 (** {2 Constructors and utils} *)
 
-val mk_axiom : compact_clause -> string -> string -> proof
-val mk_proof : compact_clause -> string -> proof list -> proof
+val mk_axiom : CompactClause.t -> string -> string -> t
+val mk_proof : CompactClause.t -> string -> t list -> t
 
-val is_axiom : proof -> bool
-val is_proof : proof -> bool
+val is_axiom : t -> bool
+val is_proof : t -> bool
 
-val proof_clause : proof -> compact_clause  (** Clause this is a proof of *)
-val proof_id : proof -> int                 (** Id of the clause *)
-val proof_lits : proof -> literal array     (** literals of the clause *)
+val proof_clause : t -> CompactClause.t   (** Clause this is a proof of *)
+val proof_id : t -> int                   (** Id of the clause *)
+val proof_lits : t -> Literal.t array     (** literals of the clause *)
 
-val is_proof_of : proof -> hclause -> bool
+val is_proof_of : t -> CompactClause.t -> bool
   (** Is the proof a proof of the clause? *)
 
-val recover_clause : ctx:context -> proof -> hclause
-  (** Re-build a clause from its proof *)
+module IntSet : Set.S with type elt = int
 
-val traverse : ?traversed:IntSet.t ref -> proof -> (proof -> unit) -> unit
+val traverse : ?traversed:IntSet.t ref -> t -> (t -> unit) -> unit
   (** Traverse the proof. Each proof node is traversed only once,
       using the integer to recognize already traversed proofs. *)
 
-val to_seq : proof -> proof Sequence.t
+val to_seq : t -> t Sequence.t
 
-val depth : proof -> int
+val depth : t -> int
   (** Max depth of the proof *)
 
 (** {2 Conversion to a graph of proofs} *)
 
-val to_graph : proof -> (proof, string) PersistentGraph.t
+val to_graph : t -> (t, string) PersistentGraph.t
   (** Get a graph of the proof *)
 
-val bij : ord:ordering -> proof Bij.t
+val bij : ord:Ordering.t -> t Bij.t
   (** Bijection. A global table of proof steps is maintained! Use a fresh
       bijection to get a fresh proof steps table. *)
 
-(** {2 Pretty printer for proofs} *)
+(** {2 IO} *)
 
-val pp_proof_tstp : Format.formatter -> proof -> unit
-val pp_proof_debug : Format.formatter -> proof -> unit
-val pp_proof : string -> Format.formatter -> proof -> unit
+val pp_tstp : Buffer.t -> t -> unit
+val pp_debug : Buffer.t -> t -> unit
+val pp : string -> Buffer.t -> t -> unit
   (** Prints the proof according to the given input switch *)
 
-val pp_dot : name:string -> Format.formatter -> proof -> unit
+val pp_dot : name:string -> Buffer.t -> t -> unit
   (** Pretty print the proof as a DOT graph *)
 
-val pp_dot_file : ?name:string -> string -> proof -> unit
+val pp_dot_file : ?name:string -> string -> t -> unit
   (** print to dot into a file *)
 

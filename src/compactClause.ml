@@ -1,4 +1,3 @@
-
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -25,34 +24,38 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Selection functions} *)
+(** {1 Compact clause representation} *)
 
 open Logtk
 
-(** See "E: a brainiac theorem prover". *)
+type t = int * Literal.t array
 
-type t = Literal.t array -> int list
+let eq c1 c2 =
+  let i1, lit1 = c1 in
+  let i2, lit2 = c2 in
+  i1 = i2 && Literal.eq_lits lit1 lit2
 
-val no_select : t
+let hash c = fst c
 
-val select_max_goal : strict:bool -> ord:Ordering.t -> t
-  (** Select a maximal negative literal, if any, or nothing *)
+let create id lits = (id, lits)
 
-val select_diff_neg_lit : strict:bool -> ord:Ordering.t -> t
-  (** arbitrary negative literal with maximal weight difference between sides *)
+let id c = fst c
 
-val select_complex : strict:bool -> ord:Ordering.t -> t
-  (** x!=y, or ground negative lit, or like select_diff_neg_lit *)
+let lits c = snd c
 
-val select_complex_except_RR_horn : strict:bool -> ord:Ordering.t -> t
-  (** if clause is a restricted range horn clause, then select nothing;
-      otherwise, like select_complex *)
+let iter c f = Array.iter f (snd c)
 
-val default_selection : ord:Ordering.t -> t
-  (** Default selection function *)
+let to_seq c = Sequence.from_iter (fun k -> iter c k)
 
-val selection_from_string : ord:Ordering.t -> string -> t
-  (** selection function from string (may fail) *)
+let pp buf c =
+  let i, lits = c in
+  Printf.bprintf buf "c_%d(%a)" i Literal.pp_lits lits
 
-val available_selections : unit -> string list
-  (** available names for selection functions *)
+let to_string c =
+  Util.on_buffer pp c
+
+let fmt fmt c =
+  Format.pp_print_string fmt (to_string c)
+
+let bij ~ord =
+  Bij.(pair int_ (Literal.bij_lits ~ord))

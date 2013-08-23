@@ -1,4 +1,3 @@
-
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -25,34 +24,27 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Selection functions} *)
+(** {1 Compact clause representation} *)
 
 open Logtk
 
-(** See "E: a brainiac theorem prover". *)
+type t
 
-type t = Literal.t array -> int list
+val eq : t -> t -> bool
+val hash : t -> int
 
-val no_select : t
+val create : int -> Literal.t array -> t
 
-val select_max_goal : strict:bool -> ord:Ordering.t -> t
-  (** Select a maximal negative literal, if any, or nothing *)
+val id : t -> int
 
-val select_diff_neg_lit : strict:bool -> ord:Ordering.t -> t
-  (** arbitrary negative literal with maximal weight difference between sides *)
+val lits : t -> Literal.t array
 
-val select_complex : strict:bool -> ord:Ordering.t -> t
-  (** x!=y, or ground negative lit, or like select_diff_neg_lit *)
+val iter : t -> (Literal.t -> unit) -> unit
 
-val select_complex_except_RR_horn : strict:bool -> ord:Ordering.t -> t
-  (** if clause is a restricted range horn clause, then select nothing;
-      otherwise, like select_complex *)
+val to_seq : t -> Literal.t Sequence.t
 
-val default_selection : ord:Ordering.t -> t
-  (** Default selection function *)
+val pp : Buffer.t -> t -> unit
+val to_string : t -> string
+val fmt : Format.formatter -> t -> unit
 
-val selection_from_string : ord:Ordering.t -> string -> t
-  (** selection function from string (may fail) *)
-
-val available_selections : unit -> string list
-  (** available names for selection functions *)
+val bij : ord:Ordering.t -> t Bij.t
