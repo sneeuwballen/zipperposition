@@ -1,54 +1,59 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** Decision procedures for theories *)
 
-open Basic
-open Symbols
+open Logtk
 
-module T = Terms
-module C = Clauses
-module S = FoSubst
-module Utils = FoUtils
+module T = Term
+module C = Clause
+module S = Substs
 
 (** {2 General interface} *)
 
-let stat_expert_redundant = mk_stat "experts.redundant"
-let stat_expert_simplify = mk_stat "experts.simplify"
+let stat_expert_redundant = Util.mk_stat "experts.redundant"
+let stat_expert_simplify = Util.mk_stat "experts.simplify"
 
-let prof_simplify_expert = Utils.mk_profiler "experts.simplify"
-let prof_redundant_expert = Utils.mk_profiler "experts.redundant"
-let prof_ground_pair = Utils.mk_profiler "experts.ground_pair"
-let prof_normal_form = Utils.mk_profiler "experts.normal_form"
+let prof_simplify_expert = Util.mk_profiler "experts.simplify"
+let prof_redundant_expert = Util.mk_profiler "experts.redundant"
+let prof_ground_pair = Util.mk_profiler "experts.ground_pair"
+let prof_normal_form = Util.mk_profiler "experts.normal_form"
 
 type t = {
   expert_name : string;                 (** Theory the expert works on *)
   expert_descr : string;                (** Description of the expert *)
-  expert_equal : term -> term -> bool;  (** Check whether two terms are equal *)
-  expert_sig : SSet.t;                  (** Symbols of the theory *)
-  expert_clauses : hclause list;        (** Additional axioms *)
-  expert_canonize : term -> term;       (** Get a canonical form of the term *)
-  expert_ord : ordering -> bool;        (** Compatible with ord? *)
-  expert_update_ctx : context -> t list;(** How to update the context *)
-  expert_ctx : context;                 (** Context used by the expert *)
-  expert_solve : ((term*term) list -> substitution list) option;
+  expert_equal : Term.t -> Term.t -> bool;  (** Check whether two terms are equal *)
+  expert_sig : Symbol.SSet.t;           (** Symbols of the theory *)
+  expert_clauses : Clause.t list;        (** Additional axioms *)
+  expert_canonize : Term.t -> Term.t;       (** Get a canonical form of the term *)
+  expert_ord : Ordering.t -> bool;        (** Compatible with ord? *)
+  expert_update_ctx : Clause.context -> t list;(** How to update the context *)
+  expert_ctx : Clause.context;                 (** Context used by the expert *)
+  expert_solve : ((Term.t*Term.t) list -> Substs.t list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
 } (** An expert for some theory *)
@@ -67,14 +72,15 @@ let update_ctx e ~ctx = e.expert_update_ctx ctx
     are compatibles: check whether they have no symbol in common. *)
 let compatible e1 e2 =
   e1.expert_ctx == e2.expert_ctx &&
-  compatible_ord e1 ~ord:e1.expert_ctx.ctx_ord = compatible_ord e2 ~ord:e2.expert_ctx.ctx_ord &&
-  SSet.is_empty (SSet.inter e1.expert_sig e2.expert_sig)
+  compatible_ord e1 ~ord:e1.expert_ctx.C.ctx_ord =
+    compatible_ord e2 ~ord:e2.expert_ctx.C.ctx_ord &&
+  Symbol.SSet.is_empty (Symbol.SSet.inter e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
     the combination of their theories, assuming they are compatible. *)
 let rec combine e1 e2 =
   assert (compatible e1 e2);
-  Utils.debug 1 "%% @[<h>experts: combine %s and %s@]"
+  Util.debug 1 "%% @[<h>experts: combine %s and %s@]"
     e1.expert_name e2.expert_name;
   (* compute normal form using both systems *)
   let rec nf t =
@@ -89,7 +95,7 @@ let rec combine e1 e2 =
     expert_descr =
       Utils.sprintf "@[<hov2>union of@ %s and@ %s@]" e1.expert_descr e2.expert_descr;
     expert_equal;
-    expert_sig = SSet.union e1.expert_sig e2.expert_sig;
+    expert_sig = Symbol.SSet.union e1.expert_sig e2.expert_sig;
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
     expert_canonize = nf;
     expert_ord = (fun o -> e1.expert_ord o && e2.expert_ord o);
@@ -111,46 +117,46 @@ let equal expert t1 t2 =
 let signature expert = expert.expert_sig
 
 (** Decide whether this clause is redundant *)
-let is_redundant expert hc =
-  assert (hc.hcctx == expert.expert_ctx);
-  Utils.enter_prof prof_redundant_expert;
-  if C.get_flag C.flag_persistent hc then false else
-  let ans = Utils.array_exists
+let is_redundant expert c =
+  assert (c.C.hcctx == expert.expert_ctx);
+  Util.enter_prof prof_redundant_expert;
+  if C.get_flag C.flag_persistent c then false else
+  let ans = Util.array_exists
     (fun lit -> match lit with
-      | Equation (l, r, true, _) when l.sort != bool_ -> equal expert l r
+      | Literal.Equation (l, r, true, _) (* FIXME when l.sort != bool_ *) -> equal expert l r
       | _ -> false)
-    hc.hclits
+    c.C.hclits
   in
   (if ans then begin
-    incr_stat stat_expert_redundant;
-    Utils.debug 2 "%% @[<h>%a redundant with %s@]"
-      !C.pp_clause#pp_h hc expert.expert_name end);
-  Utils.exit_prof prof_redundant_expert;
+    Util.incr_stat stat_expert_redundant;
+    Util.debug 2 "%% @[<h>%a redundant with %s@]" C.pp_debug c expert.expert_name
+    end);
+  Util.exit_prof prof_redundant_expert;
   ans
 
 (** Simplify the clause *)
-let simplify expert hc =
-  Utils.enter_prof prof_simplify_expert;
+let simplify expert c =
+  Util.enter_prof prof_simplify_expert;
   let ctx = expert.expert_ctx in
-  let lits = Array.to_list hc.hclits in
+  let lits = Array.to_list c.C.hclits in
   let lits = List.filter
     (fun lit -> match lit with
-      | Equation (l, r, false, _) when equal expert l r -> false
+      | Literal.Equation (l, r, false, _) when equal expert l r -> false
       | _ -> true)
     lits in
-  if List.length lits = Array.length hc.hclits
-    then (Utils.exit_prof prof_simplify_expert; hc)  (* no simplification *)
+  if List.length lits = Array.length c.C.hclits
+    then (Util.exit_prof prof_simplify_expert; c)  (* no simplification *)
     else begin
       let rule = "expert_" ^ expert.expert_name in
-      let premises = List.map (fun hc -> hc.hcproof) expert.expert_clauses in
-      let proof c' = Proof (c', rule, hc.hcproof :: premises) in
-      let parents = hc :: hc.hcparents in
-      let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      incr_stat stat_expert_simplify;
-      Utils.debug 2 "%% @[<h>theory-simplified %a into %a with %s@]"
-                     !C.pp_clause#pp hc !C.pp_clause#pp_h new_hc expert.expert_name;
+      let premises = List.map (fun c -> c.C.hcproof) expert.expert_clauses in
+      let proof c' = Proof.mk_proof c' rule (c.C.hcproof :: premises) in
+      let parents = c :: c.C.hcparents in
+      let new_hc = C.create ~parents ~ctx lits proof in
+      Util.incr_stat stat_expert_simplify;
+      Util.debug 2 "%% @[<h>theory-simplified %a into %a with %s@]"
+        C.pp_debug c C.pp_debug new_hc expert.expert_name;
       (* return simplified clause *)
-      Utils.exit_prof prof_simplify_expert;
+      Util.exit_prof prof_simplify_expert;
       new_hc
     end
 
@@ -158,11 +164,17 @@ let simplify expert hc =
     superposition prover for it to be complete *)
 let clauses expert = 
   let clauses = expert.expert_clauses in
-  List.iter (fun hc -> C.set_flag C.flag_persistent hc true) clauses;
+  List.iter (fun c -> C.set_flag C.flag_persistent c true) clauses;
   clauses
 
-let pp_expert formatter expert =
-  Format.pp_print_string formatter expert.expert_name
+let pp buf expert =
+  Buffer.add_string buf expert.expert_name
+
+let to_string e =
+  Util.on_buffer pp e
+
+let fmt fmt e =
+  Format.pp_print_string fmt (to_string e)
 
 let pp_expert_detailed formatter expert =
   Format.fprintf formatter "[expert %s (%s)]"
@@ -176,7 +188,7 @@ module Set = struct
   type t = {
     active : expert list;
     inactive : expert list;
-    ctx : context;
+    ctx : Clause.context;
   }
 
     (** A set of experts *)
@@ -203,17 +215,17 @@ module Set = struct
             add (e'::left) right' e
     in
     (* update context of experts *)
-    let experts = Utils.list_flatmap
+    let experts = Util.list_flatmap
       (fun e -> update_ctx ~ctx:set.ctx e) experts in
     List.fold_left
       (fun set e ->
-        if not (compatible_ord e ~ord:set.ctx.ctx_ord)
+        if not (compatible_ord e ~ord:set.ctx.C.ctx_ord)
           then (* [e] is disabled, not compatible with [ctx] *)
-            let _ = Utils.debug 2 "%% expert %a disabled" pp_expert e in
+            let _ = Util.debug 2 "%% expert %a disabled" pp e in
             {set with inactive = e :: set.inactive; }
           else
             (* add [e] to the active experts *)
-            let _ = Utils.debug 2 "%% expert %a enabled" pp_expert e in
+            let _ = Util.debug 2 "%% expert %a enabled" pp e in
             let active = add [] set.active e in
             {set with active; })
       set experts
@@ -239,24 +251,23 @@ module Set = struct
     let set' = add_list set' set.inactive in
     set'
 
-  let is_redundant set hc =
+  let is_redundant set c =
     List.exists
       (fun e ->
-        assert (compatible_ord e ~ord:e.expert_ctx.ctx_ord);
-        is_redundant e hc)
+        assert (compatible_ord e ~ord:e.expert_ctx.C.ctx_ord);
+        is_redundant e c)
       set.active
 
-  let simplify set hc =
+  let simplify set c =
     List.fold_left
-      (fun hc e ->
-        assert (compatible_ord e ~ord:e.expert_ctx.ctx_ord);
-        simplify e hc)
-      hc set.active
+      (fun c e ->
+        assert (compatible_ord e ~ord:e.expert_ctx.C.ctx_ord);
+        simplify e c)
+      c set.active
 
-  let pp formatter set =
-    Format.fprintf formatter "{active: %a,@ inactive: %a}"
-      (Utils.pp_list pp_expert) set.active
-      (Utils.pp_list pp_expert) set.inactive
+  let pp buf set =
+    Printf.bprintf buf "{active: %a,@ inactive: %a}"
+      (Util.pp_list pp) set.active (Util.pp_list pp) set.inactive
 end
 
 (** {2 Ground joinable sets of equations} *)
@@ -269,20 +280,21 @@ end
 type gnd_convergent = {
   gc_ord : string;              (** name of the ordering *)
   gc_theory : string;           (** Theory that is decided *)
-  gc_prec : symbol list;        (** Precedence *)
-  gc_sig : SSet.t;              (** Symbols of the theory *)
-  gc_eqns : hclause list;       (** Equations of the system *)
+  gc_prec : Symbol.t list;        (** Precedence *)
+  gc_sig : Symbol.SSet.t;              (** Symbols of the theory *)
+  gc_eqns : Clause.t list;       (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
 let mk_gc ~theory ~ord ~prec hclauses =
   let signature = C.signature hclauses in
-  let signature = SMap.filter (fun s _ -> not (is_base_symbol s)) signature in
+  let signature = Symbol.SMap.filter
+    (fun s _ -> not (Symbol.is_base_symbol s)) signature in
   (* check that every clause is a positive equation *)
   assert (List.for_all
-    (fun hc -> match hc.hclits with 
-     | [| Equation (_,_,true,_)|] -> true | _ -> false) hclauses);
-  let set = symbols_of_signature signature in
-  let set = SSetSeq.of_seq (Sequence.of_list set) in
+    (fun c -> match c.C.hclits with 
+     | [| Literal.Equation (_,_,true,_)|] -> true | _ -> false) hclauses);
+  let set = Signature.to_symbols signature in
+  let set = Symbol.SSetSeq.of_seq (Sequence.of_list set) in
   { gc_ord = ord;
     gc_theory = theory;
     gc_prec = prec;
@@ -297,12 +309,12 @@ let ground_pair t1 t2 =
   let _, subst = List.fold_left
     (fun (i,subst) v ->
       (* bind [v] to a fresh constant *)
-      let const = T.mk_const (mk_fresh_const i) v.sort in
-      let subst' = S.bind subst (v,0) (const,0) in
+      let const = T.mk_const (Symbol.mk_fresh_const i) in
+      let subst' = S.bind subst v 0 const 0 in
       (i+1, subst'))
-    (0, S.id_subst) vars in
-  let t1' = S.apply_subst subst (t1,0) in
-  let t2' = S.apply_subst subst (t2,0) in
+    (0, S.empty) vars in
+  let t1' = S.apply_subst subst t1 0 in
+  let t2' = S.apply_subst subst t2 0 in
   t1', t2'
 
 (** Same as [ground_pair], but with a cache *)
@@ -319,37 +331,46 @@ let compatible_gc ~ord gc =
     match prec with
     | [] | [_] -> true
     | x::((y::_) as prec') ->
-      ord.ord_precedence.prec_compare x y > 0 && compatible_prec ord prec'
+      Precedence.compare ord.Ordering.ord_precedence x y > 0 &&
+      compatible_prec ord prec'
   in
-  ord.ord_name = gc.gc_ord && compatible_prec ord gc.gc_prec
+  Ordering.name ord = gc.gc_ord && compatible_prec ord gc.gc_prec
+
+module OrderedTRS = Rewriting.MakeOrdered(struct
+  type t = Clause.t
+  let equal = C.eq
+  let extract c = match c.C.hclits with
+    | [| Literal.Equation (l, r, sign, _) |] -> l, r, sign
+    | _ -> assert false
+  let priority _ = 1
+end)
 
 (** From a set of ground convergent equations, create an expert for
     the associated theory. *)
 let rec gc_expert ~ctx gc =
   (* name and printing stuff *)
   let expert_sig = gc.gc_sig in
-  let theory = Utils.sprintf "@[<h>%s_%a@]" gc.gc_theory
-    (Sequence.pp_seq ~sep:"_" pp_symbol) (SSetSeq.to_seq expert_sig) in
+  let theory = Util.sprintf "@[<h>%s_%a@]" gc.gc_theory
+    (Util.pp_seq ~sep:"_" Symbol.pp) (Symbol.SSetSeq.to_seq expert_sig) in
   let expert_name = Utils.sprintf "gc_%s" theory in
   (* update clauses with the context *)
   let expert_clauses = List.map (C.update_ctx ~ctx) gc.gc_eqns in
   List.iter (fun c -> C.set_flag C.flag_persistent c true) expert_clauses;
   (* make a rewriting system from the clauses *)
-  let trs = Rewriting.OrderedTRS.create ~ord:ctx.ctx_ord in
-  Rewriting.OrderedTRS.add_seq trs (Sequence.of_list expert_clauses);
+  let trs = OrderedTRS.empty ~ord:ctx.C.ctx_ord in
+  let trs = OrderedTRS.add_seq trs (Sequence.of_list expert_clauses) in
   (* compute normal form using the rewriting system *)
-  let nf = Rewriting.OrderedTRS.mk_rewrite trs ~size:2048 in
+  let nf = OrderedTRS.mk_rewrite trs ~size:2048 in
   (* equality is equality of grounded normal forms *)
   let expert_equal t1 t2 =
-    Utils.enter_prof prof_ground_pair;
+    Util.enter_prof prof_ground_pair;
     let t1', t2' = cached_ground_pair t1 t2 in
-    Utils.exit_prof prof_ground_pair;
-    Utils.enter_prof prof_normal_form;
+    Util.exit_prof prof_ground_pair;
+    Util.enter_prof prof_normal_form;
     let t1' = nf t1' in
     let t2' = nf t2' in
-    Utils.exit_prof prof_normal_form;
-    Utils.debug 3 "%% %s: check equal @[<h>%a,%a@]"
-      expert_name !T.pp_term#pp t1 !T.pp_term#pp t2;
+    Util.exit_prof prof_normal_form;
+    Util.debug 3 "%% %s: check equal %a,%a" expert_name T.pp t1 T.pp t2;
     t1' == t2' in
   let expert_canonize t = nf t in
   { expert_name;
@@ -365,10 +386,10 @@ let rec gc_expert ~ctx gc =
   }
 
 (** Pretty-print the system of ground convergent equations *)
-let pp_gc formatter gc =
-  Format.fprintf formatter "@[<h>%s(%d equations, ord %s(%a))@]"
+let pp_gc buf gc =
+  Printf.bprintf buf "%s(%d equations, ord %s(%a))"
     gc.gc_theory (List.length gc.gc_eqns) gc.gc_ord
-    (Utils.pp_list ~sep:">" pp_symbol) gc.gc_prec
+    (Util.pp_list ~sep:">" Symbol.pp) gc.gc_prec
 
 (** {2 Some builtin theories} *)
 
@@ -379,10 +400,10 @@ let ac ~ctx f =
   let expert_canonize t = T.ac_normal_form ~is_ac t in
   let expert_equal t1 t2 = T.ac_eq ~is_ac t1 t2 in
   let rec expert ctx = {
-    expert_name = Utils.sprintf "AC_%s" (name_symbol f);
-    expert_descr = Utils.sprintf "AC for symbol %s" (name_symbol f);
+    expert_name = Util.sprintf "AC_%s" (Symbol.name_symbol f);
+    expert_descr = Util.sprintf "AC for symbol %s" (Symbol.name_symbol f);
     expert_equal;
-    expert_sig = SSet.singleton f;
+    expert_sig = Symbol.SSet.singleton f;
     expert_clauses = []; (* TODO *)
     expert_canonize;
     expert_ord = (fun _ -> true);
