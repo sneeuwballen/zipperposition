@@ -240,7 +240,15 @@ let is_empty reasoner =
 let size reasoner =
   Logic.db_size reasoner.db
 
-let all_facts reasoner lit =
+let all_facts reasoner =
+  Sequence.from_iter
+    (fun k -> Logic.db_fold
+      (fun () c ->  match Logic.open_clause c with
+        | lit, [] -> k (Logic.of_soft_lit lit)
+        | _ -> ())
+      () reasoner.db)
+
+let all_facts_matching reasoner lit =
   Sequence.from_iter
     (fun k -> Logic.db_match reasoner.db lit k)
 

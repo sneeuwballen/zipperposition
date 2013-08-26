@@ -252,6 +252,24 @@ let add_reasoner reasoner kb =
   add_lemmas reasoner kb.lemmas;
   ()
 
+let on_lemma r =
+  let s = MetaReasoner.on_new_fact_by r "lemma" in
+  Signal.map s (fun lit ->
+    let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
+    NewLemma (MetaPattern.apply (p, terms)))
+
+let on_axiom r =
+  let s = MetaReasoner.on_new_fact_by r "axiom" in
+  Signal.map s (fun lit ->
+    let name, terms = MetaReasoner.Translate.decode_head mapping_axiom "axiom" lit in
+    NewAxiom (name, terms))
+
+let on_theory r =
+  let s = MetaReasoner.on_new_fact_by r "theory" in
+  Signal.map s (fun lit ->
+    let name, terms = MetaReasoner.Translate.decode_head mapping_theory "theory" lit in
+    NewTheory (name, terms))
+
 (** {2 Backward Chaining} *)
 
 (* match goal against lemmas' conclusions, yielding (lemma, args) list *)

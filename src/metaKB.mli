@@ -78,6 +78,10 @@ and found_axiom =
 val add_reasoner : MetaReasoner.t -> t -> unit
   (** Add definitions to the reasoner *)
 
+val on_lemma : MetaReasoner.t -> found_lemma Signal.t
+val on_axiom : MetaReasoner.t -> found_axiom Signal.t
+val on_theory : MetaReasoner.t -> found_theory Signal.t
+
 (** {2 Backward chaining} *)
 
 val match_lemmas : t -> Term.t -> (lemma * Term.t list) list

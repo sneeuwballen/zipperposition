@@ -76,7 +76,9 @@ val is_empty : t -> bool
 val size : t -> int
   (** Number of clauses *)
 
-val all_facts : t -> Logic.literal -> Logic.literal Sequence.t
+val all_facts : t -> Logic.literal Sequence.t
+
+val all_facts_matching : t -> Logic.literal -> Logic.literal Sequence.t
   (** All facts for the given predicate *)
 
 val explanations : t -> Logic.clause -> Logic.explanation list

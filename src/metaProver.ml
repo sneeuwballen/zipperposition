@@ -28,14 +28,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type t = {
   mutable kb : MetaKB.t;
   mutable patterns : MetaPattern.Set.t;
+  on_lemma : MetaKB.found_lemma Signal.t;
+  on_axiom : MetaKB.found_axiom Signal.t;
+  on_theory : MetaKB.found_theory Signal.t;
   reasoner : MetaReasoner.t;
 }
 
-let create () = {
-  kb = MetaKB.empty;
-  patterns = MetaPattern.Set.empty;
-  reasoner = MetaReasoner.create ();
-}
+let create () =
+  let reasoner = MetaReasoner.create () in
+  let p = {
+    kb = MetaKB.empty;
+    patterns = MetaPattern.Set.empty;
+    reasoner;
+    on_lemma = MetaKB.on_lemma reasoner;
+    on_axiom = MetaKB.on_axiom reasoner;
+    on_theory = MetaKB.on_theory reasoner;
+  } in
+  p
 
 let patterns p = p.patterns
 
@@ -44,25 +53,36 @@ let kb p = p.kb
 let reasoner p = p.reasoner
 
 let check_formulas p formulas =
-  failwith "check_formulas: not implemented"
+  let instances = Sequence.fold
+    (fun l formula ->
+      let l' = MetaPattern.Set.matching p.patterns formula in
+      List.rev_append l' l)
+    [] formulas
+  in
+  List.iter
+    (fun (pat, args) ->
+      let lit = MetaReasoner.Translate.encode MetaPattern.mapping "pattern" (pat, args) in
+      MetaReasoner.add_fact p.reasoner lit)
+    instances
   
 let add_pattern p pat =
-  failwith "add_pattern: not implemented"
+  p.patterns <- MetaPattern.Set.add p.patterns pat
 
-let on_lemma p =
-  assert false
+let on_lemma p = p.on_lemma
 
-let on_theory p =
-  assert false
+let on_theory p = p.on_theory
 
-let on_axiom p =
-  assert false
+let on_axiom p = p.on_axiom
 
 let parse_theory_file p filename =
-  failwith "parse_theory_file: not implemented"
+  let kb = MetaKB.parse_theory_file filename in
+  p.kb <- MetaKB.union p.kb kb
 
 let save_kb p filename =
-  failwith "save_kb: not implemented"
+  MetaKB.save filename p.kb 
 
 let restore_kb p filename =
-  failwith "restore_kb: not implemented"
+  match MetaKB.restore filename with
+  | None -> ()
+  | Some kb ->
+    p.kb <- MetaKB.union p.kb kb

@@ -16,6 +16,9 @@
 #install_printer Logtk.Ast_tptp.fmt_general;;
 #install_printer Logtk.Ast_tptp.fmt_role;;
 #install_printer Logtk.Ast_tptp.fmt_declaration;;
+#install_printer Logtk.MetaPattern.fmt;;
+#install_printer Logtk.MetaPattern.Set.fmt;;
+#install_printer Logtk.MetaKB.fmt;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type.Infix;;
 module T = Logtk.Term;;
