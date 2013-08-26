@@ -107,8 +107,8 @@ val add_goal : t -> Logic.literal -> unit
 val explain : t -> Logic.literal -> Logic.literal list
   (** List of facts that explain the given fact (or Not_found) *)
 
-val premises : t -> Logic.clause -> Logic.clause * Logic.literal list
-  (** Hyperresolution atom+electrons that explain the given clause, ie,
+val premises : t -> Logic.literal -> Logic.clause * Logic.literal list
+  (** Hyperresolution atom+electrons that explain the given fact, ie,
       which directly imply it (or Not_found). *)
 
 (** {2 Events} *)

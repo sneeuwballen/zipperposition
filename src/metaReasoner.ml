@@ -313,9 +313,10 @@ let add_goal reasoner goal =
 (** {2 Explanations} *)
 
 (** List of facts that explain the given fact (or Not_found) *)
-let explain reasoner fact = []  (*TODO *)
+let explain reasoner fact =
+  Logic.db_explain reasoner.db fact
 
 (** Hyperresolution atom+electrons that explain the given fact, ie,
     which directly imply it (or Not_found). *)
 let premises reasoner clause =
-  failwith "Reasoner.premises: TODO"  (* TODO *)
+  Logic.db_premises reasoner.db clause

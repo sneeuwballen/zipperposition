@@ -68,6 +68,10 @@ let check_formulas p formulas =
 let add_pattern p pat =
   p.patterns <- MetaPattern.Set.add p.patterns pat
 
+let add_kb p kb =
+  p.kb <- MetaKB.union p.kb kb;
+  MetaKB.add_reasoner p.reasoner p.kb
+
 let on_lemma p = p.on_lemma
 
 let on_theory p = p.on_theory
@@ -84,5 +88,4 @@ let save_kb p filename =
 let restore_kb p filename =
   match MetaKB.restore filename with
   | None -> ()
-  | Some kb ->
-    p.kb <- MetaKB.union p.kb kb
+  | Some kb -> add_kb p kb

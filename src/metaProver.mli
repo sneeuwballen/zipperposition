@@ -47,6 +47,9 @@ val check_formulas : t -> Term.t Sequence.t -> unit
 val add_pattern : t -> MetaPattern.t -> unit
   (** New pattern to look for *)
 
+val add_kb : t -> MetaKB.t -> unit
+  (** Update the KB *)
+
 (** {2 Basic events} *)
 
 val on_lemma : t -> MetaKB.found_lemma Signal.t
