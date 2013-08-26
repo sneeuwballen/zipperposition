@@ -41,20 +41,31 @@ val kb : t -> MetaKB.t
 val reasoner : t -> MetaReasoner.t
   (** Reasoner of the prover *)
 
-val check_formulas : t -> Term.t Sequence.t -> unit
-  (** Look for patterns in those formulas *)
-
 val add_pattern : t -> MetaPattern.t -> unit
-  (** New pattern to look for *)
+  (** New pattern to match against formulas *)
 
 val add_kb : t -> MetaKB.t -> unit
   (** Update the KB *)
+
+val match_formula : t -> Term.t -> MetaReasoner.Logic.literal list
+  (** List of literals representing patterns matching this formula.
+      Literals can then be added with {! add_literals} *)
+
+val add_literals : t -> MetaReasoner.Logic.literal Sequence.t -> unit
+  (** Add the literals to the reasoner *)
+
+val add_clauses : t -> MetaReasoner.Logic.clause Sequence.t -> unit
+  (** Add the given clauses to the reasoner *)
+
+val add_goal : t -> MetaReasoner.Logic.literal -> unit
 
 (** {2 Basic events} *)
 
 val on_lemma : t -> MetaKB.found_lemma Signal.t
 val on_theory : t -> MetaKB.found_theory Signal.t
 val on_axiom : t -> MetaKB.found_axiom Signal.t
+
+val on_goal_pattern : t -> MetaPattern.t Signal.t
 
 (** {2 IO} *)
 

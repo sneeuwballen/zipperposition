@@ -32,6 +32,10 @@ type t = int list
 let left_pos = 0
 let right_pos = 1
 
+let compare = Pervasives.compare
+let eq p1 p2 = compare p1 p2 = 0
+let hash p = Hash.hash_list (fun x -> x) 29 p
+
 (** Opposite position in a literal *)
 let opp p = match p with
   | _ when p = left_pos -> right_pos

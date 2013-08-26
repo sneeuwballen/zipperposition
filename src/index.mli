@@ -129,7 +129,7 @@ module type SUBSUMPTION_IDX = sig
   val remove : t -> C.t -> t
     (** Un-index the clause *)
 
-  val remove_seq : t -> C.t -> t
+  val remove_seq : t -> C.t Sequence.t -> t
 
   val retrieve_subsuming : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
     (** Fold on a set of indexed candidate clauses, that may subsume

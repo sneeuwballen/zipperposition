@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: f5f7d208f35d0543acfc3e35eaad6a0d)
+# DO NOT EDIT (digest: 748e442435955f2764c7572ac94ccdf5)
 src/Symbol
 src/Hash
 src/Hashcons
@@ -23,6 +23,7 @@ src/Index
 src/Dtree
 src/Fingerprint
 src/Rewriting
+src/FeatureVector
 src/MetaPattern
 src/MetaKB
 src/MetaReasoner

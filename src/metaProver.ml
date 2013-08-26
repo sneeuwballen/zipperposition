@@ -51,19 +51,6 @@ let patterns p = p.patterns
 let kb p = p.kb
 
 let reasoner p = p.reasoner
-
-let check_formulas p formulas =
-  let instances = Sequence.fold
-    (fun l formula ->
-      let l' = MetaPattern.Set.matching p.patterns formula in
-      List.rev_append l' l)
-    [] formulas
-  in
-  List.iter
-    (fun (pat, args) ->
-      let lit = MetaReasoner.Translate.encode MetaPattern.mapping "pattern" (pat, args) in
-      MetaReasoner.add_fact p.reasoner lit)
-    instances
   
 let add_pattern p pat =
   p.patterns <- MetaPattern.Set.add p.patterns pat
@@ -72,11 +59,32 @@ let add_kb p kb =
   p.kb <- MetaKB.union p.kb kb;
   MetaKB.add_reasoner p.reasoner p.kb
 
+let match_formula p f =
+  let l = MetaPattern.Set.matching p.patterns f in
+  let lits = List.map
+    (fun (p, args) -> MetaReasoner.Translate.encode MetaPattern.mapping "pattern" (p, args))
+    l
+  in
+  lits
+
+let add_literals p lits =
+  Sequence.iter (fun lit -> MetaReasoner.add_fact p.reasoner lit) lits
+
+let add_clauses p clauses = MetaReasoner.add_seq p.reasoner clauses
+
+let add_goal p lit = MetaReasoner.add_goal p.reasoner lit
+
 let on_lemma p = p.on_lemma
 
 let on_theory p = p.on_theory
 
 let on_axiom p = p.on_axiom
+
+let on_goal_pattern p =
+  let s = MetaReasoner.on_new_goal_by p.reasoner "pattern" in
+  Signal.map s (fun lit ->
+    let pat, _ = MetaReasoner.Translate.decode_head MetaPattern.mapping "pattern" lit in
+    pat)
 
 let parse_theory_file p filename =
   let kb = MetaKB.parse_theory_file filename in
