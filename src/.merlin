@@ -1,0 +1,4 @@
+S .
+S lib
+B ../_build/src/
+B ../_build/src/lib/
