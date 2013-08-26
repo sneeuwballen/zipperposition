@@ -20,12 +20,12 @@ foundation, inc., 51 franklin street, fifth floor, boston, ma
 
 (** {1 Superposition with equivalence reasoning and delayed clausal form} *)
 
-open Basic
+open Logtk
 
-val symbol_constraint : hclause list -> precedence_constraint list
+val symbol_constraint : Term.t list -> Precedence.t list
   (** Precedence constraint *)
 
-val recursive_eliminations : hclause -> hclause list
+val recursive_eliminations : Clause.t -> Clause.t list
   (** Eliminate connectives *)
 
 val setup_env : env:Env.t -> unit

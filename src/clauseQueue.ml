@@ -38,7 +38,7 @@ module C = Clause
 module O = Ordering
 
 let empty_heap =
-  let leq (i, hci) (j, hcj) = i <= j || (i = j && hci.hctag <= hcj.hctag) in
+  let leq (i, hci) (j, hcj) = i <= j || (i = j && hci.C.hctag <= hcj.C.hctag) in
   Leftistheap.empty_with ~leq
 
 type t = {
@@ -99,44 +99,45 @@ let name q = q.functions.name
 
 let fifo =
   let name = "fifo_queue" in
-  mk_queue ~weight:(fun hc -> hc.hctag) name
+  mk_queue ~weight:(fun hc -> hc.C.hctag) name
 
 let clause_weight =
   let name = "clause_weight" in
-  mk_queue ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~weight:(fun hc -> hc.C.hcweight) name
   
 let goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = match lit with
-  | Equation (_, _, sign, _) -> not sign in
-  let is_goal_clause hc = Utils.array_forall is_goal_lit hc.hclits in
+  | Literal.Equation (_, _, sign, _) -> not sign in
+  let is_goal_clause hc = Util.array_forall is_goal_lit hc.C.hclits in
   let name = "prefer_goals" in
-  mk_queue ~accept:is_goal_clause ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_goal_clause ~weight:(fun hc -> hc.C.hcweight) name
 
 let ground =
-  let is_ground hc = hc.hcvars = [] in
+  let is_ground hc = hc.C.hcvars = [] in
   let name = "prefer_ground" in
-  mk_queue ~accept:is_ground ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_ground ~weight:(fun hc -> hc.C.hcweight) name
 
 let non_goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = match lit with
-  | Equation (_, _, sign, _) -> not sign in
-  let is_non_goal_clause hc = Utils.array_forall (fun x -> not (is_goal_lit x)) hc.hclits in
+  | Literal.Equation (_, _, sign, _) -> not sign in
+  let is_non_goal_clause hc = Util.array_forall (fun x -> not (is_goal_lit x)) hc.C.hclits in
   let name = "prefer_non_goals" in
-  mk_queue ~accept:is_non_goal_clause ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_non_goal_clause ~weight:(fun hc -> hc.C.hcweight) name
 
 let pos_unit_clauses =
-  let is_unit_pos hc = match hc.hclits with
-  | [|Equation (_,_,true,_)|] -> true
+  let is_unit_pos hc = match hc.C.hclits with
+  | [|Literal.Equation (_,_,true,_)|] -> true
   | _ -> false
   in
   let name = "prefer_pos_unit_clauses" in
-  mk_queue ~accept:is_unit_pos ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept:is_unit_pos ~weight:(fun hc -> hc.C.hcweight) name
 
 let horn =
+  let accept c = Literal.is_horn c.C.hclits in
   let name = "prefer_horn" in
-  mk_queue ~accept:C.is_horn ~weight:(fun hc -> hc.hcweight) name
+  mk_queue ~accept ~weight:(fun hc -> hc.C.hcweight) name
 
 let lemmas =
   let name = "lemmas" in
@@ -171,8 +172,9 @@ let to_string q =
   Buffer.contents buf
 
 let pp_list buf qs =
+  let pp_pair buf (c, i) = Printf.bprintf buf "%a (w=%d)" pp c i in
   Buffer.add_char buf '[';
-  Util.pp_list pp buf qs;
+  Util.pp_list pp_pair buf qs;
   Buffer.add_char buf ']';
   ()
 

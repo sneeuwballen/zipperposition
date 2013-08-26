@@ -1,5 +1,5 @@
 (*
-Zipperposition: a functional superposition prover for prototyping
+ZipperPosition.t: a functional superposition prover for prototyping
 Copyright (C) 2012 Simon Cruanes
 
 This is free software; you can redistribute it and/or
@@ -20,21 +20,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Inference and simplification rules for the superposition calculus} *)
 
-open Basic
+open Logtk
 
 (** {2 Helpers} *)
 
-val all_positions : position -> term ->  (* combinator *)
-                    (term -> position -> 'b list) -> 'b list
+val all_positions : Position.t -> Term.t ->  (* combinator *)
+                    (Term.t -> Position.t -> 'b list) -> 'b list
 
 (** fold on equation sides of literals that satisfy predicate *)
-val fold_lits : ?both:bool -> (int -> literal -> bool) ->
-                ('a -> term -> term -> bool -> position -> 'a) -> 'a ->
-                literal array -> 'a
+val fold_lits : ?both:bool -> (int -> Literal.t -> bool) ->
+                ('a -> Term.t -> Term.t -> bool -> Position.t -> 'a) -> 'a ->
+                Literal.t array -> 'a
 
 (** get the term l at given position in clause, and r such that l ?= r
-    is the literal at the given position *)
-val get_equations_sides : clause -> position -> term * term * bool
+    is the Literal.t at the given position *)
+val get_equations_sides : Clause.t -> Position.t -> Term.t * Term.t * bool
 
 (** {2 Inference rules} *)
 
@@ -52,47 +52,47 @@ val infer_split : Env.unary_inf_rule   (** hyper-splitting *)
 
 (** {2 Simplifications rules} *)
 
-val is_tautology : hclause -> bool
+val is_tautology : Clause.t -> bool
   (** Check whether the clause is a (syntactic) tautology, ie whether
       it contains true or "A" and "not A" *)
 
-val is_semantic_tautology : hclause -> bool
+val is_semantic_tautology : Clause.t -> bool
   (** semantic tautology deletion, using a congruence closure algorithm
-      to see if negative literals imply some positive literal *)
+      to see if negative literals imply some positive Literal.t *)
 
-val basic_simplify : hclause -> hclause
+val basic_simplify : Clause.t -> Clause.t
   (** basic simplifications (remove duplicate literals, trivial literals,
       destructive equality resolution...) *)
 
-val demodulate : ProofState.simpl_set -> clause -> hclause
+val demodulate : ProofState.SimplSet.t -> Clause.t -> Clause.t
   (** rewrite clause using orientable unit equations *)
 
-val backward_demodulate : ProofState.active_set -> Clauses.CSet.t -> clause -> Clauses.CSet.t
+val backward_demodulate : ProofState.ActiveSet.t -> Clause.CSet.t -> Clause.t -> Clause.CSet.t
   (** backward version of demodulation: add to the set active clauses that
       can potentially be rewritten by the given clause *)
 
-val positive_simplify_reflect : ProofState.simpl_set -> clause -> hclause
-val negative_simplify_reflect : ProofState.simpl_set -> clause -> hclause
+val positive_simplify_reflect : ProofState.SimplSet.t -> Clause.t -> Clause.t
+val negative_simplify_reflect : ProofState.SimplSet.t -> Clause.t -> Clause.t
 
 (** subsumes c1 c2 iff c1 subsumes c2 *)
-val subsumes : literal array -> literal array -> bool
-val subsumes_with : literal array bind -> literal array bind ->
-                    substitution option   (** returns subsuming subst *)
+val subsumes : Literal.t array -> Literal.t array -> bool
+val subsumes_with : Literal.t array Substs.scoped -> Literal.t array Substs.scoped ->
+                    Substs.t option   (** returns subsuming subst *)
 
 (** equality subsumption *)
-val eq_subsumes : literal array -> literal array -> bool
+val eq_subsumes : Literal.t array -> Literal.t array -> bool
 
 (** check whether the clause is subsumed by any clause in the set *)
-val subsumed_by_set : ProofState.active_set -> clause -> bool
+val subsumed_by_set : ProofState.ActiveSet.t -> Clause.t -> bool
 
 (** list of clauses in the active set that are subsumed by the clause *)
-val subsumed_in_set : ProofState.active_set -> clause -> hclause list
+val subsumed_in_set : ProofState.ActiveSet.t -> Clause.t -> Clause.t list
 
-(** contexual literal cutting *)
-val contextual_literal_cutting : ProofState.active_set -> hclause -> hclause
+(** contexual Literal.t cutting *)
+val contextual_literal_cutting : ProofState.ActiveSet.t -> Clause.t -> Clause.t
 
 (** condensation *)
-val condensation : hclause -> hclause
+val condensation : Clause.t -> Clause.t
 
 (** {2 Contributions to Env} *)
 

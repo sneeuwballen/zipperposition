@@ -22,81 +22,93 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     a set of passive clauses (to be processed), and an ordering
     that is used for redundancy elimination.} *)
 
-open Basic
-open Symbols
+open Logtk
 
-type index = Clauses.clause_pos Index.t
-  (** An index for positions in clauses *)
+type clause_pos = Clause.t * Position.t * Term.t
 
-val choose_index : string -> index
-  (** association name -> index *)
+module TermIndex : Index.TERM_IDX with type elt = clause_pos
+module UnitIndex : Index.UNIT_IDX with type E.t = Clause.t
+module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
 
-val names_index : unit -> string list
-  (** list of index names *)
+(** {2 Set of active clauses} *)
 
-(** set of active clauses *)
-type active_set =
-  < ctx : context;
-    clauses : Clauses.CSet.t;           (** set of active clauses *)
-    idx_sup_into : index;               (** index for superposition into the set *)
-    idx_sup_from : index;               (** index for superposition from the set *)
-    idx_back_demod : index;             (** index for backward demodulation/simplifications *)
-    idx_fv : Index.subsumption_t;       (** index for subsumption *)
+module ActiveSet : sig
+  type t = 
+    < ctx : Clause.context;
+      clauses : Clause.CSet.t;          (** set of active clauses *)
+      idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
+      idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
+      idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
+      idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 
-    add : hclause Sequence.t -> unit;   (** add clauses *)
-    remove : hclause Sequence.t -> unit;(** remove clauses *)
-  >
+      add : Clause.t Sequence.t -> unit;   (** add clauses *)
+      remove : Clause.t Sequence.t -> unit;(** remove clauses *)
+    >
 
-(** set of simplifying (unit) clauses *)
-type simpl_set =
-  < ctx : context;
-    idx_simpl : Index.unit_t;           (** index for forward simplifications
-                                            TODO split into pos-orientable/others *)
+  val create : ctx:Clause.context -> Signature.t -> t
+end
 
-    add : hclause Sequence.t -> unit;
-    remove : hclause Sequence.t -> unit;
-  >
+(** {2 Set of simplifying (unit) clauses} *)
 
-(** set of passive clauses *)
-type passive_set =
-  < ctx : context;
-    clauses : Clauses.CSet.t;           (** set of clauses *)
-    queues : (ClauseQueue.t * int) list;
+module SimplSet : sig
+  type t =
+    < ctx : Clause.context;
+      idx_simpl : UnitIndex.t;      (** index for forward simplifications *)
 
-    add : hclause Sequence.t -> unit;   (** add clauses *)
-    remove : int -> unit;               (** remove clause by ID *)
-    next : unit -> hclause option;      (** next passive clause, if any *)
-    clean : unit -> unit;               (** cleanup internal queues *)
-  >
+      add : Clause.t Sequence.t -> unit;
+      remove : Clause.t Sequence.t -> unit;
+    >
+
+  val create : ctx:Clause.context -> t
+end
+
+(** {2 Set of passive clauses} *)
+
+module PassiveSet : sig
+  type t =
+    < ctx : Clause.context;
+      clauses : Clause.CSet.t;           (** set of clauses *)
+      queues : (ClauseQueue.t * int) list;
+
+      add : Clause.t Sequence.t -> unit;   (** add clauses *)
+      remove : int -> unit;               (** remove clause by ID *)
+      next : unit -> Clause.t option;      (** next passive clause, if any *)
+      clean : unit -> unit;               (** cleanup internal queues *)
+    >
+
+  val create : ctx:Clause.context -> (ClauseQueue.t * int) list -> t
+end
+
+(** {2 Proof State} *)
 
 (** state of a superposition calculus instance.
     It contains a set of active clauses, a set of passive clauses,
     and is parametrized by an ordering. *)
-type state =
-  < ctx : context;
-    params : parameters;
-    simpl_set : simpl_set;              (** index for forward demodulation *)
-    active_set : active_set;            (** active clauses *)
-    passive_set : passive_set;          (** passive clauses *)
-    meta_prover : Meta.Prover.t option;
+
+type t =
+  < ctx : Clause.context;
+    params : Params.t;
+    simpl_set : SimplSet.t;              (** index for forward demodulation *)
+    active_set : ActiveSet.t;            (** active clauses *)
+    passive_set : PassiveSet.t;          (** passive clauses *)
+    meta_prover : MetaProverState.t option;
     experts : Experts.Set.t;            (** Set of current experts *)
 
     add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
-val mk_active_set : ctx:context -> index -> signature -> active_set
-val mk_simpl_set : ctx:context -> Index.unit_t -> simpl_set
-val mk_passive_set : ctx:context -> (ClauseQueue.t * int) list -> passive_set
+val create : ctx:Clause.context -> ?meta:MetaProverState.t ->
+             Params.t -> Signature.t -> t
+  (** create a state from the given ordering, and parameters *)
 
-(** create a state from the given ordering, and parameters *)
-val mk_state : ctx:context -> ?meta:Meta.Prover.t ->
-               parameters -> signature -> state
+type stats = int * int * int
+  (** statistics on the state (num active, num passive, num simplification) *)
 
-(** statistics on the state (num active, num passive, num simplification) *)
-type state_stats = int * int * int
-val stats : state -> state_stats
+val stats : t -> stats
+  (** Compute statistics *)
 
-(** pretty print the content of the state *)
-val pp_state : Format.formatter -> state -> unit
-(** debug functions: much more detailed printing *)
-val debug_state : Format.formatter -> state -> unit
+val pp : Buffer.t -> t -> unit
+  (** pretty print the content of the state *)
+
+val debug : Buffer.t -> t -> unit
+  (** debug functions: much more detailed printing *)

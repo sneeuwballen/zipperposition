@@ -46,7 +46,6 @@ type t = {
   param_learn : bool;             (** try to learn from successful proofs? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
-  param_index : string;           (** indexing structure *)
 }
 
 (** parse_args returns parameters *)
@@ -62,7 +61,6 @@ let parse_args () =
   and version = ref false
   and timeout = ref 0.
   and proof = ref "debug"
-  and index = ref "fp"
   and split = ref false
   and theories = ref true
   and calculus = ref "delayed"
@@ -106,7 +104,7 @@ let parse_args () =
       ("-kb-where", Arg.Set kb_where, "print default dir that is search for KB");
       ("-learning", Arg.Set learn, "enable lemma learning");
       (* ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once"); *)
-      ("-print-sort", Arg.Unit (fun () -> Terms.pp_term_debug#sort true), "print sorts");
+      ("-print-sort", Arg.Unit (fun () -> Term.print_sort := true), "print sorts of variables");
       ("-progress", Arg.Unit set_progress, "print progress");
       ("-profile", Arg.Set Util.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");
@@ -116,7 +114,6 @@ let parse_args () =
       ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
       ("-seed", Arg.Set_int seed, "set random seed");
       ("-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences");
-      ("-index", Arg.Set_string index, "index structure (fp or discr_tree)");
     ]
   in
   Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
@@ -129,7 +126,7 @@ let parse_args () =
     param_progress = !progress;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
-    param_index= !index; param_dot_file = !dot_file; param_plugins= !plugins;
+    param_dot_file = !dot_file; param_plugins= !plugins;
     param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
     param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
     param_kb_print = !kb_print; param_learn = !learn;

@@ -20,25 +20,24 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Global environment for an instance of the prover} *)
 
-open Basic
-open Symbols
+open Logtk
 
-module T = Terms
-module C = Clauses
-module Utils = FoUtils
+module T = Term
+module C = Clause
 
-type binary_inf_rule = ProofState.active_set -> clause -> hclause list
+type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
   (** binary inferences. An inference returns a list of conclusions *)
 
-type unary_inf_rule = hclause -> hclause list
+type unary_inf_rule = Clause.t -> Clause.t list
   (** unary infererences *)
 
-type lit_rewrite_rule = ctx:context -> literal -> literal
+type lit_rewrite_rule = ctx:Clause.context -> Literal.t -> Literal.t
   (** Rewrite rule on literals *)
 
+
 type t = {
-  mutable params : Basic.parameters;
-  mutable ctx : Basic.context;
+  mutable params : Params.t;
+  mutable ctx : Clause.context;
 
   mutable binary_rules : (string * binary_inf_rule) list;
     (** the binary inference rules *)
@@ -46,65 +45,65 @@ type t = {
   mutable unary_rules : (string * unary_inf_rule) list;
     (** the unary inference rules *)
 
-  mutable rewrite_rules : (string * (term -> term)) list;
+  mutable rewrite_rules : (string * (Term.t -> Term.t)) list;
     (** Rules to apply to term *)
 
   mutable lit_rules : (string * lit_rewrite_rule) list;
     (** Rules to be applied to literals *)
   
-  mutable basic_simplify : hclause -> hclause;
+  mutable basic_simplify : Clause.t -> Clause.t;
     (** how to simplify a clause *)
   
-  mutable rw_simplify : ProofState.simpl_set -> hclause -> hclause;
+  mutable rw_simplify : ProofState.SimplSet.t -> Clause.t -> Clause.t;
     (** how to simplify a clause w.r.t a set of unit clauses *)
   
-  mutable active_simplify : ProofState.active_set -> hclause -> hclause;
+  mutable active_simplify : ProofState.ActiveSet.t -> Clause.t -> Clause.t;
     (** how to simplify a clause w.r.t an active set of clauses *)
 
-  mutable backward_simplify : ProofState.active_set -> hclause -> Clauses.CSet.t;
+  mutable backward_simplify : ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t;
     (** backward simplification by a unit clause. It returns a set of
         active clauses that can potentially be simplified by the given clause *)
 
-  mutable redundant : ProofState.active_set -> hclause -> bool;
+  mutable redundant : ProofState.ActiveSet.t -> Clause.t -> bool;
     (** check whether the clause is redundant w.r.t the set *)
 
-  mutable backward_redundant : ProofState.active_set -> hclause -> hclause list;
+  mutable backward_redundant : ProofState.ActiveSet.t -> Clause.t -> Clause.t list;
     (** find redundant clauses in set w.r.t the clause *)
 
-  mutable list_simplify : hclause -> hclause list;
+  mutable list_simplify : Clause.t -> Clause.t list;
     (** how to simplify a clause into a (possibly empty) list
         of clauses. This subsumes the notion of trivial clauses (that
         are simplified into the empty list of clauses) *)
 
-  mutable is_trivial : hclause -> bool;
+  mutable is_trivial : Clause.t -> bool;
     (** single test to detect trivial clauses *)
 
-  mutable axioms : hclause list;
+  mutable axioms : Clause.t list;
     (** a list of axioms to add to the problem *)
 
-  mutable mk_constr : (hclause list -> precedence_constraint list) list;
+  mutable mk_constr : (Clause.t list -> Precedence.constr list) list;
     (** How to build constraints from a list of clauses *)
 
-  mutable constr : precedence_constraint list;
+  mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:context -> hclause list -> hclause list;
+  mutable preprocess : ctx:Clause.context -> Clause.t list -> Clause.t list;
     (** how to preprocess the initial list of clauses *)
 
-  mutable state : ProofState.state;
+  mutable state : ProofState.t;
     (** Proof state *)
 
-  mutable empty_clauses : Clauses.CSet.t;
+  mutable empty_clauses : Clause.CSet.t;
     (** Set of empty clauses *)
 
-  mutable on_empty : (hclause -> unit) list;
+  mutable on_empty : (Clause.t -> unit) list;
     (** Callbacks for empty clause detection *)
 }
 
 (** {2 Basic operations} *)
 
-let mk_env ?meta ~ctx params signature =
-  let state = ProofState.mk_state ~ctx ?meta params signature in
+let create ?meta ~ctx params signature =
+  let state = ProofState.create ~ctx ?meta params signature in
   let env = {
     params;
     ctx;
@@ -112,13 +111,13 @@ let mk_env ?meta ~ctx params signature =
     unary_rules = [];
     rewrite_rules = [];
     lit_rules = [];
-    basic_simplify = (fun hc -> hc);
-    rw_simplify = (fun _ hc -> hc);
-    active_simplify = (fun _ hc -> hc);
-    backward_simplify = (fun _ hc -> C.CSet.empty);
+    basic_simplify = (fun c -> c);
+    rw_simplify = (fun _ c -> c);
+    active_simplify = (fun _ c -> c);
+    backward_simplify = (fun _ c -> C.CSet.empty);
     redundant = (fun _ _ -> false);
     backward_redundant = (fun _ _ -> []);
-    list_simplify = (fun hc -> [hc]);
+    list_simplify = (fun c -> [c]);
     is_trivial = (fun _ -> false);
     axioms = [];
     mk_constr = [];
@@ -130,35 +129,35 @@ let mk_env ?meta ~ctx params signature =
   } in
   env
 
-let add_empty ~env hc =
-  assert (C.is_empty hc);
-  env.empty_clauses <- C.CSet.add env.empty_clauses hc;
-  List.iter (fun h -> h hc) env.on_empty;
+let add_empty ~env c =
+  assert (C.is_empty c);
+  env.empty_clauses <- C.CSet.add env.empty_clauses c;
+  List.iter (fun h -> h c) env.on_empty;
   ()
 
-let add_passive ~env hcs =
-  env.state#passive_set#add hcs;
+let add_passive ~env cs =
+  env.state#passive_set#add cs;
   Sequence.iter
-    (fun hc -> if C.is_empty hc then add_empty ~env hc) hcs;
+    (fun c -> if C.is_empty c then add_empty ~env c) cs;
   ()
 
-let add_active ~env hcs =
-  env.state#active_set#add hcs;
+let add_active ~env cs =
+  env.state#active_set#add cs;
   Sequence.iter
-    (fun hc -> if C.is_empty hc then add_empty ~env hc) hcs;
+    (fun c -> if C.is_empty c then add_empty ~env c) cs;
   ()
 
-let add_simpl ~env hcs =
-  env.state#simpl_set#add hcs
+let add_simpl ~env cs =
+  env.state#simpl_set#add cs
 
-let remove_active ~env hcs =
-  env.state#active_set#remove hcs
+let remove_active ~env cs =
+  env.state#active_set#remove cs
 
-let remove_passive ~env hcs =
+let remove_passive ~env cs =
   let passive_set = env.state#passive_set in
   Sequence.iter
-    (fun hc -> passive_set#remove hc.hctag)
-    hcs
+    (fun c -> passive_set#remove c.C.hctag)
+    cs
 
 let remove_passive_id ~env ids =
   let passive_set = env.state#passive_set in
@@ -166,8 +165,8 @@ let remove_passive_id ~env ids =
     (fun id -> passive_set#remove id)
     ids
 
-let remove_simpl ~env hcs =
-  env.state#simpl_set#remove hcs
+let remove_simpl ~env cs =
+  env.state#simpl_set#remove cs
 
 let clean_passive ~env =
   env.state#passive_set#clean ()
@@ -188,13 +187,15 @@ let get_simpl ~env =
   failwith "env.get_simpl: not implemented"
 
 let add_binary_inf ~env name rule =
-  env.binary_rules <- (name, rule) :: env.binary_rules
+  if not (List.mem_assoc name env.binary_rules)
+    then env.binary_rules <- (name, rule) :: env.binary_rules
 
 let add_unary_inf ~env name rule =
-  env.unary_rules <- (name, rule) :: env.unary_rules
+  if not (List.mem_assoc name env.unary_rules)
+    then env.unary_rules <- (name, rule) :: env.unary_rules
 
-let list_simplify ~env hc =
-  env.list_simplify hc
+let list_simplify ~env c =
+  env.list_simplify c
 
 let add_expert ~env expert =
   env.state#add_expert expert
@@ -224,31 +225,35 @@ let add_on_empty ~env h =
   env.on_empty <- h :: env.on_empty
 
 (** Compute all ordering constraints for the given list of clauses *)
-let compute_constrs ~env hcs =
+let compute_constrs ~env cs =
   let constrs = env.constr in
   let constrs = List.fold_left
-    (fun acc mk_constr -> acc @ mk_constr hcs)
+    (fun acc mk_constr -> acc @ mk_constr cs)
     constrs env.mk_constr
   in constrs
 
-let pp fmt env =
-  Format.fprintf fmt "state: @[%a@]@;experts: @[%a@]"
-    ProofState.debug_state env.state
+
+let pp buf env = 
+  Printf.bprintf buf "env(state: %a, experts: %a)"
+    ProofState.debug env.state
     Experts.Set.pp (get_experts ~env)
+
+let fmt fmt env =
+  Format.pp_print_string fmt (Util.on_buffer pp env)
 
 (** {2 High level operations} *)
 
-let prof_generate = Utils.mk_profiler "generate"
-let prof_generate_unary = Utils.mk_profiler "generate_unary"
-let prof_generate_binary = Utils.mk_profiler "generate_binary"
-let prof_back_simplify = Utils.mk_profiler "back_simplify"
-let prof_simplify = Utils.mk_profiler "simplify"
-let prof_all_simplify = Utils.mk_profiler "all_simplify"
-let prof_is_redundant = Utils.mk_profiler "is_redundant"
-let prof_subsumed_by = Utils.mk_profiler "subsumed_by"
+let prof_generate = Util.mk_profiler "generate"
+let prof_generate_unary = Util.mk_profiler "generate_unary"
+let prof_generate_binary = Util.mk_profiler "generate_binary"
+let prof_back_simplify = Util.mk_profiler "back_simplify"
+let prof_simplify = Util.mk_profiler "simplify"
+let prof_all_simplify = Util.mk_profiler "all_simplify"
+let prof_is_redundant = Util.mk_profiler "is_redundant"
+let prof_subsumed_by = Util.mk_profiler "subsumed_by"
 
-let stat_killed_orphans = mk_stat "orphan clauses removed"
-let stat_inferred = mk_stat "inferred clauses"
+let stat_killed_orphans = Util.mk_stat "orphan clauses removed"
+let stat_inferred = Util.mk_stat "inferred clauses"
 
 type stats = int * int * int
   (** statistics on clauses : num active, num passive, num simplification *)
@@ -261,41 +266,41 @@ let next_passive ~env =
 
 (** do binary inferences that involve the given clause *)
 let do_binary_inferences ~env c =
-  Utils.enter_prof prof_generate_binary;
+  Util.enter_prof prof_generate_binary;
   let active_set = env.state#active_set in
-  Utils.debug 3 "do binary inferences with current active set: %a"
-                C.pp_set active_set#clauses;
+  Util.debug 3 "do binary inferences with current active set: %a"
+                C.pp_set_debug active_set#clauses;
   (* apply every inference rule *)
   let clauses = List.fold_left
     (fun acc (name, rule) ->
-      Utils.debug 3 "%%  apply binary rule %s" name;
+      Util.debug 3 "%%  apply binary rule %s" name;
       let new_clauses = rule active_set c in
       List.rev_append new_clauses acc)
     [] env.binary_rules
   in
-  Utils.exit_prof prof_generate_binary;
+  Util.exit_prof prof_generate_binary;
   Sequence.of_list clauses
 
 (** do unary inferences for the given clause *)
-let do_unary_inferences ~env hc =
-  Utils.enter_prof prof_generate_unary;
-  Utils.debug 3 "do unary inferences";
+let do_unary_inferences ~env c =
+  Util.enter_prof prof_generate_unary;
+  Util.debug 3 "do unary inferences";
   (* apply every inference rule *)
   let clauses = List.fold_left
     (fun acc (name, rule) ->
-      Utils.debug 3 "%%  apply unary rule %s" name;
-      let new_clauses = rule hc in
+      Util.debug 3 "%%  apply unary rule %s" name;
+      let new_clauses = rule c in
       List.rev_append new_clauses acc)
     [] env.unary_rules in
-  Utils.exit_prof prof_generate_unary;
+  Util.exit_prof prof_generate_unary;
   Sequence.of_list clauses
 
 (** Check whether the clause is trivial (also with Experts) *)
-let is_trivial ~env hc =
-  env.is_trivial hc || Experts.Set.is_redundant (get_experts ~env) hc
+let is_trivial ~env c =
+  env.is_trivial c || Experts.Set.is_redundant (get_experts ~env) c
 
 (** Apply rewrite rules *)
-let rewrite ~env hc =
+let rewrite ~env c =
   let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
   let rec reduce_term rules t =
     match rules with
@@ -310,35 +315,34 @@ let rewrite ~env hc =
   in
   (* reduce every literal *)
   let lits' = Array.map
-    (function (Equation (l, r, sign, _) as lit) ->
+    (function (Literal.Equation (l, r, sign, _) as lit) ->
       let l' = reduce_term env.rewrite_rules l
       and r' = reduce_term env.rewrite_rules r in
       if l == l' && r == r'
         then lit  (* same lit *)
-        else Literals.mk_lit ~ord:env.ctx.ctx_ord l' r' sign)
-    hc.hclits
+        else Literal.mk_lit ~ord:env.ctx.C.ctx_ord l' r' sign)
+    c.C.hclits
   in
   if SmallSet.is_empty !applied_rules
-    then hc (* no simplification *)
+    then c (* no simplification *)
     else begin
       let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-      let proof c = Proof (c, rule, [hc.hcproof]) in
-      let parents = [hc] in
-      let new_clause = C.mk_hclause_a ~parents ~ctx:env.ctx lits' proof in
-      Utils.debug 3 "rewritten @[<h>%a into %a@]"
-        !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause;
+      let proof c' = Proof.mk_proof c' rule [c.C.hcproof] in
+      let parents = [c] in
+      let new_clause = C.create_a ~parents ~ctx:env.ctx lits' proof in
+      Util.debug 3 "rewritten %a into %a" C.pp_debug c C.pp_debug new_clause;
       new_clause
     end
 
 (** Apply literal rewrite rules *)
-let rewrite_lits ~env hc =
+let rewrite_lits ~env c =
   let ctx = env.ctx in
   let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
   let rec rewrite_lit rules lit = match rules with
   | [] -> lit
   | (name,r)::rules' ->
     let lit' = r ~ctx lit in  (* apply the rule *)
-    if Literals.eq lit lit'
+    if Literal.eq lit lit'
       then rewrite_lit rules' lit
       else begin
         applied_rules := SmallSet.add !applied_rules name;
@@ -346,71 +350,67 @@ let rewrite_lits ~env hc =
       end
   in
   (* apply lit rules *)
-  let lits = Array.map (fun lit -> rewrite_lit env.lit_rules lit) hc.hclits in
-  if SmallSet.is_empty !applied_rules then hc
+  let lits = Array.map (fun lit -> rewrite_lit env.lit_rules lit) c.C.hclits in
+  if SmallSet.is_empty !applied_rules then c
   else begin  (* simplifications occurred! *)
     let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-    let proof c = Proof (c, rule, [hc.hcproof]) in
-    let parents = [hc] in
-    let new_clause = C.mk_hclause_a ~parents ~ctx:env.ctx lits proof in
-    Utils.debug 3 "lit rewritten @[<h>%a into %a@]"
-      !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause;
+    let proof c' = Proof.mk_proof c' rule [c.C.hcproof] in
+    let parents = [c] in
+    let new_clause = C.create_a ~parents ~ctx:env.ctx lits proof in
+    Util.debug 3 "lit rewritten %a into %a" C.pp_debug c C.pp_debug new_clause;
     new_clause
   end
 
 (** All basic simplification of the clause itself *)
-let basic_simplify ~env hc =
+let basic_simplify ~env c =
   if env.lit_rules = []
-    then env.basic_simplify hc
+    then env.basic_simplify c
     else  (* rewrite lits, then simplify *)
-      let hc' = rewrite_lits ~env hc in
-      env.basic_simplify hc'
+      let c' = rewrite_lits ~env c in
+      env.basic_simplify c'
 
 (** Simplify the hclause. Returns both the hclause and its simplification. *)
 let simplify ~env old_hc =
-  Utils.enter_prof prof_simplify;
-  let hc = old_hc in
+  Util.enter_prof prof_simplify;
+  let c = old_hc in
   (* simplify with unit clauses, then all active clauses *)
-  let hc = rewrite ~env hc in
-  let hc = env.rw_simplify env.state#simpl_set hc in
-  let hc = basic_simplify ~env hc in
-  let hc = Experts.Set.simplify (get_experts env) hc in
-  let hc = env.active_simplify env.state#active_set hc in
-  let hc = basic_simplify ~env hc in
-  (if not (Literals.eq_lits hc.hclits old_hc.hclits)
-    then Utils.debug 2 "@[<hov 4>clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                        !C.pp_clause#pp_h old_hc !C.pp_clause#pp_h hc);
-  Utils.exit_prof prof_simplify;
-  old_hc, hc
+  let c = rewrite ~env c in
+  let c = env.rw_simplify env.state#simpl_set c in
+  let c = basic_simplify ~env c in
+  let c = Experts.Set.simplify (get_experts env) c in
+  let c = env.active_simplify env.state#active_set c in
+  let c = basic_simplify ~env c in
+  (if not (Literal.eq_lits c.C.hclits old_hc.C.hclits)
+    then Util.debug 2 "clause %a simplified into %a" C.pp_debug old_hc C.pp_debug c);
+  Util.exit_prof prof_simplify;
+  old_hc, c
 
 (** Perform backward simplification with the given clause *)
 let backward_simplify ~env given =
-  Utils.enter_prof prof_back_simplify;
+  Util.enter_prof prof_back_simplify;
   (* set of candidate clauses, that may be unit-simplifiable *)
   let candidates = env.backward_simplify env.state#active_set given in
   (* try to simplify the candidates. Before is the set of clauses that
      are simplified, after is the list of those clauses after simplification *)
   let simpl_set = env.state#simpl_set in
   let before, after =
-    C.CSet.fold
-      (fun (before, after) _ hc ->
-        let hc' = env.rw_simplify simpl_set hc in
-        if not (Literals.eq_lits hc.hclits hc'.hclits)
+    C.CSet.fold candidates (C.CSet.empty, [])
+      (fun (before, after) _ c ->
+        let c' = env.rw_simplify simpl_set c in
+        if not (Literal.eq_lits c.C.hclits c'.C.hclits)
           (* the active clause has been simplified! *)
           then begin
-            Utils.debug 2 "@[<hov 4>active clause @[<h>%a@]@ simplified into @[<h>%a@]@]"
-                          !C.pp_clause#pp_h hc !C.pp_clause#pp_h hc';
-            C.CSet.add before hc, hc' :: after
+            Util.debug 2 "active clause %a simplified into %a" C.pp_debug c C.pp_debug c';
+            C.CSet.add before c, c' :: after
           end else before, after)
-    (C.CSet.empty, []) candidates
   in
-  Utils.exit_prof prof_back_simplify;
+  Util.exit_prof prof_back_simplify;
   before, Sequence.of_list after
 
 (** Simplify the clause w.r.t to the active set and experts *)
-let forward_simplify ~env hc =
-  let hc = rewrite ~env hc in
-  let cs = list_simplify ~env hc in
+let forward_simplify ~env c =
+  let c = rewrite ~env c in
+  let cs = list_simplify ~env c in
   let cs = List.map (Experts.Set.simplify (get_experts ~env)) cs in
   let cs = List.map (env.rw_simplify env.state#simpl_set) cs in
   let cs = List.map (basic_simplify ~env) cs in
@@ -418,7 +418,7 @@ let forward_simplify ~env hc =
 
 (** generate all clauses from inferences *)
 let generate ~env given =
-  Utils.enter_prof prof_generate;
+  Util.enter_prof prof_generate;
   (* binary clauses *)
   let binary_clauses = do_binary_inferences ~env given in
   (* unary inferences *)
@@ -426,36 +426,36 @@ let generate ~env given =
   and unary_queue = Queue.create () in
   Queue.push (given, 0) unary_queue;
   while not (Queue.is_empty unary_queue) do
-    let hc, depth = Queue.pop unary_queue in
-    let hc = (basic_simplify ~env) hc in (* simplify a bit the clause *)
-    if not (is_trivial ~env hc) then begin
+    let c, depth = Queue.pop unary_queue in
+    let c = (basic_simplify ~env) c in (* simplify a bit the clause *)
+    if not (is_trivial ~env c) then begin
       (* add the clause to set of inferred clauses, if it's not the original clause *)
-      (if depth > 0 then unary_clauses := hc :: !unary_clauses);
-      if depth < env.params.param_unary_depth
+      (if depth > 0 then unary_clauses := c :: !unary_clauses);
+      if depth < env.params.Params.param_unary_depth
         then begin
           (* infer clauses from c, add them to the queue *)
-          let new_clauses = do_unary_inferences ~env hc in
+          let new_clauses = do_unary_inferences ~env c in
           Sequence.iter
-            (fun hc' -> Queue.push (hc', depth+1) unary_queue)
+            (fun c' -> Queue.push (c', depth+1) unary_queue)
             new_clauses
         end
     end
   done;
   let result = Sequence.append (Sequence.of_list !unary_clauses) binary_clauses in
-  add_stat stat_inferred (Sequence.length result);
-  Utils.exit_prof prof_generate;
+  Util.add_stat stat_inferred (Sequence.length result);
+  Util.exit_prof prof_generate;
   result
 
 (** remove direct descendants of the clauses from the passive set *)
 let remove_orphans ~env removed_clauses =
   (* remove descendants of the clause. If the descendants are redundant
      (cf C.flag_redundant) their descendants are also removed *)
-  let rec remove_descendants hc =
-    let orphans = hc.hcdescendants in
+  let rec remove_descendants c =
+    let orphans = c.C.hcdescendants in
     (* remove orphans from passive set *)
     SmallSet.iter
       (fun orphan_id ->
-        incr_stat stat_killed_orphans;
+        Util.incr_stat stat_killed_orphans;
         env.state#passive_set#remove orphan_id
         (*
         try
@@ -473,84 +473,88 @@ let remove_orphans ~env removed_clauses =
   Sequence.iter remove_descendants removed_clauses
 
 (** check whether the clause is redundant w.r.t the current active_set *)
-let is_redundant ~env hc =
-  Utils.enter_prof prof_is_redundant;
-  let res = env.redundant env.state#active_set hc in
-  Utils.exit_prof prof_is_redundant;
+let is_redundant ~env c =
+  Util.enter_prof prof_is_redundant;
+  let res = env.redundant env.state#active_set c in
+  Util.exit_prof prof_is_redundant;
   res
 
 (** find redundant clauses in current active_set *)
-let subsumed_by ~env hc =
-  Utils.enter_prof prof_subsumed_by;
-  let res = env.backward_redundant env.state#active_set hc in
-  Utils.exit_prof prof_subsumed_by;
+let subsumed_by ~env c =
+  Util.enter_prof prof_subsumed_by;
+  let res = env.backward_redundant env.state#active_set c in
+  Util.exit_prof prof_subsumed_by;
   res
 
 (** Use all simplification rules to convert a clause into a list of maximally
     simplified clauses (possibly empty, if trivial). *)
-let all_simplify ~env hc =
-  Utils.enter_prof prof_all_simplify;
-  let clauses = env.list_simplify hc in
-  let clauses = Utils.list_flatmap
-    (fun hc ->
+let all_simplify ~env c =
+  Util.enter_prof prof_all_simplify;
+  let clauses = env.list_simplify c in
+  let clauses = Util.list_flatmap
+    (fun c ->
       (* simplify this clause *)
-      let _, hc' = simplify ~env hc in
-      if env.is_trivial hc' (* XXX: does not seem very useful? || Sup.is_semantic_tautology hc' *)
-        then [] else [hc']) (* TODO CLI flag to enable semantic tauto *)
+      let _, c' = simplify ~env c in
+      if env.is_trivial c' (* XXX: does not seem very useful? || Sup.is_semantic_tautology c' *)
+        then [] else [c']) (* TODO CLI flag to enable semantic tauto *)
     clauses
   in
-  Utils.exit_prof prof_all_simplify;
+  Util.exit_prof prof_all_simplify;
   clauses
 
 (** Make a clause out of a 'Deduced' result *)
 let clause_of_deduced ~env lits parents = 
-  let premises = List.map (fun hc -> hc.hcproof) parents in
-  let hc = C.mk_hclause_a ~ctx:env.ctx lits ~parents
+  let premises = List.map (fun c -> c.C.hcproof) parents in
+  let c = C.create_a ~ctx:env.ctx lits ~parents
     (fun c -> Proof.mk_proof c "lemma" premises) in
-  basic_simplify ~env (C.clause_of_fof hc)
+  basic_simplify ~env (C.clause_of_fof c)
 
 (** Find the lemmas that can be deduced if we consider this new clause *)
-let find_lemmas ~env hc = 
+let find_lemmas ~env c = 
   match (get_meta env) with
   | None -> Sequence.empty (* lemmas detection is disabled *)
   | Some meta ->
-    let results = Meta.Prover.scan_clause meta hc in
-    let results = Utils.list_flatmap
+    let results = MetaProverState.scan_clause meta c in
+    let results = Util.list_fmap
       (function
-      | Meta.Prover.Deduced (lits,parents) ->
-        let hc = clause_of_deduced ~env lits parents in
-        Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp_h hc;
-        [hc]
-      | _ -> [])
+      | MetaProverState.Deduced (f,parents) ->
+        (* TODO: CNF reduction now? *)
+        let lits = [| Literal.mk_eq ~ord:env.ctx.C.ctx_ord f T.true_term |] in
+        let c = clause_of_deduced ~env lits parents in
+        Util.debug 1 "%% meta-prover: lemma %a" C.pp_debug c;
+        Some c
+      | _ -> None)
       results in
     Sequence.of_list results
 
 (** Do one step of the meta-prover. The current given clause and active set
     are provided. This returns a list of new clauses. *)
-let meta_step ~env hc =
+let meta_step ~env c =
   let results = match (get_meta env) with
   | None -> []
   | Some prover -> begin
     (* forward scanning *)
-    let results = Meta.Prover.scan_clause prover hc in
+    let results = MetaProverState.scan_clause prover c in
     (* backward scanning, if needed *)
     let results' =
-      if Meta.Prover.has_new_patterns prover
-        then Meta.Prover.scan_set prover env.state#active_set#clauses
+      if MetaProverState.has_new_patterns prover
+        then MetaProverState.scan_set prover env.state#active_set#clauses
         else [] in
     let results = List.rev_append results' results in
     (* use results *)
-    Utils.list_flatmap
+    Util.list_flatmap
       (fun result -> match result with
-        | Meta.Prover.Deduced (lits,parents) ->
+        | MetaProverState.Deduced (f,parents) ->
+          (* TODO: CNF reduction now? *)
+          let lits = [| Literal.mk_eq ~ord:env.ctx.C.ctx_ord f T.true_term |] in
           let lemma = clause_of_deduced ~env lits parents in
-          Utils.debug 1 "%% meta-prover: lemma @[<h>%a@]" !C.pp_clause#pp lemma;
+          Util.debug 1 "%% meta-prover: lemma %a" C.pp_debug lemma;
           [lemma]
-        | Meta.Prover.Theory (th_name, th_args) ->
-          Utils.debug 1 "%% meta-prover: theory @[<h>%a@]" Meta.Prover.pp_result result;
+        | MetaProverState.Theory (th_name, th_args) ->
+          Util.debug 1 "%% meta-prover: theory %a" MetaProverState.pp_result result;
           []
-        | Meta.Prover.Expert expert ->
-          Utils.debug 1 "%% meta-prover: expert @[<h>%a@]" Experts.pp_expert expert;
+        | MetaProverState.Expert expert ->
+          Util.debug 1 "%% meta-prover: expert %a" Experts.pp expert;
           add_expert env expert;
           [])
       results

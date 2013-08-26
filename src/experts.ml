@@ -268,6 +268,9 @@ module Set = struct
   let pp buf set =
     Printf.bprintf buf "{active: %a,@ inactive: %a}"
       (Util.pp_list pp) set.active (Util.pp_list pp) set.inactive
+
+  let fmt fmt set =
+    Format.pp_print_string fmt (Util.on_buffer pp set)
 end
 
 (** {2 Ground joinable sets of equations} *)
@@ -390,6 +393,9 @@ let pp_gc buf gc =
   Printf.bprintf buf "%s(%d equations, ord %s(%a))"
     gc.gc_theory (List.length gc.gc_eqns) gc.gc_ord
     (Util.pp_list ~sep:">" Symbol.pp) gc.gc_prec
+
+let fmt_gc fmt gc =
+  Format.pp_print_string fmt (Util.on_buffer pp_gc gc)
 
 (** {2 Some builtin theories} *)
 

@@ -120,8 +120,8 @@ let print_json_stats ~env =
   let theories = match (Env.get_meta ~env) with
     | None -> "[]"
     | Some meta ->
-      let seq = Meta.Prover.theories meta in
-      Utils.sprintf "@[<h>[%a]@]" (Sequence.pp_seq Meta.Prover.pp_theory) seq
+      let seq = MetaProver.theories meta in
+      Utils.sprintf "@[<h>[%a]@]" (Sequence.pp_seq MetaProver.pp_theory) seq
   in
   let experts = Experts.Set.size (Env.get_experts ~env) in
   let o = Utils.sprintf
@@ -162,7 +162,7 @@ let setup_calculus ~env =
 let mk_meta ~ctx ~kb params =
   if params.param_theories then
     (* create meta *)
-    let meta = Meta.Prover.create ~ctx kb in
+    let meta = MetaProver.create ~ctx kb in
     Some meta
   else None
 
@@ -200,14 +200,8 @@ let compute_ord ?(initial_signature=Symbols.empty_signature) ~kb ~params clauses
 (** Parse the theory file and add its content to the KB *)
 let parse_theory_file kb file =
   Format.printf "%% read content of %s into the Knowledge Base@." file;
-  let ic = open_in file in
-  try
-    let lexbuf = Lexing.from_channel ic in
-    let definitions = Parser_tptp.parse_meta (Lexer_tptp.token) lexbuf in
-    Meta.KB.add_definitions kb (Sequence.of_list definitions)
-  with e ->
-    close_in ic;
-    raise e
+  let kb' = Logtk.MetaKB.parse_theory_file file in
+  Logtk.MetaKB.union kb kb'
 
 (** Load plugins *)
 let load_plugins ~params =
