@@ -1,6 +1,7 @@
 #use "topfind";;
 #require "num";;
 #require "unix";;
+#require "datalog";;
 #directory "_build/src/";;
 #load "logtk.cma";;
 #install_printer Logtk.Symbol.fmt;;
@@ -11,7 +12,7 @@
 #install_printer Logtk.Substs.fmt;;
 #install_printer Logtk.Symbol.fmt;;
 #install_printer Logtk.Precedence.fmt;;
-#install_printer Logtk.Orderings.fmt;;
+#install_printer Logtk.Ordering.fmt;;
 #install_printer Logtk.Ast_tptp.fmt_general;;
 #install_printer Logtk.Ast_tptp.fmt_role;;
 #install_printer Logtk.Ast_tptp.fmt_declaration;;

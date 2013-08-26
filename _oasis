@@ -20,6 +20,7 @@ Library logtk
                     lib/Sequence, lib/Bij, lib/Signal
   InternalModules:  lib/Cache
   BuildDepends:     unix,num,datalog
+  XMETARequires:    datalog
 
 Document logtk
   Title:                Logtk docs

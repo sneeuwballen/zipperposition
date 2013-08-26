@@ -22,3 +22,5 @@ tags
 *.svg
 *.dot
 TAGS
+setup.data
+setup.log
