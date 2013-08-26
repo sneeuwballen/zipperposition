@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: b5ba647aaac760f5c554123222d8dc5b)
+# DO NOT EDIT (digest: f301cda30095ae37cca452a3829d890e)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -38,21 +38,33 @@
 "src/dtree.cmx": for-pack(Logtk)
 "src/fingerprint.cmx": for-pack(Logtk)
 "src/rewriting.cmx": for-pack(Logtk)
+"src/metaPattern.cmx": for-pack(Logtk)
+"src/metaKB.cmx": for-pack(Logtk)
+"src/metaReasoner.cmx": for-pack(Logtk)
+"src/metaProver.cmx": for-pack(Logtk)
+"src/ast_theory.cmx": for-pack(Logtk)
+"src/lex_theory.cmx": for-pack(Logtk)
+"src/parse_theory.cmx": for-pack(Logtk)
 "src/lib/sequence.cmx": for-pack(Logtk)
 "src/lib/bij.cmx": for-pack(Logtk)
+"src/lib/signal.cmx": for-pack(Logtk)
 "src/lib/cache.cmx": for-pack(Logtk)
 <src/*.ml{,i}>: pkg_unix
 <src/*.ml{,i}>: pkg_num
+<src/*.ml{,i}>: pkg_datalog
 <src/lib/*.ml{,i}>: pkg_unix
 <src/lib/*.ml{,i}>: pkg_num
+<src/lib/*.ml{,i}>: pkg_datalog
 # Executable run_tests
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": pkg_oUnit
 "tests/run_tests.native": pkg_unix
 "tests/run_tests.native": pkg_num
+"tests/run_tests.native": pkg_datalog
 <tests/*.ml{,i}>: use_logtk
 <tests/*.ml{,i}>: pkg_oUnit
 <tests/*.ml{,i}>: pkg_unix
 <tests/*.ml{,i}>: pkg_num
+<tests/*.ml{,i}>: pkg_datalog
 # OASIS_STOP
 true: use_menhir

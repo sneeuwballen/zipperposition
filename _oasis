@@ -15,9 +15,11 @@ Library logtk
                     Signature, TypeInference, Lex_tptp, Ast_tptp, Parse_tptp,
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting,
-                    lib/Sequence, lib/Bij
+                    MetaPattern, MetaKB, MetaReasoner, MetaProver,
+                    Ast_theory, Lex_theory, Parse_theory,
+                    lib/Sequence, lib/Bij, lib/Signal
   InternalModules:  lib/Cache
-  BuildDepends:     unix,num
+  BuildDepends:     unix,num,datalog
 
 Document logtk
   Title:                Logtk docs

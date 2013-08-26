@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: aff9f62e8023c7870afa60d299af38b6)
+# DO NOT EDIT (digest: 60197d9f9380873f6454ead465e4947e)
 Symbol
 Hash
 Hashcons
@@ -23,7 +23,15 @@ Index
 Dtree
 Fingerprint
 Rewriting
+MetaPattern
+MetaKB
+MetaReasoner
+MetaProver
+Ast_theory
+Lex_theory
+Parse_theory
 lib/Sequence
 lib/Bij
+lib/Signal
 lib/Cache
 # OASIS_STOP
