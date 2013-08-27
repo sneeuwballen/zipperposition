@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,25 +24,34 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Reduction to CNF and simplifications} *)
+(** {1 Skolem symbols} *)
 
-(** See "computing small normal forms", in the handbook of automated reasoning.
-    All transformations are made on curried terms and formulas. *)
+type ctx
+  (** Context needed to create new symbols *)
 
-val is_cnf : Term.t -> bool
-  (** Is the clause in CNF? *)
+val create : ?prefix:string -> unit -> ctx
+  (** New skolem contex. A prefix can be provided, which will be
+      added to all newly created skolem symbols *)
 
-val simplify : Term.t -> Term.t
-  (** Simplify the inner formula (double negation, trivial equalities...) *)
+val fresh_sym : ctx:ctx -> Symbol.t
+  (** Just obtain a fresh skolem symbol *)
 
-val miniscope : Term.t -> Term.t
-  (** Apply miniscoping transformation to the term *)
+val fresh_var : ctx:ctx -> int
+  (** Unique index for universal variables *)
 
-type clause = Term.t list
-  (** Basic clause representation, as list of literals *)
+val update_var : ctx:ctx -> Term.t -> unit
+  (** Avoid collisions with variables of this term in calls to {!fresh_var}. *)
 
-val cnf_of : ?ctx:Skolem.ctx -> Term.t -> clause list
-  (** Transform the clause into proper CNF; returns a list of clauses *)
+val skolem_term : ctx:ctx -> Term.t -> Term.t
+  (** Skolemize the given term at root (assumes it occurs just under an
+      existential quantifier, whose De Bruijn variable is replaced
+      by a fresh symbol applied to free variables). This also
+      caches symbols, so that the same term is always skolemized
+      the same way.
+      
+      For instance, [skolem_term ~ctx p(a, b, db0, X)] will yield
+      something like [p(a, b, sk42(X), X)].
+      *)
 
-val cnf_of_list : ?ctx:Skolem.ctx -> Term.t list -> clause list
+
 

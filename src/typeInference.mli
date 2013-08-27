@@ -32,6 +32,8 @@ module Ctx : sig
 
   val empty : t
 
+  val of_signature : Signature.t -> t
+
   val add_signature : t -> Signature.t -> t
     (** Specify the type of some symbols *)
 
@@ -70,14 +72,30 @@ end
 val infer_update : Ctx.t -> Term.t -> Ctx.t * Type.t
   (** Update the context with symbols that may occur in the
       term, and yet have no known type.
-      @raise Term.Types.Error if types are inconsistent. *)
+      @raise Type.Error if types are inconsistent. *)
 
 val infer : Ctx.t -> Term.t -> Type.t
   (** Infer the type of this term under the given signature. 
-      @raise Term.Types.Error if the types are inconsistent *)
+      @raise Type.Error if the types are inconsistent *)
 
-val check_type : Ctx.t -> Term.t -> Type.t -> bool
+val infer_sig : Signature.t -> Term.t -> Type.t
+  (** Inference from a signature (shortcut) *)
+
+(** {3 Constraining types} *)
+
+val constrain_term_term : Ctx.t -> Term.t -> Term.t -> Ctx.t
+  (** Force the two terms to have the same type *)
+
+val constrain_term_type : Ctx.t -> Term.t -> Type.t -> Ctx.t
+  (** Force the term to have the given type *)
+
+(** {3 Checking compatibility} *)
+
+val check_term_type : Ctx.t -> Term.t -> Type.t -> bool
   (** Check whether this term can be used with this type *)
 
-val same_type : Ctx.t -> Term.t -> Term.t -> Ctx.t
-  (** Force the two terms to have the same type *)
+val check_term_term : Ctx.t -> Term.t -> Term.t -> bool
+  (** Can we unify the terms' types? *)
+
+val check_type_type : Ctx.t -> Type.t -> Type.t -> bool
+  (** Can we unify the two types? *)

@@ -198,56 +198,6 @@ let rec nnf t =
     if t == t' then t' else nnf t'
   | T.At (t1, t2) -> t
 
-type skolem_ctx = {
-  sc_gensym : Symbol.Gensym.t;                  (* new symbols *)
-  mutable sc_var_index : int;                   (* fresh universal vars *)
-  mutable sc_cache : (Term.t * Symbol.t) list;  (* term -> skolem symbol cache *)
-}
-
-let mk_skolem_ctx ?(prefix="hyst_sk") () =
-  let ctx = {
-    sc_gensym = Symbol.Gensym.create ~prefix ();
-    sc_var_index = 0;
-    sc_cache = [];
-  } in
-  ctx
-
-(* update varindex in [ctx] so that it won't get captured in [t] *)
-let update_varindex ~ctx t =
-  ctx.sc_var_index <- T.max_var (T.vars t) + 1
-
-exception FoundVariant of Symbol.t
-
-(** Skolemize the given term at root (assumes it occurs just under an
-    existential quantifier, whose De Bruijn variable is replaced
-    by a fresh symbol applied to free variables). This also
-    caches symbols, so that the same term is always skolemized
-    the same way. *)
-let skolem_term ~ctx t =
-  let vars = T.vars_prefix_order t in
-  (* find the skolemized normalized term *)
-  try
-    List.iter
-      (fun (t', symb) ->
-        try
-          let _ = Unif.variant t 0 t' 1 in
-          raise (FoundVariant symb)
-        with Unif.UnificationFailure ->
-          ())
-      ctx.sc_cache;
-    (* not found, use a fresh symbol *)
-    let symb = Symbol.Gensym.new_ ctx.sc_gensym in
-    let skolem_term = T.mk_at_list (T.mk_const symb) vars in
-    (* update cache with new symbol *)
-    ctx.sc_cache <- (t, symb) :: ctx.sc_cache;
-    (* replace the existential variable by [skolem_term] in [t] *)
-    T.db_unlift (T.db_replace t skolem_term)
-  with FoundVariant symb ->
-    (* cache hit, re-use the symbol *)
-    let skolem_term = T.mk_at_list (T.mk_const symb) vars in
-    (* replace the existential variable by [skolem_term] in [t] *)
-    T.db_unlift (T.db_replace t skolem_term)
-
 (* skolemization of existentials, removal of forall *)
 let rec skolemize ~ctx t = match t.T.term with
   | T.Var _
@@ -258,13 +208,14 @@ let rec skolemize ~ctx t = match t.T.term with
     skolemize ~ctx t (* double negation *)
   | T.Bind (s, t') when s == S.forall_symbol ->
     (* a fresh variable *)
-    let v = T.mk_var ctx.sc_var_index in
-    ctx.sc_var_index <- ctx.sc_var_index + 1;
+    let ty = T.db_type t' 0 in
+    Skolem.update_var ~ctx t';
+    let v = T.mk_var ?ty (Skolem.fresh_var ~ctx) in
     let new_t' = T.db_unlift (T.db_replace t' v) in
     skolemize ~ctx new_t' (* remove forall *)
   | T.Bind (s, t') when s == S.exists_symbol ->
     (* make a skolem symbol *)
-    let new_t' = skolem_term ~ctx t' in
+    let new_t' = Skolem.skolem_term ~ctx t' in
     skolemize ~ctx new_t' (* remove forall *)
   | T.Bind (s, t') -> T.mk_bind s (skolemize ~ctx t')
   | T.Node (s, l) -> T.mk_node s (List.map (skolemize ~ctx) l)
@@ -301,7 +252,7 @@ type clause = Term.t list
   (** Basic clause representation, as list of literals *)
 
 (* Transform the clause into proper CNF; returns a list of clauses *)
-let cnf_of ?(ctx=mk_skolem_ctx ()) t =
+let cnf_of ?(ctx=Skolem.create ()) t =
   if is_cnf t
     then
       let c = T.flatten_ac Symbol.or_symbol [t] in
@@ -314,5 +265,5 @@ let cnf_of ?(ctx=mk_skolem_ctx ()) t =
       let clauses = to_cnf t in
       clauses
 
-let cnf_of_list ?(ctx=mk_skolem_ctx ()) l =
+let cnf_of_list ?(ctx=Skolem.create ()) l =
   Util.list_flatmap (fun t -> cnf_of ~ctx t) l

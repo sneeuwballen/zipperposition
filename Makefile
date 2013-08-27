@@ -62,4 +62,8 @@ uninstall:
 tags:
 	otags $(IMPLEMENTATION_FILES) $(INTERFACE_FILES)
 
+push_doc: doc
+	scp -r logtk.docdir/* cedeela.fr:~/simon/root/software/logtk
+
+
 .PHONY: all lib tests doc clean install reinstall uninstall tags

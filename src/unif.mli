@@ -25,17 +25,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Unification and matching algorithms} *)
 
-exception UnificationFailure
+exception Fail
+  (** Raised when a unification/matching attempt fails *)
+
+val types : Signature.t -> Term.t -> Term.t -> bool
+  (** Check that, if one of the terms is a variable, the (inferred) types
+      are compatible with the given signature. *)
 
 val unification : ?subst:Substs.t -> Term.t -> Substs.scope ->
                   Term.t -> Substs.scope -> Substs.t
-  (** Unify terms, returns a Substs.t or raises UnificationFailure *)
+  (** Unify terms, returns a Substs.t or
+      @raises Fail if the terms are not unifiable *)
 
 val matching : ?subst:Substs.t -> Term.t -> Substs.scope ->
                 Term.t -> Substs.scope -> Substs.t
-  (** [matching a scope_a b scope_b] returns sigma such that sigma(a) = b, or raises
-      UnificationFailure. Only variables from the scope of [a] can
-      be bound in the Substs.t. *)
+  (** [matching a scope_a b scope_b] returns sigma such that sigma(a) = b, or
+      @raise Fail if the terms do not match.
+      Only variables from the scope of [a] can  be bound in the Substs.t. *)
 
 val variant : ?subst:Substs.t -> Term.t -> Substs.scope ->
               Term.t -> Substs.scope -> Substs.t

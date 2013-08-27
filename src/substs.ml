@@ -128,7 +128,7 @@ let apply_subst ?(recursive=true) ?renaming subst t scope =
      how many binders are on the path to the variable, because of non-DB-closed
      terms that may occur in the codomain of [subst] *)
   let rec replace binder_depth subst t scope =
-    if T.is_ground_term t
+    if T.is_ground t
     || (renaming == None && is_empty subst && scope = 0)
     then t (* subst(t) = t, if t ground *)
     else match t.T.term with

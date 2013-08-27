@@ -153,7 +153,7 @@ module KBO = struct
 
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
-    if T.is_ground_term t1 && T.is_ground_term t2
+    if T.is_ground t1 && T.is_ground t2
       then
         { offset = 0; pos_counter = 0; neg_counter = 0; balance = Obj.magic None }
       else begin

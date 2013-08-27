@@ -33,12 +33,19 @@ open Term
 let prof_unification = Util.mk_profiler "unification"
 let prof_matching = Util.mk_profiler "matching"
 
-exception UnificationFailure
+exception Fail
+
+let types signature t1 t2 =
+  if T.is_var t1 || T.is_var t2
+    then
+      let ctx = TypeInference.Ctx.of_signature signature in
+      TypeInference.check_term_term ctx t1 t2
+    else true
 
 (** Does [v] appear in [t] if we apply the substitution? *)
 let occurs_check subst v sc_v t sc_t =
   let rec check v sc_v t sc_t =
-    if T.is_ground_term t then false
+    if T.is_ground t then false
       else match t.term with
       | Var _ when v == t && sc_v = sc_t -> true
       | Var _ ->  (* if [t] is a var bound by [subst], check in its image *) 
@@ -55,7 +62,7 @@ let occurs_check subst v sc_v t sc_t =
   in
   check v sc_v t sc_t
 
-(** Unify terms, returns a substitution or raises UnificationFailure *)
+(** Unify terms, returns a substitution or raises Fail *)
 let unification ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_unification;
   (* recursive unification *)
@@ -63,30 +70,30 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
     let s, sc_s = S.get_var subst s sc_s
     and t, sc_t = S.get_var subst t sc_t in
     match s.term, t.term with
-    | _ when s == t && (T.is_ground_term s || sc_s = sc_t) ->
+    | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
-    | _ when T.is_ground_term s && T.is_ground_term t ->
-      raise UnificationFailure (* terms are not equal, and ground. failure. *)
+    | _ when T.is_ground s && T.is_ground t ->
+      raise Fail (* terms are not equal, and ground. failure. *)
     | Var _, _ ->
       if occurs_check subst s sc_s t sc_t
-        then raise UnificationFailure (* occur check *)
+        then raise Fail (* occur check *)
         else S.bind subst s sc_s t sc_t (* bind s *)
     | _, Var _ ->
       if occurs_check subst t sc_t s sc_s
-        then raise UnificationFailure (* occur check *)
+        then raise Fail (* occur check *)
         else S.bind subst t sc_t s sc_s (* bind s *)
     | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
-    | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
+    | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 sc_s l2 sc_t
     | At (s1, s2), At (t1, t2) ->
       let subst = unif subst s1 sc_s t1 sc_t in
       unif subst s2 sc_s t2 sc_t
-    | _, _ -> raise UnificationFailure
+    | _, _ -> raise Fail
   (* unify pair of lists of terms *)
   and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
   | [], [] -> subst
-  | [], _ | _, [] -> raise UnificationFailure
+  | [], _ | _, [] -> raise Fail
   | t1::l1', t2::l2' ->
     let subst = unif subst t1 sc_1 t2 sc_2 in
     unif_list subst l1' sc_1 l2' sc_2
@@ -96,12 +103,12 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
     let subst = unif subst a sc_a b sc_b in
     Util.exit_prof prof_unification;
     subst
-  with UnificationFailure as e ->
+  with Fail as e ->
     Util.exit_prof prof_unification;
     raise e
 
 (** [matching a b] returns sigma such that sigma(a) = b, or raises
-    UnificationFailure. Only variables from the context of [a] can
+    Fail. Only variables from the context of [a] can
     be bound in the substitution. *)
 let matching ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_matching;
@@ -109,28 +116,28 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s in
     match s.term, t.term with
-    | _ when s == t && (T.is_ground_term s || sc_s = sc_t) ->
+    | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
-    | _ when T.is_ground_term s && T.is_ground_term t ->
-      raise UnificationFailure (* terms are not equal, and ground. failure. *)
+    | _ when T.is_ground s && T.is_ground t ->
+      raise Fail (* terms are not equal, and ground. failure. *)
     | Var _, _ ->
       if occurs_check subst s sc_s t sc_t || sc_s <> sc_a
-        then raise UnificationFailure
+        then raise Fail
           (* occur check, or [s] is not in the initial
              context [sc_a] in which variables can be bound. *)
         else S.bind subst s sc_s t sc_t (* bind s *)
     | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
-    | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
+    | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 sc_s l2 sc_t
     | At (s1, s2), At (t1, t2) ->
       let subst = unif subst s1 sc_s t1 sc_t in
       unif subst s2 sc_s t2 sc_t
-    | _, _ -> raise UnificationFailure
+    | _, _ -> raise Fail
   (* unify pair of lists of terms *)
   and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
   | [], [] -> subst
-  | [], _ | _, [] -> raise UnificationFailure
+  | [], _ | _, [] -> raise Fail
   | t1::l1', t2::l2' ->
     let subst = unif subst t1 sc_1 t2 sc_2 in
     unif_list subst l1' sc_1 l2' sc_2
@@ -140,7 +147,7 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
     let subst = unif subst a sc_a b sc_b in
     Util.exit_prof prof_matching;
     subst
-  with UnificationFailure as e ->
+  with Fail as e ->
     Util.exit_prof prof_matching;
     raise e
 
@@ -150,23 +157,23 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
     let s, sc_s = S.get_var subst s sc_s in
     let t, sc_t = S.get_var subst t sc_t in
     match s.term, t.term with
-    | _ when s == t && (T.is_ground_term s || sc_s = sc_t) ->
+    | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
-    | _ when T.is_ground_term s && T.is_ground_term t ->
-      raise UnificationFailure (* terms are not equal, and ground. failure. *)
+    | _ when T.is_ground s && T.is_ground t ->
+      raise Fail (* terms are not equal, and ground. failure. *)
     | Var _, Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
     | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
-    | BoundVar i, BoundVar j -> if i = j then subst else raise UnificationFailure
+    | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 sc_s l2 sc_t
     | At (s1, s2), At (t1, t2) ->
       let subst = unif subst s1 sc_s t1 sc_t in
       unif subst s2 sc_s t2 sc_t
-    | _, _ -> raise UnificationFailure
+    | _, _ -> raise Fail
   (* unify pair of lists of terms *)
   and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
   | [], [] -> subst
-  | [], _ | _, [] -> raise UnificationFailure
+  | [], _ | _, [] -> raise Fail
   | t1::l1', t2::l2' ->
     let subst = unif subst t1 sc_1 t2 sc_2 in
     unif_list subst l1' sc_1 l2' sc_2

@@ -60,6 +60,14 @@ let arity signature s =
 let is_ground signature =
   SMap.for_all (fun _ ty -> Type.is_ground ty) signature
 
+let is_bool signature s =
+  match SMap.find s signature with
+  | Type.Fun (ret, _) when Type.eq ret Type.o -> true
+  | _ -> false
+
+let is_not_bool signature s =
+  not (is_bool signature s)
+
 let to_seq signature = SMap.to_seq signature
 let of_seq seq = SMap.of_seq seq
 

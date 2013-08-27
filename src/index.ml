@@ -108,7 +108,7 @@ module MakeLeaf(X : Set.OrderedType) = struct
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
-        with Unif.UnificationFailure -> acc)
+        with Unif.Fail -> acc)
       leaf acc
 
   let fold_match (leaf,sc_leaf) (t,sc_t) acc k =
@@ -119,7 +119,7 @@ module MakeLeaf(X : Set.OrderedType) = struct
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
-        with Unif.UnificationFailure -> acc)
+        with Unif.Fail -> acc)
       leaf acc
 
   let fold_matched (leaf,sc_leaf) (t,sc_t) acc k =
@@ -130,7 +130,7 @@ module MakeLeaf(X : Set.OrderedType) = struct
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
-        with Unif.UnificationFailure -> acc)
+        with Unif.Fail -> acc)
       leaf acc
 end
 

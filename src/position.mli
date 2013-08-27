@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,25 +24,50 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Reduction to CNF and simplifications} *)
+(** {1 Positions in terms, clauses...} *)
 
-(** See "computing small normal forms", in the handbook of automated reasoning.
-    All transformations are made on curried terms and formulas. *)
+type t = int list
+  (** A position is a path in a tree *)
 
-val is_cnf : Term.t -> bool
-  (** Is the clause in CNF? *)
+type position = t
 
-val simplify : Term.t -> Term.t
-  (** Simplify the inner formula (double negation, trivial equalities...) *)
+val left_pos : int
+val right_pos : int
 
-val miniscope : Term.t -> Term.t
-  (** Apply miniscoping transformation to the term *)
+val compare : t -> t -> int
+val eq : t -> t -> bool
+val hash : t -> int
 
-type clause = Term.t list
-  (** Basic clause representation, as list of literals *)
+val opp : int -> int
+  (** Opposite position left->right, right->left *)
 
-val cnf_of : ?ctx:Skolem.ctx -> Term.t -> clause list
-  (** Transform the clause into proper CNF; returns a list of clauses *)
+val pp : Buffer.t -> t -> unit
+val fmt : Format.formatter -> t -> unit
+val to_string : t -> string
 
-val cnf_of_list : ?ctx:Skolem.ctx -> Term.t list -> clause list
+(** {2 Position builder} *)
 
+module Build : sig
+  type t
+
+  val empty : t
+    (** Empty builder *)
+
+  val of_pos : position -> t
+    (** Start from a given position *)
+
+  val cons : int -> t -> t
+    (** Prefix the position *)
+
+  val add : t -> int -> t
+    (** Add at the end *)
+
+  val append : t -> position -> t
+    (** Append position at the end *)
+
+  val to_pos : t -> position
+    (** Extract current position *)
+
+  val pp : Buffer.t -> t -> unit
+  val fmt : Format.formatter -> t -> unit
+end

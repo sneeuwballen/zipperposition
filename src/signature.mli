@@ -53,6 +53,12 @@ val cardinal : t -> int
 val is_ground : t -> bool
   (** Only ground types? *)
 
+val is_bool : t -> Symbol.t -> bool
+  (** Has the symbol a boolean return sort?
+      @raise Not_found if the symbol is not in the signature *)
+
+val is_not_bool : t -> Symbol.t -> bool
+
 val merge : t -> t -> t
   (** Merge two signatures together *)
 

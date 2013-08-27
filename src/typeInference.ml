@@ -49,6 +49,13 @@ module Ctx = struct
     signature = Signature.empty;
   }
 
+  let of_signature signature = {
+    offset = 0;
+    db = [];
+    varsubst = Type.Subst.empty;
+    signature;
+  }
+
   let add_signature ctx signature =
     { ctx with signature = Signature.merge ctx.signature signature; }
 
@@ -164,7 +171,22 @@ let infer ctx t =
   let _, ty = infer_update ctx t in
   ty
 
-let check_type ctx t ty =
+let infer_sig signature t =
+  let ctx = Ctx.of_signature signature in
+  infer ctx t
+
+let constrain_term_term ctx t1 t2 =
+  let ctx, ty1 = infer_update ctx t1 in
+  let ctx, ty2 = infer_update ctx t2 in
+  let ctx = Ctx.unify ctx ty1 ty2 in
+  ctx
+
+let constrain_term_type ctx t ty =
+  let ctx, ty' = infer_update ctx t in
+  let ctx = Ctx.unify ctx ty ty' in
+  ctx
+
+let check_term_type ctx t ty =
   let ctx, ty_t = infer_update ctx t in
   try
     ignore (Ctx.unify ctx ty_t ty);
@@ -172,8 +194,28 @@ let check_type ctx t ty =
   with Type.Error _ ->
     false
 
-let same_type ctx t1 t2 =
-  let ctx, ty1 = infer_update ctx t1 in
-  let ctx, ty2 = infer_update ctx t2 in
-  let ctx = Ctx.unify ctx ty1 ty2 in
-  ctx
+let check_type_type ctx ty1 ty2 =
+  try
+    ignore (Ctx.unify ctx ty1 ty2);
+    true
+  with Type.Error _ ->
+    false
+
+let check_term_term ctx t1 t2 =
+  try
+    ignore
+      (match t1.T.type_, t2.T.type_ with
+      | Some ty1, Some ty2 -> Ctx.unify ctx ty1 ty2
+      | Some ty1, None ->
+        let ctx, ty2 = infer_update ctx t2 in
+        Ctx.unify ctx ty1 ty2
+      | None, Some ty2 ->
+        let ctx, ty1 = infer_update ctx t1 in
+        Ctx.unify ctx ty1 ty2
+      | None, None ->
+        let ctx, ty1 = infer_update ctx t1 in
+        let ctx, ty2 = infer_update ctx t2 in
+        Ctx.unify ctx ty1 ty2);
+    true
+  with Type.Error _ ->
+    false

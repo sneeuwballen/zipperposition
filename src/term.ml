@@ -399,7 +399,7 @@ let subterm x t =
 
 let var_occurs x t = subterm x t
 
-let is_ground_term t = get_flag flag_ground t
+let is_ground t = get_flag flag_ground t
 
 let max_var vars =
   let rec aux idx = function

@@ -163,8 +163,8 @@ val max_cpos : term -> int
 
 val subterm : t -> t -> bool             (** [subterm s t] true if [s] subterm of [t] *) 
 val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)
-val is_ground_term : t -> bool           (** is the term ground? *)
-val max_var : varlist -> int                (** find the maximum variable index, >= 0 *)
+val is_ground : t -> bool                (** is the term ground? (no free vars) *)
+val max_var : varlist -> int             (** find the maximum variable index, >= 0 *)
 val min_var : varlist -> int
 val add_vars : THashSet.t -> t -> unit   (** add variables of the term to the set *)
 val vars : t -> varlist                  (** compute variables of the term *)
