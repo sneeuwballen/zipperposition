@@ -170,6 +170,12 @@ module Make(E : Index.EQUATION) = struct
     let tree = goto_leaf dt chars k in
     tree
 
+  let add_seq dt seq =
+    Sequence.fold add dt seq
+
+  let remove_seq dt seq =
+    Sequence.fold remove dt seq
+
   let retrieve ~sign (dt, sc_dt) (t, sc_t) acc k =
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc pos subst =

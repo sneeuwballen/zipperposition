@@ -195,7 +195,7 @@ let bij =
 (** {2 MetaReasoner} *)
 
 type found_lemma =
-  | NewLemma of Term.t
+  | NewLemma of Term.t * MetaReasoner.Logic.literal
 and found_theory =
   | NewTheory of string * Term.t list
 and found_axiom =
@@ -256,7 +256,7 @@ let on_lemma r =
   let s = MetaReasoner.on_new_fact_by r "lemma" in
   Signal.map s (fun lit ->
     let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
-    NewLemma (MetaPattern.apply (p, terms)))
+    NewLemma (MetaPattern.apply (p, terms), lit))
 
 let on_axiom r =
   let s = MetaReasoner.on_new_fact_by r "axiom" in

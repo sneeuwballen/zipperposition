@@ -69,7 +69,7 @@ val bij : t Bij.t
 (** {2 MetaReasoner} *)
 
 type found_lemma =
-  | NewLemma of Term.t
+  | NewLemma of Term.t * MetaReasoner.Logic.literal  (* formula + explanation *)
 and found_theory =
   | NewTheory of string * Term.t list
 and found_axiom =

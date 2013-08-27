@@ -854,6 +854,8 @@ let ac_eq ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
 
 (** {2 Printing/parsing} *)
 
+let print_sort = ref false
+
 let pp_tstp buf t =
   (* recursive printing *)
   let rec pp_rec buf t = match t.term with
@@ -914,8 +916,8 @@ let rec pp_debug buf t =
   and pp_var buf t = match t.term with
   | Var i -> 
     begin match t.type_ with
-    | None -> Printf.bprintf buf "X%d" i
-    | Some ty -> Printf.bprintf buf "X%d:%a" i Type.pp ty
+    | Some ty when !print_sort -> Printf.bprintf buf "X%d:%a" i Type.pp ty
+    | _ -> Printf.bprintf buf "X%d" i
     end
   | _ -> assert false
   (* complex term? *)

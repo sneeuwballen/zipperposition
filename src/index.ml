@@ -244,7 +244,11 @@ module type UNIT_IDX = sig
   val add : t -> E.t -> t
     (** Index the given (in)equation *)
 
+  val add_seq : t -> E.t Sequence.t -> t
+
   val remove : t -> E.t -> t
+
+  val remove_seq : t -> E.t Sequence.t -> t
 
   val size : t -> int
     (** Number of indexed (in)equations *)

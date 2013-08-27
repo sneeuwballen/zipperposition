@@ -275,3 +275,6 @@ val bij : t Bij.t
 
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
+
+val print_sort : bool ref
+  (** If enabled, sorts will be printed by pp_debug (default false) *)

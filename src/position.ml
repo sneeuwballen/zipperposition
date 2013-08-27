@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type t = int list
   (** A position is a path in a tree *)
 
+type position = t
+
 let left_pos = 0
 let right_pos = 1
 
@@ -53,3 +55,25 @@ let to_string pos =
 
 let fmt fmt pos =
   Format.pp_print_string fmt (to_string pos)
+
+(** {2 Position builder} *)
+
+module Build = struct
+  type t =
+    | E
+    | L of position Lazy.t
+    | P of position
+  
+  let empty = E
+
+  let add t i = match t with
+    | E -> P [i]
+    | P (([_] | [_;_]) as pos) -> P (pos @ [i])
+    | P pos -> L (lazy (pos @ [i]))
+    | L pos -> L (lazy (Lazy.force pos @ [i]))
+
+  let to_pos = function
+    | E -> []
+    | P pos -> pos
+    | L pos -> Lazy.force pos
+end
