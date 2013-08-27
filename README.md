@@ -1,34 +1,9 @@
 # Zipperposition
 
-## CASC
-
-Note for CASC: to install Zipperposition, you need OCaml >= 4.00.1.
-follow those steps:
-
-    $ cd zipperposition-0.2-casc
-    $ ./configure
-
-with options `--bindir` for the binaries location, and `--datadir` for the
-knowledge files.
-
-    $ make
-    $ make install
-
-Make install may require root permissions. Then, you can launch Zipperposition using
-
-    $ zipperposition_launcher $FILE $TIMEOUT
-
-where FILE is the problem file, and TIMEOUT a timeout in seconds. Zipperposition
-is standalone, except for the `kb` file that stores some (basic) knowledge
-about theories. Solutions, when they are found, (try to) follow
-the SZS Ontology and TSTP output format (with FOF refutations). Outputing
-solutions into graphs (in the DOT format) is also possible by giving the
-prover itself (not the launcher) the option `-dot file.dot`. Then, for
-instance, `dot -Txlib file.dot` can be used to display the graph.
-
-The regular `README` content follows, you can ignore it.
+Automated theorem prover for first-order logic with equality and theories.
 
 ## Short summary
+
 Zipperposition is intended to be a superposition prover for full first order logic. The accent
 is on flexibility, modularity and simplicity rather than performance, to allow
 quick experimenting on automated theorem proving. It generates TSTP traces; I did
@@ -54,18 +29,15 @@ likely not complete. Please don't use it to drive your personal
 nuclear power plant, nor as a trusted tool for critical applications.
 
 ## License
-Some files come from [matita](http://matita.cs.unibo.it/), the TPTP
-parser/lexer are from [Darwin](http://combination.cs.uiowa.edu/Darwin/), some
-datastructures are from [Jean-Christophe Filliâtre](http://www.lri.fr/~filliatr/software.en.html/)
-(Hashcons, Leftistheap, Ptmap). Since all of them are under GPL, the present software is also
-under GPLv2.
 
-A copy of the GPLv2 is attached to the project, in the file LICENSE.
+The license has changed from GPL to BSD2, since no code remains of
+what came from matita or Darwin .
+
+See file LICENSE.
 
 ## Regular build
 
-You will need OCaml >= 4.00.1 or higher with ocamlbuild and the standard
-library.
+OCaml >= 4.00.1 is needed. You also need the libraries `datalog` and `logtk`.
 
 Some submodules are used:
 
