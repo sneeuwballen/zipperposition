@@ -276,9 +276,9 @@ let rec to_cnf t =
   | T.Var _
   | T.Node (_, [])
   | T.BoundVar _ -> [[t]]
-  | T.Node (s, [t']) when s == S.not_symbol ->
+  | T.Node (s, [t']) when S.eq s S.not_symbol ->
     assert (T.atomic_rec t' ||
-            match t'.T.term with T.Node (s', _) when s' == S.eq_symbol -> true | _ -> false);
+            match t'.T.term with T.Node (s', _) when S.eq s' S.eq_symbol -> true | _ -> false);
     [[T.mk_not t']]
   | T.Node (s, [a; b]) when s == S.and_symbol ->
     let ca = to_cnf a
@@ -297,17 +297,22 @@ and product a b =
       acc b)
     [] a
 
-(** Transform the clause into proper CNF; returns a list of clauses *)
+type clause = Term.t list
+  (** Basic clause representation, as list of literals *)
+
+(* Transform the clause into proper CNF; returns a list of clauses *)
 let cnf_of ?(ctx=mk_skolem_ctx ()) t =
   if is_cnf t
-    then [t]
+    then
+      let c = T.flatten_ac Symbol.or_symbol [t] in
+      [c]
     else
       let t = simplify t in
       let t = nnf t in
       let t = miniscope t in
       let t = skolemize ~ctx t in
       let clauses = to_cnf t in
-      List.map T.mk_or_list clauses
+      clauses
 
 let cnf_of_list ?(ctx=mk_skolem_ctx ()) l =
   Util.list_flatmap (fun t -> cnf_of ~ctx t) l

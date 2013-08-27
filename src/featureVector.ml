@@ -36,7 +36,7 @@ module Make(C : Index.CLAUSE) = struct
   module Feature = struct
     type t = {
       name : string;
-      f : C.t -> int;
+      f : Index.lits -> int;
     } (** a function that computes a given feature on clauses *)
 
     let compute f c = f.f c
@@ -48,17 +48,17 @@ module Make(C : Index.CLAUSE) = struct
 
     let size_plus =
       { name = "size+";
-        f = (fun c ->
+        f = (fun lits ->
           let cnt = ref 0 in
-          C.iter c (fun _ _ sign -> if sign then incr cnt);
+          Sequence.iter (fun (_,_,sign) -> if sign then incr cnt) lits;
           !cnt);
       }
 
     let size_minus =
       { name = "size-";
-        f = (fun c ->
+        f = (fun lits ->
           let cnt = ref 0 in
-          C.iter c (fun _ _ sign -> if not sign then incr cnt);
+          Sequence.iter (fun (_,_,sign) -> if not sign then incr cnt) lits;
           !cnt);
       }
 
@@ -76,16 +76,16 @@ module Make(C : Index.CLAUSE) = struct
        is at depth 0) *)
     let sum_of_depths =
       { name = "sum_of_depths";
-        f = (fun c -> 
+        f = (fun lits -> 
           let n = ref 0 in
-          C.iter c (fun l r _ -> n := !n + _depth_term 0 l + _depth_term 0 r);
+          Sequence.iter (fun (l,r,_) -> n := !n + _depth_term 0 l + _depth_term 0 r) lits;
           !n);
       }
 
     (** Count the number of distinct split symbols *)
     let count_split_symb =
       { name = "count_split_symb";
-        f = (fun c ->
+        f = (fun lits ->
           let table = Symbol.SHashtbl.create 3 in
           let rec gather t = match t.T.term with
           | T.Node (s, l) ->
@@ -98,14 +98,14 @@ module Make(C : Index.CLAUSE) = struct
               then Symbol.SHashtbl.replace table s ());
             gather t'
           in
-          C.iter c (fun l r _ -> gather l; gather r);
+          Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
           Symbol.SHashtbl.length table);
       }
 
     (** Count the number of distinct skolem symbols *)
     let count_skolem_symb =
       { name = "count_skolem_symb";
-        f = (fun c ->
+        f = (fun lits ->
           let table = Symbol.SHashtbl.create 3 in
           let rec gather t = match t.T.term with
           | T.Node (s, l) ->
@@ -118,7 +118,7 @@ module Make(C : Index.CLAUSE) = struct
               then Symbol.SHashtbl.replace table s ());
             gather t'
           in
-          C.iter c (fun l r _ -> gather l; gather r);
+          Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
           Symbol.SHashtbl.length table);
       }
 
@@ -130,19 +130,20 @@ module Make(C : Index.CLAUSE) = struct
       | T.At (t1, t2) -> _iter_symb t1 k; _iter_symb t2 k
 
     (* sequence of symbols of clause, of given sign *)
-    let _symbols ~sign c =
+    let _symbols ~sign lits =
       Sequence.from_iter
-        (fun k -> C.iter c
-            (fun l r sign' -> if sign = sign' then _iter_symb l k; _iter_symb r k))
+        (fun k -> Sequence.iter
+            (fun (l,r,sign') -> if sign = sign' then _iter_symb l k; _iter_symb r k)
+            lits)
 
     let count_symb_plus symb =
       { name = Util.sprintf "count+(%a)" Symbol.pp symb;
-        f = (fun c -> Sequence.length (_symbols ~sign:true c));
+        f = (fun lits -> Sequence.length (_symbols ~sign:true lits));
       }
 
     let count_symb_minus symb =
       { name = Util.sprintf "count-(%a)" Symbol.pp symb;
-        f = (fun c -> Sequence.length (_symbols ~sign:false c));
+        f = (fun lits -> Sequence.length (_symbols ~sign:false lits));
       }
 
     (* max depth of the symbol in the term, or -1 *)
@@ -163,29 +164,31 @@ module Make(C : Index.CLAUSE) = struct
 
     let max_depth_plus symb =
       { name = Util.sprintf "max_depth+(%a)" Symbol.pp symb;
-        f = (fun c ->
+        f = (fun lits ->
           let depth = ref 0 in
-          C.iter c
-            (fun l r sign -> if sign
+          Sequence.iter
+            (fun (l,r,sign) -> if sign
               then depth := max !depth
-                (max (max_depth_term symb l 0) (max_depth_term symb r 0)));
+                (max (max_depth_term symb l 0) (max_depth_term symb r 0)))
+            lits;
           !depth);
       }
 
     let max_depth_minus symb =
       { name = Util.sprintf "max_depth-(%a)" Symbol.pp symb;
-        f = (fun c ->
+        f = (fun lits ->
           let depth = ref 0 in
-          C.iter c
-            (fun l r sign -> if not sign
+          Sequence.iter
+            (fun (l,r,sign) -> if not sign
               then depth := max !depth
-                (max (max_depth_term symb l 0) (max_depth_term symb r 0)));
+                (max (max_depth_term symb l 0) (max_depth_term symb r 0)))
+            lits;
           !depth);
       }
   end
 
-  let compute_fv features c =
-    List.map (fun feat -> feat.Feature.f c) features
+  let compute_fv features lits =
+    List.map (fun feat -> feat.Feature.f lits) features
 
   (** {2 Feature Trie} *)
 
@@ -303,7 +306,7 @@ module Make(C : Index.CLAUSE) = struct
 
   let add idx c =
     (* feature vector of [c] *)
-    let fv = compute_fv idx.features c in
+    let fv = compute_fv idx.features (C.to_lits c) in
     (* insertion *)
     let k set = TrieLeaf (CSet.add c set) in
     let trie' = goto_leaf idx.trie fv k in
@@ -312,7 +315,7 @@ module Make(C : Index.CLAUSE) = struct
   let add_seq idx seq = Sequence.fold add idx seq
 
   let remove idx c =
-    let fv = compute_fv idx.features c in
+    let fv = compute_fv idx.features (C.to_lits c) in
     (* remove [c] from the trie *)
     let k set = TrieLeaf (CSet.remove c set) in
     let trie' = goto_leaf idx.trie fv k in
@@ -321,9 +324,9 @@ module Make(C : Index.CLAUSE) = struct
   let remove_seq idx seq = Sequence.fold remove idx seq
 
   (* clauses that subsume (potentially) the given clause *)
-  let retrieve_subsuming idx c acc f =
+  let retrieve_subsuming idx lits acc f =
     (* feature vector of [c] *)
-    let fv = compute_fv idx.features c in
+    let fv = compute_fv idx.features lits in
     let rec fold_lower acc fv node = match fv, node with
     | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
     | i::fv', TrieNode map ->
@@ -337,9 +340,9 @@ module Make(C : Index.CLAUSE) = struct
     fold_lower acc fv idx.trie
 
   (** clauses that are subsumed (potentially) by the given clause *)
-  let retrieve_subsumed idx c acc f =
+  let retrieve_subsumed idx lits acc f =
     (* feature vector of the hc *)
-    let fv = compute_fv idx.features c in
+    let fv = compute_fv idx.features lits in
     let rec fold_higher acc fv node = match fv, node with
     | [], TrieLeaf set -> CSet.fold (fun c acc -> f acc c) set acc
     | i::fv', TrieNode map ->
@@ -351,4 +354,10 @@ module Make(C : Index.CLAUSE) = struct
     | _ -> failwith "number of features in feature vector changed"
     in
     fold_higher acc fv idx.trie
+
+  let retrieve_subsuming_c idx c acc f =
+    retrieve_subsuming idx (C.to_lits c) acc f
+
+  let retrieve_subsumed_c idx c acc f =
+    retrieve_subsumed idx (C.to_lits c) acc f
 end

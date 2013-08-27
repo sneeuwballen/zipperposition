@@ -32,11 +32,11 @@ module Make(C : Index.CLAUSE) : sig
   module Feature : sig
     type t = {
       name : string;
-      f : C.t -> int;
+      f : Index.lits -> int;
     } (** a function that computes a given feature on clauses *)
 
     val name : t -> string
-    val compute : t -> C.t -> int
+    val compute : t -> Index.lits -> int
     val pp : Buffer.t -> t -> unit
     val fmt : Format.formatter -> t -> unit
 
@@ -51,7 +51,7 @@ module Make(C : Index.CLAUSE) : sig
     val max_depth_minus : Symbol.t -> t   (** maximal depth of symb in negative clause *)
   end
 
-  val compute_fv : Feature.t list -> C.t -> feature_vector
+  val compute_fv : Feature.t list -> Index.lits -> feature_vector
 
   (** {2 Index} *)
 

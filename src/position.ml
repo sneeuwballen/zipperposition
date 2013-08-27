@@ -60,20 +60,33 @@ let fmt fmt pos =
 
 module Build = struct
   type t =
-    | E
-    | L of position Lazy.t
     | P of position
+    | L of position Lazy.t
   
-  let empty = E
+  let empty = P []
+
+  let of_pos pos = P pos
+
+  let cons i t = match t with
+    | P pos -> P (i :: pos)
+    | L pos -> P (i :: Lazy.force pos)
 
   let add t i = match t with
-    | E -> P [i]
+    | P [] -> P [i]
     | P (([_] | [_;_]) as pos) -> P (pos @ [i])
     | P pos -> L (lazy (pos @ [i]))
     | L pos -> L (lazy (Lazy.force pos @ [i]))
 
+  let append t pos = match t with
+    | P [] -> P pos
+    | P (([_] | [_;_]) as pos') -> P (pos' @ pos)
+    | P pos' -> L (lazy (pos' @ pos))
+    | L pos' -> L (lazy (Lazy.force pos' @ pos))
+
   let to_pos = function
-    | E -> []
     | P pos -> pos
     | L pos -> Lazy.force pos
+
+  let pp buf t = pp buf (to_pos t)
+  let fmt formatter t = fmt formatter (to_pos t)
 end

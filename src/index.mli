@@ -99,13 +99,16 @@ end
 
 (** {2 Subsumption Index} *)
 
+type lits = (Term.t * Term.t * bool) Sequence.t
+  (** Sequence of literals, as a cheap abstraction on query clauses *)
+
 module type CLAUSE = sig
   type t
 
   val cmp : t -> t -> int
     (** Compare two clauses *)
 
-  val iter : t -> (Term.t -> Term.t -> bool -> unit) -> unit
+  val to_lits : t -> lits
     (** Iterate on literals of the clause *)
 end
 
@@ -131,13 +134,17 @@ module type SUBSUMPTION_IDX = sig
 
   val remove_seq : t -> C.t Sequence.t -> t
 
-  val retrieve_subsuming : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
+  val retrieve_subsuming : t -> lits -> 'a -> ('a -> C.t -> 'a) -> 'a
     (** Fold on a set of indexed candidate clauses, that may subsume
         the given clause. *)
 
-  val retrieve_subsumed : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
+  val retrieve_subsuming_c : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
+
+  val retrieve_subsumed : t -> lits -> 'a -> ('a -> C.t -> 'a) -> 'a
     (** Fold on a set of indexed candidate clauses, that may be subsumed by
         the given clause *)
+
+  val retrieve_subsumed_c : t -> C.t -> 'a -> ('a -> C.t -> 'a) -> 'a
 end
 
 (** {2 Specialized rewriting index} *)

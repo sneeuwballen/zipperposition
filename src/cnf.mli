@@ -42,7 +42,11 @@ type skolem_ctx
 
 val mk_skolem_ctx : ?prefix:string -> unit -> skolem_ctx
 
-val cnf_of : ?ctx:skolem_ctx -> Term.t -> Term.t list
+type clause = Term.t list
+  (** Basic clause representation, as list of literals *)
+
+val cnf_of : ?ctx:skolem_ctx -> Term.t -> clause list
   (** Transform the clause into proper CNF; returns a list of clauses *)
 
-val cnf_of_list : ?ctx:skolem_ctx -> Term.t list -> Term.t list
+val cnf_of_list : ?ctx:skolem_ctx -> Term.t list -> clause list
+
