@@ -50,7 +50,7 @@ end)
 
 type t = {
   prover : MetaProver.t;    (* real meta-prover *)
-  mutable ctx : Clause.context;
+  mutable ctx : Ctx.t;
   mutable clauses : Clause.t LitMap.t;     (** for reconstructing proofs *)
   mutable theories : (string * Term.t list) list;
   mutable experts : Experts.t list;

@@ -1,21 +1,28 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** {1 Global environment for an instance of the prover} *)
@@ -28,12 +35,12 @@ type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
 type unary_inf_rule = Clause.t -> Clause.t list
   (** unary infererences *)
 
-type lit_rewrite_rule = ctx:Clause.context -> Literal.t -> Literal.t
+type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
   (** Rewrite rule on literals *)
 
 type t = {
   mutable params : Params.t;
-  mutable ctx : Clause.context;
+  mutable ctx : Ctx.t;
 
   mutable binary_rules : (string * binary_inf_rule) list;
     (** the binary inference rules *)
@@ -77,13 +84,13 @@ type t = {
   mutable axioms : Clause.t list;
     (** a list of axioms to add to the problem *)
 
-  mutable mk_constr : (Clause.t list -> Precedence.constr list) list;
+  mutable mk_constr : (Clause.t Sequence.t -> Precedence.constr list) list;
     (** How to build constraints from a list of clauses *)
 
   mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:Clause.context -> Clause.t list -> Clause.t list;
+  mutable preprocess : ctx:Ctx.t -> Clause.t list -> Clause.t list;
     (** how to preprocess the initial list of clauses *)
 
   mutable state : ProofState.t;
@@ -98,7 +105,7 @@ type t = {
 
 (** {2 Basic operations} *)
 
-val create : ?meta:MetaProverState.t -> ctx:Clause.context -> Params.t ->
+val create : ?meta:MetaProverState.t -> ctx:Ctx.t -> Params.t ->
              Signature.t -> t
   (** Create an environment (initially empty) *)
 
@@ -121,7 +128,7 @@ val clean_passive : env:t -> unit
 
 val add_constrs : env:t -> Precedence.constr Sequence.t -> unit
 
-val add_mk_constr : env:t -> (Clause.t list -> Precedence.constr list) -> unit
+val add_mk_constr : env:t -> (Clause.t Sequence.t -> Precedence.constr list) -> unit
 
 val get_passive : env:t -> Clause.t Sequence.t
 
@@ -152,8 +159,10 @@ val get_some_empty_clause : env:t -> Clause.t option
 
 val add_on_empty : env:t -> (Clause.t -> unit) -> unit
 
-val compute_constrs : env:t -> Clause.t list -> Precedence.constr list
+val compute_constrs : env:t -> Clause.t Sequence.t -> Precedence.constr list
   (** Compute all ordering constraints for the given list of clauses *)
+
+val ord : t -> Ordering.t
 
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit

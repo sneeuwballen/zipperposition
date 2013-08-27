@@ -37,10 +37,10 @@ type result =
 
 type t
 
-val create : ctx:Clause.context -> MetaKB.t -> t
+val create : ctx:Ctx.t -> MetaKB.t -> t
   (** Fresh meta-prover, using the given KB *)
 
-val update_ctx : ctx:Clause.context -> t -> unit
+val update_ctx : ctx:Ctx.t -> t -> unit
   (** Change the underlying context of the prover *)
 
 val has_new_patterns : t -> bool

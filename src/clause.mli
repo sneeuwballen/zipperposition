@@ -43,7 +43,7 @@ val stat_new_clause : Util.stat
 
 type t = private {
   hclits : Literal.t array;               (** the literals *)
-  hcctx : context;                        (** context of the clause *)
+  hcctx : Ctx.t;                          (** context of the clause *)
   mutable hctag : int;                    (** unique ID of the clause *)
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
@@ -53,18 +53,14 @@ type t = private {
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
 } 
-(** A context for clauses. TODO add a structure for local term hashconsing? *)
-and context = private {
-  mutable ctx_ord : Ordering.t;           (** current ordering on terms *)
-  mutable ctx_select : Selection.t;       (** selection function for literals *)
-  mutable ctx_complete : bool;            (** Completeness preserved? *)
-  mutable ctx_pp : Buffer.t -> t -> unit; (** Current pretty printing method *)
-}
 
 type clause = t
 
 val compact : t -> CompactClause.t
   (** Turn into a compact clause *)
+
+val to_seq : t -> (Term.t * Term.t * bool) Sequence.t
+  (** Easy iteration on literals *)
 
 (** {2 Flags} *)
 
@@ -100,13 +96,13 @@ val is_child_of : child:t -> t -> unit
 module CHashcons : Hashcons.S with type elt = clause
 
 val create : ?parents:t list -> ?selected:Bitvector.t ->
-             ctx:context -> Literal.t list ->
+             ctx:Ctx.t -> Literal.t list ->
              (CompactClause.t -> Proof.t) -> t
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
 val create_a : ?parents:t list -> ?selected:Bitvector.t ->
-                ctx:context -> Literal.t array ->
+                ctx:Ctx.t -> Literal.t array ->
                 (CompactClause.t -> Proof.t) -> t
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
@@ -127,7 +123,7 @@ val descendants : t -> int SmallSet.t
 val clause_of_fof : t -> t
   (** transform eq/not to literals *)
 
-val update_ctx : ctx:context -> t -> t
+val update_ctx : ctx:Ctx.t -> t -> t
   (** Change the context of the clause *)
 
 val check_ord : ord:Ordering.t -> t -> unit
@@ -165,10 +161,10 @@ val selected_lits : t -> (Literal.t * int) list
 val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)
 
-val signature : t list -> Signature.t
-  (** Compute signature of this set of clauses (with type inference) *)
+val type_infer : TypeInference.Ctx.t -> t Sequence.t -> TypeInference.Ctx.t
+val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
 
-val from_term : ctx:context -> Term.sourced_term -> t
+val from_term : ctx:Ctx.t -> Term.sourced_term -> t
   (** Conversion of a (boolean) term to a clause. *)
 
 (** {2 Set of clauses} *)
@@ -229,6 +225,8 @@ module CSet : sig
   val to_list : t -> clause list
   val of_list : clause list -> t
 
+  val type_infer : TypeInference.Ctx.t -> t -> TypeInference.Ctx.t
+
   val to_seq : t -> clause Sequence.t
   val of_seq : t -> clause Sequence.t -> t
   val remove_seq : t -> clause Sequence.t -> t
@@ -252,10 +250,6 @@ val fmt : Format.formatter -> t -> unit   (** debug printing *)
 val pp_set_debug : Buffer.t -> CSet.t -> unit
 val pp_set_tstp : Buffer.t -> CSet.t -> unit
 
-val bij : ctx:context -> t Bij.t
-val bij_set : ctx:context -> CSet.t Bij.t
+val bij : ctx:Ctx.t -> t Bij.t
+val bij_set : ctx:Ctx.t -> CSet.t Bij.t
 
-(** {2 Context} *)
-
-val mk_context : ?ord:Ordering.t -> ?select:Selection.t -> unit -> context
-  (** Fresh new context *)

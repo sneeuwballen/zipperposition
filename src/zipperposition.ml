@@ -1,38 +1,41 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** Main file for the prover *)
+(** {1 Main file for the prover} *)
 
-open Basic
-open Symbols
+open Logtk
 open Params
 
-module T = Terms
-module O = Orderings
-module C = Clauses
-module I = Index
+module T = Term
+module O = Ordering
+module C = Clause
 module PS = ProofState
 module CQ = ClauseQueue
-module S = FoSubst
-module Utils = FoUtils
-module Unif = FoUnif
+module S = Substs
 module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
@@ -46,7 +49,7 @@ let find_file name dir =
   (* search in [dir], and its parents recursively *)
   and search dir =
     let cur_name = Filename.concat dir name in
-    Utils.debug 2 "%% search %s as %s" name cur_name;
+    Util.debug 2 "%% search %s as %s" name cur_name;
     if file_exists cur_name then cur_name
     else
       let dir' = Filename.dirname dir in
@@ -85,8 +88,9 @@ let parse_file ~recursive f =
     try
       let buf = Lexing.from_channel input in
       Const.cur_filename := f;
-      Parser_tptp.parse_file Lexer_tptp.token buf
-    with _ as e -> close_in input; raise e
+      Parse_tptp.parse_file Lex_tptp.token buf
+    with _ as e ->
+      close_in input; raise e
   in aux [Filename.basename f] []
 
 (** print stats *)
@@ -116,26 +120,26 @@ let print_stats ~env =
 let print_json_stats ~env =
   let open Sequence.Infix in
   let encode_hashcons (x1,x2,x3,x4,x5,x6) =
-    Utils.sprintf "[%d, %d, %d, %d, %d, %d]" x1 x2 x3 x4 x5 x6 in
+    Util.sprintf "[%d, %d, %d, %d, %d, %d]" x1 x2 x3 x4 x5 x6 in
   let theories = match (Env.get_meta ~env) with
     | None -> "[]"
     | Some meta ->
       let seq = MetaProver.theories meta in
-      Utils.sprintf "@[<h>[%a]@]" (Sequence.pp_seq MetaProver.pp_theory) seq
+      Util.sprintf "@[<h>[%a]@]" (Sequence.pp_seq MetaProver.pp_theory) seq
   in
   let experts = Experts.Set.size (Env.get_experts ~env) in
-  let o = Utils.sprintf
+  let o = Util.sprintf
     "@[<h>{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }@]"
     (encode_hashcons (T.stats ())) (encode_hashcons (C.stats ())) theories experts
   in
-  Utils.debug 0 "%% @[<h>json_stats: %s@]" o
+  Util.debug 0 "%% @[<h>json_stats: %s@]" o
 
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
 let print_state ?name filename (state, result) =
   match result with
   | Sat.Unsat c -> Proof.pp_dot_file ?name filename c.hcproof
-  | _ -> Utils.debug 1 "%% no empty clause; do not print state"
+  | _ -> Util.debug 1 "%% no empty clause; do not print state"
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -205,26 +209,26 @@ let parse_theory_file kb file =
 
 (** Load plugins *)
 let load_plugins ~params =
-  Utils.list_flatmap
+  Util.list_flatmap
     (fun filename ->
       let n = String.length filename in
       let filename =  (* plugin name, or file? *)
         if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
           then filename
         else
-          let local_filename = FoUtils.sprintf "plugins/std/ext_%s.cmxs" filename in
+          let local_filename = FoUtil.sprintf "plugins/std/ext_%s.cmxs" filename in
           try
             ignore (Unix.stat local_filename);
             local_filename
           with Unix.Unix_error _ ->
-            let home_filename = FoUtils.sprintf "plugins/ext_%s.cmxs" filename in
+            let home_filename = FoUtil.sprintf "plugins/ext_%s.cmxs" filename in
             Filename.concat Const.home home_filename
       in
       match Extensions.dyn_load filename with
       | Extensions.Ext_failure msg -> (* Could not load plugin *)
         []
       | Extensions.Ext_success ext ->
-        Utils.debug 0 "%% loaded extension %s" ext.Extensions.name;
+        Util.debug 0 "%% loaded extension %s" ext.Extensions.name;
         [ext])
     params.param_plugins
 
@@ -235,7 +239,7 @@ let initial_kb params =
   let file = params.param_kb in
   (* parse file, with a lock *)
   let kb = 
-    try Utils.with_lock_file file
+    try Util.with_lock_file file
     (fun () ->
       let kb = try Meta.KB.restore ~file kb
                with Unix.Unix_error _ -> Meta.KB.empty in
@@ -268,11 +272,11 @@ let print_dots ~env result =
     | Sat.Unsat c ->
       let name = "unsat_graph" in
       Proof.pp_dot_file ~name dot_f c.hcproof
-    | _ -> Utils.debug 1 "%% no empty clause; do not print state");
+    | _ -> Util.debug 1 "%% no empty clause; do not print state");
   (try (* write simplification index into the given file *)
     let dot_simpl = Sys.getenv "DOT_SIMPL" in
-    Utils.debug 0 "%% print simplification index to %s" dot_simpl;
-    ignore (Utils.with_output dot_simpl
+    Util.debug 0 "%% print simplification index to %s" dot_simpl;
+    ignore (Util.with_output dot_simpl
       (fun out ->
         let fmt = Format.formatter_of_out_channel out in
         env.Env.state#simpl_set#idx_simpl#to_dot fmt;
@@ -284,7 +288,7 @@ let print_meta ~env =
   (* print theories *)
   match Env.get_meta ~env with
   | Some meta ->
-    Utils.debug 0 "%% @[<h>meta-prover results (%d):@ %a@]"
+    Util.debug 0 "%% @[<h>meta-prover results (%d):@ %a@]"
       (Sequence.length (Meta.Prover.results meta))
       Meta.Prover.pp_results (Meta.Prover.results meta);
     Format.printf "%% datalog contains %d clauses@."
@@ -299,7 +303,7 @@ let print_szs_result ~env result =
       (if env.Env.ctx.ctx_complete
         then Format.printf "%% SZS status CounterSatisfiable@."
         else Format.printf "%% SZS status GaveUp@." );
-      (if Utils.debug_level () >= 1
+      (if Util.debug_level () >= 1
         then Format.printf "%% saturated set: @[<v>%a@]@."
           C.pp_set (C.CSet.of_seq C.CSet.empty (Env.get_active ~env)));
   | Sat.Unsat c -> begin
@@ -318,7 +322,7 @@ let print_szs_result ~env result =
         let file = params.param_kb in
         let kb_lock = lock_file file in
         (* do the update atomically *)
-        Utils.with_lock_file kb_lock
+        Util.with_lock_file kb_lock
           (fun () ->
             (* read content of file (concurrent updates?) *)
             parse_theory_file kb file;
@@ -331,15 +335,15 @@ let print_szs_result ~env result =
 (** Given a list of clauses, and parameters, build an Env.t that fits the
     parameters (but does not contain the clauses yet) *)
 let build_env ~kb ~params clauses =
-  Utils.debug 2 "%% @[<hov2> build env from clauses@; %a@]"
-    (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
+  Util.debug 2 "%% @[<hov2> build env from clauses@; %a@]"
+    (Util.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
   let initial_signature = C.signature clauses in
   (* temporary environment *)
   let temp_env = mk_initial_env ~kb ~params clauses in
   let clauses = Env.preprocess ~env:temp_env clauses in
   (* first preprocessing, with a simple ordering. *)
-  Utils.debug 2 "%% clauses first-preprocessed into: @[<v>%a@]@."
-                 (Utils.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
+  Util.debug 2 "%% clauses first-preprocessed into: @[<v>%a@]@."
+                 (Util.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
   (* meta-prover *)
   let clauses = enrich_with_theories ~env:temp_env clauses in
   (* choose an ord now, using clauses and initial_signature (some symbols
@@ -368,13 +372,13 @@ let process_file ~kb ~plugins params f =
   and timeout = if params.param_timeout = 0.
     then None else (Format.printf "%% run for %f s@." params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
-                    Some (Utils.get_start_time () +. params.param_timeout -. 0.25))
+                    Some (Util.get_start_time () +. params.param_timeout -. 0.25))
   in
   (* parse clauses *)
   let clauses = parse_file ~recursive:true f in
   Printf.printf "%% parsed %d clauses\n" (List.length clauses);
   (* convert simple clauses to clauses, first with a simple ordering *)
-  List.iter (fun (t,_,_) -> Utils.debug 1 "%% formula @[<h>%a@]" !T.pp_term#pp t) clauses;
+  List.iter (fun (t,_,_) -> Util.debug 1 "%% formula @[<h>%a@]" !T.pp_term#pp t) clauses;
   let dummy_ctx = mk_ctx Orderings.no_ordering no_select in
   let clauses = List.map (C.from_term ~ctx:dummy_ctx) clauses in
   (* build an environment that takes parameters and clauses into account
@@ -401,7 +405,7 @@ let process_file ~kb ~plugins params f =
       result, clauses
     end else Sat.Unknown, Sequence.of_list clauses
   in
-  Utils.debug 1 "%% %d clauses processed into: @[<v>%a@]@."
+  Util.debug 1 "%% %d clauses processed into: @[<v>%a@]@."
                  num_clauses (Sequence.pp_seq ~sep:"" !C.pp_clause#pp_h) clauses;
   (* add clauses to passive set of [env] *)
   Env.add_passive ~env clauses;
@@ -421,7 +425,7 @@ let process_file ~kb ~plugins params f =
     pp_precedence env.Env.ctx.ctx_ord.ord_precedence.prec_snapshot;
   print_dots ~env result;
   print_meta ~env;
-  Utils.debug 0 "%% @[<h>experts: %a@]" Experts.Set.pp (Env.get_experts ~env);
+  Util.debug 0 "%% @[<h>experts: %a@]" Experts.Set.pp (Env.get_experts ~env);
   print_szs_result ~env result;
   ()
 
@@ -433,7 +437,7 @@ let print_kb ~kb =
 (** Clear the Knowledge Base and exit *)
 let clear_kb params =
   let file = params.param_kb in
-  Utils.with_lock_file file
+  Util.with_lock_file file
     (fun () ->  (* remove file *)
       Unix.unlink file);
   exit 0
@@ -459,4 +463,4 @@ let () =
 
 let _ =
   at_exit (fun () -> 
-    Printf.printf "\n%% run time: %.3f\n" (Utils.get_total_time ()))
+    Printf.printf "\n%% run time: %.3f\n" (Util.get_total_time ()))

@@ -34,20 +34,20 @@ module S = Substs
 
 type t =
   | Axiom of CompactClause.t * string * string (** file, axiom name *)
-  | Proof of CompactClause.t * string * t list
+  | Infer of CompactClause.t * string * t list
 
 (** {2 Constructors and utils} *)
 
 let mk_axiom x filename clause_name = Axiom (x, filename, clause_name)
 
-let mk_proof x rule_name premises = Proof (x, rule_name, premises)
+let mk_infer x rule_name premises = Infer (x, rule_name, premises)
 
 let is_axiom = function | Axiom _ -> true | _ -> false
-let is_proof = function | Proof _ -> true | _ -> false
+let is_infer = function | Infer _ -> true | _ -> false
 
 let proof_clause proof = match proof with
   | Axiom (c, _, _) -> c
-  | Proof (c, _, _) -> c
+  | Infer (c, _, _) -> c
 
 let proof_id proof = CompactClause.id (proof_clause proof)
 
@@ -74,7 +74,7 @@ let traverse ?(traversed=ref IntSet.empty) proof k =
       (* traverse premises first *)
       (match proof with
       | Axiom _ -> ()
-      | Proof (_, _, l) ->
+      | Infer (_, _, l) ->
         List.iter (fun proof' -> Queue.push proof' queue) l);
         (* call [k] on the proof *)
         k proof;
@@ -96,7 +96,7 @@ let depth proof =
       explored := IntSet.add i !explored;
       match p with
       | Axiom _ -> depth := max d !depth
-      | Proof (_, _, l) -> (* explore parents *)
+      | Infer (_, _, l) -> (* explore parents *)
         List.iter (fun p -> Queue.push (p, d+1) q) l
     end
   done;
@@ -116,7 +116,7 @@ let to_graph proof =
   traverse proof
     (fun p -> match p with
      | Axiom _ -> ()
-     | Proof (_, rule, l) ->
+     | Infer (_, rule, l) ->
        List.iter (fun p' -> PersistentGraph.add g p' rule p) l
     );
   g
@@ -132,7 +132,7 @@ let bij ~ord =
     switch
       ~inject:(function
       | Axiom (c, file, name) -> 'a', BranchTo (bij_axiom, (c,file,name))
-      | Proof (c, rule, l) -> 'p',
+      | Infer (c, rule, l) -> 'p',
         BranchTo (bij_proof, (c, rule, List.map proof_id l)))
       ~extract:(function
       | 'a' -> BranchFrom (bij_axiom, (fun (c,file,name) ->
@@ -141,7 +141,7 @@ let bij ~ord =
         proof))
       | 'p' -> BranchFrom (bij_proof, (fun (c,rule,ids) ->
         let premises = List.map (fun i -> Hashtbl.find tbl i) ids in
-        let proof = mk_proof c rule premises in
+        let proof = mk_infer c rule premises in
         Hashtbl.replace tbl (proof_id proof) proof;  (* save *)
         proof))
       | _ -> raise (DecodingError "expected proof step"))
@@ -158,7 +158,7 @@ let pp_debug buf proof =
     (function
       | Axiom (c, f, s) ->
         Printf.bprintf buf "%a <--- axiom %s in %s\n" CompactClause.pp c s f
-      | Proof (c, rule, premises) ->
+      | Infer (c, rule, premises) ->
         Printf.bprintf buf "%a <--- %s with\n" CompactClause.pp c rule;
         List.iter
           (fun premise -> Printf.bprintf buf "  %a\n" CompactClause.pp premise)
@@ -172,7 +172,7 @@ let pp_tstp buf proof =
         let t = Literal.term_of_lits (CompactClause.lits c) in
         Printf.bprintf buf "fof(%d, axiom, %a, file('%s', %s)).\n"
           (CompactClause.id c) T.pp_tstp t f ax_name
-      | Proof (c, name, premises) ->
+      | Infer (c, name, premises) ->
         let t = T.close_forall (Literal.term_of_lits (CompactClause.lits c)) in
         let premises = List.map proof_id premises in
         let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in

@@ -46,7 +46,7 @@ let prof_mk_hclause_raw = Util.mk_profiler "mk_hclause_raw"
 
 type t = {
   hclits : Literal.t array;               (** the literals *)
-  hcctx : context;                        (** context of the clause *)
+  hcctx : Ctx.t;                          (** context of the clause *)
   mutable hctag : int;                    (** unique ID of the clause *)
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
@@ -56,17 +56,14 @@ type t = {
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
 } 
-(** A context for clauses. TODO add a structure for local term hashconsing? *)
-and context = {
-  mutable ctx_ord : Ordering.t;           (** current ordering on terms *)
-  mutable ctx_select : Selection.t;       (** selection function for literals *)
-  mutable ctx_complete : bool;            (** Completeness preserved? *)
-  mutable ctx_pp : Buffer.t -> t -> unit; (** Current pretty printing method *)
-}
 
 type clause = t
 
 let compact c = CompactClause.create c.hctag c.hclits
+
+let to_seq c =
+  let lits = Sequence.of_array c.hclits in
+  Sequence.map (function | Lits.Equation (l,r,sign,_) -> l,r,sign) lits
 
  (** {2 boolean flags} *)
 
@@ -148,7 +145,7 @@ let true_clause ~ctx =
       hcdescendants=SmallSet.empty ~cmp:(fun i j -> i-j); }
   in
   let c = CHashcons.hashcons c in
-  c.hcproof <- Proof.mk_proof (compact c) "trivial" [];
+  c.hcproof <- Proof.mk_infer (compact c) "trivial" [];
   c
 
 (* TODO: use a (var, scope) -> int  hashtable to always produce
@@ -160,9 +157,9 @@ let true_clause ~ctx =
 let create_a ?parents ?selected ~ctx lits proof =
   Util.incr_stat stat_mk_hclause;
   Util.enter_prof prof_mk_hclause;
-  if Array.length lits > BV.max_len && ctx.ctx_complete
+  if Array.length lits > BV.max_len && ctx.Ctx.complete
   then (Util.debug 0 "%% incompleteness: clause of %d lits -> $true" (Array.length lits);
-        ctx.ctx_complete <- false;
+        Ctx.lost_completeness ~ctx;
         Util.exit_prof prof_mk_hclause;
         true_clause ~ctx)
   else begin
@@ -200,7 +197,7 @@ let create_a ?parents ?selected ~ctx lits proof =
     (* select literals, if not already done *)
     (c.hcselected <- match selected with
       | Some bv -> bv
-      | None -> BV.from_list (ctx.ctx_select lits));
+      | None -> BV.from_list (Ctx.select ~ctx lits));
         (* compute weight *)
         c.hcweight <- Lits.weight_lits lits;
         (* compute flags *)
@@ -227,7 +224,7 @@ let is_empty c = Array.length c.hclits = 0
 (** Adapt a proof to a new clause *)
 let adapt_proof proof c = match proof with
   | Proof.Axiom (_, f, a) -> Proof.mk_axiom c f a
-  | Proof.Proof (_, r, l) -> Proof.mk_proof c r l
+  | Proof.Infer (_, r, l) -> Proof.mk_infer c r l
 
 let stats () = CHashcons.stats ()
 
@@ -237,7 +234,7 @@ let descendants c = c.hcdescendants
 (** simplify literals *)
 let clause_of_fof c =
   let ctx = c.hcctx in
-  let lits = Array.map (Lits.lit_of_fof ~ord:ctx.ctx_ord) c.hclits in
+  let lits = Array.map (Lits.lit_of_fof ~ord:(Ctx.ord ~ctx)) c.hclits in
   if Lits.eq_lits lits c.hclits then c (* keep the same *)
   else begin
     let proof = adapt_proof c.hcproof in
@@ -248,7 +245,7 @@ let clause_of_fof c =
 
 (** Change the context of the clause *)
 let update_ctx ~ctx c =
-  let lits = Array.map (Lits.reord ~ord:ctx.ctx_ord) c.hclits in
+  let lits = Array.map (Lits.reord ~ord:(Ctx.ord ~ctx)) c.hclits in
   let proof = adapt_proof c.hcproof in
   let c' = create_a ~selected:c.hcselected ~ctx lits proof in
   c'
@@ -269,7 +266,7 @@ let check_ord ~ord c =
     literals is important. *)
 let rec apply_subst ?recursive ?renaming subst c scope =
   let ctx = c.hcctx in
-  let ord = ctx.ctx_ord in
+  let ord = Ctx.ord ~ctx in
   let lits = Array.map
     (fun lit -> Lits.apply_subst ?recursive ?renaming ~ord subst lit scope)
     c.hclits in
@@ -282,7 +279,7 @@ let rec apply_subst ?recursive ?renaming subst c scope =
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are maximal under [ord] *)
 let maxlits (c, scope) subst =
-  let ord = c.hcctx.ctx_ord in
+  let ord = Ctx.ord c.hcctx in
   let lits =
     Lits.apply_subst_lits ~recursive:true ~ord subst c.hclits scope
   in
@@ -295,7 +292,7 @@ let is_maxlit (c, scope) subst i =
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are eligible for resolution. *)
 let eligible_res (c, scope) subst =
-  let ord = c.hcctx.ctx_ord in
+  let ord = Ctx.ord c.hcctx in
   (* instantiate lits *)
   let lits = Lits.apply_subst_lits ~recursive:true ~ord subst c.hclits scope in
   let selected = c.hcselected in
@@ -327,7 +324,7 @@ let eligible_res (c, scope) subst =
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are eligible for paramodulation. *)
 let eligible_param (c, scope) subst =
-  let ord = c.hcctx.ctx_ord in
+  let ord = Ctx.ord c.hcctx in
   if BV.is_empty c.hcselected then
     (* instantiate lits *)
     let lits = Lits.apply_subst_lits ~recursive:true ~ord subst c.hclits scope in
@@ -352,23 +349,21 @@ let is_unit_clause c = match c.hclits with
   | [|_|] -> true
   | _ -> false
 
-(* TODO *)
+let type_infer ctx clauses =
+  Sequence.fold
+    (fun ctx c -> Lits.lits_infer_type ctx c.hclits)
+    ctx clauses
+
 (** Compute signature of this set of clauses *)
-let signature clauses =
-  failwith "Clause.signature: not implemented"
-  (*
-  let clauses = Sequence.of_list clauses in
-  let clauses = Sequence.map (fun c -> Lits.lits_to_seq c.hclits) clauses in
-  let lits = Sequence.concat clauses in
-  let terms = Sequence.map (fun (l,r,_) -> Sequence.of_list [l;r]) lits in
-  let terms = Sequence.concat terms in
-  T.signature terms
-  *)
+let signature ?(signature=Signature.empty) clauses =
+  let ctx = TypeInference.Ctx.of_signature signature in
+  let ctx = type_infer ctx clauses in
+  TypeInference.Ctx.to_signature ctx
 
 (** Conversion of a (boolean) term to a clause. *)
 let rec from_term ~ctx (t, file, name) =
   let module S = Symbol in
-  let ord = ctx.ctx_ord in
+  let ord = Ctx.ord ctx in
   let rec lits_from_term t = match t.T.term with
   | T.Node (n, [{T.term=T.Node (eq, [a;b])}]) when S.eq n S.not_symbol && S.eq eq S.eq_symbol ->
     [Lits.mk_neq ~ord a b]
@@ -460,6 +455,8 @@ module CSet = struct
 
   let of_seq set seq = Sequence.fold add set seq
 
+  let type_infer ctx set = type_infer ctx (to_seq set)
+
   let remove_seq set seq = Sequence.fold remove set seq
 
   let remove_id_seq set seq = Sequence.fold remove_id set seq
@@ -524,7 +521,7 @@ let bij ~ctx =
     ~extract:(fun lits ->
       let proof c = Proof.mk_axiom c "bij" "bij" in
       create_a ~ctx lits proof)
-    (Lits.bij_lits ~ord:ctx.ctx_ord))
+    (Lits.bij_lits ~ord:(Ctx.ord ctx)))
 
 let bij_set ~ctx =
   Bij.(map
@@ -534,11 +531,3 @@ let bij_set ~ctx =
     ~extract:(fun l -> CSet.add_list CSet.empty l)
     (list_ (bij ~ctx)))
 
-(** {2 Context} *)
-
-let mk_context ?(ord=Ordering.none) ?(select=Selection.no_select) () = {
-  ctx_ord=ord;
-  ctx_select=select;
-  ctx_complete=true;
-  ctx_pp=pp_debug;
-}

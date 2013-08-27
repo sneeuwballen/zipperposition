@@ -51,8 +51,8 @@ type t = {
   expert_clauses : Clause.t list;        (** Additional axioms *)
   expert_canonize : Term.t -> Term.t;       (** Get a canonical form of the term *)
   expert_ord : Ordering.t -> bool;        (** Compatible with ord? *)
-  expert_update_ctx : Clause.context -> t list;(** How to update the context *)
-  expert_ctx : Clause.context;                 (** Context used by the expert *)
+  expert_update_ctx : Ctx.t -> t list;(** How to update the context *)
+  expert_ctx : Ctx.t;                 (** Context used by the expert *)
   expert_solve : ((Term.t*Term.t) list -> Substs.t list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
@@ -72,8 +72,8 @@ let update_ctx e ~ctx = e.expert_update_ctx ctx
     are compatibles: check whether they have no symbol in common. *)
 let compatible e1 e2 =
   e1.expert_ctx == e2.expert_ctx &&
-  compatible_ord e1 ~ord:e1.expert_ctx.C.ctx_ord =
-    compatible_ord e2 ~ord:e2.expert_ctx.C.ctx_ord &&
+  compatible_ord e1 ~ord:(Ctx.ord e1.expert_ctx) =
+    compatible_ord e2 ~ord:(Ctx.ord e2.expert_ctx) &&
   Symbol.SSet.is_empty (Symbol.SSet.inter e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
@@ -149,7 +149,7 @@ let simplify expert c =
     else begin
       let rule = "expert_" ^ expert.expert_name in
       let premises = List.map (fun c -> c.C.hcproof) expert.expert_clauses in
-      let proof c' = Proof.mk_proof c' rule (c.C.hcproof :: premises) in
+      let proof c' = Proof.mk_infer c' rule (c.C.hcproof :: premises) in
       let parents = c :: c.C.hcparents in
       let new_hc = C.create ~parents ~ctx lits proof in
       Util.incr_stat stat_expert_simplify;
@@ -188,7 +188,7 @@ module Set = struct
   type t = {
     active : expert list;
     inactive : expert list;
-    ctx : Clause.context;
+    ctx : Ctx.t;
   }
 
     (** A set of experts *)
@@ -219,7 +219,7 @@ module Set = struct
       (fun e -> update_ctx ~ctx:set.ctx e) experts in
     List.fold_left
       (fun set e ->
-        if not (compatible_ord e ~ord:set.ctx.C.ctx_ord)
+        if not (compatible_ord e ~ord:(Ctx.ord set.ctx))
           then (* [e] is disabled, not compatible with [ctx] *)
             let _ = Util.debug 2 "%% expert %a disabled" pp e in
             {set with inactive = e :: set.inactive; }
@@ -254,14 +254,14 @@ module Set = struct
   let is_redundant set c =
     List.exists
       (fun e ->
-        assert (compatible_ord e ~ord:e.expert_ctx.C.ctx_ord);
+        assert (compatible_ord e ~ord:(Ctx.ord e.expert_ctx));
         is_redundant e c)
       set.active
 
   let simplify set c =
     List.fold_left
       (fun c e ->
-        assert (compatible_ord e ~ord:e.expert_ctx.C.ctx_ord);
+        assert (compatible_ord e ~ord:(Ctx.ord e.expert_ctx));
         simplify e c)
       c set.active
 
@@ -288,21 +288,21 @@ type gnd_convergent = {
   gc_eqns : Clause.t list;       (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
-let mk_gc ~theory ~ord ~prec hclauses =
-  let signature = C.signature hclauses in
+let mk_gc ~theory ~ord ~prec clauses =
+  let signature = C.signature (Sequence.of_list clauses) in
   let signature = Symbol.SMap.filter
     (fun s _ -> not (Symbol.is_base_symbol s)) signature in
   (* check that every clause is a positive equation *)
   assert (List.for_all
     (fun c -> match c.C.hclits with 
-     | [| Literal.Equation (_,_,true,_)|] -> true | _ -> false) hclauses);
+     | [| Literal.Equation (_,_,true,_)|] -> true | _ -> false) clauses);
   let set = Signature.to_symbols signature in
   let set = Symbol.SSetSeq.of_seq (Sequence.of_list set) in
   { gc_ord = ord;
     gc_theory = theory;
     gc_prec = prec;
     gc_sig = set;
-    gc_eqns = hclauses;
+    gc_eqns = clauses;
   }
 
 (** Instantiate variables in the pairs of terms with fresh constants *)
@@ -360,7 +360,7 @@ let rec gc_expert ~ctx gc =
   let expert_clauses = List.map (C.update_ctx ~ctx) gc.gc_eqns in
   List.iter (fun c -> C.set_flag C.flag_persistent c true) expert_clauses;
   (* make a rewriting system from the clauses *)
-  let trs = OrderedTRS.empty ~ord:ctx.C.ctx_ord in
+  let trs = OrderedTRS.empty ~ord:(Ctx.ord ctx) in
   let trs = OrderedTRS.add_seq trs (Sequence.of_list expert_clauses) in
   (* compute normal form using the rewriting system *)
   let nf = OrderedTRS.mk_rewrite trs ~size:2048 in

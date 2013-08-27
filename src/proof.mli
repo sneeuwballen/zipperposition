@@ -31,15 +31,15 @@ open Logtk
 
 type t = private
   | Axiom of CompactClause.t * string * string (** file, axiom name *)
-  | Proof of CompactClause.t * string * t list
+  | Infer of CompactClause.t * string * t list (** Inference *)
 
 (** {2 Constructors and utils} *)
 
 val mk_axiom : CompactClause.t -> string -> string -> t
-val mk_proof : CompactClause.t -> string -> t list -> t
+val mk_infer : CompactClause.t -> string -> t list -> t
 
 val is_axiom : t -> bool
-val is_proof : t -> bool
+val is_infer : t -> bool
 
 val proof_clause : t -> CompactClause.t   (** Clause this is a proof of *)
 val proof_id : t -> int                   (** Id of the clause *)

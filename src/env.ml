@@ -1,21 +1,28 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** {1 Global environment for an instance of the prover} *)
@@ -31,13 +38,13 @@ type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
 type unary_inf_rule = Clause.t -> Clause.t list
   (** unary infererences *)
 
-type lit_rewrite_rule = ctx:Clause.context -> Literal.t -> Literal.t
+type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
   (** Rewrite rule on literals *)
 
 
 type t = {
   mutable params : Params.t;
-  mutable ctx : Clause.context;
+  mutable ctx : Ctx.t;
 
   mutable binary_rules : (string * binary_inf_rule) list;
     (** the binary inference rules *)
@@ -81,13 +88,13 @@ type t = {
   mutable axioms : Clause.t list;
     (** a list of axioms to add to the problem *)
 
-  mutable mk_constr : (Clause.t list -> Precedence.constr list) list;
+  mutable mk_constr : (Clause.t Sequence.t -> Precedence.constr list) list;
     (** How to build constraints from a list of clauses *)
 
   mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:Clause.context -> Clause.t list -> Clause.t list;
+  mutable preprocess : ctx:Ctx.t -> Clause.t list -> Clause.t list;
     (** how to preprocess the initial list of clauses *)
 
   mutable state : ProofState.t;
@@ -232,6 +239,7 @@ let compute_constrs ~env cs =
     constrs env.mk_constr
   in constrs
 
+let ord env = Ctx.ord env.ctx
 
 let pp buf env = 
   Printf.bprintf buf "env(state: %a, experts: %a)"
@@ -320,14 +328,14 @@ let rewrite ~env c =
       and r' = reduce_term env.rewrite_rules r in
       if l == l' && r == r'
         then lit  (* same lit *)
-        else Literal.mk_lit ~ord:env.ctx.C.ctx_ord l' r' sign)
+        else Literal.mk_lit ~ord:(Ctx.ord env.ctx) l' r' sign)
     c.C.hclits
   in
   if SmallSet.is_empty !applied_rules
     then c (* no simplification *)
     else begin
       let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-      let proof c' = Proof.mk_proof c' rule [c.C.hcproof] in
+      let proof c' = Proof.mk_infer c' rule [c.C.hcproof] in
       let parents = [c] in
       let new_clause = C.create_a ~parents ~ctx:env.ctx lits' proof in
       Util.debug 3 "rewritten %a into %a" C.pp_debug c C.pp_debug new_clause;
@@ -354,7 +362,7 @@ let rewrite_lits ~env c =
   if SmallSet.is_empty !applied_rules then c
   else begin  (* simplifications occurred! *)
     let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-    let proof c' = Proof.mk_proof c' rule [c.C.hcproof] in
+    let proof c' = Proof.mk_infer c' rule [c.C.hcproof] in
     let parents = [c] in
     let new_clause = C.create_a ~parents ~ctx:env.ctx lits proof in
     Util.debug 3 "lit rewritten %a into %a" C.pp_debug c C.pp_debug new_clause;
@@ -506,7 +514,7 @@ let all_simplify ~env c =
 let clause_of_deduced ~env lits parents = 
   let premises = List.map (fun c -> c.C.hcproof) parents in
   let c = C.create_a ~ctx:env.ctx lits ~parents
-    (fun c -> Proof.mk_proof c "lemma" premises) in
+    (fun c -> Proof.mk_infer c "lemma" premises) in
   basic_simplify ~env (C.clause_of_fof c)
 
 (** Find the lemmas that can be deduced if we consider this new clause *)
@@ -519,7 +527,7 @@ let find_lemmas ~env c =
       (function
       | MetaProverState.Deduced (f,parents) ->
         (* TODO: CNF reduction now? *)
-        let lits = [| Literal.mk_eq ~ord:env.ctx.C.ctx_ord f T.true_term |] in
+        let lits = [| Literal.mk_eq ~ord:(Ctx.ord env.ctx) f T.true_term |] in
         let c = clause_of_deduced ~env lits parents in
         Util.debug 1 "%% meta-prover: lemma %a" C.pp_debug c;
         Some c
@@ -546,7 +554,7 @@ let meta_step ~env c =
       (fun result -> match result with
         | MetaProverState.Deduced (f,parents) ->
           (* TODO: CNF reduction now? *)
-          let lits = [| Literal.mk_eq ~ord:env.ctx.C.ctx_ord f T.true_term |] in
+          let lits = [| Literal.mk_eq ~ord:(Ctx.ord env.ctx) f T.true_term |] in
           let lemma = clause_of_deduced ~env lits parents in
           Util.debug 1 "%% meta-prover: lemma %a" C.pp_debug lemma;
           [lemma]

@@ -1,26 +1,33 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** {1 Dynamic extensions} *)
 
-open Basic
+open Logtk
 
 type t = {
   name : string;
@@ -28,13 +35,13 @@ type t = {
 } (** An extension *)
 and action =
   | Ext_general of (Env.t -> unit)
-  | Ext_expert of (ctx:context -> Experts.t)
+  | Ext_expert of (ctx:Ctx.t -> Experts.t)
   | Ext_binary_inf_rule of string * Env.binary_inf_rule
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
   | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
-  | Ext_term_rewrite of string * (term -> term)
-  | Ext_lit_rewrite of string * (ctx:context -> literal -> literal)
-  | Ext_simplification_rule of (hclause -> hclause list)
+  | Ext_term_rewrite of string * (Term.t -> Term.t)
+  | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
+  | Ext_simplification_rule of (Clause.t -> Clause.t list)
   (** Action that can be performed by an extension *)
 
 type load_result =
@@ -60,7 +67,7 @@ let dyn_load filename =
       !__current
     with Dynlink.Error e ->
       let s = Dynlink.error_message e in
-      FoUtils.debug 0 "%% error loading plugin %s: %s" filename s;
+      Util.debug 0 "%% error loading plugin %s: %s" filename s;
       let msg = "could not load " ^ filename ^ ": " ^ s in
       Ext_failure msg
   in
@@ -73,7 +80,7 @@ let apply_ext ~env ext =
   | Ext_expert e -> Env.add_expert ~env (e ~ctx:env.Env.ctx)
   | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
   | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
-  | Ext_signal_incompleteness -> env.Env.ctx.ctx_complete <- false
+  | Ext_signal_incompleteness -> Ctx.lost_completeness env.Env.ctx
   | Ext_term_rewrite (name, rule) ->  (* add rewrite rule *)
     Env.add_rewrite_rule ~env name rule
   | Ext_lit_rewrite (name, rule) ->
@@ -81,6 +88,6 @@ let apply_ext ~env ext =
   | Ext_simplification_rule r ->  (* add simplifcation rule *)
     let list_simplify' = env.Env.list_simplify in
     env.Env.list_simplify <-
-      (fun hc -> FoUtils.list_flatmap list_simplify' (r hc))
+      (fun hc -> Util.list_flatmap list_simplify' (r hc))
   in
   List.iter apply_action ext.actions

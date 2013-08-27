@@ -217,6 +217,20 @@ let vars lit =
   add_vars set lit;
   T.THashSet.to_list set
 
+let infer_type ctx lit =
+  match lit with
+  | Equation (l,r,_,_) when T.eq r T.true_term ->
+    TypeInference.constrain_term_type ctx l Type.o
+  | Equation (l,r,_,_) when T.eq l T.true_term ->
+    TypeInference.constrain_term_type ctx r Type.o
+  | Equation (l,r,_,_) ->
+    TypeInference.constrain_term_term ctx l r
+
+let signature ?(signature=Signature.empty) lit =
+  let ctx = TypeInference.Ctx.of_signature signature in
+  let ctx = infer_type ctx lit in
+  TypeInference.Ctx.to_signature ctx
+
 let eq_lits lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then true else
@@ -261,7 +275,7 @@ let ground_lits lits =
   let rec check i = if i = Array.length lits then true
     else match lits.(i) with
     | Equation (l, r, _, _) ->
-      T.is_ground_term l && T.is_ground_term r && check (i+1)
+      T.is_ground l && T.is_ground r && check (i+1)
   in check 0
 
 let term_of_lits lits =
@@ -324,6 +338,18 @@ let lits_to_seq lits =
       for i = 0 to Array.length lits - 1 do
         match lits.(i) with | Equation (l,r,sign,_) -> k (l,r,sign)
       done)
+
+let lits_of_terms ~ord terms =
+  let terms = Array.of_list terms in
+  Array.map (fun t -> lit_of_fof ~ord (mk_eq ~ord t T.true_term)) terms
+
+let lits_infer_type ctx lits =
+  Array.fold_left infer_type ctx lits
+
+let lits_signature ?(signature=Signature.empty) lits =
+  let ctx = TypeInference.Ctx.of_signature signature in
+  let ctx = lits_infer_type ctx lits in
+  TypeInference.Ctx.to_signature ctx
 
 (** {2 Special kinds of array} *)
 
@@ -419,10 +445,10 @@ let is_pos_eq lits =
     Some(constant, definition of constant) *)
 let is_const_definition lits =
   match lits with
-  | [|Equation (l,r,true,_)|] when T.is_const l && T.is_ground_term r
+  | [|Equation (l,r,true,_)|] when T.is_const l && T.is_ground r
     && not (T.member_term l r) ->
     Some (l,r)
-  | [|Equation (l,r,true,_)|] when T.is_const r && T.is_ground_term l
+  | [|Equation (l,r,true,_)|] when T.is_const r && T.is_ground l
     && not (T.member_term r l) ->
     Some (r,l)
   | _ -> None

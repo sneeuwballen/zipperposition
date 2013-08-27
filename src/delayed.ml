@@ -1,47 +1,55 @@
+
 (*
-zipperposition: a functional superposition prover for prototyping
-copyright (c) 2012 simon cruanes
+Zipperposition: a functional superposition prover for prototyping
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-this is free software; you can redistribute it and/or
-modify it under the terms of the gnu general public license
-as published by the free software foundation; either version 2
-of the license, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-this is distributed in the hope that it will be useful,
-but without any warranty; without even the implied warranty of
-merchantability or fitness for a particular purpose.  see the
-gnu general public license for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-you should have received a copy of the gnu general public license
-along with this program; if not, write to the free software
-foundation, inc., 51 franklin street, fifth floor, boston, ma
-02110-1301 usa.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** {1 Superposition with equivalence reasoning and delayed clausal form} *)
 
-open Basic
-open Symbols
+open Logtk
+open Comparison.Infix
 
-module T = Terms
-module C = Clauses
-module O = Orderings
-module S = FoSubst
+module T = Term
+module C = Clause
+module O = Ordering
+module S = Substs
 module BV = Bitvector
-module Lits = Literals
-module Utils = FoUtils
+module Lit = Literal
 module Sup = Superposition
 module PS = ProofState
 
-let prof_elim = Utils.mk_profiler "eliminate"
+let prof_elim = Util.mk_profiler "eliminate"
 
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
-  [at_symbol; num_symbol; split_symbol; const_symbol; eq_symbol; imply_symbol;
+  let open Symbol in
+  [num_symbol; split_symbol; const_symbol; eq_symbol; imply_symbol;
    forall_symbol; exists_symbol; lambda_symbol;
    or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
 
-let special_set = List.fold_left (fun set s -> SSet.add s set) SSet.empty special_preds
+let special_set =
+  List.fold_left (fun set s -> Symbol.SSet.add s set) Symbol.SSet.empty special_preds
 
 type symbol_kind = 
   | Predicate | DeBruijn | Skolem | Function | Special
@@ -62,12 +70,12 @@ let order k1 k2 =
 (* classify symbol into categories *)
 let classify signature s =
   match s with
-  | _ when s == db_symbol -> DeBruijn
-  | _ when attrs_symbol s land attr_skolem <> 0 -> Skolem
-  | _ when SSet.mem s special_set -> Special
+  | _ when Symbol.eq s Symbol.db_symbol -> DeBruijn
+  | _ when Symbol.attrs_symbol s land Symbol.attr_skolem <> 0 -> Skolem
+  | _ when Symbol.SSet.mem s special_set -> Special
   | _ -> (* classify between predicate and function by the sort *)
-    let sort = try SMap.find s signature with Not_found -> univ_ in
-    if sort == bool_ then Predicate else Function
+    let is_bool = try Signature.is_bool signature s with Not_found -> false in
+    if is_bool then Predicate else Function
 
 (** constraint on the ordering *)
 let symbol_constraint clauses =
@@ -82,91 +90,106 @@ let symbol_constraint clauses =
 (** equation simplified into a disjunction of conjunctions of equations *)
 type tableau_rule =
   | Alpha of tableau_rule * tableau_rule  (** alpha elimination *)
-  | List of literal list                  (** list of literals, after transformation *)
-  | Keep of literal                       (** keep this equation unchanged *)
+  | List of Literal.t list                (** list of literals, after transformation *)
+  | Keep of Literal.t                     (** keep this equation unchanged *)
 
 (** helper for alpha elimination *)
 let alpha_eliminate ~ord a signa b signb =
-  Alpha (List [Lits.mk_lit ~ord a T.true_term signa],
-         List [Lits.mk_lit ~ord b T.true_term signb])
+  Alpha (List [Lit.mk_lit ~ord a T.true_term signa],
+         List [Lit.mk_lit ~ord b T.true_term signb])
 
 (** helper for beta elimination *)
 let beta_eliminate ~ord a signa b signb =
-  List [Lits.mk_lit ~ord a T.true_term signa;
-        Lits.mk_lit ~ord b T.true_term signb]
+  List [Lit.mk_lit ~ord a T.true_term signa;
+        Lit.mk_lit ~ord b T.true_term signb]
 
 (** helper for gamma elimination *)
-let gamma_eliminate ~ord offset t sign =
-  assert (t.sort == bool_);
+let gamma_eliminate ~ctx offset t sign =
+  assert (Ctx.check_term_type ~ctx t Type.o);
+  let ord = Ctx.ord ctx in
   let i = !offset in
   incr offset;
   let new_t =
-    match T.look_db_sort 0 t with
-    | None -> T.db_unlift t (* the variable is not present *)
-    | Some sort ->
-      (* sort is the sort of the first DB symbol *)
-      let new_var = T.mk_var i sort in
-      T.db_unlift (T.db_replace t new_var)
+    if T.db_contains t 0
+      then
+        let ty = match T.db_type t 0 with
+        | Some ty -> ty
+        | None -> Type.i
+        in
+        let new_var = T.mk_var ~ty i in
+        T.db_unlift (T.db_replace t new_var)
+      else
+        T.db_unlift t (* the variable is not present *)
   in
-  List [Lits.mk_lit ~ord new_t T.true_term sign]
+  List [Lit.mk_lit ~ord new_t T.true_term sign]
 
 (** helper for delta elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a skolem
     of free variables of t) *)
 let delta_eliminate ~ctx t sign =
-  assert (t.sort == bool_);
+  assert (Ctx.check_term_type ~ctx t Type.o);
+  let ord = Ctx.ord ctx in
   let new_t =
-    match T.look_db_sort 0 t with
-    | None -> T.db_unlift t (* the variable is not present *)
-    | Some sort ->
-      (* sort is the sort of the first DB symbol *)
-      !T.skolem ~ctx t sort
+    if T.db_contains t 0
+      then begin
+        let t' = Skolem.skolem_term ~ctx:(Ctx.skolem_ctx ~ctx) t in
+        Ctx.constrain_term_term ~ctx t t';
+        t'
+      end else
+        T.db_unlift t (* the variable is not present *)
   in
-  List [Lits.mk_lit ~ord:ctx.ctx_ord new_t T.true_term sign]
+  List [Lit.mk_lit ~ord new_t T.true_term sign]
 
 (** Just keep the equation as it is *)
 let keep eqn = Keep eqn
 
 (** perform at most one simplification on each literal. It
     returns an array of tableau_rule. *)
-let eliminate_lits hc =
-  let ord = hc.hcctx.ctx_ord in
-  let offset = ref ((max 0 (T.max_var hc.hcvars)) + 1) in  (* offset to create variables *)
+let eliminate_lits c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ~ctx in
+  let offset = ref ((max 0 (T.max_var c.C.hcvars)) + 1) in  (* offset to create variables *)
   (* eliminate propositions (connective and quantifier eliminations) *)
   let prop eqn p sign =
-    assert (p.sort == bool_);
-    match p.term with
-    | BoundVar _ | Var _ -> keep eqn
-    | Node (s, [a; b]) when s == and_symbol && sign -> alpha_eliminate ~ord a true b true
-    | Node (s, [a; b]) when s == and_symbol && not sign -> beta_eliminate ~ord a false b false
-    | Node (s, [a; b]) when s == or_symbol && sign -> beta_eliminate ~ord a true b true
-    | Node (s, [a; b]) when s == or_symbol && not sign -> alpha_eliminate ~ord a false b false
-    | Node (s, [a; b]) when s == imply_symbol && sign -> beta_eliminate ~ord a false b true
-    | Node (s, [a; b]) when s == imply_symbol && not sign -> alpha_eliminate ~ord a true b false
-    | Bind (s, _, t) when s == forall_symbol && sign ->
-      gamma_eliminate ~ord offset t true
-    | Bind (s, _, t) when s == forall_symbol && not sign ->
-      delta_eliminate ~ctx:hc.hcctx (T.mk_not t) true
-    | Bind (s, _, t) when s == exists_symbol && sign ->
-      delta_eliminate ~ctx:hc.hcctx t true
-    | Bind (s, _, t) when s == exists_symbol && not sign ->
-      gamma_eliminate ~ord offset t false
-    | Bind _ | Node _ -> keep eqn
+    assert (Ctx.check_term_type ~ctx p Type.o);
+    match p.T.term with
+    | T.BoundVar _ | T.Var _ -> keep eqn
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.and_symbol && sign ->
+      alpha_eliminate ~ord a true b true
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.and_symbol && not sign ->
+      beta_eliminate ~ord a false b false
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.or_symbol && sign ->
+      beta_eliminate ~ord a true b true
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.or_symbol && not sign ->
+      alpha_eliminate ~ord a false b false
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.imply_symbol && sign ->
+      beta_eliminate ~ord a false b true
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.imply_symbol && not sign ->
+      alpha_eliminate ~ord a true b false
+    | T.Bind (s, t) when Symbol.eq s Symbol.forall_symbol && sign ->
+      gamma_eliminate ~ctx offset t true
+    | T.Bind (s, t) when Symbol.eq s Symbol.forall_symbol && not sign ->
+      delta_eliminate ~ctx (T.mk_not t) true
+    | T.Bind (s, t) when Symbol.eq s Symbol.exists_symbol && sign ->
+      delta_eliminate ~ctx t true
+    | T.Bind (s, t) when Symbol.eq s Symbol.exists_symbol && not sign ->
+      gamma_eliminate ~ctx offset t false
+    | T.Bind _ | T.Node _ | T.At _ -> keep eqn
   (* eliminate equivalence *)
   and equiv eqn l r sign =
-    match ord.ord_compare l r with
+    match Ordering.compare ord l r with
     | Gt when sign && not (T.atomic l) -> (* l <=> r -> (l => r) & (r => l)*)
-      Alpha (List [Lits.mk_neq ~ord l T.true_term; Lits.mk_eq ~ord r T.true_term],
-             List [Lits.mk_neq ~ord r T.true_term; Lits.mk_eq ~ord l T.true_term])
+      Alpha (List [Lit.mk_neq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
+             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_eq ~ord l T.true_term])
     | Lt when sign && not (T.atomic r) ->
-      Alpha (List [Lits.mk_neq ~ord l T.true_term; Lits.mk_eq ~ord r T.true_term],
-             List [Lits.mk_neq ~ord r T.true_term; Lits.mk_eq ~ord l T.true_term])
+      Alpha (List [Lit.mk_neq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
+             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_eq ~ord l T.true_term])
     | Incomparable when sign && (not (T.atomic l) || not (T.atomic r)) ->
-      Alpha (List [Lits.mk_neq ~ord l T.true_term; Lits.mk_eq ~ord r T.true_term],
-             List [Lits.mk_neq ~ord r T.true_term; Lits.mk_eq ~ord l T.true_term])
+      Alpha (List [Lit.mk_neq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
+             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_eq ~ord l T.true_term])
     | _ when not sign -> (* not (l <=> r) -> (l | r) & (not l | not r) *)
-      Alpha (List [Lits.mk_eq ~ord l T.true_term; Lits.mk_eq ~ord r T.true_term],
-             List [Lits.mk_neq ~ord r T.true_term; Lits.mk_neq ~ord l T.true_term])
+      Alpha (List [Lit.mk_eq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
+             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_neq ~ord l T.true_term])
     | _ -> keep eqn
   in
   (* try to eliminate each literal that is eligible for resolution *)
@@ -174,29 +197,30 @@ let eliminate_lits hc =
     Array.map
       (fun lit -> 
         match lit with
-        | Equation (l, r, sign, _) when T.eq_term r T.true_term -> prop lit l sign
-        | Equation (l, r, sign, _) when T.eq_term l T.true_term -> prop lit r sign
-        | Equation (l, r, sign, _) when l.sort == bool_ -> equiv lit l r sign
+        | Lit.Equation (l, r, sign, _) when T.eq r T.true_term -> prop lit l sign
+        | Lit.Equation (l, r, sign, _) when T.eq l T.true_term -> prop lit r sign
+        | Lit.Equation (l, r, sign, _) when Ctx.check_term_type ~ctx l Type.o ->
+          equiv lit l r sign  (* bool *)
         | _ -> keep lit)  (* equation between terms *)
-      hc.hclits
+      c.C.hclits
   in
   tableau_rules
 
 (** Produce a list of clauses from an array of tableau_rule, or None *)
-let tableau_to_clauses hc a =
-  let ctx = hc.hcctx in
-  if Utils.array_forall (function | Keep _ -> true | _ -> false) a
+let tableau_to_clauses c a =
+  let ctx = c.C.hcctx in
+  if Util.array_forall (function | Keep _ -> true | _ -> false) a
   then None (* just keep all literals *)
   else begin
     let clauses = ref []
     and eqns = Vector.create (Array.length a * 2) in
-    let proof c = Proof (c, "elim", [hc.hcproof]) in
+    let proof c' = Proof.mk_infer c' "elim" [c.C.hcproof] in
     (* explore all combinations of tableau splits *)
     let rec explore_splits i =
       if i = Array.length a
         then  (* produce new clause *)
-          let parents = hc :: hc.hcparents in
-          let clause = C.mk_hclause_a ~parents ~ctx (Vector.to_array eqns) proof in
+          let parents = c :: c.C.hcparents in
+          let clause = C.create_a ~parents ~ctx (Vector.to_array eqns) proof in
           clauses := clause :: !clauses
         else begin
           let len = Vector.size eqns in
@@ -218,60 +242,102 @@ let tableau_to_clauses hc a =
     Some !clauses
   end
 
+(* simplify a clause *)
+let simplify_lit ~ord lit =
+  match lit with
+  | Lit.Equation (l, r, sign, _) ->
+    let l' = Cnf.simplify l in
+    let r' = Cnf.simplify r in
+    Lit.mk_lit ~ord l' r' sign
+
+(* simplify a clause *)
+let simplify_clause ~ctx c =
+  let ord = Ctx.ord ~ctx in
+  let lits = Array.map (simplify_lit ~ord) c.C.hclits in
+  if Util.array_forall2 Lit.eq c.C.hclits lits
+    then c
+    else begin
+      let proof c' = Proof.mk_infer c' "simplify" [c.C.hcproof] in
+      let new_c = C.create_a ~parents:[c] ~ctx lits proof in
+      new_c
+    end
+
+(* miniscope a clause *)
+let miniscope_lit ~ord lit =
+  match lit with
+  | Lit.Equation (l, r, sign, _) ->
+    let l' = Cnf.miniscope l in
+    let r' = Cnf.miniscope r in
+    Lit.mk_lit ~ord l' r' sign
+
+(* miniscope a clause *)
+let miniscope_clause ~ctx c =
+  let ord = Ctx.ord ~ctx in
+  let lits = Array.map (miniscope_lit ~ord) c.C.hclits in
+  if Util.array_forall2 Lit.eq c.C.hclits lits
+    then c
+    else begin
+      let proof c' = Proof.mk_infer c' "miniscope" [c.C.hcproof] in
+      let new_c = C.create_a ~parents:[c] ~ctx lits proof in
+      new_c
+    end
+
 (** Perform eliminations recursively, until no elimination is possible *)
-let recursive_eliminations hc =
-  Utils.enter_prof prof_elim;
+let recursive_eliminations c =
+  Util.enter_prof prof_elim;
+  let ctx = c.C.hcctx in
   let clauses = ref [] in
   (* process clauses until none of them is simplifiable *)
-  let rec simplify hc =
-    let hc' = C.clause_of_fof (Cnf.simplify hc) in
+  let rec simplify c =
+    let c' = C.clause_of_fof (simplify_clause ~ctx c) in
     (* miniscoping *)
-    let hc' = Cnf.miniscope hc' in
+    let c' = miniscope_clause ~ctx c' in
     (* one step of reduction to clauses *)
-    let tableau_rules = eliminate_lits hc' in
-    match tableau_to_clauses hc' tableau_rules with
-    | None -> clauses := hc' :: !clauses (* done with this clause *)
-    | Some clauses ->
-      Utils.debug 3 "@[<hov 4>@[<h>%a@]@ simplified into clauses @[<hv>%a@]@]"
-                    !C.pp_clause#pp_h hc' (Utils.pp_list !C.pp_clause#pp_h) clauses;
+    let tableau_rules = eliminate_lits c' in
+    match tableau_to_clauses c' tableau_rules with
+    | None -> clauses := c' :: !clauses (* done with this clause *)
+    | Some new_clauses ->
+      Util.debug 3 "%a simplified into clauses\n\t%a" C.pp_debug c
+        (Util.pp_list ~sep:"\n\t" C.pp_debug) new_clauses;
       (* simplify recursively new clauses *)
-      List.iter (fun hc -> simplify hc) clauses
+      List.iter (fun c -> simplify c) new_clauses
   in
-  simplify hc;
-  Utils.exit_prof prof_elim;
+  simplify c;
+  Util.exit_prof prof_elim;
   !clauses
 
 (** Setup the environment for superposition with equivalence reasoning *)
 let setup_env ~env =
   Sup.setup_env ~env;
+  let ctx = env.Env.ctx in
   (* specific changes *)
   let basic_simplify' = env.Env.basic_simplify in
   env.Env.basic_simplify <-
-    (fun hc -> basic_simplify' (Cnf.simplify hc));
+    (fun c -> basic_simplify' (simplify_clause ~ctx c));
   env.Env.list_simplify <-
-    (fun hc ->
-      let hc = env.Env.basic_simplify hc in
-      let l = recursive_eliminations hc in
-      let l = List.filter (fun hc -> not (Env.is_trivial ~env hc)) l in
+    (fun c ->
+      let c = env.Env.basic_simplify c in
+      let l = recursive_eliminations c in
+      let l = List.filter (fun c -> not (Env.is_trivial ~env c)) l in
       l);
   env.Env.constr <- [];
   Env.add_mk_constr env symbol_constraint;
   env.Env.preprocess <-
     (fun ~ctx l ->
-      Utils.list_flatmap
-        (fun hc ->
-          let hc = C.update_ctx ~ctx hc in
+      Util.list_flatmap
+        (fun c ->
+          let c = C.update_ctx ~ctx c in
           (* simplify the clause *)
-          let hc = Sup.basic_simplify (C.clause_of_fof hc) in
-          C.check_ord_hclause ~ord:env.Env.ctx.ctx_ord hc;
-          let clauses = env.Env.list_simplify hc in
+          let c = Sup.basic_simplify (C.clause_of_fof c) in
+          C.check_ord ~ord:(Ctx.ord ctx) c;
+          let clauses = env.Env.list_simplify c in
           List.fold_left
-            (fun clauses hc ->
-              let hc = C.clause_of_fof hc in
-              C.check_ord_hclause ~ord:ctx.ctx_ord hc;
+            (fun clauses c ->
+              let c = C.clause_of_fof c in
+              C.check_ord ~ord:(Ctx.ord ctx) c;
               (* keep only non-trivial clauses *)
-              if not (Env.is_trivial ~env hc)
-                then hc :: clauses
+              if not (Env.is_trivial ~env c)
+                then c :: clauses
                 else clauses)
             [] clauses)
         l);

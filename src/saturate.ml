@@ -1,37 +1,44 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(* main saturation algorithm *)
+(** {1 Main saturation algorithm.}
+    It uses inference rules and simplification rules from Superposition. *)
 
-open Basic
+open Logtk
+open Params
 
-module C = Clauses
-module O = Orderings
+module C = Clause
+module O = Ordering
 module PS = ProofState
 module Sup = Superposition
 module Sel = Selection
-module Utils = FoUtils
-module Delayed = Delayed
 
-let stat_redundant_given = mk_stat "redundant given clauses"
-let stat_processed_given = mk_stat "processed given clauses"
+let stat_redundant_given = Util.mk_stat "redundant given clauses"
+let stat_processed_given = Util.mk_stat "processed given clauses"
 
 (** the status of a state *)
 type 'a szs_status = 
@@ -48,50 +55,51 @@ let check_timeout = function
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~env num =
   let ctx = env.Env.ctx in
-  let ord = ctx.ctx_ord in
+  let ord = Ctx.ord ctx in
   let experts = Env.get_experts env in
-  Utils.debug 3 "@[<hov2>env for next given loop:@; %a@]@." Env.pp env;
+  Util.debug 3 "@[<hov2>env for next given loop:@; %a@]@." Env.pp env;
   (* select next given clause *)
   match Env.next_passive ~env with
   | None -> Sat (* passive set is empty *)
-  | Some hc ->
+  | Some c ->
     (* simplify given clause w.r.t. active set, then remove redundant clauses *)
-    let c_list = Env.all_simplify ~env hc in
+    let c_list = Env.all_simplify ~env c in
     let c_list = List.filter
-      (fun hc' -> not (Env.is_redundant ~env hc'))
-      c_list in
+      (fun c' -> not (Env.is_redundant ~env c'))
+      c_list
+    in
     match c_list with
     | [] -> 
-      Utils.debug 2 "%% given clause %a is redundant" !C.pp_clause#pp_h hc;
-      incr_stat stat_redundant_given;
+      Util.debug 2 "%% given clause %a is redundant" C.pp_debug c;
+      Util.incr_stat stat_redundant_given;
       Unknown  (* all simplifications are redundant *)
-    | hc::_ when C.is_empty hc ->
-      Unsat hc  (* empty clause found *)
-    | hc::new_clauses when Experts.Set.is_redundant experts hc ->
-      Utils.debug 2 "%% given clause %a is redundant" !C.pp_clause#pp_h hc;
-      Env.add_simpl ~env (Sequence.singleton hc);
+    | c::_ when C.is_empty c ->
+      Unsat c  (* empty clause found *)
+    | c::new_clauses when Experts.Set.is_redundant experts c ->
+      Util.debug 2 "%% given clause %a is redundant" C.pp_debug c;
+      Env.add_simpl ~env (Sequence.singleton c);
       Env.add_passive ~env (Sequence.of_list new_clauses);
       Unknown  (* redundant given clause *)
-    | hc::new_clauses ->
+    | c::new_clauses ->
       let new_clauses = Vector.from_list new_clauses in
       (* select first clause, the other ones are passive *) 
-      assert (not (Env.is_redundant ~env hc));
+      assert (not (Env.is_redundant ~env c));
       (* process the given clause! *)
-      incr_stat stat_processed_given;
-      C.check_ord_hclause ~ord hc;
-      Utils.debug 2 "%% ============ step %5d  ============" num;
-      Utils.debug 1 "%% @[<h>%a@]" !C.pp_clause#pp_h hc;
+      Util.incr_stat stat_processed_given;
+      C.check_ord ~ord c;
+      Util.debug 2 "%% ============ step %5d  ============" num;
+      Util.debug 1 "%% %a" C.pp_tstp c;
       (* yield control to meta-prover *)
-      Vector.append_seq new_clauses (Env.meta_step ~env hc);
+      Vector.append_seq new_clauses (Env.meta_step ~env c);
       (* find clauses that are subsumed by given in active_set *)
-      let subsumed_active = Sequence.of_list (Env.subsumed_by ~env hc) in
+      let subsumed_active = Sequence.of_list (Env.subsumed_by ~env c) in
       Env.remove_active ~env subsumed_active;
       Env.remove_simpl ~env subsumed_active;
       Env.remove_orphans ~env subsumed_active; (* orphan criterion *)
       (* add given clause to simpl_set *)
-      Env.add_simpl ~env (Sequence.singleton hc);
+      Env.add_simpl ~env (Sequence.singleton c);
       (* simplify active set using c *)
-      let simplified_actives, newly_simplified = Env.backward_simplify ~env hc in
+      let simplified_actives, newly_simplified = Env.backward_simplify ~env c in
       let simplified_actives = C.CSet.to_seq simplified_actives in
       (* the simplified active clauses are removed from active set and
          added to the set of new clauses. Their descendants are also removed
@@ -101,27 +109,26 @@ let given_clause_step ?(generating=true) ~env num =
       Env.remove_orphans ~env simplified_actives;
       Vector.append_seq new_clauses newly_simplified;
       (* add given clause to active set *)
-      Env.add_active ~env (Sequence.singleton hc);
+      Env.add_active ~env (Sequence.singleton c);
       (* do inferences between c and the active set (including c),
          if [generate] is set to true *)
       let inferred_clauses = if generating
-        then Env.generate ~env hc
+        then Env.generate ~env c
         else Sequence.empty in
       (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
       let inferred_clauses = Sequence.flatMap
-        (fun hc ->
-          let cs = Env.forward_simplify ~env hc in
+        (fun c ->
+          let cs = Env.forward_simplify ~env c in
           (* keep clauses  that are not redundant *)
-          let cs = Sequence.filter (fun hc -> not (Env.is_trivial ~env hc)) cs in
+          let cs = Sequence.filter (fun c -> not (Env.is_trivial ~env c)) cs in
           cs)
         inferred_clauses
       in
       Vector.append_seq new_clauses inferred_clauses;
-      (if Utils.debug_level () >= 2 then
-        Vector.iter new_clauses
-          (fun new_c -> Utils.debug 2 "    inferred new clause @[<hov 3>%a@]"
-            !C.pp_clause#pp_h new_c));
+      (if Util.get_debug () >= 2
+        then Vector.iter new_clauses
+          (fun new_c -> Util.debug 2 "    inferred new clause %a" C.pp_debug new_c));
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
       Env.add_passive ~env (Vector.to_seq new_clauses);
       (* test whether the empty clause has been found *)
@@ -132,8 +139,10 @@ let given_clause_step ?(generating=true) ~env num =
 (** print progress *)
 let print_progress ~env steps =
   let num_active, num_passive, num_simpl = Env.stats ~env in
-  Format.printf "\r%% %d steps; %d active; %d passive; %d simpl; time %.1f s@?"
-    steps num_active num_passive num_simpl (Utils.get_total_time ())
+  Printf.printf "\r%% %d steps; %d active; %d passive; %d simpl; time %.1f s"
+    steps num_active num_passive num_simpl (Util.get_total_time ());
+  flush stdout;
+  ()
 
 let given_clause ?(generating=true) ?steps ?timeout ~env =
   let rec do_step num =
@@ -147,9 +156,7 @@ let given_clause ?(generating=true) ?steps ?timeout ~env =
         (* some cleanup from time to time *)
         (if (num mod 1000 = 0)
           then begin
-            Utils.debug 1 "%% perform cleanup of hashcons and passive set";
-            Clauses.CHashcons.clean ();
-            Terms.H.clean ();
+            Util.debug 1 "%% perform cleanup of passive set";
             Env.clean_passive ~env;
           end);
         (* do one step *)

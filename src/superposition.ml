@@ -1,21 +1,28 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
-Copyright (C) 2012 Simon Cruanes
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
 
-This is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-This is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 open Logtk
@@ -25,11 +32,12 @@ module T = Term
 module C = Clause
 module O = Ordering
 module S = Substs
-module I = Proof.mk_proofState.TermIndex
+module I = ProofState.TermIndex
 module BV = Bitvector
 module Lit = Literal
-module SubsI = Proof.mk_proofState.SubsumptionIndex
-module PS = Proof.mk_proofState
+module SubsumIdx = ProofState.SubsumptionIndex
+module UnitIdx = ProofState.UnitIndex
+module PS = ProofState
 
 (* statistics *)
 let stat_basic_simplify = Util.mk_stat "basic_simplify calls"
@@ -84,24 +92,30 @@ let rec list_first f = function
     -> (term -> position -> 'b list)
     -> 'b list
     *)
-let all_positions pos t f =
-  let rec aux pos t = match t.term with
-  | Var _ | BoundVar _ -> []
-  | Bind (_, _, t') ->
-    let acc = f t pos in  (* apply to term itself *)
-    List.rev_append (aux (pos @ [0]) t') acc
-  | Node (hd, tl) ->
-    let acc = f t pos in  (* apply to term itself *)
-    let acc, _ =
-      List.fold_left
-      (fun (acc,idx) t ->
-        let acc = List.rev_append (aux (pos @ [idx]) t) acc in (* recurse in subterm *)
+let all_positions pos t acc f =
+  let module PB = Position.Build in
+  (* pb: position builder *)
+  let rec aux acc pb t = match t.T.term with
+  | T.Var _ | T.BoundVar _ -> acc
+  | T.Bind (_, t') ->
+    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
+    aux acc (PB.add pb 0) t'
+  | T.Node (hd, tl) ->
+    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
+    let acc, _ = List.fold_left
+      (fun (acc,idx) t' ->
+        let acc = aux acc (PB.add pb idx) t' in (* recurse in subterm *)
         acc, idx+1)
       (acc, 0) tl
     in
     acc
+  | T.At(t1, t2) ->
+    let acc = f acc t (PB.to_pos pb) in
+    let acc = aux acc (PB.add pb 0) t1 in
+    let acc = aux acc (PB.add pb 1) t2 in
+    acc
   in
-  aux pos t
+  aux acc (PB.of_pos pos) t
 
 (** fold f over all literals sides, with their positions.
     f is given (acc, left side, right side, sign, position of left side)
@@ -119,16 +133,16 @@ let fold_lits ?(both=true) eligible f acc lits =
     else
       let acc = match lits.(i) with
       | Lit.Equation (l,r,sign,Gt) ->
-        f acc l r sign [i; left_pos]
+        f acc l r sign [i; Position.left_pos]
       | Lit.Equation (l,r,sign,Lt) ->
-        f acc r l sign [i; right_pos]
+        f acc r l sign [i; Position.right_pos]
       | Lit.Equation (l,r,sign,_) ->
         if both
         then (* visit both sides of the equation *)
-          let acc = f acc r l sign [i; right_pos] in
-          f acc l r sign [i; left_pos]
+          let acc = f acc r l sign [i; Position.right_pos] in
+          f acc l r sign [i; Position.left_pos]
         else (* only visit one side (arbitrary) *)
-          f acc l r sign [i; left_pos]
+          f acc l r sign [i; Position.left_pos]
       in fold acc (i+1)
   in fold acc 0
 
@@ -136,8 +150,8 @@ let fold_lits ?(both=true) eligible f acc lits =
 let get_equations_sides c pos = match pos with
   | idx::eq_side::[] ->
     (match c.C.hclits.(idx) with
-    | Lit.Equation (l,r,sign,_) when eq_side = left_pos -> (l, r, sign)
-    | Lit.Equation (l,r,sign,_) when eq_side = right_pos -> (r, l, sign)
+    | Lit.Equation (l,r,sign,_) when eq_side = Position.left_pos -> (l, r, sign)
+    | Lit.Equation (l,r,sign,_) when eq_side = Position.right_pos -> (r, l, sign)
     | _ -> invalid_arg "wrong side")
   | _ -> invalid_arg "wrong kind of position (list of >= 2 elements)"
 
@@ -146,10 +160,10 @@ let get_equations_sides c pos = match pos with
  * ---------------------------------------------------------------------- *)
 
 (* Helper that does one or zero superposition inference, with all
-   the given parameters. Clauses have an offset. *)
-let do_superposition ~ctx (active_clause, o_a) active_pos
-                          (passive_clause, o_p) passive_pos subst acc =
-  let ord = ctx.ctx_ord in
+   the given parameters. Clauses have an scope. *)
+let do_superposition ~ctx (active_clause, sc_a) active_pos
+                          (passive_clause, sc_p) passive_pos subst acc =
+  let ord = Ctx.ord ctx in
   assert (List.length active_pos = 2);
   Util.incr_stat stat_superposition_call;
   match passive_pos with
@@ -158,11 +172,10 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
   let active_idx = List.hd active_pos
   and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = get_equations_sides active_clause active_pos in
-  Util.debug 3 ("sup @[<hov>@[<h>%a s=%a t=%a@]@ @[<h>%a " ^^
-                                      "u=%a v=%a p=%a@]@ subst=%a@]")
-                       !C.pp_clause#pp active_clause !T.pp_term#pp s !T.pp_term#pp t
-                       !C.pp_clause#pp passive_clause !T.pp_term#pp u !T.pp_term#pp v
-                       pp_pos passive_pos S.pp_substitution subst;
+  Util.debug 3 ("sup %a s=%a t=%a \n%a u=%a v=%a p=%a subst=%a")
+                C.pp_debug active_clause T.pp s T.pp t
+                C.pp_debug passive_clause T.pp u T.pp v
+                Position.pp passive_pos S.pp subst;
   if not (T.db_closed s)
   then (Util.debug 3 "... active term is not DB-closed"; acc)
   else if not sign_st 
@@ -170,50 +183,52 @@ let do_superposition ~ctx (active_clause, o_a) active_pos
   else if not (T.atomic s) (* do not rewrite non-atomic formulas *)
   then (Util.debug 3 "... active term is not atomic or DB-closed"; acc)
   else if not (T.db_closed (T.at_pos u subterm_pos))
-    && (List.exists (fun x -> S.is_in_subst subst (x,o_p)) (T.vars (T.at_pos u subterm_pos)))
+    && (List.exists (fun x -> S.is_in_subst subst x sc_p) (T.vars (T.at_pos u subterm_pos)))
   then (Util.debug 3 "... narrowing with De Bruijn indices"; acc)
+  else if not (Ctx.check_term_term ~ctx s (T.at_pos u subterm_pos))
+  then (Util.debug 3 "... incompatible types"; acc)
   else
   let renaming = S.Renaming.create 3 in
-  let t' = S.apply_subst ~renaming subst (t, o_a)
-  and v' = S.apply_subst ~renaming subst (v, o_p) in
+  let t' = S.apply_subst ~renaming subst t sc_a
+  and v' = S.apply_subst ~renaming subst v sc_p in
   if sign_uv && t' == v' && subterm_pos = []
   then (Util.debug 3 "... will yield a tautology"; acc)
   else begin
-    if (ord.ord_compare (S.apply_subst ~renaming subst (s, o_a)) t' = Lt ||
-        ord.ord_compare (S.apply_subst ~renaming subst (u, o_p)) v' = Lt ||
-        not (BV.get (C.eligible_res (passive_clause, o_p) subst) passive_idx) ||
-        not (BV.get (C.eligible_param (active_clause, o_a) subst) active_idx))
+    if (O.compare ord (S.apply_subst ~renaming subst s sc_a) t' = Lt ||
+        O.compare ord (S.apply_subst ~renaming subst u sc_p) v' = Lt ||
+        not (BV.get (C.eligible_res (passive_clause, sc_p) subst) passive_idx) ||
+        not (BV.get (C.eligible_param (active_clause, sc_a) subst) active_idx))
       then (Util.debug 3 "... has bad ordering conditions"; acc)
       else begin (* ordering constraints are ok *)
         let lits_a = Util.array_except_idx active_clause.C.hclits active_idx in
         let lits_p = Util.array_except_idx passive_clause.C.hclits passive_idx in
         (* replace s\sigma by t\sigma in u|_p\sigma *)
-        let u' = S.apply_subst ~renaming subst (u, o_p) in
+        let u' = S.apply_subst ~renaming subst u sc_p in
         let new_u = T.replace_pos u' subterm_pos t' in
         (* apply substitution to other literals *)
         let new_lits =
           Lit.mk_lit ~ord new_u v' sign_uv :: 
-          (Literals.apply_subst_list ~renaming ~ord subst (lits_a, o_a)) @
-          (Literals.apply_subst_list ~renaming ~ord subst (lits_p, o_p))
+          (Lit.apply_subst_list ~renaming ~ord subst lits_a sc_a) @
+          (Lit.apply_subst_list ~renaming ~ord subst lits_p sc_p)
         in
         let rule = if sign_uv then "sup+" else "sup-" in
-        let proof c = Proof.mk_proof (c, rule, [active_clause.C.hcproof;
-                                       passive_clause.C.hcproof]) in
+        let proof c = Proof.mk_infer c rule
+          [active_clause.C.hcproof; passive_clause.C.hcproof] in
         let parents = [active_clause; passive_clause] in
-        let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
-        Util.debug 3 "... ok, conclusion @[<h>%a@]" !C.pp_clause#pp_h new_clause;
+        let new_clause = C.create ~parents ~ctx new_lits proof in
+        Util.debug 3 "... ok, conclusion @[<h>%a@]" C.pp_debug new_clause;
         new_clause :: acc
       end
   end
 
-let infer_active (actives : Proof.mk_proofState.active_set) clause : hclause list =
+let infer_active (actives : ProofState.ActiveSet.t) clause =
   Util.enter_prof prof_infer_active;
   let ctx = actives#ctx in
-  let offset = T.max_var clause.C.hcvars + 1 in
+  let scope = T.max_var clause.C.hcvars + 1 in
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
   let eligible_lit =
-    let bv = C.eligible_param (clause,0) S.id_subst in
+    let bv = C.eligible_param (clause,0) S.empty in
     fun i lit -> BV.get bv i
   in
   (* do the inferences where clause is active; for this,
@@ -222,23 +237,23 @@ let infer_active (actives : Proof.mk_proofState.active_set) clause : hclause lis
   let new_clauses = fold_lits ~both:true eligible_lit
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
-      actives#idx_sup_into#retrieve_unifiables offset (s,0) acc
+      I.retrieve_unifiables (actives#idx_sup_into, scope) (s,0) acc
         (fun acc u_p (hc, u_pos, u_p) subst ->
           (* rewrite u_p with s *)
           let passive = hc in
-          do_superposition ~ctx (clause, 0) s_pos (passive, offset) u_pos subst acc))
+          do_superposition ~ctx (clause, 0) s_pos (passive, scope) u_pos subst acc))
     [] clause.C.hclits
   in
   Util.exit_prof prof_infer_active;
   new_clauses
 
-let infer_passive (actives:Proof.mk_proofState.active_set) clause : hclause list =
+let infer_passive (actives:ProofState.ActiveSet.t) clause =
   Util.enter_prof prof_infer_passive;
   let ctx = actives#ctx in
-  let offset = T.max_var clause.C.hcvars + 1 in
+  let scope = T.max_var clause.C.hcvars + 1 in
   (* perform inference on this lit? *)
   let eligible =
-    let bv = C.eligible_res (clause,0) S.id_subst in
+    let bv = C.eligible_res (clause,0) S.empty in
     fun i lit -> BV.get bv i
   in
   (* do the inferences in which clause is passive (rewritten),
@@ -246,15 +261,14 @@ let infer_passive (actives:Proof.mk_proofState.active_set) clause : hclause list
   let new_clauses = fold_lits ~both:true eligible
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
-      let new_clauses = all_positions u_pos u
-        (fun u_p p ->
+      all_positions u_pos u acc
+        (fun acc u_p p ->
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
-          actives#idx_sup_from#retrieve_unifiables offset (u_p,0) acc
+          I.retrieve_unifiables (actives#idx_sup_from,scope) (u_p,0) acc
             (fun acc s (hc, s_pos, s) subst ->
               let active = hc in
-              do_superposition ~ctx (active, offset) s_pos (clause, 0) p subst acc))
-      in List.rev_append new_clauses acc)
+              do_superposition ~ctx (active, scope) s_pos (clause, 0) p subst acc)))
     [] clause.C.hclits
   in
   Util.exit_prof prof_infer_passive;
@@ -265,7 +279,7 @@ let infer_equality_resolution clause =
   let ctx = clause.C.hcctx in
   (* literals that can potentially be eligible for resolution *)
   let eligible =
-    let bv = C.eligible_res (clause,0) S.id_subst in
+    let bv = C.eligible_res (clause,0) S.empty in
     fun i lit -> Lit.is_neg lit && BV.get bv i
   in
   (* iterate on those literals *)
@@ -276,21 +290,21 @@ let infer_equality_resolution clause =
       | [] -> assert false
       | pos::_ ->
       try
-        let subst = Unif.unification S.id_subst (l,0) (r,0) in
+        let subst = Unif.unification l 0 r 0 in
         if BV.get (C.eligible_res (clause,0) subst) pos
           (* subst(lit) is maximal, we can do the inference *)
           then begin
             Util.incr_stat stat_equality_resolution_call;
-            let proof c = Proof.mk_proof (c, "eq_res", [clause.C.hcproof])
-            and new_lits = Util.array_except_idx clause.C.hclits pos in
-            let new_lits = Lit.apply_subst_list ~ord:ctx.ctx_ord subst (new_lits, 0) in
-            let new_clause = C.mk_hclause ~parents:[clause] ~ctx new_lits proof in
-            Util.debug 3 "equality resolution on @[<h>%a@] yields @[<h>%a@]"
-                          !C.pp_clause#pp clause !C.pp_clause#pp_h new_clause;
+            let proof c = Proof.mk_infer c "eq_res" [clause.C.hcproof] in
+            let new_lits = Util.array_except_idx clause.C.hclits pos in
+            let new_lits = Lit.apply_subst_list ~ord:(Ctx.ord ctx) subst new_lits 0 in
+            let new_clause = C.create ~parents:[clause] ~ctx new_lits proof in
+            Util.debug 3 "equality resolution on %a yields %a"
+              C.pp_debug clause C.pp_debug new_clause;
             new_clause::acc
           end else
             acc
-      with UnificationFailure -> acc) (* l and r not unifiable, try next *)
+      with Unif.Fail -> acc) (* l and r not unifiable, try next *)
     [] clause.C.hclits
   in
   Util.exit_prof prof_infer_equality_resolution;
@@ -299,10 +313,10 @@ let infer_equality_resolution clause =
 let infer_equality_factoring clause =
   Util.enter_prof prof_infer_equality_factoring;
   let ctx = clause.C.hcctx in
-  let ord = ctx.ctx_ord in
+  let ord = Ctx.ord ctx in
   (* is the literal eligible for paramodulation? *)
   let eligible =
-    let bv = C.eligible_param (clause,0) S.id_subst in
+    let bv = C.eligible_param (clause,0) S.empty in
     fun i lit -> BV.get bv i
   in
   (* find root terms that are unifiable with s and are not in the
@@ -316,12 +330,14 @@ let infer_equality_factoring clause =
         | Lit.Equation (u, v, true, _) ->
           let try_u =  (* try inference between s and u *)
             try
-              let subst = Unif.unification S.id_subst (s,0) (u,0) in [[i; left_pos], subst]
-            with UnificationFailure -> []
+              let subst = Unif.unification s 0 u 0 in
+              [[i; Position.left_pos], subst]
+            with Unif.Fail -> []
           and try_v =  (* try inference between s and v *)
             try
-              let subst = Unif.unification S.id_subst (s,0) (v,0) in [[i; right_pos], subst]
-            with UnificationFailure -> []
+              let subst = Unif.unification s 0 v 0 in
+              [[i; Position.right_pos], subst]
+            with Unif.Fail -> []
           in try_u @ try_v @ acc)
       [] clause.C.hclits
   (* do the inference between given positions, if ordering
@@ -332,21 +348,21 @@ let infer_equality_factoring clause =
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
-    if ord.ord_compare  (S.apply_subst subst (s,0))
-                    (S.apply_subst subst (t,0)) <> Lt &&
+    if O.compare ord  (S.apply_subst subst s 0)
+                      (S.apply_subst subst t 0) <> Lt &&
        BV.get (C.eligible_param (clause,0) subst) active_idx
       then begin
         Util.incr_stat stat_equality_factoring_call;
-        let proof c = Proof.mk_proof (c, "eq_fact", [clause.C.hcproof])
+        let proof c = Proof.mk_infer c "eq_fact" [clause.C.hcproof]
         (* new_lits: literals of the new clause. remove active literal
            and replace it by a t!=v one, and apply subst *)
         and new_lits = Util.array_except_idx clause.C.hclits active_idx in
         let new_lits = (Lit.mk_neq ~ord t v) :: new_lits in
         let renaming = S.Renaming.create 3 in
-        let new_lits = Lit.apply_subst_list ~renaming ~ord subst (new_lits,0) in
-        let new_clause = C.mk_hclause ~parents:[clause] ~ctx new_lits proof in
-        Util.debug 3 "equality factoring on @[<h>%a@] yields @[<h>%a@]"
-                      !C.pp_clause#pp clause !C.pp_clause#pp_h new_clause;
+        let new_lits = Lit.apply_subst_list ~renaming ~ord subst new_lits 0 in
+        let new_clause = C.create ~parents:[clause] ~ctx new_lits proof in
+        Util.debug 3 "equality factoring on %a yields %a"
+          C.pp_debug clause C.pp_debug new_clause;
         [new_clause]
       end else
         []
@@ -368,40 +384,37 @@ let split_count = ref 0
 let split_limit = ref 100
 
 (* union-find that maps terms to list of literals *)
-module UF = UnionFind.Make(
-  struct
-    type key = term
-    type value = literal list
-    let equal = (==)
-    let hash t = t.tag
-    let zero = []
-    let merge = List.rev_append
-  end)
+module UF = UnionFind.Make(struct
+  type key = Term.t
+  type value = Lit.t list
+  let equal = (==)
+  let hash t = t.T.tag
+  let zero = []
+  let merge = List.rev_append
+end)
 
 (** Hyper-splitting *)
-let infer_split hc =
-  let ctx = hc.C.hcctx in
-  let ord = ctx.ctx_ord in
+let infer_split c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
   (* only do splitting on large clauses *)
-  if Array.length hc.C.hclits < 4 || !split_count >= !split_limit then [] else begin
+  if Array.length c.C.hclits < 4 || !split_count >= !split_limit then [] else begin
   Util.enter_prof prof_split;
   (* get a fresh split symbol *)
   let rec next_split_term () = 
     let s = "$$split_" ^ (string_of_int !split_count) in
     incr split_count;
-    if Symbols.is_used s
-      then next_split_term ()
-      else T.mk_const (mk_symbol ~attrs:attr_split s) bool_
+    T.mk_const (Symbol.mk_symbol ~attrs:Symbol.attr_split s)
   in
   (* is the term made of a split symbol? *)
-  let is_split_term t = match t.term with
-  | Node (s, []) when has_attr attr_split s -> true
+  let is_split_term t = match t.T.term with
+  | T.Node (s, []) when Symbol.has_attr Symbol.attr_split s -> true
   | _ -> false
   in
   (* literals that are ground, or split symbols *)
   let branch = ref [] in
   (* maps variables to a list of literals *)
-  let cluster = UF.create hc.C.hcvars in
+  let cluster = UF.create c.C.hcvars in
   (* for each literal, merge the list of all variables occurring in
      the literal *)
   Array.iter
@@ -409,18 +422,19 @@ let infer_split hc =
       match Lit.vars lit with
       | [] -> ()
       | x::vars' -> List.iter (fun y -> UF.union cluster x y) vars')
-    hc.C.hclits;
+    c.C.hclits;
   (* Divide clause into components (that do not share variables and do not contain
      any split symbol), and a remaining (branch) part. Ground terms go in the "branch" part.
      [components] is a list of (vars, literal list ref), *)
   let rec find_components lits i =
     if i = Array.length lits then () else begin
       match lits.(i) with
-      | Lit.Equation (l, r, _, _) when ((is_split_term l && r == T.true_term)
-                                  ||(is_split_term r && l == T.true_term)) ->
+      | Lit.Equation (l, r, _, _) when
+      ((is_split_term l && r == T.true_term)
+      ||(is_split_term r && l == T.true_term)) ->
         branch := lits.(i) :: !branch;
         find_components lits (i+1)  (* branch part *)
-      | Lit.Equation (l, r, _, _) when T.is_ground_term l && T.is_ground_term r ->
+      | Lit.Equation (l, r, _, _) when T.is_ground l && T.is_ground r ->
         branch := lits.(i) :: !branch;
         find_components lits (i+1)  (* branch part *)
       | Lit.Equation (l, r, _, _) ->
@@ -434,11 +448,10 @@ let infer_split hc =
         find_components lits (i+1)
     end
   in
-  find_components hc.C.hclits 0;
+  find_components c.C.hclits 0;
   let components = ref [] in
   UF.iter cluster (fun _ l ->
-    Util.debug 4 "component @[<h>%a@]"
-                   (Util.pp_list Lit.pp_literal) l;
+    Util.debug 4 "component %a" (Util.pp_list Lit.pp) l;
     components := l :: !components);
   let n = List.length !components in
   if n > 1 && List.for_all (fun l -> List.length l >= 2) !components then begin
@@ -447,23 +460,24 @@ let infer_split hc =
     Util.incr_stat stat_splits;
     (* create a list of symbols *)
     let symbols = Util.times (n-1) next_split_term in
-    let proof c = Proof.mk_proof (c, "split", [hc.C.hcproof]) in
+    let proof c' = Proof.mk_infer c' "split" [c.C.hcproof] in
     (* the guard clause, plus the first component, plus all negated split symbols *)
     let guard =
-      let lits = List.map (Lit.mk_neq ~ord T.true_term) symbols @ List.hd !components @ !branch in
-      C.mk_hclause ~parents:[hc] ~ctx lits proof
+      let lits = List.map (Lit.mk_neq ~ord T.true_term) symbols
+               @ List.hd !components @ !branch in
+      C.create ~parents:[c] ~ctx lits proof
     in
     (* one new clause for each other component *)
     let new_clauses = List.map2
       (fun component split_symbol ->
         let split_lit = Lit.mk_eq ~ord split_symbol T.true_term in
         let lits = split_lit :: (component @ !branch) in
-        C.mk_hclause ~parents:[hc] ~ctx lits proof)
+        C.create ~parents:[c] ~ctx lits proof)
       (List.tl !components) symbols
     in
     let new_clauses = guard :: new_clauses in
-    Util.debug 3 "split on @[<h>%a@] yields @[<h>%a@]"
-                  !C.pp_clause#pp_h hc (Util.pp_list !C.pp_clause#pp_h) new_clauses;
+    Util.debug 3 "split on %a yields %a" C.pp_debug c
+      (Util.pp_list C.pp_debug) new_clauses;
     Util.exit_prof prof_split;
     new_clauses
   end else (Util.exit_prof prof_split; [])
@@ -473,13 +487,13 @@ let infer_split hc =
  * simplifications
  * ---------------------------------------------------------------------- *)
 
-exception RewriteInto of term * substitution
+exception RewriteInto of Term.t * Substs.t
 
 (** Compute normal form of term w.r.t active set. Clauses used to
     rewrite are added to the clauses hashset.
     restrict is an option for restricting demodulation in positive maximal terms *)
-let demod_nf ?(restrict=false) (simpl_set : PS.simpl_set) clauses t =
-  let ord = simpl_set#ctx.ctx_ord in
+let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
+  let ord = Ctx.ord simpl_set#ctx in
   let oriented_hclause hc = match hc.C.hclits with
   | [|Lit.Equation (_,_,true,Gt)|] | [|Lit.Equation (_,_,true,Lt)|] -> true (* oriented *)
   | _ -> false in
@@ -492,13 +506,13 @@ let demod_nf ?(restrict=false) (simpl_set : PS.simpl_set) clauses t =
       else begin
         (* find equations l=r that match subterm *)
         try
-          simpl_set#idx_simpl#retrieve ~sign:true 1 (t,0) ()
-            (fun () (l,_) (r,_) unit_hclause subst ->
+          UnitIdx.retrieve ~sign:true (simpl_set#idx_simpl,1) (t,0) ()
+            (fun () l r unit_hclause subst ->
               (* r is the term subterm is going to be rewritten into *)
               assert (C.is_unit_clause unit_hclause);
               if (not restrict || not (S.is_renaming subst))
               && (oriented_hclause unit_hclause ||
-                 ord.ord_compare (S.apply_subst subst (l,1)) (S.apply_subst subst (r,1)) = Gt)
+                 O.compare ord (S.apply_subst subst l 1) (S.apply_subst subst r 1) = Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
                   clauses := unit_hclause :: !clauses;
@@ -509,40 +523,45 @@ let demod_nf ?(restrict=false) (simpl_set : PS.simpl_set) clauses t =
         with RewriteInto (t', subst) ->
           traverse ~restrict subst t' 1 (* done one rewriting step, continue *)
       end
-  (* rewrite innermost-leftmost of [subst(t,offset)]. The initial offset is
+  (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
      0, but then we traverse terms in which variables are really the variables
      of the RHS of a previously applied rule (in context 1); all those
      variables are bound to terms in context 0 *)
-  and traverse ~restrict subst t offset =
-    match t.term with
-    | Var _ -> S.apply_subst subst (t, offset)
-    | BoundVar _ -> t
-    | Bind (s, a_sort, t') ->
-      let t'' = traverse ~restrict subst t' offset in
-      let new_t = T.mk_bind ~old:t s t.sort a_sort t'' in
+  and traverse ~restrict subst t scope =
+    match t.T.term with
+    | T.Var _ -> S.apply_subst subst t scope
+    | T.BoundVar _ -> t
+    | T.Bind (s, t') ->
+      let t'' = traverse ~restrict subst t' scope in
+      let new_t = T.mk_bind s t'' in
       (* rewrite term at root *)
       normal_form ~restrict new_t
-    | Node (s, l) ->
+    | T.Node (s, l) ->
       (* rewrite subterms *)
-      let l' = List.map (fun t' -> traverse ~restrict:false subst t' offset) l in
+      let l' = List.map (fun t' -> traverse ~restrict:false subst t' scope) l in
       let t' = if List.for_all2 (==) l l'
         then t
-        else T.mk_node s t.sort l' in
+        else T.mk_node s l' in
       (* rewrite term at root *)
       normal_form ~restrict t'
+    | T.At (t1, t2) ->
+      let t1' = traverse ~restrict:false subst t1 scope in
+      let t2' = traverse ~restrict:false subst t2 scope in
+      let t' = T.mk_at t1' t2' in
+      normal_form ~restrict t'
   in
-  traverse ~restrict S.id_subst t 0
+  traverse ~restrict S.empty t 0
 
 (** Demodulate the clause, with restrictions on which terms to rewrite *)
-let demodulate (simpl_set : PS.simpl_set) c =
+let demodulate (simpl_set : PS.SimplSet.t) c =
   Util.enter_prof prof_demodulate;
   Util.incr_stat stat_demodulate_call;
   let ctx = c.C.hcctx in
-  let ord = ctx.ctx_ord in
+  let ord = Ctx.ord ctx in
   (* clauses used to rewrite *)
   let clauses = ref [] in
   (* literals that are eligible for resolution *)
-  let eligible_res = C.eligible_res (c,0) S.id_subst in
+  let eligible_res = C.eligible_res (c,0) S.empty in
   (* demodulate literals *)
   let demod_lit i lit =
     match lit with
@@ -570,30 +589,30 @@ let demodulate (simpl_set : PS.simpl_set) c =
       let _ = Util.exit_prof prof_demodulate in
       c
     else begin  (* construct new clause *)
-      let proof c' = Proof.mk_proof (c', "demod", c.C.hcproof :: List.map (fun hc -> hc.C.hcproof) !clauses) in
+      let proof c' = Proof.mk_infer c' "demod"
+        (c.C.hcproof :: List.map (fun hc -> hc.C.hcproof) !clauses) in
       let parents = c :: c.C.hcparents in
-      let new_hc = C.mk_hclause_a ~parents ~ctx lits proof in
-      Util.debug 3 "@[<h>demodulate %a into %a using @[<hv>%a@]@]"
-                     !C.pp_clause#pp c !C.pp_clause#pp_h new_hc
-                     (Util.pp_list !C.pp_clause#pp_h) !clauses;
+      let new_c = C.create_a ~parents ~ctx lits proof in
+      Util.debug 3 "demodulate %a into %a using\n %a"
+        C.pp_debug c C.pp_debug new_c (Util.pp_list C.pp_debug) !clauses;
       (* return simplified clause *)
       Util.exit_prof prof_demodulate;
-      new_hc
+      new_c
     end
 
 (** Find clauses that [given] may demodulate, add them to set *)
-let backward_demodulate (active_set : PS.active_set) set given =
+let backward_demodulate (active_set : PS.ActiveSet.t) set given =
   Util.enter_prof prof_back_demodulate;
   let ctx = given.C.hcctx in
-  let ord = ctx.ctx_ord in
-  let offset = T.max_var given.C.hcvars + 1 in
+  let ord = Ctx.ord ctx in
+  let scope = T.max_var given.C.hcvars + 1 in
   (* find clauses that might be rewritten by l -> r *)
   let recurse ~oriented set l r =
-    active_set#idx_back_demod#retrieve_specializations offset (l,0) set
+    I.retrieve_specializations (active_set#idx_back_demod,scope) (l,0) set
       (fun set t' (hc, _, _) subst ->
         (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
         if oriented
-        || ord.ord_compare (S.apply_subst subst (l,0)) (S.apply_subst subst (r,0)) = Gt
+        || O.compare ord (S.apply_subst subst l 0) (S.apply_subst subst r 0) = Gt
           then  (* add the clause to the set, it may be rewritten by l -> r *)
             C.CSet.add set hc
           else set)
@@ -610,7 +629,7 @@ let backward_demodulate (active_set : PS.active_set) set given =
   Util.exit_prof prof_back_demodulate;
   set'
 
-let is_tautology hc =
+let is_tautology c =
   let rec check lits i =
     if i = Array.length lits then false
     else match lits.(i) with
@@ -618,17 +637,15 @@ let is_tautology hc =
     | Lit.Equation (l, r, sign, _) ->
       Util.array_exists
         (fun (Lit.Equation (l', r', sign', _)) ->
-          (sign = not sign') &&
-          (((T.eq_term l l') && (T.eq_term r r')) ||
-          ((T.eq_term l r') && (T.eq_term l' r))))
+          (sign = not sign') && ((T.eq l l' && T.eq r r') || (T.eq l r' && T.eq l' r)))
         lits
       || check lits (i+1)
   in
-  let is_tauto = check hc.C.hclits 0 in
-  (if is_tauto then
-    Util.debug 3 "@[<h>%a@] is a tautology" !C.pp_clause#pp_h hc);
+  let is_tauto = check c.C.hclits 0 in
+  (if is_tauto then Util.debug 3 "%a is a tautology" C.pp_debug c);
   is_tauto
 
+(* TODO: create CC on terms here? This function is seldom used...
 (** semantic tautology deletion, using a congruence closure algorithm
     to see if negative literals imply some positive literal *)
 let is_semantic_tautology c =
@@ -657,18 +674,21 @@ let is_semantic_tautology c =
     end);
   Util.exit_prof prof_semantic_tautology;
   res
+*)
 
-let basic_simplify hc =
+let basic_simplify c =
   Util.enter_prof prof_basic_simplify;
-  let ctx = hc.C.hcctx in
-  let ord = ctx.ctx_ord in
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
   Util.incr_stat stat_basic_simplify;
   let absurd_lit lit = match lit with
-  | Lit.Equation (l, r, false, _) when T.eq_term l r -> true
-  | Lit.Equation (l, r, true, _) when (l == T.true_term && r == T.false_term)
-                               || (l == T.false_term && r == T.true_term) -> true
-  | _ -> false in
-  let lits = Array.to_list hc.C.hclits in
+  | Lit.Equation (l, r, false, _) when T.eq l r -> true
+  | Lit.Equation (l, r, true, _)
+    when (l == T.true_term && r == T.false_term)
+      || (l == T.false_term && r == T.true_term) -> true
+  | _ -> false
+  in
+  let lits = Array.to_list c.C.hclits in
   (* remove s!=s literals *)
   let new_lits = List.filter (fun lit -> not (absurd_lit lit)) lits in
   (* remove duplicate literals *)
@@ -681,32 +701,31 @@ let basic_simplify hc =
         assert (not sign);
         assert (T.is_var l || T.is_var r);
         try
-          let subst = Unif.unification S.id_subst (l,0) (r,0) in
+          let subst = Unif.unification l 0 r 0 in
           (* remove the literal, and apply the substitution to the remaining literals
              before trying to find another x!=t *)
-          er (Lit.apply_subst_list ~ord subst ((Util.list_remove lits i),0))
-        with UnificationFailure -> lits
+          er (Lit.apply_subst_list ~ord subst (Util.list_remove lits i) 0)
+        with Unif.Fail -> lits
   (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
   and er_check (Lit.Equation (l, r, sign, _)) = (not sign) && (T.is_var l || T.is_var r) in
   let new_lits = er new_lits in
-  if List.length new_lits = Array.length hc.C.hclits
-  then (Util.exit_prof prof_basic_simplify; hc) (* no change *)
+  if List.length new_lits = Array.length c.C.hclits
+  then (Util.exit_prof prof_basic_simplify; c) (* no change *)
   else begin
-    let proof = C.adapt_proof hc.C.hcproof in  (* do not bother printing this *)
-    let parents = hc :: hc.C.hcparents in
-    let new_clause = C.mk_hclause ~parents ~ctx new_lits proof in
-    Util.debug 3 "@[<hov 4>@[<h>%a@]@ basic_simplifies into @[<h>%a@]@]"
-                   !C.pp_clause#pp_h hc !C.pp_clause#pp_h new_clause;
+    let proof = C.adapt_proof c.C.hcproof in  (* do not bother printing this *)
+    let parents = c :: c.C.hcparents in
+    let new_clause = C.create ~parents ~ctx new_lits proof in
+    Util.debug 3 "%a basic_simplifies into %a" C.pp_debug c C.pp_debug new_clause;
     Util.exit_prof prof_basic_simplify;
     new_clause
   end
 
-exception FoundMatch of (term * hclause * substitution)
+exception FoundMatch of Term.t * Clause.t * Substs.t
 
-let positive_simplify_reflect (simpl_set : PS.simpl_set) c =
+let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   Util.enter_prof prof_pos_simplify_reflect;
   let ctx = c.C.hcctx in
-  let offset = T.max_var c.C.hcvars + 1 in
+  let scope = T.max_var c.C.hcvars + 1 in
   (* iterate through literals and try to resolve negative ones *)
   let rec iterate_lits acc lits clauses = match lits with
   | [] -> List.rev acc, clauses
@@ -721,9 +740,10 @@ let positive_simplify_reflect (simpl_set : PS.simpl_set) c =
   (** try to make the terms equal using some positive unit clauses
       from active_set *)
   and equatable_terms clauses t1 t2 =
-    match t1.term, t2.term with
-    | _ when T.eq_term t1 t2 -> Some clauses  (* trivial *)
-    | Node (f, ss), Node (g, ts) when f == g && List.length ss = List.length ts ->
+    match t1.T.term, t2.T.term with
+    | _ when T.eq t1 t2 -> Some clauses  (* trivial *)
+    | T.Node (f, ss), T.Node (g, ts)
+    when Symbol.eq f g && List.length ss = List.length ts ->
       (* try to make the terms equal directly *)
       (match equate_root clauses t1 t2 with
       | None -> (* otherwise try to make subterms pairwise equal *)
@@ -741,35 +761,33 @@ let positive_simplify_reflect (simpl_set : PS.simpl_set) c =
     | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
   (** try to equate terms with a positive unit clause that match them *)
   and equate_root clauses t1 t2 =
-    try simpl_set#idx_simpl#retrieve ~sign:true offset (t1,0) ()
-      (fun () l (r,_) hc subst ->
-        if t2 == (S.apply_subst subst (r,offset))
+    try UnitIdx.retrieve ~sign:true (simpl_set#idx_simpl,scope) (t1,0) ()
+      (fun () l r c' subst ->
+        if t2 == (S.apply_subst subst r scope)
         then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
-          Util.debug 4 "equate %a and %a using %a"
-                      !T.pp_term#pp t1 !T.pp_term#pp t2 !C.pp_clause#pp_h hc;
-          raise (FoundMatch (r, hc, subst)) (* success *)
+          Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp_debug c';
+          raise (FoundMatch (r, c', subst)) (* success *)
         end else ());
       None (* no match *)
-    with FoundMatch (r, hc, subst) ->
-      Some (hc.C.hcproof :: clauses)  (* success *)
+    with FoundMatch (r, c', subst) ->
+      Some (c'.C.hcproof :: clauses)  (* success *)
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Array.to_list c.C.hclits) [] in
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_pos_simplify_reflect; c) (* no literal removed, keep c *)
     else 
-      let proof c' = Proof.mk_proof (c', "simplify_reflect+", c.C.hcproof::premises) in
+      let proof c' = Proof.mk_infer c' "simplify_reflect+" (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
-      let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      Util.debug 3 "@[<h>%a pos_simplify_reflect into %a@]"
-                    !C.pp_clause#pp c !C.pp_clause#pp_h new_hc;
+      let new_c = C.create ~parents ~ctx lits proof in
+      Util.debug 3 "%a pos_simplify_reflect into %a" C.pp_debug c C.pp_debug new_c;
       Util.exit_prof prof_pos_simplify_reflect;
-      new_hc
+      new_c
     
-let negative_simplify_reflect (simpl_set : PS.simpl_set) c =
+let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   Util.enter_prof prof_neg_simplify_reflect;
   let ctx = c.C.hcctx in
-  let offset = T.max_var c.C.hcvars + 1 in
+  let scope = T.max_var c.C.hcvars + 1 in
   (* iterate through literals and try to resolve positive ones *)
   let rec iterate_lits acc lits clauses = match lits with
   | [] -> List.rev acc, clauses
@@ -783,47 +801,45 @@ let negative_simplify_reflect (simpl_set : PS.simpl_set) c =
   | lit::lits' -> iterate_lits (lit::acc) lits' clauses
   (** try to remove the literal using a negative unit clause *)
   and can_refute s t =
-    try simpl_set#idx_simpl#retrieve ~sign:false offset (s,0) ()
-      (fun () l (r,_) hc subst ->
-        if t == (S.apply_subst subst (r,offset))
+    try UnitIdx.retrieve ~sign:false (simpl_set#idx_simpl,scope) (s,0) ()
+      (fun () l r c' subst ->
+        if t == (S.apply_subst subst r scope)
         then begin
-          Util.debug 3 "neg_reflect eliminates %a=%a with %a"
-                         !T.pp_term#pp s !T.pp_term#pp t !C.pp_clause#pp_h hc;
-          raise (FoundMatch (r, hc, subst)) (* success *)
+          Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp_debug c';
+          raise (FoundMatch (r, c', subst)) (* success *)
         end else ());
       None (* no match *)
-    with FoundMatch (r, hc, subst) ->
-      Some hc.C.hcproof  (* success *)
+    with FoundMatch (r, c', subst) ->
+      Some c'.C.hcproof  (* success *)
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] (Array.to_list c.C.hclits) [] in
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_neg_simplify_reflect; c) (* no literal removed *)
     else 
-      let proof c' = Proof.mk_proof (c', "simplify_reflect-", c.C.hcproof::premises) in
+      let proof c' = Proof.mk_infer c' "simplify_reflect-" (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
-      let new_hc = C.mk_hclause ~parents ~ctx lits proof in
-      Util.debug 3 "@[<h>%a neg_simplify_reflect into %a@]"
-                    !C.pp_clause#pp c !C.pp_clause#pp_h new_hc;
+      let new_c = C.create ~parents ~ctx lits proof in
+      Util.debug 3 "%a neg_simplify_reflect into %a" C.pp_debug c C.pp_debug new_c;
       Util.exit_prof prof_neg_simplify_reflect;
-      new_hc
+      new_c
 
 (* ----------------------------------------------------------------------
  * subsumption
  * ---------------------------------------------------------------------- *)
 
 (** raised when a subsuming substitution is found *)
-exception SubsumptionFound of substitution
+exception SubsumptionFound of Substs.t
 
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
     substitutions s such that s(lit_a) = lit_b and s contains subst. The list
     is empty if lit_a does not subsume lit_b. *)
-let match_lits subst (lit_a, o_a) (lit_b, o_b) =
+let match_lits subst lit_a sc_a lit_b sc_b =
   (* match t1 with t2, then t1' with t2' *)
   let match4 subst t1 t2 t1' t2' =
-    try let subst' = Unif.matching subst (t1,o_a) (t2,o_b) in
-        [Unif.matching subst' (t1',o_a) (t2',o_b)]
-    with UnificationFailure -> []
+    try let subst = Unif.matching ~subst t1 sc_a t2 sc_b in
+        [Unif.matching ~subst t1' sc_a t2' sc_b]
+    with Unif.Fail -> []
   in
   match lit_a, lit_b with
   | Lit.Equation (_, _, signa, _), Lit.Equation (_, _, signb, _)
@@ -838,11 +854,11 @@ let match_lits subst (lit_a, o_a) (lit_b, o_b) =
     (match4 subst la lb ra rb) @ (match4 subst la rb ra lb)
 
 (** check that every literal in a matches at least one literal in b *)
-let all_lits_match (a,o_a) (b,o_b) =
+let all_lits_match a sc_a b sc_b =
   Util.array_forall
     (fun lita ->
       Util.array_exists
-        (fun litb -> match_lits S.id_subst (lita,o_a) (litb,o_b) <> [])
+        (fun litb -> match_lits S.empty lita sc_a litb sc_b <> [])
         b)
     a
 
@@ -850,13 +866,16 @@ let all_lits_match (a,o_a) (b,o_b) =
     We sort by increasing order, so non-ground, deep, heavy literals are smaller
     (thus tested early) *)
 let compare_literals_subsumption lita litb =
-  let rec is_ground (Lit.Equation (l,r,_,_)) = T.is_ground_term l && T.is_ground_term r
-  and depth (Lit.Equation (l,r,_,_)) = max (term_depth l) (term_depth r)
-  and term_depth t = match t.term with
-    | Var _ | BoundVar _ -> 1
-    | Bind (_, _, t') -> 1 + term_depth t'
-    | Node (_, l) -> 1 + List.fold_left (fun m t' -> max m (term_depth t')) 0 l
-  and size (Lit.Equation (l,r,_,_)) = l.tsize + r.tsize
+  let rec is_ground (Lit.Equation (l,r,_,_)) =
+    T.is_ground l && T.is_ground r
+  and depth (Lit.Equation (l,r,_,_)) =
+    max (term_depth l) (term_depth r)
+  and term_depth t = match t.T.term with
+    | T.Var _ | T.BoundVar _ -> 1
+    | T.Bind (_, t') -> 1 + term_depth t'
+    | T.Node (_, l) -> 1 + List.fold_left (fun m t' -> max m (term_depth t')) 0 l
+    | T.At (t1, t2) -> 1 + max (term_depth t1) (term_depth t2)
+  and size (Lit.Equation (l,r,_,_)) = l.T.tsize + r.T.tsize
   in
   (* ground literal is bigger *)
   if is_ground lita && not (is_ground litb) then 1
@@ -871,12 +890,12 @@ let compare_literals_subsumption lita litb =
 
 (** Check whether [a] subsumes [b], and if it does, return the
     corresponding substitution *)
-let subsumes_with (a,o_a) (b,o_b) =
+let subsumes_with (a,sc_a) (b,sc_b) =
   Util.incr_stat stat_subsumption_call;
   (* a must not have more literals *)
   if Array.length a > Array.length b then None else
   (* variables that cannot be bound during subsumption *)
-  if not (all_lits_match (a,o_a) (b,o_b)) then None else
+  if not (all_lits_match a sc_a b sc_b) then None else
   (* sort a copy of [a] by decreasing difficulty *)
   let a = Array.copy a in
   (* try to subsumes literals of b whose index are not in bv, with [subst] *)
@@ -891,7 +910,7 @@ let subsumes_with (a,o_a) (b,o_b) =
     else if BV.get bv j then find_matched lita i subst bv (j+1) else begin
     let litb = b.(j) in
     (* match lita and litb, then flag litb as used, and try with next literal of a *)
-    let substs = match_lits subst (lita,o_a) (litb,o_b) in
+    let substs = match_lits subst lita sc_a litb sc_b in
     let bv' = BV.set bv j in
     List.iter (fun subst' -> try_permutations (i+1) subst' bv') substs;
     (* some variable of lita occur in a[j+1...], try another literal of b *)
@@ -902,7 +921,7 @@ let subsumes_with (a,o_a) (b,o_b) =
   (* does some literal in a[j...] contain a variable in l or r? *)
   and check_vars lit j =
     if j = Array.length a then false else match lit, a.(j) with
-    | Lit.Equation (l, r, _, _), _ when T.is_ground_term l && T.is_ground_term r -> false
+    | Lit.Equation (l, r, _, _), _ when T.is_ground l && T.is_ground r -> false
     | Lit.Equation (l, r, _, _), Lit.Equation (l', r',_,_) ->
       let vars = T.vars_list [l;r] in
       if (List.exists (fun v -> T.var_occurs v l' || T.var_occurs v r') vars)
@@ -911,14 +930,14 @@ let subsumes_with (a,o_a) (b,o_b) =
   in
   try
     Array.sort compare_literals_subsumption a;
-    try_permutations 0 S.id_subst BV.empty;
+    try_permutations 0 S.empty BV.empty;
     None
   with (SubsumptionFound subst) -> Some subst
 
 let subsumes a b =
   Util.enter_prof prof_subsumption;
-  let offset = T.max_var (Lit.vars_lits a) + 1 in  (* TODO offset=1 *)
-  let res = match subsumes_with (a,0) (b,offset) with
+  let scope = T.max_var (Lit.vars_lits a) + 1 in  (* TODO scope=1 *)
+  let res = match subsumes_with (a,0) (b,scope) with
   | None -> false
   | Some _ ->
     Util.debug 2 "%% @[<h>%a subsumes %a@]" Lit.pp_lits a Lit.pp_lits b;
@@ -929,7 +948,7 @@ let subsumes a b =
   res
 
 let eq_subsumes a b =
-  let offset = T.max_var (Lit.vars_lits b) + 1 in
+  let scope = T.max_var (Lit.vars_lits b) + 1 in
   (* subsume a literal using a = b *)
   let rec equate_lit_with a b lit =
     match lit with
@@ -937,20 +956,23 @@ let eq_subsumes a b =
     | _ -> false
   (* make u and v equal using a = b (possibly several times) *)
   and equate_terms a b u v =
-    match u.term, v.term with
+    match u.T.term, v.T.term with
     | _ when u == v -> true 
     | _ when equate_root a b u v -> true
-    | Node (f, ss), Node (g, ts) when f == g && List.length ss = List.length ts ->
+    | T.Node (f, ss), T.Node (g, ts)
+    when Symbol.eq f g && List.length ss = List.length ts ->
       List.for_all2 (equate_terms a b) ss ts
+    | T.At (t11, t12), T.At (t21, t22) ->
+      equate_terms a b t11 t21 && equate_terms a b t12 t22
     | _ -> false
   (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
   and equate_root a b u v =
-        (try let subst = Unif.matching S.id_subst (a,offset) (u,0) in
-              S.apply_subst subst (b,offset) == v
-         with UnificationFailure -> false)
-    ||  (try let subst = Unif.matching S.id_subst (b,offset) (u,0) in
-              S.apply_subst subst (a,offset) == v
-         with UnificationFailure -> false)
+        (try let subst = Unif.matching a scope u 0 in
+              S.apply_subst subst b scope == v
+         with Unif.Fail -> false)
+    ||  (try let subst = Unif.matching b scope u 0 in
+              S.apply_subst subst a scope == v
+         with Unif.Fail -> false)
   in
   (* check for each literal *)
   Util.enter_prof prof_eq_subsumption;
@@ -958,8 +980,7 @@ let eq_subsumes a b =
   let res = match a with
   | [|Lit.Equation (s, t, true, _)|] ->
     let res = Util.array_exists (equate_lit_with s t) b in
-    (if res then Util.debug 3 "@[<h>%a eq-subsumes@ %a@]"
-                                Lit.pp_lits a Lit.pp_lits b);
+    (if res then Util.debug 3 "%a eq-subsumes %a"  Lit.pp_lits a Lit.pp_lits b);
     res
   | _ -> false  (* only a positive unit clause unit-subsumes a clause *)
   in
@@ -973,13 +994,13 @@ let subsumed_by_set set c =
   let try_eq_subsumption = Util.array_exists Lit.equational c.C.hclits in
   (* use feature vector indexing *)
   try
-    set#idx_fv#retrieve_subsuming c.C.hclits
-      (fun hc' -> if (try_eq_subsumption && eq_subsumes hc'.C.hclits c.C.hclits)
-                  || subsumes hc'.C.hclits c.C.hclits then raise Exit);
+    SubsumIdx.retrieve_subsuming_c set#idx_fv c ()
+      (fun () c' -> if (try_eq_subsumption && eq_subsumes c'.C.hclits c.C.hclits)
+                    || subsumes c'.C.hclits c.C.hclits then raise Exit);
     Util.exit_prof prof_subsumption_set;
     false
   with Exit ->
-    Util.debug 3 "@[<h>%a@] subsumed by active set" !C.pp_clause#pp c;
+    Util.debug 3 "%a subsumed by active set" C.pp_debug c;
     Util.exit_prof prof_subsumption_set;
     true
 
@@ -990,9 +1011,9 @@ let subsumed_in_set set c =
   let try_eq_subsumption = C.is_unit_clause c && Lit.is_pos c.C.hclits.(0) in
   (* use feature vector indexing *)
   let l = ref [] in
-  set#idx_fv#retrieve_subsumed c.C.hclits
-    (fun hc' -> if (try_eq_subsumption && eq_subsumes c.C.hclits hc'.C.hclits)
-                || subsumes c.C.hclits hc'.C.hclits then l := hc' :: !l);
+  SubsumIdx.retrieve_subsumed_c set#idx_fv c ()
+    (fun () hc' -> if (try_eq_subsumption && eq_subsumes c.C.hclits hc'.C.hclits)
+                    || subsumes c.C.hclits hc'.C.hclits then l := hc' :: !l);
   Util.exit_prof prof_subsumption_in_set;
   !l
 
@@ -1007,13 +1028,15 @@ let rec num_equational lits i =
  * contextual literal cutting
  * ---------------------------------------------------------------------- *)
 
-exception RemoveLit of int * hclause
+exception RemoveLit of int * Clause.t
 
 (** Performs successive contextual literal cuttings *)
 let rec contextual_literal_cutting active_set c =
   Util.enter_prof prof_clc;
   let ctx = c.C.hcctx in
-  if Array.length c.C.hclits <= 1 || num_equational c.C.hclits 0 > 3 || Array.length c.C.hclits > 8
+  if Array.length c.C.hclits <= 1
+  || num_equational c.C.hclits 0 > 3
+  || Array.length c.C.hclits > 8
     then (Util.exit_prof prof_clc; c) else
   (* do we need to try to use equality subsumption? *)
   let try_eq_subsumption = Util.array_exists Lit.equational c.C.hclits in
@@ -1024,9 +1047,9 @@ let rec contextual_literal_cutting active_set c =
         (* negate literal *)
         lits.(i) <- Lit.negate lits.(i);
         (* test for subsumption *)
-        active_set#idx_fv#retrieve_subsuming lits
-          (fun c' -> if (try_eq_subsumption && eq_subsumes c'.C.hclits lits)
-                      || subsumes c'.C.hclits lits
+        SubsumIdx.retrieve_subsuming active_set#idx_fv (Lit.lits_to_seq lits) ()
+          (fun () c' -> if (try_eq_subsumption && eq_subsumes c'.C.hclits lits)
+                        || subsumes c'.C.hclits lits
              (* some clause subsumes the literals with i-th literal flipped *)
              then (lits.(i) <- Lit.negate lits.(i); raise (RemoveLit (i, c'))));
         (* restore literal *)
@@ -1042,21 +1065,21 @@ let rec contextual_literal_cutting active_set c =
   | Some (new_lits, c') -> begin
       (* hc' allowed us to cut a literal *)
       assert (List.length new_lits + 1 = Array.length c.C.hclits);
-      let proof c'' = Proof.mk_proof (c'', "clc", [c.C.hcproof; c'.C.hcproof]) in
+      let proof c'' = Proof.mk_infer c'' "clc" [c.C.hcproof; c'.C.hcproof] in
       let parents = c :: c.C.hcparents in
-      let new_hc = C.mk_hclause ~parents ~ctx new_lits proof in
-      Util.debug 3 "@[<h>contextual literal cutting in %a using %a gives %a@]"
-                    !C.pp_clause#pp_h c !C.pp_clause#pp_h c' !C.pp_clause#pp_h new_hc;
+      let new_c = C.create ~parents ~ctx new_lits proof in
+      Util.debug 3 "contextual literal cutting in %a using %a gives\n\t%a"
+        C.pp_debug c C.pp_debug c' C.pp_debug new_c;
       (* try to cut another literal *)
       Util.exit_prof prof_clc; 
-      contextual_literal_cutting active_set new_hc
+      contextual_literal_cutting active_set new_c
     end
 
 (* ----------------------------------------------------------------------
  * contraction
  * ---------------------------------------------------------------------- *)
 
-exception CondensedInto of literal array * substitution
+exception CondensedInto of Lit.t array * Substs.t
 
 (** performs condensation on the clause. It looks for two literals l1 and l2 of same
     sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then
@@ -1064,29 +1087,29 @@ exception CondensedInto of literal array * substitution
     If there are too many equational literals, the simplification is disabled to
     avoid pathologically expensive subsumption checks.
     TODO remove this limitation after an efficient subsumption check is implemented. *)
-let rec condensation hc =
+let rec condensation c =
   Util.enter_prof prof_condensation;
-  let ctx = hc.C.hcctx in
-  if Array.length hc.C.hclits <= 1 || num_equational hc.C.hclits 0 > 3 || Array.length hc.C.hclits > 8
-    then (Util.exit_prof prof_condensation; hc) else
-  (* offset is used to rename literals for subsumption *)
-  let lits = hc.C.hclits in
+  let ctx = c.C.hcctx in
+  if Array.length c.C.hclits <= 1 || num_equational c.C.hclits 0 > 3 || Array.length c.C.hclits > 8
+    then (Util.exit_prof prof_condensation; c) else
+  (* scope is used to rename literals for subsumption *)
+  let lits = c.C.hclits in
   let n = Array.length lits in
   try
     for i = 0 to n - 1 do
       let lit = lits.(i) in
       for j = i+1 to n - 1 do
         let lit' = lits.(j) in
-        (* try to match lit with lit' (and vice versa), then check if subst(hc) subsumes hc *)
-        let substs =  match_lits S.id_subst (lit,0) (lit',0) @
-                      match_lits S.id_subst (lit',0) (lit,0) in
+        (* try to match lit with lit' (and vice versa), then check if subst(c) subsumes c *)
+        let substs = match_lits S.empty lit 0 lit' 0 @
+                     match_lits S.empty lit' 0 lit 0 in
         List.iter
           (fun subst ->
             let new_lits = Array.sub lits 0 (n - 1) in
             (if i <> n-1 then new_lits.(i) <- lits.(n-1));  (* remove i-th lit *)
             let renaming = S.Renaming.create 3 in
-            let ord = ctx.ctx_ord in
-            let new_lits = Lit.apply_subst_lits ~renaming ~ord subst (new_lits,0) in
+            let ord = Ctx.ord ctx in
+            let new_lits = Lit.apply_subst_lits ~renaming ~ord subst new_lits 0 in
             (* check subsumption *)
             if subsumes new_lits lits
               then raise (CondensedInto (new_lits, subst)))
@@ -1094,53 +1117,63 @@ let rec condensation hc =
       done;
     done;
     Util.exit_prof prof_condensation; 
-    hc
+    c
   with CondensedInto (new_lits, subst) ->
     (* clause is simplified *)
-    let proof c = Proof.mk_proof (c, "condensation", [hc.C.hcproof]) in
-    let parents = hc :: hc.C.hcparents in
-    let new_hc = C.mk_hclause_a ~parents ~ctx new_lits proof in
-    Util.debug 3 "@[<h>condensation in %a (with %a) gives %a@]"
-                  !C.pp_clause#pp_h hc S.pp_substitution subst !C.pp_clause#pp_h new_hc;
+    let proof c' = Proof.mk_infer c' "condensation" [c.C.hcproof] in
+    let parents = c :: c.C.hcparents in
+    let new_c = C.create_a ~parents ~ctx new_lits proof in
+    Util.debug 3 "condensation in %a (with %a) gives\n\t %a"
+      C.pp_debug c S.pp subst C.pp_debug new_c;
     (* try to condense further *)
     Util.exit_prof prof_condensation; 
-    condensation new_hc
+    condensation new_c
 
 (** {2 Contributions to Env} *)
 
+(* wrapper of Cnf for the clause [c] *)
+let cnf_of ~ctx c =
+  let ord = Ctx.ord ctx in
+  let t = Lit.term_of_lits c.C.hclits in
+  (* conversion to CNF *)
+  let clauses = Cnf.cnf_of ~ctx:(Ctx.skolem_ctx ~ctx) t in
+  (* construction of clauses *)
+  List.map
+    (fun lits ->
+      let lits = Lit.lits_of_terms ~ord lits in
+      let proof c' = Proof.mk_infer c' "elim" [c.C.hcproof] in
+      C.create_a ~ctx lits proof)
+    clauses
+
 let setup_env ~env =
-  let rw_simplify (simpl : PS.simpl_set) hc =
-    let hc = basic_simplify (demodulate simpl hc) in
-    let hc = positive_simplify_reflect simpl hc in
-    let hc = negative_simplify_reflect simpl hc in
-    hc
-  and active_simplify actives hc =
+  let rw_simplify (simpl : PS.SimplSet.t) c =
+    let c = basic_simplify (demodulate simpl c) in
+    let c = positive_simplify_reflect simpl c in
+    let c = negative_simplify_reflect simpl c in
+    c
+  and active_simplify actives c =
     (* condensation *)
-    let hc = condensation hc in
+    let c = condensation c in
     (* contextual literal cutting *)
-    let hc = contextual_literal_cutting actives hc in
-    hc
-  and backward_simplify actives hc =
+    let c = contextual_literal_cutting actives c in
+    c
+  and backward_simplify actives c =
     let set = C.CSet.empty in
-    backward_demodulate actives set hc
+    backward_demodulate actives set c
   and redundant = subsumed_by_set
   and backward_redundant = subsumed_in_set
-  and list_simplify hc =
-    if is_tautology hc then [] else [hc]
+  and list_simplify c =
+    if is_tautology c then [] else [c]
   and is_trivial = is_tautology
   and constrs =
-    [Precedence.min_constraint [split_symbol; false_symbol; true_symbol]]
+    [Precedence.min_constraint
+      [Symbol.split_symbol; Symbol.false_symbol; Symbol.true_symbol]]
   and preprocess ~ctx l =
     List.fold_left
-      (fun acc hc ->
+      (fun acc c ->
         (* reduction to CNF *)
-        let clauses = Cnf.cnf_of hc in
-        List.fold_left
-          (fun acc hc ->
-            let hc = C.clause_of_fof (C.update_ctx ~ctx hc) in
-            let hc = basic_simplify hc in
-            if is_tautology hc then acc else hc :: acc)
-          acc clauses)
+        let clauses = cnf_of ~ctx c in
+        List.filter (fun c -> not (is_tautology c)) clauses)
       [] l
   in
   Env.add_binary_inf ~env "superposition_passive" infer_passive;

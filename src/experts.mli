@@ -43,8 +43,8 @@ type t = {
   expert_clauses : Clause.t list;        (** Additional axioms *)
   expert_canonize : Term.t -> Term.t;       (** Get a canonical form of the term *)
   expert_ord : Ordering.t -> bool;        (** Compatible with ord? *)
-  expert_update_ctx : Clause.context -> t list;(** How to update the context *)
-  expert_ctx : Clause.context;                 (** Context used by the expert *)
+  expert_update_ctx : Ctx.t -> t list;    (** How to update the context *)
+  expert_ctx : Ctx.t;                 (** Context used by the expert *)
   expert_solve : ((Term.t*Term.t) list -> Substs.t list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
@@ -53,7 +53,7 @@ type t = {
 val compatible_ord : t -> ord:Ordering.t -> bool
   (** Check whether using this expert is possible in the given ordering *)
 
-val update_ctx : t -> ctx:Clause.context -> t list
+val update_ctx : t -> ctx:Ctx.t -> t list
   (** Copy of the expert, that uses the new context. The expert
       can be broken into several experts (in case it was a combination
       that is no longer possible with the new ordering) *)
@@ -97,7 +97,7 @@ module Set : sig
   type t
     (** A set of experts *)
 
-  val empty : ctx:Clause.context -> t
+  val empty : ctx:Ctx.t -> t
 
   val add : t -> expert -> t
 
@@ -110,7 +110,7 @@ module Set : sig
 
   val iter : t -> (expert -> unit) -> unit
 
-  val update_ctx : t -> ctx:Clause.context -> t
+  val update_ctx : t -> ctx:Ctx.t -> t
 
   val is_redundant : t -> Clause.t -> bool
 
@@ -146,7 +146,7 @@ val compatible_gc : ord:Ordering.t -> gnd_convergent -> bool
 val ground_pair : Term.t -> Term.t -> Term.t * Term.t
   (** Replace variables of terms by fresh constants *)
 
-val gc_expert : ctx:Clause.context -> gnd_convergent -> t
+val gc_expert : ctx:Ctx.t -> gnd_convergent -> t
   (** From a set of ground convergent equations, create an expert for
       the associated theory. *)
 
@@ -156,5 +156,5 @@ val fmt_gc : Format.formatter -> gnd_convergent -> unit
 
 (** {2 Some builtin theories} *)
 
-val ac : ctx:Clause.context -> Symbol.t -> t
+val ac : ctx:Ctx.t -> Symbol.t -> t
   (** Theory of Associative-Commutative symbols, for the given symbol *)

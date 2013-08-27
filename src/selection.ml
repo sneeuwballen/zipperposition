@@ -82,7 +82,7 @@ let select_complex ~strict ~ord lits =
   let rec find_neg_ground best_diff best_i lits i =
     if i = Array.length lits then best_i else
     match lits.(i) with
-    | Literal.Equation (l, r, false, _) when T.is_ground_term l && T.is_ground_term r ->
+    | Literal.Equation (l, r, false, _) when T.is_ground l && T.is_ground r ->
       let diff = abs (T.size l - T.size r) in
       if diff > best_diff
         then find_neg_ground diff i lits (i+1)
