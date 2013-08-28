@@ -76,11 +76,9 @@ val min_constraint : Symbol.t list -> constr
 val alpha_constraint : constr
   (** regular (alphabetic) ordering on symbols *)
 
-(* ----------------------------------------------------------------------
- * Creation of a precedence (symbol_ordering) from constraints
- * ---------------------------------------------------------------------- *)
+(** {2 Creation of a precedence from constraints} *)
 
-val mk_precedence : ?complete:bool -> constr list -> Symbol.t list -> t
+val create : ?complete:bool -> constr list -> Symbol.t list -> t
   (** make a precedence from the given constraints. First constraints are
       more important than later constraints. Only the very first constraint
       is assured to be totally satisfied.
@@ -88,9 +86,6 @@ val mk_precedence : ?complete:bool -> constr list -> Symbol.t list -> t
       If [complete] is true (default) the symbol list is completed using
       special symbols. *)
 
-val default_precedence : Signature.t -> t
+val default : Signature.t -> t
   (** default precedence on the given signature *)
 
-(* ----------------------------------------------------------------------
- * Heuristic creation of precedences
- * ---------------------------------------------------------------------- *)

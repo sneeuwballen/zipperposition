@@ -173,9 +173,7 @@ let weight_modarity signature a =
 (** constant weight *)
 let weight_constant a = 4
 
-(* ----------------------------------------------------------------------
- * Creation of a precedence (symbol_ordering) from constraints
- * ---------------------------------------------------------------------- *)
+(** {2 Creation of a precedence from constraints} *)
 
 (** Add the special symbols to the list *)
 let complete_symbols symbols = 
@@ -191,7 +189,7 @@ let order_symbols constrs symbols =
   PartialOrder.symbols po
 
 (** build a precedence on the [symbols] from a list of constraints *)
-let mk_precedence ?(complete=true) constrs symbols =
+let create ?(complete=true) constrs symbols =
   let symbols = if complete then complete_symbols symbols else symbols in
   let symbols = order_symbols constrs symbols in
   let table = mk_table symbols in
@@ -251,11 +249,11 @@ let mk_precedence ?(complete=true) constrs symbols =
   (* initial precedence *)
   mk_prec symbols table weight
 
-let rec default_precedence signature =
+let default signature =
   (* two constraints: false, true at end of precedence, and arity constraint *)
   let constrs =
     [min_constraint [Symbol.false_symbol; Symbol.true_symbol];
      arity_constraint signature;
      alpha_constraint] in
-  mk_precedence constrs (Signature.to_symbols signature)
+  create constrs (Signature.to_symbols signature)
 

@@ -447,7 +447,7 @@ let none =
       ord_precedence = prec;
       ord_clear_cache = (fun () -> ());
     } in
-  ord (Precedence.default_precedence Signature.empty)
+  ord (Precedence.default Signature.empty)
 
 let subterm =
   let ord_compare t1 t2 =
@@ -463,10 +463,10 @@ let subterm =
     ord_precedence = prec;
     ord_clear_cache = (fun () -> ());
   } in
-  ord (Precedence.default_precedence Signature.empty)
+  ord (Precedence.default Signature.empty)
 
 let default signature =
-  rpo6 (Precedence.default_precedence signature)
+  rpo6 (Precedence.default signature)
 
 let choose name prec =
   match name with
