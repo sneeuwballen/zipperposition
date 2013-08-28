@@ -45,10 +45,20 @@ let to_cnf decls =
     (function
       | A.FOF(n,role,f,info)
       | A.TFF(n,role,f,info) ->
-        let clauses = Cnf.cnf_of ~ctx f in
-        Sequence.map
-          (fun c -> A.CNF(n,role,c,info))
-          (Sequence.of_list clauses)
+        begin match role with
+        | A.R_conjecture ->
+          (* negate conjecture *)
+          let clauses = Cnf.cnf_of ~ctx (T.mk_not f) in
+          Sequence.map
+            (fun c -> A.CNF(n,A.R_negated_conjecture,c,info))
+            (Sequence.of_list clauses)
+        | _ ->
+          (* translate, keeping the same role *)
+          let clauses = Cnf.cnf_of ~ctx f in
+          Sequence.map
+            (fun c -> A.CNF(n,role,c,info))
+            (Sequence.of_list clauses)
+        end
       | A.CNF _ as d -> Sequence.singleton d
       | _ -> Sequence.empty)
     decls

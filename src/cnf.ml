@@ -49,7 +49,7 @@ and is_lit t = match t.T.term with
   | T.Var _ -> true
   | T.At _ -> true
   | T.BoundVar _ -> false
-  | T.Bind (_, _) -> assert false
+  | T.Bind (_, _) -> false
 
 let mark_simplified t = T.set_flag T.flag_simplified t true
 
