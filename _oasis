@@ -37,3 +37,10 @@ Executable run_tests
   CompiledObject: native
   MainIs: run_tests.ml
   BuildDepends: logtk, oUnit
+
+# TPTP syntax and type checking
+Executable check_tptp
+  Path: tools/
+  Install: true
+  MainIs: check_tptp.ml
+  BuildDepends: logtk
