@@ -220,7 +220,7 @@ module TRS = struct
 
   let add trs (l, r) =
     (* check that the rule does not introduce variables *)
-    assert (List.for_all (fun v -> T.member_term v l) (T.vars r));
+    assert (List.for_all (fun v -> T.subterm ~sub:v l) (T.vars r));
     assert (not (T.is_var l));
     (* add rule to the discrimination tree *)
     let trs = DT.add trs (l, r) in

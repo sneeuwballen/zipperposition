@@ -64,13 +64,13 @@ let prof_mk_node = Util.mk_profiler "Term.mk_node"
 
 (** {2 Comparison, equality, containers} *)
 
-let rec member_term ~sub b =
+let rec subterm ~sub b =
   sub == b ||
   (match b.term with
   | Var _ | BoundVar _ -> false
-  | Node (_, subterms) -> List.exists (member_term ~sub) subterms
-  | Bind (_, b') -> member_term ~sub b'
-  | At (t1, t2) -> member_term ~sub t1 || member_term ~sub t2)
+  | Node (_, subterms) -> List.exists (subterm ~sub) subterms
+  | Bind (_, b') -> subterm ~sub b'
+  | At (t1, t2) -> subterm ~sub t1 || subterm ~sub t2)
 
 let eq x y = x == y  (* because of hashconsing *)
 
@@ -381,21 +381,6 @@ let at_cpos t pos =
   in recurse t pos
 
 let max_cpos t = size t - 1
-
-let subterm x t =
-  let rec check x t = match t.term with
-  | _ when x == t -> true
-  | Var _
-  | BoundVar _ -> false
-  | Bind (_, t') -> check x t'
-  | Node (_, l) -> check_list x l
-  | At (t1, t2) -> check x t1 || check x t2
-  and check_list x l =
-    match l with
-    | [] -> false
-    | y::l' -> check x y || check_list x l'
-  in
-  check x t
 
 let var_occurs x t = subterm x t
 

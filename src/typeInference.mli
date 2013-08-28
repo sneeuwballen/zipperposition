@@ -70,6 +70,10 @@ module Ctx : sig
         so that, for instance, "nil" (the empty list) can have several
         concrete types. *)
 
+  val declare : t -> Symbol.t -> Type.t -> unit
+    (** Declare the type of a symbol. The type {b must} be closed.
+        @raise Type.Error if an inconsistency (with inferred type) is detected. *)
+
   val to_signature : t -> Signature.t
     (** Obtain the type of all symbols whose type has been inferred *)
 
@@ -93,7 +97,14 @@ val infer : Ctx.t -> Term.t -> Type.t
 val infer_sig : Signature.t -> Term.t -> Type.t
   (** Inference from a signature (shortcut) *)
 
+val infer_no_check : Ctx.t -> Term.t -> Type.t
+  (** Infer the type of the term, but does not recurse if it's not needed. *)
+
 (** {3 Constraining types} *)
+
+val default_to_i : Ctx.t -> unit
+  (** For all symbols seen in the context, that still have un-instantiated
+      type variables in their type, set this type to {!Type.i}. *)
 
 val constrain_term_term : Ctx.t -> Term.t -> Term.t -> unit
   (** Force the two terms to have the same type

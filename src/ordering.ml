@@ -452,8 +452,8 @@ let none =
 let subterm =
   let ord_compare t1 t2 =
     if T.eq t1 t2 then Eq
-    else if T.subterm t1 t2 then Lt
-    else if T.subterm t2 t1 then Gt
+    else if T.subterm ~sub:t1 t2 then Lt
+    else if T.subterm ~sub:t2 t1 then Gt
     else Incomparable
   in
   let rec ord prec = {

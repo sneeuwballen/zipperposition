@@ -50,7 +50,7 @@ type varlist = t list
 
 (** {2 Comparison, equality, containers} *)
 
-val member_term : sub:t -> t -> bool    (** checks whether [sub] is a subterm of the second term *)
+val subterm : sub:t -> t -> bool    (** checks whether [sub] is a (non-strict) subterm of [t] *)
 val eq : t -> t -> bool             (** standard equality on terms *)
 val compare : t -> t -> int         (** a simple order on terms *)
 val hash : t -> int
@@ -161,7 +161,6 @@ val at_cpos : term -> int -> term
 val max_cpos : term -> int
   (** maximum compact position in the term *)
 
-val subterm : t -> t -> bool             (** [subterm s t] true if [s] subterm of [t] *) 
 val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)
 val is_ground : t -> bool                (** is the term ground? (no free vars) *)
 val max_var : varlist -> int             (** find the maximum variable index, >= 0 *)

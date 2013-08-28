@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Utils related to TPTP parsing} *)
 
 module A = Ast_tptp
+module T = Term
 
 (** {2 Printing/Parsing} *)
 
@@ -130,9 +131,37 @@ let has_includes decls =
 (** {2 Type inference} *)
 
 let infer_type ctx decls =
-  assert false
+  Sequence.iter
+    (function
+      | A.Include _
+      | A.IncludeOnly _ -> ()
+      | A.TypeDecl(_, s, ty) ->
+        TypeInference.Ctx.declare ctx s ty
+      | A.FOF(_,_,f,_)
+      | A.CNF(_,_,f,_)
+      | A.TFF(_,_,f,_) ->
+        TypeInference.constrain_term_type ctx f Type.o)
+    decls
 
-let signature ?(signature=Signature.empty) decls =
+let signature ?(signature=Signature.base) decls =
   let ctx = TypeInference.Ctx.of_signature signature in
   infer_type ctx decls;
   TypeInference.Ctx.to_signature ctx
+
+let __is_conjecture = function
+  | A.R_conjecture -> true
+  | _ -> false
+
+let formulas ?(negate=__is_conjecture) decls =
+  Sequence.fmap
+    (function
+      | A.TypeDecl _
+      | A.Include _
+      | A.IncludeOnly _ -> None
+      | A.FOF(_, role, f, _)
+      | A.CNF(_, role, f, _)
+      | A.TFF(_, role, f, _) ->
+        if negate role
+          then Some (T.mk_not f)
+          else Some f)
+    decls

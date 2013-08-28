@@ -126,11 +126,9 @@ let table =
   [ Symbol.true_symbol, Type.o;
     Symbol.false_symbol, Type.o;
     Symbol.eq_symbol, Type.o <== [x; x];
-    (*
     Symbol.exists_symbol, Type.o <=. (Type.o <=. x);
     Symbol.forall_symbol, Type.o <=. (Type.o <=. x);
     Symbol.lambda_symbol, Type.i <=. (Type.i <=. Type.i);
-    *)
     Symbol.not_symbol, Type.o <=. Type.o;
     Symbol.imply_symbol, Type.o <== [Type.o; Type.o];
     Symbol.and_symbol, Type.o <== [Type.o; Type.o];

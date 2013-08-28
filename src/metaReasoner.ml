@@ -101,7 +101,7 @@ module Translate = struct
       | _ -> Logic.mk_const (DSTerm x) :: l
       end
     | Abstract, (t, args) ->
-      assert (List.for_all (fun arg -> T.subterm arg t) args);
+      assert (List.for_all (fun arg -> T.subterm ~sub:arg t) args);
       let t' = T.lambda_abstract_list t args in
       let l' = List.fold_right (fun t l -> build_args term t l) args l in
       Logic.mk_const (DSAbstracted (t', List.length args)) :: l'

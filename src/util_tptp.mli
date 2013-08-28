@@ -52,8 +52,16 @@ val has_includes : Ast_tptp.declaration Sequence.t -> bool
 
 (** {2 Type inference} *)
 
-val infer_type : TypeInference.Ctx.t -> Ast_tptp.declaration Sequence.t ->
-                 TypeInference.Ctx.t
+val infer_type : TypeInference.Ctx.t -> Ast_tptp.declaration Sequence.t -> unit
 
-val signature : ?signature:Signature.t -> Ast_tptp.declaration Sequence.t ->
+val signature : ?signature:Signature.t ->
+                Ast_tptp.declaration Sequence.t ->
                 Signature.t
+
+val formulas : ?negate:(Ast_tptp.role -> bool) ->
+               Ast_tptp.declaration Sequence.t ->
+               Term.t Sequence.t
+  (** Extract only the formulas from some declarations. Formulas with
+      a role that satisfies [negate] are negated.
+      [negate] is true, by default, only for {!Ast_tptp.R_conjecture})*)
+
