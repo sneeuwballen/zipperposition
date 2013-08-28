@@ -122,7 +122,7 @@ let bij =
 
 let table =
   let open Type.Infix in
-  let x = Type.var 0 in
+  let x = Type.var "a" in
   [ Symbol.true_symbol, Type.o;
     Symbol.false_symbol, Type.o;
     Symbol.eq_symbol, Type.o <== [x; x];

@@ -26,7 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Types} *)
 
 type t =
-  | Var of int              (** Type variable *)
+  | Var of string           (** Type variable, universally quantified *)
+  | GVar of int * t ref     (** Variable instance. The int is unique *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
 
@@ -40,6 +41,7 @@ exception Error of string
   (** Type error *)
 
 val is_var : t -> bool
+val is_gvar : t -> bool
 val is_app : t -> bool
 val is_fun : t -> bool
 
@@ -56,16 +58,15 @@ module Infix : sig
     (** [s @@ args] applies the sort [s] to arguments [args]. *)
 end
 
-(** {2 Basic types} *)
-
-val i : t
-val o : t
-val int : t
-val rat : t
-val real : t
-
-val var : int -> t
+val var : string -> t
   (** Build a type variable. The integer must be >= 0 *)
+
+val new_var : unit -> t
+  (** Use a fresh name to make a fresh variable *)
+
+val new_gvar : unit -> t
+  (** New GVar, a free variable that can be instantiated once. It points to
+      itself by default *)
 
 val app : string -> t list -> t
   (** Parametrized type *)
@@ -74,47 +75,34 @@ val const : string -> t
   (** Constant sort *)
 
 val mk_fun : t -> t list -> t
+  (** Function type. The first argument is the return type *)
 
-(** {2 IO} *)
+(** {2 Basic types} *)
 
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
-val to_string : t -> string
+val i : t
+val o : t
+val int : t
+val rat : t
+val real : t
 
-val bij : t Bij.t
+(** {2 Utils} *)
 
-(** {2 Type unification} *)
+val free_vars : t -> t list
+  (** List of free GVars *)
 
-module VarSet : Sequence.Set.S with type elt = int
+val bound_vars : t -> t list
+  (** List of bound variables (Var) *)
 
-module Subst : sig
-  type t
-  
-  val empty : t
-    (** Empty subst *)
+val is_closed : t -> bool
+  (** No GVar in this type? Corresponds to {! free_vars} returning
+      an empty list *)
 
-  val bind : t -> int -> ty -> t
-    (** Bind a variable *)
+val deref : t -> t
+  (** Replace all GVars by the type they point to (if any). *)
 
-  val bind_seq : t -> (int * ty) Sequence.t -> t
-    (** BInd several variables at once *)
-
-  val apply : t -> ty -> ty
-    (** Replace bound variables, recursively *)
-
-  val apply_not_rec : t -> ty -> ty
-    (** Replace bound variables, at most once *)
-  
-  val to_seq : t -> (int * ty) Sequence.t
-  val pp : Buffer.t -> t -> unit
-  val to_string : t -> string
-  val fmt : Format.formatter -> t -> unit
-end
-
-val free_vars : ?init:VarSet.t -> t -> VarSet.t
-  (** List of free variables *)
-
-val max_var : t -> int
+val bind : t -> t -> unit
+  (** Bind the GVar to the given type.
+      @raise Invalid_argument if the type is not a GVar *)
 
 val arity : t -> int
   (** Number of arguments of the type (If it's a function, else 0)*)
@@ -122,19 +110,82 @@ val arity : t -> int
 val is_ground : t -> bool
   (** Is the type ground? *)
 
-val normalize : t -> t
-  (** Rename variables from 0 to n-1, where n is the number of varibles
-      in the type *)
+(** {2 IO} *)
 
-val rename : int -> t -> t
-  (** Shift all variables by the given offset *)
+val pp : Buffer.t -> t -> unit
+val pp_tstp : Buffer.t -> t -> unit
+val fmt : Format.formatter -> t -> unit
+val to_string : t -> string
 
-val unify : ?subst:Subst.t -> t -> t -> Subst.t
+val bij : t Bij.t
+  (** Bijection. Note that GVar cannot be decoded nor encoded. Only
+      closed types work. *)
+
+(** {2 Unification} *)
+
+module Stack : sig
+  type t
+    (** A binding stack *)
+
+  type pos
+    (** Position in the stack *)
+
+  val create : unit -> t
+    (** New stack *)
+
+  val clear : t -> unit
+    (** Clear all bindings *)
+
+  val bottom : pos
+    (** Position of the empty stack *)
+
+  val save : t -> pos
+    (** Get current position *)
+
+  val restore : t -> pos -> unit
+    (** Reset to their old state the bindings between the current pos,
+        and the one given (which must be valid) *)
+
+  val restore_all : t -> unit
+    (** Restore all bindings *)
+
+  val bind : t -> ty -> ty -> unit
+    (** Bind a GVar to a type, pushing its old binding on the stack. Next call
+        to {! restore} with a position lower than the current one will
+        restore the current binding of the GVar.
+        @raise Invalid_argument if the second argument is not a GVar *)
+
+  val protect : t -> (unit -> 'a) -> 'a
+    (** [protect st f] will save the current position [pos] of [st],
+        call [f ()], then call [restore st pos] whatever happens, and
+        finally return the result of the call to [f]. *)
+
+  val unwind_protect : t -> (unit -> 'a) -> 'a
+    (** [unwind_protect st f] will save the current position [pos] of [st],
+        and then call [f ()]. If the call succeeds, returns its result;
+        otherwise call [restore st pos] and re-raise *)
+end
+
+val instantiate : t -> t
+  (** Instantiate all bound variables with fresh GVars *)
+
+val close : t -> t
+  (** Call {!deref} on the type, then replace all free variables (GVar) by
+      bound variables (Var). This corresponds to a generalization of the type,
+      since variables are universally quantified. *)
+
+val close_var : t -> var:t -> t
+  (** [close_var ty var] replaces the GVar [var] by a fresh universal variable.
+      @raise Invalid_argument if [var] is not a GVar *)
+
+val unify : Stack.t -> t -> t -> unit
   (** Unify two types.
-      @raise Error if the types are not unifiable *)
+      @raise Error if the types are not unifiable (and restore bindings) *)
 
 val alpha_equiv : t -> t -> bool
-  (** Are the types alpha equivalent? *)
+  (** Are the types alpha equivalent after instantiation?
+      Does not change bindings. *)
 
 val unifiable : t -> t -> bool
-  (** Are the terms unifiable after renaming? *)
+  (** Are the types unifiable after instantiation?
+      Does not change bindings *)

@@ -27,55 +27,67 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Typing context} *)
 
+(** This module provides a typing context, with an imperative interface.
+    The context is used to map terms to types locally during type
+    inference. It also keeps and updates a signature when symbols' types
+    are inferred.
+*)
+
 module Ctx : sig
   type t
 
-  val empty : t
+  val create : unit -> t
+    (** Fresh environment *)
 
   val of_signature : Signature.t -> t
 
-  val add_signature : t -> Signature.t -> t
+  val add_signature : t -> Signature.t -> unit
     (** Specify the type of some symbols *)
 
-  val enter_binder : t -> t * Type.t
-    (** Enter a new binding context (with a variable type) *)
+  val within_binder : t -> (Type.t -> 'a) -> 'a
+    (** Provides a context, corresponding to a term binding environement,
+        in which the first De Bruijn variable will have the type
+        passed as argument *)
 
-  val exit_binder : t -> t
-    (** Exit the innermost binding context *)
+  val db_type : t -> int -> Type.t
+    (** The type of the bound variable of De Bruijn index [i].
+        [within_binder] must have been used enough times before, so
+        that a type is attributed to the [i]-th bound variable.
+        @raise Invalid_argument if the [i]-th variable is not bound.*)
 
-  val unify : t -> Type.t -> Type.t -> t
-    (** Unify the two types *)
-
-  val new_var : t -> t * Type.t
-  val new_vars : t -> int -> t * Type.t list
-
-  val rename_type : t -> Type.t -> t * Type.t
-    (** Rename variables of the given type to fresh variables *)
-
-  val rename_var : t -> Type.t -> int -> t * Type.t
-    (** Rename the given type variable in the given type *)
-
-  val type_of_symbol : t -> Symbol.t -> t * Type.t
-    (** Returns the type of this symbol. If the symbol has an unknown type,
-        a fresh variable is returned. Otherwise the type is instantiated
-        with fresh variables. *)
+  val unify : t -> Type.t -> Type.t -> unit
+    (** Unify the two types. On success it may update some GVar's bindings.
+        @raise Type.Error if unification is impossible. *)
 
   val eval_type : t -> Type.t -> Type.t
-    (** Evaluate the given type in this context *)
+    (** Evaluate the given type in this context, ie, dereference it.
+        [eval_type ctx ty] same as [Type.deref ty]. *)
+
+  val type_of_symbol : t -> Symbol.t -> Type.t
+    (** Returns the type of this symbol. If the symbol has an unknown type,
+        a fresh instantiated variable is returned. Otherwise the known
+        type of the symbol is returned and instantiated with fresh variables,
+        so that, for instance, "nil" (the empty list) can have several
+        concrete types. *)
 
   val to_signature : t -> Signature.t
     (** Obtain the type of all symbols whose type has been inferred *)
+
+  val unwind_protect : t -> (unit -> 'a) -> 'a
+    (** Transaction for variable bindings
+        see {!Type.Stack.unwind_protect} *)
+
+  val protect : t -> (unit -> 'a) -> 'a
+    (** Provide a local environment to perform typing, and then
+        remove all intermediate variable bindings.
+        see {!Type.Stack.protect} *)
 end
 
 (** {2 Hindley-Milner} *)
 
-val infer_update : Ctx.t -> Term.t -> Ctx.t * Type.t
-  (** Update the context with symbols that may occur in the
-      term, and yet have no known type.
-      @raise Type.Error if types are inconsistent. *)
-
 val infer : Ctx.t -> Term.t -> Type.t
-  (** Infer the type of this term under the given signature. 
+  (** Infer the type of this term under the given signature.  This updates
+      the context's typing environment!
       @raise Type.Error if the types are inconsistent *)
 
 val infer_sig : Signature.t -> Term.t -> Type.t
@@ -83,11 +95,13 @@ val infer_sig : Signature.t -> Term.t -> Type.t
 
 (** {3 Constraining types} *)
 
-val constrain_term_term : Ctx.t -> Term.t -> Term.t -> Ctx.t
-  (** Force the two terms to have the same type *)
+val constrain_term_term : Ctx.t -> Term.t -> Term.t -> unit
+  (** Force the two terms to have the same type
+      @raise Type.Error if an inconsistency is detected *)
 
-val constrain_term_type : Ctx.t -> Term.t -> Type.t -> Ctx.t
-  (** Force the term to have the given type *)
+val constrain_term_type : Ctx.t -> Term.t -> Type.t -> unit
+  (** Force the term to have the given type.
+      @raise Type.Error if an inconsistency is detected *)
 
 (** {3 Checking compatibility} *)
 

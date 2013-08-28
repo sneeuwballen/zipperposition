@@ -49,26 +49,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       Hashtbl.add __table name v;
       v
 
-  let __ty = Hashtbl.create 3
-  let __ty_count = ref 0
-
-  let clear_ty () =
-    Hashtbl.clear __ty;
-    __ty_count := 0
-
-  (** Get type variable *)
-  let get_ty_var name =
-    try Hashtbl.find __ty name
-    with Not_found ->
-      let v = Type.var !__ty_count in
-      incr __ty_count;
-      Hashtbl.add __ty name v;
-      v
-
   (** Clear everything in the current context *)
   let clear_ctx () =
     clear_table ();
-    clear_ty ();
     ()
 %}
 
@@ -156,8 +139,7 @@ declarations:
 
 declaration:
   | d=declaration_reset
-    { clear_table ();  (* cleanup variable table *)
-      clear_ty ();
+    { clear_ctx ();  (* cleanup variable table *)
       d }
 
 declaration_reset:
@@ -339,7 +321,7 @@ system_constant: system_functor { $1 }
 system_functor: s=atomic_system_word { s }
 
 tff_type:
-  | w=UPPER_WORD { get_ty_var w }
+  | w=UPPER_WORD { Type.var w }
   | w=type_const { Type.const w }
   | l=type_const ARROW r=LOWER_WORD
     { Type.mk_fun (Type.const r) [Type.const l] }
