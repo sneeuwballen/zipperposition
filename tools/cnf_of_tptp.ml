@@ -24,60 +24,71 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 TPTP Syntax and types checking} *)
+(** {1 Reduction to CNF of TPTP file} *)
 
 open Logtk
 
 module T = Term
+module A = Ast_tptp
 
-let print_line () =
-  Printf.printf "%s\n" (Util.str_repeat "=" 60);
-  ()
-
-let cat_input = ref false  (* print input declarations? *)
+let declare_types = ref false
 
 let options =
   [ "-debug", Arg.Int Util.set_debug, "debug level"
-  ; "-cat", Arg.Set cat_input, "print input declarations"
+  ; "-declare", Arg.Set declare_types, "declare types of symbols"
   ]
 
-(* check the given file *)
-let check file =
-  print_line ();
-  Printf.printf "checking file %s...\n" file;
+(* conversion to CNF of declarations *)
+let to_cnf decls =
+  let ctx = Skolem.create () in
+  let seq = Sequence.flatMap
+    (function
+      | A.FOF(n,role,f,info)
+      | A.TFF(n,role,f,info) ->
+        let clauses = Cnf.cnf_of ~ctx f in
+        Sequence.map
+          (fun c -> A.CNF(n,role,c,info))
+          (Sequence.of_list clauses)
+      | A.CNF _ as d -> Sequence.singleton d
+      | _ -> Sequence.empty)
+    decls
+  in
+  (* iterating again would change skolems, etc, which is bad *)
+  Sequence.persistent seq
+
+(* process the given file, converting it to CNF *)
+let process file =
+  Util.debug 1 "process file %s" file;
   try
     (* parse *)
     let decls = Util_tptp.parse_file ~recursive:true file in
-    (if !cat_input
-      then Sequence.iter
-        (fun d -> Util.printf "%a\n" Ast_tptp.pp_declaration d) decls);
-    (* type check *)
-    let signature = Util_tptp.signature decls in
-    Printf.printf "signature:\n";
-    Signature.iter signature
-      (fun s ty -> Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
-    Printf.printf "formulas:\n";
+    (* to CNF *)
+    let decls = to_cnf decls in
+    let decls =
+      if !declare_types
+        then
+          let signature = Util_tptp.signature decls in
+          Sequence.append (Util_tptp.declare_symbols signature) decls
+        else decls
+    in
+    (* print *)
     Sequence.iter
-      (fun f -> Util.printf "  %a\n" T.pp f)
-      (Util_tptp.formulas decls);
+      (fun d -> Util.printf "%a\n" A.pp_declaration d)
+      decls
   with
   | Util_tptp.ParseError _ as e ->
     (* syntax error *)
     Printf.printf "%s\n" (Util_tptp.string_of_error e);
     exit 1
-  | Type.Error msg ->
-    Printf.printf "%s\n" msg;
-    exit 1
 
 let main () =
   let files = ref [] in
   let add_file f = files := f :: !files in
-  Arg.parse options add_file "check_tptp [options] [file1|stdin] file2...";
+  Arg.parse options add_file "cnf_of_tptp [options] [file1|stdin] file2...";
   (if !files = [] then files := ["stdin"]);
   files := List.rev !files;
-  List.iter check !files;
-  print_line ();
-  Printf.printf "success!\n";
+  List.iter process !files;
+  Util.debug 1 "success!";
   ()
 
 let _ =

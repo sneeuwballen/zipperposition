@@ -44,3 +44,10 @@ Executable check_tptp
   Install: true
   MainIs: check_tptp.ml
   BuildDepends: logtk
+
+# Conversion to CNF
+Executable cnf_of_tptp
+  Path: tools/
+  Install: true
+  MainIs: cnf_of_tptp.ml
+  BuildDepends: logtk
