@@ -52,7 +52,7 @@ let debug l format =
   if l <= !debug_level_
     then (
       (if !need_cleanup then clear_line ());
-      Printf.bprintf b "[%.3f] " (get_total_time ());
+      Printf.bprintf b "%% [%.3f] " (get_total_time ());
       Printf.kbprintf
         (fun b -> print_endline (Buffer.contents b))
         b format)
@@ -460,6 +460,16 @@ let str_find ?(start=0) ~sub s =
     -1
   with Exit ->
     !i
+
+let str_repeat s n =
+  assert (n>=0);
+  let len = String.length s in
+  assert(len > 0);
+  let buf = String.create (len * n) in
+  for i = 0 to n-1 do
+    String.blit s 0 buf (i * len) len;
+  done;
+  buf
 
 (** {2 File utils} *)
 

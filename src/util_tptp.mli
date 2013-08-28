@@ -34,12 +34,17 @@ val find_file : string -> string -> string
       It also looks in the "TPTP" environment variable.
       @raise Failure if no such file can be found. *)
 
-(** Parsing a TPTP file is here presented with a [recursive] option
-    that, if true, will make "include" directives to be recursively
-    parsed. It uses {!find_file} for included files.
-*)
+exception ParseError of string * int * int * int * int
+  (** Error at the given file, start(line, column) stop(line,column) *)
+
+val string_of_error : exn -> string
+  (** message from ParseError *)
 
 val parse_file : recursive:bool -> string -> Ast_tptp.declaration Sequence.t
+  (** Parsing a TPTP file is here presented with a [recursive] option
+      that, if true, will make "include" directives to be recursively
+      parsed. It uses {!find_file} for included files.
+      @raise ParseError in case a syntax error is met. *)
 
 (** Printing is simpler, because it does not involve includes. *)
 

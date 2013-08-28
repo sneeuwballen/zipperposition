@@ -79,11 +79,12 @@ val mk_fun : t -> t list -> t
 
 (** {2 Basic types} *)
 
-val i : t
-val o : t
-val int : t
-val rat : t
-val real : t
+val i : t       (* individuals *)
+val o : t       (* propositions *)
+val int : t     (* ints *)
+val rat : t     (* rational numbers *)
+val real : t    (* real numbers *)
+val tType : t   (* "type" of types *)
 
 (** {2 Utils} *)
 

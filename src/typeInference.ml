@@ -75,38 +75,30 @@ module Ctx = struct
         failwith (Printf.sprintf "TypeInference.Ctx.db_type: idx %d not bound" i)
 
   let unify ctx ty1 ty2 =
-    Util.debug 5 "%% Ctx.unify %a %a" Type.pp ty1 Type.pp ty2;
+    Util.debug 5 "Ctx.unify %a %a" Type.pp ty1 Type.pp ty2;
     Type.unify ctx.st ty1 ty2;
     ()
-
-  let eval_type ctx ty =
-    Type.deref ty
 
   let type_of_symbol ctx s =
     try
       let ty = Signature.find ctx.signature s in
-      let ty = eval_type ctx ty in
+      let ty = Type.deref ty in
       Type.instantiate ty
     with Not_found ->
       (* give a new type variable to this symbol *)
       let ty = Type.new_gvar () in
-      Util.debug 5 "%% Ctx: new type %a for symbol %a" Type.pp ty Symbol.pp s;
+      Util.debug 5 "Ctx: new type %a for symbol %a" Type.pp ty Symbol.pp s;
       ctx.signature <- Signature.declare ctx.signature s ty;
       ty
 
   let declare ctx s ty =
     assert (Type.is_closed ty);
-    try
-      let ty' = Signature.find ctx.signature s in
-      (* now unify the two types *)
-      Type.Stack.unwind_protect ctx.st (fun () -> unify ctx ty ty')
-    with Not_found ->
-      ctx.signature <- Signature.declare ctx.signature s ty;
-      ()
+    ctx.signature <- Signature.declare ctx.signature s ty;
+    ()
 
   let to_signature ctx =
     let signature = ctx.signature in
-    let signature = Signature.map signature (fun _ ty -> eval_type ctx ty) in
+    let signature = Signature.map signature (fun _ ty -> Type.deref ty) in
     let signature = Signature.filter signature (fun _ ty -> Type.is_closed ty) in
     signature
 
@@ -184,6 +176,7 @@ let default_to_i ctx =
   let signature = ctx.Ctx.signature in
   Symbol.SMap.iter
     (fun s ty ->
+      let ty = Type.deref ty in
       let gvars = Type.free_vars ty in
       List.iter (fun gvar -> Type.bind gvar Type.i) gvars)
     signature;

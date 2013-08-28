@@ -30,6 +30,7 @@ type declaration =
   | FOF of name * role * Term.t * optional_info
   | TFF of name * role * Term.t * optional_info
   | TypeDecl of name * Symbol.t * Type.t  (* type declaration *)
+  | NewType of name * string  (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)
   (** top level declaration *)
@@ -49,6 +50,7 @@ and role =
   | R_plain       (* no specific semantics (proof...) *)
   | R_finite of string   (* finite interpretation, don't care *)
   | R_question    (* existential question *)
+  | R_type        (* type declaration *)
   | R_unknown     (* error *)
   (** formula role *)
 and optional_info = general_data list
@@ -66,6 +68,7 @@ let name_of_decl = function
   | FOF (n, _, _, _) -> n
   | TFF (n, _, _, _) -> n
   | TypeDecl (n, _, _) -> n
+  | NewType (n, _) -> n
   | IncludeOnly _
   | Include _ ->
     raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
@@ -86,6 +89,7 @@ let role_of_string = function
   | "fi_functors" -> R_finite "functors"
   | "fi_predicates" -> R_finite "predicates"
   | "question" -> R_question
+  | "type" -> R_type
   | "unknown" -> R_unknown
   | s -> failwith ("not a proper TPTP role: " ^ s)
 
@@ -101,6 +105,7 @@ let string_of_role = function
   | R_plain -> "plain"
   | R_finite what -> "fi_" ^ what
   | R_question -> "question"
+  | R_type -> "type"
   | R_unknown -> "unknown"
 
 let pp_role buf r =
@@ -153,6 +158,8 @@ let pp_declaration buf = function
     Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
   | TypeDecl (name, s, ty) ->
     Printf.bprintf buf "tff(%a, type, %a, %a)." pp_name name Symbol.pp s Type.pp ty
+  | NewType (name, s) ->
+    Printf.bprintf buf "tff(%a, type, (%s: $tType))." pp_name name s
   | CNF (name, role, f, generals) ->
     __pp_formula buf ("cnf", name, role, f, generals)
   | FOF (name, role, f, generals) ->

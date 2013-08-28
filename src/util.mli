@@ -184,6 +184,9 @@ val str_split : by:string -> string -> string list
 val str_find : ?start:int -> sub:string -> string -> int
   (** Find [sub] in the string, returns its first index or -1 *)
 
+val str_repeat : string -> int -> string
+  (** The same char, repeated n times *)
+
 (** {2 File utils} *)
 
 (** perform the action with a lock on the given file *)

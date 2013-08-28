@@ -1,4 +1,6 @@
 S .
 S lib
+S ../tools//
 B ../_build/src/
 B ../_build/src/lib/
+B ../_build/tools/

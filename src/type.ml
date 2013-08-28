@@ -95,7 +95,8 @@ let new_gvar =
   let __default = H.hashcons (Var "") in  (* some default type *)
   fun () ->
     incr n;
-    let ty = H.hashcons (GVar (!n, ref __default)) in
+    (* No need to hashcons, this value is unforgeable *)
+    let ty = GVar (!n, ref __default) in
     begin match ty with
     | GVar (_, r) -> r := ty  (* make [ty] point to itself *)
     | _ -> assert false
@@ -109,6 +110,7 @@ let o = const "$o"
 let int = const "$int"
 let rat = const "$rat"
 let real = const "$real"
+let tType = const "$tType"
 
 (** {2 Utils} *)
 
@@ -173,11 +175,11 @@ let rec pp buf t = match t with
   | Var s -> Printf.bprintf buf "'%s" s
   | GVar (i, _) -> Printf.bprintf buf "'_%d" i
   | App (p, []) -> Buffer.add_string buf p
-  | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
+  | App (p, args) -> Printf.bprintf buf "%s %a " p (Util.pp_list ~sep:" " pp) args
   | Fun (ret, []) -> assert false
-  | Fun (ret, [arg]) -> Printf.bprintf buf "%a -> %a" pp arg pp ret
+  | Fun (ret, [arg]) -> Printf.bprintf buf "(%a -> %a)" pp arg pp ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) -> %a" (Util.pp_list ~sep:"*" pp) l pp ret
+    Printf.bprintf buf "(%a -> %a)" (Util.pp_list ~sep:" * " pp) l pp ret
 
 let rec pp_tstp buf t = match t with
   | Var s -> Printf.bprintf buf "%s" (String.capitalize s)
@@ -187,7 +189,7 @@ let rec pp_tstp buf t = match t with
   | Fun (ret, []) -> assert false
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp arg pp ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:"*" pp) l pp ret
+    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp) l pp ret
 
 
 let to_string t =
@@ -255,12 +257,6 @@ module Stack = struct
   | GVar (_, r) -> !r
   | _ -> assert false
 
-  let bind st gvar ty =
-    Stack.push gvar st.gvars;
-    Stack.push (_binding gvar) st.bindings;
-    st.size <- st.size + 1;
-    ()
-
   let protect st f =
     let pos = save st in
     try
@@ -279,6 +275,13 @@ module Stack = struct
     with e ->
       restore st pos;
       raise e
+
+  let bind st gvar ty =
+    Stack.push gvar st.gvars;
+    Stack.push (_binding gvar) st.bindings;
+    st.size <- st.size + 1;
+    bind gvar ty;
+    ()
 end
 
 (* instantiate all bound variables *)
@@ -339,6 +342,7 @@ let rec unify_rec stack ty1 ty2 =
   let ty2 = deref ty2 in
   match ty1, ty2 with
   | Var s1, Var s2 when s1 = s2 -> ()
+  | GVar _, GVar _ when ty1 == ty2 -> ()
   | GVar _, _ when not (_occur_check ty1 ty2) ->
     Stack.bind stack ty1 ty2
   | _, GVar _ when not (_occur_check ty2 ty1) ->
@@ -358,6 +362,7 @@ let rec alpha_equiv_unify st ty1 ty2 =
   let ty2 = deref ty2 in
   match ty1, ty2 with
   | Var s1, Var s2 when s1 = s2 -> ()
+  | GVar _, GVar _ when ty1 == ty2 -> ()
   | GVar _, GVar _ when not (_occur_check ty1 ty2) ->
     Stack.bind st ty1 ty2
   | App (s1, l1), App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->

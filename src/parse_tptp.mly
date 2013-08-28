@@ -69,7 +69,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token CNF
 %token TFF
 %token INCLUDE
-%token TYPE
 
 %token NOT
 
@@ -109,6 +108,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %left VLINE
 %left AND
 %left AT
+%right ARROW
 %nonassoc EQUIV
 %nonassoc XOR
 %nonassoc IMPLY
@@ -147,8 +147,12 @@ declaration_reset:
     { Ast_tptp.FOF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
     { Ast_tptp.TFF (name, role, f, info) }
-  | TFF LEFT_PAREN name=name COMMA TYPE COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
-    { let s, ty = tydecl in Ast_tptp.TypeDecl (name, s, ty) }
+  | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
+    { let s, ty = tydecl in
+      if Type.eq ty Type.tType
+        then Ast_tptp.NewType (name, Symbol.name_symbol s)
+        else Ast_tptp.TypeDecl (name, s, ty)
+    }
   | CNF LEFT_PAREN name=name COMMA role=role COMMA f=cnf_formula info=annotations RIGHT_PAREN DOT
     { Ast_tptp.CNF (name, role, f, info) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED RIGHT_PAREN DOT
@@ -321,14 +325,21 @@ system_constant: system_functor { $1 }
 system_functor: s=atomic_system_word { s }
 
 tff_type:
+  | ty=tff_atom_type { ty }
+  | l=tff_atom_type ARROW r=tff_atom_type
+    { Type.mk_fun r [l] }
+  | LEFT_PAREN args=tff_ty_args RIGHT_PAREN ARROW r=tff_atom_type
+    { Type.mk_fun r args }
+
+tff_atom_type:
   | w=UPPER_WORD { Type.var w }
   | w=type_const { Type.const w }
-  | l=type_const ARROW r=LOWER_WORD
-    { Type.mk_fun (Type.const r) [Type.const l] }
-  | LEFT_PAREN l=separated_nonempty_list(STAR, tff_type) RIGHT_PAREN ARROW r=LOWER_WORD
-    { Type.mk_fun (Type.const r) l }
   | LEFT_PAREN ty=tff_type RIGHT_PAREN { ty }
 
+tff_ty_args:
+  | ty=tff_atom_type { [ty] }
+  | hd=tff_atom_type STAR tl=tff_ty_args { hd :: tl }
+  
 type_const:
   | w=LOWER_WORD { w }
   | w=DOLLAR_WORD { w }

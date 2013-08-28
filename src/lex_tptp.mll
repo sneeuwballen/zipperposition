@@ -76,13 +76,14 @@ let dollar_word = '$' lower_word
 let dollar_dollar_word = "$$" lower_word
 
 rule token = parse
-  | comment { Lexing.new_line lexbuf; token lexbuf }
+  | comment { token lexbuf }
   | comment_block { token lexbuf }  (* TODO: count new lines in lexeme lexbuf *)
   | '\n' { Lexing.new_line lexbuf; token lexbuf }
   | [' ' '\t' '\r'] { token lexbuf }
   | eof { EOI }
   | "fof" { FOF }
   | "cnf" { CNF }
+  | "tff" { TFF }
   | "include" { INCLUDE }
   | vline { VLINE }
   | '&' { AND }

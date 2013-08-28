@@ -59,10 +59,6 @@ module Ctx : sig
     (** Unify the two types. On success it may update some GVar's bindings.
         @raise Type.Error if unification is impossible. *)
 
-  val eval_type : t -> Type.t -> Type.t
-    (** Evaluate the given type in this context, ie, dereference it.
-        [eval_type ctx ty] same as [Type.deref ty]. *)
-
   val type_of_symbol : t -> Symbol.t -> Type.t
     (** Returns the type of this symbol. If the symbol has an unknown type,
         a fresh instantiated variable is returned. Otherwise the known

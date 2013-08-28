@@ -98,6 +98,12 @@ let to_symbols signature =
 let to_set signature =
   SMap.fold (fun s _ set -> Symbol.SSet.add s set) signature Symbol.SSet.empty
 
+let iter s f =
+  SMap.iter f s
+
+let fold s acc f =
+  SMap.fold (fun s ty acc -> f acc s ty) s acc
+
 let pp buf s =
   let pp_pair buf (s,ty) = Printf.bprintf buf "%a: %a" Symbol.pp s Type.pp ty in
   Printf.bprintf buf "{";
@@ -123,16 +129,18 @@ let bij =
 let table =
   let open Type.Infix in
   let x = Type.var "a" in
+  let y = Type.var "b" in
   [ Symbol.true_symbol, Type.o;
     Symbol.false_symbol, Type.o;
     Symbol.eq_symbol, Type.o <== [x; x];
     Symbol.exists_symbol, Type.o <=. (Type.o <=. x);
     Symbol.forall_symbol, Type.o <=. (Type.o <=. x);
-    Symbol.lambda_symbol, Type.i <=. (Type.i <=. Type.i);
+    Symbol.lambda_symbol, y <=. ((y <=. x) <=. x);  (* (x -> (x -> y)) -> y *)
     Symbol.not_symbol, Type.o <=. Type.o;
     Symbol.imply_symbol, Type.o <== [Type.o; Type.o];
     Symbol.and_symbol, Type.o <== [Type.o; Type.o];
     Symbol.or_symbol, Type.o <== [Type.o; Type.o];
+    Symbol.equiv_symbol, Type.o <== [Type.o; Type.o];
     (* special symbols, used for precedence
     Symbol.db_symbol, Type.i;
     Symbol.split_symbol, Type.o;

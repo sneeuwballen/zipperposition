@@ -74,6 +74,10 @@ val to_symbols : t -> Symbol.t list
 val to_set : t -> Symbol.SSet.t
   (** Set of symbols of the signature *)
 
+val iter : t -> (Symbol.t -> Type.t -> unit) -> unit
+
+val fold : t -> 'a -> ('a -> Symbol.t -> Type.t -> 'a) -> 'a
+
 val to_seq : t -> (Symbol.t * Type.t) Sequence.t
 val of_seq : (Symbol.t * Type.t) Sequence.t -> t
 

@@ -39,7 +39,7 @@ let find_file name dir =
   (* search in [dir], and its parents recursively *)
   and search dir =
     let cur_name = Filename.concat dir name in
-    Util.debug 2 "%% search %s as %s" name cur_name;
+    Util.debug 2 "search %s as %s" name cur_name;
     if file_exists cur_name then cur_name
     else
       let dir' = Filename.dirname dir in
@@ -58,6 +58,25 @@ let find_file name dir =
       then name  (* found *)
       else failwith ("unable to find file " ^ name)
 
+exception ParseError of string * int * int * int * int
+  (** Error at the given file, start(line, column) stop(line,column) *)
+
+let string_of_error = function
+  | ParseError (filename, s_l, s_c, e_l, e_c) ->
+    Printf.sprintf "syntax error in %s between %d:%d and %d:%d"
+      filename s_l s_c e_l e_c
+  | _ -> assert false
+
+(* raise a readable parse error *)
+let _raise_error filename lexbuf =
+  let start = Lexing.lexeme_start_p lexbuf in
+  let end_ = Lexing.lexeme_end_p lexbuf in
+  let s_l = start.Lexing.pos_lnum in
+  let s_c = start.Lexing.pos_cnum - start.Lexing.pos_bol in
+  let e_l = end_.Lexing.pos_lnum in
+  let e_c = end_.Lexing.pos_cnum - end_.Lexing.pos_bol in
+  raise (ParseError (filename, s_l, s_c, e_l, e_c))
+
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
@@ -69,12 +88,16 @@ let parse_file ~recursive f =
     | _ -> open_in (find_file filename dir) in
     begin try
       let buf = Lexing.from_channel input in
-      let decls = Parse_tptp.parse_declarations Lex_tptp.token buf in
+      let decls =
+        try Parse_tptp.parse_declarations Lex_tptp.token buf
+        with Parse_tptp.Error ->
+          _raise_error filename buf  (* report error properly *)
+      in
       List.iter
         (fun decl -> match decl, names with
-          | (A.CNF _ | A.FOF _ | A.TFF _ | A.TypeDecl _), None ->
+          | (A.CNF _ | A.FOF _ | A.TFF _ | A.TypeDecl _ | A.NewType _), None ->
             Queue.push decl result_decls
-          | (A.CNF _ | A.FOF _ | A.TFF _ | A.TypeDecl _), Some names ->
+          | (A.CNF _ | A.FOF _ | A.TFF _ | A.TypeDecl _ | A.NewType _), Some names ->
             if List.mem (A.name_of_decl decl) names
               then Queue.push decl result_decls
               else ()   (* not included *)
@@ -125,6 +148,7 @@ let has_includes decls =
       | A.FOF _
       | A.CNF _
       | A.TFF _
+      | A.NewType _
       | A.TypeDecl _ -> false)
     decls
 
@@ -132,9 +156,12 @@ let has_includes decls =
 
 let infer_type ctx decls =
   Sequence.iter
-    (function
+    (fun decl ->
+      Util.debug 3 "infer type for %a" A.pp_declaration decl;
+      match decl with
       | A.Include _
       | A.IncludeOnly _ -> ()
+      | A.NewType _ -> ()  (* ignore *)
       | A.TypeDecl(_, s, ty) ->
         TypeInference.Ctx.declare ctx s ty
       | A.FOF(_,_,f,_)
@@ -146,6 +173,7 @@ let infer_type ctx decls =
 let signature ?(signature=Signature.base) decls =
   let ctx = TypeInference.Ctx.of_signature signature in
   infer_type ctx decls;
+  TypeInference.default_to_i ctx;
   TypeInference.Ctx.to_signature ctx
 
 let __is_conjecture = function
@@ -156,6 +184,7 @@ let formulas ?(negate=__is_conjecture) decls =
   Sequence.fmap
     (function
       | A.TypeDecl _
+      | A.NewType _
       | A.Include _
       | A.IncludeOnly _ -> None
       | A.FOF(_, role, f, _)

@@ -30,6 +30,7 @@ type declaration =
   | FOF of name * role * Term.t * optional_info
   | TFF of name * role * Term.t * optional_info
   | TypeDecl of name * Symbol.t * Type.t  (* type declaration *)
+  | NewType of name * string  (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)
   (** top level declaration *)
@@ -49,6 +50,7 @@ and role =
   | R_plain       (* no specific semantics (proof...) *)
   | R_finite of string   (* finite interpretation, don't care *)
   | R_question    (* existential question *)
+  | R_type        (* type declaration *)
   | R_unknown     (* error *)
   (** formula role *)
 and optional_info = general_data list
