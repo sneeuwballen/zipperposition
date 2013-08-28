@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Ast} *)
 
 type declaration =
-  | CNF of name * role * Term.t * optional_info
+  | CNF of name * role * Term.t list * optional_info
   | FOF of name * role * Term.t * optional_info
   | TFF of name * role * Term.t * optional_info
   | TypeDecl of name * Symbol.t * Type.t  (* type declaration *)

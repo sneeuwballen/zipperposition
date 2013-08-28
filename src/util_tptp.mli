@@ -63,6 +63,12 @@ val signature : ?signature:Signature.t ->
                 Ast_tptp.declaration Sequence.t ->
                 Signature.t
 
+val declare_symbols : ?name:(int -> Symbol.t -> Ast_tptp.name) ->
+                      Signature.t ->
+                      Ast_tptp.declaration Sequence.t
+  (** Declare the symbols of the signature. A custom function
+      to name the [i]-th symbol declaration can be provided. *)
+
 val formulas : ?negate:(Ast_tptp.role -> bool) ->
                Ast_tptp.declaration Sequence.t ->
                Term.t Sequence.t

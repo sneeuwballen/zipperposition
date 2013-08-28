@@ -164,8 +164,11 @@ let infer_type ctx decls =
       | A.NewType _ -> ()  (* ignore *)
       | A.TypeDecl(_, s, ty) ->
         TypeInference.Ctx.declare ctx s ty
+      | A.CNF(_,_,c,_) ->
+        List.iter
+          (fun lit -> TypeInference.constrain_term_type ctx lit Type.o)
+          c
       | A.FOF(_,_,f,_)
-      | A.CNF(_,_,f,_)
       | A.TFF(_,_,f,_) ->
         TypeInference.constrain_term_type ctx f Type.o)
     decls
@@ -175,6 +178,19 @@ let signature ?(signature=Signature.base) decls =
   infer_type ctx decls;
   TypeInference.default_to_i ctx;
   TypeInference.Ctx.to_signature ctx
+
+let __name_symbol i sy =
+  let str = Util.sprintf "'ty_decl_%d_%a'" i Symbol.pp sy in
+  A.NameString str
+
+let declare_symbols ?(name=__name_symbol) signature =
+  let signature = Signature.diff signature Signature.base in
+  let seq = Signature.to_seq signature in
+  Sequence.mapi
+    (fun i (s, ty) ->
+      let name = name i s in
+      A.TypeDecl (name, s, ty))
+    seq
 
 let __is_conjecture = function
   | A.R_conjecture -> true
@@ -187,8 +203,11 @@ let formulas ?(negate=__is_conjecture) decls =
       | A.NewType _
       | A.Include _
       | A.IncludeOnly _ -> None
+      | A.CNF(_, role, c, _) ->
+        if negate role
+          then Some (T.mk_not (T.mk_or_list c))
+          else Some (T.mk_or_list c)
       | A.FOF(_, role, f, _)
-      | A.CNF(_, role, f, _)
       | A.TFF(_, role, f, _) ->
         if negate role
           then Some (T.mk_not f)

@@ -839,8 +839,6 @@ let ac_eq ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
 
 (** {2 Printing/parsing} *)
 
-let print_sort = ref false
-
 let pp_tstp buf t =
   (* recursive printing *)
   let rec pp_rec buf t = match t.term with
@@ -854,7 +852,7 @@ let pp_tstp buf t =
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
   | Node (s, [v; t']) when Symbol.has_attr Symbol.attr_binder s ->
     assert (is_var v);
-    Printf.bprintf buf "%a[%a]: (%a)" Symbol.pp s pp_rec v pp_rec t'
+    Printf.bprintf buf "%a[%a]: (%a)" Symbol.pp s pp_var v pp_rec t'
   | BoundVar _ | Bind _ ->
     failwith "De Bruijn index in term, cannot be printed in TSTP"
   | Node (s, body1::body) when Symbol.has_attr Symbol.attr_infix s ->
@@ -864,6 +862,14 @@ let pp_tstp buf t =
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
   | Var i -> Printf.bprintf buf "X%d" i
   | At (t1, t2) -> pp_rec buf t1; Buffer.add_string buf " @ "; pp_rec buf t2
+  and pp_var buf t = match t.term with
+  | Var i -> 
+    begin match t.type_ with
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "X%d:%a" i Type.pp_tstp ty
+    | _ -> Printf.bprintf buf "X%d" i
+    end
+  | _ -> assert false
   in
   let maxvar = max (max_var (vars t)) 0 in
   let varindex = ref (maxvar+1) in
@@ -892,7 +898,7 @@ let rec pp_debug buf t =
   | Node (s, []) -> Symbol.pp buf s
   | Node (s, args) ->
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
-  | Var _ -> pp_var buf t
+  | Var i -> Printf.bprintf buf "X%d" i
   | At (t1, t2) ->
     pp_rec buf t1; Buffer.add_char buf ' ';
     (if is_complex t2 then Buffer.add_char buf '(');
@@ -901,7 +907,8 @@ let rec pp_debug buf t =
   and pp_var buf t = match t.term with
   | Var i -> 
     begin match t.type_ with
-    | Some ty when !print_sort -> Printf.bprintf buf "X%d:%a" i Type.pp ty
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "X%d:%a" i Type.pp_tstp ty
     | _ -> Printf.bprintf buf "X%d" i
     end
   | _ -> assert false

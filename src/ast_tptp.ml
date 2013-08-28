@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Ast} *)
 
 type declaration =
-  | CNF of name * role * Term.t * optional_info
+  | CNF of name * role * Term.t list * optional_info
   | FOF of name * role * Term.t * optional_info
   | TFF of name * role * Term.t * optional_info
   | TypeDecl of name * Symbol.t * Type.t  (* type declaration *)
@@ -157,11 +157,19 @@ let pp_declaration buf = function
   | IncludeOnly (filename, names) ->
     Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
   | TypeDecl (name, s, ty) ->
-    Printf.bprintf buf "tff(%a, type, %a, %a)." pp_name name Symbol.pp s Type.pp ty
+    Printf.bprintf buf "tff(%a, type, (%a : %a))."
+      pp_name name Symbol.pp s Type.pp_tstp ty
   | NewType (name, s) ->
     Printf.bprintf buf "tff(%a, type, (%s: $tType))." pp_name name s
-  | CNF (name, role, f, generals) ->
-    __pp_formula buf ("cnf", name, role, f, generals)
+  | CNF (name, role, c, generals) ->
+    begin  match generals with
+    | [] ->
+      Printf.bprintf buf "cnf(%a, %a, (%a))." pp_name name pp_role role
+        (Util.pp_list ~sep:"|" Term.pp_tstp) c
+    | _::_ ->
+      Printf.bprintf buf "cnf(%a, %a, (%a), %a)." pp_name name pp_role role
+        (Util.pp_list ~sep:"|" Term.pp_tstp) c pp_generals generals
+    end
   | FOF (name, role, f, generals) ->
     __pp_formula buf ("fof", name, role, f, generals)
   | TFF (name, role, f, generals) ->

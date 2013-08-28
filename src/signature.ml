@@ -92,6 +92,15 @@ let map s f = SMap.mapi f s
 
 let filter s p = SMap.filter p s
 
+let diff s1 s2 =
+  SMap.merge
+    (fun s ty1 ty2 -> match ty1, ty2 with
+      | Some ty1, None -> Some ty1
+      | Some _, Some _
+      | None, Some _
+      | None, None -> None)
+    s1 s2
+
 let to_symbols signature =
   SMap.fold (fun s _ l -> s :: l) signature []
 

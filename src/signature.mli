@@ -68,6 +68,10 @@ val map : t -> (Symbol.t -> Type.t -> Type.t) -> t
 val filter : t -> (Symbol.t -> Type.t -> bool) -> t
   (** Only keep part of the signature *)
 
+val diff : t -> t -> t
+  (** [diff s1 s2] contains the symbols of [s1] that do not appear
+      in [s2]. Useful to remove base symbols. *)
+
 val to_symbols : t -> Symbol.t list
   (** extract the list of symbols from the complete signature *)
 

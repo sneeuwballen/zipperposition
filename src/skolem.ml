@@ -34,7 +34,7 @@ type ctx = {
   mutable sc_cache : (Term.t * Symbol.t) list;  (* term -> skolem symbol cache *)
 }
 
-let create ?(prefix="$$sk_") () =
+let create ?(prefix="logtk_sk_") () =
   let ctx = {
     sc_gensym = Symbol.Gensym.create ~prefix ();
     sc_var_index = 0;
@@ -70,13 +70,13 @@ let skolem_term ~ctx t =
       ctx.sc_cache;
     (* not found, use a fresh symbol *)
     let symb = Symbol.Gensym.new_ ctx.sc_gensym in
-    let skolem_term = T.mk_at_list (T.mk_const symb) vars in
+    let skolem_term = T.mk_node symb vars in
     (* update cache with new symbol *)
     ctx.sc_cache <- (t, symb) :: ctx.sc_cache;
     (* replace the existential variable by [skolem_term] in [t] *)
     T.db_unlift (T.db_replace t skolem_term)
   with FoundVariant symb ->
     (* cache hit, re-use the symbol *)
-    let skolem_term = T.mk_at_list (T.mk_const symb) vars in
+    let skolem_term = T.mk_node symb vars in
     (* replace the existential variable by [skolem_term] in [t] *)
     T.db_unlift (T.db_replace t skolem_term)

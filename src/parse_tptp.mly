@@ -108,7 +108,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %left VLINE
 %left AND
 %left AT
-%right ARROW
 %nonassoc EQUIV
 %nonassoc XOR
 %nonassoc IMPLY
@@ -153,8 +152,8 @@ declaration_reset:
         then Ast_tptp.NewType (name, Symbol.name_symbol s)
         else Ast_tptp.TypeDecl (name, s, ty)
     }
-  | CNF LEFT_PAREN name=name COMMA role=role COMMA f=cnf_formula info=annotations RIGHT_PAREN DOT
-    { Ast_tptp.CNF (name, role, f, info) }
+  | CNF LEFT_PAREN name=name COMMA role=role COMMA c=cnf_formula info=annotations RIGHT_PAREN DOT
+    { Ast_tptp.CNF (name, role, c, info) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED RIGHT_PAREN DOT
     { Ast_tptp.Include (remove_quotes x) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED COMMA names=name_list RIGHT_PAREN DOT
@@ -182,7 +181,7 @@ cnf_formula:
   | c=disjunction { c }
 
 disjunction:
-  | l=separated_nonempty_list(VLINE, literal) { T.mk_or_list l }
+  | l=separated_nonempty_list(VLINE, literal) { l }
 
 literal:
   | f=atomic_formula { f }
