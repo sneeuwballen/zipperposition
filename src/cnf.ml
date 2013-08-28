@@ -36,8 +36,8 @@ let rec is_cnf t = match t.T.term with
     is_lit t'
   | T.Node (s, [a;b]) when S.eq s S.eq_symbol ->
     T.atomic a && T.atomic b
-  | T.Node (s, _) when S.eq s S.and_symbol || S.eq s S.equiv_symbol ||
-      S.eq s S.imply_symbol -> false
+  | T.Node (s, _) when S.eq s S.and_symbol || S.eq s S.equiv_symbol
+      || S.eq s S.imply_symbol -> false
   | T.Node _ -> true
   | T.Bind (_, _) -> false
   | T.BoundVar _ -> false
@@ -45,6 +45,9 @@ let rec is_cnf t = match t.T.term with
   | T.At (t1, t2) -> true
 and is_lit t = match t.T.term with
   | T.Node (s, [a;b]) when S.eq s S.eq_symbol -> T.atomic a && T.atomic b
+  | T.Node (s, _) when S.eq s S.imply_symbol || S.eq s S.and_symbol
+    || S.eq s S.or_symbol || S.eq s S.equiv_symbol -> false
+  | T.Node (s, [t']) when S.eq s S.not_symbol -> T.atomic t'
   | T.Node (_, _) -> true
   | T.Var _ -> true
   | T.At _ -> true
@@ -257,13 +260,14 @@ let cnf_of ?(ctx=Skolem.create ()) t =
     then
       let c = T.flatten_ac Symbol.or_symbol [t] in
       [c]
-    else
+    else (
       let t = simplify t in
       let t = nnf t in
       let t = miniscope t in
+      Skolem.update_var ~ctx t;
       let t = skolemize ~ctx t in
       let clauses = to_cnf t in
-      clauses
+      clauses )
 
 let cnf_of_list ?(ctx=Skolem.create ()) l =
   Util.list_flatmap (fun t -> cnf_of ~ctx t) l

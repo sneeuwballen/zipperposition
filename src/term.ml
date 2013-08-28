@@ -855,10 +855,10 @@ let pp_tstp buf t =
     Printf.bprintf buf "%a[%a]: (%a)" Symbol.pp s pp_var v pp_rec t'
   | BoundVar _ | Bind _ ->
     failwith "De Bruijn index in term, cannot be printed in TSTP"
-  | Node (s, [a;b]) when Symbol.eq s Symbol.eq_symbol ->
-    Printf.bprintf buf "%a = %a" pp_rec a pp_rec b
-  | Node (s, body1::body) when Symbol.has_attr Symbol.attr_infix s ->
-    Printf.bprintf buf "(%a %a %a)" pp_rec body1 Symbol.pp s (Util.pp_list pp_rec) body
+  | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
+    Printf.bprintf buf "%a %a %a" pp_rec a Symbol.pp s pp_rec b
+  | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
+    Printf.bprintf buf "%a %a (%a)" pp_rec body1 Symbol.pp s (Util.pp_list pp_rec) body
   | Node (s, []) -> Symbol.pp buf s
   | Node (s, args) -> (* general case for nodes *)
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args

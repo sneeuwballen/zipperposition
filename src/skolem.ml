@@ -31,8 +31,10 @@ module T = Term
 type ctx = {
   sc_gensym : Symbol.Gensym.t;                  (* new symbols *)
   mutable sc_var_index : int;                   (* fresh universal vars *)
-  mutable sc_cache : (Term.t * Symbol.t) list;  (* term -> skolem symbol cache *)
+  mutable sc_cache : (Term.t * Term.t) list;  (* term -> skolem symbol cache *)
 }
+
+(* TODO: use a term index for the cache? *)
 
 let create ?(prefix="logtk_sk_") () =
   let ctx = {
@@ -47,36 +49,36 @@ let fresh_sym ~ctx =
 
 (* update varindex in [ctx] so that it won't get captured in [t] *)
 let update_var ~ctx t =
-  ctx.sc_var_index <- T.max_var (T.vars t) + 1
+  ctx.sc_var_index <- max ctx.sc_var_index (T.max_var (T.vars t) + 1)
 
 let fresh_var ~ctx =
   let n = ctx.sc_var_index in
   ctx.sc_var_index <- n + 1;
   n
 
-exception FoundVariant of Symbol.t
+exception FoundVariant of Term.t * Term.t * Substs.t
 
 let skolem_term ~ctx t =
   let vars = T.vars_prefix_order t in
+  let scope = T.max_var vars + 1 in
   (* find the skolemized normalized term *)
   try
     List.iter
-      (fun (t', symb) ->
+      (fun (t', new_t') ->
         try
-          let _ = Unif.variant t 0 t' 1 in
-          raise (FoundVariant symb)
+          let subst = Unif.variant t' scope t 0  in
+          raise (FoundVariant (t', new_t', subst))
         with Unif.Fail ->
           ())
       ctx.sc_cache;
     (* not found, use a fresh symbol *)
     let symb = Symbol.Gensym.new_ ctx.sc_gensym in
+    (* replace the existential variable by [skolem_term] in [t] *)
     let skolem_term = T.mk_node symb vars in
+    let new_t = T.db_unlift (T.db_replace t skolem_term) in
     (* update cache with new symbol *)
-    ctx.sc_cache <- (t, symb) :: ctx.sc_cache;
-    (* replace the existential variable by [skolem_term] in [t] *)
-    T.db_unlift (T.db_replace t skolem_term)
-  with FoundVariant symb ->
-    (* cache hit, re-use the symbol *)
-    let skolem_term = T.mk_node symb vars in
-    (* replace the existential variable by [skolem_term] in [t] *)
-    T.db_unlift (T.db_replace t skolem_term)
+    ctx.sc_cache <- (t, new_t) :: ctx.sc_cache;
+    new_t
+  with FoundVariant (t',new_t',subst) ->
+    let new_t = Substs.apply_subst subst new_t' scope in
+    new_t
