@@ -35,7 +35,7 @@ val types : Signature.t -> Term.t -> Term.t -> bool
 val unification : ?subst:Substs.t -> Term.t -> Substs.scope ->
                   Term.t -> Substs.scope -> Substs.t
   (** Unify terms, returns a Substs.t or
-      @raises Fail if the terms are not unifiable *)
+      @raise Fail if the terms are not unifiable *)
 
 val matching : ?subst:Substs.t -> Term.t -> Substs.scope ->
                 Term.t -> Substs.scope -> Substs.t

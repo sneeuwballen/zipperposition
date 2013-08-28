@@ -25,8 +25,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 TPTP Ast} *)
 
-(* TODO: type declaration, and TFF *)
-
 type declaration =
   | CNF of name * role * Term.t * optional_info
   | FOF of name * role * Term.t * optional_info
@@ -62,6 +60,17 @@ and general_data =
   | GColumn of general_data * general_data
   | GNode of string * general_data list
   | GList of general_data list
+
+let name_of_decl = function
+  | CNF (n, _, _, _) -> n
+  | FOF (n, _, _, _) -> n
+  | TFF (n, _, _, _) -> n
+  | TypeDecl (n, _, _) -> n
+  | IncludeOnly _
+  | Include _ ->
+    raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
+
+(** {2 IO} *)
 
 let role_of_string = function
   | "axiom" -> R_axiom

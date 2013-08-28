@@ -15,7 +15,8 @@ Library logtk
                     Signature, TypeInference, Lex_tptp, Ast_tptp, Parse_tptp,
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
-                    Skolem, MetaPattern, MetaKB, MetaReasoner, MetaProver,
+                    Util_tptp, Skolem,
+                    MetaPattern, MetaKB, MetaReasoner, MetaProver,
                     Ast_theory, Lex_theory, Parse_theory,
                     lib/Sequence, lib/Bij, lib/Signal
   InternalModules:  lib/Cache

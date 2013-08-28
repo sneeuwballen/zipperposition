@@ -87,5 +87,3 @@ val default : Signature.t -> t
 
 val choose : string -> Precedence.t -> t
   (** Choose ordering by name, or raise Failure *)
-
-(** {2 Heuristic hack} *)
