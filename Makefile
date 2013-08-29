@@ -20,7 +20,7 @@ CAML_LIBS = str nums unix
 # build targets
 TARGETS_LIB = src/lib.cmxa src/lib.cma src/lib.cmi
 TARGETS_BIN = src/zipperposition.native
-TARGETS_TEST = tests/tests.native
+TARGETS_TEST =
 TARGET_PLUGINS = $(PLUGIN_FILES:%.ml=%.cmxs)
 
 # output, ready to install
