@@ -1,9 +1,10 @@
 # OASIS_START
-# DO NOT EDIT (digest: df7789b9db7e89e8f6928da0fd9a398b)
+# DO NOT EDIT (digest: e2c7515b6b525a845362325f8b22ebbd)
 src/Symbol
 src/Hash
 src/Hashcons
 src/Term
+src/Formula
 src/Util
 src/Unif
 src/Type

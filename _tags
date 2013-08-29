@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 79df83a1a91c7a976064d4c3886e53d5)
+# DO NOT EDIT (digest: 50fd1e25542b0c9d0d351774847f4511)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -19,6 +19,7 @@
 "src/hash.cmx": for-pack(Logtk)
 "src/hashcons.cmx": for-pack(Logtk)
 "src/term.cmx": for-pack(Logtk)
+"src/formula.cmx": for-pack(Logtk)
 "src/util.cmx": for-pack(Logtk)
 "src/unif.cmx": for-pack(Logtk)
 "src/type.cmx": for-pack(Logtk)
@@ -85,3 +86,4 @@
 <tools/*.ml{,i}>: pkg_datalog
 # OASIS_STOP
 true: use_menhir
+<**/*.cmx>: inline(10)

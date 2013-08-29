@@ -11,7 +11,7 @@ BuildTools:  ocamlbuild
 Library logtk
   Path:             src/
   Pack:             true
-  Modules:          Symbol, Hash, Hashcons, Term, Util, Unif, Type, Substs,
+  Modules:          Symbol, Hash, Hashcons, Term, Formula, Util, Unif, Type, Substs,
                     Signature, TypeInference, Lex_tptp, Ast_tptp, Parse_tptp,
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,

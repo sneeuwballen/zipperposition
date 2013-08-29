@@ -6,8 +6,8 @@
 #load "logtk.cma";;
 #install_printer Logtk.Symbol.fmt;;
 #install_printer Logtk.Type.fmt;;
-#install_printer Logtk.Type.Subst.fmt;;
 #install_printer Logtk.Term.fmt;;
+#install_printer Logtk.Formula.fmt;;
 #install_printer Logtk.Signature.fmt;;
 #install_printer Logtk.Substs.fmt;;
 #install_printer Logtk.Symbol.fmt;;
@@ -22,6 +22,7 @@
 open Logtk.Sequence.Infix;;
 open Logtk.Type.Infix;;
 module T = Logtk.Term;;
+module F = Logtk.Formula;;
 let pterm s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token
     (Lexing.from_string s);;
 open Logtk;;
