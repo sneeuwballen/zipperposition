@@ -250,8 +250,9 @@ let print_szs_result ~env result =
   | Sat.Unsat c -> begin
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";
-      Util.printf "# SZS output start Refutation %a\n# SZS output end Refutation\n"
-        (Proof.pp (Env.get_params ~env).param_proof) c.C.hcproof;
+      Util.printf "# SZS output start Refutation\n";
+      Util.printf "%a\n" (Proof.pp (Env.get_params ~env).param_proof) c.C.hcproof;
+      Printf.printf "# SZS output end Refutation\n";
       (* update knowledge base *)
       (*
       match meta with
@@ -349,9 +350,9 @@ let process_file ~kb ~plugins params f =
       result, clauses
     end else Sat.Unknown, Sequence.of_list clauses
   in
-  Util.debug 1 "%d clauses processed into:\n" num_clauses;
+  Util.debug 1 "%d clauses processed into:" num_clauses;
   Sequence.iter
-    (fun c -> Util.debug 1 "  %a\n" C.pp_debug c)
+    (fun c -> Util.debug 1 "  %a" C.pp_debug c)
     clauses;
   (* add clauses to passive set of [env] *)
   Env.add_passive ~env clauses;

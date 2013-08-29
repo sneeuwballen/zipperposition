@@ -48,8 +48,8 @@ let iter c f = Array.iter f (snd c)
 let to_seq c = Sequence.from_iter (fun k -> iter c k)
 
 let pp buf c =
-  let i, lits = c in
-  Printf.bprintf buf "c_%d(%a)" i Literal.pp_lits lits
+  let _, lits = c in
+  Printf.bprintf buf "[%a]" Literal.pp_lits lits
 
 let to_string c =
   Util.on_buffer pp c
