@@ -463,14 +463,14 @@ let infer_split c =
     let proof c' = Proof.mk_infer c' "split" [c.C.hcproof] in
     (* the guard clause, plus the first component, plus all negated split symbols *)
     let guard =
-      let lits = List.map (Lit.mk_neq ~ord T.true_term) symbols
+      let lits = List.map (fun t -> Lit.mk_false ~ord t) symbols
                @ List.hd !components @ !branch in
       C.create ~parents:[c] ~ctx lits proof
     in
     (* one new clause for each other component *)
     let new_clauses = List.map2
       (fun component split_symbol ->
-        let split_lit = Lit.mk_eq ~ord split_symbol T.true_term in
+        let split_lit = Lit.mk_true ~ord split_symbol in
         let lits = split_lit :: (component @ !branch) in
         C.create ~parents:[c] ~ctx lits proof)
       (List.tl !components) symbols

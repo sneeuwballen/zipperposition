@@ -150,6 +150,13 @@ let mk_lit ~ord a b sign =
   check_type a b;
   Equation (a, b, sign, Ordering.compare ord a b)
 
+let mk_prop ~ord p sign =
+  mk_lit ~ord p T.true_term sign
+
+let mk_true ~ord p = mk_prop ~ord p true
+
+let mk_false ~ord p = mk_prop ~ord p false
+
 let apply_subst ?(recursive=true) ?renaming ~ord subst lit scope =
   match lit with
   | Equation (l,r,sign,_) ->
@@ -163,11 +170,11 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
   match l.T.term, r.T.term with
   (* deal with trivial literals *)
   | _ when T.eq l T.true_term && T.eq r T.false_term ->
-    mk_lit ~ord T.true_term T.true_term (not sign)
+    mk_prop ~ord T.true_term (not sign)
   | _ when T.eq r T.true_term && T.eq l T.false_term ->
-    mk_lit ~ord T.true_term T.true_term (not sign)
+    mk_prop ~ord T.true_term (not sign)
   | _ when T.eq l r ->
-    mk_lit ~ord T.true_term T.true_term sign
+    mk_prop ~ord T.true_term sign
     (* deal with false/true *)
   | _ when T.eq l T.false_term ->
     lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
@@ -286,9 +293,11 @@ let ground_lits lits =
 let term_of_lits lits =
   match lits with
   | [||] -> T.false_term
-  | _ -> Array.fold_left
-    (fun t lit -> T.mk_or t (term_of_lit lit))
-    (term_of_lit lits.(0)) (Array.sub lits 1 (Array.length lits - 1))
+  | _ ->
+    Array.fold_right
+      (fun lit t -> T.mk_or (term_of_lit lit) t)
+      (Array.sub lits 1 (Array.length lits - 1))
+      (term_of_lit lits.(0))
 
 (** Apply the substitution to the array of literals, with scope *)
 let apply_subst_lits ?(recursive=true) ?renaming ~ord subst lits scope =
@@ -346,7 +355,7 @@ let lits_to_seq lits =
 
 let lits_of_terms ~ord terms =
   let terms = Array.of_list terms in
-  Array.map (fun t -> lit_of_fof ~ord (mk_eq ~ord t T.true_term)) terms
+  Array.map (fun t -> lit_of_fof ~ord (mk_true ~ord t)) terms
 
 let lits_infer_type ctx lits =
   Array.iter (infer_type ctx) lits

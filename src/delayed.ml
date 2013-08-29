@@ -95,13 +95,13 @@ type tableau_rule =
 
 (** helper for alpha elimination *)
 let alpha_eliminate ~ord a signa b signb =
-  Alpha (List [Lit.mk_lit ~ord a T.true_term signa],
-         List [Lit.mk_lit ~ord b T.true_term signb])
+  Alpha (List [Lit.mk_prop ~ord a signa],
+         List [Lit.mk_prop ~ord b signb])
 
 (** helper for beta elimination *)
 let beta_eliminate ~ord a signa b signb =
-  List [Lit.mk_lit ~ord a T.true_term signa;
-        Lit.mk_lit ~ord b T.true_term signb]
+  List [Lit.mk_prop ~ord a signa;
+        Lit.mk_prop ~ord b signb]
 
 (** helper for gamma elimination *)
 let gamma_eliminate ~ctx offset t sign =
@@ -121,7 +121,7 @@ let gamma_eliminate ~ctx offset t sign =
       else
         T.db_unlift t (* the variable is not present *)
   in
-  List [Lit.mk_lit ~ord new_t T.true_term sign]
+  List [Lit.mk_prop ~ord new_t sign]
 
 (** helper for delta elimination (remove idx-th literal from clause
     and adds t where De Bruijn 0 is replaced by a skolem
@@ -139,7 +139,7 @@ let delta_eliminate ~ctx t sign =
       end else
         T.db_unlift t (* the variable is not present *)
   in
-  List [Lit.mk_lit ~ord new_t T.true_term sign]
+  List [Lit.mk_prop ~ord new_t sign]
 
 (** Just keep the equation as it is *)
 let keep eqn = Keep eqn
@@ -184,17 +184,17 @@ let eliminate_lits c =
   and equiv eqn l r sign =
     match Ordering.compare ord l r with
     | Gt when sign && not (T.atomic l) -> (* l <=> r -> (l => r) & (r => l)*)
-      Alpha (List [Lit.mk_neq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
-             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_eq ~ord l T.true_term])
+      Alpha (List [Lit.mk_false ~ord l; Lit.mk_true ~ord r],
+             List [Lit.mk_false ~ord r; Lit.mk_true ~ord l])
     | Lt when sign && not (T.atomic r) ->
-      Alpha (List [Lit.mk_neq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
-             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_eq ~ord l T.true_term])
+      Alpha (List [Lit.mk_false ~ord l; Lit.mk_true ~ord r],
+             List [Lit.mk_false ~ord r; Lit.mk_true ~ord l])
     | Incomparable when sign && (not (T.atomic l) || not (T.atomic r)) ->
-      Alpha (List [Lit.mk_neq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
-             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_eq ~ord l T.true_term])
+      Alpha (List [Lit.mk_false ~ord l; Lit.mk_true ~ord r],
+             List [Lit.mk_false ~ord r; Lit.mk_true ~ord l])
     | _ when not sign -> (* not (l <=> r) -> (l | r) & (not l | not r) *)
-      Alpha (List [Lit.mk_eq ~ord l T.true_term; Lit.mk_eq ~ord r T.true_term],
-             List [Lit.mk_neq ~ord r T.true_term; Lit.mk_neq ~ord l T.true_term])
+      Alpha (List [Lit.mk_true ~ord l; Lit.mk_true ~ord r],
+             List [Lit.mk_false ~ord r; Lit.mk_false ~ord l])
     | _ -> keep eqn
   in
   (* try to eliminate each literal that is eligible for resolution *)

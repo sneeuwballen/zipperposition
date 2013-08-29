@@ -509,10 +509,12 @@ let pp_debug buf c =
   ()
 
 let pp_tstp buf c =
-  (* convert into a big term *)
-  let t = Lits.term_of_lits c.hclits in
-  (* quantify all free variables *)
-  let t = T.close_forall t in
+  let t =
+    T.close_forall
+      (T.mk_node Symbol.or_symbol
+        (Array.to_list
+          (Array.map Literal.term_of_lit c.hclits)))
+  in
   T.pp buf t
 
 let to_string = Util.on_buffer pp_debug

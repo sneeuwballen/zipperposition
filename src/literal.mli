@@ -59,6 +59,10 @@ val orientation_of : t -> Comparison.t  (** get the orientation of the literal *
 val mk_eq : ord:Ordering.t -> Term.t -> Term.t -> t
 val mk_neq : ord:Ordering.t -> Term.t -> Term.t -> t
 val mk_lit : ord:Ordering.t -> Term.t -> Term.t -> bool -> t
+val mk_prop : ord:Ordering.t -> Term.t -> bool -> t   (* proposition *)
+val mk_true : ord:Ordering.t -> Term.t -> t     (* true proposition *)
+val mk_false : ord:Ordering.t -> Term.t -> t    (* false proposition *)
+
 val reord : ord:Ordering.t -> t -> t      (** recompute order *)
 val lit_of_fof : ord:Ordering.t -> t -> t (** translate eq/not to literal *)
 val term_of_lit : t -> Term.t                   (** translate lit to term *)

@@ -173,7 +173,12 @@ let pp_tstp buf proof =
         Printf.bprintf buf "fof(%d, axiom, %a, file('%s', %s)).\n"
           (CompactClause.id c) T.pp_tstp t f ax_name
       | Infer (c, name, premises) ->
-        let t = T.close_forall (Literal.term_of_lits (CompactClause.lits c)) in
+        let t =
+          T.close_forall
+            (T.mk_node Symbol.or_symbol
+              (Array.to_list
+                (Array.map Literal.term_of_lit (CompactClause.lits c))))
+        in
         let premises = List.map proof_id premises in
         let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
         (* print the inference *)
