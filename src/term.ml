@@ -41,7 +41,7 @@ and term_cell =
   | Node of Symbol.t * t list   (** term application *)
   | At of t * t                 (** HO application (curried) *)
 and sourced_term =
-  t * string * string        (** Term + file,name *)
+  t * string * string           (** Term + file,name *)
 
 type term = t
 

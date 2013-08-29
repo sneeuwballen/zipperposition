@@ -64,8 +64,8 @@ and compare_premise p1 p2 = match p1, p2 with
 and compare_premises l1 l2 =
   Util.lexicograph compare_premise l1 l2
 
-module StringMap = Map.Make(String)
-module LemmaSet = Set.Make(struct type t = lemma let compare = compare_lemma end)
+module StringMap = Sequence.Map.Make(String)
+module LemmaSet = Sequence.Set.Make(struct type t = lemma let compare = compare_lemma end)
 
 let name_of_axiom = function
   | Axiom (s, _, _, _) -> s
@@ -155,6 +155,19 @@ let diff t1 t2 =
     theories = diff_map t1.theories t2.theories;
   }
 
+let to_seq kb =
+  ( LemmaSet.to_seq kb.lemmas
+  , StringMap.values kb.axioms
+  , StringMap.values kb.theories
+  )
+
+let of_seq (lemmas, axioms, theories) =
+  let kb = empty in
+  let kb = Sequence.fold add_lemma kb lemmas in
+  let kb = Sequence.fold add_axiom kb axioms in
+  let kb = Sequence.fold add_theory kb theories in
+  kb
+
 let pp buf kb =
   let pp_premise buf p = match p with
   | IfAxiom (s, []) -> Buffer.add_string buf s
@@ -184,13 +197,52 @@ let fmt fmt kb =
   let s = Util.sprintf "%a" pp kb in
   Format.pp_print_string fmt s
 
+let bij_premise =
+  let open Bij in
+  (* Helpers *)
+  let s_args = pair string_ (list_ T.bij) in
+  let p_args = pair MetaPattern.bij (list_ T.bij) in
+  switch
+    ~inject:(function
+      | IfAxiom (s, args) -> 'a', BranchTo (s_args, (s, args))
+      | IfPattern (p, args) -> 'p', BranchTo (p_args, (p, args)))
+    ~extract:(function
+      | 'a' -> BranchFrom (s_args, fun (s, args) -> IfAxiom (s, args))
+      | 'p' -> BranchFrom (p_args, fun (p, args) -> IfPattern (p, args))
+      | _ -> raise (DecodingError "expected premise"))
+
+let bij_lemma =
+  Bij.(map
+    ~inject:(fun (Lemma(p,args,premises)) -> p,args,premises)
+    ~extract:(fun (p,args,premises) -> Lemma(p,args,premises))
+    (triple MetaPattern.bij (list_ T.bij) (list_ bij_premise)))
+
+let bij_axiom =
+  Bij.(map
+    ~inject:(fun (Axiom(s,args,p,pargs)) -> s,args,p,pargs)
+    ~extract:(fun (s,args,p,pargs) -> Axiom(s,args,p,pargs))
+    (quad string_ (list_ T.bij) MetaPattern.bij (list_ T.bij)))
+
+let bij_theory =
+  Bij.(map
+    ~inject:(fun (Theory (s,args,premises)) -> (s,args,premises))
+    ~extract:(fun (s,args,premises) -> Theory(s,args,premises))
+    (triple string_ (list_ T.bij) (list_ bij_premise)))
+
 let bij =
   let open Bij in
+  let bij_kb = triple (list_ bij_lemma) (list_ bij_axiom) (list_ bij_theory) in
   map
-    ~inject:(fun _ -> assert false)
-    ~extract:(fun _ -> assert false)
-    unit_
-(* TODO *)
+    ~inject:(fun kb ->
+      let lemmas, axioms, theories = to_seq kb in
+      Sequence.to_rev_list lemmas,
+      Sequence.to_rev_list axioms,
+      Sequence.to_rev_list theories)
+    ~extract:(fun (lemmas, axioms, theories) ->
+      of_seq (Sequence.of_list lemmas,
+              Sequence.of_list axioms,
+              Sequence.of_list theories))
+    bij_kb
 
 (** {2 MetaReasoner} *)
 
@@ -446,11 +498,24 @@ let parse_theory_file filename =
     Util.debug 1 "%% error reading theory file %s: %s" filename msg;
     empty
   
-let save filename =
-  failwith "KB.save: not implemented"
-(* TODO *)
+let save filename kb =
+  let oc = open_out filename in
+  try
+    Bij.SexpChan.encode ~bij oc kb;
+    close_out oc;
+  with e ->
+    close_out oc;
+    raise e
 
 let restore filename =
-  failwith "KB.restore: not implemented"
-(* TODO *)
+  let ic = open_in filename in
+  try
+    let source = Bij.SourceChan.create ic in
+    let kb = Bij.SexpChan.decode ~bij source in
+    close_in ic;
+    Some kb
+  with e ->
+    close_in ic;
+    Util.debug 1 "restoring KB from %s: error %s" filename (Printexc.to_string e);
+    None
 

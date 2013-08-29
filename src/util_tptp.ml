@@ -213,3 +213,23 @@ let formulas ?(negate=__is_conjecture) decls =
           then Some (T.mk_not f)
           else Some f)
     decls
+
+let sourced_formulas ?(negate=__is_conjecture) ?(file="unknown_file") decls =
+  Sequence.fmap
+    (function
+      | A.TypeDecl _
+      | A.NewType _
+      | A.Include _
+      | A.IncludeOnly _ -> None
+      | A.CNF(name, role, c, _) ->
+        let source = A.string_of_name name in
+        if negate role
+          then Some (T.mk_not (T.mk_or_list c), file, source)
+          else Some (T.mk_or_list c, file, source)
+      | A.FOF(name, role, f, _)
+      | A.TFF(name, role, f, _) ->
+        let source = A.string_of_name name in
+        if negate role
+          then Some (T.mk_not f, file, source)
+          else Some (f, file, source))
+    decls

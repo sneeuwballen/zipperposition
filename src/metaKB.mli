@@ -62,8 +62,16 @@ val diff : t -> t -> t
   (** [diff kb1 kb2] is the set of definitions of [kb1] that
       do not belong to [kb2] *)
 
+val to_seq : t -> (lemma Sequence.t * axiom Sequence.t * theory Sequence.t)
+val of_seq : (lemma Sequence.t * axiom Sequence.t * theory Sequence.t) -> t
+
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
+
+val bij_lemma : lemma Bij.t
+val bij_axiom : axiom Bij.t
+val bij_theory : theory Bij.t
+val bij_premise : premise Bij.t
 val bij : t Bij.t
 
 (** {2 MetaReasoner} *)

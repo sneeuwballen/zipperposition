@@ -76,3 +76,10 @@ val formulas : ?negate:(Ast_tptp.role -> bool) ->
       a role that satisfies [negate] are negated.
       [negate] is true, by default, only for {!Ast_tptp.R_conjecture})*)
 
+val sourced_formulas : ?negate:(Ast_tptp.role -> bool) ->
+                       ?file:string ->
+                       Ast_tptp.declaration Sequence.t ->
+                       Term.sourced_term Sequence.t
+  (** Same as {!formulas}, but keeps a source attached to formulas.
+      A [file] name has to be provided for the source to be accurate,
+      the default is "unknown_file". *)
