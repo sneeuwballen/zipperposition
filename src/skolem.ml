@@ -27,11 +27,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Skolem symbols} *)
 
 module T = Term
+module F = Formula
 
 type ctx = {
   sc_gensym : Symbol.Gensym.t;                  (* new symbols *)
   mutable sc_var_index : int;                   (* fresh universal vars *)
-  mutable sc_cache : (Term.t * Term.t) list;  (* term -> skolem symbol cache *)
+  mutable sc_cache : (Term.t * Term.t) list;  (* term -> skolemized term *)
+  mutable sc_fcache : (Formula.t * Formula.t) list; 
 }
 
 (* TODO: use a term index for the cache? *)
@@ -41,6 +43,7 @@ let create ?(prefix="logtk_sk__") () =
     sc_gensym = Symbol.Gensym.create ~prefix ();
     sc_var_index = 0;
     sc_cache = [];
+    sc_fcache = [];
   } in
   ctx
 
@@ -72,7 +75,7 @@ let skolem_term ~ctx t =
           ())
       ctx.sc_cache;
     (* not found, use a fresh symbol *)
-    let symb = Symbol.Gensym.new_ ctx.sc_gensym in
+    let symb = fresh_sym ~ctx in
     (* replace the existential variable by [skolem_term] in [t] *)
     let skolem_term = T.mk_node symb vars in
     let new_t = T.db_unlift (T.db_replace t skolem_term) in
@@ -82,3 +85,26 @@ let skolem_term ~ctx t =
   with FoundVariant (t',new_t',subst) ->
     let new_t = Substs.apply_subst subst new_t' scope in
     new_t
+
+exception FoundFormVariant of Formula.t * Formula.t * Substs.t
+
+let skolem_form ~ctx ~var f =
+  let vars = F.free_vars f in
+  let scope = T.max_var vars + 1 in
+  (* find a variant of [f] *)
+  try
+    List.iter
+      (fun (f', new_f') ->
+        Sequence.iter
+          (fun subst -> raise (FoundFormVariant (f', new_f', subst)))
+          (Unif.form_variant f' scope f 0))
+      ctx.sc_fcache;
+    (* fresh symbol *)
+    let symb = fresh_sym ~ctx in
+    let skolem_term = T.mk_node symb vars in
+    let new_f = F.replace var skolem_term f in
+    ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
+    new_f
+  with FoundFormVariant(f',new_f',subst) ->
+    let new_f = F.apply_subst subst new_f' scope in
+    new_f

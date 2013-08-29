@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %{
   module T = Term
+  module F = Formula
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
@@ -116,7 +117,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %nonassoc NOTAND
 
 %start <Term.t> parse_term
-%start <Term.t> parse_formula
+%start <Formula.t> parse_formula
 %start <Ast_tptp.declaration> parse_declaration
 %start <Ast_tptp.declaration list> parse_declarations
 %start <Term.t list list> parse_answer_tuple
@@ -185,7 +186,7 @@ disjunction:
 
 literal:
   | f=atomic_formula { f }
-  | NOT f=atomic_formula { T.mk_not f }
+  | NOT f=atomic_formula { F.mk_not f }
   | f=fol_infix_unary { f }
 
 fof_formula:
@@ -194,9 +195,8 @@ fof_formula:
 
 fof_sequent:
   | l=fof_tuple GENTZEN_ARROW r=fof_tuple
-    { T.mk_imply (T.mk_and_list l) (T.mk_or_list r) }
-  | LEFT_PAREN seq=fof_sequent RIGHT_PAREN
-    { seq }
+    { F.mk_imply (F.mk_and l) (F.mk_or r) }
+  | LEFT_PAREN seq=fof_sequent RIGHT_PAREN { seq }
 
 fof_tuple:
   LEFT_BRACKET l=separated_list(COMMA, fof_logic_formula) RIGHT_BRACKET { l } 
@@ -225,28 +225,28 @@ fol_infix_unary:
     { o l r }
   
 %inline binary_connective:
-  | EQUIV { T.mk_equiv }
-  | IMPLY { T.mk_imply }
-  | LEFT_IMPLY { fun x y -> T.mk_imply y x }
-  | XOR { T.mk_xor }
-  | NOTVLINE { fun x y -> T.mk_not (T.mk_or x y) }
-  | NOTAND { fun x y -> T.mk_not (T.mk_and x y) }
-  | AND { T.mk_and }
-  | VLINE { T.mk_or }
+  | EQUIV { F.mk_equiv }
+  | IMPLY { F.mk_imply }
+  | LEFT_IMPLY { F.mk_imply }
+  | XOR { F.mk_xor }
+  | NOTVLINE { fun x y -> F.mk_not (F.mk_or [x; y]) }
+  | NOTAND { fun x y -> F.mk_not (F.mk_and [x;x]) }
+  | AND { fun x y -> F.mk_and [x;y] }
+  | VLINE { fun x y -> F.mk_or [x;y] }
 %inline fol_quantifier:
-  | FORALL { T.mk_forall_var }
-  | EXISTS { T.mk_exists_var }
+  | FORALL { F.mk_forall_list }
+  | EXISTS { F.mk_exists_list }
 %inline unary_connective:
-  | NOT { T.mk_not }
+  | NOT { F.mk_not }
 %inline infix_inequality:
-  | NOT_EQUAL { fun x y -> T.mk_not (T.mk_eq x y) }
+  | NOT_EQUAL { F.mk_neq }
 
 atomic_formula:
   | plain_atomic_formula { $1 }
   | defined_atomic_formula { $1 }
   | system_atomic_formula { $1 }
 
-plain_atomic_formula: plain_term { $1 }
+plain_atomic_formula: plain_term { F.mk_atom $1 }
 
 defined_atomic_formula:
   | defined_plain_formula { $1 }
@@ -256,19 +256,19 @@ defined_infix_formula:
   | l=term o=defined_infix_pred r=term  { o l r }
 
 %inline defined_infix_pred:
-  | EQUAL { T.mk_eq }
+  | EQUAL { F.mk_eq }
 
 defined_plain_formula:
   | p=defined_prop
-    { T.mk_const p }
+    { F.mk_atom (T.mk_const p) }
   | p=defined_pred LEFT_PAREN args=arguments RIGHT_PAREN
-    { T.mk_node p args }
+    { F.mk_atom (T.mk_node p args) }
 
 /* includes $true and $false */
 defined_prop: atomic_defined_word { $1 } 
 defined_pred: atomic_defined_word { $1 }
 
-system_atomic_formula: system_term { $1 }
+system_atomic_formula: system_term { F.mk_atom $1 }
   
 /* Terms */
 

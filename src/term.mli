@@ -70,11 +70,12 @@ module T2Cache : Cache.S2 with type key1 = t and type key2 = t
 (** {2 Hashset of terms} *)
 module THashSet : sig
   type t
-  val create : unit -> t
+  val create : ?size:int -> unit -> t
   val cardinal : t -> int
   val member : t -> term -> bool
   val iter : t -> (term -> unit) -> unit
   val add : t -> term -> unit
+  val remove : t -> term -> unit
   val merge : t -> t -> unit              (** [merge s1 s2] adds elements of s2 to s1 *)
   val to_list : t -> term list            (** build a list from the set *)
   val from_list : term list -> t          (** build a set from the list *)

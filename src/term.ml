@@ -121,11 +121,12 @@ module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
 
 module THashSet = struct
   type t = unit THashtbl.t
-  let create () = THashtbl.create 3
+  let create ?(size=7) () = THashtbl.create size
   let cardinal t = THashtbl.length t
   let member t term = THashtbl.mem t term
   let iter set f = THashtbl.iter (fun t () -> f t) set
   let add set t = THashtbl.replace set t ()
+  let remove set t = THashtbl.remove set t
   let merge s1 s2 = iter s2 (add s1)
   let to_list set =
     let l = ref [] in

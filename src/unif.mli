@@ -55,3 +55,21 @@ val matching_ac : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
       is much more costly than [matching]. By default [is_ac] returns true only
       for symbols that have [attr_ac], and [is_com] only for [attr_commut].
       [offset] is used to create new variables. *)
+
+(** {2 Unification on formulas} *)
+
+val form_unify : ?subst:Substs.t ->
+                  Formula.t -> Substs.scope ->
+                  Formula.t -> Substs.scope ->
+                  Substs.t Sequence.t
+  (** Set of unifiers of both formulas modulo AC. No variable is
+      introduced at the proposition level, and the properties
+      that f1 or f2 may become f if f1\sigma = f2\sigma
+      are ignored (no deduplication of subformulas). *)
+
+val form_variant : ?subst:Substs.t ->
+                    Formula.t -> Substs.scope ->
+                    Formula.t -> Substs.scope ->
+                    Substs.t Sequence.t
+  (** Set of renamings of both formulas, if they are alpha-equivalent
+      modulo AC *)

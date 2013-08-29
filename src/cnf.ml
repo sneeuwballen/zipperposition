@@ -27,179 +27,100 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module T = Term
 module S = Symbol
+module F = Formula
 
-(** check whether the clause is already in CNF *)
-let rec is_cnf t = match t.T.term with
-  | T.Node (s, [a;b]) when S.eq s S.or_symbol ->
-    is_cnf a && is_cnf b
-  | T.Node (s, [t']) when S.eq s S.not_symbol ->
-    is_lit t'
-  | T.Node (s, [a;b]) when S.eq s S.eq_symbol ->
-    T.atomic a && T.atomic b
-  | T.Node (s, _) when S.eq s S.and_symbol || S.eq s S.equiv_symbol
-      || S.eq s S.imply_symbol -> false
-  | T.Node _ -> true
-  | T.Bind (_, _) -> false
-  | T.BoundVar _ -> false
-  | T.Var _ -> true
-  | T.At (t1, t2) -> true
-and is_lit t = match t.T.term with
-  | T.Node (s, [a;b]) when S.eq s S.eq_symbol -> T.atomic a && T.atomic b
-  | T.Node (s, _) when S.eq s S.imply_symbol || S.eq s S.and_symbol
-    || S.eq s S.or_symbol || S.eq s S.equiv_symbol -> false
-  | T.Node (s, [t']) when S.eq s S.not_symbol -> T.atomic t'
-  | T.Node (_, _) -> true
-  | T.Var _ -> true
-  | T.At _ -> true
-  | T.BoundVar _ -> false
-  | T.Bind (_, _) -> false
+(* check whether the formula is already in CNF *)
+let rec is_cnf f = match f.F.form with
+  | F.Or l -> List.for_all is_lit l
+  | F.Not f' -> is_lit f'
+  | F.True
+  | F.False
+  | F.Atom _
+  | F.Equal _ -> true
+  | F.And _ 
+  | F.Equiv _
+  | F.Imply _
+  | F.Forall _
+  | F.Exists _ -> false
 
-let mark_simplified t = T.set_flag T.flag_simplified t true
+and is_lit f = match f.F.form with
+  | F.Not f' -> F.is_atomic f'
+  | F.Equal _
+  | F.Atom _
+  | F.True
+  | F.False -> true
+  | F.Or _
+  | F.And _
+  | F.Equiv _
+  | F.Imply _
+  | F.Forall _
+  | F.Exists _ -> false
 
-(** Simplify a boolean term (a formula) *)
-let rec simplify t =
-  if T.get_flag T.flag_simplified t
-    then t
-    else match t.T.term with
-    | T.Var _
-    | T.Node (_, [])
-    | T.BoundVar _ -> mark_simplified t; t
-    | T.At (t1, t2) ->
-      let new_t = T.mk_at (simplify t1) (simplify t2) in
-      mark_simplified new_t;
-      new_t
-    | T.Bind (f, t') when not (T.db_contains t' 0) ->
-      simplify (T.db_unlift t')  (* eta-reduction: binder binds nothing, remove it *)
-    | T.Bind (f, t') ->
-      T.mk_bind f (simplify t')
-    | T.Node (s, [{T.term=T.Bind (s', t')}]) when s == S.not_symbol && s' == S.forall_symbol ->
-      simplify (T.mk_exists (T.mk_not t'))  (* not forall t -> exists (not t) *)
-    | T.Node (s, [{T.term=T.Bind (s', t')}]) when s == S.not_symbol && s' == S.exists_symbol ->
-      simplify (T.mk_forall (T.mk_not t'))  (* not exists t -> forall (not t) *)
-    | T.Node (s, [{T.term=T.Node (s', [t'])}]) when s == S.not_symbol && s' == S.not_symbol ->
-      simplify t'  (* double negation *)
-    | T.Node (s, [t']) when s == S.not_symbol && t' == T.true_term ->
-      T.false_term  (* not true -> false *)
-    | T.Node (s, [t']) when s == S.not_symbol && t' == T.false_term ->
-      T.true_term   (* not false -> true *)
-    | T.Node (s, [a; b]) when s == S.and_symbol && (a == T.false_term || b == T.false_term) ->
-      T.false_term  (* a and false -> false *)
-    | T.Node (s, [a; b]) when s == S.or_symbol && (a == T.true_term || b == T.true_term) ->
-      T.true_term  (* a or true -> true *)
-    | T.Node (s, [a; b]) when s == S.or_symbol && a == T.false_term ->
-      simplify b  (* b or false -> b *)
-    | T.Node (s, [a; b]) when s == S.or_symbol && b == T.false_term ->
-      simplify a  (* a or false -> a *)
-    | T.Node (s, [a; b]) when s == S.and_symbol && a == T.true_term ->
-      simplify b  (* b and true -> b *)
-    | T.Node (s, [a; b]) when s == S.and_symbol && b == T.true_term ->
-      simplify a  (* a and true -> a *)
-    | T.Node (s, [a; b]) when s == S.imply_symbol && (a == T.false_term || b == T.true_term) ->
-      T.true_term  (* (false => a) or (a => true) -> true *)
-    | T.Node (s, [a; b]) when s == S.imply_symbol && a == T.true_term ->
-      simplify b  (* (true => a) -> a *)
-    | T.Node (s, [a; b]) when (S.eq s S.eq_symbol || S.eq s S.equiv_symbol) && a == b ->
-      T.true_term  (* a = a -> true *)
-    | T.Node (s, [a; b]) when (S.eq s S.eq_symbol || S.eq s S.equiv_symbol) && 
-      ((a == T.true_term && b == T.false_term) ||
-       (b == T.true_term && a == T.false_term)) ->
-      T.false_term (* true = false -> false *)
-    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && b == T.true_term ->
-      simplify a  (* a <=> true -> a *)
-    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && a == T.true_term ->
-      simplify b  (* b <=> true -> b *)
-    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && b == T.false_term ->
-      simplify (T.mk_not a)  (* a <=> false -> not a *)
-    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && a == T.false_term ->
-      simplify (T.mk_not b)  (* b <=> false -> not b *)
-    | T.Node (s, l) ->
-      let l' = List.map simplify l in
-      if List.for_all2 (==) l l'
-        then (mark_simplified t; t)
-        else 
-          let new_t = T.mk_node s l' in
-          simplify new_t
-
-(* Apply miniscoping (push quantifiers as deep as possible in the formula) to the term *)
-let rec miniscope t =
-  (* build a n-ary and/or *)
-  let rec mk_n_ary s l = match l with
-  | [] -> assert false
-  | x::[] -> x
-  | x::y::l' ->  (* pop x, y from stack *)
-    let t = T.mk_node s [x;y] in
-    mk_n_ary s (t::l')  (* push back (x op y) on stack *)
-  in
-  (* simplify the term *)
-  let t = simplify t in
+(* miniscoping (push quantifiers as deep as possible in the formula) *)
+let rec miniscope f =
+  let f = F.simplify f in
   (* recursive miniscoping *)
-  match t.T.term with
-  | T.Bind (s, {T.term=T.Node (s', l)})
-    when (s == S.forall_symbol || s == S.exists_symbol)
-    && (s' == S.and_symbol || s' == S.or_symbol) ->
-    (* Q x. a and/or b -> (Q x. a) and/or b  if x \not\in vars(b) *)
-    let a, b = List.partition (fun f -> T.db_contains f 0) l in
-    assert (a <> []);  (* eta-reduction should have worked! *)
-    if b <> []
-      then
-        (* distribute forall over and, or exists over or; otherwise keep it outside *)
-        let a =
-          if ((s == S.forall_symbol && s' == S.and_symbol)
-            || (s == S.exists_symbol && s' == S.or_symbol))
-          then mk_n_ary s' (List.map (fun t -> miniscope (T.mk_bind s t)) a)
-          else T.mk_bind s (mk_n_ary s' a)
-        in
-        (* some subformulas do not contain x, put them outside of quantifier *)
-        let b = mk_n_ary s' (List.map (fun t -> miniscope (T.db_unlift t)) b) in
-        simplify (T.mk_node s' [a; b])
-      else t
-  | T.Bind (_, _) -> t
-  | T.BoundVar _
-  | T.Var _
-  | T.At _
-  | T.Node _ -> t
+  match f.F.form with
+  | F.Forall (v, {F.form=F.And l}) ->
+    (* forall x (and l) -> and (forall x f' \ f' in l) *)
+    let l = List.map miniscope l in
+    let with_v, without_v = List.partition (F.subterm v) l in
+    F.mk_and (List.map (F.mk_forall v) with_v @ without_v)
+  | F.Forall (v, {F.form=F.Or l}) ->
+    let l = List.map miniscope l in
+    let with_v, without_v = List.partition (F.subterm v) l in
+    F.mk_and (F.mk_forall v (F.mk_or with_v) :: without_v)
+  | F.Exists (v, {F.form=F.And l}) ->
+    let l = List.map miniscope l in
+    let with_v, without_v = List.partition (F.subterm v) l in
+    F.mk_and (F.mk_exists v (F.mk_and with_v) :: without_v)
+  | F.Exists (v, {F.form=F.Or l}) ->
+    let l = List.map miniscope l in
+    let with_v, without_v = List.partition (F.subterm v) l in
+    F.mk_or (List.map (F.mk_exists v) with_v @ without_v)
+  | F.And l -> F.mk_and (List.map miniscope l)
+  | F.Or l -> F.mk_or (List.map miniscope l)
+  | F.Imply (f1, f2) -> F.mk_imply (miniscope f1) (miniscope f2)
+  | F.Equiv (f1, f2) -> F.mk_equiv (miniscope f1) (miniscope f2)
+  | F.True
+  | F.False
+  | F.Equal _
+  | F.Atom _ -> f
 
-(** negation normal form (also remove equivalence and implications) *) 
-let rec nnf t =
-  match t.T.term with
-  | T.Var _
-  | T.Node (_, [])
-  | T.BoundVar _ -> t
-  | T.Bind (f, t') -> T.mk_bind f (nnf t')
-  | T.Node (s, [{T.term=T.Node (s', [a; b])}])
-    when s == S.not_symbol && s' == S.and_symbol ->
-    nnf (T.mk_or (T.mk_not a) (T.mk_not b))  (* de morgan *)
-  | T.Node (s, [{T.term=T.Node (s', [a; b])}])
-    when s == S.not_symbol && s' == S.or_symbol ->
-    nnf (T.mk_and (T.mk_not a) (T.mk_not b)) (* de morgan *)
-  | T.Node (s, [a; b]) when s == S.imply_symbol ->
-    nnf (T.mk_or (T.mk_not a) b) (* (a => b) -> (not a or b) *)
-  | T.Node (s, [a; b]) when s == S.equiv_symbol ->
-    (* (a <=> b) -> (not a or b) and (not b or a) *)
-    nnf (T.mk_and
-      (T.mk_or (T.mk_not a) b)
-      (T.mk_or (T.mk_not b) a))
-  | T.Node (s, [{T.term=T.Node (s', [a; b])}])
-    when s == S.not_symbol && s' == S.imply_symbol ->
-    nnf (T.mk_and a (T.mk_not b)) (* not (a => b) -> (a and not b) *)
-  | T.Node (s, [{T.term=T.Node (s', [a; b])}])
-    when s == S.not_symbol && s' == S.equiv_symbol ->
-    (* not (a <=> b) -> (a <=> (not b)) *)
-    nnf (T.mk_or
-      (T.mk_and a (T.mk_not b))
-      (T.mk_and b (T.mk_not a)))
-  | T.Node (s, [{T.term=T.Bind (s', t')}]) when s == S.not_symbol && s' == S.forall_symbol ->
-    nnf (T.mk_exists (T.mk_not t')) (* not forall -> exists not *)
-  | T.Node (s, [{T.term=T.Bind (s', t')}])
-    when s == S.not_symbol && s' == S.exists_symbol ->
-    nnf (T.mk_forall (T.mk_not t')) (* not exists -> forall not *)
-  | T.Node (s, [{T.term=T.Node (s', [t])}])
-    when s == S.not_symbol && s' == S.not_symbol ->
-    nnf t (* double negation *)
-  | T.Node (s, l) ->
-    let t' = T.mk_node s (List.map nnf l) in
-    if t == t' then t' else nnf t'
-  | T.At (t1, t2) -> t
+(* negation normal form (also remove equivalence and implications) *) 
+let rec nnf f = match f.F.form with
+  | F.Atom _
+  | F.Equal _ -> f
+  | F.And l -> F.mk_and (List.map nnf l)
+  | F.Or l -> F.mk_or (List.map nnf l)
+  | F.Not {F.form=F.Imply(f1,f2)} ->
+    F.mk_and [ nnf f1; nnf (F.mk_not f2) ]
+  | F.Imply (f1, f2) ->
+    F.mk_or [ F.mk_not (F.mk_not f1); nnf f2 ]
+  | F.Not {F.form=F.Equiv(f1,f2)} ->
+    F.mk_or
+      [ F.mk_and [ nnf (F.mk_not f1); nnf (F.mk_not f2) ]
+      ; F.mk_and [ nnf f1; nnf f2 ]
+      ]
+  | F.Equiv (f1, f2) ->
+    F.mk_and
+      [ nnf (mk_imply f1 f2)
+      ; nnf (mk_imply f2 f1)
+      ]
+  | F.Not {F.form=F.Forall(v, f')} ->
+    F.mk_exists v (nnf (F.mk_not f'))
+  | F.Forall (v, f') -> F.mk_forall v (nnf f')
+  | F.Not {F.form=F.Exists(v, f')} ->
+    F.mk_forall v (nnf (F.mk_not f'))
+  | F.Exists (v, f') -> F.mk_exists v (nnf f')
+  | F.Not f' -> F.mk_not (nnf f')
+
+let skolemize ~ctx f =
+  let rec skolemize f = match f.F.form with
+  | F.And l -> F.mk_and (List.map skolemize l)
+  | F.Or l -> F.mk_or (List.map skolemize l)
+  | F.Not f' -> F.mk_not (skolemize f')
+  | F.
 
 (* skolemization of existentials, removal of forall *)
 let rec skolemize ~ctx t = match t.T.term with

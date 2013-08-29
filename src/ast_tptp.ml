@@ -26,9 +26,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Ast} *)
 
 type declaration =
-  | CNF of name * role * Term.t list * optional_info
-  | FOF of name * role * Term.t * optional_info
-  | TFF of name * role * Term.t * optional_info
+  | CNF of name * role * Formula.t list * optional_info
+  | FOF of name * role * Formula.t * optional_info
+  | TFF of name * role * Formula.t * optional_info
   | TypeDecl of name * Symbol.t * Type.t  (* type declaration *)
   | NewType of name * string  (* declare new type constant... *)
   | Include of string
@@ -147,10 +147,11 @@ let fmt_generals fmt l =
 let __pp_formula buf (logic, name, role, f, generals) =
   match generals with
   | [] ->
-    Printf.bprintf buf "%s(%a, %a, (%a))." logic pp_name name pp_role role Term.pp_tstp f
+    Printf.bprintf buf "%s(%a, %a, (%a))."
+      logic pp_name name pp_role role Formula.pp_tstp f
   | _::_ ->
     Printf.bprintf buf "%s(%a, %a, (%a), %a)." logic pp_name name pp_role role
-      Term.pp_tstp f pp_generals generals
+      Formula.pp_tstp f pp_generals generals
 
 let pp_declaration buf = function
   | Include filename -> Printf.bprintf buf "include('%s')." filename
@@ -165,10 +166,10 @@ let pp_declaration buf = function
     begin  match generals with
     | [] ->
       Printf.bprintf buf "cnf(%a, %a, (%a))." pp_name name pp_role role
-        (Util.pp_list ~sep:" | " Term.pp_tstp) c
+        (Util.pp_list ~sep:" | " Formula.pp_tstp) c
     | _::_ ->
       Printf.bprintf buf "cnf(%a, %a, (%a), %a)." pp_name name pp_role role
-        (Util.pp_list ~sep:" | " Term.pp_tstp) c pp_generals generals
+        (Util.pp_list ~sep:" | " Formula.pp_tstp) c pp_generals generals
     end
   | FOF (name, role, f, generals) ->
     __pp_formula buf ("fof", name, role, f, generals)

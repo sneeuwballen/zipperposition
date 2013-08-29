@@ -46,6 +46,8 @@ and cell =
   | Forall of Term.t * t    (** Quantified variable, plus formula *)
   | Exists of Term.t * t
 
+type sourced_form = t * string * string    (* form, filename, axiom name *)
+
 type form = t
 
 let compare f1 f2 = f1.id - f2.id
@@ -135,6 +137,12 @@ let mk_forall v f =
 let mk_exists v f =
   H.hashcons { form=Exists(v,f); id= ~-1; }
 
+let mk_forall_list vars f =
+  List.fold_right mk_forall vars f
+
+let mk_exists_list vars f =
+  List.fold_right mk_exists vars f
+
 let rec add_terms set f = match f.form with
   | And l
   | Or l -> List.iter (add_terms set) l
@@ -156,6 +164,19 @@ let terms_seq f =
   let set = terms f in
   Sequence.from_iter (T.THashSet.iter set)
 
+let rec subterm t f = match f.form with
+  | Or l
+  | And l -> List.exists (subterm t) l
+  | Imply (f1, f2)
+  | Equiv (f1, f2) -> subterm t f1 || subterm t f2
+  | Not f' -> subterm t f'
+  | Forall (_, f')
+  | Exists (_, f') -> subterm t f'
+  | Equal (t1, t2) -> T.subterm ~sub:t t1 || T.subterm ~sub:t t2
+  | Atom p -> T.subterm ~sub:t p
+  | True
+  | False -> false
+
 let bound_variables f =
   let rec recurse acc f = match f.form with
   | Atom _
@@ -174,6 +195,29 @@ let bound_variables f =
     recurse acc f'
   in
   recurse [] f
+
+let rec free_variables f =
+  let set = T.THashSet.create ~size:3 () in
+  let rec recurse f = match f.form with
+  | Atom p -> T.add_vars set p
+  | Equal (t1, t2) ->
+    T.add_vars set t1;
+    T.add_vars set t2
+  | True
+  | False -> ()
+  | And l
+  | Or l -> List.iter recurse l
+  | Imply (f1, f2)
+  | Equiv (f1, f2) -> recurse f1; recurse f2
+  | Not f' -> recurse acc f'
+  | Forall (v, f')
+  | Exists (v, f') ->
+    let set' = free_variables f' in
+    T.THashSet.remove set' v; (* [v] not free *)
+    T.THashSet.merge set set' (* set union *)
+  in
+  recurse set f;
+  T.THashSet.to_list set
 
 let is_atomic f = match f.form with
   | And _
@@ -306,10 +350,64 @@ let of_term t =
   let varindex = ref (T.max_var (T.vars t) + 1) in
   recurse (T.db_to_classic ~varindex t)
 
+(** {2 Typing} *)
+
+let rec infer_type ctx f = match f.form with
+  | True
+  | False -> ()
+  | Atom p ->
+    TypeInference.constrain_term_type ctx p Type.o
+  | Equal (t1, t2) ->
+    TypeInference.constrain_term_term ctx t1 t2
+  | And l
+  | Or l -> List.iter (infer_type ctx) l
+  | Forall (v, f')
+  | Exists (v, f') -> infer_type ctx f'
+  | Equiv (f1, f2)
+  | Imply (f1, f2) -> infer_type ctx f1; infer_type ctx f2
+  | Not f' -> infer_type ctx f'
+
+let signature ?(signature=Signature.empty) f =
+  let ctx = TypeInference.Ctx.of_signature signature in
+  infer_type ctx f;
+  TypeInference.default_to_i ctx;
+  TypeInference.Ctx.to_signature ctx
+
 (** {2 IO} *)
 
-let rec pp buf f =
-  assert false
+let pp buf f =
+  (* outer formula *)
+  let rec pp_outer buf f = match f.form with
+  | True -> Buffer.add_string buf "true"
+  | False -> Buffer.add_string buf "false"
+  | Atom t -> T.pp buf t
+  | Not {form=Equal (t1, t2)} ->
+    T.pp buf t1; Buffer.add_string buf " != "; T.pp buf t2
+  | Equal (t1, t2) ->
+    T.pp buf t1; Buffer.add_string buf " = "; T.pp buf t2
+  | Not {form=Equiv (f1, f2)} ->
+    pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
+  | Equiv (f1, f2) ->
+    pp_inner buf f1; Buffer.add_string buf " <=> "; pp_inner buf f2
+  | Imply (f1, f2) ->
+    pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
+  | Not f' -> Buffer.add_string buf "¬ "; pp_inner buf f'
+  | Forall (v, f') ->
+    Printf.bprintf buf "∀ %a. %a" T.pp v pp_inner f'
+  | Exists (v, f') ->
+    Printf.bprintf buf "∃ %a. %a" T.pp v pp_inner f'
+  | And l -> Util.pp_list ~sep:" ∧ " pp_inner buf l
+  | Or l -> Util.pp_list ~sep:" ∨ " pp_inner buf l
+  and pp_inner buf f = match f.form with
+  | And _
+  | Or _
+  | Equiv _
+  | Imply _ ->
+    (* cases where ambiguities could arise *)
+    Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
+  | _ -> pp_outer buf f
+  in
+  pp_outer buf (flatten f)
 
 let to_string f =
   Util.on_buffer pp f
@@ -317,8 +415,39 @@ let to_string f =
 let fmt fmt f =
   Format.pp_print_string fmt (to_string f)
 
-let rec pp_tstp buf f =
-  assert false
+let pp_tstp buf f =
+  (* outer formula *)
+  let rec pp_outer buf f = match f.form with
+  | True -> Buffer.add_string buf "$true"
+  | False -> Buffer.add_string buf "$false"
+  | Atom t -> T.pp buf t
+  | Not {form=Equal (t1, t2)} ->
+    T.pp buf t1; Buffer.add_string buf " != "; T.pp buf t2
+  | Equal (t1, t2) ->
+    T.pp buf t1; Buffer.add_string buf " = "; T.pp buf t2
+  | Not {form=Equiv (f1, f2)} ->
+    pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
+  | Equiv (f1, f2) ->
+    pp_inner buf f1; Buffer.add_string buf " <=> "; pp_inner buf f2
+  | Imply (f1, f2) ->
+    pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
+  | Not f' -> Buffer.add_string buf "~ "; pp_inner buf f'
+  | Forall (v, f') ->
+    Printf.bprintf buf "![%a]: %a" T.pp v pp_inner f'
+  | Exists (v, f') ->
+    Printf.bprintf buf "?[%a]: %a" T.pp v pp_inner f'
+  | And l -> Util.pp_list ~sep:" & " pp_inner buf l
+  | Or l -> Util.pp_list ~sep:" | " pp_inner buf l
+  and pp_inner buf f = match f.form with
+  | And _
+  | Or _
+  | Equiv _
+  | Imply _ ->
+    (* cases where ambiguities could arise *)
+    Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
+  | _ -> pp_outer buf f
+  in
+  pp_outer buf (flatten f)
 
 (* KISS: use the term bijection *)
 let bij =

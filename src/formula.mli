@@ -43,6 +43,8 @@ and cell = private
   | Forall of Term.t * t    (** Quantified variable, plus formula *)
   | Exists of Term.t * t
 
+type sourced_form = t * string * string    (* form, filename, axiom name *)
+
 val eq : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
@@ -61,6 +63,9 @@ val mk_neq : Term.t -> Term.t -> t
 val mk_forall : Term.t -> t -> t
 val mk_exists : Term.t -> t -> t
 
+val mk_forall_list : Term.t list -> t -> t
+val mk_exists_list : Term.t list -> t -> t
+
 (** The following functions gather the terms of a formula.
     However, bound variables are not gathered. *)
 
@@ -68,8 +73,14 @@ val add_terms : Term.THashSet.t -> t -> unit
 val terms : t -> Term.THashSet.t
 val terms_seq : t -> Term.t Sequence.t
 
+val subterm : Term.t -> t -> bool
+  (** [subterm t f] true iff [t] occurs in some term of [f] *)
+
 val bound_variables : t -> Term.varlist
   (** Variables bound in a quantifier *)
+
+val free_variables : t -> Term.varlist
+  (** Variables not bound by any (formula) quantifier *)
 
 val is_atomic : t -> bool   (** No connectives? *)
 val is_ground : t -> bool   (** No variables? *)
@@ -80,6 +91,11 @@ val simplify : t -> t       (** Simplify the formula *)
 
 val to_term : t -> Term.t   (** Conversion to term *)
 val of_term : Term.t -> t
+
+(** {2 Typing} *)
+
+val infer_type : TypeInference.Ctx.t -> t -> unit
+val signature : ?signature:Signature.t -> t -> Signature.t
 
 (** {2 IO} *)
 
