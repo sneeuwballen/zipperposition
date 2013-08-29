@@ -65,6 +65,15 @@ let to_seq c =
   let lits = Sequence.of_array c.hclits in
   Sequence.map (function | Lits.Equation (l,r,sign,_) -> l,r,sign) lits
 
+let to_prec_clause c =
+  let lits = Sequence.of_array c.hclits in
+  let lits = Sequence.map
+    (function Lits.Equation (l,r,sign,_) ->
+      if sign then T.mk_eq l r else T.mk_neq l r)
+    lits
+  in
+  lits
+
  (** {2 boolean flags} *)
 
 let flag_ground = 1 lsl 0
@@ -349,15 +358,15 @@ let is_unit_clause c = match c.hclits with
   | [|_|] -> true
   | _ -> false
 
-let type_infer ctx clauses =
-  Sequence.fold
-    (fun ctx c -> Lits.lits_infer_type ctx c.hclits)
-    ctx clauses
+let infer_type ctx clauses =
+  Sequence.iter
+    (fun c -> Lits.lits_infer_type ctx c.hclits)
+    clauses
 
 (** Compute signature of this set of clauses *)
 let signature ?(signature=Signature.empty) clauses =
   let ctx = TypeInference.Ctx.of_signature signature in
-  let ctx = type_infer ctx clauses in
+  infer_type ctx clauses;
   TypeInference.Ctx.to_signature ctx
 
 (** Conversion of a (boolean) term to a clause. *)
@@ -455,7 +464,7 @@ module CSet = struct
 
   let of_seq set seq = Sequence.fold add set seq
 
-  let type_infer ctx set = type_infer ctx (to_seq set)
+  let infer_type ctx set = infer_type ctx (to_seq set)
 
   let remove_seq set seq = Sequence.fold remove set seq
 

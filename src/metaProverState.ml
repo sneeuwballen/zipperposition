@@ -168,3 +168,8 @@ let pp_result buf r = match r with
   | Deduced (f, _) -> Printf.bprintf buf "deduced %a" T.pp f
   | Theory (n, args) -> Printf.bprintf buf "theory %s(%a)" n (Util.pp_list T.pp) args
   | Expert e -> Printf.bprintf buf "expert %a" Experts.pp e
+
+let pp_theory buf (name, args) =
+  match args with
+  | [] -> Printf.bprintf buf "theory %s" name
+  | _::_ -> Printf.bprintf buf "theory %s(%a)" name (Util.pp_list T.pp) args

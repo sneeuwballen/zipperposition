@@ -104,7 +104,6 @@ let parse_args () =
       ("-kb-where", Arg.Set kb_where, "print default dir that is search for KB");
       ("-learning", Arg.Set learn, "enable lemma learning");
       (* ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once"); *)
-      ("-print-sort", Arg.Unit (fun () -> Term.print_sort := true), "print sorts of variables");
       ("-progress", Arg.Unit set_progress, "print progress");
       ("-profile", Arg.Set Util.enable_profiling, "enable profiling of code");
       ("-no-theories", Arg.Clear theories, "do not detect theories in input");

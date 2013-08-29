@@ -75,3 +75,4 @@ val parse_theory_file : t -> string -> unit
   (** Update KB with the content of this file *)
 
 val pp_result : Buffer.t -> result -> unit
+val pp_theory : Buffer.t -> (string * Term.t list) -> unit

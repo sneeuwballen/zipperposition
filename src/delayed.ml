@@ -133,6 +133,7 @@ let delta_eliminate ~ctx t sign =
     if T.db_contains t 0
       then begin
         let t' = Skolem.skolem_term ~ctx:(Ctx.skolem_ctx ~ctx) t in
+        (* update types *)
         Ctx.constrain_term_term ~ctx t t';
         t'
       end else

@@ -62,6 +62,8 @@ val compact : t -> CompactClause.t
 val to_seq : t -> (Term.t * Term.t * bool) Sequence.t
   (** Easy iteration on literals *)
 
+val to_prec_clause : t -> Precedence.clause
+
 (** {2 Flags} *)
 
 val flag_ground : int                             (** clause is ground *)
@@ -161,7 +163,7 @@ val selected_lits : t -> (Literal.t * int) list
 val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)
 
-val type_infer : TypeInference.Ctx.t -> t Sequence.t -> TypeInference.Ctx.t
+val infer_type : TypeInference.Ctx.t -> t Sequence.t -> unit
 val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
 
 val from_term : ctx:Ctx.t -> Term.sourced_term -> t
@@ -225,7 +227,7 @@ module CSet : sig
   val to_list : t -> clause list
   val of_list : clause list -> t
 
-  val type_infer : TypeInference.Ctx.t -> t -> TypeInference.Ctx.t
+  val infer_type : TypeInference.Ctx.t -> t -> unit
 
   val to_seq : t -> clause Sequence.t
   val of_seq : t -> clause Sequence.t -> t

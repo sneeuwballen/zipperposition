@@ -55,6 +55,9 @@ val lost_completeness : ctx:t -> unit
 
 val is_completeness_preserved : ctx:t -> bool
 
+val add_signature : ctx:t -> Signature.t -> unit
+  (** Merge  the given signature with the context's one *)
+
 (** {2 Type inference} *)
 
 val tyctx : ctx:t -> TypeInference.Ctx.t

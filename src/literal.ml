@@ -228,7 +228,7 @@ let infer_type ctx lit =
 
 let signature ?(signature=Signature.empty) lit =
   let ctx = TypeInference.Ctx.of_signature signature in
-  let ctx = infer_type ctx lit in
+  infer_type ctx lit;
   TypeInference.Ctx.to_signature ctx
 
 let eq_lits lits1 lits2 =
@@ -344,11 +344,11 @@ let lits_of_terms ~ord terms =
   Array.map (fun t -> lit_of_fof ~ord (mk_eq ~ord t T.true_term)) terms
 
 let lits_infer_type ctx lits =
-  Array.fold_left infer_type ctx lits
+  Array.iter (infer_type ctx) lits
 
 let lits_signature ?(signature=Signature.empty) lits =
   let ctx = TypeInference.Ctx.of_signature signature in
-  let ctx = lits_infer_type ctx lits in
+  lits_infer_type ctx lits;
   TypeInference.Ctx.to_signature ctx
 
 (** {2 Special kinds of array} *)
@@ -446,10 +446,10 @@ let is_pos_eq lits =
 let is_const_definition lits =
   match lits with
   | [|Equation (l,r,true,_)|] when T.is_const l && T.is_ground r
-    && not (T.member_term l r) ->
+    && not (T.subterm ~sub:l r) ->
     Some (l,r)
   | [|Equation (l,r,true,_)|] when T.is_const r && T.is_ground l
-    && not (T.member_term r l) ->
+    && not (T.subterm ~sub:r l) ->
     Some (r,l)
   | _ -> None
 

@@ -62,6 +62,9 @@ let lost_completeness ~ctx = ctx.complete <- false
 
 let is_completeness_preserved ~ctx = ctx.complete
 
+let add_signature ~ctx signature =
+  ctx.signature <- Signature.merge ctx.signature signature
+
 (** {2 Type inference} *)
 
 let tyctx ~ctx = TypeInference.Ctx.of_signature ctx.signature
@@ -71,12 +74,12 @@ let declare ~ctx symb ty =
 
 let constrain_term_type ~ctx t ty =
   let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  let tyctx = TypeInference.constrain_term_type tyctx t ty in
+  TypeInference.constrain_term_type tyctx t ty;
   ctx.signature <- TypeInference.Ctx.to_signature tyctx
 
 let constrain_term_term ~ctx t1 t2 =
   let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  let tyctx = TypeInference.constrain_term_term tyctx t1 t2 in
+  TypeInference.constrain_term_term tyctx t1 t2;
   ctx.signature <- TypeInference.Ctx.to_signature tyctx
   
 let infer_type ~ctx t =

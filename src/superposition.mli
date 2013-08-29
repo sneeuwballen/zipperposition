@@ -31,31 +31,34 @@ open Logtk
 
 (** {2 Helpers} *)
 
-val all_positions : Position.t -> Term.t -> 'a ->  (* combinator *)
+val all_positions : Position.t -> Term.t -> 'a ->
                     ('a -> Term.t -> Position.t -> 'a) -> 'a
 
-(** fold on equation sides of literals that satisfy predicate *)
 val fold_lits : ?both:bool -> (int -> Literal.t -> bool) ->
                 ('a -> Term.t -> Term.t -> bool -> Position.t -> 'a) -> 'a ->
                 Literal.t array -> 'a
+  (** fold on equation sides of literals that satisfy predicate *)
 
-(** get the term l at given position in clause, and r such that l ?= r
-    is the Literal.t at the given position *)
 val get_equations_sides : Clause.t -> Position.t -> Term.t * Term.t * bool
+  (** get the term l at given position in clause, and r such that l ?= r
+      is the Literal.t at the given position *)
 
 (** {2 Inference rules} *)
 
-val infer_active: Env.binary_inf_rule  (** superposition where given clause is active *)
+val infer_active: Env.binary_inf_rule 
+  (** superposition where given clause is active *)
 
-val infer_passive: Env.binary_inf_rule (** superposition where given clause is passive *)
+val infer_passive: Env.binary_inf_rule
+  (** superposition where given clause is passive *)
 
 val infer_equality_resolution: Env.unary_inf_rule
 
 val infer_equality_factoring: Env.unary_inf_rule
 
-val infer_split : Env.unary_inf_rule   (** hyper-splitting *)
+val infer_split : Env.unary_inf_rule
+  (** hyper-splitting *)
 
-(* TODO branch rewriting *)
+(* TODO branch rewriting? *)
 
 (** {2 Simplifications rules} *)
 
@@ -83,27 +86,32 @@ val backward_demodulate : ProofState.ActiveSet.t -> Clause.CSet.t -> Clause.t ->
 val positive_simplify_reflect : ProofState.SimplSet.t -> Clause.t -> Clause.t
 val negative_simplify_reflect : ProofState.SimplSet.t -> Clause.t -> Clause.t
 
-(** subsumes c1 c2 iff c1 subsumes c2 *)
 val subsumes : Literal.t array -> Literal.t array -> bool
-val subsumes_with : Literal.t array Substs.scoped -> Literal.t array Substs.scoped ->
-                    Substs.t option   (** returns subsuming subst *)
+  (** subsumes c1 c2 iff c1 subsumes c2 *)
 
-(** equality subsumption *)
+val subsumes_with : Literal.t array Substs.scoped ->
+                    Literal.t array Substs.scoped ->
+                    Substs.t option
+  (** returns subsuming subst if the first clause subsumes the second one *)
+
 val eq_subsumes : Literal.t array -> Literal.t array -> bool
+  (** equality subsumption *)
 
-(** check whether the clause is subsumed by any clause in the set *)
 val subsumed_by_set : ProofState.ActiveSet.t -> Clause.t -> bool
+  (** check whether the clause is subsumed by any clause in the set *)
 
-(** list of clauses in the active set that are subsumed by the clause *)
 val subsumed_in_set : ProofState.ActiveSet.t -> Clause.t -> Clause.t list
+  (** list of clauses in the active set that are subsumed by the clause *)
 
-(** contexual Literal.t cutting *)
 val contextual_literal_cutting : ProofState.ActiveSet.t -> Clause.t -> Clause.t
+  (** contexual Literal.t cutting *)
 
-(** condensation *)
 val condensation : Clause.t -> Clause.t
+  (** condensation *)
 
 (** {2 Contributions to Env} *)
+
+val cnf_of : ctx:Ctx.t -> Clause.t -> Clause.t list
 
 val setup_env : env:Env.t -> unit
   (** Add rules to the environment. *)

@@ -240,6 +240,8 @@ let compute_constrs ~env cs =
   in constrs
 
 let ord env = Ctx.ord env.ctx
+let precedence env = Ordering.precedence (ord env)
+let signature env = Ctx.signature env.ctx
 
 let pp buf env = 
   Printf.bprintf buf "env(state: %a, experts: %a)"

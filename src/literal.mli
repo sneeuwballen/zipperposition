@@ -71,7 +71,7 @@ val fmap : ord:Ordering.t -> (Term.t -> Term.t) -> t -> t (** fmap in literal *)
 val add_vars : Term.THashSet.t -> t -> unit  (** Add variables to the set *)
 val vars : t -> Term.varlist (** gather variables *)
 
-val infer_type : TypeInference.Ctx.t -> t -> TypeInference.Ctx.t
+val infer_type : TypeInference.Ctx.t -> t -> unit
 val signature : ?signature:Signature.t -> t -> Signature.t
 
 (** {2 Arrays of literals} *)
@@ -102,7 +102,7 @@ val lits_to_seq : t array -> (Term.t * Term.t * bool) Sequence.t
 val lits_of_terms : ord:Ordering.t -> Term.t list -> t array
   (** Convert a list of atoms into a list of literals *)
 
-val lits_infer_type : TypeInference.Ctx.t -> t array -> TypeInference.Ctx.t
+val lits_infer_type : TypeInference.Ctx.t -> t array -> unit
 val lits_signature : ?signature:Signature.t -> t array -> Signature.t
 
 (** {2 Special kinds of literal arrays} *)

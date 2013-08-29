@@ -33,65 +33,13 @@ open Params
 module T = Term
 module O = Ordering
 module C = Clause
+module Lit = Literal
 module PS = ProofState
 module CQ = ClauseQueue
 module S = Substs
 module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
-
-(** find the given file from given directory *)
-let find_file name dir =
-  (* check if the file exists *)
-  let rec file_exists name =
-    try ignore (Unix.stat name); true
-    with Unix.Unix_error (e, _, _) when e = Unix.ENOENT -> false
-  (* search in [dir], and its parents recursively *)
-  and search dir =
-    let cur_name = Filename.concat dir name in
-    Util.debug 2 "%% search %s as %s" name cur_name;
-    if file_exists cur_name then cur_name
-    else
-      let dir' = Filename.dirname dir in
-      if dir = dir'
-        then failwith "unable to find file"
-        else search dir'
-  in
-  if Filename.is_relative name
-    then try
-      search dir  (* search by relative path, in parent dirs *)
-    with (Failure _) as e ->
-      (try let dir' = Sys.getenv "TPTP" in
-        search dir'
-      with Not_found -> raise e)
-    else if file_exists name
-      then name  (* found *)
-      else failwith ("unable to find file " ^ name)
-
-(** parse given tptp file *)
-let parse_file ~recursive f =
-  let dir = Filename.dirname f in
-  (* [aux files clauses] parses all files in files and add
-     the resulting clauses to clauses *)
-  let rec aux files clauses = match files with
-  | [] -> clauses
-  | f::tail ->
-    let new_clauses, new_includes = parse_this f in
-    if recursive
-      then aux (List.rev_append new_includes tail) (List.rev_append new_clauses clauses)
-      else (List.rev_append new_clauses clauses)
-  (* parse the given file, raise exception in case of error *)
-  and parse_this f =
-    let input = match f with
-    | "stdin" -> stdin
-    | _ -> open_in (find_file f dir) in
-    try
-      let buf = Lexing.from_channel input in
-      Const.cur_filename := f;
-      Parse_tptp.parse_file Lex_tptp.token buf
-    with _ as e ->
-      close_in input; raise e
-  in aux [Filename.basename f] []
 
 (** print stats *)
 let print_stats ~env =
@@ -112,10 +60,10 @@ let print_stats ~env =
       stats.Gc.minor_collections stats.Gc.major_collections
   in
   print_gc ();
-  print_hashcons_stats "terms" (T.stats ());
-  print_hashcons_stats "clauses" (C.stats ());
+  print_hashcons_stats "terms" (T.H.stats ());
+  print_hashcons_stats "clauses" (C.CHashcons.stats ());
   print_state_stats (Env.stats ~env);
-  print_global_stats ()
+  Util.print_global_stats ()
 
 let print_json_stats ~env =
   let open Sequence.Infix in
@@ -124,22 +72,23 @@ let print_json_stats ~env =
   let theories = match (Env.get_meta ~env) with
     | None -> "[]"
     | Some meta ->
-      let seq = MetaProver.theories meta in
-      Util.sprintf "@[<h>[%a]@]" (Sequence.pp_seq MetaProver.pp_theory) seq
+      let seq = MetaProverState.theories meta in
+      Util.sprintf "[%a]" (Util.pp_seq MetaProverState.pp_theory) seq
   in
   let experts = Experts.Set.size (Env.get_experts ~env) in
   let o = Util.sprintf
-    "@[<h>{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }@]"
-    (encode_hashcons (T.stats ())) (encode_hashcons (C.stats ())) theories experts
+    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }"
+    (encode_hashcons (T.H.stats ()))
+    (encode_hashcons (C.CHashcons.stats ())) theories experts
   in
-  Util.debug 0 "%% @[<h>json_stats: %s@]" o
+  Util.debug 0 "json_stats: %s" o
 
 (** print the final state to given file in DOT, with
     clauses in result if needed *)
 let print_state ?name filename (state, result) =
   match result with
-  | Sat.Unsat c -> Proof.pp_dot_file ?name filename c.hcproof
-  | _ -> Util.debug 1 "%% no empty clause; do not print state"
+  | Sat.Unsat c -> Proof.pp_dot_file ?name filename c.C.hcproof
+  | _ -> Util.debug 1 "no empty clause; do not print state"
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -154,7 +103,7 @@ let setup_alarm timeout =
 
 let print_version ~params =
   if params.param_version
-    then (Format.printf "%% zipperposition v%s@." Const.version; exit 0)
+    then (Printf.printf "%% zipperposition v%s\n" Const.version; exit 0)
 
 let setup_calculus ~env =
   match (Env.get_params ~env).param_calculus with
@@ -166,44 +115,47 @@ let setup_calculus ~env =
 let mk_meta ~ctx ~kb params =
   if params.param_theories then
     (* create meta *)
-    let meta = MetaProver.create ~ctx kb in
+    let meta = MetaProverState.create ~ctx kb in
     Some meta
   else None
 
 (** Initial environment *)
-let mk_initial_env ?(initial_signature=Symbols.empty_signature) ~kb ~params clauses =
-  let signature = Symbols.merge_signatures initial_signature (C.signature clauses) in
-  let ord = Orderings.default_ordering signature in
-  let ctx = mk_ctx ord no_select in
+let mk_initial_env ?(initial_signature=Signature.empty) ~kb ~params clauses =
+  let signature = Signature.merge initial_signature (C.signature clauses) in
+  let ord = Ordering.default signature in
+  let ctx = Ctx.create ~ord ()  in
   let temp_meta = mk_meta ~ctx ~kb params in
-  let env = Env.mk_env ?meta:temp_meta ~ctx params signature in
+  let env = Env.create ?meta:temp_meta ~ctx params signature in
   (* populate env with calculus *)
   setup_calculus ~env;
   env
-  
+
 (** Compute the ordering from the list of clauses and the signature,
     according to parameters *)
-let compute_ord ?(initial_signature=Symbols.empty_signature) ~kb ~params clauses =
-  let signature = Symbols.merge_signatures initial_signature (C.signature clauses) in
-  let symbols = Symbols.symbols_of_signature signature in
+let compute_ord ?(initial_signature=Signature.empty) ~kb ~params clauses =
+  let signature = Signature.merge initial_signature (C.signature clauses) in
+  let symbols = Signature.to_symbols signature in
   (* environment is needed, to access constraints *)
   let env = mk_initial_env ~initial_signature ~kb ~params clauses in
   let constrs = Env.compute_constrs ~env clauses in
+  let clauses' = Sequence.map C.to_prec_clause clauses in
   let so = if params.param_precedence
     (* use the heuristic to try to order definitions and rewrite rules *)
-    then Precedence.heuristic_precedence ~initial_signature params.param_ord
-      [Precedence.invfreq_constraint clauses; Precedence.alpha_constraint]
+    then HeuristicPrecedence.compute ~initial_signature params.param_ord
+      [Precedence.invfreq_constraint clauses'; Precedence.alpha_constraint]
       constrs
       clauses
-    else Precedence.mk_precedence
-      (constrs  @ [Precedence.invfreq_constraint clauses;
-                   Precedence.alpha_constraint]) symbols
+    else
+      let constrs = 
+        (constrs @ [Precedence.invfreq_constraint clauses';
+                    Precedence.alpha_constraint]) in
+      Precedence.create constrs symbols
   in
   params.param_ord so
 
 (** Parse the theory file and add its content to the KB *)
 let parse_theory_file kb file =
-  Format.printf "%% read content of %s into the Knowledge Base@." file;
+  Util.debug 0 "read content of %s into the Knowledge Base" file;
   let kb' = Logtk.MetaKB.parse_theory_file file in
   Logtk.MetaKB.union kb kb'
 
@@ -216,12 +168,12 @@ let load_plugins ~params =
         if n > 4 && String.sub filename (n-5) 5 = ".cmxs"
           then filename
         else
-          let local_filename = FoUtil.sprintf "plugins/std/ext_%s.cmxs" filename in
+          let local_filename = Util.sprintf "plugins/std/ext_%s.cmxs" filename in
           try
             ignore (Unix.stat local_filename);
             local_filename
           with Unix.Unix_error _ ->
-            let home_filename = FoUtil.sprintf "plugins/ext_%s.cmxs" filename in
+            let home_filename = Util.sprintf "plugins/ext_%s.cmxs" filename in
             Filename.concat Const.home home_filename
       in
       match Extensions.dyn_load filename with
@@ -235,24 +187,13 @@ let load_plugins ~params =
 (** Parses and populates the initial Knowledge Base *)
 let initial_kb params =
   (* parse file into an initial empty KB *)
-  let kb = Meta.KB.empty in
   let file = params.param_kb in
-  (* parse file, with a lock *)
-  let kb = 
-    try Util.with_lock_file file
-    (fun () ->
-      let kb = try Meta.KB.restore ~file kb
-               with Unix.Unix_error _ -> Meta.KB.empty in
-      (* load required files *)
-      let kb = List.fold_left parse_theory_file kb params.param_kb_load in
-      (* save new KB *)
-      Meta.KB.save ~file kb;
-      kb)
-    with Unix.Unix_error _ ->
-      kb
+  let kb = match MetaKB.restore file with
+  | None -> MetaKB.empty
+  | Some kb -> kb
   in
-  (* return KB *)
-  kb
+  (* load required files *)
+  List.fold_left parse_theory_file kb params.param_kb_load
 
 (** Enrichment of the initial set of clauses by detecting some theories *)
 let enrich_with_theories ~env clauses =
@@ -271,16 +212,16 @@ let print_dots ~env result =
     match result with
     | Sat.Unsat c ->
       let name = "unsat_graph" in
-      Proof.pp_dot_file ~name dot_f c.hcproof
-    | _ -> Util.debug 1 "%% no empty clause; do not print state");
+      Proof.pp_dot_file ~name dot_f c.C.hcproof
+    | _ -> Util.debug 1 "no empty clause; do not print state");
   (try (* write simplification index into the given file *)
     let dot_simpl = Sys.getenv "DOT_SIMPL" in
-    Util.debug 0 "%% print simplification index to %s" dot_simpl;
-    ignore (Util.with_output dot_simpl
-      (fun out ->
-        let fmt = Format.formatter_of_out_channel out in
-        env.Env.state#simpl_set#idx_simpl#to_dot fmt;
-        Format.pp_print_flush fmt ()))
+    Util.debug 0 "print simplification index to %s" dot_simpl;
+    ignore
+      (Util.with_output dot_simpl
+        (fun out ->
+          Util.fprintf out "%a\n" PS.UnitIndex.to_dot env.Env.state#simpl_set#idx_simpl;
+          flush out))
    with Not_found -> ());
   ()
 
@@ -288,30 +229,29 @@ let print_meta ~env =
   (* print theories *)
   match Env.get_meta ~env with
   | Some meta ->
-    Util.debug 0 "%% @[<h>meta-prover results (%d):@ %a@]"
-      (Sequence.length (Meta.Prover.results meta))
-      Meta.Prover.pp_results (Meta.Prover.results meta);
-    Format.printf "%% datalog contains %d clauses@."
-      (Meta.KB.Logic.db_size (Meta.Prover.db meta))
+    Util.debug 0 "meta-prover results (%d): %a"
+      (Sequence.length (MetaProverState.results meta))
+      (Util.pp_seq MetaProverState.pp_result) (MetaProverState.results meta);
+    Util.debug 0 "datalog contains %d clauses"
+      (MetaReasoner.size (MetaProverState.reasoner meta))
   | None -> ()
 
 let print_szs_result ~env result =
   match result with
-  | Sat.Unknown | Sat.Timeout -> Format.printf "%% SZS status ResourceOut@."
-  | Sat.Error s -> Format.printf "%% error occurred: %s@." s
+  | Sat.Unknown | Sat.Timeout -> Format.printf "%% SZS status ResourceOut\n"
+  | Sat.Error s -> Format.printf "%% error occurred: %s\n" s
   | Sat.Sat ->
-      (if env.Env.ctx.ctx_complete
-        then Format.printf "%% SZS status CounterSatisfiable@."
-        else Format.printf "%% SZS status GaveUp@." );
-      (if Util.debug_level () >= 1
-        then Format.printf "%% saturated set: @[<v>%a@]@."
-          C.pp_set (C.CSet.of_seq C.CSet.empty (Env.get_active ~env)));
+      (if Ctx.is_completeness_preserved env.Env.ctx
+        then Printf.printf "%% SZS status CounterSatisfiable\n"
+        else Printf.printf "%% SZS status GaveUp\n");
+      (if Util.get_debug () >= 1
+        then Util.printf "%% saturated set: %a"
+          C.pp_set_tstp (C.CSet.of_seq C.CSet.empty (Env.get_active ~env)));
   | Sat.Unsat c -> begin
       (* print status then proof *)
       Printf.printf "# SZS status Theorem\n";
-      Format.printf ("@.# SZS output start Refutation@.@[<v>%a@]@." ^^
-                          "# SZS output end Refutation@.")
-                    (Proof.pp_proof (Env.get_params ~env).param_proof) c.hcproof;
+      Util.printf "# SZS output start Refutation %a\n# SZS output end Refutation\n"
+        (Proof.pp (Env.get_params ~env).param_proof) c.C.hcproof;
       (* update knowledge base *)
       (*
       match meta with
@@ -335,28 +275,28 @@ let print_szs_result ~env result =
 (** Given a list of clauses, and parameters, build an Env.t that fits the
     parameters (but does not contain the clauses yet) *)
 let build_env ~kb ~params clauses =
-  Util.debug 2 "%% @[<hov2> build env from clauses@; %a@]"
-    (Util.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
-  let initial_signature = C.signature clauses in
+  Util.debug 2 "build env from clauses %a"
+    (Util.pp_list ~sep:"" C.pp_debug) clauses;
+  let initial_signature = C.signature (Sequence.of_list clauses) in
   (* temporary environment *)
-  let temp_env = mk_initial_env ~kb ~params clauses in
+  let temp_env = mk_initial_env ~kb ~params (Sequence.of_list clauses) in
   let clauses = Env.preprocess ~env:temp_env clauses in
   (* first preprocessing, with a simple ordering. *)
-  Util.debug 2 "%% clauses first-preprocessed into: @[<v>%a@]@."
-                 (Util.pp_list ~sep:"" !C.pp_clause#pp_h) clauses;
+  Util.debug 2 "clauses first-preprocessed into: %a"
+     (Util.pp_list ~sep:"" C.pp_debug) clauses;
   (* meta-prover *)
   let clauses = enrich_with_theories ~env:temp_env clauses in
   (* choose an ord now, using clauses and initial_signature (some symbols
       may have disappeared from clauses after preprocessing). *)
-  let ord = compute_ord ~initial_signature ~kb ~params clauses in
-  Format.printf "%% precedence: %a@." pp_precedence ord.ord_precedence.prec_snapshot;
+  let ord = compute_ord ~initial_signature ~kb ~params (Sequence.of_list clauses) in
+  Util.debug 0 "precedence: %a" Precedence.pp (O.precedence ord);
   (* selection function *)
-  Format.printf "%% selection function: %s@." params.param_select;
+  Util.debug 0 "selection function: %s" params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
   (* build definitive context and env *)
-  let ctx = mk_ctx ord select in
+  let ctx = Ctx.create ~ord ~select () in
   let meta = mk_meta ~ctx:ctx ~kb params in
-  let env = Env.mk_env ?meta ~ctx params (C.signature clauses) in
+  let env = Env.create ?meta ~ctx params (C.signature (Sequence.of_list clauses)) in
   (* set calculus again *)
   setup_calculus ~env;
   (* add already discovered experts *)
@@ -365,25 +305,29 @@ let build_env ~kb ~params clauses =
 
 (** Process the given file (try to solve it) *)
 let process_file ~kb ~plugins params f =
-  Format.printf "%% *** process file %s ***@." f;
+  Util.debug 0 "===== process file %s =====" f;
   let steps = if params.param_steps = 0
-    then None else (Format.printf "%% run for %d steps@." params.param_steps;
+    then None else (Util.debug 0 "run for %d steps" params.param_steps;
                     Some params.param_steps)
   and timeout = if params.param_timeout = 0.
-    then None else (Format.printf "%% run for %f s@." params.param_timeout;
+    then None else (Util.debug 0 "run for %f s" params.param_timeout;
                     ignore (setup_alarm params.param_timeout);
                     Some (Util.get_start_time () +. params.param_timeout -. 0.25))
   in
   (* parse clauses *)
-  let clauses = parse_file ~recursive:true f in
-  Printf.printf "%% parsed %d clauses\n" (List.length clauses);
-  (* convert simple clauses to clauses, first with a simple ordering *)
-  List.iter (fun (t,_,_) -> Util.debug 1 "%% formula @[<h>%a@]" !T.pp_term#pp t) clauses;
-  let dummy_ctx = mk_ctx Orderings.no_ordering no_select in
-  let clauses = List.map (C.from_term ~ctx:dummy_ctx) clauses in
+  let decls = Util_tptp.parse_file ~recursive:true f in
+  Util.debug 0 "parsed %d declarations" (Sequence.length decls);
+  let formulas = Sequence.to_list (Util_tptp.sourced_formulas ~file:f decls) in
+  List.iter
+    (fun (f,_,_) -> Util.debug 1 "  input formula: %a" T.pp f)
+    formulas;
+  (* convert formulas to clauses, first with a simple ordering *)
+  let dummy_ctx = Ctx.create () in
+  let clauses = List.map (C.from_term ~ctx:dummy_ctx) formulas in
   (* build an environment that takes parameters and clauses into account
     (choice of ordering, etc.) *)
   let env = build_env ~kb ~params clauses in
+  (* load plugins *)
   List.iter (Extensions.apply_ext ~env) plugins;
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
   let clauses = List.rev_append env.Env.axioms clauses in
@@ -393,10 +337,10 @@ let process_file ~kb ~plugins params f =
   (* maybe perform initial inter-reductions *)
   let result, clauses = if params.param_presaturate
     then begin
-      Format.printf "%% presaturate initial clauses@.";
+      Util.debug 0 "presaturate initial clauses";
       Env.add_passive ~env (Sequence.of_list clauses);
       let result, num = Sat.presaturate ~env in
-      Format.printf "%% initial presaturation in %d steps@." num;
+      Util.debug 0 "initial presaturation in %d steps" num;
       (* pre-saturated set of clauses *)
       let clauses = Env.get_active ~env in
       (* remove clauses from [env] *)
@@ -405,8 +349,10 @@ let process_file ~kb ~plugins params f =
       result, clauses
     end else Sat.Unknown, Sequence.of_list clauses
   in
-  Util.debug 1 "%% %d clauses processed into: @[<v>%a@]@."
-                 num_clauses (Sequence.pp_seq ~sep:"" !C.pp_clause#pp_h) clauses;
+  Util.debug 1 "%d clauses processed into:\n" num_clauses;
+  Sequence.iter
+    (fun c -> Util.debug 1 "  %a\n" C.pp_debug c)
+    clauses;
   (* add clauses to passive set of [env] *)
   Env.add_passive ~env clauses;
   (* saturate *)
@@ -414,24 +360,21 @@ let process_file ~kb ~plugins params f =
     | Sat.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ~env
   in
-  Printf.printf "%% ===============================================\n";
-  Printf.printf "%% done %d iterations\n" num;
-  Format.printf "%% final precedence: %a@." pp_precedence
-    env.Env.ctx.ctx_ord.ord_precedence.prec_snapshot;
+  Util.debug 0 "===============================================";
+  Util.debug 0 "done %d iterations" num;
+  Util.debug 0 "final precedence: %a" Precedence.pp (Env.precedence env);
   (* print some statistics *)
   print_stats ~env;
   print_json_stats ~env;
-  Format.printf "%% final precedence: %a@."
-    pp_precedence env.Env.ctx.ctx_ord.ord_precedence.prec_snapshot;
   print_dots ~env result;
   print_meta ~env;
-  Util.debug 0 "%% @[<h>experts: %a@]" Experts.Set.pp (Env.get_experts ~env);
+  Util.debug 0 "experts: %a" Experts.Set.pp (Env.get_experts ~env);
   print_szs_result ~env result;
   ()
 
 (** Print the content of the KB, and exit *)
 let print_kb ~kb =
-  Format.printf "%a@." Meta.KB.pp kb;
+  Util.printf "%a\n" MetaKB.pp kb;
   exit 0
 
 (** Clear the Knowledge Base and exit *)
@@ -443,7 +386,7 @@ let clear_kb params =
   exit 0
 
 let print_kb_where params = 
-  Format.printf "%% KB located at %s@." params.param_kb;
+  Util.debug 0 "KB located at %s" params.param_kb;
   exit 0
 
 let () =
@@ -463,4 +406,4 @@ let () =
 
 let _ =
   at_exit (fun () -> 
-    Printf.printf "\n%% run time: %.3f\n" (Util.get_total_time ()))
+    Util.debug 0 "run time: %.3f" (Util.get_total_time ()))

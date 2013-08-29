@@ -163,6 +163,8 @@ val compute_constrs : env:t -> Clause.t Sequence.t -> Precedence.constr list
   (** Compute all ordering constraints for the given list of clauses *)
 
 val ord : t -> Ordering.t
+val precedence : t -> Precedence.t
+val signature : t -> Signature.t
 
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
