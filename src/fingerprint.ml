@@ -46,7 +46,7 @@ let rec gfpf pos t = match pos, t.T.term with
   | 0::pos', T.Bind (_, t') -> gfpf pos' t'  (* recurse in subterm *)
   | i::pos', T.Node (_, l) ->
     (try gfpf pos' (List.nth l i)  (* recurse in subterm *)
-    with Not_found -> N)  (* not a position in t *)
+    with Failure _ -> N)  (* not a position in t *)
   | 0::pos', T.At (t1, _) -> gfpf pos' t1
   | 1::pos', T.At (_, t2) -> gfpf pos' t2
   | _::_, T.Bind _
