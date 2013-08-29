@@ -37,7 +37,7 @@ type t = private {
   mutable complete : bool;            (** Completeness preserved? *)
 }
 
-val create : ?signature:Signature.t -> ?ord:Ordering.t -> ?select:Selection.t ->
+val create : ?ord:Ordering.t -> ?select:Selection.t -> signature:Signature.t -> 
               unit -> t
   (** Fresh new context *)
 

@@ -120,10 +120,10 @@ let mk_meta ~ctx ~kb params =
   else None
 
 (** Initial environment *)
-let mk_initial_env ?(initial_signature=Signature.empty) ~kb ~params clauses =
-  let signature = Signature.merge initial_signature (C.signature clauses) in
+let mk_initial_env ~signature ~kb ~params clauses =
+  let signature = C.signature ~signature clauses in
   let ord = Ordering.default signature in
-  let ctx = Ctx.create ~ord ()  in
+  let ctx = Ctx.create ~signature ~ord ()  in
   let temp_meta = mk_meta ~ctx ~kb params in
   let env = Env.create ?meta:temp_meta ~ctx params signature in
   (* populate env with calculus *)
@@ -132,16 +132,16 @@ let mk_initial_env ?(initial_signature=Signature.empty) ~kb ~params clauses =
 
 (** Compute the ordering from the list of clauses and the signature,
     according to parameters *)
-let compute_ord ?(initial_signature=Signature.empty) ~kb ~params clauses =
-  let signature = Signature.merge initial_signature (C.signature clauses) in
+let compute_ord ~signature ~kb ~params clauses =
+  let signature = C.signature ~signature clauses in
   let symbols = Signature.to_symbols signature in
   (* environment is needed, to access constraints *)
-  let env = mk_initial_env ~initial_signature ~kb ~params clauses in
+  let env = mk_initial_env ~signature ~kb ~params clauses in
   let constrs = Env.compute_constrs ~env clauses in
   let clauses' = Sequence.map C.to_prec_clause clauses in
   let so = if params.param_precedence
     (* use the heuristic to try to order definitions and rewrite rules *)
-    then HeuristicPrecedence.compute ~initial_signature params.param_ord
+    then HeuristicPrecedence.compute ~signature params.param_ord
       [Precedence.invfreq_constraint clauses'; Precedence.alpha_constraint]
       constrs
       clauses
@@ -245,7 +245,7 @@ let print_szs_result ~env result =
         then Printf.printf "%% SZS status CounterSatisfiable\n"
         else Printf.printf "%% SZS status GaveUp\n");
       (if Util.get_debug () >= 1
-        then Util.printf "%% saturated set: %a"
+        then Util.printf "%% saturated set:\n%a"
           C.pp_set_tstp (C.CSet.of_seq C.CSet.empty (Env.get_active ~env)));
   | Sat.Unsat c -> begin
       (* print status then proof *)
@@ -275,12 +275,12 @@ let print_szs_result ~env result =
 
 (** Given a list of clauses, and parameters, build an Env.t that fits the
     parameters (but does not contain the clauses yet) *)
-let build_env ~kb ~params clauses =
+let build_env ~signature ~kb ~params clauses =
   Util.debug 2 "build env from clauses %a"
     (Util.pp_list ~sep:"" C.pp_debug) clauses;
-  let initial_signature = C.signature (Sequence.of_list clauses) in
+  let signature = C.signature ~signature (Sequence.of_list clauses) in
   (* temporary environment *)
-  let temp_env = mk_initial_env ~kb ~params (Sequence.of_list clauses) in
+  let temp_env = mk_initial_env ~signature ~kb ~params (Sequence.of_list clauses) in
   let clauses = Env.preprocess ~env:temp_env clauses in
   (* first preprocessing, with a simple ordering. *)
   Util.debug 2 "clauses first-preprocessed into: %a"
@@ -289,13 +289,13 @@ let build_env ~kb ~params clauses =
   let clauses = enrich_with_theories ~env:temp_env clauses in
   (* choose an ord now, using clauses and initial_signature (some symbols
       may have disappeared from clauses after preprocessing). *)
-  let ord = compute_ord ~initial_signature ~kb ~params (Sequence.of_list clauses) in
+  let ord = compute_ord ~signature ~kb ~params (Sequence.of_list clauses) in
   Util.debug 0 "precedence: %a" Precedence.pp (O.precedence ord);
   (* selection function *)
   Util.debug 0 "selection function: %s" params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
   (* build definitive context and env *)
-  let ctx = Ctx.create ~ord ~select () in
+  let ctx = Ctx.create ~signature ~ord ~select () in
   let meta = mk_meta ~ctx:ctx ~kb params in
   let env = Env.create ?meta ~ctx params (C.signature (Sequence.of_list clauses)) in
   (* set calculus again *)
@@ -318,16 +318,18 @@ let process_file ~kb ~plugins params f =
   (* parse clauses *)
   let decls = Util_tptp.parse_file ~recursive:true f in
   Util.debug 0 "parsed %d declarations" (Sequence.length decls);
+  let signature = Util_tptp.signature decls in
+  Util.debug 1 "initial signature: %a" Signature.pp_no_base signature;
   let formulas = Sequence.to_list (Util_tptp.sourced_formulas ~file:f decls) in
   List.iter
     (fun (f,_,_) -> Util.debug 1 "  input formula: %a" T.pp f)
     formulas;
   (* convert formulas to clauses, first with a simple ordering *)
-  let dummy_ctx = Ctx.create () in
+  let dummy_ctx = Ctx.create ~signature () in
   let clauses = List.map (C.from_term ~ctx:dummy_ctx) formulas in
   (* build an environment that takes parameters and clauses into account
     (choice of ordering, etc.) *)
-  let env = build_env ~kb ~params clauses in
+  let env = build_env ~signature ~kb ~params clauses in
   (* load plugins *)
   List.iter (Extensions.apply_ext ~env) plugins;
   (* preprocess clauses (including calculus axioms), then possibly simplify them *)
@@ -350,6 +352,7 @@ let process_file ~kb ~plugins params f =
       result, clauses
     end else Sat.Unknown, Sequence.of_list clauses
   in
+  Util.debug 1 "signature: %a" Signature.pp_no_base (Env.signature env);
   Util.debug 1 "%d clauses processed into:" num_clauses;
   Sequence.iter
     (fun c -> Util.debug 1 "  %a" C.pp_debug c)
@@ -390,6 +393,12 @@ let print_kb_where params =
   Util.debug 0 "KB located at %s" params.param_kb;
   exit 0
 
+let save_kb params ~kb =
+  let file = params.param_kb in
+  Util.with_lock_file file
+    (fun () ->
+      MetaKB.save file kb)
+
 let () =
   (* parse arguments *)
   let params = Params.parse_args () in
@@ -403,7 +412,10 @@ let () =
   (if params.param_kb_print then print_kb ~kb);
   (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)
-  List.iter (process_file ~kb ~plugins params) params.param_files
+  List.iter (process_file ~kb ~plugins params) params.param_files;
+  (* save KB? *)
+  save_kb params ~kb;
+  ()
 
 let _ =
   at_exit (fun () -> 

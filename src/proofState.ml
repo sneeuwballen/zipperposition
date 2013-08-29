@@ -49,12 +49,12 @@ module TermIndex = Fingerprint.Make(struct
 end)
 
 module UnitIndex = Dtree.Make(struct
-  type t = C.t
-  let equal = C.eq
-  let extract c = match c.C.hclits with
-    | [| Literal.Equation (l, r, sign, _) |] -> l, r, sign
-    | _ -> assert false
-  let priority _ = 1
+  type t = Term.t * Term.t * bool * C.t
+  let equal (t11,t12,s1,c1) (t21,t22,s2,c2) =
+    T.eq t11 t21 && T.eq t12 t22 && s1 = s2 && C.eq c1 c2
+  let extract (t1,t2,sign,_) = t1, t2, sign
+  let priority (_,_,_,c) =
+    if C.is_oriented_rule c then 2 else 1
 end)
 
 module SubsumptionIndex = FeatureVector.Make(struct
@@ -229,6 +229,18 @@ module SimplSet = struct
       remove : Clause.t Sequence.t -> unit;
     >
 
+  let apply op idx c = match c.C.hclits with
+    | [| Lit.Equation (l,r,true,Gt) |] ->
+      op idx (l,r,true,c)
+    | [| Lit.Equation (l,r,true,Lt) |] ->
+      op idx (r,l,true,c)
+    | [| Lit.Equation (l,r,true,Incomparable) |] ->
+      let idx = op idx (l,r,true,c) in
+      op idx (r,l,true,c)
+    | [| Lit.Equation (l,r,false,_) |] ->
+      op idx (l,r,false,c)
+    | _ -> idx
+
   (** Create a simplification set *)
   let create ~ctx =
     object
@@ -237,10 +249,12 @@ module SimplSet = struct
       method idx_simpl = m_simpl
 
       method add cs =
-        m_simpl <- UnitIndex.add_seq m_simpl cs
+        let cs = Sequence.filter C.is_unit_clause cs in
+        m_simpl <- Sequence.fold (apply UnitIndex.add) m_simpl cs
 
       method remove cs =
-        m_simpl <- UnitIndex.remove_seq m_simpl cs
+        let cs = Sequence.filter C.is_unit_clause cs in
+        m_simpl <- Sequence.fold (apply UnitIndex.remove) m_simpl cs
     end
 end
 

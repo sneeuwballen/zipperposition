@@ -178,6 +178,11 @@ let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
   | _, T.Node (s, [t]) when Symbol.eq s Symbol.not_symbol && T.eq l T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
+    (* deal with equivalence symbol *)
+  | T.Node (s, [a; b]), _ when Symbol.eq s Symbol.equiv_symbol && T.eq r T.true_term ->
+    lit_of_fof ~ord (mk_lit ~ord a b sign)
+  | _, T.Node (s, [a; b]) when Symbol.eq s Symbol.equiv_symbol && T.eq l T.true_term ->
+    lit_of_fof ~ord (mk_lit ~ord a b sign)
     (* deal with equality symbol *)
   | T.Node (s, [a; b]), _ when Symbol.eq s Symbol.eq_symbol && T.eq r T.true_term ->
     lit_of_fof ~ord (mk_lit ~ord a b sign)

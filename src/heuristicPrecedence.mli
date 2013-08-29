@@ -32,7 +32,7 @@ open Logtk
     does not guarantee that  the optimum will be reached.
     *)
 
-val compute : ?initial_signature:Signature.t ->
+val compute : ?signature:Signature.t ->
               (Precedence.t -> Ordering.t) ->
               Precedence.constr list ->
               Precedence.constr list ->

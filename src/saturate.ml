@@ -57,7 +57,7 @@ let given_clause_step ?(generating=true) ~env num =
   let ctx = env.Env.ctx in
   let ord = Ctx.ord ctx in
   let experts = Env.get_experts env in
-  Util.debug 3 "@[<hov2>env for next given loop:@; %a@]@." Env.pp env;
+  Util.debug 3 "env for next given loop: %a" Env.pp env;
   (* select next given clause *)
   match Env.next_passive ~env with
   | None -> Sat (* passive set is empty *)
@@ -70,13 +70,13 @@ let given_clause_step ?(generating=true) ~env num =
     in
     match c_list with
     | [] -> 
-      Util.debug 2 "%% given clause %a is redundant" C.pp_debug c;
+      Util.debug 2 "given clause %a is redundant" C.pp_debug c;
       Util.incr_stat stat_redundant_given;
       Unknown  (* all simplifications are redundant *)
     | c::_ when C.is_empty c ->
       Unsat c  (* empty clause found *)
     | c::new_clauses when Experts.Set.is_redundant experts c ->
-      Util.debug 2 "%% given clause %a is redundant" C.pp_debug c;
+      Util.debug 2 "given clause %a is redundant" C.pp_debug c;
       Env.add_simpl ~env (Sequence.singleton c);
       Env.add_passive ~env (Sequence.of_list new_clauses);
       Unknown  (* redundant given clause *)
@@ -87,8 +87,8 @@ let given_clause_step ?(generating=true) ~env num =
       (* process the given clause! *)
       Util.incr_stat stat_processed_given;
       C.check_ord ~ord c;
-      Util.debug 2 "%% ============ step %5d  ============" num;
-      Util.debug 1 "%% %a" C.pp_tstp c;
+      Util.debug 2 "============ step %5d  ============" num;
+      Util.debug 1 "given: %a" C.pp_debug c;
       (* yield control to meta-prover *)
       Vector.append_seq new_clauses (Env.meta_step ~env c);
       (* find clauses that are subsumed by given in active_set *)
@@ -156,7 +156,7 @@ let given_clause ?(generating=true) ?steps ?timeout ~env =
         (* some cleanup from time to time *)
         (if (num mod 1000 = 0)
           then begin
-            Util.debug 1 "%% perform cleanup of passive set";
+            Util.debug 1 "perform cleanup of passive set";
             Env.clean_passive ~env;
           end);
         (* do one step *)

@@ -216,7 +216,7 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
           [active_clause.C.hcproof; passive_clause.C.hcproof] in
         let parents = [active_clause; passive_clause] in
         let new_clause = C.create ~parents ~ctx new_lits proof in
-        Util.debug 3 "... ok, conclusion @[<h>%a@]" C.pp_debug new_clause;
+        Util.debug 3 "... ok, conclusion %a" C.pp_debug new_clause;
         new_clause :: acc
       end
   end
@@ -494,9 +494,6 @@ exception RewriteInto of Term.t * Substs.t
     restrict is an option for restricting demodulation in positive maximal terms *)
 let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
   let ord = Ctx.ord simpl_set#ctx in
-  let oriented_hclause hc = match hc.C.hclits with
-  | [|Lit.Equation (_,_,true,Gt)|] | [|Lit.Equation (_,_,true,Lt)|] -> true (* oriented *)
-  | _ -> false in
   (* compute normal form of subterm. If restrict is true, substitutions that
      are variable renamings are forbidden (since we are at root of a max term) *) 
   let rec normal_form ~restrict t =
@@ -507,15 +504,16 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
         (* find equations l=r that match subterm *)
         try
           UnitIdx.retrieve ~sign:true (simpl_set#idx_simpl,1) (t,0) ()
-            (fun () l r unit_hclause subst ->
+            (fun () l r (_,_,_,unit_clause) subst ->
               (* r is the term subterm is going to be rewritten into *)
-              assert (C.is_unit_clause unit_hclause);
+              assert (C.is_unit_clause unit_clause);
               if (not restrict || not (S.is_renaming subst))
-              && (oriented_hclause unit_hclause ||
+              && (C.is_oriented_rule unit_clause ||
                  O.compare ord (S.apply_subst subst l 1) (S.apply_subst subst r 1) = Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
-                  clauses := unit_hclause :: !clauses;
+                  assert (O.compare ord (S.apply_subst subst l 1) (S.apply_subst subst r 1) = Gt);
+                  clauses := unit_clause :: !clauses;
                   Util.incr_stat stat_demodulate_step;
                   raise (RewriteInto (r, subst))
                 end);
@@ -762,7 +760,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   (** try to equate terms with a positive unit clause that match them *)
   and equate_root clauses t1 t2 =
     try UnitIdx.retrieve ~sign:true (simpl_set#idx_simpl,scope) (t1,0) ()
-      (fun () l r c' subst ->
+      (fun () l r (_,_,_,c') subst ->
         if t2 == (S.apply_subst subst r scope)
         then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
           Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp_debug c';
@@ -802,7 +800,7 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   (** try to remove the literal using a negative unit clause *)
   and can_refute s t =
     try UnitIdx.retrieve ~sign:false (simpl_set#idx_simpl,scope) (s,0) ()
-      (fun () l r c' subst ->
+      (fun () l r (_,_,_,c') subst ->
         if t == (S.apply_subst subst r scope)
         then begin
           Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp_debug c';
@@ -940,10 +938,10 @@ let subsumes a b =
   let res = match subsumes_with (a,0) (b,scope) with
   | None -> false
   | Some _ ->
-    Util.debug 2 "%% @[<h>%a subsumes %a@]" Lit.pp_lits a Lit.pp_lits b;
+    Util.debug 2 "%a subsumes %a" Lit.pp_lits a Lit.pp_lits b;
     true
   in
-  Util.debug 2 "%% @[<h>%a subsumes %a@]" Lit.pp_lits a Lit.pp_lits b;
+  Util.debug 2 "%a subsumes %a" Lit.pp_lits a Lit.pp_lits b;
   Util.exit_prof prof_subsumption;
   res
 

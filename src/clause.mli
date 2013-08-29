@@ -163,6 +163,9 @@ val selected_lits : t -> (Literal.t * int) list
 val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)
 
+val is_oriented_rule : t -> bool
+  (** Is the clause a positive oriented clause? *)
+
 val infer_type : TypeInference.Ctx.t -> t Sequence.t -> unit
 val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
 

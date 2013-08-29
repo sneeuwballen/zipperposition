@@ -283,7 +283,7 @@ let do_binary_inferences ~env c =
   (* apply every inference rule *)
   let clauses = List.fold_left
     (fun acc (name, rule) ->
-      Util.debug 3 "%%  apply binary rule %s" name;
+      Util.debug 3 "apply binary rule %s" name;
       let new_clauses = rule active_set c in
       List.rev_append new_clauses acc)
     [] env.binary_rules
@@ -298,7 +298,7 @@ let do_unary_inferences ~env c =
   (* apply every inference rule *)
   let clauses = List.fold_left
     (fun acc (name, rule) ->
-      Util.debug 3 "%%  apply unary rule %s" name;
+      Util.debug 3 "apply unary rule %s" name;
       let new_clauses = rule c in
       List.rev_append new_clauses acc)
     [] env.unary_rules in
@@ -531,7 +531,7 @@ let find_lemmas ~env c =
         (* TODO: CNF reduction now? *)
         let lits = [| Literal.mk_eq ~ord:(Ctx.ord env.ctx) f T.true_term |] in
         let c = clause_of_deduced ~env lits parents in
-        Util.debug 1 "%% meta-prover: lemma %a" C.pp_debug c;
+        Util.debug 1 "meta-prover: lemma %a" C.pp_debug c;
         Some c
       | _ -> None)
       results in
@@ -558,13 +558,13 @@ let meta_step ~env c =
           (* TODO: CNF reduction now? *)
           let lits = [| Literal.mk_eq ~ord:(Ctx.ord env.ctx) f T.true_term |] in
           let lemma = clause_of_deduced ~env lits parents in
-          Util.debug 1 "%% meta-prover: lemma %a" C.pp_debug lemma;
+          Util.debug 1 "meta-prover: lemma %a" C.pp_debug lemma;
           [lemma]
         | MetaProverState.Theory (th_name, th_args) ->
-          Util.debug 1 "%% meta-prover: theory %a" MetaProverState.pp_result result;
+          Util.debug 1 "meta-prover: theory %a" MetaProverState.pp_result result;
           []
         | MetaProverState.Expert expert ->
-          Util.debug 1 "%% meta-prover: expert %a" Experts.pp expert;
+          Util.debug 1 "meta-prover: expert %a" Experts.pp expert;
           add_expert env expert;
           [])
       results

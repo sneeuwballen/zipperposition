@@ -44,7 +44,7 @@ let prof_elim = Util.mk_profiler "eliminate"
 (** special predicate/connective symbols, in decreasing order *)
 let special_preds =
   let open Symbol in
-  [num_symbol; split_symbol; const_symbol; eq_symbol; imply_symbol;
+  [num_symbol; split_symbol; const_symbol; equiv_symbol; eq_symbol; imply_symbol;
    forall_symbol; exists_symbol; lambda_symbol;
    or_symbol; and_symbol; not_symbol; false_symbol; true_symbol]
 
@@ -151,7 +151,7 @@ let eliminate_lits c =
   let ord = Ctx.ord ~ctx in
   let offset = ref ((max 0 (T.max_var c.C.hcvars)) + 1) in  (* offset to create variables *)
   (* eliminate propositions (connective and quantifier eliminations) *)
-  let prop eqn p sign =
+  let rec prop eqn p sign =
     assert (Ctx.check_term_type ~ctx p Type.o);
     match p.T.term with
     | T.BoundVar _ | T.Var _ -> keep eqn
@@ -167,6 +167,10 @@ let eliminate_lits c =
       beta_eliminate ~ord a false b true
     | T.Node (s, [a; b]) when Symbol.eq s Symbol.imply_symbol && not sign ->
       alpha_eliminate ~ord a true b false
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.equiv_symbol && sign ->
+      equiv eqn a b true
+    | T.Node (s, [a; b]) when Symbol.eq s Symbol.equiv_symbol && not sign ->
+      equiv eqn a b false
     | T.Bind (s, t) when Symbol.eq s Symbol.forall_symbol && sign ->
       gamma_eliminate ~ctx offset t true
     | T.Bind (s, t) when Symbol.eq s Symbol.forall_symbol && not sign ->
@@ -310,11 +314,10 @@ let recursive_eliminations c =
 (** Setup the environment for superposition with equivalence reasoning *)
 let setup_env ~env =
   Sup.setup_env ~env;
-  let ctx = env.Env.ctx in
   (* specific changes *)
   let basic_simplify' = env.Env.basic_simplify in
   env.Env.basic_simplify <-
-    (fun c -> basic_simplify' (simplify_clause ~ctx c));
+    (fun c -> basic_simplify' (simplify_clause ~ctx:c.C.hcctx c));
   env.Env.list_simplify <-
     (fun c ->
       let c = env.Env.basic_simplify c in

@@ -358,6 +358,11 @@ let is_unit_clause c = match c.hclits with
   | [|_|] -> true
   | _ -> false
 
+let is_oriented_rule c = match c.hclits with
+  | [|Lits.Equation (_,_,true,Gt)|]
+  | [|Lits.Equation (_,_,true,Lt)|] -> true (* oriented *)
+  | _ -> false
+
 let infer_type ctx clauses =
   Sequence.iter
     (fun c -> Lits.lits_infer_type ctx c.hclits)
@@ -374,9 +379,10 @@ let rec from_term ~ctx (t, file, name) =
   let module S = Symbol in
   let ord = Ctx.ord ctx in
   let rec lits_from_term t = match t.T.term with
-  | T.Node (n, [{T.term=T.Node (eq, [a;b])}]) when S.eq n S.not_symbol && S.eq eq S.eq_symbol ->
+  | T.Node (n, [{T.term=T.Node (eq, [a;b])}])
+  when S.eq n S.not_symbol && (S.eq eq S.eq_symbol || S.eq eq S.equiv_symbol) ->
     [Lits.mk_neq ~ord a b]
-  | T.Node (eq, [a;b]) when S.eq eq S.eq_symbol ->
+  | T.Node (eq, [a;b]) when (S.eq eq S.eq_symbol || S.eq eq S.equiv_symbol) ->
     [Lits.mk_eq ~ord a b]
   | T.Node (or_, l) when S.eq or_ S.or_symbol ->
     let l' = T.flatten_ac S.or_symbol l in

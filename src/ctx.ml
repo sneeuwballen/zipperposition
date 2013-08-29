@@ -37,12 +37,11 @@ type t = {
   mutable complete : bool;            (** Completeness preserved? *)
 }
 
-let create ?(signature=Signature.base) ?(ord=Ordering.none)
-?(select=Selection.no_select) () =
+let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
   let ctx = {
     ord=ord;
     select=select;
-    skolem = Skolem.create ();
+    skolem = Skolem.create ~prefix:"zsk" ();
     signature;
     complete=true;
   } in

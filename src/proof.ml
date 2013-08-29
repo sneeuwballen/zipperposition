@@ -192,7 +192,7 @@ let pp switch buf proof = match switch with
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
 let print_vertex proof =
-  let label = `Label (Util.sprintf "@[<h>%a@]" Literal.pp_lits (proof_lits proof)) in
+  let label = `Label (Util.sprintf "%a" Literal.pp_lits (proof_lits proof)) in
   let attributes = [`Shape "box"; `Style "filled"] in
   let attributes =
     if proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
@@ -206,8 +206,10 @@ and print_edge v1 e v2 =
 let pp_dot ~name buf proof =
   let graph = to_graph proof in
   assert (PersistentGraph.is_dag graph);
-  PersistentGraph.pp ~name ~print_vertex ~print_edge
-    (Format.formatter_of_buffer buf) graph
+  let fmt = Format.formatter_of_buffer buf in
+  PersistentGraph.pp ~name ~print_vertex ~print_edge fmt graph;
+  Format.pp_print_flush fmt ();
+  ()
 
 (** print to dot into a file *)
 let pp_dot_file ?(name="proof") filename proof =

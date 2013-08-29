@@ -156,9 +156,9 @@ let hill_climb ~steps mk_precedence mk_cost symbols =
   let cost = mk_cost precedence in
   follow_gradient ~steps precedence cost
 
-let compute ?(initial_signature=Signature.empty)
+let compute ?(signature=Signature.empty)
 ord_factory weak_constrs strong_constrs clauses =
-  let signature = Signature.merge initial_signature (C.signature clauses) in
+  let signature = Signature.merge signature (C.signature clauses) in
   (* the constraints *)
   let constraints =
     Sequence.(map create_constraints clauses
