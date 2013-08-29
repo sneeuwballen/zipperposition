@@ -89,6 +89,9 @@ val pp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
+val pp_no_base : Buffer.t -> t -> unit
+  (** Print the signature, minus the base symbols *)
+
 (** {2 Pre-defined symbols} *)
 
 val base : t

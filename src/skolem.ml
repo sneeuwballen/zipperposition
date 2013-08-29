@@ -36,7 +36,7 @@ type ctx = {
 
 (* TODO: use a term index for the cache? *)
 
-let create ?(prefix="logtk_sk_") () =
+let create ?(prefix="logtk_sk__") () =
   let ctx = {
     sc_gensym = Symbol.Gensym.create ~prefix ();
     sc_var_index = 0;

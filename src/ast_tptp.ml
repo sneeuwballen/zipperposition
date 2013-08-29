@@ -165,10 +165,10 @@ let pp_declaration buf = function
     begin  match generals with
     | [] ->
       Printf.bprintf buf "cnf(%a, %a, (%a))." pp_name name pp_role role
-        (Util.pp_list ~sep:"|" Term.pp_tstp) c
+        (Util.pp_list ~sep:" | " Term.pp_tstp) c
     | _::_ ->
       Printf.bprintf buf "cnf(%a, %a, (%a), %a)." pp_name name pp_role role
-        (Util.pp_list ~sep:"|" Term.pp_tstp) c pp_generals generals
+        (Util.pp_list ~sep:" | " Term.pp_tstp) c pp_generals generals
     end
   | FOF (name, role, f, generals) ->
     __pp_formula buf ("fof", name, role, f, generals)

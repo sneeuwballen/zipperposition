@@ -98,20 +98,20 @@ let rec simplify t =
       T.true_term  (* (false => a) or (a => true) -> true *)
     | T.Node (s, [a; b]) when s == S.imply_symbol && a == T.true_term ->
       simplify b  (* (true => a) -> a *)
-    | T.Node (s, [a; b]) when s == S.eq_symbol && a == b ->
+    | T.Node (s, [a; b]) when (S.eq s S.eq_symbol || S.eq s S.equiv_symbol) && a == b ->
       T.true_term  (* a = a -> true *)
-    | T.Node (s, [a; b]) when s == S.eq_symbol && 
+    | T.Node (s, [a; b]) when (S.eq s S.eq_symbol || S.eq s S.equiv_symbol) && 
       ((a == T.true_term && b == T.false_term) ||
        (b == T.true_term && a == T.false_term)) ->
       T.false_term (* true = false -> false *)
-    | T.Node (s, [a; b]) when s == S.eq_symbol && b == T.true_term ->
-      simplify a  (* a = true -> a *)
-    | T.Node (s, [a; b]) when s == S.eq_symbol && a == T.true_term ->
-      simplify b  (* b = true -> b *)
-    | T.Node (s, [a; b]) when s == S.eq_symbol && b == T.false_term ->
-      simplify (T.mk_not a)  (* a = false -> not a *)
-    | T.Node (s, [a; b]) when s == S.eq_symbol && a == T.false_term ->
-      simplify (T.mk_not b)  (* b = false -> not b *)
+    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && b == T.true_term ->
+      simplify a  (* a <=> true -> a *)
+    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && a == T.true_term ->
+      simplify b  (* b <=> true -> b *)
+    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && b == T.false_term ->
+      simplify (T.mk_not a)  (* a <=> false -> not a *)
+    | T.Node (s, [a; b]) when S.eq s S.equiv_symbol && a == T.false_term ->
+      simplify (T.mk_not b)  (* b <=> false -> not b *)
     | T.Node (s, l) ->
       let l' = List.map simplify l in
       if List.for_all2 (==) l l'

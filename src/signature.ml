@@ -173,3 +173,5 @@ let base_symbols =
 
 let is_base_symbol s = Symbol.SSet.mem s base_symbols
 
+let pp_no_base buf s =
+  pp buf (diff s base)

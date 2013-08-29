@@ -272,7 +272,7 @@ module Gensym = struct
     mutable count : int;
   }
 
-  let create ?(prefix="hyst") () =
+  let create ?(prefix="hyst__") () =
     assert (prefix <> "");
     { prefix;
       count = 0;
@@ -281,6 +281,6 @@ module Gensym = struct
   let new_ gensym =
     let n = gensym.count in
     gensym.count <- n + 1;
-    let s = Util.sprintf "%s__%d" gensym.prefix n in
+    let s = Util.sprintf "%s%d" gensym.prefix n in
     mk_symbol s
 end

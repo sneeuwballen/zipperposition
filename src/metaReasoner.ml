@@ -291,7 +291,7 @@ let explanations_lit reasoner lit =
 
 (** Add a clause to the engine *)
 let add ?expl reasoner clause =
-  Util.debug 2 "%%reasoner: add clause %a" pp_clause clause;
+  Util.debug 4 "reasoner: add clause %a" pp_clause clause;
   Logic.db_add ?expl reasoner.db clause
 
 let add_seq reasoner seq =
@@ -307,7 +307,7 @@ let add_fact ?expl reasoner t =
 (** {2 Backward chaining (goals)} *)
 
 let add_goal reasoner goal =
-  Util.debug 2 "%% reasoner: add goal %a" pp_lit goal;
+  Util.debug 4 "reasoner: add goal %a" pp_lit goal;
   Logic.db_goal reasoner.db goal
 
 (** {2 Explanations} *)

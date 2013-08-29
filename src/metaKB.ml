@@ -508,14 +508,18 @@ let save filename kb =
     raise e
 
 let restore filename =
-  let ic = open_in filename in
   try
-    let source = Bij.SourceChan.create ic in
-    let kb = Bij.SexpChan.decode ~bij source in
-    close_in ic;
-    Some kb
+    let ic = open_in filename in
+    begin try
+      let source = Bij.SourceChan.create ic in
+      let kb = Bij.SexpChan.decode ~bij source in
+      close_in ic;
+      Some kb
+    with e ->
+      close_in ic;
+      raise e
+    end
   with e ->
-    close_in ic;
     Util.debug 1 "restoring KB from %s: error %s" filename (Printexc.to_string e);
     None
 

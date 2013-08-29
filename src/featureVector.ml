@@ -297,7 +297,7 @@ module Make(C : Index.CLAUSE) = struct
     let features = Util.list_take max_features features in
     let features = List.map (fun (_, f) -> f) features in
     let features = default_features @ features in
-    Util.debug 2 "%% FV features: [%a]" (Util.pp_list Feature.pp) features;
+    Util.debug 2 "FV features: [%a]" (Util.pp_list Feature.pp) features;
     features
 
   let of_signature signature =
