@@ -470,9 +470,9 @@ let rec atomic t =
   let open Symbol in
   match t.term with
   | Var _ | BoundVar _ -> true
-  | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic t'))
-  | Node (s, l) -> not (s == and_symbol || s == or_symbol
-    || s == imply_symbol || s == not_symbol || s == eq_symbol)
+  | Bind (s, t') -> not (eq s forall_symbol || eq s exists_symbol || not (atomic t'))
+  | Node (s, l) -> not (eq s and_symbol || eq s or_symbol
+    || eq s imply_symbol || eq s not_symbol || eq s eq_symbol || eq s equiv_symbol)
   | At (t1, t2) -> true
 
 (** check whether the term contains connectives or quantifiers *)
@@ -482,8 +482,8 @@ let rec atomic_rec t =
   | Var _ | BoundVar _ -> true
   | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic_rec t'))
   | Node (s, l) ->
-    not (s == and_symbol || s == or_symbol || s == imply_symbol
-      || s == not_symbol || s == eq_symbol)
+    not (eq s and_symbol || eq s or_symbol || eq s imply_symbol
+      || eq s not_symbol || eq s eq_symbol || eq s equiv_symbol)
     && List.for_all atomic_rec l
   | At (t1, t2) -> atomic_rec t1 && atomic_rec t2
 
@@ -686,7 +686,8 @@ let rec db_to_classic ?(varindex=ref 0) t =
     mk_var ?ty:t.type_ n
   | Node (s, l) ->
     mk_node s (List.map (db_to_classic ~varindex) l)
-  | At (t1, t2) -> mk_at (db_to_classic ~varindex t1) (db_to_classic ~varindex t2)
+  | At (t1, t2) ->
+    mk_at (db_to_classic ~varindex t1) (db_to_classic ~varindex t2)
 
 (** Curry all subterms *)
 let rec curry t =
@@ -844,26 +845,32 @@ let pp_tstp buf t =
   let rec pp_rec buf t = match t.term with
   | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
     && Symbol.eq s' Symbol.equiv_symbol ->
-    Printf.bprintf buf "(%a <~> %a)" pp_rec a pp_rec b
+    Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
   | Node (s, [{term=Node (s', [a; b])}])
     when s == Symbol.not_symbol && s' == Symbol.eq_symbol ->
-    Printf.bprintf buf "%a != %a" pp_rec a pp_rec b
+    Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
   | Node (s, [t]) when s == Symbol.not_symbol ->
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
   | Node (s, [v; t']) when Symbol.has_attr Symbol.attr_binder s ->
     assert (is_var v);
-    Printf.bprintf buf "%a[%a]: (%a)" Symbol.pp s pp_var v pp_rec t'
+    Printf.bprintf buf "%a[%a]: %a" Symbol.pp s pp_var v pp_surrounded t'
   | BoundVar _ | Bind _ ->
     failwith "De Bruijn index in term, cannot be printed in TSTP"
   | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
-    Printf.bprintf buf "%a %a %a" pp_rec a Symbol.pp s pp_rec b
+    Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
   | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
-    Printf.bprintf buf "%a %a (%a)" pp_rec body1 Symbol.pp s (Util.pp_list pp_rec) body
+    let sep = Util.sprintf " %a " Symbol.pp s in
+    Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
+      (Util.pp_list ~sep pp_surrounded) body
   | Node (s, []) -> Symbol.pp buf s
   | Node (s, args) -> (* general case for nodes *)
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
   | Var i -> Printf.bprintf buf "X%d" i
   | At (t1, t2) -> pp_rec buf t1; Buffer.add_string buf " @ "; pp_rec buf t2
+  and pp_surrounded buf t = match t.term with
+  | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
+    Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+  | _ -> pp_rec buf t
   and pp_var buf t = match t.term with
   | Var i -> 
     begin match t.type_ with
@@ -884,28 +891,34 @@ let rec pp_debug buf t =
   let rec pp_rec buf t = match t.term with
   | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
     && Symbol.eq s' Symbol.equiv_symbol ->
-    Printf.bprintf buf "(%a <~> %a)" pp_rec a pp_rec b
+    Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
   | Node (s, [{term=Node (s', [a; b])}])
     when s == Symbol.not_symbol && s' == Symbol.eq_symbol ->
-    Printf.bprintf buf "%a != %a" pp_rec a pp_rec b
+    Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
   | Node (s, [t]) when s == Symbol.not_symbol ->
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
   | Node (s, [v; t']) when Symbol.has_attr Symbol.attr_binder s ->
     assert (is_var v);
-    Printf.bprintf buf "%a[%a]: %a" Symbol.pp s pp_var v pp_rec t'
+    Printf.bprintf buf "%a[%a]: %a" Symbol.pp s pp_var v pp_surrounded t'
   | BoundVar _ | Bind _ ->
-    failwith "De Bruijn index in term, cannot be printed in TSTP"
-  | Node (s, body1::body) when Symbol.has_attr Symbol.attr_infix s ->
-    Printf.bprintf buf "%a %a %a" pp_rec body1 Symbol.pp s (Util.pp_list pp_rec) body
+    failwith "De Bruijn index in term, cannot be printed in debug"
+  | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
+    Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
+  | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
+    let sep = Util.sprintf " %a " Symbol.pp s in
+    Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
+      (Util.pp_list ~sep pp_surrounded) body
   | Node (s, []) -> Symbol.pp buf s
   | Node (s, args) ->
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
   | Var i -> Printf.bprintf buf "X%d" i
   | At (t1, t2) ->
     pp_rec buf t1; Buffer.add_char buf ' ';
-    (if is_complex t2 then Buffer.add_char buf '(');
-    pp_rec buf t2;
-    (if is_complex t2 then Buffer.add_char buf ')')
+    pp_surrounded buf t2
+  and pp_surrounded buf t = match t.term with
+  | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
+    Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+  | _ -> pp_rec buf t
   and pp_var buf t = match t.term with
   | Var i -> 
     begin match t.type_ with
@@ -914,10 +927,6 @@ let rec pp_debug buf t =
     | _ -> Printf.bprintf buf "X%d" i
     end
   | _ -> assert false
-  (* complex term? *)
-  and is_complex t = match t.term with
-  | At _ | Node (_, _::_) -> true
-  | _ -> false
   in
   let maxvar = max (max_var (vars t)) 0 in
   let varindex = ref (maxvar+1) in
