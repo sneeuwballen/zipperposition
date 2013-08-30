@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module F = Formula
 module A = Ast_tptp
 
 let declare_types = ref false
@@ -48,7 +48,7 @@ let to_cnf decls =
         begin match role with
         | A.R_conjecture ->
           (* negate conjecture *)
-          let clauses = Cnf.cnf_of ~ctx (T.mk_not f) in
+          let clauses = Cnf.cnf_of ~ctx (F.mk_not f) in
           Sequence.map
             (fun c -> A.CNF(n,A.R_negated_conjecture,c,info))
             (Sequence.of_list clauses)

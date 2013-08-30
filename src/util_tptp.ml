@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module A = Ast_tptp
 module T = Term
+module F = Formula
 
 (** {2 Printing/Parsing} *)
 
@@ -165,12 +166,10 @@ let infer_type ctx decls =
       | A.TypeDecl(_, s, ty) ->
         TypeInference.Ctx.declare ctx s ty
       | A.CNF(_,_,c,_) ->
-        List.iter
-          (fun lit -> TypeInference.constrain_term_type ctx lit Type.o)
-          c
+        List.iter (F.infer_type ctx) c
       | A.FOF(_,_,f,_)
-      | A.TFF(_,_,f,_) ->
-        TypeInference.constrain_term_type ctx f Type.o)
+      | A.TFF(_,_,f,_) -> F.infer_type ctx f
+      )
     decls
 
 let signature ?(signature=Signature.base) decls =
@@ -205,12 +204,12 @@ let formulas ?(negate=__is_conjecture) decls =
       | A.IncludeOnly _ -> None
       | A.CNF(_, role, c, _) ->
         if negate role
-          then Some (T.mk_not (T.mk_or_list c))
-          else Some (T.mk_or_list c)
+          then Some (F.mk_not (F.mk_or c))
+          else Some (F.mk_or c)
       | A.FOF(_, role, f, _)
       | A.TFF(_, role, f, _) ->
         if negate role
-          then Some (T.mk_not f)
+          then Some (F.mk_not f)
           else Some f)
     decls
 
@@ -224,12 +223,12 @@ let sourced_formulas ?(negate=__is_conjecture) ?(file="unknown_file") decls =
       | A.CNF(name, role, c, _) ->
         let source = A.string_of_name name in
         if negate role
-          then Some (T.mk_not (T.mk_or_list c), file, source)
-          else Some (T.mk_or_list c, file, source)
+          then Some (F.mk_not (F.mk_or c), file, source)
+          else Some (F.mk_or c, file, source)
       | A.FOF(name, role, f, _)
       | A.TFF(name, role, f, _) ->
         let source = A.string_of_name name in
         if negate role
-          then Some (T.mk_not f, file, source)
+          then Some (F.mk_not f, file, source)
           else Some (f, file, source))
     decls

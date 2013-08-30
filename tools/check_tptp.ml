@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module F = Formula
 
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
@@ -52,13 +52,13 @@ let check file =
       then Sequence.iter
         (fun d -> Util.printf "%a\n" Ast_tptp.pp_declaration d) decls);
     (* type check *)
-    let signature = Util_tptp.signature decls in
+    let signature = Signature.diff (Util_tptp.signature decls) Signature.base in
     Printf.printf "signature:\n";
     Signature.iter signature
       (fun s ty -> Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
     Printf.printf "formulas:\n";
     Sequence.iter
-      (fun f -> Util.printf "  %a\n" T.pp f)
+      (fun f -> Util.printf "  %a\n" F.pp f)
       (Util_tptp.formulas decls);
   with
   | Util_tptp.ParseError _ as e ->

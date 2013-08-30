@@ -143,17 +143,71 @@ let mk_forall_list vars f =
 let mk_exists_list vars f =
   List.fold_right mk_exists vars f
 
-let rec add_terms set f = match f.form with
+(** {2 Combinators} *)
+
+let rec map_leaf f form = match form.form with
+  | And l -> mk_and (List.map (map_leaf f) l)
+  | Or l -> mk_or (List.map (map_leaf f) l)
+  | Imply (f1, f2) -> mk_imply (map_leaf f f1) (map_leaf f f2)
+  | Equiv (f1, f2) -> mk_equiv (map_leaf f f1) (map_leaf f f2)
+  | Not f' -> mk_not (map_leaf f f')
+  | True
+  | False
+  | Atom _
+  | Equal _ -> f form  (* replace by image *)
+  | Forall (v, f') -> mk_forall v (map_leaf f f')
+  | Exists (v, f') -> mk_exists v (map_leaf f f')
+
+let map f form =
+  map_leaf
+    (fun form -> match form.form with
+      | True
+      | False -> form
+      | Atom p -> mk_atom (f p)
+      | Equal (t1, t2) -> mk_eq (f t1) (f t2)
+      | _ -> assert false)
+    form
+
+let rec fold f acc form = match form.form with
   | And l
-  | Or l -> List.iter (add_terms set) l
+  | Or l -> List.fold_left (fold f) acc l
   | Imply (f1, f2)
-  | Equiv (f1, f2) -> add_terms set f1; add_terms set f2
-  | Not f' -> add_terms set f'
-  | True | False -> ()
-  | Forall (_, f')
-  | Exists (_, f') -> add_terms set f'
-  | Atom p -> T.THashSet.add set p
-  | Equal (t1, t2) -> T.THashSet.add set t1; T.THashSet.add set t2
+  | Equiv (f1, f2) -> fold f (fold f acc f1) f2
+  | Not f' -> fold f acc f'
+  | True
+  | False -> acc
+  | Atom p -> f acc p
+  | Equal (t1, t2) -> f (f acc t1) t2
+  | Forall (v, f') 
+  | Exists (v, f') -> fold f acc f'
+
+let iter f form = fold (fun () t -> f t) () form
+
+let fold_bv ?(bv=[]) f acc form =
+  let rec recurse f acc bv form = match form.form with
+  | And l
+  | Or l -> List.fold_left (fun acc f' -> recurse f acc bv f') acc l
+  | Imply (f1, f2)
+  | Equiv (f1, f2) ->
+    let acc = recurse f acc bv f1 in
+    let acc = recurse f acc bv f2 in
+    acc
+  | Not f' -> recurse f acc bv f'
+  | True
+  | False -> acc
+  | Atom p -> f acc bv p
+  | Equal (t1, t2) ->
+    let acc = f acc bv t1 in
+    let acc = f acc bv t2 in
+    acc
+  | Forall (v, f') 
+  | Exists (v, f') ->
+    let bv = if List.memq v bv then bv else v :: bv in
+    recurse f acc bv f'
+  in
+  recurse f acc bv form
+
+let add_terms set f = iter (T.THashSet.add set) f
 
 let terms f =
   let set = T.THashSet.create () in
@@ -161,21 +215,14 @@ let terms f =
   set
 
 let terms_seq f =
-  let set = terms f in
-  Sequence.from_iter (T.THashSet.iter set)
+  Sequence.from_iter (fun k -> iter k f)
 
-let rec subterm t f = match f.form with
-  | Or l
-  | And l -> List.exists (subterm t) l
-  | Imply (f1, f2)
-  | Equiv (f1, f2) -> subterm t f1 || subterm t f2
-  | Not f' -> subterm t f'
-  | Forall (_, f')
-  | Exists (_, f') -> subterm t f'
-  | Equal (t1, t2) -> T.subterm ~sub:t t1 || T.subterm ~sub:t t2
-  | Atom p -> T.subterm ~sub:t p
-  | True
-  | False -> false
+let subterm t f =
+  try
+    iter (fun t' -> if T.subterm ~sub:t t' then raise Exit) f;
+    false
+  with Exit ->
+    true
 
 let bound_variables f =
   let rec recurse acc f = match f.form with
@@ -196,9 +243,14 @@ let bound_variables f =
   in
   recurse [] f
 
-let rec free_variables f =
-  let set = T.THashSet.create ~size:3 () in
-  let rec recurse f = match f.form with
+let free_variables f =
+  (* start with a fresh set *)
+  let rec start f =
+    let set = T.THashSet.create ~size:3 () in
+    recurse set f;
+    set
+  (* recurse with the same set of variables *)
+  and recurse set f = match f.form with
   | Atom p -> T.add_vars set p
   | Equal (t1, t2) ->
     T.add_vars set t1;
@@ -206,18 +258,29 @@ let rec free_variables f =
   | True
   | False -> ()
   | And l
-  | Or l -> List.iter recurse l
+  | Or l -> List.iter (recurse set) l
   | Imply (f1, f2)
-  | Equiv (f1, f2) -> recurse f1; recurse f2
-  | Not f' -> recurse acc f'
+  | Equiv (f1, f2) -> recurse set f1; recurse set f2
+  | Not f' -> recurse set f'
   | Forall (v, f')
   | Exists (v, f') ->
-    let set' = free_variables f' in
-    T.THashSet.remove set' v; (* [v] not free *)
-    T.THashSet.merge set set' (* set union *)
+    (* compute free vars of [f'] independently *)
+    let set' = start f' in
+    (* then remove [v] from it *)
+    T.THashSet.remove set' v;
+    (* and merge it back to [set] *)
+    T.THashSet.merge set set';
   in
-  recurse set f;
+  let set = start f in
   T.THashSet.to_list set
+
+let close_forall f =
+  let fv = free_variables f in
+  mk_forall_list fv f
+
+let close_exists f =
+  let fv = free_variables f in
+  mk_exists_list fv f
 
 let is_atomic f = match f.form with
   | And _
@@ -313,6 +376,66 @@ let rec simplify f = match f.form with
   | Equiv ({form=False}, f')
   | Equiv (f', {form=False}) -> mk_not (simplify f')
   | Equiv (f1, f2) -> mk_equiv (simplify f1) (simplify f2)
+
+let ac_normal_form f =
+  let rec recurse f = match f.form with
+  | True
+  | False
+  | Atom _ -> f
+  | Imply (f1, f2) -> mk_imply (recurse f1) (recurse f2)
+  | Equiv (f1, f2) -> mk_equiv (recurse f1) (recurse f2)
+  | Not f' -> mk_not (recurse f')
+  | Equal (t1, t2) ->
+    (* put bigger term first *)
+    begin match T.compare t1 t2 with
+    | n when n >= 0 -> f
+    | _ -> mk_eq t2 t1
+    end
+  | And l ->
+    let l' = List.map recurse l in
+    let l' = List.sort compare l' in
+    mk_and l'
+  | Or l ->
+    let l' = List.map recurse l in
+    let l' = List.sort compare l' in
+    mk_or l'
+  | Forall (v, f') -> mk_forall v (recurse f')
+  | Exists (v, f') -> mk_exists v (recurse f')
+  in
+  recurse (flatten f)
+
+let ac_eq f1 f2 =
+  let f1 = ac_normal_form f1 in
+  let f2 = ac_normal_form f2 in
+  eq f1 f2
+
+let apply_subst ?renaming ?recursive ~subst f scope =
+  let rec recurse subst f = match f.form with
+  | Atom p ->
+    let p' = Substs.apply_subst ?recursive ?renaming subst p scope in
+    mk_atom p'
+  | Equal (t1, t2) ->
+    let t1' = Substs.apply_subst ?recursive ?renaming subst t1 scope in
+    let t2' = Substs.apply_subst ?recursive ?renaming subst t2 scope in
+    mk_eq t1' t2'
+  | True
+  | False -> f
+  | And l -> mk_and (List.map (recurse subst) l)
+  | Or l -> mk_or (List.map (recurse subst) l)
+  | Imply (f1, f2) -> mk_imply (recurse subst f1) (recurse subst f2)
+  | Equiv (f1, f2) -> mk_equiv (recurse subst f1) (recurse subst f2)
+  | Not f' -> mk_not (recurse subst f')
+  | Forall (v, f') ->
+    Util.debug 5 "remove %a %d from subst %a" T.pp v scope Substs.pp subst; (* dangerous *)
+    let subst = Substs.remove subst v scope in
+    mk_forall v (recurse subst f')
+  | Exists (v, f') ->
+    let subst = Substs.remove subst v scope in
+    mk_exists v (recurse subst f')
+  in
+  recurse subst f
+
+(** {2 Conversion} *)
 
 let rec to_term f = match f.form with
   | True -> T.true_term

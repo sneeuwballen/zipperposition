@@ -82,6 +82,14 @@ let bind ?(recursive=true) subst v sc_v t sc_t =
       then SubstBind (t', sc_t', t, sc_t, subst)  (* add binding at front *)
       else raise (Invalid_argument "Subst.bind: inconsistent binding")
 
+let rec remove subst v sc_v = match subst with
+  | SubstEmpty -> SubstEmpty
+  | SubstBind (v', sc_v', t', sc_t', subst') ->
+    let subst' = remove subst' v sc_v in
+    if v == v' && sc_v = sc_v'
+      then subst'  (* remove binding *)
+      else SubstBind (v', sc_v', t', sc_t', subst')  (* keep binding *)
+
 let rec append s1 s2 =
   match s1 with
   | SubstEmpty -> s2

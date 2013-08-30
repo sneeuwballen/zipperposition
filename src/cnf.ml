@@ -70,6 +70,7 @@ let rec miniscope f =
     let l = List.map miniscope l in
     let with_v, without_v = List.partition (F.subterm v) l in
     F.mk_and (F.mk_forall v (F.mk_or with_v) :: without_v)
+  | F.Forall (v, f') -> F.mk_forall v (miniscope f')
   | F.Exists (v, {F.form=F.And l}) ->
     let l = List.map miniscope l in
     let with_v, without_v = List.partition (F.subterm v) l in
@@ -78,10 +79,12 @@ let rec miniscope f =
     let l = List.map miniscope l in
     let with_v, without_v = List.partition (F.subterm v) l in
     F.mk_or (List.map (F.mk_exists v) with_v @ without_v)
+  | F.Exists (v, f') -> F.mk_exists v (miniscope f')
   | F.And l -> F.mk_and (List.map miniscope l)
   | F.Or l -> F.mk_or (List.map miniscope l)
   | F.Imply (f1, f2) -> F.mk_imply (miniscope f1) (miniscope f2)
   | F.Equiv (f1, f2) -> F.mk_equiv (miniscope f1) (miniscope f2)
+  | F.Not f' -> F.mk_not (miniscope f')
   | F.True
   | F.False
   | F.Equal _
@@ -91,12 +94,16 @@ let rec miniscope f =
 let rec nnf f = match f.F.form with
   | F.Atom _
   | F.Equal _ -> f
+  | F.Not {F.form=F.And l} ->
+    nnf (F.mk_or (List.map F.mk_not l))
   | F.And l -> F.mk_and (List.map nnf l)
+  | F.Not {F.form=F.Or l} ->
+    nnf (F.mk_and (List.map F.mk_not l))
   | F.Or l -> F.mk_or (List.map nnf l)
   | F.Not {F.form=F.Imply(f1,f2)} ->
     F.mk_and [ nnf f1; nnf (F.mk_not f2) ]
   | F.Imply (f1, f2) ->
-    F.mk_or [ F.mk_not (F.mk_not f1); nnf f2 ]
+    F.mk_or [ nnf (F.mk_not f1); nnf f2 ]
   | F.Not {F.form=F.Equiv(f1,f2)} ->
     F.mk_or
       [ F.mk_and [ nnf (F.mk_not f1); nnf (F.mk_not f2) ]
@@ -104,66 +111,68 @@ let rec nnf f = match f.F.form with
       ]
   | F.Equiv (f1, f2) ->
     F.mk_and
-      [ nnf (mk_imply f1 f2)
-      ; nnf (mk_imply f2 f1)
+      [ nnf (F.mk_imply f1 f2)
+      ; nnf (F.mk_imply f2 f1)
       ]
-  | F.Not {F.form=F.Forall(v, f')} ->
-    F.mk_exists v (nnf (F.mk_not f'))
+  | F.Not {F.form=F.Forall(v, f')} -> F.mk_exists v (nnf (F.mk_not f'))
   | F.Forall (v, f') -> F.mk_forall v (nnf f')
-  | F.Not {F.form=F.Exists(v, f')} ->
-    F.mk_forall v (nnf (F.mk_not f'))
+  | F.Not {F.form=F.Exists(v, f')} -> F.mk_forall v (nnf (F.mk_not f'))
   | F.Exists (v, f') -> F.mk_exists v (nnf f')
   | F.Not f' -> F.mk_not (nnf f')
+  | F.True
+  | F.False -> f
 
 let skolemize ~ctx f =
   let rec skolemize f = match f.F.form with
   | F.And l -> F.mk_and (List.map skolemize l)
   | F.Or l -> F.mk_or (List.map skolemize l)
   | F.Not f' -> F.mk_not (skolemize f')
-  | F.
+  | F.Imply _
+  | F.Equiv _ -> failwith "can only skolemize a NNF formula"
+  | F.Atom _
+  | F.Equal _
+  | F.True
+  | F.False -> f
+  | F.Exists (v, f') ->
+    (* replace [v] by a fresh skolem term *)
+    let new_f' = Skolem.skolem_form ~ctx ~var:v f' in
+    skolemize new_f'
+  | F.Forall (v, f') ->
+    (* remove quantifier, replace by fresh variable *)
+    F.iter (Skolem.update_var ~ctx) f';
+    let v' = T.mk_var ?ty:v.T.type_ (Skolem.fresh_var ~ctx) in
+    assert (v != v');
+    let subst = Substs.bind Substs.empty v 0 v' 0 in
+    let new_f' = F.apply_subst ~subst f' 0 in
+    skolemize new_f'
+  in
+  skolemize f
 
-(* skolemization of existentials, removal of forall *)
-let rec skolemize ~ctx t = match t.T.term with
-  | T.Var _
-  | T.Node (_, [])
-  | T.BoundVar _ -> t
-  | T.Node (s, [{T.term=T.Node (s', [t])}])
-    when s == S.not_symbol && s' == S.not_symbol ->
-    skolemize ~ctx t (* double negation *)
-  | T.Bind (s, t') when s == S.forall_symbol ->
-    (* a fresh variable *)
-    let ty = T.db_type t' 0 in
-    Skolem.update_var ~ctx t';
-    let v = T.mk_var ?ty (Skolem.fresh_var ~ctx) in
-    let new_t' = T.db_unlift (T.db_replace t' v) in
-    skolemize ~ctx new_t' (* remove forall *)
-  | T.Bind (s, t') when s == S.exists_symbol ->
-    (* make a skolem symbol *)
-    let new_t' = Skolem.skolem_term ~ctx t' in
-    skolemize ~ctx new_t' (* remove forall *)
-  | T.Bind (s, t') -> T.mk_bind s (skolemize ~ctx t')
-  | T.Node (s, l) -> T.mk_node s (List.map (skolemize ~ctx) l)
-  | T.At (t1, t2) -> T.mk_at (skolemize ~ctx t1) (skolemize ~ctx t2)
-
-(* helper: reduction to cnf using De Morgan laws. Returns a list of list of terms *)
-let rec to_cnf t =
-  match t.T.term with
-  | T.Var _
-  | T.Node (_, [])
-  | T.BoundVar _ -> [[t]]
-  | T.Node (s, [t']) when S.eq s S.not_symbol ->
-    assert (T.atomic_rec t' ||
-            match t'.T.term with T.Node (s', _) when S.eq s' S.eq_symbol -> true | _ -> false);
-    [[T.mk_not t']]
-  | T.Node (s, [a; b]) when s == S.and_symbol ->
-    let ca = to_cnf a
-    and cb = to_cnf b in
-    List.rev_append ca cb
-  | T.Node (s, [a; b]) when s == S.or_symbol ->
-    product (to_cnf a) (to_cnf b)
-  | T.Node _
-  | T.At _
-  | T.Bind _ -> [[t]]
+(* helper: reduction to cnf using De Morgan laws. Returns a list of list of
+  atomic formulas *)
+let rec to_cnf f = match f.F.form with
+  | F.Equal _
+  | F.Atom _
+  | F.True
+  | F.False -> [[f]]
+  | F.Not f' ->
+    if F.is_atomic f'
+      then [[f]]
+      else failwith (Util.sprintf "should be atomic: %a" F.pp f')
+  | F.And l ->
+    (* simply concat sub-CNF *)
+    Util.list_flatmap to_cnf l
+  | F.Or (f'::l) ->
+    (* cartesian products of sub-CNF *)
+    List.fold_left
+      (fun cnf f' -> product (to_cnf f') cnf)
+      (to_cnf f')
+      l
+  | F.Forall _
+  | F.Exists _ -> failwith "Cnf.to_cnf: can only clausify a skolemized formula"
+  | F.Imply _
+  | F.Equiv _ -> failwith "Cnf.to_cnf: can only clausify a NNF formula"
+  | F.Or [] -> assert false
 (* cartesian product of lists of lists *)
 and product a b =
   List.fold_left
@@ -172,23 +181,41 @@ and product a b =
       acc b)
     [] a
 
-type clause = Term.t list
+type clause = Formula.t list
   (** Basic clause representation, as list of literals *)
 
 (* Transform the clause into proper CNF; returns a list of clauses *)
-let cnf_of ?(ctx=Skolem.create ()) t =
-  if is_cnf t
+let cnf_of ?(ctx=Skolem.create ()) f =
+  let f = F.flatten f in
+  if is_cnf f
     then
-      let c = T.flatten_ac Symbol.or_symbol [t] in
-      [c]
-    else (
-      let t = simplify t in
-      let t = nnf t in
-      let t = miniscope t in
-      Skolem.update_var ~ctx t;
-      let t = skolemize ~ctx t in
-      let clauses = to_cnf t in
-      clauses )
+      match f.F.form with
+      | F.Or l -> [l]
+      | F.False -> []
+      | F.True 
+      | F.Equal _
+      | F.Atom _ -> [[f]]
+      | F.Not f' when F.is_atomic f' -> [[f]]
+      | F.Not _
+      | F.Equiv _
+      | F.Imply _
+      | F.And _
+      | F.Forall _
+      | F.Exists _ -> assert false
+    else begin
+      Util.debug 4 "reduce %a to CNF..." F.pp f;
+      let f = F.simplify f in
+      Util.debug 4 "... simplified: %a" F.pp f;
+      let f = nnf f in
+      Util.debug 4 "... NNF: %a" F.pp f;
+      let f = miniscope f in
+      Util.debug 4 "... miniscoped: %a" F.pp f;
+      F.iter (Skolem.update_var ~ctx) f;
+      let f = skolemize ~ctx f in
+      Util.debug 4 "... skolemized: %a" F.pp f;
+      let clauses = to_cnf f in
+      clauses
+    end
 
 let cnf_of_list ?(ctx=Skolem.create ()) l =
-  Util.list_flatmap (fun t -> cnf_of ~ctx t) l
+  Util.list_flatmap (fun f -> cnf_of ~ctx f) l

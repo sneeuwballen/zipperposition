@@ -66,12 +66,30 @@ val mk_exists : Term.t -> t -> t
 val mk_forall_list : Term.t list -> t -> t
 val mk_exists_list : Term.t list -> t -> t
 
+(** {2 Combinators} *)
+
+val map_leaf : (t -> t) -> t -> t
+  (** Call the function on leaves (atom,equal,true,false) and replace the
+      leaves by their image *)
+
+val map : (Term.t -> Term.t) -> t -> t    (** Map on terms *)
+val fold : ('a -> Term.t -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
+val iter : (Term.t -> unit) -> t -> unit
+
+val fold_bv : ?bv:Term.varlist ->
+              ('a -> Term.varlist -> Term.t -> 'a) ->
+              'a -> t -> 'a
+  (** Fold on terms, but with an additional argument, the list of
+      variables that are bound through the path to the term *)
+
 (** The following functions gather the terms of a formula.
     However, bound variables are not gathered. *)
 
 val add_terms : Term.THashSet.t -> t -> unit
 val terms : t -> Term.THashSet.t
+
 val terms_seq : t -> Term.t Sequence.t
+  (** Sequence of terms. Terms may occur several times *)
 
 val subterm : Term.t -> t -> bool
   (** [subterm t f] true iff [t] occurs in some term of [f] *)
@@ -82,12 +100,26 @@ val bound_variables : t -> Term.varlist
 val free_variables : t -> Term.varlist
   (** Variables not bound by any (formula) quantifier *)
 
+val close_forall : t -> t   (** Bind all free variables with forall *)
+val close_exists : t -> t   (** Bind all free variables with exists *)
+
 val is_atomic : t -> bool   (** No connectives? *)
 val is_ground : t -> bool   (** No variables? *)
 val is_closed : t -> bool   (** All variables bound? *)
 
 val flatten : t -> t        (** Flatten AC connectives (or/and) *)
 val simplify : t -> t       (** Simplify the formula *)
+
+val ac_normal_form : t -> t (** Normal form modulo AC of "or" and "and" *)
+val ac_eq : t -> t -> bool  (** Equal modulo AC? *)
+
+val apply_subst : ?renaming:Substs.Renaming.t -> ?recursive:bool ->
+                  subst:Substs.t -> 
+                  t -> Substs.scope -> t
+  (** Apply substitution to the formula. Quantified variables are not
+      replaced. *)
+
+(** {2 Conversions} *)
 
 val to_term : t -> Term.t   (** Conversion to term *)
 val of_term : Term.t -> t

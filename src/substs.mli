@@ -55,6 +55,9 @@ val bind : ?recursive:bool -> t -> Term.t -> int -> Term.t -> int -> t
   (** Add v -> t to the substitution. Both terms have a context. Raise
       Invalid_argument if v is already bound in the same context, to another term. *)
 
+val remove : t -> Term.t -> int -> t
+  (** Remove the given binding. No other variable should depend on it... *)
+
 val append : t -> t -> t
   (** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
 

@@ -286,11 +286,11 @@ let form_unify ?(subst=S.empty) f1 sc_1 f2 sc_2 =
 let form_variant ?(subst=S.empty) f1 sc_1 f2 sc_2 =
   (* CPS, with [k] the continuation that is given the answer
     substitutions *)
-  let rec unif subst f1 f2 k = match f1.form, f2.form with
+  let rec unif subst f1 f2 k = match f1.F.form, f2.F.form with
     | _ when F.eq f1 f2 -> k subst
     | F.Atom p1, F.Atom p2 ->
       begin try
-        let subst = variant ~subst t1 sc_1 t2 sc_2 in
+        let subst = variant ~subst p1 sc_1 p2 sc_2 in
         k subst
       with Fail -> ()
       end
@@ -324,9 +324,6 @@ let form_variant ?(subst=S.empty) f1 sc_1 f2 sc_2 =
     | F.True, F.True
     | F.False, F.False -> k subst  (* yep :) *)
     | _ -> ()  (* failure :( *)
-  and unif_com subst f11 f12 f21 f22 k =
-    unif subst f11 f21 (fun subst -> unif subst f12 f22);
-    unif subst f11 f22 (fun subst -> unif subst f12 f21);
   (* invariant: [l1] and [left @ right] always have the same length *)
   and unif_ac subst l1 left right k = match l1, left, right with
     | [], [], [] -> k subst  (* success! *)
@@ -337,6 +334,7 @@ let form_variant ?(subst=S.empty) f1 sc_1 f2 sc_2 =
       (* f1 against right', keep f2 for later *)
       unif_ac subst l1 (f2::left) right' k;
       ()
+    | _::_, left, [] -> ()
     | _ -> assert false
   in
   (* flattening (for and/or) *)

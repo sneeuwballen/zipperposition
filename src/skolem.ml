@@ -89,12 +89,14 @@ let skolem_term ~ctx t =
 exception FoundFormVariant of Formula.t * Formula.t * Substs.t
 
 let skolem_form ~ctx ~var f =
-  let vars = F.free_vars f in
+  let vars = F.free_variables f in
+  let vars = List.filter (fun v' -> var != v') vars in  (* [var] does not count *)
   let scope = T.max_var vars + 1 in
   (* find a variant of [f] *)
   try
     List.iter
       (fun (f', new_f') ->
+        Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
         Sequence.iter
           (fun subst -> raise (FoundFormVariant (f', new_f', subst)))
           (Unif.form_variant f' scope f 0))
@@ -102,9 +104,13 @@ let skolem_form ~ctx ~var f =
     (* fresh symbol *)
     let symb = fresh_sym ~ctx in
     let skolem_term = T.mk_node symb vars in
-    let new_f = F.replace var skolem_term f in
+    (* replace variable by skolem t*)
+    let subst = Substs.bind Substs.empty var 0 skolem_term 0 in
+    let new_f = F.apply_subst ~subst f 0 in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
     new_f
   with FoundFormVariant(f',new_f',subst) ->
+    Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f Substs.pp subst;
     let new_f = F.apply_subst subst new_f' scope in
     new_f
+
