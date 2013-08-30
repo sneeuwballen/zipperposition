@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9ce075ee503d25ef2aaaca3c6285450d)
+# DO NOT EDIT (digest: e001723ded347f976498c8d9eeee1b8f)
 Symbol
 Hash
 Hashcons
@@ -27,13 +27,6 @@ Rewriting
 FeatureVector
 Util_tptp
 Skolem
-MetaPattern
-MetaKB
-MetaReasoner
-MetaProver
-Ast_theory
-Lex_theory
-Parse_theory
 lib/Sequence
 lib/Bij
 lib/Signal

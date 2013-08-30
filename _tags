@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 50fd1e25542b0c9d0d351774847f4511)
+# DO NOT EDIT (digest: 21a7acc490cb2d3576b3bfaace4e4748)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -42,48 +42,45 @@
 "src/featureVector.cmx": for-pack(Logtk)
 "src/util_tptp.cmx": for-pack(Logtk)
 "src/skolem.cmx": for-pack(Logtk)
-"src/metaPattern.cmx": for-pack(Logtk)
-"src/metaKB.cmx": for-pack(Logtk)
-"src/metaReasoner.cmx": for-pack(Logtk)
-"src/metaProver.cmx": for-pack(Logtk)
-"src/ast_theory.cmx": for-pack(Logtk)
-"src/lex_theory.cmx": for-pack(Logtk)
-"src/parse_theory.cmx": for-pack(Logtk)
 "src/lib/sequence.cmx": for-pack(Logtk)
 "src/lib/bij.cmx": for-pack(Logtk)
 "src/lib/signal.cmx": for-pack(Logtk)
 "src/lib/cache.cmx": for-pack(Logtk)
-<src/*.ml{,i}>: pkg_unix
-<src/*.ml{,i}>: pkg_num
-<src/*.ml{,i}>: pkg_datalog
 <src/lib/*.ml{,i}>: pkg_unix
 <src/lib/*.ml{,i}>: pkg_num
-<src/lib/*.ml{,i}>: pkg_datalog
+# Library logtk_meta
+"src/logtk_meta.cmxs": use_logtk_meta
+"src/metaPattern.cmx": for-pack(Logtk_meta)
+"src/metaKB.cmx": for-pack(Logtk_meta)
+"src/metaReasoner.cmx": for-pack(Logtk_meta)
+"src/metaProver.cmx": for-pack(Logtk_meta)
+"src/ast_theory.cmx": for-pack(Logtk_meta)
+"src/lex_theory.cmx": for-pack(Logtk_meta)
+"src/parse_theory.cmx": for-pack(Logtk_meta)
+<src/*.ml{,i}>: use_logtk
+<src/*.ml{,i}>: pkg_datalog
+<src/*.ml{,i}>: pkg_unix
+<src/*.ml{,i}>: pkg_num
 # Executable run_tests
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": pkg_oUnit
 "tests/run_tests.native": pkg_unix
 "tests/run_tests.native": pkg_num
-"tests/run_tests.native": pkg_datalog
 <tests/*.ml{,i}>: use_logtk
 <tests/*.ml{,i}>: pkg_oUnit
 <tests/*.ml{,i}>: pkg_unix
 <tests/*.ml{,i}>: pkg_num
-<tests/*.ml{,i}>: pkg_datalog
 # Executable check_tptp
 "tools/check_tptp.byte": use_logtk
 "tools/check_tptp.byte": pkg_unix
 "tools/check_tptp.byte": pkg_num
-"tools/check_tptp.byte": pkg_datalog
 # Executable cnf_of_tptp
 "tools/cnf_of_tptp.byte": use_logtk
 "tools/cnf_of_tptp.byte": pkg_unix
 "tools/cnf_of_tptp.byte": pkg_num
-"tools/cnf_of_tptp.byte": pkg_datalog
 <tools/*.ml{,i}>: use_logtk
 <tools/*.ml{,i}>: pkg_unix
 <tools/*.ml{,i}>: pkg_num
-<tools/*.ml{,i}>: pkg_datalog
 # OASIS_STOP
 true: use_menhir
 <**/*.cmx>: inline(10)

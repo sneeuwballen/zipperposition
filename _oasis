@@ -1,14 +1,25 @@
 OASISFormat: 0.3
 Name:        logtk
 Version:     0.1
-Synopsis:    Logic toolkit, designed primarily for first-order automated reasoning.
 Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
 License:     BSD3
+LicenseFile: LICENSE
 Plugins:     META (0.3)
+OCamlVersion: >= 4.00.1
 BuildTools:  ocamlbuild
 
-Library logtk
+Synopsis:    Logic toolkit, designed primarily for first-order automated reasoning.
+Description: 
+    Logic toolkit, designed primarily for first-order automated reasoning. It aims
+    at providing basic types and algorithms (terms, unification, orderings,
+    indexing, etc.) that can be factored out of several applications.
+
+Flag "meta"
+  Description:  Build and install meta-prover
+  Default:      true
+
+Library "logtk"
   Path:             src/
   Pack:             true
   Modules:          Symbol, Hash, Hashcons, Term, Formula, Util, Unif, Type, Substs,
@@ -16,11 +27,20 @@ Library logtk
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     Util_tptp, Skolem,
-                    MetaPattern, MetaKB, MetaReasoner, MetaProver,
-                    Ast_theory, Lex_theory, Parse_theory,
                     lib/Sequence, lib/Bij, lib/Signal
   InternalModules:  lib/Cache
-  BuildDepends:     unix,num,datalog
+  BuildDepends:     unix,num
+
+Library "logtk_meta"
+  Path:             src
+  Pack:             true
+  FindlibName:      meta
+  FindlibParent:    logtk
+  Modules:          MetaPattern, MetaKB, MetaReasoner, MetaProver,
+                    Ast_theory, Lex_theory, Parse_theory
+  BuildDepends:     logtk,datalog
+  Build$:           flag(meta)
+  Install$:         flag(meta)
   XMETARequires:    datalog
 
 Document logtk
@@ -51,3 +71,8 @@ Executable cnf_of_tptp
   Install: true
   MainIs: cnf_of_tptp.ml
   BuildDepends: logtk
+
+SourceRepository head
+  Type: git
+  Location: https://github.com/c-cube/logtk
+  Browser: https://github.com/c-cube/logtk/tree/master/src
