@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     https://en.wikipedia.org/wiki/Hindley-Milner
 *)
 
+let prof_infer = Util.mk_profiler "TypeInference.infer"
+
 module T = Term
 
 (** {2 Typing context} *)
@@ -112,7 +114,7 @@ end
 (* infer a type for [t], possibly updating [ctx]. If [check] is true,
    will type-check recursively in the term even if it's not needed to
    compute its type. *)
-let rec infer_rec ~check ctx t =
+let rec _infer_rec ~check ctx t =
   let open Type.Infix in
   match t.T.type_ with
   | Some ty -> ty
@@ -121,8 +123,8 @@ let rec infer_rec ~check ctx t =
     | T.Var _ -> Type.i
     | T.BoundVar i -> Ctx.db_type ctx i
     | T.At (t1, t2) ->
-      let ty1 = infer_rec ~check ctx t1 in
-      let ty2 = infer_rec ~check ctx t2 in
+      let ty1 = _infer_rec ~check ctx t1 in
+      let ty2 = _infer_rec ~check ctx t2 in
       (* t1 : ty1, t2 : ty2. Now we must also have
          ty1 = ty2 -> ty1_ret, ty1_ret being the result type *)
       let ty1_ret = Type.new_gvar () in
@@ -132,7 +134,7 @@ let rec infer_rec ~check ctx t =
       let ty_s = Ctx.type_of_symbol ctx s in
       Ctx.within_binder ctx
         (fun v ->
-          let ty_t' = infer_rec ~check ctx t' in
+          let ty_t' = _infer_rec ~check ctx t' in
           (* now, the bound variable has type [v], [s] has type [ty_s]
               and should also have type [(v -> ty_t') -> ty_t'].
               The resulting type is [ty_t'] *)
@@ -147,7 +149,7 @@ let rec infer_rec ~check ctx t =
         ty_s (* no need to recurse *)
       | _ ->
         let ty_l = List.fold_right
-          (fun t' ty_l -> infer_rec ~check ctx t' :: ty_l) l [] in
+          (fun t' ty_l -> _infer_rec ~check ctx t' :: ty_l) l [] in
         (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
             The result is 'a. *)
         let ty_ret = Type.new_gvar () in
@@ -156,20 +158,31 @@ let rec infer_rec ~check ctx t =
       end
     end
 
+(* wrapper to [infer_rec], with profiling *)
+let infer_type_of ~check ctx t =
+  Util.enter_prof prof_infer;
+  try
+    let res = _infer_rec ~check ctx t in
+    Util.exit_prof prof_infer;
+    res
+  with e ->
+    Util.exit_prof prof_infer;
+    raise e
+
 let infer ctx t =
   let check = true in
-  let ty = Ctx.unwind_protect ctx (fun () -> infer_rec ~check ctx t) in
+  let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
   Type.deref ty
 
 let infer_sig signature t =
   let ctx = Ctx.of_signature signature in
   let check = true in
-  let ty = Ctx.unwind_protect ctx (fun () -> infer_rec ~check ctx t) in
+  let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
   Type.deref ty
 
 let infer_no_check ctx t =
   let check = false in
-  let ty = Ctx.unwind_protect ctx (fun () -> infer_rec ~check ctx t) in
+  let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
   Type.deref ty
 
 let default_to_i ctx =
@@ -201,22 +214,22 @@ let constrain_term_term ctx t1 t2 =
   let check = true in
   Ctx.unwind_protect ctx
     (fun () ->
-      let ty1 = infer_rec ~check ctx t1 in
-      let ty2 = infer_rec ~check ctx t2 in
+      let ty1 = infer_type_of ~check ctx t1 in
+      let ty2 = infer_type_of ~check ctx t2 in
       Ctx.unify ctx ty1 ty2)
 
 let constrain_term_type ctx t ty =
   let check = true in
   Ctx.unwind_protect ctx
     (fun () ->
-      let ty' = infer_rec ~check ctx t in
+      let ty' = infer_type_of ~check ctx t in
       Ctx.unify ctx ty ty')
 
 let check_term_type ctx t ty =
   let check = false in
   Ctx.protect ctx
     (fun () ->
-      let ty_t = infer_rec ~check ctx t in
+      let ty_t = infer_type_of ~check ctx t in
       try
         Ctx.unify ctx ty_t ty;
         true
@@ -240,14 +253,14 @@ let check_term_term ctx t1 t2 =
         (match t1.T.type_, t2.T.type_ with
         | Some ty1, Some ty2 -> Ctx.unify ctx ty1 ty2
         | Some ty1, None ->
-          let ty2 = infer_rec ~check ctx t2 in
+          let ty2 = infer_type_of ~check ctx t2 in
           Ctx.unify ctx ty1 ty2
         | None, Some ty2 ->
-          let ty1 = infer_rec ~check ctx t1 in
+          let ty1 = infer_type_of ~check ctx t1 in
           Ctx.unify ctx ty1 ty2
         | None, None ->
-          let ty1 = infer_rec ~check ctx t1 in
-          let ty2 = infer_rec ~check ctx t2 in
+          let ty1 = infer_type_of ~check ctx t1 in
+          let ty2 = infer_type_of ~check ctx t2 in
           Ctx.unify ctx ty1 ty2);
         true
       with Type.Error _ ->

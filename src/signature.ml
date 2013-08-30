@@ -101,6 +101,8 @@ let diff s1 s2 =
       | None, None -> None)
     s1 s2
 
+let size s = SMap.cardinal s
+
 let curry s = SMap.map Type.curry s
 
 let uncurry s = SMap.map Type.uncurry s
@@ -116,6 +118,8 @@ let iter s f =
 
 let fold s acc f =
   SMap.fold (fun s ty acc -> f acc s ty) s acc
+
+(** {2 IO} *)
 
 let pp buf s =
   let pp_pair buf (s,ty) = Printf.bprintf buf "%a: %a" Symbol.pp s Type.pp ty in
@@ -179,3 +183,45 @@ let is_base_symbol s = Symbol.SSet.mem s base_symbols
 
 let pp_no_base buf s =
   pp buf (diff s base)
+
+(** {2 Arith} *)
+
+module Arith = struct
+  let table = 
+    let open Type.Infix in
+    let module S = Symbol in
+    let x = Type.var "X" in
+    [ S.mk_const "$less", Type.o <== [x; x]
+    ; S.mk_const "$lesseq", Type.o <== [x; x]
+    ; S.mk_const "$greater", Type.o <== [x; x]
+    ; S.mk_const "$greatereq", Type.o <== [x; x]
+    ; S.mk_const "$uminus", x <== [x]
+    ; S.mk_const "$sum", x <== [x; x]
+    ; S.mk_const "$difference", x <== [x; x]
+    ; S.mk_const "$product", x <== [x; x]
+    ; S.mk_const "$quotient", x <== [x; x]
+    ; S.mk_const "$quotient_f", Type.int <== [x; x]
+    ; S.mk_const "$quotient_t", Type.int <== [x; x]
+    ; S.mk_const "$quotient_e", Type.int <== [x; x]
+    ; S.mk_const "$remainder_f", Type.int <== [x; x]
+    ; S.mk_const "$remainder_t", Type.int <== [x; x]
+    ; S.mk_const "$remainder_e", Type.int <== [x; x]
+    ; S.mk_const "$floor", Type.int <== [x]
+    ; S.mk_const "$ceiling", Type.int <== [x]
+    ; S.mk_const "$truncate", Type.int <== [x]
+    ; S.mk_const "$round", Type.int <== [x]
+    ; S.mk_const "$is_int", Type.o <== [x]
+    ; S.mk_const "$is_rat", Type.o <== [x]
+    ; S.mk_const "$to_int", Type.int <== [x]
+    ; S.mk_const "$to_rat", Type.rat <== [x]
+    ; S.mk_const "$to_real", Type.real <== [x]
+    ]
+
+  let operators = List.map fst table
+
+  let is_operator s = List.exists (fun s' -> Symbol.eq s s') operators
+
+  let signature =
+    List.fold_left (fun sign (s, ty) -> declare sign s ty) empty table
+end
+

@@ -72,6 +72,8 @@ val diff : t -> t -> t
   (** [diff s1 s2] contains the symbols of [s1] that do not appear
       in [s2]. Useful to remove base symbols. *)
 
+val size : t -> int
+
 val curry : t -> t
   (** Curry all types occurring in the signature *)
 
@@ -91,6 +93,8 @@ val fold : t -> 'a -> ('a -> Symbol.t -> Type.t -> 'a) -> 'a
 val to_seq : t -> (Symbol.t * Type.t) Sequence.t
 val of_seq : (Symbol.t * Type.t) Sequence.t -> t
 
+(** {2 IO} *)
+
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
@@ -104,3 +108,12 @@ val base : t
 val is_base_symbol : Symbol.t -> bool
 val base_symbols : Symbol.SSet.t
 
+(** {2 Arith} *)
+
+module Arith : sig
+  val operators : Symbol.t list
+
+  val is_operator : Symbol.t -> bool
+
+  val signature : t
+end

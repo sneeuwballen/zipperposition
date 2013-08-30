@@ -25,6 +25,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Types} *)
 
+let prof_unify = Util.mk_profiler "Type.unify"
+let prof_variant = Util.mk_profiler "Type.variant"
+
 type t =
   | Var of string           (** Universal type variable *)
   | GVar of int * t ref     (** Variable instance. The int is unique *)
@@ -400,30 +403,43 @@ let rec alpha_equiv_unify st ty1 ty2 =
   | _, _ -> raise (Error "not alpha equivalent")
 
 let unify st ty1 ty2 =
+  Util.enter_prof prof_unify;
   let pos = Stack.save st in
   try
     unify_rec st ty1 ty2;
+    Util.exit_prof prof_unify;
     ()
   with e ->
     Stack.restore st pos;
+    Util.exit_prof prof_unify;
     raise e
 
 let alpha_equiv ty1 ty2 =
+  Util.enter_prof prof_variant;
   let st = Stack.create () in
   let ty1 = instantiate ty1 in
   let ty2 = instantiate ty2 in
   try
-    Stack.protect st
+    let res = Stack.protect st
       (fun () -> alpha_equiv_unify st ty1 ty2; true)
+    in
+    Util.exit_prof prof_variant;
+    res
   with Error _ ->
+    Util.exit_prof prof_variant;
     false
 
 let unifiable ty1 ty2 =
+  Util.enter_prof prof_unify;
   let st = Stack.create () in
   let ty1 = instantiate ty1 in
   let ty2 = instantiate ty2 in
   try
-    Stack.protect st
+    let res = Stack.protect st
       (fun () -> unify_rec st ty1 ty2; true)
+    in
+    Util.exit_prof prof_unify;
+    res
   with Error _ ->
+    Util.exit_prof prof_unify;
     false

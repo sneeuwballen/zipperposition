@@ -62,6 +62,7 @@ Executable run_tests
 Executable check_tptp
   Path: tools/
   Install: true
+  CompiledObject: native
   MainIs: check_tptp.ml
   BuildDepends: logtk
 
@@ -69,6 +70,7 @@ Executable check_tptp
 Executable cnf_of_tptp
   Path: tools/
   Install: true
+  CompiledObject: native
   MainIs: cnf_of_tptp.ml
   BuildDepends: logtk
 

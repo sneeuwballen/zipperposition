@@ -35,10 +35,13 @@ let print_line () =
   ()
 
 let cat_input = ref false  (* print input declarations? *)
+let stats = ref false
 
 let options =
   [ "-debug", Arg.Int Util.set_debug, "debug level"
   ; "-cat", Arg.Set cat_input, "print input declarations"
+  ; "-profile", Arg.Set Util.enable_profiling, "enable profiling"
+  ; "-stats", Arg.Set stats, "statistics"
   ]
 
 (* check the given file *)
@@ -60,6 +63,10 @@ let check file =
     Sequence.iter
       (fun f -> Util.printf "  %a\n" F.pp f)
       (Util_tptp.formulas decls);
+    (if !stats then begin
+      Util.printf "number of symbols: %d\n" (Signature.size signature);
+      Util.printf "number of input declarations: %d\n" (Sequence.length decls);
+      end);
   with
   | Util_tptp.ParseError _ as e ->
     (* syntax error *)
