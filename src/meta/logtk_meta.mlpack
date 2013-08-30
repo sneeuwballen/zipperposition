@@ -1,0 +1,11 @@
+# OASIS_START
+# DO NOT EDIT (digest: 31d2389cf1bca45ff88b602803d1a90c)
+MetaPattern
+MetaKB
+MetaReasoner
+MetaProver
+Ast_theory
+Lex_theory
+Parse_theory
+Signal
+# OASIS_STOP
