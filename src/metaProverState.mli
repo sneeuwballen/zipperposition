@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Meta Prover for zipperposition} *)
 
 open Logtk
+open Logtk_meta
 
 type result =
   | Deduced of Term.t * Clause.t list

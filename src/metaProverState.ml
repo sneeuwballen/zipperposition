@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Meta Prover for zipperposition} *)
 
 open Logtk
+open Logtk_meta
 
 let prof_scan_clause = Util.mk_profiler "meta.scan_clause"
 let prof_scan_set = Util.mk_profiler "meta.scan_set"
