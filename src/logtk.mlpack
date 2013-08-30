@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e001723ded347f976498c8d9eeee1b8f)
+# DO NOT EDIT (digest: d7c2439bcae84a00bf904d4253a5b011)
 Symbol
 Hash
 Hashcons
@@ -29,6 +29,5 @@ Util_tptp
 Skolem
 lib/Sequence
 lib/Bij
-lib/Signal
 lib/Cache
 # OASIS_STOP

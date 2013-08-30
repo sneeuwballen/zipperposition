@@ -27,21 +27,21 @@ Library "logtk"
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     Util_tptp, Skolem,
-                    lib/Sequence, lib/Bij, lib/Signal
+                    lib/Sequence, lib/Bij
   InternalModules:  lib/Cache
   BuildDepends:     unix,num
 
 Library "logtk_meta"
-  Path:             src
+  Path:             src/meta/
   Pack:             true
   FindlibName:      meta
   FindlibParent:    logtk
   Modules:          MetaPattern, MetaKB, MetaReasoner, MetaProver,
-                    Ast_theory, Lex_theory, Parse_theory
+                    Ast_theory, Lex_theory, Parse_theory, Signal
   BuildDepends:     logtk,datalog
   Build$:           flag(meta)
   Install$:         flag(meta)
-  XMETARequires:    datalog
+  XMETARequires:    logtk,datalog
 
 Document logtk
   Title:                Logtk docs

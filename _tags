@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 21a7acc490cb2d3576b3bfaace4e4748)
+# DO NOT EDIT (digest: 9077e5e763b7356dfb146b15e9295433)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -44,23 +44,25 @@
 "src/skolem.cmx": for-pack(Logtk)
 "src/lib/sequence.cmx": for-pack(Logtk)
 "src/lib/bij.cmx": for-pack(Logtk)
-"src/lib/signal.cmx": for-pack(Logtk)
 "src/lib/cache.cmx": for-pack(Logtk)
+<src/*.ml{,i}>: pkg_unix
+<src/*.ml{,i}>: pkg_num
 <src/lib/*.ml{,i}>: pkg_unix
 <src/lib/*.ml{,i}>: pkg_num
 # Library logtk_meta
-"src/logtk_meta.cmxs": use_logtk_meta
-"src/metaPattern.cmx": for-pack(Logtk_meta)
-"src/metaKB.cmx": for-pack(Logtk_meta)
-"src/metaReasoner.cmx": for-pack(Logtk_meta)
-"src/metaProver.cmx": for-pack(Logtk_meta)
-"src/ast_theory.cmx": for-pack(Logtk_meta)
-"src/lex_theory.cmx": for-pack(Logtk_meta)
-"src/parse_theory.cmx": for-pack(Logtk_meta)
-<src/*.ml{,i}>: use_logtk
-<src/*.ml{,i}>: pkg_datalog
-<src/*.ml{,i}>: pkg_unix
-<src/*.ml{,i}>: pkg_num
+"src/meta/logtk_meta.cmxs": use_logtk_meta
+"src/meta/metaPattern.cmx": for-pack(Logtk_meta)
+"src/meta/metaKB.cmx": for-pack(Logtk_meta)
+"src/meta/metaReasoner.cmx": for-pack(Logtk_meta)
+"src/meta/metaProver.cmx": for-pack(Logtk_meta)
+"src/meta/ast_theory.cmx": for-pack(Logtk_meta)
+"src/meta/lex_theory.cmx": for-pack(Logtk_meta)
+"src/meta/parse_theory.cmx": for-pack(Logtk_meta)
+"src/meta/signal.cmx": for-pack(Logtk_meta)
+<src/meta/*.ml{,i}>: use_logtk
+<src/meta/*.ml{,i}>: pkg_datalog
+<src/meta/*.ml{,i}>: pkg_unix
+<src/meta/*.ml{,i}>: pkg_num
 # Executable run_tests
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": pkg_oUnit

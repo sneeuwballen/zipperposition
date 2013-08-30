@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 45a1ed1a73ab3c58df0997b18e031078)
+# DO NOT EDIT (digest: 456e57d15bd2d8d417dcac417ba7223d)
 src/Symbol
 src/Hash
 src/Hashcons
@@ -29,12 +29,12 @@ src/Util_tptp
 src/Skolem
 src/lib/Sequence
 src/lib/Bij
-src/lib/Signal
-src/MetaPattern
-src/MetaKB
-src/MetaReasoner
-src/MetaProver
-src/Ast_theory
-src/Lex_theory
-src/Parse_theory
+src/meta/MetaPattern
+src/meta/MetaKB
+src/meta/MetaReasoner
+src/meta/MetaProver
+src/meta/Ast_theory
+src/meta/Lex_theory
+src/meta/Parse_theory
+src/meta/Signal
 # OASIS_STOP
