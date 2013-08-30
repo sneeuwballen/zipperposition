@@ -50,4 +50,5 @@ val compare : t -> Symbol.t -> Symbol.t -> int
 val symbols : t -> Symbol.t list
   (** symbols, in decreasing order (assuming the ordering is total) *)
 
+val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit

@@ -272,14 +272,14 @@ module Make(C : Index.CLAUSE) = struct
   (** maximam number of features in addition to basic ones *)
   let max_features = 25
 
-  let features_of_signature signature =
+  let features_of_signature ?(ignore=Symbol.is_connective) signature =
     (* list of (salience: float, feature) *)
     let features = ref [] in
     (* create features for the symbols *)
     Symbol.SMap.iter
       (fun s ty ->
         let arity = Type.arity ty in
-        if Symbol.is_base_symbol s
+        if ignore s
           then ()  (* base symbols don't count *)
         else if Type.eq ty Type.o
           then features := [1 + arity, Feature.count_symb_plus s;

@@ -61,7 +61,11 @@ module Make(C : Index.CLAUSE) : sig
 
   val default_features : Feature.t list
 
-  val features_of_signature : Signature.t -> Feature.t list
+  val features_of_signature : ?ignore:(Symbol.t -> bool) -> 
+                              Signature.t -> Feature.t list
+    (** Build a set of features from the given signature. Symbols
+        that satisfy [ignore] are not considered (default ignores
+        connectives) *)
 
   val of_signature : Signature.t -> t
 

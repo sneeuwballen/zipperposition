@@ -263,8 +263,8 @@ plain_term:
   | s=constant { T.mk_const s }
   | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
 
-constant: s=atomic_word { Symbol.mk_symbol s }
-functor_: f=atomic_word { Symbol.mk_symbol f }
+constant: s=atomic_word { Symbol.mk_const s }
+functor_: f=atomic_word { Symbol.mk_const f }
 
 defined_term:
   | defined_atom { T.mk_const $1 }
@@ -308,10 +308,10 @@ atomic_word:
   | s=LOWER_WORD { s }
 
 atomic_defined_word:
-  | w=DOLLAR_WORD { Symbol.mk_symbol w }
+  | w=DOLLAR_WORD { Symbol.mk_const w }
 
 atomic_system_word:
-  | w=DOLLAR_DOLLAR_WORD { Symbol.mk_symbol w }
+  | w=DOLLAR_DOLLAR_WORD { Symbol.mk_const w }
 
 %%
 

@@ -50,6 +50,9 @@ module type S = sig
   val hashcons : ?table:t -> elt -> elt
     (** Hashcons the elements *)
 
+  val mem : ?table:t -> elt -> bool
+    (** Is the element present in this table? *)
+
   val stats : ?table:t -> unit -> int*int*int*int*int*int
 end
 
@@ -81,6 +84,9 @@ module Make(X : HashedType) = struct
         table.count <- table.count + 1
       end);
     x'
+
+  let mem ?(table=default) x =
+    H.mem table.tbl x
 
   let stats ?(table=default) () =
     H.stats table.tbl

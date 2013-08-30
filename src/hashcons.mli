@@ -50,6 +50,9 @@ module type S = sig
   val hashcons : ?table:t -> elt -> elt
     (** Hashcons the elements *)
 
+  val mem : ?table:t -> elt -> bool
+    (** Is the element present in this table? *)
+
   val stats : ?table:t -> unit -> int*int*int*int*int*int
 end
 

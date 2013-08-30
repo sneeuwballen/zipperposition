@@ -31,18 +31,18 @@ module T = Term
 module S = Substs
 module Rw = Rewriting.TRS
 
-let a = T.mk_const (Symbol.mk_symbol "a")
-let b = T.mk_const (Symbol.mk_symbol "b") 
-let c = T.mk_const (Symbol.mk_symbol "c") 
-let d = T.mk_const (Symbol.mk_symbol "d") 
-let f x y = T.mk_node (Symbol.mk_symbol "f") [x; y]
-let g x = T.mk_node (Symbol.mk_symbol "g") [x]
-let h x = T.mk_node (Symbol.mk_symbol "h") [x]
-let zero = T.mk_const (Symbol.mk_symbol "0") 
-let succ n = T.mk_node (Symbol.mk_symbol "s") [n]
-let plus a b = T.mk_node (Symbol.mk_symbol "+") [a; b]
-let minus a = T.mk_node (Symbol.mk_symbol "-") [a]
-let times a b = T.mk_node (Symbol.mk_symbol "x") [a; b]
+let a = T.mk_const (Symbol.mk_const "a")
+let b = T.mk_const (Symbol.mk_const "b")
+let c = T.mk_const (Symbol.mk_const "c")
+let d = T.mk_const (Symbol.mk_const "d")
+let f x y = T.mk_node (Symbol.mk_const "f") [x; y]
+let g x = T.mk_node (Symbol.mk_const "g") [x]
+let h x = T.mk_node (Symbol.mk_const "h") [x]
+let zero = T.mk_const (Symbol.mk_const "0")
+let succ n = T.mk_node (Symbol.mk_const "s") [n]
+let plus a b = T.mk_node (Symbol.mk_const "+") [a; b]
+let minus a = T.mk_node (Symbol.mk_const "-") [a]
+let times a b = T.mk_node (Symbol.mk_const "x") [a; b]
 let x = T.mk_var 1
 let y = T.mk_var 2
 let z = T.mk_var 3
@@ -57,7 +57,7 @@ let peano_to_int t =
   let rec count t n =
     match t.T.term with
     | _ when T.eq t zero -> n
-    | T.Node (s, [t2]) when Symbol.eq s (Symbol.mk_symbol "s") -> count t2 (n+1)
+    | T.Node (s, [t2]) when Symbol.eq s (Symbol.mk_const "s") -> count t2 (n+1)
     | _ -> failwith "not peano!"
   in count t 0
 
@@ -112,7 +112,7 @@ let test_peano_bis n () =
   let a = plus (from_int n) (from_int n)
   and b = times (from_int 2) (from_int n) in
   test peano_trs a b
-  
+
 
 let tests:(unit -> unit) list =
   [ test_peano 2; test_peano 4; test_peano 100; test_peano 1000;
@@ -151,7 +151,7 @@ let suite =
     ; "test-peano4" >:: test_peano 4
     ; "test-peano100" >:: test_peano 100
     ; "test-peano1000" >:: test_peano 1000
-    ; "test-peano-bis2" >:: test_peano_bis 2 
+    ; "test-peano-bis2" >:: test_peano_bis 2
     ; "test-peano-bis4" >:: test_peano_bis 4
     ; "test-peano-bis50" >:: test_peano_bis 50
     ; "test-peano-bis500" >:: test_peano_bis 500
@@ -159,7 +159,7 @@ let suite =
     ; "bench-peano4" >:: benchmark_peano 4
     ; "bench-peano100" >:: benchmark_peano 100
     ; "bench-peano1000" >:: benchmark_peano 1000
-    ; "bench-peano-bis2" >:: benchmark_peano_bis 2 
+    ; "bench-peano-bis2" >:: benchmark_peano_bis 2
     ; "bench-peano-bis4" >:: benchmark_peano_bis 4
     ; "bench-peano-bis50" >:: benchmark_peano_bis 50
     ; "bench-peano-bis500" >:: benchmark_peano_bis 500

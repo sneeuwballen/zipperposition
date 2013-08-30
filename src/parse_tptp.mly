@@ -150,7 +150,7 @@ declaration_reset:
   | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
       if Type.eq ty Type.tType
-        then Ast_tptp.NewType (name, Symbol.name_symbol s)
+        then Ast_tptp.NewType (name, Symbol.to_string_tstp s)
         else Ast_tptp.TypeDecl (name, s, ty)
     }
   | CNF LEFT_PAREN name=name COMMA role=role COMMA c=cnf_formula info=annotations RIGHT_PAREN DOT
@@ -174,8 +174,8 @@ answer_tuple:
 
 type_decl:
   | LEFT_PAREN tydecl=type_decl RIGHT_PAREN { tydecl }
-  | s=atomic_word COLUMN ty=tff_type { Symbol.mk_symbol s, ty }
-  | s=DOLLAR_WORD COLUMN ty=tff_type { Symbol.mk_symbol s, ty }
+  | s=atomic_word COLUMN ty=tff_type { Symbol.mk_const s, ty }
+  | s=DOLLAR_WORD COLUMN ty=tff_type { Symbol.mk_const s, ty }
 
 cnf_formula:
   | LEFT_PAREN c=disjunction RIGHT_PAREN { c }
@@ -291,9 +291,9 @@ plain_term:
   | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
 
 constant:
-| s=atomic_word { Symbol.mk_symbol s }
+| s=atomic_word { Symbol.mk_const s }
 | s=atomic_defined_word { s }
-functor_: f=atomic_word { Symbol.mk_symbol f }
+functor_: f=atomic_word { Symbol.mk_const f }
 
 defined_term:
   | defined_atom { T.mk_const $1 }
@@ -357,10 +357,10 @@ atomic_word:
   | s=LOWER_WORD { s }
 
 atomic_defined_word:
-  | w=DOLLAR_WORD { Symbol.mk_symbol w }
+  | w=DOLLAR_WORD { Symbol.mk_const w }
 
 atomic_system_word:
-  | w=DOLLAR_DOLLAR_WORD { Symbol.mk_symbol w }
+  | w=DOLLAR_DOLLAR_WORD { Symbol.mk_const w }
 
 name_list:
   l=separated_list(COMMA, name) { l }

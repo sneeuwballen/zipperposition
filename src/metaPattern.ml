@@ -30,7 +30,7 @@ module S = Substs
 
 let prof_matching = Util.mk_profiler "meta.pattern.matching"
 
-let __var_symbol = Symbol.mk_symbol "$$var"
+let __var_symbol = Symbol.mk_const "$$var"
 
 (** {2 Basics} *)
 

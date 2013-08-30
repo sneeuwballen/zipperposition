@@ -411,7 +411,7 @@ let map_to_vars ?(offset=0) terms =
   let vars = List.mapi (fun i t -> T.mk_var (i+offset)) terms in
   TermBij.of_list terms vars
 
-let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_symbol s)) l
+let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_const s)) l
 
 (** Conversion of a list of Ast_theory.statement to a KB *)
 let kb_of_statements ?(init=empty) statements =

@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Signature} *)
 
-module SMap = Symbol.SMapSeq
+module SMap = Symbol.SMap
 
 type t = Type.t SMap.t
   (** A signature maps symbols to their sort *)

@@ -76,6 +76,23 @@ let is_total po =
   po.total ||
   (let res = check_is_total po in (if res then po.total <- true); res)
 
+let pp buf po =
+  let n = po.size in
+  Printf.bprintf buf "total: %B\n" (is_total po);
+  (* print num -> symbol *)
+  for i = 0 to n-1 do
+    Printf.bprintf buf " %2d: %a" i Symbol.pp po.symbols.(i)
+  done;
+  (* print the matrix *)
+  for i = 0 to n-1 do
+    for j = 0 to n-1 do
+      Printf.bprintf buf " %d" (if po.cmp.(i).(j) then 1 else 0)
+    done;
+    Buffer.add_char buf '\n';
+  done;
+  Buffer.add_char buf '\n';
+  ()
+
 (** pretty print the partial order as a boolean matrix *)
 let fmt formatter po =
   let n = po.size in
@@ -83,7 +100,7 @@ let fmt formatter po =
   Format.fprintf formatter "@[<v>total %B;@;" (is_total po);
   for i = 0 to n-1 do
     Format.fprintf formatter " @[<h>%2d: %s@]@;" i
-      (Symbol.name_symbol po.symbols.(i))
+      (Symbol.to_string po.symbols.(i))
   done;
   (* print the matrix *)
   for i = 0 to n-1 do

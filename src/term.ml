@@ -696,7 +696,7 @@ let rec curry t =
   | Var _ | BoundVar _ -> t
   | Bind (s, t') -> mk_bind s (curry t')
   | Node (f, []) -> t
-  | Node (f, l) when Symbol.is_base_symbol f ->
+  | Node (f, l) when Symbol.is_connective f ->
     mk_node f (List.map curry l)
   | Node (f, [t']) ->
     mk_at (mk_const f) (curry t')
@@ -945,11 +945,11 @@ let rec debug fmt t = match t.term with
   | Var i -> Format.fprintf fmt "X%d" i
   | BoundVar i -> Format.fprintf fmt "Y%d" i
   | Bind (s, t') -> 
-    Format.fprintf fmt "(%s %a)" (Symbol.name_symbol s) debug t'
+    Format.fprintf fmt "(%s %a)" (Symbol.to_string s) debug t'
   | Node (s, []) ->
-    Format.pp_print_string fmt (Symbol.name_symbol s)
+    Format.pp_print_string fmt (Symbol.to_string s)
   | Node (s, l) ->
-    Format.fprintf fmt "(%s %a)" (Symbol.name_symbol s)
+    Format.fprintf fmt "(%s %a)" (Symbol.to_string s)
       (Sequence.pp_seq debug) (Sequence.of_list l)
   | At (t1, t2) -> Format.fprintf fmt "%a %a" debug t1 debug t2
 
