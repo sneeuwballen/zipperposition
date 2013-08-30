@@ -47,9 +47,9 @@ Document logtk
   Title:                Logtk docs
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install:              false
+  Install:              true
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk
+  XOCamlbuildLibraries: logtk,logtk.meta
 
 Executable run_tests
   Path: tests/
