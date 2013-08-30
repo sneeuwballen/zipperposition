@@ -26,6 +26,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 First-order Formulas} *)
 
+(** Hashconsed formulas for first-order logic. This provides many useful
+    functions, and smart constructors that perform some basic
+    simplifications *)
+
+(* TODO: attributes, to speed up
+    simplification/flattening/groundness/closenes checking *)
+
 type t = private {
   form : cell;
   mutable id : int;

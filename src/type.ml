@@ -169,6 +169,33 @@ let rec is_ground t = match t with
   | App (_, l) -> List.for_all is_ground l
   | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
 
+let rec curry ty = match ty with
+  | Var _
+  | GVar _ -> ty
+  | App (s, l) -> app s (List.map curry l)
+  | Fun (ret, l) ->
+    List.fold_left 
+      (fun ret arg -> mk_fun ret [curry arg])
+      (curry ret) l
+
+let rec uncurry ty = match ty with
+  | Var _
+  | GVar _ -> ty
+  | App (s, l) -> app s (List.map uncurry l)
+  | Fun _ ->
+    begin match _gather_uncurry ty [] with
+    | [] -> assert false
+    | ret::args -> mk_fun (uncurry ret) args
+    end 
+(* given a curried function type, recover all its argument types into
+    a list prepended to [acc] *)
+and _gather_uncurry ty acc = match ty with
+  | Var _
+  | GVar _
+  | App _ -> uncurry ty :: acc  (* proper return value *)
+  | Fun (ret, [arg]) -> _gather_uncurry ret (uncurry arg :: acc)
+  | Fun _ -> uncurry ty :: acc (* consider this as a single argument *)
+
 (** {2 IO} *)
 
 let rec pp buf t = match t with

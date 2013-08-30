@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 0ebfcab37d5223fe1c0cb6e6941754b1)
+# DO NOT EDIT (digest: eaf0530404148a6f95268271cb79212a)
 version = "0.1"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
@@ -13,7 +13,7 @@ package "meta" (
  version = "0.1"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "datalog"
+ requires = "logtk datalog"
  archive(byte) = "logtk_meta.cma"
  archive(byte, plugin) = "logtk_meta.cma"
  archive(native) = "logtk_meta.cmxa"

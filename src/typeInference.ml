@@ -182,6 +182,21 @@ let default_to_i ctx =
     signature;
   ()
 
+let generalize_all ctx =
+  let signature = ctx.Ctx.signature in
+  Symbol.SMap.iter
+    (fun s ty ->
+      let ty = Type.deref ty in
+      let gvars = Type.free_vars ty in
+      match gvars with
+      | [] -> ()
+      | _::_ ->
+        (* change the type *)
+        let ty' = Type.close ty in
+        ctx.Ctx.signature <- Symbol.SMap.add s ty' ctx.Ctx.signature)
+    signature;
+  ()
+
 let constrain_term_term ctx t1 t2 =
   let check = true in
   Ctx.unwind_protect ctx

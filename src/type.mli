@@ -111,6 +111,12 @@ val arity : t -> int
 val is_ground : t -> bool
   (** Is the type ground? *)
 
+val curry : t -> t
+  (** Curry the type *)
+
+val uncurry : t -> t
+  (** Uncurry the type. It {b must} be curried. *)
+
 (** {2 IO} *)
 
 val pp : Buffer.t -> t -> unit

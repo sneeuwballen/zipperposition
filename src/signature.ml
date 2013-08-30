@@ -101,6 +101,10 @@ let diff s1 s2 =
       | None, None -> None)
     s1 s2
 
+let curry s = SMap.map Type.curry s
+
+let uncurry s = SMap.map Type.uncurry s
+
 let to_symbols signature =
   SMap.fold (fun s _ l -> s :: l) signature []
 

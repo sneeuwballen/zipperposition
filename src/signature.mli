@@ -72,6 +72,12 @@ val diff : t -> t -> t
   (** [diff s1 s2] contains the symbols of [s1] that do not appear
       in [s2]. Useful to remove base symbols. *)
 
+val curry : t -> t
+  (** Curry all types occurring in the signature *)
+
+val uncurry : t -> t
+  (** Uncurry all types occurring in the signature *)
+
 val to_symbols : t -> Symbol.t list
   (** extract the list of symbols from the complete signature *)
 

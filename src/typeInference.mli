@@ -99,8 +99,13 @@ val infer_no_check : Ctx.t -> Term.t -> Type.t
 (** {3 Constraining types} *)
 
 val default_to_i : Ctx.t -> unit
-  (** For all symbols seen in the context, that still have un-instantiated
+  (** For all symbols seen in the context that still have un-instantiated
       type variables in their type, set this type to {!Type.i}. *)
+
+val generalize_all : Ctx.t -> unit
+  (** For all symbols seen in the context that still have un-instantiated
+      type variables in their type, generalize those type variables
+      (ie, quantify over them) *)
 
 val constrain_term_term : Ctx.t -> Term.t -> Term.t -> unit
   (** Force the two terms to have the same type
