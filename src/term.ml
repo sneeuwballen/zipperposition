@@ -593,13 +593,12 @@ let db_unlift t =
   in recurse 0 t
 
 (** Replace [t'] by a fresh De Bruijn index in [t]. *)
-let db_from_term t t' =
+let db_from_term ?(ty=Type.i) t t' =
   (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
-  | _ when t == t' -> mk_bound_var ?ty:t.type_ depth
+  | _ when t == t' -> mk_bound_var ~ty depth
   | Var _ -> t
-  | Bind (s, t') ->
-    mk_bind s (replace (depth+1) t')
+  | Bind (s, t') -> mk_bind s (replace (depth+1) t')
   | BoundVar _ -> t
   | Node (_, []) -> t
   | Node (s, l) -> mk_node s (List.map (replace depth) l)
@@ -689,102 +688,6 @@ let rec db_to_classic ?(varindex=ref 0) t =
     mk_node s (List.map (db_to_classic ~varindex) l)
   | At (t1, t2) ->
     mk_at (db_to_classic ~varindex t1) (db_to_classic ~varindex t2)
-
-(** Curry all subterms *)
-let rec curry t =
-  match t.term with
-  | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind s (curry t')
-  | Node (f, []) -> t
-  | Node (f, l) when Symbol.is_connective f ->
-    mk_node f (List.map curry l)
-  | Node (f, [t']) ->
-    mk_at (mk_const f) (curry t')
-  | Node (f, l) ->
-    (* build the curryfied application of [f] to [l] *)
-    List.fold_left
-      (fun left t' -> mk_at left (curry t'))
-      (mk_const f) l
-  | At (t1, t2) -> mk_at (curry t1) (curry t2)  (* already curried *)
-
-(** Uncurry all subterms *)
-let uncurry t =
-  (* uncurry any kind of term, except the '@' terms that are
-     handled over to unfold_left *)
-  let rec uncurry t =
-    match t.term with
-    | Var _ | BoundVar _ -> t
-    | Bind (s, t') -> mk_bind s (uncurry t')
-    | Node (_, []) -> t  (* constant *)
-    | Node (f, l) -> mk_node f (List.map uncurry l)
-    | At (t1, t2) -> unfold_left t1 [uncurry t2]
-  (* transform "(((f @ a) @ b) @ c) into f(a,b,c)". Here, we
-     deconstruct "f @ a" into "unfold f (a :: args)"*)
-  and unfold_left head args = match head.term with
-    | At (a, b) -> unfold_left a (uncurry b :: args)
-    | Node (f, []) ->
-      mk_node f args  (* constant symbol, ok *)
-    | _ -> failwith "not a curried term"
-  in
-  uncurry t
-
-let rec curryfied t =
-  failwith "not implemented" (* TODO *)
-
-let rec is_fo t = match t.term with
-  | Var _ | BoundVar _ -> true
-  | Bind (s, t') when Symbol.eq s Symbol.lambda_symbol -> false
-  | Bind (_, t') -> is_fo t'
-  | At ({term=(Var _ | BoundVar _)}, _) -> false (* X @ _ is not first-order  *)
-  | At (a, b) -> is_fo a && is_fo b
-  | Node (_, l) -> List.for_all is_fo l
-
-(** Beta reduce the (curryfied) term, ie [(^[X]: t) @ t']
-    becomes [subst(X -> t')(t)] *)
-let rec beta_reduce t =
-  match t.term with
-  | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind s (beta_reduce t')
-  | At ({term=Bind (s, t1)}, t2) when Symbol.eq s Symbol.lambda_symbol ->
-    (* a beta-redex! Fire!! *)
-    let t1' = db_replace t1 t2  in
-    let t1' = db_unlift t1' in
-    beta_reduce t1'
-  | At (t1, t2) -> mk_at (beta_reduce t1) (beta_reduce t2)
-  | Node (f, l) ->
-    mk_node f (List.map beta_reduce l)
-
-(** Eta-reduce the (curryfied) term, ie [^[X]: (t @ X)]
-    becomes [t] if [X] does not occur in [t]. *)
-let rec eta_reduce t =
-  match t.term with
-  | Var _ | BoundVar _ -> t
-  | Bind (s, {term=Node (a, [t'; {term=BoundVar 0}])})
-    when Symbol.eq s Symbol.lambda_symbol && not (db_contains t' 0) ->
-    eta_reduce (db_unlift t')  (* remove the lambda and variable *)
-  | Bind (s, t') ->
-    mk_bind s (eta_reduce t')
-  | Node (f, l) ->
-    mk_node f (List.map eta_reduce l)
-  | At (t1, t2) -> mk_at (eta_reduce t1) (eta_reduce t2)
-
-(** [lambda_abstract t sub_t], applied to a currified term [t], and a
-    subterm [sub_t] of [t], gives [t'] such that
-    [beta_reduce (t' @ sub_t) == t] holds.
-    It basically abstracts out [sub_t] with a lambda. If [sub_t] is not
-    a subterm of [t], then [t' == ^[X]: t].
-
-    For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
-    the term [^[X]: f(a, X @ b, c)] *)
-let lambda_abstract t sub_t =
-  mk_lambda (db_from_term t sub_t)
-
-let lambda_abstract_list t args =
-  List.fold_left lambda_abstract t args
-
-let lambda_apply_list t args =
-  let t' = List.fold_right (fun arg t -> beta_reduce (mk_at t arg)) args t in
-  t'
 
 (** {2 Some AC-utils} *)
 
@@ -918,6 +821,8 @@ let rec pp_debug buf t =
     pp_surrounded buf t2
   and pp_surrounded buf t = match t.term with
   | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
+    Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+  | At _ ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
   and pp_var buf t = match t.term with

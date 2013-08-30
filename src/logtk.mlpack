@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d7c2439bcae84a00bf904d4253a5b011)
+# DO NOT EDIT (digest: 72b35113b0f962c509aac55c3e3e6bef)
 Symbol
 Hash
 Hashcons
@@ -27,6 +27,7 @@ Rewriting
 FeatureVector
 Util_tptp
 Skolem
+HO
 lib/Sequence
 lib/Bij
 lib/Cache

@@ -24,8 +24,8 @@ open Logtk.Sequence.Infix;;
 open Logtk.Type.Infix;;
 module T = Logtk.Term;;
 module F = Logtk.Formula;;
-let pterm s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token
-    (Lexing.from_string s);;
+let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
+let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
 open Logtk;;
 (* vim:syntax=ocaml
 *)

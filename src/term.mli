@@ -197,7 +197,7 @@ val db_lift : int -> t -> t
 val db_unlift : t -> t
   (** Unlift the term (decrement indices of all De Bruijn variables inside *)
 
-val db_from_term : t -> t -> t
+val db_from_term : ?ty:Type.t -> t -> t -> t
   (** Replace [t'] by a fresh De Bruijn index in [t]. *)
 
 val db_from_var : t -> t -> t
@@ -223,29 +223,6 @@ val db_to_classic : ?varindex:int ref -> t -> t
   (** Transform binders and De Bruijn indexes into regular variables.
       [varindex] is a variable counter used to give fresh variables
       names to De Bruijn indexes. *)
-
-val curry : t -> t                    (** Curry all subterms *)
-val uncurry : t -> t                  (** Un-curry all subterms *)
-val curryfied : t -> bool             (** Is the term already curried? *)
-
-val is_fo : t -> bool                 (** Check that the (curried) term is first-order *)
-
-val beta_reduce : t -> t              (** Beta-reduce the (curried) term *)
-
-val eta_reduce : t -> t               (** Eta-reduce the (curried) term *)
-
-val lambda_abstract : t -> t -> t
-  (** [lambda_abstract t sub_t], applied to a curried term [t], and a
-      subterm [sub_t] of [t], gives [t'] such that
-      [beta_reduce (t' @ sub_t) == t] holds.
-      It basically abstracts out [sub_t] with a lambda. If [sub_t] is not
-      a subterm of [t], then [t' == ^[X]: t].
-
-      For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
-      the term [^[X]: f(a, X @ b, c)] *)
-
-val lambda_abstract_list : t -> t list -> t
-val lambda_apply_list : t -> t list -> t
 
 (** {2 Some AC-utils} *)
 
