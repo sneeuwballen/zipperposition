@@ -207,10 +207,14 @@ fof_logic_formula:
     { o l r }
 
 fof_unitary_formula:
-  | fof_quantified_formula { $1 }
-  | fof_unary_formula { $1 } 
-  | atomic_formula { $1 } 
-  | LEFT_PAREN f=fof_logic_formula RIGHT_PAREN { f }
+  | f=fof_quantified_formula { f }
+  | f=fof_unary_formula { f } 
+  | f=atomic_formula { f } 
+  | LEFT_PAREN f=fof_composite_formula RIGHT_PAREN { f }
+
+%inline fof_composite_formula:
+  | f=fof_quantified_formula { f }
+  | f=fol_infix_unary { f }
 
 fof_quantified_formula:
   | q=fol_quantifier LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN f=fof_unitary_formula
@@ -242,15 +246,15 @@ fol_infix_unary:
   | NOT_EQUAL { F.mk_neq }
 
 atomic_formula:
-  | plain_atomic_formula { $1 }
-  | defined_atomic_formula { $1 }
-  | system_atomic_formula { $1 }
+  | f=plain_atomic_formula { f }
+  | f=defined_atomic_formula { f }
+  | f=system_atomic_formula { f }
 
-plain_atomic_formula: plain_term { F.mk_atom $1 }
+%inline plain_atomic_formula: f=plain_term { F.mk_atom f }
 
 defined_atomic_formula:
-  | defined_plain_formula { $1 }
-  | defined_infix_formula { $1 }
+  | f=defined_plain_formula { f }
+  | f=defined_infix_formula { f }
 
 defined_infix_formula:
   | l=term o=defined_infix_pred r=term  { o l r }
@@ -265,26 +269,34 @@ defined_plain_formula:
     { F.mk_atom (T.mk_node p args) }
 
 /* includes $true and $false */
-defined_prop: atomic_defined_word { $1 } 
-defined_pred: atomic_defined_word { $1 }
+defined_prop: f=atomic_defined_word { f } 
+defined_pred: f=atomic_defined_word { f }
 
-system_atomic_formula: system_term { F.mk_atom $1 }
+system_atomic_formula: t=system_term { F.mk_atom t }
   
 /* Terms */
 
 term:
-  | function_term { $1 }
-  | variable { $1 }
-  | l=term AT r=term { T.mk_at l r }
-  | LAMBDA LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN t=term
+  | t=unary_term { t }
+  | t=composite_term { t }
+
+composite_term:
+  | l=unary_term AT r=unary_term { T.mk_at l r }
+  | l=composite_term AT r=unary_term { T.mk_at l r }
+  | LAMBDA LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN t=unary_term
     { T.mk_lambda_var vars t }
   /* | conditional_term { $1 }  for TFF */
   /* | let_term { $1 } */
 
+%inline unary_term:
+  | t=function_term { t}
+  | t=variable { t }
+  | LEFT_PAREN t=composite_term RIGHT_PAREN { t }
+
 function_term:
-  | plain_term { $1 }
-  | defined_term { $1 }
-  | system_term { $1 }
+  | t=plain_term { t }
+  | t=defined_term { t }
+  | t=system_term { t }
 
 plain_term:
   | s=constant { T.mk_const s }
@@ -293,6 +305,7 @@ plain_term:
 constant:
 | s=atomic_word { Symbol.mk_const s }
 | s=atomic_defined_word { s }
+
 functor_: f=atomic_word { Symbol.mk_const f }
 
 defined_term:
