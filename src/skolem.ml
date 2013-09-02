@@ -83,14 +83,13 @@ let skolem_term ~ctx t =
     ctx.sc_cache <- (t, new_t) :: ctx.sc_cache;
     new_t
   with FoundVariant (t',new_t',subst) ->
-    let new_t = Substs.apply_subst subst new_t' scope in
+    let new_t = Substs.apply subst new_t' scope in
     new_t
 
 exception FoundFormVariant of Formula.t * Formula.t * Substs.t
 
-let skolem_form ~ctx ~var f =
+let skolem_form ~ctx f =
   let vars = F.free_variables f in
-  let vars = List.filter (fun v' -> var != v') vars in  (* [var] does not count *)
   let scope = T.max_var vars + 1 in
   (* find a variant of [f] *)
   try
@@ -105,12 +104,11 @@ let skolem_form ~ctx ~var f =
     let symb = fresh_sym ~ctx in
     let skolem_term = T.mk_node symb vars in
     (* replace variable by skolem t*)
-    let subst = Substs.bind Substs.empty var 0 skolem_term 0 in
-    let new_f = F.apply_subst ~subst f 0 in
+    let new_f = F.db_replace f skolem_term in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
     new_f
   with FoundFormVariant(f',new_f',subst) ->
     Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f Substs.pp subst;
-    let new_f = F.apply_subst subst new_f' scope in
+    let new_f = Substs.apply_f subst new_f' scope in
     new_f
 

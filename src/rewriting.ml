@@ -173,11 +173,11 @@ module MakeOrdered(E : Index.EQUATION) = struct
           (fun () _ _ rule subst ->
             (* right-hand part *)
             let r = rule.rule_right in
-            let r' = S.apply_subst subst r 1 in
+            let r' = S.apply subst r 1 in
             if rule.rule_oriented
               then raise (RewrittenInto r')  (* we know that t > r' *)
               else (
-                assert (t == S.apply_subst subst rule.rule_left 1);
+                assert (t == S.apply subst rule.rule_left 1);
                 if Ordering.compare trs.ord t r' = Gt
                   then raise (RewrittenInto r')
                   else ()));
@@ -266,7 +266,7 @@ module TRS = struct
         let t' = T.mk_node hd l' in
         (* rewrite at root *)
         reduce_at_root t'
-      | T.Var _ -> S.apply_subst subst t offset  (* normal form in subst *)
+      | T.Var _ -> S.apply subst t offset  (* normal form in subst *)
       | T.BoundVar _ -> t
       | T.At (t1, t2) ->
         let t1' = compute_nf subst t1 offset in

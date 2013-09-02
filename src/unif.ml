@@ -316,10 +316,8 @@ let form_variant ?(subst=S.empty) f1 sc_1 f2 sc_2 =
       if List.length l1 = List.length l2
         then unif_ac subst l1 [] l2 k
         else ()  (* not. *)
-    | F.Exists (v1, f1'), F.Exists (v2, f2')
-    | F.Forall (v1, f1'), F.Forall (v2, f2') ->
-      (* ensure the variables are the same *)
-      let subst = variant ~subst v1 sc_1 v2 sc_2 in
+    | F.Exists f1', F.Exists f2'
+    | F.Forall f1', F.Forall f2' ->
       unif subst f1' f2' k
     | F.True, F.True
     | F.False, F.False -> k subst  (* yep :) *)

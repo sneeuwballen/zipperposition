@@ -179,28 +179,31 @@ val size : t -> int
 
 val atomic : t -> bool                   (** atomic proposition, or term, at root *)
 val atomic_rec : t -> bool               (** does not contain connectives/quantifiers *)
-val db_closed : t -> bool                (** check whether the term is closed *)
+
+val db_closed : ?depth:int -> t -> bool
+  (** check whether the term is closed (all DB vars are bound) *)
 
 val db_contains : t -> int -> bool
   (** Does t contains the De Bruijn variable of index n? *)
 
-val db_replace : t -> t -> t
+val db_replace : ?depth:int -> t -> t -> t
   (** Substitution of De Bruijn symbol by a term. [db_replace t s]
-      replaces the De Bruijn symbol 0 by s in t *)
+      replaces the De Bruijn symbol 0 by s in t. *)
 
 val db_type : t -> int -> Type.t option
   (** [db_type t n] returns the type of the [n]-th De Bruijn index in [t] *)
 
-val db_lift : int -> t -> t
+val db_lift : ?depth:int -> int -> t -> t
   (** lift the non-captured De Bruijn indexes in the term by n *)
 
-val db_unlift : t -> t
-  (** Unlift the term (decrement indices of all De Bruijn variables inside *)
+val db_unlift : ?depth:int -> t -> t
+  (** Unlift the term (decrement indices of all free De Bruijn variables
+      inside *)
 
-val db_from_term : ?ty:Type.t -> t -> t -> t
-  (** Replace [t'] by a fresh De Bruijn index in [t]. *)
+val db_from_term : ?depth:int -> ?ty:Type.t -> t -> t -> t
+  (** [db_from_term t t'] Replace [t'] by a fresh De Bruijn index in [t]. *)
 
-val db_from_var : t -> t -> t
+val db_from_var : ?depth:int -> t -> t -> t
   (** [db_from_var t v] replace v by a De Bruijn symbol in t.
       Same as db_from_term. *)
 
@@ -244,10 +247,17 @@ val ac_eq : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
 
 (** {2 Printing/parsing} *)
 
+(** First, full functions with the amount of surrounding binders; then helpers
+    in the case this amount is 0 (for instance in clauses) *)
+
+val pp_depth : int -> Buffer.t -> t -> unit
+val pp_tstp_depth : int -> Buffer.t -> t -> unit
+
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
+
 val bij : t Bij.t
 
 val debug : Format.formatter -> t -> unit

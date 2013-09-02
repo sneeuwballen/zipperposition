@@ -43,8 +43,8 @@ and cell =
   | Imply of t * t
   | Equiv of t * t
   | Equal of Term.t * Term.t
-  | Forall of Term.t * t    (** Quantified variable, plus formula *)
-  | Exists of Term.t * t
+  | Forall of t    (** Quantified formula, with De Bruijn *)
+  | Exists of t
 
 type sourced_form = t * string * string    (* form, filename, axiom name *)
 
@@ -65,8 +65,8 @@ let hash_rec f = match f.form with
   | Imply (f1,f2) -> Hash.hash_int2 (hash f1) (hash f2)
   | Equiv (f1,f2) -> Hash.hash_int3 (hash f1) (hash f2) 11
   | Equal (t1,t2) -> Hash.hash_int3 (T.hash t1) (T.hash t2) 13
-  | Forall (v, f') -> Hash.hash_int2 (T.hash v) (hash f')
-  | Exists (v, f') -> Hash.hash_int3 (T.hash v) (hash f') 11
+  | Forall f' -> Hash.hash_int (hash f')
+  | Exists f' -> Hash.hash_int2 (hash f') 11
 
 module H = Hashcons.Make(struct
   type t = form
@@ -120,7 +120,7 @@ let mk_equiv f1 f2 =
   | False, _ -> mk_not f2
   | _, False -> mk_not f1
   | _ -> 
-    H.hashcons { form=Imply (f1,f2); id= ~-1; }
+    H.hashcons { form=Equiv(f1,f2); id= ~-1; }
 
 let mk_xor f1 f2 = mk_not (mk_equiv f1 f2)
 
@@ -131,17 +131,11 @@ let mk_eq t1 t2 =
 
 let mk_neq t1 t2 = mk_not (mk_eq t1 t2)
 
-let mk_forall v f =
-  H.hashcons { form=Forall(v,f); id= ~-1; }
+let mk_forall f =
+  H.hashcons { form=Forall f; id= ~-1; }
 
-let mk_exists v f =
-  H.hashcons { form=Exists(v,f); id= ~-1; }
-
-let mk_forall_list vars f =
-  List.fold_right mk_forall vars f
-
-let mk_exists_list vars f =
-  List.fold_right mk_exists vars f
+let mk_exists f =
+  H.hashcons { form=Exists f; id= ~-1; }
 
 (** {2 Combinators} *)
 
@@ -155,8 +149,8 @@ let rec map_leaf f form = match form.form with
   | False
   | Atom _
   | Equal _ -> f form  (* replace by image *)
-  | Forall (v, f') -> mk_forall v (map_leaf f f')
-  | Exists (v, f') -> mk_exists v (map_leaf f f')
+  | Forall f' -> mk_forall (map_leaf f f')
+  | Exists f' -> mk_exists (map_leaf f f')
 
 let map f form =
   map_leaf
@@ -178,34 +172,46 @@ let rec fold f acc form = match form.form with
   | False -> acc
   | Atom p -> f acc p
   | Equal (t1, t2) -> f (f acc t1) t2
-  | Forall (v, f') 
-  | Exists (v, f') -> fold f acc f'
+  | Forall f' 
+  | Exists f' -> fold f acc f'
 
 let iter f form = fold (fun () t -> f t) () form
 
-let fold_bv ?(bv=[]) f acc form =
-  let rec recurse f acc bv form = match form.form with
+let rec map_depth ?(depth=0) f form = match form.form with
+  | And l -> mk_and (List.map (map_depth ~depth f) l)
+  | Or l -> mk_or (List.map (map_depth ~depth f) l)
+  | Imply (f1, f2) -> mk_imply (map_depth ~depth f f1) (map_depth ~depth f f2)
+  | Equiv (f1, f2) -> mk_equiv (map_depth ~depth f f1) (map_depth ~depth f f2)
+  | Not f' -> mk_not (map_depth ~depth f f')
+  | True
+  | False -> form
+  | Atom p -> mk_atom (f depth p)
+  | Equal (t1, t2) -> mk_eq (f depth t1) (f depth t2)
+  | Forall f' -> mk_forall (map_depth ~depth:(depth+1) f f')
+  | Exists f' -> mk_exists (map_depth ~depth:(depth+1) f f')
+
+let fold_depth ?(depth=0) f acc form =
+  let rec recurse f acc depth form = match form.form with
   | And l
-  | Or l -> List.fold_left (fun acc f' -> recurse f acc bv f') acc l
+  | Or l -> List.fold_left (fun acc f' -> recurse f acc depth f') acc l
   | Imply (f1, f2)
   | Equiv (f1, f2) ->
-    let acc = recurse f acc bv f1 in
-    let acc = recurse f acc bv f2 in
+    let acc = recurse f acc depth f1 in
+    let acc = recurse f acc depth f2 in
     acc
-  | Not f' -> recurse f acc bv f'
+  | Not f' -> recurse f acc depth f'
   | True
   | False -> acc
-  | Atom p -> f acc bv p
+  | Atom p -> f acc depth p
   | Equal (t1, t2) ->
-    let acc = f acc bv t1 in
-    let acc = f acc bv t2 in
+    let acc = f acc depth t1 in
+    let acc = f acc depth t2 in
     acc
-  | Forall (v, f') 
-  | Exists (v, f') ->
-    let bv = if List.memq v bv then bv else v :: bv in
-    recurse f acc bv f'
+  | Forall f' 
+  | Exists f' ->
+    recurse f acc (depth+1) f'
   in
-  recurse f acc bv form
+  recurse f acc depth form
 
 let add_terms set f = iter (T.THashSet.add set) f
 
@@ -224,63 +230,10 @@ let subterm t f =
   with Exit ->
     true
 
-let bound_variables f =
-  let rec recurse acc f = match f.form with
-  | Atom _
-  | Equal _
-  | True
-  | False -> acc
-  | And l
-  | Or l -> List.fold_left recurse acc l
-  | Imply (f1, f2)
-  | Equiv (f1, f2) ->
-    recurse (recurse acc f1) f2
-  | Not f' -> recurse acc f'
-  | Forall (v, f')
-  | Exists (v, f') ->
-    let acc = if List.memq v acc then acc else v :: acc in
-    recurse acc f'
-  in
-  recurse [] f
-
 let free_variables f =
-  (* start with a fresh set *)
-  let rec start f =
-    let set = T.THashSet.create ~size:3 () in
-    recurse set f;
-    set
-  (* recurse with the same set of variables *)
-  and recurse set f = match f.form with
-  | Atom p -> T.add_vars set p
-  | Equal (t1, t2) ->
-    T.add_vars set t1;
-    T.add_vars set t2
-  | True
-  | False -> ()
-  | And l
-  | Or l -> List.iter (recurse set) l
-  | Imply (f1, f2)
-  | Equiv (f1, f2) -> recurse set f1; recurse set f2
-  | Not f' -> recurse set f'
-  | Forall (v, f')
-  | Exists (v, f') ->
-    (* compute free vars of [f'] independently *)
-    let set' = start f' in
-    (* then remove [v] from it *)
-    T.THashSet.remove set' v;
-    (* and merge it back to [set] *)
-    T.THashSet.merge set set';
-  in
-  let set = start f in
+  let set = T.THashSet.create () in
+  iter (fun t -> T.add_vars set t) f;
   T.THashSet.to_list set
-
-let close_forall f =
-  let fv = free_variables f in
-  mk_forall_list fv f
-
-let close_exists f =
-  let fv = free_variables f in
-  mk_exists_list fv f
 
 let is_atomic f = match f.form with
   | And _
@@ -309,10 +262,77 @@ let rec is_ground f = match f.form with
   | False -> true
 
 let is_closed f =
-  let vars = T.vars_seq (terms_seq f) in
-  let bvars = bound_variables f in
-  (* all variables are bound? *)
-  List.for_all (fun v -> List.memq v bvars) vars
+  match free_variables f with
+  | [] -> true
+  | _ -> false
+
+(** {2 De Bruijn indexes} *)
+
+let db_closed f =
+  try
+    fold_depth
+      (fun () depth t -> if not (T.db_closed ~depth t) then raise Exit)
+      () f;
+    true
+  with Exit ->
+    false
+
+let db_contains f n =
+  try
+    fold_depth
+      (fun () depth t -> if T.db_contains t (n+depth) then raise Exit)
+      () f;
+    false
+  with Exit ->
+    true
+
+let db_replace f t =
+  map_depth ~depth:0 (fun depth t' -> T.db_replace ~depth t' t) f
+
+exception FoundType of Type.t
+
+let db_type f n =
+  try
+    fold_depth
+      (fun () depth t -> match T.db_type t (depth+n) with
+        | None -> ()
+        | Some ty -> raise (FoundType ty))
+      () f;
+    None
+  with FoundType ty ->
+    Some ty
+
+let db_lift f =
+  map_depth (fun depth t -> T.db_lift ~depth 1 t) f
+
+let db_unlift ?(depth=0) f =
+  map_depth ~depth (fun depth' t -> T.db_unlift ~depth t) f
+
+let db_from_term ?ty f t =
+  map_depth (fun depth t' -> T.db_from_term ~depth ?ty t' t) f
+
+let db_from_var f v =
+  db_from_term ?ty:v.T.type_ f v
+
+let mk_forall_list vars f =
+  List.fold_right
+    (fun v f -> mk_forall (db_from_var (db_lift f) v))
+    vars f
+
+let mk_exists_list vars f =
+  List.fold_right
+    (fun v f -> mk_exists (db_from_var (db_lift f) v))
+    vars f
+
+let close_forall f =
+  let fv = free_variables f in
+  mk_forall_list fv f
+
+let close_exists f =
+  let fv = free_variables f in
+  mk_exists_list fv f
+
+(** {2 Simplifications} *)
 
 let rec _gather_or f = match f.form with
   | Or l -> Util.list_flatmap _gather_or l
@@ -336,8 +356,8 @@ let rec flatten f = match f.form with
   | Imply (f1, f2) -> mk_imply (flatten f1) (flatten f2)
   | Equiv (f1, f2) -> mk_equiv (flatten f1) (flatten f2)
   | Not f' -> mk_not (flatten f')
-  | Forall (v, f') -> mk_forall v (flatten f')
-  | Exists (v, f') -> mk_exists v (flatten f')
+  | Forall f' -> mk_forall (flatten f')
+  | Exists f' -> mk_exists (flatten f')
   | True
   | False
   | Atom _
@@ -355,10 +375,10 @@ let rec simplify f = match f.form with
   | Or l ->
     let l' = List.map simplify l in
     flatten (mk_or l')
-  | Forall (v, f')
-  | Exists (v, f') when not (_var_occurs v f') -> simplify f'
-  | Forall (v, f') -> mk_forall v (simplify f')
-  | Exists (v, f') -> mk_exists v (simplify f')
+  | Forall f'
+  | Exists f' when not (db_contains f' 0) -> simplify f'
+  | Forall f' -> mk_forall (simplify f')
+  | Exists f' -> mk_exists (simplify f')
   | Equal (a,b) when T.eq a b -> mk_true
   | Equal _ -> f
   | Atom _
@@ -399,8 +419,8 @@ let ac_normal_form f =
     let l' = List.map recurse l in
     let l' = List.sort compare l' in
     mk_or l'
-  | Forall (v, f') -> mk_forall v (recurse f')
-  | Exists (v, f') -> mk_exists v (recurse f')
+  | Forall f' -> mk_forall (recurse f')
+  | Exists f' -> mk_exists (recurse f')
   in
   recurse (flatten f)
 
@@ -408,32 +428,6 @@ let ac_eq f1 f2 =
   let f1 = ac_normal_form f1 in
   let f2 = ac_normal_form f2 in
   eq f1 f2
-
-let apply_subst ?renaming ?recursive ~subst f scope =
-  let rec recurse subst f = match f.form with
-  | Atom p ->
-    let p' = Substs.apply_subst ?recursive ?renaming subst p scope in
-    mk_atom p'
-  | Equal (t1, t2) ->
-    let t1' = Substs.apply_subst ?recursive ?renaming subst t1 scope in
-    let t2' = Substs.apply_subst ?recursive ?renaming subst t2 scope in
-    mk_eq t1' t2'
-  | True
-  | False -> f
-  | And l -> mk_and (List.map (recurse subst) l)
-  | Or l -> mk_or (List.map (recurse subst) l)
-  | Imply (f1, f2) -> mk_imply (recurse subst f1) (recurse subst f2)
-  | Equiv (f1, f2) -> mk_equiv (recurse subst f1) (recurse subst f2)
-  | Not f' -> mk_not (recurse subst f')
-  | Forall (v, f') ->
-    Util.debug 5 "remove %a %d from subst %a" T.pp v scope Substs.pp subst; (* dangerous *)
-    let subst = Substs.remove subst v scope in
-    mk_forall v (recurse subst f')
-  | Exists (v, f') ->
-    let subst = Substs.remove subst v scope in
-    mk_exists v (recurse subst f')
-  in
-  recurse subst f
 
 (** {2 Conversion} *)
 
@@ -446,8 +440,8 @@ let rec to_term f = match f.form with
   | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
   | Equal (t1, t2) -> T.mk_eq t1 t2
   | Not f' -> T.mk_not (to_term f')
-  | Forall (v, f') -> T.mk_forall_var [v] (to_term f')
-  | Exists (v, f') -> T.mk_exists_var [v] (to_term f')
+  | Forall f' -> T.mk_forall (to_term f')
+  | Exists f' -> T.mk_exists (to_term f')
   | Atom p -> p
 
 let of_term t =
@@ -464,10 +458,10 @@ let of_term t =
     mk_not (recurse a)
   | T.Node (s, [a;b]) when S.eq s S.eq_symbol ->
     mk_eq a b
-  | T.Node (s, [v;f']) when S.eq s S.forall_symbol ->
-    mk_forall v (recurse f')
-  | T.Node (s, [v;f']) when S.eq s S.exists_symbol ->
-    mk_exists v (recurse f')
+  | T.Bind (s, f') when S.eq s S.forall_symbol ->
+    mk_forall (recurse f')
+  | T.Bind (s, f') when S.eq s S.exists_symbol ->
+    mk_exists (recurse f')
   | _ -> mk_atom t  (* default: atom *)
   in
   let varindex = ref (T.max_var (T.vars t) + 1) in
@@ -484,8 +478,9 @@ let rec infer_type ctx f = match f.form with
     TypeInference.constrain_term_term ctx t1 t2
   | And l
   | Or l -> List.iter (infer_type ctx) l
-  | Forall (v, f')
-  | Exists (v, f') -> infer_type ctx f'
+  | Forall f'
+  | Exists f' ->
+    TypeInference.Ctx.within_binder ctx (fun _ -> infer_type ctx f')
   | Equiv (f1, f2)
   | Imply (f1, f2) -> infer_type ctx f1; infer_type ctx f2
   | Not f' -> infer_type ctx f'
@@ -499,15 +494,16 @@ let signature ?(signature=Signature.empty) f =
 (** {2 IO} *)
 
 let pp buf f =
+  let depth = ref 0 in
   (* outer formula *)
   let rec pp_outer buf f = match f.form with
   | True -> Buffer.add_string buf "true"
   | False -> Buffer.add_string buf "false"
-  | Atom t -> T.pp buf t
+  | Atom t -> (T.pp_depth !depth) buf t
   | Not {form=Equal (t1, t2)} ->
-    T.pp buf t1; Buffer.add_string buf " != "; T.pp buf t2
+    (T.pp_depth !depth) buf t1; Buffer.add_string buf " != "; (T.pp_depth !depth) buf t2
   | Equal (t1, t2) ->
-    T.pp buf t1; Buffer.add_string buf " = "; T.pp buf t2
+    (T.pp_depth !depth) buf t1; Buffer.add_string buf " = "; (T.pp_depth !depth) buf t2
   | Not {form=Equiv (f1, f2)} ->
     pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
   | Equiv (f1, f2) ->
@@ -515,10 +511,24 @@ let pp buf f =
   | Imply (f1, f2) ->
     pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
   | Not f' -> Buffer.add_string buf "¬ "; pp_inner buf f'
-  | Forall (v, f') ->
-    Printf.bprintf buf "∀ %a. %a" T.pp v pp_inner f'
-  | Exists (v, f') ->
-    Printf.bprintf buf "∃ %a. %a" T.pp v pp_inner f'
+  | Forall f' ->
+    let v = !depth in
+    incr depth;
+    begin match db_type f' 0 with
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f'
+    | _ -> Printf.bprintf buf "∀ Y%d. %a" v pp_inner f'
+    end;
+    decr depth
+  | Exists f' ->
+    let v = !depth in
+    incr depth;
+    begin match db_type f' 0 with
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "∃ Y%d: %a. %a" v Type.pp ty pp_inner f'
+    | _ -> Printf.bprintf buf "∃ Y%d. %a" v pp_inner f'
+    end;
+    decr depth
   | And l -> Util.pp_list ~sep:" ∧ " pp_inner buf l
   | Or l -> Util.pp_list ~sep:" ∨ " pp_inner buf l
   and pp_inner buf f = match f.form with
@@ -539,15 +549,20 @@ let fmt fmt f =
   Format.pp_print_string fmt (to_string f)
 
 let pp_tstp buf f =
+  let depth = ref 0 in
   (* outer formula *)
   let rec pp_outer buf f = match f.form with
   | True -> Buffer.add_string buf "$true"
   | False -> Buffer.add_string buf "$false"
-  | Atom t -> T.pp buf t
+  | Atom t -> (T.pp_depth !depth) buf t
   | Not {form=Equal (t1, t2)} ->
-    T.pp buf t1; Buffer.add_string buf " != "; T.pp buf t2
+    (T.pp_tstp_depth !depth) buf t1;
+    Buffer.add_string buf " != ";
+    (T.pp_tstp_depth !depth) buf t2
   | Equal (t1, t2) ->
-    T.pp buf t1; Buffer.add_string buf " = "; T.pp buf t2
+    (T.pp_tstp_depth !depth) buf t1;
+    Buffer.add_string buf " = ";
+    (T.pp_tstp_depth !depth) buf t2
   | Not {form=Equiv (f1, f2)} ->
     pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
   | Equiv (f1, f2) ->
@@ -555,10 +570,24 @@ let pp_tstp buf f =
   | Imply (f1, f2) ->
     pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
   | Not f' -> Buffer.add_string buf "~ "; pp_inner buf f'
-  | Forall (v, f') ->
-    Printf.bprintf buf "![%a]: %a" T.pp v pp_inner f'
-  | Exists (v, f') ->
-    Printf.bprintf buf "?[%a]: %a" T.pp v pp_inner f'
+  | Forall f' ->
+    let v = !depth in
+    incr depth;
+    begin match db_type f' 0 with
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "![Y%d:%a]: %a" v Type.pp ty pp_inner f'
+    | _ -> Printf.bprintf buf "![Y%d]: %a" v pp_inner f'
+    end;
+    decr depth
+  | Exists f' ->
+    let v = !depth in
+    incr depth;
+    begin match db_type f' 0 with
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "?[Y%d:%a]: %a" v Type.pp ty pp_inner f'
+    | _ -> Printf.bprintf buf "?[Y%d]: %a" v pp_inner f'
+    end;
+    decr depth
   | And l -> Util.pp_list ~sep:" & " pp_inner buf l
   | Or l -> Util.pp_list ~sep:" | " pp_inner buf l
   and pp_inner buf f = match f.form with

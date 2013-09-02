@@ -20,6 +20,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Substitutions} *)
 
+module T = Term
+module F = Formula
+
 (** substitution, a list of (variable -> term) *)
 type t =
   | SubstBind of (Term.t * int * Term.t * int * t)
@@ -28,8 +31,6 @@ and scope = int
 and 'a scoped = 'a * int
   (** A scope is an integer. Variables can only be bound in one scope,
       and variables from distinct scopes are distinct too. *)
-
-module T = Term
 
 let empty = SubstEmpty
 
@@ -131,7 +132,7 @@ end
     by [subst]) while avoiding collisions.
     [recursive] decides whether, when [v] is replaced by [t], [subst] is
     applied to [t] recursively or not (default true). *)
-let apply_subst ?(recursive=true) ?renaming subst t scope =
+let apply ?(recursive=true) ?renaming ?(depth=0) subst t scope =
   (* apply subst to bound term. We need to keep track of
      how many binders are on the path to the variable, because of non-DB-closed
      terms that may occur in the codomain of [subst] *)
@@ -181,7 +182,12 @@ let apply_subst ?(recursive=true) ?renaming subst t scope =
     let new_t = replace binder_depth subst t scope in
     new_t :: replace_list binder_depth subst scope l'
   in
-  replace 0 subst t scope
+  replace depth subst t scope
+
+let apply_f ?recursive ?renaming ?(depth=0) subst f scope =
+  F.map_depth ~depth
+    (fun depth' t -> apply ?renaming ?recursive ~depth subst t scope)
+    f
 
 (** Set of bound terms *)
 module Domain = Set.Make(struct

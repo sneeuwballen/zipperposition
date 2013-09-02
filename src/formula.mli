@@ -47,8 +47,8 @@ and cell = private
   | Imply of t * t
   | Equiv of t * t
   | Equal of Term.t * Term.t
-  | Forall of Term.t * t    (** Quantified variable, plus formula *)
-  | Exists of Term.t * t
+  | Forall of t    (** Quantified formula, with De Bruijn *)
+  | Exists of t
 
 type sourced_form = t * string * string    (* form, filename, axiom name *)
 
@@ -67,30 +67,33 @@ val mk_equiv : t -> t -> t
 val mk_xor : t -> t -> t
 val mk_eq : Term.t -> Term.t -> t
 val mk_neq : Term.t -> Term.t -> t
-val mk_forall : Term.t -> t -> t
-val mk_exists : Term.t -> t -> t
-
-val mk_forall_list : Term.t list -> t -> t
-val mk_exists_list : Term.t list -> t -> t
+val mk_forall : t -> t
+val mk_exists : t -> t
 
 (** {2 Combinators} *)
 
 val map_leaf : (t -> t) -> t -> t
   (** Call the function on leaves (atom,equal,true,false) and replace the
-      leaves by their image *)
+      leaves by their image. The image formulas should {b not} contain
+      free De Bruijn indexes (ie, should verify {! db_closed}). *)
 
 val map : (Term.t -> Term.t) -> t -> t    (** Map on terms *)
 val fold : ('a -> Term.t -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
 val iter : (Term.t -> unit) -> t -> unit
 
-val fold_bv : ?bv:Term.varlist ->
-              ('a -> Term.varlist -> Term.t -> 'a) ->
-              'a -> t -> 'a
-  (** Fold on terms, but with an additional argument, the list of
-      variables that are bound through the path to the term *)
+val map_depth: ?depth:int ->
+                (int -> Term.t -> Term.t) ->
+                t -> t
+  (** Map each term to another term. The number of binders from the root
+      of the formula to the term is given to the function. *)
 
-(** The following functions gather the terms of a formula.
-    However, bound variables are not gathered. *)
+val fold_depth : ?depth:int ->
+              ('a -> int -> Term.t -> 'a) ->
+              'a -> t -> 'a
+  (** Fold on terms, but with an additional argument, the number of
+      De Bruijn indexes bound on through the path to the term *)
+
+(** The following functions gather the terms of a formula. *)
 
 val add_terms : Term.THashSet.t -> t -> unit
 val terms : t -> Term.THashSet.t
@@ -101,30 +104,50 @@ val terms_seq : t -> Term.t Sequence.t
 val subterm : Term.t -> t -> bool
   (** [subterm t f] true iff [t] occurs in some term of [f] *)
 
-val bound_variables : t -> Term.varlist
-  (** Variables bound in a quantifier *)
-
 val free_variables : t -> Term.varlist
   (** Variables not bound by any (formula) quantifier *)
-
-val close_forall : t -> t   (** Bind all free variables with forall *)
-val close_exists : t -> t   (** Bind all free variables with exists *)
 
 val is_atomic : t -> bool   (** No connectives? *)
 val is_ground : t -> bool   (** No variables? *)
 val is_closed : t -> bool   (** All variables bound? *)
+
+(** {2 De Bruijn indexes} *)
+
+val db_closed : t -> bool
+  (** All De Bruijn indexes bound? *)
+
+val db_contains : t -> int -> bool
+  (** Does the formula contain the De Bruijn variable of index n? *)
+
+val db_replace : t -> Term.t -> t
+  (** Replace De Bruijn index 0 by the given term *)
+
+val db_type : t -> int -> Type.t option
+  (** Type of the n-th DB variable *)
+
+val db_lift : t -> t
+
+val db_unlift : ?depth:int -> t -> t
+
+val db_from_term : ?ty:Type.t -> t -> Term.t -> t
+  (** Replace the given term by a De Bruijn index *)
+
+val db_from_var : t -> Term.t -> t
+  (** Replace the given variable by a De Bruijn index *)
+
+val mk_forall_list : Term.t list -> t -> t
+val mk_exists_list : Term.t list -> t -> t
+
+val close_forall : t -> t   (** Bind all free variables with forall *)
+val close_exists : t -> t   (** Bind all free variables with exists *)
+
+(** {2 Simplifications} *)
 
 val flatten : t -> t        (** Flatten AC connectives (or/and) *)
 val simplify : t -> t       (** Simplify the formula *)
 
 val ac_normal_form : t -> t (** Normal form modulo AC of "or" and "and" *)
 val ac_eq : t -> t -> bool  (** Equal modulo AC? *)
-
-val apply_subst : ?renaming:Substs.Renaming.t -> ?recursive:bool ->
-                  subst:Substs.t -> 
-                  t -> Substs.scope -> t
-  (** Apply substitution to the formula. Quantified variables are not
-      replaced. *)
 
 (** {2 Conversions} *)
 

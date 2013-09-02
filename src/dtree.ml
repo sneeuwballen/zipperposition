@@ -204,8 +204,8 @@ module Make(E : Index.EQUATION) = struct
             | Variable v1' when (not (T.has_type t_pos) || T.compatible_type v1' t_pos)
             && S.is_in_subst subst v1' sc_dt ->
                (* already bound, check consistency *)
-               let t_matched = S.apply_subst subst t_pos sc_t in
-               let t_bound = S.apply_subst subst v1' sc_dt in
+               let t_matched = S.apply subst t_pos sc_t in
+               let t_bound = S.apply subst v1' sc_dt in
                if t_matched == t_bound
                   then traverse subtrie acc (skip t pos) subst  (* skip term *)
                   else acc (* incompatible bindings of the variable *)

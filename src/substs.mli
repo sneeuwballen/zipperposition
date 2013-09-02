@@ -77,14 +77,18 @@ module Renaming : sig
     (** Rename the given variable, scoped by the given context *)
 end
 
-val apply_subst : ?recursive:bool -> ?renaming:Renaming.t ->
-                   t -> Term.t -> int -> Term.t
+val apply : ?recursive:bool -> ?renaming:Renaming.t -> ?depth:int ->
+            t -> Term.t -> scope -> Term.t
   (** Apply substitution to term, replacing variables by the terms they are bound to.
       The [renaming] is used to rename free variables (not bound
       by [subst]) while avoiding collisions. Otherwise variables are shifted
       by [offset].
       [recursive] decides whether, when [v] is replaced by [t], [subst] is
       applied to [t] recursively or not (default true). *)
+
+val apply_f : ?recursive:bool -> ?renaming:Renaming.t -> ?depth:int ->
+              t -> Formula.t -> scope -> Formula.t
+  (** Apply the substitution to the formula *)
 
 module Domain : Set.S with type elt = Term.t * int
   (** Set of bound terms *)

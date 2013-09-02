@@ -53,5 +53,5 @@ val skolem_term : ctx:ctx -> Term.t -> Term.t
       something like [p(a, b, sk42(X), X)].
       *)
 
-val skolem_form : ctx:ctx -> var:Term.t -> Formula.t -> Formula.t
-  (** Skolemize the variable [var] in this formula. *)
+val skolem_form : ctx:ctx -> Formula.t -> Formula.t
+  (** Skolemize the De Bruijn index 0 in this formula. *)

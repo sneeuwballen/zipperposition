@@ -503,13 +503,16 @@ let compute_db_closed depth t =
   recurse depth t
 
 (** check wether the term is closed w.r.t. De Bruijn variables *)
-let db_closed t =
-  (* compute it, if not already computed *)
-  (if not (get_flag flag_db_closed_computed t) then begin
-    set_flag flag_db_closed_computed t true;
-    set_flag flag_db_closed t (compute_db_closed 0 t);
-    end);
-  get_flag flag_db_closed t
+let db_closed ?(depth=0) t =
+  match depth with
+  | 0 ->
+    (* compute it, if not already computed *)
+    (if not (get_flag flag_db_closed_computed t) then begin
+      set_flag flag_db_closed_computed t true;
+      set_flag flag_db_closed t (compute_db_closed 0 t);
+      end);
+    get_flag flag_db_closed t
+  | _ -> compute_db_closed depth t
 
 (** check whether t contains the De Bruijn symbol n *)
 let rec db_contains t n = match t.term with
@@ -520,7 +523,7 @@ let rec db_contains t n = match t.term with
   | At (t1, t2) -> db_contains t1 n || db_contains t2 n
 
 (** replace 0 by s in t *)
-let db_replace t s =
+let db_replace ?(depth=0) t s =
   (* replace db by s in t *)
   let rec replace depth s t = match t.term with
   | BoundVar n -> if n = depth then s else t
@@ -534,7 +537,7 @@ let db_replace t s =
   | At (t1, t2) -> mk_at (replace depth s t1) (replace depth s t2)
   (* replace the 0 De Bruijn index by s in t *)
   in
-  replace 0 s t
+  replace depth s t
 
 (** Type of the [n]-th De Bruijn index in [t] *)
 let rec db_type t n = match t.term with
@@ -555,7 +558,7 @@ let rec db_type t n = match t.term with
   | Bind (_, t') -> db_type t' (n+1)
 
 (** lift the non-captured De Bruijn indexes in the term by n *)
-let db_lift n t =
+let db_lift ?(depth=0) n t =
   (* traverse the term, looking for non-captured DB indexes.
      [depth] is the number of binders on the path from the root of the
      term, to the current position. *)
@@ -574,10 +577,10 @@ let db_lift n t =
     | At (t1, t2) -> mk_at (recurse depth t1) (recurse depth t2)
   in
   assert (n >= 0);
-  if n = 0 then t else recurse 0 t
+  if depth=0 && n = 0 then t else recurse depth t
 
 (* unlift the term (decrement indices of all De Bruijn variables inside *)
-let db_unlift t =
+let db_unlift ?(depth=0) t =
   (* only unlift DB symbol that are free. [depth] is the number of binders
      on the path from the root term. *)
   let rec recurse depth t =
@@ -590,10 +593,10 @@ let db_unlift t =
       mk_node s (List.map (recurse depth) l)
     | At (t1, t2) ->
       mk_at (recurse depth t1) (recurse depth t2)
-  in recurse 0 t
+  in recurse depth t
 
 (** Replace [t'] by a fresh De Bruijn index in [t]. *)
-let db_from_term ?(ty=Type.i) t t' =
+let db_from_term ?(depth=0) ?(ty=Type.i) t t' =
   (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
   | _ when t == t' -> mk_bound_var ~ty depth
@@ -604,13 +607,13 @@ let db_from_term ?(ty=Type.i) t t' =
   | Node (s, l) -> mk_node s (List.map (replace depth) l)
   | At (t1, t2) -> mk_at (replace depth t1) (replace depth t2)
   in
-  replace 0 t
+  replace depth t
 
-  (** [db_from_var t v] replace v by a De Bruijn symbol in t.
-    Same as db_from_term. *)
-let db_from_var t v =
+(** [db_from_var t v] replace v by a De Bruijn symbol in t.
+  Same as db_from_term. *)
+let db_from_var ?depth t v =
   assert (is_var v);
-  db_from_term t v
+  db_from_term ?depth t v
 
 (** {2 High-level operations} *)
 
@@ -621,21 +624,21 @@ let db_from_var t v =
 let mk_lambda_var vars t =
   List.fold_right
     (fun var t ->
-      mk_lambda (db_from_var t var))
+      mk_lambda (db_from_var (db_lift 1 t) var))
     vars t
 
 let mk_forall_var vars t =
   List.fold_right
     (fun var t ->
       assert (is_var var);
-      mk_forall (db_from_var t var))
+      mk_forall (db_from_var (db_lift 1 t) var))
     vars t
 
 let mk_exists_var vars t =
   List.fold_right
     (fun var t ->
       assert (is_var var);
-      mk_exists (db_from_var t var))
+      mk_exists (db_from_var (db_lift 1 t) var))
     vars t
 
 let symbols seq =
@@ -655,18 +658,12 @@ let symbols seq =
 (** Bind all free variables by 'forall' *)
 let close_forall t =
   let vars = vars t in
-  List.fold_left
-    (fun t var ->
-      mk_bind Symbol.forall_symbol (db_from_var t var))
-    t vars
+  mk_forall_var vars t
 
 (** Bind all free variables by 'exists' *)
 let close_exists t =
   let vars = vars t in
-  List.fold_left
-    (fun t var ->
-      mk_bind Symbol.exists_symbol (db_from_var t var))
-    t vars
+  mk_exists_var vars t
 
 (** Transform binders and De Bruijn indexes into regular variables.
     [varindex] is a variable counter used to give fresh variables
@@ -744,7 +741,8 @@ let ac_eq ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
 
 (** {2 Printing/parsing} *)
 
-let pp_tstp buf t =
+let pp_tstp_depth depth buf t =
+  let depth = ref depth in
   (* recursive printing *)
   let rec pp_rec buf t = match t.term with
   | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
@@ -755,11 +753,12 @@ let pp_tstp buf t =
     Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
   | Node (s, [t]) when s == Symbol.not_symbol ->
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
-  | Node (s, [v; t']) when Symbol.has_attr Symbol.attr_binder s ->
-    assert (is_var v);
-    Printf.bprintf buf "%a[%a]: %a" Symbol.pp s pp_var v pp_surrounded t'
-  | BoundVar _ | Bind _ ->
-    failwith "De Bruijn index in term, cannot be printed in TSTP"
+  | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+  | Bind (s,t') ->
+    Printf.bprintf buf "%a[%a]: " Symbol.pp s pp_bvar t';
+    incr depth;
+    pp_surrounded buf t';
+    decr depth
   | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
     Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
   | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
@@ -775,22 +774,15 @@ let pp_tstp buf t =
   | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
-  and pp_var buf t = match t.term with
-  | Var i -> 
-    begin match t.type_ with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "X%d:%a" i Type.pp_tstp ty
-    | _ -> Printf.bprintf buf "X%d" i
-    end
-  | _ -> assert false
+  and pp_bvar buf t = match db_type t 0 with
+  | None -> Printf.bprintf buf "Y%d" !depth
+  | Some ty -> Printf.bprintf buf "Y%d: %a" !depth Type.pp ty
   in
-  let maxvar = max (max_var (vars t)) 0 in
-  let varindex = ref (maxvar+1) in
-  (* convert everything to named variables, then print *)
-  pp_rec buf (db_to_classic ~varindex t)
+  pp_rec buf t
 
 (* lightweight printing *)
-let rec pp_debug buf t =
+let rec pp_depth depth buf t =
+  let depth = ref depth in
   (* recursive printing *)
   let rec pp_rec buf t = match t.term with
   | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
@@ -801,11 +793,12 @@ let rec pp_debug buf t =
     Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
   | Node (s, [t]) when s == Symbol.not_symbol ->
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
-  | Node (s, [v; t']) when Symbol.has_attr Symbol.attr_binder s ->
-    assert (is_var v);
-    Printf.bprintf buf "%a[%a]: %a" Symbol.pp s pp_var v pp_surrounded t'
-  | BoundVar _ | Bind _ ->
-    failwith "De Bruijn index in term, cannot be printed in debug"
+  | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+  | Bind (s,t') ->
+    Printf.bprintf buf "%a[%a]: " Symbol.pp s pp_bvar t';
+    incr depth;
+    pp_surrounded buf t';
+    decr depth
   | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
     Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
   | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
@@ -825,22 +818,15 @@ let rec pp_debug buf t =
   | At _ ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
-  and pp_var buf t = match t.term with
-  | Var i -> 
-    begin match t.type_ with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "X%d:%a" i Type.pp_tstp ty
-    | _ -> Printf.bprintf buf "X%d" i
-    end
-  | _ -> assert false
+  and pp_bvar buf t = match db_type t 0 with
+  | None -> Printf.bprintf buf "Y%d" !depth
+  | Some ty -> Printf.bprintf buf "Y%d: %a" !depth Type.pp ty
   in
-  let maxvar = max (max_var (vars t)) 0 in
-  let varindex = ref (maxvar+1) in
-  (* convert everything to named variables, then print *)
-  pp_rec buf (db_to_classic ~varindex t);
-  ()
+  pp_rec buf t
 
-let pp = pp_debug
+let pp buf t = pp_depth 0 buf t
+
+let pp_tstp buf t = pp_tstp_depth 0 buf t
 
 let to_string t = Util.sprintf "%a" pp t
 
