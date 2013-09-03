@@ -36,7 +36,14 @@ type t =
 
 type ty = t
 
-let compare_struct t1 t2 = Pervasives.compare t1 t2
+let rec eq_struct t1 t2 = match t1, t2 with
+  | Var s1, Var s2 -> s1 = s2
+  | GVar (i1,r1), GVar (i2,r2) -> i1 = i2 && r1 == r2
+  | App (s1, l1), App (s2, l2) when List.length l1 = List.length l2 ->
+    s1 = s2 && List.for_all2 (==) l1 l2
+  | Fun (ret1,l1), Fun (ret2,l2) ->
+    ret1 == ret2 && List.for_all2 (==) l1 l2
+  | _, _ -> false
 
 let rec hash t = match t with
   | Var s -> Hash.hash_string s
@@ -47,14 +54,14 @@ let rec hash t = match t with
 (* hashconsing *)
 module H = Hashcons.Make(struct
   type t = ty
-  let equal a b = compare_struct a b = 0
+  let equal = eq_struct
   let hash = hash
   let tag i ty = ()
 end)
 
 let eq t1 t2 = t1 == t2
 
-let cmp t1 t2 = compare_struct t1 t2
+let cmp t1 t2 = Pervasives.compare t1 t2
 
 exception Error of string
   (** Type error *)
@@ -207,9 +214,13 @@ let rec pp buf t = match t with
   | App (p, []) -> Buffer.add_string buf p
   | App (p, args) -> Printf.bprintf buf "%s %a " p (Util.pp_list ~sep:" " pp) args
   | Fun (ret, []) -> assert false
-  | Fun (ret, [arg]) -> Printf.bprintf buf "(%a -> %a)" pp arg pp ret
+  | Fun (ret, [arg]) -> Printf.bprintf buf "%a -> %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a -> %a)" (Util.pp_list ~sep:" * " pp) l pp ret
+    Printf.bprintf buf "(%a) -> %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
+and pp_inner buf t = match t with
+  | Fun (_, _::_) ->
+    Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
+  | _ -> pp buf t
 
 let rec pp_tstp buf t = match t with
   | Var s -> Printf.bprintf buf "%s" (String.capitalize s)
@@ -217,9 +228,13 @@ let rec pp_tstp buf t = match t with
   | App (p, []) -> Buffer.add_string buf p
   | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
   | Fun (ret, []) -> assert false
-  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp arg pp ret
+  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp) l pp ret
+    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
+and pp_inner buf t = match t with
+  | Fun (_, _::_) ->
+    Buffer.add_char buf '('; pp_tstp buf t; Buffer.add_char buf ')'
+  | _ -> pp_tstp buf t
 
 
 let to_string t =
