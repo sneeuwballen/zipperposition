@@ -141,7 +141,7 @@ let skolemize ~ctx f =
     F.iter (Skolem.update_var ~ctx) f';
     let ty = F.db_type f' 0 in
     let v = T.mk_var ?ty (Skolem.fresh_var ~ctx) in
-    let new_f' = F.db_replace f' v in
+    let new_f' = F.db_unlift (F.db_replace f' v) in
     skolemize new_f'
   in
   skolemize f

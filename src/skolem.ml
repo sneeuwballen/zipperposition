@@ -104,7 +104,7 @@ let skolem_form ~ctx f =
     let symb = fresh_sym ~ctx in
     let skolem_term = T.mk_node symb vars in
     (* replace variable by skolem t*)
-    let new_f = F.db_replace f skolem_term in
+    let new_f = F.db_unlift (F.db_replace f skolem_term) in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
     new_f
   with FoundFormVariant(f',new_f',subst) ->
