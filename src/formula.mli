@@ -141,6 +141,9 @@ val mk_exists_list : Term.t list -> t -> t
 val close_forall : t -> t   (** Bind all free variables with forall *)
 val close_exists : t -> t   (** Bind all free variables with exists *)
 
+val open_forall : ?offset:int -> t -> t
+  (** Remove outer forall binders, using fresh vars instead of DB symbols *)
+
 (** {2 Simplifications} *)
 
 val flatten : t -> t        (** Flatten AC connectives (or/and) *)

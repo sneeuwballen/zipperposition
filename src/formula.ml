@@ -332,6 +332,18 @@ let close_exists f =
   let fv = free_variables f in
   mk_exists_list fv f
 
+let open_forall ?(offset=0) f =
+  let offset = max offset (T.max_var (free_variables f) + 1) in
+  let rec open_one offset f = match f.form with
+  | Forall f' ->
+    let ty = db_type f' 0 in
+    let v = T.mk_var ?ty offset in
+    let new_f' = db_replace f' v in
+    open_one (offset+1) new_f'
+  | _ -> f
+  in
+  open_one offset f
+
 (** {2 Simplifications} *)
 
 let rec _gather_or f = match f.form with
