@@ -56,6 +56,8 @@ and is_lit f = match f.F.form with
   | F.Forall _
   | F.Exists _ -> false
 
+let is_clause l = List.for_all is_lit l
+
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let rec miniscope f =
   let f = F.simplify f in
@@ -185,7 +187,7 @@ type clause = Formula.t list
 (* Transform the clause into proper CNF; returns a list of clauses *)
 let cnf_of ?(ctx=Skolem.create ()) f =
   let f = F.flatten f in
-  if is_cnf f
+  let clauses = if is_cnf f
     then
       match f.F.form with
       | F.Or l -> [l]
@@ -214,6 +216,9 @@ let cnf_of ?(ctx=Skolem.create ()) f =
       let clauses = to_cnf f in
       clauses
     end
+  in
+  assert (List.for_all is_clause clauses);
+  clauses
 
 let cnf_of_list ?(ctx=Skolem.create ()) l =
   Util.list_flatmap (fun f -> cnf_of ~ctx f) l

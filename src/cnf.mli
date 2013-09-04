@@ -34,6 +34,9 @@ val is_cnf : Formula.t -> bool
 val is_lit : Formula.t -> bool
   (** Literal? *)
 
+val is_clause : Formula.t list -> bool
+  (** Is it a clause, ie a list of literals? *)
+
 val miniscope : Formula.t -> Formula.t
   (** Apply miniscoping transformation to the term *)
 
