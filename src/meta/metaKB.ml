@@ -406,9 +406,9 @@ let formulas_of_statements statements =
       | A.Error _ -> Sequence.empty)
     statements
 
-(* infer signature from statements *)
-let signature_of_statements statements =
-  F.signature_seq (formulas_of_statements statements) 
+(* infer signature from statement *)
+let signature_of_statement stmt =
+  F.signature_seq (formulas_of_statements (Sequence.singleton stmt))
 
 (* apply the axiom definition to args, getting back a pattern,args *)
 let apply_axiom axiom args =
@@ -451,9 +451,7 @@ let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_const s)) l
 (** Conversion of a list of Ast_theory.statement to a KB *)
 let kb_of_statements ?(init=empty) statements =
   let module A = Ast_theory in
-  (* infer types *)
-  let signature = signature_of_statements statements in
-  let convert_premise = function
+  let convert_premise ~signature = function
     | A.IfAxiom f ->
       let f' = MetaPattern.EncodedForm.encode f in
       let pat, args = MetaPattern.create ~signature f' in
@@ -463,6 +461,8 @@ let kb_of_statements ?(init=empty) statements =
       IfAxiom (s, args)
   in
   let add_statement kb statement =
+    (* infer types *)
+    let signature = Signature.curry (signature_of_statement statement) in
     match statement with
     | A.Axiom (s, args, f) ->
       (* convert axiom *)
@@ -482,7 +482,7 @@ let kb_of_statements ?(init=empty) statements =
       (* describe a lemma *)
       let f' = MetaPattern.EncodedForm.encode f in
       let pat, args = MetaPattern.create ~signature f' in
-      let premises = List.map convert_premise premises in
+      let premises = List.map (convert_premise ~signature) premises in
       let args' = gather_premises_terms premises in
       assert (List.for_all (fun t -> List.memq t args') args);  (* check safe *)
       (* map args' to fresh variables *)
@@ -492,7 +492,7 @@ let kb_of_statements ?(init=empty) statements =
       add_lemma kb lemma
     | A.Lemma (s, args, premises) ->
       let args = str_to_terms args in
-      let premises = List.map convert_premise premises in
+      let premises = List.map (convert_premise ~signature) premises in
       let l = gather_premises_terms premises in
       assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
       (* map symbols to variables *)
@@ -509,7 +509,7 @@ let kb_of_statements ?(init=empty) statements =
       end
     | A.Theory (s, args, premises) ->
       let args = str_to_terms args in
-      let premises = List.map convert_premise premises in
+      let premises = List.map (convert_premise ~signature) premises in
       let l = gather_premises_terms premises in
       assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
       (* map symbols to variables *)
