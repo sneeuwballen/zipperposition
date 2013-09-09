@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Meta-prover, working on axioms, theories and lemmas} *)
 
+open Logtk
+
 type t
 
 (** {2 Basic operations and accessors} *)
@@ -47,7 +49,7 @@ val add_pattern : t -> MetaPattern.t -> unit
 val add_kb : t -> MetaKB.t -> unit
   (** Update the KB *)
 
-val match_formula : t -> Term.t -> MetaReasoner.Logic.literal list
+val match_formula : t -> Formula.t -> MetaReasoner.Logic.literal list
   (** List of literals representing patterns matching this formula.
       Literals can then be added with {! add_literals} *)
 

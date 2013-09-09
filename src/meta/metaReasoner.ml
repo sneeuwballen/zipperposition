@@ -25,25 +25,31 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Forward and backward Logic Reasoner} *)
 
+open Logtk
+
 module T = Term
+module F = Formula
 
 type datalog_symbol =
   | DSName of string
   | DSTerm of Term.t
-  | DSAbstracted of Term.t * int
+  | DSFormula of Formula.t
+  | DSType of Type.t
   | DSSTartList of int
 
 let eq_datalog_symbol s1 s2 = match s1, s2 with
   | DSName s1, DSName s2 -> s1 = s2
   | DSTerm t1, DSTerm t2 -> Term.eq t1 t2
-  | DSAbstracted (t1, i1), DSAbstracted (t2, i2) -> Term.eq t1 t2 && i1 = i2
+  | DSFormula f1, DSFormula f2 -> Formula.eq f1 f2
+  | DSType ty1, DSType ty2 -> Type.eq ty1 ty2
   | DSSTartList i1, DSSTartList i2 -> i1 = i2
   | _ -> false
 
 let hash_datalog_symbol s = match s with
   | DSName s -> Hash.hash_string s
-  | DSTerm t -> Term.hash t
-  | DSAbstracted (t, i) -> Hash.hash_int2 (Term.hash t) i
+  | DSTerm t -> T.hash t
+  | DSFormula f -> F.hash f
+  | DSType ty -> Type.hash ty
   | DSSTartList i -> i + 13
 
 (** Datalog instance *)
@@ -54,7 +60,8 @@ module Logic = Datalog.Make(struct
   let to_string = function
     | DSName s -> s
     | DSTerm t -> T.to_string t
-    | DSAbstracted (t, i) -> Util.sprintf "\\%d(%a)" i T.pp t
+    | DSFormula f -> F.to_string f
+    | DSType ty -> Type.to_string ty
     | DSSTartList i -> Util.sprintf "L%d" i
 end)
 
@@ -65,7 +72,8 @@ module Translate = struct
     | None : unit mapping  (* no argument *)
     | String : string mapping
     | Term : Term.t mapping
-    | Abstract : (Term.t * Term.t list) mapping
+    | Formula : Formula.t mapping
+    | Type : Type.t mapping
     | Parametrize : 'a mapping -> ('a * Term.t list) mapping
     | Map : ('a -> 'b) * ('b -> 'a) * 'b mapping -> 'a mapping
     | List : 'a mapping -> 'a list mapping
@@ -79,7 +87,8 @@ module Translate = struct
   let none = None
   let str = String
   let term = Term
-  let abstract = Abstract
+  let form = Formula
+  let type_ = Type
   let parametrize p = Parametrize p
   let map ~inject ~extract m = Map (inject, extract, m)
   let list_ m = List m
@@ -100,11 +109,8 @@ module Translate = struct
       | T.Var i -> Logic.mk_var i :: l
       | _ -> Logic.mk_const (DSTerm x) :: l
       end
-    | Abstract, (t, args) ->
-      assert (List.for_all (fun arg -> T.subterm ~sub:arg t) args);
-      let t' = T.lambda_abstract_list t args in
-      let l' = List.fold_right (fun t l -> build_args term t l) args l in
-      Logic.mk_const (DSAbstracted (t', List.length args)) :: l'
+    | Formula, f -> (Logic.mk_const (DSFormula f)) :: l
+    | Type, ty -> (Logic.mk_const (DSType ty)) :: l
     | Parametrize p, (y, args) ->
       let l' = build_args (list_ term) args l in
       build_args p y l'
@@ -138,6 +144,8 @@ module Translate = struct
       | String, (Logic.Const (DSName s))::l' -> s, l'
       | Term, (Logic.Var i) :: l' -> T.mk_var i, l'
       | Term, (Logic.Const (DSTerm t))::l' -> t, l'
+      | Formula, (Logic.Const (DSFormula f))::l' -> f, l'
+      | Type, (Logic.Const (DSType ty))::l' -> ty, l'
       | Map (_, extract, m'), l ->
         let y, l' = decode m' l in
         extract y, l'
@@ -161,11 +169,6 @@ module Translate = struct
         let c, l''' = decode mc l'' in
         let d, l'''' = decode md l''' in
         (a, b, c, d), l''''
-      | Abstract, (Logic.Const (DSAbstracted (t', i))) :: l' ->
-        let args, l'' = decode_list term i l' in
-        (* apply lambda term *)
-        let t = T.lambda_apply_list t' args in
-        (t, args), l''
       | _, _ ->
         raise CannotDecode
     (* decode a list of [n] elements using [mapping] *)

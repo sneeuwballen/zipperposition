@@ -78,6 +78,10 @@ let _raise_error filename lexbuf =
   let e_c = end_.Lexing.pos_cnum - end_.Lexing.pos_bol in
   raise (ParseError (filename, s_l, s_c, e_l, e_c))
 
+(* FIXME: includes should be replaced by the content of the file
+    at the same place, not later (can break in presence of type
+    declarations) *)
+
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in

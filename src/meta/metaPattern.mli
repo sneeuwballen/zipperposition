@@ -25,11 +25,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Formula Patterns} *)
 
+open Logtk
+
+(** {2 Main type} *)
+
 type t
-
 type pattern = t
-
-(** {2 Basics} *)
 
 val compare : t -> t -> int
 val eq : t -> t -> bool
@@ -40,30 +41,56 @@ val pp_apply : Buffer.t -> (t * Term.t list) -> unit
 val fmt : Format.formatter -> t -> unit
 val bij : t Bij.t
 
-val encode : Term.t -> Term.t
-  (** Encode the term into a curryfied, guarded term suitable for pattern matching *)
+(** {2 Basic Operations} *)
 
-val decode : Term.t -> Term.t
-  (** Inverse of {! encode} *)
+(** This module is used to handle the encoding of formulas and terms into
+    patterns. Terms are supposed to be curried. *)
 
-(** {2 Fundamental operations} *)
+module EncodedForm : sig
+  type t
 
-val create : Term.t -> t * Term.t list
+  exception DontForgetToCurry of Term.t
+
+  (** Careful: terms here must be curried! See {!HO.curry} *)
+  
+  val encode_t : Term.t -> t
+  val decode_t : t -> Term.t
+
+  (** Formulas don't need to be curried. *)
+  
+  val encode : Formula.t -> t
+  val decode : t -> Formula.t
+
+  val eq : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val bij : t Bij.t
+  val mapping : t MetaReasoner.Translate.mapping
+  val pp : Buffer.t -> t -> unit
+end
+
+(** Pattern creation and application *)
+
+val create : signature:Signature.t -> EncodedForm.t -> t * Term.t list
   (** Create a pattern by abstracting its symbols (which are returned
       as a list of constants) *)
 
 val arity : t -> int
   (** Number of arguments of the pattern *)
 
-val apply : t * Term.t list -> Term.t
+val can_apply : signature:Signature.t -> t * Term.t list -> bool
+  (** Is the application type-safe? *)
+
+val apply : t * Term.t list -> EncodedForm.t
   (** Apply the pattern to the given constants/terms to get back a formula.
-      Arity of the pattern must match the length of the list. *)
+      Arity of the pattern must match the length of the list.
+      {b Warning}: Types are not checked!*)
 
 val mapping : (t * Term.t list) MetaReasoner.Translate.mapping
-  (** Bidirectional translation to Datalog terms *)
+  (** Bidirectional translation to Datalog literals *)
 
-val matching : t -> Term.t -> (t * Term.t list) Sequence.t
-  (** Match a pattern against an encoded term *)
+val matching : t -> EncodedForm.t -> (t * Term.t list) Sequence.t
+  (** Match a pattern against an encoded formula. *)
 
 (** {2 Set of patterns} *)
 
@@ -78,7 +105,7 @@ module Set : sig
   val add : t -> pattern -> t
     (** Add a pattern to the set *)
 
-  val matching : t -> Term.t -> (pattern * Term.t list) list
+  val matching : t -> EncodedForm.t -> (pattern * Term.t list) list
     (** Match the given formula against indexed patterns, returning
         instances of patterns of the set. *)
 

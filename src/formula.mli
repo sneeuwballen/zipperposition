@@ -161,6 +161,7 @@ val of_term : Term.t -> t
 
 val infer_type : TypeInference.Ctx.t -> t -> unit
 val signature : ?signature:Signature.t -> t -> Signature.t
+val signature_seq : ?signature:Signature.t -> t Sequence.t -> Signature.t
 
 (** {2 IO} *)
 

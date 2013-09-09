@@ -26,7 +26,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Theory file Parser} *)
 
 %{
+  open Logtk
+
   module T = Term
+  module F = Formula
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
@@ -40,10 +43,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     __count := 0
 
   (** Get variable associated with this name *)
-  let get_var name =
+  let get_var ?ty name =
     try Hashtbl.find __table name
     with Not_found ->
-      let v = T.mk_var !__count in
+      let v = T.mk_var ?ty !__count in
       incr __count;
       Hashtbl.add __table name v;
       v
@@ -52,7 +55,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token EOI
 
 %token DOT
-%token COLUMN
 %token COMMA
 %token LEFT_PAREN
 %token RIGHT_PAREN
@@ -68,6 +70,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token INCLUDE
 
 %token NOT
+
+%token COLUMN
+%token STAR
+%token ARROW
 
 %token AND
 %token NOTAND
@@ -170,9 +176,8 @@ fof_formula:
 
 fof_sequent:
   | l=fof_tuple GENTZEN_ARROW r=fof_tuple
-    { T.mk_imply (T.mk_and_list l) (T.mk_or_list r) }
-  | LEFT_PAREN seq=fof_sequent RIGHT_PAREN
-    { seq }
+    { F.mk_imply (F.mk_and l) (F.mk_or r) }
+  | LEFT_PAREN seq=fof_sequent RIGHT_PAREN { seq }
 
 fof_tuple:
   LEFT_BRACKET l=separated_list(COMMA, fof_logic_formula) RIGHT_BRACKET { l } 
@@ -201,28 +206,28 @@ fol_infix_unary:
     { o l r }
   
 %inline binary_connective:
-  | EQUIV { T.mk_equiv }
-  | IMPLY { T.mk_imply }
-  | LEFT_IMPLY { fun x y -> T.mk_imply y x }
-  | XOR { T.mk_xor }
-  | NOTVLINE { fun x y -> T.mk_not (T.mk_or x y) }
-  | NOTAND { fun x y -> T.mk_not (T.mk_and x y) }
-  | AND { T.mk_and }
-  | VLINE { T.mk_or }
+  | EQUIV { F.mk_equiv }
+  | IMPLY { F.mk_imply }
+  | LEFT_IMPLY { F.mk_imply }
+  | XOR { F.mk_xor }
+  | NOTVLINE { fun x y -> F.mk_not (F.mk_or [x; y]) }
+  | NOTAND { fun x y -> F.mk_not (F.mk_and [x;x]) }
+  | AND { fun x y -> F.mk_and [x;y] }
+  | VLINE { fun x y -> F.mk_or [x;y] }
 %inline fol_quantifier:
-  | FORALL { T.mk_forall_var }
-  | EXISTS { T.mk_exists_var }
+  | FORALL { F.mk_forall_list }
+  | EXISTS { F.mk_exists_list }
 %inline unary_connective:
-  | NOT { T.mk_not }
+  | NOT { F.mk_not }
 %inline infix_inequality:
-  | NOT_EQUAL { fun x y -> T.mk_not (T.mk_eq x y) }
+  | NOT_EQUAL { F.mk_neq }
 
 atomic_formula:
   | plain_atomic_formula { $1 }
   | defined_atomic_formula { $1 }
   | system_atomic_formula { $1 }
 
-plain_atomic_formula: plain_term { $1 }
+plain_atomic_formula: plain_term { F.mk_atom $1 }
 
 defined_atomic_formula:
   | defined_plain_formula { $1 }
@@ -232,19 +237,19 @@ defined_infix_formula:
   | l=term o=defined_infix_pred r=term  { o l r }
 
 %inline defined_infix_pred:
-  | EQUAL { T.mk_eq }
+  | EQUAL { F.mk_eq }
 
 defined_plain_formula:
   | p=defined_prop
-    { T.mk_const p }
+    { F.mk_atom (T.mk_const p) }
   | p=defined_pred LEFT_PAREN args=arguments RIGHT_PAREN
-    { T.mk_node p args }
+    { F.mk_atom (T.mk_node p args) }
 
 /* includes $true and $false */
 defined_prop: atomic_defined_word { $1 } 
 defined_pred: atomic_defined_word { $1 }
 
-system_atomic_formula: system_term { $1 }
+system_atomic_formula: system_term { F.mk_atom $1 }
   
 /* Terms */
 
@@ -263,7 +268,9 @@ plain_term:
   | s=constant { T.mk_const s }
   | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
 
-constant: s=atomic_word { Symbol.mk_const s }
+constant:
+| s=atomic_word { Symbol.mk_const s }
+| s=atomic_defined_word { s }
 functor_: f=atomic_word { Symbol.mk_const f }
 
 defined_term:
@@ -294,6 +301,26 @@ system_term:
 system_constant: system_functor { $1 }
 system_functor: s=atomic_system_word { s }
 
+tff_type:
+  | ty=tff_atom_type { ty }
+  | l=tff_atom_type ARROW r=tff_atom_type
+    { Type.mk_fun r [l] }
+  | LEFT_PAREN args=tff_ty_args RIGHT_PAREN ARROW r=tff_atom_type
+    { Type.mk_fun r args }
+
+tff_atom_type:
+  | w=UPPER_WORD { Type.var w }
+  | w=type_const { Type.const w }
+  | LEFT_PAREN ty=tff_type RIGHT_PAREN { ty }
+
+tff_ty_args:
+  | ty=tff_atom_type { [ty] }
+  | hd=tff_atom_type STAR tl=tff_ty_args { hd :: tl }
+  
+type_const:
+  | w=LOWER_WORD { w }
+  | w=DOLLAR_WORD { w }
+
 arguments: separated_nonempty_list(COMMA, term) { $1 }
 
 variables:
@@ -302,6 +329,7 @@ variables:
 /* TODO: typed variables */
 variable:
   | x=UPPER_WORD { get_var x }
+  | x=UPPER_WORD COLUMN ty=tff_type { get_var ~ty x }
 
 atomic_word:
   | s=SINGLE_QUOTED { remove_quotes s }

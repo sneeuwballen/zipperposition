@@ -3,6 +3,7 @@
 #require "unix";;
 #require "datalog";;
 #directory "_build/src/";;
+#directory "_build/src/meta/";;
 #load "logtk.cma";;
 #load "logtk_meta.cma";;
 #install_printer Logtk.Symbol.fmt;;

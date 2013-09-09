@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Meta-prover, working on axioms, theories and lemmas} *)
 
+open Logtk
+
 type t = {
   mutable kb : MetaKB.t;
   mutable patterns : MetaPattern.Set.t;
@@ -60,7 +62,8 @@ let add_kb p kb =
   MetaKB.add_reasoner p.reasoner p.kb
 
 let match_formula p f =
-  let l = MetaPattern.Set.matching p.patterns f in
+  let f' = MetaPattern.EncodedForm.encode f in
+  let l = MetaPattern.Set.matching p.patterns f' in
   let lits = List.map
     (fun (p, args) -> MetaReasoner.Translate.encode MetaPattern.mapping "pattern" (p, args))
     l

@@ -25,109 +25,164 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Clause Patterns} *)
 
+open Logtk
+
 module T = Term
 module S = Substs
+module F = Formula
 
 let prof_matching = Util.mk_profiler "meta.pattern.matching"
 
-let __var_symbol = Symbol.mk_const "$$var"
+let __var_symbol = Symbol.mk_const "V"
+let __fun_symbol = Symbol.mk_const "S"
 
-(** {2 Basics} *)
+(** {2 Encoding as terms} *)
+
+(** This module is used to handle the encoding of formulas and terms into
+    patterns. Terms are supposed to be curried. *)
+
+module EncodedForm = struct
+  type t = Term.t
+
+  exception DontForgetToCurry of Term.t
+  
+  (* Encoding of term, in a form that allows to distinguish variables from
+      constants even after abstracting symbols *)
+  let rec encode_t t = match t.T.term with
+    | T.Var _ ->
+      (* First order variable. We add a special constant before it, so
+          that we won't match an abstracted symbol with a variable, e.g.
+          (p a) with (p X) once a is abstracted to A. (p X) will become
+          (p (__var X)), and the substitution will be rejected. *)
+      T.mk_node __var_symbol [t]
+    | T.BoundVar _ -> t
+    | T.Bind (s, t') -> T.mk_bind s (encode_t t')
+    | T.Node (s, []) ->
+      (** Similarly to the Var case, here we need to protect constants
+          from being bound to variables once abstracted into variables *)
+      T.mk_node __fun_symbol [t]
+    | T.Node (s, l) -> raise (DontForgetToCurry t)
+    | T.At (t1, t2) -> T.mk_at (encode_t t1) (encode_t t2)
+
+  (* Inverse operation of {! encode_t} *)
+  let rec decode_t t = match t.T.term with
+    | T.Var _
+    | T.BoundVar _ -> t
+    | T.Bind (s, t') -> T.mk_bind s (decode_t t')
+    | T.Node (s, [t']) when Symbol.eq s __var_symbol -> decode_t t'
+    | T.Node (s, [t']) when Symbol.eq s __fun_symbol -> decode_t t'
+    | T.Node (s, l) -> raise (DontForgetToCurry t)
+    | T.At (t1, t2) -> T.mk_at (decode_t t1) (decode_t t2)
+
+  let encode f =
+    let f = F.map (fun t -> encode_t (HO.curry t)) f in
+    F.to_term f
+
+  let decode t =
+    let f = F.of_term t in
+    F.map (fun t -> HO.uncurry (decode_t t)) f
+
+  let eq = T.eq
+  let compare = T.compare
+  let hash = T.hash
+  let bij = T.bij
+  let mapping = MetaReasoner.Translate.term
+  let pp = T.pp
+end
+
+(** {2 Main type} *)
+
+(** We encode formulas as terms, because it allows us to lambda-abstract
+    over them, which makes the order of variables pretty clear. *)
 
 type t =
-  | Pattern of Term.t * int
+  | Pattern of EncodedForm.t * Type.t list
 
-(** Encoding of term, in a form that allows to distinguish variables from
-    constants even after abstracting symbols *)
-let rec encode t = match t.T.term with
-  | T.Var _ ->
-    (* First order variable. We add a special constant before it, so
-        that we won't match an abstracted symbol with a variable, e.g.
-        (p a) with (p X) once a is abstracted to A. (p X) will become
-        (p (__var X)), and the substitution will be rejected. *)
-    T.mk_node __var_symbol [t]
-  | T.BoundVar _ -> t
-  | T.Bind (s, t') -> T.mk_bind s (encode t')
-  | T.Node (s, []) -> t
-  | T.Node (s, l) -> T.mk_node s (List.map encode l)
-  | T.At (t1, t2) -> T.mk_at (encode t1) (encode t2)
+let compare (Pattern (t1, types1)) (Pattern (t2, types2)) =
+  let c = EncodedForm.compare t1 t2 in
+  if c <> 0
+    then c
+    else Util.lexicograph Type.cmp types1 types2
 
-(** Inverse operation for [encode] *)
-let rec decode t = match t.T.term with
-  | T.Var _
-  | T.BoundVar _ -> t
-  | T.Bind (s, t') -> T.mk_bind s (decode t')
-  | T.Node (s, [t']) when Symbol.eq s __var_symbol -> decode t'
-  | T.Node (s, l) -> T.mk_node s (List.map decode l)
-  | T.At (t1, t2) -> T.mk_at (decode t1) (decode t2)
+let eq p1 p2 = compare p1 p2 = 0
 
-let compare (Pattern (t1, i1)) (Pattern (t2, i2)) = Term.compare t1 t2
-
-let eq (Pattern (t1, _)) (Pattern (t2, _)) = Term.eq t1 t2
-
-let hash (Pattern (t, _)) = Term.hash t
+let hash (Pattern (t, types)) =
+  Hash.hash_list Type.hash (EncodedForm.hash t) types
 
 let pp buf (Pattern (p, _)) =
-  Term.pp buf p
+  EncodedForm.pp buf p
 
 let pp_apply buf (p, args) =
-  Printf.bprintf buf "%a(%a)" pp p (Util.pp_list T.pp) args
+  Printf.bprintf buf "%a(%a)" pp p (Util.pp_list EncodedForm.pp) args
 
 let fmt fmt (Pattern (p, _)) =
-  Term.fmt fmt p
+  Format.pp_print_string fmt (Util.on_buffer T.pp p)
 
 let bij =
-  Bij.map
-    ~inject:(fun (Pattern (t, i)) -> t, i)
-    ~extract:(fun (t, i) -> Pattern (t, i))
-    (Bij.pair T.bij Bij.int_)
+  Bij.(map
+    ~inject:(fun (Pattern (t, types)) -> t, types)
+    ~extract:(fun (t, types) -> Pattern (t, types))
+    (pair EncodedForm.bij (list_ Type.bij)))
 
-(** {2 Fundamental operations} *)
+(** {2 Basic Operations} *)
 
-(** list of constants, in prefix traversal order *)
-let functions_in_order t =
-  let rec recurse acc t = match t.T.term with
+(* list of constants, in prefix traversal order *)
+let rec functions_in_order acc t = match t.T.term with
   | T.Var _
   | T.BoundVar _ -> acc
   | T.Bind (s, t') ->
-    recurse acc t'
+    functions_in_order acc t'
   | T.Node (_, []) -> (* constant, add it *)
     if List.memq t acc then acc else t :: acc
   | T.Node (_, l) ->  (* subterms *)
-    List.fold_left recurse acc l
+    List.fold_left functions_in_order acc l
   | T.At (t1, t2) ->
-    let acc = recurse acc t1 in
-    recurse acc t2
-  in
-  List.rev (recurse [] t)
+    let acc = functions_in_order acc t1 in
+    functions_in_order acc t2
 
-let create t =
-  let t = encode (T.curry t) in
-  let funs = functions_in_order t in
-  let pat = T.lambda_abstract_list t funs in
-  Pattern (pat, List.length funs), funs
+let create ~signature f =
+  let funs = List.rev (functions_in_order [] f) in
+  let symbols = List.map T.head funs in
+  let pat = HO.lambda_abstract_list ~signature f funs in
+  Pattern (pat, List.map (Signature.find signature) symbols), funs
 
 let arity = function
-  | Pattern (_, i) -> i
+  | Pattern (_, l) -> List.length l
+
+let can_apply ~signature (pat,args) =
+  match pat with
+  | Pattern (t, types) ->
+    (* type checking for compatibility of [args] and [types] *)
+    if List.length types <> List.length args
+      then false
+      else
+        let ctx = TypeInference.Ctx.of_signature signature in
+        try TypeInference.Ctx.protect ctx
+          (fun () ->
+            List.iter2 (TypeInference.constrain_term_type ctx) args types;
+            true)
+        with Type.Error _ ->
+          false
 
 let apply (pat, args) =
   match pat with
-  | Pattern (t, arity) ->
-    assert (arity = List.length args);
-    let t = T.lambda_apply_list t args in
-    decode t
-
-let to_term = function
-  | Pattern (p, _) -> p
-let of_term t i =
-  Pattern (t, i)
+  | Pattern (t, types) ->
+    (* type checking for compatibility of [args] and [types] *)
+    assert (List.length types = List.length args);
+    let t = HO.lambda_apply_list t args in
+    t
 
 (** Maps a pattern, parametrized by some of its variables, into datalog terms *)
 let mapping =
-  MetaReasoner.Translate.map
-    ~inject:(fun (p, args) -> assert (List.length args = arity p); to_term p, args)
-    ~extract:(fun (t, args) -> of_term t (List.length args), args)
-    (MetaReasoner.Translate.parametrize MetaReasoner.Translate.term)
+  let module MT = MetaReasoner.Translate in
+  let m = MT.triple MT.term (MT.list_ MT.type_) (MT.list_ MT.term) in
+  MT.map
+    ~inject:(fun (Pattern (p,types), args) ->
+      assert (List.length args = List.length types);
+      p, types, args)
+    ~extract:(fun (t, types, args) ->
+      Pattern (t, types), args)
+    m
 
 (** Matches the first pattern (curryfied term) against the second one. Only
     head variables can be bound to any term. It may return several solutions. *)
@@ -158,15 +213,15 @@ let matching pat right =
       else T.mk_var (offset+i) :: _mk_vars offset (i-1)
   in
   match pat with
-  | Pattern (t', i) ->
+  | Pattern (t', types) ->
     (* instantiate with variables *)
-    let vars = _mk_vars (T.max_var (T.vars t') + 1) i in
-    let left = T.lambda_apply_list t' vars in
-    (* match pat and pat' *)
+    let vars = List.mapi (fun i ty -> T.mk_var ~ty i) types in
+    let left = HO.lambda_apply_list t' vars in
+    (* match left and right *)
     let substs = matching_terms left 1 right 0 in
     Sequence.map
       (fun subst ->
-        let args = List.map (fun v -> Substs.apply_subst subst v 1) vars in
+        let args = List.map (fun v -> Substs.apply subst v 1) vars in
         pat, args)
       substs
 
@@ -195,15 +250,14 @@ module Set = struct
   (** Add a pattern to the set *)
   let add set pat = PSet.add pat set
 
-  (** Match the given term (raw) against the patterns of the set. Returns
+  (** Match the given formula (curried) against the patterns of the set. Returns
       a list of instances of the pattern. E.g. if the pattern is
       commutativity, matching against "f(X,Y)=f(Y,X)" will return
       [\f. f @ X @ Y = f @ Y @X, [f]]. *)
-  let matching set t =
-    let right = encode t in
+  let matching set f =
     PSet.fold
       (fun pat' acc ->
-        let substs = matching pat' right in
+        let substs = matching pat' f in
         (Sequence.to_rev_list substs) @ acc)
       set []
 

@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Forward and backward Logic Reasoner} *)
 
+open Logtk
+
 type datalog_symbol
 
 module Logic : Datalog.S with type symbol = datalog_symbol
@@ -40,9 +42,10 @@ module Translate : sig
 
   val none : unit mapping
   val str : string mapping
-  val abstract : (Term.t * Term.t list) mapping
   val parametrize : 'a mapping -> ('a * Term.t list) mapping
   val term : Term.t mapping
+  val form : Formula.t mapping
+  val type_ : Type.t mapping
   val list_ : 'a mapping -> 'a list mapping
   val map : inject:('a -> 'b) -> extract:('b -> 'a) -> 'b mapping -> 'a mapping
   val pair : 'a mapping -> 'b mapping -> ('a * 'b) mapping

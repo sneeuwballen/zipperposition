@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Knowledge base} *)
 
+open Logtk
+
 (** {2 Basic knowledge} *)
 
 type lemma =
@@ -77,9 +79,12 @@ val bij : t Bij.t
 (** {2 MetaReasoner} *)
 
 type found_lemma =
-  | NewLemma of Term.t * MetaReasoner.Logic.literal  (* formula + explanation *)
+  | NewLemma of Formula.t * MetaReasoner.Logic.literal
+    (** formula + explanation *)
+
 and found_theory =
   | NewTheory of string * Term.t list
+
 and found_axiom =
   | NewAxiom of string * Term.t list
 
@@ -92,20 +97,20 @@ val on_theory : MetaReasoner.t -> found_theory Signal.t
 
 (** {2 Backward chaining} *)
 
-val match_lemmas : t -> Term.t -> (lemma * Term.t list) list
-  (** Given a KB and a goal term [g], find lemmas whose conclusions imply
-      [g]. For each such lemma [l], return:
+val match_lemmas : t -> MetaPattern.EncodedForm.t -> (lemma * Term.t list) list
+  (** Given a KB and a goal formula [g], find lemmas whose
+      conclusions imply [g]. For each such lemma [l], return:
 
       - the lemma
       - a list of arguments that serve to instantiate the lemma's conclusion
   *)
 
 type lemma_back_chain =
-  | LBC_add_goal of Term.t
+  | LBC_add_goal of MetaPattern.EncodedForm.t
   | LBC_add_datalog_goal of MetaReasoner.Logic.literal
   | LBC_add_datalog_clause of MetaReasoner.Logic.clause
 
-val backward_chain : t -> Term.t -> lemma_back_chain list
+val backward_chain : t -> MetaPattern.EncodedForm.t -> lemma_back_chain list
   (** uses {!match_lemmas} to try to solve the given goal
       using lemmas. It returns a list of actions that may help solving
       the input goal. *)

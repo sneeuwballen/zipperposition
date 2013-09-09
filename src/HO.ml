@@ -65,8 +65,13 @@ let uncurry t =
   in
   uncurry t
 
-let rec curried t =
-  failwith "not implemented" (* TODO *)
+let rec curried t = match t.term with
+  | Var _
+  | BoundVar _
+  | Node (_, []) -> true
+  | Node (_, _::_) -> false
+  | Bind (_, t') -> curried t'
+  | At (t1, t2) -> curried t1 && curried t2
 
 let rec is_fo t = match t.term with
   | Var _ | BoundVar _ -> true

@@ -25,7 +25,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Knowledge base} *)
 
+open Logtk
+
 module T = Term
+module F = Formula
 
 (** {2 Basic knowledge} *)
 
@@ -247,9 +250,12 @@ let bij =
 (** {2 MetaReasoner} *)
 
 type found_lemma =
-  | NewLemma of Term.t * MetaReasoner.Logic.literal
+  | NewLemma of Formula.t * MetaReasoner.Logic.literal
+    (** formula + explanation *)
+
 and found_theory =
   | NewTheory of string * Term.t list
+
 and found_axiom =
   | NewAxiom of string * Term.t list
 
@@ -308,7 +314,9 @@ let on_lemma r =
   let s = MetaReasoner.on_new_fact_by r "lemma" in
   Signal.map s (fun lit ->
     let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
-    NewLemma (MetaPattern.apply (p, terms), lit))
+    (* recover a formula from the raw datalog literal *)
+    let f = MetaPattern.apply (p, terms) in
+    NewLemma (MetaPattern.EncodedForm.decode f, lit))
 
 let on_axiom r =
   let s = MetaReasoner.on_new_fact_by r "axiom" in
@@ -326,10 +334,9 @@ let on_theory r =
 
 (* match goal against lemmas' conclusions, yielding (lemma, args) list *)
 let match_lemmas kb goal =
-  let goal' = MetaPattern.encode goal in
   LemmaSet.fold
     (fun (Lemma (p, args, premises) as lemma) acc ->
-      let substs = MetaPattern.matching p goal' in
+      let substs = MetaPattern.matching p goal in
       Sequence.fold
         (fun acc (_, args) ->
           (lemma, args) :: acc)
@@ -337,17 +344,17 @@ let match_lemmas kb goal =
     kb.lemmas []
 
 type lemma_back_chain =
-  | LBC_add_goal of Term.t
+  | LBC_add_goal of MetaPattern.EncodedForm.t
   | LBC_add_datalog_goal of MetaReasoner.Logic.literal
   | LBC_add_datalog_clause of MetaReasoner.Logic.clause
 
 let term_to_lit t =
-  MetaReasoner.Translate.encode MetaReasoner.Translate.term "istrue" t
+  MetaReasoner.Translate.encode MetaPattern.EncodedForm.mapping "istrue" t
 
 let term_of_lit lit =
-  MetaReasoner.Translate.decode_head MetaReasoner.Translate.term "istrue" lit
+  MetaReasoner.Translate.decode_head MetaPattern.EncodedForm.mapping "istrue" lit
 
-(* suggest actions to take in order to solve the given goal *)
+(* suggest actions to take in order to solve the given formula goal *)
 let backward_chain kb goal =
   let matches = match_lemmas kb goal in
   let actions = List.fold_left
@@ -360,9 +367,12 @@ let backward_chain kb goal =
           (term_to_lit goal)
           [term_to_lit goal']
         in
-        let datalog_goal = MetaReasoner.Translate.encode mapping_lemma "lemma" (pat, args) in
-        LBC_add_goal goal' :: LBC_add_datalog_clause clause
-        :: LBC_add_datalog_goal datalog_goal :: acc)
+        let datalog_goal = MetaReasoner.Translate.encode mapping_lemma
+          "lemma" (pat, args)
+        in
+        LBC_add_goal goal' ::
+        LBC_add_datalog_clause clause ::
+        LBC_add_datalog_goal datalog_goal :: acc)
       [] matches
   in
   actions
@@ -374,6 +384,31 @@ module TermBij = Util.Bijection(struct
   let equal = Term.eq
   let hash = Term.hash
 end)
+
+(* all formulas occurring in statements *)
+let formulas_of_statements statements =
+  let module A = Ast_theory in
+  let gather_premises premises =
+    Sequence.fmap
+      (function
+      | A.IfAxiom f -> Some f
+      | A.IfFact _ -> None)
+      (Sequence.of_list premises)
+  in
+  Sequence.flatMap
+    (function
+      | A.Lemma(_, _, premises) -> gather_premises premises
+      | A.LemmaInline(f,premises) ->
+        Sequence.append (Sequence.singleton f) (gather_premises premises)
+      | A.Axiom (_, _, f) -> Sequence.singleton f
+      | A.Theory (_, _, premises) -> gather_premises premises
+      | A.Include _
+      | A.Error _ -> Sequence.empty)
+    statements
+
+(* infer signature from statements *)
+let signature_of_statements statements =
+  F.signature_seq (formulas_of_statements statements) 
 
 (* apply the axiom definition to args, getting back a pattern,args *)
 let apply_axiom axiom args =
@@ -416,9 +451,12 @@ let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_const s)) l
 (** Conversion of a list of Ast_theory.statement to a KB *)
 let kb_of_statements ?(init=empty) statements =
   let module A = Ast_theory in
+  (* infer types *)
+  let signature = signature_of_statements statements in
   let convert_premise = function
-    | A.IfAxiom t ->
-      let pat, args = MetaPattern.create t in
+    | A.IfAxiom f ->
+      let f' = MetaPattern.EncodedForm.encode f in
+      let pat, args = MetaPattern.create ~signature f' in
       IfPattern (pat, args)
     | A.IfFact (s, args) ->
       let args = str_to_terms args in
@@ -426,10 +464,11 @@ let kb_of_statements ?(init=empty) statements =
   in
   let add_statement kb statement =
     match statement with
-    | A.Axiom (s, args, t) ->
+    | A.Axiom (s, args, f) ->
       (* convert axiom *)
       let left = str_to_terms args in
-      let p, right = MetaPattern.create t in
+      let f' = MetaPattern.EncodedForm.encode f in
+      let p, right = MetaPattern.create ~signature f' in
       assert (List.length args = List.length right);
       (* map to variables *)
       let perm = map_to_vars left in
@@ -439,9 +478,10 @@ let kb_of_statements ?(init=empty) statements =
       (* build axiom *)
       let axiom = Axiom (s, new_left, p, new_right) in
       add_axiom kb axiom
-    | A.LemmaInline (t, premises) ->
+    | A.LemmaInline (f, premises) ->
       (* describe a lemma *)
-      let pat, args = MetaPattern.create t in
+      let f' = MetaPattern.EncodedForm.encode f in
+      let pat, args = MetaPattern.create ~signature f' in
       let premises = List.map convert_premise premises in
       let args' = gather_premises_terms premises in
       assert (List.for_all (fun t -> List.memq t args') args);  (* check safe *)
@@ -481,7 +521,7 @@ let kb_of_statements ?(init=empty) statements =
     | A.Include _ -> failwith "KB.kb_of_statements: remaining includes"
     | A.Error _ -> failwith "KB.kb_of_statements: error in list"
   in
-  List.fold_left add_statement init statements
+  Sequence.fold add_statement init statements
 
 (** {2 IO} *)
 
@@ -491,7 +531,7 @@ let parse_theory_file filename =
     let ic = open_in filename in
     let lexbuf = Lexing.from_channel ic in
     let statements = Parse_theory.parse_statements Lex_theory.token lexbuf in
-    let kb = kb_of_statements statements in
+    let kb = kb_of_statements (Sequence.of_list statements) in
     kb
   with Unix.Unix_error (e, _, _) ->
     let msg = Unix.error_message e in

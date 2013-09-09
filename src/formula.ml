@@ -503,6 +503,10 @@ let signature ?(signature=Signature.empty) f =
   TypeInference.default_to_i ctx;
   TypeInference.Ctx.to_signature ctx
 
+let __signature = signature
+let signature_seq ?(signature=Signature.empty) seq =
+  Sequence.fold (fun signature f -> __signature ~signature f) signature seq
+
 (** {2 IO} *)
 
 let pp buf f =
