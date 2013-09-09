@@ -74,6 +74,15 @@ Executable cnf_of_tptp
   MainIs: cnf_of_tptp.ml
   BuildDepends: logtk
 
+# detection of theories
+Executable detect_theories
+  Path: tools/
+  Build$: flag(meta)
+  Install$: flag(meta)
+  CompiledObject: native
+  MainIs: detect_theories.ml
+  BuildDepends: logtk,logtk.meta
+
 SourceRepository head
   Type: git
   Location: https://github.com/c-cube/logtk

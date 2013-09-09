@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: cb832cfa5cc24b77437bea83deb5aa8e)
+# DO NOT EDIT (digest: 54cdc1441a0408fd5760a80a23dd10f3)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -81,7 +81,15 @@
 "tools/cnf_of_tptp.native": use_logtk
 "tools/cnf_of_tptp.native": pkg_unix
 "tools/cnf_of_tptp.native": pkg_num
+# Executable detect_theories
+"tools/detect_theories.native": use_logtk_meta
+"tools/detect_theories.native": use_logtk
+"tools/detect_theories.native": pkg_datalog
+"tools/detect_theories.native": pkg_unix
+"tools/detect_theories.native": pkg_num
+<tools/*.ml{,i}>: use_logtk_meta
 <tools/*.ml{,i}>: use_logtk
+<tools/*.ml{,i}>: pkg_datalog
 <tools/*.ml{,i}>: pkg_unix
 <tools/*.ml{,i}>: pkg_num
 # OASIS_STOP

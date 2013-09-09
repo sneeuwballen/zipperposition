@@ -207,17 +207,14 @@ let matching_terms p1 o_1 p2 o_2 =
 (* assuming term is encoded, match the pattern against it, yielding
     a sequence of (pattern, term list) *)
 let matching pat right =
-  let rec _mk_vars offset i =
-    if i = 0
-      then []
-      else T.mk_var (offset+i) :: _mk_vars offset (i-1)
-  in
   match pat with
   | Pattern (t', types) ->
     (* instantiate with variables *)
-    let vars = List.mapi (fun i ty -> T.mk_var ~ty i) types in
+    let offset = T.max_var (T.vars t') + 1 in
+    let vars = List.mapi (fun i ty -> T.mk_var ~ty (i+offset)) types in
     let left = HO.lambda_apply_list t' vars in
     (* match left and right *)
+    Util.debug 5 "MetaPattern: match %a with %a" T.pp left T.pp right;
     let substs = matching_terms left 1 right 0 in
     Sequence.map
       (fun subst ->

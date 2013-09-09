@@ -67,6 +67,9 @@ val diff : t -> t -> t
 val to_seq : t -> (lemma Sequence.t * axiom Sequence.t * theory Sequence.t)
 val of_seq : (lemma Sequence.t * axiom Sequence.t * theory Sequence.t) -> t
 
+val pp_lemma : Buffer.t -> lemma -> unit
+val pp_theory : Buffer.t -> theory -> unit
+val pp_axiom : Buffer.t -> axiom -> unit
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
 

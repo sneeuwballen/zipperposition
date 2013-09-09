@@ -243,6 +243,12 @@ let is_empty reasoner =
 let size reasoner =
   Logic.db_size reasoner.db
 
+let all_clauses reasoner =
+  Sequence.from_iter
+    (fun k -> Logic.db_fold
+      (fun () c -> k c)
+      () reasoner.db)
+
 let all_facts reasoner =
   Sequence.from_iter
     (fun k -> Logic.db_fold

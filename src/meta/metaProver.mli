@@ -31,7 +31,7 @@ type t
 
 (** {2 Basic operations and accessors} *)
 
-val create : unit -> t
+val create : ?kb:MetaKB.t -> unit -> t
   (** New prover *)
 
 val patterns : t -> MetaPattern.Set.t
@@ -53,6 +53,9 @@ val match_formula : t -> Formula.t -> MetaReasoner.Logic.literal list
   (** List of literals representing patterns matching this formula.
       Literals can then be added with {! add_literals} *)
 
+val match_clause : t -> Formula.t list -> MetaReasoner.Logic.literal list
+  (** See {! match_formula} *)
+
 val add_literals : t -> MetaReasoner.Logic.literal Sequence.t -> unit
   (** Add the literals to the reasoner *)
 
@@ -62,6 +65,9 @@ val add_clauses : t -> MetaReasoner.Logic.clause Sequence.t -> unit
 val add_goal : t -> MetaReasoner.Logic.literal -> unit
 
 (** {2 Basic events} *)
+
+(** Those events should be used by the user's code when it wishes
+    to know which lemmas, theories and axioms have been detected *)
 
 val on_lemma : t -> MetaKB.found_lemma Signal.t
 val on_theory : t -> MetaKB.found_theory Signal.t

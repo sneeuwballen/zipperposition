@@ -27,6 +27,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module F = Formula
+
 type t = {
   mutable kb : MetaKB.t;
   mutable patterns : MetaPattern.Set.t;
@@ -36,16 +38,23 @@ type t = {
   reasoner : MetaReasoner.t;
 }
 
-let create () =
+let _add_patterns_of_kb mp kb =
+  let patterns = MetaKB.all_patterns kb in
+  mp.patterns <- List.fold_left MetaPattern.Set.add mp.patterns patterns;
+  ()
+
+let create ?(kb=MetaKB.empty) () =
   let reasoner = MetaReasoner.create () in
   let p = {
-    kb = MetaKB.empty;
+    kb;
     patterns = MetaPattern.Set.empty;
     reasoner;
     on_lemma = MetaKB.on_lemma reasoner;
     on_axiom = MetaKB.on_axiom reasoner;
     on_theory = MetaKB.on_theory reasoner;
   } in
+  _add_patterns_of_kb p p.kb;
+  MetaKB.add_reasoner p.reasoner p.kb;
   p
 
 let patterns p = p.patterns
@@ -58,6 +67,7 @@ let add_pattern p pat =
   p.patterns <- MetaPattern.Set.add p.patterns pat
 
 let add_kb p kb =
+  _add_patterns_of_kb p kb;
   p.kb <- MetaKB.union p.kb kb;
   MetaKB.add_reasoner p.reasoner p.kb
 
@@ -69,6 +79,10 @@ let match_formula p f =
     l
   in
   lits
+
+let match_clause p c =
+  let f = F.mk_or c in
+  match_formula p f
 
 let add_literals p lits =
   Sequence.iter (fun lit -> MetaReasoner.add_fact p.reasoner lit) lits

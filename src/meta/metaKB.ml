@@ -171,29 +171,28 @@ let of_seq (lemmas, axioms, theories) =
   let kb = Sequence.fold add_theory kb theories in
   kb
 
+let pp_premise buf p = match p with
+| IfAxiom (s, []) -> Buffer.add_string buf s
+| IfAxiom (s, args) -> Printf.bprintf buf "%s(%a)" s (Util.pp_list T.pp) args
+| IfPattern (p, args) -> MetaPattern.pp_apply buf (p, args)
+let pp_premises = Util.pp_list pp_premise
+let pp_lemma buf = function
+  | Lemma (p, args, premises) ->
+    Printf.bprintf buf "lemma(%a if %a)" MetaPattern.pp_apply (p,args) pp_premises premises
+and pp_axiom buf = function
+  | Axiom (s, left, p, right) ->
+    Printf.bprintf buf "axiom(%s(%a) is %a)" s
+      (Util.pp_list T.pp) left MetaPattern.pp_apply (p,right)
+and pp_theory buf = function
+  | Theory (s, args, premises) -> Printf.bprintf buf "theory(%s(%a) if %a)"
+    s (Util.pp_list T.pp) args pp_premises premises
+
 let pp buf kb =
-  let pp_premise buf p = match p with
-  | IfAxiom (s, []) -> Buffer.add_string buf s
-  | IfAxiom (s, args) -> Printf.bprintf buf "%s(%a)" s (Util.pp_list T.pp) args
-  | IfPattern (p, args) -> MetaPattern.pp_apply buf (p, args)
-  in
-  let pp_premises = Util.pp_list pp_premise in
-  let pp_lemma buf = function
-    | Lemma (p, args, premises) ->
-      Printf.bprintf buf "lemma(%a, %a)" MetaPattern.pp_apply (p,args) pp_premises premises
-  and pp_axiom buf = function
-    | Axiom (s, left, p, right) ->
-      Printf.bprintf buf "axiom(%s(%a), %a)" s
-        (Util.pp_list T.pp) left MetaPattern.pp_apply (p,right)
-  and pp_theory buf = function
-    | Theory (s, args, premises) -> Printf.bprintf buf "theory(%s(%a), %a)"
-      s (Util.pp_list T.pp) args pp_premises premises
-  in
-  Buffer.add_string buf "KB(";
-  StringMap.iter (fun _ a -> pp_axiom buf a) kb.axioms;
-  StringMap.iter (fun _ t -> pp_theory buf t) kb.theories;
-  LemmaSet.iter (pp_lemma buf) kb.lemmas;
-  Buffer.add_string buf ")";
+  Buffer.add_string buf "KB {\n";
+  StringMap.iter (fun _ a -> Printf.bprintf buf "  %a\n" pp_axiom a) kb.axioms;
+  StringMap.iter (fun _ t -> Printf.bprintf buf "  %a\n" pp_theory t) kb.theories;
+  LemmaSet.iter (Printf.bprintf buf "  %a\n" pp_lemma) kb.lemmas;
+  Buffer.add_string buf "}\n";
   ()
 
 let fmt fmt kb =
