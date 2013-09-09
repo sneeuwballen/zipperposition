@@ -30,6 +30,8 @@ open Logtk
 
 module F = Formula
 
+let printer = ref F.pp
+
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
   ()
@@ -42,6 +44,7 @@ let options =
   ; "-cat", Arg.Set cat_input, "print input declarations"
   ; "-profile", Arg.Set Util.enable_profiling, "enable profiling"
   ; "-stats", Arg.Set stats, "statistics"
+  ; "-tstp", Arg.Unit (fun () -> printer := F.pp_tstp), "output in TSTP format"
   ]
 
 (* check the given file *)
@@ -61,7 +64,7 @@ let check file =
       (fun s ty -> Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
     Printf.printf "formulas:\n";
     Sequence.iter
-      (fun f -> Util.printf "  %a\n" F.pp f)
+      (fun f -> Util.printf "  %a\n" !printer f)
       (Util_tptp.formulas decls);
     (if !stats then begin
       Util.printf "number of symbols: %d\n" (Signature.size signature);
