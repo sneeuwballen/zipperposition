@@ -35,25 +35,37 @@ module A = Ast_tptp
 module KB = MetaKB
 
 let theory_files = ref []
+let kb_files = ref []
 let flag_print_kb = ref false
 
 let add_theory f =
   theory_files := f :: !theory_files
+let add_kb f =
+  kb_files := f :: !kb_files
 
 let options =
   [ "-debug", Arg.Int Util.set_debug, "debug level"
   ; "-theory", Arg.String add_theory, "use theory file"
+  ; "-kb", Arg.String add_kb, "use KB file"
   ; "-print-kb", Arg.Set flag_print_kb, "print KB"
   ]
 
 (* parse the given theory files into a KB *)
-let parse_kb files =
+let parse_kb kb_files theory_files =
+  let kb = List.fold_left
+    (fun kb file -> 
+      Util.debug 3 "parse KB file %s" file;
+      match MetaKB.restore file with
+      | None -> kb
+      | Some kb' -> MetaKB.union kb kb')
+    MetaKB.empty kb_files
+  in
   List.fold_left
     (fun kb file ->
       Util.debug 3 "parse theory file %s" file;
       let kb' = MetaKB.parse_theory_file file in
       MetaKB.union kb kb')
-    MetaKB.empty files
+    kb theory_files
 
 (* conversion to CNF of declarations *)
 let to_cnf ?(ctx=Skolem.create ()) decls =
@@ -134,10 +146,12 @@ let main () =
   let add_file f = files := f :: !files in
   Arg.parse options add_file "detect_theories [options] [file1|stdin] file2...";
   (* set default *)
-  (if !theory_files = [] then theory_files := ["data/builtin.theory"]);
+  (match !kb_files, !theory_files with
+    | [], [] -> theory_files := ["data/builtin.theory"]
+    | _ -> ());
   (if !files = [] then files := ["stdin"]);
   (* parse KB *)
-  let kb = parse_kb !theory_files in
+  let kb = parse_kb !kb_files !theory_files in
   (if !flag_print_kb then print_kb ~kb);
   (* parse CNF formulas *)
   let clauses = parse_and_cnf !files in
