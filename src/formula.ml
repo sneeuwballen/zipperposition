@@ -55,7 +55,27 @@ let compare f1 f2 = f1.id - f2.id
 let eq f1 f2 = f1.id = f2.id
 let hash f = f.id
 
-let compare_rec f1 f2 = Pervasives.compare f1 f2
+let eq_rec f1 f2 = match f1.form, f2.form with
+  | True, True
+  | False, False -> true
+  | Atom p1, Atom p2 -> T.eq p1 p2
+  | Equal (t11,t12), Equal(t21,t22) ->
+    (T.eq t11 t21 && T.eq t12 t22) ||
+    (T.eq t11 t22 && T.eq t12 t21)
+  | And l1, And l2 when List.length l1 = List.length l2 ->
+    List.for_all2 (==) l1 l2
+  | Or l1, Or l2 when List.length l1 = List.length l2 ->
+    List.for_all2 (==) l1 l2
+  | Imply (f11, f12), Imply (f21, f22) ->
+    eq f11 f21 && eq f12 f22
+  | Equiv (f11, f12), Equiv (f21, f22) ->
+    (eq f11 f21 && eq f12 f22) ||
+    (eq f11 f22 && eq f12 f21)
+  | Not f1', Not f2'
+  | Forall f1', Forall f2'
+  | Exists f1', Exists f2' -> eq f1' f2'
+  | _, _ -> false
+
 let hash_rec f = match f.form with
   | True -> 13
   | False -> 14
@@ -64,8 +84,8 @@ let hash_rec f = match f.form with
   | Or l -> Hash.hash_list hash 19 l
   | Not f' -> Hash.hash_int2 (hash f') 23
   | Imply (f1,f2) -> Hash.hash_int2 (hash f1) (hash f2)
-  | Equiv (f1,f2) -> Hash.hash_int3 (hash f1) (hash f2) 11
-  | Equal (t1,t2) -> Hash.hash_int3 (T.hash t1) (T.hash t2) 13
+  | Equiv (f1,f2) -> Hash.hash_int2 (hash f1 lxor hash f2) 11
+  | Equal (t1,t2) -> Hash.hash_int2 (T.hash t1 lxor T.hash t2) 13
   | Forall f' -> Hash.hash_int (hash f')
   | Exists f' -> Hash.hash_int2 (hash f') 11
 
@@ -81,7 +101,7 @@ let has_flag f flag = (f.flags land flag) != 0
 
 module H = Hashcons.Make(struct
   type t = form
-  let equal f1 f2 = compare_rec f1 f2 = 0
+  let equal f1 f2 = eq_rec f1 f2
   let hash f = hash_rec f
   let tag id f = f.id <- id
 end)
@@ -120,9 +140,9 @@ let mk_or = function
 let mk_imply f1 f2 =
   match f1.form, f2.form with
   | True, _ -> f2
-  | False, _ -> mk_true
-  | _, True -> mk_not f1
-  | _, False -> f1
+  | False, _
+  | _, True -> mk_true
+  | _, False -> mk_not f1
   | _ ->
     let f = { form=Imply (f1,f2); flags=0; id= ~-1; } in
     let f' = H.hashcons f in

@@ -90,6 +90,8 @@ rule token = parse
   | '!' { FORALL }
   | '?' { EXISTS }
   | '^' { LAMBDA }
+  | "$true" { TRUE }
+  | "$false" { FALSE }
   | '@' { AT }
   (* | ';' { SEMICOLUMN } *)
   | ':' { COLUMN }

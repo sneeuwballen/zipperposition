@@ -89,6 +89,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token EQUAL
 %token NOT_EQUAL
 
+%token TRUE
+%token FALSE
+
 %token FORALL
 %token EXISTS
 %token LAMBDA
@@ -227,7 +230,7 @@ fol_infix_unary:
 %inline binary_connective:
   | EQUIV { F.mk_equiv }
   | IMPLY { F.mk_imply }
-  | LEFT_IMPLY { F.mk_imply }
+  | LEFT_IMPLY { fun l r -> F.mk_imply r l }
   | XOR { F.mk_xor }
   | NOTVLINE { fun x y -> F.mk_not (F.mk_or [x; y]) }
   | NOTAND { fun x y -> F.mk_not (F.mk_and [x;x]) }
@@ -259,13 +262,14 @@ defined_infix_formula:
   | EQUAL { F.mk_eq }
 
 defined_plain_formula:
-  | p=defined_prop
-    { F.mk_atom (T.mk_const p) }
+  | p=defined_prop { p }
   | p=defined_pred LEFT_PAREN args=arguments RIGHT_PAREN
     { F.mk_atom (T.mk_node p args) }
 
 /* includes $true and $false */
-defined_prop: atomic_defined_word { $1 } 
+defined_prop:
+  | TRUE { F.mk_true } 
+  | FALSE { F.mk_false }
 defined_pred: atomic_defined_word { $1 }
 
 system_atomic_formula: system_term { F.mk_atom $1 }
