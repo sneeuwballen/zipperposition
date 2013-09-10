@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 54cdc1441a0408fd5760a80a23dd10f3)
+# DO NOT EDIT (digest: d648b4e99d086866a444c45ea23b3bfc)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -60,6 +60,7 @@
 "src/meta/lex_theory.cmx": for-pack(Logtk_meta)
 "src/meta/parse_theory.cmx": for-pack(Logtk_meta)
 "src/meta/signal.cmx": for-pack(Logtk_meta)
+"src/meta/multiMap.cmx": for-pack(Logtk_meta)
 <src/meta/*.ml{,i}>: use_logtk
 <src/meta/*.ml{,i}>: pkg_datalog
 <src/meta/*.ml{,i}>: pkg_unix

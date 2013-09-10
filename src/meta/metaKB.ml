@@ -69,6 +69,7 @@ and compare_premises l1 l2 =
 
 module StringMap = Sequence.Map.Make(String)
 module LemmaSet = Sequence.Set.Make(struct type t = lemma let compare = compare_lemma end)
+module TheoryMap = MultiMap.Make(String)(struct type t = theory let compare = compare_theory end)
 
 let name_of_axiom = function
   | Axiom (s, _, _, _) -> s
@@ -81,18 +82,18 @@ let name_of_theory = function
 type t = {
   lemmas : LemmaSet.t;            (* set of lemmas *)
   axioms : axiom StringMap.t;     (* axioms, by name *)
-  theories : theory StringMap.t;  (* theories, by name *)
+  theories : TheoryMap.t;         (* theories, by name *)
 } (* KB *)
 
 let eq t1 t2 =
   LemmaSet.equal t1.lemmas t2.lemmas &&
   StringMap.equal (fun a1 a2 -> compare_axiom a1 a2 = 0) t1.axioms t2.axioms &&
-  StringMap.equal (fun t1 t2 -> compare_theory t1 t2 = 0) t1.theories t2.theories
+  TheoryMap.equal t1.theories t2.theories
 
 let empty =
   { lemmas = LemmaSet.empty;
     axioms = StringMap.empty;
-    theories = StringMap.empty;
+    theories = TheoryMap.empty;
   }
 
 let add_lemma kb l =
@@ -105,16 +106,13 @@ let add_axiom kb a =
 
 let add_theory kb t =
   let name = name_of_theory t in
-  assert (not (StringMap.mem name kb.theories));
-  { kb with theories = StringMap.add name t kb.theories }
+  { kb with theories = TheoryMap.add kb.theories name t }
 
 let get_axiom kb s =
   try Some (StringMap.find s kb.axioms)
   with Not_found -> None
 
-let get_theory kb s =
-  try Some (StringMap.find s kb.theories)
-  with Not_found -> None
+let get_theory kb s = TheoryMap.find kb.theories s
 
 let all_patterns kb =
   let l = ref [] in
@@ -125,7 +123,7 @@ let all_patterns kb =
     | (IfPattern (p, _)) :: premises -> add_pattern p; iter_premises premises
   in
   StringMap.iter (fun _ (Axiom (_, _, p, _)) -> add_pattern p) kb.axioms;
-  StringMap.iter (fun _ (Theory (_, _, premises)) -> iter_premises premises) kb.theories;
+  TheoryMap.iter kb.theories (fun _ (Theory (_, _, premises)) -> iter_premises premises);
   LemmaSet.iter (fun (Lemma (_, _, premises)) -> iter_premises premises) kb.lemmas;
   !l
 
@@ -136,16 +134,10 @@ let union t1 t2 =
   | None, None -> None
   | Some a1, Some a2 when compare_axiom a1 a2 = 0 -> Some a1
   | Some a1, Some a2 -> failwith ("two definitions for axiom " ^ (name_of_axiom a1))
-  and merge_theories _ t1 t2 = match t1, t2 with
-  | None, None -> None
-  | Some t, None
-  | None, Some t -> Some t
-  | Some t1, Some t2 when compare_theory t1 t2 = 0 -> Some t1
-  | Some t1, Some _ -> failwith ("two definitions for theory " ^ (name_of_theory t1))
   in
   { lemmas = LemmaSet.union t1.lemmas t2.lemmas;
     axioms = StringMap.merge merge_axioms t1.axioms t2.axioms;
-    theories = StringMap.merge merge_theories t1.theories t2.theories;
+    theories = TheoryMap.union t1.theories t2.theories;
   }
 
 let diff t1 t2 =
@@ -155,13 +147,13 @@ let diff t1 t2 =
   in
   { lemmas = LemmaSet.diff t1.lemmas t2.lemmas;
     axioms = diff_map t1.axioms t2.axioms;
-    theories = diff_map t1.theories t2.theories;
+    theories = TheoryMap.diff t1.theories t2.theories;
   }
 
 let to_seq kb =
   ( LemmaSet.to_seq kb.lemmas
   , StringMap.values kb.axioms
-  , StringMap.values kb.theories
+  , TheoryMap.values kb.theories
   )
 
 let of_seq (lemmas, axioms, theories) =
@@ -190,7 +182,7 @@ and pp_theory buf = function
 let pp buf kb =
   Buffer.add_string buf "KB {\n";
   StringMap.iter (fun _ a -> Printf.bprintf buf "  %a\n" pp_axiom a) kb.axioms;
-  StringMap.iter (fun _ t -> Printf.bprintf buf "  %a\n" pp_theory t) kb.theories;
+  TheoryMap.iter kb.theories (fun _ t -> Printf.bprintf buf "  %a\n" pp_theory t);
   LemmaSet.iter (Printf.bprintf buf "  %a\n" pp_lemma) kb.lemmas;
   Buffer.add_string buf "}\n";
   ()
@@ -285,13 +277,12 @@ let add_axioms reasoner axioms =
     axioms
 and add_theories reasoner theories =
   let open MetaReasoner.Translate in
-  StringMap.iter
+  TheoryMap.iter theories
     (fun _ (Theory (s, args, premises)) ->
       let concl = encode mapping_theory "theory" (s, args) in
       let premises = List.map encode_premise premises in
       let clause = MetaReasoner.Logic.mk_clause concl premises in
       MetaReasoner.add reasoner clause)
-    theories
 and add_lemmas reasoner lemmas =
   let open MetaReasoner.Translate in
   LemmaSet.iter

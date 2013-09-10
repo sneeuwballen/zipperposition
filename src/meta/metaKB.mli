@@ -52,7 +52,7 @@ val add_axiom : t -> axiom -> t
 val add_theory : t -> theory -> t
 
 val get_axiom : t -> string -> axiom option
-val get_theory : t -> string -> theory option
+val get_theory : t -> string -> theory list
 
 val all_patterns : t -> MetaPattern.t list
   (** All patterns used in some premise *)
