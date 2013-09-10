@@ -26,6 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Precedence (total ordering) on symbols} *)
 
 module T = Term
+module F = Formula
 module PO = PartialOrder
 
 type t = {
@@ -38,7 +39,7 @@ type t = {
 } (** A total ordering on symbols *)
 and constr = Symbol.t -> Symbol.t -> int
   (** an ordering constraint (a possibly non-total ordering on symbols) *)
-and clause = Term.t Sequence.t
+and clause = Formula.t list
   (** Abstraction of a clause. It's only a list of terms. *)
 
 let eq p1 p2 =
@@ -110,7 +111,8 @@ let arity_constraint signature s1 s2 =
 let invfreq_constraint clauses =
   let freq_table = Symbol.SHashtbl.create 5 in
   (* frequency of symbols in clause *)
-  let rec clause_freq c = Sequence.iter term_freq c
+  let rec clause_freq c = List.iter form_freq c
+  and form_freq f = F.iter term_freq f
   and term_freq t = match t.T.term with
     | T.Var _ | T.BoundVar _ -> ()
     | T.Bind (_, t') ->

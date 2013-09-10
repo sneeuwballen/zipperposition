@@ -35,7 +35,7 @@ type t = {
 } (** A total ordering on symbols *)
 and constr = Symbol.t -> Symbol.t -> int
   (** an ordering constraint (a possibly non-total ordering on symbols) *)
-and clause = Term.t Sequence.t
+and clause = Formula.t list
   (** Abstraction of a clause. It's only a list of formulas. *)
 
 val eq : t -> t -> bool
