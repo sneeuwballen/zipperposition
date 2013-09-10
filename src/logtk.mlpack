@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 72b35113b0f962c509aac55c3e3e6bef)
+# DO NOT EDIT (digest: be711db15caf0a53330712dd93dc53d2)
 Symbol
 Hash
 Hashcons
@@ -25,6 +25,7 @@ Dtree
 Fingerprint
 Rewriting
 FeatureVector
+FormulaShape
 Util_tptp
 Skolem
 HO

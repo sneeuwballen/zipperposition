@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d648b4e99d086866a444c45ea23b3bfc)
+# DO NOT EDIT (digest: cc526f04f384c66bce2ad360337dcb0d)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -40,6 +40,7 @@
 "src/fingerprint.cmx": for-pack(Logtk)
 "src/rewriting.cmx": for-pack(Logtk)
 "src/featureVector.cmx": for-pack(Logtk)
+"src/formulaShape.cmx": for-pack(Logtk)
 "src/util_tptp.cmx": for-pack(Logtk)
 "src/skolem.cmx": for-pack(Logtk)
 "src/HO.cmx": for-pack(Logtk)

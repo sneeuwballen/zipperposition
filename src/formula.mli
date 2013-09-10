@@ -107,9 +107,13 @@ val subterm : Term.t -> t -> bool
 val free_variables : t -> Term.varlist
   (** Variables not bound by any (formula) quantifier *)
 
+val var_occurs : Term.t -> t -> bool
+
 val is_atomic : t -> bool   (** No connectives? *)
 val is_ground : t -> bool   (** No variables? *)
 val is_closed : t -> bool   (** All variables bound? *)
+
+val contains_symbol : Symbol.t -> t -> bool
 
 (** {2 De Bruijn indexes} *)
 
@@ -171,3 +175,4 @@ val fmt : Format.formatter -> t -> unit
 val to_string : t -> string
 
 val bij : t Bij.t
+

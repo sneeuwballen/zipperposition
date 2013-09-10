@@ -221,6 +221,7 @@ val close_forall : t -> t             (** Bind all free variables by 'forall' *)
 val close_exists : t -> t             (** Bind all free variables by 'exists' *)
 
 val symbols : t Sequence.t -> Symbol.SSet.t   (** Symbols of the terms (keys of signature) *)
+val contains_symbol : Symbol.t -> t -> bool   (** Does the term contain the symbol *)
 
 val db_to_classic : ?varindex:int ref -> t -> t
   (** Transform binders and De Bruijn indexes into regular variables.

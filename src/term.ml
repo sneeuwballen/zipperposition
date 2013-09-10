@@ -655,6 +655,15 @@ let symbols seq =
   in
   Sequence.fold symbols Symbol.SSet.empty seq
 
+(** Does t contains the symbol f? *)
+let rec contains_symbol f t =
+  match t.term with
+  | Var _
+  | BoundVar _ -> false
+  | Bind (s, t') -> s == f || contains_symbol f t'
+  | Node (g, ts) -> g == f || List.exists (contains_symbol f) ts
+  | At (t1, t2) -> contains_symbol f t1 || contains_symbol f t2
+
 (** Bind all free variables by 'forall' *)
 let close_forall t =
   let vars = vars t in

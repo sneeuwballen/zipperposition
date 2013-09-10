@@ -78,7 +78,7 @@ end)
 let mk_true =
   H.hashcons { form=True; id= ~-1; }
 
-let mk_false = 
+let mk_false =
   H.hashcons { form=False; id= ~-1; }
 
 let mk_atom p =
@@ -93,14 +93,14 @@ let mk_and = function
   | [] -> mk_true
   | l when List.memq mk_false l -> mk_false
   | [f] -> f
-  | l -> 
+  | l ->
     H.hashcons { form=And l; id= ~-1; }
 
 let mk_or = function
   | [] -> mk_false
   | l when List.memq mk_true l -> mk_true
   | [f] -> f
-  | l -> 
+  | l ->
     H.hashcons { form=Or l; id= ~-1; }
 
 let mk_imply f1 f2 =
@@ -109,7 +109,7 @@ let mk_imply f1 f2 =
   | False, _ -> mk_true
   | _, True -> mk_not f1
   | _, False -> f1
-  | _ -> 
+  | _ ->
     H.hashcons { form=Imply (f1,f2); id= ~-1; }
 
 let mk_equiv f1 f2 =
@@ -119,7 +119,7 @@ let mk_equiv f1 f2 =
   | _, True -> f1
   | False, _ -> mk_not f2
   | _, False -> mk_not f1
-  | _ -> 
+  | _ ->
     H.hashcons { form=Equiv(f1,f2); id= ~-1; }
 
 let mk_xor f1 f2 = mk_not (mk_equiv f1 f2)
@@ -172,7 +172,7 @@ let rec fold f acc form = match form.form with
   | False -> acc
   | Atom p -> f acc p
   | Equal (t1, t2) -> f (f acc t1) t2
-  | Forall f' 
+  | Forall f'
   | Exists f' -> fold f acc f'
 
 let iter f form = fold (fun () t -> f t) () form
@@ -207,7 +207,7 @@ let fold_depth ?(depth=0) f acc form =
     let acc = f acc depth t1 in
     let acc = f acc depth t2 in
     acc
-  | Forall f' 
+  | Forall f'
   | Exists f' ->
     recurse f acc (depth+1) f'
   in
@@ -229,6 +229,10 @@ let subterm t f =
     false
   with Exit ->
     true
+
+let var_occurs v f =
+  assert (T.is_var v);
+  subterm v f
 
 let free_variables f =
   let set = T.THashSet.create () in
@@ -265,6 +269,10 @@ let is_closed f =
   match free_variables f with
   | [] -> true
   | _ -> false
+
+let contains_symbol sy f =
+  let terms = terms_seq f in
+  Sequence.exists (T.contains_symbol sy) terms
 
 (** {2 De Bruijn indexes} *)
 
@@ -619,9 +627,10 @@ let pp_tstp buf f =
   in
   pp_outer buf (flatten f)
 
-(* KISS: use the term bijection *)
+(* XXX KISS: use the term bijection *)
 let bij =
   Bij.(map
     ~inject:to_term
     ~extract:of_term
     T.bij)
+
