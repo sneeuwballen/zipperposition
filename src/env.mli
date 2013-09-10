@@ -81,7 +81,7 @@ type t = {
   mutable is_trivial : Clause.t -> bool;
     (** single test to detect trivial clauses *)
 
-  mutable axioms : Clause.t list;
+  mutable axioms : Formula.t list;
     (** a list of axioms to add to the problem *)
 
   mutable mk_constr : (Clause.t Sequence.t -> Precedence.constr list) list;
@@ -90,8 +90,8 @@ type t = {
   mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:Ctx.t -> Clause.t list -> Clause.t list;
-    (** how to preprocess the initial list of clauses *)
+  mutable preprocess : ctx:Ctx.t -> Formula.t list -> Formula.t list;
+    (** how to preprocess the initial list of formulas *)
 
   mutable state : ProofState.t;
     (** Proof state *)
@@ -220,6 +220,6 @@ val meta_step : env:t -> Clause.t -> Clause.t Sequence.t
   (** Do one step of the meta-prover with the current given clause. New clauses
       (lemmas) are returned. *)
   
-val preprocess : env:t -> Clause.t list -> Clause.t list
+val preprocess : env:t -> Formula.t list -> Formula.t list
   (** Preprocess clauses *)
 

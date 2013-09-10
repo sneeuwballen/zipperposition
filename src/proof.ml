@@ -30,7 +30,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module T = Term
+module F = Formula
 module S = Substs
+module CC = CompactClause
 
 type t =
   | Axiom of CompactClause.t * string * string (** file, axiom name *)
@@ -49,11 +51,11 @@ let proof_clause proof = match proof with
   | Axiom (c, _, _) -> c
   | Infer (c, _, _) -> c
 
-let proof_id proof = CompactClause.id (proof_clause proof)
+let proof_id proof = (proof_clause proof).CC.id
 
-let proof_lits proof = CompactClause.lits (proof_clause proof)
+let proof_lits proof = (proof_clause proof).CC.lits
 
-let is_proof_of proof c = proof_id proof = CompactClause.id c
+let is_proof_of proof c = proof_id proof = c.CC.id
 
 module IntSet = Set.Make(struct
   type t = int
@@ -157,35 +159,30 @@ let pp_debug buf proof =
   traverse proof
     (function
       | Axiom (c, f, s) ->
-        Printf.bprintf buf "%a <--- axiom %s in %s\n" CompactClause.pp c s f
+        Printf.bprintf buf "%a <--- axiom %s in %s\n" CC.pp c s f
       | Infer (c, rule, premises) ->
-        Printf.bprintf buf "%a <--- %s with\n" CompactClause.pp c rule;
+        Printf.bprintf buf "%a <--- %s with\n" CC.pp c rule;
         List.iter
-          (fun premise -> Printf.bprintf buf "  %a\n" CompactClause.pp premise)
+          (fun premise -> Printf.bprintf buf "  %a\n" CC.pp premise)
           (List.map proof_clause premises)
     )
 
 let pp_tstp buf proof =
   traverse proof
     (function
-      | Axiom (c, f, ax_name) ->
-        let t = Literal.term_of_lits (CompactClause.lits c) in
+      | Axiom (c, file, ax_name) ->
+        let f = Literal.Arr.to_form c.CC.lits in
         Printf.bprintf buf "fof(%d, axiom, %a, file('%s', %s)).\n"
-          (CompactClause.id c) T.pp_tstp t f ax_name
+          c.CC.id F.pp_tstp f file ax_name
       | Infer (c, name, premises) ->
-        let t =
-          T.close_forall
-            (T.mk_node Symbol.or_symbol
-              (Array.to_list
-                (Array.map Literal.term_of_lit (CompactClause.lits c))))
-        in
+        let f = F.close_forall (Literal.Arr.to_form c.CC.lits) in
         let premises = List.map proof_id premises in
         let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
         (* print the inference *)
         Printf.bprintf buf
           ("fof(%d, plain, %a, inference('%s', " ^^
            "[status(%s), theory(equality)], [%a])).\n")
-          (CompactClause.id c) T.pp_tstp t name status
+          c.CC.id F.pp_tstp f name status
           (Util.pp_list ~sep:"," (fun b i -> Printf.bprintf b "%d" i)) premises
     )
 
@@ -197,7 +194,7 @@ let pp switch buf proof = match switch with
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
 let print_vertex proof =
-  let label = `Label (Util.sprintf "%a" Literal.pp_lits (proof_lits proof)) in
+  let label = `Label (Util.sprintf "%a" Literal.Arr.pp (proof_lits proof)) in
   let attributes = [`Shape "box"; `Style "filled"] in
   let attributes =
     if proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes

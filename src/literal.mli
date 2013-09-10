@@ -30,11 +30,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type t = private
- | Equation of    Term.t  (** lhs *)
-                * Term.t  (** rhs *)
-                * bool    (** sign (equality, ie true, or difference) *)
-                * Comparison.t   (* TODO remove? or just orient equations? *)
-  (** a literal, that is, a signed equation *)
+  | Equation of Term.t * Term.t * bool * Comparison.t
+  | Prop of Term.t * bool
+  | True
+  | False
+  (** a literal, that is, a signed equation or a proposition *)
 
 val eq : t -> t -> bool         (** equality of literals *)
 val eq_com : t -> t -> bool     (** commutative equality of lits *)
@@ -64,7 +64,9 @@ val mk_true : ord:Ordering.t -> Term.t -> t     (* true proposition *)
 val mk_false : ord:Ordering.t -> Term.t -> t    (* false proposition *)
 
 val reord : ord:Ordering.t -> t -> t      (** recompute order *)
-val lit_of_fof : ord:Ordering.t -> t -> t (** translate eq/not to literal *)
+val lit_of_form : ord:Ordering.t -> Formula.t -> t (** translate eq/not to literal *)
+val to_tuple : t -> (Term.t * Term.t * bool)
+val form_of_lit : t -> Formula.t
 val term_of_lit : t -> Term.t                   (** translate lit to term *)
 
 val apply_subst : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
@@ -74,40 +76,61 @@ val negate : t -> t                     (** negate literal *)
 val fmap : ord:Ordering.t -> (Term.t -> Term.t) -> t -> t (** fmap in literal *)
 val add_vars : Term.THashSet.t -> t -> unit  (** Add variables to the set *)
 val vars : t -> Term.varlist (** gather variables *)
+val var_occurs : Term.t -> t -> bool
+val is_ground : t -> bool
 
 val infer_type : TypeInference.Ctx.t -> t -> unit
 val signature : ?signature:Signature.t -> t -> Signature.t
 
-(** {2 Arrays of literals} *)
-
-val eq_lits : t array -> t array -> bool
-val compare_lits : t array -> t array -> int
-val hash_lits : t array -> int
-val weight_lits : t array -> int
-val depth_lits : t array -> int
-val vars_lits : t array -> Term.varlist
-val ground_lits : t array -> bool             (** all the literals are ground? *)
-val term_of_lits : t array -> Term.t
-
-val apply_subst_lits : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
-                       ord:Ordering.t -> Substs.t ->
-                       t array -> Substs.scope -> t array
 val apply_subst_list : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
                         ord:Ordering.t -> Substs.t ->
                         t list -> Substs.scope -> t list
 
-val pos_lits : t array -> Bitvector.t
-val neg_lits : t array -> Bitvector.t
-val maxlits : ord:Ordering.t -> t array -> Bitvector.t
+(** {2 IO} *)
 
-val lits_to_seq : t array -> (Term.t * Term.t * bool) Sequence.t
-  (** Convert the lits into a sequence of equations *)
+val pp : Buffer.t -> t -> unit
+val to_string : t -> string
+val fmt : Format.formatter -> t -> unit
+val bij : ord:Ordering.t -> t Bij.t
 
-val lits_of_terms : ord:Ordering.t -> Term.t list -> t array
-  (** Convert a list of atoms into a list of literals *)
+(** {2 Arrays of literals} *)
 
-val lits_infer_type : TypeInference.Ctx.t -> t array -> unit
-val lits_signature : ?signature:Signature.t -> t array -> Signature.t
+module Arr : sig
+  val eq : t array -> t array -> bool
+  val compare : t array -> t array -> int
+  val hash : t array -> int
+  val weight : t array -> int
+  val depth : t array -> int
+  val vars : t array -> Term.varlist
+  val is_ground : t array -> bool             (** all the literals are ground? *)
+
+  val to_form : t array -> Formula.t
+
+  val apply_subst : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
+                         ord:Ordering.t -> Substs.t ->
+                         t array -> Substs.scope -> t array
+
+  val pos : t array -> Bitvector.t
+  val neg : t array -> Bitvector.t
+  val maxlits : ord:Ordering.t -> t array -> Bitvector.t
+
+  val to_seq : t array -> (Term.t * Term.t * bool) Sequence.t
+    (** Convert the lits into a sequence of equations *)
+
+  val of_forms : ord:Ordering.t -> Formula.t list -> t array
+    (** Convert a list of atoms into literals *)
+
+  val to_forms : t array -> Formula.t list
+    (** To list of formulas *)
+
+  val infer_type : TypeInference.Ctx.t -> t array -> unit
+  val signature : ?signature:Signature.t -> t array -> Signature.t
+
+  val pp : Buffer.t -> t array -> unit
+  val to_string : t array -> string
+  val fmt : Format.formatter -> t array -> unit
+  val bij : ord:Ordering.t -> t array Bij.t
+end
 
 (** {2 Special kinds of literal arrays} *)
 
@@ -117,34 +140,5 @@ val is_RR_horn_clause : t array -> bool
 val is_horn : t array -> bool
   (** Recognizes Horn clauses (at most one positive literal) *)
 
-val is_definition : t array -> (Term.t * Term.t) option
-  (** Check whether the clause defines a symbol, e.g.
-      subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
-      is a flat symbol with variables, and all variables in RHS
-      are also in LHS *)
-
-val is_rewrite_rule : t array -> (Term.t * Term.t) list
-  (** More general than definition. It means the clause is an
-      equality where all variables in RHS are also in LHS. It
-      can return two rewrite rules if the clause can be oriented
-      in both ways, e.g. associativity axiom. *)
-
-val is_const_definition : t array -> (Term.t * Term.t) option
-  (** Checks whether the clause is "const = ground composite term", e.g.
-      a clause "aIbUc = inter(a, union(b, c))". In this case it returns
-      Some(constant, definition of constant) *)
-
 val is_pos_eq : t array -> (Term.t * Term.t) option
   (** Recognize whether the clause is a positive unit equality. *)
-
-(** {2 IO} *)
-
-val pp : Buffer.t -> t -> unit
-val pp_lits : Buffer.t -> t array -> unit
-val to_string : t -> string
-val lits_to_string : t array -> string
-val fmt : Format.formatter -> t -> unit
-val fmt_lits : Format.formatter -> t array -> unit
-
-val bij : ord:Ordering.t -> t Bij.t
-val bij_lits : ord:Ordering.t -> t array Bij.t

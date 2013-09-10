@@ -291,13 +291,13 @@ type gnd_convergent = {
 let mk_gc ~theory ~ord ~prec clauses =
   let signature = C.signature (Sequence.of_list clauses) in
   let signature = Symbol.SMap.filter
-    (fun s _ -> not (Symbol.is_base_symbol s)) signature in
+    (fun s _ -> not (Symbol.is_connective s)) signature in
   (* check that every clause is a positive equation *)
   assert (List.for_all
     (fun c -> match c.C.hclits with 
      | [| Literal.Equation (_,_,true,_)|] -> true | _ -> false) clauses);
   let set = Signature.to_symbols signature in
-  let set = Symbol.SSetSeq.of_seq (Sequence.of_list set) in
+  let set = Symbol.SSet.of_seq (Sequence.of_list set) in
   { gc_ord = ord;
     gc_theory = theory;
     gc_prec = prec;
@@ -316,8 +316,8 @@ let ground_pair t1 t2 =
       let subst' = S.bind subst v 0 const 0 in
       (i+1, subst'))
     (0, S.empty) vars in
-  let t1' = S.apply_subst subst t1 0 in
-  let t2' = S.apply_subst subst t2 0 in
+  let t1' = S.apply subst t1 0 in
+  let t2' = S.apply subst t2 0 in
   t1', t2'
 
 (** Same as [ground_pair], but with a cache *)
@@ -354,7 +354,7 @@ let rec gc_expert ~ctx gc =
   (* name and printing stuff *)
   let expert_sig = gc.gc_sig in
   let theory = Util.sprintf "@[<h>%s_%a@]" gc.gc_theory
-    (Util.pp_seq ~sep:"_" Symbol.pp) (Symbol.SSetSeq.to_seq expert_sig) in
+    (Util.pp_seq ~sep:"_" Symbol.pp) (Symbol.SSet.to_seq expert_sig) in
   let expert_name = Utils.sprintf "gc_%s" theory in
   (* update clauses with the context *)
   let expert_clauses = List.map (C.update_ctx ~ctx) gc.gc_eqns in
@@ -406,8 +406,8 @@ let ac ~ctx f =
   let expert_canonize t = T.ac_normal_form ~is_ac t in
   let expert_equal t1 t2 = T.ac_eq ~is_ac t1 t2 in
   let rec expert ctx = {
-    expert_name = Util.sprintf "AC_%s" (Symbol.name_symbol f);
-    expert_descr = Util.sprintf "AC for symbol %s" (Symbol.name_symbol f);
+    expert_name = Util.sprintf "AC_%s" (Symbol.to_string f);
+    expert_descr = Util.sprintf "AC for symbol %s" (Symbol.to_string f);
     expert_equal;
     expert_sig = Symbol.SSet.singleton f;
     expert_clauses = []; (* TODO *)

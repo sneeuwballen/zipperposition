@@ -31,20 +31,25 @@ open Logtk
 open Comparison.Infix
 
 module T = Term
+module F = Formula
 module S = Substs
 module BV = Bitvector
 
 type t =
- | Equation of    Term.t  (** lhs *)
-                * Term.t  (** rhs *)
-                * bool    (** sign (equality, ie true, or difference) *)
-                * Comparison.t   (* TODO remove? or just orient equations? *)
-  (** a literal, that is, a signed equation *)
+  | Equation of Term.t * Term.t * bool * Comparison.t
+  | Prop of Term.t * bool
+  | True
+  | False
+  (** a literal, that is, a signed equation or a proposition *)
 
 let eq l1 l2 =
   match l1, l2 with
   | Equation (l1,r1,sign1,ord1), Equation (l2,r2,sign2,ord2) ->
     sign1 = sign2 && l1 == l2 && r1 == r2 && ord1 = ord2
+  | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.eq p1 p2
+  | True, True
+  | False, False -> true
+  | _, _ -> false
 
 let eq_com l1 l2 =
   match l1, l2 with
@@ -52,6 +57,16 @@ let eq_com l1 l2 =
     sign1 = sign2 &&
     ((T.eq l1 l2 && T.eq r1 r2 && o1 = o2) ||
      (T.eq l1 r2 && T.eq r1 l2 && o1 = (Comparison.opp o2)))
+  | Prop (p1, sign1), Prop(p2, sign2) -> sign1 = sign2 && T.eq p1 p2
+  | True, True
+  | False, False -> true
+  | _, _ -> false
+
+let __to_int = function
+  | Equation _ -> 3
+  | Prop _ -> 2
+  | True -> 1
+  | False -> 0
 
 let compare l1 l2 =
   match l1, l2 with
@@ -63,95 +78,92 @@ let compare l1 l2 =
           let c = T.compare r1 r2 in
           if c <> 0 then c else
             Pervasives.compare sign1 sign2
+  | Prop (p1, sign1), Prop(p2, sign2) ->
+    let c = T.compare p1 p2 in
+    if c <> 0 then c else Pervasives.compare sign1 sign2
+  | True, True
+  | False, False -> 0
+  | _, _ -> __to_int l1 - __to_int l2
 
 let to_multiset lit = match lit with
   | Equation (l, r, true, _) -> [l; r]
   | Equation (l, r, false, _) -> [l; l; r; r]
+  | Prop (p, true) -> [p; T.true_term]
+  | Prop (p, false) -> [p; p; T.true_term; T.true_term]
+  | True -> [T.true_term; T.true_term]
+  | False -> [T.true_term; T.true_term; T.true_term; T.true_term]
 
 let compare_partial ~ord l1 l2 =
-  (* Utils.multiset_partial ord#compare (lit_to_multiset l1) (lit_to_multiset l2) *)
-  match l1, l2 with
-  | Equation (s, t, sign_st, _), Equation (u, v, sign_uv, _) ->
-    let s_u = Ordering.compare ord s u
-    and s_v = Ordering.compare ord s v
-    and t_u = Ordering.compare ord t u
-    and t_v = Ordering.compare ord t v in
-    match s_u, s_v, t_u, t_v, sign_st, sign_uv with
-    | Eq, _, _, Eq, _, _
-    | _, Eq, Eq, _, _, _ ->
-      if sign_st = sign_uv then Eq
-      else if sign_st then Lt
-      else (assert sign_uv; Gt)
-    | Gt, Gt, _, _, _, _        (* s dominates *)
-    | _, _, Gt, Gt, _, _ -> Gt  (* t dominates *)
-    | Gt, Eq, _, _, false, true (* s = v & s > u *)
-    | Eq, Gt, _, _, false, true (* s = u & s > v *)
-    | _, _, Gt, Eq, false, true (* t = v & t > u *)
-    | _, _, Eq, Gt, false, true -> Gt (* t = u & t > v *)
-    | Lt, _, Lt, _, _, _        (* u dominates *)
-    | _, Lt, _, Lt, _, _ -> Lt  (* v dominates *)
-    | Eq, _, Lt, _, true, false (* s = u, t < u *)
-    | Lt, _, Eq, _, true, false (* t = u, s < u *)
-    | _, Eq, _, Lt, true, false (* s = v, t < v *)
-    | _, Lt, _, Eq, true, false -> Lt (* t = v, s < v *)
-    | Eq, _, _, Gt, _, _        (* s = u, t > v *)
-    | Gt, _, _, Eq, _, _        (* s > u, t = v *)
-    | _, Eq, Gt, _, _, _        (* s = v, t > u *)
-    | _, Gt, Eq, _, _, _        (* s > v, t = u *)
-      when sign_uv = sign_st -> Gt
-    | Eq, _, _, Lt, _, _        (* s = u, t < v *)
-    | Lt, _, _, Eq, _, _        (* s < u, t = v *)
-    | _, Eq, Lt, _, _, _        (* s = v, t < u *)
-    | _, Lt, Eq, _, _, _        (* s < v, t = u *)
-      when sign_uv = sign_st -> Lt
-    | Eq, Eq, _, _, false, true (* s = u, s = v *)
-    | _, _, Eq, Eq, false, true -> Gt (* t = u, t = v *)
-    | _, Eq, _, Eq, true, false (* s = v, t = v *)
-    | Eq, _, Eq, _, true, false -> Lt (* s = u, t = u *)
-    | _ -> Incomparable
+  let m1 = to_multiset l1 in
+  let m2 = to_multiset l2 in
+  Ordering.Multiset.compare (Ordering.compare ord) m1 m2
 
 let hash lit = match lit with
   | Equation (l, r, sign, o) ->
-    if sign
-      then Hash.hash_int3 (Hash.hash_string o) l.T.tag r.T.tag
-      else Hash.hash_int3 (Hash.hash_string o) r.T.tag l.T.tag
+    Hash.hash_int3 (22 + Comparison.to_total o) l.T.tag r.T.tag
+  | Prop (p, sign) -> T.hash p
+  | True -> 2
+  | False -> 1
 
 let weight = function
   | Equation (l, r, _ ,_) -> T.size l + T.size r
+  | Prop (p, _) -> T.size p
+  | True
+  | False -> 1
 
 let depth = function
   | Equation (l, r, _ ,_) -> max (T.depth l) (T.depth r)
+  | Prop (p, _) -> T.depth p
+  | True
+  | False -> 0
 
 let is_pos lit = match lit with
-  | Equation (_,_,sign,_) -> sign
+  | Equation (_,_,sign,_)
+  | Prop (_, sign) -> sign
+  | True -> true
+  | False -> false
 
 let is_neg lit = match lit with
-  | Equation (_,_,sign,_) -> not sign
+  | Equation (_,_,sign,_)
+  | Prop (_, sign) -> not sign
+  | True -> false
+  | False -> true
 
 let equational = function
-  | Equation (l, r, _,_) -> l != T.true_term && r != T.true_term
+  | Equation _ -> true
+  | Prop _
+  | True 
+  | False -> false
 
 let orientation_of = function
   | Equation (_, _, _, ord) -> ord
+  | Prop _ -> Gt
+  | True
+  | False -> Eq
 
 let check_type a b =
   let ok = not (T.has_type a) || not (T.has_type b) || T.compatible_type a b in
   assert ok
 
-let mk_eq ~ord a b =
-  check_type a b;
-  Equation (a, b, true, Ordering.compare ord a b)
-
-let mk_neq ~ord a b = 
-  check_type a b;
-  Equation (a, b, false, Ordering.compare ord a b)
-
+(* primary constructor *)
 let mk_lit ~ord a b sign =
-  check_type a b;
-  Equation (a, b, sign, Ordering.compare ord a b)
+  match a, b with
+  | _ when a == b -> if sign then True else False
+  | _ when a == T.true_term && b == T.false_term -> if sign then False else True
+  | _ when a == T.false_term && b == T.true_term -> if sign then False else True
+  | _ when a == T.true_term -> Prop (b, sign)
+  | _ when b == T.true_term -> Prop (a, sign)
+  | _ when a == T.false_term -> Prop (b, not sign)
+  | _ when b == T.false_term -> Prop (a, not sign)
+  | _ ->
+    check_type a b;
+    Equation (a, b, sign, Ordering.compare ord a b)
 
-let mk_prop ~ord p sign =
-  mk_lit ~ord p T.true_term sign
+let mk_eq ~ord a b = mk_lit ~ord a b true
+
+let mk_neq ~ord a b = mk_lit ~ord a b false
+
+let mk_prop ~ord p sign = mk_lit ~ord p T.true_term sign
 
 let mk_true ~ord p = mk_prop ~ord p true
 
@@ -160,359 +172,291 @@ let mk_false ~ord p = mk_prop ~ord p false
 let apply_subst ?(recursive=true) ?renaming ~ord subst lit scope =
   match lit with
   | Equation (l,r,sign,_) ->
-    let new_l = S.apply_subst ~recursive ?renaming subst l scope
-    and new_r = S.apply_subst ~recursive ?renaming subst r scope in
+    let new_l = S.apply ~recursive ?renaming subst l scope
+    and new_r = S.apply ~recursive ?renaming subst r scope in
     mk_lit ~ord new_l new_r sign
+  | Prop (p, sign) ->
+    let p' = S.apply ~recursive ?renaming subst p scope in
+    mk_prop ~ord p' sign
+  | True
+  | False -> lit
 
-let reord ~ord (Equation (l,r,sign,_)) = mk_lit ~ord l r sign
-
-let rec lit_of_fof ~ord ((Equation (l,r,sign,_)) as lit) =
-  match l.T.term, r.T.term with
-  (* deal with trivial literals *)
-  | _ when T.eq l T.true_term && T.eq r T.false_term ->
-    mk_prop ~ord T.true_term (not sign)
-  | _ when T.eq r T.true_term && T.eq l T.false_term ->
-    mk_prop ~ord T.true_term (not sign)
-  | _ when T.eq l r ->
-    mk_prop ~ord T.true_term sign
-    (* deal with false/true *)
-  | _ when T.eq l T.false_term ->
-    lit_of_fof ~ord (mk_lit ~ord r T.true_term (not sign))
-  | _ when T.eq r T.false_term ->
-    lit_of_fof ~ord (mk_lit ~ord l T.true_term (not sign))
-    (* deal with negation *)
-  | T.Node (s, [t]), _ when Symbol.eq s Symbol.not_symbol && T.eq r T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
-  | _, T.Node (s, [t]) when Symbol.eq s Symbol.not_symbol && T.eq l T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord t T.true_term (not sign))
-    (* deal with equivalence symbol *)
-  | T.Node (s, [a; b]), _ when Symbol.eq s Symbol.equiv_symbol && T.eq r T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
-  | _, T.Node (s, [a; b]) when Symbol.eq s Symbol.equiv_symbol && T.eq l T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
-    (* deal with equality symbol *)
-  | T.Node (s, [a; b]), _ when Symbol.eq s Symbol.eq_symbol && T.eq r T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
-  | _, T.Node (s, [a; b]) when Symbol.eq s Symbol.eq_symbol && T.eq l T.true_term ->
-    lit_of_fof ~ord (mk_lit ~ord a b sign)
-    (* default is just reordering *)
-  | _ -> reord ~ord lit
-
-let term_of_lit lit =
+let reord ~ord lit =
   match lit with
-  | Equation (left, right, false, _) when T.eq right T.true_term ->
-    T.mk_not left
-  | Equation (left, right, true, _) when T.eq right T.true_term ->
-    left
-  | Equation (left, right, true, _) when T.eq left T.true_term ->
-    right
-  | Equation (left, right, false, _) when T.eq left T.true_term ->
-    T.mk_not right
-  | Equation (left, right, sign, ord) ->
-    if sign then T.mk_eq left right else T.mk_not (T.mk_eq left right)
+  | Equation (l,r,sign,_) -> mk_lit ~ord l r sign
+  | Prop _
+  | True
+  | False -> lit
 
-let negate (Equation (l,r,sign,ord)) = Equation (l,r,not sign,ord)
+let lit_of_form ~ord f =
+  let f = F.simplify f in
+  match f.F.form with
+  | F.Atom a -> mk_true ~ord a
+  | F.Not {F.form=F.Atom a} -> mk_false ~ord a
+  | F.Equal (l,r) -> mk_eq ~ord l r
+  | F.Not {F.form=F.Equal (l,r)} -> mk_neq ~ord l r
+  | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
+
+let to_tuple = function
+  | Equation (l,r,sign,_) -> l,r,sign
+  | Prop (p,sign) -> p, T.true_term, sign
+  | True -> T.true_term, T.true_term, true
+  | False -> T.true_term, T.true_term, false
+
+let form_of_lit lit = match lit with
+  | Equation (l, r, true, _) -> F.mk_eq l r
+  | Equation (l, r, false, _) -> F.mk_neq l r
+  | Prop (p, true) -> F.mk_atom p
+  | Prop (p, false) -> F.mk_not (F.mk_atom p)
+  | True -> F.mk_true
+  | False -> F.mk_false
+
+let term_of_lit lit = F.to_term (form_of_lit lit)
+
+let negate lit = match lit with
+  | Equation (l,r,sign,ord) -> Equation (l,r,not sign,ord)
+  | Prop (p, sign) -> Prop (p, not sign)
+  | True -> False
+  | False -> True
 
 let fmap ~ord f = function
   | Equation (left, right, sign, _) ->
     let new_left = f left
     and new_right = f right in
-    Equation (new_left, new_right, sign, Ordering.compare ord new_left new_right)
+    mk_lit ~ord new_left new_right sign
+  | Prop (p, sign) ->
+    let p' = f p in
+    mk_prop ~ord p' sign
+  | True -> True
+  | False -> False
 
 let add_vars set = function
   | Equation (l, r, _, _) ->
     T.add_vars set l;
     T.add_vars set r
+  | Prop (p, _) -> T.add_vars set p
+  | True
+  | False -> ()
 
 let vars lit =
   let set = T.THashSet.create () in
   add_vars set lit;
   T.THashSet.to_list set
 
+let var_occurs v lit = match lit with
+  | Prop (p,_) -> T.var_occurs v p
+  | Equation (l,r,_,_) -> T.var_occurs v l || T.var_occurs v r
+  | True
+  | False -> false
+
+let is_ground lit = match lit with
+  | Equation (l,r,_,_) -> T.is_ground l && T.is_ground r
+  | Prop (p, _) -> T.is_ground p
+  | True
+  | False -> true
+
 let infer_type ctx lit =
   match lit with
-  | Equation (l,r,_,_) when T.eq r T.true_term ->
-    TypeInference.constrain_term_type ctx l Type.o
-  | Equation (l,r,_,_) when T.eq l T.true_term ->
-    TypeInference.constrain_term_type ctx r Type.o
   | Equation (l,r,_,_) ->
     TypeInference.constrain_term_term ctx l r
+  | Prop (p,_) ->
+    TypeInference.constrain_term_type ctx p Type.o
+  | True
+  | False -> ()
 
 let signature ?(signature=Signature.empty) lit =
   let ctx = TypeInference.Ctx.of_signature signature in
   infer_type ctx lit;
   TypeInference.Ctx.to_signature ctx
 
-let eq_lits lits1 lits2 =
-  let rec check i =
-    if i = Array.length lits1 then true else
-    eq_com lits1.(i) lits2.(i) && check (i+1)
-  in
-  if Array.length lits1 <> Array.length lits2
-    then false
-    else check 0
-
-let compare_lits lits1 lits2 = 
-  let rec check i =
-    if i = Array.length lits1 then 0 else
-      let cmp = compare lits1.(i) lits2.(i) in
-      if cmp = 0 then check (i+1) else cmp
-  in
-  if Array.length lits1 <> Array.length lits2
-    then Array.length lits1 - Array.length lits2
-    else check 0
-
-let hash_lits lits =
-  let h = ref 0 in
-  Array.iter
-    (fun (Equation (l, r, sign, _)) ->
-      h := Hash.combine (Hash.combine !h l.T.tag) r.T.tag)
-    lits;
-  !h
-
-let weight_lits lits =
-  Array.fold_left (fun w lit -> w + weight lit) 0 lits
-
-let depth_lits lits =
-  Array.fold_left (fun d lit -> max d (depth lit)) 0 lits
-
-let vars_lits lits =
-  let set = T.THashSet.create () in
-  for i = 0 to Array.length lits - 1 do
-    add_vars set lits.(i);
-  done;
-  T.THashSet.to_list set
-
-let ground_lits lits =
-  let rec check i = if i = Array.length lits then true
-    else match lits.(i) with
-    | Equation (l, r, _, _) ->
-      T.is_ground l && T.is_ground r && check (i+1)
-  in check 0
-
-let term_of_lits lits =
-  match lits with
-  | [||] -> T.false_term
-  | _ ->
-    Array.fold_right
-      (fun lit t -> T.mk_or (term_of_lit lit) t)
-      (Array.sub lits 1 (Array.length lits - 1))
-      (term_of_lit lits.(0))
-
-(** Apply the substitution to the array of literals, with scope *)
-let apply_subst_lits ?(recursive=true) ?renaming ~ord subst lits scope =
-  Array.map
-    (fun lit -> apply_subst ~recursive ?renaming ~ord subst lit scope)
-    lits
-
 let apply_subst_list ?(recursive=true) ?renaming ~ord subst lits scope =
   List.map
     (fun lit -> apply_subst ~recursive ?renaming ~ord subst lit scope)
     lits
 
-(** bitvector of literals that are positive *)
-let pos_lits lits =
-  let bv = ref BV.empty in
-  for i = 0 to Array.length lits - 1 do
-    if is_pos lits.(i) then bv := BV.set !bv i
-  done;
-  !bv
-
-(** bitvector of literals that are positive *)
-let neg_lits lits =
-  let bv = ref BV.empty in
-  for i = 0 to Array.length lits - 1 do
-    if is_neg lits.(i) then bv := BV.set !bv i
-  done;
-  !bv
-
-(** Bitvector that indicates which of the literals are maximal *)
-let maxlits ~ord lits =
-  let n = Array.length lits in
-  (* at the beginning, all literals are potentially maximal *)
-  let bv = ref (BV.make n) in
-  for i = 0 to n-1 do
-    (* i-th lit is already known not to be max? *)
-    if not (BV.get !bv i) then () else
-    for j = i+1 to n-1 do
-      if not (BV.get !bv j) then () else
-      match compare_partial ~ord lits.(i) lits.(j) with
-      | Incomparable | Eq -> ()     (* no further information about i-th and j-th *)
-      | Gt -> bv := BV.clear !bv j  (* j-th cannot be max *)
-      | Lt -> bv := BV.clear !bv i  (* i-th cannot be max *)
-    done;
-  done;
-  (* return bitvector *)
-  !bv
-
-(** Convert the lits into a sequence of equations *)
-let lits_to_seq lits =
-  Sequence.from_iter
-    (fun k ->
-      for i = 0 to Array.length lits - 1 do
-        match lits.(i) with | Equation (l,r,sign,_) -> k (l,r,sign)
-      done)
-
-let lits_of_terms ~ord terms =
-  let terms = Array.of_list terms in
-  Array.map (fun t -> lit_of_fof ~ord (mk_true ~ord t)) terms
-
-let lits_infer_type ctx lits =
-  Array.iter (infer_type ctx) lits
-
-let lits_signature ?(signature=Signature.empty) lits =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  lits_infer_type ctx lits;
-  TypeInference.Ctx.to_signature ctx
-
-(** {2 Special kinds of array} *)
-
-(** Does t contains the symbol f? *)
-let rec contains_symbol f t =
-  match t.T.term with
-  | T.Var _ | T.BoundVar _ -> false
-  | T.Bind (s, t') -> s == f || contains_symbol f t'
-  | T.Node (g, ts) -> g == f || List.exists (contains_symbol f) ts
-  | T.At (t1, t2) -> contains_symbol f t1 || contains_symbol f t2
-
-(** Recognized whether the clause is a Range-Restricted Horn clause *)
-let is_RR_horn_clause lits = 
-  let lit = ref None in
-  (* find whether there is exactly one positive literal *)
-  let rec find_uniq_pos n i =
-    if i = Array.length lits
-      then if n = 1 then !lit else None
-      else begin
-        match lits.(i) with
-        | Equation (l,r,true,_) as lit' ->
-          lit := Some lit';
-          find_uniq_pos (n+1) (i+1)
-        | _ -> find_uniq_pos n (i+1)
-      end
-  in
-  match find_uniq_pos 0 0 with
-  | None -> false
-  | Some lit' ->
-    (* check that all variables of the clause occur in the head *)
-    let vars = vars lit' in
-    List.length vars = List.length (vars_lits lits)
-
-(** Recognizes Horn clauses (at most one positive literal) *)
-let is_horn lits =
-  (* Iterate on literals, counting the positive ones.
-     [pos]: did we already meet a positive literal *)
-  let rec iter_lits pos lits i =
-    if i = Array.length lits then true else match lits.(i) with
-      | Equation (_, _, true, _) ->
-        if pos then false else iter_lits true lits (i+1)
-      | Equation (_, _, false, _) -> iter_lits pos lits (i+1)
-  in iter_lits false lits 0
-
-(** Check whether the clause defines a symbol, e.g.
-    subset(X,Y) = \forall Z(Z in X -> Z in Y). It means the LHS
-    is a flat symbol with variables, and all variables in RHS
-    are also in LHS *)
-let is_definition lits =
-  (* check that r is a definition of l=f(x1,...,xn) *)
-  let check_def l r =
-    match l.T.term with
-    | T.Var _ | T.BoundVar _ | T.Bind _ | T.At _ -> false
-    | T.Node (f, ts) ->
-      (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n > 0 *)
-      T.atomic_rec l && ts <> [] && not (contains_symbol f r)
-      && l != T.true_term && r != T.true_term
-      && List.for_all T.is_var ts
-      && List.for_all (fun x -> T.var_occurs x l) (T.vars r)
-  in
-  match lits with
-  | [|Equation (({T.term=T.Node(_, _)} as l), r, true, _)|]
-    when check_def l r -> Some (l, r)
-  | [|Equation (l, ({T.term=T.Node(_, _)} as r), true, _)|]
-    when check_def r l -> Some (r, l)
-  | _ -> None
-
-(** More general than definition. It means the clause is an
-    equality where all variables in RHS are also in LHS. It
-    can return two rewrite rules if the clause can be oriented
-    in both ways, e.g. associativity axiom. *)
-let is_rewrite_rule lits =
-  (* check that l -> r is an acceptable rewrite rule *)
-  let check_rule l r =
-    match l.T.term with
-    | T.Var _ | T.Bind _ | T.BoundVar _ | T.At _ -> false
-    | T.Node (_, _) ->
-      T.atomic_rec l && l != T.true_term && r != T.true_term &&
-      List.for_all (fun x -> T.var_occurs x l) (T.vars r)
-  in
-  match lits with
-  | [|Equation (l, r, true, _)|] ->
-    (if check_rule l r then [l, r] else []) @ (if check_rule r l then [r, l] else [])
-  | _ -> []
-
-let is_pos_eq lits =
-  match lits with
-  | [|Equation (l,r,true,_)|] -> Some (l,r)
-  | _ -> None
-
-(** Checks whether the clause is "const = ground composite term", e.g.
-    a clause "aIbUc = inter(a, union(b, c))". In this case it returns
-    Some(constant, definition of constant) *)
-let is_const_definition lits =
-  match lits with
-  | [|Equation (l,r,true,_)|] when T.is_const l && T.is_ground r
-    && not (T.subterm ~sub:l r) ->
-    Some (l,r)
-  | [|Equation (l,r,true,_)|] when T.is_const r && T.is_ground l
-    && not (T.subterm ~sub:r l) ->
-    Some (r,l)
-  | _ -> None
-
 (** {2 IO} *)
 
 let pp buf lit =
   match lit with
-  | Equation (l, r, sign, _) when T.eq r T.true_term ->
-    if sign
-      then T.pp buf l
-      else Printf.bprintf buf "¬%a" T.pp l
-  | Equation (l, r, sign, _) when T.eq l T.true_term ->
-    if sign
-      then T.pp buf r
-      else Printf.bprintf buf "¬%a" T.pp r
-  | Equation (l, r, sign, _) when T.is_bool l ->
-    if sign
-      then Printf.bprintf buf "%a <=> %a" T.pp l T.pp r
-      else Printf.bprintf buf "%a <~> %a" T.pp l T.pp r
-  | Equation (l, r, sign, _) ->
-    if sign
-      then Printf.bprintf buf "%a = %a" T.pp l T.pp r
-      else Printf.bprintf buf "%a != %a" T.pp l T.pp r
-
-let pp_lits buf lits = 
-  Util.pp_arrayi ~sep:" | "
-    (fun buf i lit -> Printf.bprintf buf "%a" pp lit)
-    buf lits
+  | Prop (p, true) -> T.pp buf p
+  | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp p
+  | True -> Buffer.add_string buf "$true"
+  | False -> Buffer.add_string buf "$false"
+  | Equation (l, r, true, _) ->
+    Printf.bprintf buf "%a = %a" T.pp l T.pp r
+  | Equation (l, r, false, _) ->
+    Printf.bprintf buf "%a != %a" T.pp l T.pp r
 
 let to_string t = Util.on_buffer pp t
-
-let lits_to_string a = Util.on_buffer pp_lits a
 
 let fmt fmt lit =
   Format.pp_print_string fmt (to_string lit)
 
-let fmt_lits fmt lits =
-  Format.pp_print_string fmt (lits_to_string lits)
-
 let bij ~ord =
   let open Bij in
   map
-    ~inject:(fun (Equation (l,r,sign,_)) -> l,r,sign)
+    ~inject:(fun lit -> to_tuple lit)
     ~extract:(fun (l,r,sign) -> mk_lit ~ord l r sign)
     (triple T.bij T.bij bool_)
 
-let bij_lits ~ord =
-  let open Bij in
-  map
-    ~inject:(fun a -> Array.to_list a)
-    ~extract:(fun l -> Array.of_list l)
-    (list_ (bij ~ord))
+(** {2 Arrays of literals} *)
+
+module Arr = struct
+  let eq lits1 lits2 =
+    let rec check i =
+      if i = Array.length lits1 then true else
+      eq_com lits1.(i) lits2.(i) && check (i+1)
+    in
+    if Array.length lits1 <> Array.length lits2
+      then false
+      else check 0
+
+  let compare lits1 lits2 = 
+    let rec check i =
+      if i = Array.length lits1 then 0 else
+        let cmp = compare lits1.(i) lits2.(i) in
+        if cmp = 0 then check (i+1) else cmp
+    in
+    if Array.length lits1 <> Array.length lits2
+      then Array.length lits1 - Array.length lits2
+      else check 0
+
+  let hash lits =
+    Array.fold_left
+      (fun h lit -> Hash.hash_int2 h (hash lit))
+      13 lits
+
+  let weight lits =
+    Array.fold_left (fun w lit -> w + weight lit) 0 lits
+
+  let depth lits =
+    Array.fold_left (fun d lit -> max d (depth lit)) 0 lits
+
+  let vars lits =
+    let set = T.THashSet.create () in
+    for i = 0 to Array.length lits - 1 do
+      add_vars set lits.(i);
+    done;
+    T.THashSet.to_list set
+
+  let is_ground lits =
+    Util.array_forall is_ground lits
+
+  let to_form lits =
+    let lits = Array.map form_of_lit lits in
+    let lits = Array.to_list lits in
+    F.mk_or lits
+
+  (** Apply the substitution to the array of literals, with scope *)
+  let apply_subst ?(recursive=true) ?renaming ~ord subst lits scope =
+    Array.map
+      (fun lit -> apply_subst ~recursive ?renaming ~ord subst lit scope)
+      lits
+
+  (** bitvector of literals that are positive *)
+  let pos lits =
+    let bv = ref BV.empty in
+    for i = 0 to Array.length lits - 1 do
+      if is_pos lits.(i) then bv := BV.set !bv i
+    done;
+    !bv
+
+  (** bitvector of literals that are positive *)
+  let neg lits =
+    let bv = ref BV.empty in
+    for i = 0 to Array.length lits - 1 do
+      if is_neg lits.(i) then bv := BV.set !bv i
+    done;
+    !bv
+
+  (** Bitvector that indicates which of the literals are maximal *)
+  let maxlits ~ord lits =
+    let n = Array.length lits in
+    (* at the beginning, all literals are potentially maximal *)
+    let bv = ref (BV.make n) in
+    for i = 0 to n-1 do
+      (* i-th lit is already known not to be max? *)
+      if not (BV.get !bv i) then () else
+      for j = i+1 to n-1 do
+        if not (BV.get !bv j) then () else
+        match compare_partial ~ord lits.(i) lits.(j) with
+        | Incomparable
+        | Eq -> ()     (* no further information about i-th and j-th *)
+        | Gt -> bv := BV.clear !bv j  (* j-th cannot be max *)
+        | Lt -> bv := BV.clear !bv i  (* i-th cannot be max *)
+      done;
+    done;
+    (* return bitvector *)
+    !bv
+
+  (** Convert the lits into a sequence of equations *)
+  let to_seq lits =
+    Sequence.from_iter
+      (fun k ->
+        for i = 0 to Array.length lits - 1 do
+          match lits.(i) with
+          | Equation (l,r,sign,_) -> k (l,r,sign)
+          | Prop (p, sign) -> k (p, T.true_term, sign)
+          | True -> k (T.true_term, T.true_term, true)
+          | False -> k (T.true_term, T.true_term, false)
+        done)
+
+  let of_forms ~ord forms =
+    let forms = Array.of_list forms in
+    Array.map (lit_of_form ~ord ) forms
+
+  let to_forms lits =
+    Array.to_list (Array.map form_of_lit lits)
+
+  let infer_type ctx lits =
+    Array.iter (infer_type ctx) lits
+
+  let signature ?(signature=Signature.empty) lits =
+    let ctx = TypeInference.Ctx.of_signature signature in
+    infer_type ctx lits;
+    TypeInference.Ctx.to_signature ctx
+
+  (** {3 IO} *)
+
+  let pp buf lits = 
+    Util.pp_arrayi ~sep:" | "
+      (fun buf i lit -> Printf.bprintf buf "%a" pp lit)
+      buf lits
+
+  let to_string a = Util.on_buffer pp a
+
+  let fmt fmt lits =
+    Format.pp_print_string fmt (to_string lits)
+
+  let bij ~ord =
+    let open Bij in
+    map
+      ~inject:(fun a -> Array.to_list a)
+      ~extract:(fun l -> Array.of_list l)
+      (list_ (bij ~ord))
+end
+
+(** {2 Special kinds of array} *)
+
+(** Recognized whether the clause is a Range-Restricted Horn clause *)
+let is_RR_horn_clause lits =
+  let bv = Arr.pos lits in
+  match BV.to_list bv with
+  | [i] ->
+    (* single positive lit, check variables restrictions, ie all vars
+        occur in the head *)
+    let vars = vars lits.(i) in
+    List.length vars = List.length (Arr.vars lits)
+  | _ -> false
+
+(** Recognizes Horn clauses (at most one positive literal) *)
+let is_horn lits =
+  let bv = Arr.pos lits in
+  BV.size bv <= 1
+
+let is_pos_eq lits =
+  match lits with
+  | [| Equation (l,r,true,_) |] -> Some (l,r)
+  | [| Prop(p,true) |] -> Some (p, T.true_term)
+  | [| True |] -> Some (T.true_term, T.true_term)
+  | _ -> None

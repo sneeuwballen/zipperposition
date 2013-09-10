@@ -110,6 +110,13 @@ val create_a : ?parents:t list -> ?selected:Bitvector.t ->
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
 
+val create_forms : ?parents:t list -> ?selected:Bitvector.t ->
+                    ctx:Ctx.t -> Formula.t list ->
+                    (CompactClause.t -> Proof.t) -> t
+  (** Directly from list of formulas *)
+
+val get_proof : t -> Proof.t
+
 val adapt_proof : Proof.t -> CompactClause.t -> Proof.t
   (** Adapt an old Proof.t to the new CompactClause.t *)
 
@@ -121,9 +128,6 @@ val is_empty : t -> bool
 
 val descendants : t -> int SmallSet.t
   (** set of ID of descendants of the clause *)
-
-val clause_of_fof : t -> t
-  (** transform eq/not to literals *)
 
 val update_ctx : ctx:Ctx.t -> t -> t
   (** Change the context of the clause *)
@@ -169,8 +173,8 @@ val is_oriented_rule : t -> bool
 val infer_type : TypeInference.Ctx.t -> t Sequence.t -> unit
 val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
 
-val from_term : ctx:Ctx.t -> Term.sourced_term -> t
-  (** Conversion of a (boolean) term to a clause. *)
+val from_forms : file:string -> name:string -> ctx:Ctx.t -> Formula.t list -> t
+  (** Conversion of a formula list to a clause *)
 
 (** {2 Set of clauses} *)
 

@@ -28,7 +28,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type t
+type t = private {
+  lits : Literal.t array;
+  id : int;
+}
 
 val eq : t -> t -> bool
 val hash : t -> int

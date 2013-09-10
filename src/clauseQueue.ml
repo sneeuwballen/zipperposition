@@ -36,6 +36,7 @@ open Logtk
 
 module C = Clause
 module O = Ordering
+module Lit = Literal
 
 let empty_heap =
   let leq (i, hci) (j, hcj) = i <= j || (i = j && hci.C.hctag <= hcj.C.hctag) in
@@ -107,8 +108,7 @@ let clause_weight =
   
 let goals =
   (* check whether a literal is a goal *)
-  let is_goal_lit lit = match lit with
-  | Literal.Equation (_, _, sign, _) -> not sign in
+  let is_goal_lit lit = Lit.is_neg lit in
   let is_goal_clause hc = Util.array_forall is_goal_lit hc.C.hclits in
   let name = "prefer_goals" in
   mk_queue ~accept:is_goal_clause ~weight:(fun hc -> hc.C.hcweight) name
@@ -120,22 +120,21 @@ let ground =
 
 let non_goals =
   (* check whether a literal is a goal *)
-  let is_goal_lit lit = match lit with
-  | Literal.Equation (_, _, sign, _) -> not sign in
+  let is_goal_lit lit = Lit.is_neg lit in
   let is_non_goal_clause hc = Util.array_forall (fun x -> not (is_goal_lit x)) hc.C.hclits in
   let name = "prefer_non_goals" in
   mk_queue ~accept:is_non_goal_clause ~weight:(fun hc -> hc.C.hcweight) name
 
 let pos_unit_clauses =
   let is_unit_pos hc = match hc.C.hclits with
-  | [|Literal.Equation (_,_,true,_)|] -> true
+  | [| lit |] when Lit.is_pos lit -> true
   | _ -> false
   in
   let name = "prefer_pos_unit_clauses" in
   mk_queue ~accept:is_unit_pos ~weight:(fun hc -> hc.C.hcweight) name
 
 let horn =
-  let accept c = Literal.is_horn c.C.hclits in
+  let accept c = Lit.is_horn c.C.hclits in
   let name = "prefer_horn" in
   mk_queue ~accept ~weight:(fun hc -> hc.C.hcweight) name
 

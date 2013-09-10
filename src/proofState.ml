@@ -36,6 +36,7 @@ module T = Term
 module C = Clause
 module S = Substs
 module Lit = Literal
+module Lits = Literal.Arr
 module Pos = Position
 module BV = Bitvector
 module CQ = ClauseQueue
@@ -100,6 +101,10 @@ let update_with_clause op acc eligible ~subterms ~both_sides c =
     | Lit.Equation (l,r,_,Eq) ->
       let acc = process_term op acc l [Position.left_pos; i] in
       process_term op acc r [Position.right_pos; i]
+    | Lit.Prop (p,_) ->
+      process_term op acc p [Position.left_pos; i]
+    | Lit.True
+    | Lit.False -> acc
   (* process a term (maybe recursively). We build positions in the wrong order,
      so we have to reverse them before giving them to [op acc]. *)
   and process_term op acc t pos =
@@ -239,6 +244,8 @@ module SimplSet = struct
       op idx (r,l,true,c)
     | [| Lit.Equation (l,r,false,_) |] ->
       op idx (l,r,false,c)
+    | [| Lit.Prop (p, sign) |] ->
+      op idx (p,T.true_term,sign,c)
     | _ -> idx
 
   (** Create a simplification set *)

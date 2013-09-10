@@ -31,6 +31,7 @@ open Logtk
 
 module T = Term
 module C = Clause
+module Lit = Literal
 
 type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
   (** binary inferences. An inference returns a list of conclusions *)
@@ -38,7 +39,7 @@ type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
 type unary_inf_rule = Clause.t -> Clause.t list
   (** unary infererences *)
 
-type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
+type lit_rewrite_rule = ctx:Ctx.t -> Lit.t -> Lit.t
   (** Rewrite rule on literals *)
 
 
@@ -85,7 +86,7 @@ type t = {
   mutable is_trivial : Clause.t -> bool;
     (** single test to detect trivial clauses *)
 
-  mutable axioms : Clause.t list;
+  mutable axioms : Formula.t list;
     (** a list of axioms to add to the problem *)
 
   mutable mk_constr : (Clause.t Sequence.t -> Precedence.constr list) list;
@@ -94,8 +95,8 @@ type t = {
   mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:Ctx.t -> Clause.t list -> Clause.t list;
-    (** how to preprocess the initial list of clauses *)
+  mutable preprocess : ctx:Ctx.t -> Formula.t list -> Formula.t list;
+    (** how to preprocess the initial list of formulas *)
 
   mutable state : ProofState.t;
     (** Proof state *)
@@ -325,12 +326,18 @@ let rewrite ~env c =
   in
   (* reduce every literal *)
   let lits' = Array.map
-    (function (Literal.Equation (l, r, sign, _) as lit) ->
-      let l' = reduce_term env.rewrite_rules l
-      and r' = reduce_term env.rewrite_rules r in
-      if l == l' && r == r'
-        then lit  (* same lit *)
-        else Literal.mk_lit ~ord:(Ctx.ord env.ctx) l' r' sign)
+    (fun lit -> match lit with
+      | Lit.Equation (l, r, sign, _) ->
+        let l' = reduce_term env.rewrite_rules l
+        and r' = reduce_term env.rewrite_rules r in
+        if l == l' && r == r'
+          then lit  (* same lit *)
+          else Lit.mk_lit ~ord:(Ctx.ord env.ctx) l' r' sign
+      | Lit.Prop (p, sign) ->
+        let p' = reduce_term env.rewrite_rules p in
+        if p == p' then lit else Lit.mk_prop ~ord:(Ctx.ord env.ctx) p' sign
+      | Lit.True
+      | Lit.False -> lit)
     c.C.hclits
   in
   if SmallSet.is_empty !applied_rules
@@ -352,7 +359,7 @@ let rewrite_lits ~env c =
   | [] -> lit
   | (name,r)::rules' ->
     let lit' = r ~ctx lit in  (* apply the rule *)
-    if Literal.eq lit lit'
+    if Lit.eq lit lit'
       then rewrite_lit rules' lit
       else begin
         applied_rules := SmallSet.add !applied_rules name;
@@ -390,7 +397,7 @@ let simplify ~env old_hc =
   let c = Experts.Set.simplify (get_experts env) c in
   let c = env.active_simplify env.state#active_set c in
   let c = basic_simplify ~env c in
-  (if not (Literal.eq_lits c.C.hclits old_hc.C.hclits)
+  (if not (Lit.Arr.eq c.C.hclits old_hc.C.hclits)
     then Util.debug 2 "clause %a simplified into %a" C.pp_debug old_hc C.pp_debug c);
   Util.exit_prof prof_simplify;
   old_hc, c
@@ -407,7 +414,7 @@ let backward_simplify ~env given =
     C.CSet.fold candidates (C.CSet.empty, [])
       (fun (before, after) _ c ->
         let c' = env.rw_simplify simpl_set c in
-        if not (Literal.eq_lits c.C.hclits c'.C.hclits)
+        if not (Lit.Arr.eq c.C.hclits c'.C.hclits)
           (* the active clause has been simplified! *)
           then begin
             Util.debug 2 "active clause %a simplified into %a" C.pp_debug c C.pp_debug c';
@@ -512,34 +519,10 @@ let all_simplify ~env c =
   Util.exit_prof prof_all_simplify;
   clauses
 
-(** Make a clause out of a 'Deduced' result *)
-let clause_of_deduced ~env lits parents = 
-  let premises = List.map (fun c -> c.C.hcproof) parents in
-  let c = C.create_a ~ctx:env.ctx lits ~parents
-    (fun c -> Proof.mk_infer c "lemma" premises) in
-  basic_simplify ~env (C.clause_of_fof c)
-
-(** Find the lemmas that can be deduced if we consider this new clause *)
-let find_lemmas ~env c = 
-  match (get_meta env) with
-  | None -> Sequence.empty (* lemmas detection is disabled *)
-  | Some meta ->
-    let results = MetaProverState.scan_clause meta c in
-    let results = Util.list_fmap
-      (function
-      | MetaProverState.Deduced (f,parents) ->
-        (* TODO: CNF reduction now? *)
-        let lits = [| Literal.mk_eq ~ord:(Ctx.ord env.ctx) f T.true_term |] in
-        let c = clause_of_deduced ~env lits parents in
-        Util.debug 1 "meta-prover: lemma %a" C.pp_debug c;
-        Some c
-      | _ -> None)
-      results in
-    Sequence.of_list results
-
 (** Do one step of the meta-prover. The current given clause and active set
     are provided. This returns a list of new clauses. *)
 let meta_step ~env c =
+  let ctx = env.ctx in
   let results = match (get_meta env) with
   | None -> []
   | Some prover -> begin
@@ -555,11 +538,20 @@ let meta_step ~env c =
     Util.list_flatmap
       (fun result -> match result with
         | MetaProverState.Deduced (f,parents) ->
-          (* TODO: CNF reduction now? *)
-          let lits = [| Literal.mk_eq ~ord:(Ctx.ord env.ctx) f T.true_term |] in
-          let lemma = clause_of_deduced ~env lits parents in
-          Util.debug 1 "meta-prover: lemma %a" C.pp_debug lemma;
-          [lemma]
+          (* reduce result in CNF *)
+          let clauses = Cnf.cnf_of ~ctx:env.ctx.Ctx.skolem f in
+          let premises = List.map (fun c -> c.C.hcproof) parents in
+          let proof cc = Proof.mk_infer cc "lemma" premises in
+          (* now build "proper" clauses, with proof and all *)
+          let clauses =
+            List.map
+              (fun c ->
+                let c = C.create_forms ~ctx ~parents c proof in
+                Util.debug 1 "meta-prover: lemma %a" C.pp_debug c;
+                c)
+              clauses
+          in
+          clauses
         | MetaProverState.Theory (th_name, th_args) ->
           Util.debug 1 "meta-prover: theory %a" MetaProverState.pp_result result;
           []
@@ -573,5 +565,5 @@ let meta_step ~env c =
   Sequence.of_list results
 
 (** Preprocess clauses *)
-let preprocess ~env clauses =
-  env.preprocess ~ctx:env.ctx clauses
+let preprocess ~env forms =
+  env.preprocess ~ctx:env.ctx forms

@@ -56,3 +56,7 @@ val selection_from_string : ord:Ordering.t -> string -> t
 
 val available_selections : unit -> string list
   (** available names for selection functions *)
+
+val register : string -> (ord:Ordering.t -> t) -> unit
+  (** Register new selection function
+      @raise Failure if the name is already used *)

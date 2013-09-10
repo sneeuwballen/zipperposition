@@ -47,7 +47,7 @@ let select_positives lits =
   in find_pos [] 0 lits
 
 let select_max_goal ~strict ~ord lits =
-  let maxlits = Literal.maxlits ~ord lits in
+  let maxlits = Literal.Arr.maxlits ~ord lits in
   (* find negative lits *)
   let rec find_maxneg lits i =
     if i = Array.length lits then [] else (* select nothing *)
@@ -81,8 +81,8 @@ let select_complex ~strict ~ord lits =
   (* find the ground negative literal with highest diff in size *)
   let rec find_neg_ground best_diff best_i lits i =
     if i = Array.length lits then best_i else
-    match lits.(i) with
-    | Literal.Equation (l, r, false, _) when T.is_ground l && T.is_ground r ->
+    match Literal.to_tuple lits.(i) with
+    | l, r, false when Literal.is_ground lits.(i) ->
       let diff = abs (T.size l - T.size r) in
       if diff > best_diff
         then find_neg_ground diff i lits (i+1)
@@ -102,24 +102,25 @@ let select_complex_except_RR_horn ~strict ~ord lits =
 
 let default_selection ~ord = select_complex ~strict:true ~ord
 
-(** table of name -> functions *)
-let functions =
-  let table = Hashtbl.create 17 in
-  Hashtbl.add table "NoSelection" (fun ~ord c -> no_select c);
-  Hashtbl.add table "MaxGoal" (select_max_goal ~strict:true);
-  Hashtbl.add table "MaxGoalNS" (select_max_goal ~strict:false);
-  Hashtbl.add table "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
-  Hashtbl.add table "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
-  Hashtbl.add table "SelectComplex" (select_complex ~strict:true);
-  Hashtbl.add table "SelectComplexNS" (select_complex ~strict:false);
-  Hashtbl.add table "SelectComplexExceptRRHorn" (select_complex_except_RR_horn ~strict:true);
-  Hashtbl.add table "SelectComplexExceptRRHornNS" (select_complex_except_RR_horn ~strict:false);
-  table
+let __table = Hashtbl.create 17
+  (** table of name -> functions *)
+
+let () =
+  Hashtbl.add __table "NoSelection" (fun ~ord c -> no_select c);
+  Hashtbl.add __table "MaxGoal" (select_max_goal ~strict:true);
+  Hashtbl.add __table "MaxGoalNS" (select_max_goal ~strict:false);
+  Hashtbl.add __table "SelectDiffNegLit" (select_diff_neg_lit ~strict:true);
+  Hashtbl.add __table "SelectDiffNegLitNS" (select_diff_neg_lit ~strict:false);
+  Hashtbl.add __table "SelectComplex" (select_complex ~strict:true);
+  Hashtbl.add __table "SelectComplexNS" (select_complex ~strict:false);
+  Hashtbl.add __table "SelectComplexExceptRRHorn" (select_complex_except_RR_horn ~strict:true);
+  Hashtbl.add __table "SelectComplexExceptRRHornNS" (select_complex_except_RR_horn ~strict:false);
+  ()
 
 (** selection function from string (may fail) *)
 let selection_from_string ~ord s =
   try
-    let select = Hashtbl.find functions s in
+    let select = Hashtbl.find __table s in
     select ~ord
   with Not_found ->
     failwith ("no such selection function: "^s)
@@ -127,5 +128,10 @@ let selection_from_string ~ord s =
 (** available names for selection functions *)
 let available_selections () =
   let l = ref [] in
-  Hashtbl.iter (fun name select -> l := name :: !l) functions;
+  Hashtbl.iter (fun name select -> l := name :: !l) __table;
   !l
+
+let register name f =
+  (if Hashtbl.mem __table name
+    then failwith ("selection function " ^ name ^ " already defined"));
+  Hashtbl.add __table name f

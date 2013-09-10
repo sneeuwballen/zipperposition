@@ -31,14 +31,14 @@ open Logtk
 open Logtk_meta
 
 type result =
-  | Deduced of Term.t * Clause.t list
+  | Deduced of Formula.t * Clause.t list
   | Theory of string * Term.t list
   | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
 type t
 
-val create : ctx:Ctx.t -> MetaKB.t -> t
+val create : ctx:Ctx.t -> Logtk_meta.MetaKB.t -> t
   (** Fresh meta-prover, using the given KB *)
 
 val update_ctx : ctx:Ctx.t -> t -> unit
@@ -66,10 +66,10 @@ val experts : t -> Experts.t Sequence.t
 val results : t -> result Sequence.t
   (** All results *)
 
-val reasoner : t -> MetaReasoner.t
+val reasoner : t -> Logtk_meta.MetaReasoner.t
   (** Datalog reasoner *)
 
-val kb : t -> MetaKB.t
+val kb : t -> Logtk_meta.MetaKB.t
   (** Current knowledge base *)
 
 val parse_theory_file : t -> string -> unit

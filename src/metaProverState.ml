@@ -28,21 +28,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Meta Prover for zipperposition} *)
 
 open Logtk
-open Logtk_meta
 
 let prof_scan_clause = Util.mk_profiler "meta.scan_clause"
 let prof_scan_set = Util.mk_profiler "meta.scan_set"
 
 module T = Term
+module F = Formula
 module C = Clause
+module M = Logtk_meta
+module Lit = Literal
+module Lits = Literal.Arr
 
 type result =
-  | Deduced of Term.t * Clause.t list
+  | Deduced of Formula.t * Clause.t list
   | Theory of string * Term.t list
   | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
-module Logic = MetaReasoner.Logic
+module Logic = M.MetaReasoner.Logic
 
 module LitMap = Map.Make(struct
   type t = Logic.literal
@@ -50,14 +53,14 @@ module LitMap = Map.Make(struct
 end)
 
 type t = {
-  prover : MetaProver.t;    (* real meta-prover *)
+  prover : M.MetaProver.t;    (* real meta-prover *)
   mutable ctx : Ctx.t;
   mutable clauses : Clause.t LitMap.t;     (** for reconstructing proofs *)
   mutable theories : (string * Term.t list) list;
   mutable experts : Experts.t list;
   mutable results : result list;
   mutable new_results : result list;  (* recent results *)
-  mutable new_patterns : MetaPattern.t list;  (** List of new patterns to match *)
+  mutable new_patterns : M.MetaPattern.t list;  (** List of new patterns to match *)
 }
 
 (* add a new result *)
@@ -77,7 +80,7 @@ let map_lit_to_clause p lit c =
 
 (* find which clauses "explain" this fact *)
 let find_premises p lit =
-  let lits = MetaReasoner.explain (MetaProver.reasoner p.prover) lit in
+  let lits = M.MetaReasoner.explain (M.MetaProver.reasoner p.prover) lit in
   Util.list_fmap
     (fun lit ->
       try Some (LitMap.find lit p.clauses)
@@ -90,7 +93,7 @@ let flush_new_results p =
 
 let create ~ctx kb =
   let p = {
-    prover = MetaProver.create ();
+    prover = M.MetaProver.create ();
     ctx;
     clauses = LitMap.empty;
     theories = [];
@@ -99,14 +102,14 @@ let create ~ctx kb =
     new_results = [];
     new_patterns = [];
   } in
-  MetaProver.add_kb p.prover kb;
+  M.MetaProver.add_kb p.prover kb;
   (* hook events to p.results *)
-  Signal.on (MetaProver.on_theory p.prover)
-    (function | MetaKB.NewTheory (name, args) ->
+  M.Signal.on (M.MetaProver.on_theory p.prover)
+    (function | M.MetaKB.NewTheory (name, args) ->
       add_new_result p (Theory (name, args));
       true);
-  Signal.on (MetaProver.on_lemma p.prover)
-    (function | MetaKB.NewLemma (f, lit) ->
+  M.Signal.on (M.MetaProver.on_lemma p.prover)
+    (function | M.MetaKB.NewLemma (f, lit) ->
       let premises = find_premises p lit in
       add_new_result p (Deduced (f, premises));
       true);
@@ -127,10 +130,10 @@ let scan_clause p c =
   Util.debug 3 "%% meta-prover: scan %a" C.pp_debug c;
   Util.enter_prof prof_scan_clause;
   (* match [c] against patterns *)
-  let f = Literal.term_of_lits c.C.hclits in
-  let lits = MetaProver.match_formula p.prover f in
+  let f = Lits.to_form c.C.hclits in
+  let lits = M.MetaProver.match_formula p.prover f in
   List.iter (fun lit -> map_lit_to_clause p lit c) lits;
-  MetaProver.add_literals p.prover (Sequence.of_list lits);
+  M.MetaProver.add_literals p.prover (Sequence.of_list lits);
   (* get results *)
   let results = p.new_results in
   flush_new_results p;
@@ -142,10 +145,10 @@ let scan_set p set =
   C.CSet.iter set
     (fun c ->
       (* match [c] against patterns *)
-      let f = Literal.term_of_lits c.C.hclits in
-      let lits = MetaProver.match_formula p.prover f in
+      let f = Lits.to_form c.C.hclits in
+      let lits = M.MetaProver.match_formula p.prover f in
       List.iter (fun lit -> map_lit_to_clause p lit c) lits;
-      MetaProver.add_literals p.prover (Sequence.of_list lits));
+      M.MetaProver.add_literals p.prover (Sequence.of_list lits));
   (* get results *)
   let results = p.new_results in
   flush_new_results p;
@@ -158,15 +161,15 @@ let experts p = Sequence.of_list p.experts
 
 let results p = Sequence.of_list p.results
 
-let reasoner p = MetaProver.reasoner p.prover
+let reasoner p = M.MetaProver.reasoner p.prover
 
-let kb p = MetaProver.kb p.prover
+let kb p = M.MetaProver.kb p.prover
 
 let parse_theory_file p filename =
-  MetaProver.parse_theory_file p.prover filename
+  M.MetaProver.parse_theory_file p.prover filename
 
 let pp_result buf r = match r with
-  | Deduced (f, _) -> Printf.bprintf buf "deduced %a" T.pp f
+  | Deduced (f, _) -> Printf.bprintf buf "deduced %a" F.pp f
   | Theory (n, args) -> Printf.bprintf buf "theory %s(%a)" n (Util.pp_list T.pp) args
   | Expert e -> Printf.bprintf buf "expert %a" Experts.pp e
 

@@ -2,7 +2,6 @@ Bitvector
 ClauseQueue
 Clause
 Const
-Delayed
 Experts
 Extensions
 PersistentGraph

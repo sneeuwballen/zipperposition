@@ -111,7 +111,10 @@ val condensation : Clause.t -> Clause.t
 
 (** {2 Contributions to Env} *)
 
-val cnf_of : ctx:Ctx.t -> Clause.t -> Clause.t list
+val cnf_of : ?parents:Clause.t list ->
+             ?rule:string ->
+              ctx:Ctx.t -> Formula.t -> Clause.t list
+  (** CNF of the formula, maybe with parents or proof *)
 
 val setup_env : env:Env.t -> unit
   (** Add rules to the environment. *)

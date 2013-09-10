@@ -31,8 +31,9 @@ open Logtk
 open Comparison.Infix
 
 module T = Term
-module Lits = Literal
 module S = Substs
+module Lit = Literal
+module Lits = Literal.Arr
 module BV = Bitvector
 
 let stat_fresh = Util.mk_stat "fresh_clause"
@@ -62,17 +63,9 @@ type clause = t
 let compact c = CompactClause.create c.hctag c.hclits
 
 let to_seq c =
-  let lits = Sequence.of_array c.hclits in
-  Sequence.map (function | Lits.Equation (l,r,sign,_) -> l,r,sign) lits
+  Lit.Arr.to_seq c.hclits
 
-let to_prec_clause c =
-  let lits = Sequence.of_array c.hclits in
-  let lits = Sequence.map
-    (function Lits.Equation (l,r,sign,_) ->
-      if sign then T.mk_eq l r else T.mk_neq l r)
-    lits
-  in
-  lits
+let to_prec_clause c = Lit.Arr.to_forms c.hclits
 
  (** {2 boolean flags} *)
 
@@ -93,7 +86,7 @@ let eq hc1 hc2 = hc1.hctag = hc2.hctag
 
 let compare hc1 hc2 = hc1.hctag - hc2.hctag
 
-let hash c = Lits.hash_lits c.hclits
+let hash c = Lits.hash c.hclits
 
 module CHashtbl = Hashtbl.Make(struct
   type t = clause
@@ -139,15 +132,15 @@ let is_child_of ~child c =
 
 module CHashcons = Hashcons.Make(struct
   type t = clause
-  let hash c = Lits.hash_lits c.hclits
-  let equal c1 c2 = Lits.eq_lits c1.hclits c2.hclits && c1.hcctx == c2.hcctx
+  let hash c = Lits.hash c.hclits
+  let equal c1 c2 = Lits.eq c1.hclits c2.hclits && c1.hcctx == c2.hcctx
   let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
 end)
 
 (** the tautological empty clause *)
 let true_clause ~ctx =
   let hcflags = flag_ground in
-  let hclits = [| Lits.mk_eq ~ord:Ordering.none T.true_term T.true_term |] in
+  let hclits = [| Lit.mk_true ~ord:Ordering.none T.true_term |] in
   let c = { hclits; hcproof = Obj.magic 0;
       hctag = -1; hcweight=2; hcselected=0; hcflags; hcctx=ctx;
       hcvars=[]; hcparents=[];
@@ -173,7 +166,7 @@ let create_a ?parents ?selected ~ctx lits proof =
         true_clause ~ctx)
   else begin
   (* Set of variables. *)
-  let all_vars = Lits.vars_lits lits in
+  let all_vars = Lits.vars lits in
   (*
   (* Renaming subst *)
   let subst, _ = List.fold_left
@@ -182,7 +175,7 @@ let create_a ?parents ?selected ~ctx lits proof =
     (S.id_subst, 0) all_vars
   in
   (* Normalize literals *)
-  let lits = Lits.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
+  let lits = Lit.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
   let all_vars = vars_of_lits lits in
   *)
   (* create the structure *)
@@ -208,9 +201,9 @@ let create_a ?parents ?selected ~ctx lits proof =
       | Some bv -> bv
       | None -> BV.from_list (Ctx.select ~ctx lits));
         (* compute weight *)
-        c.hcweight <- Lits.weight_lits lits;
+        c.hcweight <- Lits.weight lits;
         (* compute flags *)
-        (if Lits.ground_lits lits then set_flag flag_ground c true);
+        (if Lits.is_ground lits then set_flag flag_ground c true);
         (* parents *)
         (match parents with
         | None -> ()
@@ -228,6 +221,12 @@ let create_a ?parents ?selected ~ctx lits proof =
 let create ?parents ?selected ~ctx lits proof =
   create_a ?parents ?selected ~ctx (Array.of_list lits) proof
 
+let create_forms ?parents ?selected ~ctx forms proof =
+  let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
+  create_a ?parents ?selected ~ctx lits proof
+
+let get_proof c = c.hcproof
+
 let is_empty c = Array.length c.hclits = 0
 
 (** Adapt a proof to a new clause *)
@@ -240,21 +239,9 @@ let stats () = CHashcons.stats ()
 (** descendants of the clause *)
 let descendants c = c.hcdescendants
 
-(** simplify literals *)
-let clause_of_fof c =
-  let ctx = c.hcctx in
-  let lits = Array.map (Lits.lit_of_fof ~ord:(Ctx.ord ~ctx)) c.hclits in
-  if Lits.eq_lits lits c.hclits then c (* keep the same *)
-  else begin
-    let proof = adapt_proof c.hcproof in
-    let new_hc = create_a ~parents:[c] ~ctx lits proof in
-    new_hc.hcdescendants <- c.hcdescendants;
-    new_hc
-  end
-
 (** Change the context of the clause *)
 let update_ctx ~ctx c =
-  let lits = Array.map (Lits.reord ~ord:(Ctx.ord ~ctx)) c.hclits in
+  let lits = Array.map (Lit.reord ~ord:(Ctx.ord ~ctx)) c.hclits in
   let proof = adapt_proof c.hcproof in
   let c' = create_a ~selected:c.hcselected ~ctx lits proof in
   c'
@@ -263,12 +250,16 @@ let update_ctx ~ctx c =
 let check_ord ~ord c =
   assert (
   Util.array_forall
-    (function (Lits.Equation (l,r,sign,o)) as lit ->
-      let ok = o = Ordering.compare ord l r in
-      (if not ok then Util.printf "Ord problem: literal %a, ord %s is not %s\n"
-                      Lits.pp lit (Comparison.to_string o)
-                      (Comparison.to_string (Ordering.compare ord l r)));
-      ok)
+    (function 
+      | Lit.Equation (l,r,sign,o) as lit ->
+        let ok = o = Ordering.compare ord l r in
+        (if not ok then begin
+          Util.printf "Ord problem: literal %a, ord %s is not %s\n"
+            Lit.pp lit (Comparison.to_string o)
+            (Comparison.to_string (Ordering.compare ord l r))
+          end);
+        ok
+      | _ -> true)
     c.hclits)
 
 (** Apply substitution to the clause. Note that using the same renaming for all
@@ -277,7 +268,7 @@ let rec apply_subst ?recursive ?renaming subst c scope =
   let ctx = c.hcctx in
   let ord = Ctx.ord ~ctx in
   let lits = Array.map
-    (fun lit -> Lits.apply_subst ?recursive ?renaming ~ord subst lit scope)
+    (fun lit -> Lit.apply_subst ?recursive ?renaming ~ord subst lit scope)
     c.hclits in
   let descendants = c.hcdescendants in
   let proof = adapt_proof c.hcproof in
@@ -290,7 +281,7 @@ let rec apply_subst ?recursive ?renaming subst c scope =
 let maxlits (c, scope) subst =
   let ord = Ctx.ord c.hcctx in
   let lits =
-    Lits.apply_subst_lits ~recursive:true ~ord subst c.hclits scope
+    Lits.apply_subst ~recursive:true ~ord subst c.hclits scope
   in
   Lits.maxlits ~ord lits
 
@@ -303,7 +294,7 @@ let is_maxlit (c, scope) subst i =
 let eligible_res (c, scope) subst =
   let ord = Ctx.ord c.hcctx in
   (* instantiate lits *)
-  let lits = Lits.apply_subst_lits ~recursive:true ~ord subst c.hclits scope in
+  let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
   let selected = c.hcselected in
   let n = Array.length lits in
   (* Literals that may be eligible: all of them if none is selected,
@@ -320,10 +311,11 @@ let eligible_res (c, scope) subst =
       let lit' = lits.(j) in
       (* check if both lits are still potentially eligible, and have the same sign 
          if [check_sign] is true. *)
-      if (check_sign && Lits.is_pos lit <> Lits.is_pos lit')
+      if (check_sign && Lit.is_pos lit <> Lit.is_pos lit')
         || not (BV.get !bv j) then () else
-      match Lits.compare_partial ~ord lits.(i) lits.(j) with
-      | Incomparable | Eq -> ()     (* no further information about i-th and j-th *)
+      match Lit.compare_partial ~ord lits.(i) lits.(j) with
+      | Incomparable
+      | Eq -> ()     (* no further information about i-th and j-th *)
       | Gt -> bv := BV.clear !bv j  (* j-th cannot be max *)
       | Lt -> bv := BV.clear !bv i  (* i-th cannot be max *)
     done;
@@ -336,10 +328,10 @@ let eligible_param (c, scope) subst =
   let ord = Ctx.ord c.hcctx in
   if BV.is_empty c.hcselected then
     (* instantiate lits *)
-    let lits = Lits.apply_subst_lits ~recursive:true ~ord subst c.hclits scope in
+    let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
     (* only keep literals that are positive *)
     let bv = Lits.maxlits ~ord lits in
-    BV.inter bv (Lits.pos_lits lits)
+    BV.inter bv (Lits.pos lits)
   else BV.empty  (* no eligible literal when some are selected *)
 
 (** are there selected literals in the clause? *)
@@ -359,13 +351,13 @@ let is_unit_clause c = match c.hclits with
   | _ -> false
 
 let is_oriented_rule c = match c.hclits with
-  | [|Lits.Equation (_,_,true,Gt)|]
-  | [|Lits.Equation (_,_,true,Lt)|] -> true (* oriented *)
+  | [| Lit.Equation (_,_,true,Gt) |]
+  | [| Lit.Equation (_,_,true,Lt) |] -> true (* oriented *)
   | _ -> false
 
 let infer_type ctx clauses =
   Sequence.iter
-    (fun c -> Lits.lits_infer_type ctx c.hclits)
+    (fun c -> Lits.infer_type ctx c.hclits)
     clauses
 
 (** Compute signature of this set of clauses *)
@@ -374,34 +366,10 @@ let signature ?(signature=Signature.empty) clauses =
   infer_type ctx clauses;
   TypeInference.Ctx.to_signature ctx
 
-(** Conversion of a (boolean) term to a clause. *)
-let rec from_term ~ctx (t, file, name) =
-  let module S = Symbol in
-  let ord = Ctx.ord ctx in
-  let rec lits_from_term t = match t.T.term with
-  | T.Node (n, [{T.term=T.Node (eq, [a;b])}])
-  when S.eq n S.not_symbol && (S.eq eq S.eq_symbol || S.eq eq S.equiv_symbol) ->
-    [Lits.mk_neq ~ord a b]
-  | T.Node (eq, [a;b]) when (S.eq eq S.eq_symbol || S.eq eq S.equiv_symbol) ->
-    [Lits.mk_eq ~ord a b]
-  | T.Node (or_, l) when S.eq or_ S.or_symbol ->
-    let l' = T.flatten_ac S.or_symbol l in
-    (* flatten the or, and convert each element to a list of literals *)
-    List.concat (List.map lits_from_term l')
-  | T.Node (n, [f]) when S.eq n S.not_symbol ->
-    [Lits.mk_neq ~ord f T.true_term]
-  | T.Node _ ->
-    [Lits.mk_eq ~ord t T.true_term]
-  | T.Bind _ ->
-    [Lits.mk_eq ~ord t T.true_term]
-  | T.At _ ->
-    failwith "curried clauses not handled"
-  | T.Var _ | T.BoundVar _ ->
-    failwith "variable should not occur at the formula level"
-  in
+let from_forms ~file ~name ~ctx forms =
+  let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
   let proof c = Proof.mk_axiom c file name in
-  let c = create ~ctx (lits_from_term t) proof in
-  c
+  create_a ~ctx lits proof
 
 (** {2 Set of clauses} *)
 
@@ -502,7 +470,7 @@ let pp_debug buf c =
   Util.pp_arrayi ~sep:" | "
     (fun buf i lit ->
       let annot = pp_annot selected max i in
-      Lits.pp buf lit;
+      Lit.pp buf lit;
       Buffer.add_string buf annot)
     buf c.hclits;
   Buffer.add_char buf ']';
@@ -538,7 +506,7 @@ let bij ~ctx =
     ~extract:(fun lits ->
       let proof c = Proof.mk_axiom c "bij" "bij" in
       create_a ~ctx lits proof)
-    (Lits.bij_lits ~ord:(Ctx.ord ctx)))
+    (Lits.bij ~ord:(Ctx.ord ctx)))
 
 let bij_set ~ctx =
   Bij.(map

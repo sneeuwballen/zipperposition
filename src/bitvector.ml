@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 02110-1301 USA.
 *)
 
-(* bitvectors of at most 31 bits *)
+(** {2 Bitvectors of limited size} *)
 
 (** a bitvector is just an int *)
 type t = int
@@ -57,6 +57,12 @@ let iter bv f =
   for i = 0 to max_len do
     if get bv i then f i;
   done
+
+(** Number of true bits (naive) *)
+let size bv =
+  let r = ref 0 in
+  iter bv (fun _ -> incr r);
+  !r
 
 (** From a list of ints *)
 let from_list l = List.fold_left set empty l
