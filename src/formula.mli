@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type t = private {
   form : cell;
+  mutable flags : int;
   mutable id : int;
 }
 and cell = private
@@ -69,6 +70,14 @@ val mk_eq : Term.t -> Term.t -> t
 val mk_neq : Term.t -> Term.t -> t
 val mk_forall : t -> t
 val mk_exists : t -> t
+
+(** {2 Flags} *)
+
+val flag_simplified : int
+val flag_ground : int
+
+val set_flag : t -> int -> unit
+val has_flag : t -> int -> bool
 
 (** {2 Combinators} *)
 
@@ -152,6 +161,8 @@ val open_forall : ?offset:int -> t -> t
 
 val flatten : t -> t        (** Flatten AC connectives (or/and) *)
 val simplify : t -> t       (** Simplify the formula *)
+
+val is_trivial : t -> bool  (** Trivially true formula? *)
 
 val ac_normal_form : t -> t (** Normal form modulo AC of "or" and "and" *)
 val ac_eq : t -> t -> bool  (** Equal modulo AC? *)

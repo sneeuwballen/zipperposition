@@ -31,6 +31,7 @@ module S = Symbol
 
 type t = {
   form : cell;
+  mutable flags : int;
   mutable id : int;
 }
 and cell =
@@ -68,6 +69,16 @@ let hash_rec f = match f.form with
   | Forall f' -> Hash.hash_int (hash f')
   | Exists f' -> Hash.hash_int2 (hash f') 11
 
+(** {2 Flags} *)
+
+let flag_simplified = 0x1
+let flag_ground = 0x2
+
+let set_flag f flag = f.flags <- f.flags lor flag
+let has_flag f flag = (f.flags land flag) != 0
+
+(** {2 Constructors} *)
+
 module H = Hashcons.Make(struct
   type t = form
   let equal f1 f2 = compare_rec f1 f2 = 0
@@ -76,32 +87,35 @@ module H = Hashcons.Make(struct
 end)
 
 let mk_true =
-  H.hashcons { form=True; id= ~-1; }
+  H.hashcons { form=True; flags=(flag_ground lor flag_simplified); id= ~-1; }
 
 let mk_false =
-  H.hashcons { form=False; id= ~-1; }
+  H.hashcons { form=False; flags=(flag_ground lor flag_simplified); id= ~-1; }
 
 let mk_atom p =
-  H.hashcons { form=Atom p; id= ~-1; }
+  let flags =
+    if T.is_ground p
+      then flag_simplified lor flag_ground
+      else flag_simplified
+  in
+  H.hashcons { form=Atom p; flags; id= ~-1; }
 
 let mk_not f =
   match f.form with
   | Not f' -> f'  (* double negation *)
-  | _ -> H.hashcons { form=Not f; id= ~-1; }
+  | _ -> H.hashcons { form=Not f; flags=f.flags; id= ~-1; }
 
 let mk_and = function
   | [] -> mk_true
   | l when List.memq mk_false l -> mk_false
   | [f] -> f
-  | l ->
-    H.hashcons { form=And l; id= ~-1; }
+  | l -> H.hashcons { form=And l; flags=0; id= ~-1; }
 
 let mk_or = function
   | [] -> mk_false
   | l when List.memq mk_true l -> mk_true
   | [f] -> f
-  | l ->
-    H.hashcons { form=Or l; id= ~-1; }
+  | l -> H.hashcons { form=Or l; flags=0; id= ~-1; }
 
 let mk_imply f1 f2 =
   match f1.form, f2.form with
@@ -110,7 +124,12 @@ let mk_imply f1 f2 =
   | _, True -> mk_not f1
   | _, False -> f1
   | _ ->
-    H.hashcons { form=Imply (f1,f2); id= ~-1; }
+    let f = { form=Imply (f1,f2); flags=0; id= ~-1; } in
+    let f' = H.hashcons f in
+    (if f == f' then
+      let is_ground = has_flag f1 flag_ground && has_flag f2 flag_ground in
+      if is_ground then set_flag f flag_ground);
+    f'
 
 let mk_equiv f1 f2 =
   match f1.form, f2.form with
@@ -120,22 +139,33 @@ let mk_equiv f1 f2 =
   | False, _ -> mk_not f2
   | _, False -> mk_not f1
   | _ ->
-    H.hashcons { form=Equiv(f1,f2); id= ~-1; }
+    let f = { form=Equiv(f1,f2); flags=0; id= ~-1; } in
+    let f' = H.hashcons f in
+    (if f == f' then
+      let is_ground = has_flag f1 flag_ground && has_flag f2 flag_ground in
+      if is_ground then set_flag f flag_ground);
+    f'
 
 let mk_xor f1 f2 = mk_not (mk_equiv f1 f2)
 
 let mk_eq t1 t2 =
   if T.eq t1 t2
     then mk_true
-    else H.hashcons { form=Equal(t1,t2); id= ~-1; }
+    else
+      let f = { form=Equal(t1,t2); flags=flag_simplified; id= ~-1; } in
+      let f' = H.hashcons f in
+      let _ = if f == f' && T.is_ground t1 && T.is_ground t2
+        then set_flag f flag_ground
+      in
+      f'
 
 let mk_neq t1 t2 = mk_not (mk_eq t1 t2)
 
 let mk_forall f =
-  H.hashcons { form=Forall f; id= ~-1; }
+  H.hashcons { form=Forall f; flags=0; id= ~-1; }
 
 let mk_exists f =
-  H.hashcons { form=Exists f; id= ~-1; }
+  H.hashcons { form=Exists f; flags=0; id= ~-1; }
 
 (** {2 Combinators} *)
 
@@ -252,18 +282,26 @@ let is_atomic f = match f.form with
   | Atom _
   | Equal _ -> true
 
-let rec is_ground f = match f.form with
-  | And l
-  | Or l -> List.for_all is_ground l
-  | Imply (f1, f2)
-  | Equiv (f1, f2) -> is_ground f1 && is_ground f2
-  | Not f' -> is_ground f'
-  | Forall _
-  | Exists _ -> false
-  | Atom p -> T.is_ground p
-  | Equal (t1, t2) -> T.is_ground t1 && T.is_ground t2
-  | True
-  | False -> true
+let rec is_ground f =
+  if has_flag f flag_ground
+    then true
+    else
+      let res = match f.form with
+      | And l
+      | Or l -> List.for_all is_ground l
+      | Imply (f1, f2)
+      | Equiv (f1, f2) -> is_ground f1 && is_ground f2
+      | Not f' -> is_ground f'
+      | Forall _
+      | Exists _ -> false
+      | Atom p -> T.is_ground p
+      | Equal (t1, t2) -> T.is_ground t1 && T.is_ground t2
+      | True
+      | False -> true
+      in
+      let () = if res then set_flag f flag_ground in
+      res
+
 
 let is_closed f =
   match free_variables f with
@@ -364,7 +402,9 @@ let rec _gather_and f = match f.form with
   | True -> []
   | _ -> [f]
 
-let rec flatten f = match f.form with
+let rec flatten f =
+  if has_flag f flag_simplified then f
+  else match f.form with
   | Or l ->
     let l' = _gather_or f in
     let l' = List.map flatten l' in
@@ -385,37 +425,59 @@ let rec flatten f = match f.form with
 
 (* does the var [v] occur in some term of [f]? *)
 let _var_occurs v f =
-  let vars = T.vars_seq (terms_seq f) in
-  List.memq v vars
+  if is_ground f
+    then false
+    else
+      Sequence.exists (T.var_occurs v) (terms_seq f)
 
-let rec simplify f = match f.form with
-  | And l ->
-    let l' = List.map simplify l in
-    flatten (mk_and l')
-  | Or l ->
-    let l' = List.map simplify l in
-    flatten (mk_or l')
-  | Forall f'
-  | Exists f' when not (db_contains f' 0) -> simplify f'
-  | Forall f' -> mk_forall (simplify f')
-  | Exists f' -> mk_exists (simplify f')
-  | Equal (a,b) when T.eq a b -> mk_true
-  | Equal _ -> f
-  | Atom _
-  | True
-  | False -> f
-  | Not f' -> mk_not (simplify f')
-  | Imply ({form=True}, f') -> simplify f'
-  | Imply ({form=False}, _) -> mk_true
-  | Imply (_, {form=True}) -> mk_true
-  | Imply (f', {form=False}) -> mk_not (simplify f')
-  | Imply (f1, f2) -> mk_imply (simplify f1) (simplify f2)
-  | Equiv (f1, f2) when eq f1 f2 -> mk_true
-  | Equiv ({form=True}, f')
-  | Equiv (f', {form=True}) -> simplify f'
-  | Equiv ({form=False}, f')
-  | Equiv (f', {form=False}) -> mk_not (simplify f')
-  | Equiv (f1, f2) -> mk_equiv (simplify f1) (simplify f2)
+let rec simplify f =
+  if has_flag f flag_simplified then f
+  else
+    let f' = match f.form with
+    | And l ->
+      let l' = List.map simplify l in
+      flatten (mk_and l')
+    | Or l ->
+      let l' = List.map simplify l in
+      flatten (mk_or l')
+    | Forall f'
+    | Exists f' when not (db_contains f' 0) -> simplify f'
+    | Forall f' -> mk_forall (simplify f')
+    | Exists f' -> mk_exists (simplify f')
+    | Equal (a,b) when T.eq a b -> mk_true
+    | Equal _ -> f
+    | Atom _
+    | True
+    | False -> f
+    | Not f' -> mk_not (simplify f')
+    | Imply ({form=True}, f') -> simplify f'
+    | Imply ({form=False}, _) -> mk_true
+    | Imply (_, {form=True}) -> mk_true
+    | Imply (f', {form=False}) -> mk_not (simplify f')
+    | Imply (f1, f2) -> mk_imply (simplify f1) (simplify f2)
+    | Equiv (f1, f2) when eq f1 f2 -> mk_true
+    | Equiv ({form=True}, f')
+    | Equiv (f', {form=True}) -> simplify f'
+    | Equiv ({form=False}, f')
+    | Equiv (f', {form=False}) -> mk_not (simplify f')
+    | Equiv (f1, f2) -> mk_equiv (simplify f1) (simplify f2)
+    in
+    let () = set_flag f' flag_simplified in
+    f'
+
+let rec is_trivial f = match f.form with
+  | True -> true
+  | Equal (l,r) -> T.eq l r 
+  | False
+  | Atom _ -> false
+  | Imply ({form=False},_) -> true
+  | Equiv (l,r) -> eq l r
+  | Or l -> List.exists is_trivial l
+  | And _
+  | Imply _
+  | Not _ -> false
+  | Exists f'
+  | Forall f' -> is_trivial f'
 
 let ac_normal_form f =
   let rec recurse f = match f.form with
