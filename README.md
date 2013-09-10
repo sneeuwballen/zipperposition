@@ -10,19 +10,42 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 
 ## Regular build
 
-You will need OCaml >= 4.00.1 or higher with ocamlbuild and the standard
-library.
+You will need OCaml >= 4.00.1 or higher with ocamlbuild,
+[menhir](http://cristal.inria.fr/~fpottier/menhir/) and the standard
+library. Some modules come from
+[containers](https://github.com/c-cube/ocaml-containers/) and are packaged with
+the library.
 
-Some submodules are used:
+An additional library, `logtk_meta`, can be built if you have
+[datalog](https://github.com/c-cube/datalog) installed. For instance:
 
-    $ git submodule update --init
+    $ opam install datalog
+    $ ./configure --enable-meta
 
-Then, type in a terminal located in the root directory of the project:
+
+To build the library, documentation and tools, type in a terminal located in
+the root directory of the project:
 
     $ make
 
-If you use `ocamlfind` (which you should), installation is just
+If you use `ocamlfind` (which you should), installation is just:
 
     $ make install
+
+## Usage
+
+Logtk provides several useful parts for logic-related implementations:
+
+- a library packed in a module `Logtk`, with terms, formulas, etc.;
+- small tools (see directory `tools/`) to illustrate how to use the library
+    and provide basic services (type-checking, reduction to CNF, etc.);
+- an optional library in a module `Logtk_meta`, that depends on `Datalog`
+    to provide reasoning at the problem level, about the presence of axiomatic
+    theories. A small file describing a few theories can be found in
+    `data/builtin.theory`.
+
+## Documentation
+
+See [this page](http://cedeela.fr/~simon/software/logtk/).
 
     
