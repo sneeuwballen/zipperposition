@@ -30,6 +30,7 @@ open Comparison.Infix
 
 module T = Term
 module F = Formula
+module PF = PFormula
 module C = Clause
 module O = Ordering
 module S = Substs
@@ -172,8 +173,8 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
   and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
   and s, t, sign_st = get_equations_sides active_clause active_pos in
   Util.debug 3 ("sup %a s=%a t=%a \n%a u=%a v=%a p=%a subst=%a")
-                C.pp_debug active_clause T.pp s T.pp t
-                C.pp_debug passive_clause T.pp u T.pp v
+                C.pp active_clause T.pp s T.pp t
+                C.pp passive_clause T.pp u T.pp v
                 Position.pp passive_pos S.pp subst;
   if not (T.db_closed s)
   then (Util.debug 3 "... active term is not DB-closed"; acc)
@@ -211,11 +212,11 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
           (Lit.apply_subst_list ~renaming ~ord subst lits_p sc_p)
         in
         let rule = if sign_uv then "sup+" else "sup-" in
-        let proof c = Proof.mk_infer c rule
+        let proof c = Proof.mk_c_step c rule
           [active_clause.C.hcproof; passive_clause.C.hcproof] in
         let parents = [active_clause; passive_clause] in
         let new_clause = C.create ~parents ~ctx new_lits proof in
-        Util.debug 3 "... ok, conclusion %a" C.pp_debug new_clause;
+        Util.debug 3 "... ok, conclusion %a" C.pp new_clause;
         new_clause :: acc
       end
   end
@@ -294,12 +295,12 @@ let infer_equality_resolution clause =
           (* subst(lit) is maximal, we can do the inference *)
           then begin
             Util.incr_stat stat_equality_resolution_call;
-            let proof c = Proof.mk_infer c "eq_res" [clause.C.hcproof] in
+            let proof c = Proof.mk_c_step c "eq_res" [clause.C.hcproof] in
             let new_lits = Util.array_except_idx clause.C.hclits pos in
             let new_lits = Lit.apply_subst_list ~ord:(Ctx.ord ctx) subst new_lits 0 in
             let new_clause = C.create ~parents:[clause] ~ctx new_lits proof in
             Util.debug 3 "equality resolution on %a yields %a"
-              C.pp_debug clause C.pp_debug new_clause;
+              C.pp clause C.pp new_clause;
             new_clause::acc
           end else
             acc
@@ -361,7 +362,7 @@ let infer_equality_factoring clause =
        BV.get (C.eligible_param (clause,0) subst) active_idx
       then begin
         Util.incr_stat stat_equality_factoring_call;
-        let proof c = Proof.mk_infer c "eq_fact" [clause.C.hcproof]
+        let proof c = Proof.mk_c_step c "eq_fact" [clause.C.hcproof]
         (* new_lits: literals of the new clause. remove active literal
            and replace it by a t!=v one, and apply subst *)
         and new_lits = Util.array_except_idx clause.C.hclits active_idx in
@@ -370,7 +371,7 @@ let infer_equality_factoring clause =
         let new_lits = Lit.apply_subst_list ~renaming ~ord subst new_lits 0 in
         let new_clause = C.create ~parents:[clause] ~ctx new_lits proof in
         Util.debug 3 "equality factoring on %a yields %a"
-          C.pp_debug clause C.pp_debug new_clause;
+          C.pp clause C.pp new_clause;
         [new_clause]
       end else
         []
@@ -476,7 +477,7 @@ let infer_split c =
     Util.incr_stat stat_splits;
     (* create a list of symbols *)
     let symbols = Util.times (n-1) next_split_term in
-    let proof c' = Proof.mk_infer c' "split" [c.C.hcproof] in
+    let proof c' = Proof.mk_c_step c' "split" [c.C.hcproof] in
     (* the guard clause, plus the first component, plus all negated split symbols *)
     let guard =
       let lits = List.map (fun t -> Lit.mk_false ~ord t) symbols
@@ -492,8 +493,8 @@ let infer_split c =
       (List.tl !components) symbols
     in
     let new_clauses = guard :: new_clauses in
-    Util.debug 3 "split on %a yields %a" C.pp_debug c
-      (Util.pp_list C.pp_debug) new_clauses;
+    Util.debug 3 "split on %a yields %a" C.pp c
+      (Util.pp_list C.pp) new_clauses;
     Util.exit_prof prof_split;
     new_clauses
   end else (Util.exit_prof prof_split; [])
@@ -609,12 +610,12 @@ let demodulate (simpl_set : PS.SimplSet.t) c =
       let _ = Util.exit_prof prof_demodulate in
       c
     else begin  (* construct new clause *)
-      let proof c' = Proof.mk_infer c' "demod"
+      let proof c' = Proof.mk_c_step c' "demod"
         (c.C.hcproof :: List.map (fun hc -> hc.C.hcproof) !clauses) in
       let parents = c :: c.C.hcparents in
       let new_c = C.create_a ~parents ~ctx lits proof in
       Util.debug 3 "demodulate %a into %a using\n %a"
-        C.pp_debug c C.pp_debug new_c (Util.pp_list C.pp_debug) !clauses;
+        C.pp c C.pp new_c (Util.pp_list C.pp) !clauses;
       (* return simplified clause *)
       Util.exit_prof prof_demodulate;
       new_c
@@ -675,7 +676,7 @@ let is_tautology c =
       || check lits (i+1)
   in
   let is_tauto = check c.C.hclits 0 in
-  (if is_tauto then Util.debug 3 "%a is a tautology" C.pp_debug c);
+  (if is_tauto then Util.debug 3 "%a is a tautology" C.pp c);
   is_tauto
 
 (* TODO: create CC on terms here? This function is seldom used...
@@ -752,10 +753,10 @@ let basic_simplify c =
   if List.length new_lits = Array.length c.C.hclits
   then (Util.exit_prof prof_basic_simplify; c) (* no change *)
   else begin
-    let proof = C.adapt_proof c.C.hcproof in  (* do not bother printing this *)
+    let proof = Proof.adapt_c c.C.hcproof in  (* do not bother printing this *)
     let parents = c :: c.C.hcparents in
     let new_clause = C.create ~parents ~ctx new_lits proof in
-    Util.debug 3 "%a basic_simplifies into %a" C.pp_debug c C.pp_debug new_clause;
+    Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
     Util.exit_prof prof_basic_simplify;
     new_clause
   end
@@ -805,7 +806,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
       (fun () l r (_,_,_,c') subst ->
         if t2 == (S.apply subst r scope)
         then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
-          Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp_debug c';
+          Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
           raise (FoundMatch (r, c', subst)) (* success *)
         end else ());
       None (* no match *)
@@ -817,10 +818,10 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_pos_simplify_reflect; c) (* no literal removed, keep c *)
     else 
-      let proof c' = Proof.mk_infer c' "simplify_reflect+" (c.C.hcproof::premises) in
+      let proof c' = Proof.mk_c_step c' "simplify_reflect+" (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx lits proof in
-      Util.debug 3 "%a pos_simplify_reflect into %a" C.pp_debug c C.pp_debug new_c;
+      Util.debug 3 "%a pos_simplify_reflect into %a" C.pp c C.pp new_c;
       Util.exit_prof prof_pos_simplify_reflect;
       new_c
     
@@ -845,7 +846,7 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
       (fun () l r (_,_,_,c') subst ->
         if t == (S.apply subst r scope)
         then begin
-          Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp_debug c';
+          Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
           raise (FoundMatch (r, c', subst)) (* success *)
         end else ());
       None (* no match *)
@@ -857,10 +858,10 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   if List.length lits = Array.length c.C.hclits
     then (Util.exit_prof prof_neg_simplify_reflect; c) (* no literal removed *)
     else 
-      let proof c' = Proof.mk_infer c' "simplify_reflect-" (c.C.hcproof::premises) in
+      let proof c' = Proof.mk_c_step c' "simplify_reflect-" (c.C.hcproof::premises) in
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx lits proof in
-      Util.debug 3 "%a neg_simplify_reflect into %a" C.pp_debug c C.pp_debug new_c;
+      Util.debug 3 "%a neg_simplify_reflect into %a" C.pp c C.pp new_c;
       Util.exit_prof prof_neg_simplify_reflect;
       new_c
 
@@ -1042,7 +1043,7 @@ let subsumed_by_set set c =
     Util.exit_prof prof_subsumption_set;
     false
   with Exit ->
-    Util.debug 3 "%a subsumed by active set" C.pp_debug c;
+    Util.debug 3 "%a subsumed by active set" C.pp c;
     Util.exit_prof prof_subsumption_set;
     true
 
@@ -1107,11 +1108,11 @@ let rec contextual_literal_cutting active_set c =
   | Some (new_lits, c') -> begin
       (* hc' allowed us to cut a literal *)
       assert (List.length new_lits + 1 = Array.length c.C.hclits);
-      let proof c'' = Proof.mk_infer c'' "clc" [c.C.hcproof; c'.C.hcproof] in
+      let proof c'' = Proof.mk_c_step c'' "clc" [c.C.hcproof; c'.C.hcproof] in
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx new_lits proof in
       Util.debug 3 "contextual literal cutting in %a using %a gives\n\t%a"
-        C.pp_debug c C.pp_debug c' C.pp_debug new_c;
+        C.pp c C.pp c' C.pp new_c;
       (* try to cut another literal *)
       Util.exit_prof prof_clc; 
       contextual_literal_cutting active_set new_c
@@ -1163,32 +1164,16 @@ let rec condensation c =
     c
   with CondensedInto (new_lits, subst) ->
     (* clause is simplified *)
-    let proof c' = Proof.mk_infer c' "condensation" [c.C.hcproof] in
+    let proof c' = Proof.mk_c_step c' "condensation" [c.C.hcproof] in
     let parents = c :: c.C.hcparents in
     let new_c = C.create_a ~parents ~ctx new_lits proof in
     Util.debug 3 "condensation in %a (with %a) gives\n\t %a"
-      C.pp_debug c S.pp subst C.pp_debug new_c;
+      C.pp c S.pp subst C.pp new_c;
     (* try to condense further *)
     Util.exit_prof prof_condensation; 
     condensation new_c
 
 (** {2 Contributions to Env} *)
-
-(* wrapper of Cnf for the formula [f] *)
-let cnf_of ?(parents=[]) ?(rule="cnf") ~ctx f =
-  (* conversion to CNF *)
-  let clauses = Cnf.cnf_of ~ctx:(Ctx.skolem_ctx ~ctx) f in
-  (* construction of clauses *)
-  List.map
-    (fun lits ->
-      let premises = List.map C.get_proof parents in
-      let proof cc =
-        match parents with
-        | [] -> Proof.mk_axiom cc "" ""
-        | _::_ -> Proof.mk_infer cc rule premises
-      in
-      C.create_forms ~ctx lits proof)
-    clauses
 
 let setup_env ~env =
   let rw_simplify (simpl : PS.SimplSet.t) c =
@@ -1213,7 +1198,7 @@ let setup_env ~env =
   and constrs =
     [Precedence.min_constraint
       [Symbol.split_symbol; Symbol.false_symbol; Symbol.true_symbol]]
-  and preprocess ~ctx l = List.filter (fun f -> not (F.is_trivial f)) l in
+  and preprocess ~ctx l = List.filter (fun f -> not (F.is_trivial f.PF.form)) l in
   Env.add_binary_inf ~env "superposition_passive" infer_passive;
   Env.add_binary_inf ~env "superposition_active" infer_active;
   Env.add_unary_inf ~env "equality_factoring" infer_equality_factoring;

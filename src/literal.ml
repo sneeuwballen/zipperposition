@@ -280,12 +280,23 @@ let pp buf lit =
   match lit with
   | Prop (p, true) -> T.pp buf p
   | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp p
-  | True -> Buffer.add_string buf "$true"
-  | False -> Buffer.add_string buf "$false"
+  | True -> Buffer.add_string buf "true"
+  | False -> Buffer.add_string buf "false"
   | Equation (l, r, true, _) ->
     Printf.bprintf buf "%a = %a" T.pp l T.pp r
   | Equation (l, r, false, _) ->
-    Printf.bprintf buf "%a != %a" T.pp l T.pp r
+    Printf.bprintf buf "%a ≠ %a" T.pp l T.pp r
+
+let pp_tstp buf lit =
+  match lit with
+  | Prop (p, true) -> T.pp_tstp buf p
+  | Prop (p, false) -> Printf.bprintf buf "~ %a" T.pp_tstp p
+  | True -> Buffer.add_string buf "$true"
+  | False -> Buffer.add_string buf "$false"
+  | Equation (l, r, true, _) ->
+    Printf.bprintf buf "%a = %a" T.pp_tstp l T.pp_tstp r
+  | Equation (l, r, false, _) ->
+    Printf.bprintf buf "%a != %a" T.pp_tstp l T.pp_tstp r
 
 let to_string t = Util.on_buffer pp t
 
@@ -421,6 +432,11 @@ module Arr = struct
   let pp buf lits = 
     Util.pp_arrayi ~sep:" | "
       (fun buf i lit -> Printf.bprintf buf "%a" pp lit)
+      buf lits
+
+  let pp_tstp buf lits = 
+    Util.pp_arrayi ~sep:" | "
+      (fun buf i lit -> Printf.bprintf buf "%a" pp_tstp lit)
       buf lits
 
   let to_string a = Util.on_buffer pp a

@@ -30,34 +30,58 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type t = private
-  | Axiom of CompactClause.t * string * string (** file, axiom name *)
-  | Infer of CompactClause.t * string * t list (** Inference *)
+  | Axiom of string * string (* filename, axiom name *)
+  | InferForm of Formula.t * step
+  | InferClause of CompactClause.t * step
+and step = {
+  rule : string;
+  parents : t array;
+  esa : bool;  (** Equisatisfiable step? *)
+}
+
+val eq : t -> t -> bool
+val hash : t -> int
+val cmp : t -> t -> int
 
 (** {2 Constructors and utils} *)
 
-val mk_axiom : CompactClause.t -> string -> string -> t
-val mk_infer : CompactClause.t -> string -> t list -> t
+(** Rule must {b NOT} be "axiom" for deduction steps.
+    [esa] is false by default. *)
+
+val mk_f_axiom : Formula.t -> file:string -> name:string -> t
+val mk_c_axiom : CompactClause.t -> file:string -> name:string -> t
+val mk_f_step : ?esa:bool -> Formula.t -> rule:string -> t list -> t
+val mk_c_step : ?esa:bool -> CompactClause.t -> rule:string -> t list -> t
+
+val adapt_f : t -> Formula.t -> t
+val adapt_c : t -> CompactClause.t -> t
 
 val is_axiom : t -> bool
-val is_infer : t -> bool
+val is_proof_of_false : t -> bool
 
-val proof_clause : t -> CompactClause.t   (** Clause this is a proof of *)
-val proof_id : t -> int                   (** Id of the clause *)
-val proof_lits : t -> Literal.t array     (** literals of the clause *)
+(** {2 Proof traversal} *)
 
-val is_proof_of : t -> CompactClause.t -> bool
-  (** Is the proof a proof of the clause? *)
+module ProofTbl : Hashtbl.S with type key = t
 
-module IntSet : Set.S with type elt = int
+type proof_set = unit ProofTbl.t
 
-val traverse : ?traversed:IntSet.t ref -> t -> (t -> unit) -> unit
+type proof_name = int ProofTbl.t
+
+val traverse : ?traversed:proof_set -> t -> (t -> unit) -> unit
   (** Traverse the proof. Each proof node is traversed only once,
-      using the integer to recognize already traversed proofs. *)
+      using the set to recognize already traversed proofs. *)
+
+val get_name : namespace:proof_name -> t -> int
+  (** Unique name of the proof, within the given [namespace] *)
 
 val to_seq : t -> t Sequence.t
+  (** Traverse the subproofs, once each *)
 
 val depth : t -> int
   (** Max depth of the proof *)
+
+val share : t -> t
+  (** Share common subproofs, physically *)
 
 (** {2 Conversion to a graph of proofs} *)
 
@@ -69,6 +93,9 @@ val bij : ord:Ordering.t -> t Bij.t
       bijection to get a fresh proof steps table. *)
 
 (** {2 IO} *)
+
+val pp_notrec : Buffer.t -> t -> unit
+  (** Print the step in debug mode, but not its parents *)
 
 val pp_tstp : Buffer.t -> t -> unit
 val pp_debug : Buffer.t -> t -> unit

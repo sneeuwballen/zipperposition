@@ -74,7 +74,7 @@ let dyn_load filename =
   current
 
 (** Apply the extension to the Env.t *)
-let apply_ext ~env ext =
+let apply ~env ext =
   let apply_action action = match action with
   | Ext_general f -> f env
   | Ext_expert e -> Env.add_expert ~env (e ~ctx:env.Env.ctx)
@@ -91,3 +91,6 @@ let apply_ext ~env ext =
       (fun hc -> Util.list_flatmap list_simplify' (r hc))
   in
   List.iter apply_action ext.actions
+
+let apply_list ~env l =
+  List.iter (apply ~env) l

@@ -1,3 +1,4 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -24,24 +25,51 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Compact clause representation} *)
+(** {6 Formulas with Proofs} *)
 
 open Logtk
 
-type t = Literal.t array
+type t = {
+  form : Formula.t;
+  proof : Proof.t;
+}
+
+type pform = t
+
+val get_form : t -> Formula.t
+val get_proof : t -> Proof.t
 
 val eq : t -> t -> bool
 val hash : t -> int
 
-val is_empty : t -> bool
+val create : Formula.t -> Proof.t -> t
 
-val iter : t -> (Literal.t -> unit) -> unit
+val of_sourced : Formula.sourced_form -> t
+val to_sourced : t -> Formula.sourced_form option
 
-val to_seq : t -> Literal.t Sequence.t
+val signature : t -> Signature.t
+val signature_seq : ?init:Signature.t -> t Sequence.t -> Signature.t
 
 val pp : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
-
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
-val bij : ord:Ordering.t -> t Bij.t
+
+(** {2 Set of formulas} *)
+
+module FSet : sig
+  type t
+
+  val create : unit -> t
+
+  val add : t -> pform -> unit
+
+  val remove : t -> pform -> unit
+
+  val iter : t -> (pform -> unit) -> unit
+
+  val of_seq : ?init:t -> pform Sequence.t -> t
+
+  val to_seq : t -> pform Sequence.t
+
+  val size : t -> int
+end

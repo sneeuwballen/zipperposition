@@ -60,7 +60,7 @@ type t = {
 
 type clause = t
 
-let compact c = CompactClause.create c.hctag c.hclits
+let compact c = c.hclits
 
 let to_seq c =
   Lit.Arr.to_seq c.hclits
@@ -147,7 +147,7 @@ let true_clause ~ctx =
       hcdescendants=SmallSet.empty ~cmp:(fun i j -> i-j); }
   in
   let c = CHashcons.hashcons c in
-  c.hcproof <- Proof.mk_infer (compact c) "trivial" [];
+  c.hcproof <- Proof.mk_c_axiom (compact c) ~file:"/dev/null" ~name:"trivial";
   c
 
 (* TODO: use a (var, scope) -> int  hashtable to always produce
@@ -160,7 +160,7 @@ let create_a ?parents ?selected ~ctx lits proof =
   Util.incr_stat stat_mk_hclause;
   Util.enter_prof prof_mk_hclause;
   if Array.length lits > BV.max_len && ctx.Ctx.complete
-  then (Util.debug 0 "%% incompleteness: clause of %d lits -> $true" (Array.length lits);
+  then (Util.debug 0 "incompleteness: clause of %d lits -> $true" (Array.length lits);
         Ctx.lost_completeness ~ctx;
         Util.exit_prof prof_mk_hclause;
         true_clause ~ctx)
@@ -229,11 +229,6 @@ let get_proof c = c.hcproof
 
 let is_empty c = Array.length c.hclits = 0
 
-(** Adapt a proof to a new clause *)
-let adapt_proof proof c = match proof with
-  | Proof.Axiom (_, f, a) -> Proof.mk_axiom c f a
-  | Proof.Infer (_, r, l) -> Proof.mk_infer c r l
-
 let stats () = CHashcons.stats ()
 
 (** descendants of the clause *)
@@ -242,7 +237,7 @@ let descendants c = c.hcdescendants
 (** Change the context of the clause *)
 let update_ctx ~ctx c =
   let lits = Array.map (Lit.reord ~ord:(Ctx.ord ~ctx)) c.hclits in
-  let proof = adapt_proof c.hcproof in
+  let proof = Proof.adapt_c c.hcproof in
   let c' = create_a ~selected:c.hcselected ~ctx lits proof in
   c'
 
@@ -271,7 +266,7 @@ let rec apply_subst ?recursive ?renaming subst c scope =
     (fun lit -> Lit.apply_subst ?recursive ?renaming ~ord subst lit scope)
     c.hclits in
   let descendants = c.hcdescendants in
-  let proof = adapt_proof c.hcproof in
+  let proof = Proof.adapt_c c.hcproof in
   let new_hc = create_a ~parents:[c] ~ctx lits proof in
   new_hc.hcdescendants <- descendants;
   new_hc
@@ -368,7 +363,7 @@ let signature ?(signature=Signature.empty) clauses =
 
 let from_forms ~file ~name ~ctx forms =
   let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
-  let proof c = Proof.mk_axiom c file name in
+  let proof c = Proof.mk_c_axiom c ~file ~name in
   create_a ~ctx lits proof
 
 (** {2 Set of clauses} *)
@@ -458,7 +453,7 @@ let compare_clause_pos (c1, p1, t1) (c2, p2, t2) =
 
 (** {2 IO} *)
 
-let pp_debug buf c =
+let pp buf c =
   let pp_annot selected maxlits i =
     ""^(if BV.get selected i then "+" else "")
       ^(if BV.get maxlits i then "*" else "")
@@ -485,14 +480,14 @@ let pp_tstp buf c =
   in
   T.pp buf t
 
-let to_string = Util.on_buffer pp_debug
+let to_string = Util.on_buffer pp
 
 let fmt fmt c =
   Format.pp_print_string fmt (to_string c)
 
-let pp_set_debug buf set =
+let pp_set buf set =
   Sequence.iter
-    (fun c -> pp_debug buf c; Buffer.add_char buf '\n')
+    (fun c -> pp buf c; Buffer.add_char buf '\n')
     (CSet.to_seq set)
 
 let pp_set_tstp buf set =
@@ -501,12 +496,14 @@ let pp_set_tstp buf set =
     (CSet.to_seq set)
 
 let bij ~ctx =
+  let ord = Ctx.ord ctx in
   Bij.(map
-    ~inject:(fun c -> c.hclits)
-    ~extract:(fun lits ->
-      let proof c = Proof.mk_axiom c "bij" "bij" in
+    ~inject:(fun c -> c.hclits, c.hcproof)
+    ~extract:(fun (lits,proof) ->
+      let proof = Proof.adapt_c proof in
       create_a ~ctx lits proof)
-    (Lits.bij ~ord:(Ctx.ord ctx)))
+    (pair (Lits.bij ~ord) (Proof.bij ~ord))
+    )
 
 let bij_set ~ctx =
   Bij.(map

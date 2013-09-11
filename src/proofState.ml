@@ -401,5 +401,5 @@ let debug buf state =
       "\nactive:%a\npassive:%a\n}")
     num_active num_passive num_simpl
     CQ.pp_list state#passive_set#queues
-    C.pp_set_debug state#active_set#clauses
-    C.pp_set_debug state#passive_set#clauses
+    C.pp_set state#active_set#clauses
+    C.pp_set state#passive_set#clauses

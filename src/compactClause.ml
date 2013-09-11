@@ -28,28 +28,25 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type t = {
-  lits : Literal.t array;
-  id : int;
-}
+module Lits = Literal.Arr
 
-let eq c1 c2 =
-  c1.id = c2.id && Literal.Arr.eq c1.lits c2.lits
+type t = Literal.t array
 
-let hash c = c.id
+let eq c1 c2 = Lits.eq c1 c2
 
-let create id lits = { id; lits; }
+let hash c = Lits.hash c
 
-let id c = c.id
+let is_empty c = Array.length c = 0
 
-let lits c = c.lits
-
-let iter c f = Array.iter f c.lits
+let iter c f = Array.iter f c
 
 let to_seq c = Sequence.from_iter (fun k -> iter c k)
 
 let pp buf c =
-  Printf.bprintf buf "[%a]" Literal.Arr.pp c.lits
+  Printf.bprintf buf "[%a]" Lits.pp c
+
+let pp_tstp buf c =
+  Printf.bprintf buf "(%a)" Lits.pp_tstp c
 
 let to_string c =
   Util.on_buffer pp c
@@ -57,8 +54,4 @@ let to_string c =
 let fmt fmt c =
   Format.pp_print_string fmt (to_string c)
 
-let bij ~ord =
-  Bij.(map
-    ~inject:(fun c -> c.id, c.lits)
-    ~extract:(fun (id,lits) -> create id lits)
-    (pair int_ (Literal.Arr.bij ~ord)))
+let bij ~ord = Lits.bij ~ord

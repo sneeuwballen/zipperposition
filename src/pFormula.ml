@@ -1,3 +1,4 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -24,24 +25,72 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Compact clause representation} *)
+(** {6 Formulas with Proofs} *)
 
 open Logtk
 
-type t = Literal.t array
+module F = Formula
 
-val eq : t -> t -> bool
-val hash : t -> int
+type t = {
+  form : Formula.t;
+  proof : Proof.t;
+}
 
-val is_empty : t -> bool
+type pform = t
 
-val iter : t -> (Literal.t -> unit) -> unit
+let eq t1 t2 = F.eq t1.form t2.form && Proof.eq t1.proof t2.proof
+let hash t = Hash.hash_int2 (F.hash t.form) (Proof.hash t.proof)
 
-val to_seq : t -> Literal.t Sequence.t
+let create form proof = { form; proof; }
 
-val pp : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
+let get_form t = t.form
 
-val to_string : t -> string
-val fmt : Format.formatter -> t -> unit
-val bij : ord:Ordering.t -> t Bij.t
+let get_proof t = t.proof
+
+let of_sourced (f, file,name) =
+  let proof = Proof.mk_f_axiom f ~file ~name in
+  create f proof
+
+let to_sourced t =
+  match t.proof with
+  | Proof.InferForm (f, {Proof.parents=[|Proof.Axiom (file,name)|]}) ->
+    Some ((t.form, file, name))
+  | _ -> None
+
+let signature t = F.signature t.form
+
+let signature_seq ?init seq =
+  F.signature_seq ?signature:init (Sequence.map get_form seq)
+
+let pp buf t = F.pp buf t.form
+let to_string t = F.to_string t.form
+let fmt fmt t = F.fmt fmt t.form
+
+(** {2 Set of formulas} *)
+
+module FSet = struct
+  module H = Hashtbl.Make(struct
+    type t = pform
+    let equal = eq
+    let hash = hash
+  end)
+
+  type t = unit H.t
+
+  let create () = H.create 15
+
+  let add set pf = H.replace set pf ()
+
+  let remove set pf = H.remove set pf
+
+  let iter set k = H.iter (fun pf () -> k pf) set
+
+  let of_seq ?(init=create ()) seq =
+    Sequence.iter (add init) seq;
+    init
+
+  let to_seq set =
+    Sequence.from_iter (fun k -> iter set k)
+
+  let size set = H.length set
+end

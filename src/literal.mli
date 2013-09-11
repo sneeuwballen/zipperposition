@@ -89,6 +89,7 @@ val apply_subst_list : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
 (** {2 IO} *)
 
 val pp : Buffer.t -> t -> unit
+val pp_tstp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 val bij : ord:Ordering.t -> t Bij.t
@@ -127,6 +128,7 @@ module Arr : sig
   val signature : ?signature:Signature.t -> t array -> Signature.t
 
   val pp : Buffer.t -> t array -> unit
+  val pp_tstp : Buffer.t -> t array -> unit
   val to_string : t array -> string
   val fmt : Format.formatter -> t array -> unit
   val bij : ord:Ordering.t -> t array Bij.t

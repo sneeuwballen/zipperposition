@@ -129,7 +129,7 @@ let is_redundant expert c =
   in
   (if ans then begin
     Util.incr_stat stat_expert_redundant;
-    Util.debug 2 "%% @[<h>%a redundant with %s@]" C.pp_debug c expert.expert_name
+    Util.debug 2 "%a redundant with %s" C.pp c expert.expert_name
     end);
   Util.exit_prof prof_redundant_expert;
   ans
@@ -149,12 +149,12 @@ let simplify expert c =
     else begin
       let rule = "expert_" ^ expert.expert_name in
       let premises = List.map (fun c -> c.C.hcproof) expert.expert_clauses in
-      let proof c' = Proof.mk_infer c' rule (c.C.hcproof :: premises) in
+      let proof c' = Proof.mk_c_step c' rule (c.C.hcproof :: premises) in
       let parents = c :: c.C.hcparents in
       let new_hc = C.create ~parents ~ctx lits proof in
       Util.incr_stat stat_expert_simplify;
-      Util.debug 2 "%% @[<h>theory-simplified %a into %a with %s@]"
-        C.pp_debug c C.pp_debug new_hc expert.expert_name;
+      Util.debug 2 "theory-simplified %a into %a with %s"
+        C.pp c C.pp new_hc expert.expert_name;
       (* return simplified clause *)
       Util.exit_prof prof_simplify_expert;
       new_hc

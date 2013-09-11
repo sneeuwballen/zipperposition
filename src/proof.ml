@@ -35,169 +35,253 @@ module S = Substs
 module CC = CompactClause
 
 type t =
-  | Axiom of CompactClause.t * string * string (** file, axiom name *)
-  | Infer of CompactClause.t * string * t list
+  | Axiom of string * string
+  | InferForm of Formula.t * step
+  | InferClause of CompactClause.t * step
+and step = {
+  rule : string;
+  parents : t array;
+  esa : bool;
+}
+
+type proof = t 
+
+let rec eq p1 p2 = match p1, p2 with
+  | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
+  | InferForm (f1, step1), InferForm(f2, step2) ->
+    F.eq f1 f2 && step_eq step1 step2
+  | InferClause (c1, step1), InferClause(c2, step2) ->
+    CC.eq c1 c2 && step_eq step1 step2
+  | _ -> false
+and step_eq step1 step2 =
+  step1.rule = step2.rule &&
+  Array.length step1.parents = Array.length step2.parents &&
+  Util.array_forall2 eq step1.parents step2.parents
+
+let hash p = match p with
+  | Axiom (f, n) -> Hash.hash_int2 (Hash.hash_string f) (Hash.hash_string n)
+  | InferForm (f,_) -> F.hash f
+  | InferClause (c, _) -> CC.hash c
+
+let cmp p1 p2 = Pervasives.compare p1 p2
 
 (** {2 Constructors and utils} *)
 
-let mk_axiom x filename clause_name = Axiom (x, filename, clause_name)
+let mk_f_axiom f ~file ~name =
+  InferForm (f, {rule="axiom"; parents = [| Axiom (file,name) |]; esa=false; })
 
-let mk_infer x rule_name premises = Infer (x, rule_name, premises)
+let mk_c_axiom c ~file ~name =
+  InferClause (c, {rule="axiom"; parents = [| Axiom (file,name) |]; esa=false; })
 
-let is_axiom = function | Axiom _ -> true | _ -> false
-let is_infer = function | Infer _ -> true | _ -> false
+let mk_f_step ?(esa=false) f ~rule parents =
+  assert(rule <> "axiom");
+  InferForm (f, {rule; parents=Array.of_list parents; esa;})
 
-let proof_clause proof = match proof with
-  | Axiom (c, _, _) -> c
-  | Infer (c, _, _) -> c
+let mk_c_step ?(esa=false) c ~rule parents =
+  assert(rule <> "axiom");
+  InferClause (c, {rule; parents=Array.of_list parents; esa;})
 
-let proof_id proof = (proof_clause proof).CC.id
+let adapt_c p c =
+  match p with
+  | Axiom _ -> p
+  | InferClause(_,step)
+  | InferForm (_,step) -> InferClause(c,step)
 
-let proof_lits proof = (proof_clause proof).CC.lits
+let adapt_f p f =
+  match p with
+  | Axiom _ -> p
+  | InferClause(_,step)
+  | InferForm (_,step) -> InferForm(f,step)
 
-let is_proof_of proof c = proof_id proof = c.CC.id
+let is_axiom = function
+  | Axiom _ -> true
+  | _ -> false
 
-module IntSet = Set.Make(struct
-  type t = int
-  let compare i j = i - j
+let is_proof_of_false = function
+  | InferForm ({F.form=F.False}, _) -> true
+  | InferClause(c,_) when CC.is_empty c -> true
+  | _ -> false
+
+(** {2 Proof traversal} *)
+
+module ProofTbl = Hashtbl.Make(struct
+  type t = proof
+  let equal = eq
+  let hash = hash
 end)
 
+type proof_set = unit ProofTbl.t
+
+type proof_name = int ProofTbl.t
+
 (** Traverse the proof. Each proof node is traversed only once. *)
-let traverse ?(traversed=ref IntSet.empty) proof k =
+let traverse ?(traversed=ProofTbl.create 11) proof k =
   (* set of already traversed proof nodes; queue of proof nodes
      yet to traverse *)
   let queue = Queue.create () in
   Queue.push proof queue;
   while not (Queue.is_empty queue) do
     let proof = Queue.take queue in
-    if IntSet.mem (proof_id proof) !traversed then ()
+    if ProofTbl.mem traversed proof then ()
     else begin
-      traversed := IntSet.add (proof_id proof) !traversed;
+      ProofTbl.add traversed proof ();
       (* traverse premises first *)
-      (match proof with
+      begin match proof with
       | Axiom _ -> ()
-      | Infer (_, _, l) ->
-        List.iter (fun proof' -> Queue.push proof' queue) l);
-        (* call [k] on the proof *)
-        k proof;
+      | InferForm (_, step)
+      | InferClause (_, step) ->
+        Array.iter (fun proof' -> Queue.push proof' queue) step.parents
+      end;
+      (* call [k] on the proof *)
+      k proof;
     end
   done
+
+let get_name ~namespace p =
+  try
+    ProofTbl.find namespace p
+  with Not_found ->
+    let n = ProofTbl.length namespace in
+    ProofTbl.add namespace p n;
+    n
 
 let to_seq proof = Sequence.from_iter (fun k -> traverse proof k)
 
 (** Depth of a proof, ie max distance between the root and any axiom *)
 let depth proof =
-  let explored = ref IntSet.empty in
+  let explored = ProofTbl.create 11 in
   let depth = ref 0 in
   let q = Queue.create () in
   Queue.push (proof, 0) q;
   while not (Queue.is_empty q) do
     let (p, d) = Queue.pop q in
-    let i = proof_id p in
-    if IntSet.mem i !explored then () else begin
-      explored := IntSet.add i !explored;
+    if ProofTbl.mem explored proof then () else begin
+      ProofTbl.add explored proof ();
       match p with
       | Axiom _ -> depth := max d !depth
-      | Infer (_, _, l) -> (* explore parents *)
-        List.iter (fun p -> Queue.push (p, d+1) q) l
+      | InferForm(_, step)
+      | InferClause (_, step) ->
+        (* explore parents *)
+        Array.iter (fun p -> Queue.push (p, d+1) q) step.parents
     end
   done;
   !depth
 
+(* physically share subproofs, to save memory *)
+let share t =
+  Util.debug 0 "Proof.share: not implemented";  (* TODO *)
+  t
+
 (** {2 Conversion to a graph of proofs} *)
 
-let mk_graph () =
-  PersistentGraph.empty
-    ~hash:(fun p -> proof_id p)
-    ~eq:(fun p1 p2 -> proof_id p1 = proof_id p2)
-    10
+let mk_graph () = PersistentGraph.empty ~hash ~eq 10
 
 (** Get a graph of the proof *)
 let to_graph proof =
   let g = mk_graph () in
   traverse proof
     (fun p -> match p with
-     | Axiom _ -> ()
-     | Infer (_, rule, l) ->
-       List.iter (fun p' -> PersistentGraph.add g p' rule p) l
-    );
+      | Axiom _ -> ()
+      | InferForm (_, step)
+      | InferClause (_, step) ->
+        Array.iter (fun p' -> PersistentGraph.add g p' step.rule p) step.parents);
   g
 
 let bij ~ord =
   let open Bij in
-  let tbl = Hashtbl.create 15 in
-  (* bijection for a step. [tbl] is used during parsing, for retrieving steps
-      by their ID. *)
-  let bij_step =
-    let bij_axiom = triple (CompactClause.bij ~ord) string_ string_ in
-    let bij_proof = triple (CompactClause.bij ~ord) string_ (list_ int_) in
-    switch
-      ~inject:(function
-      | Axiom (c, file, name) -> 'a', BranchTo (bij_axiom, (c,file,name))
-      | Infer (c, rule, l) -> 'p',
-        BranchTo (bij_proof, (c, rule, List.map proof_id l)))
-      ~extract:(function
-      | 'a' -> BranchFrom (bij_axiom, (fun (c,file,name) ->
-        let proof = mk_axiom c file name in
-        Hashtbl.replace tbl (proof_id proof) proof;  (* save *)
-        proof))
-      | 'p' -> BranchFrom (bij_proof, (fun (c,rule,ids) ->
-        let premises = List.map (fun i -> Hashtbl.find tbl i) ids in
-        let proof = mk_infer c rule premises in
-        Hashtbl.replace tbl (proof_id proof) proof;  (* save *)
-        proof))
-      | _ -> raise (DecodingError "expected proof step"))
-  in
-  map
-    ~inject:(fun p -> Sequence.to_list (traverse p), p)
-    ~extract:(fun (l,p) -> p)
-    (pair (list_ bij_step) bij_step)
+  fix
+    (fun bij_ ->
+      let bij_step = map
+        ~inject:(fun step -> step.rule, step.parents, step.esa)
+        ~extract:(fun (rule,parents,esa) -> {rule;parents;esa;})
+          (triple string_ (array_ (bij_ ())) bool_) in
+      let bij_axiom = pair string_ string_
+      and bij_form = pair F.bij bij_step
+      and bij_clause = pair (CC.bij ~ord) bij_step
+      in switch
+          ~inject:(function
+            | Axiom (f,n) -> 'a', BranchTo(bij_axiom, (f,n))
+            | InferForm(f,step) -> 'f', BranchTo(bij_form, (f,step))
+            | InferClause(c,step) -> 'c', BranchTo(bij_clause, (c,step)))
+          ~extract:(function
+            | 'a' -> BranchFrom(bij_axiom, (fun (f,n) -> Axiom(f,n)))
+            | 'f' -> BranchFrom(bij_form, (fun(f,step) -> InferForm(f,step)))
+            | 'c' -> BranchFrom(bij_clause, (fun(c,step) -> InferClause(c,step)))
+            | c -> raise (DecodingError "expected proof step"))
+    )
 
 (** {2 IO} *)
+
+let pp_notrec buf proof =
+  match proof with
+  | Axiom(f,n) -> Printf.bprintf buf "axiom \"%s\" in %s" f n
+  | InferForm (f, _) -> F.pp buf f
+  | InferClause(c, _) -> CC.pp buf c
 
 let pp_debug buf proof =
   traverse proof
     (function
-      | Axiom (c, f, s) ->
-        Printf.bprintf buf "%a <--- axiom %s in %s\n" CC.pp c s f
-      | Infer (c, rule, premises) ->
-        Printf.bprintf buf "%a <--- %s with\n" CC.pp c rule;
-        List.iter
-          (fun premise -> Printf.bprintf buf "  %a\n" CC.pp premise)
-          (List.map proof_clause premises)
+      | Axiom (f,n) -> ()
+      | InferForm (f, step) ->
+        Printf.bprintf buf "%a <--- %s with\n" F.pp f step.rule;
+        Array.iter
+          (fun premise -> Printf.bprintf buf "  %a\n" pp_notrec premise)
+          step.parents
+      | InferClause (c, step) ->
+        Printf.bprintf buf "%a <--- %s with\n" CC.pp c step.rule;
+        Array.iter
+          (fun premise -> Printf.bprintf buf "  %a\n" pp_notrec premise)
+          step.parents
     )
 
+let _extract_axiom proof = match proof with
+  | Axiom (f,n) -> f,n
+  | _ -> assert false
+
+let _pp_parent_names buf names =
+  Util.pp_array ~sep:"," (fun buf -> Printf.bprintf buf "%i") buf names
+
 let pp_tstp buf proof =
+  let namespace = ProofTbl.create 5 in
   traverse proof
-    (function
-      | Axiom (c, file, ax_name) ->
-        let f = Literal.Arr.to_form c.CC.lits in
-        Printf.bprintf buf "fof(%d, axiom, %a, file('%s', %s)).\n"
-          c.CC.id F.pp_tstp f file ax_name
-      | Infer (c, name, premises) ->
-        let f = F.close_forall (Literal.Arr.to_form c.CC.lits) in
-        let premises = List.map proof_id premises in
-        let status = if name = "elim" || name = "to_cnf" then "esa" else "thm" in
-        (* print the inference *)
+    (fun p ->
+      let name = get_name ~namespace p in
+      match p with
+      | Axiom _ -> failwith "cannot print an axiom step as TSTP"
+      | InferClause(c, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
+        let f,n = _extract_axiom step.parents.(0) in
+        Printf.bprintf buf "cnf(%d, axiom, %a, file('%s', %s)).\n"
+          name CC.pp_tstp c f n
+      | InferForm(f, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
+        let file,n = _extract_axiom step.parents.(0) in
+        Printf.bprintf buf "tff(%d, axiom, %a, file('%s', %s)).\n"
+          name F.pp_tstp f file n
+      | InferForm(f, step) ->
+        let names = Array.map (get_name ~namespace) step.parents in
+        let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
-          ("fof(%d, plain, %a, inference('%s', " ^^
-           "[status(%s), theory(equality)], [%a])).\n")
-          c.CC.id F.pp_tstp f name status
-          (Util.pp_list ~sep:"," (fun b i -> Printf.bprintf b "%d" i)) premises
+          "tff(%d, axiom, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
+          name F.pp_tstp (F.close_forall f) step.rule status _pp_parent_names names
+      | InferClause(c, step) ->
+        let names = Array.map (get_name ~namespace) step.parents in
+        let status = if step.esa then "esa" else "thm" in
+        Printf.bprintf buf
+          "cnf(%d, axiom, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
+          name CC.pp_tstp c step.rule status _pp_parent_names names
     )
 
 (** Prints the proof according to the given input switch *)
 let pp switch buf proof = match switch with
-  | "none" -> Util.debug 1 "%% proof printing disabled"
+  | "none" -> Util.debug 1 "proof printing disabled"
   | "tstp" -> pp_tstp buf proof
   | "debug" -> pp_debug buf proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
 let print_vertex proof =
-  let label = `Label (Util.sprintf "%a" Literal.Arr.pp (proof_lits proof)) in
+  let label = `Label (Util.on_buffer pp_notrec proof) in
   let attributes = [`Shape "box"; `Style "filled"] in
   let attributes =
-    if proof_lits proof = [||] then `Color "red" :: `Label "[]" :: attributes
+    if is_proof_of_false proof then `Color "red" :: `Label "[]" :: attributes
     else if is_axiom proof then label :: `Color "yellow" :: attributes
     else label :: attributes in
   attributes
@@ -220,7 +304,7 @@ let pp_dot_file ?(name="proof") filename proof =
   try
     let buf = Buffer.create 1024 in
     pp_dot ~name buf proof;
-    Util.debug 1 "%% print proof to %s" filename;
+    Util.debug 1 "print proof to %s" filename;
     (* write on the opened out channel *)
     Buffer.output_buffer out buf;
     close_out out

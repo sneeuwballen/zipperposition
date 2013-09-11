@@ -2,7 +2,6 @@ module Bitvector : module type of Bitvector
 module ClauseQueue : module type of ClauseQueue
 module Clause : module type of Clause
 module Const : module type of Const
-module Delayed : module type of Delayed
 module Experts : module type of Experts
 module Extensions : module type of Extensions
 module PersistentGraph : module type of PersistentGraph

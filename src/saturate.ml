@@ -70,13 +70,13 @@ let given_clause_step ?(generating=true) ~env num =
     in
     match c_list with
     | [] -> 
-      Util.debug 2 "given clause %a is redundant" C.pp_debug c;
+      Util.debug 2 "given clause %a is redundant" C.pp c;
       Util.incr_stat stat_redundant_given;
       Unknown  (* all simplifications are redundant *)
     | c::_ when C.is_empty c ->
       Unsat c  (* empty clause found *)
     | c::new_clauses when Experts.Set.is_redundant experts c ->
-      Util.debug 2 "given clause %a is redundant" C.pp_debug c;
+      Util.debug 2 "given clause %a is redundant" C.pp c;
       Env.add_simpl ~env (Sequence.singleton c);
       Env.add_passive ~env (Sequence.of_list new_clauses);
       Unknown  (* redundant given clause *)
@@ -88,7 +88,7 @@ let given_clause_step ?(generating=true) ~env num =
       Util.incr_stat stat_processed_given;
       C.check_ord ~ord c;
       Util.debug 2 "============ step %5d  ============" num;
-      Util.debug 1 "given: %a" C.pp_debug c;
+      Util.debug 1 "given: %a" C.pp c;
       (* yield control to meta-prover *)
       Vector.append_seq new_clauses (Env.meta_step ~env c);
       (* find clauses that are subsumed by given in active_set *)
@@ -128,7 +128,7 @@ let given_clause_step ?(generating=true) ~env num =
       Vector.append_seq new_clauses inferred_clauses;
       (if Util.get_debug () >= 2
         then Vector.iter new_clauses
-          (fun new_c -> Util.debug 2 "    inferred new clause %a" C.pp_debug new_c));
+          (fun new_c -> Util.debug 2 "    inferred new clause %a" C.pp new_c));
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
       Env.add_passive ~env (Vector.to_seq new_clauses);
       (* test whether the empty clause has been found *)

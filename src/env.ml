@@ -31,6 +31,8 @@ open Logtk
 
 module T = Term
 module C = Clause
+module F = Formula
+module PF = PFormula
 module Lit = Literal
 
 type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
@@ -86,7 +88,7 @@ type t = {
   mutable is_trivial : Clause.t -> bool;
     (** single test to detect trivial clauses *)
 
-  mutable axioms : Formula.t list;
+  mutable axioms : PFormula.t list;
     (** a list of axioms to add to the problem *)
 
   mutable mk_constr : (Clause.t Sequence.t -> Precedence.constr list) list;
@@ -95,7 +97,7 @@ type t = {
   mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:Ctx.t -> Formula.t list -> Formula.t list;
+  mutable preprocess : ctx:Ctx.t -> PFormula.t list -> PFormula.t list;
     (** how to preprocess the initial list of formulas *)
 
   mutable state : ProofState.t;
@@ -272,6 +274,21 @@ type stats = int * int * int
 let stats ~env =
   ProofState.stats env.state
 
+let cnf ~env pf_list =
+  let ctx = env.ctx in
+  let clauses = Sequence.flatMap
+    (fun pf ->
+      let f = pf.PF.form in
+      (* reduce to CNF this clause *)
+      let clauses = Cnf.cnf_of ~ctx:ctx.Ctx.skolem f in
+      (* now build "proper" clauses, with proof and all *)
+      let proof cc = Proof.mk_c_step cc "cnf" [pf.PF.proof] in
+      let clauses = List.map (fun c -> C.create_forms ~ctx c proof) clauses in
+      Sequence.of_list clauses)
+    (Sequence.of_list pf_list)
+  in
+  Sequence.to_rev_list clauses
+
 let next_passive ~env =
   env.state#passive_set#next ()
 
@@ -280,7 +297,7 @@ let do_binary_inferences ~env c =
   Util.enter_prof prof_generate_binary;
   let active_set = env.state#active_set in
   Util.debug 3 "do binary inferences with current active set: %a"
-                C.pp_set_debug active_set#clauses;
+                C.pp_set active_set#clauses;
   (* apply every inference rule *)
   let clauses = List.fold_left
     (fun acc (name, rule) ->
@@ -344,10 +361,10 @@ let rewrite ~env c =
     then c (* no simplification *)
     else begin
       let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-      let proof c' = Proof.mk_infer c' rule [c.C.hcproof] in
+      let proof c' = Proof.mk_c_step c' rule [c.C.hcproof] in
       let parents = [c] in
       let new_clause = C.create_a ~parents ~ctx:env.ctx lits' proof in
-      Util.debug 3 "rewritten %a into %a" C.pp_debug c C.pp_debug new_clause;
+      Util.debug 3 "rewritten %a into %a" C.pp c C.pp new_clause;
       new_clause
     end
 
@@ -371,10 +388,10 @@ let rewrite_lits ~env c =
   if SmallSet.is_empty !applied_rules then c
   else begin  (* simplifications occurred! *)
     let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-    let proof c' = Proof.mk_infer c' rule [c.C.hcproof] in
+    let proof c' = Proof.mk_c_step c' rule [c.C.hcproof] in
     let parents = [c] in
     let new_clause = C.create_a ~parents ~ctx:env.ctx lits proof in
-    Util.debug 3 "lit rewritten %a into %a" C.pp_debug c C.pp_debug new_clause;
+    Util.debug 3 "lit rewritten %a into %a" C.pp c C.pp new_clause;
     new_clause
   end
 
@@ -398,7 +415,7 @@ let simplify ~env old_hc =
   let c = env.active_simplify env.state#active_set c in
   let c = basic_simplify ~env c in
   (if not (Lit.Arr.eq c.C.hclits old_hc.C.hclits)
-    then Util.debug 2 "clause %a simplified into %a" C.pp_debug old_hc C.pp_debug c);
+    then Util.debug 2 "clause %a simplified into %a" C.pp old_hc C.pp c);
   Util.exit_prof prof_simplify;
   old_hc, c
 
@@ -417,7 +434,7 @@ let backward_simplify ~env given =
         if not (Lit.Arr.eq c.C.hclits c'.C.hclits)
           (* the active clause has been simplified! *)
           then begin
-            Util.debug 2 "active clause %a simplified into %a" C.pp_debug c C.pp_debug c';
+            Util.debug 2 "active clause %a simplified into %a" C.pp c C.pp c';
             C.CSet.add before c, c' :: after
           end else before, after)
   in
@@ -522,7 +539,6 @@ let all_simplify ~env c =
 (** Do one step of the meta-prover. The current given clause and active set
     are provided. This returns a list of new clauses. *)
 let meta_step ~env c =
-  let ctx = env.ctx in
   let results = match (get_meta env) with
   | None -> []
   | Some prover -> begin
@@ -539,19 +555,7 @@ let meta_step ~env c =
       (fun result -> match result with
         | MetaProverState.Deduced (f,parents) ->
           (* reduce result in CNF *)
-          let clauses = Cnf.cnf_of ~ctx:env.ctx.Ctx.skolem f in
-          let premises = List.map (fun c -> c.C.hcproof) parents in
-          let proof cc = Proof.mk_infer cc "lemma" premises in
-          (* now build "proper" clauses, with proof and all *)
-          let clauses =
-            List.map
-              (fun c ->
-                let c = C.create_forms ~ctx ~parents c proof in
-                Util.debug 1 "meta-prover: lemma %a" C.pp_debug c;
-                c)
-              clauses
-          in
-          clauses
+          cnf ~env [f]
         | MetaProverState.Theory (th_name, th_args) ->
           Util.debug 1 "meta-prover: theory %a" MetaProverState.pp_result result;
           []

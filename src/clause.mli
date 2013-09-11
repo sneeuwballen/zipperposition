@@ -117,9 +117,6 @@ val create_forms : ?parents:t list -> ?selected:Bitvector.t ->
 
 val get_proof : t -> Proof.t
 
-val adapt_proof : Proof.t -> CompactClause.t -> Proof.t
-  (** Adapt an old Proof.t to the new CompactClause.t *)
-
 val stats : unit -> (int*int*int*int*int*int)
   (** hashconsing stats *)
 
@@ -250,13 +247,13 @@ val compare_clause_pos : clause_pos -> clause_pos -> int
 
 (** {2 IO} *)
 
+val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
-val pp_debug : Buffer.t -> t -> unit
 
 val to_string : t -> string               (** Debug printing to a  string *)
 val fmt : Format.formatter -> t -> unit   (** debug printing *)
 
-val pp_set_debug : Buffer.t -> CSet.t -> unit
+val pp_set : Buffer.t -> CSet.t -> unit
 val pp_set_tstp : Buffer.t -> CSet.t -> unit
 
 val bij : ctx:Ctx.t -> t Bij.t

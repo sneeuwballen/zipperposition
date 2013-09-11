@@ -31,22 +31,26 @@ open Logtk
 open Logtk_meta
 
 type result =
-  | Deduced of Formula.t * Clause.t list
+  | Deduced of PFormula.t * source list
   | Theory of string * Term.t list
   | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
+and source =
+  | FromClause of Clause.t
+  | FromForm of PFormula.t
+
 type t
 
-val create : ctx:Ctx.t -> Logtk_meta.MetaKB.t -> t
+val create : ?kb:Logtk_meta.MetaKB.t -> unit -> t
   (** Fresh meta-prover, using the given KB *)
-
-val update_ctx : ctx:Ctx.t -> t -> unit
-  (** Change the underlying context of the prover *)
 
 val has_new_patterns : t -> bool
   (** Are there some new patterns that should be lookud up for in
       the active set? *)
+
+val scan_formula : t -> PFormula.t -> result list
+  (** Scan a formula for patterns *)
 
 val scan_clause : t -> Clause.t -> result list
   (** Scan a clause for patterns *)
@@ -56,6 +60,9 @@ val scan_set : t -> Clause.CSet.t -> result list
       be called on the active set every time [has_new_patterns prover]
       returns true. After this, [has_new_patterns prover] returns false
       at least until the next call to [scan_clause]. *)
+
+val proof_of_source : source -> Proof.t
+  (** Extract the proof of a source *)
 
 val theories : t -> (string * Term.t list) Sequence.t
   (** List of theories detected so far *)
@@ -72,8 +79,17 @@ val reasoner : t -> Logtk_meta.MetaReasoner.t
 val kb : t -> Logtk_meta.MetaKB.t
   (** Current knowledge base *)
 
+val add_kb : t -> Logtk_meta.MetaKB.t -> unit
+  (** Merge KB with the given KB *)
+
+val parse_kb_file : t -> string -> unit
+  (** Parse KB from this file *)
+
 val parse_theory_file : t -> string -> unit
   (** Update KB with the content of this file *)
+
+val save_kb_file : t -> string -> unit
+  (** Save the KB into this file *)
 
 val pp_result : Buffer.t -> result -> unit
 val pp_theory : Buffer.t -> (string * Term.t list) -> unit
