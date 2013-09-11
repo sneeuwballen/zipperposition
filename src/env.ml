@@ -91,7 +91,7 @@ type t = {
   mutable axioms : PFormula.t list;
     (** a list of axioms to add to the problem *)
 
-  mutable mk_constr : (Clause.t Sequence.t -> Precedence.constr list) list;
+  mutable mk_constr : (Formula.t Sequence.t -> Precedence.constr list) list;
     (** How to build constraints from a list of clauses *)
 
   mutable constr : Precedence.constr list;
@@ -279,10 +279,15 @@ let cnf ~env pf_list =
   let clauses = Sequence.flatMap
     (fun pf ->
       let f = pf.PF.form in
+      Util.debug 3 "reduce %a to CNF..." F.pp f;
       (* reduce to CNF this clause *)
       let clauses = Cnf.cnf_of ~ctx:ctx.Ctx.skolem f in
       (* now build "proper" clauses, with proof and all *)
-      let proof cc = Proof.mk_c_step cc "cnf" [pf.PF.proof] in
+      let proof cc =
+        match clauses with
+        | [[f']] when F.eq f f' -> Proof.adapt_c pf.PF.proof cc  (* keep proof *)
+        | _ -> Proof.mk_c_step ~esa:true cc ~rule:"cnf" [pf.PF.proof]
+      in
       let clauses = List.map (fun c -> C.create_forms ~ctx c proof) clauses in
       Sequence.of_list clauses)
     (Sequence.of_list pf_list)
@@ -554,8 +559,7 @@ let meta_step ~env c =
     Util.list_flatmap
       (fun result -> match result with
         | MetaProverState.Deduced (f,parents) ->
-          (* reduce result in CNF *)
-          cnf ~env [f]
+          cnf ~env [f] (* reduce result in CNF *)
         | MetaProverState.Theory (th_name, th_args) ->
           Util.debug 1 "meta-prover: theory %a" MetaProverState.pp_result result;
           []

@@ -49,14 +49,10 @@ type proof = t
 let rec eq p1 p2 = match p1, p2 with
   | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
   | InferForm (f1, step1), InferForm(f2, step2) ->
-    F.eq f1 f2 && step_eq step1 step2
+    F.eq f1 f2
   | InferClause (c1, step1), InferClause(c2, step2) ->
-    CC.eq c1 c2 && step_eq step1 step2
+    CC.eq c1 c2
   | _ -> false
-and step_eq step1 step2 =
-  step1.rule = step2.rule &&
-  Array.length step1.parents = Array.length step2.parents &&
-  Util.array_forall2 eq step1.parents step2.parents
 
 let hash p = match p with
   | Axiom (f, n) -> Hash.hash_int2 (Hash.hash_string f) (Hash.hash_string n)
@@ -214,14 +210,24 @@ let bij ~ord =
 
 let pp_notrec buf proof =
   match proof with
-  | Axiom(f,n) -> Printf.bprintf buf "axiom \"%s\" in %s" f n
+  | Axiom(f,n) -> Printf.bprintf buf "axiom '%s' in %s" f n
   | InferForm (f, _) -> F.pp buf f
   | InferClause(c, _) -> CC.pp buf c
+
+let _extract_axiom proof = match proof with
+  | Axiom (f,n) -> f,n
+  | _ -> assert false
 
 let pp_debug buf proof =
   traverse proof
     (function
       | Axiom (f,n) -> ()
+      | InferClause(c, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
+        let f,n = _extract_axiom step.parents.(0) in
+        Printf.bprintf buf "%a <--- axiom %s in file '%s'\n" CC.pp_tstp c n f
+      | InferForm(f, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
+        let file,n = _extract_axiom step.parents.(0) in
+        Printf.bprintf buf "%a <--- axiom %s in file '%s'\n" F.pp f n file
       | InferForm (f, step) ->
         Printf.bprintf buf "%a <--- %s with\n" F.pp f step.rule;
         Array.iter
@@ -234,10 +240,6 @@ let pp_debug buf proof =
           step.parents
     )
 
-let _extract_axiom proof = match proof with
-  | Axiom (f,n) -> f,n
-  | _ -> assert false
-
 let _pp_parent_names buf names =
   Util.pp_array ~sep:"," (fun buf -> Printf.bprintf buf "%i") buf names
 
@@ -247,7 +249,7 @@ let pp_tstp buf proof =
     (fun p ->
       let name = get_name ~namespace p in
       match p with
-      | Axiom _ -> failwith "cannot print an axiom step as TSTP"
+      | Axiom _ -> () 
       | InferClause(c, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
         let f,n = _extract_axiom step.parents.(0) in
         Printf.bprintf buf "cnf(%d, axiom, %a, file('%s', %s)).\n"
@@ -260,13 +262,13 @@ let pp_tstp buf proof =
         let names = Array.map (get_name ~namespace) step.parents in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
-          "tff(%d, axiom, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
+          "tff(%d, plain, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
           name F.pp_tstp (F.close_forall f) step.rule status _pp_parent_names names
       | InferClause(c, step) ->
         let names = Array.map (get_name ~namespace) step.parents in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
-          "cnf(%d, axiom, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
+          "cnf(%d, plain, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
           name CC.pp_tstp c step.rule status _pp_parent_names names
     )
 

@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module Lit = Literal
 module Lits = Literal.Arr
 
 type t = Literal.t array
@@ -43,10 +44,16 @@ let iter c f = Array.iter f c
 let to_seq c = Sequence.from_iter (fun k -> iter c k)
 
 let pp buf c =
-  Printf.bprintf buf "[%a]" Lits.pp c
+  match c with
+  | [| |] -> Buffer.add_string buf "$false"
+  | [| _ |] -> Lit.pp buf c.(0)
+  | _ -> Printf.bprintf buf "[%a]" Lits.pp c
 
 let pp_tstp buf c =
-  Printf.bprintf buf "(%a)" Lits.pp_tstp c
+  match c with
+  | [| |] -> Buffer.add_string buf "$false"
+  | [| _ |] -> Lit.pp_tstp buf c.(0)
+  | _ -> Printf.bprintf buf "(%a)" Lits.pp_tstp c
 
 let to_string c =
   Util.on_buffer pp c

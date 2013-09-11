@@ -221,11 +221,11 @@ module Set = struct
       (fun set e ->
         if not (compatible_ord e ~ord:(Ctx.ord set.ctx))
           then (* [e] is disabled, not compatible with [ctx] *)
-            let _ = Util.debug 2 "%% expert %a disabled" pp e in
+            let _ = Util.debug 2 "expert %a disabled" pp e in
             {set with inactive = e :: set.inactive; }
           else
             (* add [e] to the active experts *)
-            let _ = Util.debug 2 "%% expert %a enabled" pp e in
+            let _ = Util.debug 2 "expert %a enabled" pp e in
             let active = add [] set.active e in
             {set with active; })
       set experts
@@ -266,7 +266,7 @@ module Set = struct
       c set.active
 
   let pp buf set =
-    Printf.bprintf buf "{active: %a,@ inactive: %a}"
+    Printf.bprintf buf "{active: %a, inactive: %a}"
       (Util.pp_list pp) set.active (Util.pp_list pp) set.inactive
 
   let fmt fmt set =
@@ -353,7 +353,7 @@ end)
 let rec gc_expert ~ctx gc =
   (* name and printing stuff *)
   let expert_sig = gc.gc_sig in
-  let theory = Util.sprintf "@[<h>%s_%a@]" gc.gc_theory
+  let theory = Util.sprintf "%s_%a" gc.gc_theory
     (Util.pp_seq ~sep:"_" Symbol.pp) (Symbol.SSet.to_seq expert_sig) in
   let expert_name = Utils.sprintf "gc_%s" theory in
   (* update clauses with the context *)
@@ -373,7 +373,7 @@ let rec gc_expert ~ctx gc =
     let t1' = nf t1' in
     let t2' = nf t2' in
     Util.exit_prof prof_normal_form;
-    Util.debug 3 "%% %s: check equal %a,%a" expert_name T.pp t1 T.pp t2;
+    Util.debug 3 "%s: check equal %a,%a" expert_name T.pp t1 T.pp t2;
     t1' == t2' in
   let expert_canonize t = nf t in
   { expert_name;

@@ -156,14 +156,24 @@ let load_plugins ~params =
         [ext])
     params.param_plugins
 
+(** Precedence *)
+let mk_precedence ?(constrs=[]) ~params formulas =
+  let formulas = Sequence.map PF.get_form (Sequence.of_list formulas) in
+  let constrs = constrs @
+    [Precedence.invfreq_constraint formulas; Precedence.alpha_constraint]
+  in
+  let signature = F.signature_seq formulas in
+  let symbols = Signature.to_symbols signature in
+  Precedence.create ~complete:false constrs symbols
+
 (** Create the environment from parameters and formulas *)
-let mk_env ?meta ~params formulas =
-  let signature = PF.signature_seq (Sequence.of_list formulas) in
-  let precedence = Precedence.default signature in
+let mk_env ?meta ?constrs ~params formulas =
+  let precedence = mk_precedence ?constrs ~params formulas in
   Util.debug 1 "precedence: %a" Precedence.pp precedence;
   let ord = params.param_ord precedence in
   Util.debug 1 "selection function: %s" params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
+  let signature = PF.signature_seq (Sequence.of_list formulas) in
   let ctx = Ctx.create ~select ~signature ~ord () in
   let env = Env.create ?meta ~ctx params signature in
   setup_calculus ~env;
@@ -175,7 +185,11 @@ let mk_env ?meta ~params formulas =
     Returns *)
 let do_preprocessing ?meta ~params ~env formulas =
   let formulas = Env.preprocess ~env formulas in
-  let env' = mk_env ?meta ~params formulas in
+  Util.debug 3 "formulas pre-processed into:\n  %a"
+    (Util.pp_list ~sep:"\n  " PF.pp) formulas;
+  let constrs = Env.compute_constrs ~env
+    (Sequence.map PF.get_form (Sequence.of_list formulas)) in
+  let env' = mk_env ~constrs ?meta ~params formulas in
   (* transfert experts *)
   Experts.Set.iter (Env.get_experts ~env) (Env.add_expert ~env:env');
   env', formulas
@@ -198,6 +212,7 @@ let load_everything ?meta ~plugins ~params formulas =
   let env, formulas = do_preprocessing ?meta ~params ~env formulas in
   Extensions.apply_list ~env plugins;
   let clauses = Env.cnf ~env formulas in
+  Util.debug 3 "CNF:\n  %a" (Util.pp_list ~sep:"\n  " C.pp) clauses;
   let clauses = enrich_with_theories ~env clauses in
   env, clauses
 
@@ -249,19 +264,19 @@ let print_szs_result ~env result =
       then Printf.printf "%% SZS status CounterSatisfiable\n"
       else Printf.printf "%% SZS status GaveUp\n";
     Util.debug 1 "saturated set:\n  %a\n"
-      (Util.pp_seq ~sep:"\n  " C.pp_tstp) (Env.get_active ~env)
+      (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ~env)
   | Sat.Unsat c ->
     (* print status then proof *)
     let params = Env.get_params ~env in
     Printf.printf "%% SZS status Theorem\n";
     Util.printf "%% SZS output start Refutation\n";
-    Util.printf "%a\n" (Proof.pp params.param_proof) c.C.hcproof;
+    Util.printf "%a" (Proof.pp params.param_proof) c.C.hcproof;
     Printf.printf "%% SZS output end Refutation\n";
     ()
 
 (** Process the given file (try to solve it) *)
-let process_file ?meta ~plugins ~params filename =
-  Util.debug 1 "================ process file %s ===========" filename;
+let process_file ?meta ~plugins ~params file =
+  Util.debug 1 "================ process file %s ===========" file;
   let steps = if params.param_steps = 0
     then None else (Util.debug 0 "run for %d steps" params.param_steps;
                     Some params.param_steps)
@@ -271,14 +286,14 @@ let process_file ?meta ~plugins ~params filename =
                     Some (Util.get_start_time () +. params.param_timeout -. 0.25))
   in
   (* parse formulas *)
-  let decls = Util_tptp.parse_file ~recursive:true filename in
+  let decls = Util_tptp.parse_file ~recursive:true file in
   Util.debug 1 "parsed %d declarations" (Sequence.length decls);
   (* obtain proved formulas *)
-  let formulas = Util_tptp.sourced_formulas decls in
+  let formulas = Util_tptp.sourced_formulas ~file decls in
   let formulas = Sequence.map PF.of_sourced formulas in
   let formulas = Sequence.to_rev_list formulas in
   (* obtain clauses + env *)
-  Util.debug 1 "input formulas:\n  %a\n" (Util.pp_list ~sep:"\n  " PF.pp) formulas;
+  Util.debug 2 "input formulas:\n  %a\n" (Util.pp_list ~sep:"\n  " PF.pp) formulas;
   let env, clauses = load_everything ?meta ~plugins ~params formulas in
   (* pre-saturation *)
   let num_clauses = List.length clauses in

@@ -84,7 +84,7 @@ type t = {
   mutable axioms : PFormula.t list;
     (** a list of axioms to add to the problem *)
 
-  mutable mk_constr : (Clause.t Sequence.t -> Precedence.constr list) list;
+  mutable mk_constr : (Formula.t Sequence.t -> Precedence.constr list) list;
     (** How to build constraints from a list of clauses *)
 
   mutable constr : Precedence.constr list;
@@ -128,7 +128,7 @@ val clean_passive : env:t -> unit
 
 val add_constrs : env:t -> Precedence.constr Sequence.t -> unit
 
-val add_mk_constr : env:t -> (Clause.t Sequence.t -> Precedence.constr list) -> unit
+val add_mk_constr : env:t -> (Formula.t Sequence.t -> Precedence.constr list) -> unit
 
 val get_passive : env:t -> Clause.t Sequence.t
 
@@ -159,7 +159,7 @@ val get_some_empty_clause : env:t -> Clause.t option
 
 val add_on_empty : env:t -> (Clause.t -> unit) -> unit
 
-val compute_constrs : env:t -> Clause.t Sequence.t -> Precedence.constr list
+val compute_constrs : env:t -> Formula.t Sequence.t -> Precedence.constr list
   (** Compute all ordering constraints for the given list of clauses *)
 
 val ord : t -> Ordering.t

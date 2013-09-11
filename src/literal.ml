@@ -191,6 +191,8 @@ let reord ~ord lit =
 let lit_of_form ~ord f =
   let f = F.simplify f in
   match f.F.form with
+  | F.True -> True
+  | F.False -> False
   | F.Atom a -> mk_true ~ord a
   | F.Not {F.form=F.Atom a} -> mk_false ~ord a
   | F.Equal (l,r) -> mk_eq ~ord l r
@@ -434,7 +436,7 @@ module Arr = struct
       (fun buf i lit -> Printf.bprintf buf "%a" pp lit)
       buf lits
 
-  let pp_tstp buf lits = 
+  let pp_tstp buf lits =
     Util.pp_arrayi ~sep:" | "
       (fun buf i lit -> Printf.bprintf buf "%a" pp_tstp lit)
       buf lits

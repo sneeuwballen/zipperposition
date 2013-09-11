@@ -63,8 +63,8 @@ let select_diff_neg_lit ~strict ~ord lits =
      the weights of the sides of the equation *)
   let rec find_lit best_diff best_idx lits i =
     if i = Array.length lits then best_idx
-    else match lits.(i) with
-      | Literal.Equation (l, r, false, _) ->
+    else match Literal.to_tuple lits.(i) with
+      | l, r, false ->
         let weightdiff = abs (T.size l - T.size r) in
         if weightdiff > best_diff
           then find_lit weightdiff i lits (i+1) (* prefer this lit *)

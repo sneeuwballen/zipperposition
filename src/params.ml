@@ -56,6 +56,7 @@ let parse_args () =
   in
   (* parameters *)
   let ord = ref "rpo6"
+  and debug = ref 1
   and seed = ref 1928575
   and steps = ref 0
   and version = ref false
@@ -88,7 +89,7 @@ let parse_args () =
   (* options list *) 
   let options =
     [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
-      ("-debug", Arg.Int Util.set_debug, "debug level");
+      ("-debug", Arg.Set_int debug, "debug level");
       ("-version", Arg.Set version, "print version");
       ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
       ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))");
@@ -118,6 +119,9 @@ let parse_args () =
   Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
   (if !files = [] then files := ["stdin"]);
   let param_ord = Ordering.choose !ord in
+  (* debug level *)
+  Util.set_debug !debug;
+  Util.debug 1 "set debug level to %d" !debug;
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;

@@ -39,6 +39,9 @@ and step = {
   esa : bool;  (** Equisatisfiable step? *)
 }
 
+(** {b note}: Equality does not take the parents into account. Two
+    proofs that have the same conclusion are equal. *)
+
 val eq : t -> t -> bool
 val hash : t -> int
 val cmp : t -> t -> int

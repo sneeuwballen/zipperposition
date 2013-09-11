@@ -249,6 +249,7 @@ val compare_clause_pos : clause_pos -> clause_pos -> int
 
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
+val pp_tstp_full : Buffer.t -> t -> unit  (** Print in a cnf() statement *)
 
 val to_string : t -> string               (** Debug printing to a  string *)
 val fmt : Format.formatter -> t -> unit   (** debug printing *)

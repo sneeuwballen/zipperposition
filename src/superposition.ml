@@ -333,8 +333,8 @@ let infer_equality_factoring clause =
         | Lit.Prop (p, true) ->
           begin try
             let subst = Unif.unification s 0 p 0 in
-            [[i; Position.left_pos], subst]
-          with Unif.Fail -> []
+            ([i; Position.left_pos], subst) :: acc
+          with Unif.Fail -> acc
           end
         | Lit.Equation (u, v, true, _) ->
           let try_u =  (* try inference between s and u *)
@@ -722,6 +722,7 @@ let basic_simplify c =
       || (l == T.false_term && r == T.true_term) -> true
   | Lit.Prop (p, false) when T.eq p T.true_term -> true
   | Lit.Prop (p, true) when T.eq p T.false_term -> true
+  | Lit.False -> true
   | _ -> false
   in
   let lits = Array.to_list c.C.hclits in

@@ -167,17 +167,11 @@ let create_a ?parents ?selected ~ctx lits proof =
   else begin
   (* Set of variables. *)
   let all_vars = Lits.vars lits in
-  (*
-  (* Renaming subst *)
-  let subst, _ = List.fold_left
-    (fun (subst, i) var ->
-      (S.bind ~recursive:false subst (var, 0) (T.mk_var i var.sort, 0), i+1))
-    (S.id_subst, 0) all_vars
-  in
-  (* Normalize literals *)
-  let lits = Lit.apply_subst_lits ~recursive:false ~ord:ctx.ctx_ord subst (lits, 0) in
-  let all_vars = vars_of_lits lits in
-  *)
+  (* Rename variables *)
+  let renaming = S.Renaming.create (List.length all_vars) in
+  let lits = Lits.apply_subst ~recursive:false ~renaming ~ord:ctx.Ctx.ord
+    S.empty lits 0 in
+  let all_vars = Lits.vars lits in
   (* create the structure *)
   let rec c = {
     hclits = lits;
@@ -472,13 +466,13 @@ let pp buf c =
   ()
 
 let pp_tstp buf c =
-  let t =
-    T.close_forall
-      (T.mk_node Symbol.or_symbol
-        (Array.to_list
-          (Array.map Literal.term_of_lit c.hclits)))
-  in
-  T.pp buf t
+  match c.hclits with
+  | [| |] -> Buffer.add_string buf "$false"
+  | [| l |] -> Lit.pp_tstp buf l
+  | _ -> Printf.bprintf buf "(%a)" Lits.pp_tstp c.hclits
+
+let pp_tstp_full buf c =
+  Printf.bprintf buf "cnf(%d, plain, %a)." c.hctag pp_tstp c
 
 let to_string = Util.on_buffer pp
 
