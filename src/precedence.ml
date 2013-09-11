@@ -108,11 +108,10 @@ let arity_constraint signature s1 s2 =
     (Type.arity s1sort) - (Type.arity s2sort)  (* bigger arity means bigger symbol *)
   with Not_found -> 0
 
-let invfreq_constraint clauses =
+let invfreq_constraint formulas =
   let freq_table = Symbol.SHashtbl.create 5 in
   (* frequency of symbols in clause *)
-  let rec clause_freq c = List.iter form_freq c
-  and form_freq f = F.iter term_freq f
+  let rec form_freq f = F.iter term_freq f
   and term_freq t = match t.T.term with
     | T.Var _ | T.BoundVar _ -> ()
     | T.Bind (_, t') ->
@@ -124,7 +123,7 @@ let invfreq_constraint clauses =
       Symbol.SHashtbl.replace freq_table s (count+1);
       List.iter term_freq l)
   in
-  Sequence.iter clause_freq clauses;
+  Sequence.iter form_freq formulas;
   (* compare by inverse frequency (higher frequency => smaller) *)
   fun s1 s2 ->
     let freq1 = try Symbol.SHashtbl.find freq_table s1 with Not_found -> 0
@@ -191,7 +190,7 @@ let order_symbols constrs symbols =
   PartialOrder.symbols po
 
 (** build a precedence on the [symbols] from a list of constraints *)
-let create ?(complete=true) constrs symbols =
+let create ?(complete=false) constrs symbols =
   let symbols = if complete then complete_symbols symbols else symbols in
   let symbols = order_symbols constrs symbols in
   let table = mk_table symbols in
@@ -206,9 +205,9 @@ let create ?(complete=true) constrs symbols =
       let new_len = List.length all_symbols in
       if new_len > old_len then begin
         (* some symbols have been added *)
-        Util.debug 3 "%% add @[<h>%a@] to the precedence"
+        Util.debug 3 "add %a to the precedence"
                       (Util.pp_list ~sep:", " Symbol.pp) new_symbols;
-        Util.debug 3 "%% old precedence %a" pp_snapshot symbols;
+        Util.debug 3 "old precedence %a" pp_snapshot symbols;
 
         (* build a partial order that respects the current ordering *)
         let po = PartialOrder.mk_partial_order all_symbols in
@@ -220,7 +219,7 @@ let create ?(complete=true) constrs symbols =
         let all_symbols = PartialOrder.symbols po in
         let table' = mk_table all_symbols in
         let prec' = mk_prec all_symbols table' weight in
-        Util.debug 3 "%% new precedence %a" pp_snapshot all_symbols;
+        Util.debug 3 "new precedence %a" pp_snapshot all_symbols;
         (* return number of new symbols *)
         prec', new_len - old_len
       end else mk_prec symbols table weight, 0

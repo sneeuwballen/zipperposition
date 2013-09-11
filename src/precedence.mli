@@ -64,7 +64,7 @@ val list_constraint : Symbol.t list -> constr
 val arity_constraint : Signature.t -> constr
   (** decreasing arity constraint *)
 
-val invfreq_constraint : clause Sequence.t -> constr
+val invfreq_constraint : Formula.t Sequence.t -> constr
   (** symbols with high frequency are smaller *)
 
 val max_constraint : Symbol.t list -> constr
@@ -83,7 +83,7 @@ val create : ?complete:bool -> constr list -> Symbol.t list -> t
       more important than later constraints. Only the very first constraint
       is assured to be totally satisfied.
       
-      If [complete] is true (default) the symbol list is completed using
+      If [complete] is true (default false) the symbol list is completed using
       special symbols. *)
 
 val default : Signature.t -> t

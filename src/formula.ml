@@ -122,6 +122,8 @@ let mk_atom p =
 
 let mk_not f =
   match f.form with
+  | True -> mk_false
+  | False -> mk_true
   | Not f' -> f'  (* double negation *)
   | _ -> H.hashcons { form=Not f; flags=f.flags; id= ~-1; }
 

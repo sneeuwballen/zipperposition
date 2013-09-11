@@ -32,7 +32,7 @@ module F = Formula
 (* check whether the formula is already in CNF *)
 let rec is_cnf f = match f.F.form with
   | F.Or l -> List.for_all is_lit l
-  | F.Not f' -> is_lit f'
+  | F.Not f' -> is_lit f
   | F.True
   | F.False
   | F.Atom _
@@ -187,11 +187,12 @@ type clause = Formula.t list
 (* Transform the clause into proper CNF; returns a list of clauses *)
 let cnf_of ?(ctx=Skolem.create ()) f =
   let f = F.flatten f in
+  Util.debug 4 "reduce %a to CNF..." F.pp f;
   let clauses = if is_cnf f
     then
       match f.F.form with
       | F.Or l -> [l]
-      | F.False -> []
+      | F.False
       | F.True 
       | F.Equal _
       | F.Atom _ -> [[f]]
@@ -203,7 +204,6 @@ let cnf_of ?(ctx=Skolem.create ()) f =
       | F.Forall _
       | F.Exists _ -> assert false
     else begin
-      Util.debug 4 "reduce %a to CNF..." F.pp f;
       let f = F.simplify f in
       Util.debug 4 "... simplified: %a" F.pp f;
       let f = nnf true f in
