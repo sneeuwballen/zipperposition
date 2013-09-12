@@ -209,8 +209,10 @@ let load_everything ?meta ~plugins ~params formulas =
   let env = mk_env ?meta ~params formulas in
   Extensions.apply_list ~env plugins;
   (* env after preprocessing *)
+  Util.debug 1 "preprocessing...";
   let env, formulas = do_preprocessing ?meta ~params ~env formulas in
   Extensions.apply_list ~env plugins;
+  Util.debug 1 "reduce to CNF...";
   let clauses = Env.cnf ~env formulas in
   Util.debug 3 "CNF:\n  %a" (Util.pp_list ~sep:"\n  " C.pp) clauses;
   let clauses = enrich_with_theories ~env clauses in
@@ -293,7 +295,7 @@ let process_file ?meta ~plugins ~params file =
   let formulas = Sequence.map PF.of_sourced formulas in
   let formulas = Sequence.to_rev_list formulas in
   (* obtain clauses + env *)
-  Util.debug 2 "input formulas:\n  %a\n" (Util.pp_list ~sep:"\n  " PF.pp) formulas;
+  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_list ~sep:"\n%%  " PF.pp) formulas;
   let env, clauses = load_everything ?meta ~plugins ~params formulas in
   (* pre-saturation *)
   let num_clauses = List.length clauses in
@@ -302,8 +304,8 @@ let process_file ?meta ~plugins ~params file =
     else Sat.Unknown, clauses
   in
   Util.debug 1 "signature: %a" Signature.pp_no_base (Env.signature env);
-  Util.debug 2 "%d clauses processed into:\n  %a\n"
-    num_clauses (Util.pp_list ~sep:"\n  " C.pp) clauses;
+  Util.debug 2 "%d clauses processed into:\n%%  %a"
+    num_clauses (Util.pp_list ~sep:"\n%%  " C.pp) clauses;
   (* add clauses to passive set of [env] *)
   Env.add_passive ~env (Sequence.of_list clauses);
   (* saturate *)
