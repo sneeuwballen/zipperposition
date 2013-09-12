@@ -232,9 +232,9 @@ let create () =
   Logic.db_subscribe_goal reasoner.db (Signal.send on_new_goal);
   Logic.db_subscribe_all_facts reasoner.db (Signal.send on_new_fact);
   Logic.db_subscribe_all_facts db
-    (fun lit -> Util.debug 1 "reasoner: new fact %a" pp_lit lit);
+    (fun lit -> Util.debug 4 "reasoner: new fact %a" pp_lit lit);
   Logic.db_subscribe_goal db
-    (fun lit -> Util.debug 1 "reasoner: new goal %a" pp_lit lit);
+    (fun lit -> Util.debug 4 "reasoner: new goal %a" pp_lit lit);
   reasoner
     
 let is_empty reasoner =
