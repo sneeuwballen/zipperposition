@@ -107,3 +107,33 @@ let is_const_pred_definition f =
   | F.Equiv ({F.form=F.Atom {T.term=T.Node (s, [])}}, r) -> Some (s,r)
   | F.Equiv (l,{F.form=F.Atom {T.term=T.Node (s, [])}}) -> Some (s,l)
   | _ -> None
+
+(** {2 Interface to Tranform} *)
+
+(* mconcat on a list of lazy options *)
+let rec _lazy_mappend l = match l with
+  | (lazy (Some x)) :: _ -> Some x
+  | (lazy None) :: l' -> _lazy_mappend l'
+  | [] -> None
+
+let detect seq =
+  (* fmap on options *)
+  let (>|=) opt f = match opt with
+  | None -> None
+  | Some x -> Some (f x)
+  and (@|=) l f = match l with
+  | [] -> None
+  | x::_ -> Some (f x)
+  in
+  let seq = Sequence.fmap
+    (fun form ->
+      _lazy_mappend
+        [ lazy (is_definition form >|= Transform.of_term_rule)
+        ; lazy (is_pred_definition form >|= Transform.of_form_rule)
+        ; lazy (is_rewrite_rule form @|= Transform.of_term_rule)
+        ; lazy (is_pred_rewrite_rule form >|= Transform.of_form_rule)
+        ]
+    )
+    seq
+  in
+  Sequence.to_rev_list seq

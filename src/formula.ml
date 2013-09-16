@@ -265,6 +265,24 @@ let fold_depth ?(depth=0) f acc form =
   in
   recurse f acc depth form
 
+let weight f =
+  let rec count n f = match f.form with
+  | True
+  | False -> n + 1
+  | Not f'
+  | Forall f'
+  | Exists f' -> count (n+1) f'
+  | Equal (t1, t2) -> n + T.size t1 + T.size t2
+  | Atom p -> n + T.size p
+  | Or l
+  | And l -> List.fold_left count (n+1) l
+  | Imply (f1, f2)
+  | Equiv (f1, f2) ->
+    let n = count (n+1) f1 in
+    count n f2
+  in
+  count 0 f
+
 let add_terms set f = iter (T.THashSet.add set) f
 
 let terms f =
@@ -412,27 +430,27 @@ let open_forall ?(offset=0) f =
   in
   open_one offset f
 
-(** {2 Simplifications} *)
+let rec open_and f = match f.form with
+  | And l -> Util.list_flatmap open_and l
+  | True -> []
+  | _ -> [f]
 
-let rec _gather_or f = match f.form with
-  | Or l -> Util.list_flatmap _gather_or l
+let rec open_or f = match f.form with
+  | Or l -> Util.list_flatmap open_or l
   | False -> []
   | _ -> [f]
 
-let rec _gather_and f = match f.form with
-  | And l -> Util.list_flatmap _gather_and l
-  | True -> []
-  | _ -> [f]
+(** {2 Simplifications} *)
 
 let rec flatten f =
   if has_flag f flag_simplified then f
   else match f.form with
   | Or l ->
-    let l' = _gather_or f in
+    let l' = open_or f in
     let l' = List.map flatten l' in
     mk_or l'
   | And l ->
-    let l' = _gather_and f in
+    let l' = open_and f in
     let l' = List.map flatten l' in
     mk_and l'
   | Imply (f1, f2) -> mk_imply (flatten f1) (flatten f2)
@@ -740,6 +758,17 @@ module FSet = struct
 
   let size = H.length
 
+  let eq s1 s2 =
+    size s1 = size s2 &&
+    begin try
+      H.iter
+        (fun f () -> if not (mem s2 f) then raise Exit)
+        s1;
+      true
+    with Exit ->
+      false
+    end
+
   let add set f = H.replace set f ()
 
   let remove set f = H.remove set f
@@ -768,6 +797,15 @@ module FSet = struct
       (fun form () -> match f form with
         | None -> ()
         | Some form' -> add s form')
+      set;
+    s
+
+  let flatMap set f =
+    let s = create (size set) in
+    H.iter
+      (fun form () ->
+        let l = f form in
+        List.iter (fun form' -> add s form') l)
       set;
     s
 

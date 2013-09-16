@@ -51,3 +51,13 @@ val is_const_definition : Formula.t -> (Symbol.t * Term.t) option
 
 val is_const_pred_definition : Formula.t -> (Symbol.t * Formula.t) option
   (** Definition of constant predicate *)
+
+(** {2 Interface to Transform} *)
+
+(** See module {! Transform}. By detecting some shapes in the input,
+    for instance rewrite rules or term definitions, one can obtain
+    interesting transformations *)
+
+val detect : Formula.t Sequence.t -> Transform.t list
+  (** Detect shapes in the given sequence, and convert them into
+      transformations over formulas *)

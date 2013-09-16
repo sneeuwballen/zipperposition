@@ -99,6 +99,8 @@ let char_to_str c = match c with
 module Make(E : Index.EQUATION) = struct
   module E = E
 
+  type rhs = E.rhs
+
   type trie =
     | TrieNode of trie CharMap.t       (** map atom -> trie *)
     | TrieLeaf of (Term.t * E.t * int) list  (** leaf with (term, value, priority) list *)

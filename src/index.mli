@@ -152,9 +152,13 @@ end
 module type EQUATION = sig
   type t
 
+  type rhs
+    (** An equation can have something other than a term as a right-hand
+        side, for instance a formula. *)
+
   val equal : t -> t -> bool
 
-  val extract : t -> (Term.t * Term.t * bool)
+  val extract : t -> (Term.t * rhs * bool)
     (** Obtain a representation of the (in)equation. The sign indicates
         whether it is an equation [l = r] (if true) or an inequation
         [l != r] (if false) *)
@@ -169,6 +173,9 @@ module type UNIT_IDX = sig
 
   module E : EQUATION
     (** Module that describes indexed equations *)
+
+  type rhs = E.rhs
+    (** Right hand side of equation *)
 
   val empty : t
 
@@ -190,7 +197,7 @@ module type UNIT_IDX = sig
     (** Iterate on indexed equations *)
 
   val retrieve : sign:bool -> t scoped -> Term.t scoped -> 'a ->
-                 ('a -> Term.t -> Term.t -> E.t -> Substs.t -> 'a) ->
+                 ('a -> Term.t -> rhs -> E.t -> Substs.t -> 'a) ->
                  'a
       (** [retrieve ~sign (idx,si) (t,st) acc] folds on
           (in)equations l ?= r of given [sign] and substitutions [subst],

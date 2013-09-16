@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 module T = Term
+module F = Formula
 module S = Substs
 
 let prof_ordered_rewriting = Util.mk_profiler "rewriting.ordered"
@@ -63,7 +64,7 @@ module type ORDERED = sig
         performs term rewriting *)
 end
 
-module MakeOrdered(E : Index.EQUATION) = struct
+module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
   module E = E
 
   type rule = {
@@ -85,6 +86,7 @@ module MakeOrdered(E : Index.EQUATION) = struct
 
   module DT = Dtree.Make(struct
     type t = rule
+    type rhs = Term.t
     let equal = eq_rule
     let extract r = r.rule_left, r.rule_right, true
     let priority = rule_priority
@@ -208,6 +210,7 @@ module TRS = struct
   (** Instance of discrimination tree indexing} *)
   module DT = Dtree.Make(struct
     type t = rule
+    type rhs = Term.t
     let equal (l1,r1) (l2,r2) = l1 == l2 && r1 == r2
     let extract (l,r) = (l,r,true)
     let priority _ = 1
@@ -288,4 +291,90 @@ module TRS = struct
     in
     let t' = compute_nf S.empty t 0 in
     t'
+end
+
+(** {2 Formula Rewriting } *)
+
+module FormRW = struct
+  type rule = Term.t * Formula.t
+
+  (** Instance of discrimination tree indexing} *)
+  module DT = Dtree.Make(struct
+    type t = rule
+    type rhs = Formula.t
+    let equal (l1,r1) (l2,r2) = T.eq l1 l2 && F.eq r1 r2
+    let extract (l,r) = (l,r,true)
+    let priority (l,r) = F.weight r
+  end)
+
+  type t = DT.t
+    (** Term Rewriting System *)
+
+  let empty = DT.empty
+
+  let add trs (l, r) =
+    (* check that the rule does not introduce variables *)
+    assert (List.for_all (fun v -> T.subterm ~sub:v l) (F.free_variables r));
+    assert (not (T.is_var l));
+    (* add rule to the discrimination tree *)
+    let trs = DT.add trs (l, r) in
+    trs
+
+  let add_seq trs seq =
+    Sequence.fold add trs seq
+
+  let add_list trs l =
+    List.fold_left add trs l
+
+  let add_term_rule trs (l,r) =
+    let rule = l, F.mk_atom r in
+    add trs rule
+
+  let add_term_rules trs seq =
+    List.fold_left add_term_rule trs seq
+
+  let size trs = DT.size trs
+
+  let iter trs k =
+    DT.iter trs (fun _ rule -> k rule)
+
+  let to_seq trs =
+    Sequence.from_iter
+      (fun k -> iter trs k)
+
+  let of_seq seq =
+    add_seq empty seq
+
+  let of_list l =
+    add_list empty l
+
+  (** {2 Computation of normal forms} *)
+
+  exception RewrittenIn of Formula.t * Substs.t
+
+  (** Compute normal form of the formula *)
+  let rewrite trs f =
+    let rec compute_nf subst f scope =
+      F.map_leaf
+        (fun leaf -> match leaf.F.form with
+          | F.Atom p ->
+            (* rewrite atoms *)
+            let p' = S.apply subst p scope in
+            reduce_at_root p'
+          | _ -> leaf)
+        f
+    (* try to rewrite this term at root *)
+    and reduce_at_root t =
+      try
+        DT.retrieve ~sign:true (trs,1) (t,0) () rewrite_handler;
+        F.mk_atom t  (* normal form is itself *)
+      with (RewrittenIn (f, subst)) ->
+        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t F.pp f Substs.pp subst;
+        compute_nf subst f 1  (* rewritten into subst(t',1), continue *)
+    (* attempt to use one of the rules to rewrite t *)
+    and rewrite_handler () l r rule subst =
+      raise (RewrittenIn (r, subst))
+    in
+    let f = compute_nf S.empty f 0 in
+    f
 end

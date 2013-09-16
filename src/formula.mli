@@ -103,6 +103,9 @@ val fold_depth : ?depth:int ->
   (** Fold on terms, but with an additional argument, the number of
       De Bruijn indexes bound on through the path to the term *)
 
+val weight : t -> int
+  (** Number of 'nodes' of the formula, including the terms *)
+
 (** The following functions gather the terms of a formula. *)
 
 val add_terms : Term.THashSet.t -> t -> unit
@@ -158,6 +161,12 @@ val close_exists : t -> t   (** Bind all free variables with exists *)
 val open_forall : ?offset:int -> t -> t
   (** Remove outer forall binders, using fresh vars instead of DB symbols *)
 
+val open_and : t -> t list
+  (** If the formula is an outer conjunction, return the list of elements of
+      the conjunction *)
+
+val open_or : t -> t list
+
 (** {2 Simplifications} *)
 
 val flatten : t -> t        (** Flatten AC connectives (or/and) *)
@@ -206,6 +215,9 @@ module FSet : sig
 
   val size : t -> int
     (** Number of formulas *)
+
+  val eq : t -> t -> bool
+    (** Equality of sets *)
   
   val add : t -> form -> unit
 
@@ -220,6 +232,8 @@ module FSet : sig
   val map : t -> (form -> form) -> t
 
   val fmap : t -> (form -> form option) -> t
+
+  val flatMap : t -> (form -> form list) -> t
 
   val union : t -> t -> t
     (** Union of two sets *)

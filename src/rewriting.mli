@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Term rewriting} *)
 
+(* FIXME: allow one to specify depth of rewritten term EVERYWHERE *)
+
 (** {2 Ordered rewriting} *)
 
 (** Although this module is parametrized by an EQUATION
@@ -51,7 +53,7 @@ module type ORDERED = sig
         performs term rewriting *)
 end
 
-module MakeOrdered(E : Index.EQUATION) : ORDERED with module E = E
+module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) : ORDERED with module E = E
 
 (** {2 Regular rewriting} *)
 
@@ -76,4 +78,32 @@ module TRS : sig
 
   val rewrite : t -> Term.t -> Term.t
     (** Compute normal form of the term *)
+end
+
+(** {2 Formula rewriting} *)
+
+module FormRW : sig
+  type t
+
+  type rule = Term.t * Formula.t
+    (** rewrite rule, from left to right *)
+
+  val empty : t 
+
+  val add : t -> rule -> t
+  val add_seq : t -> rule Sequence.t -> t
+  val add_list : t -> rule list -> t
+
+  val add_term_rule : t -> (Term.t * Term.t) -> t
+  val add_term_rules : t -> (Term.t * Term.t) list -> t
+
+  val to_seq : t -> rule Sequence.t
+  val of_seq : rule Sequence.t -> t
+  val of_list : rule list -> t
+
+  val size : t -> int
+  val iter : t -> (rule -> unit) -> unit
+
+  val rewrite : t -> Formula.t -> Formula.t
+    (** Compute normal form of the formula *)
 end

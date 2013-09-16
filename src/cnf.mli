@@ -48,3 +48,6 @@ val cnf_of : ?ctx:Skolem.ctx -> Formula.t -> clause list
 
 val cnf_of_list : ?ctx:Skolem.ctx -> Formula.t list -> clause list
 
+val as_transform : ctx:Skolem.ctx -> Transform.t
+  (** reduction to CNF as a transformation on formulas. It represents
+      clauses as n-ary disjunctions. *)

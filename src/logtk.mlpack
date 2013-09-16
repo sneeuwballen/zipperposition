@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: be711db15caf0a53330712dd93dc53d2)
+# DO NOT EDIT (digest: 35711f26c8f1574d6564906a90b4401a)
 Symbol
 Hash
 Hashcons
@@ -29,6 +29,7 @@ FormulaShape
 Util_tptp
 Skolem
 HO
+Transform
 lib/Sequence
 lib/Bij
 lib/Cache

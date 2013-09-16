@@ -222,3 +222,10 @@ let cnf_of ?(ctx=Skolem.create ()) f =
 
 let cnf_of_list ?(ctx=Skolem.create ()) l =
   Util.list_flatmap (fun f -> cnf_of ~ctx f) l
+
+let as_transform ~ctx =
+  let transform f =
+    let clauses = cnf_of ~ctx f in
+    List.map (fun c -> F.mk_or c) clauses
+  in
+  Transform.Tr ("cnf", transform)
