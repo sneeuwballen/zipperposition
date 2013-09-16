@@ -201,6 +201,10 @@ val to_string : t -> string
 
 val bij : t Bij.t
 
+(** {2 Containers} *)
+
+module Tbl : Hashtbl.S with type key = t
+
 (** {2 Set} *)
 
 (** Imperative set of formulas *)

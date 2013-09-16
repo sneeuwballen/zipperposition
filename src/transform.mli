@@ -36,6 +36,8 @@ type t =
   (** the function can return a conjunction of formulas. The
       string is a short name/description of the transformation *)
 
+type transformation = t
+
 val of_term_rule : (Term.t * Term.t) -> t
 
 val of_term_rules : (Term.t * Term.t) list -> t
@@ -69,3 +71,43 @@ val fix : t list -> Formula.FSet.t -> Formula.FSet.t
 
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
+
+(** {2 Transformation DAG} *)
+
+(** Abstraction over formulas with additional information. A FORM.t
+    contains a formula, and is built from parent formula wrappers
+    upon a transformation.
+*)
+
+module type FORM = sig
+  type t
+
+  val of_form : rule:string -> parents:t list -> Formula.t -> t
+
+  val to_form : t -> Formula.t
+end
+
+(** This module provides an infrastructure to efficiently compute
+    the fixpoint of a set of transformations on a set of formulas.
+    Formulas form a DAG, whose edges go from a formula to the formulas it
+    transforms into; result set is the set of leaves reachable from the
+    initial formulas.
+*)
+
+module type DAG = sig
+  module Form : FORM
+
+  type t
+
+  val create : (string * transformation) list -> t
+    (** Create a DAG that implements the given list of transformations *)
+
+  val transform : t -> Form.t list -> Form.t list
+    (** Transform a set of formulas recursively *)
+end
+
+(** Build a DAG *)
+module MakeDAG(Form : FORM) : DAG with module Form = Form
+
+(** Trivial instance, with bare formulas *)
+module FormDag : DAG with type Form.t = Formula.t

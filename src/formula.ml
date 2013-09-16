@@ -749,32 +749,33 @@ let bij =
     ~extract:of_term
     T.bij)
 
+(** {2 Containers} *)
+
+module Tbl = Hashtbl.Make(struct
+  type t = form
+  let equal = eq
+  let hash = hash
+end)
 
 (** {2 Sets of formulas} *)
 
 module FSet = struct
-  module H = Hashtbl.Make(struct
-    type t = form
-    let equal = eq
-    let hash = hash
-  end)
+  type t = unit Tbl.t
 
-  type t = unit H.t
+  let create = Tbl.create
 
-  let create = H.create
+  let copy = Tbl.copy
 
-  let copy = H.copy
+  let is_empty set = Tbl.length set = 0
 
-  let is_empty set = H.length set = 0
+  let mem = Tbl.mem
 
-  let mem = H.mem
-
-  let size = H.length
+  let size = Tbl.length
 
   let eq s1 s2 =
     size s1 = size s2 &&
     begin try
-      H.iter
+      Tbl.iter
         (fun f () -> if not (mem s2 f) then raise Exit)
         s1;
       true
@@ -782,9 +783,9 @@ module FSet = struct
       false
     end
 
-  let add set f = H.replace set f ()
+  let add set f = Tbl.replace set f ()
 
-  let remove set f = H.remove set f
+  let remove set f = Tbl.remove set f
 
   let add_seq set seq = Sequence.iter (add set) seq
 
@@ -792,21 +793,21 @@ module FSet = struct
 
   let filter set pred =
     let s = create (size set) in
-    H.iter
+    Tbl.iter
       (fun f () -> if pred f then add s f)
       set;
     s
 
   let map set f =
     let s = create (size set) in
-    H.iter
+    Tbl.iter
       (fun form () -> add s (f form))
       set;
     s
 
   let fmap set f =
     let s = create (size set) in
-    H.iter
+    Tbl.iter
       (fun form () -> match f form with
         | None -> ()
         | Some form' -> add s form')
@@ -815,7 +816,7 @@ module FSet = struct
 
   let flatMap set f =
     let s = create (size set) in
-    H.iter
+    Tbl.iter
       (fun form () ->
         let l = f form in
         List.iter (fun form' -> add s form') l)
@@ -824,19 +825,19 @@ module FSet = struct
 
   let union s1 s2 =
     let s = copy s1 in
-    H.iter (fun f () -> add s f) s2;
+    Tbl.iter (fun f () -> add s f) s2;
     s
 
   let inter s1 s2 =
-    let s = H.create (min (size s1) (size s2)) in
-    H.iter (fun f () -> if mem s2 f then add s f) s1;
+    let s = Tbl.create (min (size s1) (size s2)) in
+    Tbl.iter (fun f () -> if mem s2 f then add s f) s1;
     s
 
   let to_seq set =
-    Sequence.from_iter (fun k -> H.iter (fun f () -> k f) set)
+    Sequence.from_iter (fun k -> Tbl.iter (fun f () -> k f) set)
 
   let iter set k =
-    H.iter (fun f () -> k f) set
+    Tbl.iter (fun f () -> k f) set
 
   let of_list l =
     let s = create (List.length l) in
@@ -853,3 +854,4 @@ module FSet = struct
   let fmt fmt set =
     Format.pp_print_string fmt (Util.on_buffer pp set)
 end
+
