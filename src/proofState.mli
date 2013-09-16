@@ -35,6 +35,7 @@ type clause_pos = Clause.t * Position.t * Term.t
 
 module TermIndex : Index.TERM_IDX with type elt = clause_pos
 module UnitIndex : Index.UNIT_IDX with type E.t = (Term.t * Term.t * bool * Clause.t)
+                                  and type E.rhs = Term.t
 module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
 
 (** {2 Set of active clauses} *)

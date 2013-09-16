@@ -51,6 +51,7 @@ end)
 
 module UnitIndex = Dtree.Make(struct
   type t = Term.t * Term.t * bool * C.t
+  type rhs = Term.t
   let equal (t11,t12,s1,c1) (t21,t22,s2,c2) =
     T.eq t11 t21 && T.eq t12 t22 && s1 = s2 && C.eq c1 c2
   let extract (t1,t2,sign,_) = t1, t2, sign
