@@ -54,6 +54,9 @@ val of_term_tr : string -> (Term.t -> Term.t) -> t
 val open_and : t
   (** transformation that opens outermost "and" connectives *)
 
+val remove_trivial : t
+  (** Tranformation that removes trivial formulas *)
+
 val apply : t -> Formula.t -> Formula.t list
   (** Apply the transformations to a formula *)
 

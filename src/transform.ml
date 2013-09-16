@@ -65,6 +65,9 @@ let of_term_tr name term2term =
 let open_and =
   Tr ("open_and", F.open_and)
 
+let remove_trivial =
+  Tr ("remove_trivial", fun f -> if F.is_trivial f then [] else [f])
+
 let rec apply tr f = match tr with
   | RwTerm trs ->
     let f' = F.map_depth (fun depth t -> Rewriting.TRS.rewrite ~depth trs t) f in
