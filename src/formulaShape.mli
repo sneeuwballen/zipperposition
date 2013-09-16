@@ -61,3 +61,5 @@ val is_const_pred_definition : Formula.t -> (Symbol.t * Formula.t) option
 val detect : Formula.t Sequence.t -> Transform.t list
   (** Detect shapes in the given sequence, and convert them into
       transformations over formulas *)
+
+val detect_list : Formula.t list -> Transform.t list

@@ -242,6 +242,19 @@ let rec map_depth ?(depth=0) f form = match form.form with
   | Forall f' -> mk_forall (map_depth ~depth:(depth+1) f f')
   | Exists f' -> mk_exists (map_depth ~depth:(depth+1) f f')
 
+let rec map_leaf_depth ?(depth=0) f form = match form.form with
+  | And l -> mk_and (List.map (map_leaf_depth ~depth f) l)
+  | Or l -> mk_or (List.map (map_leaf_depth ~depth f) l)
+  | Imply (f1, f2) -> mk_imply (map_leaf_depth ~depth f f1) (map_leaf_depth ~depth f f2)
+  | Equiv (f1, f2) -> mk_equiv (map_leaf_depth ~depth f f1) (map_leaf_depth ~depth f f2)
+  | Not f' -> mk_not (map_leaf_depth ~depth f f')
+  | True
+  | False
+  | Atom _
+  | Equal _ -> f depth form  (* replace by image *)
+  | Forall f' -> mk_forall (map_leaf_depth ~depth:(depth+1) f f')
+  | Exists f' -> mk_exists (map_leaf_depth ~depth:(depth+1) f f')
+
 let fold_depth ?(depth=0) f acc form =
   let rec recurse f acc depth form = match form.form with
   | And l
@@ -824,4 +837,19 @@ module FSet = struct
 
   let iter set k =
     H.iter (fun f () -> k f) set
+
+  let of_list l =
+    let s = create (List.length l) in
+    List.iter (add s) l;
+    s
+
+  let to_list set =
+    Sequence.to_rev_list (to_seq set)
+
+  let pp buf set =
+    Printf.bprintf buf "set(\n  %a\n)"
+      (Util.pp_seq ~sep:"\n  " pp) (to_seq set)
+
+  let fmt fmt set =
+    Format.pp_print_string fmt (Util.on_buffer pp set)
 end

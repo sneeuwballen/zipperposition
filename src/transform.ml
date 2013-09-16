@@ -67,7 +67,7 @@ let open_and =
 
 let rec apply tr f = match tr with
   | RwTerm trs ->
-    let f' = F.map (fun t -> Rewriting.TRS.rewrite trs t) f in
+    let f' = F.map_depth (fun depth t -> Rewriting.TRS.rewrite ~depth trs t) f in
     [f']
   | RwForm frs ->
     let f' = Rewriting.FormRW.rewrite frs f in
@@ -82,18 +82,23 @@ let apply_set tr set =
   F.FSet.flatMap set (fun f -> apply tr f)
 
 let fix tr_list set =
-  let rec step l set' = match l with
+  let rec step l prev_set set = match l with
   | [] ->
-    if F.FSet.eq set set'
-      then set'
-      else step tr_list set'   (* start again with all transformations *)
+    if F.FSet.eq prev_set set
+      then set
+      else step tr_list set set
+        (* start again with all transformations, but remember the set
+          at the end of this turn *)
   | tr::l' ->
-    let set' = apply_set tr set in
-    step l' set'
+    let set = apply_set tr set in
+    step l' prev_set set
   in
-  step tr_list set
+  step tr_list set set
 
 let pp buf tr = match tr with
   | RwTerm trs -> Buffer.add_string buf "TRS"
   | RwForm trs -> Buffer.add_string buf "FormRW"
   | Tr (name, _) -> Buffer.add_string buf name
+
+let fmt fmt tr =
+  Format.pp_print_string fmt (Util.on_buffer pp tr)

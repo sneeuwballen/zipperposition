@@ -97,6 +97,10 @@ val map_depth: ?depth:int ->
   (** Map each term to another term. The number of binders from the root
       of the formula to the term is given to the function. *)
 
+val map_leaf_depth : ?depth:int ->
+                      (int -> t -> t) ->
+                      t -> t
+
 val fold_depth : ?depth:int ->
               ('a -> int -> Term.t -> 'a) ->
               'a -> t -> 'a
@@ -244,4 +248,11 @@ module FSet : sig
   val to_seq : t -> form Sequence.t
 
   val iter : t -> (form -> unit) -> unit
+
+  val of_list : form list -> t
+
+  val to_list : t -> form list
+
+  val pp : Buffer.t -> t -> unit
+  val fmt : Format.formatter -> t -> unit
 end

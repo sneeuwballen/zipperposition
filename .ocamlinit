@@ -18,6 +18,8 @@
 #install_printer Logtk.Ast_tptp.fmt_general;;
 #install_printer Logtk.Ast_tptp.fmt_role;;
 #install_printer Logtk.Ast_tptp.fmt_declaration;;
+#install_printer Logtk.Formula.FSet.fmt;;
+#install_printer Logtk.Transform.fmt;;
 #install_printer Logtk_meta.MetaPattern.fmt;;
 #install_printer Logtk_meta.MetaPattern.Set.fmt;;
 #install_printer Logtk_meta.MetaKB.fmt;;

@@ -65,4 +65,4 @@ val fix : t list -> Formula.FSet.t -> Formula.FSet.t
       is reached. *)
 
 val pp : Buffer.t -> t -> unit
-
+val fmt : Format.formatter -> t -> unit

@@ -137,3 +137,5 @@ let detect seq =
     seq
   in
   Sequence.to_rev_list seq
+
+let detect_list l = detect (Sequence.of_list l)

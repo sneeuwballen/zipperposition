@@ -76,7 +76,7 @@ module TRS : sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
 
-  val rewrite : t -> Term.t -> Term.t
+  val rewrite : ?depth:int -> t -> Term.t -> Term.t
     (** Compute normal form of the term *)
 end
 
@@ -104,6 +104,6 @@ module FormRW : sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
 
-  val rewrite : t -> Formula.t -> Formula.t
+  val rewrite : ?depth: int -> t -> Formula.t -> Formula.t
     (** Compute normal form of the formula *)
 end
