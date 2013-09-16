@@ -52,6 +52,7 @@ and cell = private
   | Exists of t
 
 type sourced_form = t * string * string    (* form, filename, axiom name *)
+type form = t
 
 val eq : t -> t -> bool
 val compare : t -> t -> int
@@ -187,3 +188,46 @@ val to_string : t -> string
 
 val bij : t Bij.t
 
+(** {2 Set} *)
+
+(** Imperative set of formulas *)
+
+module FSet : sig
+  type t
+
+  val create : int -> t
+
+  val copy : t -> t
+    (** Copy of the set *)
+
+  val is_empty : t -> bool
+
+  val mem : t -> form -> bool
+
+  val size : t -> int
+    (** Number of formulas *)
+  
+  val add : t -> form -> unit
+
+  val remove : t -> form -> unit
+
+  val add_seq : t -> form Sequence.t -> unit
+
+  val remove_seq : t -> form Sequence.t -> unit
+
+  val filter : t -> (form -> bool) -> t
+
+  val map : t -> (form -> form) -> t
+
+  val fmap : t -> (form -> form option) -> t
+
+  val union : t -> t -> t
+    (** Union of two sets *)
+
+  val inter : t -> t -> t
+    (** Intersection of two sets *)
+
+  val to_seq : t -> form Sequence.t
+
+  val iter : t -> (form -> unit) -> unit
+end

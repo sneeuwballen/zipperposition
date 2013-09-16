@@ -718,3 +718,72 @@ let bij =
     ~extract:of_term
     T.bij)
 
+
+(** {2 Sets of formulas} *)
+
+module FSet = struct
+  module H = Hashtbl.Make(struct
+    type t = form
+    let equal = eq
+    let hash = hash
+  end)
+
+  type t = unit H.t
+
+  let create = H.create
+
+  let copy = H.copy
+
+  let is_empty set = H.length set = 0
+
+  let mem = H.mem
+
+  let size = H.length
+
+  let add set f = H.replace set f ()
+
+  let remove set f = H.remove set f
+
+  let add_seq set seq = Sequence.iter (add set) seq
+
+  let remove_seq set seq = Sequence.iter (remove set) seq
+
+  let filter set pred =
+    let s = create (size set) in
+    H.iter
+      (fun f () -> if pred f then add s f)
+      set;
+    s
+
+  let map set f =
+    let s = create (size set) in
+    H.iter
+      (fun form () -> add s (f form))
+      set;
+    s
+
+  let fmap set f =
+    let s = create (size set) in
+    H.iter
+      (fun form () -> match f form with
+        | None -> ()
+        | Some form' -> add s form')
+      set;
+    s
+
+  let union s1 s2 =
+    let s = copy s1 in
+    H.iter (fun f () -> add s f) s2;
+    s
+
+  let inter s1 s2 =
+    let s = H.create (min (size s1) (size s2)) in
+    H.iter (fun f () -> if mem s2 f then add s f) s1;
+    s
+
+  let to_seq set =
+    Sequence.from_iter (fun k -> H.iter (fun f () -> k f) set)
+
+  let iter set k =
+    H.iter (fun f () -> k f) set
+end
