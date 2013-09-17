@@ -44,6 +44,9 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 
+(* TODO: params to limit depth of preprocessing *)
+(* TODO: params to enable/disable some preprocessing *)
+
 (** print stats *)
 let print_stats ~env =
   let print_hashcons_stats what (sz, num, sum_length, small, median, big) =
@@ -165,6 +168,8 @@ let mk_precedence ?(constrs=[]) ~params formulas =
   let signature = F.signature_seq formulas in
   let symbols = Signature.to_symbols signature in
   Precedence.create ~complete:false constrs symbols
+
+(* TODO: use Env.preprocess to reduce to CNF + expand defs *)
 
 (** Create the environment from parameters and formulas *)
 let mk_env ?meta ?constrs ~params formulas =

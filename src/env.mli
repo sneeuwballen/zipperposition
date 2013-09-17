@@ -38,6 +38,9 @@ type unary_inf_rule = Clause.t -> Clause.t list
 type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
   (** Rewrite rule on literals *)
 
+type preprocess_rule = string * (ctx:Ctx.t -> Transform.t)
+  (** A preprocessing rule, which is a named transformation of formula. *)
+
 type t = {
   mutable params : Params.t;
   mutable ctx : Ctx.t;
@@ -90,7 +93,7 @@ type t = {
   mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:Ctx.t -> PFormula.t list -> PFormula.t list;
+  mutable preprocess : preprocess_rule list;
     (** how to preprocess the initial list of formulas *)
 
   mutable state : ProofState.t;
@@ -145,6 +148,8 @@ val add_expert : env:t -> Experts.t -> unit
 val add_rewrite_rule : env:t -> string -> (Term.t -> Term.t) -> unit
 
 val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
+
+val add_preprocess_rule : env:t -> preprocess_rule -> unit
 
 val list_simplify : env:t -> Clause.t -> Clause.t list
 
@@ -224,5 +229,6 @@ val meta_step : env:t -> Clause.t -> Clause.t Sequence.t
       (lemmas) are returned. *)
   
 val preprocess : env:t -> PFormula.t list -> PFormula.t list
-  (** Preprocess clauses *)
+  (** Preprocess formulas. This has a fixpoint semantic, i.e. it applies
+      preprocessing rules until none applies anymore *)
 

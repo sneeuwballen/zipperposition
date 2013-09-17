@@ -63,6 +63,10 @@ module FSet : sig
 
   val add : t -> pform -> unit
 
+  val eq : t -> t -> bool
+
+  val flatMap : t -> (pform -> pform list) -> t
+
   val remove : t -> pform -> unit
 
   val iter : t -> (pform -> unit) -> unit
@@ -71,5 +75,13 @@ module FSet : sig
 
   val to_seq : t -> pform Sequence.t
 
+  val of_list : pform list -> t
+
+  val to_list : t -> pform list
+
   val size : t -> int
 end
+
+(** {2 Transformations} *)
+
+module TransformDag : Transform.DAG with type Form.t = pform

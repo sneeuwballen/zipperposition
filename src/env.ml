@@ -44,6 +44,8 @@ type unary_inf_rule = Clause.t -> Clause.t list
 type lit_rewrite_rule = ctx:Ctx.t -> Lit.t -> Lit.t
   (** Rewrite rule on literals *)
 
+type preprocess_rule = string * (ctx:Ctx.t -> Transform.t)
+  (** A preprocessing rule, which is a named transformation of formula. *)
 
 type t = {
   mutable params : Params.t;
@@ -97,7 +99,7 @@ type t = {
   mutable constr : Precedence.constr list;
     (** some constraints on the precedence *)
 
-  mutable preprocess : ctx:Ctx.t -> PFormula.t list -> PFormula.t list;
+  mutable preprocess : preprocess_rule list;
     (** how to preprocess the initial list of formulas *)
 
   mutable state : ProofState.t;
@@ -132,7 +134,7 @@ let create ?meta ~ctx params signature =
     axioms = [];
     mk_constr = [];
     constr = [];
-    preprocess = (fun ~ctx l -> l);
+    preprocess = [];
     state;
     empty_clauses = C.CSet.empty;
     on_empty = [];
@@ -215,6 +217,9 @@ let add_rewrite_rule ~env name rule =
 
 let add_lit_rule ~env name rule =
   env.lit_rules <- (name, rule) :: env.lit_rules
+
+let add_preprocess_rule ~env rule =
+  env.preprocess <- env.preprocess @ [rule]
 
 let get_experts ~env =
   env.state#experts
@@ -572,6 +577,9 @@ let meta_step ~env c =
   in
   Sequence.of_list results
 
-(** Preprocess clauses *)
-let preprocess ~env forms =
-  env.preprocess ~ctx:env.ctx forms
+(** Preprocess set of formulas *)
+let preprocess ~env l =
+  let tr_list = List.map (fun (name, f) -> name, f ~ctx:env.ctx) env.preprocess in
+  let dag = PF.TransformDag.create tr_list in
+  let l' = PFormula.TransformDag.transform dag l in
+  l'

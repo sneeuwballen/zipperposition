@@ -1199,7 +1199,9 @@ let setup_env ~env =
   and constrs =
     [Precedence.min_constraint
       [Symbol.split_symbol; Symbol.false_symbol; Symbol.true_symbol]]
-  and preprocess ~ctx l = List.filter (fun f -> not (F.is_trivial f.PF.form)) l in
+  and rule_remove_trivial = ("remove_trivial", fun ~ctx -> Transform.remove_trivial)
+  and rule_reduce_cnf = ("cnf", fun ~ctx -> Cnf.as_transform ~ctx:(Ctx.skolem_ctx ~ctx))
+  in
   Env.add_binary_inf ~env "superposition_passive" infer_passive;
   Env.add_binary_inf ~env "superposition_active" infer_active;
   Env.add_unary_inf ~env "equality_factoring" infer_equality_factoring;
@@ -1213,5 +1215,6 @@ let setup_env ~env =
   env.Env.list_simplify <- list_simplify;
   env.Env.is_trivial <- is_trivial;
   Env.add_constrs env (Sequence.of_list constrs);
-  env.Env.preprocess <- preprocess;
+  Env.add_preprocess_rule ~env rule_remove_trivial;
+  Env.add_preprocess_rule ~env rule_reduce_cnf;
   ()

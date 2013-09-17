@@ -79,9 +79,27 @@ module FSet = struct
 
   let create () = H.create 15
 
+  let eq s1 s2 =
+    H.length s1 = H.length s2 &&
+    try
+      H.iter
+        (fun pf () -> if not (H.mem s2 pf) then raise Exit)
+        s1;
+      true
+    with Exit -> false
+
   let add set pf = H.replace set pf ()
 
   let remove set pf = H.remove set pf
+
+  let flatMap set f =
+    let s' = H.create (H.length set) in
+    H.iter
+      (fun pf () ->
+        let l = f pf in
+        List.iter (fun pf -> add s' pf) l)
+      set;
+    s'
 
   let iter set k = H.iter (fun pf () -> k pf) set
 
@@ -92,5 +110,32 @@ module FSet = struct
   let to_seq set =
     Sequence.from_iter (fun k -> iter set k)
 
+  let of_list l =
+    let s = create () in
+    List.iter (add s) l;
+    s
+
+  let to_list set =
+    let l = ref [] in
+    iter set (fun x -> l := x :: !l);
+    !l
+
   let size set = H.length set
 end
+
+(** {2 Transformations} *)
+
+module TransformDag = Transform.MakeDAG(struct
+  type t = pform
+
+  let to_form pf = pf.form
+
+  let of_form ~rule ~parents form =
+    let proof = match parents with
+    | [] -> Proof.mk_f_axiom form ~file:"" ~name:rule
+    | _::_ ->
+      let premises = List.map get_proof parents in
+      Proof.mk_f_step ~esa:true form ~rule premises
+    in
+    { form; proof; }
+end)
