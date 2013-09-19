@@ -85,6 +85,7 @@ rule token = parse
   | "and" { AND_ALSO }
   | "lemma" { LEMMA }
   | "include" { INCLUDE }
+  | "raw" { RAW }
   | vline { VLINE }
   | '&' { AND }
   | '!' { FORALL }

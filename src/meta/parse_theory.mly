@@ -68,6 +68,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token THEORY
 %token LEMMA
 %token INCLUDE
+%token RAW
 
 %token NOT
 
@@ -131,6 +132,7 @@ statement:
   | t=theory { t }
   | a=axiom { a }
   | l=lemma { l }
+  | c=clause { c }
   | i=include_ { i }
 
 theory:
@@ -152,6 +154,21 @@ lemma:
     { let name, args = h in
       Ast_theory.Lemma (name, args, l)
     }
+
+clause:
+  | RAW h=datalog_lit DOT
+    { Ast_theory.Clause (h, []) }
+  | RAW h=datalog_lit IF l=separated_nonempty_list(COMMA, datalog_lit) DOT
+    { Ast_theory.Clause (h, l) }
+
+datalog_lit:
+  | s=atomic_word { s, [] }
+  | s=atomic_word LEFT_PAREN l=separated_nonempty_list(COMMA, datalog_term) RIGHT_PAREN
+    { s, l }
+
+datalog_term:
+  | s=atomic_word { s }
+  | s=UPPER_WORD { s }
 
 include_:
   | INCLUDE w=atomic_word DOT

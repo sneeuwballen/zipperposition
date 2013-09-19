@@ -35,12 +35,15 @@ type statement =
   | LemmaInline of Formula.t * premise list
   | Axiom of string * string list * Formula.t
   | Theory of string * string list * premise list
+  | Clause of clause
   | Include of string
   | Error of string * Lexing.position * Lexing.position
   (** Parse statement *)
 and premise =
   | IfAxiom of Formula.t
   | IfFact of string * string list
+and clause = raw_lit * raw_lit list
+and raw_lit = string * string list
 
 (** Print a statement *)
 let pp buf statement =
@@ -55,6 +58,10 @@ let pp buf statement =
   in
   let pp_premises buf premises =
     Util.pp_list ~sep:" and " pp_premise buf premises
+  and pp_lit buf lit = match lit with
+  | s, [] -> Buffer.add_string buf s
+  | s, args ->
+    Printf.bprintf buf "%s(%a)" s (Util.pp_list Buffer.add_string) args
   in
   match statement with
   | Lemma (s, args, premises) ->
@@ -68,6 +75,9 @@ let pp buf statement =
   | Theory (s, args, premises) ->
     Printf.bprintf buf "theory %a is %a." pp_datalog (s, args)
       pp_premises premises
+  | Clause (head, []) -> Printf.bprintf buf "%a." pp_lit head
+  | Clause (head, body) ->
+    Printf.bprintf buf "%a :- %a." pp_lit head (Util.pp_list pp_lit) body
   | Include s ->
     Printf.bprintf buf "include %s." s
   | Error (e, start, stop) ->

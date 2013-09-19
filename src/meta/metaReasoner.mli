@@ -27,7 +27,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type datalog_symbol
+type datalog_symbol =
+  | DSName of string
+  | DSTerm of Term.t
+  | DSFormula of Formula.t
+  | DSType of Type.t
+  | DSSTartList of int
 
 module Logic : Datalog.S with type symbol = datalog_symbol
 

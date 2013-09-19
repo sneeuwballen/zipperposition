@@ -38,6 +38,9 @@ and theory =
 and premise =
   | IfAxiom of string * Term.t list
   | IfPattern of MetaPattern.t * Term.t list
+and clause =
+  | Clause of raw_lit * raw_lit list
+and raw_lit = string * string list
 
 (** {2 Knowledge base} *)
 
@@ -50,6 +53,7 @@ val empty : t
 val add_lemma : t -> lemma -> t
 val add_axiom : t -> axiom -> t
 val add_theory : t -> theory -> t
+val add_clause : t -> clause -> t
 
 val get_axiom : t -> string -> axiom option
 val get_theory : t -> string -> theory list
@@ -64,8 +68,10 @@ val diff : t -> t -> t
   (** [diff kb1 kb2] is the set of definitions of [kb1] that
       do not belong to [kb2] *)
 
-val to_seq : t -> (lemma Sequence.t * axiom Sequence.t * theory Sequence.t)
-val of_seq : (lemma Sequence.t * axiom Sequence.t * theory Sequence.t) -> t
+val to_seq : t -> (lemma Sequence.t * axiom Sequence.t *
+                   theory Sequence.t * clause Sequence.t)
+val of_seq : (lemma Sequence.t * axiom Sequence.t *
+              theory Sequence.t * clause Sequence.t) -> t
 
 val pp_lemma : Buffer.t -> lemma -> unit
 val pp_theory : Buffer.t -> theory -> unit
@@ -76,6 +82,7 @@ val fmt : Format.formatter -> t -> unit
 val bij_lemma : lemma Bij.t
 val bij_axiom : axiom Bij.t
 val bij_theory : theory Bij.t
+val bij_clause : clause Bij.t
 val bij_premise : premise Bij.t
 val bij : t Bij.t
 

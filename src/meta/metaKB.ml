@@ -41,6 +41,9 @@ and theory =
 and premise =
   | IfAxiom of string * Term.t list
   | IfPattern of MetaPattern.t * Term.t list
+and clause =
+  | Clause of raw_lit * raw_lit list
+and raw_lit = string * string list
 
 (* XXX not very efficient, may we need a lazy {! Util.lexicograph_combine}? *)
 let rec compare_lemma l1 l2 = match l1, l2 with
@@ -66,10 +69,12 @@ and compare_premise p1 p2 = match p1, p2 with
     Util.lexicograph_combine [MetaPattern.compare p1 p2; Util.lexicograph T.compare args1 args2]
 and compare_premises l1 l2 =
   Util.lexicograph compare_premise l1 l2
+and compare_clause = Pervasives.compare
 
 module StringMap = Sequence.Map.Make(String)
 module LemmaSet = Sequence.Set.Make(struct type t = lemma let compare = compare_lemma end)
 module TheoryMap = MultiMap.Make(String)(struct type t = theory let compare = compare_theory end)
+module ClauseSet = Sequence.Set.Make(struct type t = clause let compare = compare_clause end)
 
 let name_of_axiom = function
   | Axiom (s, _, _, _) -> s
@@ -83,17 +88,20 @@ type t = {
   lemmas : LemmaSet.t;            (* set of lemmas *)
   axioms : axiom StringMap.t;     (* axioms, by name *)
   theories : TheoryMap.t;         (* theories, by name *)
+  clauses : ClauseSet.t;          (* set of raw clauses *)
 } (* KB *)
 
 let eq t1 t2 =
   LemmaSet.equal t1.lemmas t2.lemmas &&
   StringMap.equal (fun a1 a2 -> compare_axiom a1 a2 = 0) t1.axioms t2.axioms &&
-  TheoryMap.equal t1.theories t2.theories
+  TheoryMap.equal t1.theories t2.theories &&
+  ClauseSet.equal t1.clauses t2.clauses
 
 let empty =
   { lemmas = LemmaSet.empty;
     axioms = StringMap.empty;
     theories = TheoryMap.empty;
+    clauses = ClauseSet.empty;
   }
 
 let add_lemma kb l =
@@ -107,6 +115,9 @@ let add_axiom kb a =
 let add_theory kb t =
   let name = name_of_theory t in
   { kb with theories = TheoryMap.add kb.theories name t }
+
+let add_clause kb c =
+  { kb with clauses = ClauseSet.add c kb.clauses }
 
 let get_axiom kb s =
   try Some (StringMap.find s kb.axioms)
@@ -138,6 +149,7 @@ let union t1 t2 =
   { lemmas = LemmaSet.union t1.lemmas t2.lemmas;
     axioms = StringMap.merge merge_axioms t1.axioms t2.axioms;
     theories = TheoryMap.union t1.theories t2.theories;
+    clauses = ClauseSet.union t1.clauses t2.clauses;
   }
 
 let diff t1 t2 =
@@ -148,19 +160,22 @@ let diff t1 t2 =
   { lemmas = LemmaSet.diff t1.lemmas t2.lemmas;
     axioms = diff_map t1.axioms t2.axioms;
     theories = TheoryMap.diff t1.theories t2.theories;
+    clauses = ClauseSet.diff t1.clauses t2.clauses;
   }
 
 let to_seq kb =
   ( LemmaSet.to_seq kb.lemmas
   , StringMap.values kb.axioms
   , TheoryMap.values kb.theories
+  , ClauseSet.to_seq kb.clauses
   )
 
-let of_seq (lemmas, axioms, theories) =
+let of_seq (lemmas, axioms, theories, clauses) =
   let kb = empty in
   let kb = Sequence.fold add_lemma kb lemmas in
   let kb = Sequence.fold add_axiom kb axioms in
   let kb = Sequence.fold add_theory kb theories in
+  let kb = Sequence.fold add_clause kb clauses in
   kb
 
 let pp_premise buf p = match p with
@@ -178,12 +193,21 @@ and pp_axiom buf = function
 and pp_theory buf = function
   | Theory (s, args, premises) -> Printf.bprintf buf "theory(%s(%a) if %a)"
     s (Util.pp_list T.pp) args pp_premises premises
+and pp_lit buf lit = match lit with
+  | h, [] -> Buffer.add_string buf h
+  | h, l -> Printf.bprintf buf "%s(%a)" h (Util.pp_list Buffer.add_string) l
+
+let pp_clause buf = function
+  | Clause (lit, []) -> pp_lit buf lit; Buffer.add_char buf '.'
+  | Clause (lit, body) ->
+    Printf.bprintf buf "%a :- %a." pp_lit lit (Util.pp_list pp_lit) body
 
 let pp buf kb =
   Buffer.add_string buf "KB {\n";
   StringMap.iter (fun _ a -> Printf.bprintf buf "  %a\n" pp_axiom a) kb.axioms;
   TheoryMap.iter kb.theories (fun _ t -> Printf.bprintf buf "  %a\n" pp_theory t);
   LemmaSet.iter (Printf.bprintf buf "  %a\n" pp_lemma) kb.lemmas;
+  ClauseSet.iter (Printf.bprintf buf "  %a\n" pp_clause) kb.clauses;
   Buffer.add_string buf "}\n";
   ()
 
@@ -223,19 +247,31 @@ let bij_theory =
     ~extract:(fun (s,args,premises) -> Theory(s,args,premises))
     (triple string_ (list_ T.bij) (list_ bij_premise)))
 
+let bij_lit =
+  Bij.(pair string_ (list_ string_))
+
+let bij_clause =
+  Bij.(map
+    ~inject:(fun (Clause (h,b)) -> h,b)
+    ~extract:(fun (h,b) -> Clause(h,b))
+    (pair bij_lit (list_ bij_lit)))
+
 let bij =
   let open Bij in
-  let bij_kb = triple (list_ bij_lemma) (list_ bij_axiom) (list_ bij_theory) in
+  let bij_kb = quad (list_ bij_lemma) (list_ bij_axiom)
+    (list_ bij_theory) (list_ bij_clause) in
   map
     ~inject:(fun kb ->
-      let lemmas, axioms, theories = to_seq kb in
+      let lemmas, axioms, theories, clauses = to_seq kb in
       Sequence.to_rev_list lemmas,
       Sequence.to_rev_list axioms,
-      Sequence.to_rev_list theories)
-    ~extract:(fun (lemmas, axioms, theories) ->
+      Sequence.to_rev_list theories,
+      Sequence.to_rev_list clauses)
+    ~extract:(fun (lemmas, axioms, theories, clauses) ->
       of_seq (Sequence.of_list lemmas,
               Sequence.of_list axioms,
-              Sequence.of_list theories))
+              Sequence.of_list theories,
+              Sequence.of_list clauses))
     bij_kb
 
 (** {2 MetaReasoner} *)
@@ -266,6 +302,38 @@ let encode_premise p =
     encode mapping "axiom" (s, terms)
   | IfPattern (p, args) -> encode MetaPattern.mapping "pattern" (p, args)
 
+(* clause -> proper datalog clause *)
+let _compile_clause (Clause (head,body)) =
+  let open MetaReasoner.Logic in
+  let h = Hashtbl.create 5 in
+  let find_var name =
+    try Hashtbl.find h name
+    with Not_found ->
+      let n = Hashtbl.length h in
+      let v = mk_var n in
+      Hashtbl.add h name v;
+      v
+  in
+  let compile_lit (s, args) =
+    let s = MetaReasoner.DSName s in
+    let args = List.map
+      (fun arg ->
+        assert (arg <> "");
+        if arg.[0] = 'L'
+          then try
+            let i = int_of_string (String.sub arg 1 (String.length arg-1)) in
+            mk_const (MetaReasoner.DSSTartList i)
+          with Failure _ ->
+            find_var arg 
+        else if Char.uppercase arg.[0] = arg.[0]
+          then find_var arg
+          else mk_const (MetaReasoner.DSName arg))
+      args
+    in
+    mk_literal s args
+  in
+  mk_clause (compile_lit head) (List.map compile_lit body)
+
 let add_axioms reasoner axioms =
   let open MetaReasoner.Translate in
   StringMap.iter
@@ -293,11 +361,18 @@ and add_lemmas reasoner lemmas =
       let clause = MetaReasoner.Logic.mk_clause concl premises in
       MetaReasoner.add reasoner clause)
     lemmas
+and add_clauses reasoner clauses =
+  ClauseSet.iter
+    (fun c ->
+      let clause = _compile_clause c in
+      MetaReasoner.add reasoner clause)
+    clauses
 
 let add_reasoner reasoner kb =
   add_axioms reasoner kb.axioms;
   add_theories reasoner kb.theories;
   add_lemmas reasoner kb.lemmas;
+  add_clauses reasoner kb.clauses;
   ()
 
 let on_lemma r =
@@ -392,6 +467,7 @@ let formulas_of_statements statements =
         Sequence.append (Sequence.singleton f) (gather_premises premises)
       | A.Axiom (_, _, f) -> Sequence.singleton f
       | A.Theory (_, _, premises) -> gather_premises premises
+      | A.Clause (head, body) -> Sequence.empty
       | A.Include _
       | A.Error _ -> Sequence.empty)
     statements
@@ -508,6 +584,9 @@ let kb_of_statements ?(init=empty) statements =
       let new_args = TermBij.apply_list perm args in
       let theory = Theory (s, new_args, new_premises) in
       add_theory kb theory
+    | A.Clause (head, body) ->
+      let c = Clause (head, body) in
+      add_clause kb c
     | A.Include _ -> failwith "KB.kb_of_statements: remaining includes"
     | A.Error _ -> failwith "KB.kb_of_statements: error in list"
   in
