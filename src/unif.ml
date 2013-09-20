@@ -33,6 +33,7 @@ open Term
 
 let prof_unification = Util.mk_profiler "unification"
 let prof_matching = Util.mk_profiler "matching"
+let prof_variant = Util.mk_profiler "alpha-equiv"
 
 exception Fail
 
@@ -153,6 +154,7 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
     raise e
 
 let variant ?(subst=S.empty) a sc_a b sc_b =
+  Util.enter_prof prof_variant;
   (* recursive variant checking *)
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s in
@@ -179,7 +181,20 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
     let subst = unif subst t1 sc_1 t2 sc_2 in
     unif_list subst l1' sc_1 l2' sc_2
   in
-  unif subst a sc_a b sc_b
+  try
+    let subst = unif subst a sc_a b sc_b in
+    Util.exit_prof prof_variant;
+    subst
+  with Fail as e ->
+    Util.exit_prof prof_variant;
+    raise e
+
+let are_variant t1 t2 =
+  try
+    let _ = variant t1 0 t2 1 in
+    true
+  with Fail ->
+    false
 
 (** [matching_ac a b] returns substitutions such that [subst(a) =_AC b]. It
     is much more costly than [matching]. By default [is_ac] returns true only
@@ -341,3 +356,10 @@ let form_variant ?(subst=S.empty) f1 sc_1 f2 sc_2 =
   (* bottom continuation *)
   let seq k = unif subst f1 f2 k in
   Sequence.from_iter seq
+
+let form_are_variant f1 f2 =
+  try
+    let _ = form_variant f1 0 f2 1 in
+    true
+  with Fail ->
+    false

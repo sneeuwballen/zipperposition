@@ -56,6 +56,8 @@ val matching_ac : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
       for symbols that have [attr_ac], and [is_com] only for [attr_commut].
       [offset] is used to create new variables. *)
 
+val are_variant : Term.t -> Term.t -> bool
+
 (** {2 Unification on formulas} *)
 
 val form_unify : ?subst:Substs.t ->
@@ -73,3 +75,5 @@ val form_variant : ?subst:Substs.t ->
                     Substs.t Sequence.t
   (** Set of renamings of both formulas, if they are alpha-equivalent
       modulo AC *)
+
+val form_are_variant : Formula.t -> Formula.t -> bool
