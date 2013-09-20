@@ -89,6 +89,19 @@ let hash_rec f = match f.form with
   | Forall f' -> Hash.hash_int (hash f')
   | Exists f' -> Hash.hash_int2 (hash f') 11
 
+let rec hash_novar f = match f.form with
+  | True -> 13
+  | False -> 14
+  | Atom t -> T.hash t
+  | And l -> Hash.hash_list hash 17 l
+  | Or l -> Hash.hash_list hash 19 l
+  | Not f' -> Hash.hash_int2 (hash_novar f') 23
+  | Imply (f1,f2) -> Hash.hash_int2 (hash_novar f1) (hash_novar f2)
+  | Equiv (f1,f2) -> Hash.hash_int2 (hash_novar f1 lxor hash_novar f2) 11
+  | Equal (t1,t2) -> Hash.hash_int2 (T.hash_novar t1 lxor T.hash_novar t2) 13
+  | Forall f' -> Hash.hash_int (hash_novar f')
+  | Exists f' -> Hash.hash_int2 (hash_novar f') 11
+
 (** {2 Flags} *)
 
 let flag_simplified = 0x1

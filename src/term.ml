@@ -60,6 +60,17 @@ let hash_term t = match t.term with
   | At (t1, t2) ->
     Hash.combine t1.tag t2.tag
 
+let rec hash_novar t = match t.term with
+  | Var _ -> 42
+  | BoundVar _ -> 43
+  | Node (s, l) ->
+    let h = Symbol.hash s in
+    Hash.hash_list hash_novar h l
+  | Bind (s, t') ->
+    Hash.combine (Symbol.hash s) (hash_novar t')
+  | At (t1,t2) ->
+    Hash.combine (hash_novar t1) (hash_novar t2)
+
 let prof_mk_node = Util.mk_profiler "Term.mk_node"
 
 (** {2 Comparison, equality, containers} *)

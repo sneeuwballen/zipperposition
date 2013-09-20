@@ -54,6 +54,7 @@ val subterm : sub:t -> t -> bool    (** checks whether [sub] is a (non-strict) s
 val eq : t -> t -> bool             (** standard equality on terms *)
 val compare : t -> t -> int         (** a simple order on terms *)
 val hash : t -> int
+val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
 val has_type : t -> bool              (** Has a known type *)
 val compatible_type : t -> t -> bool  (** Unifiable types? false if type missing *)

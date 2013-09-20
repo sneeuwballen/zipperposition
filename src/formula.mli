@@ -57,6 +57,7 @@ type form = t
 val eq : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
+val hash_novar : t -> int
 
 val mk_true : t
 val mk_false : t
