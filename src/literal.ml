@@ -85,6 +85,29 @@ let compare l1 l2 =
   | False, False -> 0
   | _, _ -> __to_int l1 - __to_int l2
 
+let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
+  match lit1, lit2 with
+  | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
+    Unif.variant ~subst p1 sc1 p2 sc2
+  | True, True
+  | False, False -> subst
+  | Equation (l1, r1, sign1, _), Equation (l2, r2, sign2, _) when sign1 = sign2 ->
+    begin try
+      let subst = Unif.variant ~subst l1 sc1 l2 sc2 in
+      Unif.variant ~subst r1 sc1 r2 sc2
+    with Unif.Fail ->
+      let subst = Unif.variant ~subst l1 sc1 r2 sc2 in
+      Unif.variant ~subst r1 sc1 l2 sc2
+    end
+  | _ -> raise Unif.Fail
+
+let are_variant lit1 lit2 =
+  try
+    let _ = variant lit1 0 lit2 1 in
+    true
+  with Unif.Fail ->
+    false
+
 let to_multiset lit = match lit with
   | Equation (l, r, true, _) -> [l; r]
   | Equation (l, r, false, _) -> [l; l; r; r]
@@ -102,6 +125,17 @@ let hash lit = match lit with
   | Equation (l, r, sign, o) ->
     Hash.hash_int3 (22 + Comparison.to_total o) l.T.tag r.T.tag
   | Prop (p, sign) -> T.hash p
+  | True -> 2
+  | False -> 1
+
+let hash_novar lit = match lit with
+  | Equation (l, r, sign, o) ->
+    let hl = T.hash_novar l in
+    let hr = T.hash_novar r in
+    if hl < hr
+      then Hash.hash_int3 22 hl hr
+      else Hash.hash_int3 22 hr hl
+  | Prop (p, sign) -> T.hash_novar p
   | True -> 2
   | False -> 1
 
@@ -334,10 +368,34 @@ module Arr = struct
       then Array.length lits1 - Array.length lits2
       else check 0
 
+  let sort_by_hash lits =
+    Array.sort (fun l1 l2 -> hash_novar l1 - hash_novar l2) lits
+
   let hash lits =
     Array.fold_left
       (fun h lit -> Hash.hash_int2 h (hash lit))
       13 lits
+
+  let hash_novar lits =
+    Array.fold_left
+      (fun h lit -> Hash.hash_int2 h (hash_novar lit))
+      13 lits
+
+  let variant ?(subst=Substs.empty) a1 sc1 a2 sc2 =
+    if Array.length a1 <> Array.length a2
+      then raise Unif.Fail;
+    let subst = ref subst in
+    for i = 0 to Array.length a1 - 1 do
+      subst := variant ~subst:!subst a1.(i) sc1 a2.(i) sc2;
+    done;
+    !subst
+
+  let are_variant a1 a2 =
+    try
+      let _ = variant a1 0 a2 1 in
+      true
+    with Unif.Fail ->
+      false
 
   let weight lits =
     Array.fold_left (fun w lit -> w + weight lit) 0 lits

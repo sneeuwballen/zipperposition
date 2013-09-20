@@ -40,6 +40,12 @@ val eq : t -> t -> bool         (** equality of literals *)
 val eq_com : t -> t -> bool     (** commutative equality of lits *)
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
 
+val hash : t -> int
+val hash_novar : t -> int
+
+val variant : ?subst:Substs.t -> t -> Substs.scope -> t -> Substs.scope -> Substs.t
+val are_variant : t -> t -> bool
+
 val compare_partial : ord:Ordering.t -> t -> t -> Comparison.t
   (** partial comparison of literals *)
 
@@ -100,6 +106,16 @@ module Arr : sig
   val eq : t array -> t array -> bool
   val compare : t array -> t array -> int
   val hash : t array -> int
+  val hash_novar : t array -> int
+
+  val sort_by_hash : t array -> unit
+    (** Sort literals by increasing [hash_novar] *)
+
+  val variant : ?subst:Substs.t ->
+                t array -> Substs.scope -> t array -> Substs.scope ->
+                Substs.t
+  val are_variant : t array -> t array -> bool
+
   val weight : t array -> int
   val depth : t array -> int
   val vars : t array -> Term.varlist

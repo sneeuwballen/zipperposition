@@ -52,8 +52,10 @@ val skolem_ctx : ctx:t -> Skolem.ctx
 val signature : ctx:t -> Signature.t
 
 val lost_completeness : ctx:t -> unit
+  (** To be called when completeness is not preserved *)
 
 val is_completeness_preserved : ctx:t -> bool
+  (** Check whether completeness was preserved so far *)
 
 val add_signature : ctx:t -> Signature.t -> unit
   (** Merge  the given signature with the context's one *)
