@@ -190,35 +190,51 @@ let apply_f ?recursive ?renaming ?(depth=0) subst f scope =
     f
 
 (** Set of bound terms *)
-module Domain = Set.Make(struct
-  type t = Term.t * int
-  let compare (t1,o1) (t2,o2) =
-    if o1 <> o2 then o1 - o2 else T.compare t1 t2
+module VarSet = Set.Make(struct
+  type t = Term.t * scope
+  let compare (t1,sc1) (t2,sc2) =
+    if sc1 <> sc2 then sc1 - sc2 else T.compare t1 t2
 end)
 
-(** Domain of substitution *)
+(** VarSet of substitution *)
 let domain subst =
   let rec gather set subst = match subst with
   | SubstEmpty -> set
   | SubstBind (v, sc_v, _, _, subst') ->
-    gather (Domain.add (v, sc_v) set) subst'
-  in gather Domain.empty subst
+    gather (VarSet.add (v, sc_v) set) subst'
+  in gather VarSet.empty subst
 
 (** Codomain (range) of substitution *)
 let codomain subst =
   let rec gather set subst = match subst with
   | SubstEmpty -> set
   | SubstBind (_, _, t, sc_t, subst') ->
-    gather (Domain.add (t, sc_t) set) subst'
-  in gather Domain.empty subst
+    gather (VarSet.add (t, sc_t) set) subst'
+  in gather VarSet.empty subst
+
+let introduced subst =
+  let rec gather set subst = match subst with
+  | SubstEmpty -> set
+  | SubstBind (_, _, t, sc_t, subst') ->
+    let vars = T.vars t in
+    let set = List.fold_left (fun set v -> VarSet.add (v, sc_t) set) set vars in
+    gather set subst'
+  in
+  gather VarSet.empty subst
+
+let rec compose s1 s2 = match s1 with
+  | SubstEmpty -> s2
+  | SubstBind (v, s_v, t, s_t, s1') ->
+    let s1'' = compose s1' s2 in
+    SubstBind (v, s_v, t, s_t, s1'')
 
 (** Check whether the substitution is a variable renaming *)
 let is_renaming subst =
   let c = domain subst
   and cd = codomain subst in
   (* check that codomain is made of vars, and that domain and codomain have same size *)
-  Domain.cardinal c = Domain.cardinal cd &&
-  Domain.for_all (fun (v,_) -> T.is_var v) cd
+  VarSet.cardinal c = VarSet.cardinal cd &&
+  VarSet.for_all (fun (v,_) -> T.is_var v) cd
 
 (** Printing *)
 let pp_full pp_term buf subst =
@@ -243,6 +259,12 @@ let pp buf subst = pp_full Term.pp buf subst
 let to_string subst = Util.sprintf "%a" pp subst
 
 let fmt fmt subst = Format.pp_print_string fmt (to_string subst)
+
+let rec fold subst acc f = match subst with
+| SubstEmpty -> acc
+| SubstBind (v, scv, t, sct, subst') ->
+  let acc' = f acc v scv t sct in
+  fold subst' acc' f
 
 let rec iter subst k = match subst with
 | SubstEmpty -> ()

@@ -25,7 +25,7 @@ type t = private
   | SubstBind of (Term.t * int * Term.t * int * t)
   | SubstEmpty
 and scope = int
-and 'a scoped = 'a * int
+and 'a scoped = 'a * scope
   (** A scope is an integer. Variables can only be bound in one scope,
       and variables from distinct scopes are distinct too. *)
 
@@ -38,20 +38,20 @@ val is_empty : t -> bool
 val eq : t -> t -> bool
   (** Check (naively, ie structurally) whether two substitutions are equal *)
 
-val compare : t -> t -> int
+val compare : t -> t -> scope
   (** Compare substitutions (arbitrary but total order) *)
 
-val lookup : t -> Term.t -> int -> Term.t * int
+val lookup : t -> Term.t -> scope -> Term.t * scope
   (** Lookup variable in substitution. Raise Not_found if not present. *)
 
-val get_var : t -> Term.t -> int -> Term.t * int
+val get_var : t -> Term.t -> scope -> Term.t * scope
   (** Lookup recursively the var in the substitution, until it is not a
       variable anymore, or it is not bound *)
 
-val is_in_subst : t -> Term.t -> int -> bool
+val is_in_subst : t -> Term.t -> scope -> bool
   (** Check whether the variable is bound by the substitution *)
 
-val bind : ?recursive:bool -> t -> Term.t -> int -> Term.t -> int -> t
+val bind : ?recursive:bool -> t -> Term.t -> scope -> Term.t -> scope -> t
   (** Add v -> t to the substitution. Both terms have a context. Raise
       Invalid_argument if v is already bound in the same context, to another term. *)
 
@@ -73,7 +73,7 @@ module Renaming : sig
   val clear : t -> unit
     (** Clear the content of the renaming *)
 
-  val rename : t -> Term.t -> int -> Term.t
+  val rename : t -> Term.t -> scope -> Term.t
     (** Rename the given variable, scoped by the given context *)
 end
 
@@ -90,14 +90,28 @@ val apply_f : ?recursive:bool -> ?renaming:Renaming.t -> ?depth:int ->
               t -> Formula.t -> scope -> Formula.t
   (** Apply the substitution to the formula *)
 
-module Domain : Set.S with type elt = Term.t * int
+module VarSet : Set.S with type elt = Term.t * scope
   (** Set of bound terms *)
 
-val domain : t -> Domain.t
+val domain : t -> VarSet.t
   (** Domain of substitution *)
 
-val codomain : t -> Domain.t
+val codomain : t -> VarSet.t
   (** Codomain (image terms) of substitution *)
+
+val introduced : t -> VarSet.t
+  (** Variables introduced by the substitution (ie vars of codomain) *)
+
+val compose : t -> t -> t
+  (** [compose s1 s2] is the substitution that to [x] associates
+      [s1 (s2 x)]. *)
+
+(* XXX is it possible to express it with this representation of substs?
+val join : t -> t -> t
+  (** [join s1 s2] maps [x] to [s1 (s2 x)] if [x] is in the domain of [s2],
+      and to [s1 x] if [x] is in the domain of s1 but not in [introduced s2].
+      Basically, it hides the variables introduced in [s2] and bound in [s1] *)
+*)
 
 val is_renaming : t -> bool
   (** Check whether the substitution is a variable renaming *)
@@ -107,10 +121,11 @@ val pp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
-val iter : t -> (Term.t * int * Term.t * int -> unit) -> unit
+val fold : t -> 'a -> ('a -> Term.t -> scope -> Term.t -> scope -> 'a) -> 'a
+val iter : t -> (Term.t * scope * Term.t * scope -> unit) -> unit
 
-val to_seq : t -> (Term.t * int * Term.t * int) Sequence.t
+val to_seq : t -> (Term.t * scope * Term.t * scope) Sequence.t
 val of_seq : ?recursive:bool -> ?subst:t ->
-            (Term.t * int * Term.t * int) Sequence.t -> t
+            (Term.t * scope * Term.t * scope) Sequence.t -> t
 val of_list : ?recursive:bool -> ?subst:t ->
-            (Term.t * int * Term.t * int) list -> t
+            (Term.t * scope * Term.t * scope) list -> t
