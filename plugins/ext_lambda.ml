@@ -20,12 +20,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Plugin for Beta-reduction} *)
 
-open Basic
-
-module T = Terms
+open Logtk
 
 let lambda_canonize t =
-  T.eta_reduce (T.beta_reduce t)
+  HO.eta_reduce (HO.beta_reduce t)
 
 let ext =
   let open Extensions in

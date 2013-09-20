@@ -20,9 +20,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 (** {1 Exemple of plugin} *)
 
+open Logtk
+
 let ext =
   let open Extensions in
-  let action = Ext_general (fun _ -> FoUtils.debug 0 "%% call to plugin foo") in
+  let action = Ext_general (fun _ -> Util.debug 0 "call to plugin foo") in
   { name = "foo";
     actions = [action];
   }

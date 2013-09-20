@@ -72,8 +72,11 @@ PLUGIN_OPTIONS = -cflags -I,$(BUILD_PATH) -lib lib
 plugins: bin
 	mkdir -p plugins/std/
 	for f in $(wildcard plugins/*.ml) ; do \
-	    ocamlopt $(CAML_OPTS) -c -I _build/src $$f -o plugins/$$(basename $$f .ml).cmx; \
-	    ocamlopt $(CAML_OPTS) -shared plugins/$$(basename $$f .ml).cmx -o plugins/std/$$(basename $$f .ml).cmxs; \
+	    ocamlfind ocamlopt $(CAML_OPTS) -c -I _build/src -package logtk $$f \
+	    	-o plugins/$$(basename $$f .ml).cmx; \
+	    ocamlfind ocamlopt $(CAML_OPTS) -package logtk \
+	    	-shared plugins/$$(basename $$f .ml).cmx \
+	    	-o plugins/std/$$(basename $$f .ml).cmxs; \
 	done
 	@echo plugins compiled.
 
