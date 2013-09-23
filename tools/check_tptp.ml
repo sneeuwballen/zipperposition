@@ -38,12 +38,14 @@ let print_line () =
 
 let cat_input = ref false  (* print input declarations? *)
 let stats = ref false
+let pp_base = ref false
 
 let options =
   [ "-debug", Arg.Int Util.set_debug, "debug level"
   ; "-cat", Arg.Set cat_input, "print input declarations"
   ; "-profile", Arg.Set Util.enable_profiling, "enable profiling"
   ; "-stats", Arg.Set stats, "statistics"
+  ; "-base", Arg.Set pp_base, "print signature of base symbols"
   ; "-tstp", Arg.Unit (fun () -> printer := F.pp_tstp), "output in TSTP format"
   ]
 
@@ -58,7 +60,10 @@ let check file =
       then Sequence.iter
         (fun d -> Util.printf "%a\n" Ast_tptp.pp_declaration d) decls);
     (* type check *)
-    let signature = Signature.diff (Util_tptp.signature decls) Signature.base in
+    let signature = if !pp_base
+      then Util_tptp.signature decls
+      else Signature.diff (Util_tptp.signature decls) Signature.base
+    in
     Printf.printf "signature:\n";
     Signature.iter signature
       (fun s ty -> Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
