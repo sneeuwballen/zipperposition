@@ -2,14 +2,18 @@
 #require "datalog";;
 #require "num";;
 #require "unix";;
+#require "dynlink";;
 #require "logtk";;
 #require "logtk.meta";;
 #directory "_build/containers/"
 #directory "_build/src/"
-#load "lib.cma";;
+#load "libzipperposition.cma";;
 (* TODO: find a way to source logtk's ocamlinit *)
 (* pretty printing *)
 open Logtk;;
+open Libzipperposition;;
+open Logtk.Sequence.Infix;;
+open Logtk.Type.Infix;;
 #install_printer Term.fmt;;
 #install_printer Literal.fmt;;
 #install_printer Clause.fmt;;
@@ -19,7 +23,10 @@ open Logtk;;
 #install_printer Symbol.fmt;;
 #install_printer Signature.fmt;;
 #install_printer Type.fmt;;
+module T = Logtk.Term;;
+module F = Logtk.Formula;;
+let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
+let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
 Printf.printf "finished loading\n";;
-
 (* vim:syntax=ocaml
 *)
