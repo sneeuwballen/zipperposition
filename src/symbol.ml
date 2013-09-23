@@ -223,6 +223,24 @@ module Arith = struct
   let one_f = mk_real 1.
   let zero_f = mk_real 0.
 
+  let typeof s =  match s with
+    | Int _ -> Type.int
+    | Rat _ -> Type.rat
+    | Real _ -> Type.real
+    | _ -> raise TypeMismatch
+
+  let zero_of_ty ty =
+    if Type.eq ty Type.int then zero_i
+    else if Type.eq ty Type.rat then zero_rat
+    else if Type.eq ty Type.real then zero_f
+    else raise TypeMismatch
+
+  let one_of_ty ty =
+    if Type.eq ty Type.int then one_i
+    else if Type.eq ty Type.rat then one_rat
+    else if Type.eq ty Type.real then one_f
+    else raise TypeMismatch
+
   let is_zero s = match s with
   | Int n -> Big_int.sign_big_int n = 0
   | Rat n -> Ratio.sign_ratio n = 0

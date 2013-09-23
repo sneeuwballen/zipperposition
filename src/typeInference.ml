@@ -85,9 +85,9 @@ module Ctx = struct
 
   let type_of_symbol ctx s =
     match s with
-    | Symbol.Int _ -> Type.int
-    | Symbol.Rat _ -> Type.rat
-    | Symbol.Real _ -> Type.real
+    | Symbol.Int _
+    | Symbol.Rat _
+    | Symbol.Real _ -> Symbol.Arith.typeof s
     | Symbol.Const _ ->
       begin try
         let ty = Signature.find ctx.signature s in

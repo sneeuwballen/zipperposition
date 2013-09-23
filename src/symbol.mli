@@ -150,6 +150,11 @@ module Arith : sig
   val one_f : t
   val zero_f : t
 
+  val typeof : t -> Type.t        (** Type of a constant *)
+
+  val zero_of_ty : Type.t -> t
+  val one_of_ty : Type.t -> t
+
   val is_zero : t -> bool
 
   val sum : t
