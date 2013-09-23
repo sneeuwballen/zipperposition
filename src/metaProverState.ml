@@ -32,6 +32,7 @@ open Logtk
 let prof_scan_clause = Util.mk_profiler "meta.scan_clause"
 let prof_scan_formula = Util.mk_profiler "meta.scan_formula"
 let prof_scan_set = Util.mk_profiler "meta.scan_set"
+let prof_add_lits = Util.mk_profiler "meta.add_lits"
 
 module T = Term
 module F = Formula
@@ -142,7 +143,9 @@ let scan_formula p pf =
   Util.enter_prof prof_scan_formula;
   let lits = M.MetaProver.match_formula p.prover f in
   List.iter (fun lit -> map_lit_to_form p lit pf) lits;
+  Util.enter_prof prof_add_lits;
   M.MetaProver.add_literals p.prover (Sequence.of_list lits);
+  Util.exit_prof prof_add_lits;
   (* get results *)
   let results = p.new_results in
   flush_new_results p;
@@ -155,7 +158,9 @@ let scan_clause p c =
   let f = Lits.to_form c.C.hclits in
   let lits = M.MetaProver.match_formula p.prover f in
   List.iter (fun lit -> map_lit_to_clause p lit c) lits;
+  Util.enter_prof prof_add_lits;
   M.MetaProver.add_literals p.prover (Sequence.of_list lits);
+  Util.exit_prof prof_add_lits;
   (* get results *)
   let results = p.new_results in
   flush_new_results p;
@@ -170,7 +175,9 @@ let scan_set p set =
       let f = Lits.to_form c.C.hclits in
       let lits = M.MetaProver.match_formula p.prover f in
       List.iter (fun lit -> map_lit_to_clause p lit c) lits;
-      M.MetaProver.add_literals p.prover (Sequence.of_list lits));
+      Util.enter_prof prof_add_lits;
+      M.MetaProver.add_literals p.prover (Sequence.of_list lits);
+      Util.exit_prof prof_add_lits);
   (* get results *)
   let results = p.new_results in
   flush_new_results p;
