@@ -156,6 +156,7 @@ module Arith : sig
   val one_of_ty : Type.t -> t
 
   val is_zero : t -> bool
+  val is_one : t -> bool
 
   val sum : t
   val difference : t

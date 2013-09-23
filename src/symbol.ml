@@ -247,6 +247,15 @@ module Arith = struct
   | Real f -> f = 0.
   | _ -> raise TypeMismatch
 
+  let __one_i = Big_int.big_int_of_int 1
+  let __one_rat = Ratio.ratio_of_int 1
+
+  let is_one s = match s with
+  | Int n -> Big_int.eq_big_int n __one_i
+  | Rat n -> Ratio.eq_ratio n __one_rat
+  | Real f -> f = 1.
+  | Const _ -> raise TypeMismatch
+
   let sum = mk_const "$sum"
   let difference = mk_const "$difference"
   let uminus = mk_const "$uminus"
