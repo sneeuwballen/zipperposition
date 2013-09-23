@@ -100,6 +100,9 @@ val bij : ord:Ordering.t -> t Bij.t
 val pp_notrec : Buffer.t -> t -> unit
   (** Print the step in debug mode, but not its parents *)
 
+val fmt : Format.formatter -> t -> unit
+  (** Non recursive printing on formatter *)
+
 val pp_tstp : Buffer.t -> t -> unit
 val pp_debug : Buffer.t -> t -> unit
 val pp : string -> Buffer.t -> t -> unit

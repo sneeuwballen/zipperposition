@@ -91,9 +91,9 @@ let rec combine e1 e2 =
     let t1' = nf t1 and t2' = nf t2 in
     t1' == t2' || e1.expert_equal t1' t2' || e2.expert_equal t1' t2'
   in
-  { expert_name = Utils.sprintf "(%s)_U_(%s)" e1.expert_name e2.expert_name;
+  { expert_name = Util.sprintf "(%s)_U_(%s)" e1.expert_name e2.expert_name;
     expert_descr =
-      Utils.sprintf "@[<hov2>union of@ %s and@ %s@]" e1.expert_descr e2.expert_descr;
+      Util.sprintf "union of %s and %s" e1.expert_descr e2.expert_descr;
     expert_equal;
     expert_sig = Symbol.SSet.union e1.expert_sig e2.expert_sig;
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
@@ -356,7 +356,7 @@ let rec gc_expert ~ctx gc =
   let expert_sig = gc.gc_sig in
   let theory = Util.sprintf "%s_%a" gc.gc_theory
     (Util.pp_seq ~sep:"_" Symbol.pp) (Symbol.SSet.to_seq expert_sig) in
-  let expert_name = Utils.sprintf "gc_%s" theory in
+  let expert_name = Util.sprintf "gc_%s" theory in
   (* update clauses with the context *)
   let expert_clauses = List.map (C.update_ctx ~ctx) gc.gc_eqns in
   List.iter (fun c -> C.set_flag C.flag_persistent c true) expert_clauses;

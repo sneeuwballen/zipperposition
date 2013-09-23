@@ -11,6 +11,9 @@ Leftistheap
 Literal
 MetaProverState
 PersistentHashtbl
+PHashtbl
+CompactClause
+Ctx
 Proof
 ProofState
 Saturate

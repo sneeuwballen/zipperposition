@@ -214,6 +214,9 @@ let pp_notrec buf proof =
   | InferForm (f, _) -> F.pp buf f
   | InferClause(c, _) -> CC.pp buf c
 
+let fmt fmt proof =
+  Format.pp_print_string fmt (Util.on_buffer pp_notrec proof)
+
 let _extract_axiom proof = match proof with
   | Axiom (f,n) -> f,n
   | _ -> assert false

@@ -1,28 +1,24 @@
 #use "topfind";;
-#require "yojson";;
 #require "datalog";;
 #require "num";;
 #require "unix";;
-#require "zip";;
+#require "logtk";;
+#require "logtk.meta";;
+#directory "_build/containers/"
 #directory "_build/src/"
 #load "lib.cma";;
+(* TODO: find a way to source logtk's ocamlinit *)
 (* pretty printing *)
-let debug_pp_term = !Terms.pp_term#pp;;
-#install_printer debug_pp_term;;
-#install_printer Literals.pp_literal;;
-let debug_pp_clause = Clauses.pp_clause_debug#pp;;
-#install_printer debug_pp_clause;;
-#install_printer FoSubst.pp_substitution;;
-#install_printer Proof.pp_proof_debug;;
-#install_printer Symbols.pp_symbol;;
-#install_printer Symbols.pp_sort;;
-let debug_pp_json fmt json = Format.pp_print_string fmt (Yojson.Basic.to_string json);;
-#install_printer debug_pp_json;;
-(* vim:syntax=ocaml *)
-#directory "_build/tests/";;
-#load "helpers.cmo";;
-#load "testTerms.cmo";;
-#load "testClauses.cmo";;
+open Logtk;;
+#install_printer Term.fmt;;
+#install_printer Literal.fmt;;
+#install_printer Clause.fmt;;
+#install_printer Formula.fmt;;
+#install_printer Substs.fmt;;
+#install_printer Proof.fmt;;
+#install_printer Symbol.fmt;;
+#install_printer Signature.fmt;;
+#install_printer Type.fmt;;
 Printf.printf "finished loading\n";;
 
 (* vim:syntax=ocaml
