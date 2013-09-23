@@ -32,6 +32,8 @@ module S = Substs
 module F = Formula
 
 let prof_matching = Util.mk_profiler "meta.pattern.matching"
+let prof_encode = Util.mk_profiler "meta.pattern.encode"
+let prof_decode = Util.mk_profiler "meta.pattern.decode"
 
 let __var_symbol = Symbol.mk_const "V"
 let __fun_symbol = Symbol.mk_const "S"
@@ -75,12 +77,18 @@ module EncodedForm = struct
     | T.At (t1, t2) -> T.mk_at (decode_t t1) (decode_t t2)
 
   let encode f =
+    Util.enter_prof prof_encode;
     let f = F.map (fun t -> encode_t (HO.curry t)) f in
-    F.to_term f
+    let t = F.to_term f in
+    Util.exit_prof prof_encode;
+    t
 
   let decode t =
+    Util.enter_prof prof_decode;
     let f = F.of_term t in
-    F.map (fun t -> HO.uncurry (decode_t t)) f
+    let f = F.map (fun t -> HO.uncurry (decode_t t)) f in
+    Util.exit_prof prof_decode;
+    f
 
   let eq = T.eq
   let compare = T.compare
@@ -207,6 +215,7 @@ let matching_terms p1 o_1 p2 o_2 =
 (* assuming term is encoded, match the pattern against it, yielding
     a sequence of (pattern, term list) *)
 let matching pat right =
+  Util.enter_prof prof_matching;
   match pat with
   | Pattern (t', types) ->
     (* instantiate with variables *)
@@ -216,11 +225,15 @@ let matching pat right =
     (* match left and right *)
     Util.debug 5 "MetaPattern: match %a with %a" T.pp left T.pp right;
     let substs = matching_terms left 1 right 0 in
-    Sequence.map
+    let subst = Sequence.map
       (fun subst ->
         let args = List.map (fun v -> Substs.apply subst v 1) vars in
         pat, args)
       substs
+    in
+    let substs = Sequence.persistent subst in
+    Util.exit_prof prof_matching;
+    substs
 
 (** {2 Set of patterns} *)
 

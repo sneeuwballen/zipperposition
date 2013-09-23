@@ -202,6 +202,12 @@ let mk_forall f =
 let mk_exists f =
   H.hashcons { form=Exists f; flags=0; id= ~-1; }
 
+module FCache = Cache.Replacing(struct
+  type t = form
+  let equal = eq
+  let hash = hash
+end)
+
 (** {2 Combinators} *)
 
 let rec map_leaf f form = match form.form with
@@ -579,18 +585,24 @@ let ac_eq f1 f2 =
 
 (** {2 Conversion} *)
 
-let rec to_term f = match f.form with
-  | True -> T.true_term
-  | False -> T.false_term
-  | And l -> T.mk_and_list (List.map to_term l)
-  | Or l -> T.mk_or_list (List.map to_term l)
-  | Equiv (f1, f2) -> T.mk_equiv (to_term f1) (to_term f2)
-  | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
-  | Equal (t1, t2) -> T.mk_eq t1 t2
-  | Not f' -> T.mk_not (to_term f')
-  | Forall f' -> T.mk_forall (to_term f')
-  | Exists f' -> T.mk_exists (to_term f')
-  | Atom p -> p
+let __cache_f2t = FCache.create 513
+
+let to_term f =
+  FCache.with_cache_rec __cache_f2t
+    (fun to_term f ->
+    match f.form with
+    | True -> T.true_term
+    | False -> T.false_term
+    | And l -> T.mk_and_list (List.map to_term l)
+    | Or l -> T.mk_or_list (List.map to_term l)
+    | Equiv (f1, f2) -> T.mk_equiv (to_term f1) (to_term f2)
+    | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
+    | Equal (t1, t2) -> T.mk_eq t1 t2
+    | Not f' -> T.mk_not (to_term f')
+    | Forall f' -> T.mk_forall (to_term f')
+    | Exists f' -> T.mk_exists (to_term f')
+    | Atom p -> p)
+    f
 
 let of_term t =
   let rec recurse t = match t.T.term with

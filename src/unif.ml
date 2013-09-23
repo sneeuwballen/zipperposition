@@ -34,6 +34,7 @@ open Term
 let prof_unification = Util.mk_profiler "unification"
 let prof_matching = Util.mk_profiler "matching"
 let prof_variant = Util.mk_profiler "alpha-equiv"
+let prof_ac_matching = Util.mk_profiler "ac-matching"
 
 exception Fail
 
@@ -290,7 +291,11 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
   in
   (* sequence of solutions. Substsitutions are restricted to the variables
      of [a]. *)
-  let seq k = unif subst a sc_a b sc_b k in
+  let seq k =
+    Util.enter_prof prof_ac_matching;
+    unif subst a sc_a b sc_b k;
+    Util.exit_prof prof_ac_matching
+  in
   Sequence.from_iter seq
 
 (** {2 Unification on formulas} *)
