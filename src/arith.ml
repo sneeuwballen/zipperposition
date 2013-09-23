@@ -63,6 +63,117 @@ module T = struct
   let mk_product t1 t2 = mk_node S.Arith.product [t1; t2]
   let mk_quotient t1 t2 = mk_node S.Arith.quotient [t1; t2]
   let mk_uminus t = mk_node S.Arith.uminus [t]
+
+  let simplify ~signature t =
+    (* recursive function with cache *)
+    let rec simplify recurse t = match t.term with
+    | Bind (s, t') -> mk_bind s (recurse t')
+    | At (t1, t2) -> mk_at (recurse t1) (recurse t2)
+    | Var _
+    | BoundVar _ -> t
+    | Node (s, [t']) ->
+      let t' = recurse t' in
+      try_reduce_unary recurse s t'
+    | Node (s, [t1; t2]) ->
+      let t1 = recurse t1 in
+      let t2 = recurse t2 in
+      try_reduce_binary recurse s t1 t2
+    | Node (s, l) ->
+      let t = mk_node s (List.map recurse l) in
+      t
+    (** unary builtins *)
+    and try_reduce_unary recurse s a =
+      match s, a.term with
+      | S.Const ("$uminus", _), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.uminus n)
+      | S.Const ("$uminus",_), Node (S.Const ("$uminus",_), [x]) -> x
+      | S.Const ("$floor",_), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.floor n)
+      | S.Const ("$ceiling",_), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.ceiling n)
+      | S.Const ("$round",_), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.round n)
+      | S.Const ("$truncate",_), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.truncate n)
+      | S.Const ("$is_int",_), Node (n, []) when S.is_numeric n ->
+        if S.is_int n then true_term else false_term
+      | S.Const ("$is_rat",_), Node (n, []) when S.is_numeric n ->
+        if S.is_rat n then true_term else false_term
+      | S.Const ("$is_real",_), Node (n, []) when S.is_numeric n ->
+        if S.is_real n then true_term else false_term
+      | S.Const ("$to_rat",_), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.to_rat n)
+      | S.Const ("$to_real",_), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.to_real n)
+      | S.Const ("$to_int",_), Node (n, []) when S.is_numeric n ->
+        mk_const (S.Arith.Op.to_int n)
+      | _ -> mk_node s [a]  (* default case *)
+    (** binary builtins *)
+    and try_reduce_binary recurse s a b =
+      try begin match s, a.term, b.term with
+      | S.Const ("$sum",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.sum na nb)
+      | S.Const ("$difference",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.difference na nb)
+      | S.Const ("$product",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.product na nb)
+      | S.Const ("$quotient",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.quotient na nb)
+      | S.Const ("$quotient_e",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.quotient_e na nb)
+      | S.Const ("$quotient_t",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.quotient_t na nb)
+      | S.Const ("$quotient_f",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.quotient_f na nb)
+      | S.Const ("$remainder_e",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.remainder_e na nb)
+      | S.Const ("$remainder_t",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.remainder_t na nb)
+      | S.Const ("$remainder_f",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        mk_const (S.Arith.Op.remainder_f na nb)
+      | S.Const ("$less",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        if S.Arith.Op.less na nb then true_term else false_term
+      | S.Const ("$lesseq",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        if S.Arith.Op.lesseq na nb then true_term else false_term
+      | S.Const ("$greater",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        if S.Arith.Op.greater na nb then true_term else false_term
+      | S.Const ("$greatereq",_), Node (na, []), Node (nb, [])
+        when S.is_numeric na && S.is_numeric nb ->
+        if S.Arith.Op.greatereq na nb then true_term else false_term
+      | S.Const ("$sum",_), _, Node (nb,[]) when S.Arith.is_zero nb -> a
+      | S.Const ("$sum",_), Node (na,[]), _ when S.Arith.is_zero na -> b
+      | S.Const ("$difference",_), _, Node (nb,[]) when S.Arith.is_zero nb -> a
+      | S.Const ("$difference",_), Node (na,[]), _ when S.Arith.is_zero na ->
+        recurse (mk_uminus b)
+      | S.Const ("$difference",_), _, _ when eq a b ->
+        (* need to infer types so  that we know which zero to return *)
+        let ty = TypeInference.infer_sig signature a in
+        mk_const (S.Arith.zero_of_ty ty)
+      | S.Const ("$product",_), _, Node (nb,[]) when S.Arith.is_one nb -> a
+      | S.Const ("$product",_), Node (na,[]), _ when S.Arith.is_one na -> b
+      | S.Const ("$product",_), Node (na,[]), _ when S.Arith.is_zero na -> a
+      | S.Const ("$product",_), _, Node (nb,[]) when S.Arith.is_zero nb -> b
+      | S.Const ("$quotient",_), _, Node (nb,[]) when S.Arith.is_one nb -> a
+      | S.Const ("$quotient",_), Node (na,[]), _ when S.Arith.is_zero na -> a
+      | _ -> mk_node s [a; b]  (* default case *)
+      end with Division_by_zero ->
+        mk_node s [a; b]
+    in
+    let __cache = TCache.create 9 in
+    TCache.with_cache_rec __cache simplify t
 end
 
 (** {2 Polynomials of Order 1} *)

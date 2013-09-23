@@ -44,6 +44,9 @@ module T : sig
 
   val is_arith : Term.t -> bool
     (** Is the term arithmetic? *)
+
+  val simplify : signature:Signature.t -> Term.t -> Term.t
+    (** Arithmetic simplifications *)
 end
 
 (** {2 Polynomes of order 1, over several variables}.
