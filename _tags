@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: bab62061eaba638951dd3c1411aaf1f3)
+# DO NOT EDIT (digest: ddae6e3f07702301262b6d3e70a31252)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -18,7 +18,7 @@
 "src/bitvector.cmx": for-pack(Libzipperposition)
 "src/clauseQueue.cmx": for-pack(Libzipperposition)
 "src/clause.cmx": for-pack(Libzipperposition)
-"src/Const.cmx": for-pack(Libzipperposition)
+"src/const.cmx": for-pack(Libzipperposition)
 "src/experts.cmx": for-pack(Libzipperposition)
 "src/extensions.cmx": for-pack(Libzipperposition)
 "src/literal.cmx": for-pack(Libzipperposition)
@@ -36,6 +36,7 @@
 "src/chaining.cmx": for-pack(Libzipperposition)
 "src/params.cmx": for-pack(Libzipperposition)
 "src/env.cmx": for-pack(Libzipperposition)
+"src/arith.cmx": for-pack(Libzipperposition)
 "src/containers/persistentGraph.cmx": for-pack(Libzipperposition)
 "src/containers/hashset.cmx": for-pack(Libzipperposition)
 "src/containers/pHashtbl.cmx": for-pack(Libzipperposition)

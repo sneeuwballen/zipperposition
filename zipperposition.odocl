@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: f9a499260e7cc0e3c506ce7549288dff)
+# DO NOT EDIT (digest: 8f669a6f9e398f4c75fcc422f005ef80)
 src/Bitvector
 src/ClauseQueue
 src/Clause
@@ -21,4 +21,5 @@ src/AC
 src/Chaining
 src/Params
 src/Env
+src/Arith
 # OASIS_STOP

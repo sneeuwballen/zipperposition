@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6c292e3d1e2de6a469a6bb3d68f4e579)
+# DO NOT EDIT (digest: fb5067e5f03bba0b4bbab9ff117083c8)
 Bitvector
 ClauseQueue
 Clause
@@ -21,6 +21,7 @@ AC
 Chaining
 Params
 Env
+Arith
 containers/PersistentGraph
 containers/Hashset
 containers/PHashtbl
