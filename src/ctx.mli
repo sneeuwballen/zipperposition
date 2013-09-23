@@ -35,9 +35,12 @@ type t = private {
   mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
+  ac : Theories.AC.t;                 (** AC symbols *)
+  total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
 
-val create : ?ord:Ordering.t -> ?select:Selection.t -> signature:Signature.t -> 
+val create : ?ord:Ordering.t -> ?select:Selection.t ->
+              signature:Signature.t -> 
               unit -> t
   (** Fresh new context *)
 
@@ -51,6 +54,10 @@ val skolem_ctx : ctx:t -> Skolem.ctx
 
 val signature : ctx:t -> Signature.t
 
+val ac : ctx:t -> Theories.AC.t
+
+val total_order : ctx:t -> Theories.TotalOrder.t
+
 val lost_completeness : ctx:t -> unit
   (** To be called when completeness is not preserved *)
 
@@ -59,6 +66,12 @@ val is_completeness_preserved : ctx:t -> bool
 
 val add_signature : ctx:t -> Signature.t -> unit
   (** Merge  the given signature with the context's one *)
+
+val add_ac : ctx:t -> Symbol.t -> unit
+  (** Symbol is AC *)
+
+val add_order : ctx:t -> less:Symbol.t -> lesseq:Symbol.t -> unit
+  (** Pair of symbols that consistute an ordering *)
 
 (** {2 Type inference} *)
 

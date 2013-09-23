@@ -169,6 +169,8 @@ module ActiveSet = struct
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
+      idx_left_ord : TermIndex.t;       (** terms on left of an inequality *)
+      idx_right_ord : TermIndex.t;      (** terms on right of an inequality *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 
@@ -183,14 +185,20 @@ module ActiveSet = struct
       val mutable m_clauses = C.CSet.empty
       val mutable m_sup_into = TermIndex.empty
       val mutable m_sup_from = TermIndex.empty
+      val mutable m_left_ord = TermIndex.empty
+      val mutable m_right_ord = TermIndex.empty
       val mutable m_back_demod = TermIndex.empty
       val mutable m_fv = idx
       method ctx = ctx
       method clauses = m_clauses
       method idx_sup_into = m_sup_into
       method idx_sup_from = m_sup_from
+      method idx_left_ord = m_left_ord
+      method idx_right_ord = m_right_ord
       method idx_back_demod = m_back_demod
       method idx_fv = m_fv
+
+      (* TODO: update indexes *)
 
       (** update indexes by removing/adding clauses *)
       method update op cs =

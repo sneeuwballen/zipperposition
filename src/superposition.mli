@@ -29,20 +29,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-(** {2 Helpers} *)
-
-val all_positions : Position.t -> Term.t -> 'a ->
-                    ('a -> Term.t -> Position.t -> 'a) -> 'a
-
-val fold_lits : ?both:bool -> (int -> Literal.t -> bool) ->
-                ('a -> Term.t -> Term.t -> bool -> Position.t -> 'a) -> 'a ->
-                Literal.t array -> 'a
-  (** fold on equation sides of literals that satisfy predicate *)
-
-val get_equations_sides : Clause.t -> Position.t -> Term.t * Term.t * bool
-  (** get the term l at given position in clause, and r such that l ?= r
-      is the Literal.t at the given position *)
-
 (** {2 Inference rules} *)
 
 val infer_active: Env.binary_inf_rule 

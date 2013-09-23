@@ -143,6 +143,24 @@ module Arr : sig
   val infer_type : TypeInference.Ctx.t -> t array -> unit
   val signature : ?signature:Signature.t -> t array -> Signature.t
 
+  (** {3 High order combinators} *)
+
+  val fold_eqn : ?both:bool ->
+                  eligible:(int -> t -> bool) ->
+                  t array -> 'a ->
+                  ('a -> Term.t -> Term.t -> bool -> Position.t -> 'a) ->
+                  'a
+    (** fold f over all literals sides, with their positions.
+        f is given (acc, left side, right side, sign, position of left side)
+        if both=true, then both sides of a non-oriented equation
+          will be visited *)
+
+  val get_eqn : t array -> Position.t -> Term.t * Term.t * bool
+    (** get the term l at given position in clause, and r such that l ?= r
+        is the Literal.t at the given position *)
+
+  (** {3 IO} *)
+
   val pp : Buffer.t -> t array -> unit
   val pp_tstp : Buffer.t -> t array -> unit
   val to_string : t array -> string

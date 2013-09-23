@@ -35,6 +35,8 @@ type t = {
   mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
+  ac : Theories.AC.t;                 (** AC symbols *)
+  total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
 
 let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
@@ -44,6 +46,8 @@ let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
     skolem = Skolem.create ~prefix:"zsk" ();
     signature;
     complete=true;
+    ac = Theories.AC.create ();
+    total_order = Theories.TotalOrder.create ();
   } in
   ctx
 
@@ -63,6 +67,16 @@ let is_completeness_preserved ~ctx = ctx.complete
 
 let add_signature ~ctx signature =
   ctx.signature <- Signature.merge ctx.signature signature
+
+let ac ~ctx = ctx.ac
+
+let total_order ~ctx = ctx.total_order
+
+let add_ac ~ctx s = Theories.AC.add ~spec:ctx.ac s
+
+let add_order ~ctx ~less ~lesseq =
+  let _ = Theories.TotalOrder.add ~spec:ctx.total_order ~less ~lesseq in
+  ()
 
 (** {2 Type inference} *)
 

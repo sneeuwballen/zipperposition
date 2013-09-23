@@ -75,87 +75,6 @@ let prof_infer_equality_factoring = Util.mk_profiler "infer_equality_factoring"
 let prof_split = Util.mk_profiler "infer_split"
 
 (* ----------------------------------------------------------------------
- * combinators
- * ---------------------------------------------------------------------- *)
-
-(** apply f to all non-variable positions in t, accumulating the
-    results along. f is given the subterm, the position and the context
-    at each such position, and returns a list of objects; all lists
-    returned by f are concatenated.
-
-    position -> term
-    -> (term -> position -> 'b list)
-    -> 'b list
-    *)
-let all_positions pos t acc f =
-  let module PB = Position.Build in
-  (* pb: position builder *)
-  let rec aux acc pb t = match t.T.term with
-  | T.Var _ | T.BoundVar _ -> acc
-  | T.Bind (_, t') ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    aux acc (PB.add pb 0) t'
-  | T.Node (hd, tl) ->
-    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    let acc, _ = List.fold_left
-      (fun (acc,idx) t' ->
-        let acc = aux acc (PB.add pb idx) t' in (* recurse in subterm *)
-        acc, idx+1)
-      (acc, 0) tl
-    in
-    acc
-  | T.At(t1, t2) ->
-    let acc = f acc t (PB.to_pos pb) in
-    let acc = aux acc (PB.add pb 0) t1 in
-    let acc = aux acc (PB.add pb 1) t2 in
-    acc
-  in
-  aux acc (PB.of_pos pos) t
-
-(** fold f over all literals sides, with their positions.
-    f is given (acc, left side, right side, sign, position of left side)
-    if both=true, then both sides of a non-oriented equation
-      will be visited
-
-    ?pos:bool -> ?neg:bool -> ?both:bool
-    -> ('a -> Basic.term -> Basic.term -> bool -> int list -> 'a)
-    -> 'a -> (Basic.literal * int) list
-    -> 'a *)
-let fold_lits ?(both=true) eligible f acc lits =
-  let rec fold acc i =
-    if i = Array.length lits then acc
-    else if not (eligible i lits.(i)) then fold acc (i+1)
-    else
-      let acc = match lits.(i) with
-      | Lit.Equation (l,r,sign,Gt) ->
-        f acc l r sign [i; Position.left_pos]
-      | Lit.Equation (l,r,sign,Lt) ->
-        f acc r l sign [i; Position.right_pos]
-      | Lit.Equation (l,r,sign,_) ->
-        if both
-        then (* visit both sides of the equation *)
-          let acc = f acc r l sign [i; Position.right_pos] in
-          f acc l r sign [i; Position.left_pos]
-        else (* only visit one side (arbitrary) *)
-          f acc l r sign [i; Position.left_pos]
-      | Lit.Prop (p, sign) ->
-        f acc p T.true_term sign [i; Position.left_pos]
-      | Lit.True
-      | Lit.False -> acc
-      in fold acc (i+1)
-  in fold acc 0
-
-(** decompose the literal at given position *)
-let get_equations_sides c pos = match pos with
-  | idx::eq_side::[] ->
-    (match c.C.hclits.(idx) with
-    | Lit.Equation (l,r,sign,_) when eq_side = Position.left_pos -> (l, r, sign)
-    | Lit.Equation (l,r,sign,_) when eq_side = Position.right_pos -> (r, l, sign)
-    | Lit.Prop (p, sign) when eq_side = Position.left_pos -> (p, T.true_term, sign)
-    | _ -> invalid_arg "wrong side")
-  | _ -> invalid_arg "wrong kind of position (list of >= 2 elements)"
-
-(* ----------------------------------------------------------------------
  * inferences
  * ---------------------------------------------------------------------- *)
 
@@ -170,8 +89,8 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
   | [] | _::[] -> assert false
   | passive_idx::passive_side::subterm_pos ->
   let active_idx = List.hd active_pos
-  and u, v, sign_uv = get_equations_sides passive_clause [passive_idx; passive_side]
-  and s, t, sign_st = get_equations_sides active_clause active_pos in
+  and u, v, sign_uv = Lits.get_eqn passive_clause.C.hclits [passive_idx; passive_side]
+  and s, t, sign_st = Lits.get_eqn active_clause.C.hclits active_pos in
   Util.debug 3 ("sup %a s=%a t=%a \n%a u=%a v=%a p=%a subst=%a")
                 C.pp active_clause T.pp s T.pp t
                 C.pp passive_clause T.pp u T.pp v
@@ -227,14 +146,14 @@ let infer_active (actives : ProofState.ActiveSet.t) clause =
   let scope = T.max_var clause.C.hcvars + 1 in
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
-  let eligible_lit =
+  let eligible =
     let bv = C.eligible_param (clause,0) S.empty in
     fun i lit -> BV.get bv i
   in
   (* do the inferences where clause is active; for this,
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
-  let new_clauses = fold_lits ~both:true eligible_lit
+  let new_clauses = Lits.fold_eqn ~both:true ~eligible clause.C.hclits []
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
       I.retrieve_unifiables (actives#idx_sup_into, scope) (s,0) acc
@@ -242,7 +161,6 @@ let infer_active (actives : ProofState.ActiveSet.t) clause =
           (* rewrite u_p with s *)
           let passive = hc in
           do_superposition ~ctx (clause, 0) s_pos (passive, scope) u_pos subst acc))
-    [] clause.C.hclits
   in
   Util.exit_prof prof_infer_active;
   new_clauses
@@ -258,10 +176,10 @@ let infer_passive (actives:ProofState.ActiveSet.t) clause =
   in
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
-  let new_clauses = fold_lits ~both:true eligible
+  let new_clauses = Lits.fold_eqn ~both:true ~eligible clause.C.hclits []
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
-      all_positions u_pos u acc
+      T.all_positions u_pos u acc
         (fun acc u_p p ->
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
@@ -269,7 +187,6 @@ let infer_passive (actives:ProofState.ActiveSet.t) clause =
             (fun acc s (hc, s_pos, s) subst ->
               let active = hc in
               do_superposition ~ctx (active, scope) s_pos (clause, 0) p subst acc)))
-    [] clause.C.hclits
   in
   Util.exit_prof prof_infer_passive;
   new_clauses
@@ -283,7 +200,7 @@ let infer_equality_resolution clause =
     fun i lit -> Lit.is_neg lit && BV.get bv i
   in
   (* iterate on those literals *)
-  let new_clauses = fold_lits ~both:false eligible
+  let new_clauses = Lits.fold_eqn ~both:false ~eligible clause.C.hclits []
     (fun acc l r sign l_pos ->
       assert (not sign);
       match l_pos with
@@ -305,7 +222,6 @@ let infer_equality_resolution clause =
           end else
             acc
       with Unif.Fail -> acc) (* l and r not unifiable, try next *)
-    [] clause.C.hclits
   in
   Util.exit_prof prof_infer_equality_resolution;
   new_clauses
@@ -352,8 +268,8 @@ let infer_equality_factoring clause =
   (* do the inference between given positions, if ordering
      conditions are respected *)
   and do_inference active_pos passive_pos subst =
-    let s, t, sign_st = get_equations_sides clause active_pos
-    and u, v, sign_uv = get_equations_sides clause passive_pos
+    let s, t, sign_st = Lits.get_eqn clause.C.hclits active_pos
+    and u, v, sign_uv = Lits.get_eqn clause.C.hclits passive_pos
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
@@ -377,14 +293,13 @@ let infer_equality_factoring clause =
         []
   (* try to do inferences with each positive literal *)
   in
-  let new_clauses = fold_lits ~both:true eligible
+  let new_clauses = Lits.fold_eqn ~both:true ~eligible clause.C.hclits []
     (fun acc s t _ s_pos -> (* try with s=t *)
       let unifiables = find_unifiable_lits s s_pos in
       List.fold_left
         (fun acc (passive_pos, subst) ->
           (do_inference s_pos passive_pos subst) @ acc)
         acc unifiables)
-    [] clause.C.hclits
   in
   Util.exit_prof prof_infer_equality_factoring;
   new_clauses
