@@ -19,3 +19,5 @@ module Selection : module type of Selection
 module SmallSet : module type of SmallSet
 module Superposition : module type of Superposition
 module Vector : module type of Vector
+module PFormula : module type of PFormula
+module AC : module type of AC
