@@ -25,24 +25,29 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 AC redundancy} *)
+(** {6 Chaining Inferences} *)
 
 open Logtk
 
-type spec = Theories.AC.t
+type spec = Theories.TotalOrder.t
 
-val axioms : spec:spec -> ctx:Ctx.t -> Clause.t list
-  (** List of (persistent) axioms that are needed for simplifications to
-      be complete. The signature is required for type inference. *)
+let eq_chaining_left ~spec active_set c =
+  assert false (* TODO *)
 
-(** {2 Rules} *)
+let eq_chaining_right ~spec active_set c =
+  assert false (* TODO *)
 
-val is_trivial_lit : spec:spec -> Literal.t -> bool
+let ineq_chaining ~spec active_set c =
+  assert false (* TODO *)
 
-val is_trivial : spec:spec -> Clause.t -> bool
-  (** Check whether the clause is AC-trivial *)
+let reflexivity_res ~spec c =
+  assert false (* TODO *)
 
-val simplify : spec:spec -> ctx:Ctx.t -> Clause.t -> Clause.t
-  (** Simplify the clause modulo AC *)
+let is_tautology ~spec c =
+  false (* TODO *)
 
-val setup_env : env:Env.t -> unit
+let simplify ~spec c =
+  assert false (* TODO *)
+
+let setup_env ~env =
+  assert false (* TODO *)

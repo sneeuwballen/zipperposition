@@ -46,6 +46,8 @@ module ActiveSet : sig
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
+      idx_left_ord : TermIndex.t;       (** terms on left of an inequality *)
+      idx_right_ord : TermIndex.t;      (** terms on right of an inequality *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 

@@ -445,6 +445,7 @@ let compare_clause_pos (c1, p1, t1) (c2, p2, t2) =
   if c <> 0 then c else
   (assert (T.eq t1 t2); 0)
 
+
 (** {2 IO} *)
 
 let pp buf c =

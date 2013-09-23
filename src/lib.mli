@@ -20,4 +20,6 @@ module SmallSet : module type of SmallSet
 module Superposition : module type of Superposition
 module Vector : module type of Vector
 module PFormula : module type of PFormula
+module Theories : module type of Theories
 module AC : module type of AC
+module Chaining : module type of Chaining

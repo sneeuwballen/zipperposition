@@ -25,24 +25,58 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 AC redundancy} *)
+(** {6 Specifications of Built-in Theories} *)
 
 open Logtk
 
-type spec = Theories.AC.t
+(** {2 Associativity-Commutativity} *)
 
-val axioms : spec:spec -> ctx:Ctx.t -> Clause.t list
-  (** List of (persistent) axioms that are needed for simplifications to
-      be complete. The signature is required for type inference. *)
+module AC : sig
+  type t = private {
+    is_ac : Symbol.t -> bool;
+    symbols : unit -> Symbol.SSet.t;
+    add : Symbol.t -> unit;
+  }
 
-(** {2 Rules} *)
+  val create : unit -> t
+    (** Create a new specification *)
 
-val is_trivial_lit : spec:spec -> Literal.t -> bool
+  val add : spec:t -> Symbol.t -> unit
+    (** Add the symbol to the list of AC symbols *)
 
-val is_trivial : spec:spec -> Clause.t -> bool
-  (** Check whether the clause is AC-trivial *)
+  val is_ac : spec:t -> Symbol.t -> bool
+    (** Check whether the symbol is AC *)
 
-val simplify : spec:spec -> ctx:Ctx.t -> Clause.t -> Clause.t
-  (** Simplify the clause modulo AC *)
+  val symbols : spec:t -> Symbol.SSet.t
+end
 
-val setup_env : env:Env.t -> unit
+(** {2 Total Ordering} *)
+
+module TotalOrder : sig
+  type instance = {
+    less : Symbol.t;
+    lesseq : Symbol.t;
+  } (** A single instance of total ordering *)
+
+  type t 
+
+  val create : unit -> t
+    (** New specification. It already contains an instance
+        for "$less" and "$lesseq". *)
+
+  val add : spec:t -> less:Symbol.t -> lesseq:Symbol.t -> instance
+    (** New instance of ordering.
+        @raise Invalid_argument if one of the symbols is already part of an
+              instance. *)
+
+  val is_less : spec:t -> Symbol.t -> bool
+
+  val is_lesseq : spec:t -> Symbol.t -> bool
+
+  val find : spec:t -> Symbol.t -> instance
+    (** Find the instance that corresponds to this symbol.
+        @raise Not_found if the symbol is not part of any instance. *)
+
+  val is_order_symbol : spec:t -> Symbol.t -> bool
+    (** Is less or lesseq of some instance? *)
+end

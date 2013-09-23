@@ -33,12 +33,44 @@ module Lit = Literal
 
 let prof_simplify = Util.mk_profiler "ac.simplify"
 
-type spec = {
-  is_ac : Symbol.t -> bool;
-} (** Specification: which symbols are AC? *)
+type spec = Theories.AC.t
+
+let axioms ~spec ~ctx =
+  let set = Theories.AC.symbols ~spec in
+  let signature = Ctx.signature ~ctx in
+  let ord = Ctx.ord ~ctx in
+  Symbol.SSet.fold
+    (fun s clauses ->
+      let ty = Signature.find signature s in
+      match ty with
+      | Type.Fun (ret, [ret1;ret2]) when Type.eq ret ret1 && Type.eq ret ret2 ->
+        (* type is ok. *)
+        let x = T.mk_var ~ty:ret 0 in
+        let y = T.mk_var ~ty:ret 1 in
+        let z = T.mk_var ~ty:ret 2 in
+        (* first clause: commutativity *)
+        let proof cc = Proof.mk_c_axiom cc ~file:"" ~name:"commutativity" in
+        let lits = [ Lit.mk_eq ~ord (T.mk_node s [x; y]) (T.mk_node s [y; x]) ] in
+        let c1 = C.create ~ctx lits proof in
+        C.set_flag C.flag_persistent c1 true;
+        (* second clause: associativity *)
+        let proof cc = Proof.mk_c_axiom cc ~file:"" ~name:"associativity" in
+        let lits = [ Lit.mk_eq ~ord
+          (T.mk_node s [T.mk_node s [x; y]; z])
+          (T.mk_node s [x; T.mk_node s [y; x]]) ] in
+        let c2 = C.create ~ctx lits proof in
+        C.set_flag C.flag_persistent c2 true;
+        (* add the two clauses *)
+        c1 :: c2 :: clauses
+      | _ ->
+        Util.debug 1 "AC symbol %a has wrong type %a" Symbol.pp s Type.pp ty;
+        assert false)
+    set []
+  
+(** {2 Rules} *)
 
 let is_trivial_lit ~spec lit =
-  let is_ac = spec.is_ac in
+  let is_ac = Theories.AC.is_ac ~spec in
   match lit with
   | Lit.Equation (l, r, true, _) -> T.ac_eq ~is_ac l r
   | Lit.Equation _
@@ -53,7 +85,7 @@ let is_trivial ~spec c =
 let simplify ~spec ~ctx c =
   Util.enter_prof prof_simplify;
   let n = Array.length c.C.hclits in
-  let is_ac = spec.is_ac in
+  let is_ac = Theories.AC.is_ac ~spec in
   let lits = Array.to_list c.C.hclits in
   let lits = List.filter
     (fun lit -> match lit with
@@ -76,3 +108,7 @@ let simplify ~spec ~ctx c =
     end else
       let _ = Util.exit_prof prof_simplify in
       c (* no simplification *)
+
+let setup_env ~env =
+  (* TODO: make env's simplification rules handling better/more modular *) 
+  assert false

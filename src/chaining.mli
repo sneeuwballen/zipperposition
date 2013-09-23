@@ -25,24 +25,43 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {6 AC redundancy} *)
+(** {6 Chaining Inferences} *)
+
+(** We follow the paper "ordered chaining for total orderings" by
+    L. Bachmair and H. Ganzinger.
+
+    Chaining allows to deal with total order in a very efficient manner.
+    Here it needs to know which symbols are orderings, an ordering instance
+    being a pair of strict order symbol, and non-strict order symbol.
+    Equality can only be the regular, "builtin" equality symbol.
+*)
 
 open Logtk
 
-type spec = Theories.AC.t
+type spec = Theories.TotalOrder.t
 
-val axioms : spec:spec -> ctx:Ctx.t -> Clause.t list
-  (** List of (persistent) axioms that are needed for simplifications to
-      be complete. The signature is required for type inference. *)
+(** {2 Inference Rules} *)
 
-(** {2 Rules} *)
+val eq_chaining_left : spec:spec -> Env.binary_inf_rule
+  (** Equality chaining left *)
 
-val is_trivial_lit : spec:spec -> Literal.t -> bool
+val eq_chaining_right : spec:spec -> Env.binary_inf_rule
+  (** Equality chaining right *)
 
-val is_trivial : spec:spec -> Clause.t -> bool
-  (** Check whether the clause is AC-trivial *)
+val ineq_chaining : spec:spec -> Env.binary_inf_rule
+  (** Inequality chaining. *)
 
-val simplify : spec:spec -> ctx:Ctx.t -> Clause.t -> Clause.t
-  (** Simplify the clause modulo AC *)
+val reflexivity_res : spec:spec -> Env.unary_inf_rule
+  (** Reflexivity resolution *)
+
+val is_tautology : spec:spec -> Clause.t -> bool
+  (** Clause is always true in ordering models? *)
+
+val simplify : spec:spec -> Clause.t -> Clause.t
+  (** Simplify the clause, by removing impossible literals *)
+
+(** {2 Env} *)
 
 val setup_env : env:Env.t -> unit
+  (** Setup inference rules in Env. The specification that is used is
+      the one from env.ctx. *)

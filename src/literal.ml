@@ -487,6 +487,45 @@ module Arr = struct
     infer_type ctx lits;
     TypeInference.Ctx.to_signature ctx
 
+  (** {3 High Order combinators} *)
+
+  let fold_eqn ?(both=true) ~eligible lits acc f =
+    let rec fold acc i =
+      if i = Array.length lits then acc
+      else if not (eligible i lits.(i)) then fold acc (i+1)
+      else
+        let acc = match lits.(i) with
+        | Equation (l,r,sign,Gt) ->
+          f acc l r sign [i; Position.left_pos]
+        | Equation (l,r,sign,Lt) ->
+          f acc r l sign [i; Position.right_pos]
+        | Equation (l,r,sign,_) ->
+          if both
+          then (* visit both sides of the equation *)
+            let acc = f acc r l sign [i; Position.right_pos] in
+            f acc l r sign [i; Position.left_pos]
+          else (* only visit one side (arbitrary) *)
+            f acc l r sign [i; Position.left_pos]
+        | Prop (p, sign) ->
+          f acc p T.true_term sign [i; Position.left_pos]
+        | True
+        | False -> acc
+        in fold acc (i+1)
+    in fold acc 0
+
+  (** decompose the literal at given position *)
+  let get_eqn lits pos = match pos with
+    | idx::eq_side::_ ->
+      begin match lits.(idx) with
+      | Equation (l,r,sign,_) when eq_side = Position.left_pos -> (l, r, sign)
+      | Equation (l,r,sign,_) when eq_side = Position.right_pos -> (r, l, sign)
+      | Prop (p, sign) when eq_side = Position.left_pos -> (p, T.true_term, sign)
+      | True when eq_side = Position.left_pos -> (T.true_term, T.true_term, true)
+      | False when eq_side = Position.left_pos -> (T.true_term, T.true_term, false)
+      | _ -> invalid_arg "wrong side"
+      end
+    | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
+
   (** {3 IO} *)
 
   let pp buf lits = 
