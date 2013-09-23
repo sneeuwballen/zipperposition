@@ -43,11 +43,13 @@ module Ctx = struct
     mutable signature : Signature.t;(* symbol -> type *)
   }
 
-  let create () = {
-    st = Type.Stack.create ();
-    db = [];
-    signature = Signature.empty;
-  }
+  let create ?(base=true) () =
+    let signature = if base then Signature.base else Signature.empty in
+    {
+      st = Type.Stack.create ();
+      db = [];
+      signature;
+    }
 
   let of_signature signature = {
     st = Type.Stack.create ();
@@ -82,16 +84,22 @@ module Ctx = struct
     ()
 
   let type_of_symbol ctx s =
-    try
-      let ty = Signature.find ctx.signature s in
-      let ty = Type.deref ty in
-      Type.instantiate ty
-    with Not_found ->
-      (* give a new type variable to this symbol *)
-      let ty = Type.new_gvar () in
-      Util.debug 5 "Ctx: new type %a for symbol %a" Type.pp ty Symbol.pp s;
-      ctx.signature <- Signature.declare ctx.signature s ty;
-      ty
+    match s with
+    | Symbol.Int _ -> Type.int
+    | Symbol.Rat _ -> Type.rat
+    | Symbol.Real _ -> Type.real
+    | Symbol.Const _ ->
+      begin try
+        let ty = Signature.find ctx.signature s in
+        let ty = Type.deref ty in
+        Type.instantiate ty
+      with Not_found ->
+        (* give a new type variable to this symbol *)
+        let ty = Type.new_gvar () in
+        Util.debug 5 "Ctx: new type %a for symbol %a" Type.pp ty Symbol.pp s;
+        ctx.signature <- Signature.declare ctx.signature s ty;
+        ty
+      end
 
   let declare ctx s ty =
     assert (Type.is_closed ty);

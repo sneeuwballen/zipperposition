@@ -33,7 +33,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** A symbol of TPTP *)
 type t = private
   | Const of string * const_info
-  | Num of Num.num
+  | Int of Big_int.big_int
+  | Rat of Ratio.ratio
   | Real of float
 and const_info = private {
   mutable tag : int;
@@ -73,10 +74,13 @@ val attr_distinct : symbol_attribute    (** distinct element (between "") *)
 
 val mk_const : ?attrs:symbol_attribute -> string -> t
 val mk_distinct : ?attrs:symbol_attribute -> string -> t
-val mk_num : Num.num -> t
-val parse_num : string -> t
+val mk_bigint : Big_int.big_int -> t
 val mk_int : int -> t
+val mk_rat : int -> int -> t
+val mk_ratio : Ratio.ratio -> t
 val mk_real : float -> t
+
+val parse_num : string -> t             (** Parse an Int or a Rat *)
 
 val is_const : t -> bool
 val is_distinct : t -> bool
@@ -118,7 +122,9 @@ val is_connective : t -> bool
 
 (** {2 Arithmetic} *)
 
-(** Arithmetic (assumes the symbols verify {!is_numeric}) *)
+(** Arithmetic (assumes the symbols verify {!is_numeric}).
+    {!Arith} contains the symbols, and {!Arith.Op} contains the computational
+    part of arithmetic (compute the result of operations) *)
 
 module Arith : sig
   exception TypeMismatch
@@ -129,13 +135,13 @@ module Arith : sig
 
   val sign : t -> int   (* -1, 0 or 1 *)
 
-  val floor : t -> t
-  val ceiling : t -> t
-  val truncate : t -> t
-  val round : t -> t
+  val floor : t
+  val ceiling : t
+  val truncate : t
+  val round : t
 
-  val prec : t -> t
-  val succ : t -> t
+  val prec : t
+  val succ : t
 
   val one_i : t
   val zero_i : t
@@ -144,27 +150,59 @@ module Arith : sig
 
   val is_zero : t -> bool
 
-  val sum : t -> t -> t
-  val difference : t -> t -> t
-  val uminus : t -> t
-  val product : t -> t -> t
-  val quotient : t -> t -> t
+  val sum : t
+  val difference : t
+  val uminus : t
+  val product : t
+  val quotient : t
 
-  val quotient_e : t -> t -> t
-  val quotient_t : t -> t -> t
-  val quotient_f : t -> t -> t
-  val remainder_e : t -> t -> t
-  val remainder_t : t -> t -> t
-  val remainder_f : t -> t -> t
+  val quotient_e : t
+  val quotient_t : t
+  val quotient_f : t
+  val remainder_e : t
+  val remainder_t : t
+  val remainder_f : t
 
-  val to_int : t -> t
-  val to_rat : t -> t
-  val to_real : t -> t
+  val to_int : t
+  val to_rat : t
+  val to_real : t
 
-  val less : t -> t -> bool
-  val lesseq : t -> t -> bool
-  val greater : t -> t -> bool
-  val greatereq : t -> t -> bool
+  val less : t
+  val lesseq : t
+  val greater : t
+  val greatereq : t
+
+  module Op : sig
+    val floor : t -> t
+    val ceiling : t -> t
+    val truncate : t -> t
+    val round : t -> t
+
+    val prec : t -> t
+    val succ : t -> t
+
+    val sum : t -> t -> t
+    val difference : t -> t -> t
+    val uminus : t -> t
+    val product : t -> t -> t
+    val quotient : t -> t -> t
+
+    val quotient_e : t -> t -> t
+    val quotient_t : t -> t -> t
+    val quotient_f : t -> t -> t
+    val remainder_e : t -> t -> t
+    val remainder_t : t -> t -> t
+    val remainder_f : t -> t -> t
+
+    val to_int : t -> t
+    val to_rat : t -> t
+    val to_real : t -> t
+
+    val less : t -> t -> bool
+    val lesseq : t -> t -> bool
+    val greater : t -> t -> bool
+    val greatereq : t -> t -> bool
+  end
 end
 
 

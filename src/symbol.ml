@@ -28,7 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** A symbol of TPTP *)
 type t =
   | Const of string * const_info
-  | Num of Num.num
+  | Int of Big_int.big_int
+  | Rat of Ratio.ratio
   | Real of float
 and const_info = {
   mutable tag : int;
@@ -53,7 +54,8 @@ let attr_distinct = 1 lsl 8
 
 let attrs s = match s with
   | Const (_, info) -> info.attrs
-  | Num _
+  | Int _
+  | Rat _
   | Real _ -> 0
 
 let has_attr attr s = (attrs s land attr) <> 0
@@ -62,13 +64,15 @@ let has_attr attr s = (attrs s land attr) <> 0
 
 let eq_base s1 s2 = match s1, s2 with
   | Const (s1,_), Const (s2, _) -> s1 = s2
-  | Num n1, Num n2 -> Num.eq_num n1 n2
+  | Int n1, Int n2 -> Big_int.eq_big_int n1 n2
+  | Rat n1, Rat n2 -> Ratio.eq_ratio n1 n2
   | Real f1, Real f2 -> f1 = f2
   | _ -> false
 
 let hash_base s = match s with
   | Const (s, _) -> Hash.hash_string s
-  | Num n -> Hashtbl.hash n
+  | Int n -> Hashtbl.hash n
+  | Rat n -> Hashtbl.hash n
   | Real f -> Hashtbl.hash f
 
 module H = Hashcons.Make(struct
@@ -85,20 +89,26 @@ let is_used s =
 
 (** {2 Basic operations} *)
 
-let compare s1 s2 = match s1, s2 with
+let compare s1 s2 =
+  let __to_int = function
+    | Const _ -> 0
+    | Int _ -> 1
+    | Rat _ -> 2
+    | Real _ -> 3
+  in
+  match s1, s2 with
   | Const (_, info1), Const (_, info2) -> info1.tag - info2.tag
-  | Num n1, Num n2 -> Num.compare_num n1 n2
+  | Int n1, Int n2 -> Big_int.compare_big_int n1 n2
+  | Rat n1, Rat n2 -> Ratio.compare_ratio n1 n2
   | Real f1, Real f2 -> Pervasives.compare f1 f2
-  | Const _, _ -> 1
-  | _, Const _ -> -1
-  | Num _, _ -> 1
-  | _, Num _ -> -1
+  | _, _ -> __to_int s1 - __to_int s2
 
 let eq a b = compare a b = 0
 
 let hash s = match s with
   | Const (_, info) -> info.tag
-  | Num n -> Hashtbl.hash n
+  | Int n -> Hashtbl.hash n
+  | Rat n -> Hashtbl.hash n
   | Real f -> int_of_float f
 
 let mk_const ?(attrs=0) s =
@@ -109,30 +119,37 @@ let mk_distinct ?(attrs=0) s =
   let attrs = attrs lor attr_distinct in
   mk_const ~attrs s
 
-let mk_num n = Num n
+let mk_bigint i = Int i
+
+let mk_int i = Int (Big_int.big_int_of_int i)
+
+let mk_ratio rat = Rat rat
+
+let mk_rat i j =
+  Rat (Ratio.create_ratio (Big_int.big_int_of_int i) (Big_int.big_int_of_int j))
+
+let mk_real f = Real f
 
 let parse_num str =
   let n = Num.num_of_string str in
-  Num n
-
-let mk_int i = Num (Num.num_of_int i)
-
-let mk_real f = Real f
+  if Num.is_integer_num n
+    then Int (Num.big_int_of_num n)
+    else Rat (Num.ratio_of_num n)
 
 let is_const s = match s with
   | Const _ -> true | _ -> false
 
 let is_int s = match s with
-  | Num n -> Num.is_integer_num n | _ -> false
+  | Int _ -> true | _ -> false
 
 let is_rat s = match s with
-  | Num n -> not (Num.is_integer_num n) | _ -> false
+  | Rat _ -> true | _ -> false
 
 let is_real s = match s with
   | Real f -> true | _ -> false
 
 let is_numeric s = match s with
-  | Real _ | Num _ -> true | _ -> false
+  | Real _ | Int _ | Rat _ -> true | _ -> false
 
 let is_distinct s = match s with
   | Const _ -> has_attr attr_distinct s | _ -> false
@@ -183,48 +200,21 @@ let is_connective s = List.exists (fun s' -> eq s s') connectives
 module Arith = struct
   exception TypeMismatch
 
-  open Num
-
   let sign s = match s with
-  | Num n -> sign_num n
+  | Int n -> Big_int.sign_big_int n
+  | Rat n -> Ratio.sign_ratio n
   | Real f when f > 0. -> 1
   | Real f when f < 0. -> -1
   | Real f -> 0
   | _ -> raise TypeMismatch
 
-  let floor s = match s with
-  | Num n -> mk_num (floor_num n)
-  | Real f -> mk_real (floor f)
-  | _ -> raise TypeMismatch
+  let floor = mk_const "$floor"
+  let ceiling = mk_const "$ceiling"
+  let truncate = mk_const "$truncate"
+  let round = mk_const "$round"
 
-  let ceiling s = match s with
-  | Num n -> mk_num (ceiling_num n)
-  | Real f -> mk_real (ceil f)
-  | _ -> raise TypeMismatch
-
-  let truncate s = match s with
-  | Num n when sign_num n >= 0 -> mk_num (floor_num n)
-  | Num n -> mk_num (minus_num (floor_num (abs_num n)))
-  | Real f -> mk_num (num_of_int (truncate f))
-  | _ -> raise TypeMismatch
-
-  let round s = match s with
-  | Num n -> mk_num (round_num n)
-  | Real f ->
-    let f' = Pervasives.floor f in
-    let i = if f -. f' > 0.5 then int_of_float f' else (int_of_float f') + 1 in
-    mk_num (num_of_int i)
-  | _ -> raise TypeMismatch
-
-  let prec s = match s with
-  | Num n -> mk_num (pred_num n)
-  | Real f -> mk_real (f -. 1.)
-  | _ -> raise TypeMismatch
-
-  let succ s = match s with
-  | Num n -> mk_num (succ_num n)
-  | Real f -> mk_real (f +. 1.)
-  | _ -> raise TypeMismatch
+  let prec = mk_const "$prec"
+  let succ = mk_const "$succ"
 
   let one_i = mk_int 1
   let zero_i = mk_int 0
@@ -232,79 +222,172 @@ module Arith = struct
   let zero_f = mk_real 0.
 
   let is_zero s = match s with
-  | Num n -> Num.sign_num n = 0
+  | Int n -> Big_int.sign_big_int n = 0
+  | Rat n -> Ratio.sign_ratio n = 0
   | Real f -> f = 0.
   | _ -> raise TypeMismatch
 
-  let sum s1 s2 = match s1, s2 with
-  | Num n1, Num n2 -> mk_num (n1 +/ n2)
-  | Real f1, Real f2 -> mk_real (f1 +. f2)
-  | _ -> raise TypeMismatch
+  let sum = mk_const "$sum"
+  let difference = mk_const "$difference"
+  let uminus = mk_const "$uminus"
+  let product = mk_const "$product"
+  let quotient = mk_const "$quotient"
 
-  let difference s1 s2 = match s1, s2 with
-  | Num n1, Num n2 -> mk_num (n1 -/ n2)
-  | Real f1, Real f2 -> mk_real (f1 -. f2)
-  | _ -> raise TypeMismatch
+  let quotient_e = mk_const "$quotient_e"
+  let quotient_t = mk_const "$quotient_t"
+  let quotient_f = mk_const "$quotient_f"
+  let remainder_e = mk_const "$remainder_e"
+  let remainder_t = mk_const "$remainder_t"
+  let remainder_f = mk_const "$remainder_f"
 
-  let uminus s = match s with
-  | Num n -> mk_num (minus_num n)
-  | Real f -> mk_real (~-. f)
-  | _ -> raise TypeMismatch
+  let to_int = mk_const "$to_int"
+  let to_rat = mk_const "$to_rat"
+  let to_real = mk_const "$to_real"
 
-  let product s1 s2 = match s1, s2 with
-  | Num n1, Num n2 -> mk_num (n1 */ n2)
-  | Real f1, Real f2 -> mk_real (f1 *. f2)
-  | _ -> raise TypeMismatch
+  let less = mk_const "$less"
+  let lesseq = mk_const "$lesseq"
+  let greater = mk_const "$greater"
+  let greatereq = mk_const "$greatereq"
 
-  let quotient s1 s2 = match s1, s2 with
-  | Num n1, Num n2 ->
-    (try mk_num (n1 // n2) with Failure _ -> raise Division_by_zero)
-  | Real f1, Real f2 ->
-    let f = f1 /. f2 in if f == infinity then raise Division_by_zero else mk_real f
-  | _ -> raise TypeMismatch
+  module Op = struct
+    let floor s = match s with
+    | Int _ -> s
+    | Rat n -> mk_bigint (Ratio.floor_ratio n)
+    | Real f -> mk_real (Pervasives.floor f)
+    | _ -> raise TypeMismatch
 
-  let quotient_e s1 s2 =
-    if sign s2 >= 0 then floor (quotient s1 s2) else ceiling (quotient s1 s2)
+    let ceiling s = match s with
+    | Int _ -> s
+    | Rat n -> mk_bigint (Ratio.ceiling_ratio n)
+    | Real f -> mk_real (Pervasives.ceil f)
+    | _ -> raise TypeMismatch
 
-  let quotient_t s1 s2 = truncate (quotient s1 s2)
+    let truncate s = match s with
+    | Int _ -> s
+    | Rat n when Ratio.sign_ratio n >= 0 -> mk_bigint (Ratio.floor_ratio n)
+    | Rat n -> mk_bigint (Big_int.minus_big_int (Ratio.floor_ratio (Ratio.abs_ratio n)))
+    | Real f -> mk_int (Pervasives.truncate f)
+    | _ -> raise TypeMismatch
 
-  let quotient_f s1 s2 = floor (quotient s1 s2)
+    let round s = match s with
+    | Int _ -> s
+    | Rat n -> mk_bigint (Ratio.round_ratio n)
+    | Real f ->
+      let f' = Pervasives.floor f in
+      let i = if f -. f' > 0.5 then int_of_float f' else (int_of_float f') + 1 in
+      mk_int i
+    | _ -> raise TypeMismatch
 
-  let remainder_e s1 s2 = difference s1 (product (quotient_e s1 s2) s2)
+    let prec s = match s with
+    | Int n -> mk_bigint (Big_int.pred_big_int n)
+    | Rat n -> mk_ratio (Ratio.add_int_ratio (-1) n)
+    | Real f -> mk_real (f -. 1.)
+    | _ -> raise TypeMismatch
 
-  let remainder_t s1 s2 = difference s1 (product (quotient_t s1 s2) s2)
+    let succ s = match s with
+    | Int n -> mk_bigint (Big_int.succ_big_int n)
+    | Rat n -> mk_ratio (Ratio.add_int_ratio 1 n)
+    | Real f -> mk_real (f +. 1.)
+    | _ -> raise TypeMismatch
 
-  let remainder_f s1 s2 = difference s1 (product (quotient_f s1 s2) s2)
+    let sum s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (Big_int.add_big_int n1 n2)
+    | Rat n1, Rat n2 -> mk_ratio (Ratio.add_ratio n1 n2)
+    | Real f1, Real f2 -> mk_real (f1 +. f2)
+    | _ -> raise TypeMismatch
 
-  let to_int s = floor s
+    let difference s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (Big_int.sub_big_int n1 n2)
+    | Rat n1, Rat n2 -> mk_ratio (Ratio.sub_ratio n1 n2)
+    | Real f1, Real f2 -> mk_real (f1 -. f2)
+    | _ -> raise TypeMismatch
 
-  let to_rat s = s
-    (* XXX not fully specified... *)
+    let uminus s = match s with
+    | Int n -> mk_bigint (Big_int.minus_big_int n)
+    | Rat n -> mk_ratio (Ratio.minus_ratio n)
+    | Real f -> mk_real (~-. f)
+    | _ -> raise TypeMismatch
 
-  let to_real s = match s with
-  | Num n -> mk_real (float_of_num n)
-  | Real _ -> s
-  | _ -> raise TypeMismatch
+    let product s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (Big_int.mult_big_int n1 n2)
+    | Rat n1, Rat n2 -> mk_ratio (Ratio.mult_ratio n1 n2)
+    | Real f1, Real f2 -> mk_real (f1 *. f2)
+    | _ -> raise TypeMismatch
 
-  let less s1 s2 = match s1, s2 with
-  | Num n1, Num n2 -> n1 </ n2
-  | Real f1, Real f2 -> f1 < f2
-  | _ -> raise TypeMismatch
+    let quotient s1 s2 = match s1, s2 with
+    | Int _, Int _ -> raise TypeMismatch
+    | Rat n1, Rat n2 ->
+      (try mk_ratio (Ratio.div_ratio n1 n2) with Failure _ -> raise Division_by_zero)
+    | Real f1, Real f2 ->
+      let f = f1 /. f2 in if f == infinity then raise Division_by_zero else mk_real f
+    | _ -> raise TypeMismatch
 
-  let lesseq s1 s2 = match s1, s2 with
-  | Num n1, Num n2 -> n1 <=/ n2
-  | Real f1, Real f2 -> f1 <= f2
-  | _ -> raise TypeMismatch
+    let quotient_e s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (fst (Big_int.quomod_big_int n1 n2))
+    | _ ->
+      if sign s2 > 0
+        then floor (quotient s1 s2)
+        else ceiling (quotient s1 s2)
 
-  let greater s1 s2 = match s1, s2 with
-  | Num n1, Num n2 -> n1 >/ n2
-  | Real f1, Real f2 -> f1 > f2
-  | _ -> raise TypeMismatch
+    let quotient_t s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (fst (Big_int.quomod_big_int n1 n2))
+    | _ -> truncate (quotient s1 s2)
 
-  let greatereq s1 s2 = match s1, s2 with
-  | Num n1, Num n2 -> n1 >=/ n2
-  | Real f1, Real f2 -> f1 >= f2
-  | _ -> raise TypeMismatch
+    let quotient_f s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (fst (Big_int.quomod_big_int n1 n2))
+    | _ -> floor (quotient s1 s2)
+
+    let remainder_e s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (fst (Big_int.quomod_big_int n1 n2))
+    | _ -> difference s1 (product (quotient_e s1 s2) s2)
+
+    let remainder_t s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (snd (Big_int.quomod_big_int n1 n2))
+    | _ -> difference s1 (product (quotient_t s1 s2) s2)
+
+    let remainder_f s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> mk_bigint (snd (Big_int.quomod_big_int n1 n2))
+    | _ -> difference s1 (product (quotient_f s1 s2) s2)
+
+    let to_int s = match s with
+    | Int _ -> s
+    | _ -> floor s
+
+    let to_rat s = match s with
+    | Int n -> mk_ratio (Ratio.ratio_of_big_int n)
+    | Rat _ -> s
+    | _ -> raise TypeMismatch (* XXX not fully specified... *)
+
+    let to_real s = match s with
+    | Int n -> mk_real (Big_int.float_of_big_int n)
+    | Rat n -> mk_real (Ratio.float_of_ratio n)
+    | Real _ -> s
+    | _ -> raise TypeMismatch
+
+    let less s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> Big_int.lt_big_int n1 n2
+    | Rat n1, Rat n2 -> Ratio.lt_ratio n1 n2
+    | Real f1, Real f2 -> f1 < f2
+    | _ -> raise TypeMismatch
+
+    let lesseq s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> Big_int.le_big_int n1 n2
+    | Rat n1, Rat n2 -> Ratio.le_ratio n1 n2
+    | Real f1, Real f2 -> f1 <= f2
+    | _ -> raise TypeMismatch
+
+    let greater s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> Big_int.gt_big_int n1 n2
+    | Rat n1, Rat n2 -> Ratio.gt_ratio n1 n2
+    | Real f1, Real f2 -> f1 > f2
+    | _ -> raise TypeMismatch
+
+    let greatereq s1 s2 = match s1, s2 with
+    | Int n1, Int n2 -> Big_int.ge_big_int n1 n2
+    | Rat n1, Rat n2 -> Ratio.ge_ratio n1 n2
+    | Real f1, Real f2 -> f1 >= f2
+    | _ -> raise TypeMismatch
+  end
 end
 
 (** {2 "Magic" symbols} *)
@@ -339,7 +422,8 @@ let mk_fresh_const i =
 
 let to_string s = match s with
   | Const (s,_) -> s
-  | Num n -> Num.string_of_num n
+  | Int n -> Big_int.string_of_big_int n
+  | Rat n -> Ratio.string_of_ratio n
   | Real f -> string_of_float f
 
 let pp buf s = Buffer.add_string buf (to_string s)
@@ -360,17 +444,18 @@ let pp_tstp buf s = Buffer.add_string buf (to_string_tstp s)
 let fmt fmt s = Format.pp_print_string fmt (to_string s)
 
 let bij =
-  let open Bij in
-  switch
+  Bij.switch
     ~inject:(fun s -> match s with
-      | Const (s,info) -> 'c', BranchTo (pair string_ int_, (s, info.attrs))
-      | Num n -> 'n', BranchTo (string_, Num.string_of_num n)
-      | Real f -> 'f', BranchTo (float_, f))
+      | Const (s,info) -> 'c', Bij.(BranchTo (pair string_ int_, (s, info.attrs)))
+      | Int n -> 'i', Bij.(BranchTo (string_, Big_int.string_of_big_int n))
+      | Rat n -> 'r', Bij.(BranchTo (string_, Ratio.string_of_ratio n))
+      | Real f -> 'f', Bij.(BranchTo (float_, f)))
     ~extract:(fun c -> match c with
-      | 'c' -> BranchFrom (pair string_ int_, fun (s,attrs) -> mk_const ~attrs s)
-      | 'n' -> BranchFrom (string_, (fun n -> mk_num (Num.num_of_string n)))
-      | 'f' -> BranchFrom (float_, mk_real)
-      | c -> raise (DecodingError "expected symbol"))
+      | 'c' -> Bij.(BranchFrom (pair string_ int_, fun (s,attrs) -> mk_const ~attrs s))
+      | 'i' -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
+      | 'r' -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
+      | 'f' -> Bij.(BranchFrom (float_, mk_real))
+      | c -> raise (Bij.DecodingError "expected symbol"))
 
 (** {2 Generation of symbols} *)
 

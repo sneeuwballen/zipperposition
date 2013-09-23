@@ -158,6 +158,28 @@ let table =
     Symbol.and_symbol, Type.o <== [Type.o; Type.o];
     Symbol.or_symbol, Type.o <== [Type.o; Type.o];
     Symbol.equiv_symbol, Type.o <== [Type.o; Type.o];
+    Symbol.Arith.less, Type.o <== [x; x];
+    Symbol.Arith.lesseq, Type.o <== [x; x];
+    Symbol.Arith.greater, Type.o <== [x; x];
+    Symbol.Arith.greatereq, Type.o <== [x; x];
+    Symbol.Arith.uminus, x <=. x;
+    Symbol.Arith.sum, x <== [x; x];
+    Symbol.Arith.difference, x <== [x; x];
+    Symbol.Arith.product, x <== [x; x];
+    Symbol.Arith.quotient, x <== [x; x];
+    Symbol.Arith.quotient_e, Type.int <== [x; x];
+    Symbol.Arith.quotient_f, Type.int <== [x; x];
+    Symbol.Arith.quotient_t, Type.int <== [x; x];
+    Symbol.Arith.remainder_e, Type.int <== [x; x];
+    Symbol.Arith.remainder_f, Type.int <== [x; x];
+    Symbol.Arith.remainder_t, Type.int <== [x; x];
+    Symbol.Arith.floor, Type.int <=. x;
+    Symbol.Arith.ceiling, Type.int <=. x;
+    Symbol.Arith.round, Type.int <=. x;
+    Symbol.Arith.truncate, Type.int <=. x;
+    Symbol.Arith.to_int, Type.int <=. x;
+    Symbol.Arith.to_rat, Type.rat <=. x;
+    Symbol.Arith.to_real, Type.real <=. x;
     (* special symbols, used for precedence
     Symbol.db_symbol, Type.i;
     Symbol.split_symbol, Type.o;

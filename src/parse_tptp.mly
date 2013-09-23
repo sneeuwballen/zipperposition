@@ -190,7 +190,6 @@ disjunction:
 literal:
   | f=atomic_formula { f }
   | NOT f=atomic_formula { F.mk_not f }
-  | f=fol_infix_unary { f }
 
 fof_formula:
   | fof_logic_formula { $1 }
@@ -221,11 +220,6 @@ fof_quantified_formula:
 
 fof_unary_formula:
   | o=unary_connective f=fof_unitary_formula { o f }
-  | f=fol_infix_unary { f }
-
-fol_infix_unary:
-  | l=term o=infix_inequality r=term
-    { o l r }
   
 %inline binary_connective:
   | EQUIV { F.mk_equiv }
@@ -241,39 +235,17 @@ fol_infix_unary:
   | EXISTS { F.mk_exists_list }
 %inline unary_connective:
   | NOT { F.mk_not }
-%inline infix_inequality:
-  | NOT_EQUAL { F.mk_neq }
 
 atomic_formula:
-  | plain_atomic_formula { $1 }
-  | defined_atomic_formula { $1 }
-  | system_atomic_formula { $1 }
-
-plain_atomic_formula: plain_term { F.mk_atom $1 }
-
-defined_atomic_formula:
-  | defined_plain_formula { $1 }
-  | defined_infix_formula { $1 }
-
-defined_infix_formula:
-  | l=term o=defined_infix_pred r=term  { o l r }
-
-%inline defined_infix_pred:
-  | EQUAL { F.mk_eq }
-
-defined_plain_formula:
-  | p=defined_prop { p }
-  | p=defined_pred LEFT_PAREN args=arguments RIGHT_PAREN
-    { F.mk_atom (T.mk_node p args) }
-
-/* includes $true and $false */
-defined_prop:
   | TRUE { F.mk_true } 
   | FALSE { F.mk_false }
-defined_pred: atomic_defined_word { $1 }
+  | l=term o=infix_connective r=term { o l r }
+  | function_term { F.mk_atom $1 }
 
-system_atomic_formula: system_term { F.mk_atom $1 }
-  
+%inline infix_connective:
+  | EQUAL { F.mk_eq }
+  | NOT_EQUAL { F.mk_neq }
+
 /* Terms */
 
 term:
@@ -304,8 +276,8 @@ defined_term:
   | defined_atomic_term { $1 }
 
 defined_atom:
-  | n=INTEGER { Symbol.mk_int (int_of_string n) }
-  | n=RATIONAL { Symbol.mk_num (Num.num_of_string n) }
+  | n=INTEGER { Symbol.mk_bigint (Big_int.big_int_of_string n) }
+  | n=RATIONAL { Symbol.mk_ratio (Ratio.ratio_of_string n) }
   | n=REAL { Symbol.mk_real (float_of_string n) }
   | s=DISTINCT_OBJECT { Symbol.mk_distinct s }
 

@@ -295,8 +295,8 @@ defined_term:
   | defined_atomic_term { $1 }
 
 defined_atom:
-  | n=INTEGER { Symbol.mk_int (int_of_string n) }
-  | n=RATIONAL { Symbol.mk_num (Num.num_of_string n) }
+  | n=INTEGER { Symbol.mk_bigint (Big_int.big_int_of_string n) }
+  | n=RATIONAL { Symbol.mk_ratio (Ratio.ratio_of_string n) }
   | n=REAL { Symbol.mk_real (float_of_string n) }
   | s=DISTINCT_OBJECT { Symbol.mk_distinct s }
 

@@ -36,8 +36,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module Ctx : sig
   type t
 
-  val create : unit -> t
-    (** Fresh environment *)
+  val create : ?base:bool -> unit -> t
+    (** Fresh environment. if [base] is true (default), then the
+        base signature is used from start, rather than an empty
+        signature *)
 
   val of_signature : Signature.t -> t
 
