@@ -225,13 +225,13 @@ let matching pat right =
     (* match left and right *)
     Util.debug 5 "MetaPattern: match %a with %a" T.pp left T.pp right;
     let substs = matching_terms left 1 right 0 in
-    let subst = Sequence.map
+    let substs = Sequence.map
       (fun subst ->
         let args = List.map (fun v -> Substs.apply subst v 1) vars in
         pat, args)
       substs
     in
-    let substs = Sequence.persistent subst in
+    let substs = Sequence.persistent substs in
     Util.exit_prof prof_matching;
     substs
 
@@ -268,7 +268,9 @@ module Set = struct
     PSet.fold
       (fun pat' acc ->
         let substs = matching pat' f in
-        (Sequence.to_rev_list substs) @ acc)
+        List.rev_append
+          (Sequence.to_rev_list substs)
+          acc)
       set []
 
   let to_seq set =
