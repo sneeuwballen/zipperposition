@@ -218,6 +218,8 @@ module Arith = struct
 
   let one_i = mk_int 1
   let zero_i = mk_int 0
+  let one_rat = mk_rat 1 1
+  let zero_rat = mk_rat 0 1
   let one_f = mk_real 1.
   let zero_f = mk_real 0.
 
@@ -248,6 +250,17 @@ module Arith = struct
   let lesseq = mk_const "$lesseq"
   let greater = mk_const "$greater"
   let greatereq = mk_const "$greatereq"
+
+  let set =
+    let l = [
+      sum; difference; uminus; product; quotient;
+      quotient_e; quotient_t; quotient_f;
+      remainder_e; remainder_t; remainder_f;
+      less; lesseq; greater; greatereq;
+    ] in
+    SSet.of_seq (Sequence.of_list l)
+
+  let is_arith s = SSet.mem s set
 
   module Op = struct
     let floor s = match s with

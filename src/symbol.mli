@@ -145,6 +145,8 @@ module Arith : sig
 
   val one_i : t
   val zero_i : t
+  val one_rat : t
+  val zero_rat : t
   val one_f : t
   val zero_f : t
 
@@ -171,6 +173,11 @@ module Arith : sig
   val lesseq : t
   val greater : t
   val greatereq : t
+
+  val set : SSet.t
+
+  val is_arith : t -> bool
+    (** Is the symbol an arithmetic symbol? *)
 
   module Op : sig
     val floor : t -> t
