@@ -234,6 +234,24 @@ module Monome = struct
 
   let find m t = T.TMap.find t m.coeffs
 
+  let add m coeff t =
+    (* compute sum of coeffs for [t], if need be *)
+    let c =
+      try
+        let coeff' = T.TMap.find t m.coeffs in
+        S.Arith.Op.sum coeff coeff'
+      with Not_found -> coeff
+    in
+    if S.Arith.is_zero c
+      then {m with coeffs=T.TMap.remove t m.coeffs;}
+      else {m with coeffs=T.TMap.add t c m.coeffs;}
+  
+  let remove m t =
+    { m with coeffs=T.TMap.remove t m.coeffs; }
+
+  let terms m =
+    T.TMap.fold (fun t coeff acc -> (coeff,t) :: acc) m.coeffs []
+
   (* scale: multiply all coeffs by constant, multiply divby by same constant.
     This yields the very same monome *)
   let _scale m c =
@@ -316,46 +334,47 @@ module Monome = struct
   exception NotLinear
     (** Used by [of_term] *)
 
-  let of_term ~signature t =
-    let rec of_term t = match t.T.term with
-    | T.Node (s, [t1; t2]) when S.eq s S.Arith.sum ->
-      let m1 = of_term t1 in
-      let m2 = of_term t2 in
-      sum m1 m2
-    | T.Node (s, [t1; t2]) when S.eq s S.Arith.difference ->
-      let m1 = of_term t1 in
-      let m2 = of_term t2 in
-      difference m1 m2
-    | T.Node (s, [t']) when S.eq s S.Arith.uminus ->
-      let m = of_term t' in
-      uminus m
-    | T.Node (s, [{T.term=T.Node (s',[])}; t2])
-      when S.eq s S.Arith.product && S.is_numeric s' ->
-      let m = of_term t2 in
-      product m s'
-    | T.Node (s, [t2; {T.term=T.Node (s',[])}])
-      when S.eq s S.Arith.product && S.is_numeric s' ->
-      let m = of_term t2 in
-      product m s'
-    | T.Node (s, [t2; {T.term=T.Node (s',[])}])
-      when S.eq s S.Arith.quotient && S.is_numeric s' && not (S.Arith.is_zero s') ->
-      let m = of_term t2 in
-      divby m s'
-    | T.Node (s, [_; _]) when S.Arith.is_arith s ->
-      raise NotLinear  (* failure *)
-    | T.Var _
-    | T.BoundVar _ ->
-      let ty = match t.T.type_ with Some ty -> ty | None -> assert false in
-      let one = S.Arith.one_of_ty ty in
-      singleton one t
-    | T.Node _
-    | T.At _
-    | T.Bind _ ->
-      let ty = TypeInference.infer_sig signature t in
-      let one = S.Arith.one_of_ty ty in
-      singleton one t
-    in
-    try Some (of_term t)
+  let rec of_term ~signature t = match t.T.term with
+  | T.Node (s, [t1; t2]) when S.eq s S.Arith.sum ->
+    let m1 = of_term ~signature t1 in
+    let m2 = of_term ~signature t2 in
+    sum m1 m2
+  | T.Node (s, [t1; t2]) when S.eq s S.Arith.difference ->
+    let m1 = of_term ~signature t1 in
+    let m2 = of_term ~signature t2 in
+    difference m1 m2
+  | T.Node (s, [t']) when S.eq s S.Arith.uminus ->
+    let m = of_term ~signature t' in
+    uminus m
+  | T.Node (s, [{T.term=T.Node (s',[])}; t2])
+    when S.eq s S.Arith.product && S.is_numeric s' ->
+    let m = of_term ~signature t2 in
+    product m s'
+  | T.Node (s, [t2; {T.term=T.Node (s',[])}])
+    when S.eq s S.Arith.product && S.is_numeric s' ->
+    let m = of_term ~signature t2 in
+    product m s'
+  | T.Node (s, [t2; {T.term=T.Node (s',[])}])
+    when S.eq s S.Arith.quotient && S.is_numeric s' && not (S.Arith.is_zero s') ->
+    let m = of_term ~signature t2 in
+    divby m s'
+  | T.Node (s, []) when S.is_numeric s -> const s
+  | T.Node (s, [_; _]) when S.Arith.is_arith s ->
+    raise NotLinear  (* failure *)
+  | T.Var _
+  | T.BoundVar _ ->
+    let ty = match t.T.type_ with Some ty -> ty | None -> assert false in
+    let one = S.Arith.one_of_ty ty in
+    singleton one t
+  | T.Node _
+  | T.At _
+  | T.Bind _ ->
+    let ty = TypeInference.infer_sig signature t in
+    let one = S.Arith.one_of_ty ty in
+    singleton one t
+
+  let of_term_opt ~signature t =
+    try Some (of_term ~signature t)
     with NotLinear -> None
       
   let to_term m =
@@ -386,7 +405,82 @@ module Lit = struct
   | Literal.True
   | Literal.False -> false
 
-  let extract lit = []  (* TODO *)
+  let extract ~signature lit =
+    (* extract literal from (l=r | l!=r) *)
+    let extract_eqn l r sign =
+      try
+        let m1 = Monome.of_term ~signature l in
+        let m2 = Monome.of_term ~signature r in
+        let m = Monome.difference m1 m2 in
+        let terms = Monome.terms m in
+        (* for each term, pivot the monome so that we isolate the term
+          on one side of the (dis)equation *)
+        List.map
+          (fun (coeff, t) ->
+            assert (not (S.Arith.is_zero coeff));
+            let m = Monome.divby (Monome.remove m t) coeff in
+            if sign
+              then Eq (t, m)
+              else Neq (t, m))
+          terms
+      with Monome.NotLinear -> []
+    (* extract lit from (l <= r | l < r) *)
+    and extract_less ~strict l r =
+      try
+        let m1 = Monome.of_term ~signature l in
+        let m2 = Monome.of_term ~signature r in
+        let m = Monome.difference m1 m2 in
+        let terms = Monome.terms m in
+        (* for each term, pivot the monome to isolate the term. Careful with
+            the sign as it can change the comparison sign too! If the
+            coeff is > 0 it means that the term [t] is on the {b left}
+            side. *)
+        List.map
+          (fun (coeff, t) ->
+            assert (not (S.Arith.is_zero coeff));
+            (* do we have to change the sign of comparison? *)
+            let swap = S.Arith.sign coeff < 0 in
+            let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
+            match strict, swap with
+            | true, false -> L_less (t, m)
+            | true, true -> R_less (m, t)
+            | false, false -> L_lesseq (t, m)
+            | false, true -> R_lesseq (m, t)
+          )
+          terms
+      with Monome.NotLinear -> []
+    in
+    let extract_le a b = extract_less ~strict:false a b in
+    let extract_lt a b = extract_less ~strict:true a b in
+    match lit with
+    | Literal.True
+    | Literal.False -> []
+    | Literal.Equation (l, r, sign, _) -> extract_eqn l r sign
+    | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, true) ->
+      extract_lt a b
+    | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, false) ->
+      extract_le b a
+    | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, true) ->
+      extract_le a b
+    | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, false) ->
+      extract_lt b a
+    | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, true) ->
+      extract_lt b a
+    | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, false) ->
+      extract_le a b
+    | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, true) ->
+      extract_le b a
+    | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, false) ->
+      extract_lt a b
+    | Literal.Prop _ -> []
+
+  let simplify ~ord ~signature lit = match lit with
+  | Literal.Equation (l, r, sign, _) ->
+    Literal.mk_lit ~ord (T.simplify ~signature l) (T.simplify ~signature r) sign
+  | Literal.Prop (p, sign) ->
+    Literal.mk_prop ~ord (T.simplify ~signature p) sign
+  | Literal.True
+  | Literal.False -> lit
 end
 
 (** {2 Other transformations} *)

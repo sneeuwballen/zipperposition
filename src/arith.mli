@@ -72,6 +72,11 @@ module Monome : sig
 
   val find : t -> Term.t -> Symbol.t  (** @raise Not_found if not present *)
   val mem : t -> Term.t -> bool       (** Is the term in the monome? *)
+  val add : t -> Symbol.t -> Term.t -> t  (** Add term with coefficient. Sums coeffs. *)
+  val remove : t -> Term.t -> t           (** Remove the term *)
+
+  val terms : t -> (Symbol.t * Term.t) list
+    (** List of terms that occur in the monome with non-nul coefficients *)
 
   val reduce_same_divby : t -> t -> t * t
     (** Reduce the two monomes to the same denominator *)
@@ -80,10 +85,16 @@ module Monome : sig
   val difference : t -> t -> t
   val uminus : t -> t
   val product : t -> Symbol.t -> t  (** Product with constant *)
-  val divby : t -> Symbol.t -> t    (** Division by constant, must be != 0 *)
+  val divby : t -> Symbol.t -> t    (** Division by constant, must be > 0 *)
 
-  val of_term : signature:Signature.t ->
-                Term.t -> t option  (** try to get a monome from a term *)
+  exception NotLinear
+    
+  val of_term : signature:Signature.t -> Term.t -> t
+    (** try to get a monome from a term.
+        @raise NotLinear if the term is not a proper monome. *)
+
+  val of_term_opt : signature:Signature.t -> Term.t -> t option
+    (** Exceptionless versionf of {!of_term} *)
 
   val to_term : t -> Term.t         (** convert back to a term *)
 
@@ -110,9 +121,11 @@ module Lit : sig
     (** Is this literal arithmetic (i.e., root predicate is equality or
         inequality, with arithmetic operators just underneath)? *)
 
-  val extract : Literal.t -> t list
+  val extract : signature:Signature.t -> Literal.t -> t list
     (** Possible views of a literal *)
 
+  val simplify : ord:Ordering.t -> signature:Signature.t ->
+                 Literal.t -> Literal.t
 end
 
 (** {2 Other transformations} *)
