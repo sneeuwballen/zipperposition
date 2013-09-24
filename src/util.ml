@@ -515,18 +515,14 @@ let with_output filename action =
 (** {2 Printing utils} *)
 
 let sprintf format =
-  let buffer = Buffer.create 512 in
+  let buffer = Buffer.create 64 in
   Printf.kbprintf
-    (begin fun fmt ->
-    let s = Buffer.contents buffer in
-    Buffer.clear buffer;
-    s
-    end)
-  buffer
-  format
+    (fun fmt -> Buffer.contents buffer)
+    buffer
+    format
 
 let fprintf oc format =
-  let buffer = Buffer.create 512 in
+  let buffer = Buffer.create 64 in
   Printf.kbprintf
     (fun fmt -> Buffer.output_buffer oc buffer)
   buffer
