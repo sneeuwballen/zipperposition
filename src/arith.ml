@@ -64,6 +64,25 @@ module T = struct
   let mk_quotient t1 t2 = mk_node S.Arith.quotient [t1; t2]
   let mk_uminus t = mk_node S.Arith.uminus [t]
 
+  let extract_subterms t =
+    (* recursive function that gathers terms into set *)
+    let rec gather set t = match t.term with
+    | Bind _
+    | At _
+    | Var _
+    | BoundVar _ -> THashSet.add set t
+    | Node (s, []) when S.is_numeric s -> ()
+    | Node (s, l) when S.Arith.is_arith s ->
+      List.iter (gather set) l
+    | Node _ -> THashSet.add set t
+    in
+    if is_arith t
+      then
+        let set = THashSet.create ~size:5 () in
+        let () = gather set t in
+        THashSet.to_list set
+      else []
+
   let simplify ~signature t =
     (* recursive function with cache *)
     let rec simplify recurse t = match t.term with
@@ -258,22 +277,31 @@ module Monome = struct
     assert (S.is_numeric c);
     assert (not (S.Arith.is_zero c));
     if S.Arith.is_one c
-      then m
+      then m  (* same monome *)
       else
         let constant = S.Arith.Op.product c m.constant in
         let coeffs = T.TMap.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
         let divby = S.Arith.Op.product m.divby c in
         { constant; coeffs; divby; }
 
-  (* reduce to same divby (if any) *)
+  (* reduce to same divby (same denominator) *)
   let reduce_same_divby m1 m2 =
     match m1.divby, m2.divby with
     | S.Int n1, S.Int n2 ->
       let gcd = Big_int.gcd_big_int n1 n2 in
+      (* n1 × n2 = gcd × lcm, so we need to raise both n1 and n2 to lcm.
+         to do that, let us introduce  n1 = gcd × d1, and n2 = gcd × d2.
+         Then
+            n1 × d2 = gcd × d1 × d2, and
+            n2 × d1 = gcd × d2 × d1
+         so we multiply m1 by d2, and m2 by d1.
+      *)
       let d1 = S.mk_bigint (Big_int.div_big_int n1 gcd) in
       let d2 = S.mk_bigint (Big_int.div_big_int n2 gcd) in
-      _scale m1 d1, _scale m2 d2
+      _scale m1 d2, _scale m2 d1
     | c1, c2 ->
+      (* reduce m1 / c1 and m2 / c2 to same denominator. We choose c2
+         arbitrarily, so we need to multiply m1/c1 by c1/c2. *)
       _scale m1 (S.Arith.Op.quotient c1 c2), m2
 
   let sum m1 m2 =
@@ -485,5 +513,52 @@ end
 
 (** {2 Other transformations} *)
 
-let purify ~ord lits = lits (* TODO *)
+let purify ~ord ~signature lits =
+  let new_lits = ref [] in
+  let _add_lit lit = new_lits := lit :: !new_lits in
+  let varidx = ref (T.max_var (Lits.vars lits) + 1) in
+  (* purify a term (adding constraints to the list). [root] is true only
+      if the term occurs in the outermost arith expression *)
+  let rec purify_term ~root t = match t.T.term with
+  | T.Var _
+  | T.BoundVar _ -> t
+  | T.Bind (s, t') -> T.mk_bind s (purify_term ~root:false t')
+  | T.At (t1, t2) ->
+    T.mk_at (purify_term ~root:false t1) (purify_term ~root:false t2)
+  | T.Node (s,[]) when S.is_numeric s -> t
+  | T.Node (s, l) when S.Arith.is_arith s ->
+    if root
+      then (* recurse, still in root arith expression *)
+        T.mk_node s (List.map (purify_term ~root) l)
+      else begin
+        (* purify this term out! *)
+        let ty = TypeInference.infer_sig signature t in
+        let v = T.mk_var ~ty !varidx in
+        incr varidx;
+        (* purify the term and add a constraint *)
+        let t' = purify_term ~root:true t in
+        let lit = Literal.mk_neq ~ord v t' in
+        _add_lit lit;
+        (* return variable instead of literal *)
+        v
+      end
+  | T.Node (s, l) -> T.mk_node s (List.map (purify_term ~root:false) l)
+  in
+  (* purify each literal *)
+  Array.iter
+    (fun lit -> match lit with
+      | Literal.Equation (l, r, sign, _) ->
+        let l = purify_term ~root:true l in
+        let r = purify_term r ~root:true in
+        let lit = Literal.mk_lit ~ord l r sign in
+        _add_lit lit
+      | Literal.Prop (p, sign) ->
+        let p = purify_term ~root:true p in
+        let lit = Literal.mk_prop ~ord p sign in
+        _add_lit lit
+      | Literal.True -> _add_lit lit
+      | Literal.False -> ()  (* useless *)
+    )
+    lits;
+  Array.of_list !new_lits
 

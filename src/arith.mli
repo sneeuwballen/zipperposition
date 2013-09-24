@@ -45,6 +45,19 @@ module T : sig
   val is_arith : Term.t -> bool
     (** Is the term arithmetic? *)
 
+  val mk_sum : Term.t -> Term.t -> Term.t
+  val mk_difference : Term.t -> Term.t -> Term.t
+  val mk_product : Term.t -> Term.t -> Term.t
+  val mk_quotient : Term.t -> Term.t -> Term.t
+  val mk_uminus : Term.t -> Term.t
+
+  val extract_subterms : Term.t -> Term.t list
+    (** If the term's root is an arithmetic expression, extract the
+        list of outermost terms that occur immediately as parameters
+        of the arithmetic expression. Returns [] if the term is not
+        arithmetic or if it's a pure arithmetic expression
+        (akin to a constant). *)
+
   val simplify : signature:Signature.t -> Term.t -> Term.t
     (** Arithmetic simplifications *)
 end
@@ -55,6 +68,9 @@ end
     functions and predicates, that occur immediately under an arithmetic
     operator. For instance, in the term "f(X) + 1 + 3 × a", the variables
     are "f(X)" and "a", with coefficients "1" and "3".
+
+    Monomes of integers {b must} satisfy the property that each
+    coefficient is divisible by the [divby] field.
 *)
 
 module Monome : sig
@@ -130,7 +146,8 @@ end
 
 (** {2 Other transformations} *)
 
-val purify : ord:Ordering.t -> Literal.t array -> Literal.t array
+val purify : ord:Ordering.t -> signature:Signature.t ->
+             Literal.t array -> Literal.t array
   (** Purify the literals, by replacing arithmetic terms that occur
       under a non-interpreted predicate of formula, by a fresh variable,
       and adding the constraint variable=arith subterm to the literals. *)
