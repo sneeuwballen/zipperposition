@@ -467,6 +467,12 @@ module Arith = struct
     | Real _ -> s
     | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
+    let abs s = match s with
+    | Int n -> mk_bigint (Big_int.abs_big_int n)
+    | Rat n -> mk_ratio (Ratio.abs_ratio n)
+    | Real f -> mk_real (Pervasives.abs_float f)
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
+
     let less s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> Big_int.lt_big_int n1 n2
     | Rat n1, Rat n2 -> Ratio.lt_ratio n1 n2

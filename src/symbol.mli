@@ -218,6 +218,8 @@ module Arith : sig
     val to_rat : t -> t
     val to_real : t -> t
 
+    val abs : t -> t (* absolute value *)
+
     val less : t -> t -> bool
     val lesseq : t -> t -> bool
     val greater : t -> t -> bool
