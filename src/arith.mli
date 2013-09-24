@@ -89,6 +89,7 @@ module Monome : sig
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
 end
 
 (** {2 View a Literal as an arithmetic Literal}.

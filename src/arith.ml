@@ -219,7 +219,7 @@ module Monome = struct
   let pp buf monome =
     Buffer.add_char buf '(';
     T.TMap.iter
-      (fun t coeff -> Printf.bprintf buf "%a × %a +" S.pp coeff T.pp t)
+      (fun t coeff -> Printf.bprintf buf "%a×%a +" S.pp coeff T.pp t)
       monome.coeffs;
     S.pp buf monome.constant;
     if S.Arith.is_one monome.divby
@@ -228,6 +228,8 @@ module Monome = struct
 
   let to_string monome = Util.on_buffer pp monome
 
+  let fmt fmt m = Format.pp_print_string fmt (to_string m)
+
   let mem m t = T.TMap.mem t m.coeffs
 
   let find m t = T.TMap.find t m.coeffs
@@ -235,6 +237,7 @@ module Monome = struct
   (* scale: multiply all coeffs by constant, multiply divby by same constant.
     This yields the very same monome *)
   let _scale m c =
+    assert (S.is_numeric c);
     assert (not (S.Arith.is_zero c));
     if S.Arith.is_one c
       then m
