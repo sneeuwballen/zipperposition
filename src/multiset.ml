@@ -46,7 +46,7 @@ let remove_eq f m1 m2 =
   (* find an element of [m2] that can remove [i] from [bv1], On success
       remove elements from [m1] and [m2] using [bv1] and [bv2]. *)
   let rec find_mate f m1 m2 bv1 bv2 i j =
-    if j = size m2 - 1
+    if j = size m2
       then ()
     else if BV.get bv2 j && f m1.(i) m2.(j) = Comparison.Eq
       then (BV.reset bv1 i; BV.reset bv2 j)  (* remove both *)
@@ -70,11 +70,11 @@ let compare f m1 m2 =
   (* here, bitvectors are be used to determine whether
     an element can be maximal, ie if it dominates every element of the
     other set. *)
-  let rec compare_all m1 m2 bv1 bv2 i j =
+  let rec compare_all f m1 m2 bv1 bv2 i j =
     if i = size m1
       then ()
     else if j = size m2
-      then compare_all m1 m2 bv1 bv2 (i+1) 0
+      then compare_all f m1 m2 bv1 bv2 (i+1) 0
     else if BV.get bv1 i && BV.get bv2 j then
       (* compare m1(i) and m2(j). The loser, if any, is removed
          from the set of candidates for maximality *)
@@ -84,14 +84,14 @@ let compare f m1 m2 =
       | Comparison.Gt -> BV.reset bv2 j
       | Comparison.Lt -> BV.reset bv1 i
       in
-      compare_all m1 m2 bv1 bv2 i (j+1)
-    else compare_all m1 m2 bv1 bv2 i (j+1)
+      compare_all f m1 m2 bv1 bv2 i (j+1)
+    else compare_all f m1 m2 bv1 bv2 i (j+1)
   in
   let bv1, bv2 = remove_eq f m1 m2 in
   if BV.is_empty bv1 && BV.is_empty bv2
     then Comparison.Eq
   else begin
-    compare_all m1 m2 bv1 bv2 0 0;
+    compare_all f m1 m2 bv1 bv2 0 0;
     match BV.cardinal bv1, BV.cardinal bv2 with
     | 0, 0 -> assert false    (* inconsistent: where is the dominating elemt? *)
     | 0, _ -> Comparison.Lt   (* m2 has at least one maximal element *)
