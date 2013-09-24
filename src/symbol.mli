@@ -181,9 +181,16 @@ module Arith : sig
   val greatereq : t
 
   val set : SSet.t
+    (** Set of arithmetic symbols *)
 
   val is_arith : t -> bool
     (** Is the symbol an arithmetic symbol? *)
+
+  (** The module {!Op} deals only with numeric constants, i.e., all symbols
+      must verify {!is_numeric} (and most of the time, have the same type).
+      The semantics of operations follows
+      {{: http://www.cs.miami.edu/~tptp/TPTP/TR/TPTPTR.shtml#Arithmetic} TPTP}.
+    *)
 
   module Op : sig
     val floor : t -> t

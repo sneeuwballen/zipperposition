@@ -101,6 +101,5 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 
 ## TODO
 
-- default types for numeric symbols
 - substitution trees
 - optimize meta-prover matching
