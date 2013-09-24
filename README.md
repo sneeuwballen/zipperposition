@@ -69,6 +69,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `Skolem`: skolemization
     - `HO`: higher-order operations, including beta-reduction
     - `Transform`: computation of fixpoints over transformations of formulas
+    - `Multiset`: low level multiset of elements, with multiset ordering
 
 - Helpers:
     - `Hash`: utils for hashing values
@@ -77,6 +78,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `PartialOrder`: matrix representation of partial orderings, with completion
     - `lib/Sequence`: library of iterators
     - `lib/Bij`: GADT-based serialization/deserialization library
+    - `lib/BV`: bitvectors
 
 - TPTP:
     - `Lex_tptp`: TPTP syntax lexer

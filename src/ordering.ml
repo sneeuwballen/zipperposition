@@ -31,7 +31,7 @@ let prof_rpo = Util.mk_profiler "compare_rpo"
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
 let prof_kbo = Util.mk_profiler "compare_kbo"
 
-open Comparison.Infix
+open Comparison
 
 (** {2 Type definitions} *)
 
@@ -63,66 +63,6 @@ let to_string ord =
 
 let fmt fmt ord =
   Format.pp_print_string fmt (to_string ord)
-
-(** {2 Multiset Ordering} *)
-
-module Multiset = struct
-  type +'a t = 'a list
-
-  (** remove from l1, l2 elements that compare equal using f. This
-      should do a quadratic number of comparisons (at worst, compares
-      all elementts of l1 with all elements of l2) *)
-  let remove_eq f l1 l2 =
-    let rec aux l1 acc1 l2 acc2 = match l1, l2 with
-    | [], [] | _, [] | [], _ -> l1 @ acc1, l2 @ acc2
-    | x1::xs1, x2::xs2 when f x1 x2 = Eq ->
-      aux xs1 acc1 xs2 acc2 (* drop x1 and x2 *)
-    | x1::xs1, x2::xs2 ->
-      match remove x1 [] xs2, remove x2 [] xs1 with
-        | None, None -> aux xs1 (x1::acc1) xs2 (x2::acc2) (* keep both *)
-        | Some l2', None -> aux xs1 acc1 l2' (x2::acc2)
-        | None, Some l1' -> aux l1' (x1::acc1) xs2 acc2
-        | Some l2', Some l1' -> aux l1' acc1 l2' acc2  (* drop both *)
-    (* if l contains an element equal to x, returns Some(l')
-       where l' is l without this element. Otherwise, None. *)
-    and remove x acc l = match l with
-    | [] -> None
-    | y::ys when f x y = Eq -> Some (acc @ ys)
-    | y::ys -> remove x (y :: acc) ys
-    in aux l1 [] l2 []
-
-  (* check that l1 and l2 are equal multisets under f *)
-  let eq f l1 l2 =
-    let l1, l2 = remove_eq f l1 l2 in
-    match l1, l2 with
-    | [], [] -> true
-    | _ -> false
-
-  (* naive recursive version, tries all permutations *)
-  let compare f l1 l2 = 
-    (* first, remove common elements *)
-    let l1, l2 = remove_eq f l1 l2 in
-    (* now for a naive Mana and Dershowitz ordering, as presented in
-       chapter "paramodulation-based theorem proving" of the
-       handbook of automated reasoning. We look for an element that
-       dominates the whole other multiset *)
-    let rec find_dominating l1' l2' = match l1', l2' with
-    | [], [] -> Incomparable
-    | x1::xs1, [] -> if dominates x1 l2 then Gt else find_dominating xs1 []
-    | [], x2::xs2 -> if dominates x2 l1 then Lt else find_dominating [] xs2
-    | x1::xs1, x2::xs2 ->
-      let x1_win = dominates x1 l2
-      and x2_win = dominates x2 l1 in
-      assert ((not x1_win) || (not x2_win));
-      if x1_win then Gt else if x2_win then Lt else find_dominating xs1 xs2
-    and dominates x l = match l with
-    | [] -> true
-    | y::ys when f x y = Gt -> dominates x ys
-    | _ -> false
-    in match l1, l2 with
-    | [], [] -> Eq (* all elements removed by multiset_remove_eq *)
-    | _ -> find_dominating l1 l2
-end
 
 (** {2 Common internal interface for orderings} *)
 
@@ -232,7 +172,7 @@ module KBO = struct
         avoid breaking the weight computing invariants *)
     and tckbocommute wb ss ts =
       (* multiset comparison *)
-      let res = Multiset.compare (kbo ~prec) ss ts in
+      let res = Multiset.compare (kbo ~prec) (Multiset.create ss) (Multiset.create ts) in
       (* also compute weights of subterms *)
       let wb', _ = balance_weight_rec wb ss 0 true false in
       let wb'', _ = balance_weight_rec wb' ts 0 false false in
@@ -372,7 +312,8 @@ module RPO6 = struct
     | [], [] -> Eq
     | _ -> assert false (* different length... *)
   (** multiset comparison of subterms (not optimized) *)
-  and cMultiset ~prec ss ts = Multiset.compare (rpo6 ~prec) ss ts
+  and cMultiset ~prec ss ts =
+    Multiset.compare (rpo6 ~prec) (Multiset.create ss) (Multiset.create ts)
   (** bidirectional comparison by subterm property (bidirectional alpha) *)
   and cAA ~prec s t ss ts =
     match alpha ~prec ss t with
@@ -465,13 +406,26 @@ let subterm =
   } in
   ord (Precedence.default Signature.empty)
 
+(** {2 Globa table of orders} *)
+
+let __table =
+  let h = Hashtbl.create 5 in
+  Hashtbl.add h "rpo6" rpo6;
+  Hashtbl.add h "kbo" kbo;
+  Hashtbl.add h "none" (set_precedence none);
+  Hashtbl.add h "subterm" (set_precedence subterm);
+  h
+
 let default signature =
   rpo6 (Precedence.default signature)
 
 let choose name prec =
-  match name with
-  | "rpo6" -> rpo6 prec
-  | "kbo" -> kbo prec
-  | "none" -> (set_precedence none prec)
-  | "subterm" -> (set_precedence subterm prec)
-  | _ -> failwith ("unknown ordering: " ^ name)
+  try
+    (Hashtbl.find __table name) prec
+  with Not_found ->
+    failwith ("no such registered ordering: " ^ name)
+
+let register name ord =
+  if Hashtbl.mem __table name
+    then raise (Invalid_argument ("ordering name already used: " ^ name))
+    else Hashtbl.add __table name ord

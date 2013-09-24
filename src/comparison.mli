@@ -25,13 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Partial Ordering values} *)
 
-(* intended to be opened *)
-module Infix : sig
-  type t = Lt | Eq | Gt | Incomparable
-    (** partial order *)
-end
-
-type t = Infix.t
+type t = Lt | Eq | Gt | Incomparable
+  (** partial order *)
 
 val to_string : t -> string
   (** Infix Representation *)

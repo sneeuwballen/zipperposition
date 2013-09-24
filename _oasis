@@ -26,8 +26,8 @@ Library "logtk"
                     Signature, TypeInference, Lex_tptp, Ast_tptp, Parse_tptp,
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
-                    FormulaShape, Util_tptp, Skolem, HO, Transform,
-                    lib/Sequence, lib/Bij
+                    FormulaShape, Util_tptp, Skolem, HO, Transform, Multiset,
+                    lib/Sequence, lib/Bij, lib/BV
   InternalModules:  lib/Cache
   BuildDepends:     unix,num
 

@@ -50,16 +50,6 @@ val clear_cache : t -> unit
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
 val to_string : t -> string
-
-(** {2 Multiset Ordering} *)
-
-module Multiset : sig
-  type +'a t = 'a list
-
-  val eq : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> bool
-
-  val compare : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> Comparison.t
-end
   
 (** {2 Ordering implementations} *)
 
@@ -82,8 +72,16 @@ val none : t
 val subterm : t
   (** Subterm ordering. Not a simplification ordering. *)
 
+(** {2 Global table of Orders} *)
+
 val default : Signature.t -> t
   (** default ordering on terms (RPO6) *)
 
 val choose : string -> Precedence.t -> t
-  (** Choose ordering by name, or raise Failure *)
+  (** Choose ordering by name among registered ones, or
+      @raise Failure if no ordering with the given name are registered. *)
+
+val register : string -> (Precedence.t -> t) -> unit
+  (** Register a new ordering, which can depend on a precedence.
+      The name must not be registered already.
+      @raise Invalid_argument if the name is already used. *)

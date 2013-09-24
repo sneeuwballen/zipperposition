@@ -110,12 +110,11 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
     let l, r, sign = E.extract eqn in
     if sign
       then
-        let open Comparison.Infix in
         match Ordering.compare trs.ord l r with
-        | Gt -> [ mk_rule eqn l r true ]
-        | Lt -> [ mk_rule eqn r l true ]
-        | Eq -> []
-        | Incomparable -> [ mk_rule eqn l r false; mk_rule eqn r l false ]
+        | Comparison.Gt -> [ mk_rule eqn l r true ]
+        | Comparison.Lt -> [ mk_rule eqn r l true ]
+        | Comparison.Eq -> []
+        | Comparison.Incomparable -> [ mk_rule eqn l r false; mk_rule eqn r l false ]
       else []   (* negative equation *)
 
   let add trs eqn =
@@ -147,7 +146,6 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
   (** Given a TRS and a cache size, build a memoized function that
       performs term rewriting *)
   let mk_rewrite trs ~size =
-    let open Comparison.Infix in
     (* reduce to normal form. [reduce'] is the memoized version of reduce. *)
     let rec reduce reduce' t =
       match t.T.term with
@@ -180,14 +178,14 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
               then raise (RewrittenInto r')  (* we know that t > r' *)
               else (
                 assert (t == S.apply subst rule.rule_left 1);
-                if Ordering.compare trs.ord t r' = Gt
+                if Ordering.compare trs.ord t r' = Comparison.Gt
                   then raise (RewrittenInto r')
                   else ()));
         t (* could not rewrite t *)
       with RewrittenInto t' ->
-        Util.debug 3 "%% rewrite @[<h>%a into %a@]" T.pp t T.pp t';
+        Util.debug 3 "rewrite %a into %a" T.pp t T.pp t';
         Util.incr_stat stat_ordered_rewriting;
-        assert (Ordering.compare trs.ord t t' = Gt);
+        assert (Ordering.compare trs.ord t t' = Comparison.Gt);
         reduce reduce' t'  (* term is rewritten, reduce it again *)
     in
     let cache = TCache.create size in

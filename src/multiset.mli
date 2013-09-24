@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,37 +24,45 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Partial Ordering values} *)
+(** {6 Generic multisets} *)
 
-type t = Lt | Eq | Gt | Incomparable
-  (** partial order *)
+(** Those multiset are not optimized for high-cardinality of single
+    elements, but rather for operations such as multiset comparisons
+*)
 
-let to_string = function
-  | Lt -> "=<="
-  | Gt -> "=>="
-  | Eq -> "==="
-  | Incomparable -> "=?="
+type 'a t
+  (** A multiset of elements of type 'a *)
 
-let combine cmp1 cmp2 = match cmp1, cmp2 with
-  | Eq, Eq
-  | Eq, Incomparable | Incomparable, Eq -> Eq
-  | Lt, Incomparable | Incomparable, Lt -> Lt
-  | Gt, Incomparable | Incomparable, Gt -> Gt
-  | Incomparable, Incomparable -> Incomparable
-  | _ ->
-    raise (Invalid_argument "inconsistent comparisons") (* not compatible *)
+val create : 'a list -> 'a t
+  (** Multiset from list *)
 
-let opp cmp = match cmp with
-  | Eq | Incomparable -> cmp
-  | Lt -> Gt
-  | Gt -> Lt
+val create_a : 'a array -> 'a t
+  (** Non-copying creation.  The array is used by the multiset, so it should
+      not be modified later! *)
 
-let to_total ord = match ord with
-  | Lt -> -1
-  | Gt -> 1
-  | Eq | Incomparable -> 0
+val size : 'a t -> int
+  (** Number of distinct occurrences of elements *)
 
-let of_total ord = match ord with
-  | 0 -> Eq
-  | x when x > 0 -> Gt
-  | _ -> Lt
+val is_empty : 'a t -> bool
+  (** Is the multiset empty? *)
+
+val iter : 'a t -> ('a -> unit) -> unit
+  (** Iterate on distinct occurrences of elements *)
+
+val eq : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> bool
+  (** Check equality of two multisets *)
+
+val compare : ('a -> 'a -> Comparison.t) -> 'a t -> 'a t -> Comparison.t
+  (** Compare two multisets with the multiset extension of the
+      given ordering *)
+
+val max : ('a -> 'a -> Comparison.t) -> 'a t -> BV.t
+  (** Maximal elements of the multiset, w.r.t the given ordering. *)
+
+val get : 'a t -> int -> 'a
+  (** [get m i] returns the i-th element ([i] must be < [size m]) *)
+
+val to_array : 'a t -> 'a array
+  (** Extract the underlying array *)
+
+val to_list : 'a t -> 'a list

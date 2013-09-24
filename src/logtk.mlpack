@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 35711f26c8f1574d6564906a90b4401a)
+# DO NOT EDIT (digest: 6dc31ee56a4994d49fc0ce61e4c76476)
 Symbol
 Hash
 Hashcons
@@ -30,7 +30,9 @@ Util_tptp
 Skolem
 HO
 Transform
+Multiset
 lib/Sequence
 lib/Bij
+lib/BV
 lib/Cache
 # OASIS_STOP
