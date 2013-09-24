@@ -31,32 +31,31 @@ open Logtk
 
 module T = Term
 module S = Substs
-module BV = Bitvector
 module Lit = Literal
+module Lits = Literal.Arr
 
-type t = Literal.t array -> int list
+type t = Literal.t array -> BV.t
 
-let no_select _ = []
+let no_select _ = BV.empty ()
 
 (** Select all positives literals *)
 let select_positives lits =
-  let rec find_pos acc i lits =
-    if i = Array.length lits then acc
-    else if Literal.is_pos lits.(i) then find_pos (i::acc) (i+1) lits
-    else find_pos acc (i+1) lits
-  in find_pos [] 0 lits
+  let bv = Lits.pos lits in
+  bv
 
 let select_max_goal ~strict ~ord lits =
-  let maxlits = Literal.Arr.maxlits ~ord lits in
-  (* find negative lits *)
-  let rec find_maxneg lits i =
-    if i = Array.length lits then [] else (* select nothing *)
-    if Literal.is_neg lits.(i) && BV.get maxlits i
-      then if strict
-        then [i] (* select one negative max goal *)
-        else i :: select_positives lits (* negative max goal + positive lits *)
-      else []
-  in find_maxneg lits 0
+  let bv = Lits.maxlits ~ord lits in
+  BV.filter bv (fun i -> Lit.is_neg lits.(i));
+  try
+    (* keep only first satisfying lit *)
+    let i = BV.first bv in
+    BV.clear bv;
+    BV.set bv i;
+    if not strict
+      then BV.union_into ~into:bv (select_positives lits);
+    bv
+  with Not_found ->
+    BV.empty ()  (* empty one *)
 
 let select_diff_neg_lit ~strict ~ord lits =
   (* find a negative literal with maximal difference between
@@ -73,9 +72,12 @@ let select_diff_neg_lit ~strict ~ord lits =
   in
   (* search such a lit among the clause's lits *)
   match find_lit (-1) (-1) lits 0 with
-  | -1 -> []
-  | n when strict -> [n]
-  | n -> n :: select_positives lits
+  | -1 -> BV.empty ()
+  | n when strict -> BV.of_list [n]
+  | n ->
+    let bv = select_positives lits in
+    BV.set bv n;
+    bv
 
 let select_complex ~strict ~ord lits =
   (* find the ground negative literal with highest diff in size *)
@@ -92,15 +94,24 @@ let select_complex ~strict ~ord lits =
   (* try to find ground negative lit with bigger weight difference, else delegate *)
   let i = find_neg_ground (-1) (-1) lits 0 in
   if i >= 0
-    then if strict then [i] else i :: select_positives lits
-    else select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
+    then if strict
+      then BV.of_list [i]
+      else
+        let bv = select_positives lits in
+        let _ = BV.set bv i in
+        bv
+    else
+      select_diff_neg_lit ~strict ~ord lits (* delegate to select_diff_neg_lit *)
 
 let select_complex_except_RR_horn ~strict ~ord lits =
   if Literal.is_RR_horn_clause lits
-    then []  (* do not select (conditional rewrite rule) *)
+    then BV.empty ()  (* do not select (conditional rewrite rule) *)
     else select_complex ~strict ~ord lits  (* like select_complex *)
 
-let default_selection ~ord = select_complex ~strict:true ~ord
+(** {2 Global selection Functions} *)
+
+let default_selection ~ord =
+  select_complex ~strict:true ~ord
 
 let __table = Hashtbl.create 17
   (** table of name -> functions *)

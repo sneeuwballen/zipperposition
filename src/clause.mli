@@ -47,7 +47,7 @@ type t = private {
   mutable hctag : int;                    (** unique ID of the clause *)
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
-  mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
+  mutable hcselected : BV.t;              (** bitvector for selected literals *)
   mutable hcvars : Term.t list;           (** the free variables *)
   mutable hcproof : Proof.t;             (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
@@ -97,20 +97,20 @@ val is_child_of : child:t -> t -> unit
 
 module CHashcons : Hashcons.S with type elt = clause
 
-val create : ?parents:t list -> ?selected:Bitvector.t ->
+val create : ?parents:t list -> ?selected:BV.t ->
              ctx:Ctx.t -> Literal.t list ->
              (CompactClause.t -> Proof.t) -> t
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. *)
 
-val create_a : ?parents:t list -> ?selected:Bitvector.t ->
+val create_a : ?parents:t list -> ?selected:BV.t ->
                 ctx:Ctx.t -> Literal.t array ->
                 (CompactClause.t -> Proof.t) -> t
   (** Build a new hclause from the given literals. If there are more than 31 literals,
       the prover becomes incomplete by returning [true] instead. This function takes
       ownership of the input array. *)
 
-val create_forms : ?parents:t list -> ?selected:Bitvector.t ->
+val create_forms : ?parents:t list -> ?selected:BV.t ->
                     ctx:Ctx.t -> Formula.t list ->
                     (CompactClause.t -> Proof.t) -> t
   (** Directly from list of formulas *)
@@ -136,19 +136,19 @@ val apply_subst : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
                   Substs.t -> t -> Substs.scope -> t
   (** apply the substitution to the clause *)
 
-val maxlits : t Substs.scoped -> Substs.t -> Bitvector.t
+val maxlits : t -> Substs.scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
 
-val is_maxlit : t Substs.scoped -> Substs.t -> int -> bool
+val is_maxlit : t -> Substs.scope -> Substs.t -> int -> bool
   (** Is the i-th literal maximal in subst(clause)? Equivalent to
       Bitvector.get (maxlits ~ord c subst) i *)
 
-val eligible_res : t Substs.scoped -> Substs.t -> Bitvector.t
+val eligible_res : t -> Substs.scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. *)
 
-val eligible_param : t Substs.scoped -> Substs.t -> Bitvector.t
+val eligible_param : t -> Substs.scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
 

@@ -28,13 +28,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Clauses} *)
 
 open Logtk
-open Comparison.Infix
 
 module T = Term
 module S = Substs
 module Lit = Literal
 module Lits = Literal.Arr
-module BV = Bitvector
 
 let stat_fresh = Util.mk_stat "fresh_clause"
 let stat_mk_hclause = Util.mk_stat "mk_hclause"
@@ -51,7 +49,7 @@ type t = {
   mutable hctag : int;                    (** unique ID of the clause *)
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
-  mutable hcselected : Bitvector.t;       (** bitvector for selected literals *)
+  mutable hcselected : BV.t;              (** bitvector for selected literals *)
   mutable hcvars : Term.t list;           (** the free variables *)
   mutable hcproof : Proof.t;              (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
@@ -137,21 +135,7 @@ module CHashcons = Hashcons.Make(struct
   let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
 end)
 
-(** the tautological empty clause *)
-let true_clause ~ctx =
-  let hcflags = flag_ground in
-  let hclits = [| Lit.mk_true ~ord:Ordering.none T.true_term |] in
-  let c = { hclits; hcproof = Obj.magic 0;
-      hctag = -1; hcweight=2; hcselected=0; hcflags; hcctx=ctx;
-      hcvars=[]; hcparents=[];
-      hcdescendants=SmallSet.empty ~cmp:(fun i j -> i-j); }
-  in
-  let c = CHashcons.hashcons c in
-  c.hcproof <- Proof.mk_c_axiom (compact c) ~file:"/dev/null" ~name:"trivial";
-  c
-
-(* TODO: use a (var, scope) -> int  hashtable to always produce
-   normalized clauses, by construction (see renaming in logic-terms) *)
+let __no_select = BV.empty ()
 
 (** Build a new hclause from the given literals.
     If there are more than [BV.max_len] literals,
@@ -159,12 +143,6 @@ let true_clause ~ctx =
 let create_a ?parents ?selected ~ctx lits proof =
   Util.incr_stat stat_mk_hclause;
   Util.enter_prof prof_mk_hclause;
-  if Array.length lits > BV.max_len && ctx.Ctx.complete
-  then (Util.debug 0 "incompleteness: clause of %d lits -> $true" (Array.length lits);
-        Ctx.lost_completeness ~ctx;
-        Util.exit_prof prof_mk_hclause;
-        true_clause ~ctx)
-  else begin
   (* Set of variables. *)
   let all_vars = Lits.vars lits in
   (* Rename variables *)
@@ -176,10 +154,10 @@ let create_a ?parents ?selected ~ctx lits proof =
   let rec c = {
     hclits = lits;
     hcctx = ctx;
-    hcflags = BV.empty;
+    hcflags = 0;
     hctag = (-1);
     hcweight = 0;
-    hcselected = 0;
+    hcselected = __no_select;
     hcvars = all_vars;
     hcproof = Obj.magic 0;
     hcparents = [];
@@ -191,25 +169,26 @@ let create_a ?parents ?selected ~ctx lits proof =
     let proof' = proof (compact c) in
     c.hcproof <- proof';
     (* select literals, if not already done *)
-    (c.hcselected <- match selected with
+    begin c.hcselected <- match selected with
       | Some bv -> bv
-      | None -> BV.from_list (Ctx.select ~ctx lits));
-        (* compute weight *)
-        c.hcweight <- Lits.weight lits;
-        (* compute flags *)
-        (if Lits.is_ground lits then set_flag flag_ground c true);
-        (* parents *)
-        (match parents with
-        | None -> ()
-        | Some parents ->
-          c.hcparents <- parents;
-          List.iter (fun parent -> is_child_of ~child:c parent) parents);
+      | None -> Ctx.select ~ctx lits
+    end;
+    (* compute weight *)
+    c.hcweight <- Lits.weight lits;
+    (* compute flags *)
+    (if Lits.is_ground lits then set_flag flag_ground c true);
+    (* parents *)
+    begin match parents with
+    | None -> ()
+    | Some parents ->
+      c.hcparents <- parents;
+      List.iter (fun parent -> is_child_of ~child:c parent) parents
+    end
   end;
   (* return clause *)
   Util.incr_stat stat_new_clause;
   Util.exit_prof prof_mk_hclause;
   c
-  end
 
 (** Build clause from a list (delegating to create_a) *)
 let create ?parents ?selected ~ctx lits proof =
@@ -267,7 +246,7 @@ let rec apply_subst ?recursive ?renaming subst c scope =
 
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are maximal under [ord] *)
-let maxlits (c, scope) subst =
+let maxlits c scope subst =
   let ord = Ctx.ord c.hcctx in
   let lits =
     Lits.apply_subst ~recursive:true ~ord subst c.hclits scope
@@ -275,12 +254,13 @@ let maxlits (c, scope) subst =
   Lits.maxlits ~ord lits
 
 (** Check whether the literal is maximal *)
-let is_maxlit (c, scope) subst i =
-  BV.get (maxlits (c, scope) subst) i
+let is_maxlit c scope subst i =
+  let bv = maxlits c scope subst in
+  BV.get bv i
 
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are eligible for resolution. *)
-let eligible_res (c, scope) subst =
+let eligible_res c scope subst =
   let ord = Ctx.ord c.hcctx in
   (* instantiate lits *)
   let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
@@ -289,47 +269,51 @@ let eligible_res (c, scope) subst =
   (* Literals that may be eligible: all of them if none is selected,
      selected ones otherwise. *)
   let check_sign = not (BV.is_empty selected) in
-  let bv = ref (if BV.is_empty selected then BV.make n else selected) in
+  let bv = if BV.is_empty selected
+    then BV.create ~size:n true else
+    BV.copy selected
+  in
   (* Only keep literals that are maximal. If [check_sign] is true, comparisons
      are only done between same-sign literals. *)
   for i = 0 to n-1 do
     (* i-th lit is already known not to be max? *)
-    if not (BV.get !bv i) then () else
+    if not (BV.get bv i) then () else
     let lit = lits.(i) in
     for j = i+1 to n-1 do
       let lit' = lits.(j) in
       (* check if both lits are still potentially eligible, and have the same sign 
          if [check_sign] is true. *)
       if (check_sign && Lit.is_pos lit <> Lit.is_pos lit')
-        || not (BV.get !bv j) then () else
-      match Lit.compare_partial ~ord lits.(i) lits.(j) with
-      | Incomparable
-      | Eq -> ()     (* no further information about i-th and j-th *)
-      | Gt -> bv := BV.clear !bv j  (* j-th cannot be max *)
-      | Lt -> bv := BV.clear !bv i  (* i-th cannot be max *)
+          || not (BV.get bv j)
+        then ()
+        else match Lit.compare_partial ~ord lits.(i) lits.(j) with
+        | Comparison.Incomparable
+        | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
+        | Comparison.Gt -> BV.reset bv j  (* j-th cannot be max *)
+        | Comparison.Lt -> BV.reset bv i  (* i-th cannot be max *)
     done;
   done;
-  !bv
+  bv
 
 (** Bitvector that indicates which of the literals of [subst(clause)]
     are eligible for paramodulation. *)
-let eligible_param (c, scope) subst =
+let eligible_param c scope subst =
   let ord = Ctx.ord c.hcctx in
   if BV.is_empty c.hcselected then
     (* instantiate lits *)
     let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
-    (* only keep literals that are positive *)
+    (* maximal ones *)
     let bv = Lits.maxlits ~ord lits in
-    BV.inter bv (Lits.pos lits)
-  else BV.empty  (* no eligible literal when some are selected *)
+    (* only keep literals that are positive *)
+    BV.filter bv (fun i -> Lit.is_pos lits.(i));
+    bv
+  else BV.empty ()  (* no eligible literal when some are selected *)
 
 (** are there selected literals in the clause? *)
 let has_selected_lits c = not (BV.is_empty c.hcselected)
 
 (** Check whether the literal is selected *)
-let is_selected c i =
-  let bv = c.hcselected in
-  BV.get bv i
+let is_selected c i = BV.get c.hcselected i
 
 (** Indexed list of selected literals *)
 let selected_lits c = BV.select c.hcselected c.hclits
@@ -340,8 +324,8 @@ let is_unit_clause c = match c.hclits with
   | _ -> false
 
 let is_oriented_rule c = match c.hclits with
-  | [| Lit.Equation (_,_,true,Gt) |]
-  | [| Lit.Equation (_,_,true,Lt) |] -> true (* oriented *)
+  | [| Lit.Equation (_,_,true,Comparison.Gt) |]
+  | [| Lit.Equation (_,_,true,Comparison.Lt) |] -> true (* oriented *)
   | _ -> false
 
 let infer_type ctx clauses =
@@ -454,8 +438,8 @@ let pp buf c =
       ^(if BV.get maxlits i then "*" else "")
   in
   (* print literals with a '*' for maximal, and '+' for selected *)
-  let selected = c.hcselected
-  and max = maxlits (c, 0) S.empty in
+  let selected = c.hcselected in
+  let max = maxlits c 0 S.empty in
   Buffer.add_char buf '[';
   Util.pp_arrayi ~sep:" | "
     (fun buf i lit ->

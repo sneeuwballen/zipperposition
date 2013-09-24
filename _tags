@@ -1,6 +1,70 @@
-<src>: include
-<tests>: include
-<containers>: include
-<**/*.cm*> or <**/*.ml*>: package(logtk), package(logtk.meta)
+# OASIS_START
+# DO NOT EDIT (digest: 8e1cd8713b4d39b752e4ae58371beca0)
+# Ignore VCS directories, you can use the same kind of rule outside
+# OASIS_START/STOP if you want to exclude directories that contains
+# useless stuff for the build process
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+".bzr": -traverse
+".bzr": not_hygienic
+".hg": -traverse
+".hg": not_hygienic
+".git": -traverse
+".git": not_hygienic
+"_darcs": -traverse
+"_darcs": not_hygienic
+# Library libzipperposition
+"src/libzipperposition.cmxs": use_libzipperposition
+"src/clauseQueue.cmx": for-pack(Libzipperposition)
+"src/clause.cmx": for-pack(Libzipperposition)
+"src/const.cmx": for-pack(Libzipperposition)
+"src/experts.cmx": for-pack(Libzipperposition)
+"src/extensions.cmx": for-pack(Libzipperposition)
+"src/literal.cmx": for-pack(Libzipperposition)
+"src/metaProverState.cmx": for-pack(Libzipperposition)
+"src/compactClause.cmx": for-pack(Libzipperposition)
+"src/ctx.cmx": for-pack(Libzipperposition)
+"src/proof.cmx": for-pack(Libzipperposition)
+"src/proofState.cmx": for-pack(Libzipperposition)
+"src/saturate.cmx": for-pack(Libzipperposition)
+"src/selection.cmx": for-pack(Libzipperposition)
+"src/superposition.cmx": for-pack(Libzipperposition)
+"src/pFormula.cmx": for-pack(Libzipperposition)
+"src/theories.cmx": for-pack(Libzipperposition)
+"src/AC.cmx": for-pack(Libzipperposition)
+"src/chaining.cmx": for-pack(Libzipperposition)
+"src/params.cmx": for-pack(Libzipperposition)
+"src/env.cmx": for-pack(Libzipperposition)
+"src/containers/persistentGraph.cmx": for-pack(Libzipperposition)
+"src/containers/hashset.cmx": for-pack(Libzipperposition)
+"src/containers/pHashtbl.cmx": for-pack(Libzipperposition)
+"src/containers/persistentHashtbl.cmx": for-pack(Libzipperposition)
+"src/containers/heap.cmx": for-pack(Libzipperposition)
+"src/containers/leftistheap.cmx": for-pack(Libzipperposition)
+"src/containers/vector.cmx": for-pack(Libzipperposition)
+"src/containers/sequence.cmx": for-pack(Libzipperposition)
+"src/containers/smallSet.cmx": for-pack(Libzipperposition)
+"src/containers/gen.cmx": for-pack(Libzipperposition)
+"src/containers/unionFind.cmx": for-pack(Libzipperposition)
+<src/containers/*.ml{,i}>: package(unix)
+<src/containers/*.ml{,i}>: package(num)
+<src/containers/*.ml{,i}>: package(logtk)
+<src/containers/*.ml{,i}>: package(logtk.meta)
+<src/containers/*.ml{,i}>: package(dynlink)
+# Executable zipperposition
+"src/zipperposition.native": use_libzipperposition
+"src/zipperposition.native": package(unix)
+"src/zipperposition.native": package(num)
+"src/zipperposition.native": package(logtk)
+"src/zipperposition.native": package(logtk.meta)
+"src/zipperposition.native": package(dynlink)
+<src/*.ml{,i}>: use_libzipperposition
+<src/*.ml{,i}>: package(unix)
+<src/*.ml{,i}>: package(num)
+<src/*.ml{,i}>: package(logtk)
+<src/*.ml{,i}>: package(logtk.meta)
+<src/*.ml{,i}>: package(dynlink)
+# OASIS_STOP
+<src/const.cmx>: for-pack(Libzipperposition)
 <**/*.cmx>: inline(15)
 <**/*.native> or <**/*.byte>: package(num), package(dynlink), package(str), package(unix), package(logtk), package(datalog), package(logtk.meta)
