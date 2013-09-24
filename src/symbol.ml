@@ -195,10 +195,57 @@ let connectives =
 
 let is_connective s = List.exists (fun s' -> eq s s') connectives
 
+(** {2 IO} *)
+
+let to_string s = match s with
+  | Const (s,_) -> s
+  | Int n -> Big_int.string_of_big_int n
+  | Rat n -> Ratio.string_of_ratio n
+  | Real f -> string_of_float f
+
+let pp buf s = Buffer.add_string buf (to_string s)
+
+let to_string_tstp s = match s with
+  | _ when eq s not_symbol -> "~"
+  | _ when eq s eq_symbol -> "="
+  | _ when eq s lambda_symbol -> "^"
+  | _ when eq s exists_symbol -> "?"
+  | _ when eq s forall_symbol -> "!"
+  | _ when eq s and_symbol -> "&"
+  | _ when eq s or_symbol -> "|"
+  | _ when eq s imply_symbol -> "=>"
+  | _ -> to_string s (* default *)
+
+let pp_tstp buf s = Buffer.add_string buf (to_string_tstp s)
+
+let fmt fmt s = Format.pp_print_string fmt (to_string s)
+
+let bij =
+  Bij.switch
+    ~inject:(fun s -> match s with
+      | Const (s,info) -> 'c', Bij.(BranchTo (pair string_ int_, (s, info.attrs)))
+      | Int n -> 'i', Bij.(BranchTo (string_, Big_int.string_of_big_int n))
+      | Rat n -> 'r', Bij.(BranchTo (string_, Ratio.string_of_ratio n))
+      | Real f -> 'f', Bij.(BranchTo (float_, f)))
+    ~extract:(fun c -> match c with
+      | 'c' -> Bij.(BranchFrom (pair string_ int_, fun (s,attrs) -> mk_const ~attrs s))
+      | 'i' -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
+      | 'r' -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
+      | 'f' -> Bij.(BranchFrom (float_, mk_real))
+      | c -> raise (Bij.DecodingError "expected symbol"))
+
 (** {2 Arith} *)
 
 module Arith = struct
-  exception TypeMismatch
+  exception TypeMismatch of string
+
+  (* helper to raise errors *)
+  let _ty_mismatch fmt =
+    let buf = Buffer.create 32 in
+    Printf.kbprintf
+      (fun _ -> raise (TypeMismatch (Buffer.contents buf)))
+      buf
+      fmt
 
   let sign s = match s with
   | Int n -> Big_int.sign_big_int n
@@ -206,7 +253,7 @@ module Arith = struct
   | Real f when f > 0. -> 1
   | Real f when f < 0. -> -1
   | Real f -> 0
-  | _ -> raise TypeMismatch
+  | _ -> _ty_mismatch "cannot compute sign of symbol %a" pp s
 
   let floor = mk_const "$floor"
   let ceiling = mk_const "$ceiling"
@@ -227,25 +274,25 @@ module Arith = struct
     | Int _ -> Type.int
     | Rat _ -> Type.rat
     | Real _ -> Type.real
-    | _ -> raise TypeMismatch
+    | _ -> _ty_mismatch "cannot compute type of symbol %a" pp s
 
   let zero_of_ty ty =
     if Type.eq ty Type.int then zero_i
     else if Type.eq ty Type.rat then zero_rat
     else if Type.eq ty Type.real then zero_f
-    else raise TypeMismatch
+    else _ty_mismatch "bad arith type %a for zero_of_ty" Type.pp ty
 
   let one_of_ty ty =
     if Type.eq ty Type.int then one_i
     else if Type.eq ty Type.rat then one_rat
     else if Type.eq ty Type.real then one_f
-    else raise TypeMismatch
+    else _ty_mismatch "bad arith type %a for one_of_ty" Type.pp ty
 
   let is_zero s = match s with
   | Int n -> Big_int.sign_big_int n = 0
   | Rat n -> Ratio.sign_ratio n = 0
   | Real f -> f = 0.
-  | _ -> raise TypeMismatch
+  | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let __one_i = Big_int.big_int_of_int 1
   let __one_rat = Ratio.ratio_of_int 1
@@ -254,7 +301,7 @@ module Arith = struct
   | Int n -> Big_int.eq_big_int n __one_i
   | Rat n -> Ratio.eq_ratio n __one_rat
   | Real f -> f = 1.
-  | Const _ -> raise TypeMismatch
+  | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let sum = mk_const "$sum"
   let difference = mk_const "$difference"
@@ -294,20 +341,20 @@ module Arith = struct
     | Int _ -> s
     | Rat n -> mk_bigint (Ratio.floor_ratio n)
     | Real f -> mk_real (Pervasives.floor f)
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let ceiling s = match s with
     | Int _ -> s
     | Rat n -> mk_bigint (Ratio.ceiling_ratio n)
     | Real f -> mk_real (Pervasives.ceil f)
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let truncate s = match s with
     | Int _ -> s
     | Rat n when Ratio.sign_ratio n >= 0 -> mk_bigint (Ratio.floor_ratio n)
     | Rat n -> mk_bigint (Big_int.minus_big_int (Ratio.floor_ratio (Ratio.abs_ratio n)))
     | Real f -> mk_int (Pervasives.truncate f)
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let round s = match s with
     | Int _ -> s
@@ -316,51 +363,66 @@ module Arith = struct
       let f' = Pervasives.floor f in
       let i = if f -. f' > 0.5 then int_of_float f' else (int_of_float f') + 1 in
       mk_int i
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let prec s = match s with
     | Int n -> mk_bigint (Big_int.pred_big_int n)
     | Rat n -> mk_ratio (Ratio.add_int_ratio (-1) n)
     | Real f -> mk_real (f -. 1.)
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let succ s = match s with
     | Int n -> mk_bigint (Big_int.succ_big_int n)
     | Rat n -> mk_ratio (Ratio.add_int_ratio 1 n)
     | Real f -> mk_real (f +. 1.)
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let sum s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> mk_bigint (Big_int.add_big_int n1 n2)
     | Rat n1, Rat n2 -> mk_ratio (Ratio.add_ratio n1 n2)
     | Real f1, Real f2 -> mk_real (f1 +. f2)
-    | _ -> raise TypeMismatch
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
     let difference s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> mk_bigint (Big_int.sub_big_int n1 n2)
     | Rat n1, Rat n2 -> mk_ratio (Ratio.sub_ratio n1 n2)
     | Real f1, Real f2 -> mk_real (f1 -. f2)
-    | _ -> raise TypeMismatch
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
     let uminus s = match s with
     | Int n -> mk_bigint (Big_int.minus_big_int n)
     | Rat n -> mk_ratio (Ratio.minus_ratio n)
     | Real f -> mk_real (~-. f)
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let product s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> mk_bigint (Big_int.mult_big_int n1 n2)
     | Rat n1, Rat n2 -> mk_ratio (Ratio.mult_ratio n1 n2)
     | Real f1, Real f2 -> mk_real (f1 *. f2)
-    | _ -> raise TypeMismatch
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
     let quotient s1 s2 = match s1, s2 with
-    | Int _, Int _ -> raise TypeMismatch
+    | Int n1, Int n2 ->
+      let q, r = Big_int.quomod_big_int n1 n2 in
+      if Big_int.sign_big_int r = 0
+        then mk_bigint q
+        else _ty_mismatch "non-exact integral division: %a / %a" pp s1 pp s2
     | Rat n1, Rat n2 ->
-      (try mk_ratio (Ratio.div_ratio n1 n2) with Failure _ -> raise Division_by_zero)
+      begin try mk_ratio (Ratio.div_ratio n1 n2)
+      with Failure _ -> raise Division_by_zero
+      end
     | Real f1, Real f2 ->
-      let f = f1 /. f2 in if f == infinity then raise Division_by_zero else mk_real f
-    | _ -> raise TypeMismatch
+      let f = f1 /. f2 in
+      if f == infinity then raise Division_by_zero else mk_real f
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
     let quotient_e s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> mk_bigint (fst (Big_int.quomod_big_int n1 n2))
@@ -396,37 +458,46 @@ module Arith = struct
     let to_rat s = match s with
     | Int n -> mk_ratio (Ratio.ratio_of_big_int n)
     | Rat _ -> s
-    | _ -> raise TypeMismatch (* XXX not fully specified... *)
+    | Real _ -> _ty_mismatch "cannot compute to_rat of real %a" pp s
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let to_real s = match s with
     | Int n -> mk_real (Big_int.float_of_big_int n)
     | Rat n -> mk_real (Ratio.float_of_ratio n)
     | Real _ -> s
-    | _ -> raise TypeMismatch
+    | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let less s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> Big_int.lt_big_int n1 n2
     | Rat n1, Rat n2 -> Ratio.lt_ratio n1 n2
     | Real f1, Real f2 -> f1 < f2
-    | _ -> raise TypeMismatch
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
     let lesseq s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> Big_int.le_big_int n1 n2
     | Rat n1, Rat n2 -> Ratio.le_ratio n1 n2
     | Real f1, Real f2 -> f1 <= f2
-    | _ -> raise TypeMismatch
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
     let greater s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> Big_int.gt_big_int n1 n2
     | Rat n1, Rat n2 -> Ratio.gt_ratio n1 n2
     | Real f1, Real f2 -> f1 > f2
-    | _ -> raise TypeMismatch
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
     let greatereq s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> Big_int.ge_big_int n1 n2
     | Rat n1, Rat n2 -> Ratio.ge_ratio n1 n2
     | Real f1, Real f2 -> f1 >= f2
-    | _ -> raise TypeMismatch
+    | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+    | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
+    | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
   end
 end
 
@@ -457,45 +528,6 @@ let num_symbol = mk_const "$$num_magic_cookie"
     the signature of the problem *)
 let mk_fresh_const i =
   mk_const ~attrs:attr_fresh_const ("$$c_" ^ string_of_int i)
-
-(** {2 IO} *)
-
-let to_string s = match s with
-  | Const (s,_) -> s
-  | Int n -> Big_int.string_of_big_int n
-  | Rat n -> Ratio.string_of_ratio n
-  | Real f -> string_of_float f
-
-let pp buf s = Buffer.add_string buf (to_string s)
-
-let to_string_tstp s = match s with
-  | _ when eq s not_symbol -> "~"
-  | _ when eq s eq_symbol -> "="
-  | _ when eq s lambda_symbol -> "^"
-  | _ when eq s exists_symbol -> "?"
-  | _ when eq s forall_symbol -> "!"
-  | _ when eq s and_symbol -> "&"
-  | _ when eq s or_symbol -> "|"
-  | _ when eq s imply_symbol -> "=>"
-  | _ -> to_string s (* default *)
-
-let pp_tstp buf s = Buffer.add_string buf (to_string_tstp s)
-
-let fmt fmt s = Format.pp_print_string fmt (to_string s)
-
-let bij =
-  Bij.switch
-    ~inject:(fun s -> match s with
-      | Const (s,info) -> 'c', Bij.(BranchTo (pair string_ int_, (s, info.attrs)))
-      | Int n -> 'i', Bij.(BranchTo (string_, Big_int.string_of_big_int n))
-      | Rat n -> 'r', Bij.(BranchTo (string_, Ratio.string_of_ratio n))
-      | Real f -> 'f', Bij.(BranchTo (float_, f)))
-    ~extract:(fun c -> match c with
-      | 'c' -> Bij.(BranchFrom (pair string_ int_, fun (s,attrs) -> mk_const ~attrs s))
-      | 'i' -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
-      | 'r' -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
-      | 'f' -> Bij.(BranchFrom (float_, mk_real))
-      | c -> raise (Bij.DecodingError "expected symbol"))
 
 (** {2 Generation of symbols} *)
 

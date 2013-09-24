@@ -127,7 +127,7 @@ val is_connective : t -> bool
     part of arithmetic (compute the result of operations) *)
 
 module Arith : sig
-  exception TypeMismatch
+  exception TypeMismatch of string
     (** This exception is raised when Arith functions are called
         on non-numeric values (Const). *)
 
