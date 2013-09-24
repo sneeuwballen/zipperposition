@@ -1,6 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8f669a6f9e398f4c75fcc422f005ef80)
-src/Bitvector
+# DO NOT EDIT (digest: e2a4152d030465f67fcf4bb88c552924)
 src/ClauseQueue
 src/Clause
 src/Const

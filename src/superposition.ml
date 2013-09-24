@@ -26,7 +26,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 open Logtk
-open Comparison.Infix
 
 module T = Term
 module F = Formula
@@ -35,12 +34,12 @@ module C = Clause
 module O = Ordering
 module S = Substs
 module I = ProofState.TermIndex
-module BV = Bitvector
 module Lit = Literal
 module Lits = Literal.Arr
 module SubsumIdx = ProofState.SubsumptionIndex
 module UnitIdx = ProofState.UnitIndex
 module PS = ProofState
+module Comp = Comparison
 
 (* statistics *)
 let stat_basic_simplify = Util.mk_stat "basic_simplify calls"
@@ -113,10 +112,10 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
   if sign_uv && t' == v' && subterm_pos = []
   then (Util.debug 3 "... will yield a tautology"; acc)
   else begin
-    if (O.compare ord (S.apply ~renaming subst s sc_a) t' = Lt ||
-        O.compare ord (S.apply ~renaming subst u sc_p) v' = Lt ||
-        not (BV.get (C.eligible_res (passive_clause, sc_p) subst) passive_idx) ||
-        not (BV.get (C.eligible_param (active_clause, sc_a) subst) active_idx))
+    if (O.compare ord (S.apply ~renaming subst s sc_a) t' = Comp.Lt ||
+        O.compare ord (S.apply ~renaming subst u sc_p) v' = Comp.Lt ||
+        not (BV.get (C.eligible_res passive_clause sc_p subst) passive_idx) ||
+        not (BV.get (C.eligible_param active_clause sc_a subst) active_idx))
       then (Util.debug 3 "... has bad ordering conditions"; acc)
       else begin (* ordering constraints are ok *)
         let lits_a = Util.array_except_idx active_clause.C.hclits active_idx in
@@ -147,7 +146,7 @@ let infer_active (actives : ProofState.ActiveSet.t) clause =
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
   let eligible =
-    let bv = C.eligible_param (clause,0) S.empty in
+    let bv = C.eligible_param clause 0 S.empty in
     fun i lit -> BV.get bv i
   in
   (* do the inferences where clause is active; for this,
@@ -171,7 +170,7 @@ let infer_passive (actives:ProofState.ActiveSet.t) clause =
   let scope = T.max_var clause.C.hcvars + 1 in
   (* perform inference on this lit? *)
   let eligible =
-    let bv = C.eligible_res (clause,0) S.empty in
+    let bv = C.eligible_res clause 0 S.empty in
     fun i lit -> BV.get bv i
   in
   (* do the inferences in which clause is passive (rewritten),
@@ -196,7 +195,7 @@ let infer_equality_resolution clause =
   let ctx = clause.C.hcctx in
   (* literals that can potentially be eligible for resolution *)
   let eligible =
-    let bv = C.eligible_res (clause,0) S.empty in
+    let bv = C.eligible_res clause 0 S.empty in
     fun i lit -> Lit.is_neg lit && BV.get bv i
   in
   (* iterate on those literals *)
@@ -208,7 +207,7 @@ let infer_equality_resolution clause =
       | pos::_ ->
       try
         let subst = Unif.unification l 0 r 0 in
-        if BV.get (C.eligible_res (clause,0) subst) pos
+        if BV.get (C.eligible_res clause 0 subst) pos
           (* subst(lit) is maximal, we can do the inference *)
           then begin
             Util.incr_stat stat_equality_resolution_call;
@@ -232,7 +231,7 @@ let infer_equality_factoring clause =
   let ord = Ctx.ord ctx in
   (* is the literal eligible for paramodulation? *)
   let eligible =
-    let bv = C.eligible_param (clause,0) S.empty in
+    let bv = C.eligible_param clause 0 S.empty in
     fun i lit -> BV.get bv i
   in
   (* find root terms that are unifiable with s and are not in the
@@ -274,8 +273,8 @@ let infer_equality_factoring clause =
     assert (sign_st && sign_uv);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     if O.compare ord  (S.apply subst s 0)
-                      (S.apply subst t 0) <> Lt &&
-       BV.get (C.eligible_param (clause,0) subst) active_idx
+                      (S.apply subst t 0) <> Comp.Lt &&
+       BV.get (C.eligible_param clause 0 subst) active_idx
       then begin
         Util.incr_stat stat_equality_factoring_call;
         let proof c = Proof.mk_c_step c "eq_fact" [clause.C.hcproof]
@@ -441,10 +440,10 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
               assert (C.is_unit_clause unit_clause);
               if (not restrict || not (S.is_renaming subst))
               && (C.is_oriented_rule unit_clause ||
-                 O.compare ord (S.apply subst l 1) (S.apply subst r 1) = Gt)
+                 O.compare ord (S.apply subst l 1) (S.apply subst r 1) = Comp.Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
-                  assert (O.compare ord (S.apply subst l 1) (S.apply subst r 1) = Gt);
+                  assert (O.compare ord (S.apply subst l 1) (S.apply subst r 1) = Comp.Gt);
                   clauses := unit_clause :: !clauses;
                   Util.incr_stat stat_demodulate_step;
                   raise (RewriteInto (r, subst))
@@ -491,7 +490,7 @@ let demodulate (simpl_set : PS.SimplSet.t) c =
   (* clauses used to rewrite *)
   let clauses = ref [] in
   (* literals that are eligible for resolution *)
-  let eligible_res = C.eligible_res (c,0) S.empty in
+  let eligible_res = C.eligible_res c 0 S.empty in
   (* demodulate literals *)
   let demod_lit i lit =
     match lit with
@@ -505,11 +504,11 @@ let demodulate (simpl_set : PS.SimplSet.t) c =
       Lit.mk_true ~ord (demod_nf ~restrict:true simpl_set clauses p)
     | Lit.Prop (p, sign) ->
       Lit.mk_prop ~ord (demod_nf simpl_set clauses p) sign
-    | Lit.Equation (l, r, true, Gt) when BV.get eligible_res i ->
+    | Lit.Equation (l, r, true, Comp.Gt) when BV.get eligible_res i ->
       Lit.mk_eq ~ord
         (demod_nf ~restrict:true simpl_set clauses l)
         (demod_nf simpl_set clauses r)
-    | Lit.Equation (l, r, true, Lt) when BV.get eligible_res i ->
+    | Lit.Equation (l, r, true, Comp.Lt) when BV.get eligible_res i ->
       Lit.mk_eq ~ord
         (demod_nf simpl_set clauses l)
         (demod_nf ~restrict:true simpl_set clauses r)
@@ -548,14 +547,14 @@ let backward_demodulate (active_set : PS.ActiveSet.t) set given =
       (fun set t' (hc, _, _) subst ->
         (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
         if oriented
-        || O.compare ord (S.apply subst l 0) (S.apply subst r 0) = Gt
+        || O.compare ord (S.apply subst l 0) (S.apply subst r 0) = Comp.Gt
           then  (* add the clause to the set, it may be rewritten by l -> r *)
             C.CSet.add set hc
           else set)
   in
   let set' = match given.C.hclits with
-  | [|Lit.Equation (l,r,true,Gt)|] -> recurse ~oriented:true set l r
-  | [|Lit.Equation (l,r,true,Lt)|] -> recurse ~oriented:true set r l
+  | [|Lit.Equation (l,r,true,Comp.Gt)|] -> recurse ~oriented:true set l r
+  | [|Lit.Equation (l,r,true,Comp.Lt)|] -> recurse ~oriented:true set r l
   | [|Lit.Equation (l,r,true,_)|] ->
     let set' = recurse ~oriented:false set l r in
     recurse ~oriented:false set' r l  (* both sides can rewrite, but we
@@ -807,11 +806,11 @@ let match_lits subst lit_a sc_a lit_b sc_b =
       else []
   | Lit.Equation (_, _, signa, _), Lit.Equation (_, _, signb, _)
     when signa <> signb -> [] (* different sign *)
-  | Lit.Equation (la, ra, _, Lt), Lit.Equation (lb, rb, _, Lt)
-  | Lit.Equation (la, ra, _, Gt), Lit.Equation (lb, rb, _, Gt) -> (* use monotonicity *)
+  | Lit.Equation (la, ra, _, Comp.Lt), Lit.Equation (lb, rb, _, Comp.Lt)
+  | Lit.Equation (la, ra, _, Comp.Gt), Lit.Equation (lb, rb, _, Comp.Gt) -> (* use monotonicity *)
     match4 subst la lb ra rb
-  | Lit.Equation (la, ra, _, Gt), Lit.Equation (lb, rb, _, Lt)
-  | Lit.Equation (la, ra, _, Lt), Lit.Equation (lb, rb, _, Gt) -> (* use monotonicity *)
+  | Lit.Equation (la, ra, _, Comp.Gt), Lit.Equation (lb, rb, _, Comp.Lt)
+  | Lit.Equation (la, ra, _, Comp.Lt), Lit.Equation (lb, rb, _, Comp.Gt) -> (* use monotonicity *)
     match4 subst la rb ra lb
   | Lit.Equation (la, ra, _, _), Lit.Equation (lb, rb, _, _) -> (* general case *)
     (match4 subst la lb ra rb) @ (match4 subst la rb ra lb)
@@ -866,8 +865,9 @@ let subsumes_with (a,sc_a) (b,sc_b) =
     let litb = b.(j) in
     (* match lita and litb, then flag litb as used, and try with next literal of a *)
     let substs = match_lits subst lita sc_a litb sc_b in
-    let bv' = BV.set bv j in
-    List.iter (fun subst' -> try_permutations (i+1) subst' bv') substs;
+    BV.set bv j;
+    List.iter (fun subst' -> try_permutations (i+1) subst' bv) substs;
+    BV.reset bv j;
     (* some variable of lita occur in a[j+1...], try another literal of b *)
     if substs <> [] && not (check_vars lita (i+1))
       then () (* no backtracking for litb *)
@@ -889,7 +889,8 @@ let subsumes_with (a,sc_a) (b,sc_b) =
   in
   try
     Array.sort compare_literals_subsumption a;
-    try_permutations 0 S.empty BV.empty;
+    let bv = BV.empty () in
+    try_permutations 0 S.empty bv;
     None
   with (SubsumptionFound subst) -> Some subst
 

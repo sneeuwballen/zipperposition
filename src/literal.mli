@@ -49,7 +49,7 @@ val are_variant : t -> t -> bool
 val compare_partial : ord:Ordering.t -> t -> t -> Comparison.t
   (** partial comparison of literals *)
 
-val to_multiset : t -> Term.t list    (** literal to multiset of terms *)
+val to_multiset : t -> Term.t Multiset.t  (** literal to multiset of terms *)
 
 val hash : t -> int                   (** hashing of literal *)
 val weight : t -> int                 (** weight of the lit *)
@@ -127,9 +127,9 @@ module Arr : sig
                          ord:Ordering.t -> Substs.t ->
                          t array -> Substs.scope -> t array
 
-  val pos : t array -> Bitvector.t
-  val neg : t array -> Bitvector.t
-  val maxlits : ord:Ordering.t -> t array -> Bitvector.t
+  val pos : t array -> BV.t
+  val neg : t array -> BV.t
+  val maxlits : ord:Ordering.t -> t array -> BV.t
 
   val to_seq : t array -> (Term.t * Term.t * bool) Sequence.t
     (** Convert the lits into a sequence of equations *)

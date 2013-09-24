@@ -29,9 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-(** See "E: a brainiac theorem prover". *)
+(** See "E: a brainiac theorem prover". A selection function
+    returns a bitvector of selected literals. *)
 
-type t = Literal.t array -> int list
+type t = Literal.t array -> BV.t
 
 val no_select : t
 
@@ -47,6 +48,8 @@ val select_complex : strict:bool -> ord:Ordering.t -> t
 val select_complex_except_RR_horn : strict:bool -> ord:Ordering.t -> t
   (** if clause is a restricted range horn clause, then select nothing;
       otherwise, like select_complex *)
+
+(** {2 Global selection Functions} *)
 
 val default_selection : ord:Ordering.t -> t
   (** Default selection function *)

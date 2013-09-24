@@ -30,7 +30,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     that is used for redundancy elimination.} *)
 
 open Logtk
-open Comparison.Infix
 
 module T = Term
 module C = Clause
@@ -38,7 +37,6 @@ module S = Substs
 module Lit = Literal
 module Lits = Literal.Arr
 module Pos = Position
-module BV = Bitvector
 module CQ = ClauseQueue
 
 type clause_pos = C.t * Pos.t * T.t
@@ -94,12 +92,12 @@ let update_with_clause op acc eligible ~subterms ~both_sides c =
     | Lit.Equation (l,r,_,_) when both_sides ->
       let acc = process_term op acc l [Position.left_pos; i] in
       process_term op acc r [Position.right_pos; i]
-    | Lit.Equation (l,r,_,Gt) ->
+    | Lit.Equation (l,r,_,Comparison.Gt) ->
       process_term op acc l [Position.left_pos; i]
-    | Lit.Equation (l,r,_,Lt) ->
+    | Lit.Equation (l,r,_,Comparison.Lt) ->
       process_term op acc r [Position.right_pos; i]
-    | Lit.Equation (l,r,_,Incomparable)
-    | Lit.Equation (l,r,_,Eq) ->
+    | Lit.Equation (l,r,_,Comparison.Incomparable)
+    | Lit.Equation (l,r,_,Comparison.Eq) ->
       let acc = process_term op acc l [Position.left_pos; i] in
       process_term op acc r [Position.right_pos; i]
     | Lit.Prop (p,_) ->
@@ -150,12 +148,12 @@ let update_with_clauses op acc eligible ~subterms ~both_sides cs =
 
 (* process literals that are potentially eligible for resolution *)
 let eligible_res c =
-  let bv = C.eligible_res (c,0) S.empty in
+  let bv = C.eligible_res c 0 S.empty in
   fun i lit -> BV.get bv i
 
 (* process literals that are potentially eligible for paramodulation *)
 let eligible_param c =
-  let bv = C.eligible_param (c,0) S.empty in
+  let bv = C.eligible_param c 0 S.empty in
   fun i lit -> BV.get bv i
 
 (* process all literals *)
@@ -244,11 +242,11 @@ module SimplSet = struct
     >
 
   let apply op idx c = match c.C.hclits with
-    | [| Lit.Equation (l,r,true,Gt) |] ->
+    | [| Lit.Equation (l,r,true,Comparison.Gt) |] ->
       op idx (l,r,true,c)
-    | [| Lit.Equation (l,r,true,Lt) |] ->
+    | [| Lit.Equation (l,r,true,Comparison.Lt) |] ->
       op idx (r,l,true,c)
-    | [| Lit.Equation (l,r,true,Incomparable) |] ->
+    | [| Lit.Equation (l,r,true,Comparison.Incomparable) |] ->
       let idx = op idx (l,r,true,c) in
       op idx (r,l,true,c)
     | [| Lit.Equation (l,r,false,_) |] ->

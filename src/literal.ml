@@ -28,12 +28,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Equational literals} *)
 
 open Logtk
-open Comparison.Infix
 
 module T = Term
 module F = Formula
 module S = Substs
-module BV = Bitvector
 
 type t =
   | Equation of Term.t * Term.t * bool * Comparison.t
@@ -109,17 +107,17 @@ let are_variant lit1 lit2 =
     false
 
 let to_multiset lit = match lit with
-  | Equation (l, r, true, _) -> [l; r]
-  | Equation (l, r, false, _) -> [l; l; r; r]
-  | Prop (p, true) -> [p; T.true_term]
-  | Prop (p, false) -> [p; p; T.true_term; T.true_term]
-  | True -> [T.true_term; T.true_term]
-  | False -> [T.true_term; T.true_term; T.true_term; T.true_term]
+  | Equation (l, r, true, _) -> Multiset.create_a [|l; r|]
+  | Equation (l, r, false, _) -> Multiset.create_a [|l; l; r; r|]
+  | Prop (p, true) -> Multiset.create_a [|p; T.true_term|]
+  | Prop (p, false) -> Multiset.create_a [|p; p; T.true_term; T.true_term|]
+  | True -> Multiset.create_a [|T.true_term; T.true_term|]
+  | False -> Multiset.create_a [|T.true_term; T.true_term; T.true_term; T.true_term|]
 
 let compare_partial ~ord l1 l2 =
   let m1 = to_multiset l1 in
   let m2 = to_multiset l2 in
-  Ordering.Multiset.compare (Ordering.compare ord) m1 m2
+  Multiset.compare (fun t1 t2 -> Ordering.compare ord t1 t2) m1 m2
 
 let hash lit = match lit with
   | Equation (l, r, sign, o) ->
@@ -171,9 +169,9 @@ let equational = function
 
 let orientation_of = function
   | Equation (_, _, _, ord) -> ord
-  | Prop _ -> Gt
+  | Prop _ -> Comparison.Gt
   | True
-  | False -> Eq
+  | False -> Comparison.Eq
 
 let check_type a b =
   let ok = not (T.has_type a) || not (T.has_type b) || T.compatible_type a b in
@@ -426,39 +424,25 @@ module Arr = struct
 
   (** bitvector of literals that are positive *)
   let pos lits =
-    let bv = ref BV.empty in
+    let bv = BV.create ~size:(Array.length lits) false in
     for i = 0 to Array.length lits - 1 do
-      if is_pos lits.(i) then bv := BV.set !bv i
+      if is_pos lits.(i) then BV.set bv i
     done;
-    !bv
+    bv
 
   (** bitvector of literals that are positive *)
   let neg lits =
-    let bv = ref BV.empty in
+    let bv = BV.create ~size:(Array.length lits) false in
     for i = 0 to Array.length lits - 1 do
-      if is_neg lits.(i) then bv := BV.set !bv i
+      if is_neg lits.(i) then BV.set bv i
     done;
-    !bv
+    bv
 
   (** Bitvector that indicates which of the literals are maximal *)
   let maxlits ~ord lits =
-    let n = Array.length lits in
-    (* at the beginning, all literals are potentially maximal *)
-    let bv = ref (BV.make n) in
-    for i = 0 to n-1 do
-      (* i-th lit is already known not to be max? *)
-      if not (BV.get !bv i) then () else
-      for j = i+1 to n-1 do
-        if not (BV.get !bv j) then () else
-        match compare_partial ~ord lits.(i) lits.(j) with
-        | Incomparable
-        | Eq -> ()     (* no further information about i-th and j-th *)
-        | Gt -> bv := BV.clear !bv j  (* j-th cannot be max *)
-        | Lt -> bv := BV.clear !bv i  (* i-th cannot be max *)
-      done;
-    done;
-    (* return bitvector *)
-    !bv
+    let m = Multiset.create_a lits in
+    let bv = Multiset.max (fun lit1 lit2 -> compare_partial ~ord lit1 lit2) m in
+    bv
 
   (** Convert the lits into a sequence of equations *)
   let to_seq lits =
@@ -495,9 +479,9 @@ module Arr = struct
       else if not (eligible i lits.(i)) then fold acc (i+1)
       else
         let acc = match lits.(i) with
-        | Equation (l,r,sign,Gt) ->
+        | Equation (l,r,sign,Comparison.Gt) ->
           f acc l r sign [i; Position.left_pos]
-        | Equation (l,r,sign,Lt) ->
+        | Equation (l,r,sign,Comparison.Lt) ->
           f acc r l sign [i; Position.right_pos]
         | Equation (l,r,sign,_) ->
           if both
@@ -567,7 +551,7 @@ let is_RR_horn_clause lits =
 (** Recognizes Horn clauses (at most one positive literal) *)
 let is_horn lits =
   let bv = Arr.pos lits in
-  BV.size bv <= 1
+  BV.cardinal bv <= 1
 
 let is_pos_eq lits =
   match lits with

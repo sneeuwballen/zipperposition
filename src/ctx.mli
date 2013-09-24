@@ -48,7 +48,7 @@ val ord : ctx:t -> Ordering.t
 
 val compare : ctx:t -> Term.t -> Term.t -> Comparison.t
 
-val select : ctx:t -> Literal.t array -> int list
+val select : ctx:t -> Literal.t array -> BV.t
 
 val skolem_ctx : ctx:t -> Skolem.ctx
 
