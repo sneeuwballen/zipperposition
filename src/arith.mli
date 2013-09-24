@@ -51,6 +51,9 @@ module T : sig
   val mk_quotient : Term.t -> Term.t -> Term.t
   val mk_uminus : Term.t -> Term.t
 
+  val mk_less : Term.t -> Term.t -> Term.t
+  val mk_lesseq : Term.t -> Term.t -> Term.t
+
   val extract_subterms : Term.t -> Term.t list
     (** If the term's root is an arithmetic expression, extract the
         list of outermost terms that occur immediately as parameters
@@ -140,14 +143,57 @@ module Lit : sig
   val extract : signature:Signature.t -> Literal.t -> t list
     (** Possible views of a literal *)
 
+  val to_lit : ord:Ordering.t -> t -> Literal.t
+    (** Convert back into a regular literal *)
+
   val simplify : ord:Ordering.t -> signature:Signature.t ->
                  Literal.t -> Literal.t
+    (** Simplify a literal (evaluation) *)
+
+  val get_term : t -> Term.t
+
+  val get_monome : t -> Monome.t
+
+  (** {3 Operations on Lists of literals} *)
+  module L : sig
+    val get_terms : t list -> Term.t list
+
+    val filter : t list -> (Term.t -> Monome.t -> bool) -> t list
+  end
 end
 
-(** {2 Other transformations} *)
+(** {2 Arrays of literals} *)
 
-val purify : ord:Ordering.t -> signature:Signature.t ->
-             Literal.t array -> Literal.t array
-  (** Purify the literals, by replacing arithmetic terms that occur
-      under a non-interpreted predicate of formula, by a fresh variable,
-      and adding the constraint variable=arith subterm to the literals. *)
+module Lits : sig
+  val purify : ord:Ordering.t -> signature:Signature.t ->
+               Literal.t array -> Literal.t array
+    (** Purify the literals, by replacing arithmetic terms that occur
+        under a non-interpreted predicate of formula, by a fresh variable,
+        and adding the constraint variable=arith subterm to the literals. *)
+
+  val pivot : ord:Ordering.t ->
+              signature:Signature.t ->
+              eligible:(int -> Literal.t -> bool) ->
+              Literal.t array ->
+              Literal.t array list
+    (** [pivot ~ord ~signature ~eligible lits] tries to pivot each literal
+        which is [eligible] (ie [eligible index lit] returns [true]).
+        Pivoting is done by extracting arithmetic literals [t <| monome]
+        and replacing the old literal by those new ones (if [t] maximal).
+        It returns a list of such pivoted arrays, each pivoted array resulting
+        from a single pivoted literal. *)
+end
+
+(** {2 Inference Rules} *)
+
+val rewrite_lit : Env.lit_rewrite_rule
+  (** Simplify literals by evaluating them; in the case of integer monomes,
+      also reduce them to common denominator. *)
+
+val factor_arith : Env.unary_inf_rule
+  (** Try to unify terms of arithmetic literals *)
+
+val pivot_arith : Env.unary_inf_rule
+  (** Pivot arithmetic literals *)
+
+val setup_env : env:Env.t -> unit

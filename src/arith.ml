@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module S = Symbol
-module Lits = Literal.Arr
+module Literals = Literal.Arr
 
 (** {2 Utils} *)
 
@@ -63,6 +63,9 @@ module T = struct
   let mk_product t1 t2 = mk_node S.Arith.product [t1; t2]
   let mk_quotient t1 t2 = mk_node S.Arith.quotient [t1; t2]
   let mk_uminus t = mk_node S.Arith.uminus [t]
+  
+  let mk_less t1 t2 = mk_node S.Arith.less [t1; t2]
+  let mk_lesseq t1 t2 = mk_node S.Arith.lesseq [t1; t2]
 
   let extract_subterms t =
     (* recursive function that gathers terms into set *)
@@ -502,6 +505,14 @@ module Lit = struct
       extract_lt a b
     | Literal.Prop _ -> []
 
+  let to_lit ~ord lit = match lit with
+  | Eq (t, m) -> Literal.mk_eq ~ord t (Monome.to_term m)
+  | Neq (t, m) -> Literal.mk_neq ~ord t (Monome.to_term m)
+  | L_less (t, m) -> Literal.mk_true ~ord (T.mk_less t (Monome.to_term m))
+  | L_lesseq (t, m) -> Literal.mk_true ~ord (T.mk_lesseq t (Monome.to_term m))
+  | R_less (m, t) -> Literal.mk_true ~ord (T.mk_less (Monome.to_term m) t)
+  | R_lesseq (m, t) -> Literal.mk_true ~ord (T.mk_lesseq (Monome.to_term m) t)
+
   let simplify ~ord ~signature lit = match lit with
   | Literal.Equation (l, r, sign, _) ->
     Literal.mk_lit ~ord (T.simplify ~signature l) (T.simplify ~signature r) sign
@@ -509,56 +520,123 @@ module Lit = struct
     Literal.mk_prop ~ord (T.simplify ~signature p) sign
   | Literal.True
   | Literal.False -> lit
+
+  let get_term = function
+  | Eq (t, _)
+  | Neq (t, _)
+  | L_less (t, _)
+  | L_lesseq (t, _)
+  | R_less (_, t)
+  | R_lesseq (_, t) -> t
+
+  let get_monome = function
+  | Eq (_, m)
+  | Neq (_, m)
+  | L_less (_, m)
+  | L_lesseq (_, m)
+  | R_less (m, _)
+  | R_lesseq (m, _) -> m
+
+  module L = struct
+    let get_terms l = List.map get_term l
+
+    let filter l p =
+      List.filter
+        (fun lit ->
+          let t = get_term lit in
+          let m = get_monome lit in
+          p t m)
+        l
+  end
 end
 
-(** {2 Other transformations} *)
+(** {2 Arrays of literals} *)
 
-let purify ~ord ~signature lits =
-  let new_lits = ref [] in
-  let _add_lit lit = new_lits := lit :: !new_lits in
-  let varidx = ref (T.max_var (Lits.vars lits) + 1) in
-  (* purify a term (adding constraints to the list). [root] is true only
-      if the term occurs in the outermost arith expression *)
-  let rec purify_term ~root t = match t.T.term with
-  | T.Var _
-  | T.BoundVar _ -> t
-  | T.Bind (s, t') -> T.mk_bind s (purify_term ~root:false t')
-  | T.At (t1, t2) ->
-    T.mk_at (purify_term ~root:false t1) (purify_term ~root:false t2)
-  | T.Node (s,[]) when S.is_numeric s -> t
-  | T.Node (s, l) when S.Arith.is_arith s ->
-    if root
-      then (* recurse, still in root arith expression *)
-        T.mk_node s (List.map (purify_term ~root) l)
-      else begin
-        (* purify this term out! *)
-        let ty = TypeInference.infer_sig signature t in
-        let v = T.mk_var ~ty !varidx in
-        incr varidx;
-        (* purify the term and add a constraint *)
-        let t' = purify_term ~root:true t in
-        let lit = Literal.mk_neq ~ord v t' in
-        _add_lit lit;
-        (* return variable instead of literal *)
-        v
+module Lits = struct
+  let purify ~ord ~signature lits =
+    let new_lits = ref [] in
+    let _add_lit lit = new_lits := lit :: !new_lits in
+    let varidx = ref (T.max_var (Literals.vars lits) + 1) in
+    (* purify a term (adding constraints to the list). [root] is true only
+        if the term occurs in the outermost arith expression *)
+    let rec purify_term ~root t = match t.T.term with
+    | T.Var _
+    | T.BoundVar _ -> t
+    | T.Bind (s, t') -> T.mk_bind s (purify_term ~root:false t')
+    | T.At (t1, t2) ->
+      T.mk_at (purify_term ~root:false t1) (purify_term ~root:false t2)
+    | T.Node (s,[]) when S.is_numeric s -> t
+    | T.Node (s, l) when S.Arith.is_arith s ->
+      if root
+        then (* recurse, still in root arith expression *)
+          T.mk_node s (List.map (purify_term ~root) l)
+        else begin
+          (* purify this term out! *)
+          let ty = TypeInference.infer_sig signature t in
+          let v = T.mk_var ~ty !varidx in
+          incr varidx;
+          (* purify the term and add a constraint *)
+          let t' = purify_term ~root:true t in
+          let lit = Literal.mk_neq ~ord v t' in
+          _add_lit lit;
+          (* return variable instead of literal *)
+          v
+        end
+    | T.Node (s, l) -> T.mk_node s (List.map (purify_term ~root:false) l)
+    in
+    (* purify each literal *)
+    Array.iter
+      (fun lit -> match lit with
+        | Literal.Equation (l, r, sign, _) ->
+          let l = purify_term ~root:true l in
+          let r = purify_term r ~root:true in
+          let lit = Literal.mk_lit ~ord l r sign in
+          _add_lit lit
+        | Literal.Prop (p, sign) ->
+          let p = purify_term ~root:true p in
+          let lit = Literal.mk_prop ~ord p sign in
+          _add_lit lit
+        | Literal.True -> _add_lit lit
+        | Literal.False -> ()  (* useless *)
+      )
+      lits;
+    Array.of_list !new_lits
+
+  let pivot ~ord ~signature ~eligible lits =
+    let results = ref [] in
+    let add_res a = results := a :: !results in
+    for i = 0 to Array.length lits - 1 do
+      if eligible i lits.(i) then begin
+        (* try to pivot the i-th literal *)
+        let pivots = Lit.extract ~signature lits.(i) in
+        (* only keep maximal terms *)
+        let terms = Lit.L.get_terms pivots in
+        let terms = Multiset.create terms in
+        let bv = Multiset.max (Ordering.compare ord) terms in
+        let terms = BV.select bv (Multiset.to_array terms) in
+        List.iter
+          (fun lit' ->
+            (* build a new literal from lit', if the term is maximal *)
+            let t = Lit.get_term lit' in
+            if List.exists (fun (t',_) -> T.eq t t') terms then
+              let lits = Util.array_except_idx lits i in
+              let lits = Lit.to_lit ~ord lit' :: lits in
+              let lits = Array.of_list lits in
+              add_res lits
+          )
+          pivots
       end
-  | T.Node (s, l) -> T.mk_node s (List.map (purify_term ~root:false) l)
-  in
-  (* purify each literal *)
-  Array.iter
-    (fun lit -> match lit with
-      | Literal.Equation (l, r, sign, _) ->
-        let l = purify_term ~root:true l in
-        let r = purify_term r ~root:true in
-        let lit = Literal.mk_lit ~ord l r sign in
-        _add_lit lit
-      | Literal.Prop (p, sign) ->
-        let p = purify_term ~root:true p in
-        let lit = Literal.mk_prop ~ord p sign in
-        _add_lit lit
-      | Literal.True -> _add_lit lit
-      | Literal.False -> ()  (* useless *)
-    )
-    lits;
-  Array.of_list !new_lits
+    done;
+    !results
+end
 
+(** {2 Inference Rules} *)
+
+let rewrite_lit ~ctx lit = lit  (* TODO *)
+
+let factor_arith c = []  (* TODO *)
+
+let pivot_arith c = [] (* TODO *)
+
+let setup_env ~env =
+  ()  (* TODO: register rules *)
