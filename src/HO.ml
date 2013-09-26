@@ -145,7 +145,7 @@ let lambda_abstract_list ~signature t args =
   List.fold_left (lambda_abstract ~signature) t args
 
 let lambda_apply_list t args =
-  let t' = List.fold_right (fun arg t -> mk_at t arg) args t in
+  let t' = mk_at_list t args in
   let t' = beta_reduce t' in
   t'
 

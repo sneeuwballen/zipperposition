@@ -169,7 +169,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
        yields back to [reduce]. *)
     and rewrite_here reduce' t =
       try
-        DT.retrieve ~sign:true (trs.rules,1) (t,0) ()
+        DT.retrieve ~sign:true trs.rules 1 t 0 ()
           (fun () _ _ rule subst ->
             (* right-hand part *)
             let r = rule.rule_right in
@@ -277,7 +277,7 @@ module TRS = struct
     (* assuming subterms of [t] are in normal form, reduce the term *)
     and reduce_at_root ~depth t =
       try
-        DT.retrieve ~sign:true (trs,1) (t,0) () rewrite_handler;
+        DT.retrieve ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst)) ->
         Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' Substs.pp subst;
@@ -366,7 +366,7 @@ module FormRW = struct
     (* try to rewrite this term at root *)
     and reduce_at_root ~depth t =
       try
-        DT.retrieve ~sign:true (frs,1) (t,0) () rewrite_handler;
+        DT.retrieve ~sign:true frs 1 t 0 () rewrite_handler;
         F.mk_atom t  (* normal form is itself *)
       with (RewrittenIn (f, subst)) ->
         Util.debug 3 "rewrite %a into %a (with %a)" T.pp t F.pp f Substs.pp subst;

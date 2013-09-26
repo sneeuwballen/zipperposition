@@ -270,24 +270,24 @@ module Make(X : Set.OrderedType) = struct
     in
     recurse idx.trie features acc
 
-  let retrieve_unifiables (idx, o_i) (t, o_t) acc f = 
+  let retrieve_unifiables idx o_i t o_t acc f = 
     let features = idx.fp t in
     let compatible = compatible_features_unif in
     traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_unify (leaf, o_i) (t, o_t) acc f)
+      (fun acc leaf -> Leaf.fold_unify leaf o_i t o_t acc f)
 
-  let retrieve_generalizations (idx, o_i) (t, o_t) acc f = 
+  let retrieve_generalizations idx o_i t o_t acc f = 
     let features = idx.fp t in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
     traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_match (leaf, o_i) (t, o_t) acc f)
+      (fun acc leaf -> Leaf.fold_match leaf o_i t o_t acc f)
 
-  let retrieve_specializations (idx, o_i) (t, o_t) acc f = 
+  let retrieve_specializations idx o_i t o_t acc f = 
     let features = idx.fp t in
     let compatible = compatible_features_match in
     traverse ~compatible idx features acc
-      (fun acc leaf -> Leaf.fold_matched (leaf, o_i) (t, o_t) acc f)
+      (fun acc leaf -> Leaf.fold_matched leaf o_i t o_t acc f)
 
   let to_dot buf t =
     failwith "Fingerprint: to_dot not implemented"

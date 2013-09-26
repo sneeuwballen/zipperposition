@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Generic term indexing} *)
 
-type 'a scoped = 'a Substs.scoped
+type scope = Substs.scope
 
 (** {2 Leaf} *)
 
@@ -45,15 +45,15 @@ module type LEAF = sig
   val fold : t -> ('a -> Term.t -> S.t -> 'a) -> 'a -> 'a
   val size : t -> int
 
-  val fold_unify : t scoped -> Term.t scoped -> 'a ->
+  val fold_unify : t -> scope -> Term.t -> scope -> 'a ->
                     ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
     (** Unify the given term with indexed terms *)
 
-  val fold_match: t scoped -> Term.t scoped -> 'a ->
+  val fold_match: t -> scope -> Term.t -> scope -> 'a ->
                   ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
     (** Match the indexed terms against the given query term *)
 
-  val fold_matched: t scoped -> Term.t scoped -> 'a ->
+  val fold_matched: t -> scope -> Term.t -> scope -> 'a ->
                     ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
     (** Match the query term against the indexed terms *)
 end
@@ -84,13 +84,13 @@ module type TERM_IDX = sig
 
   val fold : t -> ('a -> Term.t -> Leaf.S.t -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : t scoped -> Term.t scoped -> 'a ->
+  val retrieve_unifiables : t -> scope -> Term.t -> scope -> 'a ->
                             ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
 
-  val retrieve_generalizations : t scoped -> Term.t scoped -> 'a ->
+  val retrieve_generalizations : t -> scope -> Term.t -> scope -> 'a ->
                                 ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
 
-  val retrieve_specializations : t scoped -> Term.t scoped -> 'a ->
+  val retrieve_specializations : t -> scope -> Term.t -> scope -> 'a ->
                                  ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
 
   val to_dot : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
@@ -196,7 +196,7 @@ module type UNIT_IDX = sig
   val iter : t -> (Term.t -> E.t -> unit) -> unit
     (** Iterate on indexed equations *)
 
-  val retrieve : sign:bool -> t scoped -> Term.t scoped -> 'a ->
+  val retrieve : sign:bool -> t -> scope -> Term.t -> scope -> 'a ->
                  ('a -> Term.t -> rhs -> E.t -> Substs.t -> 'a) ->
                  'a
       (** [retrieve ~sign (idx,si) (t,st) acc] folds on
