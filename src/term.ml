@@ -396,9 +396,16 @@ let at_cpos t pos =
 
 let max_cpos t = size t - 1
 
-let var_occurs x t = subterm x t
-
 let is_ground t = get_flag flag_ground t
+
+let rec var_occurs x t = match t.term with
+  | Var _
+  | BoundVar _ -> x == t
+  | Bind (_, t') -> var_occurs x t'
+  | _ when is_ground t -> false  (* no variable *)
+  | At (t1, t2) -> var_occurs x t1 || var_occurs x t2
+  | Node (s, []) -> false
+  | Node (s, l) -> List.exists (var_occurs x) l
 
 let max_var vars =
   let rec aux idx = function
