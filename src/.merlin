@@ -6,3 +6,4 @@ B ../_build/src/
 B ../_build/src/lib/
 B ../_build/src/meta
 B ../_build/tools/
+PKG oUnit

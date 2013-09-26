@@ -25,13 +25,53 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** Test terms *)
 
+open Logtk
 open OUnit
 
 module T = Term
 module H = Helpers
 module S = Substs
 
+let pterm s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
+
+let f x y = T.mk_node (Symbol.mk_const "f") [x;y]
+let g x = T.mk_node (Symbol.mk_const "g") [x]
+let a = T.mk_const (Symbol.mk_const "a")
+let b = T.mk_const (Symbol.mk_const "b")
+let x = T.mk_var 0
+let y = T.mk_var 1
+
+let test_db_lift () =
+  let t = T.mk_lambda (f (T.mk_bound_var 0) (g (T.mk_bound_var 1))) in
+  let t' = T.db_lift 1 t in
+  let t1 = T.mk_lambda (f (T.mk_bound_var 0) (g (T.mk_bound_var 2))) in
+  assert_equal ~cmp:T.eq ~printer:T.to_string t1 t';
+  ()
+
+let test_db_unlift () =
+  let t = T.mk_lambda (f (T.mk_bound_var 0) (g (T.mk_bound_var 2))) in
+  let t' = T.db_unlift t in
+  let t1 = T.mk_lambda (f (T.mk_bound_var 0) (g (T.mk_bound_var 1))) in
+  assert_equal ~cmp:T.eq ~printer:T.to_string t1 t';
+  ()
+
+let redex = T.mk_at
+  (T.mk_lambda_var [x] (f (T.mk_at x a) (T.mk_at x b)))
+  (T.mk_at
+    (T.mk_lambda_var [y;x] (T.mk_at y x))
+    (T.mk_lambda_var [x] (g x))
+  )
+
+let test_beta_reduce () =
+  let t' = HO.beta_reduce redex in
+  let t1 = pterm "f(g(a), g(b))" in
+  assert_equal ~cmp:T.eq ~printer:T.to_string t1 t';
+  ()
+
 let suite =
   "test_term" >:::
-    []
+    [ "test_db_lift" >:: test_db_lift
+    ; "test_db_unlift" >:: test_db_unlift
+    ; "test_beta_reduce" >:: test_beta_reduce
+    ]
 

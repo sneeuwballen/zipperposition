@@ -25,6 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** Testing of rewriting *)
 
+open Logtk
 open OUnit
 
 module T = Term
@@ -131,7 +132,7 @@ let benchmark ?(count=benchmark_count) trs a b =
   let start = Unix.gettimeofday () in
   for i = 1 to count do one_step () done;
   let stop = Unix.gettimeofday () in
-  Util.printf "%f seconds to do %d joins of %a and %a (%f each)\n"
+  Util.debug 1 "%f seconds to do %d joins of %a and %a (%f each)\n"
     (stop -. start) count print_peano_nice a print_peano_nice b
     ((stop -. start) /. (float_of_int count))
 

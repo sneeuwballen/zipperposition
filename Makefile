@@ -39,7 +39,7 @@ all:
 bin:
 	ocaml setup.ml -build
 
-tests:
+tests: bin
 	ocaml setup.ml -test
 
 doc:

@@ -59,6 +59,11 @@ Executable run_tests
   MainIs: run_tests.ml
   BuildDepends: logtk, oUnit
 
+Test all
+  Command: $run_tests
+  TestTools: run_tests
+  Run$: flag(tests)
+
 # TPTP syntax and type checking
 Executable check_tptp
   Path: tools/

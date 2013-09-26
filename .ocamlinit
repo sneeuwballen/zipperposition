@@ -4,6 +4,7 @@
 #require "datalog";;
 #directory "_build/src/";;
 #directory "_build/src/meta/";;
+#directory "_build/tests/";;
 #load "logtk.cma";;
 #load "logtk_meta.cma";;
 #install_printer Logtk.Symbol.fmt;;
