@@ -233,17 +233,11 @@ val db_to_classic : ?varindex:int ref -> t -> t
 
 (** High level fold-like combinators *)
 
-val all_positions : Position.t -> t -> 'a ->
+val all_positions : ?vars:bool -> Position.t -> t -> 'a ->
                     ('a -> t -> Position.t -> 'a) -> 'a
   (** apply f to all non-variable positions in t, accumulating the
-      results along. f is given the subterm, the position and the context
-      at each such position, and returns a list of objects; all lists
-      returned by f are concatenated.
-
-      position -> term
-      -> (term -> position -> 'b list)
-      -> 'b list
-      *)
+      results along.
+      [vars] specifies whether variables are folded on (default true). *)
 
 (** {2 Some AC-utils} *)
 

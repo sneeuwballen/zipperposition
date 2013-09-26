@@ -25,6 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 First-order terms} *)
 
+module PB = Position.Build
+
 (** term *)
 type t = {
   term : term_cell;             (** the term itself *)
@@ -708,30 +710,28 @@ let rec db_to_classic ?(varindex=ref 0) t =
 
 (** {2 Fold} *)
 
-let all_positions pos t acc f =
-  let module PB = Position.Build in
-  (* pb: position builder *)
-  let rec aux acc pb t = match t.term with
-  | Var _ | BoundVar _ -> acc
+let rec _all_pos_rec f vars acc pb t = match t.term with
+  | Var _ | BoundVar _ ->
+    if vars then f acc t (PB.to_pos pb) else acc
   | Bind (_, t') ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    aux acc (PB.add pb 0) t'
+    _all_pos_rec f vars acc (PB.add pb 0) t'
   | Node (hd, tl) ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
-    let acc, _ = List.fold_left
-      (fun (acc,idx) t' ->
-        let acc = aux acc (PB.add pb idx) t' in (* recurse in subterm *)
-        acc, idx+1)
-      (acc, 0) tl
-    in
-    acc
+    _all_pos_rec_list f vars acc pb tl 0
   | At(t1, t2) ->
     let acc = f acc t (PB.to_pos pb) in
-    let acc = aux acc (PB.add pb 0) t1 in
-    let acc = aux acc (PB.add pb 1) t2 in
-    acc
-  in
-  aux acc (PB.of_pos pos) t
+    let acc = _all_pos_rec f vars acc (PB.add pb 0) t1 in
+    let acc = _all_pos_rec f vars acc (PB.add pb 1) t2 in
+  acc
+and _all_pos_rec_list f vars acc pb l i = match l with
+  | [] -> acc
+  | t::l' ->
+    let acc = _all_pos_rec f vars acc (PB.add pb i) t in
+    _all_pos_rec_list f vars acc pb l' (i+1)
+
+let all_positions ?(vars=false) pos t acc f =
+  _all_pos_rec f vars acc (PB.of_pos pos) t
 
 (** {2 Some AC-utils} *)
 
