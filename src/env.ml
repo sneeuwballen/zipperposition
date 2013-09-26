@@ -362,7 +362,9 @@ let rewrite ~env c =
           else Lit.mk_lit ~ord:(Ctx.ord env.ctx) l' r' sign
       | Lit.Prop (p, sign) ->
         let p' = reduce_term env.rewrite_rules p in
-        if p == p' then lit else Lit.mk_prop ~ord:(Ctx.ord env.ctx) p' sign
+        if p == p'
+          then lit
+          else Lit.mk_prop p' sign
       | Lit.True
       | Lit.False -> lit)
     c.C.hclits

@@ -156,9 +156,10 @@ let infer_active (actives : ProofState.ActiveSet.t) clause =
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
       I.retrieve_unifiables (actives#idx_sup_into, scope) (s,0) acc
-        (fun acc u_p (hc, u_pos, u_p) subst ->
+        (fun acc u_p with_pos subst ->
           (* rewrite u_p with s *)
-          let passive = hc in
+          let passive = with_pos.C.WithPos.clause in
+          let u_pos = with_pos.C.WithPos.pos in
           do_superposition ~ctx (clause, 0) s_pos (passive, scope) u_pos subst acc))
   in
   Util.exit_prof prof_infer_active;
@@ -178,13 +179,14 @@ let infer_passive (actives:ProofState.ActiveSet.t) clause =
   let new_clauses = Lits.fold_eqn ~both:true ~eligible clause.C.hclits []
     (fun acc u v _ u_pos ->
       (* rewrite subterms of u *)
-      T.all_positions u_pos u acc
+      T.all_positions ~pos:u_pos u acc
         (fun acc u_p p ->
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
           I.retrieve_unifiables (actives#idx_sup_from,scope) (u_p,0) acc
-            (fun acc s (hc, s_pos, s) subst ->
-              let active = hc in
+            (fun acc s with_pos subst ->
+              let active = with_pos.C.WithPos.clause in
+              let s_pos = with_pos.C.WithPos.pos in
               do_superposition ~ctx (active, scope) s_pos (clause, 0) p subst acc)))
   in
   Util.exit_prof prof_infer_passive;
@@ -319,7 +321,6 @@ end)
 (** Hyper-splitting *)
 let infer_split c =
   let ctx = c.C.hcctx in
-  let ord = Ctx.ord ctx in
   (* only do splitting on large clauses *)
   if Array.length c.C.hclits < 4 || !split_count >= !split_limit then [] else begin
   Util.enter_prof prof_split;
@@ -394,14 +395,14 @@ let infer_split c =
     let proof c' = Proof.mk_c_step c' "split" [c.C.hcproof] in
     (* the guard clause, plus the first component, plus all negated split symbols *)
     let guard =
-      let lits = List.map (fun t -> Lit.mk_false ~ord t) symbols
+      let lits = List.map Lit.mk_false symbols
                @ List.hd !components @ !branch in
       C.create ~parents:[c] ~ctx lits proof
     in
     (* one new clause for each other component *)
     let new_clauses = List.map2
       (fun component split_symbol ->
-        let split_lit = Lit.mk_true ~ord split_symbol in
+        let split_lit = Lit.mk_true split_symbol in
         let lits = split_lit :: (component @ !branch) in
         C.create ~parents:[c] ~ctx lits proof)
       (List.tl !components) symbols
@@ -501,9 +502,9 @@ let demodulate (simpl_set : PS.SimplSet.t) c =
     | Lit.True
     | Lit.False -> lit
     | Lit.Prop (p, true) when BV.get eligible_res i ->
-      Lit.mk_true ~ord (demod_nf ~restrict:true simpl_set clauses p)
+      Lit.mk_true (demod_nf ~restrict:true simpl_set clauses p)
     | Lit.Prop (p, sign) ->
-      Lit.mk_prop ~ord (demod_nf simpl_set clauses p) sign
+      Lit.mk_prop (demod_nf simpl_set clauses p) sign
     | Lit.Equation (l, r, true, Comp.Gt) when BV.get eligible_res i ->
       Lit.mk_eq ~ord
         (demod_nf ~restrict:true simpl_set clauses l)
@@ -544,12 +545,13 @@ let backward_demodulate (active_set : PS.ActiveSet.t) set given =
   (* find clauses that might be rewritten by l -> r *)
   let recurse ~oriented set l r =
     I.retrieve_specializations (active_set#idx_back_demod,scope) (l,0) set
-      (fun set t' (hc, _, _) subst ->
+      (fun set t' with_pos subst ->
+        let c = with_pos.C.WithPos.clause in
         (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
         if oriented
         || O.compare ord (S.apply subst l 0) (S.apply subst r 0) = Comp.Gt
           then  (* add the clause to the set, it may be rewritten by l -> r *)
-            C.CSet.add set hc
+            C.CSet.add set c
           else set)
   in
   let set' = match given.C.hclits with

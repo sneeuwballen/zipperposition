@@ -60,14 +60,31 @@ val is_neg : t -> bool                (** is the literal negative? *)
 val equational : t -> bool            (** is the literal a proper equation? *)
 val orientation_of : t -> Comparison.t  (** get the orientation of the literal *)
 
+val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
+  (** Assuming the literal is an inequation, returns the corresponding
+      total order literal.
+      @raise Not_found if the literal is not an inequality *)
+
+val is_ineq : spec:Theories.TotalOrder.t -> t -> bool
+val is_strict_ineq : spec:Theories.TotalOrder.t -> t -> bool
+val is_nonstrict_ineq : spec:Theories.TotalOrder.t -> t -> bool
+
+val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
+  (** Assuming the literal is an inequation, returns the corresponding
+      total order literal.
+      @raise Not_found if the literal is not an inequality *)
+
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
 val mk_eq : ord:Ordering.t -> Term.t -> Term.t -> t
 val mk_neq : ord:Ordering.t -> Term.t -> Term.t -> t
 val mk_lit : ord:Ordering.t -> Term.t -> Term.t -> bool -> t
-val mk_prop : ord:Ordering.t -> Term.t -> bool -> t   (* proposition *)
-val mk_true : ord:Ordering.t -> Term.t -> t     (* true proposition *)
-val mk_false : ord:Ordering.t -> Term.t -> t    (* false proposition *)
+val mk_prop : Term.t -> bool -> t   (* proposition *)
+val mk_true : Term.t -> t     (* true proposition *)
+val mk_false : Term.t -> t    (* false proposition *)
+
+val mk_less : Theories.TotalOrder.instance -> Term.t -> Term.t -> t
+val mk_lesseq : Theories.TotalOrder.instance -> Term.t -> Term.t -> t
 
 val reord : ord:Ordering.t -> t -> t      (** recompute order *)
 val lit_of_form : ord:Ordering.t -> Formula.t -> t (** translate eq/not to literal *)
@@ -145,19 +162,59 @@ module Arr : sig
 
   (** {3 High order combinators} *)
 
-  val fold_eqn : ?both:bool ->
+  val get_eqn : t array -> Position.t -> Term.t * Term.t * bool
+    (** get the term l at given position in clause, and r such that l ?= r
+        is the Literal.t at the given position.
+        @raise Invalid_argument if the position is not valid in the array *)
+
+  val get_ineq : spec:Theories.TotalOrder.t ->
+                 t array -> Position.t ->
+                Theories.TotalOrder.lit
+    (** Obtain the l <= r at the given position in the array, plus a
+        boolean that is [true] iff the inequality is {b strict}, and
+        the corresponding ordering instance (pair of symbols)
+        @raise Invalid_argument if the position is not valid in the array
+          or if the literal is not an inequation. *)
+
+  val fold_eqn : ?both:bool -> ?sign:bool ->
                   eligible:(int -> t -> bool) ->
                   t array -> 'a ->
                   ('a -> Term.t -> Term.t -> bool -> Position.t -> 'a) ->
                   'a
     (** fold f over all literals sides, with their positions.
         f is given (acc, left side, right side, sign, position of left side)
-        if both=true, then both sides of a non-oriented equation
-          will be visited *)
+        if [both = true], then both sides of a non-oriented equation
+          will be visited.
+        if [sign = true], then only positive equations are visited; if it's
+          [false], only negative ones; if it's not defined, both. *)
 
-  val get_eqn : t array -> Position.t -> Term.t * Term.t * bool
-    (** get the term l at given position in clause, and r such that l ?= r
-        is the Literal.t at the given position *)
+  val fold_ineq : spec:Theories.TotalOrder.t ->
+                  eligible:(int -> t -> bool) ->
+                  t array -> 'a ->
+                  ('a -> Theories.TotalOrder.lit -> Position.t -> 'a) ->
+                  'a
+    (** Fold on inequalities of the lits. The fold function is given
+        the inequation instance, plus its position within the array.
+        [eligible] is used to filter which literals to fold over (given
+        the literal and its index). *)
+
+  val fold_terms : ?vars:bool -> which:[<`Max|`One|`Both] -> subterms:bool ->
+                   eligible:(int -> t -> bool) ->
+                   t array -> 'a ->
+                   ('a -> Term.t -> Position.t -> 'a) ->
+                   'a
+    (** Fold on terms, maybe subterms, of the literal array.
+        Variables are ignored if [vars] is [false]. 
+
+        [vars] decides whether variables are iterated on too (default [false])
+        [eligible] decides whether literals are explored.
+        [subterms] decides whether subterms are explored.
+
+        [which] is used to decide on equational literals:
+        - if [which] is [`Max], only the maximal side is explored (or both if not comparable)
+        - if [which] is [`One], the maximal side, or an arbitrary one, is visited
+        - if [which] is [`Both], both sides of any equations are visited.
+    *)
 
   (** {3 IO} *)
 

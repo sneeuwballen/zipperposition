@@ -508,16 +508,16 @@ module Lit = struct
   let to_lit ~ord lit = match lit with
   | Eq (t, m) -> Literal.mk_eq ~ord t (Monome.to_term m)
   | Neq (t, m) -> Literal.mk_neq ~ord t (Monome.to_term m)
-  | L_less (t, m) -> Literal.mk_true ~ord (T.mk_less t (Monome.to_term m))
-  | L_lesseq (t, m) -> Literal.mk_true ~ord (T.mk_lesseq t (Monome.to_term m))
-  | R_less (m, t) -> Literal.mk_true ~ord (T.mk_less (Monome.to_term m) t)
-  | R_lesseq (m, t) -> Literal.mk_true ~ord (T.mk_lesseq (Monome.to_term m) t)
+  | L_less (t, m) -> Literal.mk_true (T.mk_less t (Monome.to_term m))
+  | L_lesseq (t, m) -> Literal.mk_true (T.mk_lesseq t (Monome.to_term m))
+  | R_less (m, t) -> Literal.mk_true (T.mk_less (Monome.to_term m) t)
+  | R_lesseq (m, t) -> Literal.mk_true (T.mk_lesseq (Monome.to_term m) t)
 
   let simplify ~ord ~signature lit = match lit with
   | Literal.Equation (l, r, sign, _) ->
     Literal.mk_lit ~ord (T.simplify ~signature l) (T.simplify ~signature r) sign
   | Literal.Prop (p, sign) ->
-    Literal.mk_prop ~ord (T.simplify ~signature p) sign
+    Literal.mk_prop (T.simplify ~signature p) sign
   | Literal.True
   | Literal.False -> lit
 
@@ -594,7 +594,7 @@ module Lits = struct
           _add_lit lit
         | Literal.Prop (p, sign) ->
           let p = purify_term ~root:true p in
-          let lit = Literal.mk_prop ~ord p sign in
+          let lit = Literal.mk_prop p sign in
           _add_lit lit
         | Literal.True -> _add_lit lit
         | Literal.False -> ()  (* useless *)

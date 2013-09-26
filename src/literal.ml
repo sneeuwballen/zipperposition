@@ -32,6 +32,9 @@ open Logtk
 module T = Term
 module F = Formula
 module S = Substs
+module TO = Theories.TotalOrder
+module Pos = Position
+module PB = Position.Build
 
 type t =
   | Equation of Term.t * Term.t * bool * Comparison.t
@@ -173,6 +176,36 @@ let orientation_of = function
   | True
   | False -> Comparison.Eq
 
+let ineq_lit ~spec lit =
+  match lit with
+  | Prop ({T.term=T.Node(s, [l;r])}, true) ->
+    let instance = TO.find ~spec s in
+    let strict = Symbol.eq s instance.TO.less in
+    TO.({ left=l; right=r; strict; instance; })
+  | _ -> raise Not_found
+
+let is_ineq ~spec lit =
+  try
+    let _ = ineq_lit ~spec lit in
+    true
+  with Not_found ->
+    false
+
+let is_strict_ineq ~spec lit =
+  try
+    let lit' = ineq_lit ~spec lit in
+    lit'.TO.strict
+  with Not_found ->
+    false
+
+let is_nonstrict_ineq ~spec lit =
+  try
+    let lit' = ineq_lit ~spec lit in
+    not lit'.TO.strict
+  with Not_found ->
+    false
+
+(* TODO: remove, typechecking should do its work *)
 let check_type a b =
   let ok = not (T.has_type a) || not (T.has_type b) || T.compatible_type a b in
   assert ok
@@ -195,11 +228,22 @@ let mk_eq ~ord a b = mk_lit ~ord a b true
 
 let mk_neq ~ord a b = mk_lit ~ord a b false
 
-let mk_prop ~ord p sign = mk_lit ~ord p T.true_term sign
+let mk_prop p sign = match p with
+  | _ when p == T.true_term -> if sign then True else False
+  | _ when p == T.false_term -> if sign then False else True
+  | _ -> Prop (p, sign)
 
-let mk_true ~ord p = mk_prop ~ord p true
+let mk_true p = mk_prop p true
 
-let mk_false ~ord p = mk_prop ~ord p false
+let mk_false p = mk_prop p false
+
+let mk_less instance l r =
+  let open Theories.TotalOrder in
+  mk_true (T.mk_node instance.less [l; r])
+
+let mk_lesseq instance l r =
+  let open Theories.TotalOrder in
+  mk_true (T.mk_node instance.lesseq [l; r])
 
 let apply_subst ?(recursive=true) ?renaming ~ord subst lit scope =
   match lit with
@@ -209,7 +253,7 @@ let apply_subst ?(recursive=true) ?renaming ~ord subst lit scope =
     mk_lit ~ord new_l new_r sign
   | Prop (p, sign) ->
     let p' = S.apply ~recursive ?renaming subst p scope in
-    mk_prop ~ord p' sign
+    mk_prop p' sign
   | True
   | False -> lit
 
@@ -225,8 +269,8 @@ let lit_of_form ~ord f =
   match f.F.form with
   | F.True -> True
   | F.False -> False
-  | F.Atom a -> mk_true ~ord a
-  | F.Not {F.form=F.Atom a} -> mk_false ~ord a
+  | F.Atom a -> mk_true a
+  | F.Not {F.form=F.Atom a} -> mk_false a
   | F.Equal (l,r) -> mk_eq ~ord l r
   | F.Not {F.form=F.Equal (l,r)} -> mk_neq ~ord l r
   | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
@@ -260,7 +304,7 @@ let fmap ~ord f = function
     mk_lit ~ord new_left new_right sign
   | Prop (p, sign) ->
     let p' = f p in
-    mk_prop ~ord p' sign
+    mk_prop p' sign
   | True -> True
   | False -> False
 
@@ -473,30 +517,6 @@ module Arr = struct
 
   (** {3 High Order combinators} *)
 
-  let fold_eqn ?(both=true) ~eligible lits acc f =
-    let rec fold acc i =
-      if i = Array.length lits then acc
-      else if not (eligible i lits.(i)) then fold acc (i+1)
-      else
-        let acc = match lits.(i) with
-        | Equation (l,r,sign,Comparison.Gt) ->
-          f acc l r sign [i; Position.left_pos]
-        | Equation (l,r,sign,Comparison.Lt) ->
-          f acc r l sign [i; Position.right_pos]
-        | Equation (l,r,sign,_) ->
-          if both
-          then (* visit both sides of the equation *)
-            let acc = f acc r l sign [i; Position.right_pos] in
-            f acc l r sign [i; Position.left_pos]
-          else (* only visit one side (arbitrary) *)
-            f acc l r sign [i; Position.left_pos]
-        | Prop (p, sign) ->
-          f acc p T.true_term sign [i; Position.left_pos]
-        | True
-        | False -> acc
-        in fold acc (i+1)
-    in fold acc 0
-
   (** decompose the literal at given position *)
   let get_eqn lits pos = match pos with
     | idx::eq_side::_ ->
@@ -509,6 +529,106 @@ module Arr = struct
       | _ -> invalid_arg "wrong side"
       end
     | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
+
+  (* extract inequation from given position *)
+  let get_ineq ~spec lits pos = match pos with
+    | idx::side::_ when side = Position.left_pos ->
+      begin try
+        let lit = ineq_lit ~spec lits.(idx) in
+        lit
+      with Not_found ->
+        invalid_arg (Util.sprintf "lit %a not an inequation" pp lits.(idx))
+      end
+    | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
+
+  let fold_eqn ?(both=true) ?sign ~eligible lits acc f =
+    let sign_ok = match sign with
+      | None -> (fun _ -> true)
+      | Some sign -> (fun sign' -> sign = sign')
+    in
+    let rec fold acc i =
+      if i = Array.length lits then acc
+      else if not (eligible i lits.(i)) then fold acc (i+1)
+      else
+        let acc = match lits.(i) with
+        | Equation (l,r,sign,Comparison.Gt) when sign_ok sign ->
+          f acc l r sign [i; Position.left_pos]
+        | Equation (l,r,sign,Comparison.Lt) when sign_ok sign ->
+          f acc r l sign [i; Position.right_pos]
+        | Equation (l,r,sign,_) when sign_ok sign ->
+          if both
+          then (* visit both sides of the equation *)
+            let acc = f acc r l sign [i; Position.right_pos] in
+            f acc l r sign [i; Position.left_pos]
+          else (* only visit one side (arbitrary) *)
+            f acc l r sign [i; Position.left_pos]
+        | Prop (p, sign) when sign_ok sign ->
+          f acc p T.true_term sign [i; Position.left_pos]
+        | Prop _
+        | Equation _
+        | True
+        | False -> acc
+        in fold acc (i+1)
+    in fold acc 0
+
+  let fold_ineq ~spec ~eligible lits acc f =
+    let rec fold acc i =
+      if i = Array.length lits then acc
+      else if not (eligible i lits.(i)) then fold acc (i+1)
+      else
+        let acc =
+          try
+            let lit = ineq_lit ~spec lits.(i) in
+            let pos = [i; Position.left_pos] in
+            f acc lit pos
+          with Not_found ->
+            acc
+        in
+        fold acc (i+1)
+    in fold acc 0
+
+  (* TODO: new arguments *)
+  let fold_terms ?(vars=false) ~(which : [< `Max|`One|`Both]) ~subterms ~eligible lits acc f =
+    let rec fold acc i =
+      if i = Array.length lits
+        then acc
+      else if not (eligible i lits.(i))
+        then fold acc (i+1)   (* ignore lit *)
+      else
+        let acc = match lits.(i), which with
+        | Equation (l,r,sign,Comparison.Gt), (`Max | `One) ->
+          if subterms
+            then T.all_positions ~vars ~pos:[i; Pos.left_pos] l acc f
+            else f acc l [i; Pos.left_pos]
+        | Equation (l,r,sign,Comparison.Lt), (`Max | `One) ->
+          if subterms
+            then T.all_positions ~vars ~pos:[i; Pos.right_pos] r acc f
+            else f acc r [i; Pos.left_pos]
+        | Equation (l,r,sign,_), `One ->
+          (* only visit one side (arbitrary) *)
+          f acc l [i; Pos.left_pos]
+        | Equation (l,r,sign,(Comparison.Eq | Comparison.Incomparable)), `Max ->
+          (* visit both sides, they are both (potentially) maximal *)
+          f acc l [i; Pos.left_pos]
+        | Equation (l,r,sign,_), `Both ->
+          (* visit both sides of the equation *)
+          if subterms
+            then
+              let acc = T.all_positions ~vars ~pos:[i; Pos.left_pos] l acc f in
+              let acc = T.all_positions ~vars ~pos:[i; Pos.right_pos] r acc f in
+              acc
+            else
+              let acc = f acc l [i; Pos.left_pos] in
+              let acc = f acc r [i; Pos.right_pos] in
+              acc
+        | Prop (p, _), _ ->
+          if subterms
+            then T.all_positions ~vars ~pos:[i; Pos.left_pos] p acc f
+            else f acc p [i; Pos.left_pos]
+        | True, _
+        | False, _ -> acc
+        in fold acc (i+1)
+    in fold acc 0
 
   (** {3 IO} *)
 

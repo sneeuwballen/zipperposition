@@ -76,6 +76,15 @@ module TotalOrder = struct
     lesseq_tbl : instance STbl.t;
   } (** Specification of which symbols implement total orderings *)
 
+  type lit = {
+    left : Term.t;
+    right : Term.t;
+    strict : bool;
+    instance : instance;
+  } (** A literal is an atomic inequality. [strict] is [true] iff the
+      literal is a strict inequality, and the ordering itself
+      is also provided. *)
+
   let is_less ~spec s = STbl.mem spec.less_tbl s
 
   let is_lesseq ~spec s = STbl.mem spec.lesseq_tbl s

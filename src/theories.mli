@@ -61,6 +61,15 @@ module TotalOrder : sig
 
   type t 
 
+  type lit = {
+    left : Term.t;
+    right : Term.t;
+    strict : bool;
+    instance : instance;
+  } (** A literal is an atomic inequality. [strict] is [true] iff the
+      literal is a strict inequality, and the ordering itself
+      is also provided. *)
+
   val create : ?base:bool -> unit -> t
     (** New specification. It already contains an instance
         for "$less" and "$lesseq" if [base] is true (default). *)

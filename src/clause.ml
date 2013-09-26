@@ -299,7 +299,7 @@ let eligible_res c scope subst =
     are eligible for paramodulation. *)
 let eligible_param c scope subst =
   let ord = Ctx.ord c.hcctx in
-  if BV.is_empty c.hcselected then
+  if BV.is_empty c.hcselected then begin
     (* instantiate lits *)
     let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
     (* maximal ones *)
@@ -307,7 +307,20 @@ let eligible_param c scope subst =
     (* only keep literals that are positive *)
     BV.filter bv (fun i -> Lit.is_pos lits.(i));
     bv
-  else BV.empty ()  (* no eligible literal when some are selected *)
+  end else BV.empty ()  (* no eligible literal when some are selected *)
+
+let eligible_chaining c scope subst =
+  let ord = Ctx.ord c.hcctx in
+  let spec = Ctx.total_order c.hcctx in
+  if BV.is_empty c.hcselected then begin
+    let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
+    let bv = Lits.maxlits ~ord lits in
+    (* only keep literals that are positive *)
+    BV.filter bv (fun i -> Lit.is_pos lits.(i));
+    (* only keep ordering lits *)
+    BV.filter bv (fun i -> Lit.is_ineq ~spec lits.(i));
+    bv
+  end else BV.empty ()
 
 (** are there selected literals in the clause? *)
 let has_selected_lits c = not (BV.is_empty c.hcselected)
@@ -343,6 +356,41 @@ let from_forms ~file ~name ~ctx forms =
   let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
   let proof c = Proof.mk_c_axiom c ~file ~name in
   create_a ~ctx lits proof
+
+(** {2 Filter literals} *)
+
+module Eligible = struct
+  type t = int -> Lit.t -> bool
+
+  let res c =
+    let bv = eligible_res c 0 S.empty in
+    fun i lit -> BV.get bv i
+
+  let param c =
+    let bv = eligible_param c 0 S.empty in
+    fun i lit -> BV.get bv i
+
+  let chaining c =
+    let bv = eligible_chaining c 0 S.empty in
+    fun i lit -> BV.get bv i
+
+  let ineq c =
+    let spec = Ctx.total_order c.hcctx in
+    fun i lit -> Lit.is_ineq ~spec lit
+
+  let pos i lit = Lit.is_pos lit
+
+  let neg i lit = Lit.is_neg lit
+
+  let always i lit = true
+
+  let combine l = match l with
+  | [] -> (fun i lit -> true)
+  | [x] -> x
+  | [x; y] -> (fun i lit -> x i lit && y i lit)
+  | [x; y; z] -> (fun i lit -> x i lit && y i lit && z i lit)
+  | _ -> (fun i lit -> List.for_all (fun eligible -> eligible i lit) l)
+end
 
 (** {2 Set of clauses} *)
 
@@ -421,14 +469,21 @@ end
 
 (** {2 Positions in clauses} *)
 
-type clause_pos = clause * Position.t * Term.t
-let compare_clause_pos (c1, p1, t1) (c2, p2, t2) =
-  let c = Pervasives.compare p1 p2 in
-  if c <> 0 then c else
-  let c = compare c1 c2 in
-  if c <> 0 then c else
-  (assert (T.eq t1 t2); 0)
+module WithPos = struct
+  type t = {
+    clause : clause;
+    pos : Position.t;
+    term : Term.t;
+  }
+  let compare t1 t2 =
+    let c = Pervasives.compare t1.clause t2.clause in
+    if c <> 0 then c else
+    let c = T.compare t1.term t2.term in
+    if c <> 0 then c else
+    Position.compare t1.pos t2.pos
 
+  let pp buf t = failwith "C.WithPos.pp: not implemented"
+end
 
 (** {2 IO} *)
 

@@ -37,15 +37,11 @@ module S = Substs
 module Lit = Literal
 module Lits = Literal.Arr
 module Pos = Position
+module PB = Position.Build
 module CQ = ClauseQueue
+module TO = Theories.TotalOrder
 
-type clause_pos = C.t * Pos.t * T.t
-
-module TermIndex = Fingerprint.Make(struct
-  type t = clause_pos
-  let compare (c1, p1, t1) (c2, p2, t2) =
-    Util.lexicograph_combine [C.compare c1 c2; Pos.compare p1 p2; T.compare t1 t2]
-end)
+module TermIndex = Fingerprint.Make(C.WithPos)
 
 module UnitIndex = Dtree.Make(struct
   type t = Term.t * Term.t * bool * C.t
@@ -68,8 +64,6 @@ let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 (* XXX: no customization of indexing for now
 let _indexes =
   let table = Hashtbl.create 2 in
-  (* TODO write a Substitution Tree, with the new substitution representation? *)
-  (* TODO rewrite a general purpose discrimination tree *)
   let mk_fingerprint fp = 
     Fingerprint.mk_index ~cmp:Clauses.compare_clause_pos fp in
   Hashtbl.add table "fp" (mk_fingerprint Fingerprint.fp6m);
@@ -77,87 +71,6 @@ let _indexes =
   Hashtbl.add table "fp16" (mk_fingerprint Fingerprint.fp16);
   table
 *)
-
-(** {2 Utils (for indexing part of a clause)} *)
-
-(* apply the operation to literals that verify (eligible c i lit) where
-   i is the index of the literal; if subterm is true then the operation is
-   done on every subterm, otherwise on root *)
-let update_with_clause op acc eligible ~subterms ~both_sides c =
-  let acc = ref acc in
-  (* specialize eligible for the clause *)
-  let eligible = eligible c in
-  (* process a lit *)
-  let rec process_lit op acc i = function
-    | Lit.Equation (l,r,_,_) when both_sides ->
-      let acc = process_term op acc l [Position.left_pos; i] in
-      process_term op acc r [Position.right_pos; i]
-    | Lit.Equation (l,r,_,Comparison.Gt) ->
-      process_term op acc l [Position.left_pos; i]
-    | Lit.Equation (l,r,_,Comparison.Lt) ->
-      process_term op acc r [Position.right_pos; i]
-    | Lit.Equation (l,r,_,Comparison.Incomparable)
-    | Lit.Equation (l,r,_,Comparison.Eq) ->
-      let acc = process_term op acc l [Position.left_pos; i] in
-      process_term op acc r [Position.right_pos; i]
-    | Lit.Prop (p,_) ->
-      process_term op acc p [Position.left_pos; i]
-    | Lit.True
-    | Lit.False -> acc
-  (* process a term (maybe recursively). We build positions in the wrong order,
-     so we have to reverse them before giving them to [op acc]. *)
-  and process_term op acc t pos =
-    match t.T.term with
-    | T.Var _ | T.BoundVar _ -> acc  (* variables are never indexed *)
-    | T.Bind (s, t') ->
-      (* apply the operation on the term itself *)
-      let acc = op acc t (c, List.rev pos, t) in
-      if subterms then process_term op acc t' (0::pos) else acc
-    | T.Node (_, []) -> op acc t (c, List.rev pos, t)
-    | T.Node (_, l) ->
-      (* apply the operation on the term itself *)
-      let acc = op acc t (c, List.rev pos, t) in
-      if subterms
-        then (* recursively process (non-var) subterms *)
-          let _, acc = List.fold_left
-            (fun (i, acc) t -> i+1, process_term op acc t (i::pos))
-            (0, acc) l
-          in acc
-        else acc (* stop after the root literal *)
-    | T.At (t1, t2) ->
-      let acc = op acc t (c, List.rev pos, t) in
-      if subterms
-        then
-          let acc = process_term op acc t1 (0::pos) in
-          process_term op acc t2 (1::pos)
-        else acc
-  in
-  (* process eligible literals *)
-  Array.iteri
-    (fun i lit -> if eligible i lit then acc := process_lit op !acc i lit)
-    c.C.hclits;
-  !acc
-
-(* update acc using op, on all given clauses *)
-let update_with_clauses op acc eligible ~subterms ~both_sides cs =
-  let acc = ref acc in
-  Sequence.iter
-    (fun c -> acc := update_with_clause op !acc eligible ~subterms ~both_sides c)
-    cs;
-  !acc
-
-(* process literals that are potentially eligible for resolution *)
-let eligible_res c =
-  let bv = C.eligible_res c 0 S.empty in
-  fun i lit -> BV.get bv i
-
-(* process literals that are potentially eligible for paramodulation *)
-let eligible_param c =
-  let bv = C.eligible_param c 0 S.empty in
-  fun i lit -> BV.get bv i
-
-(* process all literals *)
-let eligible_always c i lit = true
 
 (** {2 Set of active clauses} *)
 
@@ -167,8 +80,8 @@ module ActiveSet = struct
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_left_ord : TermIndex.t;       (** terms on left of an inequality *)
-      idx_right_ord : TermIndex.t;      (** terms on right of an inequality *)
+      idx_ord_side : TermIndex.t;       (** terms immediately under inequality *)
+      idx_ord_subterm : TermIndex.t;    (** subterms of inequality literals *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 
@@ -183,32 +96,59 @@ module ActiveSet = struct
       val mutable m_clauses = C.CSet.empty
       val mutable m_sup_into = TermIndex.empty
       val mutable m_sup_from = TermIndex.empty
-      val mutable m_left_ord = TermIndex.empty
-      val mutable m_right_ord = TermIndex.empty
+      val mutable m_ord_side = TermIndex.empty
+      val mutable m_ord_subterm = TermIndex.empty
       val mutable m_back_demod = TermIndex.empty
       val mutable m_fv = idx
       method ctx = ctx
       method clauses = m_clauses
       method idx_sup_into = m_sup_into
       method idx_sup_from = m_sup_from
-      method idx_left_ord = m_left_ord
-      method idx_right_ord = m_right_ord
+      method idx_ord_side = m_ord_subterm
+      method idx_ord_subterm = m_ord_subterm
       method idx_back_demod = m_back_demod
       method idx_fv = m_fv
 
-      (* TODO: update indexes *)
-
-      (** update indexes by removing/adding clauses *)
-      method update op cs =
-        (* sup into: subterms of literals that are eligible for res *)
-        m_sup_into <-
-          update_with_clauses op m_sup_into eligible_res ~subterms:true ~both_sides:false cs;
-        (* sup from : literals that are eligible for param *)
-        m_sup_from <-
-          update_with_clauses op m_sup_from eligible_param ~subterms:false ~both_sides:false cs;
-        (* back-demod : all subterms *)
-        m_back_demod <-
-          update_with_clauses op m_back_demod eligible_always ~subterms:true ~both_sides:true cs
+      (* apply operation [f] to some parts of [c] *)
+      method update f c =
+        (* index subterms that can be rewritten by superposition *)
+        m_sup_into <- Lits.fold_terms ~which:`Max ~subterms:true
+          ~eligible:(C.Eligible.res c) c.C.hclits m_sup_into
+          (fun tree t pos ->
+            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+            f tree t with_pos);
+        (* index terms that can rewrite into other clauses *)
+        m_sup_from <- Lits.fold_eqn ~both:true ~sign:true
+          ~eligible:(C.Eligible.param c) c.C.hclits m_sup_from
+          (fun tree l r sign pos ->
+            assert sign;
+            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
+            f tree l with_pos);
+        (* terms that can be demodulated: all subterms *)
+        m_back_demod <- Lits.fold_terms ~subterms:true ~which:`Both
+          ~eligible:C.Eligible.always c.C.hclits m_back_demod
+          (fun tree t pos ->
+            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+            f tree t with_pos);
+        (* terms occurring immediately under an inequation *)
+        let spec = Ctx.total_order ~ctx:c.C.hcctx in
+        m_ord_side <- Lits.fold_ineq ~spec
+          ~eligible:(C.Eligible.chaining c) c.C.hclits m_ord_side
+          (fun tree lit pos ->
+            let l = lit.TO.left in
+            let with_pos = C.WithPos.( {term=l; pos=(pos@[0]); clause=c} ) in
+            let tree = f tree l with_pos in
+            let r = lit.TO.right in
+            let with_pos = C.WithPos.( {term=r; pos=(pos@[1]); clause=c} ) in
+            let tree = f tree r with_pos in
+            tree);
+        (* subterms occurring under an inequation *)
+        m_ord_subterm <- Lits.fold_terms ~which:`Both ~subterms:true
+          ~eligible:(C.Eligible.chaining c) c.C.hclits m_ord_subterm
+          (fun tree t pos ->
+            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+            f tree t with_pos);
+        ()
 
       (** add clauses (only process the ones not present in the set) *)
       method add cs =
@@ -216,7 +156,7 @@ module ActiveSet = struct
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.of_seq m_clauses cs;
         let op tree = TermIndex.add tree in
-        self#update op cs;
+        Sequence.iter (self#update op) cs;
         m_fv <- SubsumptionIndex.add_seq m_fv cs
 
       (** remove clauses (only process the ones present in the set) *)
@@ -225,7 +165,7 @@ module ActiveSet = struct
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.remove_seq m_clauses cs;
         let op tree = TermIndex.remove tree in
-        self#update op cs;
+        Sequence.iter (self#update op) cs;
         m_fv <- SubsumptionIndex.remove_seq m_fv cs
     end :> t)
 end
