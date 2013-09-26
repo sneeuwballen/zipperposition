@@ -38,26 +38,30 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type spec = Theories.TotalOrder.t
-
 (** {2 Inference Rules} *)
 
-val eq_chaining_left : spec:spec -> Env.binary_inf_rule
-  (** Equality chaining left *)
+(** Inference rules find the specification of the ordering in the
+    given context/env, or in the clause they have to simplify. *)
 
-val eq_chaining_right : spec:spec -> Env.binary_inf_rule
-  (** Equality chaining right *)
+val eq_chaining_active : Env.binary_inf_rule
+  (** Equality chaining where the clause is active *)
 
-val ineq_chaining : spec:spec -> Env.binary_inf_rule
-  (** Inequality chaining. *)
+val eq_chaining_passive : Env.binary_inf_rule
+  (** Equality chaining where the clause is passive *)
 
-val reflexivity_res : spec:spec -> Env.unary_inf_rule
+val ineq_chaining_active : Env.binary_inf_rule
+  (** Inequality chaining where the clause is active. *)
+
+val ineq_chaining_passive : Env.binary_inf_rule
+  (** Inequality chaining where the clause is passive. *)
+
+val reflexivity_res : Env.unary_inf_rule
   (** Reflexivity resolution *)
 
-val is_tautology : spec:spec -> Clause.t -> bool
+val is_tautology : Clause.t -> bool
   (** Clause is always true in ordering models? *)
 
-val simplify : spec:spec -> Clause.t -> Clause.t
+val simplify : Clause.t -> Clause.t
   (** Simplify the clause, by removing impossible literals *)
 
 (** {2 Env} *)

@@ -29,24 +29,59 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type spec = Theories.TotalOrder.t
+module T = Term
+module C = Clause
+module I = ProofState.TermIndex
+module Lit = Literal
+module Lits = Literal.Arr
+module TO = Theories.TotalOrder
 
-let eq_chaining_left ~spec active_set c =
+let prof_eq_chaining_active = Util.mk_profiler "chaining.eq_active"
+let prof_eq_chaining_passive = Util.mk_profiler "chaining.eq_passive"
+let prof_ineq_chaining_active = Util.mk_profiler "chaining.ineq_active"
+let prof_ineq_chaining_passive = Util.mk_profiler "chaining.ineq_passive"
+
+(* perform equality chaining *)
+let do_eq_chaining ~ctx active s_a active_pos passive s_p passive_pos subst acc =
   assert false (* TODO *)
 
-let eq_chaining_right ~spec active_set c =
+(* use [s = t] to rewrite subterms of active clauses that unify with [s]
+  into [t] *)
+let eq_chaining_active active_set c =
+  Util.enter_prof prof_eq_chaining_active;
+  let ctx = active_set#ctx in
+  let scope = T.max_var c.C.hcvars + 1 in
+  let eligible = C.Eligible.param c in
+  (* fold on eq lits *)
+  let new_clauses = Lits.fold_eqn ~both:true ~eligible c.C.hclits []
+    (fun acc s t _ s_pos ->
+      I.retrieve_unifiables active_set#idx_ord_subterm scope s 0 acc
+        (fun acc u_p with_pos subst ->
+          let passive = with_pos.C.WithPos.clause in
+          let u_pos = with_pos.C.WithPos.pos in
+          do_eq_chaining ~ctx c 0 s_pos passive scope u_pos subst acc
+        )
+    )
+  in
+  Util.exit_prof prof_eq_chaining_active;
+  new_clauses
+
+let eq_chaining_passive active_set c =
   assert false (* TODO *)
 
-let ineq_chaining ~spec active_set c =
+let ineq_chaining_active active_set c =
   assert false (* TODO *)
 
-let reflexivity_res ~spec c =
+let ineq_chaining_passive active_set c =
   assert false (* TODO *)
 
-let is_tautology ~spec c =
+let reflexivity_res c =
+  assert false (* TODO *)
+
+let is_tautology c =
   false (* TODO *)
 
-let simplify ~spec c =
+let simplify c =
   assert false (* TODO *)
 
 let setup_env ~env =

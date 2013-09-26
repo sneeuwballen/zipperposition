@@ -155,7 +155,7 @@ let infer_active (actives : ProofState.ActiveSet.t) clause =
   let new_clauses = Lits.fold_eqn ~both:true ~eligible clause.C.hclits []
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
-      I.retrieve_unifiables (actives#idx_sup_into, scope) (s,0) acc
+      I.retrieve_unifiables actives#idx_sup_into scope s 0 acc
         (fun acc u_p with_pos subst ->
           (* rewrite u_p with s *)
           let passive = with_pos.C.WithPos.clause in
@@ -183,7 +183,7 @@ let infer_passive (actives:ProofState.ActiveSet.t) clause =
         (fun acc u_p p ->
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
-          I.retrieve_unifiables (actives#idx_sup_from,scope) (u_p,0) acc
+          I.retrieve_unifiables actives#idx_sup_from scope u_p 0 acc
             (fun acc s with_pos subst ->
               let active = with_pos.C.WithPos.clause in
               let s_pos = with_pos.C.WithPos.pos in
@@ -435,7 +435,7 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
       else begin
         (* find equations l=r that match subterm *)
         try
-          UnitIdx.retrieve ~sign:true (simpl_set#idx_simpl,1) (t,0) ()
+          UnitIdx.retrieve ~sign:true simpl_set#idx_simpl 1 t 0 ()
             (fun () l r (_,_,_,unit_clause) subst ->
               (* r is the term subterm is going to be rewritten into *)
               assert (C.is_unit_clause unit_clause);
@@ -544,7 +544,7 @@ let backward_demodulate (active_set : PS.ActiveSet.t) set given =
   let scope = T.max_var given.C.hcvars + 1 in
   (* find clauses that might be rewritten by l -> r *)
   let recurse ~oriented set l r =
-    I.retrieve_specializations (active_set#idx_back_demod,scope) (l,0) set
+    I.retrieve_specializations active_set#idx_back_demod scope l 0 set
       (fun set t' with_pos subst ->
         let c = with_pos.C.WithPos.clause in
         (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
@@ -719,7 +719,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
     | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
   (** try to equate terms with a positive unit clause that match them *)
   and equate_root clauses t1 t2 =
-    try UnitIdx.retrieve ~sign:true (simpl_set#idx_simpl,scope) (t1,0) ()
+    try UnitIdx.retrieve ~sign:true simpl_set#idx_simpl scope t1 0 ()
       (fun () l r (_,_,_,c') subst ->
         if t2 == (S.apply subst r scope)
         then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
@@ -759,7 +759,7 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   | lit::lits' -> iterate_lits (lit::acc) lits' clauses
   (** try to remove the literal using a negative unit clause *)
   and can_refute s t =
-    try UnitIdx.retrieve ~sign:false (simpl_set#idx_simpl,scope) (s,0) ()
+    try UnitIdx.retrieve ~sign:false simpl_set#idx_simpl scope s 0 ()
       (fun () l r (_,_,_,c') subst ->
         if t == (S.apply subst r scope)
         then begin
