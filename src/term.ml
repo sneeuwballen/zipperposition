@@ -730,7 +730,7 @@ and _all_pos_rec_list f vars acc pb l i = match l with
     let acc = _all_pos_rec f vars acc (PB.add pb i) t in
     _all_pos_rec_list f vars acc pb l' (i+1)
 
-let all_positions ?(vars=false) pos t acc f =
+let all_positions ?(vars=false) ?(pos=[]) t acc f =
   _all_pos_rec f vars acc (PB.of_pos pos) t
 
 (** {2 Some AC-utils} *)

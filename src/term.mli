@@ -233,7 +233,7 @@ val db_to_classic : ?varindex:int ref -> t -> t
 
 (** High level fold-like combinators *)
 
-val all_positions : ?vars:bool -> Position.t -> t -> 'a ->
+val all_positions : ?vars:bool -> ?pos:Position.t -> t -> 'a ->
                     ('a -> t -> Position.t -> 'a) -> 'a
   (** apply f to all non-variable positions in t, accumulating the
       results along.
