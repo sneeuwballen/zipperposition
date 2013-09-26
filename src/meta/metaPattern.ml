@@ -34,6 +34,7 @@ module F = Formula
 let prof_matching = Util.mk_profiler "meta.pattern.matching"
 let prof_encode = Util.mk_profiler "meta.pattern.encode"
 let prof_decode = Util.mk_profiler "meta.pattern.decode"
+let prof_foo = Util.mk_profiler "meta.pattern.foo"
 
 let __var_symbol = Symbol.mk_const "V"
 let __fun_symbol = Symbol.mk_const "S"
@@ -221,7 +222,9 @@ let matching pat right =
     (* instantiate with variables *)
     let offset = T.max_var (T.vars t') + 1 in
     let vars = List.mapi (fun i ty -> T.mk_var ~ty (i+offset)) types in
+    Util.enter_prof prof_foo;
     let left = HO.lambda_apply_list t' vars in
+    Util.exit_prof prof_foo;
     (* match left and right *)
     Util.debug 5 "MetaPattern: match %a with %a" T.pp left T.pp right;
     let substs = matching_terms left 1 right 0 in

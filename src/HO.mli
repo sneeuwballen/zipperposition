@@ -32,9 +32,9 @@ val curry : Term.t -> Term.t                    (** Curry all subterms *)
 val uncurry : Term.t -> Term.t                  (** Un-curry all subterms *)
 val curried : Term.t -> bool                    (** Is the term already curried? *)
 
-val is_fo : Term.t -> bool                 (** Check that the (curried) term is first-order *)
+val is_fo : Term.t -> bool                      (** Check whehter the (curried) term is first-order *)
 
-val beta_reduce : Term.t -> Term.t              (** Beta-reduce the (curried) term *)
+val beta_reduce : ?depth:int -> Term.t -> Term.t  (** Beta-reduce the (curried) term *)
 
 val eta_reduce : Term.t -> Term.t               (** Eta-reduce the (curried) term *)
 

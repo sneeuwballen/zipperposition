@@ -182,14 +182,14 @@ val atomic : t -> bool                   (** atomic proposition, or term, at roo
 val atomic_rec : t -> bool               (** does not contain connectives/quantifiers *)
 
 val db_closed : ?depth:int -> t -> bool
-  (** check whether the term is closed (all DB vars are bound) *)
+  (** check whether the term is closed (all DB vars are bound within the term) *)
 
 val db_contains : t -> int -> bool
   (** Does t contains the De Bruijn variable of index n? *)
 
-val db_replace : ?depth:int -> t -> t -> t
-  (** Substitution of De Bruijn symbol by a term. [db_replace t s]
-      replaces the De Bruijn symbol 0 by s in t. *)
+val db_replace : ?depth:int -> into:t -> by:t -> t
+  (** Substitution of De Bruijn symbol by a term. [db_replace ~into ~by]
+      replaces the De Bruijn symbol 0 by [by] in [into]. *)
 
 val db_type : t -> int -> Type.t option
   (** [db_type t n] returns the type of the [n]-th De Bruijn index in [t] *)

@@ -28,6 +28,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Term
 
+let prof_beta_reduce = Util.mk_profiler "HO.beta_reduce"
+let prof_lambda_abstract = Util.mk_profiler "HO.lambda_abstract"
+
 (* Curry all subterms *)
 let rec curry t =
   match t.term with
@@ -81,18 +84,39 @@ let rec is_fo t = match t.term with
   | At (a, b) -> is_fo a && is_fo b
   | Node (_, l) -> List.for_all is_fo l
 
-let rec beta_reduce t =
-  match t.term with
-  | Var _ | BoundVar _ -> t
-  | Bind (s, t') -> mk_bind s (beta_reduce t')
+let beta_reduce ?(depth=0) t =
+  Util.enter_prof prof_beta_reduce;
+  (* recursive reduction in call by value. [env] contains the environment for
+  De Bruijn indexes. *)
+  let rec beta_reduce ~depth env t = match t.term with
+  | Var _ -> t
+  | BoundVar n when n < List.length env ->
+    (* look for the possible binding for [n] *)
+    begin match List.nth env n with
+    | None -> t
+    | Some t' when t == t' -> t
+    | Some t' -> db_lift ~depth depth t' (* need to lift free vars *)
+    end
+  | BoundVar _ -> t
+  | Bind (s, t') -> mk_bind s (beta_reduce ~depth:(depth+1) (None::env) t')
   | At ({term=Bind (s, t1)}, t2) when Symbol.eq s Symbol.lambda_symbol ->
-    (* a beta-redex! Fire!! *)
-    let t1' = db_replace t1 t2  in
-    let t1' = db_unlift t1' in
-    beta_reduce t1'
-  | At (t1, t2) -> mk_at (beta_reduce t1) (beta_reduce t2)
+    (* a beta-redex! Fire!! First evaluate t2, then
+       remplace db0 by [t2] in [t1] *)
+    let t2' = beta_reduce ~depth env t2 in
+    let env' = Some t2' :: env in
+    beta_reduce ~depth env' t1
+  | At (t1, t2) ->
+    let t1' = beta_reduce ~depth env t1 in
+    let t2' = beta_reduce ~depth env t2 in
+    if t1 == t1' && t2 == t2'
+      then t
+      else beta_reduce ~depth env (mk_at t1' t2')  (* new redex? *)
   | Node (f, l) ->
-    mk_node f (List.map beta_reduce l)
+    mk_node f (List.map (fun t -> beta_reduce ~depth env t) l)
+  in
+  let t' = beta_reduce ~depth [] t in
+  Util.exit_prof prof_beta_reduce;
+  t'
 
 let rec eta_reduce t =
   match t.term with
@@ -107,12 +131,15 @@ let rec eta_reduce t =
   | At (t1, t2) -> mk_at (eta_reduce t1) (eta_reduce t2)
 
 let lambda_abstract ~signature t sub_t =
+  Util.enter_prof prof_lambda_abstract;
   (* infer type of [sub_t] *)
   let ctx = TypeInference.Ctx.of_signature signature in
   let ty = TypeInference.infer ctx sub_t in
   (* abstract the term *)
   let t' = db_from_term ~ty t sub_t in
-  mk_lambda t'
+  let t' = mk_lambda t' in
+  Util.exit_prof prof_lambda_abstract;
+  t'
 
 let lambda_abstract_list ~signature t args =
   List.fold_left (lambda_abstract ~signature) t args

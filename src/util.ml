@@ -541,6 +541,10 @@ let pp_pair ?(sep=" ") px py buf (x,y) =
   Buffer.add_string buf sep;
   py buf y
 
+let pp_opt pp buf x = match x with
+  | None -> Buffer.add_string buf "None"
+  | Some x -> Printf.bprintf buf "Some %a" pp x
+
 (** print a list of items using the printing function *)
 let rec pp_list ?(sep=", ") pp_item buf = function
   | x::((y::xs) as l) ->

@@ -214,6 +214,8 @@ val on_buffer : (Buffer.t -> 'a -> unit) -> 'a -> string
 val pp_pair: ?sep:string -> (Buffer.t -> 'a -> unit) ->
               (Buffer.t -> 'b -> unit) -> Buffer.t -> ('a * 'b) -> unit
 
+val pp_opt : (Buffer.t -> 'a -> unit) -> Buffer.t -> 'a option -> unit
+
 (** print a list of items using the printing function *)
 val pp_list: ?sep:string -> (Buffer.t -> 'a -> unit)
           -> Buffer.t -> 'a list -> unit

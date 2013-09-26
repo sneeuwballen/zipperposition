@@ -542,41 +542,6 @@ let rec db_contains t n = match t.term with
   | Node (_, l) -> List.exists (fun t' -> db_contains t' n) l
   | At (t1, t2) -> db_contains t1 n || db_contains t2 n
 
-(** replace 0 by s in t *)
-let db_replace ?(depth=0) t s =
-  (* replace db by s in t *)
-  let rec replace depth s t = match t.term with
-  | BoundVar n -> if n = depth then s else t
-  | Var _ -> t
-  | Bind (symb, t') ->
-    (* lift the De Bruijn to replace *)
-    mk_bind symb (replace (depth+1) s t')
-  | Node (_, []) -> t
-  | Node (f, l) ->
-    mk_node f (List.map (replace depth s) l)
-  | At (t1, t2) -> mk_at (replace depth s t1) (replace depth s t2)
-  (* replace the 0 De Bruijn index by s in t *)
-  in
-  replace depth s t
-
-(** Type of the [n]-th De Bruijn index in [t] *)
-let rec db_type t n = match t.term with
-  | BoundVar i when i = n -> t.type_
-  | BoundVar _
-  | Var _ -> None
-  | At (t1, t2) ->
-    begin match db_type t1 n with
-    | Some ty -> Some ty
-    | None -> db_type t2 n
-    end
-  | Node (_, l) ->
-    List.fold_left
-      (fun acc t' -> match acc with
-        | Some _ -> acc
-        | None -> db_type t' n)
-      None l
-  | Bind (_, t') -> db_type t' (n+1)
-
 (** lift the non-captured De Bruijn indexes in the term by n *)
 let db_lift ?(depth=0) n t =
   (* traverse the term, looking for non-captured DB indexes.
@@ -599,12 +564,51 @@ let db_lift ?(depth=0) n t =
   assert (n >= 0);
   if depth=0 && n = 0 then t else recurse depth t
 
-(* unlift the term (decrement indices of all De Bruijn variables inside *)
+(** replace 0 by [by] into [into] *)
+let db_replace ?(depth=0) ~into ~by =
+  (* replace db by s in t *)
+  let rec replace depth s t = match t.term with
+  | BoundVar n ->
+    if n = depth
+      then db_lift depth s   (* free vars must be lifted *)
+      else t
+  | Var _ -> t
+  | Bind (symb, t') ->
+    (* lift the De Bruijn to replace *)
+    mk_bind symb (replace (depth+1) s t')
+  | Node (_, []) -> t
+  | Node (f, l) ->
+    mk_node f (List.map (replace depth s) l)
+  | At (t1, t2) -> mk_at (replace depth s t1) (replace depth s t2)
+  (* replace the 0 De Bruijn index by s in t *)
+  in
+  replace depth by into
+
+(** Type of the [n]-th De Bruijn index in [t] *)
+let rec db_type t n = match t.term with
+  | BoundVar i when i = n -> t.type_
+  | BoundVar _
+  | Var _ -> None
+  | At (t1, t2) ->
+    begin match db_type t1 n with
+    | Some ty -> Some ty
+    | None -> db_type t2 n
+    end
+  | Node (_, l) ->
+    List.fold_left
+      (fun acc t' -> match acc with
+        | Some _ -> acc
+        | None -> db_type t' n)
+      None l
+  | Bind (_, t') -> db_type t' (n+1)
+
+(* unlift the term (decrement indices of all free De Bruijn variables inside *)
 let db_unlift ?(depth=0) t =
   (* only unlift DB symbol that are free. [depth] is the number of binders
      on the path from the root term. *)
   let rec recurse depth t =
     match t.term with
+    | _ when db_closed t -> t
     | BoundVar i -> if i >= depth then mk_bound_var ?ty:t.type_ (i-1) else t
     | Node (_, []) | Var _ -> t
     | Bind (s, t') ->
