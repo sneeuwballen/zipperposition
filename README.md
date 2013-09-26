@@ -104,4 +104,12 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 ## TODO
 
 - substitution trees
+- general purpose discrimination trees (simple)
+- path indexing? (better for merges)
 - optimize meta-prover matching
+
+- tool to maintain/update a KB
+- conditional compilation for parsers on menhir
+- typing in meta-prover, with typing preconditions (for expressing sets with types)
+- think about extensibility of parser for meta-prover
+
