@@ -147,7 +147,7 @@ let rec _apply_rec ~recursive ~renaming ~depth subst t scope =
       (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
       let t' = T.db_lift ~depth depth t' in
       (* also apply [subst] to [t']? *)
-      if recursive && t' != t
+      if recursive && (t' != t || scope <> sc_t')
         then (* _apply_rec also in the image of t *)
           _apply_rec ~recursive ~renaming ~depth subst t' sc_t'
         else t'
@@ -158,9 +158,7 @@ let rec _apply_rec ~recursive ~renaming ~depth subst t scope =
   | T.At (t1, t2) ->
     let t1' = _apply_rec ~recursive ~renaming ~depth subst t1 scope in
     let t2' = _apply_rec ~recursive ~renaming ~depth subst t2 scope in
-    if t1 == t1' && t2 == t2'
-      then t else
-      T.mk_at t1' t2'
+    T.mk_at t1' t2'
 (* apply subst to the list, all elements of which have the given scope *)
 and _apply_rec_list ~recursive ~renaming ~depth subst scope l = match l with
   | [] -> []
