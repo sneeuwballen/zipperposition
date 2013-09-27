@@ -205,6 +205,19 @@ let is_nonstrict_ineq ~spec lit =
   with Not_found ->
     false
 
+let ineq_lit_of ~instance lit = match lit with
+  | Prop ({T.term=T.Node(s, [l;r])}, true) when Symbol.eq s instance.TO.less ->
+    TO.({ left=l; right=r; strict=true; instance; })
+  | Prop ({T.term=T.Node(s, [l;r])}, true) when Symbol.eq s instance.TO.lesseq ->
+    TO.({ left=l; right=r; strict=false; instance; })
+  | _ -> raise Not_found
+
+let is_ineq_of ~instance lit =
+  match lit with
+  | Prop ({T.term=T.Node(s, [l;r])}, true) ->
+    Symbol.eq s instance.TO.less || Symbol.eq s instance.TO.lesseq
+  | _ -> false
+
 (* TODO: remove, typechecking should do its work *)
 let check_type a b =
   let ok = not (T.has_type a) || not (T.has_type b) || T.compatible_type a b in
@@ -332,6 +345,34 @@ let is_ground lit = match lit with
   | Prop (p, _) -> T.is_ground p
   | True
   | False -> true
+
+let get_eqn lit ~side =
+  match lit with
+  | Equation (l,r,sign,_) when side = Position.left_pos -> (l, r, sign)
+  | Equation (l,r,sign,_) when side = Position.right_pos -> (r, l, sign)
+  | Prop (p, sign) when side = Position.left_pos -> (p, T.true_term, sign)
+  | True when side = Position.left_pos -> (T.true_term, T.true_term, true)
+  | False when side = Position.left_pos -> (T.true_term, T.true_term, false)
+  | _ -> invalid_arg "wrong side"
+
+let at_pos lit pos = match lit, pos with
+  | Equation (l, _, _, _), i::pos' when i = Position.left_pos -> T.at_pos l pos'
+  | Equation (_, r, _, _), i::pos' when i = Position.right_pos -> T.at_pos r pos'
+  | Prop (p, _), i::pos' when i = Position.left_pos -> T.at_pos p pos'
+  | True, [i] when i = Position.left_pos -> T.true_term
+  | False, [i] when i = Position.left_pos -> T.false_term
+  | _ -> raise Not_found
+
+let replace_pos ~ord lit ~at ~by = match lit, at with
+  | Equation (l, r, sign, _), i::pos' when i = Position.left_pos ->
+    mk_lit ~ord (T.replace_pos l pos' by) r sign
+  | Equation (l, r, sign, _), i::pos' when i = Position.right_pos ->
+    mk_lit ~ord l (T.replace_pos r pos' by) sign
+  | Prop (p, sign), i::pos' when i = Position.left_pos ->
+    mk_prop (T.replace_pos p pos' by) sign
+  | True, [i] when i = Position.left_pos -> lit
+  | False, [i] when i = Position.left_pos -> lit
+  | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
 
 let infer_type ctx lit =
   match lit with
@@ -517,17 +558,20 @@ module Arr = struct
 
   (** {3 High Order combinators} *)
 
+  let at_pos lits pos = match pos with
+    | idx::pos' when idx >= 0 && idx < Array.length lits ->
+      at_pos lits.(idx) pos'
+    | _ -> raise Not_found
+
+  let replace_pos ~ord lits ~at ~by = match at with
+    | idx::pos' when idx >= 0 && idx < Array.length lits ->
+      lits.(idx) <- replace_pos ~ord lits.(idx) ~at:pos' ~by
+    | _ -> invalid_arg (Util.sprintf "invalid position %a in lits" Position.pp at)
+
   (** decompose the literal at given position *)
   let get_eqn lits pos = match pos with
-    | idx::eq_side::_ ->
-      begin match lits.(idx) with
-      | Equation (l,r,sign,_) when eq_side = Position.left_pos -> (l, r, sign)
-      | Equation (l,r,sign,_) when eq_side = Position.right_pos -> (r, l, sign)
-      | Prop (p, sign) when eq_side = Position.left_pos -> (p, T.true_term, sign)
-      | True when eq_side = Position.left_pos -> (T.true_term, T.true_term, true)
-      | False when eq_side = Position.left_pos -> (T.true_term, T.true_term, false)
-      | _ -> invalid_arg "wrong side"
-      end
+    | idx::eq_side::_ when idx < Array.length lits ->
+      get_eqn lits.(idx) ~side:eq_side
     | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
 
   (* extract inequation from given position *)
@@ -540,6 +584,33 @@ module Arr = struct
         invalid_arg (Util.sprintf "lit %a not an inequation" pp lits.(idx))
       end
     | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
+
+  let terms_under_ineq ~instance lits =
+    Sequence.from_iter
+      (fun k ->
+        for i = 0 to Array.length lits - 1 do
+          match lits.(i) with
+          | Equation (l, r, _, _) -> k l; k r
+          | Prop (p, _) ->
+            begin try
+              let ord_lit = ineq_lit_of ~instance lits.(i) in
+              k ord_lit.TO.left; k ord_lit.TO.right
+            with Not_found ->
+              k p  (* regular predicate *)
+            end
+          | True
+          | False -> ()
+        done)
+
+  let fold_lits ~eligible lits acc f =
+    let rec fold acc i =
+      if i = Array.length lits then acc
+      else if not (eligible i lits.(i)) then fold acc (i+1)
+      else
+        let acc = f acc lits.(i) i in
+        fold acc (i+1)
+    in
+    fold acc 0
 
   let fold_eqn ?(both=true) ?sign ~eligible lits acc f =
     let sign_ok = match sign with

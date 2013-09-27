@@ -69,6 +69,13 @@ val is_ineq : spec:Theories.TotalOrder.t -> t -> bool
 val is_strict_ineq : spec:Theories.TotalOrder.t -> t -> bool
 val is_nonstrict_ineq : spec:Theories.TotalOrder.t -> t -> bool
 
+val ineq_lit_of : instance:Theories.TotalOrder.instance -> t -> Theories.TotalOrder.lit
+  (** Extract a total ordering literal from the literal, only for the
+      given ordering instance *)
+
+val is_ineq_of : instance:Theories.TotalOrder.instance -> t -> bool
+  (** [true] iff the literal is an inequation for the given total order *)
+
 val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
   (** Assuming the literal is an inequation, returns the corresponding
       total order literal.
@@ -101,6 +108,17 @@ val add_vars : Term.THashSet.t -> t -> unit  (** Add variables to the set *)
 val vars : t -> Term.varlist (** gather variables *)
 val var_occurs : Term.t -> t -> bool
 val is_ground : t -> bool
+
+val get_eqn : t -> side:int -> Term.t * Term.t * bool
+  (** Equational view of a literal *)
+
+val at_pos : t -> Position.t -> Term.t
+  (** Subterm at given position, or
+      @raise Not_found if the position is invalid *)
+
+val replace_pos : ord:Ordering.t -> t -> at:Position.t -> by:Term.t -> t
+  (** Replace subterm, or
+      @raise Invalid_argument if the position is invalid *)
 
 val infer_type : TypeInference.Ctx.t -> t -> unit
 val signature : ?signature:Signature.t -> t -> Signature.t
@@ -162,6 +180,15 @@ module Arr : sig
 
   (** {3 High order combinators} *)
 
+  val at_pos : t array -> Position.t -> Term.t
+    (** Return the subterm at the given position, or
+        @raise Not_found if no such position is valid *)
+
+  val replace_pos : ord:Ordering.t -> t array -> at:Position.t -> by:Term.t -> unit
+    (** In-place modification of the array, in which the subterm at given
+        position is replaced by the [by] term.
+        @raise Invalid_argument if the position is not valid *)
+
   val get_eqn : t array -> Position.t -> Term.t * Term.t * bool
     (** get the term l at given position in clause, and r such that l ?= r
         is the Literal.t at the given position.
@@ -175,6 +202,18 @@ module Arr : sig
         the corresponding ordering instance (pair of symbols)
         @raise Invalid_argument if the position is not valid in the array
           or if the literal is not an inequation. *)
+
+  val terms_under_ineq : instance:Theories.TotalOrder.instance ->
+                         t array -> Term.t Sequence.t
+    (** All terms that occur under an equation, a predicate,
+        or an inequation for the given total ordering. *)
+
+  val fold_lits : eligible:(int -> t -> bool) ->
+                  t array -> 'a ->
+                  ('a -> t -> int -> 'a) ->
+                  'a
+    (** Fold over literals who satisfy [eligible]. The folded function
+        is given the literal and its index. *)
 
   val fold_eqn : ?both:bool -> ?sign:bool ->
                   eligible:(int -> t -> bool) ->

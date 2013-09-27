@@ -378,6 +378,9 @@ module Eligible = struct
     let spec = Ctx.total_order c.hcctx in
     fun i lit -> Lit.is_ineq ~spec lit
 
+  let ineq_of clause instance =
+    fun i lit -> Lit.is_ineq_of ~instance lit
+
   let pos i lit = Lit.is_pos lit
 
   let neg i lit = Lit.is_neg lit
