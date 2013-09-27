@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: f3eebb1c7dc5b0f193326863872163d8)
+# DO NOT EDIT (digest: 91fa4814f5509bc492124c0eedeb957f)
 src/Symbol
 src/Hash
 src/Hashcons
@@ -31,6 +31,7 @@ src/Skolem
 src/HO
 src/Transform
 src/Multiset
+src/Trace_tstp
 src/lib/Sequence
 src/lib/Bij
 src/lib/BV

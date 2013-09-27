@@ -58,7 +58,6 @@ and general_data =
   | GString of string
   | GVar of string   (* variable *)
   | GInt of int
-  | GQuote of string
   | GColumn of general_data * general_data
   | GNode of string * general_data list
   | GList of general_data list
@@ -125,7 +124,6 @@ let fmt_name fmt n =
   Format.pp_print_string fmt (string_of_name n)
 
 let rec pp_general buf d = match d with
-  | GQuote s -> Printf.bprintf buf "'%s'" s
   | GString s -> Buffer.add_string buf s
   | GInt i -> Printf.bprintf buf "%d" i
   | GVar s -> Buffer.add_string buf s
@@ -134,6 +132,16 @@ let rec pp_general buf d = match d with
     Printf.bprintf buf "%s(%a)" f (Util.pp_list pp_general) l
   | GList l ->
     Printf.bprintf buf "[%a]" (Util.pp_list pp_general) l
+
+let rec pp_general_debug buf d = match d with
+  | GString s -> Printf.bprintf buf "GSstr %s" s
+  | GInt i -> Printf.bprintf buf "GInt %d" i
+  | GVar s -> Printf.bprintf buf "GVar %s" s
+  | GColumn (a, b) -> Printf.bprintf buf "%a: %a" pp_general_debug a pp_general_debug b
+  | GNode (f, l) ->
+    Printf.bprintf buf "GNode(%s[%a])" f (Util.pp_list pp_general_debug) l
+  | GList l ->
+    Printf.bprintf buf "[%a]" (Util.pp_list pp_general_debug) l
 
 let fmt_general fmt d =
   Format.pp_print_string fmt (Util.sprintf "%a" pp_general d)

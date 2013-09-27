@@ -359,7 +359,7 @@ general_data:
   | general_function { $1 }
   | INTEGER { Ast_tptp.GInt (int_of_string $1) }
   | v=UPPER_WORD { Ast_tptp.GVar v }
-  | w=DISTINCT_OBJECT { Ast_tptp.GQuote w }
+  | w=DISTINCT_OBJECT { Ast_tptp.GString w }
 
 general_function:
   | f=atomic_word LEFT_PAREN l=separated_nonempty_list(COMMA, general_term) RIGHT_PAREN

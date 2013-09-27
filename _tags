@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: f1e50c9d275962dedcf4b162508f007d)
+# DO NOT EDIT (digest: 8a10c0ae4151ffe7d9eb0fd86e075ca3)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -46,14 +46,17 @@
 "src/HO.cmx": for-pack(Logtk)
 "src/transform.cmx": for-pack(Logtk)
 "src/multiset.cmx": for-pack(Logtk)
+"src/trace_tstp.cmx": for-pack(Logtk)
 "src/lib/sequence.cmx": for-pack(Logtk)
 "src/lib/bij.cmx": for-pack(Logtk)
 "src/lib/BV.cmx": for-pack(Logtk)
 "src/lib/cache.cmx": for-pack(Logtk)
 <src/*.ml{,i}>: pkg_unix
 <src/*.ml{,i}>: pkg_num
+<src/*.ml{,i}>: pkg_str
 <src/lib/*.ml{,i}>: pkg_unix
 <src/lib/*.ml{,i}>: pkg_num
+<src/lib/*.ml{,i}>: pkg_str
 # Library logtk_meta
 "src/meta/logtk_meta.cmxs": use_logtk_meta
 "src/meta/metaPattern.cmx": for-pack(Logtk_meta)
@@ -69,34 +72,41 @@
 <src/meta/*.ml{,i}>: pkg_datalog
 <src/meta/*.ml{,i}>: pkg_unix
 <src/meta/*.ml{,i}>: pkg_num
+<src/meta/*.ml{,i}>: pkg_str
 # Executable run_tests
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": pkg_oUnit
 "tests/run_tests.native": pkg_unix
 "tests/run_tests.native": pkg_num
+"tests/run_tests.native": pkg_str
 <tests/*.ml{,i}>: use_logtk
 <tests/*.ml{,i}>: pkg_oUnit
 <tests/*.ml{,i}>: pkg_unix
 <tests/*.ml{,i}>: pkg_num
-# Executable check_tptp
-"tools/check_tptp.native": use_logtk
-"tools/check_tptp.native": pkg_unix
-"tools/check_tptp.native": pkg_num
+<tests/*.ml{,i}>: pkg_str
+# Executable type_check_tptp
+"tools/type_check_tptp.native": use_logtk
+"tools/type_check_tptp.native": pkg_unix
+"tools/type_check_tptp.native": pkg_num
+"tools/type_check_tptp.native": pkg_str
 # Executable cnf_of_tptp
 "tools/cnf_of_tptp.native": use_logtk
 "tools/cnf_of_tptp.native": pkg_unix
 "tools/cnf_of_tptp.native": pkg_num
+"tools/cnf_of_tptp.native": pkg_str
 # Executable detect_theories
 "tools/detect_theories.native": use_logtk_meta
 "tools/detect_theories.native": use_logtk
 "tools/detect_theories.native": pkg_datalog
 "tools/detect_theories.native": pkg_unix
 "tools/detect_theories.native": pkg_num
+"tools/detect_theories.native": pkg_str
 <tools/*.ml{,i}>: use_logtk_meta
 <tools/*.ml{,i}>: use_logtk
 <tools/*.ml{,i}>: pkg_datalog
 <tools/*.ml{,i}>: pkg_unix
 <tools/*.ml{,i}>: pkg_num
+<tools/*.ml{,i}>: pkg_str
 # OASIS_STOP
 true: use_menhir
 <**/*.cmx>: inline(10)

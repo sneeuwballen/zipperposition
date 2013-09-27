@@ -58,7 +58,6 @@ and general_data =
   | GString of string
   | GVar of string   (* variable *)
   | GInt of int
-  | GQuote of string
   | GColumn of general_data * general_data
   | GNode of string * general_data list
   | GList of general_data list
@@ -79,6 +78,7 @@ val pp_name : Buffer.t -> name -> unit
 val fmt_name : Format.formatter -> name -> unit
 
 val pp_general : Buffer.t -> general_data -> unit
+val pp_general_debug : Buffer.t -> general_data -> unit  (* ugly version *)
 val fmt_general : Format.formatter -> general_data -> unit
 val pp_generals : Buffer.t -> general_data list -> unit
 val fmt_generals : Format.formatter -> general_data list -> unit
