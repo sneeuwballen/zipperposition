@@ -65,11 +65,11 @@ Test all
   Run$: flag(tests)
 
 # TPTP syntax and type checking
-Executable check_tptp
+Executable type_check_tptp
   Path: tools/
   Install: true
   CompiledObject: native
-  MainIs: check_tptp.ml
+  MainIs: type_check_tptp.ml
   BuildDepends: logtk
 
 # Conversion to CNF
