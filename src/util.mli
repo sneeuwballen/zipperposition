@@ -202,16 +202,23 @@ val str_repeat : string -> int -> string
 
 (** {2 File utils} *)
 
-(** perform the action with a lock on the given file *)
 val with_lock_file : string -> (unit -> 'a) -> 'a
+  (** perform the action with a lock on the given file *)
 
-(** Open the given file for reading, and returns
-    the result of the action applied to the input channel *)
 val with_input : string -> (in_channel -> 'a) -> 'a option
+  (** Open the given file for reading, and returns
+      the result of the action applied to the input channel *)
 
-(** Open the given file for writing, and returns
-    the result of the action applied to the output channel *)
 val with_output : string -> (out_channel -> 'a) -> 'a option
+  (** Open the given file for writing, and returns
+      the result of the action applied to the output channel *)
+
+val slurp : in_channel -> string
+  (** Read the whole filedescriptor into a string *)
+
+val popen : cmd:string -> input:string -> string
+  (** Run the given command [cmd] with the given [input], wait for it
+      to terminate, and return its stdout. *)
 
 (** {2 Printing utils} *)
 

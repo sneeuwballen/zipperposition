@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8a10c0ae4151ffe7d9eb0fd86e075ca3)
+# DO NOT EDIT (digest: 858991ed5a1a7ab69d0851540f7e7b11)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -47,6 +47,7 @@
 "src/transform.cmx": for-pack(Logtk)
 "src/multiset.cmx": for-pack(Logtk)
 "src/trace_tstp.cmx": for-pack(Logtk)
+"src/callProver.cmx": for-pack(Logtk)
 "src/lib/sequence.cmx": for-pack(Logtk)
 "src/lib/bij.cmx": for-pack(Logtk)
 "src/lib/BV.cmx": for-pack(Logtk)
@@ -94,6 +95,11 @@
 "tools/cnf_of_tptp.native": pkg_unix
 "tools/cnf_of_tptp.native": pkg_num
 "tools/cnf_of_tptp.native": pkg_str
+# Executable proof_check_tstp
+"tools/proof_check_tstp.native": use_logtk
+"tools/proof_check_tstp.native": pkg_unix
+"tools/proof_check_tstp.native": pkg_num
+"tools/proof_check_tstp.native": pkg_str
 # Executable detect_theories
 "tools/detect_theories.native": use_logtk_meta
 "tools/detect_theories.native": use_logtk

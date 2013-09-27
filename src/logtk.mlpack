@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d3ba22970fe8ee371a7c3490b6419daf)
+# DO NOT EDIT (digest: 26465d2e9a00396ccef9cf5e885f310b)
 Symbol
 Hash
 Hashcons
@@ -32,6 +32,7 @@ HO
 Transform
 Multiset
 Trace_tstp
+CallProver
 lib/Sequence
 lib/Bij
 lib/BV

@@ -50,11 +50,11 @@ type proof = t
 let rec eq p1 p2 = match p1, p2 with
   | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
   | Theory s1, Theory s2 -> s1 = s2
-  | InferForm (f1, step1), InferForm(f2, step2) ->
-    F.eq f1 f2
-  | InferClause (c1, step1), InferClause(c2, step2) ->
+  | InferForm (f1, lazy step1), InferForm(f2, lazy step2) ->
+    F.eq f1 f2 && step1.id = step2.id
+  | InferClause (c1, lazy step1), InferClause(c2, lazy step2) ->
     begin try
-      List.for_all2 F.eq c1 c2
+      List.for_all2 F.eq c1 c2 && step1.id = step2.id
     with Invalid_argument _ -> false
     end
   | _ -> false
@@ -95,6 +95,12 @@ let is_theory = function
   | Theory _ -> true
   | _ -> false
 
+let is_step = function
+  | InferClause _
+  | InferForm _ -> true
+  | Axiom _
+  | Theory _ -> false
+
 let is_proof_of_false = function
   | InferForm ({F.form=F.False}, _) -> true
   | InferClause(l,_) -> List.for_all (F.eq F.mk_false) l
@@ -121,6 +127,37 @@ module StepTbl = Hashtbl.Make(struct
 end)
 
 type proof_set = unit StepTbl.t
+
+let is_dag proof =
+  (* steps currently being explored *)
+  let current = StepTbl.create 10 in
+  (* steps totally explored *)
+  let closed = StepTbl.create 10 in
+  (* recursive DFS traversal *)
+  let rec check_proof proof =
+    if StepTbl.mem closed proof
+      then ()  (* ok *)
+    else if StepTbl.mem current proof
+      then raise Exit  (* we followed a back link! *)
+    else begin
+      StepTbl.add current proof ();
+      begin match proof with
+      | InferClause (_, lazy step)
+      | InferForm (_, lazy step) ->
+        Array.iter check_proof step.parents
+      | Axiom _
+      | Theory _ -> ()
+      end;
+      (* proof is now totally explored *)
+      StepTbl.remove current proof;
+      StepTbl.add closed proof ();
+    end
+  in
+  try
+    check_proof proof;  (* check from root *)
+    true
+  with Exit ->
+    false  (* loop detected *)
 
 (** Traverse the proof. Each proof node is traversed only once. *)
 let traverse ?(traversed=StepTbl.create 11) proof k =
@@ -168,6 +205,8 @@ let depth proof =
     end
   done;
   !depth
+
+let size proof = Sequence.length (to_seq proof)
 
 (** {2 IO} *)
 
@@ -309,7 +348,7 @@ let pp_tstp buf proof =
           (Util.pp_array Buffer.add_string) ids
     )
 
-let pp buf proof = match proof with
+let pp0 buf proof = match proof with
   | Axiom (f,n) -> Printf.bprintf buf "axiom(%s, %s)" f n
   | Theory s -> Printf.bprintf buf "theory(%s)" s
   | InferClause (c, _) ->
@@ -317,4 +356,16 @@ let pp buf proof = match proof with
   | InferForm (f, _) ->
     Printf.bprintf buf "proof for %a (id %a)" F.pp f A.pp_name (get_id proof)
 
-let fmt fmt proof = Format.pp_print_string fmt (Util.on_buffer pp proof)
+let pp1 buf proof = match proof with
+  | Axiom (f,n) -> Printf.bprintf buf "axiom(%s, %s)" f n
+  | Theory s -> Printf.bprintf buf "theory(%s)" s
+  | InferClause (c, lazy step) ->
+    Printf.bprintf buf "proof for %a (id %a) from\n  %a"
+      _pp_clause c A.pp_name (get_id proof)
+      (Util.pp_array ~sep:"\n  " pp0) step.parents
+  | InferForm (f, lazy step) ->
+    Printf.bprintf buf "proof for %a (id %a) from\n %a"
+      F.pp f A.pp_name (get_id proof)
+      (Util.pp_array ~sep:"\n  " pp0) step.parents
+
+let fmt fmt proof = Format.pp_print_string fmt (Util.on_buffer pp0 proof)

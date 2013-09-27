@@ -71,6 +71,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `Transform`: computation of fixpoints over transformations of formulas
     - `Multiset`: low level multiset of elements, with multiset ordering
     - `Trace_tstp`: proof traces from TSTP provers
+    - `CallProver`: call a TSTP prover on a problem
 
 - Helpers:
     - `Hash`: utils for hashing values

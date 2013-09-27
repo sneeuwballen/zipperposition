@@ -51,6 +51,7 @@ val mk_c_step : ?esa:bool -> id:id -> Formula.t list -> rule:string -> t list ->
 
 val is_axiom : t -> bool
 val is_theory : t -> bool
+val is_step : t -> bool
 val is_proof_of_false : t -> bool
 
 val get_id : t -> id
@@ -66,6 +67,9 @@ module StepTbl : Hashtbl.S with type key = t
 
 type proof_set = unit StepTbl.t
 
+val is_dag : t -> bool
+  (** Is the proof a proper DAG? *)
+
 val traverse : ?traversed:proof_set -> t -> (t -> unit) -> unit
   (** Traverse the proof. Each proof node is traversed only once,
       using the set to recognize already traversed proofs. *)
@@ -75,6 +79,9 @@ val to_seq : t -> t Sequence.t
 
 val depth : t -> int
   (** Max depth of the proof *)
+
+val size : t -> int
+  (** Number of nodes in the proof *)
 
 (** {3 IO} *)
 
@@ -88,7 +95,10 @@ val parse : ?recursive:bool -> string -> t option
 val pp_tstp : Buffer.t -> t -> unit
   (** Print proof in TSTP format *)
 
-val pp : Buffer.t -> t -> unit
+val pp0 : Buffer.t -> t -> unit
   (** debug printing, non recursive *)
+
+val pp1 : Buffer.t -> t -> unit
+  (** Print proof step, and its parents *)
 
 val fmt : Format.formatter -> t -> unit

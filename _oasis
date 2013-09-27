@@ -27,7 +27,7 @@ Library "logtk"
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     FormulaShape, Util_tptp, Skolem, HO, Transform, Multiset,
-                    Trace_tstp,
+                    Trace_tstp, CallProver,
                     lib/Sequence, lib/Bij, lib/BV
   InternalModules:  lib/Cache
   BuildDepends:     unix,num,str
@@ -79,6 +79,14 @@ Executable cnf_of_tptp
   Install: true
   CompiledObject: native
   MainIs: cnf_of_tptp.ml
+  BuildDepends: logtk
+
+# proof checking
+Executable proof_check_tstp
+  Path: tools/
+  Install: true
+  CompiledObject: native
+  MainIs: proof_check_tstp.ml
   BuildDepends: logtk
 
 # detection of theories

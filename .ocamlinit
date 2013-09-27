@@ -2,6 +2,7 @@
 #require "num";;
 #require "unix";;
 #require "datalog";;
+#require "str";;
 #directory "_build/src/";;
 #directory "_build/src/meta/";;
 #directory "_build/tests/";;

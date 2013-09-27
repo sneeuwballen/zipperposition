@@ -526,6 +526,30 @@ let with_output filename action =
   with Sys_error s ->
     None
 
+(** slurp the entire content of the file_descr into a string *)
+let slurp i_chan =
+  let buf_size = 128 in
+  let content = Buffer.create 120
+  and buf = String.make 128 'a' in
+  let rec next () =
+    let num = input i_chan buf 0 buf_size in
+    if num = 0
+      then Buffer.contents content (* EOF *)
+      else (Buffer.add_substring content buf 0 num; next ())
+  in next ()
+
+(** Call given command with given output, and return its output as a string *)
+let popen ~cmd ~input =
+  let from, into = Unix.open_process cmd in
+  (* send input to the subprocess *)
+  output_string into input;
+  close_out into;
+  (* read ouput from the subprocess *)
+  let output = slurp from in
+  (* wait for subprocess to terminate *)
+  ignore (Unix.close_process (from, into));
+  output
+
 (** {2 Printing utils} *)
 
 let sprintf format =
