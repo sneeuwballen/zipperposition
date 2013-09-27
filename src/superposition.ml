@@ -79,8 +79,8 @@ let prof_split = Util.mk_profiler "infer_split"
 
 (* Helper that does one or zero superposition inference, with all
    the given parameters. Clauses have an scope. *)
-let do_superposition ~ctx (active_clause, sc_a) active_pos
-                          (passive_clause, sc_p) passive_pos subst acc =
+let do_superposition ~ctx active_clause sc_a active_pos
+                          passive_clause sc_p passive_pos subst acc =
   let ord = Ctx.ord ctx in
   assert (List.length active_pos = 2);
   Util.incr_stat stat_superposition_call;
@@ -120,12 +120,14 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
       else begin (* ordering constraints are ok *)
         let lits_a = Util.array_except_idx active_clause.C.hclits active_idx in
         let lits_p = Util.array_except_idx passive_clause.C.hclits passive_idx in
+        Substs.Renaming.clear renaming;
         (* replace s\sigma by t\sigma in u|_p\sigma *)
+        let t' = S.apply ~renaming subst t sc_a in
         let u' = S.apply ~renaming subst u sc_p in
         let new_u = T.replace_pos u' subterm_pos t' in
         (* apply substitution to other literals *)
         let new_lits =
-          Lit.mk_lit ~ord new_u v' sign_uv :: 
+          Lit.mk_lit ~ord new_u (S.apply ~renaming subst v sc_p) sign_uv :: 
           (Lit.apply_subst_list ~renaming ~ord subst lits_a sc_a) @
           (Lit.apply_subst_list ~renaming ~ord subst lits_p sc_p)
         in
@@ -142,7 +144,6 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
 let infer_active (actives : ProofState.ActiveSet.t) clause =
   Util.enter_prof prof_infer_active;
   let ctx = actives#ctx in
-  let scope = T.max_var clause.C.hcvars + 1 in
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
   let eligible =
@@ -155,11 +156,12 @@ let infer_active (actives : ProofState.ActiveSet.t) clause =
   let new_clauses = Lits.fold_eqn ~both:true ~eligible clause.C.hclits []
     (fun acc s t _ s_pos ->
       (* rewrite clauses using s *)
-      I.retrieve_unifiables (actives#idx_sup_into, scope) (s,0) acc
-        (fun acc u_p (hc, u_pos, u_p) subst ->
+      I.retrieve_unifiables actives#idx_sup_into 1 s 0 acc
+        (fun acc u_p with_pos subst ->
           (* rewrite u_p with s *)
-          let passive = hc in
-          do_superposition ~ctx (clause, 0) s_pos (passive, scope) u_pos subst acc))
+          let passive = with_pos.C.WithPos.clause in
+          let u_pos = with_pos.C.WithPos.pos in
+          do_superposition ~ctx clause 0 s_pos passive 1 u_pos subst acc))
   in
   Util.exit_prof prof_infer_active;
   new_clauses
@@ -167,7 +169,6 @@ let infer_active (actives : ProofState.ActiveSet.t) clause =
 let infer_passive (actives:ProofState.ActiveSet.t) clause =
   Util.enter_prof prof_infer_passive;
   let ctx = actives#ctx in
-  let scope = T.max_var clause.C.hcvars + 1 in
   (* perform inference on this lit? *)
   let eligible =
     let bv = C.eligible_res clause 0 S.empty in
@@ -182,10 +183,11 @@ let infer_passive (actives:ProofState.ActiveSet.t) clause =
         (fun acc u_p p ->
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
-          I.retrieve_unifiables (actives#idx_sup_from,scope) (u_p,0) acc
-            (fun acc s (hc, s_pos, s) subst ->
-              let active = hc in
-              do_superposition ~ctx (active, scope) s_pos (clause, 0) p subst acc)))
+          I.retrieve_unifiables actives#idx_sup_from 1 u_p 0 acc
+            (fun acc s with_pos subst ->
+              let active = with_pos.C.WithPos.clause in
+              let s_pos = with_pos.C.WithPos.pos in
+              do_superposition ~ctx active 1 s_pos clause 0 p subst acc)))
   in
   Util.exit_prof prof_infer_passive;
   new_clauses
@@ -865,17 +867,18 @@ let subsumes_with (a,sc_a) (b,sc_b) =
   and find_matched lita i subst bv j =
     if j = Array.length b then ()
     (* if litb is already matched, continue *)
-    else if BV.get bv j then find_matched lita i subst bv (j+1) else begin
-    let litb = b.(j) in
-    (* match lita and litb, then flag litb as used, and try with next literal of a *)
-    let substs = match_lits subst lita sc_a litb sc_b in
-    BV.set bv j;
-    List.iter (fun subst' -> try_permutations (i+1) subst' bv) substs;
-    BV.reset bv j;
-    (* some variable of lita occur in a[j+1...], try another literal of b *)
-    if substs <> [] && not (check_vars lita (i+1))
-      then () (* no backtracking for litb *)
-      else find_matched lita i subst bv (j+1)
+    else if BV.get bv j then find_matched lita i subst bv (j+1)
+    else begin
+      let litb = b.(j) in
+      (* match lita and litb, then flag litb as used, and try with next literal of a *)
+      let substs = match_lits subst lita sc_a litb sc_b in
+      BV.set bv j;
+      List.iter (fun subst' -> try_permutations (i+1) subst' bv) substs;
+      BV.reset bv j;
+      (* some variable of lita occur in a[j+1...], try another literal of b *)
+      if substs <> [] && not (check_vars lita (i+1))
+        then () (* no backtracking for litb *)
+        else find_matched lita i subst bv (j+1)
     end
   (* does some literal in a[j...] contain a variable in l or r? *)
   and check_vars lit j =
@@ -907,7 +910,6 @@ let subsumes a b =
     Util.debug 2 "%a subsumes %a" Lits.pp a Lits.pp b;
     true
   in
-  Util.debug 2 "%a subsumes %a" Lits.pp a Lits.pp b;
   Util.exit_prof prof_subsumption;
   res
 
