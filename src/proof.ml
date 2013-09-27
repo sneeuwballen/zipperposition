@@ -262,13 +262,13 @@ let pp_tstp buf proof =
         let names = Array.map (get_name ~namespace) step.parents in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
-          "tff(%d, plain, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
+          "tff(%d, plain, %a, inference('%s', [status(%s)], [%a,theory(equality)])).\n"
           name F.pp_tstp (F.close_forall f) step.rule status _pp_parent_names names
       | InferClause(c, step) ->
         let names = Array.map (get_name ~namespace) step.parents in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
-          "cnf(%d, plain, %a, inference('%s', [status(%s),theory(equality)], [%a])).\n"
+          "cnf(%d, plain, %a, inference('%s', [status(%s)], [%a,theory(equality)])).\n"
           name CC.pp_tstp c step.rule status _pp_parent_names names
     )
 
