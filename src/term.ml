@@ -188,11 +188,14 @@ end)
 
 (** {2 Boolean flags} *)
 
-let flag_db_closed = 1 lsl 0
-and flag_simplified = 1 lsl 1
-and flag_normal_form = 1 lsl 2
-and flag_ground = 1 lsl 3
-and flag_db_closed_computed = 1 lsl 4
+let __gen = Util.Flag.create ()
+let new_flag () = Util.Flag.get_new __gen
+
+let flag_db_closed = new_flag ()
+and flag_simplified = new_flag ()
+and flag_normal_form = new_flag ()
+and flag_ground = new_flag ()
+and flag_db_closed_computed = new_flag ()
 
 let set_flag flag t truth =
   if truth

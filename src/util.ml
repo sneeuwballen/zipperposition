@@ -161,6 +161,20 @@ let mk_stat, print_global_stats =
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
 let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
 
+(** {Flags as integers} *)
+
+module Flag = struct
+  type gen = int ref
+
+  let create () = ref 1
+
+  let get_new gen =
+    let n = !gen in
+    if n < 0 then failwith "Util.Flag.get_new: too many flags allocated";
+    gen := 2*n;
+    n
+end
+
 (** {2 Ordering utils} *)
 
 let rec lexicograph f l1 l2 =

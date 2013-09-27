@@ -100,6 +100,9 @@ val set_flag : int -> t -> bool -> unit
 val get_flag : int -> t -> bool
   (** read the flag *)
 
+val new_flag : unit -> int
+  (** New flag, different from all other flags *)
+
 (** {2 Smart constructors} *)
 
 val mk_var : ?ty:Type.t -> int -> t        (** Create a variable. The index must be >= 0 *)

@@ -74,6 +74,19 @@ val print_global_stats : unit -> unit
 val incr_stat : stat -> unit
 val add_stat : stat -> int -> unit
 
+(** {2 Flags as integers} *)
+
+module Flag : sig
+  type gen = int ref
+    (** Generator of flags *)
+
+  val create : unit -> gen
+    (** New generator *)
+
+  val get_new : gen -> int
+    (** New flag from the generator (2*previous flag) *)
+end
+
 (** {2 Ordering utils} *)
 
 (** lexicographic order on lists l1,l2 which elements are ordered by f *)

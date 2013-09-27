@@ -104,8 +104,11 @@ let rec hash_novar f = match f.form with
 
 (** {2 Flags} *)
 
-let flag_simplified = 0x1
-let flag_ground = 0x2
+let __gen = Util.Flag.create ()
+let new_flag () = Util.Flag.get_new __gen
+
+let flag_simplified = new_flag ()
+let flag_ground = new_flag ()
 
 let set_flag f flag = f.flags <- f.flags lor flag
 let has_flag f flag = (f.flags land flag) != 0

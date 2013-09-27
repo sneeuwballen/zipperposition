@@ -80,6 +80,7 @@ val flag_ground : int
 
 val set_flag : t -> int -> unit
 val has_flag : t -> int -> bool
+val new_flag : unit -> int
 
 (** {2 Combinators} *)
 
