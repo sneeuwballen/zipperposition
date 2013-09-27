@@ -155,7 +155,7 @@ let suite =
     ; "test-peano-bis2" >:: test_peano_bis 2
     ; "test-peano-bis4" >:: test_peano_bis 4
     ; "test-peano-bis50" >:: test_peano_bis 50
-    ; "test-peano-bis500" >:: test_peano_bis 500
+    ; "test-peano-bis100" >:: test_peano_bis 100
     ; "bench-peano2" >:: benchmark_peano 2
     ; "bench-peano4" >:: benchmark_peano 4
     ; "bench-peano100" >:: benchmark_peano 100
@@ -163,6 +163,6 @@ let suite =
     ; "bench-peano-bis2" >:: benchmark_peano_bis 2
     ; "bench-peano-bis4" >:: benchmark_peano_bis 4
     ; "bench-peano-bis50" >:: benchmark_peano_bis 50
-    ; "bench-peano-bis500" >:: benchmark_peano_bis 500
+    ; "bench-peano-bis100" >:: benchmark_peano_bis 100
     ]
 

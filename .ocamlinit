@@ -21,15 +21,17 @@
 #install_printer Logtk.Ast_tptp.fmt_declaration;;
 #install_printer Logtk.Formula.FSet.fmt;;
 #install_printer Logtk.Transform.fmt;;
-#install_printer Logtk_meta.MetaPattern.fmt;;
-#install_printer Logtk_meta.MetaPattern.Set.fmt;;
-#install_printer Logtk_meta.MetaKB.fmt;;
+#install_printer Logtk.Trace_tstp.fmt;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type.Infix;;
 module T = Logtk.Term;;
 module F = Logtk.Formula;;
 let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
 let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
+(* optional part *)
+#install_printer Logtk_meta.MetaPattern.fmt;;
+#install_printer Logtk_meta.MetaPattern.Set.fmt;;
+#install_printer Logtk_meta.MetaKB.fmt;;
 open Logtk;;
 (* vim:syntax=ocaml
 *)

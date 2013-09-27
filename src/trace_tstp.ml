@@ -206,12 +206,11 @@ let of_decls decls =
       `NoIdea
   in
   (* what to do if a step is read *)
-  let add_step step = match step with
+  let add_step id step = match step with
   | InferForm _
   | InferClause _ ->
     if is_proof_of_false step && !root = None
       then root := Some step;
-    let id = get_id step in
     Util.debug 3 "add step %a (root? %B)" A.pp_name id (is_proof_of_false step);
     Hashtbl.replace steps id step;
   | Axiom _
@@ -228,7 +227,7 @@ let of_decls decls =
       | `Parents (rule, esa, parents) ->
         let step = lazy {id=name; esa; rule; parents=Lazy.force parents} in
         let p = InferClause (c, step) in
-        add_step p
+        add_step name p
       end
     | A.FOF(name, role, f, info :: _)
     | A.TFF (name, role, f, info :: _) ->
@@ -239,7 +238,7 @@ let of_decls decls =
       | `Parents (rule, esa, parents) ->
         let step = lazy{id=name; esa; rule; parents=Lazy.force parents} in
         let p = InferForm (f, step) in
-        add_step p
+        add_step name p
       end
     | A.FOF _
     | A.CNF _
@@ -266,12 +265,15 @@ let _extract_axiom proof = match proof with
   | Axiom (f,n) -> f,n
   | _ -> assert false
 
-let _pp_parent_ids buf ids =
-  Util.pp_array ~sep:"," A.pp_name buf ids
-
 let _pp_clause buf c = match c with
   | [] -> Buffer.add_string buf "$false"
   | _ -> Util.pp_list ~sep:" | "  F.pp_tstp buf c
+
+let _print_parent p = match p with
+  | InferForm _
+  | InferClause _ -> Util.on_buffer A.pp_name (get_id  p)
+  | Theory s -> Util.sprintf "theory(%s)" s
+  | Axiom (f,n) -> Util.sprintf "file('%s', %s)" f n
 
 let pp_tstp buf proof =
   traverse proof
@@ -291,16 +293,28 @@ let pp_tstp buf proof =
           A.pp_name id F.pp_tstp f file n
       | InferForm(f, lazy step) ->
         let id = get_id p in
-        let ids = Array.map get_id step.parents in
+        let ids = Array.map _print_parent step.parents in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
           "tff(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
-          A.pp_name id F.pp_tstp (F.close_forall f) step.rule status _pp_parent_ids ids
+          A.pp_name id F.pp_tstp (F.close_forall f) step.rule status
+          (Util.pp_array Buffer.add_string) ids
       | InferClause(c, lazy step) ->
         let id = get_id p in
-        let ids = Array.map get_id step.parents in
+        let ids = Array.map _print_parent step.parents in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
           "cnf(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
-          A.pp_name id _pp_clause c step.rule status _pp_parent_ids ids
+          A.pp_name id _pp_clause c step.rule status
+          (Util.pp_array Buffer.add_string) ids
     )
+
+let pp buf proof = match proof with
+  | Axiom (f,n) -> Printf.bprintf buf "axiom(%s, %s)" f n
+  | Theory s -> Printf.bprintf buf "theory(%s)" s
+  | InferClause (c, _) ->
+    Printf.bprintf buf "proof for %a (id %a)" _pp_clause c A.pp_name (get_id proof)
+  | InferForm (f, _) ->
+    Printf.bprintf buf "proof for %a (id %a)" F.pp f A.pp_name (get_id proof)
+
+let fmt fmt proof = Format.pp_print_string fmt (Util.on_buffer pp proof)

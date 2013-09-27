@@ -87,3 +87,8 @@ val parse : ?recursive:bool -> string -> t option
 
 val pp_tstp : Buffer.t -> t -> unit
   (** Print proof in TSTP format *)
+
+val pp : Buffer.t -> t -> unit
+  (** debug printing, non recursive *)
+
+val fmt : Format.formatter -> t -> unit
