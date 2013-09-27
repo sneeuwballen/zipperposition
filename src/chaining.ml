@@ -191,3 +191,51 @@ let eq_chaining_active active_set c =
   new_clauses
 
 let eq_chaining_passive active_set c =
+  Util.enter_prof prof_eq_chaining_passive;
+  let ctx = active_set#ctx in
+  let passive = c in
+  let scope = 1 in
+  let spec = Ctx.total_order ~ctx in
+  let eligible = C.Eligible.chaining c in
+  (* fold on ineq lits *)
+  let new_clauses = Lits.fold_ineq ~spec ~eligible c.C.hclits []
+    (fun acc ord_lit lit_pos ->
+      (* factorize code for left and right terms *)
+      let explore acc t pos =
+        T.all_positions ~pos t acc
+        (fun acc t_p passive_pos ->
+          (* at this point, [t_p] is a subterm of a side of the inequation *)
+          I.retrieve_unifiables active_set#idx_sup_from scope t_p 0 acc
+            (fun acc s with_pos subst ->
+              (* [s] is the lhs of an equation in some clause, that can
+                  potentially rewrite [t_p] into some smaller term *)
+              let active = with_pos.C.WithPos.clause in
+              let active_pos = with_pos.C.WithPos.pos in
+              do_eq_chaining ~ctx active scope active_pos passive 0 passive_pos subst acc))
+      in
+      let l = ord_lit.TO.left in
+      let r = ord_lit.TO.right in
+      let acc = explore acc l (lit_pos @ [Position.left_pos]) in
+      let acc = explore acc r (lit_pos @ [Position.right_pos]) in
+      acc)
+  in
+  Util.exit_prof prof_eq_chaining_passive;
+  new_clauses
+
+let ineq_chaining_active active_set c =
+  assert false (* TODO *)
+
+let ineq_chaining_passive active_set c =
+  assert false (* TODO *)
+
+let reflexivity_res c =
+  assert false (* TODO *)
+
+let is_tautology c =
+  false (* TODO *)
+
+let simplify c =
+  assert false (* TODO *)
+
+let setup_env ~env =
+  assert false (* TODO *)
