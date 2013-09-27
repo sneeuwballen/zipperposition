@@ -145,11 +145,7 @@ let check_step ~timeout ~prover step =
 
 (* print progress in proof checking *)
 let pp_progress num total =
-  if Util.get_debug () >= 1
-    then begin
-      Printf.printf "\r%% checking step %-5d on %5d" num total;
-      flush stdout;
-    end
+  Util.debug 1 "checking step %-5d on %-5d" num total
 
 (* check every step of [trace] using [provers], and put the result
     in [checked] *)
