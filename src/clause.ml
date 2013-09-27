@@ -143,10 +143,8 @@ let __no_select = BV.empty ()
 let create_a ?parents ?selected ~ctx lits proof =
   Util.incr_stat stat_mk_hclause;
   Util.enter_prof prof_mk_hclause;
-  (* Set of variables. *)
-  let all_vars = Lits.vars lits in
   (* Rename variables *)
-  let renaming = S.Renaming.create (List.length all_vars) in
+  let renaming = Ctx.renaming_clear ~ctx in
   let lits = Lits.apply_subst ~recursive:false ~renaming ~ord:ctx.Ctx.ord
     S.empty lits 0 in
   let all_vars = Lits.vars lits in
@@ -232,11 +230,11 @@ let check_ord ~ord c =
 
 (** Apply substitution to the clause. Note that using the same renaming for all
     literals is important. *)
-let rec apply_subst ?recursive ?renaming subst c scope =
+let rec apply_subst ?recursive ~renaming subst c scope =
   let ctx = c.hcctx in
   let ord = Ctx.ord ~ctx in
   let lits = Array.map
-    (fun lit -> Lit.apply_subst ?recursive ?renaming ~ord subst lit scope)
+    (fun lit -> Lit.apply_subst ?recursive ~renaming ~ord subst lit scope)
     c.hclits in
   let descendants = c.hcdescendants in
   let proof = Proof.adapt_c c.hcproof in
@@ -248,8 +246,9 @@ let rec apply_subst ?recursive ?renaming subst c scope =
     are maximal under [ord] *)
 let maxlits c scope subst =
   let ord = Ctx.ord c.hcctx in
+  let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
   let lits =
-    Lits.apply_subst ~recursive:true ~ord subst c.hclits scope
+    Lits.apply_subst ~recursive:true ~ord ~renaming subst c.hclits scope
   in
   Lits.maxlits ~ord lits
 
@@ -262,8 +261,9 @@ let is_maxlit c scope subst i =
     are eligible for resolution. *)
 let eligible_res c scope subst =
   let ord = Ctx.ord c.hcctx in
+  let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
   (* instantiate lits *)
-  let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
+  let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
   let selected = c.hcselected in
   let n = Array.length lits in
   (* Literals that may be eligible: all of them if none is selected,
@@ -301,7 +301,8 @@ let eligible_param c scope subst =
   let ord = Ctx.ord c.hcctx in
   if BV.is_empty c.hcselected then begin
     (* instantiate lits *)
-    let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
+    let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
+    let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
     (* maximal ones *)
     let bv = Lits.maxlits ~ord lits in
     (* only keep literals that are positive *)
@@ -313,7 +314,8 @@ let eligible_chaining c scope subst =
   let ord = Ctx.ord c.hcctx in
   let spec = Ctx.total_order c.hcctx in
   if BV.is_empty c.hcselected then begin
-    let lits = Lits.apply_subst ~recursive:true ~ord subst c.hclits scope in
+    let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
+    let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
     let bv = Lits.maxlits ~ord lits in
     (* only keep literals that are positive *)
     BV.filter bv (fun i -> Lit.is_pos lits.(i));

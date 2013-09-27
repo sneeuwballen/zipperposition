@@ -132,7 +132,7 @@ val update_ctx : ctx:Ctx.t -> t -> t
 val check_ord : ord:Ordering.t -> t -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
+val apply_subst : ?recursive:bool -> renaming:Substs.Renaming.t ->
                   Substs.t -> t -> Substs.scope -> t
   (** apply the substitution to the clause *)
 
