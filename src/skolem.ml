@@ -63,13 +63,12 @@ exception FoundVariant of Term.t * Term.t * Substs.t
 
 let skolem_term ~ctx t =
   let vars = T.vars_prefix_order t in
-  let scope = T.max_var vars + 1 in
   (* find the skolemized normalized term *)
   try
     List.iter
       (fun (t', new_t') ->
         try
-          let subst = Unif.variant t' scope t 0  in
+          let subst = Unif.variant t' 1 t 0  in
           raise (FoundVariant (t', new_t', subst))
         with Unif.Fail ->
           ())
@@ -83,14 +82,14 @@ let skolem_term ~ctx t =
     ctx.sc_cache <- (t, new_t) :: ctx.sc_cache;
     new_t
   with FoundVariant (t',new_t',subst) ->
-    let new_t = Substs.apply subst new_t' scope in
+    let renaming = Substs.Renaming.create 5 in
+    let new_t = Substs.apply ~renaming subst new_t' 1 in
     new_t
 
 exception FoundFormVariant of Formula.t * Formula.t * Substs.t
 
 let skolem_form ~ctx f =
   let vars = F.free_variables f in
-  let scope = T.max_var vars + 1 in
   (* find a variant of [f] *)
   try
     List.iter
@@ -98,7 +97,7 @@ let skolem_form ~ctx f =
         Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
         Sequence.iter
           (fun subst -> raise (FoundFormVariant (f', new_f', subst)))
-          (Unif.form_variant f' scope f 0))
+          (Unif.form_variant f' 1 f 0))
       ctx.sc_fcache;
     (* fresh symbol *)
     let symb = fresh_sym ~ctx in
@@ -109,6 +108,7 @@ let skolem_form ~ctx f =
     new_f
   with FoundFormVariant(f',new_f',subst) ->
     Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f Substs.pp subst;
-    let new_f = Substs.apply_f subst new_f' scope in
+    let renaming = Substs.Renaming.create 5 in
+    let new_f = Substs.apply_f ~renaming subst new_f' 1 in
     new_f
 

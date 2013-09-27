@@ -173,11 +173,11 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
           (fun () _ _ rule subst ->
             (* right-hand part *)
             let r = rule.rule_right in
-            let r' = S.apply subst r 1 in
+            let r' = S.apply_no_renaming subst r 1 in
             if rule.rule_oriented
               then raise (RewrittenInto r')  (* we know that t > r' *)
               else (
-                assert (t == S.apply subst rule.rule_left 1);
+                assert (t == S.apply_no_renaming subst rule.rule_left 1);
                 if Ordering.compare trs.ord t r' = Comparison.Gt
                   then raise (RewrittenInto r')
                   else ()));
@@ -267,7 +267,10 @@ module TRS = struct
         let t' = T.mk_node hd l' in
         (* rewrite at root *)
         reduce_at_root ~depth t'
-      | T.Var _ -> S.apply ~depth subst t offset  (* normal form in subst *)
+      | T.Var _ ->
+        (* normal form in subst. No renaming is needed, because all vars in
+          lhs are bound to vars in offset 0 *)
+        S.apply_no_renaming ~depth subst t offset
       | T.BoundVar _ -> t
       | T.At (t1, t2) ->
         let t1' = compute_nf ~depth subst t1 offset in
@@ -357,10 +360,12 @@ module FormRW = struct
         (fun depth leaf -> match leaf.F.form with
           | F.Atom p ->
             (* rewrite atoms *)
-            let p' = S.apply ~depth subst p scope in
+            let p' = S.apply_no_renaming ~depth subst p scope in
             reduce_at_root ~depth p'
           | F.Equal (l,r) ->
-            F.mk_eq (S.apply ~depth subst l scope) (S.apply ~depth subst r scope)
+            F.mk_eq
+              (S.apply_no_renaming ~depth subst l scope)
+              (S.apply_no_renaming ~depth subst r scope)
           | _ -> leaf)
         f
     (* try to rewrite this term at root *)

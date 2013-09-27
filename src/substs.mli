@@ -70,6 +70,10 @@ module Renaming : sig
     (** Create a new general-purpose renaming, which manages to rename
         variables of any number of contexts without ambiguities *)
 
+  val dummy : t
+    (** Renaming that does not rename (yes...). It maps all variables to
+        themselves, regardless of the scope they occur in. Use with caution! *)
+
   val clear : t -> unit
     (** Clear the content of the renaming *)
 
@@ -77,18 +81,23 @@ module Renaming : sig
     (** Rename the given variable, scoped by the given context *)
 end
 
-val apply : ?recursive:bool -> ?renaming:Renaming.t -> ?depth:int ->
+val apply : ?recursive:bool -> ?depth:int -> renaming:Renaming.t -> 
             t -> Term.t -> scope -> Term.t
   (** Apply substitution to term, replacing variables by the terms they are bound to.
-      The [renaming] is used to rename free variables (not bound
-      by [subst]) while avoiding collisions. Otherwise variables are shifted
-      by [offset].
+
+      [renaming] is used to rename free variables (not bound by [subst])
+      while avoiding collisions.    
       [recursive] decides whether, when [v] is replaced by [t], [subst] is
       applied to [t] recursively or not (default true). *)
 
-val apply_f : ?recursive:bool -> ?renaming:Renaming.t -> ?depth:int ->
+val apply_f : ?recursive:bool -> ?depth:int -> renaming:Renaming.t -> 
               t -> Formula.t -> scope -> Formula.t
   (** Apply the substitution to the formula *)
+
+val apply_no_renaming : ?recursive:bool -> ?depth:int ->
+                        t -> Term.t -> scope -> Term.t
+  (** Apply the substitution, and does not rename variables. {b Caution}, this
+      can entail collisions between scopes! *)
 
 module VarSet : Set.S with type elt = Term.t * scope
   (** Set of bound terms *)

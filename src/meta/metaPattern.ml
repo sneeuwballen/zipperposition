@@ -230,7 +230,7 @@ let matching pat right =
     let substs = matching_terms left 1 right 0 in
     let substs = Sequence.map
       (fun subst ->
-        let args = List.map (fun v -> Substs.apply subst v 1) vars in
+        let args = List.map (fun v -> Substs.apply_no_renaming subst v 1) vars in
         pat, args)
       substs
     in

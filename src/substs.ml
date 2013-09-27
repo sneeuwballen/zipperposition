@@ -110,10 +110,13 @@ module Renaming = struct
 
   let create size = H.create size
 
+  let dummy = create 3
+
   let clear ren = H.clear ren
 
   let rename ren t scope =
-    match t.T.term with
+    if ren == dummy then t  (* special case: no renaming *)
+    else match t.T.term with
     | T.Var _ ->
       begin try
         H.find ren (t, scope)
@@ -127,66 +130,61 @@ module Renaming = struct
     | _ -> assert false
 end
 
+let rec _apply_rec ~recursive ~renaming ~depth subst t scope =
+  if T.is_ground t then t (* subst(t) = t, if t ground *)
+  else match t.T.term with
+  | T.BoundVar _ -> t
+  | T.Bind (s, t') ->
+    let t'' = _apply_rec ~recursive ~renaming ~depth:(depth+1) subst t' scope in
+    T.mk_bind s t''
+  | T.Node (s, l) ->
+    let l' = _apply_rec_list ~recursive ~renaming ~depth subst scope l in
+    T.mk_node s l'
+  | T.Var i ->
+    (* two cases, depending on whether [t] is bound by [subst] or not *)
+    begin try
+      let t', sc_t' = lookup subst t scope in
+      (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
+      let t' = T.db_lift ~depth depth t' in
+      (* also apply [subst] to [t']? *)
+      if recursive && t' != t
+        then (* _apply_rec also in the image of t *)
+          _apply_rec ~recursive ~renaming ~depth subst t' sc_t'
+        else t'
+    with Not_found ->
+      (* variable not bound by [subst], rename it *)
+      Renaming.rename renaming t scope
+    end
+  | T.At (t1, t2) ->
+    let t1' = _apply_rec ~recursive ~renaming ~depth subst t1 scope in
+    let t2' = _apply_rec ~recursive ~renaming ~depth subst t2 scope in
+    if t1 == t1' && t2 == t2'
+      then t else
+      T.mk_at t1' t2'
+(* apply subst to the list, all elements of which have the given scope *)
+and _apply_rec_list ~recursive ~renaming ~depth subst scope l = match l with
+  | [] -> []
+  | t::l' ->
+    let new_t = _apply_rec ~recursive ~renaming ~depth subst t scope in
+    new_t :: _apply_rec_list ~recursive ~renaming ~depth subst scope l'
+
 (** Apply substitution to term, replacing variables by the terms they are bound to.
-    The [renaming] is used to rename free variables (not bound
+    [renaming] is used to rename free variables (not bound
     by [subst]) while avoiding collisions.
     [recursive] decides whether, when [v] is replaced by [t], [subst] is
     applied to [t] recursively or not (default true). *)
-let apply ?(recursive=true) ?renaming ?(depth=0) subst t scope =
+let apply ?(recursive=true) ?(depth=0) ~renaming subst t scope =
   (* apply subst to bound term. We need to keep track of
      how many binders are on the path to the variable, because of non-DB-closed
      terms that may occur in the codomain of [subst] *)
-  let rec replace binder_depth subst t scope =
-    if T.is_ground t
-    || (renaming == None && is_empty subst && scope = 0)
-    then t (* subst(t) = t, if t ground *)
-    else match t.T.term with
-    | T.BoundVar _ -> t
-    | T.Bind (s, t') ->
-      let t'' = replace (binder_depth + 1) subst t' scope in
-      if t' == t''
-        then t
-        else T.mk_bind s t''
-    | T.Node (s, l) ->
-      let l' = replace_list binder_depth subst scope l in
-      if List.for_all2 (==) l l'
-        then t
-        else T.mk_node s l'
-    | T.Var i ->
-      (* two cases, depending on whether [t] is bound by [subst] or not *)
-      begin try
-        let (t', sc_t') = lookup subst t scope in
-          (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
-          let t' = if T.db_closed t'
-            then t' else T.db_lift binder_depth t' in
-          (* also apply [subst] to [t']? *)
-          if recursive && (t' != t || sc_t' <> scope)
-            then (* replace also in the image of t *)
-              replace binder_depth subst t' sc_t'
-            else (* return image, in which variables are shifted *)
-              replace binder_depth empty t' sc_t' 
-      with Not_found -> (* variable not bound by [subst], rename it *)
-        match renaming with
-        | None when scope = 0 -> t
-        | None -> T.mk_var (i+scope)             (* shift *)
-        | Some r -> Renaming.rename r t scope    (* rename *)
-      end
-    | T.At (t1, t2) ->
-      let t1' = replace binder_depth subst t1 scope in
-      let t2' = replace binder_depth subst t2 scope in
-      if t1 == t1' && t2 == t2' then t else T.mk_at t1' t2'
-  (* apply subst to the list, all elements of which have the given scope *)
-  and replace_list binder_depth subst scope l = match l with
-  | [] -> []
-  | t::l' ->
-    let new_t = replace binder_depth subst t scope in
-    new_t :: replace_list binder_depth subst scope l'
-  in
-  replace depth subst t scope
+  _apply_rec ~recursive ~renaming ~depth subst t scope
 
-let apply_f ?recursive ?renaming ?(depth=0) subst f scope =
+let apply_no_renaming ?(recursive=true) ?(depth=0) subst t scope =
+  _apply_rec ~recursive ~renaming:Renaming.dummy ~depth subst t scope
+
+let apply_f ?recursive ?(depth=0) ~renaming subst f scope =
   F.map_depth ~depth
-    (fun depth' t -> apply ?renaming ?recursive ~depth subst t scope)
+    (fun depth' t -> apply ?recursive ~depth ~renaming subst t scope)
     f
 
 (** Set of bound terms *)
