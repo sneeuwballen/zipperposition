@@ -90,9 +90,9 @@ let do_superposition ~ctx active_clause sc_a active_pos
   let active_idx = List.hd active_pos
   and u, v, sign_uv = Lits.get_eqn passive_clause.C.hclits [passive_idx; passive_side]
   and s, t, sign_st = Lits.get_eqn active_clause.C.hclits active_pos in
-  Util.debug 3 ("sup %a s=%a t=%a \n%a u=%a v=%a p=%a subst=%a")
-                C.pp active_clause T.pp s T.pp t
-                C.pp passive_clause T.pp u T.pp v
+  Util.debug 3 ("sup %a[%d] s=%a t=%a \n%a[%d] u=%a v=%a p=%a subst=%a")
+                C.pp active_clause sc_a T.pp s T.pp t
+                C.pp passive_clause sc_p T.pp u T.pp v
                 Position.pp passive_pos S.pp subst;
   if not (T.db_closed s)
   then (Util.debug 3 "... active term is not DB-closed"; acc)
@@ -279,7 +279,8 @@ let infer_equality_factoring clause =
     let renaming = Ctx.renaming_clear ~ctx in
     if O.compare ord  (S.apply ~renaming subst s 0)
                       (S.apply ~renaming subst t 0) <> Comp.Lt &&
-       BV.get (C.eligible_param clause 0 subst) active_idx
+       BV.get (C.eligible_param clause 0 subst) active_idx &&
+       Ctx.check_term_term ~ctx s u  (* type check *)
       then begin
         Util.incr_stat stat_equality_factoring_call;
         let proof c = Proof.mk_c_step c "eq_fact" [clause.C.hcproof]
