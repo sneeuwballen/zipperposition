@@ -61,6 +61,7 @@ let _gather_positions ~eligible lits scope pos subst =
       with Not_found | Unif.Fail ->
         (pos_list, subst))
 
+(* FIXME: check that types are compatible! *)
 (* check ordering conditions for the active clause in equality chaining *)
 let _check_eq_chaining_active ~ctx active s_a active_pos subst =
   let s, t, sign = Lits.get_eqn active.C.hclits active_pos in
