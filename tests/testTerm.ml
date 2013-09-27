@@ -36,6 +36,7 @@ let pterm s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
 
 let f x y = T.mk_node (Symbol.mk_const "f") [x;y]
 let g x = T.mk_node (Symbol.mk_const "g") [x]
+let h x y z = T.mk_node (Symbol.mk_const "h") [x;y;z]
 let a = T.mk_const (Symbol.mk_const "a")
 let b = T.mk_const (Symbol.mk_const "b")
 let x = T.mk_var 0

@@ -123,7 +123,7 @@ module Renaming = struct
       with Not_found ->
         (* new name *)
         let n = H.length ren in
-        let t' = T.mk_var n in
+        let t' = T.mk_var ?ty:t.T.type_ n in
         H.add ren (t, scope) t';
         t'
       end

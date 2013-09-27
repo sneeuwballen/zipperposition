@@ -27,17 +27,25 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open OUnit
 
-let suite = 
-  "all_tests" >:::
-    [ TestTerm.suite
-    ; TestSubsts.suite
-    ; TestOrdering.suite
-    ; TestRewriting.suite
+module T = Term
+module S = Substs
+module TT = TestTerm
+
+let test_rename () =
+  let t1 = TT.(f x (g y)) in
+  let t2 = TT.(f x (g a)) in
+  let t3 = TT.(g (g x)) in
+  let subst = Unif.unification t1 1 t2 0 in
+  let renaming = Substs.Renaming.create 5 in
+  let t1' = S.apply ~renaming subst t1 1 in
+  let t2' = S.apply ~renaming subst t2 0 in
+  let t3' = TT.(h (S.apply ~renaming subst y 1) t1' (S.apply ~renaming subst t3 0)) in
+  assert_bool "must be equal" (T.eq t1' t2');
+  let t3'' = TT.pterm "h(a, f(X, g(a)), g(g(X)))" in
+  assert_equal ~cmp:Unif.are_variant ~printer:T.to_string t3'' t3';
+  ()
+
+let suite =
+  "test_substs" >:::
+    [ "test_rename" >:: test_rename
     ]
-
-let specs =
-  [ "debug", Arg.Int Util.set_debug, "set debug level"
-  ]
-
-let _ =
-  run_test_tt_main ~arg_specs:specs suite
