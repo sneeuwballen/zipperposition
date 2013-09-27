@@ -444,10 +444,10 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
               assert (C.is_unit_clause unit_clause);
               if (not restrict || not (S.is_renaming subst))
               && (C.is_oriented_rule unit_clause ||
-                 O.compare ord (S.apply subst l 1) (S.apply subst r 1) = Comp.Gt)
+                 O.compare ord (S.apply_no_renaming subst l 1) (S.apply_no_renaming subst r 1) = Comp.Gt)
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
                 then begin
-                  assert (O.compare ord (S.apply subst l 1) (S.apply subst r 1) = Comp.Gt);
+                  assert (O.compare ord (S.apply_no_renaming subst l 1) (S.apply_no_renaming subst r 1) = Comp.Gt);
                   clauses := unit_clause :: !clauses;
                   Util.incr_stat stat_demodulate_step;
                   raise (RewriteInto (r, subst))
@@ -462,7 +462,7 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
      variables are bound to terms in context 0 *)
   and traverse ~restrict subst t scope =
     match t.T.term with
-    | T.Var _ -> S.apply subst t scope
+    | T.Var _ -> S.apply_no_renaming subst t scope
     | T.BoundVar _ -> t
     | T.Bind (s, t') ->
       let t'' = traverse ~restrict subst t' scope in
@@ -544,6 +544,7 @@ let backward_demodulate (active_set : PS.ActiveSet.t) set given =
   Util.enter_prof prof_back_demodulate;
   let ctx = given.C.hcctx in
   let ord = Ctx.ord ctx in
+  let renaming = Ctx.renaming_clear ~ctx in
   let scope = T.max_var given.C.hcvars + 1 in
   (* find clauses that might be rewritten by l -> r *)
   let recurse ~oriented set l r =
@@ -551,8 +552,8 @@ let backward_demodulate (active_set : PS.ActiveSet.t) set given =
       (fun set t' with_pos subst ->
         let c = with_pos.C.WithPos.clause in
         (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
-        if oriented
-        || O.compare ord (S.apply subst l 0) (S.apply subst r 0) = Comp.Gt
+        if oriented || O.compare ord
+        (S.apply ~renaming subst l 0) (S.apply ~renaming subst r 0) = Comp.Gt
           then  (* add the clause to the set, it may be rewritten by l -> r *)
             C.CSet.add set c
           else set)
@@ -725,7 +726,8 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   and equate_root clauses t1 t2 =
     try UnitIdx.retrieve ~sign:true simpl_set#idx_simpl scope t1 0 ()
       (fun () l r (_,_,_,c') subst ->
-        if t2 == (S.apply subst r scope)
+        let renaming = Ctx.renaming_clear ~ctx in
+        if t2 == S.apply ~renaming subst r scope
         then begin  (* t1!=t2 is refuted by l\sigma = r\sigma *)
           Util.debug 4 "equate %a and %a using %a" T.pp t1 T.pp t2 C.pp c';
           raise (FoundMatch (r, c', subst)) (* success *)
@@ -765,7 +767,8 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   and can_refute s t =
     try UnitIdx.retrieve ~sign:false simpl_set#idx_simpl scope s 0 ()
       (fun () l r (_,_,_,c') subst ->
-        if t == (S.apply subst r scope)
+        let renaming = Ctx.renaming_clear ~ctx in
+        if t == S.apply ~renaming subst r scope
         then begin
           Util.debug 3 "neg_reflect eliminates %a=%a with %a" T.pp s T.pp t C.pp c';
           raise (FoundMatch (r, c', subst)) (* success *)
@@ -850,7 +853,7 @@ let compare_literals_subsumption lita litb =
 
 (** Check whether [a] subsumes [b], and if it does, return the
     corresponding substitution *)
-let subsumes_with (a,sc_a) (b,sc_b) =
+let subsumes_with a sc_a b sc_b =
   Util.incr_stat stat_subsumption_call;
   (* a must not have more literals *)
   if Array.length a > Array.length b then None else
@@ -902,8 +905,7 @@ let subsumes_with (a,sc_a) (b,sc_b) =
 
 let subsumes a b =
   Util.enter_prof prof_subsumption;
-  let scope = T.max_var (Lits.vars a) + 1 in  (* TODO scope=1 *)
-  let res = match subsumes_with (a,0) (b,scope) with
+  let res = match subsumes_with a 0 b 1 with
   | None -> false
   | Some _ ->
     Util.debug 2 "%a subsumes %a" Lits.pp a Lits.pp b;
@@ -914,7 +916,6 @@ let subsumes a b =
   res
 
 let eq_subsumes a b =
-  let scope = T.max_var (Lits.vars b) + 1 in
   (* subsume a literal using a = b *)
   let rec equate_lit_with a b lit =
     match lit with
@@ -933,11 +934,13 @@ let eq_subsumes a b =
     | _ -> false
   (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
   and equate_root a b u v =
-        (try let subst = Unif.matching a scope u 0 in
-              S.apply subst b scope == v
+        (try let subst = Unif.matching a 1 u 0 in
+              let _ = Unif.matching ~subst b 1 v 0 in
+              true
          with Unif.Fail -> false)
-    ||  (try let subst = Unif.matching b scope u 0 in
-              S.apply subst a scope == v
+    ||  (try let subst = Unif.matching b 1 u 0 in
+              let _ = Unif.matching ~subst a 1 v 0 in
+              true
          with Unif.Fail -> false)
   in
   (* check for each literal *)

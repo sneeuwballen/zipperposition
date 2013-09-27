@@ -316,8 +316,8 @@ let ground_pair t1 t2 =
       let subst' = S.bind subst v 0 const 0 in
       (i+1, subst'))
     (0, S.empty) vars in
-  let t1' = S.apply subst t1 0 in
-  let t2' = S.apply subst t2 0 in
+  let t1' = S.apply_no_renaming subst t1 0 in
+  let t2' = S.apply_no_renaming subst t2 0 in
   t1', t2'
 
 (** Same as [ground_pair], but with a cache *)
