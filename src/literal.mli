@@ -96,7 +96,7 @@ val to_tuple : t -> (Term.t * Term.t * bool)
 val form_of_lit : t -> Formula.t
 val term_of_lit : t -> Term.t                   (** translate lit to term *)
 
-val apply_subst : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
+val apply_subst : ?recursive:bool -> renaming:Substs.Renaming.t ->
                   ord:Ordering.t -> Substs.t -> t -> Substs.scope -> t
 
 val negate : t -> t                     (** negate literal *)
@@ -120,7 +120,7 @@ val replace_pos : ord:Ordering.t -> t -> at:Position.t -> by:Term.t -> t
 val infer_type : TypeInference.Ctx.t -> t -> unit
 val signature : ?signature:Signature.t -> t -> Signature.t
 
-val apply_subst_list : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
+val apply_subst_list : ?recursive:bool -> renaming:Substs.Renaming.t ->
                         ord:Ordering.t -> Substs.t ->
                         t list -> Substs.scope -> t list
 
@@ -155,7 +155,7 @@ module Arr : sig
 
   val to_form : t array -> Formula.t
 
-  val apply_subst : ?recursive:bool -> ?renaming:Substs.Renaming.t ->
+  val apply_subst : ?recursive:bool -> renaming:Substs.Renaming.t ->
                          ord:Ordering.t -> Substs.t ->
                          t array -> Substs.scope -> t array
 

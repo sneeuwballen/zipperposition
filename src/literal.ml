@@ -244,15 +244,15 @@ let mk_true ~ord p = mk_prop ~ord p true
 
 let mk_false ~ord p = mk_prop ~ord p false
 
-let apply_subst ?(recursive=true) ?renaming ~ord subst lit scope =
+let apply_subst ?(recursive=true) ~renaming ~ord subst lit scope =
   match lit with
   | Equation (l,r,sign,_) ->
-    let new_l = S.apply ~recursive ?renaming subst l scope
-    and new_r = S.apply ~recursive ?renaming subst r scope in
+    let new_l = S.apply ~recursive ~renaming subst l scope
+    and new_r = S.apply ~recursive ~renaming subst r scope in
     mk_lit ~ord new_l new_r sign
   | Prop (p, sign) ->
-    let p' = S.apply ~recursive ?renaming subst p scope in
-    mk_prop ~ord p' sign
+    let p' = S.apply ~recursive ~renaming subst p scope in
+    mk_prop p' sign
   | True
   | False -> lit
 
@@ -374,9 +374,9 @@ let signature ?(signature=Signature.empty) lit =
   infer_type ctx lit;
   TypeInference.Ctx.to_signature ctx
 
-let apply_subst_list ?(recursive=true) ?renaming ~ord subst lits scope =
+let apply_subst_list ?(recursive=true) ~renaming ~ord subst lits scope =
   List.map
-    (fun lit -> apply_subst ~recursive ?renaming ~ord subst lit scope)
+    (fun lit -> apply_subst ~recursive ~renaming ~ord subst lit scope)
     lits
 
 (** {2 IO} *)
@@ -488,9 +488,9 @@ module Arr = struct
     F.mk_or lits
 
   (** Apply the substitution to the array of literals, with scope *)
-  let apply_subst ?(recursive=true) ?renaming ~ord subst lits scope =
+  let apply_subst ?(recursive=true) ~renaming ~ord subst lits scope =
     Array.map
-      (fun lit -> apply_subst ~recursive ?renaming ~ord subst lit scope)
+      (fun lit -> apply_subst ~recursive ~renaming ~ord subst lit scope)
       lits
 
   (** bitvector of literals that are positive *)

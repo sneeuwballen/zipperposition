@@ -106,7 +106,7 @@ let do_superposition ~ctx (active_clause, sc_a) active_pos
   else if not (Ctx.check_term_term ~ctx s (T.at_pos u subterm_pos))
   then (Util.debug 3 "... incompatible types"; acc)
   else
-  let renaming = S.Renaming.create 3 in
+  let renaming = Ctx.renaming_clear ~ctx in
   let t' = S.apply ~renaming subst t sc_a
   and v' = S.apply ~renaming subst v sc_p in
   if sign_uv && t' == v' && subterm_pos = []
@@ -211,9 +211,11 @@ let infer_equality_resolution clause =
           (* subst(lit) is maximal, we can do the inference *)
           then begin
             Util.incr_stat stat_equality_resolution_call;
+            let ord = Ctx.ord ~ctx in
+            let renaming = Ctx.renaming_clear ~ctx in
             let proof c = Proof.mk_c_step c "eq_res" [clause.C.hcproof] in
             let new_lits = Util.array_except_idx clause.C.hclits pos in
-            let new_lits = Lit.apply_subst_list ~ord:(Ctx.ord ctx) subst new_lits 0 in
+            let new_lits = Lit.apply_subst_list ~ord ~renaming subst new_lits 0 in
             let new_clause = C.create ~parents:[clause] ~ctx new_lits proof in
             Util.debug 3 "equality resolution on %a yields %a"
               C.pp clause C.pp new_clause;
@@ -272,8 +274,9 @@ let infer_equality_factoring clause =
     and active_idx = List.hd active_pos in
     assert (sign_st && sign_uv);
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
-    if O.compare ord  (S.apply subst s 0)
-                      (S.apply subst t 0) <> Comp.Lt &&
+    let renaming = Ctx.renaming_clear ~ctx in
+    if O.compare ord  (S.apply ~renaming subst s 0)
+                      (S.apply ~renaming subst t 0) <> Comp.Lt &&
        BV.get (C.eligible_param clause 0 subst) active_idx
       then begin
         Util.incr_stat stat_equality_factoring_call;
@@ -282,7 +285,7 @@ let infer_equality_factoring clause =
            and replace it by a t!=v one, and apply subst *)
         and new_lits = Util.array_except_idx clause.C.hclits active_idx in
         let new_lits = (Lit.mk_neq ~ord t v) :: new_lits in
-        let renaming = S.Renaming.create 3 in
+        let renaming = Ctx.renaming_clear ~ctx in
         let new_lits = Lit.apply_subst_list ~renaming ~ord subst new_lits 0 in
         let new_clause = C.create ~parents:[clause] ~ctx new_lits proof in
         Util.debug 3 "equality factoring on %a yields %a"
@@ -652,9 +655,10 @@ let basic_simplify c =
         assert (T.is_var l || T.is_var r);
         begin try
           let subst = Unif.unification l 0 r 0 in
+          let renaming = Ctx.renaming_clear ~ctx in
           (* remove the literal, and apply the substitution to the remaining literals
              before trying to find another x!=t *)
-          er (Lit.apply_subst_list ~ord subst (Util.list_remove lits i) 0)
+          er (Lit.apply_subst_list ~ord ~renaming subst (Util.list_remove lits i) 0)
         with Unif.Fail -> lits
         end
     | None -> lits
@@ -1068,7 +1072,7 @@ let rec condensation c =
           (fun subst ->
             let new_lits = Array.sub lits 0 (n - 1) in
             (if i <> n-1 then new_lits.(i) <- lits.(n-1));  (* remove i-th lit *)
-            let renaming = S.Renaming.create 3 in
+            let renaming = Ctx.renaming_clear ~ctx in
             let ord = Ctx.ord ctx in
             let new_lits = Lits.apply_subst ~renaming ~ord subst new_lits 0 in
             (* check subsumption *)
