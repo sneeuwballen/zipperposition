@@ -344,6 +344,44 @@ let from_forms ~file ~name ~ctx forms =
   let proof c = Proof.mk_c_axiom c ~file ~name in
   create_a ~ctx lits proof
 
+(** {2 Filter literals} *)
+
+module Eligible = struct
+  type t = int -> Lit.t -> bool
+
+  let res c =
+    let bv = eligible_res c 0 S.empty in
+    fun i lit -> BV.get bv i
+
+  let param c =
+    let bv = eligible_param c 0 S.empty in
+    fun i lit -> BV.get bv i
+
+  let chaining c =
+    let bv = eligible_chaining c 0 S.empty in
+    fun i lit -> BV.get bv i
+
+  let ineq c =
+    let spec = Ctx.total_order c.hcctx in
+    fun i lit -> Lit.is_ineq ~spec lit
+
+  let ineq_of clause instance =
+    fun i lit -> Lit.is_ineq_of ~instance lit
+
+  let pos i lit = Lit.is_pos lit
+
+  let neg i lit = Lit.is_neg lit
+
+  let always i lit = true
+
+  let combine l = match l with
+  | [] -> (fun i lit -> true)
+  | [x] -> x
+  | [x; y] -> (fun i lit -> x i lit && y i lit)
+  | [x; y; z] -> (fun i lit -> x i lit && y i lit && z i lit)
+  | _ -> (fun i lit -> List.for_all (fun eligible -> eligible i lit) l)
+end
+
 (** {2 Set of clauses} *)
 
 (** Simple set *)

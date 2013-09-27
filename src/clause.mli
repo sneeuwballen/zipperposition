@@ -173,6 +173,41 @@ val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
 val from_forms : file:string -> name:string -> ctx:Ctx.t -> Formula.t list -> t
   (** Conversion of a formula list to a clause *)
 
+(** {2 Filter literals} *)
+
+module Eligible : sig
+  type t = int -> Literal.t -> bool
+    (** Eligibility criterion for a literal *)
+
+  val res : clause -> t
+    (** Only literals that are eligible for resolution *)
+
+  val param : clause -> t
+    (** Only literals that are eligible for paramodulation *)
+
+  val chaining : clause -> t
+    (** Eligible for chaining *)
+
+  val ineq : clause -> t
+    (** Only literals that are inequations *)
+
+  val ineq_of : clause -> Theories.TotalOrder.instance -> t
+    (** Only literals that are inequations for the given ordering *)
+
+  val pos : t
+    (** Only positive literals *)
+
+  val neg : t
+    (** Only negative literals *)
+
+  val always : t 
+    (** All literals *)
+
+  val combine : t list -> t
+    (** Logical "and" of the given eligibility criteria. A literal is
+        eligible only if all elements of the list say so. *)
+end
+
 (** {2 Set of clauses} *)
 
 (** Simple set *)
