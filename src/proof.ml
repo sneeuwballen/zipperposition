@@ -184,27 +184,26 @@ let to_graph proof =
   g
 
 let bij ~ord =
-  let open Bij in
-  fix
+  Bij.(fix
     (fun bij_ ->
       let bij_step = map
         ~inject:(fun step -> step.rule, step.parents, step.esa)
         ~extract:(fun (rule,parents,esa) -> {rule;parents;esa;})
-          (triple string_ (array_ (bij_ ())) bool_) in
+          (triple string_ (array_ (Lazy.force bij_)) bool_) in
       let bij_axiom = pair string_ string_
       and bij_form = pair F.bij bij_step
       and bij_clause = pair (CC.bij ~ord) bij_step
       in switch
           ~inject:(function
-            | Axiom (f,n) -> 'a', BranchTo(bij_axiom, (f,n))
-            | InferForm(f,step) -> 'f', BranchTo(bij_form, (f,step))
-            | InferClause(c,step) -> 'c', BranchTo(bij_clause, (c,step)))
+            | Axiom (f,n) -> "axiom", BranchTo(bij_axiom, (f,n))
+            | InferForm(f,step) -> "form", BranchTo(bij_form, (f,step))
+            | InferClause(c,step) -> "clause", BranchTo(bij_clause, (c,step)))
           ~extract:(function
-            | 'a' -> BranchFrom(bij_axiom, (fun (f,n) -> Axiom(f,n)))
-            | 'f' -> BranchFrom(bij_form, (fun(f,step) -> InferForm(f,step)))
-            | 'c' -> BranchFrom(bij_clause, (fun(c,step) -> InferClause(c,step)))
+            | "axiom" -> BranchFrom(bij_axiom, (fun (f,n) -> Axiom(f,n)))
+            | "form" -> BranchFrom(bij_form, (fun(f,step) -> InferForm(f,step)))
+            | "clause" -> BranchFrom(bij_clause, (fun(c,step) -> InferClause(c,step)))
             | c -> raise (DecodingError "expected proof step"))
-    )
+    ))
 
 (** {2 IO} *)
 
