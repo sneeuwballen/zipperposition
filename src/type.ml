@@ -246,18 +246,18 @@ let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
 let bij =
   Bij.(fix (fun bij' ->
-    let bij_app () = pair string_ (list_ (bij' ())) in
-    let bij_fun () = pair (bij' ()) (list_ (bij' ())) in
+    let bij_app = lazy (pair string_ (list_ (Lazy.force bij'))) in
+    let bij_fun = lazy (pair (Lazy.force bij') (list_ (Lazy.force bij'))) in
     switch
       ~inject:(function
-        | Var s -> 'v', BranchTo (string_, s)
+        | Var s -> "var", BranchTo (string_, s)
         | GVar _ -> failwith "Type.bij: GVar not supported"
-        | App (p, l) -> 'a', BranchTo (bij_app (), (p, l))
-        | Fun (ret, l) -> 'f', BranchTo (bij_fun (), (ret, l)))
+        | App (p, l) -> "app", BranchTo (Lazy.force bij_app, (p, l))
+        | Fun (ret, l) -> "fun", BranchTo (Lazy.force bij_fun, (ret, l)))
       ~extract:(function
-        | 'v' -> BranchFrom (string_, var)
-        | 'a' -> BranchFrom (bij_app (), fun (s,l) -> app s l)
-        | 'f' -> BranchFrom (bij_fun (), fun (ret,l) -> mk_fun ret l)
+        | "var" -> BranchFrom (string_, var)
+        | "app" -> BranchFrom (Lazy.force bij_app, fun (s,l) -> app s l)
+        | "fun" -> BranchFrom (Lazy.force bij_fun, fun (ret,l) -> mk_fun ret l)
         | _ -> raise (DecodingError "expected Type"))))
 
 (** {2 Unification} *)

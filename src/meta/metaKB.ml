@@ -222,11 +222,11 @@ let bij_premise =
   let p_args = pair MetaPattern.bij (list_ T.bij) in
   switch
     ~inject:(function
-      | IfAxiom (s, args) -> 'a', BranchTo (s_args, (s, args))
-      | IfPattern (p, args) -> 'p', BranchTo (p_args, (p, args)))
+      | IfAxiom (s, args) -> "if_axiom", BranchTo (s_args, (s, args))
+      | IfPattern (p, args) -> "if_pattern", BranchTo (p_args, (p, args)))
     ~extract:(function
-      | 'a' -> BranchFrom (s_args, fun (s, args) -> IfAxiom (s, args))
-      | 'p' -> BranchFrom (p_args, fun (p, args) -> IfPattern (p, args))
+      | "if_axiom" -> BranchFrom (s_args, fun (s, args) -> IfAxiom (s, args))
+      | "if_pattern" -> BranchFrom (p_args, fun (p, args) -> IfPattern (p, args))
       | _ -> raise (DecodingError "expected premise"))
 
 let bij_lemma =
@@ -610,7 +610,7 @@ let parse_theory_file filename =
 let save filename kb =
   let oc = open_out filename in
   try
-    Bij.SexpChan.encode ~bij oc kb;
+    Bij.TrBencode.write ~bij oc kb;
     close_out oc;
   with e ->
     close_out oc;
@@ -620,8 +620,7 @@ let restore filename =
   try
     let ic = open_in filename in
     begin try
-      let source = Bij.SourceChan.create ic in
-      let kb = Bij.SexpChan.decode ~bij source in
+      let kb = Bij.TrBencode.read ~bij ic in
       close_in ic;
       Some kb
     with e ->

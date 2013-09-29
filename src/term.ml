@@ -909,20 +909,21 @@ let bij =
   let open Bij in
   fix
     (fun bij ->
-      let bij_bind () = pair Symbol.bij (bij ()) in
-      let bij_node () = pair Symbol.bij (list_ (bij ())) in
-      let bij_var () = pair int_ (opt Type.bij) in
+      let bij_bind = lazy (pair Symbol.bij (Lazy.force bij)) in
+      let bij_node = lazy (pair Symbol.bij (list_ (Lazy.force bij))) in
+      let bij_var = lazy (pair int_ (opt Type.bij)) in
+      let bij_pair = lazy (pair (Lazy.force bij) (Lazy.force bij)) in
       switch
         ~inject:(fun t -> match t.term with
-        | BoundVar i -> 'd', BranchTo (bij_var (), (i, t.type_))
-        | Var i -> 'v', BranchTo (bij_var (), (i, t.type_))
-        | Bind (s, t') -> 'b', BranchTo (bij_bind (), (s, t'))
-        | Node (s, l) -> 'n', BranchTo (bij_node (), (s, l))
-        | At (t1, t2) -> 'a', BranchTo (pair (bij ()) (bij ()), (t1, t2)))
+        | BoundVar i -> "bvar", BranchTo (Lazy.force bij_var, (i, t.type_))
+        | Var i -> "var", BranchTo (Lazy.force bij_var, (i, t.type_))
+        | Bind (s, t') -> "bind", BranchTo (Lazy.force bij_bind, (s, t'))
+        | Node (s, l) -> "node", BranchTo (Lazy.force bij_node, (s, l))
+        | At (t1, t2) -> "at", BranchTo (Lazy.force bij_pair, (t1, t2)))
         ~extract:(function
-        | 'd' -> BranchFrom (bij_var (), fun (i,ty) -> mk_bound_var ?ty i)
-        | 'v' -> BranchFrom (bij_var (), fun (i,ty) -> mk_var ?ty i)
-        | 'b' -> BranchFrom (bij_bind (), fun (s,t') -> mk_bind s t')
-        | 'n' -> BranchFrom (bij_node (), fun (s,l) -> mk_node s l)
-        | 'a' -> BranchFrom (pair (bij ()) (bij ()), fun (a, b) -> mk_at a b)
+        | "bvar" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_bound_var ?ty i)
+        | "var" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_var ?ty i)
+        | "bind" -> BranchFrom (Lazy.force bij_bind, fun (s,t') -> mk_bind s t')
+        | "node" -> BranchFrom (Lazy.force bij_node, fun (s,l) -> mk_node s l)
+        | "at" -> BranchFrom (Lazy.force bij_pair, fun (a, b) -> mk_at a b)
         | _ -> raise (DecodingError "expected Term")))

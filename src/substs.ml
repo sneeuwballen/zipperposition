@@ -279,3 +279,9 @@ let of_seq ?(recursive=true) ?(subst=empty) seq =
     subst seq
 
 let of_list ?recursive ?subst l = of_seq ?recursive ?subst (Sequence.of_list l)
+
+let bij =
+  Bij.(map
+    ~inject:(fun s -> Sequence.to_list (to_seq s))
+    ~extract:(fun seq -> of_seq (Sequence.of_list seq))
+    (list_ (quad T.bij int_ T.bij int_)))

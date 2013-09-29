@@ -79,6 +79,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `Util`: many utils on lists, printing, strings...
     - `PartialOrder`: matrix representation of partial orderings, with completion
     - `lib/Sequence`: library of iterators
+    - `lib/Bencode`: B-encode serialization format
     - `lib/Bij`: GADT-based serialization/deserialization library
     - `lib/BV`: bitvectors
 

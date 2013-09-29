@@ -138,3 +138,5 @@ val of_seq : ?recursive:bool -> ?subst:t ->
             (Term.t * scope * Term.t * scope) Sequence.t -> t
 val of_list : ?recursive:bool -> ?subst:t ->
             (Term.t * scope * Term.t * scope) list -> t
+
+val bij : t Bij.t

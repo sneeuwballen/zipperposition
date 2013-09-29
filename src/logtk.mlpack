@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 26465d2e9a00396ccef9cf5e885f310b)
+# DO NOT EDIT (digest: ef509a4fd8e9ad0cb7f11262ec785633)
 Symbol
 Hash
 Hashcons
@@ -36,5 +36,6 @@ CallProver
 lib/Sequence
 lib/Bij
 lib/BV
+lib/Bencode
 lib/Cache
 # OASIS_STOP

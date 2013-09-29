@@ -223,15 +223,15 @@ let fmt fmt s = Format.pp_print_string fmt (to_string s)
 let bij =
   Bij.switch
     ~inject:(fun s -> match s with
-      | Const (s,info) -> 'c', Bij.(BranchTo (pair string_ int_, (s, info.attrs)))
-      | Int n -> 'i', Bij.(BranchTo (string_, Big_int.string_of_big_int n))
-      | Rat n -> 'r', Bij.(BranchTo (string_, Ratio.string_of_ratio n))
-      | Real f -> 'f', Bij.(BranchTo (float_, f)))
+      | Const (s,info) -> "const", Bij.(BranchTo (pair string_ int_, (s, info.attrs)))
+      | Int n -> "int", Bij.(BranchTo (string_, Big_int.string_of_big_int n))
+      | Rat n -> "rat", Bij.(BranchTo (string_, Ratio.string_of_ratio n))
+      | Real f -> "real", Bij.(BranchTo (float_, f)))
     ~extract:(fun c -> match c with
-      | 'c' -> Bij.(BranchFrom (pair string_ int_, fun (s,attrs) -> mk_const ~attrs s))
-      | 'i' -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
-      | 'r' -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
-      | 'f' -> Bij.(BranchFrom (float_, mk_real))
+      | "const" -> Bij.(BranchFrom (pair string_ int_, fun (s,attrs) -> mk_const ~attrs s))
+      | "int" -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
+      | "rat" -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
+      | "real" -> Bij.(BranchFrom (float_, mk_real))
       | c -> raise (Bij.DecodingError "expected symbol"))
 
 (** {2 Arith} *)
