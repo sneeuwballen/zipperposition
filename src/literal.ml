@@ -465,7 +465,7 @@ module Arr = struct
 
   let hash lits =
     Array.fold_left
-      (fun h lit -> Hash.hash_int2 h (hash lit))
+      (fun h lit -> Hash.combine h (hash lit))
       13 lits
 
   let hash_novar lits =
