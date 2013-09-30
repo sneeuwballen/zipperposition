@@ -66,8 +66,14 @@ let signature_seq ?init seq =
   F.signature_seq ?signature:init (Sequence.map get_form seq)
 
 let pp buf t = F.pp buf t.form
+let pp_tstp buf t = F.pp_tstp buf t.form
 let to_string t = F.to_string t.form
 let fmt fmt t = F.fmt fmt t.form
+
+let bij ~ord = Bij.(map
+  ~inject:(fun pf -> pf.form, pf.proof)
+  ~extract:(fun (form,proof) -> {form; proof;})
+  (pair F.bij (Proof.bij ~ord)))
 
 (** {2 Set of formulas} *)
 

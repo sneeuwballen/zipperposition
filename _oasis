@@ -21,9 +21,9 @@ Library "libzipperposition"
   Path: src/
   Pack: true
   Modules:  ClauseQueue, Clause, Const, Experts, Extensions,
-            Literal, MetaProverState, CompactClause, Ctx, Proof, ProofState, Saturate,
-            Selection, Superposition, PFormula, Theories, AC, Chaining,
-            Params, Env, Arith
+            Literal, MetaProverState, CompactClause, Ctx, Proof, ProofState,
+            Saturate, Selection, Superposition, PFormula, Theories, AC,
+            Chaining, FormOrClause, Params, Env, Arith
   InternalModules:  containers/PersistentGraph, containers/Hashset,
                     containers/PHashtbl, containers/PersistentHashtbl, containers/Heap,
                     containers/Leftistheap, containers/Vector, containers/Sequence,
