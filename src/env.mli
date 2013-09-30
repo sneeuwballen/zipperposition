@@ -61,11 +61,6 @@ type is_trivial_rule = Clause.t -> bool
 type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
   (** Rewrite rule on literals *)
 
-type preprocess_rule = string * (ctx:Ctx.t -> Transform.t)
-  (** A preprocessing rule, which is a named transformation of formula.
-  TODO remove and use some Clause|Formula format with forward
-    simplification ptr *)
-
 type t
   (** Global context for a superposition proof. It contains the inference
       rules, the context, the proof state... *)
@@ -99,12 +94,6 @@ val remove_simpl  : env:t -> Clause.t Sequence.t -> unit
 
 val clean_passive : env:t -> unit
   (** Clean passive set (remove old clauses from clause queues) *)
-
-val add_constrs : env:t -> Precedence.constr Sequence.t -> unit
-  (** Add precedence constraints to the env *)
-
-val add_mk_constr : env:t -> (Formula.t Sequence.t -> Precedence.constr list) -> unit
-  (** Add constraint factory *)
 
 val get_passive : env:t -> Clause.t Sequence.t
   (** Passive clauses *)
@@ -151,12 +140,6 @@ val add_rewrite_rule : env:t -> string -> (Term.t -> Term.t) -> unit
 val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
   (** Add a literal rewrite rule *)
 
-val add_preprocess_rule : env:t -> preprocess_rule -> unit
-  (** Preprocessing rule *)
-
-val add_axioms : env:t -> PFormula.t Sequence.t -> unit
-  (** Add axioms to the environment *)
-
 (** {2 Use the Env} *)
 
 val simplify : env:t -> Clause.t -> Clause.t
@@ -179,9 +162,6 @@ val add_on_empty : env:t -> (Clause.t -> unit) -> unit
   (** Callback, that will be called when an empty clause is added to the
       active or passive set *)
 
-val compute_constrs : env:t -> Formula.t Sequence.t -> Precedence.constr list
-  (** Compute all ordering constraints for the given list of clauses *)
-
 val ctx : t -> Ctx.t
 val ord : t -> Ordering.t
 val precedence : t -> Precedence.t
@@ -197,8 +177,8 @@ val fmt : Format.formatter -> t -> unit
 type stats = int * int * int
   (** statistics on clauses : num active, num passive, num simplification *)
 
-val cnf : env:t -> PFormula.t list -> Clause.t list
-  (** Reduce formulas to CNF TODO: FormOrClause.t *)
+val cnf : env:t -> PFormula.Set.t -> Clause.CSet.t
+  (** Reduce formulas to CNF *)
 
 val stats : env:t -> stats
   (** Compute stats *)
@@ -245,9 +225,4 @@ val all_simplify : env:t -> Clause.t -> Clause.t option
 val meta_step : env:t -> Clause.t -> Clause.t Sequence.t
   (** Do one step of the meta-prover with the current given clause. New clauses
       (lemmas) are returned. *)
-  
-val preprocess : env:t -> PFormula.t list -> PFormula.t list
-  (** Preprocess formulas. This has a fixpoint semantic, i.e. it applies
-      preprocessing rules until none applies anymore
-      TODO use FormOrClause.t *)
 

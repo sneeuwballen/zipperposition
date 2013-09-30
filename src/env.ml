@@ -68,9 +68,6 @@ type is_trivial_rule = Clause.t -> bool
 type lit_rewrite_rule = ctx:Ctx.t -> Lit.t -> Lit.t
   (** Rewrite rule on literals *)
 
-type preprocess_rule = string * (ctx:Ctx.t -> Transform.t)
-  (** A preprocessing rule, which is a named transformation of formula. *)
-
 type t = {
   mutable params : Params.t;
   mutable ctx : Ctx.t;
@@ -109,18 +106,6 @@ type t = {
   mutable is_trivial : is_trivial_rule list;
     (** single test to detect trivial clauses *)
 
-  mutable axioms : PFormula.FSet.t;
-    (** a list of axioms to add to the problem *)
-
-  mutable mk_constr : (Formula.t Sequence.t -> Precedence.constr list) list;
-    (** How to build constraints from a list of clauses *)
-
-  mutable constr : Precedence.constr list;
-    (** some constraints on the precedence *)
-
-  mutable preprocess : preprocess_rule list;
-    (** how to preprocess the initial list of formulas *)
-
   mutable state : ProofState.t;
     (** Proof state *)
 
@@ -149,10 +134,6 @@ let create ?meta ~ctx params signature =
     redundant = [];
     backward_redundant = [];
     is_trivial = [];
-    axioms = PFormula.FSet.create ();
-    mk_constr = [];
-    constr = [];
-    preprocess = [];
     state;
     empty_clauses = C.CSet.empty;
     on_empty = [];
@@ -201,12 +182,6 @@ let remove_simpl ~env cs =
 let clean_passive ~env =
   env.state#passive_set#clean ()
 
-let add_constrs ~env constrs =
-  env.constr <- Sequence.fold (fun cs c -> c::cs) env.constr constrs
-
-let add_mk_constr ~env mk_constr =
-  env.mk_constr <- mk_constr :: env.mk_constr
-
 let get_passive ~env =
   C.CSet.to_seq env.state#passive_set#clauses
 
@@ -254,14 +229,6 @@ let add_rewrite_rule ~env name rule =
 let add_lit_rule ~env name rule =
   env.lit_rules <- (name, rule) :: env.lit_rules
 
-let add_preprocess_rule ~env rule =
-  env.preprocess <- env.preprocess @ [rule]
-
-let add_axioms ~env seq =
-  Sequence.iter
-    (fun ax -> PFormula.FSet.add env.axioms ax)
-    seq
-
 let get_experts ~env =
   env.state#experts
 
@@ -279,14 +246,6 @@ let get_some_empty_clause ~env =
 
 let add_on_empty ~env h =
   env.on_empty <- h :: env.on_empty
-
-(** Compute all ordering constraints for the given list of clauses *)
-let compute_constrs ~env cs =
-  let constrs = env.constr in
-  let constrs = List.fold_left
-    (fun acc mk_constr -> acc @ mk_constr cs)
-    constrs env.mk_constr
-  in constrs
 
 let ctx env = env.ctx
 let ord env = Ctx.ord env.ctx
@@ -323,10 +282,10 @@ type stats = int * int * int
 let stats ~env =
   ProofState.stats env.state
 
-let cnf ~env pf_list =
+let cnf ~env set =
   let ctx = env.ctx in
-  let clauses = Sequence.flatMap
-    (fun pf ->
+  let clauses = Sequence.fold
+    (fun cset pf ->
       let f = pf.PF.form in
       Util.debug 3 "reduce %a to CNF..." F.pp f;
       (* reduce to CNF this clause *)
@@ -338,10 +297,10 @@ let cnf ~env pf_list =
         | _ -> Proof.mk_c_step ~esa:true cc ~rule:"cnf" [pf.PF.proof]
       in
       let clauses = List.map (fun c -> C.create_forms ~ctx c proof) clauses in
-      Sequence.of_list clauses)
-    (Sequence.of_list pf_list)
+      C.CSet.add_list cset clauses)
+    C.CSet.empty (PF.Set.to_seq set)
   in
-  Sequence.to_rev_list clauses
+  clauses
 
 let next_passive ~env =
   env.state#passive_set#next ()
@@ -669,7 +628,9 @@ let meta_step ~env c =
     Util.list_flatmap
       (fun result -> match result with
         | MetaProverState.Deduced (f,parents) ->
-          cnf ~env [f] (* reduce result in CNF *)
+          (* reduce result in CNF *)
+          let cset = cnf ~env (PF.Set.singleton f) in
+          C.CSet.to_list cset
         | MetaProverState.Theory (th_name, th_args) ->
           Util.debug 1 "meta-prover: theory %a" MetaProverState.pp_result result;
           []
@@ -681,10 +642,3 @@ let meta_step ~env c =
     end
   in
   Sequence.of_list results
-
-(** Preprocess set of formulas *)
-let preprocess ~env l =
-  let tr_list = List.map (fun (name, f) -> name, f ~ctx:env.ctx) env.preprocess in
-  let dag = PF.TransformDag.create tr_list in
-  let l' = PFormula.TransformDag.transform dag l in
-  l'

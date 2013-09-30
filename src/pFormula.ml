@@ -34,6 +34,7 @@ module F = Formula
 type t = {
   form : Formula.t;
   proof : Proof.t;
+  mutable simpl_to : t option;
 }
 
 type pform = t
@@ -44,7 +45,11 @@ let cmp t1 t2 =
   let c = F.compare t1.form t2.form in
   if c <> 0 then c else Proof.cmp t1.proof t2.proof
 
-let create form proof = { form; proof; }
+let eq_noproof t1 t2 = F.eq t1.form t2.form
+
+let cmp_noproof t1 t2 = F.compare t1.form t2.form
+
+let create form proof = { form; proof; simpl_to=None; }
 
 let get_form t = t.form
 
@@ -60,6 +65,16 @@ let to_sourced t =
     Some ((t.form, file, name))
   | _ -> None
 
+let rec follow_simpl pf = match pf.simpl_to with
+  | None -> pf
+  | Some pf' -> follow_simpl pf'
+
+let simpl_to ~from ~into =
+  let from = follow_simpl from in
+  if eq from into
+    then ()
+    else from.simpl_to <- Some into
+
 let signature t = F.signature t.form
 
 let signature_seq ?init seq =
@@ -72,79 +87,17 @@ let fmt fmt t = F.fmt fmt t.form
 
 let bij ~ord = Bij.(map
   ~inject:(fun pf -> pf.form, pf.proof)
-  ~extract:(fun (form,proof) -> {form; proof;})
+  ~extract:(fun (form,proof) -> {form; proof; simpl_to=None; })
   (pair F.bij (Proof.bij ~ord)))
 
 (** {2 Set of formulas} *)
 
-module FSet = struct
-  module H = Hashtbl.Make(struct
+module Set = struct
+  include Sequence.Set.Make(struct
     type t = pform
-    let equal = eq
-    let hash = hash
+    let compare = cmp_noproof
   end)
 
-  type t = unit H.t
-
-  let create () = H.create 15
-
-  let eq s1 s2 =
-    H.length s1 = H.length s2 &&
-    try
-      H.iter
-        (fun pf () -> if not (H.mem s2 pf) then raise Exit)
-        s1;
-      true
-    with Exit -> false
-
-  let add set pf = H.replace set pf ()
-
-  let remove set pf = H.remove set pf
-
-  let flatMap set f =
-    let s' = H.create (H.length set) in
-    H.iter
-      (fun pf () ->
-        let l = f pf in
-        List.iter (fun pf -> add s' pf) l)
-      set;
-    s'
-
-  let iter set k = H.iter (fun pf () -> k pf) set
-
-  let of_seq ?(init=create ()) seq =
-    Sequence.iter (add init) seq;
-    init
-
-  let to_seq set =
-    Sequence.from_iter (fun k -> iter set k)
-
-  let of_list l =
-    let s = create () in
-    List.iter (add s) l;
-    s
-
-  let to_list set =
-    let l = ref [] in
-    iter set (fun x -> l := x :: !l);
-    !l
-
-  let size set = H.length set
+  let signature ?signature set =
+    F.signature_seq ?signature (Sequence.map get_form (to_seq set))
 end
-
-(** {2 Transformations} *)
-
-module TransformDag = Transform.MakeDAG(struct
-  type t = pform
-
-  let to_form pf = pf.form
-
-  let of_form ~rule ~parents form =
-    let proof = match parents with
-    | [] -> Proof.mk_f_axiom form ~file:"" ~name:rule
-    | _::_ ->
-      let premises = List.map get_proof parents in
-      Proof.mk_f_step ~esa:true form ~rule premises
-    in
-    { form; proof; }
-end)

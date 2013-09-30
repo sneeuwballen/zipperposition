@@ -117,6 +117,7 @@ let create ?(kb=M.MetaKB.empty) () =
   (* hook events to p.results *)
   M.Signal.on (M.MetaProver.on_theory p.prover)
     (function | M.MetaKB.NewTheory (name, args) ->
+      Util.debug 1 "meta-prover: theory %s(%a)" name (Util.pp_list T.pp) args;
       add_new_result p (Theory (name, args));
       true);
   M.Signal.on (M.MetaProver.on_lemma p.prover)
@@ -125,6 +126,7 @@ let create ?(kb=M.MetaKB.empty) () =
       let proofs = List.map proof_of_source premises in
       let proof = Proof.mk_f_step f ~rule:"lemma" proofs in
       let pf = PF.create f proof in
+      Util.debug 1 "meta-prover: lemma %a" PF.pp pf;
       add_new_result p (Deduced (pf, premises));
       true);
   p

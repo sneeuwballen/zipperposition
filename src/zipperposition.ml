@@ -114,7 +114,18 @@ let print_version ~params =
   if params.param_version
     then (Printf.printf "%% zipperposition v%s\n" Const.version; exit 0)
 
-let setup_calculus ~env =
+let setup_penv ?(ctx=Skolem.create ()) ~penv () =
+  begin match (PEnv.get_params ~penv).param_calculus with
+  | "superposition" -> Superposition.setup_penv ~ctx ~penv
+  | x -> failwith ("unknown calculus " ^ x)
+  end;
+  if (PEnv.get_params ~penv).param_expand_def then
+    PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
+  (* be sure to get a total order on symbols *)
+  PEnv.add_constr ~penv Precedence.alpha_constraint;
+  ()
+
+let setup_env ~env =
   match (Env.get_params ~env).param_calculus with
   | "superposition" -> Superposition.setup_env ~env
   | x -> failwith ("unknown calculus " ^ x)
@@ -159,82 +170,44 @@ let load_plugins ~params =
         [ext])
     params.param_plugins
 
-(** Precedence *)
-let mk_precedence ?(constrs=[]) ~params formulas =
-  let formulas = Sequence.map PF.get_form (Sequence.of_list formulas) in
-  let constrs = constrs @
-    [Precedence.invfreq_constraint formulas; Precedence.alpha_constraint]
-  in
-  let signature = F.signature_seq formulas in
-  let symbols = Signature.to_symbols signature in
-  Precedence.create ~complete:false constrs symbols
-
-(* TODO: use Env.preprocess to reduce to CNF + expand defs *)
-
-(** Create the environment from parameters and formulas *)
-let mk_env ?meta ?constrs ~params formulas =
-  let precedence = mk_precedence ?constrs ~params formulas in
+(* build initial env and clauses *)
+let preprocess ?meta ~plugins ~params formulas =
+  (* penv *)
+  let penv = PEnv.create ?meta params in
+  setup_penv ~penv ();
+  let formulas = PEnv.process ~penv formulas in
+  Util.debug 3 "formulas pre-processed into:\n  %a"
+    (Util.pp_seq ~sep:"\n  " PF.pp) (PF.Set.to_seq formulas);
+  (* now build a context *)
+  let precedence = PEnv.mk_precedence ~penv formulas in
   Util.debug 1 "precedence: %a" Precedence.pp precedence;
   let ord = params.param_ord precedence in
-  Util.debug 1 "selection function: %s" params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
-  let signature = PF.signature_seq (Sequence.of_list formulas) in
-  let ctx = Ctx.create ~select ~signature ~ord () in
+  Util.debug 1 "selection function: %s" params.param_select;
+  let signature = PF.Set.signature formulas in
+  let ctx = Ctx.create ~ord ~select ~signature () in
+  (* build the env *)
   let env = Env.create ?meta ~ctx params signature in
-  setup_calculus ~env;
-  env
-
-(** Use the environment to compute a new environment. The idea is
-    that formulas are preprocessed using [env], and then a new environment
-    is computed using the preprocessed formulas (different signature, etc.).
-    Returns *)
-let do_preprocessing ?meta ~params ~env formulas =
-  let formulas = Env.preprocess ~env formulas in
-  Util.debug 3 "formulas pre-processed into:\n  %a"
-    (Util.pp_list ~sep:"\n  " PF.pp) formulas;
-  let constrs = Env.compute_constrs ~env
-    (Sequence.map PF.get_form (Sequence.of_list formulas)) in
-  let env' = mk_env ~constrs ?meta ~params formulas in
-  (* transfert experts *)
-  Experts.Set.iter (Env.get_experts ~env) (Env.add_expert ~env:env');
-  env', formulas
-
-(** Enrichment of the initial set of clauses by detecting some theories *)
-let enrich_with_theories ~env clauses =
-  List.fold_left
-    (fun acc hc ->
-      let lemmas = Env.meta_step ~env hc in
-      Sequence.fold
-        (fun acc hc -> hc::acc) acc lemmas)
-    clauses clauses
-
-(* build initial env and clauses *)
-let load_everything ?meta ~plugins ~params formulas =
-  (* initial env *)
-  let env = mk_env ?meta ~params formulas in
-  Extensions.apply_list ~env plugins;
-  (* env after preprocessing *)
-  Util.debug 1 "preprocessing...";
-  let env, formulas = do_preprocessing ?meta ~params ~env formulas in
-  Extensions.apply_list ~env plugins;
+  setup_env ~env;
+  (* reduce to CNF *)
   Util.debug 1 "reduce to CNF...";
   let clauses = Env.cnf ~env formulas in
-  Util.debug 3 "CNF:\n  %a" (Util.pp_list ~sep:"\n  " C.pp) clauses;
-  let clauses = enrich_with_theories ~env clauses in
+  Util.debug 3 "CNF:\n  %a" (Util.pp_seq ~sep:"\n  " C.pp) (C.CSet.to_seq clauses);
+  (* return env + clauses *)
   env, clauses
 
 (* pre-saturation *)
 let presaturate_clauses ~env clauses =
   Util.debug 1 "presaturate initial clauses";
-  Env.add_passive ~env (Sequence.of_list clauses);
+  Env.add_passive ~env clauses;
   let result, num = Sat.presaturate ~env in
   Util.debug 1 "initial presaturation in %d steps" num;
   (* pre-saturated set of clauses *)
-  let clauses = Env.get_active ~env in
+  let clauses = Sequence.persistent (Env.get_active ~env) in
   (* remove clauses from [env] *)
   Env.remove_active ~env clauses;
   Env.remove_passive ~env clauses;
-  result, Sequence.to_rev_list clauses
+  result, clauses
 
 (** Print some content of the state, based on environment variables *)
 let print_dots ~env result =
@@ -295,24 +268,25 @@ let process_file ?meta ~plugins ~params file =
   (* parse formulas *)
   let decls = Util_tptp.parse_file ~recursive:true file in
   Util.debug 1 "parsed %d declarations" (Sequence.length decls);
-  (* obtain proved formulas *)
+  (* obtain a set of proved formulas *)
   let formulas = Util_tptp.sourced_formulas ~file decls in
   let formulas = Sequence.map PF.of_sourced formulas in
-  let formulas = Sequence.to_rev_list formulas in
+  let formulas = PF.Set.of_seq formulas in
   (* obtain clauses + env *)
-  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_list ~sep:"\n%%  " PF.pp) formulas;
-  let env, clauses = load_everything ?meta ~plugins ~params formulas in
+  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
+    (PF.Set.to_seq formulas);
+  let env, clauses = preprocess ?meta ~plugins ~params formulas in
   (* pre-saturation *)
-  let num_clauses = List.length clauses in
+  let num_clauses = C.CSet.size clauses in
   let result, clauses = if params.param_presaturate
-    then presaturate_clauses ~env clauses
-    else Sat.Unknown, clauses
+    then presaturate_clauses ~env (C.CSet.to_seq clauses)
+    else Sat.Unknown, C.CSet.to_seq clauses
   in
   Util.debug 1 "signature: %a" Signature.pp_no_base (Env.signature env);
   Util.debug 2 "%d clauses processed into:\n%%  %a"
-    num_clauses (Util.pp_list ~sep:"\n%%  " C.pp) clauses;
+    num_clauses (Util.pp_seq ~sep:"\n%%  " C.pp) clauses;
   (* add clauses to passive set of [env] *)
-  Env.add_passive ~env (Sequence.of_list clauses);
+  Env.add_passive ~env clauses;
   (* saturate *)
   let result, num = match result with
     | Sat.Unsat _ -> result, 0  (* already found unsat during presaturation *)

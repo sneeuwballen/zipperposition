@@ -95,7 +95,9 @@ val contextual_literal_cutting : ProofState.ActiveSet.t -> Clause.t -> Clause.t
 val condensation : Clause.t -> Clause.t
   (** condensation *)
 
-(** {2 Contributions to Env} *)
+(** {2 Contributions to Env and Penv} *)
+
+val setup_penv : ctx:Skolem.ctx -> penv:PEnv.t -> unit
 
 val setup_env : env:Env.t -> unit
   (** Add rules to the environment. *)

@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+(* TODO: also allow to contribute to {!PEnv} *)
+
 type t = {
   name : string;
   actions : action list;

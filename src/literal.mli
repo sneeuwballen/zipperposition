@@ -163,9 +163,14 @@ module Arr : sig
                          ord:Ordering.t -> Substs.t ->
                          t array -> Substs.scope -> t array
 
+  val fmap : ord:Ordering.t -> t array -> (Term.t -> Term.t) -> t array
+
   val pos : t array -> BV.t
   val neg : t array -> BV.t
   val maxlits : ord:Ordering.t -> t array -> BV.t
+
+  val is_trivial : t array -> bool
+    (** Tautology? (simple syntactic criterion only) *)
 
   val to_seq : t array -> (Term.t * Term.t * bool) Sequence.t
     (** Convert the lits into a sequence of equations *)

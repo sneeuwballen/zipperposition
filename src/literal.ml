@@ -516,6 +516,9 @@ module Arr = struct
       (fun lit -> apply_subst ~recursive ~renaming ~ord subst lit scope)
       lits
 
+  let fmap ~ord lits f =
+    Array.map (fun lit -> fmap ~ord f lit) lits
+
   (** bitvector of literals that are positive *)
   let pos lits =
     let bv = BV.create ~size:(Array.length lits) false in
@@ -537,6 +540,16 @@ module Arr = struct
     let m = Multiset.create_a lits in
     let bv = Multiset.max (fun lit1 lit2 -> compare_partial ~ord lit1 lit2) m in
     bv
+
+  let is_trivial lits =
+    Util.array_exists
+      (function
+      | True -> true
+      | False -> false
+      | Equation (l, r, true, _) -> T.eq l r
+      | Equation (l, r, false, _) -> false
+      | Prop (_, _) -> false)
+      lits
 
   (** Convert the lits into a sequence of equations *)
   let to_seq lits =

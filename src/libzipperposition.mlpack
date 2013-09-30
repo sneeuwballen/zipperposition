@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6ee19d605a6512b92a9471cdc5bb3fb5)
+# DO NOT EDIT (digest: 9c6a8769d556fe415bb61347554862e1)
 ClauseQueue
 Clause
 Const
@@ -18,7 +18,7 @@ PFormula
 Theories
 AC
 Chaining
-FormOrClause
+PEnv
 Params
 Env
 Arith

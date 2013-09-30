@@ -29,9 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type t = {
+type t = private {
   form : Formula.t;
   proof : Proof.t;
+  mutable simpl_to : t option;
 }
 
 type pform = t
@@ -43,10 +44,21 @@ val eq : t -> t -> bool
 val hash : t -> int
 val cmp : t -> t -> int
 
+val eq_noproof : t -> t -> bool
+val cmp_noproof : t -> t -> int
+  (** Compare only by formula, not by proof *)
+
 val create : Formula.t -> Proof.t -> t
 
 val of_sourced : Formula.sourced_form -> t
 val to_sourced : t -> Formula.sourced_form option
+
+val follow_simpl : t -> t
+  (** Follow the "simplify to" links until the formula has None *)
+
+val simpl_to : from:t -> into:t -> unit
+  (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
+      the simplification of [from] into [into] is cached. *)
 
 val signature : t -> Signature.t
 val signature_seq : ?init:Signature.t -> t Sequence.t -> Signature.t
@@ -60,32 +72,12 @@ val bij : ord:Ordering.t -> t Bij.t
 
 (** {2 Set of formulas} *)
 
-module FSet : sig
-  type t
+(** PFormulas are compared by their formulas, not their proofs. A set
+    can contain at most one proof for a given formula. *)
 
-  val create : unit -> t
+module Set : sig
+  include Sequence.Set.S with type elt = pform
 
-  val add : t -> pform -> unit
-
-  val eq : t -> t -> bool
-
-  val flatMap : t -> (pform -> pform list) -> t
-
-  val remove : t -> pform -> unit
-
-  val iter : t -> (pform -> unit) -> unit
-
-  val of_seq : ?init:t -> pform Sequence.t -> t
-
-  val to_seq : t -> pform Sequence.t
-
-  val of_list : pform list -> t
-
-  val to_list : t -> pform list
-
-  val size : t -> int
+  val signature : ?signature:Signature.t -> t -> Signature.t
 end
 
-(** {2 Transformations} *)
-
-module TransformDag : Transform.DAG with type Form.t = pform
