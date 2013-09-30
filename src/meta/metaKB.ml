@@ -379,17 +379,11 @@ let add_reasoner reasoner kb =
 let on_lemma r =
   let s = MetaReasoner.on_new_fact_by r "lemma" in
   Signal.map s (fun lit ->
-    Util.debug 1 "on_lemma fires";
-    try
-      let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
-      (* recover a formula from the raw datalog literal *)
-      let f = MetaPattern.apply (p, terms) in
-      let f = MetaPattern.EncodedForm.decode f in
-      Util.debug 1 "got lemma %a" F.pp f;
-      NewLemma (f, lit)
-    with MetaPattern.EncodedForm.DontForgetToCurry t ->
-      Util.debug 1 "curry %a" T.pp t;
-      assert false)
+    let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
+    (* recover a formula from the raw datalog literal *)
+    let f = MetaPattern.apply (p, terms) in
+    let f = MetaPattern.EncodedForm.decode f in
+    NewLemma (f, lit))
 
 let on_axiom r =
   let s = MetaReasoner.on_new_fact_by r "axiom" in
