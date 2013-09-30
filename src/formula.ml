@@ -410,8 +410,7 @@ let db_contains f n =
 let db_replace f t =
   map_depth
     ~depth:0
-    (fun depth t' ->
-      T.db_unlift ~depth (T.db_replace ~depth ~into:t' ~by:t))
+    (fun depth t' -> T.db_replace ~depth ~into:t' ~by:(T.db_lift depth t))
     f
 
 exception FoundType of Type.t
