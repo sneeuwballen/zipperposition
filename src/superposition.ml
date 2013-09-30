@@ -980,12 +980,14 @@ let subsumed_in_set set c =
   (* if c is a single unit clause *)
   let try_eq_subsumption = C.is_unit_clause c && Lit.is_pos c.C.hclits.(0) in
   (* use feature vector indexing *)
-  let l = ref [] in
-  SubsumIdx.retrieve_subsumed_c set#idx_fv c ()
-    (fun () hc' -> if (try_eq_subsumption && eq_subsumes c.C.hclits hc'.C.hclits)
-                    || subsumes c.C.hclits hc'.C.hclits then l := hc' :: !l);
+  let res = SubsumIdx.retrieve_subsumed_c set#idx_fv c C.CSet.empty
+    (fun res c' -> if (try_eq_subsumption && eq_subsumes c.C.hclits c'.C.hclits)
+                    || subsumes c.C.hclits c'.C.hclits
+      then C.CSet.add res c'
+      else res)
+  in
   Util.exit_prof prof_subsumption_in_set;
-  !l
+  res
 
 (** Number of equational lits. Used as an estimation for the difficulty of the subsumption
     check for this clause. *)
@@ -1119,8 +1121,6 @@ let setup_env ~env =
     backward_demodulate actives set c
   and redundant = subsumed_by_set
   and backward_redundant = subsumed_in_set
-  and list_simplify c =
-    if is_tautology c then [] else [c]
   and is_trivial = is_tautology
   and constrs =
     [Precedence.min_constraint
@@ -1132,15 +1132,14 @@ let setup_env ~env =
   Env.add_binary_inf ~env "superposition_active" infer_active;
   Env.add_unary_inf ~env "equality_factoring" infer_equality_factoring;
   Env.add_unary_inf ~env "equality_resolution" infer_equality_resolution;
-  env.Env.rw_simplify <- rw_simplify;
-  env.Env.basic_simplify <- basic_simplify;
-  env.Env.active_simplify <- active_simplify;
-  env.Env.backward_simplify <- backward_simplify;
-  env.Env.redundant <- redundant;
-  env.Env.backward_redundant <- backward_redundant;
-  env.Env.list_simplify <- list_simplify;
-  env.Env.is_trivial <- is_trivial;
-  Env.add_constrs env (Sequence.of_list constrs);
+  Env.add_rw_simplify ~env rw_simplify;
+  Env.add_simplify ~env basic_simplify;
+  Env.add_active_simplify ~env active_simplify;
+  Env.add_backward_simplify ~env backward_simplify;
+  Env.add_redundant ~env redundant;
+  Env.add_backward_redundant ~env backward_redundant;
+  Env.add_is_trivial ~env is_trivial;
+  Env.add_constrs ~env (Sequence.of_list constrs);
   Env.add_preprocess_rule ~env rule_remove_trivial;
   Env.add_preprocess_rule ~env rule_reduce_cnf;
   ()

@@ -54,6 +54,7 @@ type t = {
   mutable hcproof : Proof.t;              (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
+  mutable hcsimplto : t option;           (** simplifies into the clause *)
 } 
 
 type clause = t
@@ -128,6 +129,20 @@ let is_child_of ~child c =
   let descendants = SmallSet.add c.hcdescendants child.hctag in
   c.hcdescendants <- descendants
 
+(* see if [c] is known to simplify into some other clause *)
+let rec follow_simpl c = match c.hcsimplto with
+  | None -> c
+  | Some c' ->
+    Util.debug 3 "clause %a already simplified to %a" Lits.pp c.hclits Lits.pp c'.hclits;
+    follow_simpl c'
+
+(* [from] simplifies into [into] *)
+let simpl_to ~from ~into =
+  let from = follow_simpl from in
+  assert (from.hcsimplto = None);
+  if from != into then
+    from.hcsimplto <- Some into
+
 module CHashcons = Hashcons.Make(struct
   type t = clause
   let hash c = Lits.hash c.hclits
@@ -160,6 +175,7 @@ let create_a ?parents ?selected ~ctx lits proof =
     hcproof = Obj.magic 0;
     hcparents = [];
     hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
+    hcsimplto = None;
   } in
   let old_hc, c = c, CHashcons.hashcons c in
   if c == old_hc then begin
@@ -442,6 +458,22 @@ module CSet = struct
   let choose set =
     try Some (snd (IntMap.choose set))
     with Not_found -> None
+
+  let union s1 s2 = IntMap.merge
+    (fun _ c1 c2 -> match c1, c2 with
+      | Some c1, Some c2 -> assert (c1 == c2); Some c1
+      | Some c, None
+      | None, Some c -> Some c
+      | None, None -> None)
+    s1 s2
+
+  let inter s1 s2 = IntMap.merge
+    (fun _ c1 c2 -> match c1, c2 with
+      | Some c1, Some c2 -> assert (c1 == c2); Some c1
+      | Some _, None
+      | None, Some _
+      | None, None -> None)
+    s1 s2
 
   let iter set k = IntMap.iter (fun _ c -> k c) set
 

@@ -267,7 +267,7 @@ let print_szs_result ~env result =
     Printf.printf "%% SZS status InternalError\n";
     Util.debug 1 "error is: %s" s
   | Sat.Sat ->
-    if Ctx.is_completeness_preserved env.Env.ctx
+    if Ctx.is_completeness_preserved (Env.ctx env)
       then Printf.printf "%% SZS status CounterSatisfiable\n"
       else Printf.printf "%% SZS status GaveUp\n";
     Util.debug 1 "saturated set:\n  %a\n"

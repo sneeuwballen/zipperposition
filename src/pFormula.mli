@@ -41,6 +41,7 @@ val get_proof : t -> Proof.t
 
 val eq : t -> t -> bool
 val hash : t -> int
+val cmp : t -> t -> int
 
 val create : Formula.t -> Proof.t -> t
 

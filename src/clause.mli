@@ -52,6 +52,7 @@ type t = private {
   mutable hcproof : Proof.t;             (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
+  mutable hcsimplto : t option;           (** simplifies into the clause *)
 } 
 
 type clause = t
@@ -94,6 +95,13 @@ end
 val is_child_of : child:t -> t -> unit
   (** [is_child_of ~child c] is to be called to remember that [child] is a child
       of [c], is has been infered/simplified from [c] *)
+
+val follow_simpl : t -> t
+  (** Follow the "hcsimplto" links until the clause has None *)
+
+val simpl_to : from:t -> into:t -> unit
+  (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
+      the simplification of [from] into [into] is cached. *)
 
 module CHashcons : Hashcons.S with type elt = clause
 
@@ -263,6 +271,12 @@ module CSet : sig
 
   val choose : t -> clause option
     (** Choose a clause in the set *)
+
+  val union : t -> t -> t
+    (** Union of sets *)
+
+  val inter : t -> t -> t
+    (** Intersection of sets *)
 
   val iter : t -> (clause -> unit) -> unit
     (** iterate on clauses in the set *)

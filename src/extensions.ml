@@ -41,7 +41,7 @@ and action =
   | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
   | Ext_term_rewrite of string * (Term.t -> Term.t)
   | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
-  | Ext_simplification_rule of (Clause.t -> Clause.t list)
+  | Ext_simplification_rule of (Clause.t -> Clause.t)
   (** Action that can be performed by an extension *)
 
 type load_result =
@@ -77,18 +77,16 @@ let dyn_load filename =
 let apply ~env ext =
   let apply_action action = match action with
   | Ext_general f -> f env
-  | Ext_expert e -> Env.add_expert ~env (e ~ctx:env.Env.ctx)
+  | Ext_expert e -> Env.add_expert ~env (e ~ctx:(Env.ctx env))
   | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
   | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
-  | Ext_signal_incompleteness -> Ctx.lost_completeness env.Env.ctx
+  | Ext_signal_incompleteness -> Ctx.lost_completeness (Env.ctx env)
   | Ext_term_rewrite (name, rule) ->  (* add rewrite rule *)
     Env.add_rewrite_rule ~env name rule
   | Ext_lit_rewrite (name, rule) ->
     Env.add_lit_rule ~env name rule
   | Ext_simplification_rule r ->  (* add simplifcation rule *)
-    let list_simplify' = env.Env.list_simplify in
-    env.Env.list_simplify <-
-      (fun hc -> Util.list_flatmap list_simplify' (r hc))
+    Env.add_simplify ~env r
   in
   List.iter apply_action ext.actions
 

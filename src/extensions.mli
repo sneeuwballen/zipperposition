@@ -40,7 +40,7 @@ and action =
   | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
   | Ext_term_rewrite of string * (Term.t -> Term.t)
   | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
-  | Ext_simplification_rule of (Clause.t -> Clause.t list)
+  | Ext_simplification_rule of (Clause.t -> Clause.t)
   (** Action that can be performed by an extension *)
 
 val register : t -> unit

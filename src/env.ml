@@ -34,12 +34,36 @@ module C = Clause
 module F = Formula
 module PF = PFormula
 module Lit = Literal
+module Lits = Literal.Arr
 
 type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
   (** binary inferences. An inference returns a list of conclusions *)
 
 type unary_inf_rule = Clause.t -> Clause.t list
   (** unary infererences *)
+
+type rw_simplify_rule = ProofState.SimplSet.t -> Clause.t -> Clause.t 
+  (** Simplify a clause w.r.t. a simplification set *)
+
+type active_simplify_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t
+  (** Simplify the given clause using clauses from the active set. *)
+
+type backward_simplify_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
+  (** backward simplification by a unit clause. It returns a set of
+      active clauses that can potentially be simplified by the given clause.
+      [backward_simplify active c] therefore returns a subset of [active]. *)
+
+type redundant_rule = ProofState.ActiveSet.t -> Clause.t -> bool
+  (** check whether the clause is redundant w.r.t the set *)
+
+type backward_redundant_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
+  (** find redundant clauses in set w.r.t the clause *)
+
+type simplify_rule = Clause.t -> Clause.t
+  (** Simplify the clause structurally (basic simplifications) *)
+
+type is_trivial_rule = Clause.t -> bool
+  (** Rule that checks whether the clause is trivial (a tautology) *)
 
 type lit_rewrite_rule = ctx:Ctx.t -> Lit.t -> Lit.t
   (** Rewrite rule on literals *)
@@ -63,34 +87,29 @@ type t = {
   mutable lit_rules : (string * lit_rewrite_rule) list;
     (** Rules to be applied to literals *)
   
-  mutable basic_simplify : Clause.t -> Clause.t;
+  mutable basic_simplify : simplify_rule list;
     (** how to simplify a clause *)
   
-  mutable rw_simplify : ProofState.SimplSet.t -> Clause.t -> Clause.t;
+  mutable rw_simplify : rw_simplify_rule list;
     (** how to simplify a clause w.r.t a set of unit clauses *)
   
-  mutable active_simplify : ProofState.ActiveSet.t -> Clause.t -> Clause.t;
+  mutable active_simplify : active_simplify_rule list;
     (** how to simplify a clause w.r.t an active set of clauses *)
 
-  mutable backward_simplify : ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t;
+  mutable backward_simplify : backward_simplify_rule list;
     (** backward simplification by a unit clause. It returns a set of
         active clauses that can potentially be simplified by the given clause *)
 
-  mutable redundant : ProofState.ActiveSet.t -> Clause.t -> bool;
+  mutable redundant : redundant_rule list;
     (** check whether the clause is redundant w.r.t the set *)
 
-  mutable backward_redundant : ProofState.ActiveSet.t -> Clause.t -> Clause.t list;
+  mutable backward_redundant : backward_redundant_rule list;
     (** find redundant clauses in set w.r.t the clause *)
 
-  mutable list_simplify : Clause.t -> Clause.t list;
-    (** how to simplify a clause into a (possibly empty) list
-        of clauses. This subsumes the notion of trivial clauses (that
-        are simplified into the empty list of clauses) *)
-
-  mutable is_trivial : Clause.t -> bool;
+  mutable is_trivial : is_trivial_rule list;
     (** single test to detect trivial clauses *)
 
-  mutable axioms : PFormula.t list;
+  mutable axioms : PFormula.FSet.t;
     (** a list of axioms to add to the problem *)
 
   mutable mk_constr : (Formula.t Sequence.t -> Precedence.constr list) list;
@@ -123,15 +142,14 @@ let create ?meta ~ctx params signature =
     unary_rules = [];
     rewrite_rules = [];
     lit_rules = [];
-    basic_simplify = (fun c -> c);
-    rw_simplify = (fun _ c -> c);
-    active_simplify = (fun _ c -> c);
-    backward_simplify = (fun _ c -> C.CSet.empty);
-    redundant = (fun _ _ -> false);
-    backward_redundant = (fun _ _ -> []);
-    list_simplify = (fun c -> [c]);
-    is_trivial = (fun _ -> false);
-    axioms = [];
+    basic_simplify = [];
+    rw_simplify = [];
+    active_simplify = [];
+    backward_simplify = [];
+    redundant = [];
+    backward_redundant = [];
+    is_trivial = [];
+    axioms = PFormula.FSet.create ();
     mk_constr = [];
     constr = [];
     preprocess = [];
@@ -206,8 +224,26 @@ let add_unary_inf ~env name rule =
   if not (List.mem_assoc name env.unary_rules)
     then env.unary_rules <- (name, rule) :: env.unary_rules
 
-let list_simplify ~env c =
-  env.list_simplify c
+let add_rw_simplify ~env r =
+  env.rw_simplify <- r :: env.rw_simplify
+
+let add_active_simplify ~env r =
+  env.active_simplify <- r :: env.active_simplify
+
+let add_backward_simplify ~env r =
+  env.backward_simplify <- r :: env.backward_simplify
+
+let add_redundant ~env r =
+  env.redundant <- r :: env.redundant
+
+let add_backward_redundant ~env r =
+  env.backward_redundant <- r :: env.backward_redundant
+
+let add_simplify ~env r =
+  env.basic_simplify <- r :: env.basic_simplify
+
+let add_is_trivial ~env r =
+  env.is_trivial <- r :: env.is_trivial
 
 let add_expert ~env expert =
   env.state#add_expert expert
@@ -220,6 +256,11 @@ let add_lit_rule ~env name rule =
 
 let add_preprocess_rule ~env rule =
   env.preprocess <- env.preprocess @ [rule]
+
+let add_axioms ~env seq =
+  Sequence.iter
+    (fun ax -> PFormula.FSet.add env.axioms ax)
+    seq
 
 let get_experts ~env =
   env.state#experts
@@ -247,9 +288,12 @@ let compute_constrs ~env cs =
     constrs env.mk_constr
   in constrs
 
+let ctx env = env.ctx
 let ord env = Ctx.ord env.ctx
 let precedence env = Ordering.precedence (ord env)
 let signature env = Ctx.signature env.ctx
+
+let state env = env.state
 
 let pp buf env = 
   Printf.bprintf buf "env(state: %a, experts: %a)"
@@ -335,7 +379,12 @@ let do_unary_inferences ~env c =
 
 (** Check whether the clause is trivial (also with Experts) *)
 let is_trivial ~env c =
-  env.is_trivial c || Experts.Set.is_redundant (get_experts ~env) c
+  begin match env.is_trivial with
+  | [] -> false
+  | [f] -> f c
+  | [f;g] -> f c || g c
+  | l -> List.exists (fun f -> f c) l
+  end || Experts.Set.is_redundant (get_experts ~env) c
 
 (** Apply rewrite rules *)
 let rewrite ~env c =
@@ -408,41 +457,99 @@ let rewrite_lits ~env c =
   end
 
 (** All basic simplification of the clause itself *)
-let basic_simplify ~env c =
-  if env.lit_rules = []
-    then env.basic_simplify c
-    else  (* rewrite lits, then simplify *)
-      let c' = rewrite_lits ~env c in
-      env.basic_simplify c'
+let rec basic_simplify ~env c =
+  (* first, rewrite literals (if needed) *)
+  let c = match env.lit_rules with
+  | [] -> c
+  | l -> rewrite_lits ~env c
+  in
+  let c = C.follow_simpl c in
+  (* apply simplifications *)
+  let c' = match env.basic_simplify with
+  | [] -> c
+  | [f] -> f c
+  | [f;g] -> g (f c)
+  | l -> List.fold_left (fun c f -> f c) c l
+  in
+  (* fixpoint *)
+  if C.eq c c'
+    then c'
+    else begin
+      C.simpl_to c c';
+      basic_simplify ~env c'  (* fixpoint *)
+    end
+
+(* rewrite clause with simpl_set *)
+let rec rw_simplify ~env c =
+  let simpl_set = env.state#simpl_set in
+  let c' = match env.rw_simplify with
+  | [] -> c
+  | [f] -> f simpl_set c
+  | [f;g] -> g simpl_set (f simpl_set c)
+  | l -> List.fold_left (fun c f -> f simpl_set c) c l
+  in
+  if C.eq c c'
+    then c'
+    else rw_simplify ~env c'
+
+(* simplify clause w.r.t. active set *)
+let rec active_simplify ~env c =
+  let active = env.state#active_set in
+  let c' = match env.active_simplify with
+  | [] -> c
+  | [f] -> f active c
+  | [f;g] -> f active (g active c)
+  | l -> List.fold_left (fun c f -> f active c) c l
+  in
+  if C.eq c c'
+    then c'
+    else active_simplify ~env c'
 
 (** Simplify the hclause. Returns both the hclause and its simplification. *)
-let simplify ~env old_hc =
+let simplify ~env old_c =
+  (* fixpoint *)
+  let rec fix ~env old_c =
+    let c = old_c in
+    let c = basic_simplify ~env c in
+    (* simplify with unit clauses, then all active clauses *)
+    let c = rewrite ~env c in
+    let c = rw_simplify ~env c in
+    let c = basic_simplify ~env c in
+    let c = Experts.Set.simplify (get_experts env) c in
+    let c = active_simplify ~env c in
+    if not (Lits.eq_com c.C.hclits old_c.C.hclits)
+      then begin
+        Util.debug 2 "clause %a simplified into %a" C.pp old_c C.pp c;
+        C.simpl_to old_c c;
+        fix ~env c
+      end else
+        c
+  in
   Util.enter_prof prof_simplify;
-  let c = old_hc in
-  (* simplify with unit clauses, then all active clauses *)
-  let c = rewrite ~env c in
-  let c = env.rw_simplify env.state#simpl_set c in
-  let c = basic_simplify ~env c in
-  let c = Experts.Set.simplify (get_experts env) c in
-  let c = env.active_simplify env.state#active_set c in
-  let c = basic_simplify ~env c in
-  (if not (Lit.Arr.eq c.C.hclits old_hc.C.hclits)
-    then Util.debug 2 "clause %a simplified into %a" C.pp old_hc C.pp c);
+  let c = fix ~env old_c in
   Util.exit_prof prof_simplify;
-  old_hc, c
+  old_c, c
+
+(* find candidates for backward simplification in active set *)
+let backward_simplify ~env given =
+  let active = env.state#active_set in
+  match env.backward_simplify with
+  | [] -> C.CSet.empty
+  | [f] -> f active given
+  | [f;g] -> C.CSet.union (f active given) (g active given)
+  | l -> List.fold_left (fun set f -> C.CSet.union set (f active given)) C.CSet.empty l
 
 (** Perform backward simplification with the given clause *)
 let backward_simplify ~env given =
   Util.enter_prof prof_back_simplify;
   (* set of candidate clauses, that may be unit-simplifiable *)
-  let candidates = env.backward_simplify env.state#active_set given in
+  let candidates = backward_simplify ~env given in
   (* try to simplify the candidates. Before is the set of clauses that
      are simplified, after is the list of those clauses after simplification *)
-  let simpl_set = env.state#simpl_set in
   let before, after =
     C.CSet.fold candidates (C.CSet.empty, [])
       (fun (before, after) _ c ->
-        let c' = env.rw_simplify simpl_set c in
+        let c' = rw_simplify ~env c in
         if not (Lit.Arr.eq c.C.hclits c'.C.hclits)
           (* the active clause has been simplified! *)
           then begin
@@ -456,11 +563,10 @@ let backward_simplify ~env given =
 (** Simplify the clause w.r.t to the active set and experts *)
 let forward_simplify ~env c =
   let c = rewrite ~env c in
-  let cs = list_simplify ~env c in
-  let cs = List.map (Experts.Set.simplify (get_experts ~env)) cs in
-  let cs = List.map (env.rw_simplify env.state#simpl_set) cs in
-  let cs = List.map (basic_simplify ~env) cs in
-  Sequence.of_list cs
+  let c = Experts.Set.simplify (get_experts ~env) c in
+  let c = rw_simplify ~env c in
+  let c = basic_simplify ~env c in
+  c
 
 (** generate all clauses from inferences *)
 let generate ~env given =
@@ -502,18 +608,7 @@ let remove_orphans ~env removed_clauses =
     SmallSet.iter
       (fun orphan_id ->
         Util.incr_stat stat_killed_orphans;
-        env.state#passive_set#remove orphan_id
-        (*
-        try
-          let c = C.CSet.get passive_set#clauses orphan_id in
-          if Ptset.is_empty c.hcdescendants then begin
-            (* only kill orphans that have never participated in inferences *)
-            incr_stat stat_killed_orphans;
-            passive_set#remove orphan_id
-          end
-        with Not_found -> ())
-        *)
-        )
+        env.state#passive_set#remove orphan_id)
       orphans
   in
   Sequence.iter remove_descendants removed_clauses
@@ -521,32 +616,40 @@ let remove_orphans ~env removed_clauses =
 (** check whether the clause is redundant w.r.t the current active_set *)
 let is_redundant ~env c =
   Util.enter_prof prof_is_redundant;
-  let res = env.redundant env.state#active_set c in
+  let active = env.state#active_set in
+  let res = match env.redundant with
+  | [] -> false
+  | [f] -> f active c
+  | [f;g] -> f active c || g active c
+  | l -> List.exists (fun f -> f active c) l
+  in
   Util.exit_prof prof_is_redundant;
   res
 
 (** find redundant clauses in current active_set *)
 let subsumed_by ~env c =
   Util.enter_prof prof_subsumed_by;
-  let res = env.backward_redundant env.state#active_set c in
+  let active = env.state#active_set in
+  let res = match env.backward_redundant with
+  | [] -> C.CSet.empty
+  | [f] -> f active c
+  | [f;g] -> C.CSet.union (f active c) (g active c)
+  | l -> List.fold_left (fun set f -> C.CSet.union set (f active c)) C.CSet.empty l
+  in
   Util.exit_prof prof_subsumed_by;
   res
 
-(** Use all simplification rules to convert a clause into a list of maximally
-    simplified clauses (possibly empty, if trivial). *)
+(** Use all simplification rules to convert a clause into a maximally
+    simplified clause, or None *)
 let all_simplify ~env c =
   Util.enter_prof prof_all_simplify;
-  let clauses = env.list_simplify c in
-  let clauses = Util.list_flatmap
-    (fun c ->
-      (* simplify this clause *)
-      let _, c' = simplify ~env c in
-      if env.is_trivial c' (* XXX: does not seem very useful? || Sup.is_semantic_tautology c' *)
-        then [] else [c']) (* TODO CLI flag to enable semantic tauto *)
-    clauses
+  let _, c' = simplify ~env c in
+  let res = if is_trivial ~env c' || is_redundant ~env c'
+    then None
+    else Some c'
   in
   Util.exit_prof prof_all_simplify;
-  clauses
+  res
 
 (** Do one step of the meta-prover. The current given clause and active set
     are provided. This returns a list of new clauses. *)

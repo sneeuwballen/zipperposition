@@ -139,6 +139,7 @@ val bij : ord:Ordering.t -> t Bij.t
 
 module Arr : sig
   val eq : t array -> t array -> bool
+  val eq_com : t array -> t array -> bool
   val compare : t array -> t array -> int
   val hash : t array -> int
   val hash_novar : t array -> int
