@@ -50,17 +50,13 @@ type term = t
 (** list of variables *)
 type varlist = t list            
 
-let hash_term t = match t.term with
-  | Var i -> Hash.hash_int i
-  | BoundVar i -> Hash.hash_int i
-  | Node (s, l) ->
-    let h = Hash.hash_list (fun x -> x.tag) 0 l in
-    let h = Hash.combine h (Symbol.hash s) in
-    h
-  | Bind (s, t) ->
-    Hash.combine (Symbol.hash s) t.tag
-  | At (t1, t2) ->
-    Hash.combine t1.tag t2.tag
+let hash_term t = match t.term, t.type_ with
+  | Var i, Some ty -> Hash.hash_int2 (Hash.hash_int i) (Type.hash ty)
+  | BoundVar i, Some ty -> Hash.hash_int3 27 (Hash.hash_int i) (Type.hash ty)
+  | (Var _ | BoundVar _), None -> assert false
+  | Node (s, l), _ -> Hash.hash_list (fun x -> x.tag) (Symbol.hash s) l
+  | Bind (s, t), _ -> Hash.hash_int3 13 (Symbol.hash s) t.tag
+  | At (t1, t2), _ -> Hash.hash_int3 1025 t1.tag t2.tag
 
 let rec hash_novar t = match t.term with
   | Var _ -> 42
