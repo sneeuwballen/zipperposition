@@ -37,6 +37,7 @@ and step = {
   rule : string;
   parents : t array;
   esa : bool;  (** Equisatisfiable step? *)
+  theories : string list;
 }
 
 (** {b note}: Equality does not take the parents into account. Two
@@ -53,8 +54,20 @@ val cmp : t -> t -> int
 
 val mk_f_axiom : Formula.t -> file:string -> name:string -> t
 val mk_c_axiom : CompactClause.t -> file:string -> name:string -> t
-val mk_f_step : ?esa:bool -> Formula.t -> rule:string -> t list -> t
-val mk_c_step : ?esa:bool -> CompactClause.t -> rule:string -> t list -> t
+
+val mk_f_step : ?theories:string list -> ?esa:bool ->
+                Formula.t -> rule:string -> t list -> t
+  (** Inference step that lead to the given formula. [esa = true] means
+      that the inference only preserved equisatisfiability (default false),
+      [theories] is a list of theories that are used by the inference
+      (default [["equality"]]). *)
+
+val mk_c_step : ?theories:string list -> ?esa:bool ->
+                CompactClause.t -> rule:string -> t list -> t
+  (** Inference step that lead to the given clause. [esa = true] means
+      that the inference only preserved equisatisfiability (default false),
+      [theories] is a list of theories that are used by the inference
+      (default [["equality"]]). *)
 
 val adapt_f : t -> Formula.t -> t
 val adapt_c : t -> CompactClause.t -> t
