@@ -434,7 +434,7 @@ let rec basic_simplify ~env c =
   if C.eq c c'
     then c'
     else begin
-      C.simpl_to c c';
+      C.simpl_to ~from:c ~into:c';
       basic_simplify ~env c'  (* fixpoint *)
     end
 

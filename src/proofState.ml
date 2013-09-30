@@ -41,6 +41,16 @@ module PB = Position.Build
 module CQ = ClauseQueue
 module TO = Theories.TotalOrder
 
+let prof_add_active = Util.mk_profiler "proofState.add_active"
+let prof_remove_active = Util.mk_profiler "proofState.remove_active"
+let prof_add_passive = Util.mk_profiler "proofState.add_passive"
+let prof_next_passive = Util.mk_profiler "proofState.next_passive"
+let prof_clean_passive = Util.mk_profiler "proofState.clean_passive"
+let prof_add_simpl = Util.mk_profiler "proofState.add_simpl"
+let prof_remove_simpl = Util.mk_profiler "proofState.remove_simpl"
+
+let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
+
 module TermIndex = Fingerprint.Make(C.WithPos)
 
 module UnitIndex = Dtree.Make(struct
@@ -58,8 +68,6 @@ module SubsumptionIndex = FeatureVector.Make(struct
   let cmp = C.compare
   let to_lits = C.to_seq
 end)
-
-let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 
 (* XXX: no customization of indexing for now
 let _indexes =
@@ -152,21 +160,25 @@ module ActiveSet = struct
 
       (** add clauses (only process the ones not present in the set) *)
       method add cs =
+        Util.enter_prof prof_add_active;
         let cs = Sequence.filter (fun c -> not (C.CSet.mem m_clauses c)) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.of_seq m_clauses cs;
         let op tree = TermIndex.add tree in
         Sequence.iter (self#update op) cs;
-        m_fv <- SubsumptionIndex.add_seq m_fv cs
+        m_fv <- SubsumptionIndex.add_seq m_fv cs;
+        Util.exit_prof prof_add_active
 
       (** remove clauses (only process the ones present in the set) *)
       method remove cs =
+        Util.enter_prof prof_remove_active;
         let cs = Sequence.filter (C.CSet.mem m_clauses) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.remove_seq m_clauses cs;
         let op tree = TermIndex.remove tree in
         Sequence.iter (self#update op) cs;
-        m_fv <- SubsumptionIndex.remove_seq m_fv cs
+        m_fv <- SubsumptionIndex.remove_seq m_fv cs;
+        Util.exit_prof prof_remove_active
     end :> t)
 end
 
@@ -203,12 +215,16 @@ module SimplSet = struct
       method idx_simpl = m_simpl
 
       method add cs =
+        Util.enter_prof prof_add_simpl;
         let cs = Sequence.filter C.is_unit_clause cs in
-        m_simpl <- Sequence.fold (apply UnitIndex.add) m_simpl cs
+        m_simpl <- Sequence.fold (apply UnitIndex.add) m_simpl cs;
+        Util.exit_prof prof_add_simpl
 
       method remove cs =
+        Util.enter_prof prof_remove_simpl;
         let cs = Sequence.filter C.is_unit_clause cs in
-        m_simpl <- Sequence.fold (apply UnitIndex.remove) m_simpl cs
+        m_simpl <- Sequence.fold (apply UnitIndex.remove) m_simpl cs;
+        Util.exit_prof prof_remove_simpl
     end
 end
 
@@ -239,6 +255,7 @@ module PassiveSet = struct
 
       (** add clauses (not already present in set) to the set *)
       method add cs =
+        Util.enter_prof prof_add_passive;
         let cs = Sequence.filter (fun c -> not (C.CSet.mem m_clauses c)) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.of_seq m_clauses cs;
@@ -246,14 +263,16 @@ module PassiveSet = struct
           (* add to i-th queue *)
           let (q, w) = m_queues.(i) in
           m_queues.(i) <- (CQ.adds q cs, w)
-        done
+        done;
+        Util.exit_prof prof_add_passive
 
       (** remove clauses (not from the queues) *)
-      method remove id = 
+      method remove id =
         m_clauses <- C.CSet.remove_id m_clauses id
 
       (** next clause *)
       method next () =
+        Util.enter_prof prof_next_passive;
         let first_idx, w = m_state in
         (* search in the idx-th queue *)
         let rec search idx weight =
@@ -277,15 +296,19 @@ module PassiveSet = struct
           else if idx = length then next_idx 0 (* cycle *)
           else search idx 0 (* search in this queue *)
         in
-        search first_idx w
+        let res = search first_idx w in
+        Util.exit_prof prof_next_passive;
+        res
 
       (* cleanup the clause queues *)
       method clean () =
+        Util.enter_prof prof_clean_passive;
         Util.incr_stat stat_passive_cleanup;
         for i = 0 to length - 1 do
           let q, w = m_queues.(i) in
           m_queues.(i) <- CQ.clean q m_clauses, w
-        done
+        done;
+        Util.exit_prof prof_clean_passive
     end
 end
 
