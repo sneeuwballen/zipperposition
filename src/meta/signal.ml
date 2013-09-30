@@ -28,7 +28,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type 'a t = {
   mutable n : int;  (* how many handlers? *)
   mutable handlers : ('a -> bool) array;
+  mutable alive : keepalive;   (* keep some signal alive *)
 } (** Signal of type 'a *)
+
+and keepalive =
+  | Keep : 'a t -> keepalive
+  | NotAlive : keepalive
 
 let nop_handler x = true
 
@@ -36,6 +41,7 @@ let create () =
   let s = { 
     n = 0;
     handlers = Array.create 3 nop_handler;
+    alive = NotAlive;
   } in
   s
 
@@ -82,6 +88,7 @@ let map signal f =
     match Weak.get r 0 with
     | None -> false
     | Some signal' -> send signal' (f x); true);
+  signal'.alive <- Keep signal;
   signal'
 
 let filter signal p =
@@ -93,4 +100,5 @@ let filter signal p =
     match Weak.get r 0 with
     | None -> false
     | Some signal' -> (if p x then send signal' x); true);
+  signal'.alive <- Keep signal;
   signal'

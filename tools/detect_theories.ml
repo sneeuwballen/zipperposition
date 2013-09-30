@@ -37,6 +37,7 @@ module KB = MetaKB
 let theory_files = ref []
 let kb_files = ref []
 let flag_print_kb = ref false
+let flag_print_datalog = ref false
 
 let add_theory f =
   theory_files := f :: !theory_files
@@ -48,6 +49,7 @@ let options =
   ; "-theory", Arg.String add_theory, "use theory file"
   ; "-kb", Arg.String add_kb, "use KB file"
   ; "-print-kb", Arg.Set flag_print_kb, "print KB"
+  ; "-print-datalog", Arg.Set flag_print_datalog, "print Datalog clauses"
   ]
 
 (* parse the given theory files into a KB *)
@@ -139,7 +141,7 @@ let detect_theories ~kb clauses =
       let facts = MetaProver.match_clause mp c in
       MetaProver.add_literals mp (Sequence.of_list facts))
     clauses;
-  ()
+  mp
 
 let main () =
   let files = ref [] in
@@ -156,7 +158,11 @@ let main () =
   (* parse CNF formulas *)
   let clauses = parse_and_cnf !files in
   (* detect theories *)
-  detect_theories ~kb clauses;
+  let mp = detect_theories ~kb clauses in
+  (* print datalog? *)
+  if !flag_print_datalog then
+    let clauses = MetaReasoner.all_clauses (MetaProver.reasoner mp) in
+    Sequence.iter (fun c -> Util.printf "  %a\n" MetaReasoner.pp_clause c) clauses;
   flush stdout;
   Util.debug 1 "success!";
   ()

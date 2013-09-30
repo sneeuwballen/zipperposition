@@ -74,6 +74,7 @@ module EncodedForm = struct
     | T.Bind (s, t') -> T.mk_bind s (decode_t t')
     | T.Node (s, [t']) when Symbol.eq s __var_symbol -> decode_t t'
     | T.Node (s, [t']) when Symbol.eq s __fun_symbol -> decode_t t'
+    | T.Node (s, []) -> t
     | T.Node (s, l) -> raise (DontForgetToCurry t)
     | T.At (t1, t2) -> T.mk_at (decode_t t1) (decode_t t2)
 
@@ -178,8 +179,8 @@ let apply (pat, args) =
   | Pattern (t, types) ->
     (* type checking for compatibility of [args] and [types] *)
     assert (List.length types = List.length args);
-    let t = HO.lambda_apply_list t args in
-    t
+    let t = List.fold_right (fun arg t -> T.mk_at t arg) args t in
+    HO.beta_reduce t
 
 (** Maps a pattern, parametrized by some of its variables, into datalog terms *)
 let mapping =
@@ -223,7 +224,8 @@ let matching pat right =
     let offset = T.max_var (T.vars t') + 1 in
     let vars = List.mapi (fun i ty -> T.mk_var ~ty (i+offset)) types in
     Util.enter_prof prof_foo;
-    let left = HO.lambda_apply_list t' vars in
+    let left = List.fold_right (fun arg t -> T.mk_at t arg) vars t' in
+    let left = HO.beta_reduce left in
     Util.exit_prof prof_foo;
     (* match left and right *)
     Util.debug 5 "MetaPattern: match %a with %a" T.pp left T.pp right;

@@ -286,7 +286,8 @@ and found_theory =
 and found_axiom =
   | NewAxiom of string * Term.t list
 
-let mapping_lemma = MetaPattern.mapping
+let mapping_lemma =
+  MetaPattern.mapping
 and mapping_theory =
   let open MetaReasoner.Translate in
   pair str (list_ term)
@@ -378,10 +379,17 @@ let add_reasoner reasoner kb =
 let on_lemma r =
   let s = MetaReasoner.on_new_fact_by r "lemma" in
   Signal.map s (fun lit ->
-    let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
-    (* recover a formula from the raw datalog literal *)
-    let f = MetaPattern.apply (p, terms) in
-    NewLemma (MetaPattern.EncodedForm.decode f, lit))
+    Util.debug 1 "on_lemma fires";
+    try
+      let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
+      (* recover a formula from the raw datalog literal *)
+      let f = MetaPattern.apply (p, terms) in
+      let f = MetaPattern.EncodedForm.decode f in
+      Util.debug 1 "got lemma %a" F.pp f;
+      NewLemma (f, lit)
+    with MetaPattern.EncodedForm.DontForgetToCurry t ->
+      Util.debug 1 "curry %a" T.pp t;
+      assert false)
 
 let on_axiom r =
   let s = MetaReasoner.on_new_fact_by r "axiom" in
