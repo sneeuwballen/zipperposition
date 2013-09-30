@@ -360,6 +360,25 @@ let array_except_idx a i =
     (fun acc j elt -> if i = j then acc else elt::acc)
     [] a
 
+(** {2 Options utils} *)
+
+module Opt = struct
+  let maybe opt x = match opt with
+    | Some y -> y
+    | None -> x
+
+  let (>>=) opt f = match opt with
+  | None -> None
+  | Some x -> f x
+
+  let get = function
+  | Some x -> x
+  | None -> invalid_arg "Opt.get"
+
+  let is_some = function | Some _ -> true | None -> false
+  let is_none = function | None -> true | Some _ -> false
+end
+
 (** {2 Finite bijections} *)
 
 module Bijection(X : Hashtbl.HashedType) = struct
