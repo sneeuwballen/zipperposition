@@ -380,7 +380,8 @@ module FormRW = struct
     and rewrite_handler () l r rule subst =
       raise (RewrittenIn (r, subst))
     in
-    let f = compute_nf ~depth S.empty f 0 in
-    Util.debug 3 "normal form: %a" F.pp f;
-    f
+    let f' = compute_nf ~depth S.empty f 0 in
+    if not (F.eq f f') 
+      then Util.debug 3 "normal form of %a: %a" F.pp f F.pp f';
+    f'
 end
