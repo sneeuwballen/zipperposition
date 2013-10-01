@@ -138,6 +138,13 @@ val list_range : int -> int -> int list
 (** call the function n times with unit *)
 val times : int -> (unit -> 'a) -> 'a list
 
+val list_product : 'a list -> 'b list -> ('a * 'b) list
+  (** Cartesian product *)
+
+val list_diagonal : 'a list -> ('a * 'a) list
+  (** All pairs of distinct positions of the list. [list_diagonal l] will
+      return the list of [List.nth i l, List.nth j l] if [i < j]. *)
+
 (** shuffle randomly the array, in place *)
 val array_shuffle : 'a array -> unit
 (** shuffle randomly the list *)

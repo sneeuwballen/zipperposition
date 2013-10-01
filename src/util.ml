@@ -313,6 +313,22 @@ let rec times i f =
   if i = 0 then []
   else (f ()) :: (times (i-1) f)
 
+let list_product l1 l2 =
+  List.fold_left
+    (fun acc x1 -> List.fold_left
+      (fun acc x2 -> (x1,x2) :: acc)
+      acc l2)
+    [] l1
+
+let list_diagonal l =
+  let rec gen acc l = match l with
+  | [] -> acc
+  | x::l' ->
+    let acc = List.fold_left (fun acc y -> (x,y) :: acc) acc l' in
+    gen acc l'
+  in
+  gen [] l
+
 (** Randomly shuffle the array, in place.
     See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle *)
 let array_shuffle a = 
