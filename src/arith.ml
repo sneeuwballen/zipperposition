@@ -177,9 +177,9 @@ module T = struct
       | S.Const ("$greatereq",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
         if S.Arith.Op.greatereq na nb then true_term else false_term
-      | S.Const ("$sum",_), _, Node (nb,[]) when S.Arith.is_zero nb -> a
-      | S.Const ("$sum",_), Node (na,[]), _ when S.Arith.is_zero na -> b
-      | S.Const ("$difference",_), _, Node (nb,[]) when S.Arith.is_zero nb -> a
+      | S.Const ("$sum",_), _, Node (nb,[]) when S.Arith.is_zero nb -> recurse a
+      | S.Const ("$sum",_), Node (na,[]), _ when S.Arith.is_zero na -> recurse b
+      | S.Const ("$difference",_), _, Node (nb,[]) when S.Arith.is_zero nb -> recurse a
       | S.Const ("$difference",_), Node (na,[]), _ when S.Arith.is_zero na ->
         recurse (mk_uminus b)
       | S.Const ("$difference",_), _, _ when eq a b ->
@@ -370,7 +370,7 @@ module Monome = struct
 
   let difference m1 m2 =
     let m1, m2 = reduce_same_divby m1 m2 in
-    let constant = S.Arith.Op.sum m1.constant m2.constant in
+    let constant = S.Arith.Op.difference m1.constant m2.constant in
     let coeffs = T.TMap.merge
       (fun t c1 c2 -> match c1, c2 with
       | None, Some c -> Some (S.Arith.Op.uminus c)
@@ -400,6 +400,7 @@ module Monome = struct
         { m with constant; coeffs; }
 
   let divby m const =
+    assert (S.Arith.sign const >= 0);
     if S.Arith.is_zero const
       then raise Division_by_zero
       else
@@ -469,7 +470,11 @@ module Monome = struct
   let to_term m =
     let sum = T.mk_const m.constant in
     let sum = T.TMap.fold
-      (fun t' coeff sum -> T.mk_sum (T.mk_product (T.mk_const coeff) t') sum)
+      (fun t' coeff sum ->
+        assert (not (S.Arith.is_zero coeff));
+        if S.Arith.is_one coeff
+          then T.mk_sum t' sum
+          else T.mk_sum (T.mk_product (T.mk_const coeff) t') sum)
       m.coeffs sum
     in
     if S.Arith.is_one m.divby
@@ -520,9 +525,10 @@ module Lit = struct
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
         let terms = Monome.to_list m in
-        (* for each term, pivot the monome to isolate the term. Careful with
-            the sign as it can change the comparison sign too! If the
-            coeff is > 0 it means that the term [t] is on the {b left}
+        (* l <| r is equivalent to m <| 0.
+            for each term [t] of [m], pivot the monome to isolate [t]. Careful
+              with the sign as it can change the comparison sign too! If the
+              coeff of [t] is > 0 it means that the term [t] is on the {b left}
             side. *)
         List.map
           (fun (coeff, t) ->
@@ -531,10 +537,14 @@ module Lit = struct
             let swap = S.Arith.sign coeff < 0 in
             let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
             match strict, swap with
-            | true, false -> L_less (t, m)
-            | true, true -> R_less (m, t)
-            | false, false -> L_lesseq (t, m)
-            | false, true -> R_lesseq (m, t)
+            | true, false ->
+              L_less (t, Monome.uminus m) (* t+m < 0 ---> t < -m *)
+            | true, true ->
+              R_less (m, t)  (* -t+m < 0 ---> m < t *)
+            | false, false ->
+              L_lesseq (t, Monome.uminus m)  (* t+m <= 0 ---> t <= -m *)
+            | false, true ->
+              R_lesseq (m, t)  (* -t+m <= 0 ---> m <= t *)
           )
           terms
       with Monome.NotLinear -> []
@@ -777,6 +787,7 @@ let factor_arith c =
     let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
       ~rule:"factor" cc [c.C.hcproof] in
     let new_c = C.create ~parents:[c] ~ctx lits' proof in
+    Util.debug 3 "factor %a with %a" Literal.pp c.C.hclits.(i) Substs.pp subst;
     new_c
   in
   (* try to factor arith literals *)
