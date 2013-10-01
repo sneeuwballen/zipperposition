@@ -65,6 +65,14 @@ module T : sig
     (** Arithmetic simplifications *)
 end
 
+(** {2 Formulas} *)
+
+module F : sig
+  val simplify : signature:Signature.t -> Formula.t -> Formula.t
+    (** Simplify an arithmetic formula. In particular, it eliminates
+        $greater and $greatereq, and simplifies subterms. *)
+end
+
 (** {2 Polynomes of order 1, over several variables}.
 
     Variables, in this module, are non-arithmetic terms, i.e. non-interpreted
@@ -166,6 +174,7 @@ end
 
 module Lits : sig
   val purify : ord:Ordering.t -> signature:Signature.t ->
+               eligible:(int -> Literal.t -> bool) ->
                Literal.t array -> Literal.t array
     (** Purify the literals, by replacing arithmetic terms that occur
         under a non-interpreted predicate of formula, by a fresh variable,
@@ -195,5 +204,15 @@ val factor_arith : Env.unary_inf_rule
 
 val pivot_arith : Env.unary_inf_rule
   (** Pivot arithmetic literals *)
+
+val purify_arith : Env.unary_inf_rule
+  (** Purification inference *)
+
+val axioms : PFormula.t list
+  (** Set of axioms useful to do arithmetic *)
+
+(** {2 Setup} *)
+
+val setup_penv : penv:PEnv.t -> unit
 
 val setup_env : env:Env.t -> unit

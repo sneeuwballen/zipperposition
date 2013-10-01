@@ -29,7 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module C = Clause
 module S = Symbol
+module PF = PFormula
 module Literals = Literal.Arr
 
 (** {2 Utils} *)
@@ -196,6 +198,42 @@ module T = struct
     in
     let __cache = TCache.create 9 in
     TCache.with_cache_rec __cache simplify t
+end
+
+(** {2 Formulas} *)
+
+module F = struct
+  include Formula
+
+  let rec simplify ~signature f = match f.form with
+  | True
+  | False -> f
+  | Not {form=Atom {T.term=T.Node(S.Const("$greater",_), [l;r])}} ->
+    simplify ~signature (mk_atom (T.mk_lesseq l r))
+  | Not {form=Atom {T.term=T.Node(S.Const("$greatereq",_), [l;r])}} ->
+    simplify ~signature (mk_atom (T.mk_less l r))
+  | Not {form=Atom {T.term=T.Node(S.Const("$less",_), [l;r])}} ->
+    simplify ~signature (mk_atom (T.mk_lesseq r l))
+  | Not {form=Atom {T.term=T.Node(S.Const("$lesseq",_), [l;r])}} ->
+    simplify ~signature (mk_atom (T.mk_less r l))
+  | Atom {T.term=T.Node(S.Const("$greater",_), [l;r])} ->
+    simplify ~signature (mk_atom (T.mk_less r l))
+  | Atom {T.term=T.Node(S.Const("$greatereq",_), [l;r])} ->
+    simplify ~signature (mk_atom (T.mk_lesseq r l))
+  | Or l -> mk_or (List.map (simplify ~signature) l)
+  | And l -> mk_and (List.map (simplify ~signature) l)
+  | Not f' -> mk_not (simplify ~signature f')
+  | Equiv (f1, f2) -> mk_equiv (simplify ~signature f1) (simplify ~signature f2)
+  | Imply (f1, f2) -> mk_imply (simplify ~signature f1) (simplify ~signature f2)
+  | Atom p ->
+    let p' = T.simplify ~signature p in
+    mk_atom p'
+  | Equal (l, r) ->
+    let l' = T.simplify ~signature l in
+    let r' = T.simplify ~signature r in
+    mk_eq l' r'
+  | Forall f' -> mk_forall (simplify ~signature f')
+  | Exists f' -> mk_exists (simplify ~signature f')
 end
 
 (** {2 Polynomials of Order 1} *)
@@ -553,7 +591,7 @@ end
 (** {2 Arrays of literals} *)
 
 module Lits = struct
-  let purify ~ord ~signature lits =
+  let purify ~ord ~signature ~eligible lits =
     let new_lits = ref [] in
     let _add_lit lit = new_lits := lit :: !new_lits in
     let varidx = ref (T.max_var (Literals.vars lits) + 1) in
@@ -585,22 +623,25 @@ module Lits = struct
     | T.Node (s, l) -> T.mk_node s (List.map (purify_term ~root:false) l)
     in
     (* purify each literal *)
-    Array.iter
-      (fun lit -> match lit with
-        | Literal.Equation (l, r, sign, _) ->
-          let l = purify_term ~root:true l in
-          let r = purify_term r ~root:true in
-          let lit = Literal.mk_lit ~ord l r sign in
-          _add_lit lit
-        | Literal.Prop (p, sign) ->
-          let p = purify_term ~root:true p in
-          let lit = Literal.mk_prop p sign in
-          _add_lit lit
-        | Literal.True -> _add_lit lit
-        | Literal.False -> ()  (* useless *)
+    Array.iteri
+      (fun i lit ->
+        if eligible i lit
+          then match lit with
+          | Literal.Equation (l, r, sign, _) ->
+            let l = purify_term ~root:true l in
+            let r = purify_term r ~root:true in
+            let lit = Literal.mk_lit ~ord l r sign in
+            _add_lit lit
+          | Literal.Prop (p, sign) ->
+            let p = purify_term ~root:true p in
+            let lit = Literal.mk_prop p sign in
+            _add_lit lit
+          | Literal.True -> _add_lit lit
+          | Literal.False -> ()  (* useless *)
+          else _add_lit lit (* keep *)
       )
       lits;
-    Array.of_list !new_lits
+    Array.of_list (List.rev !new_lits)
 
   let pivot ~ord ~signature ~eligible lits =
     let results = ref [] in
@@ -632,11 +673,98 @@ end
 
 (** {2 Inference Rules} *)
 
-let rewrite_lit ~ctx lit = lit  (* TODO *)
+let rewrite_lit ~ctx lit =
+  let signature = Ctx.signature ~ctx in
+  match lit with
+  | Literal.Prop (p, sign) ->
+    let p' = T.simplify ~signature p in
+    begin match p'.T.term, sign with
+    | T.Node (S.Const("$less",_), [l;r]), false ->
+      (* not (l < r) ---> r <= l *)
+      Literal.mk_true (T.mk_lesseq r l)
+    | T.Node (S.Const("$lesseq",_), [l;r]), false ->
+      (* not (l <= r) ---> r < l *)
+      Literal.mk_true (T.mk_less r l)
+    | _ -> Literal.mk_prop p' sign
+    end
+  | Literal.Equation (l, r, sign, _) ->
+    let l' = T.simplify ~signature l in
+    let r' = T.simplify ~signature r in
+    Literal.mk_lit ~ord:(Ctx.ord ctx) l' r' sign 
+  | Literal.True
+  | Literal.False -> lit
 
 let factor_arith c = []  (* TODO *)
 
-let pivot_arith c = [] (* TODO *)
+let pivot_arith c =
+  let ctx = c.C.hcctx in
+  let eligible = C.Eligible.(combine [param c; ineq c]) in
+  let lits'_list = Lits.pivot ~ord:(Ctx.ord ctx) ~signature:(Ctx.signature ctx)
+    ~eligible c.C.hclits
+  in
+  Util.list_fmap
+    (fun lits' ->
+      if Literals.eq_com c.C.hclits lits'
+        then None
+        else begin
+          (* build new clause *)
+          let proof cc = Proof.mk_c_step ~theories:["equality";"arith"]
+            ~rule:"arith_pivot" cc [c.C.hcproof] in
+          let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
+          Util.debug 3 "arith_pivot of %a: %a" C.pp c C.pp new_c;
+          Some new_c
+        end)
+    lits'_list
+
+let purify_arith c =
+  let ctx = c.C.hcctx in
+  let eligible = C.Eligible.(combine [param c; ineq c]) in
+  let lits' = Lits.purify ~ord:(Ctx.ord ctx) ~signature:(Ctx.signature ctx)
+    ~eligible c.C.hclits
+  in
+  if Literals.eq_com c.C.hclits lits'
+    then []
+    else begin
+      let proof cc = Proof.mk_c_step ~rule:"purify" cc [c.C.hcproof] in
+      let new_c = C.create_a ~ctx ~parents:[c] lits' proof in
+      [new_c]
+    end
+
+let axioms =
+  (* parse a pformula *)
+  let pform ~name s =
+    let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
+    let proof = Proof.mk_f_axiom f ~file:"/dev/arith" ~name in
+    let pf = PF.create f proof in
+    pf
+  in
+  [ pform ~name:"sum_assoc" "$sum($sum(X,Y),Z) = $sum(X,$sum(Y,Z))"
+  ; pform ~name:"sum_com" "$sum(X,Y) = $sum(Y,X)"
+  ; pform ~name:"product_assoc" "$product($product(X,Y),Z) = $product(X,$product(Y,Z))"
+  ; pform ~name:"product_com" "$product(X,Y) = $product(Y,X)"
+  ]
+
+(** {2 Setup} *)
+
+let setup_penv ~penv =
+  let simplify_rule set =
+    let signature = PF.Set.signature set in
+    fun set pf ->
+      let f' = F.simplify ~signature pf.PF.form in
+      if F.eq pf.PF.form f'
+        then PEnv.DoNothing
+        else
+          let proof = Proof.mk_f_step f' ~rule:"arith_simplify" [pf.PF.proof] in
+          let pf' = PF.create f' proof in
+          PEnv.SimplifyInto pf'
+  in
+  PEnv.add_axioms ~penv (Sequence.of_list axioms);
+  PEnv.add_operation_rule ~penv ~prio:2 simplify_rule;
+  ()
 
 let setup_env ~env =
-  ()  (* TODO: register rules *)
+  Env.add_lit_rule ~env "arith_rw" rewrite_lit;
+  Env.add_unary_inf ~env "arith_factor" factor_arith;
+  Env.add_unary_inf ~env "arith_pivot" pivot_arith;
+  Env.add_unary_inf ~env "arith_purify" purify_arith;
+  ()

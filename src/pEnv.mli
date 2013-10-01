@@ -68,6 +68,9 @@ val rw_term : ?rule:string -> Rewriting.TRS.t -> operation
 val rw_form : ?rule:string -> Rewriting.FormRW.t -> operation
   (** Rewrite formulas into other formulas *)
 
+val fmap_term : rule:string -> (Term.t -> Term.t) -> operation
+  (** Transformation on terms *)
+
 val expand_def : operation
   (** Expand definitions of terms and predicates *)
 
@@ -98,6 +101,9 @@ val add_operation : penv:t -> prio:int -> operation -> unit
   (** Add a preprocessing operation. [prio] is the priority of the operation;
       the higher the priority, the latter the operation is run (ie
       operations with low priority are tried first) *)
+
+val add_operation_rule : penv:t -> prio:int -> (PFormula.Set.t -> operation) -> unit
+  (** Add an operation that depends on the initial set of formulas to process *)
 
 val add_constr : penv:t -> Precedence.constr -> unit
   (** Add a precedence constraint *)

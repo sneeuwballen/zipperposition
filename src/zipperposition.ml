@@ -121,14 +121,20 @@ let setup_penv ?(ctx=Skolem.create ()) ~penv () =
   end;
   if (PEnv.get_params ~penv).param_expand_def then
     PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
+  if (PEnv.get_params ~penv).param_arith then
+    Arith.setup_penv ~penv;
   (* be sure to get a total order on symbols *)
   PEnv.add_constr ~penv Precedence.alpha_constraint;
   ()
 
 let setup_env ~env =
-  match (Env.get_params ~env).param_calculus with
+  begin match (Env.get_params ~env).param_calculus with
   | "superposition" -> Superposition.setup_env ~env
   | x -> failwith ("unknown calculus " ^ x)
+  end;
+  if (Env.get_params ~env).param_arith then
+    Arith.setup_env ~env;
+  ()
 
 (** Make an optional meta-prover and parse its KB *)
 let mk_meta ~params =

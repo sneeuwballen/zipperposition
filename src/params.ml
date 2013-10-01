@@ -44,6 +44,7 @@ type t = {
   param_kb_clear : bool;          (** do we need to clear the KB? *)
   param_kb_print : bool;          (** print knowledge base and exit *)
   param_expand_def : bool;        (** expand definitions *)
+  param_arith : bool;             (** enable arith? *)
   param_learn : bool;             (** try to learn from successful proofs? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
@@ -75,6 +76,7 @@ let parse_args () =
   and kb_clear = ref false
   and kb_print = ref false
   and kb_where = ref false
+  and arith = ref false
   and expand_def = ref false
   and learn = ref false
   and select = ref "SelectComplex"
@@ -106,6 +108,7 @@ let parse_args () =
       ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
       ("-kb-where", Arg.Set kb_where, "print default dir that is search for KB");
       ("-expand-def", Arg.Set expand_def, "expand definitions");
+      ("-arith", Arg.Set arith, "enable arithmetic");
       ("-learning", Arg.Set learn, "enable lemma learning");
       (* ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once"); *)
       ("-progress", Arg.Unit set_progress, "print progress");
@@ -136,4 +139,5 @@ let parse_args () =
     param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
     param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
     param_kb_print = !kb_print; param_learn = !learn;
-    param_expand_def= !expand_def; param_precedence= !heuristic_precedence;}
+    param_expand_def= !expand_def; param_arith= !arith;
+    param_precedence= !heuristic_precedence;}

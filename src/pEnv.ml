@@ -162,6 +162,17 @@ let rw_form ?(rule="rw") frs =
         let pf' = PF.create f' proof in
         SimplifyInto pf'
 
+let fmap_term ~rule func =
+  fun set pf ->
+    let f = pf.PF.form in
+    let f' = Formula.map func f in
+    if F.eq f f'
+      then DoNothing
+      else
+        let proof = Proof.mk_f_step f' ~rule [pf.PF.proof] in
+        let pf' = PF.create f' proof in
+        SimplifyInto pf'
+
 (* expand definitions *)
 let expand_def set pf =
   (* detect definitions in [pf] and the current set *)
@@ -187,12 +198,28 @@ let expand_def set pf =
 
 type t = {
   mutable axioms : PF.Set.t;
-  mutable ops : (int * operation) list;  (* int: priority *)
+  mutable ops : (int * (PF.Set.t -> operation)) list;  (* int: priority *)
   mutable constrs : Precedence.constr list;
   mutable constr_rules : (PF.Set.t -> Precedence.constr) list;
   meta : MetaProverState.t option;
   params : Params.t;
 }
+
+let copy penv = { penv with ops = penv.ops; }
+
+let get_params ~penv = penv.params
+
+let add_axiom ~penv ax =
+  penv.axioms <- PF.Set.add ax penv.axioms
+
+let add_axioms ~penv axioms =
+  Sequence.iter (add_axiom ~penv) axioms
+
+let add_operation ~penv ~prio op =
+  penv.ops <- (prio, (fun _ -> op)) :: penv.ops
+
+let add_operation_rule ~penv ~prio rule =
+  penv.ops <- (prio, rule) :: penv.ops
 
 let create ?meta params =
   let penv = {
@@ -206,26 +233,14 @@ let create ?meta params =
   (* may add the [meta] operation *)
   begin match meta with
   | None -> ()
-  | Some m -> penv.ops <- (2, meta_prover ~meta:m) :: penv.ops
+  | Some m -> add_operation ~penv ~prio:2 (meta_prover ~meta:m);
   end;
   penv
 
-let copy penv = { penv with ops = penv.ops; }
-
-let get_params ~penv = penv.params
-
-let add_axiom ~penv ax =
-  penv.axioms <- PF.Set.add ax penv.axioms
-
-let add_axioms ~penv axioms =
-  Sequence.iter (add_axiom ~penv) axioms
-
-let add_operation ~penv ~prio op =
-  penv.ops <- (prio, op) :: penv.ops
-
 let process ~penv set =
   let compare (p1, _) (p2, _) = p1 - p2 in
-  let ops = List.map snd (List.sort compare penv.ops) in
+  let rules = List.map snd (List.sort compare penv.ops) in
+  let ops = List.map (fun rule -> rule set) rules in
   fix ops set
 
 let add_constr ~penv c =

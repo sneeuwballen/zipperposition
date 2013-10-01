@@ -146,7 +146,7 @@ let simpl_to ~from ~into =
 module CHashcons = Hashcons.Make(struct
   type t = clause
   let hash c = Lits.hash c.hclits
-  let equal c1 c2 = Lits.eq c1.hclits c2.hclits && c1.hcctx == c2.hcctx
+  let equal c1 c2 = Lits.eq_com c1.hclits c2.hclits && c1.hcctx == c2.hcctx
   let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
 end)
 
