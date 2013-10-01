@@ -513,7 +513,7 @@ module WithPos = struct
     term : Term.t;
   }
   let compare t1 t2 =
-    let c = Pervasives.compare t1.clause t2.clause in
+    let c = t1.clause.hctag - t2.clause.hctag in
     if c <> 0 then c else
     let c = T.compare t1.term t2.term in
     if c <> 0 then c else
