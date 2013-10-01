@@ -50,6 +50,14 @@ let snapshot p = p.prec_snapshot
 
 let compare p s1 s2 = p.prec_compare s1 s2
 
+let add_symbols p l =
+  let p', _ = p.prec_add_symbols l in
+  p'
+
+let add_signature p signature =
+  let symbols = Signature.to_symbols signature in
+  add_symbols p symbols
+
 let pp_snapshot buf s =
   Util.pp_list ~sep:" > " Symbol.pp buf s
 

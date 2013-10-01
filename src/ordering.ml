@@ -49,6 +49,14 @@ let precedence ord = ord.ord_precedence
 
 let set_precedence ord prec = ord.ord_set_precedence prec
 
+let add_symbols ord l =
+  let prec = Precedence.add_symbols ord.ord_precedence l in
+  set_precedence ord prec
+
+let add_signature ord signature =
+  let prec = Precedence.add_signature ord.ord_precedence signature in
+  set_precedence ord prec
+
 let name ord = ord.ord_name
 
 let clear_cache ord = ord.ord_clear_cache ()

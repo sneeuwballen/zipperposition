@@ -91,10 +91,10 @@ let is_used s =
 
 let compare s1 s2 =
   let __to_int = function
-    | Const _ -> 0
     | Int _ -> 1
     | Rat _ -> 2
     | Real _ -> 3
+    | Const _ -> 4  (* const are bigger! *)
   in
   match s1, s2 with
   | Const (_, info1), Const (_, info2) -> info1.tag - info2.tag
@@ -292,7 +292,7 @@ module Arith = struct
   | Int n -> Big_int.sign_big_int n = 0
   | Rat n -> Ratio.sign_ratio n = 0
   | Real f -> f = 0.
-  | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
+  | Const _ -> false
 
   let __one_i = Big_int.big_int_of_int 1
   let __one_rat = Ratio.ratio_of_int 1
@@ -301,7 +301,7 @@ module Arith = struct
   | Int n -> Big_int.eq_big_int n __one_i
   | Rat n -> Ratio.eq_ratio n __one_rat
   | Real f -> f = 1.
-  | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
+  | Const _ -> false
 
   let sum = mk_const "$sum"
   let difference = mk_const "$difference"

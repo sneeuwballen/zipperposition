@@ -47,6 +47,13 @@ val snapshot : t -> Symbol.t list
 val compare : t -> Symbol.t -> Symbol.t -> int
   (** Compare two symbols using the precedence *)
 
+val add_symbols : t -> Symbol.t list -> t
+  (** Update the precedence with the given symbols *)
+
+val add_signature : t -> Signature.t -> t
+  (** Update the precedence with the symbols that are present in the
+      signature *)
+
 val pp_snapshot : Buffer.t -> Symbol.t list -> unit
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit

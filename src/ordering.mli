@@ -44,6 +44,12 @@ val precedence : t -> Precedence.t
 val set_precedence : t -> Precedence.t -> t
   (** Change the precedence. The new one must be a superset of the old one. *)
 
+val add_symbols : t -> Symbol.t list -> t
+  (** Update precedence with symbols *)
+
+val add_signature : t -> Signature.t -> t
+  (** Update precedence with signature *)
+
 val name : t -> string
 val clear_cache : t -> unit
 
