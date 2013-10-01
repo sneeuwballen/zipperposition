@@ -57,7 +57,7 @@ let debug l format =
         (fun b -> print_endline (Buffer.contents b))
         b format)
     else
-      Printf.kbprintf (fun _ -> ()) b format
+      Printf.ifprintf b format
 
 let pp_pos pos =
   let open Lexing in
