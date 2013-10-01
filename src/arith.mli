@@ -45,6 +45,9 @@ module T : sig
   val is_arith : Term.t -> bool
     (** Is the term arithmetic? *)
 
+  val is_arith_const : Term.t -> bool
+    (** Is the term an arithmetic constant? *)
+
   val mk_sum : Term.t -> Term.t -> Term.t
   val mk_difference : Term.t -> Term.t -> Term.t
   val mk_product : Term.t -> Term.t -> Term.t

@@ -68,7 +68,9 @@ let lost_completeness ~ctx = ctx.complete <- false
 let is_completeness_preserved ~ctx = ctx.complete
 
 let add_signature ~ctx signature =
-  ctx.signature <- Signature.merge ctx.signature signature
+  ctx.signature <- Signature.merge ctx.signature signature;
+  ctx.ord <- Ordering.add_signature ctx.ord ctx.signature;
+  ()
 
 let ac ~ctx = ctx.ac
 

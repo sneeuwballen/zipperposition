@@ -55,6 +55,10 @@ module T = struct
       end
     | _ -> false
 
+  let is_arith_const t = match t.term with
+    | Node ((S.Int _ | S.Rat _ | S.Real _), []) -> true
+    | _ -> false
+
   let rec sum_list l = match l with
     | [] -> failwith "Arith.sum_list: got empty list"
     | [x] -> x
@@ -222,6 +226,12 @@ module F = struct
     simplify ~signature (mk_atom (T.mk_lesseq r l))
   | Or l -> mk_or (List.map (simplify ~signature) l)
   | And l -> mk_and (List.map (simplify ~signature) l)
+  | Not {form=Equal(l,r)} ->
+    let l' = T.simplify ~signature l in
+    let r' = T.simplify ~signature r in
+    if T.eq l' r'
+      then mk_false
+      else mk_neq l' r'
   | Not f' -> mk_not (simplify ~signature f')
   | Equiv (f1, f2) -> mk_equiv (simplify ~signature f1) (simplify ~signature f2)
   | Imply (f1, f2) -> mk_imply (simplify ~signature f1) (simplify ~signature f2)
@@ -231,7 +241,9 @@ module F = struct
   | Equal (l, r) ->
     let l' = T.simplify ~signature l in
     let r' = T.simplify ~signature r in
-    mk_eq l' r'
+    if T.is_arith_const l'  && T.is_arith_const r' && l' != r'
+      then mk_false
+      else mk_eq l' r'
   | Forall f' -> mk_forall (simplify ~signature f')
   | Exists f' -> mk_exists (simplify ~signature f')
 end
@@ -512,7 +524,9 @@ module Lit = struct
         List.map
           (fun (coeff, t) ->
             assert (not (S.Arith.is_zero coeff));
-            let m = Monome.divby (Monome.remove m t) coeff in
+            let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
+            (* -t+m = 0 ---> t=m, but t+m = 0 ----> t=-m *)
+            let m = if S.Arith.sign coeff < 0 then m else Monome.uminus m in
             if sign
               then Eq (t, m)
               else Neq (t, m))
@@ -768,14 +782,16 @@ let rewrite_lit ~ctx lit =
   | Literal.Equation (l, r, sign, _) ->
     let l' = T.simplify ~signature l in
     let r' = T.simplify ~signature r in
-    Literal.mk_lit ~ord:(Ctx.ord ctx) l' r' sign 
+    if sign && T.is_arith_const l' && T.is_arith_const r' && not (T.eq l' r')
+      then Literal.mk_false T.true_term
+      else Literal.mk_lit ~ord:(Ctx.ord ctx) l' r' sign 
   | Literal.True
   | Literal.False -> lit
 
 let factor_arith c =
   let ctx = c.C.hcctx in
   let signature = Ctx.signature ctx in
-  let eligible = C.Eligible.param c in
+  let eligible = C.Eligible.max c in
   (* we can eliminate variables that are not shielded *)
   let elim_var x = not (Literals.shielded c.C.hclits x) in
   (* eliminate i-th literal with [subst] *)
@@ -787,7 +803,7 @@ let factor_arith c =
     let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
       ~rule:"factor" cc [c.C.hcproof] in
     let new_c = C.create ~parents:[c] ~ctx lits' proof in
-    Util.debug 3 "factor %a with %a" Literal.pp c.C.hclits.(i) Substs.pp subst;
+    Util.debug 3 "factor %a (with %a) into %a" C.pp c Substs.pp subst C.pp new_c;
     new_c
   in
   (* try to factor arith literals *)
@@ -801,8 +817,7 @@ let factor_arith c =
 
 let pivot_arith c =
   let ctx = c.C.hcctx in
-  let instance = Theories.TotalOrder.tstp_instance (Ctx.total_order ctx) in
-  let eligible = C.Eligible.(combine [param c; ineq_of c instance]) in
+  let eligible = C.Eligible.max c in
   let lits'_list = Lits.pivot ~ord:(Ctx.ord ctx) ~signature:(Ctx.signature ctx)
     ~eligible c.C.hclits
   in

@@ -399,6 +399,11 @@ module Eligible = struct
   let ineq_of clause instance =
     fun i lit -> Lit.is_ineq_of ~instance lit
 
+  let max c =
+    let bv = Lits.maxlits ~ord:(Ctx.ord c.hcctx) c.hclits in
+    fun i lit ->
+      BV.get bv i
+
   let pos i lit = Lit.is_pos lit
 
   let neg i lit = Lit.is_neg lit

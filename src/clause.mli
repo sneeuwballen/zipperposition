@@ -212,6 +212,9 @@ module Eligible : sig
   val ineq_of : clause -> Theories.TotalOrder.instance -> t
     (** Only literals that are inequations for the given ordering *)
 
+  val max : clause -> t
+    (** Maximal literals of the clause *)
+
   val pos : t
     (** Only positive literals *)
 
