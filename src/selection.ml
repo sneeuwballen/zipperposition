@@ -45,7 +45,8 @@ let select_positives lits =
 
 let select_max_goal ~strict ~ord lits =
   let bv = Lits.maxlits ~ord lits in
-  BV.filter bv (fun i -> Lit.is_neg lits.(i));
+  BV.filter bv (fun i -> Lit.is_neg lits.(i) &&
+                         not (Arith.Lit.is_arith lits.(i)));
   try
     (* keep only first satisfying lit *)
     let i = BV.first bv in
@@ -63,7 +64,7 @@ let select_diff_neg_lit ~strict ~ord lits =
   let rec find_lit best_diff best_idx lits i =
     if i = Array.length lits then best_idx
     else match Literal.to_tuple lits.(i) with
-      | l, r, false ->
+      | l, r, false when not (Arith.T.is_arith l) || not (Arith.T.is_arith r) ->
         let weightdiff = abs (T.size l - T.size r) in
         if weightdiff > best_diff
           then find_lit weightdiff i lits (i+1) (* prefer this lit *)
@@ -84,7 +85,7 @@ let select_complex ~strict ~ord lits =
   let rec find_neg_ground best_diff best_i lits i =
     if i = Array.length lits then best_i else
     match Literal.to_tuple lits.(i) with
-    | l, r, false when Literal.is_ground lits.(i) ->
+    | l, r, false when Literal.is_ground lits.(i) && not (Arith.Lit.is_arith lits.(i)) ->
       let diff = abs (T.size l - T.size r) in
       if diff > best_diff
         then find_neg_ground diff i lits (i+1)

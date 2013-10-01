@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9c6a8769d556fe415bb61347554862e1)
+# DO NOT EDIT (digest: 3ab9bfd235801b44698a1d677f083765)
 ClauseQueue
 Clause
 Const
@@ -21,7 +21,9 @@ Chaining
 PEnv
 Params
 Env
+Monome
 Arith
+ArithElim
 containers/PersistentGraph
 containers/Hashset
 containers/PHashtbl

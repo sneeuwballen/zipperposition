@@ -122,7 +122,7 @@ let setup_penv ?(ctx=Skolem.create ()) ~penv () =
   if (PEnv.get_params ~penv).param_expand_def then
     PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
   if (PEnv.get_params ~penv).param_arith then
-    Arith.setup_penv ~penv;
+    ArithElim.setup_penv ~penv;  (* TODO chaining! *)
   (* be sure to get a total order on symbols *)
   PEnv.add_constr ~penv Precedence.alpha_constraint;
   ()
@@ -133,7 +133,7 @@ let setup_env ~env =
   | x -> failwith ("unknown calculus " ^ x)
   end;
   if (Env.get_params ~env).param_arith then
-    Arith.setup_env ~env;
+    ArithElim.setup_env ~env;
   ()
 
 (** Make an optional meta-prover and parse its KB *)
