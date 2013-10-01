@@ -102,8 +102,14 @@ module Monome : sig
   val add : t -> Symbol.t -> Term.t -> t  (** Add term with coefficient. Sums coeffs. *)
   val remove : t -> Term.t -> t           (** Remove the term *)
 
-  val terms : t -> (Symbol.t * Term.t) list
+  val terms : t -> Term.t list
     (** List of terms that occur in the monome with non-nul coefficients *)
+  
+  val to_list : t -> (Symbol.t * Term.t) list
+    (** Terms and their coefficients. Ignores the constant and divby! *)
+
+  val var_occurs : Term.t -> t -> bool
+    (** Does the variable occur in the monome? *)
 
   val reduce_same_divby : t -> t -> t * t
     (** Reduce the two monomes to the same denominator *)
@@ -113,6 +119,8 @@ module Monome : sig
   val uminus : t -> t
   val product : t -> Symbol.t -> t  (** Product with constant *)
   val divby : t -> Symbol.t -> t    (** Division by constant, must be > 0 *)
+  val succ : t -> t                 (** +1 *)
+  val pred : t -> t                 (** -1 *)
 
   exception NotLinear
     
@@ -161,6 +169,12 @@ module Lit : sig
   val get_term : t -> Term.t
 
   val get_monome : t -> Monome.t
+
+  val eliminate : ?elim_var:(Term.t -> bool) -> signature:Signature.t ->
+                  t -> Substs.t list
+    (** List of substitutions that make the literal inconsistent.
+        [elim_var] is called to check whether eliminating a variable
+        in an equation is possible. *)
 
   (** {3 Operations on Lists of literals} *)
   module L : sig

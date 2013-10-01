@@ -89,4 +89,7 @@ module TotalOrder : sig
 
   val is_order_symbol : spec:t -> Symbol.t -> bool
     (** Is less or lesseq of some instance? *)
+
+  val tstp_instance : spec:t -> instance
+    (** The specific instance that complies with TSTP signature $less, $lesseq *)
 end

@@ -111,12 +111,18 @@ module TotalOrder = struct
     STbl.add spec.lesseq_tbl lesseq instance;
     instance
 
+  let tstp_instance ~spec =
+    try
+      find ~spec Symbol.Arith.less
+    with Not_found ->
+      add ~spec ~less:Symbol.Arith.less ~lesseq:Symbol.Arith.lesseq
+
   let create ?(base=true) () =
     let spec = {
       less_tbl = STbl.create 13;
       lesseq_tbl = STbl.create 13;
     } in
     if base then
-      ignore (add ~spec ~less:Symbol.Arith.less ~lesseq:Symbol.Arith.lesseq);
+      ignore (tstp_instance ~spec);
     spec
 end

@@ -186,6 +186,13 @@ module Arr : sig
 
   (** {3 High order combinators} *)
 
+  val shielded : t array -> Term.t -> bool
+    (** Is the given variable shielded (ie occur as a subterm somewhere)?
+        @raise Invalid_argument if the term is not a var *)
+
+  val naked_vars : t array -> Term.varlist
+    (** Variables occurring in inequations, that are not shielded *)
+
   val at_pos : t array -> Position.t -> Term.t
     (** Return the subterm at the given position, or
         @raise Not_found if no such position is valid *)

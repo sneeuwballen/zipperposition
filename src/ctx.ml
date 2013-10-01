@@ -82,7 +82,9 @@ let renaming_clear ~ctx =
 let add_ac ~ctx s = Theories.AC.add ~spec:ctx.ac s
 
 let add_order ~ctx ~less ~lesseq =
-  let _ = Theories.TotalOrder.add ~spec:ctx.total_order ~less ~lesseq in
+  let spec = ctx.total_order in
+  if not (Theories.TotalOrder.is_less ~spec less)
+    then ignore (Theories.TotalOrder.add ~spec ~less ~lesseq);
   ()
 
 (** {2 Type inference} *)

@@ -75,6 +75,8 @@ val add_signature : ctx:t -> Signature.t -> unit
 val add_ac : ctx:t -> Symbol.t -> unit
   (** Symbol is AC *)
 
+(* TODO: also update signature so that less and lesseq have same type
+        and occur in signature *)
 val add_order : ctx:t -> less:Symbol.t -> lesseq:Symbol.t -> unit
   (** Pair of symbols that consistute an ordering *)
 

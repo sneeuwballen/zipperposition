@@ -310,7 +310,13 @@ module Monome = struct
     { m with coeffs=T.TMap.remove t m.coeffs; }
 
   let terms m =
+    T.TMap.fold (fun t coeff acc -> t :: acc) m.coeffs []
+
+  let to_list m =
     T.TMap.fold (fun t coeff acc -> (coeff,t) :: acc) m.coeffs []
+
+  let var_occurs v m =
+    List.exists (fun t -> T.var_occurs v t) (terms m)
 
   (* scale: multiply all coeffs by constant, multiply divby by same constant.
     This yields the very same monome *)
@@ -400,6 +406,14 @@ module Monome = struct
         let divby = S.Arith.Op.product const m.divby in
         { m with divby; }
 
+  let succ m =
+    let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
+    sum m (const one)
+
+  let pred m =
+    let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
+    difference m (const one)
+
   exception NotLinear
     (** Used by [of_term] *)
 
@@ -419,6 +433,12 @@ module Monome = struct
     when S.eq s S.Arith.product && S.is_numeric s' ->
     let m = of_term ~signature t2 in
     product m s'
+  | T.Node (S.Const("$succ",_), [t']) ->
+    let m = of_term ~signature t' in
+    succ m
+  | T.Node (S.Const("$pred",_), [t']) ->
+    let m = of_term ~signature t' in
+    pred m
   | T.Node (s, [t2; {T.term=T.Node (s',[])}])
     when S.eq s S.Arith.product && S.is_numeric s' ->
     let m = of_term ~signature t2 in
@@ -481,7 +501,7 @@ module Lit = struct
         let m1 = Monome.of_term ~signature l in
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
-        let terms = Monome.terms m in
+        let terms = Monome.to_list m in
         (* for each term, pivot the monome so that we isolate the term
           on one side of the (dis)equation *)
         List.map
@@ -499,7 +519,7 @@ module Lit = struct
         let m1 = Monome.of_term ~signature l in
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
-        let terms = Monome.terms m in
+        let terms = Monome.to_list m in
         (* for each term, pivot the monome to isolate the term. Careful with
             the sign as it can change the comparison sign too! If the
             coeff is > 0 it means that the term [t] is on the {b left}
@@ -574,6 +594,54 @@ module Lit = struct
   | L_lesseq (_, m)
   | R_less (m, _)
   | R_lesseq (m, _) -> m
+
+  let eliminate ?(elim_var=(fun v -> true)) ~signature lit =
+    (* unify non-arith subterms pairwise *)
+    let fact_subterms lit =
+      let l = get_term lit :: Monome.terms (get_monome lit) in
+      let l = Util.list_diagonal l in
+      Util.list_fmap
+        (fun (t1, t2) ->
+          try Some (Unif.unification t1 0 t2 0)
+          with Unif.Fail -> None)
+        l
+    (* find substitutions that solve the lit *)
+    and solve_lit lit =
+      begin match lit with
+      | Eq _ -> []
+      | Neq (x, m) when T.is_var x ->
+        (* eliminate x, if not shielded *)
+        if not (Monome.var_occurs x m) && elim_var x
+          then
+            let subst = Substs.(bind empty x 0 (Monome.to_term m) 0) in
+            [subst]
+          else []
+      | L_less(x, m)
+      | R_less(m, x)
+        when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+        (* x < m  is inconsistent with x = m *)
+        begin try
+          [ Unif.unification x 0 (Monome.to_term m) 0]
+        with Unif.Fail -> []  (* occur check... *)
+        end
+      | L_lesseq(x, m)
+        when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+        (* x <= m inconsistent with x = m+1 *)
+        begin try
+          [ Unif.unification x 0 (Monome.to_term (Monome.succ m)) 0 ]
+        with Unif.Fail -> []  (* occur check... *)
+        end
+      | R_lesseq(m, x)
+        when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+        (* x >= m inconsistent with x = m-1 *)
+        begin try
+          [ Unif.unification x 0 (Monome.to_term (Monome.pred m)) 0 ]
+        with Unif.Fail -> []  (* occur check... *)
+        end
+      | _ -> []
+      end
+    in
+    solve_lit lit @ fact_subterms lit
 
   module L = struct
     let get_terms l = List.map get_term l
@@ -694,11 +762,36 @@ let rewrite_lit ~ctx lit =
   | Literal.True
   | Literal.False -> lit
 
-let factor_arith c = []  (* TODO *)
+let factor_arith c =
+  let ctx = c.C.hcctx in
+  let signature = Ctx.signature ctx in
+  let eligible = C.Eligible.param c in
+  (* we can eliminate variables that are not shielded *)
+  let elim_var x = not (Literals.shielded c.C.hclits x) in
+  (* eliminate i-th literal with [subst] *)
+  let eliminate_lit i subst =
+    let lits' = Util.array_except_idx c.C.hclits i in
+    let renaming = Ctx.renaming_clear ~ctx in
+    let ord = Ctx.ord ctx in
+    let lits' = Literal.apply_subst_list ~ord ~renaming subst lits' 0 in
+    let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
+      ~rule:"factor" cc [c.C.hcproof] in
+    let new_c = C.create ~parents:[c] ~ctx lits' proof in
+    new_c
+  in
+  (* try to factor arith literals *)
+  Literals.fold_lits ~eligible c.C.hclits []
+    (fun acc lit i ->
+      let ord_lits = Lit.extract ~signature lit in
+      let substs = Util.list_flatmap (Lit.eliminate ~elim_var ~signature) ord_lits in
+      List.fold_left
+        (fun acc subst -> eliminate_lit i subst :: acc)
+        acc substs)
 
 let pivot_arith c =
   let ctx = c.C.hcctx in
-  let eligible = C.Eligible.(combine [param c; ineq c]) in
+  let instance = Theories.TotalOrder.tstp_instance (Ctx.total_order ctx) in
+  let eligible = C.Eligible.(combine [param c; ineq_of c instance]) in
   let lits'_list = Lits.pivot ~ord:(Ctx.ord ctx) ~signature:(Ctx.signature ctx)
     ~eligible c.C.hclits
   in
@@ -767,4 +860,6 @@ let setup_env ~env =
   Env.add_unary_inf ~env "arith_factor" factor_arith;
   Env.add_unary_inf ~env "arith_pivot" pivot_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
+  (* be sure that the ordering is present in the context *)
+  Ctx.add_order ~ctx:(Env.ctx env) ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
   ()

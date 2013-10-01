@@ -580,6 +580,18 @@ module Arr = struct
 
   (** {3 High Order combinators} *)
 
+  let shielded lits v =
+    if not (T.is_var v) then failwith "shielded: need a var";
+    Sequence.exists
+      (fun (l, r, _) ->
+        (not (T.eq l v) && T.var_occurs v l) ||
+        (not (T.eq r v) && T.var_occurs v r))
+      (to_seq lits)
+
+  let naked_vars lits =
+    let vars = vars lits in
+    List.filter (fun v -> not (shielded lits v)) vars
+
   let at_pos lits pos = match pos with
     | idx::pos' when idx >= 0 && idx < Array.length lits ->
       at_pos lits.(idx) pos'
