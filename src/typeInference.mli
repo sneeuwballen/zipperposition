@@ -127,3 +127,9 @@ val check_term_term : Ctx.t -> Term.t -> Term.t -> bool
 
 val check_type_type : Ctx.t -> Type.t -> Type.t -> bool
   (** Can we unify the two types? *)
+
+val check_term_term_sig : Signature.t -> Term.t -> Term.t -> bool
+
+val check_term_type_sig : Signature.t -> Term.t -> Type.t -> bool
+
+val check_type_type_sig : Signature.t -> Type.t -> Type.t -> bool

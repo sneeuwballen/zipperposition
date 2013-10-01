@@ -273,3 +273,15 @@ let check_term_term ctx t1 t2 =
         true
       with Type.Error _ ->
         false)
+
+let check_term_term_sig signature t1 t2 =
+  let ctx = Ctx.of_signature signature in
+  check_term_term ctx t1 t2
+
+let check_term_type_sig signature t1 t2 =
+  let ctx = Ctx.of_signature signature in
+  check_term_type ctx t1 t2
+
+let check_type_type_sig signature t1 t2 =
+  let ctx = Ctx.of_signature signature in
+  check_type_type ctx t1 t2
