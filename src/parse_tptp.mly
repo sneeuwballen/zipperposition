@@ -249,10 +249,22 @@ atomic_formula:
 /* Terms */
 
 term:
-  | function_term { $1 }
-  | variable { $1 }
-  | l=term AT r=term { T.mk_at l r }
-  | LAMBDA LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN t=term
+  | t=function_term { t }
+  | t=variable { t }
+  | t=ho_term { t }
+
+ho_term:
+  | t=ho_composite_term { t }
+  | t=ho_unary_term { t }
+
+ho_unary_term:
+  | s=constant { T.mk_const s }
+  | t=variable { t }
+  | LEFT_PAREN t=ho_composite_term RIGHT_PAREN { t } 
+
+ho_composite_term:
+  | l=ho_term AT r=ho_term { T.mk_at l r }
+  | LAMBDA LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN t=ho_unary_term
     { T.mk_lambda_var vars t }
   /* | conditional_term { $1 }  for TFF */
   /* | let_term { $1 } */
