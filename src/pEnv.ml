@@ -248,6 +248,8 @@ let process ~penv set =
   let compare (p1, _) (p2, _) = p1 - p2 in
   let rules = List.map snd (List.sort compare penv.ops) in
   let ops = List.map (fun rule -> rule set) rules in
+  (* also add axioms *)
+  let set = PF.Set.union set penv.axioms in
   fix ops set
 
 let add_constr ~penv c =

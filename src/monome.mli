@@ -55,6 +55,8 @@ val mem : t -> Term.t -> bool       (** Is the term in the monome? *)
 val add : t -> Symbol.t -> Term.t -> t  (** Add term with coefficient. Sums coeffs. *)
 val remove : t -> Term.t -> t           (** Remove the term *)
 
+val type_of : t -> Type.t           (** type of the monome *)
+
 val terms : t -> Term.t list
   (** List of terms that occur in the monome with non-nul coefficients *)
 
@@ -66,6 +68,10 @@ val var_occurs : Term.t -> t -> bool
 
 val reduce_same_divby : t -> t -> t * t
   (** Reduce the two monomes to the same denominator *)
+
+val normalize : t -> t
+  (** Normalize the [divby] field. If rat/real, divby will be 1,
+      otherwise some coefficient will be irreducible. *)
 
 val sum : t -> t -> t
 val difference : t -> t -> t

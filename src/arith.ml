@@ -339,13 +339,34 @@ module Lit = struct
       extract_lt a b
     | Literal.Prop _ -> []
 
-  let to_lit ~ord lit = match lit with
-  | Eq (t, m) -> Literal.mk_eq ~ord t (Monome.to_term m)
-  | Neq (t, m) -> Literal.mk_neq ~ord t (Monome.to_term m)
-  | L_less (t, m) -> Literal.mk_true (T.mk_less t (Monome.to_term m))
-  | L_lesseq (t, m) -> Literal.mk_true (T.mk_lesseq t (Monome.to_term m))
-  | R_less (m, t) -> Literal.mk_true (T.mk_less (Monome.to_term m) t)
-  | R_lesseq (m, t) -> Literal.mk_true (T.mk_lesseq (Monome.to_term m) t)
+  let to_lit ~ord lit =
+    (* if type==int, multiply t and m by m.divby *)
+    let scale t m =
+      if Type.eq Type.int (Monome.type_of m) && not (S.Arith.is_one m.Monome.divby)
+        then  (* need to multiply by m.divby to remain within integers *)
+          let c = m.Monome.divby in
+          T.mk_product t (T.mk_const c), Monome.product m c
+        else t, m
+    in
+    match lit with
+    | Eq (t, m) ->
+      let t, m = scale t m in
+      Literal.mk_eq ~ord t (Monome.to_term m)
+    | Neq (t, m) ->
+      let t, m = scale t m in
+      Literal.mk_neq ~ord t (Monome.to_term m)
+    | L_less (t, m) ->
+      let t, m = scale t m in
+      Literal.mk_true (T.mk_less t (Monome.to_term m))
+    | L_lesseq (t, m) ->
+      let t, m = scale t m in
+      Literal.mk_true (T.mk_lesseq t (Monome.to_term m))
+    | R_less (m, t) ->
+      let t, m = scale t m in
+      Literal.mk_true (T.mk_less (Monome.to_term m) t)
+    | R_lesseq (m, t) ->
+      let t, m = scale t m in
+      Literal.mk_true (T.mk_lesseq (Monome.to_term m) t)
 
   let simplify ~ord ~signature lit = match lit with
   | Literal.Equation (l, r, sign, _) ->

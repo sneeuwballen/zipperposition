@@ -102,6 +102,8 @@ let add m coeff t =
 let remove m t =
   { m with coeffs=T.TMap.remove t m.coeffs; }
 
+let type_of m = S.Arith.typeof m.constant
+
 let terms m =
   T.TMap.fold (fun t coeff acc -> t :: acc) m.coeffs []
 
@@ -123,6 +125,28 @@ let _scale m c =
       let coeffs = T.TMap.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
       let divby = S.Arith.Op.product m.divby c in
       { constant; coeffs; divby; }
+
+let _gcd s1 s2 = match s1, s2 with
+  | S.Int a, S.Int b -> S.mk_bigint (Big_int.gcd_big_int a b)
+  | _ -> assert false
+
+let normalize m = match m.constant with
+  | S.Int _ ->
+    (* divide by common gcd of coeffs and divby *)
+    let gcd = _gcd m.constant m.divby in
+    let gcd = T.TMap.fold (fun _ c gcd -> _gcd c gcd) m.coeffs gcd in
+    let constant = S.Arith.Op.quotient m.constant gcd in
+    let coeffs = T.TMap.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
+    let divby = S.Arith.Op.quotient m.divby gcd in
+    { constant; coeffs; divby; }
+  | S.Rat _
+  | S.Real _ ->
+    (* multiply by 1/divby *)
+    let constant = S.Arith.Op.quotient m.constant m.divby in
+    let coeffs = T.TMap.map (fun c' -> S.Arith.Op.quotient c' m.divby) m.coeffs in
+    let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
+    { constant; coeffs; divby=one; }
+  | _ -> assert false
 
 (* reduce to same divby (same denominator) *)
 let reduce_same_divby m1 m2 =
@@ -187,18 +211,21 @@ let uminus m =
 let product m c =
   if S.Arith.is_zero c
     then const c  (* 0 *)
-    else  (* itemwise product *)
-      let constant = S.Arith.Op.product m.constant c in
-      let coeffs = T.TMap.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
-      { m with constant; coeffs; }
+  else if S.eq c m.divby
+    (* c * m/c ---> m *)
+    then { m with divby=S.Arith.one_of_ty (S.Arith.typeof m.constant); }
+  else  (* itemwise product *)
+    let constant = S.Arith.Op.product m.constant c in
+    let coeffs = T.TMap.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
+    { m with constant; coeffs; }
 
 let divby m const =
   assert (S.Arith.sign const >= 0);
   if S.Arith.is_zero const
     then raise Division_by_zero
-    else
-      let divby = S.Arith.Op.product const m.divby in
-      { m with divby; }
+  else
+    let divby = S.Arith.Op.product const m.divby in
+    normalize { m with divby; }
 
 let succ m =
   let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
