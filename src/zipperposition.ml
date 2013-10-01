@@ -190,7 +190,7 @@ let preprocess ?meta ~plugins ~params formulas =
   let ord = params.param_ord precedence in
   let select = Sel.selection_from_string ~ord params.param_select in
   Util.debug 1 "selection function: %s" params.param_select;
-  let signature = PF.Set.signature formulas in
+  let signature = PF.Set.signature ~signature:(PEnv.signature ~penv) formulas in
   let ctx = Ctx.create ~ord ~select ~signature () in
   (* build the env *)
   let env = Env.create ?meta ~ctx params signature in

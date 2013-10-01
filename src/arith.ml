@@ -840,6 +840,7 @@ let axioms =
 (** {2 Setup} *)
 
 let setup_penv ~penv =
+  (* rule for formula simplification *)
   let simplify_rule set =
     let signature = PF.Set.signature set in
     fun set pf ->
@@ -851,6 +852,8 @@ let setup_penv ~penv =
           let pf' = PF.create f' proof in
           PEnv.SimplifyInto pf'
   in
+  (* signature of arith symbols *)
+  PEnv.add_base_sig ~penv Signature.Arith.signature;
   PEnv.add_axioms ~penv (Sequence.of_list axioms);
   PEnv.add_operation_rule ~penv ~prio:2 simplify_rule;
   ()

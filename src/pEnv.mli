@@ -79,7 +79,7 @@ val expand_def : operation
 type t
   (** Environment used for preprocessing of the problem *)
 
-val create : ?meta:MetaProverState.t -> Params.t -> t
+val create : ?base:Signature.t -> ?meta:MetaProverState.t -> Params.t -> t
   (** Create a new preprocessing env.
       [meta] is a meta-prover that can be used for processing.
   *)
@@ -89,6 +89,12 @@ val copy : t -> t
 
 val get_params : penv:t -> Params.t
   (** Parameters *)
+
+val signature : penv:t -> Signature.t
+  (** Base signature *)
+
+val add_base_sig : penv:t -> Signature.t -> unit
+  (** Declare a set of base symbols *)
 
 val add_axiom : penv:t -> PFormula.t -> unit
   (** Add a single axiom. Preprocessed sets will be enriched with the

@@ -201,6 +201,7 @@ type t = {
   mutable ops : (int * (PF.Set.t -> operation)) list;  (* int: priority *)
   mutable constrs : Precedence.constr list;
   mutable constr_rules : (PF.Set.t -> Precedence.constr) list;
+  mutable base : Signature.t;
   meta : MetaProverState.t option;
   params : Params.t;
 }
@@ -208,6 +209,11 @@ type t = {
 let copy penv = { penv with ops = penv.ops; }
 
 let get_params ~penv = penv.params
+
+let signature ~penv = penv.base
+
+let add_base_sig ~penv s =
+  penv.base <- Signature.merge penv.base s
 
 let add_axiom ~penv ax =
   penv.axioms <- PF.Set.add ax penv.axioms
@@ -221,12 +227,13 @@ let add_operation ~penv ~prio op =
 let add_operation_rule ~penv ~prio rule =
   penv.ops <- (prio, rule) :: penv.ops
 
-let create ?meta params =
+let create ?(base=Signature.base) ?meta params =
   let penv = {
     axioms = PF.Set.empty;
     ops = [];
     constrs = [];
     constr_rules = [];
+    base;
     meta;
     params;
   } in
