@@ -128,13 +128,16 @@ let mk_true =
 let mk_false =
   H.hashcons { form=False; flags=(flag_ground lor flag_simplified); id= ~-1; }
 
-let mk_atom p =
-  let flags =
-    if T.is_ground p
-      then flag_simplified lor flag_ground
-      else flag_simplified
-  in
-  H.hashcons { form=Atom p; flags; id= ~-1; }
+let mk_atom p = match p with
+  | _ when T.eq p T.true_term -> mk_true
+  | _ when T.eq p T.false_term -> mk_false
+  | _ -> 
+    let flags =
+      if T.is_ground p
+        then flag_simplified lor flag_ground
+        else flag_simplified
+    in
+    H.hashcons { form=Atom p; flags; id= ~-1; }
 
 let mk_not f =
   match f.form with

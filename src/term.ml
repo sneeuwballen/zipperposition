@@ -157,7 +157,7 @@ let hashcons_equal x y =
   in
   let eq_types x y = match x.type_, y.type_ with
     | None, None -> true
-    | Some ty_x, Some ty_y when ty_x == ty_y -> true
+    | Some ty_x, Some ty_y when Type.eq ty_x ty_y -> true
     | _ -> false
   in
   (* compare types and subterms, if same structure *)
@@ -165,9 +165,11 @@ let hashcons_equal x y =
   match x.term, y.term with
   | Var i, Var j
   | BoundVar i, BoundVar j -> i = j
-  | Node (sa, la), Node (sb, lb) -> sa == sb && eq_subterms la lb
-  | Bind (sa, ta), Bind (sb, tb) ->
-    sa == sb && ta == tb
+  | Node (sa, []), Node (sb, []) -> Symbol.eq sa sb
+  | Node (_, []), Node (_, _::_)
+  | Node (_, _::_), Node (_, []) -> false
+  | Node (sa, la), Node (sb, lb) -> Symbol.eq sa sb && eq_subterms la lb
+  | Bind (sa, ta), Bind (sb, tb) -> Symbol.eq sa sb && ta == tb
   | _ -> false
 
 (** hashconsing for terms *)
@@ -500,7 +502,7 @@ let rec atomic_rec t =
   let open Symbol in
   match t.term with
   | Var _ | BoundVar _ -> true
-  | Bind (s, t') -> not (s == forall_symbol || s == exists_symbol || not (atomic_rec t'))
+  | Bind (s, t') -> not (eq s forall_symbol || eq s exists_symbol || not (atomic_rec t'))
   | Node (s, l) ->
     not (eq s and_symbol || eq s or_symbol || eq s imply_symbol
       || eq s not_symbol || eq s eq_symbol || eq s equiv_symbol)
