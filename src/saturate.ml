@@ -110,7 +110,7 @@ let given_clause_step ?(generating=true) ~env num =
         (fun c ->
           let c = Env.forward_simplify ~env c in
           (* keep clauses  that are not redundant *)
-          if Env.is_trivial ~env c
+          if Env.is_trivial ~env c || Env.is_active ~env c || Env.is_passive ~env c
             then None
             else Some c)
         inferred_clauses

@@ -195,6 +195,12 @@ val do_unary_inferences : env:t -> Clause.t -> Clause.t Sequence.t
 val is_trivial : env:t -> Clause.t -> bool
   (** Check whether the clause is trivial (also with Experts) *)
 
+val is_active : env:t -> Clause.t -> bool
+  (** Is the clause in the active set *)
+
+val is_passive : env:t -> Clause.t -> bool
+  (** Is the clause a passive clause? *)
+
 val simplify : env:t -> Clause.t -> Clause.t * Clause.t
   (** Simplify the hclause. Returns both the hclause and its simplification. *)
 

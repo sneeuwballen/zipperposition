@@ -345,6 +345,12 @@ let is_trivial ~env c =
   | l -> List.exists (fun f -> f c) l
   end || Experts.Set.is_redundant (get_experts ~env) c
 
+let is_active ~env c =
+  C.CSet.mem env.state#active_set#clauses c
+
+let is_passive ~env c =
+  C.CSet.mem env.state#passive_set#clauses c
+
 (** Apply rewrite rules *)
 let rewrite ~env c =
   let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
@@ -396,7 +402,7 @@ let rewrite_lits ~env c =
   | [] -> lit
   | (name,r)::rules' ->
     let lit' = r ~ctx lit in  (* apply the rule *)
-    if Lit.eq lit lit'
+    if Lit.eq_com lit lit'
       then rewrite_lit rules' lit
       else begin
         applied_rules := SmallSet.add !applied_rules name;
@@ -405,7 +411,7 @@ let rewrite_lits ~env c =
   in
   (* apply lit rules *)
   let lits = Array.map (fun lit -> rewrite_lit env.lit_rules lit) c.C.hclits in
-  if SmallSet.is_empty !applied_rules then c
+  if Lits.eq_com lits c.C.hclits then c
   else begin  (* simplifications occurred! *)
     let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
     let proof c' = Proof.mk_c_step c' rule [c.C.hcproof] in
@@ -441,6 +447,7 @@ let rec basic_simplify ~env c =
 (* rewrite clause with simpl_set *)
 let rec rw_simplify ~env c =
   let simpl_set = env.state#simpl_set in
+  let c = C.follow_simpl c in
   let c' = match env.rw_simplify with
   | [] -> c
   | [f] -> f simpl_set c
@@ -449,7 +456,9 @@ let rec rw_simplify ~env c =
   in
   if C.eq c c'
     then c'
-    else rw_simplify ~env c'
+    else 
+      let _ = C.simpl_to ~from:c ~into:c' in
+      rw_simplify ~env c'
 
 (* simplify clause w.r.t. active set *)
 let rec active_simplify ~env c =
@@ -521,6 +530,7 @@ let backward_simplify ~env given =
 
 (** Simplify the clause w.r.t to the active set and experts *)
 let forward_simplify ~env c =
+  let c = C.follow_simpl c in
   let c = rewrite ~env c in
   let c = Experts.Set.simplify (get_experts ~env) c in
   let c = rw_simplify ~env c in
