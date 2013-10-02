@@ -351,32 +351,18 @@ module Lit = struct
     | Literal.Prop _ -> []
 
   let to_lit ~ord lit =
-    (* if type==int, multiply t and m by m.divby *)
-    let scale t m =
-      if Type.eq Type.int (Monome.type_of m) && not (S.Arith.is_one m.Monome.divby)
-        then  (* need to multiply by m.divby to remain within integers *)
-          let c = m.Monome.divby in
-          T.mk_product t (T.mk_const c), Monome.product m c
-        else t, m
-    in
     match lit with
     | Eq (t, m) ->
-      let t, m = scale t m in
       Literal.mk_eq ~ord t (Monome.to_term m)
     | Neq (t, m) ->
-      let t, m = scale t m in
       Literal.mk_neq ~ord t (Monome.to_term m)
     | L_less (t, m) ->
-      let t, m = scale t m in
       Literal.mk_true (T.mk_less t (Monome.to_term m))
     | L_lesseq (t, m) ->
-      let t, m = scale t m in
       Literal.mk_true (T.mk_lesseq t (Monome.to_term m))
     | R_less (m, t) ->
-      let t, m = scale t m in
       Literal.mk_true (T.mk_less (Monome.to_term m) t)
     | R_lesseq (m, t) ->
-      let t, m = scale t m in
       Literal.mk_true (T.mk_lesseq (Monome.to_term m) t)
 
   let simplify ~ord ~signature lit = match lit with
@@ -417,13 +403,7 @@ module Lit = struct
   let eliminate ?(elim_var=(fun v -> true)) ~signature lit =
     begin match lit with
     | Eq _ -> []
-    | Neq (x, m) when T.is_var x ->
-      (* eliminate x, if not shielded and if [m] has instances *)
-      if not (Monome.var_occurs x m) && elim_var x && Monome.has_instances m
-        then
-          let subst = Substs.(bind empty x 0 (Monome.to_term m) 0) in
-          [subst]
-        else []
+    | Neq (x, m) -> [] (* for Neq, let equality resolution deal with it *)
     | L_less(x, m)
       when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
       (* x < m  is inconsistent with x = ceil(m) *)

@@ -148,7 +148,7 @@ let pivot_arith c =
 
 let purify_arith c =
   let ctx = c.C.hcctx in
-  let eligible = C.Eligible.(combine [param c; ineq c]) in
+  let eligible = C.Eligible.(max c) in
   let lits' = Arith.Lits.purify ~ord:(Ctx.ord ctx)
     ~signature:(Ctx.signature ctx) ~eligible c.C.hclits
   in
