@@ -126,15 +126,11 @@ let _scale m c =
       let divby = S.Arith.Op.product m.divby c in
       { constant; coeffs; divby; }
 
-let _gcd s1 s2 = match s1, s2 with
-  | S.Int a, S.Int b -> S.mk_bigint (Big_int.gcd_big_int a b)
-  | _ -> assert false
-
 let normalize m = match m.constant with
   | S.Int _ ->
     (* divide by common gcd of coeffs and divby *)
-    let gcd = _gcd m.constant m.divby in
-    let gcd = T.TMap.fold (fun _ c gcd -> _gcd c gcd) m.coeffs gcd in
+    let gcd = S.Arith.Op.gcd m.constant m.divby in
+    let gcd = T.TMap.fold (fun _ c gcd -> S.Arith.Op.gcd c gcd) m.coeffs gcd in
     let constant = S.Arith.Op.quotient m.constant gcd in
     let coeffs = T.TMap.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
     let divby = S.Arith.Op.quotient m.divby gcd in
@@ -303,3 +299,22 @@ let to_term m =
   if S.Arith.is_one m.divby
     then sum
     else T.mk_node S.Arith.quotient [sum; T.mk_const m.divby]
+
+(** {2 Satisfiability} *)
+
+let has_instances m = match m.constant with
+  | S.Real _
+  | S.Rat _ -> true
+  | S.Int _ ->
+    if S.Arith.is_one m.divby
+      then true  (* gcd is one, always true *)
+      else
+        let g = T.TMap.fold (fun _ c g -> S.Arith.Op.gcd c g) m.coeffs m.divby in
+        S.Arith.Op.divides g m.constant
+  | _ -> assert false
+
+let floor m =
+  assert false
+
+let ceil m =
+  assert false

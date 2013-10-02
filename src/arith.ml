@@ -90,6 +90,15 @@ module T = struct
         THashSet.to_list set
       else []
 
+  let _var_occur_strict v t =
+    not (eq v t) && var_occurs v t
+
+  let shielded v t = match extract_subterms t with
+    | [] -> _var_occur_strict v t
+    | l -> List.exists (fun t' -> _var_occur_strict v t') l
+
+  (* TODO: a flag for simplified terms, makes simplifying them faster *)
+
   let simplify ~signature t =
     (* recursive function with cache *)
     let rec simplify recurse t = match t.term with
@@ -272,16 +281,18 @@ module Lit = struct
         let m = Monome.difference m1 m2 in
         let terms = Monome.to_list m in
         (* for each term, pivot the monome so that we isolate the term
-          on one side of the (dis)equation *)
-        List.map
+          on one side of the (dis)equation, but only if it admits solutions *)
+        Util.list_fmap
           (fun (coeff, t) ->
             assert (not (S.Arith.is_zero coeff));
             let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
             (* -t+m = 0 ---> t=m, but t+m = 0 ----> t=-m *)
             let m = if S.Arith.sign coeff < 0 then m else Monome.uminus m in
             if sign
-              then Eq (t, m)
-              else Neq (t, m))
+              then if Monome.has_instances m
+                then Some (Eq (t, m))
+                else None  (* unsatisfiable *)
+              else Some (Neq (t, m)))
           terms
       with Monome.NotLinear -> []
     (* extract lit from (l <= r | l < r) *)
@@ -392,53 +403,57 @@ module Lit = struct
   | R_less (m, _)
   | R_lesseq (m, _) -> m
 
+  (* unify non-arith subterms pairwise *)
+  let factor lit =
+    let l = get_term lit :: Monome.terms (get_monome lit) in
+    let l = Util.list_diagonal l in
+    Util.list_fmap
+      (fun (t1, t2) ->
+        try Some (Unif.unification t1 0 t2 0)
+        with Unif.Fail -> None)
+      l
+
+  (* find instances of variables that eliminate the literal *)
   let eliminate ?(elim_var=(fun v -> true)) ~signature lit =
-    (* unify non-arith subterms pairwise *)
-    let fact_subterms lit =
-      let l = get_term lit :: Monome.terms (get_monome lit) in
-      let l = Util.list_diagonal l in
-      Util.list_fmap
-        (fun (t1, t2) ->
-          try Some (Unif.unification t1 0 t2 0)
-          with Unif.Fail -> None)
-        l
-    (* find substitutions that solve the lit *)
-    and solve_lit lit =
-      begin match lit with
-      | Eq _ -> []
-      | Neq (x, m) when T.is_var x ->
-        (* eliminate x, if not shielded *)
-        if not (Monome.var_occurs x m) && elim_var x
-          then
-            let subst = Substs.(bind empty x 0 (Monome.to_term m) 0) in
-            [subst]
-          else []
-      | L_less(x, m)
-      | R_less(m, x)
-        when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
-        (* x < m  is inconsistent with x = m *)
-        begin try
-          [ Unif.unification x 0 (Monome.to_term m) 0]
-        with Unif.Fail -> []  (* occur check... *)
-        end
-      | L_lesseq(x, m)
-        when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
-        (* x <= m inconsistent with x = m+1 *)
-        begin try
-          [ Unif.unification x 0 (Monome.to_term (Monome.succ m)) 0 ]
-        with Unif.Fail -> []  (* occur check... *)
-        end
-      | R_lesseq(m, x)
-        when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
-        (* x >= m inconsistent with x = m-1 *)
-        begin try
-          [ Unif.unification x 0 (Monome.to_term (Monome.pred m)) 0 ]
-        with Unif.Fail -> []  (* occur check... *)
-        end
-      | _ -> []
+    begin match lit with
+    | Eq _ -> []
+    | Neq (x, m) when T.is_var x ->
+      (* eliminate x, if not shielded and if [m] has instances *)
+      if not (Monome.var_occurs x m) && elim_var x && Monome.has_instances m
+        then
+          let subst = Substs.(bind empty x 0 (Monome.to_term m) 0) in
+          [subst]
+        else []
+    | L_less(x, m)
+      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+      (* x < m  is inconsistent with x = ceil(m) *)
+      begin try
+        [ Unif.unification x 0 Monome.(to_term (ceil m)) 0]
+      with Unif.Fail -> []  (* occur check... *)
       end
-    in
-    solve_lit lit @ fact_subterms lit
+    | R_less(m, x)
+      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+      (* m < x  is inconsistent with x = floor(m) *)
+      begin try
+        [ Unif.unification x 0 Monome.(to_term (floor m)) 0]
+      with Unif.Fail -> []  (* occur check... *)
+      end
+    | L_lesseq(x, m)
+      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+      (* x <= m inconsistent with x = ceil(m)+1 *)
+      begin try
+        [ Unif.unification x 0 Monome.(to_term (succ (ceil m))) 0 ]
+      with Unif.Fail -> []  (* occur check... *)
+      end
+    | R_lesseq(m, x)
+      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+      (* x >= m inconsistent with x = floor(m)-1 *)
+      begin try
+        [ Unif.unification x 0 Monome.(to_term (pred (floor m))) 0 ]
+      with Unif.Fail -> []  (* occur check... *)
+      end
+    | _ -> []
+    end
 
   module L = struct
     let get_terms l = List.map get_term l
@@ -534,4 +549,23 @@ module Lits = struct
       end
     done;
     !results
+
+  let shielded ?(filter=(fun _ _ -> true)) lits v =
+    if not (T.is_var v) then failwith "shielded: need a var";
+    try
+      for i = 0 to Array.length lits - 1 do
+        if filter i lits.(i) &&
+        match lits.(i) with
+        | Literal.Prop (p, _) -> T.shielded v p
+        | Literal.Equation (l, r, _, _) -> T.shielded v l || T.shielded v r
+        | _ -> false
+        then raise Exit
+      done;
+      false
+    with Exit ->
+      true
+
+  let naked_vars ?filter lits =
+    let vars = Literals.vars lits in
+    List.filter (fun v -> not (shielded ?filter lits v)) vars
 end

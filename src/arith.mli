@@ -64,6 +64,10 @@ module T : sig
         arithmetic or if it's a pure arithmetic expression
         (akin to a constant). *)
 
+  val shielded : Term.t -> Term.t -> bool
+    (** [shielded v t] is true if [v] is a variable that occurs under a
+        non interpreted symbol in [t] *)
+
   val simplify : signature:Signature.t -> Term.t -> Term.t
     (** Arithmetic simplifications *)
 end
@@ -108,6 +112,9 @@ module Lit : sig
 
   val get_monome : t -> Monome.t
 
+  val factor : t -> Substs.t list
+    (** Unify non-arith subterms pairwise, return corresponding substitutions *)
+
   val eliminate : ?elim_var:(Term.t -> bool) -> signature:Signature.t ->
                   t -> Substs.t list
     (** List of substitutions that make the literal inconsistent.
@@ -143,5 +150,16 @@ module Lits : sig
         and replacing the old literal by those new ones (if [t] maximal).
         It returns a list of such pivoted arrays, each pivoted array resulting
         from a single pivoted literal. *)
+
+  val shielded : ?filter:(int -> Literal.t -> bool) ->
+                  Literal.t array -> Term.t -> bool
+    (** Is the given variable shielded (ie occur as a subterm somewhere)?
+        [filter] is used to know which literals can shield the variable.
+        @raise Invalid_argument if the term is not a var *)
+
+  val naked_vars : ?filter:(int -> Literal.t -> bool) ->
+                    Literal.t array -> Term.varlist
+    (** Variables occurring in inequations, that are not shielded *)
+
 end
 

@@ -95,3 +95,23 @@ val to_term : t -> Term.t         (** convert back to a term *)
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
+
+(** {2 Satisfiability} *)
+
+val has_instances : t -> bool
+  (** For real or rational, always true. For integers, returns true
+      iff g divides [m.constant], where g is the
+      GCD of [c] for [c] in [m.coeffs] union [m.divby].
+
+      The intuition is that this returns [true] iff the monome, with its
+      denominator [divby], actually has some instances in its type. Trivially
+      true in reals or rationals, this is only the case for integers if
+      [x * m.divby = m.coeffs + m.constant] is a satisfiable diophantine
+      equation.
+  *)
+
+val floor : t -> t
+  (** Highest monome that is <= m, and that satisfies [has_instances]. *)
+
+val ceil : t -> t
+  (** Same as {!round_low} but rounds high *)

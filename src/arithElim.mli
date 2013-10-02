@@ -40,6 +40,10 @@ val rewrite_lit : Env.lit_rewrite_rule
   (** Simplify literals by evaluating them; in the case of integer monomes,
       also reduce them to common denominator. *)
 
+val eliminate_arith : Env.unary_inf_rule
+  (** Try to find instances that make one literal unsatisfiable,
+      and thus eliminate it *)
+
 val factor_arith : Env.unary_inf_rule
   (** Try to unify terms of arithmetic literals *)
 

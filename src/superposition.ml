@@ -636,6 +636,7 @@ let basic_simplify c =
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
   Util.incr_stat stat_basic_simplify;
+  (* is the literal absurd? *)
   let absurd_lit lit = match lit with
   | Lit.Equation (l, r, false, _) when T.eq l r -> true
   | Lit.Equation (l, r, true, _)
@@ -645,44 +646,50 @@ let basic_simplify c =
   | Lit.Prop (p, true) when T.eq p T.false_term -> true
   | Lit.False -> true
   | _ -> false
+  (* arith equality constraint? *)
+  and arith_eq_constraint lits bv i lit = match lit with
+  | Lit.Equation (l, r, false, _) ->
+    let filter i' lit' = BV.get bv i' && not (Lit.eq_com lit lit') in
+    (* inequation with a variable and an arith term, where the variable
+      is shielded in another literal *)
+    (T.is_var l && Arith.T.is_arith r && Arith.Lits.shielded ~filter lits l) ||
+    (T.is_var r && Arith.T.is_arith l && Arith.Lits.shielded ~filter lits r)
+  | _ -> false
   in
-  let lits = Array.to_list c.C.hclits in
-  (* remove s!=s literals *)
-  let new_lits = List.filter (fun lit -> not (absurd_lit lit)) lits in
-  (* remove duplicate literals *)
+  let lits = c.C.hclits in
+  (* bv: literals to keep *)
+  let bv = BV.create ~size:(Array.length lits) true in
+  (* eliminate absurd lits *)
+  Array.iteri (fun i lit -> if absurd_lit lit then BV.reset bv i) lits;
+  (* eliminate inequations x != t *)
+  let subst = ref Substs.empty in
+  Array.iteri
+    (fun i lit ->
+      if BV.get bv i then match lit with
+        | Lit.Equation (l, r, false, _) when (T.is_var l || T.is_var r)
+          && not (arith_eq_constraint lits bv i lit) ->
+          (* eligible for destructive Equality Resolution, try to update subst *)
+          begin try
+            let subst' = Unif.unification ~subst:!subst l 0 r 0 in
+            BV.reset bv i;
+            subst := subst';
+          with Unif.Fail -> ()
+          end
+        | _ -> ())
+    lits;
+  let new_lits = List.map fst (BV.select bv lits) in
+  let renaming = Ctx.renaming_clear ~ctx in
+  let new_lits = Lit.apply_subst_list ~ord ~renaming !subst new_lits 0 in
   let new_lits = Util.list_uniq Lit.eq_com new_lits in
-  (* destructive equality resolution *)
-  let rec er lits =
-    match Util.list_find er_check lits with
-    | Some (i, Lit.Equation (l, r, sign, _)) ->
-        assert (not sign);
-        assert (T.is_var l || T.is_var r);
-        begin try
-          let subst = Unif.unification l 0 r 0 in
-          let renaming = Ctx.renaming_clear ~ctx in
-          (* remove the literal, and apply the substitution to the remaining literals
-             before trying to find another x!=t *)
-          er (Lit.apply_subst_list ~ord ~renaming subst (Util.list_remove lits i) 0)
-        with Unif.Fail -> lits
-        end
-    | None -> lits
-    | _ -> assert false
-  (* finds candidate literals for destructive ER (lits with >= 1 variable) *)
-  and er_check = function
-    | Lit.Equation (l, r, sign, _) -> (not sign) && (T.is_var l || T.is_var r)
-    | _ -> false
-  in
-  let new_lits = er new_lits in
-  if List.length new_lits = Array.length c.C.hclits
-  then (Util.exit_prof prof_basic_simplify; c) (* no change *)
-  else begin
-    let proof = Proof.adapt_c c.C.hcproof in  (* do not bother printing this *)
-    let parents = c :: c.C.hcparents in
-    let new_clause = C.create ~parents ~ctx new_lits proof in
-    Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
-    Util.exit_prof prof_basic_simplify;
-    new_clause
-  end
+  if List.length new_lits = Array.length lits
+    then (Util.exit_prof prof_basic_simplify; c)  (* no simplification *)
+    else begin
+      let proof cc= Proof.mk_c_step ~rule:"simplify" cc [c.C.hcproof] in
+      let new_clause = C.create ~parents:[c] ~ctx new_lits proof in
+      Util.debug 3 "%a basic_simplifies into %a" C.pp c C.pp new_clause;
+      Util.exit_prof prof_basic_simplify;
+      new_clause
+    end
 
 exception FoundMatch of Term.t * Clause.t * Substs.t
 

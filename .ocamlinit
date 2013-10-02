@@ -23,7 +23,7 @@ open Logtk.Type.Infix;;
 #install_printer Symbol.fmt;;
 #install_printer Signature.fmt;;
 #install_printer Type.fmt;;
-#install_printer Arith.Monome.fmt;;
+#install_printer Monome.fmt;;
 module T = Logtk.Term;;
 module F = Logtk.Formula;;
 let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;

@@ -72,12 +72,10 @@ let rewrite_lit ~ctx lit =
   | Lit.True
   | Lit.False -> lit
 
-let factor_arith c =
+let eliminate_arith c =
   let ctx = c.C.hcctx in
   let signature = Ctx.signature ctx in
   let eligible = C.Eligible.max c in
-  (* we can eliminate variables that are not shielded *)
-  let elim_var x = not (Lits.shielded c.C.hclits x) in
   (* eliminate i-th literal with [subst] *)
   let eliminate_lit i subst =
     let lits' = Util.array_except_idx c.C.hclits i in
@@ -85,8 +83,37 @@ let factor_arith c =
     let ord = Ctx.ord ctx in
     let lits' = Lit.apply_subst_list ~ord ~renaming subst lits' 0 in
     let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
-      ~rule:"factor" cc [c.C.hcproof] in
+      ~rule:"arith_elim" cc [c.C.hcproof] in
     let new_c = C.create ~parents:[c] ~ctx lits' proof in
+    Util.debug 3 "eliminate %a in %a (with %a) into %a" Lit.pp c.C.hclits.(i)
+      C.pp c Substs.pp subst C.pp new_c;
+    new_c
+  in
+  (* try to eliminate every arith literals *)
+  Lits.fold_lits ~eligible c.C.hclits []
+    (fun acc lit i ->
+      let ord_lits = Arith.Lit.extract ~signature lit in
+      (* we can eliminate variables that are not shielded in other literals *)
+      let elim_var x = not (Arith.Lits.shielded ~filter:(fun i' _ -> i <> i') c.C.hclits x) in
+      let substs = Util.list_flatmap
+        (Arith.Lit.eliminate ~elim_var ~signature) ord_lits
+      in
+      List.fold_left
+        (fun acc subst -> eliminate_lit i subst :: acc)
+        acc substs)
+
+let factor_arith c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let signature = Ctx.signature ctx in
+  let eligible = C.Eligible.max c in
+  (* instantiate the clause with subst *)
+  let mk_instance subst =
+    let renaming = Ctx.renaming_clear ~ctx in
+    let lits' = Lits.apply_subst ~ord ~renaming subst c.C.hclits 0 in
+    let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
+      ~rule:"factor" cc [c.C.hcproof] in
+    let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
     Util.debug 3 "factor %a (with %a) into %a" C.pp c Substs.pp subst C.pp new_c;
     new_c
   in
@@ -94,11 +121,9 @@ let factor_arith c =
   Lits.fold_lits ~eligible c.C.hclits []
     (fun acc lit i ->
       let ord_lits = Arith.Lit.extract ~signature lit in
-      let substs = Util.list_flatmap
-        (Arith.Lit.eliminate ~elim_var ~signature) ord_lits
-      in
+      let substs = Util.list_flatmap Arith.Lit.factor ord_lits in
       List.fold_left
-        (fun acc subst -> eliminate_lit i subst :: acc)
+        (fun acc subst -> mk_instance subst :: acc)
         acc substs)
 
 let pivot_arith c =
@@ -180,6 +205,7 @@ let setup_env ~env =
   Env.add_unary_inf ~env "arith_factor" factor_arith;
   Env.add_unary_inf ~env "arith_pivot" pivot_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
+  Env.add_unary_inf ~env "arith_elim" eliminate_arith;
   (* be sure that the ordering is present in the context *)
   Ctx.add_order ~ctx:(Env.ctx env) ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
   ()
