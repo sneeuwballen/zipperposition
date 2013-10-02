@@ -157,7 +157,9 @@ module T = struct
         mk_const (S.Arith.Op.product na nb)
       | S.Const ("$quotient",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.quotient na nb)
+        begin try mk_const (S.Arith.Op.quotient na nb)
+        with S.Arith.TypeMismatch _ -> mk_quotient a b
+        end
       | S.Const ("$quotient_e",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
         mk_const (S.Arith.Op.quotient_e na nb)
@@ -288,11 +290,12 @@ module Lit = struct
             let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
             (* -t+m = 0 ---> t=m, but t+m = 0 ----> t=-m *)
             let m = if S.Arith.sign coeff < 0 then m else Monome.uminus m in
-            if sign
-              then if Monome.has_instances m
+            if Monome.has_instances m
+              then if sign
                 then Some (Eq (t, m))
-                else None  (* unsatisfiable *)
-              else Some (Neq (t, m)))
+                else Some (Neq (t, m))
+              else None  (* unsatisfiable *)
+          )
           terms
       with Monome.NotLinear -> []
     (* extract lit from (l <= r | l < r) *)
