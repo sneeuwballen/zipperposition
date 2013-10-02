@@ -89,7 +89,7 @@ class Run(object):
                 constraint foobar unique (filename, prover) on conflict replace
                 );"""
             self.conn.execute(create_query)
-            atexit.register(lambda : db.close())
+            atexit.register(lambda : self.conn.close())
         except sqlite3.OperationalError as e:
             pass
 
