@@ -63,7 +63,9 @@ let skolem_ctx ~ctx = ctx.skolem
 
 let signature ~ctx = ctx.signature
 
-let lost_completeness ~ctx = ctx.complete <- false
+let lost_completeness ~ctx =
+  if ctx.complete then Util.debug 1 "completeness is lost";
+  ctx.complete <- false
 
 let is_completeness_preserved ~ctx = ctx.complete
 

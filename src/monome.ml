@@ -313,8 +313,27 @@ let has_instances m = match m.constant with
         S.Arith.Op.divides g m.constant
   | _ -> assert false
 
-let floor m =
-  assert false
+let floor m = match m.constant with
+  | S.Int _ when T.TMap.is_empty m.coeffs ->
+    (* m = m.constant / m.divby *)
+    let constant = S.Arith.Op.quotient_f m.constant m.divby in
+    let one = S.Arith.one_i in
+    { m with constant; divby=one; }
+  | _ -> m
 
 let ceil m =
-  assert false
+match m.constant with
+  | S.Int _ when T.TMap.is_empty m.coeffs ->
+    (* m = m.constant / m.divby *)
+    let constant = match m.constant, m.divby with
+    | S.Int a, S.Int b ->
+      let q, r = Big_int.quomod_big_int a b in
+      if Big_int.sign_big_int b = 0
+        then S.mk_bigint q
+        else S.mk_bigint (Big_int.succ_big_int q)  (* round up! *)
+    | _ -> assert false
+    in
+    let one = S.Arith.one_i in
+    { m with constant; divby=one; }
+  | _ -> m
+

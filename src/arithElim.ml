@@ -208,4 +208,6 @@ let setup_env ~env =
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
   (* be sure that the ordering is present in the context *)
   Ctx.add_order ~ctx:(Env.ctx env) ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
+  (* we are (until proved otherwise) incomplete *)
+  Ctx.lost_completeness ~ctx:(Env.ctx env);
   ()
