@@ -268,8 +268,11 @@ val ac_eq : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
 val pp_depth : int -> Buffer.t -> t -> unit
 val pp_tstp_depth : int -> Buffer.t -> t -> unit
 
-val pp : Buffer.t -> t -> unit
+val pp_debug : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
+
+val pp : Buffer.t -> t -> unit
+val set_default_pp : (Buffer.t -> t -> unit) -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 

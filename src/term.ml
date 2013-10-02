@@ -883,9 +883,15 @@ let rec pp_depth depth buf t =
   in
   pp_rec buf t
 
-let pp buf t = pp_depth 0 buf t
+let pp_debug buf t = pp_depth 0 buf t
 
 let pp_tstp buf t = pp_tstp_depth 0 buf t
+
+let __default_pp = ref pp_debug
+
+let pp buf t = !__default_pp buf t
+
+let set_default_pp pp = __default_pp := pp
 
 let to_string t = Util.sprintf "%a" pp t
 

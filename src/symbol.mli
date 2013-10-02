@@ -243,12 +243,15 @@ val mk_fresh_const : int -> t
 
 (** {2 IO} *)
 
-val pp : Buffer.t -> t -> unit
 val to_string : t -> string
-val fmt : Format.formatter -> t -> unit
-
+val pp_debug : Buffer.t -> t -> unit
 val to_string_tstp : t -> string
 val pp_tstp : Buffer.t -> t -> unit
+
+val pp : Buffer.t -> t -> unit   (* uses default printer *)
+val fmt : Format.formatter -> t -> unit
+
+val set_default_pp : (Buffer.t -> t -> unit) -> unit (* change default printer *)
 
 val bij : t Bij.t
 

@@ -668,7 +668,7 @@ let signature_seq ?(signature=Signature.empty) seq =
 
 (** {2 IO} *)
 
-let pp buf f =
+let pp_debug buf f =
   let depth = ref 0 in
   (* outer formula *)
   let rec pp_outer buf f = match f.form with
@@ -716,12 +716,6 @@ let pp buf f =
   | _ -> pp_outer buf f
   in
   pp_outer buf (flatten f)
-
-let to_string f =
-  Util.on_buffer pp f
-
-let fmt fmt f =
-  Format.pp_print_string fmt (to_string f)
 
 let pp_tstp buf f =
   let depth = ref 0 in
@@ -775,6 +769,18 @@ let pp_tstp buf f =
   | _ -> pp_outer buf f
   in
   pp_outer buf (flatten f)
+
+let __default_pp = ref pp_debug
+
+let pp buf f = !__default_pp buf f
+
+let set_default_pp pp = __default_pp := pp
+
+let to_string f =
+  Util.on_buffer pp f
+
+let fmt fmt f =
+  Format.pp_print_string fmt (to_string f)
 
 (* XXX KISS: use the term bijection *)
 let bij =

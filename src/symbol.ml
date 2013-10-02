@@ -197,13 +197,13 @@ let is_connective s = List.exists (fun s' -> eq s s') connectives
 
 (** {2 IO} *)
 
-let to_string s = match s with
+let to_string_debug s = match s with
   | Const (s,_) -> s
   | Int n -> Big_int.string_of_big_int n
   | Rat n -> Ratio.string_of_ratio n
   | Real f -> string_of_float f
 
-let pp buf s = Buffer.add_string buf (to_string s)
+let pp_debug buf s = Buffer.add_string buf (to_string_debug s)
 
 let to_string_tstp s = match s with
   | _ when eq s not_symbol -> "~"
@@ -214,9 +214,16 @@ let to_string_tstp s = match s with
   | _ when eq s and_symbol -> "&"
   | _ when eq s or_symbol -> "|"
   | _ when eq s imply_symbol -> "=>"
-  | _ -> to_string s (* default *)
+  | _ -> to_string_debug s (* default *)
 
 let pp_tstp buf s = Buffer.add_string buf (to_string_tstp s)
+
+let to_string s = to_string_debug s
+
+let __default_pp = ref pp_debug
+let pp buf s = !__default_pp buf s
+
+let set_default_pp pp = __default_pp := pp
 
 let fmt fmt s = Format.pp_print_string fmt (to_string s)
 
