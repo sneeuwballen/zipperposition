@@ -473,6 +473,18 @@ module Arith = struct
     | Real f -> mk_real (Pervasives.abs_float f)
     | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
+    let divides a b = match a, b with
+    | Rat _, Rat _
+    | Real _, Real _ -> true
+    | Int a, Int b -> Big_int.sign_big_int (Big_int.mod_big_int b a) = 0
+    | _ -> _ty_mismatch "divides: expected two numerical types"
+
+    let gcd a b = match a, b with
+    | Rat _, Rat _ -> one_rat
+    | Real _, Real _ -> one_f
+    | Int a, Int b -> mk_bigint (Big_int.gcd_big_int a b)
+    | _ -> _ty_mismatch "gcd: expected two numerical types"
+
     let less s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> Big_int.lt_big_int n1 n2
     | Rat n1, Rat n2 -> Ratio.lt_ratio n1 n2
