@@ -155,7 +155,8 @@ let mk_stat, print_global_stats =
   (* print stats *)
   (fun () ->
     List.iter
-      (fun (name, cnt) -> Format.printf "%% %-30s ... %s@." name (Int64.to_string !cnt))
+      (fun (name, cnt) ->
+        debug 0 "stat: %-30s ... %s" name (Int64.to_string !cnt))
       !stats)
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
