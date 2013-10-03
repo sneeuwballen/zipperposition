@@ -64,5 +64,8 @@ val detect : Formula.t Sequence.t -> Transform.t list
 
 val detect_list : Formula.t list -> Transform.t list
 
-val detect_def : Formula.t Sequence.t -> Transform.t list
-  (** Detect definitions *)
+val detect_def : ?only:[`Pred|`Term] -> ?arity:[`Zero|`Nonzero] ->
+                 Formula.t Sequence.t -> Transform.t list
+  (** Detect definitions.
+      @param only if present, restrict detection to predicates or terms
+      @param arity if present, restrict to constant or non-constant symbols *)

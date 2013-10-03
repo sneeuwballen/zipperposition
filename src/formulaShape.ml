@@ -116,15 +116,17 @@ let rec _lazy_mappend l = match l with
   | (lazy None) :: l' -> _lazy_mappend l'
   | [] -> None
 
-let detect seq =
-  (* fmap on options *)
-  let (>|=) opt f = match opt with
+(* fmap on options *)
+let (>|=) opt f = match opt with
   | None -> None
   | Some x -> Some (f x)
-  and (@|=) l f = match l with
+
+(* fmap on the head of the list *)
+let (@|=) l f = match l with
   | [] -> None
   | x::_ -> Some (f x)
-  in
+
+let detect seq =
   let seq = Sequence.fmap
     (fun form ->
       _lazy_mappend
@@ -140,13 +142,33 @@ let detect seq =
 
 let detect_list l = detect (Sequence.of_list l)
 
-let detect_def forms =
+let detect_def ?(only:[`Pred|`Term] option) ?(arity:[`Zero|`Nonzero] option) forms =
+  let pred_ok, term_ok = match only with
+  | Some `Pred -> true, false
+  | Some `Term -> false, true
+  | None -> true, true
+  and const_ok, fun_ok = match arity with
+  | Some `Zero -> true, false
+  | Some `Nonzero -> false, true
+  | None -> true, true
+  in
   let seq = Sequence.fmap
     (fun form ->
-      match is_definition form with
-      | Some (l,r) -> Some (Transform.of_term_rule (l,r))
-      | None -> match is_pred_definition form with
-      | Some (l,p) -> Some (Transform.of_form_rule (l,p))
-      | None -> None)
+      _lazy_mappend
+      [ lazy
+        (if pred_ok then match is_pred_definition form with
+        | Some (l,p) ->
+          if (T.is_const l && const_ok) || (not (T.is_const l) && fun_ok)
+            then Some (Transform.of_form_rule (l,p))
+            else None
+        | None -> None else None)
+      ; lazy
+        (if term_ok then match is_definition form with
+        | Some (l,r) ->
+          if (T.is_const l && const_ok) || (not (T.is_const l) && fun_ok)
+            then Some (Transform.of_term_rule (l,r))
+            else None
+        | None -> None else None)
+      ])
     forms
   in Sequence.to_rev_list seq
