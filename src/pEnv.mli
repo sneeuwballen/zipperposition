@@ -40,8 +40,9 @@ type operation_result =
   | Esa of PFormula.t list      (** replace by list of formulas *)
   | Add of PFormula.t list      (** add given formulas, and restart! *)
   | AddOps of operation list    (** New operations to perform, and restart *)
-  | DoNothing                   (** sic. *)
-and operation = PFormula.Set.t -> PFormula.t -> operation_result
+
+and operation = PFormula.Set.t -> PFormula.t -> operation_result list
+  (** An operation can have several results *)
 
 val fix : operation list -> PFormula.Set.t -> PFormula.Set.t
   (** Fixpoint of the given set of operations on the initial set. For a

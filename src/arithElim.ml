@@ -187,11 +187,11 @@ let setup_penv ~penv =
     fun set pf ->
       let f' = Arith.F.simplify ~signature pf.PF.form in
       if F.eq pf.PF.form f'
-        then PEnv.DoNothing
+        then []
         else
           let proof = Proof.mk_f_step f' ~rule:"arith_simplify" [pf.PF.proof] in
           let pf' = PF.create f' proof in
-          PEnv.SimplifyInto pf'
+          [PEnv.SimplifyInto pf']
   in
   (* signature of arith symbols *)
   let base = Signature.Arith.signature in

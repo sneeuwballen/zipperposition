@@ -65,9 +65,13 @@ let to_sourced t =
     Some ((t.form, file, name))
   | _ -> None
 
-let rec follow_simpl pf = match pf.simpl_to with
+let rec _follow_simpl n pf =
+  if n > 10_000 then failwith (Util.sprintf "follow_simpl loops on %a" F.pp pf.form);
+  match pf.simpl_to with
   | None -> pf
-  | Some pf' -> follow_simpl pf'
+  | Some pf' -> _follow_simpl (n+1) pf'
+
+let follow_simpl pf = _follow_simpl 0 pf
 
 let simpl_to ~from ~into =
   let from = follow_simpl from in

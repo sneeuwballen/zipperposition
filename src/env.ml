@@ -642,7 +642,6 @@ let meta_step ~env c =
           let cset = cnf ~env (PF.Set.singleton f) in
           C.CSet.to_list cset
         | MetaProverState.Theory (th_name, th_args) ->
-          Util.debug 1 "meta-prover: theory %a" MetaProverState.pp_result result;
           []
         | MetaProverState.Expert expert ->
           Util.debug 1 "meta-prover: expert %a" Experts.pp expert;

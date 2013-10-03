@@ -40,69 +40,77 @@ type operation_result =
   | Esa of PFormula.t list      (** replace by list of formulas *)
   | Add of PFormula.t list      (** add given formulas *)
   | AddOps of operation list    (** New operations to perform! *)
-  | DoNothing                   (** sic. *)
-and operation = PF.Set.t -> PF.t -> operation_result
 
-exception ExitOperation
-exception Restart
+and operation = PFormula.Set.t -> PFormula.t -> operation_result list
+
+exception ProcessNext
 
 (* fixpoint of transformations *)
 let fix ops set =
   let ops = ref ops in
-  let q = Queue.create () in
-  let add_forms l = List.iter (fun f -> Queue.push f q) l in
-  PF.Set.iter (fun f -> Queue.push f q) set;
-  (* initial queue to process *)
   let ans = ref PF.Set.empty in
+  let q = Queue.create () in
+  (* also process the given formulas *)
+  let add_forms l = List.iter (fun f -> Queue.push f q) l in
+  (* a new operation appeared, so we must process again all formulas
+      to be sure that they are irreducible *)
+  let restart () = 
+    Util.debug 4 "restart fixpoint computation";
+    PF.Set.iter (fun f -> Queue.push f q) !ans;
+    ans := PF.Set.empty
+  in
+  (* initial queue to process *)
+  PF.Set.iter (fun f -> Queue.push f q) set;
   while not (Queue.is_empty q) do
     let pf = Queue.pop q in
-    (* memoized simplifications *)
-    let pf = PF.follow_simpl pf in
-    try
+    if not (PF.Set.mem pf !ans)
+    then try
+      (* memoized simplifications *)
+      let pf = PF.follow_simpl pf in
       List.iter
-        (fun tr -> match tr !ans pf with
-          | DoNothing -> ()
-          | Remove ->
-            raise ExitOperation  (* remove formula *)
-          | Esa [pf'] when PF.eq_noproof pf pf' -> ()
-          | Esa l ->
-            (* get rid of [f], but process [l] instead *)
-            add_forms l;
-            raise ExitOperation
-          | Add l ->
-            (* continue processing [pf], but also [l] *)
-            add_forms (pf :: l);
-            raise Restart
-          | AddOps l ->
-            (* add those operations to the list of ops to perform, and keep [pf] *)
-            ops := List.rev_append l !ops;
-            add_forms [pf];
-            raise Restart
-          | SimplifyInto f' when F.ac_eq pf.PF.form f'.PF.form ->
-            () (* not really simplified *)
-          | SimplifyInto f' ->
-            (* ignore [f], process [f'] instead, and remember the
-                simplification step *)
-            PF.simpl_to ~from:pf ~into:f';
-            Queue.push f' q;
-            raise ExitOperation)
+        (fun tr ->
+          let keep = ref true in
+          let results = tr !ans pf in
+          List.iter
+            (function
+            | Remove -> keep := false
+            | Esa [pf'] when PF.eq_noproof pf pf' -> ()
+            | Esa l ->
+              (* get rid of [f], but process [l] instead *)
+              add_forms l;
+              keep := false
+            | Add l ->
+              (* continue processing [pf], but also [l] *)
+              add_forms l
+            | AddOps [] -> assert false
+            | AddOps l ->
+              (* add those operations to the list of ops to perform, and keep [pf] *)
+              ops := List.rev_append l !ops;
+              Util.debug 5 "restart after adding %d operations" (List.length l);
+              restart ()
+            | SimplifyInto f' when F.ac_eq pf.PF.form f'.PF.form ->
+              () (* not really simplified *)
+            | SimplifyInto f' ->
+              (* ignore [f], process [f'] instead, and remember the
+                  simplification step *)
+              PF.simpl_to ~from:pf ~into:f';
+              Queue.push f' q;
+              keep := false
+            )
+          results;
+          if not !keep then raise ProcessNext)
         !ops;
       (* terminal node, keep it *)
       ans := PF.Set.add pf !ans
-    with ExitOperation -> ()
-    | Restart ->
-      (* process again all formulas *)
-      Util.debug 4 "restart fixpoint computation";
-      PF.Set.iter (fun f -> Queue.push f q) !ans;
-      ans := PF.Set.empty
+    with ProcessNext -> ()
   done;
   !ans
 
 (* remove trivial formulas *)
 let remove_trivial set pf =
   if F.is_trivial pf.PF.form
-    then Remove
-    else DoNothing
+    then [Remove]
+    else []
 
 (* reduce formulas to CNF *)
 let cnf ~ctx =
@@ -112,7 +120,7 @@ let cnf ~ctx =
     let clauses = Cnf.cnf_of ~ctx pf.PF.form in
     (* now build "proper" clauses, with proof and all *)
     match clauses with
-    | [[f]] when F.eq f pf.PF.form -> DoNothing
+    | [[f]] when F.eq f pf.PF.form -> []
     | _ ->
       let proof f' = Proof.mk_f_step ~esa:true f' ~rule:"cnf" [pf.PF.proof] in
       let clauses =
@@ -123,7 +131,7 @@ let cnf ~ctx =
             PF.create f (proof f))
           clauses
       in
-      Esa clauses
+      [Esa clauses]
 
 let meta_prover ~meta =
   fun set pf ->
@@ -138,50 +146,49 @@ let meta_prover ~meta =
       res
     in
     if lemmas = []
-      then DoNothing
-      else Add lemmas
+      then []
+      else [Add lemmas]
 
 let rw_term ?(rule="rw") trs =
   fun set pf ->
     let f = pf.PF.form in
     let f' = Formula.map (fun t -> Rewriting.TRS.rewrite trs t) f in
     if F.eq f f'
-      then DoNothing
+      then []
       else
         let proof = Proof.mk_f_step f' ~rule [pf.PF.proof] in
         let pf' = PF.create f' proof in
-        SimplifyInto pf'
+        [SimplifyInto pf']
 
 let rw_form ?(rule="rw") frs =
   fun set pf ->
     let f = pf.PF.form in
+    Util.debug 5 "start rewriting %a" PF.pp pf;
     let f' = Rewriting.FormRW.rewrite frs f in
+    Util.debug 5 "done rewriting %a" PF.pp pf;
     if F.eq f f'
-      then DoNothing
+      then []
       else
         let proof = Proof.mk_f_step f' ~rule [pf.PF.proof] in
         let pf' = PF.create f' proof in
-        SimplifyInto pf'
+        let _ = Util.debug 5 "rewritten %a in %a!" PF.pp pf PF.pp pf' in
+        [SimplifyInto pf']
 
 let fmap_term ~rule func =
   fun set pf ->
     let f = pf.PF.form in
     let f' = Formula.map func f in
     if F.eq f f'
-      then DoNothing
+      then []
       else
         let proof = Proof.mk_f_step f' ~rule [pf.PF.proof] in
         let pf' = PF.create f' proof in
-        SimplifyInto pf'
+        [SimplifyInto pf']
 
 (* expand definitions *)
 let expand_def set pf =
-  (* detect definitions in [pf] and the current set *)
-  let forms = Sequence.map PF.get_form (PF.Set.to_seq set) in
-  let transforms =
-    FormulaShape.detect_list [pf.PF.form] @
-    FormulaShape.detect forms
-  in
+  (* detect definitions in [pf] *)
+  let transforms = FormulaShape.detect_def ~only:`Pred (Sequence.singleton pf.PF.form) in
   (* make new operations on the set of formulas *)
   let ops = Util.list_fmap
     (function
@@ -190,10 +197,12 @@ let expand_def set pf =
       | Transform.Tr _ -> None)
     transforms
   in
-  (* add those definitions *)
+  (* add those definitions, and remove the formula *)
   if ops = []
-    then DoNothing
-    else AddOps ops
+    then []
+    else
+      let _ = Util.debug 5 "detected def in %a" PF.pp pf in
+      [Remove; AddOps ops]
 
 (** {2 Preprocessing} *)
 

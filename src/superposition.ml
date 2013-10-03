@@ -425,6 +425,9 @@ let infer_split c =
 
 exception RewriteInto of Term.t * Substs.t
 
+(* TODO: put forward pointers in simpl_set, to make some rewriting steps
+    faster? (invalidate when updated, also allows to reclaim memory) *)
+
 (** Compute normal form of term w.r.t active set. Clauses used to
     rewrite are added to the clauses hashset.
     restrict is an option for restricting demodulation in positive maximal terms *)
@@ -432,7 +435,7 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
   let ord = Ctx.ord simpl_set#ctx in
   (* compute normal form of subterm. If restrict is true, substitutions that
      are variable renamings are forbidden (since we are at root of a max term) *) 
-  let rec normal_form ~restrict t =
+  let rec reduce_at_root ~restrict t =
     (* do not rewrite non-atomic formulas *)
     if not (T.atomic t)
       then t  (* do not rewrite such formulas *)
@@ -455,36 +458,36 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
                 end);
           t (* not found any match, normal form found *)
         with RewriteInto (t', subst) ->
-          traverse ~restrict subst t' 1 (* done one rewriting step, continue *)
+          normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
       end
   (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
-     0, but then we traverse terms in which variables are really the variables
+     0, but then we normal_form terms in which variables are really the variables
      of the RHS of a previously applied rule (in context 1); all those
      variables are bound to terms in context 0 *)
-  and traverse ~restrict subst t scope =
+  and normal_form ~restrict subst t scope =
     match t.T.term with
     | T.Var _ -> S.apply_no_renaming subst t scope
     | T.BoundVar _ -> t
     | T.Bind (s, t') ->
-      let t'' = traverse ~restrict subst t' scope in
+      let t'' = normal_form ~restrict subst t' scope in
       let new_t = T.mk_bind s t'' in
       (* rewrite term at root *)
-      normal_form ~restrict new_t
+      reduce_at_root ~restrict new_t
     | T.Node (s, l) ->
       (* rewrite subterms *)
-      let l' = List.map (fun t' -> traverse ~restrict:false subst t' scope) l in
+      let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
       let t' = if List.for_all2 (==) l l'
         then t
         else T.mk_node s l' in
       (* rewrite term at root *)
-      normal_form ~restrict t'
+      reduce_at_root ~restrict t'
     | T.At (t1, t2) ->
-      let t1' = traverse ~restrict:false subst t1 scope in
-      let t2' = traverse ~restrict:false subst t2 scope in
-      let t' = T.mk_at t1' t2' in
-      normal_form ~restrict t'
+      let t1' = normal_form ~restrict:false subst t1 scope in
+      let t2' = normal_form ~restrict:false subst t2 scope in
+      let t' = if t1 == t2' && t2 == t2' then t else T.mk_at t1' t2' in
+      reduce_at_root ~restrict t'
   in
-  traverse ~restrict S.empty t 0
+  normal_form ~restrict S.empty t 0
 
 (** Demodulate the clause, with restrictions on which terms to rewrite *)
 let demodulate (simpl_set : PS.SimplSet.t) c =

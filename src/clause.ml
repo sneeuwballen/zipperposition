@@ -130,11 +130,15 @@ let is_child_of ~child c =
   c.hcdescendants <- descendants
 
 (* see if [c] is known to simplify into some other clause *)
-let rec follow_simpl c = match c.hcsimplto with
+let rec _follow_simpl n c =
+  if n > 10_000 then failwith (Util.sprintf "follow_simpl loops on %a" Lits.pp c.hclits);
+  match c.hcsimplto with
   | None -> c
   | Some c' ->
     Util.debug 3 "clause %a already simplified to %a" Lits.pp c.hclits Lits.pp c'.hclits;
-    follow_simpl c'
+    _follow_simpl (n+1) c'
+
+let follow_simpl c = _follow_simpl 0 c
 
 (* [from] simplifies into [into] *)
 let simpl_to ~from ~into =
