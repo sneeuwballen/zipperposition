@@ -145,11 +145,13 @@ let check_step ~timeout ~prover step =
 
 (* print progress in proof checking *)
 let pp_progress num total =
-  Util.debug 1 "checking step %-5d on %-5d" num total
+  Printf.printf "\r checking step %-5d on %-5d" num total;
+  flush stdout;
+  ()
 
 (* check every step of [trace] using [provers], and put the result
     in [checked] *)
-let check_all ~provers ~timeout ~checked =
+let check_all ~progress ~provers ~timeout ~checked =
   let n = ref 0 in
   let trace = CheckedTrace.trace checked in
   let len = TT.size trace in
@@ -157,13 +159,15 @@ let check_all ~provers ~timeout ~checked =
     (fun step ->
       (* print progress *)
       incr n;
-      pp_progress !n len;
+      if progress then pp_progress !n len;
       List.iter
         (fun prover ->
           (* check step with prover *)
           let res = check_step ~timeout ~prover step in
           CheckedTrace.add ~checked step res)
-        provers)
+        provers);
+  (* clean line of progress *)
+  if progress then Printf.printf "                                      \n"
 
 (* check that all paths from root, through proof nodes that satisfy [valid],
     reach axioms *)
@@ -221,6 +225,7 @@ let print_problem = ref false
 let timeout = ref 10
 let minimum = ref 1
 let provers = CallProver.Prover.default
+let progress = ref false
 
 (* TODO option to choose provers *)
 
@@ -229,6 +234,7 @@ let options =
   ; "-pp", Arg.Set print_problem, "print problem after parsing"
   ; "-timeout", Arg.Set_int timeout, "timeout for subprovers (in seconds)"
   ; "-minimum", Arg.Set_int minimum, "minimum number of checks to validate a step (1)"
+  ; "-progress", Arg.Set progress, "print progress"
   ]
 
 (** parse_args returns parameters *)
@@ -252,7 +258,7 @@ let () =
     end else Util.debug 0 "derivation is a DAG";
     (* validate steps one by one *)
     let checked = CheckedTrace.create trace in
-    check_all ~provers ~checked ~timeout:!timeout;
+    check_all ~progress:!progress ~provers ~checked ~timeout:!timeout;
     (* print failures *)
     List.iter
       (fun (proof, res) -> match res with
