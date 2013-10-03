@@ -511,40 +511,42 @@ let _var_occurs v f =
     else
       Sequence.exists (T.var_occurs v) (terms_seq f)
 
-let rec simplify f =
+let simplify f =
+  let rec simplify ~depth f =
   if has_flag f flag_simplified then f
   else
     let f' = match f.form with
     | And l ->
-      let l' = List.map simplify l in
+      let l' = List.map (simplify ~depth) l in
       flatten (mk_and l')
     | Or l ->
-      let l' = List.map simplify l in
+      let l' = List.map (simplify ~depth) l in
       flatten (mk_or l')
     | Forall f'
-    | Exists f' when not (db_contains f' 0) -> simplify f'
-    | Forall f' -> mk_forall (simplify f')
-    | Exists f' -> mk_exists (simplify f')
+    | Exists f' when not (db_contains f' 0) -> simplify ~depth (db_unlift ~depth f')
+    | Forall f' -> mk_forall (simplify ~depth:(depth+1) f')
+    | Exists f' -> mk_exists (simplify ~depth:(depth+1) f')
     | Equal (a,b) when T.eq a b -> mk_true
     | Equal _ -> f
     | Atom _
     | True
     | False -> f
-    | Not f' -> mk_not (simplify f')
-    | Imply ({form=True}, f') -> simplify f'
+    | Not f' -> mk_not (simplify ~depth f')
+    | Imply ({form=True}, f') -> simplify ~depth f'
     | Imply ({form=False}, _) -> mk_true
     | Imply (_, {form=True}) -> mk_true
-    | Imply (f', {form=False}) -> mk_not (simplify f')
-    | Imply (f1, f2) -> mk_imply (simplify f1) (simplify f2)
+    | Imply (f', {form=False}) -> mk_not (simplify ~depth f')
+    | Imply (f1, f2) -> mk_imply (simplify ~depth f1) (simplify ~depth f2)
     | Equiv (f1, f2) when eq f1 f2 -> mk_true
     | Equiv ({form=True}, f')
-    | Equiv (f', {form=True}) -> simplify f'
+    | Equiv (f', {form=True}) -> simplify ~depth f'
     | Equiv ({form=False}, f')
-    | Equiv (f', {form=False}) -> mk_not (simplify f')
-    | Equiv (f1, f2) -> mk_equiv (simplify f1) (simplify f2)
+    | Equiv (f', {form=False}) -> mk_not (simplify ~depth f')
+    | Equiv (f1, f2) -> mk_equiv (simplify ~depth f1) (simplify ~depth f2)
     in
     let () = set_flag f' flag_simplified in
     f'
+  in simplify ~depth:0 f
 
 let rec is_trivial f = match f.form with
   | True -> true
