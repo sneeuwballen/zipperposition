@@ -63,3 +63,6 @@ val detect : Formula.t Sequence.t -> Transform.t list
       transformations over formulas *)
 
 val detect_list : Formula.t list -> Transform.t list
+
+val detect_def : Formula.t Sequence.t -> Transform.t list
+  (** Detect definitions *)

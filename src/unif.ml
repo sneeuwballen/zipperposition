@@ -165,6 +165,7 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground s && T.is_ground t ->
       raise Fail (* terms are not equal, and ground. failure. *)
+    | Var i, Var j when i <> j && sc_s = sc_t -> raise Fail
     | Var _, Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
     | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail

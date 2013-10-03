@@ -139,3 +139,14 @@ let detect seq =
   Sequence.to_rev_list seq
 
 let detect_list l = detect (Sequence.of_list l)
+
+let detect_def forms =
+  let seq = Sequence.fmap
+    (fun form ->
+      match is_definition form with
+      | Some (l,r) -> Some (Transform.of_term_rule (l,r))
+      | None -> match is_pred_definition form with
+      | Some (l,p) -> Some (Transform.of_form_rule (l,p))
+      | None -> None)
+    forms
+  in Sequence.to_rev_list seq
