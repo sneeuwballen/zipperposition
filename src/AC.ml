@@ -25,7 +25,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** {6 AC redundancy} *)
+
 open Logtk
+open Logtk_meta
 
 module T = Term
 module C = Clause
@@ -35,41 +38,40 @@ let prof_simplify = Util.mk_profiler "ac.simplify"
 
 type spec = Theories.AC.t
 
-let axioms ~spec ~ctx =
-  let set = Theories.AC.symbols ~spec in
+let axioms ~ctx s =
   let signature = Ctx.signature ~ctx in
   let ord = Ctx.ord ~ctx in
-  Symbol.SSet.fold
-    (fun s clauses ->
-      let ty = Signature.find signature s in
-      match ty with
-      | Type.Fun (ret, [ret1;ret2]) when Type.eq ret ret1 && Type.eq ret ret2 ->
-        (* type is ok. *)
-        let x = T.mk_var ~ty:ret 0 in
-        let y = T.mk_var ~ty:ret 1 in
-        let z = T.mk_var ~ty:ret 2 in
-        (* first clause: commutativity *)
-        let proof cc = Proof.mk_c_axiom cc ~file:"" ~name:"commutativity" in
-        let lits = [ Lit.mk_eq ~ord (T.mk_node s [x; y]) (T.mk_node s [y; x]) ] in
-        let c1 = C.create ~ctx lits proof in
-        C.set_flag C.flag_persistent c1 true;
-        (* second clause: associativity *)
-        let proof cc = Proof.mk_c_axiom cc ~file:"" ~name:"associativity" in
-        let lits = [ Lit.mk_eq ~ord
-          (T.mk_node s [T.mk_node s [x; y]; z])
-          (T.mk_node s [x; T.mk_node s [y; x]]) ] in
-        let c2 = C.create ~ctx lits proof in
-        C.set_flag C.flag_persistent c2 true;
-        (* add the two clauses *)
-        c1 :: c2 :: clauses
-      | _ ->
-        Util.debug 1 "AC symbol %a has wrong type %a" Symbol.pp s Type.pp ty;
-        assert false)
-    set []
+  let ty = Signature.find signature s in
+  match ty with
+  | Type.Fun (ret, [ret1;ret2]) when Type.eq ret ret1 && Type.eq ret ret2 ->
+    (* type is ok. *)
+    let x = T.mk_var ~ty:ret 0 in
+    let y = T.mk_var ~ty:ret 1 in
+    let z = T.mk_var ~ty:ret 2 in
+    let f x y = T.mk_node s [x;y] in
+    let res = ref [] in
+    (* build clause l=r *)
+    let add_clause l r =
+      let name = Util.sprintf "ac_%a_%d" Symbol.pp s (List.length !res) in
+      let proof cc = Proof.mk_c_axiom cc ~file:"" ~name in
+      let c = C.create ~ctx [ Lit.mk_eq ~ord l r ] proof in
+      C.set_flag C.flag_persistent c true;
+      res := c :: !res
+    in
+    add_clause (f x y) (f y x);
+    add_clause (f (f x y) z) (f x (f y z));
+    add_clause (f x (f y z)) (f z (f x y));
+    add_clause (f x (f y z)) (f y (f x z));
+    add_clause (f x (f y z)) (f z (f y x));
+    !res
+  | _ ->
+    Util.debug 1 "AC symbol %a has wrong type %a" Symbol.pp s Type.pp ty;
+    assert false
   
 (** {2 Rules} *)
 
 let is_trivial_lit ~spec lit =
+  if not (Theories.AC.exists_ac ~spec) then false else
   let is_ac = Theories.AC.is_ac ~spec in
   match lit with
   | Lit.Equation (l, r, true, _) -> T.ac_eq ~is_ac l r
@@ -84,6 +86,7 @@ let is_trivial ~spec c =
 (* simplify: remove literals that are redundant modulo AC *)
 let simplify ~spec ~ctx c =
   Util.enter_prof prof_simplify;
+  if not (Theories.AC.exists_ac ~spec) then c else
   let n = Array.length c.C.hclits in
   let is_ac = Theories.AC.is_ac ~spec in
   let lits = Array.to_list c.C.hclits in
@@ -109,6 +112,39 @@ let simplify ~spec ~ctx c =
       let _ = Util.exit_prof prof_simplify in
       c (* no simplification *)
 
+let add_ac ~env s =
+  Util.debug 1 "enable AC redundancy criterion for %a" Symbol.pp s;
+  let ctx = Env.ctx env in
+  let spec = Ctx.ac ~ctx in
+  (* is this the first case of AC symbols? If yes, then add inference rules *)
+  let first = not (Theories.AC.exists_ac ~spec) in
+  if first then begin
+    Env.add_is_trivial ~env (is_trivial ~spec);
+    Env.add_simplify ~env (simplify ~spec ~ctx);
+    end;
+  (* remember that the symbols is AC *)
+  Ctx.add_ac ~ctx s;
+  (* add clauses *)
+  let clauses = axioms ~ctx s in
+  Env.add_passive ~env (Sequence.of_list clauses);
+  ()
+
 let setup_env ~env =
-  (* TODO: make env's simplification rules handling better/more modular *) 
-  assert false
+  match Env.get_meta ~env with
+  | None -> ()
+  | Some meta ->
+    (* react to future detected theories *)
+    let signal = MetaKB.on_theory (MetaProverState.reasoner meta) in
+    Signal.on signal
+      (function
+        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}]) ->
+          add_ac ~env f; true
+        | _ -> true);
+    (* see whether AC symbols have already been detected *)
+    Sequence.iter
+      (function
+        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}]) ->
+          add_ac ~env f
+        | _ -> ())
+      (MetaKB.cur_theories (MetaProverState.reasoner meta));
+    ()

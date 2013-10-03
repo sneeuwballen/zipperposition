@@ -168,19 +168,15 @@ let purify_arith c =
     end
 
 let axioms =
-  (* parse a pformula *)
+  (* parse a pformula
   let pform ~name s =
     let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
     let proof = Proof.mk_f_axiom f ~file:"/dev/arith" ~name in
     let pf = PF.create f proof in
     pf
   in
-  [ pform ~name:"sum_assoc" "![X:A,Y:A,Z:A]: $sum($sum(X,Y),Z) = $sum(X,$sum(Y,Z))"
-  ; pform ~name:"sum_com" "![X:A,Y:A]: $sum(X,Y) = $sum(Y,X)"
-  ; pform ~name:"product_assoc"
-    "![X:A,Y:A,Z:A]: $product($product(X,Y),Z) = $product(X,$product(Y,Z))"
-  ; pform ~name:"product_com" "![X:A,Y:A]: $product(X,Y) = $product(Y,X)"
-  ]
+  *)
+  []  (* TODO: some simplification stuff? Or distributivity? *)
 
 (** {2 Setup} *)
 
@@ -200,7 +196,6 @@ let setup_penv ~penv =
   (* signature of arith symbols *)
   let base = Signature.Arith.signature in
   PEnv.add_base_sig ~penv base;
-  PEnv.add_axioms ~penv (Sequence.of_list axioms);
   PEnv.add_operation_rule ~penv ~prio:2 simplify_rule;
   PEnv.add_constr ~penv (Precedence.min_constraint (Signature.to_symbols base));
   ()
@@ -211,6 +206,9 @@ let setup_env ~env =
   Env.add_unary_inf ~env "arith_pivot" pivot_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
+  (* declare some AC symbols *)
+  AC.add_ac ~env S.Arith.sum;
+  AC.add_ac ~env S.Arith.product;
   (* be sure that the ordering is present in the context *)
   Ctx.add_order ~ctx:(Env.ctx env) ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
   (* we are (until proved otherwise) incomplete *)

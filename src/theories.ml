@@ -33,34 +33,22 @@ module STbl = Symbol.SHashtbl
 (** {2 Associativity-Commutativity} *)
 
 module AC = struct
-  type t = {
-    is_ac : Symbol.t -> bool;
-    symbols : unit -> Symbol.SSet.t;
-    add : Symbol.t -> unit;
-  } (** Specification: which symbols are AC? *)
+  type t = unit STbl.t
 
-  let create ?(base=true) () =
-    let h = STbl.create 13 in
-    let is_ac s = STbl.mem h s in
-    let symbols () =
-      STbl.fold
-        (fun s () set -> Symbol.SSet.add s set)
-        h Symbol.SSet.empty
-    in
-    let add s = STbl.replace h s () in
-    let spec = { is_ac; symbols; add; } in
-    (* add basic AC symbol *)
-    if base then begin
-      add Symbol.Arith.sum;
-      add Symbol.Arith.product;
-      end;
-    spec
+  let create () = STbl.create 7
 
-  let add ~spec s = spec.add s
+  let is_ac ~spec s = STbl.mem spec s
 
-  let is_ac ~spec s = spec.is_ac s
+  let add ~spec s = STbl.replace spec s ()
 
-  let symbols ~spec = spec.symbols ()
+  let is_ac ~spec s = STbl.mem spec s
+
+  let exists_ac ~spec = STbl.length spec > 0
+
+  let symbols ~spec =
+    STbl.fold
+      (fun s () set -> Symbol.SSet.add s set)
+      spec Symbol.SSet.empty
 end
 
 (** {2 Total Ordering} *)

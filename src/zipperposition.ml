@@ -132,6 +132,7 @@ let setup_env ~env =
   | "superposition" -> Superposition.setup_env ~env
   | x -> failwith ("unknown calculus " ^ x)
   end;
+  AC.setup_env ~env;
   if (Env.get_params ~env).param_arith then
     ArithElim.setup_env ~env;
   ()

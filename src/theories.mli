@@ -32,15 +32,10 @@ open Logtk
 (** {2 Associativity-Commutativity} *)
 
 module AC : sig
-  type t = private {
-    is_ac : Symbol.t -> bool;
-    symbols : unit -> Symbol.SSet.t;
-    add : Symbol.t -> unit;
-  }
+  type t
 
-  val create : ?base:bool -> unit -> t
-    (** Create a new specification. If [base] is true (default), then
-        AC symbols from the default signature are declared (arithmetic...) *)
+  val create : unit -> t
+    (** Create a new specification. *)
 
   val add : spec:t -> Symbol.t -> unit
     (** Add the symbol to the list of AC symbols *)
@@ -48,7 +43,11 @@ module AC : sig
   val is_ac : spec:t -> Symbol.t -> bool
     (** Check whether the symbol is AC *)
 
+  val exists_ac : spec:t -> bool
+    (** Are some symbols AC? *)
+
   val symbols : spec:t -> Symbol.SSet.t
+    (** set of AC symbols *)
 end
 
 (** {2 Total Ordering} *)
