@@ -39,20 +39,23 @@ module Ctx = struct
 
   type t = {
     st : Type.Stack.t;              (* bindings stack *)
+    default : Type.t;               (* default type *)
     mutable db : Type.t list;       (* types of bound variables (stack) *)
     mutable signature : Signature.t;(* symbol -> type *)
   }
 
-  let create ?(base=true) () =
+  let create ?(default=Type.i) ?(base=true) () =
     let signature = if base then Signature.base else Signature.empty in
     {
       st = Type.Stack.create ();
+      default;
       db = [];
       signature;
     }
 
-  let of_signature signature = {
+  let of_signature ?(default=Type.i) signature = {
     st = Type.Stack.create ();
+    default;
     db = [];
     signature;
   }
@@ -83,7 +86,7 @@ module Ctx = struct
     Type.unify ctx.st ty1 ty2;
     ()
 
-  let type_of_symbol ctx s =
+  let type_of_fun ctx s =
     match s with
     | Symbol.Int _
     | Symbol.Rat _
@@ -96,7 +99,7 @@ module Ctx = struct
       with Not_found ->
         (* give a new type variable to this symbol *)
         let ty = Type.new_gvar () in
-        Util.debug 5 "Ctx: new type %a for symbol %a" Type.pp ty Symbol.pp s;
+        Util.debug 5 "Ctx: new type %a for function %a" Type.pp ty Symbol.pp s;
         ctx.signature <- Signature.declare ctx.signature s ty;
         ty
       end
@@ -108,8 +111,16 @@ module Ctx = struct
 
   let to_signature ctx =
     let signature = ctx.signature in
-    let signature = Signature.map signature (fun _ ty -> Type.deref ty) in
-    let signature = Signature.filter signature (fun _ ty -> Type.is_closed ty) in
+    let signature = Signature.map signature
+      (fun _ ty ->
+        (* bind all remaining free variables to [ctx.default] *)
+        let vars = Type.free_vars ty in
+        List.iter (fun gv -> Type.bind gv ctx.default) vars;
+        (* dereference the type *)
+        let ty = Type.deref ty in
+        assert (Type.is_closed ty);
+        ty)
+    in
     signature
 
   let unwind_protect ctx f = Type.Stack.unwind_protect ctx.st f
@@ -124,46 +135,51 @@ end
    compute its type. *)
 let rec _infer_rec ~check ctx t =
   let open Type.Infix in
-  match t.T.type_ with
-  | Some ty -> ty
-  | None -> 
-    begin match t.T.term with
-    | T.Var _ -> Type.i
-    | T.BoundVar i -> Ctx.db_type ctx i
-    | T.At (t1, t2) ->
-      let ty1 = _infer_rec ~check ctx t1 in
-      let ty2 = _infer_rec ~check ctx t2 in
-      (* t1 : ty1, t2 : ty2. Now we must also have
-         ty1 = ty2 -> ty1_ret, ty1_ret being the result type *)
-      let ty1_ret = Type.new_gvar () in
-      Ctx.unify ctx ty1 (ty1_ret <=. ty2);
-      ty1_ret
-    | T.Bind (s, t') ->
-      let ty_s = Ctx.type_of_symbol ctx s in
-      Ctx.within_binder ctx
-        (fun v ->
-          let ty_t' = _infer_rec ~check ctx t' in
-          (* now, the bound variable has type [v], [s] has type [ty_s]
-              and should also have type [(v -> ty_t') -> ty_t'].
-              The resulting type is [ty_t'] *)
-          Ctx.unify ctx ty_s (ty_t' <=. (ty_t' <=. v));
-          ty_t')
-    | T.Node (s, l) ->
-      let ty_s = Ctx.type_of_symbol ctx s in
-      begin match ty_s with
-      | Type.Fun (ret, _) when (not check) && Type.is_ground ret ->
-        ret  (* no need to recurse *)
-      | Type.App (_, _) when (not check) && Type.is_ground ty_s ->
-        ty_s (* no need to recurse *)
-      | _ ->
-        let ty_l = List.fold_right
-          (fun t' ty_l -> _infer_rec ~check ctx t' :: ty_l) l [] in
-        (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
-            The result is 'a. *)
-        let ty_ret = Type.new_gvar () in
-        Ctx.unify ctx ty_s (ty_ret <== ty_l);
-        ty_ret
-      end
+  match t.T.term with
+  | T.Var _ ->
+    begin match t.T.type_ with
+    | Some ty -> Type.instantiate ty
+    | None -> failwith (Util.sprintf "type_infer: free var %a without type" T.pp t)
+    end
+  | T.BoundVar i ->
+    begin match t.T.type_ with
+    | None -> Ctx.db_type ctx i
+    | Some ty ->
+      let ty' = Ctx.db_type ctx i in
+      Ctx.unify ctx ty' (Type.instantiate ty);
+      ty'
+    end
+  | T.At (t1, t2) ->
+    let ty1 = _infer_rec ~check ctx t1 in
+    let ty2 = _infer_rec ~check ctx t2 in
+    (* t1 : ty1, t2 : ty2. Now we must also have
+       ty1 = ty2 -> ty1_ret, ty1_ret being the result type *)
+    let ty1_ret = Type.new_gvar () in
+    Ctx.unify ctx ty1 (ty1_ret <=. ty2);
+    ty1_ret
+  | T.Bind (s, t') ->
+    Ctx.within_binder ctx
+      (fun v ->
+        let ty_t' = _infer_rec ~check ctx t' in
+        (* generalize w.r.t [v] if it's still free *)
+        Type.close_var v;
+        ty_t')
+  | T.Node (s, []) -> Ctx.type_of_fun ctx s
+  | T.Node (s, l) ->
+    let ty_s = Ctx.type_of_fun ctx s in
+    begin match ty_s with
+    | Type.Fun (ret, _) when (not check) && Type.is_ground ret ->
+      ret  (* no need to recurse *)
+    | Type.App (_, _) when (not check) && Type.is_ground ty_s ->
+      ty_s (* no need to recurse *)
+    | _ ->
+      let ty_l = List.fold_right
+        (fun t' ty_l -> _infer_rec ~check ctx t' :: ty_l) l [] in
+      (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
+          The result is 'a. *)
+      let ty_ret = Type.new_gvar () in
+      Ctx.unify ctx ty_s (ty_ret <== ty_l);
+      ty_ret
     end
 
 (* wrapper to [infer_rec], with profiling *)
@@ -192,31 +208,6 @@ let infer_no_check ctx t =
   let check = false in
   let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
   Type.deref ty
-
-let default_to_i ctx =
-  let signature = ctx.Ctx.signature in
-  Symbol.SMap.iter
-    (fun s ty ->
-      let ty = Type.deref ty in
-      let gvars = Type.free_vars ty in
-      List.iter (fun gvar -> Type.bind gvar Type.i) gvars)
-    signature;
-  ()
-
-let generalize_all ctx =
-  let signature = ctx.Ctx.signature in
-  Symbol.SMap.iter
-    (fun s ty ->
-      let ty = Type.deref ty in
-      let gvars = Type.free_vars ty in
-      match gvars with
-      | [] -> ()
-      | _::_ ->
-        (* change the type *)
-        let ty' = Type.close ty in
-        ctx.Ctx.signature <- Symbol.SMap.add s ty' ctx.Ctx.signature)
-    signature;
-  ()
 
 let constrain_term_term ctx t1 t2 =
   let check = true in

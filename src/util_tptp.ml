@@ -179,7 +179,6 @@ let infer_type ctx decls =
 let signature ?(signature=Signature.base) decls =
   let ctx = TypeInference.Ctx.of_signature signature in
   infer_type ctx decls;
-  TypeInference.default_to_i ctx;
   TypeInference.Ctx.to_signature ctx
 
 let __name_symbol i sy =

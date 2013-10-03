@@ -649,7 +649,11 @@ let rec infer_type ctx f = match f.form with
   | Or l -> List.iter (infer_type ctx) l
   | Forall f'
   | Exists f' ->
-    TypeInference.Ctx.within_binder ctx (fun _ -> infer_type ctx f')
+    TypeInference.Ctx.within_binder ctx
+      (fun v ->
+        infer_type ctx f';
+        (* if [v] is still free after the inference, then generalize it *)
+        Type.close_var v)
   | Equiv (f1, f2)
   | Imply (f1, f2) -> infer_type ctx f1; infer_type ctx f2
   | Not f' -> infer_type ctx f'
@@ -657,13 +661,11 @@ let rec infer_type ctx f = match f.form with
 let signature ?(signature=Signature.empty) f =
   let ctx = TypeInference.Ctx.of_signature signature in
   infer_type ctx f;
-  TypeInference.default_to_i ctx;
   TypeInference.Ctx.to_signature ctx
 
 let signature_seq ?(signature=Signature.empty) seq =
   let ctx = TypeInference.Ctx.of_signature signature in
   Sequence.iter (infer_type ctx) seq;
-  TypeInference.default_to_i ctx;
   TypeInference.Ctx.to_signature ctx
 
 (** {2 IO} *)

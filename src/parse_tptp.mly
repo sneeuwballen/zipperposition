@@ -76,6 +76,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token COLUMN
 %token STAR
 %token ARROW
+%token FORALL_TY  /* quantification on types */
+%token TYPE_TY  /* tType */
 
 %token AND
 %token NOTAND
@@ -299,7 +301,13 @@ system_term:
 system_constant: system_functor { $1 }
 system_functor: s=atomic_system_word { s }
 
+/* prenex quantified type */
 tff_type:
+  | ty=tff_term_type { Type.instantiate ty }
+  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_type { ty }
+
+/* general type, without quantifiers */
+tff_term_type:
   | ty=tff_atom_type { ty }
   | l=tff_atom_type ARROW r=tff_atom_type
     { Type.mk_fun r [l] }
@@ -307,13 +315,20 @@ tff_type:
     { Type.mk_fun r args }
 
 tff_atom_type:
-  | w=UPPER_WORD { Type.var w }
+  | v=tff_ty_var { v }
   | w=type_const { Type.const w }
-  | LEFT_PAREN ty=tff_type RIGHT_PAREN { ty }
+  | TYPE_TY { Type.tType }
+  | LEFT_PAREN ty=tff_term_type RIGHT_PAREN { ty }
 
 tff_ty_args:
   | ty=tff_atom_type { [ty] }
   | hd=tff_atom_type STAR tl=tff_ty_args { hd :: tl }
+
+tff_ty_vars:
+  | v=tff_ty_var COLUMN TYPE_TY {  [v] }
+  | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
+
+tff_ty_var: w=UPPER_WORD { Type.var w }
   
 type_const:
   | w=LOWER_WORD { w }

@@ -87,11 +87,13 @@ rule token = parse
   | "include" { INCLUDE }
   | vline { VLINE }
   | '&' { AND }
+  | "!>" { FORALL_TY }
   | '!' { FORALL }
   | '?' { EXISTS }
   | '^' { LAMBDA }
   | "$true" { TRUE }
   | "$false" { FALSE }
+  | "$tType" { TYPE_TY }
   | '@' { AT }
   (* | ';' { SEMICOLUMN } *)
   | ':' { COLUMN }

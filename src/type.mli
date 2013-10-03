@@ -88,6 +88,8 @@ val tType : t   (* "type" of types *)
 
 (** {2 Utils} *)
 
+(** All those functions but {!bind} follow pointers of {!GVar}s. *)
+
 val free_vars : t -> t list
   (** List of free GVars *)
 
@@ -181,8 +183,9 @@ val close : t -> t
       bound variables (Var). This corresponds to a generalization of the type,
       since variables are universally quantified. *)
 
-val close_var : t -> var:t -> t
-  (** [close_var ty var] replaces the GVar [var] by a fresh universal variable.
+val close_var : t -> unit
+  (** [close_var var] replaces the GVar [var] by a fresh universal variable,
+      if it's still not bound.
       @raise Invalid_argument if [var] is not a GVar *)
 
 val unify : Stack.t -> t -> t -> unit

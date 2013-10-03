@@ -36,12 +36,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module Ctx : sig
   type t
 
-  val create : ?base:bool -> unit -> t
-    (** Fresh environment. if [base] is true (default), then the
-        base signature is used from start, rather than an empty
-        signature *)
+  val create : ?default:Type.t -> ?base:bool -> unit -> t
+    (** Fresh environment.
+    
+        if [base] is true (default), then the
+          base signature is used from start, rather than an empty
+          signature
+        @param default is the type to use for non-declared constants,
+          defaults to {!Type.i} *)
 
-  val of_signature : Signature.t -> t
+  val of_signature : ?default:Type.t -> Signature.t -> t
 
   val add_signature : t -> Signature.t -> unit
     (** Specify the type of some symbols *)
@@ -61,8 +65,8 @@ module Ctx : sig
     (** Unify the two types. On success it may update some GVar's bindings.
         @raise Type.Error if unification is impossible. *)
 
-  val type_of_symbol : t -> Symbol.t -> Type.t
-    (** Returns the type of this symbol. If the symbol has an unknown type,
+  val type_of_fun : t -> Symbol.t -> Type.t
+    (** If the function symbol has an unknown type,
         a fresh instantiated variable is returned. Otherwise the known
         type of the symbol is returned and instantiated with fresh variables,
         so that, for instance, "nil" (the empty list) can have several
@@ -73,7 +77,9 @@ module Ctx : sig
         @raise Type.Error if an inconsistency (with inferred type) is detected. *)
 
   val to_signature : t -> Signature.t
-    (** Obtain the type of all symbols whose type has been inferred *)
+    (** Obtain the type of all symbols whose type has been inferred.
+        If some variables remain, they are bound to the [default] type
+        of the context. *)
 
   val unwind_protect : t -> (unit -> 'a) -> 'a
     (** Transaction for variable bindings
@@ -99,15 +105,6 @@ val infer_no_check : Ctx.t -> Term.t -> Type.t
   (** Infer the type of the term, but does not recurse if it's not needed. *)
 
 (** {3 Constraining types} *)
-
-val default_to_i : Ctx.t -> unit
-  (** For all symbols seen in the context that still have un-instantiated
-      type variables in their type, set this type to {!Type.i}. *)
-
-val generalize_all : Ctx.t -> unit
-  (** For all symbols seen in the context that still have un-instantiated
-      type variables in their type, generalize those type variables
-      (ie, quantify over them) *)
 
 val constrain_term_term : Ctx.t -> Term.t -> Term.t -> unit
   (** Force the two terms to have the same type

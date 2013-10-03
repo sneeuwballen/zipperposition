@@ -53,7 +53,8 @@ type varlist = t list
 let hash_term t = match t.term, t.type_ with
   | Var i, Some ty -> Hash.hash_int2 (Hash.hash_int i) (Type.hash ty)
   | BoundVar i, Some ty -> Hash.hash_int3 27 (Hash.hash_int i) (Type.hash ty)
-  | (Var _ | BoundVar _), None -> assert false
+  | BoundVar i, None -> Hash.hash_int2 22 (Hash.hash_int i)
+  | Var _ , None -> assert false
   | Node (s, l), _ -> Hash.hash_list (fun x -> x.tag) (Symbol.hash s) l
   | Bind (s, t), _ -> Hash.hash_int3 13 (Symbol.hash s) t.tag
   | At (t1, t2), _ -> Hash.hash_int3 1025 t1.tag t2.tag
@@ -231,9 +232,9 @@ let mk_var ?(ty=Type.i) idx =
               tag= -1} in
   H.hashcons my_v
 
-let mk_bound_var ?(ty=Type.i) idx =
+let mk_bound_var ?ty idx =
   assert (idx >= 0);
-  let my_v = {term = BoundVar idx; type_=Some ty; tsize = 1;
+  let my_v = {term = BoundVar idx; type_=ty; tsize = 1;
               flags=(flag_db_closed_computed lor flag_simplified lor flag_normal_form);
               tag= -1} in
   H.hashcons my_v
@@ -638,7 +639,7 @@ let db_from_term ?(depth=0) ?(ty=Type.i) t t' =
   Same as db_from_term. *)
 let db_from_var ?depth t v =
   assert (is_var v);
-  db_from_term ?depth t v
+  db_from_term ?depth ?ty:v.type_ t v
 
 (** {2 High-level operations} *)
 

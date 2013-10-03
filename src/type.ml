@@ -97,7 +97,7 @@ let new_var =
   let n = ref 0 in
   fun () ->
     incr n;
-    let s = Printf.sprintf "$$ty_%d" !n in
+    let s = Printf.sprintf "Ty_%d" !n in
     H.hashcons (Var s)
 
 let new_gvar =
@@ -124,8 +124,15 @@ let tType = const "$tType"
 
 (** {2 Utils} *)
 
+let rec _deref_var ty = match ty with
+  | GVar (_, r) ->
+    if !r == ty
+      then ty  (* points to self, not bound *)
+      else _deref_var !r
+  | _ -> ty
+
 let free_vars ty =
-  let rec recurse acc ty = match ty with
+  let rec recurse acc ty = match _deref_var ty with
   | Var _ -> acc
   | GVar _ -> if List.memq ty acc then acc else ty :: acc
   | App (_, l) -> List.fold_left recurse acc l
@@ -134,7 +141,7 @@ let free_vars ty =
   recurse [] ty
 
 let bound_vars ty =
-  let rec recurse acc ty = match ty with
+  let rec recurse acc ty = match _deref_var ty with
   | Var _ -> if List.memq ty acc then acc else ty :: acc
   | GVar _ -> acc
   | App (_, l) -> List.fold_left recurse acc l
@@ -142,18 +149,15 @@ let bound_vars ty =
   in
   recurse [] ty
 
-let rec is_closed ty = match ty with
+let rec is_closed ty = match _deref_var ty with
   | Var _ -> true
   | GVar _ -> false
   | App (_, l) -> List.for_all is_closed l
   | Fun (ret, l) -> is_closed ret && List.for_all is_closed l
 
-let rec deref ty = match ty with
+let rec deref ty = match _deref_var ty with
   | Var _ -> ty
-  | GVar (_, r) ->
-    if !r == ty
-      then ty   (* points to self, not bound *)
-      else deref !r
+  | GVar (_, r) -> ty
   | App (s, l) ->
     let l' = List.map deref l in
     app s l'
@@ -173,13 +177,13 @@ let arity ty = match ty with
   | GVar _
   | App _ -> 0
 
-let rec is_ground t = match t with
+let rec is_ground t = match _deref_var t with
   | Var _ -> false
   | GVar _ -> false
   | App (_, l) -> List.for_all is_ground l
   | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
 
-let rec curry ty = match ty with
+let rec curry ty = match _deref_var ty with
   | Var _
   | GVar _ -> ty
   | App (s, l) -> app s (List.map curry l)
@@ -188,7 +192,7 @@ let rec curry ty = match ty with
       (fun ret arg -> mk_fun ret [curry arg])
       (curry ret) l
 
-let rec uncurry ty = match ty with
+let rec uncurry ty = match _deref_var ty with
   | Var _
   | GVar _ -> ty
   | App (s, l) -> app s (List.map uncurry l)
@@ -199,7 +203,7 @@ let rec uncurry ty = match ty with
     end 
 (* given a curried function type, recover all its argument types into
     a list prepended to [acc] *)
-and _gather_uncurry ty acc = match ty with
+and _gather_uncurry ty acc = match _deref_var ty with
   | Var _
   | GVar _
   | App _ -> uncurry ty :: acc  (* proper return value *)
@@ -208,7 +212,7 @@ and _gather_uncurry ty acc = match ty with
 
 (** {2 IO} *)
 
-let rec pp buf t = match t with
+let rec pp buf t = match _deref_var t with
   | Var s -> Printf.bprintf buf "'%s" s
   | GVar (i, _) -> Printf.bprintf buf "'_%d" i
   | App (p, []) -> Buffer.add_string buf p
@@ -222,7 +226,7 @@ and pp_inner buf t = match t with
     Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
   | _ -> pp buf t
 
-let rec pp_tstp buf t = match t with
+let rec pp_tstp buf t = match _deref_var t with
   | Var s -> Printf.bprintf buf "%s" (String.capitalize s)
   | GVar (i, _) -> failwith "Type.pp_tstp: free variables not printable"
   | App (p, []) -> Buffer.add_string buf p
@@ -231,11 +235,10 @@ let rec pp_tstp buf t = match t with
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
-and pp_inner buf t = match t with
+and pp_inner buf t = match _deref_var t with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp_tstp buf t; Buffer.add_char buf ')'
   | _ -> pp_tstp buf t
-
 
 let to_string t =
   let b = Buffer.create 15 in
@@ -249,7 +252,7 @@ let bij =
     let bij_app = lazy (pair string_ (list_ (Lazy.force bij'))) in
     let bij_fun = lazy (pair (Lazy.force bij') (list_ (Lazy.force bij'))) in
     switch
-      ~inject:(function
+      ~inject:(fun ty -> match _deref_var ty with
         | Var s -> "var", BranchTo (string_, s)
         | GVar _ -> failwith "Type.bij: GVar not supported"
         | App (p, l) -> "app", BranchTo (Lazy.force bij_app, (p, l))
@@ -331,20 +334,21 @@ end
 
 (* instantiate all bound variables *)
 let instantiate ty =
-  let bvars = bound_vars ty in
-  let subst = List.map (fun v -> v, new_gvar ()) bvars in
-  let rec recurse subst ty = match ty with
-  | Var _ -> List.assq ty subst
+  (* recurse. [map] is a hashtable name -> gvar *)
+  let rec find_and_bound map ty = match ty with
+  | Var n ->
+    (* see whether we already instantiated this var *)
+    begin try Hashtbl.find map n
+    with Not_found ->
+      let v = new_gvar () in
+      Hashtbl.add map n v;
+      v
+    end
   | GVar _ -> ty
-  | App (s, l) ->
-    let l' = List.map (recurse subst) l in
-    app s l'
-  | Fun (ret, l) ->
-    let ret' = recurse subst ret in
-    let l' = List.map (recurse subst) l in
-    mk_fun ret' l'
+  | App (s, l) -> App (s, List.map (find_and_bound map) l)
+  | Fun (ret, l) -> Fun (find_and_bound map ret, List.map (find_and_bound map) l)
   in
-  recurse subst ty
+  find_and_bound (Hashtbl.create 4) ty
 
 (* close all free variables *)
 let close ty =
@@ -361,15 +365,13 @@ let close ty =
     List.iter2 (fun gvar old_bind -> bind gvar old_bind) gvars old_bindings;
     new_ty
 
-let close_var ty ~var =
-  match var with
-  | GVar (_,r) ->
-    let old = !r in
-    bind var (new_var ());
-    let new_ty = deref ty in
-    bind var old;  (* restore *)
-    new_ty
-  | _ -> raise (Invalid_argument "Type.close_var: expected a GVar as 2nd arg")
+let close_var var =
+  match _deref_var var with
+  | GVar (_,r) as var ->
+    (* still not bound, bind it to a fresh var *)
+    let v = new_var () in
+    bind var v
+  | _ -> ()
 
 (* occur-check *)
 let rec _occur_check gvar ty = match ty with
@@ -383,8 +385,8 @@ let rec _occur_check gvar ty = match ty with
 
 (* unification *)
 let rec unify_rec stack ty1 ty2 =
-  let ty1 = deref ty1 in
-  let ty2 = deref ty2 in
+  let ty1 = _deref_var ty1 in
+  let ty2 = _deref_var ty2 in
   match ty1, ty2 with
   | Var s1, Var s2 when s1 = s2 -> ()
   | GVar _, GVar _ when ty1 == ty2 -> ()
@@ -403,8 +405,8 @@ let rec unify_rec stack ty1 ty2 =
 
 (* alpha-equivalence check *)
 let rec alpha_equiv_unify st ty1 ty2 =
-  let ty1 = deref ty1 in
-  let ty2 = deref ty2 in
+  let ty1 = _deref_var ty1 in
+  let ty2 = _deref_var ty2 in
   match ty1, ty2 with
   | Var s1, Var s2 when s1 = s2 -> ()
   | GVar _, GVar _ when ty1 == ty2 -> ()
