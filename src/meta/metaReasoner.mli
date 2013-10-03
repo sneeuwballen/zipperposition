@@ -88,8 +88,11 @@ val all_clauses : t -> Logic.clause Sequence.t
 
 val all_facts : t -> Logic.literal Sequence.t
 
+val all_facts_by : t -> string -> Logic.literal Sequence.t
+  (** All facts for the given symbol *)
+
 val all_facts_matching : t -> Logic.literal -> Logic.literal Sequence.t
-  (** All facts for the given predicate *)
+  (** All facts matching the given predicate *)
 
 val explanations : t -> Logic.clause -> Logic.explanation list
 

@@ -110,6 +110,9 @@ val on_lemma : MetaReasoner.t -> found_lemma Signal.t
 val on_axiom : MetaReasoner.t -> found_axiom Signal.t
 val on_theory : MetaReasoner.t -> found_theory Signal.t
 
+val cur_lemmas : MetaReasoner.t -> found_lemma Sequence.t  (* lemmas discovered *)
+val cur_theories : MetaReasoner.t -> found_theory Sequence.t (* theories discovered *)
+
 (** {2 Backward chaining} *)
 
 val match_lemmas : t -> MetaPattern.EncodedForm.t -> (lemma * Term.t list) list

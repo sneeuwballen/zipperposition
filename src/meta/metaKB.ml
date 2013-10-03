@@ -29,6 +29,7 @@ open Logtk
 
 module T = Term
 module F = Formula
+module MRT = MetaReasoner.Translate
 
 (** {2 Basic knowledge} *)
 
@@ -289,14 +290,14 @@ and found_axiom =
 let mapping_lemma =
   MetaPattern.mapping
 and mapping_theory =
-  let open MetaReasoner.Translate in
+  let open MRT in
   pair str (list_ term)
 and mapping_axiom =
-  let open MetaReasoner.Translate in
+  let open MRT in
   pair str (list_ term)
   
 let encode_premise p =
-  let open MetaReasoner.Translate in
+  let open MRT in
   match p with
   | IfAxiom (s, terms) ->
     let mapping = pair str (list_ term) in
@@ -336,7 +337,7 @@ let _compile_clause (Clause (head,body)) =
   mk_clause (compile_lit head) (List.map compile_lit body)
 
 let add_axioms reasoner axioms =
-  let open MetaReasoner.Translate in
+  let open MRT in
   StringMap.iter
     (fun _ (Axiom (s, left, p, right)) ->
       let concl = encode mapping_axiom "axiom" (s, left) in
@@ -345,7 +346,7 @@ let add_axioms reasoner axioms =
       MetaReasoner.add reasoner clause)
     axioms
 and add_theories reasoner theories =
-  let open MetaReasoner.Translate in
+  let open MRT in
   TheoryMap.iter theories
     (fun _ (Theory (s, args, premises)) ->
       let concl = encode mapping_theory "theory" (s, args) in
@@ -353,7 +354,7 @@ and add_theories reasoner theories =
       let clause = MetaReasoner.Logic.mk_clause concl premises in
       MetaReasoner.add reasoner clause)
 and add_lemmas reasoner lemmas =
-  let open MetaReasoner.Translate in
+  let open MRT in
   LemmaSet.iter
     (fun (Lemma (p, args, premises)) ->
       (* add definition of lemma *)
@@ -379,7 +380,7 @@ let add_reasoner reasoner kb =
 let on_lemma r =
   let s = MetaReasoner.on_new_fact_by r "lemma" in
   Signal.map s (fun lit ->
-    let p, terms = MetaReasoner.Translate.decode_head mapping_lemma "lemma" lit in
+    let p, terms = MRT.decode_head mapping_lemma "lemma" lit in
     (* recover a formula from the raw datalog literal *)
     let f = MetaPattern.apply (p, terms) in
     let f = MetaPattern.EncodedForm.decode f in
@@ -388,14 +389,33 @@ let on_lemma r =
 let on_axiom r =
   let s = MetaReasoner.on_new_fact_by r "axiom" in
   Signal.map s (fun lit ->
-    let name, terms = MetaReasoner.Translate.decode_head mapping_axiom "axiom" lit in
+    let name, terms = MRT.decode_head mapping_axiom "axiom" lit in
     NewAxiom (name, terms))
 
 let on_theory r =
   let s = MetaReasoner.on_new_fact_by r "theory" in
   Signal.map s (fun lit ->
-    let name, terms = MetaReasoner.Translate.decode_head mapping_theory "theory" lit in
+    let name, terms = MRT.decode_head mapping_theory "theory" lit in
     NewTheory (name, terms))
+
+let cur_lemmas r =
+  let seq = MetaReasoner.all_facts_by r "lemma" in
+  Sequence.map
+    (fun lit ->
+      let p, terms = MRT.decode_head mapping_lemma "lemma" lit in
+      (* recover a formula from the raw datalog literal *)
+      let f = MetaPattern.apply (p, terms) in
+      let f = MetaPattern.EncodedForm.decode f in
+      NewLemma (f, lit))
+    seq 
+
+let cur_theories r =
+  let seq = MetaReasoner.all_facts_by r "theory" in
+  Sequence.map
+    (fun lit ->
+      let name, terms = MRT.decode_head mapping_theory "theory" lit in
+      NewTheory (name, terms))
+    seq
 
 (** {2 Backward Chaining} *)
 
@@ -416,10 +436,10 @@ type lemma_back_chain =
   | LBC_add_datalog_clause of MetaReasoner.Logic.clause
 
 let term_to_lit t =
-  MetaReasoner.Translate.encode MetaPattern.EncodedForm.mapping "istrue" t
+  MRT.encode MetaPattern.EncodedForm.mapping "istrue" t
 
 let term_of_lit lit =
-  MetaReasoner.Translate.decode_head MetaPattern.EncodedForm.mapping "istrue" lit
+  MRT.decode_head MetaPattern.EncodedForm.mapping "istrue" lit
 
 (* suggest actions to take in order to solve the given formula goal *)
 let backward_chain kb goal =
@@ -434,7 +454,7 @@ let backward_chain kb goal =
           (term_to_lit goal)
           [term_to_lit goal']
         in
-        let datalog_goal = MetaReasoner.Translate.encode mapping_lemma
+        let datalog_goal = MRT.encode mapping_lemma
           "lemma" (pat, args)
         in
         LBC_add_goal goal' ::

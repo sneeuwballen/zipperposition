@@ -257,6 +257,16 @@ let all_facts reasoner =
         | _ -> ())
       () reasoner.db)
 
+let all_facts_by reasoner str =
+  let symbol = DSName str in
+  Sequence.from_iter
+    (fun k -> Logic.db_fold
+      (fun () c ->  match Logic.open_clause c with
+        | (s,arg) as lit, [] when eq_datalog_symbol s symbol ->
+          k (Logic.of_soft_lit lit)
+        | _ -> ())
+      () reasoner.db)
+
 let all_facts_matching reasoner lit =
   Sequence.from_iter
     (fun k -> Logic.db_match reasoner.db lit k)
