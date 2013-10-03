@@ -124,6 +124,7 @@ val create_forms : ?parents:t list -> ?selected:BV.t ->
   (** Directly from list of formulas *)
 
 val get_proof : t -> Proof.t
+  (** Extract its proof from the clause *)
 
 val stats : unit -> (int*int*int*int*int*int)
   (** hashconsing stats *)

@@ -55,9 +55,9 @@ let print_stats ~env =
       what sz num sum_length small median big
   and print_state_stats (num_active, num_passive, num_simpl) =
     Util.debug 1 "proof state stats:";
-    Util.debug 1 "  active clauses          %d" num_active;
-    Util.debug 1 "  passive clauses         %d" num_passive;
-    Util.debug 1 "  simplification clauses  %d" num_simpl
+    Util.debug 1 "stat:  active clauses          %d" num_active;
+    Util.debug 1 "stat:  passive clauses         %d" num_passive;
+    Util.debug 1 "stat:  simplification clauses  %d" num_simpl
   and print_gc () =
     let stats = Gc.stat () in
     Util.debug 1 ("GC: minor words %.0f; major_words: %.0f; max_heap: %d; "
@@ -241,23 +241,23 @@ let print_meta ~env =
       (MetaReasoner.size (MetaProverState.reasoner meta))
   | None -> ()
 
-let print_szs_result ~env result =
+let print_szs_result ~file ~env result =
   match result with
   | Sat.Unknown
-  | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
+  | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut for '%s'\n" file
   | Sat.Error s ->
-    Printf.printf "%% SZS status InternalError\n";
+    Printf.printf "%% SZS status InternalError for '%s'\n" file;
     Util.debug 1 "error is: %s" s
   | Sat.Sat ->
     if Ctx.is_completeness_preserved (Env.ctx env)
-      then Printf.printf "%% SZS status CounterSatisfiable\n"
-      else Printf.printf "%% SZS status GaveUp\n";
+      then Printf.printf "%% SZS status CounterSatisfiable for '%s'\n" file
+      else Printf.printf "%% SZS status GaveUp for '%s'\n" file;
     Util.debug 1 "saturated set:\n  %a\n"
       (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ~env)
   | Sat.Unsat c ->
     (* print status then proof *)
     let params = Env.get_params ~env in
-    Printf.printf "%% SZS status Theorem\n";
+    Printf.printf "%% SZS status Theorem for '%s'\n" file;
     Util.printf "%% SZS output start Refutation\n";
     Util.printf "%a" (Proof.pp params.param_proof) c.C.hcproof;
     Printf.printf "%% SZS output end Refutation\n";
@@ -305,12 +305,14 @@ let process_file ?meta ~plugins ~params file =
   Util.debug 1 "done %d iterations" num;
   Util.debug 1 "final precedence: %a" Precedence.pp (Env.precedence env);
   (* print some statistics *)
-  print_stats ~env;
-  print_json_stats ~env;
+  if params.param_stats then begin
+    print_stats ~env;
+    print_json_stats ~env;
+    Util.debug 1 "experts: %a" Experts.Set.pp (Env.get_experts ~env);
+    end;
   print_dots ~env result;
   print_meta ~env;
-  Util.debug 1 "experts: %a" Experts.Set.pp (Env.get_experts ~env);
-  print_szs_result ~env result;
+  print_szs_result ~file ~env result;
   ()
 
 (** Print the content of the KB, and exit *)
@@ -357,7 +359,7 @@ let () =
   (if params.param_kb_print then print_kb ?meta);
   (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)
-  List.iter (process_file ?meta ~plugins ~params) params.param_files;
+  Vector.iter params.param_files (process_file ?meta ~plugins ~params);
   (* save KB? *)
   save_kb ?meta ~params;
   ()

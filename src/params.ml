@@ -29,10 +29,9 @@ type t = {
   param_version : bool;
   param_calculus : string;
   param_timeout : float;
-  param_files : string list;
+  param_files : string Vector.t;
   param_split : bool;             (** use splitting *)
   param_theories : bool;          (** detect theories *)
-  param_precedence : bool;        (** use heuristic for precedence? *)
   param_select : string;          (** name of the selection function *)
   param_progress : bool;          (** print progress during search *)
   param_proof : string;           (** how to print proof? *)
@@ -45,7 +44,7 @@ type t = {
   param_kb_print : bool;          (** print knowledge base and exit *)
   param_expand_def : bool;        (** expand definitions *)
   param_arith : bool;             (** enable arith? *)
-  param_learn : bool;             (** try to learn from successful proofs? *)
+  param_stats : bool;             (** print stats? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
 }
@@ -68,7 +67,6 @@ let parse_args () =
   and theories = ref true
   and calculus = ref "superposition"
   and presaturate = ref false
-  and heuristic_precedence = ref true
   and dot_file = ref None
   and plugins = ref []
   and kb = ref (Filename.concat Const.home "kb")
@@ -77,53 +75,53 @@ let parse_args () =
   and kb_print = ref false
   and kb_where = ref false
   and arith = ref false
+  and stats = ref false
   and expand_def = ref false
-  and learn = ref false
   and select = ref "SelectComplex"
   and progress = ref false
   and unary_depth = ref 1
-  and files = ref [] in
+  and files = Vector.create 15 in
   (* special handlers *)
   let set_progress () =
     Util.need_cleanup := true;
     progress := true
   and add_plugin s = plugins := s :: !plugins
   and add_plugins s = plugins := (Util.str_split ~by:"," s) @ !plugins
+  and add_file s = Vector.push files s 
   in
   (* options list *) 
   let options =
-    [ ("-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)");
-      ("-debug", Arg.Set_int debug, "debug level");
-      ("-version", Arg.Set version, "print version");
-      ("-steps", Arg.Set_int steps, "maximal number of steps of given clause loop");
-      ("-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))");
-      ("-timeout", Arg.Set_float timeout, "timeout (in seconds)");
-      ("-select", Arg.Set_string select, help_select);
-      ("-split", Arg.Set split, "enable splitting");
-      ("-plugin", Arg.String add_plugin, "load given plugin (.cmxs)");
-      ("-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated");
-      ("-kb", Arg.Set_string kb, "Knowledge Base (KB) file");
-      ("-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB");
-      ("-kb-clear", Arg.Set kb_clear, "clear content of KB and exit");
-      ("-kb-print", Arg.Set kb_print, "print content of KB and exit");
-      ("-kb-where", Arg.Set kb_where, "print default dir that is search for KB");
-      ("-expand-def", Arg.Set expand_def, "expand definitions");
-      ("-arith", Arg.Set arith, "enable arithmetic");
-      ("-learning", Arg.Set learn, "enable lemma learning");
-      (* ("-learning-limit", Arg.Set_int LemmaLearning.max_lemmas, "maximum number of lemma learnt at once"); *)
-      ("-progress", Arg.Unit set_progress, "print progress");
-      ("-profile", Arg.Set Util.enable_profiling, "enable profiling of code");
-      ("-no-theories", Arg.Clear theories, "do not detect theories in input");
-      ("-no-heuristic-precedence", Arg.Clear heuristic_precedence, "do not use heuristic to choose precedence");
-      ("-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)");
-      ("-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set");
-      ("-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT");
-      ("-seed", Arg.Set_int seed, "set random seed");
-      ("-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences");
+    [ "-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)"
+    ; "-debug", Arg.Set_int debug, "debug level"
+    ; "-version", Arg.Set version, "print version"
+    ; "-steps", Arg.Set_int steps, "maximal number of steps of given clause loop"
+    ; "-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))"
+    ; "-timeout", Arg.Set_float timeout, "timeout (in seconds)"
+    ; "-select", Arg.Set_string select, help_select
+    ; "-split", Arg.Set split, "enable splitting"
+    ; "-plugin", Arg.String add_plugin, "load given plugin (.cmxs)"
+    ; "-plugins", Arg.String add_plugins, "load given plugin(s), comma-separated"
+    ; "-kb", Arg.Set_string kb, "Knowledge Base (KB) file"
+    ; "-kb-load", Arg.String (fun f -> kb_load := f :: !kb_load), "load theory file into KB"
+    ; "-kb-clear", Arg.Set kb_clear, "clear content of KB and exit"
+    ; "-kb-print", Arg.Set kb_print, "print content of KB and exit"
+    ; "-kb-where", Arg.Set kb_where, "print default dir that is search for KB"
+    ; "-expand-def", Arg.Set expand_def, "expand definitions"
+    ; "-arith", Arg.Set arith, "enable arithmetic"
+    ; "-stats", Arg.Set stats, "print statistics"
+    ; "-progress", Arg.Unit set_progress, "print progress"
+    ; "-profile", Arg.Set Util.enable_profiling, "enable profiling of code"
+    ; "-no-theories", Arg.Clear theories, "do not detect theories in input"
+    ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
+    ; "-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set"
+    ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
+    ; "-seed", Arg.Set_int seed, "set random seed"
+    ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
     ]
   in
-  Arg.parse options (fun f -> files := f :: !files) "solve problems in files";
-  (if !files = [] then files := ["stdin"]);
+  Arg.parse options add_file "solve problems in files";
+  if Vector.is_empty files
+    then Vector.push files "stdin";
   let param_ord = Ordering.choose !ord in
   (* debug level *)
   Util.set_debug !debug;
@@ -131,13 +129,12 @@ let parse_args () =
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;
-    param_files = !files; param_select = !select; param_theories = !theories;
-    param_progress = !progress;
+    param_files = files; param_select = !select; param_theories = !theories;
+    param_progress = !progress; param_stats= !stats;
     param_proof = !proof; param_split = !split;
     param_presaturate = !presaturate;
     param_dot_file = !dot_file; param_plugins= !plugins;
     param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
     param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
-    param_kb_print = !kb_print; param_learn = !learn;
-    param_expand_def= !expand_def; param_arith= !arith;
-    param_precedence= !heuristic_precedence;}
+    param_kb_print = !kb_print; 
+    param_expand_def= !expand_def; param_arith= !arith; }
