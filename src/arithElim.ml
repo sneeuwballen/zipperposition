@@ -175,14 +175,12 @@ let axioms =
     let pf = PF.create f proof in
     pf
   in
-  []
-  (* FIXME: need to parse TFF1, to quantify on X,Y,Z of type alpha.
-  [ pform ~name:"sum_assoc" "$sum($sum(X,Y),Z) = $sum(X,$sum(Y,Z))"
-  ; pform ~name:"sum_com" "$sum(X,Y) = $sum(Y,X)"
-  ; pform ~name:"product_assoc" "$product($product(X,Y),Z) = $product(X,$product(Y,Z))"
-  ; pform ~name:"product_com" "$product(X,Y) = $product(Y,X)"
+  [ pform ~name:"sum_assoc" "![X:A,Y:A,Z:A]: $sum($sum(X,Y),Z) = $sum(X,$sum(Y,Z))"
+  ; pform ~name:"sum_com" "![X:A,Y:A]: $sum(X,Y) = $sum(Y,X)"
+  ; pform ~name:"product_assoc"
+    "![X:A,Y:A,Z:A]: $product($product(X,Y),Z) = $product(X,$product(Y,Z))"
+  ; pform ~name:"product_com" "![X:A,Y:A]: $product(X,Y) = $product(Y,X)"
   ]
-  *)
 
 (** {2 Setup} *)
 
