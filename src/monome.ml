@@ -104,6 +104,13 @@ let remove m t =
 
 let type_of m = S.Arith.typeof m.constant
 
+let is_constant m = T.TMap.is_empty m.coeffs
+
+let sign m =
+  if not (is_constant m) then invalid_arg "sign: require constant monome";
+  assert (S.Arith.sign m.divby > 0);
+  S.Arith.sign m.constant
+
 let terms m =
   T.TMap.fold (fun t coeff acc -> t :: acc) m.coeffs []
 

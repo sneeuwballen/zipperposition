@@ -89,6 +89,8 @@ val mk_lit : ord:Ordering.t -> Term.t -> Term.t -> bool -> t
 val mk_prop : Term.t -> bool -> t   (* proposition *)
 val mk_true : Term.t -> t     (* true proposition *)
 val mk_false : Term.t -> t    (* false proposition *)
+val mk_tauto : t (* tautological literal *)
+val mk_absurd : t (* absurd literal, like ~ true *)
 
 val mk_less : Theories.TotalOrder.instance -> Term.t -> Term.t -> t
 val mk_lesseq : Theories.TotalOrder.instance -> Term.t -> Term.t -> t

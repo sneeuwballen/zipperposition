@@ -57,6 +57,13 @@ val remove : t -> Term.t -> t           (** Remove the term *)
 
 val type_of : t -> Type.t           (** type of the monome *)
 
+val is_constant : t -> bool
+  (** Returns [true] if the monome is only a constant *)
+
+val sign : t -> int
+  (** Assuming [is_constant m], [sign m] returns the sign of [m].
+      @raise Invalid_argument if the monome is not a constant *)
+
 val terms : t -> Term.t list
   (** List of terms that occur in the monome with non-nul coefficients *)
 

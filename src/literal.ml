@@ -250,6 +250,10 @@ let mk_true p = mk_prop p true
 
 let mk_false p = mk_prop p false
 
+let mk_tauto = True
+
+let mk_absurd = False
+
 let mk_less instance l r =
   let open Theories.TotalOrder in
   mk_true (T.mk_node instance.less [l; r])

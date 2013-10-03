@@ -261,6 +261,8 @@ end
 
 module Lit = struct
   type t =
+  | True   (* arithmetic tautology *)
+  | False  (* arithmetic absurdity *)
   | Eq of Term.t * Monome.t
   | Neq of Term.t * Monome.t
   | L_less of Term.t * Monome.t   (* term < monome *)
@@ -274,6 +276,8 @@ module Lit = struct
   | Literal.True
   | Literal.False -> false
 
+  exception UnsatLit
+
   let extract ~signature lit =
     (* extract literal from (l=r | l!=r) *)
     let extract_eqn l r sign =
@@ -282,9 +286,13 @@ module Lit = struct
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
         let terms = Monome.to_list m in
+        if terms = []
+        then if Monome.sign m = 0
+          then [True]
+          else [False]
         (* for each term, pivot the monome so that we isolate the term
           on one side of the (dis)equation, but only if it admits solutions *)
-        Util.list_fmap
+        else List.map
           (fun (coeff, t) ->
             assert (not (S.Arith.is_zero coeff));
             let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
@@ -292,12 +300,13 @@ module Lit = struct
             let m = if S.Arith.sign coeff < 0 then m else Monome.uminus m in
             if Monome.has_instances m
               then if sign
-                then Some (Eq (t, m))
-                else Some (Neq (t, m))
-              else None  (* unsatisfiable *)
+                then Eq (t, m)
+                else Neq (t, m)
+              else raise UnsatLit  (* unsatisfiable *)
           )
           terms
       with Monome.NotLinear -> []
+      | UnsatLit -> [False]
     (* extract lit from (l <= r | l < r) *)
     and extract_less ~strict l r =
       try
@@ -305,12 +314,17 @@ module Lit = struct
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
         let terms = Monome.to_list m in
+        if terms = []
+        then match Monome.sign m with
+        | 0 -> if strict then [False] else [True]
+        | n when n < 0 -> [True]
+        | _ -> [False]  (* m < 0 where m>0 *)
         (* l <| r is equivalent to m <| 0.
             for each term [t] of [m], pivot the monome to isolate [t]. Careful
               with the sign as it can change the comparison sign too! If the
               coeff of [t] is > 0 it means that the term [t] is on the {b left}
             side. *)
-        List.map
+        else List.map
           (fun (coeff, t) ->
             assert (not (S.Arith.is_zero coeff));
             (* do we have to change the sign of comparison? *)
@@ -334,7 +348,10 @@ module Lit = struct
     match lit with
     | Literal.True
     | Literal.False -> []
-    | Literal.Equation (l, r, sign, _) -> extract_eqn l r sign
+    | Literal.Equation (l, r, sign, _) ->
+      if T.is_arith l || T.is_arith r
+        then extract_eqn l r sign
+        else []
     | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, true) ->
       extract_lt a b
     | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, false) ->
@@ -355,6 +372,8 @@ module Lit = struct
 
   let to_lit ~ord lit =
     match lit with
+    | True -> Literal.mk_tauto
+    | False -> Literal.mk_absurd
     | Eq (t, m) ->
       Literal.mk_eq ~ord t (Monome.to_term m)
     | Neq (t, m) ->
@@ -376,7 +395,25 @@ module Lit = struct
   | Literal.True
   | Literal.False -> lit
 
+  let is_trivial ~signature lit =
+    let l = extract ~signature lit in
+    List.exists
+      (function
+      | True -> true
+      | _ -> false)
+      l
+
+  let has_instances ~signature lit =
+    let l = extract ~signature lit in
+    List.for_all
+      (function
+      | False -> false
+      | _ -> true)
+      l
+
   let get_term = function
+  | True
+  | False -> invalid_arg "get_term"
   | Eq (t, _)
   | Neq (t, _)
   | L_less (t, _)
@@ -385,6 +422,8 @@ module Lit = struct
   | R_lesseq (_, t) -> t
 
   let get_monome = function
+  | True
+  | False -> invalid_arg "get_monome"
   | Eq (_, m)
   | Neq (_, m)
   | L_less (_, m)
@@ -405,6 +444,8 @@ module Lit = struct
   (* find instances of variables that eliminate the literal *)
   let eliminate ?(elim_var=(fun v -> true)) ~signature lit =
     begin match lit with
+    | True
+    | False -> []
     | Eq _ -> []
     | Neq (x, m) -> [] (* for Neq, let equality resolution deal with it *)
     | L_less(x, m)
@@ -439,14 +480,19 @@ module Lit = struct
     end
 
   module L = struct
-    let get_terms l = List.map get_term l
+    let get_terms l = match l with
+    | [True]
+    | [False] -> []
+    | l -> List.map get_term l
 
     let filter l p =
       List.filter
         (fun lit ->
-          let t = get_term lit in
-          let m = get_monome lit in
-          p t m)
+          try
+            let t = get_term lit in
+            let m = get_monome lit in
+            p t m
+          with Invalid_argument _ -> false)
         l
   end
 end

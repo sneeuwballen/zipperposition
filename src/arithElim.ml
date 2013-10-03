@@ -41,7 +41,7 @@ module Lits = Literal.Arr
 
 let rewrite_lit ~ctx lit =
   let signature = Ctx.signature ~ctx in
-  match lit with
+  let lit' = match lit with
   | Lit.Prop (p, sign) ->
     let p' = Arith.T.simplify ~signature p in
     begin match p'.T.term, sign with
@@ -71,6 +71,13 @@ let rewrite_lit ~ctx lit =
     end
   | Lit.True
   | Lit.False -> lit
+  in
+  let signature = Ctx.signature ctx in
+  if Arith.Lit.is_trivial ~signature lit'
+    then Lit.mk_tauto
+  else if Arith.Lit.has_instances ~signature lit'
+    then lit'
+    else Lit.mk_absurd
 
 let eliminate_arith c =
   let ctx = c.C.hcctx in

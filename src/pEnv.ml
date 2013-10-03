@@ -92,6 +92,7 @@ let fix ops set =
     with ExitOperation -> ()
     | Restart ->
       (* process again all formulas *)
+      Util.debug 4 "restart fixpoint computation";
       PF.Set.iter (fun f -> Queue.push f q) !ans;
       ans := PF.Set.empty
   done;

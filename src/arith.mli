@@ -87,6 +87,8 @@ end
 
 module Lit : sig
   type t = private
+  | True   (* arithmetic tautology *)
+  | False  (* arithmetic absurdity *)
   | Eq of Term.t * Monome.t
   | Neq of Term.t * Monome.t
   | L_less of Term.t * Monome.t   (* term < monome *)
@@ -108,9 +110,21 @@ module Lit : sig
                  Literal.t -> Literal.t
     (** Simplify a literal (evaluation) *)
 
+  val is_trivial : signature:Signature.t -> Literal.t -> bool
+    (** Is the literal a tautology in arithmetic? *)
+
+  val has_instances : signature:Signature.t -> Literal.t -> bool
+    (** If the literal is arithmetic, return [true] iff it is compatible
+        with the theory of arithmetic (e.g. X+2Y=3 is ok, but 1=2 is not).
+        Otherwise return [true] *)
+
   val get_term : t -> Term.t
+    (** Extract the term.
+        @raise Invalid_argument if the literal is [True] or [False] *)
 
   val get_monome : t -> Monome.t
+    (** Extract the monome from the lit.
+        @raise Invalid_argument if the literal is [True] or [False] *)
 
   val factor : t -> Substs.t list
     (** Unify non-arith subterms pairwise, return corresponding substitutions *)
