@@ -335,35 +335,22 @@ end
 (* instantiate all bound variables *)
 let instantiate ty =
   (* recurse. [map] is a hashtable name -> gvar *)
-  let rec find_and_bound map ty = match ty with
-  | Var n ->
-    (* see whether we already instantiated this var *)
-    begin try Hashtbl.find map n
-    with Not_found ->
-      let v = new_gvar () in
-      Hashtbl.add map n v;
-      v
-    end
-  | GVar _ -> ty
-  | App (s, l) -> App (s, List.map (find_and_bound map) l)
-  | Fun (ret, l) -> Fun (find_and_bound map ret, List.map (find_and_bound map) l)
+  let rec find_and_bound map ty =
+    let ty = _deref_var ty in
+    match ty with
+    | Var n ->
+      (* see whether we already instantiated this var *)
+      begin try Hashtbl.find map n
+      with Not_found ->
+        let v = new_gvar () in
+        Hashtbl.add map n v;
+        v
+      end
+    | GVar _ -> ty
+    | App (s, l) -> App (s, List.map (find_and_bound map) l)
+    | Fun (ret, l) -> Fun (find_and_bound map ret, List.map (find_and_bound map) l)
   in
   find_and_bound (Hashtbl.create 4) ty
-
-(* close all free variables *)
-let close ty =
-  let ty = deref ty in
-  let gvars = free_vars ty in
-  match gvars with
-  | [] -> ty
-  | _::_ ->
-    let old_bindings = List.map deref gvars in
-    (* bind free variables to new universal variables, and deref *)
-    List.iter (fun gvar -> bind gvar (new_var ())) gvars;
-    let new_ty = deref ty in
-    (* restore the previous bindings of the free variables *)
-    List.iter2 (fun gvar old_bind -> bind gvar old_bind) gvars old_bindings;
-    new_ty
 
 let close_var var =
   match _deref_var var with
@@ -372,6 +359,12 @@ let close_var var =
     let v = new_var () in
     bind var v
   | _ -> ()
+
+(* close all free variables *)
+let close ty =
+  let gvars = free_vars ty in
+  List.iter close_var gvars;
+  deref ty
 
 (* occur-check *)
 let rec _occur_check gvar ty = match ty with

@@ -94,7 +94,6 @@ module Ctx = struct
     | Symbol.Const _ ->
       begin try
         let ty = Signature.find ctx.signature s in
-        let ty = Type.deref ty in
         Type.instantiate ty
       with Not_found ->
         (* give a new type variable to this symbol *)
@@ -222,57 +221,34 @@ let constrain_term_type ctx t ty =
   Ctx.unwind_protect ctx
     (fun () ->
       let ty' = infer_type_of ~check ctx t in
-      Ctx.unify ctx ty ty')
+      Ctx.unify ctx ty' (Type.instantiate ty))
 
 let check_term_type ctx t ty =
   let check = false in
   Ctx.protect ctx
     (fun () ->
       let ty_t = infer_type_of ~check ctx t in
-      try
-        Ctx.unify ctx ty_t ty;
-        true
-      with Type.Error _ ->
-        false)
+      Type.unifiable ty ty_t)
 
 let check_type_type ctx ty1 ty2 =
-  Ctx.protect ctx
-    (fun () ->
-      try
-        Ctx.unify ctx ty1 ty2;
-        true
-      with Type.Error _ ->
-        false)
+  Type.unifiable ty1 ty2
 
 let check_term_term ctx t1 t2 =
   let check = false in
   Ctx.protect ctx
     (fun () ->
-      try
-        (match t1.T.type_, t2.T.type_ with
-        | Some ty1, Some ty2 -> Ctx.unify ctx ty1 ty2
-        | Some ty1, None ->
-          let ty2 = infer_type_of ~check ctx t2 in
-          Ctx.unify ctx ty1 ty2
-        | None, Some ty2 ->
-          let ty1 = infer_type_of ~check ctx t1 in
-          Ctx.unify ctx ty1 ty2
-        | None, None ->
-          let ty1 = infer_type_of ~check ctx t1 in
-          let ty2 = infer_type_of ~check ctx t2 in
-          Ctx.unify ctx ty1 ty2);
-        true
-      with Type.Error _ ->
-        false)
+      let ty1 = infer_type_of ~check ctx t1 in
+      let ty2 = infer_type_of ~check ctx t2 in
+      Type.unifiable ty1 ty2)
 
 let check_term_term_sig signature t1 t2 =
   let ctx = Ctx.of_signature signature in
   check_term_term ctx t1 t2
 
-let check_term_type_sig signature t1 t2 =
+let check_term_type_sig signature t1 ty2 =
   let ctx = Ctx.of_signature signature in
-  check_term_type ctx t1 t2
+  check_term_type ctx t1 ty2
 
-let check_type_type_sig signature t1 t2 =
+let check_type_type_sig signature ty1 ty2 =
   let ctx = Ctx.of_signature signature in
-  check_type_type ctx t1 t2
+  check_type_type ctx ty1 ty2
