@@ -73,6 +73,7 @@ type result =
   | Unknown
   | Error of string
 
+
 val call : ?timeout:int -> prover:Prover.t ->
            Ast_tptp.declaration list -> result
   (** Call the prover (if present) on the given problem, and
@@ -83,3 +84,8 @@ val call_proof : ?timeout:int -> prover:Prover.t ->
                   result * Trace_tstp.t option
   (** Call the prover, and also tries to parse a TSTP derivation,
       if the prover succeeded *)
+
+val call_with_out : ?timeout:int -> prover:Prover.t ->
+                    Ast_tptp.declaration list ->
+                    result * string
+  (** Same as {!call}, but also returns the raw output of the prover *)

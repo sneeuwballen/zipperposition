@@ -97,7 +97,7 @@ type result =
   | Unknown
   | Error of string
 
-let _call_with_out ?(timeout=30) ~prover decls =
+let call_with_out ?(timeout=30) ~prover decls =
   try
     (* compute input to give to the prover *)
     let input = Util.on_buffer (Util.pp_list ~sep:"\n" A.pp_declaration) decls in
@@ -134,11 +134,11 @@ let _call_with_out ?(timeout=30) ~prover decls =
     Error str, ""
 
 let call ?timeout ~prover decls =
-  let res, _ = _call_with_out ?timeout ~prover decls in
+  let res, _ = call_with_out ?timeout ~prover decls in
   res
 
 let call_proof ?timeout ~prover decls =
-  let res, output = _call_with_out ?timeout ~prover decls in
+  let res, output = call_with_out ?timeout ~prover decls in
   let proof =
     try
       let lexbuf = Lexing.from_string output in
