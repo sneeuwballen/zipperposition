@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module T = Term
 module S = Substs
 
+let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
+
 (** {2 Term traversal} *)
 
 (** Term traversal in prefix order. This is akin to lazy transformation
@@ -179,6 +181,7 @@ module Make(E : Index.EQUATION) = struct
     Sequence.fold remove dt seq
 
   let retrieve ~sign dt sc_dt t sc_t acc k =
+    Util.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc pos subst =
       match trie with
@@ -218,7 +221,9 @@ module Make(E : Index.EQUATION) = struct
             | _ -> acc)
           m acc
     in
-    traverse dt acc 0 S.empty
+    let acc = traverse dt acc 0 S.empty in
+    Util.exit_prof prof_dtree_retrieve;
+    acc
 
   (** iterate on all (term -> value) in the tree *)
   let iter dt k =

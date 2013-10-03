@@ -71,6 +71,7 @@ let rec hash_novar t = match t.term with
     Hash.combine (hash_novar t1) (hash_novar t2)
 
 let prof_mk_node = Util.mk_profiler "Term.mk_node"
+let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 
 (** {2 Comparison, equality, containers} *)
 
@@ -765,6 +766,7 @@ let flatten_ac f l =
 let ac_normal_form ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
                    ?(is_com=fun s -> Symbol.has_attr Symbol.attr_commut s)
                    t =
+  Util.enter_prof prof_ac_normal_form;
   let rec normalize t = match t.term with
     | Var _ -> t
     | BoundVar _ -> t
@@ -779,6 +781,8 @@ let ac_normal_form ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
           x l'
         | [] -> assert false)
     | Node (f, [a;b]) when is_com f ->
+      let a = normalize a in
+      let b = normalize b in
       if compare a b > 0
         then mk_node f [b; a]
         else t
@@ -787,7 +791,9 @@ let ac_normal_form ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       mk_node f l
     | At (t1, t2) -> mk_at (normalize t1) (normalize t2)
   in
-  normalize t
+  let t' = normalize t in
+  Util.exit_prof prof_ac_normal_form;
+  t'
 
 (** Check whether the two terms are AC-equal. Optional arguments specify
     which symbols are AC or commutative (by default by looking at

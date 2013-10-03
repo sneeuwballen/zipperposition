@@ -164,5 +164,6 @@ let suite =
     ; "bench-peano-bis4" >:: benchmark_peano_bis 4
     ; "bench-peano-bis50" >:: benchmark_peano_bis 50
     ; "bench-peano-bis100" >:: benchmark_peano_bis 100
+    ; "bench-peano-bis1000" >:: benchmark_peano_bis 1000
     ]
 
