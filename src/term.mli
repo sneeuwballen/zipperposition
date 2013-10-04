@@ -168,8 +168,8 @@ val max_cpos : term -> int
 
 val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)
 val is_ground : t -> bool                (** is the term ground? (no free vars) *)
-val max_var : varlist -> int             (** find the maximum variable index, >= 0 *)
-val min_var : varlist -> int
+val max_var : varlist -> int             (** find the maximum variable index, or 0 *)
+val min_var : varlist -> int             (** minimum variable, or 0 if ground *)
 val add_vars : THashSet.t -> t -> unit   (** add variables of the term to the set *)
 val vars : t -> varlist                  (** compute variables of the term *)
 val vars_list : t list -> varlist        (** variables of terms in the list *)
@@ -277,8 +277,12 @@ val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
 val bij : t Bij.t
+
 val arbitrary : t QCheck.Arbitrary.t        (* generates terms *)
 val arbitrary_pred : t QCheck.Arbitrary.t   (* generates predicates *)
+
+val arbitrary_pos : t -> Position.t QCheck.Arbitrary.t
+  (** Arbitrary position in the term *)
 
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)

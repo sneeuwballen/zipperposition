@@ -424,7 +424,7 @@ let min_var vars =
   | ({term=Var i}::vars) -> aux (min i idx) vars
   | _ -> assert false
   in
-  aux max_int vars
+  aux 0 vars
 
 (** add variables of the term to the set *)
 let add_vars set t =
@@ -969,3 +969,20 @@ let arbitrary_pred =
   let sub = arbitrary in
   QCheck.Arbitrary.(choose
     [ lift2 p sub sub; lift q sub; lift r sub; return s; return true_term ])
+
+let arbitrary_pos t =
+  QCheck.Arbitrary.(
+    let rec recurse t pb st =
+      let stop = return (PB.to_pos pb) in
+      match t.term with
+        | Node (_, [])
+        | Var _
+        | BoundVar _ -> PB.to_pos pb
+        | Bind (_, t') ->
+          choose [stop; recurse t' (PB.add pb 0)] st
+        | At (t1, t2) ->
+          choose [stop; recurse t1 (PB.add pb 0); recurse t2 (PB.add pb 1)] st
+        | Node (_, l) ->
+          choose (stop :: List.mapi (fun i t' -> recurse t' (PB.add pb i)) l) st
+    in
+    recurse t (PB.of_pos []))
