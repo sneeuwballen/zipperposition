@@ -78,16 +78,18 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
     (* better priority for oriented rules *)
     if rule.rule_oriented then 1 else 2
 
-  let eq_rule r1 r2 =
-    r1.rule_oriented = r2.rule_oriented &&
-    r1.rule_left == r2.rule_left &&
-    r1.rule_right == r2.rule_right &&
-    E.equal r1.rule_equation r2.rule_equation
+  let cmp_rule r1 r2 =
+    Util.lexicograph_combine
+      [ E.compare r1.rule_equation r2.rule_equation
+      ; T.compare r1.rule_left r2.rule_left
+      ; T.compare r1.rule_right r2.rule_right
+      ; Pervasives.compare r1.rule_oriented r2.rule_oriented
+      ]
 
   module DT = Dtree.Make(struct
     type t = rule
     type rhs = Term.t
-    let equal = eq_rule
+    let compare = cmp_rule
     let extract r = r.rule_left, r.rule_right, true
     let priority = rule_priority
   end)
@@ -209,7 +211,8 @@ module TRS = struct
   module DT = Dtree.Make(struct
     type t = rule
     type rhs = Term.t
-    let equal (l1,r1) (l2,r2) = l1 == l2 && r1 == r2
+    let compare (l1,r1) (l2,r2) =
+      Util.lexicograph_combine [T.compare l1 l2; T.compare r1 r2]
     let extract (l,r) = (l,r,true)
     let priority _ = 1
   end)
@@ -303,7 +306,8 @@ module FormRW = struct
   module DT = Dtree.Make(struct
     type t = rule
     type rhs = Formula.t
-    let equal (l1,r1) (l2,r2) = T.eq l1 l2 && F.eq r1 r2
+    let compare (l1,r1) (l2,r2) = 
+      Util.lexicograph_combine [T.compare l1 l2; F.compare r1 r2]
     let extract (l,r) = (l,r,true)
     let priority (l,r) = F.weight r
   end)

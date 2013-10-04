@@ -156,7 +156,8 @@ module type EQUATION = sig
     (** An equation can have something other than a term as a right-hand
         side, for instance a formula. *)
 
-  val equal : t -> t -> bool
+  val compare : t -> t -> int
+    (** Total order on equations *)
 
   val extract : t -> (Term.t * rhs * bool)
     (** Obtain a representation of the (in)equation. The sign indicates

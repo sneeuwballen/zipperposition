@@ -228,7 +228,8 @@ module type EQUATION = sig
 
   type rhs
 
-  val equal : t -> t -> bool
+  val compare : t -> t -> int
+    (** Total order on equations *)
 
   val extract : t -> (Term.t * rhs * bool)
     (** Obtain a representation of the (in)equation. The sign indicates

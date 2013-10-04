@@ -168,7 +168,7 @@ module Make(E : Index.EQUATION) = struct
     let chars = to_list t in
     let k l =
       (* remove tuples that match *)
-      let l' = List.filter (fun (t', eqn', _) -> t' != t || not (E.equal eqn eqn')) l in
+      let l' = List.filter (fun (t', eqn', _) -> t' != t || E.compare eqn eqn' <> 0) l in
       TrieLeaf l'
     in
     let tree = goto_leaf dt chars k in
