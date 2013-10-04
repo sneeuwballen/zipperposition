@@ -28,7 +28,7 @@ Library "logtk"
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     FormulaShape, Util_tptp, Skolem, HO, Transform, Multiset,
                     Trace_tstp, CallProver,
-                    lib/Sequence, lib/Bij, lib/BV, lib/Bencode
+                    lib/Sequence, lib/Bij, lib/BV, lib/Bencode, lib/QCheck
   InternalModules:  lib/Cache
   BuildDepends:     unix,num,str
 

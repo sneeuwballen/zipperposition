@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 10be40581a9fe2ffd077b6f6ad4ad7d3)
+# DO NOT EDIT (digest: fe6f984d1c4213118697cd13347e5707)
 src/Symbol
 src/Hash
 src/Hashcons
@@ -37,6 +37,7 @@ src/lib/Sequence
 src/lib/Bij
 src/lib/BV
 src/lib/Bencode
+src/lib/QCheck
 src/meta/MetaPattern
 src/meta/MetaKB
 src/meta/MetaReasoner
