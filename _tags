@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: b0c9934dfd37112ca4a8aa28359f793e)
+# DO NOT EDIT (digest: 231a35fed09b4e6ba17e9d0c73bc1321)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -46,6 +46,7 @@
 "src/HO.cmx": for-pack(Logtk)
 "src/transform.cmx": for-pack(Logtk)
 "src/multiset.cmx": for-pack(Logtk)
+"src/NPDtree.cmx": for-pack(Logtk)
 "src/trace_tstp.cmx": for-pack(Logtk)
 "src/callProver.cmx": for-pack(Logtk)
 "src/lib/sequence.cmx": for-pack(Logtk)
@@ -82,8 +83,15 @@
 "tests/run_tests.native": pkg_unix
 "tests/run_tests.native": pkg_num
 "tests/run_tests.native": pkg_str
-<tests/*.ml{,i}>: use_logtk
 <tests/*.ml{,i}>: pkg_oUnit
+# Executable run_bench
+"tests/run_bench.native": use_logtk
+"tests/run_bench.native": pkg_bench
+"tests/run_bench.native": pkg_unix
+"tests/run_bench.native": pkg_num
+"tests/run_bench.native": pkg_str
+<tests/*.ml{,i}>: use_logtk
+<tests/*.ml{,i}>: pkg_bench
 <tests/*.ml{,i}>: pkg_unix
 <tests/*.ml{,i}>: pkg_num
 <tests/*.ml{,i}>: pkg_str

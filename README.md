@@ -62,6 +62,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `Cnf`: transformation of formulas into Clause Normal Form
     - `Index`: definition of term index signatures
         - `Dtree`: perfect discrimination tree, for rewriting
+        - `NPDtree`: non-perfect discrimination tree, for rewriting
         - `Fingerprint`: fingerprint term indexing
         - `FeatureVector`: feature-vector indexing for subsumption
     - `Rewriting`: rewriting on terms, ordered rewriting, formula rewriting

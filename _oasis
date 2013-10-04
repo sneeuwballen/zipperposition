@@ -19,6 +19,10 @@ Flag "meta"
   Description:  Build and install meta-prover
   Default:      false
 
+Flag "bench"
+  Description:  Build and run benchmarks
+  Default:      false
+
 Library "logtk"
   Path:             src/
   Pack:             true
@@ -27,7 +31,7 @@ Library "logtk"
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     FormulaShape, Util_tptp, Skolem, HO, Transform, Multiset,
-                    Trace_tstp, CallProver,
+                    NPDtree, Trace_tstp, CallProver,
                     lib/Sequence, lib/Bij, lib/BV, lib/Bencode, lib/QCheck
   InternalModules:  lib/Cache
   BuildDepends:     unix,num,str
@@ -59,6 +63,13 @@ Executable run_tests
   CompiledObject: native
   MainIs: run_tests.ml
   BuildDepends: logtk, oUnit
+
+Executable run_bench
+  Path: tests/
+  Install: false
+  CompiledObject: native
+  MainIs: run_bench.ml
+  BuildDepends: logtk, bench
 
 Test all
   Command: $run_tests
