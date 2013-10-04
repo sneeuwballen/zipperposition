@@ -107,11 +107,33 @@ module TestUnit(I : UnitIndex) = struct
     let name = Util.sprintf "index(%s)_gen_retrieved_match" I.name in
     mk_test ~name gen prop
 
+  (* check that all matching terms are retrieved *)
+  let check_all_retrieved =
+    let prop seq =
+      let idx = I.add_seq I.empty seq in
+      Sequence.for_all
+        (fun (t,_) ->
+          let retrieved = find_all idx t in
+          Sequence.for_all
+            (fun (t',_) ->
+              try
+                let _ = Unif.matching t' 1 t 0 in
+                List.exists
+                  (fun (t'',_) -> T.eq t' t'')
+                  retrieved
+              with Unif.Fail -> true)
+            seq)
+        seq
+    in
+    let name = Util.sprintf "index(%s)_all_retrieved" I.name in
+    mk_test ~name gen prop
+
   (* check the matching of generalization *)
   let props =
     [ check_size_add
     ; check_gen_retrieved_member
     ; check_gen_retrieved_match
+    ; check_all_retrieved
     ]
 end
 
