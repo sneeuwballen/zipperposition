@@ -126,8 +126,8 @@ module Make(E : Index.EQUATION) = struct
     Util.enter_prof prof_npdtree_retrieve;
     (* extended callback *)
     let k' acc t' eqn subst =
-      let _, r, _ = E.extract eqn in
-      k acc t' r eqn subst
+      let _, r, sign' = E.extract eqn in
+      if sign = sign' then k acc t' r eqn subst else acc
     in
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc i =
