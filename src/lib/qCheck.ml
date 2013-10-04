@@ -256,20 +256,20 @@ let run ?(out=stdout) ?(rand=Random.State.make_self_init()) (Test test) =
   Printf.fprintf out "testing property %s...\n" test.name;
   match check ~rand ~n:test.n test.gen test.prop with
   | Ok (n, prefail) ->
-    Printf.fprintf out "passed %d tests (%d preconditions failed)\n" n prefail;
+    Printf.fprintf out "  [✔] passed %d tests (%d preconditions failed)\n" n prefail;
     true
   | Failed l ->
     begin match test.pp with
-    | None -> Printf.fprintf out "%d failures\n" (List.length l)
+    | None -> Printf.fprintf out "  [×] [%d failures\n" (List.length l)
     | Some pp ->
-      Printf.fprintf out "%d failures:\n" (List.length l);
+      Printf.fprintf out "  [×] %d failures:\n" (List.length l);
       List.iter
         (fun x -> Printf.fprintf out "  %s\n" (pp x))
         l
     end;
     false
   | Error e ->
-    Printf.fprintf out "error: %s\n" (Printexc.to_string e);
+    Printf.fprintf out "  [×] error: %s\n" (Printexc.to_string e);
     false
 
 type suite = test list
@@ -281,6 +281,6 @@ let run_tests ?(out=stdout) ?(rand=Random.State.make_self_init()) l =
   Printf.fprintf out "check %d properties...\n" (List.length l);
   List.iter (fun test -> if not (run ~out ~rand test) then res := false) l;
   if !res
-    then Printf.fprintf out "Success!\n"
-    else Printf.fprintf out "Failure.\n";
+    then Printf.fprintf out "[✔] Success!\n"
+    else Printf.fprintf out "[×] Failure.\n";
   !res
