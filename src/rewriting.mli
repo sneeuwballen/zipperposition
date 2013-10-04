@@ -57,7 +57,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) : ORDERED with mod
 
 (** {2 Regular rewriting} *)
 
-module TRS : sig
+module type SIG_TRS = sig
   type t
 
   type rule = Term.t * Term.t
@@ -79,6 +79,11 @@ module TRS : sig
   val rewrite : ?depth:int -> t -> Term.t -> Term.t
     (** Compute normal form of the term *)
 end
+
+module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E)
+  : SIG_TRS
+
+module TRS : SIG_TRS
 
 (** {2 Formula rewriting} *)
 

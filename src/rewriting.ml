@@ -204,11 +204,34 @@ end
 
 (** {2 Regular rewriting} *)
 
-module TRS = struct
+module type SIG_TRS = sig
+  type t
+
+  type rule = Term.t * Term.t
+    (** rewrite rule, from left to right *)
+
+  val empty : t 
+
+  val add : t -> rule -> t
+  val add_seq : t -> rule Sequence.t -> t
+  val add_list : t -> rule list -> t
+
+  val to_seq : t -> rule Sequence.t
+  val of_seq : rule Sequence.t -> t
+  val of_list : rule list -> t
+
+  val size : t -> int
+  val iter : t -> (rule -> unit) -> unit
+
+  val rewrite : ?depth:int -> t -> Term.t -> Term.t
+    (** Compute normal form of the term *)
+end
+
+module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E) = struct
   type rule = Term.t * Term.t
 
   (** Instance of discrimination tree indexing} *)
-  module DT = Dtree.Make(struct
+  module Idx = I(struct
     type t = rule
     type rhs = Term.t
     let compare (l1,r1) (l2,r2) =
@@ -217,17 +240,17 @@ module TRS = struct
     let priority _ = 1
   end)
 
-  type t = DT.t
+  type t = Idx.t
     (** Term Rewriting System *)
 
-  let empty = DT.empty
+  let empty = Idx.empty
 
   let add trs (l, r) =
     (* check that the rule does not introduce variables *)
     assert (List.for_all (fun v -> T.subterm ~sub:v l) (T.vars r));
     assert (not (T.is_var l));
     (* add rule to the discrimination tree *)
-    let trs = DT.add trs (l, r) in
+    let trs = Idx.add trs (l, r) in
     trs
 
   let add_seq trs seq =
@@ -236,10 +259,10 @@ module TRS = struct
   let add_list trs l =
     List.fold_left add trs l
 
-  let size trs = DT.size trs
+  let size trs = Idx.size trs
 
   let iter trs k =
-    DT.iter trs (fun _ rule -> k rule)
+    Idx.iter trs (fun _ rule -> k rule)
 
   let to_seq trs =
     Sequence.from_iter
@@ -283,7 +306,7 @@ module TRS = struct
     (* assuming subterms of [t] are in normal form, reduce the term *)
     and reduce_at_root ~depth t =
       try
-        DT.retrieve ~sign:true trs 1 t 0 () rewrite_handler;
+        Idx.retrieve ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst)) ->
         Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' Substs.pp subst;
@@ -296,6 +319,8 @@ module TRS = struct
     let t' = compute_nf ~depth S.empty t 0 in
     t'
 end
+
+module TRS = MakeTRS(Dtree.Make)
 
 (** {2 Formula Rewriting } *)
 
