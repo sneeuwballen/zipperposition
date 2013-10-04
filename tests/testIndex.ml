@@ -48,18 +48,16 @@ end
 (* test unit index *)
 module TestUnit(I : UnitIndex) = struct
   (* lists of unique terms *)
-  let gen = Arbitrary.(
-    list ~len:(20 -- 100) T.arbitrary >>= fun l ->
+  let gen low high = Arbitrary.(
+    list ~len:(low -- high) T.arbitrary >>= fun l ->
     let set = T.THashSet.from_list l in
     let seq = Sequence.from_iter (fun k -> T.THashSet.iter set k) in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.persistent seq))
 
-  (*
   let pp seq =
     let pp buf (t,i) = Printf.bprintf buf "%a -> %d" T.pp t i in
     Util.on_buffer (Util.pp_seq pp) seq
-    *)
 
   (* check that the size of index is correct *)
   let check_size_add =
@@ -68,7 +66,7 @@ module TestUnit(I : UnitIndex) = struct
       Sequence.length seq = I.size idx
     in
     let name = Util.sprintf "index(%s)_size_after_add" I.name in
-    mk_test ~name gen prop
+    mk_test ~name (gen 30 100) prop
 
   (* list of (term,int) that generalize [t] *)
   let find_all idx t =
@@ -87,7 +85,7 @@ module TestUnit(I : UnitIndex) = struct
       seq
     in
     let name = Util.sprintf "index(%s)_gen_retrieved_member" I.name in
-    mk_test ~name gen prop
+    mk_test ~name (gen 30 100) prop
 
   (* check that the retrieved terms match the query *)
   let check_gen_retrieved_match =
@@ -105,7 +103,7 @@ module TestUnit(I : UnitIndex) = struct
       seq
     in
     let name = Util.sprintf "index(%s)_gen_retrieved_match" I.name in
-    mk_test ~name gen prop
+    mk_test ~name (gen 50 150) prop
 
   (* check that all matching terms are retrieved *)
   let check_all_retrieved =
@@ -126,7 +124,7 @@ module TestUnit(I : UnitIndex) = struct
         seq
     in
     let name = Util.sprintf "index(%s)_all_retrieved" I.name in
-    mk_test ~name gen prop
+    mk_test ~name (gen 50 150) prop
 
   (* check the matching of generalization *)
   let props =
