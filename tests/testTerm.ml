@@ -32,6 +32,8 @@ module T = Term
 module H = Helpers
 module S = Substs
 
+(** unit tests *)
+
 let pterm s = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s);;
 
 let f x y = T.mk_node (Symbol.mk_const "f") [x;y]
@@ -76,3 +78,63 @@ let suite =
     ; "test_beta_reduce" >:: test_beta_reduce
     ]
 
+(** Properties *)
+
+open QCheck
+
+(* subterm is smaller than term *)
+let check_size_subterm =
+  (* choose a subterm of t *)
+  let gen = Arbitrary.(T.arbitrary >>= fun t ->
+    T.arbitrary_pos t >>= fun pos ->
+    return (t, T.at_pos t pos))
+  in
+  let pp = PP.(pair T.to_string T.to_string) in
+  let prop (t1, t2) =
+    T.subterm ~sub:t2 t1 &&
+    T.size t1 >= T.size t2
+  in
+  mk_test ~pp ~name:"term_size_subterm" gen prop
+
+(* replace subterm by itself yields same term *)
+let check_replace_id =
+  let gen = Arbitrary.(
+    T.arbitrary >>= fun t ->
+    T.arbitrary_pos t >>= fun pos ->
+    return (t, pos))
+  in
+  let pp = PP.(pair T.to_string Position.to_string) in
+  let prop (t, pos) =
+    let sub = T.at_pos t pos in
+    Prop.assume (T.db_closed sub);
+    let t' = T.replace_pos t pos sub in
+    T.eq t t'
+  in
+  mk_test ~pp ~name:"term_replace_same_subterm" gen prop
+    
+let check_ground_novar =
+  let gen = T.arbitrary in
+  let pp = T.to_string in
+  let prop t =
+    Prop.assume (T.is_ground t);
+    T.vars t = []
+  in
+  mk_test ~n:1000 ~pp ~name:"term_ground_has_no_var" gen prop
+
+let check_min_max_vars =
+  let gen = T.arbitrary in
+  let prop t =
+    let vars = T.vars t in
+    T.min_var vars <= T.max_var vars
+  in
+  mk_test ~n:1000 ~pp:T.to_string ~name:"term_min_max_var" gen prop
+
+(* TODO: write a term arbitrary instance for DB terms (lambda terms?)
+   and check that a lifted/unlifted closed term remains closed *)
+
+let props =
+  [ check_size_subterm
+  ; check_replace_id
+  ; check_ground_novar
+  ; check_min_max_vars
+  ]

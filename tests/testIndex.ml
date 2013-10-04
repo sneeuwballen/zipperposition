@@ -24,26 +24,34 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** {1 Test indexing structures} *)
+
 open Logtk
-open OUnit
 
-let suite = 
-  "all_tests" >:::
-    [ TestTerm.suite
-    ; TestSubsts.suite
-    ; TestOrdering.suite
-    ; TestRewriting.suite
+module T = Term
+
+(* a simple instance of equation *)
+module E : Index.EQUATION with type rhs = int = struct
+  type t = T.t * int
+  type rhs = int
+  let compare (t1,i1) (t2,i2) = if t1 == t2 then i1-i2 else T.compare t1 t2
+  let extract (t,i) = t, i, true
+  let priority _ = 1
+end
+
+(* test unit index *)
+module TestUnit(I : Index.UNIT_IDX with module E = E) = struct
+
+  let props =
+    [ ]
+end
+
+let props =
+  let module DT = Dtree.Make(E) in
+  let module TestDtree = TestUnit(DT) in
+  let module NPDT = NPDtree.Make(E) in
+  let module TestNPDtree = TestUnit(DT) in
+  QCheck.flatten
+    [ TestDtree.props
+    ; TestNPDtree.props
     ]
-let props = QCheck.flatten
-  [ TestTerm.props
-  ; TestIndex.props
-  ]
-
-let specs =
-  [ "debug", Arg.Int Util.set_debug, "set debug level"
-  ]
-
-let _ =
-  ignore (run_test_tt_main ~arg_specs:specs suite);
-  ignore (QCheck.run_tests props);
-  ()
