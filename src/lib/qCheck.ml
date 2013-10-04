@@ -260,7 +260,7 @@ let run ?(out=stdout) ?(rand=Random.State.make_self_init()) (Test test) =
     true
   | Failed l ->
     begin match test.pp with
-    | None -> Printf.fprintf out "  [×] [%d failures\n" (List.length l)
+    | None -> Printf.fprintf out "  [×] %d failures\n" (List.length l)
     | Some pp ->
       Printf.fprintf out "  [×] %d failures:\n" (List.length l);
       List.iter
@@ -277,10 +277,12 @@ type suite = test list
 let flatten = List.flatten
 
 let run_tests ?(out=stdout) ?(rand=Random.State.make_self_init()) l =
-  let res = ref true in
+  let start = Unix.gettimeofday () in
+  let failed = ref 0 in
   Printf.fprintf out "check %d properties...\n" (List.length l);
-  List.iter (fun test -> if not (run ~out ~rand test) then res := false) l;
-  if !res
+  List.iter (fun test -> if not (run ~out ~rand test) then incr failed) l;
+  Printf.fprintf out "tests run in %.2fs\n" (Unix.gettimeofday() -. start);
+  if !failed = 0
     then Printf.fprintf out "[✔] Success!\n"
-    else Printf.fprintf out "[×] Failure.\n";
-  !res
+    else Printf.fprintf out "[×] Failure (%d tests failed).\n" !failed;
+  !failed = 0
