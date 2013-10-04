@@ -938,3 +938,34 @@ let bij =
         | "node" -> BranchFrom (Lazy.force bij_node, fun (s,l) -> mk_node s l)
         | "at" -> BranchFrom (Lazy.force bij_pair, fun (a, b) -> mk_at a b)
         | _ -> raise (DecodingError "expected Term")))
+
+let arbitrary =
+  let a = mk_const (Symbol.mk_const "a") in
+  let b = mk_const (Symbol.mk_const "b") in
+  let c = mk_const (Symbol.mk_const "c") in
+  let d = mk_const (Symbol.mk_const "d") in
+  let e = mk_const (Symbol.mk_const "e") in
+  let x = mk_var 0 in
+  let y = mk_var 1 in
+  let z = mk_var 2 in
+  let f x y = mk_node (Symbol.mk_const "f") [x; y] in
+  let sum x y = mk_node (Symbol.mk_const "sum") [x; y] in
+  let g x = mk_node (Symbol.mk_const "g") [x] in
+  let h x = mk_node (Symbol.mk_const "h") [x] in
+  let ite x y z = mk_node (Symbol.mk_const "ite") [x; y; z] in
+  QCheck.Arbitrary.(
+    let base = among [a; b; c; d; e; x; y; z] in
+    let t = fix ~max:6 ~base (fun sub ->
+      choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
+        choose [lift2 sum sub sub; lift3 ite sub sub sub]])
+    in
+    t)
+      
+let arbitrary_pred =
+  let p x y = mk_node (Symbol.mk_const "p") [x; y] in
+  let q x = mk_node (Symbol.mk_const "q") [x] in
+  let r x = mk_node (Symbol.mk_const "r") [x] in
+  let s = mk_const (Symbol.mk_const "s") in
+  let sub = arbitrary in
+  QCheck.Arbitrary.(choose
+    [ lift2 p sub sub; lift q sub; lift r sub; return s; return true_term ])

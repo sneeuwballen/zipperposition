@@ -241,6 +241,9 @@ let bij =
       | "real" -> Bij.(BranchFrom (float_, mk_real))
       | c -> raise (Bij.DecodingError "expected symbol"))
 
+let arbitrary =
+  QCheck.Arbitrary.(map (among ["f"; "g"; "h"; "a"; "b"; "c"]) mk_const)
+
 (** {2 Arith} *)
 
 module Arith = struct

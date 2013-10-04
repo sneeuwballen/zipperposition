@@ -277,6 +277,8 @@ val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
 val bij : t Bij.t
+val arbitrary : t QCheck.Arbitrary.t        (* generates terms *)
+val arbitrary_pred : t QCheck.Arbitrary.t   (* generates predicates *)
 
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
