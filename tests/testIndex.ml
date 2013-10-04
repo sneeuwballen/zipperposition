@@ -27,11 +27,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Test indexing structures} *)
 
 open Logtk
+open QCheck
 
 module T = Term
 
 (* a simple instance of equation *)
-module E : Index.EQUATION with type rhs = int = struct
+module E : Index.EQUATION with type rhs = int and type t = T.t * int = struct
   type t = T.t * int
   type rhs = int
   let compare (t1,i1) (t2,i2) = if t1 == t2 then i1-i2 else T.compare t1 t2
@@ -39,18 +40,86 @@ module E : Index.EQUATION with type rhs = int = struct
   let priority _ = 1
 end
 
-(* test unit index *)
-module TestUnit(I : Index.UNIT_IDX with module E = E) = struct
+module type UnitIndex = sig
+  include Index.UNIT_IDX with module E = E
+  val name : string
+end
 
+(* test unit index *)
+module TestUnit(I : UnitIndex) = struct
+  (* lists of unique terms *)
+  let gen = Arbitrary.(
+    list ~len:(20 -- 100) T.arbitrary >>= fun l ->
+    let set = T.THashSet.from_list l in
+    let seq = Sequence.from_iter (fun k -> T.THashSet.iter set k) in
+    let seq = Sequence.mapi (fun i t -> t, i) seq in
+    return (Sequence.persistent seq))
+
+  (*
+  let pp seq =
+    let pp buf (t,i) = Printf.bprintf buf "%a -> %d" T.pp t i in
+    Util.on_buffer (Util.pp_seq pp) seq
+    *)
+
+  (* check that the size of index is correct *)
+  let check_size_add =
+    let prop seq =
+      let idx = I.add_seq I.empty seq in
+      Sequence.length seq = I.size idx
+    in
+    let name = Util.sprintf "index(%s)_size_after_add" I.name in
+    mk_test ~name gen prop
+
+  (* list of (term,int) that generalize [t] *)
+  let find_all idx t =
+    I.retrieve ~sign:true idx 1 t 0 []
+      (fun acc t' i _ _ -> (t', i) :: acc)
+
+  (* check that at least the terms are retrieved *)
+  let check_gen_retrieved_member =
+    let prop seq =
+      let idx = I.add_seq I.empty seq in
+      Sequence.for_all
+        (fun (t,i) ->
+          let retrieved = find_all idx t in
+          (* [i] must occur in the list *)
+          List.exists (fun (_, i') -> i=i') retrieved)
+      seq
+    in
+    let name = Util.sprintf "index(%s)_gen_retrieved_member" I.name in
+    mk_test ~name gen prop
+
+  (* check that the retrieved terms match the query *)
+  let check_gen_retrieved_match =
+    let prop seq =
+      let idx = I.add_seq I.empty seq in
+      Sequence.for_all
+        (fun (t,i) ->
+          let retrieved = find_all idx t in
+          (* all terms must match [t] *)
+          List.for_all
+            (fun (t',_) ->
+              try ignore (Unif.matching t' 0 t 1); true
+              with Unif.Fail -> false)
+            retrieved)
+      seq
+    in
+    let name = Util.sprintf "index(%s)_gen_retrieved_match" I.name in
+    mk_test ~name gen prop
+
+  (* check the matching of generalization *)
   let props =
-    [ ]
+    [ check_size_add
+    ; check_gen_retrieved_member
+    ; check_gen_retrieved_match
+    ]
 end
 
 let props =
-  let module DT = Dtree.Make(E) in
+  let module DT = struct include Dtree.Make(E) let name = "dtree" end in
   let module TestDtree = TestUnit(DT) in
-  let module NPDT = NPDtree.Make(E) in
-  let module TestNPDtree = TestUnit(DT) in
+  let module NPDT = struct include NPDtree.Make(E) let name = "npdtree" end in
+  let module TestNPDtree = TestUnit(NPDT) in
   QCheck.flatten
     [ TestDtree.props
     ; TestNPDtree.props
