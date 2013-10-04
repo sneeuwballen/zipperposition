@@ -24,10 +24,9 @@ Library "libzipperposition"
             Literal, MetaProverState, CompactClause, Ctx, Proof, ProofState,
             Saturate, Selection, Superposition, PFormula, Theories, AC,
             Chaining, PEnv, Params, Env, Monome, Arith, ArithElim
-  InternalModules:  containers/PersistentGraph, containers/Hashset,
-                    containers/PHashtbl, containers/PersistentHashtbl, containers/Heap,
-                    containers/Leftistheap, containers/Vector, containers/Sequence,
-                    containers/SmallSet, containers/Gen, containers/UnionFind
+  InternalModules:  containers/LazyGraph, containers/Leftistheap,
+                    containers/Vector, containers/Sequence, containers/SmallSet,
+                    containers/UnionFind
   BuildDepends: unix,num,logtk,logtk.meta,dynlink
 
 # main executable for the prover

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 3ab9bfd235801b44698a1d677f083765)
+# DO NOT EDIT (digest: 7c6fc520f2a52e2be2a29f00718e9826)
 ClauseQueue
 Clause
 Const
@@ -24,15 +24,10 @@ Env
 Monome
 Arith
 ArithElim
-containers/PersistentGraph
-containers/Hashset
-containers/PHashtbl
-containers/PersistentHashtbl
-containers/Heap
+containers/LazyGraph
 containers/Leftistheap
 containers/Vector
 containers/Sequence
 containers/SmallSet
-containers/Gen
 containers/UnionFind
 # OASIS_STOP

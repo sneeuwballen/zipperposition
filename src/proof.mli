@@ -101,7 +101,7 @@ val share : t -> t
 
 (** {2 Conversion to a graph of proofs} *)
 
-val to_graph : t -> (t, string) PersistentGraph.t
+val as_graph : (t, t, string) LazyGraph.t
   (** Get a graph of the proof *)
 
 val bij : ord:Ordering.t -> t Bij.t
@@ -120,6 +120,8 @@ val pp_tstp : Buffer.t -> t -> unit
 val pp_debug : Buffer.t -> t -> unit
 val pp : string -> Buffer.t -> t -> unit
   (** Prints the proof according to the given input switch *)
+
+val as_dot_graph : (t, LazyGraph.Dot.attribute list, LazyGraph.Dot.attribute list) LazyGraph.t
 
 val pp_dot : name:string -> Buffer.t -> t -> unit
   (** Pretty print the proof as a DOT graph *)

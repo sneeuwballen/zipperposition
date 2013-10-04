@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 820e2ecc503d9f3da484550d1b88ade3)
+# DO NOT EDIT (digest: a3a0cfaf2c15b6616f30218d3b3968aa)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -39,16 +39,11 @@
 "src/monome.cmx": for-pack(Libzipperposition)
 "src/arith.cmx": for-pack(Libzipperposition)
 "src/arithElim.cmx": for-pack(Libzipperposition)
-"src/containers/persistentGraph.cmx": for-pack(Libzipperposition)
-"src/containers/hashset.cmx": for-pack(Libzipperposition)
-"src/containers/pHashtbl.cmx": for-pack(Libzipperposition)
-"src/containers/persistentHashtbl.cmx": for-pack(Libzipperposition)
-"src/containers/heap.cmx": for-pack(Libzipperposition)
+"src/containers/lazyGraph.cmx": for-pack(Libzipperposition)
 "src/containers/leftistheap.cmx": for-pack(Libzipperposition)
 "src/containers/vector.cmx": for-pack(Libzipperposition)
 "src/containers/sequence.cmx": for-pack(Libzipperposition)
 "src/containers/smallSet.cmx": for-pack(Libzipperposition)
-"src/containers/gen.cmx": for-pack(Libzipperposition)
 "src/containers/unionFind.cmx": for-pack(Libzipperposition)
 <src/containers/*.ml{,i}>: pkg_unix
 <src/containers/*.ml{,i}>: pkg_num

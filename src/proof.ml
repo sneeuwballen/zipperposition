@@ -173,18 +173,17 @@ let share t =
 
 (** {2 Conversion to a graph of proofs} *)
 
-let mk_graph () = PersistentGraph.empty ~hash ~eq 10
-
 (** Get a graph of the proof *)
-let to_graph proof =
-  let g = mk_graph () in
-  traverse proof
-    (fun p -> match p with
-      | Axiom _ -> ()
-      | InferForm (_, step)
-      | InferClause (_, step) ->
-        Array.iter (fun p' -> PersistentGraph.add g p' step.rule p) step.parents);
-  g
+let as_graph =
+  let f proof = match proof with
+  | Axiom _ -> LazyGraph.Node(proof, proof, Sequence.empty)
+  | InferClause(_, step)
+  | InferForm (_, step) ->
+    let parents = Sequence.of_array step.parents in
+    let parents = Sequence.map (fun p' -> (step.rule, p')) parents in
+    LazyGraph.Node (proof, proof, parents)
+  in
+  LazyGraph.make ~eq:eq ~hash:hash f
 
 let bij ~ord =
   Bij.(fix
@@ -294,23 +293,22 @@ let pp switch buf proof = match switch with
   | "debug" -> pp_debug buf proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
-let print_vertex proof =
-  let label = `Label (Util.on_buffer pp_notrec proof) in
+let as_dot_graph =
+  let label proof = `Label (Util.on_buffer pp_notrec proof) in
   let attributes = [`Shape "box"; `Style "filled"] in
-  let attributes =
-    if is_proof_of_false proof then `Color "red" :: `Label "[]" :: attributes
-    else if is_axiom proof then label :: `Color "yellow" :: attributes
-    else label :: attributes in
-  attributes
-and print_edge v1 e v2 =
-  [`Label e]
+  LazyGraph.map
+    ~vertices:(fun p ->
+      if is_proof_of_false p then `Color "red" :: `Label "[]" :: attributes
+      else if is_axiom p then label p :: `Color "yellow" :: attributes
+      else label p :: attributes)
+    ~edges:(fun e -> [`Label e])
+    as_graph
 
 (** Add the proof to the given graph *)
 let pp_dot ~name buf proof =
-  let graph = to_graph proof in
-  assert (PersistentGraph.is_dag graph);
   let fmt = Format.formatter_of_buffer buf in
-  PersistentGraph.pp ~name ~print_vertex ~print_edge fmt graph;
+  assert (LazyGraph.is_dag as_graph proof);
+  LazyGraph.Dot.pp ~name as_dot_graph fmt (Sequence.singleton proof);
   Format.pp_print_flush fmt ();
   ()
 
