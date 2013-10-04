@@ -65,7 +65,6 @@ let given_clause_step ?(generating=true) ~env num =
     | None ->
       Util.incr_stat stat_redundant_given;
       Util.debug 2 "given clause %a is redundant" C.pp c;
-      Env.add_simpl ~env (Sequence.singleton c);
       Unknown
     | Some c when C.is_empty c ->
       Unsat c  (* empty clause found *)
