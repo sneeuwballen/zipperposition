@@ -39,6 +39,8 @@ module Arbitrary = struct
       then 0
       else start + Random.State.int st n
 
+  let (--) start stop = int_range ~start ~stop
+
   let small_int = int 100
 
   let bool = Random.State.bool
