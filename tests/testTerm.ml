@@ -116,8 +116,7 @@ let check_ground_novar =
   let gen = T.arbitrary in
   let pp = T.to_string in
   let prop t =
-    Prop.assume (T.is_ground t);
-    T.vars t = []
+    T.is_ground t = (T.vars t = [])  (* ground <=> no vars *)
   in
   mk_test ~n:1000 ~pp ~name:"term_ground_has_no_var" gen prop
 
