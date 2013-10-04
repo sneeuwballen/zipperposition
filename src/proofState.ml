@@ -53,11 +53,12 @@ let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 
 module TermIndex = Fingerprint.Make(C.WithPos)
 
-module UnitIndex = Dtree.Make(struct
+module UnitIndex = NPDtree.Make(struct
   type t = Term.t * Term.t * bool * C.t
   type rhs = Term.t
-  let equal (t11,t12,s1,c1) (t21,t22,s2,c2) =
-    T.eq t11 t21 && T.eq t12 t22 && s1 = s2 && C.eq c1 c2
+  let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
+    Util.lexicograph_combine [T.compare t11 t21; T.compare t12 t22;
+                              compare s1 s2; C.compare c1 c2]
   let extract (t1,t2,sign,_) = t1, t2, sign
   let priority (_,_,_,c) =
     if C.is_oriented_rule c then 2 else 1

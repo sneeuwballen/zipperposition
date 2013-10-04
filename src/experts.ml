@@ -342,7 +342,7 @@ let compatible_gc ~ord gc =
 module OrderedTRS = Rewriting.MakeOrdered(struct
   type t = Clause.t
   type rhs = Term.t
-  let equal = C.eq
+  let compare = C.compare
   let extract c = match c.C.hclits with
     | [| Literal.Equation (l, r, sign, _) |] -> l, r, sign
     | _ -> assert false
