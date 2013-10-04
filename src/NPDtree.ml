@@ -54,21 +54,15 @@ module Make(E : Index.EQUATION) = struct
 
   module SMap = Symbol.SMap
 
-  type t =
-  | Leaf of Leaf.t
-  | Node of node
-  (** The discrimination tree *)
-
-  and node = {
+  type t = {
     star : t option;  (* by variable *)
     map : t SMap.t;   (* by symbol *)
-  } (** A node of the tree, pointing to subtrees *)
+    leaf : Leaf.t;    (* leaves *)
+  }  (** The discrimination tree *)
 
-  let empty = Node {map=SMap.empty; star=None;}
+  let empty = {map=SMap.empty; star=None; leaf=Leaf.empty;}
 
-  let is_empty n = match n with
-  | Leaf l -> Leaf.is_empty l
-  | Node n -> n.star = None && SMap.is_empty n.map
+  let is_empty n = n.star = None && SMap.is_empty n.map && Leaf.is_empty n.leaf
 
   (** get/add/remove the leaf for the given term. The
       continuation k takes the leaf, and returns a leaf option
@@ -81,38 +75,33 @@ module Make(E : Index.EQUATION) = struct
         [t] is the same term, [i] is the index in the term *)
     let rec goto trie t i rebuild =
       if T.size t = i
-        then match trie with
-          | Leaf l ->
-            begin match k l with
-            | l' when l == l' -> root (* no change, return same tree *)
-            | l' -> rebuild (Leaf l')
-            end
-          | Node _ -> failwith "end of term is not in a NPDtree leaf"
-        else match trie, (T.at_cpos t i).T.term with
-          | Leaf _, _ -> failwith "middle of term is in a NPDtree leaf"
-          | Node n, (T.Var _ | T.BoundVar _) ->
-            let subtrie = match n.star with
-              | None -> Node {star=None; map=SMap.empty;}
+        then match k trie.leaf with
+          | leaf' when leaf' == trie.leaf -> root (* no change, return same tree *)
+          | leaf' -> rebuild {trie with leaf=leaf'; }
+        else match (T.at_cpos t i).T.term with
+          | (T.Var _ | T.BoundVar _) ->
+            let subtrie = match trie.star with
+              | None -> empty
               | Some trie' -> trie'
             in
             let rebuild subtrie =
               if is_empty subtrie
-                then rebuild (Node {n with star=None; })
-                else rebuild (Node {n with star=Some subtrie ;})
+                then rebuild {trie with star=None; }
+                else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie t (i+1) rebuild
-          | Node n, (T.Node (s, _) | T.Bind (s, _)) ->
+          | (T.Node (s, _) | T.Bind (s, _)) ->
             let subtrie =
-              try SMap.find s n.map
-              with Not_found -> Node{star=None; map=SMap.empty;}
+              try SMap.find s trie.map
+              with Not_found -> empty
             in
             let rebuild subtrie =
               if is_empty subtrie
-                then rebuild (Node {n with map=SMap.remove s n.map; })
-                else rebuild (Node {n with map=SMap.add s subtrie n.map ;})
+                then rebuild {trie with map=SMap.remove s trie.map; }
+                else rebuild {trie with map=SMap.add s subtrie trie.map ;}
             in
             goto subtrie t (i+1) rebuild
-          | Node n, T.At _ ->
+          | T.At _ ->
             failwith "NPDtree: unable to deal with curried terms" (* TODO? *)
   in
   goto trie t 0 (fun t -> t)
@@ -143,31 +132,27 @@ module Make(E : Index.EQUATION) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc i =
       if i = T.size t
-        then match trie with
-          | Leaf l ->
-            Leaf.fold_match l sc_dt t sc_t acc k'
-          | Node _ -> failwith "wrong arity in NPDtree.retrieve"
-        else match trie, (T.at_cpos t i).T.term with
-          | Leaf _, _ -> failwith "wrong structure in NPDtree.retrieve"
-          | Node n, (T.Var _ | T.BoundVar _) ->
-            begin match n.star with
+        then Leaf.fold_match trie.leaf sc_dt t sc_t acc k'
+        else match (T.at_cpos t i).T.term with
+          | (T.Var _ | T.BoundVar _) ->
+            begin match trie.star with
             | None -> acc
             | Some subtrie ->
               traverse subtrie acc (i+1)  (* match "*" against "*" *)
             end
-          | Node n, (T.Node (s, _) | T.Bind (s, _)) ->
+          | (T.Node (s, _) | T.Bind (s, _)) ->
             let acc =
               try
-                let subtrie = SMap.find s n.map in
+                let subtrie = SMap.find s trie.map in
                 traverse subtrie acc (i+1)
               with Not_found -> acc
             in
-            begin match n.star with
+            begin match trie.star with
               | None -> acc
               | Some subtrie ->
                 traverse subtrie acc (skip t i)  (* skip subterm *)
             end
-          | Node n, T.At _ ->
+          | T.At _ ->
             failwith "NPDtree: unable to deal with curried terms" (* TODO? *)
     in
     let acc = traverse dt acc 0 in
@@ -176,14 +161,12 @@ module Make(E : Index.EQUATION) = struct
 
   (** iterate on all (term -> value) in the tree *)
   let rec iter dt k =
-    match dt with
-    | Leaf leaf -> Leaf.iter leaf (fun t set -> Leaf.S.iter (fun v -> k t v) set)
-    | Node n ->
-      begin match n.star with
-      | None -> ()
-      | Some trie' -> iter trie' k
-      end;
-      SMap.iter (fun _ trie' -> iter trie' k) n.map
+    Leaf.iter dt.leaf (fun t set -> Leaf.S.iter (fun v -> k t v) set);
+    begin match dt.star with
+    | None -> ()
+    | Some trie' -> iter trie' k
+    end;
+    SMap.iter (fun _ trie' -> iter trie' k) dt.map
 
   let size dt =
     let n = ref 0 in
