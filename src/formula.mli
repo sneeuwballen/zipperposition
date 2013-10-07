@@ -206,6 +206,10 @@ val to_string : t -> string
 
 val bij : t Bij.t
 
+val arbitrary_atom : t QCheck.Arbitrary.t
+val arbitrary_clause : t list QCheck.Arbitrary.t
+val arbitrary : t QCheck.Arbitrary.t (* any formula (DB-closed) *)
+
 (** {2 Containers} *)
 
 module Tbl : Hashtbl.S with type key = t

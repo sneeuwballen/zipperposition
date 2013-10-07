@@ -120,7 +120,7 @@ module Arbitrary : sig
     (** Transform an arbitrary into another *)
 
   val list : ?len:int t -> 'a t -> 'a list t
-    (** List of arbitrary length *)
+    (** List of arbitrary length. Default [len] is between 0 and 10. *)
 
   val opt : 'a t -> 'a option t
     (** May return a value, or None *)
@@ -151,7 +151,7 @@ module Arbitrary : sig
 
   val fix : ?max:int -> base:'a t -> ('a t -> 'a t) -> 'a t
     (** Recursive arbitrary values. The optional value [max] defines
-        the maximal depth, if needed. [base] is the base case. *)
+        the maximal depth, if needed (default 15). [base] is the base case. *)
 
   val fix_depth : depth:int t -> base:'a t -> ('a t -> 'a t) -> 'a t
     (** Recursive values of at most given random depth *)

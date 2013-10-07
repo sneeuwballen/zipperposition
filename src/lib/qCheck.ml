@@ -90,24 +90,26 @@ module Arbitrary = struct
     Array.init n (fun _ -> ar st)
 
   let among_array a st =
+    if Array.length a < 1
+      then failwith "Arbitrary.among: cannot choose in empty array ";
     let i = Random.State.int st (Array.length a) in
     a.(i)
 
-  let among l = among_array (Array.of_list l)
+  let among l =
+    if List.length l < 1
+      then failwith "Arbitrary.among: cannot choose in empty list";
+    among_array (Array.of_list l)
 
-  let choose l =
-    assert (l <> []);
-    let a = Array.of_list l in
-    fun st ->
-      let i = Random.State.int st (Array.length a) in
-      a.(i) st
+  let choose l = match l with
+    | [] -> failwith "cannot choose from empty list"
+    | [x] -> x
+    | _ ->
+      let a = Array.of_list l in
+      fun st ->
+        let i = Random.State.int st (Array.length a) in
+        a.(i) st
 
-  let _fix ~max ~depth recursive f =
-    let rec ar = lazy (fun st -> (Lazy.force ar_rec) st)
-    and ar_rec = lazy (f ar) in
-    Lazy.force ar
-
-  let fix ?(max=max_int) ~base f =
+  let fix ?(max=15) ~base f =
     let rec ar = lazy
       (fun depth st ->
         if depth >= max || Random.State.int st max < depth
@@ -169,22 +171,22 @@ module PP = struct
 
   let list pp l =
     let b = Buffer.create 25 in
-    Buffer.add_char b '(';
+    Buffer.add_char b '[';
     List.iteri (fun i x ->
       if i > 0 then Buffer.add_string b ", ";
       Buffer.add_string b (pp x))
       l;
-    Buffer.add_char b ')';
+    Buffer.add_char b ']';
     Buffer.contents b
 
   let array pp a = 
     let b = Buffer.create 25 in
-    Buffer.add_char b '[';
+    Buffer.add_string b "[|";
     Array.iteri (fun i x ->
       if i > 0 then Buffer.add_string b ", ";
       Buffer.add_string b (pp x))
       a;
-    Buffer.add_char b ']';
+    Buffer.add_string b "|]";
     Buffer.contents b
 end
 

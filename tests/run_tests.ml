@@ -31,11 +31,13 @@ let suite =
   "all_tests" >:::
     [ TestTerm.suite
     ; TestSubsts.suite
+    ; TestFormula.suite
     ; TestOrdering.suite
     ; TestRewriting.suite
     ]
 let props = QCheck.flatten
   [ TestTerm.props
+  ; TestFormula.props
   ; TestIndex.props
   ]
 
