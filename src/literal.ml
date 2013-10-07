@@ -350,6 +350,14 @@ let is_ground lit = match lit with
   | True
   | False -> true
 
+let terms lit =
+  Sequence.from_iter (fun k ->
+    match lit with
+    | Equation (l,r,_,_) -> k l; k r
+    | Prop (p, _) -> k p
+    | True
+    | False -> ())
+
 let get_eqn lit ~side =
   match lit with
   | Equation (l,r,sign,_) when side = Position.left_pos -> (l, r, sign)
@@ -508,6 +516,9 @@ module Arr = struct
 
   let is_ground lits =
     Util.array_forall is_ground lits
+
+  let terms lits =
+    Sequence.flatMap terms (Sequence.of_array lits)
 
   let to_form lits =
     let lits = Array.map form_of_lit lits in

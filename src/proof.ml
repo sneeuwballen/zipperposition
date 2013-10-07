@@ -185,25 +185,25 @@ let as_graph =
   in
   LazyGraph.make ~eq:eq ~hash:hash f
 
-let bij ~ord =
+let bij =
   Bij.(fix
     (fun bij_ ->
-      let bij_step = map
+      let bij_step = lazy (map
         ~inject:(fun step -> step.rule, step.parents, step.esa, step.theories)
         ~extract:(fun (rule,parents,esa,theories) -> {rule;parents;esa;theories;})
-          (quad string_ (array_ (Lazy.force bij_)) bool_ (list_ string_)) in
+          (quad string_ (array_ (Lazy.force bij_)) bool_ (list_ string_))) in
       let bij_axiom = pair string_ string_
-      and bij_form = pair F.bij bij_step
-      and bij_clause = pair (CC.bij ~ord) bij_step
+      and bij_form = lazy (pair F.bij (Lazy.force bij_step))
+      and bij_clause = lazy (pair CC.bij (Lazy.force bij_step))
       in switch
           ~inject:(function
             | Axiom (f,n) -> "axiom", BranchTo(bij_axiom, (f,n))
-            | InferForm(f,step) -> "form", BranchTo(bij_form, (f,step))
-            | InferClause(c,step) -> "clause", BranchTo(bij_clause, (c,step)))
+            | InferForm(f,step) -> "form", BranchTo(Lazy.force bij_form, (f,step))
+            | InferClause(c,step) -> "clause", BranchTo(Lazy.force bij_clause, (c,step)))
           ~extract:(function
             | "axiom" -> BranchFrom(bij_axiom, (fun (f,n) -> Axiom(f,n)))
-            | "form" -> BranchFrom(bij_form, (fun(f,step) -> InferForm(f,step)))
-            | "clause" -> BranchFrom(bij_clause, (fun(c,step) -> InferClause(c,step)))
+            | "form" -> BranchFrom(Lazy.force bij_form, (fun(f,step) -> InferForm(f,step)))
+            | "clause" -> BranchFrom(Lazy.force bij_clause, (fun(c,step) -> InferClause(c,step)))
             | c -> raise (DecodingError "expected proof step"))
     ))
 
@@ -257,11 +257,11 @@ let pp_tstp buf proof =
       | Axiom _ -> () 
       | InferClause(c, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
         let f,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "cnf(%d, axiom, %a, file('%s', %s)).\n"
+        Printf.bprintf buf "cnf(%d, axiom, %a, file('%s', '%s')).\n"
           name CC.pp_tstp c f n
       | InferForm(f, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
         let file,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "tff(%d, axiom, %a, file('%s', %s)).\n"
+        Printf.bprintf buf "tff(%d, axiom, %a, file('%s', '%s')).\n"
           name F.pp_tstp f file n
       | InferForm(f, step) ->
         let names = Array.map (get_name ~namespace) step.parents in
@@ -307,7 +307,8 @@ let as_dot_graph =
 (** Add the proof to the given graph *)
 let pp_dot ~name buf proof =
   let fmt = Format.formatter_of_buffer buf in
-  assert (LazyGraph.is_dag as_graph proof);
+  if not (LazyGraph.is_dag as_graph proof)
+    then Util.debug 0 "warning: proof is not a DAG";
   LazyGraph.Dot.pp ~name as_dot_graph fmt (Sequence.singleton proof);
   Format.pp_print_flush fmt ();
   ()
@@ -317,11 +318,9 @@ let pp_dot_file ?(name="proof") filename proof =
   (* print graph on file *)
   let out = open_out filename in
   try
-    let buf = Buffer.create 1024 in
-    pp_dot ~name buf proof;
     Util.debug 1 "print proof to %s" filename;
-    (* write on the opened out channel *)
-    Buffer.output_buffer out buf;
+    Util.fprintf out "%a\n" (pp_dot ~name) proof;
     close_out out
-  with _ ->
+  with e ->
+    Util.debug 1 "error: %s" (Printexc.to_string e);
     close_out out

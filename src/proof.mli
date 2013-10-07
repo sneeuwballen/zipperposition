@@ -104,9 +104,7 @@ val share : t -> t
 val as_graph : (t, t, string) LazyGraph.t
   (** Get a graph of the proof *)
 
-val bij : ord:Ordering.t -> t Bij.t
-  (** Bijection. A global table of proof steps is maintained! Use a fresh
-      bijection to get a fresh proof steps table. *)
+val bij : t Bij.t
 
 (** {2 IO} *)
 

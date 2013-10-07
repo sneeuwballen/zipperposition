@@ -59,10 +59,14 @@ type t = {
 
 type clause = t
 
-let compact c = c.hclits
+let compact c =
+  lazy (Array.map Lit.form_of_lit c.hclits)
 
 let to_seq c =
-  Lit.Arr.to_seq c.hclits
+  Lits.to_seq c.hclits
+
+let terms c =
+  Lits.terms c.hclits
 
 let to_prec_clause c = Lit.Arr.to_forms c.hclits
 
@@ -582,7 +586,7 @@ let bij ~ctx =
     ~extract:(fun (lits,proof) ->
       let proof = Proof.adapt_c proof in
       create_a ~ctx lits proof)
-    (pair (Lits.bij ~ord) (Proof.bij ~ord))
+    (pair (Lits.bij ~ord) Proof.bij)
     )
 
 let bij_set ~ctx =

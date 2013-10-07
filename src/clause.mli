@@ -63,6 +63,8 @@ val compact : t -> CompactClause.t
 val to_seq : t -> (Term.t * Term.t * bool) Sequence.t
   (** Easy iteration on literals *)
 
+val terms : t -> Term.t Sequence.t
+
 val to_prec_clause : t -> Precedence.clause
 
 (** {2 Flags} *)

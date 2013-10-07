@@ -111,6 +111,8 @@ val vars : t -> Term.varlist (** gather variables *)
 val var_occurs : Term.t -> t -> bool
 val is_ground : t -> bool
 
+val terms : t -> Term.t Sequence.t (** Terms occuring in the literal *)
+
 val get_eqn : t -> side:int -> Term.t * Term.t * bool
   (** Equational view of a literal *)
 
@@ -158,6 +160,8 @@ module Arr : sig
   val depth : t array -> int
   val vars : t array -> Term.varlist
   val is_ground : t array -> bool             (** all the literals are ground? *)
+
+  val terms : t array -> Term.t Sequence.t
 
   val to_form : t array -> Formula.t
 
