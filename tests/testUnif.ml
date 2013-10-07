@@ -24,30 +24,31 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** Test unification *)
+
 open Logtk
-open OUnit
+open QCheck
 
-let suite = 
-  "all_tests" >:::
-    [ TestTerm.suite
-    ; TestSubsts.suite
-    ; TestFormula.suite
-    ; TestOrdering.suite
-    ; TestRewriting.suite
-    ]
-let props = QCheck.flatten
-  [ TestTerm.props
-  ; TestFormula.props
-  ; TestUnif.props
-  ; TestCNF.props
-  ; TestIndex.props
+module T = Term
+module S = Substs
+
+let check_unify_gives_unifier =
+  let gen = Arbitrary.(pair T.arbitrary T.arbitrary) in
+  let pp = PP.(pair T.to_string T.to_string) in
+  let name = "unify_gives_unifier" in
+  let prop (t1, t2) =
+    try
+      let subst = Unif.unification t1 0 t2 1 in
+      let renaming = S.Renaming.create 5 in
+      let t1' = S.apply ~renaming subst t1 0 in
+      let t2' = S.apply ~renaming subst t2 1 in
+      T.eq t1' t2'
+    with Unif.Fail ->
+      Prop.assume false;
+      true
+  in
+  mk_test ~n:1000 ~pp ~name gen prop
+
+let props =
+  [ check_unify_gives_unifier
   ]
-
-let specs =
-  [ "debug", Arg.Int Util.set_debug, "set debug level"
-  ]
-
-let _ =
-  ignore (run_test_tt_main ~arg_specs:specs suite);
-  ignore (QCheck.run_tests props);
-  ()

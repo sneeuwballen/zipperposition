@@ -24,30 +24,50 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** Tests for CNF *)
+
 open Logtk
-open OUnit
+open QCheck
 
-let suite = 
-  "all_tests" >:::
-    [ TestTerm.suite
-    ; TestSubsts.suite
-    ; TestFormula.suite
-    ; TestOrdering.suite
-    ; TestRewriting.suite
-    ]
-let props = QCheck.flatten
-  [ TestTerm.props
-  ; TestFormula.props
-  ; TestUnif.props
-  ; TestCNF.props
-  ; TestIndex.props
+module F = Formula
+
+let pp = F.to_string
+
+let check_cnf_idempotent =
+  let gen = Arbitrary.(lift F.close_forall F.arbitrary) in
+  let name = "cnf_idempotent" in
+  (* check that if [f] is in CNF, then [cnf_of f] is [f] *)
+  let prop f =
+    Prop.assume (Cnf.is_cnf f);
+    match Cnf.cnf_of f with
+    | [] -> F.is_trivial f
+    | [[f']] -> F.eq f f'
+    | _ -> false
+  in
+  mk_test ~name ~pp gen prop
+
+let check_cnf_gives_clauses =
+  let gen = Arbitrary.(lift F.close_forall F.arbitrary) in
+  let name = "cnf_gives_clauses" in
+  (* check that the CNf of a formula is in clausal form *)
+  let prop f =
+    let clauses = Cnf.cnf_of f in
+    let clauses = List.map F.mk_or clauses in
+    List.for_all Cnf.is_cnf clauses
+  in
+  mk_test ~name ~pp gen prop
+
+let check_miniscope_db_closed =
+  let gen = Arbitrary.(lift F.close_forall F.arbitrary) in
+  let name = "cnf_miniscope_db_closed" in
+  (* check that miniscoping preserved db_closed *)
+  let prop f =
+    F.db_closed f = F.db_closed (Cnf.miniscope f)
+  in
+  mk_test ~name ~pp gen prop
+
+let props =
+  [ check_cnf_idempotent
+  ; check_cnf_gives_clauses
+  ; check_miniscope_db_closed
   ]
-
-let specs =
-  [ "debug", Arg.Int Util.set_debug, "set debug level"
-  ]
-
-let _ =
-  ignore (run_test_tt_main ~arg_specs:specs suite);
-  ignore (QCheck.run_tests props);
-  ()
