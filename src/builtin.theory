@@ -137,6 +137,18 @@ theory strict_partial_order(r) is
   transitive(r) and
   antisymmetric(r).
 
+theory total_order(less, lesseq) is
+  axiom lesseq(X,Y) <=> (less(X,Y) | X=Y) and
+  axiom less(X,Y) | X=Y | less(Y,X) and
+  strict_partial_order(less).
+
+theory total_order(less, lesseq) is
+  axiom ~lesseq(X,Y) | less(X,Y) | X=Y and
+  axiom ~less(X,Y) | lesseq(X,Y) and
+  axiom X!=Y | lesseq(X,Y) and
+  axiom less(X,Y) | X=Y | less(Y,X) and
+  strict_partial_order(less).
+
 % lattices
 
 theory semi_lattice(meet) is
