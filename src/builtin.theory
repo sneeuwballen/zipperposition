@@ -134,8 +134,7 @@ theory partial_order(r) is
 
 theory strict_partial_order(r) is
   irreflexive(r) and
-  transitive(r) and
-  antisymmetric(r).
+  transitive(r).
 
 theory total_order(less, lesseq) is
   axiom lesseq(X,Y) <=> (less(X,Y) | X=Y) and
