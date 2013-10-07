@@ -289,8 +289,8 @@ let mk_at_list t l =
 
 let mk_const s = mk_node s []
 
-let true_term = cast (mk_const Symbol.true_symbol) Type.o
-let false_term = cast (mk_const Symbol.false_symbol) Type.o
+let true_term = mk_const Symbol.true_symbol
+let false_term = mk_const Symbol.false_symbol
 
 (* constructors for terms *)
 

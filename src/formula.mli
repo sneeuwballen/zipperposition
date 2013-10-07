@@ -203,6 +203,8 @@ val pp : Buffer.t -> t -> unit
 val set_default_pp : (Buffer.t -> t -> unit) -> unit
 val fmt : Format.formatter -> t -> unit
 val to_string : t -> string
+val to_string_debug : t -> string
+val to_string_tstp : t -> string
 
 val bij : t Bij.t
 

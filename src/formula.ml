@@ -635,8 +635,7 @@ let of_term t =
     mk_exists (recurse f')
   | _ -> mk_atom t  (* default: atom *)
   in
-  let varindex = ref (T.max_var (T.vars t) + 1) in
-  recurse (T.db_to_classic ~varindex t)
+  recurse t
 
 (** {2 Typing} *)
 
@@ -782,6 +781,12 @@ let set_default_pp pp = __default_pp := pp
 
 let to_string f =
   Util.on_buffer pp f
+
+let to_string_debug f =
+  Util.on_buffer pp_debug f
+
+let to_string_tstp f =
+  Util.on_buffer pp_tstp f
 
 let fmt fmt f =
   Format.pp_print_string fmt (to_string f)
