@@ -103,7 +103,7 @@ let mk_proof_obligation proof =
   else try
     let goal, step = match proof with
     | TT.InferForm (f, lazy step) ->
-      A.FOF(step.TT.id, A.R_conjecture, f, []), step
+      A.FOF(step.TT.id, A.R_conjecture, F.close_forall f, []), step
     | TT.InferClause (c, lazy step) ->
       A.FOF(step.TT.id, A.R_conjecture, F.close_forall (F.mk_or c), []), step
     | _ -> assert false 
@@ -113,7 +113,7 @@ let mk_proof_obligation proof =
         | TT.InferClause (c, lazy step') ->
           Some (A.FOF(step'.TT.id, A.R_axiom, F.close_forall (F.mk_or c), []))
         | TT.InferForm(f, lazy step') ->
-          Some (A.FOF(step'.TT.id, A.R_axiom, f, []))
+          Some (A.FOF(step'.TT.id, A.R_axiom, F.close_forall f, []))
         | TT.Axiom _
         | TT.Theory _ -> None)
       (Array.to_list step.TT.parents)
