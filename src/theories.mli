@@ -99,6 +99,8 @@ module TotalOrder : sig
         @raise Invalid_argument if one of the symbols is already part of an
               instance. *)
 
+  val eq : instance -> instance -> bool
+
   val is_less : spec:t -> Symbol.t -> bool
 
   val is_lesseq : spec:t -> Symbol.t -> bool

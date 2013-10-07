@@ -272,10 +272,38 @@ let is_tautology c =
     true
 
 let simplify c =
-  c (* TODO *)
+  let ctx = c.C.hcctx in
+  let spec = Ctx.total_order ctx in
+  let eligible = C.Eligible.always in
+  let size = Array.length c.C.hclits in
+  let bv = BV.create ~size true in
+  let instances = ref [] in
+  (* remove absurd literals from [bv] *)
+  Lits.fold_ineq ~spec ~eligible c.C.hclits ()
+    (fun () lit pos ->
+      if lit.TO.strict && T.eq lit.TO.left lit.TO.right
+        then begin
+          (* eliminate literal a <= a *)
+          let i = List.hd pos in
+          BV.reset bv i;
+          instances := lit.TO.instance :: !instances
+        end);
+  if BV.cardinal bv < size
+    then begin
+      let lits = List.map fst (BV.select bv c.C.hclits) in
+      let theories = ["total_order"] in
+      instances := Util.list_uniq TO.eq !instances;
+      let proofs = Util.list_flatmap (fun instance -> instance.TO.proof) !instances in
+      let rule = "total_order_simplify" in
+      let proof cc = Proof.mk_c_step ~theories ~rule cc (c.C.hcproof :: proofs) in
+      let new_c = C.create ~ctx ~parents:[c] lits proof in
+      Util.debug 3 "total_order_simplify %a into %a" C.pp c C.pp new_c;
+      new_c
+    end else
+      c
 
 let axioms ~ctx ~instance =
-  []  (* TODO? *)
+  []
 
 (** {2 Env} *)
 

@@ -162,6 +162,9 @@ module TotalOrder = struct
     STbl.add spec.lesseq_tbl lesseq instance;
     instance
 
+  let eq i1 i2 =
+    Symbol.eq i1.less i2.less && Symbol.eq i1.lesseq i2.lesseq
+
   let tstp_instance ~spec =
     try
       find ~spec Symbol.Arith.less
