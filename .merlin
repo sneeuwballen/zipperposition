@@ -1,6 +1,13 @@
-S src/
+S src
 S src/lib
-S containers/
-B _build
-B _build/containers/
+S tools/
+S tests/
+S src/meta
+B _build/src/
 B _build/src/lib/
+B _build/src/meta
+B _build/tools/
+B _build/tests/
+PKG oUnit
+PKG bench
+PKG datalog
