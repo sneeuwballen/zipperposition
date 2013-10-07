@@ -63,11 +63,17 @@ val cnf : ctx:Skolem.ctx -> operation
 val meta_prover : meta:MetaProverState.t -> operation
   (** Detect theories in the set, and add lemmas to the set *)
 
-val rw_term : ?rule:string -> Rewriting.TRS.t -> operation
-  (** Rewrite terms in the formula *)
+val rw_term : ?rule:string -> premises:PFormula.Set.t ->
+              Rewriting.TRS.t -> operation
+  (** Rewrite terms in the formula.
+      @param premises is the set of formulas that justify why the
+        transformtion is correct *)
 
-val rw_form : ?rule:string -> Rewriting.FormRW.t -> operation
-  (** Rewrite formulas into other formulas *)
+val rw_form : ?rule:string -> premises:PFormula.Set.t ->
+              Rewriting.FormRW.t -> operation
+  (** Rewrite formulas into other formulas
+      @param premises is the set of formulas that justify why the
+        transformtion is correct *)
 
 val fmap_term : rule:string -> (Term.t -> Term.t) -> operation
   (** Transformation on terms *)

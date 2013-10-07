@@ -149,18 +149,20 @@ let meta_prover ~meta =
       then []
       else [Add lemmas]
 
-let rw_term ?(rule="rw") trs =
+let rw_term ?(rule="rw") ~premises trs =
   fun set pf ->
     let f = pf.PF.form in
     let f' = Formula.map (fun t -> Rewriting.TRS.rewrite trs t) f in
     if F.eq f f'
       then []
       else
-        let proof = Proof.mk_f_step f' ~rule [pf.PF.proof] in
+        let premises = PF.Set.to_seq premises in
+        let premises = Sequence.to_list (Sequence.map PF.get_proof premises) in
+        let proof = Proof.mk_f_step f' ~rule (pf.PF.proof::premises) in
         let pf' = PF.create f' proof in
         [SimplifyInto pf']
 
-let rw_form ?(rule="rw") frs =
+let rw_form ?(rule="rw") ~premises frs =
   fun set pf ->
     let f = pf.PF.form in
     Util.debug 5 "start rewriting %a" PF.pp pf;
@@ -169,7 +171,9 @@ let rw_form ?(rule="rw") frs =
     if F.eq f f'
       then []
       else
-        let proof = Proof.mk_f_step f' ~rule [pf.PF.proof] in
+        let premises = PF.Set.to_seq premises in
+        let premises = Sequence.to_list (Sequence.map PF.get_proof premises) in
+        let proof = Proof.mk_f_step f' ~rule (pf.PF.proof::premises) in
         let pf' = PF.create f' proof in
         let _ = Util.debug 5 "rewritten %a in %a!" PF.pp pf PF.pp pf' in
         [SimplifyInto pf']
@@ -190,10 +194,13 @@ let expand_def set pf =
   (* detect definitions in [pf] *)
   let transforms = FormulaShape.detect_def ~only:`Pred (Sequence.singleton pf.PF.form) in
   (* make new operations on the set of formulas *)
+  let premises = PF.Set.singleton pf in
   let ops = Util.list_fmap
     (function
-      | Transform.RwForm frs -> Some (rw_form ~rule:"expand_pred_def" frs)
-      | Transform.RwTerm trs -> Some (rw_term ~rule:"expand_term_def" trs)
+      | Transform.RwForm frs ->
+        Some (rw_form ~rule:"expand_pred_def" ~premises frs)
+      | Transform.RwTerm trs ->
+        Some (rw_term ~rule:"expand_term_def" ~premises trs)
       | Transform.Tr _ -> None)
     transforms
   in
