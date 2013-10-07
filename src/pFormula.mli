@@ -68,7 +68,7 @@ val pp_tstp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
-val bij : ord:Ordering.t -> t Bij.t
+val bij : t Bij.t
 
 (** {2 Set of formulas} *)
 

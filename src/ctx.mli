@@ -72,13 +72,16 @@ val is_completeness_preserved : ctx:t -> bool
 val add_signature : ctx:t -> Signature.t -> unit
   (** Merge  the given signature with the context's one *)
 
-val add_ac : ctx:t -> Symbol.t -> unit
+val add_ac : ctx:t -> ?proof:Proof.t list -> Symbol.t -> unit
   (** Symbol is AC *)
 
 (* TODO: also update signature so that less and lesseq have same type
         and occur in signature *)
-val add_order : ctx:t -> less:Symbol.t -> lesseq:Symbol.t -> unit
-  (** Pair of symbols that consistute an ordering *)
+val add_order : ctx:t -> ?proof:Proof.t list ->
+                less:Symbol.t -> lesseq:Symbol.t ->
+                Theories.TotalOrder.instance
+  (** Pair of symbols that constitute an ordering.
+      @return the corresponding instance. *)
 
 (** {2 Type inference} *)
 

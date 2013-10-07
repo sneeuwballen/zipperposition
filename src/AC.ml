@@ -102,7 +102,11 @@ let simplify ~spec ~ctx c =
   let n' = List.length lits in
   if n' < n && not (C.get_flag C.flag_persistent c)
     then begin
-      let proof cc = Proof.mk_c_step cc ~rule:"ac" [c.C.hcproof] in
+      let symbols = Theories.AC.symbols_of_terms ~spec (C.terms c) in
+      let symbols = Sequence.to_list (Symbol.SSet.to_seq symbols) in
+      let ac_proof = Util.list_flatmap (Theories.AC.find_proof ~spec) symbols in
+      let premises = c.C.hcproof :: ac_proof in
+      let proof cc = Proof.mk_c_step cc ~rule:"ac" premises in
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx lits proof in
       Util.exit_prof prof_simplify;
@@ -112,7 +116,7 @@ let simplify ~spec ~ctx c =
       let _ = Util.exit_prof prof_simplify in
       c (* no simplification *)
 
-let add_ac ~env s =
+let add_ac ?proof ~env s =
   Util.debug 1 "enable AC redundancy criterion for %a" Symbol.pp s;
   let ctx = Env.ctx env in
   let spec = Ctx.ac ~ctx in
@@ -123,7 +127,7 @@ let add_ac ~env s =
     Env.add_simplify ~env (simplify ~spec ~ctx);
     end;
   (* remember that the symbols is AC *)
-  Ctx.add_ac ~ctx s;
+  Ctx.add_ac ?proof ~ctx s;
   (* add clauses *)
   let clauses = axioms ~ctx s in
   Env.add_passive ~env (Sequence.of_list clauses);
@@ -137,14 +141,16 @@ let setup_env ~env =
     let signal = MetaKB.on_theory (MetaProverState.reasoner meta) in
     Signal.on signal
       (function
-        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}]) ->
-          add_ac ~env f; true
+        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}], lit) ->
+          let proof = MetaProverState.explain meta lit in
+          add_ac ~env ~proof f; true
         | _ -> true);
     (* see whether AC symbols have already been detected *)
     Sequence.iter
       (function
-        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}]) ->
-          add_ac ~env f
+        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}], lit) ->
+          let proof = MetaProverState.explain meta lit in
+          add_ac ~env ~proof f
         | _ -> ())
       (MetaKB.cur_theories (MetaProverState.reasoner meta));
     ()

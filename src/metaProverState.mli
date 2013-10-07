@@ -32,7 +32,7 @@ open Logtk_meta
 
 type result =
   | Deduced of PFormula.t * source list
-  | Theory of string * Term.t list
+  | Theory of string * Term.t list * source list
   | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
@@ -63,6 +63,12 @@ val scan_set : t -> Clause.CSet.t -> result list
 
 val proof_of_source : source -> Proof.t
   (** Extract the proof of a source *)
+
+val explain : t -> MetaReasoner.Logic.literal -> Proof.t list
+  (** Find why the given literal is true.
+      @raise Invalid_argument if the literal is not true in Datalog
+      @raise Not_found if the literal's premises are not explained by
+        previous scan_clause/scan_formula *)
 
 val theories : t -> (string * Term.t list) Sequence.t
   (** List of theories detected so far *)

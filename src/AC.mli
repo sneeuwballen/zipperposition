@@ -47,7 +47,8 @@ val is_trivial : spec:spec -> Clause.t -> bool
 val simplify : spec:spec -> ctx:Ctx.t -> Clause.t -> Clause.t
   (** Simplify the clause modulo AC *)
 
-val add_ac : env:Env.t -> Symbol.t -> unit
+val add_ac : ?proof:Proof.t list -> env:Env.t -> 
+             Symbol.t -> unit
   (** Declare that the given symbol is AC, and update the Env subsequently
       by adding clauses, etc. *)
 

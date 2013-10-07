@@ -89,10 +89,10 @@ let pp_tstp buf t = F.pp_tstp buf t.form
 let to_string t = F.to_string t.form
 let fmt fmt t = F.fmt fmt t.form
 
-let bij ~ord = Bij.(map
+let bij = Bij.(map
   ~inject:(fun pf -> pf.form, pf.proof)
   ~extract:(fun (form,proof) -> {form; proof; simpl_to=None; })
-  (pair F.bij (Proof.bij ~ord)))
+  (pair F.bij Proof.bij))
 
 (** {2 Set of formulas} *)
 

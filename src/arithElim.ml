@@ -210,7 +210,7 @@ let setup_env ~env =
   AC.add_ac ~env S.Arith.sum;
   AC.add_ac ~env S.Arith.product;
   (* be sure that the ordering is present in the context *)
-  Chaining.add_order ~env ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
+  Chaining.add_order ~env ?proof:None ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
   (* we are (until proved otherwise) incomplete *)
   Ctx.lost_completeness ~ctx:(Env.ctx env);
   ()

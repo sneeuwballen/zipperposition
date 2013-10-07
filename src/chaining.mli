@@ -69,7 +69,8 @@ val axioms : ctx:Ctx.t -> instance:Theories.TotalOrder.instance -> Clause.t list
 
 (** {2 Env} *)
 
-val add_order : env:Env.t -> less:Symbol.t -> lesseq:Symbol.t -> unit
+val add_order : env:Env.t -> ?proof:Proof.t list ->
+                less:Symbol.t -> lesseq:Symbol.t -> unit
   (** Declare a new total ordering instance *)
 
 val setup_env : env:Env.t -> unit

@@ -83,13 +83,23 @@ let renaming_clear ~ctx =
   Substs.Renaming.clear r;
   r
 
-let add_ac ~ctx s = Theories.AC.add ~spec:ctx.ac s
+let add_ac ~ctx ?proof s = Theories.AC.add ~spec:ctx.ac ?proof s
 
-let add_order ~ctx ~less ~lesseq =
+let add_order ~ctx ?proof ~less ~lesseq =
   let spec = ctx.total_order in
-  if not (Theories.TotalOrder.is_less ~spec less)
-    then ignore (Theories.TotalOrder.add ~spec ~less ~lesseq);
-  ()
+  try
+    Theories.TotalOrder.find ~spec less
+  with Not_found ->
+    let instance = Theories.TotalOrder.add ~spec ?proof ~less ~lesseq in
+    (* declare missing symbols, if any; also take care that
+      less and lesseq have the same type, which is, a binary predicate *)
+    let tyctx = TypeInference.Ctx.of_signature ctx.signature in
+    let ty_less = TypeInference.Ctx.type_of_fun tyctx less in
+    let ty_lesseq = TypeInference.Ctx.type_of_fun tyctx lesseq in
+    TypeInference.Ctx.unify tyctx ty_less Type.(mk_fun o [var "A"; var "A"]);
+    TypeInference.Ctx.unify tyctx ty_less ty_lesseq;
+    ctx.signature <- TypeInference.Ctx.to_signature tyctx;
+    instance
 
 (** {2 Type inference} *)
 

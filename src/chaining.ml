@@ -231,10 +231,45 @@ let ineq_chaining_passive active_set c =
   [] (* TODO *)
 
 let reflexivity_res c =
-  [] (* TODO *)
+  let ctx = c.C.hcctx in
+  let spec = Ctx.total_order ctx in
+  let ord = Ctx.ord ctx in
+  let eligible = C.Eligible.max c in
+  Lits.fold_ineq ~spec ~eligible c.C.hclits []
+    (fun acc lit pos ->
+      try
+        let subst = Unif.unification lit.TO.left 0 lit.TO.right 0 in
+        if lit.TO.strict
+          then begin
+            (* remove lit and make a new clause after substitution *)
+            let i = List.hd pos in
+            let lits = Util.array_except_idx c.C.hclits i in
+            let renaming = Ctx.renaming_clear ~ctx in
+            let lits = Lit.apply_subst_list ~ord ~renaming subst lits 0 in
+            let premises = c.C.hcproof :: lit.TO.instance.TO.proof in
+            let theories = ["total_order"] in
+            let rule = "reflexivity_res" in
+            let proof cc = Proof.mk_c_step ~theories ~rule cc premises in
+            let new_c = C.create ~parents:[c] ~ctx lits proof in
+            Util.debug 3 "reflexivity res of %a gives %a" C.pp c C.pp new_c;
+            new_c :: acc
+          end
+        else acc
+      with Unif.Fail -> acc)
 
 let is_tautology c =
-  false (* TODO *)
+  let ctx = c.C.hcctx in
+  let spec = Ctx.total_order ctx in
+  let eligible = C.Eligible.always in
+  try
+    Lits.fold_ineq ~spec ~eligible c.C.hclits ()
+      (fun () lit pos ->
+        if not lit.TO.strict && T.eq lit.TO.left lit.TO.right
+          (* a <= a is definitely a tautology *)
+          then raise Exit);
+    false
+  with Exit ->
+    true
 
 let simplify c =
   c (* TODO *)
@@ -244,12 +279,11 @@ let axioms ~ctx ~instance =
 
 (** {2 Env} *)
 
-let add_order ~env ~less ~lesseq =
-  let spec = Ctx.total_order (Env.ctx env) in
+let add_order ~env ?proof ~less ~lesseq =
+  let ctx = Env.ctx env in
+  let spec = Ctx.total_order ctx in
   let exists_some = Theories.TotalOrder.exists_order ~spec in
-  (* declare instance *)
-  let instance = Theories.TotalOrder.add ~spec ~less ~lesseq in
-  Util.debug 1 "enable chaining for order %a" Theories.TotalOrder.pp_instance instance;
+  Util.debug 1 "enable chaining for order %a, %a" Symbol.pp less Symbol.pp lesseq;
   (* first ordering, we have to enable the chaining inferences *)
   if not exists_some then begin
     Util.debug 3 "setup chaining inferences";
@@ -261,6 +295,8 @@ let add_order ~env ~less ~lesseq =
     Env.add_binary_inf ~env "eq_chaining_passive" eq_chaining_passive;
     Env.add_binary_inf ~env "eq_chaining_active" eq_chaining_active;
     end;
+  (* declare instance *)
+  let instance = Ctx.add_order ~ctx ?proof ~less ~lesseq in
   (* add clauses *)
   let clauses = axioms ~ctx:(Env.ctx env) ~instance in
   Env.add_passive ~env (Sequence.of_list clauses);
@@ -275,16 +311,18 @@ let setup_env ~env =
     let signal = MetaKB.on_theory (MetaProverState.reasoner meta) in
     Signal.on signal
       (function
-        | MetaKB.NewTheory ("total_order", [{T.term=T.Node(less,[])};
-                                            {T.term=T.Node(lesseq,[])}]) ->
-          add_order ~env ~less ~lesseq; true
+        | MetaKB.NewTheory ("total_order",
+          [{T.term=T.Node(less,[])}; {T.term=T.Node(lesseq,[])}], lit) ->
+          let proof = MetaProverState.explain meta lit in
+          add_order ~env ~proof ~less ~lesseq; true
         | _ -> true);
     (* see whether total order instances have already been detected *)
     Sequence.iter
       (function
-        | MetaKB.NewTheory ("total_order", [{T.term=T.Node(less,[])};
-                                            {T.term=T.Node(lesseq,[])}]) ->
-          add_order ~env ~less ~lesseq
+        | MetaKB.NewTheory ("total_order",
+          [{T.term=T.Node(less,[])}; {T.term=T.Node(lesseq,[])}], lit) ->
+          let proof = MetaProverState.explain meta lit in
+          add_order ~env ~proof ~less ~lesseq
         | _ -> ())
       (MetaKB.cur_theories (MetaProverState.reasoner meta));
     ()
