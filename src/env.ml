@@ -410,6 +410,7 @@ let rewrite_lits ~env c =
       end
   in
   (* apply lit rules *)
+  let c = C.follow_simpl c in
   let lits = Array.map (fun lit -> rewrite_lit env.lit_rules lit) c.C.hclits in
   if Lits.eq_com lits c.C.hclits then c
   else begin  (* simplifications occurred! *)
@@ -446,6 +447,7 @@ let rec basic_simplify ~env c =
 
 (* rewrite clause with simpl_set *)
 let rec rw_simplify ~env c =
+  if C.get_flag C.flag_persistent c then c else
   let simpl_set = env.state#simpl_set in
   let c = C.follow_simpl c in
   let c' = match env.rw_simplify with
@@ -462,6 +464,7 @@ let rec rw_simplify ~env c =
 
 (* simplify clause w.r.t. active set *)
 let rec active_simplify ~env c =
+  if C.get_flag C.flag_persistent c then c else
   let active = env.state#active_set in
   let c' = match env.active_simplify with
   | [] -> c
@@ -471,7 +474,9 @@ let rec active_simplify ~env c =
   in
   if C.eq c c'
     then c'
-    else active_simplify ~env c'
+    else
+      let _ = C.simpl_to ~from:c ~into:c' in
+      active_simplify ~env c'
 
 (** Simplify the hclause. Returns both the hclause and its simplification. *)
 let simplify ~env old_c =

@@ -70,11 +70,15 @@ let terms c =
 
 let to_prec_clause c = Lit.Arr.to_forms c.hclits
 
- (** {2 boolean flags} *)
+(** {2 boolean flags} *)
 
-let flag_ground = 1 lsl 0
-let flag_lemma = 1 lsl 1
-let flag_persistent = 1 lsl 2
+let new_flag =
+  let flag_gen = Util.Flag.create () in
+  fun () -> Util.Flag.get_new flag_gen
+
+let flag_ground = new_flag ()
+let flag_lemma = new_flag ()
+let flag_persistent = new_flag ()
 
 let set_flag flag c truth =
   if truth

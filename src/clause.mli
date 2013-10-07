@@ -75,6 +75,7 @@ val flag_persistent : int                         (** clause cannot be redundant
 
 val set_flag : int -> t -> bool -> unit     (** set boolean flag *)
 val get_flag : int -> t -> bool             (** get value of boolean flag *)
+val new_flag : unit -> int                  (** new flag that can be used on clauses *)
 
 (** {2 Basics} *)
 
