@@ -49,14 +49,6 @@ number of instances to generate and test...
 
 Examples:
 
-    - Not all lists are sorted:
-
-{[
-let test = QCheck.(mk_test ~n:10 ~pp:QCheck.PP.(list int)
-  QCheck.Arbitrary.(list small_int) (fun l -> l = List.sort compare l));;
-QCheck.run test;;
-]}
-
     - List.rev is involutive:
 
 {[
@@ -64,6 +56,14 @@ let test = QCheck.mk_test ~n:1000 QCheck.Arbitrary.(list alpha)
   (fun l -> List.rev (List.rev l) = l);;
 QCheck.run test;;
 ]}
+    - Not all lists are sorted (false property that will fail):
+
+{[
+let test = QCheck.(mk_test ~n:10 ~pp:QCheck.PP.(list int)
+  QCheck.Arbitrary.(list small_int) (fun l -> l = List.sort compare l));;
+QCheck.run test;;
+]}
+
 
     - generate a tree using {! Arbitrary.fix} :
 
@@ -196,10 +196,13 @@ module Prop : sig
     (** Precondition for a test *)
 
   val assume : bool -> unit
-    (** Assume the given precondition holds *)
+    (** Assume the given precondition holds. A test won't fail if the
+        precondition (the boolean argument) is false, but it will be
+        discarded. Running tests counts how many instances were
+        discarded for not satisfying preconditions. *)
 
   val assume_lazy : bool lazy_t -> unit
-    (** Assume the given (lazy) precondition holds *)
+    (** Assume the given (lazy) precondition holds. See {!assume}. *)
 
   val (&&&) : 'a t -> 'a t -> 'a t
     (** Logical 'and' on tests *)
@@ -232,6 +235,7 @@ val mk_test : ?n:int -> ?pp:'a PP.t -> ?name:string ->
       @param name is the name of the property that is checked
       @param pp is a pretty printer for failing instances
       @out is the channel to print results onto
+      @n is the number of tests (default 100)
       @rand is the random generator to use *)
 
 val run : ?out:out_channel -> ?rand:Random.State.t -> test -> bool
