@@ -49,6 +49,36 @@ let check_unify_gives_unifier =
   in
   mk_test ~n:1000 ~pp ~name gen prop
 
+let check_variant =
+  let gen = T.arbitrary in
+  let name = "unif_term_self_variant" in
+  let pp = T.to_string in
+  let prop t =
+    let renaming = S.Renaming.create 5 in
+    let t' = S.apply ~renaming S.empty t 0 in
+    Unif.are_variant t t'
+  in
+  mk_test ~pp ~name gen prop
+
+let check_matching =
+  let gen = Arbitrary.pair T.arbitrary T.arbitrary in
+  let name = "unif_matching_gives_matcher" in
+  let pp = PP.(pair T.to_string T.to_string) in
+  let prop (t1, t2) =
+    try
+      let subst = Unif.matching t1 0 t2 1 in
+      let renaming = S.Renaming.create 5 in
+      let t1' = S.apply ~renaming subst t1 0 in
+      let t2' = S.apply ~renaming subst t2 1 in
+      T.eq t1' t2' && Unif.are_variant t2 t2'
+    with Unif.Fail ->
+      Prop.assume false;
+      true
+  in
+  mk_test ~n:1000 ~pp ~name gen prop
+
 let props =
   [ check_unify_gives_unifier
+  ; check_variant
+  ; check_matching
   ]

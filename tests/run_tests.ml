@@ -44,7 +44,7 @@ let props = QCheck.flatten
   ]
 
 let specs =
-  [ "debug", Arg.Int Util.set_debug, "set debug level"
+  [ "-debug", Arg.Int Util.set_debug, "set debug level"
   ]
 
 let _ =
