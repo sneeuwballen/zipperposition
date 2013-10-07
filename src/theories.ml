@@ -113,4 +113,15 @@ module TotalOrder = struct
     if base then
       ignore (tstp_instance ~spec);
     spec
+
+  let exists_order ~spec =
+    assert (STbl.length spec.lesseq_tbl = STbl.length spec.less_tbl);
+    STbl.length spec.less_tbl > 0
+
+  let pp_instance buf i =
+    Printf.bprintf buf "total_order{%a, %a}" Symbol.pp i.less Symbol.pp i.lesseq
+
+  let to_string_instance i = Util.on_buffer pp_instance i
+
+  let fmt_instance fmt i = Format.pp_print_string fmt (to_string_instance i)
 end

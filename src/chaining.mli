@@ -64,7 +64,13 @@ val is_tautology : Clause.t -> bool
 val simplify : Clause.t -> Clause.t
   (** Simplify the clause, by removing impossible literals *)
 
+val axioms : ctx:Ctx.t -> instance:Theories.TotalOrder.instance -> Clause.t list
+  (** Additional axioms *)
+
 (** {2 Env} *)
+
+val add_order : env:Env.t -> less:Symbol.t -> lesseq:Symbol.t -> unit
+  (** Declare a new total ordering instance *)
 
 val setup_env : env:Env.t -> unit
   (** Setup inference rules in Env. The specification that is used is

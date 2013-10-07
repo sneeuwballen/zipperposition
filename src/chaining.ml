@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {6 Chaining Inferences} *)
 
 open Logtk
+open Logtk_meta
 
 module T = Term
 module C = Clause
@@ -224,19 +225,66 @@ let eq_chaining_passive active_set c =
   new_clauses
 
 let ineq_chaining_active active_set c =
-  assert false (* TODO *)
+  [] (* TODO *)
 
 let ineq_chaining_passive active_set c =
-  assert false (* TODO *)
+  [] (* TODO *)
 
 let reflexivity_res c =
-  assert false (* TODO *)
+  [] (* TODO *)
 
 let is_tautology c =
   false (* TODO *)
 
 let simplify c =
-  assert false (* TODO *)
+  c (* TODO *)
+
+let axioms ~ctx ~instance =
+  []  (* TODO? *)
+
+(** {2 Env} *)
+
+let add_order ~env ~less ~lesseq =
+  let spec = Ctx.total_order (Env.ctx env) in
+  let exists_some = Theories.TotalOrder.exists_order ~spec in
+  (* declare instance *)
+  let instance = Theories.TotalOrder.add ~spec ~less ~lesseq in
+  Util.debug 1 "enable chaining for order %a" Theories.TotalOrder.pp_instance instance;
+  (* first ordering, we have to enable the chaining inferences *)
+  if not exists_some then begin
+    Util.debug 3 "setup chaining inferences";
+    Env.add_is_trivial ~env is_tautology;
+    Env.add_simplify ~env simplify;
+    Env.add_unary_inf ~env "reflexivity_res" reflexivity_res;
+    Env.add_binary_inf ~env "ineq_chaining_active" ineq_chaining_active;
+    Env.add_binary_inf ~env "ineq_chaining_passive" ineq_chaining_passive;
+    Env.add_binary_inf ~env "eq_chaining_passive" eq_chaining_passive;
+    Env.add_binary_inf ~env "eq_chaining_active" eq_chaining_active;
+    end;
+  (* add clauses *)
+  let clauses = axioms ~ctx:(Env.ctx env) ~instance in
+  Env.add_passive ~env (Sequence.of_list clauses);
+  ()
 
 let setup_env ~env =
-  assert false (* TODO *)
+  (* plug in the meta-prover *)
+  match Env.get_meta ~env with
+  | None -> ()
+  | Some meta ->
+    (* react to future detected theories *)
+    let signal = MetaKB.on_theory (MetaProverState.reasoner meta) in
+    Signal.on signal
+      (function
+        | MetaKB.NewTheory ("total_order", [{T.term=T.Node(less,[])};
+                                            {T.term=T.Node(lesseq,[])}]) ->
+          add_order ~env ~less ~lesseq; true
+        | _ -> true);
+    (* see whether total order instances have already been detected *)
+    Sequence.iter
+      (function
+        | MetaKB.NewTheory ("total_order", [{T.term=T.Node(less,[])};
+                                            {T.term=T.Node(lesseq,[])}]) ->
+          add_order ~env ~less ~lesseq
+        | _ -> ())
+      (MetaKB.cur_theories (MetaProverState.reasoner meta));
+    ()

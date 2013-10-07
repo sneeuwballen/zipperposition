@@ -91,4 +91,11 @@ module TotalOrder : sig
 
   val tstp_instance : spec:t -> instance
     (** The specific instance that complies with TSTP signature $less, $lesseq *)
+
+  val exists_order : spec:t -> bool
+    (** Are there some known ordering instances? *)
+
+  val pp_instance : Buffer.t -> instance -> unit
+  val to_string_instance : instance -> string
+  val fmt_instance : Format.formatter -> instance -> unit
 end
