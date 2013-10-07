@@ -32,6 +32,7 @@ open Logtk
 type t = private {
   form : Formula.t;
   proof : Proof.t;
+  mutable id : int;
   mutable simpl_to : t option;
 }
 
@@ -48,7 +49,10 @@ val eq_noproof : t -> t -> bool
 val cmp_noproof : t -> t -> int
   (** Compare only by formula, not by proof *)
 
-val create : Formula.t -> Proof.t -> t
+val create : ?follow:bool -> Formula.t -> Proof.t -> t
+  (** Create a formula from a proof. If the formula already has a proof,
+      then the old proof is kept. PFormulas are hashconsed.
+      @param follow follow simpl_to links if the formula has any (default false) *)
 
 val of_sourced : Formula.sourced_form -> t
 val to_sourced : t -> Formula.sourced_form option

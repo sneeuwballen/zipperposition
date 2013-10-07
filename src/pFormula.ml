@@ -34,6 +34,7 @@ module F = Formula
 type t = {
   form : Formula.t;
   proof : Proof.t;
+  mutable id : int;
   mutable simpl_to : t option;
 }
 
@@ -49,15 +50,16 @@ let eq_noproof t1 t2 = F.eq t1.form t2.form
 
 let cmp_noproof t1 t2 = F.compare t1.form t2.form
 
-let create form proof = { form; proof; simpl_to=None; }
+module H = Hashcons.Make(struct
+  type t = pform
+  let equal pf1 pf2 = F.eq pf1.form pf2.form
+  let hash pf = F.hash pf.form
+  let tag i pf = pf.id <- i
+end)
 
 let get_form t = t.form
 
 let get_proof t = t.proof
-
-let of_sourced (f, file,name) =
-  let proof = Proof.mk_f_axiom f ~file ~name in
-  create f proof
 
 let to_sourced t =
   match t.proof with
@@ -72,6 +74,16 @@ let rec _follow_simpl n pf =
   | Some pf' -> _follow_simpl (n+1) pf'
 
 let follow_simpl pf = _follow_simpl 0 pf
+
+let create ?(follow=false) form proof =
+  let pf = H.hashcons { form; proof; id= ~-1; simpl_to=None; } in
+  if follow
+    then follow_simpl pf
+    else pf
+
+let of_sourced (f, file,name) =
+  let proof = Proof.mk_f_axiom f ~file ~name in
+  create f proof
 
 let simpl_to ~from ~into =
   let from = follow_simpl from in
@@ -91,7 +103,7 @@ let fmt fmt t = F.fmt fmt t.form
 
 let bij = Bij.(map
   ~inject:(fun pf -> pf.form, pf.proof)
-  ~extract:(fun (form,proof) -> {form; proof; simpl_to=None; })
+  ~extract:(fun (form,proof) -> create form proof)
   (pair F.bij Proof.bij))
 
 (** {2 Set of formulas} *)

@@ -527,7 +527,7 @@ let demodulate (simpl_set : PS.SimplSet.t) c =
   in
   (* demodulate every literal *)
   let lits = Array.mapi demod_lit c.C.hclits in
-  if !clauses = []
+  if Lits.eq_com c.C.hclits lits
     then (* no rewriting performed *)
       let _ = Util.exit_prof prof_demodulate in
       c
