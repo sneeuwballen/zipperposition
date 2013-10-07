@@ -805,6 +805,18 @@ let ac_eq ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
   and t2' = ac_normal_form ~is_ac ~is_com t2 in
   t1' == t2'
 
+let ac_symbols ~is_ac seq =
+  let rec find set t = match t.term with
+  | Var _
+  | BoundVar _ -> set
+  | Bind (_, t') -> find set t'
+  | At (t1, t2) -> find (find set t1) t2
+  | Node (s, l) ->
+    let set = if is_ac s then Symbol.SSet.add s set else set in
+    List.fold_left find set l
+  in
+  Sequence.fold find Symbol.SSet.empty seq
+
 (** {2 Printing/parsing} *)
 
 let pp_tstp_depth depth buf t =

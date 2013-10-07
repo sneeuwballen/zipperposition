@@ -260,6 +260,9 @@ val ac_eq : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
       which symbols are AC or commutative (by default by looking at
       attr_ac and attr_commut). *)
 
+val ac_symbols : is_ac:(Symbol.t -> bool) -> t Sequence.t -> Symbol.SSet.t
+  (** Set of symbols occurring in the terms, that are AC *)
+
 (** {2 Printing/parsing} *)
 
 (** First, full functions with the amount of surrounding binders; then helpers
