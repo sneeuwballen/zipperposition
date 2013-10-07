@@ -98,7 +98,8 @@ type found_lemma =
     (** formula + explanation *)
 
 and found_theory =
-  | NewTheory of string * Term.t list
+  | NewTheory of string * Term.t list * MetaReasoner.Logic.literal
+    (** Theory + explanation *)
 
 and found_axiom =
   | NewAxiom of string * Term.t list

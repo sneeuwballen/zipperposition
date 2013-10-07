@@ -75,9 +75,18 @@ module type SIG_TRS = sig
 
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
+  
+  val rule_to_form : rule -> Formula.t
+    (** Make a formula out of a rule (an equality) *)
+
+  val rewrite_collect : ?depth:int -> t -> Term.t -> Term.t * rule list
+    (** Compute normal form of the term, and also return the list of
+        rules that were used.
+        @param depth the number of surrounding binders (default 0) *)
 
   val rewrite : ?depth:int -> t -> Term.t -> Term.t
-    (** Compute normal form of the term *)
+    (** Compute normal form of the term.
+        @see {!rewrite_collect}. *)
 end
 
 module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E)
@@ -109,6 +118,14 @@ module FormRW : sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
 
-  val rewrite : ?depth: int -> t -> Formula.t -> Formula.t
-    (** Compute normal form of the formula *)
+  val rule_to_form : rule -> Formula.t
+    (** Convert the rule back to a term *)
+
+  val rewrite_collect : ?depth:int -> t -> Formula.t -> Formula.t * rule list
+    (** Compute normal form of the formula, and return it together with
+        the list of rules that were used to rewrite.
+        @param depth the number of surrounding binders *)
+
+  val rewrite : ?depth:int -> t -> Formula.t -> Formula.t
+    (** @see {!rewrite_collect} *)
 end

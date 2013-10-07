@@ -282,7 +282,7 @@ type found_lemma =
     (** formula + explanation *)
 
 and found_theory =
-  | NewTheory of string * Term.t list
+  | NewTheory of string * Term.t list * MetaReasoner.Logic.literal
 
 and found_axiom =
   | NewAxiom of string * Term.t list
@@ -396,7 +396,7 @@ let on_theory r =
   let s = MetaReasoner.on_new_fact_by r "theory" in
   Signal.map s (fun lit ->
     let name, terms = MRT.decode_head mapping_theory "theory" lit in
-    NewTheory (name, terms))
+    NewTheory (name, terms, lit))
 
 let cur_lemmas r =
   let seq = MetaReasoner.all_facts_by r "lemma" in
@@ -414,7 +414,7 @@ let cur_theories r =
   Sequence.map
     (fun lit ->
       let name, terms = MRT.decode_head mapping_theory "theory" lit in
-      NewTheory (name, terms))
+      NewTheory (name, terms, lit))
     seq
 
 (** {2 Backward Chaining} *)

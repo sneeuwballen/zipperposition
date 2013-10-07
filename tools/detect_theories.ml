@@ -127,7 +127,7 @@ let detect_theories ~kb clauses =
       | KB.NewLemma (f,_) -> Util.printf "lemma: %a\n" F.pp f; true);
   Signal.on (MetaProver.on_theory mp)
     (function
-      | KB.NewTheory (s,args) ->
+      | KB.NewTheory (s,args,_) ->
         Util.printf "theory: %s(%a)\n" s (Util.pp_list T.pp) args;
         true);
   Signal.on (MetaProver.on_axiom mp)
