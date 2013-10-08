@@ -257,6 +257,8 @@ type test =
   (** GADT needed for the existential type *)
 
 let mk_test ?(n=100) ?pp ?(name="<anon prop>") ?size ?(limit=10) gen prop =
+  if limit < 0 then failwith "QCheck: limit needs be >= 0";
+  if n <= 0 then failwith "QCheck: n needs be >= 0";
   Test { prop; gen; name; n; pp; size; limit; }
 
 (* tail call version of take, that returns (at most) [n] elements of [l] *)

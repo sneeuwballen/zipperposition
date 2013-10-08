@@ -268,6 +268,21 @@ let rec iter subst k = match subst with
   k (v, o_v, t, o_t);
   iter subst' k
 
+let infer ctx subst =
+  iter subst (fun (v, _, t, _) -> TypeInference.constrain_term_term ctx v t)
+
+let check_type ctx subst =
+  TypeInference.Ctx.protect ctx
+    (fun () ->
+      try
+        infer ctx subst;
+        true
+      with Type.Error _ -> false)
+
+let check_type_sig signature subst =
+  let ctx = TypeInference.Ctx.of_signature signature in
+  check_type ctx subst
+
 (** Sequence of pairs of bound terms *)
 let to_seq subst =
   Sequence.from_iter (fun k -> iter subst k)

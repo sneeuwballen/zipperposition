@@ -56,16 +56,20 @@ let test = QCheck.mk_test ~n:1000 QCheck.Arbitrary.(list alpha)
   (fun l -> List.rev (List.rev l) = l);;
 QCheck.run test;;
 ]}
-    - Not all lists are sorted (false property that will fail):
+    - Not all lists are sorted (false property that will fail. The 15 smallest
+      counter-example lists will be printed):
 
 {[
-let test = QCheck.(mk_test ~n:10 ~pp:QCheck.PP.(list int)
-  QCheck.Arbitrary.(list small_int) (fun l -> l = List.sort compare l));;
+let test = QCheck.(
+  mk_test
+    ~n:10_000 ~size:List.length ~limit:15 ~pp:QCheck.PP.(list int)
+    QCheck.Arbitrary.(list small_int)
+    (fun l -> l = List.sort compare l));;
 QCheck.run test;;
 ]}
 
 
-    - generate a tree using {! Arbitrary.fix} :
+    - generate 20 random trees using {! Arbitrary.fix} :
 
 {[type tree = Int of int | Node of tree list;;
  
@@ -73,7 +77,7 @@ QCheck.run test;;
   ~base:(map small_int (fun i -> Int i))
   (fun t st -> Node (list t st)));;
 
- ar (Random.State.make_self_init ());;
+ Arbitrary.generate ~n:20 ar;;
  ]}
 *)
 

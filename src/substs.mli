@@ -125,6 +125,15 @@ val join : t -> t -> t
 val is_renaming : t -> bool
   (** Check whether the substitution is a variable renaming *)
 
+val infer : TypeInference.Ctx.t -> t -> unit
+  (** Infer types using the signature in the given context.
+      @raise Type.Error if types are not consistent *)
+
+val check_type : TypeInference.Ctx.t -> t -> bool
+  (** Is the substitution well-typeable in the given context? *)
+
+val check_type_sig : Signature.t -> t -> bool
+
 val pp_full : (Buffer.t -> Term.t -> unit) -> Buffer.t -> t -> unit
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string
