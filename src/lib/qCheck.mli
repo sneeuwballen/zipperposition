@@ -230,13 +230,19 @@ type test
   (** A single property test *)
 
 val mk_test : ?n:int -> ?pp:'a PP.t -> ?name:string ->
+              ?size:('a -> int) -> ?limit:int ->
               'a Arbitrary.t -> 'a Prop.t -> test
   (** Construct a test. Optional parameters are the same as for {!run}.
       @param name is the name of the property that is checked
       @param pp is a pretty printer for failing instances
       @out is the channel to print results onto
       @n is the number of tests (default 100)
-      @rand is the random generator to use *)
+      @rand is the random generator to use
+      @size is a size function on values on which tests are performed. If
+        the test fails and a size function is given, the smallest 
+        counter-examples with respect to [size] will be printed in priority.
+      @limit maximal number of counter-examples that will get printed.
+        Default is [10]. *)
 
 val run : ?out:out_channel -> ?rand:Random.State.t -> test -> bool
   (** Run a test and print results *)
