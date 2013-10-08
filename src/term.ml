@@ -982,6 +982,25 @@ let arbitrary_pred =
   QCheck.Arbitrary.(choose
     [ lift2 p sub sub; lift q sub; lift r sub; return s; return true_term ])
 
+let arbitrary_ground =
+  let a = mk_const (Symbol.mk_const "a") in
+  let b = mk_const (Symbol.mk_const "b") in
+  let c = mk_const (Symbol.mk_const "c") in
+  let d = mk_const (Symbol.mk_const "d") in
+  let e = mk_const (Symbol.mk_const "e") in
+  let f x y = mk_node (Symbol.mk_const "f") [x; y] in
+  let sum x y = mk_node (Symbol.mk_const "sum") [x; y] in
+  let g x = mk_node (Symbol.mk_const "g") [x] in
+  let h x = mk_node (Symbol.mk_const "h") [x] in
+  let ite x y z = mk_node (Symbol.mk_const "ite") [x; y; z] in
+  QCheck.Arbitrary.(
+    let base = among [a; b; c; d; e] in
+    let t = fix ~max:6 ~base (fun sub ->
+      choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
+        choose [lift2 sum sub sub; lift3 ite sub sub sub]])
+    in
+    t)
+
 let arbitrary_pos t =
   QCheck.Arbitrary.(
     let rec recurse t pb st =

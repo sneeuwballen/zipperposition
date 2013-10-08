@@ -283,6 +283,7 @@ val bij : t Bij.t
 
 val arbitrary : t QCheck.Arbitrary.t        (* generates terms *)
 val arbitrary_pred : t QCheck.Arbitrary.t   (* generates predicates *)
+val arbitrary_ground : t QCheck.Arbitrary.t (* ground terms *)
 
 val arbitrary_pos : t -> Position.t QCheck.Arbitrary.t
   (** Arbitrary position in the term *)

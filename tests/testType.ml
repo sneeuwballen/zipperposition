@@ -24,33 +24,43 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** Test typing *)
+
 open Logtk
-open OUnit
+open QCheck
 
-let suite = 
-  "all_tests" >:::
-    [ TestTerm.suite
-    ; TestSubsts.suite
-    ; TestFormula.suite
-    ; TestOrdering.suite
-    ; TestRewriting.suite
-    ]
-let props = QCheck.flatten
-  [ TestTerm.props
-  ; TestFormula.props
-  ; TestUnif.props
-  ; TestCNF.props
-  ; TestIndex.props
-  ; TestType.props
-  ; TestBij.props
-  ; TestOrdering.props
+module T = Term
+
+let check_infer_all_symbs =
+  let gen = Arbitrary.(list T.arbitrary) in
+  let name = "type_infer_all_symbols" in
+  let pp = PP.(list T.to_string) in
+  (* check that after type inference, all symbols apppear in the signature *)
+  let prop terms =
+    let ctx = TypeInference.Ctx.create () in
+    List.iter (fun t -> ignore (TypeInference.infer ctx t)) terms;
+    let signature = TypeInference.Ctx.to_signature ctx in
+    let symbols = T.symbols (Sequence.of_list terms) in
+    Symbol.SSet.for_all (Signature.mem signature) symbols
+  in
+  mk_test ~pp ~name gen prop
+
+let check_infer_types_closed =
+  let gen = Arbitrary.(list T.arbitrary) in
+  let name = "type_infer_types_closed" in
+  let pp = PP.(list T.to_string) in
+  (* check that after type inference, all types are closed *)
+  let prop terms =
+    let ctx = TypeInference.Ctx.create () in
+    List.iter (fun t -> ignore (TypeInference.infer ctx t)) terms;
+    let signature = TypeInference.Ctx.to_signature ctx in
+    Symbol.SMap.for_all
+      (fun _ ty -> Type.is_closed ty)
+      signature
+  in
+  mk_test ~pp ~name gen prop
+
+let props =
+  [ check_infer_all_symbs
+  ; check_infer_types_closed
   ]
-
-let specs =
-  [ "-debug", Arg.Int Util.set_debug, "set debug level"
-  ]
-
-let _ =
-  ignore (run_test_tt_main ~arg_specs:specs suite);
-  ignore (QCheck.run_tests props);
-  ()
