@@ -574,7 +574,6 @@ let kb_of_statements ?(init=empty) statements =
       let left = str_to_terms args in
       let f' = MetaPattern.EncodedForm.encode f in
       let p, right = MetaPattern.create ~signature f' in
-      assert (List.length args = List.length right);
       (* map to variables *)
       let perm = map_to_vars left in
       (* replace by variables *)

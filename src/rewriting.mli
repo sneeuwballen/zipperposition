@@ -86,7 +86,7 @@ module type SIG_TRS = sig
 
   val rewrite : ?depth:int -> t -> Term.t -> Term.t
     (** Compute normal form of the term.
-        @see {!rewrite_collect}. *)
+        see {!rewrite_collect}. *)
 end
 
 module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E)
@@ -127,5 +127,5 @@ module FormRW : sig
         @param depth the number of surrounding binders *)
 
   val rewrite : ?depth:int -> t -> Formula.t -> Formula.t
-    (** @see {!rewrite_collect} *)
+    (** see {!rewrite_collect} *)
 end
