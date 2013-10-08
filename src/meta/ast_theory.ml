@@ -40,10 +40,21 @@ type statement =
   | Error of string * Lexing.position * Lexing.position
   (** Parse statement *)
 and premise =
-  | IfAxiom of Formula.t
-  | IfFact of string * string list
+  | IfPattern of Formula.t
+  | IfAxiom of string * string list
+  | IfTheory of string * string list
 and clause = raw_lit * raw_lit list
 and raw_lit = string * string list
+
+let is_error = function
+  | Error (_, _, _) -> true
+  | _ -> false
+
+let error_to_string = function
+  | Error (msg, start, stop) ->
+    Util.sprintf "parse error at %s - %s: %s"
+      (Util.pp_pos start) (Util.pp_pos stop)  msg
+  | _ -> failwith "Ast_theory.error_to_string: not an error"
 
 (** Print a statement *)
 let pp buf statement =
@@ -53,8 +64,9 @@ let pp buf statement =
     Printf.bprintf buf "%s(%a)" s (Util.pp_list Buffer.add_string) args
   in
   let pp_premise buf premise = match premise with
-  | IfAxiom t -> Printf.bprintf buf "axiom %a" F.pp t
-  | IfFact (s, args) -> pp_datalog buf (s, args)
+  | IfPattern t -> F.pp buf t
+  | IfAxiom (s, args) -> Printf.bprintf buf "axiom %a" pp_datalog (s, args)
+  | IfTheory (s, args) -> Printf.bprintf buf "theory %a" pp_datalog (s, args)
   in
   let pp_premises buf premises =
     Util.pp_list ~sep:" and " pp_premise buf premises

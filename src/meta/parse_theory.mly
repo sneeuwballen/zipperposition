@@ -142,15 +142,15 @@ theory:
     }
 
 axiom:
-  | h=datalog_atom IS AXIOM f=fof_formula DOT
+  | AXIOM h=datalog_atom IS f=fof_formula DOT
     { let name, args = h in
       Ast_theory.Axiom (name, args, f)
     }
 
 lemma:
-  | LEMMA AXIOM f=fof_formula IF l=premises DOT
+  | LEMMA f=fof_formula IF l=premises DOT
     { Ast_theory.LemmaInline (f, l) }
-  | LEMMA h=datalog_atom IF l=premises DOT
+  | LEMMA AXIOM h=datalog_atom IF l=premises DOT
     { let name, args = h in
       Ast_theory.Lemma (name, args, l)
     }
@@ -177,8 +177,9 @@ include_:
 premises: separated_nonempty_list(AND_ALSO, premise) { $1 }
 
 premise:
-  | AXIOM f=fof_formula { Ast_theory.IfAxiom f }
-  | h=datalog_atom { let name, args = h in Ast_theory.IfFact (name, args) }
+  | f=fof_formula { Ast_theory.IfPattern f }
+  | AXIOM h=datalog_atom { let name, args = h in Ast_theory.IfAxiom (name, args) }
+  | THEORY h=datalog_atom { let name, args = h in Ast_theory.IfTheory (name, args) }
 
 datalog_atom:
   | w=LOWER_WORD { w, [] }

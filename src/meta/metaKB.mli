@@ -37,15 +37,11 @@ and theory =
   | Theory of string * Term.t list * premise list
 and premise =
   | IfAxiom of string * Term.t list
+  | IfTheory of string * Term.t list
   | IfPattern of MetaPattern.t * Term.t list
 and clause =
   | Clause of raw_lit * raw_lit list
 and raw_lit = string * string list
-
-(* TODO: fix bug in parser, need to make a difference between IfAxiom and
-  IfTheory, not parsed correctly right now. Or, introduce rules
-  axiomOrTheory(f, args) :- axiom(f, args).
-  axiomOrTheory(f, args) :- theory(f, args). *)
 
 (** {2 Knowledge base} *)
 

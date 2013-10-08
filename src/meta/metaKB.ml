@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module A = Ast_theory
 module T = Term
 module F = Formula
 module MRT = MetaReasoner.Translate
@@ -41,6 +42,7 @@ and theory =
   | Theory of string * Term.t list * premise list
 and premise =
   | IfAxiom of string * Term.t list
+  | IfTheory of string * Term.t list
   | IfPattern of MetaPattern.t * Term.t list
 and clause =
   | Clause of raw_lit * raw_lit list
@@ -62,12 +64,16 @@ and compare_theory t1 t2 = match t1, t2 with
       [String.compare s1 s2; Util.lexicograph T.compare args1 args2;
         compare_premises l1 l2]
 and compare_premise p1 p2 = match p1, p2 with
-  | IfAxiom _, IfPattern _ -> 1
-  | IfPattern _, IfAxiom _ -> -1
+  | IfTheory (s1, l1), IfTheory (s2, l2)
   | IfAxiom (s1, l1), IfAxiom (s2, l2) ->
     Util.lexicograph_combine [String.compare s1 s2; Util.lexicograph T.compare l1 l2]
   | IfPattern (p1, args1), IfPattern (p2, args2) ->
     Util.lexicograph_combine [MetaPattern.compare p1 p2; Util.lexicograph T.compare args1 args2]
+  | _, _ -> _premise_to_int p1 - _premise_to_int p2
+and _premise_to_int = function
+  | IfAxiom _ -> 0
+  | IfPattern _ -> 1
+  | IfTheory _ -> 2
 and compare_premises l1 l2 =
   Util.lexicograph compare_premise l1 l2
 and compare_clause = Pervasives.compare
@@ -131,7 +137,7 @@ let all_patterns kb =
   let add_pattern p = l := p :: !l in
   let rec iter_premises = function
     | [] -> ()
-    | (IfAxiom _) :: premises -> iter_premises premises
+    | (IfAxiom _ | IfTheory _) :: premises -> iter_premises premises
     | (IfPattern (p, _)) :: premises -> add_pattern p; iter_premises premises
   in
   StringMap.iter (fun _ (Axiom (_, _, p, _)) -> add_pattern p) kb.axioms;
@@ -180,8 +186,10 @@ let of_seq (lemmas, axioms, theories, clauses) =
   kb
 
 let pp_premise buf p = match p with
-| IfAxiom (s, []) -> Buffer.add_string buf s
-| IfAxiom (s, args) -> Printf.bprintf buf "%s(%a)" s (Util.pp_list T.pp) args
+| IfAxiom (s, []) -> Printf.bprintf buf "axiom %s" s
+| IfAxiom (s, args) -> Printf.bprintf buf "axiom %s(%a)" s (Util.pp_list T.pp) args
+| IfTheory (s, []) -> Printf.bprintf buf "theory %s" s
+| IfTheory (s, args) -> Printf.bprintf buf "theory %s(%a)" s (Util.pp_list T.pp) args
 | IfPattern (p, args) -> MetaPattern.pp_apply buf (p, args)
 let pp_premises = Util.pp_list pp_premise
 let pp_lemma buf = function
@@ -224,9 +232,11 @@ let bij_premise =
   switch
     ~inject:(function
       | IfAxiom (s, args) -> "if_axiom", BranchTo (s_args, (s, args))
+      | IfTheory (s, args) -> "if_theory", BranchTo (s_args, (s, args))
       | IfPattern (p, args) -> "if_pattern", BranchTo (p_args, (p, args)))
     ~extract:(function
       | "if_axiom" -> BranchFrom (s_args, fun (s, args) -> IfAxiom (s, args))
+      | "if_theory" -> BranchFrom (s_args, fun (s, args) -> IfTheory (s, args))
       | "if_pattern" -> BranchFrom (p_args, fun (p, args) -> IfPattern (p, args))
       | _ -> raise (DecodingError "expected premise"))
 
@@ -302,6 +312,9 @@ let encode_premise p =
   | IfAxiom (s, terms) ->
     let mapping = pair str (list_ term) in
     encode mapping "axiom" (s, terms)
+  | IfTheory (s, terms) ->
+    let mapping = pair str (list_ term) in
+    encode mapping "theory" (s, terms)
   | IfPattern (p, args) -> encode MetaPattern.mapping "pattern" (p, args)
 
 (* clause -> proper datalog clause *)
@@ -474,12 +487,12 @@ end)
 
 (* all formulas occurring in statements *)
 let formulas_of_statements statements =
-  let module A = Ast_theory in
   let gather_premises premises =
     Sequence.fmap
       (function
-      | A.IfAxiom f -> Some f
-      | A.IfFact _ -> None)
+      | A.IfAxiom _
+      | A.IfTheory _ -> None
+      | A.IfPattern f -> Some f)
       (Sequence.of_list premises)
   in
   Sequence.flatMap
@@ -514,7 +527,8 @@ let apply_axiom axiom args =
 (** All terms referenced in the premises *)
 let gather_premises_terms premises =
   let terms_of = function
-    | IfAxiom (_, l) -> l
+    | IfAxiom (_, l)
+    | IfTheory (_, l)
     | IfPattern (_, l) -> l
   in
   List.fold_left
@@ -526,6 +540,7 @@ let fmap_premises f premises =
   List.map
     (function
       | IfAxiom (a, l) -> IfAxiom (a, List.map f l)
+      | IfTheory (a, l) -> IfTheory (a, List.map f l)
       | IfPattern (p, l) -> IfPattern (p, List.map f l))
     premises
 
@@ -538,15 +553,17 @@ let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_const s)) l
 
 (** Conversion of a list of Ast_theory.statement to a KB *)
 let kb_of_statements ?(init=empty) statements =
-  let module A = Ast_theory in
   let convert_premise ~signature = function
-    | A.IfAxiom f ->
+    | A.IfPattern f ->
       let f' = MetaPattern.EncodedForm.encode f in
       let pat, args = MetaPattern.create ~signature f' in
       IfPattern (pat, args)
-    | A.IfFact (s, args) ->
+    | A.IfAxiom (s, args) ->
       let args = str_to_terms args in
       IfAxiom (s, args)
+    | A.IfTheory (s, args) ->
+      let args = str_to_terms args in
+      IfTheory (s, args)
   in
   let add_statement kb statement =
     (* infer types *)
@@ -622,11 +639,20 @@ let parse_theory_file filename =
     let ic = open_in filename in
     let lexbuf = Lexing.from_channel ic in
     let statements = Parse_theory.parse_statements Lex_theory.token lexbuf in
-    let kb = kb_of_statements (Sequence.of_list statements) in
-    kb
-  with Unix.Unix_error (e, _, _) ->
+    begin try
+      (* error, fail *)
+      let e = List.find A.is_error statements in
+      Util.debug 0 "error in parsed KB: %s" (A.error_to_string e);
+      empty
+    with Not_found ->
+      (* no error, proceed *)
+      let kb = kb_of_statements (Sequence.of_list statements) in
+      kb
+    end
+  with
+  | Unix.Unix_error (e, _, _) ->
     let msg = Unix.error_message e in
-    Util.debug 1 "%% error reading theory file %s: %s" filename msg;
+    Util.debug 0 "error reading theory file %s: %s" filename msg;
     empty
   
 let save filename kb =
