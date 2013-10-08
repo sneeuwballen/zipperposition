@@ -287,12 +287,14 @@ module Arith = struct
     | _ -> _ty_mismatch "cannot compute type of symbol %a" pp s
 
   let zero_of_ty ty =
+    let ty = Type.deref ty in
     if Type.eq ty Type.int then zero_i
     else if Type.eq ty Type.rat then zero_rat
     else if Type.eq ty Type.real then zero_f
     else _ty_mismatch "bad arith type %a for zero_of_ty" Type.pp ty
 
   let one_of_ty ty =
+    let ty = Type.deref ty in
     if Type.eq ty Type.int then one_i
     else if Type.eq ty Type.rat then one_rat
     else if Type.eq ty Type.real then one_f

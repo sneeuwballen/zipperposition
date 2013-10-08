@@ -41,7 +41,7 @@ let rec eq_struct t1 t2 = match t1, t2 with
   | GVar (i1,r1), GVar (i2,r2) -> i1 = i2 && r1 == r2
   | App (s1, l1), App (s2, l2) when List.length l1 = List.length l2 ->
     s1 = s2 && List.for_all2 (==) l1 l2
-  | Fun (ret1,l1), Fun (ret2,l2) ->
+  | Fun (ret1,l1), Fun (ret2,l2) when List.length l1 = List.length l2 ->
     ret1 == ret2 && List.for_all2 (==) l1 l2
   | _, _ -> false
 
