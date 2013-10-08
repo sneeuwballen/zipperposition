@@ -125,28 +125,47 @@ transitive(r) is axiom ~r(X,Y) | ~r(Y,Z) | r(X,Z).
 antisymmetric(r) is axiom ~r(X,Y) | ~r(Y,X) | X=Y.
 symmetric(r) is axiom ~r(X,Y) | r(Y,X).
 
-% orders and partial orders
+% partial orders
 
 theory partial_order(r) is
   reflexive(r) and
   transitive(r) and
   antisymmetric(r).
 
-theory strict_partial_order(r) is
+theory partial_order_strict(r) is
   irreflexive(r) and
   transitive(r).
 
-theory total_order(less, lesseq) is
-  axiom lesseq(X,Y) <=> (less(X,Y) | X=Y) and
-  axiom less(X,Y) | X=Y | less(Y,X) and
-  strict_partial_order(less).
+% total orders
+
+total_non_strict(r) is axiom r(X,Y) | r(Y,X).
+total_strict(r) is axiom r(X,Y) | X=Y | r(Y,X).
+
+theory total_order_strict(less) is
+  partial_order_strict(less) and
+  total_strict(less).
+
+theory total_order_non_strict(lesseq) is
+  partial_order(lesseq) and
+  total_non_strict(lesseq).
 
 theory total_order(less, lesseq) is
+  total_order_strict(less) and
+  axiom lesseq(X,Y) <=> (less(X,Y) | X=Y).
+
+theory total_order(less, lesseq) is
+  total_order_strict(less) and
   axiom ~lesseq(X,Y) | less(X,Y) | X=Y and
-  axiom ~less(X,Y) | lesseq(X,Y) and
-  axiom X!=Y | lesseq(X,Y) and
-  axiom less(X,Y) | X=Y | less(Y,X) and
-  strict_partial_order(less).
+  axiom ~less(X,Y) | lesseq(X,Y).
+
+theory total_order(less, lesseq) is
+  total_order(lesseq) and
+  axiom lesseq(X,Y) <=> (less(X,Y) | X=Y).
+
+theory total_order(less, lesseq) is
+  total_order(lesseq) and
+  axiom ~lesseq(X,Y) | less(X,Y) | X=Y and
+  axiom ~less(X,Y) | lesseq(X,Y).
 
 % lattices
 
@@ -168,5 +187,7 @@ theory complete_lattice(meet, join, top, bottom) is
   axiom join(X,top) = top and
   axiom meet(X,bottom) = bottom and
   axiom join(X,bottom) = X.
+
+raw ac(F) if 'theory'(ac, L1, F).
 
 % vim:syntax=ocaml:
