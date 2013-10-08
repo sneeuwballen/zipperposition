@@ -3,190 +3,190 @@
 
 % ac
 
-associative(f) is axiom f(X,f(Y,Z)) = f(f(X,Y), Z).
-commutative(f) is axiom f(X,Y) = f(Y,X).
+axiom associative(f) is f(X,f(Y,Z)) = f(f(X,Y), Z).
+axiom commutative(f) is f(X,Y) = f(Y,X).
 
 theory ac(f) is
-  associative(f) and
-  commutative(f).
+  axiom associative(f) and
+  axiom commutative(f).
 
 % a few general definitions (mostly form "rewriting, solving, proving")
 
-involutive(f) is axiom f(f(X)) = X.
-idempotent(f) is axiom f(X,X) = X.
+axiom involutive(f) is f(f(X)) = X.
+axiom idempotent(f) is f(X,X) = X.
 
-endomorphism(h, mult) is axiom h(mult(X,Y)) = mult(h(X), h(Y)).
-unit_endomorphism(h, e) is axiom h(e) = e.
-anti_endomorphism(h, mult) is axiom h(mult(X,Y)) = mult(h(Y),h(X)).
+axiom endomorphism(h, mult) is h(mult(X,Y)) = mult(h(X), h(Y)).
+axiom unit_endomorphism(h, e) is h(e) = e.
+axiom anti_endomorphism(h, mult) is h(mult(X,Y)) = mult(h(Y),h(X)).
 
-homomorphism(h, mult, add) is axiom h(mult(X,Y)) = add(h(X), h(Y)).
+axiom homomorphism(h, mult, add) is h(mult(X,Y)) = add(h(X), h(Y)).
 
-left_identity(mult, e) is axiom mult(e, X) = X.
-right_identity(mult, e) is axiom mult(X, e) = X.
+axiom left_identity(mult, e) is mult(e, X) = X.
+axiom right_identity(mult, e) is mult(X, e) = X.
 
-left_inverse(mult, e, inverse) is axiom mult(inverse(X), X) = e.
-right_inverse(mult, e, inverse) is axiom mult(X, inverse(X)) = e.
+axiom left_inverse(mult, e, inverse) is mult(inverse(X), X) = e.
+axiom right_inverse(mult, e, inverse) is mult(X, inverse(X)) = e.
 
-left_absorb(mult,e) is axiom mult(e,X) = e.
-right_absorb(mult,e) is axiom mult(X,e) = e.
+axiom left_absorb(mult,e) is mult(e,X) = e.
+axiom right_absorb(mult,e) is mult(X,e) = e.
 
 % functional relations
 
-functional1(p) is axiom ~p(X,Y) | ~p(X,Y2) | Y=Y2.
-total1(p, f) is axiom p(X,f(X)).
-functional2(p) is axiom ~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2.
-total2(p, f) is axiom p(X,Y,f(X,Y)).
+axiom functional1(p) is ~p(X,Y) | ~p(X,Y2) | Y=Y2.
+axiom total1(p, f) is p(X,f(X)).
+axiom functional2(p) is ~p(X,Y,Z) | ~p(X,Y,Z2) | Z=Z2.
+axiom total2(p, f) is p(X,Y,f(X,Y)).
 
-lemma axiom p(X,Y) <=> Y=f(X)
-  if functional1(p) and total1(p, f).
-lemma axiom p(X,Y,Z) <=> Z = f(X,Y)
-  if functional2(p) and total2(p, f).
+lemma p(X,Y) <=> Y=f(X)
+  if axiom functional1(p) and axiom total1(p, f).
+lemma p(X,Y,Z) <=> Z = f(X,Y)
+  if axiom functional2(p) and axiom total2(p, f).
 
 % monoid
 
 theory monoid(mult, e) is
-  left_identity(mult, e) and
-  right_identity(mult, e) and
-  associative(mult).
+  axiom left_identity(mult, e) and
+  axiom right_identity(mult, e) and
+  axiom associative(mult).
 
 % group
 
 theory group(mult, e, inverse) is
-  monoid(mult, e) and
-  left_inverse(mult, e, inverse) and
-  right_inverse(mult, e, inverse).
+  theory monoid(mult, e) and
+  axiom left_inverse(mult, e, inverse) and
+  axiom right_inverse(mult, e, inverse).
 
 theory abelian_group(mult, e, inverse) is
-  group(mult, e, inverse) and
-  commutative(mult).
+  theory group(mult, e, inverse) and
+  axiom commutative(mult).
 
 % basic set
 
 theory set(member, subset) is
-  axiom ~member(X,Y) | ~subset(Y,Z) | member(X,Z) and
-  axiom subset(X,Y) | member(sk, X) | ~member(sk, Y) and
-  axiom ~subset(X,Y) | ~subset(Y,X) | X=Y and
-  axiom subset(X,Y) | X != Y and
-  axiom subset(Y,X) | X != Y.
+  ~member(X,Y) | ~subset(Y,Z) | member(X,Z) and
+  subset(X,Y) | member(sk, X) | ~member(sk, Y) and
+  ~subset(X,Y) | ~subset(Y,X) | X=Y and
+  subset(X,Y) | X != Y and
+  subset(Y,X) | X != Y.
 
 % subgroup theory
 
-subgroup_inverse(in_subgroup, inverse) is
-  axiom ~in_subgroup(X) | in_subgroup(inverse(X)).
-subgroup_mult(in_subgroup, mult) is
-  axiom ~in_subgroup(X) | ~in_subgroup(Y) | in_subgroup(mult(X,Y)).
+axiom subgroup_inverse(in_subgroup, inverse) is
+  ~in_subgroup(X) | in_subgroup(inverse(X)).
+axiom subgroup_mult(in_subgroup, mult) is
+  ~in_subgroup(X) | ~in_subgroup(Y) | in_subgroup(mult(X,Y)).
 
 theory subgroup(mult, e, inverse, in_subgroup) is
-  group(mult, e, inverse) and
-  subgroup_inverse(in_subgroup, inverse) and
-  subgroup_mult(in_subgroup, mult).
+  theory group(mult, e, inverse) and
+  axiom subgroup_inverse(in_subgroup, inverse) and
+  axiom subgroup_mult(in_subgroup, mult).
 
-lemma axiom in_subgroup(e) if
-  subgroup(mult, e, inverse, in_subgroup).
+lemma in_subgroup(e) if
+  theory subgroup(mult, e, inverse, in_subgroup).
 
 % ring
 
-left_distributive(mult, sum) is axiom mult(X, sum(Y,Z)) = sum(mult(X,Y), mult(X,Z)).
-right_distributive(mult, sum) is axiom mult(sum(X,Y),Z) = sum(mult(X,Z), mult(Y,Z)).
+axiom left_distributive(mult, sum) is mult(X, sum(Y,Z)) = sum(mult(X,Y), mult(X,Z)).
+axiom right_distributive(mult, sum) is mult(sum(X,Y),Z) = sum(mult(X,Z), mult(Y,Z)).
 
 theory ring(mult, one, add, zero, add_inverse) is
-  abelian_group(add, zero, add_inverse) and
-  monoid(mult, one) and
-  left_distributive(mult, sum) and
-  right_distributive(mult, sum).
+  theory abelian_group(add, zero, add_inverse) and
+  theory monoid(mult, one) and
+  axiom left_distributive(mult, sum) and
+  axiom right_distributive(mult, sum).
 
 theory commutative_ring(mult, one, add, zero, add_inverse) is
-  ring(mult, one, add, zero, add_inverse) and
-  commutative(mult).
+  theory ring(mult, one, add, zero, add_inverse) and
+  axiom commutative(mult).
 
 % boolean algebra
 
 theory bool_algebra(add, zero, mult, one, inverse) is
-  commutative(add) and
-  commutative(mult) and
-  left_inverse(add, one, inverse) and     % X or not(X) = true
-  right_inverse(add, one, inverse) and
-  left_inverse(mult, zero, inverse) and   % X and not(X) = false
-  right_inverse(mult, zero, inverse) and
-  left_distributive(mult, add) and        % X or (Y and Z) = XorY and XorZ
-  right_distributive(mult, add) and
-  left_distributive(add, mult) and        % X and (Y or Z) = XandY or XandZ
-  right_distributive(add, mult) and
-  left_identity(add, zero) and            % X or false = X
-  right_identity(add, zero) and
-  left_identity(mult, one) and            % X and true = X
-  right_identity(mult, one).
+  axiom commutative(add) and
+  axiom commutative(mult) and
+  axiom left_inverse(add, one, inverse) and     % X or not(X) = true
+  axiom right_inverse(add, one, inverse) and
+  axiom left_inverse(mult, zero, inverse) and   % X and not(X) = false
+  axiom right_inverse(mult, zero, inverse) and
+  axiom left_distributive(mult, add) and        % X or (Y and Z) = XorY and XorZ
+  axiom right_distributive(mult, add) and
+  axiom left_distributive(add, mult) and        % X and (Y or Z) = XandY or XandZ
+  axiom right_distributive(add, mult) and
+  axiom left_identity(add, zero) and            % X or false = X
+  axiom right_identity(add, zero) and
+  axiom left_identity(mult, one) and            % X and true = X
+  axiom right_identity(mult, one).
 
 % basic relations
     
-reflexive(r) is axiom r(X,X).
-irreflexive(r) is axiom ~r(X,X).
-transitive(r) is axiom ~r(X,Y) | ~r(Y,Z) | r(X,Z).
-antisymmetric(r) is axiom ~r(X,Y) | ~r(Y,X) | X=Y.
-symmetric(r) is axiom ~r(X,Y) | r(Y,X).
+axiom reflexive(r) is r(X,X).
+axiom irreflexive(r) is ~r(X,X).
+axiom transitive(r) is ~r(X,Y) | ~r(Y,Z) | r(X,Z).
+axiom antisymmetric(r) is ~r(X,Y) | ~r(Y,X) | X=Y.
+axiom symmetric(r) is ~r(X,Y) | r(Y,X).
 
 % partial orders
 
 theory partial_order(r) is
-  reflexive(r) and
-  transitive(r) and
-  antisymmetric(r).
+  axiom reflexive(r) and
+  axiom transitive(r) and
+  axiom antisymmetric(r).
 
 theory partial_order_strict(r) is
-  irreflexive(r) and
-  transitive(r).
+  axiom irreflexive(r) and
+  axiom transitive(r).
 
 % total orders
 
-total_non_strict(r) is axiom r(X,Y) | r(Y,X).
-total_strict(r) is axiom r(X,Y) | X=Y | r(Y,X).
+axiom total_non_strict(r) is r(X,Y) | r(Y,X).
+axiom total_strict(r) is r(X,Y) | X=Y | r(Y,X).
 
 theory total_order_strict(less) is
-  partial_order_strict(less) and
-  total_strict(less).
+  theory partial_order_strict(less) and
+  axiom total_strict(less).
 
 theory total_order_non_strict(lesseq) is
-  partial_order(lesseq) and
-  total_non_strict(lesseq).
+  theory partial_order(lesseq) and
+  axiom total_non_strict(lesseq).
 
 theory total_order(less, lesseq) is
-  total_order_strict(less) and
-  axiom lesseq(X,Y) <=> (less(X,Y) | X=Y).
+  theory total_order_strict(less) and
+  lesseq(X,Y) <=> (less(X,Y) | X=Y).
 
 theory total_order(less, lesseq) is
-  total_order_strict(less) and
-  axiom ~lesseq(X,Y) | less(X,Y) | X=Y and
-  axiom ~less(X,Y) | lesseq(X,Y).
+  theory total_order_strict(less) and
+  ~lesseq(X,Y) | less(X,Y) | X=Y and
+  ~less(X,Y) | lesseq(X,Y).
 
 theory total_order(less, lesseq) is
-  total_order(lesseq) and
-  axiom lesseq(X,Y) <=> (less(X,Y) | X=Y).
+  theory total_order(lesseq) and
+  lesseq(X,Y) <=> (less(X,Y) | X=Y).
 
 theory total_order(less, lesseq) is
-  total_order(lesseq) and
-  axiom ~lesseq(X,Y) | less(X,Y) | X=Y and
-  axiom ~less(X,Y) | lesseq(X,Y).
+  theory total_order(lesseq) and
+  ~lesseq(X,Y) | less(X,Y) | X=Y and
+  ~less(X,Y) | lesseq(X,Y).
 
 % lattices
 
 theory semi_lattice(meet) is
-  ac(meet) and
-  idempotent(meet).
+  theory ac(meet) and
+  axiom idempotent(meet).
 
-absorption(f1, f2) is axiom f1(X, f2(X, Y)) = X.
+axiom absorption(f1, f2) is f1(X, f2(X, Y)) = X.
 
 theory lattice(meet, join) is
-  semi_lattice(meet) and
-  semi_lattice(join) and
-  absorption(meet, join) and
-  absorption(join, meet).
+  theory semi_lattice(meet) and
+  theory semi_lattice(join) and
+  axiom absorption(meet, join) and
+  axiom absorption(join, meet).
 
 theory complete_lattice(meet, join, top, bottom) is
-  lattice(meet, join) and
-  axiom meet(X,top) = X and
-  axiom join(X,top) = top and
-  axiom meet(X,bottom) = bottom and
-  axiom join(X,bottom) = X.
+  theory lattice(meet, join) and
+  meet(X,top) = X and
+  join(X,top) = top and
+  meet(X,bottom) = bottom and
+  join(X,bottom) = X.
 
 raw ac(F) if 'theory'(ac, L1, F).
 
