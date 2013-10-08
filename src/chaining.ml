@@ -43,27 +43,27 @@ let stat_ineq_chaining = Util.mk_stat "ineq_chaining"
 
 let prof_eq_chaining_active = Util.mk_profiler "chaining.eq_active"
 let prof_eq_chaining_passive = Util.mk_profiler "chaining.eq_passive"
-let prof_ineq_chaining_active = Util.mk_profiler "chaining.ineq_active"
-let prof_ineq_chaining_passive = Util.mk_profiler "chaining.ineq_passive"
+let prof_ineq_chaining_left = Util.mk_profiler "chaining.ineq_left"
+let prof_ineq_chaining_right = Util.mk_profiler "chaining.ineq_right"
 
 (* finds all positions, in lits that are [eligible], that unify with the
   subterm at the given [pos], and return the list of such positions
   plus the new substitution *)
-let _gather_positions ~eligible lits scope pos subst =
+let _gather_positions ~eligible ~signature lits scope pos subst =
   let t = Lits.at_pos lits pos in
   let pos' = List.tl pos in  (* position within the literal *)
   Lits.fold_lits ~eligible lits ([], subst)
     (fun (pos_list, subst) lit i ->
       try
         let t' = Lit.at_pos lit pos' in
-        if T.is_var t' then raise Exit;  (* variables are not eligible *)
-        let subst = Unif.unification ~subst t scope t' scope in
-        let pos_list = (i::pos') :: pos_list in
-        pos_list, subst
+        if T.is_var t' || not (TypeInference.check_term_term_sig signature t t')
+          then raise Exit  (* variables are not eligible *)
+          else
+            let subst = Unif.unification ~subst t scope t' scope in
+            let pos_list = (i::pos') :: pos_list in
+            pos_list, subst
       with Not_found | Unif.Fail | Exit ->
-        (pos_list, subst))
-
-(* FIXME: check that types are compatible! *)
+        pos_list, subst)
 
 (* check ordering conditions for the active clause in equality chaining *)
 let _check_eq_chaining_active ~ctx active s_a active_pos subst =
@@ -117,11 +117,46 @@ let _check_eq_chaining_left_passive ~ctx passive s_p positions subst =
       | _ -> true
     end
     positions
+
+(* check ordering conditions for passive clause in equality chaining right *)
+let _check_eq_chaining_right_passive ~ctx passive s_p positions subst =
+  assert (positions <> []);
+  let ord = Ctx.ord ~ctx in
+  let spec = Ctx.total_order ~ctx in
+  let ord_lit = Lits.get_ineq ~spec passive.C.hclits (List.hd positions) in
+  let instance = ord_lit.TO.instance in
+  let renaming = Ctx.renaming_clear ~ctx in
+  let t1' = Substs.apply ~renaming subst ord_lit.TO.right s_p in
+  (* subst(t1) must be a maximal term *)
+  Sequence.for_all
+    (fun v ->
+      let v' = Substs.apply ~renaming subst v s_p in
+      (* all other terms [v'] must not be bigger than [t1'] *)
+      match Ord.compare ord t1' v' with
+      | Comparison.Lt -> false
+      | _ -> true)
+    (Lits.terms_under_ineq ~instance passive.C.hclits)
+  &&
+  (* each vi <| ti must verify that subst(ti) not < subst(vi) in
+    the term ordering *)
+  List.for_all
+    begin fun pos ->
+      let ord_lit = Lits.get_ineq ~spec passive.C.hclits pos in
+      let renaming = Ctx.renaming_clear ~ctx in
+      let ti = Substs.apply ~renaming subst ord_lit.TO.right s_p in
+      let vi = Substs.apply ~renaming subst ord_lit.TO.left s_p in
+      match Ord.compare ord ti vi with
+      | Comparison.Lt -> false
+      | _ -> true
+    end
+    positions
   
 (* equality chaining left *)
 let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst acc =
   let ord = Ctx.ord ~ctx in
+  let signature = Ctx.signature ctx in
   let spec = Ctx.total_order ~ctx in
+  let instance = (Lits.get_ineq ~spec passive.C.hclits passive_pos).TO.instance in
   (* rewrite s into t *)
   let s, t, _ = Lits.get_eqn active.C.hclits active_pos in
   assert (not (T.is_var s));
@@ -133,12 +168,10 @@ let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst
   let ord_lit = Lits.get_ineq ~spec passive.C.hclits passive_pos in
   let eligible = C.Eligible.ineq_of passive ord_lit.TO.instance in
   let positions, subst =
-    _gather_positions ~eligible passive.C.hclits s_p passive_pos subst in
+    _gather_positions ~eligible ~signature passive.C.hclits s_p passive_pos subst in
   (* check ordering conditions, and well-typedness *)
   if _check_eq_chaining_active ~ctx active s_a active_pos subst
   && _check_eq_chaining_left_passive ~ctx passive s_p positions subst
-  && Substs.check_type_sig (Ctx.signature ctx) subst
-  (* XXX: should check during _gather_positions *)
     then begin
       (* now we can combine the two clauses *)
       let renaming = Ctx.renaming_clear ~ctx in
@@ -152,20 +185,64 @@ let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst
       let lits_p = Array.to_list (Lits.apply_subst ~renaming ~ord subst lits_p s_p) in
       let new_lits = lits_a @ lits_p in
       (* proof *)
-      let proof cc = Proof.mk_c_step cc "eq_chain_left"
-        [active.C.hcproof; passive.C.hcproof] in
+      let premises = active.C.hcproof :: passive.C.hcproof :: instance.TO.proof in
+      let theories = ["total_order"] in
+      let proof cc = Proof.mk_c_step ~theories ~rule:"eq_chain_left" cc premises in
       let parents = [active; passive] in
       let new_clause = C.create ~parents ~ctx new_lits proof in
       Util.debug 3 "eq chaining left --> %a" C.pp new_clause;
       new_clause :: acc
     end else begin
-      Util.debug 3 "eq chaining between %a at %a, and %a at %a redundant"
+      Util.debug 3 "eq chaining left between %a at %a, and %a at %a redundant"
         C.pp active Position.pp active_pos C.pp passive Position.pp passive_pos;
       acc
     end
 
 let do_eq_chaining_right ~ctx active s_a active_pos passive s_p passive_pos subst acc =
-  acc (* TODO *)
+  let ord = Ctx.ord ~ctx in
+  let signature = Ctx.signature ctx in
+  let spec = Ctx.total_order ~ctx in
+  let instance = (Lits.get_ineq ~spec passive.C.hclits passive_pos).TO.instance in
+  (* rewrite s into t *)
+  let s, t, _ = Lits.get_eqn active.C.hclits active_pos in
+  assert (not (T.is_var s));
+  (* get all inequalities that can be factored with passive_pos: if 
+      the passive lit is v1 <| t1[s1]_p, we want all the vi <| ti[si]_p
+      such that si is unifiable with s1 (and thus with [s]).
+      We only consider literals that are inequations of the same instance
+      as [v1 <| t1]. *)
+  let ord_lit = Lits.get_ineq ~spec passive.C.hclits passive_pos in
+  let eligible = C.Eligible.ineq_of passive ord_lit.TO.instance in
+  let positions, subst =
+    _gather_positions ~eligible ~signature passive.C.hclits s_p passive_pos subst in
+  (* check ordering conditions, and well-typedness *)
+  if _check_eq_chaining_active ~ctx active s_a active_pos subst
+  && _check_eq_chaining_right_passive ~ctx passive s_p positions subst
+    then begin
+      (* now we can combine the two clauses *)
+      let renaming = Ctx.renaming_clear ~ctx in
+      (* literals of new clause *)
+      let lits_a = Util.array_except_idx active.C.hclits (List.hd active_pos) in
+      let lits_a = Lit.apply_subst_list ~ord ~renaming subst lits_a s_a in
+      let lits_p = Array.copy passive.C.hclits in
+      List.iter
+        (fun pos -> Lits.replace_pos ~ord lits_p ~at:pos ~by:t)
+        positions;
+      let lits_p = Array.to_list (Lits.apply_subst ~renaming ~ord subst lits_p s_p) in
+      let new_lits = lits_a @ lits_p in
+      (* proof *)
+      let premises = active.C.hcproof :: passive.C.hcproof :: instance.TO.proof in
+      let theories = ["total_order"] in
+      let proof cc = Proof.mk_c_step ~theories ~rule:"eq_chain_right" cc premises in
+      let parents = [active; passive] in
+      let new_clause = C.create ~parents ~ctx new_lits proof in
+      Util.debug 3 "eq chaining right --> %a" C.pp new_clause;
+      new_clause :: acc
+    end else begin
+      Util.debug 3 "eq chaining right between %a at %a, and %a at %a redundant"
+        C.pp active Position.pp active_pos C.pp passive Position.pp passive_pos;
+      acc
+    end
 
 (* perform equality chaining *)
 let do_eq_chaining ~ctx active s_a active_pos passive s_p passive_pos subst acc =
@@ -196,6 +273,8 @@ let eq_chaining_active active_set c =
   Util.exit_prof prof_eq_chaining_active;
   new_clauses
 
+(* rewrite subterms in inequalities of the given clause [c] using equations
+    of active clauses *)
 let eq_chaining_passive active_set c =
   Util.enter_prof prof_eq_chaining_passive;
   let ctx = active_set#ctx in
@@ -228,11 +307,111 @@ let eq_chaining_passive active_set c =
   Util.exit_prof prof_eq_chaining_passive;
   new_clauses
 
-let ineq_chaining_active active_set c =
-  [] (* TODO *)
+(* literals whose position does not occur in [positions] *)
+let _all_lits_but_positions lits positions =
+  let bv = BV.create ~size:(Array.length lits) true in
+  List.iter
+    (fun pos -> match pos with
+      | i::_ -> BV.reset bv i
+      | [] -> assert false)
+    positions;
+  List.map fst (BV.select bv lits)
 
-let ineq_chaining_passive active_set c =
-  [] (* TODO *)
+(* inequality chaining between two clauses *)
+let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc =
+  let ord = Ctx.ord ctx in
+  let spec = Ctx.total_order ctx in
+  let signature = Ctx.signature ctx in
+  let instance = (Lits.get_ineq ~spec left.C.hclits left_pos).TO.instance in
+  let mk_less t1 t2 = Lit.mk_true (T.mk_node instance.TO.less [t1; t2]) in
+  let t1 = (Lits.get_ineq ~spec right.C.hclits right_pos).TO.left in
+  (* find other literals that can be chained on *)
+  let eligible = C.Eligible.pos in
+  let left_pos_list, subst =
+    _gather_positions ~eligible ~signature left.C.hclits s_left left_pos subst in
+  let right_pos_list, subst =
+    _gather_positions ~eligible ~signature right.C.hclits s_right right_pos subst in
+  (* remaining lits *)
+  if _check_eq_chaining_left_passive ~ctx left s_left left_pos_list subst
+  && _check_eq_chaining_right_passive ~ctx right s_right right_pos_list subst
+    then begin
+      let renaming = Ctx.renaming_clear ~ctx in
+      (* build literal list *)
+      let lits_left = _all_lits_but_positions left.C.hclits left_pos_list in
+      let lits_left = Lit.apply_subst_list ~ord ~renaming subst lits_left s_left in
+      let lits_right = _all_lits_but_positions right.C.hclits right_pos_list in
+      let lits_right = Lit.apply_subst_list ~ord ~renaming subst lits_right s_right in
+      let product = List.fold_left
+        (fun acc left_pos ->
+          let lit_left = Lits.get_ineq ~spec left.C.hclits left_pos in
+          let ui = lit_left.TO.left in
+          List.fold_left
+            (fun acc right_pos ->
+              let lit_right = Lits.get_ineq ~spec right.C.hclits right_pos in
+              let vj = lit_right.TO.right in
+              (* now to compute INEQ(ui, vj) *)
+              let ui' = Substs.apply ~renaming subst ui s_left in
+              let vj' = Substs.apply ~renaming subst vj s_right in
+              let t1' = Substs.apply ~renaming subst t1 s_right in
+              if lit_left.TO.strict || lit_right.TO.strict
+                then (* ui < vj *)
+                  mk_less ui' vj' :: acc
+                else (* ui < vj OR ui = t1 *)
+                  mk_less ui' vj' :: Lit.mk_eq ~ord ui' t1' :: acc        
+              )
+            acc right_pos_list)
+        [] left_pos_list
+      in
+      let lits = lits_left @ lits_right @ product in
+      (* build clause *)
+      let theories = ["total_order"] in
+      let rule = "inequality_chaining" in
+      let premises = left.C.hcproof :: right.C.hcproof :: instance.TO.proof in
+      let proof cc = Proof.mk_c_step ~theories ~rule cc premises in
+      let new_clause = C.create ~parents:[left;right] ~ctx lits proof in
+      Util.debug 3 "ineq_chaining of %a and %a gives %a"
+        C.pp left C.pp right C.pp new_clause;
+      new_clause :: acc
+    end else acc
+
+(* inequality chaining, where [c] is on the left (which means terms on
+    the RHS of inequalities will be chained) *)
+let ineq_chaining_left active_set c =
+  Util.enter_prof prof_ineq_chaining_left;
+  let ctx = active_set#ctx in
+  let spec = Ctx.total_order ~ctx in
+  let eligible = C.Eligible.chaining c in
+  (* fold on ineq lits *)
+  let new_clauses = Lits.fold_ineq ~spec ~eligible c.C.hclits []
+    (fun acc ord_lit left_pos ->
+      let s1 = ord_lit.TO.right in
+      I.retrieve_unifiables active_set#idx_ord_side 1 s1 0 acc
+        (fun acc t1 with_pos subst ->
+          let right = with_pos.C.WithPos.clause in
+          let right_pos = with_pos.C.WithPos.pos in
+          do_ineq_chaining ~ctx c 0 left_pos right 1 right_pos subst acc))
+  in
+  Util.exit_prof prof_ineq_chaining_left;
+  new_clauses
+
+(* inequality chaining where [c] is on the right *)
+let ineq_chaining_right active_set c =
+  Util.enter_prof prof_ineq_chaining_right;
+  let ctx = active_set#ctx in
+  let spec = Ctx.total_order ~ctx in
+  let eligible = C.Eligible.chaining c in
+  (* fold on ineq lits *)
+  let new_clauses = Lits.fold_ineq ~spec ~eligible c.C.hclits []
+    (fun acc ord_lit right_pos ->
+      let t1 = ord_lit.TO.left in
+      I.retrieve_unifiables active_set#idx_ord_side 1 t1 0 acc
+        (fun acc s1 with_pos subst ->
+          let left = with_pos.C.WithPos.clause in
+          let left_pos = with_pos.C.WithPos.pos in
+          do_ineq_chaining ~ctx left 1 left_pos c 0 right_pos subst acc))
+  in
+  Util.exit_prof prof_ineq_chaining_right;
+  new_clauses
 
 let reflexivity_res c =
   let ctx = c.C.hcctx in
@@ -322,8 +501,8 @@ let add_order ~env ?proof ~less ~lesseq =
     Env.add_is_trivial ~env is_tautology;
     Env.add_simplify ~env simplify;
     Env.add_unary_inf ~env "reflexivity_res" reflexivity_res;
-    Env.add_binary_inf ~env "ineq_chaining_active" ineq_chaining_active;
-    Env.add_binary_inf ~env "ineq_chaining_passive" ineq_chaining_passive;
+    Env.add_binary_inf ~env "ineq_chaining_left" ineq_chaining_left;
+    Env.add_binary_inf ~env "ineq_chaining_right" ineq_chaining_right;
     Env.add_binary_inf ~env "eq_chaining_passive" eq_chaining_passive;
     Env.add_binary_inf ~env "eq_chaining_active" eq_chaining_active;
     end;

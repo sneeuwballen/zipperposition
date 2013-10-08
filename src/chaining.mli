@@ -49,11 +49,11 @@ val eq_chaining_active : Env.binary_inf_rule
 val eq_chaining_passive : Env.binary_inf_rule
   (** Equality chaining where the clause is passive *)
 
-val ineq_chaining_active : Env.binary_inf_rule
-  (** Inequality chaining where the clause is active. *)
+val ineq_chaining_left : Env.binary_inf_rule
+  (** Inequality chaining where the clause is on the left. *)
 
-val ineq_chaining_passive : Env.binary_inf_rule
-  (** Inequality chaining where the clause is passive. *)
+val ineq_chaining_right : Env.binary_inf_rule
+  (** Inequality chaining where the clause is on the right. *)
 
 val reflexivity_res : Env.unary_inf_rule
   (** Reflexivity resolution *)
