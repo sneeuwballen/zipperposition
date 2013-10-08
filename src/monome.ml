@@ -288,7 +288,8 @@ let of_term ~signature t =
     singleton one t
   in
   try of_term ~signature t
-  with Symbol.Arith.TypeMismatch _ -> raise NotLinear  (* too hard. *)
+  with Symbol.Arith.TypeMismatch msg ->
+    raise NotLinear  (* too hard. *)
 
 let of_term_opt ~signature t =
   try Some (of_term ~signature t)

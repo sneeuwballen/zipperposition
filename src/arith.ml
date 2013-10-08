@@ -270,11 +270,24 @@ module Lit = struct
   | R_less of Monome.t * Term.t
   | R_lesseq of Monome.t * Term.t
 
+  let pp buf lit = match lit with
+  | True -> Buffer.add_string buf "true"
+  | False -> Buffer.add_string buf "false"
+  | Eq (t, m) -> Printf.bprintf buf "%a = %a" T.pp t Monome.pp m
+  | Neq (t, m) -> Printf.bprintf buf "%a ≠ %a" T.pp t Monome.pp m
+  | L_less (t, m) -> Printf.bprintf buf "%a < %a" T.pp t Monome.pp m
+  | L_lesseq (t, m) -> Printf.bprintf buf "%a ≤ %a" T.pp t Monome.pp m
+  | R_less (m, t) -> Printf.bprintf buf "%a < %a" Monome.pp m T.pp t
+  | R_lesseq (m, t) -> Printf.bprintf buf "%a ≤ %a" Monome.pp m T.pp t
+
+  let to_string lit = Util.on_buffer pp lit
+
   let is_arith lit = match lit with
   | Literal.Equation (l, r, _, _) -> T.is_arith l || T.is_arith r
   | Literal.Prop (p, _) -> T.is_arith p
   | Literal.True
   | Literal.False -> false
+
 
   exception UnsatLit
 
@@ -305,20 +318,24 @@ module Lit = struct
               else raise UnsatLit  (* unsatisfiable *)
           )
           terms
-      with Monome.NotLinear -> []
+      with
+      | Monome.NotLinear -> []
       | UnsatLit -> [False]
     (* extract lit from (l <= r | l < r) *)
     and extract_less ~strict l r =
       try
+        Util.debug 5 "extract_less %a %a" T.pp l T.pp r;
         let m1 = Monome.of_term ~signature l in
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
+        Util.debug 5 "monome %a" Monome.pp m;
         let terms = Monome.to_list m in
         if terms = []
+        (* constant, ground arith expression, must be true or false *)
         then match Monome.sign m with
-        | 0 -> if strict then [False] else [True]
-        | n when n < 0 -> [True]
-        | _ -> [False]  (* m < 0 where m>0 *)
+          | 0 -> if strict then [False] else [True]
+          | n when n < 0 -> [True]
+          | _ -> [False]  (* m < 0 where m>0 *)
         (* l <| r is equivalent to m <| 0.
             for each term [t] of [m], pivot the monome to isolate [t]. Careful
               with the sign as it can change the comparison sign too! If the
@@ -345,7 +362,7 @@ module Lit = struct
     in
     let extract_le a b = extract_less ~strict:false a b in
     let extract_lt a b = extract_less ~strict:true a b in
-    match lit with
+    let ans = match lit with
     | Literal.True
     | Literal.False -> []
     | Literal.Equation (l, r, sign, _) ->
@@ -369,6 +386,9 @@ module Lit = struct
     | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, false) ->
       extract_lt a b
     | Literal.Prop _ -> []
+    in
+    Util.debug 5 "arith extraction of %a gives [%a]" Literal.pp lit (Util.pp_list pp) ans;
+    ans
 
   let to_lit ~ord lit =
     match lit with
@@ -446,31 +466,32 @@ module Lit = struct
     begin match lit with
     | True
     | False -> []
-    | Eq _ -> []
+    | Eq (x, m) -> 
+      (* x = m eliminated with x := m+1 *)
+      begin try
+        [ Unif.unification x 0 Monome.(to_term (pred m)) 0]
+      with Unif.Fail -> []  (* occur check... *)
+      end
     | Neq (x, m) -> [] (* for Neq, let equality resolution deal with it *)
-    | L_less(x, m)
-      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+    | L_less(x, m) when T.is_var x ->
       (* x < m  is inconsistent with x = ceil(m) *)
       begin try
         [ Unif.unification x 0 Monome.(to_term (ceil m)) 0]
       with Unif.Fail -> []  (* occur check... *)
       end
-    | R_less(m, x)
-      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+    | R_less(m, x) when T.is_var x ->
       (* m < x  is inconsistent with x = floor(m) *)
       begin try
         [ Unif.unification x 0 Monome.(to_term (floor m)) 0]
       with Unif.Fail -> []  (* occur check... *)
       end
-    | L_lesseq(x, m)
-      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+    | L_lesseq(x, m) when T.is_var x ->
       (* x <= m inconsistent with x = ceil(m)+1 *)
       begin try
         [ Unif.unification x 0 Monome.(to_term (succ (ceil m))) 0 ]
       with Unif.Fail -> []  (* occur check... *)
       end
-    | R_lesseq(m, x)
-      when T.is_var x && TypeInference.check_term_type_sig signature x Type.int ->
+    | R_lesseq(m, x) when T.is_var x ->
       (* x >= m inconsistent with x = floor(m)-1 *)
       begin try
         [ Unif.unification x 0 Monome.(to_term (pred (floor m))) 0 ]

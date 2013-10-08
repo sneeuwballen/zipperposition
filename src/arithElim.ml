@@ -100,6 +100,9 @@ let eliminate_arith c =
   Lits.fold_lits ~eligible c.C.hclits []
     (fun acc lit i ->
       let ord_lits = Arith.Lit.extract ~signature lit in
+      List.iter
+        (fun olit -> Util.debug 5 "%a pivoted into %a" Lit.pp lit Arith.Lit.pp olit)
+        ord_lits;
       (* we can eliminate variables that are not shielded in other literals *)
       let elim_var x = not (Arith.Lits.shielded ~filter:(fun i' _ -> i <> i') c.C.hclits x) in
       let substs = Util.list_flatmap

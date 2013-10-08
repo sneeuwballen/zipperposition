@@ -96,6 +96,9 @@ module Lit : sig
   | R_less of Monome.t * Term.t
   | R_lesseq of Monome.t * Term.t
 
+  val pp : Buffer.t -> t -> unit
+  val to_string : t -> string
+
   val is_arith : Literal.t -> bool
     (** Is this literal arithmetic (i.e., root predicate is equality or
         inequality, with arithmetic operators just underneath)? *)

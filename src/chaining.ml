@@ -56,13 +56,15 @@ let _gather_positions ~eligible lits scope pos subst =
     (fun (pos_list, subst) lit i ->
       try
         let t' = Lit.at_pos lit pos' in
+        if T.is_var t' then raise Exit;  (* variables are not eligible *)
         let subst = Unif.unification ~subst t scope t' scope in
         let pos_list = (i::pos') :: pos_list in
         pos_list, subst
-      with Not_found | Unif.Fail ->
+      with Not_found | Unif.Fail | Exit ->
         (pos_list, subst))
 
 (* FIXME: check that types are compatible! *)
+
 (* check ordering conditions for the active clause in equality chaining *)
 let _check_eq_chaining_active ~ctx active s_a active_pos subst =
   let s, t, sign = Lits.get_eqn active.C.hclits active_pos in
@@ -132,9 +134,11 @@ let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst
   let eligible = C.Eligible.ineq_of passive ord_lit.TO.instance in
   let positions, subst =
     _gather_positions ~eligible passive.C.hclits s_p passive_pos subst in
-  (* check ordering conditions *)
+  (* check ordering conditions, and well-typedness *)
   if _check_eq_chaining_active ~ctx active s_a active_pos subst
   && _check_eq_chaining_left_passive ~ctx passive s_p positions subst
+  && Substs.check_type_sig (Ctx.signature ctx) subst
+  (* XXX: should check during _gather_positions *)
     then begin
       (* now we can combine the two clauses *)
       let renaming = Ctx.renaming_clear ~ctx in
