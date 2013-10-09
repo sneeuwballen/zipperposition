@@ -167,6 +167,21 @@ theory total_order(less, lesseq) is
   ~lesseq(X,Y) | less(X,Y) | X=Y and
   ~less(X,Y) | lesseq(X,Y).
 
+axiom unbounded_order_up(less) is less(X, something_higher_than(X)).
+axiom unbounded_order_down(less) is less(something_lower_than(X), X).
+
+% dense total orders, possibly without endpoints
+
+theory dense_total_order(less) is
+  theory total_order_strict(less) and
+  ~less(X,Y) | less(X, choice(X,Y)) and
+  ~less(X,Y) | less(choice(X,Y),Y).   % x < y ==> \exists z, x < z < y
+
+theory dense_total_order_without_endpoints(less) is
+  theory dense_total_order(less) and
+  axiom unbounded_order_up(less) and
+  axiom unbounded_order_down(less).
+
 % lattices
 
 theory semi_lattice(meet) is

@@ -52,4 +52,6 @@ val add_ac : ?proof:Proof.t list -> env:Env.t ->
   (** Declare that the given symbol is AC, and update the Env subsequently
       by adding clauses, etc. *)
 
+val setup_penv : penv:PEnv.t -> unit
+
 val setup_env : env:Env.t -> unit

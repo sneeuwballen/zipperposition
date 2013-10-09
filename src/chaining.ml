@@ -513,6 +513,9 @@ let add_order ~env ?proof ~less ~lesseq =
   Env.add_passive ~env (Sequence.of_list clauses);
   ()
 
+let setup_penv ~penv =
+  ()  (* TODO? *)
+
 let setup_env ~env =
   (* plug in the meta-prover *)
   match Env.get_meta ~env with

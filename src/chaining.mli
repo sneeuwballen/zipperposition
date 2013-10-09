@@ -55,6 +55,14 @@ val ineq_chaining_left : Env.binary_inf_rule
 val ineq_chaining_right : Env.binary_inf_rule
   (** Inequality chaining where the clause is on the right. *)
 
+(* TODO: redundancy criterion: replace vars by constants, and see whether
+   it's always trivially true
+   (e,g, to make transitivity redundant, we have
+   ~ x<y | ~ y<z | x<z, once simplified and grounded,
+   we have b <= a | c <= b | a <= c  trivial?
+   
+   Use <= as negation for > and see whether implication is trivial *)
+
 val reflexivity_res : Env.unary_inf_rule
   (** Reflexivity resolution *)
 
@@ -72,6 +80,8 @@ val axioms : ctx:Ctx.t -> instance:Theories.TotalOrder.instance -> Clause.t list
 val add_order : env:Env.t -> ?proof:Proof.t list ->
                 less:Symbol.t -> lesseq:Symbol.t -> unit
   (** Declare a new total ordering instance *)
+
+val setup_penv : penv:PEnv.t -> unit
 
 val setup_env : env:Env.t -> unit
   (** Setup inference rules in Env. The specification that is used is

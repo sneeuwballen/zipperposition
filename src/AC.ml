@@ -133,6 +133,9 @@ let add_ac ?proof ~env s =
   Env.add_passive ~env (Sequence.of_list clauses);
   ()
 
+let setup_penv ~penv =
+  ()
+
 let setup_env ~env =
   match Env.get_meta ~env with
   | None -> ()
