@@ -37,9 +37,14 @@ val eq : t -> t -> bool
 val hash : t -> int
 
 val pp : Buffer.t -> t -> unit
+val to_string : t -> string
 val pp_apply : Buffer.t -> (t * Term.t list) -> unit
 val fmt : Format.formatter -> t -> unit
+val debug : Format.formatter -> t -> unit
 val bij : t Bij.t
+
+val arbitrary : t QCheck.Arbitrary.t
+val arbitrary_apply : (t * Term.t list) QCheck.Arbitrary.t
 
 (** {2 Basic Operations} *)
 

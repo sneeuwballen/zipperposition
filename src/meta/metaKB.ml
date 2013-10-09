@@ -78,7 +78,7 @@ and compare_premises l1 l2 =
   Util.lexicograph compare_premise l1 l2
 and compare_clause = Pervasives.compare
 
-module StringMap = Sequence.Map.Make(String)
+module AxiomMap = MultiMap.Make(String)(struct type t = axiom let compare = compare_axiom end)
 module LemmaSet = Sequence.Set.Make(struct type t = lemma let compare = compare_lemma end)
 module TheoryMap = MultiMap.Make(String)(struct type t = theory let compare = compare_theory end)
 module ClauseSet = Sequence.Set.Make(struct type t = clause let compare = compare_clause end)
@@ -93,20 +93,20 @@ let name_of_theory = function
 
 type t = {
   lemmas : LemmaSet.t;            (* set of lemmas *)
-  axioms : axiom StringMap.t;     (* axioms, by name *)
+  axioms : AxiomMap.t;            (* axioms, by name *)
   theories : TheoryMap.t;         (* theories, by name *)
   clauses : ClauseSet.t;          (* set of raw clauses *)
 } (* KB *)
 
 let eq t1 t2 =
   LemmaSet.equal t1.lemmas t2.lemmas &&
-  StringMap.equal (fun a1 a2 -> compare_axiom a1 a2 = 0) t1.axioms t2.axioms &&
+  AxiomMap.equal t1.axioms t2.axioms &&
   TheoryMap.equal t1.theories t2.theories &&
   ClauseSet.equal t1.clauses t2.clauses
 
 let empty =
   { lemmas = LemmaSet.empty;
-    axioms = StringMap.empty;
+    axioms = AxiomMap.empty;
     theories = TheoryMap.empty;
     clauses = ClauseSet.empty;
   }
@@ -116,8 +116,8 @@ let add_lemma kb l =
 
 let add_axiom kb a =
   let name = name_of_axiom a in
-  assert (not (StringMap.mem name kb.axioms));
-  { kb with axioms = StringMap.add name a kb.axioms }
+  assert (not (AxiomMap.mem kb.axioms name));
+  { kb with axioms = AxiomMap.add kb.axioms name a }
 
 let add_theory kb t =
   let name = name_of_theory t in
@@ -126,9 +126,7 @@ let add_theory kb t =
 let add_clause kb c =
   { kb with clauses = ClauseSet.add c kb.clauses }
 
-let get_axiom kb s =
-  try Some (StringMap.find s kb.axioms)
-  with Not_found -> None
+let get_axiom kb s = AxiomMap.find kb.axioms s
 
 let get_theory kb s = TheoryMap.find kb.theories s
 
@@ -140,39 +138,28 @@ let all_patterns kb =
     | (IfAxiom _ | IfTheory _) :: premises -> iter_premises premises
     | (IfPattern (p, _)) :: premises -> add_pattern p; iter_premises premises
   in
-  StringMap.iter (fun _ (Axiom (_, _, p, _)) -> add_pattern p) kb.axioms;
+  AxiomMap.iter kb.axioms (fun _ (Axiom (_, _, p, _)) -> add_pattern p);
   TheoryMap.iter kb.theories (fun _ (Theory (_, _, premises)) -> iter_premises premises);
   LemmaSet.iter (fun (Lemma (_, _, premises)) -> iter_premises premises) kb.lemmas;
   !l
 
 let union t1 t2 =
-  let merge_axioms _ a1 a2 = match a1, a2 with
-  | None, Some a
-  | Some a, None -> Some a
-  | None, None -> None
-  | Some a1, Some a2 when compare_axiom a1 a2 = 0 -> Some a1
-  | Some a1, Some a2 -> failwith ("two definitions for axiom " ^ (name_of_axiom a1))
-  in
   { lemmas = LemmaSet.union t1.lemmas t2.lemmas;
-    axioms = StringMap.merge merge_axioms t1.axioms t2.axioms;
+    axioms = AxiomMap.union t1.axioms t2.axioms;
     theories = TheoryMap.union t1.theories t2.theories;
     clauses = ClauseSet.union t1.clauses t2.clauses;
   }
 
 let diff t1 t2 =
-  (* elements of [m1] that are not in [m2] *)
-  let diff_map m1 m2 =
-    StringMap.filter (fun name _ -> not (StringMap.mem name m2)) m1
-  in
   { lemmas = LemmaSet.diff t1.lemmas t2.lemmas;
-    axioms = diff_map t1.axioms t2.axioms;
+    axioms = AxiomMap.diff t1.axioms t2.axioms;
     theories = TheoryMap.diff t1.theories t2.theories;
     clauses = ClauseSet.diff t1.clauses t2.clauses;
   }
 
 let to_seq kb =
   ( LemmaSet.to_seq kb.lemmas
-  , StringMap.values kb.axioms
+  , AxiomMap.values kb.axioms
   , TheoryMap.values kb.theories
   , ClauseSet.to_seq kb.clauses
   )
@@ -213,7 +200,7 @@ let pp_clause buf = function
 
 let pp buf kb =
   Buffer.add_string buf "KB {\n";
-  StringMap.iter (fun _ a -> Printf.bprintf buf "  %a\n" pp_axiom a) kb.axioms;
+  AxiomMap.iter kb.axioms (fun _ a -> Printf.bprintf buf "  %a\n" pp_axiom a);
   TheoryMap.iter kb.theories (fun _ t -> Printf.bprintf buf "  %a\n" pp_theory t);
   LemmaSet.iter (Printf.bprintf buf "  %a\n" pp_lemma) kb.lemmas;
   ClauseSet.iter (Printf.bprintf buf "  %a\n" pp_clause) kb.clauses;
@@ -351,13 +338,12 @@ let _compile_clause (Clause (head,body)) =
 
 let add_axioms reasoner axioms =
   let open MRT in
-  StringMap.iter
+  AxiomMap.iter axioms
     (fun _ (Axiom (s, left, p, right)) ->
       let concl = encode mapping_axiom "axiom" (s, left) in
       let premises = [encode_premise (IfPattern (p, right))] in
       let clause = MetaReasoner.Logic.mk_clause concl premises in
       MetaReasoner.add reasoner clause)
-    axioms
 and add_theories reasoner theories =
   let open MRT in
   TheoryMap.iter theories
@@ -604,9 +590,9 @@ let kb_of_statements ?(init=empty) statements =
       let new_premises = fmap_premises (TermBij.apply perm) premises in
       let new_args = TermBij.apply_list perm args in
       begin match get_axiom kb s with
-      | None -> failwith (Util.sprintf "axiom %s is not defined" s)
-      | Some (Axiom _ as axiom) ->
-        (* use the axiom definition to get a proper pattern *)
+      | [] -> failwith (Util.sprintf "axiom %s is not defined" s)
+      | (Axiom _ as axiom) :: _ ->
+        (* use the first axiom definition to get a proper pattern *)
         let pat, args' = apply_axiom axiom new_args in 
         let lemma = Lemma (pat, args', new_premises) in
         add_lemma kb lemma

@@ -51,12 +51,18 @@ val eq : t -> t -> bool
 
 val empty : t
 
+val compare_lemma : lemma -> lemma -> int
+val compare_axiom : axiom -> axiom -> int
+val compare_theory : theory -> theory -> int
+val compare_premise : premise -> premise -> int
+val compare_premises : premise list -> premise list -> int
+
 val add_lemma : t -> lemma -> t
 val add_axiom : t -> axiom -> t
 val add_theory : t -> theory -> t
 val add_clause : t -> clause -> t
 
-val get_axiom : t -> string -> axiom option
+val get_axiom : t -> string -> axiom list
 val get_theory : t -> string -> theory list
 
 val all_patterns : t -> MetaPattern.t list

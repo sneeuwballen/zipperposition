@@ -122,11 +122,17 @@ let hash (Pattern (t, types)) =
 let pp buf (Pattern (p, _)) =
   EncodedForm.pp buf p
 
+let to_string p = Util.on_buffer pp p
+
 let pp_apply buf (p, args) =
   Printf.bprintf buf "%a(%a)" pp p (Util.pp_list EncodedForm.pp) args
 
 let fmt fmt (Pattern (p, _)) =
   Format.pp_print_string fmt (Util.on_buffer T.pp p)
+
+let debug fmt (Pattern (p, types)) =
+  Format.fprintf fmt "pat(%a, [%a])" T.debug p
+    (Sequence.pp_seq Type.fmt) (Sequence.of_list types)
 
 let bij =
   Bij.(map
@@ -239,6 +245,13 @@ let matching pat right =
     let substs = Sequence.persistent substs in
     Util.exit_prof prof_matching;
     substs
+
+let arbitrary_apply =
+  QCheck.Arbitrary.(map F.arbitrary (fun f ->
+    let signature = Signature.curry (F.signature ~signature:Signature.base f) in
+    create ~signature (EncodedForm.encode f)))
+
+let arbitrary = QCheck.Arbitrary.map arbitrary_apply fst
 
 (** {2 Set of patterns} *)
 
