@@ -119,6 +119,9 @@ val curry : t -> t
 val uncurry : t -> t
   (** Uncurry the type. It {b must} be curried. *)
 
+val size : t -> int
+  (** Size of type, in number of "nodes" *)
+
 (** {2 IO} *)
 
 val pp : Buffer.t -> t -> unit
@@ -129,6 +132,9 @@ val to_string : t -> string
 val bij : t Bij.t
   (** Bijection. Note that GVar cannot be decoded nor encoded. Only
       closed types work. *)
+
+val arbitrary : t QCheck.Arbitrary.t         (* closed types *)
+val arbitrary_ground : t QCheck.Arbitrary.t  (* ground types *)
 
 (** {2 Unification} *)
 

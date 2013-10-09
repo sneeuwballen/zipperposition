@@ -153,8 +153,7 @@ let hashcons_equal x y =
   (* pairwise comparison of subterms *)
   let rec eq_subterms a b = match a, b with
     | [], [] -> true
-    | a::a1, b::b1 ->
-      if a == b then eq_subterms a1 b1 else false
+    | a::a1, b::b1 -> a == b && eq_subterms a1 b1
     | _, _ -> false
   in
   let eq_types x y = match x.type_, y.type_ with
@@ -163,15 +162,15 @@ let hashcons_equal x y =
     | _ -> false
   in
   (* compare types and subterms, if same structure *)
-  eq_types x y &&
   match x.term, y.term with
   | Var i, Var j
-  | BoundVar i, BoundVar j -> i = j
+  | BoundVar i, BoundVar j -> i = j && eq_types x y
   | Node (sa, []), Node (sb, []) -> Symbol.eq sa sb
   | Node (_, []), Node (_, _::_)
   | Node (_, _::_), Node (_, []) -> false
   | Node (sa, la), Node (sb, lb) -> Symbol.eq sa sb && eq_subterms la lb
   | Bind (sa, ta), Bind (sb, tb) -> Symbol.eq sa sb && ta == tb
+  | At (ta1, ta2), At (tb1, tb2) -> ta1 == tb1 && ta2 == tb2
   | _ -> false
 
 (** hashconsing for terms *)
@@ -280,7 +279,7 @@ let mk_at t1 t2 =
       (* compute ground-ness of term *)
       let is_ground = get_flag flag_ground t1 && get_flag flag_ground t2 in
       set_flag flag_ground t is_ground;
-      t.tsize <- t1.tsize + t2.tsize;
+      t.tsize <- t1.tsize + t2.tsize + 1;
     end);
   t
 
@@ -916,17 +915,19 @@ let to_string t = Util.sprintf "%a" pp t
 
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
-let rec debug fmt t = match t.term with
-  | Var i -> Format.fprintf fmt "X%d" i
-  | BoundVar i -> Format.fprintf fmt "Y%d" i
-  | Bind (s, t') -> 
+let rec debug fmt t = match t.term, t.type_ with
+  | Var i, None -> Format.fprintf fmt "X%d" i
+  | Var i, Some ty -> Format.fprintf fmt "X%d:%a" i Type.fmt ty
+  | BoundVar i, None -> Format.fprintf fmt "Y%d" i
+  | BoundVar i, Some ty -> Format.fprintf fmt "Y%d:%a" i Type.fmt ty
+  | Bind (s, t'), _ -> 
     Format.fprintf fmt "(%s %a)" (Symbol.to_string s) debug t'
-  | Node (s, []) ->
+  | Node (s, []), _ ->
     Format.pp_print_string fmt (Symbol.to_string s)
-  | Node (s, l) ->
+  | Node (s, l), _ ->
     Format.fprintf fmt "(%s %a)" (Symbol.to_string s)
       (Sequence.pp_seq debug) (Sequence.of_list l)
-  | At (t1, t2) -> Format.fprintf fmt "%a %a" debug t1 debug t2
+  | At (t1, t2), _-> Format.fprintf fmt "%a %a" debug t1 debug t2
 
 let bij =
   let open Bij in

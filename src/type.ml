@@ -61,7 +61,22 @@ end)
 
 let eq t1 t2 = t1 == t2
 
-let cmp t1 t2 = Pervasives.compare t1 t2
+let __to_int = function
+  | Var _ -> 0
+  | GVar _ -> 1
+  | App _ -> 2
+  | Fun _ -> 3
+
+let rec cmp t1 t2 = match t1, t2 with
+  | Var s1, Var s2 -> String.compare s1 s2
+  | GVar (i1, r1), GVar (i2, r2) -> i1 - i2
+  | App (s1, l1), App (s2, l2) ->
+    let c = String.compare s1 s2 in
+    if c <> 0 then c else Util.lexicograph cmp l1 l2
+  | Fun (ret1, l1), Fun(ret2, l2) ->
+    let c = cmp ret1 ret2 in
+    if c <> 0 then c else Util.lexicograph cmp l1 l2
+  | _, _ -> __to_int t1 - __to_int t2
 
 exception Error of string
   (** Type error *)
@@ -210,6 +225,13 @@ and _gather_uncurry ty acc = match _deref_var ty with
   | Fun (ret, [arg]) -> _gather_uncurry ret (uncurry arg :: acc)
   | Fun _ -> uncurry ty :: acc (* consider this as a single argument *)
 
+let rec size ty = match ty with
+  | Var _
+  | GVar _ -> 1
+  | App (s, []) -> 1
+  | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
+  | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
+
 (** {2 IO} *)
 
 let rec pp buf t = match _deref_var t with
@@ -262,6 +284,25 @@ let bij =
         | "app" -> BranchFrom (Lazy.force bij_app, fun (s,l) -> app s l)
         | "fun" -> BranchFrom (Lazy.force bij_fun, fun (ret,l) -> mk_fun ret l)
         | _ -> raise (DecodingError "expected Type"))))
+
+let arbitrary =
+  QCheck.Arbitrary.(
+    let base = among [ i; const "$int"; const "a"; const "b"; var "A"; var "B" ] in
+    fix ~max:4 ~base (fun sub -> choose
+      [ lift (app "list") (list_repeat 1 sub)
+      ; lift (app "prod") (list_repeat 2 sub)
+      ; lift2 mk_fun sub (list sub)
+      ]))
+
+let arbitrary_ground =
+  QCheck.Arbitrary.(
+    let base = among [ i; const "$int"; const "a"; const "b" ] in
+    fix ~max:4 ~base (fun sub -> choose
+      [ lift (app "list") (list_repeat 1 sub)
+      ; lift (app "prod") (list_repeat 2 sub)
+      ; lift2 mk_fun sub (list sub)
+      ]))
+
 
 (** {2 Unification} *)
 
