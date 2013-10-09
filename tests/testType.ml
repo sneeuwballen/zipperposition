@@ -60,7 +60,20 @@ let check_infer_types_closed =
   in
   mk_test ~pp ~name gen prop
 
+let check_cmp =
+  let gen = Arbitrary.(pair Type.arbitrary Type.arbitrary) in
+  let name = "type_cmp_compatible_eq" in
+  let pp = PP.(pair Type.to_string Type.to_string) in
+  let size (ty1, ty2) = Type.size ty1 + Type.size ty2 in
+  (* comparison of two types is 0 iff they are equal *)
+  let prop (ty1, ty2) =
+    let c = Type.cmp ty1 ty2 in
+    (c = 0) = (Type.eq ty1 ty2)
+  in
+  mk_test ~name ~pp ~size gen prop
+    
 let props =
   [ check_infer_all_symbs
   ; check_infer_types_closed
+  ; check_cmp
   ]

@@ -62,7 +62,8 @@ Executable run_tests
   Install: false
   CompiledObject: native
   MainIs: run_tests.ml
-  BuildDepends: logtk, oUnit
+  Build$: flag(meta)
+  BuildDepends: logtk, logtk.meta, oUnit
 
 Executable run_bench
   Path: tests/
@@ -74,7 +75,7 @@ Executable run_bench
 Test all
   Command: $run_tests
   TestTools: run_tests
-  Run$: flag(tests)
+  Run$: flag(tests) && flag(meta)
 
 # TPTP syntax and type checking
 Executable type_check_tptp

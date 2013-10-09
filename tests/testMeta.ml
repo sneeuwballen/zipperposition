@@ -24,35 +24,34 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
+(** Test meta prover stuff *)
+
 open Logtk
-open OUnit
+open Logtk_meta
+open QCheck
 
-let suite = 
-  "all_tests" >:::
-    [ TestTerm.suite
-    ; TestSubsts.suite
-    ; TestFormula.suite
-    ; TestOrdering.suite
-    ; TestRewriting.suite
-    ]
+let check_pattern_cmp_self =
+  let gen = MetaPattern.arbitrary in
+  let pp = MetaPattern.to_string in
+  let name = "meta_pattern_cmp_self_zero" in
+  let prop p =
+    MetaPattern.compare p p = 0
+  in
+  mk_test ~name ~n:100 ~pp gen prop
 
-let props = QCheck.flatten
-  [ TestTerm.props
-  ; TestFormula.props
-  ; TestUnif.props
-  ; TestCNF.props
-  ; TestIndex.props
-  ; TestType.props
-  ; TestBij.props
-  ; TestOrdering.props
-  ; TestMeta.props
+let check_kb_axiom_cmp_self =
+  let gen = Arbitrary.(
+    map (pair MetaPattern.arbitrary_apply (among ["foo"; "bar"; "baaz"]))
+      (fun ((p,terms), name) -> MetaKB.Axiom (name, terms, p, terms)))
+  in
+  let pp = Util.on_buffer MetaKB.pp_axiom in
+  let name = "meta_kb_axiom_cmp_self_zero" in
+  let prop ax =
+    MetaKB.compare_axiom ax ax = 0
+  in
+  mk_test ~name ~pp ~n:100 gen prop
+
+let props =
+  [ check_pattern_cmp_self
+  ; check_kb_axiom_cmp_self
   ]
-
-let specs =
-  [ "-debug", Arg.Int Util.set_debug, "set debug level"
-  ]
-
-let _ =
-  ignore (run_test_tt_main ~arg_specs:specs suite);
-  ignore (QCheck.run_tests props);
-  ()

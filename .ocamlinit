@@ -29,10 +29,16 @@ module T = Logtk.Term;;
 module F = Logtk.Formula;;
 let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
 let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
+open Logtk;;
 (* optional part *)
 #install_printer Logtk_meta.MetaPattern.fmt;;
 #install_printer Logtk_meta.MetaPattern.Set.fmt;;
 #install_printer Logtk_meta.MetaKB.fmt;;
-open Logtk;;
+open Logtk_meta;;
+let ppat s =
+    let f = pform s in
+    let signature = Signature.curry (F.signature ~signature:Signature.base f) in
+    let f = MetaPattern.EncodedForm.encode f in
+    MetaPattern.create ~signature f;;
 (* vim:syntax=ocaml
 *)
