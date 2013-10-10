@@ -307,13 +307,14 @@ let as_dot_graph =
 (** Add the proof to the given graph *)
 let pp_dot ~name buf proof =
   let fmt = Format.formatter_of_buffer buf in
-  if not (LazyGraph.is_dag as_graph proof) then
+  if not (LazyGraph.is_dag as_graph proof) then begin
     (* output warning, cyclic proof *)
     let cycle = LazyGraph.find_cycle as_graph proof in
     let cycle = List.map (fun (v,_,_) -> v) cycle in
     let pp_squared buf pf = Printf.bprintf buf "[%a]" pp_notrec pf in
     Util.debug 0 "warning: proof is not a DAG (cycle %a)"
       (Util.pp_list pp_squared) cycle;
+    end;
   LazyGraph.Dot.pp ~name as_dot_graph fmt (Sequence.singleton proof);
   Format.pp_print_flush fmt ();
   ()
@@ -323,8 +324,9 @@ let pp_dot_file ?(name="proof") filename proof =
   (* print graph on file *)
   let out = open_out filename in
   try
-    Util.debug 1 "print proof to %s" filename;
+    Util.debug 1 "print proof graph to %s" filename;
     Util.fprintf out "%a\n" (pp_dot ~name) proof;
+    flush out;
     close_out out
   with e ->
     Util.debug 1 "error: %s" (Printexc.to_string e);
