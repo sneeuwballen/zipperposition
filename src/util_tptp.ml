@@ -78,14 +78,9 @@ let _raise_error filename lexbuf =
   let e_c = end_.Lexing.pos_cnum - end_.Lexing.pos_bol in
   raise (ParseError (filename, s_l, s_c, e_l, e_c))
 
-(* FIXME: includes should be replaced by the content of the file
-    at the same place, not later (can break in presence of type
-    declarations) *)
-
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
-  let includes = Queue.create () in
   (* function that parses one file *)
   let rec parse_this_file ?names filename =
     let input = match filename with
@@ -106,8 +101,10 @@ let parse_file ~recursive f =
             if List.mem (A.name_of_decl decl) names
               then Queue.push decl result_decls
               else ()   (* not included *)
-          | (A.Include _ | A.IncludeOnly _), _ when recursive ->
-            Queue.push decl includes
+          | A.Include f, _ when recursive ->
+            parse_this_file ?names:None f
+          | A.IncludeOnly (f, names'), _ when recursive ->
+            parse_this_file ~names:names' f
           | (A.Include _ | A.IncludeOnly _), _ ->
             Queue.push decl result_decls)
         decls
@@ -115,12 +112,6 @@ let parse_file ~recursive f =
       close_in input;
       raise e
     end;
-    if recursive && not (Queue.is_empty includes)
-      then
-        match Queue.pop includes with
-        | A.Include filename -> parse_this_file filename
-        | A.IncludeOnly (filename, names) -> parse_this_file ~names filename
-        | _ -> assert false
   in
   parse_this_file ?names:None f;
   Sequence.of_queue result_decls

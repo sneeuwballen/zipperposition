@@ -108,6 +108,9 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 
 ## TODO
 
+- consider moving the proof-checking part of tools/proof_check_tstp.ml
+    to trace_tstp (can be used for embedded proof checking)
+
 - polymorphism in parser and meta-prover (allow vars to have non ground type)
 - typing in meta-prover, with typing preconditions (for expressing sets with types)
 

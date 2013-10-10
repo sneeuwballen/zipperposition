@@ -46,6 +46,9 @@ val parse_file : recursive:bool -> string -> Ast_tptp.declaration Sequence.t
       parsed. It uses {!find_file} for included files.
       @raise ParseError in case a syntax error is met. *)
 
+(* TODO: a function that takes a TPTP file, and returns the list of
+        files that it depends on (recursive includes) *)
+
 (** Printing is simpler, because it does not involve includes. *)
 
 val print_into : out_channel -> Ast_tptp.declaration Sequence.t -> unit
