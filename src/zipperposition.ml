@@ -350,6 +350,12 @@ let save_kb ?meta ~params =
       (fun () -> MetaProverState.save_kb_file meta file)
 
 let () =
+  (* GC! increase max overhead because we want the GC to be faster, even if
+      it implies more wasted memory. *)
+  let gc = Gc.get () in
+  Gc.set { gc with Gc.space_overhead=150; }
+
+let () =
   (* parse arguments *)
   let params = Params.parse_args () in
   Random.init params.param_seed;
