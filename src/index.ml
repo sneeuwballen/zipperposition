@@ -26,8 +26,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Generic term indexing} *)
 
 type scope = Substs.scope
+type term = FOTerm.t
+type subst = Substs.FO.t
 
-module T = Term
+module T = FOTerm
 
 (** {2 Leaf} *)
 
@@ -40,97 +42,97 @@ module type LEAF = sig
   module S : Set.S with type elt = elt
 
   val empty : t
-  val add : t -> Term.t -> elt -> t
-  val remove : t -> Term.t -> elt -> t
+  val add : t -> term -> elt -> t
+  val remove : t -> term -> elt -> t
   val is_empty : t -> bool
-  val iter : t -> (Term.t -> S.t -> unit) -> unit
-  val fold : t -> ('a -> Term.t -> S.t -> 'a) -> 'a -> 'a
+  val iter : t -> (term -> S.t -> unit) -> unit
+  val fold : t -> ('a -> term -> S.t -> 'a) -> 'a -> 'a
   val size : t -> int
 
-  val fold_unify : t -> scope -> Term.t -> scope -> 'a ->
-                    ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
-    (** Unify the given term with indexed terms *)
+  val fold_unify : t -> scope -> term -> scope -> 'a ->
+                    ('a -> term -> elt -> subst -> 'a) -> 'a
+    (** FOUnify the given term with indexed terms *)
 
-  val fold_match: t -> scope -> Term.t -> scope -> 'a ->
-                  ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val fold_match: t -> scope -> term -> scope -> 'a ->
+                  ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the indexed terms against the given query term *)
 
-  val fold_matched: t -> scope -> Term.t -> scope -> 'a ->
-                    ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val fold_matched: t -> scope -> term -> scope -> 'a ->
+                    ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the query term against the indexed terms *)
 end
 
 module MakeLeaf(X : Set.OrderedType) = struct
   module S = Set.Make(X)
 
-  type t = S.t T.TMap.t
+  type t = S.t T.Map.t
 
   type elt = X.t
 
-  let empty = T.TMap.empty
+  let empty = T.Map.empty
 
   let _find leaf t =
-    try T.TMap.find t leaf with Not_found -> S.empty
+    try T.Map.find t leaf with Not_found -> S.empty
 
   let add leaf t data =
     let set = _find leaf t in
     let set = S.add data set in
-    T.TMap.add t set leaf
+    T.Map.add t set leaf
 
   let remove leaf t data =
     try
-      let set = T.TMap.find t leaf in
+      let set = T.Map.find t leaf in
       let set = S.remove data set in
       if S.is_empty set
-        then T.TMap.remove t leaf
-        else T.TMap.add t set leaf
+        then T.Map.remove t leaf
+        else T.Map.add t set leaf
     with Not_found ->
       leaf
 
-  let is_empty = T.TMap.is_empty
+  let is_empty = T.Map.is_empty
 
   let iter leaf f =
-    T.TMap.iter (fun t set -> f t set) leaf
+    T.Map.iter (fun t set -> f t set) leaf
 
   let fold leaf f acc =
-    T.TMap.fold (fun t set acc -> f acc t set) leaf acc
+    T.Map.fold (fun t set acc -> f acc t set) leaf acc
 
   let size leaf =
     let cnt = ref 0 in
-    T.TMap.iter (fun _ set -> cnt := !cnt + S.cardinal set) leaf;
+    T.Map.iter (fun _ set -> cnt := !cnt + S.cardinal set) leaf;
     !cnt
 
   let fold_unify leaf sc_leaf t sc_t acc k =
-    T.TMap.fold
+    T.Map.fold
       (fun t' set acc ->
         try
-          let subst = Unif.unification t' sc_leaf t sc_t in
+          let subst = FOUnif.unification t' sc_leaf t sc_t in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
-        with Unif.Fail -> acc)
+        with FOUnif.Fail -> acc)
       leaf acc
 
   let fold_match leaf sc_leaf t sc_t acc k =
-    T.TMap.fold
+    T.Map.fold
       (fun t' set acc ->
         try
-          let subst = Unif.matching t' sc_leaf t sc_t in
+          let subst = FOUnif.matching t' sc_leaf t sc_t in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
-        with Unif.Fail -> acc)
+        with FOUnif.Fail -> acc)
       leaf acc
 
   let fold_matched leaf sc_leaf t sc_t acc k =
-    T.TMap.fold
+    T.Map.fold
       (fun t' set acc ->
         try
-          let subst = Unif.matching t sc_t t' sc_leaf in
+          let subst = FOUnif.matching t sc_t t' sc_leaf in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
-        with Unif.Fail -> acc)
+        with FOUnif.Fail -> acc)
       leaf acc
 end
 
@@ -150,22 +152,22 @@ module type TERM_IDX = sig
 
   val size : t -> int
 
-  val add : t -> Term.t -> elt -> t
+  val add : t -> term -> elt -> t
 
-  val remove : t -> Term.t -> elt -> t
+  val remove : t -> term -> elt -> t
 
-  val iter : t -> (Term.t -> Leaf.S.t -> unit) -> unit
+  val iter : t -> (term -> Leaf.S.t -> unit) -> unit
 
-  val fold : t -> ('a -> Term.t -> Leaf.S.t -> 'a) -> 'a -> 'a
+  val fold : t -> ('a -> term -> Leaf.S.t -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : t -> scope -> Term.t -> scope -> 'a ->
-                            ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val retrieve_unifiables : t -> scope -> term -> scope -> 'a ->
+                            ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_generalizations : t -> scope -> Term.t -> scope -> 'a ->
-                                ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val retrieve_generalizations : t -> scope -> term -> scope -> 'a ->
+                                ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_specializations : t -> scope -> Term.t -> scope -> 'a ->
-                                 ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val retrieve_specializations : t -> scope -> term -> scope -> 'a ->
+                                 ('a -> term -> elt -> subst -> 'a) -> 'a
 
   val to_dot : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
     (** print oneself in DOT into the given file *)
@@ -173,7 +175,7 @@ end
 
 (** {2 Subsumption Index} *)
 
-type lits = (Term.t * Term.t * bool) Sequence.t
+type lits = (term * term * bool) Sequence.t
   (** Sequence of literals, as a cheap abstraction on query clauses *)
 
 module type CLAUSE = sig
@@ -231,7 +233,7 @@ module type EQUATION = sig
   val compare : t -> t -> int
     (** Total order on equations *)
 
-  val extract : t -> (Term.t * rhs * bool)
+  val extract : t -> (term * rhs * bool)
     (** Obtain a representation of the (in)equation. The sign indicates
         whether it is an equation [l = r] (if true) or an inequation
         [l != r] (if false) *)
@@ -266,11 +268,11 @@ module type UNIT_IDX = sig
   val size : t -> int
     (** Number of indexed (in)equations *)
 
-  val iter : t -> (Term.t -> E.t -> unit) -> unit
+  val iter : t -> (term -> E.t -> unit) -> unit
     (** Iterate on indexed equations *)
 
-  val retrieve : sign:bool -> t -> scope -> Term.t -> scope -> 'a ->
-                 ('a -> Term.t -> rhs -> E.t -> Substs.t -> 'a) ->
+  val retrieve : sign:bool -> t -> scope -> term -> scope -> 'a ->
+                 ('a -> term -> rhs -> E.t -> subst -> 'a) ->
                  'a
       (** [retrieve ~sign (idx,si) (t,st) acc] folds on
           (in)equations l ?= r of given [sign] and substitutions [subst],

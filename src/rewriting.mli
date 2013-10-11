@@ -23,7 +23,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Term rewriting} *)
+(** {1 FOTerm rewriting} *)
 
 (* FIXME: allow one to specify depth of rewritten term EVERYWHERE *)
 
@@ -48,19 +48,19 @@ module type ORDERED = sig
 
   val size : t -> int
   
-  val mk_rewrite : t -> size:int -> (Term.t -> Term.t)
+  val mk_rewrite : t -> size:int -> (FOTerm.t -> FOTerm.t)
     (** Given a TRS and a cache size, build a memoized function that
         performs term rewriting *)
 end
 
-module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) : ORDERED with module E = E
+module MakeOrdered(E : Index.EQUATION with type rhs = FOTerm.t) : ORDERED with module E = E
 
 (** {2 Regular rewriting} *)
 
 module type SIG_TRS = sig
   type t
 
-  type rule = Term.t * Term.t
+  type rule = FOTerm.t * FOTerm.t
     (** rewrite rule, from left to right *)
 
   val empty : t 
@@ -76,15 +76,15 @@ module type SIG_TRS = sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
   
-  val rule_to_form : rule -> Formula.t
+  val rule_to_form : rule -> FOFormula.t
     (** Make a formula out of a rule (an equality) *)
 
-  val rewrite_collect : ?depth:int -> t -> Term.t -> Term.t * rule list
+  val rewrite_collect : ?depth:int -> t -> FOTerm.t -> FOTerm.t * rule list
     (** Compute normal form of the term, and also return the list of
         rules that were used.
         @param depth the number of surrounding binders (default 0) *)
 
-  val rewrite : ?depth:int -> t -> Term.t -> Term.t
+  val rewrite : ?depth:int -> t -> FOTerm.t -> FOTerm.t
     (** Compute normal form of the term.
         see {!rewrite_collect}. *)
 end
@@ -94,12 +94,12 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
 
 module TRS : SIG_TRS
 
-(** {2 Formula rewriting} *)
+(** {2 FOFormula rewriting} *)
 
 module FormRW : sig
   type t
 
-  type rule = Term.t * Formula.t
+  type rule = FOTerm.t * FOFormula.t
     (** rewrite rule, from left to right *)
 
   val empty : t 
@@ -108,8 +108,8 @@ module FormRW : sig
   val add_seq : t -> rule Sequence.t -> t
   val add_list : t -> rule list -> t
 
-  val add_term_rule : t -> (Term.t * Term.t) -> t
-  val add_term_rules : t -> (Term.t * Term.t) list -> t
+  val add_term_rule : t -> (FOTerm.t * FOTerm.t) -> t
+  val add_term_rules : t -> (FOTerm.t * FOTerm.t) list -> t
 
   val to_seq : t -> rule Sequence.t
   val of_seq : rule Sequence.t -> t
@@ -118,14 +118,14 @@ module FormRW : sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
 
-  val rule_to_form : rule -> Formula.t
+  val rule_to_form : rule -> FOFormula.t
     (** Convert the rule back to a term *)
 
-  val rewrite_collect : ?depth:int -> t -> Formula.t -> Formula.t * rule list
+  val rewrite_collect : ?depth:int -> t -> FOFormula.t -> FOFormula.t * rule list
     (** Compute normal form of the formula, and return it together with
         the list of rules that were used to rewrite.
         @param depth the number of surrounding binders *)
 
-  val rewrite : ?depth:int -> t -> Formula.t -> Formula.t
+  val rewrite : ?depth:int -> t -> FOFormula.t -> FOFormula.t
     (** see {!rewrite_collect} *)
 end

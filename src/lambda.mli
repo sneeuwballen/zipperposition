@@ -24,26 +24,22 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Higher Order operations} *)
+(** {1 Lambda-Calculus} *)
 
-(** Higher order formulas and terms are represented by terms. *)
+type term = HOTerm.t
 
-val curry : Term.t -> Term.t                    (** Curry all subterms *)
-val uncurry : Term.t -> Term.t                  (** Un-curry all subterms *)
-val curried : Term.t -> bool                    (** Is the term already curried? *)
+val beta_reduce : ?depth:int -> term -> term
+  (** Beta-reduce the term *)
 
-val is_fo : Term.t -> bool                      (** Check whehter the (curried) term is first-order *)
+val eta_reduce : term -> term
+  (** Eta-reduce the term *)
 
-val beta_reduce : ?depth:int -> Term.t -> Term.t  (** Beta-reduce the (curried) term *)
-
-val eta_reduce : Term.t -> Term.t               (** Eta-reduce the (curried) term *)
-
-val lambda_abstract : signature:Signature.t -> Term.t -> Term.t -> Term.t
-  (** [lambda_abstract t sub_t], applied to a curried term [t], and a
-      subterm [sub_t] of [t], gives [t'] such that
-      [beta_reduce (t' @ sub_t) == t] holds.
+val lambda_abstract : signature:Signature.t -> term -> term -> term
+  (** [lambda_abstract term sub_t], applied to a curried term [term], and a
+      subterm [sub_t] of [term], gives [term'] such that
+      [beta_reduce (term' @ sub_t) == term] holds.
       It basically abstracts out [sub_t] with a lambda. If [sub_t] is not
-      a subterm of [t], then [t' == ^[X]: t].
+      a subterm of [term], then [term' == ^[X]: term].
 
       For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
       the term [^[X]: f(a, X @ b, c)].
@@ -52,8 +48,8 @@ val lambda_abstract : signature:Signature.t -> Term.t -> Term.t -> Term.t
       to infer the type of the lambda-bound variable
   *)
 
-val lambda_abstract_list : signature:Signature.t -> Term.t -> Term.t list -> Term.t
+val lambda_abstract_list : signature:Signature.t -> term -> term list -> term
   (** Abstract successively the given subterms, starting from the
       left ones (the closer from the left, the deeper the lambda) *)
 
-val lambda_apply_list : Term.t -> Term.t list -> Term.t
+val lambda_apply_list : term -> term list -> term

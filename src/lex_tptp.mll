@@ -90,11 +90,9 @@ rule token = parse
   | "!>" { FORALL_TY }
   | '!' { FORALL }
   | '?' { EXISTS }
-  | '^' { LAMBDA }
   | "$true" { TRUE }
   | "$false" { FALSE }
   | "$tType" { TYPE_TY }
-  | '@' { AT }
   (* | ';' { SEMICOLUMN } *)
   | ':' { COLUMN }
   | '>' { ARROW }

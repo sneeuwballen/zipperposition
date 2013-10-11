@@ -25,9 +25,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Precedence (total ordering) on symbols} *)
 
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 module PO = PartialOrder
+
+type constr = Symbol.t -> Symbol.t -> int
+  (** an ordering constraint (a possibly non-total ordering on symbols) *)
+
+type  clause = FOFormula.t list
+  (** Abstraction of a clause. It's only a list of terms. *)
 
 type t = {
   prec_snapshot : Symbol.t list;  (** symbols in decreasing order *)
@@ -37,10 +43,6 @@ type t = {
   prec_add_symbols : Symbol.t list -> t * int;
     (** add the given symbols to the precedenc (returns how many are new) *)
 } (** A total ordering on symbols *)
-and constr = Symbol.t -> Symbol.t -> int
-  (** an ordering constraint (a possibly non-total ordering on symbols) *)
-and clause = Formula.t list
-  (** Abstraction of a clause. It's only a list of terms. *)
 
 let eq p1 p2 =
   List.length p1.prec_snapshot = List.length p2.prec_snapshot
@@ -122,10 +124,6 @@ let invfreq_constraint formulas =
   let rec form_freq f = F.iter term_freq f
   and term_freq t = match t.T.term with
     | T.Var _ | T.BoundVar _ -> ()
-    | T.Bind (_, t') ->
-      term_freq t'  (* do not bother with (special) binder symbols anyway *)
-    | T.At (t1, t2) ->
-      term_freq t1; term_freq t2
     | T.Node (s,l) ->
       (let count = try Symbol.SHashtbl.find freq_table s with Not_found -> 0 in
       Symbol.SHashtbl.replace freq_table s (count+1);

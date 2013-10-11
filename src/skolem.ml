@@ -26,14 +26,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Skolem symbols} *)
 
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
+module S = Substs.FO
 
 type ctx = {
   sc_gensym : Symbol.Gensym.t;                  (* new symbols *)
   mutable sc_var_index : int;                   (* fresh universal vars *)
-  mutable sc_cache : (Term.t * Term.t) list;  (* term -> skolemized term *)
-  mutable sc_fcache : (Formula.t * Formula.t) list; 
+  mutable sc_cache : (T.t * T.t) list;  (* term -> skolemized term *)
+  mutable sc_fcache : (F.t * F.t) list; 
 }
 
 (* TODO: use a term index for the cache? *)
@@ -59,7 +60,7 @@ let fresh_var ~ctx =
   ctx.sc_var_index <- n + 1;
   n
 
-exception FoundVariant of Term.t * Term.t * Substs.t
+exception FoundVariant of T.t * T.t * S.t
 
 let skolem_term ~ctx t =
   let vars = T.vars_prefix_order t in
@@ -68,9 +69,9 @@ let skolem_term ~ctx t =
     List.iter
       (fun (t', new_t') ->
         try
-          let subst = Unif.variant t' 1 t 0  in
+          let subst = FOUnif.variant t' 1 t 0  in
           raise (FoundVariant (t', new_t', subst))
-        with Unif.Fail ->
+        with FOUnif.Fail ->
           ())
       ctx.sc_cache;
     (* not found, use a fresh symbol *)
@@ -82,11 +83,11 @@ let skolem_term ~ctx t =
     ctx.sc_cache <- (t, new_t) :: ctx.sc_cache;
     new_t
   with FoundVariant (t',new_t',subst) ->
-    let renaming = Substs.Renaming.create 5 in
-    let new_t = Substs.apply ~renaming subst new_t' 1 in
+    let renaming = S.Renaming.create 5 in
+    let new_t = S.apply ~renaming subst new_t' 1 in
     new_t
 
-exception FoundFormVariant of Formula.t * Formula.t * Substs.t
+exception FoundFormVariant of F.t * F.t * S.t
 
 let skolem_form ~ctx f =
   let vars = F.free_variables f in
@@ -97,7 +98,7 @@ let skolem_form ~ctx f =
         Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
         Sequence.iter
           (fun subst -> raise (FoundFormVariant (f', new_f', subst)))
-          (Unif.form_variant f' 1 f 0))
+          (FOUnif.form_variant f' 1 f 0))
       ctx.sc_fcache;
     (* fresh symbol *)
     let symb = fresh_sym ~ctx in
@@ -107,8 +108,9 @@ let skolem_form ~ctx f =
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
     new_f
   with FoundFormVariant(f',new_f',subst) ->
-    Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f Substs.pp subst;
-    let renaming = Substs.Renaming.create 5 in
-    let new_f = Substs.apply_f ~renaming subst new_f' 1 in
+    Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f S.pp subst;
+    let renaming = S.Renaming.create 5 in
+    let new_f = S.apply_f ~renaming subst new_f' 1 in
     new_f
 
+let skolem_ho ~ctx f = failwith "Skolem_ho: not implemented"

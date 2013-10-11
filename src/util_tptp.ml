@@ -27,8 +27,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Utils related to TPTP parsing} *)
 
 module A = Ast_tptp
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 
 (** {2 Printing/Parsing} *)
 
@@ -95,9 +95,9 @@ let parse_file ~recursive f =
       in
       List.iter
         (fun decl -> match decl, names with
-          | (A.CNF _ | A.FOF _ | A.TFF _ | A.TypeDecl _ | A.NewType _), None ->
+          | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), None ->
             Queue.push decl result_decls
-          | (A.CNF _ | A.FOF _ | A.TFF _ | A.TypeDecl _ | A.NewType _), Some names ->
+          | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), Some names ->
             if List.mem (A.name_of_decl decl) names
               then Queue.push decl result_decls
               else ()   (* not included *)
@@ -144,6 +144,7 @@ let has_includes decls =
       | A.FOF _
       | A.CNF _
       | A.TFF _
+      | A.THF _
       | A.NewType _
       | A.TypeDecl _ -> false)
     decls
@@ -164,6 +165,7 @@ let infer_type ctx decls =
         List.iter (F.infer_type ctx) c
       | A.FOF(_,_,f,_)
       | A.TFF(_,_,f,_) -> F.infer_type ctx f
+      | A.THF(_,_,f,_) -> ignore (TypeInference.HO.infer ctx f)
       )
     decls
 
@@ -204,7 +206,8 @@ let formulas ?(negate=__is_conjecture) decls =
       | A.TFF(_, role, f, _) ->
         if negate role
           then Some (F.mk_not f)
-          else Some f)
+          else Some f
+      | A.THF _ -> None)
     decls
 
 let sourced_formulas ?(negate=__is_conjecture) ?(file="unknown_file") decls =
@@ -224,5 +227,6 @@ let sourced_formulas ?(negate=__is_conjecture) ?(file="unknown_file") decls =
         let source = A.string_of_name name in
         if negate role
           then Some (F.mk_not f, file, source)
-          else Some (f, file, source))
+          else Some (f, file, source)
+      | A.THF _ -> None)
     decls

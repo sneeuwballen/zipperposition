@@ -1,12 +1,16 @@
 # OASIS_START
-# DO NOT EDIT (digest: 09fe14a3a1f5e67a03095655c347ac84)
+# DO NOT EDIT (digest: abd24efe9e4561890097a80a4c909fbd)
+HO
+FO
 Symbol
 Hash
 Hashcons
-Term
-Formula
+FOTerm
+HOTerm
+FOFormula
 Util
-Unif
+FOUnif
+HOUnif
 Type
 Substs
 Signature
@@ -14,6 +18,8 @@ TypeInference
 Lex_tptp
 Ast_tptp
 Parse_tptp
+Lambda
+Multiset
 Comparison
 PartialOrder
 Precedence
@@ -28,16 +34,11 @@ FeatureVector
 FormulaShape
 Util_tptp
 Skolem
-HO
 Transform
-Multiset
-NPDtree
-Trace_tstp
-CallProver
 lib/Sequence
 lib/Bij
-lib/BV
-lib/Bencode
-lib/QCheck
 lib/Cache
+lib/QCheck
+lib/Bencode
+lib/BV
 # OASIS_STOP

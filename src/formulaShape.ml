@@ -26,8 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 Detect some specific formulas} *)
 
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 
 (* map terms to distinct variables of same type *)
 let __mk_vars args =
@@ -37,11 +37,11 @@ let is_definition f =
   (* check that r is a definition of l=f(x1,...,xn) *)
   let check_def l r =
     match l.T.term with
-    | T.Var _ | T.BoundVar _ | T.Bind _ | T.At _ -> false
+    | T.Var _ | T.BoundVar _ -> false
     | T.Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       let l' = T.mk_node f (__mk_vars ts) in
-      (try ignore(Unif.variant l 0 l' 1); true with Unif.Fail -> false)
+      (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
       && not (T.contains_symbol f r)
       && List.for_all (fun x -> T.var_occurs x l) (T.vars r)
   in
@@ -55,11 +55,11 @@ let is_pred_definition f =
   (* check that r is a predicate definition of l=f(x1,...,xn) *)
   let check_def l r =
     match l.T.term with
-    | T.Var _ | T.BoundVar _ | T.Bind _ | T.At _ -> false
+    | T.Var _ | T.BoundVar _ -> false
     | T.Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       let l' = T.mk_node f (__mk_vars ts) in
-      (try ignore(Unif.variant l 0 l' 1); true with Unif.Fail -> false)
+      (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
       && not (F.contains_symbol f r)
       && List.for_all (fun x -> T.var_occurs x l) (F.free_variables r)
   in
@@ -73,7 +73,7 @@ let is_rewrite_rule f =
   (* check that l -> r is an acceptable rewrite rule *)
   let check_rule l r =
     match l.T.term with
-    | T.Var _ | T.Bind _ | T.BoundVar _ | T.At _ -> false
+    | T.Var _ | T.BoundVar _ -> false
     | T.Node (_, _) -> List.for_all (fun x -> T.var_occurs x l) (T.vars r)
   in
   let f = F.open_forall f in
@@ -86,7 +86,7 @@ let is_pred_rewrite_rule f =
   (* check that l -> r is an acceptable predicate rewrite rule *)
   let check_rule l r =
     match l.T.term with
-    | T.Var _ | T.Bind _ | T.BoundVar _ | T.At _ -> false
+    | T.Var _ | T.BoundVar _ -> false
     | T.Node (_, _) ->
       List.for_all (fun x -> T.var_occurs x l) (F.free_variables r)
   in

@@ -37,9 +37,7 @@ type t = private {
 and term_cell = private
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Bind of Symbol.t * t        (** bind one variable (of given sort), with the symbol *)
   | Node of Symbol.t * t list   (** term application *)
-  | At of t * t                 (** HO application (curried) *)
 and sourced_term =
   t * string * string           (** Term + file,name *)
 
@@ -61,26 +59,12 @@ val compatible_type : t -> t -> bool  (** Unifiable types? false if type missing
 val same_type : t -> t -> bool        (** Alpha-equiv types? false if type missing *)
 val compare_type : t -> t -> int      (** Comparison of types *)
 
-module THashtbl : Hashtbl.S with type key = t
-module TSet : Sequence.Set.S with type elt = t
-module TMap : Sequence.Map.S with type key = t
+module Tbl : Hashtbl.S with type key = t
+module Set : Sequence.Set.S with type elt = t
+module Map : Sequence.Map.S with type key = t
 
 module TCache : Cache.S with type key = t
 module T2Cache : Cache.S2 with type key1 = t and type key2 = t
-
-(** {2 Hashset of terms} *)
-module THashSet : sig
-  type t
-  val create : ?size:int -> unit -> t
-  val cardinal : t -> int
-  val member : t -> term -> bool
-  val iter : t -> (term -> unit) -> unit
-  val add : t -> term -> unit
-  val remove : t -> term -> unit
-  val merge : t -> t -> unit              (** [merge s1 s2] adds elements of s2 to s1 *)
-  val to_list : t -> term list            (** build a list from the set *)
-  val from_list : term list -> t          (** build a set from the list *)
-end
 
 (** {2 Global terms table (hashconsing)} *)
 
@@ -88,11 +72,7 @@ module H : Hashcons.S with type elt = t
 
 (** {2 Boolean flags} *)
 
-val flag_db_closed : int
-val flag_simplified : int
-val flag_normal_form : int
 val flag_ground : int
-val flag_db_closed_computed : int
 
 val set_flag : int -> t -> bool -> unit
   (** set or reset the given flag of the term to bool *)
@@ -105,41 +85,15 @@ val new_flag : unit -> int
 
 (** {2 Smart constructors} *)
 
-val mk_var : ?ty:Type.t -> int -> t        (** Create a variable. The index must be >= 0 *)
-val mk_bound_var : ?ty:Type.t -> int -> t  (** De Bruijn index, must be >= 0 *)
-
-val mk_bind : Symbol.t -> t -> t
-  (** [mk_bind s t] binds the De Bruijn 0 in [t]. *)
-
-val mk_node : Symbol.t -> t list -> t
-val mk_const : Symbol.t -> t
-
-val mk_at : t -> t -> t
-val mk_at_list : t -> t list -> t
+val mk_var : ?ty:Type.t -> int -> t        (** Create a variable. *)
+val mk_bound_var : ?ty:Type.t -> int -> t  (** Create a De Bruijn index. *)
+val mk_node : Symbol.t -> t list -> t       (** Application *)
+val mk_const : Symbol.t -> t              (** Shortcut for constants *)
 
 val true_term : t                        (** tautology symbol *)
 val false_term : t                       (** antilogy symbol *)
 
-val mk_not : t -> t
-val mk_and : t -> t -> t
-val mk_or : t -> t -> t
-val mk_imply : t -> t -> t
-val mk_equiv : t -> t -> t
-val mk_xor : t -> t -> t
-val mk_eq : t -> t -> t
-val mk_neq : t -> t -> t
-val mk_lambda : t -> t
-val mk_forall : t -> t
-val mk_exists : t -> t
-
-val mk_and_list : t list -> t
-val mk_or_list : t list -> t
-
-(** {2 Typing} *)
-
-val is_bool : t -> bool               (** Boolean typed? *)
 val cast : t -> Type.t -> t           (** Set the type *)
-val arity : t -> int                  (** Arity, or 0 if it makes no sense *)
 
 (** {2 Subterms and positions} *)
 
@@ -147,8 +101,6 @@ val is_var : t -> bool
 val is_bound_var : t -> bool
 val is_node : t -> bool
 val is_const : t -> bool
-val is_at : t -> bool
-val is_bind : t -> bool
 
 val at_pos : t -> Position.t -> t 
   (** retrieve subterm at pos, or raise Invalid_argument*)
@@ -156,21 +108,21 @@ val at_pos : t -> Position.t -> t
 val replace_pos : t -> Position.t -> t -> t
   (** replace t|_p by the second term *)
 
-val replace : t -> old:term -> by:term -> t
+val replace : t -> old:t -> by:t -> t
   (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
       in [t] by the term [by]. *)
 
-val at_cpos : term -> int -> term
+val at_cpos : t -> int -> t
   (** retrieve subterm at the compact pos, or raise Invalid_argument*)
 
-val max_cpos : term -> int
+val max_cpos : t -> int
   (** maximum compact position in the term *)
 
 val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)
 val is_ground : t -> bool                (** is the term ground? (no free vars) *)
 val max_var : varlist -> int             (** find the maximum variable index, or 0 *)
 val min_var : varlist -> int             (** minimum variable, or 0 if ground *)
-val add_vars : THashSet.t -> t -> unit   (** add variables of the term to the set *)
+val add_vars : unit Tbl.t -> t -> unit   (** add variables of the term to the set *)
 val vars : t -> varlist                  (** compute variables of the term *)
 val vars_list : t list -> varlist        (** variables of terms in the list *)
 val vars_seq : t Sequence.t -> varlist   (** variables of terms in the sequence *)
@@ -179,10 +131,7 @@ val depth : t -> int                     (** depth of the term *)
 val head : t -> Symbol.t                  (** head symbol (or Invalid_argument) *)
 val size : t -> int
 
-(** {2 De Bruijn indexes} *)
-
-val atomic : t -> bool                   (** atomic proposition, or term, at root *)
-val atomic_rec : t -> bool               (** does not contain connectives/quantifiers *)
+(** {2 De Bruijn Indexes manipulations} *)
 
 val db_closed : ?depth:int -> t -> bool
   (** check whether the term is closed (all DB vars are bound within the term) *)
@@ -213,24 +162,8 @@ val db_from_var : ?depth:int -> t -> t -> t
 
 (** {2 High-level operations} *)
 
-(** constructors with free variables. The first argument is the
-    list of variables that is bound, then the quantified/abstracted
-    term. *)
-
-val mk_lambda_var : t list -> t -> t   (** (lambda v1,...,vn. t). *)
-val mk_forall_var : t list -> t -> t
-val mk_exists_var : t list -> t -> t
-
-val close_forall : t -> t             (** Bind all free variables by 'forall' *)
-val close_exists : t -> t             (** Bind all free variables by 'exists' *)
-
 val symbols : t Sequence.t -> Symbol.SSet.t   (** Symbols of the terms (keys of signature) *)
 val contains_symbol : Symbol.t -> t -> bool   (** Does the term contain the symbol *)
-
-val db_to_classic : ?varindex:int ref -> t -> t
-  (** Transform binders and De Bruijn indexes into regular variables.
-      [varindex] is a variable counter used to give fresh variables
-      names to De Bruijn indexes. *)
 
 (** {2 Fold} *)
 
@@ -264,9 +197,6 @@ val ac_symbols : is_ac:(Symbol.t -> bool) -> t Sequence.t -> Symbol.SSet.t
   (** Set of symbols occurring in the terms, that are AC *)
 
 (** {2 Printing/parsing} *)
-
-(** First, full functions with the amount of surrounding binders; then helpers
-    in the case this amount is 0 (for instance in clauses) *)
 
 val pp_depth : int -> Buffer.t -> t -> unit
 val pp_tstp_depth : int -> Buffer.t -> t -> unit

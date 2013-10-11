@@ -31,12 +31,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 
-module T = Term
-
 (** {2 Typing context} *)
 
 module Ctx = struct
-
   type t = {
     st : Type.Stack.t;              (* bindings stack *)
     default : Type.t;               (* default type *)
@@ -129,126 +126,204 @@ end
 
 (** {2 Hindley-Milner} *)
 
-(* infer a type for [t], possibly updating [ctx]. If [check] is true,
-   will type-check recursively in the term even if it's not needed to
-   compute its type. *)
-let rec _infer_rec ~check ctx t =
-  let open Type.Infix in
-  match t.T.term with
-  | T.Var _ ->
-    begin match t.T.type_ with
-    | Some ty -> Type.instantiate ty
-    | None -> failwith (Util.sprintf "type_infer: free var %a without type" T.pp t)
-    end
-  | T.BoundVar i ->
-    begin match t.T.type_ with
-    | None -> Ctx.db_type ctx i
-    | Some ty ->
-      let ty' = Ctx.db_type ctx i in
-      Ctx.unify ctx ty' (Type.instantiate ty);
-      ty'
-    end
-  | T.At (t1, t2) ->
-    let ty1 = _infer_rec ~check ctx t1 in
-    let ty2 = _infer_rec ~check ctx t2 in
-    (* t1 : ty1, t2 : ty2. Now we must also have
-       ty1 = ty2 -> ty1_ret, ty1_ret being the result type *)
-    let ty1_ret = Type.new_gvar () in
-    Ctx.unify ctx ty1 (ty1_ret <=. ty2);
-    ty1_ret
-  | T.Bind (s, t') ->
-    Ctx.within_binder ctx
-      (fun v ->
-        let ty_t' = _infer_rec ~check ctx t' in
-        (* generalize w.r.t [v] if it's still free *)
-        Type.close_var v;
-        ty_t')
-  | T.Node (s, []) -> Ctx.type_of_fun ctx s
-  | T.Node (s, l) ->
-    let ty_s = Ctx.type_of_fun ctx s in
-    begin match ty_s with
-    | Type.Fun (ret, _) when (not check) && Type.is_ground ret ->
-      ret  (* no need to recurse *)
-    | Type.App (_, _) when (not check) && Type.is_ground ty_s ->
-      ty_s (* no need to recurse *)
-    | _ ->
-      let ty_l = List.fold_right
-        (fun t' ty_l -> _infer_rec ~check ctx t' :: ty_l) l [] in
-      (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
-          The result is 'a. *)
-      let ty_ret = Type.new_gvar () in
-      Ctx.unify ctx ty_s (ty_ret <== ty_l);
-      ty_ret
-    end
-
-(* wrapper to [infer_rec], with profiling *)
-let infer_type_of ~check ctx t =
-  Util.enter_prof prof_infer;
-  try
-    let res = _infer_rec ~check ctx t in
-    Util.exit_prof prof_infer;
-    res
-  with e ->
-    Util.exit_prof prof_infer;
-    raise e
-
-let infer ctx t =
-  let check = true in
-  let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
-  Type.deref ty
-
-let infer_sig signature t =
-  let ctx = Ctx.of_signature signature in
-  let check = true in
-  let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
-  Type.deref ty
-
-let infer_no_check ctx t =
-  let check = false in
-  let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
-  Type.deref ty
-
-let constrain_term_term ctx t1 t2 =
-  let check = true in
-  Ctx.unwind_protect ctx
-    (fun () ->
-      let ty1 = infer_type_of ~check ctx t1 in
-      let ty2 = infer_type_of ~check ctx t2 in
-      Ctx.unify ctx ty1 ty2)
-
-let constrain_term_type ctx t ty =
-  let check = true in
-  Ctx.unwind_protect ctx
-    (fun () ->
-      let ty' = infer_type_of ~check ctx t in
-      Ctx.unify ctx ty' (Type.instantiate ty))
-
-let check_term_type ctx t ty =
-  let check = false in
-  Ctx.protect ctx
-    (fun () ->
-      let ty_t = infer_type_of ~check ctx t in
-      Type.unifiable ty ty_t)
-
 let check_type_type ctx ty1 ty2 =
   Type.unifiable ty1 ty2
-
-let check_term_term ctx t1 t2 =
-  let check = false in
-  Ctx.protect ctx
-    (fun () ->
-      let ty1 = infer_type_of ~check ctx t1 in
-      let ty2 = infer_type_of ~check ctx t2 in
-      Type.unifiable ty1 ty2)
-
-let check_term_term_sig signature t1 t2 =
-  let ctx = Ctx.of_signature signature in
-  check_term_term ctx t1 t2
-
-let check_term_type_sig signature t1 ty2 =
-  let ctx = Ctx.of_signature signature in
-  check_term_type ctx t1 ty2
 
 let check_type_type_sig signature ty1 ty2 =
   let ctx = Ctx.of_signature signature in
   check_type_type ctx ty1 ty2
+
+module type S = sig
+  type term
+
+  val infer : Ctx.t -> term -> Type.t
+    (** Infer the type of this term under the given signature.  This updates
+        the context's typing environment!
+        @raise Type.Error if the types are inconsistent *)
+
+  val infer_sig : Signature.t -> term -> Type.t
+    (** Inference from a signature (shortcut) *)
+
+  val infer_no_check : Ctx.t -> term -> Type.t
+    (** Infer the type of the term, but does not recurse if it's not needed. *)
+
+  (** {3 Constraining types} *)
+
+  val constrain_term_term : Ctx.t -> term -> term -> unit
+    (** Force the two terms to have the same type
+        @raise Type.Error if an inconsistency is detected *)
+
+  val constrain_term_type : Ctx.t -> term -> Type.t -> unit
+    (** Force the term to have the given type.
+        @raise Type.Error if an inconsistency is detected *)
+
+  (** {3 Checking compatibility} *)
+
+  val check_term_type : Ctx.t -> term -> Type.t -> bool
+    (** Check whether this term can be used with this type *)
+
+  val check_term_term : Ctx.t -> term -> term -> bool
+    (** Can we unify the terms' types? *)
+
+  val check_term_term_sig : Signature.t -> term -> term -> bool
+
+  val check_term_type_sig : Signature.t -> term -> Type.t -> bool
+end
+
+(* build an instance of {!S}, given the function that infers the type
+    of a term. *)
+module Make(T : sig
+  type term
+  val infer_rec : check:bool -> Ctx.t -> term -> Type.t
+end) = struct
+  type term = T.term
+
+  (* wrapper to [infer_rec], with profiling *)
+  let infer_type_of ~check ctx t =
+    Util.enter_prof prof_infer;
+    try
+      let res = T.infer_rec ~check ctx t in
+      Util.exit_prof prof_infer;
+      res
+    with e ->
+      Util.exit_prof prof_infer;
+      raise e
+
+  let infer ctx t =
+    let check = true in
+    let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
+    Type.deref ty
+
+  let infer_sig signature t =
+    let ctx = Ctx.of_signature signature in
+    let check = true in
+    let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
+    Type.deref ty
+
+  let infer_no_check ctx t =
+    let check = false in
+    let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
+    Type.deref ty
+
+  let constrain_term_term ctx t1 t2 =
+    let check = true in
+    Ctx.unwind_protect ctx
+      (fun () ->
+        let ty1 = infer_type_of ~check ctx t1 in
+        let ty2 = infer_type_of ~check ctx t2 in
+        Ctx.unify ctx ty1 ty2)
+
+  let constrain_term_type ctx t ty =
+    let check = true in
+    Ctx.unwind_protect ctx
+      (fun () ->
+        let ty' = infer_type_of ~check ctx t in
+        Ctx.unify ctx ty' (Type.instantiate ty))
+
+  let check_term_type ctx t ty =
+    let check = false in
+    Ctx.protect ctx
+      (fun () ->
+        let ty_t = infer_type_of ~check ctx t in
+        Type.unifiable ty ty_t)
+
+  let check_term_term ctx t1 t2 =
+    let check = false in
+    Ctx.protect ctx
+      (fun () ->
+        let ty1 = infer_type_of ~check ctx t1 in
+        let ty2 = infer_type_of ~check ctx t2 in
+        Type.unifiable ty1 ty2)
+
+  let check_term_term_sig signature t1 t2 =
+    let ctx = Ctx.of_signature signature in
+    check_term_term ctx t1 t2
+
+  let check_term_type_sig signature t1 ty2 =
+    let ctx = Ctx.of_signature signature in
+    check_term_type ctx t1 ty2
+end
+
+module FO = Make(struct
+  module T = FOTerm
+
+  type term = T.t
+
+  (* infer a type for [t], possibly updating [ctx]. If [check] is true,
+     will type-check recursively in the term even if it's not needed to
+     compute its type. *)
+  let rec infer_rec ~check ctx t =
+    let open Type.Infix in
+    match t.T.term with
+    | T.Var _ ->
+      begin match t.T.type_ with
+      | Some ty -> Type.instantiate ty
+      | None -> failwith (Util.sprintf "type_infer: free var %a without type" T.pp t)
+      end
+    | T.BoundVar i ->
+      begin match t.T.type_ with
+      | None -> Ctx.db_type ctx i
+      | Some ty ->
+        let ty' = Ctx.db_type ctx i in
+        Ctx.unify ctx ty' (Type.instantiate ty);
+        ty'
+      end
+    | T.Node (s, []) -> Ctx.type_of_fun ctx s
+    | T.Node (s, l) ->
+      let ty_s = Ctx.type_of_fun ctx s in
+      begin match ty_s with
+      | Type.Fun (ret, _) when (not check) && Type.is_ground ret ->
+        ret  (* no need to recurse *)
+      | Type.App (_, _) when (not check) && Type.is_ground ty_s ->
+        ty_s (* no need to recurse *)
+      | _ ->
+        let ty_l = List.fold_right
+          (fun t' ty_l -> infer_rec ~check ctx t' :: ty_l) l [] in
+        (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
+            The result is 'a. *)
+        let ty_ret = Type.new_gvar () in
+        Ctx.unify ctx ty_s (ty_ret <== ty_l);
+        ty_ret
+      end
+end)
+
+module HO = Make(struct
+  module T = HOTerm
+  type term = T.t
+
+  (* infer a type for [t], possibly updating [ctx]. If [check] is true,
+     will type-check recursively in the term even if it's not needed to
+     compute its type. *)
+  let rec infer_rec ~check ctx t =
+    let open Type.Infix in
+    match t.T.term with
+    | T.Var _ ->
+      begin match t.T.type_ with
+      | Some ty -> Type.instantiate ty
+      | None -> failwith (Util.sprintf "type_infer: free var %a without type" T.pp t)
+      end
+    | T.BoundVar i ->
+      begin match t.T.type_ with
+      | None -> Ctx.db_type ctx i
+      | Some ty ->
+        let ty' = Ctx.db_type ctx i in
+        Ctx.unify ctx ty' (Type.instantiate ty);
+        ty'
+      end
+    | T.At (t1, t2) ->
+      let ty1 = infer_rec ~check ctx t1 in
+      let ty2 = infer_rec ~check ctx t2 in
+      (* t1 : ty1, t2 : ty2. Now we must also have
+         ty1 = ty2 -> ty1_ret, ty1_ret being the result type *)
+      let ty1_ret = Type.new_gvar () in
+      Ctx.unify ctx ty1 (ty1_ret <=. ty2);
+      ty1_ret
+    | T.Bind (s, t') ->
+      Ctx.within_binder ctx
+        (fun v ->
+          let ty_t' = infer_rec ~check ctx t' in
+          (* generalize w.r.t [v] if it's still free *)
+          Type.close_var v;
+          ty_t')
+    | T.Const s -> Ctx.type_of_fun ctx s
+end)

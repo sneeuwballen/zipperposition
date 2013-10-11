@@ -39,10 +39,10 @@ val fresh_sym : ctx:ctx -> Symbol.t
 val fresh_var : ctx:ctx -> int
   (** Unique index for universal variables *)
 
-val update_var : ctx:ctx -> Term.t -> unit
+val update_var : ctx:ctx -> FOTerm.t -> unit
   (** Avoid collisions with variables of this term in calls to {!fresh_var}. *)
 
-val skolem_term : ctx:ctx -> Term.t -> Term.t
+val skolem_term : ctx:ctx -> FOTerm.t -> FOTerm.t
   (** Skolemize the given term at root (assumes it occurs just under an
       existential quantifier, whose De Bruijn variable is replaced
       by a fresh symbol applied to free variables). This also
@@ -53,5 +53,9 @@ val skolem_term : ctx:ctx -> Term.t -> Term.t
       something like [p(a, b, sk42(X), X)].
       *)
 
-val skolem_form : ctx:ctx -> Formula.t -> Formula.t
+val skolem_form : ctx:ctx -> FOFormula.t -> FOFormula.t
   (** Skolemize the De Bruijn index 0 in this formula. *)
+
+val skolem_ho : ctx:ctx -> HOTerm.t -> HOTerm.t
+  (** SKolemize a higher order term *)
+

@@ -26,8 +26,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 First-order Formulas} *)
 
-module T = Term
+module T = FOTerm
 module S = Symbol
+
+type term = FOTerm.t
 
 type t = {
   form : cell;
@@ -37,13 +39,13 @@ type t = {
 and cell =
   | True
   | False
-  | Atom of Term.t
+  | Atom of term
   | And of t list
   | Or of t list
   | Not of t
   | Imply of t * t
   | Equiv of t * t
-  | Equal of Term.t * Term.t
+  | Equal of term * term
   | Forall of t    (** Quantified formula, with De Bruijn *)
   | Exists of t
 
@@ -321,10 +323,10 @@ let weight f =
   in
   count 0 f
 
-let add_terms set f = iter (T.THashSet.add set) f
+let add_terms set f = iter (fun t -> T.Tbl.replace set t ()) f
 
 let terms f =
-  let set = T.THashSet.create () in
+  let set = T.Tbl.create 6 in
   add_terms set f;
   set
 
@@ -343,9 +345,9 @@ let var_occurs v f =
   subterm v f
 
 let free_variables f =
-  let set = T.THashSet.create () in
+  let set = T.Tbl.create 5 in
   iter (fun t -> T.add_vars set t) f;
-  T.THashSet.to_list set
+  T.Tbl.fold (fun v () acc -> v :: acc) set []
 
 let is_atomic f = match f.form with
   | And _
@@ -379,7 +381,6 @@ let rec is_ground f =
       in
       let () = if res then set_flag f flag_ground in
       res
-
 
 let is_closed f =
   match free_variables f with
@@ -599,6 +600,7 @@ let ac_eq f1 f2 =
 let __cache_f2t = FCache.create 513
 
 let to_term f =
+  let module T = HOTerm in
   FCache.with_cache_rec __cache_f2t
     (fun to_term f ->
     match f.form with
@@ -608,32 +610,41 @@ let to_term f =
     | Or l -> T.mk_or_list (List.map to_term l)
     | Equiv (f1, f2) -> T.mk_equiv (to_term f1) (to_term f2)
     | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
-    | Equal (t1, t2) -> T.mk_eq t1 t2
+    | Equal (t1, t2) -> T.mk_eq (T.curry t1) (T.curry t2)
     | Not f' -> T.mk_not (to_term f')
     | Forall f' -> T.mk_forall (to_term f')
     | Exists f' -> T.mk_exists (to_term f')
-    | Atom p -> p)
+    | Atom p -> T.curry p)
     f
 
 let of_term t =
+  let module T = HOTerm in
   let rec recurse t = match t.T.term with
   | _ when t == T.true_term -> mk_true
   | _ when t == T.false_term -> mk_false
-  | T.Node (s, l) when S.eq s S.and_symbol -> mk_and (List.map recurse l)
-  | T.Node (s, l) when S.eq s S.or_symbol -> mk_or (List.map recurse l)
-  | T.Node (s, [a;b]) when S.eq s S.equiv_symbol ->
-    mk_equiv (recurse a) (recurse b)
-  | T.Node (s, [a;b]) when S.eq s S.imply_symbol ->
-    mk_imply (recurse a) (recurse b)
-  | T.Node (s, [a]) when S.eq s S.not_symbol ->
-    mk_not (recurse a)
-  | T.Node (s, [a;b]) when S.eq s S.eq_symbol ->
-    mk_eq a b
   | T.Bind (s, f') when S.eq s S.forall_symbol ->
     mk_forall (recurse f')
   | T.Bind (s, f') when S.eq s S.exists_symbol ->
     mk_exists (recurse f')
-  | _ -> mk_atom t  (* default: atom *)
+  | T.Bind _ -> failwith "unknown binder"
+  | T.Const s -> mk_atom (FOTerm.mk_const s)
+  | T.At _ ->
+    begin match T.open_at t with
+    | {T.term=T.Const s}, l when S.eq s S.and_symbol ->
+      mk_and (List.map recurse l)
+    | {T.term=T.Const s}, l when S.eq s S.or_symbol ->
+      mk_or (List.map recurse l)
+    | {T.term=T.Const s}, [a; b] when S.eq s S.or_symbol ->
+      mk_equiv (recurse a) (recurse b)
+    | {T.term=T.Const s}, [a; b] when S.eq s S.imply_symbol ->
+      mk_imply (recurse a) (recurse b)
+    | {T.term=T.Const s}, [a; b] when S.eq s S.eq_symbol ->
+      mk_eq (T.uncurry a) (T.uncurry b)
+    | {T.term=T.Const s}, [t'] when S.eq s S.not_symbol ->
+      mk_not (recurse t')
+    | _ -> mk_atom (T.uncurry t)
+    end
+  | T.Var _ | T.BoundVar _ -> failwith "F.of_term: not first-order"
   in
   recurse t
 
@@ -643,9 +654,9 @@ let rec infer_type ctx f = match f.form with
   | True
   | False -> ()
   | Atom p ->
-    TypeInference.constrain_term_type ctx p Type.o
+    TypeInference.FO.constrain_term_type ctx p Type.o
   | Equal (t1, t2) ->
-    TypeInference.constrain_term_term ctx t1 t2
+    TypeInference.FO.constrain_term_term ctx t1 t2
   | And l
   | Or l -> List.iter (infer_type ctx) l
   | Forall f'
@@ -796,7 +807,7 @@ let bij =
   Bij.(map
     ~inject:to_term
     ~extract:of_term
-    T.bij)
+    HOTerm.bij)
 
 let arbitrary_atom =
   QCheck.Arbitrary.(choose

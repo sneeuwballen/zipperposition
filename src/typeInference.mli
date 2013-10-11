@@ -93,40 +93,48 @@ end
 
 (** {2 Hindley-Milner} *)
 
-val infer : Ctx.t -> Term.t -> Type.t
-  (** Infer the type of this term under the given signature.  This updates
-      the context's typing environment!
-      @raise Type.Error if the types are inconsistent *)
-
-val infer_sig : Signature.t -> Term.t -> Type.t
-  (** Inference from a signature (shortcut) *)
-
-val infer_no_check : Ctx.t -> Term.t -> Type.t
-  (** Infer the type of the term, but does not recurse if it's not needed. *)
-
-(** {3 Constraining types} *)
-
-val constrain_term_term : Ctx.t -> Term.t -> Term.t -> unit
-  (** Force the two terms to have the same type
-      @raise Type.Error if an inconsistency is detected *)
-
-val constrain_term_type : Ctx.t -> Term.t -> Type.t -> unit
-  (** Force the term to have the given type.
-      @raise Type.Error if an inconsistency is detected *)
-
-(** {3 Checking compatibility} *)
-
-val check_term_type : Ctx.t -> Term.t -> Type.t -> bool
-  (** Check whether this term can be used with this type *)
-
-val check_term_term : Ctx.t -> Term.t -> Term.t -> bool
-  (** Can we unify the terms' types? *)
-
 val check_type_type : Ctx.t -> Type.t -> Type.t -> bool
   (** Can we unify the two types? *)
 
-val check_term_term_sig : Signature.t -> Term.t -> Term.t -> bool
-
-val check_term_type_sig : Signature.t -> Term.t -> Type.t -> bool
-
 val check_type_type_sig : Signature.t -> Type.t -> Type.t -> bool
+
+module type S = sig
+  type term
+
+  val infer : Ctx.t -> term -> Type.t
+    (** Infer the type of this term under the given signature.  This updates
+        the context's typing environment!
+        @raise Type.Error if the types are inconsistent *)
+
+  val infer_sig : Signature.t -> term -> Type.t
+    (** Inference from a signature (shortcut) *)
+
+  val infer_no_check : Ctx.t -> term -> Type.t
+    (** Infer the type of the term, but does not recurse if it's not needed. *)
+
+  (** {3 Constraining types} *)
+
+  val constrain_term_term : Ctx.t -> term -> term -> unit
+    (** Force the two terms to have the same type
+        @raise Type.Error if an inconsistency is detected *)
+
+  val constrain_term_type : Ctx.t -> term -> Type.t -> unit
+    (** Force the term to have the given type.
+        @raise Type.Error if an inconsistency is detected *)
+
+  (** {3 Checking compatibility} *)
+
+  val check_term_type : Ctx.t -> term -> Type.t -> bool
+    (** Check whether this term can be used with this type *)
+
+  val check_term_term : Ctx.t -> term -> term -> bool
+    (** Can we unify the terms' types? *)
+
+  val check_term_term_sig : Signature.t -> term -> term -> bool
+
+  val check_term_type_sig : Signature.t -> term -> Type.t -> bool
+end
+
+module FO : S with type term = FOTerm.t
+
+module HO : S with type term = HOTerm.t

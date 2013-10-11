@@ -30,6 +30,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     functions, and smart constructors that perform some basic
     simplifications *)
 
+type term = FOTerm.t
+
 (* TODO: attributes, to speed up
     simplification/flattening/groundness/closenes checking *)
 
@@ -41,13 +43,13 @@ type t = private {
 and cell = private
   | True
   | False
-  | Atom of Term.t
+  | Atom of term
   | And of t list
   | Or of t list
   | Not of t
   | Imply of t * t
   | Equiv of t * t
-  | Equal of Term.t * Term.t
+  | Equal of term * term
   | Forall of t    (** Quantified formula, with De Bruijn *)
   | Exists of t
 
@@ -61,15 +63,15 @@ val hash_novar : t -> int
 
 val mk_true : t
 val mk_false : t
-val mk_atom : Term.t -> t
+val mk_atom : term -> t
 val mk_not : t -> t
 val mk_and : t list -> t
 val mk_or : t list -> t
 val mk_imply : t -> t -> t
 val mk_equiv : t -> t -> t
 val mk_xor : t -> t -> t
-val mk_eq : Term.t -> Term.t -> t
-val mk_neq : Term.t -> Term.t -> t
+val mk_eq : term -> term -> t
+val mk_neq : term -> term -> t
 val mk_forall : t -> t
 val mk_exists : t -> t
 
@@ -89,12 +91,12 @@ val map_leaf : (t -> t) -> t -> t
       leaves by their image. The image formulas should {b not} contain
       free De Bruijn indexes (ie, should verify {! db_closed}). *)
 
-val map : (Term.t -> Term.t) -> t -> t    (** Map on terms *)
-val fold : ('a -> Term.t -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
-val iter : (Term.t -> unit) -> t -> unit
+val map : (term -> term) -> t -> t    (** Map on terms *)
+val fold : ('a -> term -> 'a) -> 'a -> t -> 'a  (** Fold on terms *)
+val iter : (term -> unit) -> t -> unit
 
 val map_depth: ?depth:int ->
-                (int -> Term.t -> Term.t) ->
+                (int -> term -> term) ->
                 t -> t
   (** Map each term to another term. The number of binders from the root
       of the formula to the term is given to the function. *)
@@ -104,7 +106,7 @@ val map_leaf_depth : ?depth:int ->
                       t -> t
 
 val fold_depth : ?depth:int ->
-              ('a -> int -> Term.t -> 'a) ->
+              ('a -> int -> term -> 'a) ->
               'a -> t -> 'a
   (** Fold on terms, but with an additional argument, the number of
       De Bruijn indexes bound on through the path to the term *)
@@ -112,21 +114,21 @@ val fold_depth : ?depth:int ->
 val weight : t -> int
   (** Number of 'nodes' of the formula, including the terms *)
 
-(** The following functions gather the terms of a formula. *)
+(** The following functions gather the subterms of a formula. *)
 
-val add_terms : Term.THashSet.t -> t -> unit
-val terms : t -> Term.THashSet.t
+val add_terms : unit FOTerm.Tbl.t -> t -> unit
+val terms : t -> unit FOTerm.Tbl.t
 
-val terms_seq : t -> Term.t Sequence.t
-  (** Sequence of terms. Terms may occur several times *)
+val terms_seq : t -> term Sequence.t
+  (** Sequence of terms. FOTerms may occur several times *)
 
-val subterm : Term.t -> t -> bool
+val subterm : term -> t -> bool
   (** [subterm t f] true iff [t] occurs in some term of [f] *)
 
-val free_variables : t -> Term.varlist
+val free_variables : t -> FOTerm.varlist
   (** Variables not bound by any (formula) quantifier *)
 
-val var_occurs : Term.t -> t -> bool
+val var_occurs : term -> t -> bool
 
 val is_atomic : t -> bool   (** No connectives? *)
 val is_ground : t -> bool   (** No variables? *)
@@ -142,7 +144,7 @@ val db_closed : t -> bool
 val db_contains : t -> int -> bool
   (** Does the formula contain the De Bruijn variable of index n? *)
 
-val db_replace : t -> Term.t -> t
+val db_replace : t -> term -> t
   (** Replace De Bruijn index 0 by the given term *)
 
 val db_type : t -> int -> Type.t option
@@ -152,14 +154,14 @@ val db_lift : t -> t
 
 val db_unlift : ?depth:int -> t -> t
 
-val db_from_term : ?ty:Type.t -> t -> Term.t -> t
+val db_from_term : ?ty:Type.t -> t -> term -> t
   (** Replace the given term by a De Bruijn index *)
 
-val db_from_var : t -> Term.t -> t
+val db_from_var : t -> term -> t
   (** Replace the given variable by a De Bruijn index *)
 
-val mk_forall_list : Term.t list -> t -> t
-val mk_exists_list : Term.t list -> t -> t
+val mk_forall_list : term list -> t -> t
+val mk_exists_list : term list -> t -> t
 
 val close_forall : t -> t   (** Bind all free variables with forall *)
 val close_exists : t -> t   (** Bind all free variables with exists *)
@@ -185,8 +187,8 @@ val ac_eq : t -> t -> bool  (** Equal modulo AC? *)
 
 (** {2 Conversions} *)
 
-val to_term : t -> Term.t   (** Conversion to term *)
-val of_term : Term.t -> t
+val to_term : t -> HOTerm.t   (** Conversion to higher-order term *)
+val of_term : HOTerm.t -> t
 
 (** {2 Typing} *)
 

@@ -26,8 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Parser} *)
 
 %{
-  module T = Term
-  module F = Formula
+  module T = FOTerm
+  module F = FOFormula
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
@@ -96,8 +96,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %token FORALL
 %token EXISTS
-%token LAMBDA
-%token AT
 
 %token UNDERSCORE
 
@@ -113,7 +111,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %left VLINE
 %left AND
-%left AT
 %nonassoc EQUIV
 %nonassoc XOR
 %nonassoc IMPLY
@@ -121,11 +118,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %nonassoc NOTVLINE
 %nonassoc NOTAND
 
-%start <Term.t> parse_term
-%start <Formula.t> parse_formula
+%start <FOTerm.t> parse_term
+%start <FOFormula.t> parse_formula
 %start <Ast_tptp.declaration> parse_declaration
 %start <Ast_tptp.declaration list> parse_declarations
-%start <Term.t list list> parse_answer_tuple
+%start <FOTerm.t list list> parse_answer_tuple
 
 %%
 
@@ -253,9 +250,6 @@ atomic_formula:
 term:
   | function_term { $1 }
   | variable { $1 }
-  | l=term AT r=term { T.mk_at l r }
-  | LAMBDA LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN t=term
-    { T.mk_lambda_var vars t }
   /* | conditional_term { $1 }  for TFF */
   /* | let_term { $1 } */
 

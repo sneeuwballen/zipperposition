@@ -23,9 +23,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Term Orderings} *)
+(** {1 FOTerm Orderings} *)
 
-module T = Term
+module T = FOTerm
 
 let prof_rpo = Util.mk_profiler "compare_rpo"
 let prof_rpo6 = Util.mk_profiler "compare_rpo6"
@@ -37,7 +37,7 @@ open Comparison
 
 type t = {
   ord_clear_cache : unit -> unit;                 (** Clear underlying cache *)
-  ord_compare : Term.t -> Term.t -> Comparison.t; (** Compare two terms *)
+  ord_compare : FOTerm.t -> FOTerm.t -> Comparison.t; (** Compare two terms *)
   ord_precedence : Precedence.t;                  (** Current precedence *)
   ord_set_precedence : Precedence.t -> t;         (** Change the precedence *)
   ord_name : string;                              (** Name of the ordering *)
@@ -79,7 +79,7 @@ module type S = sig
    * - stable for instantiation
    * - monotonic
    * - total on ground terms *)
-  val compare_terms : prec:Precedence.t -> Term.t -> Term.t -> Comparison.t
+  val compare_terms : prec:Precedence.t -> FOTerm.t -> FOTerm.t -> Comparison.t
 
   val name : string
 end
@@ -150,14 +150,10 @@ module KBO = struct
         if pos
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
-      | T.Bind (s, t') ->
-        let wb' = if pos then wb + prec.prec_weight s else wb - prec.prec_weight s in
-        balance_weight wb' t' y pos
       | T.BoundVar _ -> (if pos then wb + 1 else wb - 1), false
       | T.Node (s, l) ->
         let wb' = if pos then wb + prec.prec_weight s else wb - prec.prec_weight s in
         balance_weight_rec wb' l y pos false
-      | T.At _ -> failwith "KBO for curried terms not implemented"
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms y pos res = match terms with
       | [] -> (wb, res)
@@ -201,21 +197,13 @@ module KBO = struct
         add_neg_var balance y;
         let wb', contains = balance_weight wb t1 y true in
         (wb' - 1, if contains then Gt else Incomparable)
-      (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
+      (* node/node, De Bruijn/De Bruijn *)
       | T.Node (f, ss), T.Node (g, ts) -> tckbo_composite wb f g ss ts
-      | T.Bind (f, t1'), T.Bind (g, t2') -> tckbo_composite wb f g [t1'] [t2']
       | T.BoundVar i, T.BoundVar j ->
         (wb, if i = j && T.same_type t1 t2 then Eq else Incomparable)
       (* node and something else *)
-      | T.Node (f, ss), T.Bind (g, t2') -> tckbo_composite wb f g ss [t2']
       | T.Node (f, ss), T.BoundVar _ -> tckbo_composite wb f Symbol.db_symbol ss []
-      | T.Bind (f, t1'), T.Node (g, ts) -> tckbo_composite wb f g [t1'] ts
       | T.BoundVar _, T.Node (g, ts) -> tckbo_composite wb Symbol.db_symbol g [] ts
-      (* De Bruijn with Bind *)
-      | T.Bind (f, t1'), T.BoundVar _ -> tckbo_composite wb f Symbol.db_symbol [t1'] []
-      | T.BoundVar _, T.Bind (g, t2') -> tckbo_composite wb Symbol.db_symbol g [] [t2']
-      | T.At _, _
-      | _, T.At _ -> failwith "KBO for curried terms not implemented"
     (** tckbo, for composite terms (ie non variables). It takes a symbol
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
@@ -274,21 +262,13 @@ module RPO6 = struct
     | T.Var _, T.Var _ -> Incomparable
     | _, T.Var _ -> if T.var_occurs t s then Gt else Incomparable
     | T.Var _, _ -> if T.var_occurs s t then Lt else Incomparable
-    (* node/node, De Bruijn/De Bruijn, Bind/Bind *)
+    (* node/node, De Bruijn/De Bruijn *)
     | T.Node (f, ss), T.Node (g, ts) -> rpo6_composite ~prec s t f g ss ts
-    | T.Bind (f, s'), T.Bind (g, t') -> rpo6_composite ~prec s t f g [s'] [t']
     | T.BoundVar i, T.BoundVar j ->
       if i = j && T.same_type s t then Eq else Incomparable
     (* node and something else *)
-    | T.Node (f, ss), T.Bind (g, t') -> rpo6_composite ~prec s t f g ss [t']
     | T.Node (f, ss), T.BoundVar _ -> rpo6_composite ~prec s t f Symbol.db_symbol ss []
-    | T.Bind (f, s'), T.Node (g, ts) -> rpo6_composite ~prec s t f g [s'] ts
     | T.BoundVar _, T.Node (g, ts) -> rpo6_composite ~prec s t Symbol.db_symbol g [] ts
-    (* De Bruijn with Bind *)
-    | T.Bind (f, s'), T.BoundVar _ -> rpo6_composite ~prec s t f Symbol.db_symbol [s'] []
-    | T.BoundVar _, T.Bind (g, t') -> rpo6_composite ~prec s t Symbol.db_symbol g [] [t']
-    | T.At _, _
-    | _, T.At _ -> failwith "RPO for curried terms not implemented"
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match prec.prec_compare f g with

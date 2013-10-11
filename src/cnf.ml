@@ -25,9 +25,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Reduction to CNF and simplifications} *)
 
-module T = Term
+module T = FOTerm
 module S = Symbol
-module F = Formula
+module F = FOFormula
 
 (* check whether the formula is already in CNF *)
 let rec is_cnf f = match f.F.form with
@@ -181,7 +181,7 @@ and product a b =
       acc b)
     [] a
 
-type clause = Formula.t list
+type clause = F.t list
   (** Basic clause representation, as list of literals *)
 
 (* Transform the clause into proper CNF; returns a list of clauses *)

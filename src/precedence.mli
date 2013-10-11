@@ -25,6 +25,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Precedence (total ordering) on symbols} *)
 
+type constr = Symbol.t -> Symbol.t -> int
+  (** an ordering constraint (a possibly non-total ordering on symbols) *)
+
+type  clause = FOFormula.t list
+  (** Abstraction of a clause. It's only a list of terms. *)
+
 type t = {
   prec_snapshot : Symbol.t list;  (** symbols in decreasing order *)
   prec_compare : Symbol.t -> Symbol.t -> int;       (** Compare symbols *)
@@ -33,10 +39,6 @@ type t = {
   prec_add_symbols : Symbol.t list -> t * int;
     (** add the given symbols to the precedenc (returns how many are new) *)
 } (** A total ordering on symbols *)
-and constr = Symbol.t -> Symbol.t -> int
-  (** an ordering constraint (a possibly non-total ordering on symbols) *)
-and clause = Formula.t list
-  (** Abstraction of a clause. It's only a list of formulas. *)
 
 val eq : t -> t -> bool
   (** Check whether the two precedences are equal (same snapshot) *)
@@ -71,7 +73,7 @@ val list_constraint : Symbol.t list -> constr
 val arity_constraint : Signature.t -> constr
   (** decreasing arity constraint *)
 
-val invfreq_constraint : Formula.t Sequence.t -> constr
+val invfreq_constraint : FOFormula.t Sequence.t -> constr
   (** symbols with high frequency are smaller *)
 
 val max_constraint : Symbol.t list -> constr

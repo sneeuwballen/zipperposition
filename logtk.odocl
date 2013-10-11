@@ -1,12 +1,16 @@
 # OASIS_START
-# DO NOT EDIT (digest: 55063fa524ac6c774d92c856779ad236)
+# DO NOT EDIT (digest: ac0f54101b2466b4e866e25815c58e05)
+src/HO
+src/FO
 src/Symbol
 src/Hash
 src/Hashcons
-src/Term
-src/Formula
+src/FOTerm
+src/HOTerm
+src/FOFormula
 src/Util
-src/Unif
+src/FOUnif
+src/HOUnif
 src/Type
 src/Substs
 src/Signature
@@ -14,6 +18,8 @@ src/TypeInference
 src/Lex_tptp
 src/Ast_tptp
 src/Parse_tptp
+src/Lambda
+src/Multiset
 src/Comparison
 src/PartialOrder
 src/Precedence
@@ -28,17 +34,13 @@ src/FeatureVector
 src/FormulaShape
 src/Util_tptp
 src/Skolem
-src/HO
 src/Transform
-src/Multiset
-src/NPDtree
-src/Trace_tstp
-src/CallProver
 src/lib/Sequence
 src/lib/Bij
-src/lib/BV
-src/lib/Bencode
+src/lib/Cache
 src/lib/QCheck
+src/lib/Bencode
+src/lib/BV
 src/meta/MetaPattern
 src/meta/MetaKB
 src/meta/MetaReasoner

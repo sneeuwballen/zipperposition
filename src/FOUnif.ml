@@ -25,11 +25,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Unification and matching algorithms} *)
 
-module T = Term
-module S = Substs
-module F = Formula
+module T = FOTerm
+module S = Substs.FO
+module F = FOFormula
 
-open Term
+open T
+
+type term = FOTerm.t
+type subst = Substs.FO.t
 
 let prof_unification = Util.mk_profiler "unification"
 let prof_matching = Util.mk_profiler "matching"
@@ -42,7 +45,7 @@ let types signature t1 t2 =
   if T.is_var t1 || T.is_var t2
     then
       let ctx = TypeInference.Ctx.of_signature signature in
-      TypeInference.check_term_term ctx t1 t2
+      TypeInference.FO.check_term_term ctx t1 t2
     else true
 
 (** Does [v] appear in [t] if we apply the substitution? *)
@@ -56,9 +59,7 @@ let occurs_check subst v sc_v t sc_t =
               check v sc_v t' sc_t'
         with Not_found -> false)
       | BoundVar _ -> false
-      | Bind (_, t') -> check v sc_v t' sc_t
       | Node (_, l) -> check_list v sc_v l sc_t
-      | At (t1, t2) -> check v sc_v t1 sc_t || check v sc_v t2 sc_t
   and check_list v sc_v l sc_l = match l with
   | [] -> false
   | t::l' -> check v sc_v t sc_l || check_list v sc_v l' sc_l
@@ -85,13 +86,9 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
       if occurs_check subst t sc_t s sc_s
         then raise Fail (* occur check *)
         else S.bind subst t sc_t s sc_s (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 sc_s l2 sc_t
-    | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 sc_s t1 sc_t in
-      unif subst s2 sc_s t2 sc_t
     | _, _ -> raise Fail
   (* unify pair of lists of terms *)
   and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
@@ -129,13 +126,9 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
           (* occur check, or [s] is not in the initial
              context [sc_a] in which variables can be bound. *)
         else S.bind subst s sc_s t sc_t (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 sc_s l2 sc_t
-    | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 sc_s t1 sc_t in
-      unif subst s2 sc_s t2 sc_t
     | _, _ -> raise Fail
   (* unify pair of lists of terms *)
   and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
@@ -167,13 +160,9 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
       raise Fail (* terms are not equal, and ground. failure. *)
     | Var i, Var j when i <> j && sc_s = sc_t -> raise Fail
     | Var _, Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when f == g -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
       unif_list subst l1 sc_s l2 sc_t
-    | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 sc_s t1 sc_t in
-      unif subst s2 sc_s t2 sc_t
     | _, _ -> raise Fail
   (* unify pair of lists of terms *)
   and unif_list subst l1 sc_1 l2 sc_2 = match l1, l2 with
@@ -227,8 +216,6 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
             (* occur check, or [s] is not in the initial
                context [sc_a] in which variables can be bound. *)
           else k (S.bind subst s sc_s t sc_t) (* bind s and continue *)
-      | Bind (f, t1'), Bind (g, t2') when f == g ->
-        unif subst t1' sc_s t2' sc_t k
       | BoundVar i, BoundVar j -> if i = j then k subst
       | Node (f, l1), Node (g, l2) when f == g && is_ac f ->
         (* flatten into a list of terms that do not have [f] as head symbol *)
@@ -242,9 +229,6 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
         unif_com subst x1 y1 sc_s x2 y2 sc_t k
       | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
         unif_list subst l1 sc_s l2 sc_t k  (* regular decomposition *)
-      | At (s1, s2), At (t1, t2) ->
-        unif subst s1 sc_s t1 sc_t
-          (fun subst' -> unif subst' s2 sc_s t2 sc_t k)
       | _, _ -> ()  (* failure, close branch *)
   (* unify pair of lists of terms, with given continuation. *)
   and unif_list subst l1 sc_1 l2 sc_2 k =

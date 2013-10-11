@@ -23,12 +23,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Term rewriting} *)
+(** {1 T rewriting} *)
 
 
-module T = Term
-module F = Formula
-module S = Substs
+module T = FOTerm
+module F = FOFormula
+module S = Substs.FO
 
 let prof_ordered_rewriting = Util.mk_profiler "rewriting.ordered"
 let stat_ordered_rewriting = Util.mk_stat "rewriting.ordered.steps"
@@ -36,7 +36,7 @@ let stat_ordered_rewriting = Util.mk_stat "rewriting.ordered.steps"
 (** {2 Ordered rewriting} *)
 
 module TermHASH = struct
-  type t = Term.t
+  type t = T.t
   let equal = (==)
   let hash t = t.T.tag
 end
@@ -59,17 +59,17 @@ module type ORDERED = sig
 
   val size : t -> int
   
-  val mk_rewrite : t -> size:int -> (Term.t -> Term.t)
+  val mk_rewrite : t -> size:int -> (T.t -> T.t)
     (** Given a TRS and a cache size, build a memoized function that
         performs term rewriting *)
 end
 
-module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
+module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
   module E = E
 
   type rule = {
-    rule_left : Term.t;     (** Pattern *)
-    rule_right : Term.t;    (** Result *)
+    rule_left : T.t;     (** Pattern *)
+    rule_right : T.t;    (** Result *)
     rule_oriented : bool;   (** Is the rule already oriented? *)
     rule_equation: E.t;     (** User-defined equation *)
   } (** A rule, oriented or not *)
@@ -88,7 +88,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
 
   module DT = Dtree.Make(struct
     type t = rule
-    type rhs = Term.t
+    type rhs = T.t
     let compare = cmp_rule
     let extract r = r.rule_left, r.rule_right, true
     let priority = rule_priority
@@ -143,7 +143,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
 
   let size trs = DT.size trs.rules
   
-  exception RewrittenInto of Term.t
+  exception RewrittenInto of T.t
 
   (** Given a TRS and a cache size, build a memoized function that
       performs term rewriting *)
@@ -152,20 +152,12 @@ module MakeOrdered(E : Index.EQUATION with type rhs = Term.t) = struct
     let rec reduce reduce' t =
       match t.T.term with
       | T.Var _ | T.BoundVar _ -> t
-      | T.Bind (s, t') ->
-        let t' = reduce' t' in
-        T.mk_bind s t'
       | T.Node (s, l) ->
         let l' = List.map reduce' l in
         let t' = if List.for_all2 (==) l l'
           then t
           else T.mk_node s l' in
         (* now rewrite the term itself *)
-        rewrite_here reduce' t'
-      | T.At (t1, t2) ->
-        let t1' = reduce' t1 in
-        let t2' = reduce' t2 in
-        let t' = T.mk_at t1' t2' in
         rewrite_here reduce' t'
     (* rewrite once at this position. If it succeeds,
        yields back to [reduce]. *)
@@ -207,7 +199,7 @@ end
 module type SIG_TRS = sig
   type t
 
-  type rule = Term.t * Term.t
+  type rule = T.t * T.t
     (** rewrite rule, from left to right *)
 
   val empty : t 
@@ -223,26 +215,26 @@ module type SIG_TRS = sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
   
-  val rule_to_form : rule -> Formula.t
+  val rule_to_form : rule -> F.t
     (** Make a formula out of a rule (an equality) *)
 
-  val rewrite_collect : ?depth:int -> t -> Term.t -> Term.t * rule list
+  val rewrite_collect : ?depth:int -> t -> T.t -> T.t * rule list
     (** Compute normal form of the term, and also return the list of
         rules that were used.
         @param depth the number of surrounding binders (default 0) *)
 
-  val rewrite : ?depth:int -> t -> Term.t -> Term.t
+  val rewrite : ?depth:int -> t -> T.t -> T.t
     (** Compute normal form of the term.
         @see {!rewrite_collect}. *)
 end
 
 module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E) = struct
-  type rule = Term.t * Term.t
+  type rule = T.t * T.t
 
   (** Instance of discrimination tree indexing} *)
   module Idx = I(struct
     type t = rule
-    type rhs = Term.t
+    type rhs = T.t
     let compare (l1,r1) (l2,r2) =
       Util.lexicograph_combine [T.compare l1 l2; T.compare r1 r2]
     let extract (l,r) = (l,r,true)
@@ -250,7 +242,7 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
   end)
 
   type t = Idx.t
-    (** Term Rewriting System *)
+    (** T Rewriting System *)
 
   let empty = Idx.empty
 
@@ -287,17 +279,13 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
 
   (** {2 Computation of normal forms} *)
 
-  exception RewrittenIn of Term.t * Substs.t * rule
+  exception RewrittenIn of T.t * S.t * rule
 
   (** Compute normal form of the term, and set its binding to the normal form *)
   let rewrite_collect ?(depth=0) trs t = 
     (* compute normal form of [subst(t, offset)] *)
     let rec compute_nf ~depth ~rules subst t offset =
       match t.T.term with
-      | T.Bind (s, t') ->
-        let t'' = compute_nf ~depth:(depth+1) ~rules subst t' offset in
-        let new_t = T.mk_bind s t'' in
-        reduce_at_root ~depth ~rules new_t
       | T.Node (hd, l) ->
         (* rewrite subterms first *)
         let l' = List.map (fun t' -> compute_nf ~depth ~rules subst t' offset) l in
@@ -309,18 +297,13 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
           lhs are bound to vars in offset 0 *)
         S.apply_no_renaming ~depth subst t offset
       | T.BoundVar _ -> t
-      | T.At (t1, t2) ->
-        let t1' = compute_nf ~depth ~rules subst t1 offset in
-        let t2' = compute_nf ~depth ~rules subst t2 offset in
-        let t' = T.mk_at t1' t2' in
-        reduce_at_root ~depth ~rules t'
     (* assuming subterms of [t] are in normal form, reduce the term *)
     and reduce_at_root ~depth ~rules t =
       try
         Idx.retrieve ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst, rule)) ->
-        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' Substs.pp subst;
+        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' S.pp subst;
         rules := rule :: !rules;
         compute_nf ~depth ~rules subst t' 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
@@ -339,15 +322,15 @@ end
 
 module TRS = MakeTRS(Dtree.Make)
 
-(** {2 Formula Rewriting } *)
+(** {2 F Rewriting } *)
 
 module FormRW = struct
-  type rule = Term.t * Formula.t
+  type rule = T.t * F.t
 
   (** Instance of discrimination tree indexing} *)
   module DT = Dtree.Make(struct
     type t = rule
-    type rhs = Formula.t
+    type rhs = F.t
     let compare (l1,r1) (l2,r2) = 
       Util.lexicograph_combine [T.compare l1 l2; F.compare r1 r2]
     let extract (l,r) = (l,r,true)
@@ -355,7 +338,7 @@ module FormRW = struct
   end)
 
   type t = DT.t
-    (** Term Rewriting System *)
+    (** T Rewriting System *)
 
   let empty = DT.empty
 
@@ -399,7 +382,7 @@ module FormRW = struct
 
   (** {2 Computation of normal forms} *)
 
-  exception RewrittenIn of Formula.t * Substs.t * rule
+  exception RewrittenIn of F.t * S.t * rule
 
   (** Compute normal form of the formula *)
   let rewrite_collect ?(depth=0) frs f =
@@ -422,7 +405,7 @@ module FormRW = struct
         DT.retrieve ~sign:true frs 1 t 0 () rewrite_handler;
         F.mk_atom t  (* normal form is itself *)
       with (RewrittenIn (f, subst, rule)) ->
-        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t F.pp f Substs.pp subst;
+        Util.debug 3 "rewrite %a into %a (with %a)" T.pp t F.pp f S.pp subst;
         rules := rule :: !rules;
         compute_nf ~depth ~rules subst f 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)

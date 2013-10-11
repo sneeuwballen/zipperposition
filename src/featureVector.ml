@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 (** Feature Vector indexing (see Schulz 2004) for efficient forward
     and backward subsumption *)
 
-module T = Term
+module T = FOTerm
 
 module Make(C : Index.CLAUSE) = struct
   module C = C
@@ -65,12 +65,9 @@ module Make(C : Index.CLAUSE) = struct
     let rec _depth_term depth t = match t.T.term with
       | T.Var _
       | T.BoundVar _ -> 0
-      | T.Bind (_, t') -> _depth_term (depth+1) t'
       | T.Node (_, l) ->
         let depth' = depth + 1 in
         List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
-      | T.At (t1, t2) ->
-        _depth_term (depth+1) t1 + _depth_term (depth+1) t2
 
     (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
        is at depth 0) *)
@@ -92,11 +89,7 @@ module Make(C : Index.CLAUSE) = struct
             (if Symbol.has_attr Symbol.attr_split s
               then Symbol.SHashtbl.replace table s ());
             List.iter gather l
-          | T.BoundVar _ | T.Var _ | T.At _ -> ()
-          | T.Bind (s, t') ->
-            (if Symbol.has_attr Symbol.attr_split s
-              then Symbol.SHashtbl.replace table s ());
-            gather t'
+          | T.BoundVar _ | T.Var _ -> ()
           in
           Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
           Symbol.SHashtbl.length table);
@@ -112,11 +105,7 @@ module Make(C : Index.CLAUSE) = struct
             (if Symbol.has_attr Symbol.attr_skolem s
               then Symbol.SHashtbl.replace table s ());
             List.iter gather l
-          | T.BoundVar _ | T.Var _ | T.At _ -> ()
-          | T.Bind (s, t') ->
-            (if Symbol.has_attr Symbol.attr_skolem s
-              then Symbol.SHashtbl.replace table s ());
-            gather t'
+          | T.BoundVar _ | T.Var _ -> ()
           in
           Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
           Symbol.SHashtbl.length table);
@@ -125,9 +114,7 @@ module Make(C : Index.CLAUSE) = struct
     (* iterate on symbols of a term *)
     let rec _iter_symb t k = match t.T.term with
       | T.Var _ | T.BoundVar _ -> ()
-      | T.Bind (s, t') -> k s; _iter_symb t' k
       | T.Node (s, l) -> k s; List.iter (fun t -> _iter_symb t k) l
-      | T.At (t1, t2) -> _iter_symb t1 k; _iter_symb t2 k
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
@@ -150,17 +137,11 @@ module Make(C : Index.CLAUSE) = struct
     let rec max_depth_term symb t depth =
       match t.T.term with
       | T.Var _ | T.BoundVar _ -> -1
-      | T.Bind (s, t') ->
-        let cur_depth = if Symbol.eq s symb then depth else -1 in
-        max cur_depth (max_depth_term symb t' (depth+1))
       | T.Node (s, l) ->
         let cur_depth = if Symbol.eq s symb then depth else -1 in
         List.fold_left
           (fun maxdepth subterm -> max maxdepth (max_depth_term symb subterm (depth+1)))
           cur_depth l
-      | T.At (t1, t2) ->
-        let depth' = depth + 1 in
-        max (max_depth_term symb t1 depth') (max_depth_term symb t2 depth')
 
     let max_depth_plus symb =
       { name = Util.sprintf "max_depth+(%a)" Symbol.pp symb;

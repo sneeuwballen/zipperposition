@@ -25,10 +25,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 TPTP Ast} *)
 
+module F = FOFormula
+module HOT = HOTerm
+
 type declaration =
-  | CNF of name * role * Formula.t list * optional_info
-  | FOF of name * role * Formula.t * optional_info
-  | TFF of name * role * Formula.t * optional_info
+  | CNF of name * role * FOFormula.t list * optional_info
+  | FOF of name * role * FOFormula.t * optional_info
+  | TFF of name * role * FOFormula.t * optional_info
+  | THF of name * role * HOTerm.t * optional_info
   | TypeDecl of name * Symbol.t * Type.t  (* type declaration *)
   | NewType of name * string  (* declare new type constant... *)
   | Include of string
@@ -66,6 +70,7 @@ let name_of_decl = function
   | CNF (n, _, _, _) -> n
   | FOF (n, _, _, _) -> n
   | TFF (n, _, _, _) -> n
+  | THF (n, _, _, _) -> n
   | TypeDecl (n, _, _) -> n
   | NewType (n, _) -> n
   | IncludeOnly _
@@ -152,14 +157,14 @@ let pp_generals buf l =
 let fmt_generals fmt l =
   Sequence.pp_seq fmt_general fmt (Sequence.of_list l)
 
-let __pp_formula buf (logic, name, role, f, generals) =
+let __pp_formula buf pp (logic, name, role, f, generals) =
   match generals with
   | [] ->
     Printf.bprintf buf "%s(%a, %a, (%a))."
-      logic pp_name name pp_role role Formula.pp_tstp f
+      logic pp_name name pp_role role pp f
   | _::_ ->
     Printf.bprintf buf "%s(%a, %a, (%a), %a)." logic pp_name name pp_role role
-      Formula.pp_tstp f pp_generals generals
+      pp f pp_generals generals
 
 let pp_declaration buf = function
   | Include filename -> Printf.bprintf buf "include('%s')." filename
@@ -171,18 +176,13 @@ let pp_declaration buf = function
   | NewType (name, s) ->
     Printf.bprintf buf "tff(%a, type, (%s: $tType))." pp_name name s
   | CNF (name, role, c, generals) ->
-    begin  match generals with
-    | [] ->
-      Printf.bprintf buf "cnf(%a, %a, (%a))." pp_name name pp_role role
-        (Util.pp_list ~sep:" | " Formula.pp_tstp) c
-    | _::_ ->
-      Printf.bprintf buf "cnf(%a, %a, (%a), %a)." pp_name name pp_role role
-        (Util.pp_list ~sep:" | " Formula.pp_tstp) c pp_generals generals
-    end
+    __pp_formula buf (Util.pp_list ~sep:" | " F.pp_tstp) ("cnf", name, role, c, generals)
   | FOF (name, role, f, generals) ->
-    __pp_formula buf ("fof", name, role, f, generals)
+    __pp_formula buf F.pp_tstp ("fof", name, role, f, generals)
   | TFF (name, role, f, generals) ->
-    __pp_formula buf ("tff", name, role, f, generals)
+    __pp_formula buf F.pp_tstp ("tff", name, role, f, generals)
+  | THF (name, role, f, generals) ->
+    __pp_formula buf HOT.pp_tstp ("thf", name, role, f, generals)
 
 let fmt_declaration fmt decl =
   Format.pp_print_string fmt (Util.sprintf "%a" pp_declaration decl)

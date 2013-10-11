@@ -28,26 +28,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** See "computing small normal forms", in the handbook of automated reasoning.
     All transformations are made on curried terms and formulas. *)
 
-val is_cnf : Formula.t -> bool
+val is_cnf : FOFormula.t -> bool
   (** Is the formula in CNF? *)
 
-val is_lit : Formula.t -> bool
+val is_lit : FOFormula.t -> bool
   (** Literal? *)
 
-val is_clause : Formula.t list -> bool
+val is_clause : FOFormula.t list -> bool
   (** Is it a clause, ie a list of literals? *)
 
-val miniscope : Formula.t -> Formula.t
+val miniscope : FOFormula.t -> FOFormula.t
   (** Apply miniscoping transformation to the term *)
 
-type clause = Formula.t list
+type clause = FOFormula.t list
   (** Basic clause representation, as list of literals *)
 
-val cnf_of : ?ctx:Skolem.ctx -> Formula.t -> clause list
+val cnf_of : ?ctx:Skolem.ctx -> FOFormula.t -> clause list
   (** Transform the clause into proper CNF; returns a list of clauses *)
 
-val cnf_of_list : ?ctx:Skolem.ctx -> Formula.t list -> clause list
-
-val as_transform : ctx:Skolem.ctx -> Transform.t
-  (** reduction to CNF as a transformation on formulas. It represents
-      clauses as n-ary disjunctions. *)
+val cnf_of_list : ?ctx:Skolem.ctx -> FOFormula.t list -> clause list

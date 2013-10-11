@@ -23,19 +23,19 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Term Orderings} *)
+(** {1 FOTerm Orderings} *)
 
 (** {2 Type definitions} *)
 
 type t = {
   ord_clear_cache : unit -> unit;                 (** Clear underlying cache *)
-  ord_compare : Term.t -> Term.t -> Comparison.t; (** Compare two terms *)
+  ord_compare : FOTerm.t -> FOTerm.t -> Comparison.t; (** Compare two terms *)
   ord_precedence : Precedence.t;                  (** Current precedence *)
   ord_set_precedence : Precedence.t -> t;         (** Change the precedence *)
   ord_name : string;                              (** Name of the ordering *)
 } (** A reduction ordering on terms *)
 
-val compare : t -> Term.t -> Term.t -> Comparison.t
+val compare : t -> FOTerm.t -> FOTerm.t -> Comparison.t
   (** Compare two terms *)
 
 val precedence : t -> Precedence.t

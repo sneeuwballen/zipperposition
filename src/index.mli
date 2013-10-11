@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Generic term indexing} *)
 
 type scope = Substs.scope
+type term = FOTerm.t
+type subst = Substs.FO.t
 
 (** {2 Leaf} *)
 
@@ -38,29 +40,29 @@ module type LEAF = sig
   module S : Set.S with type elt = elt
 
   val empty : t
-  val add : t -> Term.t -> elt -> t
-  val remove : t -> Term.t -> elt -> t
+  val add : t -> term -> elt -> t
+  val remove : t -> term -> elt -> t
   val is_empty : t -> bool
-  val iter : t -> (Term.t -> S.t -> unit) -> unit
-  val fold : t -> ('a -> Term.t -> S.t -> 'a) -> 'a -> 'a
+  val iter : t -> (term -> S.t -> unit) -> unit
+  val fold : t -> ('a -> term -> S.t -> 'a) -> 'a -> 'a
   val size : t -> int
 
-  val fold_unify : t -> scope -> Term.t -> scope -> 'a ->
-                    ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val fold_unify : t -> scope -> term -> scope -> 'a ->
+                    ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Unify the given term with indexed terms *)
 
-  val fold_match: t -> scope -> Term.t -> scope -> 'a ->
-                  ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val fold_match: t -> scope -> term -> scope -> 'a ->
+                  ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the indexed terms against the given query term *)
 
-  val fold_matched: t -> scope -> Term.t -> scope -> 'a ->
-                    ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val fold_matched: t -> scope -> term -> scope -> 'a ->
+                    ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the query term against the indexed terms *)
 end
 
 module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t
 
-(** {2 Term index} *)
+(** {2 FOTerm index} *)
 
 module type TERM_IDX = sig
   type t
@@ -76,22 +78,22 @@ module type TERM_IDX = sig
 
   val size : t -> int
 
-  val add : t -> Term.t -> elt -> t
+  val add : t -> term -> elt -> t
 
-  val remove : t -> Term.t -> elt -> t
+  val remove : t -> term -> elt -> t
 
-  val iter : t -> (Term.t -> Leaf.S.t -> unit) -> unit
+  val iter : t -> (term -> Leaf.S.t -> unit) -> unit
 
-  val fold : t -> ('a -> Term.t -> Leaf.S.t -> 'a) -> 'a -> 'a
+  val fold : t -> ('a -> term -> Leaf.S.t -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : t -> scope -> Term.t -> scope -> 'a ->
-                            ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val retrieve_unifiables : t -> scope -> term -> scope -> 'a ->
+                            ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_generalizations : t -> scope -> Term.t -> scope -> 'a ->
-                                ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val retrieve_generalizations : t -> scope -> term -> scope -> 'a ->
+                                ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_specializations : t -> scope -> Term.t -> scope -> 'a ->
-                                 ('a -> Term.t -> elt -> Substs.t -> 'a) -> 'a
+  val retrieve_specializations : t -> scope -> term -> scope -> 'a ->
+                                 ('a -> term -> elt -> subst -> 'a) -> 'a
 
   val to_dot : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
     (** print oneself in DOT into the given file *)
@@ -99,7 +101,7 @@ end
 
 (** {2 Subsumption Index} *)
 
-type lits = (Term.t * Term.t * bool) Sequence.t
+type lits = (term * term * bool) Sequence.t
   (** Sequence of literals, as a cheap abstraction on query clauses *)
 
 module type CLAUSE = sig
@@ -159,7 +161,7 @@ module type EQUATION = sig
   val compare : t -> t -> int
     (** Total order on equations *)
 
-  val extract : t -> (Term.t * rhs * bool)
+  val extract : t -> (term * rhs * bool)
     (** Obtain a representation of the (in)equation. The sign indicates
         whether it is an equation [l = r] (if true) or an inequation
         [l != r] (if false) *)
@@ -194,11 +196,11 @@ module type UNIT_IDX = sig
   val size : t -> int
     (** Number of indexed (in)equations *)
 
-  val iter : t -> (Term.t -> E.t -> unit) -> unit
+  val iter : t -> (term -> E.t -> unit) -> unit
     (** Iterate on indexed equations *)
 
-  val retrieve : sign:bool -> t -> scope -> Term.t -> scope -> 'a ->
-                 ('a -> Term.t -> rhs -> E.t -> Substs.t -> 'a) ->
+  val retrieve : sign:bool -> t -> scope -> term -> scope -> 'a ->
+                 ('a -> term -> rhs -> E.t -> subst -> 'a) ->
                  'a
       (** [retrieve ~sign (idx,si) (t,st) acc] folds on
           (in)equations l ?= r of given [sign] and substitutions [subst],

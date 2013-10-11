@@ -25,8 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Perfect Discrimination Tree} *)
 
-module T = Term
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 
 let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
 
@@ -45,8 +45,8 @@ let skip t pos =
 
 type character =
   | Symbol of Symbol.t
-  | BoundVariable of int * Term.t
-  | Variable of Term.t
+  | BoundVariable of int * T.t
+  | Variable of T.t
 
 let compare_char c1 c2 =
   (* compare variables by index *)
@@ -71,9 +71,7 @@ let rec term_to_char t =
   match t.T.term with
   | T.Var _ -> Variable t
   | T.BoundVar i -> BoundVariable (i, t)
-  | T.Bind (f, _) -> Symbol f
   | T.Node (f, _) -> Symbol f
-  | T.At _ -> failwith "Dtree: curried terms not supported"
 
 (** convert term to list of var/symbol *)
 let to_list t =
@@ -105,7 +103,7 @@ module Make(E : Index.EQUATION) = struct
 
   type trie =
     | TrieNode of trie CharMap.t       (** map atom -> trie *)
-    | TrieLeaf of (Term.t * E.t * int) list  (** leaf with (term, value, priority) list *)
+    | TrieLeaf of (T.t * E.t * int) list  (** leaf with (term, value, priority) list *)
 
   let empty_trie n = match n with
     | TrieNode m when CharMap.is_empty m -> true
@@ -210,9 +208,9 @@ module Make(E : Index.EQUATION) = struct
             && S.is_in_subst subst v1' sc_dt ->
                (* already bound, check consistency *)
               begin try
-                let subst = Unif.matching ~subst v1' sc_dt t_pos sc_t in
+                let subst = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in
                 traverse subtrie acc (skip t pos) subst
-              with Unif.Fail -> acc (* incompatible binding *)
+              with FOUnif.Fail -> acc (* incompatible binding *)
               end
             | Variable v1' when not (T.has_type t_pos) || T.compatible_type v1' t_pos ->
               (* t1' not bound, so we bind it and continue in subtree *)

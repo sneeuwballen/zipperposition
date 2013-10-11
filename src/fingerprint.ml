@@ -26,14 +26,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Fingerprint term indexing} *)
 
-module T = Term
+module T = FOTerm
 module I = Index
 
 (** a feature *)
 type feature = A | B | N | S of Symbol.t
 
 (** a fingerprint function, it computes several features of a term *)
-type fingerprint_fun = Term.t -> feature list
+type fingerprint_fun = T.t -> feature list
 
 (* TODO: use a feature array, rather than a list *)
 
@@ -41,18 +41,12 @@ type fingerprint_fun = Term.t -> feature list
 let rec gfpf pos t = match pos, t.T.term with
   | [], T.Var _ -> A
   | [], T.BoundVar _ -> S Symbol.db_symbol
-  | [], T.Bind (s, _) -> S s
   | [], T.Node (s, _) -> S s
-  | 0::pos', T.Bind (_, t') -> gfpf pos' t'  (* recurse in subterm *)
   | i::pos', T.Node (_, l) ->
     (try gfpf pos' (List.nth l i)  (* recurse in subterm *)
     with Failure _ -> N)  (* not a position in t *)
-  | 0::pos', T.At (t1, _) -> gfpf pos' t1
-  | 1::pos', T.At (_, t2) -> gfpf pos' t2
-  | _::_, T.Bind _
   | _::_, T.BoundVar _ -> N
   | _::_, T.Var _ -> B  (* under variable *)
-  | _, T.At _ -> failwith "Fingerprint: not implemented for curried terms"
 
 (* TODO more efficient way to compute a vector of features: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
