@@ -70,6 +70,9 @@ val explain : t -> MetaReasoner.Logic.literal -> Proof.t list
       @raise Not_found if the literal's premises are not explained by
         previous scan_clause/scan_formula *)
 
+val prover : t -> MetaProver.t
+  (** MetaProver itself *)
+
 val theories : t -> (string * Term.t list) Sequence.t
   (** List of theories detected so far *)
 

@@ -155,12 +155,14 @@ let setup_env ~env =
   | None -> ()
   | Some meta ->
     (* react to future detected theories *)
-    let signal = MetaKB.on_theory (MetaProverState.reasoner meta) in
+    let signal = MetaProver.on_theory (MetaProverState.prover meta) in
     Signal.on signal
       (function
         | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}], lit) ->
           let proof = MetaProverState.explain meta lit in
           add_ac ~env ~proof f; true
+        | MetaKB.NewTheory ("ac", [t], _) ->
+          Util.debug 1 "ignore AC instance for term %a" T.pp t; true
         | _ -> true);
     (* see whether AC symbols have already been detected *)
     Sequence.iter
@@ -168,6 +170,8 @@ let setup_env ~env =
         | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}], lit) ->
           let proof = MetaProverState.explain meta lit in
           add_ac ~env ~proof f
+        | MetaKB.NewTheory ("ac", [t], _) ->
+          Util.debug 1 "ignore AC instance for term %a" T.pp t
         | _ -> ())
       (MetaKB.cur_theories (MetaProverState.reasoner meta));
     ()

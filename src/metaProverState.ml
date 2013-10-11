@@ -108,6 +108,8 @@ let explain p lit =
 let flush_new_results p =
   p.new_results <- []
 
+let prover p = p.prover
+
 let create ?(kb=M.MetaKB.empty) () =
   let p = {
     prover = M.MetaProver.create ~kb ();

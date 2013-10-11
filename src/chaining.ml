@@ -522,7 +522,7 @@ let setup_env ~env =
   | None -> ()
   | Some meta ->
     (* react to future detected theories *)
-    let signal = MetaKB.on_theory (MetaProverState.reasoner meta) in
+    let signal = MetaProver.on_theory (MetaProverState.prover meta) in
     Signal.on signal
       (function
         | MetaKB.NewTheory ("total_order",
