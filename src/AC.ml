@@ -36,6 +36,9 @@ module Lit = Literal
 
 let prof_simplify = Util.mk_profiler "ac.simplify"
 
+let stat_ac_simplify = Util.mk_stat "ac.simplify"
+let stat_ac_redundant = Util.mk_stat "ac.redundant"
+
 type spec = Theories.AC.t
 
 let axioms ~ctx s =
@@ -81,7 +84,9 @@ let is_trivial_lit ~spec lit =
   | Lit.True -> true
 
 let is_trivial ~spec c =
-  Util.array_exists (is_trivial_lit ~spec) c.C.hclits
+  let res = Util.array_exists (is_trivial_lit ~spec) c.C.hclits in
+  if res then Util.incr_stat stat_ac_redundant;
+  res
 
 (* simplify: remove literals that are redundant modulo AC *)
 let simplify ~spec ~ctx c =
@@ -110,6 +115,7 @@ let simplify ~spec ~ctx c =
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx lits proof in
       Util.exit_prof prof_simplify;
+      Util.incr_stat stat_ac_simplify;
       Util.debug 3 "%a AC-simplify into %a" C.pp c C.pp new_c;
       new_c
     end else
