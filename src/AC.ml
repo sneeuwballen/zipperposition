@@ -143,6 +143,14 @@ let setup_penv ~penv =
   ()
 
 let setup_env ~env =
+  let ctx = Env.ctx env in
+  let spec = Ctx.ac ctx in
+  (* enable AC inferences if needed *)
+  if Theories.AC.exists_ac ~spec
+    then begin
+    Env.add_is_trivial ~env (is_trivial ~spec);
+    Env.add_simplify ~env (simplify ~spec ~ctx);
+    end;
   match Env.get_meta ~env with
   | None -> ()
   | Some meta ->
