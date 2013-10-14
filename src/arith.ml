@@ -496,6 +496,40 @@ module Lit = struct
     | _ -> []
     end
 
+  let heuristic_eliminate ~signature lit =
+    match lit with
+    | ( Literal.Equation ({T.term=T.Node(prod, [x1; x2])}, {T.term=T.Node(n,[])}, false, _)
+      | Literal.Equation ({T.term=T.Node(n,[])}, {T.term=T.Node(prod, [x1; x2])}, false, _))
+      when S.eq prod S.Arith.product && T.is_var x1 && T.eq x1 x2 && S.is_numeric n ->
+      (* ahah, square root spotted! *)
+      Util.debug 5 "heuristic_elim tries sqrt of %a" S.pp n;
+      begin match n with
+      | S.Int n ->
+        if Big_int.sign_big_int n >= 0
+          then
+            let s = Big_int.sqrt_big_int n in
+            if Big_int.eq_big_int (Big_int.square_big_int s) n
+              then
+                (* n is positive, and has an exact square root, try both
+                    the positive and negative square roots*)
+                [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_bigint s)) 0
+                ; Substs.FO.bind Substs.FO.empty x1 0
+                  (T.mk_const (S.mk_bigint (Big_int.minus_big_int s))) 0 ]
+              else []
+          else []
+      | S.Rat n -> []  (* TODO *)
+      | S.Real n ->
+        if n >= 0.
+          then
+            let s = sqrt n in
+            [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_real s)) 0
+            ; Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_real (~-. s))) 0
+            ]
+          else []
+      | _ -> failwith "unknown numeric type!?"
+      end
+    | _ -> []
+
   module L = struct
     let get_terms l = match l with
     | [True]

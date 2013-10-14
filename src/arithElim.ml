@@ -83,16 +83,18 @@ let eliminate_arith c =
   let ctx = c.C.hcctx in
   let signature = Ctx.signature ctx in
   let eligible = C.Eligible.max c in
-  (* eliminate i-th literal with [subst] *)
+  (* instantiate with [subst]. Simplifications should then remove
+      the literal; making the instantiation a step makes the proof
+      more readable *)
   let eliminate_lit i subst =
-    let lits' = Util.array_except_idx c.C.hclits i in
+    let lits' = Array.to_list c.C.hclits in
     let renaming = Ctx.renaming_clear ~ctx in
     let ord = Ctx.ord ctx in
     let lits' = Lit.apply_subst_list ~ord ~renaming subst lits' 0 in
     let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
-      ~rule:"arith_elim" cc [c.C.hcproof] in
+      ~rule:"arith_instantiate" cc [c.C.hcproof] in
     let new_c = C.create ~parents:[c] ~ctx lits' proof in
-    Util.debug 3 "eliminate %a in %a (with %a) into %a" Lit.pp c.C.hclits.(i)
+    Util.debug 3 "instantiate %a with %a into %a"
       C.pp c Substs.FO.pp subst C.pp new_c;
     new_c
   in
@@ -108,6 +110,7 @@ let eliminate_arith c =
       let substs = Util.list_flatmap
         (Arith.Lit.eliminate ~elim_var ~signature) ord_lits
       in
+      let substs = Arith.Lit.heuristic_eliminate ~signature lit @ substs in
       List.fold_left
         (fun acc subst -> eliminate_lit i subst :: acc)
         acc substs)

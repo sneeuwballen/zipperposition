@@ -138,6 +138,10 @@ module Lit : sig
         [elim_var] is called to check whether eliminating a variable
         in an equation is possible. *)
 
+  val heuristic_eliminate : signature:Signature.t -> Literal.t -> Substs.FO.t list
+    (** Heuristic version of [eliminate] that tries to deal with some
+        non-linear, or too hard, cases. For instance, square roots. *)
+
   (** {3 Operations on Lists of literals} *)
   module L : sig
     val get_terms : t list -> FOTerm.t list
