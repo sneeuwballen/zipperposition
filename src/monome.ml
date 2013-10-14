@@ -165,6 +165,8 @@ let reduce_same_divby m1 m2 =
     *)
     let d1 = S.mk_bigint (Big_int.div_big_int n1 gcd) in
     let d2 = S.mk_bigint (Big_int.div_big_int n2 gcd) in
+    Util.debug 5 "reduce same divby: %a, %a have gcd %s, mult by %a, %a"
+      pp m1 pp m2 (Big_int.string_of_big_int gcd) S.pp d2 S.pp d1;
     _scale m1 d2, _scale m2 d1
   | c1, c2 ->
     (* reduce m1 / c1 and m2 / c2 to same denominator. We choose c2
@@ -214,9 +216,8 @@ let uminus m =
 let product m c =
   if S.Arith.is_zero c
     then const c  (* 0 *)
-  else if S.eq c m.divby
-    (* c * m/c ---> m *)
-    then { m with divby=S.Arith.one_of_ty (S.Arith.typeof m.constant); }
+  else if S.Arith.Op.divides c m.divby
+    then { m with divby = S.Arith.Op.quotient m.divby c }
   else  (* itemwise product *)
     let constant = S.Arith.Op.product m.constant c in
     let coeffs = T.Map.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
@@ -312,7 +313,8 @@ let to_term m =
 
 (** {2 Satisfiability} *)
 
-let has_instances m = match m.constant with
+let has_instances m =
+  let res = match m.constant with
   | S.Real _
   | S.Rat _ -> true
   | S.Int _ ->
@@ -322,6 +324,9 @@ let has_instances m = match m.constant with
         let g = T.Map.fold (fun _ c g -> S.Arith.Op.gcd c g) m.coeffs m.divby in
         S.Arith.Op.divides g m.constant
   | _ -> assert false
+  in
+  Util.debug 5 "monome %a has instances: %B" pp m res;
+  res
 
 let floor m = match m.constant with
   | S.Int _ when T.Map.is_empty m.coeffs ->

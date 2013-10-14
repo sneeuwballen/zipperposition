@@ -54,7 +54,7 @@ let prof_ineq_chaining_right = Util.mk_profiler "chaining.ineq_right"
 let _gather_positions ~eligible ~signature lits scope pos subst =
   let t = Lits.at_pos lits pos in
   let pos' = List.tl pos in  (* position within the literal *)
-  Lits.fold_lits ~eligible lits ([], subst)
+  Lits.fold_lits ~eligible lits ([pos], subst)
     (fun (pos_list, subst) lit i ->
       try
         let t' = Lit.at_pos lit pos' in

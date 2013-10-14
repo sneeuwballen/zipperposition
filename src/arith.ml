@@ -284,7 +284,7 @@ module Lit = struct
   | Literal.True
   | Literal.False -> false
 
-
+  exception TrivialLit
   exception UnsatLit
 
   let extract ~signature lit =
@@ -294,6 +294,7 @@ module Lit = struct
         let m1 = Monome.of_term ~signature l in
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
+        let m = Monome.product m m.Monome.divby in
         let terms = Monome.to_list m in
         if terms = []
         then if Monome.sign m = 0
@@ -307,24 +308,25 @@ module Lit = struct
             let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
             (* -t+m = 0 ---> t=m, but t+m = 0 ----> t=-m *)
             let m = if S.Arith.sign coeff < 0 then m else Monome.uminus m in
-            if Monome.has_instances m
-              then if sign
+            if sign
+              then if Monome.has_instances m
                 then Eq (t, m)
-                else Neq (t, m)
-              else raise UnsatLit  (* unsatisfiable *)
+              else raise UnsatLit  (* unsatisfiable diophantine eq *)
+            else if Monome.has_instances m
+              then Neq (t, m)
+              else raise TrivialLit (* always true, diophantine eq has no solution *)
           )
           terms
       with
       | Monome.NotLinear -> []
-      | UnsatLit -> if sign then [False] else [True]
+      | TrivialLit -> [True]
+      | UnsatLit -> [False]
     (* extract lit from (l <= r | l < r) *)
     and extract_less ~strict l r =
       try
-        Util.debug 5 "extract_less %a %a" T.pp l T.pp r;
         let m1 = Monome.of_term ~signature l in
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
-        Util.debug 5 "monome %a" Monome.pp m;
         let terms = Monome.to_list m in
         if terms = []
         (* constant, ground arith expression, must be true or false *)
