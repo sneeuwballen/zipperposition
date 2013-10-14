@@ -403,13 +403,55 @@ module Lit = struct
     | R_lesseq (m, t) ->
       Literal.mk_true (T.mk_lesseq (Monome.to_term m) t)
 
-  let simplify ~ord ~signature lit = match lit with
-  | Literal.Equation (l, r, sign, _) ->
-    Literal.mk_lit ~ord (T.simplify ~signature l) (T.simplify ~signature r) sign
-  | Literal.Prop (p, sign) ->
-    Literal.mk_prop (T.simplify ~signature p) sign
-  | Literal.True
-  | Literal.False -> lit
+  let simplify ~ord ~signature lit =
+    (* simplify [l <= r] (depends on [strict]) *)
+    let _simpl_less l r strict =
+      let ty = TypeInference.FO.infer_sig signature l in
+      let p = if strict && Type.eq ty Type.int
+        then
+          (* l < r  rewritten into l <= r-1, for integers *)
+          let p = T.mk_lesseq l (T.mk_difference r (T.mk_const (S.Arith.one_i))) in
+          T.simplify ~signature p
+        else if strict
+          then T.mk_less l r
+        else T.mk_lesseq l r
+      in
+      Literal.mk_true p
+    in
+    match lit with
+    | Literal.Prop (p, sign) ->
+      let p' = T.simplify ~signature p in
+      begin match p'.T.term, sign with
+      | T.Node (S.Const("$less",_), [l;r]), false ->
+        (* not (l < r) ---> r <= l *)
+        _simpl_less r l false
+      | T.Node (S.Const("$lesseq",_), [l;r]), false ->
+        (* not (l <= r) ---> r < l *)
+        _simpl_less r l true
+      | T.Node (S.Const("$lesseq",_), [l;r]), true ->
+        _simpl_less l r false
+      | T.Node (S.Const("$less",_), [l;r]), true ->
+        _simpl_less l r true
+      | _ -> Literal.mk_prop p' sign
+      end
+    | Literal.Equation (l, r, sign, _) ->
+      let l' = T.simplify ~signature l in
+      let r' = T.simplify ~signature r in
+      begin match sign with
+      | true when T.is_arith_const l'
+        && T.is_arith_const r' && not (T.eq l' r') ->
+        (* i = j, when i and j are distinct numbers ---> false *)
+        Literal.mk_false T.true_term
+      | false when T.is_arith_const l'
+        && T.is_arith_const r' && not (T.eq l' r') ->
+        (* i != j. when i and j are distinct numbers ---> true *)
+        Literal.mk_true T.true_term
+      | _ ->
+        (* just keep the literal *)
+        Literal.mk_lit ~ord l' r' sign 
+      end
+    | Literal.True
+    | Literal.False -> lit
 
   let is_trivial ~signature lit =
     let l = extract ~signature lit in

@@ -40,39 +40,9 @@ module Lits = Literal.Arr
 (** {2 Inference Rules} *)
 
 let rewrite_lit ~ctx lit =
+  let ord = Ctx.ord ~ctx in
   let signature = Ctx.signature ~ctx in
-  let lit' = match lit with
-  | Lit.Prop (p, sign) ->
-    let p' = Arith.T.simplify ~signature p in
-    begin match p'.T.term, sign with
-    | T.Node (S.Const("$less",_), [l;r]), false ->
-      (* not (l < r) ---> r <= l *)
-      Lit.mk_true (Arith.T.mk_lesseq r l)
-    | T.Node (S.Const("$lesseq",_), [l;r]), false ->
-      (* not (l <= r) ---> r < l *)
-      Lit.mk_true (Arith.T.mk_less r l)
-    | _ -> Lit.mk_prop p' sign
-    end
-  | Lit.Equation (l, r, sign, _) ->
-    let l' = Arith.T.simplify ~signature l in
-    let r' = Arith.T.simplify ~signature r in
-    begin match sign with
-    | true when Arith.T.is_arith_const l'
-      && Arith.T.is_arith_const r' && not (T.eq l' r') ->
-      (* i = j, when i and j are distinct numbers ---> false *)
-      Lit.mk_false T.true_term
-    | false when Arith.T.is_arith_const l'
-      && Arith.T.is_arith_const r' && not (T.eq l' r') ->
-      (* i != j. when i and j are distinct numbers ---> true *)
-      Lit.mk_true T.true_term
-    | _ ->
-      (* just keep the literal *)
-      Lit.mk_lit ~ord:(Ctx.ord ctx) l' r' sign 
-    end
-  | Lit.True
-  | Lit.False -> lit
-  in
-  let signature = Ctx.signature ctx in
+  let lit' = Arith.Lit.simplify ~ord ~signature lit in
   if Arith.Lit.is_trivial ~signature lit'
     then Lit.mk_tauto
   else if Arith.Lit.has_instances ~signature lit'
