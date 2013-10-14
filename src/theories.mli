@@ -89,9 +89,8 @@ module TotalOrder : sig
       literal is a strict inequality, and the ordering itself
       is also provided. *)
 
-  val create : ?base:bool -> unit -> t
-    (** New specification. It already contains an instance
-        for "$less" and "$lesseq" if [base] is true (default). *)
+  val create : unit -> t
+    (** New specification.  *)
 
   val add : spec:t -> ?proof:Proof.t list ->
             less:Symbol.t -> lesseq:Symbol.t -> instance

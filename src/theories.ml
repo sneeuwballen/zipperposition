@@ -174,13 +174,11 @@ module TotalOrder = struct
       (* add instance *)
       add ~spec ?proof:None ~less ~lesseq
 
-  let create ?(base=true) () =
+  let create () =
     let spec = {
       less_tbl = STbl.create 13;
       lesseq_tbl = STbl.create 13;
     } in
-    if base then
-      ignore (tstp_instance ~spec);
     spec
 
   let exists_order ~spec =

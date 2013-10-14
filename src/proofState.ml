@@ -145,18 +145,23 @@ module ActiveSet = struct
           ~eligible:(C.Eligible.chaining c) c.C.hclits m_ord_side
           (fun tree lit pos ->
             let l = lit.TO.left in
-            let with_pos = C.WithPos.( {term=l; pos=(pos@[0]); clause=c} ) in
+            let with_pos = C.WithPos.( {term=l; pos=(pos@[Position.left_pos]); clause=c} ) in
             let tree = f tree l with_pos in
             let r = lit.TO.right in
-            let with_pos = C.WithPos.( {term=r; pos=(pos@[1]); clause=c} ) in
+            let with_pos = C.WithPos.( {term=r; pos=(pos@[Position.right_pos]); clause=c} ) in
             let tree = f tree r with_pos in
             tree);
         (* subterms occurring under an inequation *)
         m_ord_subterm <- Lits.fold_terms ~which:`Both ~subterms:true
           ~eligible:(C.Eligible.chaining c) c.C.hclits m_ord_subterm
           (fun tree t pos ->
-            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-            f tree t with_pos);
+            match pos with
+            | [_; _] ->
+              tree  (* this must be the inequality itself, not the subterms *)
+            | _::_::_ ->
+              let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+              f tree t with_pos
+            | _ -> assert false);
         ()
 
       (** add clauses (only process the ones not present in the set) *)

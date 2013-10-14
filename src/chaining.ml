@@ -94,7 +94,7 @@ let _check_eq_chaining_left_passive ~ctx passive s_p positions subst =
   let spec = Ctx.total_order ~ctx in
   let ord_lit = Lits.get_ineq ~spec passive.C.hclits (List.hd positions) in
   let instance = ord_lit.TO.instance in
-  let renaming = Ctx.renaming_clear ~ctx in
+  let renaming = S.Renaming.create 5 in
   let t1' = S.apply ~renaming subst ord_lit.TO.left s_p in
   (* subst(t1) must be a maximal term *)
   Sequence.for_all
@@ -248,6 +248,8 @@ let do_eq_chaining_right ~ctx active s_a active_pos passive s_p passive_pos subs
 
 (* perform equality chaining *)
 let do_eq_chaining ~ctx active s_a active_pos passive s_p passive_pos subst acc =
+  Util.debug 5 "try eq chaining with %a at %a and %a at %a" C.pp active
+    Position.pp active_pos C.pp passive Position.pp passive_pos;
   match passive_pos with
   | _::_::pos::_ when pos = Position.left_pos ->
     do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst acc
@@ -323,6 +325,8 @@ let _all_lits_but_positions lits positions =
 let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc =
   let ord = Ctx.ord ctx in
   let spec = Ctx.total_order ctx in
+  Util.debug 5 "ineq_chaining between %a at %a and %a at %a" C.pp left
+    Position.pp left_pos C.pp right Position.pp right_pos;
   let signature = Ctx.signature ctx in
   let instance = (Lits.get_ineq ~spec left.C.hclits left_pos).TO.instance in
   let mk_less t1 t2 = Lit.mk_true (T.mk_node instance.TO.less [t1; t2]) in
@@ -333,9 +337,13 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
     _gather_positions ~eligible ~signature left.C.hclits s_left left_pos subst in
   let right_pos_list, subst =
     _gather_positions ~eligible ~signature right.C.hclits s_right right_pos subst in
-  (* remaining lits *)
-  if _check_eq_chaining_left_passive ~ctx left s_left left_pos_list subst
-  && _check_eq_chaining_right_passive ~ctx right s_right right_pos_list subst
+  Util.debug 5 "positions for left: %a" (Util.pp_list Position.pp) left_pos_list;
+  Util.debug 5 "positions for right: %a" (Util.pp_list Position.pp) right_pos_list;
+  (* check ordering conditions. Note that the conditions are inversed w.r.t
+    equality chaining (ie, in left clause, right hand side terms must
+    be maximal, and conversely *)
+  if _check_eq_chaining_right_passive ~ctx left s_left left_pos_list subst
+  && _check_eq_chaining_left_passive ~ctx right s_right right_pos_list subst
     then begin
       let renaming = Ctx.renaming_clear ~ctx in
       (* build literal list *)
@@ -374,7 +382,9 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
       Util.debug 3 "ineq_chaining of %a and %a gives %a"
         C.pp left C.pp right C.pp new_clause;
       new_clause :: acc
-    end else acc
+    end else
+      let () = Util.debug 5 "ordering conditions won't do." in
+      acc
 
 (* inequality chaining, where [c] is on the left (which means terms on
     the RHS of inequalities will be chained) *)
@@ -387,6 +397,8 @@ let ineq_chaining_left active_set c =
   let new_clauses = Lits.fold_ineq ~spec ~eligible c.C.hclits []
     (fun acc ord_lit left_pos ->
       let s1 = ord_lit.TO.right in
+      let left_pos = left_pos @ [Position.right_pos] in
+      Util.debug 5 "try left ineq chaining with %a at %a" C.pp c Position.pp left_pos;
       I.retrieve_unifiables active_set#idx_ord_side 1 s1 0 acc
         (fun acc t1 with_pos subst ->
           let right = with_pos.C.WithPos.clause in
@@ -406,6 +418,8 @@ let ineq_chaining_right active_set c =
   let new_clauses = Lits.fold_ineq ~spec ~eligible c.C.hclits []
     (fun acc ord_lit right_pos ->
       let t1 = ord_lit.TO.left in
+      let right_pos = right_pos @ [Position.left_pos] in
+      Util.debug 5 "try right ineq chaining with %a at %a" C.pp c Position.pp right_pos;
       I.retrieve_unifiables active_set#idx_ord_side 1 t1 0 acc
         (fun acc s1 with_pos subst ->
           let left = with_pos.C.WithPos.clause in
