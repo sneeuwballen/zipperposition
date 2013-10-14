@@ -59,7 +59,14 @@ val compatible_type : t -> t -> bool  (** Unifiable types? false if type missing
 val same_type : t -> t -> bool        (** Alpha-equiv types? false if type missing *)
 val compare_type : t -> t -> int      (** Comparison of types *)
 
-module Tbl : Hashtbl.S with type key = t
+module Tbl : sig
+  include Hashtbl.S with type key = t
+  val to_list : unit t -> term list
+  val from_list : term list -> unit t
+  val to_seq : unit t -> term Sequence.t
+  val from_seq : term Sequence.t -> unit t
+end
+
 module Set : Sequence.Set.S with type elt = t
 module Map : Sequence.Map.S with type key = t
 

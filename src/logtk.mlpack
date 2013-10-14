@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: abd24efe9e4561890097a80a4c909fbd)
+# DO NOT EDIT (digest: f87e4f4fdf2306ae06e40c9605771dc8)
 HO
 FO
 Symbol
@@ -35,6 +35,9 @@ FormulaShape
 Util_tptp
 Skolem
 Transform
+NPDtree
+Trace_tstp
+CallProver
 lib/Sequence
 lib/Bij
 lib/Cache

@@ -28,10 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open OUnit
 
-module T = Term
-module TT = TestTerm
-module H = Helpers
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 module O = Ordering
 
 let suite =
@@ -72,10 +70,10 @@ let check_ordering_inv_by_subst ord =
   let prop (t1, t2, subst) =
     let t1' = S.apply_no_renaming subst t1 0 in
     let t2' = S.apply_no_renaming subst t2 0 in
-    ignore (TypeInference.infer tyctx t1);
-    ignore (TypeInference.infer tyctx t2);
-    ignore (TypeInference.infer tyctx t1');
-    ignore (TypeInference.infer tyctx t2');
+    ignore (TypeInference.FO.infer tyctx t1);
+    ignore (TypeInference.FO.infer tyctx t2);
+    ignore (TypeInference.FO.infer tyctx t1');
+    ignore (TypeInference.FO.infer tyctx t2');
     signature := TypeInference.Ctx.to_signature tyctx;
     ord := O.add_signature !ord !signature;
     (* check that instantiating variables preserves ordering *)

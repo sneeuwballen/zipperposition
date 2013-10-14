@@ -27,20 +27,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module F = Formula
+module T = HOTerm
 
 type datalog_symbol =
   | DSName of string
-  | DSTerm of Term.t
-  | DSFormula of Formula.t
+  | DSTerm of HOTerm.t
   | DSType of Type.t
   | DSSTartList of int
 
 let eq_datalog_symbol s1 s2 = match s1, s2 with
   | DSName s1, DSName s2 -> s1 = s2
-  | DSTerm t1, DSTerm t2 -> Term.eq t1 t2
-  | DSFormula f1, DSFormula f2 -> Formula.eq f1 f2
+  | DSTerm t1, DSTerm t2 -> T.eq t1 t2
   | DSType ty1, DSType ty2 -> Type.eq ty1 ty2
   | DSSTartList i1, DSSTartList i2 -> i1 = i2
   | _ -> false
@@ -48,7 +45,6 @@ let eq_datalog_symbol s1 s2 = match s1, s2 with
 let hash_datalog_symbol s = match s with
   | DSName s -> Hash.hash_string s
   | DSTerm t -> T.hash t
-  | DSFormula f -> F.hash f
   | DSType ty -> Type.hash ty
   | DSSTartList i -> i + 13
 
@@ -60,7 +56,6 @@ module Logic = Datalog.Make(struct
   let to_string = function
     | DSName s -> s
     | DSTerm t -> T.to_string t
-    | DSFormula f -> F.to_string f
     | DSType ty -> Type.to_string ty
     | DSSTartList i -> Util.sprintf "L%d" i
 end)
@@ -71,10 +66,9 @@ module Translate = struct
   type _ mapping =
     | None : unit mapping  (* no argument *)
     | String : string mapping
-    | Term : Term.t mapping
-    | Formula : Formula.t mapping
+    | Term : T.t mapping
     | Type : Type.t mapping
-    | Parametrize : 'a mapping -> ('a * Term.t list) mapping
+    | Parametrize : 'a mapping -> ('a * T.t list) mapping
     | Map : ('a -> 'b) * ('b -> 'a) * 'b mapping -> 'a mapping
     | List : 'a mapping -> 'a list mapping
     | Pair : 'a mapping * 'b mapping -> ('a * 'b) mapping
@@ -87,7 +81,6 @@ module Translate = struct
   let none = None
   let str = String
   let term = Term
-  let form = Formula
   let type_ = Type
   let parametrize p = Parametrize p
   let map ~inject ~extract m = Map (inject, extract, m)
@@ -109,7 +102,6 @@ module Translate = struct
       | T.Var i -> Logic.mk_var i :: l
       | _ -> Logic.mk_const (DSTerm x) :: l
       end
-    | Formula, f -> (Logic.mk_const (DSFormula f)) :: l
     | Type, ty -> (Logic.mk_const (DSType ty)) :: l
     | Parametrize p, (y, args) ->
       let l' = build_args (list_ term) args l in
@@ -144,7 +136,6 @@ module Translate = struct
       | String, (Logic.Const (DSName s))::l' -> s, l'
       | Term, (Logic.Var i) :: l' -> T.mk_var i, l'
       | Term, (Logic.Const (DSTerm t))::l' -> t, l'
-      | Formula, (Logic.Const (DSFormula f))::l' -> f, l'
       | Type, (Logic.Const (DSType ty))::l' -> ty, l'
       | Map (_, extract, m'), l ->
         let y, l' = decode m' l in

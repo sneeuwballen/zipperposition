@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open QCheck
 
-module F = Formula
+module F = FOFormula
 
 let pp = F.to_string
 

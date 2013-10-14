@@ -25,8 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Non-Perfect Discrimination Tree} *)
 
-module T = Term
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 
 let prof_npdtree_retrieve = Util.mk_profiler "NPDtree_retrieve"
 
@@ -90,7 +90,7 @@ module Make(E : Index.EQUATION) = struct
                 else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie t (i+1) rebuild
-          | (T.Node (s, _) | T.Bind (s, _)) ->
+          | T.Node (s, _) ->
             let subtrie =
               try SMap.find s trie.map
               with Not_found -> empty
@@ -101,8 +101,6 @@ module Make(E : Index.EQUATION) = struct
                 else rebuild {trie with map=SMap.add s subtrie trie.map ;}
             in
             goto subtrie t (i+1) rebuild
-          | T.At _ ->
-            failwith "NPDtree: unable to deal with curried terms" (* TODO? *)
   in
   goto trie t 0 (fun t -> t)
 
@@ -140,7 +138,7 @@ module Make(E : Index.EQUATION) = struct
             | Some subtrie ->
               traverse subtrie acc (i+1)  (* match "*" against "*" *)
             end
-          | (T.Node (s, _) | T.Bind (s, _)) ->
+          | T.Node (s, _) ->
             let acc =
               try
                 let subtrie = SMap.find s trie.map in
@@ -152,8 +150,6 @@ module Make(E : Index.EQUATION) = struct
               | Some subtrie ->
                 traverse subtrie acc (skip t i)  (* skip subterm *)
             end
-          | T.At _ ->
-            failwith "NPDtree: unable to deal with curried terms" (* TODO? *)
     in
     let acc = traverse dt acc 0 in
     Util.exit_prof prof_npdtree_retrieve;

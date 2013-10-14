@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_meta
 
-module T = Term
-module F = Formula
+module HOT = HOTerm
+module F = FOFormula
 module A = Ast_tptp
 module KB = MetaKB
 
@@ -128,12 +128,12 @@ let detect_theories ~kb clauses =
   Signal.on (MetaProver.on_theory mp)
     (function
       | KB.NewTheory (s,args,_) ->
-        Util.printf "theory: %s(%a)\n" s (Util.pp_list T.pp) args;
+        Util.printf "theory: %s(%a)\n" s (Util.pp_list HOT.pp) args;
         true);
   Signal.on (MetaProver.on_axiom mp)
     (function
       | KB.NewAxiom (s,args) ->
-        Util.printf "axiom: %s(%a)\n" s (Util.pp_list T.pp) args;
+        Util.printf "axiom: %s(%a)\n" s (Util.pp_list HOT.pp) args;
         true);
   (* match clauses *)
   Sequence.iter

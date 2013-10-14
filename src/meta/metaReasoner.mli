@@ -29,8 +29,7 @@ open Logtk
 
 type datalog_symbol =
   | DSName of string
-  | DSTerm of Term.t
-  | DSFormula of Formula.t
+  | DSTerm of HOTerm.t
   | DSType of Type.t
   | DSSTartList of int
 
@@ -47,9 +46,8 @@ module Translate : sig
 
   val none : unit mapping
   val str : string mapping
-  val parametrize : 'a mapping -> ('a * Term.t list) mapping
-  val term : Term.t mapping
-  val form : Formula.t mapping
+  val parametrize : 'a mapping -> ('a * HOTerm.t list) mapping
+  val term : HOTerm.t mapping
   val type_ : Type.t mapping
   val list_ : 'a mapping -> 'a list mapping
   val map : inject:('a -> 'b) -> extract:('b -> 'a) -> 'b mapping -> 'a mapping

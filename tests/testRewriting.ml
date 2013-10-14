@@ -28,8 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open OUnit
 
-module T = Term
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 module Rw = Rewriting.TRS
 
 let a = T.mk_const (Symbol.mk_const "a")
@@ -68,12 +68,10 @@ let rec print_peano_nice buf t =
     Printf.bprintf buf "%d" (peano_to_int t)
   with Failure _ ->
     match t.T.term with
-    | T.Var _ | T.BoundVar _ -> T.pp buf t
-    | T.Bind (s, t') ->
-      Printf.bprintf buf "%a(%a)" Symbol.pp s print_peano_nice t'
+    | T.Var _
+    | T.BoundVar _ -> T.pp buf t
     | T.Node (h, []) -> Printf.bprintf buf "%a" Symbol.pp h
     | T.Node (h, l) -> Printf.bprintf buf "%a(%a)" Symbol.pp h (Util.pp_list T.pp) l
-    | T.At _ -> assert false
 
 (** Simple rewriting system for Peano arithmetic with + and x *)
 let peano_trs =

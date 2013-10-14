@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open QCheck
 
-module T = Term
+module T = FOTerm
 
 (* a simple instance of equation *)
 module E : Index.EQUATION with type rhs = int and type t = T.t * int = struct
@@ -50,8 +50,8 @@ module TestUnit(I : UnitIndex) = struct
   (* lists of unique terms *)
   let gen low high = Arbitrary.(
     list ~len:(low -- high) T.arbitrary >>= fun l ->
-    let set = T.THashSet.from_list l in
-    let seq = Sequence.from_iter (fun k -> T.THashSet.iter set k) in
+    let set = T.Tbl.from_list l in
+    let seq = T.Tbl.to_seq set in
     let seq = Sequence.mapi (fun i t -> t, i) seq in
     return (Sequence.persistent seq))
 
@@ -97,8 +97,8 @@ module TestUnit(I : UnitIndex) = struct
           (* all terms must match [t] *)
           List.for_all
             (fun (t',_) ->
-              try ignore (Unif.matching t' 0 t 1); true
-              with Unif.Fail -> false)
+              try ignore (FOUnif.matching t' 0 t 1); true
+              with FOUnif.Fail -> false)
             retrieved)
       seq
     in
@@ -115,11 +115,11 @@ module TestUnit(I : UnitIndex) = struct
           Sequence.for_all
             (fun (t',_) ->
               try
-                let _ = Unif.matching t' 1 t 0 in
+                let _ = FOUnif.matching t' 1 t 0 in
                 List.exists
                   (fun (t'',_) -> T.eq t' t'')
                   retrieved
-              with Unif.Fail -> true)
+              with FOUnif.Fail -> true)
             seq)
         seq
     in

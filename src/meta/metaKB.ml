@@ -28,22 +28,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module A = Ast_theory
-module T = Term
-module F = Formula
+module T = HOTerm
+module F = FOFormula
 module MRT = MetaReasoner.Translate
 
 (** {2 Basic knowledge} *)
 
 type lemma =
-  | Lemma of MetaPattern.t * Term.t list * premise list
+  | Lemma of MetaPattern.t * T.t list * premise list
 and axiom =
-  | Axiom of string * Term.t list * MetaPattern.t * Term.t list
+  | Axiom of string * T.t list * MetaPattern.t * T.t list
 and theory =
-  | Theory of string * Term.t list * premise list
+  | Theory of string * T.t list * premise list
 and premise =
-  | IfAxiom of string * Term.t list
-  | IfTheory of string * Term.t list
-  | IfPattern of MetaPattern.t * Term.t list
+  | IfAxiom of string * T.t list
+  | IfTheory of string * T.t list
+  | IfPattern of MetaPattern.t * T.t list
 and clause =
   | Clause of raw_lit * raw_lit list
 and raw_lit = string * string list
@@ -275,14 +275,14 @@ let bij =
 (** {2 MetaReasoner} *)
 
 type found_lemma =
-  | NewLemma of Formula.t * MetaReasoner.Logic.literal
+  | NewLemma of F.t * MetaReasoner.Logic.literal
     (** formula + explanation *)
 
 and found_theory =
-  | NewTheory of string * Term.t list * MetaReasoner.Logic.literal
+  | NewTheory of string * T.t list * MetaReasoner.Logic.literal
 
 and found_axiom =
-  | NewAxiom of string * Term.t list
+  | NewAxiom of string * T.t list
 
 let mapping_lemma =
   MetaPattern.mapping
@@ -465,10 +465,10 @@ let backward_chain kb goal =
   
 (** {2 Conversion from Ast_theory} *)
 
-module TermBij = Util.Bijection(struct
-  type t = Term.t
-  let equal = Term.eq
-  let hash = Term.hash
+module TBij = Util.Bijection(struct
+  type t = T.t
+  let equal = T.eq
+  let hash = T.hash
 end)
 
 (* all formulas occurring in statements *)
@@ -504,10 +504,10 @@ let apply_axiom axiom args =
     assert (List.length left = List.length right);
     assert (List.length left = List.length args);
     (* we need to permute [args] in the same way [right] is a permutation of [left] *)
-    let p_args = TermBij.of_list args left in
-    let p_inner = TermBij.of_list left right in
-    let p = TermBij.compose_list [p_args; p_inner; TermBij.rev p_args] in
-    let args' = TermBij.apply_list p args in
+    let p_args = TBij.of_list args left in
+    let p_inner = TBij.of_list left right in
+    let p = TBij.compose_list [p_args; p_inner; TBij.rev p_args] in
+    let args' = TBij.apply_list p args in
     pat, args'
 
 (** All terms referenced in the premises *)
@@ -533,7 +533,7 @@ let fmap_premises f premises =
 (** Map the terms to fresh variables, returning a permutation *)
 let map_to_vars ?(offset=0) terms =
   let vars = List.mapi (fun i t -> T.mk_var (i+offset)) terms in
-  TermBij.of_list terms vars
+  TBij.of_list terms vars
 
 let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_const s)) l
 
@@ -563,8 +563,8 @@ let kb_of_statements ?(init=empty) statements =
       (* map to variables *)
       let perm = map_to_vars left in
       (* replace by variables *)
-      let new_left = TermBij.apply_list perm left in
-      let new_right = TermBij.apply_list perm right in
+      let new_left = TBij.apply_list perm left in
+      let new_right = TBij.apply_list perm right in
       (* build axiom *)
       let axiom = Axiom (s, new_left, p, new_right) in
       add_axiom kb axiom
@@ -577,8 +577,8 @@ let kb_of_statements ?(init=empty) statements =
       assert (List.for_all (fun t -> List.memq t args') args);  (* check safe *)
       (* map args' to fresh variables *)
       let perm = map_to_vars args' in
-      let new_premises = fmap_premises (TermBij.apply perm) premises in
-      let lemma = Lemma (pat, TermBij.apply_list perm args, new_premises) in
+      let new_premises = fmap_premises (TBij.apply perm) premises in
+      let lemma = Lemma (pat, TBij.apply_list perm args, new_premises) in
       add_lemma kb lemma
     | A.Lemma (s, args, premises) ->
       let args = str_to_terms args in
@@ -587,8 +587,8 @@ let kb_of_statements ?(init=empty) statements =
       assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
       (* map symbols to variables *)
       let perm = map_to_vars l in
-      let new_premises = fmap_premises (TermBij.apply perm) premises in
-      let new_args = TermBij.apply_list perm args in
+      let new_premises = fmap_premises (TBij.apply perm) premises in
+      let new_args = TBij.apply_list perm args in
       begin match get_axiom kb s with
       | [] -> failwith (Util.sprintf "axiom %s is not defined" s)
       | (Axiom _ as axiom) :: _ ->
@@ -604,8 +604,8 @@ let kb_of_statements ?(init=empty) statements =
       assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
       (* map symbols to variables *)
       let perm = map_to_vars l in
-      let new_premises = fmap_premises (TermBij.apply perm) premises in
-      let new_args = TermBij.apply_list perm args in
+      let new_premises = fmap_premises (TBij.apply perm) premises in
+      let new_args = TBij.apply_list perm args in
       let theory = Theory (s, new_args, new_premises) in
       add_theory kb theory
     | A.Clause (head, body) ->

@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open QCheck
 
-module T = Term
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 
 let check_unify_gives_unifier =
   let gen = Arbitrary.(pair T.arbitrary T.arbitrary) in
@@ -38,12 +38,12 @@ let check_unify_gives_unifier =
   let name = "unify_gives_unifier" in
   let prop (t1, t2) =
     try
-      let subst = Unif.unification t1 0 t2 1 in
+      let subst = FOUnif.unification t1 0 t2 1 in
       let renaming = S.Renaming.create 5 in
       let t1' = S.apply ~renaming subst t1 0 in
       let t2' = S.apply ~renaming subst t2 1 in
       T.eq t1' t2'
-    with Unif.Fail ->
+    with FOUnif.Fail ->
       Prop.assume false;
       true
   in
@@ -56,7 +56,7 @@ let check_variant =
   let prop t =
     let renaming = S.Renaming.create 5 in
     let t' = S.apply ~renaming S.empty t 0 in
-    Unif.are_variant t t'
+    FOUnif.are_variant t t'
   in
   mk_test ~pp ~name gen prop
 
@@ -66,12 +66,12 @@ let check_matching =
   let pp = PP.(pair T.to_string T.to_string) in
   let prop (t1, t2) =
     try
-      let subst = Unif.matching t1 0 t2 1 in
+      let subst = FOUnif.matching t1 0 t2 1 in
       let renaming = S.Renaming.create 5 in
       let t1' = S.apply ~renaming subst t1 0 in
       let t2' = S.apply ~renaming subst t2 1 in
-      T.eq t1' t2' && Unif.are_variant t2 t2'
-    with Unif.Fail ->
+      T.eq t1' t2' && FOUnif.are_variant t2 t2'
+    with FOUnif.Fail ->
       Prop.assume false;
       true
   in

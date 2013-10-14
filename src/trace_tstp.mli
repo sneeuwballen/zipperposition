@@ -31,8 +31,8 @@ type id = Ast_tptp.name
 type t =
   | Axiom of string * string (* filename, axiom name *)
   | Theory of string (* a theory used to do an inference *)
-  | InferForm of Formula.t * step lazy_t
-  | InferClause of Formula.t list * step lazy_t
+  | InferForm of FOFormula.t * step lazy_t
+  | InferClause of FOFormula.t list * step lazy_t
 and step = {
   id : id;
   rule : string;
@@ -44,10 +44,10 @@ val eq : t -> t -> bool
 val hash : t -> int
 val cmp : t -> t -> int
 
-val mk_f_axiom : id:id -> Formula.t -> file:string -> name:string -> t
-val mk_c_axiom : id:id -> Formula.t list -> file:string -> name:string -> t
-val mk_f_step : ?esa:bool -> id:id -> Formula.t -> rule:string -> t list -> t
-val mk_c_step : ?esa:bool -> id:id -> Formula.t list -> rule:string -> t list -> t
+val mk_f_axiom : id:id -> FOFormula.t -> file:string -> name:string -> t
+val mk_c_axiom : id:id -> FOFormula.t list -> file:string -> name:string -> t
+val mk_f_step : ?esa:bool -> id:id -> FOFormula.t -> rule:string -> t list -> t
+val mk_c_step : ?esa:bool -> id:id -> FOFormula.t list -> rule:string -> t list -> t
 
 val is_axiom : t -> bool
 val is_theory : t -> bool

@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open QCheck
 
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 
 let test_bijection_symbol =
   let gen = Symbol.arbitrary in

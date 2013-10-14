@@ -27,20 +27,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 
 type statement =
   | Lemma of string * string list * premise list
-  | LemmaInline of Formula.t * premise list
-  | Axiom of string * string list * Formula.t
+  | LemmaInline of F.t * premise list
+  | Axiom of string * string list * F.t
   | Theory of string * string list * premise list
   | Clause of clause
   | Include of string
   | Error of string * Lexing.position * Lexing.position
   (** Parse statement *)
 and premise =
-  | IfPattern of Formula.t
+  | IfPattern of F.t
   | IfAxiom of string * string list
   | IfTheory of string * string list
 and clause = raw_lit * raw_lit list

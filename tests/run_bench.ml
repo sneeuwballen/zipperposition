@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 
 let a = T.mk_const (Symbol.mk_const "a")
 let b = T.mk_const (Symbol.mk_const "b")

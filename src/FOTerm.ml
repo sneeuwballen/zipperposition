@@ -103,7 +103,23 @@ module TermHASH = struct
   let hash = hash
 end
 
-module Tbl = Hashtbl.Make(TermHASH)
+module Tbl = struct
+  include Hashtbl.Make(TermHASH)
+
+  let to_list set = fold (fun x _ acc -> x :: acc) set []
+
+  let from_list l =
+    let tbl = create 13 in
+    List.iter (fun x -> replace tbl x ()) l;
+    tbl
+
+  let to_seq set = fun k -> iter (fun x () -> k x) set
+
+  let from_seq seq =
+    let tbl = create 13 in
+    Sequence.iter (fun x -> replace tbl x ()) seq;
+    tbl
+end
 
 module Set = Sequence.Set.Make(struct
   type t = term
@@ -653,8 +669,8 @@ let bij =
         | Var i -> "v", BranchTo (Lazy.force bij_var, (i, t.type_))
         | Node (s, l) -> "n", BranchTo (Lazy.force bij_node, (s, l)))
         ~extract:(function
-        | "bvar" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_bound_var ?ty i)
-        | "var" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_var ?ty i)
+        | "bv" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_bound_var ?ty i)
+        | "v" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_var ?ty i)
         | "n" -> BranchFrom (Lazy.force bij_node, fun (s,l) -> mk_node s l)
         | _ -> raise (DecodingError "expected Term")))
 

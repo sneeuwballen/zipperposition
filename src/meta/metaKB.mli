@@ -30,15 +30,15 @@ open Logtk
 (** {2 Basic knowledge} *)
 
 type lemma =
-  | Lemma of MetaPattern.t * Term.t list * premise list
+  | Lemma of MetaPattern.t * HOTerm.t list * premise list
 and axiom =
-  | Axiom of string * Term.t list * MetaPattern.t * Term.t list
+  | Axiom of string * HOTerm.t list * MetaPattern.t * HOTerm.t list
 and theory =
-  | Theory of string * Term.t list * premise list
+  | Theory of string * HOTerm.t list * premise list
 and premise =
-  | IfAxiom of string * Term.t list
-  | IfTheory of string * Term.t list
-  | IfPattern of MetaPattern.t * Term.t list
+  | IfAxiom of string * HOTerm.t list
+  | IfTheory of string * HOTerm.t list
+  | IfPattern of MetaPattern.t * HOTerm.t list
 and clause =
   | Clause of raw_lit * raw_lit list
 and raw_lit = string * string list
@@ -96,15 +96,15 @@ val bij : t Bij.t
 (** {2 MetaReasoner} *)
 
 type found_lemma =
-  | NewLemma of Formula.t * MetaReasoner.Logic.literal
+  | NewLemma of FOFormula.t * MetaReasoner.Logic.literal
     (** formula + explanation *)
 
 and found_theory =
-  | NewTheory of string * Term.t list * MetaReasoner.Logic.literal
+  | NewTheory of string * HOTerm.t list * MetaReasoner.Logic.literal
     (** Theory + explanation *)
 
 and found_axiom =
-  | NewAxiom of string * Term.t list
+  | NewAxiom of string * HOTerm.t list
 
 val add_reasoner : MetaReasoner.t -> t -> unit
   (** Add definitions to the reasoner *)
@@ -118,7 +118,7 @@ val cur_theories : MetaReasoner.t -> found_theory Sequence.t (* theories discove
 
 (** {2 Backward chaining} *)
 
-val match_lemmas : t -> MetaPattern.EncodedForm.t -> (lemma * Term.t list) list
+val match_lemmas : t -> MetaPattern.EncodedForm.t -> (lemma * HOTerm.t list) list
   (** Given a KB and a goal formula [g], find lemmas whose
       conclusions imply [g]. For each such lemma [l], return:
 

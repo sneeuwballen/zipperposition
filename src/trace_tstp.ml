@@ -26,9 +26,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 Trace of a TSTP prover} *)
 
-module T = Term
-module F = Formula
-module S = Substs
+module T = FOTerm
+module F = FOFormula
+module S = Substs.FO
 module A = Ast_tptp
 
 type id = A.name
@@ -36,8 +36,8 @@ type id = A.name
 type t =
   | Axiom of string * string (* filename, axiom name *)
   | Theory of string (* a theory used to do an inference *)
-  | InferForm of Formula.t * step lazy_t
-  | InferClause of Formula.t list * step lazy_t
+  | InferForm of F.t * step lazy_t
+  | InferClause of F.t list * step lazy_t
 and step = {
   id : id;
   rule : string;
@@ -282,6 +282,7 @@ let of_decls decls =
     | A.FOF _
     | A.CNF _
     | A.TFF _
+    | A.THF _
     | A.TypeDecl _
     | A.Include _
     | A.IncludeOnly _

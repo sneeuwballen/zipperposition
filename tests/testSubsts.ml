@@ -27,22 +27,29 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open OUnit
 
-module T = Term
-module S = Substs
-module TT = TestTerm
+module T = FOTerm
+module S = Substs.FO
+
+let a = T.mk_const (Symbol.mk_const "a")
+let b = T.mk_const (Symbol.mk_const "b")
+let x = T.mk_var 0
+let y = T.mk_var 1
+let f x y = T.mk_node (Symbol.mk_const "f") [x; y]
+let g x = T.mk_node (Symbol.mk_const "g") [x]
+let h x y z = T.mk_node (Symbol.mk_const "h") [x;y;z]
 
 let test_rename () =
-  let t1 = TT.(f x (g y)) in
-  let t2 = TT.(f x (g a)) in
-  let t3 = TT.(g (g x)) in
-  let subst = Unif.unification t1 1 t2 0 in
-  let renaming = Substs.Renaming.create 5 in
+  let t1 = f x (g y) in
+  let t2 = f x (g a) in
+  let t3 = g (g x) in
+  let subst = FOUnif.unification t1 1 t2 0 in
+  let renaming = S.Renaming.create 5 in
   let t1' = S.apply ~renaming subst t1 1 in
   let t2' = S.apply ~renaming subst t2 0 in
-  let t3' = TT.(h (S.apply ~renaming subst y 1) t1' (S.apply ~renaming subst t3 0)) in
+  let t3' = h (S.apply ~renaming subst y 1) t1' (S.apply ~renaming subst t3 0) in
   assert_bool "must be equal" (T.eq t1' t2');
-  let t3'' = TT.pterm "h(a, f(X, g(a)), g(g(X)))" in
-  assert_equal ~cmp:Unif.are_variant ~printer:T.to_string t3'' t3';
+  let t3'' = h a (f x (g a)) (g (g x)) in
+  assert_equal ~cmp:FOUnif.are_variant ~printer:T.to_string t3'' t3';
   ()
 
 let suite =

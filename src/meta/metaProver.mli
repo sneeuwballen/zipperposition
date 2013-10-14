@@ -49,11 +49,11 @@ val add_pattern : t -> MetaPattern.t -> unit
 val add_kb : t -> MetaKB.t -> unit
   (** Update the KB *)
 
-val match_formula : t -> Formula.t -> MetaReasoner.Logic.literal list
+val match_formula : t -> FOFormula.t -> MetaReasoner.Logic.literal list
   (** List of literals representing patterns matching this formula.
       Literals can then be added with {! add_literals} *)
 
-val match_clause : t -> Formula.t list -> MetaReasoner.Logic.literal list
+val match_clause : t -> FOFormula.t list -> MetaReasoner.Logic.literal list
   (** See {! match_formula} *)
 
 val add_literals : t -> MetaReasoner.Logic.literal Sequence.t -> unit

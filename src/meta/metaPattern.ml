@@ -27,9 +27,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module S = Substs
-module F = Formula
+module T = FOTerm
+module S = Substs.HO
+module F = FOFormula
+module HOT = HOTerm
 
 let prof_matching = Util.mk_profiler "meta.pattern.matching"
 let prof_encode = Util.mk_profiler "meta.pattern.encode"
@@ -39,65 +40,65 @@ let prof_foo = Util.mk_profiler "meta.pattern.foo"
 let __var_symbol = Symbol.mk_const "V"
 let __fun_symbol = Symbol.mk_const "S"
 
+let __var = HOT.mk_const __var_symbol
+let __fun = HOT.mk_const __fun_symbol
+
 (** {2 Encoding as terms} *)
 
 (** This module is used to handle the encoding of formulas and terms into
     patterns. Terms are supposed to be curried. *)
 
 module EncodedForm = struct
-  type t = Term.t
+  type t = HOT.t
 
-  exception DontForgetToCurry of Term.t
-  
   (* Encoding of term, in a form that allows to distinguish variables from
       constants even after abstracting symbols *)
-  let rec encode_t t = match t.T.term with
-    | T.Var _ ->
+  let rec encode_t t = match t.HOT.term with
+    | HOT.Var _ ->
       (* First order variable. We add a special constant before it, so
           that we won't match an abstracted symbol with a variable, e.g.
           (p a) with (p X) once a is abstracted to A. (p X) will become
           (p (__var X)), and the substitution will be rejected. *)
-      T.mk_node __var_symbol [t]
-    | T.BoundVar _ -> t
-    | T.Bind (s, t') -> T.mk_bind s (encode_t t')
-    | T.Node (s, []) ->
+      HOT.mk_at __var t
+    | HOT.BoundVar _ -> t
+    | HOT.Bind (s, t') -> HOT.mk_bind s (encode_t t')
+    | HOT.Const _ -> 
       (** Similarly to the Var case, here we need to protect constants
           from being bound to variables once abstracted into variables *)
-      T.mk_node __fun_symbol [t]
-    | T.Node (s, l) -> raise (DontForgetToCurry t)
-    | T.At (t1, t2) -> T.mk_at (encode_t t1) (encode_t t2)
+      HOT.mk_at __fun t
+    | HOT.At (t1, t2) -> HOT.mk_at (encode_t t1) (encode_t t2)
 
   (* Inverse operation of {! encode_t} *)
-  let rec decode_t t = match t.T.term with
-    | T.Var _
-    | T.BoundVar _ -> t
-    | T.Bind (s, t') -> T.mk_bind s (decode_t t')
-    | T.Node (s, [t']) when Symbol.eq s __var_symbol -> decode_t t'
-    | T.Node (s, [t']) when Symbol.eq s __fun_symbol -> decode_t t'
-    | T.Node (s, []) -> t
-    | T.Node (s, l) -> raise (DontForgetToCurry t)
-    | T.At (t1, t2) -> T.mk_at (decode_t t1) (decode_t t2)
+  let rec decode_t t = match t.HOT.term with
+    | HOT.Var _
+    | HOT.BoundVar _ -> t
+    | HOT.Bind (s, t') -> HOT.mk_bind s (decode_t t')
+    | HOT.At (s, t') when HOT.eq s __var -> decode_t t'
+    | HOT.At (s, t') when HOT.eq s __fun -> decode_t t'
+    | HOT.Const _ -> t
+    | HOT.At (t1, t2) -> HOT.mk_at (decode_t t1) (decode_t t2)
 
   let encode f =
     Util.enter_prof prof_encode;
-    let f = F.map (fun t -> encode_t (HO.curry t)) f in
     let t = F.to_term f in
+    let t = encode_t t in
     Util.exit_prof prof_encode;
     t
 
   let decode t =
     Util.enter_prof prof_decode;
+    let t = decode_t t in
     let f = F.of_term t in
-    let f = F.map (fun t -> HO.uncurry (decode_t t)) f in
     Util.exit_prof prof_decode;
     f
 
-  let eq = T.eq
-  let compare = T.compare
-  let hash = T.hash
-  let bij = T.bij
+  let eq = HOT.eq
+  let compare = HOT.compare
+  let hash = HOT.hash
+  let bij = HOT.bij
   let mapping = MetaReasoner.Translate.term
-  let pp = T.pp
+  let pp = HOT.pp
+  let fmt = HOT.fmt
 end
 
 (** {2 Main type} *)
@@ -128,10 +129,10 @@ let pp_apply buf (p, args) =
   Printf.bprintf buf "%a(%a)" pp p (Util.pp_list EncodedForm.pp) args
 
 let fmt fmt (Pattern (p, _)) =
-  Format.pp_print_string fmt (Util.on_buffer T.pp p)
+  Format.pp_print_string fmt (Util.on_buffer HOT.pp p)
 
 let debug fmt (Pattern (p, types)) =
-  Format.fprintf fmt "pat(%a, [%a])" T.debug p
+  Format.fprintf fmt "pat(%a, [%a])" HOT.debug p
     (Sequence.pp_seq Type.fmt) (Sequence.of_list types)
 
 let bij =
@@ -143,23 +144,26 @@ let bij =
 (** {2 Basic Operations} *)
 
 (* list of constants, in prefix traversal order *)
-let rec functions_in_order acc t = match t.T.term with
-  | T.Var _
-  | T.BoundVar _ -> acc
-  | T.Bind (s, t') ->
+let rec functions_in_order acc t = match t.HOT.term with
+  | HOT.Bind (s, t') ->
     functions_in_order acc t'
-  | T.Node (_, []) -> (* constant, add it *)
-    if List.memq t acc then acc else t :: acc
-  | T.Node (_, l) ->  (* subterms *)
-    List.fold_left functions_in_order acc l
-  | T.At (t1, t2) ->
+  | HOT.Const s when not (Symbol.is_connective s)
+    && not (Symbol.eq s __var_symbol)
+    && not (Symbol.eq s __fun_symbol) -> (* constant, add it *)
+    if List.exists (fun s' -> Symbol.eq s s') acc then acc else s :: acc
+  | HOT.Const _
+  | HOT.Var _
+  | HOT.BoundVar _ -> acc
+  | HOT.At (t1, t2) ->
     let acc = functions_in_order acc t1 in
     functions_in_order acc t2
 
 let create ~signature f =
-  let funs = List.rev (functions_in_order [] f) in
-  let symbols = List.map T.head funs in
-  let pat = HO.lambda_abstract_list ~signature f funs in
+  (* gather interesting symbols to abstract *)
+  let symbols = List.rev (functions_in_order [] f) in
+  let funs = List.map HOT.mk_const symbols in
+  (* create pattern by lambda abstraction *)
+  let pat = Lambda.lambda_abstract_list ~signature f funs in
   Pattern (pat, List.map (Signature.find signature) symbols), funs
 
 let arity = function
@@ -175,7 +179,7 @@ let can_apply ~signature (pat,args) =
         let ctx = TypeInference.Ctx.of_signature signature in
         try TypeInference.Ctx.protect ctx
           (fun () ->
-            List.iter2 (TypeInference.constrain_term_type ctx) args types;
+            List.iter2 (TypeInference.HO.constrain_term_type ctx) args types;
             true)
         with Type.Error _ ->
           false
@@ -185,8 +189,8 @@ let apply (pat, args) =
   | Pattern (t, types) ->
     (* type checking for compatibility of [args] and [types] *)
     assert (List.length types = List.length args);
-    let t = List.fold_right (fun arg t -> T.mk_at t arg) args t in
-    HO.beta_reduce t
+    let t = List.fold_right (fun arg t -> HOT.mk_at t arg) args t in
+    Lambda.beta_reduce t
 
 (** Maps a pattern, parametrized by some of its variables, into datalog terms *)
 let mapping =
@@ -203,21 +207,13 @@ let mapping =
 (** Matches the first pattern (curryfied term) against the second one. Only
     head variables can be bound to any term. It may return several solutions. *)
 let matching_terms p1 o_1 p2 o_2 =
-  (** Does [symb] occur in [t]? *)
-  let rec symb_occurs symb t = match t.T.term with
-    | T.Var _
-    | T.BoundVar _ -> false
-    | T.Bind (s, t') -> Symbol.eq s symb || symb_occurs symb t'
-    | T.Node (s, l) -> Symbol.eq s symb || List.exists (symb_occurs symb) l
-    | T.At (t1, t2) -> symb_occurs symb t1 || symb_occurs symb t2
-  in
   (* is a substitution acceptable? *)
   let ok_subst subst =
     Sequence.for_all
-      (fun (_, _, t, _) -> not (symb_occurs __var_symbol t))
-      (Substs.to_seq subst)
+      (fun (_, _, t, _) -> not (HOT.contains_symbol  __var_symbol t))
+      (S.to_seq subst)
   in
-  let substs = Unif.matching_ac p1 o_1 p2 o_2 in
+  let substs = HOUnif.matching_ac p1 o_1 p2 o_2 in
   Sequence.filter ok_subst substs
 
 (* assuming term is encoded, match the pattern against it, yielding
@@ -227,18 +223,18 @@ let matching pat right =
   match pat with
   | Pattern (t', types) ->
     (* instantiate with variables *)
-    let offset = T.max_var (T.vars t') + 1 in
-    let vars = List.mapi (fun i ty -> T.mk_var ~ty (i+offset)) types in
+    let offset = HOT.max_var (HOT.vars t') + 1 in
+    let vars = List.mapi (fun i ty -> HOT.mk_var ~ty (i+offset)) types in
     Util.enter_prof prof_foo;
-    let left = List.fold_right (fun arg t -> T.mk_at t arg) vars t' in
-    let left = HO.beta_reduce left in
+    let left = List.fold_right (fun arg t -> HOT.mk_at t arg) vars t' in
+    let left = Lambda.beta_reduce left in
     Util.exit_prof prof_foo;
     (* match left and right *)
-    Util.debug 5 "MetaPattern: match %a with %a" T.pp left T.pp right;
+    Util.debug 5 "MetaPattern: match %a with %a" HOT.pp left HOT.pp right;
     let substs = matching_terms left 1 right 0 in
     let substs = Sequence.map
       (fun subst ->
-        let args = List.map (fun v -> Substs.apply_no_renaming subst v 1) vars in
+        let args = List.map (fun v -> S.apply_no_renaming subst v 1) vars in
         pat, args)
       substs
     in

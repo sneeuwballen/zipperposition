@@ -93,6 +93,9 @@ val fold : t -> 'a -> ('a -> Symbol.t -> Type.t -> 'a) -> 'a
 val to_seq : t -> (Symbol.t * Type.t) Sequence.t
 val of_seq : (Symbol.t * Type.t) Sequence.t -> t
 
+val to_list : t -> (Symbol.t * Type.t) list
+val of_list : (Symbol.t * Type.t) list -> t
+
 (** {2 IO} *)
 
 val pp : Buffer.t -> t -> unit

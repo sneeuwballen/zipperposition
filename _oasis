@@ -19,6 +19,10 @@ Flag "meta"
   Description:  Build and install meta-prover
   Default:      false
 
+Flag "bench"
+  Description:  Build and run benchmarks
+  Default:      false
+
 Library "logtk"
   Path:             src/
   Pack:             true
@@ -27,10 +31,10 @@ Library "logtk"
                     Lex_tptp, Ast_tptp, Parse_tptp, Lambda, Multiset,
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
-                    FormulaShape, Util_tptp, Skolem, Transform,
-                    lib/Sequence, lib/Bij, lib/Cache, lib/QCheck, lib/Bencode,
-                    lib/BV
-  BuildDepends:     unix,num
+                    FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
+                    Trace_tstp, CallProver, lib/Sequence, lib/Bij, lib/Cache,
+                    lib/QCheck, lib/Bencode, lib/BV
+  BuildDepends:     unix,num,str
 
 Library "logtk_meta"
   Path:             src/meta/
@@ -53,19 +57,31 @@ Document logtk
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: logtk,logtk.meta
 
+Executable run_bench
+  Path: tests/
+  Install: false
+  CompiledObject: native
+  MainIs: run_bench.ml
+  BuildDepends: logtk, bench
+
+Test all
+  Command: $run_tests
+  TestTools: run_tests
+  Run$: flag(tests) && flag(meta)
+
 Executable run_tests
   Path: tests/
   Install: false
   CompiledObject: native
   MainIs: run_tests.ml
-  BuildDepends: logtk, oUnit
+  BuildDepends: logtk, oUnit, logtk.meta
 
 # TPTP syntax and type checking
-Executable check_tptp
+Executable type_check_tptp
   Path: tools/
   Install: true
   CompiledObject: native
-  MainIs: check_tptp.ml
+  MainIs: type_check_tptp.ml
   BuildDepends: logtk
 
 # Conversion to CNF
@@ -84,6 +100,14 @@ Executable detect_theories
   CompiledObject: native
   MainIs: detect_theories.ml
   BuildDepends: logtk,logtk.meta
+
+# proof checking
+Executable proof_check_tstp
+  Path: tools/
+  Install: true
+  CompiledObject: native
+  MainIs: proof_check_tstp.ml
+  BuildDepends: logtk
 
 SourceRepository head
   Type: git

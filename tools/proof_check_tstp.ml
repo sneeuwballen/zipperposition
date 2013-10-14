@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module A = Ast_tptp
-module F = Formula
+module F = FOFormula
 module TT = Trace_tstp
 module StepTbl = TT.StepTbl
 

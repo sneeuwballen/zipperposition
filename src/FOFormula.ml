@@ -634,7 +634,7 @@ let of_term t =
       mk_and (List.map recurse l)
     | {T.term=T.Const s}, l when S.eq s S.or_symbol ->
       mk_or (List.map recurse l)
-    | {T.term=T.Const s}, [a; b] when S.eq s S.or_symbol ->
+    | {T.term=T.Const s}, [a; b] when S.eq s S.equiv_symbol ->
       mk_equiv (recurse a) (recurse b)
     | {T.term=T.Const s}, [a; b] when S.eq s S.imply_symbol ->
       mk_imply (recurse a) (recurse b)

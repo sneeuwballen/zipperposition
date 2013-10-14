@@ -71,6 +71,9 @@ let is_not_bool signature s =
 let to_seq signature = SMap.to_seq signature
 let of_seq seq = SMap.of_seq seq
 
+let to_list signature = Sequence.to_rev_list (to_seq signature)
+let of_list l = SMap.of_seq (Sequence.of_list l)
+
 let merge s1 s2 =
   SMap.merge
     (fun s t1 t2 -> match t1, t2 with
