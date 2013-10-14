@@ -29,10 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = Formula
+module F = FOFormula
 
 type t = {
-  form : Formula.t;
+  form : FOFormula.t;
   proof : Proof.t;
   mutable id : int;
   mutable simpl_to : t option;

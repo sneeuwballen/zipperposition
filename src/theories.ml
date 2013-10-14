@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module STbl = Symbol.SHashtbl
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 module PF = PFormula
 
 (** {2 Associativity-Commutativity} *)
@@ -104,8 +104,8 @@ module TotalOrder = struct
   } (** Specification of which symbols implement total orderings *)
 
   type lit = {
-    left : Term.t;
-    right : Term.t;
+    left : FOTerm.t;
+    right : FOTerm.t;
     strict : bool;
     instance : instance;
   } (** A literal is an atomic inequality. [strict] is [true] iff the

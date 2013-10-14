@@ -29,16 +29,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module F = Formula
-module S = Substs
+module T = FOTerm
+module F = FOFormula
+module S = Substs.FO
 module TO = Theories.TotalOrder
 module Pos = Position
 module PB = Position.Build
 
 type t =
-  | Equation of Term.t * Term.t * bool * Comparison.t
-  | Prop of Term.t * bool
+  | Equation of T.t * T.t * bool * Comparison.t
+  | Prop of T.t * bool
   | True
   | False
   (** a literal, that is, a signed equation or a proposition *)
@@ -86,27 +86,27 @@ let compare l1 l2 =
   | False, False -> 0
   | _, _ -> __to_int l1 - __to_int l2
 
-let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
+let variant ?(subst=S.empty) lit1 sc1 lit2 sc2 =
   match lit1, lit2 with
   | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
-    Unif.variant ~subst p1 sc1 p2 sc2
+    FOUnif.variant ~subst p1 sc1 p2 sc2
   | True, True
   | False, False -> subst
   | Equation (l1, r1, sign1, _), Equation (l2, r2, sign2, _) when sign1 = sign2 ->
     begin try
-      let subst = Unif.variant ~subst l1 sc1 l2 sc2 in
-      Unif.variant ~subst r1 sc1 r2 sc2
-    with Unif.Fail ->
-      let subst = Unif.variant ~subst l1 sc1 r2 sc2 in
-      Unif.variant ~subst r1 sc1 l2 sc2
+      let subst = FOUnif.variant ~subst l1 sc1 l2 sc2 in
+      FOUnif.variant ~subst r1 sc1 r2 sc2
+    with FOUnif.Fail ->
+      let subst = FOUnif.variant ~subst l1 sc1 r2 sc2 in
+      FOUnif.variant ~subst r1 sc1 l2 sc2
     end
-  | _ -> raise Unif.Fail
+  | _ -> raise FOUnif.Fail
 
 let are_variant lit1 lit2 =
   try
     let _ = variant lit1 0 lit2 1 in
     true
-  with Unif.Fail ->
+  with FOUnif.Fail ->
     false
 
 let to_multiset lit = match lit with
@@ -334,9 +334,9 @@ let add_vars set = function
   | False -> ()
 
 let vars lit =
-  let set = T.THashSet.create () in
+  let set = T.Tbl.create 7 in
   add_vars set lit;
-  T.THashSet.to_list set
+  T.Tbl.to_list set
 
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs v p
@@ -389,9 +389,9 @@ let replace_pos ~ord lit ~at ~by = match lit, at with
 let infer_type ctx lit =
   match lit with
   | Equation (l,r,_,_) ->
-    TypeInference.constrain_term_term ctx l r
+    TypeInference.FO.constrain_term_term ctx l r
   | Prop (p,_) ->
-    TypeInference.constrain_term_type ctx p Type.o
+    TypeInference.FO.constrain_term_type ctx p Type.o
   | True
   | False -> ()
 
@@ -485,9 +485,9 @@ module Arr = struct
       (fun h lit -> Hash.hash_int2 h (hash_novar lit))
       13 lits
 
-  let variant ?(subst=Substs.empty) a1 sc1 a2 sc2 =
+  let variant ?(subst=S.empty) a1 sc1 a2 sc2 =
     if Array.length a1 <> Array.length a2
-      then raise Unif.Fail;
+      then raise FOUnif.Fail;
     let subst = ref subst in
     for i = 0 to Array.length a1 - 1 do
       subst := variant ~subst:!subst a1.(i) sc1 a2.(i) sc2;
@@ -498,7 +498,7 @@ module Arr = struct
     try
       let _ = variant a1 0 a2 1 in
       true
-    with Unif.Fail ->
+    with FOUnif.Fail ->
       false
 
   let weight lits =
@@ -508,11 +508,11 @@ module Arr = struct
     Array.fold_left (fun d lit -> max d (depth lit)) 0 lits
 
   let vars lits =
-    let set = T.THashSet.create () in
+    let set = T.Tbl.create 11 in
     for i = 0 to Array.length lits - 1 do
       add_vars set lits.(i);
     done;
-    T.THashSet.to_list set
+    T.Tbl.to_list set
 
   let is_ground lits =
     Util.array_forall is_ground lits

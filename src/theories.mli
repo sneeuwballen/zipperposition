@@ -58,10 +58,10 @@ module AC : sig
   val symbols : spec:t -> Symbol.SSet.t
     (** set of AC symbols *)
 
-  val symbols_of_terms : spec:t -> Term.t Sequence.t -> Symbol.SSet.t
+  val symbols_of_terms : spec:t -> FOTerm.t Sequence.t -> Symbol.SSet.t
     (** set of AC symbols occurring in the given term *)
 
-  val symbols_of_forms : spec:t -> Formula.t Sequence.t -> Symbol.SSet.t
+  val symbols_of_forms : spec:t -> FOFormula.t Sequence.t -> Symbol.SSet.t
     (** Set of AC symbols occurring in the given formula *)
 
   val proofs : spec:t -> Proof.t list
@@ -81,8 +81,8 @@ module TotalOrder : sig
   type t 
 
   type lit = {
-    left : Term.t;
-    right : Term.t;
+    left : FOTerm.t;
+    right : FOTerm.t;
     strict : bool;
     instance : instance;
   } (** A literal is an atomic inequality. [strict] is [true] iff the

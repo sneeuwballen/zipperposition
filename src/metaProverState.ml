@@ -34,8 +34,8 @@ let prof_scan_formula = Util.mk_profiler "meta.scan_formula"
 let prof_scan_set = Util.mk_profiler "meta.scan_set"
 let prof_add_lits = Util.mk_profiler "meta.add_lits"
 
-module T = Term
-module F = Formula
+module T = HOTerm
+module F = FOFormula
 module PF = PFormula
 module C = Clause
 module M = Logtk_meta
@@ -44,7 +44,7 @@ module Lits = Literal.Arr
 
 type result =
   | Deduced of PFormula.t * source list
-  | Theory of string * Term.t list * source list
+  | Theory of string * T.t list * source list
   | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
@@ -62,7 +62,7 @@ end)
 type t = {
   prover : M.MetaProver.t;    (* real meta-prover *)
   mutable sources : source LitMap.t;     (** for reconstructing proofs *)
-  mutable theories : (string * Term.t list * source list) list;
+  mutable theories : (string * T.t list * source list) list;
   mutable experts : Experts.t list;
   mutable results : result list;
   mutable new_results : result list;  (* recent results *)

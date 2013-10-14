@@ -29,14 +29,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module F = Formula
-module S = Substs
+module F = FOFormula
 module CC = CompactClause
 
 type t =
   | Axiom of string * string
-  | InferForm of Formula.t * step
+  | InferForm of FOFormula.t * step
   | InferClause of CompactClause.t * step
 and step = {
   rule : string;

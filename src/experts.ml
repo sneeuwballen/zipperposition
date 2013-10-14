@@ -29,9 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 module C = Clause
-module S = Substs
+module S = Substs.FO
 
 (** {2 General interface} *)
 
@@ -46,14 +46,14 @@ let prof_normal_form = Util.mk_profiler "experts.normal_form"
 type t = {
   expert_name : string;                 (** Theory the expert works on *)
   expert_descr : string;                (** Description of the expert *)
-  expert_equal : Term.t -> Term.t -> bool;  (** Check whether two terms are equal *)
+  expert_equal : T.t -> T.t -> bool;  (** Check whether two terms are equal *)
   expert_sig : Symbol.SSet.t;           (** Symbols of the theory *)
   expert_clauses : Clause.t list;        (** Additional axioms *)
-  expert_canonize : Term.t -> Term.t;       (** Get a canonical form of the term *)
+  expert_canonize : T.t -> T.t;       (** Get a canonical form of the term *)
   expert_ord : Ordering.t -> bool;        (** Compatible with ord? *)
   expert_update_ctx : Ctx.t -> t list;(** How to update the context *)
   expert_ctx : Ctx.t;                 (** Context used by the expert *)
-  expert_solve : ((Term.t*Term.t) list -> Substs.t list) option;
+  expert_solve : ((T.t*T.t) list -> S.t list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
 } (** An expert for some theory *)
@@ -341,7 +341,7 @@ let compatible_gc ~ord gc =
 
 module OrderedTRS = Rewriting.MakeOrdered(struct
   type t = Clause.t
-  type rhs = Term.t
+  type rhs = T.t
   let compare = C.compare
   let extract c = match c.C.hclits with
     | [| Literal.Equation (l, r, sign, _) |] -> l, r, sign

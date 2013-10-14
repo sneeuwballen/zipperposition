@@ -31,8 +31,7 @@ open Logtk
 open Logtk_meta
 open Params
 
-module T = Term
-module F = Formula
+module T = FOTerm
 module PF = PFormula
 module O = Ordering
 module C = Clause

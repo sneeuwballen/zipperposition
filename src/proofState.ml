@@ -31,9 +31,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 module C = Clause
-module S = Substs
+module S = Substs.FO
 module Lit = Literal
 module Lits = Literal.Arr
 module Pos = Position
@@ -54,8 +54,8 @@ let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 module TermIndex = Fingerprint.Make(C.WithPos)
 
 module UnitIndex = NPDtree.Make(struct
-  type t = Term.t * Term.t * bool * C.t
-  type rhs = Term.t
+  type t = T.t * T.t * bool * C.t
+  type rhs = T.t
   let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
     Util.lexicograph_combine [T.compare t11 t21; T.compare t12 t22;
                               compare s1 s2; C.compare c1 c2]

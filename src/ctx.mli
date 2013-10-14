@@ -35,7 +35,7 @@ type t = private {
   mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
-  renaming : Substs.Renaming.t;       (** Renaming, always useful... *)
+  renaming : Substs.FO.Renaming.t;    (** Renaming, always useful... *)
   ac : Theories.AC.t;                 (** AC symbols *)
   total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
@@ -47,7 +47,7 @@ val create : ?ord:Ordering.t -> ?select:Selection.t ->
 
 val ord : ctx:t -> Ordering.t
 
-val compare : ctx:t -> Term.t -> Term.t -> Comparison.t
+val compare : ctx:t -> FOTerm.t -> FOTerm.t -> Comparison.t
 
 val select : ctx:t -> Literal.t array -> BV.t
 
@@ -59,7 +59,7 @@ val ac : ctx:t -> Theories.AC.t
 
 val total_order : ctx:t -> Theories.TotalOrder.t
 
-val renaming_clear : ctx:t -> Substs.Renaming.t
+val renaming_clear : ctx:t -> Substs.FO.Renaming.t
   (** Obtain the global renaming. The renaming is cleared before
       it is returned. *)
 
@@ -91,20 +91,20 @@ val tyctx : ctx:t -> TypeInference.Ctx.t
 val declare : ctx:t -> Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
-val constrain_term_type : ctx:t -> Term.t -> Type.t -> unit
+val constrain_term_type : ctx:t -> FOTerm.t -> Type.t -> unit
   (** Force the term to have the given type, or
       @raise Type.Error if types are incompatible *)
 
-val constrain_term_term : ctx:t -> Term.t -> Term.t -> unit
+val constrain_term_term : ctx:t -> FOTerm.t -> FOTerm.t -> unit
   (** Constrain the two terms to have the same type, or
       @raise Type.Error if types are incompatible *)
 
-val infer_type : ctx:t -> Term.t -> Type.t
+val infer_type : ctx:t -> FOTerm.t -> Type.t
   (** Infer the type of this term *)
 
-val check_term_type : ctx:t -> Term.t -> Type.t -> bool
+val check_term_type : ctx:t -> FOTerm.t -> Type.t -> bool
   (** [check_term_type ~ctx t ty] checks that [t] can have type [ty]. *)
 
-val check_term_term : ctx:t -> Term.t -> Term.t -> bool
+val check_term_term : ctx:t -> FOTerm.t -> FOTerm.t -> bool
   (** [check_term_term ~ctx t1 t2] checks that [t1] and [t2]
       have compatible types *)

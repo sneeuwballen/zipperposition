@@ -134,7 +134,7 @@ val add_is_trivial : env:t -> is_trivial_rule -> unit
 val add_expert : env:t -> Experts.t -> unit
   (** Add an expert structure *)
 
-val add_rewrite_rule : env:t -> string -> (Term.t -> Term.t) -> unit
+val add_rewrite_rule : env:t -> string -> (FOTerm.t -> FOTerm.t) -> unit
   (** Add a term rewrite rule *)
 
 val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit

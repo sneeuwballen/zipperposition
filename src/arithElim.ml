@@ -30,8 +30,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module S = Symbol
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 module C = Clause
 module PF = PFormula
 module Lit = Literal
@@ -93,7 +93,7 @@ let eliminate_arith c =
       ~rule:"arith_elim" cc [c.C.hcproof] in
     let new_c = C.create ~parents:[c] ~ctx lits' proof in
     Util.debug 3 "eliminate %a in %a (with %a) into %a" Lit.pp c.C.hclits.(i)
-      C.pp c Substs.pp subst C.pp new_c;
+      C.pp c Substs.FO.pp subst C.pp new_c;
     new_c
   in
   (* try to eliminate every arith literals *)
@@ -124,7 +124,7 @@ let factor_arith c =
     let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
       ~rule:"factor" cc [c.C.hcproof] in
     let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
-    Util.debug 3 "factor %a (with %a) into %a" C.pp c Substs.pp subst C.pp new_c;
+    Util.debug 3 "factor %a (with %a) into %a" C.pp c Substs.FO.pp subst C.pp new_c;
     new_c
   in
   (* try to factor arith literals *)

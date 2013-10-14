@@ -38,14 +38,14 @@ open Logtk
 type t = {
   expert_name : string;                 (** Theory the expert works on *)
   expert_descr : string;                (** Description of the expert *)
-  expert_equal : Term.t -> Term.t -> bool;  (** Check whether two terms are equal *)
+  expert_equal : FOTerm.t -> FOTerm.t -> bool;  (** Check whether two terms are equal *)
   expert_sig : Symbol.SSet.t;           (** Symbols of the theory *)
   expert_clauses : Clause.t list;        (** Additional axioms *)
-  expert_canonize : Term.t -> Term.t;       (** Get a canonical form of the term *)
+  expert_canonize : FOTerm.t -> FOTerm.t;       (** Get a canonical form of the term *)
   expert_ord : Ordering.t -> bool;        (** Compatible with ord? *)
   expert_update_ctx : Ctx.t -> t list;    (** How to update the context *)
   expert_ctx : Ctx.t;                 (** Context used by the expert *)
-  expert_solve : ((Term.t*Term.t) list -> Substs.t list) option;
+  expert_solve : ((FOTerm.t*FOTerm.t) list -> Substs.FO.t list) option;
     (** The expert may be able to solve systems of equations, returning
         a list of substitutions. Example: the simplex. *)
 } (** An expert for some theory *)
@@ -66,10 +66,10 @@ val combine : t -> t -> t
   (** Combine two experts into a new one, that works on
       the combination of their theories, assuming they are compatible. *)
 
-val canonize : t -> Term.t -> Term.t
+val canonize : t -> FOTerm.t -> FOTerm.t
   (** Get the normal form of the term *)
 
-val equal : t -> Term.t -> Term.t -> bool
+val equal : t -> FOTerm.t -> FOTerm.t -> bool
   (** Check whether the terms are equal modulo theory *)
 
 val signature : t -> Symbol.SSet.t
@@ -143,7 +143,7 @@ val mk_gc : theory:string -> ord:string -> prec:Symbol.t list ->
 val compatible_gc : ord:Ordering.t -> gnd_convergent -> bool
   (** check compatibility of ord with gc.gc_ord,gc.gc_prec! *)
 
-val ground_pair : Term.t -> Term.t -> Term.t * Term.t
+val ground_pair : FOTerm.t -> FOTerm.t -> FOTerm.t * FOTerm.t
   (** Replace variables of terms by fresh constants *)
 
 val gc_expert : ctx:Ctx.t -> gnd_convergent -> t

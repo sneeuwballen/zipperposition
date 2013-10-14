@@ -30,7 +30,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_meta
 
-module T = Term
+module HOT = HOTerm
+module T = FOTerm
 module C = Clause
 module Lit = Literal
 
@@ -158,20 +159,20 @@ let setup_env ~env =
     let signal = MetaProver.on_theory (MetaProverState.prover meta) in
     Signal.on signal
       (function
-        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}], lit) ->
+        | MetaKB.NewTheory ("ac", [{HOT.term=HOT.Const f}], lit) ->
           let proof = MetaProverState.explain meta lit in
           add_ac ~env ~proof f; true
         | MetaKB.NewTheory ("ac", [t], _) ->
-          Util.debug 1 "ignore AC instance for term %a" T.pp t; true
+          Util.debug 1 "ignore AC instance for term %a" HOT.pp t; true
         | _ -> true);
     (* see whether AC symbols have already been detected *)
     Sequence.iter
       (function
-        | MetaKB.NewTheory ("ac", [{T.term=T.Node(f,[])}], lit) ->
+        | MetaKB.NewTheory ("ac", [{HOT.term=HOT.Const f}], lit) ->
           let proof = MetaProverState.explain meta lit in
           add_ac ~env ~proof f
         | MetaKB.NewTheory ("ac", [t], _) ->
-          Util.debug 1 "ignore AC instance for term %a" T.pp t
+          Util.debug 1 "ignore AC instance for term %a" HOT.pp t
         | _ -> ())
       (MetaKB.cur_theories (MetaProverState.reasoner meta));
     ()

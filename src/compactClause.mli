@@ -28,16 +28,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type t = Formula.t array lazy_t
+type t = FOFormula.t array lazy_t
 
 val eq : t -> t -> bool
 val hash : t -> int
 
 val is_empty : t -> bool
 
-val iter : t -> (Formula.t -> unit) -> unit
+val iter : t -> (FOFormula.t -> unit) -> unit
 
-val to_seq : t -> Formula.t Sequence.t
+val to_seq : t -> FOFormula.t Sequence.t
 
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit

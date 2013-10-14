@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = Formula
+module F = FOFormula
 module PF = PFormula
 
 (** {2 Transformations} *)
@@ -152,7 +152,7 @@ let meta_prover ~meta =
 let rw_term ?(rule="rw") ~premises trs =
   fun set pf ->
     let f = pf.PF.form in
-    let f' = Formula.map (fun t -> Rewriting.TRS.rewrite trs t) f in
+    let f' = F.map (fun t -> Rewriting.TRS.rewrite trs t) f in
     if F.eq f f'
       then []
       else
@@ -181,7 +181,7 @@ let rw_form ?(rule="rw") ~premises frs =
 let fmap_term ~rule func =
   fun set pf ->
     let f = pf.PF.form in
-    let f' = Formula.map func f in
+    let f' = F.map func f in
     if F.eq f f'
       then []
       else

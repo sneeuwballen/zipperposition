@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 
 let rules, symbols = 
   let s_symb = Symbol.mk_const "s" in

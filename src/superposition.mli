@@ -77,7 +77,7 @@ val subsumes : Literal.t array -> Literal.t array -> bool
 
 val subsumes_with : Literal.t array -> Substs.scope ->
                     Literal.t array -> Substs.scope ->
-                    Substs.t option
+                    Substs.FO.t option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
 val eq_subsumes : Literal.t array -> Literal.t array -> bool

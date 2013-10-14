@@ -39,7 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 type t = private {
-  coeffs : Symbol.t Term.TMap.t;
+  coeffs : Symbol.t FOTerm.Map.t;
   constant : Symbol.t;
   divby : Symbol.t;  (* divide everything by this constant (cool for ints) *)
 }
@@ -47,13 +47,13 @@ type t = private {
 val const : Symbol.t -> t           (** Empty monomial, from constant (decides type) *)
 val singleton : ?divby:Symbol.t ->
                 Symbol.t ->
-                Term.t -> t         (** One term. *)
-val of_list : Symbol.t -> (Symbol.t * Term.t) list -> t
+                FOTerm.t -> t         (** One term. *)
+val of_list : Symbol.t -> (Symbol.t * FOTerm.t) list -> t
 
-val find : t -> Term.t -> Symbol.t  (** @raise Not_found if not present *)
-val mem : t -> Term.t -> bool       (** Is the term in the monome? *)
-val add : t -> Symbol.t -> Term.t -> t  (** Add term with coefficient. Sums coeffs. *)
-val remove : t -> Term.t -> t           (** Remove the term *)
+val find : t -> FOTerm.t -> Symbol.t  (** @raise Not_found if not present *)
+val mem : t -> FOTerm.t -> bool       (** Is the term in the monome? *)
+val add : t -> Symbol.t -> FOTerm.t -> t  (** Add term with coefficient. Sums coeffs. *)
+val remove : t -> FOTerm.t -> t           (** Remove the term *)
 
 val type_of : t -> Type.t           (** type of the monome *)
 
@@ -64,13 +64,13 @@ val sign : t -> int
   (** Assuming [is_constant m], [sign m] returns the sign of [m].
       @raise Invalid_argument if the monome is not a constant *)
 
-val terms : t -> Term.t list
+val terms : t -> FOTerm.t list
   (** List of terms that occur in the monome with non-nul coefficients *)
 
-val to_list : t -> (Symbol.t * Term.t) list
+val to_list : t -> (Symbol.t * FOTerm.t) list
   (** Terms and their coefficients. Ignores the constant and divby! *)
 
-val var_occurs : Term.t -> t -> bool
+val var_occurs : FOTerm.t -> t -> bool
   (** Does the variable occur in the monome? *)
 
 val reduce_same_divby : t -> t -> t * t
@@ -90,14 +90,14 @@ val pred : t -> t                 (** -1 *)
 
 exception NotLinear
   
-val of_term : signature:Signature.t -> Term.t -> t
+val of_term : signature:Signature.t -> FOTerm.t -> t
   (** try to get a monome from a term.
       @raise NotLinear if the term is not a proper monome. *)
 
-val of_term_opt : signature:Signature.t -> Term.t -> t option
+val of_term_opt : signature:Signature.t -> FOTerm.t -> t option
   (** Exceptionless versionf of {!of_term} *)
 
-val to_term : t -> Term.t         (** convert back to a term *)
+val to_term : t -> FOTerm.t         (** convert back to a term *)
 
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string

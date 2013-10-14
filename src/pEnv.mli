@@ -75,7 +75,7 @@ val rw_form : ?rule:string -> premises:PFormula.Set.t ->
       @param premises is the set of formulas that justify why the
         transformtion is correct *)
 
-val fmap_term : rule:string -> (Term.t -> Term.t) -> operation
+val fmap_term : rule:string -> (FOTerm.t -> FOTerm.t) -> operation
   (** Transformation on terms *)
 
 val expand_def : operation

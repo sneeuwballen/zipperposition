@@ -29,9 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 module C = Clause
-module F = Formula
+module F = FOFormula
 module PF = PFormula
 module Lit = Literal
 module Lits = Literal.Arr
@@ -78,7 +78,7 @@ type t = {
   mutable unary_rules : (string * unary_inf_rule) list;
     (** the unary inference rules *)
 
-  mutable rewrite_rules : (string * (Term.t -> Term.t)) list;
+  mutable rewrite_rules : (string * (T.t -> T.t)) list;
     (** Rules to apply to term *)
 
   mutable lit_rules : (string * lit_rewrite_rule) list;

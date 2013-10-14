@@ -48,7 +48,7 @@ type t = private {
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : BV.t;              (** bitvector for selected literals *)
-  mutable hcvars : Term.t list;           (** the free variables *)
+  mutable hcvars : FOTerm.t list;           (** the free variables *)
   mutable hcproof : Proof.t;             (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
@@ -60,10 +60,10 @@ type clause = t
 val compact : t -> CompactClause.t
   (** Turn into a compact clause *)
 
-val to_seq : t -> (Term.t * Term.t * bool) Sequence.t
+val to_seq : t -> (FOTerm.t * FOTerm.t * bool) Sequence.t
   (** Easy iteration on literals *)
 
-val terms : t -> Term.t Sequence.t
+val terms : t -> FOTerm.t Sequence.t
 
 val to_prec_clause : t -> Precedence.clause
 
@@ -122,7 +122,7 @@ val create_a : ?parents:t list -> ?selected:BV.t ->
       ownership of the input array. *)
 
 val create_forms : ?parents:t list -> ?selected:BV.t ->
-                    ctx:Ctx.t -> Formula.t list ->
+                    ctx:Ctx.t -> FOFormula.t list ->
                     (CompactClause.t -> Proof.t) -> t
   (** Directly from list of formulas *)
 
@@ -144,31 +144,31 @@ val update_ctx : ctx:Ctx.t -> t -> t
 val check_ord : ord:Ordering.t -> t -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : ?recursive:bool -> renaming:Substs.Renaming.t ->
-                  Substs.t -> t -> Substs.scope -> t
+val apply_subst : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
+                  Substs.FO.t -> t -> Substs.scope -> t
   (** apply the substitution to the clause *)
 
-val maxlits : t -> Substs.scope -> Substs.t -> BV.t
+val maxlits : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
 
-val is_maxlit : t -> Substs.scope -> Substs.t -> int -> bool
+val is_maxlit : t -> Substs.scope -> Substs.FO.t -> int -> bool
   (** Is the i-th literal maximal in subst(clause)? Equivalent to
       Bitvector.get (maxlits ~ord c subst) i *)
 
-val eligible_res : t -> Substs.scope -> Substs.t -> BV.t
+val eligible_res : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. THe literal has to be either maximal
       among selected literals of the same sign, if some literal is selected,
       or maximal if none is selected. *)
 
-val eligible_param : t -> Substs.scope -> Substs.t -> BV.t
+val eligible_param : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. That means the literal
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
-val eligible_chaining : t -> Substs.scope -> Substs.t -> BV.t
+val eligible_chaining : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector of literals of [subst(clause)] that are eligible
       for equality chaining or inequality chaining. That amouns to being
       a maximal, positive inequality literal within the clause,
@@ -192,7 +192,7 @@ val is_oriented_rule : t -> bool
 val infer_type : TypeInference.Ctx.t -> t Sequence.t -> unit
 val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
 
-val from_forms : file:string -> name:string -> ctx:Ctx.t -> Formula.t list -> t
+val from_forms : file:string -> name:string -> ctx:Ctx.t -> FOFormula.t list -> t
   (** Conversion of a formula list to a clause *)
 
 (** {2 Filter literals} *)
@@ -312,7 +312,7 @@ module WithPos : sig
   type t = {
     clause : clause;
     pos : Position.t;
-    term : Term.t;
+    term : FOTerm.t;
   }
 
   val compare : t -> t -> int

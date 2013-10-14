@@ -32,8 +32,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module TermIndex : Index.TERM_IDX with type elt = Clause.WithPos.t
-module UnitIndex : Index.UNIT_IDX with type E.t = (Term.t * Term.t * bool * Clause.t)
-                                  and type E.rhs = Term.t
+module UnitIndex : Index.UNIT_IDX with type E.t = (FOTerm.t * FOTerm.t * bool * Clause.t)
+                                  and type E.rhs = FOTerm.t
 module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
 
 (** {2 Set of active clauses} *)

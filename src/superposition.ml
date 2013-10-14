@@ -27,12 +27,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module F = Formula
+module T = FOTerm
+module F = FOFormula
 module PF = PFormula
 module C = Clause
 module O = Ordering
-module S = Substs
+module S = Substs.FO
 module I = ProofState.TermIndex
 module Lit = Literal
 module Lits = Literal.Arr
@@ -98,8 +98,6 @@ let do_superposition ~ctx active_clause sc_a active_pos
   then (Util.debug 3 "... active term is not DB-closed"; acc)
   else if not sign_st 
   then (Util.debug 3 "... active literal is negative"; acc)
-  else if not (T.atomic s) (* do not rewrite non-atomic formulas *)
-  then (Util.debug 3 "... active term is not atomic or DB-closed"; acc)
   else if not (T.db_closed (T.at_pos u subterm_pos))
     && (List.exists (fun x -> S.is_in_subst subst x sc_p) (T.vars (T.at_pos u subterm_pos)))
   then (Util.debug 3 "... narrowing with De Bruijn indices"; acc)
@@ -120,7 +118,7 @@ let do_superposition ~ctx active_clause sc_a active_pos
       else begin (* ordering constraints are ok *)
         let lits_a = Util.array_except_idx active_clause.C.hclits active_idx in
         let lits_p = Util.array_except_idx passive_clause.C.hclits passive_idx in
-        Substs.Renaming.clear renaming;
+        S.Renaming.clear renaming;
         (* replace s\sigma by t\sigma in u|_p\sigma *)
         let t' = S.apply ~renaming subst t sc_a in
         let u' = S.apply ~renaming subst u sc_p in
@@ -208,7 +206,7 @@ let infer_equality_resolution clause =
       | [] -> assert false
       | pos::_ ->
       try
-        let subst = Unif.unification l 0 r 0 in
+        let subst = FOUnif.unification l 0 r 0 in
         if BV.get (C.eligible_res clause 0 subst) pos
           (* subst(lit) is maximal, we can do the inference *)
           then begin
@@ -224,7 +222,7 @@ let infer_equality_resolution clause =
             new_clause::acc
           end else
             acc
-      with Unif.Fail -> acc) (* l and r not unifiable, try next *)
+      with FOUnif.Fail -> acc) (* l and r not unifiable, try next *)
   in
   Util.exit_prof prof_infer_equality_resolution;
   new_clauses
@@ -251,21 +249,21 @@ let infer_equality_factoring clause =
         | _ when List.hd s_pos = i -> acc (* same index *) 
         | Lit.Prop (p, true) ->
           begin try
-            let subst = Unif.unification s 0 p 0 in
+            let subst = FOUnif.unification s 0 p 0 in
             ([i; Position.left_pos], subst) :: acc
-          with Unif.Fail -> acc
+          with FOUnif.Fail -> acc
           end
         | Lit.Equation (u, v, true, _) ->
           let try_u =  (* try inference between s and u *)
             try
-              let subst = Unif.unification s 0 u 0 in
+              let subst = FOUnif.unification s 0 u 0 in
               [[i; Position.left_pos], subst]
-            with Unif.Fail -> []
+            with FOUnif.Fail -> []
           and try_v =  (* try inference between s and v *)
             try
-              let subst = Unif.unification s 0 v 0 in
+              let subst = FOUnif.unification s 0 v 0 in
               [[i; Position.right_pos], subst]
-            with Unif.Fail -> []
+            with FOUnif.Fail -> []
           in try_u @ try_v @ acc)
       [] clause.C.hclits
   (* do the inference between given positions, if ordering
@@ -314,7 +312,7 @@ let split_limit = ref 100
 
 (* union-find that maps terms to list of literals *)
 module UF = UnionFind.Make(struct
-  type key = Term.t
+  type key = T.t
   type value = Lit.t list
   let equal = (==)
   let hash t = t.T.tag
@@ -423,7 +421,7 @@ let infer_split c =
  * simplifications
  * ---------------------------------------------------------------------- *)
 
-exception RewriteInto of Term.t * Substs.t
+exception RewriteInto of T.t * S.t
 
 (* TODO: put forward pointers in simpl_set, to make some rewriting steps
     faster? (invalidate when updated, also allows to reclaim memory) *)
@@ -436,30 +434,25 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
   (* compute normal form of subterm. If restrict is true, substitutions that
      are variable renamings are forbidden (since we are at root of a max term) *) 
   let rec reduce_at_root ~restrict t =
-    (* do not rewrite non-atomic formulas *)
-    if not (T.atomic t)
-      then t  (* do not rewrite such formulas *)
-      else begin
-        (* find equations l=r that match subterm *)
-        try
-          UnitIdx.retrieve ~sign:true simpl_set#idx_simpl 1 t 0 ()
-            (fun () l r (_,_,_,unit_clause) subst ->
-              (* r is the term subterm is going to be rewritten into *)
-              assert (C.is_unit_clause unit_clause);
-              if (not restrict || not (S.is_renaming subst))
-              && (C.is_oriented_rule unit_clause ||
-                 O.compare ord (S.apply_no_renaming subst l 1) (S.apply_no_renaming subst r 1) = Comp.Gt)
-                (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
-                then begin
-                  assert (O.compare ord (S.apply_no_renaming subst l 1) (S.apply_no_renaming subst r 1) = Comp.Gt);
-                  clauses := unit_clause :: !clauses;
-                  Util.incr_stat stat_demodulate_step;
-                  raise (RewriteInto (r, subst))
-                end);
-          t (* not found any match, normal form found *)
-        with RewriteInto (t', subst) ->
-          normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
-      end
+    (* find equations l=r that match subterm *)
+    try
+      UnitIdx.retrieve ~sign:true simpl_set#idx_simpl 1 t 0 ()
+        (fun () l r (_,_,_,unit_clause) subst ->
+          (* r is the term subterm is going to be rewritten into *)
+          assert (C.is_unit_clause unit_clause);
+          if (not restrict || not (S.is_renaming subst))
+          && (C.is_oriented_rule unit_clause ||
+             O.compare ord (S.apply_no_renaming subst l 1) (S.apply_no_renaming subst r 1) = Comp.Gt)
+            (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
+            then begin
+              assert (O.compare ord (S.apply_no_renaming subst l 1) (S.apply_no_renaming subst r 1) = Comp.Gt);
+              clauses := unit_clause :: !clauses;
+              Util.incr_stat stat_demodulate_step;
+              raise (RewriteInto (r, subst))
+            end);
+      t (* not found any match, normal form found *)
+    with RewriteInto (t', subst) ->
+      normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
   (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
      0, but then we normal_form terms in which variables are really the variables
      of the RHS of a previously applied rule (in context 1); all those
@@ -468,11 +461,6 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
     match t.T.term with
     | T.Var _ -> S.apply_no_renaming subst t scope
     | T.BoundVar _ -> t
-    | T.Bind (s, t') ->
-      let t'' = normal_form ~restrict subst t' scope in
-      let new_t = T.mk_bind s t'' in
-      (* rewrite term at root *)
-      reduce_at_root ~restrict new_t
     | T.Node (s, l) ->
       (* rewrite subterms *)
       let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
@@ -480,11 +468,6 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
         then t
         else T.mk_node s l' in
       (* rewrite term at root *)
-      reduce_at_root ~restrict t'
-    | T.At (t1, t2) ->
-      let t1' = normal_form ~restrict:false subst t1 scope in
-      let t2' = normal_form ~restrict:false subst t2 scope in
-      let t' = if t1 == t2' && t2 == t2' then t else T.mk_at t1' t2' in
       reduce_at_root ~restrict t'
   in
   normal_form ~restrict S.empty t 0
@@ -665,7 +648,7 @@ let basic_simplify c =
   (* eliminate absurd lits *)
   Array.iteri (fun i lit -> if absurd_lit lit then BV.reset bv i) lits;
   (* eliminate inequations x != t *)
-  let subst = ref Substs.empty in
+  let subst = ref S.empty in
   Array.iteri
     (fun i lit ->
       if BV.get bv i then match lit with
@@ -673,10 +656,10 @@ let basic_simplify c =
           && not (arith_eq_constraint lits bv i lit) ->
           (* eligible for destructive Equality Resolution, try to update subst *)
           begin try
-            let subst' = Unif.unification ~subst:!subst l 0 r 0 in
+            let subst' = FOUnif.unification ~subst:!subst l 0 r 0 in
             BV.reset bv i;
             subst := subst';
-          with Unif.Fail -> ()
+          with FOUnif.Fail -> ()
           end
         | _ -> ())
     lits;
@@ -694,7 +677,7 @@ let basic_simplify c =
       new_clause
     end
 
-exception FoundMatch of Term.t * Clause.t * Substs.t
+exception FoundMatch of T.t * Clause.t * S.t
 
 let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   Util.enter_prof prof_pos_simplify_reflect;
@@ -805,7 +788,7 @@ let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
  * ---------------------------------------------------------------------- *)
 
 (** raised when a subsuming substitution is found *)
-exception SubsumptionFound of Substs.t
+exception SubsumptionFound of S.t
 
 (** checks whether subst(lit_a) subsumes subst(lit_b). Returns a list of
     substitutions s such that s(lit_a) = lit_b and s contains subst. The list
@@ -813,11 +796,11 @@ exception SubsumptionFound of Substs.t
 let match_lits subst lit_a sc_a lit_b sc_b =
   (* match t1 with t2, then t1' with t2' *)
   let match4 subst t1 t2 t1' t2' =
-    try let subst = Unif.matching ~subst t1 sc_a t2 sc_b in
-        [Unif.matching ~subst t1' sc_a t2' sc_b]
-    with Unif.Fail -> []
+    try let subst = FOUnif.matching ~subst t1 sc_a t2 sc_b in
+        [FOUnif.matching ~subst t1' sc_a t2' sc_b]
+    with FOUnif.Fail -> []
   and match2 subst t1 sc1 t2 sc2 =
-    try [Unif.matching ~subst t1 sc1 t2 sc2] with Unif.Fail -> []
+    try [FOUnif.matching ~subst t1 sc1 t2 sc2] with FOUnif.Fail -> []
   in
   match lit_a, lit_b with
   | Lit.Prop (pa, signa), Lit.Prop (pb, signb) ->
@@ -940,19 +923,17 @@ let eq_subsumes a b =
     | T.Node (f, ss), T.Node (g, ts)
     when Symbol.eq f g && List.length ss = List.length ts ->
       List.for_all2 (equate_terms a b) ss ts
-    | T.At (t11, t12), T.At (t21, t22) ->
-      equate_terms a b t11 t21 && equate_terms a b t12 t22
     | _ -> false
   (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
   and equate_root a b u v =
-        (try let subst = Unif.matching a 1 u 0 in
-              let _ = Unif.matching ~subst b 1 v 0 in
+        (try let subst = FOUnif.matching a 1 u 0 in
+              let _ = FOUnif.matching ~subst b 1 v 0 in
               true
-         with Unif.Fail -> false)
-    ||  (try let subst = Unif.matching b 1 u 0 in
-              let _ = Unif.matching ~subst a 1 v 0 in
+         with FOUnif.Fail -> false)
+    ||  (try let subst = FOUnif.matching b 1 u 0 in
+              let _ = FOUnif.matching ~subst a 1 v 0 in
               true
-         with Unif.Fail -> false)
+         with FOUnif.Fail -> false)
   in
   (* check for each literal *)
   Util.enter_prof prof_eq_subsumption;
@@ -1061,7 +1042,7 @@ let rec contextual_literal_cutting active_set c =
  * contraction
  * ---------------------------------------------------------------------- *)
 
-exception CondensedInto of Lit.t array * Substs.t
+exception CondensedInto of Lit.t array * S.t
 
 (** performs condensation on the clause. It looks for two literals l1 and l2 of same
     sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then

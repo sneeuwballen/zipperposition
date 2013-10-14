@@ -39,43 +39,43 @@ open Logtk
 (** {2 Terms} *)
 
 module T : sig
-  val sum_list : Term.t list -> Term.t
+  val sum_list : FOTerm.t list -> FOTerm.t
     (** Sum of those terms *)
 
-  val is_arith : Term.t -> bool
+  val is_arith : FOTerm.t -> bool
     (** Is the term arithmetic? *)
 
-  val is_arith_const : Term.t -> bool
+  val is_arith_const : FOTerm.t -> bool
     (** Is the term an arithmetic constant? *)
 
-  val mk_sum : Term.t -> Term.t -> Term.t
-  val mk_difference : Term.t -> Term.t -> Term.t
-  val mk_product : Term.t -> Term.t -> Term.t
-  val mk_quotient : Term.t -> Term.t -> Term.t
-  val mk_uminus : Term.t -> Term.t
+  val mk_sum : FOTerm.t -> FOTerm.t -> FOTerm.t
+  val mk_difference : FOTerm.t -> FOTerm.t -> FOTerm.t
+  val mk_product : FOTerm.t -> FOTerm.t -> FOTerm.t
+  val mk_quotient : FOTerm.t -> FOTerm.t -> FOTerm.t
+  val mk_uminus : FOTerm.t -> FOTerm.t
 
-  val mk_less : Term.t -> Term.t -> Term.t
-  val mk_lesseq : Term.t -> Term.t -> Term.t
+  val mk_less : FOTerm.t -> FOTerm.t -> FOTerm.t
+  val mk_lesseq : FOTerm.t -> FOTerm.t -> FOTerm.t
 
-  val extract_subterms : Term.t -> Term.t list
+  val extract_subterms : FOTerm.t -> FOTerm.t list
     (** If the term's root is an arithmetic expression, extract the
         list of outermost terms that occur immediately as parameters
         of the arithmetic expression. Returns [] if the term is not
         arithmetic or if it's a pure arithmetic expression
         (akin to a constant). *)
 
-  val shielded : Term.t -> Term.t -> bool
+  val shielded : FOTerm.t -> FOTerm.t -> bool
     (** [shielded v t] is true if [v] is a variable that occurs under a
         non interpreted symbol in [t] *)
 
-  val simplify : signature:Signature.t -> Term.t -> Term.t
+  val simplify : signature:Signature.t -> FOTerm.t -> FOTerm.t
     (** Arithmetic simplifications *)
 end
 
 (** {2 Formulas} *)
 
 module F : sig
-  val simplify : signature:Signature.t -> Formula.t -> Formula.t
+  val simplify : signature:Signature.t -> FOFormula.t -> FOFormula.t
     (** Simplify an arithmetic formula. In particular, it eliminates
         $greater and $greatereq, and simplifies subterms. *)
 end
@@ -89,12 +89,12 @@ module Lit : sig
   type t = private
   | True   (* arithmetic tautology *)
   | False  (* arithmetic absurdity *)
-  | Eq of Term.t * Monome.t
-  | Neq of Term.t * Monome.t
-  | L_less of Term.t * Monome.t   (* term < monome *)
-  | L_lesseq of Term.t * Monome.t
-  | R_less of Monome.t * Term.t
-  | R_lesseq of Monome.t * Term.t
+  | Eq of FOTerm.t * Monome.t
+  | Neq of FOTerm.t * Monome.t
+  | L_less of FOTerm.t * Monome.t   (* term < monome *)
+  | L_lesseq of FOTerm.t * Monome.t
+  | R_less of Monome.t * FOTerm.t
+  | R_lesseq of Monome.t * FOTerm.t
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
@@ -121,7 +121,7 @@ module Lit : sig
         with the theory of arithmetic (e.g. X+2Y=3 is ok, but 1=2 is not).
         Otherwise return [true] *)
 
-  val get_term : t -> Term.t
+  val get_term : t -> FOTerm.t
     (** Extract the term.
         @raise Invalid_argument if the literal is [True] or [False] *)
 
@@ -129,20 +129,20 @@ module Lit : sig
     (** Extract the monome from the lit.
         @raise Invalid_argument if the literal is [True] or [False] *)
 
-  val factor : t -> Substs.t list
+  val factor : t -> Substs.FO.t list
     (** Unify non-arith subterms pairwise, return corresponding substitutions *)
 
-  val eliminate : ?elim_var:(Term.t -> bool) -> signature:Signature.t ->
-                  t -> Substs.t list
+  val eliminate : ?elim_var:(FOTerm.t -> bool) -> signature:Signature.t ->
+                  t -> Substs.FO.t list
     (** List of substitutions that make the literal inconsistent.
         [elim_var] is called to check whether eliminating a variable
         in an equation is possible. *)
 
   (** {3 Operations on Lists of literals} *)
   module L : sig
-    val get_terms : t list -> Term.t list
+    val get_terms : t list -> FOTerm.t list
 
-    val filter : t list -> (Term.t -> Monome.t -> bool) -> t list
+    val filter : t list -> (FOTerm.t -> Monome.t -> bool) -> t list
   end
 end
 
@@ -169,13 +169,13 @@ module Lits : sig
         from a single pivoted literal. *)
 
   val shielded : ?filter:(int -> Literal.t -> bool) ->
-                  Literal.t array -> Term.t -> bool
+                  Literal.t array -> FOTerm.t -> bool
     (** Is the given variable shielded (ie occur as a subterm somewhere)?
         [filter] is used to know which literals can shield the variable.
         @raise Invalid_argument if the term is not a var *)
 
   val naked_vars : ?filter:(int -> Literal.t -> bool) ->
-                    Literal.t array -> Term.varlist
+                    Literal.t array -> FOTerm.varlist
     (** Variables occurring in inequations, that are not shielded *)
 
 end

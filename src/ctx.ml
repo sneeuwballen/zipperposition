@@ -29,13 +29,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module S = Substs.FO
+
 type t = {
   mutable ord : Ordering.t;           (** current ordering on terms *)
   mutable select : Selection.t;       (** selection function for literals *)
   mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
-  renaming : Substs.Renaming.t;       (** Renaming *)
+  renaming : S.Renaming.t;       (** Renaming *)
   ac : Theories.AC.t;                 (** AC symbols *)
   total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
@@ -47,7 +49,7 @@ let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
     skolem = Skolem.create ~prefix:"zsk" ();
     signature;
     complete=true;
-    renaming = Substs.Renaming.create 13;
+    renaming = S.Renaming.create 13;
     ac = Theories.AC.create ();
     total_order = Theories.TotalOrder.create ();
   } in
@@ -80,7 +82,7 @@ let total_order ~ctx = ctx.total_order
 
 let renaming_clear ~ctx =
   let r = ctx.renaming in
-  Substs.Renaming.clear r;
+  S.Renaming.clear r;
   r
 
 let add_ac ~ctx ?proof s = Theories.AC.add ~spec:ctx.ac ?proof s
@@ -110,22 +112,22 @@ let declare ~ctx symb ty =
 
 let constrain_term_type ~ctx t ty =
   let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.constrain_term_type tyctx t ty;
+  TypeInference.FO.constrain_term_type tyctx t ty;
   ctx.signature <- TypeInference.Ctx.to_signature tyctx
 
 let constrain_term_term ~ctx t1 t2 =
   let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.constrain_term_term tyctx t1 t2;
+  TypeInference.FO.constrain_term_term tyctx t1 t2;
   ctx.signature <- TypeInference.Ctx.to_signature tyctx
   
 let infer_type ~ctx t =
   let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.infer tyctx t
+  TypeInference.FO.infer tyctx t
 
 let check_term_type ~ctx t ty =
   let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.check_term_type tyctx t ty
+  TypeInference.FO.check_term_type tyctx t ty
 
 let check_term_term ~ctx t1 t2 =
   let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.check_term_term tyctx t1 t2
+  TypeInference.FO.check_term_term tyctx t1 t2

@@ -32,7 +32,7 @@ open Logtk_meta
 
 type result =
   | Deduced of PFormula.t * source list
-  | Theory of string * Term.t list * source list
+  | Theory of string * HOTerm.t list * source list
   | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
@@ -73,7 +73,7 @@ val explain : t -> MetaReasoner.Logic.literal -> Proof.t list
 val prover : t -> MetaProver.t
   (** MetaProver itself *)
 
-val theories : t -> (string * Term.t list) Sequence.t
+val theories : t -> (string * HOTerm.t list) Sequence.t
   (** List of theories detected so far *)
 
 val experts : t -> Experts.t Sequence.t
@@ -101,4 +101,4 @@ val save_kb_file : t -> string -> unit
   (** Save the KB into this file *)
 
 val pp_result : Buffer.t -> result -> unit
-val pp_theory : Buffer.t -> (string * Term.t list) -> unit
+val pp_theory : Buffer.t -> (string * HOTerm.t list) -> unit

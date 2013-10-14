@@ -31,7 +31,7 @@ open Logtk
 
 type t = private
   | Axiom of string * string (* filename, axiom name *)
-  | InferForm of Formula.t * step
+  | InferForm of FOFormula.t * step
   | InferClause of CompactClause.t * step
 and step = {
   rule : string;
@@ -52,11 +52,11 @@ val cmp : t -> t -> int
 (** Rule must {b NOT} be "axiom" for deduction steps.
     [esa] is false by default. *)
 
-val mk_f_axiom : Formula.t -> file:string -> name:string -> t
+val mk_f_axiom : FOFormula.t -> file:string -> name:string -> t
 val mk_c_axiom : CompactClause.t -> file:string -> name:string -> t
 
 val mk_f_step : ?theories:string list -> ?esa:bool ->
-                Formula.t -> rule:string -> t list -> t
+                FOFormula.t -> rule:string -> t list -> t
   (** Inference step that lead to the given formula. [esa = true] means
       that the inference only preserved equisatisfiability (default false),
       [theories] is a list of theories that are used by the inference
@@ -69,7 +69,7 @@ val mk_c_step : ?theories:string list -> ?esa:bool ->
       [theories] is a list of theories that are used by the inference
       (default [["equality"]]). *)
 
-val adapt_f : t -> Formula.t -> t
+val adapt_f : t -> FOFormula.t -> t
 val adapt_c : t -> CompactClause.t -> t
 
 val is_axiom : t -> bool

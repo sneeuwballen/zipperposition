@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 module Lit = Literal
 module Lits = Literal.Arr
 
@@ -50,7 +50,7 @@ type t = {
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : BV.t;              (** bitvector for selected literals *)
-  mutable hcvars : Term.t list;           (** the free variables *)
+  mutable hcvars : FOTerm.t list;           (** the free variables *)
   mutable hcproof : Proof.t;              (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
@@ -527,7 +527,7 @@ module WithPos = struct
   type t = {
     clause : clause;
     pos : Position.t;
-    term : Term.t;
+    term : T.t;
   }
   let compare t1 t2 =
     let c = t1.clause.hctag - t2.clause.hctag in

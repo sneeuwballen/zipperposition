@@ -40,7 +40,7 @@ let is_arith_ty ty =
 (** {2 Terms} *)
 
 module T = struct
-  include Term  (* for the rest of arith *)
+  include FOTerm  (* for the rest of arith *)
 
   let rec is_arith t = match t.term with
     | Node ((S.Int _ | S.Rat _ | S.Real _), []) -> true
@@ -74,20 +74,18 @@ module T = struct
   let extract_subterms t =
     (* recursive function that gathers terms into set *)
     let rec gather set t = match t.term with
-    | Bind _
-    | At _
     | Var _
-    | BoundVar _ -> THashSet.add set t
+    | BoundVar _ -> Tbl.replace set t ()
     | Node (s, []) when S.is_numeric s -> ()
     | Node (s, l) when S.Arith.is_arith s ->
       List.iter (gather set) l
-    | Node _ -> THashSet.add set t
+    | Node _ -> Tbl.replace set t ()
     in
     if is_arith t
       then
-        let set = THashSet.create ~size:5 () in
+        let set = Tbl.create 5 in
         let () = gather set t in
-        THashSet.to_list set
+        Tbl.to_list set
       else []
 
   let _var_occur_strict v t =
@@ -102,8 +100,6 @@ module T = struct
   let simplify ~signature t =
     (* recursive function with cache *)
     let rec simplify recurse t = match t.term with
-    | Bind (s, t') -> mk_bind s (recurse t')
-    | At (t1, t2) -> mk_at (recurse t1) (recurse t2)
     | Var _
     | BoundVar _ -> t
     | Node (s, [t']) ->
@@ -197,7 +193,7 @@ module T = struct
         recurse (mk_uminus b)
       | S.Const ("$difference",_), _, _ when eq a b ->
         (* need to infer types so  that we know which zero to return *)
-        let ty = TypeInference.infer_sig signature a in
+        let ty = TypeInference.FO.infer_sig signature a in
         mk_const (S.Arith.zero_of_ty ty)
       | S.Const ("$product",_), _, Node (nb,[]) when S.Arith.is_one nb -> a
       | S.Const ("$product",_), Node (na,[]), _ when S.Arith.is_one na -> b
@@ -216,7 +212,7 @@ end
 (** {2 Formulas} *)
 
 module F = struct
-  include Formula
+  include FOFormula
 
   let rec simplify ~signature f = match f.form with
   | True
@@ -263,12 +259,12 @@ module Lit = struct
   type t =
   | True   (* arithmetic tautology *)
   | False  (* arithmetic absurdity *)
-  | Eq of Term.t * Monome.t
-  | Neq of Term.t * Monome.t
-  | L_less of Term.t * Monome.t   (* term < monome *)
-  | L_lesseq of Term.t * Monome.t
-  | R_less of Monome.t * Term.t
-  | R_lesseq of Monome.t * Term.t
+  | Eq of FOTerm.t * Monome.t
+  | Neq of FOTerm.t * Monome.t
+  | L_less of FOTerm.t * Monome.t   (* term < monome *)
+  | L_lesseq of FOTerm.t * Monome.t
+  | R_less of Monome.t * FOTerm.t
+  | R_lesseq of Monome.t * FOTerm.t
 
   let pp buf lit = match lit with
   | True -> Buffer.add_string buf "true"
@@ -457,8 +453,8 @@ module Lit = struct
     let l = Util.list_diagonal l in
     Util.list_fmap
       (fun (t1, t2) ->
-        try Some (Unif.unification t1 0 t2 0)
-        with Unif.Fail -> None)
+        try Some (FOUnif.unification t1 0 t2 0)
+        with FOUnif.Fail -> None)
       l
 
   (* find instances of variables that eliminate the literal *)
@@ -469,33 +465,33 @@ module Lit = struct
     | Eq (x, m) -> 
       (* x = m eliminated with x := m+1 *)
       begin try
-        [ Unif.unification x 0 Monome.(to_term (pred m)) 0]
-      with Unif.Fail -> []  (* occur check... *)
+        [ FOUnif.unification x 0 Monome.(to_term (pred m)) 0]
+      with FOUnif.Fail -> []  (* occur check... *)
       end
     | Neq (x, m) -> [] (* for Neq, let equality resolution deal with it *)
     | L_less(x, m) when T.is_var x ->
       (* x < m  is inconsistent with x = ceil(m) *)
       begin try
-        [ Unif.unification x 0 Monome.(to_term (ceil m)) 0]
-      with Unif.Fail -> []  (* occur check... *)
+        [ FOUnif.unification x 0 Monome.(to_term (ceil m)) 0]
+      with FOUnif.Fail -> []  (* occur check... *)
       end
     | R_less(m, x) when T.is_var x ->
       (* m < x  is inconsistent with x = floor(m) *)
       begin try
-        [ Unif.unification x 0 Monome.(to_term (floor m)) 0]
-      with Unif.Fail -> []  (* occur check... *)
+        [ FOUnif.unification x 0 Monome.(to_term (floor m)) 0]
+      with FOUnif.Fail -> []  (* occur check... *)
       end
     | L_lesseq(x, m) when T.is_var x ->
       (* x <= m inconsistent with x = ceil(m)+1 *)
       begin try
-        [ Unif.unification x 0 Monome.(to_term (succ (ceil m))) 0 ]
-      with Unif.Fail -> []  (* occur check... *)
+        [ FOUnif.unification x 0 Monome.(to_term (succ (ceil m))) 0 ]
+      with FOUnif.Fail -> []  (* occur check... *)
       end
     | R_lesseq(m, x) when T.is_var x ->
       (* x >= m inconsistent with x = floor(m)-1 *)
       begin try
-        [ Unif.unification x 0 Monome.(to_term (pred (floor m))) 0 ]
-      with Unif.Fail -> []  (* occur check... *)
+        [ FOUnif.unification x 0 Monome.(to_term (pred (floor m))) 0 ]
+      with FOUnif.Fail -> []  (* occur check... *)
       end
     | _ -> []
     end
@@ -530,9 +526,6 @@ module Lits = struct
     let rec purify_term ~root t = match t.T.term with
     | T.Var _
     | T.BoundVar _ -> t
-    | T.Bind (s, t') -> T.mk_bind s (purify_term ~root:false t')
-    | T.At (t1, t2) ->
-      T.mk_at (purify_term ~root:false t1) (purify_term ~root:false t2)
     | T.Node (s,[]) when S.is_numeric s -> t
     | T.Node (s, l) when S.Arith.is_arith s ->
       if root
@@ -540,7 +533,7 @@ module Lits = struct
           T.mk_node s (List.map (purify_term ~root) l)
         else begin
           (* purify this term out! *)
-          let ty = TypeInference.infer_sig signature t in
+          let ty = TypeInference.FO.infer_sig signature t in
           let v = T.mk_var ~ty !varidx in
           incr varidx;
           (* purify the term and add a constraint *)

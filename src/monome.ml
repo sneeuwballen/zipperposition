@@ -29,11 +29,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 module S = Symbol
 
 type t = {
-  coeffs : Symbol.t Term.TMap.t;
+  coeffs : Symbol.t T.Map.t;
   constant : Symbol.t;
   divby : Symbol.t;  (* divide everything by this constant (cool for ints) *)
 }
@@ -41,7 +41,7 @@ type t = {
 let const constant =
   assert (S.is_numeric constant);
   {
-    coeffs = T.TMap.empty;
+    coeffs = T.Map.empty;
     constant;
     divby = S.Arith.one_of_ty (S.Arith.typeof constant);
   }
@@ -50,7 +50,7 @@ let singleton ?divby coeff t =
   if S.Arith.is_zero coeff
     then const coeff  (* 0 *)
     else
-      let coeffs = T.TMap.singleton t coeff in
+      let coeffs = T.Map.singleton t coeff in
       let constant = S.Arith.zero_of_ty (S.Arith.typeof coeff) in
       let divby = match divby with
       | Some d -> d
@@ -64,14 +64,14 @@ let of_list constant l =
     (fun m (coeff, t) ->
       if S.Arith.is_zero coeff
         then m
-        else T.TMap.add t coeff m)
-    T.TMap.empty l
+        else T.Map.add t coeff m)
+    T.Map.empty l
   in
   { constant; coeffs; divby; }
 
 let pp buf monome =
   Buffer.add_char buf '(';
-  T.TMap.iter
+  T.Map.iter
     (fun t coeff -> Printf.bprintf buf "%a×%a +" S.pp coeff T.pp t)
     monome.coeffs;
   S.pp buf monome.constant;
@@ -83,28 +83,28 @@ let to_string monome = Util.on_buffer pp monome
 
 let fmt fmt m = Format.pp_print_string fmt (to_string m)
 
-let mem m t = T.TMap.mem t m.coeffs
+let mem m t = T.Map.mem t m.coeffs
 
-let find m t = T.TMap.find t m.coeffs
+let find m t = T.Map.find t m.coeffs
 
 let add m coeff t =
   (* compute sum of coeffs for [t], if need be *)
   let c =
     try
-      let coeff' = T.TMap.find t m.coeffs in
+      let coeff' = T.Map.find t m.coeffs in
       S.Arith.Op.sum coeff coeff'
     with Not_found -> coeff
   in
   if S.Arith.is_zero c
-    then {m with coeffs=T.TMap.remove t m.coeffs;}
-    else {m with coeffs=T.TMap.add t c m.coeffs;}
+    then {m with coeffs=T.Map.remove t m.coeffs;}
+    else {m with coeffs=T.Map.add t c m.coeffs;}
 
 let remove m t =
-  { m with coeffs=T.TMap.remove t m.coeffs; }
+  { m with coeffs=T.Map.remove t m.coeffs; }
 
 let type_of m = S.Arith.typeof m.constant
 
-let is_constant m = T.TMap.is_empty m.coeffs
+let is_constant m = T.Map.is_empty m.coeffs
 
 let sign m =
   if not (is_constant m) then invalid_arg "sign: require constant monome";
@@ -112,10 +112,10 @@ let sign m =
   S.Arith.sign m.constant
 
 let terms m =
-  T.TMap.fold (fun t coeff acc -> t :: acc) m.coeffs []
+  T.Map.fold (fun t coeff acc -> t :: acc) m.coeffs []
 
 let to_list m =
-  T.TMap.fold (fun t coeff acc -> (coeff,t) :: acc) m.coeffs []
+  T.Map.fold (fun t coeff acc -> (coeff,t) :: acc) m.coeffs []
 
 let var_occurs v m =
   List.exists (fun t -> T.var_occurs v t) (terms m)
@@ -129,7 +129,7 @@ let _scale m c =
     then m  (* same monome *)
     else
       let constant = S.Arith.Op.product c m.constant in
-      let coeffs = T.TMap.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
+      let coeffs = T.Map.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
       let divby = S.Arith.Op.product m.divby c in
       { constant; coeffs; divby; }
 
@@ -137,16 +137,16 @@ let normalize m = match m.constant with
   | S.Int _ ->
     (* divide by common gcd of coeffs and divby *)
     let gcd = S.Arith.Op.gcd m.constant m.divby in
-    let gcd = T.TMap.fold (fun _ c gcd -> S.Arith.Op.gcd c gcd) m.coeffs gcd in
+    let gcd = T.Map.fold (fun _ c gcd -> S.Arith.Op.gcd c gcd) m.coeffs gcd in
     let constant = S.Arith.Op.quotient m.constant gcd in
-    let coeffs = T.TMap.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
+    let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
     let divby = S.Arith.Op.quotient m.divby gcd in
     { constant; coeffs; divby; }
   | S.Rat _
   | S.Real _ ->
     (* multiply by 1/divby *)
     let constant = S.Arith.Op.quotient m.constant m.divby in
-    let coeffs = T.TMap.map (fun c' -> S.Arith.Op.quotient c' m.divby) m.coeffs in
+    let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' m.divby) m.coeffs in
     let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
     { constant; coeffs; divby=one; }
   | _ -> assert false
@@ -174,7 +174,7 @@ let reduce_same_divby m1 m2 =
 let sum m1 m2 =
   let m1, m2 = reduce_same_divby m1 m2 in
   let constant = S.Arith.Op.sum m1.constant m2.constant in
-  let coeffs = T.TMap.merge
+  let coeffs = T.Map.merge
     (fun t c1 c2 -> match c1, c2 with
     | None, Some c
     | Some c, None -> Some c
@@ -191,7 +191,7 @@ let sum m1 m2 =
 let difference m1 m2 =
   let m1, m2 = reduce_same_divby m1 m2 in
   let constant = S.Arith.Op.difference m1.constant m2.constant in
-  let coeffs = T.TMap.merge
+  let coeffs = T.Map.merge
     (fun t c1 c2 -> match c1, c2 with
     | None, Some c -> Some (S.Arith.Op.uminus c)
     | Some c, None -> Some c
@@ -207,7 +207,7 @@ let difference m1 m2 =
 
 let uminus m =
   let constant = S.Arith.Op.uminus m.constant in
-  let coeffs = T.TMap.map S.Arith.Op.uminus m.coeffs in
+  let coeffs = T.Map.map S.Arith.Op.uminus m.coeffs in
   { m with constant; coeffs; }
 
 (* product by constant *)
@@ -219,7 +219,7 @@ let product m c =
     then { m with divby=S.Arith.one_of_ty (S.Arith.typeof m.constant); }
   else  (* itemwise product *)
     let constant = S.Arith.Op.product m.constant c in
-    let coeffs = T.TMap.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
+    let coeffs = T.Map.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
     { m with constant; coeffs; }
 
 let divby m const =
@@ -280,10 +280,8 @@ let of_term ~signature t =
     let ty = match t.T.type_ with Some ty -> ty | None -> assert false in
     let one = S.Arith.one_of_ty ty in
     singleton one t
-  | T.Node _
-  | T.At _
-  | T.Bind _ ->
-    let ty = TypeInference.infer_sig signature t in
+  | T.Node _ ->
+    let ty = TypeInference.FO.infer_sig signature t in
     let one = S.Arith.one_of_ty ty in
     singleton one t
   in
@@ -297,7 +295,7 @@ let of_term_opt ~signature t =
     
 let to_term m =
   let sum = T.mk_const m.constant in
-  let sum = T.TMap.fold
+  let sum = T.Map.fold
     (fun t' coeff sum ->
       assert (not (S.Arith.is_zero coeff));
       if S.Arith.is_one coeff
@@ -321,12 +319,12 @@ let has_instances m = match m.constant with
     if S.Arith.is_one m.divby
       then true  (* gcd is one, always true *)
       else
-        let g = T.TMap.fold (fun _ c g -> S.Arith.Op.gcd c g) m.coeffs m.divby in
+        let g = T.Map.fold (fun _ c g -> S.Arith.Op.gcd c g) m.coeffs m.divby in
         S.Arith.Op.divides g m.constant
   | _ -> assert false
 
 let floor m = match m.constant with
-  | S.Int _ when T.TMap.is_empty m.coeffs ->
+  | S.Int _ when T.Map.is_empty m.coeffs ->
     (* m = m.constant / m.divby *)
     let constant = S.Arith.Op.quotient_f m.constant m.divby in
     let one = S.Arith.one_i in
@@ -335,7 +333,7 @@ let floor m = match m.constant with
 
 let ceil m =
 match m.constant with
-  | S.Int _ when T.TMap.is_empty m.coeffs ->
+  | S.Int _ when T.Map.is_empty m.coeffs ->
     (* m = m.constant / m.divby *)
     let constant = match m.constant, m.divby with
     | S.Int a, S.Int b ->

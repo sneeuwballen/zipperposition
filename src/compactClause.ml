@@ -28,9 +28,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = Formula
+module F = FOFormula
 
-type t = Formula.t array lazy_t
+type t = FOFormula.t array lazy_t
 
 let eq (lazy c1) (lazy c2) =
   try

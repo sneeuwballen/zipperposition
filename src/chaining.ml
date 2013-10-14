@@ -30,13 +30,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Logtk_meta
 
-module T = Term
+module T = FOTerm
+module HOT = HOTerm
 module C = Clause
 module I = ProofState.TermIndex
 module Lit = Literal
 module Lits = Literal.Arr
 module TO = Theories.TotalOrder
 module Ord = Ordering
+module S = Substs.FO
 
 let stat_eq_chaining = Util.mk_stat "eq_chaining"
 let stat_ineq_chaining = Util.mk_stat "ineq_chaining"
@@ -56,13 +58,13 @@ let _gather_positions ~eligible ~signature lits scope pos subst =
     (fun (pos_list, subst) lit i ->
       try
         let t' = Lit.at_pos lit pos' in
-        if T.is_var t' || not (TypeInference.check_term_term_sig signature t t')
+        if T.is_var t' || not (TypeInference.FO.check_term_term_sig signature t t')
           then raise Exit  (* variables are not eligible *)
           else
-            let subst = Unif.unification ~subst t scope t' scope in
+            let subst = FOUnif.unification ~subst t scope t' scope in
             let pos_list = (i::pos') :: pos_list in
             pos_list, subst
-      with Not_found | Unif.Fail | Exit ->
+      with Not_found | FOUnif.Fail | Exit ->
         pos_list, subst)
 
 (* check ordering conditions for the active clause in equality chaining *)
@@ -73,8 +75,8 @@ let _check_eq_chaining_active ~ctx active s_a active_pos subst =
   begin (* s' not < t' *)
     let ord = Ctx.ord ~ctx in
     let renaming = Ctx.renaming_clear ~ctx in
-    let s' = Substs.apply ~renaming subst s s_a in
-    let t' = Substs.apply ~renaming subst t s_a in
+    let s' = S.apply ~renaming subst s s_a in
+    let t' = S.apply ~renaming subst t s_a in
     match Ord.compare ord s' t' with
     | Comparison.Lt -> false
     | _ -> true
@@ -93,11 +95,11 @@ let _check_eq_chaining_left_passive ~ctx passive s_p positions subst =
   let ord_lit = Lits.get_ineq ~spec passive.C.hclits (List.hd positions) in
   let instance = ord_lit.TO.instance in
   let renaming = Ctx.renaming_clear ~ctx in
-  let t1' = Substs.apply ~renaming subst ord_lit.TO.left s_p in
+  let t1' = S.apply ~renaming subst ord_lit.TO.left s_p in
   (* subst(t1) must be a maximal term *)
   Sequence.for_all
     (fun v ->
-      let v' = Substs.apply ~renaming subst v s_p in
+      let v' = S.apply ~renaming subst v s_p in
       (* all other terms [v'] must not be bigger than [t1'] *)
       match Ord.compare ord t1' v' with
       | Comparison.Lt -> false
@@ -110,8 +112,8 @@ let _check_eq_chaining_left_passive ~ctx passive s_p positions subst =
     begin fun pos ->
       let ord_lit = Lits.get_ineq ~spec passive.C.hclits pos in
       let renaming = Ctx.renaming_clear ~ctx in
-      let ti = Substs.apply ~renaming subst ord_lit.TO.left s_p in
-      let vi = Substs.apply ~renaming subst ord_lit.TO.right s_p in
+      let ti = S.apply ~renaming subst ord_lit.TO.left s_p in
+      let vi = S.apply ~renaming subst ord_lit.TO.right s_p in
       match Ord.compare ord ti vi with
       | Comparison.Lt -> false
       | _ -> true
@@ -126,11 +128,11 @@ let _check_eq_chaining_right_passive ~ctx passive s_p positions subst =
   let ord_lit = Lits.get_ineq ~spec passive.C.hclits (List.hd positions) in
   let instance = ord_lit.TO.instance in
   let renaming = Ctx.renaming_clear ~ctx in
-  let t1' = Substs.apply ~renaming subst ord_lit.TO.right s_p in
+  let t1' = S.apply ~renaming subst ord_lit.TO.right s_p in
   (* subst(t1) must be a maximal term *)
   Sequence.for_all
     (fun v ->
-      let v' = Substs.apply ~renaming subst v s_p in
+      let v' = S.apply ~renaming subst v s_p in
       (* all other terms [v'] must not be bigger than [t1'] *)
       match Ord.compare ord t1' v' with
       | Comparison.Lt -> false
@@ -143,8 +145,8 @@ let _check_eq_chaining_right_passive ~ctx passive s_p positions subst =
     begin fun pos ->
       let ord_lit = Lits.get_ineq ~spec passive.C.hclits pos in
       let renaming = Ctx.renaming_clear ~ctx in
-      let ti = Substs.apply ~renaming subst ord_lit.TO.right s_p in
-      let vi = Substs.apply ~renaming subst ord_lit.TO.left s_p in
+      let ti = S.apply ~renaming subst ord_lit.TO.right s_p in
+      let vi = S.apply ~renaming subst ord_lit.TO.left s_p in
       match Ord.compare ord ti vi with
       | Comparison.Lt -> false
       | _ -> true
@@ -350,9 +352,9 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
               let lit_right = Lits.get_ineq ~spec right.C.hclits right_pos in
               let vj = lit_right.TO.right in
               (* now to compute INEQ(ui, vj) *)
-              let ui' = Substs.apply ~renaming subst ui s_left in
-              let vj' = Substs.apply ~renaming subst vj s_right in
-              let t1' = Substs.apply ~renaming subst t1 s_right in
+              let ui' = S.apply ~renaming subst ui s_left in
+              let vj' = S.apply ~renaming subst vj s_right in
+              let t1' = S.apply ~renaming subst t1 s_right in
               if lit_left.TO.strict || lit_right.TO.strict
                 then (* ui < vj *)
                   mk_less ui' vj' :: acc
@@ -421,7 +423,7 @@ let reflexivity_res c =
   Lits.fold_ineq ~spec ~eligible c.C.hclits []
     (fun acc lit pos ->
       try
-        let subst = Unif.unification lit.TO.left 0 lit.TO.right 0 in
+        let subst = FOUnif.unification lit.TO.left 0 lit.TO.right 0 in
         if lit.TO.strict
           then begin
             (* remove lit and make a new clause after substitution *)
@@ -438,7 +440,7 @@ let reflexivity_res c =
             new_c :: acc
           end
         else acc
-      with Unif.Fail -> acc)
+      with FOUnif.Fail -> acc)
 
 let is_tautology c =
   let ctx = c.C.hcctx in
@@ -526,7 +528,7 @@ let setup_env ~env =
     Signal.on signal
       (function
         | MetaKB.NewTheory ("total_order",
-          [{T.term=T.Node(less,[])}; {T.term=T.Node(lesseq,[])}], lit) ->
+          [{HOT.term=HOT.Const less}; {HOT.term=HOT.Const lesseq}], lit) ->
           let proof = MetaProverState.explain meta lit in
           add_order ~env ~proof ~less ~lesseq; true
         | _ -> true);
@@ -534,7 +536,7 @@ let setup_env ~env =
     Sequence.iter
       (function
         | MetaKB.NewTheory ("total_order",
-          [{T.term=T.Node(less,[])}; {T.term=T.Node(lesseq,[])}], lit) ->
+          [{HOT.term=HOT.Const less}; {HOT.term=HOT.Const lesseq}], lit) ->
           let proof = MetaProverState.explain meta lit in
           add_order ~env ~proof ~less ~lesseq
         | _ -> ())
