@@ -198,12 +198,12 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       match s.term, t.term with
       | Var _, Var _ when s == t && sc_s = sc_t -> k subst (* trivial success *)
       | Var _, _ ->
-        if occurs_check subst s sc_s t sc_t || sc_s <> sc_a
-          then ()
+        if occurs_check subst s sc_s t sc_t || sc_s = sc_t
+          then Util.debug 5 "occur check of %a[%d] in %a[%d]" T.pp s sc_s T.pp t sc_t
             (* occur check, or [s] is not in the initial
                context [sc_a] in which variables can be bound. *)
           else k (S.bind subst s sc_s t sc_t) (* bind s and continue *)
-      | Bind (f, t1'), Bind (g, t2') when f == g ->
+      | Bind (f, t1'), Bind (g, t2') when Symbol.eq f g ->
         unif subst t1' sc_s t2' sc_t k
       | BoundVar i, BoundVar j -> if i = j then k subst
       | At (s1, s2), At (t1, t2) ->
@@ -213,18 +213,30 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
           (* flatten into a list of terms that do not have [f] as head symbol *)
           let l1 = T.flatten_ac f l1
           and l2 = T.flatten_ac f l2 in 
+          Util.debug 5 "ac_match for %a: [%a] and [%a]" Symbol.pp f
+            (Util.pp_list T.pp) l1 (Util.pp_list T.pp) l2;
           (* eliminate terms that are common to l1 and l2 *)
           let l1, l2 = eliminate_common l1 l2 in
           (* permutative matching *)
           unif_ac subst f l1 sc_s [] l2 sc_t k
         | ({T.term=T.Const f}, [x1;y1]), ({T.term=T.Const g}, [x2;y2])
           when Symbol.eq f g && is_com f ->
+          Util.debug 5 "com_match for %a: [%a] and [%a]" Symbol.pp f
+            (Util.pp_list T.pp) [x1;y1] (Util.pp_list T.pp) [x2;y2];
           unif_com subst x1 y1 sc_s x2 y2 sc_t k
-        | _ -> (* regular decomposition *)
-          unif subst s1 sc_s t1 sc_t
-            (fun subst' -> unif subst' s2 sc_s t2 sc_t k)
+        | (t1, l1), (t2, l2) ->
+          (* regular decomposition, but from the left *)
+          unif_list subst (t1::l1) sc_s (t2::l2) sc_t k
         end
+      | Const f, Const g when Symbol.eq f g -> k subst
       | _, _ -> ()  (* failure, close branch *)
+  (* unify lists *)
+  and unif_list subst l1 sc_1 l2 sc_2 k = match l1, l2 with
+  | [], [] -> k subst
+  | x::l1', y::l2' ->
+    unif subst x sc_1 y sc_2
+      (fun subst' -> unif_list subst' l1' sc_1 l2' sc_2 k)
+  | _ -> ()
   (* unify terms under a commutative symbol (try both sides) *)
   and unif_com subst x1 y1 sc_1 x2 y2 sc_2 k =
     unif subst x1 sc_1 x2 sc_2 (fun subst -> unif subst y1 sc_1 y2 sc_2 k);
@@ -261,7 +273,7 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
   (* eliminate common occurrences of terms in [l1] and [l2] *)
   and eliminate_common l1 l2 = l1, l2 (* TODO *)
   in
-  (* sequence of solutions. Substsitutions are restricted to the variables
+  (* sequence of solutions. Substitutions are restricted to the variables
      of [a]. *)
   let seq k =
     Util.enter_prof prof_ac_matching;

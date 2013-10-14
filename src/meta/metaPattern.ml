@@ -62,10 +62,11 @@ module EncodedForm = struct
       HOT.mk_at __var t
     | HOT.BoundVar _ -> t
     | HOT.Bind (s, t') -> HOT.mk_bind s (encode_t t')
-    | HOT.Const _ -> 
+    | HOT.Const s when not (Symbol.is_connective s) -> 
       (** Similarly to the Var case, here we need to protect constants
           from being bound to variables once abstracted into variables *)
       HOT.mk_at __fun t
+    | HOT.Const _ -> t
     | HOT.At (t1, t2) -> HOT.mk_at (encode_t t1) (encode_t t2)
 
   (* Inverse operation of {! encode_t} *)
@@ -209,6 +210,7 @@ let mapping =
 let matching_terms p1 o_1 p2 o_2 =
   (* is a substitution acceptable? *)
   let ok_subst subst =
+    Util.debug 5 "examine matching subst %a" Substs.HO.pp subst;
     Sequence.for_all
       (fun (_, _, t, _) -> not (HOT.contains_symbol  __var_symbol t))
       (S.to_seq subst)
