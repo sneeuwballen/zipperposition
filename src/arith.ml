@@ -316,7 +316,7 @@ module Lit = struct
           terms
       with
       | Monome.NotLinear -> []
-      | UnsatLit -> [False]
+      | UnsatLit -> if sign then [False] else [True]
     (* extract lit from (l <= r | l < r) *)
     and extract_less ~strict l r =
       try
