@@ -294,6 +294,7 @@ module Lit = struct
         let m1 = Monome.of_term ~signature l in
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
+        (* remove denominator, it doesn't matter *)
         let m = Monome.product m m.Monome.divby in
         let terms = Monome.to_list m in
         if terms = []
@@ -327,6 +328,9 @@ module Lit = struct
         let m1 = Monome.of_term ~signature l in
         let m2 = Monome.of_term ~signature r in
         let m = Monome.difference m1 m2 in
+        (* remove the denominator *)
+        assert (S.Arith.sign m.Monome.divby > 0);
+        let m = Monome.product m m.Monome.divby in
         let terms = Monome.to_list m in
         if terms = []
         (* constant, ground arith expression, must be true or false *)
