@@ -354,7 +354,12 @@ module Arith = struct
     let floor s = match s with
     | Int _ -> s
     | Rat n -> mk_bigint (Ratio.floor_ratio n)
-    | Real f -> mk_real (Pervasives.floor f)
+    | Real f ->
+      begin try
+        let i = int_of_float (Pervasives.floor f) in 
+        mk_int i
+      with _ -> s  (* keep *)
+      end
     | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let ceiling s = match s with
