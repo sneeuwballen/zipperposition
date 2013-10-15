@@ -327,7 +327,7 @@ end
 
 (** Check that new_prec is a compatible superset of old_prec *)
 let check_precedence old_prec new_prec =
-  Util.debug 3 "check compatibility of @[<h>%a@] with @[<h>%a@]"
+  Util.debug 3 "check compatibility of %a with %a"
                 Precedence.pp old_prec Precedence.pp new_prec;
   let rec check l = match l with
   | [] | [_] -> true

@@ -143,7 +143,9 @@ let is_int s = match s with
   | Int _ -> true | _ -> false
 
 let is_rat s = match s with
-  | Rat _ -> true | _ -> false
+  | Int _
+  | Rat _ -> true
+  | _ -> false
 
 let is_real s = match s with
   | Real f -> true | _ -> false
