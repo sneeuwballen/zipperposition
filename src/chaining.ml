@@ -54,7 +54,7 @@ let prof_ineq_chaining_right = Util.mk_profiler "chaining.ineq_right"
 let _gather_positions ~eligible ~signature lits scope pos subst =
   let t = Lits.at_pos lits pos in
   let pos' = List.tl pos in  (* position within the literal *)
-  Lits.fold_lits ~eligible lits ([pos], subst)
+  let positions, subst = Lits.fold_lits ~eligible lits ([pos], subst)
     (fun (pos_list, subst) lit i ->
       try
         let t' = Lit.at_pos lit pos' in
@@ -64,8 +64,11 @@ let _gather_positions ~eligible ~signature lits scope pos subst =
             let subst = FOUnif.unification ~subst t scope t' scope in
             let pos_list = (i::pos') :: pos_list in
             pos_list, subst
-      with Not_found | FOUnif.Fail | Exit ->
+      with Not_found | FOUnif.Fail | Exit | Invalid_argument _ ->
         pos_list, subst)
+  in
+  let positions = Util.list_uniq Position.eq positions in
+  positions, subst
 
 (* check ordering conditions for the active clause in equality chaining *)
 let _check_eq_chaining_active ~ctx active s_a active_pos subst =
@@ -187,7 +190,8 @@ let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst
       let lits_p = Array.to_list (Lits.apply_subst ~renaming ~ord subst lits_p s_p) in
       let new_lits = lits_a @ lits_p in
       (* proof *)
-      let premises = active.C.hcproof :: passive.C.hcproof :: instance.TO.proof in
+      (*let premises = active.C.hcproof :: passive.C.hcproof :: instance.TO.proof in*)
+      let premises = active.C.hcproof :: passive.C.hcproof :: [] in
       let theories = ["total_order"] in
       let proof cc = Proof.mk_c_step ~theories ~rule:"eq_chain_left" cc premises in
       let parents = [active; passive] in
@@ -233,7 +237,7 @@ let do_eq_chaining_right ~ctx active s_a active_pos passive s_p passive_pos subs
       let lits_p = Array.to_list (Lits.apply_subst ~renaming ~ord subst lits_p s_p) in
       let new_lits = lits_a @ lits_p in
       (* proof *)
-      let premises = active.C.hcproof :: passive.C.hcproof :: instance.TO.proof in
+      let premises = active.C.hcproof :: passive.C.hcproof :: [] (* instance.TO.proof *) in
       let theories = ["total_order"] in
       let proof cc = Proof.mk_c_step ~theories ~rule:"eq_chain_right" cc premises in
       let parents = [active; passive] in
@@ -337,8 +341,8 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
     _gather_positions ~eligible ~signature left.C.hclits s_left left_pos subst in
   let right_pos_list, subst =
     _gather_positions ~eligible ~signature right.C.hclits s_right right_pos subst in
-  Util.debug 5 "positions for left: %a" (Util.pp_list Position.pp) left_pos_list;
-  Util.debug 5 "positions for right: %a" (Util.pp_list Position.pp) right_pos_list;
+  Util.debug 5 "positions for left: [%a]" (Util.pp_list Position.pp) left_pos_list;
+  Util.debug 5 "positions for right: [%a]" (Util.pp_list Position.pp) right_pos_list;
   (* check ordering conditions. Note that the conditions are inversed w.r.t
     equality chaining (ie, in left clause, right hand side terms must
     be maximal, and conversely *)
@@ -376,7 +380,7 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
       (* build clause *)
       let theories = ["total_order"] in
       let rule = "inequality_chaining" in
-      let premises = left.C.hcproof :: right.C.hcproof :: instance.TO.proof in
+      let premises = left.C.hcproof :: right.C.hcproof :: [] (* instance.TO.proof *) in
       let proof cc = Proof.mk_c_step ~theories ~rule cc premises in
       let new_clause = C.create ~parents:[left;right] ~ctx lits proof in
       Util.debug 3 "ineq_chaining of %a and %a gives %a"
@@ -395,11 +399,11 @@ let ineq_chaining_left active_set c =
   let eligible = C.Eligible.chaining c in
   (* fold on ineq lits *)
   let new_clauses = Lits.fold_ineq ~spec ~eligible c.C.hclits []
-    (fun acc ord_lit left_pos ->
+    (fun acc ord_lit lit_pos ->
       let s1 = ord_lit.TO.right in
-      let left_pos = left_pos @ [Position.right_pos] in
+      let left_pos = lit_pos @ [Position.right_pos] in
       Util.debug 5 "try left ineq chaining with %a at %a" C.pp c Position.pp left_pos;
-      I.retrieve_unifiables active_set#idx_ord_side 1 s1 0 acc
+      I.retrieve_unifiables active_set#idx_ord_left 1 s1 0 acc
         (fun acc t1 with_pos subst ->
           let right = with_pos.C.WithPos.clause in
           let right_pos = with_pos.C.WithPos.pos in
@@ -416,11 +420,11 @@ let ineq_chaining_right active_set c =
   let eligible = C.Eligible.chaining c in
   (* fold on ineq lits *)
   let new_clauses = Lits.fold_ineq ~spec ~eligible c.C.hclits []
-    (fun acc ord_lit right_pos ->
+    (fun acc ord_lit lit_pos ->
       let t1 = ord_lit.TO.left in
-      let right_pos = right_pos @ [Position.left_pos] in
+      let right_pos = lit_pos @ [Position.left_pos] in
       Util.debug 5 "try right ineq chaining with %a at %a" C.pp c Position.pp right_pos;
-      I.retrieve_unifiables active_set#idx_ord_side 1 t1 0 acc
+      I.retrieve_unifiables active_set#idx_ord_right 1 t1 0 acc
         (fun acc s1 with_pos subst ->
           let left = with_pos.C.WithPos.clause in
           let left_pos = with_pos.C.WithPos.pos in
@@ -435,13 +439,13 @@ let reflexivity_res c =
   let ord = Ctx.ord ctx in
   let eligible = C.Eligible.max c in
   Lits.fold_ineq ~spec ~eligible c.C.hclits []
-    (fun acc lit pos ->
+    (fun acc lit lit_pos ->
       try
         let subst = FOUnif.unification lit.TO.left 0 lit.TO.right 0 in
         if lit.TO.strict
           then begin
             (* remove lit and make a new clause after substitution *)
-            let i = List.hd pos in
+            let i = List.hd lit_pos in
             let lits = Util.array_except_idx c.C.hclits i in
             let renaming = Ctx.renaming_clear ~ctx in
             let lits = Lit.apply_subst_list ~ord ~renaming subst lits 0 in
@@ -462,7 +466,7 @@ let is_tautology c =
   let eligible = C.Eligible.always in
   try
     Lits.fold_ineq ~spec ~eligible c.C.hclits ()
-      (fun () lit pos ->
+      (fun () lit _lit_pos ->
         if not lit.TO.strict && T.eq lit.TO.left lit.TO.right
           (* a <= a is definitely a tautology *)
           then raise Exit);
@@ -479,11 +483,11 @@ let simplify c =
   let instances = ref [] in
   (* remove absurd literals from [bv] *)
   Lits.fold_ineq ~spec ~eligible c.C.hclits ()
-    (fun () lit pos ->
+    (fun () lit lit_pos ->
       if lit.TO.strict && T.eq lit.TO.left lit.TO.right
         then begin
           (* eliminate literal a <= a *)
-          let i = List.hd pos in
+          let i = List.hd lit_pos in
           BV.reset bv i;
           instances := lit.TO.instance :: !instances
         end);

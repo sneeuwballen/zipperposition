@@ -717,7 +717,8 @@ module Arr = struct
           f acc l [i; Pos.left_pos]
         | Equation (l,r,sign,(Comparison.Eq | Comparison.Incomparable)), `Max ->
           (* visit both sides, they are both (potentially) maximal *)
-          f acc l [i; Pos.left_pos]
+          let acc = f acc l [i; Pos.left_pos] in
+          f acc r [i; Pos.right_pos]
         | Equation (l,r,sign,_), `Both ->
           (* visit both sides of the equation *)
           if subterms

@@ -515,6 +515,7 @@ let demodulate (simpl_set : PS.SimplSet.t) c =
       let _ = Util.exit_prof prof_demodulate in
       c
     else begin  (* construct new clause *)
+      clauses := Util.list_uniq C.eq !clauses;
       let proof c' = Proof.mk_c_step c' "demod"
         (c.C.hcproof :: List.map (fun hc -> hc.C.hcproof) !clauses) in
       let parents = c :: c.C.hcparents in
