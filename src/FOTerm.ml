@@ -612,7 +612,7 @@ let rec pp_depth depth buf t =
     Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
   | Node (s, [{term=Node (s', [a; b])}])
     when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
-    Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
+    Printf.bprintf buf "%a ≠ %a" pp_surrounded a pp_surrounded b
   | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
   | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
@@ -632,9 +632,66 @@ let rec pp_depth depth buf t =
   in
   pp_rec buf t
 
+(* lightweight printing with arithmetic *)
+let rec pp_arith_depth depth buf t =
+  let depth = ref depth in
+  (* recursive printing *)
+  let rec pp_rec buf t = match t.term with
+  | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+  | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
+    && Symbol.eq s' Symbol.equiv_symbol ->
+    Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
+  | Node (s, [{term=Node (s', [a; b])}])
+    when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
+    Printf.bprintf buf "%a ≠ %a" pp_surrounded a pp_surrounded b
+  | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
+    Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
+  | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
+    Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.less ->
+    Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.lesseq ->
+    Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greater ->
+    Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greatereq ->
+    Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.sum ->
+    Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.difference ->
+    Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.product ->
+    Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.quotient ->
+    Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b
+  | Node (s, [a]) when Symbol.eq s Symbol.Arith.uminus ->
+    Printf.bprintf buf "-%a" pp_surrounded a
+  | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
+    let sep = Util.sprintf " %a " Symbol.pp s in
+    Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
+      (Util.pp_list ~sep pp_surrounded) body
+  | Node (s, []) -> Symbol.pp buf s
+  | Node (s, args) ->
+    Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
+  | Var i -> Printf.bprintf buf "X%d" i
+  and pp_surrounded buf t = match t.term with
+  | Node (s, [_;_]) when
+    Symbol.eq s Symbol.Arith.sum ||
+    Symbol.eq s Symbol.Arith.product ||
+    Symbol.eq s Symbol.Arith.difference ||
+    Symbol.eq s Symbol.Arith.quotient ->
+    Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+  | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
+    Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+  | _ -> pp_rec buf t
+  in
+  pp_rec buf t
+
 let pp_debug buf t = pp_depth 0 buf t
 
 let pp_tstp buf t = pp_tstp_depth 0 buf t
+
+let pp_arith buf t = pp_arith_depth 0 buf t
 
 let __default_pp = ref pp_debug
 

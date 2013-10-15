@@ -200,6 +200,7 @@ val signature_seq : ?signature:Signature.t -> t Sequence.t -> Signature.t
 
 val pp_debug : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
+val pp_arith : Buffer.t -> t -> unit
 
 val pp : Buffer.t -> t -> unit
 val set_default_pp : (Buffer.t -> t -> unit) -> unit

@@ -690,7 +690,7 @@ let pp_debug buf f =
   | False -> Buffer.add_string buf "false"
   | Atom t -> (T.pp_depth !depth) buf t
   | Not {form=Equal (t1, t2)} ->
-    (T.pp_depth !depth) buf t1; Buffer.add_string buf " != "; (T.pp_depth !depth) buf t2
+    (T.pp_depth !depth) buf t1; Buffer.add_string buf " ≠ "; (T.pp_depth !depth) buf t2
   | Equal (t1, t2) ->
     (T.pp_depth !depth) buf t1; Buffer.add_string buf " = "; (T.pp_depth !depth) buf t2
   | Not {form=Equiv (f1, f2)} ->
@@ -773,6 +773,55 @@ let pp_tstp buf f =
     decr depth
   | And l -> Util.pp_list ~sep:" & " pp_inner buf l
   | Or l -> Util.pp_list ~sep:" | " pp_inner buf l
+  and pp_inner buf f = match f.form with
+  | And _
+  | Or _
+  | Equiv _
+  | Imply _ ->
+    (* cases where ambiguities could arise *)
+    Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
+  | _ -> pp_outer buf f
+  in
+  pp_outer buf (flatten f)
+
+let pp_arith buf f =
+  let depth = ref 0 in
+  (* outer formula *)
+  let rec pp_outer buf f = match f.form with
+  | True -> Buffer.add_string buf "true"
+  | False -> Buffer.add_string buf "false"
+  | Atom t -> (T.pp_arith_depth !depth) buf t
+  | Not {form=Equal (t1, t2)} ->
+    (T.pp_arith_depth !depth) buf t1; Buffer.add_string buf " ≠ "; (T.pp_arith_depth !depth) buf t2
+  | Equal (t1, t2) ->
+    (T.pp_arith_depth !depth) buf t1; Buffer.add_string buf " = "; (T.pp_arith_depth !depth) buf t2
+  | Not {form=Equiv (f1, f2)} ->
+    pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
+  | Equiv (f1, f2) ->
+    pp_inner buf f1; Buffer.add_string buf " <=> "; pp_inner buf f2
+  | Imply (f1, f2) ->
+    pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
+  | Not f' -> Buffer.add_string buf "¬ "; pp_inner buf f'
+  | Forall f' ->
+    let v = !depth in
+    incr depth;
+    begin match db_type f' 0 with
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f'
+    | _ -> Printf.bprintf buf "∀ Y%d. %a" v pp_inner f'
+    end;
+    decr depth
+  | Exists f' ->
+    let v = !depth in
+    incr depth;
+    begin match db_type f' 0 with
+    | Some ty when not (Type.eq ty Type.i) ->
+      Printf.bprintf buf "∃ Y%d: %a. %a" v Type.pp ty pp_inner f'
+    | _ -> Printf.bprintf buf "∃ Y%d. %a" v pp_inner f'
+    end;
+    decr depth
+  | And l -> Util.pp_list ~sep:" ∧ " pp_inner buf l
+  | Or l -> Util.pp_list ~sep:" ∨ " pp_inner buf l
   and pp_inner buf f = match f.form with
   | And _
   | Or _

@@ -207,9 +207,11 @@ val ac_symbols : is_ac:(Symbol.t -> bool) -> t Sequence.t -> Symbol.SSet.t
 
 val pp_depth : int -> Buffer.t -> t -> unit
 val pp_tstp_depth : int -> Buffer.t -> t -> unit
+val pp_arith_depth : int -> Buffer.t -> t -> unit
 
 val pp_debug : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
+val pp_arith : Buffer.t -> t -> unit  (* pretty arith expressions; same as debug otherwise *)
 
 val pp : Buffer.t -> t -> unit
 val set_default_pp : (Buffer.t -> t -> unit) -> unit
