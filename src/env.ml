@@ -338,6 +338,7 @@ let do_unary_inferences ~env c =
 
 (** Check whether the clause is trivial (also with Experts) *)
 let is_trivial ~env c =
+  if C.get_flag C.flag_persistent c then false else
   begin match env.is_trivial with
   | [] -> false
   | [f] -> f c
