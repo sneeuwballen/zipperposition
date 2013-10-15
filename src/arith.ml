@@ -297,10 +297,10 @@ module Lit = struct
         (* remove denominator, it doesn't matter *)
         let m = Monome.product m m.Monome.divby in
         let terms = Monome.to_list m in
-        if terms = []
+        if Monome.is_constant m
         then if Monome.sign m = 0
-          then [True]
-          else [False]
+          then if sign then [True] else [False]
+          else if sign then [False] else [True]
         (* for each term, pivot the monome so that we isolate the term
           on one side of the (dis)equation, but only if it admits solutions *)
         else List.map

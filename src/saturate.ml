@@ -56,7 +56,7 @@ let check_timeout = function
 let given_clause_step ?(generating=true) ~env num =
   let ctx = Env.ctx env in
   let ord = Ctx.ord ctx in
-  Util.debug 3 "env for next given loop: %a" Env.pp env;
+  Util.debug 4 "env for next given loop: %a" Env.pp env;
   (* select next given clause *)
   match Env.next_passive ~env with
   | None -> Sat (* passive set is empty *)
