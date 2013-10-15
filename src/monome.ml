@@ -128,6 +128,7 @@ let _scale m c =
   if S.Arith.is_one c
     then m  (* same monome *)
     else
+      let c = S.Arith.Op.abs c in
       let constant = S.Arith.Op.product c m.constant in
       let coeffs = T.Map.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
       let divby = S.Arith.Op.product m.divby c in
@@ -156,6 +157,7 @@ let reduce_same_divby m1 m2 =
   match m1.divby, m2.divby with
   | S.Int n1, S.Int n2 ->
     let gcd = Big_int.gcd_big_int n1 n2 in
+    assert (Big_int.sign_big_int gcd > 0);
     (* n1 × n2 = gcd × lcm, so we need to raise both n1 and n2 to lcm.
        to do that, let us introduce  n1 = gcd × d1, and n2 = gcd × d2.
        Then

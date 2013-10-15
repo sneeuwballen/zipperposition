@@ -424,7 +424,7 @@ module Lit = struct
       in
       Literal.mk_true p
     in
-    match lit with
+    let lit = match lit with
     | Literal.Prop (p, sign) ->
       let p' = T.simplify ~signature p in
       begin match p'.T.term, sign with
@@ -458,6 +458,13 @@ module Lit = struct
       end
     | Literal.True
     | Literal.False -> lit
+    in
+    match extract ~signature lit with
+    | [True] | [False] -> lit  (* already simplified *)
+    | [lit'] ->
+      (* exactly one pivot possible, apply it! *)
+      to_lit ~ord lit'
+    | _ -> lit  (* keep lit *)
 
   let is_trivial ~signature lit =
     let l = extract ~signature lit in
