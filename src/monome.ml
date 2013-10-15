@@ -125,6 +125,7 @@ let var_occurs v m =
 let _scale m c =
   assert (S.is_numeric c);
   assert (not (S.Arith.is_zero c));
+  assert (S.Arith.sign m.divby > 0);
   if S.Arith.is_one c
     then m  (* same monome *)
     else
@@ -157,6 +158,8 @@ let reduce_same_divby m1 m2 =
   match m1.divby, m2.divby with
   | S.Int n1, S.Int n2 ->
     let gcd = Big_int.gcd_big_int n1 n2 in
+    assert (Big_int.sign_big_int n1 > 0);
+    assert (Big_int.sign_big_int n2 > 0);
     assert (Big_int.sign_big_int gcd > 0);
     (* n1 × n2 = gcd × lcm, so we need to raise both n1 and n2 to lcm.
        to do that, let us introduce  n1 = gcd × d1, and n2 = gcd × d2.
@@ -218,7 +221,7 @@ let uminus m =
 let product m c =
   if S.Arith.is_zero c
     then const c  (* 0 *)
-  else if S.Arith.Op.divides c m.divby
+  else if S.Arith.Op.divides c m.divby && S.Arith.sign c > 0
     then { m with divby = S.Arith.Op.quotient m.divby c }
   else  (* itemwise product *)
     let constant = S.Arith.Op.product m.constant c in
@@ -297,17 +300,35 @@ let of_term_opt ~signature t =
   with NotLinear -> None
     
 let to_term m =
-  let sum = T.mk_const m.constant in
-  let sum = T.Map.fold
-    (fun t' coeff sum ->
-      assert (not (S.Arith.is_zero coeff));
-      if S.Arith.is_one coeff
-        then T.mk_node S.Arith.sum [t'; sum]
-        else
-          T.mk_node S.Arith.sum
-            [T.mk_node S.Arith.product [T.mk_const coeff; t'];
-            sum])
-    m.coeffs sum
+  if T.Map.is_empty m.coeffs
+    then T.mk_const m.constant (* constant *)
+  else if S.Arith.is_zero m.constant then
+    (* sum of coeffs, no constant *)
+    let t, sum = T.Map.choose m.coeffs in
+    let map = T.Map.remove t m.coeffs in
+    T.Map.fold
+      (fun t' coeff sum ->
+        assert (not (S.Arith.is_zero coeff));
+        if S.Arith.is_one coeff
+          then T.mk_node S.Arith.sum [t'; sum]
+          else
+            T.mk_node S.Arith.sum
+              [T.mk_node S.Arith.product [T.mk_const coeff; t'];
+              sum])
+      map (T.mk_const sum)
+  else
+    (* add coeffs to constant *)
+    let sum = T.mk_const m.constant in
+    let sum = T.Map.fold
+      (fun t' coeff sum ->
+        assert (not (S.Arith.is_zero coeff));
+        if S.Arith.is_one coeff
+          then T.mk_node S.Arith.sum [t'; sum]
+          else
+            T.mk_node S.Arith.sum
+              [T.mk_node S.Arith.product [T.mk_const coeff; t'];
+              sum])
+      m.coeffs sum
   in
   if S.Arith.is_one m.divby
     then sum

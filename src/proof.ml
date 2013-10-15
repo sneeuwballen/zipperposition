@@ -226,7 +226,7 @@ let pp_debug buf proof =
       | Axiom (f,n) -> ()
       | InferClause(c, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
         let f,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "%a <--- axiom %s in file '%s'\n" CC.pp_tstp c n f
+        Printf.bprintf buf "%a <--- axiom %s in file '%s'\n" CC.pp c n f
       | InferForm(f, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
         let file,n = _extract_axiom step.parents.(0) in
         Printf.bprintf buf "%a <--- axiom %s in file '%s'\n" F.pp f n file

@@ -135,8 +135,12 @@ val apply_subst_list : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
 
 (** {2 IO} *)
 
-val pp : Buffer.t -> t -> unit
+val pp_debug : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
+val pp_arith : Buffer.t -> t -> unit
+val pp : Buffer.t -> t -> unit
+val set_default_pp : (Buffer.t -> t -> unit) -> unit
+
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 val bij : ord:Ordering.t -> t Bij.t

@@ -407,7 +407,7 @@ let apply_subst_list ?(recursive=true) ~renaming ~ord subst lits scope =
 
 (** {2 IO} *)
 
-let pp buf lit =
+let pp_debug buf lit =
   match lit with
   | Prop (p, true) -> T.pp buf p
   | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp p
@@ -428,6 +428,26 @@ let pp_tstp buf lit =
     Printf.bprintf buf "%a = %a" T.pp_tstp l T.pp_tstp r
   | Equation (l, r, false, _) ->
     Printf.bprintf buf "%a != %a" T.pp_tstp l T.pp_tstp r
+
+let pp_arith buf lit =
+  match lit with
+  | Prop ({T.term=T.Node(f,[a;b])},true) when Symbol.eq f Symbol.Arith.less ->
+    Printf.bprintf buf "%a < %a" T.pp_arith a T.pp_arith b
+  | Prop ({T.term=T.Node(f,[a;b])},true) when Symbol.eq f Symbol.Arith.lesseq ->
+    Printf.bprintf buf "%a ≤ %a" T.pp_arith a T.pp_arith b
+  | Prop (p, true) -> T.pp_arith buf p
+  | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp_arith p
+  | True -> Buffer.add_string buf "true"
+  | False -> Buffer.add_string buf "false"
+  | Equation (l, r, true, _) ->
+    Printf.bprintf buf "%a = %a" T.pp_arith l T.pp_arith r
+  | Equation (l, r, false, _) ->
+    Printf.bprintf buf "%a ≠ %a" T.pp_arith l T.pp_arith r
+
+let __pp = ref pp_debug
+let set_default_pp pp = __pp := pp
+
+let pp buf lit = !__pp buf lit
 
 let to_string t = Util.on_buffer pp t
 

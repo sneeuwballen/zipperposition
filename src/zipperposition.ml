@@ -135,9 +135,13 @@ let setup_env ~env =
   end;
   AC.setup_env ~env;
   Chaining.setup_env ~env;
-  if (Env.get_params ~env).param_arith then
+  if (Env.get_params ~env).param_arith then begin
     let ac = (Env.get_params ~env).param_arith_ac in
+    T.set_default_pp T.pp_arith;
+    FOFormula.set_default_pp FOFormula.pp_arith;
+    Lit.set_default_pp Lit.pp_arith;
     ArithElim.setup_env ~ac ~env;
+    end;
   ()
 
 (** Make an optional meta-prover and parse its KB *)
