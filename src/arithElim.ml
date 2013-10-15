@@ -176,15 +176,17 @@ let setup_penv ~penv =
   PEnv.add_constr ~penv (Precedence.min_constraint (Signature.to_symbols base));
   ()
 
-let setup_env ~env =
+let setup_env ?(ac=false) ~env =
   Env.add_lit_rule ~env "arith_rw" rewrite_lit;
   Env.add_unary_inf ~env "arith_factor" factor_arith;
   Env.add_unary_inf ~env "arith_pivot" pivot_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
   (* declare some AC symbols *)
-  AC.add_ac ~env S.Arith.sum;
-  AC.add_ac ~env S.Arith.product;
+  if ac then begin
+    AC.add_ac ~env S.Arith.sum;
+    AC.add_ac ~env S.Arith.product;
+    end;
   (* be sure that the ordering is present in the context *)
   Chaining.add_order ~env ?proof:None ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
   (* we are (until proved otherwise) incomplete *)

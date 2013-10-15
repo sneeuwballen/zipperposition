@@ -172,8 +172,8 @@ let reduce_same_divby m1 m2 =
     _scale m1 d2, _scale m2 d1
   | c1, c2 ->
     (* reduce m1 / c1 and m2 / c2 to same denominator. We choose c2
-       arbitrarily, so we need to multiply m1/c1 by c1/c2. *)
-    _scale m1 (S.Arith.Op.quotient c1 c2), m2
+       arbitrarily, so we need to scale m1 with c2/c1. *)
+    _scale m1 (S.Arith.Op.quotient c2 c1), m2
 
 let sum m1 m2 =
   let m1, m2 = reduce_same_divby m1 m2 in

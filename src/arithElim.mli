@@ -63,4 +63,6 @@ val axioms : PFormula.t list
 
 val setup_penv : penv:PEnv.t -> unit
 
-val setup_env : env:Env.t -> unit
+val setup_env : ?ac:bool -> env:Env.t -> unit
+  (** Add inference rules to env.
+    @param [ac] if true, add AC axioms for addition and multiplication (default [false]) *)

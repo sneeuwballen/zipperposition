@@ -73,14 +73,18 @@ let fix ops set =
           let results = tr !ans pf in
           List.iter
             (function
-            | Remove -> keep := false
+            | Remove ->
+              Util.debug 5 "remove form %a" PF.pp pf;
+              keep := false
             | Esa [pf'] when PF.eq_noproof pf pf' -> ()
             | Esa l ->
               (* get rid of [f], but process [l] instead *)
+              Util.debug 5 "%a equisatisfiable with %a" PF.pp pf (Util.pp_list PF.pp) l;
               add_forms l;
               keep := false
             | Add l ->
               (* continue processing [pf], but also [l] *)
+              Util.debug 5 "add forms %a" (Util.pp_list PF.pp) l;
               add_forms l
             | AddOps [] -> assert false
             | AddOps l ->
@@ -94,6 +98,7 @@ let fix ops set =
               (* ignore [f], process [f'] instead, and remember the
                   simplification step *)
               PF.simpl_to ~from:pf ~into:f';
+              Util.debug 5 "simplify %a into %a" PF.pp pf PF.pp f';
               Queue.push f' q;
               keep := false
             )

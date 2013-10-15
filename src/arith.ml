@@ -32,6 +32,9 @@ open Logtk
 module S = Symbol
 module Literals = Literal.Arr
 
+let prof_arith_simplify = Util.mk_profiler "arith.simplify"
+let prof_arith_extract = Util.mk_profiler "arith.extract"
+
 (** {2 Utils} *)
 
 let is_arith_ty ty =
@@ -98,6 +101,7 @@ module T = struct
   (* TODO: a flag for simplified terms, makes simplifying them faster *)
 
   let simplify ~signature t =
+    Util.enter_prof prof_arith_simplify;
     (* recursive function with cache *)
     let rec simplify recurse t = match t.term with
     | Var _
@@ -206,7 +210,9 @@ module T = struct
         mk_node s [a; b]
     in
     let __cache = TCache.create 9 in
-    TCache.with_cache_rec __cache simplify t
+    let t' = TCache.with_cache_rec __cache simplify t in
+    Util.exit_prof prof_arith_simplify;
+    t'
 end
 
 (** {2 Formulas} *)
@@ -288,6 +294,7 @@ module Lit = struct
   exception UnsatLit
 
   let extract ~signature lit =
+    Util.enter_prof prof_arith_extract;
     (* extract literal from (l=r | l!=r) *)
     let extract_eqn l r sign =
       try
@@ -390,6 +397,7 @@ module Lit = struct
     | Literal.Prop _ -> []
     in
     Util.debug 5 "arith extraction of %a gives [%a]" Literal.pp lit (Util.pp_list pp) ans;
+    Util.exit_prof prof_arith_extract;
     ans
 
   let to_lit ~ord lit =

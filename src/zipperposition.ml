@@ -136,7 +136,8 @@ let setup_env ~env =
   AC.setup_env ~env;
   Chaining.setup_env ~env;
   if (Env.get_params ~env).param_arith then
-    ArithElim.setup_env ~env;
+    let ac = (Env.get_params ~env).param_arith_ac in
+    ArithElim.setup_env ~ac ~env;
   ()
 
 (** Make an optional meta-prover and parse its KB *)

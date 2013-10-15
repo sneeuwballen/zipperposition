@@ -44,6 +44,7 @@ type t = {
   param_kb_print : bool;          (** print knowledge base and exit *)
   param_expand_def : bool;        (** expand definitions *)
   param_arith : bool;             (** enable arith? *)
+  param_arith_ac : bool;          (** enable AC axioms for arith? *)
   param_stats : bool;             (** print stats? *)
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
@@ -75,6 +76,7 @@ let parse_args () =
   and kb_print = ref false
   and kb_where = ref false
   and arith = ref false
+  and arith_ac = ref false
   and stats = ref false
   and expand_def = ref false
   and select = ref "SelectComplex"
@@ -108,6 +110,7 @@ let parse_args () =
     ; "-kb-where", Arg.Set kb_where, "print default dir that is search for KB"
     ; "-expand-def", Arg.Set expand_def, "expand definitions"
     ; "-arith", Arg.Set arith, "enable arithmetic"
+    ; "-arith-ac", Arg.Set arith_ac, "enable AC axioms for arith"
     ; "-stats", Arg.Set stats, "print statistics"
     ; "-progress", Arg.Unit set_progress, "print progress"
     ; "-profile", Arg.Set Util.enable_profiling, "enable profiling of code"
@@ -136,5 +139,6 @@ let parse_args () =
     param_dot_file = !dot_file; param_plugins= !plugins;
     param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
     param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
-    param_kb_print = !kb_print; 
-    param_expand_def= !expand_def; param_arith= !arith; }
+    param_kb_print = !kb_print;
+    param_expand_def= !expand_def; param_arith= !arith;
+    param_arith_ac= !arith_ac; }
