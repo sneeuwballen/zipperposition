@@ -107,8 +107,8 @@ let eq a b = compare a b = 0
 
 let hash s = match s with
   | Const (_, info) -> info.tag
-  | Int n -> Hashtbl.hash n
-  | Rat n -> Hashtbl.hash n
+  | Int n -> Hash.hash_string (Big_int.string_of_big_int n)
+  | Rat n -> Hash.hash_string (Ratio.string_of_ratio n)
   | Real f -> int_of_float f
 
 let mk_const ?(attrs=0) s =

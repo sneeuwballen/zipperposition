@@ -390,7 +390,7 @@ let symbols seq =
 let rec contains_symbol f t =
   match t.term with
   | Var _ | BoundVar _ -> false
-  | Node (g, ts) -> g == f || List.exists (contains_symbol f) ts
+  | Node (g, ts) -> Symbol.eq g f || List.exists (contains_symbol f) ts
 
 (** {2 De Bruijn Indexes manipulations} *)
 
@@ -513,7 +513,7 @@ let flatten_ac f l =
   | [] -> acc
   | x::l' -> flatten (deconstruct acc x) l'
   and deconstruct acc t = match t.term with
-  | Node (f', l') when f == f' ->
+  | Node (f', l') when Symbol.eq f f' ->
     flatten acc l'
   | _ -> t::acc
   in flatten [] l
@@ -580,9 +580,9 @@ let pp_tstp_depth depth buf t =
     && Symbol.eq s' Symbol.equiv_symbol ->
     Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
   | Node (s, [{term=Node (s', [a; b])}])
-    when s == Symbol.not_symbol && s' == Symbol.eq_symbol ->
+    when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
     Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
-  | Node (s, [t]) when s == Symbol.not_symbol ->
+  | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
   | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
     Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
@@ -611,9 +611,9 @@ let rec pp_depth depth buf t =
     && Symbol.eq s' Symbol.equiv_symbol ->
     Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
   | Node (s, [{term=Node (s', [a; b])}])
-    when s == Symbol.not_symbol && s' == Symbol.eq_symbol ->
+    when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
     Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
-  | Node (s, [t]) when s == Symbol.not_symbol ->
+  | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
     Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
   | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
     Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
