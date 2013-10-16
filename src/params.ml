@@ -36,6 +36,7 @@ type t = {
   param_progress : bool;          (** print progress during search *)
   param_proof : string;           (** how to print proof? *)
   param_dot_file : string option; (** file to print the final state in *)
+  param_dot_sat : bool;           (** Print saturated set into DOT? *)
   param_plugins : string list;    (** plugins to load *)
   param_kb : string;              (** file to use for KB *)
   param_kb_where : bool;          (** print where is the KB? *)
@@ -69,6 +70,7 @@ let parse_args () =
   and calculus = ref "superposition"
   and presaturate = ref false
   and dot_file = ref None
+  and dot_sat = ref false
   and plugins = ref []
   and kb = ref (Filename.concat Const.home "kb")
   and kb_load = ref []
@@ -118,6 +120,7 @@ let parse_args () =
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
     ; "-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set"
     ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
+    ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
     ; "-seed", Arg.Set_int seed, "set random seed"
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
     ]
@@ -139,6 +142,6 @@ let parse_args () =
     param_dot_file = !dot_file; param_plugins= !plugins;
     param_kb = !kb; param_kb_load = !kb_load; param_kb_where = !kb_where;
     param_kb_clear = !kb_clear; param_unary_depth= !unary_depth;
-    param_kb_print = !kb_print;
+    param_kb_print = !kb_print; param_dot_sat= !dot_sat;
     param_expand_def= !expand_def; param_arith= !arith;
     param_arith_ac= !arith_ac; }

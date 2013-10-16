@@ -127,3 +127,8 @@ val pp_dot : name:string -> Buffer.t -> t -> unit
 val pp_dot_file : ?name:string -> string -> t -> unit
   (** print to dot into a file *)
 
+val pp_dot_seq : name:string -> Buffer.t -> t Sequence.t -> unit
+  (** Print a set of proofs as a DOT graph, sharing common subproofs *)
+
+val pp_dot_seq_file : ?name:string -> string -> t Sequence.t -> unit
+  (** same as {!pp_dot_seq} but into a file *)

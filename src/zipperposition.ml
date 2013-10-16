@@ -230,7 +230,14 @@ let print_dots ~env result =
   begin match params.param_dot_file, result with
   | Some dot_f, Sat.Unsat c ->
     let name = "unsat_graph" in
+    (* print proof of false *)
     Proof.pp_dot_file ~name dot_f c.C.hcproof
+  | Some dot_f, (Sat.Sat | Sat.Unknown) when params.param_dot_sat ->
+    (* print saturated set *)
+    let name = "sat_set" in
+    let seq = Sequence.append (Env.get_active ~env) (Env.get_passive ~env) in
+    let seq = Sequence.map C.get_proof seq in
+    Proof.pp_dot_seq_file ~name dot_f seq
   | _ -> ()
   end;
   ()

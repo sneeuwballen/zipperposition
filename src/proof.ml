@@ -302,30 +302,38 @@ let as_dot_graph =
     ~edges:(fun e -> [`Label e])
     as_graph
 
-(** Add the proof to the given graph *)
-let pp_dot ~name buf proof =
+let pp_dot_seq ~name buf seq =
   let fmt = Format.formatter_of_buffer buf in
-  if not (LazyGraph.is_dag as_graph proof) then begin
-    (* output warning, cyclic proof *)
-    let cycle = LazyGraph.find_cycle as_graph proof in
-    let cycle = List.map (fun (v,_,_) -> v) cycle in
-    let pp_squared buf pf = Printf.bprintf buf "[%a]" pp_notrec pf in
-    Util.debug 0 "warning: proof is not a DAG (cycle %a)"
-      (Util.pp_list pp_squared) cycle;
-    end;
-  LazyGraph.Dot.pp ~name as_dot_graph fmt (Sequence.singleton proof);
+  Sequence.iter (fun proof ->
+    if not (LazyGraph.is_dag as_graph proof) then begin
+      (* output warning, cyclic proof *)
+      let cycle = LazyGraph.find_cycle as_graph proof in
+      let cycle = List.map (fun (v,_,_) -> v) cycle in
+      let pp_squared buf pf = Printf.bprintf buf "[%a]" pp_notrec pf in
+      Util.debug 0 "warning: proof is not a DAG (cycle %a)"
+        (Util.pp_list pp_squared) cycle;
+      end)
+    seq;
+  LazyGraph.Dot.pp ~name as_dot_graph fmt seq;
   Format.pp_print_flush fmt ();
   ()
 
+(** Add the proof to the given graph *)
+let pp_dot ~name buf proof =
+  pp_dot_seq ~name buf (Sequence.singleton proof)
+
 (** print to dot into a file *)
-let pp_dot_file ?(name="proof") filename proof =
+let pp_dot_seq_file ?(name="proof") filename seq =
   (* print graph on file *)
   let out = open_out filename in
   try
     Util.debug 1 "print proof graph to %s" filename;
-    Util.fprintf out "%a\n" (pp_dot ~name) proof;
+    Util.fprintf out "%a\n" (pp_dot_seq ~name) seq;
     flush out;
     close_out out
   with e ->
     Util.debug 1 "error: %s" (Printexc.to_string e);
     close_out out
+
+let pp_dot_file ?name filename proof =
+  pp_dot_seq_file ?name filename (Sequence.singleton proof)
