@@ -44,6 +44,10 @@ type t = private {
   divby : Symbol.t;  (* divide everything by this constant (cool for ints) *)
 }
 
+val eq : t -> t -> bool
+val compare : t -> t -> int
+val hash : t -> int
+
 val const : Symbol.t -> t           (** Empty monomial, from constant (decides type) *)
 val singleton : ?divby:Symbol.t ->
                 Symbol.t ->
@@ -122,3 +126,10 @@ val floor : t -> t
 
 val ceil : t -> t
   (** Same as {!round_low} but rounds high *)
+
+(** {2 Lib} *)
+
+val bij : t Bij.t
+val arbitrary_int : t QCheck.Arbitrary.t (* with int coeffs *)
+val arbitrary_rat : t QCheck.Arbitrary.t (* with rat coeffs *)
+val arbitrary : t QCheck.Arbitrary.t     (* with any coeffs *)

@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: 1996d02b4fc06352187a2053e064a3e9) *)
+(* DO NOT EDIT (digest: cc6de555d5134fc18e5113feabd0d7e8) *)
 module OASISGettext = struct
 (* # 21 "src/oasis/OASISGettext.ml" *)
 
@@ -480,12 +480,17 @@ let package_default =
      MyOCamlbuildBase.lib_ocaml = [("libzipperposition", ["src"])];
      lib_c = [];
      flags = [];
-     includes = [("src/containers", ["src"]); ("src", ["src/containers"])];
+     includes =
+       [
+          ("tests", ["src"]);
+          ("src/containers", ["src"]);
+          ("src", ["src/containers"])
+       ];
      }
   ;;
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default package_default;;
 
-# 490 "myocamlbuild.ml"
+# 495 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;

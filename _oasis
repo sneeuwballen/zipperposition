@@ -46,6 +46,18 @@ Document zipperposition
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: libzipperposition
 
+Test all
+  Command: $run_tests
+  TestTools: run_tests
+  Run$: flag(tests)
+
+Executable run_tests
+  Path: tests/
+  Install: false
+  CompiledObject: native
+  MainIs: run_tests.ml
+  BuildDepends: logtk, logtk.meta, libzipperposition
+
 SourceRepository head
   Type: git
   Location: https://github.com/c-cube/zipperposition

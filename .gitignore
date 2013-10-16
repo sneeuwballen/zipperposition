@@ -36,4 +36,3 @@ TAGS
 src/man/
 src/const.ml
 setup.data
-tests/

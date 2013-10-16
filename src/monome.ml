@@ -38,6 +38,26 @@ type t = {
   divby : Symbol.t;  (* divide everything by this constant (cool for ints) *)
 }
 
+let eq m1 m2 =
+  Symbol.eq m1.constant m2.constant &&
+  Symbol.eq m1.divby m2.divby &&
+  T.Map.equal Symbol.eq m1.coeffs m2.coeffs
+
+let compare m1 m2 =
+  Util.lexicograph_combine
+    [ Symbol.compare m1.constant m2.constant
+    ; Symbol.compare m1.divby m2.divby
+    ; T.Map.compare Symbol.compare m1.coeffs m2.coeffs
+    ]
+
+let hash m =
+  Hash.hash_int3
+    (Symbol.hash m.constant)
+    (Symbol.hash m.divby)
+    (T.Map.fold
+      (fun t coeff acc -> Hash.hash_int3 acc (Symbol.hash coeff) (T.hash t))
+      m.coeffs 13)
+
 let const constant =
   assert (S.is_numeric constant);
   {
@@ -300,35 +320,28 @@ let of_term_opt ~signature t =
   with NotLinear -> None
     
 let to_term m =
-  if T.Map.is_empty m.coeffs
-    then T.mk_const m.constant (* constant *)
-  else if S.Arith.is_zero m.constant then
-    (* sum of coeffs, no constant *)
-    let t, sum = T.Map.choose m.coeffs in
-    let map = T.Map.remove t m.coeffs in
-    T.Map.fold
-      (fun t' coeff sum ->
-        assert (not (S.Arith.is_zero coeff));
-        if S.Arith.is_one coeff
-          then T.mk_node S.Arith.sum [t'; sum]
-          else
-            T.mk_node S.Arith.sum
-              [T.mk_node S.Arith.product [T.mk_const coeff; t'];
-              sum])
-      map (T.mk_const sum)
-  else
-    (* add coeffs to constant *)
-    let sum = T.mk_const m.constant in
-    let sum = T.Map.fold
-      (fun t' coeff sum ->
-        assert (not (S.Arith.is_zero coeff));
-        if S.Arith.is_one coeff
-          then T.mk_node S.Arith.sum [t'; sum]
-          else
-            T.mk_node S.Arith.sum
-              [T.mk_node S.Arith.product [T.mk_const coeff; t'];
-              sum])
-      m.coeffs sum
+  let add x y = T.mk_node S.Arith.sum [x;y] in
+  let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
+  let prod s x = if S.Arith.is_one s then x
+    else T.mk_node S.Arith.product [T.mk_const s; x]
+  in
+  let sum =
+    if T.Map.is_empty m.coeffs
+      then T.mk_const m.constant (* constant *)
+    else
+      (* remove one coeff to make the basic sum *)
+      let t, c = T.Map.choose m.coeffs in
+      let map = T.Map.remove t m.coeffs in
+      let sum = prod c t in
+      (* add coeff*term for the remaining terms *)
+      let sum = T.Map.fold
+        (fun t' coeff sum ->
+          assert (not (S.Arith.is_zero coeff));
+          add sum (prod coeff t'))
+        map sum 
+      in
+      (* add the constant (if needed) *)
+      add_sym m.constant sum
   in
   if S.Arith.is_one m.divby
     then sum
@@ -375,3 +388,39 @@ match m.constant with
     { m with constant; divby=one; }
   | _ -> m
 
+(** {2 Lib} *)
+
+let bij =
+  Bij.(map
+    ~inject:to_term
+    ~extract:(fun t ->
+      let tyctx = TypeInference.Ctx.create () in
+      ignore (TypeInference.FO.infer tyctx t);
+      let signature = TypeInference.Ctx.to_signature tyctx in
+      of_term ~signature t)
+    T.bij)
+
+(* arbitrary instance for the given constant generators *)
+let _arbitrary_for ty any any_nonzero =
+  let open QCheck.Arbitrary in
+  0 -- 3 >>= fun n ->
+  list_repeat n (pair any_nonzero (T.arbitrary_ty ty)) >>= fun terms ->
+  any >>= fun constant ->
+  any_nonzero >>= fun divby ->
+  let m = of_list constant terms in
+  return { m with divby; }
+
+let arbitrary_int =
+  QCheck.Arbitrary.(
+    let any_int = lift Symbol.mk_int small_int in
+    let any_int_nonzero = lift Symbol.mk_int (1 -- 10) in
+    _arbitrary_for Type.int any_int any_int_nonzero)
+
+let arbitrary_rat =
+  QCheck.Arbitrary.(
+    let any_rat = lift2 Symbol.mk_rat small_int (1 -- 10) in
+    let any_rat_nonzero = lift2 Symbol.mk_rat (1 -- 50) (1 -- 10) in
+    _arbitrary_for Type.rat any_rat any_rat_nonzero)
+
+let arbitrary =
+  QCheck.Arbitrary.choose [ arbitrary_int; arbitrary_rat ]
