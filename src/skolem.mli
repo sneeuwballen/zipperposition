@@ -33,6 +33,10 @@ val create : ?prefix:string -> unit -> ctx
   (** New skolem contex. A prefix can be provided, which will be
       added to all newly created skolem symbols *)
 
+val to_signature : ctx -> Signature.t
+  (** Signature of all new skolem symbols that were created using this
+      context. *)
+
 val fresh_sym : ctx:ctx -> Symbol.t
   (** Just obtain a fresh skolem symbol *)
 

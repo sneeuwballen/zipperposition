@@ -35,6 +35,7 @@ type ctx = {
   mutable sc_var_index : int;                   (* fresh universal vars *)
   mutable sc_cache : (T.t * T.t) list;  (* term -> skolemized term *)
   mutable sc_fcache : (F.t * F.t) list; 
+  mutable sc_signature : Signature.t;
 }
 
 (* TODO: use a term index for the cache? *)
@@ -45,8 +46,11 @@ let create ?(prefix="logtk_sk__") () =
     sc_var_index = 0;
     sc_cache = [];
     sc_fcache = [];
+    sc_signature = Signature.empty;
   } in
   ctx
+
+let to_signature ctx = ctx.sc_signature
 
 let fresh_sym ~ctx =
   Symbol.Gensym.new_ ctx.sc_gensym
@@ -76,11 +80,19 @@ let skolem_term ~ctx t =
       ctx.sc_cache;
     (* not found, use a fresh symbol *)
     let symb = fresh_sym ~ctx in
+    (* which type? *)
+    let ty = match T.db_type t 0 with
+      | Some ty -> ty
+      | None -> Type.i  (* default... *)
+    in
     (* replace the existential variable by [skolem_term] in [t] *)
     let skolem_term = T.mk_node symb vars in
     let new_t = T.db_unlift (T.db_replace t skolem_term) in
     (* update cache with new symbol *)
     ctx.sc_cache <- (t, new_t) :: ctx.sc_cache;
+    (* update signature *)
+    ctx.sc_signature <- Signature.declare ctx.sc_signature symb ty;
+    Util.debug 5 "new skolem symbol %a with type %a" Symbol.pp symb Type.pp ty;
     new_t
   with FoundVariant (t',new_t',subst) ->
     let renaming = S.Renaming.create 5 in
@@ -103,9 +115,17 @@ let skolem_form ~ctx f =
     (* fresh symbol *)
     let symb = fresh_sym ~ctx in
     let skolem_term = T.mk_node symb vars in
+    (* which type? *)
+    let ty = match F.db_type f 0 with
+      | Some ty -> ty
+      | None -> Type.i  (* default... *)
+    in
     (* replace variable by skolem t*)
     let new_f = F.db_unlift (F.db_replace f skolem_term) in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
+    (* update signature *)
+    ctx.sc_signature <- Signature.declare ctx.sc_signature symb ty;
+    Util.debug 5 "new skolem symbol %a with type %a" Symbol.pp symb Type.pp ty;
     new_f
   with FoundFormVariant(f',new_f',subst) ->
     Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f S.pp subst;
