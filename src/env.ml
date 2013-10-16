@@ -300,6 +300,8 @@ let cnf ~env set =
       C.CSet.add_list cset clauses)
     C.CSet.empty (PF.Set.to_seq set)
   in
+  (* declaration of new skolem symbols *)
+  Ctx.add_signature ~ctx (Skolem.to_signature ctx.Ctx.skolem);
   clauses
 
 let next_passive ~env =

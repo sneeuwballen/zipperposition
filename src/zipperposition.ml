@@ -206,9 +206,6 @@ let preprocess ?meta ~plugins ~params formulas =
   (* reduce to CNF *)
   Util.debug 1 "reduce to CNF...";
   let clauses = Env.cnf ~env formulas in
-  (* update signature (skolem?) *)
-  let signature = C.signature ~signature (C.CSet.to_seq clauses) in
-  Ctx.add_signature ~ctx signature;
   Util.debug 3 "CNF:\n  %a" (Util.pp_seq ~sep:"\n  " C.pp) (C.CSet.to_seq clauses);
   (* return env + clauses *)
   env, clauses
