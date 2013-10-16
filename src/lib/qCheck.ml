@@ -43,6 +43,12 @@ module Arbitrary = struct
 
   let small_int = int 100
 
+  let split_int gen st =
+    let n = gen st in
+    if n > 0
+      then let i = Random.State.int st (n+1) in i, n-i
+      else 0, 0
+
   let bool = Random.State.bool
 
   let float f st = Random.State.float st f
@@ -123,6 +129,10 @@ module Arbitrary = struct
   let fix_depth ~depth ~base f st =
     let max = depth st in
     fix ~max ~base f st
+
+  let rec retry gen st = match gen st with
+    | None -> retry gen st
+    | Some x -> x
 
   let lift f a st = f (a st)
 
@@ -218,7 +228,7 @@ end
 type 'a result =
   | Ok of int * int  (* total number / precond failed *)
   | Failed of 'a list
-  | Error of exn
+  | Error of 'a option * exn
 
 (* random seed, for repeatability of tests *)
 let __seed = [| 89809344; 994326685; 290180182 |]
@@ -226,9 +236,11 @@ let __seed = [| 89809344; 994326685; 290180182 |]
 let check ?(rand=Random.State.make __seed) ?(n=100) gen prop =
   let precond_failed = ref 0 in
   let failures = ref [] in
+  let inst = ref None in
   try
     for i = 0 to n - 1 do
       let x = gen rand in
+      inst := Some x;
       try
         if not (prop x)
           then failures := x :: !failures
@@ -239,7 +251,7 @@ let check ?(rand=Random.State.make __seed) ?(n=100) gen prop =
     | [] -> Ok (n, !precond_failed)
     | _ -> Failed (!failures)
   with e ->
-    Error e
+    Error (!inst, e)
 
 (** {2 Main} *)
 
@@ -294,8 +306,15 @@ let run ?(out=stdout) ?(rand=Random.State.make __seed) (Test test) =
         to_print
     end;
     false
-  | Error e ->
-    Printf.fprintf out "  [×] error: %s\n" (Printexc.to_string e);
+  | Error (inst, e) ->
+    begin match inst, test.pp with
+    | _, None
+    | None, _ -> Printf.fprintf out "  [×] error: %s\n" (Printexc.to_string e);
+    | Some x, Some pp ->
+      (* print instance on which the error occurred *)
+      Printf.fprintf out "  [×] error on instance %s: %s\n"
+        (pp x) (Printexc.to_string e);
+    end;
     false
 
 type suite = test list

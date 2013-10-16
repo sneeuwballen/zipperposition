@@ -221,6 +221,7 @@ val fmt : Format.formatter -> t -> unit
 val bij : t Bij.t
 
 val arbitrary : t QCheck.Arbitrary.t        (* generates terms *)
+val arbitrary_ty : Type.t -> t QCheck.Arbitrary.t (* terms of the given type *)
 val arbitrary_pred : t QCheck.Arbitrary.t   (* generates predicates *)
 val arbitrary_ground : t QCheck.Arbitrary.t (* ground terms *)
 

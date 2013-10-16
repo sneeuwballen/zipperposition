@@ -731,15 +731,15 @@ let bij =
         | "n" -> BranchFrom (Lazy.force bij_node, fun (s,l) -> mk_node s l)
         | _ -> raise (DecodingError "expected Term")))
 
-let arbitrary =
+let arbitrary_ty ty =
   let a = mk_const (Symbol.mk_const "a") in
   let b = mk_const (Symbol.mk_const "b") in
   let c = mk_const (Symbol.mk_const "c") in
   let d = mk_const (Symbol.mk_const "d") in
   let e = mk_const (Symbol.mk_const "e") in
-  let x = mk_var 0 in
-  let y = mk_var 1 in
-  let z = mk_var 2 in
+  let x = mk_var ~ty 0 in
+  let y = mk_var ~ty 1 in
+  let z = mk_var ~ty 2 in
   let f x y = mk_node (Symbol.mk_const "f") [x; y] in
   let sum x y = mk_node (Symbol.mk_const "sum") [x; y] in
   let g x = mk_node (Symbol.mk_const "g") [x] in
@@ -752,6 +752,8 @@ let arbitrary =
         choose [lift2 sum sub sub; lift3 ite sub sub sub]])
     in
     t)
+
+let arbitrary = arbitrary_ty Type.i
       
 let arbitrary_pred =
   let p x y = mk_node (Symbol.mk_const "p") [x; y] in
