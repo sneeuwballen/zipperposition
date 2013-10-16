@@ -111,7 +111,7 @@ let factor_arith c =
 
 let pivot_arith c =
   let ctx = c.C.hcctx in
-  let eligible = C.Eligible.max c in
+  let eligible = C.Eligible.always in
   let lits'_list = Arith.Lits.pivot ~ord:(Ctx.ord ctx)
     ~signature:(Ctx.signature ctx) ~eligible c.C.hclits
   in
