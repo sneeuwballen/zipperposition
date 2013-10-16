@@ -364,6 +364,20 @@ let has_instances m =
   Util.debug 5 "monome %a has instances: %B" pp m res;
   res
 
+let total_expression m =
+  let m = normalize m in
+  let res = match m.constant with
+  | S.Real _
+  | S.Rat _ -> true
+  | S.Int _ ->
+    (* either divby is 1, or the monome is an integer constant *)
+    S.Arith.is_one m.divby ||
+    (T.Map.is_empty m.coeffs && S.Arith.Op.divides m.divby m.constant)
+  | _ -> assert false
+  in
+  Util.debug 5 "monome %a is a total expression: %B" pp m res;
+  res
+
 let floor m = match m.constant with
   | S.Int _ when T.Map.is_empty m.coeffs ->
     (* m = m.constant / m.divby *)

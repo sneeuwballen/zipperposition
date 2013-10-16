@@ -498,7 +498,10 @@ let simplify c =
       let lits = List.map fst (BV.select bv c.C.hclits) in
       let theories = ["total_order"] in
       instances := Util.list_uniq TO.eq !instances;
+      (*
       let proofs = Util.list_flatmap (fun instance -> instance.TO.proof) !instances in
+      *)
+      let proofs = [] in
       let rule = "total_order_simplify" in
       let proof cc = Proof.mk_c_step ~theories ~rule cc (c.C.hcproof :: proofs) in
       let new_c = C.create ~ctx ~parents:[c] lits proof in

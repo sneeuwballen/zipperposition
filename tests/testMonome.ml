@@ -79,12 +79,12 @@ let check_has_instances_int_normalize =
   let name = "monome_int_has_instances_inv_by_normalization" in
   mk_test ~name ~pp:M.to_string gen prop
 
-let check_normalization_involutive =
+let check_normalization_idempotent =
   let gen = M.arbitrary in
   let prop m =
     M.eq (M.normalize m) (M.normalize (M.normalize m))
   in
-  let name = "monome_normalization_involutive" in
+  let name = "monome_normalization_idempotent" in
   mk_test ~name ~pp:M.to_string gen prop
 
 let props =
@@ -94,5 +94,5 @@ let props =
   ; check_has_instances_rat
   ; check_has_instances_int_prod
   ; check_has_instances_int_normalize
-  ; check_normalization_involutive
+  ; check_normalization_idempotent
   ]

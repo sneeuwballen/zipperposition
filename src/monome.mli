@@ -121,6 +121,15 @@ val has_instances : t -> bool
       equation.
   *)
 
+val total_expression : t -> bool
+  (** For real or rationals, always true. For integers, returns true
+      iff the monome evaluates to an integer for any valuation of free
+      variables and terms that occur in the right hand side. Most of
+      the time, it means that the denominator is 1.
+      
+      For instance, a/2 is not a total expression, 3 + 5Y is total,
+      but (3Y+7/5) has instances without being total. *)
+
 val floor : t -> t
   (** Highest monome that is <= m, and that satisfies [has_instances]. *)
 

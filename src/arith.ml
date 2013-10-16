@@ -522,38 +522,48 @@ module Lit = struct
 
   (* find instances of variables that eliminate the literal *)
   let eliminate ?(elim_var=(fun v -> true)) ~signature lit =
+    (* unify [t] with monome [m], but only if [m] has instances *)
+    let unif_arith t1 sc_t m sc_m =
+      if not (Monome.has_instances m)
+        then raise FOUnif.Fail;
+      FOUnif.unification t1 sc_t (Monome.to_term m) sc_m
+    in
     begin match lit with
     | True
     | False -> []
-    | Eq (x, m) -> 
+    | Eq (x, m) when not (T.is_var x) || elim_var x -> 
       (* x = m eliminated with x := m+1 *)
       begin try
-        [ FOUnif.unification x 0 Monome.(to_term (pred m)) 0]
+        [ unif_arith x 0 (Monome.pred m) 0]
       with FOUnif.Fail -> []  (* occur check... *)
       end
-    | Neq (x, m) -> [] (* for Neq, let equality resolution deal with it *)
-    | L_less(x, m) when T.is_var x ->
+    | Neq (x, m) when not (T.is_var x) || elim_var x ->
+      begin try
+        [ unif_arith x 0 m 0 ]
+      with FOUnif.Fail -> []
+      end
+    | L_less(x, m) when not (T.is_var x) || elim_var x ->
       (* x < m  is inconsistent with x = ceil(m) *)
       begin try
-        [ FOUnif.unification x 0 Monome.(to_term (ceil m)) 0]
+        [ unif_arith x 0 (Monome.ceil m) 0]
       with FOUnif.Fail -> []  (* occur check... *)
       end
-    | R_less(m, x) when T.is_var x ->
+    | R_less(m, x) when not (T.is_var x) || elim_var x ->
       (* m < x  is inconsistent with x = floor(m) *)
       begin try
-        [ FOUnif.unification x 0 Monome.(to_term (floor m)) 0]
+        [ unif_arith x 0 (Monome.floor m) 0]
       with FOUnif.Fail -> []  (* occur check... *)
       end
-    | L_lesseq(x, m) when T.is_var x ->
+    | L_lesseq(x, m) when not (T.is_var x) || elim_var x ->
       (* x <= m inconsistent with x = ceil(m)+1 *)
       begin try
-        [ FOUnif.unification x 0 Monome.(to_term (succ (ceil m))) 0 ]
+        [ unif_arith x 0 Monome.(succ (ceil m)) 0 ]
       with FOUnif.Fail -> []  (* occur check... *)
       end
-    | R_lesseq(m, x) when T.is_var x ->
+    | R_lesseq(m, x) when not (T.is_var x) || elim_var x ->
       (* x >= m inconsistent with x = floor(m)-1 *)
       begin try
-        [ FOUnif.unification x 0 Monome.(to_term (pred (floor m))) 0 ]
+        [ unif_arith x 0 Monome.(pred (floor m)) 0 ]
       with FOUnif.Fail -> []  (* occur check... *)
       end
     | _ -> []
@@ -708,4 +718,40 @@ module Lits = struct
   let naked_vars ?filter lits =
     let vars = Literals.vars lits in
     List.filter (fun v -> not (shielded ?filter lits v)) vars
+
+  let eliminate ~ord ~signature ~eligible lits =
+    let results = ref [] in
+    let lits' = Array.to_list lits in
+    let add_res a = results := a :: !results in
+    (* instantiate with [subst]. Simplifications should then remove
+        the literal; making the instantiation a step makes the proof
+        more readable *)
+    let eliminate_lit i subst =
+      let renaming = Substs.FO.Renaming.create 5 in
+      let lits' = Literal.apply_subst_list ~ord ~renaming subst lits' 0 in
+      let lits' = Array.of_list lits' in
+      add_res lits'
+    in
+    for i = 0 to Array.length lits - 1 do
+      if eligible i lits.(i) then begin
+        (* can eliminate only naked vars *)
+        let elim_var =
+          let vars = naked_vars ~filter:(fun i' _ -> i<>i') lits in
+          fun v -> List.memq v vars
+        in
+        (* try heuristic substitutions *)
+        let substs = Lit.heuristic_eliminate ~signature lits.(i) in
+        (* try to extract arithmetic literals, then eliminate them *)
+        let arith_lits = Lit.extract ~signature lits.(i) in
+        let substs = List.fold_left
+          (fun substs arith_lit ->
+            Lit.eliminate ~elim_var ~signature arith_lit @ substs)
+          substs arith_lits
+        in
+        List.iter
+          (fun subst -> eliminate_lit i subst)
+          substs;
+      end
+    done;
+    !results
 end

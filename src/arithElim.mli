@@ -59,6 +59,22 @@ val axioms : PFormula.t list
 (* TODO: rule that simplifies  t < a | t < b if a and b are constants?
   see if it's into t < b or t < a (check redundancy criterion) *)
 
+(* TODO: redundancy criterion:
+   a<b subsumes c<d if c<a and b<=d, or c<=a and b<d *)
+
+(* TODO: inference rule
+          C1 or a <= b   C2 or b <= c
+          ---------------------------
+              C1 or C2
+        if a > c are arithmetic expressions *)
+
+(* TODO: simplification rule
+        C or a < t1 or a < t2 ... or a < tn
+        ===================================
+          C or a < max(t1, ..., tn)
+  if t_i are constants
+*)
+
 (** {2 Setup} *)
 
 val setup_penv : penv:PEnv.t -> unit

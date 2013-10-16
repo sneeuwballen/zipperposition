@@ -51,39 +51,25 @@ let rewrite_lit ~ctx lit =
 
 let eliminate_arith c =
   let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
   let signature = Ctx.signature ctx in
   let eligible = C.Eligible.max c in
-  (* instantiate with [subst]. Simplifications should then remove
-      the literal; making the instantiation a step makes the proof
-      more readable *)
-  let eliminate_lit i subst =
-    let lits' = Array.to_list c.C.hclits in
-    let renaming = Ctx.renaming_clear ~ctx in
-    let ord = Ctx.ord ctx in
-    let lits' = Lit.apply_subst_list ~ord ~renaming subst lits' 0 in
-    let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
-      ~rule:"arith_instantiate" cc [c.C.hcproof] in
-    let new_c = C.create ~parents:[c] ~ctx lits' proof in
-    Util.debug 3 "instantiate %a with %a into %a"
-      C.pp c Substs.FO.pp subst C.pp new_c;
-    new_c
-  in
-  (* try to eliminate every arith literals *)
-  Lits.fold_lits ~eligible c.C.hclits []
-    (fun acc lit i ->
-      let ord_lits = Arith.Lit.extract ~signature lit in
-      List.iter
-        (fun olit -> Util.debug 5 "%a pivoted into %a" Lit.pp lit Arith.Lit.pp olit)
-        ord_lits;
-      (* we can eliminate variables that are not shielded in other literals *)
-      let elim_var x = not (Arith.Lits.shielded ~filter:(fun i' _ -> i <> i') c.C.hclits x) in
-      let substs = Util.list_flatmap
-        (Arith.Lit.eliminate ~elim_var ~signature) ord_lits
-      in
-      let substs = Arith.Lit.heuristic_eliminate ~signature lit @ substs in
-      List.fold_left
-        (fun acc subst -> eliminate_lit i subst :: acc)
-        acc substs)
+  (* find new arrays of literals, after substitution *)
+  let lits'_list = Arith.Lits.eliminate ~ord ~signature ~eligible c.C.hclits in
+  (* turn new arrays into clauses, if needed *)
+  List.fold_left
+    (fun acc lits' ->
+      if Lits.eq_com c.C.hclits lits'
+        then acc
+        else begin
+          (* build new clause *)
+          let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
+            ~rule:"arith_instantiate" cc [c.C.hcproof] in
+          let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
+          Util.debug 3 "arith instantiate %a into %a" C.pp c C.pp new_c;
+          new_c :: acc
+        end)
+    [] lits'_list
 
 let factor_arith c =
   let ctx = c.C.hcctx in

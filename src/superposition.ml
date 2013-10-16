@@ -204,8 +204,8 @@ let infer_equality_resolution clause =
       assert (not sign);
       match l_pos with
       | [] -> assert false
-      | pos::_ ->
-      try
+      | pos::_ when not (Arith.T.is_arith l) && not (Arith.T.is_arith r) ->
+        begin try
         let subst = FOUnif.unification l 0 r 0 in
         if BV.get (C.eligible_res clause 0 subst) pos
           (* subst(lit) is maximal, we can do the inference *)
@@ -222,7 +222,10 @@ let infer_equality_resolution clause =
             new_clause::acc
           end else
             acc
-      with FOUnif.Fail -> acc) (* l and r not unifiable, try next *)
+        with FOUnif.Fail ->
+          acc  (* l and r not unifiable, try next *)
+        end
+      | _::_ -> acc)
   in
   Util.exit_prof prof_infer_equality_resolution;
   new_clauses
@@ -633,28 +636,20 @@ let basic_simplify c =
   | Lit.Prop (p, true) when T.eq p T.false_term -> true
   | Lit.False -> true
   | _ -> false
-  (* arith equality constraint? *)
-  and arith_eq_constraint lits bv i lit = match lit with
-  | Lit.Equation (l, r, false, _) ->
-    let filter i' lit' = BV.get bv i' && not (Lit.eq_com lit lit') in
-    (* inequation with a variable and an arith term, where the variable
-      is shielded in another literal *)
-    (T.is_var l && Arith.T.is_arith r && Arith.Lits.shielded ~filter lits l) ||
-    (T.is_var r && Arith.T.is_arith l && Arith.Lits.shielded ~filter lits r)
-  | _ -> false
   in
   let lits = c.C.hclits in
   (* bv: literals to keep *)
   let bv = BV.create ~size:(Array.length lits) true in
   (* eliminate absurd lits *)
   Array.iteri (fun i lit -> if absurd_lit lit then BV.reset bv i) lits;
-  (* eliminate inequations x != t *)
+  (* eliminate inequations x != t but keep arithmetic inequalities,
+     for they may be constraints *)
   let subst = ref S.empty in
   Array.iteri
     (fun i lit ->
       if BV.get bv i then match lit with
         | Lit.Equation (l, r, false, _) when (T.is_var l || T.is_var r)
-          && not (arith_eq_constraint lits bv i lit) ->
+          && not (Arith.Lit.is_arith lit) ->
           (* eligible for destructive Equality Resolution, try to update subst *)
           begin try
             let subst' = FOUnif.unification ~subst:!subst l 0 r 0 in

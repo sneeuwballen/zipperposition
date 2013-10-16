@@ -132,7 +132,8 @@ module Lit : sig
   val factor : t -> Substs.FO.t list
     (** Unify non-arith subterms pairwise, return corresponding substitutions *)
 
-  val eliminate : ?elim_var:(FOTerm.t -> bool) -> signature:Signature.t ->
+  val eliminate : ?elim_var:(FOTerm.t -> bool) ->
+                  signature:Signature.t ->
                   t -> Substs.FO.t list
     (** List of substitutions that make the literal inconsistent.
         [elim_var] is called to check whether eliminating a variable
@@ -140,7 +141,8 @@ module Lit : sig
 
   val heuristic_eliminate : signature:Signature.t -> Literal.t -> Substs.FO.t list
     (** Heuristic version of [eliminate] that tries to deal with some
-        non-linear, or too hard, cases. For instance, square roots. *)
+        non-linear, or too hard, cases. For instance, square roots.
+        TODO: instantiate inside to_int/ to_rat*)
 
   (** {3 Operations on Lists of literals} *)
   module L : sig
@@ -172,6 +174,16 @@ module Lits : sig
         It returns a list of such pivoted arrays, each pivoted array resulting
         from a single pivoted literal. *)
 
+  val eliminate : ord:Ordering.t ->
+                  signature:Signature.t ->
+                  eligible:(int -> Literal.t -> bool) ->
+                  Literal.t array ->
+                  Literal.t array list
+    (** Try to eliminate literals by finding relevant instantiations.
+        Instantiations must bind variables only to satisfiable terms
+        (ie terms that always represent at least one integer).
+        Shielded variables (see {!shielded}) are never eliminated.*)
+
   val shielded : ?filter:(int -> Literal.t -> bool) ->
                   Literal.t array -> FOTerm.t -> bool
     (** Is the given variable shielded (ie occur as a subterm somewhere)?
@@ -181,6 +193,5 @@ module Lits : sig
   val naked_vars : ?filter:(int -> Literal.t -> bool) ->
                     Literal.t array -> FOTerm.varlist
     (** Variables occurring in inequations, that are not shielded *)
-
 end
 
