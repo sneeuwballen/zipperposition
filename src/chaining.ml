@@ -335,12 +335,14 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
   let instance = (Lits.get_ineq ~spec left.C.hclits left_pos).TO.instance in
   let mk_less t1 t2 = Lit.mk_true (T.mk_node instance.TO.less [t1; t2]) in
   let t1 = (Lits.get_ineq ~spec right.C.hclits right_pos).TO.left in
-  (* find other literals that can be chained on *)
-  let eligible = C.Eligible.pos in
+  (* find other inequality literals that can be chained on *)
+  let eligible c = C.Eligible.ineq_of c instance in
   let left_pos_list, subst =
-    _gather_positions ~eligible ~signature left.C.hclits s_left left_pos subst in
+    _gather_positions ~eligible:(eligible left) ~signature
+    left.C.hclits s_left left_pos subst in
   let right_pos_list, subst =
-    _gather_positions ~eligible ~signature right.C.hclits s_right right_pos subst in
+    _gather_positions ~eligible:(eligible right) ~signature
+    right.C.hclits s_right right_pos subst in
   Util.debug 5 "positions for left: [%a]" (Util.pp_list Position.pp) left_pos_list;
   Util.debug 5 "positions for right: [%a]" (Util.pp_list Position.pp) right_pos_list;
   (* check ordering conditions. Note that the conditions are inversed w.r.t
