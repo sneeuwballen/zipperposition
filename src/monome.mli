@@ -57,6 +57,7 @@ val of_list : Symbol.t -> (Symbol.t * FOTerm.t) list -> t
 val find : t -> FOTerm.t -> Symbol.t  (** @raise Not_found if not present *)
 val mem : t -> FOTerm.t -> bool       (** Is the term in the monome? *)
 val add : t -> Symbol.t -> FOTerm.t -> t  (** Add term with coefficient. Sums coeffs. *)
+val add_const : t -> Symbol.t -> t        (** Add given number to constant *)
 val remove : t -> FOTerm.t -> t           (** Remove the term *)
 
 val type_of : t -> Type.t           (** type of the monome *)
@@ -116,12 +117,18 @@ val of_term : signature:Signature.t -> FOTerm.t -> t
 val of_term_opt : signature:Signature.t -> FOTerm.t -> t option
   (** Exceptionless versionf of {!of_term} *)
 
+val of_term_infer : FOTerm.t -> t
+  (** Infer signature from term, and then make a monome. *)
+
 val to_term : t -> FOTerm.t
   (** convert back to a term *)
 
 val apply_subst : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
                   Substs.FO.t -> t -> Substs.scope -> t
   (** Apply a substitution to the monome's terms *)
+
+val is_ground : t -> bool
+  (** Are there no variables in the monome? *)
 
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string
@@ -156,18 +163,39 @@ val floor : t -> t
 val ceil : t -> t
   (** Same as {!round_low} but rounds high *)
 
-val solve_eq_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> Substs.FO.t list
-  (** Returns substitutions that make the monome always equal to zero.
-      Fresh variables may be generated using [fresh_var],
-      for diophantine equations. Returns the empty list if no solution is
-      found.
+(** {2 Find Solutions} *)
 
-      For instance, on the monome 2X + 3Y - 7, it may generate a new variable
-      Z and return the substitution  [X -> 3Z - 7, Y -> 2Z + 7] *)
+module Solve : sig
+  type solution = (FOTerm.t * t) list
+    (** List of constraints (term = monome). It means that
+        if all those constraints are satisfied, then a solution
+        to the given problem has been found *)
 
-val solve_lt_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> Substs.FO.t list
-  (** Solve for the monome to be always strictly lower than zero. This
-      may not return all solutions, but a subspace of it *)
+  val split_solution : solution -> Substs.FO.t * solution
+    (** Split the solution into a variable substitution, and a
+        list of constraints on non-variable terms *)
+
+  val diophant2 : Big_int.big_int -> Big_int.big_int -> Big_int.big_int ->
+                  Big_int.big_int * Big_int.big_int * Big_int.big_int
+    (** Find the solution vector for this diophantine equation, or fails.
+        @return a triple [u, v, gcd] such that for all int [k],
+        [u + b * k, v - a * k] is solution of equation [a * x + b * y = const].
+        @raise Failure if the equation is unsolvable *)
+
+  val eq_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
+    (** Returns substitutions that make the monome always equal to zero.
+        Fresh variables may be generated using [fresh_var],
+        for diophantine equations. Returns the empty list if no solution is
+        found.
+
+        For instance, on the monome 2X + 3Y - 7, it may generate a new variable
+        Z and return the substitution  [X -> 3Z - 7, Y -> 2Z + 7] *)
+
+  val lt_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
+    (** Solve for the monome to be always strictly lower than zero. This
+        may not return all solutions, but a subspace of it
+        @param fresh_var see {!solve_eq_zero} *)
+end
 
 (** {2 Lib} *)
 
@@ -175,3 +203,6 @@ val bij : t Bij.t
 val arbitrary_int : t QCheck.Arbitrary.t (* with int coeffs *)
 val arbitrary_rat : t QCheck.Arbitrary.t (* with rat coeffs *)
 val arbitrary : t QCheck.Arbitrary.t     (* with any coeffs *)
+
+val arbitrary_ty : Type.t -> t QCheck.Arbitrary.t
+  (* for the given type. Works only for $int and $rat *)

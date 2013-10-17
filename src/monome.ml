@@ -108,6 +108,7 @@ let mem m t = T.Map.mem t m.coeffs
 let find m t = T.Map.find t m.coeffs
 
 let add m coeff t =
+  let coeff = S.Arith.Op.product coeff m.divby in
   (* compute sum of coeffs for [t], if need be *)
   let c =
     try
@@ -118,6 +119,12 @@ let add m coeff t =
   if S.Arith.is_zero c
     then {m with coeffs=T.Map.remove t m.coeffs;}
     else {m with coeffs=T.Map.add t c m.coeffs;}
+
+let add_const m c =
+  (* same denominator *)
+  let c = S.Arith.Op.product c m.divby in
+  let constant = S.Arith.Op.sum c m.constant in
+  { m with constant; }
 
 let remove m t =
   { m with coeffs=T.Map.remove t m.coeffs; }
@@ -347,6 +354,12 @@ let of_term ~signature t =
 let of_term_opt ~signature t =
   try Some (of_term ~signature t)
   with NotLinear -> None
+
+let of_term_infer t =
+  let ctx = TypeInference.Ctx.of_signature Signature.Arith.signature in
+  ignore (TypeInference.FO.infer ctx t);
+  let signature = TypeInference.Ctx.to_signature ctx in
+  of_term ~signature t
     
 let to_term m =
   let add x y = T.mk_node S.Arith.sum [x;y] in
@@ -388,6 +401,9 @@ let apply_subst ?recursive ~renaming subst m sc_m =
       m.coeffs m'
     in
     { m' with divby= m.divby; }
+
+let is_ground m =
+  T.Map.for_all (fun t _ -> T.is_ground t) m.coeffs
 
 (** {2 Satisfiability} *)
 
@@ -444,17 +460,139 @@ match m.constant with
     { m with constant; divby=one; }
   | _ -> m
 
-(* default generator of fresh variables *)
-let __fresh_var =
-  let count = ref 0 in
-  fun ty ->
-    let n = !count in
-    incr count;
-    T.mk_var ~ty n
+(** {2 Find Solutions} *)
 
-let solve_eq_zero ?(fresh_var=__fresh_var) m = []  (* TODO *)
+module Solve = struct
+  type solution = (FOTerm.t * t) list
+    (** List of constraints (term = monome). It means that
+        if all those constraints are satisfied, then a solution
+        to the given problem has been found *)
 
-let solve_lt_zero ?(fresh_var=__fresh_var) m = [] (* TODO *)
+  let split_solution s =
+    let vars, nonvars = List.partition (fun (t, _) -> T.is_var t) s in
+    let subst = List.fold_left
+      (fun subst (v, m) -> Substs.FO.bind subst v 0 (to_term m) 0)
+      Substs.FO.empty vars
+    in
+    subst, nonvars
+
+  (* default generator of fresh variables *)
+  let __fresh_var =
+    let count = ref 0 in
+    fun ty ->
+      let n = !count in
+      incr count;
+      T.mk_var ~ty n
+
+  module B = Big_int
+
+  (** Solving diophantine equations: see
+      http://mathworld.wolfram.com/DiophantineEquation.html
+      for the solution for 2 variables *)
+
+  let __one = B.big_int_of_int 1
+  let pp_bigint buf b = Buffer.add_string buf (B.string_of_big_int b)
+
+  (* solve the diophantine equation [a * x + b * y = const] *)
+  let diophant2 a b const =
+    (* Euclid's algorithm, enriched to find the pair of Bezout integers
+        [u,v] such that [a*u + b*v = g].
+        Here we find a list of pairs that have the same GCD as [a, b],
+        the last element of which is [_, 1]; In addition we also keep
+        the quotients.
+        We assume that a and b are > 0 and that a >= b. *)
+    let solve a b const =
+      let rec recurse a b acc =
+        let q, r = B.quomod_big_int a b in
+        if B.eq_big_int r B.zero_big_int
+          then (a,b,q) :: acc  (* done *)
+          else
+            recurse b r ((a,b,q) :: acc)
+      in
+      (* a list of pairs with the same GCD as [a, b], and their
+          quotients *)
+      assert (B.ge_big_int a b);
+      let u, v = match recurse a b [] with
+      | [] -> assert false
+      | (a,b,_) :: l ->
+        let u, v = B.zero_big_int, b in
+        List.fold_left
+          (fun (u, v) (a, b, q) ->
+            let u' = B.sub_big_int u (B.mult_big_int v q) in
+            v, u')
+          (u, v) l
+      in
+      u, v
+    in
+    let sign1 = B.sign_big_int a > 0 in
+    let sign2 = B.sign_big_int b > 0 in
+    let sign_const = B.sign_big_int const >= 0 in
+    (* use positive integers *)
+    let a, b = B.abs_big_int a, B.abs_big_int b in
+    let const = B.abs_big_int const in
+    (* [a] must be bigger *)
+    let swap = B.gt_big_int b a in
+    let a, b = if swap then b, a else a, b in
+    let u, v, gcd =
+      let gcd = B.gcd_big_int a b in
+      let q, r = B.quomod_big_int const gcd in
+      if B.sign_big_int r <> 0
+        then
+          failwith
+            (Util.sprintf "unsolvable diophantine equation %a x + %a y = %a"
+              pp_bigint a pp_bigint b pp_bigint const)
+        else
+          let a' = B.div_big_int a gcd in
+          let b' = B.div_big_int b gcd in
+          (* solve for coprime numbers *)
+          let u, v = solve a' b' __one in
+          B.mult_big_int u q, B.mult_big_int v q, gcd
+    in
+    let u, v = if swap then v, u else u, v in
+    (* put sign back *)
+    let u = if sign1 <> sign_const then B.minus_big_int u else u in
+    let v = if sign2 <> sign_const then B.minus_big_int v else v in
+    (* return solution *)
+    u, v, gcd
+
+  let eq_zero ?(fresh_var=__fresh_var) m =
+    match m.constant with
+    | S.Rat _
+    | S.Real _ ->
+      (* eliminate variables by extracting them *)
+      let terms = to_list m in
+      Util.list_fmap
+        (fun (c, t) ->
+          if T.is_var t
+            then try
+              let m = divby (uminus (remove m t)) c in
+              let _ = FOUnif.unification t 0 (to_term m) 0 in
+              Some [ t, m ]
+            with FOUnif.Fail -> None
+            else None)
+        terms
+    | S.Int _ ->
+      (* m = 0 <=> m * m.divby = 0, so scale it *)
+      let m = normalize (product m m.divby) in
+      assert (S.Arith.is_one m.divby);
+      (* need to solve a diophantine equation *)
+      let terms = to_list m in
+      begin match terms with
+      | [] when S.Arith.is_zero m.constant -> [[]]  (* trivial *)
+      | [c, t] when S.Arith.Op.divides c m.constant ->
+        (* [c * x + constant = 0], let [x = - constant / c] *)
+        let n = S.Arith.Op.quotient (S.Arith.Op.uminus m.constant) c in
+        [ [t, const n] ]
+      | _::_::_ as l ->
+        (* ok, real diophantine solving HERE *)
+        let n = List.length l in
+        assert false (* TODO *)
+      | _ ->  []  (* cannot do much otherwise *)
+      end
+    | _ -> failwith "bad type for a monome"
+
+  let lt_zero ?(fresh_var=__fresh_var) m = [] (* TODO *)
+end
 
 (** {2 Lib} *)
 
@@ -489,6 +627,13 @@ let arbitrary_rat =
     let any_rat = lift2 Symbol.mk_rat small_int (1 -- 10) in
     let any_rat_nonzero = lift2 Symbol.mk_rat (1 -- 50) (1 -- 10) in
     _arbitrary_for Type.rat any_rat any_rat_nonzero)
+
+let arbitrary_ty ty =
+  if Type.eq ty Type.int
+    then arbitrary_int
+  else if Type.eq ty Type.rat
+    then arbitrary_rat
+  else failwith ("Monome.arbitrary_ty: cannot deal with type " ^ Type.to_string ty)
 
 let arbitrary =
   QCheck.Arbitrary.choose [ arbitrary_int; arbitrary_rat ]
