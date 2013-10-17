@@ -44,8 +44,8 @@ type t = private {
   divby : Symbol.t;  (* divide everything by this constant (cool for ints) *)
 }
 
-val eq : t -> t -> bool
-val compare : t -> t -> int
+val eq : t -> t -> bool       (* structural equality *)
+val compare : t -> t -> int   (* arbitrary total order on monomes *)
 val hash : t -> int
 
 val const : Symbol.t -> t           (** Empty monomial, from constant (decides type) *)
@@ -71,6 +71,9 @@ val sign : t -> int
 val terms : t -> FOTerm.t list
   (** List of terms that occur in the monome with non-nul coefficients *)
 
+val vars : t -> FOTerm.t list
+  (** Variables that occur in some term of the monome *)
+
 val to_list : t -> (Symbol.t * FOTerm.t) list
   (** Terms and their coefficients. Ignores the constant and divby! *)
 
@@ -92,6 +95,18 @@ val divby : t -> Symbol.t -> t    (** Division by constant, must be > 0 *)
 val succ : t -> t                 (** +1 *)
 val pred : t -> t                 (** -1 *)
 
+val comparison : t -> t -> Comparison.t
+  (** Try to compare two monomes. They may not be comparable (ie on some
+      points, or in some models, one will be bigger), but some pairs of
+      monomes are:
+      for instance, 2X + 1 < 2X + 4  is always true
+    *)
+
+val dominates : t -> t -> bool
+  (** [dominates m1 m2] is true if [m1] is always bigger or equal than
+      [m2], in any model or variable valuation.
+      if [dominates m1 m2 && dominates m2 m1], then [m1 = m2]. *)
+
 exception NotLinear
   
 val of_term : signature:Signature.t -> FOTerm.t -> t
@@ -101,7 +116,12 @@ val of_term : signature:Signature.t -> FOTerm.t -> t
 val of_term_opt : signature:Signature.t -> FOTerm.t -> t option
   (** Exceptionless versionf of {!of_term} *)
 
-val to_term : t -> FOTerm.t         (** convert back to a term *)
+val to_term : t -> FOTerm.t
+  (** convert back to a term *)
+
+val apply_subst : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
+                  Substs.FO.t -> t -> Substs.scope -> t
+  (** Apply a substitution to the monome's terms *)
 
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string
@@ -135,6 +155,19 @@ val floor : t -> t
 
 val ceil : t -> t
   (** Same as {!round_low} but rounds high *)
+
+val solve_eq_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> Substs.FO.t list
+  (** Returns substitutions that make the monome always equal to zero.
+      Fresh variables may be generated using [fresh_var],
+      for diophantine equations. Returns the empty list if no solution is
+      found.
+
+      For instance, on the monome 2X + 3Y - 7, it may generate a new variable
+      Z and return the substitution  [X -> 3Z - 7, Y -> 2Z + 7] *)
+
+val solve_lt_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> Substs.FO.t list
+  (** Solve for the monome to be always strictly lower than zero. This
+      may not return all solutions, but a subspace of it *)
 
 (** {2 Lib} *)
 

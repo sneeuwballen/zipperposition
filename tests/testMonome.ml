@@ -31,6 +31,8 @@ open Logtk
 open Libzipperposition
 open QCheck
 
+module T = FOTerm
+module S = Substs.FO
 module M = Monome
 
 (* m1 + m2 == m1 - (- m2) *)
@@ -87,6 +89,42 @@ let check_normalization_idempotent =
   let name = "monome_normalization_idempotent" in
   mk_test ~name ~pp:M.to_string gen prop
 
+(* check  that applying empty substitution gets the same monome *)
+let check_apply_empty_subst =
+  let gen = M.arbitrary in
+  let prop m =
+    let renaming = S.Renaming.dummy in
+    M.eq m (M.apply_subst ~renaming S.empty m 0)
+  in
+  let name = "monome_apply_empty_subst_is_eq" in
+  mk_test ~name ~pp:M.to_string gen prop
+
+(* check that comparison is compatible with substitutions *)
+let check_comparison_compatible_subst =
+  let gen = Arbitrary.(
+    pair M.arbitrary_int M.arbitrary_int >>= fun (m1,m2) ->
+    let vars = Util.list_uniq T.eq (M.vars m1 @ M.vars m2) in
+    (* grounding substitution *)
+    let subst st = List.fold_left
+      (fun subst v -> S.bind subst v 0 (T.arbitrary_ground st) 0) S.empty vars in
+    triple (return m1) (return m2) subst
+  ) in
+  let prop (m1, m2, subst) =
+    let o = M.comparison m1 m2 in
+    let renaming = S.Renaming.create 5 in
+    let m1' = M.apply_subst ~renaming subst m1 0 in
+    let m2' = M.apply_subst ~renaming subst m2 0 in
+    let o' = M.comparison m1' m2' in
+    match o, o' with
+    | Comparison.Gt, (Comparison.Lt | Comparison.Eq | Comparison.Incomparable)
+    | Comparison.Lt, (Comparison.Gt | Comparison.Eq | Comparison.Incomparable)
+    | Comparison.Eq, (Comparison.Gt | Comparison.Lt | Comparison.Incomparable) -> false
+    | _ -> true
+  in
+  let name = "monome_comparison_compatible_with_subst" in
+  let pp = PP.triple M.to_string M.to_string Substs.FO.to_string in
+  mk_test ~name ~pp ~n:1000 gen prop
+
 let props =
   [ check_add_diff M.arbitrary_int "int"
   ; check_add_diff M.arbitrary_int "rat"
@@ -95,4 +133,6 @@ let props =
   ; check_has_instances_int_prod
   ; check_has_instances_int_normalize
   ; check_normalization_idempotent
+  ; check_apply_empty_subst
+  ; check_comparison_compatible_subst
   ]

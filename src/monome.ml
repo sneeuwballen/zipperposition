@@ -134,6 +134,9 @@ let sign m =
 let terms m =
   T.Map.fold (fun t coeff acc -> t :: acc) m.coeffs []
 
+let vars m =
+  T.vars_list (terms m)
+
 let to_list m =
   T.Map.fold (fun t coeff acc -> (coeff,t) :: acc) m.coeffs []
 
@@ -175,6 +178,7 @@ let normalize m = match m.constant with
 
 (* reduce to same divby (same denominator) *)
 let reduce_same_divby m1 m2 =
+  if S.eq m1.divby m2.divby then m1, m2 else
   match m1.divby, m2.divby with
   | S.Int n1, S.Int n2 ->
     let gcd = Big_int.gcd_big_int n1 n2 in
@@ -264,6 +268,31 @@ let pred m =
   let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
   difference m (const one)
 
+let dominates m1 m2 =
+  let m1, m2 = reduce_same_divby m1 m2 in
+  (* same type *)
+  Type.eq (type_of m1) (type_of m2) &&
+  (* bigger constant *)
+  S.Arith.Op.greatereq m1.constant m2.constant &&
+  (* all terms of m1 appear in m2 *)
+  T.Map.for_all (fun t1 _ -> T.Map.mem t1 m2.coeffs) m1.coeffs &&
+  (* all terms of m2 appear in m1 with bigger or equal a coefficient *)
+  T.Map.for_all
+    (fun t c2 ->
+      try
+        let c1 = T.Map.find t m1.coeffs in
+        S.Arith.Op.greatereq c1 c2
+      with Not_found -> false)
+    m2.coeffs
+
+let comparison m1 m2 =
+  let m1, m2 = reduce_same_divby m1 m2 in
+  match dominates m1 m2, dominates m2 m1 with
+  | true, true -> Comparison.Eq
+  | true, false -> Comparison.Gt
+  | false, true -> Comparison.Lt
+  | false, false -> Comparison.Incomparable
+
 exception NotLinear
   (** Used by [of_term] *)
 
@@ -347,6 +376,19 @@ let to_term m =
     then sum
     else T.mk_node S.Arith.quotient [sum; T.mk_const m.divby]
 
+let apply_subst ?recursive ~renaming subst m sc_m =
+  if T.Map.is_empty m.coeffs then m else
+    let m' = const m.constant in
+    (* add terms one by one, after applying the substitution to them *)
+    let m' = T.Map.fold
+      (fun t c m' ->
+        (* apply subst to [t] *)
+        let t' = Substs.FO.apply ?recursive ~renaming subst t sc_m in
+        add m' c t')
+      m.coeffs m'
+    in
+    { m' with divby= m.divby; }
+
 (** {2 Satisfiability} *)
 
 let has_instances m =
@@ -401,6 +443,18 @@ match m.constant with
     let one = S.Arith.one_i in
     { m with constant; divby=one; }
   | _ -> m
+
+(* default generator of fresh variables *)
+let __fresh_var =
+  let count = ref 0 in
+  fun ty ->
+    let n = !count in
+    incr count;
+    T.mk_var ~ty n
+
+let solve_eq_zero ?(fresh_var=__fresh_var) m = []  (* TODO *)
+
+let solve_lt_zero ?(fresh_var=__fresh_var) m = [] (* TODO *)
 
 (** {2 Lib} *)
 
