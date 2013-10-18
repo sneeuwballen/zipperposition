@@ -87,9 +87,9 @@ let of_sourced (f, file,name) =
 
 let simpl_to ~from ~into =
   let from = follow_simpl from in
-  if eq from into
-    then ()
-    else from.simpl_to <- Some into
+  let into' = follow_simpl into in
+  if not (eq from into')
+    then from.simpl_to <- Some into
 
 let signature t = F.signature t.form
 

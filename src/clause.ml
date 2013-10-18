@@ -152,7 +152,9 @@ let follow_simpl c = _follow_simpl 0 c
 let simpl_to ~from ~into =
   let from = follow_simpl from in
   assert (from.hcsimplto = None);
-  if from != into then
+  let into' = follow_simpl into in
+  (* avoid cycles *)
+  if from != into' then
     from.hcsimplto <- Some into
 
 module CHashcons = Hashcons.Make(struct
