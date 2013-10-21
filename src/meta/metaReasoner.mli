@@ -33,7 +33,7 @@ type datalog_symbol =
   | DSType of Type.t
   | DSSTartList of int
 
-module Logic : Datalog.S with type symbol = datalog_symbol
+module Logic : Datalog.BottomUp.S with type symbol = datalog_symbol
 
 (** {2 Encoding into Datalog literals/clauses} *)
 

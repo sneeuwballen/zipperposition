@@ -49,7 +49,7 @@ let hash_datalog_symbol s = match s with
   | DSSTartList i -> i + 13
 
 (** Datalog instance *)
-module Logic = Datalog.Make(struct
+module Logic = Datalog.BottomUp.Make(struct
   type t = datalog_symbol
   let equal = eq_datalog_symbol
   let hash t = hash_datalog_symbol t
