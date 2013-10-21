@@ -65,6 +65,8 @@ module Tbl : sig
   val from_list : term list -> unit t
   val to_seq : unit t -> term Sequence.t
   val from_seq : term Sequence.t -> unit t
+  val add_list : unit t -> term list -> unit
+  val add_seq : unit t -> term Sequence.t -> unit
 end
 
 module Set : Sequence.Set.S with type elt = t

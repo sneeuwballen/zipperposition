@@ -106,18 +106,24 @@ end
 module Tbl = struct
   include Hashtbl.Make(TermHASH)
 
+  let add_list tbl l =
+    List.iter (fun x -> replace tbl x ()) l
+
+  let add_seq tbl seq =
+    Sequence.iter (fun x -> replace tbl x ()) seq
+
   let to_list set = fold (fun x _ acc -> x :: acc) set []
 
   let from_list l =
     let tbl = create 13 in
-    List.iter (fun x -> replace tbl x ()) l;
+    add_list tbl l;
     tbl
 
   let to_seq set = fun k -> iter (fun x () -> k x) set
 
   let from_seq seq =
     let tbl = create 13 in
-    Sequence.iter (fun x -> replace tbl x ()) seq;
+    add_seq tbl seq;
     tbl
 end
 
