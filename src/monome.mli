@@ -88,6 +88,12 @@ val normalize : t -> t
   (** Normalize the [divby] field. If rat/real, divby will be 1,
       otherwise some coefficient will be irreducible. *)
 
+val normalize_eq_zero : t -> t
+  (** Same as {!normalize}, but also allows to multiply or divide by any
+      positive number since we consider that the monome is equal to zero. For
+      integers, in particular, this will simply {b remove} the divby constant.
+      For integer monomes, the result will have coprime coefficients. *)
+
 val sum : t -> t -> t
 val difference : t -> t -> t
 val uminus : t -> t

@@ -184,7 +184,7 @@ let check_diophant2 =
         l
       in
       res
-    with (Failure _) as e ->
+    with Failure _->
       Prop.assume false; false
   in
   let name = "monome_diophant2" in
@@ -219,7 +219,7 @@ let check_diophant_l =
   in
   let pp = PP.(pair (list Big_int.string_of_big_int) Big_int.string_of_big_int) in
   let name = "monome_diophant_l_yields_bezout_tuple" in
-  mk_test ~name ~pp ~n:10_000 gen prop
+  mk_test ~name ~pp ~n:100_000 gen prop
 
 (* check that coeff_l always provide a zero sum solution space *)
 let check_coeffs_n =
@@ -273,7 +273,45 @@ let check_coeffs_n =
   in
   let name = "monome_coeffs_n_check_solutions" in
   let pp = PP.(pair (list Big_int.string_of_big_int) (list (list T.to_string))) in
-  mk_test ~name ~pp ~n:10_000 gen prop
+  mk_test ~name ~pp ~n:100_000 gen prop
+
+(* check that eq_solve really finds general solutions *)
+let check_solve_eq_zero =
+  let gen = Arbitrary.(lift M.normalize_eq_zero M.arbitrary_int) in
+  let prop m =
+    (* how to generate fresh vars *)
+    let fresh_var =
+      let offset = ref (T.max_var (M.vars m) + 1) in
+      fun ty ->
+        incr offset;
+        T.mk_var ~ty !offset
+    in
+    let solutions = M.Solve.eq_zero ~fresh_var m in
+    List.for_all
+      (fun solution ->
+        Util.debug 5 "solution: %a" (Util.pp_list (Util.pp_pair T.pp M.pp)) solution;
+        let terms = M.to_list m in
+        (* "apply" solution: for each (c,t) in m, see whether
+            t is bound by the solution ,in which case replace it,
+            otherwise keep the same term *)
+        let m' = List.fold_left
+          (fun m' (c,t) ->
+            try
+              let m = List.assq t solution in
+              M.sum m' (M.product m c)
+            with Not_found ->
+              M.add m' c t)
+          (M.const m.M.constant) terms
+        in
+        Util.debug 5 "solving %a yields %a" M.pp m M.pp m';
+        Monome.is_constant m' &&
+        Monome.sign m' = 0)
+      solutions
+  in
+  let name = "monome_solve_eq_zero_works" in
+  let pp = M.to_string in
+  let size m = List.fold_left (fun s t -> s + T.size t) 0 (M.terms m) in
+  mk_test ~name ~pp ~size ~n:10_000 gen prop
 
 let props =
   [ check_add_diff M.arbitrary_int "int"
@@ -290,4 +328,5 @@ let props =
   ; check_diophant2
   ; check_diophant_l
   ; check_coeffs_n
+  ; check_solve_eq_zero
   ]

@@ -92,7 +92,7 @@ let of_list constant l =
 let pp buf monome =
   Buffer.add_char buf '(';
   T.Map.iter
-    (fun t coeff -> Printf.bprintf buf "%a×%a +" S.pp coeff T.pp t)
+    (fun t coeff -> Printf.bprintf buf "%a×%a + " S.pp coeff T.pp t)
     monome.coeffs;
   S.pp buf monome.constant;
   if S.Arith.is_one monome.divby
@@ -186,6 +186,18 @@ let normalize m = match m.constant with
     let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
     { constant; coeffs; divby=one; }
   | _ -> assert false
+
+(* for integers,  *)
+let normalize_eq_zero m =
+  match m.constant with
+  | S.Int _ when not (is_constant m) ->
+    (* divide by common gcd of coeffs and divby *)
+    let gcd = T.Map.fold (fun _ c gcd -> S.Arith.Op.gcd c gcd) m.coeffs m.constant in
+    let constant = S.Arith.Op.quotient m.constant gcd in
+    let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
+    let divby = S.Arith.one_i in  (* no more. *)
+    { constant; coeffs; divby; }
+  | _ -> normalize m
 
 (* reduce to same divby (same denominator) *)
 let reduce_same_divby m1 m2 =
@@ -485,14 +497,6 @@ module Solve = struct
     in
     subst, nonvars
 
-  (* default generator of fresh variables *)
-  let __fresh_var =
-    let count = ref 0 in
-    fun ty ->
-      let n = !count in
-      incr count;
-      T.mk_var ~ty n
-
   module B = Big_int
 
   (** Solving diophantine equations: see
@@ -640,7 +644,27 @@ module Solve = struct
         )
         l
 
-  let eq_zero ?(fresh_var=__fresh_var) m =
+  (* default generator of fresh variables *)
+  let __fresh_var m =
+    let count = ref (T.max_var (vars m) + 1) in
+    fun ty ->
+      let n = !count in
+      incr count;
+      T.mk_var ~ty n
+
+  let eq_zero ?fresh_var m =
+    let open Sequence.Infix in
+    (* is the constant +/- 1? *)
+    let _is_one_abs (s, _) =
+      S.Arith.is_one s || S.Arith.is_one (S.Arith.Op.uminus s)
+    and _of_symb = function
+      | S.Int i -> i
+      | _ -> assert false
+    (* generation of fresh variables, with default function *)
+    and fresh_var = match fresh_var with
+      | None -> __fresh_var m
+      | Some f -> f
+    in
     match m.constant with
     | S.Rat _
     | S.Real _ ->
@@ -656,9 +680,10 @@ module Solve = struct
             with FOUnif.Fail -> None
             else None)
         terms
+    | S.Int _ when is_constant m -> []
     | S.Int _ ->
       (* m = 0 <=> m * m.divby = 0, so scale it *)
-      let m = normalize (product m m.divby) in
+      let m = normalize_eq_zero m in
       assert (S.Arith.is_one m.divby);
       (* need to solve a diophantine equation *)
       let terms = to_list m in
@@ -668,14 +693,47 @@ module Solve = struct
         (* [c * x + constant = 0], let [x = - constant / c] *)
         let n = S.Arith.Op.quotient (S.Arith.Op.uminus m.constant) c in
         [ [t, const n] ]
+      | _::_::_ as l when List.exists _is_one_abs l ->
+        (* at leat one of the coefficients is +/- 1. Extract
+            the corresponding terms *)
+        let unit_terms = List.filter _is_one_abs l in
+        List.map
+          (fun (c, t) ->
+            let m' = remove m t in
+            (* t = -m' if the coefficient of t was 1, m' otherwise *)
+            let m' = if S.Arith.sign c > 0 then uminus m' else m' in
+            [ t, m' ])
+          unit_terms
       | _::_::_ as l ->
-        (* ok, real diophantine solving HERE *)
-        assert false (* TODO *)
+        (* extract coefficients *)
+        let l' = List.map (fun (c,_) -> _of_symb c) l in
+        let c = _of_symb m.constant in
+        begin try
+          let gcd = List.fold_left Big_int.gcd_big_int (List.hd l') (List.tl l') in
+          (* coefficients for the solution hyperplane *)
+          let coeffs = coeffs_n l' gcd in
+          (* initial solution *)
+          let init, _gcd = diophant_l l' (Big_int.minus_big_int c) in
+          let init = List.map S.mk_bigint init in
+          (* generate fresh vars to describe the solution space *)
+          let n = List.length l in
+          let vars = Sequence.(repeat () |> take (n-1) |> to_rev_list) in
+          let vars = List.map (fun () -> fresh_var Type.int) vars in
+          (* build general solution by summing variable part and initial solution *)
+          let monomes = List.map2
+            (fun var_part const_part -> sum var_part (const const_part))
+            (coeffs vars)
+            init
+          in
+          [ List.combine (List.map snd l) monomes ]
+        with Failure _ -> []
+        end
       | _ ->  []  (* cannot do much otherwise *)
       end
     | _ -> failwith "bad type for a monome"
 
-  let lt_zero ?(fresh_var=__fresh_var) m = [] (* TODO *)
+  let lt_zero ?fresh_var m =
+    [] (* TODO *)
 end
 
 (** {2 Lib} *)
