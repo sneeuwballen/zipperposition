@@ -96,6 +96,8 @@ val divby : t -> Symbol.t -> t    (** Division by constant, must be > 0 *)
 val succ : t -> t                 (** +1 *)
 val pred : t -> t                 (** -1 *)
 
+val sum_list : t list -> t  (** Sum of a list. @raise Failure if the list is empty *)
+
 val comparison : t -> t -> Comparison.t
   (** Try to compare two monomes. They may not be comparable (ie on some
       points, or in some models, one will be bigger), but some pairs of
@@ -181,6 +183,28 @@ module Solve : sig
         @return a triple [u, v, gcd] such that for all int [k],
         [u + b * k, v - a * k] is solution of equation [a * x + b * y = const].
         @raise Failure if the equation is unsolvable *)
+
+  val diophant_l : Big_int.big_int list -> Big_int.big_int ->
+                   Big_int.big_int list * Big_int.big_int
+  (** generalize diophantine equation solving to a list of at least two
+      coefficients.
+      @return a list of Bezout coefficients, and the
+        GCD of the input list, or fails
+      @raise Failure if the equation is not solvable *)
+
+  val coeffs_n : Big_int.big_int list -> Big_int.big_int ->
+                (FOTerm.t list -> t list)
+    (** [coeffs_n l gcd], if [length l = n], returns a function that
+        takes a list of [n-1] terms [k1, ..., k(n-1)] and returns a list of
+        monomes [m1, ..., mn] that depend on [k1, ..., k(n-1)] such that the sum
+        [l1 * m1 + l2 * m2 + ... + ln * mn = 0].
+
+        {b Note} that the input list of the solution must have [n-1] elements,
+        but that it returns a list of [n] elements!
+
+        @param gcd is the gcd of all members of [l].
+        @param l is a list of at least 2 elements, none of which should be 0
+    *)
 
   val eq_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
     (** Returns substitutions that make the monome always equal to zero.

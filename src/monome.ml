@@ -107,24 +107,28 @@ let mem m t = T.Map.mem t m.coeffs
 
 let find m t = T.Map.find t m.coeffs
 
-let add m coeff t =
-  let coeff = S.Arith.Op.product coeff m.divby in
-  (* compute sum of coeffs for [t], if need be *)
-  let c =
-    try
-      let coeff' = T.Map.find t m.coeffs in
-      S.Arith.Op.sum coeff coeff'
-    with Not_found -> coeff
-  in
-  if S.Arith.is_zero c
-    then {m with coeffs=T.Map.remove t m.coeffs;}
-    else {m with coeffs=T.Map.add t c m.coeffs;}
-
 let add_const m c =
   (* same denominator *)
   let c = S.Arith.Op.product c m.divby in
   let constant = S.Arith.Op.sum c m.constant in
   { m with constant; }
+
+let add m coeff t = match t.T.term with
+  | T.Node (s, []) when S.is_numeric s ->
+    (* special case: if the term is a constant *)
+    add_const m (S.Arith.Op.product coeff s)
+  | _ ->
+    let coeff = S.Arith.Op.product coeff m.divby in
+    (* compute sum of coeffs for [t], if need be *)
+    let c =
+      try
+        let coeff' = T.Map.find t m.coeffs in
+        S.Arith.Op.sum coeff coeff'
+      with Not_found -> coeff
+    in
+    if S.Arith.is_zero c
+      then {m with coeffs=T.Map.remove t m.coeffs;}
+      else {m with coeffs=T.Map.add t c m.coeffs;}
 
 let remove m t =
   { m with coeffs=T.Map.remove t m.coeffs; }
@@ -274,6 +278,11 @@ let succ m =
 let pred m =
   let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
   difference m (const one)
+
+let rec sum_list = function
+  | [] -> failwith "Monome.sum_list: empty list"
+  | [m] -> m
+  | m::l' -> sum m (sum_list l')
 
 let dominates m1 m2 =
   let m1, m2 = reduce_same_divby m1 m2 in
@@ -555,6 +564,82 @@ module Solve = struct
     (* return solution *)
     u, v, gcd
 
+  (* solve equation [l1 * x1 + l2 * x2 + .. + ln * xn = const *)
+  let rec diophant_l l const = match l with
+    | []
+    | [_] -> failwith "diophant_l: expect at least 2 coefficients"
+    | [a; b] ->
+      let u, v, gcd = diophant2 a b const in
+      [u; v], gcd
+    | a1 :: a2 :: l' ->
+      let gcd_1_2 = Big_int.gcd_big_int a1 a2 in
+      let u1, u2, _ = diophant2 a1 a2 gcd_1_2 in
+      (* first, solve [a1 * u1 + a2 * u2 = gcd_1_2]. We then
+          find u1_2, u' such that  [gcd_1_2 * u1_2 + u' * l' = const],
+          after which [a1 * u1 * u1_2 + a2 * u1_2 * u2 + u' * l' = const]
+          and we're done. *)
+      begin match diophant_l (gcd_1_2 :: l') const with
+      | [], _ -> assert false
+      | (u_1_2 :: u'), gcd ->
+        let u1' = Big_int.mult_big_int u1 u_1_2 in
+        let u2' = Big_int.mult_big_int u2 u_1_2 in
+        u1' :: u2' :: u', gcd
+      end
+
+  (* least common multiple of a and b *)
+  let _lcm a b =
+    (* a * b = gcd * lcm *)
+    let gcd = Big_int.gcd_big_int a b in
+    Big_int.div_big_int (Big_int.abs_big_int (Big_int.mult_big_int a b)) gcd
+
+  (* find solutions that equate zero *)
+  let coeffs_n l gcd =
+    let n = List.length l in
+    if n < 2 then failwith "coeffs_n: expected list of at least 2 elements";
+    (* array, for faster lookup of coefficient i *)
+    let a = Array.of_list l in
+    fun k ->
+      assert (List.length k + 1 = List.length l);
+      (* let's build a linear combination of the variables that are going to
+          be provided. for this, we build smaller linear combinations
+            {[x1 = lcm(1,2)/l1 k1
+            ...
+            xi = -lcm(i-1,i)/li k(i-1) + lcm(i,i+1)/li ki
+            ...
+            xn = -lcm(n-1,n)/ln k(n-1)
+            ]}
+          where lcm(i,j) = lcm(li, lj).
+          This linear combination is of dimension n-1, and is always solution
+          of [sum_i (li * xi) = 0].
+          *)
+      let k = Array.of_list k in
+      List.mapi
+        (fun i _li ->
+          if i = 0
+            then
+              (* lcm(0,1) / l0 * k0 *)
+              let lcm12 = _lcm a.(0) a.(1) in
+              let coeff = Big_int.div_big_int lcm12 a.(0) in
+              singleton (S.mk_bigint coeff) k.(0)
+          else if i = n-1
+            then
+              (* -lcm(n-1,n-2) / l(n-1) * k(n-2) *)
+              let lcm_last = _lcm a.(n-1) a.(n-2) in
+              let coeff = Big_int.minus_big_int (Big_int.div_big_int lcm_last a.(n-1)) in
+              singleton (S.mk_bigint coeff) k.(n-2)
+          else
+            (* general case: -lcm(i-1,i)/li * k(i-1) + lcm(i,i+1)/li * ki *)
+            let lcm_prev = _lcm a.(i-1) a.(i) in
+            let c_prev = S.mk_bigint (Big_int.minus_big_int
+              (Big_int.div_big_int lcm_prev a.(i))) in
+            let lcm_i = _lcm a.(i) a.(i+1) in
+            let c_i = S.mk_bigint (Big_int.div_big_int lcm_i a.(i)) in
+            sum
+              (singleton c_prev k.(i-1))
+              (singleton c_i k.(i))
+        )
+        l
+
   let eq_zero ?(fresh_var=__fresh_var) m =
     match m.constant with
     | S.Rat _
@@ -585,7 +670,6 @@ module Solve = struct
         [ [t, const n] ]
       | _::_::_ as l ->
         (* ok, real diophantine solving HERE *)
-        let n = List.length l in
         assert false (* TODO *)
       | _ ->  []  (* cannot do much otherwise *)
       end

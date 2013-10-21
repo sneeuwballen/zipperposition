@@ -55,6 +55,17 @@ val ineq_chaining_left : Env.binary_inf_rule
 val ineq_chaining_right : Env.binary_inf_rule
   (** Inequality chaining where the clause is on the right. *)
 
+(* TODO: in ineq chaining, if the two bounds are arithmetic constants,
+         say,  a <| t1    t2 <| b
+              --------------------
+                    a <| b
+        and a |> b is obviously true, then directly cut the literal off.
+        Especially useful in case of a <= t1 and t2 <= b because we
+        save two literals (equality and inequality)
+
+        See same TODO in ArithElim
+*)
+
 (* TODO: redundancy criterion: replace vars by constants, and see whether
    it's always trivially true
    (e,g, to make transitivity redundant, we have
@@ -62,6 +73,10 @@ val ineq_chaining_right : Env.binary_inf_rule
    we have b <= a | c <= b | a < c  trivial?
    
    Use <= as negation for > and see whether implication is trivial *)
+
+(* TODO: redundancy criterion:
+   a<b subsumes c<d if it is known from unit facts
+   that c<a and b<=d, or c<=a and b<d *)
 
 val reflexivity_res : Env.unary_inf_rule
   (** Reflexivity resolution *)

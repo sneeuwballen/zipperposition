@@ -191,6 +191,90 @@ let check_diophant2 =
   let pp = PP.(quad bgstr bgstr bgstr (list bgstr)) in
   mk_test ~name ~pp ~n:100_000 gen prop
 
+(* check that diophant_l finds a valid bezout n-uplet *)
+let check_diophant_l =
+  let gen = Arbitrary.(
+    let gen =
+      list ~len:(3 -- 6) (lift Big_int.big_int_of_int (~-20 -- 20)) >>= fun l ->
+      if List.exists (fun i -> Big_int.sign_big_int i = 0) l
+        then return None
+        else return (Some l)
+    in
+    retry gen >>= function
+    | [] -> assert false
+    | const::l -> return (l, const)
+  ) in
+  let prop (l, const) =
+    try
+      let u, gcd = Monome.Solve.diophant_l l const in
+      let sum = List.fold_left2
+        (fun sum ai ui ->
+          Big_int.add_big_int sum (Big_int.mult_big_int ai ui))
+        Big_int.zero_big_int l u
+      in
+      (* check that the sum is really const *)
+      Big_int.eq_big_int sum const
+    with Failure _ ->
+      Prop.assume false; false
+  in
+  let pp = PP.(pair (list Big_int.string_of_big_int) Big_int.string_of_big_int) in
+  let name = "monome_diophant_l_yields_bezout_tuple" in
+  mk_test ~name ~pp ~n:10_000 gen prop
+
+(* check that coeff_l always provide a zero sum solution space *)
+let check_coeffs_n =
+  let bgstr = Big_int.string_of_big_int in
+  let ppbi buf i = Buffer.add_string buf (bgstr i) in
+  let gen = Arbitrary.(
+    2 -- 5 >>= fun n ->
+    (* generate list of coefficients of length n, none of which is 0 *)
+    let gen_l =
+      list_repeat n (lift Big_int.big_int_of_int (~-20 -- 20)) >>= fun l ->
+      if List.exists (fun i -> Big_int.sign_big_int i = 0) l
+        then return None
+        else return (Some l)
+    in
+    retry gen_l >>= fun l ->
+    (* generate points on which to try the solutions *)
+    let gen_solution =
+      list_repeat (n-1) (lift Big_int.big_int_of_int (~-50 -- 50)) >>= fun pt ->
+      let pt = List.map Symbol.mk_bigint pt in
+      let pt = List.map T.mk_const pt in
+      return pt
+    in
+    list gen_solution >>= fun solutions ->
+    (* return tuple *)
+    return (l, solutions)
+  ) in
+  let prop (l, tests) =
+    (* compute gcd *)
+    let gcd = match l with
+      | [] -> assert false
+      | x::l' -> List.fold_left Big_int.gcd_big_int x l'
+    in
+    Util.debug 5 "solving %a..." (Util.pp_list ppbi) l;
+    let solution = Monome.Solve.coeffs_n l gcd in
+    (* try the solution on all test samples *)
+    List.for_all
+      (fun point ->
+        let monomes = solution point in
+        (* pairwise product of monomes with their coefficient *)
+        let monomes = List.map2
+          (fun ai mi -> Monome.product mi (Symbol.mk_bigint ai))
+          l monomes 
+        in
+        let m = Monome.sum_list monomes in
+        (* check that the monome is the constant 0 *)
+        Util.debug 5 "  for point %a, monome list %a, final monome is %a"
+          (Util.pp_list T.pp) point (Util.pp_list Monome.pp) monomes Monome.pp m;
+        Monome.is_constant m &&
+        Monome.sign m = 0)
+      tests
+  in
+  let name = "monome_coeffs_n_check_solutions" in
+  let pp = PP.(pair (list Big_int.string_of_big_int) (list (list T.to_string))) in
+  mk_test ~name ~pp ~n:10_000 gen prop
+
 let props =
   [ check_add_diff M.arbitrary_int "int"
   ; check_add_diff M.arbitrary_int "rat"
@@ -204,4 +288,6 @@ let props =
   ; check_apply_empty_subst
   ; check_comparison_compatible_subst
   ; check_diophant2
+  ; check_diophant_l
+  ; check_coeffs_n
   ]

@@ -72,7 +72,7 @@ val axioms : PFormula.t list
         C or a < t1 or a < t2 ... or a < tn
         ===================================
           C or a < max(t1, ..., tn)
-  if t_i are constants
+  if t_i are arithmetic constants
 *)
 
 (** {2 Setup} *)

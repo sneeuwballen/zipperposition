@@ -520,6 +520,8 @@ module Lit = struct
         with FOUnif.Fail -> None)
       l
 
+  (* TODO: use diophantine equations! See the module {! Monome.Solve} *)
+
   (* find instances of variables that eliminate the literal *)
   let eliminate ?(elim_var=(fun v -> true)) ~signature lit =
     (* unify [t] with monome [m], but only if [m] has instances *)
