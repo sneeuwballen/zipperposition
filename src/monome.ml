@@ -381,7 +381,7 @@ let of_term_infer t =
   ignore (TypeInference.FO.infer ctx t);
   let signature = TypeInference.Ctx.to_signature ctx in
   of_term ~signature t
-    
+
 let to_term m =
   let add x y = T.mk_node S.Arith.sum [x;y] in
   let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
@@ -432,12 +432,15 @@ let has_instances m =
   let res = match m.constant with
   | S.Real _
   | S.Rat _ -> true
+  | S.Int c when is_constant m -> Big_int.sign_big_int c = 0
   | S.Int _ ->
-    if S.Arith.is_one m.divby
-      then true  (* gcd is one, always true *)
-      else
-        let g = T.Map.fold (fun _ c g -> S.Arith.Op.gcd c g) m.coeffs m.divby in
-        S.Arith.Op.divides g m.constant
+    let terms = to_list m in
+    begin match terms with
+    | [] -> assert false
+    | (g,_) :: l ->
+      let g = List.fold_left (fun g (c,_) -> S.Arith.Op.gcd c g) g l in
+      S.Arith.Op.divides g m.constant
+    end
   | _ -> assert false
   in
   Util.debug 5 "monome %a has instances: %B" pp m res;

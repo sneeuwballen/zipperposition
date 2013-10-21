@@ -147,13 +147,12 @@ val fmt : Format.formatter -> t -> unit
 val has_instances : t -> bool
   (** For real or rational, always true. For integers, returns true
       iff g divides [m.constant], where g is the
-      GCD of [c] for [c] in [m.coeffs] union [m.divby].
+      GCD of [c] for [c] in [m.coeffs].
 
-      The intuition is that this returns [true] iff the monome, with its
-      denominator [divby], actually has some instances in its type. Trivially
-      true in reals or rationals, this is only the case for integers if
-      [x * m.divby = m.coeffs + m.constant] is a satisfiable diophantine
-      equation.
+      The intuition is that this returns [true] iff the monome actually has
+      some instances in its type. Trivially true in reals or rationals, this is
+      only the case for integers if [m.coeffs + m.constant = 0] is a
+      satisfiable diophantine equation.
   *)
 
 val total_expression : t -> bool
@@ -161,7 +160,7 @@ val total_expression : t -> bool
       iff the monome evaluates to an integer for any valuation of free
       variables and terms that occur in the right hand side. Most of
       the time, it means that the denominator is 1.
-      
+
       For instance, a/2 is not a total expression, 3 + 5Y is total,
       but (3Y+7/5) has instances without being total. *)
 
