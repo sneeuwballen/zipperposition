@@ -80,38 +80,88 @@ module F : sig
         $greater and $greatereq, and simplifies subterms. *)
 end
 
-(** {2 View a Literal as an arithmetic Literal}.
+(** {2 Arithmetic-centric views of a literal}.
 
-    This module provides a given view of a literal, where some arith variable
-    has been extracted *)
+    Two  views are provided, one that compares a monome to zero,
+    and one that has some priviledged term on the side.
+*)
 
 module Lit : sig
-  type t = private
-  | True   (* arithmetic tautology *)
-  | False  (* arithmetic absurdity *)
-  | Eq of FOTerm.t * Monome.t
-  | Neq of FOTerm.t * Monome.t
-  | L_less of FOTerm.t * Monome.t   (* term < monome *)
-  | L_lesseq of FOTerm.t * Monome.t
-  | R_less of Monome.t * FOTerm.t
-  | R_lesseq of Monome.t * FOTerm.t
-
-  val pp : Buffer.t -> t -> unit
-  val to_string : t -> string
-
   val is_arith : Literal.t -> bool
     (** Is this literal arithmetic (i.e., root predicate is equality or
         inequality, with arithmetic operators just underneath)? *)
 
-  val extract : signature:Signature.t -> Literal.t -> t list
-    (** Possible views of a literal *)
+  (** {3 Comparison with 0} *)
 
-  val to_lit : ord:Ordering.t -> t -> Literal.t
-    (** Convert back into a regular literal *)
+  module Extracted : sig
+    type t = private
+    | True
+    | False
+    | Eq of Monome.t  (* monome = 0 *)
+    | Neq of Monome.t (* monome != 0 *)
+    | Lt of Monome.t  (* monome < 0 *)
+    | Leq of Monome.t (* monome <= 0 *)
 
-  val simplify : ord:Ordering.t -> signature:Signature.t ->
-                 Literal.t -> Literal.t
-    (** Simplify a literal (evaluation) *)
+    val pp : Buffer.t -> t -> unit
+    val to_string : t -> string
+
+    val extract : signature:Signature.t -> Literal.t -> t
+      (** Convert a regular literal into an extracted literal.
+          @raise Failure if the literal is not a linear expression *)
+
+    val extract_opt : signature:Signature.t -> Literal.t -> t option
+      (** Same as {!extract}, but doesn't raise *)
+
+    val to_lit : ord:Ordering.t -> t -> Literal.t
+      (** Conversion back to a literal *)
+
+    val get_monome : t -> Monome.t
+      (** Return the monome inside the literal.
+          @raise Invalid_argument if the literal is true or false *)
+
+    val factor : t -> Substs.FO.t list
+      (** Unify non-arith subterms pairwise, return corresponding
+          substitutions *)
+
+    val eliminate : ?fresh_var:(Type.t -> FOTerm.t) -> t ->
+                    Monome.Solve.solution list
+      (** Attempt to eliminate the literal *)
+  end
+
+  (** {3 Literal with isolated term} *)
+
+  module Pivoted : sig
+    type t = private
+    | Eq of FOTerm.t * Monome.t
+    | Neq of FOTerm.t * Monome.t
+    | L_less of FOTerm.t * Monome.t   (* term < monome *)
+    | L_lesseq of FOTerm.t * Monome.t
+    | R_less of Monome.t * FOTerm.t
+    | R_lesseq of Monome.t * FOTerm.t
+
+    val pp : Buffer.t -> t -> unit
+    val to_string : t -> string
+
+    val of_extracted : Extracted.t -> t list
+      (** Pivots of an {!Extracted.t}. Trivial literals, ie
+          {!Extracted.True} and {!Extracted.False}, are simply
+          ignored. *)
+
+    val to_lit : ord:Ordering.t -> t -> Literal.t
+      (** Convert back into a regular literal *)
+
+    val get_term : t -> FOTerm.t
+      (** Extract the term part. *)
+
+    val get_monome : t -> Monome.t
+      (** Extract the monome part from the lit. *)
+
+    module List : sig
+      val get_terms : t list -> FOTerm.t list
+    end
+  end
+
+  (** {3 High level operations} *)
 
   val is_trivial : signature:Signature.t -> Literal.t -> bool
     (** Is the literal a tautology in arithmetic? *)
@@ -121,35 +171,24 @@ module Lit : sig
         with the theory of arithmetic (e.g. X+2Y=3 is ok, but 1=2 is not).
         Otherwise return [true] *)
 
-  val get_term : t -> FOTerm.t
-    (** Extract the term.
-        @raise Invalid_argument if the literal is [True] or [False] *)
-
-  val get_monome : t -> Monome.t
-    (** Extract the monome from the lit.
-        @raise Invalid_argument if the literal is [True] or [False] *)
-
-  val factor : t -> Substs.FO.t list
-    (** Unify non-arith subterms pairwise, return corresponding substitutions *)
+  val simplify : ord:Ordering.t -> signature:Signature.t ->
+                 Literal.t -> Literal.t
+    (** Simplify a literal (evaluation) *)
 
   val eliminate : ?elim_var:(FOTerm.t -> bool) ->
+                  ?fresh_var:(Type.t -> FOTerm.t) ->
                   signature:Signature.t ->
-                  t -> Substs.FO.t list
+                  Literal.t ->
+                  Substs.FO.t list
     (** List of substitutions that make the literal inconsistent.
         [elim_var] is called to check whether eliminating a variable
         in an equation is possible. *)
 
-  val heuristic_eliminate : signature:Signature.t -> Literal.t -> Substs.FO.t list
+  val heuristic_eliminate : signature:Signature.t -> Literal.t ->
+                            Substs.FO.t list
     (** Heuristic version of [eliminate] that tries to deal with some
         non-linear, or too hard, cases. For instance, square roots.
-        TODO: instantiate inside to_int/ to_rat*)
-
-  (** {3 Operations on Lists of literals} *)
-  module L : sig
-    val get_terms : t list -> FOTerm.t list
-
-    val filter : t list -> (FOTerm.t -> Monome.t -> bool) -> t list
-  end
+        TODO: instantiate inside to_int/ to_rat *)
 end
 
 (** {2 Arrays of literals} *)

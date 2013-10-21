@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module S = Symbol
+module M = Monome
 module Literals = Literal.Arr
 
 let prof_arith_simplify = Util.mk_profiler "arith.simplify"
@@ -262,160 +263,281 @@ end
 (** {2 View a Literal as an arithmetic Literal}. *)
 
 module Lit = struct
-  type t =
-  | True   (* arithmetic tautology *)
-  | False  (* arithmetic absurdity *)
-  | Eq of FOTerm.t * Monome.t
-  | Neq of FOTerm.t * Monome.t
-  | L_less of FOTerm.t * Monome.t   (* term < monome *)
-  | L_lesseq of FOTerm.t * Monome.t
-  | R_less of Monome.t * FOTerm.t
-  | R_lesseq of Monome.t * FOTerm.t
-
-  let pp buf lit = match lit with
-  | True -> Buffer.add_string buf "true"
-  | False -> Buffer.add_string buf "false"
-  | Eq (t, m) -> Printf.bprintf buf "%a = %a" T.pp t Monome.pp m
-  | Neq (t, m) -> Printf.bprintf buf "%a ≠ %a" T.pp t Monome.pp m
-  | L_less (t, m) -> Printf.bprintf buf "%a < %a" T.pp t Monome.pp m
-  | L_lesseq (t, m) -> Printf.bprintf buf "%a ≤ %a" T.pp t Monome.pp m
-  | R_less (m, t) -> Printf.bprintf buf "%a < %a" Monome.pp m T.pp t
-  | R_lesseq (m, t) -> Printf.bprintf buf "%a ≤ %a" Monome.pp m T.pp t
-
-  let to_string lit = Util.on_buffer pp lit
-
   let is_arith lit = match lit with
   | Literal.Equation (l, r, _, _) -> T.is_arith l || T.is_arith r
   | Literal.Prop (p, _) -> T.is_arith p
   | Literal.True
   | Literal.False -> false
 
-  exception TrivialLit
-  exception UnsatLit
+  (** {3 Comparison with 0} *)
 
-  let extract ~signature lit =
-    Util.enter_prof prof_arith_extract;
-    (* extract literal from (l=r | l!=r) *)
-    let extract_eqn l r sign =
-      try
-        let m1 = Monome.of_term ~signature l in
-        let m2 = Monome.of_term ~signature r in
-        let m = Monome.difference m1 m2 in
-        (* remove denominator, it doesn't matter *)
-        let m = Monome.product m m.Monome.divby in
-        let terms = Monome.to_list m in
-        if Monome.is_constant m
-        then if Monome.sign m = 0
-          then if sign then [True] else [False]
-          else if sign then [False] else [True]
-        (* for each term, pivot the monome so that we isolate the term
-          on one side of the (dis)equation, but only if it admits solutions *)
-        else List.map
-          (fun (coeff, t) ->
-            assert (not (S.Arith.is_zero coeff));
-            let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
-            (* -t+m = 0 ---> t=m, but t+m = 0 ----> t=-m *)
-            let m = if S.Arith.sign coeff < 0 then m else Monome.uminus m in
-            if sign
-              then if Monome.has_instances m
-                then Eq (t, m)
-              else raise UnsatLit  (* unsatisfiable diophantine eq *)
-            else if Monome.has_instances m
-              then Neq (t, m)
-              else raise TrivialLit (* always true, diophantine eq has no solution *)
-          )
-          terms
-      with
-      | Monome.NotLinear -> []
-      | TrivialLit -> [True]
-      | UnsatLit -> [False]
-    (* extract lit from (l <= r | l < r) *)
-    and extract_less ~strict l r =
-      try
-        let m1 = Monome.of_term ~signature l in
-        let m2 = Monome.of_term ~signature r in
-        let m = Monome.difference m1 m2 in
-        (* remove the denominator *)
-        assert (S.Arith.sign m.Monome.divby > 0);
-        let m = Monome.product m m.Monome.divby in
-        let terms = Monome.to_list m in
-        if terms = []
-        (* constant, ground arith expression, must be true or false *)
-        then match Monome.sign m with
-          | 0 -> if strict then [False] else [True]
-          | n when n < 0 -> [True]
-          | _ -> [False]  (* m < 0 where m>0 *)
-        (* l <| r is equivalent to m <| 0.
-            for each term [t] of [m], pivot the monome to isolate [t]. Careful
-              with the sign as it can change the comparison sign too! If the
-              coeff of [t] is > 0 it means that the term [t] is on the {b left}
-            side. *)
-        else List.map
-          (fun (coeff, t) ->
-            assert (not (S.Arith.is_zero coeff));
-            (* do we have to change the sign of comparison? *)
-            let swap = S.Arith.sign coeff < 0 in
-            let m = Monome.divby (Monome.remove m t) (S.Arith.Op.abs coeff) in
-            match strict, swap with
-            | true, false ->
-              L_less (t, Monome.uminus m) (* t+m < 0 ---> t < -m *)
-            | true, true ->
-              R_less (m, t)  (* -t+m < 0 ---> m < t *)
-            | false, false ->
-              L_lesseq (t, Monome.uminus m)  (* t+m <= 0 ---> t <= -m *)
-            | false, true ->
-              R_lesseq (m, t)  (* -t+m <= 0 ---> m <= t *)
-          )
-          terms
-      with Monome.NotLinear -> []
-    in
-    let extract_le a b = extract_less ~strict:false a b in
-    let extract_lt a b = extract_less ~strict:true a b in
-    let ans = match lit with
-    | Literal.True
-    | Literal.False -> []
-    | Literal.Equation (l, r, sign, _) ->
-      if T.is_arith l || T.is_arith r
-        then extract_eqn l r sign
-        else []
-    | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, true) ->
-      extract_lt a b
-    | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, false) ->
-      extract_le b a
-    | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, true) ->
-      extract_le a b
-    | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, false) ->
-      extract_lt b a
-    | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, true) ->
-      extract_lt b a
-    | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, false) ->
-      extract_le a b
-    | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, true) ->
-      extract_le b a
-    | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, false) ->
-      extract_lt a b
-    | Literal.Prop _ -> []
-    in
-    Util.debug 5 "arith extraction of %a gives [%a]" Literal.pp lit (Util.pp_list pp) ans;
-    Util.exit_prof prof_arith_extract;
-    ans
+  module Extracted = struct
+    type t =
+    | True
+    | False
+    | Eq of M.t  (* monome = 0 *)
+    | Neq of M.t (* monome != 0 *)
+    | Lt of M.t  (* monome < 0 *)
+    | Leq of M.t (* monome <= 0 *)
 
-  let to_lit ~ord lit =
-    match lit with
-    | True -> Literal.mk_tauto
-    | False -> Literal.mk_absurd
-    | Eq (t, m) ->
-      Literal.mk_eq ~ord t (Monome.to_term m)
-    | Neq (t, m) ->
-      Literal.mk_neq ~ord t (Monome.to_term m)
-    | L_less (t, m) ->
-      Literal.mk_true (T.mk_less t (Monome.to_term m))
-    | L_lesseq (t, m) ->
-      Literal.mk_true (T.mk_lesseq t (Monome.to_term m))
-    | R_less (m, t) ->
-      Literal.mk_true (T.mk_less (Monome.to_term m) t)
-    | R_lesseq (m, t) ->
-      Literal.mk_true (T.mk_lesseq (Monome.to_term m) t)
+    let pp buf lit = match lit with
+    | True -> Buffer.add_string buf "true"
+    | False -> Buffer.add_string buf "false"
+    | Eq m -> Printf.bprintf buf "%a = 0" M.pp m
+    | Neq m -> Printf.bprintf buf "%a ≠ 0" M.pp m
+    | Lt m -> Printf.bprintf buf "%a < 0" M.pp m
+    | Leq m -> Printf.bprintf buf "%a ≤ 0" M.pp m
+
+    let to_string = Util.on_buffer pp
+
+    let extract ~signature lit =
+      Util.enter_prof prof_arith_extract;
+      (* extract literal from (l=r | l!=r) *)
+      let extract_eqn l r sign =
+        try
+          let m1 = M.of_term ~signature l in
+          let m2 = M.of_term ~signature r in
+          let m = M.difference m1 m2 in
+          (* remove denominator, it doesn't matter *)
+          let m = M.normalize_eq_zero m in
+          if M.is_constant m
+          then if M.sign m = 0
+            then if sign then True else False
+            else if sign then False else True
+          else if not (M.has_instances m) && sign
+            then False
+          else if sign
+            then Eq m
+            else Neq m
+        with M.NotLinear ->
+          failwith "not linear"
+      (* extract lit from (l <= r | l < r) *)
+      and extract_less ~strict l r =
+        try
+          let m1 = M.of_term ~signature l in
+          let m2 = M.of_term ~signature r in
+          let m = M.difference m1 m2 in
+          (* remove the denominator *)
+          assert (S.Arith.sign m.M.divby > 0);
+          let m = M.normalize_eq_zero m in
+          if M.is_constant m then match M.sign m with
+            | 0 -> if strict then False else True
+            | n when n < 0 -> True
+            | _ -> False
+          else if strict
+            then Lt m
+            else Leq m
+        with M.NotLinear ->
+          failwith "not linear"
+      in
+      let extract_le a b = extract_less ~strict:false a b in
+      let extract_lt a b = extract_less ~strict:true a b in
+      let ans = match lit with
+      | Literal.True -> True
+      | Literal.False -> False
+      | Literal.Equation (l, r, sign, _) ->
+        if T.is_arith l || T.is_arith r
+          then extract_eqn l r sign
+          else failwith "not arithmetic"
+      | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, true) ->
+        extract_lt a b
+      | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, false) ->
+        extract_le b a
+      | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, true) ->
+        extract_le a b
+      | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, false) ->
+        extract_lt b a
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, true) ->
+        extract_lt b a
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, false) ->
+        extract_le a b
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, true) ->
+        extract_le b a
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, false) ->
+        extract_lt a b
+      | Literal.Prop _ -> failwith "not arithmetic"
+      in
+      Util.debug 5 "arith extraction of %a gives %a" Literal.pp lit pp ans;
+      Util.exit_prof prof_arith_extract;
+      ans
+
+    let extract_opt ~signature lit =
+      try Some (extract ~signature lit)
+      with Failure _ -> None
+
+    let to_lit ~ord lit =
+      let mk_zero m = T.mk_const (S.Arith.zero_of_ty (M.type_of m)) in
+      match lit with
+      | True -> Literal.mk_tauto
+      | False -> Literal.mk_absurd
+      | Eq m ->
+        Literal.mk_eq ~ord (M.to_term m) (mk_zero m)
+      | Neq m ->
+        Literal.mk_neq ~ord (M.to_term m) (mk_zero m)
+      | Lt m ->
+        Literal.mk_true (T.mk_less (M.to_term m) (mk_zero m))
+      | Leq m ->
+        Literal.mk_true (T.mk_lesseq (M.to_term m) (mk_zero m))
+
+    let get_monome = function
+    | Eq m
+    | Neq m
+    | Lt m
+    | Leq m -> m
+    | True
+    | False -> raise (Invalid_argument "arith.lit.extracted.get_monome")
+
+    (* unify non-arith subterms pairwise *)
+    let factor lit = match lit with
+    | True
+    | False -> []
+    | _ ->
+      let m = get_monome lit in
+      (* all terms occurring immediately under the linear expression *)
+      let l = M.terms m in
+      let l = Util.list_diagonal l in
+      Util.list_fmap
+        (fun (t1, t2) ->
+          try Some (FOUnif.unification t1 0 t2 0)
+          with FOUnif.Fail -> None)
+        l
+
+    let eliminate ?fresh_var lit = match lit with
+    | True
+    | False -> []
+    | Eq m -> M.Solve.neq_zero ?fresh_var m
+    | Neq m -> M.Solve.eq_zero ?fresh_var m
+    | Lt m -> M.Solve.leq_zero ?fresh_var (M.uminus m)
+    | Leq m -> M.Solve.lt_zero ?fresh_var (M.uminus m)
+  end
+
+  (** {3 Literal with isolated term} *)
+
+  module Pivoted = struct
+    type t =
+    | Eq of FOTerm.t * M.t
+    | Neq of FOTerm.t * M.t
+    | L_less of FOTerm.t * M.t   (* term < monome *)
+    | L_lesseq of FOTerm.t * M.t
+    | R_less of M.t * FOTerm.t
+    | R_lesseq of M.t * FOTerm.t
+
+    let pp buf lit = match lit with
+    | Eq (t, m) -> Printf.bprintf buf "%a = %a" T.pp t M.pp m
+    | Neq (t, m) -> Printf.bprintf buf "%a ≠ %a" T.pp t M.pp m
+    | L_less (t, m) -> Printf.bprintf buf "%a < %a" T.pp t M.pp m
+    | L_lesseq (t, m) -> Printf.bprintf buf "%a ≤ %a" T.pp t M.pp m
+    | R_less (m, t) -> Printf.bprintf buf "%a < %a" M.pp m T.pp t
+    | R_lesseq (m, t) -> Printf.bprintf buf "%a ≤ %a" M.pp m T.pp t
+
+    module E = Extracted
+
+    let to_string lit = Util.on_buffer pp lit
+
+    let of_extracted e = match e with
+    | E.True
+    | E.False -> []
+    | E.Eq m ->
+      let terms = M.to_list m in
+      List.map
+        (fun (coeff, t) ->
+          assert (not (S.Arith.is_zero coeff));
+          let m = M.divby (M.remove m t) (S.Arith.Op.abs coeff) in
+          (* -t+m = 0 ---> t=m, but t+m = 0 ----> t=-m *)
+          let m = if S.Arith.sign coeff < 0 then m else M.uminus m in
+          Eq (t, m)
+        )
+        terms
+    | E.Neq m ->
+      let terms = M.to_list m in
+      List.map
+        (fun (coeff, t) ->
+          assert (not (S.Arith.is_zero coeff));
+          let m = M.divby (M.remove m t) (S.Arith.Op.abs coeff) in
+          (* -t+m != 0 ---> t=m, but t+m != 0 ----> t!=-m *)
+          let m = if S.Arith.sign coeff < 0 then m else M.uminus m in
+          Neq (t, m)
+        )
+        terms
+    | E.Lt m ->
+      let terms = M.to_list m in
+      List.map
+        (fun (coeff, t) ->
+          assert (not (S.Arith.is_zero coeff));
+          (* do we have to change the sign of comparison? *)
+          let swap = S.Arith.sign coeff < 0 in
+          let m = M.divby (M.remove m t) (S.Arith.Op.abs coeff) in
+          if swap
+            then R_less (m, t)  (* -t+m < 0 ---> m < t *)
+            else L_less (t, M.uminus m)  (* t+m < 0 ---> t < -m *)
+        )
+        terms
+    | E.Leq m ->
+      let terms = M.to_list m in
+      List.map
+        (fun (coeff, t) ->
+          assert (not (S.Arith.is_zero coeff));
+          (* do we have to change the sign of comparison? *)
+          let swap = S.Arith.sign coeff < 0 in
+          let m = M.divby (M.remove m t) (S.Arith.Op.abs coeff) in
+          if swap
+            then R_lesseq (m, t)  (* -t+m <= 0 ---> m <= t *)
+            else L_lesseq (t, M.uminus m)  (* t+m <= 0 ---> t <= -m *)
+        )
+        terms
+
+    let to_lit ~ord lit =
+      match lit with
+      | Eq (t, m) ->
+        Literal.mk_eq ~ord t (M.to_term m)
+      | Neq (t, m) ->
+        Literal.mk_neq ~ord t (M.to_term m)
+      | L_less (t, m) ->
+        Literal.mk_true (T.mk_less t (M.to_term m))
+      | L_lesseq (t, m) ->
+        Literal.mk_true (T.mk_lesseq t (M.to_term m))
+      | R_less (m, t) ->
+        Literal.mk_true (T.mk_less (M.to_term m) t)
+      | R_lesseq (m, t) ->
+        Literal.mk_true (T.mk_lesseq (M.to_term m) t)
+
+    let get_term = function
+    | Eq (t, _)
+    | Neq (t, _)
+    | L_less (t, _)
+    | L_lesseq (t, _)
+    | R_less (_, t)
+    | R_lesseq (_, t) -> t
+
+    let get_monome = function
+    | Eq (_, m)
+    | Neq (_, m)
+    | L_less (_, m)
+    | L_lesseq (_, m)
+    | R_less (m, _)
+    | R_lesseq (m, _) -> m
+
+    module List = struct
+      let get_terms l =
+        let set = T.Tbl.create 5 in
+        List.iter
+          (fun lit -> T.Tbl.replace set (get_term lit) ())
+          l;
+        T.Tbl.to_list set
+    end
+  end
+
+  module E = Extracted
+
+  let is_trivial ~signature lit =
+    match E.extract_opt ~signature lit with
+    | Some E.True -> true
+    | _ -> false
+
+  let has_instances ~signature lit =
+    match E.extract_opt ~signature lit with
+    | Some E.False -> false
+    | _ -> true
 
   let simplify ~ord ~signature lit =
     (* simplify [l <= r] (depends on [strict]) *)
@@ -462,114 +584,52 @@ module Lit = struct
         Literal.mk_true T.true_term
       | _ ->
         (* just keep the literal *)
-        Literal.mk_lit ~ord l' r' sign 
+        Literal.mk_lit ~ord l' r' sign
       end
     | Literal.True
     | Literal.False -> lit
     in
-    match extract ~signature lit with
-    | [True] | [False] -> lit  (* already simplified *)
-    | [lit'] ->
-      (* exactly one pivot possible, apply it! *)
-      to_lit ~ord lit'
-    | _ -> lit  (* keep lit *)
-
-  let is_trivial ~signature lit =
-    let l = extract ~signature lit in
-    List.exists
-      (function
-      | True -> true
-      | _ -> false)
-      l
-
-  let has_instances ~signature lit =
-    let l = extract ~signature lit in
-    List.for_all
-      (function
-      | False -> false
-      | _ -> true)
-      l
-
-  let get_term = function
-  | True
-  | False -> invalid_arg "get_term"
-  | Eq (t, _)
-  | Neq (t, _)
-  | L_less (t, _)
-  | L_lesseq (t, _)
-  | R_less (_, t)
-  | R_lesseq (_, t) -> t
-
-  let get_monome = function
-  | True
-  | False -> invalid_arg "get_monome"
-  | Eq (_, m)
-  | Neq (_, m)
-  | L_less (_, m)
-  | L_lesseq (_, m)
-  | R_less (m, _)
-  | R_lesseq (m, _) -> m
-
-  (* unify non-arith subterms pairwise *)
-  let factor lit =
-    let l = get_term lit :: Monome.terms (get_monome lit) in
-    let l = Util.list_diagonal l in
-    Util.list_fmap
-      (fun (t1, t2) ->
-        try Some (FOUnif.unification t1 0 t2 0)
-        with FOUnif.Fail -> None)
-      l
-
-  (* TODO: use diophantine equations! See the module {! Monome.Solve} *)
+    try
+      let elit = E.extract ~signature lit in
+      match elit with
+      | E.True -> Literal.mk_tauto
+      | E.False -> Literal.mk_absurd
+      | _ ->
+        begin match Pivoted.of_extracted elit with
+        | [p] ->
+          (* exactly one pivot possible, apply it! *)
+          Pivoted.to_lit ~ord p
+        | _ -> lit (* keep literal *)
+        end
+    with Failure _ ->
+      lit
 
   (* find instances of variables that eliminate the literal *)
-  let eliminate ?(elim_var=(fun v -> true)) ~signature lit =
-    (* unify [t] with monome [m], but only if [m] has instances *)
-    let unif_arith t1 sc_t m sc_m =
-      if not (Monome.has_instances m)
-        then raise FOUnif.Fail;
-      FOUnif.unification t1 sc_t (Monome.to_term m) sc_m
+  let eliminate ?(elim_var=(fun v -> true)) ?fresh_var ~signature lit =
+    (* find some solutions *)
+    let solutions =
+      try
+        let elit = E.extract ~signature lit in
+        E.eliminate ?fresh_var elit
+      with Failure _ -> []
     in
-    begin match lit with
-    | True
-    | False -> []
-    | Eq (x, m) when not (T.is_var x) || elim_var x -> 
-      (* x = m eliminated with x := m+1 *)
-      begin try
-        [ unif_arith x 0 (Monome.pred m) 0]
-      with FOUnif.Fail -> []  (* occur check... *)
-      end
-    | Neq (x, m) when not (T.is_var x) || elim_var x ->
-      begin try
-        [ unif_arith x 0 m 0 ]
-      with FOUnif.Fail -> []
-      end
-    | L_less(x, m) when not (T.is_var x) || elim_var x ->
-      (* x < m  is inconsistent with x = ceil(m) *)
-      begin try
-        [ unif_arith x 0 (Monome.ceil m) 0]
-      with FOUnif.Fail -> []  (* occur check... *)
-      end
-    | R_less(m, x) when not (T.is_var x) || elim_var x ->
-      (* m < x  is inconsistent with x = floor(m) *)
-      begin try
-        [ unif_arith x 0 (Monome.floor m) 0]
-      with FOUnif.Fail -> []  (* occur check... *)
-      end
-    | L_lesseq(x, m) when not (T.is_var x) || elim_var x ->
-      (* x <= m inconsistent with x = ceil(m)+1 *)
-      begin try
-        [ unif_arith x 0 Monome.(succ (ceil m)) 0 ]
-      with FOUnif.Fail -> []  (* occur check... *)
-      end
-    | R_lesseq(m, x) when not (T.is_var x) || elim_var x ->
-      (* x >= m inconsistent with x = floor(m)-1 *)
-      begin try
-        [ unif_arith x 0 Monome.(pred (floor m)) 0 ]
-      with FOUnif.Fail -> []  (* occur check... *)
-      end
-    | _ -> []
-    end
+    let unif_arith ~subst t1 sc_t m sc_m =
+      FOUnif.unification ~subst t1 sc_t (M.to_term m) sc_m
+    in
+    Util.list_fmap
+      (fun sol ->
+        try
+          (* make a substitution out of the solution *)
+          let subst = List.fold_left
+            (fun subst (t, m) ->
+              (* check whether we can eliminate a variable *)
+              if T.is_var t && not (elim_var t) then raise Exit;
+              unif_arith ~subst t 0 m 0)
+            Substs.FO.empty sol
+          in
+          Some subst
+        with FOUnif.Fail | Exit -> None)
+      solutions
 
   let heuristic_eliminate ~signature lit =
     match lit with
@@ -604,23 +664,6 @@ module Lit = struct
       | _ -> failwith "unknown numeric type!?"
       end
     | _ -> []
-
-  module L = struct
-    let get_terms l = match l with
-    | [True]
-    | [False] -> []
-    | l -> List.map get_term l
-
-    let filter l p =
-      List.filter
-        (fun lit ->
-          try
-            let t = get_term lit in
-            let m = get_monome lit in
-            p t m
-          with Invalid_argument _ -> false)
-        l
-  end
 end
 
 (** {2 Arrays of literals} *)
@@ -679,26 +722,27 @@ module Lits = struct
     let results = ref [] in
     let add_res a = results := a :: !results in
     for i = 0 to Array.length lits - 1 do
-      if eligible i lits.(i) then begin
+      if eligible i lits.(i) then try
         (* try to pivot the i-th literal *)
-        let pivots = Lit.extract ~signature lits.(i) in
+        let elit = Lit.Extracted.extract ~signature lits.(i) in
+        let pivots = Lit.Pivoted.of_extracted elit in
         (* only keep maximal terms *)
-        let terms = Lit.L.get_terms pivots in
+        let terms = Lit.Pivoted.List.get_terms pivots in
         let terms = Multiset.create terms in
         let bv = Multiset.max (Ordering.compare ord) terms in
         let terms = BV.select bv (Multiset.to_array terms) in
         List.iter
           (fun lit' ->
             (* build a new literal from lit', if the term is maximal *)
-            let t = Lit.get_term lit' in
+            let t = Lit.Pivoted.get_term lit' in
             if List.exists (fun (t',_) -> T.eq t t') terms then
               let lits = Util.array_except_idx lits i in
-              let lits = Lit.to_lit ~ord lit' :: lits in
+              let lits = Lit.Pivoted.to_lit ~ord lit' :: lits in
               let lits = Array.of_list lits in
               add_res lits
           )
           pivots
-      end
+      with Failure _ -> ()
     done;
     !results
 
@@ -725,6 +769,13 @@ module Lits = struct
     let results = ref [] in
     let lits' = Array.to_list lits in
     let add_res a = results := a :: !results in
+    (* how to build fresh variables *)
+    let fresh_var =
+      let offset = ref (T.max_var (Literals.vars lits) + 1) in
+      fun ty ->
+        incr offset;
+        T.mk_var ~ty !offset
+    in
     (* instantiate with [subst]. Simplifications should then remove
         the literal; making the instantiation a step makes the proof
         more readable *)
@@ -743,16 +794,11 @@ module Lits = struct
         in
         (* try heuristic substitutions *)
         let substs = Lit.heuristic_eliminate ~signature lits.(i) in
-        (* try to extract arithmetic literals, then eliminate them *)
-        let arith_lits = Lit.extract ~signature lits.(i) in
-        let substs = List.fold_left
-          (fun substs arith_lit ->
-            Lit.eliminate ~elim_var ~signature arith_lit @ substs)
-          substs arith_lits
-        in
+        (* try to eliminate literal as a linear expression *)
+        let substs' = Lit.eliminate ~elim_var ~fresh_var ~signature lits.(i) in
         List.iter
           (fun subst -> eliminate_lit i subst)
-          substs;
+          (substs @ substs');
       end
     done;
     !results

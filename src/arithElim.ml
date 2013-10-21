@@ -89,11 +89,13 @@ let factor_arith c =
   (* try to factor arith literals *)
   Lits.fold_lits ~eligible c.C.hclits []
     (fun acc lit i ->
-      let ord_lits = Arith.Lit.extract ~signature lit in
-      let substs = Util.list_flatmap Arith.Lit.factor ord_lits in
-      List.fold_left
-        (fun acc subst -> mk_instance subst :: acc)
-        acc substs)
+      try
+        let elit = Arith.Lit.Extracted.extract ~signature lit in
+        let substs = Arith.Lit.Extracted.factor elit in
+        List.fold_left
+          (fun acc subst -> mk_instance subst :: acc)
+          acc substs
+      with Failure _ -> acc)
 
 let pivot_arith c =
   let ctx = c.C.hcctx in
