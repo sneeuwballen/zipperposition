@@ -221,10 +221,22 @@ module Solve : sig
         For instance, on the monome 2X + 3Y - 7, it may generate a new variable
         Z and return the substitution  [X -> 3Z - 7, Y -> 2Z + 7] *)
 
-  val lt_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
-    (** Solve for the monome to be always strictly lower than zero. This
+  val lower_zero : ?fresh_var:(Type.t -> FOTerm.t) -> strict:bool ->
+                   t -> solution list
+    (** Solve for the monome to be always lower than zero ([strict] determines
+        whether the inequality is strict or not). This
         may not return all solutions, but a subspace of it
         @param fresh_var see {!solve_eq_zero} *)
+
+  val lt_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
+    (** Shortcut for {!lower_zero} when [strict = true] *)
+
+  val leq_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
+    (** Shortcut for {!lower_zero} when [strict = false] *)
+
+  val neq_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
+    (** Find some solutions that negate the equation. For now it
+        just takes solutions to [m < 0].  *)
 end
 
 (** {2 Lib} *)

@@ -733,21 +733,25 @@ module Solve = struct
       end
     | _ -> failwith "bad type for a monome"
 
-  let lt_zero ?fresh_var m = match m.constant with
+  let lower_zero ?fresh_var ~strict m = match m.constant with
     | S.Rat _
     | S.Real _ ->
-      (* eliminate variables by extracting them *)
-      let terms = to_list m in
-      Util.list_fmap
-        (fun (c, t) ->
-          if T.is_var t
-            then try
-              let m = divby (succ (uminus (remove m t))) c in
-              let _ = FOUnif.unification t 0 (to_term m) 0 in
-              Some [ t, m ]
-            with FOUnif.Fail -> None
-            else None)
-        terms
+      if strict
+      then 
+        (* eliminate variables by extracting them *)
+        let terms = to_list m in
+        Util.list_fmap
+          (fun (c, t) ->
+            if T.is_var t
+              then try
+                let m = divby (succ (uminus (remove m t))) c in
+                let _ = FOUnif.unification t 0 (to_term m) 0 in
+                Some [ t, m ]
+              with FOUnif.Fail -> None
+              else None)
+          terms
+      else (* non-strict implies that equality is ok *)
+        eq_zero ?fresh_var m
     | S.Int _ when is_constant m -> []
     | S.Int _ ->
       let m = normalize_eq_zero m in
@@ -755,21 +759,26 @@ module Solve = struct
       begin match terms with
       | [] | [_] -> []
       | _::_::_ when List.exists _is_one_abs terms ->
-        (* there is some coefficient equal to one, just extract the
-          corresponding terms and make them equal to monome + 1 *)
-        let terms = List.filter _is_one_abs terms in
-        List.map
-          (fun (c,t) ->
-            let m' = remove m t in
-            let m' = if S.Arith.sign c > 0
-              then pred (uminus m') (* t + m < 0 ---> t = -m - 1 *)
-              else succ m'  (* -t + m < 0 ---> t = m + 1 *)
-            in
-            [ t, m' ]
-          )
-          terms
+        if strict
+        then
+          (* there is some coefficient equal to one, just extract the
+            corresponding terms and make them equal to monome + 1 *)
+          let terms = List.filter _is_one_abs terms in
+          List.map
+            (fun (c,t) ->
+              let m' = remove m t in
+              let m' = if S.Arith.sign c > 0
+                then pred (uminus m') (* t + m < 0 ---> t = -m - 1 *)
+                else succ m'  (* -t + m < 0 ---> t = m + 1 *)
+              in
+              [ t, m' ]
+            )
+            terms
+        else
+          (* equality is ok, and here we know there are always solutions *)
+          eq_zero ?fresh_var m
       | _::_::_ ->
-        (* the idea: to find instances of m < 0, we find the smallest positive n
+        (* the idea: to find instances of m <= 0, we find the smallest positive n
           such that m = n is solvable, then we call {!eq_zero}. *)
         let gcd = List.fold_left
           (fun gcd (c,_) -> Big_int.gcd_big_int gcd (_of_symb c))
@@ -780,9 +789,12 @@ module Solve = struct
         let c = Big_int.minus_big_int (_of_symb m.constant) in
         let q, r = Big_int.quomod_big_int c gcd in
         let c' = if Big_int.sign_big_int r = 0
-          then (* already a multiple of gcd. take the previous one, gcd * (q-1) *)
-            Big_int.mult_big_int (Big_int.pred_big_int q) gcd
-          else (* gcd * q < gcd * q + r *)
+          then if strict
+            then (* already a multiple of gcd. take the previous one, gcd * (q-1) *)
+              Big_int.mult_big_int (Big_int.pred_big_int q) gcd
+            else (* equality has solutions *)
+              c
+          else (* gcd * q < gcd * q + r, ok for both strict and non-strict *)
             Big_int.mult_big_int q gcd
         in
         let c' = S.mk_bigint (Big_int.minus_big_int c') in
@@ -790,6 +802,15 @@ module Solve = struct
         eq_zero ?fresh_var m'
       end
     | _ -> failwith "bad type for a monome"
+
+  let lt_zero ?fresh_var m =
+    lower_zero ?fresh_var ~strict:true m
+
+  let leq_zero ?fresh_var m =
+    lower_zero ?fresh_var ~strict:false m
+
+  let neq_zero ?fresh_var m =
+    lt_zero ?fresh_var m
 end
 
 (** {2 Lib} *)

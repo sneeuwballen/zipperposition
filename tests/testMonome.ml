@@ -306,7 +306,8 @@ let check_solve_eq_zero =
   let size m = List.fold_left (fun s t -> s + T.size t) 0 (M.terms m) in
   mk_test ~name ~pp ~size ~n:10_000 gen prop
 
-(* check that solve.lt_zero really finds general solutions *)
+(* check that solve.lower_zero really finds general solutions in
+    the strict case *)
 let check_solve_lt_zero =
   let gen = Arbitrary.(lift M.normalize_eq_zero M.arbitrary_int) in
   let prop m =
@@ -337,6 +338,38 @@ let check_solve_lt_zero =
   let size m = List.fold_left (fun s t -> s + T.size t) 0 (M.terms m) in
   mk_test ~name ~pp ~size ~n:10_000 gen prop
 
+(* check that solve.lower_zero really finds general solutions in
+  the non strict case *)
+let check_solve_leq_zero =
+  let gen = Arbitrary.(lift M.normalize_eq_zero M.arbitrary_int) in
+  let prop m =
+    let solutions = M.Solve.leq_zero m in
+    List.for_all
+      (fun solution ->
+        Util.debug 5 "solution: %a" (Util.pp_list (Util.pp_pair T.pp M.pp)) solution;
+        let terms = M.to_list m in
+        (* "apply" solution: for each (c,t) in m, see whether
+            t is bound by the solution ,in which case replace it,
+            otherwise keep the same term *)
+        let m' = List.fold_left
+          (fun m' (c,t) ->
+            try
+              let m = List.assq t solution in
+              M.sum m' (M.product m c)
+            with Not_found ->
+              M.add m' c t)
+          (M.const m.M.constant) terms
+        in
+        Util.debug 5 "solving %a yields %a" M.pp m M.pp m';
+        Monome.is_constant m' &&
+        Monome.sign m' <= 0)
+      solutions
+  in
+  let name = "monome_solve_leq_zero_works" in
+  let pp = M.to_string in
+  let size m = List.fold_left (fun s t -> s + T.size t) 0 (M.terms m) in
+  mk_test ~name ~pp ~size ~n:10_000 gen prop
+
 let props =
   [ check_add_diff M.arbitrary_int "int"
   ; check_add_diff M.arbitrary_int "rat"
@@ -354,4 +387,5 @@ let props =
   ; check_coeffs_n
   ; check_solve_eq_zero
   ; check_solve_lt_zero
+  ; check_solve_leq_zero
   ]
