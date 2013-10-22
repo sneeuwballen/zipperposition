@@ -25,7 +25,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Types} *)
 
-type t =
+(** Be careful that types may contain {!GVAr}s (destructively modifiable
+    variables). Those variables may be pointers to other types, after
+    unification, so you may want to use {!deref} often to be sure that
+    you followed the pointers properly in the whole subtype.
+
+    Types are hashconsed, excepted {!GVar}.
+*)
+
+type t = private
   | Var of string           (** Type variable, universally quantified *)
   | GVar of int * t ref     (** Variable instance. The int is unique *)
   | App of string * t list  (** parametrized type *)
@@ -33,9 +41,14 @@ type t =
 
 type ty = t
 
-val eq : t -> t -> bool
-val cmp : t -> t -> int
-val hash : t -> int
+val eq : t -> t -> bool     (* syntactic equality *)
+val cmp : t -> t -> int     (* syntactic comparison *)
+val hash : t -> int         (* hash of the structure *)
+
+(* TODO: a "view" of [t] that enforces some invariants (mostly
+    that GVars are fully dereferenced); needs to make [t] abstract,
+    provide a copy of it as [view], and a function [view : t -> view]
+    that enforces invariants *)
 
 exception Error of string
   (** Type error *)
