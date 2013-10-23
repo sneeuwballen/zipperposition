@@ -46,6 +46,7 @@ let props = QCheck.flatten
   ; TestBij.props
   ; TestOrdering.props
   ; TestMeta.props
+  ; TestCongruence.props
   ]
 
 let specs =

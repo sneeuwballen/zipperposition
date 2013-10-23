@@ -72,8 +72,6 @@ module type TERM = sig
   val update_subterms : t -> t list -> t
     (** Replace immediate subterms by the given list.
         This is used to test for equality *)
-
-  val pp : Buffer.t -> t -> unit
 end
 
 module Make(T : TERM) = struct
@@ -114,7 +112,6 @@ module Make(T : TERM) = struct
       and we check whether updated subterms are equal *)
   let _are_congruent n1 n2 =
     assert (Array.length n1.subnodes = Array.length n2.subnodes);
-    Util.debug 3 "%a and %a are congruent" T.pp n1.term T.pp n2.term;
     let l1' = List.map (fun n -> (_find n).term) (Array.to_list n1.subnodes) in
     let l2' = List.map (fun n -> (_find n).term) (Array.to_list n2.subnodes) in
     let t1 = T.update_subterms n1.term l1' in
@@ -140,7 +137,6 @@ module Make(T : TERM) = struct
     let n1 = _find n1 in
     let n2 = _find n2 in
     if n1 != n2 then begin
-      Util.debug 3 "merge %a into %a" T.pp n1.term T.pp n2.term;
       n1.next <- n2;
       (* n1 now points to n2, put every class information in n2 *)
       n2.lower <- List.rev_append n1.lower n2.lower;
@@ -150,10 +146,10 @@ module Make(T : TERM) = struct
       n1.waiters <- [];
       (* check congruence of waiters of n1 and n2 *)
       List.iter
-        (fun (_, _, n1') ->
+        (fun (arity1, i1, n1') ->
           List.iter
-            (fun (_, _, n2') ->
-              if _are_congruent n1' n2'
+            (fun (arity2, i2, n2') ->
+              if arity1 = arity2 && i1 = i2 && _are_congruent n1' n2'
                 then _merge n1' n2')
             right)
         left
@@ -252,8 +248,6 @@ module FO = Make(struct
     | T.Node (s, l), l' when List.length l = List.length l' ->
       T.mk_node s l'
     | _ -> assert false
-
-  let pp = T.pp
 end)
 
 module HO = Make(struct
@@ -277,6 +271,4 @@ module HO = Make(struct
     | T.At (t1, t2), [t1'; t2'] -> T.mk_at t1' t2'
     | T.Bind (s, _), [t'] -> T.mk_bind s t'
     | _ -> assert false
-
-  let pp = T.pp
 end)
