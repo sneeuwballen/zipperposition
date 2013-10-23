@@ -627,27 +627,27 @@ module Lit = struct
         if swap
           then
             (* 3 * t > 7 -----> t > 7/3 ---> t >= 3 *)
-            Single.R_lesseq (S.Arith.Op.(succ (quotient_f const c)), t)
+            Single.R_lesseq (S.Arith.Op.(succ (quotient_f (_uminus const) c)), t)
           else
              (* 3 * t < 7 --->  t < 7/3 ----> t <= 2 *)
-             Single.L_lesseq (t, S.Arith.Op.quotient_f const c)
+             Single.L_lesseq (t, S.Arith.Op.quotient_f (_uminus const) c)
       | E.Lt _ ->
         if swap
-          then Single.R_less (const, t)
-          else Single.L_less (t, const)
+          then Single.R_less (_uminus const, t)
+          else Single.L_less (t, _uminus const)
       | E.Leq _ when not (S.Arith.is_one c)->
         assert is_int;
         if swap
           then
             (* 3 * t >= 7 ---> t >= 7/3 ----> t >= 3 *)
-            Single.R_lesseq (S.Arith.Op.(succ (quotient_f const c)), t)
+            Single.R_lesseq (S.Arith.Op.(succ (quotient_f (_uminus const) c)), t)
           else
             (* 3 * t <= 7 ---> t <= 7/3 ----> t <= 2 *)
-            Single.L_lesseq (t, S.Arith.Op.quotient_f const c)
+            Single.L_lesseq (t, S.Arith.Op.quotient_f (_uminus const) c)
       | E.Leq _ ->
         if swap
-          then Single.R_lesseq (const, t)
-          else Single.L_less (t, const)
+          then Single.R_lesseq (_uminus const, t)
+          else Single.L_lesseq (t, _uminus const)
       in
       Single lit'
     | E.Eq m ->
