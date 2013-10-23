@@ -72,7 +72,8 @@ val ineq_chaining_right : Env.binary_inf_rule
    ~ x<y | ~ y<z | x<z, once simplified and grounded,
    we have b <= a | c <= b | a < c  trivial?
    
-   Use <= as negation for > and see whether implication is trivial *)
+   Use <= as negation for > and see whether implication is trivial.
+   Use Logtk.Congruence when it's ready *)
 
 (* TODO: redundancy criterion:
    a<b subsumes c<d if it is known from unit facts

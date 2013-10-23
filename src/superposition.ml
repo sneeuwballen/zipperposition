@@ -590,36 +590,37 @@ let is_tautology c =
   (if is_tauto then Util.debug 3 "%a is a tautology" C.pp c);
   is_tauto
 
-(* TODO: create CC on terms here? This function is seldom used...
 (** semantic tautology deletion, using a congruence closure algorithm
     to see if negative literals imply some positive literal *)
 let is_semantic_tautology c =
   Util.enter_prof prof_semantic_tautology;
   (* create the congruence closure of all negative equations of [c] *)
-  let cc = T.TCC.create 5 in
-  let cc =
-    Array.fold_left
-      (fun cc lit -> match lit with
-        | Lit.Equation (l, r, false, _) ->
-          T.TCC.merge cc (T.cc_curry l) (T.cc_curry r)
-        | _ -> cc)
-      cc c.C.hclits in
+  let cc = Congruence.FO.create ~size:7 () in
+  Array.iter
+    (function
+      | Lit.Equation (l, r, false, _) ->
+        Congruence.FO.mk_eq cc l r
+      | Lit.Prop (p, false) ->
+        Congruence.FO.mk_eq cc p T.true_term
+      | _ -> ())
+    c.C.hclits;
   let res =
     Util.array_exists
       (function
-        | Lit.Equation (_, _, false, _) -> false
         | Lit.Equation (l, r, true, _) ->
           (* if l=r is implied by the congruence, then the clause is redundant *)
-          T.TCC.eq cc (T.cc_curry l) (T.cc_curry r))
+          Congruence.FO.is_eq cc l r
+        | Lit.Prop (p, true) ->
+          Congruence.FO.is_eq cc p T.true_term
+        | _ -> false)
       c.C.hclits
   in
   (if res then begin
     Util.incr_stat stat_semantic_tautology;
-    Util.debug 2 "@[<h>%a is a semantic tautology@]" !C.pp_clause#pp_h c;
+    Util.debug 2 "%a is a semantic tautology" C.pp c;
     end);
   Util.exit_prof prof_semantic_tautology;
   res
-*)
 
 let basic_simplify c =
   Util.enter_prof prof_basic_simplify;
@@ -737,7 +738,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
       Util.debug 3 "%a pos_simplify_reflect into %a" C.pp c C.pp new_c;
       Util.exit_prof prof_pos_simplify_reflect;
       new_c
-    
+
 let negative_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   Util.enter_prof prof_neg_simplify_reflect;
   let ctx = c.C.hcctx in
@@ -1130,4 +1131,5 @@ let setup_env ~env =
   Env.add_redundant ~env redundant;
   Env.add_backward_redundant ~env backward_redundant;
   Env.add_is_trivial ~env is_trivial;
+  Env.add_is_trivial ~env is_semantic_tautology;
   ()
