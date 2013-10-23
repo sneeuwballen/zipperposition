@@ -42,11 +42,13 @@ module S = Substs.FO
 
 let stat_eq_chaining = Util.mk_stat "eq_chaining"
 let stat_ineq_chaining = Util.mk_stat "ineq_chaining"
+let stat_semantic_tautology = Util.mk_stat "chaining_semantic_tauto"
 
 let prof_eq_chaining_active = Util.mk_profiler "chaining.eq_active"
 let prof_eq_chaining_passive = Util.mk_profiler "chaining.eq_passive"
 let prof_ineq_chaining_left = Util.mk_profiler "chaining.ineq_left"
 let prof_ineq_chaining_right = Util.mk_profiler "chaining.ineq_right"
+let prof_semantic_tautology = Util.mk_profiler "chaining.semantic_tauto"
 
 (* finds all positions, in lits that are [eligible], that unify with the
   subterm at the given [pos], and return the list of such positions
@@ -196,6 +198,7 @@ let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst
       let parents = [active; passive] in
       let new_clause = C.create ~parents ~ctx new_lits proof in
       Util.debug 3 "eq chaining left --> %a" C.pp new_clause;
+      Util.incr_stat stat_eq_chaining;
       new_clause :: acc
     end else begin
       Util.debug 3 "eq chaining left between %a at %a, and %a at %a redundant"
@@ -241,6 +244,7 @@ let do_eq_chaining_right ~ctx active s_a active_pos passive s_p passive_pos subs
       let parents = [active; passive] in
       let new_clause = C.create ~parents ~ctx new_lits proof in
       Util.debug 3 "eq chaining right --> %a" C.pp new_clause;
+      Util.incr_stat stat_eq_chaining;
       new_clause :: acc
     end else begin
       Util.debug 3 "eq chaining right between %a at %a, and %a at %a redundant"
@@ -385,6 +389,7 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
       let new_clause = C.create ~parents:[left;right] ~ctx lits proof in
       Util.debug 3 "ineq_chaining of %a and %a gives %a"
         C.pp left C.pp right C.pp new_clause;
+      Util.incr_stat stat_ineq_chaining;
       new_clause :: acc
     end else
       let () = Util.debug 5 "ordering conditions won't do." in
@@ -474,6 +479,59 @@ let is_tautology c =
   with Exit ->
     true
 
+(* redundancy criterion: if variables are replaced by constants,
+   do equations and inequations in left part of =>
+   always imply something on the right part of => ?
+
+   e,g, transitivity is redundant, because we have
+   ~ x<y | ~ y<z | x<z, once simplified and grounded,
+   x < y & y < z ==> x < z is always trivial
+
+   We consider that  a <= b is negation for b < a, and use the congruence
+   closure (same as for {!Superposition.is_semantic_tautology}) *)
+let is_semantic_tautology c =
+  Util.enter_prof prof_semantic_tautology;
+  let ctx = c.C.hcctx in
+  let spec = Ctx.total_order ctx in
+  (* find ordering instances *)
+  let instances = Lits.order_instances ~spec c.C.hclits in
+  let res = List.exists
+    (fun instance ->
+      let cc = Congruence.FO.create ~size:13 () in
+      let to_check = ref [] in   (* ineq to checks afterward *)
+      Array.iter
+        (fun lit -> match lit with
+        | Lit.Equation (l, r, false, _) -> Congruence.FO.mk_eq cc l r
+        | Lit.Prop (_, true) ->
+          begin try
+            let olit = Lit.ineq_lit_of ~instance lit in
+            if olit.TO.strict
+              then to_check := olit :: !to_check
+              else
+                (* left <= right ----> we add  right < less to CC *)
+                let l = olit.TO.left in
+                let r = olit.TO.right in
+                Congruence.FO.mk_less cc r l
+          with Not_found -> ()
+          end
+        | _ -> ())
+        c.C.hclits;
+      List.exists
+        (fun olit ->
+          assert olit.TO.strict;
+          let l = olit.TO.left in
+          let r = olit.TO.right in
+          Congruence.FO.is_less cc l r)
+        !to_check)
+    instances
+  in
+  if res then begin
+    Util.incr_stat stat_semantic_tautology;
+    Util.debug 2 "%a is a chaining semantic tautology" C.pp c;
+    end;
+  Util.exit_prof prof_semantic_tautology;
+  res
+
 let simplify c =
   let ctx = c.C.hcctx in
   let spec = Ctx.total_order ctx in
@@ -522,6 +580,7 @@ let add_order ~env ?proof ~less ~lesseq =
   if not exists_some then begin
     Util.debug 3 "setup chaining inferences";
     Env.add_is_trivial ~env is_tautology;
+    Env.add_is_trivial ~env is_semantic_tautology;
     Env.add_simplify ~env simplify;
     Env.add_unary_inf ~env "reflexivity_res" reflexivity_res;
     Env.add_binary_inf ~env "ineq_chaining_left" ineq_chaining_left;

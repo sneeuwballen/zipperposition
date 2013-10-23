@@ -221,6 +221,11 @@ module Arr : sig
         @raise Invalid_argument if the position is not valid in the array
           or if the literal is not an inequation. *)
 
+  val order_instances : spec:Theories.TotalOrder.t ->
+                        t array ->
+                        Theories.TotalOrder.instance list
+    (** Returns a list of all ordering instances present in the array *)
+
   val terms_under_ineq : instance:Theories.TotalOrder.instance ->
                          t array -> FOTerm.t Sequence.t
     (** All terms that occur under an equation, a predicate,

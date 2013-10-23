@@ -642,6 +642,19 @@ module Arr = struct
       end
     | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
 
+  let order_instances ~spec lits =
+    let rec fold acc i =
+      if i = Array.length lits then acc
+      else try
+        let lit = ineq_lit ~spec lits.(i) in
+        let acc = lit.TO.instance :: acc in
+        fold acc (i+1)
+      with Not_found ->
+        fold acc (i+1)
+    in
+    let l = fold [] 0 in
+    Util.list_uniq TO.eq l
+
   let terms_under_ineq ~instance lits =
     Sequence.from_iter
       (fun k ->
