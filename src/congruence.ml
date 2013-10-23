@@ -35,8 +35,21 @@ module type S = sig
   val create : ?size:int -> unit -> t
     (** New congruence *)
 
+  val clear : t -> unit
+    (** Clear the content of the congruence. It is now equivalent to
+        the empty congruence. *)
+
   val find : t -> term -> term
     (** Current representative of this term *)
+
+  val iter : t -> (mem:term -> repr:term -> unit) -> unit
+    (** Iterate on terms that are explicitely present in the congruence.
+        The callback is given [mem], the term itself, and [repr],
+        the current representative of the term [mem].
+
+        Invariant: when calling [iter cc f], if [f ~mem ~repr] is called,
+        then [find cc mem == repr] holds.
+    *)
 
   val mk_eq : t -> term -> term -> unit
     (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
@@ -97,6 +110,8 @@ module Make(T : TERM) = struct
   type t = node H.t
 
   let create ?(size=17) () = H.create size
+
+  let clear h = H.clear h
 
   (* find representative *)
   let rec _find node =
@@ -189,6 +204,13 @@ module Make(T : TERM) = struct
     let n = _get h t in
     let n = _find n in
     n.term
+
+  let iter h f =
+    H.iter
+      (fun mem node ->
+        let repr = (_find node).term in
+        f ~mem ~repr)
+      h
 
   let mk_eq congruence t1 t2 =
     let n1 = _get congruence t1 in

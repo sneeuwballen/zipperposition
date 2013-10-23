@@ -35,8 +35,21 @@ module type S = sig
   val create : ?size:int -> unit -> t
     (** New congruence *)
 
+  val clear : t -> unit
+    (** Clear the content of the congruence. It is now equivalent to
+        the empty congruence. *)
+
   val find : t -> term -> term
     (** Current representative of this term *)
+
+  val iter : t -> (mem:term -> repr:term -> unit) -> unit
+    (** Iterate on terms that are explicitely present in the congruence.
+        The callback is given [mem], the term itself, and [repr],
+        the current representative of the term [mem].
+
+        Invariant: when calling [iter cc f], if [f ~mem ~repr] is called,
+        then [find cc mem == repr] holds.
+    *)
 
   val mk_eq : t -> term -> term -> unit
     (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to

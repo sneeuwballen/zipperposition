@@ -154,10 +154,11 @@ let mk_stat, print_global_stats =
     stat),
   (* print stats *)
   (fun () ->
+    let stats = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) !stats in
     List.iter
       (fun (name, cnt) ->
         debug 0 "stat: %-30s ... %s" name (Int64.to_string !cnt))
-      !stats)
+      stats)
 
 let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
 let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
