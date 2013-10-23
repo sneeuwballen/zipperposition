@@ -744,7 +744,7 @@ module Solve = struct
     | S.Rat _
     | S.Real _ ->
       if strict
-      then 
+      then
         (* eliminate variables by extracting them *)
         let terms = to_list m in
         Util.list_fmap
@@ -764,7 +764,20 @@ module Solve = struct
       let m = normalize_eq_zero m in
       let terms = to_list m in
       begin match terms with
-      | [] | [_] -> []
+      | [] -> []
+      | [c, t] when S.Arith.Op.divides c m.constant ->
+        (* c * t + m < 0 ----> t = (-m / c) - 1 *)
+        let v = S.Arith.Op.(quotient (uminus m.constant) c) in
+        let v = if S.Arith.sign c > 0
+          then S.Arith.Op.prec v
+          else S.Arith.Op.succ v
+        in
+        [ [t, const v] ]
+      | [c, t] ->
+        (* must be integer, take the quotient itself *)
+        let v = S.Arith.Op.(quotient_f (uminus m.constant) c) in
+        let v = if S.Arith.sign c < 0 then S.Arith.Op.succ v else v in
+        [ [t, const v] ]
       | _::_::_ when List.exists _is_one_abs terms ->
         if strict
         then
