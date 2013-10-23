@@ -157,6 +157,7 @@ module Arith : sig
 
   val is_zero : t -> bool
   val is_one : t -> bool
+  val is_minus_one : t -> bool
 
   val sum : t
   val difference : t

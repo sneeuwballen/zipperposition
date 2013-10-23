@@ -168,6 +168,24 @@ module type S = sig
   val check_term_term_sig : Signature.t -> term -> term -> bool
 
   val check_term_type_sig : Signature.t -> term -> Type.t -> bool
+
+  (** {3 Handy shortcuts for type inference} *)
+
+  module Quick : sig
+    (* type constraints *)
+    type constr =
+      | WellTyped of term
+      | SameType of term * term
+      | HasType of term * Type.t
+
+    val constrain : ?ctx:Ctx.t -> constr list -> Ctx.t
+    
+    val constrain_seq : ?ctx:Ctx.t -> constr Sequence.t -> Ctx.t
+
+    val signature : ?signature:Signature.t -> constr list -> Signature.t
+
+    val signature_seq : ?signature:Signature.t -> constr Sequence.t -> Signature.t
+  end
 end
 
 (* build an instance of {!S}, given the function that infers the type
@@ -242,6 +260,31 @@ end) = struct
   let check_term_type_sig signature t1 ty2 =
     let ctx = Ctx.of_signature signature in
     check_term_type ctx t1 ty2
+
+  module Quick = struct
+    type constr =
+      | WellTyped of term
+      | SameType of term * term
+      | HasType of term * Type.t
+
+    let constrain_seq ?(ctx=Ctx.create ()) seq =
+      Sequence.iter
+        (function
+        | WellTyped t -> ignore (infer ctx t)
+        | SameType (t1, t2) -> constrain_term_term ctx t1 t2
+        | HasType (t, ty) -> constrain_term_type ctx t ty)
+        seq;
+      ctx
+
+    let constrain ?ctx l = constrain_seq ?ctx (Sequence.of_list l)
+
+    let signature_seq ?(signature=Signature.empty) seq =
+      let ctx = Ctx.of_signature signature in
+      ignore (constrain_seq ~ctx seq);
+      Ctx.to_signature ctx
+
+    let signature ?signature l = signature_seq ?signature (Sequence.of_list l)
+  end
 end
 
 module FO = Make(struct

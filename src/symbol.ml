@@ -309,11 +309,19 @@ module Arith = struct
   | Const _ -> false
 
   let __one_i = Big_int.big_int_of_int 1
+  let __m_one_i = Big_int.big_int_of_int ~-1
   let __one_rat = Ratio.ratio_of_int 1
+  let __m_one_rat = Ratio.ratio_of_int ~-1
 
   let is_one s = match s with
   | Int n -> Big_int.eq_big_int n __one_i
   | Rat n -> Ratio.eq_ratio n __one_rat
+  | Real f -> f = 1.
+  | Const _ -> false
+
+  let is_minus_one s = match s with
+  | Int n -> Big_int.eq_big_int n __m_one_i
+  | Rat n -> Ratio.eq_ratio n __m_one_rat
   | Real f -> f = 1.
   | Const _ -> false
 

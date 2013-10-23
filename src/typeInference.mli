@@ -133,6 +133,24 @@ module type S = sig
   val check_term_term_sig : Signature.t -> term -> term -> bool
 
   val check_term_type_sig : Signature.t -> term -> Type.t -> bool
+
+  (** {3 Handy shortcuts for type inference} *)
+
+  module Quick : sig
+    (* type constraints *)
+    type constr =
+      | WellTyped of term
+      | SameType of term * term
+      | HasType of term * Type.t
+
+    val constrain : ?ctx:Ctx.t -> constr list -> Ctx.t
+    
+    val constrain_seq : ?ctx:Ctx.t -> constr Sequence.t -> Ctx.t
+
+    val signature : ?signature:Signature.t -> constr list -> Signature.t
+
+    val signature_seq : ?signature:Signature.t -> constr Sequence.t -> Signature.t
+  end
 end
 
 module FO : S with type term = FOTerm.t
