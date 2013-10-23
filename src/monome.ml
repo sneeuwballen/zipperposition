@@ -682,7 +682,10 @@ module Solve = struct
         (fun (c, t) ->
           if T.is_var t
             then try
-              let m = divby (uminus (remove m t)) c in
+              let m = if S.Arith.sign c > 0
+                then divby (uminus (remove m t)) c
+                else divby (remove m t) (S.Arith.Op.uminus c)
+              in
               let _ = FOUnif.unification t 0 (to_term m) 0 in
               Some [ t, m ]
             with FOUnif.Fail -> None
@@ -751,7 +754,14 @@ module Solve = struct
           (fun (c, t) ->
             if T.is_var t
               then try
-                let m = divby (succ (uminus (remove m t))) c in
+                let m = if S.Arith.sign c > 0
+                  then
+                    (* c * t + m < 0 reachable by t = -m/c - 1 *)
+                    pred (divby (uminus (remove m t)) c)
+                  else
+                    (* -c * t + m < 0 reachable by t = m/c + 1 *)
+                    succ (divby (remove m t) (S.Arith.Op.uminus c))
+                in
                 let _ = FOUnif.unification t 0 (to_term m) 0 in
                 Some [ t, m ]
               with FOUnif.Fail -> None
