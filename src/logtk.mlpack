@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: f87e4f4fdf2306ae06e40c9605771dc8)
+# DO NOT EDIT (digest: 69df12ef0454577e5ed563c6d538ce3f)
 HO
 FO
 Symbol
@@ -38,9 +38,11 @@ Transform
 NPDtree
 Trace_tstp
 CallProver
+Congruence
 lib/Sequence
 lib/Bij
 lib/Cache
+lib/MultiMap
 lib/QCheck
 lib/Bencode
 lib/BV

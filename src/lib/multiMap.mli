@@ -26,8 +26,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 Multimap} *)
 
-open Logtk
-
 module type S = sig
   type key
   type value

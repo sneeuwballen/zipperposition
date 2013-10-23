@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6050e55ed3cdcca266cced8f38fc7e1b)
+# DO NOT EDIT (digest: 31d2389cf1bca45ff88b602803d1a90c)
 MetaPattern
 MetaKB
 MetaReasoner
@@ -8,5 +8,4 @@ Ast_theory
 Lex_theory
 Parse_theory
 Signal
-MultiMap
 # OASIS_STOP

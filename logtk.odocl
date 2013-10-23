@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9e25302c120eb4bf9c1310bba89b0354)
+# DO NOT EDIT (digest: 4b593d0c3f15fb092840f2eb37c354b1)
 src/HO
 src/FO
 src/Symbol
@@ -38,9 +38,11 @@ src/Transform
 src/NPDtree
 src/Trace_tstp
 src/CallProver
+src/Congruence
 src/lib/Sequence
 src/lib/Bij
 src/lib/Cache
+src/lib/MultiMap
 src/lib/QCheck
 src/lib/Bencode
 src/lib/BV
@@ -52,5 +54,4 @@ src/meta/Ast_theory
 src/meta/Lex_theory
 src/meta/Parse_theory
 src/meta/Signal
-src/meta/MultiMap
 # OASIS_STOP
