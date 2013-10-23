@@ -501,9 +501,11 @@ module Arith = struct
     | Const _ -> _ty_mismatch "not a numeric constant: %a" pp s
 
     let divides a b = match a, b with
-    | Rat _, Rat _
-    | Real _, Real _ -> true
-    | Int a, Int b -> Big_int.sign_big_int (Big_int.mod_big_int b a) = 0
+    | Rat i, Rat _ -> Ratio.sign_ratio i <> 0
+    | Real f, Real _ -> f <> 0.
+    | Int a, Int b ->
+      Big_int.sign_big_int a <> 0 &&
+      Big_int.sign_big_int (Big_int.mod_big_int b a) = 0
     | _ -> _ty_mismatch "divides: expected two numerical types"
 
     let gcd a b = match a, b with
