@@ -155,7 +155,7 @@ let _check_eq_chaining_right_passive ~ctx passive s_p positions subst =
       | _ -> true
     end
     positions
-  
+
 (* equality chaining left *)
 let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst acc =
   let ord = Ctx.ord ~ctx in
@@ -164,7 +164,6 @@ let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst
   let instance = (Lits.get_ineq ~spec passive.C.hclits passive_pos).TO.instance in
   (* rewrite s into t *)
   let s, t, _ = Lits.get_eqn active.C.hclits active_pos in
-  assert (not (T.is_var s));
   (* get all inequalities that can be factored with passive_pos: if 
       the passive lit is t1[s1]_p <| v1, we want all the ti[si]_p < vi
       such that si is unifiable with s1 (and thus with [s]).
@@ -211,7 +210,6 @@ let do_eq_chaining_right ~ctx active s_a active_pos passive s_p passive_pos subs
   let instance = (Lits.get_ineq ~spec passive.C.hclits passive_pos).TO.instance in
   (* rewrite s into t *)
   let s, t, _ = Lits.get_eqn active.C.hclits active_pos in
-  assert (not (T.is_var s));
   (* get all inequalities that can be factored with passive_pos: if 
       the passive lit is v1 <| t1[s1]_p, we want all the vi <| ti[si]_p
       such that si is unifiable with s1 (and thus with [s]).
