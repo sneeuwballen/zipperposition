@@ -43,6 +43,7 @@ module Sup = Superposition
 module Sat = Saturate
 module Sel = Selection
 
+(* TODO: if real arith detected, print warning and exit *)
 (* TODO: params to limit depth of preprocessing *)
 (* TODO: params to enable/disable some preprocessing *)
 

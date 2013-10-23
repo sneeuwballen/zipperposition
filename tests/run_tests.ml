@@ -32,6 +32,7 @@ open Libzipperposition
 
 let props = QCheck.flatten
   [ TestMonome.props
+  ; TestArith.props
   ]
 
 let specs =

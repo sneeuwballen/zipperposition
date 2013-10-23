@@ -89,6 +89,14 @@ let check_normalization_idempotent =
   let name = "monome_normalization_idempotent" in
   mk_test ~name ~pp:M.to_string gen prop
 
+let check_normalization_eq_zero_idempotent =
+  let gen = M.arbitrary in
+  let prop m =
+    M.eq (M.normalize_eq_zero m) (M.normalize_eq_zero (M.normalize_eq_zero m))
+  in
+  let name = "monome_normalization_eq_zero_idempotent" in
+  mk_test ~name ~pp:M.to_string gen prop
+
 (* check  that applying empty substitution gets the same monome *)
 let check_apply_empty_subst =
   let gen = M.arbitrary in
@@ -151,7 +159,7 @@ let check_comparison_compatible_subst =
   mk_test ~name ~pp ~n:1000 gen prop
 
 (* check that Solve.diophant2 actually finds valid solutions *)
-let check_diophant2 =
+let check_diophant2 n =
   let mkbig = Big_int.big_int_of_int in
   let bgstr = Big_int.string_of_big_int in
   let ppbi buf i = Buffer.add_string buf (bgstr i) in
@@ -189,10 +197,10 @@ let check_diophant2 =
   in
   let name = "monome_diophant2" in
   let pp = PP.(quad bgstr bgstr bgstr (list bgstr)) in
-  mk_test ~name ~pp ~n:100_000 gen prop
+  mk_test ~name ~pp ~n gen prop
 
 (* check that diophant_l finds a valid bezout n-uplet *)
-let check_diophant_l =
+let check_diophant_l n =
   let gen = Arbitrary.(
     let gen =
       list ~len:(3 -- 6) (lift Big_int.big_int_of_int (~-20 -- 20)) >>= fun l ->
@@ -219,10 +227,10 @@ let check_diophant_l =
   in
   let pp = PP.(pair (list Big_int.string_of_big_int) Big_int.string_of_big_int) in
   let name = "monome_diophant_l_yields_bezout_tuple" in
-  mk_test ~name ~pp ~n:100_000 gen prop
+  mk_test ~name ~pp ~n gen prop
 
 (* check that coeff_l always provide a zero sum solution space *)
-let check_coeffs_n =
+let check_coeffs_n n =
   let bgstr = Big_int.string_of_big_int in
   let ppbi buf i = Buffer.add_string buf (bgstr i) in
   let gen = Arbitrary.(
@@ -261,7 +269,7 @@ let check_coeffs_n =
         (* pairwise product of monomes with their coefficient *)
         let monomes = List.map2
           (fun ai mi -> Monome.product mi (Symbol.mk_bigint ai))
-          l monomes 
+          l monomes
         in
         let m = Monome.sum_list monomes in
         (* check that the monome is the constant 0 *)
@@ -273,10 +281,10 @@ let check_coeffs_n =
   in
   let name = "monome_coeffs_n_check_solutions" in
   let pp = PP.(pair (list Big_int.string_of_big_int) (list (list T.to_string))) in
-  mk_test ~name ~pp ~n:100_000 gen prop
+  mk_test ~name ~pp ~n gen prop
 
 (* check that solve.eq_zero really finds general solutions *)
-let check_solve_eq_zero =
+let check_solve_eq_zero n =
   let gen = Arbitrary.(lift M.normalize_eq_zero M.arbitrary_int) in
   let prop m =
     let solutions = M.Solve.eq_zero m in
@@ -304,11 +312,11 @@ let check_solve_eq_zero =
   let name = "monome_solve_eq_zero_works" in
   let pp = M.to_string in
   let size m = List.fold_left (fun s t -> s + T.size t) 0 (M.terms m) in
-  mk_test ~name ~pp ~size ~n:10_000 gen prop
+  mk_test ~name ~pp ~size ~n gen prop
 
 (* check that solve.lower_zero really finds general solutions in
     the strict case *)
-let check_solve_lt_zero =
+let check_solve_lt_zero n =
   let gen = Arbitrary.(lift M.normalize_eq_zero M.arbitrary_int) in
   let prop m =
     let solutions = M.Solve.lt_zero m in
@@ -336,11 +344,11 @@ let check_solve_lt_zero =
   let name = "monome_solve_lt_zero_works" in
   let pp = M.to_string in
   let size m = List.fold_left (fun s t -> s + T.size t) 0 (M.terms m) in
-  mk_test ~name ~pp ~size ~n:10_000 gen prop
+  mk_test ~name ~pp ~size ~n gen prop
 
 (* check that solve.lower_zero really finds general solutions in
   the non strict case *)
-let check_solve_leq_zero =
+let check_solve_leq_zero n =
   let gen = Arbitrary.(lift M.normalize_eq_zero M.arbitrary_int) in
   let prop m =
     let solutions = M.Solve.leq_zero m in
@@ -368,7 +376,7 @@ let check_solve_leq_zero =
   let name = "monome_solve_leq_zero_works" in
   let pp = M.to_string in
   let size m = List.fold_left (fun s t -> s + T.size t) 0 (M.terms m) in
-  mk_test ~name ~pp ~size ~n:10_000 gen prop
+  mk_test ~name ~pp ~size ~n gen prop
 
 let props =
   [ check_add_diff M.arbitrary_int "int"
@@ -378,14 +386,15 @@ let props =
   ; check_has_instances_int_prod
   ; check_has_instances_int_normalize
   ; check_normalization_idempotent
+  ; check_normalization_eq_zero_idempotent
   ; check_comparison_offset
   ; check_comparison_antisymmetric
   ; check_apply_empty_subst
   ; check_comparison_compatible_subst
-  ; check_diophant2
-  ; check_diophant_l
-  ; check_coeffs_n
-  ; check_solve_eq_zero
-  ; check_solve_lt_zero
-  ; check_solve_leq_zero
+  ; check_diophant2 100
+  ; check_diophant_l 100
+  ; check_coeffs_n 100
+  ; check_solve_eq_zero 100
+  ; check_solve_lt_zero 100
+  ; check_solve_leq_zero 100
   ]
