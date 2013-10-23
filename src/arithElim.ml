@@ -147,7 +147,8 @@ let axioms =
 let setup_penv ~penv =
   (* rule for formula simplification *)
   let simplify_rule set =
-    let signature = PF.Set.signature set in
+    let signature = PEnv.signature ~penv in
+    let signature = PF.Set.signature ~signature set in
     fun set pf ->
       let f' = Arith.F.simplify ~signature pf.PF.form in
       if F.eq pf.PF.form f'

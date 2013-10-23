@@ -54,7 +54,7 @@ let fix ops set =
   let add_forms l = List.iter (fun f -> Queue.push f q) l in
   (* a new operation appeared, so we must process again all formulas
       to be sure that they are irreducible *)
-  let restart () = 
+  let restart () =
     Util.debug 4 "restart fixpoint computation";
     PF.Set.iter (fun f -> Queue.push f q) !ans;
     ans := PF.Set.empty
@@ -286,6 +286,6 @@ let add_constr_rule ~penv r =
 let mk_precedence ~penv set =
   let constrs = penv.constrs @ List.map (fun rule -> rule set) penv.constr_rules in
   let forms = Sequence.map PF.get_form (PF.Set.to_seq set) in
-  let signature = F.signature_seq forms in
+  let signature = F.signature_seq ~signature:penv.base forms in
   let symbols = Signature.to_symbols signature in
   Precedence.create ~complete:false constrs symbols
