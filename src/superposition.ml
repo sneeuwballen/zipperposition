@@ -1130,6 +1130,6 @@ let setup_env ~env =
   Env.add_backward_simplify ~env backward_simplify;
   Env.add_redundant ~env redundant;
   Env.add_backward_redundant ~env backward_redundant;
-  Env.add_is_trivial ~env is_trivial;
   Env.add_is_trivial ~env is_semantic_tautology;
+  Env.add_is_trivial ~env is_trivial;
   ()
