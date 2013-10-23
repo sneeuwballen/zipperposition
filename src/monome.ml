@@ -142,6 +142,8 @@ let sign m =
   assert (S.Arith.sign m.divby > 0);
   S.Arith.sign m.constant
 
+let size m = T.Map.cardinal m.coeffs
+
 let terms m =
   T.Map.fold (fun t coeff acc -> t :: acc) m.coeffs []
 
@@ -191,7 +193,7 @@ let normalize m = match m.constant with
 let normalize_eq_zero m =
   match m.constant with
   | S.Int _ when not (is_constant m) ->
-    (* divide by common gcd of coeffs and divby *)
+    (* divide by common gcd of coeffs and constant *)
     let gcd = T.Map.fold (fun _ c gcd -> S.Arith.Op.gcd c gcd) m.coeffs m.constant in
     let constant = S.Arith.Op.quotient m.constant gcd in
     let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
@@ -275,21 +277,23 @@ let product m c =
     let coeffs = T.Map.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
     { m with constant; coeffs; }
 
-let divby m const =
+let rec divby m const =
   assert (S.Arith.sign const >= 0);
   if S.Arith.is_zero const
     then raise Division_by_zero
+  else if S.Arith.sign const < 0
+    then divby (uminus m) (S.Arith.Op.uminus const)
   else
     let divby = S.Arith.Op.product const m.divby in
     normalize { m with divby; }
 
 let succ m =
   let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
-  sum m (const one)
+  add_const m one
 
 let pred m =
   let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
-  difference m (const one)
+  add_const m (S.Arith.Op.uminus one)
 
 let rec sum_list = function
   | [] -> failwith "Monome.sum_list: empty list"
@@ -321,7 +325,7 @@ let comparison m1 m2 =
   | false, true -> Comparison.Lt
   | false, false -> Comparison.Incomparable
 
-exception NotLinear
+exception NotLinear of string
   (** Used by [of_term] *)
 
 let of_term ~signature t =
@@ -357,7 +361,7 @@ let of_term ~signature t =
     divby m s'
   | T.Node (s, []) when S.is_numeric s -> const s
   | T.Node (s, [_; _]) when S.Arith.is_arith s ->
-    raise NotLinear  (* failure *)
+    raise (NotLinear (Util.sprintf "non linear op %a" S.pp s)) (* failure *)
   | T.Var _
   | T.BoundVar _ ->
     let ty = match t.T.type_ with Some ty -> ty | None -> assert false in
@@ -370,11 +374,11 @@ let of_term ~signature t =
   in
   try of_term ~signature t
   with Symbol.Arith.TypeMismatch msg ->
-    raise NotLinear  (* too hard. *)
+    raise (NotLinear ("type error: " ^ msg))
 
 let of_term_opt ~signature t =
   try Some (of_term ~signature t)
-  with NotLinear -> None
+  with NotLinear _ -> None
 
 let of_term_infer t =
   let ctx = TypeInference.Ctx.of_signature Signature.Arith.signature in

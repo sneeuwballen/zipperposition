@@ -69,6 +69,9 @@ val sign : t -> int
   (** Assuming [is_constant m], [sign m] returns the sign of [m].
       @raise Invalid_argument if the monome is not a constant *)
 
+val size : t -> int
+  (** Number of distinct terms. 0 means that the monome is a constant *)
+
 val terms : t -> FOTerm.t list
   (** List of terms that occur in the monome with non-nul coefficients *)
 
@@ -116,7 +119,7 @@ val dominates : t -> t -> bool
       [m2], in any model or variable valuation.
       if [dominates m1 m2 && dominates m2 m1], then [m1 = m2]. *)
 
-exception NotLinear
+exception NotLinear of string
   
 val of_term : signature:Signature.t -> FOTerm.t -> t
   (** try to get a monome from a term.
