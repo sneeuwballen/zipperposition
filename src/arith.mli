@@ -54,8 +54,12 @@ module T : sig
   val mk_quotient : FOTerm.t -> FOTerm.t -> FOTerm.t
   val mk_uminus : FOTerm.t -> FOTerm.t
 
+  (** Smart constructors, that perform small simplifications *)
+
   val mk_less : FOTerm.t -> FOTerm.t -> FOTerm.t
   val mk_lesseq : FOTerm.t -> FOTerm.t -> FOTerm.t
+  val mk_greater : FOTerm.t -> FOTerm.t -> FOTerm.t
+  val mk_greatereq : FOTerm.t -> FOTerm.t -> FOTerm.t
 
   val extract_subterms : FOTerm.t -> FOTerm.t list
     (** If the term's root is an arithmetic expression, extract the
@@ -68,8 +72,14 @@ module T : sig
     (** [shielded v t] is true if [v] is a variable that occurs under a
         non interpreted symbol in [t] *)
 
+  val flag_simplified : int
+    (** flag for simplified terms *)
+
   val simplify : signature:Signature.t -> FOTerm.t -> FOTerm.t
     (** Arithmetic simplifications *)
+
+  val arbitrary_arith : Type.t -> FOTerm.t QCheck.Arbitrary.t
+    (** Arbitrary arithmetic terms *)
 end
 
 (** {2 Formulas} *)
@@ -91,7 +101,46 @@ module Lit : sig
     (** Is this literal arithmetic (i.e., root predicate is equality or
         inequality, with arithmetic operators just underneath)? *)
 
-  (** {3 Comparison with 0} *)
+  val mk_less : FOTerm.t -> FOTerm.t -> Literal.t
+    (** Smart constructor for strict inequality (performs simplifications) *)
+
+  val mk_lesseq : FOTerm.t -> FOTerm.t -> Literal.t
+    (** Smart constructor for non strict inequality (performs simplifications) *)
+
+  val mk_eq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> Literal.t
+    (** Smart constructor for equality *)
+
+  val mk_neq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> Literal.t
+    (** Smart constructor for inequality *)
+
+  val arbitrary : Type.t -> Literal.t QCheck.Arbitrary.t
+
+  (** {3 Single-term literal}
+      This type helps deal with the special case where there is a single
+      term in the literal. It can therefore perform many simplifications.
+  *)
+
+  module Single : sig
+    type t = private
+    | True
+    | False
+    | Eq of FOTerm.t * Symbol.t
+    | Neq of FOTerm.t * Symbol.t
+    | L_less of FOTerm.t * Symbol.t
+    | L_lesseq of FOTerm.t * Symbol.t
+    | R_less of Symbol.t * FOTerm.t
+    | R_lesseq of Symbol.t * FOTerm. t
+
+    val pp : Buffer.t -> t -> unit
+    val to_string : t -> string
+
+    val to_lit : ord:Ordering.t -> t -> Literal.t
+  end
+
+  (** {3 Comparison with 0}
+      An arithmetic literal can always be reduced to exactly one such
+      "extracted" literal, but putting all terms on the same side of the
+      relation. *)
 
   module Extracted : sig
     type t = private
@@ -112,12 +161,12 @@ module Lit : sig
     val extract_opt : signature:Signature.t -> Literal.t -> t option
       (** Same as {!extract}, but doesn't raise *)
 
-    val to_lit : ord:Ordering.t -> t -> Literal.t
-      (** Conversion back to a literal *)
-
     val get_monome : t -> Monome.t
       (** Return the monome inside the literal.
           @raise Invalid_argument if the literal is true or false *)
+
+    val to_lit : ord:Ordering.t -> t -> Literal.t
+      (** Conversion back to a literal *)
 
     val factor : t -> Substs.FO.t list
       (** Unify non-arith subterms pairwise, return corresponding
@@ -128,7 +177,12 @@ module Lit : sig
       (** Attempt to eliminate the literal *)
   end
 
-  (** {3 Literal with isolated term} *)
+  (** {3 Literal with isolated term}
+      This form is used for complex literals, that have
+      several non-arithmetic subterms. An {!Extracted.t} can
+      be transformed in several {!Pivoted.t}, or into one {!Single.t}.
+
+      See the very important {!pivot} operation. *)
 
   module Pivoted : sig
     type t = private
@@ -142,24 +196,30 @@ module Lit : sig
     val pp : Buffer.t -> t -> unit
     val to_string : t -> string
 
-    val of_extracted : Extracted.t -> t list
-      (** Pivots of an {!Extracted.t}. Trivial literals, ie
-          {!Extracted.True} and {!Extracted.False}, are simply
-          ignored. *)
-
-    val to_lit : ord:Ordering.t -> t -> Literal.t
-      (** Convert back into a regular literal *)
-
     val get_term : t -> FOTerm.t
       (** Extract the term part. *)
 
     val get_monome : t -> Monome.t
       (** Extract the monome part from the lit. *)
 
+    val to_lit : ord:Ordering.t -> t -> Literal.t
+      (** Convert back into a regular literal *)
+
     module List : sig
       val get_terms : t list -> FOTerm.t list
     end
   end
+
+  (** {3 Pivot operation} *)
+
+  type pivot_result =
+    | Single of Single.t
+    | Multiple of Pivoted.t list
+    | True
+    | False
+
+  val pivot : Extracted.t -> pivot_result
+    (** Pivots of an {!Extracted.t} *)
 
   (** {3 High level operations} *)
 
