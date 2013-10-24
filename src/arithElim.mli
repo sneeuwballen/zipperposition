@@ -56,14 +56,14 @@ val purify_arith : Env.unary_inf_rule
 val axioms : PFormula.t list
   (** Set of axioms useful to do arithmetic *)
 
-(* TODO: redundancy criterion:
-   a<b subsumes c<d if c<a and b<=d, or c<=a and b<d *)
-
-(* TODO: inference rule
-          C1 or a <= b   C2 or b <= c
-          ---------------------------
-              C1 or C2
-        if a > c are arithmetic expressions *)
+(* inference rule
+        C1 or a <= b     C2 or b <= c
+    -------------------------------------
+        C1 or C2 or or_{i=a....c} (b = i)
+    if a and c are integer constants. If a > c, then the range a...c
+    is empty and the literal has been erased.
+*)
+val case_switch : Env.binary_inf_rule
 
 (* TODO: simplification rule
         C or a < t1 or a < t2 ... or a < tn
@@ -71,6 +71,9 @@ val axioms : PFormula.t list
           C or a < max(t1, ..., tn)
   if t_i are arithmetic constants
 *)
+
+(* TODO: redundancy criterion:
+   a<b subsumes c<d if c<a and b<=d, or c<=a and b<d *)
 
 (** {2 Setup} *)
 

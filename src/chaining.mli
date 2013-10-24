@@ -55,21 +55,13 @@ val ineq_chaining_left : Env.binary_inf_rule
 val ineq_chaining_right : Env.binary_inf_rule
   (** Inequality chaining where the clause is on the right. *)
 
-(* TODO: in ineq chaining, if the two bounds are arithmetic constants,
-         say,  a <| t1    t2 <| b
-              --------------------
-                    a <| b
-        and a |> b is obviously true, then directly cut the literal off.
-        Especially useful in case of a <= t1 and t2 <= b because we
-        save two literals (equality and inequality)
-
-        See same TODO in ArithElim
-*)
-
 
 (* TODO: redundancy criterion:
    a<b subsumes c<d if it is known from unit facts
-   that c<a and b<=d, or c<=a and b<d *)
+   that c<a and b<=d, or c<=a and b<d.
+
+   Same as simplify-reflect for equality: maintain a global graph of
+   ordering relations used to cut inconsistent literals. *)
 
 val is_semantic_tautology : Clause.t -> bool
   (** Check whether the clause is tautological for some ordering completion *)

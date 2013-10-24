@@ -33,9 +33,15 @@ module S = Symbol
 module T = FOTerm
 module F = FOFormula
 module C = Clause
+module I = ProofState.TermIndex
 module PF = PFormula
+module TO = Theories.TotalOrder
 module Lit = Literal
 module Lits = Literal.Arr
+
+let prof_case_switch = Util.mk_profiler "arith.case_switch"
+
+let stat_case_switch = Util.mk_stat "arith.case_switch"
 
 (** {2 Inference Rules} *)
 
@@ -131,6 +137,99 @@ let purify_arith c =
       [new_c]
     end
 
+(* enumerate integers from lower to higher, included. Returns an empty list
+    if lower > higher *)
+let _int_range lower higher =
+  let rec enum acc l r = match Big_int.compare_big_int l r with
+    | 0 -> l :: acc (* done *)
+    | n when n > 0 -> [] (* l must be smaller *)
+    | _ -> enum (l :: acc) (Big_int.succ_big_int l) r
+  in
+  enum [] lower higher
+
+(* new inference, kind of the dual of inequality chaining for integer
+   inequalities. See the .mli file for more explanations. *)
+let case_switch active_set c =
+  Util.enter_prof prof_case_switch;
+  let ctx = active_set#ctx in
+  let ord = Ctx.ord ctx in
+  let spec = Ctx.total_order ctx in
+  let instance = TO.tstp_instance ~spec in  (* $less, $lesseq *)
+  let eligible = C.Eligible.chaining c in
+  (* do the case switch inference. c contains lower <= t,
+      c' contains t <= higher. Enumerates t = i for i in lower .... higher *)
+  let _do_case_switch c s_c i c' s_c' i' t lower higher subst acc =
+    Util.debug 5 "case_switch between %a at %d and %a at %d" C.pp c i C.pp c' i';
+    let renaming = Ctx.renaming_clear ~ctx in
+    let lits_left = Util.array_except_idx c.C.hclits i in
+    let lits_left = Lit.apply_subst_list ~renaming ~ord subst lits_left s_c in
+    let lits_right = Util.array_except_idx c'.C.hclits i' in
+    let lits_right = Lit.apply_subst_list ~renaming ~ord subst lits_right s_c' in
+    let t' = Substs.FO.apply ~renaming subst t s_c in
+    (* the case switch on t *)
+    let lits_case = List.map
+      (fun n -> Lit.mk_eq ~ord t' (T.mk_const (S.mk_bigint n)))
+      (_int_range lower higher)
+    in
+    let new_lits = lits_left @ lits_right @ lits_case in
+    let proof cc = Proof.mk_c_step cc ~rule:"arith_case_switch" [c.C.hcproof; c'.C.hcproof] in
+    let parents = [c; c'] in
+    let new_c = C.create ~parents ~ctx new_lits proof in
+    Util.debug 5 "  --> case switch gives clause %a" C.pp new_c;
+    new_c :: acc
+  in
+  (* fold on literals *)
+  let new_clauses = Lits.fold_lits ~eligible c.C.hclits []
+    (fun acc lit i ->
+      try
+        let olit = Lit.ineq_lit_of ~instance lit in
+        let l = olit.TO.left in
+        let r = olit.TO.right in
+        if olit.TO.strict
+          then acc  (* on integers, we should only have <=, not < *)
+        else begin match l.T.term, r.T.term with
+          | T.Node (S.Int lower, []), _ when not (Arith.T.is_arith_const r) ->
+            (* const <= r, look for r <= const' in index *)
+            I.retrieve_unifiables active_set#idx_ord_left 1 r 0 acc
+              (fun acc _ with_pos subst ->
+                try
+                  let c' = with_pos.C.WithPos.clause in
+                  let pos' = with_pos.C.WithPos.pos in
+                  let i' = List.hd pos' in
+                  let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
+                  begin match olit'.TO.right.T.term with
+                  | T.Node (S.Int higher, []) ->
+                    (* found higher bound, now we can do the case switch *)
+                    _do_case_switch c 0 i c' 1 i' r lower higher subst acc
+                  | _ -> acc
+                  end
+                with Not_found ->
+                  acc)
+          | _, T.Node (S.Int higher, []) when not (Arith.T.is_arith_const l) ->
+            (* l <= const, look for const' <= l in index *)
+            I.retrieve_unifiables active_set#idx_ord_right 1 l 0 acc
+              (fun acc _ with_pos subst ->
+                try
+                  let c' = with_pos.C.WithPos.clause in
+                  let pos' = with_pos.C.WithPos.pos in
+                  let i' = List.hd pos' in
+                  let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
+                  begin match olit'.TO.left.T.term with
+                  | T.Node (S.Int lower, []) ->
+                    (* found lower bound *)
+                    _do_case_switch c' 1 i' c 0 i l lower higher subst acc
+                  | _ -> acc
+                  end
+                with Not_found ->
+                  acc)
+          | _ -> acc
+        end
+      with Not_found ->
+        acc)
+  in
+  Util.exit_prof prof_case_switch;
+  new_clauses
+
 let axioms =
   (* parse a pformula
   let pform ~name s =
@@ -171,6 +270,7 @@ let setup_env ?(ac=false) ~env =
   Env.add_unary_inf ~env "arith_pivot" pivot_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
+  Env.add_binary_inf ~env "arith_case_switch" case_switch;
   (* declare some AC symbols *)
   if ac then begin
     AC.add_ac ~env S.Arith.sum;
