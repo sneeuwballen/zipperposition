@@ -110,7 +110,7 @@ module Ctx = struct
     let signature = Signature.map signature
       (fun _ ty ->
         (* bind all remaining free variables to [ctx.default] *)
-        let vars = Type.free_vars ty in
+        let vars = Type.free_gvars ty in
         List.iter (fun gv -> Type.bind gv ctx.default) vars;
         (* dereference the type *)
         let ty = Type.deref ty in

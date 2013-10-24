@@ -86,6 +86,17 @@ let is_gvar = function | GVar _ -> true | _ -> false
 let is_app = function | App _ -> true | _ -> false
 let is_fun = function | Fun _ -> true | _ -> false
 
+module Tbl = Hashtbl.Make(struct
+  type t = ty
+  let equal = eq
+  let hash = hash
+end)
+
+module Set = Sequence.Set.Make(struct
+  type t = ty
+  let compare = cmp
+end)
+
 (** {2 Infix constructors} *)
 
 module Infix = struct
@@ -146,7 +157,7 @@ let rec _deref_var ty = match ty with
       else _deref_var !r
   | _ -> ty
 
-let free_vars ty =
+let free_gvars ty =
   let rec recurse acc ty = match _deref_var ty with
   | Var _ -> acc
   | GVar _ -> if List.memq ty acc then acc else ty :: acc
@@ -155,7 +166,7 @@ let free_vars ty =
   in
   recurse [] ty
 
-let bound_vars ty =
+let free_univ_vars ty =
   let rec recurse acc ty = match _deref_var ty with
   | Var _ -> if List.memq ty acc then acc else ty :: acc
   | GVar _ -> acc
@@ -203,7 +214,7 @@ let rec curry ty = match _deref_var ty with
   | GVar _ -> ty
   | App (s, l) -> app s (List.map curry l)
   | Fun (ret, l) ->
-    List.fold_left 
+    List.fold_left
       (fun ret arg -> mk_fun ret [curry arg])
       (curry ret) l
 
@@ -215,7 +226,7 @@ let rec uncurry ty = match _deref_var ty with
     begin match _gather_uncurry ty [] with
     | [] -> assert false
     | ret::args -> mk_fun (uncurry ret) args
-    end 
+    end
 (* given a curried function type, recover all its argument types into
     a list prepended to [acc] *)
 and _gather_uncurry ty acc = match _deref_var ty with
@@ -327,7 +338,7 @@ module Stack = struct
     ()
 
   let bottom = 0
-  
+
   let save st = st.size
 
   let restore st pos =
@@ -374,12 +385,13 @@ module Stack = struct
 end
 
 (* instantiate all bound variables *)
-let instantiate ty =
+let instantiate ?(filter=fun _ -> true) ty =
+  let map = Hashtbl.create 4 in
   (* recurse. [map] is a hashtable name -> gvar *)
-  let rec find_and_bound map ty =
+  let rec find_and_bound ty =
     let ty = _deref_var ty in
     match ty with
-    | Var n ->
+    | Var n when filter ty ->
       (* see whether we already instantiated this var *)
       begin try Hashtbl.find map n
       with Not_found ->
@@ -387,11 +399,14 @@ let instantiate ty =
         Hashtbl.add map n v;
         v
       end
+    | Var _
     | GVar _ -> ty
-    | App (s, l) -> App (s, List.map (find_and_bound map) l)
-    | Fun (ret, l) -> Fun (find_and_bound map ret, List.map (find_and_bound map) l)
+    | App (s, l) ->
+      app s (List.map find_and_bound l)
+    | Fun (ret, l) ->
+      mk_fun (find_and_bound ret) (List.map find_and_bound l)
   in
-  find_and_bound (Hashtbl.create 4) ty
+  find_and_bound ty
 
 let close_var var =
   match _deref_var var with
@@ -403,7 +418,7 @@ let close_var var =
 
 (* close all free variables *)
 let close ty =
-  let gvars = free_vars ty in
+  let gvars = free_gvars ty in
   List.iter close_var gvars;
   deref ty
 
@@ -494,3 +509,34 @@ let unifiable ty1 ty2 =
   with Error _ ->
     Util.exit_prof prof_unify;
     false
+
+(** {2 Prenex quantification of types} *)
+
+module Quantified = struct
+  type t = {
+    bound : Set.t;
+    ty : ty;
+  }
+
+  let mk_forall vars t =
+    if not (List.for_all is_var vars)
+      then invalid_arg "Type.Quantified.mk_forall: expect vars";
+    let bound = List.fold_left (fun set v -> Set.add v set) t.bound vars in
+    { t with bound; }
+
+  let of_ty ty = { bound=Set.empty; ty; }
+
+  let instantiate t =
+    let filter ty = not (Set.mem ty t.bound) in
+    instantiate ~filter t.ty
+
+  let pp buf t =
+    if Set.is_empty t.bound
+      then pp buf t.ty
+      else
+        let pp_var buf v = Printf.bprintf buf "%a: $tType" pp v in
+        Printf.bprintf buf "!>[%a]: %a"
+          (Util.pp_seq pp_var) (Set.to_seq t.bound) pp t.ty
+
+  let to_string = Util.on_buffer pp
+end

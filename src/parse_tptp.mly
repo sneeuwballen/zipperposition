@@ -297,8 +297,12 @@ system_functor: s=atomic_system_word { s }
 
 /* prenex quantified type */
 tff_type:
-  | ty=tff_term_type { Type.instantiate ty }
-  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_type { ty }
+  | ty=tff_quantified_type { Type.Quantified.instantiate ty }
+
+tff_quantified_type:
+  | ty=tff_term_type { Type.Quantified.of_ty ty }
+  | FORALL_TY LEFT_BRACKET vars=tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_quantified_type
+    { Type.Quantified.mk_forall vars ty }
 
 /* general type, without quantifiers */
 tff_term_type:
@@ -311,6 +315,8 @@ tff_term_type:
 tff_atom_type:
   | v=tff_ty_var { v }
   | w=type_const { Type.const w }
+  | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_term_type) RIGHT_PAREN
+    { Type.app w l }
   | TYPE_TY { Type.tType }
   | LEFT_PAREN ty=tff_term_type RIGHT_PAREN { ty }
 
@@ -323,7 +329,7 @@ tff_ty_vars:
   | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
 
 tff_ty_var: w=UPPER_WORD { Type.var w }
-  
+
 type_const:
   | w=LOWER_WORD { w }
   | w=DOLLAR_WORD { w }

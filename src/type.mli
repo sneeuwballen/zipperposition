@@ -58,6 +58,9 @@ val is_gvar : t -> bool
 val is_app : t -> bool
 val is_fun : t -> bool
 
+module Tbl : Hashtbl.S with type key = ty
+module Set : Sequence.Set.S with type elt = ty
+
 (** {2 Infix constructors} *)
 
 module Infix : sig
@@ -103,11 +106,11 @@ val tType : t   (* "type" of types *)
 
 (** All those functions but {!bind} follow pointers of {!GVar}s. *)
 
-val free_vars : t -> t list
-  (** List of free GVars *)
+val free_gvars : t -> t list
+  (** List of free {!GVar}s *)
 
-val bound_vars : t -> t list
-  (** List of bound variables (Var) *)
+val free_univ_vars : t -> t list
+  (** List of universally bound variables ({!Var}) *)
 
 val is_closed : t -> bool
   (** No GVar in this type? Corresponds to {! free_vars} returning
@@ -194,8 +197,11 @@ module Stack : sig
         otherwise call [restore st pos] and re-raise *)
 end
 
-val instantiate : t -> t
-  (** Instantiate all bound variables with fresh GVars *)
+val instantiate : ?filter:(t -> bool) -> t -> t
+  (** Instantiate all bound variables with fresh GVars.
+      @param filter can be used to restrict which variables are instantiated,
+        only those who satisfy the predicate are considered (default: all).
+      @return the instantiated type *)
 
 val close : t -> t
   (** Call {!deref} on the type, then replace all free variables (GVar) by
@@ -218,3 +224,29 @@ val alpha_equiv : t -> t -> bool
 val unifiable : t -> t -> bool
   (** Are the types unifiable after instantiation?
       Does not change bindings *)
+
+(** {2 Prenex quantification of types}
+
+This module helps dealing with explicitely quantified types.
+The most important operation is the instantiation of free variables
+to GVar (i.e. to a still-unknown type). *)
+
+module Quantified : sig
+  type t
+    (** Universally quantified type *)
+
+  val mk_forall : ty list -> t -> t
+    (** Quantify more variables.
+        @raise Invalid_argument if some element of the list is not a {!Var}. *)
+
+  val of_ty : ty -> t
+    (** No quantification *)
+
+  val instantiate : t -> ty
+    (** Instantiate variables that are not quantified into {!GVar}.
+        The quantified variables are kept as {!Var}.
+    *)
+
+  val pp : Buffer.t -> t -> unit
+  val to_string : t -> string
+end
