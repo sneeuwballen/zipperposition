@@ -174,6 +174,13 @@ let signature ?(signature=Signature.base) decls =
   infer_type ctx decls;
   TypeInference.Ctx.to_signature ctx
 
+let type_declarations decls =
+  Sequence.fold
+    (fun signature decl -> match decl with
+      | A.TypeDecl (_, s, ty) -> Signature.declare signature s ty
+      | _ -> signature)
+    Signature.empty decls
+
 let __name_symbol i sy =
   let str = Util.sprintf "'ty_decl_%d_%a'" i Symbol.pp sy in
   A.NameString str
