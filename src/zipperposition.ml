@@ -186,9 +186,9 @@ let load_plugins ~params =
     params.param_plugins
 
 (* build initial env and clauses *)
-let preprocess ?meta ~plugins ~params formulas =
+let preprocess ?meta ~signature ~plugins ~params formulas =
   (* penv *)
-  let penv = PEnv.create ?meta params in
+  let penv = PEnv.create ~base:signature ?meta params in
   setup_penv ~penv ();
   let formulas = PEnv.process ~penv formulas in
   Util.debug 3 "formulas pre-processed into:\n  %a"
@@ -303,9 +303,10 @@ let process_file ?meta ~plugins ~params file =
   let formulas = Sequence.map PF.of_sourced formulas in
   let formulas = PF.Set.of_seq formulas in
   (* obtain clauses + env *)
+  let signature = Util_tptp.type_declarations decls in
   Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
     (PF.Set.to_seq formulas);
-  let env, clauses = preprocess ?meta ~plugins ~params formulas in
+  let env, clauses = preprocess ?meta ~signature ~plugins ~params formulas in
   (* pre-saturation *)
   let num_clauses = C.CSet.size clauses in
   let result, clauses = if params.param_presaturate
