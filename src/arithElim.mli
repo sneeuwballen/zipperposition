@@ -56,9 +56,6 @@ val purify_arith : Env.unary_inf_rule
 val axioms : PFormula.t list
   (** Set of axioms useful to do arithmetic *)
 
-(* TODO: rule that simplifies  t < a | t < b if a and b are constants?
-  see if it's into t < b or t < a (check redundancy criterion) *)
-
 (* TODO: redundancy criterion:
    a<b subsumes c<d if c<a and b<=d, or c<=a and b<d *)
 

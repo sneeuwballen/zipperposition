@@ -255,6 +255,7 @@ let print_meta ~env =
   | None -> ()
 
 let print_szs_result ~file ~env result =
+  let params = Env.get_params ~env in
   match result with
   | Sat.Unknown
   | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut for '%s'\n" file
@@ -265,11 +266,18 @@ let print_szs_result ~file ~env result =
     if Ctx.is_completeness_preserved (Env.ctx env)
       then Printf.printf "%% SZS status CounterSatisfiable for '%s'\n" file
       else Printf.printf "%% SZS status GaveUp for '%s'\n" file;
-    Util.debug 1 "saturated set:\n  %a\n"
-      (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ~env)
+    begin match params.param_proof with
+      | "none" -> ()
+      | "tstp" ->
+        Util.debug 1 "saturated set:\n  %a\n"
+          (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ~env)
+      | "debug" ->
+        Util.debug 1 "saturated set:\n  %a\n"
+          (Util.pp_seq ~sep:"\n  " C.pp) (Env.get_active ~env)
+      | n -> failwith ("unknown proof format: " ^ n)
+    end
   | Sat.Unsat c ->
     (* print status then proof *)
-    let params = Env.get_params ~env in
     Printf.printf "%% SZS status Theorem for '%s'\n" file;
     Util.printf "%% SZS output start Refutation\n";
     Util.printf "%a" (Proof.pp params.param_proof) c.C.hcproof;
