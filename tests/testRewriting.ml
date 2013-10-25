@@ -44,10 +44,10 @@ let succ n = T.mk_node (Symbol.mk_const "s") [n]
 let plus a b = T.mk_node (Symbol.mk_const "+") [a; b]
 let minus a = T.mk_node (Symbol.mk_const "-") [a]
 let times a b = T.mk_node (Symbol.mk_const "x") [a; b]
-let x = T.mk_var 1
-let y = T.mk_var 2
-let z = T.mk_var 3
-let u = T.mk_var 4
+let x = T.mk_var ~ty:Type.i 1
+let y = T.mk_var ~ty:Type.i 2
+let z = T.mk_var ~ty:Type.i 3
+let u = T.mk_var ~ty:Type.i 4
 
 let rec from_int n =
   assert (n >= 0);

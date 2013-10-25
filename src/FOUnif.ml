@@ -69,6 +69,7 @@ let occurs_check subst v sc_v t sc_t =
 (** Unify terms, returns a substitution or raises Fail *)
 let unification ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_unification;
+  let ty_stack = Type.Stack.create () in
   (* recursive unification *)
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s
@@ -78,6 +79,15 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground s && T.is_ground t ->
       raise Fail (* terms are not equal, and ground. failure. *)
+    | Var _, Var _ when occurs_check subst s sc_s t sc_t -> raise Fail
+    | Var _, Var _ ->
+      let ty_s, ty_t = T.get_type s, T.get_type t in
+      (* unification of two vars: unify their types into [ty], and bind [s] to
+          a specialized version of [t] that has type [ty]. *)
+      let ty = Type.unify_deref ty_stack ty_s ty_t in
+      let t' = T.cast t ty in
+      let subst = S.bind subst s sc_s t' sc_t in
+      S.bind subst t sc_t t' sc_t
     | Var _, _ ->
       if occurs_check subst s sc_s t sc_t
         then raise Fail (* occur check *)
@@ -101,11 +111,15 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
   (* try unification, and return solution/exception (with profiler handling) *)
   try
     let subst = unif subst a sc_a b sc_b in
+    Type.Stack.restore_all ty_stack;
     Util.exit_prof prof_unification;
     subst
-  with Fail as e ->
+  with
+  | Type.Error _
+  | Fail ->
+    Type.Stack.restore_all ty_stack;
     Util.exit_prof prof_unification;
-    raise e
+    raise Fail
 
 (** [matching a b] returns sigma such that sigma(a) = b, or raises
     Fail. Only variables from the context of [a] can
@@ -200,8 +214,8 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
     | None -> ref (max (T.max_var (T.vars a) + sc_a + 1)
                        (T.max_var (T.vars b) + sc_b + 1)) in
   (* avoid index collisions *)
-  let fresh_var () =
-    let v = T.mk_var !offset in
+  let fresh_var ~ty =
+    let v = T.mk_var ~ty !offset in
     incr offset;
     v
   in
@@ -261,7 +275,7 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       (* try to bind x1 to [x2+z] where [z] is fresh,
          if len(l1) < len(left+right) *)
       if T.is_var x1 && List.length l1 < List.length left + List.length right then
-        let z = fresh_var () in
+        let z = fresh_var ~ty:(T.get_type x1) in
         (* offset trick: we need [z] in both contexts sc_1 and sc_2, so we
            bind it so that (z,sc_2) -> (z,sc_1), and use (z,sc_1) to continue
            the matching *)
@@ -321,9 +335,11 @@ let form_variant ?(subst=S.empty) f1 sc_1 f2 sc_2 =
       if List.length l1 = List.length l2
         then unif_ac subst l1 [] l2 k
         else ()  (* not. *)
-    | F.Exists f1', F.Exists f2'
-    | F.Forall f1', F.Forall f2' ->
-      unif subst f1' f2' k
+    | F.Exists (ty1,f1'), F.Exists (ty2,f2')
+    | F.Forall (ty1,f1'), F.Forall (ty2,f2') ->
+      if Type.unifiable ty1 ty2
+        then unif subst f1' f2' k
+        else ()
     | F.True, F.True
     | F.False, F.False -> k subst  (* yep :) *)
     | _ -> ()  (* failure :( *)

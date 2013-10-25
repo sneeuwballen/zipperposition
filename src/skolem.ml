@@ -66,7 +66,7 @@ let fresh_var ~ctx =
 
 exception FoundVariant of T.t * T.t * S.t
 
-let skolem_term ~ctx t =
+let skolem_term ~ctx ~ty t =
   let vars = T.vars_prefix_order t in
   (* find the skolemized normalized term *)
   try
@@ -80,11 +80,6 @@ let skolem_term ~ctx t =
       ctx.sc_cache;
     (* not found, use a fresh symbol *)
     let symb = fresh_sym ~ctx in
-    (* which type? *)
-    let ty = match T.db_type t 0 with
-      | Some ty -> ty
-      | None -> Type.i  (* default... *)
-    in
     (* replace the existential variable by [skolem_term] in [t] *)
     let skolem_term = T.mk_node symb vars in
     let new_t = T.db_unlift (T.db_replace t skolem_term) in
@@ -101,7 +96,7 @@ let skolem_term ~ctx t =
 
 exception FoundFormVariant of F.t * F.t * S.t
 
-let skolem_form ~ctx f =
+let skolem_form ~ctx ~ty f =
   let vars = F.free_variables f in
   (* find a variant of [f] *)
   try
@@ -115,11 +110,6 @@ let skolem_form ~ctx f =
     (* fresh symbol *)
     let symb = fresh_sym ~ctx in
     let skolem_term = T.mk_node symb vars in
-    (* which type? *)
-    let ty = match F.db_type f 0 with
-      | Some ty -> ty
-      | None -> Type.i  (* default... *)
-    in
     (* replace variable by skolem t*)
     let new_f = F.db_unlift (F.db_replace f skolem_term) in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
@@ -133,4 +123,4 @@ let skolem_form ~ctx f =
     let new_f = S.apply_f ~renaming subst new_f' 1 in
     new_f
 
-let skolem_ho ~ctx f = failwith "Skolem_ho: not implemented"
+let skolem_ho ~ctx ~ty f = failwith "Skolem_ho: not implemented"

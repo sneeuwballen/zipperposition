@@ -182,8 +182,9 @@ let rec is_closed ty = match _deref_var ty with
   | Fun (ret, l) -> is_closed ret && List.for_all is_closed l
 
 let rec deref ty = match _deref_var ty with
-  | Var _ -> ty
-  | GVar (_, r) -> ty
+  | Var _
+  | GVar _
+  | App (_, []) -> ty
   | App (s, l) ->
     let l' = List.map deref l in
     app s l'
@@ -475,6 +476,19 @@ let unify st ty1 ty2 =
     unify_rec st ty1 ty2;
     Util.exit_prof prof_unify;
     ()
+  with e ->
+    Stack.restore st pos;
+    Util.exit_prof prof_unify;
+    raise e
+
+let unify_deref st ty1 ty2 =
+  Util.enter_prof prof_unify;
+  let pos = Stack.save st in
+  try
+    unify_rec st ty1 ty2;
+    let ty = deref ty1 in
+    Util.exit_prof prof_unify;
+    ty
   with e ->
     Stack.restore st pos;
     Util.exit_prof prof_unify;

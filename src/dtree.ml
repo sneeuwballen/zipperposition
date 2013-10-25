@@ -45,19 +45,19 @@ let skip t pos =
 
 type character =
   | Symbol of Symbol.t
-  | BoundVariable of int * T.t
+  | BoundVariable of int
   | Variable of T.t
 
 let compare_char c1 c2 =
   (* compare variables by index *)
   let compare_vars v1 v2 = match v1.T.term, v2.T.term with
-    | T.Var i, T.Var j -> if i <> j then i - j else T.compare_type v1 v2
+    | T.Var i, T.Var j ->
+      if i <> j then i - j else Type.cmp (T.get_type v1) (T.get_type v2)
     | _ -> assert false
   in
   match c1, c2 with
   | Symbol s1, Symbol s2 -> Symbol.compare s1 s2
-  | BoundVariable (i, ti), BoundVariable (j, tj) when i = j -> T.compare_type ti tj
-  | BoundVariable (i, _), BoundVariable (j, _) -> i - j
+  | BoundVariable i, BoundVariable j -> i - j
   | Variable v1, Variable v2 -> compare_vars v1 v2
   (* symbol < bound_variable < variable *)
   | Variable _, _ -> 1
@@ -70,7 +70,7 @@ let eq_char c1 c2 = compare_char c1 c2 = 0
 let rec term_to_char t =
   match t.T.term with
   | T.Var _ -> Variable t
-  | T.BoundVar i -> BoundVariable (i, t)
+  | T.BoundVar i -> BoundVariable i
   | T.Node (f, _) -> Symbol f
 
 (** convert term to list of var/symbol *)
@@ -91,7 +91,7 @@ end)
 
 let char_to_str c = match c with
   | Symbol s -> Util.sprintf "%a" Symbol.pp s
-  | BoundVariable (i, sort) -> Util.sprintf "Y%d" i
+  | BoundVariable i -> Util.sprintf "Y%d" i
   | Variable t -> Util.sprintf "%a" T.pp t
 
 (** {2 Discrimination tree} *)
@@ -204,17 +204,16 @@ module Make(E : Index.EQUATION) = struct
             in
             (* if variable, try to bind it and continue *)
             match t1' with
-            | Variable v1' when (not (T.has_type t_pos) || T.compatible_type v1' t_pos)
-            && S.is_in_subst subst v1' sc_dt ->
+            | Variable v1' when S.is_in_subst subst v1' sc_dt ->
                (* already bound, check consistency *)
               begin try
                 let subst = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in
                 traverse subtrie acc (skip t pos) subst
               with FOUnif.Fail -> acc (* incompatible binding *)
               end
-            | Variable v1' when not (T.has_type t_pos) || T.compatible_type v1' t_pos ->
+            | Variable v1' ->
               (* t1' not bound, so we bind it and continue in subtree *)
-              let subst' = S.bind subst v1' sc_dt t_pos sc_t in
+              let subst' = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in
               traverse subtrie acc (skip t pos) subst'
             | _ -> acc)
           m acc

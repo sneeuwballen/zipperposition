@@ -32,8 +32,8 @@ module S = Substs.FO
 
 let a = T.mk_const (Symbol.mk_const "a")
 let b = T.mk_const (Symbol.mk_const "b")
-let x = T.mk_var 0
-let y = T.mk_var 1
+let x = T.mk_var ~ty:Type.i 0
+let y = T.mk_var ~ty:Type.i 1
 let f x y = T.mk_node (Symbol.mk_const "f") [x; y]
 let g x = T.mk_node (Symbol.mk_const "g") [x]
 let h x y z = T.mk_node (Symbol.mk_const "h") [x;y;z]

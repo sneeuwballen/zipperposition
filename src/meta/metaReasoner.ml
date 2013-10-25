@@ -134,7 +134,7 @@ module Translate = struct
       match mapping, l with
       | None, _ -> (), l
       | String, (Logic.Const (DSName s))::l' -> s, l'
-      | Term, (Logic.Var i) :: l' -> T.mk_var i, l'
+      | Term, (Logic.Var i) :: l' -> T.mk_var ~ty:Type.i i, l'
       | Term, (Logic.Const (DSTerm t))::l' -> t, l'
       | Type, (Logic.Const (DSType ty))::l' -> ty, l'
       | Map (_, extract, m'), l ->

@@ -530,9 +530,10 @@ let fmap_premises f premises =
       | IfPattern (p, l) -> IfPattern (p, List.map f l))
     premises
 
-(** Map the terms to fresh variables, returning a permutation *)
+(** Map the terms to fresh variables, returning a permutation
+    FIXME use proper types, or type variables *)
 let map_to_vars ?(offset=0) terms =
-  let vars = List.mapi (fun i t -> T.mk_var (i+offset)) terms in
+  let vars = List.mapi (fun i t -> T.mk_var ~ty:Type.i (i+offset)) terms in
   TBij.of_list terms vars
 
 let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_const s)) l

@@ -61,7 +61,9 @@ module EncodedForm = struct
           (p (__var X)), and the substitution will be rejected. *)
       HOT.mk_at __var t
     | HOT.BoundVar _ -> t
-    | HOT.Bind (s, t') -> HOT.mk_bind s (encode_t t')
+    | HOT.Bind (s, t') ->
+      let ty = HOT.get_type t in
+      HOT.mk_bind ~ty s (encode_t t')
     | HOT.Const s when not (Symbol.is_connective s) -> 
       (** Similarly to the Var case, here we need to protect constants
           from being bound to variables once abstracted into variables *)
@@ -73,7 +75,9 @@ module EncodedForm = struct
   let rec decode_t t = match t.HOT.term with
     | HOT.Var _
     | HOT.BoundVar _ -> t
-    | HOT.Bind (s, t') -> HOT.mk_bind s (decode_t t')
+    | HOT.Bind (s, t') ->
+      let ty = HOT.get_type t in
+      HOT.mk_bind ~ty s (decode_t t')
     | HOT.At (s, t') when HOT.eq s __var -> decode_t t'
     | HOT.At (s, t') when HOT.eq s __fun -> decode_t t'
     | HOT.Const _ -> t

@@ -217,6 +217,11 @@ val unify : Stack.t -> t -> t -> unit
   (** Unify two types.
       @raise Error if the types are not unifiable (and restore bindings) *)
 
+val unify_deref : Stack.t -> t -> t -> t
+  (** Same as {!unify}, but if it succeeds it also evaluates one of the
+      two types (that became equal), and return it.
+      @raise Error in case of unification error (and restore bindings) *)
+
 val alpha_equiv : t -> t -> bool
   (** Are the types alpha equivalent after instantiation?
       Does not change bindings. *)

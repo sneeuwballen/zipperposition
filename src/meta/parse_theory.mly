@@ -43,10 +43,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     __count := 0
 
   (** Get variable associated with this name *)
-  let get_var ?ty name =
+  let get_var ~ty name =
     try Hashtbl.find __table name
     with Not_found ->
-      let v = T.mk_var ?ty !__count in
+      let v = T.mk_var ~ty !__count in
       incr __count;
       Hashtbl.add __table name v;
       v
@@ -346,7 +346,7 @@ variables:
 
 /* TODO: typed variables */
 variable:
-  | x=UPPER_WORD { get_var x }
+  | x=UPPER_WORD { get_var ~ty:Type.i x }
   | x=UPPER_WORD COLUMN ty=tff_type { get_var ~ty x }
 
 atomic_word:

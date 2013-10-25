@@ -61,11 +61,10 @@ module Ctx = struct
     ctx.signature <- Signature.merge ctx.signature signature;
     ()
 
-  let within_binder ctx f =
-    let gvar = Type.new_gvar () in
-    ctx.db <- gvar :: ctx.db;
+  let within_binder ctx ~ty f =
+    ctx.db <- ty :: ctx.db;
     try
-      let x = f gvar in
+      let x = f () in
       ctx.db <- List.tl ctx.db;
       x
     with e ->
@@ -299,18 +298,9 @@ module FO = Make(struct
     let open Type.Infix in
     match t.T.term with
     | T.Var _ ->
-      begin match t.T.type_ with
-      | Some ty -> Type.instantiate ty
-      | None -> failwith (Util.sprintf "type_infer: free var %a without type" T.pp t)
-      end
-    | T.BoundVar i ->
-      begin match t.T.type_ with
-      | None -> Ctx.db_type ctx i
-      | Some ty ->
-        let ty' = Ctx.db_type ctx i in
-        Ctx.unify ctx ty' (Type.instantiate ty);
-        ty'
-      end
+      let ty = T.get_type t in
+      Type.instantiate ty
+    | T.BoundVar i -> Ctx.db_type ctx i
     | T.Node (s, []) -> Ctx.type_of_fun ctx s
     | T.Node (s, l) ->
       let ty_s = Ctx.type_of_fun ctx s in
@@ -341,18 +331,9 @@ module HO = Make(struct
     let open Type.Infix in
     match t.T.term with
     | T.Var _ ->
-      begin match t.T.type_ with
-      | Some ty -> Type.instantiate ty
-      | None -> failwith (Util.sprintf "type_infer: free var %a without type" T.pp t)
-      end
-    | T.BoundVar i ->
-      begin match t.T.type_ with
-      | None -> Ctx.db_type ctx i
-      | Some ty ->
-        let ty' = Ctx.db_type ctx i in
-        Ctx.unify ctx ty' (Type.instantiate ty);
-        ty'
-      end
+      let ty = T.get_type t in
+      Type.instantiate ty
+    | T.BoundVar i -> Ctx.db_type ctx i
     | T.At (t1, t2) ->
       let ty1 = infer_rec ~check ctx t1 in
       let ty2 = infer_rec ~check ctx t2 in
@@ -362,11 +343,13 @@ module HO = Make(struct
       Ctx.unify ctx ty1 (ty1_ret <=. ty2);
       ty1_ret
     | T.Bind (s, t') ->
-      Ctx.within_binder ctx
-        (fun v ->
+      let ty = Type.instantiate (T.get_type t) in
+      let vars = Type.free_gvars ty in
+      Ctx.within_binder ~ty ctx
+        (fun () ->
           let ty_t' = infer_rec ~check ctx t' in
-          (* generalize w.r.t [v] if it's still free *)
-          Type.close_var v;
+          (* re-generalize type variables *)
+          List.iter Type.close_var vars;
           ty_t')
     | T.Const s -> Ctx.type_of_fun ctx s
 end)

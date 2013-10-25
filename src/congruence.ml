@@ -291,6 +291,8 @@ module HO = Make(struct
     | T.Var _
     | T.BoundVar _), [] -> t
     | T.At (t1, t2), [t1'; t2'] -> T.mk_at t1' t2'
-    | T.Bind (s, _), [t'] -> T.mk_bind s t'
+    | T.Bind (s, _), [t'] ->
+      let ty = T.get_type t in
+      T.mk_bind ~ty s t'
     | _ -> assert false
 end)

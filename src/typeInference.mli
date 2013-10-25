@@ -50,9 +50,9 @@ module Ctx : sig
   val add_signature : t -> Signature.t -> unit
     (** Specify the type of some symbols *)
 
-  val within_binder : t -> (Type.t -> 'a) -> 'a
+  val within_binder : t -> ty:Type.t -> (unit -> 'a) -> 'a
     (** Provides a context, corresponding to a term binding environement,
-        in which the first De Bruijn variable will have the type
+        in which the first De Bruijn variable will have the type [ty]
         passed as argument *)
 
   val db_type : t -> int -> Type.t

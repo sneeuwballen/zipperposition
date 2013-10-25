@@ -58,6 +58,10 @@ val compare : t -> t -> int         (** a simple order on terms *)
 val hash : t -> int
 val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
+val get_type : t -> Type.t
+  (** Obtain the type of a {!Var} or {!Bind}.
+      @raise Failure if the term is not a variable. *)
+
 module Tbl : Hashtbl.S with type key = t
 module Set : Sequence.Set.S with type elt = t
 module Map : Sequence.Map.S with type key = t
@@ -83,10 +87,10 @@ val get_flag : int -> t -> bool
 val new_flag : unit -> int
   (** New flag, different from all other flags *)
 
-val mk_var : ?ty:Type.t -> int -> t        (** Create a variable. The index must be >= 0 *)
-val mk_bound_var : ?ty:Type.t -> int -> t  (** De Bruijn index, must be >= 0 *)
+val mk_var : ty:Type.t -> int -> t  (** Create a variable. The index must be >= 0 *)
+val mk_bound_var : int -> t  (** De Bruijn index, must be >= 0 *)
 
-val mk_bind : Symbol.t -> t -> t
+val mk_bind : Symbol.t -> ty:Type.t -> t -> t
   (** [mk_bind s t] binds the De Bruijn 0 in [t]. *)
 
 val mk_const : Symbol.t -> t
@@ -112,9 +116,9 @@ val mk_equiv : t -> t -> t
 val mk_xor : t -> t -> t
 val mk_eq : t -> t -> t
 val mk_neq : t -> t -> t
-val mk_lambda : t -> t
-val mk_forall : t -> t
-val mk_exists : t -> t
+val mk_lambda : ty:Type.t -> t -> t
+val mk_forall : ty:Type.t -> t -> t
+val mk_exists : ty:Type.t -> t -> t
 
 val mk_and_list : t list -> t
 val mk_or_list : t list -> t
@@ -204,9 +208,6 @@ val db_replace : ?depth:int -> into:t -> by:t -> t
   (** Substitution of De Bruijn symbol by a term. [db_replace ~into ~by]
       replaces the De Bruijn symbol 0 by [by] in [into]. *)
 
-val db_type : t -> int -> Type.t option
-  (** [db_type t n] returns the type of the [n]-th De Bruijn index in [t] *)
-
 val db_lift : ?depth:int -> int -> t -> t
   (** lift the non-captured De Bruijn indexes in the term by n *)
 
@@ -214,7 +215,7 @@ val db_unlift : ?depth:int -> t -> t
   (** Unlift the term (decrement indices of all free De Bruijn variables
       inside *)
 
-val db_from_term : ?depth:int -> ?ty:Type.t -> t -> t -> t
+val db_from_term : ?depth:int -> t -> t -> t
   (** [db_from_term t t'] Replace [t'] by a fresh De Bruijn index in [t]. *)
 
 val db_from_var : ?depth:int -> t -> t -> t

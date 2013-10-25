@@ -93,6 +93,16 @@ let compare_type t1 t2 = match t1.type_, t2.type_ with
   | None, Some _ -> -1
   | None, None -> 0
 
+(* get the type of this term. The term MUST be a variable or bind,
+  in which case it must have a type. *)
+let get_type t = match t.term, t.type_ with
+  | Var _, Some ty -> ty
+  | Bind _, Some ty -> ty
+  | (Var _ | Bind _), None -> assert false
+  | At _, _ -> failwith "HOTerm.At is not typed"
+  | Const _, _ -> failwith "HOTerm.Const is not typed"
+  | BoundVar _, _ -> failwith "HOTerm.BoundVar is not typed"
+
 module TermHASH = struct
   type t = term
   let equal = eq
@@ -169,7 +179,7 @@ let cast t ty =
 (** In this section, term smart constructors are defined. They perform
     hashconsing, and precompute some properties (flags) *)
 
-let mk_var ?(ty=Type.i) idx =
+let mk_var ~ty idx =
   assert (idx >= 0);
   let my_v = {term = Var idx; type_= Some ty; tsize = 1;
               flags=(flag_db_closed lor flag_db_closed_computed lor
@@ -177,16 +187,16 @@ let mk_var ?(ty=Type.i) idx =
               tag= -1} in
   H.hashcons my_v
 
-let mk_bound_var ?ty idx =
+let mk_bound_var idx =
   assert (idx >= 0);
-  let my_v = {term = BoundVar idx; type_=ty; tsize = 1;
+  let my_v = {term = BoundVar idx; type_=None; tsize = 1;
               flags=(flag_db_closed_computed lor flag_normal_form);
               tag= -1} in
   H.hashcons my_v
 
-let mk_bind s t' =
+let mk_bind s ~ty t' =
   assert (Symbol.has_attr Symbol.attr_binder s);
-  let my_t = {term=Bind (s, t'); type_=None; flags=0; tsize=0; tag= -1} in
+  let my_t = {term=Bind (s, t'); type_=Some ty; flags=0; tsize=0; tag= -1} in
   let t = H.hashcons my_t in
   (if t == my_t
     then begin (* compute ground-ness of term *)
@@ -238,9 +248,9 @@ let mk_equiv a b = mk_at_list equiv_term [a; b]
 let mk_xor a b = mk_not (mk_equiv a b)
 let mk_eq a b = mk_at_list eq_term [a; b]
 let mk_neq a b = mk_not (mk_eq a b)
-let mk_lambda t = mk_bind Symbol.lambda_symbol t
-let mk_forall t = mk_bind Symbol.forall_symbol t
-let mk_exists t = mk_bind Symbol.exists_symbol t
+let mk_lambda ~ty t = mk_bind Symbol.lambda_symbol ~ty t
+let mk_forall ~ty t = mk_bind Symbol.forall_symbol ~ty t
+let mk_exists ~ty t = mk_bind Symbol.exists_symbol ~ty t
 
 let rec mk_and_list l = match l with
   | [] -> true_term
@@ -296,7 +306,8 @@ let rec replace t ~old ~by = match t.term with
   | _ when t == old -> by
   | Var _ | BoundVar _ | Const _ -> t
   | Bind (s, t') ->
-    mk_bind s (replace t' ~old ~by)
+    let ty = get_type t in
+    mk_bind ~ty s (replace t' ~old ~by)
   | At (t1, t2) ->
     mk_at (replace t1 ~old ~by) (replace t2 ~old ~by)
 
@@ -480,10 +491,11 @@ let db_lift ?(depth=0) n t =
     match t.term with
     | _ when db_closed t -> t  (* closed. *)
     | BoundVar i when i >= depth ->
-      mk_bound_var ?ty:t.type_ (i+n) (* lift by n, term not captured *)
+      mk_bound_var (i+n) (* lift by n, term not captured *)
     | Var _ | BoundVar _ | Const _ -> t
     | Bind (s, t') ->
-      mk_bind s (recurse (depth+1) t')  (* increase depth and recurse *)
+      let ty = get_type t in
+      mk_bind ~ty s (recurse (depth+1) t')  (* increase depth and recurse *)
     | At (t1, t2) -> mk_at (recurse depth t1) (recurse depth t2)
   in
   assert (n >= 0);
@@ -501,23 +513,11 @@ let db_replace ?(depth=0) ~into ~by =
   | Var _ -> t
   | Bind (symb, t') ->
     (* lift the De Bruijn to replace *)
-    mk_bind symb (replace (depth+1) s t')
+    let ty = get_type t in
+    mk_bind symb ~ty (replace (depth+1) s t')
   | At (t1, t2) -> mk_at (replace depth s t1) (replace depth s t2)
   in
   replace depth by into
-
-(** Type of the [n]-th De Bruijn index in [t] *)
-let rec db_type t n = match t.term with
-  | BoundVar i when i = n -> t.type_
-  | BoundVar _
-  | Const _
-  | Var _ -> None
-  | At (t1, t2) ->
-    begin match db_type t1 n with
-    | Some ty -> Some ty
-    | None -> db_type t2 n
-    end
-  | Bind (_, t') -> db_type t' (n+1)
 
 (* unlift the term (decrement indices of all free De Bruijn variables inside *)
 let db_unlift ?(depth=0) t =
@@ -526,20 +526,23 @@ let db_unlift ?(depth=0) t =
   let rec recurse depth t =
     match t.term with
     | _ when db_closed t -> t
-    | BoundVar i -> if i >= depth then mk_bound_var ?ty:t.type_ (i-1) else t
+    | BoundVar i -> if i >= depth then mk_bound_var (i-1) else t
     | Const _ | Var _ -> t
     | Bind (s, t') ->
-      mk_bind s (recurse (depth+1) t')
+      let ty = get_type t in
+      mk_bind ~ty s (recurse (depth+1) t')
     | At (t1, t2) ->
       mk_at (recurse depth t1) (recurse depth t2)
   in recurse depth t
 
 (** Replace [t'] by a fresh De Bruijn index in [t]. *)
-let db_from_term ?(depth=0) ?(ty=Type.i) t t' =
+let db_from_term ?(depth=0) t t' =
   (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
-  | _ when t == t' -> mk_bound_var ~ty depth
-  | Bind (s, t') -> mk_bind s (replace (depth+1) t')
+  | _ when t == t' -> mk_bound_var depth
+  | Bind (s, t') ->
+    let ty = get_type t in
+    mk_bind ~ty s (replace (depth+1) t')
   | Var _
   | Const _
   | BoundVar _ -> t
@@ -551,7 +554,7 @@ let db_from_term ?(depth=0) ?(ty=Type.i) t t' =
   Same as db_from_term. *)
 let db_from_var ?depth t v =
   assert (is_var v);
-  db_from_term ?depth ?ty:v.type_ t v
+  db_from_term ?depth t v
 
 (** {2 High-level operations} *)
 
@@ -561,16 +564,14 @@ let db_from_var ?depth t v =
 let rec db_to_classic ?(varindex=ref 0) t =
   match t.term with
   | Bind (s, t') ->
-    let ty = db_type t' 0 in
-    let v = mk_var ?ty !varindex in
+    let ty = get_type t in
+    let v = mk_var ~ty !varindex in
     incr varindex;
     let new_t = mk_at_list (mk_const s) [v; db_unlift (db_replace t' v)] in
     db_to_classic ~varindex new_t
   | Const _ | Var _ -> t
   | BoundVar _ ->  (* free variable *)
-    let n = !varindex in
-    incr varindex;
-    mk_var ?ty:t.type_ n
+    failwith "HOTerm.db_to_classic: free De Bruijn index"
   | At (t1, t2) ->
     mk_at (db_to_classic ~varindex t1) (db_to_classic ~varindex t2)
 
@@ -581,21 +582,25 @@ let rec db_to_classic ?(varindex=ref 0) t =
 let mk_lambda_var vars t =
   List.fold_right
     (fun var t ->
-      mk_lambda (db_from_var (db_lift 1 t) var))
+      assert (is_var var);
+      let ty = get_type var in
+      mk_lambda ~ty (db_from_var (db_lift 1 t) var))
     vars t
 
 let mk_forall_var vars t =
   List.fold_right
     (fun var t ->
       assert (is_var var);
-      mk_forall (db_from_var (db_lift 1 t) var))
+      let ty = get_type var in
+      mk_forall ~ty (db_from_var (db_lift 1 t) var))
     vars t
 
 let mk_exists_var vars t =
   List.fold_right
     (fun var t ->
       assert (is_var var);
-      mk_exists (db_from_var (db_lift 1 t) var))
+      let ty = get_type var in
+      mk_exists ~ty (db_from_var (db_lift 1 t) var))
     vars t
 
 (** Bind all free variables by 'forall' *)
@@ -616,16 +621,11 @@ let rec curry t =
   match t.FOT.term with
   | FOT.Var i ->
     let ty = match t.FOT.type_ with
-    | None -> None
-    | Some ty -> Some (Type.curry ty)
+    | None -> failwith "FOTerm.Var must have a type"
+    | Some ty -> Type.curry ty
     in
-    mk_var ?ty i
-  | FOT.BoundVar i ->
-    let ty = match t.FOT.type_ with
-    | None -> None
-    | Some ty -> Some (Type.curry ty)
-    in
-    mk_bound_var ?ty i
+    mk_var ~ty i
+  | FOT.BoundVar i -> mk_bound_var i
   | FOT.Node (f, []) -> mk_const f
   | FOT.Node (f, l) ->
     mk_at_list (mk_const f) (List.map curry l)
@@ -636,17 +636,9 @@ let uncurry t =
   let rec uncurry t =
     match t.term with
     | Var i ->
-      let ty = match t.type_ with
-      | None -> None
-      | Some ty -> Some (Type.uncurry ty)
-      in
-      FOT.mk_var ?ty i
-    | BoundVar i -> 
-      let ty = match t.type_ with
-      | None -> None
-      | Some ty -> Some (Type.uncurry ty)
-      in
-      FOT.mk_bound_var ?ty i
+      let ty = Type.uncurry (get_type t) in
+      FOT.mk_var ~ty i
+    | BoundVar i -> FOT.mk_bound_var i
     | Bind (s, t') -> failwith "cannot uncurry binder"
     | Const s -> FOT.mk_const s
     | At (t1, t2) -> unfold_left t1 [uncurry t2]
@@ -675,7 +667,10 @@ let pp_tstp_depth depth buf t =
   let rec pp_rec buf t = match t.term with
   | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
   | Bind (s,t') ->
-    Printf.bprintf buf "%a[%a]: " Symbol.pp s pp_bvar t';
+    let ty = get_type t in
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "%a[%a]: " Symbol.pp s pp_bvar ()
+      else Printf.bprintf buf "%a[%a:%a]: " Symbol.pp s pp_bvar () Type.pp ty;
     incr depth;
     pp_surrounded buf t';
     decr depth
@@ -686,10 +681,7 @@ let pp_tstp_depth depth buf t =
   | At (_, _) ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
-  and pp_bvar buf t = match db_type t 0 with
-  | None -> Printf.bprintf buf "Y%d" !depth
-  | Some ty -> Printf.bprintf buf "Y%d: %a" !depth Type.pp ty
-  in
+  and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in
   pp_rec buf t
 
 (* lightweight printing *)
@@ -698,13 +690,20 @@ let rec pp_depth depth buf t =
   (* recursive printing *)
   let rec pp_rec buf t = match t.term with
   | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-  | Bind (s,t') ->
-    Printf.bprintf buf "%a[%a]: " Symbol.pp s pp_bvar t';
+  | Bind (s, t') ->
+    let ty = get_type t in
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "%a[%a]: " Symbol.pp s pp_bvar ()
+      else Printf.bprintf buf "%a[%a:%a]: " Symbol.pp s Type.pp ty pp_bvar ();
     incr depth;
     pp_surrounded buf t';
     decr depth
   | Const s -> Symbol.pp buf s
-  | Var i -> Printf.bprintf buf "X%d" i
+  | Var i ->
+    let ty = get_type t in
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "X%d" i
+      else Printf.bprintf buf "X%d:%a" i Type.pp ty
   | At (t1, t2) ->
     pp_rec buf t1; Buffer.add_char buf ' ';
     pp_surrounded buf t2
@@ -712,10 +711,7 @@ let rec pp_depth depth buf t =
   | At _ ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
-  and pp_bvar buf t = match db_type t 0 with
-  | None -> Printf.bprintf buf "Y%d" !depth
-  | Some ty -> Printf.bprintf buf "Y%d: %a" !depth Type.pp ty
-  in
+  and pp_bvar buf () = Printf.bprintf buf "Y%d" !depth in
   pp_rec buf t
 
 let pp_debug buf t = pp_depth 0 buf t
@@ -732,34 +728,35 @@ let to_string t = Util.sprintf "%a" pp t
 
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
-let rec debug fmt t = match t.term, t.type_ with
-  | Var i, None -> Format.fprintf fmt "X%d" i
-  | Var i, Some ty -> Format.fprintf fmt "X%d:%a" i Type.fmt ty
-  | BoundVar i, None -> Format.fprintf fmt "Y%d" i
-  | BoundVar i, Some ty -> Format.fprintf fmt "Y%d:%a" i Type.fmt ty
-  | Bind (s, t'), _ -> 
-    Format.fprintf fmt "(%s %a)" (Symbol.to_string s) debug t'
-  | Const s, _ -> Symbol.fmt fmt s
-  | At (t1, t2), _-> Format.fprintf fmt "%a %a" debug t1 debug t2
+let rec debug fmt t = match t.term with
+  | Var i ->
+    let ty = get_type t in
+    Format.fprintf fmt "X%d:%a" i Type.fmt ty
+  | BoundVar i -> Format.fprintf fmt "Y%d" i
+  | Bind (s, t') -> 
+    let ty = get_type t in
+    Format.fprintf fmt "(%s %a %a)" (Symbol.to_string s) Type.fmt ty debug t'
+  | Const s -> Symbol.fmt fmt s
+  | At (t1, t2) -> Format.fprintf fmt "%a %a" debug t1 debug t2
 
 let bij =
   let open Bij in
   fix
     (fun bij ->
-      let bij_bind = lazy (pair Symbol.bij (Lazy.force bij)) in
-      let bij_var = lazy (pair int_ (opt Type.bij)) in
+      let bij_bind = lazy (triple Symbol.bij Type.bij (Lazy.force bij)) in
+      let bij_var = lazy (pair int_ Type.bij) in
       let bij_pair = lazy (pair (Lazy.force bij) (Lazy.force bij)) in
       switch
         ~inject:(fun t -> match t.term with
-        | BoundVar i -> "bv", BranchTo (Lazy.force bij_var, (i, t.type_))
-        | Var i -> "v", BranchTo (Lazy.force bij_var, (i, t.type_))
-        | Bind (s, t') -> "bind", BranchTo (Lazy.force bij_bind, (s, t'))
+        | BoundVar i -> "bv", BranchTo (int_, i)
+        | Var i -> "v", BranchTo (Lazy.force bij_var, (i, get_type t))
+        | Bind (s, t') -> "bind", BranchTo (Lazy.force bij_bind, (s, get_type t, t'))
         | Const s -> "c", BranchTo (Symbol.bij, s)
         | At (t1, t2) -> "at", BranchTo (Lazy.force bij_pair, (t1, t2)))
         ~extract:(function
-        | "bv" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_bound_var ?ty i)
-        | "v" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_var ?ty i)
-        | "bind" -> BranchFrom (Lazy.force bij_bind, fun (s,t') -> mk_bind s t')
+        | "bv" -> BranchFrom (int_, fun i -> mk_bound_var i)
+        | "v" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_var ~ty i)
+        | "bind" -> BranchFrom (Lazy.force bij_bind, fun (s,ty,t') -> mk_bind s ~ty t')
         | "c" -> BranchFrom (Symbol.bij, mk_const)
         | "at" -> BranchFrom (Lazy.force bij_pair, fun (a, b) -> mk_at a b)
         | _ -> raise (DecodingError "expected Term")))

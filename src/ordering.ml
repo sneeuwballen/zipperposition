@@ -200,7 +200,7 @@ module KBO = struct
       (* node/node, De Bruijn/De Bruijn *)
       | T.Node (f, ss), T.Node (g, ts) -> tckbo_composite wb f g ss ts
       | T.BoundVar i, T.BoundVar j ->
-        (wb, if i = j && T.same_type t1 t2 then Eq else Incomparable)
+        (wb, if i = j then Eq else Incomparable)
       (* node and something else *)
       | T.Node (f, ss), T.BoundVar _ -> tckbo_composite wb f Symbol.db_symbol ss []
       | T.BoundVar _, T.Node (g, ts) -> tckbo_composite wb Symbol.db_symbol g [] ts
@@ -265,7 +265,7 @@ module RPO6 = struct
     (* node/node, De Bruijn/De Bruijn *)
     | T.Node (f, ss), T.Node (g, ts) -> rpo6_composite ~prec s t f g ss ts
     | T.BoundVar i, T.BoundVar j ->
-      if i = j && T.same_type s t then Eq else Incomparable
+      if i = j then Eq else Incomparable
     (* node and something else *)
     | T.Node (f, ss), T.BoundVar _ -> rpo6_composite ~prec s t f Symbol.db_symbol ss []
     | T.BoundVar _, T.Node (g, ts) -> rpo6_composite ~prec s t Symbol.db_symbol g [] ts

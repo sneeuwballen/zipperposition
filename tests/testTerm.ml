@@ -40,20 +40,20 @@ let g x = HOT.mk_at (HOT.mk_const (Symbol.mk_const "g")) x
 let h x y z = HOT.mk_at_list (HOT.mk_const (Symbol.mk_const "h")) [x;y;z]
 let a = HOT.mk_const (Symbol.mk_const "a")
 let b = HOT.mk_const (Symbol.mk_const "b")
-let x = HOT.mk_var 0
-let y = HOT.mk_var 1
+let x = HOT.mk_var ~ty:Type.i 0
+let y = HOT.mk_var ~ty:Type.i 1
 
 let test_db_lift () =
-  let t = HOT.mk_lambda (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 1))) in
+  let t = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 1))) in
   let t' = HOT.db_lift 1 t in
-  let t1 = HOT.mk_lambda (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 2))) in
+  let t1 = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 2))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 
 let test_db_unlift () =
-  let t = HOT.mk_lambda (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 2))) in
+  let t = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 2))) in
   let t' = HOT.db_unlift t in
-  let t1 = HOT.mk_lambda (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 1))) in
+  let t1 = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 1))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 

@@ -49,13 +49,12 @@ and sourced_term =
 type term = t
 
 (** list of variables *)
-type varlist = t list            
+type varlist = t list
 
 let hash_term t = match t.term, t.type_ with
   | Var i, Some ty -> Hash.hash_int2 (Hash.hash_int i) (Type.hash ty)
-  | BoundVar i, Some ty -> Hash.hash_int3 27 (Hash.hash_int i) (Type.hash ty)
-  | BoundVar i, None -> Hash.hash_int2 22 (Hash.hash_int i)
   | Var _ , None -> assert false
+  | BoundVar i, _ -> Hash.hash_int2 22 (Hash.hash_int i)
   | Node (s, l), _ -> Hash.hash_list (fun x -> x.tag) (Symbol.hash s) l
 
 let rec hash_novar t = match t.term with
@@ -79,23 +78,11 @@ let compare x y = x.tag - y.tag
 
 let hash x = x.tag
 
-let has_type t = match t.type_ with
-  | None -> false
-  | Some _ -> true
-
-let compatible_type t1 t2 = match t1.type_, t2.type_ with
-  | Some ty1, Some ty2 -> Type.unifiable ty1 ty2
-  | _ -> false
-
-let same_type t1 t2 = match t1.type_, t2.type_ with
-  | Some ty1, Some ty2 -> Type.alpha_equiv ty1 ty2
-  | _ -> false
-
-let compare_type t1 t2 = match t1.type_, t2.type_ with
-  | Some ty1, Some ty2 -> Type.cmp ty1 ty2
-  | Some _, None -> 1
-  | None, Some _ -> -1
-  | None, None -> 0
+let get_type t = match t.term, t.type_ with
+  | Var _, Some ty -> ty
+  | Var _, None -> assert false
+  | BoundVar _, _ -> failwith "FOTerm.BoundVar has no type"
+  | Node _, _ -> failwith "FOTerm.Node has no type"
 
 module TermHASH = struct
   type t = term
@@ -200,15 +187,15 @@ let cast t ty =
 (** In this section, term smart constructors are defined. They perform
     hashconsing, and precompute some properties (flags) *)
 
-let mk_var ?(ty=Type.i) idx =
+let mk_var ~ty idx =
   assert (idx >= 0);
   let my_v = {term = Var idx; type_= Some ty; tsize = 1;
               flags= 0; tag= -1} in
   H.hashcons my_v
 
-let mk_bound_var ?ty idx =
+let mk_bound_var idx =
   assert (idx >= 0);
-  let my_v = {term = BoundVar idx; type_=ty; tsize = 1;
+  let my_v = {term = BoundVar idx; type_=None; tsize = 1;
               flags=0; tag= -1} in
   H.hashcons my_v
 
@@ -427,7 +414,7 @@ let db_lift ?(depth=0) n t =
     match t.term with
     | _ when is_ground t -> t  (* closed. *)
     | BoundVar i when i >= depth ->
-      mk_bound_var ?ty:t.type_ (i+n) (* lift by n, term not captured *)
+      mk_bound_var (i+n) (* lift by n, term not captured *)
     | Node (_, []) | Var _ | BoundVar _ -> t
     | Node (s, l) ->
       mk_node s (List.map (recurse depth) l)
@@ -449,19 +436,6 @@ let db_replace ?(depth=0) ~into ~by =
   in
   replace depth by into
 
-(* Type of the [n]-th De Bruijn index in [t] *)
-let rec db_type t n = match t.term with
-  | BoundVar i when i = n -> t.type_
-  | BoundVar _
-  | Node (_, [])
-  | Var _ -> None
-  | Node (_, l) ->
-    List.fold_left
-      (fun acc t' -> match acc with
-        | Some _ -> acc
-        | None -> db_type t' n)
-      None l
-
 (* unlift the term (decrement indices of all free De Bruijn variables inside *)
 let db_unlift ?(depth=0) t =
   (* only unlift DB symbol that are free. [depth] is the number of binders
@@ -469,20 +443,20 @@ let db_unlift ?(depth=0) t =
   let rec recurse depth t =
     match t.term with
     | _ when is_ground t -> t
-    | BoundVar i -> if i >= depth then mk_bound_var ?ty:t.type_ (i-1) else t
+    | BoundVar i -> if i >= depth then mk_bound_var (i-1) else t
     | Node (_, []) | Var _ -> t
     | Node (s, l) -> mk_node s (List.map (recurse depth) l)
   in recurse depth t
 
 (** Replace [t'] by a fresh De Bruijn index in [t]. *)
-let db_from_term ?(depth=0) ?(ty=Type.i) t t' =
+let db_from_term ?(depth=0) t t' =
   (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
-  | _ when t == t' -> mk_bound_var ~ty depth
+  | _ when t == t' -> mk_bound_var depth
   | Var _
   | Node (_, [])
   | BoundVar _ -> t
-  | Node (s, l) -> mk_node s (List.map (replace depth) l) 
+  | Node (s, l) -> mk_node s (List.map (replace depth) l)
   in
   replace depth t
 
@@ -490,7 +464,7 @@ let db_from_term ?(depth=0) ?(ty=Type.i) t t' =
   Same as db_from_term. *)
 let db_from_var ?depth t v =
   assert (is_var v);
-  db_from_term ?depth ?ty:v.type_ t v
+  db_from_term ?depth t v
 
 (** {2 Fold} *)
 
@@ -609,10 +583,6 @@ let pp_tstp_depth depth buf t =
   in
   pp_rec buf t
 
-let _get_ty t = match t.type_ with
-  | Some ty -> ty
-  | None -> failwith "_get_ty"
-
 (* lightweight printing *)
 let rec pp_depth depth buf t =
   let depth = ref depth in
@@ -637,9 +607,9 @@ let rec pp_depth depth buf t =
   | Node (s, args) ->
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
   | Var i ->
-    let ty = _get_ty t in
+    let ty = get_type t in
     if !print_var_types && not (Type.eq ty Type.i)
-      then Printf.bprintf buf "X%d:%a" i Type.pp (_get_ty t)
+      then Printf.bprintf buf "X%d:%a" i Type.pp ty
       else Printf.bprintf buf "X%d" i
   and pp_surrounded buf t = match t.term with
   | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
@@ -690,9 +660,9 @@ let rec pp_arith_depth depth buf t =
   | Node (s, args) ->
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
   | Var i ->
-    let ty = _get_ty t in
+    let ty = get_type t in
     if !print_var_types && not (Type.eq ty Type.i)
-      then Printf.bprintf buf "X%d:%a" i Type.pp (_get_ty t)
+      then Printf.bprintf buf "X%d:%a" i Type.pp ty
       else Printf.bprintf buf "X%d" i
   and pp_surrounded buf t = match t.term with
   | Node (s, [_;_]) when
@@ -739,15 +709,15 @@ let bij =
   fix
     (fun bij ->
       let bij_node = lazy (pair Symbol.bij (list_ (Lazy.force bij))) in
-      let bij_var = lazy (pair int_ (opt Type.bij)) in
+      let bij_var = pair int_ Type.bij in
       switch
         ~inject:(fun t -> match t.term with
-        | BoundVar i -> "bv", BranchTo (Lazy.force bij_var, (i, t.type_))
-        | Var i -> "v", BranchTo (Lazy.force bij_var, (i, t.type_))
+        | BoundVar i -> "bv", BranchTo (int_, i)
+        | Var i -> "v", BranchTo (bij_var, (i, get_type t))
         | Node (s, l) -> "n", BranchTo (Lazy.force bij_node, (s, l)))
         ~extract:(function
-        | "bv" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_bound_var ?ty i)
-        | "v" -> BranchFrom (Lazy.force bij_var, fun (i,ty) -> mk_var ?ty i)
+        | "bv" -> BranchFrom (int_, fun i -> mk_bound_var i)
+        | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
         | "n" -> BranchFrom (Lazy.force bij_node, fun (s,l) -> mk_node s l)
         | _ -> raise (DecodingError "expected Term")))
 

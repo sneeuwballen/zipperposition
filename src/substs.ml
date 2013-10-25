@@ -264,9 +264,10 @@ module FO = struct
         begin try
           H.find ren (t, scope)
         with Not_found ->
+          let ty = T.get_type t in
           (* new name *)
           let n = H.length ren in
-          let t' = T.mk_var ?ty:t.T.type_ n in
+          let t' = T.mk_var ~ty n in
           H.add ren (t, scope) t';
           t'
         end
@@ -377,7 +378,7 @@ module FO = struct
       | Empty -> ()
       | Bind (v, sc_v, t, sc_t, subst') ->
         Printf.bprintf buf "%a[%d] -> %a[%d]" pp_term v sc_v pp_term t sc_t;
-        (if not (is_last subst) then Buffer.add_string buf ", ");
+        if not (is_last subst) then Buffer.add_string buf ", ";
         pp_rec buf subst'
     in
     Buffer.add_string buf "{";
@@ -492,7 +493,7 @@ module HO = struct
   (** Add v -> t to the substitution. Both terms have a context. Raise
       Invalid_argument if v is already bound in the same context, to another term. *)
   let bind ?(recursive=true) subst v sc_v t sc_t =
-    let (t', sc_t') = if recursive then get_var subst v sc_v else v, sc_v in
+    let t', sc_t' = if recursive then get_var subst v sc_v else v, sc_v in
     if T.eq t' t && sc_t' = sc_t
       then subst (* compatible (absence of) bindings *)
       else if T.is_var t'
@@ -537,9 +538,10 @@ module HO = struct
         begin try
           H.find ren (t, scope)
         with Not_found ->
+          let ty = T.get_type t in
           (* new name *)
           let n = H.length ren in
-          let t' = T.mk_var ?ty:t.T.type_ n in
+          let t' = T.mk_var ~ty n in
           H.add ren (t, scope) t';
           t'
         end
@@ -553,7 +555,8 @@ module HO = struct
     | T.BoundVar _ -> t
     | T.Bind (s, t') ->
       let t'' = _apply_rec ~recursive ~renaming ~depth:(depth+1) subst t' scope in
-      T.mk_bind s t''
+      let ty = T.get_type t in
+      T.mk_bind s ~ty t''
     | T.Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       begin try

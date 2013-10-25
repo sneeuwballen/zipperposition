@@ -31,7 +31,7 @@ module F = FOFormula
 
 (* map terms to distinct variables of same type *)
 let __mk_vars args =
-  List.mapi (fun i t -> T.mk_var ?ty:t.T.type_ i) args
+  List.mapi (fun i v -> T.mk_var ~ty:(T.get_type v) i) args
 
 let is_definition f =
   (* check that r is a definition of l=f(x1,...,xn) *)
@@ -40,6 +40,7 @@ let is_definition f =
     | T.Var _ | T.BoundVar _ -> false
     | T.Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
+      List.for_all T.is_var ts &&
       let l' = T.mk_node f (__mk_vars ts) in
       (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
       && not (T.contains_symbol f r)
@@ -58,6 +59,7 @@ let is_pred_definition f =
     | T.Var _ | T.BoundVar _ -> false
     | T.Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
+      List.for_all T.is_var ts &&
       let l' = T.mk_node f (__mk_vars ts) in
       (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
       && not (F.contains_symbol f r)

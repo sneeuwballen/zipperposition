@@ -50,7 +50,9 @@ let beta_reduce ?(depth=0) t =
     end
   | T.Const _
   | T.BoundVar _ -> t
-  | T.Bind (s, t') -> T.mk_bind s (beta_reduce ~depth:(depth+1) (None::env) t')
+  | T.Bind (s, t') ->
+    let ty = T.get_type t in
+    T.mk_bind ~ty s (beta_reduce ~depth:(depth+1) (None::env) t')
   | T.At ({T.term=T.Bind (s, t1)}, t2) when Symbol.eq s Symbol.lambda_symbol ->
     (* a beta-redex! Fire!! First evaluate t2, then
        remplace db0 by [t2] in [t1] *)
@@ -74,7 +76,9 @@ let rec eta_reduce t =
   | T.Bind (s, {T.term=T.At (t', {T.term=T.BoundVar 0})})
     when Symbol.eq s Symbol.lambda_symbol && not (T.db_contains t' 0) ->
     eta_reduce (T.db_unlift t')  (* remove the lambda and variable *)
-  | T.Bind (s, t') -> T.mk_bind s (eta_reduce t')
+  | T.Bind (s, t') ->
+    let ty = T.get_type t in
+    T.mk_bind ~ty s (eta_reduce t')
   | T.At (t1, t2) -> T.mk_at (eta_reduce t1) (eta_reduce t2)
 
 let lambda_abstract ~signature t sub_t =
@@ -83,8 +87,8 @@ let lambda_abstract ~signature t sub_t =
   let ctx = TypeInference.Ctx.of_signature signature in
   let ty = TypeInference.HO.infer ctx sub_t in
   (* abstract the term *)
-  let t' = T.db_from_term ~ty t sub_t in
-  let t' = T.mk_lambda t' in
+  let t' = T.db_from_term t sub_t in
+  let t' = T.mk_lambda ~ty t' in
   Util.exit_prof prof_lambda_abstract;
   t'
 

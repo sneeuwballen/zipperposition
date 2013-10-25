@@ -44,7 +44,7 @@ and sourced_term =
 type term = t
 
 (** list of variables *)
-type varlist = t list            
+type varlist = t list
 
 (** {2 Comparison, equality, containers} *)
 
@@ -54,10 +54,9 @@ val compare : t -> t -> int         (** a simple order on terms *)
 val hash : t -> int
 val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
-val has_type : t -> bool              (** Has a known type *)
-val compatible_type : t -> t -> bool  (** Unifiable types? false if type missing *)
-val same_type : t -> t -> bool        (** Alpha-equiv types? false if type missing *)
-val compare_type : t -> t -> int      (** Comparison of types *)
+val get_type : t -> Type.t
+  (** Obtain the type of a {!Var}.
+      @raise Failure if the term is not a variable. *)
 
 module Tbl : sig
   include Hashtbl.S with type key = t
@@ -94,15 +93,15 @@ val new_flag : unit -> int
 
 (** {2 Smart constructors} *)
 
-val mk_var : ?ty:Type.t -> int -> t        (** Create a variable. *)
-val mk_bound_var : ?ty:Type.t -> int -> t  (** Create a De Bruijn index. *)
+val mk_var : ty:Type.t -> int -> t  (** Create a variable. Providing a type is mandatory. *)
+val mk_bound_var : int -> t  (** Create a De Bruijn index. *)
 val mk_node : Symbol.t -> t list -> t       (** Application *)
 val mk_const : Symbol.t -> t              (** Shortcut for constants *)
 
 val true_term : t                        (** tautology symbol *)
 val false_term : t                       (** antilogy symbol *)
 
-val cast : t -> Type.t -> t           (** Set the type *)
+val cast : t -> Type.t -> t     (** Change the type. Only works on variables. *)
 
 (** {2 Subterms and positions} *)
 
@@ -111,7 +110,7 @@ val is_bound_var : t -> bool
 val is_node : t -> bool
 val is_const : t -> bool
 
-val at_pos : t -> Position.t -> t 
+val at_pos : t -> Position.t -> t
   (** retrieve subterm at pos, or raise Invalid_argument*)
 
 val replace_pos : t -> Position.t -> t -> t
@@ -152,9 +151,6 @@ val db_replace : ?depth:int -> into:t -> by:t -> t
   (** Substitution of De Bruijn symbol by a term. [db_replace ~into ~by]
       replaces the De Bruijn symbol 0 by [by] in [into]. *)
 
-val db_type : t -> int -> Type.t option
-  (** [db_type t n] returns the type of the [n]-th De Bruijn index in [t] *)
-
 val db_lift : ?depth:int -> int -> t -> t
   (** lift the non-captured De Bruijn indexes in the term by n *)
 
@@ -162,7 +158,7 @@ val db_unlift : ?depth:int -> t -> t
   (** Unlift the term (decrement indices of all free De Bruijn variables
       inside *)
 
-val db_from_term : ?depth:int -> ?ty:Type.t -> t -> t -> t
+val db_from_term : ?depth:int -> t -> t -> t
   (** [db_from_term t t'] Replace [t'] by a fresh De Bruijn index in [t]. *)
 
 val db_from_var : ?depth:int -> t -> t -> t

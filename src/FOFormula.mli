@@ -50,8 +50,8 @@ and cell = private
   | Imply of t * t
   | Equiv of t * t
   | Equal of term * term
-  | Forall of t    (** Quantified formula, with De Bruijn *)
-  | Exists of t
+  | Forall of Type.t * t  (** Quantified formula, with De Bruijn index *)
+  | Exists of Type.t * t
 
 type sourced_form = t * string * string    (* form, filename, axiom name *)
 type form = t
@@ -72,8 +72,8 @@ val mk_equiv : t -> t -> t
 val mk_xor : t -> t -> t
 val mk_eq : term -> term -> t
 val mk_neq : term -> term -> t
-val mk_forall : t -> t
-val mk_exists : t -> t
+val mk_forall : ty:Type.t -> t -> t
+val mk_exists : ty:Type.t -> t -> t
 
 (** {2 Flags} *)
 
@@ -147,14 +147,11 @@ val db_contains : t -> int -> bool
 val db_replace : t -> term -> t
   (** Replace De Bruijn index 0 by the given term *)
 
-val db_type : t -> int -> Type.t option
-  (** Type of the n-th DB variable *)
-
 val db_lift : t -> t
 
 val db_unlift : ?depth:int -> t -> t
 
-val db_from_term : ?ty:Type.t -> t -> term -> t
+val db_from_term : t -> term -> t
   (** Replace the given term by a De Bruijn index *)
 
 val db_from_var : t -> term -> t
@@ -222,6 +219,8 @@ module Tbl : Hashtbl.S with type key = t
 (** {2 Set} *)
 
 (** Imperative set of formulas *)
+
+(* TODO remove, quite useless; also remove it from {!Transform} *)
 
 module FSet : sig
   type t

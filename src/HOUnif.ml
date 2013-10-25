@@ -187,8 +187,8 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
     | None -> ref (max (T.max_var (T.vars a) + sc_a + 1)
                        (T.max_var (T.vars b) + sc_b + 1)) in
   (* avoid index collisions *)
-  let fresh_var () =
-    let v = T.mk_var !offset in
+  let fresh_var ~ty =
+    let v = T.mk_var ~ty !offset in
     incr offset;
     v
   in
@@ -260,7 +260,7 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       (* try to bind x1 to [x2+z] where [z] is fresh,
          if len(l1) < len(left+right) *)
       if T.is_var x1 && List.length l1 < List.length left + List.length right then
-        let z = fresh_var () in
+        let z = fresh_var ~ty:(T.get_type x1) in
         (* offset trick: we need [z] in both contexts sc_1 and sc_2, so we
            bind it so that (z,sc_2) -> (z,sc_1), and use (z,sc_1) to continue
            the matching *)

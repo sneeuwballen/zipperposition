@@ -46,8 +46,8 @@ and cell =
   | Imply of t * t
   | Equiv of t * t
   | Equal of term * term
-  | Forall of t    (** Quantified formula, with De Bruijn *)
-  | Exists of t
+  | Forall of Type.t * t  (** Quantified formula, with De Bruijn index *)
+  | Exists of Type.t * t
 
 type sourced_form = t * string * string    (* form, filename, axiom name *)
 
@@ -73,9 +73,9 @@ let eq_rec f1 f2 = match f1.form, f2.form with
   | Equiv (f11, f12), Equiv (f21, f22) ->
     (eq f11 f21 && eq f12 f22) ||
     (eq f11 f22 && eq f12 f21)
-  | Not f1', Not f2'
-  | Forall f1', Forall f2'
-  | Exists f1', Exists f2' -> eq f1' f2'
+  | Not f1', Not f2' -> eq f1' f2'
+  | Forall (ty1,f1'), Forall (ty2,f2')
+  | Exists (ty1,f1'), Exists (ty2,f2') -> Type.eq ty1 ty2 && eq f1' f2'
   | _, _ -> false
 
 let hash_rec f = match f.form with
@@ -88,8 +88,8 @@ let hash_rec f = match f.form with
   | Imply (f1,f2) -> Hash.hash_int2 (hash f1) (hash f2)
   | Equiv (f1,f2) -> Hash.hash_int2 (hash f1 lxor hash f2) 11
   | Equal (t1,t2) -> Hash.hash_int2 (T.hash t1 lxor T.hash t2) 13
-  | Forall f' -> Hash.hash_int (hash f')
-  | Exists f' -> Hash.hash_int2 (hash f') 11
+  | Forall (_,f') -> Hash.hash_int (hash f')
+  | Exists (_,f') -> Hash.hash_int2 (hash f') 11
 
 let rec hash_novar f = match f.form with
   | True -> 13
@@ -101,8 +101,8 @@ let rec hash_novar f = match f.form with
   | Imply (f1,f2) -> Hash.hash_int2 (hash_novar f1) (hash_novar f2)
   | Equiv (f1,f2) -> Hash.hash_int2 (hash_novar f1 lxor hash_novar f2) 11
   | Equal (t1,t2) -> Hash.hash_int2 (T.hash_novar t1 lxor T.hash_novar t2) 13
-  | Forall f' -> Hash.hash_int (hash_novar f')
-  | Exists f' -> Hash.hash_int2 (hash_novar f') 11
+  | Forall (_,f') -> Hash.hash_int (hash_novar f')
+  | Exists (_,f') -> Hash.hash_int2 (hash_novar f') 11
 
 (** {2 Flags} *)
 
@@ -204,11 +204,11 @@ let mk_eq t1 t2 =
 
 let mk_neq t1 t2 = mk_not (mk_eq t1 t2)
 
-let mk_forall f =
-  H.hashcons { form=Forall f; flags=0; id= ~-1; }
+let mk_forall ~ty f =
+  H.hashcons { form=Forall (ty,f); flags=0; id= ~-1; }
 
-let mk_exists f =
-  H.hashcons { form=Exists f; flags=0; id= ~-1; }
+let mk_exists ~ty f =
+  H.hashcons { form=Exists (ty,f); flags=0; id= ~-1; }
 
 module FCache = Cache.Replacing(struct
   type t = form
@@ -228,8 +228,8 @@ let rec map_leaf f form = match form.form with
   | False
   | Atom _
   | Equal _ -> f form  (* replace by image *)
-  | Forall f' -> mk_forall (map_leaf f f')
-  | Exists f' -> mk_exists (map_leaf f f')
+  | Forall (ty,f') -> mk_forall ~ty (map_leaf f f')
+  | Exists (ty,f') -> mk_exists ~ty (map_leaf f f')
 
 let map f form =
   map_leaf
@@ -251,8 +251,8 @@ let rec fold f acc form = match form.form with
   | False -> acc
   | Atom p -> f acc p
   | Equal (t1, t2) -> f (f acc t1) t2
-  | Forall f'
-  | Exists f' -> fold f acc f'
+  | Forall (_,f')
+  | Exists (_,f') -> fold f acc f'
 
 let iter f form = fold (fun () t -> f t) () form
 
@@ -266,8 +266,8 @@ let rec map_depth ?(depth=0) f form = match form.form with
   | False -> form
   | Atom p -> mk_atom (f depth p)
   | Equal (t1, t2) -> mk_eq (f depth t1) (f depth t2)
-  | Forall f' -> mk_forall (map_depth ~depth:(depth+1) f f')
-  | Exists f' -> mk_exists (map_depth ~depth:(depth+1) f f')
+  | Forall (ty,f') -> mk_forall ~ty (map_depth ~depth:(depth+1) f f')
+  | Exists (ty,f') -> mk_exists ~ty (map_depth ~depth:(depth+1) f f')
 
 let rec map_leaf_depth ?(depth=0) f form = match form.form with
   | And l -> mk_and (List.map (map_leaf_depth ~depth f) l)
@@ -279,8 +279,8 @@ let rec map_leaf_depth ?(depth=0) f form = match form.form with
   | False
   | Atom _
   | Equal _ -> f depth form  (* replace by image *)
-  | Forall f' -> mk_forall (map_leaf_depth ~depth:(depth+1) f f')
-  | Exists f' -> mk_exists (map_leaf_depth ~depth:(depth+1) f f')
+  | Forall (ty,f') -> mk_forall ~ty (map_leaf_depth ~depth:(depth+1) f f')
+  | Exists (ty,f') -> mk_exists ~ty (map_leaf_depth ~depth:(depth+1) f f')
 
 let fold_depth ?(depth=0) f acc form =
   let rec recurse f acc depth form = match form.form with
@@ -299,8 +299,8 @@ let fold_depth ?(depth=0) f acc form =
     let acc = f acc depth t1 in
     let acc = f acc depth t2 in
     acc
-  | Forall f'
-  | Exists f' ->
+  | Forall (ty, f')
+  | Exists (ty, f') ->
     recurse f acc (depth+1) f'
   in
   recurse f acc depth form
@@ -310,8 +310,8 @@ let weight f =
   | True
   | False -> n + 1
   | Not f'
-  | Forall f'
-  | Exists f' -> count (n+1) f'
+  | Forall (_,f')
+  | Exists (_,f') -> count (n+1) f'
   | Equal (t1, t2) -> n + T.size t1 + T.size t2
   | Atom p -> n + T.size p
   | Or l
@@ -419,37 +419,30 @@ let db_replace f t =
 
 exception FoundType of Type.t
 
-let db_type f n =
-  try
-    fold_depth
-      (fun () depth t -> match T.db_type t (depth+n) with
-        | None -> ()
-        | Some ty -> raise (FoundType ty))
-      () f;
-    None
-  with FoundType ty ->
-    Some ty
-
 let db_lift f =
   map_depth (fun depth t -> T.db_lift ~depth 1 t) f
 
 let db_unlift ?(depth=0) f =
   map_depth ~depth (fun depth t -> T.db_unlift ~depth t) f
 
-let db_from_term ?ty f t =
-  map_depth (fun depth t' -> T.db_from_term ~depth ?ty t' t) f
+let db_from_term f t =
+  map_depth (fun depth t' -> T.db_from_term ~depth t' t) f
 
 let db_from_var f v =
-  db_from_term ?ty:v.T.type_ f v
+  db_from_term f v
 
 let mk_forall_list vars f =
   List.fold_right
-    (fun v f -> mk_forall (db_from_var (db_lift f) v))
+    (fun v f ->
+      let ty = T.get_type v in
+      mk_forall ~ty (db_from_var (db_lift f) v))
     vars f
 
 let mk_exists_list vars f =
   List.fold_right
-    (fun v f -> mk_exists (db_from_var (db_lift f) v))
+    (fun v f ->
+      let ty = T.get_type v in
+      mk_exists ~ty (db_from_var (db_lift f) v))
     vars f
 
 let close_forall f =
@@ -463,9 +456,8 @@ let close_exists f =
 let open_forall ?(offset=0) f =
   let offset = max offset (T.max_var (free_variables f) + 1) in
   let rec open_one offset f = match f.form with
-  | Forall f' ->
-    let ty = db_type f' 0 in
-    let v = T.mk_var ?ty offset in
+  | Forall (ty,f') ->
+    let v = T.mk_var ~ty offset in
     let new_f' = db_replace f' v in
     open_one (offset+1) new_f'
   | _ -> f
@@ -498,8 +490,8 @@ let rec flatten f =
   | Imply (f1, f2) -> mk_imply (flatten f1) (flatten f2)
   | Equiv (f1, f2) -> mk_equiv (flatten f1) (flatten f2)
   | Not f' -> mk_not (flatten f')
-  | Forall f' -> mk_forall (flatten f')
-  | Exists f' -> mk_exists (flatten f')
+  | Forall (ty,f') -> mk_forall ~ty (flatten f')
+  | Exists (ty,f') -> mk_exists ~ty (flatten f')
   | True
   | False
   | Atom _
@@ -523,10 +515,11 @@ let simplify f =
     | Or l ->
       let l' = List.map (simplify ~depth) l in
       flatten (mk_or l')
-    | Forall f'
-    | Exists f' when not (db_contains f' 0) -> simplify ~depth (db_unlift ~depth f')
-    | Forall f' -> mk_forall (simplify ~depth:(depth+1) f')
-    | Exists f' -> mk_exists (simplify ~depth:(depth+1) f')
+    | Forall (_,f')
+    | Exists (_,f') when not (db_contains f' 0) ->
+      simplify ~depth (db_unlift ~depth f')
+    | Forall (ty,f') -> mk_forall ~ty (simplify ~depth:(depth+1) f')
+    | Exists (ty,f') -> mk_exists ~ty (simplify ~depth:(depth+1) f')
     | Equal (a,b) when T.eq a b -> mk_true
     | Equal _ -> f
     | Atom _
@@ -560,8 +553,8 @@ let rec is_trivial f = match f.form with
   | And _
   | Imply _
   | Not _ -> false
-  | Exists f'
-  | Forall f' -> is_trivial f'
+  | Exists (_,f')
+  | Forall (_,f') -> is_trivial f'
 
 let ac_normal_form f =
   let rec recurse f = match f.form with
@@ -585,8 +578,8 @@ let ac_normal_form f =
     let l' = List.map recurse l in
     let l' = List.sort compare l' in
     mk_or l'
-  | Forall f' -> mk_forall (recurse f')
-  | Exists f' -> mk_exists (recurse f')
+  | Forall (ty,f') -> mk_forall ~ty (recurse f')
+  | Exists (ty,f') -> mk_exists ~ty (recurse f')
   in
   recurse (flatten f)
 
@@ -612,8 +605,8 @@ let to_term f =
     | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
     | Equal (t1, t2) -> T.mk_eq (T.curry t1) (T.curry t2)
     | Not f' -> T.mk_not (to_term f')
-    | Forall f' -> T.mk_forall (to_term f')
-    | Exists f' -> T.mk_exists (to_term f')
+    | Forall (ty,f') -> T.mk_forall ~ty (to_term f')
+    | Exists (ty,f') -> T.mk_exists ~ty (to_term f')
     | Atom p -> T.curry p)
     f
 
@@ -623,10 +616,12 @@ let of_term t =
   | _ when t == T.true_term -> mk_true
   | _ when t == T.false_term -> mk_false
   | T.Bind (s, f') when S.eq s S.forall_symbol ->
-    mk_forall (recurse f')
+    let ty = T.get_type t in
+    mk_forall ~ty (recurse f')
   | T.Bind (s, f') when S.eq s S.exists_symbol ->
-    mk_exists (recurse f')
-  | T.Bind _ -> failwith "unknown binder"
+    let ty = T.get_type t in
+    mk_exists ~ty (recurse f')
+  | T.Bind (s,_) -> failwith (Util.sprintf "unknown binder %a" S.pp s)
   | T.Const s -> mk_atom (FOTerm.mk_const s)
   | T.At _ ->
     begin match T.open_at t with
@@ -659,13 +654,14 @@ let rec infer_type ctx f = match f.form with
     TypeInference.FO.constrain_term_term ctx t1 t2
   | And l
   | Or l -> List.iter (infer_type ctx) l
-  | Forall f'
-  | Exists f' ->
-    TypeInference.Ctx.within_binder ctx
-      (fun v ->
+  | Forall (ty,f')
+  | Exists (ty,f') ->
+    let ty = Type.instantiate ty in
+    let vars = Type.free_gvars ty in
+    TypeInference.Ctx.within_binder ctx ~ty
+      (fun () ->
         infer_type ctx f';
-        (* if [v] is still free after the inference, then generalize it *)
-        Type.close_var v)
+        List.iter Type.close_var vars)
   | Equiv (f1, f2)
   | Imply (f1, f2) -> infer_type ctx f1; infer_type ctx f2
   | Not f' -> infer_type ctx f'
@@ -700,23 +696,19 @@ let pp_debug buf f =
   | Imply (f1, f2) ->
     pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
   | Not f' -> Buffer.add_string buf "¬ "; pp_inner buf f'
-  | Forall f' ->
+  | Forall (ty,f') ->
     let v = !depth in
     incr depth;
-    begin match db_type f' 0 with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f'
-    | _ -> Printf.bprintf buf "∀ Y%d. %a" v pp_inner f'
-    end;
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "∀ Y%d. %a" v pp_inner f'
+      else Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f';
     decr depth
-  | Exists f' ->
+  | Exists (ty, f') ->
     let v = !depth in
     incr depth;
-    begin match db_type f' 0 with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "∃ Y%d: %a. %a" v Type.pp ty pp_inner f'
-    | _ -> Printf.bprintf buf "∃ Y%d. %a" v pp_inner f'
-    end;
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "∃ Y%d. %a" v pp_inner f'
+      else Printf.bprintf buf "∃ Y%d: %a. %a" v Type.pp ty pp_inner f';
     decr depth
   | And l -> Util.pp_list ~sep:" ∧ " pp_inner buf l
   | Or l -> Util.pp_list ~sep:" ∨ " pp_inner buf l
@@ -753,23 +745,19 @@ let pp_tstp buf f =
   | Imply (f1, f2) ->
     pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
   | Not f' -> Buffer.add_string buf "~ "; pp_inner buf f'
-  | Forall f' ->
+  | Forall (ty,f') ->
     let v = !depth in
     incr depth;
-    begin match db_type f' 0 with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "![Y%d:%a]: %a" v Type.pp ty pp_inner f'
-    | _ -> Printf.bprintf buf "![Y%d]: %a" v pp_inner f'
-    end;
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "![Y%d]: %a" v pp_inner f'
+      else Printf.bprintf buf "![Y%d:%a]: %a" v Type.pp ty pp_inner f';
     decr depth
-  | Exists f' ->
+  | Exists (ty, f') ->
     let v = !depth in
     incr depth;
-    begin match db_type f' 0 with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "?[Y%d:%a]: %a" v Type.pp ty pp_inner f'
-    | _ -> Printf.bprintf buf "?[Y%d]: %a" v pp_inner f'
-    end;
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "?[Y%d]: %a" v pp_inner f'
+      else Printf.bprintf buf "?[Y%d:%a]: %a" v Type.pp ty pp_inner f';
     decr depth
   | And l -> Util.pp_list ~sep:" & " pp_inner buf l
   | Or l -> Util.pp_list ~sep:" | " pp_inner buf l
@@ -802,23 +790,19 @@ let pp_arith buf f =
   | Imply (f1, f2) ->
     pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
   | Not f' -> Buffer.add_string buf "¬ "; pp_inner buf f'
-  | Forall f' ->
+  | Forall (ty,f') ->
     let v = !depth in
     incr depth;
-    begin match db_type f' 0 with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f'
-    | _ -> Printf.bprintf buf "∀ Y%d. %a" v pp_inner f'
-    end;
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "∀ Y%d. %a" v pp_inner f'
+      else Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f';
     decr depth
-  | Exists f' ->
+  | Exists (ty, f') ->
     let v = !depth in
     incr depth;
-    begin match db_type f' 0 with
-    | Some ty when not (Type.eq ty Type.i) ->
-      Printf.bprintf buf "∃ Y%d: %a. %a" v Type.pp ty pp_inner f'
-    | _ -> Printf.bprintf buf "∃ Y%d. %a" v pp_inner f'
-    end;
+    if Type.eq ty Type.i
+      then Printf.bprintf buf "∃ Y%d. %a" v pp_inner f'
+      else Printf.bprintf buf "∃ Y%d: %a. %a" v Type.pp ty pp_inner f';
     decr depth
   | And l -> Util.pp_list ~sep:" ∧ " pp_inner buf l
   | Or l -> Util.pp_list ~sep:" ∨ " pp_inner buf l
