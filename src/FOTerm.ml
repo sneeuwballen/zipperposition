@@ -577,6 +577,8 @@ let ac_symbols ~is_ac seq =
 
 (** {2 Printing/parsing} *)
 
+let print_var_types = ref false
+
 let pp_tstp_depth depth buf t =
   let depth = ref depth in
   (* recursive printing *)
@@ -607,6 +609,10 @@ let pp_tstp_depth depth buf t =
   in
   pp_rec buf t
 
+let _get_ty t = match t.type_ with
+  | Some ty -> ty
+  | None -> failwith "_get_ty"
+
 (* lightweight printing *)
 let rec pp_depth depth buf t =
   let depth = ref depth in
@@ -630,7 +636,11 @@ let rec pp_depth depth buf t =
   | Node (s, []) -> Symbol.pp buf s
   | Node (s, args) ->
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
-  | Var i -> Printf.bprintf buf "X%d" i
+  | Var i ->
+    let ty = _get_ty t in
+    if !print_var_types && not (Type.eq ty Type.i)
+      then Printf.bprintf buf "X%d:%a" i Type.pp (_get_ty t)
+      else Printf.bprintf buf "X%d" i
   and pp_surrounded buf t = match t.term with
   | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
@@ -679,7 +689,11 @@ let rec pp_arith_depth depth buf t =
   | Node (s, []) -> Symbol.pp buf s
   | Node (s, args) ->
     Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
-  | Var i -> Printf.bprintf buf "X%d" i
+  | Var i ->
+    let ty = _get_ty t in
+    if !print_var_types && not (Type.eq ty Type.i)
+      then Printf.bprintf buf "X%d:%a" i Type.pp (_get_ty t)
+      else Printf.bprintf buf "X%d" i
   and pp_surrounded buf t = match t.term with
   | Node (s, [_;_]) when
     Symbol.eq s Symbol.Arith.sum ||

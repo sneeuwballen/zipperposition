@@ -220,6 +220,8 @@ val set_default_pp : (Buffer.t -> t -> unit) -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
+val print_var_types : bool ref  (* in debug, print types of all vars, except $i *)
+
 val bij : t Bij.t
 
 val arbitrary : t QCheck.Arbitrary.t        (* generates terms *)

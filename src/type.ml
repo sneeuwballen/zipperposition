@@ -246,14 +246,14 @@ let rec size ty = match ty with
 (** {2 IO} *)
 
 let rec pp buf t = match _deref_var t with
-  | Var s -> Printf.bprintf buf "'%s" s
-  | GVar (i, _) -> Printf.bprintf buf "'_%d" i
+  | Var s -> Printf.bprintf buf "%s" s
+  | GVar (i, _) -> Printf.bprintf buf "_Ty_%d" i
   | App (p, []) -> Buffer.add_string buf p
-  | App (p, args) -> Printf.bprintf buf "%s %a " p (Util.pp_list ~sep:" " pp) args
+  | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
   | Fun (ret, []) -> assert false
-  | Fun (ret, [arg]) -> Printf.bprintf buf "%a -> %a" pp_inner arg pp_inner ret
+  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) -> %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
+    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
 and pp_inner buf t = match t with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
