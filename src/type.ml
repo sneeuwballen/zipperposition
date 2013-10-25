@@ -181,6 +181,12 @@ let rec is_closed ty = match _deref_var ty with
   | App (_, l) -> List.for_all is_closed l
   | Fun (ret, l) -> is_closed ret && List.for_all is_closed l
 
+let rec is_instantiated ty = match _deref_var ty with
+  | Var _ -> false
+  | GVar _ -> true
+  | App (_, l) -> List.for_all is_closed l
+  | Fun (ret, l) -> is_closed ret && List.for_all is_closed l
+
 let rec deref ty = match _deref_var ty with
   | Var _
   | GVar _

@@ -113,8 +113,11 @@ val free_univ_vars : t -> t list
   (** List of universally bound variables ({!Var}) *)
 
 val is_closed : t -> bool
-  (** No GVar in this type? Corresponds to {! free_vars} returning
+  (** No {!GVar} in this type? Corresponds to {! free_gvars} returning
       an empty list *)
+
+val is_instantiated : t -> bool
+  (** No {!Var} in this type? Corresponds to {! free_univ_vars} returning [] *)
 
 val deref : t -> t
   (** Replace all GVars by the type they point to (if any). *)
@@ -127,7 +130,7 @@ val arity : t -> int
   (** Number of arguments of the type (If it's a function, else 0)*)
 
 val is_ground : t -> bool
-  (** Is the type ground? *)
+  (** Is the type ground? (means that no {!Var} nor {!GVar} occur in it) *)
 
 val curry : t -> t
   (** Curry the type *)

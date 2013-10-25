@@ -205,9 +205,13 @@ let mk_eq t1 t2 =
 let mk_neq t1 t2 = mk_not (mk_eq t1 t2)
 
 let mk_forall ~ty f =
+  if not (Type.is_instantiated ty)
+    then failwith "F.mk_forall: needs instantiated type";
   H.hashcons { form=Forall (ty,f); flags=0; id= ~-1; }
 
 let mk_exists ~ty f =
+  if not (Type.is_instantiated ty)
+    then failwith "F.mk_forall: needs instantiated type";
   H.hashcons { form=Exists (ty,f); flags=0; id= ~-1; }
 
 module FCache = Cache.Replacing(struct

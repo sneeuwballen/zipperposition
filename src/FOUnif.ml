@@ -69,7 +69,6 @@ let occurs_check subst v sc_v t sc_t =
 (** Unify terms, returns a substitution or raises Fail *)
 let unification ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_unification;
-  let ty_stack = Type.Stack.create () in
   (* recursive unification *)
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s
@@ -79,15 +78,6 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground s && T.is_ground t ->
       raise Fail (* terms are not equal, and ground. failure. *)
-    | Var _, Var _ when occurs_check subst s sc_s t sc_t -> raise Fail
-    | Var _, Var _ ->
-      let ty_s, ty_t = T.get_type s, T.get_type t in
-      (* unification of two vars: unify their types into [ty], and bind [s] to
-          a specialized version of [t] that has type [ty]. *)
-      let ty = Type.unify_deref ty_stack ty_s ty_t in
-      let t' = T.cast t ty in
-      let subst = S.bind subst s sc_s t' sc_t in
-      S.bind subst t sc_t t' sc_t
     | Var _, _ ->
       if occurs_check subst s sc_s t sc_t
         then raise Fail (* occur check *)
@@ -111,15 +101,11 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
   (* try unification, and return solution/exception (with profiler handling) *)
   try
     let subst = unif subst a sc_a b sc_b in
-    Type.Stack.restore_all ty_stack;
     Util.exit_prof prof_unification;
     subst
-  with
-  | Type.Error _
-  | Fail ->
-    Type.Stack.restore_all ty_stack;
+  with Fail as e ->
     Util.exit_prof prof_unification;
-    raise Fail
+    raise e
 
 (** [matching a b] returns sigma such that sigma(a) = b, or raises
     Fail. Only variables from the context of [a] can

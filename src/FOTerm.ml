@@ -189,6 +189,8 @@ let cast t ty =
 
 let mk_var ~ty idx =
   assert (idx >= 0);
+  if not (Type.is_instantiated ty)
+    then failwith "T.mk_var: needs instantiated type";
   let my_v = {term = Var idx; type_= Some ty; tsize = 1;
               flags= 0; tag= -1} in
   H.hashcons my_v
