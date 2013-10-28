@@ -38,25 +38,10 @@ let check_infer_all_symbs =
   (* check that after type inference, all symbols apppear in the signature *)
   let prop terms =
     let ctx = TypeInference.Ctx.create () in
-    List.iter (fun t -> ignore (TypeInference.FO.infer ctx t)) terms;
+    List.iter (fun t -> ignore (TypeInference.FO.infer ctx t 0)) terms;
     let signature = TypeInference.Ctx.to_signature ctx in
     let symbols = T.symbols (Sequence.of_list terms) in
-    Symbol.SSet.for_all (Signature.mem signature) symbols
-  in
-  mk_test ~pp ~name gen prop
-
-let check_infer_types_closed =
-  let gen = Arbitrary.(list T.arbitrary) in
-  let name = "type_infer_types_closed" in
-  let pp = PP.(list T.to_string) in
-  (* check that after type inference, all types are closed *)
-  let prop terms =
-    let ctx = TypeInference.Ctx.create () in
-    List.iter (fun t -> ignore (TypeInference.FO.infer ctx t)) terms;
-    let signature = TypeInference.Ctx.to_signature ctx in
-    Symbol.SMap.for_all
-      (fun _ ty -> Type.is_closed ty)
-      signature
+    Symbol.Set.for_all (Signature.mem signature) symbols
   in
   mk_test ~pp ~name gen prop
 
@@ -74,6 +59,5 @@ let check_cmp =
     
 let props =
   [ check_infer_all_symbs
-  ; check_infer_types_closed
   ; check_cmp
   ]

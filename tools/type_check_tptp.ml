@@ -80,8 +80,8 @@ let check file =
     (* syntax error *)
     Printf.printf "%s\n" (Util_tptp.string_of_error e);
     exit 1
-  | Type.Error msg ->
-    Printf.printf "%s\n" msg;
+  | TypeUnif.Error e ->
+    Util.printf "%a\n" TypeUnif.pp_error e;
     exit 1
 
 let main () =

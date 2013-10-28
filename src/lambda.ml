@@ -85,7 +85,7 @@ let lambda_abstract ~signature t sub_t =
   Util.enter_prof prof_lambda_abstract;
   (* infer type of [sub_t] *)
   let ctx = TypeInference.Ctx.of_signature signature in
-  let ty = TypeInference.HO.infer ctx sub_t in
+  let ty = TypeInference.HO.infer_eval ctx sub_t 0 in
   (* abstract the term *)
   let t' = T.db_from_term t sub_t in
   let t' = T.mk_lambda ~ty t' in

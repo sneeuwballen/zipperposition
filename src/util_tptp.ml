@@ -162,10 +162,10 @@ let infer_type ctx decls =
       | A.TypeDecl(_, s, ty) ->
         TypeInference.Ctx.declare ctx s ty
       | A.CNF(_,_,c,_) ->
-        List.iter (F.infer_type ctx) c
+        List.iter (fun f -> TypeInference.FO.constrain_form ctx f 0) c
       | A.FOF(_,_,f,_)
-      | A.TFF(_,_,f,_) -> F.infer_type ctx f
-      | A.THF(_,_,f,_) -> ignore (TypeInference.HO.infer ctx f)
+      | A.TFF(_,_,f,_) -> TypeInference.FO.constrain_form ctx f 0
+      | A.THF(_,_,f,_) -> ignore (TypeInference.HO.infer ctx f 0)
       )
     decls
 

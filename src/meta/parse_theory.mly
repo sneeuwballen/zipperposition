@@ -36,20 +36,29 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     String.sub s 1 (String.length s - 2)
 
   let __table = Hashtbl.create 5
-  let __count = ref 0
+  let __ty_table = Hashtbl.create 5
 
-  let clear_table () =
-    Hashtbl.clear __table;
-    __count := 0
-
+  (* TODO: check same type, otherwise make new var *)
   (** Get variable associated with this name *)
   let get_var ~ty name =
     try Hashtbl.find __table name
     with Not_found ->
-      let v = T.mk_var ~ty !__count in
-      incr __count;
+      let v = T.mk_var ~ty (Hashtbl.length __table) in
       Hashtbl.add __table name v;
       v
+
+  let get_ty_var name =
+    try Hashtbl.find __ty_table name
+    with Not_found ->
+      let v = Type.var (Hashtbl.length __ty_table) in
+      Hashtbl.add __ty_table name v;
+      v
+
+  (** Clear everything in the current context *)
+  let clear_ctx () =
+    Hashtbl.clear __table;
+    Hashtbl.clear __ty_table;
+    ()
 %}
 
 %token EOI
@@ -75,6 +84,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token COLUMN
 %token STAR
 %token ARROW
+%token FORALL_TY  /* quantification on types */
+%token TYPE_TY  /* tType */
 
 %token AND
 %token NOTAND
@@ -129,6 +140,12 @@ statements:
   | error statements { [Ast_theory.Error ("syntax error", $startpos($1), $endpos($1))] }
 
 statement:
+  | s=__statement
+    { clear_ctx ();
+      s
+    }
+
+__statement:
   | t=theory { t }
   | a=axiom { a }
   | l=lemma { l }
@@ -319,7 +336,13 @@ system_term:
 system_constant: system_functor { $1 }
 system_functor: s=atomic_system_word { s }
 
+/* prenex quantified type */
 tff_type:
+  | ty=tff_term_type { ty }
+  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_type { ty }
+
+/* general type, without quantifiers */
+tff_term_type:
   | ty=tff_atom_type { ty }
   | l=tff_atom_type ARROW r=tff_atom_type
     { Type.mk_fun r [l] }
@@ -327,14 +350,23 @@ tff_type:
     { Type.mk_fun r args }
 
 tff_atom_type:
-  | w=UPPER_WORD { Type.var w }
+  | v=tff_ty_var { v }
   | w=type_const { Type.const w }
-  | LEFT_PAREN ty=tff_type RIGHT_PAREN { ty }
+  | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_term_type) RIGHT_PAREN
+    { Type.app w l }
+  | TYPE_TY { Type.tType }
+  | LEFT_PAREN ty=tff_term_type RIGHT_PAREN { ty }
 
 tff_ty_args:
   | ty=tff_atom_type { [ty] }
   | hd=tff_atom_type STAR tl=tff_ty_args { hd :: tl }
-  
+
+tff_ty_vars:
+  | v=tff_ty_var COLUMN TYPE_TY {  [v] }
+  | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
+
+tff_ty_var: w=UPPER_WORD { get_ty_var w }
+
 type_const:
   | w=LOWER_WORD { w }
   | w=DOLLAR_WORD { w }

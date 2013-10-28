@@ -75,7 +75,7 @@ let remove_trivial =
 
 let rec apply tr f = match tr with
   | RwTerm trs ->
-    let f' = F.map_depth (fun depth t -> Rewriting.TRS.rewrite ~depth trs t) f in
+    let f' = F.map (fun t -> Rewriting.TRS.rewrite trs t) f in
     [f']
   | RwForm frs ->
     let f' = Rewriting.FormRW.rewrite frs f in

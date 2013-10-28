@@ -199,7 +199,7 @@ end
 module type SIG_TRS = sig
   type t
 
-  type rule = T.t * T.t
+  type rule = FOTerm.t * FOTerm.t
     (** rewrite rule, from left to right *)
 
   val empty : t 
@@ -215,17 +215,15 @@ module type SIG_TRS = sig
   val size : t -> int
   val iter : t -> (rule -> unit) -> unit
   
-  val rule_to_form : rule -> F.t
+  val rule_to_form : rule -> FOFormula.t
     (** Make a formula out of a rule (an equality) *)
 
-  val rewrite_collect : ?depth:int -> t -> T.t -> T.t * rule list
+  val rewrite_collect : t -> FOTerm.t -> FOTerm.t * rule list
     (** Compute normal form of the term, and also return the list of
-        rules that were used.
-        @param depth the number of surrounding binders (default 0) *)
+        rules that were used. *)
 
-  val rewrite : ?depth:int -> t -> T.t -> T.t
-    (** Compute normal form of the term.
-        @see {!rewrite_collect}. *)
+  val rewrite : t -> FOTerm.t -> FOTerm.t
+    (** Compute normal form of the term. See {!rewrite_collect}. *)
 end
 
 module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E) = struct
@@ -282,41 +280,41 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
   exception RewrittenIn of T.t * S.t * rule
 
   (** Compute normal form of the term, and set its binding to the normal form *)
-  let rewrite_collect ?(depth=0) trs t = 
+  let rewrite_collect trs t = 
     (* compute normal form of [subst(t, offset)] *)
-    let rec compute_nf ~depth ~rules subst t offset =
+    let rec compute_nf ~rules subst t offset =
       match t.T.term with
       | T.Node (hd, l) ->
         (* rewrite subterms first *)
-        let l' = List.map (fun t' -> compute_nf ~depth ~rules subst t' offset) l in
+        let l' = List.map (fun t' -> compute_nf ~rules subst t' offset) l in
         let t' = T.mk_node hd l' in
         (* rewrite at root *)
-        reduce_at_root ~depth ~rules t'
+        reduce_at_root ~rules t'
       | T.Var _ ->
         (* normal form in subst. No renaming is needed, because all vars in
           lhs are bound to vars in offset 0 *)
-        S.apply_no_renaming ~depth subst t offset
+        S.apply_no_renaming subst t offset
       | T.BoundVar _ -> t
     (* assuming subterms of [t] are in normal form, reduce the term *)
-    and reduce_at_root ~depth ~rules t =
+    and reduce_at_root ~rules t =
       try
         Idx.retrieve ~sign:true trs 1 t 0 () rewrite_handler;
         t  (* normal form *)
       with (RewrittenIn (t', subst, rule)) ->
         Util.debug 3 "rewrite %a into %a (with %a)" T.pp t T.pp t' S.pp subst;
         rules := rule :: !rules;
-        compute_nf ~depth ~rules subst t' 1  (* rewritten into subst(t',1), continue *)
+        compute_nf ~rules subst t' 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
     and rewrite_handler () l r rule subst =
       let t' = r in
       raise (RewrittenIn (t', subst, rule))
     in
     let rules = ref [] in
-    let t' = compute_nf ~depth ~rules S.empty t 0 in
+    let t' = compute_nf ~rules S.empty t 0 in
     t', !rules
 
-  let rewrite ?depth trs t =
-    let t', _ = rewrite_collect ?depth trs t in
+  let rewrite trs t =
+    let t', _ = rewrite_collect trs t in
     t'
 end
 
@@ -385,40 +383,40 @@ module FormRW = struct
   exception RewrittenIn of F.t * S.t * rule
 
   (** Compute normal form of the formula *)
-  let rewrite_collect ?(depth=0) frs f =
-    let rec compute_nf ~depth ~rules subst f scope =
-      F.map_leaf_depth ~depth
-        (fun depth leaf -> match leaf.F.form with
+  let rewrite_collect frs f =
+    let rec compute_nf ~rules subst f scope =
+      F.map_leaf
+        (fun leaf -> match leaf.F.form with
           | F.Atom p ->
             (* rewrite atoms *)
-            let p' = S.apply_no_renaming ~depth subst p scope in
-            reduce_at_root ~depth ~rules p'
+            let p' = S.apply_no_renaming subst p scope in
+            reduce_at_root ~rules p'
           | F.Equal (l,r) ->
             F.mk_eq
-              (S.apply_no_renaming ~depth subst l scope)
-              (S.apply_no_renaming ~depth subst r scope)
+              (S.apply_no_renaming subst l scope)
+              (S.apply_no_renaming subst r scope)
           | _ -> leaf)
         f
     (* try to rewrite this term at root *)
-    and reduce_at_root ~depth ~rules t =
+    and reduce_at_root ~rules t =
       try
         DT.retrieve ~sign:true frs 1 t 0 () rewrite_handler;
         F.mk_atom t  (* normal form is itself *)
       with (RewrittenIn (f, subst, rule)) ->
         Util.debug 3 "rewrite %a into %a (with %a)" T.pp t F.pp f S.pp subst;
         rules := rule :: !rules;
-        compute_nf ~depth ~rules subst f 1  (* rewritten into subst(t',1), continue *)
+        compute_nf ~rules subst f 1  (* rewritten into subst(t',1), continue *)
     (* attempt to use one of the rules to rewrite t *)
     and rewrite_handler () l r rule subst =
       raise (RewrittenIn (r, subst, rule))
     in
     let rules = ref [] in
-    let f' = compute_nf ~depth ~rules S.empty f 0 in
+    let f' = compute_nf ~rules S.empty f 0 in
     if not (F.eq f f') 
       then Util.debug 3 "normal form of %a: %a" F.pp f F.pp f';
     f', !rules
 
-  let rewrite ?depth frs f =
-    let f', _ = rewrite_collect ?depth frs f in
+  let rewrite frs f =
+    let f', _ = rewrite_collect frs f in
     f'
 end

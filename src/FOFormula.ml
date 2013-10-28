@@ -205,13 +205,9 @@ let mk_eq t1 t2 =
 let mk_neq t1 t2 = mk_not (mk_eq t1 t2)
 
 let mk_forall ~ty f =
-  if not (Type.is_instantiated ty)
-    then failwith "F.mk_forall: needs instantiated type";
   H.hashcons { form=Forall (ty,f); flags=0; id= ~-1; }
 
 let mk_exists ~ty f =
-  if not (Type.is_instantiated ty)
-    then failwith "F.mk_forall: needs instantiated type";
   H.hashcons { form=Exists (ty,f); flags=0; id= ~-1; }
 
 module FCache = Cache.Replacing(struct
@@ -646,39 +642,6 @@ let of_term t =
   | T.Var _ | T.BoundVar _ -> failwith "F.of_term: not first-order"
   in
   recurse t
-
-(** {2 Typing} *)
-
-let rec infer_type ctx f = match f.form with
-  | True
-  | False -> ()
-  | Atom p ->
-    TypeInference.FO.constrain_term_type ctx p Type.o
-  | Equal (t1, t2) ->
-    TypeInference.FO.constrain_term_term ctx t1 t2
-  | And l
-  | Or l -> List.iter (infer_type ctx) l
-  | Forall (ty,f')
-  | Exists (ty,f') ->
-    let ty = Type.instantiate ty in
-    let vars = Type.free_gvars ty in
-    TypeInference.Ctx.within_binder ctx ~ty
-      (fun () ->
-        infer_type ctx f';
-        List.iter Type.close_var vars)
-  | Equiv (f1, f2)
-  | Imply (f1, f2) -> infer_type ctx f1; infer_type ctx f2
-  | Not f' -> infer_type ctx f'
-
-let signature ?(signature=Signature.empty) f =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  infer_type ctx f;
-  TypeInference.Ctx.to_signature ctx
-
-let signature_seq ?(signature=Signature.empty) seq =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  Sequence.iter (infer_type ctx) seq;
-  TypeInference.Ctx.to_signature ctx
 
 (** {2 IO} *)
 

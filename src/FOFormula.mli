@@ -187,12 +187,6 @@ val ac_eq : t -> t -> bool  (** Equal modulo AC? *)
 val to_term : t -> HOTerm.t   (** Conversion to higher-order term *)
 val of_term : HOTerm.t -> t
 
-(** {2 Typing} *)
-
-val infer_type : TypeInference.Ctx.t -> t -> unit
-val signature : ?signature:Signature.t -> t -> Signature.t
-val signature_seq : ?signature:Signature.t -> t Sequence.t -> Signature.t
-
 (** {2 IO} *)
 
 val pp_debug : Buffer.t -> t -> unit

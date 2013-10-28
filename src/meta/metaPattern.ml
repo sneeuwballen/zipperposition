@@ -182,11 +182,12 @@ let can_apply ~signature (pat,args) =
       then false
       else
         let ctx = TypeInference.Ctx.of_signature signature in
-        try TypeInference.Ctx.protect ctx
-          (fun () ->
-            List.iter2 (TypeInference.HO.constrain_term_type ctx) args types;
-            true)
-        with Type.Error _ ->
+        try
+          List.iter2
+            (fun t ty -> TypeInference.HO.constrain_term_type ctx t 0 ty 1)
+            args types;
+          true
+        with TypeUnif.Error _ ->
           false
 
 let apply (pat, args) =
@@ -250,7 +251,9 @@ let matching pat right =
 
 let arbitrary_apply =
   QCheck.Arbitrary.(map F.arbitrary (fun f ->
-    let signature = Signature.curry (F.signature ~signature:Signature.base f) in
+    let signature = TypeInference.FO.signature_forms
+      ~signature:Signature.base (Sequence.singleton f) in
+    let signature = Signature.curry signature in
     create ~signature (EncodedForm.encode f)))
 
 let arbitrary = QCheck.Arbitrary.map arbitrary_apply fst

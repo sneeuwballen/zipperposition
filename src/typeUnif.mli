@@ -38,7 +38,6 @@ type error = {
 
 val pp_error : Buffer.t -> error -> unit
 val error_to_string : error -> string
-  
 
 exception Error of error
   (** Raised when a unification error occurred *)

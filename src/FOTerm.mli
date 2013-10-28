@@ -167,7 +167,7 @@ val db_from_var : ?depth:int -> t -> t -> t
 
 (** {2 High-level operations} *)
 
-val symbols : t Sequence.t -> Symbol.SSet.t   (** Symbols of the terms (keys of signature) *)
+val symbols : t Sequence.t -> Symbol.Set.t   (** Symbols of the terms (keys of signature) *)
 val contains_symbol : Symbol.t -> t -> bool   (** Does the term contain the symbol *)
 
 (** {2 Fold} *)
@@ -198,7 +198,7 @@ val ac_eq : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
       which symbols are AC or commutative (by default by looking at
       attr_ac and attr_commut). *)
 
-val ac_symbols : is_ac:(Symbol.t -> bool) -> t Sequence.t -> Symbol.SSet.t
+val ac_symbols : is_ac:(Symbol.t -> bool) -> t Sequence.t -> Symbol.Set.t
   (** Set of symbols occurring in the terms, that are AC *)
 
 (** {2 Printing/parsing} *)

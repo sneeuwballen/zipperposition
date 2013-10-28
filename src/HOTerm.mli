@@ -177,7 +177,7 @@ val open_at : t -> t * t list
       and the list of its arguments. For instance, on
       [a @ b @ c @ (d @ e)] it will return [a], and [b; c; (d @ e)]. *)
 
-val symbols : t Sequence.t -> Symbol.SSet.t   (** Symbols of the terms (keys of signature) *)
+val symbols : t Sequence.t -> Symbol.Set.t   (** Symbols of the terms (keys of signature) *)
 val contains_symbol : Symbol.t -> t -> bool
 
 val flatten_ac : Symbol.t -> t list -> t list

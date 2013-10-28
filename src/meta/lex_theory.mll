@@ -86,13 +86,17 @@ rule token = parse
   | "lemma" { LEMMA }
   | "include" { INCLUDE }
   | "raw" { RAW }
+  | "$tType" { TYPE_TY }
   | vline { VLINE }
   | '&' { AND }
   | '!' { FORALL }
   | '?' { EXISTS }
+  | "!>" { FORALL_TY }
   (* | '^' { LAMBDA } *)
   (* | ';' { SEMICOLUMN } *)
   | ':' { COLUMN }
+  | '>' { ARROW }
+  | '*' { STAR }
   | "<=>" { EQUIV }
   | "=>" { IMPLY }
   | "<=" { LEFT_IMPLY }

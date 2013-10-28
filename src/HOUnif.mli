@@ -30,29 +30,37 @@ exception Fail
 
 type term = HOTerm.t
 type subst = Substs.HO.t
+type scope = Substs.scope
 
-val types : Signature.t -> term -> term -> bool
-  (** Check that, if one of the terms is a variable, the (inferred) types
-      are compatible with the given signature. *)
+val types : ctx:TypeInference.Ctx.t -> ?subst:subst ->
+            term -> scope -> term -> scope ->
+            subst
+  (** Infer the types of those terms, and unify them. Returns the substitution
+      that may bind type variables.
+      @raise Fail if the types are not unifiable. *)
 
-val unification : ?subst:subst -> term -> Substs.scope ->
-                  term -> Substs.scope -> subst
+val types_sig : ?subst:subst -> Signature.t ->
+                term -> scope -> term -> scope -> subst
+  (** Convenience wrapper for {!types} *)
+
+val unification : ?subst:subst -> term -> scope ->
+                  term -> scope -> subst
   (** Unify terms, returns a subst or
       @raise Fail if the terms are not unifiable *)
 
-val matching : ?subst:subst -> term -> Substs.scope ->
-                term -> Substs.scope -> subst
+val matching : ?subst:subst -> term -> scope ->
+                term -> scope -> subst
   (** [matching a scope_a b scope_b] returns sigma such that sigma(a) = b, or
       @raise Fail if the terms do not match.
       Only variables from the scope of [a] can  be bound in the subst. *)
 
-val variant : ?subst:subst -> term -> Substs.scope ->
-              term -> Substs.scope -> subst
+val variant : ?subst:subst -> term -> scope ->
+              term -> scope -> subst
   (** Succeeds iff the first term is a variant of the second *)
 
 val matching_ac : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
                   ?offset:int ref -> ?subst:subst ->
-                  term -> Substs.scope -> term -> Substs.scope ->
+                  term -> scope -> term -> scope ->
                   subst Sequence.t
   (** [matching_ac a b] returns substs such that [subst(a) =_AC b]. It
       is much more costly than [matching]. By default [is_ac] returns true only

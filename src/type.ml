@@ -109,7 +109,7 @@ let app s args = H.hashcons (App (s, args))
 
 let var i =
   if i < 0 then failwith "Type.var: expected a nonnegative int";
-  H.hashcons (Var si)
+  H.hashcons (Var i)
 
 let mk_fun = (<==)
 

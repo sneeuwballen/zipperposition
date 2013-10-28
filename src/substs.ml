@@ -191,7 +191,10 @@ module Common(T : TERM) = struct
           in
           T (PH.replace tbl (t', s_t') (t, s_t))
         else
-          let msg = Util.sprintf "Subst.bind: inconsistent binding for %a" T.pp v in
+          let msg = Util.sprintf
+            "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
+              T.pp v s_v T.pp t s_t T.pp t' s_t'
+          in
           raise (Invalid_argument msg)
 
   let remove subst v s_v = match subst with
@@ -356,7 +359,7 @@ module Ty = struct
     | Type.Var _ ->
       begin try
         (* type variable is bound, recurse *)
-        let ty', sc_ty' = get_var subst ty sc_ty in
+        let ty', sc_ty' = lookup subst ty sc_ty in
         _apply ty' sc_ty'
       with Not_found ->
         Renaming.rename renaming ty sc_ty

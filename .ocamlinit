@@ -16,6 +16,7 @@
 #install_printer Logtk.Signature.fmt;;
 #install_printer Logtk.Substs.FO.fmt;;
 #install_printer Logtk.Substs.HO.fmt;;
+#install_printer Logtk.Substs.Ty.fmt;;
 #install_printer Logtk.Symbol.fmt;;
 #install_printer Logtk.Precedence.fmt;;
 #install_printer Logtk.Ordering.fmt;;
@@ -25,7 +26,7 @@
 #install_printer Logtk.Transform.fmt;;
 #install_printer Logtk.Trace_tstp.fmt;;
 open Logtk.Sequence.Infix;;
-open Logtk.Type.Infix;;
+open Logtk.Type;;
 module T = Logtk.FOTerm;;
 module F = Logtk.FOFormula;;
 module HOT = Logtk.HOTerm;;
@@ -40,7 +41,9 @@ open Logtk;;
 open Logtk_meta;;
 let ppat s =
     let f = pform s in
-    let signature = Signature.curry (F.signature ~signature:Signature.base f) in
+    let signature = Signature.curry
+        (TypeInference.FO.signature_forms ~signature:Signature.base
+            (Sequence.singleton f)) in
     let f = MetaPattern.EncodedForm.encode f in
     MetaPattern.create ~signature f;;
 (* vim:syntax=ocaml

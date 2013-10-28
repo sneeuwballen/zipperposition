@@ -82,8 +82,7 @@ module Ctx : sig
     (** Evaluate the type within the given context and scope.
         A renaming can be provided instead of using the context's one *)
 
-  val to_signature : ?renaming:Substs.Ty.Renaming.t ->
-                      t -> Signature.t
+  val to_signature : t -> Signature.t
     (** Obtain the type of all symbols whose type has been inferred.
         If some instantiated variables remain, they are bound to the
         context's [default] parameter. *)
@@ -94,10 +93,16 @@ end
 module type S = sig
   type term
 
-  val infer : Ctx.t -> term -> scope -> Type.t * scope
+  val infer : Ctx.t -> term -> scope -> Type.t
     (** Infer the type of this term under the given signature. This updates
-        the context's typing environment!
+        the context's typing environment! The resulting type
+        is to be used within the same scope as the last argument.
         @raise TypeUnif.Error if the types are inconsistent *)
+
+  val infer_eval : ?renaming:Substs.Ty.Renaming.t ->
+                    Ctx.t -> term -> scope -> Type.t
+    (** Infer the type of the given term, and then evaluate the type
+        in the given renaming (desambiguate scopes). *)
 
   (** {3 Constraining types} *)
 
@@ -111,7 +116,7 @@ module type S = sig
 
   (** {3 Checking compatibility} *)
 
-  val check_term_type : Ctx.t -> term -> Type.t -> scope -> bool
+  val check_term_type : Ctx.t -> term -> scope -> Type.t -> scope -> bool
     (** Check whether this term can be used with this type. *)
 
   val check_term_term : Ctx.t -> term -> scope -> term -> scope -> bool
@@ -147,6 +152,9 @@ module FO : sig
 
   val constrain_form : Ctx.t -> FOFormula.t -> scope -> unit
     (** Assert that the formula should be well-typed. *)
+
+  val signature_forms : ?signature:Signature.t -> FOFormula.t Sequence.t -> Signature.t
+    (** Infer signature for this sequence of formulas *)
 end
 
 module HO : S with type term = HOTerm.t

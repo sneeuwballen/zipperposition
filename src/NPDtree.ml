@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module T = FOTerm
 module S = Substs.FO
+module SMap = Symbol.Map
 
 let prof_npdtree_retrieve = Util.mk_profiler "NPDtree_retrieve"
 
@@ -52,7 +53,7 @@ module Make(E : Index.EQUATION) = struct
 
   module Leaf = Index.MakeLeaf(E)
 
-  module SMap = Symbol.SMap
+  module SMap = SMap
 
   type t = {
     star : t option;  (* by variable *)

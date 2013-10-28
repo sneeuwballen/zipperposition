@@ -79,14 +79,12 @@ module type SIG_TRS = sig
   val rule_to_form : rule -> FOFormula.t
     (** Make a formula out of a rule (an equality) *)
 
-  val rewrite_collect : ?depth:int -> t -> FOTerm.t -> FOTerm.t * rule list
+  val rewrite_collect : t -> FOTerm.t -> FOTerm.t * rule list
     (** Compute normal form of the term, and also return the list of
-        rules that were used.
-        @param depth the number of surrounding binders (default 0) *)
+        rules that were used. *)
 
-  val rewrite : ?depth:int -> t -> FOTerm.t -> FOTerm.t
-    (** Compute normal form of the term.
-        see {!rewrite_collect}. *)
+  val rewrite : t -> FOTerm.t -> FOTerm.t
+    (** Compute normal form of the term. See {!rewrite_collect}. *)
 end
 
 module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E)
@@ -121,11 +119,10 @@ module FormRW : sig
   val rule_to_form : rule -> FOFormula.t
     (** Convert the rule back to a term *)
 
-  val rewrite_collect : ?depth:int -> t -> FOFormula.t -> FOFormula.t * rule list
+  val rewrite_collect : t -> FOFormula.t -> FOFormula.t * rule list
     (** Compute normal form of the formula, and return it together with
-        the list of rules that were used to rewrite.
-        @param depth the number of surrounding binders *)
+        the list of rules that were used to rewrite. *)
 
-  val rewrite : ?depth:int -> t -> FOFormula.t -> FOFormula.t
+  val rewrite : t -> FOFormula.t -> FOFormula.t
     (** see {!rewrite_collect} *)
 end

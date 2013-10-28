@@ -45,42 +45,42 @@ type error = {
 exception Error of error
 
 let _error subst ty1 s1 ty2 s2 =
-  Error {
+  raise (Error {
     left = ty1;
     s_left = s1;
     right = ty2;
     s_right = s2;
     subst;
-  }
+  })
 
 let pp_error buf e =
   Printf.bprintf buf "type error when unifying %a[%d] with %a[%d] in context %a"
-    Ty.pp e.left e.s_left Ty.pp right e.s_right S.pp e.subst
+    Ty.pp e.left e.s_left Ty.pp e.right e.s_right S.pp e.subst
 
 let error_to_string = Util.on_buffer pp_error
 
 (* occur-check *)
 let _occur_check subst v s_v t s_t =
-  let rec check v s_v = match v with
-  | Ty.Var when s_v = s_t && Ty.eq v t -> true
+  let rec check t s_t = match t with
+  | Ty.Var _ when s_v = s_t && Ty.eq v t -> true
   | Ty.Var _ ->
     begin try
-      let v', s_v' = S.get_var subst v s_v in
-      check subst v' s_v'
+      let t', s_t' = S.lookup subst t s_t in
+      check t' s_t'
     with Not_found -> false
     end
-  | Ty.App (_, l) -> List.exists (fun v' -> check v' s_v) l
+  | Ty.App (_, l) -> List.exists (fun t' -> check t' s_t) l
   | Ty.Fun (ret, l) ->
-    check ret s_v || List.exists (fun v' -> check v' s_v) l
+    check ret s_t || List.exists (fun t' -> check t' s_t) l
   in
-  check v s_v
+  check t s_t
 
 (* unification *)
 let rec _unify_rec subst ty1 s1 ty2 s2 =
   let ty1, s1 = S.get_var subst ty1 s1 in
   let ty2, s2 = S.get_var subst ty2 s2 in
   match ty1, ty2 with
-  | s1 = s2 && Ty.eq ty1 ty2 -> subst
+  | _ when s1 = s2 && Ty.eq ty1 ty2 -> subst
   | Ty.Var _, _ ->
     if _occur_check subst ty1 s1 ty2 s2
       then _error subst ty1 s1 ty2 s2
@@ -89,12 +89,12 @@ let rec _unify_rec subst ty1 s1 ty2 s2 =
     if _occur_check subst ty2 s2 ty1 s1
       then _error subst ty2 s2 ty1 s1
       else S.bind subst ty2 s2 ty1 s1
-  | Ty.App (s1, l1), Ty.App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->
+  | Ty.App (sym1, l1), Ty.App (sym2, l2) when sym1 = sym2 && List.length l1 = List.length l2 ->
     List.fold_left2
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
       subst
       l1 l2
-  | Ty.Fun (ret1, l1), Ty.App (ret2, l2) when List.length l1 = List.length l2 ->
+  | Ty.Fun (ret1, l1), Ty.Fun (ret2, l2) when List.length l1 = List.length l2 ->
     let subst = _unify_rec subst ret1 s1 ret2 s2 in
     List.fold_left2
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
@@ -112,11 +112,11 @@ let unify ?(subst=S.create 10) ty1 s1 ty2 s2 =
     Util.exit_prof prof_unify;
     raise e
 
-let unify_fo ?subst ty1 s1 ty2 s2 =
+let unify_fo ?(subst=Substs.FO.create 11) ty1 s1 ty2 s2 =
   Substs.FO.update_ty subst
     (fun subst -> unify ~subst ty1 s1 ty2 s2)
 
-let unify_ho ?subst ty1 s1 ty2 s2 =
+let unify_ho ?(subst=Substs.HO.create 11) ty1 s1 ty2 s2 =
   Substs.HO.update_ty subst
     (fun subst -> unify ~subst ty1 s1 ty2 s2)
 
@@ -138,20 +138,20 @@ let rec _variant_rec subst ty1 s1 ty2 s2 =
   let ty1, s1 = S.get_var subst ty1 s1 in
   let ty2, s2 = S.get_var subst ty2 s2 in
   match ty1, ty2 with
-  | s1 = s2 && Ty.eq ty1 ty2 -> subst
+  | _ when s1 = s2 && Ty.eq ty1 ty2 -> subst
   | Ty.Var i1, Ty.Var i2 ->
     (* can bind variables if they do not belong to the same scope *)
     if s1 <> s2
       then S.bind subst ty1 s1 ty2 s2
       else _error subst ty1 s1 ty2 s2
-  | _, Ty.Var _ ->
-  | Ty.Var _ -> _error subst ty2 s2 ty1 s1
-  | Ty.App (s1, l1), Ty.App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->
+  | _, Ty.Var _
+  | Ty.Var _, _ -> _error subst ty2 s2 ty1 s1
+  | Ty.App (sym1, l1), Ty.App (sym2, l2) when sym1 = sym2 && List.length l1 = List.length l2 ->
     List.fold_left2
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
       subst
       l1 l2
-  | Ty.Fun (ret1, l1), Ty.App (ret2, l2) when List.length l1 = List.length l2 ->
+  | Ty.Fun (ret1, l1), Ty.Fun (ret2, l2) when List.length l1 = List.length l2 ->
     let subst = _unify_rec subst ret1 s1 ret2 s2 in
     List.fold_left2
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)

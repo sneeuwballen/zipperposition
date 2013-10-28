@@ -139,6 +139,10 @@ module Ty : sig
   val apply : t -> renaming:Renaming.t -> Type.t -> scope -> Type.t
     (** Apply the substitution to the type.
         @param renaming used to desambiguate free variables from distinct scopes *)
+
+  val apply_no_renaming : t -> Type.t -> scope -> Type.t
+    (** Same as {!apply}, but performs no renaming of free variables.
+        {b Caution}, can entail collisions between scopes! *)
 end
 
 (** {2 Substitutions on various Terms}

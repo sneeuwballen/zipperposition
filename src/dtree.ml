@@ -204,7 +204,7 @@ module Make(E : Index.EQUATION) = struct
             in
             (* if variable, try to bind it and continue *)
             match t1' with
-            | Variable v1' when S.is_in_subst subst v1' sc_dt ->
+            | Variable v1' when S.mem subst v1' sc_dt ->
                (* already bound, check consistency *)
               begin try
                 let subst = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in

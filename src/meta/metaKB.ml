@@ -495,7 +495,8 @@ let formulas_of_statements statements =
 
 (* infer signature from statement *)
 let signature_of_statement stmt =
-  F.signature_seq (formulas_of_statements (Sequence.singleton stmt))
+  TypeInference.FO.signature_forms
+    (formulas_of_statements (Sequence.singleton stmt))
 
 (* apply the axiom definition to args, getting back a pattern,args *)
 let apply_axiom axiom args =

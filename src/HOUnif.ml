@@ -32,6 +32,7 @@ open T
 
 type subst = S.t
 type term = T.t
+type scope = Substs.scope
 
 let prof_unification = Util.mk_profiler "unification"
 let prof_matching = Util.mk_profiler "matching"
@@ -40,12 +41,19 @@ let prof_ac_matching = Util.mk_profiler "ac-matching"
 
 exception Fail
 
-let types signature t1 t2 =
-  if T.is_var t1 || T.is_var t2
-    then
-      let ctx = TypeInference.Ctx.of_signature signature in
-      TypeInference.HO.check_term_term ctx t1 t2
-    else true
+let types ~ctx ?subst t1 s1 t2 s2 =
+  let ty1 = TypeInference.HO.infer ctx t1 s1 in
+  let ty2 = TypeInference.HO.infer ctx t2 s2 in
+  try
+    let subst = TypeUnif.unify_ho ?subst ty1 s1 ty2 s2 in
+    subst
+  with TypeUnif.Error _ ->
+    raise Fail
+
+let types_sig ?subst signature t1 s1 t2 s2 =
+  let ctx = TypeInference.Ctx.of_signature signature in
+  types ~ctx ?subst t1 s1 t2 s2
+
 
 (** Does [v] appear in [t] if we apply the substitution? *)
 let occurs_check subst v sc_v t sc_t =

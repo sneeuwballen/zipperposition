@@ -181,8 +181,6 @@ let cast t ty =
 
 let mk_var ~ty idx =
   assert (idx >= 0);
-  if not (Type.is_instantiated ty)
-    then failwith "HOT.mk_var: needs instantiated type";
   let my_v = {term = Var idx; type_= Some ty; tsize = 1;
               flags=(flag_db_closed lor flag_db_closed_computed lor
                      flag_normal_form);
@@ -198,8 +196,6 @@ let mk_bound_var idx =
 
 let mk_bind s ~ty t' =
   assert (Symbol.has_attr Symbol.attr_binder s);
-  if not (Type.is_instantiated ty)
-    then failwith "HOT.mk_bind: needs instantiated type";
   let my_t = {term=Bind (s, t'); type_=Some ty; flags=0; tsize=0; tag= -1} in
   let t = H.hashcons my_t in
   (if t == my_t
@@ -415,13 +411,13 @@ let symbols seq =
   let rec symbols set t = match t.term with
     | Var _
     | BoundVar _ -> set
-    | Const s -> Symbol.SSet.add s set
+    | Const s -> Symbol.Set.add s set
     | Bind (s, t') ->
-      let set = Symbol.SSet.add s set in
+      let set = Symbol.Set.add s set in
       symbols set t'
     | At (t1, t2) -> symbols (symbols set t1) t2
   in
-  Sequence.fold symbols Symbol.SSet.empty seq
+  Sequence.fold symbols Symbol.Set.empty seq
 
 (** Does t contains the symbol f? *)
 let rec contains_symbol f t =

@@ -25,9 +25,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Partial Ordering on symbols} *)
 
+module STbl = Symbol.Tbl
+
 (** the partial order is the adjacency matrix of a DAG *)
 type t = {
-  num : int Symbol.SHashtbl.t;    (** symbol -> index *)
+  num : int STbl.t;    (** symbol -> index *)
   symbols : Symbol.t array;       (** num -> symbol *)
   mutable total : bool;           (** is the order total? *)
   size : int;                     (** number of symbols in the table *)
@@ -36,19 +38,19 @@ type t = {
 
 (** Compute the symbols from the symbol table *)
 let compute_symbols num =
-  let symbols = Array.make (Symbol.SHashtbl.length num) Symbol.true_symbol in
-  Symbol.SHashtbl.iter (fun s i -> symbols.(i) <- s) num;
+  let symbols = Array.make (STbl.length num) Symbol.true_symbol in
+  STbl.iter (fun s i -> symbols.(i) <- s) num;
   symbols
 
 (** build an empty partial order for the list of symbols *)
 let mk_partial_order symbs =
-  let num = Symbol.SHashtbl.create (List.length symbs) in
+  let num = STbl.create (List.length symbs) in
   let size = ref 0 in
   List.iter
     (fun s ->
-      if Symbol.SHashtbl.mem num s then ()
+      if STbl.mem num s then ()
       else begin
-        Symbol.SHashtbl.replace num s !size;
+        STbl.replace num s !size;
         incr size;
       end)
     symbs;
@@ -162,8 +164,8 @@ let complete po cmp_fun =
 (** compare two symbols in the partial ordering *)
 let compare po s t =
   assert (is_total po);
-  let ns = Symbol.SHashtbl.find po.num s
-  and nt = Symbol.SHashtbl.find po.num t in
+  let ns = STbl.find po.num s
+  and nt = STbl.find po.num t in
   match po.cmp.(ns).(nt), po.cmp.(nt).(ns) with
   | true, false -> 1
   | false, true -> -1

@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
     and backward subsumption *)
 
 module T = FOTerm
+module STbl = Symbol.Tbl
+module SMap = Symbol.Map
 
 module Make(C : Index.CLAUSE) = struct
   module C = C
@@ -83,32 +85,32 @@ module Make(C : Index.CLAUSE) = struct
     let count_split_symb =
       { name = "count_split_symb";
         f = (fun lits ->
-          let table = Symbol.SHashtbl.create 3 in
+          let table = STbl.create 3 in
           let rec gather t = match t.T.term with
           | T.Node (s, l) ->
             (if Symbol.has_attr Symbol.attr_split s
-              then Symbol.SHashtbl.replace table s ());
+              then STbl.replace table s ());
             List.iter gather l
           | T.BoundVar _ | T.Var _ -> ()
           in
           Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
-          Symbol.SHashtbl.length table);
+          STbl.length table);
       }
 
     (** Count the number of distinct skolem symbols *)
     let count_skolem_symb =
       { name = "count_skolem_symb";
         f = (fun lits ->
-          let table = Symbol.SHashtbl.create 3 in
+          let table = STbl.create 3 in
           let rec gather t = match t.T.term with
           | T.Node (s, l) ->
             (if Symbol.has_attr Symbol.attr_skolem s
-              then Symbol.SHashtbl.replace table s ());
+              then STbl.replace table s ());
             List.iter gather l
           | T.BoundVar _ | T.Var _ -> ()
           in
           Sequence.iter (fun (l,r,_) -> gather l; gather r) lits;
-          Symbol.SHashtbl.length table);
+          STbl.length table);
       }
 
     (* iterate on symbols of a term *)
@@ -257,7 +259,7 @@ module Make(C : Index.CLAUSE) = struct
     (* list of (salience: float, feature) *)
     let features = ref [] in
     (* create features for the symbols *)
-    Symbol.SMap.iter
+    SMap.iter
       (fun s ty ->
         let arity = Type.arity ty in
         if ignore s

@@ -189,8 +189,6 @@ let cast t ty =
 
 let mk_var ~ty idx =
   assert (idx >= 0);
-  if not (Type.is_instantiated ty)
-    then failwith "T.mk_var: needs instantiated type";
   let my_v = {term = Var idx; type_= Some ty; tsize = 1;
               flags= 0; tag= -1} in
   H.hashcons my_v
@@ -376,10 +374,10 @@ let symbols seq =
   let rec symbols set t = match t.term with
     | Var _ | BoundVar _ -> set
     | Node (s, l) ->
-      let set = Symbol.SSet.add s set in
+      let set = Symbol.Set.add s set in
       List.fold_left symbols set l
   in
-  Sequence.fold symbols Symbol.SSet.empty seq
+  Sequence.fold symbols Symbol.Set.empty seq
 
 (** Does t contains the symbol f? *)
 let rec contains_symbol f t =
@@ -546,10 +544,10 @@ let ac_symbols ~is_ac seq =
   | Var _
   | BoundVar _ -> set
   | Node (s, l) ->
-    let set = if is_ac s then Symbol.SSet.add s set else set in
+    let set = if is_ac s then Symbol.Set.add s set else set in
     List.fold_left find set l
   in
-  Sequence.fold find Symbol.SSet.empty seq
+  Sequence.fold find Symbol.Set.empty seq
 
 (** {2 Printing/parsing} *)
 

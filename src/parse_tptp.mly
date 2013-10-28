@@ -34,25 +34,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     String.sub s 1 (String.length s - 2)
 
   let __table = Hashtbl.create 5
-  let __count = ref 0
-
-  let clear_table () =
-    Hashtbl.clear __table;
-    __count := 0
+  let __ty_table = Hashtbl.create 5
 
   (* TODO: check same type, otherwise make new var *)
   (** Get variable associated with this name *)
   let get_var ~ty name =
     try Hashtbl.find __table name
     with Not_found ->
-      let v = T.mk_var ~ty !__count in
-      incr __count;
+      let v = T.mk_var ~ty (Hashtbl.length __table) in
       Hashtbl.add __table name v;
+      v
+
+  let get_ty_var name =
+    try Hashtbl.find __ty_table name
+    with Not_found ->
+      let v = Type.var (Hashtbl.length __ty_table) in
+      Hashtbl.add __ty_table name v;
       v
 
   (** Clear everything in the current context *)
   let clear_ctx () =
-    clear_table ();
+    Hashtbl.clear __table;
+    Hashtbl.clear __ty_table;
     ()
 %}
 
@@ -297,12 +300,8 @@ system_functor: s=atomic_system_word { s }
 
 /* prenex quantified type */
 tff_type:
-  | ty=tff_quantified_type { Type.Quantified.instantiate ty }
-
-tff_quantified_type:
-  | ty=tff_term_type { Type.Quantified.of_ty ty }
-  | FORALL_TY LEFT_BRACKET vars=tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_quantified_type
-    { Type.Quantified.mk_forall vars ty }
+  | ty=tff_term_type { ty }
+  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_type { ty }
 
 /* general type, without quantifiers */
 tff_term_type:
@@ -328,7 +327,7 @@ tff_ty_vars:
   | v=tff_ty_var COLUMN TYPE_TY {  [v] }
   | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
 
-tff_ty_var: w=UPPER_WORD { Type.var w }
+tff_ty_var: w=UPPER_WORD { get_ty_var w }
 
 type_const:
   | w=LOWER_WORD { w }
