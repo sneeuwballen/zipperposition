@@ -156,15 +156,21 @@ let is_numeric s = match s with
 let is_distinct s = match s with
   | Const _ -> has_attr attr_distinct s | _ -> false
 
-module SHashtbl = Hashtbl.Make(struct
+module Tbl = Hashtbl.Make(struct
   type t = symbol
   let equal = eq
   let hash = hash
 end)
 
-module SMap = Sequence.Map.Make(struct type t = symbol let compare = compare end)
+module Map = Sequence.Map.Make(struct
+  type t = symbol
+  let compare = compare
+end)
 
-module SSet = Sequence.Set.Make(struct type t = symbol let compare = compare end)
+module Set = Sequence.Set.Make(struct
+  type t = symbol
+  let compare = compare
+end)
 
 (** {2 connectives} *)
 
@@ -289,14 +295,12 @@ module Arith = struct
     | _ -> _ty_mismatch "cannot compute type of symbol %a" pp s
 
   let zero_of_ty ty =
-    let ty = Type.deref ty in
     if Type.eq ty Type.int then zero_i
     else if Type.eq ty Type.rat then zero_rat
     else if Type.eq ty Type.real then zero_f
     else _ty_mismatch "bad arith type %a for zero_of_ty" Type.pp ty
 
   let one_of_ty ty =
-    let ty = Type.deref ty in
     if Type.eq ty Type.int then one_i
     else if Type.eq ty Type.rat then one_rat
     else if Type.eq ty Type.real then one_f
@@ -354,9 +358,9 @@ module Arith = struct
       remainder_e; remainder_t; remainder_f;
       less; lesseq; greater; greatereq;
     ] in
-    SSet.of_seq (Sequence.of_list l)
+    Set.of_seq (Sequence.of_list l)
 
-  let is_arith s = SSet.mem s set
+  let is_arith s = Set.mem s set
 
   module Op = struct
     let floor s = match s with

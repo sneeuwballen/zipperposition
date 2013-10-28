@@ -95,9 +95,9 @@ val attrs : t -> symbol_attribute
 val has_attr : symbol_attribute -> t -> bool
   (** does the symbol have this attribute? *)
 
-module SHashtbl : Hashtbl.S with type key = t
-module SMap : Sequence.Map.S with type key = t
-module SSet : Sequence.Set.S with type elt = t
+module Map : Sequence.Map.S with type key = t
+module Set : Sequence.Set.S with type elt = t
+module Tbl : Hashtbl.S with type key = t
 
 (** {2 connectives} *)
 
@@ -181,7 +181,7 @@ module Arith : sig
   val greater : t
   val greatereq : t
 
-  val set : SSet.t
+  val set : Set.t
     (** Set of arithmetic symbols *)
 
   val is_arith : t -> bool
