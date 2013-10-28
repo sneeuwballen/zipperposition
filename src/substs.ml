@@ -515,7 +515,10 @@ module FO = struct
           else t'
       with Not_found ->
         (* variable not bound by [subst], rename it *)
-        Renaming.rename renaming t scope
+        let ty = T.get_type t in
+        let ty' = Ty.apply subst.ty ~renaming:renaming.Renaming.ty ty scope in
+        let t = if Type.eq ty ty' then t else T.cast t ty' in
+        Renaming.rename renaming t scope 
       end
   (* apply subst to the list, all elements of which have the given scope *)
   and _apply_rec_list ~renaming subst scope l = match l with
@@ -560,6 +563,9 @@ module HO = struct
           else t'
       with Not_found ->
         (* variable not bound by [subst], rename it *)
+        let ty = T.get_type t in
+        let ty' = Ty.apply subst.ty ~renaming:renaming.Renaming.ty ty scope in
+        let t = if Type.eq ty ty' then t else T.cast t ty' in
         Renaming.rename renaming t scope
       end
     | T.At (t1, t2) ->
