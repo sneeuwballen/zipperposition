@@ -29,42 +29,86 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     https://en.wikipedia.org/wiki/Hindley-Milner
 *)
 
+module Ty = Type
+module S = Substs.Ty
+module Unif = TypeUnif
+
+module STbl = Symbol.Tbl
+
+type scope = Substs.scope
+
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 
-(** {2 Typing context} *)
+(** {2 Typing context}
+
+The scope maintained by the typing context starts at 1.
+Scope 0 should be used for ground types.
+*)
 
 module Ctx = struct
   type t = {
-    st : Type.Stack.t;              (* bindings stack *)
     default : Type.t;               (* default type *)
-    mutable db : Type.t list;       (* types of bound variables (stack) *)
+    mutable scope : int;            (* next scope *)
+    mutable db : (Type.t * scope) list;  (* types of bound variables (stack) *)
     mutable signature : Signature.t;(* symbol -> type *)
+    mutable subst : S.t;            (* variable bindings *)
+    symbols : (Type.t * scope) STbl.t; (* symbol -> instantiated type *)
   }
 
   let create ?(default=Type.i) ?(base=true) () =
     let signature = if base then Signature.base else Signature.empty in
-    {
-      st = Type.Stack.create ();
+    let ctx = {
       default;
+      scope = 1;
+      var = ~-1;
       db = [];
       signature;
-    }
+      subst = S.create 17;
+      symbols = STbl.create 7;
+    } in
+    ctx
 
-  let of_signature ?(default=Type.i) signature = {
-    st = Type.Stack.create ();
-    default;
-    db = [];
-    signature;
-  }
+  let of_signature ?(default=Type.i) signature =
+    let ctx = {
+      default;
+      scope = 1;
+      var = ~-1;
+      db = [];
+      signature;
+      subst = S.create 17;
+      symbols = STbl.create 7;
+    } in
+    ctx
 
   let add_signature ctx signature =
     ctx.signature <- Signature.merge ctx.signature signature;
     ()
 
+  let _new_scope ctx =
+    let n = ctx.scope in
+    ctx.scope <- n+1;
+    n
+
+  let _new_var ctx =
+    let n = ctx.var in
+    ctx.var <- n -1 ;
+    Type.__var n
+
+  (* unify within the context's substitution *)
+  let unify ctx ty1 s1 ty2 s2 =
+    Unif.unify ~subst:ctx.subst ty1 s1 ty2 s2
+
+  (* same as {!unify}, but also updates the ctx's substitution *)
+  let unify_and_set ctx ty1 s1 ty2 s2 =
+    let subst = unify ctx ty1 s1 ty2 s2 in
+    ctx.subst <- subst
+
   let within_binder ctx ~ty f =
-    ctx.db <- ty :: ctx.db;
+    let scope = _new_scope ctx in
+    ctx.db <- (ty, scope) :: ctx.db;
     try
-      let x = f () in
+      (* compute within scope *)
+      let x = f ty scope in
       ctx.db <- List.tl ctx.db;
       x
     with e ->
@@ -77,89 +121,75 @@ module Ctx = struct
       else
         failwith (Printf.sprintf "TypeInference.Ctx.db_type: idx %d not bound" i)
 
-  let unify ctx ty1 ty2 =
-    Util.debug 5 "Ctx.unify %a %a" Type.pp ty1 Type.pp ty2;
-    Type.unify ctx.st ty1 ty2;
-    ()
-
   let type_of_fun ctx s =
     match s with
     | Symbol.Int _
     | Symbol.Rat _
-    | Symbol.Real _ -> Symbol.Arith.typeof s
+    | Symbol.Real _ -> Symbol.Arith.typeof s, 0  (* ground *)
     | Symbol.Const _ ->
       begin try
         let ty = Signature.find ctx.signature s in
-        Type.instantiate ty
+        ty, _new_scope ctx
       with Not_found ->
-        (* give a new type variable to this symbol *)
-        let ty = Type.new_gvar () in
-        Util.debug 5 "Ctx: new type %a for function %a" Type.pp ty Symbol.pp s;
-        ctx.signature <- Signature.declare ctx.signature s ty;
-        ty
+        (* give a new type variable to this symbol. The symbol will not
+          be able to be polymorphic (need to declare it!). *)
+        try
+          STbl.find ctx.symbols s
+        with Not_found ->
+          let v = Type.var 0 in
+          let scope = _new_scope ctx in
+          STbl.add ctx.symbols s (v, scope);
+          v, scope
       end
 
   let declare ctx s ty =
-    assert (Type.is_closed ty);
     ctx.signature <- Signature.declare ctx.signature s ty;
     ()
 
   let to_signature ctx =
     let signature = ctx.signature in
-    let signature = Signature.map signature
-      (fun _ ty ->
+    (* enrich signature with new symbols *)
+    STbl.fold
+      (fun s (ty,scope) signature ->
+        (* evaluate type (no renaming needed because we don't care
+            about collisions, all variables will be grounded) *)
+        let ty = S.apply_no_renaming ctx.subst ty scope in
         (* bind all remaining free variables to [ctx.default] *)
-        let vars = Type.free_gvars ty in
-        List.iter (fun gv -> Type.bind gv ctx.default) vars;
-        (* dereference the type *)
-        let ty = Type.deref ty in
-        assert (Type.is_closed ty);
-        ty)
-    in
-    signature
-
-  let unwind_protect ctx f = Type.Stack.unwind_protect ctx.st f
-
-  let protect ctx f = Type.Stack.protect ctx.st f
+        let vars = Ty.free_vars ty in
+        let subst' = S.of_list ~init:ctx.subst
+          (List.map (fun v -> v, scope, ctx.default, 0) vars)
+        in
+        let ty, _ = S.apply_no_renaming ctx.subst ty scope in
+        (* add to signature *)
+        Signature.declare signature s ty)
+      ctx.symbols signature
 end
 
 (** {2 Hindley-Milner} *)
 
-let check_type_type ctx ty1 ty2 =
-  Type.unifiable ty1 ty2
-
-let check_type_type_sig signature ty1 ty2 =
-  let ctx = Ctx.of_signature signature in
-  check_type_type ctx ty1 ty2
-
 module type S = sig
   type term
 
-  val infer : Ctx.t -> term -> Type.t
+  val infer : Ctx.t -> term -> Type.t * scope
     (** Infer the type of this term under the given signature.  This updates
         the context's typing environment!
-        @raise Type.Error if the types are inconsistent *)
-
-  val infer_sig : Signature.t -> term -> Type.t
-    (** Inference from a signature (shortcut) *)
-
-  val infer_no_check : Ctx.t -> term -> Type.t
-    (** Infer the type of the term, but does not recurse if it's not needed. *)
+        @raise TypeUnif.Error if the types are inconsistent *)
 
   (** {3 Constraining types} *)
 
   val constrain_term_term : Ctx.t -> term -> term -> unit
-    (** Force the two terms to have the same type
-        @raise Type.Error if an inconsistency is detected *)
+    (** Force the two terms to have the same type in this context
+        @raise TypeUnif.Error if an inconsistency is detected *)
 
-  val constrain_term_type : Ctx.t -> term -> Type.t -> unit
-    (** Force the term to have the given type.
-        @raise Type.Error if an inconsistency is detected *)
+  val constrain_term_type : Ctx.t -> term -> Type.t -> scope -> unit
+    (** Force the term to have the given type in the given scope.
+        @raise TypeUnif.Error if an inconsistency is detected *)
 
   (** {3 Checking compatibility} *)
 
   val check_term_type : Ctx.t -> term -> Type.t -> bool
-    (** Check whether this term can be used with this type *)
+    (** Check whether this term can be used with this type. The type
+        is assumed to belong to a new scope. *)
 
   val check_term_term : Ctx.t -> term -> term -> bool
     (** Can we unify the terms' types? *)
@@ -191,74 +221,54 @@ end
     of a term. *)
 module Make(T : sig
   type term
-  val infer_rec : check:bool -> Ctx.t -> term -> Type.t
+  val infer_rec : Ctx.t -> term -> scope -> Type.t * scope
 end) = struct
   type term = T.term
 
   (* wrapper to [infer_rec], with profiling *)
-  let infer_type_of ~check ctx t =
+  let infer ctx t s_t =
     Util.enter_prof prof_infer;
     try
-      let res = T.infer_rec ~check ctx t in
+      let res = T.infer_rec ctx t s_t in
       Util.exit_prof prof_infer;
       res
     with e ->
       Util.exit_prof prof_infer;
       raise e
 
-  let infer ctx t =
-    let check = true in
-    let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
-    Type.deref ty
+  let constrain_term_term ctx t1 s1 t2 s2 =
+    let ty1, s1 = infer ctx t1 in
+    let ty2, s2 = infer ctx t2 in
+    Ctx.unify_and_set ty1 s1 ty2 s2
 
-  let infer_sig signature t =
+  let constrain_term_type ctx t s_t ty s_ty =
+    let ty1, s1 = infer ctx t in
+    Ctx.unify_and_set ty1 s1 ty s_ty
+
+  let check_term_type ctx t s_t ty s_ty =
+    let ty', s' = infer ctx t s_t in
+    try
+      ignore (Ctx.unify ctx ty' s' ty (Ctx._new_scope ()));
+      true
+    with Unif.Error _ ->
+      false
+
+  let check_term_term ctx t1 s1 t2 s2 =
+    let ty1, s1 = infer ctx t1 s1 in
+    let ty2, s2 = infer ctx t2 s2 in
+    try
+      ignore (Ctx.unify ctx ty1 s1 ty2 s2);
+      true
+    with Unif.Error _ ->
+      false
+
+  let check_term_term_sig signature t1 s1 t2 s2 =
     let ctx = Ctx.of_signature signature in
-    let check = true in
-    let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
-    Type.deref ty
+    check_term_term ctx t1 s1 t2 s2
 
-  let infer_no_check ctx t =
-    let check = false in
-    let ty = Ctx.unwind_protect ctx (fun () -> infer_type_of ~check ctx t) in
-    Type.deref ty
-
-  let constrain_term_term ctx t1 t2 =
-    let check = true in
-    Ctx.unwind_protect ctx
-      (fun () ->
-        let ty1 = infer_type_of ~check ctx t1 in
-        let ty2 = infer_type_of ~check ctx t2 in
-        Ctx.unify ctx ty1 ty2)
-
-  let constrain_term_type ctx t ty =
-    let check = true in
-    Ctx.unwind_protect ctx
-      (fun () ->
-        let ty' = infer_type_of ~check ctx t in
-        Ctx.unify ctx ty' (Type.instantiate ty))
-
-  let check_term_type ctx t ty =
-    let check = false in
-    Ctx.protect ctx
-      (fun () ->
-        let ty_t = infer_type_of ~check ctx t in
-        Type.unifiable ty ty_t)
-
-  let check_term_term ctx t1 t2 =
-    let check = false in
-    Ctx.protect ctx
-      (fun () ->
-        let ty1 = infer_type_of ~check ctx t1 in
-        let ty2 = infer_type_of ~check ctx t2 in
-        Type.unifiable ty1 ty2)
-
-  let check_term_term_sig signature t1 t2 =
+  let check_term_type_sig signature t1 s1 ty2 s2 =
     let ctx = Ctx.of_signature signature in
-    check_term_term ctx t1 t2
-
-  let check_term_type_sig signature t1 ty2 =
-    let ctx = Ctx.of_signature signature in
-    check_term_type ctx t1 ty2
+    check_term_type ctx t1 s1 ty2 s2
 
   module Quick = struct
     type constr =
@@ -269,9 +279,9 @@ end) = struct
     let constrain_seq ?(ctx=Ctx.create ()) seq =
       Sequence.iter
         (function
-        | WellTyped t -> ignore (infer ctx t)
-        | SameType (t1, t2) -> constrain_term_term ctx t1 t2
-        | HasType (t, ty) -> constrain_term_type ctx t ty)
+        | WellTyped t -> ignore (infer ctx t 0)
+        | SameType (t1, t2) -> constrain_term_term ctx t1 0 t2 0
+        | HasType (t, ty) -> constrain_term_type ctx t 0 ty 0)
         seq;
       ctx
 
@@ -286,39 +296,51 @@ end) = struct
   end
 end
 
-module FO = Make(struct
-  module T = FOTerm
+module FO = struct
+  module TI = Make(struct
+    module T = FOTerm
+    module F = FOFormula
 
-  type term = T.t
+    type term = T.t
 
-  (* infer a type for [t], possibly updating [ctx]. If [check] is true,
-     will type-check recursively in the term even if it's not needed to
-     compute its type. *)
-  let rec infer_rec ~check ctx t =
-    let open Type.Infix in
-    match t.T.term with
-    | T.Var _ ->
-      let ty = T.get_type t in
-      Type.instantiate ty
-    | T.BoundVar i -> Ctx.db_type ctx i
-    | T.Node (s, []) -> Ctx.type_of_fun ctx s
-    | T.Node (s, l) ->
-      let ty_s = Ctx.type_of_fun ctx s in
-      begin match ty_s with
-      | Type.Fun (ret, _) when (not check) && Type.is_ground ret ->
-        ret  (* no need to recurse *)
-      | Type.App (_, _) when (not check) && Type.is_ground ty_s ->
-        ty_s (* no need to recurse *)
-      | _ ->
+    (* infer a type for [t], possibly updating [ctx]. If [check] is true,
+       will type-check recursively in the term even if it's not needed to
+       compute its type. *)
+    let rec infer_rec ctx t s_t =
+      match t.T.term with
+      | T.Var _ ->
+        let ty = T.get_type t in
+        ty, s_t
+      | T.BoundVar i -> Ctx.db_type ctx i
+      | T.Node (s, []) -> Ctx.type_of_fun ctx s
+      | T.Node (s, l) ->
+        let ty_s, s_s = Ctx.type_of_fun ctx s in
         let ty_l = List.fold_right
-          (fun t' ty_l -> infer_rec ~check ctx t' :: ty_l) l [] in
+          (fun t' ty_l -> infer_rec ctx t' s_t :: ty_l) l [] in
         (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
-            The result is 'a. *)
-        let ty_ret = Type.new_gvar () in
-        Ctx.unify ctx ty_s (ty_ret <== ty_l);
-        ty_ret
-      end
-end)
+            We generate a fresh variable 'a, which is also the result. *)
+        let ty_ret = Ctx._new_var ctx in
+        Ctx.unify_and_set ctx ty_s s_s (Type.mk_fun ty_ret ty_l) s_t;
+        ty_ret, s_t
+  end)
+  
+  include TI
+
+  let rec constrain_form ctx f s_f = match f.F.form with
+    | F.True
+    | F.False -> ()
+    | F.Atom p -> constrain_term_type ctx p s_f Type.o s_f
+    | F.Equal (t1, t2) ->
+      constrain_term_term ctx t1 s_f t2 s_f
+    | F.And l
+    | F.Or l -> List.iter (fun f' -> constrain_form ctx f' s_f) l
+    | F.Forall (ty,f')
+    | F.Exists (ty,f') ->
+      within_binder ctx ~ty (fun _ _ -> constrain_form ctx f' s_f)
+    | F.Equiv (f1, f2)
+    | F.Imply (f1, f2) -> constrain_form ctx f1 s_f; constrain_form ctx f2 s_f
+    | F.Not f' -> constrain_form ctx f' s_f
+end
 
 module HO = Make(struct
   module T = HOTerm

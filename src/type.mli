@@ -25,17 +25,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Types} *)
 
-(** Be careful that types may contain {!GVAr}s (destructively modifiable
-    variables). Those variables may be pointers to other types, after
-    unification, so you may want to use {!deref} often to be sure that
-    you followed the pointers properly in the whole subtype.
+(** Common representation of types, including higher-order
+    and polymorphic types. Types are hashconsed and all type variables
+    are assumed to be universally quantified in the outermost possible
+    scope (outside any other quantifier).
 
-    Types are hashconsed, excepted {!GVar}.
+    See {!TypeInference} for inferring types from terms and formulas,
+    and {!Signature} to associate types with symbols.
 *)
 
 type t = private
-  | Var of string           (** Type variable, universally quantified *)
-  | GVar of int * t ref     (** Variable instance. The int is unique *)
+  | Var of int              (** Type variable, universally quantified *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
 
@@ -45,16 +45,7 @@ val eq : t -> t -> bool     (* syntactic equality *)
 val cmp : t -> t -> int     (* syntactic comparison *)
 val hash : t -> int         (* hash of the structure *)
 
-(* TODO: a "view" of [t] that enforces some invariants (mostly
-    that GVars are fully dereferenced); needs to make [t] abstract,
-    provide a copy of it as [view], and a function [view : t -> view]
-    that enforces invariants *)
-
-exception Error of string
-  (** Type error *)
-
 val is_var : t -> bool
-val is_gvar : t -> bool
 val is_app : t -> bool
 val is_fun : t -> bool
 
@@ -63,26 +54,18 @@ module Set : Sequence.Set.S with type elt = ty
 
 (** {2 Infix constructors} *)
 
-module Infix : sig
-  val (<==) : t -> t list -> t
-    (** General function type *)
+val (<==) : t -> t list -> t
+  (** General function type. [x <== l] is the same as [x] if [l]
+      is empty. *)
 
-  val (<=.) : t -> t -> t
-    (** Unary function type *)
+val (<=.) : t -> t -> t
+  (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
 
-  val (@@) : string -> t list -> t
-    (** [s @@ args] applies the sort [s] to arguments [args]. *)
-end
+val (@@) : string -> t list -> t
+  (** [s @@ args] applies the sort [s] to arguments [args]. *)
 
-val var : string -> t
+val var : int -> t
   (** Build a type variable. The integer must be >= 0 *)
-
-val new_var : unit -> t
-  (** Use a fresh name to make a fresh variable *)
-
-val new_gvar : unit -> t
-  (** New GVar, a free variable that can be instantiated once. It points to
-      itself by default *)
 
 val app : string -> t list -> t
   (** Parametrized type *)
@@ -104,39 +87,21 @@ val tType : t   (* "type" of types *)
 
 (** {2 Utils} *)
 
-(** All those functions but {!bind} follow pointers of {!GVar}s. *)
-
-val free_gvars : t -> t list
-  (** List of free {!GVar}s *)
-
-val free_univ_vars : t -> t list
-  (** List of universally bound variables ({!Var}) *)
-
-val is_closed : t -> bool
-  (** No {!GVar} in this type? Corresponds to {! free_gvars} returning
-      an empty list *)
-
-val is_instantiated : t -> bool
-  (** No {!Var} in this type? Corresponds to {! free_univ_vars} returning [] *)
-
-val deref : t -> t
-  (** Replace all GVars by the type they point to (if any). *)
-
-val bind : t -> t -> unit
-  (** Bind the GVar to the given type.
-      @raise Invalid_argument if the type is not a GVar *)
+val free_vars : t -> t list
+  (** List of free variables ({!Var}) that are not bound *)
 
 val arity : t -> int
   (** Number of arguments of the type (If it's a function, else 0)*)
 
 val is_ground : t -> bool
-  (** Is the type ground? (means that no {!Var} nor {!GVar} occur in it) *)
+  (** Is the type ground? (means that no {!Var} occur in it) *)
 
 val curry : t -> t
   (** Curry the type *)
 
 val uncurry : t -> t
-  (** Uncurry the type. It {b must} be curried. *)
+  (** Uncurry the type. It {b must} be curried.
+      @raise Failure if the type is not fully curried. *)
 
 val size : t -> int
   (** Size of type, in number of "nodes" *)
@@ -152,109 +117,11 @@ val bij : t Bij.t
   (** Bijection. Note that GVar cannot be decoded nor encoded. Only
       closed types work. *)
 
-val arbitrary : t QCheck.Arbitrary.t         (* closed types *)
+val arbitrary : t QCheck.Arbitrary.t         (* types *)
 val arbitrary_ground : t QCheck.Arbitrary.t  (* ground types *)
 
-(** {2 Unification} *)
+(** {2 Misc} *)
 
-module Stack : sig
-  type t
-    (** A binding stack *)
-
-  type pos
-    (** Position in the stack *)
-
-  val create : unit -> t
-    (** New stack *)
-
-  val clear : t -> unit
-    (** Clear all bindings *)
-
-  val bottom : pos
-    (** Position of the empty stack *)
-
-  val save : t -> pos
-    (** Get current position *)
-
-  val restore : t -> pos -> unit
-    (** Reset to their old state the bindings between the current pos,
-        and the one given (which must be valid) *)
-
-  val restore_all : t -> unit
-    (** Restore all bindings *)
-
-  val bind : t -> ty -> ty -> unit
-    (** Bind a GVar to a type, pushing its old binding on the stack. Next call
-        to {! restore} with a position lower than the current one will
-        restore the current binding of the GVar.
-        @raise Invalid_argument if the second argument is not a GVar *)
-
-  val protect : t -> (unit -> 'a) -> 'a
-    (** [protect st f] will save the current position [pos] of [st],
-        call [f ()], then call [restore st pos] whatever happens, and
-        finally return the result of the call to [f]. *)
-
-  val unwind_protect : t -> (unit -> 'a) -> 'a
-    (** [unwind_protect st f] will save the current position [pos] of [st],
-        and then call [f ()]. If the call succeeds, returns its result;
-        otherwise call [restore st pos] and re-raise *)
-end
-
-val instantiate : ?filter:(t -> bool) -> t -> t
-  (** Instantiate all bound variables with fresh GVars.
-      @param filter can be used to restrict which variables are instantiated,
-        only those who satisfy the predicate are considered (default: all).
-      @return the instantiated type *)
-
-val close : t -> t
-  (** Call {!deref} on the type, then replace all free variables (GVar) by
-      bound variables (Var). This corresponds to a generalization of the type,
-      since variables are universally quantified. *)
-
-val close_var : t -> unit
-  (** [close_var var] replaces the GVar [var] by a fresh universal variable,
-      if it's still not bound.
-      @raise Invalid_argument if [var] is not a GVar *)
-
-val unify : Stack.t -> t -> t -> unit
-  (** Unify two types.
-      @raise Error if the types are not unifiable (and restore bindings) *)
-
-val unify_deref : Stack.t -> t -> t -> t
-  (** Same as {!unify}, but if it succeeds it also evaluates one of the
-      two types (that became equal), and return it.
-      @raise Error in case of unification error (and restore bindings) *)
-
-val alpha_equiv : t -> t -> bool
-  (** Are the types alpha equivalent after instantiation?
-      Does not change bindings. *)
-
-val unifiable : t -> t -> bool
-  (** Are the types unifiable after instantiation?
-      Does not change bindings *)
-
-(** {2 Prenex quantification of types}
-
-This module helps dealing with explicitely quantified types.
-The most important operation is the instantiation of free variables
-to GVar (i.e. to a still-unknown type). *)
-
-module Quantified : sig
-  type t
-    (** Universally quantified type *)
-
-  val mk_forall : ty list -> t -> t
-    (** Quantify more variables.
-        @raise Invalid_argument if some element of the list is not a {!Var}. *)
-
-  val of_ty : ty -> t
-    (** No quantification *)
-
-  val instantiate : t -> ty
-    (** Instantiate variables that are not quantified into {!GVar}.
-        The quantified variables are kept as {!Var}.
-    *)
-
-  val pp : Buffer.t -> t -> unit
-  val to_string : t -> string
-end
+val __var : int -> t
+  (** Escape hatch to generate fresh variables with negative indexes.
+      Use at your own risk... *)

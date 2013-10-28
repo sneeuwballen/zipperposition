@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Signature} *)
 
-type t = Type.t Symbol.SMap.t
+type t = Type.t Symbol.Map.t
   (** A signature maps symbols to types *)
 
 val empty : t
@@ -83,7 +83,7 @@ val uncurry : t -> t
 val to_symbols : t -> Symbol.t list
   (** extract the list of symbols from the complete signature *)
 
-val to_set : t -> Symbol.SSet.t
+val to_set : t -> Symbol.Set.t
   (** Set of symbols of the signature *)
 
 val iter : t -> (Symbol.t -> Type.t -> unit) -> unit
@@ -109,7 +109,7 @@ val pp_no_base : Buffer.t -> t -> unit
 
 val base : t
 val is_base_symbol : Symbol.t -> bool
-val base_symbols : Symbol.SSet.t
+val base_symbols : Symbol.Set.t
 
 (** {2 Arith} *)
 

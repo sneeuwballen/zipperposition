@@ -25,12 +25,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Type Inference} *)
 
-(** {2 Typing context} *)
+type scope = Substs.scope
 
-(** This module provides a typing context, with an imperative interface.
-    The context is used to map terms to types locally during type
-    inference. It also keeps and updates a signature when symbols' types
-    are inferred.
+(** {2 Typing context}
+
+This module provides a typing context, with an imperative interface.
+The context is used to map terms to types locally during type
+inference. It also keeps and updates a signature when symbols' types
+are inferred.
 *)
 
 module Ctx : sig
@@ -38,103 +40,90 @@ module Ctx : sig
 
   val create : ?default:Type.t -> ?base:bool -> unit -> t
     (** Fresh environment.
-    
-        if [base] is true (default), then the
+        @param base is true (default), then the
           base signature is used from start, rather than an empty
           signature
-        @param default is the type to use for non-declared constants,
-          defaults to {!Type.i} *)
+        @param default is the type to use for non-declared symbols,
+          defaults to {!Type.i}. Please not that non-declared
+          symbols cannot have polymorphic types. *)
 
   val of_signature : ?default:Type.t -> Signature.t -> t
+    (** Shortcut that calls {!create} and then adds the given signature. *)
 
   val add_signature : t -> Signature.t -> unit
     (** Specify the type of some symbols *)
 
-  val within_binder : t -> ty:Type.t -> (unit -> 'a) -> 'a
-    (** Provides a context, corresponding to a term binding environement,
-        in which the first De Bruijn variable will have the type [ty]
-        passed as argument *)
+  val within_binder : t -> ty:Type.t -> (Type.t -> scope -> 'a) -> 'a
+    (** Provides a context, corresponding to a term binding environment.
+        Within the local context, the bound De Bruijn variable will
+        have the (type,scope) that are passed as arguments to the closure. *)
 
-  val db_type : t -> int -> Type.t
+  val db_type : t -> int -> Type.t * scope
     (** The type of the bound variable of De Bruijn index [i].
         [within_binder] must have been used enough times before, so
         that a type is attributed to the [i]-th bound variable.
         @raise Invalid_argument if the [i]-th variable is not bound.*)
 
-  val unify : t -> Type.t -> Type.t -> unit
-    (** Unify the two types. On success it may update some GVar's bindings.
-        @raise Type.Error if unification is impossible. *)
-
-  val type_of_fun : t -> Symbol.t -> Type.t
-    (** If the function symbol has an unknown type,
-        a fresh instantiated variable is returned. Otherwise the known
-        type of the symbol is returned and instantiated with fresh variables,
+  val type_of_fun : t -> Symbol.t -> Type.t * scope
+    (** If the function symbol has an unknown type, a fresh variable
+        (in a fresh scope, that is) is returned. Otherwise the known
+        type of the symbol is returned along with a new scope,
         so that, for instance, "nil" (the empty list) can have several
-        concrete types. *)
+        concrete types (using distinct scopes). *)
 
   val declare : t -> Symbol.t -> Type.t -> unit
-    (** Declare the type of a symbol. The type {b must} be closed.
-        @raise Type.Error if an inconsistency (with inferred type) is detected. *)
+    (** Declare the type of a symbol. The type {b must} be compatible
+        (unifiable with) the current type of the symbol, if any.
+        @raise TypeUnif.Error if an inconsistency (with inferred types) is
+          detected. *)
 
-  val to_signature : t -> Signature.t
+  val eval_type : ?renaming:Substs.Ty.Renaming.t ->
+                  t -> Type.t -> scope -> Type.t
+    (** Evaluate the type within the given context and scope.
+        A renaming can be provided instead of using the context's one *)
+
+  val to_signature : ?renaming:Substs.Ty.Renaming.t ->
+                      t -> Signature.t
     (** Obtain the type of all symbols whose type has been inferred.
-        If some variables remain, they are bound to the [default] type
-        of the context. *)
-
-  val unwind_protect : t -> (unit -> 'a) -> 'a
-    (** Transaction for variable bindings
-        see {!Type.Stack.unwind_protect} *)
-
-  val protect : t -> (unit -> 'a) -> 'a
-    (** Provide a local environment to perform typing, and then
-        remove all intermediate variable bindings.
-        see {!Type.Stack.protect} *)
+        If some instantiated variables remain, they are bound to the
+        context's [default] parameter. *)
 end
 
 (** {2 Hindley-Milner} *)
 
-val check_type_type : Ctx.t -> Type.t -> Type.t -> bool
-  (** Can we unify the two types? *)
-
-val check_type_type_sig : Signature.t -> Type.t -> Type.t -> bool
-
 module type S = sig
   type term
 
-  val infer : Ctx.t -> term -> Type.t
-    (** Infer the type of this term under the given signature.  This updates
+  val infer : Ctx.t -> term -> scope -> Type.t * scope
+    (** Infer the type of this term under the given signature. This updates
         the context's typing environment!
-        @raise Type.Error if the types are inconsistent *)
-
-  val infer_sig : Signature.t -> term -> Type.t
-    (** Inference from a signature (shortcut) *)
-
-  val infer_no_check : Ctx.t -> term -> Type.t
-    (** Infer the type of the term, but does not recurse if it's not needed. *)
+        @raise TypeUnif.Error if the types are inconsistent *)
 
   (** {3 Constraining types} *)
 
-  val constrain_term_term : Ctx.t -> term -> term -> unit
-    (** Force the two terms to have the same type
-        @raise Type.Error if an inconsistency is detected *)
+  val constrain_term_term : Ctx.t -> term -> scope -> term -> scope -> unit
+    (** Force the two terms to have the same type in this context
+        @raise TypeUnif.Error if an inconsistency is detected *)
 
-  val constrain_term_type : Ctx.t -> term -> Type.t -> unit
-    (** Force the term to have the given type.
-        @raise Type.Error if an inconsistency is detected *)
+  val constrain_term_type : Ctx.t -> term -> scope -> Type.t -> scope -> unit
+    (** Force the term to have the given type in the given scope.
+        @raise TypeUnif.Error if an inconsistency is detected *)
 
   (** {3 Checking compatibility} *)
 
-  val check_term_type : Ctx.t -> term -> Type.t -> bool
-    (** Check whether this term can be used with this type *)
+  val check_term_type : Ctx.t -> term -> Type.t -> scope -> bool
+    (** Check whether this term can be used with this type. *)
 
-  val check_term_term : Ctx.t -> term -> term -> bool
+  val check_term_term : Ctx.t -> term -> scope -> term -> scope -> bool
     (** Can we unify the terms' types? *)
 
-  val check_term_term_sig : Signature.t -> term -> term -> bool
+  val check_term_term_sig : Signature.t -> term -> scope -> term -> scope -> bool
 
-  val check_term_type_sig : Signature.t -> term -> Type.t -> bool
+  val check_term_type_sig : Signature.t -> term -> scope -> Type.t -> scope -> bool
 
-  (** {3 Handy shortcuts for type inference} *)
+  (** {3 Handy shortcuts for type inference}
+  This module provides an easy way to specify constraints. Every term and
+  type is assumed to live in the scope 0. *)
 
   module Quick : sig
     (* type constraints *)
@@ -153,6 +142,11 @@ module type S = sig
   end
 end
 
-module FO : S with type term = FOTerm.t
+module FO : sig
+  include S with type term = FOTerm.t
+
+  val constrain_form : Ctx.t -> FOFormula.t -> scope -> unit
+    (** Assert that the formula should be well-typed. *)
+end
 
 module HO : S with type term = HOTerm.t

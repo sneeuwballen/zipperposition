@@ -29,16 +29,14 @@ let prof_unify = Util.mk_profiler "Type.unify"
 let prof_variant = Util.mk_profiler "Type.variant"
 
 type t =
-  | Var of string           (** Universal type variable *)
-  | GVar of int * t ref     (** Variable instance. The int is unique *)
+  | Var of int              (** Universal type variable *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
 
 type ty = t
 
 let rec eq_struct t1 t2 = match t1, t2 with
-  | Var s1, Var s2 -> s1 = s2
-  | GVar (i1,r1), GVar (i2,r2) -> i1 = i2 && r1 == r2
+  | Var i1, Var i2 -> i1 = i2
   | App (s1, l1), App (s2, l2) when List.length l1 = List.length l2 ->
     s1 = s2 && List.for_all2 (==) l1 l2
   | Fun (ret1,l1), Fun (ret2,l2) when List.length l1 = List.length l2 ->
@@ -46,8 +44,7 @@ let rec eq_struct t1 t2 = match t1, t2 with
   | _, _ -> false
 
 let rec hash t = match t with
-  | Var s -> Hash.hash_string s
-  | GVar (i, _) -> Hash.hash_int i
+  | Var i -> i
   | App (s, l) -> Hash.hash_list hash (Hash.hash_string s) l
   | Fun (ret, l) -> Hash.hash_list hash (hash ret) l
 
@@ -63,13 +60,11 @@ let eq t1 t2 = t1 == t2
 
 let __to_int = function
   | Var _ -> 0
-  | GVar _ -> 1
-  | App _ -> 2
-  | Fun _ -> 3
+  | App _ -> 1
+  | Fun _ -> 2
 
 let rec cmp t1 t2 = match t1, t2 with
-  | Var s1, Var s2 -> String.compare s1 s2
-  | GVar (i1, r1), GVar (i2, r2) -> i1 - i2
+  | Var i1, Var i2 -> i1 - i2
   | App (s1, l1), App (s2, l2) ->
     let c = String.compare s1 s2 in
     if c <> 0 then c else Util.lexicograph cmp l1 l2
@@ -78,11 +73,7 @@ let rec cmp t1 t2 = match t1, t2 with
     if c <> 0 then c else Util.lexicograph cmp l1 l2
   | _, _ -> __to_int t1 - __to_int t2
 
-exception Error of string
-  (** Type error *)
-
 let is_var = function | Var _ -> true | _ -> false
-let is_gvar = function | GVar _ -> true | _ -> false
 let is_app = function | App _ -> true | _ -> false
 let is_fun = function | Fun _ -> true | _ -> false
 
@@ -99,17 +90,16 @@ end)
 
 (** {2 Infix constructors} *)
 
-module Infix = struct
-  let (<==) ret args =
-    match args with
-    | [] -> ret
-    | _::_ -> H.hashcons (Fun (ret, args))
+let (<==) ret args =
+  match args with
+  | [] -> ret
+  | _::_ -> H.hashcons (Fun (ret, args))
 
-  let (<=.) ret arg = ret <== [arg]
+let (<=.) ret arg =
+  H.hashcons (Fun (ret, [arg]))
 
-  let (@@) s args =
-    H.hashcons (App (s, args))
-end
+let (@@) s args =
+  H.hashcons (App (s, args))
 
 (** {2 Basic types} *)
 
@@ -117,29 +107,11 @@ let const s = H.hashcons (App (s, []))
 
 let app s args = H.hashcons (App (s, args))
 
-let var s = H.hashcons (Var s)
+let var i =
+  if i < 0 then failwith "Type.var: expected a nonnegative int";
+  H.hashcons (Var si)
 
-let new_var =
-  let n = ref 0 in
-  fun () ->
-    incr n;
-    let s = Printf.sprintf "Ty_%d" !n in
-    H.hashcons (Var s)
-
-let new_gvar =
-  let n = ref 0 in
-  let __default = H.hashcons (Var "") in  (* some default type *)
-  fun () ->
-    incr n;
-    (* No need to hashcons, this value is unforgeable *)
-    let ty = GVar (!n, ref __default) in
-    begin match ty with
-    | GVar (_, r) -> r := ty  (* make [ty] point to itself *)
-    | _ -> assert false
-    end;
-    ty
-
-let mk_fun = Infix.(<==)
+let mk_fun = (<==)
 
 let i = const "$i"
 let o = const "$o"
@@ -150,111 +122,59 @@ let tType = const "$tType"
 
 (** {2 Utils} *)
 
-let rec _deref_var ty = match ty with
-  | GVar (_, r) ->
-    if !r == ty
-      then ty  (* points to self, not bound *)
-      else _deref_var !r
-  | _ -> ty
+let rec _free_vars set ty = match ty with
+  | Var _ -> Set.add ty set
+  | App (_, l) -> List.fold_left _free_vars set l
+  | Fun (ret, l) -> List.fold_left _free_vars (_free_vars set ret) l
 
-let free_gvars ty =
-  let rec recurse acc ty = match _deref_var ty with
-  | Var _ -> acc
-  | GVar _ -> if List.memq ty acc then acc else ty :: acc
-  | App (_, l) -> List.fold_left recurse acc l
-  | Fun (ret, l) -> List.fold_left recurse (recurse acc ret) l
-  in
-  recurse [] ty
-
-let free_univ_vars ty =
-  let rec recurse acc ty = match _deref_var ty with
-  | Var _ -> if List.memq ty acc then acc else ty :: acc
-  | GVar _ -> acc
-  | App (_, l) -> List.fold_left recurse acc l
-  | Fun (ret, l) -> List.fold_left recurse (recurse acc ret) l
-  in
-  recurse [] ty
-
-let rec is_closed ty = match _deref_var ty with
-  | Var _ -> true
-  | GVar _ -> false
-  | App (_, l) -> List.for_all is_closed l
-  | Fun (ret, l) -> is_closed ret && List.for_all is_closed l
-
-let rec is_instantiated ty = match _deref_var ty with
-  | Var _ -> false
-  | GVar _ -> true
-  | App (_, l) -> List.for_all is_closed l
-  | Fun (ret, l) -> is_closed ret && List.for_all is_closed l
-
-let rec deref ty = match _deref_var ty with
-  | Var _
-  | GVar _
-  | App (_, []) -> ty
-  | App (s, l) ->
-    let l' = List.map deref l in
-    app s l'
-  | Fun (ret, l) ->
-    let ret' = deref ret in
-    let l' = List.map deref l in
-    mk_fun ret' l'
-
-let bind gvar to_ =
-  match gvar with
-  | GVar (_, r) -> r := to_
-  | _ -> raise (Invalid_argument "Type.bind: expect a GVar")
+let free_vars ty =
+  let set = _free_vars Set.empty ty in
+  Set.elements set
 
 let arity ty = match ty with
   | Fun (_, l) -> List.length l
   | Var _
-  | GVar _
   | App _ -> 0
 
-let rec is_ground t = match _deref_var t with
+let rec is_ground t = match t with
   | Var _ -> false
-  | GVar _ -> false
   | App (_, l) -> List.for_all is_ground l
   | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
 
-let rec curry ty = match _deref_var ty with
-  | Var _
-  | GVar _ -> ty
+let rec curry ty = match ty with
+  | Var _ -> ty
   | App (s, l) -> app s (List.map curry l)
   | Fun (ret, l) ->
     List.fold_left
       (fun ret arg -> mk_fun ret [curry arg])
       (curry ret) l
 
-let rec uncurry ty = match _deref_var ty with
-  | Var _
-  | GVar _ -> ty
+let rec uncurry ty = match ty with
+  | Var _ -> ty
   | App (s, l) -> app s (List.map uncurry l)
   | Fun _ ->
     begin match _gather_uncurry ty [] with
-    | [] -> assert false
+    | [] -> failwith "Type.uncurry: expected curried type"
     | ret::args -> mk_fun (uncurry ret) args
     end
 (* given a curried function type, recover all its argument types into
     a list prepended to [acc] *)
-and _gather_uncurry ty acc = match _deref_var ty with
+and _gather_uncurry ty acc = match ty with
   | Var _
-  | GVar _
   | App _ -> uncurry ty :: acc  (* proper return value *)
   | Fun (ret, [arg]) -> _gather_uncurry ret (uncurry arg :: acc)
   | Fun _ -> uncurry ty :: acc (* consider this as a single argument *)
 
 let rec size ty = match ty with
-  | Var _
-  | GVar _ -> 1
+  | Var _ -> 1
   | App (s, []) -> 1
   | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
   | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
 
 (** {2 IO} *)
 
-let rec pp buf t = match _deref_var t with
-  | Var s -> Printf.bprintf buf "%s" s
-  | GVar (i, _) -> Printf.bprintf buf "_Ty_%d" i
+let rec pp buf t = match t with
+  | Var i -> Printf.bprintf buf "T%d" i
   | App (p, []) -> Buffer.add_string buf p
   | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
   | Fun (ret, []) -> assert false
@@ -266,16 +186,15 @@ and pp_inner buf t = match t with
     Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
   | _ -> pp buf t
 
-let rec pp_tstp buf t = match _deref_var t with
-  | Var s -> Printf.bprintf buf "%s" (String.capitalize s)
-  | GVar (i, _) -> failwith "Type.pp_tstp: free variables not printable"
+let rec pp_tstp buf t = match t with
+  | Var i -> Printf.bprintf buf "T%d" i
   | App (p, []) -> Buffer.add_string buf p
   | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
   | Fun (ret, []) -> assert false
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
-and pp_inner buf t = match _deref_var t with
+and pp_inner buf t = match t with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp_tstp buf t; Buffer.add_char buf ')'
   | _ -> pp_tstp buf t
@@ -292,20 +211,20 @@ let bij =
     let bij_app = lazy (pair string_ (list_ (Lazy.force bij'))) in
     let bij_fun = lazy (pair (Lazy.force bij') (list_ (Lazy.force bij'))) in
     switch
-      ~inject:(fun ty -> match _deref_var ty with
-        | Var s -> "var", BranchTo (string_, s)
-        | GVar _ -> failwith "Type.bij: GVar not supported"
-        | App (p, l) -> "app", BranchTo (Lazy.force bij_app, (p, l))
+      ~inject:(fun ty -> match ty with
+        | Var i -> "v", BranchTo (int_, i)
+        | App (p, l) -> "at", BranchTo (Lazy.force bij_app, (p, l))
         | Fun (ret, l) -> "fun", BranchTo (Lazy.force bij_fun, (ret, l)))
       ~extract:(function
-        | "var" -> BranchFrom (string_, var)
-        | "app" -> BranchFrom (Lazy.force bij_app, fun (s,l) -> app s l)
+        | "v" -> BranchFrom (int_, var)
+        | "at" -> BranchFrom (Lazy.force bij_app, fun (s,l) -> app s l)
         | "fun" -> BranchFrom (Lazy.force bij_fun, fun (ret,l) -> mk_fun ret l)
         | _ -> raise (DecodingError "expected Type"))))
 
 let arbitrary =
   QCheck.Arbitrary.(
-    let base = among [ i; const "$int"; const "a"; const "b"; var "A"; var "B" ] in
+    let var = among [var 0; var 1 ] in
+    let base = choose [ among [ i; const "$int"; const "a"; const "b"; ] ; var ] in
     fix ~max:4 ~base (fun sub -> choose
       [ lift (app "list") (list_repeat 1 sub)
       ; lift (app "prod") (list_repeat 2 sub)
@@ -322,241 +241,6 @@ let arbitrary_ground =
       ]))
 
 
-(** {2 Unification} *)
+(** {2 Misc} *)
 
-module Stack = struct
-  type t = {
-    gvars : ty Stack.t;
-    bindings : ty Stack.t;
-    mutable size : int;  (* Stack.length is O(n)... *)
-  }
-  and pos = int
-
-  let create () =
-    { gvars = Stack.create ();
-      bindings = Stack.create ();
-      size = 0;
-    }
-
-  let clear st =
-    Stack.clear st.gvars;
-    Stack.clear st.bindings;
-    st.size <- 0;
-    ()
-
-  let bottom = 0
-
-  let save st = st.size
-
-  let restore st pos =
-    assert (st.size >= pos);
-    while st.size > pos do
-      let gvar = Stack.pop st.gvars in
-      let binding = Stack.pop st.bindings in
-      bind gvar binding;
-      st.size <- st.size - 1;
-    done
-
-  let restore_all st = restore st bottom
-
-  (* the current immediate binding of the variable *)
-  let _binding gvar = match gvar with
-  | GVar (_, r) -> !r
-  | _ -> assert false
-
-  let protect st f =
-    let pos = save st in
-    try
-      let x = f () in
-      restore st pos;
-      x
-    with e ->
-      restore st pos;
-      raise e
-
-  let unwind_protect st f =
-    let pos = save st in
-    try
-      let x = f () in
-      x
-    with e ->
-      restore st pos;
-      raise e
-
-  let bind st gvar ty =
-    Stack.push gvar st.gvars;
-    Stack.push (_binding gvar) st.bindings;
-    st.size <- st.size + 1;
-    bind gvar ty;
-    ()
-end
-
-(* instantiate all bound variables *)
-let instantiate ?(filter=fun _ -> true) ty =
-  let map = Hashtbl.create 4 in
-  (* recurse. [map] is a hashtable name -> gvar *)
-  let rec find_and_bound ty =
-    let ty = _deref_var ty in
-    match ty with
-    | Var n when filter ty ->
-      (* see whether we already instantiated this var *)
-      begin try Hashtbl.find map n
-      with Not_found ->
-        let v = new_gvar () in
-        Hashtbl.add map n v;
-        v
-      end
-    | Var _
-    | GVar _ -> ty
-    | App (s, l) ->
-      app s (List.map find_and_bound l)
-    | Fun (ret, l) ->
-      mk_fun (find_and_bound ret) (List.map find_and_bound l)
-  in
-  find_and_bound ty
-
-let close_var var =
-  match _deref_var var with
-  | GVar (_,r) as var ->
-    (* still not bound, bind it to a fresh var *)
-    let v = new_var () in
-    bind var v
-  | _ -> ()
-
-(* close all free variables *)
-let close ty =
-  let gvars = free_gvars ty in
-  List.iter close_var gvars;
-  deref ty
-
-(* occur-check *)
-let rec _occur_check gvar ty = match ty with
-  | Var _ -> false
-  | GVar _ when ty == gvar -> true
-  | GVar (_, r) ->
-    if !r == ty then false else _occur_check gvar !r  (* deref *)
-  | App (_, l) -> List.exists (_occur_check gvar) l
-  | Fun (ret, l) ->
-    _occur_check gvar ret || List.exists (_occur_check gvar) l
-
-(* unification *)
-let rec unify_rec stack ty1 ty2 =
-  let ty1 = _deref_var ty1 in
-  let ty2 = _deref_var ty2 in
-  match ty1, ty2 with
-  | Var s1, Var s2 when s1 = s2 -> ()
-  | GVar _, GVar _ when ty1 == ty2 -> ()
-  | GVar _, _ when not (_occur_check ty1 ty2) ->
-    Stack.bind stack ty1 ty2
-  | _, GVar _ when not (_occur_check ty2 ty1) ->
-    Stack.bind stack ty2 ty1
-  | App (s1, l1), App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->
-    List.iter2 (unify_rec stack) l1 l2
-  | Fun (ret1, l1), Fun (ret2, l2) when List.length l1 = List.length l2 ->
-    unify_rec stack ret1 ret2;
-    List.iter2 (unify_rec stack) l1 l2
-  | _, _ ->
-    let msg = Util.sprintf "unification error: %a and %a" pp ty1 pp ty2 in
-    raise (Error msg)
-
-(* alpha-equivalence check *)
-let rec alpha_equiv_unify st ty1 ty2 =
-  let ty1 = _deref_var ty1 in
-  let ty2 = _deref_var ty2 in
-  match ty1, ty2 with
-  | Var s1, Var s2 when s1 = s2 -> ()
-  | GVar _, GVar _ when ty1 == ty2 -> ()
-  | GVar _, GVar _ when not (_occur_check ty1 ty2) ->
-    Stack.bind st ty1 ty2
-  | App (s1, l1), App (s2, l2) when s1 = s2 && List.length l1 = List.length l2 ->
-    List.iter2 (alpha_equiv_unify st) l1 l2
-  | Fun (ret1, l1), Fun (ret2, l2) when List.length l1 = List.length l2 ->
-    alpha_equiv_unify st ret1 ret2;
-    List.iter2 (alpha_equiv_unify st) l1 l2
-  | _, _ -> raise (Error "not alpha equivalent")
-
-let unify st ty1 ty2 =
-  Util.enter_prof prof_unify;
-  let pos = Stack.save st in
-  try
-    unify_rec st ty1 ty2;
-    Util.exit_prof prof_unify;
-    ()
-  with e ->
-    Stack.restore st pos;
-    Util.exit_prof prof_unify;
-    raise e
-
-let unify_deref st ty1 ty2 =
-  Util.enter_prof prof_unify;
-  let pos = Stack.save st in
-  try
-    unify_rec st ty1 ty2;
-    let ty = deref ty1 in
-    Util.exit_prof prof_unify;
-    ty
-  with e ->
-    Stack.restore st pos;
-    Util.exit_prof prof_unify;
-    raise e
-
-let alpha_equiv ty1 ty2 =
-  Util.enter_prof prof_variant;
-  let st = Stack.create () in
-  let ty1 = instantiate ty1 in
-  let ty2 = instantiate ty2 in
-  try
-    let res = Stack.protect st
-      (fun () -> alpha_equiv_unify st ty1 ty2; true)
-    in
-    Util.exit_prof prof_variant;
-    res
-  with Error _ ->
-    Util.exit_prof prof_variant;
-    false
-
-let unifiable ty1 ty2 =
-  Util.enter_prof prof_unify;
-  let st = Stack.create () in
-  let ty1 = instantiate ty1 in
-  let ty2 = instantiate ty2 in
-  try
-    let res = Stack.protect st
-      (fun () -> unify_rec st ty1 ty2; true)
-    in
-    Util.exit_prof prof_unify;
-    res
-  with Error _ ->
-    Util.exit_prof prof_unify;
-    false
-
-(** {2 Prenex quantification of types} *)
-
-module Quantified = struct
-  type t = {
-    bound : Set.t;
-    ty : ty;
-  }
-
-  let mk_forall vars t =
-    if not (List.for_all is_var vars)
-      then invalid_arg "Type.Quantified.mk_forall: expect vars";
-    let bound = List.fold_left (fun set v -> Set.add v set) t.bound vars in
-    { t with bound; }
-
-  let of_ty ty = { bound=Set.empty; ty; }
-
-  let instantiate t =
-    let filter ty = not (Set.mem ty t.bound) in
-    instantiate ~filter t.ty
-
-  let pp buf t =
-    if Set.is_empty t.bound
-      then pp buf t.ty
-      else
-        let pp_var buf v = Printf.bprintf buf "%a: $tType" pp v in
-        Printf.bprintf buf "!>[%a]: %a"
-          (Util.pp_seq pp_var) (Set.to_seq t.bound) pp t.ty
-
-  let to_string = Util.on_buffer pp
-end
+let __var i = H.hashcons (Var i)

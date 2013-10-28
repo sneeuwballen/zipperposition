@@ -25,7 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Signature} *)
 
-module SMap = Symbol.SMap
+module SMap = Symbol.Map
+module SSet = Symbol.Set
 
 type t = Type.t SMap.t
   (** A signature maps symbols to their sort *)
@@ -34,14 +35,17 @@ let empty = SMap.empty
 
 let mem signature s = SMap.mem s signature
 
-
 let find signature s =
   SMap.find s signature
+
+(* TODO: when declaring a symbol several times, maybe types should
+    be unified, and the symbol declared with their unifier?
+    Allows incremental type-checking, with declarations more and more refined *)
 
 let declare signature symb ty =
   try
     let ty' = find signature symb in
-    if Type.alpha_equiv ty ty'
+    if TypeUnif.are_variants ty ty'
       then signature  (* ok *)
       else
         let msg = Util.sprintf "type error for %a: %a and %a are incompatible"
@@ -79,7 +83,7 @@ let merge s1 s2 =
     (fun s t1 t2 -> match t1, t2 with
       | None, None -> None (* ?? *)
       | Some t1, Some t2 ->
-        if Type.alpha_equiv t1 t2
+        if TypeUnif.are_variants t1 t2
           then Some t1
           else
             let msg =
@@ -114,7 +118,7 @@ let to_symbols signature =
   SMap.fold (fun s _ l -> s :: l) signature []
 
 let to_set signature =
-  SMap.fold (fun s _ set -> Symbol.SSet.add s set) signature Symbol.SSet.empty
+  SMap.fold (fun s _ set -> SSet.add s set) signature SSet.empty
 
 let iter s f =
   SMap.iter f s
@@ -146,50 +150,49 @@ let bij =
 
 (** {2 Pre-defined symbols} *)
 
-let table =
-  let open Type.Infix in
-  let x = Type.var "a" in
-  let y = Type.var "b" in
-  [ Symbol.true_symbol, Type.o;
-    Symbol.false_symbol, Type.o;
-    Symbol.eq_symbol, Type.o <== [x; x];
-    Symbol.exists_symbol, Type.o <=. (Type.o <=. x);
-    Symbol.forall_symbol, Type.o <=. (Type.o <=. x);
+let table = Type.(
+  let x = var 0 in
+  let y = var 1 in
+  [ Symbol.true_symbol, o;
+    Symbol.false_symbol, o;
+    Symbol.eq_symbol, o <== [x; x];
+    Symbol.exists_symbol, o <=. (o <=. x);
+    Symbol.forall_symbol, o <=. (o <=. x);
     Symbol.lambda_symbol, y <=. ((y <=. x) <=. x);  (* (x -> (x -> y)) -> y *)
-    Symbol.not_symbol, Type.o <=. Type.o;
-    Symbol.imply_symbol, Type.o <== [Type.o; Type.o];
-    Symbol.and_symbol, Type.o <== [Type.o; Type.o];
-    Symbol.or_symbol, Type.o <== [Type.o; Type.o];
-    Symbol.equiv_symbol, Type.o <== [Type.o; Type.o];
-    Symbol.Arith.less, Type.o <== [x; x];
-    Symbol.Arith.lesseq, Type.o <== [x; x];
-    Symbol.Arith.greater, Type.o <== [x; x];
-    Symbol.Arith.greatereq, Type.o <== [x; x];
+    Symbol.not_symbol, o <=. o;
+    Symbol.imply_symbol, o <== [o; o];
+    Symbol.and_symbol, o <== [o; o];
+    Symbol.or_symbol, o <== [o; o];
+    Symbol.equiv_symbol, o <== [o; o];
+    Symbol.Arith.less, o <== [x; x];
+    Symbol.Arith.lesseq, o <== [x; x];
+    Symbol.Arith.greater, o <== [x; x];
+    Symbol.Arith.greatereq, o <== [x; x];
     Symbol.Arith.uminus, x <=. x;
     Symbol.Arith.sum, x <== [x; x];
     Symbol.Arith.difference, x <== [x; x];
     Symbol.Arith.product, x <== [x; x];
     Symbol.Arith.quotient, x <== [x; x];
-    Symbol.Arith.quotient_e, Type.int <== [x; x];
-    Symbol.Arith.quotient_f, Type.int <== [x; x];
-    Symbol.Arith.quotient_t, Type.int <== [x; x];
-    Symbol.Arith.remainder_e, Type.int <== [x; x];
-    Symbol.Arith.remainder_f, Type.int <== [x; x];
-    Symbol.Arith.remainder_t, Type.int <== [x; x];
-    Symbol.Arith.floor, Type.int <=. x;
-    Symbol.Arith.ceiling, Type.int <=. x;
-    Symbol.Arith.round, Type.int <=. x;
-    Symbol.Arith.truncate, Type.int <=. x;
-    Symbol.Arith.to_int, Type.int <=. x;
-    Symbol.Arith.to_rat, Type.rat <=. x;
-    Symbol.Arith.to_real, Type.real <=. x;
+    Symbol.Arith.quotient_e, int <== [x; x];
+    Symbol.Arith.quotient_f, int <== [x; x];
+    Symbol.Arith.quotient_t, int <== [x; x];
+    Symbol.Arith.remainder_e, int <== [x; x];
+    Symbol.Arith.remainder_f, int <== [x; x];
+    Symbol.Arith.remainder_t, int <== [x; x];
+    Symbol.Arith.floor, int <=. x;
+    Symbol.Arith.ceiling, int <=. x;
+    Symbol.Arith.round, int <=. x;
+    Symbol.Arith.truncate, int <=. x;
+    Symbol.Arith.to_int, int <=. x;
+    Symbol.Arith.to_rat, rat <=. x;
+    Symbol.Arith.to_real, real <=. x;
     (* special symbols, used for precedence
     Symbol.db_symbol, Type.i;
     Symbol.split_symbol, Type.o;
     Symbol.const_symbol, Type.i;
     Symbol.num_symbol, Type.i;
     *)
-  ]
+  ])
 
 (* TODO: arithmetic special symbols, especially polymorphic ones ($less, etc.) *)
 
@@ -201,10 +204,10 @@ let base =
 
 (** Set of base symbols *)
 let base_symbols =
-  List.fold_left (fun set (s, _) -> Symbol.SSet.add s set)
-    Symbol.SSet.empty table
+  List.fold_left (fun set (s, _) -> SSet.add s set)
+    SSet.empty table
 
-let is_base_symbol s = Symbol.SSet.mem s base_symbols
+let is_base_symbol s = SSet.mem s base_symbols
 
 let pp_no_base buf s =
   pp buf (diff s base)
@@ -212,35 +215,34 @@ let pp_no_base buf s =
 (** {2 Arith} *)
 
 module Arith = struct
-  let table = 
-    let open Type.Infix in
+  let table = Type.(
     let module S = Symbol in
-    let x = Type.var "X" in
-    [ S.mk_const "$less", Type.o <== [x; x]
-    ; S.mk_const "$lesseq", Type.o <== [x; x]
-    ; S.mk_const "$greater", Type.o <== [x; x]
-    ; S.mk_const "$greatereq", Type.o <== [x; x]
+    let x = var 0 in
+    [ S.mk_const "$less", o <== [x; x]
+    ; S.mk_const "$lesseq", o <== [x; x]
+    ; S.mk_const "$greater", o <== [x; x]
+    ; S.mk_const "$greatereq", o <== [x; x]
     ; S.mk_const "$uminus", x <== [x]
     ; S.mk_const "$sum", x <== [x; x]
     ; S.mk_const "$difference", x <== [x; x]
     ; S.mk_const "$product", x <== [x; x]
     ; S.mk_const "$quotient", x <== [x; x]
-    ; S.mk_const "$quotient_f", Type.int <== [x; x]
-    ; S.mk_const "$quotient_t", Type.int <== [x; x]
-    ; S.mk_const "$quotient_e", Type.int <== [x; x]
-    ; S.mk_const "$remainder_f", Type.int <== [x; x]
-    ; S.mk_const "$remainder_t", Type.int <== [x; x]
-    ; S.mk_const "$remainder_e", Type.int <== [x; x]
-    ; S.mk_const "$floor", Type.int <== [x]
-    ; S.mk_const "$ceiling", Type.int <== [x]
-    ; S.mk_const "$truncate", Type.int <== [x]
-    ; S.mk_const "$round", Type.int <== [x]
-    ; S.mk_const "$is_int", Type.o <== [x]
-    ; S.mk_const "$is_rat", Type.o <== [x]
-    ; S.mk_const "$to_int", Type.int <== [x]
-    ; S.mk_const "$to_rat", Type.rat <== [x]
-    ; S.mk_const "$to_real", Type.real <== [x]
-    ]
+    ; S.mk_const "$quotient_f", int <== [x; x]
+    ; S.mk_const "$quotient_t", int <== [x; x]
+    ; S.mk_const "$quotient_e", int <== [x; x]
+    ; S.mk_const "$remainder_f", int <== [x; x]
+    ; S.mk_const "$remainder_t", int <== [x; x]
+    ; S.mk_const "$remainder_e", int <== [x; x]
+    ; S.mk_const "$floor", int <== [x]
+    ; S.mk_const "$ceiling", int <== [x]
+    ; S.mk_const "$truncate", int <== [x]
+    ; S.mk_const "$round", int <== [x]
+    ; S.mk_const "$is_int", o <== [x]
+    ; S.mk_const "$is_rat", o <== [x]
+    ; S.mk_const "$to_int", int <== [x]
+    ; S.mk_const "$to_rat", rat <== [x]
+    ; S.mk_const "$to_real", real <== [x]
+    ])
 
   let operators = List.map fst table
 

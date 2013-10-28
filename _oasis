@@ -34,7 +34,7 @@ Library "logtk"
                     FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
                     Trace_tstp, CallProver, Congruence,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
-                    lib/QCheck, lib/Bencode, lib/BV
+                    lib/QCheck, lib/Bencode, lib/BV, lib/PersistentHashtbl
   BuildDepends:     unix,num,str
 
 Library "logtk_meta"
