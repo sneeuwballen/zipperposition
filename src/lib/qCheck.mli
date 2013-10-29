@@ -215,6 +215,14 @@ module Prop : sig
   val assume_lazy : bool lazy_t -> unit
     (** Assume the given (lazy) precondition holds. See {!assume}. *)
 
+  val raises : e:exn -> f:('a -> 'b) -> x:'a -> bool
+    (** [raise ~e ~f ~x] is true if and only if calling
+        [f x] raises the exception [exn].
+        
+        For instance (on lists):
+        [let prop l = Prop.(assume (l = []); raises ~f:List.hd ~x:l ~e:(Failure "hd"));;]
+    *)
+
   val (&&&) : 'a t -> 'a t -> 'a t
     (** Logical 'and' on tests *)
 

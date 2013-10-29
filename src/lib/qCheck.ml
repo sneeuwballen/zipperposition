@@ -213,6 +213,13 @@ module Prop = struct
   let assume_lazy (lazy p) =
     if not p then raise PrecondFail
 
+  let raises ~e ~f ~x =
+    try
+      f x;
+      false
+    with e' ->
+      e = e'
+
   let (==>) a b =
     fun x ->
       assume (a x);
