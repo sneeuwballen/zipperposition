@@ -86,23 +86,6 @@ let rec apply tr f = match tr with
     | [f''] when F.eq f f'' -> f'
     | _ -> Util.list_flatmap (apply tr) f'
 
-let apply_set tr set =
-  F.FSet.flatMap set (fun f -> apply tr f)
-
-let fix tr_list set =
-  let rec step l prev_set set = match l with
-  | [] ->
-    if F.FSet.eq prev_set set
-      then set
-      else step tr_list set set
-        (* start again with all transformations, but remember the set
-          at the end of this turn *)
-  | tr::l' ->
-    let set = apply_set tr set in
-    step l' prev_set set
-  in
-  step tr_list set set
-
 let pp buf tr = match tr with
   | RwTerm trs -> Buffer.add_string buf "TRS"
   | RwForm trs -> Buffer.add_string buf "FormRW"
