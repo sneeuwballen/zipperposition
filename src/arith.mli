@@ -231,6 +231,12 @@ module Lit : sig
         with the theory of arithmetic (e.g. X+2Y=3 is ok, but 1=2 is not).
         Otherwise return [true] *)
 
+  val make_total : ord:Ordering.t -> signature:Signature.t ->
+                  Literal.t -> Literal.t
+    (** be sure that the literal is "total", ie, if it's an equation, that
+        replacing one side by the other is always safe.
+        In particular:   a = b/3  is {b NOT} total for integers. *)
+
   val simplify : ord:Ordering.t -> signature:Signature.t ->
                  Literal.t -> Literal.t
     (** Simplify a literal (evaluation) *)

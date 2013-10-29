@@ -65,11 +65,17 @@ val axioms : PFormula.t list
 *)
 val case_switch : Env.binary_inf_rule
 
-(* TODO: simplification rule
+(* simplification rule
         C or a < t1 or a < t2 ... or a < tn
         ===================================
           C or a < max(t1, ..., tn)
   if t_i are arithmetic constants
+*)
+val factor_bounds : Env.simplify_rule
+
+(* TODO: redundancy criterion:
+         t1 < a or a < t2 or C
+         =====================  if t1 < t2
 *)
 
 (* TODO: redundancy criterion:

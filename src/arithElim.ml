@@ -40,8 +40,10 @@ module Lit = Literal
 module Lits = Literal.Arr
 
 let prof_case_switch = Util.mk_profiler "arith.case_switch"
+let prof_factor_bounds = Util.mk_profiler "arith.factor_bounds"
 
 let stat_case_switch = Util.mk_stat "arith.case_switch"
+let stat_factor_bounds = Util.mk_stat "arith.factor_bounds"
 
 (** {2 Inference Rules} *)
 
@@ -137,6 +139,58 @@ let purify_arith c =
       [new_c]
     end
 
+(* if a < t1, a < t2, .... a < tn occurs in clause, where t_i are all
+   arithmetic constants, replace by  a < max_i(t_i) *)
+let factor_bounds c = c (* TODO *)
+(*
+  Util.enter_prof prof_factor_bounds;
+  let ctx = c.C.hcctx in
+  let instance = TO.tstp_instance ~spec:(Ctx.total_order ctx) in
+  (* [bv] stores which literals should survive *)
+  let bv = BV.create ~size:(Array.length c.C.hclits) true in
+  let left = T.Tbl.create 5 in   (* terms t such that  t < constant *)
+  let right = T.Tbl.create 5 in  (* terms t such that constant < t *)
+  Lits.fold_lits ~eligible:C.Eligible.pos c.C.hclits ()
+    (fun () lit i ->
+      try
+        let olit = Lit.ineq_lit_of ~instance lit in
+        let l = olit.TO.left in
+        let r = olit.TO.right in
+        let strict = olit.TO.strict in
+        match l.T.term, r.T.term with
+        | T.Node ((S.Int _ | S.Rat _ | S.Real _) as s, []), _
+          when not (Arith.T.is_arith_const r) ->
+          begin try
+            (* find whether [r] has another bound *)
+            let (i', s', strict') = T.Tbl.find right r in
+            if S.eq s s' && (strict <> strict')
+              then begin
+                (* if s=s' then  s' < r  or s <= r ----> s <= r *)
+                T.Tbl.replace right r (i, s, false);
+                BV.reset i;
+                BV.reset i';
+              end
+            else if S.Arith.Op.less s s'
+              (* if s < s' then  s' <| r  or  s <| r -----> s <| r *)
+              then begin
+                T.Tbl.replace right r (i, s, strict);
+                BV.reset bv i;
+                BV.reset bv i;
+              end
+          with Not_found ->
+            T.Tbl.add right r (i, s, strict) (* remember bound for r *)
+          end
+        | _, T.Node ((S.Int _ | S.Rat _ | S.Real _) as s, []
+          when not (Arith.T.is_arith_const l) ->
+      with Not_found -> ());
+  if BV.length bv < Array.length c.C.hclits then begin
+    assert false (* TODO *)
+
+
+    end
+  else c  (* no change *)
+    *)
+
 (* enumerate integers from lower to higher, included. Returns an empty list
     if lower > higher *)
 let _int_range lower higher =
@@ -176,6 +230,7 @@ let case_switch active_set c =
     let parents = [c; c'] in
     let new_c = C.create ~parents ~ctx new_lits proof in
     Util.debug 5 "  --> case switch gives clause %a" C.pp new_c;
+    Util.incr_stat stat_case_switch;
     new_c :: acc
   in
   (* fold on literals *)
@@ -271,6 +326,7 @@ let setup_env ?(ac=false) ~env =
   Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
   Env.add_binary_inf ~env "arith_case_switch" case_switch;
+  Env.add_simplify ~env factor_bounds;
   (* declare some AC symbols *)
   if ac then begin
     AC.add_ac ~env S.Arith.sum;

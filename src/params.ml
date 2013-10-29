@@ -121,6 +121,7 @@ let parse_args () =
     ; "-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set"
     ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
     ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
+    ; "-print-types", Arg.Set FOTerm.print_var_types, "print type of variables"
     ; "-seed", Arg.Set_int seed, "set random seed"
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
     ]

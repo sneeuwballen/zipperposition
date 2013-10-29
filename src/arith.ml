@@ -707,6 +707,36 @@ module Lit = struct
     | Some E.False -> false
     | _ -> true
 
+  (* be sure that the literal is "total", ie, if it's an equation, that
+    replacing one side by the other is always safe.
+    In particular:   a = b/3  is {b NOT} total for integers.
+  *)
+  let make_total ~ord ~signature lit =
+    (* scale equation t = m so that m is a total expression *)
+    let _scale_eqn t m lit =
+      if not (M.total_expression m)
+        then
+          let t = T.mk_product (T.mk_const m.M.divby) t in
+          let t' = M.to_term (M.product m m.M.divby) in
+          mk_eq ~ord t t'
+        else
+          lit
+    in
+    match lit with
+      | Literal.Equation (l, r, true, _) when not (T.is_arith l) ->
+        begin try
+          let m = M.of_term ~signature r in
+          _scale_eqn l m lit
+        with M.NotLinear _ -> lit
+        end
+      | Literal.Equation (l, r, true, _) when not (T.is_arith r) ->
+        begin try
+          let m = M.of_term ~signature l in
+          _scale_eqn r m lit
+        with M.NotLinear _ -> lit
+        end
+      | _ -> lit
+
   let simplify ~ord ~signature lit =
     try
       let elit = E.extract ~signature lit in
