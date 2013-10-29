@@ -37,16 +37,22 @@ type ty = t
 
 let rec eq_struct t1 t2 = match t1, t2 with
   | Var i1, Var i2 -> i1 = i2
-  | App (s1, l1), App (s2, l2) when List.length l1 = List.length l2 ->
-    s1 = s2 && List.for_all2 (==) l1 l2
-  | Fun (ret1,l1), Fun (ret2,l2) when List.length l1 = List.length l2 ->
-    ret1 == ret2 && List.for_all2 (==) l1 l2
+  | App (s1, l1), App (s2, l2) -> 
+    s1 = s2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
+  | Fun (ret1,l1), Fun (ret2,l2) ->
+    ret1 == ret2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
   | _, _ -> false
 
-let rec hash t = match t with
+let rec _hash_rec t = match t with
   | Var i -> i
-  | App (s, l) -> Hash.hash_list hash (Hash.hash_string s) l
-  | Fun (ret, l) -> Hash.hash_list hash (hash ret) l
+  | App (s, l) -> Hash.hash_list _hash_rec (Hash.hash_string s) l
+  | Fun (ret, l) -> Hash.hash_list _hash_rec (_hash_rec ret) l
+
+(* optimize hash for frequent case: variable or constant *)
+let hash t = match t with
+  | Var i -> i
+  | App (s, []) -> Hash.hash_string s
+  | _ -> _hash_rec t
 
 (* hashconsing *)
 module H = Hashcons.Make(struct
@@ -137,6 +143,7 @@ let arity ty = match ty with
   | App _ -> 0
 
 let rec is_ground t = match t with
+  | App (_, [])
   | Var _ -> false
   | App (_, l) -> List.for_all is_ground l
   | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
@@ -150,6 +157,7 @@ let rec curry ty = match ty with
       (curry ret) l
 
 let rec uncurry ty = match ty with
+  | App (_, [])
   | Var _ -> ty
   | App (s, l) -> app s (List.map uncurry l)
   | Fun _ ->
@@ -166,8 +174,8 @@ and _gather_uncurry ty acc = match ty with
   | Fun _ -> uncurry ty :: acc (* consider this as a single argument *)
 
 let rec size ty = match ty with
-  | Var _ -> 1
-  | App (s, []) -> 1
+  | Var _
+  | App (_, []) -> 1
   | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
   | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
 
