@@ -32,7 +32,7 @@ Library "logtk"
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
-                    Trace_tstp, CallProver, Congruence, TypeUnif,
+                    Trace_tstp, CallProver, Congruence, TypeUnif, Options,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
                     lib/QCheck, lib/Bencode, lib/BV, lib/PersistentHashtbl
   BuildDepends:     unix,num,str

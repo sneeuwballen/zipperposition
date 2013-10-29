@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d00399a6e7b8675a865257eb13735a61)
+# DO NOT EDIT (digest: 74c01d4bdc2aafc8df3b477f3142e625)
 HO
 FO
 Symbol
@@ -40,6 +40,7 @@ Trace_tstp
 CallProver
 Congruence
 TypeUnif
+Options
 lib/Sequence
 lib/Bij
 lib/Cache
