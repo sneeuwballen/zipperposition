@@ -47,15 +47,15 @@ module type LEAF = sig
   val fold : t -> ('a -> term -> S.t -> 'a) -> 'a -> 'a
   val size : t -> int
 
-  val fold_unify : t -> scope -> term -> scope -> 'a ->
+  val fold_unify : ?subst:subst -> t -> scope -> term -> scope -> 'a ->
                     ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Unify the given term with indexed terms *)
 
-  val fold_match: t -> scope -> term -> scope -> 'a ->
+  val fold_match: ?subst:subst -> t -> scope -> term -> scope -> 'a ->
                   ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the indexed terms against the given query term *)
 
-  val fold_matched: t -> scope -> term -> scope -> 'a ->
+  val fold_matched: ?subst:subst -> t -> scope -> term -> scope -> 'a ->
                     ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the query term against the indexed terms *)
 end
@@ -86,13 +86,16 @@ module type TERM_IDX = sig
 
   val fold : t -> ('a -> term -> Leaf.S.t -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : t -> scope -> term -> scope -> 'a ->
+  val retrieve_unifiables : ?subst:subst ->
+                            t -> scope -> term -> scope -> 'a ->
                             ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_generalizations : t -> scope -> term -> scope -> 'a ->
+  val retrieve_generalizations : ?subst:subst ->
+                                t -> scope -> term -> scope -> 'a ->
                                 ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_specializations : t -> scope -> term -> scope -> 'a ->
+  val retrieve_specializations : ?subst:subst ->
+                                  t -> scope -> term -> scope -> 'a ->
                                  ('a -> term -> elt -> subst -> 'a) -> 'a
 
   val to_dot : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
@@ -199,7 +202,8 @@ module type UNIT_IDX = sig
   val iter : t -> (term -> E.t -> unit) -> unit
     (** Iterate on indexed equations *)
 
-  val retrieve : sign:bool -> t -> scope -> term -> scope -> 'a ->
+  val retrieve : ?subst:subst -> sign:bool ->
+                  t -> scope -> term -> scope -> 'a ->
                  ('a -> term -> rhs -> E.t -> subst -> 'a) ->
                  'a
       (** [retrieve ~sign (idx,si) (t,st) acc] folds on

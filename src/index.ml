@@ -49,15 +49,15 @@ module type LEAF = sig
   val fold : t -> ('a -> term -> S.t -> 'a) -> 'a -> 'a
   val size : t -> int
 
-  val fold_unify : t -> scope -> term -> scope -> 'a ->
+  val fold_unify : ?subst:subst -> t -> scope -> term -> scope -> 'a ->
                     ('a -> term -> elt -> subst -> 'a) -> 'a
-    (** FOUnify the given term with indexed terms *)
+    (** Unify the given term with indexed terms *)
 
-  val fold_match: t -> scope -> term -> scope -> 'a ->
+  val fold_match: ?subst:subst -> t -> scope -> term -> scope -> 'a ->
                   ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the indexed terms against the given query term *)
 
-  val fold_matched: t -> scope -> term -> scope -> 'a ->
+  val fold_matched: ?subst:subst -> t -> scope -> term -> scope -> 'a ->
                     ('a -> term -> elt -> subst -> 'a) -> 'a
     (** Match the query term against the indexed terms *)
 end
@@ -102,33 +102,33 @@ module MakeLeaf(X : Set.OrderedType) = struct
     T.Map.iter (fun _ set -> cnt := !cnt + S.cardinal set) leaf;
     !cnt
 
-  let fold_unify leaf sc_leaf t sc_t acc k =
+  let fold_unify ?(subst=Substs.FO.create 11) leaf sc_leaf t sc_t acc k =
     T.Map.fold
       (fun t' set acc ->
         try
-          let subst = FOUnif.unification t' sc_leaf t sc_t in
+          let subst = FOUnif.unification ~subst t' sc_leaf t sc_t in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
         with FOUnif.Fail -> acc)
       leaf acc
 
-  let fold_match leaf sc_leaf t sc_t acc k =
+  let fold_match ?(subst=Substs.FO.create 11) leaf sc_leaf t sc_t acc k =
     T.Map.fold
       (fun t' set acc ->
         try
-          let subst = FOUnif.matching t' sc_leaf t sc_t in
+          let subst = FOUnif.matching ~subst t' sc_leaf t sc_t in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
         with FOUnif.Fail -> acc)
       leaf acc
 
-  let fold_matched leaf sc_leaf t sc_t acc k =
+  let fold_matched ?(subst=Substs.FO.create 11) leaf sc_leaf t sc_t acc k =
     T.Map.fold
       (fun t' set acc ->
         try
-          let subst = FOUnif.matching t sc_t t' sc_leaf in
+          let subst = FOUnif.matching ~subst t sc_t t' sc_leaf in
           S.fold
             (fun data acc -> k acc t' data subst)
             set acc
@@ -160,13 +160,16 @@ module type TERM_IDX = sig
 
   val fold : t -> ('a -> term -> Leaf.S.t -> 'a) -> 'a -> 'a
 
-  val retrieve_unifiables : t -> scope -> term -> scope -> 'a ->
+  val retrieve_unifiables : ?subst:subst ->
+                            t -> scope -> term -> scope -> 'a ->
                             ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_generalizations : t -> scope -> term -> scope -> 'a ->
+  val retrieve_generalizations : ?subst:subst ->
+                                t -> scope -> term -> scope -> 'a ->
                                 ('a -> term -> elt -> subst -> 'a) -> 'a
 
-  val retrieve_specializations : t -> scope -> term -> scope -> 'a ->
+  val retrieve_specializations : ?subst:subst ->
+                                  t -> scope -> term -> scope -> 'a ->
                                  ('a -> term -> elt -> subst -> 'a) -> 'a
 
   val to_dot : (Buffer.t -> elt -> unit) -> Buffer.t -> t -> unit
@@ -271,7 +274,8 @@ module type UNIT_IDX = sig
   val iter : t -> (term -> E.t -> unit) -> unit
     (** Iterate on indexed equations *)
 
-  val retrieve : sign:bool -> t -> scope -> term -> scope -> 'a ->
+  val retrieve : ?subst:subst -> sign:bool ->
+                  t -> scope -> term -> scope -> 'a ->
                  ('a -> term -> rhs -> E.t -> subst -> 'a) ->
                  'a
       (** [retrieve ~sign (idx,si) (t,st) acc] folds on

@@ -81,8 +81,21 @@ module Ctx = struct
     } in
     ctx
 
+  let clear ctx =
+    ctx.scope <- 0;
+    ctx.var <- ~-1;
+    ctx.db <- [];
+    ctx.subst <- S.empty;
+    STbl.clear ctx.symbols;
+    ctx.signature <- Signature.empty;
+    ()
+
   let add_signature ctx signature =
     ctx.signature <- Signature.merge ctx.signature signature;
+    ()
+
+  let set_signature ctx signature =
+    ctx.signature <- signature;
     ()
 
   let _new_scope ctx =

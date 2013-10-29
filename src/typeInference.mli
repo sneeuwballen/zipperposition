@@ -50,8 +50,14 @@ module Ctx : sig
   val of_signature : ?default:Type.t -> Signature.t -> t
     (** Shortcut that calls {!create} and then adds the given signature. *)
 
+  val clear : t -> unit
+    (** Remove every data from the context. It is as new. *)
+
   val add_signature : t -> Signature.t -> unit
     (** Specify the type of some symbols *)
+
+  val set_signature : t -> Signature.t -> unit
+    (** Set the exact signature. The old one will be erased. *)
 
   val within_binder : t -> ty:Type.t -> (Type.t -> scope -> 'a) -> 'a
     (** Provides a context, corresponding to a term binding environment.
@@ -76,6 +82,15 @@ module Ctx : sig
         (unifiable with) the current type of the symbol, if any.
         @raise TypeUnif.Error if an inconsistency (with inferred types) is
           detected. *)
+
+  val unify : t -> Type.t -> scope -> Type.t -> scope -> Substs.Ty.t
+    (** Unify the two types within the context's environment (substitution)
+        @raise TypeUnif.Error on type inconsistency *)
+
+  val unify_and_set : t -> Type.t -> scope -> Type.t -> scope -> unit
+    (** Unify the two types, then update the context's environment with
+        the resulting substitution.
+        @raise TypeUnif.Error on inconsistency *)
 
   val eval_type : ?renaming:Substs.Ty.Renaming.t ->
                   t -> Type.t -> scope -> Type.t

@@ -81,7 +81,7 @@ let check_ordering_inv_by_subst ord =
     let o2 = O.compare !ord t1' t2' in
     more_specific o1 o2
   in
-  mk_test ~n:10_000 ~name ~pp ~size gen prop
+  mk_test ~n:1000 ~name ~pp ~size gen prop
 
 let props =
   [ check_ordering_inv_by_subst (O.kbo (Precedence.default Signature.empty))

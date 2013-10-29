@@ -121,7 +121,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ~sign dt sc_dt t sc_t acc k =
+  let retrieve ?(subst=S.create 11) ~sign dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_retrieve;
     (* extended callback *)
     let k' acc t' eqn subst =
@@ -131,7 +131,7 @@ module Make(E : Index.EQUATION) = struct
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc i =
       if i = T.size t
-        then Leaf.fold_match trie.leaf sc_dt t sc_t acc k'
+        then Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k'
         else match (T.at_cpos t i).T.term with
           | (T.Var _ | T.BoundVar _) ->
             begin match trie.star with
