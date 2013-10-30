@@ -46,23 +46,20 @@ val fresh_var : ctx:ctx -> int
 val update_var : ctx:ctx -> FOTerm.t -> unit
   (** Avoid collisions with variables of this term in calls to {!fresh_var}. *)
 
-val skolem_term : ctx:ctx -> ty:Type.t -> FOTerm.t -> FOTerm.t
-  (** Skolemize the given term at root (assumes it occurs just under an
-      existential quantifier, whose De Bruijn variable is replaced
-      by a fresh symbol applied to free variables). This also
-      caches symbols, so that the same term is always skolemized
-      the same way.
+val skolem_form : ctx:ctx -> ty:Type.t -> FOFormula.t -> FOFormula.t
+  (** Skolemize the given formula at root (assumes it occurs just under an
+      existential quantifier, whose De Bruijn variable 0 is replaced
+      by a fresh symbol applied to free variables). This also caches symbols,
+      so that the same formula (modulo alpha-renaming) is always skolemized the
+      same way.
 
-      For instance, [skolem_term ~ctx p(a, b, db0, X)] will yield
+      For instance, [skolem_form ~ctx p(a, b, db0, X)] will yield
       something like [p(a, b, sk42(X), X)].
 
       @param ty the type of the De Bruijn variable to replace
       *)
 
-val skolem_form : ctx:ctx -> ty:Type.t -> FOFormula.t -> FOFormula.t
-  (** Skolemize the De Bruijn index 0 in this formula. *)
-
 val skolem_ho : ctx:ctx -> ty:Type.t -> HOTerm.t -> HOTerm.t
-  (** SKolemize a higher order term.
+  (** Skolemize a higher order term. Quite the same as {!skolem_form}.
       {b Not implemented} *)
 

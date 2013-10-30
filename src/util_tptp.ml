@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module A = Ast_tptp
 module T = FOTerm
 module F = FOFormula
+module UT = Untyped.FO
+module UF = Untyped.Form
 
 (** {2 Printing/Parsing} *)
 
@@ -160,12 +162,12 @@ let infer_type ctx decls =
       | A.IncludeOnly _ -> ()
       | A.NewType _ -> ()  (* ignore *)
       | A.TypeDecl(_, s, ty) ->
-        TypeInference.Ctx.declare ctx s ty
+        TypeInference.Ctx.declare_parsed ctx s ty
       | A.CNF(_,_,c,_) ->
-        List.iter (fun f -> TypeInference.FO.constrain_form ctx f 0) c
+        List.iter (fun f -> TypeInference.FO.constrain_form ctx f) c
       | A.FOF(_,_,f,_)
-      | A.TFF(_,_,f,_) -> TypeInference.FO.constrain_form ctx f 0
-      | A.THF(_,_,f,_) -> ignore (TypeInference.HO.infer ctx f 0)
+      | A.TFF(_,_,f,_) -> TypeInference.FO.constrain_form ctx f
+      | A.THF(_,_,f,_) -> ignore (TypeInference.HO.constrain ctx f)
       )
     decls
 
@@ -177,7 +179,9 @@ let signature ?(signature=Signature.base) decls =
 let type_declarations decls =
   Sequence.fold
     (fun signature decl -> match decl with
-      | A.TypeDecl (_, s, ty) -> Signature.declare signature s ty
+      | A.TypeDecl (_, s, ty) ->
+        let ty = Type.of_parsed ty in
+        Signature.declare signature s ty
       | _ -> signature)
     Signature.empty decls
 
@@ -191,7 +195,7 @@ let declare_symbols ?(name=__name_symbol) signature =
   Sequence.mapi
     (fun i (s, ty) ->
       let name = name i s in
-      A.TypeDecl (name, s, ty))
+      A.TypeDecl (name, s, Type.to_parsed ty))
     seq
 
 let __is_conjecture = function
@@ -207,12 +211,12 @@ let formulas ?(negate=__is_conjecture) decls =
       | A.IncludeOnly _ -> None
       | A.CNF(_, role, c, _) ->
         if negate role
-          then Some (F.mk_not (F.mk_or c))
-          else Some (F.mk_or c)
+          then Some (UF.mk_not (UF.mk_or c))
+          else Some (UF.mk_or c)
       | A.FOF(_, role, f, _)
       | A.TFF(_, role, f, _) ->
         if negate role
-          then Some (F.mk_not f)
+          then Some (UF.mk_not f)
           else Some f
       | A.THF _ -> None)
     decls
@@ -227,13 +231,13 @@ let sourced_formulas ?(negate=__is_conjecture) ?(file="unknown_file") decls =
       | A.CNF(name, role, c, _) ->
         let source = A.string_of_name name in
         if negate role
-          then Some (F.mk_not (F.mk_or c), file, source)
-          else Some (F.mk_or c, file, source)
+          then Some (UF.mk_not (UF.mk_or c), file, source)
+          else Some (UF.mk_or c, file, source)
       | A.FOF(name, role, f, _)
       | A.TFF(name, role, f, _) ->
         let source = A.string_of_name name in
         if negate role
-          then Some (F.mk_not f, file, source)
+          then Some (UF.mk_not f, file, source)
           else Some (f, file, source)
       | A.THF _ -> None)
     decls

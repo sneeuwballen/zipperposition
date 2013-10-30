@@ -146,7 +146,8 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
   exception RewrittenInto of T.t
 
   (** Given a TRS and a cache size, build a memoized function that
-      performs term rewriting *)
+      performs term rewriting.
+      XXX rewriting cannot change the type of a term. *)
   let mk_rewrite trs ~size =
     (* reduce to normal form. [reduce'] is the memoized version of reduce. *)
     let rec reduce reduce' t =
@@ -156,7 +157,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
         let l' = List.map reduce' l in
         let t' = if List.for_all2 (==) l l'
           then t
-          else T.mk_node s l' in
+          else T.mk_node ~ty:t.T.ty s l' in
         (* now rewrite the term itself *)
         rewrite_here reduce' t'
     (* rewrite once at this position. If it succeeds,
@@ -287,7 +288,7 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
       | T.Node (hd, l) ->
         (* rewrite subterms first *)
         let l' = List.map (fun t' -> compute_nf ~rules subst t' offset) l in
-        let t' = T.mk_node hd l' in
+        let t' = T.mk_node ~ty:t.T.ty hd l' in
         (* rewrite at root *)
         reduce_at_root ~rules t'
       | T.Var _ ->

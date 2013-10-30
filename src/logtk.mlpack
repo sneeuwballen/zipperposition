@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 74c01d4bdc2aafc8df3b477f3142e625)
+# DO NOT EDIT (digest: 8273ffb179af2730bcb03fe0a8fb620a)
 HO
 FO
 Symbol
@@ -41,6 +41,7 @@ CallProver
 Congruence
 TypeUnif
 Options
+Untyped
 lib/Sequence
 lib/Bij
 lib/Cache

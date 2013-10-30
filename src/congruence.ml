@@ -268,7 +268,7 @@ module FO = Make(struct
     | (T.Var _
     | T.BoundVar _), [] -> t
     | T.Node (s, l), l' when List.length l = List.length l' ->
-      T.mk_node s l'
+      T.mk_node ~ty:t.T.ty s l'
     | _ -> assert false
 end)
 
@@ -283,16 +283,15 @@ module HO = Make(struct
     | T.Const _
     | T.Var _
     | T.BoundVar _ -> []
-    | T.At (t1, t2) -> [t1; t2]
-    | T.Bind (_, t) -> [t]
+    | T.At (t, l) -> t :: l
+    | T.Lambda t' -> [t']
 
   let update_subterms t l = match t.T.term, l with
-    | (T.Const _
-    | T.Var _
-    | T.BoundVar _), [] -> t
-    | T.At (t1, t2), [t1'; t2'] -> T.mk_at t1' t2'
-    | T.Bind (s, _), [t'] ->
-      let ty = T.get_type t in
-      T.mk_bind ~ty s t'
+    | (T.Const _ | T.Var _ | T.BoundVar _), [] -> t
+    | T.At (t, l), (t' :: l') ->
+      T.mk_at t' l'
+    | T.Lambda _, [t'] ->
+      let varty = T.lambda_var_ty t in
+      T.mk_lambda ~varty t'
     | _ -> assert false
 end)

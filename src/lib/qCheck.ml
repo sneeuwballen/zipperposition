@@ -152,6 +152,13 @@ module Arbitrary = struct
     let x = a st in
     f x st
 
+  let guard p gen st =
+    let x = gen st in
+    if p x then Some x else None
+
+  let list_sequence l st =
+    List.map (fun gen -> gen st) l
+
   let generate ?(n=100) ?(rand=Random.State.make_self_init()) gen =
     let l = ref [] in
     for i = 0 to n-1 do

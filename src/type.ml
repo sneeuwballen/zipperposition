@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 let prof_unify = Util.mk_profiler "Type.unify"
 let prof_variant = Util.mk_profiler "Type.variant"
 
+(** {2 Main Type representation} *)
+
 type t =
   | Var of int              (** Universal type variable *)
   | App of string * t list  (** parametrized type *)
@@ -96,10 +98,16 @@ end)
 
 (** {2 Infix constructors} *)
 
-let (<==) ret args =
+let rec (<==) ret args =
   match args with
   | [] -> ret
-  | _::_ -> H.hashcons (Fun (ret, args))
+  | _::_ ->
+    match ret with
+    | Fun (ret', args') ->
+      (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
+          constructor invariant *)
+      ret' <== (args @ args')
+    | _ -> H.hashcons (Fun (ret, args))
 
 let (<=.) ret arg =
   H.hashcons (Fun (ret, [arg]))
@@ -118,6 +126,8 @@ let var i =
   H.hashcons (Var i)
 
 let mk_fun = (<==)
+
+(** {2 Basic types} *)
 
 let i = const "$i"
 let o = const "$o"
@@ -178,6 +188,29 @@ let rec size ty = match ty with
   | App (_, []) -> 1
   | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
   | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
+
+let apply_fun f args =
+  (* recursive matching of expected arguments and provided arguments.
+    careful: we could have a curried function *)
+  let rec apply_fun f_ret f_args args = match f_ret, f_args, args with
+    | _, x::f_args', y::args' ->
+      (* match arguments *)
+      if eq x y
+        then apply_fun f_ret f_args' args'
+        else failwith "Type.apply_fun: argument type mismatch"
+    | _, [], [] -> f_ret  (* total application *)
+    | Fun (f_ret', f_args'), [], _ ->
+      (* the function has been totally applied, and returned a new function
+          that will be used to consume remaining arguments *)
+      apply_fun f_ret' f_args' args
+    | _, [], _ -> failwith "Type.apply_fun: too many arguments"
+    | _, _::_, [] ->
+      (* partial application. The remaining arguments need be provided *)
+      mk_fun f_ret f_args
+  in
+  match f, args with
+  | Fun (ret, l), l' -> apply_fun ret l l'
+  | _, _ -> failwith "Type.apply_fun: expected function type"
 
 (** {2 IO} *)
 
@@ -248,6 +281,79 @@ let arbitrary_ground =
       ; lift2 mk_fun sub (list sub)
       ]))
 
+(** {2 Parsed types} *)
+
+module Parsed = struct
+  type t =
+    | Var of string
+    | App of string * t list
+    | Fun of t * t list
+
+  let eq a b = a = b
+  let cmp a b = Pervasives.compare a b
+  let hash a = Hashtbl.hash a
+
+  let var s = Var s
+  let app s l = App (s, l)
+  let const s = app s []
+
+  let mk_fun ret l = match l with
+    | [] -> ret
+    | _ -> Fun (ret, l)
+
+  let (<==) = mk_fun
+  let (<=.) a b = mk_fun a [b]
+
+  let i = const "$i"
+  let o = const "$o"
+  let int = const "$int"
+  let rat = const "$rat"
+  let real = const "$real"
+  let tType = const "$tType"
+
+  let rec pp buf t = match t with
+    | Var s -> Buffer.add_string buf s
+    | App (s, []) -> Buffer.add_string buf s
+    | App (s, l) ->
+      Printf.bprintf buf "%s(%a)" s (Util.pp_list pp) l
+    | Fun (ret, [x]) ->
+      Printf.bprintf buf "%a > %a" pp x pp ret
+    | Fun (ret, l) ->
+      Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp) l pp ret
+
+  let pp_tstp = pp
+  let to_string = Util.on_buffer pp
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+end
+
+type ctx = (string, ty) Hashtbl.t
+
+let create_ctx () = Hashtbl.create 5
+
+let of_parsed ?(ctx=create_ctx ()) ty =
+  let rec convert ty = match ty with
+  | Parsed.Var s ->
+    begin try
+      Hashtbl.find ctx s
+    with Not_found ->
+      let v = var (Hashtbl.length ctx) in
+      Hashtbl.add ctx s v;
+      v
+    end
+  | Parsed.App (s, l) ->
+    let l = List.map convert l in
+    app s l
+  | Parsed.Fun (ret, l) ->
+    let ret = convert ret in
+    let l = List.map convert l in
+    mk_fun ret l
+  in
+  convert ty
+
+let rec to_parsed ty = match ty with
+  | Var i -> Parsed.var (Util.sprintf "T%d" i)
+  | App (s, l) -> Parsed.app s (List.map to_parsed l)
+  | Fun (ret, l) -> Parsed.mk_fun (to_parsed ret) (List.map to_parsed l)
 
 (** {2 Misc} *)
 

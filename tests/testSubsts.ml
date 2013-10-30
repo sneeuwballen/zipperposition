@@ -52,7 +52,27 @@ let test_rename () =
   assert_equal ~cmp:FOUnif.are_variant ~printer:T.to_string t3'' t3';
   ()
 
+let test_unify () =
+  let x = T.mk_var ~ty:Type.(app "list" [var 0]) 0 in
+  let y = T.mk_var ~ty:Type.(app "list" [int]) 1 in
+  let t1 = f x (g y) in
+  let t2 = f a (g x) in
+  let signature = TypeInference.FO.Quick.(signature [WellTyped t1; WellTyped t2]) in
+  let tyctx = TypeInference.Ctx.of_signature signature in
+  let ty1 = TypeInference.FO.infer tyctx t1 0 in
+  let ty2 = TypeInference.FO.infer tyctx t2 0 in
+  let subst = TypeUnif.unify_fo ty1 0 ty2 1 in
+  let subst = FOUnif.unification ~subst t1 0 t2 1 in
+  let renaming = S.Renaming.create 5 in
+  let t1' = S.apply subst ~renaming t1 0 in
+  let t2' = S.apply subst ~renaming t2 0 in
+  T.print_var_types := true;
+  Util.printf "t1: %a, t2: %a, subst: %a\n" T.pp t1 T.pp t2 S.pp subst;
+  assert_equal ~cmp:T.eq ~printer:T.to_string t1' t2';
+  ()
+
 let suite =
   "test_substs" >:::
     [ "test_rename" >:: test_rename
+    ; "test_unify" >:: test_unify
     ]

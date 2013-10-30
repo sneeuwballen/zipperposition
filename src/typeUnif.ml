@@ -30,6 +30,7 @@ module Ty = Type
 module S = Substs.Ty
 
 let prof_unify = Util.mk_profiler "TypeUnif.unify"
+let prof_match = Util.mk_profiler "TypeUnif.match"
 let prof_variant = Util.mk_profiler "TypeUnif.variant"
 
 type scope = Substs.scope
@@ -74,6 +75,8 @@ let _occur_check subst v s_v t s_t =
     check ret s_t || List.exists (fun t' -> check t' s_t) l
   in
   check t s_t
+
+(** {2 Unification} *)
 
 (* unification *)
 let rec _unify_rec subst ty1 s1 ty2 s2 =
@@ -133,6 +136,53 @@ let unifier ty1 ty2 =
   let ty = S.apply subst ~renaming ty1 0 in
   ty
 
+(** {2 Matching} *)
+
+let rec _match_rec ~protect subst ty1 s1 ty2 s2 =
+  let ty1, s1 = S.get_var subst ty1 s1 in
+  let ty2, s2 = S.get_var subst ty2 s2 in
+  match ty1, ty2 with
+  | _ when s1 = s2 && Ty.eq ty1 ty2 -> subst
+  | Ty.Var _, _ ->
+    (* fail if occur check, or if we need to bind a protected variable *)
+    if _occur_check subst ty1 s1 ty2 s2 || (List.memq ty1 protect && s1 = s2)
+      then _error subst ty1 s1 ty2 s2
+      else S.bind subst ty1 s1 ty2 s2
+  | Ty.App (sym1, l1), Ty.App (sym2, l2) when sym1 = sym2 && List.length l1 = List.length l2 ->
+    List.fold_left2
+      (fun subst ty1 ty2 -> _match_rec ~protect subst ty1 s1 ty2 s2)
+      subst
+      l1 l2
+  | Ty.Fun (ret1, l1), Ty.Fun (ret2, l2) when List.length l1 = List.length l2 ->
+    let subst = _match_rec ~protect subst ret1 s1 ret2 s2 in
+    List.fold_left2
+      (fun subst ty1 ty2 -> _match_rec ~protect subst ty1 s1 ty2 s2)
+      subst
+      l1 l2
+  | _ -> _error subst ty1 s1 ty2 s2
+
+let match_ ?(subst=S.create 6) ty1 s1 ty2 s2 =
+  Util.enter_prof prof_match;
+  let protect = Ty.free_vars ty2 in
+  try
+    let subst = _match_rec ~protect subst ty1 s1 ty2 s2 in
+    Util.exit_prof prof_match;
+    subst
+  with e ->
+    Util.exit_prof prof_match;
+    raise e
+
+let match_fo ?(subst=Substs.FO.create 11) ty1 s1 ty2 s2 =
+  Substs.FO.update_ty subst
+    (fun subst -> match_ ~subst ty1 s1 ty2 s2)
+
+let match_ho ?(subst=Substs.HO.create 11) ty1 s1 ty2 s2 =
+  Substs.HO.update_ty subst
+    (fun subst -> match_ ~subst ty1 s1 ty2 s2)
+
+
+(** {2 Alpha-equivalence} *)
+
 (* alpha-equivalence check *)
 let rec _variant_rec subst ty1 s1 ty2 s2 =
   let ty1, s1 = S.get_var subst ty1 s1 in
@@ -168,6 +218,15 @@ let variant ?(subst=S.create 10) ty1 s1 ty2 s2 =
   with e ->
     Util.exit_prof prof_variant;
     raise e
+
+let variant_fo ?(subst=Substs.FO.create 11) ty1 s1 ty2 s2 =
+  Substs.FO.update_ty subst
+    (fun subst -> variant ~subst ty1 s1 ty2 s2)
+
+let variant_ho ?(subst=Substs.HO.create 11) ty1 s1 ty2 s2 =
+  Substs.HO.update_ty subst
+    (fun subst -> variant ~subst ty1 s1 ty2 s2)
+
 
 let are_variants ty1 ty2 =
   try

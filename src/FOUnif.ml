@@ -42,20 +42,8 @@ let prof_ac_matching = Util.mk_profiler "ac-matching"
 
 exception Fail
 
-let types ~ctx ?subst t1 s1 t2 s2 =
-  let ty1 = TypeInference.FO.infer ctx t1 s1 in
-  let ty2 = TypeInference.FO.infer ctx t2 s2 in
-  try
-    let subst = TypeUnif.unify_fo ?subst ty1 s1 ty2 s2 in
-    subst
-  with TypeUnif.Error _ ->
-    raise Fail
-
-let types_sig ?subst signature t1 s1 t2 s2 =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  types ~ctx ?subst t1 s1 t2 s2
-
-(** Does [v] appear in [t] if we apply the substitution? *)
+(** Does [v] appear in [t] if we apply the substitution?
+  TODO: maybe cause problem with polymorphism, e.g. X:'a = f(X:'int)? *)
 let occurs_check subst v sc_v t sc_t =
   let rec check v sc_v t sc_t =
     if T.is_ground t then false
@@ -80,11 +68,14 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s
     and t, sc_t = S.get_var subst t sc_t in
+    (* unify types first *)
+    let subst = TypeUnif.unify_fo ~subst s.T.ty sc_s t.T.ty sc_t in
     match s.term, t.term with
     | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground s && T.is_ground t ->
       raise Fail (* terms are not equal, and ground. failure. *)
+    | Var _, Var _ -> S.bind subst s sc_s t sc_t
     | Var _, _ ->
       if occurs_check subst s sc_s t sc_t
         then raise Fail (* occur check *)
@@ -122,11 +113,18 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
   (* recursive matching *)
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s in
+    (* match types first *)
+    let subst = TypeUnif.match_fo ~subst s.T.ty sc_s t.T.ty sc_t in
     match s.term, t.term with
     | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
     | _ when T.is_ground s && T.is_ground t ->
       raise Fail (* terms are not equal, and ground. failure. *)
+    | Var _, Var _ when sc_s <> sc_t ->
+      let ty_s = T.get_type s in
+      let ty_t = T.get_type t in
+      let subst = TypeUnif.unify_fo ~subst ty_s sc_s ty_t sc_t in
+      S.bind subst s sc_s t sc_t
     | Var _, _ ->
       if occurs_check subst s sc_s t sc_t || sc_s <> sc_a
         then raise Fail
@@ -160,6 +158,7 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s in
     let t, sc_t = S.get_var subst t sc_t in
+    let subst = TypeUnif.variant_fo ~subst s.T.ty sc_s t.T.ty sc_t in
     match s.term, t.term with
     | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
@@ -214,7 +213,10 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
   in
   (* recursive matching. [k] is called with solutions *)
   let rec unif subst s sc_s t sc_t k =
-    let s, sc_s = S.get_var subst s sc_s in
+    try
+      let s, sc_s = S.get_var subst s sc_s in
+      (* first match types *)
+      let subst = TypeUnif.match_fo ~subst s.T.ty sc_s t.T.ty sc_t in
       match s.term, t.term with
       | Var _, Var _ when s == t && sc_s = sc_t -> k subst (* trivial success *)
       | Var _, _ ->
@@ -231,12 +233,13 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
         (* eliminate terms that are common to l1 and l2 *)
         let l1, l2 = eliminate_common l1 l2 in
         (* permutative matching *)
-        unif_ac subst f l1 sc_s [] l2 sc_t k
+        unif_ac ~ty:s.T.ty subst f l1 sc_s [] l2 sc_t k
       | Node (f, [x1;y1]), Node (g, [x2;y2]) when f == g && is_com f ->
         unif_com subst x1 y1 sc_s x2 y2 sc_t k
       | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
         unif_list subst l1 sc_s l2 sc_t k  (* regular decomposition *)
       | _, _ -> ()  (* failure, close branch *)
+    with TypeUnif.Error _ -> ()
   (* unify pair of lists of terms, with given continuation. *)
   and unif_list subst l1 sc_1 l2 sc_2 k =
     match l1, l2 with
@@ -252,7 +255,7 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
     ()
   (* try all permutations of [left@right] against [l1]. [left,right] is a
      zipper over terms to be matched against [l1]. *)
-  and unif_ac subst f l1 sc_1 left right sc_2 k =
+  and unif_ac ~ty subst f l1 sc_1 left right sc_2 k =
     match l1, left, right with
     | [], [], [] -> k subst  (* success *)
     | _ when List.length l1 > List.length left + List.length right ->
@@ -262,9 +265,9 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       unif subst x1 sc_1 x2 sc_2
         (fun subst ->
           (* continue without x1 and x2 *)
-          unif_ac subst f l1' sc_1 [] (left @ right') sc_2 k);
+          unif_ac ~ty subst f l1' sc_1 [] (left @ right') sc_2 k);
       (* try x1 against right', keeping x2 on the side *)
-      unif_ac subst f l1 sc_1 (x2::left) right' sc_2 k;
+      unif_ac ~ty subst f l1 sc_1 (x2::left) right' sc_2 k;
       (* try to bind x1 to [x2+z] where [z] is fresh,
          if len(l1) < len(left+right) *)
       if T.is_var x1 && List.length l1 < List.length left + List.length right then
@@ -273,9 +276,9 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
            bind it so that (z,sc_2) -> (z,sc_1), and use (z,sc_1) to continue
            the matching *)
         let subst' = S.bind subst z sc_2 z sc_1 in
-        let x2' = T.mk_node f [x2; z] in
+        let x2' = T.mk_node ~ty f [x2; z] in
         let subst' = S.bind subst' x1 sc_1 x2' sc_2 in
-        unif_ac subst' f (z::l1') sc_1 left right' sc_2 k
+        unif_ac ~ty subst' f (z::l1') sc_1 left right' sc_2 k
     | x1::l1', left, [] -> ()
     | [], _, _ -> ()  (* failure, some terms are not matched *)
   (* eliminate common occurrences of terms in [l1] and [l2] *)

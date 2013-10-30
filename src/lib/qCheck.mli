@@ -172,8 +172,15 @@ module Arbitrary : sig
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
     (** Monadic bind *)
 
+  val guard : ('a -> bool) -> 'a t -> 'a option t
+    (** To be used in combination with {!retry}. Ensures that only generated
+        values that satisfy some property are accepted. *)
+
   val retry : 'a option t -> 'a t
     (** Generate until a Some value is returned *)
+
+  val list_sequence : 'a t list -> 'a list t
+    (** Use a list of generators to generate a list *)
 
   val generate : ?n:int -> ?rand:Random.State.t -> 'a t -> 'a list
     (** Generate [n] random values of the given type *)

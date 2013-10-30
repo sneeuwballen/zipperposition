@@ -31,7 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** term *)
 type t = private {
   term : term_cell;             (** the term itself *)
-  type_ : Type.t option;        (** optional type *)
+  ty : Type.t;                  (** type *)
   mutable tsize : int;          (** size (number of subterms) *)
   mutable flags : int;          (** boolean flags about the term *)
   mutable tag : int;            (** hashconsing tag *)
@@ -40,9 +40,10 @@ type t = private {
 and term_cell = private
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Bind of Symbol.t * t        (** bind one variable *)
+  | Lambda of t                 (** lambda abstraction over one variable. *)
   | Const of Symbol.t           (** Constant *)
-  | At of t * t                 (** HO application (curried) *)
+  | At of t * t list            (** HO function application.
+                                    Invariant: first term is not a {!At}. *)
 and sourced_term =
   t * string * string           (** Term + file,name *)
 
@@ -59,8 +60,6 @@ val hash : t -> int
 val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
 val get_type : t -> Type.t
-  (** Obtain the type of a {!Var} or {!Bind}.
-      @raise Failure if the term is not a variable. *)
 
 module Tbl : Hashtbl.S with type key = t
 module Set : Sequence.Set.S with type elt = t
@@ -88,25 +87,31 @@ val new_flag : unit -> int
   (** New flag, different from all other flags *)
 
 val mk_var : ty:Type.t -> int -> t  (** Create a variable. The index must be >= 0 *)
-val mk_bound_var : int -> t  (** De Bruijn index, must be >= 0 *)
+val mk_bound_var : ty:Type.t -> int -> t  (** De Bruijn index, must be >= 0 *)
 
-val mk_bind : Symbol.t -> ty:Type.t -> t -> t
-  (** [mk_bind s t] binds the De Bruijn 0 in [t]. *)
+val mk_lambda : varty:Type.t -> t -> t
+  (** [mk_lambda ~varty t'] creates the lambda function with
+      type [varty -> t'.ty] *)
 
-val mk_const : Symbol.t -> t
+val mk_const : ty:Type.t -> Symbol.t -> t
+  (** Constant, with a given type *)
 
-val mk_at : t -> t -> t
-val mk_at_list : t -> t list -> t
+val mk_at : t -> t list -> t
+  (** Apply a term to other terms. Type can be deduced from arguments.
+      @raise Failure if types do not match. *)
 
-val true_term : t                        (** tautology symbol *)
-val false_term : t                       (** antilogy symbol *)
+val true_term : t   (** tautology symbol *)
+val false_term : t  (** antilogy symbol *)
 
 val not_term : t
 val and_term : t
 val or_term : t
 val imply_term : t
 val equiv_term : t
-val eq_term : t
+
+val eq_term : Type.t -> t
+val forall_term : Type.t -> t
+val exists_term : Type.t -> t
 
 val mk_not : t -> t
 val mk_and : t -> t -> t
@@ -116,9 +121,9 @@ val mk_equiv : t -> t -> t
 val mk_xor : t -> t -> t
 val mk_eq : t -> t -> t
 val mk_neq : t -> t -> t
-val mk_lambda : ty:Type.t -> t -> t
-val mk_forall : ty:Type.t -> t -> t
-val mk_exists : ty:Type.t -> t -> t
+val mk_lambda : varty:Type.t -> t -> t
+val mk_forall : varty:Type.t -> t -> t
+val mk_exists : varty:Type.t -> t -> t
 
 val mk_and_list : t list -> t
 val mk_or_list : t list -> t
@@ -133,13 +138,15 @@ val mk_exists_var : t list -> t -> t
 
 val cast : t -> Type.t -> t           (** Set the type *)
 
+val lambda_var_ty : t -> Type.t       (** Type of arguments this lambda accepts *)
+
 (** {2 Properties} *)
 
 val is_var : t -> bool
 val is_bound_var : t -> bool
 val is_const : t -> bool
 val is_at : t -> bool
-val is_bind : t -> bool
+val is_lambda : t -> bool
 
 (** {2 Positions} *)
 
@@ -161,6 +168,7 @@ val max_cpos : t -> int
 
 val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)
 val is_ground : t -> bool                (** is the term ground? (no free vars) *)
+val monomorphic : t -> bool              (** true if no type variable occurs in term *)
 val max_var : varlist -> int             (** find the maximum variable index, or 0 *)
 val min_var : varlist -> int             (** minimum variable, or 0 if ground *)
 val add_vars : unit Tbl.t -> t -> unit   (** add variables of the term to the set *)
@@ -171,11 +179,6 @@ val vars_prefix_order : t -> varlist     (** variables of the term in prefix tra
 val depth : t -> int                     (** depth of the term *)
 val head : t -> Symbol.t                 (** head symbol (or Invalid_argument) *)
 val size : t -> int
-
-val open_at : t -> t * t list
-  (** [open_at t] returns the head term (the function that is applied)
-      and the list of its arguments. For instance, on
-      [a @ b @ c @ (d @ e)] it will return [a], and [b; c; (d @ e)]. *)
 
 val symbols : t Sequence.t -> Symbol.Set.t   (** Symbols of the terms (keys of signature) *)
 val contains_symbol : Symbol.t -> t -> bool
@@ -224,13 +227,8 @@ val db_from_var : ?depth:int -> t -> t -> t
 
 (** {2 High level operations} *)
 
-val db_to_classic : ?varindex:int ref -> t -> t
-  (** Transform binders and De Bruijn indexes into regular variables.
-      [varindex] is a variable counter used to give fresh variables
-      names to De Bruijn indexes. *)
-
-val close_forall : t -> t     (** Bind all free variables by 'forall' *)
-val close_exists : t -> t     (** Bind all free variables by 'exists' *)
+val close_forall : t -> t     (** Bind all free variables with 'forall' *)
+val close_exists : t -> t     (** Bind all free variables with 'exists' *)
 
 (** {2 IO} *)
 
@@ -250,6 +248,8 @@ val fmt : Format.formatter -> t -> unit
 
 val bij : t Bij.t
 
-
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
+
+val erase_types : t -> Untyped.HO.t
+  (** Erase types (except for variables) *)

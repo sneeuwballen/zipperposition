@@ -44,8 +44,8 @@ module Ctx : sig
           base signature is used from start, rather than an empty
           signature
         @param default is the type to use for non-declared symbols,
-          defaults to {!Type.i}. Please not that non-declared
-          symbols cannot have polymorphic types. *)
+          their return type defaults to {!Type.i}. Please note that
+          non-declared symbols therefore cannot have polymorphic types. *)
 
   val of_signature : ?default:Type.t -> Signature.t -> t
     (** Shortcut that calls {!create} and then adds the given signature. *)
@@ -59,43 +59,14 @@ module Ctx : sig
   val set_signature : t -> Signature.t -> unit
     (** Set the exact signature. The old one will be erased. *)
 
-  val within_binder : t -> ty:Type.t -> (Type.t -> scope -> 'a) -> 'a
-    (** Provides a context, corresponding to a term binding environment.
-        Within the local context, the bound De Bruijn variable will
-        have the (type,scope) that are passed as arguments to the closure. *)
-
-  val db_type : t -> int -> Type.t * scope
-    (** The type of the bound variable of De Bruijn index [i].
-        [within_binder] must have been used enough times before, so
-        that a type is attributed to the [i]-th bound variable.
-        @raise Invalid_argument if the [i]-th variable is not bound.*)
-
-  val type_of_fun : t -> Symbol.t -> Type.t * scope
-    (** If the function symbol has an unknown type, a fresh variable
-        (in a fresh scope, that is) is returned. Otherwise the known
-        type of the symbol is returned along with a new scope,
-        so that, for instance, "nil" (the empty list) can have several
-        concrete types (using distinct scopes). *)
-
   val declare : t -> Symbol.t -> Type.t -> unit
     (** Declare the type of a symbol. The type {b must} be compatible
         (unifiable with) the current type of the symbol, if any.
         @raise TypeUnif.Error if an inconsistency (with inferred types) is
           detected. *)
 
-  val unify : t -> Type.t -> scope -> Type.t -> scope -> Substs.Ty.t
-    (** Unify the two types within the context's environment (substitution)
-        @raise TypeUnif.Error on type inconsistency *)
-
-  val unify_and_set : t -> Type.t -> scope -> Type.t -> scope -> unit
-    (** Unify the two types, then update the context's environment with
-        the resulting substitution.
-        @raise TypeUnif.Error on inconsistency *)
-
-  val eval_type : ?renaming:Substs.Ty.Renaming.t ->
-                  t -> Type.t -> scope -> Type.t
-    (** Evaluate the type within the given context and scope.
-        A renaming can be provided instead of using the context's one *)
+  val declare_parsed : t -> Symbol.t -> Type.Parsed.t -> unit
+    (** Declare the type of a symbol, in raw form *)
 
   val to_signature : t -> Signature.t
     (** Obtain the type of all symbols whose type has been inferred.
@@ -103,73 +74,85 @@ module Ctx : sig
         context's [default] parameter. *)
 end
 
-(** {2 Hindley-Milner} *)
+(** {2 Hindley-Milner}
+
+This module, abstract in the exact kind of term it types, takes as input
+a signature and an {b untyped term}, and updates the typing context
+so that the {b untyped term} can be converted into a {b typed term}. *)
+
+type 'a closure = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
+  (** Function that returns a ['a] value if provided with a proper
+      type substitution and renaming *)
 
 module type S = sig
-  type term
+  type untyped (* untyped term *)
+  type typed   (* typed term *)
 
-  val infer : Ctx.t -> term -> scope -> Type.t
+  val infer : Ctx.t -> untyped -> scope -> Type.t * typed closure
     (** Infer the type of this term under the given signature. This updates
-        the context's typing environment! The resulting type
-        is to be used within the same scope as the last argument.
+        the context's typing environment! The resulting type's variables
+        belong to the given scope.
+
+        @param ctx the context
+        @param untyped the untyped term whose type must be inferred
+        @param scope where the term's type variables live
+
+        @return the inferred type of the untyped term (possibly a type var)
+          along with a closure to produce a typed term once every
+          constraint has been solved
         @raise TypeUnif.Error if the types are inconsistent *)
 
-  val infer_eval : ?renaming:Substs.Ty.Renaming.t ->
-                    Ctx.t -> term -> scope -> Type.t
-    (** Infer the type of the given term, and then evaluate the type
-        in the given renaming (desambiguate scopes). *)
+  (** {3 Constraining types}
+  
+  This section is mostly useful for inferring a signature without
+  converting untyped_terms into typed_terms. *)
 
-  (** {3 Constraining types} *)
-
-  val constrain_term_term : Ctx.t -> term -> scope -> term -> scope -> unit
+  val constrain_term_term : Ctx.t -> untyped -> scope -> untyped -> scope -> unit
     (** Force the two terms to have the same type in this context
         @raise TypeUnif.Error if an inconsistency is detected *)
 
-  val constrain_term_type : Ctx.t -> term -> scope -> Type.t -> scope -> unit
-    (** Force the term to have the given type in the given scope.
+  val constrain_term_type : Ctx.t -> untyped -> scope -> Type.t -> scope -> unit
+    (** Force the term's type and the given type to be the same.
         @raise TypeUnif.Error if an inconsistency is detected *)
-
-  (** {3 Checking compatibility} *)
-
-  val check_term_type : Ctx.t -> term -> scope -> Type.t -> scope -> bool
-    (** Check whether this term can be used with this type. *)
-
-  val check_term_term : Ctx.t -> term -> scope -> term -> scope -> bool
-    (** Can we unify the terms' types? *)
-
-  val check_term_term_sig : Signature.t -> term -> scope -> term -> scope -> bool
-
-  val check_term_type_sig : Signature.t -> term -> scope -> Type.t -> scope -> bool
-
-  (** {3 Handy shortcuts for type inference}
-  This module provides an easy way to specify constraints. Every term and
-  type is assumed to live in the scope 0. *)
-
-  module Quick : sig
-    (* type constraints *)
-    type constr =
-      | WellTyped of term
-      | SameType of term * term
-      | HasType of term * Type.t
-
-    val constrain : ?ctx:Ctx.t -> constr list -> Ctx.t
-    
-    val constrain_seq : ?ctx:Ctx.t -> constr Sequence.t -> Ctx.t
-
-    val signature : ?signature:Signature.t -> constr list -> Signature.t
-
-    val signature_seq : ?signature:Signature.t -> constr Sequence.t -> Signature.t
-  end
 end
 
 module FO : sig
-  include S with type term = FOTerm.t
+  include S with type untyped = Untyped.FO.t and type typed = FOTerm.t
 
-  val constrain_form : Ctx.t -> FOFormula.t -> scope -> unit
+  val infer_form : Ctx.t -> Untyped.Form.t -> scope -> FOFormula.t closure
+    (** Inferring the type of a formula is trivial, it's always {!Type.o}.
+        However, here we can still return a closure that produces a
+        type formula *)
+
+  val constrain_form : Ctx.t -> Untyped.Form.t -> unit
     (** Assert that the formula should be well-typed. *)
 
-  val signature_forms : ?signature:Signature.t -> FOFormula.t Sequence.t -> Signature.t
+  val signature_forms : Signature.t -> Untyped.Form.t Sequence.t -> Signature.t
     (** Infer signature for this sequence of formulas *)
+
+  val convert : ctx:Ctx.t -> Untyped.Form.t -> FOFormula.t
+    (** Convert a formula into a typed formula *)
+
+  val convert_clause : ctx:Ctx.t -> Untyped.Form.t list -> FOFormula.t list
+    (** Convert a "clause". Type variables are bound in the same scope *)
+
+  val convert_seq : ctx:Ctx.t -> Untyped.Form.t Sequence.t -> FOFormula.t list
+    (** Given the signature for those formulas, infer their type and
+        convert untyped formulas into typed formulas. Also updates
+        the context. *)
 end
 
-module HO : S with type term = HOTerm.t
+module HO : sig
+  include S with type untyped = Untyped.HO.t and type typed= HOTerm.t
+
+  val constrain : ctx:Ctx.t -> Untyped.HO.t -> unit
+    (** Constrain the term to be well-typed and of boolean type *)
+
+  val convert : ctx:Ctx.t -> Untyped.HO.t -> HOTerm.t
+    (** Convert a single untyped term to a typed term *)
+
+  val convert_seq : ctx:Ctx.t -> Untyped.HO.t Sequence.t -> HOTerm.t list
+    (** Infer the types of those terms and annotate each term and subterm with
+        its type. Also updates the context's signature.
+        All terms must be boolean. *)
+end

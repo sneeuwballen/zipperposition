@@ -85,8 +85,12 @@ val size : t -> int
 
 (** {3 IO} *)
 
-val of_decls : Ast_tptp.declaration Sequence.t -> t option
-  (** Try to extract a proof from a list of TSTP statements *)
+val of_decls : ?base:Signature.t ->
+                Ast_tptp.declaration Sequence.t -> t option
+  (** Try to extract a proof from a list of TSTP statements.
+      Since it has to check types, it may fail.
+      @param base a base signature that can be provided for type inference.
+      @raise TypeUnif.Error if a type error occurs. *)
 
 val parse : ?recursive:bool -> string -> t option
   (** Try to parse a proof from a file. May rise the same IO errors

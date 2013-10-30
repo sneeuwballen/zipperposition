@@ -61,6 +61,12 @@ val compare : t -> t -> int
 val hash : t -> int
 val hash_novar : t -> int
 
+(** {b Caution}: constructors can raise Failure if the types are not
+    as expected.
+    {!mk_atom} expects a term of type {!Type.o}
+    {!mk_eq} and {!mk_neq} expect two terms of the exact same type
+*)
+
 val mk_true : t
 val mk_false : t
 val mk_atom : term -> t
@@ -189,7 +195,7 @@ val of_term : HOTerm.t -> t
 
 (** {2 IO} *)
 
-val pp_debug : Buffer.t -> t -> unit
+val pp_debug : ?hooks:FOTerm.print_hook list -> Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
 val pp_arith : Buffer.t -> t -> unit
 
@@ -201,6 +207,8 @@ val to_string_debug : t -> string
 val to_string_tstp : t -> string
 
 val bij : t Bij.t
+
+(* TODO: ensure the signature is the same for many formulas (T.arbitrary_pred...) *)
 
 val arbitrary_atom : t QCheck.Arbitrary.t
 val arbitrary_clause : t list QCheck.Arbitrary.t

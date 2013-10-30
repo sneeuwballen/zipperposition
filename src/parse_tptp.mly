@@ -26,37 +26,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Parser} *)
 
 %{
-  module T = FOTerm
-  module F = FOFormula
+  module T = Untyped.FO
+  module F = Untyped.Form
+  module Ty = Type.Parsed
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
     String.sub s 1 (String.length s - 2)
-
-  let __table = Hashtbl.create 5
-  let __ty_table = Hashtbl.create 5
-
-  (* TODO: check same type, otherwise make new var *)
-  (** Get variable associated with this name *)
-  let get_var ~ty name =
-    try Hashtbl.find __table name
-    with Not_found ->
-      let v = T.mk_var ~ty (Hashtbl.length __table) in
-      Hashtbl.add __table name v;
-      v
-
-  let get_ty_var name =
-    try Hashtbl.find __ty_table name
-    with Not_found ->
-      let v = Type.var (Hashtbl.length __ty_table) in
-      Hashtbl.add __ty_table name v;
-      v
-
-  (** Clear everything in the current context *)
-  let clear_ctx () =
-    Hashtbl.clear __table;
-    Hashtbl.clear __ty_table;
-    ()
 %}
 
 %token EOI
@@ -121,21 +97,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %nonassoc NOTVLINE
 %nonassoc NOTAND
 
-%start <FOTerm.t> parse_term
-%start <FOFormula.t> parse_formula
+%start <Untyped.FO.t> parse_term
+%start <Untyped.Form.t> parse_formula
 %start <Ast_tptp.declaration> parse_declaration
 %start <Ast_tptp.declaration list> parse_declarations
-%start <FOTerm.t list list> parse_answer_tuple
+%start <Untyped.FO.t list list> parse_answer_tuple
 
 %%
 
 /* top-level */
 
-parse_term: t=term EOI { clear_ctx (); t }
-parse_formula: f=fof_formula EOI { clear_ctx (); f }
-parse_declaration: d=declaration EOI { clear_ctx (); d }
-parse_declarations: l=declarations EOI { clear_ctx (); l }
-parse_answer_tuple: t=answer_tuples EOI { clear_ctx (); t }
+parse_term: t=term EOI { t }
+parse_formula: f=fof_formula EOI { f }
+parse_declaration: d=declaration EOI { d }
+parse_declarations: l=declarations EOI { l }
+parse_answer_tuple: t=answer_tuples EOI { t }
 
 /* TPTP grammar */
 
@@ -143,18 +119,13 @@ declarations:
   | l=declaration* { l }
 
 declaration:
-  | d=declaration_reset
-    { clear_ctx ();  (* cleanup variable table *)
-      d }
-
-declaration_reset:
   | FOF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
     { Ast_tptp.FOF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
     { Ast_tptp.TFF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
-      if Type.eq ty Type.tType
+      if Ty.eq ty Ty.tType
         then Ast_tptp.NewType (name, Symbol.to_string_tstp s)
         else Ast_tptp.TypeDecl (name, s, ty)
     }
@@ -229,12 +200,12 @@ fof_unary_formula:
   | LEFT_IMPLY { fun l r -> F.mk_imply r l }
   | XOR { F.mk_xor }
   | NOTVLINE { fun x y -> F.mk_not (F.mk_or [x; y]) }
-  | NOTAND { fun x y -> F.mk_not (F.mk_and [x;x]) }
+  | NOTAND { fun x y -> F.mk_not (F.mk_and [x; y]) }
   | AND { fun x y -> F.mk_and [x;y] }
   | VLINE { fun x y -> F.mk_or [x;y] }
 %inline fol_quantifier:
-  | FORALL { F.mk_forall_list }
-  | EXISTS { F.mk_exists_list }
+  | FORALL { F.forall }
+  | EXISTS { F.exists }
 %inline unary_connective:
   | NOT { F.mk_not }
 
@@ -242,7 +213,7 @@ atomic_formula:
   | TRUE { F.mk_true } 
   | FALSE { F.mk_false }
   | l=term o=infix_connective r=term { o l r }
-  | function_term { F.mk_atom $1 }
+  | function_term { F.atom $1 }
 
 %inline infix_connective:
   | EQUAL { F.mk_eq }
@@ -262,8 +233,8 @@ function_term:
   | system_term { $1 }
 
 plain_term:
-  | s=constant { T.mk_const s }
-  | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
+  | s=constant { T.const s }
+  | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
 
 constant:
 | s=atomic_word { Symbol.mk_const s }
@@ -271,7 +242,7 @@ constant:
 functor_: f=atomic_word { Symbol.mk_const f }
 
 defined_term:
-  | defined_atom { T.mk_const $1 }
+  | defined_atom { T.const $1 }
   | defined_atomic_term { $1 }
 
 defined_atom:
@@ -285,15 +256,15 @@ defined_atomic_term:
   /* | defined_infix_term { $1 } */
 
 defined_plain_term:
-  | s=defined_constant { T.mk_const s }
-  | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
+  | s=defined_constant { T.const s }
+  | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
 
 defined_constant: defined_functor { $1 }
 defined_functor: s=atomic_defined_word { s }
 
 system_term:
-  | c=system_constant { T.mk_const c }
-  | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
+  | c=system_constant { T.const c }
+  | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
 
 system_constant: system_functor { $1 }
 system_functor: s=atomic_system_word { s }
@@ -307,16 +278,16 @@ tff_type:
 tff_term_type:
   | ty=tff_atom_type { ty }
   | l=tff_atom_type ARROW r=tff_atom_type
-    { Type.mk_fun r [l] }
+    { Ty.mk_fun r [l] }
   | LEFT_PAREN args=tff_ty_args RIGHT_PAREN ARROW r=tff_atom_type
-    { Type.mk_fun r args }
+    { Ty.mk_fun r args }
 
 tff_atom_type:
   | v=tff_ty_var { v }
-  | w=type_const { Type.const w }
+  | w=type_const { Ty.const w }
   | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_term_type) RIGHT_PAREN
-    { Type.app w l }
-  | TYPE_TY { Type.tType }
+    { Ty.app w l }
+  | TYPE_TY { Ty.tType }
   | LEFT_PAREN ty=tff_term_type RIGHT_PAREN { ty }
 
 tff_ty_args:
@@ -327,7 +298,7 @@ tff_ty_vars:
   | v=tff_ty_var COLUMN TYPE_TY {  [v] }
   | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
 
-tff_ty_var: w=UPPER_WORD { get_ty_var w }
+tff_ty_var: w=UPPER_WORD { Ty.var w }
 
 type_const:
   | w=LOWER_WORD { w }
@@ -339,8 +310,8 @@ variables:
   | l=separated_nonempty_list(COMMA, variable) { l }
 
 variable:
-  | x=UPPER_WORD { get_var ~ty:Type.i x }
-  | x=UPPER_WORD COLUMN ty=tff_type { get_var ~ty x }
+  | x=UPPER_WORD { T.var ~ty:Ty.i x }
+  | x=UPPER_WORD COLUMN ty=tff_type { T.var ~ty x }
 
 atomic_word:
   | s=SINGLE_QUOTED { remove_quotes s }

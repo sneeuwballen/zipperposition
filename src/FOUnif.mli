@@ -32,17 +32,6 @@ type term = FOTerm.t
 type subst = Substs.FO.t
 type scope = Substs.scope
 
-val types : ctx:TypeInference.Ctx.t -> ?subst:subst ->
-            term -> scope -> term -> scope ->
-            subst
-  (** Infer the types of those terms, and unify them. Returns the substitution
-      that may bind type variables.
-      @raise Fail if the types are not unifiable. *)
-
-val types_sig : ?subst:subst -> Signature.t ->
-                term -> scope -> term -> scope -> subst
-  (** Convenience wrapper for {!types} *)
-
 val unification : ?subst:subst -> term -> scope ->
                   term -> scope -> subst
   (** Unify terms, returns a subst or

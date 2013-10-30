@@ -110,7 +110,6 @@ val false_symbol : t
 val eq_symbol : t
 val exists_symbol : t
 val forall_symbol : t
-val lambda_symbol : t
 val not_symbol : t
 val imply_symbol : t
 val equiv_symbol : t
@@ -256,6 +255,7 @@ val set_default_pp : (Buffer.t -> t -> unit) -> unit (* change default printer *
 
 val bij : t Bij.t
 val arbitrary : t QCheck.Arbitrary.t
+val arbitrary_set : Set.t QCheck.Arbitrary.t
 
 (** {2 Generation of symbols} *)
 

@@ -42,6 +42,8 @@ val error_to_string : error -> string
 exception Error of error
   (** Raised when a unification error occurred *)
 
+(** {2 Unification} *)
+
 val unify : ?subst:Substs.Ty.t ->
             Type.t -> scope -> Type.t -> scope ->
             Substs.Ty.t
@@ -68,10 +70,38 @@ val unifier : Type.t -> Type.t -> Type.t
       a new type? Variables not bound during unification will be
       arbitrarily renamed. *)
 
+(** {2 Matching}
+Only variables of the pattern (first type) can be bound. *)
+
+val match_ : ?subst:Substs.Ty.t ->
+              Type.t -> scope -> Type.t -> scope ->
+              Substs.Ty.t
+  (** Match first type against the second
+      @raise Error in case the first is not a generalization of the second *)
+
+val match_fo : ?subst:Substs.FO.t -> 
+               Type.t -> scope -> Type.t -> scope ->
+               Substs.FO.t
+
+val match_ho : ?subst:Substs.HO.t -> 
+               Type.t -> scope -> Type.t -> scope ->
+               Substs.HO.t
+
+(** {2 Alpha-equivalence}
+Same structure, only the type variables' names change *)
+
 val variant : ?subst:Substs.Ty.t ->
               Type.t -> scope -> Type.t -> scope ->
               Substs.Ty.t
   (** Check for alpha renaming *)
+
+val variant_fo : ?subst:Substs.FO.t -> 
+                 Type.t -> scope -> Type.t -> scope ->
+                 Substs.FO.t
+
+val variant_ho : ?subst:Substs.HO.t -> 
+                 Type.t -> scope -> Type.t -> scope ->
+                 Substs.HO.t
 
 val are_variants : Type.t -> Type.t -> bool
   (** Shortcut for {!variant} in distinct scopes *)

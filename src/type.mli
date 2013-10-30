@@ -25,13 +25,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Types} *)
 
-(** Common representation of types, including higher-order
-    and polymorphic types. Types are hashconsed and all type variables
-    are assumed to be universally quantified in the outermost possible
-    scope (outside any other quantifier).
+(** {2 Main Type representation}
 
-    See {!TypeInference} for inferring types from terms and formulas,
-    and {!Signature} to associate types with symbols.
+Common representation of types, including higher-order
+and polymorphic types. Types are hashconsed and all type variables
+are assumed to be universally quantified in the outermost possible
+scope (outside any other quantifier).
+
+See {!TypeInference} for inferring types from terms and formulas,
+and {!Signature} to associate types with symbols.
 *)
 
 type t = private
@@ -56,7 +58,7 @@ module Set : Sequence.Set.S with type elt = ty
 
 val (<==) : t -> t list -> t
   (** General function type. [x <== l] is the same as [x] if [l]
-      is empty. *)
+      is empty. Invariant: the return type is never a function type. *)
 
 val (<=.) : t -> t -> t
   (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
@@ -74,7 +76,8 @@ val const : string -> t
   (** Constant sort *)
 
 val mk_fun : t -> t list -> t
-  (** Function type. The first argument is the return type *)
+  (** Function type. The first argument is the return type.
+      see {!(<==)}. *)
 
 (** {2 Basic types} *)
 
@@ -106,6 +109,12 @@ val uncurry : t -> t
 val size : t -> int
   (** Size of type, in number of "nodes" *)
 
+val apply_fun : t -> t list -> t
+  (** Given a function type, and a list of arguments, return the
+      type that results from applying the function to the arguments.
+      No unification is done, types must check exactly.
+      @raise Failure if the types do not match *)
+
 (** {2 IO} *)
 
 val pp : Buffer.t -> t -> unit
@@ -119,6 +128,54 @@ val bij : t Bij.t
 
 val arbitrary : t QCheck.Arbitrary.t         (* types *)
 val arbitrary_ground : t QCheck.Arbitrary.t  (* ground types *)
+
+(** {2 Parsed types}
+This module exports a very simple representation of types, typically
+obtained right after parsing. No hashconsing is performed,
+and variables are still strings.
+*)
+
+module Parsed : sig
+  type t = private
+    | Var of string
+    | App of string * t list
+    | Fun of t * t list
+
+  val eq : t -> t -> bool
+  val cmp : t -> t -> int
+  val hash : t -> int
+
+  val var : string -> t
+  val app : string -> t list -> t
+  val const : string -> t
+  val mk_fun : t -> t list -> t
+  val (<==) : t -> t list -> t
+  val (<=.) : t -> t -> t
+
+  val i : t
+  val o : t
+  val int : t
+  val rat : t
+  val real : t
+  val tType : t
+
+  val pp : Buffer.t -> t -> unit
+  val pp_tstp : Buffer.t -> t -> unit
+  val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
+end
+
+type ctx = (string, t) Hashtbl.t
+
+val create_ctx : unit -> ctx
+
+val of_parsed : ?ctx:ctx -> Parsed.t -> t
+  (** Conversion from a {!Parsed.t} term representation.
+      An optional {!ctx} can be used to map named variables
+      to {!Var}s. *)
+
+val to_parsed : t -> Parsed.t
+  (** Convert back to "parsed" raw type *)
 
 (** {2 Misc} *)
 

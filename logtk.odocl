@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 250028abab46ea44267f4ca908eca8ff)
+# DO NOT EDIT (digest: ececf51e8036abcf35867fce197dc9db)
 src/HO
 src/FO
 src/Symbol
@@ -41,6 +41,7 @@ src/CallProver
 src/Congruence
 src/TypeUnif
 src/Options
+src/Untyped
 src/lib/Sequence
 src/lib/Bij
 src/lib/Cache

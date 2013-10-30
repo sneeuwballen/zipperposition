@@ -41,8 +41,8 @@ let is_definition f =
     | T.Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       List.for_all T.is_var ts &&
-      let l' = T.mk_node f (__mk_vars ts) in
-      (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
+      let l' = T.mk_node ~ty:l.T.ty f (__mk_vars ts) in
+      FOUnif.are_variant l l'
       && not (T.contains_symbol f r)
       && List.for_all (fun x -> T.var_occurs x l) (T.vars r)
   in
@@ -60,7 +60,7 @@ let is_pred_definition f =
     | T.Node (f, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       List.for_all T.is_var ts &&
-      let l' = T.mk_node f (__mk_vars ts) in
+      let l' = T.mk_node ~ty:l.T.ty f (__mk_vars ts) in
       (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
       && not (F.contains_symbol f r)
       && List.for_all (fun x -> T.var_occurs x l) (F.free_variables r)

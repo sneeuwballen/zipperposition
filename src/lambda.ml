@@ -50,21 +50,27 @@ let beta_reduce ?(depth=0) t =
     end
   | T.Const _
   | T.BoundVar _ -> t
-  | T.Bind (s, t') ->
-    let ty = T.get_type t in
-    T.mk_bind ~ty s (beta_reduce ~depth:(depth+1) (None::env) t')
-  | T.At ({T.term=T.Bind (s, t1)}, t2) when Symbol.eq s Symbol.lambda_symbol ->
-    (* a beta-redex! Fire!! First evaluate t2, then
-       remplace db0 by [t2] in [t1] *)
+  | T.Lambda t' ->
+    let varty = T.lambda_var_ty t in
+    let t'' = beta_reduce ~depth:(depth+1) (None::env) t' in
+    T.mk_lambda ~varty t''
+  | T.At ({T.term=T.Lambda t1}, t2::l) ->
+    (* a beta-redex! Fire!! First evaluate t2, then remplace
+        db0 by [t2] in [t1] *)
     let t2' = beta_reduce ~depth env t2 in
     let env' = Some t2' :: env in
-    beta_reduce ~depth env' t1
-  | T.At (t1, t2) ->
-    let t1' = beta_reduce ~depth env t1 in
-    let t2' = beta_reduce ~depth env t2 in
-    if T.eq t1 t1' && T.eq t2 t2'
+    let t1' = beta_reduce ~depth env' t1 in
+    (* now reduce t1 @ l, if l not empty *)
+    begin match l with
+      | [] -> t1'
+      | _::_ -> beta_reduce ~depth env (T.mk_at t1 l)
+    end
+  | T.At (t, l) ->
+    let t' = beta_reduce ~depth env t in
+    let l' = List.map (beta_reduce ~depth env) l in
+    if T.eq t t' && List.for_all2 T.eq l l'
       then t
-      else beta_reduce ~depth env (T.mk_at t1' t2')  (* new redex? *)
+      else beta_reduce ~depth env (T.mk_at t' l')  (* new redex? *)
   in
   let t' = beta_reduce ~depth [] t in
   Util.exit_prof prof_beta_reduce;
@@ -73,29 +79,27 @@ let beta_reduce ?(depth=0) t =
 let rec eta_reduce t =
   match t.T.term with
   | T.Var _ | T.BoundVar _ | T.Const _ -> t
-  | T.Bind (s, {T.term=T.At (t', {T.term=T.BoundVar 0})})
-    when Symbol.eq s Symbol.lambda_symbol && not (T.db_contains t' 0) ->
+  | T.Lambda {T.term=T.At (t', [{T.term=T.BoundVar 0}])} when not (T.db_contains t' 0) ->
     eta_reduce (T.db_unlift t')  (* remove the lambda and variable *)
-  | T.Bind (s, t') ->
-    let ty = T.get_type t in
-    T.mk_bind ~ty s (eta_reduce t')
-  | T.At (t1, t2) -> T.mk_at (eta_reduce t1) (eta_reduce t2)
+  | T.Lambda t' ->
+    let varty = T.lambda_var_ty t in
+    T.mk_lambda ~varty (eta_reduce t')
+  | T.At (t, l) ->
+    T.mk_at (eta_reduce t) (List.map eta_reduce l)
 
-let lambda_abstract ~signature t sub_t =
+let lambda_abstract t sub_t =
   Util.enter_prof prof_lambda_abstract;
-  (* infer type of [sub_t] *)
-  let ctx = TypeInference.Ctx.of_signature signature in
-  let ty = TypeInference.HO.infer_eval ctx sub_t 0 in
   (* abstract the term *)
   let t' = T.db_from_term t sub_t in
-  let t' = T.mk_lambda ~ty t' in
+  let varty = sub_t.T.ty in
+  let t' = T.mk_lambda ~varty t' in
   Util.exit_prof prof_lambda_abstract;
   t'
 
-let lambda_abstract_list ~signature t args =
-  List.fold_left (lambda_abstract ~signature) t args
+let lambda_abstract_list t args =
+  List.fold_left lambda_abstract t args
 
 let lambda_apply_list t args =
-  let t' = T.mk_at_list t args in
+  let t' = T.mk_at t args in
   let t' = beta_reduce t' in
   t'

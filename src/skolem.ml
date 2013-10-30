@@ -66,34 +66,6 @@ let fresh_var ~ctx =
 
 exception FoundVariant of T.t * T.t * S.t
 
-let skolem_term ~ctx ~ty t =
-  let vars = T.vars_prefix_order t in
-  (* find the skolemized normalized term *)
-  try
-    List.iter
-      (fun (t', new_t') ->
-        try
-          let subst = FOUnif.variant t' 1 t 0  in
-          raise (FoundVariant (t', new_t', subst))
-        with FOUnif.Fail ->
-          ())
-      ctx.sc_cache;
-    (* not found, use a fresh symbol *)
-    let symb = fresh_sym ~ctx in
-    (* replace the existential variable by [skolem_term] in [t] *)
-    let skolem_term = T.mk_node symb vars in
-    let new_t = T.db_unlift (T.db_replace t skolem_term) in
-    (* update cache with new symbol *)
-    ctx.sc_cache <- (t, new_t) :: ctx.sc_cache;
-    (* update signature *)
-    ctx.sc_signature <- Signature.declare ctx.sc_signature symb ty;
-    Util.debug 5 "new skolem symbol %a with type %a" Symbol.pp symb Type.pp ty;
-    new_t
-  with FoundVariant (t',new_t',subst) ->
-    let renaming = S.Renaming.create 5 in
-    let new_t = S.apply ~renaming subst new_t' 1 in
-    new_t
-
 exception FoundFormVariant of F.t * F.t * S.t
 
 let skolem_form ~ctx ~ty f =
@@ -109,7 +81,7 @@ let skolem_form ~ctx ~ty f =
       ctx.sc_fcache;
     (* fresh symbol *)
     let symb = fresh_sym ~ctx in
-    let skolem_term = T.mk_node symb vars in
+    let skolem_term = T.mk_node ~ty symb vars in
     (* replace variable by skolem t*)
     let new_f = F.db_unlift (F.db_replace f skolem_term) in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;

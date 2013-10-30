@@ -23,15 +23,19 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 First-order terms} *)
+(** {1 First-order terms}
+Terms are all annotated with their type. Hashconsing is always performed,
+and takes the type into account (two terms are only equal if
+they have the same type).
+*)
 
 (** term *)
 type t = private {
-  term : term_cell;             (** the term itself *)
-  type_ : Type.t option;        (** optional type *)
-  mutable tsize : int;          (** size (number of subterms) *)
-  mutable flags : int;          (** boolean flags about the term *)
-  mutable tag : int;            (** hashconsing tag *)
+  term : term_cell;       (** the term itself *)
+  ty : Type.t;            (** type of the term *)
+  mutable tsize : int;    (** size (number of subterms) *)
+  mutable flags : int;    (** boolean flags about the term *)
+  mutable tag : int;      (** hashconsing tag *)
 }
 (** content of the term *)
 and term_cell = private
@@ -51,12 +55,10 @@ type varlist = t list
 val subterm : sub:t -> t -> bool    (** checks whether [sub] is a (non-strict) subterm of [t] *)
 val eq : t -> t -> bool             (** standard equality on terms *)
 val compare : t -> t -> int         (** a simple order on terms *)
-val hash : t -> int
+val hash : t -> int                 (** Fast hash on hashconsed terms *)
 val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
-val get_type : t -> Type.t
-  (** Obtain the type of a {!Var}.
-      @raise Failure if the term is not a variable. *)
+val get_type : t -> Type.t          (** Obtain the type of a term.. *)
 
 module Tbl : sig
   include Hashtbl.S with type key = t
@@ -80,7 +82,8 @@ module H : Hashcons.S with type elt = t
 
 (** {2 Boolean flags} *)
 
-val flag_ground : int
+val flag_ground : int       (** No variables *)
+val flag_monomorphic : int  (** No type variable in term nor subterms *)
 
 val set_flag : int -> t -> bool -> unit
   (** set or reset the given flag of the term to bool *)
@@ -89,19 +92,20 @@ val get_flag : int -> t -> bool
   (** read the flag *)
 
 val new_flag : unit -> int
-  (** New flag, different from all other flags *)
+  (** New flag, different from all other term flags *)
 
 (** {2 Smart constructors} *)
 
 val mk_var : ty:Type.t -> int -> t  (** Create a variable. Providing a type is mandatory. *)
-val mk_bound_var : int -> t  (** Create a De Bruijn index. *)
-val mk_node : Symbol.t -> t list -> t       (** Application *)
-val mk_const : Symbol.t -> t              (** Shortcut for constants *)
+val mk_bound_var : ty:Type.t -> int -> t  (** Create a De Bruijn index. *)
+val mk_node : ty:Type.t -> Symbol.t -> t list -> t    (** Application *)
+val mk_const : ty:Type.t -> Symbol.t -> t       (** Shortcut for constants *)
 
 val true_term : t                        (** tautology symbol *)
 val false_term : t                       (** antilogy symbol *)
 
-val cast : t -> Type.t -> t     (** Change the type. Only works on variables. *)
+val cast : t -> Type.t -> t
+  (** Change the type. *)
 
 (** {2 Subterms and positions} *)
 
@@ -114,20 +118,22 @@ val at_pos : t -> Position.t -> t
   (** retrieve subterm at pos, or raise Invalid_argument*)
 
 val replace_pos : t -> Position.t -> t -> t
-  (** replace t|_p by the second term *)
+  (** replace t|_p by the second term. They should have the same type. *)
 
 val replace : t -> old:t -> by:t -> t
   (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
       in [t] by the term [by]. *)
 
 val at_cpos : t -> int -> t
-  (** retrieve subterm at the compact pos, or raise Invalid_argument*)
+  (** retrieve subterm at the compact pos.
+      @raise Invalid_argument if the position is not valid within the term *)
 
 val max_cpos : t -> int
   (** maximum compact position in the term *)
 
 val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)
 val is_ground : t -> bool                (** is the term ground? (no free vars) *)
+val monomorphic : t -> bool              (** true if the term contains no type var *)
 val max_var : varlist -> int             (** find the maximum variable index, or 0 *)
 val min_var : varlist -> int             (** minimum variable, or 0 if ground *)
 val add_vars : unit Tbl.t -> t -> unit   (** add variables of the term to the set *)
@@ -136,7 +142,7 @@ val vars_list : t list -> varlist        (** variables of terms in the list *)
 val vars_seq : t Sequence.t -> varlist   (** variables of terms in the sequence *)
 val vars_prefix_order : t -> varlist     (** variables of the term in prefix traversal order *)
 val depth : t -> int                     (** depth of the term *)
-val head : t -> Symbol.t                  (** head symbol (or Invalid_argument) *)
+val head : t -> Symbol.t                 (** head symbol (or Invalid_argument) *)
 val size : t -> int
 
 (** {2 De Bruijn Indexes manipulations} *)
@@ -168,7 +174,7 @@ val db_from_var : ?depth:int -> t -> t -> t
 (** {2 High-level operations} *)
 
 val symbols : t Sequence.t -> Symbol.Set.t   (** Symbols of the terms (keys of signature) *)
-val contains_symbol : Symbol.t -> t -> bool   (** Does the term contain the symbol *)
+val contains_symbol : Symbol.t -> t -> bool  (** Does the term contain the symbol *)
 
 (** {2 Fold} *)
 
@@ -203,27 +209,47 @@ val ac_symbols : is_ac:(Symbol.t -> bool) -> t Sequence.t -> Symbol.Set.t
 
 (** {2 Printing/parsing} *)
 
-val pp_depth : int -> Buffer.t -> t -> unit
+type print_hook = (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+  (** User-provided hook that can be used to print terms (the {!Node} case)
+      before the default printing occurs.
+      A hook takes as first argument the recursive printing function
+      that it can use to print subterms.
+      A hook should return [true] if it fired, [false] to fall back
+      on the default printing. *)
+
+val pp_depth : ?hooks:print_hook list -> int -> Buffer.t -> t -> unit
 val pp_tstp_depth : int -> Buffer.t -> t -> unit
-val pp_arith_depth : int -> Buffer.t -> t -> unit
 
 val pp_debug : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
-val pp_arith : Buffer.t -> t -> unit  (* pretty arith expressions; same as debug otherwise *)
+
+val arith_hook : print_hook           (* hook to print arithmetic expressions *)
+val pp_arith : Buffer.t -> t -> unit  (* use arith_hook with pp_debug *)
 
 val pp : Buffer.t -> t -> unit
 val set_default_pp : (Buffer.t -> t -> unit) -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
-val print_var_types : bool ref  (* in debug, print types of all vars, except $i *)
+val print_var_types : bool ref
+  (** If true, {!pp_debug} will print types of all vars, except those of type $i *)
+
+val print_all_types : bool ref
+  (** If true, {!pp_debug} will print the types of all annotated terms *)
 
 val bij : t Bij.t
 
-val arbitrary : t QCheck.Arbitrary.t        (* generates terms *)
-val arbitrary_ty : Type.t -> t QCheck.Arbitrary.t (* terms of the given type *)
-val arbitrary_pred : t QCheck.Arbitrary.t   (* generates predicates *)
-val arbitrary_ground : t QCheck.Arbitrary.t (* ground terms *)
+(* TODO: need backtracking generators because some types may not
+    be generable (e.g. if no function returns it) *)
+
+val arbitrary : t QCheck.Arbitrary.t
+  (** Generates random terms within the given signature *)
+
+val arbitrary_ground : t QCheck.Arbitrary.t
+  (** Generates ground terms *)
+
+val arbitrary_pred : t QCheck.Arbitrary.t
+  (** Generates predicates (type "o") *)
 
 val arbitrary_pos : t -> Position.t QCheck.Arbitrary.t
   (** Arbitrary position in the term *)

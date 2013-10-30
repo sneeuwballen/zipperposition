@@ -180,7 +180,6 @@ let eq_symbol = mk_const ~attrs:(attr_infix lor attr_multiset lor
                                   attr_commut) "="
 let exists_symbol = mk_const ~attrs:attr_binder "?"
 let forall_symbol = mk_const ~attrs:attr_binder "!"
-let lambda_symbol = mk_const ~attrs:attr_binder "^"
 let not_symbol = mk_const "~"
 let imply_symbol = mk_const ~attrs:attr_infix "=>"
 let equiv_symbol = mk_const ~attrs:(attr_infix lor attr_commut) "<=>"
@@ -194,7 +193,6 @@ let connectives =
   ; equiv_symbol
   ; exists_symbol
   ; forall_symbol
-  ; lambda_symbol
   ; not_symbol
   ; imply_symbol
   ; and_symbol
@@ -216,7 +214,6 @@ let pp_debug buf s = Buffer.add_string buf (to_string_debug s)
 let to_string_tstp s = match s with
   | _ when eq s not_symbol -> "~"
   | _ when eq s eq_symbol -> "="
-  | _ when eq s lambda_symbol -> "^"
   | _ when eq s exists_symbol -> "?"
   | _ when eq s forall_symbol -> "!"
   | _ when eq s and_symbol -> "&"
@@ -250,7 +247,12 @@ let bij =
       | c -> raise (Bij.DecodingError "expected symbol"))
 
 let arbitrary =
-  QCheck.Arbitrary.(map (among ["f"; "g"; "h"; "a"; "b"; "c"]) mk_const)
+  QCheck.Arbitrary.(map (among ["f"; "g"; "h"; "a"; "b"; "c"; "d"]) mk_const)
+
+let arbitrary_set =
+  QCheck.Arbitrary.(
+    list arbitrary >>= fun l ->
+    return (Set.of_seq (Sequence.of_list l)))
 
 (** {2 Arith} *)
 

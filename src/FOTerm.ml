@@ -32,11 +32,11 @@ let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 
 (** term *)
 type t = {
-  term : term_cell;             (** the term itself *)
-  type_ : Type.t option;        (** optional type *)
-  mutable tsize : int;          (** size (number of subterms) *)
-  mutable flags : int;          (** boolean flags about the term *)
-  mutable tag : int;            (** hashconsing tag *)
+  term : term_cell;       (** the term itself *)
+  ty : Type.t;            (** type of the term *)
+  mutable tsize : int;    (** size (number of subterms) *)
+  mutable flags : int;    (** boolean flags about the term *)
+  mutable tag : int;      (** hashconsing tag *)
 }
 (** content of the term *)
 and term_cell =
@@ -51,26 +51,37 @@ type term = t
 (** list of variables *)
 type varlist = t list
 
-let hash_term t = match t.term, t.type_ with
-  | Var i, Some ty -> Hash.hash_int2 (Hash.hash_int i) (Type.hash ty)
-  | Var _ , None -> assert false
-  | BoundVar i, _ -> Hash.hash_int2 22 (Hash.hash_int i)
-  | Node (s, l), _ -> Hash.hash_list (fun x -> x.tag) (Symbol.hash s) l
+let hash_term t =
+  let h_type = Type.hash t.ty in
+  let h_term = match t.term with
+  | Var i -> Hash.hash_int i
+  | BoundVar i -> Hash.hash_int2 22 (Hash.hash_int i)
+  | Node (s, []) -> Symbol.hash s
+  | Node (s, l) -> Hash.hash_list (fun x -> x.tag) (Symbol.hash s) l
+  in
+  Hash.combine h_type h_term
 
-let rec hash_novar t = match t.term with
+let rec hash_novar t =
+  let h_type = Type.hash t.ty in
+  let h_term = match t.term with
   | Var _ -> 42
   | BoundVar _ -> 43
   | Node (s, l) ->
     let h = Symbol.hash s in
     Hash.hash_list hash_novar h l
+  in
+  Hash.combine h_type h_term
 
 (** {2 Comparison, equality, containers} *)
 
-let rec subterm ~sub b =
-  sub == b ||
-  match b.term with
-  | Var _ | BoundVar _ -> false
-  | Node (_, subterms) -> List.exists (subterm ~sub) subterms
+let subterm ~sub t =
+  let rec check t =
+    sub == t ||
+    match t.term with
+    | Var _ | BoundVar _ | Node (_, []) -> false
+    | Node (_, subterms) -> List.exists check subterms
+  in
+  check t
 
 let eq x y = x == y  (* because of hashconsing *)
 
@@ -78,11 +89,7 @@ let compare x y = x.tag - y.tag
 
 let hash x = x.tag
 
-let get_type t = match t.term, t.type_ with
-  | Var _, Some ty -> ty
-  | Var _, None -> assert false
-  | BoundVar _, _ -> failwith "FOTerm.BoundVar has no type"
-  | Node _, _ -> failwith "FOTerm.Node has no type"
+let get_type t = t.ty
 
 module TermHASH = struct
   type t = term
@@ -136,15 +143,12 @@ let hashcons_equal x y =
     | a::a1, b::b1 -> a == b && eq_subterms a1 b1
     | _, _ -> false
   in
-  let eq_types x y = match x.type_, y.type_ with
-    | None, None -> true
-    | Some ty_x, Some ty_y when Type.eq ty_x ty_y -> true
-    | _ -> false
-  in
+  (* compare types *)
+  Type.eq x.ty y.ty &&
   (* compare types and subterms, if same structure *)
   match x.term, y.term with
   | Var i, Var j
-  | BoundVar i, BoundVar j -> i = j && eq_types x y
+  | BoundVar i, BoundVar j -> i = j
   | Node (sa, []), Node (sb, []) -> Symbol.eq sa sb
   | Node (_, []), Node (_, _::_)
   | Node (_, _::_), Node (_, []) -> false
@@ -169,6 +173,7 @@ let __gen = Util.Flag.create ()
 let new_flag () = Util.Flag.get_new __gen
 
 let flag_ground = new_flag ()
+let flag_monomorphic = new_flag ()
 
 let set_flag flag t truth =
   if truth
@@ -180,22 +185,24 @@ let get_flag flag t = (t.flags land flag) != 0
 (** {2 Typing} *)
 
 let cast t ty =
-  H.hashcons { t with type_ = Some ty; tag = ~-1; }
+  H.hashcons { t with ty = ty; tag = ~-1; }
 
 (** {2 Smart constructors} *)
 
 (** In this section, term smart constructors are defined. They perform
-    hashconsing, and precompute some properties (flags) *)
+    hashconsing, and precompute some properties (flags).
+    
+    TODO: flag_monomorphic *)
 
 let mk_var ~ty idx =
   assert (idx >= 0);
-  let my_v = {term = Var idx; type_= Some ty; tsize = 1;
+  let my_v = {term = Var idx; ty; tsize = 1;
               flags= 0; tag= -1} in
   H.hashcons my_v
 
-let mk_bound_var idx =
+let mk_bound_var ~ty idx =
   assert (idx >= 0);
-  let my_v = {term = BoundVar idx; type_=None; tsize = 1;
+  let my_v = {term = BoundVar idx; ty; tsize = 1;
               flags=0; tag= -1} in
   H.hashcons my_v
 
@@ -207,15 +214,15 @@ let rec compute_tsize l = match l with
   | [] -> 1  (* with the initial symbol! *)
   | x::l' -> x.tsize + compute_tsize l'
 
-let mk_node s l =
+let mk_node ~ty s l =
   Util.enter_prof prof_mk_node;
   let t = match l with
   | [] ->
-    let my_t = {term=Node (s, l); type_ = None; flags=flag_ground;
+    let my_t = {term=Node (s, l); ty; flags=flag_ground;
                tsize=1; tag= -1} in
     H.hashcons my_t
   | _::_ ->
-    let my_t = {term=Node (s, l); type_ = None; flags=0;
+    let my_t = {term=Node (s, l); ty; flags=0;
                tsize=0; tag= -1} in
     let t = H.hashcons my_t in
     if t == my_t
@@ -229,10 +236,10 @@ let mk_node s l =
   Util.exit_prof prof_mk_node;
   t
 
-let mk_const s = mk_node s []
+let mk_const ~ty s = mk_node ~ty s []
 
-let true_term = mk_const Symbol.true_symbol
-let false_term = mk_const Symbol.false_symbol
+let true_term = mk_const ~ty:Type.o Symbol.true_symbol
+let false_term = mk_const ~ty:Type.o Symbol.false_symbol
 
 (** {2 Subterms and positions} *)
 
@@ -264,7 +271,7 @@ let rec replace_pos t pos new_t = match t.term, pos with
   | (Var _ | BoundVar _), _::_ -> invalid_arg "wrong position in term"
   | Node (s, l), i::subpos when i < List.length l ->
     let new_subterm = replace_pos (Util.list_get l i) subpos new_t in
-    mk_node s (Util.list_set l i new_subterm)
+    mk_node ~ty:t.ty s (Util.list_set l i new_subterm)
   | _ -> invalid_arg "index too high for subterm"
 
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
@@ -274,7 +281,7 @@ let rec replace t ~old ~by = match t.term with
   | Var _ | BoundVar _ -> t
   | Node (s, l) ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
-    mk_node s l'
+    mk_node ~ty:t.ty s l'
 
 (** Size of the term (number of subterms) *)
 let size t = t.tsize
@@ -296,6 +303,13 @@ let at_cpos t pos =
 let max_cpos t = size t - 1
 
 let is_ground t = get_flag flag_ground t
+
+(* TODO: use a flag to avoid computing it here? Or compute on demand? *)
+let rec monomorphic t =
+  Type.is_ground t.ty &&
+  match t.term with
+  | Var _ | BoundVar _ | Node (_, []) -> true
+  | Node (_, l) -> List.for_all monomorphic l
 
 let rec var_occurs x t = match t.term with
   | Var _ | BoundVar _ -> x == t
@@ -414,10 +428,10 @@ let db_lift ?(depth=0) n t =
     match t.term with
     | _ when is_ground t -> t  (* closed. *)
     | BoundVar i when i >= depth ->
-      mk_bound_var (i+n) (* lift by n, term not captured *)
+      mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
     | Node (_, []) | Var _ | BoundVar _ -> t
     | Node (s, l) ->
-      mk_node s (List.map (recurse depth) l)
+      mk_node ~ty:t.ty s (List.map (recurse depth) l)
   in
   assert (n >= 0);
   if depth=0 && n = 0 then t else recurse depth t
@@ -432,7 +446,8 @@ let db_replace ?(depth=0) ~into ~by =
       else t
   | Node (_, [])
   | Var _ -> t
-  | Node (f, l) -> mk_node f (List.map (replace depth s) l)
+  | Node (f, l) ->
+    mk_node ~ty:t.ty f (List.map (replace depth s) l)
   in
   replace depth by into
 
@@ -443,20 +458,22 @@ let db_unlift ?(depth=0) t =
   let rec recurse depth t =
     match t.term with
     | _ when is_ground t -> t
-    | BoundVar i -> if i >= depth then mk_bound_var (i-1) else t
+    | BoundVar i -> if i >= depth then mk_bound_var ~ty:t.ty (i-1) else t
     | Node (_, []) | Var _ -> t
-    | Node (s, l) -> mk_node s (List.map (recurse depth) l)
+    | Node (s, l) ->
+      mk_node ~ty:t.ty s (List.map (recurse depth) l)
   in recurse depth t
 
 (** Replace [t'] by a fresh De Bruijn index in [t]. *)
 let db_from_term ?(depth=0) t t' =
   (* recurse and replace [t']. *)
   let rec replace depth t = match t.term with
-  | _ when t == t' -> mk_bound_var depth
+  | _ when t == t' -> mk_bound_var ~ty:t.ty depth
   | Var _
   | Node (_, [])
   | BoundVar _ -> t
-  | Node (s, l) -> mk_node s (List.map (replace depth) l)
+  | Node (s, l) ->
+    mk_node ~ty:t.ty s (List.map (replace depth) l)
   in
   replace depth t
 
@@ -512,18 +529,18 @@ let ac_normal_form ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       let l = List.sort compare l in
       (match l with
         | x::l' -> List.fold_left
-          (fun subt x -> mk_node f [x;subt])
+          (fun subt x -> mk_node ~ty:t.ty f [x;subt])
           x l'
         | [] -> assert false)
     | Node (f, [a;b]) when is_com f ->
       let a = normalize a in
       let b = normalize b in
       if compare a b > 0
-        then mk_node f [b; a]
+        then mk_node ~ty:t.ty f [b; a]
         else t
     | Node (f, l) ->
       let l = List.map normalize l in
-      mk_node f l
+      mk_node ~ty:t.ty f l
   in
   let t' = normalize t in
   Util.exit_prof prof_ac_normal_form;
@@ -552,6 +569,9 @@ let ac_symbols ~is_ac seq =
 (** {2 Printing/parsing} *)
 
 let print_var_types = ref false
+let print_all_types = ref false
+
+type print_hook = (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
 
 let pp_tstp_depth depth buf t =
   let depth = ref depth in
@@ -572,9 +592,9 @@ let pp_tstp_depth depth buf t =
     let sep = Util.sprintf " %a " Symbol.pp s in
     Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
       (Util.pp_list ~sep pp_surrounded) body
-  | Node (s, []) -> Symbol.pp buf s
-  | Node (s, args) -> (* general case for nodes *)
-    Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
+  | Node (s, []) -> Symbol.pp_tstp buf s
+  | Node (s, args) ->
+    Printf.bprintf buf "%a(%a)" Symbol.pp_tstp s (Util.pp_list ~sep:", " pp_rec) args
   | Var i -> Printf.bprintf buf "X%d" i
   and pp_surrounded buf t = match t.term with
   | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
@@ -584,33 +604,45 @@ let pp_tstp_depth depth buf t =
   pp_rec buf t
 
 (* lightweight printing *)
-let rec pp_depth depth buf t =
+let rec pp_depth ?(hooks=[]) depth buf t =
   let depth = ref depth in
   (* recursive printing *)
-  let rec pp_rec buf t = match t.term with
-  | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-  | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
-    && Symbol.eq s' Symbol.equiv_symbol ->
-    Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
-  | Node (s, [{term=Node (s', [a; b])}])
-    when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
-    Printf.bprintf buf "%a ≠ %a" pp_surrounded a pp_surrounded b
-  | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
-    Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
-  | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
-    Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
-  | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
-    let sep = Util.sprintf " %a " Symbol.pp s in
-    Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
-      (Util.pp_list ~sep pp_surrounded) body
-  | Node (s, []) -> Symbol.pp buf s
-  | Node (s, args) ->
-    Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
-  | Var i ->
-    let ty = get_type t in
-    if !print_var_types && not (Type.eq ty Type.i)
-      then Printf.bprintf buf "X%d:%a" i Type.pp ty
-      else Printf.bprintf buf "X%d" i
+  let rec pp_rec buf t =
+    begin match t.term with
+    | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+    | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
+      && Symbol.eq s' Symbol.equiv_symbol ->
+      Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
+    | Node (s, [{term=Node (s', [a; b])}])
+      when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
+      Printf.bprintf buf "%a ≠ %a" pp_surrounded a pp_surrounded b
+    | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
+      Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
+    | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
+      Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
+    | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
+      let sep = Util.sprintf " %a " Symbol.pp s in
+      Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
+        (Util.pp_list ~sep pp_surrounded) body
+    | Node (s, args) ->
+      (* try to use some hook *)
+      if List.exists (fun hook -> hook pp_rec buf t) hooks
+      then ()
+      else begin
+        (* default case for nodes *)
+        match args with
+        | [] -> Symbol.pp buf s
+        | _::_ ->
+          Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
+        end
+    | Var i ->
+      if not !print_all_types && !print_var_types && not (Type.eq t.ty Type.i)
+        then Printf.bprintf buf "X%d:%a" i Type.pp t.ty
+        else Printf.bprintf buf "X%d" i
+    end;
+    (* print type of term *)
+    if !print_all_types
+      then Printf.bprintf buf ":%a" Type.pp t.ty
   and pp_surrounded buf t = match t.term with
   | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
@@ -618,70 +650,44 @@ let rec pp_depth depth buf t =
   in
   pp_rec buf t
 
-(* lightweight printing with arithmetic *)
-let rec pp_arith_depth depth buf t =
-  let depth = ref depth in
-  (* recursive printing *)
-  let rec pp_rec buf t = match t.term with
-  | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-  | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
-    && Symbol.eq s' Symbol.equiv_symbol ->
-    Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
-  | Node (s, [{term=Node (s', [a; b])}])
-    when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
-    Printf.bprintf buf "%a ≠ %a" pp_surrounded a pp_surrounded b
-  | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
-    Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
-  | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
-    Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.less ->
-    Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.lesseq ->
-    Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greater ->
-    Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greatereq ->
-    Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.sum ->
-    Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.difference ->
-    Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.product ->
-    Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.quotient ->
-    Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b
-  | Node (s, [a]) when Symbol.eq s Symbol.Arith.uminus ->
-    Printf.bprintf buf "-%a" pp_surrounded a
-  | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
-    let sep = Util.sprintf " %a " Symbol.pp s in
-    Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
-      (Util.pp_list ~sep pp_surrounded) body
-  | Node (s, []) -> Symbol.pp buf s
-  | Node (s, args) ->
-    Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
-  | Var i ->
-    let ty = get_type t in
-    if !print_var_types && not (Type.eq ty Type.i)
-      then Printf.bprintf buf "X%d:%a" i Type.pp ty
-      else Printf.bprintf buf "X%d" i
-  and pp_surrounded buf t = match t.term with
+(* hook that prints arithmetic expressions *)
+let arith_hook pp_rec buf t =
+  let pp_surrounded buf t = match t.term with
   | Node (s, [_;_]) when
     Symbol.eq s Symbol.Arith.sum ||
     Symbol.eq s Symbol.Arith.product ||
     Symbol.eq s Symbol.Arith.difference ||
     Symbol.eq s Symbol.Arith.quotient ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
-  | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
-    Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
   in
-  pp_rec buf t
+  match t.term with
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.less ->
+    Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.lesseq ->
+    Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greater ->
+    Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greatereq ->
+    Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.sum ->
+    Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.difference ->
+    Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.product ->
+    Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.quotient ->
+    Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, [a]) when Symbol.eq s Symbol.Arith.uminus ->
+    Printf.bprintf buf "-%a" pp_surrounded a; true;
+  | _ -> false  (* default *)
 
 let pp_debug buf t = pp_depth 0 buf t
 
 let pp_tstp buf t = pp_tstp_depth 0 buf t
 
-let pp_arith buf t = pp_arith_depth 0 buf t
+let pp_arith buf t =
+  pp_depth ~hooks:[arith_hook] 0 buf t
 
 let __default_pp = ref pp_debug
 
@@ -693,85 +699,112 @@ let to_string t = Util.sprintf "%a" pp t
 
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
-let rec debug fmt t = match t.term, t.type_ with
-  | Var i, None -> Format.fprintf fmt "X%d" i
-  | Var i, Some ty -> Format.fprintf fmt "X%d:%a" i Type.fmt ty
-  | BoundVar i, None -> Format.fprintf fmt "Y%d" i
-  | BoundVar i, Some ty -> Format.fprintf fmt "Y%d:%a" i Type.fmt ty
-  | Node (s, []), _ ->
+let rec debug fmt t =
+  begin match t.term with
+  | Var i -> Format.fprintf fmt "X%d" i
+  | BoundVar i -> Format.fprintf fmt "Y%d" i
+  | Node (s, []) ->
     Format.pp_print_string fmt (Symbol.to_string s)
-  | Node (s, l), _ ->
+  | Node (s, l) ->
     Format.fprintf fmt "(%s %a)" (Symbol.to_string s)
       (Sequence.pp_seq debug) (Sequence.of_list l)
+  end;
+  Format.fprintf fmt ":%a" Type.fmt t.ty
 
 let bij =
   let open Bij in
   fix
     (fun bij ->
-      let bij_node = lazy (pair Symbol.bij (list_ (Lazy.force bij))) in
+      let bij_node = lazy (triple Symbol.bij (list_ (Lazy.force bij)) Type.bij) in
       let bij_var = pair int_ Type.bij in
       switch
         ~inject:(fun t -> match t.term with
-        | BoundVar i -> "bv", BranchTo (int_, i)
-        | Var i -> "v", BranchTo (bij_var, (i, get_type t))
-        | Node (s, l) -> "n", BranchTo (Lazy.force bij_node, (s, l)))
+        | BoundVar i -> "bv", BranchTo (bij_var, (i,t.ty))
+        | Var i -> "v", BranchTo (bij_var, (i, t.ty))
+        | Node (s, l) -> "n", BranchTo (Lazy.force bij_node, (s, l, t.ty)))
         ~extract:(function
-        | "bv" -> BranchFrom (int_, fun i -> mk_bound_var i)
+        | "bv" -> BranchFrom (bij_var, fun (i,ty) -> mk_bound_var ~ty i)
         | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
-        | "n" -> BranchFrom (Lazy.force bij_node, fun (s,l) -> mk_node s l)
+        | "n" -> BranchFrom (Lazy.force bij_node, fun (s,l,ty) -> mk_node ~ty s l)
         | _ -> raise (DecodingError "expected Term")))
 
-let arbitrary_ty ty =
-  let a = mk_const (Symbol.mk_const "a") in
-  let b = mk_const (Symbol.mk_const "b") in
-  let c = mk_const (Symbol.mk_const "c") in
-  let d = mk_const (Symbol.mk_const "d") in
-  let e = mk_const (Symbol.mk_const "e") in
-  let x = mk_var ~ty 0 in
-  let y = mk_var ~ty 1 in
-  let z = mk_var ~ty 2 in
-  let f x y = mk_node (Symbol.mk_const "f") [x; y] in
-  let sum x y = mk_node (Symbol.mk_const "sum") [x; y] in
-  let g x = mk_node (Symbol.mk_const "g") [x] in
-  let h x = mk_node (Symbol.mk_const "h") [x] in
-  let ite x y z = mk_node (Symbol.mk_const "ite") [x; y; z] in
-  QCheck.Arbitrary.(
-    let base = among [a; b; c; d; e; x; y; z] in
-    let t = fix ~max:6 ~base (fun sub ->
-      choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
-        choose [lift2 sum sub sub; lift3 ite sub sub sub]])
-    in
-    t)
+(* generate a term of the given type *)
+let rec _ar_ty ~ground ~depth ~consts ~funs ty =
+  let open QCheck.Arbitrary in
+  (* choice: either a variable, or a constant, or a recursive case *)
+  let vars = among [mk_var ~ty 0; mk_var ~ty 1; mk_var ~ty 2] in
+  if depth > 5
+    then if ground then consts
+    else choose [consts; vars]
+  else if ground
+    then choose
+      [ consts
+      ; _non_const ~ground ~depth:(depth+1) ~consts ~funs ty
+      ]
+    else choose
+      [ consts
+      ; vars
+      ; _non_const ~ground ~depth:(depth+1) ~consts ~funs ty
+      ]
+(* generate a composite term using [gen] to make subterms. The generated
+    term has type [ty] *)
+and _non_const ~ground ~depth ~consts ~funs ty =
+  let open QCheck.Arbitrary in
+  let funs = List.filter (fun (_,ty') -> Type.eq ty ty') funs in
+  among funs >>= fun (s, fun_ty) ->
+  match fun_ty with
+  | Type.Fun (ty, args) ->
+    list_sequence (List.map (_ar_ty ~ground ~depth ~consts ~funs) args) >>= fun l ->
+    return (mk_node ~ty s l)
+  | _ -> assert false 
+(* term of any type in the const set *)
+and _ar_any_ty ~ground ~depth ~consts ~funs signature =
+  let open QCheck.Arbitrary in
+  let types = Sequence.to_list (Symbol.Map.values signature) in
+  among types >>= fun ty ->
+  _ar_ty ~ground ~depth ~consts ~funs ty
 
-let arbitrary = arbitrary_ty Type.i
+let arbitrary st = assert false
+
+let arbitrary_ground st = assert false
+
+let arbitrary_pred st = assert false
+
+(*
+let arbitrary signature =
+  let open QCheck.Arbitrary in
+  let base, recur = Symbol.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
+  let consts = among (Symbol.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
+  let funs = Sequence.to_list (Symbol.Map.to_seq recur) in
+  _ar_any_ty ~ground:false ~depth:0 ~consts ~funs signature
+
+let arbitrary_ground signature =
+  let open QCheck.Arbitrary in
+  let base, recur = Symbol.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
+  let consts = among (Symbol.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
+  let funs = Sequence.to_list (Symbol.Map.to_seq recur) in
+  _ar_any_ty ~ground:true ~depth:0 ~consts ~funs signature
       
-let arbitrary_pred =
-  let p x y = mk_node (Symbol.mk_const "p") [x; y] in
-  let q x = mk_node (Symbol.mk_const "q") [x] in
-  let r x = mk_node (Symbol.mk_const "r") [x] in
-  let s = mk_const (Symbol.mk_const "s") in
-  let sub = arbitrary in
-  QCheck.Arbitrary.(choose
-    [ lift2 p sub sub; lift q sub; lift r sub; return s; return true_term ])
-
-let arbitrary_ground =
-  let a = mk_const (Symbol.mk_const "a") in
-  let b = mk_const (Symbol.mk_const "b") in
-  let c = mk_const (Symbol.mk_const "c") in
-  let d = mk_const (Symbol.mk_const "d") in
-  let e = mk_const (Symbol.mk_const "e") in
-  let f x y = mk_node (Symbol.mk_const "f") [x; y] in
-  let sum x y = mk_node (Symbol.mk_const "sum") [x; y] in
-  let g x = mk_node (Symbol.mk_const "g") [x] in
-  let h x = mk_node (Symbol.mk_const "h") [x] in
-  let ite x y z = mk_node (Symbol.mk_const "ite") [x; y; z] in
-  QCheck.Arbitrary.(
-    let base = among [a; b; c; d; e] in
-    let t = fix ~max:6 ~base (fun sub ->
-      choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
-        choose [lift2 sum sub sub; lift3 ite sub sub sub]])
-    in
-    t)
+let arbitrary_pred signature =
+  let open QCheck.Arbitrary in
+  let types = Sequence.to_list (Symbol.Map.values signature) in
+  let some_ty = among types in
+  let mk_preds st =
+    [ Symbol.mk_const "p", Type.(o <== [some_ty st; some_ty st])
+    ; Symbol.mk_const "q", Type.(o <== [some_ty st])
+    ; Symbol.mk_const "r", Type.(o <== [some_ty st])
+    ; Symbol.mk_const "s", Type.o
+    ]
+  in
+  mk_preds >>= fun preds ->
+  let signature = List.fold_left
+    (fun sign (s,ty) -> Signature.declare sign s ty)
+    signature preds in
+  let base, recur = Symbol.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
+  let consts = among (Symbol.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
+  let funs = Sequence.to_list (Symbol.Map.to_seq recur) in
+  _ar_ty ~ground:false ~depth:0 ~consts ~funs Type.o
+*)
 
 let arbitrary_pos t =
   QCheck.Arbitrary.(

@@ -26,11 +26,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Ast} *)
 
 type declaration =
-  | CNF of name * role * FOFormula.t list * optional_info
-  | FOF of name * role * FOFormula.t * optional_info
-  | TFF of name * role * FOFormula.t * optional_info
-  | THF of name * role * HOTerm.t * optional_info  (* XXX not parsed yet *)
-  | TypeDecl of name * Symbol.t * Type.t  (* type declaration *)
+  | CNF of name * role * Untyped.Form.t list * optional_info
+  | FOF of name * role * Untyped.Form.t * optional_info
+  | TFF of name * role * Untyped.Form.t * optional_info
+  | THF of name * role * Untyped.HO.t * optional_info  (* XXX not parsed yet *)
+  | TypeDecl of name * Symbol.t * Type.Parsed.t  (* type declaration *)
   | NewType of name * string  (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)

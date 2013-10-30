@@ -134,6 +134,8 @@ let mk_atom p = match p with
   | _ when T.eq p T.true_term -> mk_true
   | _ when T.eq p T.false_term -> mk_false
   | _ -> 
+    if not (Type.eq p.T.ty Type.o)
+      then failwith "Formula.mk_atom: expected boolean term";
     let flags =
       if T.is_ground p
         then flag_simplified lor flag_ground
@@ -194,13 +196,15 @@ let mk_xor f1 f2 = mk_not (mk_equiv f1 f2)
 let mk_eq t1 t2 =
   if T.eq t1 t2
     then mk_true
-    else
-      let f = { form=Equal(t1,t2); flags=flag_simplified; id= ~-1; } in
-      let f' = H.hashcons f in
-      let _ = if f == f' && T.is_ground t1 && T.is_ground t2
-        then set_flag f flag_ground
-      in
-      f'
+  else if not (Type.eq t1.T.ty t2.T.ty)
+    then failwith "Formula.mk_eq: expected same type on both sides"
+  else
+    let f = { form=Equal(t1,t2); flags=flag_simplified; id= ~-1; } in
+    let f' = H.hashcons f in
+    let _ = if f == f' && T.is_ground t1 && T.is_ground t2
+      then set_flag f flag_ground
+    in
+    f'
 
 let mk_neq t1 t2 = mk_not (mk_eq t1 t2)
 
@@ -605,8 +609,8 @@ let to_term f =
     | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
     | Equal (t1, t2) -> T.mk_eq (T.curry t1) (T.curry t2)
     | Not f' -> T.mk_not (to_term f')
-    | Forall (ty,f') -> T.mk_forall ~ty (to_term f')
-    | Exists (ty,f') -> T.mk_exists ~ty (to_term f')
+    | Forall (ty,f') -> T.mk_forall ~varty:ty (to_term f')
+    | Exists (ty,f') -> T.mk_exists ~varty:ty (to_term f')
     | Atom p -> T.curry p)
     f
 
@@ -615,47 +619,50 @@ let of_term t =
   let rec recurse t = match t.T.term with
   | _ when t == T.true_term -> mk_true
   | _ when t == T.false_term -> mk_false
-  | T.Bind (s, f') when S.eq s S.forall_symbol ->
-    let ty = T.get_type t in
-    mk_forall ~ty (recurse f')
-  | T.Bind (s, f') when S.eq s S.exists_symbol ->
-    let ty = T.get_type t in
-    mk_exists ~ty (recurse f')
-  | T.Bind (s,_) -> failwith (Util.sprintf "unknown binder %a" S.pp s)
-  | T.Const s -> mk_atom (FOTerm.mk_const s)
-  | T.At _ ->
-    begin match T.open_at t with
-    | {T.term=T.Const s}, l when S.eq s S.and_symbol ->
+  | T.At ({T.term=T.Const s}, [{T.term=T.Lambda t'} as lam]) when S.eq s S.forall_symbol ->
+    let ty = T.lambda_var_ty lam in
+    mk_forall ~ty (recurse t')
+  | T.At ({T.term=T.Const s}, [{T.term=T.Lambda t'} as lam]) when S.eq s S.exists_symbol ->
+    let ty = T.lambda_var_ty lam in
+    mk_exists ~ty (recurse t')
+  | T.Lambda _ -> failwith "FOFormula.of_term: unexpected lambda term"
+  | T.Const s ->
+    let ty = Type.uncurry (T.get_type t) in
+    mk_atom (FOTerm.mk_const ~ty s)
+  | T.Var _ | T.BoundVar _ -> failwith "F.of_term: not first-order, var under formula"
+  | T.At ({T.term=T.Const s}, l) when S.eq s S.and_symbol ->
       mk_and (List.map recurse l)
-    | {T.term=T.Const s}, l when S.eq s S.or_symbol ->
+  | T.At ({T.term=T.Const s}, l) when S.eq s S.or_symbol ->
       mk_or (List.map recurse l)
-    | {T.term=T.Const s}, [a; b] when S.eq s S.equiv_symbol ->
-      mk_equiv (recurse a) (recurse b)
-    | {T.term=T.Const s}, [a; b] when S.eq s S.imply_symbol ->
-      mk_imply (recurse a) (recurse b)
-    | {T.term=T.Const s}, [a; b] when S.eq s S.eq_symbol ->
-      mk_eq (T.uncurry a) (T.uncurry b)
-    | {T.term=T.Const s}, [t'] when S.eq s S.not_symbol ->
-      mk_not (recurse t')
-    | _ -> mk_atom (T.uncurry t)
-    end
-  | T.Var _ | T.BoundVar _ -> failwith "F.of_term: not first-order"
+  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.equiv_symbol ->
+    mk_equiv (recurse a) (recurse b)
+  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.imply_symbol ->
+    mk_imply (recurse a) (recurse b)
+  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.eq_symbol ->
+    mk_eq (T.uncurry a) (T.uncurry b)
+  | T.At ({T.term=T.Const s}, [t']) when S.eq s S.not_symbol ->
+    mk_not (recurse t')
+  | _ -> mk_atom (T.uncurry t)
   in
   recurse t
 
 (** {2 IO} *)
 
-let pp_debug buf f =
+let pp_debug ?(hooks=[]) buf f =
   let depth = ref 0 in
   (* outer formula *)
   let rec pp_outer buf f = match f.form with
   | True -> Buffer.add_string buf "true"
   | False -> Buffer.add_string buf "false"
-  | Atom t -> (T.pp_depth !depth) buf t
+  | Atom t -> (T.pp_depth ~hooks !depth) buf t
   | Not {form=Equal (t1, t2)} ->
-    (T.pp_depth !depth) buf t1; Buffer.add_string buf " ≠ "; (T.pp_depth !depth) buf t2
+    T.pp_depth ~hooks !depth buf t1;
+    Buffer.add_string buf " ≠ ";
+    T.pp_depth ~hooks !depth buf t2
   | Equal (t1, t2) ->
-    (T.pp_depth !depth) buf t1; Buffer.add_string buf " = "; (T.pp_depth !depth) buf t2
+    T.pp_depth ~hooks !depth buf t1;
+    Buffer.add_string buf " = ";
+    T.pp_depth ~hooks !depth buf t2
   | Not {form=Equiv (f1, f2)} ->
     pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
   | Equiv (f1, f2) ->
@@ -739,52 +746,9 @@ let pp_tstp buf f =
   in
   pp_outer buf (flatten f)
 
-let pp_arith buf f =
-  let depth = ref 0 in
-  (* outer formula *)
-  let rec pp_outer buf f = match f.form with
-  | True -> Buffer.add_string buf "true"
-  | False -> Buffer.add_string buf "false"
-  | Atom t -> (T.pp_arith_depth !depth) buf t
-  | Not {form=Equal (t1, t2)} ->
-    (T.pp_arith_depth !depth) buf t1; Buffer.add_string buf " ≠ "; (T.pp_arith_depth !depth) buf t2
-  | Equal (t1, t2) ->
-    (T.pp_arith_depth !depth) buf t1; Buffer.add_string buf " = "; (T.pp_arith_depth !depth) buf t2
-  | Not {form=Equiv (f1, f2)} ->
-    pp_inner buf f1; Buffer.add_string buf " <~> "; pp_inner buf f2
-  | Equiv (f1, f2) ->
-    pp_inner buf f1; Buffer.add_string buf " <=> "; pp_inner buf f2
-  | Imply (f1, f2) ->
-    pp_inner buf f1; Buffer.add_string buf " => "; pp_inner buf f2
-  | Not f' -> Buffer.add_string buf "¬ "; pp_inner buf f'
-  | Forall (ty,f') ->
-    let v = !depth in
-    incr depth;
-    if Type.eq ty Type.i
-      then Printf.bprintf buf "∀ Y%d. %a" v pp_inner f'
-      else Printf.bprintf buf "∀ Y%d: %a. %a" v Type.pp ty pp_inner f';
-    decr depth
-  | Exists (ty, f') ->
-    let v = !depth in
-    incr depth;
-    if Type.eq ty Type.i
-      then Printf.bprintf buf "∃ Y%d. %a" v pp_inner f'
-      else Printf.bprintf buf "∃ Y%d: %a. %a" v Type.pp ty pp_inner f';
-    decr depth
-  | And l -> Util.pp_list ~sep:" ∧ " pp_inner buf l
-  | Or l -> Util.pp_list ~sep:" ∨ " pp_inner buf l
-  and pp_inner buf f = match f.form with
-  | And _
-  | Or _
-  | Equiv _
-  | Imply _ ->
-    (* cases where ambiguities could arise *)
-    Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
-  | _ -> pp_outer buf f
-  in
-  pp_outer buf (flatten f)
+let pp_arith buf f = pp_debug ~hooks:[T.arith_hook] buf f
 
-let __default_pp = ref pp_debug
+let __default_pp = ref (pp_debug ~hooks:[])
 
 let pp buf f = !__default_pp buf f
 

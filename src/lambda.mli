@@ -34,7 +34,7 @@ val beta_reduce : ?depth:int -> term -> term
 val eta_reduce : term -> term
   (** Eta-reduce the term *)
 
-val lambda_abstract : signature:Signature.t -> term -> term -> term
+val lambda_abstract : term -> term -> term
   (** [lambda_abstract term sub_t], applied to a curried term [term], and a
       subterm [sub_t] of [term], gives [term'] such that
       [beta_reduce (term' @ sub_t) == term] holds.
@@ -43,12 +43,9 @@ val lambda_abstract : signature:Signature.t -> term -> term -> term
 
       For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
       the term [^[X]: f(a, X @ b, c)].
-
-      The signature is needed to infer the types of terms, and therefore
-      to infer the type of the lambda-bound variable
   *)
 
-val lambda_abstract_list : signature:Signature.t -> term -> term list -> term
+val lambda_abstract_list : term -> term list -> term
   (** Abstract successively the given subterms, starting from the
       left ones (the closer from the left, the deeper the lambda) *)
 

@@ -210,9 +210,10 @@ let size proof = Sequence.length (to_seq proof)
 
 (** {2 IO} *)
 
-let of_decls decls =
+let of_decls ?(base=Signature.base) decls =
   let steps = Hashtbl.create 13 in (* maps names to steps *)
   let root = ref None in (* (one) root of proof *)
+  let ctx = TypeInference.Ctx.of_signature base in
   (* find a proof name *)
   let find_step name =
     try
@@ -226,6 +227,7 @@ let of_decls decls =
     | A.GNode("inference", [A.GString rule;
                             A.GList [A.GNode ("status", [A.GString status])];
                             A.GList parents]) ->
+      (* lazily lookup parent steps by their name in the derivation *)
       let parents = lazy
         (Array.map
           (fun data -> match data with
@@ -260,6 +262,7 @@ let of_decls decls =
     begin fun decl -> match decl with
     | A.CNF (name, role, c, info :: _) ->
       Util.debug 3 "convert step %a" A.pp_declaration decl;
+      let c = TypeInference.FO.convert_clause ~ctx c in
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -271,6 +274,7 @@ let of_decls decls =
     | A.FOF(name, role, f, info :: _)
     | A.TFF (name, role, f, info :: _) ->
       Util.debug 3 "convert step %a" A.pp_declaration decl;
+      let f = TypeInference.FO.convert ~ctx f in
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()
@@ -279,11 +283,11 @@ let of_decls decls =
         let p = InferForm (f, step) in
         add_step name p
       end
+    | A.TypeDecl (_, s, ty) -> TypeInference.Ctx.declare_parsed ctx s ty
     | A.FOF _
     | A.CNF _
     | A.TFF _
     | A.THF _
-    | A.TypeDecl _
     | A.Include _
     | A.IncludeOnly _
     | A.NewType _ -> ()

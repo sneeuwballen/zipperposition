@@ -41,20 +41,6 @@ let prof_ac_matching = Util.mk_profiler "ac-matching"
 
 exception Fail
 
-let types ~ctx ?subst t1 s1 t2 s2 =
-  let ty1 = TypeInference.HO.infer ctx t1 s1 in
-  let ty2 = TypeInference.HO.infer ctx t2 s2 in
-  try
-    let subst = TypeUnif.unify_ho ?subst ty1 s1 ty2 s2 in
-    subst
-  with TypeUnif.Error _ ->
-    raise Fail
-
-let types_sig ?subst signature t1 s1 t2 s2 =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  types ~ctx ?subst t1 s1 t2 s2
-
-
 (** Does [v] appear in [t] if we apply the substitution? *)
 let occurs_check subst v sc_v t sc_t =
   let rec check v sc_v t sc_t =
@@ -66,8 +52,9 @@ let occurs_check subst v sc_v t sc_t =
               check v sc_v t' sc_t'
         with Not_found -> false)
       | Const _ | BoundVar _ -> false
-      | Bind (_, t') -> check v sc_v t' sc_t
-      | At (t1, t2) -> check v sc_v t1 sc_t || check v sc_v t2 sc_t
+      | Lambda t' -> check v sc_v t' sc_t
+      | At (t, l) ->
+        check v sc_v t sc_t || List.exists (fun t' -> check v sc_v t' sc_t) l
   in
   check v sc_v t sc_t
 
@@ -78,6 +65,7 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s
     and t, sc_t = S.get_var subst t sc_t in
+    let subst = TypeUnif.unify_ho ~subst s.T.ty sc_s t.T.ty sc_t in
     match s.term, t.term with
     | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
@@ -91,13 +79,14 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
       if occurs_check subst t sc_t s sc_s
         then raise Fail (* occur check *)
         else S.bind subst t sc_t s sc_s (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when Symbol.eq f g ->
+    | Lambda t1', Lambda t2' ->
       unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Const f, Const g when Symbol.eq f g -> subst
-    | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 sc_s t1 sc_t in
-      unif subst s2 sc_s t2 sc_t
+    | At (t1, l1), At (t2, l2) when List.length l1 = List.length l2 ->
+      List.fold_left2
+        (fun subst t1' t2' -> unif subst t1' sc_s t2' sc_t)
+        subst (t1 :: l1) (t2 :: l2)
     | _, _ -> raise Fail
   in
   (* try unification, and return solution/exception (with profiler handling) *)
@@ -117,6 +106,7 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
   (* recursive matching *)
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s in
+    let subst = TypeUnif.match_ho ~subst s.T.ty sc_s t.T.ty sc_t in
     match s.term, t.term with
     | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
@@ -128,12 +118,13 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
           (* occur check, or [s] is not in the initial
              context [sc_a] in which variables can be bound. *)
         else S.bind subst s sc_s t sc_t (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when Symbol.eq f g -> unif subst t1' sc_s t2' sc_t
+    | Lambda t1', Lambda t2' -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Const f, Const g when Symbol.eq f g -> subst
-    | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 sc_s t1 sc_t in
-      unif subst s2 sc_s t2 sc_t
+    | At (t1, l1), At (t2, l2) when List.length l1 = List.length l2 ->
+      List.fold_left2
+        (fun subst t1' t2' -> unif subst t1' sc_s t2' sc_t)
+        subst (t1 :: l1) (t2 :: l2)
     | _, _ -> raise Fail
   in
   (* try matching, and return solution/exception (with profiler handling) *)
@@ -151,6 +142,7 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
   let rec unif subst s sc_s t sc_t =
     let s, sc_s = S.get_var subst s sc_s in
     let t, sc_t = S.get_var subst t sc_t in
+    let subst = TypeUnif.variant_ho ~subst s.T.ty sc_s t.T.ty sc_t in
     match s.term, t.term with
     | _ when s == t && (T.is_ground s || sc_s = sc_t) ->
       subst (* the terms are equal under any substitution *)
@@ -158,13 +150,14 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
       raise Fail (* terms are not equal, and ground. failure. *)
     | Var i, Var j when i <> j && sc_s = sc_t -> raise Fail
     | Var _, Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
-    | Bind (f, t1'), Bind (g, t2') when Symbol.eq f g ->
+    | Lambda t1', Lambda t2' ->
       unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Const f, Const g when Symbol.eq f g -> subst
-    | At (s1, s2), At (t1, t2) ->
-      let subst = unif subst s1 sc_s t1 sc_t in
-      unif subst s2 sc_s t2 sc_t
+    | At (t1, l1), At (t2, l2) when List.length l1 = List.length l2 ->
+      List.fold_left2
+        (fun subst t1' t2' -> unif subst t1' sc_s t2' sc_t)
+        subst (t1 :: l1) (t2 :: l2)
     | _, _ -> raise Fail
   in
   try
@@ -202,7 +195,10 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
   in
   (* recursive matching. [k] is called with solutions *)
   let rec unif subst s sc_s t sc_t k =
-    let s, sc_s = S.get_var subst s sc_s in
+    try
+      let s, sc_s = S.get_var subst s sc_s in
+      (* first match types *)
+      let subst = TypeUnif.match_ho ~subst s.T.ty sc_s t.T.ty sc_t in
       match s.term, t.term with
       | Var _, Var _ when s == t && sc_s = sc_t -> k subst (* trivial success *)
       | Var _, _ ->
@@ -211,33 +207,31 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
             (* occur check, or [s] is not in the initial
                context [sc_a] in which variables can be bound. *)
           else k (S.bind subst s sc_s t sc_t) (* bind s and continue *)
-      | Bind (f, t1'), Bind (g, t2') when Symbol.eq f g ->
+      | Lambda t1', Lambda t2' ->
         unif subst t1' sc_s t2' sc_t k
       | BoundVar i, BoundVar j -> if i = j then k subst
-      | At (s1, s2), At (t1, t2) ->
-        begin match T.open_at s, T.open_at t with
-        | ({T.term=T.Const f}, l1), ({T.term=T.Const g}, l2)
-          when Symbol.eq f g && is_ac f ->
-          (* flatten into a list of terms that do not have [f] as head symbol *)
-          let l1 = T.flatten_ac f l1
-          and l2 = T.flatten_ac f l2 in 
-          Util.debug 5 "ac_match for %a: [%a] and [%a]" Symbol.pp f
-            (Util.pp_list T.pp) l1 (Util.pp_list T.pp) l2;
-          (* eliminate terms that are common to l1 and l2 *)
-          let l1, l2 = eliminate_common l1 l2 in
-          (* permutative matching *)
-          unif_ac subst f l1 sc_s [] l2 sc_t k
-        | ({T.term=T.Const f}, [x1;y1]), ({T.term=T.Const g}, [x2;y2])
-          when Symbol.eq f g && is_com f ->
-          Util.debug 5 "com_match for %a: [%a] and [%a]" Symbol.pp f
-            (Util.pp_list T.pp) [x1;y1] (Util.pp_list T.pp) [x2;y2];
-          unif_com subst x1 y1 sc_s x2 y2 sc_t k
-        | (t1, l1), (t2, l2) ->
-          (* regular decomposition, but from the left *)
-          unif_list subst (t1::l1) sc_s (t2::l2) sc_t k
-        end
+      | At ({T.term=T.Const f} as head, l1), At ({T.term=T.Const g}, l2)
+        when Symbol.eq f g && is_ac f ->
+        (* flatten into a list of terms that do not have [f] as head symbol *)
+        let l1 = T.flatten_ac f l1
+        and l2 = T.flatten_ac f l2 in 
+        Util.debug 5 "ac_match for %a: [%a] and [%a]" Symbol.pp f
+          (Util.pp_list T.pp) l1 (Util.pp_list T.pp) l2;
+        (* eliminate terms that are common to l1 and l2 *)
+        let l1, l2 = eliminate_common l1 l2 in
+        (* permutative matching *)
+        unif_ac subst head l1 sc_s [] l2 sc_t k
+      | At ({T.term=T.Const f}, [x1;y1]), At ({T.term=T.Const g}, [x2;y2])
+        when Symbol.eq f g && is_com f ->
+        Util.debug 5 "com_match for %a: [%a] and [%a]" Symbol.pp f
+          (Util.pp_list T.pp) [x1;y1] (Util.pp_list T.pp) [x2;y2];
+        unif_com subst x1 y1 sc_s x2 y2 sc_t k
+      | At (t1, l1), At (t2, l2) ->
+        (* regular decomposition, but from the left *)
+        unif_list subst (t1::l1) sc_s (t2::l2) sc_t k
       | Const f, Const g when Symbol.eq f g -> k subst
       | _, _ -> ()  (* failure, close branch *)
+    with TypeUnif.Error _ -> ()
   (* unify lists *)
   and unif_list subst l1 sc_1 l2 sc_2 k = match l1, l2 with
   | [], [] -> k subst
@@ -273,7 +267,7 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
            bind it so that (z,sc_2) -> (z,sc_1), and use (z,sc_1) to continue
            the matching *)
         let subst' = S.bind subst z sc_2 z sc_1 in
-        let x2' = T.mk_at_list (T.mk_const f) [x2; z] in
+        let x2' = T.mk_at f [x2; z] in
         let subst' = S.bind subst' x1 sc_1 x2' sc_2 in
         unif_ac subst' f (z::l1') sc_1 left right' sc_2 k
     | x1::l1', left, [] -> ()

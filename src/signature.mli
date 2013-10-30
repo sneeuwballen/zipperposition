@@ -73,6 +73,12 @@ val diff : t -> t -> t
       in [s2]. Useful to remove base symbols. *)
 
 val size : t -> int
+  (** Number of symbols *)
+
+val well_founded : t -> bool
+  (** Are there some symbols of arity 0 in the signature?
+      @return true iff the Herbrand term universe of this signature is
+        non empty  *)
 
 val curry : t -> t
   (** Curry all types occurring in the signature *)
@@ -104,6 +110,9 @@ val fmt : Format.formatter -> t -> unit
 
 val pp_no_base : Buffer.t -> t -> unit
   (** Print the signature, minus the base symbols *)
+
+val arbitrary : t QCheck.Arbitrary.t  (* arbitrary well-founded signature *)
+val arbitrary_ground : t QCheck.Arbitrary.t  (* only ground types *)
 
 (** {2 Pre-defined symbols} *)
 

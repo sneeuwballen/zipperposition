@@ -349,6 +349,7 @@ module Ty = struct
   (* apply substitution *)
   let apply subst ~renaming ty sc_ty =
     let rec _apply ty sc_ty = match ty with
+    | Type.App (_, []) -> ty
     | Type.App (s, l) ->
       let l' = List.map (fun ty' -> _apply ty' sc_ty) l in
       Type.app s l'
@@ -489,6 +490,10 @@ module MakeProd(T : TYPED_TERM) = struct
     let rename_ty h v s_v =
       Ty.Renaming.rename h.ty v s_v
   end
+
+  (* apply the substitution on a type *)
+  let apply_ty subst ~renaming ty s_ty =
+    Ty.apply subst.ty ~renaming:renaming.Renaming.ty ty s_ty
 end
 
 module FO = struct
@@ -498,12 +503,16 @@ module FO = struct
   include MakeProd(T)
 
   let rec apply ~renaming subst t scope =
-    if T.is_ground t then t (* subst(t) = t, if t ground *)
+    if T.is_ground t && T.monomorphic t then t (* subst(t) = t, if t ground *)
     else match t.T.term with
-    | T.BoundVar _ -> t
+    | T.BoundVar _ when Type.is_ground t.T.ty -> t
+    | T.BoundVar i ->
+      let ty = apply_ty ~renaming subst t.T.ty scope in
+      T.mk_bound_var ~ty i
     | T.Node (s, l) ->
       let l' = _apply_rec_list ~renaming subst scope l in
-      T.mk_node s l'
+      let ty = apply_ty ~renaming subst t.T.ty scope in
+      T.mk_node ~ty s l'
     | T.Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       begin try
@@ -514,10 +523,14 @@ module FO = struct
             apply ~renaming subst t' sc_t'
           else t'
       with Not_found ->
-        (* variable not bound by [subst], rename it *)
-        let ty = T.get_type t in
-        let ty' = Ty.apply subst.ty ~renaming:renaming.Renaming.ty ty scope in
-        let t = if Type.eq ty ty' then t else T.cast t ty' in
+        (* variable not bound by [subst], rename it (but first evaluate its type) *)
+        let t = if Type.is_ground t.T.ty
+          then t
+          else
+            let ty = T.get_type t in
+            let ty' = apply_ty ~renaming subst ty scope in
+            T.cast t ty'
+        in
         Renaming.rename renaming t scope 
       end
   (* apply subst to the list, all elements of which have the given scope *)
@@ -544,12 +557,17 @@ module HO = struct
   let rec _apply_rec ~renaming ~depth subst t scope =
     if T.is_ground t then t (* subst(t) = t, if t ground *)
     else match t.T.term with
-    | T.Const _
-    | T.BoundVar _ -> t
-    | T.Bind (s, t') ->
+    | (T.Const _ | T.BoundVar _) when Type.is_ground t.T.ty -> t
+    | T.Const f ->
+      let ty = apply_ty ~renaming subst t.T.ty scope in
+      T.mk_const ~ty f
+    | T.BoundVar i ->
+      let ty = apply_ty ~renaming subst t.T.ty scope in
+      T.mk_bound_var ~ty i
+    | T.Lambda t' ->
       let t'' = _apply_rec ~renaming ~depth:(depth+1) subst t' scope in
-      let ty = T.get_type t in
-      T.mk_bind s ~ty t''
+      let varty = apply_ty ~renaming subst (T.lambda_var_ty t) scope in
+      T.mk_lambda ~varty t''
     | T.Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       begin try
@@ -562,16 +580,20 @@ module HO = struct
             _apply_rec ~renaming ~depth subst t' sc_t'
           else t'
       with Not_found ->
-        (* variable not bound by [subst], rename it *)
-        let ty = T.get_type t in
-        let ty' = Ty.apply subst.ty ~renaming:renaming.Renaming.ty ty scope in
-        let t = if Type.eq ty ty' then t else T.cast t ty' in
-        Renaming.rename renaming t scope
+        (* variable not bound by [subst], rename it (but first evaluate its type) *)
+        let t = if Type.is_ground t.T.ty
+          then t
+          else
+            let ty = T.get_type t in
+            let ty' = apply_ty ~renaming subst ty scope in
+            T.cast t ty'
+        in
+        Renaming.rename renaming t scope 
       end
-    | T.At (t1, t2) ->
-      let t1' = _apply_rec ~renaming ~depth subst t1 scope in
-      let t2' = _apply_rec ~renaming ~depth subst t2 scope in
-      T.mk_at t1' t2'
+    | T.At (t, l) ->
+      let t' = _apply_rec ~renaming ~depth subst t scope in
+      let l' = List.map (fun t' -> _apply_rec ~renaming ~depth subst t' scope) l in
+      T.mk_at t' l'
 
   (** Apply substitution to term, replacing variables by the terms they are bound to.
       [renaming] is used to rename free variables (not bound
