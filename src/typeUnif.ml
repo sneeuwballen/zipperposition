@@ -60,6 +60,8 @@ let pp_error buf e =
 
 let error_to_string = Util.on_buffer pp_error
 
+let fmt_error fmt e = Format.pp_print_string fmt (error_to_string e)
+
 (* occur-check *)
 let _occur_check subst v s_v t s_t =
   let rec check t s_t = match t with

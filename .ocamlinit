@@ -25,14 +25,25 @@
 #install_printer Logtk.Ast_tptp.fmt_declaration;;
 #install_printer Logtk.Transform.fmt;;
 #install_printer Logtk.Trace_tstp.fmt;;
+#install_printer Logtk.TypeUnif.fmt_error;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type;;
 module T = Logtk.FOTerm;;
 module F = Logtk.FOFormula;;
 module HOT = Logtk.HOTerm;;
-let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
-let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
 open Logtk;;
+let pterm s =
+    let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create ~base:true () in
+    let _, clos = TypeInference.FO.infer tyctx t 0 in
+    let renaming = Substs.Ty.Renaming.create 5 in
+    clos renaming (TypeInference.Ctx.subst tyctx)
+;;
+let pform s =
+    let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create ~base:true () in
+    TypeInference.FO.convert ~ctx:tyctx f
+;;
 (* optional part *)
 #install_printer Logtk_meta.MetaPattern.fmt;;
 #install_printer Logtk_meta.MetaPattern.EncodedForm.fmt;;
@@ -41,10 +52,7 @@ open Logtk;;
 open Logtk_meta;;
 let ppat s =
     let f = pform s in
-    let signature = Signature.curry
-        (TypeInference.FO.signature_forms ~signature:Signature.base
-            (Sequence.singleton f)) in
     let f = MetaPattern.EncodedForm.encode f in
-    MetaPattern.create ~signature f;;
+    MetaPattern.create f;;
 (* vim:syntax=ocaml
 *)

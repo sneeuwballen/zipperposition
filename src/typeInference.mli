@@ -72,6 +72,9 @@ module Ctx : sig
     (** Obtain the type of all symbols whose type has been inferred.
         If some instantiated variables remain, they are bound to the
         context's [default] parameter. *)
+
+  val subst : t -> Substs.Ty.t
+    (** Type substitution *)
 end
 
 (** {2 Hindley-Milner}

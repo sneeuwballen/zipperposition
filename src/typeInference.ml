@@ -202,7 +202,7 @@ module Ctx = struct
         try
           STbl.find ctx.symbols s
         with Not_found ->
-          let vars = Util.list_range 0 (arity-1) in
+          let vars = Util.list_range 0 arity in
           let vars = List.map Type.var vars in
           let ret = match ret with
             | None -> ctx.default
@@ -242,6 +242,8 @@ module Ctx = struct
         (* add to signature *)
         Signature.declare signature s ty)
       ctx.symbols signature
+
+  let subst ctx = ctx.subst
 end
 
 (** {2 Hindley-Milner} *)

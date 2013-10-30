@@ -153,8 +153,8 @@ let arity ty = match ty with
   | App _ -> 0
 
 let rec is_ground t = match t with
-  | App (_, [])
   | Var _ -> false
+  | App (_, []) -> true
   | App (_, l) -> List.for_all is_ground l
   | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
 
