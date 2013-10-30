@@ -63,18 +63,21 @@ let check_ordering_inv_by_subst ord =
   let size (t1, t2, s) =
     T.size t1 + T.size t2 + (S.fold s 0 (fun n _ _ t _ -> n + T.size t))
   in
-  (* do type inference on the fly *)
+  (* do type inference on the fly 
   let tyctx = TypeInference.Ctx.create () in
+  *)
   let signature = ref Signature.empty in
   let ord = ref ord in
   let prop (t1, t2, subst) =
     let t1' = S.apply_no_renaming subst t1 0 in
     let t2' = S.apply_no_renaming subst t2 0 in
+    (* FIXME use a fixed signature?
     ignore (TypeInference.FO.infer tyctx t1 0);
     ignore (TypeInference.FO.infer tyctx t2 0);
     ignore (TypeInference.FO.infer tyctx t1' 0);
     ignore (TypeInference.FO.infer tyctx t2' 0);
     signature := TypeInference.Ctx.to_signature tyctx;
+    *)
     ord := O.add_signature !ord !signature;
     (* check that instantiating variables preserves ordering *)
     let o1 = O.compare !ord t1 t2 in

@@ -35,34 +35,34 @@ module HOT = HOTerm
 
 (** unit tests *)
 
-let f x y = HOT.mk_at_list (HOT.mk_const (Symbol.mk_const "f")) [x;y]
-let g x = HOT.mk_at (HOT.mk_const (Symbol.mk_const "g")) x
-let h x y z = HOT.mk_at_list (HOT.mk_const (Symbol.mk_const "h")) [x;y;z]
-let a = HOT.mk_const (Symbol.mk_const "a")
-let b = HOT.mk_const (Symbol.mk_const "b")
-let x = HOT.mk_var ~ty:Type.i 0
-let y = HOT.mk_var ~ty:Type.i 1
+let ty = Type.i
+let f x y = HOT.mk_at (HOT.mk_const ~ty:Type.(ty <== [ty;ty]) (Symbol.mk_const "f")) [x;y]
+let g x = HOT.mk_at (HOT.mk_const ~ty:Type.(ty <== [ty])  (Symbol.mk_const "g")) [x]
+let h x y z = HOT.mk_at (HOT.mk_const ~ty:Type.(ty <== [ty;ty;ty]) (Symbol.mk_const "h")) [x;y;z]
+let a = HOT.mk_const ~ty (Symbol.mk_const "a")
+let b = HOT.mk_const ~ty (Symbol.mk_const "b")
+let x = HOT.mk_var ~ty 0
+let y = HOT.mk_var ~ty 1
 
 let test_db_lift () =
-  let t = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 1))) in
+  let t = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 1))) in
   let t' = HOT.db_lift 1 t in
-  let t1 = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 2))) in
+  let t1 = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 2))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 
 let test_db_unlift () =
-  let t = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 2))) in
+  let t = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 2))) in
   let t' = HOT.db_unlift t in
-  let t1 = HOT.mk_lambda ~ty:Type.i (f (HOT.mk_bound_var 0) (g (HOT.mk_bound_var 1))) in
+  let t1 = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 1))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 
-let redex = HOT.mk_at
-  (HOT.mk_lambda_var [x] (f (HOT.mk_at x a) (HOT.mk_at x b)))
-  (HOT.mk_at
-    (HOT.mk_lambda_var [y;x] (HOT.mk_at y x))
-    (HOT.mk_lambda_var [x] (g x))
-  )
+let redex =
+  let x' = HOT.mk_var ~ty:Type.(i <=. i) 2 in
+  HOT.mk_at
+    (HOT.mk_lambda_var [x'] (f (HOT.mk_at x' [a]) (HOT.mk_at x' [b])))
+    [HOT.mk_lambda_var [x] (g x)]
 
 let test_beta_reduce () =
   let t' = Lambda.beta_reduce redex in

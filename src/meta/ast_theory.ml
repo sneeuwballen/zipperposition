@@ -27,20 +27,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = FOTerm
-module F = FOFormula
+module UF = Untyped.Form
 
 type statement =
   | Lemma of string * string list * premise list
-  | LemmaInline of F.t * premise list
-  | Axiom of string * string list * F.t
+  | LemmaInline of UF.t * premise list
+  | Axiom of string * string list * UF.t
   | Theory of string * string list * premise list
   | Clause of clause
   | Include of string
   | Error of string * Lexing.position * Lexing.position
   (** Parse statement *)
 and premise =
-  | IfPattern of F.t
+  | IfPattern of UF.t
   | IfAxiom of string * string list
   | IfTheory of string * string list
 and clause = raw_lit * raw_lit list
@@ -64,7 +63,7 @@ let pp buf statement =
     Printf.bprintf buf "%s(%a)" s (Util.pp_list Buffer.add_string) args
   in
   let pp_premise buf premise = match premise with
-  | IfPattern t -> F.pp buf t
+  | IfPattern t -> UF.pp buf t
   | IfAxiom (s, args) -> Printf.bprintf buf "axiom %a" pp_datalog (s, args)
   | IfTheory (s, args) -> Printf.bprintf buf "theory %a" pp_datalog (s, args)
   in
@@ -81,9 +80,9 @@ let pp buf statement =
       pp_datalog (s,args) pp_premises premises
   | LemmaInline (f, premises) ->
     Printf.bprintf buf "lemma axiom %a if %a."
-      F.pp f pp_premises premises
+      UF.pp f pp_premises premises
   | Axiom (s, args, f) ->
-    Printf.bprintf buf "%a is axiom %a." pp_datalog (s, args) F.pp f
+    Printf.bprintf buf "%a is axiom %a." pp_datalog (s, args) UF.pp f
   | Theory (s, args, premises) ->
     Printf.bprintf buf "theory %a is %a." pp_datalog (s, args)
       pp_premises premises

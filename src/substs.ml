@@ -407,6 +407,8 @@ module MakeProd(T : TYPED_TERM) = struct
   let update_ty s f =
     { s with ty = f s.ty }
 
+  let of_ty ty = { term = TSubst.empty; ty; }
+
   let is_empty s = TSubst.is_empty s.term && Ty.is_empty s.ty
 
   let lookup s = TSubst.lookup s.term

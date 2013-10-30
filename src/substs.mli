@@ -162,6 +162,9 @@ module FO : sig
   val update_ty : t -> (Ty.t -> Ty.t) -> t
     (** Update the type substitution inside the substitution *)
 
+  val of_ty : Ty.t -> t
+    (** Lift substitution on type to substution on terms *)
+
   module Renaming : RENAMING
 
   val apply : renaming:Renaming.t -> t -> term -> scope -> term
@@ -189,6 +192,9 @@ module HO : sig
 
   val update_ty : t -> (Ty.t -> Ty.t) -> t
     (** Update the type substitution inside the substitution *)
+
+  val of_ty : Ty.t -> t
+    (** Lift substitution on type to substution on terms *)
 
   module Renaming : RENAMING
 

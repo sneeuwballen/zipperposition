@@ -40,6 +40,15 @@ module FO = struct
   let app s l = App (s, l)
   let const s = app s []
   let var ~ty s = Var (s,ty)
+  
+  let symbols seq =
+    let rec recurse set t = match t with
+    | App (s, l) ->
+      let set = Symbol.Set.add s set in
+      List.fold_left recurse set l
+    | Var _ -> set
+    in
+    Sequence.fold recurse Symbol.Set.empty seq
 
   let rec pp buf t = match t with
     | App (s, []) -> Symbol.pp buf s
@@ -54,6 +63,10 @@ module FO = struct
   let pp_tstp = pp
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let arbitrary st = assert false
+  let arbitrary_pred st = assert false
+  let arbitrary_ground st = assert false
 end
 
 (** {2 First Order formulas} *)
@@ -171,6 +184,9 @@ module Form = struct
 
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let arbitrary st = assert false
+  let arbitrary_clause = QCheck.Arbitrary.(list ~len:(0--5) arbitrary)
 end
 
 (** {2 Higher order Terms} *)

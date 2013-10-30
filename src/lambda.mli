@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Lambda-Calculus} *)
 
 type term = HOTerm.t
+type scope = Substs.scope
 
 val beta_reduce : ?depth:int -> term -> term
   (** Beta-reduce the term *)
@@ -34,19 +35,38 @@ val beta_reduce : ?depth:int -> term -> term
 val eta_reduce : term -> term
   (** Eta-reduce the term *)
 
-val lambda_abstract : term -> term -> term
-  (** [lambda_abstract term sub_t], applied to a curried term [term], and a
-      subterm [sub_t] of [term], gives [term'] such that
+val lambda_abstract : term -> sub:term -> term
+  (** [lambda_abstract term ~sub], applied to a curried term [term], and a
+      subterm [sub] of [term], gives [term'] such that
       [beta_reduce (term' @ sub_t) == term] holds.
-      It basically abstracts out [sub_t] with a lambda. If [sub_t] is not
+      It basically abstracts out [sub] with a lambda. If [sub] is not
       a subterm of [term], then [term' == ^[X]: term].
 
-      For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) g] will return
+      For instance (@ are omitted), [lambda_abstract f(a,g @ b,c) ~sub:g] will return
       the term [^[X]: f(a, X @ b, c)].
   *)
 
 val lambda_abstract_list : term -> term list -> term
   (** Abstract successively the given subterms, starting from the
-      left ones (the closer from the left, the deeper the lambda) *)
+      right ones. The converse operation is {!lambda_apply_list},
+      that is, [lambda_apply_list (lambda_abstract_list t args) args = t]
+      should hold. *)
+
+val match_types : ?subst:Substs.Ty.t ->
+                  Type.t -> scope -> Type.t list -> scope ->
+                  Substs.Ty.t
+  (** Match the first type's arguments with the list.
+      @raise TypeUnif.Error if types are not compatible *)
+
+val can_apply : Type.t -> Type.t list -> bool
+  (** Can we apply a term with the given type to terms with
+      the corresponding list of types? *)
 
 val lambda_apply_list : term -> term list -> term
+  (** Apply a lambda to a list of arguments.
+      The type of the lambda must be a generalization of a function
+      that takes the list's types as arguments.
+      
+      @raise TypeUnif.Error if the first term doesn't have a function type or
+        if the types are not compatible
+  *)

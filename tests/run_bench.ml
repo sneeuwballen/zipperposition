@@ -30,18 +30,18 @@ open Logtk
 
 module T = FOTerm
 
-let a = T.mk_const (Symbol.mk_const "a")
-let b = T.mk_const (Symbol.mk_const "b")
-let c = T.mk_const (Symbol.mk_const "c")
-let d = T.mk_const (Symbol.mk_const "d")
-let f x y = T.mk_node (Symbol.mk_const "f") [x; y]
-let g x = T.mk_node (Symbol.mk_const "g") [x]
-let h x = T.mk_node (Symbol.mk_const "h") [x]
-let zero = T.mk_const (Symbol.mk_const "0")
-let succ n = T.mk_node (Symbol.mk_const "s") [n]
-let plus a b = T.mk_node (Symbol.mk_const "+") [a; b]
-let minus a = T.mk_node (Symbol.mk_const "-") [a]
-let times a b = T.mk_node (Symbol.mk_const "x") [a; b]
+let a = T.mk_const ~ty:Type.i (Symbol.mk_const "a")
+let b = T.mk_const ~ty:Type.i (Symbol.mk_const "b")
+let c = T.mk_const ~ty:Type.i (Symbol.mk_const "c")
+let d = T.mk_const ~ty:Type.i (Symbol.mk_const "d")
+let f x y = T.mk_node ~ty:Type.i (Symbol.mk_const "f") [x; y]
+let g x = T.mk_node ~ty:Type.i (Symbol.mk_const "g") [x]
+let h x = T.mk_node ~ty:Type.i (Symbol.mk_const "h") [x]
+let zero = T.mk_const ~ty:Type.i (Symbol.mk_const "0")
+let succ n = T.mk_node ~ty:Type.i (Symbol.mk_const "s") [n]
+let plus a b = T.mk_node ~ty:Type.i (Symbol.mk_const "+") [a; b]
+let minus a = T.mk_node ~ty:Type.i (Symbol.mk_const "-") [a]
+let times a b = T.mk_node ~ty:Type.i (Symbol.mk_const "x") [a; b]
 let x = T.mk_var ~ty:Type.i 1
 let y = T.mk_var ~ty:Type.i 2
 let z = T.mk_var ~ty:Type.i 3

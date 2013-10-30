@@ -30,6 +30,7 @@ let prof_beta_reduce = Util.mk_profiler "HO.beta_reduce"
 let prof_lambda_abstract = Util.mk_profiler "HO.lambda_abstract"
 
 type term = HOTerm.t
+type scope = Substs.scope
 
 module T = HOTerm
 
@@ -87,19 +88,49 @@ let rec eta_reduce t =
   | T.At (t, l) ->
     T.mk_at (eta_reduce t) (List.map eta_reduce l)
 
-let lambda_abstract t sub_t =
+let lambda_abstract t ~sub =
   Util.enter_prof prof_lambda_abstract;
   (* abstract the term *)
-  let t' = T.db_from_term t sub_t in
-  let varty = sub_t.T.ty in
+  let t' = T.db_from_term t sub in
+  let varty = sub.T.ty in
   let t' = T.mk_lambda ~varty t' in
   Util.exit_prof prof_lambda_abstract;
   t'
 
 let lambda_abstract_list t args =
-  List.fold_left lambda_abstract t args
+  List.fold_right (fun sub t -> lambda_abstract t ~sub) args t
+
+(* match l_expected against l_arg. All types of l_arg must have a
+  corresponding generalization in l_expected (but l_expected can be
+  longer, it's a partial application) *)
+let rec _match_list subst l_expected s_e l_arg s_a = match l_expected, l_arg with
+  | [], _ -> failwith "lambda_apply_list: too many arguments"
+  | _, [] -> subst   (* all arguments pass *)
+  | ty::l_expected', arg::l_arg' ->
+    (* match expected type with argument *)
+    let subst = TypeUnif.match_ ~subst ty s_e arg s_a in 
+    _match_list subst l_expected' s_e l_arg' s_a
+
+let match_types ?(subst=Substs.Ty.create 7) ty s_ty args s_args =
+  match ty with
+  | Type.Fun (_, expected) ->
+    (* match expected types against provided types *)
+    _match_list subst expected s_ty args s_args
+  | _ ->
+    (* raise some type error *)
+    TypeUnif.fail Substs.Ty.empty ty s_ty Type.((__var ~-1) <== args) s_args
+
+let can_apply ty args =
+  try ignore (match_types ty 0 args 0); true
+  with TypeUnif.Error _ -> false
 
 let lambda_apply_list t args =
-  let t' = T.mk_at t args in
+  (* specialize type of [t] *)
+  let ty_args = List.map T.get_type args in
+  let subst = match_types t.T.ty 0 ty_args 0 in
+  let subst = Substs.HO.of_ty subst in
+  let t' = Substs.HO.apply_no_renaming subst t 0 in
+  (* apply function and reduce *)
+  let t' = T.mk_at t' args in
   let t' = beta_reduce t' in
   t'

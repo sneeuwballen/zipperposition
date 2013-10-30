@@ -30,13 +30,14 @@ open OUnit
 module T = FOTerm
 module S = Substs.FO
 
-let a = T.mk_const (Symbol.mk_const "a")
-let b = T.mk_const (Symbol.mk_const "b")
-let x = T.mk_var ~ty:Type.i 0
-let y = T.mk_var ~ty:Type.i 1
-let f x y = T.mk_node (Symbol.mk_const "f") [x; y]
-let g x = T.mk_node (Symbol.mk_const "g") [x]
-let h x y z = T.mk_node (Symbol.mk_const "h") [x;y;z]
+let ty = Type.i
+let a = T.mk_const ~ty (Symbol.mk_const "a")
+let b = T.mk_const ~ty (Symbol.mk_const "b")
+let x = T.mk_var ~ty 0
+let y = T.mk_var ~ty 1
+let f x y = T.mk_node ~ty (Symbol.mk_const "f") [x; y]
+let g x = T.mk_node ~ty (Symbol.mk_const "g") [x]
+let h x y z = T.mk_node ~ty (Symbol.mk_const "h") [x;y;z]
 
 let test_rename () =
   let t1 = f x (g y) in
@@ -57,12 +58,7 @@ let test_unify () =
   let y = T.mk_var ~ty:Type.(app "list" [int]) 1 in
   let t1 = f x (g y) in
   let t2 = f a (g x) in
-  let signature = TypeInference.FO.Quick.(signature [WellTyped t1; WellTyped t2]) in
-  let tyctx = TypeInference.Ctx.of_signature signature in
-  let ty1 = TypeInference.FO.infer tyctx t1 0 in
-  let ty2 = TypeInference.FO.infer tyctx t2 0 in
-  let subst = TypeUnif.unify_fo ty1 0 ty2 1 in
-  let subst = FOUnif.unification ~subst t1 0 t2 1 in
+  let subst = FOUnif.unification t1 0 t2 1 in
   let renaming = S.Renaming.create 5 in
   let t1' = S.apply subst ~renaming t1 0 in
   let t2' = S.apply subst ~renaming t2 0 in

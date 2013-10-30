@@ -28,9 +28,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = FOFormula
+module UF = Untyped.Form
 
-let printer = ref F.pp
+let printer = ref UF.pp
 
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
@@ -46,7 +46,7 @@ let options =
   ; "-profile", Arg.Set Util.enable_profiling, "enable profiling"
   ; "-stats", Arg.Set stats, "statistics"
   ; "-base", Arg.Set pp_base, "print signature of base symbols"
-  ; "-tstp", Arg.Unit (fun () -> printer := F.pp_tstp), "output in TSTP format"
+  ; "-tstp", Arg.Unit (fun () -> printer := UF.pp_tstp), "output in TSTP format"
   ]
 
 (* check the given file *)

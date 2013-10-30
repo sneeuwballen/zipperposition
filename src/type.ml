@@ -209,6 +209,7 @@ let apply_fun f args =
       mk_fun f_ret f_args
   in
   match f, args with
+  | _, [] -> f
   | Fun (ret, l), l' -> apply_fun ret l l'
   | _, _ -> failwith "Type.apply_fun: expected function type"
 

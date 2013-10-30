@@ -88,7 +88,7 @@ module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : Ctx.t -> untyped -> scope -> Type.t * typed closure
+  val infer : ?pred:bool -> Ctx.t -> untyped -> scope -> Type.t * typed closure
     (** Infer the type of this term under the given signature. This updates
         the context's typing environment! The resulting type's variables
         belong to the given scope.
@@ -96,6 +96,7 @@ module type S = sig
         @param ctx the context
         @param untyped the untyped term whose type must be inferred
         @param scope where the term's type variables live
+        @param pred true if we expect a predicate (return type {!Type.o})
 
         @return the inferred type of the untyped term (possibly a type var)
           along with a closure to produce a typed term once every

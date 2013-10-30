@@ -71,10 +71,13 @@ let parse_kb kb_files theory_files =
 
 (* conversion to CNF of declarations *)
 let to_cnf ?(ctx=Skolem.create ()) decls =
+  let tyctx = TypeInference.Ctx.create ~base:true () in
   let seq = Sequence.flatMap
     (function
       | A.FOF(n,role,f,info)
       | A.TFF(n,role,f,info) ->
+        (* type formula *)
+        let f = TypeInference.FO.convert ~ctx:tyctx f in
         begin match role with
         | A.R_conjecture ->
           (* negate conjecture *)
@@ -85,7 +88,9 @@ let to_cnf ?(ctx=Skolem.create ()) decls =
           let clauses = Cnf.cnf_of ~ctx f in
           Sequence.of_list clauses
         end
-      | A.CNF(_,_,c,_) -> Sequence.singleton c
+      | A.CNF(_,_,c,_) ->
+        let c = TypeInference.FO.convert_clause ~ctx:tyctx c in
+        Sequence.singleton c
       | _ -> Sequence.empty)
     decls
   in

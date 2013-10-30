@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module UF = Untyped.Form
 module F = FOFormula
 module A = Ast_tptp
 
@@ -40,6 +41,7 @@ let options =
 
 (* conversion to CNF of declarations *)
 let to_cnf decls =
+  let tyctx = TypeInference.Ctx.create ~base:true () in
   let ctx = Skolem.create () in
   let seq = Sequence.flatMap
     (function
@@ -47,16 +49,24 @@ let to_cnf decls =
       | A.TFF(n,role,f,info) ->
         begin match role with
         | A.R_conjecture ->
+          (* type conjecture *)
+          let f = TypeInference.FO.convert ~ctx:tyctx f in
           (* negate conjecture *)
           let clauses = Cnf.cnf_of ~ctx (F.mk_not f) in
           Sequence.map
-            (fun c -> A.CNF(n,A.R_negated_conjecture,c,info))
+            (fun c ->
+              let c = List.map F.erase_types c in
+              A.CNF(n,A.R_negated_conjecture,c,info))
             (Sequence.of_list clauses)
         | _ ->
+          (* type conjecture *)
+          let f = TypeInference.FO.convert ~ctx:tyctx f in
           (* translate, keeping the same role *)
           let clauses = Cnf.cnf_of ~ctx f in
           Sequence.map
-            (fun c -> A.CNF(n,role,c,info))
+            (fun c ->
+              let c = List.map F.erase_types c in
+              A.CNF(n,role,c,info))
             (Sequence.of_list clauses)
         end
       | A.CNF _ as d -> Sequence.singleton d

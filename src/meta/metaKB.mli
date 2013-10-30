@@ -138,9 +138,10 @@ val backward_chain : t -> MetaPattern.EncodedForm.t -> lemma_back_chain list
 
 (** {2 IO} *)
 
-val parse_theory_file : string -> t
+val parse_theory_file : ?base:Signature.t -> string -> t
   (** Parse the given file (blocking). On failure, logs an error
-      and return the empty KB. *)
+      and return the empty KB.
+      @param base signature to start with *)
 
 val save : string -> t -> unit
   (** Save to the file (blocking) *)

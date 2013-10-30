@@ -42,6 +42,9 @@ val error_to_string : error -> string
 exception Error of error
   (** Raised when a unification error occurred *)
 
+val fail : Substs.Ty.t -> Type.t -> scope -> Type.t -> scope -> 'a
+  (** Raise an error *)
+
 (** {2 Unification} *)
 
 val unify : ?subst:Substs.Ty.t ->

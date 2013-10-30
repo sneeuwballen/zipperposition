@@ -818,3 +818,13 @@ let arbitrary_pos t =
           choose (stop :: List.mapi (fun i t' -> recurse t' (PB.add pb i)) l) st
     in
     recurse t (PB.of_pos []))
+
+module UT = Untyped.FO
+
+let erase_types ?(depth=0) t =
+  let rec erase t = match t.term with
+  | Var i -> UT.var ~ty:(Type.to_parsed t.ty) (Util.sprintf "X%d" i)
+  | BoundVar i -> UT.var ~ty:(Type.to_parsed t.ty) (Util.sprintf "Y%d" (depth-i-1))
+  | Node (s, l) -> UT.app s (List.map erase l)
+  in
+  erase t

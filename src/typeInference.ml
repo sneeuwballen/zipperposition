@@ -182,8 +182,12 @@ module Ctx = struct
      (in a fresh scope, that is) is returned. Otherwise the known
      type of the symbol is returned along with a new scope,
      so that, for instance, "nil" (the empty list) can have several
-     concrete types (using distinct scopes). *)
-  let type_of_fun ctx s =
+     concrete types (using distinct scopes).
+     
+     @param ret the expected return type (if symbol not declared). Must be ground
+     @arity the expected arity (if not declared)
+  *)
+  let type_of_fun ?ret ~arity ctx s =
     match s with
     | Symbol.Int _
     | Symbol.Rat _
@@ -198,10 +202,16 @@ module Ctx = struct
         try
           STbl.find ctx.symbols s
         with Not_found ->
-          let v = Type.var 0 in
+          let vars = Util.list_range 0 (arity-1) in
+          let vars = List.map Type.var vars in
+          let ret = match ret with
+            | None -> ctx.default
+            | Some ty -> assert (Type.is_ground ty); ty
+          in
+          let ty = Type.(ret <== vars) in
           let scope = _new_scope ctx in
-          STbl.add ctx.symbols s (v, scope);
-          v, scope
+          STbl.add ctx.symbols s (ty, scope);
+          ty, scope
       end
 
   let declare ctx s ty =
@@ -244,14 +254,19 @@ module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : Ctx.t -> untyped -> scope -> Type.t * typed closure
+  val infer : ?pred:bool -> Ctx.t -> untyped -> scope -> Type.t * typed closure
     (** Infer the type of this term under the given signature. This updates
-        the context's typing environment! The resulting type
-        is to be used within the same scope as the last argument.
+        the context's typing environment! The resulting type's variables
+        belong to the given scope.
 
-        @return the inferred type of the untyped term (possibly a type var) and
-          a continuation that converts the term into a typed term given
-          a type substitution
+        @param ctx the context
+        @param untyped the untyped term whose type must be inferred
+        @param scope where the term's type variables live
+        @param pred true if we expect a predicate (return type {!Type.o})
+
+        @return the inferred type of the untyped term (possibly a type var)
+          along with a closure to produce a typed term once every
+          constraint has been solved
         @raise TypeUnif.Error if the types are inconsistent *)
 
   (** {3 Constraining types}
@@ -264,7 +279,7 @@ module type S = sig
         @raise TypeUnif.Error if an inconsistency is detected *)
 
   val constrain_term_type : Ctx.t -> untyped -> scope -> Type.t -> scope -> unit
-    (** Force the term to have the given type in the given scope.
+    (** Force the term's type and the given type to be the same.
         @raise TypeUnif.Error if an inconsistency is detected *)
 end
 
@@ -277,8 +292,8 @@ module FO = struct
   type untyped = UT.t
   type typed = T.t
 
-  let _get_sym ctx s scope =
-    let ty', s' = Ctx.type_of_fun ctx s in
+  let _get_sym ?ret ~arity ctx s scope  =
+    let ty', s' = Ctx.type_of_fun ?ret ~arity ctx s in
     let v = Ctx._new_var ctx in
     Ctx.unify_and_set ctx v scope ty' s';
     v
@@ -294,8 +309,10 @@ module FO = struct
     Ctx._of_parsed ctx ty
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
-    continuation to build a typed term *)
-  let rec infer_rec ctx t s_t =
+    continuation to build a typed term.
+    @param pred true if the term is a predicate *)
+  let rec infer_rec ~pred ctx t s_t =
+    let ret = if pred then Some Type.o else None in
     match t with
     | UT.Var (name, ty) ->
       let ty = _get_ty ctx ty in
@@ -306,15 +323,15 @@ module FO = struct
       in
       ty, closure
     | UT.App (s, []) ->
-      let ty = _get_sym ctx s s_t in
+      let ty = _get_sym ?ret ~arity:0 ctx s s_t in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_const ~ty s
       in
       ty, closure
     | UT.App (s, l) ->
-      let ty_s = _get_sym ctx s s_t in
-      let sub = List.map (fun t' -> infer_rec ctx t' s_t) l in
+      let ty_s = _get_sym ?ret ~arity:(List.length l) ctx s s_t in
+      let sub = List.map (fun t' -> infer_rec ~pred:false ctx t' s_t) l in
       let ty_l, closure_l = List.split sub in
       (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
           We generate a fresh variable 'a, which is also the result. *)
@@ -328,10 +345,11 @@ module FO = struct
       in
       ty_ret, closure
 
-  let infer ctx t s_t =
+  let infer ?(pred=false) ctx t s_t =
     Util.enter_prof prof_infer;
     try
-      let ty, k = infer_rec ctx t s_t in
+      let ty, k = infer_rec ~pred ctx t s_t in
+      if pred then Ctx.unify_and_set ctx ty s_t Type.o s_t; (* check *)
       Util.exit_prof prof_infer;
       ty, k
     with e ->
@@ -376,7 +394,7 @@ module FO = struct
       let closure_f' = infer_form ctx f' s_f in
       (fun renaming subst -> F.mk_not (closure_f' renaming subst))
     | UF.Atom p ->
-      let ty, clos = infer ctx p s_f in
+      let ty, clos = infer ~pred:true ctx p s_f in
       Ctx.unify_and_set ctx ty s_f Type.o s_f;  (* must return Type.o *)
       let closure renaming subst =
         F.mk_atom (clos renaming subst)
@@ -448,8 +466,8 @@ module HO = struct
   type untyped = UT.t
   type typed = T.t
 
-  let _get_sym ctx s scope =
-    let ty', s' = Ctx.type_of_fun ctx s in
+  let _get_sym ?ret ~arity ctx s scope =
+    let ty', s' = Ctx.type_of_fun ?ret ~arity ctx s in
     let v = Ctx._new_var ctx in
     Ctx.unify_and_set ctx v scope ty' s';
     v
@@ -465,8 +483,11 @@ module HO = struct
     Ctx._of_parsed ctx ty
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
-    continuation to build a typed term *)
-  let rec infer_rec ctx t s_t =
+    continuation to build a typed term
+    @param pred true if we expect a proposition
+    @param arity expected number of arguments *)
+  let rec infer_rec ?(arity=0) ~pred ctx t s_t =
+    let ret = if pred then Some Type.o else None in
     match t with
     | UT.Var (name, ty) ->
       let ty = _get_ty ctx ty in
@@ -477,7 +498,7 @@ module HO = struct
       in
       ty, closure
     | UT.Const s ->
-      let ty = _get_sym ctx s s_t in
+      let ty = _get_sym ?ret ~arity ctx s s_t in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_const ~ty s
@@ -485,8 +506,9 @@ module HO = struct
       ty, closure
     | UT.App (_, []) -> assert false
     | UT.App (t, l) ->
-      let ty_t, clos_t = infer_rec ctx t s_t in
-      let ty_l, clos_l = List.split (List.map (fun t' -> infer_rec ctx t' s_t) l) in
+      let ty_t, clos_t = infer_rec ~pred ~arity:(List.length l) ctx t s_t in
+      let ty_l, clos_l = List.split
+        (List.map (fun t' -> infer_rec ~pred:false ctx t' s_t) l) in
       let ty_ret = Ctx._new_var ctx in
       (* t:ty_t, l:ty_l. now we must have  ty_t = (ty_l -> ty_ret) *)
       Ctx.unify_and_set ctx ty_t s_t Type.(ty_ret <== ty_l) s_t;
@@ -497,8 +519,8 @@ module HO = struct
       in
       ty_ret, closure
     | UT.Lambda (v, t) ->
-      let ty_t, clos_t = infer_rec ctx t s_t in
-      let ty_v, clos_v = infer_rec ctx v s_t in
+      let ty_t, clos_t = infer_rec ~pred:false ctx t s_t in
+      let ty_v, clos_v = infer_rec ~pred:false ctx v s_t in
       (* type is ty_v -> ty_t *)
       let ty = Type.(ty_t <=. ty_v) in
       let closure renaming subst =
@@ -508,10 +530,11 @@ module HO = struct
       in
       ty, closure 
 
-  let infer ctx t s_t =
+  let infer ?(pred=false) ctx t s_t =
     Util.enter_prof prof_infer;
     try
-      let ty, k = infer_rec ctx t s_t in
+      let ty, k = infer_rec ~pred ctx t s_t in
+      if pred then Ctx.unify_and_set ctx ty s_t Type.o s_t; (* check *)
       Util.exit_prof prof_infer;
       ty, k
     with e ->
@@ -528,7 +551,7 @@ module HO = struct
     Ctx.unify_and_set ctx ty1 s_t ty s_ty
 
   let constrain ~ctx t =
-    let _ = infer ctx t 0 in  (* TODO return bool *)
+    let _ = infer ~pred:true ctx t 0 in
     ()
 
   let convert ~ctx t =
@@ -540,8 +563,7 @@ module HO = struct
   let convert_seq ~ctx terms =
     let closures = Sequence.map
       (fun t ->
-        (* TODO: check that they are all bool? *)
-        let _, closure = infer ctx t 0 in
+        let _, closure = infer ~pred:true ctx t 0 in
         closure)
       terms
     in

@@ -493,11 +493,6 @@ let formulas_of_statements statements =
       | A.Error _ -> Sequence.empty)
     statements
 
-(* infer signature from statement *)
-let signature_of_statement stmt =
-  TypeInference.FO.signature_forms
-    (formulas_of_statements (Sequence.singleton stmt))
-
 (* apply the axiom definition to args, getting back a pattern,args *)
 let apply_axiom axiom args =
   match axiom with
@@ -532,19 +527,28 @@ let fmap_premises f premises =
     premises
 
 (** Map the terms to fresh variables, returning a permutation
-    FIXME use proper types, or type variables *)
+    FIXME use proper types, or type variables? *)
 let map_to_vars ?(offset=0) terms =
-  let vars = List.mapi (fun i t -> T.mk_var ~ty:Type.i (i+offset)) terms in
+  let vars = List.mapi
+    (fun i _ ->
+      let ty = Type.var i in
+      T.mk_var ~ty (i+offset))
+    terms
+  in
   TBij.of_list terms vars
 
-let str_to_terms l = List.map (fun s -> T.mk_const (Symbol.mk_const s)) l
+let str_to_terms l =
+  List.map (fun s -> T.mk_const ~ty:Type.i (Symbol.mk_const s)) l
 
 (** Conversion of a list of Ast_theory.statement to a KB *)
-let kb_of_statements ?(init=empty) statements =
-  let convert_premise ~signature = function
+let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
+  let base = Signature.curry base in
+  let ctx = TypeInference.Ctx.of_signature base in
+  let convert_premise = function
     | A.IfPattern f ->
+      let f = TypeInference.FO.convert ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
-      let pat, args = MetaPattern.create ~signature f' in
+      let pat, args = MetaPattern.create f' in
       IfPattern (pat, args)
     | A.IfAxiom (s, args) ->
       let args = str_to_terms args in
@@ -555,13 +559,13 @@ let kb_of_statements ?(init=empty) statements =
   in
   let add_statement kb statement =
     (* infer types *)
-    let signature = Signature.curry (signature_of_statement statement) in
     match statement with
     | A.Axiom (s, args, f) ->
       (* convert axiom *)
       let left = str_to_terms args in
+      let f = TypeInference.FO.convert ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
-      let p, right = MetaPattern.create ~signature f' in
+      let p, right = MetaPattern.create f' in
       (* map to variables *)
       let perm = map_to_vars left in
       (* replace by variables *)
@@ -572,9 +576,10 @@ let kb_of_statements ?(init=empty) statements =
       add_axiom kb axiom
     | A.LemmaInline (f, premises) ->
       (* describe a lemma *)
+      let f = TypeInference.FO.convert ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
-      let pat, args = MetaPattern.create ~signature f' in
-      let premises = List.map (convert_premise ~signature) premises in
+      let pat, args = MetaPattern.create f' in
+      let premises = List.map convert_premise premises in
       let args' = gather_premises_terms premises in
       assert (List.for_all (fun t -> List.memq t args') args);  (* check safe *)
       (* map args' to fresh variables *)
@@ -584,7 +589,7 @@ let kb_of_statements ?(init=empty) statements =
       add_lemma kb lemma
     | A.Lemma (s, args, premises) ->
       let args = str_to_terms args in
-      let premises = List.map (convert_premise ~signature) premises in
+      let premises = List.map convert_premise premises in
       let l = gather_premises_terms premises in
       assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
       (* map symbols to variables *)
@@ -601,7 +606,7 @@ let kb_of_statements ?(init=empty) statements =
       end
     | A.Theory (s, args, premises) ->
       let args = str_to_terms args in
-      let premises = List.map (convert_premise ~signature) premises in
+      let premises = List.map convert_premise premises in
       let l = gather_premises_terms premises in
       assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
       (* map symbols to variables *)
@@ -621,7 +626,7 @@ let kb_of_statements ?(init=empty) statements =
 (** {2 IO} *)
 
 (** Parse a theory file, and build a KB out of it *)
-let parse_theory_file filename =
+let parse_theory_file ?base filename =
   try
     let ic = open_in filename in
     let lexbuf = Lexing.from_channel ic in
@@ -633,7 +638,7 @@ let parse_theory_file filename =
       empty
     with Not_found ->
       (* no error, proceed *)
-      let kb = kb_of_statements (Sequence.of_list statements) in
+      let kb = kb_of_statements ?base (Sequence.of_list statements) in
       kb
     end
   with

@@ -31,7 +31,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 let printable_char = [^ '\n']
 let not_star_slash = ([^ '*']* '*'+ [^ '/' '*'])* [^ '*']*
-let comment_line = '%' printable_char*
+let comment_line = ['%' '#'] printable_char*
+let comment_block = '/' '*' not_star_slash '*' '/'
+let comment = comment_line | comment_block
 
 let sq_char = [^ '\\' '''] | "\\\\" | "\\'"
 let do_char = [^ '"' '\\' ] |  "\\\\" | "\\\""
@@ -74,7 +76,8 @@ let dollar_word = '$' lower_word
 let dollar_dollar_word = "$$" lower_word
 
 rule token = parse
-  | comment_line { token lexbuf }
+  | comment { token lexbuf }
+  | comment_block { token lexbuf }  (* TODO: count new lines in lexeme lexbuf *)
   | '\n' { Lexing.new_line lexbuf; token lexbuf }
   | [' ' '\t' '\r'] { token lexbuf }
   | eof { EOI }
@@ -86,13 +89,14 @@ rule token = parse
   | "lemma" { LEMMA }
   | "include" { INCLUDE }
   | "raw" { RAW }
-  | "$tType" { TYPE_TY }
   | vline { VLINE }
   | '&' { AND }
+  | "!>" { FORALL_TY }
   | '!' { FORALL }
   | '?' { EXISTS }
-  | "!>" { FORALL_TY }
-  (* | '^' { LAMBDA } *)
+  | "$true" { TRUE }
+  | "$false" { FALSE }
+  | "$tType" { TYPE_TY }
   (* | ';' { SEMICOLUMN } *)
   | ':' { COLUMN }
   | '>' { ARROW }

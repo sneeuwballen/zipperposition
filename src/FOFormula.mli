@@ -217,3 +217,7 @@ val arbitrary : t QCheck.Arbitrary.t (* any formula (DB-closed) *)
 (** {2 Containers} *)
 
 module Tbl : Hashtbl.S with type key = t
+
+(** {2 Type erasure} *)
+
+val erase_types : t -> Untyped.Form.t

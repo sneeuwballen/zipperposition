@@ -35,13 +35,12 @@ module HOT = HOTerm
 let prof_matching = Util.mk_profiler "meta.pattern.matching"
 let prof_encode = Util.mk_profiler "meta.pattern.encode"
 let prof_decode = Util.mk_profiler "meta.pattern.decode"
-let prof_foo = Util.mk_profiler "meta.pattern.foo"
 
 let __var_symbol = Symbol.mk_const "V"
 let __fun_symbol = Symbol.mk_const "S"
 
-let __var = HOT.mk_const __var_symbol
-let __fun = HOT.mk_const __fun_symbol
+let __var ty = HOT.mk_const ~ty:Type.(ty <=. ty) __var_symbol
+let __fun ty = HOT.mk_const ~ty:Type.(ty <=. ty) __fun_symbol
 
 (** {2 Encoding as terms} *)
 
@@ -59,29 +58,30 @@ module EncodedForm = struct
           that we won't match an abstracted symbol with a variable, e.g.
           (p a) with (p X) once a is abstracted to A. (p X) will become
           (p (__var X)), and the substitution will be rejected. *)
-      HOT.mk_at __var t
+      HOT.mk_at (__var t.HOT.ty) [t]
     | HOT.BoundVar _ -> t
-    | HOT.Bind (s, t') ->
-      let ty = HOT.get_type t in
-      HOT.mk_bind ~ty s (encode_t t')
+    | HOT.Lambda t' ->
+      let varty = HOT.lambda_var_ty t in
+      HOT.mk_lambda ~varty (encode_t t')
     | HOT.Const s when not (Symbol.is_connective s) -> 
       (** Similarly to the Var case, here we need to protect constants
           from being bound to variables once abstracted into variables *)
-      HOT.mk_at __fun t
+      HOT.mk_at (__fun t.HOT.ty) [t]
     | HOT.Const _ -> t
-    | HOT.At (t1, t2) -> HOT.mk_at (encode_t t1) (encode_t t2)
+    | HOT.At (t, l) ->
+      HOT.mk_at (encode_t t) (List.map encode_t l)
 
   (* Inverse operation of {! encode_t} *)
   let rec decode_t t = match t.HOT.term with
     | HOT.Var _
     | HOT.BoundVar _ -> t
-    | HOT.Bind (s, t') ->
-      let ty = HOT.get_type t in
-      HOT.mk_bind ~ty s (decode_t t')
-    | HOT.At (s, t') when HOT.eq s __var -> decode_t t'
-    | HOT.At (s, t') when HOT.eq s __fun -> decode_t t'
+    | HOT.Lambda t' ->
+      let varty = HOT.lambda_var_ty t in
+      HOT.mk_lambda ~varty (decode_t t')
     | HOT.Const _ -> t
-    | HOT.At (t1, t2) -> HOT.mk_at (decode_t t1) (decode_t t2)
+    | HOT.At ({HOT.term=HOT.Const s}, [t'])
+      when (Symbol.eq s __var_symbol || Symbol.eq s __fun_symbol) -> decode_t t'
+    | HOT.At (t, l) -> HOT.mk_at (decode_t t) (List.map decode_t l)
 
   let encode f =
     Util.enter_prof prof_encode;
@@ -106,10 +106,14 @@ module EncodedForm = struct
   let fmt = HOT.fmt
 end
 
-(** {2 Main type} *)
+(** {2 Main type}
 
-(** We encode formulas as terms, because it allows us to lambda-abstract
-    over them, which makes the order of variables pretty clear. *)
+We encode formulas as terms, because it allows us to lambda-abstract
+over them, which makes the order of variables pretty clear.
+
+TODO: remove the list of types, the EncodedForm already contains a function
+type
+*)
 
 type t =
   | Pattern of EncodedForm.t * Type.t list
@@ -150,53 +154,37 @@ let bij =
 
 (* list of constants, in prefix traversal order *)
 let rec functions_in_order acc t = match t.HOT.term with
-  | HOT.Bind (s, t') ->
-    functions_in_order acc t'
+  | HOT.Lambda t' -> functions_in_order acc t'
   | HOT.Const s when not (Symbol.is_connective s)
     && not (Symbol.eq s __var_symbol)
     && not (Symbol.eq s __fun_symbol) -> (* constant, add it *)
-    if List.exists (fun s' -> Symbol.eq s s') acc then acc else s :: acc
+    if List.memq t acc then acc else t :: acc
   | HOT.Const _
   | HOT.Var _
   | HOT.BoundVar _ -> acc
-  | HOT.At (t1, t2) ->
-    let acc = functions_in_order acc t1 in
-    functions_in_order acc t2
+  | HOT.At (t, l) ->
+    let acc = functions_in_order acc t in
+    List.fold_left functions_in_order acc l
 
-let create ~signature f =
+let create f =
   (* gather interesting symbols to abstract *)
   let symbols = List.rev (functions_in_order [] f) in
-  let funs = List.map HOT.mk_const symbols in
   (* create pattern by lambda abstraction *)
-  let pat = Lambda.lambda_abstract_list ~signature f funs in
-  Pattern (pat, List.map (Signature.find signature) symbols), funs
+  let pat = Lambda.lambda_abstract_list f symbols in
+  Pattern (pat, List.map HOT.get_type symbols), symbols
 
 let arity = function
   | Pattern (_, l) -> List.length l
 
-let can_apply ~signature (pat,args) =
+let can_apply (pat,args) =
   match pat with
   | Pattern (t, types) ->
     (* type checking for compatibility of [args] and [types] *)
-    if List.length types <> List.length args
-      then false
-      else
-        let ctx = TypeInference.Ctx.of_signature signature in
-        try
-          List.iter2
-            (fun t ty -> TypeInference.HO.constrain_term_type ctx t 0 ty 1)
-            args types;
-          true
-        with TypeUnif.Error _ ->
-          false
+    Lambda.can_apply t.HOT.ty (List.map HOT.get_type args)
 
 let apply (pat, args) =
   match pat with
-  | Pattern (t, types) ->
-    (* type checking for compatibility of [args] and [types] *)
-    assert (List.length types = List.length args);
-    let t = List.fold_right (fun arg t -> HOT.mk_at t arg) args t in
-    Lambda.beta_reduce t
+  | Pattern (t, types) -> Lambda.lambda_apply_list t args
 
 (** Maps a pattern, parametrized by some of its variables, into datalog terms *)
 let mapping =
@@ -232,10 +220,7 @@ let matching pat right =
     (* instantiate with variables *)
     let offset = HOT.max_var (HOT.vars t') + 1 in
     let vars = List.mapi (fun i ty -> HOT.mk_var ~ty (i+offset)) types in
-    Util.enter_prof prof_foo;
-    let left = List.fold_right (fun arg t -> HOT.mk_at t arg) vars t' in
-    let left = Lambda.beta_reduce left in
-    Util.exit_prof prof_foo;
+    let left = Lambda.lambda_apply_list t' vars in
     (* match left and right *)
     Util.debug 5 "MetaPattern: match %a with %a" HOT.pp left HOT.pp right;
     let substs = matching_terms left 1 right 0 in
@@ -250,11 +235,9 @@ let matching pat right =
     substs
 
 let arbitrary_apply =
-  QCheck.Arbitrary.(map F.arbitrary (fun f ->
-    let signature = TypeInference.FO.signature_forms
-      ~signature:Signature.base (Sequence.singleton f) in
-    let signature = Signature.curry signature in
-    create ~signature (EncodedForm.encode f)))
+  QCheck.Arbitrary.(
+    F.arbitrary >>= fun f ->
+    return (create (EncodedForm.encode f)))
 
 let arbitrary = QCheck.Arbitrary.map arbitrary_apply fst
 

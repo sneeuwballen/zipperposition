@@ -806,3 +806,26 @@ module Tbl = Hashtbl.Make(struct
   let equal = eq
   let hash = hash
 end)
+
+module UT = Untyped.FO
+module UF = Untyped.Form
+
+let erase_types f =
+  let rec erase depth f = match f.form with
+    | True -> UF.mk_true
+    | False -> UF.mk_false
+    | Atom p -> UF.atom (T.erase_types ~depth p)
+    | Equal (t1, t2) -> UF.mk_eq (T.erase_types ~depth t1) (T.erase_types ~depth t2)
+    | And l -> UF.mk_and (List.map (erase depth) l)
+    | Or l -> UF.mk_or (List.map (erase depth) l)
+    | Not f' -> UF.mk_not (erase depth f')
+    | Imply (f1, f2) -> UF.mk_imply (erase depth f1) (erase depth f2)
+    | Equiv (f1, f2) -> UF.mk_equiv (erase depth f1) (erase depth f2)
+    | Forall (ty, f') ->
+      let v = UT.var ~ty:(Type.to_parsed ty) (Util.sprintf "Y%d" depth) in
+      UF.forall [v] (erase (depth+1) f')
+    | Exists (ty, f') ->
+      let v = UT.var ~ty:(Type.to_parsed ty) (Util.sprintf "Y%d" depth) in
+      UF.exists [v] (erase (depth+1) f')
+  in
+  erase 0 f

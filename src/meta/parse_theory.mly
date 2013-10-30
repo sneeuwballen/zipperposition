@@ -28,37 +28,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %{
   open Logtk
 
-  module T = FOTerm
-  module F = FOFormula
+  module T = Untyped.FO
+  module F = Untyped.Form
+  module Ty = Type.Parsed
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
     String.sub s 1 (String.length s - 2)
-
-  let __table = Hashtbl.create 5
-  let __ty_table = Hashtbl.create 5
-
-  (* TODO: check same type, otherwise make new var *)
-  (** Get variable associated with this name *)
-  let get_var ~ty name =
-    try Hashtbl.find __table name
-    with Not_found ->
-      let v = T.mk_var ~ty (Hashtbl.length __table) in
-      Hashtbl.add __table name v;
-      v
-
-  let get_ty_var name =
-    try Hashtbl.find __ty_table name
-    with Not_found ->
-      let v = Type.var (Hashtbl.length __ty_table) in
-      Hashtbl.add __ty_table name v;
-      v
-
-  (** Clear everything in the current context *)
-  let clear_ctx () =
-    Hashtbl.clear __table;
-    Hashtbl.clear __ty_table;
-    ()
 %}
 
 %token EOI
@@ -80,6 +56,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token RAW
 
 %token NOT
+%token TRUE
+%token FALSE
 
 %token COLUMN
 %token STAR
@@ -140,12 +118,6 @@ statements:
   | error statements { [Ast_theory.Error ("syntax error", $startpos($1), $endpos($1))] }
 
 statement:
-  | s=__statement
-    { clear_ctx ();
-      s
-    }
-
-__statement:
   | t=theory { t }
   | a=axiom { a }
   | l=lemma { l }
@@ -204,7 +176,6 @@ datalog_atom:
     { w, args }
 
 /* TPTP formulas */
-
 fof_formula:
   | fof_logic_formula { $1 }
   | fof_sequent { $1 } 
@@ -234,58 +205,32 @@ fof_quantified_formula:
 
 fof_unary_formula:
   | o=unary_connective f=fof_unitary_formula { o f }
-  | f=fol_infix_unary { f }
-
-fol_infix_unary:
-  | l=term o=infix_inequality r=term
-    { o l r }
   
 %inline binary_connective:
   | EQUIV { F.mk_equiv }
   | IMPLY { F.mk_imply }
-  | LEFT_IMPLY { F.mk_imply }
+  | LEFT_IMPLY { fun l r -> F.mk_imply r l }
   | XOR { F.mk_xor }
   | NOTVLINE { fun x y -> F.mk_not (F.mk_or [x; y]) }
-  | NOTAND { fun x y -> F.mk_not (F.mk_and [x;x]) }
+  | NOTAND { fun x y -> F.mk_not (F.mk_and [x; y]) }
   | AND { fun x y -> F.mk_and [x;y] }
   | VLINE { fun x y -> F.mk_or [x;y] }
 %inline fol_quantifier:
-  | FORALL { F.mk_forall_list }
-  | EXISTS { F.mk_exists_list }
+  | FORALL { F.forall }
+  | EXISTS { F.exists }
 %inline unary_connective:
   | NOT { F.mk_not }
-%inline infix_inequality:
-  | NOT_EQUAL { F.mk_neq }
 
 atomic_formula:
-  | plain_atomic_formula { $1 }
-  | defined_atomic_formula { $1 }
-  | system_atomic_formula { $1 }
+  | TRUE { F.mk_true } 
+  | FALSE { F.mk_false }
+  | l=term o=infix_connective r=term { o l r }
+  | function_term { F.atom $1 }
 
-plain_atomic_formula: plain_term { F.mk_atom $1 }
-
-defined_atomic_formula:
-  | defined_plain_formula { $1 }
-  | defined_infix_formula { $1 }
-
-defined_infix_formula:
-  | l=term o=defined_infix_pred r=term  { o l r }
-
-%inline defined_infix_pred:
+%inline infix_connective:
   | EQUAL { F.mk_eq }
+  | NOT_EQUAL { F.mk_neq }
 
-defined_plain_formula:
-  | p=defined_prop
-    { F.mk_atom (T.mk_const p) }
-  | p=defined_pred LEFT_PAREN args=arguments RIGHT_PAREN
-    { F.mk_atom (T.mk_node p args) }
-
-/* includes $true and $false */
-defined_prop: atomic_defined_word { $1 } 
-defined_pred: atomic_defined_word { $1 }
-
-system_atomic_formula: system_term { F.mk_atom $1 }
-  
 /* Terms */
 
 term:
@@ -300,8 +245,8 @@ function_term:
   | system_term { $1 }
 
 plain_term:
-  | s=constant { T.mk_const s }
-  | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
+  | s=constant { T.const s }
+  | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
 
 constant:
 | s=atomic_word { Symbol.mk_const s }
@@ -309,7 +254,7 @@ constant:
 functor_: f=atomic_word { Symbol.mk_const f }
 
 defined_term:
-  | defined_atom { T.mk_const $1 }
+  | defined_atom { T.const $1 }
   | defined_atomic_term { $1 }
 
 defined_atom:
@@ -323,15 +268,15 @@ defined_atomic_term:
   /* | defined_infix_term { $1 } */
 
 defined_plain_term:
-  | s=defined_constant { T.mk_const s }
-  | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
+  | s=defined_constant { T.const s }
+  | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
 
 defined_constant: defined_functor { $1 }
 defined_functor: s=atomic_defined_word { s }
 
 system_term:
-  | c=system_constant { T.mk_const c }
-  | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.mk_node f args }
+  | c=system_constant { T.const c }
+  | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
 
 system_constant: system_functor { $1 }
 system_functor: s=atomic_system_word { s }
@@ -345,16 +290,16 @@ tff_type:
 tff_term_type:
   | ty=tff_atom_type { ty }
   | l=tff_atom_type ARROW r=tff_atom_type
-    { Type.mk_fun r [l] }
+    { Ty.mk_fun r [l] }
   | LEFT_PAREN args=tff_ty_args RIGHT_PAREN ARROW r=tff_atom_type
-    { Type.mk_fun r args }
+    { Ty.mk_fun r args }
 
 tff_atom_type:
   | v=tff_ty_var { v }
-  | w=type_const { Type.const w }
+  | w=type_const { Ty.const w }
   | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_term_type) RIGHT_PAREN
-    { Type.app w l }
-  | TYPE_TY { Type.tType }
+    { Ty.app w l }
+  | TYPE_TY { Ty.tType }
   | LEFT_PAREN ty=tff_term_type RIGHT_PAREN { ty }
 
 tff_ty_args:
@@ -365,7 +310,7 @@ tff_ty_vars:
   | v=tff_ty_var COLUMN TYPE_TY {  [v] }
   | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
 
-tff_ty_var: w=UPPER_WORD { get_ty_var w }
+tff_ty_var: w=UPPER_WORD { Ty.var w }
 
 type_const:
   | w=LOWER_WORD { w }
@@ -376,10 +321,9 @@ arguments: separated_nonempty_list(COMMA, term) { $1 }
 variables:
   | l=separated_nonempty_list(COMMA, variable) { l }
 
-/* TODO: typed variables */
 variable:
-  | x=UPPER_WORD { get_var ~ty:Type.i x }
-  | x=UPPER_WORD COLUMN ty=tff_type { get_var ~ty x }
+  | x=UPPER_WORD { T.var ~ty:Ty.i x }
+  | x=UPPER_WORD COLUMN ty=tff_type { T.var ~ty x }
 
 atomic_word:
   | s=SINGLE_QUOTED { remove_quotes s }

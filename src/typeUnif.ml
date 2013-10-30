@@ -45,7 +45,7 @@ type error = {
 
 exception Error of error
 
-let _error subst ty1 s1 ty2 s2 =
+let fail subst ty1 s1 ty2 s2 =
   raise (Error {
     left = ty1;
     s_left = s1;
@@ -86,11 +86,11 @@ let rec _unify_rec subst ty1 s1 ty2 s2 =
   | _ when s1 = s2 && Ty.eq ty1 ty2 -> subst
   | Ty.Var _, _ ->
     if _occur_check subst ty1 s1 ty2 s2
-      then _error subst ty1 s1 ty2 s2
+      then fail subst ty1 s1 ty2 s2
       else S.bind subst ty1 s1 ty2 s2
   | _, Ty.Var _ ->
     if _occur_check subst ty2 s2 ty1 s1
-      then _error subst ty2 s2 ty1 s1
+      then fail subst ty2 s2 ty1 s1
       else S.bind subst ty2 s2 ty1 s1
   | Ty.App (sym1, l1), Ty.App (sym2, l2) when sym1 = sym2 && List.length l1 = List.length l2 ->
     List.fold_left2
@@ -103,7 +103,7 @@ let rec _unify_rec subst ty1 s1 ty2 s2 =
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
       subst
       l1 l2
-  | _ -> _error subst ty1 s1 ty2 s2
+  | _ -> fail subst ty1 s1 ty2 s2
 
 let unify ?(subst=S.create 10) ty1 s1 ty2 s2 =
   Util.enter_prof prof_unify;
@@ -146,7 +146,7 @@ let rec _match_rec ~protect subst ty1 s1 ty2 s2 =
   | Ty.Var _, _ ->
     (* fail if occur check, or if we need to bind a protected variable *)
     if _occur_check subst ty1 s1 ty2 s2 || (List.memq ty1 protect && s1 = s2)
-      then _error subst ty1 s1 ty2 s2
+      then fail subst ty1 s1 ty2 s2
       else S.bind subst ty1 s1 ty2 s2
   | Ty.App (sym1, l1), Ty.App (sym2, l2) when sym1 = sym2 && List.length l1 = List.length l2 ->
     List.fold_left2
@@ -159,7 +159,7 @@ let rec _match_rec ~protect subst ty1 s1 ty2 s2 =
       (fun subst ty1 ty2 -> _match_rec ~protect subst ty1 s1 ty2 s2)
       subst
       l1 l2
-  | _ -> _error subst ty1 s1 ty2 s2
+  | _ -> fail subst ty1 s1 ty2 s2
 
 let match_ ?(subst=S.create 6) ty1 s1 ty2 s2 =
   Util.enter_prof prof_match;
@@ -193,9 +193,9 @@ let rec _variant_rec subst ty1 s1 ty2 s2 =
     (* can bind variables if they do not belong to the same scope *)
     if s1 <> s2
       then S.bind subst ty1 s1 ty2 s2
-      else _error subst ty1 s1 ty2 s2
+      else fail subst ty1 s1 ty2 s2
   | _, Ty.Var _
-  | Ty.Var _, _ -> _error subst ty2 s2 ty1 s1
+  | Ty.Var _, _ -> fail subst ty2 s2 ty1 s1
   | Ty.App (sym1, l1), Ty.App (sym2, l2) when sym1 = sym2 && List.length l1 = List.length l2 ->
     List.fold_left2
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
@@ -207,7 +207,7 @@ let rec _variant_rec subst ty1 s1 ty2 s2 =
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
       subst
       l1 l2
-  | _ -> _error subst ty1 s1 ty2 s2
+  | _ -> fail subst ty1 s1 ty2 s2
 
 let variant ?(subst=S.create 10) ty1 s1 ty2 s2 =
   Util.enter_prof prof_variant;

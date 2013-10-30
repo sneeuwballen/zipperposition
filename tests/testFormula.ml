@@ -36,7 +36,10 @@ module F = FOFormula
 let printer = F.to_string
 
 (* parse a formula *)
-let pform s = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s)
+let pform s =
+  let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
+  let ctx = TypeInference.Ctx.create () in
+  TypeInference.FO.convert ~ctx f
 
 let test_mk_not () =
   assert_equal ~cmp:F.eq ~printer F.mk_true (F.mk_not F.mk_false);

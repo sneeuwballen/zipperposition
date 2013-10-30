@@ -218,20 +218,25 @@ let rec mk_at t l = match t.term, l with
   | _, [] ->
     t (* t @ [] ---> t *)
   | _, _ ->
-    (* infer the type returned by the function application *)
-    let ty = Type.apply_fun t.ty (List.map get_type l) in
-    let my_t = {term=At (t,l); ty; tsize=0; flags=0; tag= -1} in
-    let t = H.hashcons my_t in
-    (if t == my_t
-      then begin
-        (* compute ground-ness of term *)
-        let is_ground = get_flag flag_ground t &&
-          List.for_all (get_flag flag_ground) l
-        in
-        set_flag flag_ground t is_ground;
-        t.tsize <- List.fold_left (fun s t' -> s + t'.tsize) (t.tsize+1) l;
-      end);
-    t
+    let ty_args = List.map get_type l in
+    try
+      (* infer the type returned by the function application *)
+      let ty = Type.apply_fun t.ty ty_args in
+      let my_t = {term=At (t,l); ty; tsize=0; flags=0; tag= -1} in
+      let t = H.hashcons my_t in
+      (if t == my_t
+        then begin
+          (* compute ground-ness of term *)
+          let is_ground = get_flag flag_ground t &&
+            List.for_all (get_flag flag_ground) l
+          in
+          set_flag flag_ground t is_ground;
+          t.tsize <- List.fold_left (fun s t' -> s + t'.tsize) (t.tsize+1) l;
+        end);
+      t
+    with Failure msg ->
+      failwith (Util.sprintf "%s (applying %a to %a)"
+        msg Type.pp t.ty (Util.pp_list Type.pp) ty_args)
 
 let true_term = mk_const ~ty:Type.o Symbol.true_symbol
 let false_term = mk_const ~ty:Type.o Symbol.false_symbol

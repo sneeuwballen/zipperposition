@@ -71,20 +71,19 @@ end
 
 (** Pattern creation and application *)
 
-val create : signature:Signature.t -> EncodedForm.t -> t * HOTerm.t list
+val create : EncodedForm.t -> t * HOTerm.t list
   (** Create a pattern by abstracting its symbols (which are returned
       as a list of constants) *)
 
 val arity : t -> int
   (** Number of arguments of the pattern *)
 
-val can_apply : signature:Signature.t -> t * HOTerm.t list -> bool
+val can_apply : t * HOTerm.t list -> bool
   (** Is the application type-safe? *)
 
 val apply : t * HOTerm.t list -> EncodedForm.t
   (** Apply the pattern to the given constants/terms to get back a formula.
-      Arity of the pattern must match the length of the list.
-      {b Warning}: Types are not checked!*)
+      Arity of the pattern must match the length of the list. *)
 
 val mapping : (t * HOTerm.t list) MetaReasoner.Translate.mapping
   (** Bidirectional translation to Datalog literals *)

@@ -48,11 +48,17 @@ module FO : sig
   val app : Symbol.t -> t list -> t
   val const : Symbol.t -> t
   val var : ty:Type.Parsed.t -> string -> t
+
+  val symbols : t Sequence.t -> Symbol.Set.t
   
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
+
+  val arbitrary : t QCheck.Arbitrary.t
+  val arbitrary_pred : t QCheck.Arbitrary.t
+  val arbitrary_ground : t QCheck.Arbitrary.t
 end
 
 (** {2 First Order formulas} *)
@@ -104,6 +110,9 @@ module Form : sig
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
+
+  val arbitrary : t QCheck.Arbitrary.t
+  val arbitrary_clause : t list QCheck.Arbitrary.t
 end
 
 (** {2 Higher order Terms} *)
