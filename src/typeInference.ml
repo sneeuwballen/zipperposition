@@ -62,8 +62,8 @@ module Ctx = struct
     let signature = if base then Signature.base else Signature.empty in
     let ctx = {
       default;
-      scope = 1;
-      var = 0;
+      scope = ~-1;
+      var = ~-1;
       db = [];
       signature;
       subst = S.create 17;
@@ -76,7 +76,7 @@ module Ctx = struct
   let of_signature ?(default=Type.i) signature =
     let ctx = {
       default;
-      scope = 1;
+      scope = ~-1;
       var = ~-1;
       db = [];
       signature;
@@ -109,14 +109,14 @@ module Ctx = struct
 
   let _new_scope ctx =
     let n = ctx.scope in
-    ctx.scope <- n+1;
+    ctx.scope <- n-1;
     n
 
   (* generate fresh vars. Those should always live in their own scope *)
   let _new_var ctx =
     let n = ctx.var in
-    ctx.var <- n + 1 ;
-    Type.var n
+    ctx.var <- n - 1 ;
+    Type.__var n
 
   let _of_parsed ctx ty =
     Type.of_parsed ~ctx:ctx.tyctx ty
