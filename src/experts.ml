@@ -47,7 +47,7 @@ type t = {
   expert_name : string;                 (** Theory the expert works on *)
   expert_descr : string;                (** Description of the expert *)
   expert_equal : T.t -> T.t -> bool;  (** Check whether two terms are equal *)
-  expert_sig : Symbol.SSet.t;           (** Symbols of the theory *)
+  expert_sig : Symbol.Set.t;           (** Symbols of the theory *)
   expert_clauses : Clause.t list;        (** Additional axioms *)
   expert_canonize : T.t -> T.t;       (** Get a canonical form of the term *)
   expert_ord : Ordering.t -> bool;        (** Compatible with ord? *)
@@ -74,7 +74,7 @@ let compatible e1 e2 =
   e1.expert_ctx == e2.expert_ctx &&
   compatible_ord e1 ~ord:(Ctx.ord e1.expert_ctx) =
     compatible_ord e2 ~ord:(Ctx.ord e2.expert_ctx) &&
-  Symbol.SSet.is_empty (Symbol.SSet.inter e1.expert_sig e2.expert_sig)
+  Symbol.Set.is_empty (Symbol.Set.inter e1.expert_sig e2.expert_sig)
 
 (** Combine two decision procedures into a new one, that decides
     the combination of their theories, assuming they are compatible. *)
@@ -95,7 +95,7 @@ let rec combine e1 e2 =
     expert_descr =
       Util.sprintf "union of %s and %s" e1.expert_descr e2.expert_descr;
     expert_equal;
-    expert_sig = Symbol.SSet.union e1.expert_sig e2.expert_sig;
+    expert_sig = Symbol.Set.union e1.expert_sig e2.expert_sig;
     expert_clauses = List.rev_append e1.expert_clauses e2.expert_clauses;
     expert_canonize = nf;
     expert_ord = (fun o -> e1.expert_ord o && e2.expert_ord o);
@@ -284,20 +284,20 @@ type gnd_convergent = {
   gc_ord : string;              (** name of the ordering *)
   gc_theory : string;           (** Theory that is decided *)
   gc_prec : Symbol.t list;        (** Precedence *)
-  gc_sig : Symbol.SSet.t;              (** Symbols of the theory *)
+  gc_sig : Symbol.Set.t;              (** Symbols of the theory *)
   gc_eqns : Clause.t list;       (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
 let mk_gc ~theory ~ord ~prec clauses =
   let signature = C.signature (Sequence.of_list clauses) in
-  let signature = Symbol.SMap.filter
+  let signature = Symbol.Map.filter
     (fun s _ -> not (Symbol.is_connective s)) signature in
   (* check that every clause is a positive equation *)
   assert (List.for_all
     (fun c -> match c.C.hclits with 
      | [| Literal.Equation (_,_,true,_)|] -> true | _ -> false) clauses);
   let set = Signature.to_symbols signature in
-  let set = Symbol.SSet.of_seq (Sequence.of_list set) in
+  let set = Symbol.Set.of_seq (Sequence.of_list set) in
   { gc_ord = ord;
     gc_theory = theory;
     gc_prec = prec;
@@ -355,7 +355,7 @@ let rec gc_expert ~ctx gc =
   (* name and printing stuff *)
   let expert_sig = gc.gc_sig in
   let theory = Util.sprintf "%s_%a" gc.gc_theory
-    (Util.pp_seq ~sep:"_" Symbol.pp) (Symbol.SSet.to_seq expert_sig) in
+    (Util.pp_seq ~sep:"_" Symbol.pp) (Symbol.Set.to_seq expert_sig) in
   let expert_name = Util.sprintf "gc_%s" theory in
   (* update clauses with the context *)
   let expert_clauses = List.map (C.update_ctx ~ctx) gc.gc_eqns in
@@ -410,7 +410,7 @@ let ac ~ctx f =
     expert_name = Util.sprintf "AC_%s" (Symbol.to_string f);
     expert_descr = Util.sprintf "AC for symbol %s" (Symbol.to_string f);
     expert_equal;
-    expert_sig = Symbol.SSet.singleton f;
+    expert_sig = Symbol.Set.singleton f;
     expert_clauses = []; (* TODO *)
     expert_canonize;
     expert_ord = (fun _ -> true);

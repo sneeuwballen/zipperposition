@@ -43,6 +43,8 @@ let prof_mk_hclause_raw = Util.mk_profiler "mk_hclause_raw"
 
 (** {2 Type def} *)
 
+type scope = Substs.scope
+
 type t = {
   hclits : Literal.t array;               (** the literals *)
   hcctx : Ctx.t;                          (** context of the clause *)
@@ -172,9 +174,10 @@ let __no_select = BV.empty ()
 let create_a ?parents ?selected ~ctx lits proof =
   Util.incr_stat stat_mk_hclause;
   Util.enter_prof prof_mk_hclause;
-  (* Rename variables *)
+  (* Rename variables.
+    TODO: type-check, so that variables' types may be specialized? *)
   let renaming = Ctx.renaming_clear ~ctx in
-  let lits = Lits.apply_subst ~recursive:false ~renaming ~ord:ctx.Ctx.ord
+  let lits = Lits.apply_subst ~renaming ~ord:ctx.Ctx.ord
     S.empty lits 0 in
   let all_vars = Lits.vars lits in
   (* create the structure *)
@@ -260,11 +263,11 @@ let check_ord ~ord c =
 
 (** Apply substitution to the clause. Note that using the same renaming for all
     literals is important. *)
-let rec apply_subst ?recursive ~renaming subst c scope =
+let rec apply_subst ~renaming subst c scope =
   let ctx = c.hcctx in
   let ord = Ctx.ord ~ctx in
   let lits = Array.map
-    (fun lit -> Lit.apply_subst ?recursive ~renaming ~ord subst lit scope)
+    (fun lit -> Lit.apply_subst ~renaming ~ord subst lit scope)
     c.hclits in
   let descendants = c.hcdescendants in
   let proof = Proof.adapt_c c.hcproof in
@@ -277,9 +280,7 @@ let rec apply_subst ?recursive ~renaming subst c scope =
 let maxlits c scope subst =
   let ord = Ctx.ord c.hcctx in
   let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
-  let lits =
-    Lits.apply_subst ~recursive:true ~ord ~renaming subst c.hclits scope
-  in
+  let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
   Lits.maxlits ~ord lits
 
 (** Check whether the literal is maximal *)
@@ -373,15 +374,15 @@ let is_oriented_rule c = match c.hclits with
   | [| Lit.Equation (_,_,true,Comparison.Lt) |] -> true (* oriented *)
   | _ -> false
 
-let infer_type ctx clauses =
+let infer_type ctx clauses s_c =
   Sequence.iter
-    (fun c -> Lits.infer_type ctx c.hclits)
+    (fun c -> Lits.infer_type ctx c.hclits s_c)
     clauses
 
 (** Compute signature of this set of clauses *)
 let signature ?(signature=Signature.empty) clauses =
   let ctx = TypeInference.Ctx.of_signature signature in
-  infer_type ctx clauses;
+  infer_type ctx clauses 0;
   TypeInference.Ctx.to_signature ctx
 
 let from_forms ~file ~name ~ctx forms =
@@ -515,7 +516,7 @@ module CSet = struct
 
   let of_seq set seq = Sequence.fold add set seq
 
-  let infer_type ctx set = infer_type ctx (to_seq set)
+  let infer_type ctx set scope = infer_type ctx (to_seq set) scope
 
   let remove_seq set seq = Sequence.fold remove set seq
 

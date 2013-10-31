@@ -59,13 +59,13 @@ module AC : sig
   val exists_ac : spec:t -> bool
     (** Are some symbols AC? *)
 
-  val symbols : spec:t -> Symbol.SSet.t
+  val symbols : spec:t -> Symbol.Set.t
     (** set of AC symbols *)
 
-  val symbols_of_terms : spec:t -> FOTerm.t Sequence.t -> Symbol.SSet.t
+  val symbols_of_terms : spec:t -> FOTerm.t Sequence.t -> Symbol.Set.t
     (** set of AC symbols occurring in the given term *)
 
-  val symbols_of_forms : spec:t -> FOFormula.t Sequence.t -> Symbol.SSet.t
+  val symbols_of_forms : spec:t -> FOFormula.t Sequence.t -> Symbol.Set.t
     (** Set of AC symbols occurring in the given formula *)
 
   val proofs : spec:t -> Proof.t list

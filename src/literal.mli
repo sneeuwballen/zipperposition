@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type scope = Substs.scope
+
 type t = private
   | Equation of FOTerm.t * FOTerm.t * bool * Comparison.t
   | Prop of FOTerm.t * bool
@@ -44,7 +46,9 @@ val hash : t -> int
 val hash_novar : t -> int
 
 val variant : ?subst:Substs.FO.t ->
-              t -> Substs.scope -> t -> Substs.scope -> Substs.FO.t
+              t -> scope -> t -> scope ->
+              Substs.FO.t
+  (** Are two literals alpha-equivalent? *)
 
 val are_variant : t -> t -> bool
 
@@ -103,7 +107,7 @@ val to_tuple : t -> (FOTerm.t * FOTerm.t * bool)
 val form_of_lit : t -> FOFormula.t
 val term_of_lit : t -> HOTerm.t                   (** translate lit to term *)
 
-val apply_subst : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
+val apply_subst : renaming:Substs.FO.Renaming.t ->
                   ord:Ordering.t -> Substs.FO.t -> t -> Substs.scope -> t
 
 val negate : t -> t                     (** negate literal *)
@@ -122,16 +126,23 @@ val at_pos : t -> Position.t -> FOTerm.t
   (** Subterm at given position, or
       @raise Not_found if the position is invalid *)
 
+val type_at_pos : TypeInference.Ctx.t ->
+                  t -> Substs.scope -> Position.t -> Type.t
+  (** Infer the type of the subterm at given position in the given
+      scope and context, and return it. The type is constrained by its
+      surrounding environment (e.g., in [cons(1,nil)], [nil] will
+      have type [int list] and not ['a list] because of its context) *)
+
 val replace_pos : ord:Ordering.t -> t -> at:Position.t -> by:FOTerm.t -> t
   (** Replace subterm, or
       @raise Invalid_argument if the position is invalid *)
 
-val infer_type : TypeInference.Ctx.t -> t -> unit
+val infer_type : TypeInference.Ctx.t -> t -> scope -> unit
 val signature : ?signature:Signature.t -> t -> Signature.t
 
-val apply_subst_list : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
-                        ord:Ordering.t -> Substs.FO.t ->
-                        t list -> Substs.scope -> t list
+val apply_subst_list : renaming:Substs.FO.Renaming.t ->
+                       ord:Ordering.t -> Substs.FO.t ->
+                       t list -> scope -> t list
 
 (** {2 IO} *)
 
@@ -171,9 +182,9 @@ module Arr : sig
 
   val to_form : t array -> FOFormula.t
 
-  val apply_subst : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
-                         ord:Ordering.t -> Substs.FO.t ->
-                         t array -> Substs.scope -> t array
+  val apply_subst : renaming:Substs.FO.Renaming.t ->
+                    ord:Ordering.t -> Substs.FO.t ->
+                    t array -> scope -> t array
 
   val fmap : ord:Ordering.t -> t array -> (FOTerm.t -> FOTerm.t) -> t array
 
@@ -193,7 +204,7 @@ module Arr : sig
   val to_forms : t array -> FOFormula.t list
     (** To list of formulas *)
 
-  val infer_type : TypeInference.Ctx.t -> t array -> unit
+  val infer_type : TypeInference.Ctx.t -> t array -> scope -> unit
   val signature : ?signature:Signature.t -> t array -> Signature.t
 
   (** {3 High order combinators} *)
@@ -201,6 +212,13 @@ module Arr : sig
   val at_pos : t array -> Position.t -> FOTerm.t
     (** Return the subterm at the given position, or
         @raise Not_found if no such position is valid *)
+
+  val type_at_pos : TypeInference.Ctx.t ->
+                    t array -> scope -> Position.t -> Type.t
+    (** Infer the type of the subterm at given position in the given
+        scope and context, and return it. See {!Literal.type_at_pos}.
+        @raise Not_found if the position is not valid.
+        @raise TypeUnif.Error if types are inconsistent. *)
 
   val replace_pos : ord:Ordering.t -> t array -> at:Position.t -> by:FOTerm.t -> unit
     (** In-place modification of the array, in which the subterm at given

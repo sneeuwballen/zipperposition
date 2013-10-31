@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+type scope = Substs.scope
+
 type t = private {
   mutable ord : Ordering.t;           (** current ordering on terms *)
   mutable select : Selection.t;       (** selection function for literals *)
@@ -36,6 +38,7 @@ type t = private {
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
   renaming : Substs.FO.Renaming.t;    (** Renaming, always useful... *)
+  tyctx : TypeInference.Ctx.t;        (** Type context, always useful too *)
   ac : Theories.AC.t;                 (** AC symbols *)
   total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
@@ -85,26 +88,24 @@ val add_order : ctx:t -> ?proof:Proof.t list ->
 
 (** {2 Type inference} *)
 
-val tyctx : ctx:t -> TypeInference.Ctx.t
-  (** Obtain a fresh typing inference context *)
+val tyctx_clear : ctx:t -> TypeInference.Ctx.t
+  (** Obtain the global type inference context. It is cleared (reset)
+      before it is returned. *)
 
 val declare : ctx:t -> Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
-val constrain_term_type : ctx:t -> FOTerm.t -> Type.t -> unit
+val constrain_term_type : ctx:t -> FOTerm.t -> scope -> Type.t -> scope -> unit
   (** Force the term to have the given type, or
       @raise Type.Error if types are incompatible *)
 
-val constrain_term_term : ctx:t -> FOTerm.t -> FOTerm.t -> unit
+val constrain_term_term : ctx:t -> FOTerm.t -> scope -> FOTerm.t -> scope -> unit
   (** Constrain the two terms to have the same type, or
       @raise Type.Error if types are incompatible *)
 
-val infer_type : ctx:t -> FOTerm.t -> Type.t
-  (** Infer the type of this term *)
-
-val check_term_type : ctx:t -> FOTerm.t -> Type.t -> bool
+val check_term_type : ctx:t -> FOTerm.t -> scope -> Type.t -> scope -> bool
   (** [check_term_type ~ctx t ty] checks that [t] can have type [ty]. *)
 
-val check_term_term : ctx:t -> FOTerm.t -> FOTerm.t -> bool
+val check_term_term : ctx:t -> FOTerm.t -> scope -> FOTerm.t -> scope -> bool
   (** [check_term_term ~ctx t1 t2] checks that [t1] and [t2]
       have compatible types *)

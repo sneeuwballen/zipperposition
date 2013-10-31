@@ -41,6 +41,8 @@ val stat_fresh : Util.stat
 val stat_mk_hclause : Util.stat
 val stat_new_clause : Util.stat
 
+type scope = Substs.scope
+
 type t = private {
   hclits : Literal.t array;               (** the literals *)
   hcctx : Ctx.t;                          (** context of the clause *)
@@ -144,7 +146,7 @@ val update_ctx : ctx:Ctx.t -> t -> t
 val check_ord : ord:Ordering.t -> t -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : ?recursive:bool -> renaming:Substs.FO.Renaming.t ->
+val apply_subst : renaming:Substs.FO.Renaming.t ->
                   Substs.FO.t -> t -> Substs.scope -> t
   (** apply the substitution to the clause *)
 
@@ -189,7 +191,7 @@ val is_unit_clause : t -> bool
 val is_oriented_rule : t -> bool
   (** Is the clause a positive oriented clause? *)
 
-val infer_type : TypeInference.Ctx.t -> t Sequence.t -> unit
+val infer_type : TypeInference.Ctx.t -> t Sequence.t -> scope -> unit
 val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
 
 val from_forms : file:string -> name:string -> ctx:Ctx.t -> FOFormula.t list -> t
@@ -297,7 +299,7 @@ module CSet : sig
   val to_list : t -> clause list
   val of_list : clause list -> t
 
-  val infer_type : TypeInference.Ctx.t -> t -> unit
+  val infer_type : TypeInference.Ctx.t -> t -> scope -> unit
 
   val to_seq : t -> clause Sequence.t
   val of_seq : t -> clause Sequence.t -> t

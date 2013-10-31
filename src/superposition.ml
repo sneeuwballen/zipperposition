@@ -78,7 +78,7 @@ let prof_split = Util.mk_profiler "infer_split"
  * ---------------------------------------------------------------------- *)
 
 (* Helper that does one or zero superposition inference, with all
-   the given parameters. Clauses have an scope. *)
+   the given parameters. Clauses have a scope. *)
 let do_superposition ~ctx active_clause sc_a active_pos
                           passive_clause sc_p passive_pos subst acc =
   let ord = Ctx.ord ctx in
@@ -99,7 +99,7 @@ let do_superposition ~ctx active_clause sc_a active_pos
   else if not sign_st 
   then (Util.debug 3 "... active literal is negative"; acc)
   else if not (T.db_closed (T.at_pos u subterm_pos))
-    && (List.exists (fun x -> S.is_in_subst subst x sc_p) (T.vars (T.at_pos u subterm_pos)))
+    && (List.exists (fun x -> S.mem subst x sc_p) (T.vars (T.at_pos u subterm_pos)))
   then (Util.debug 3 "... narrowing with De Bruijn indices"; acc)
   else if not (Ctx.check_term_term ~ctx s (T.at_pos u subterm_pos))
   then (Util.debug 3 "... incompatible types"; acc)

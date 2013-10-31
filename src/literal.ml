@@ -36,6 +36,8 @@ module TO = Theories.TotalOrder
 module Pos = Position
 module PB = Position.Build
 
+type scope = Substs.scope
+
 type t =
   | Equation of T.t * T.t * bool * Comparison.t
   | Prop of T.t * bool
@@ -218,11 +220,6 @@ let is_ineq_of ~instance lit =
     Symbol.eq s instance.TO.less || Symbol.eq s instance.TO.lesseq
   | _ -> false
 
-(* TODO: remove, typechecking should do its work *)
-let check_type a b =
-  let ok = not (T.has_type a) || not (T.has_type b) || T.compatible_type a b in
-  assert ok
-
 (* primary constructor *)
 let mk_lit ~ord a b sign =
   match a, b with
@@ -233,9 +230,7 @@ let mk_lit ~ord a b sign =
   | _ when b == T.true_term -> Prop (a, sign)
   | _ when a == T.false_term -> Prop (b, not sign)
   | _ when b == T.false_term -> Prop (a, not sign)
-  | _ ->
-    check_type a b;
-    Equation (a, b, sign, Ordering.compare ord a b)
+  | _ -> Equation (a, b, sign, Ordering.compare ord a b)
 
 let mk_eq ~ord a b = mk_lit ~ord a b true
 
@@ -262,14 +257,14 @@ let mk_lesseq instance l r =
   let open Theories.TotalOrder in
   mk_true (T.mk_node instance.lesseq [l; r])
 
-let apply_subst ?(recursive=true) ~renaming ~ord subst lit scope =
+let apply_subst ~renaming ~ord subst lit scope =
   match lit with
   | Equation (l,r,sign,_) ->
-    let new_l = S.apply ~recursive ~renaming subst l scope
-    and new_r = S.apply ~recursive ~renaming subst r scope in
+    let new_l = S.apply ~renaming subst l scope
+    and new_r = S.apply ~renaming subst r scope in
     mk_lit ~ord new_l new_r sign
   | Prop (p, sign) ->
-    let p' = S.apply ~recursive ~renaming subst p scope in
+    let p' = S.apply ~renaming subst p scope in
     mk_prop p' sign
   | True
   | False -> lit
@@ -375,6 +370,9 @@ let at_pos lit pos = match lit, pos with
   | False, [i] when i = Position.left_pos -> T.false_term
   | _ -> raise Not_found
 
+let type_at_pos ctx lit s_lit pos =
+  failwith "not implemented" (* TODO *)
+
 let replace_pos ~ord lit ~at ~by = match lit, at with
   | Equation (l, r, sign, _), i::pos' when i = Position.left_pos ->
     mk_lit ~ord (T.replace_pos l pos' by) r sign
@@ -386,23 +384,23 @@ let replace_pos ~ord lit ~at ~by = match lit, at with
   | False, [i] when i = Position.left_pos -> lit
   | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
 
-let infer_type ctx lit =
+let infer_type ctx lit s_lit =
   match lit with
   | Equation (l,r,_,_) ->
-    TypeInference.FO.constrain_term_term ctx l r
+    TypeInference.FO.constrain_term_term ctx l s_lit r s_lit
   | Prop (p,_) ->
-    TypeInference.FO.constrain_term_type ctx p Type.o
+    TypeInference.FO.constrain_term_type ctx p s_lit Type.o s_lit
   | True
   | False -> ()
 
 let signature ?(signature=Signature.empty) lit =
   let ctx = TypeInference.Ctx.of_signature signature in
-  infer_type ctx lit;
+  infer_type ctx lit 0;
   TypeInference.Ctx.to_signature ctx
 
-let apply_subst_list ?(recursive=true) ~renaming ~ord subst lits scope =
+let apply_subst_list ~renaming ~ord subst lits scope =
   List.map
-    (fun lit -> apply_subst ~recursive ~renaming ~ord subst lit scope)
+    (fun lit -> apply_subst ~renaming ~ord subst lit scope)
     lits
 
 (** {2 IO} *)
@@ -546,9 +544,9 @@ module Arr = struct
     F.mk_or lits
 
   (** Apply the substitution to the array of literals, with scope *)
-  let apply_subst ?(recursive=true) ~renaming ~ord subst lits scope =
+  let apply_subst ~renaming ~ord subst lits scope =
     Array.map
-      (fun lit -> apply_subst ~recursive ~renaming ~ord subst lit scope)
+      (fun lit -> apply_subst ~renaming ~ord subst lit scope)
       lits
 
   let fmap ~ord lits f =
@@ -605,12 +603,12 @@ module Arr = struct
   let to_forms lits =
     Array.to_list (Array.map form_of_lit lits)
 
-  let infer_type ctx lits =
-    Array.iter (infer_type ctx) lits
+  let infer_type ctx lits s_lit =
+    Array.iter (fun lit -> infer_type ctx lit s_lit) lits
 
   let signature ?(signature=Signature.empty) lits =
     let ctx = TypeInference.Ctx.of_signature signature in
-    infer_type ctx lits;
+    infer_type ctx lits 0;
     TypeInference.Ctx.to_signature ctx
 
   (** {3 High Order combinators} *)
@@ -618,6 +616,11 @@ module Arr = struct
   let at_pos lits pos = match pos with
     | idx::pos' when idx >= 0 && idx < Array.length lits ->
       at_pos lits.(idx) pos'
+    | _ -> raise Not_found
+
+  let type_at_pos ctx lits s_lit pos = match pos with
+    | idx::pos' when idx >= 0 && idx < Array.length lits ->
+      type_at_pos ctx lits.(idx) s_lit pos'
     | _ -> raise Not_found
 
   let replace_pos ~ord lits ~at ~by = match at with

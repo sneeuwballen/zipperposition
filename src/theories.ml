@@ -74,8 +74,8 @@ module AC = struct
 
   let symbols ~spec =
     STbl.fold
-      (fun s _ set -> Symbol.SSet.add s set)
-      spec Symbol.SSet.empty
+      (fun s _ set -> Symbol.Set.add s set)
+      spec Symbol.Set.empty
 
   let symbols_of_terms ~spec seq =
     T.ac_symbols ~is_ac:(is_ac ~spec) seq

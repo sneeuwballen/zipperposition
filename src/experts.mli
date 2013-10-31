@@ -39,7 +39,7 @@ type t = {
   expert_name : string;                 (** Theory the expert works on *)
   expert_descr : string;                (** Description of the expert *)
   expert_equal : FOTerm.t -> FOTerm.t -> bool;  (** Check whether two terms are equal *)
-  expert_sig : Symbol.SSet.t;           (** Symbols of the theory *)
+  expert_sig : Symbol.Set.t;           (** Symbols of the theory *)
   expert_clauses : Clause.t list;        (** Additional axioms *)
   expert_canonize : FOTerm.t -> FOTerm.t;       (** Get a canonical form of the term *)
   expert_ord : Ordering.t -> bool;        (** Compatible with ord? *)
@@ -72,7 +72,7 @@ val canonize : t -> FOTerm.t -> FOTerm.t
 val equal : t -> FOTerm.t -> FOTerm.t -> bool
   (** Check whether the terms are equal modulo theory *)
 
-val signature : t -> Symbol.SSet.t
+val signature : t -> Symbol.Set.t
   (** Symbols of the theory associated to the expert *)
 
 val is_redundant : t -> Clause.t -> bool
@@ -131,7 +131,7 @@ type gnd_convergent = {
   gc_ord : string;              (** name of the ordering *)
   gc_theory : string;           (** Theory that is decided *)
   gc_prec : Symbol.t list;        (** Precedence *)
-  gc_sig : Symbol.SSet.t;              (** Symbols of the theory *)
+  gc_sig : Symbol.Set.t;              (** Symbols of the theory *)
   gc_eqns : Clause.t list;       (** Equations of the system *)
 } (** A set of ground convergent equations, for some order+precedence *)
 
