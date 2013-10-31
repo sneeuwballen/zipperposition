@@ -151,6 +151,10 @@ module Common(T : TERM) = struct
     | E
     | T of (term * int) PH.t
 
+  (* TODO: third constructor, Cons (list node), where the tail is a
+      substitution; lists that are too long end with a hashtable
+      (e.g. type inference) *)
+
   let empty = E
 
   let create size =

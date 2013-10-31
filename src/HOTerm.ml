@@ -214,7 +214,7 @@ let mk_const ~ty s =
 (* enforce invariant:  (t @ l) @ l' -----> t @ (concat l l') *)
 let rec mk_at t l = match t.term, l with
   | At (t', l'), _ ->
-    mk_at t' (l @ l') (* flatten application *)
+    mk_at t' (l' @ l) (* flatten application *)
   | _, [] ->
     t (* t @ [] ---> t *)
   | _, _ ->

@@ -188,10 +188,9 @@ module Ctx = struct
      so that, for instance, "nil" (the empty list) can have several
      concrete types (using distinct scopes).
      
-     @param ret the expected return type (if symbol not declared). Must be ground
      @arity the expected arity (if not declared)
   *)
-  let type_of_fun ?ret ~arity ctx s =
+  let type_of_fun ~arity ctx s =
     match s with
     | Symbol.Int _
     | Symbol.Rat _
@@ -274,7 +273,7 @@ module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : ?pred:bool -> Ctx.t -> untyped -> scope -> Type.t * typed closure
+  val infer : Ctx.t -> untyped -> scope -> Type.t * typed closure
     (** Infer the type of this term under the given signature. This updates
         the context's typing environment! The resulting type's variables
         belong to the given scope.
@@ -282,7 +281,6 @@ module type S = sig
         @param ctx the context
         @param untyped the untyped term whose type must be inferred
         @param scope where the term's type variables live
-        @param pred true if we expect a predicate (return type {!Type.o})
 
         @return the inferred type of the untyped term (possibly a type var)
           along with a closure to produce a typed term once every
@@ -312,8 +310,8 @@ module FO = struct
   type untyped = UT.t
   type typed = T.t
 
-  let _get_sym ?ret ~arity ctx s scope  =
-    let ty', s' = Ctx.type_of_fun ?ret ~arity ctx s in
+  let _get_sym ~arity ctx s scope  =
+    let ty', s' = Ctx.type_of_fun ~arity ctx s in
     let v = Ctx._new_var ctx in
     Ctx.unify_and_set ctx v scope ty' s';
     v
@@ -329,10 +327,8 @@ module FO = struct
     Ctx._of_parsed ctx ty
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
-    continuation to build a typed term.
-    @param pred true if the term is a predicate *)
-  let rec infer_rec ~pred ctx t s_t =
-    let ret = if pred then Some Type.o else None in
+    continuation to build a typed term. *)
+  let rec infer_rec ctx t s_t =
     match t with
     | UT.Var (name, ty) ->
       let ty = _get_ty ctx ty in
@@ -343,15 +339,15 @@ module FO = struct
       in
       ty, closure
     | UT.App (s, []) ->
-      let ty = _get_sym ?ret ~arity:0 ctx s s_t in
+      let ty = _get_sym ~arity:0 ctx s s_t in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_const ~ty s
       in
       ty, closure
     | UT.App (s, l) ->
-      let ty_s = _get_sym ?ret ~arity:(List.length l) ctx s s_t in
-      let sub = List.map (fun t' -> infer_rec ~pred:false ctx t' s_t) l in
+      let ty_s = _get_sym ~arity:(List.length l) ctx s s_t in
+      let sub = List.map (fun t' -> infer_rec ctx t' s_t) l in
       let ty_l, closure_l = List.split sub in
       (* [s] has type [ty_s], but must also have type [ty_l -> 'a].
           We generate a fresh variable 'a, which is also the result. *)
@@ -365,11 +361,10 @@ module FO = struct
       in
       ty_ret, closure
 
-  let infer ?(pred=false) ctx t s_t =
+  let infer ctx t s_t =
     Util.enter_prof prof_infer;
     try
-      let ty, k = infer_rec ~pred ctx t s_t in
-      if pred then Ctx.unify_and_set ctx ty s_t Type.o s_t; (* check *)
+      let ty, k = infer_rec ctx t s_t in
       Util.exit_prof prof_infer;
       ty, k
     with e ->
@@ -414,7 +409,7 @@ module FO = struct
       let closure_f' = infer_form ctx f' s_f in
       (fun renaming subst -> F.mk_not (closure_f' renaming subst))
     | UF.Atom p ->
-      let ty, clos = infer ~pred:true ctx p s_f in
+      let ty, clos = infer ctx p s_f in
       Ctx.unify_and_set ctx ty s_f Type.o s_f;  (* must return Type.o *)
       let closure renaming subst =
         F.mk_atom (clos renaming subst)
@@ -451,14 +446,13 @@ module FO = struct
 
   let convert ~ctx f =
     let closure = infer_form ctx f 0 in
-    let renaming = Substs.Ty.Renaming.create 13 in
+    let renaming = Substs.Ty.Renaming.create 7 in
     Ctx.apply_closure ~renaming ctx closure
 
   let convert_clause ~ctx c =
     let closures = List.map (fun lit -> infer_form ctx lit 0) c in
-    let renaming = Substs.Ty.Renaming.create 13 in
+    let renaming = Substs.Ty.Renaming.create 7 in
     Ctx.bind_to_default ctx;
-    let subst = ctx.Ctx.subst in
     List.map (fun c' -> Ctx.apply_closure ~renaming ctx c') closures
 
   let convert_seq ~ctx forms =
@@ -468,7 +462,7 @@ module FO = struct
       forms
     in
     let closures = Sequence.to_rev_list closures in
-    let renaming = Substs.Ty.Renaming.create 13 in
+    let renaming = Substs.Ty.Renaming.create 7 in
     (* apply closures to the final substitution *)
     List.rev_map
       (fun closure ->
@@ -484,8 +478,8 @@ module HO = struct
   type untyped = UT.t
   type typed = T.t
 
-  let _get_sym ?ret ~arity ctx s scope =
-    let ty', s' = Ctx.type_of_fun ?ret ~arity ctx s in
+  let _get_sym ~arity ctx s scope =
+    let ty', s' = Ctx.type_of_fun ~arity ctx s in
     let v = Ctx._new_var ctx in
     Ctx.unify_and_set ctx v scope ty' s';
     v
@@ -504,8 +498,7 @@ module HO = struct
     continuation to build a typed term
     @param pred true if we expect a proposition
     @param arity expected number of arguments *)
-  let rec infer_rec ?(arity=0) ~pred ctx t s_t =
-    let ret = if pred then Some Type.o else None in
+  let rec infer_rec ?(arity=0) ctx t s_t =
     match t with
     | UT.Var (name, ty) ->
       let ty = _get_ty ctx ty in
@@ -516,7 +509,7 @@ module HO = struct
       in
       ty, closure
     | UT.Const s ->
-      let ty = _get_sym ?ret ~arity ctx s s_t in
+      let ty = _get_sym ~arity ctx s s_t in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_const ~ty s
@@ -524,9 +517,9 @@ module HO = struct
       ty, closure
     | UT.App (_, []) -> assert false
     | UT.App (t, l) ->
-      let ty_t, clos_t = infer_rec ~pred ~arity:(List.length l) ctx t s_t in
+      let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t s_t in
       let ty_l, clos_l = List.split
-        (List.map (fun t' -> infer_rec ~pred:false ctx t' s_t) l) in
+        (List.map (fun t' -> infer_rec ctx t' s_t) l) in
       let ty_ret = Ctx._new_var ctx in
       (* t:ty_t, l:ty_l. now we must have  ty_t = (ty_l -> ty_ret) *)
       Ctx.unify_and_set ctx ty_t s_t Type.(ty_ret <== ty_l) s_t;
@@ -537,8 +530,8 @@ module HO = struct
       in
       ty_ret, closure
     | UT.Lambda (v, t) ->
-      let ty_t, clos_t = infer_rec ~pred:false ctx t s_t in
-      let ty_v, clos_v = infer_rec ~pred:false ctx v s_t in
+      let ty_t, clos_t = infer_rec ctx t s_t in
+      let ty_v, clos_v = infer_rec ctx v s_t in
       (* type is ty_v -> ty_t *)
       let ty = Type.(ty_t <=. ty_v) in
       let closure renaming subst =
@@ -548,11 +541,10 @@ module HO = struct
       in
       ty, closure 
 
-  let infer ?(pred=false) ctx t s_t =
+  let infer ctx t s_t =
     Util.enter_prof prof_infer;
     try
-      let ty, k = infer_rec ~pred ctx t s_t in
-      if pred then Ctx.unify_and_set ctx ty s_t Type.o s_t; (* check *)
+      let ty, k = infer_rec ctx t s_t in
       Util.exit_prof prof_infer;
       ty, k
     with e ->
@@ -569,25 +561,27 @@ module HO = struct
     Ctx.unify_and_set ctx ty1 s_t ty s_ty
 
   let constrain ~ctx t =
-    let _ = infer ~pred:true ctx t 0 in
+    let ty, _ = infer ctx t 0 in
+    Ctx.unify_and_set ctx ty 0 Type.o 0;
     ()
 
-  let convert ~ctx t =
-    let _, closure = infer ctx t 0 in
+  let convert ?(ret=Type.o) ~ctx t =
+    let ty, closure = infer ctx t 0 in
+    Ctx.unify_and_set ctx ty 0 ret 0;
     let renaming = Substs.Ty.Renaming.create 13 in
     Ctx.apply_closure ~renaming ctx closure
 
   let convert_seq ~ctx terms =
     let closures = Sequence.map
       (fun t ->
-        let _, closure = infer ~pred:true ctx t 0 in
+        let ty, closure = infer ctx t 0 in
+        Ctx.unify_and_set ctx ty 0 Type.o 0;
         closure)
       terms
     in
     (* evaluate *)
     let closures = Sequence.to_rev_list closures in
     let renaming = Substs.Ty.Renaming.create 13 in
-    let subst = ctx.Ctx.subst in
     List.rev_map
       (fun c ->
         Substs.Ty.Renaming.clear renaming;

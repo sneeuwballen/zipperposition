@@ -72,6 +72,10 @@ module Ctx : sig
   val declare_parsed : t -> Symbol.t -> Type.Parsed.t -> unit
     (** Declare the type of a symbol, in raw form *)
 
+  val unify_and_set : t -> Type.t -> scope -> Type.t -> scope -> unit
+    (** Unify the two types in the given scopes.
+        @raise TypeUnif.Error if types are not unifiable in the context *)
+
   val to_signature : t -> Signature.t
     (** Obtain the type of all symbols whose type has been inferred.
         If some instantiated variables remain, they are bound to the
@@ -84,8 +88,11 @@ module Ctx : sig
   val generalize : t -> unit
     (** Free constructor variables will be generalized, i.e., kept as variables *)
 
-  val apply_closure : ?default:bool -> renaming:Substs.Ty.Renaming.t ->
-                      t -> 'a closure -> 'a
+  val apply_closure : ?default:bool ->
+                      renaming:Substs.Ty.Renaming.t ->
+                      t ->
+                      'a closure ->
+                      'a
     (** Apply the given closure to the substitution contained in the context
         (type constraints). A renaming needs be provided.
         @param default if true, !{bind_to_default} is called first to ensure
@@ -103,7 +110,7 @@ module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : ?pred:bool -> Ctx.t -> untyped -> scope -> Type.t * typed closure
+  val infer : Ctx.t -> untyped -> scope -> Type.t * typed closure
     (** Infer the type of this term under the given signature. This updates
         the context's typing environment! The resulting type's variables
         belong to the given scope.
@@ -111,7 +118,6 @@ module type S = sig
         @param ctx the context
         @param untyped the untyped term whose type must be inferred
         @param scope where the term's type variables live
-        @param pred true if we expect a predicate (return type {!Type.o})
 
         @return the inferred type of the untyped term (possibly a type var)
           along with a closure to produce a typed term once every
@@ -168,9 +174,10 @@ module HO : sig
   val constrain : ctx:Ctx.t -> Untyped.HO.t -> unit
     (** Constrain the term to be well-typed and of boolean type *)
 
-  val convert : ctx:Ctx.t -> Untyped.HO.t -> HOTerm.t
+  val convert : ?ret:Type.t -> ctx:Ctx.t -> Untyped.HO.t -> HOTerm.t
     (** Convert a single untyped term to a typed term. Binds free constructor
-        variables to default. *)
+        variables to default.
+        @param ret is the type we expect for this term (default: {!Type.o}) *)
 
   val convert_seq : ctx:Ctx.t -> Untyped.HO.t Sequence.t -> HOTerm.t list
     (** Infer the types of those terms and annotate each term and subterm with
