@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: ececf51e8036abcf35867fce197dc9db)
+# DO NOT EDIT (digest: e1caa0c2f37d8419a82346837d6286e9)
 src/HO
 src/FO
 src/Symbol
@@ -46,7 +46,6 @@ src/lib/Sequence
 src/lib/Bij
 src/lib/Cache
 src/lib/MultiMap
-src/lib/QCheck
 src/lib/Bencode
 src/lib/BV
 src/lib/PersistentHashtbl
@@ -58,4 +57,10 @@ src/meta/Ast_theory
 src/meta/Lex_theory
 src/meta/Parse_theory
 src/meta/Signal
+src/arbitrary/ArTerm
+src/arbitrary/ArForm
+src/arbitrary/ArType
+src/arbitrary/ArSignature
+src/arbitrary/ArSymbol
+src/arbitrary/ArPattern
 # OASIS_STOP

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 18c260f10dc6673466bceef203e1355c)
+# DO NOT EDIT (digest: 62466eb5a070fb98281cdabd94e08166)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -61,7 +61,6 @@
 "src/lib/bij.cmx": for-pack(Logtk)
 "src/lib/cache.cmx": for-pack(Logtk)
 "src/lib/multiMap.cmx": for-pack(Logtk)
-"src/lib/qCheck.cmx": for-pack(Logtk)
 "src/lib/bencode.cmx": for-pack(Logtk)
 "src/lib/BV.cmx": for-pack(Logtk)
 "src/lib/persistentHashtbl.cmx": for-pack(Logtk)
@@ -86,6 +85,21 @@
 <src/meta/*.ml{,i}>: pkg_unix
 <src/meta/*.ml{,i}>: pkg_num
 <src/meta/*.ml{,i}>: pkg_str
+# Library logtk_arbitrary
+"src/arbitrary/logtk_arbitrary.cmxs": use_logtk_arbitrary
+"src/arbitrary/arTerm.cmx": for-pack(Logtk_arbitrary)
+"src/arbitrary/arForm.cmx": for-pack(Logtk_arbitrary)
+"src/arbitrary/arType.cmx": for-pack(Logtk_arbitrary)
+"src/arbitrary/arSignature.cmx": for-pack(Logtk_arbitrary)
+"src/arbitrary/arSymbol.cmx": for-pack(Logtk_arbitrary)
+"src/arbitrary/arPattern.cmx": for-pack(Logtk_arbitrary)
+<src/arbitrary/*.ml{,i}>: use_logtk_meta
+<src/arbitrary/*.ml{,i}>: use_logtk
+<src/arbitrary/*.ml{,i}>: pkg_qcheck
+<src/arbitrary/*.ml{,i}>: pkg_datalog
+<src/arbitrary/*.ml{,i}>: pkg_unix
+<src/arbitrary/*.ml{,i}>: pkg_num
+<src/arbitrary/*.ml{,i}>: pkg_str
 # Executable run_bench
 "tests/run_bench.native": use_logtk
 "tests/run_bench.native": pkg_bench
@@ -94,16 +108,20 @@
 "tests/run_bench.native": pkg_str
 <tests/*.ml{,i}>: pkg_bench
 # Executable run_tests
+"tests/run_tests.native": use_logtk_arbitrary
 "tests/run_tests.native": use_logtk_meta
 "tests/run_tests.native": use_logtk
 "tests/run_tests.native": pkg_oUnit
+"tests/run_tests.native": pkg_qcheck
 "tests/run_tests.native": pkg_datalog
 "tests/run_tests.native": pkg_unix
 "tests/run_tests.native": pkg_num
 "tests/run_tests.native": pkg_str
+<tests/*.ml{,i}>: use_logtk_arbitrary
 <tests/*.ml{,i}>: use_logtk_meta
 <tests/*.ml{,i}>: use_logtk
 <tests/*.ml{,i}>: pkg_oUnit
+<tests/*.ml{,i}>: pkg_qcheck
 <tests/*.ml{,i}>: pkg_datalog
 <tests/*.ml{,i}>: pkg_unix
 <tests/*.ml{,i}>: pkg_num

@@ -25,6 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 open Logtk
+open Logtk_arbitrary
 open QCheck
 
 module T = FOTerm
@@ -47,7 +48,7 @@ let _size_classes l =
   List.fold_left (fun acc l -> (_size_class l) + acc) 0 l
 
 let check_term_eq_itself =
-  let gen = T.arbitrary in
+  let gen = ArTerm.default in
   let prop t =
     let cc = CC.create () in
     CC.is_eq cc t t
@@ -58,7 +59,7 @@ let check_term_eq_itself =
 (* if we build a congruence closure with classes, in each class,
     all elements are equal *)
 let check_classes_are_eq =
-  let gen = Arbitrary.(list (list T.arbitrary)) in
+  let gen = Arbitrary.(list (list ArTerm.default)) in
   let prop classes =
     let cc = _cc_of_classes classes in
     List.for_all

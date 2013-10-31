@@ -215,22 +215,6 @@ let is_base_symbol s = SSet.mem s base_symbols
 let pp_no_base buf s =
   pp buf (diff s base)
 
-let _arbitrary_of gen_ty =
-  QCheck.Arbitrary.(
-    let gen = 
-      Symbol.arbitrary_set >>= fun symbs ->
-      let size = Symbol.Set.cardinal symbs in
-      list_repeat size gen_ty >>= fun types ->
-      let l = Sequence.to_rev_list (Symbol.Set.to_seq symbs) in
-      let signature = of_list (List.combine l types) in
-      (* be sure that we only accept well founded signatures *)
-      return (if well_founded signature then Some signature else None)
-    in
-    retry gen)
-    
-let arbitrary = _arbitrary_of Type.arbitrary
-let arbitrary_ground = _arbitrary_of Type.arbitrary_ground
-
 (** {2 Arith} *)
 
 module Arith = struct

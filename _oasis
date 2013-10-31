@@ -23,6 +23,10 @@ Flag "bench"
   Description:  Build and run benchmarks
   Default:      false
 
+Flag "qcheck"
+  Description:  Build and install QCheck random generators
+  Default:      false
+
 Library "logtk"
   Path:             src/
   Pack:             true
@@ -35,7 +39,7 @@ Library "logtk"
                     Trace_tstp, CallProver, Congruence, TypeUnif, Options,
                     Untyped,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
-                    lib/QCheck, lib/Bencode, lib/BV, lib/PersistentHashtbl
+                    lib/Bencode, lib/BV, lib/PersistentHashtbl
   BuildDepends:     unix,num,str
 
 Library "logtk_meta"
@@ -50,32 +54,46 @@ Library "logtk_meta"
   Install$:         flag(meta)
   XMETARequires:    logtk,datalog
 
+Library "logtk_arbitrary"
+  Path:             src/arbitrary/
+  Pack:             true
+  FindlibName:      arbitrary
+  FindlibParent:    logtk
+  Modules:          ArTerm, ArForm, ArType, ArSignature, ArSymbol, ArPattern
+  BuildDepends:     logtk,qcheck,logtk.meta
+  Build$:           flag(qcheck) & flag(meta)
+  Install$:         flag(qcheck) & flag(meta)
+  XMETARequires:    logtk,logtk.meta,datalog,qcheck
+
 Document logtk
   Title:                Logtk docs
   Type:                 ocamlbuild (0.3)
   BuildTools+:          ocamldoc
-  Install:              true
+  Install$:             flag(qcheck) & flag(meta)
+  Build$:               flag(qcheck) & flag(meta)
   XOCamlbuildPath:      .
-  XOCamlbuildLibraries: logtk,logtk.meta
+  XOCamlbuildLibraries: logtk,logtk.meta,logtk.arbitrary
 
 Executable run_bench
   Path: tests/
   Install: false
   CompiledObject: native
   MainIs: run_bench.ml
+  Build$:   flag(bench) & flag(tests)
   BuildDepends: logtk, bench
 
 Test all
   Command: $run_tests
   TestTools: run_tests
-  Run$: flag(tests) && flag(meta)
+  Run$: flag(tests) & flag(meta) & flag(qcheck)
 
 Executable run_tests
   Path: tests/
   Install: false
   CompiledObject: native
   MainIs: run_tests.ml
-  BuildDepends: logtk, oUnit, logtk.meta
+  Build$: flag(tests) & flag(meta) & flag(qcheck)
+  BuildDepends: logtk,oUnit,logtk.meta,logtk.arbitrary
 
 # TPTP syntax and type checking
 Executable type_check_tptp

@@ -274,7 +274,7 @@ let of_decls ?(base=Signature.base) decls =
     | A.FOF(name, role, f, info :: _)
     | A.TFF (name, role, f, info :: _) ->
       Util.debug 3 "convert step %a" A.pp_declaration decl;
-      let f = TypeInference.FO.convert ~ctx f in
+      let f = TypeInference.FO.convert_form ~ctx f in
       begin match read_info info with
       | `Proof
       | `NoIdea -> ()

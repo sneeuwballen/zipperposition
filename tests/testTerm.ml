@@ -26,6 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** Test terms *)
 
 open Logtk
+open Logtk_arbitrary
 open OUnit
 
 module T = FOTerm
@@ -84,8 +85,8 @@ open QCheck
 (* subterm is smaller than term *)
 let check_size_subterm =
   (* choose a subterm of t *)
-  let gen = Arbitrary.(T.arbitrary >>= fun t ->
-    T.arbitrary_pos t >>= fun pos ->
+  let gen = Arbitrary.(ArTerm.default >>= fun t ->
+    ArTerm.pos t >>= fun pos ->
     return (t, T.at_pos t pos))
   in
   let pp = PP.(pair T.to_string T.to_string) in
@@ -98,8 +99,8 @@ let check_size_subterm =
 (* replace subterm by itself yields same term *)
 let check_replace_id =
   let gen = Arbitrary.(
-    T.arbitrary >>= fun t ->
-    T.arbitrary_pos t >>= fun pos ->
+    ArTerm.default >>= fun t ->
+    ArTerm.pos t >>= fun pos ->
     return (t, pos))
   in
   let pp = PP.(pair T.to_string Position.to_string) in
@@ -112,7 +113,7 @@ let check_replace_id =
   mk_test ~pp ~name:"term_replace_same_subterm" gen prop
     
 let check_ground_novar =
-  let gen = T.arbitrary in
+  let gen = ArTerm.default in
   let pp = T.to_string in
   let prop t =
     T.is_ground t = (T.vars t = [])  (* ground <=> no vars *)
@@ -120,7 +121,7 @@ let check_ground_novar =
   mk_test ~n:1000 ~pp ~name:"term_ground_has_no_var" gen prop
 
 let check_min_max_vars =
-  let gen = T.arbitrary in
+  let gen = ArTerm.default in
   let prop t =
     let vars = T.vars t in
     T.min_var vars <= T.max_var vars

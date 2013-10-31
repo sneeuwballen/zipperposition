@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** Tests for CNF *)
 
 open Logtk
+open Logtk_arbitrary
 open QCheck
 
 module F = FOFormula
@@ -34,7 +35,7 @@ module F = FOFormula
 let pp = F.to_string
 
 let check_cnf_idempotent =
-  let gen = Arbitrary.(lift F.close_forall F.arbitrary) in
+  let gen = Arbitrary.(lift F.close_forall ArForm.default) in
   let name = "cnf_idempotent" in
   (* check that if [f] is in CNF, then [cnf_of f] is [f] *)
   let prop f =
@@ -47,7 +48,7 @@ let check_cnf_idempotent =
   mk_test ~name ~pp gen prop
 
 let check_cnf_gives_clauses =
-  let gen = Arbitrary.(lift F.close_forall F.arbitrary) in
+  let gen = Arbitrary.(lift F.close_forall ArForm.default) in
   let name = "cnf_gives_clauses" in
   (* check that the CNf of a formula is in clausal form *)
   let prop f =
@@ -58,7 +59,7 @@ let check_cnf_gives_clauses =
   mk_test ~name ~pp gen prop
 
 let check_miniscope_db_closed =
-  let gen = Arbitrary.(lift F.close_forall F.arbitrary) in
+  let gen = Arbitrary.(lift F.close_forall ArForm.default) in
   let name = "cnf_miniscope_db_closed" in
   (* check that miniscoping preserved db_closed *)
   let prop f =

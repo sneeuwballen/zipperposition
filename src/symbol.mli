@@ -254,8 +254,6 @@ val fmt : Format.formatter -> t -> unit
 val set_default_pp : (Buffer.t -> t -> unit) -> unit (* change default printer *)
 
 val bij : t Bij.t
-val arbitrary : t QCheck.Arbitrary.t
-val arbitrary_set : Set.t QCheck.Arbitrary.t
 
 (** {2 Generation of symbols} *)
 

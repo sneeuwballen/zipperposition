@@ -43,9 +43,6 @@ val fmt : Format.formatter -> t -> unit
 val debug : Format.formatter -> t -> unit
 val bij : t Bij.t
 
-val arbitrary : t QCheck.Arbitrary.t
-val arbitrary_apply : (t * HOTerm.t list) QCheck.Arbitrary.t
-
 (** {2 Basic Operations} *)
 
 (** This module is used to handle the encoding of formulas and terms into

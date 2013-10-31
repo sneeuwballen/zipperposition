@@ -242,18 +242,6 @@ val bij : t Bij.t
 (* TODO: need backtracking generators because some types may not
     be generable (e.g. if no function returns it) *)
 
-val arbitrary : t QCheck.Arbitrary.t
-  (** Generates random terms within the given signature *)
-
-val arbitrary_ground : t QCheck.Arbitrary.t
-  (** Generates ground terms *)
-
-val arbitrary_pred : t QCheck.Arbitrary.t
-  (** Generates predicates (type "o") *)
-
-val arbitrary_pos : t -> Position.t QCheck.Arbitrary.t
-  (** Arbitrary position in the term *)
-
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
 

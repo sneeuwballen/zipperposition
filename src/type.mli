@@ -126,9 +126,6 @@ val bij : t Bij.t
   (** Bijection. Note that GVar cannot be decoded nor encoded. Only
       closed types work. *)
 
-val arbitrary : t QCheck.Arbitrary.t         (* types *)
-val arbitrary_ground : t QCheck.Arbitrary.t  (* ground types *)
-
 (** {2 Parsed types}
 This module exports a very simple representation of types, typically
 obtained right after parsing. No hashconsing is performed,

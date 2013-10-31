@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** Test formulas *)
 
 open Logtk
+open Logtk_arbitrary
 open OUnit
 
 module F = FOFormula
@@ -39,7 +40,7 @@ let printer = F.to_string
 let pform s =
   let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
   let ctx = TypeInference.Ctx.create () in
-  TypeInference.FO.convert ~ctx f
+  TypeInference.FO.convert_form ~ctx f
 
 let test_mk_not () =
   assert_equal ~cmp:F.eq ~printer F.mk_true (F.mk_not F.mk_false);
@@ -65,7 +66,7 @@ open QCheck
 let pp = F.to_string
 
 let check_simplify_preserve_closed =
-  let gen = F.arbitrary in
+  let gen = ArForm.default in
   let name = "formula_simplify_preserve_closed" in
   let prop f =
     F.db_closed f = F.db_closed (F.simplify f)
@@ -73,7 +74,7 @@ let check_simplify_preserve_closed =
   mk_test ~n:1000 ~pp ~name gen prop
 
 let check_db_lift_preserve_closed =
-  let gen = F.arbitrary in
+  let gen = ArForm.default in
   let name = "formula_db_lift_preserve_closed" in
   let prop f =
     Prop.assume (F.db_closed f);
@@ -82,7 +83,7 @@ let check_db_lift_preserve_closed =
   mk_test ~n:100 ~pp ~name gen prop
 
 let check_db_unlift_preserve_closed =
-  let gen = F.arbitrary in
+  let gen = ArForm.default in
   let name = "formula_db_unlift_preserve_closed" in
   let prop f =
     Prop.assume (F.db_closed f);
@@ -91,7 +92,7 @@ let check_db_unlift_preserve_closed =
   mk_test ~n:100 ~pp ~name gen prop
 
 let check_forall_close_is_closed =
-  let gen = F.arbitrary_atom in
+  let gen = ArForm.atom in
   let name = "formula_forall_close_is_closed" in
   let prop f =
     F.is_closed (F.close_forall f)

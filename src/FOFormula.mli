@@ -208,12 +208,6 @@ val to_string_tstp : t -> string
 
 val bij : t Bij.t
 
-(* TODO: ensure the signature is the same for many formulas (T.arbitrary_pred...) *)
-
-val arbitrary_atom : t QCheck.Arbitrary.t
-val arbitrary_clause : t list QCheck.Arbitrary.t
-val arbitrary : t QCheck.Arbitrary.t (* any formula (DB-closed) *)
-
 (** {2 Containers} *)
 
 module Tbl : Hashtbl.S with type key = t

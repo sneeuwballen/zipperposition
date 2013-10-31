@@ -28,10 +28,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 open Logtk_meta
+open Logtk_arbitrary
 open QCheck
 
 let check_pattern_cmp_self =
-  let gen = MetaPattern.arbitrary in
+  let gen = ArPattern.default in
   let pp = MetaPattern.to_string in
   let name = "meta_pattern_cmp_self_zero" in
   let prop p =
@@ -41,7 +42,7 @@ let check_pattern_cmp_self =
 
 let check_kb_axiom_cmp_self =
   let gen = Arbitrary.(
-    map (pair MetaPattern.arbitrary_apply (among ["foo"; "bar"; "baaz"]))
+    map (pair ArPattern.apply (among ["foo"; "bar"; "baaz"]))
       (fun ((p,terms), name) -> MetaKB.Axiom (name, terms, p, terms)))
   in
   let pp = Util.on_buffer MetaKB.pp_axiom in

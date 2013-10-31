@@ -773,32 +773,6 @@ let bij =
     ~extract:of_term
     HOTerm.bij)
 
-let arbitrary_atom =
-  QCheck.Arbitrary.(choose
-    [ lift mk_atom T.arbitrary_pred
-    ; lift (fun t -> mk_not (mk_atom t)) T.arbitrary_pred
-    ; lift2 mk_eq T.arbitrary T.arbitrary
-    ; lift2 mk_neq T.arbitrary T.arbitrary
-    ; choose [ return mk_true; return mk_false ]
-    ])
-
-let arbitrary =
-  QCheck.Arbitrary.(
-    let f = fix ~max:10 ~base:arbitrary_atom
-      (fun sub_f -> choose
-        [ lift mk_or (list sub_f)
-        ; lift mk_and (list sub_f)
-        ; lift2 mk_equiv sub_f sub_f
-        ; lift2 mk_imply sub_f sub_f
-        ; lift mk_not sub_f
-        ; lift close_forall sub_f
-        ; lift close_exists sub_f
-        ])
-    in
-    f)
-
-let arbitrary_clause = QCheck.Arbitrary.(list arbitrary_atom)
-
 (** {2 Containers} *)
 
 module Tbl = Hashtbl.Make(struct

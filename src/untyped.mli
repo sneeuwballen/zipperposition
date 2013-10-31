@@ -55,10 +55,6 @@ module FO : sig
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
-
-  val arbitrary : t QCheck.Arbitrary.t
-  val arbitrary_pred : t QCheck.Arbitrary.t
-  val arbitrary_ground : t QCheck.Arbitrary.t
 end
 
 (** {2 First Order formulas} *)
@@ -115,9 +111,6 @@ module Form : sig
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
-
-  val arbitrary : t QCheck.Arbitrary.t
-  val arbitrary_clause : t list QCheck.Arbitrary.t
 end
 
 (** {2 Higher order Terms} *)

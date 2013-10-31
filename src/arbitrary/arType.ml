@@ -24,41 +24,35 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** Test typing *)
+(** {1 Arbitrary generation of symbols} *)
 
 open Logtk
-open Logtk_arbitrary
 open QCheck
 
-module UT = Untyped.FO
+type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-let check_infer_all_symbs =
-  let gen = Arbitrary.(list ArTerm.ArbitraryUntyped.default) in
-  let name = "type_infer_all_symbols" in
-  let pp = PP.(list UT.to_string) in
-  (* check that after type inference, all symbols apppear in the signature *)
-  let prop terms =
-    let ctx = TypeInference.Ctx.create () in
-    List.iter (fun t -> ignore (TypeInference.FO.infer ctx t 0)) terms;
-    let signature = TypeInference.Ctx.to_signature ctx in
-    let symbols = UT.symbols (Sequence.of_list terms) in
-    Symbol.Set.for_all (Signature.mem signature) symbols
-  in
-  mk_test ~pp ~name gen prop
+let base =
+  Arbitrary.(among Type.([i; o; int; rat]))
 
-let check_cmp =
-  let gen = Arbitrary.(pair ArType.default ArType.default) in
-  let name = "type_cmp_compatible_eq" in
-  let pp = PP.(pair Type.to_string Type.to_string) in
-  let size (ty1, ty2) = Type.size ty1 + Type.size ty2 in
-  (* comparison of two types is 0 iff they are equal *)
-  let prop (ty1, ty2) =
-    let c = Type.cmp ty1 ty2 in
-    (c = 0) = (Type.eq ty1 ty2)
-  in
-  mk_test ~name ~pp ~size gen prop
-    
-let props =
-  [ check_infer_all_symbs
-  ; check_cmp
-  ]
+let ground =
+  Arbitrary.(
+    let base = among Type.([ i; const "$int"; const "a"; const "b" ]) in
+    fix ~max:3 ~base (fun sub -> choose
+      [ lift (Type.app "list") (list_repeat 1 sub)
+      ; lift (Type.app "prod") (list_repeat 2 sub)
+      ; lift2 Type.mk_fun sub (list sub)
+      ]))
+
+let default =
+  Arbitrary.(
+    let var = among [Type.var 0; Type.var 1 ] in
+    let base =
+      among [ Type.i; Type.const "$int"; Type.const "a"; Type.const "b"; ]
+      ||| var
+    in
+    fix ~max:4 ~base (fun sub -> choose
+      [ lift (Type.app "list") (list_repeat 1 sub)
+      ; lift (Type.app "prod") (list_repeat 2 sub)
+      ; lift2 Type.mk_fun sub (list sub)
+      ]))
+

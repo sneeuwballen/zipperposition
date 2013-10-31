@@ -77,7 +77,7 @@ let to_cnf ?(ctx=Skolem.create ()) decls =
       | A.FOF(n,role,f,info)
       | A.TFF(n,role,f,info) ->
         (* type formula *)
-        let f = TypeInference.FO.convert ~ctx:tyctx f in
+        let f = TypeInference.FO.convert_form ~ctx:tyctx f in
         begin match role with
         | A.R_conjecture ->
           (* negate conjecture *)

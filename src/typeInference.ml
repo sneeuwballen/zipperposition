@@ -54,6 +54,7 @@ module Ctx = struct
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
     mutable to_bind : (Type.t * scope) list;  (* constructor variables to bind *)
+    renaming : Substs.Ty.Renaming.t;
     symbols : (Type.t * scope) STbl.t; (* symbol -> instantiated type *)
     tyctx : Type.ctx;               (* convert types *)
     vars : (string, (int * Type.t)) Hashtbl.t;  (* var name -> number + type *)
@@ -69,26 +70,16 @@ module Ctx = struct
       signature;
       subst = S.create 17;
       to_bind = [];
+      renaming = Substs.Ty.Renaming.create 7;
       symbols = STbl.create 7;
       tyctx = Type.create_ctx ();
-      vars = Hashtbl.create 13;
+      vars = Hashtbl.create 7;
     } in
     ctx
 
   let of_signature ?(default=Type.i) signature =
-    let ctx = {
-      default;
-      scope = ~-1;
-      var = ~-1;
-      db = [];
-      signature;
-      subst = S.create 17;
-      to_bind = [];
-      symbols = STbl.create 7;
-      tyctx = Type.create_ctx ();
-      vars = Hashtbl.create 13;
-    } in
-    ctx
+    let ctx = create ~base:false ~default () in
+    { ctx with signature; }
 
   let clear ctx =
     ctx.scope <- 0;
@@ -258,8 +249,18 @@ module Ctx = struct
     (* keep constructor variables as they are *)
     ctx.to_bind <- []
 
-  let apply_closure ?(default=true) ~renaming ctx closure =
+  (* clear and return the renaming *)
+  let renaming_clear ctx =
+    let renaming = ctx.renaming in
+    Substs.Ty.Renaming.clear renaming;
+    renaming
+
+  let apply_closure ?(default=true) ?renaming ctx closure =
     if default then bind_to_default ctx;
+    let renaming = match renaming with
+      | None -> renaming_clear ctx
+      | Some r -> r
+    in
     closure renaming ctx.subst
 end
 
@@ -444,31 +445,30 @@ module FO = struct
     Sequence.iter (constrain_form ctx) seq;
     Ctx.to_signature ctx
 
-  let convert ~ctx f =
+  let convert ~ctx t =
+    let _, closure = infer ctx t 0 in
+    Ctx.bind_to_default ctx;
+    Ctx.apply_closure ctx closure
+
+  let convert_form ~ctx f =
     let closure = infer_form ctx f 0 in
-    let renaming = Substs.Ty.Renaming.create 7 in
-    Ctx.apply_closure ~renaming ctx closure
+    Ctx.apply_closure ctx closure
 
   let convert_clause ~ctx c =
     let closures = List.map (fun lit -> infer_form ctx lit 0) c in
-    let renaming = Substs.Ty.Renaming.create 7 in
+    (* use same renaming for all formulas, to keep
+      a consistent scope *)
+    let renaming = Ctx.renaming_clear ctx in
     Ctx.bind_to_default ctx;
     List.map (fun c' -> Ctx.apply_closure ~renaming ctx c') closures
 
   let convert_seq ~ctx forms =
     (* build closures, inferring all types *)
-    let closures = Sequence.map
-      (fun f -> infer_form ctx f 0)
-      forms
+    let closures = Sequence.map (fun f -> infer_form ctx f 0) forms
     in
     let closures = Sequence.to_rev_list closures in
-    let renaming = Substs.Ty.Renaming.create 7 in
     (* apply closures to the final substitution *)
-    List.rev_map
-      (fun closure ->
-        Substs.Ty.Renaming.clear renaming;
-        Ctx.apply_closure ~renaming ctx closure)
-      closures
+    List.rev_map (Ctx.apply_closure ctx) closures
 end
 
 module HO = struct
@@ -568,8 +568,7 @@ module HO = struct
   let convert ?(ret=Type.o) ~ctx t =
     let ty, closure = infer ctx t 0 in
     Ctx.unify_and_set ctx ty 0 ret 0;
-    let renaming = Substs.Ty.Renaming.create 13 in
-    Ctx.apply_closure ~renaming ctx closure
+    Ctx.apply_closure ctx closure
 
   let convert_seq ~ctx terms =
     let closures = Sequence.map
@@ -581,10 +580,7 @@ module HO = struct
     in
     (* evaluate *)
     let closures = Sequence.to_rev_list closures in
-    let renaming = Substs.Ty.Renaming.create 13 in
     List.rev_map
-      (fun c ->
-        Substs.Ty.Renaming.clear renaming;
-        Ctx.apply_closure ~renaming ctx c)
+      (fun c -> Ctx.apply_closure ctx c)
       closures
 end

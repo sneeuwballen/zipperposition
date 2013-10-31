@@ -88,16 +88,20 @@ module Ctx : sig
   val generalize : t -> unit
     (** Free constructor variables will be generalized, i.e., kept as variables *)
 
+  val renaming_clear : t -> Substs.Ty.Renaming.t
+    (** Clear and return the default renaming stored in this context *)
+
   val apply_closure : ?default:bool ->
-                      renaming:Substs.Ty.Renaming.t ->
-                      t ->
-                      'a closure ->
-                      'a
+                      ?renaming:Substs.Ty.Renaming.t ->
+                      t -> 'a closure -> 'a
     (** Apply the given closure to the substitution contained in the context
-        (type constraints). A renaming needs be provided.
+        (type constraints). A renaming can be provided
+
         @param default if true, !{bind_to_default} is called first to ensure
           that symbols whose type is inferred are not generalized.
-          if not provided, [default] is true. *)
+          if not provided, [default] is true.
+        @param renaming a renaming that is used to apply the substitution
+    *)
 end
 
 (** {2 Hindley-Milner}
@@ -152,7 +156,11 @@ module FO : sig
   val signature_forms : Signature.t -> Untyped.Form.t Sequence.t -> Signature.t
     (** Infer signature for this sequence of formulas *)
 
-  val convert : ctx:Ctx.t -> Untyped.Form.t -> FOFormula.t
+  val convert : ctx:Ctx.t -> Untyped.FO.t -> FOTerm.t
+    (** Convert a term into a typed term. Free constructor variables are
+        bound to [default] *)
+
+  val convert_form : ctx:Ctx.t -> Untyped.Form.t -> FOFormula.t
     (** Convert a formula into a typed formula. Free constructor variables
         are bound to [default]. *)
 

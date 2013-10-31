@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8273ffb179af2730bcb03fe0a8fb620a)
+# DO NOT EDIT (digest: fef77d4b08e8f882f642e8100c2aa936)
 HO
 FO
 Symbol
@@ -46,7 +46,6 @@ lib/Sequence
 lib/Bij
 lib/Cache
 lib/MultiMap
-lib/QCheck
 lib/Bencode
 lib/BV
 lib/PersistentHashtbl

@@ -27,13 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** Test unification *)
 
 open Logtk
+open Logtk_arbitrary
 open QCheck
 
 module T = FOTerm
 module S = Substs.FO
 
 let check_unify_gives_unifier =
-  let gen = Arbitrary.(pair T.arbitrary T.arbitrary) in
+  let gen = Arbitrary.(pair ArTerm.default ArTerm.default) in
   let pp = PP.(pair T.to_string T.to_string) in
   let name = "unify_gives_unifier" in
   let prop (t1, t2) =
@@ -50,7 +51,7 @@ let check_unify_gives_unifier =
   mk_test ~n:1000 ~pp ~name gen prop
 
 let check_variant =
-  let gen = T.arbitrary in
+  let gen = ArTerm.default in
   let name = "unif_term_self_variant" in
   let pp = T.to_string in
   let prop t =
@@ -61,7 +62,7 @@ let check_variant =
   mk_test ~pp ~name gen prop
 
 let check_matching =
-  let gen = Arbitrary.pair T.arbitrary T.arbitrary in
+  let gen = Arbitrary.pair ArTerm.default ArTerm.default in
   let name = "unif_matching_gives_matcher" in
   let pp = PP.(pair T.to_string T.to_string) in
   let prop (t1, t2) =

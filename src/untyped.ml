@@ -63,10 +63,6 @@ module FO = struct
   let pp_tstp = pp
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
-
-  let arbitrary st = assert false
-  let arbitrary_pred st = assert false
-  let arbitrary_ground st = assert false
 end
 
 (** {2 First Order formulas} *)
@@ -184,9 +180,6 @@ module Form = struct
 
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
-
-  let arbitrary st = assert false
-  let arbitrary_clause = QCheck.Arbitrary.(list ~len:(0--5) arbitrary)
 end
 
 (** {2 Higher order Terms} *)

@@ -546,7 +546,7 @@ let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
   let ctx = TypeInference.Ctx.of_signature base in
   let convert_premise = function
     | A.IfPattern f ->
-      let f = TypeInference.FO.convert ~ctx f in
+      let f = TypeInference.FO.convert_form ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
       let pat, args = MetaPattern.create f' in
       IfPattern (pat, args)
@@ -563,7 +563,7 @@ let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
     | A.Axiom (s, args, f) ->
       (* convert axiom *)
       let left = str_to_terms args in
-      let f = TypeInference.FO.convert ~ctx f in
+      let f = TypeInference.FO.convert_form ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
       let p, right = MetaPattern.create f' in
       (* map to variables *)
@@ -576,7 +576,7 @@ let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
       add_axiom kb axiom
     | A.LemmaInline (f, premises) ->
       (* describe a lemma *)
-      let f = TypeInference.FO.convert ~ctx f in
+      let f = TypeInference.FO.convert_form ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
       let pat, args = MetaPattern.create f' in
       let premises = List.map convert_premise premises in

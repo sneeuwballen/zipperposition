@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 73aec3f043253c82aa8c249f3db41d99)
+# DO NOT EDIT (digest: 0ca4ca5bbf6c0ad3d2d0f483a19e04c1)
 version = "0.1"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
@@ -19,6 +19,18 @@ package "meta" (
  archive(native) = "logtk_meta.cmxa"
  archive(native, plugin) = "logtk_meta.cmxs"
  exists_if = "logtk_meta.cma"
+)
+
+package "arbitrary" (
+ version = "0.1"
+ description =
+ "Logic toolkit, designed primarily for first-order automated reasoning."
+ requires = "logtk logtk.meta datalog qcheck"
+ archive(byte) = "logtk_arbitrary.cma"
+ archive(byte, plugin) = "logtk_arbitrary.cma"
+ archive(native) = "logtk_arbitrary.cmxa"
+ archive(native, plugin) = "logtk_arbitrary.cmxs"
+ exists_if = "logtk_arbitrary.cma"
 )
 # OASIS_STOP
 

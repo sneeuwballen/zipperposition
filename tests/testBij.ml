@@ -27,13 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** Test bij *)
 
 open Logtk
+open Logtk_arbitrary
 open QCheck
 
 module T = FOTerm
 module F = FOFormula
 
 let test_bijection_symbol =
-  let gen = Symbol.arbitrary in
+  let gen = ArSymbol.default in
   let name = "bij_bijection_for_symb" in
   let prop t =
     let s = Bij.TrBencode.to_string ~bij:Symbol.bij t in
@@ -43,7 +44,7 @@ let test_bijection_symbol =
   mk_test ~pp:Symbol.to_string ~name gen prop
 
 let test_bijection_term =
-  let gen = T.arbitrary in
+  let gen = ArTerm.default in
   let name = "bij_bijection_for_term" in
   let prop t =
     let s = Bij.TrBencode.to_string ~bij:T.bij t in
@@ -53,7 +54,7 @@ let test_bijection_term =
   mk_test ~pp:T.to_string ~name gen prop
 
 let test_bijection_pred =
-  let gen = T.arbitrary_pred in
+  let gen = ArTerm.pred in
   let name = "bij_bijection_for_pred" in
   let prop t =
     let s = Bij.TrBencode.to_string ~bij:T.bij t in
@@ -63,7 +64,7 @@ let test_bijection_pred =
   mk_test ~pp:T.to_string ~name gen prop
 
 let test_bijection_form =
-  let gen = F.arbitrary in
+  let gen = ArForm.default in
   let name = "bij_bijection_for_form" in
   let prop f =
     let s = Bij.TrBencode.to_string ~bij:F.bij f in

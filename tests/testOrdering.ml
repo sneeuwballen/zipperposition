@@ -26,6 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** test orderings *)
 
 open Logtk
+open Logtk_arbitrary
 open OUnit
 
 module T = FOTerm
@@ -53,11 +54,11 @@ let check_ordering_inv_by_subst ord =
   let name = Util.sprintf "ordering_%s_inv_by_subst" (O.name ord) in
   let pp = PP.triple T.to_string T.to_string S.to_string in
   (* generate pairs of terms, and grounding substitutions *)
-  let gen = Arbitrary.((pair T.arbitrary T.arbitrary) >>= fun (t1, t2) ->
+  let gen = Arbitrary.((pair ArTerm.default ArTerm.default) >>= fun (t1, t2) ->
     let vars = T.vars_list [t1; t2] in
     (* grounding substitution *)
     let subst st = List.fold_left
-      (fun subst v -> S.bind subst v 0 (T.arbitrary_ground st) 0) S.empty vars in
+      (fun subst v -> S.bind subst v 1 (ArTerm.ground st) 0) S.empty vars in
     triple (return t1) (return t2) subst)
   in
   let size (t1, t2, s) =

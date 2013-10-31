@@ -263,25 +263,6 @@ let bij =
         | "fun" -> BranchFrom (Lazy.force bij_fun, fun (ret,l) -> mk_fun ret l)
         | _ -> raise (DecodingError "expected Type"))))
 
-let arbitrary =
-  QCheck.Arbitrary.(
-    let var = among [var 0; var 1 ] in
-    let base = choose [ among [ i; const "$int"; const "a"; const "b"; ] ; var ] in
-    fix ~max:4 ~base (fun sub -> choose
-      [ lift (app "list") (list_repeat 1 sub)
-      ; lift (app "prod") (list_repeat 2 sub)
-      ; lift2 mk_fun sub (list sub)
-      ]))
-
-let arbitrary_ground =
-  QCheck.Arbitrary.(
-    let base = among [ i; const "$int"; const "a"; const "b" ] in
-    fix ~max:4 ~base (fun sub -> choose
-      [ lift (app "list") (list_repeat 1 sub)
-      ; lift (app "prod") (list_repeat 2 sub)
-      ; lift2 mk_fun sub (list sub)
-      ]))
-
 (** {2 Parsed types} *)
 
 module Parsed = struct

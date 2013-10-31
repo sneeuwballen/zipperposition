@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Test indexing structures} *)
 
 open Logtk
+open Logtk_arbitrary
 open QCheck
 
 module T = FOTerm
@@ -49,7 +50,7 @@ end
 module TestUnit(I : UnitIndex) = struct
   (* lists of unique terms *)
   let gen low high = Arbitrary.(
-    list ~len:(low -- high) T.arbitrary >>= fun l ->
+    list ~len:(low -- high) ArTerm.default >>= fun l ->
     let set = T.Tbl.from_list l in
     let seq = T.Tbl.to_seq set in
     let seq = Sequence.mapi (fun i t -> t, i) seq in

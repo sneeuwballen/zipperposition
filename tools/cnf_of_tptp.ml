@@ -50,7 +50,7 @@ let to_cnf decls =
         begin match role with
         | A.R_conjecture ->
           (* type conjecture *)
-          let f = TypeInference.FO.convert ~ctx:tyctx f in
+          let f = TypeInference.FO.convert_form ~ctx:tyctx f in
           (* negate conjecture *)
           let clauses = Cnf.cnf_of ~ctx (F.mk_not f) in
           Sequence.map
@@ -60,7 +60,7 @@ let to_cnf decls =
             (Sequence.of_list clauses)
         | _ ->
           (* type conjecture *)
-          let f = TypeInference.FO.convert ~ctx:tyctx f in
+          let f = TypeInference.FO.convert_form ~ctx:tyctx f in
           (* translate, keeping the same role *)
           let clauses = Cnf.cnf_of ~ctx f in
           Sequence.map

@@ -1,13 +1,16 @@
 S src
 S src/lib
+S src/arbitrary/
+S src/meta
 S tools/
 S tests/
-S src/meta
 B _build/src/
 B _build/src/lib/
 B _build/src/meta
+B _build/src/arbitrary
 B _build/tools/
 B _build/tests/
 PKG oUnit
 PKG bench
 PKG datalog
+PKG qcheck

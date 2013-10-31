@@ -234,13 +234,6 @@ let matching pat right =
     Util.exit_prof prof_matching;
     substs
 
-let arbitrary_apply =
-  QCheck.Arbitrary.(
-    F.arbitrary >>= fun f ->
-    return (create (EncodedForm.encode f)))
-
-let arbitrary = QCheck.Arbitrary.map arbitrary_apply fst
-
 (** {2 Set of patterns} *)
 
 type pattern = t
