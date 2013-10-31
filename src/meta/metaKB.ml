@@ -540,13 +540,20 @@ let map_to_vars ?(offset=0) terms =
 let str_to_terms l =
   List.map (fun s -> T.mk_const ~ty:Type.i (Symbol.mk_const s)) l
 
+
+(* FIXME: we need to build closures locally, so that we can generalize
+  after the {b whole} statement is type-checked. *)
+
+(* TODO: wrap into try/with to print type errors within a context,
+    so we know where the type error is *)
+
 (** Conversion of a list of Ast_theory.statement to a KB *)
 let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
   let base = Signature.curry base in
   let ctx = TypeInference.Ctx.of_signature base in
   let convert_premise = function
     | A.IfPattern f ->
-      let f = TypeInference.FO.convert_form ~ctx f in
+      let f = TypeInference.FO.convert_form ~generalize:true ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
       let pat, args = MetaPattern.create f' in
       IfPattern (pat, args)
@@ -558,12 +565,13 @@ let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
       IfTheory (s, args)
   in
   let add_statement kb statement =
+    Util.debug 3 "metaKB: add statement %a" A.pp statement;
     (* infer types *)
     match statement with
     | A.Axiom (s, args, f) ->
       (* convert axiom *)
       let left = str_to_terms args in
-      let f = TypeInference.FO.convert_form ~ctx f in
+      let f = TypeInference.FO.convert_form ~generalize:true ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
       let p, right = MetaPattern.create f' in
       (* map to variables *)
@@ -576,7 +584,7 @@ let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
       add_axiom kb axiom
     | A.LemmaInline (f, premises) ->
       (* describe a lemma *)
-      let f = TypeInference.FO.convert_form ~ctx f in
+      let f = TypeInference.FO.convert_form ~generalize:true ~ctx f in
       let f' = MetaPattern.EncodedForm.encode f in
       let pat, args = MetaPattern.create f' in
       let premises = List.map convert_premise premises in

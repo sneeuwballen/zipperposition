@@ -23,7 +23,25 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Type Inference} *)
+(** {1 Type Inference}
+
+This module is used for two things that overlap:
+- inferring the types of symbols that have not been declared (e.g. in
+  "fof" or "cnf" TPTP statements) so as to enrich a {!Signature.t}
+- converting {!Untyped} terms or formulas into typed formulas, by inferring
+  the exact type of each subterm.
+
+In this context, {b generalizing} type variables means that if some symbol
+whose type was unknown and its type still contains variables after the
+type inference, those variables are kept instead of being bound to
+a default type (typically {!Type.i}).
+
+For instance: say [f] is not declared and occurs in the term [f(f(nil))]
+with the declared constructor [nil : list(A)]. The inferred type for
+[f] should be something like [list(B) -> list(B)].
+- If we generalize, we declare that [f : list(A) -> list(A)] (for all [A]).
+- If we don't, we declare that [f : list($i) -> list($i)].
+*)
 
 type scope = Substs.scope
 
@@ -156,24 +174,29 @@ module FO : sig
   val signature_forms : Signature.t -> Untyped.Form.t Sequence.t -> Signature.t
     (** Infer signature for this sequence of formulas *)
 
-  val convert : ctx:Ctx.t -> Untyped.FO.t -> FOTerm.t
-    (** Convert a term into a typed term. Free constructor variables are
-        bound to [default] *)
+  val convert : ?generalize:bool -> ctx:Ctx.t ->
+                Untyped.FO.t -> FOTerm.t
+    (** Convert a term into a typed term.
+        @param generalize if true, constructor types are generalized (default false)  *)
 
-  val convert_form : ctx:Ctx.t -> Untyped.Form.t -> FOFormula.t
-    (** Convert a formula into a typed formula. Free constructor variables
-        are bound to [default]. *)
+  val convert_form : ?generalize:bool -> ctx:Ctx.t ->
+                      Untyped.Form.t -> FOFormula.t
+    (** Convert a formula into a typed formula.
+        @param generalize see {!convert} *)
 
-  val convert_clause : ctx:Ctx.t -> Untyped.Form.t list -> FOFormula.t list
+  val convert_clause : ?generalize:bool -> ctx:Ctx.t ->
+                        Untyped.Form.t list -> FOFormula.t list
     (** Convert a "clause". Type variables are bound in the same scope
-        for all formulas in the list. Binds free constructor
-        variables to default. *)
+        for all formulas in the list. 
+        @param generalize see {!convert} *)
 
-  val convert_seq : ctx:Ctx.t -> Untyped.Form.t Sequence.t -> FOFormula.t list
-    (** Given the signature for those formulas, infer their type and
-        convert untyped formulas into typed formulas. Also updates
-        the context. Type variables of each formulas live in distinct
-        scopes. Bind free constructor variables to default *)
+  val convert_seq : ?generalize:bool -> ctx:Ctx.t ->
+                    Untyped.Form.t Sequence.t -> FOFormula.t list
+    (** Given the signature for those formulas, infer their type and convert
+        untyped formulas into typed formulas. Also updates the context. Type
+        variables of each formulas live in distinct scopes. 
+        @param generalize see {!convert} *)
+ 
 end
 
 module HO : sig
@@ -182,13 +205,16 @@ module HO : sig
   val constrain : ctx:Ctx.t -> Untyped.HO.t -> unit
     (** Constrain the term to be well-typed and of boolean type *)
 
-  val convert : ?ret:Type.t -> ctx:Ctx.t -> Untyped.HO.t -> HOTerm.t
+  val convert : ?generalize:bool -> ?ret:Type.t -> ctx:Ctx.t ->
+                Untyped.HO.t -> HOTerm.t
     (** Convert a single untyped term to a typed term. Binds free constructor
         variables to default.
-        @param ret is the type we expect for this term (default: {!Type.o}) *)
+        @param ret is the type we expect for this term (default: {!Type.o})
+        @param generalize if true, constructor types are generalized (default false) *)
 
-  val convert_seq : ctx:Ctx.t -> Untyped.HO.t Sequence.t -> HOTerm.t list
+  val convert_seq : ?generalize:bool -> ctx:Ctx.t ->
+                    Untyped.HO.t Sequence.t -> HOTerm.t list
     (** Infer the types of those terms and annotate each term and subterm with
         its type. Also updates the context's signature.
-        All terms must be boolean. *)
+        All terms are assumed to be boolean. *)
 end

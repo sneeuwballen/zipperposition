@@ -445,28 +445,29 @@ module FO = struct
     Sequence.iter (constrain_form ctx) seq;
     Ctx.to_signature ctx
 
-  let convert ~ctx t =
+  let convert ?(generalize=false) ~ctx t =
     let _, closure = infer ctx t 0 in
-    Ctx.bind_to_default ctx;
+    if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     Ctx.apply_closure ctx closure
 
-  let convert_form ~ctx f =
+  let convert_form ?(generalize=false) ~ctx f =
     let closure = infer_form ctx f 0 in
+    if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     Ctx.apply_closure ctx closure
 
-  let convert_clause ~ctx c =
+  let convert_clause ?(generalize=false) ~ctx c =
     let closures = List.map (fun lit -> infer_form ctx lit 0) c in
     (* use same renaming for all formulas, to keep
       a consistent scope *)
     let renaming = Ctx.renaming_clear ctx in
-    Ctx.bind_to_default ctx;
+    if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     List.map (fun c' -> Ctx.apply_closure ~renaming ctx c') closures
 
-  let convert_seq ~ctx forms =
+  let convert_seq ?(generalize=false) ~ctx forms =
     (* build closures, inferring all types *)
-    let closures = Sequence.map (fun f -> infer_form ctx f 0) forms
-    in
+    let closures = Sequence.map (fun f -> infer_form ctx f 0) forms in
     let closures = Sequence.to_rev_list closures in
+    if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     (* apply closures to the final substitution *)
     List.rev_map (Ctx.apply_closure ctx) closures
 end
@@ -565,12 +566,13 @@ module HO = struct
     Ctx.unify_and_set ctx ty 0 Type.o 0;
     ()
 
-  let convert ?(ret=Type.o) ~ctx t =
+  let convert ?(generalize=false) ?(ret=Type.o) ~ctx t =
     let ty, closure = infer ctx t 0 in
     Ctx.unify_and_set ctx ty 0 ret 0;
+    if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     Ctx.apply_closure ctx closure
 
-  let convert_seq ~ctx terms =
+  let convert_seq ?(generalize=false) ~ctx terms =
     let closures = Sequence.map
       (fun t ->
         let ty, closure = infer ctx t 0 in
@@ -580,6 +582,7 @@ module HO = struct
     in
     (* evaluate *)
     let closures = Sequence.to_rev_list closures in
+    if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     List.rev_map
       (fun c -> Ctx.apply_closure ctx c)
       closures
