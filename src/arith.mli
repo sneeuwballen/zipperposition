@@ -77,9 +77,6 @@ module T : sig
 
   val simplify : signature:Signature.t -> FOTerm.t -> FOTerm.t
     (** Arithmetic simplifications *)
-
-  val arbitrary_arith : Type.t -> FOTerm.t QCheck.Arbitrary.t
-    (** Arbitrary arithmetic terms *)
 end
 
 (** {2 Formulas} *)
@@ -112,8 +109,6 @@ module Lit : sig
 
   val mk_neq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> Literal.t
     (** Smart constructor for inequality *)
-
-  val arbitrary : Type.t -> Literal.t QCheck.Arbitrary.t
 
   (** {3 Single-term literal}
       This type helps deal with the special case where there is a single

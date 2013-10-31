@@ -221,17 +221,6 @@ module Make(N : NUM) = struct
       _pp_bound_high buf h
 
   let to_string a = Util.on_buffer pp a
-
-  let arbitrary ar =
-    QCheck.Arbitrary.(
-    choose
-      [ lift lt ar
-      ; lift gt ar
-      ; lift leq ar
-      ; lift geq ar
-      ; lift2 range ar ar
-      ; among [empty; all]
-      ])
 end
 
 module Int = Make(struct

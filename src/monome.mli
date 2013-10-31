@@ -244,9 +244,3 @@ end
 (** {2 Lib} *)
 
 val bij : t Bij.t
-val arbitrary_int : t QCheck.Arbitrary.t (* with int coeffs *)
-val arbitrary_rat : t QCheck.Arbitrary.t (* with rat coeffs *)
-val arbitrary : t QCheck.Arbitrary.t     (* with any coeffs *)
-
-val arbitrary_ty : Type.t -> t QCheck.Arbitrary.t
-  (* for the given type. Works only for $int and $rat *)

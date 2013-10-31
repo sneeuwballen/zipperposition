@@ -232,9 +232,6 @@ module T = struct
     let t' = TCache.with_cache_rec __cache simplify t in
     Util.exit_prof prof_arith_simplify;
     t'
-
-  let arbitrary_arith ty =
-    QCheck.Arbitrary.(lift M.to_term (M.arbitrary_ty ty))
 end
 
 (** {2 Formulas} *)
@@ -309,20 +306,6 @@ module Lit = struct
         then Literal.mk_absurd
         else Literal.mk_tauto
       else Literal.mk_neq ~ord t1 t2
-
-  let arbitrary ty =
-    let open QCheck.Arbitrary in
-    T.arbitrary_arith ty >>= fun t1 ->
-    T.arbitrary_arith ty >>= fun t2 ->
-    let signature = TypeInference.FO.Quick.(signature
-      ~signature:Signature.Arith.signature [WellTyped t1; WellTyped t2]) in
-    let ord = Ordering.default signature in
-    among
-      [ mk_less t1 t2
-      ; mk_lesseq t1 t2
-      ; mk_eq ~ord t1 t2
-      ; mk_neq ~ord t1 t2
-      ]
 
   let _uminus = S.Arith.Op.uminus
 

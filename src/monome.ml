@@ -854,35 +854,3 @@ let bij =
       let signature = TypeInference.Ctx.to_signature tyctx in
       of_term ~signature t)
     T.bij)
-
-(* arbitrary instance for the given constant generators *)
-let _arbitrary_for ty any any_nonzero =
-  let open QCheck.Arbitrary in
-  0 -- 3 >>= fun n ->
-  list_repeat n (pair any_nonzero (T.arbitrary_ty ty)) >>= fun terms ->
-  any >>= fun constant ->
-  any_nonzero >>= fun divby ->
-  let m = of_list constant terms in
-  return { m with divby; }
-
-let arbitrary_int =
-  QCheck.Arbitrary.(
-    let any_int = lift Symbol.mk_int small_int in
-    let any_int_nonzero = lift Symbol.mk_int (1 -- 10) in
-    _arbitrary_for Type.int any_int any_int_nonzero)
-
-let arbitrary_rat =
-  QCheck.Arbitrary.(
-    let any_rat = lift2 Symbol.mk_rat small_int (1 -- 10) in
-    let any_rat_nonzero = lift2 Symbol.mk_rat (1 -- 50) (1 -- 10) in
-    _arbitrary_for Type.rat any_rat any_rat_nonzero)
-
-let arbitrary_ty ty =
-  if Type.eq ty Type.int
-    then arbitrary_int
-  else if Type.eq ty Type.rat
-    then arbitrary_rat
-  else failwith ("Monome.arbitrary_ty: cannot deal with type " ^ Type.to_string ty)
-
-let arbitrary =
-  QCheck.Arbitrary.choose [ arbitrary_int; arbitrary_rat ]

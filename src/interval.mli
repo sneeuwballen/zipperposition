@@ -80,8 +80,6 @@ module type S = sig
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
-
-  val arbitrary : N.t QCheck.Arbitrary.t -> t QCheck.Arbitrary.t
 end
 
 module Make(N : NUM) : S with module N = N

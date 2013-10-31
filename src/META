@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 23bce70c701c3929f885a58219a3a13e)
+# DO NOT EDIT (digest: d91f186815176edd722f36bbf34fa61e)
 version = "0.3"
 description =
 "Superposition theorem prover, for first order logic with equality."
@@ -9,5 +9,16 @@ archive(byte, plugin) = "libzipperposition.cma"
 archive(native) = "libzipperposition.cmxa"
 archive(native, plugin) = "libzipperposition.cmxs"
 exists_if = "libzipperposition.cma"
+package "arbitrary" (
+ version = "0.3"
+ description =
+ "Superposition theorem prover, for first order logic with equality."
+ requires = "qcheck logtk logtk.arbitrary libzipperposition"
+ archive(byte) = "libzipperposition_arbitrary.cma"
+ archive(byte, plugin) = "libzipperposition_arbitrary.cma"
+ archive(native) = "libzipperposition_arbitrary.cmxa"
+ archive(native, plugin) = "libzipperposition_arbitrary.cmxs"
+ exists_if = "libzipperposition_arbitrary.cma"
+)
 # OASIS_STOP
 
