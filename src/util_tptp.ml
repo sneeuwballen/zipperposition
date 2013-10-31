@@ -169,7 +169,8 @@ let infer_type ctx decls =
       | A.TFF(_,_,f,_) -> TypeInference.FO.constrain_form ctx f
       | A.THF(_,_,f,_) -> ignore (TypeInference.HO.constrain ctx f)
       )
-    decls
+    decls;
+  TypeInference.Ctx.bind_to_default ctx
 
 let signature ?(signature=Signature.base) decls =
   let ctx = TypeInference.Ctx.of_signature signature in

@@ -173,4 +173,8 @@ let main () =
   ()
 
 let _ =
-  main ()
+  try
+    main ()
+  with TypeUnif.Error e ->
+    Util.printf "%a\n" TypeUnif.pp_error e;
+    exit 1

@@ -50,6 +50,18 @@ module FO = struct
     in
     Sequence.fold recurse Symbol.Set.empty seq
 
+  let _same_name v1 v2 = match v1, v2 with
+    | Var (n1, _), Var (n2, _) -> n1 = n2
+    | _ -> false
+
+  (* replace var of given [name] by [v] in [t] *)
+  let rec _replace_var v t = match t with
+    | Var _ ->
+      if _same_name v t then v else t
+    | App (s, l) ->
+      let l = List.map (_replace_var v) l in
+      app s l
+
   let rec pp buf t = match t with
     | App (s, []) -> Symbol.pp buf s
     | App (s, l) ->
@@ -105,10 +117,33 @@ module Form = struct
   let mk_xor f1 f2 = mk_not (mk_equiv f1 f2)
   let mk_imply f1 f2 = Binary (Imply, f1, f2)
   let atom t = Atom t
-  let forall vars f = Quant (Forall, vars, f)
-  let exists vars f = Quant (Exists, vars, f)
   let mk_true = Bool true
   let mk_false = Bool false
+
+  (* replace vars with same name as [v] by [v] in [f] *)
+  let rec _replace_var v f = match f with
+    | Bool _ -> f
+    | Not f' -> mk_not (_replace_var v f')
+    | Binary (op, f1, f2) ->
+      Binary (op, _replace_var v f1, _replace_var v f2)
+    | Nary (op, l) ->
+      Nary (op, List.map (_replace_var v) l)
+    | Quant (op, vars, f') ->
+      if List.exists (FO._same_name v) vars
+        then f  (* shadowed *)
+        else Quant (op, vars, _replace_var v f')
+    | Equal (t1, t2) -> Equal (FO._replace_var v t1, FO._replace_var v t2)
+    | Atom p -> Atom (FO._replace_var v p)
+
+  (* be sure that all variables in [vars] are properly replace in [f] *)
+  let _replace_vars vars f =
+    assert (List.for_all (function | FO.Var _ -> true | _ -> false) vars);
+    List.fold_left
+      (fun f v -> _replace_var v f)
+      f vars
+
+  let forall vars f = Quant (Forall, vars, _replace_vars vars f)
+  let exists vars f = Quant (Exists, vars, _replace_vars vars f)
 
   let rec pp buf f = match f with
     | Bool true -> Buffer.add_string buf "$true"
@@ -207,8 +242,31 @@ module HO = struct
 
   let at a b = app a [b]
   let var ~ty s = Var (s, ty)
+
+  let _same_name v1 v2 = match v1, v2 with
+    | Var (n1, _), Var (n2, _) -> n1 = n2
+    | _ -> false
+
+  (* replace vars with same name as [v] by [v] in [t] *)
+  let rec _replace_var v t = match t with
+    | Const _ -> t
+    | Var _ ->
+      if _same_name v t then v else t
+    | App (t, l) ->
+      let t = _replace_var v t in
+      let l = List.map (_replace_var v) l in
+      app t l
+    | Lambda (Var _ as var, t') ->
+      if _same_name v var
+        then t  (* name is shadowed under quantifier *)
+        else Lambda (var, _replace_var v t')
+    | Lambda _ -> assert false
+
   let lambda ~var t = match var with
-    | Var _ -> Lambda (var, t)
+    | Var _  ->
+      (* be sure that all variables occurring in [t] with the same name
+          have the same type *)
+      Lambda (var, _replace_var var t)
     | _ -> failwith "Untyped.HO.lambda: expect (var, term)"
 
   let forall ~var t = at (const Symbol.forall_symbol) (lambda ~var t)

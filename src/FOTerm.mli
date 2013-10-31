@@ -239,9 +239,6 @@ val print_all_types : bool ref
 
 val bij : t Bij.t
 
-(* TODO: need backtracking generators because some types may not
-    be generable (e.g. if no function returns it) *)
-
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
 

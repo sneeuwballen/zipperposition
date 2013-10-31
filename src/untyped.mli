@@ -102,11 +102,6 @@ module Form : sig
   val mk_true : t
   val mk_false : t 
 
-  (* FIXME: forall/exists on a typed variable should type all variables
-      of subformula that have the same name, with the same type.
-      e.g. forall x:int p(f(x),x) ----> forall x:int p(f(x:int),x:int)
-  *)
-
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
