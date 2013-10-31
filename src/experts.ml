@@ -289,19 +289,17 @@ type gnd_convergent = {
 } (** A set of ground convergent equations, for some order+precedence *)
 
 let mk_gc ~theory ~ord ~prec clauses =
-  let signature = C.signature (Sequence.of_list clauses) in
-  let signature = Symbol.Map.filter
-    (fun s _ -> not (Symbol.is_connective s)) signature in
+  let symbols = C.symbols (Sequence.of_list clauses) in
+  let symbols = Symbol.Set.filter
+    (fun s -> not (Symbol.is_connective s)) symbols in
   (* check that every clause is a positive equation *)
   assert (List.for_all
     (fun c -> match c.C.hclits with 
      | [| Literal.Equation (_,_,true,_)|] -> true | _ -> false) clauses);
-  let set = Signature.to_symbols signature in
-  let set = Symbol.Set.of_seq (Sequence.of_list set) in
   { gc_ord = ord;
     gc_theory = theory;
     gc_prec = prec;
-    gc_sig = set;
+    gc_sig = symbols;
     gc_eqns = clauses;
   }
 
@@ -312,7 +310,7 @@ let ground_pair t1 t2 =
   let _, subst = List.fold_left
     (fun (i,subst) v ->
       (* bind [v] to a fresh constant *)
-      let const = T.mk_const (Symbol.mk_fresh_const i) in
+      let const = T.mk_const ~ty:v.T.ty (Symbol.mk_fresh_const i) in
       let subst' = S.bind subst v 0 const 0 in
       (i+1, subst'))
     (0, S.empty) vars in

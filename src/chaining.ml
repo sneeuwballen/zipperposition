@@ -60,7 +60,7 @@ let _gather_positions ~eligible ~signature lits scope pos subst =
     (fun (pos_list, subst) lit i ->
       try
         let t' = Lit.at_pos lit pos' in
-        if T.is_var t' || not (TypeInference.FO.check_term_term_sig signature t t')
+        if T.is_var t'
           then raise Exit  (* variables are not eligible *)
           else
             let subst = FOUnif.unification ~subst t scope t' scope in
@@ -335,7 +335,7 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
     Position.pp left_pos C.pp right Position.pp right_pos;
   let signature = Ctx.signature ctx in
   let instance = (Lits.get_ineq ~spec left.C.hclits left_pos).TO.instance in
-  let mk_less t1 t2 = Lit.mk_true (T.mk_node instance.TO.less [t1; t2]) in
+  let mk_less t1 t2 = Lit.mk_true (T.mk_node ~ty:Type.o instance.TO.less [t1; t2]) in
   let t1 = (Lits.get_ineq ~spec right.C.hclits right_pos).TO.left in
   (* find other inequality literals that can be chained on *)
   let eligible c = C.Eligible.ineq_of c instance in

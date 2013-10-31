@@ -88,7 +88,7 @@ type t
 
 val create : ?base:Signature.t -> ?meta:MetaProverState.t -> Params.t -> t
   (** Create a new preprocessing env.
-      [meta] is a meta-prover that can be used for processing.
+      @param meta is a meta-prover that can be used for processing.
   *)
 
 val copy : t -> t

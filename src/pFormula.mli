@@ -64,9 +64,6 @@ val simpl_to : from:t -> into:t -> unit
   (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
       the simplification of [from] into [into] is cached. *)
 
-val signature : t -> Signature.t
-val signature_seq : ?init:Signature.t -> t Sequence.t -> Signature.t
-
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
 val to_string : t -> string
@@ -79,9 +76,5 @@ val bij : t Bij.t
 (** PFormulas are compared by their formulas, not their proofs. A set
     can contain at most one proof for a given formula. *)
 
-module Set : sig
-  include Sequence.Set.S with type elt = pform
-
-  val signature : ?signature:Signature.t -> t -> Signature.t
-end
+module Set : Sequence.Set.S with type elt = pform
 

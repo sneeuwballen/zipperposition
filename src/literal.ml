@@ -222,6 +222,8 @@ let is_ineq_of ~instance lit =
 
 (* primary constructor *)
 let mk_lit ~ord a b sign =
+  if not (Type.eq a.T.ty b.T.ty)
+    then TypeUnif.fail Substs.Ty.empty a.T.ty 0 b.T.ty 0;
   match a, b with
   | _ when a == b -> if sign then True else False
   | _ when a == T.true_term && b == T.false_term -> if sign then False else True
@@ -239,7 +241,10 @@ let mk_neq ~ord a b = mk_lit ~ord a b false
 let mk_prop p sign = match p with
   | _ when p == T.true_term -> if sign then True else False
   | _ when p == T.false_term -> if sign then False else True
-  | _ -> Prop (p, sign)
+  | _ ->
+    if not (Type.eq p.T.ty Type.o)
+      then TypeUnif.fail Substs.Ty.empty p.T.ty 0 Type.o 0;
+    Prop (p, sign)
 
 let mk_true p = mk_prop p true
 
@@ -251,11 +256,11 @@ let mk_absurd = False
 
 let mk_less instance l r =
   let open Theories.TotalOrder in
-  mk_true (T.mk_node instance.less [l; r])
+  mk_true (T.mk_node ~ty:Type.o instance.less [l; r])
 
 let mk_lesseq instance l r =
   let open Theories.TotalOrder in
-  mk_true (T.mk_node instance.lesseq [l; r])
+  mk_true (T.mk_node ~ty:Type.o instance.lesseq [l; r])
 
 let apply_subst ~renaming ~ord subst lit scope =
   match lit with
@@ -268,6 +273,13 @@ let apply_subst ~renaming ~ord subst lit scope =
     mk_prop p' sign
   | True
   | False -> lit
+
+let symbols lit = match lit with
+  | Equation (l,r,_,_) ->
+    T.symbols (Sequence.of_list [l;r])
+  | Prop (p,_) -> T.symbols (Sequence.singleton p)
+  | True
+  | False -> Symbol.Set.empty
 
 let reord ~ord lit =
   match lit with
@@ -383,20 +395,6 @@ let replace_pos ~ord lit ~at ~by = match lit, at with
   | True, [i] when i = Position.left_pos -> lit
   | False, [i] when i = Position.left_pos -> lit
   | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
-
-let infer_type ctx lit s_lit =
-  match lit with
-  | Equation (l,r,_,_) ->
-    TypeInference.FO.constrain_term_term ctx l s_lit r s_lit
-  | Prop (p,_) ->
-    TypeInference.FO.constrain_term_type ctx p s_lit Type.o s_lit
-  | True
-  | False -> ()
-
-let signature ?(signature=Signature.empty) lit =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  infer_type ctx lit 0;
-  TypeInference.Ctx.to_signature ctx
 
 let apply_subst_list ~renaming ~ord subst lits scope =
   List.map
@@ -603,14 +601,6 @@ module Arr = struct
   let to_forms lits =
     Array.to_list (Array.map form_of_lit lits)
 
-  let infer_type ctx lits s_lit =
-    Array.iter (fun lit -> infer_type ctx lit s_lit) lits
-
-  let signature ?(signature=Signature.empty) lits =
-    let ctx = TypeInference.Ctx.of_signature signature in
-    infer_type ctx lits 0;
-    TypeInference.Ctx.to_signature ctx
-
   (** {3 High Order combinators} *)
 
   let at_pos lits pos = match pos with
@@ -774,6 +764,11 @@ module Arr = struct
         | False, _ -> acc
         in fold acc (i+1)
     in fold acc 0
+
+  let symbols ?(init=Symbol.Set.empty) lits =
+    Array.fold_left
+      (fun set lit -> Symbol.Set.union set (symbols lit))
+      init lits
 
   (** {3 IO} *)
 

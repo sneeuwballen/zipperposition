@@ -328,64 +328,59 @@ let comparison m1 m2 =
 exception NotLinear of string
   (** Used by [of_term] *)
 
-let of_term ~signature t =
-  let rec of_term ~signature t = match t.T.term with
+let of_term t =
+  let rec of_term t = match t.T.term with
   | T.Node (s, [t1; t2]) when S.eq s S.Arith.sum ->
-    let m1 = of_term ~signature t1 in
-    let m2 = of_term ~signature t2 in
+    let m1 = of_term t1 in
+    let m2 = of_term t2 in
     sum m1 m2
   | T.Node (s, [t1; t2]) when S.eq s S.Arith.difference ->
-    let m1 = of_term ~signature t1 in
-    let m2 = of_term ~signature t2 in
+    let m1 = of_term t1 in
+    let m2 = of_term t2 in
     difference m1 m2
   | T.Node (s, [t']) when S.eq s S.Arith.uminus ->
-    let m = of_term ~signature t' in
+    let m = of_term t' in
     uminus m
   | T.Node (s, [{T.term=T.Node (s',[])}; t2])
     when S.eq s S.Arith.product && S.is_numeric s' ->
-    let m = of_term ~signature t2 in
+    let m = of_term t2 in
     product m s'
   | T.Node (S.Const("$succ",_), [t']) ->
-    let m = of_term ~signature t' in
+    let m = of_term t' in
     succ m
   | T.Node (S.Const("$pred",_), [t']) ->
-    let m = of_term ~signature t' in
+    let m = of_term t' in
     pred m
   | T.Node (s, [t2; {T.term=T.Node (s',[])}])
     when S.eq s S.Arith.product && S.is_numeric s' ->
-    let m = of_term ~signature t2 in
+    let m = of_term t2 in
     product m s'
   | T.Node (s, [t2; {T.term=T.Node (s',[])}])
     when S.eq s S.Arith.quotient && S.is_numeric s' && not (S.Arith.is_zero s') ->
-    let m = of_term ~signature t2 in
+    let m = of_term t2 in
     divby m s'
   | T.Node (s, []) when S.is_numeric s -> const s
   | T.Node (s, [_; _]) when S.Arith.is_arith s ->
     raise (NotLinear (Util.sprintf "non linear op %a" S.pp s)) (* failure *)
   | T.Var _
   | T.BoundVar _ ->
-    let ty = match t.T.type_ with Some ty -> ty | None -> assert false in
+    let ty = t.T.ty in
     let one = S.Arith.one_of_ty ty in
     singleton one t
   | T.Node _ ->
-    let ty = TypeInference.FO.infer_sig signature t in
+    let ty = t.T.ty in
     let one = S.Arith.one_of_ty ty in
     singleton one t
   in
-  try of_term ~signature t
+  try of_term t
   with Symbol.Arith.TypeMismatch msg ->
     raise (NotLinear ("type error: " ^ msg))
 
-let of_term_opt ~signature t =
-  try Some (of_term ~signature t)
+let of_term_opt t =
+  try Some (of_term t)
   with NotLinear _ -> None
 
-let of_term_infer t =
-  let ctx = TypeInference.Ctx.of_signature Signature.Arith.signature in
-  ignore (TypeInference.FO.infer ctx t);
-  let signature = TypeInference.Ctx.to_signature ctx in
-  of_term ~signature t
-
+(* FIXME types types types *)
 let to_term m =
   let add x y = T.mk_node S.Arith.sum [x;y] in
   let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
@@ -848,9 +843,5 @@ end
 let bij =
   Bij.(map
     ~inject:to_term
-    ~extract:(fun t ->
-      let tyctx = TypeInference.Ctx.create () in
-      ignore (TypeInference.FO.infer tyctx t);
-      let signature = TypeInference.Ctx.to_signature tyctx in
-      of_term ~signature t)
+    ~extract:of_term
     T.bij)

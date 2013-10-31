@@ -40,7 +40,6 @@ type t = {
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
   renaming : S.Renaming.t;            (** Global Renaming *)
-  tyctx : TypeInference.Ctx.t;        (** Global Type inference context *)
   ac : Theories.AC.t;                 (** AC symbols *)
   total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
@@ -53,7 +52,6 @@ let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
     signature;
     complete=true;
     renaming = S.Renaming.create 13;
-    tyctx = TypeInference.Ctx.of_signature signature;
     ac = Theories.AC.create ();
     total_order = Theories.TotalOrder.create ();
   } in
@@ -99,41 +97,13 @@ let add_order ~ctx ?proof ~less ~lesseq =
     let instance = Theories.TotalOrder.add ~spec ?proof ~less ~lesseq in
     (* declare missing symbols, if any; also take care that
       less and lesseq have the same type, which is, a binary predicate *)
-    let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-    let ty_less, s_less = TypeInference.Ctx.type_of_fun tyctx less in
-    let ty_lesseq, s_lesseq = TypeInference.Ctx.type_of_fun tyctx lesseq in
-    TypeInference.Ctx.unify_and_set tyctx
-      ty_less s_less Type.(o <== [var 0; var 0]) s_less;
-    TypeInference.Ctx.unify_and_set tyctx
-      ty_less s_less ty_lesseq s_lesseq;
-    ctx.signature <- TypeInference.Ctx.to_signature tyctx;
+    if not (Signature.mem ctx.signature less) || not (Signature.mem ctx.signature lesseq)
+      then failwith "Ctx.add_order: order symbols must be declared";
+    let ty_less = Signature.find ctx.signature less in
+    let ty_lesseq = Signature.find ctx.signature lesseq in
+    if not (Type.eq ty_less ty_lesseq)
+      then TypeUnif.fail Substs.Ty.empty ty_less 0 ty_lesseq 0;
     instance
-
-(** {2 Type inference} *)
-
-let tyctx_clear ~ctx =
-  let s = ctx.signature in
-  TypeInference.Ctx.clear ctx.tyctx;
-  TypeInference.Ctx.set_signature ctx.tyctx s;
-  ctx.tyctx
 
 let declare ~ctx symb ty =
   ctx.signature <- Signature.declare ctx.signature symb ty
-
-let constrain_term_type ~ctx t s_t ty s_ty =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.FO.constrain_term_type tyctx t s_t ty s_ty;
-  ctx.signature <- TypeInference.Ctx.to_signature tyctx
-
-let constrain_term_term ~ctx t1 s1 t2 s2 =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.FO.constrain_term_term tyctx t1 s1 t2 s2;
-  ctx.signature <- TypeInference.Ctx.to_signature tyctx
-
-let check_term_type ~ctx t s_t ty s_ty =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.FO.check_term_type tyctx t s_t ty s_ty
-
-let check_term_term ~ctx t1 s1 t2 s2 =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.FO.check_term_term tyctx t1 s1 t2 s2

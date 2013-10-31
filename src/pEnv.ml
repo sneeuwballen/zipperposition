@@ -285,7 +285,6 @@ let add_constr_rule ~penv r =
 
 let mk_precedence ~penv set =
   let constrs = penv.constrs @ List.map (fun rule -> rule set) penv.constr_rules in
-  let forms = Sequence.map PF.get_form (PF.Set.to_seq set) in
-  let signature = F.signature_seq ~signature:penv.base forms in
+  let signature = penv.base in
   let symbols = Signature.to_symbols signature in
   Precedence.create ~complete:false constrs symbols

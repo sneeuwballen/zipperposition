@@ -191,8 +191,8 @@ val is_unit_clause : t -> bool
 val is_oriented_rule : t -> bool
   (** Is the clause a positive oriented clause? *)
 
-val infer_type : TypeInference.Ctx.t -> t Sequence.t -> scope -> unit
-val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
+val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
+  (** symbols that occur in the clause *)
 
 val from_forms : file:string -> name:string -> ctx:Ctx.t -> FOFormula.t list -> t
   (** Conversion of a formula list to a clause *)
@@ -298,8 +298,6 @@ module CSet : sig
 
   val to_list : t -> clause list
   val of_list : clause list -> t
-
-  val infer_type : TypeInference.Ctx.t -> t -> scope -> unit
 
   val to_seq : t -> clause Sequence.t
   val of_seq : t -> clause Sequence.t -> t

@@ -101,8 +101,6 @@ let do_superposition ~ctx active_clause sc_a active_pos
   else if not (T.db_closed (T.at_pos u subterm_pos))
     && (List.exists (fun x -> S.mem subst x sc_p) (T.vars (T.at_pos u subterm_pos)))
   then (Util.debug 3 "... narrowing with De Bruijn indices"; acc)
-  else if not (Ctx.check_term_term ~ctx s (T.at_pos u subterm_pos))
-  then (Util.debug 3 "... incompatible types"; acc)
   else
   let renaming = Ctx.renaming_clear ~ctx in
   let t' = S.apply ~renaming subst t sc_a
@@ -280,8 +278,7 @@ let infer_equality_factoring clause =
     let renaming = Ctx.renaming_clear ~ctx in
     if O.compare ord  (S.apply ~renaming subst s 0)
                       (S.apply ~renaming subst t 0) <> Comp.Lt &&
-       BV.get (C.eligible_param clause 0 subst) active_idx &&
-       Ctx.check_term_term ~ctx s u  (* type check *)
+       BV.get (C.eligible_param clause 0 subst) active_idx
       then begin
         Util.incr_stat stat_equality_factoring_call;
         let proof c = Proof.mk_c_step c "eq_fact" [clause.C.hcproof]
@@ -333,7 +330,7 @@ let infer_split c =
   let rec next_split_term () = 
     let s = "$$split_" ^ (string_of_int !split_count) in
     incr split_count;
-    T.mk_const (Symbol.mk_const ~attrs:Symbol.attr_split s)
+    T.mk_const ~ty:Type.o (Symbol.mk_const ~attrs:Symbol.attr_split s)
   in
   (* is the term made of a split symbol? *)
   let is_split_term t = match t.T.term with
@@ -469,7 +466,7 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
       let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
       let t' = if List.for_all2 (==) l l'
         then t
-        else T.mk_node s l' in
+        else T.mk_node ~ty:t.T.ty s l' in
       (* rewrite term at root *)
       reduce_at_root ~restrict t'
   in

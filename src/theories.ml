@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module STbl = Symbol.SHashtbl
+module STbl = Symbol.Tbl
 module T = FOTerm
 module F = FOFormula
 module PF = PFormula
@@ -43,6 +43,7 @@ module AC = struct
   let is_ac ~spec s = STbl.mem spec s
 
   let axioms s =
+    (* FIXME: need to recover type of [f]
     let x = T.mk_var 0 in
     let y = T.mk_var 1 in
     let z = T.mk_var 2 in
@@ -57,6 +58,8 @@ module AC = struct
     [ mk_pform "associative" (mk_eq (f (f x y) z) (f x (f y z)))
     ; mk_pform "commutative" (mk_eq (f x y) (f y x))
     ]
+    *)
+    []
 
   let add ~spec ?proof s =
     let proof = match proof with
@@ -131,11 +134,12 @@ module TotalOrder = struct
     STbl.mem spec.less_tbl s || STbl.mem spec.lesseq_tbl s
 
   let axioms ~less ~lesseq =
+    (* FIXME: need to recover type of less's arguments
     let x = T.mk_var 0 in
     let y = T.mk_var 1 in
     let z = T.mk_var 2 in
-    let mk_less x y = F.mk_atom (T.mk_node less [x;y]) in
-    let mk_lesseq x y = F.mk_atom (T.mk_node lesseq [x;y]) in
+    let mk_less x y = F.mk_atom (T.mk_node ~ty:Type.o less [x;y]) in
+    let mk_lesseq x y = F.mk_atom (T.mk_node ~ty:Type.o lesseq [ x;y]) in
     let mk_eq x y = F.mk_eq x y in
     let mk_pform name f =
       let f = F.close_forall f in
@@ -148,6 +152,8 @@ module TotalOrder = struct
     ; mk_pform "transitive" (F.mk_imply (F.mk_and [mk_less x y; mk_less y z]) (mk_less x z))
     ; mk_pform "nonstrict" (F.mk_equiv (mk_lesseq x y) (F.mk_or [mk_less x y; mk_eq x y]))
     ]
+    *)
+    []
 
   let add ~spec ?proof ~less ~lesseq =
     let proof = match proof with

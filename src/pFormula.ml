@@ -91,11 +91,6 @@ let simpl_to ~from ~into =
   if not (eq from into')
     then from.simpl_to <- Some into
 
-let signature t = F.signature t.form
-
-let signature_seq ?init seq =
-  F.signature_seq ?signature:init (Sequence.map get_form seq)
-
 let pp buf t = F.pp buf t.form
 let pp_tstp buf t = F.pp_tstp buf t.form
 let to_string t = F.to_string t.form
@@ -108,12 +103,7 @@ let bij = Bij.(map
 
 (** {2 Set of formulas} *)
 
-module Set = struct
-  include Sequence.Set.Make(struct
-    type t = pform
-    let compare = cmp_noproof
-  end)
-
-  let signature ?signature set =
-    F.signature_seq ?signature (Sequence.map get_form (to_seq set))
-end
+module Set = Sequence.Set.Make(struct
+  type t = pform
+  let compare = cmp_noproof
+end)

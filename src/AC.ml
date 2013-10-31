@@ -52,7 +52,7 @@ let axioms ~ctx s =
     let x = T.mk_var ~ty:ret 0 in
     let y = T.mk_var ~ty:ret 1 in
     let z = T.mk_var ~ty:ret 2 in
-    let f x y = T.mk_node s [x;y] in
+    let f x y = T.mk_node ~ty:ret s [x;y] in
     let res = ref [] in
     (* build clause l=r *)
     let add_clause l r =
@@ -109,7 +109,7 @@ let simplify ~spec ~ctx c =
   if n' < n && not (C.get_flag C.flag_persistent c)
     then begin
       let symbols = Theories.AC.symbols_of_terms ~spec (C.terms c) in
-      let symbols = Sequence.to_list (Symbol.SSet.to_seq symbols) in
+      let symbols = Sequence.to_list (Symbol.Set.to_seq symbols) in
       let ac_proof = Util.list_flatmap (Theories.AC.find_proof ~spec) symbols in
       let premises = c.C.hcproof :: ac_proof in
       let proof cc = Proof.mk_c_step cc ~rule:"ac" premises in

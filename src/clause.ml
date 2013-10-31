@@ -374,16 +374,10 @@ let is_oriented_rule c = match c.hclits with
   | [| Lit.Equation (_,_,true,Comparison.Lt) |] -> true (* oriented *)
   | _ -> false
 
-let infer_type ctx clauses s_c =
-  Sequence.iter
-    (fun c -> Lits.infer_type ctx c.hclits s_c)
-    clauses
-
-(** Compute signature of this set of clauses *)
-let signature ?(signature=Signature.empty) clauses =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  infer_type ctx clauses 0;
-  TypeInference.Ctx.to_signature ctx
+let symbols ?(init=Symbol.Set.empty) seq =
+  Sequence.fold
+    (fun set c -> Lits.symbols ~init:set c.hclits)
+    init seq
 
 let from_forms ~file ~name ~ctx forms =
   let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
@@ -515,8 +509,6 @@ module CSet = struct
       (fun k -> iter set k)
 
   let of_seq set seq = Sequence.fold add set seq
-
-  let infer_type ctx set scope = infer_type ctx (to_seq set) scope
 
   let remove_seq set seq = Sequence.fold remove set seq
 

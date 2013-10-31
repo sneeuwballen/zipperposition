@@ -137,12 +137,12 @@ val replace_pos : ord:Ordering.t -> t -> at:Position.t -> by:FOTerm.t -> t
   (** Replace subterm, or
       @raise Invalid_argument if the position is invalid *)
 
-val infer_type : TypeInference.Ctx.t -> t -> scope -> unit
-val signature : ?signature:Signature.t -> t -> Signature.t
-
 val apply_subst_list : renaming:Substs.FO.Renaming.t ->
                        ord:Ordering.t -> Substs.FO.t ->
                        t list -> scope -> t list
+
+val symbols : t -> Symbol.Set.t
+  (** Symbols occurring in the literal *)
 
 (** {2 IO} *)
 
@@ -203,9 +203,6 @@ module Arr : sig
 
   val to_forms : t array -> FOFormula.t list
     (** To list of formulas *)
-
-  val infer_type : TypeInference.Ctx.t -> t array -> scope -> unit
-  val signature : ?signature:Signature.t -> t array -> Signature.t
 
   (** {3 High order combinators} *)
 
@@ -295,6 +292,8 @@ module Arr : sig
         - if [which] is [`One], the maximal side, or an arbitrary one, is visited
         - if [which] is [`Both], both sides of any equations are visited.
     *)
+
+  val symbols : ?init:Symbol.Set.t -> t array -> Symbol.Set.t
 
   (** {3 IO} *)
 

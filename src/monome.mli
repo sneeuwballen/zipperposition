@@ -121,15 +121,12 @@ val dominates : t -> t -> bool
 
 exception NotLinear of string
   
-val of_term : signature:Signature.t -> FOTerm.t -> t
+val of_term : FOTerm.t -> t
   (** try to get a monome from a term.
       @raise NotLinear if the term is not a proper monome. *)
 
-val of_term_opt : signature:Signature.t -> FOTerm.t -> t option
+val of_term_opt : FOTerm.t -> t option
   (** Exceptionless versionf of {!of_term} *)
-
-val of_term_infer : FOTerm.t -> t
-  (** Infer signature from term, and then make a monome. *)
 
 val to_term : t -> FOTerm.t
   (** convert back to a term *)
