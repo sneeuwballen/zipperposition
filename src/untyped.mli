@@ -50,6 +50,7 @@ module FO : sig
   val var : ty:Type.Parsed.t -> string -> t
 
   val symbols : t Sequence.t -> Symbol.Set.t
+  val free_vars : ?init:t list -> t -> t list
   
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit
@@ -101,6 +102,11 @@ module Form : sig
   val exists : FO.t list -> t -> t
   val mk_true : t
   val mk_false : t 
+
+  val free_vars : t -> FO.t list
+
+  val close_forall : t -> t
+  val close_exists : t -> t
 
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit

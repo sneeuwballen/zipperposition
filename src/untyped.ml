@@ -50,6 +50,13 @@ module FO = struct
     in
     Sequence.fold recurse Symbol.Set.empty seq
 
+  let free_vars ?(init=[]) t =
+    let rec find set t = match t with
+      | Var _ -> if List.mem t set then set else t :: set
+      | App (_, l) -> List.fold_left find set l
+    in
+    find init t
+
   let _same_name v1 v2 = match v1, v2 with
     | Var (n1, _), Var (n2, _) -> n1 = n2
     | _ -> false
@@ -144,6 +151,29 @@ module Form = struct
 
   let forall vars f = Quant (Forall, vars, _replace_vars vars f)
   let exists vars f = Quant (Exists, vars, _replace_vars vars f)
+
+  let free_vars f =
+    let rec find set f = match f with
+    | Bool _ -> set
+    | Not f' -> find set f'
+    | Binary (_, f1, f2) -> find (find set f1) f2
+    | Nary (_, l) -> List.fold_left find set l
+    | Atom p -> FO.free_vars ~init:set p
+    | Equal (t1, t2) -> FO.free_vars ~init:(FO.free_vars ~init:set t1) t2
+    | Quant (_, vars, f') ->
+      let set' = find [] f' in
+      let set' = List.filter (fun v -> not (List.mem v vars)) set' in
+      Util.list_merge compare set set'
+    in
+    find [] f
+
+  let close_forall f = match free_vars f with
+    | [] -> f
+    | vars -> forall vars f
+
+  let close_exists f = match free_vars f with
+    | [] -> f
+    | vars -> exists vars f
 
   let rec pp buf f = match f with
     | Bool true -> Buffer.add_string buf "$true"

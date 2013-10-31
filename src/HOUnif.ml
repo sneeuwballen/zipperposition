@@ -97,6 +97,9 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
   with Fail as e ->
     Util.exit_prof prof_unification;
     raise e
+  | TypeUnif.Error _ ->
+    Util.exit_prof prof_unification;
+    raise Fail
 
 (** [matching a b] returns sigma such that sigma(a) = b, or raises
     Fail. Only variables from the context of [a] can
@@ -135,6 +138,9 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
   with Fail as e ->
     Util.exit_prof prof_matching;
     raise e
+  | TypeUnif.Error _ ->
+    Util.exit_prof prof_matching;
+    raise Fail
 
 let variant ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_variant;
@@ -167,6 +173,9 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
   with Fail as e ->
     Util.exit_prof prof_variant;
     raise e
+  | TypeUnif.Error _ ->
+    Util.exit_prof prof_variant;
+    raise Fail
 
 let are_variant t1 t2 =
   try

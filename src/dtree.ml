@@ -202,7 +202,6 @@ module Make(E : Index.EQUATION) = struct
               then traverse subtrie acc (next t pos) subst
               else acc
             in
-            (* if variable, try to bind it and continue *)
             match t1' with
             | Variable v1' when S.mem subst v1' sc_dt ->
                (* already bound, check consistency *)
@@ -212,9 +211,12 @@ module Make(E : Index.EQUATION) = struct
               with FOUnif.Fail -> acc (* incompatible binding *)
               end
             | Variable v1' ->
-              (* t1' not bound, so we bind it and continue in subtree *)
-              let subst' = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in
-              traverse subtrie acc (skip t pos) subst'
+              (* try to bind and continue *)
+              begin try
+                let subst = FOUnif.matching ~subst v1' sc_dt t_pos sc_t in
+                traverse subtrie acc (skip t pos) subst
+              with FOUnif.Fail -> acc (* incompatible binding *)
+              end
             | _ -> acc)
           m acc
     in
