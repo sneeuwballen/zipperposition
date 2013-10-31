@@ -27,6 +27,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type scope = Substs.scope
 
+type 'a closure = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
+  (** Function that returns a ['a] value if provided with a proper
+      type substitution and renaming *)
+
 (** {2 Typing context}
 
 This module provides a typing context, with an imperative interface.
@@ -73,8 +77,20 @@ module Ctx : sig
         If some instantiated variables remain, they are bound to the
         context's [default] parameter. *)
 
-  val subst : t -> Substs.Ty.t
-    (** Type substitution *)
+  val bind_to_default : t -> unit
+    (** Free constructor variables are bound to the [default] type provided
+        at creation of the context. *)
+
+  val generalize : t -> unit
+    (** Free constructor variables will be generalized, i.e., kept as variables *)
+
+  val apply_closure : ?default:bool -> renaming:Substs.Ty.Renaming.t ->
+                      t -> 'a closure -> 'a
+    (** Apply the given closure to the substitution contained in the context
+        (type constraints). A renaming needs be provided.
+        @param default if true, !{bind_to_default} is called first to ensure
+          that symbols whose type is inferred are not generalized.
+          if not provided, [default] is true. *)
 end
 
 (** {2 Hindley-Milner}
@@ -82,10 +98,6 @@ end
 This module, abstract in the exact kind of term it types, takes as input
 a signature and an {b untyped term}, and updates the typing context
 so that the {b untyped term} can be converted into a {b typed term}. *)
-
-type 'a closure = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
-  (** Function that returns a ['a] value if provided with a proper
-      type substitution and renaming *)
 
 module type S = sig
   type untyped (* untyped term *)
@@ -135,15 +147,19 @@ module FO : sig
     (** Infer signature for this sequence of formulas *)
 
   val convert : ctx:Ctx.t -> Untyped.Form.t -> FOFormula.t
-    (** Convert a formula into a typed formula *)
+    (** Convert a formula into a typed formula. Free constructor variables
+        are bound to [default]. *)
 
   val convert_clause : ctx:Ctx.t -> Untyped.Form.t list -> FOFormula.t list
-    (** Convert a "clause". Type variables are bound in the same scope *)
+    (** Convert a "clause". Type variables are bound in the same scope
+        for all formulas in the list. Binds free constructor
+        variables to default. *)
 
   val convert_seq : ctx:Ctx.t -> Untyped.Form.t Sequence.t -> FOFormula.t list
     (** Given the signature for those formulas, infer their type and
         convert untyped formulas into typed formulas. Also updates
-        the context. *)
+        the context. Type variables of each formulas live in distinct
+        scopes. Bind free constructor variables to default *)
 end
 
 module HO : sig
@@ -153,7 +169,8 @@ module HO : sig
     (** Constrain the term to be well-typed and of boolean type *)
 
   val convert : ctx:Ctx.t -> Untyped.HO.t -> HOTerm.t
-    (** Convert a single untyped term to a typed term *)
+    (** Convert a single untyped term to a typed term. Binds free constructor
+        variables to default. *)
 
   val convert_seq : ctx:Ctx.t -> Untyped.HO.t Sequence.t -> HOTerm.t list
     (** Infer the types of those terms and annotate each term and subterm with

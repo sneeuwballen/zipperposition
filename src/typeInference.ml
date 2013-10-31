@@ -53,6 +53,7 @@ module Ctx = struct
     mutable db : (Type.t * scope) list;  (* types of bound variables (stack) *)
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
+    mutable to_bind : (Type.t * scope) list;  (* constructor variables to bind *)
     symbols : (Type.t * scope) STbl.t; (* symbol -> instantiated type *)
     tyctx : Type.ctx;               (* convert types *)
     vars : (string, (int * Type.t)) Hashtbl.t;  (* var name -> number + type *)
@@ -67,6 +68,7 @@ module Ctx = struct
       db = [];
       signature;
       subst = S.create 17;
+      to_bind = [];
       symbols = STbl.create 7;
       tyctx = Type.create_ctx ();
       vars = Hashtbl.create 13;
@@ -81,6 +83,7 @@ module Ctx = struct
       db = [];
       signature;
       subst = S.create 17;
+      to_bind = [];
       symbols = STbl.create 7;
       tyctx = Type.create_ctx ();
       vars = Hashtbl.create 13;
@@ -92,6 +95,7 @@ module Ctx = struct
     ctx.var <- ~-1;
     ctx.db <- [];
     ctx.subst <- S.empty;
+    ctx.to_bind <- [];
     STbl.clear ctx.symbols;
     ctx.signature <- Signature.empty;
     Hashtbl.clear ctx.tyctx;
@@ -202,15 +206,13 @@ module Ctx = struct
         try
           STbl.find ctx.symbols s
         with Not_found ->
-          let vars = Util.list_range 0 arity in
+          let ret = Type.var 0 in
+          let vars = Util.list_range 1 (arity+1) in
           let vars = List.map Type.var vars in
-          let ret = match ret with
-            | None -> ctx.default
-            | Some ty -> assert (Type.is_ground ty); ty
-          in
           let ty = Type.(ret <== vars) in
           let scope = _new_scope ctx in
           STbl.add ctx.symbols s (ty, scope);
+          ctx.to_bind <- (ret, scope) :: ctx.to_bind;
           ty, scope
       end
 
@@ -243,7 +245,23 @@ module Ctx = struct
         Signature.declare signature s ty)
       ctx.symbols signature
 
-  let subst ctx = ctx.subst
+  let bind_to_default ctx =
+    List.iter
+      (fun (v, s_v) ->
+        (* try to bind the variable. Will fail if already bound to
+            something else, which is fine. *)
+        try unify_and_set ctx v s_v ctx.default s_v
+        with TypeUnif.Error _ -> ())
+      ctx.to_bind;
+    ctx.to_bind <- []
+
+  let generalize ctx =
+    (* keep constructor variables as they are *)
+    ctx.to_bind <- []
+
+  let apply_closure ?(default=true) ~renaming ctx closure =
+    if default then bind_to_default ctx;
+    closure renaming ctx.subst
 end
 
 (** {2 Hindley-Milner} *)
@@ -434,14 +452,14 @@ module FO = struct
   let convert ~ctx f =
     let closure = infer_form ctx f 0 in
     let renaming = Substs.Ty.Renaming.create 13 in
-    let subst = ctx.Ctx.subst in
-    closure renaming subst
+    Ctx.apply_closure ~renaming ctx closure
 
   let convert_clause ~ctx c =
     let closures = List.map (fun lit -> infer_form ctx lit 0) c in
     let renaming = Substs.Ty.Renaming.create 13 in
+    Ctx.bind_to_default ctx;
     let subst = ctx.Ctx.subst in
-    List.map (fun c' -> c' renaming subst) closures
+    List.map (fun c' -> Ctx.apply_closure ~renaming ctx c') closures
 
   let convert_seq ~ctx forms =
     (* build closures, inferring all types *)
@@ -451,13 +469,11 @@ module FO = struct
     in
     let closures = Sequence.to_rev_list closures in
     let renaming = Substs.Ty.Renaming.create 13 in
-    let subst = ctx.Ctx.subst in
     (* apply closures to the final substitution *)
     List.rev_map
       (fun closure ->
-        let f = closure renaming subst in
         Substs.Ty.Renaming.clear renaming;
-        f)
+        Ctx.apply_closure ~renaming ctx closure)
       closures
 end
 
@@ -559,8 +575,7 @@ module HO = struct
   let convert ~ctx t =
     let _, closure = infer ctx t 0 in
     let renaming = Substs.Ty.Renaming.create 13 in
-    let subst = ctx.Ctx.subst in
-    closure renaming subst
+    Ctx.apply_closure ~renaming ctx closure
 
   let convert_seq ~ctx terms =
     let closures = Sequence.map
@@ -576,6 +591,6 @@ module HO = struct
     List.rev_map
       (fun c ->
         Substs.Ty.Renaming.clear renaming;
-        c renaming subst)
+        Ctx.apply_closure ~renaming ctx c)
       closures
 end

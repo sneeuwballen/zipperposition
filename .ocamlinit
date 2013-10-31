@@ -37,7 +37,7 @@ let pterm s =
     let tyctx = TypeInference.Ctx.create ~base:true () in
     let _, clos = TypeInference.FO.infer tyctx t 0 in
     let renaming = Substs.Ty.Renaming.create 5 in
-    clos renaming (TypeInference.Ctx.subst tyctx)
+    TypeInference.Ctx.apply_closure ~renaming tyctx clos
 ;;
 let pform s =
     let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
