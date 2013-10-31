@@ -36,15 +36,57 @@ module HOT = HOTerm
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
 module ArbitraryUntyped = struct
-  let ground st = assert false
+  module UT = Untyped.FO
 
-  let base st = assert false
+  let ground =
+    let a = UT.const (Symbol.mk_const "a") in
+    let b = UT.const (Symbol.mk_const "b") in
+    let c = UT.const (Symbol.mk_const "c") in
+    let d = UT.const (Symbol.mk_const "d") in
+    let e = UT.const (Symbol.mk_const "e") in
+    let f x y = UT.app (Symbol.mk_const "f") [x; y] in
+    let sum x y = UT.app (Symbol.mk_const "sum") [x; y] in
+    let g x = UT.app (Symbol.mk_const "g") [x] in
+    let h x = UT.app (Symbol.mk_const "h") [x] in
+    let ite x y z = UT.app (Symbol.mk_const "ite") [x; y; z] in
+    Arbitrary.(
+      let base = among [a; b; c; d; e; ] in
+      let t = fix ~max:6 ~base (fun sub ->
+        choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
+          choose [lift2 sum sub sub; lift3 ite sub sub sub]])
+      in
+      t)
 
-  let pred st = assert false
+  let default =
+    let a = UT.const (Symbol.mk_const "a") in
+    let b = UT.const (Symbol.mk_const "b") in
+    let c = UT.const (Symbol.mk_const "c") in
+    let d = UT.const (Symbol.mk_const "d") in
+    let e = UT.const (Symbol.mk_const "e") in
+    let x = UT.var ~ty:(Type.Parsed.var "A") "X" in
+    let y = UT.var ~ty:(Type.Parsed.var "B") "Y" in
+    let z = UT.var ~ty:(Type.Parsed.var "C") "Z" in
+    let f x y = UT.app (Symbol.mk_const "f") [x; y] in
+    let sum x y = UT.app (Symbol.mk_const "sum") [x; y] in
+    let g x = UT.app (Symbol.mk_const "g") [x] in
+    let h x = UT.app (Symbol.mk_const "h") [x] in
+    let ite x y z = UT.app (Symbol.mk_const "ite") [x; y; z] in
+    Arbitrary.(
+      let base = among [a; b; c; d; e; x; y; z] in
+      let t = fix ~max:6 ~base (fun sub ->
+        choose [ lift2 f sub sub; lift g sub; lift h sub; sub;
+          choose [lift2 sum sub sub; lift3 ite sub sub sub]])
+      in
+      t)
 
-  let default st = assert false
-
-  let arith st = assert false
+  let pred = 
+    let p x y = UT.app (Symbol.mk_const "p") [x; y] in
+    let q x = UT.app (Symbol.mk_const "q") [x] in
+    let r x = UT.app (Symbol.mk_const "r") [x] in
+    let s = UT.const (Symbol.mk_const "s") in
+    let sub = default in
+    QCheck.Arbitrary.(choose
+      [ lift2 p sub sub; lift q sub; lift r sub; return s; ])
 
   module HO = struct
     let ground st = assert false
@@ -58,11 +100,18 @@ let default =
     let ctx = TypeInference.Ctx.create () in
     return (TypeInference.FO.convert ~ctx t))
 
-let default st = assert false
+let ground =
+  Arbitrary.(ArbitraryUntyped.ground >>= fun t ->
+    let ctx = TypeInference.Ctx.create () in
+    return (TypeInference.FO.convert ~ctx t))
 
-let ground st = assert false
-
-let pred st = assert false
+let pred =
+  Arbitrary.(ArbitraryUntyped.pred >>= fun t ->
+    let ctx = TypeInference.Ctx.create () in
+    let ty, closure = TypeInference.FO.infer ctx t 0 in
+    TypeInference.Ctx.unify_and_set ctx ty 0 Type.o 0;
+    let t = TypeInference.Ctx.apply_closure ctx closure in
+    return t)
 
 let pos t =
   let module PB = Position.Build in

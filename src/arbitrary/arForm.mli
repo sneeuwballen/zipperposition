@@ -39,4 +39,3 @@ val clause : FOFormula.t list arbitrary
 val default : FOFormula.t arbitrary
   (** polymorphic formula with connectives (DB-closed) *)
 
-val arith : FOFormula.t arbitrary

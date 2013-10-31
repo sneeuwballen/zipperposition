@@ -31,22 +31,55 @@ open QCheck
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-module Untyped = struct
-  let default st = assert false
 
-  let atom st = assert false
+module ArbitraryUntyped = struct
+  module UF = Untyped.Form
+  module AT = ArTerm.ArbitraryUntyped
+
+  let atom =
+    Arbitrary.(choose
+      [ lift UF.atom AT.pred
+      ; lift (fun t -> UF.mk_not (UF.atom t)) AT.pred
+      ; lift2 UF.mk_eq AT.default AT.default
+      ; lift2 UF.mk_neq AT.default AT.default
+      ; among [ UF.mk_true; UF.mk_false ]
+      ])
 
   let clause = Arbitrary.(list atom)
 
-  let arith st = assert false
+  let default =
+    Arbitrary.(
+      let f = fix ~max:5 ~base:atom
+        (fun sub_f -> choose
+          [ lift UF.mk_or (list sub_f)
+          ; lift UF.mk_and (list sub_f)
+          ; lift2 UF.mk_equiv sub_f sub_f
+          ; lift2 UF.mk_imply sub_f sub_f
+          ; lift UF.mk_not sub_f
+          ; lift UF.close_forall sub_f
+          ; lift UF.close_exists sub_f
+          ])
+      in
+      f)
 end
 
-let atom st = assert false
-
-let clause = Arbitrary.((list Untyped.atom) >>= fun lits ->
+let atom =
+  Arbitrary.(
+    ArbitraryUntyped.atom >>= fun f ->
     let ctx = TypeInference.Ctx.create () in
-    return (TypeInference.FO.convert_clause ~ctx lits))
+    return (TypeInference.FO.convert_form ~ctx f)
+  )
 
-let default st = assert false
+let clause =
+  Arbitrary.(
+    list ArbitraryUntyped.atom >>= fun lits ->
+    let ctx = TypeInference.Ctx.create () in
+    return (TypeInference.FO.convert_clause ~ctx lits)
+  )
 
-let arith st = assert false
+let default = 
+  Arbitrary.(
+    ArbitraryUntyped.default >>= fun f ->
+    let ctx = TypeInference.Ctx.create () in
+    return (TypeInference.FO.convert_form ~ctx f)
+  )
