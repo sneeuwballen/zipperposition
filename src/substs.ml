@@ -481,14 +481,16 @@ module MakeProd(T : TYPED_TERM) = struct
       Ty.Renaming.clear h.ty;
       ()
 
-    let dummy = create 2
+    let dummy = { term=TSubst.H.create 2 ; ty=Ty.Renaming.dummy; }
 
-    let rename h v s_v =
+    (* need subst for evaluating the type *)
+    let rename ty_subst h v s_v =
       if not (T.is_var v) then invalid_arg "renaming: expected variable";
       if h == dummy then v else
       try TSubst.H.find h.term (v, s_v)
       with Not_found ->
         let ty = T.get_type v in
+        let ty = Ty.apply ty_subst ~renaming:h.ty ty s_v in
         let v' = T.mk_var ~ty (TSubst.H.length h.term) in
         TSubst.H.add h.term (v, s_v) v';
         v'
@@ -523,21 +525,11 @@ module FO = struct
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       begin try
         let t', sc_t' = lookup subst t scope in
-        (* also apply [subst] to [t']? *)
-        if t' != t || scope <> sc_t'
-          then (* _apply_rec also in the image of t *)
-            apply ~renaming subst t' sc_t'
-          else t'
+        apply ~renaming subst t' sc_t'
       with Not_found ->
-        (* variable not bound by [subst], rename it (but first evaluate its type) *)
-        let t = if Type.is_ground t.T.ty
-          then t
-          else
-            let ty = T.get_type t in
-            let ty' = apply_ty ~renaming subst ty scope in
-            T.cast t ty'
-        in
-        Renaming.rename renaming t scope 
+        (* variable not bound by [subst], rename it *)
+        let ty_subst = subst.ty in
+        Renaming.rename ty_subst renaming t scope 
       end
   (* apply subst to the list, all elements of which have the given scope *)
   and _apply_rec_list ~renaming subst scope l = match l with
@@ -580,21 +572,12 @@ module HO = struct
         let t', sc_t' = lookup subst t scope in
         (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
         let t' = T.db_lift ~depth depth t' in
-        (* also apply [subst] to [t']? *)
-        if t' != t || scope <> sc_t'
-          then (* _apply_rec also in the image of t *)
-            _apply_rec ~renaming ~depth subst t' sc_t'
-          else t'
+        (* also apply [subst] to [t'] *)
+        _apply_rec ~renaming ~depth subst t' sc_t'
       with Not_found ->
-        (* variable not bound by [subst], rename it (but first evaluate its type) *)
-        let t = if Type.is_ground t.T.ty
-          then t
-          else
-            let ty = T.get_type t in
-            let ty' = apply_ty ~renaming subst ty scope in
-            T.cast t ty'
-        in
-        Renaming.rename renaming t scope 
+        (* variable not bound by [subst], rename it *)
+        let ty_subst = subst.ty in
+        Renaming.rename ty_subst renaming t scope 
       end
     | T.At (t, l) ->
       let t' = _apply_rec ~renaming ~depth subst t scope in

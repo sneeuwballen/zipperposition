@@ -59,13 +59,13 @@ let test_db_unlift () =
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 
-let redex =
-  let x' = HOT.mk_var ~ty:Type.(i <=. i) 2 in
-  HOT.mk_at
-    (HOT.mk_lambda_var [x'] (f (HOT.mk_at x' [a]) (HOT.mk_at x' [b])))
-    [HOT.mk_lambda_var [x] (g x)]
-
 let test_beta_reduce () =
+  let redex =
+    let x' = HOT.mk_var ~ty:Type.(i <=. i) 2 in
+    HOT.mk_at
+      (HOT.mk_lambda_var [x'] (f (HOT.mk_at x' [a]) (HOT.mk_at x' [b])))
+      [HOT.mk_lambda_var [x] (g x)]
+  in
   let t' = Lambda.beta_reduce redex in
   let t1 = f (g a) (g b) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';

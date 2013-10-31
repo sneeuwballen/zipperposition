@@ -46,8 +46,9 @@ let beta_reduce ?(depth=0) t =
     (* look for the possible binding for [n] *)
     begin match List.nth env n with
     | None -> t
-    | Some t' when T.eq t t' -> t
-    | Some t' -> T.db_lift ~depth depth t' (* need to lift free vars *)
+    | Some t' ->
+      assert (Type.eq t.T.ty t'.T.ty);
+      T.db_lift ~depth depth t' (* need to lift free vars *)
     end
   | T.Const _
   | T.BoundVar _ -> t
@@ -55,23 +56,27 @@ let beta_reduce ?(depth=0) t =
     let varty = T.lambda_var_ty t in
     let t'' = beta_reduce ~depth:(depth+1) (None::env) t' in
     T.mk_lambda ~varty t''
-  | T.At ({T.term=T.Lambda t1}, t2::l) ->
+  | T.At ({T.term=T.Lambda t1} as head, t2::l) ->
     (* a beta-redex! Fire!! First evaluate t2, then remplace
         db0 by [t2] in [t1] *)
+    Util.debug 4 "beta-reduce: %a @ [%a]" T.pp head (Util.pp_list T.pp) (t2::l);
     let t2' = beta_reduce ~depth env t2 in
+    assert (Type.eq t2.T.ty t2'.T.ty);
+    assert (Type.eq (T.lambda_var_ty head) t2'.T.ty);
     let env' = Some t2' :: env in
     let t1' = beta_reduce ~depth env' t1 in
-    (* now reduce t1 @ l, if l not empty *)
-    begin match l with
-      | [] -> t1'
-      | _::_ -> beta_reduce ~depth env (T.mk_at t1 l)
-    end
+    Util.debug 4 " ---> %a @ [%a]" T.pp t1' (Util.pp_list T.pp) l;
+    (* now reduce t1' @ l, if l not empty *)
+    mk_at_check ~depth env t1' l
   | T.At (t, l) ->
     let t' = beta_reduce ~depth env t in
     let l' = List.map (beta_reduce ~depth env) l in
-    if T.eq t t' && List.for_all2 T.eq l l'
-      then t
-      else beta_reduce ~depth env (T.mk_at t' l')  (* new redex? *)
+    mk_at_check ~depth env t' l'
+  and mk_at_check ~depth env t l = match t.T.term, l with
+    | _, [] -> t
+    | T.Lambda _, l ->
+      beta_reduce ~depth env (T.mk_at t l)  (* redex *)
+    | _, l -> T.mk_at t l   (* just apply *)
   in
   let t' = beta_reduce ~depth [] t in
   Util.exit_prof prof_beta_reduce;
@@ -111,7 +116,7 @@ let rec _match_list subst l_expected s_e l_arg s_a = match l_expected, l_arg wit
     let subst = TypeUnif.match_ ~subst ty s_e arg s_a in 
     _match_list subst l_expected' s_e l_arg' s_a
 
-let match_types ?(subst=Substs.Ty.create 7) ty s_ty args s_args =
+let match_types ?(subst=Substs.Ty.empty) ty s_ty args s_args =
   match ty with
   | Type.Fun (_, expected) ->
     (* match expected types against provided types *)

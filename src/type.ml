@@ -106,20 +106,19 @@ let rec (<==) ret args =
     | Fun (ret', args') ->
       (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
           constructor invariant *)
-      ret' <== (args @ args')
+      ret' <== (args' @ args)
     | _ -> H.hashcons (Fun (ret, args))
 
-let (<=.) ret arg =
-  H.hashcons (Fun (ret, [arg]))
+let (<=.) ret arg = ret <== [arg]
 
 let (@@) s args =
   H.hashcons (App (s, args))
 
 (** {2 Basic types} *)
 
-let const s = H.hashcons (App (s, []))
+let const s = s @@ []
 
-let app s args = H.hashcons (App (s, args))
+let app s args = s @@ args
 
 let var i =
   if i < 0 then failwith "Type.var: expected a nonnegative int";
@@ -199,10 +198,7 @@ let apply_fun f args =
         then apply_fun f_ret f_args' args'
         else failwith "Type.apply_fun: argument type mismatch"
     | _, [], [] -> f_ret  (* total application *)
-    | Fun (f_ret', f_args'), [], _ ->
-      (* the function has been totally applied, and returned a new function
-          that will be used to consume remaining arguments *)
-      apply_fun f_ret' f_args' args
+    | Fun (f_ret', f_args'), _, _ -> assert false
     | _, [], _ -> failwith "Type.apply_fun: too many arguments"
     | _, _::_, [] ->
       (* partial application. The remaining arguments need be provided *)

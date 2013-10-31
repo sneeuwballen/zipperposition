@@ -241,6 +241,8 @@ val pp_tstp_depth : int -> Buffer.t -> t -> unit
 val pp_debug : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
 
+val print_all_types : bool ref
+
 val pp : Buffer.t -> t -> unit
 val set_default_pp : (Buffer.t -> t -> unit) -> unit
 val to_string : t -> string

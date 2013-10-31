@@ -168,7 +168,7 @@ let cast t ty =
 let lambda_var_ty t = match t.term with
   | Lambda _ ->
     begin match t.ty with
-    | Type.Fun (ret, _) -> ret
+    | Type.Fun (_, arg::_) -> arg
     | _ -> failwith "lambda_var_ty: expected function type"
     end
   | _ -> failwith "lambda_var_ty: expected lambda term"
@@ -235,7 +235,7 @@ let rec mk_at t l = match t.term, l with
         end);
       t
     with Failure msg ->
-      failwith (Util.sprintf "%s (applying %a to %a)"
+      failwith (Util.sprintf "%s (applying %a to [%a])"
         msg Type.pp t.ty (Util.pp_list Type.pp) ty_args)
 
 let true_term = mk_const ~ty:Type.o Symbol.true_symbol
@@ -664,6 +664,8 @@ let rec is_fo t = match t.term with
 
 (** {2 IO} *)
 
+let print_all_types = ref false
+
 let pp_tstp_depth depth buf t =
   let depth = ref depth in
   (* recursive printing *)
@@ -689,20 +691,23 @@ let pp_tstp_depth depth buf t =
 let rec pp_depth depth buf t =
   let depth = ref depth in
   (* recursive printing *)
-  let rec pp_rec buf t = match t.term with
-  | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-  | Lambda t' ->
-    let varty = lambda_var_ty t in
-    Printf.bprintf buf "λ%a:%a. " pp_bvar () Type.pp varty;
-    incr depth;
-    pp_surrounded buf t';
-    decr depth
-  | Const s -> Symbol.pp buf s
-  | Var i ->
-    if Type.eq t.ty Type.i
-      then Printf.bprintf buf "X%d" i
-      else Printf.bprintf buf "X%d:%a" i Type.pp t.ty
-  | At (t, l) -> Util.pp_list ~sep:" @ " pp_surrounded buf (t :: l)
+  let rec pp_rec buf t =
+    begin match t.term with
+    | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+    | Lambda t' ->
+      let varty = lambda_var_ty t in
+      Printf.bprintf buf "λ%a:%a. " pp_bvar () Type.pp varty;
+      incr depth;
+      pp_surrounded buf t';
+      decr depth
+    | Const s -> Symbol.pp buf s
+    | Var i ->
+      if Type.eq t.ty Type.i
+        then Printf.bprintf buf "X%d" i
+        else Printf.bprintf buf "X%d:%a" i Type.pp t.ty
+    | At (t, l) -> Util.pp_list ~sep:" @ " pp_surrounded buf (t :: l)
+    end;
+    if !print_all_types then Printf.bprintf buf ":%a" Type.pp t.ty
   and pp_surrounded buf t = match t.term with
   | At _ ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'

@@ -55,12 +55,17 @@ let fail subst ty1 s1 ty2 s2 =
   })
 
 let pp_error buf e =
-  Printf.bprintf buf "type error when unifying %a[%d] with %a[%d] in context %a"
-    Ty.pp e.left e.s_left Ty.pp e.right e.s_right S.pp e.subst
+  Printf.bprintf buf "type error when unifying %a[%d] with %a[%d]"
+    Ty.pp e.left e.s_left Ty.pp e.right e.s_right
 
 let error_to_string = Util.on_buffer pp_error
 
 let fmt_error fmt e = Format.pp_print_string fmt (error_to_string e)
+
+let () =
+  Printexc.register_printer (function
+    | Error e -> Some (error_to_string e)
+    | _ -> None)
 
 (* occur-check *)
 let _occur_check subst v s_v t s_t =

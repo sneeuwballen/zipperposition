@@ -38,6 +38,7 @@ let y = T.mk_var ~ty 1
 let f x y = T.mk_node ~ty (Symbol.mk_const "f") [x; y]
 let g x = T.mk_node ~ty (Symbol.mk_const "g") [x]
 let h x y z = T.mk_node ~ty (Symbol.mk_const "h") [x;y;z]
+let nil = T.mk_const ~ty:Type.(app "list" [var 0]) (Symbol.mk_const "nil")
 
 let test_rename () =
   let t1 = f x (g y) in
@@ -54,16 +55,18 @@ let test_rename () =
   ()
 
 let test_unify () =
-  let x = T.mk_var ~ty:Type.(app "list" [var 0]) 0 in
+  let x = T.mk_var ~ty:Type.(app "list" [var 3]) 0 in
   let y = T.mk_var ~ty:Type.(app "list" [int]) 1 in
   let t1 = f x (g y) in
-  let t2 = f a (g x) in
+  let t2 = f nil (g x) in
   let subst = FOUnif.unification t1 0 t2 1 in
   let renaming = S.Renaming.create 5 in
   let t1' = S.apply subst ~renaming t1 0 in
-  let t2' = S.apply subst ~renaming t2 0 in
+  let t2' = S.apply subst ~renaming t2 1 in
+  (*
   T.print_var_types := true;
   Util.printf "t1: %a, t2: %a, subst: %a\n" T.pp t1 T.pp t2 S.pp subst;
+  *)
   assert_equal ~cmp:T.eq ~printer:T.to_string t1' t2';
   ()
 

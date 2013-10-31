@@ -185,7 +185,7 @@ let get_flag flag t = (t.flags land flag) != 0
 (** {2 Typing} *)
 
 let cast t ty =
-  H.hashcons { t with ty = ty; tag = ~-1; }
+  H.hashcons { t with ty ; tag = ~-1; }
 
 (** {2 Smart constructors} *)
 
