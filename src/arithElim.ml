@@ -49,21 +49,19 @@ let stat_factor_bounds = Util.mk_stat "arith.factor_bounds"
 
 let rewrite_lit ~ctx lit =
   let ord = Ctx.ord ~ctx in
-  let signature = Ctx.signature ~ctx in
-  let lit' = Arith.Lit.simplify ~ord ~signature lit in
-  if Arith.Lit.is_trivial ~signature lit'
+  let lit' = Arith.Lit.simplify ~ord lit in
+  if Arith.Lit.is_trivial lit'
     then Lit.mk_tauto
-  else if Arith.Lit.has_instances ~signature lit'
+  else if Arith.Lit.has_instances lit'
     then lit'
     else Lit.mk_absurd
 
 let eliminate_arith c =
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
-  let signature = Ctx.signature ctx in
   let eligible = C.Eligible.max c in
   (* find new arrays of literals, after substitution *)
-  let lits'_list = Arith.Lits.eliminate ~ord ~signature ~eligible c.C.hclits in
+  let lits'_list = Arith.Lits.eliminate ~ord ~eligible c.C.hclits in
   (* turn new arrays into clauses, if needed *)
   List.fold_left
     (fun acc lits' ->
@@ -82,7 +80,6 @@ let eliminate_arith c =
 let factor_arith c =
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
-  let signature = Ctx.signature ctx in
   let eligible = C.Eligible.max c in
   (* instantiate the clause with subst *)
   let mk_instance subst =
@@ -98,7 +95,7 @@ let factor_arith c =
   Lits.fold_lits ~eligible c.C.hclits []
     (fun acc lit i ->
       try
-        let elit = Arith.Lit.Extracted.extract ~signature lit in
+        let elit = Arith.Lit.Extracted.extract lit in
         let substs = Arith.Lit.Extracted.factor elit in
         List.fold_left
           (fun acc subst -> mk_instance subst :: acc)
@@ -108,8 +105,7 @@ let factor_arith c =
 let pivot_arith c =
   let ctx = c.C.hcctx in
   let eligible = C.Eligible.always in
-  let lits'_list = Arith.Lits.pivot ~ord:(Ctx.ord ctx)
-    ~signature:(Ctx.signature ctx) ~eligible c.C.hclits
+  let lits'_list = Arith.Lits.pivot ~ord:(Ctx.ord ctx) ~eligible c.C.hclits
   in
   Util.list_fmap
     (fun lits' ->
@@ -128,8 +124,7 @@ let pivot_arith c =
 let purify_arith c =
   let ctx = c.C.hcctx in
   let eligible = C.Eligible.(max c) in
-  let lits' = Arith.Lits.purify ~ord:(Ctx.ord ctx)
-    ~signature:(Ctx.signature ctx) ~eligible c.C.hclits
+  let lits' = Arith.Lits.purify ~ord:(Ctx.ord ctx) ~eligible c.C.hclits
   in
   if Lits.eq_com c.C.hclits lits'
     then []
@@ -222,7 +217,7 @@ let case_switch active_set c =
     let t' = Substs.FO.apply ~renaming subst t s_c in
     (* the case switch on t *)
     let lits_case = List.map
-      (fun n -> Lit.mk_eq ~ord t' (T.mk_const (S.mk_bigint n)))
+      (fun n -> Lit.mk_eq ~ord t' (T.mk_const ~ty:Type.int (S.mk_bigint n)))
       (_int_range lower higher)
     in
     let new_lits = lits_left @ lits_right @ lits_case in
@@ -300,22 +295,19 @@ let axioms =
 
 let setup_penv ~penv =
   (* rule for formula simplification *)
-  let simplify_rule set =
-    let signature = PEnv.signature ~penv in
-    let signature = PF.Set.signature ~signature set in
-    fun set pf ->
-      let f' = Arith.F.simplify ~signature pf.PF.form in
-      if F.eq pf.PF.form f'
-        then []
-        else
-          let proof = Proof.mk_f_step f' ~rule:"arith_simplify" [pf.PF.proof] in
-          let pf' = PF.create f' proof in
-          [PEnv.SimplifyInto pf']
+  let simplify_rule set pf =
+    let f' = Arith.F.simplify pf.PF.form in
+    if F.eq pf.PF.form f'
+      then []
+      else
+        let proof = Proof.mk_f_step f' ~rule:"arith_simplify" [pf.PF.proof] in
+        let pf' = PF.create f' proof in
+        [PEnv.SimplifyInto pf']
   in
   (* signature of arith symbols *)
   let base = Signature.Arith.signature in
   PEnv.add_base_sig ~penv base;
-  PEnv.add_operation_rule ~penv ~prio:2 simplify_rule;
+  PEnv.add_operation ~penv ~prio:2 simplify_rule;
   PEnv.add_constr ~penv (Precedence.min_constraint (Signature.to_symbols base));
   ()
 

@@ -30,10 +30,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Libzipperposition
 
-type 'a arbitrary = QCheck.Arbitrary.t
+type 'a arbitrary = 'a QCheck.Arbitrary.t
+
+module type S = sig
+  module I : Interval.S
+
+  val t : I.N.t arbitrary -> I.t arbitrary
+end
 
 module Make(I : Interval.S) = struct
-  let arbitrary ar =
+  module I = I
+
+  let t ar =
     QCheck.Arbitrary.(
     choose
       [ lift I.lt ar

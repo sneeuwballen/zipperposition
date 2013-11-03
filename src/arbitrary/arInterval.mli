@@ -30,16 +30,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Libzipperposition
 
-type 'a arbitrary = QCheck.Arbitrary.t
+type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-module Make(I : Interval.S) : sig
-  val t : I.N.t arbitrary -> t arbitrary
+module type S = sig
+  module I : Interval.S
+
+  val t : I.N.t arbitrary -> I.t arbitrary
 end
 
-module Int : sig
-  val t : Interval.Int.t arbitrary -> t arbitrary
-end
+module Make(I : Interval.S) : S with module I = I
 
-module Rat : sig
-  val t : Interval.Rat.t arbitrary -> t arbitrary
-end
+module Int : S with module I = Interval.Int
+
+module Rat : S with module I = Interval.Rat

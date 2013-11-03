@@ -382,14 +382,15 @@ let of_term_opt t =
 
 (* FIXME types types types *)
 let to_term m =
-  let add x y = T.mk_node S.Arith.sum [x;y] in
-  let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
+  let ty = type_of m in
+  let add x y = T.mk_node ~ty S.Arith.sum [x;y] in
+  let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const ~ty s) x in
   let prod s x = if S.Arith.is_one s then x
-    else T.mk_node S.Arith.product [T.mk_const s; x]
+    else T.mk_node ~ty S.Arith.product [T.mk_const ~ty s; x]
   in
   let sum =
     if T.Map.is_empty m.coeffs
-      then T.mk_const m.constant (* constant *)
+      then T.mk_const ~ty m.constant (* constant *)
     else
       (* remove one coeff to make the basic sum *)
       let t, c = T.Map.choose m.coeffs in
@@ -407,16 +408,16 @@ let to_term m =
   in
   if S.Arith.is_one m.divby
     then sum
-    else T.mk_node S.Arith.quotient [sum; T.mk_const m.divby]
+    else T.mk_node ~ty S.Arith.quotient [sum; T.mk_const ~ty m.divby]
 
-let apply_subst ?recursive ~renaming subst m sc_m =
+let apply_subst ~renaming subst m sc_m =
   if T.Map.is_empty m.coeffs then m else
     let m' = const m.constant in
     (* add terms one by one, after applying the substitution to them *)
     let m' = T.Map.fold
       (fun t c m' ->
         (* apply subst to [t] *)
-        let t' = Substs.FO.apply ?recursive ~renaming subst t sc_m in
+        let t' = Substs.FO.apply ~renaming subst t sc_m in
         add m' c t')
       m.coeffs m'
     in

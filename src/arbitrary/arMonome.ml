@@ -30,7 +30,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Libzipperposition
 
-let t st = assert false
+let of_ty ty st = assert false
+
+let t = QCheck.Arbitrary.(among [Type.int; Type.rat] >>= of_ty)
 
 (*
 (* arbitrary instance for the given constant generators *)

@@ -199,7 +199,6 @@ let preprocess ?meta ~signature ~plugins ~params formulas =
   let ord = params.param_ord precedence in
   let select = Sel.selection_from_string ~ord params.param_select in
   Util.debug 1 "selection function: %s" params.param_select;
-  let signature = PF.Set.signature ~signature:(PEnv.signature ~penv) formulas in
   let ctx = Ctx.create ~ord ~select ~signature () in
   (* build the env *)
   let env = Env.create ?meta ~ctx params signature in
@@ -284,6 +283,17 @@ let print_szs_result ~file ~env result =
     Printf.printf "%% SZS output end Refutation\n";
     ()
 
+(* perform type inference on those formulas *)
+let annotate_formulas ~signature formulas =
+  let tyctx = TypeInference.Ctx.of_signature signature in
+  let formulas = Sequence.map
+    (fun (f, file,name) ->
+      let f = TypeInference.FO.convert_form ~ctx:tyctx f in
+      f, file, name)
+    formulas
+  in
+  Sequence.persistent formulas
+
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
   Util.debug 1 "================ process file %s ===========" file;
@@ -298,12 +308,14 @@ let process_file ?meta ~plugins ~params file =
   (* parse formulas *)
   let decls = Util_tptp.parse_file ~recursive:true file in
   Util.debug 1 "parsed %d declarations" (Sequence.length decls);
-  (* obtain a set of proved formulas *)
+  (* obtain a set of proved formulas, and an initial signature *)
   let formulas = Util_tptp.sourced_formulas ~file decls in
+  let signature = Util_tptp.type_declarations decls in
+  (* perform type inference on formulas *)
+  let formulas = annotate_formulas ~signature formulas in
   let formulas = Sequence.map PF.of_sourced formulas in
   let formulas = PF.Set.of_seq formulas in
   (* obtain clauses + env *)
-  let signature = Util_tptp.type_declarations decls in
   Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
     (PF.Set.to_seq formulas);
   let env, clauses = preprocess ?meta ~signature ~plugins ~params formulas in

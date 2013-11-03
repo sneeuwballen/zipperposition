@@ -75,14 +75,14 @@ module T : sig
   val flag_simplified : int
     (** flag for simplified terms *)
 
-  val simplify : signature:Signature.t -> FOTerm.t -> FOTerm.t
+  val simplify : FOTerm.t -> FOTerm.t
     (** Arithmetic simplifications *)
 end
 
 (** {2 Formulas} *)
 
 module F : sig
-  val simplify : signature:Signature.t -> FOFormula.t -> FOFormula.t
+  val simplify : FOFormula.t -> FOFormula.t
     (** Simplify an arithmetic formula. In particular, it eliminates
         $greater and $greatereq, and simplifies subterms. *)
 end
@@ -149,11 +149,11 @@ module Lit : sig
     val pp : Buffer.t -> t -> unit
     val to_string : t -> string
 
-    val extract : signature:Signature.t -> Literal.t -> t
+    val extract : Literal.t -> t
       (** Convert a regular literal into an extracted literal.
           @raise Failure if the literal is not a linear expression *)
 
-    val extract_opt : signature:Signature.t -> Literal.t -> t option
+    val extract_opt : Literal.t -> t option
       (** Same as {!extract}, but doesn't raise *)
 
     val get_monome : t -> Monome.t
@@ -218,35 +218,31 @@ module Lit : sig
 
   (** {3 High level operations} *)
 
-  val is_trivial : signature:Signature.t -> Literal.t -> bool
+  val is_trivial : Literal.t -> bool
     (** Is the literal a tautology in arithmetic? *)
 
-  val has_instances : signature:Signature.t -> Literal.t -> bool
+  val has_instances : Literal.t -> bool
     (** If the literal is arithmetic, return [true] iff it is compatible
         with the theory of arithmetic (e.g. X+2Y=3 is ok, but 1=2 is not).
         Otherwise return [true] *)
 
-  val make_total : ord:Ordering.t -> signature:Signature.t ->
-                  Literal.t -> Literal.t
+  val make_total : ord:Ordering.t -> Literal.t -> Literal.t
     (** be sure that the literal is "total", ie, if it's an equation, that
         replacing one side by the other is always safe.
         In particular:   a = b/3  is {b NOT} total for integers. *)
 
-  val simplify : ord:Ordering.t -> signature:Signature.t ->
-                 Literal.t -> Literal.t
+  val simplify : ord:Ordering.t -> Literal.t -> Literal.t
     (** Simplify a literal (evaluation) *)
 
   val eliminate : ?elim_var:(FOTerm.t -> bool) ->
                   ?fresh_var:(Type.t -> FOTerm.t) ->
-                  signature:Signature.t ->
                   Literal.t ->
                   Substs.FO.t list
     (** List of substitutions that make the literal inconsistent.
         [elim_var] is called to check whether eliminating a variable
         in an equation is possible. *)
 
-  val heuristic_eliminate : signature:Signature.t -> Literal.t ->
-                            Substs.FO.t list
+  val heuristic_eliminate : Literal.t -> Substs.FO.t list
     (** Heuristic version of [eliminate] that tries to deal with some
         non-linear, or too hard, cases. For instance, square roots.
         TODO: instantiate inside to_int/ to_rat *)
@@ -255,7 +251,7 @@ end
 (** {2 Arrays of literals} *)
 
 module Lits : sig
-  val purify : ord:Ordering.t -> signature:Signature.t ->
+  val purify : ord:Ordering.t -> 
                eligible:(int -> Literal.t -> bool) ->
                Literal.t array -> Literal.t array
     (** Purify the literals, by replacing arithmetic terms that occur
@@ -263,11 +259,10 @@ module Lits : sig
         and adding the constraint variable=arith subterm to the literals. *)
 
   val pivot : ord:Ordering.t ->
-              signature:Signature.t ->
               eligible:(int -> Literal.t -> bool) ->
               Literal.t array ->
               Literal.t array list
-    (** [pivot ~ord ~signature ~eligible lits] tries to pivot each literal
+    (** [pivot ~ord ~eligible lits] tries to pivot each literal
         which is [eligible] (ie [eligible index lit] returns [true]).
         Pivoting is done by extracting arithmetic literals [t <| monome]
         and replacing the old literal by those new ones (if [t] maximal).
@@ -275,7 +270,6 @@ module Lits : sig
         from a single pivoted literal. *)
 
   val eliminate : ord:Ordering.t ->
-                  signature:Signature.t ->
                   eligible:(int -> Literal.t -> bool) ->
                   Literal.t array ->
                   Literal.t array list

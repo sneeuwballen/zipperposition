@@ -50,11 +50,7 @@ module T = struct
     | Node ((S.Int _ | S.Rat _ | S.Real _), []) -> true
     | Node (s, _) when Symbol.Arith.is_arith s -> true
     | Var _
-    | BoundVar _ ->
-      begin match t.type_ with
-      | Some ty -> is_arith_ty ty
-      | None -> assert false
-      end
+    | BoundVar _ -> is_arith_ty t.ty
     | _ -> false
 
   let is_arith_const t = match t.term with
@@ -64,27 +60,27 @@ module T = struct
   let rec sum_list l = match l with
     | [] -> failwith "Arith.sum_list: got empty list"
     | [x] -> x
-    | x::l' -> mk_node S.Arith.sum [x; sum_list l']
+    | x::l' -> mk_node ~ty:x.ty S.Arith.sum [x; sum_list l']
 
-  let mk_sum t1 t2 = mk_node S.Arith.sum [t1; t2]
-  let mk_difference t1 t2 = mk_node S.Arith.difference [t1; t2]
-  let mk_product t1 t2 = mk_node S.Arith.product [t1; t2]
-  let mk_quotient t1 t2 = mk_node S.Arith.quotient [t1; t2]
-  let mk_uminus t = mk_node S.Arith.uminus [t]
+  let mk_sum t1 t2 = mk_node ~ty:t1.ty S.Arith.sum [t1; t2]
+  let mk_difference t1 t2 = mk_node ~ty:t1.ty S.Arith.difference [t1; t2]
+  let mk_product t1 t2 = mk_node ~ty:t1.ty S.Arith.product [t1; t2]
+  let mk_quotient t1 t2 = mk_node ~ty:t1.ty S.Arith.quotient [t1; t2]
+  let mk_uminus t = mk_node ~ty:t.ty S.Arith.uminus [t]
 
   let mk_less t1 t2 =
     if is_arith_const t1 && is_arith_const t2
       then if S.Arith.Op.less (head t1) (head t2)
         then true_term
         else false_term
-      else mk_node S.Arith.less [t1; t2]
+      else mk_node ~ty:Type.o S.Arith.less [t1; t2]
 
   let mk_lesseq t1 t2 =
     if is_arith_const t1 && is_arith_const t2
       then if S.Arith.Op.lesseq (head t1) (head t2)
         then true_term
         else false_term
-      else mk_node S.Arith.lesseq [t1; t2]
+      else mk_node ~ty:Type.o S.Arith.lesseq [t1; t2]
 
   let mk_greater t1 t2 = mk_less t2 t1
   let mk_greatereq t1 t2 = mk_lesseq t2 t1
@@ -115,7 +111,7 @@ module T = struct
 
   let flag_simplified = new_flag ()
 
-  let simplify ~signature t =
+  let simplify t =
     Util.enter_prof prof_arith_simplify;
     (* recursive function with cache *)
     let rec simplify recurse t =
@@ -125,30 +121,30 @@ module T = struct
       | BoundVar _ -> t
       | Node (s, [t']) ->
         let t' = recurse t' in
-        try_reduce_unary recurse s t'
+        try_reduce_unary recurse t.ty s t'
       | Node (s, [t1; t2]) ->
         let t1 = recurse t1 in
         let t2 = recurse t2 in
-        try_reduce_binary recurse s t1 t2
+        try_reduce_binary recurse t.ty s t1 t2
       | Node (s, l) ->
-        let t = mk_node s (List.map recurse l) in
+        let t = mk_node ~ty:t.ty s (List.map recurse l) in
         t
       in
       (set_flag flag_simplified t' true; t')
     (** unary builtins *)
-    and try_reduce_unary recurse s a =
+    and try_reduce_unary recurse ty s a =
       match s, a.term with
       | S.Const ("$uminus", _), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.uminus n)
+        mk_const ~ty (S.Arith.Op.uminus n)
       | S.Const ("$uminus",_), Node (S.Const ("$uminus",_), [x]) -> x
       | S.Const ("$floor",_), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.floor n)
+        mk_const ~ty (S.Arith.Op.floor n)
       | S.Const ("$ceiling",_), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.ceiling n)
+        mk_const ~ty (S.Arith.Op.ceiling n)
       | S.Const ("$round",_), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.round n)
+        mk_const ~ty (S.Arith.Op.round n)
       | S.Const ("$truncate",_), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.truncate n)
+        mk_const ~ty (S.Arith.Op.truncate n)
       | S.Const ("$is_int",_), Node (n, []) when S.is_numeric n ->
         if S.is_int n then true_term else false_term
       | S.Const ("$is_rat",_), Node (n, []) when S.is_numeric n ->
@@ -156,47 +152,47 @@ module T = struct
       | S.Const ("$is_real",_), Node (n, []) when S.is_numeric n ->
         if S.is_real n then true_term else false_term
       | S.Const ("$to_rat",_), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.to_rat n)
+        mk_const ~ty (S.Arith.Op.to_rat n)
       | S.Const ("$to_real",_), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.to_real n)
+        mk_const ~ty (S.Arith.Op.to_real n)
       | S.Const ("$to_int",_), Node (n, []) when S.is_numeric n ->
-        mk_const (S.Arith.Op.to_int n)
-      | _ -> mk_node s [a]  (* default case *)
+        mk_const ~ty (S.Arith.Op.to_int n)
+      | _ -> mk_node ~ty s [a]  (* default case *)
     (** binary builtins *)
-    and try_reduce_binary recurse s a b =
+    and try_reduce_binary recurse ty s a b =
       try begin match s, a.term, b.term with
       | S.Const ("$sum",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.sum na nb)
+        mk_const ~ty (S.Arith.Op.sum na nb)
       | S.Const ("$difference",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.difference na nb)
+        mk_const ~ty (S.Arith.Op.difference na nb)
       | S.Const ("$product",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.product na nb)
+        mk_const ~ty (S.Arith.Op.product na nb)
       | S.Const ("$quotient",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        begin try mk_const (S.Arith.Op.quotient na nb)
+        begin try mk_const ~ty (S.Arith.Op.quotient na nb)
         with S.Arith.TypeMismatch _ -> mk_quotient a b
         end
       | S.Const ("$quotient_e",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.quotient_e na nb)
+        mk_const ~ty (S.Arith.Op.quotient_e na nb)
       | S.Const ("$quotient_t",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.quotient_t na nb)
+        mk_const ~ty (S.Arith.Op.quotient_t na nb)
       | S.Const ("$quotient_f",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.quotient_f na nb)
+        mk_const ~ty (S.Arith.Op.quotient_f na nb)
       | S.Const ("$remainder_e",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.remainder_e na nb)
+        mk_const ~ty (S.Arith.Op.remainder_e na nb)
       | S.Const ("$remainder_t",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.remainder_t na nb)
+        mk_const ~ty (S.Arith.Op.remainder_t na nb)
       | S.Const ("$remainder_f",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
-        mk_const (S.Arith.Op.remainder_f na nb)
+        mk_const ~ty (S.Arith.Op.remainder_f na nb)
       | S.Const ("$less",_), Node (na, []), Node (nb, [])
         when S.is_numeric na && S.is_numeric nb ->
         if S.Arith.Op.less na nb then true_term else false_term
@@ -216,17 +212,16 @@ module T = struct
         recurse (mk_uminus b)
       | S.Const ("$difference",_), _, _ when eq a b ->
         (* need to infer types so  that we know which zero to return *)
-        let ty = TypeInference.FO.infer_sig signature a in
-        mk_const (S.Arith.zero_of_ty ty)
+        mk_const ~ty (S.Arith.zero_of_ty ty)
       | S.Const ("$product",_), _, Node (nb,[]) when S.Arith.is_one nb -> a
       | S.Const ("$product",_), Node (na,[]), _ when S.Arith.is_one na -> b
       | S.Const ("$product",_), Node (na,[]), _ when S.Arith.is_zero na -> a
       | S.Const ("$product",_), _, Node (nb,[]) when S.Arith.is_zero nb -> b
       | S.Const ("$quotient",_), _, Node (nb,[]) when S.Arith.is_one nb -> a
       | S.Const ("$quotient",_), Node (na,[]), _ when S.Arith.is_zero na -> a
-      | _ -> mk_node s [a; b]  (* default case *)
+      | _ -> mk_node ~ty s [a; b]  (* default case *)
       end with Division_by_zero ->
-        mk_node s [a; b]
+        mk_node ~ty s [a; b]
     in
     let __cache = TCache.create 9 in
     let t' = TCache.with_cache_rec __cache simplify t in
@@ -239,43 +234,43 @@ end
 module F = struct
   include FOFormula
 
-  let rec simplify ~signature f = match f.form with
+  let rec simplify f = match f.form with
   | True
   | False -> f
   | Not {form=Atom {T.term=T.Node(S.Const("$greater",_), [l;r])}} ->
-    simplify ~signature (mk_atom (T.mk_lesseq l r))
+    simplify (mk_atom (T.mk_lesseq l r))
   | Not {form=Atom {T.term=T.Node(S.Const("$greatereq",_), [l;r])}} ->
-    simplify ~signature (mk_atom (T.mk_less l r))
+    simplify (mk_atom (T.mk_less l r))
   | Not {form=Atom {T.term=T.Node(S.Const("$less",_), [l;r])}} ->
-    simplify ~signature (mk_atom (T.mk_lesseq r l))
+    simplify (mk_atom (T.mk_lesseq r l))
   | Not {form=Atom {T.term=T.Node(S.Const("$lesseq",_), [l;r])}} ->
-    simplify ~signature (mk_atom (T.mk_less r l))
+    simplify (mk_atom (T.mk_less r l))
   | Atom {T.term=T.Node(S.Const("$greater",_), [l;r])} ->
-    simplify ~signature (mk_atom (T.mk_less r l))
+    simplify (mk_atom (T.mk_less r l))
   | Atom {T.term=T.Node(S.Const("$greatereq",_), [l;r])} ->
-    simplify ~signature (mk_atom (T.mk_lesseq r l))
-  | Or l -> mk_or (List.map (simplify ~signature) l)
-  | And l -> mk_and (List.map (simplify ~signature) l)
+    simplify (mk_atom (T.mk_lesseq r l))
+  | Or l -> mk_or (List.map simplify l)
+  | And l -> mk_and (List.map simplify l)
   | Not {form=Equal(l,r)} ->
-    let l' = T.simplify ~signature l in
-    let r' = T.simplify ~signature r in
+    let l' = T.simplify l in
+    let r' = T.simplify r in
     if T.eq l' r'
       then mk_false
       else mk_neq l' r'
-  | Not f' -> mk_not (simplify ~signature f')
-  | Equiv (f1, f2) -> mk_equiv (simplify ~signature f1) (simplify ~signature f2)
-  | Imply (f1, f2) -> mk_imply (simplify ~signature f1) (simplify ~signature f2)
+  | Not f' -> mk_not (simplify f')
+  | Equiv (f1, f2) -> mk_equiv (simplify f1) (simplify f2)
+  | Imply (f1, f2) -> mk_imply (simplify f1) (simplify f2)
   | Atom p ->
-    let p' = T.simplify ~signature p in
+    let p' = T.simplify p in
     mk_atom p'
   | Equal (l, r) ->
-    let l' = T.simplify ~signature l in
-    let r' = T.simplify ~signature r in
+    let l' = T.simplify l in
+    let r' = T.simplify r in
     if T.is_arith_const l'  && T.is_arith_const r' && l' != r'
       then mk_false
       else mk_eq l' r'
-  | Forall f' -> mk_forall (simplify ~signature f')
-  | Exists f' -> mk_exists (simplify ~signature f')
+  | Forall (ty,f') -> mk_forall ~ty (simplify f')
+  | Exists (ty,f') -> mk_exists ~ty (simplify f')
 end
 
 (** {2 View a Literal as an arithmetic Literal}. *)
@@ -342,23 +337,23 @@ module Lit = struct
       | True -> Literal.mk_tauto
       | False -> Literal.mk_absurd
       | Eq (t, const) ->
-        mk_eq ~ord t (T.mk_const const)
+        mk_eq ~ord t (T.mk_const ~ty:t.T.ty const)
       | Neq (t, const) ->
-        mk_neq ~ord t (T.mk_const const)
+        mk_neq ~ord t (T.mk_const ~ty:t.T.ty const)
       | L_less (t, const) when S.is_int const ->
         (* t < c ----> t <= c - 1 *)
-        mk_lesseq t (T.mk_const (S.Arith.Op.prec const))
+        mk_lesseq t (T.mk_const ~ty:t.T.ty (S.Arith.Op.prec const))
       | L_less (t, const) ->
-        mk_less t (T.mk_const const)
+        mk_less t (T.mk_const ~ty:t.T.ty const)
       | L_lesseq (t, const) ->
-        mk_lesseq t (T.mk_const const)
+        mk_lesseq t (T.mk_const ~ty:t.T.ty const)
       | R_less (const, t) when S.is_int const ->
         (* c < t ----> c+1 <= t  *)
-        mk_lesseq (T.mk_const (S.Arith.Op.succ const)) t
+        mk_lesseq (T.mk_const ~ty:t.T.ty (S.Arith.Op.succ const)) t
       | R_less (const, t) ->
-        mk_less (T.mk_const const) t
+        mk_less (T.mk_const ~ty:t.T.ty const) t
       | R_lesseq (const, t) ->
-        mk_lesseq (T.mk_const const) t
+        mk_lesseq (T.mk_const ~ty:t.T.ty const) t
   end
 
   (** {3 Comparison with 0} *)
@@ -382,13 +377,13 @@ module Lit = struct
 
     let to_string = Util.on_buffer pp
 
-    let extract ~signature lit =
+    let extract lit =
       Util.enter_prof prof_arith_extract;
       (* extract literal from (l=r | l!=r) *)
       let extract_eqn l r sign =
         try
-          let m1 = M.of_term ~signature l in
-          let m2 = M.of_term ~signature r in
+          let m1 = M.of_term l in
+          let m2 = M.of_term r in
           let m = M.difference m1 m2 in
           (* remove denominator, it doesn't matter *)
           let m = M.normalize_eq_zero m in
@@ -406,8 +401,8 @@ module Lit = struct
       (* extract lit from (l <= r | l < r) *)
       and extract_less ~strict l r =
         try
-          let m1 = M.of_term ~signature l in
-          let m2 = M.of_term ~signature r in
+          let m1 = M.of_term l in
+          let m2 = M.of_term r in
           let m = M.difference m1 m2 in
           (* remove the denominator *)
           assert (S.Arith.sign m.M.divby > 0);
@@ -455,8 +450,8 @@ module Lit = struct
       Util.exit_prof prof_arith_extract;
       ans
 
-    let extract_opt ~signature lit =
-      try Some (extract ~signature lit)
+    let extract_opt lit =
+      try Some (extract lit)
       with Failure _ -> None
 
     let get_monome = function
@@ -468,7 +463,10 @@ module Lit = struct
     | False -> raise (Invalid_argument "arith.lit.extracted.get_monome")
 
     let to_lit ~ord lit =
-      let mk_zero m = T.mk_const (S.Arith.zero_of_ty (M.type_of m)) in
+      let mk_zero m =
+        let ty = M.type_of m in
+        T.mk_const ~ty (S.Arith.zero_of_ty ty)
+      in
       match lit with
       | True -> Literal.mk_tauto
       | False -> Literal.mk_absurd
@@ -680,13 +678,13 @@ module Lit = struct
 
   (** {3 High level operations} *)
 
-  let is_trivial ~signature lit =
-    match E.extract_opt ~signature lit with
+  let is_trivial lit =
+    match E.extract_opt lit with
     | Some E.True -> true
     | _ -> false
 
-  let has_instances ~signature lit =
-    match E.extract_opt ~signature lit with
+  let has_instances lit =
+    match E.extract_opt lit with
     | Some E.False -> false
     | _ -> true
 
@@ -694,12 +692,12 @@ module Lit = struct
     replacing one side by the other is always safe.
     In particular:   a = b/3  is {b NOT} total for integers.
   *)
-  let make_total ~ord ~signature lit =
+  let make_total ~ord lit =
     (* scale equation t = m so that m is a total expression *)
     let _scale_eqn t m lit =
       if not (M.total_expression m)
         then
-          let t = T.mk_product (T.mk_const m.M.divby) t in
+          let t = T.mk_product (T.mk_const ~ty:(M.type_of m) m.M.divby) t in
           let t' = M.to_term (M.product m m.M.divby) in
           mk_eq ~ord t t'
         else
@@ -708,21 +706,21 @@ module Lit = struct
     match lit with
       | Literal.Equation (l, r, true, _) when not (T.is_arith l) ->
         begin try
-          let m = M.of_term ~signature r in
+          let m = M.of_term r in
           _scale_eqn l m lit
         with M.NotLinear _ -> lit
         end
       | Literal.Equation (l, r, true, _) when not (T.is_arith r) ->
         begin try
-          let m = M.of_term ~signature l in
+          let m = M.of_term l in
           _scale_eqn r m lit
         with M.NotLinear _ -> lit
         end
       | _ -> lit
 
-  let simplify ~ord ~signature lit =
+  let simplify ~ord lit =
     try
-      let elit = E.extract ~signature lit in
+      let elit = E.extract lit in
       match pivot elit with
       | True -> Literal.mk_tauto
       | False -> Literal.mk_absurd
@@ -736,11 +734,11 @@ module Lit = struct
       lit
 
   (* find instances of variables that eliminate the literal *)
-  let eliminate ?(elim_var=(fun v -> true)) ?fresh_var ~signature lit =
+  let eliminate ?(elim_var=(fun v -> true)) ?fresh_var lit =
     (* find some solutions *)
     let solutions =
       try
-        let elit = E.extract ~signature lit in
+        let elit = E.extract lit in
         E.eliminate ?fresh_var elit
       with Failure _ -> []
     in
@@ -762,7 +760,7 @@ module Lit = struct
         with FOUnif.Fail | Exit -> None)
       solutions
 
-  let heuristic_eliminate ~signature lit =
+  let heuristic_eliminate lit =
     match lit with
     | ( Literal.Equation ({T.term=T.Node(prod, [x1; x2])}, {T.term=T.Node(n,[])}, false, _)
       | Literal.Equation ({T.term=T.Node(n,[])}, {T.term=T.Node(prod, [x1; x2])}, false, _))
@@ -771,6 +769,7 @@ module Lit = struct
       Util.debug 5 "heuristic_elim tries sqrt of %a" S.pp n;
       begin match n with
       | S.Int n ->
+        let ty = Type.int in
         if Big_int.sign_big_int n >= 0
           then
             let s = Big_int.sqrt_big_int n in
@@ -778,18 +777,19 @@ module Lit = struct
               then
                 (* n is positive, and has an exact square root, try both
                     the positive and negative square roots*)
-                [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_bigint s)) 0
+                [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const ~ty (S.mk_bigint s)) 0
                 ; Substs.FO.bind Substs.FO.empty x1 0
-                  (T.mk_const (S.mk_bigint (Big_int.minus_big_int s))) 0 ]
+                  (T.mk_const ~ty (S.mk_bigint (Big_int.minus_big_int s))) 0 ]
               else []
           else []
       | S.Rat n -> []  (* TODO *)
       | S.Real n ->
+        let ty = Type.real in
         if n >= 0.
           then
             let s = sqrt n in
-            [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_real s)) 0
-            ; Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_real (~-. s))) 0
+            [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const ~ty (S.mk_real s)) 0
+            ; Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const ~ty (S.mk_real (~-. s))) 0
             ]
           else []
       | _ -> failwith "unknown numeric type!?"
@@ -800,7 +800,7 @@ end
 (** {2 Arrays of literals} *)
 
 module Lits = struct
-  let purify ~ord ~signature ~eligible lits =
+  let purify ~ord ~eligible lits =
     let new_lits = ref [] in
     let _add_lit lit = new_lits := lit :: !new_lits in
     let varidx = ref (T.max_var (Literals.vars lits) + 1) in
@@ -813,10 +813,10 @@ module Lits = struct
     | T.Node (s, l) when S.Arith.is_arith s ->
       if root
         then (* recurse, still in root arith expression *)
-          T.mk_node s (List.map (purify_term ~root) l)
+          T.mk_node ~ty:t.T.ty s (List.map (purify_term ~root) l)
         else begin
           (* purify this term out! *)
-          let ty = TypeInference.FO.infer_sig signature t in
+          let ty = t.T.ty in
           let v = T.mk_var ~ty !varidx in
           incr varidx;
           (* purify the term and add a constraint *)
@@ -826,7 +826,7 @@ module Lits = struct
           (* return variable instead of literal *)
           v
         end
-    | T.Node (s, l) -> T.mk_node s (List.map (purify_term ~root:false) l)
+    | T.Node (s, l) -> T.mk_node ~ty:t.T.ty s (List.map (purify_term ~root:false) l)
     in
     (* purify each literal *)
     Array.iteri
@@ -849,13 +849,13 @@ module Lits = struct
       lits;
     Array.of_list (List.rev !new_lits)
 
-  let pivot ~ord ~signature ~eligible lits =
+  let pivot ~ord ~eligible lits =
     let results = ref [] in
     let add_res a = results := a :: !results in
     for i = 0 to Array.length lits - 1 do
       if eligible i lits.(i) then try
         (* try to pivot the i-th literal *)
-        let elit = Lit.Extracted.extract ~signature lits.(i) in
+        let elit = Lit.Extracted.extract lits.(i) in
         match Lit.pivot elit with
         | Lit.True
         | Lit.False
@@ -899,7 +899,7 @@ module Lits = struct
     let vars = Literals.vars lits in
     List.filter (fun v -> not (shielded ?filter lits v)) vars
 
-  let eliminate ~ord ~signature ~eligible lits =
+  let eliminate ~ord ~eligible lits =
     let results = ref [] in
     let lits' = Array.to_list lits in
     let add_res a = results := a :: !results in
@@ -927,9 +927,9 @@ module Lits = struct
           fun v -> List.memq v vars
         in
         (* try heuristic substitutions *)
-        let substs = Lit.heuristic_eliminate ~signature lits.(i) in
+        let substs = Lit.heuristic_eliminate lits.(i) in
         (* try to eliminate literal as a linear expression *)
-        let substs' = Lit.eliminate ~elim_var ~fresh_var ~signature lits.(i) in
+        let substs' = Lit.eliminate ~elim_var ~fresh_var lits.(i) in
         List.iter
           (fun subst -> eliminate_lit i subst)
           (substs @ substs');

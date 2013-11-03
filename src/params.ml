@@ -96,7 +96,6 @@ let parse_args () =
   (* options list *) 
   let options =
     [ "-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)"
-    ; "-debug", Arg.Set_int debug, "debug level"
     ; "-version", Arg.Set version, "print version"
     ; "-steps", Arg.Set_int steps, "maximal number of steps of given clause loop"
     ; "-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))"
@@ -113,18 +112,15 @@ let parse_args () =
     ; "-expand-def", Arg.Set expand_def, "expand definitions"
     ; "-arith", Arg.Set arith, "enable arithmetic"
     ; "-arith-ac", Arg.Set arith_ac, "enable AC axioms for arith"
-    ; "-stats", Arg.Set stats, "print statistics"
     ; "-progress", Arg.Unit set_progress, "print progress"
-    ; "-profile", Arg.Set Util.enable_profiling, "enable profiling of code"
     ; "-no-theories", Arg.Clear theories, "do not detect theories in input"
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
     ; "-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set"
     ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
     ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
-    ; "-print-types", Arg.Set FOTerm.print_var_types, "print type of variables"
     ; "-seed", Arg.Set_int seed, "set random seed"
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
-    ]
+    ] @ Options.global_opts
   in
   Arg.parse options add_file "solve problems in files";
   if Vector.is_empty files

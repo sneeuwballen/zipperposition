@@ -29,23 +29,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 open Libzipperposition
+open Libzipperposition_arbitrary
 open QCheck
 
 module T = FOTerm
 module M = Monome
 module E = Arith.Lit.Extracted
 
+let arTerm ty =
+  Arbitrary.(lift M.to_term (ArMonome.of_ty ty))
+
 (* simplify (simplify t) == simplify t *)
 let check_simplify_idempotent =
-  let gen = Arbitrary.(among [Type.int; Type.rat] >>= fun ty ->
-    Arith.T.arbitrary_arith ty)
-  in
+  let gen = Arbitrary.(among [Type.int; Type.rat] >>= arTerm) in
   let prop t =
-    let tyctx = TypeInference.Ctx.of_signature Signature.Arith.signature in
-    ignore (TypeInference.FO.infer tyctx t);
-    let signature = TypeInference.Ctx.to_signature tyctx in
-    let t' = Arith.T.simplify ~signature t in
-    let t'' = Arith.T.simplify ~signature t' in
+    let t' = Arith.T.simplify t in
+    let t'' = Arith.T.simplify t' in
     T.eq t' t''
   in
   let name = "arith_term_simplify_is_idempotent" in
@@ -58,14 +57,14 @@ let check_lit_extract_inverse_is_to_lit n =
     Arith.Lit.arbitrary ty)
   in
   let prop lit =
-    let signature = Literal.signature ~signature:Signature.Arith.signature lit in
-    Prop.assume (not (Arith.Lit.is_trivial ~signature lit));
+    let symbols = Literal.symbols lit in
+    Prop.assume (not (Arith.Lit.is_trivial lit));
     (* create ordering *)
-    let ord = Ordering.default signature in
+    let ord = Ordering.default symbols in
     (* lit -> elit -> lit' -> elit' -> lit'' *)
-    let elit = E.extract ~signature lit in
+    let elit = E.extract lit in
     let lit' = E.to_lit ~ord elit in
-    let elit' = E.extract ~signature lit' in
+    let elit' = E.extract lit' in
     let lit'' = E.to_lit ~ord elit' in
     (* check lit' = lit'' *)
     let res = Literal.eq_com lit' lit'' in

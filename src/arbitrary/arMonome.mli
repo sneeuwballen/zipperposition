@@ -30,4 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 open Libzipperposition
 
+val of_ty : Type.t -> Monome.t QCheck.Arbitrary.t
+  (** Monome of the given type *)
+
 val t : Monome.t QCheck.Arbitrary.t
