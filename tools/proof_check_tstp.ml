@@ -234,12 +234,11 @@ let progress = ref false
 (* TODO option to choose provers *)
 
 let options =
-  [ "-debug", Arg.Int Util.set_debug, "set debug level"
-  ; "-pp", Arg.Set print_problem, "print problem after parsing"
+  [ "-pp", Arg.Set print_problem, "print problem after parsing"
   ; "-timeout", Arg.Set_int timeout, "timeout for subprovers (in seconds)"
   ; "-minimum", Arg.Set_int minimum, "minimum number of checks to validate a step (1)"
   ; "-progress", Arg.Set progress, "print progress"
-  ]
+  ] @ Options.global_opts
 
 (** parse_args returns parameters *)
 let parse_args () =

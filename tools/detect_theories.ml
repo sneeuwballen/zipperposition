@@ -45,12 +45,11 @@ let add_kb f =
   kb_files := f :: !kb_files
 
 let options =
-  [ "-debug", Arg.Int Util.set_debug, "debug level"
-  ; "-theory", Arg.String add_theory, "use theory file"
+  [ "-theory", Arg.String add_theory, "use theory file"
   ; "-kb", Arg.String add_kb, "use KB file"
   ; "-print-kb", Arg.Set flag_print_kb, "print KB"
   ; "-print-datalog", Arg.Set flag_print_datalog, "print Datalog clauses"
-  ]
+  ] @ Options.global_opts
 
 (* parse the given theory files into a KB *)
 let parse_kb kb_files theory_files =

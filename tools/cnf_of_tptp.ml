@@ -35,9 +35,8 @@ module A = Ast_tptp
 let declare_types = ref false
 
 let options =
-  [ "-debug", Arg.Int Util.set_debug, "debug level"
-  ; "-declare", Arg.Set declare_types, "declare types of symbols"
-  ]
+  [  "-declare", Arg.Set declare_types, "declare types of symbols"
+  ] @ Options.global_opts
 
 (* conversion to CNF of declarations *)
 let to_cnf decls =

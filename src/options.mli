@@ -43,3 +43,9 @@ val make : t ref -> (string * Arg.spec * string) list
   (** Produce of list of options suitable for {!Arg.parse}, that may
       modify global parameters and the given option reference.
       After parsing, the reference content will reflect CLI options *)
+
+val global : t ref
+  (** Global parameters, can be used as a mutable default *)
+
+val global_opts : (string * Arg.spec * string) list
+  (** Options that modify {!global} *)

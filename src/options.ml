@@ -42,6 +42,11 @@ let default = {
   print_format = "debug";
 }
 
+let _print_types () =
+  HOTerm.print_all_types := true;
+  FOTerm.print_all_types := true;
+  ()
+
 let make opts =
   let mod_opt f = opts := f !opts in
   [ "-debug", Arg.Int Util.set_debug, "logtk: debug level"
@@ -50,4 +55,9 @@ let make opts =
       "enable statistics"
   ; "-print", Arg.String (fun s -> mod_opt (fun o -> {o with print_format=s;} )),
       "choose printing format for terms and formulas (default \"debug\""
+  ; "-print-types", Arg.Unit _print_types , "print type annotations everywhere"
   ]
+
+let global = ref default
+
+let global_opts = make global
