@@ -359,7 +359,7 @@ let pp0 buf proof = match proof with
   | InferClause (c, _) ->
     Printf.bprintf buf "proof for %a (id %a)" _pp_clause c A.pp_name (get_id proof)
   | InferForm (f, _) ->
-    Printf.bprintf buf "proof for %a (id %a)" F.pp f A.pp_name (get_id proof)
+    Printf.bprintf buf "proof for %a (id %a)" F.pp_tstp f A.pp_name (get_id proof)
 
 let pp1 buf proof = match proof with
   | Axiom (f,n) -> Printf.bprintf buf "axiom(%s, %s)" f n
@@ -370,7 +370,7 @@ let pp1 buf proof = match proof with
       (Util.pp_array ~sep:"\n  " pp0) step.parents
   | InferForm (f, lazy step) ->
     Printf.bprintf buf "proof for %a (id %a) from\n %a"
-      F.pp f A.pp_name (get_id proof)
+      F.pp_tstp f A.pp_name (get_id proof)
       (Util.pp_array ~sep:"\n  " pp0) step.parents
 
 let fmt fmt proof = Format.pp_print_string fmt (Util.on_buffer pp0 proof)

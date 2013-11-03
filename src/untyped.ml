@@ -221,26 +221,26 @@ module Form = struct
     | Binary (Equiv, f1, f2) ->
       Printf.bprintf buf "%a <=> %a" pp_tstp_inner f1 pp_tstp_inner f2
     | Equal (t1, t2) ->
-      Printf.bprintf buf "%a = %a" FO.pp t1 FO.pp t2
+      Printf.bprintf buf "%a = %a" FO.pp_tstp t1 FO.pp_tstp t2
     | Not (Equal (t1, t2)) ->
-      Printf.bprintf buf "%a != %a" FO.pp t1 FO.pp t2
+      Printf.bprintf buf "%a != %a" FO.pp_tstp t1 FO.pp_tstp t2
     | Not (Binary (Equiv, f1, f2)) ->
       Printf.bprintf buf "%a <~> %a" pp_tstp_inner f1 pp_tstp_inner f2
     | Not f' -> Printf.bprintf buf "~ %a" pp_tstp_inner f'
     | Quant (Forall, vars, f') ->
-      Printf.bprintf buf "![%a]: %a" (Util.pp_list FO.pp) vars pp_tstp_inner f'
+      Printf.bprintf buf "![%a]: %a" (Util.pp_list FO.pp_tstp) vars pp_tstp_inner f'
     | Quant (Exists, vars, f') ->
-      Printf.bprintf buf "?[%a]: %a" (Util.pp_list FO.pp) vars pp_tstp_inner f'
+      Printf.bprintf buf "?[%a]: %a" (Util.pp_list FO.pp_tstp) vars pp_tstp_inner f'
   and pp_tstp_inner buf f = match f with
     | Bool _
     | Equal _
     | Quant _
     | Atom _
-    | Not _ -> pp buf f
+    | Not _ -> pp_tstp buf f
     | Nary _
     | Binary _ ->
       Buffer.add_char buf '(';
-      pp buf f;
+      pp_tstp buf f;
       Buffer.add_char buf ')'
 
   let to_string = Util.on_buffer pp

@@ -707,7 +707,7 @@ let pp_tstp buf f =
   let rec pp_outer buf f = match f.form with
   | True -> Buffer.add_string buf "$true"
   | False -> Buffer.add_string buf "$false"
-  | Atom t -> (T.pp_depth !depth) buf t
+  | Atom t -> (T.pp_tstp_depth !depth) buf t
   | Not {form=Equal (t1, t2)} ->
     (T.pp_tstp_depth !depth) buf t1;
     Buffer.add_string buf " != ";
