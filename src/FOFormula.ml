@@ -609,8 +609,8 @@ let to_term f =
     | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
     | Equal (t1, t2) -> T.mk_eq (T.curry t1) (T.curry t2)
     | Not f' -> T.mk_not (to_term f')
-    | Forall (ty,f') -> T.mk_forall ~varty:ty (to_term f')
-    | Exists (ty,f') -> T.mk_exists ~varty:ty (to_term f')
+    | Forall (ty,f') -> T.mk_forall ~varty:(Type.curry ty) (to_term f')
+    | Exists (ty,f') -> T.mk_exists ~varty:(Type.curry ty) (to_term f')
     | Atom p -> T.curry p)
     f
 
@@ -623,7 +623,7 @@ let of_term t =
     let ty = T.lambda_var_ty lam in
     mk_forall ~ty (recurse t')
   | T.At ({T.term=T.Const s}, [{T.term=T.Lambda t'} as lam]) when S.eq s S.exists_symbol ->
-    let ty = T.lambda_var_ty lam in
+    let ty = Type.uncurry (T.lambda_var_ty lam) in
     mk_exists ~ty (recurse t')
   | T.Lambda _ -> failwith "FOFormula.of_term: unexpected lambda term"
   | T.Const s ->
@@ -638,6 +638,10 @@ let of_term t =
     mk_equiv (recurse a) (recurse b)
   | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.imply_symbol ->
     mk_imply (recurse a) (recurse b)
+  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.or_symbol ->
+    mk_and [recurse a; recurse b]
+  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.and_symbol ->
+    mk_or [recurse a; recurse b]
   | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.eq_symbol ->
     mk_eq (T.uncurry a) (T.uncurry b)
   | T.At ({T.term=T.Const s}, [t']) when S.eq s S.not_symbol ->

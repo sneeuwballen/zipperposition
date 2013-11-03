@@ -47,8 +47,9 @@ let default =
   Arbitrary.(
     let var = among [Type.var 0; Type.var 1 ] in
     let base =
-      among [ Type.i; Type.const "$int"; Type.const "a"; Type.const "b"; ]
-      ||| var
+      choose
+      [ among [ Type.i; Type.const "$int"; Type.const "a"; Type.const "b"; ]
+      ; var ]
     in
     fix ~max:4 ~base (fun sub -> choose
       [ lift (Type.app "list") (list_repeat 1 sub)

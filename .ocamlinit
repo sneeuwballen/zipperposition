@@ -42,7 +42,7 @@ let pterm s =
 let pform s =
     let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create ~base:true () in
-    TypeInference.FO.convert ~ctx:tyctx f
+    TypeInference.FO.convert_form ~ctx:tyctx f
 ;;
 (* optional part *)
 #install_printer Logtk_meta.MetaPattern.fmt;;

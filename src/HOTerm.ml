@@ -650,7 +650,6 @@ let rec uncurry t =
   | Const s -> FOT.mk_const ~ty s
   | At ({term=Const s}, l) ->
     let l = List.map uncurry l in
-    let ty = Type.apply_fun ty (List.map FOT.get_type l) in
     FOT.mk_node ~ty s l
   | _ -> failwith "cannot uncurry higher-order application"
 
