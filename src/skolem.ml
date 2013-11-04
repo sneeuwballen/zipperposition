@@ -40,13 +40,13 @@ type ctx = {
 
 (* TODO: use a term index for the cache? *)
 
-let create ?(prefix="logtk_sk__") () =
+let create ?(base=Signature.base) ?(prefix="logtk_sk__") () =
   let ctx = {
     sc_gensym = Symbol.Gensym.create ~prefix ();
     sc_var_index = 0;
     sc_cache = [];
     sc_fcache = [];
-    sc_signature = Signature.empty;
+    sc_signature = base;
   } in
   ctx
 

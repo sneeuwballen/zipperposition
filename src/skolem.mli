@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type ctx
   (** Context needed to create new symbols *)
 
-val create : ?prefix:string -> unit -> ctx
+val create : ?base:Signature.t -> ?prefix:string -> unit -> ctx
   (** New skolem contex. A prefix can be provided, which will be
       added to all newly created skolem symbols *)
 

@@ -33,16 +33,18 @@ module F = FOFormula
 module A = Ast_tptp
 
 let declare_types = ref false
+let print_sig = ref false
 
 let options =
-  [  "-declare", Arg.Set declare_types, "declare types of symbols"
+  [ "-declare", Arg.Set declare_types, "declare types of symbols"
+  ; "-signature", Arg.Set print_sig, "print signature"
   ] @ Options.global_opts
 
 (* conversion to CNF of declarations *)
 let to_cnf decls =
   let signature = Util_tptp.type_declarations decls in
   let tyctx = TypeInference.Ctx.of_signature signature in
-  let ctx = Skolem.create () in
+  let ctx = Skolem.create ~base:signature () in
   let seq = Sequence.flatMap
     (function
       | A.FOF(n,role,f,info)
@@ -74,7 +76,7 @@ let to_cnf decls =
     decls
   in
   (* iterating again would change skolems, etc, which is bad *)
-  Sequence.persistent seq
+  Sequence.persistent seq, Skolem.to_signature ctx
 
 (* process the given file, converting it to CNF *)
 let process file =
@@ -83,14 +85,13 @@ let process file =
     (* parse *)
     let decls = Util_tptp.parse_file ~recursive:true file in
     (* to CNF *)
-    let decls = to_cnf decls in
-    let decls =
-      if !declare_types
-        then
-          let signature = Util_tptp.signature decls in
-          Sequence.append (Util_tptp.declare_symbols signature) decls
-        else decls
+    let decls, signature = to_cnf decls in
+    let decls = if !declare_types
+      then Sequence.append (Util_tptp.declare_symbols signature) decls
+      else decls
     in
+    if !print_sig
+      then Util.printf "signature: %a\n" Signature.pp signature;
     (* print *)
     Sequence.iter
       (fun d -> Util.printf "%a\n" A.pp_declaration d)
