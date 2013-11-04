@@ -81,4 +81,4 @@ val parse_theory_file : t -> string -> unit Monad.Err.t
   (** Parse a theory file and update the KB, or return an error *)
 
 val save_kb : t -> string -> unit
-val restore_kb : t -> string -> unit
+val restore_kb : t -> string -> unit Monad.Err.t

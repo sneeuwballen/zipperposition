@@ -724,12 +724,15 @@ let restore filename =
     begin try
       let kb = Bij.TrBencode.read ~bij ic in
       close_in ic;
-      Some kb
+      Monad.Err.return kb
     with e ->
       close_in ic;
-      raise e
+      let msg = Util.sprintf "restoring KB from %s: error %s"
+        filename (Printexc.to_string e) in
+      Monad.Err.fail msg
     end
   with e ->
-    Util.debug 1 "restoring KB from %s: error %s" filename (Printexc.to_string e);
-    None
+    let msg = Util.sprintf "restoring KB from %s: error %s"
+      filename (Printexc.to_string e) in
+    Monad.Err.fail msg
 

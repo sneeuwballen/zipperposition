@@ -53,19 +53,18 @@ let options =
 
 (* parse the given theory files into a KB *)
 let parse_kb kb_files theory_files =
-  let kb = List.fold_left
+  let open Monad.Err in
+  let kb = Monad.TraverseErr.fold_l kb_files (return MetaKB.empty)
     (fun kb file -> 
       Util.debug 3 "parse KB file %s" file;
-      match MetaKB.restore file with
-      | None -> kb
-      | Some kb' -> MetaKB.union kb kb')
-    MetaKB.empty kb_files
+      MetaKB.restore file >>= fun kb' ->
+      Monad.Err.return (MetaKB.union kb kb'))
   in
   Monad.TraverseErr.fold_l
-    theory_files (Monad.Err.return kb)
+    theory_files kb
     (fun kb file ->
       Util.debug 3 "parse theory file %s" file;
-      Monad.Err.map
+      map
         (MetaKB.parse_theory_file file)
         (fun kb' -> MetaKB.union kb kb'))
 

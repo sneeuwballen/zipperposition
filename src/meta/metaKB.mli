@@ -147,7 +147,7 @@ val parse_theory_file : ?base:Signature.t -> string -> t Monad.Err.t
 val save : string -> t -> unit
   (** Save to the file (blocking) *)
 
-val restore : string -> t option
+val restore : string -> t Monad.Err.t
   (** Restore from a file (blocking IO).
       @return None if some failure occurred *)
 

@@ -113,6 +113,6 @@ let save_kb p filename =
   MetaKB.save filename p.kb 
 
 let restore_kb p filename =
-  match MetaKB.restore filename with
-  | None -> ()
-  | Some kb -> add_kb p kb
+  let kb' = MetaKB.restore filename in
+  Monad.Err.map kb'
+    (fun kb' -> add_kb p kb')
