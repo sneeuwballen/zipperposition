@@ -33,6 +33,9 @@ module type S = sig
 
   val return : 'a -> 'a t
 
+  val map : 'a t -> ('a -> 'b) -> 'b t
+    (** Functorial map *)
+
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 end
 
@@ -66,6 +69,12 @@ module Err : sig
     | Error of string
 
   include S with type 'a t = 'a err
+
+  val guard : ?print:(exn -> string) -> (unit -> 'a) -> 'a t
+    (** [guard f] returns [Ok (f x)] if [f x] evaluates without raising
+        an exception, or [Error msg] if [f x] raises [e] and [msg] is the
+        string representation of [e]. An exception printer can be
+        provided (by default {!Printexc.to_string} is used) *)
 
   val fail : string -> 'a t
   val fail_exn : exn -> 'a t

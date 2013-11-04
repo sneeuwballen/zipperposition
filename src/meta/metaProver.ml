@@ -104,8 +104,10 @@ let on_goal_pattern p =
     pat)
 
 let parse_theory_file p filename =
-  let kb = MetaKB.parse_theory_file filename in
-  p.kb <- MetaKB.union p.kb kb
+  let open Monad.Err in
+  MetaKB.parse_theory_file filename >>= fun kb ->
+  p.kb <- MetaKB.union p.kb kb;
+  return ()
 
 let save_kb p filename =
   MetaKB.save filename p.kb 

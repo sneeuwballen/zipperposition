@@ -61,12 +61,13 @@ let parse_kb kb_files theory_files =
       | Some kb' -> MetaKB.union kb kb')
     MetaKB.empty kb_files
   in
-  List.fold_left
+  Monad.TraverseErr.fold_l
+    theory_files (Monad.Err.return kb)
     (fun kb file ->
       Util.debug 3 "parse theory file %s" file;
-      let kb' = MetaKB.parse_theory_file file in
-      MetaKB.union kb kb')
-    kb theory_files
+      Monad.Err.map
+        (MetaKB.parse_theory_file file)
+        (fun kb' -> MetaKB.union kb kb'))
 
 (* conversion to CNF of declarations *)
 let to_cnf ?(ctx=Skolem.create ()) decls =
@@ -158,18 +159,23 @@ let main () =
   (if !files = [] then files := ["stdin"]);
   (* parse KB *)
   let kb = parse_kb !kb_files !theory_files in
-  (if !flag_print_kb then print_kb ~kb);
-  (* parse CNF formulas *)
-  let clauses = parse_and_cnf !files in
-  (* detect theories *)
-  let mp = detect_theories ~kb clauses in
-  (* print datalog? *)
-  if !flag_print_datalog then
-    let clauses = MetaReasoner.all_clauses (MetaProver.reasoner mp) in
-    Sequence.iter (fun c -> Util.printf "  %a\n" MetaReasoner.pp_clause c) clauses;
-  flush stdout;
-  Util.debug 1 "success!";
-  ()
+  match kb with
+  | Monad.Err.Ok kb ->
+    if !flag_print_kb then print_kb ~kb;
+    (* parse CNF formulas *)
+    let clauses = parse_and_cnf !files in
+    (* detect theories *)
+    let mp = detect_theories ~kb clauses in
+    (* print datalog? *)
+    if !flag_print_datalog then
+      let clauses = MetaReasoner.all_clauses (MetaProver.reasoner mp) in
+      Sequence.iter (fun c -> Util.printf "  %a\n" MetaReasoner.pp_clause c) clauses;
+    flush stdout;
+    Util.debug 1 "success!";
+    ()
+  | Monad.Err.Error msg ->
+    Util.debug 0 "error: %s" msg;
+    exit 1
 
 let _ =
   try

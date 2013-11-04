@@ -33,6 +33,9 @@ module type S = sig
 
   val return : 'a -> 'a t
 
+  val map : 'a t -> ('a -> 'b) -> 'b t
+    (** Functorial map *)
+
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 end
 
@@ -50,6 +53,10 @@ module Opt = struct
   | Some x -> f x
 
   let return x = Some x
+
+  let map x f = match x with
+    | None -> None
+    | Some x' -> Some (f x')
 
   let get = function
   | Some x -> x
@@ -70,6 +77,16 @@ module Err = struct
 
   let return x = Ok x
 
+  let map x f = match x with
+    | Ok x -> Ok (f x)
+    | Error s -> Error s
+
+  let guard ?(print=Printexc.to_string) f =
+    try
+      Ok (f ())
+    with e ->
+      Error (print e)
+
   let fail s = Error s
   let fail_exn ex = Error (Printexc.to_string ex)
 
@@ -84,6 +101,8 @@ module L = struct
   type 'a t = 'a list
 
   let return x = [x]
+
+  let map x f = List.map f x
 
   let (>>=) l f =
     let rec expand l = match l with

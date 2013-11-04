@@ -629,7 +629,17 @@ let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
     | A.Include _ -> failwith "KB.kb_of_statements: remaining includes"
     | A.Error _ -> failwith "KB.kb_of_statements: error in list"
   in
-  Sequence.fold add_statement init statements
+  (* error monad *)
+  let module Err = Monad.Err in
+  Monad.TraverseErr.fold
+    statements (Monad.Err.return init)
+    (fun kb stmt ->
+        try Err.return (add_statement kb stmt)
+        with TypeUnif.Error e ->
+          let msg = Util.sprintf "typing statement %a: error %a"
+            A.pp stmt TypeUnif.pp_error e
+          in
+          Err.fail msg)
 
 (** {2 IO} *)
 
@@ -642,18 +652,18 @@ let parse_theory_file ?base filename =
     begin try
       (* error, fail *)
       let e = List.find A.is_error statements in
-      Util.debug 0 "error in parsed KB: %s" (A.error_to_string e);
-      empty
+      let msg = Util.sprintf "error in parsed KB: %s" (A.error_to_string e) in
+      Monad.Err.fail msg
     with Not_found ->
       (* no error, proceed *)
-      let kb = kb_of_statements ?base (Sequence.of_list statements) in
-      kb
+      kb_of_statements ?base (Sequence.of_list statements)
     end
-  with
-  | Unix.Unix_error (e, _, _) ->
-    let msg = Unix.error_message e in
-    Util.debug 0 "error reading theory file %s: %s" filename msg;
-    empty
+  with Unix.Unix_error (e, _, _) ->
+    let msg =
+      Util.sprintf "error reading theory file %s: %s"
+      filename (Unix.error_message e)
+    in
+    Monad.Err.fail msg
   
 let save filename kb =
   let oc = open_out filename in

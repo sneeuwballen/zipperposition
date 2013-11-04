@@ -342,7 +342,7 @@ let form_variant ?(subst=S.empty) f1 sc_1 f2 sc_2 =
         else ()  (* not. *)
     | F.Exists (ty1,f1'), F.Exists (ty2,f2')
     | F.Forall (ty1,f1'), F.Forall (ty2,f2') ->
-      let subst = TypeUnif.unify_fo ~subst ty1 sc_1 ty2 sc_2 in  (* FIXME: in other functions *)
+      let subst = TypeUnif.unify_fo ~subst ty1 sc_1 ty2 sc_2 in
       unif subst f1' f2' k
     | F.True, F.True
     | F.False, F.False -> k subst  (* yep :) *)

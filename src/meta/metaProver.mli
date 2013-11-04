@@ -77,8 +77,8 @@ val on_goal_pattern : t -> MetaPattern.t Signal.t
 
 (** {2 IO} *)
 
-val parse_theory_file : t -> string -> unit
-  (** Parse a theory file and update the KB *)
+val parse_theory_file : t -> string -> unit Monad.Err.t
+  (** Parse a theory file and update the KB, or return an error *)
 
 val save_kb : t -> string -> unit
 val restore_kb : t -> string -> unit
