@@ -156,4 +156,4 @@
 <tools/*.ml{,i}>: pkg_str
 # OASIS_STOP
 true: use_menhir
-<**/*.cmx>: inline(10)
+<src/**/*.cmx>: inline(10)

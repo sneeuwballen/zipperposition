@@ -40,7 +40,8 @@ let options =
 
 (* conversion to CNF of declarations *)
 let to_cnf decls =
-  let tyctx = TypeInference.Ctx.create ~base:true () in
+  let signature = Util_tptp.type_declarations decls in
+  let tyctx = TypeInference.Ctx.of_signature signature in
   let ctx = Skolem.create () in
   let seq = Sequence.flatMap
     (function
@@ -97,7 +98,11 @@ let process file =
   with
   | Util_tptp.ParseError _ as e ->
     (* syntax error *)
-    Printf.printf "%s\n" (Util_tptp.string_of_error e);
+    Printf.eprintf "%s\n" (Util_tptp.string_of_error e);
+    exit 1
+  | TypeUnif.Error e ->
+    Util.eprintf "%a\n" TypeUnif.pp_error e;
+    Printexc.print_backtrace stderr;
     exit 1
 
 let main () =

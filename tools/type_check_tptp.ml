@@ -41,13 +41,10 @@ let stats = ref false
 let pp_base = ref false
 
 let options =
-  [ "-debug", Arg.Int Util.set_debug, "debug level"
-  ; "-cat", Arg.Set cat_input, "print input declarations"
-  ; "-profile", Arg.Set Util.enable_profiling, "enable profiling"
-  ; "-stats", Arg.Set stats, "statistics"
+  [ "-cat", Arg.Set cat_input, "print input declarations"
   ; "-base", Arg.Set pp_base, "print signature of base symbols"
   ; "-tstp", Arg.Unit (fun () -> printer := UF.pp_tstp), "output in TSTP format"
-  ]
+  ] @ Options.global_opts
 
 (* check the given file *)
 let check file =
@@ -78,10 +75,10 @@ let check file =
   with
   | Util_tptp.ParseError _ as e ->
     (* syntax error *)
-    Printf.printf "%s\n" (Util_tptp.string_of_error e);
+    Printf.eprintf "%s\n" (Util_tptp.string_of_error e);
     exit 1
   | TypeUnif.Error e ->
-    Util.printf "%a\n" TypeUnif.pp_error e;
+    Util.eprintf "%a\n" TypeUnif.pp_error e;
     exit 1
 
 let main () =
