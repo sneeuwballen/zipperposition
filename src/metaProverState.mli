@@ -91,10 +91,10 @@ val kb : t -> Logtk_meta.MetaKB.t
 val add_kb : t -> Logtk_meta.MetaKB.t -> unit
   (** Merge KB with the given KB *)
 
-val parse_kb_file : t -> string -> unit
+val parse_kb_file : t -> string -> unit Monad.Err.t
   (** Parse KB from this file *)
 
-val parse_theory_file : t -> string -> unit
+val parse_theory_file : t -> string -> unit Monad.Err.t
   (** Update KB with the content of this file *)
 
 val save_kb_file : t -> string -> unit

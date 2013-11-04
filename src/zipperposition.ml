@@ -154,7 +154,10 @@ let mk_meta ~params =
     MetaProverState.parse_kb_file meta params.param_kb;
     (* read some theory files *)
     List.iter
-      (fun file -> MetaProverState.parse_theory_file meta file)
+      (fun file ->
+        match MetaProverState.parse_theory_file meta file with
+        | Monad.Err.Ok () -> ()
+        | Monad.Err.Error msg -> Util.debug 0 "%s" msg)
       params.param_kb_load;
     Some meta
   end else
@@ -399,7 +402,11 @@ let () =
   (if params.param_kb_print then print_kb ?meta);
   (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)
-  Vector.iter params.param_files (process_file ?meta ~plugins ~params);
+  Vector.iter params.param_files
+    (fun file ->
+      try process_file ?meta ~plugins ~params file
+      with Util_tptp.ParseError _ as e ->
+        Util.eprintf "file %s: %s\n" file (Util_tptp.string_of_error e));
   (* save KB? *)
   save_kb ?meta ~params;
   ()
