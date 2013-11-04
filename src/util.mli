@@ -163,23 +163,6 @@ val array_exists : ('a -> bool) -> 'a array -> bool
 (** Elements of array except the one at given index (reverse list) *)
 val array_except_idx : 'a array -> int -> 'a list
 
-(** {2 Option utils} *)
-
-module Opt : sig
-  val maybe : 'a option -> 'a -> 'a
-    (** Safe extraction from an option *)
-
-  val (>>=) : 'a option -> ('a -> 'b option) -> 'b option
-    (** Option monad *)
-
-  val get : 'a option -> 'a
-    (** Get the content of the option.
-        @raise Invalid_argument if the option is None *)
-
-  val is_some : _ option -> bool
-  val is_none : _ option -> bool
-end
-
 (** {2 Finite Bijections} *)
 
 module Bijection(X : Hashtbl.HashedType) : sig

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: fef77d4b08e8f882f642e8100c2aa936)
+# DO NOT EDIT (digest: 315ceecdfa29e9df9dd88915b63ee4b8)
 HO
 FO
 Symbol
@@ -42,6 +42,7 @@ Congruence
 TypeUnif
 Options
 Untyped
+Monad
 lib/Sequence
 lib/Bij
 lib/Cache
