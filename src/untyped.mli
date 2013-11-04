@@ -51,6 +51,9 @@ module FO : sig
 
   val symbols : t Sequence.t -> Symbol.Set.t
   val free_vars : ?init:t list -> t -> t list
+
+  val generalize_vars : t -> t
+    (** Each variable gets its own type variable *)
   
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit
@@ -107,6 +110,9 @@ module Form : sig
 
   val close_forall : t -> t
   val close_exists : t -> t
+
+  val generalize_vars : t -> t
+    (** See {!FO.generalize_vars} *)
 
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit

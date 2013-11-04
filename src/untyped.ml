@@ -57,6 +57,12 @@ module FO = struct
     in
     find init t
 
+  let rec generalize_vars t = match t with
+    | Var (s, Type.Parsed.App("$i",[])) ->
+      var ~ty:(Type.Parsed.var ("Ty_" ^ s)) s
+    | Var _ -> t
+    | App (s, l) -> app s (List.map generalize_vars l)
+
   let _same_name v1 v2 = match v1, v2 with
     | Var (n1, _), Var (n2, _) -> n1 = n2
     | _ -> false
@@ -174,6 +180,17 @@ module Form = struct
   let close_exists f = match free_vars f with
     | [] -> f
     | vars -> exists vars f
+
+  let rec generalize_vars f = match f with
+    | Nary (op, l) -> Nary (op, List.map generalize_vars l)
+    | Binary (op, f1, f2) -> Binary (op, generalize_vars f1, generalize_vars f2)
+    | Not f' -> Not (generalize_vars f')
+    | Atom p -> Atom (FO.generalize_vars p)
+    | Bool _ -> f
+    | Equal (t1, t2) -> Equal (FO.generalize_vars t1, FO.generalize_vars t2)
+    | Quant (op, vars, f') ->
+      let vars = List.map FO.generalize_vars vars in
+      Quant (op, vars, _replace_vars vars f')
 
   let rec pp buf f = match f with
     | Bool true -> Buffer.add_string buf "$true"
