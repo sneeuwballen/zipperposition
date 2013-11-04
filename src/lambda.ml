@@ -109,6 +109,7 @@ let lambda_abstract_list t args =
   corresponding generalization in l_expected (but l_expected can be
   longer, it's a partial application) *)
 let rec _match_list subst l_expected s_e l_arg s_a = match l_expected, l_arg with
+  | [], [] -> subst
   | [], _ -> failwith "lambda_apply_list: too many arguments"
   | _, [] -> subst   (* all arguments pass *)
   | ty::l_expected', arg::l_arg' ->
