@@ -29,6 +29,7 @@ open Logtk
 
 module A = Ast_theory
 module T = HOTerm
+module UT = Untyped.HO
 module F = FOFormula
 module MRT = MetaReasoner.Translate
 
@@ -339,7 +340,8 @@ let _compile_clause (Clause (head,body)) =
 let add_axioms reasoner axioms =
   let open MRT in
   AxiomMap.iter axioms
-    (fun _ (Axiom (s, left, p, right)) ->
+    (fun _ (Axiom (s, left, p, right) as a) ->
+      Util.debug 4 "add %a to KB" pp_axiom a;
       let concl = encode mapping_axiom "axiom" (s, left) in
       let premises = [encode_premise (IfPattern (p, right))] in
       let clause = MetaReasoner.Logic.mk_clause concl premises in
@@ -347,7 +349,8 @@ let add_axioms reasoner axioms =
 and add_theories reasoner theories =
   let open MRT in
   TheoryMap.iter theories
-    (fun _ (Theory (s, args, premises)) ->
+    (fun _ (Theory (s, args, premises) as th) ->
+      Util.debug 4 "add %a to KB" pp_theory th;
       let concl = encode mapping_theory "theory" (s, args) in
       let premises = List.map encode_premise premises in
       let clause = MetaReasoner.Logic.mk_clause concl premises in
@@ -355,8 +358,9 @@ and add_theories reasoner theories =
 and add_lemmas reasoner lemmas =
   let open MRT in
   LemmaSet.iter
-    (fun (Lemma (p, args, premises)) ->
+    (fun (Lemma (p, args, premises) as l) ->
       (* add definition of lemma *)
+      Util.debug 4 "add %a to KB" pp_lemma l;
       let concl = encode mapping_lemma "lemma" (p, args) in
       let premises = List.map encode_premise premises in
       let clause = MetaReasoner.Logic.mk_clause concl premises in
@@ -526,120 +530,160 @@ let fmap_premises f premises =
       | IfPattern (p, l) -> IfPattern (p, List.map f l))
     premises
 
-(** Map the terms to fresh variables, returning a permutation
-    FIXME use proper types, or type variables? *)
-let map_to_vars ?(offset=0) terms =
-  let vars = List.mapi
-    (fun i _ ->
-      let ty = Type.var i in
-      T.mk_var ~ty (i+offset))
-    terms
-  in
-  TBij.of_list terms vars
+(** Mapping from symbols to variables. Used for compilation *)
+module MapToVar = struct
+  type t = (Symbol.t * HOTerm.t) list
+
+  let empty = []
+
+  (* map to *untyped* variables. Type checking should be outside... *)
+  let add_terms map terms =
+    List.fold_left
+      (fun map t -> match t.T.term with
+        | T.Const s when not (Symbol.Arith.is_arith s) ->
+          (* map symbol to a fresh var *)
+          if List.mem_assq s map
+            then map
+            else
+              let v = T.mk_var ~ty:Type.i (List.length map) in  (* fresh var *)
+              (s, v) :: map
+        | _ -> map)
+      map terms
+
+  let of_list terms = add_terms [] terms
+
+  let apply map t = match t.T.term with
+    | T.Const s ->
+      begin try List.assq s map
+      with Not_found -> t
+      end
+    | _ -> t
+
+  let apply_list map l = List.map (apply map) l
+end
 
 let str_to_terms l =
-  List.map (fun s -> T.mk_const ~ty:Type.i (Symbol.mk_const s)) l
+  List.map (fun s -> UT.const (Symbol.mk_const s)) l
 
+let closure_of_terms ctx l =
+  let l = List.map (fun t -> snd (TypeInference.HO.infer ctx t 0)) l in
+  TypeInference.TraverseClosure.seq l
 
-(* FIXME: we need to build closures locally, so that we can generalize
-  after the {b whole} statement is type-checked. *)
+(* type inference closure of a premise *)
+let closure_of_premise ctx p =
+  let open TypeInference.Closure in
+  match p with
+  | A.IfPattern f ->
+    TypeInference.FO.infer_form ctx f 0 >>= fun f' ->
+    let f' = MetaPattern.EncodedForm.encode f' in
+    let pat, args = MetaPattern.create f' in
+    return (IfPattern (pat, args))
+  | A.IfAxiom (s, args) ->
+    closure_of_terms ctx (str_to_terms args) >>= fun args ->
+    return (IfAxiom (s, args))
+  | A.IfTheory (s, args) ->
+    closure_of_terms ctx (str_to_terms args) >>= fun args ->
+    return (IfTheory (s, args))
 
-(* TODO: wrap into try/with to print type errors within a context,
-    so we know where the type error is *)
+let closure_of_premises ctx l =
+  let l = List.map (closure_of_premise ctx) l in
+  TypeInference.TraverseClosure.seq l
 
-(** Conversion of a list of Ast_theory.statement to a KB *)
-let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
-  let base = Signature.curry base in
-  let ctx = TypeInference.Ctx.of_signature base in
-  let convert_premise = function
-    | A.IfPattern f ->
-      let f = TypeInference.FO.convert_form ~generalize:true ~ctx f in
-      let f' = MetaPattern.EncodedForm.encode f in
-      let pat, args = MetaPattern.create f' in
-      IfPattern (pat, args)
-    | A.IfAxiom (s, args) ->
-      let args = str_to_terms args in
-      IfAxiom (s, args)
-    | A.IfTheory (s, args) ->
-      let args = str_to_terms args in
-      IfTheory (s, args)
-  in
-  let add_statement kb statement =
-    Util.debug 3 "metaKB: add statement %a" A.pp statement;
-    (* infer types *)
-    match statement with
-    | A.Axiom (s, args, f) ->
-      (* convert axiom *)
-      let left = str_to_terms args in
-      let f = TypeInference.FO.convert_form ~generalize:true ~ctx f in
-      let f' = MetaPattern.EncodedForm.encode f in
-      let p, right = MetaPattern.create f' in
-      (* map to variables *)
-      let perm = map_to_vars left in
-      (* replace by variables *)
-      let new_left = TBij.apply_list perm left in
-      let new_right = TBij.apply_list perm right in
-      (* build axiom *)
-      let axiom = Axiom (s, new_left, p, new_right) in
-      add_axiom kb axiom
-    | A.LemmaInline (f, premises) ->
-      (* describe a lemma *)
-      let f = TypeInference.FO.convert_form ~generalize:true ~ctx f in
-      let f' = MetaPattern.EncodedForm.encode f in
-      let pat, args = MetaPattern.create f' in
-      let premises = List.map convert_premise premises in
-      let args' = gather_premises_terms premises in
-      assert (List.for_all (fun t -> List.memq t args') args);  (* check safe *)
-      (* map args' to fresh variables *)
-      let perm = map_to_vars args' in
-      let new_premises = fmap_premises (TBij.apply perm) premises in
-      let lemma = Lemma (pat, TBij.apply_list perm args, new_premises) in
-      add_lemma kb lemma
-    | A.Lemma (s, args, premises) ->
-      let args = str_to_terms args in
-      let premises = List.map convert_premise premises in
-      let l = gather_premises_terms premises in
-      assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
-      (* map symbols to variables *)
-      let perm = map_to_vars l in
-      let new_premises = fmap_premises (TBij.apply perm) premises in
-      let new_args = TBij.apply_list perm args in
-      begin match get_axiom kb s with
+(* given an Ast_theory.statement, return a closure of kb->kb *)
+let closure_of_statement ctx statement =
+  let open TypeInference.Closure in
+  (* be sure that the variables are polymorphic *)
+  let statement = A.generalize_statement statement in
+  match statement with
+  | A.Axiom (s, args, f) ->
+    (* convert axiom *)
+    TypeInference.FO.infer_form ctx f 0 >>= fun f' ->
+    closure_of_terms ctx (str_to_terms args) >>= fun left ->
+    let f' = MetaPattern.EncodedForm.encode f' in
+    let p, right = MetaPattern.create f' in
+    (* map to variables *)
+    let perm = MapToVar.of_list left in
+    (* replace by variables *)
+    let new_left = MapToVar.apply_list perm left in
+    let new_right = MapToVar.apply_list perm right in
+    (* build axiom *)
+    let axiom = Axiom (s, new_left, p, new_right) in
+    return (fun kb -> add_axiom kb axiom)
+  | A.LemmaInline (f, premises) ->
+    (* describe a lemma *)
+    TypeInference.FO.infer_form ctx f 0 >>= fun f' ->
+    closure_of_premises ctx premises >>= fun premises' ->
+    let f' = MetaPattern.EncodedForm.encode f' in
+    let pat, args = MetaPattern.create f' in
+    let args' = gather_premises_terms premises' in
+    (* assert (List.for_all (fun t -> List.memq t args') args);  (* check safe *) *)
+    (* map args' to fresh variables *)
+    let perm = MapToVar.of_list args' in
+    let new_premises = fmap_premises (MapToVar.apply perm) premises' in
+    let lemma = Lemma (pat, MapToVar.apply_list perm args, new_premises) in
+    return (fun kb -> add_lemma kb lemma)
+  | A.Lemma (s, args, premises) ->
+    closure_of_terms ctx (str_to_terms args) >>= fun args ->
+    closure_of_premises ctx premises >>= fun premises ->
+    let l = gather_premises_terms premises in
+    (* assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *) *)
+    (* map symbols to variables *)
+    let perm = MapToVar.of_list l in
+    let new_premises = fmap_premises (MapToVar.apply perm) premises in
+    let new_args = MapToVar.apply_list perm args in
+    return
+      (fun kb -> match get_axiom kb s with
       | [] -> failwith (Util.sprintf "axiom %s is not defined" s)
       | (Axiom _ as axiom) :: _ ->
         (* use the first axiom definition to get a proper pattern *)
         let pat, args' = apply_axiom axiom new_args in 
         let lemma = Lemma (pat, args', new_premises) in
-        add_lemma kb lemma
-      end
-    | A.Theory (s, args, premises) ->
-      let args = str_to_terms args in
-      let premises = List.map convert_premise premises in
-      let l = gather_premises_terms premises in
-      assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *)
-      (* map symbols to variables *)
-      let perm = map_to_vars l in
-      let new_premises = fmap_premises (TBij.apply perm) premises in
-      let new_args = TBij.apply_list perm args in
-      let theory = Theory (s, new_args, new_premises) in
-      add_theory kb theory
-    | A.Clause (head, body) ->
-      let c = Clause (head, body) in
-      add_clause kb c
-    | A.Include _ -> failwith "KB.kb_of_statements: remaining includes"
-    | A.Error _ -> failwith "KB.kb_of_statements: error in list"
+        add_lemma kb lemma)
+  | A.Theory (s, args, premises) ->
+    closure_of_premises ctx premises >>= fun premises ->
+    closure_of_terms ctx (str_to_terms args) >>= fun args ->
+    let l = gather_premises_terms premises in
+    (* assert (List.for_all (fun t -> List.memq t l) args);  (* check safe *) *)
+    (* map symbols to variables *)
+    let perm = MapToVar.of_list l in
+    let new_premises = fmap_premises (MapToVar.apply perm) premises in
+    let new_args = MapToVar.apply_list perm args in
+    let theory = Theory (s, new_args, new_premises) in
+    return (fun kb -> add_theory kb theory)
+  | A.Clause (head, body) ->
+    let c = Clause (head, body) in
+    return (fun kb -> add_clause kb c)
+  | A.Include _ -> failwith "KB.kb_of_statements: remaining includes"
+  | A.Error _ -> failwith "KB.kb_of_statements: error in list"
+
+(** Conversion of a list of Ast_theory.statement to a KB *)
+let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
+  (* deal with a single statement *)
+  let add_statement kb statement =
+    Util.debug 3 "metaKB: add statement %a" A.pp statement;
+    (* context is local *)
+    let ctx = TypeInference.Ctx.of_signature base in
+    let closure = closure_of_statement ctx statement in
+    (* generalize types as much as possible *)
+    TypeInference.Ctx.generalize ctx;
+    let modify_kb = TypeInference.Ctx.apply_closure ctx closure in
+    modify_kb kb
   in
   (* error monad *)
   let module Err = Monad.Err in
   Monad.TraverseErr.fold
     statements (Monad.Err.return init)
     (fun kb stmt ->
-        try Err.return (add_statement kb stmt)
-        with TypeUnif.Error e ->
-          let msg = Util.sprintf "typing statement %a: error %a"
-            A.pp stmt TypeUnif.pp_error e
-          in
-          Err.fail msg)
+      try Err.return (add_statement kb stmt)
+      with TypeUnif.Error e ->
+        let msg = Util.sprintf "typing statement %a: error %a"
+          A.pp stmt TypeUnif.pp_error e in
+        Util.debug 2 "stacktrace: %s" (Printexc.get_backtrace ());
+        Err.fail msg
+      | Failure msg ->
+        let msg = Util.sprintf "converting statement %a: error %s" A.pp stmt msg in
+        Util.debug 2 "stacktrace: %s" (Printexc.get_backtrace ());
+        Err.fail msg)
 
 (** {2 IO} *)
 

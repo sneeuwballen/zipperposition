@@ -99,3 +99,20 @@ let pp buf statement =
 let pp_statements buf statements =
   let pp_stmt buf st = Printf.bprintf buf "%a\n" pp st in
   Util.pp_list pp_stmt buf statements
+
+(** Generalize the variables occurring in the statement *)
+let generalize_statement stmt =
+  let generalize_premise p = match p with
+  | IfPattern f -> IfPattern (UF.generalize_vars f)
+  | IfAxiom _
+  | IfTheory _ -> p
+  in
+  let generalize_premises = List.map generalize_premise in
+  match stmt with
+  | Lemma (n,l, premises) -> Lemma (n,l, generalize_premises premises)
+  | LemmaInline(f, premises) -> LemmaInline(UF.generalize_vars f, generalize_premises premises)
+  | Axiom (n,l, f) -> Axiom (n,l, UF.generalize_vars f)
+  | Theory (n,l, premises) -> Theory (n,l, generalize_premises premises)
+  | Clause _
+  | Include _
+  | Error _ -> stmt
