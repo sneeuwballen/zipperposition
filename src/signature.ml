@@ -115,10 +115,6 @@ let well_founded s =
     (fun _ ty -> Type.arity ty = 0)
     s
 
-let curry s = SMap.map Type.curry s
-
-let uncurry s = SMap.map Type.uncurry s
-
 let to_symbols signature =
   SMap.fold (fun s _ l -> s :: l) signature []
 

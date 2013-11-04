@@ -39,6 +39,30 @@ type scope = Substs.scope
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 
+(** {2 Closures} *)
+
+module Closure = struct
+  type 'a t = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
+    (** Function that returns a ['a] value if provided with a proper
+        type substitution *)
+
+  let return x = fun _ _ -> x
+
+  let map clos f =
+    fun renaming subst ->
+      f (clos renaming subst)
+
+  let (>>=) clos f =
+    fun renaming subst ->
+      let x = clos renaming subst in
+      f x renaming subst
+
+  let pure_ty ty s_ty =
+    fun renaming subst -> Substs.Ty.apply subst ~renaming ty s_ty
+end
+
+module TraverseClosure = Monad.Traverse(Closure)
+
 (** {2 Typing context}
 
 The scope maintained by the typing context starts at 1.
@@ -266,15 +290,11 @@ end
 
 (** {2 Hindley-Milner} *)
 
-type 'a closure = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
-  (** Function that returns a ['a] value if provided with a proper
-      type substitution *)
-
 module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : Ctx.t -> untyped -> scope -> Type.t * typed closure
+  val infer : Ctx.t -> untyped -> scope -> Type.t * typed Closure.t
     (** Infer the type of this term under the given signature. This updates
         the context's typing environment! The resulting type's variables
         belong to the given scope.

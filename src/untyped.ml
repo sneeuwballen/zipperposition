@@ -215,7 +215,7 @@ module Form = struct
     | Bool false -> Buffer.add_string buf "$false"
     | Nary (And, l) -> Util.pp_list ~sep:" & " pp_tstp_inner buf l
     | Nary (Or, l) -> Util.pp_list ~sep:" | " pp_tstp_inner buf l
-    | Atom t -> FO.pp buf t
+    | Atom t -> FO.pp_tstp buf t
     | Binary (Imply, f1, f2) ->
       Printf.bprintf buf "%a | %a" pp_tstp_inner f1 pp_tstp_inner f2
     | Binary (Equiv, f1, f2) ->
@@ -263,7 +263,7 @@ module HO = struct
   let const s = Const s
 
   let rec app a l = match a with
-    | App (a', l') -> app a' (l @ l')   (* no nested apps *)
+    | App (a', l') -> app a' (l' @ l)   (* no nested apps *)
     | _ ->
       begin match l with
       | [] -> a
@@ -299,8 +299,43 @@ module HO = struct
       Lambda (var, _replace_var var t)
     | _ -> failwith "Untyped.HO.lambda: expect (var, term)"
 
+  let true_term = const (Symbol.true_symbol)
+  let false_term = const (Symbol.false_symbol)
+
   let forall ~var t = at (const Symbol.forall_symbol) (lambda ~var t)
   let exists ~var t = at (const Symbol.exists_symbol) (lambda ~var t)
+
+  let rec forall_list vars t = match vars with
+    | [] -> t
+    | var::vars' -> forall ~var (forall_list vars' t)
+
+  let rec exists_list vars t = match vars with
+    | [] -> t
+    | var::vars' -> exists ~var (exists_list vars' t)
+
+  let rec of_term t = match t with
+    | FO.Var (n, ty) -> var ~ty n
+    | FO.App (s, l) -> app (const s) (List.map of_term l)
+
+  let rec of_form f = match f with
+    | Form.Bool true -> true_term
+    | Form.Bool false -> false_term
+    | Form.Nary (Form.And, l) ->
+      app (const Symbol.and_symbol) (List.map of_form l)
+    | Form.Nary (Form.Or, l) ->
+      app (const Symbol.or_symbol) (List.map of_form l)
+    | Form.Binary (Form.Equiv, f1, f2) ->
+      app (const Symbol.equiv_symbol) [of_form f1; of_form f2]
+    | Form.Binary (Form.Imply, f1, f2) ->
+      app (const Symbol.imply_symbol) [of_form f1; of_form f2]
+    | Form.Equal (t1, t2) ->
+      app (const Symbol.eq_symbol) [of_term t1; of_term t2]
+    | Form.Not f' -> at (const Symbol.not_symbol) (of_form f')
+    | Form.Atom p -> of_term p
+    | Form.Quant (Form.Forall, l, f') ->
+      forall_list (List.map of_term l) (of_form f')
+    | Form.Quant (Form.Exists, l, f') ->
+      exists_list (List.map of_term l) (of_form f')
 
   let rec pp buf t = match t with
     | Const s -> Symbol.pp buf s

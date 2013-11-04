@@ -93,6 +93,10 @@ module Err = struct
   let (>>=) x f = match x with
     | Ok x' -> f x'
     | Error s -> Error s
+
+  let to_opt = function
+    | Ok x -> Some x
+    | Error _ -> None
 end
 
 (** {2 List monad} *)
@@ -125,6 +129,8 @@ module type TRAVERSE = sig
   val fold_l : 'a list -> 'b M.t -> ('b -> 'a -> 'b M.t) -> 'b M.t
 
   val map_l : 'a list -> ('a -> 'b M.t) -> 'b list M.t
+
+  val seq : 'a M.t list -> 'a list M.t
 end
 
 module Traverse(M : S) = struct
@@ -152,6 +158,15 @@ module Traverse(M : S) = struct
         M.return (x' :: l')
     in
     map l
+
+  open M
+
+  let rec seq l = match l with
+    | [] -> M.return []
+    | x::l' ->
+      x >>= fun x' ->
+      seq l' >>= fun l'' ->
+      M.return (x' :: l'')
 end
 
 module TraverseOpt = Traverse(Opt)

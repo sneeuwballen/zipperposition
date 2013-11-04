@@ -99,13 +99,6 @@ val arity : t -> int
 val is_ground : t -> bool
   (** Is the type ground? (means that no {!Var} occur in it) *)
 
-val curry : t -> t
-  (** Curry the type *)
-
-val uncurry : t -> t
-  (** Uncurry the type. It {b must} be curried.
-      @raise Failure if the type is not fully curried. *)
-
 val size : t -> int
   (** Size of type, in number of "nodes" *)
 

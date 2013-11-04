@@ -632,7 +632,7 @@ let close_exists t =
 
 (* Curry all subterms *)
 let rec curry t =
-  let ty = Type.curry (FOT.get_type t) in
+  let ty = FOT.get_type t in
   match t.FOT.term with
   | FOT.Var i -> mk_var ~ty i
   | FOT.BoundVar i -> mk_bound_var ~ty i
@@ -642,7 +642,7 @@ let rec curry t =
     mk_at (mk_const ~ty f) (List.map curry l)
 
 let rec uncurry t =
-  let ty = Type.uncurry t.ty in
+  let ty = t.ty in
   match t.term with
   | Var i -> FOT.mk_var ~ty i
   | BoundVar i -> FOT.mk_bound_var ~ty i

@@ -45,9 +45,29 @@ with the declared constructor [nil : list(A)]. The inferred type for
 
 type scope = Substs.scope
 
-type 'a closure = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
-  (** Function that returns a ['a] value if provided with a proper
-      type substitution and renaming *)
+(** {2 Closures} 
+A closure is a function that returns a ['a] value if provided with a proper
+type substitution and renaming. It is useful to delay the translation
+from untyped terms to typed terms, because locally we don't have applied all
+the type constraints resulting from the context yet. Therefore, when inferring
+the type of a subterm, we apply local constraints, and return a {b closure}
+that, given the final environment, converts the subterm into a typed term.
+
+For instance, if we infer the type of [nil] in the terms
+[cons(1, nil)] and [cons("foo", nil)], we can't infer the most specialized
+type for [nil] unless we also take its context (cons(_,_)) into account.
+The same closure will therefore be used to build [nil:$int] and [nil:$string]
+respectively.
+*)
+
+module Closure : sig
+  include Monad.S with type 'a t = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
+
+  val pure_ty : Type.t -> scope -> Type.t t
+    (** Evaluate the type,scope in some renaming,subst *)
+end
+
+module TraverseClosure : Monad.TRAVERSE with type 'a M.t = 'a Closure.t
 
 (** {2 Typing context}
 
@@ -111,7 +131,7 @@ module Ctx : sig
 
   val apply_closure : ?default:bool ->
                       ?renaming:Substs.Ty.Renaming.t ->
-                      t -> 'a closure -> 'a
+                      t -> 'a Closure.t -> 'a
     (** Apply the given closure to the substitution contained in the context
         (type constraints). A renaming can be provided
 
@@ -132,7 +152,7 @@ module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : Ctx.t -> untyped -> scope -> Type.t * typed closure
+  val infer : Ctx.t -> untyped -> scope -> Type.t * typed Closure.t
     (** Infer the type of this term under the given signature. This updates
         the context's typing environment! The resulting type's variables
         belong to the given scope.
@@ -163,7 +183,7 @@ end
 module FO : sig
   include S with type untyped = Untyped.FO.t and type typed = FOTerm.t
 
-  val infer_form : Ctx.t -> Untyped.Form.t -> scope -> FOFormula.t closure
+  val infer_form : Ctx.t -> Untyped.Form.t -> scope -> FOFormula.t Closure.t
     (** Inferring the type of a formula is trivial, it's always {!Type.o}.
         However, here we can still return a closure that produces a
         type formula *)

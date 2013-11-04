@@ -132,9 +132,18 @@ module HO : sig
   val at : t -> t -> t
   val var : ty:Type.Parsed.t -> string -> t
 
+  val true_term : t
+  val false_term : t
+
   val forall : var:t -> t -> t
   val exists : var:t -> t -> t
   val lambda : var:t -> t -> t
+
+  val forall_list : t list -> t -> t
+  val exists_list : t list -> t -> t
+
+  val of_term : FO.t -> t
+  val of_form : Form.t -> t
   
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit

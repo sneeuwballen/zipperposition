@@ -105,8 +105,10 @@ let rec (<==) ret args =
     match ret with
     | Fun (ret', args') ->
       (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
-          constructor invariant *)
-      ret' <== (args' @ args)
+          constructor invariant. [args] must be applied before [args']
+          need to be supplied.
+          Example: [(a <- b) <- c] requires [c] first *)
+      ret' <== (args @ args')
     | _ -> H.hashcons (Fun (ret, args))
 
 let (<=.) ret arg = ret <== [arg]
@@ -156,31 +158,6 @@ let rec is_ground t = match t with
   | App (_, []) -> true
   | App (_, l) -> List.for_all is_ground l
   | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
-
-let rec curry ty = match ty with
-  | Var _ -> ty
-  | App (s, l) -> app s (List.map curry l)
-  | Fun (ret, l) ->
-    List.fold_left
-      (fun ret arg -> mk_fun ret [curry arg])
-      (curry ret) l
-
-let rec uncurry ty = match ty with
-  | App (_, [])
-  | Var _ -> ty
-  | App (s, l) -> app s (List.map uncurry l)
-  | Fun _ ->
-    begin match _gather_uncurry ty [] with
-    | [] -> failwith "Type.uncurry: expected curried type"
-    | ret::args -> mk_fun (uncurry ret) args
-    end
-(* given a curried function type, recover all its argument types into
-    a list prepended to [acc] *)
-and _gather_uncurry ty acc = match ty with
-  | Var _
-  | App _ -> uncurry ty :: acc  (* proper return value *)
-  | Fun (ret, [arg]) -> _gather_uncurry ret (uncurry arg :: acc)
-  | Fun _ -> uncurry ty :: acc (* consider this as a single argument *)
 
 let rec size ty = match ty with
   | Var _
@@ -277,7 +254,12 @@ module Parsed = struct
 
   let mk_fun ret l = match l with
     | [] -> ret
-    | _ -> Fun (ret, l)
+    | _ ->
+      (* see {!(<==)} for the invariants *)
+      begin match ret with
+      | Fun (ret', l') -> Fun (ret', l @ l')
+      | _ -> Fun (ret, l)
+      end
 
   let (<==) = mk_fun
   let (<=.) a b = mk_fun a [b]

@@ -78,6 +78,8 @@ module Err : sig
 
   val fail : string -> 'a t
   val fail_exn : exn -> 'a t
+
+  val to_opt : 'a t -> 'a option
 end
 
 (** {2 Monadic traversal}
@@ -92,6 +94,8 @@ module type TRAVERSE = sig
   val fold_l : 'a list -> 'b M.t -> ('b -> 'a -> 'b M.t) -> 'b M.t
 
   val map_l : 'a list -> ('a -> 'b M.t) -> 'b list M.t
+
+  val seq : 'a M.t list -> 'a list M.t
 end
 
 module Traverse(M : S) : TRAVERSE with module M = M

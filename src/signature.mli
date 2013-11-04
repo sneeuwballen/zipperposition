@@ -80,12 +80,6 @@ val well_founded : t -> bool
       @return true iff the Herbrand term universe of this signature is
         non empty  *)
 
-val curry : t -> t
-  (** Curry all types occurring in the signature *)
-
-val uncurry : t -> t
-  (** Uncurry all types occurring in the signature *)
-
 val to_symbols : t -> Symbol.t list
   (** extract the list of symbols from the complete signature *)
 

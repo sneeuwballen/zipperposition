@@ -135,7 +135,8 @@ let mk_atom p = match p with
   | _ when T.eq p T.false_term -> mk_false
   | _ -> 
     if not (Type.eq p.T.ty Type.o)
-      then failwith "Formula.mk_atom: expected boolean term";
+      then failwith
+        (Util.sprintf "Formula.mk_atom: expected boolean term, got %a" T.pp p);
     let flags =
       if T.is_ground p
         then flag_simplified lor flag_ground
@@ -609,8 +610,8 @@ let to_term f =
     | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
     | Equal (t1, t2) -> T.mk_eq (T.curry t1) (T.curry t2)
     | Not f' -> T.mk_not (to_term f')
-    | Forall (ty,f') -> T.mk_forall ~varty:(Type.curry ty) (to_term f')
-    | Exists (ty,f') -> T.mk_exists ~varty:(Type.curry ty) (to_term f')
+    | Forall (ty,f') -> T.mk_forall ~varty:ty (to_term f')
+    | Exists (ty,f') -> T.mk_exists ~varty:ty (to_term f')
     | Atom p -> T.curry p)
     f
 
@@ -623,11 +624,11 @@ let of_term t =
     let ty = T.lambda_var_ty lam in
     mk_forall ~ty (recurse t')
   | T.At ({T.term=T.Const s}, [{T.term=T.Lambda t'} as lam]) when S.eq s S.exists_symbol ->
-    let ty = Type.uncurry (T.lambda_var_ty lam) in
+    let ty = T.lambda_var_ty lam in
     mk_exists ~ty (recurse t')
   | T.Lambda _ -> failwith "FOFormula.of_term: unexpected lambda term"
   | T.Const s ->
-    let ty = Type.uncurry (T.get_type t) in
+    let ty = T.get_type t in
     mk_atom (FOTerm.mk_const ~ty s)
   | T.Var _ | T.BoundVar _ -> failwith "F.of_term: not first-order, var under formula"
   | T.At ({T.term=T.Const s}, l) when S.eq s S.and_symbol ->
