@@ -207,6 +207,13 @@ val str_find : ?start:int -> sub:string -> string -> int
 val str_repeat : string -> int -> string
   (** The same char, repeated n times *)
 
+(** {2 Exceptions} *)
+
+val finally : h:(unit -> unit) -> f:(unit -> 'a) -> 'a
+  (** [finally h f] calls [f ()] and returns its result. If it raises, the
+      same exception is raised; in {b any} case, [h ()] is called after
+      [f ()] terminates. *)
+
 (** {2 File utils} *)
 
 val with_lock_file : string -> (unit -> 'a) -> 'a

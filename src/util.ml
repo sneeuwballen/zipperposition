@@ -503,6 +503,17 @@ let str_repeat s n =
   done;
   buf
 
+(** {2 Exceptions} *)
+
+let finally ~h ~f =
+  try
+    let x = f () in
+    h ();
+    x
+  with e ->
+    h ();
+    raise e
+
 (** {2 File utils} *)
 
 let with_lock_file filename action =
