@@ -122,11 +122,14 @@ end
 module OrderedInt = struct type t = int let compare i j = i-j end
 module IntFingerprint = Fingerprint.Make(OrderedInt)
 module BenchFingerprint = MakeIdxBench(IntFingerprint)
+module IntFastFingerprint = FastFingerprint.Make(OrderedInt)
+module BenchFastFingerprint = MakeIdxBench(IntFastFingerprint)
 
 let bench_idx n =
   let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
   Bench.bench
     [ Util.sprintf "bench_fingerprint_%d" n, BenchFingerprint.bench terms
+    ; Util.sprintf "bench_fast_fingerprint_%d" n, BenchFastFingerprint.bench terms
     ]
 
 (** {2 Type checking} *)

@@ -136,12 +136,155 @@ module TestUnit(I : UnitIndex) = struct
     ]
 end
 
+(* test term index *)
+
+module type TermIndex = sig
+  include Index.TERM_IDX with type elt = int
+  val name : string
+end
+
+module TestTerm(I : TermIndex) = struct
+  (* lists of unique terms *)
+  let gen low high = Arbitrary.(
+    list ~len:(low -- high) ArTerm.default >>= fun l ->
+    let set = T.Tbl.from_list l in
+    let seq = T.Tbl.to_seq set in
+    let seq = Sequence.mapi (fun i t -> t, i) seq in
+    return (Sequence.persistent seq))
+
+  let pp seq =
+    let pp buf (t,i) = Printf.bprintf buf "%a -> %d" T.pp t i in
+    Util.on_buffer (Util.pp_seq pp) seq
+
+  (* check that the size of index is correct *)
+  let check_size_add =
+    let prop seq =
+      let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
+      Sequence.length seq = I.size idx
+    in
+    let name = Util.sprintf "index(%s)_size_after_add" I.name in
+    mk_test ~name (gen 10 100) prop
+
+  (* list of (term,int) that can be retrieved using [retrieve] in [t] *)
+  let find_all retrieve idx s_idx t s_t =
+    retrieve ?subst:None idx s_idx t s_t []
+      (fun acc t' i _ -> (t', i) :: acc)
+
+  (* check that at least the terms are retrieved *)
+  let check_gen_retrieved_member =
+    let prop seq =
+      let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
+      Sequence.for_all
+        (fun (t,i) ->
+          let retrieved = find_all I.retrieve_unifiables idx 0 t 1 in
+          (* [i] must occur in the list *)
+          List.exists (fun (_, i') -> i=i') retrieved)
+      seq
+    in
+    let name = Util.sprintf "index(%s)_gen_retrieved_member" I.name in
+    mk_test ~name (gen 10 100) prop
+
+  (* check that the retrieved terms satisfy the given properry w.r.t the query *)
+  let _check_all_retrieved_satisfy retrieve check seq =
+    let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
+    Sequence.for_all
+      (fun (t,i) ->
+        let retrieved = find_all retrieve idx 1 t 0 in
+        (* all terms must match [t] *)
+        List.for_all
+          (fun (t',_) ->
+            try ignore (check t 0 t' 1); true
+            with FOUnif.Fail ->
+              false)
+          retrieved)
+    seq
+
+  (* check that all terms that satisfy the relation with query are retrieved *)
+  let _check_all_satisfying_are_retrieved retrieve check seq =
+    let idx = Sequence.fold (fun idx (t,i) -> I.add idx t i) (I.empty ()) seq in
+    Sequence.for_all
+      (fun (t,_) ->
+        let retrieved = find_all retrieve idx 1 t 0 in
+        Sequence.for_all
+          (fun (t',i') ->
+            try
+              let _ = check t 0 t' 1 in
+              List.exists
+                (fun (_,i'') -> i' = i'')
+                retrieved
+            with FOUnif.Fail -> true)
+          seq)
+      seq
+
+  let _match_flip ?subst t1 s_1 t2 s_2 =
+    FOUnif.matching ?subst t2 s_2 t1 s_1
+
+  let size = Sequence.length
+  let pp l =
+    Util.on_buffer
+      (fun buf l -> Util.pp_seq
+        (fun buf (t,i) -> Printf.bprintf buf "%a -> %d" T.pp t i) buf l) l
+
+  let _limit = 0
+
+  let check_retrieved_unify =
+    let prop = _check_all_retrieved_satisfy I.retrieve_unifiables FOUnif.unification in
+    let name = Util.sprintf "index(%s)_retrieve_imply_unify" I.name in
+    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+
+  let check_retrieved_specializations =
+    let prop = _check_all_retrieved_satisfy I.retrieve_specializations FOUnif.matching in
+    let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
+    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+
+  let check_retrieved_generalizations =
+    let prop = _check_all_retrieved_satisfy I.retrieve_generalizations _match_flip in
+    let name = Util.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
+    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+
+  let check_retrieve_all_unify =
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_unifiables FOUnif.unification in
+    let name = Util.sprintf "index(%s)_retrieve_imply_unify" I.name in
+    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+
+  let check_retrieve_all_specializations =
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_specializations FOUnif.matching in
+    let name = Util.sprintf "index(%s)_retrieve_imply_specializations" I.name in
+    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+
+  let check_retrieve_all_generalizations =
+    let prop = _check_all_satisfying_are_retrieved I.retrieve_generalizations _match_flip in
+    let name = Util.sprintf "index(%s)_retrieve_imply_generalizations" I.name in
+    mk_test ~name ~limit:_limit ~size ~pp (gen 10 150) prop
+
+  (* check the matching of generalization *)
+  let props =
+    [ check_size_add
+    ; check_retrieved_unify
+    ; check_retrieved_generalizations
+    ; check_retrieved_specializations
+    ; check_retrieve_all_unify
+    ; check_retrieve_all_generalizations
+    ; check_retrieve_all_specializations
+    ]
+end
+
+module OrderedInt = struct type t = int let compare i j = i-j end
+
+(** {2 Properties} *)
+
 let props =
   let module DT = struct include Dtree.Make(E) let name = "dtree" end in
   let module TestDtree = TestUnit(DT) in
   let module NPDT = struct include NPDtree.Make(E) let name = "npdtree" end in
   let module TestNPDtree = TestUnit(NPDT) in
+  let module IntFingerprint = Fingerprint.Make(OrderedInt) in
+  let module TestFingerprint = TestTerm(IntFingerprint) in
+  let module IntFastFingerprint = FastFingerprint.Make(OrderedInt) in
+  let module TestFastFingerprint = TestTerm(IntFastFingerprint) in
   QCheck.flatten
     [ TestDtree.props
     ; TestNPDtree.props
+    ; TestFingerprint.props
+    ; TestFastFingerprint.props
     ]
