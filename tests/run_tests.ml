@@ -49,9 +49,7 @@ let props = QCheck.flatten
   ; TestCongruence.props
   ]
 
-let specs =
-  [ "-debug", Arg.Int Util.set_debug, "set debug level"
-  ]
+let specs = Options.global_opts
 
 let _ =
   ignore (run_test_tt_main ~arg_specs:specs suite);
