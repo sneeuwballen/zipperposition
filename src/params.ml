@@ -46,7 +46,7 @@ type t = {
   param_expand_def : bool;        (** expand definitions *)
   param_arith : bool;             (** enable arith? *)
   param_arith_ac : bool;          (** enable AC axioms for arith? *)
-  param_stats : bool;             (** print stats? *)
+  param_stats : bool;
   param_presaturate : bool;       (** initial interreduction of proof state? *)
   param_unary_depth : int;        (** Maximum successive levels of unary inferences *)
 }
@@ -59,7 +59,6 @@ let parse_args () =
   in
   (* parameters *)
   let ord = ref "rpo6"
-  and debug = ref 1
   and seed = ref 1928575
   and steps = ref 0
   and version = ref false
@@ -116,19 +115,18 @@ let parse_args () =
     ; "-no-theories", Arg.Clear theories, "do not detect theories in input"
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
     ; "-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set"
+    ; "-stats", Arg.Set stats, "print statistics"
     ; "-dot", Arg.String (fun s -> dot_file := Some s) , "print final state to file in DOT"
     ; "-dot-sat", Arg.Set dot_sat, "print saturated set into DOT"
     ; "-seed", Arg.Set_int seed, "set random seed"
     ; "-unary-depth", Arg.Set_int unary_depth, "maximum depth for successive unary inferences"
     ] @ Options.global_opts
   in
+  Util.set_debug 1;  (* default *)
   Arg.parse options add_file "solve problems in files";
   if Vector.is_empty files
     then Vector.push files "stdin";
   let param_ord = Ordering.choose !ord in
-  (* debug level *)
-  Util.set_debug !debug;
-  Util.debug 1 "set debug level to %d" !debug;
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;

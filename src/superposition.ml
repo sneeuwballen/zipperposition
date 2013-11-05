@@ -285,9 +285,12 @@ let infer_equality_factoring clause =
         (* new_lits: literals of the new clause. remove active literal
            and replace it by a t!=v one, and apply subst *)
         and new_lits = Util.array_except_idx clause.C.hclits active_idx in
-        let new_lits = (Lit.mk_neq ~ord t v) :: new_lits in
-        let renaming = Ctx.renaming_clear ~ctx in
         let new_lits = Lit.apply_subst_list ~renaming ~ord subst new_lits 0 in
+        let lit' = Lit.mk_neq ~ord
+          (S.apply ~renaming subst t 0)
+          (S.apply ~renaming subst v 0)
+        in
+        let new_lits = lit' :: new_lits in
         let new_clause = C.create ~parents:[clause] ~ctx new_lits proof in
         Util.debug 3 "equality factoring on %a yields %a"
           C.pp clause C.pp new_clause;
