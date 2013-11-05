@@ -151,7 +151,10 @@ let mk_meta ~params =
     (* create meta *)
     let meta = MetaProverState.create () in
     (* handle KB *)
-    MetaProverState.parse_kb_file meta params.param_kb;
+    begin match MetaProverState.parse_kb_file meta params.param_kb with
+    | Monad.Err.Ok () -> ()
+    | Monad.Err.Error msg -> Util.debug 0 "error: %s" msg
+    end;
     (* read some theory files *)
     List.iter
       (fun file ->

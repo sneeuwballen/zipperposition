@@ -46,7 +46,7 @@ let axioms ~ctx s =
   let signature = Ctx.signature ~ctx in
   let ord = Ctx.ord ~ctx in
   let ty = Signature.find signature s in
-  match ty with
+  match ty.Type.ty with
   | Type.Fun (ret, [ret1;ret2]) when Type.eq ret ret1 && Type.eq ret ret2 ->
     (* type is ok. *)
     let x = T.mk_var ~ty:ret 0 in
