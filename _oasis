@@ -80,7 +80,7 @@ Executable run_bench
   CompiledObject: native
   MainIs: run_bench.ml
   Build$:   flag(bench) & flag(tests)
-  BuildDepends: logtk, bench
+  BuildDepends: logtk, bench, qcheck, logtk.arbitrary
 
 Test all
   Command: $run_tests

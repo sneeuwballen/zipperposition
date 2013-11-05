@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Benchmarks} *)
 
 open Logtk
+open Logtk_arbitrary
 
 module T = FOTerm
 
@@ -87,7 +88,7 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
   module Idx2 = I(E2)
 
   let bench_random n () =
-    let terms = QCheck.Arbitrary.generate ~rand:(mk_rand()) ~n T.arbitrary in
+    let terms = QCheck.Arbitrary.generate ~rand:(mk_rand()) ~n ArTerm.default in
     let idx = Idx2.add_seq Idx2.empty
       (Sequence.map (fun t -> t,()) (Sequence.of_list terms)) in
     List.iter
@@ -97,12 +98,22 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
     ()
 end
 
+let bench_type_inf n =
+  let terms = QCheck.Arbitrary.generate ~n ArTerm.ArbitraryUntyped.default in
+  let ctx = TypeInference.Ctx.create () in
+  List.iter
+    (fun t -> ignore (TypeInference.FO.infer ctx t 0))
+    terms;
+  ()
+
 let run_bench () =
   let module B_Dtree = MakeBench(Dtree.Make) in
   let module B_NPDtree = MakeBench(NPDtree.Make) in
   let conf = Bench.config in
   let old_sample = conf.Bench.samples in
   conf.Bench.samples <- 100;
+  let res = Bench.bench_arg ["type_inf_200", bench_type_inf, 200] in
+  Bench.summarize 1. res;
   Bench.bench
     [ "dtree_peano_1000", B_Dtree.bench_peano 1000
     ; "npdtree_peano_1000", B_NPDtree.bench_peano 1000

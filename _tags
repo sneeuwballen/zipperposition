@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 39ec0575e2cb39892f3fe3b4a93f7556)
+# DO NOT EDIT (digest: e2287b2a43f22b01fae44fbbddd900f7)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -102,8 +102,12 @@
 <src/arbitrary/*.ml{,i}>: pkg_num
 <src/arbitrary/*.ml{,i}>: pkg_str
 # Executable run_bench
+"tests/run_bench.native": use_logtk_arbitrary
+"tests/run_bench.native": use_logtk_meta
 "tests/run_bench.native": use_logtk
 "tests/run_bench.native": pkg_bench
+"tests/run_bench.native": pkg_qcheck
+"tests/run_bench.native": pkg_datalog
 "tests/run_bench.native": pkg_unix
 "tests/run_bench.native": pkg_num
 "tests/run_bench.native": pkg_str
