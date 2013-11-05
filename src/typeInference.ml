@@ -74,7 +74,6 @@ module Ctx = struct
     default : Type.t;               (* default type *)
     mutable scope : int;            (* next scope *)
     mutable var : int;              (* generate fresh vars *)
-    mutable db : (Type.t * scope) list;  (* types of bound variables (stack) *)
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
     mutable to_bind : (Type.t * scope) list;  (* constructor variables to bind *)
@@ -90,7 +89,6 @@ module Ctx = struct
       default;
       scope = ~-1;
       var = ~-1;
-      db = [];
       signature;
       subst = S.create 17;
       to_bind = [];
@@ -108,13 +106,16 @@ module Ctx = struct
   let clear ctx =
     ctx.scope <- 0;
     ctx.var <- ~-1;
-    ctx.db <- [];
     ctx.subst <- S.empty;
     ctx.to_bind <- [];
     STbl.clear ctx.symbols;
     ctx.signature <- Signature.empty;
     Hashtbl.clear ctx.tyctx;
+    Hashtbl.clear ctx.vars;
     ()
+
+  let exit_scope ctx =
+    Hashtbl.clear ctx.vars
 
   let add_signature ctx signature =
     ctx.signature <- Signature.merge ctx.signature signature;
@@ -163,6 +164,15 @@ module Ctx = struct
       Hashtbl.add ctx.vars name (n,ty);
       n, ty
 
+  (* enter new scope for the variable with this name *)
+  let _enter_var_scope ctx name ty =
+    let n = Hashtbl.length ctx.vars in
+    Hashtbl.add ctx.vars name (n,ty);
+    n
+
+  let _exit_var_scope ctx name =
+    Hashtbl.remove ctx.vars name
+
   (* unify within the context's substitution *)
   let unify ctx ty1 s1 ty2 s2 =
     Unif.unify ~subst:ctx.subst ty1 s1 ty2 s2
@@ -171,31 +181,6 @@ module Ctx = struct
   let unify_and_set ctx ty1 s1 ty2 s2 =
     let subst = unify ctx ty1 s1 ty2 s2 in
     ctx.subst <- subst
-
-  (* Provides a context, corresponding to a term binding environment.
-     Within the local context, the bound De Bruijn variable will
-     have the (type,scope) that are passed as arguments to the closure. *)
-  let within_binder ctx ~ty f =
-    let scope = _new_scope ctx in
-    ctx.db <- (ty, scope) :: ctx.db;
-    try
-      (* compute within scope *)
-      let x = f ty scope in
-      ctx.db <- List.tl ctx.db;
-      x
-    with e ->
-      ctx.db <- List.tl ctx.db;
-      raise e
-
-  (* The type of the bound variable of De Bruijn index [i].
-     {!within_binder} must have been used enough times before, so
-     that a type is attributed to the [i]-th bound variable.
-     @raise Invalid_argument if the [i]-th variable is not bound.*)
-  let db_type ctx i =
-    if i >= 0 && i < List.length ctx.db
-      then List.nth ctx.db i
-      else
-        failwith (Printf.sprintf "TypeInference.Ctx.db_type: idx %d not bound" i)
 
   (* If the function symbol has an unknown type, a fresh variable
      (in a fresh scope, that is) is returned. Otherwise the known
@@ -337,12 +322,6 @@ module FO = struct
     Ctx.unify_and_set ctx v scope ty' s';
     v
 
-  let _get_db ctx i scope =
-    let ty', s' = Ctx.db_type ctx i in
-    let v = Ctx._new_var ctx in
-    Ctx.unify_and_set ctx v scope ty' s';
-    v
-
   (* convert type *)
   let _get_ty ctx ty =
     Ctx._of_parsed ctx ty
@@ -382,8 +361,24 @@ module FO = struct
       in
       ty_ret, closure
 
+  let infer_var_scope ctx t s_t = match t with
+    | UT.Var (name, ty) ->
+      let ty = _get_ty ctx ty in
+      let i = Ctx._enter_var_scope ctx name ty in
+      let closure renaming subst =
+        let ty = Substs.Ty.apply ~renaming subst ty s_t in
+        T.mk_var ~ty i
+      in
+      closure
+    | _ -> assert false
+
+  let exit_var_scope ctx t = match t with
+    | UT.Var (name, _) -> Ctx._exit_var_scope ctx name
+    | _ -> assert false
+
   let infer ctx t s_t =
     Util.enter_prof prof_infer;
+    Util.debug 5 "infer_term %a" UT.pp t;
     try
       let ty, k = infer_rec ctx t s_t in
       Util.exit_prof prof_infer;
@@ -401,13 +396,13 @@ module FO = struct
     let ty1, _ = infer ctx t s_t in
     Ctx.unify_and_set ctx ty1 s_t ty s_ty
 
-  let rec infer_form ctx f s_f = match f with
+  let rec infer_form_rec ctx f s_f = match f with
     | UF.Bool b ->
       let closure renaming subst = if b then F.mk_true else F.mk_false in
       closure
     | UF.Nary (op, l) ->
       (* closures of sub formulas *)
-      let l' = List.map (fun f' -> infer_form ctx f' s_f) l in
+      let l' = List.map (fun f' -> infer_form_rec ctx f' s_f) l in
       let closure renaming subst =
         let l'' = List.map (fun f' -> f' renaming subst) l' in
         match op with
@@ -416,8 +411,8 @@ module FO = struct
       in
       closure
     | UF.Binary (op, f1, f2) ->
-      let closure_f1 = infer_form ctx f1 s_f in
-      let closure_f2 = infer_form ctx f2 s_f in
+      let closure_f1 = infer_form_rec ctx f1 s_f in
+      let closure_f2 = infer_form_rec ctx f2 s_f in
       let closure renaming subst =
         let f1' = closure_f1 renaming subst in
         let f2' = closure_f2 renaming subst in
@@ -427,7 +422,7 @@ module FO = struct
       in
       closure
     | UF.Not f' ->
-      let closure_f' = infer_form ctx f' s_f in
+      let closure_f' = infer_form_rec ctx f' s_f in
       (fun renaming subst -> F.mk_not (closure_f' renaming subst))
     | UF.Atom p ->
       let ty, clos = infer ctx p s_f in
@@ -445,8 +440,12 @@ module FO = struct
       in
       closure
     | UF.Quant (op, vars, f') ->
-      let _, clos_vars = List.split (List.map (fun t -> infer ctx t s_f) vars) in
-      let clos_f = infer_form ctx f' s_f in
+      let clos_vars = List.map (fun t -> infer_var_scope ctx t s_f) vars in
+      let clos_f =
+        Util.finally
+          ~h:(fun () -> List.iter (fun t -> exit_var_scope ctx t) vars)
+          ~f:(fun () -> infer_form_rec ctx f' s_f)
+      in
       let closure renaming subst =
         let vars' = List.map (fun c -> c renaming subst) clos_vars in
         let f' = clos_f renaming subst in
@@ -455,6 +454,11 @@ module FO = struct
         | UF.Exists -> F.mk_exists_list vars' f'
       in
       closure
+
+  let infer_form ctx f s_f =
+    Util.debug 5 "infer_form %a" UF.pp f;
+    let c_f = infer_form_rec ctx f s_f in
+    c_f
 
   let constrain_form ctx f =
     let _ = infer_form ctx f 0 in
@@ -477,6 +481,7 @@ module FO = struct
 
   let convert_clause ?(generalize=false) ~ctx c =
     let closures = List.map (fun lit -> infer_form ctx lit 0) c in
+    Ctx.exit_scope ctx;
     (* use same renaming for all formulas, to keep
       a consistent scope *)
     let renaming = Ctx.renaming_clear ctx in
@@ -505,15 +510,24 @@ module HO = struct
     Ctx.unify_and_set ctx v scope ty' s';
     v
 
-  let _get_db ctx i scope =
-    let ty', s' = Ctx.db_type ctx i in
-    let v = Ctx._new_var ctx in
-    Ctx.unify_and_set ctx v scope ty' s';
-    v
-
   (* convert type *)
   let _get_ty ctx ty =
     Ctx._of_parsed ctx ty
+
+  let infer_var_scope ctx t s_t = match t with
+    | UT.Var (name, ty) ->
+      let ty = _get_ty ctx ty in
+      let i = Ctx._enter_var_scope ctx name ty in
+      let closure renaming subst =
+        let ty = Substs.Ty.apply ~renaming subst ty s_t in
+        T.mk_var ~ty i
+      in
+      ty, closure
+    | _ -> assert false
+
+  let exit_var_scope ctx t = match t with
+    | UT.Var (name, _) -> Ctx._exit_var_scope ctx name
+    | _ -> assert false
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
     continuation to build a typed term
@@ -551,8 +565,11 @@ module HO = struct
       in
       ty_ret, closure
     | UT.Lambda (v, t) ->
-      let ty_t, clos_t = infer_rec ctx t s_t in
-      let ty_v, clos_v = infer_rec ctx v s_t in
+      let ty_v, clos_v = infer_var_scope ctx v s_t in
+      let ty_t, clos_t = Util.finally
+        ~f:(fun () -> infer_rec ctx t s_t)
+        ~h:(fun () -> exit_var_scope ctx v)
+      in
       (* type is ty_v -> ty_t *)
       let ty = Type.(ty_t <=. ty_v) in
       let closure renaming subst =
@@ -564,11 +581,14 @@ module HO = struct
 
   let infer ctx t s_t =
     Util.enter_prof prof_infer;
+    Util.debug 5 "infer_term %a" UT.pp t;
     try
       let ty, k = infer_rec ctx t s_t in
+      Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
       ty, k
     with e ->
+      Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
       raise e
 

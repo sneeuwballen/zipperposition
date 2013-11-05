@@ -95,6 +95,9 @@ module Ctx : sig
   val clear : t -> unit
     (** Remove every data from the context. It is as new. *)
 
+  val exit_scope : t -> unit
+    (** Exit the current scope (formula, clause). *)
+
   val add_signature : t -> Signature.t -> unit
     (** Specify the type of some symbols *)
 
