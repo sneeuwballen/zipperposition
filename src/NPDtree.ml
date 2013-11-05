@@ -158,7 +158,7 @@ module Make(E : Index.EQUATION) = struct
 
   (** iterate on all (term -> value) in the tree *)
   let rec iter dt k =
-    Leaf.iter dt.leaf (fun t set -> Leaf.S.iter (fun v -> k t v) set);
+    Leaf.iter dt.leaf k;
     begin match dt.star with
     | None -> ()
     | Some trie' -> iter trie' k

@@ -239,7 +239,7 @@ module Make(X : Set.OrderedType) = struct
     let rec fold trie f acc = match trie with
       | Empty -> acc
       | Node map -> FeatureMap.fold (fun _ subtrie acc -> fold subtrie f acc) map acc
-      | Leaf leaf -> Leaf.fold leaf f acc
+      | Leaf leaf -> Leaf.fold leaf acc f
     in
     fold idx.trie f acc
 

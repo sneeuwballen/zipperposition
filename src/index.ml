@@ -39,14 +39,12 @@ module type LEAF = sig
   type t
   type elt
 
-  module S : Set.S with type elt = elt
-
   val empty : t
   val add : t -> term -> elt -> t
   val remove : t -> term -> elt -> t
   val is_empty : t -> bool
-  val iter : t -> (term -> S.t -> unit) -> unit
-  val fold : t -> ('a -> term -> S.t -> 'a) -> 'a -> 'a
+  val iter : t -> (term -> elt -> unit) -> unit
+  val fold : t -> 'a -> ('a -> term -> elt -> 'a) -> 'a
   val size : t -> int
 
   val fold_unify : ?subst:subst -> t -> scope -> term -> scope -> 'a ->
@@ -92,10 +90,10 @@ module MakeLeaf(X : Set.OrderedType) = struct
   let is_empty = T.Map.is_empty
 
   let iter leaf f =
-    T.Map.iter (fun t set -> f t set) leaf
+    T.Map.iter (fun t set -> S.iter (fun elt -> f t elt) set) leaf
 
-  let fold leaf f acc =
-    T.Map.fold (fun t set acc -> f acc t set) leaf acc
+  let fold leaf acc f =
+    T.Map.fold (fun t set acc -> S.fold (fun elt acc -> f acc t elt) set acc) leaf acc
 
   let size leaf =
     let cnt = ref 0 in
@@ -156,9 +154,9 @@ module type TERM_IDX = sig
 
   val remove : t -> term -> elt -> t
 
-  val iter : t -> (term -> Leaf.S.t -> unit) -> unit
+  val iter : t -> (term -> elt -> unit) -> unit
 
-  val fold : t -> ('a -> term -> Leaf.S.t -> 'a) -> 'a -> 'a
+  val fold : t -> ('a -> term -> elt -> 'a) -> 'a -> 'a
 
   val retrieve_unifiables : ?subst:subst ->
                             t -> scope -> term -> scope -> 'a ->

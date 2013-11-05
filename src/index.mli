@@ -37,14 +37,12 @@ module type LEAF = sig
   type t
   type elt
 
-  module S : Set.S with type elt = elt
-
   val empty : t
   val add : t -> term -> elt -> t
   val remove : t -> term -> elt -> t
   val is_empty : t -> bool
-  val iter : t -> (term -> S.t -> unit) -> unit
-  val fold : t -> ('a -> term -> S.t -> 'a) -> 'a -> 'a
+  val iter : t -> (term -> elt -> unit) -> unit
+  val fold : t -> 'a -> ('a -> term -> elt -> 'a) -> 'a
   val size : t -> int
 
   val fold_unify : ?subst:subst -> t -> scope -> term -> scope -> 'a ->
@@ -82,9 +80,9 @@ module type TERM_IDX = sig
 
   val remove : t -> term -> elt -> t
 
-  val iter : t -> (term -> Leaf.S.t -> unit) -> unit
+  val iter : t -> (term -> elt -> unit) -> unit
 
-  val fold : t -> ('a -> term -> Leaf.S.t -> 'a) -> 'a -> 'a
+  val fold : t -> ('a -> term -> elt -> 'a) -> 'a -> 'a
 
   val retrieve_unifiables : ?subst:subst ->
                             t -> scope -> term -> scope -> 'a ->
