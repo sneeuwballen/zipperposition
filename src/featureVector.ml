@@ -250,7 +250,7 @@ module Make(C : Index.CLAUSE) = struct
     [ Feature.size_plus; Feature.size_minus; Feature.count_skolem_symb;
       Feature.count_split_symb; Feature.sum_of_depths ]
 
-  let empty = empty_with default_features
+  let empty () = empty_with default_features
 
   (** maximam number of features in addition to basic ones *)
   let max_features = 25

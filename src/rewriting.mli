@@ -63,7 +63,7 @@ module type SIG_TRS = sig
   type rule = FOTerm.t * FOTerm.t
     (** rewrite rule, from left to right *)
 
-  val empty : t 
+  val empty : unit -> t 
 
   val add : t -> rule -> t
   val add_seq : t -> rule Sequence.t -> t
@@ -100,7 +100,7 @@ module FormRW : sig
   type rule = FOTerm.t * FOFormula.t
     (** rewrite rule, from left to right *)
 
-  val empty : t 
+  val empty : unit -> t 
 
   val add : t -> rule -> t
   val add_seq : t -> rule Sequence.t -> t

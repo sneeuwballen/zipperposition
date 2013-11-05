@@ -53,8 +53,10 @@ let rec from_int n =
   if n = 0 then zero else succ (from_int (n-1))
 
 (* deterministic gen *)
-let mk_rand () =
+let rand =
   Random.State.make [| 42 |]
+
+(** {2 Benchmark rewriting indexes} *)
 
 module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E = E) = struct
   module TRS = Rewriting.MakeTRS(I)
@@ -88,8 +90,8 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
   module Idx2 = I(E2)
 
   let bench_random n () =
-    let terms = QCheck.Arbitrary.generate ~rand:(mk_rand()) ~n ArTerm.default in
-    let idx = Idx2.add_seq Idx2.empty
+    let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
+    let idx = Idx2.add_seq (Idx2.empty ())
       (Sequence.map (fun t -> t,()) (Sequence.of_list terms)) in
     List.iter
       (fun t ->
@@ -98,13 +100,47 @@ module MakeBench(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E
     ()
 end
 
+(** {2 Benchmark indexes} *)
+
+module MakeIdxBench(I : Index.TERM_IDX with type elt = int) = struct
+  let idx_of_terms terms =
+    let idx, _ = List.fold_left
+      (fun (idx,i) t -> I.add idx t i, i+1)
+      (I.empty (),0) terms
+    in
+    idx
+
+  let bench terms () =
+    let idx = idx_of_terms terms in
+    List.iter
+      (fun t ->
+        I.retrieve_unifiables idx 0 t 1 ()
+          (fun () t' i subst -> ()))
+      terms
+end
+
+module OrderedInt = struct type t = int let compare i j = i-j end
+module IntFingerprint = Fingerprint.Make(OrderedInt)
+module BenchFingerprint = MakeIdxBench(IntFingerprint)
+
+let bench_idx n =
+  let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
+  Bench.bench
+    [ Util.sprintf "bench_fingerprint_%d" n, BenchFingerprint.bench terms
+    ]
+
+(** {2 Type checking} *)
+
 let bench_type_inf n =
-  let terms = QCheck.Arbitrary.generate ~n ArTerm.ArbitraryUntyped.default in
+  let terms = QCheck.Arbitrary.generate ~rand ~n
+    ArTerm.ArbitraryUntyped.default in
   let ctx = TypeInference.Ctx.create () in
   List.iter
     (fun t -> ignore (TypeInference.FO.infer ctx t 0))
     terms;
   ()
+
+(** {2 Main} *)
 
 let run_bench () =
   let module B_Dtree = MakeBench(Dtree.Make) in
@@ -112,15 +148,20 @@ let run_bench () =
   let conf = Bench.config in
   let old_sample = conf.Bench.samples in
   conf.Bench.samples <- 100;
+  (* type inference *)
   let res = Bench.bench_arg ["type_inf_200", bench_type_inf, 200] in
   Bench.summarize 1. res;
+  (* indexing *)
+  bench_idx 1000;
+  bench_idx 5_000;
+  (* rewriting *)
   Bench.bench
     [ "dtree_peano_1000", B_Dtree.bench_peano 1000
     ; "npdtree_peano_1000", B_NPDtree.bench_peano 1000
     ];
   Bench.bench
-    [ "dtree_peano_10_000", B_Dtree.bench_peano 10_000
-    ; "npdtree_peano_10_000", B_NPDtree.bench_peano 10_000
+    [ "dtree_peano_5_000", B_Dtree.bench_peano 5_000
+    ; "npdtree_peano_5_000", B_NPDtree.bench_peano 5_000
     ];
   Bench.bench
     [ "dtree_rand_1000", B_Dtree.bench_random 1000

@@ -63,7 +63,7 @@ module TestUnit(I : UnitIndex) = struct
   (* check that the size of index is correct *)
   let check_size_add =
     let prop seq =
-      let idx = I.add_seq I.empty seq in
+      let idx = I.add_seq (I.empty ()) seq in
       Sequence.length seq = I.size idx
     in
     let name = Util.sprintf "index(%s)_size_after_add" I.name in
@@ -77,7 +77,7 @@ module TestUnit(I : UnitIndex) = struct
   (* check that at least the terms are retrieved *)
   let check_gen_retrieved_member =
     let prop seq =
-      let idx = I.add_seq I.empty seq in
+      let idx = I.add_seq (I.empty ()) seq in
       Sequence.for_all
         (fun (t,i) ->
           let retrieved = find_all idx t in
@@ -91,7 +91,7 @@ module TestUnit(I : UnitIndex) = struct
   (* check that the retrieved terms match the query *)
   let check_gen_retrieved_match =
     let prop seq =
-      let idx = I.add_seq I.empty seq in
+      let idx = I.add_seq (I.empty ()) seq in
       Sequence.for_all
         (fun (t,i) ->
           let retrieved = find_all idx t in
@@ -109,7 +109,7 @@ module TestUnit(I : UnitIndex) = struct
   (* check that all matching terms are retrieved *)
   let check_all_retrieved =
     let prop seq =
-      let idx = I.add_seq I.empty seq in
+      let idx = I.add_seq (I.empty ()) seq in
       Sequence.for_all
         (fun (t,_) ->
           let retrieved = find_all idx t in

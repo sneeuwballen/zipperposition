@@ -146,7 +146,7 @@ module Make(E : Index.EQUATION) = struct
       
   type t = trie
 
-  let empty = TrieNode CharMap.empty
+  let empty () = TrieNode CharMap.empty
 
   let is_empty = empty_trie
 

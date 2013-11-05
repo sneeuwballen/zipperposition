@@ -72,7 +72,7 @@ module type TERM_IDX = sig
 
   val name : string
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
 
@@ -126,7 +126,7 @@ module type SUBSUMPTION_IDX = sig
 
   val name : string
 
-  val empty : t
+  val empty : unit -> t
     (** Empty index *)
 
   val add : t -> C.t -> t
@@ -183,7 +183,7 @@ module type UNIT_IDX = sig
   type rhs = E.rhs
     (** Right hand side of equation *)
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
   

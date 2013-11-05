@@ -61,7 +61,7 @@ module Make(E : Index.EQUATION) = struct
     leaf : Leaf.t;    (* leaves *)
   }  (** The discrimination tree *)
 
-  let empty = {map=SMap.empty; star=None; leaf=Leaf.empty;}
+  let empty () = {map=SMap.empty; star=None; leaf=Leaf.empty;}
 
   let is_empty n = n.star = None && SMap.is_empty n.map && Leaf.is_empty n.leaf
 
@@ -82,7 +82,7 @@ module Make(E : Index.EQUATION) = struct
         else match (T.at_cpos t i).T.term with
           | (T.Var _ | T.BoundVar _) ->
             let subtrie = match trie.star with
-              | None -> empty
+              | None -> empty ()
               | Some trie' -> trie'
             in
             let rebuild subtrie =
@@ -94,7 +94,7 @@ module Make(E : Index.EQUATION) = struct
           | T.Node (s, _) ->
             let subtrie =
               try SMap.find s trie.map
-              with Not_found -> empty
+              with Not_found -> empty ()
             in
             let rebuild subtrie =
               if is_empty subtrie

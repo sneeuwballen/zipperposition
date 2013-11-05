@@ -142,7 +142,7 @@ module Make(X : Set.OrderedType) = struct
 
   let default_fp = fp7m
 
-  let empty = {
+  let empty () = {
     trie = Empty;
     fp = default_fp;
   }

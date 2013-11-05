@@ -42,25 +42,25 @@ type t =
 type transformation = t
 
 let of_term_rule rule =
-  RwTerm (Rewriting.TRS.(add empty rule))
+  RwTerm (Rewriting.TRS.(add (empty ()) rule))
 
 let of_term_rules_seq seq =
-  let trs = Rewriting.TRS.(add_seq empty seq) in
+  let trs = Rewriting.TRS.(add_seq (empty ()) seq) in
   RwTerm trs
 
 let of_term_rules l =
-  let trs = Rewriting.TRS.(add_list empty l) in
+  let trs = Rewriting.TRS.(add_list (empty ()) l) in
   RwTerm trs
 
 let of_form_rule rule =
-  RwForm (Rewriting.FormRW.(add empty rule))
+  RwForm (Rewriting.FormRW.(add (empty ()) rule))
 
 let of_form_rules_seq seq =
-  let frs = Rewriting.FormRW.(add_seq empty seq) in
+  let frs = Rewriting.FormRW.(add_seq (empty ()) seq) in
   RwForm frs
 
 let of_form_rules l =
-  let frs = Rewriting.FormRW.(add_list empty l) in
+  let frs = Rewriting.FormRW.(add_list (empty ()) l) in
   RwForm frs
 
 let of_term_tr name term2term =

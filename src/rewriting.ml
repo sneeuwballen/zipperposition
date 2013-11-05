@@ -101,7 +101,7 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
 
   let empty ~ord = {
     ord;
-    rules = DT.empty;
+    rules = DT.empty ();
   }
 
   let mk_rule eqn l r oriented =
@@ -203,7 +203,7 @@ module type SIG_TRS = sig
   type rule = FOTerm.t * FOTerm.t
     (** rewrite rule, from left to right *)
 
-  val empty : t 
+  val empty : unit -> t 
 
   val add : t -> rule -> t
   val add_seq : t -> rule Sequence.t -> t
@@ -243,7 +243,7 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
   type t = Idx.t
     (** T Rewriting System *)
 
-  let empty = Idx.empty
+  let empty () = Idx.empty ()
 
   let add trs (l, r) =
     (* check that the rule does not introduce variables *)
@@ -269,10 +269,10 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
       (fun k -> iter trs k)
 
   let of_seq seq =
-    add_seq empty seq
+    add_seq (empty ()) seq
 
   let of_list l =
-    add_list empty l
+    add_list (empty ()) l
 
   let rule_to_form (l, r) = F.mk_eq l r
 
@@ -339,7 +339,7 @@ module FormRW = struct
   type t = DT.t
     (** T Rewriting System *)
 
-  let empty = DT.empty
+  let empty () = DT.empty ()
 
   let add trs (l, r) =
     (* check that the rule does not introduce variables *)
@@ -372,10 +372,10 @@ module FormRW = struct
       (fun k -> iter trs k)
 
   let of_seq seq =
-    add_seq empty seq
+    add_seq (empty ()) seq
 
   let of_list l =
-    add_list empty l
+    add_list (empty ()) l
 
   let rule_to_form (l, r) = F.mk_equiv (F.mk_atom l) r
 
