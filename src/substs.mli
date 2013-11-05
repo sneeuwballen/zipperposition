@@ -40,10 +40,6 @@ module type S = sig
   val empty : t
     (** The identity substitution *)
 
-  val create : int -> t
-    (** Substitution with an initial "size". The more elements you expect
-        to bind within this substitution, the bigger this initial size should be *)
-
   val is_empty : t -> bool
     (** Is the substitution empty? *)
 
