@@ -90,7 +90,7 @@ module Ctx = struct
       scope = ~-1;
       var = ~-1;
       signature;
-      subst = S.create 17;
+      subst = S.empty;
       to_bind = [];
       renaming = Substs.Ty.Renaming.create 7;
       symbols = STbl.create 7;

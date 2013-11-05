@@ -167,7 +167,7 @@ let cast t ty =
 
 let lambda_var_ty t = match t.term with
   | Lambda _ ->
-    begin match t.ty with
+    begin match t.ty.Type.ty with
     | Type.Fun (_, arg::_) -> arg
     | _ -> failwith "lambda_var_ty: expected function type"
     end
@@ -194,7 +194,7 @@ let mk_bound_var ~ty idx =
   H.hashcons my_v
 
 let mk_lambda ~varty t' =
-  let ty = Type.(t'.ty <=. varty) in
+  let ty = Type.mk_fun t'.ty [varty] in
   let my_t = {term=Lambda t'; ty; flags=0; tsize=0; tag= -1} in
   let t = H.hashcons my_t in
   (if t == my_t

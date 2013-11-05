@@ -30,14 +30,19 @@ let prof_variant = Util.mk_profiler "Type.variant"
 
 (** {2 Main Type representation} *)
 
-type t =
+type t = {
+  ty : tree; (* shape of the term *)
+  mutable ground : bool;
+  mutable id : int;  (* hashconsing tag *)
+}
+and tree =
   | Var of int              (** Universal type variable *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
 
 type ty = t
 
-let rec eq_struct t1 t2 = match t1, t2 with
+let rec eq_struct t1 t2 = match t1.ty, t2.ty with
   | Var i1, Var i2 -> i1 = i2
   | App (s1, l1), App (s2, l2) -> 
     s1 = s2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
@@ -45,45 +50,28 @@ let rec eq_struct t1 t2 = match t1, t2 with
     ret1 == ret2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
   | _, _ -> false
 
-let rec _hash_rec t = match t with
-  | Var i -> i
-  | App (s, l) -> Hash.hash_list _hash_rec (Hash.hash_string s) l
-  | Fun (ret, l) -> Hash.hash_list _hash_rec (_hash_rec ret) l
+let hash t = t.id
 
-(* optimize hash for frequent case: variable or constant *)
-let hash t = match t with
+let rec _hash_top t = match t.ty with
   | Var i -> i
-  | App (s, []) -> Hash.hash_string s
-  | _ -> _hash_rec t
+  | App (s, l) -> Hash.hash_list hash (Hash.hash_string s) l
+  | Fun (ret, l) -> Hash.hash_list hash (hash ret) l
 
 (* hashconsing *)
 module H = Hashcons.Make(struct
   type t = ty
   let equal = eq_struct
-  let hash = hash
-  let tag i ty = ()
+  let hash = _hash_top
+  let tag i ty = ty.id <- i
 end)
 
 let eq t1 t2 = t1 == t2
 
-let __to_int = function
-  | Var _ -> 0
-  | App _ -> 1
-  | Fun _ -> 2
+let cmp ty1 ty2 = ty1.id - ty2.id
 
-let rec cmp t1 t2 = match t1, t2 with
-  | Var i1, Var i2 -> i1 - i2
-  | App (s1, l1), App (s2, l2) ->
-    let c = String.compare s1 s2 in
-    if c <> 0 then c else Util.lexicograph cmp l1 l2
-  | Fun (ret1, l1), Fun(ret2, l2) ->
-    let c = cmp ret1 ret2 in
-    if c <> 0 then c else Util.lexicograph cmp l1 l2
-  | _, _ -> __to_int t1 - __to_int t2
-
-let is_var = function | Var _ -> true | _ -> false
-let is_app = function | App _ -> true | _ -> false
-let is_fun = function | Fun _ -> true | _ -> false
+let is_var = function | {ty=Var _} -> true | _ -> false
+let is_app = function | {ty=App _} -> true | _ -> false
+let is_fun = function | {ty=Fun _} -> true | _ -> false
 
 module Tbl = Hashtbl.Make(struct
   type t = ty
@@ -98,23 +86,41 @@ end)
 
 (** {2 Infix constructors} *)
 
+let rec _list_ground l = match l with
+  | [] -> true
+  | ty::l' -> ty.ground && _list_ground l'
+
+(* real constructor *)
+let _mk_fun ret args =
+  let ty = {ty=Fun (ret, args); id= ~-1; ground=false;} in
+  let ty' = H.hashcons ty in
+  if ty == ty' then begin
+    ty.ground <- ret.ground && _list_ground args
+    end;
+  ty'
+
 let rec (<==) ret args =
   match args with
   | [] -> ret
   | _::_ ->
-    match ret with
+    match ret.ty with
     | Fun (ret', args') ->
       (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
           constructor invariant. [args] must be applied before [args']
           need to be supplied.
           Example: [(a <- b) <- c] requires [c] first *)
       ret' <== (args @ args')
-    | _ -> H.hashcons (Fun (ret, args))
+    | _ -> _mk_fun ret args
 
 let (<=.) ret arg = ret <== [arg]
 
 let (@@) s args =
-  H.hashcons (App (s, args))
+  let ty = {ty=App(s, args); id= ~-1; ground=false} in
+  let ty' = H.hashcons ty in
+  if ty == ty' then begin
+    ty.ground <- _list_ground args;
+    end;
+  ty'
 
 (** {2 Basic types} *)
 
@@ -124,7 +130,7 @@ let app s args = s @@ args
 
 let var i =
   if i < 0 then failwith "Type.var: expected a nonnegative int";
-  H.hashcons (Var i)
+  H.hashcons {ty=Var i; id= ~-1; ground=false; }
 
 let mk_fun = (<==)
 
@@ -139,7 +145,9 @@ let tType = const "$tType"
 
 (** {2 Utils} *)
 
-let rec _free_vars set ty = match ty with
+let rec _free_vars set ty =
+  if ty.ground then set
+  else match ty.ty with
   | Var _ -> Set.add ty set
   | App (_, l) -> List.fold_left _free_vars set l
   | Fun (ret, l) -> List.fold_left _free_vars (_free_vars set ret) l
@@ -148,18 +156,14 @@ let free_vars ty =
   let set = _free_vars Set.empty ty in
   Set.elements set
 
-let arity ty = match ty with
+let arity ty = match ty.ty with
   | Fun (_, l) -> List.length l
   | Var _
   | App _ -> 0
 
-let rec is_ground t = match t with
-  | Var _ -> false
-  | App (_, []) -> true
-  | App (_, l) -> List.for_all is_ground l
-  | Fun (ret, l) -> is_ground ret && List.for_all is_ground l
+let is_ground t = t.ground
 
-let rec size ty = match ty with
+let rec size ty = match ty.ty with
   | Var _
   | App (_, []) -> 1
   | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
@@ -168,7 +172,7 @@ let rec size ty = match ty with
 let apply_fun f args =
   (* recursive matching of expected arguments and provided arguments.
     careful: we could have a curried function *)
-  let rec apply_fun f_ret f_args args = match f_ret, f_args, args with
+  let rec apply_fun f_ret f_args args = match f_ret.ty, f_args, args with
     | _, x::f_args', y::args' ->
       (* match arguments *)
       if eq x y
@@ -181,14 +185,34 @@ let apply_fun f args =
       (* partial application. The remaining arguments need be provided *)
       mk_fun f_ret f_args
   in
-  match f, args with
+  match f.ty, args with
   | _, [] -> f
   | Fun (ret, l), l' -> apply_fun ret l l'
   | _, _ -> failwith "Type.apply_fun: expected function type"
 
+let rec looks_similar ty1 ty2 =
+  ty1 == ty2 ||
+  match ty1.ty, ty2.ty with
+  | Var _, _
+  | _, Var _ -> true
+  | App (s1, []), App (s2, []) -> s1 = s2
+  | App (_, []), App (_, _)
+  | App (_, _), App (_, []) -> false
+  | App (s1, l1), App (s2, l2) ->
+    s1 = s2 && looks_similar_list l1 l2
+  | Fun (ret1, l1), Fun (ret2, l2) ->
+    looks_similar ret1 ret2 &&
+    looks_similar_list l1 l2
+  | _ -> false
+and looks_similar_list l1 l2 = match l1, l2 with
+  | [], [] -> true
+  | [], _
+  | _, [] -> false
+  | ty1::l1', ty2::l2' -> looks_similar ty1 ty2 && looks_similar_list l1' l2
+
 (** {2 IO} *)
 
-let rec pp buf t = match t with
+let rec pp buf t = match t.ty with
   | Var i -> Printf.bprintf buf "T%d" i
   | App (p, []) -> Buffer.add_string buf p
   | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
@@ -196,12 +220,12 @@ let rec pp buf t = match t with
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
-and pp_inner buf t = match t with
+and pp_inner buf t = match t.ty with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
   | _ -> pp buf t
 
-let rec pp_tstp buf t = match t with
+let rec pp_tstp buf t = match t.ty with
   | Var i -> Printf.bprintf buf "T%d" i
   | App (p, []) -> Buffer.add_string buf p
   | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
@@ -209,7 +233,7 @@ let rec pp_tstp buf t = match t with
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
-and pp_inner buf t = match t with
+and pp_inner buf t = match t.ty with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp_tstp buf t; Buffer.add_char buf ')'
   | _ -> pp_tstp buf t
@@ -226,7 +250,7 @@ let bij =
     let bij_app = lazy (pair string_ (list_ (Lazy.force bij'))) in
     let bij_fun = lazy (pair (Lazy.force bij') (list_ (Lazy.force bij'))) in
     switch
-      ~inject:(fun ty -> match ty with
+      ~inject:(fun ty -> match ty.ty with
         | Var i -> "v", BranchTo (int_, i)
         | App (p, l) -> "at", BranchTo (Lazy.force bij_app, (p, l))
         | Fun (ret, l) -> "fun", BranchTo (Lazy.force bij_fun, (ret, l)))
@@ -310,11 +334,12 @@ let of_parsed ?(ctx=create_ctx ()) ty =
   in
   convert ty
 
-let rec to_parsed ty = match ty with
+let rec to_parsed ty = match ty.ty with
   | Var i -> Parsed.var (Util.sprintf "T%d" i)
   | App (s, l) -> Parsed.app s (List.map to_parsed l)
   | Fun (ret, l) -> Parsed.mk_fun (to_parsed ret) (List.map to_parsed l)
 
 (** {2 Misc} *)
 
-let __var i = H.hashcons (Var i)
+let __var i =
+  H.hashcons {ty=Var i; id= ~-1; ground=false; }

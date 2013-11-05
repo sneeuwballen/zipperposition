@@ -118,7 +118,7 @@ let rec _match_list subst l_expected s_e l_arg s_a = match l_expected, l_arg wit
     _match_list subst l_expected' s_e l_arg' s_a
 
 let match_types ?(subst=Substs.Ty.empty) ty s_ty args s_args =
-  match ty with
+  match ty.Type.ty with
   | Type.Fun (_, expected) ->
     (* match expected types against provided types *)
     _match_list subst expected s_ty args s_args

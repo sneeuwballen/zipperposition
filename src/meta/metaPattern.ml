@@ -171,7 +171,7 @@ let create f =
   let symbols = List.rev (functions_in_order [] f) in
   (* create pattern by lambda abstraction *)
   let pat = Lambda.lambda_abstract_list f symbols in
-  let types = match pat.HOT.ty with
+  let types = match pat.HOT.ty.Type.ty with
     | Type.Fun (_, l) -> l
     | _ -> []
   in

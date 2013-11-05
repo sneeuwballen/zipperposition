@@ -102,7 +102,7 @@ module MakeLeaf(X : Set.OrderedType) = struct
     T.Map.iter (fun _ set -> cnt := !cnt + S.cardinal set) leaf;
     !cnt
 
-  let fold_unify ?(subst=Substs.FO.create 11) leaf sc_leaf t sc_t acc k =
+  let fold_unify ?(subst=Substs.FO.empty) leaf sc_leaf t sc_t acc k =
     T.Map.fold
       (fun t' set acc ->
         try
@@ -113,7 +113,7 @@ module MakeLeaf(X : Set.OrderedType) = struct
         with FOUnif.Fail -> acc)
       leaf acc
 
-  let fold_match ?(subst=Substs.FO.create 11) leaf sc_leaf t sc_t acc k =
+  let fold_match ?(subst=Substs.FO.empty) leaf sc_leaf t sc_t acc k =
     T.Map.fold
       (fun t' set acc ->
         try
@@ -124,7 +124,7 @@ module MakeLeaf(X : Set.OrderedType) = struct
         with FOUnif.Fail -> acc)
       leaf acc
 
-  let fold_matched ?(subst=Substs.FO.create 11) leaf sc_leaf t sc_t acc k =
+  let fold_matched ?(subst=Substs.FO.empty) leaf sc_leaf t sc_t acc k =
     T.Map.fold
       (fun t' set acc ->
         try

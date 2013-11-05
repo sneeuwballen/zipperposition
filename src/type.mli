@@ -36,7 +36,12 @@ See {!TypeInference} for inferring types from terms and formulas,
 and {!Signature} to associate types with symbols.
 *)
 
-type t = private
+type t = private {
+  ty : tree; (* shape of the term *)
+  mutable ground : bool;
+  mutable id : int;  (* hashconsing tag *)
+}
+and tree = private
   | Var of int              (** Type variable, universally quantified *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
@@ -53,6 +58,8 @@ val is_fun : t -> bool
 
 module Tbl : Hashtbl.S with type key = ty
 module Set : Sequence.Set.S with type elt = ty
+
+module H : Hashcons.S with type elt = t
 
 (** {2 Infix constructors} *)
 
@@ -107,6 +114,12 @@ val apply_fun : t -> t list -> t
       type that results from applying the function to the arguments.
       No unification is done, types must check exactly.
       @raise Failure if the types do not match *)
+
+val looks_similar : t -> t -> bool
+  (** Quick check that two types {b might} be unifiable or equal, but
+      designed to be fast.
+      If the types are unifiable then this function returns true, but
+      it can also return true in cases where unifiability isn't present *)
 
 (** {2 IO} *)
 

@@ -66,7 +66,8 @@ let is_ground signature =
 
 let is_bool signature s =
   match SMap.find s signature with
-  | Type.Fun (ret, _) when Type.eq ret Type.o -> true
+  | {Type.ty=Type.Fun (ret, _)} when Type.eq ret Type.o -> true
+  | ty when Type.eq ty Type.o -> true
   | _ -> false
 
 let is_not_bool signature s =
