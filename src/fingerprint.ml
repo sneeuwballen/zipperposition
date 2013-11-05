@@ -30,6 +30,8 @@ module T = FOTerm
 module I = Index
 module S = Substs.FO
 
+let prof_traverse = Util.mk_profiler "fingerprint.traverse"
+
 (** a feature *)
 type feature = A | B | N | S of Symbol.t
 
@@ -249,6 +251,7 @@ module Make(X : Set.OrderedType) = struct
 
   (** fold on parts of the trie that are compatible with features *)
   let traverse ~compatible idx features acc k =
+    Util.enter_prof prof_traverse;
     (* fold on the trie *)
     let rec recurse trie features acc =
       match trie, features with
@@ -266,7 +269,13 @@ module Make(X : Set.OrderedType) = struct
       | Node _, [] | Leaf _, _::_ ->
         failwith "different feature length in fingerprint trie"
     in
-    recurse idx.trie features acc
+    try
+      let acc = recurse idx.trie features acc in
+      Util.exit_prof prof_traverse;
+      acc
+    with e ->
+      Util.exit_prof prof_traverse;
+      raise e
 
   let retrieve_unifiables ?(subst=S.empty) idx o_i t o_t acc f = 
     let features = idx.fp t in

@@ -319,6 +319,7 @@ module Ty = struct
   let apply subst ~renaming ty sc_ty =
     let rec _apply ty sc_ty = match ty.Type.ty with
     | Type.App (_, []) -> ty
+    | _ when Type.is_ground ty -> ty
     | Type.App (s, l) ->
       let l' = List.map (fun ty' -> _apply ty' sc_ty) l in
       Type.app s l'
