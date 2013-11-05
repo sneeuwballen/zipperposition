@@ -5,6 +5,7 @@
 #require "str";;
 #directory "_build/src/";;
 #directory "_build/src/meta/";;
+#directory "_build/src/arbitrary/";;
 #directory "_build/tests/";;
 #load "logtk.cma";;
 #load "logtk_meta.cma";;
@@ -44,7 +45,7 @@ let pform s =
     let tyctx = TypeInference.Ctx.create ~base:true () in
     TypeInference.FO.convert_form ~ctx:tyctx f
 ;;
-(* optional part *)
+(* optional part: meta *)
 #install_printer Logtk_meta.MetaPattern.fmt;;
 #install_printer Logtk_meta.MetaPattern.EncodedForm.fmt;;
 #install_printer Logtk_meta.MetaPattern.Set.fmt;;
@@ -54,5 +55,10 @@ let ppat s =
     let f = pform s in
     let f = MetaPattern.EncodedForm.encode f in
     MetaPattern.create f;;
+(* optional part: arbitrary *)
+#require "qcheck";;
+#load "logtk_arbitrary.cma";;
+open Logtk_arbitrary;;
+open QCheck;;
 (* vim:syntax=ocaml
 *)
