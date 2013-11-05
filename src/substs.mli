@@ -37,7 +37,7 @@ module type S = sig
   type t
     (** A substitution that binds term variables to other terms *)
 
-  val empty : t
+  val empty : unit -> t
     (** The identity substitution *)
 
   val is_empty : t -> bool

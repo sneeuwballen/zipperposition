@@ -37,7 +37,7 @@ module type S = sig
   type t
     (** A substitution that binds term variables to other terms *)
 
-  val empty : t
+  val empty : unit -> t
     (** The identity substitution *)
 
   val is_empty : t -> bool
@@ -142,21 +142,24 @@ module Common(T : TERM) = struct
     let hash (t,s) = Hash.combine (T.hash t) s
   end
 
+  (*
   module M = Sequence.Map.Make(TermInt)
+  *)
+  module M = PersistentHashtbl.Make(TermInt)
   module H = Hashtbl.Make(TermInt)
 
   type t = (term * int) M.t
 
-  let empty = M.empty
+  let empty () = M.empty ()
 
   let is_empty = M.is_empty
 
   let lookup subst v s_v =
     if T.is_var v
-      then M.find (v, s_v) subst
+      then M.find subst (v, s_v)
       else raise Not_found
 
-  let mem subst v s_v = M.mem (v, s_v) subst
+  let mem subst v s_v = M.mem subst (v, s_v)
 
   (** Recursively lookup a variable in the substitution, until we get a value
       that is not a variable or that is not bound *)
@@ -172,7 +175,7 @@ module Common(T : TERM) = struct
     if s_t' = s_t && T.eq t' t
       then subst (* compatible (absence of) bindings *)
       else if T.is_var t'
-        then M.add (t', s_t') (t, s_t) subst
+        then M.replace subst (t', s_t') (t, s_t)
         else
           let msg = Util.sprintf
             "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
@@ -180,7 +183,7 @@ module Common(T : TERM) = struct
           in
           raise (Invalid_argument msg)
 
-  let remove subst v s_v = M.remove (v, s_v) subst
+  let remove subst v s_v = M.remove subst (v, s_v)
 
   let append s1 s2 =
     M.merge
@@ -201,46 +204,44 @@ module Common(T : TERM) = struct
   let compose s1 s2 = failwith "Subst.compose: not implemented"
 
   let fold subst acc f =
-    M.fold (fun (v,s_v) (t,s_t) acc -> f acc v s_v t s_t) subst acc
+    M.fold (fun acc (v,s_v) (t,s_t) -> f acc v s_v t s_t) acc subst
 
   let iter subst k =
-    M.iter (fun (v,s_v) (t,s_t) -> k v s_v t s_t) subst
+    M.iter subst (fun (v,s_v) (t,s_t) -> k v s_v t s_t)
 
   (* is the substitution a renaming? *)
   let is_renaming subst =
     begin try
       let codomain = H.create 5 in
-      M.iter
+      M.iter subst
         (fun _ (t,s_t) ->
           (* is some var bound to a non-var term? *)
           if not (T.is_var t) then raise Exit;
-          H.replace codomain (t,s_t) ())
-        subst ;
+          H.replace codomain (t,s_t) ());
       (* as many variables in codomain as variables in domain *)
-      H.length codomain = M.cardinal subst
+      H.length codomain = M.length subst
     with Exit -> false
     end
 
   (* set of variables bound by subst, with their scope *)
   let domain s =
     let set = H.create 5 in
-    M.iter (fun (v,s_v) _ -> H.replace set (v,s_v) ()) s;
+    M.iter s (fun (v,s_v) _ -> H.replace set (v,s_v) ());
     set
 
   (* set of terms that some variables are bound to by the substitution *)
   let codomain s =
     let set = H.create 5 in
-    M.iter (fun _ (t,s_t) -> H.replace set (t,s_t) ()) s;
+    M.iter s (fun _ (t,s_t) -> H.replace set (t,s_t) ());
     set
 
   (* variables introduced by the subst *)
   let introduced subst =
     let set = H.create 5 in
-    M.iter
+    M.iter subst
       (fun _ (t,s_t) ->
         let vars = T.vars t in
-        List.iter (fun v -> H.replace set (v,s_t) ()) vars)
-      subst;
+        List.iter (fun v -> H.replace set (v,s_t) ()) vars);
     set
 
   let to_seq subst =
@@ -251,10 +252,10 @@ module Common(T : TERM) = struct
     let seq = to_seq subst in
     Sequence.to_rev_list seq
 
-  let of_seq ?(init=empty) seq =
+  let of_seq ?(init=empty ()) seq =
     Sequence.fold (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init seq
 
-  let of_list ?(init=empty) l = match l with
+  let of_list ?(init=empty ()) l = match l with
     | [] -> init
     | _::_ ->
       List.fold_left (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init l
@@ -362,9 +363,9 @@ module MakeProd(T : TYPED_TERM) = struct
     ty : Ty.t;
   }
 
-  let empty = {
-    term = TSubst.empty;
-    ty = Ty.empty;
+  let empty () = {
+    term = TSubst.empty ();
+    ty = Ty.empty ();
   }
   
   let ty_subst s = s.ty
@@ -375,7 +376,7 @@ module MakeProd(T : TYPED_TERM) = struct
   let update_ty s f =
     { s with ty = f s.ty }
 
-  let of_ty ty = { term = TSubst.empty; ty; }
+  let of_ty ty = { term = TSubst.empty (); ty; }
 
   let is_empty s = TSubst.is_empty s.term && Ty.is_empty s.ty
 
@@ -421,8 +422,8 @@ module MakeProd(T : TYPED_TERM) = struct
 
   let to_seq t = TSubst.to_seq t.term
   let to_list t = TSubst.to_list t.term
-  let of_seq ?(init=empty) seq = { init with term=TSubst.of_seq ~init:init.term seq; }
-  let of_list ?(init=empty) l = { init with term=TSubst.of_list ~init:init.term l; }
+  let of_seq ?(init=empty ()) seq = { init with term=TSubst.of_seq ~init:init.term seq; }
+  let of_list ?(init=empty ()) l = { init with term=TSubst.of_list ~init:init.term l; }
 
   let bij = Bij.(map
     ~inject:(fun s -> s.term, s.ty)

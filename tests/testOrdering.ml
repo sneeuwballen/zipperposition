@@ -58,7 +58,7 @@ let check_ordering_inv_by_subst ord =
     let vars = T.vars_list [t1; t2] in
     (* grounding substitution *)
     let subst st = List.fold_left
-      (fun subst v -> S.bind subst v 1 (ArTerm.ground st) 0) S.empty vars in
+      (fun subst v -> S.bind subst v 1 (ArTerm.ground st) 0) (S.empty ()) vars in
     triple (return t1) (return t2) subst)
   in
   let size (t1, t2, s) =

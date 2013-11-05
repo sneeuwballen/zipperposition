@@ -178,7 +178,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
+  let retrieve ?(subst=S.empty ()) ~sign dt sc_dt t sc_t acc k =
     Util.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc pos subst =

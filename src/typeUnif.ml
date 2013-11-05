@@ -112,7 +112,7 @@ let rec _unify_rec subst ty1 s1 ty2 s2 =
       l1 l2
   | _ -> fail subst ty1 s1 ty2 s2
 
-let unify ?(subst=S.empty) ty1 s1 ty2 s2 =
+let unify ?(subst=S.empty ()) ty1 s1 ty2 s2 =
   Util.enter_prof prof_unify;
   try
     let subst =
@@ -130,11 +130,11 @@ let unify ?(subst=S.empty) ty1 s1 ty2 s2 =
     Util.exit_prof prof_unify;
     raise e
 
-let unify_fo ?(subst=Substs.FO.empty) ty1 s1 ty2 s2 =
+let unify_fo ?(subst=Substs.FO.empty ()) ty1 s1 ty2 s2 =
   Substs.FO.update_ty subst
     (fun subst -> unify ~subst ty1 s1 ty2 s2)
 
-let unify_ho ?(subst=Substs.HO.empty) ty1 s1 ty2 s2 =
+let unify_ho ?(subst=Substs.HO.empty ()) ty1 s1 ty2 s2 =
   Substs.HO.update_ty subst
     (fun subst -> unify ~subst ty1 s1 ty2 s2)
 
@@ -176,7 +176,7 @@ let rec _match_rec ~protect subst ty1 s1 ty2 s2 =
       l1 l2
   | _ -> fail subst ty1 s1 ty2 s2
 
-let match_ ?(subst=S.empty) ty1 s1 ty2 s2 =
+let match_ ?(subst=S.empty ()) ty1 s1 ty2 s2 =
   Util.enter_prof prof_match;
   let protect = Ty.free_vars ty2 in
   try
@@ -187,11 +187,11 @@ let match_ ?(subst=S.empty) ty1 s1 ty2 s2 =
     Util.exit_prof prof_match;
     raise e
 
-let match_fo ?(subst=Substs.FO.empty) ty1 s1 ty2 s2 =
+let match_fo ?(subst=Substs.FO.empty ()) ty1 s1 ty2 s2 =
   Substs.FO.update_ty subst
     (fun subst -> match_ ~subst ty1 s1 ty2 s2)
 
-let match_ho ?(subst=Substs.HO.empty) ty1 s1 ty2 s2 =
+let match_ho ?(subst=Substs.HO.empty ()) ty1 s1 ty2 s2 =
   Substs.HO.update_ty subst
     (fun subst -> match_ ~subst ty1 s1 ty2 s2)
 
@@ -224,7 +224,7 @@ let rec _variant_rec subst ty1 s1 ty2 s2 =
       l1 l2
   | _ -> fail subst ty1 s1 ty2 s2
 
-let variant ?(subst=S.empty) ty1 s1 ty2 s2 =
+let variant ?(subst=S.empty ()) ty1 s1 ty2 s2 =
   Util.enter_prof prof_variant;
   try
     let subst = _variant_rec subst ty1 s1 ty2 s2 in
@@ -234,11 +234,11 @@ let variant ?(subst=S.empty) ty1 s1 ty2 s2 =
     Util.exit_prof prof_variant;
     raise e
 
-let variant_fo ?(subst=Substs.FO.empty) ty1 s1 ty2 s2 =
+let variant_fo ?(subst=Substs.FO.empty ()) ty1 s1 ty2 s2 =
   Substs.FO.update_ty subst
     (fun subst -> variant ~subst ty1 s1 ty2 s2)
 
-let variant_ho ?(subst=Substs.HO.empty) ty1 s1 ty2 s2 =
+let variant_ho ?(subst=Substs.HO.empty ()) ty1 s1 ty2 s2 =
   Substs.HO.update_ty subst
     (fun subst -> variant ~subst ty1 s1 ty2 s2)
 

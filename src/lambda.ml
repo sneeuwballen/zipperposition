@@ -117,14 +117,14 @@ let rec _match_list subst l_expected s_e l_arg s_a = match l_expected, l_arg wit
     let subst = TypeUnif.match_ ~subst ty s_e arg s_a in 
     _match_list subst l_expected' s_e l_arg' s_a
 
-let match_types ?(subst=Substs.Ty.empty) ty s_ty args s_args =
+let match_types ?(subst=Substs.Ty.empty ()) ty s_ty args s_args =
   match ty.Type.ty with
   | Type.Fun (_, expected) ->
     (* match expected types against provided types *)
     _match_list subst expected s_ty args s_args
   | _ ->
     (* raise some type error *)
-    TypeUnif.fail Substs.Ty.empty ty s_ty Type.((__var ~-1) <== args) s_args
+    TypeUnif.fail subst ty s_ty Type.((__var ~-1) <== args) s_args
 
 let can_apply ty args =
   try ignore (match_types ty 0 args 0); true
