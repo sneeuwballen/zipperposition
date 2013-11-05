@@ -110,8 +110,7 @@ module MakeIdxBench(I : Index.TERM_IDX with type elt = int) = struct
     in
     idx
 
-  let bench terms () =
-    let idx = idx_of_terms terms in
+  let bench idx terms () =
     List.iter
       (fun t ->
         I.retrieve_unifiables idx 0 t 1 ()
@@ -125,11 +124,20 @@ module BenchFingerprint = MakeIdxBench(IntFingerprint)
 module IntFastFingerprint = FastFingerprint.Make(OrderedInt)
 module BenchFastFingerprint = MakeIdxBench(IntFastFingerprint)
 
+module BenchFingerprint16 = MakeIdxBench(struct include IntFingerprint let empty () = empty_with Fingerprint.fp16 end)
+module BenchFastFingerprint16 = MakeIdxBench(struct include IntFastFingerprint let empty () = empty_with FastFingerprint.fp16 end)
+
 let bench_idx n =
   let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
+  let ifinger = BenchFingerprint.idx_of_terms terms in
+  let ifastfinger = BenchFastFingerprint.idx_of_terms terms in
+  let ifinger16 = BenchFingerprint16.idx_of_terms terms in
+  let ifastfinger16 = BenchFastFingerprint16.idx_of_terms terms in
   Bench.bench
-    [ Util.sprintf "bench_fingerprint_%d" n, BenchFingerprint.bench terms
-    ; Util.sprintf "bench_fast_fingerprint_%d" n, BenchFastFingerprint.bench terms
+    [ Util.sprintf "bench_fingerprint_%d" n, BenchFingerprint.bench ifinger terms
+    ; Util.sprintf "bench_fast_fingerprint_%d" n, BenchFastFingerprint.bench ifastfinger terms
+    ; Util.sprintf "bench_fingerprint_fp16_%d" n, BenchFingerprint16.bench ifinger16 terms
+    ; Util.sprintf "bench_fast_fingerprint_fp16_%d" n, BenchFastFingerprint16.bench ifastfinger16 terms
     ]
 
 (** {2 Type checking} *)
@@ -145,6 +153,10 @@ let bench_type_inf n =
 
 (** {2 Main} *)
 
+let draw_line () =
+  Printf.printf "\n--------------------------------------------------------\n";
+  ()
+
 let run_bench () =
   let module B_Dtree = MakeBench(Dtree.Make) in
   let module B_NPDtree = MakeBench(NPDtree.Make) in
@@ -152,20 +164,26 @@ let run_bench () =
   let old_sample = conf.Bench.samples in
   conf.Bench.samples <- 100;
   (* type inference *)
+  draw_line ();
   let res = Bench.bench_arg ["type_inf_200", bench_type_inf, 200] in
   Bench.summarize 1. res;
+  draw_line ();
   (* indexing *)
   bench_idx 1000;
-  bench_idx 5_000;
+  draw_line ();
+  bench_idx 2_000;
+  draw_line();
   (* rewriting *)
   Bench.bench
     [ "dtree_peano_1000", B_Dtree.bench_peano 1000
     ; "npdtree_peano_1000", B_NPDtree.bench_peano 1000
     ];
+  draw_line ();
   Bench.bench
     [ "dtree_peano_5_000", B_Dtree.bench_peano 5_000
     ; "npdtree_peano_5_000", B_NPDtree.bench_peano 5_000
     ];
+  draw_line ();
   Bench.bench
     [ "dtree_rand_1000", B_Dtree.bench_random 1000
     ; "npdtree_rand_1000", B_NPDtree.bench_random 1000

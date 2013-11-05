@@ -79,6 +79,20 @@ let fp16 = fp [[]; [1]; [2]; [3]; [4]; [1;1]; [1;2]; [1;3]; [2;1];
 
 (** {2 The index} *)
 
+let __to_int = function
+  | N -> 0
+  | B -> 1
+  | A -> 2
+  | S _ -> 3
+
+(* N < B < A < S, S are ordered by symbols *)
+let compare_features f1 f2 = match f1, f2 with
+  | N, N
+  | A, A
+  | B, B -> 0
+  | S s1, S s2 -> Symbol.compare s1 s2
+  | _ -> __to_int f1 - __to_int f2
+
 let eq_features f1 f2 = match f1, f2 with
   | N, N
   | B, B
@@ -98,6 +112,11 @@ module PH = PersistentHashtbl.Make(struct
   let hash = hash_feature
 end)
 
+module M = Map.Make(struct
+  type t = feature
+  let compare = compare_features
+end)
+
 module Make(X : Set.OrderedType) = struct
   type elt = X.t
 
@@ -105,12 +124,12 @@ module Make(X : Set.OrderedType) = struct
 
   type trie = {
     leaf : Leaf.t;
-    sub : trie PH.t;
+    sub : trie M.t;
   }
 
   let empty_trie () = {
     leaf = Leaf.empty;
-    sub = PH.create 7;
+    sub = M.empty;
   }
 
   type t = {
@@ -134,7 +153,7 @@ module Make(X : Set.OrderedType) = struct
   let rec is_empty_trie t =
     Leaf.is_empty t.leaf &&
     try
-      PH.iter t.sub (fun _ trie' -> if not (is_empty_trie trie') then raise Exit);
+      M.iter (fun _ trie' -> if not (is_empty_trie trie') then raise Exit) t.sub;
       true
     with Exit -> false
 
@@ -150,13 +169,13 @@ module Make(X : Set.OrderedType) = struct
       else
         let feature = fingerprint.(i) in
         let subtrie =
-          try PH.find trie.sub feature
+          try M.find feature trie.sub
           with Not_found -> empty_trie ()
         in
         let subtrie' = goto_leaf subtrie fingerprint (i+1) k in
         if is_empty_trie subtrie'
-          then {trie with sub=PH.remove trie.sub feature}
-          else {trie with sub=PH.replace trie.sub feature subtrie'}
+          then {trie with sub=M.remove feature trie.sub}
+          else {trie with sub=M.add feature subtrie' trie.sub}
   
   let add idx t data =
     let fingerprint = idx.fp t in
@@ -175,14 +194,14 @@ module Make(X : Set.OrderedType) = struct
   let iter idx f =
     let rec iter_trie trie f =
       Leaf.iter trie.leaf f;
-      PH.iter trie.sub (fun _ trie' -> iter_trie trie' f)
+      M.iter (fun _ trie' -> iter_trie trie' f) trie.sub
     in
     iter_trie idx.trie f
 
   let fold idx f acc =
     let rec fold_trie trie acc f =
       let acc = Leaf.fold trie.leaf acc f in
-      PH.fold (fun acc _ trie' -> fold_trie trie' acc f) acc trie.sub
+      M.fold (fun _ trie' acc -> fold_trie trie' acc f) trie.sub acc
     in
     fold_trie idx.trie acc f
 
@@ -194,16 +213,16 @@ module Make(X : Set.OrderedType) = struct
 
   (* try to follow the branch with this given feature *)
   let rec try_feature k trie acc i feature =
-    try k (PH.find trie.sub feature) acc (i+1)
+    try k (M.find feature trie.sub) acc (i+1)
     with Not_found -> acc
 
   (* try all S branches *)
   let rec all_symbols k trie acc i =
-    PH.fold
-      (fun acc feat' trie' -> match feat' with
+    M.fold
+      (fun feat' trie' acc -> match feat' with
         | S _ -> k trie' acc (i+1)
         | _ -> acc)
-      acc trie.sub
+      trie.sub acc
 
   let retrieve_unifiables ?(subst=S.empty ()) idx o_i t o_t acc f =
     let fingerprint = idx.fp t in

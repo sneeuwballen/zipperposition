@@ -195,6 +195,7 @@ module TestTerm(I : TermIndex) = struct
           (fun (t',_) ->
             try ignore (check t 0 t' 1); true
             with FOUnif.Fail ->
+              Util.debug 1 "problem with %a and %a" T.pp t T.pp t';
               false)
           retrieved)
     seq

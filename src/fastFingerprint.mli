@@ -29,6 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 This implementation of fingerprint indexing should take types into
 account, and also only traverse the relevant parts of the tree.
 
+Right now it's not more efficient than {!Fingerprint} (see the benchmarks
+in ../tests/run_bench.ml)
+
 TODO: pre-index on types? *)
 
 type fingerprint_fun
