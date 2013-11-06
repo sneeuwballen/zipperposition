@@ -49,36 +49,51 @@ Logtk provides several useful parts for logic-related implementations:
 - Logic related modules:
     - `Symbol`: representation of logical constants, including text symbols
         and numeric symbols
-    - `Term`: first-order terms, with optional higher-order features
-    - `Formula`: first-order formulas
-    - `Unif`: unification algorithms
+    - `FOTerm`: first-order typed terms
+    - `HOTerm`: higher-order typed terms
+    - `FOFormula`: first-order formulas (with typed terms)
+    - `Untyped`: simple non-typed terms and formulas (after parsing). Contains:
+        - `Untyped.FO`: first order untyped terms
+        - `Untyped.HO`: higher order untyped terms
+        - `Untyped.Form`: first order untyped formulas
+    - `FOUnif`: unification algorithms on `FOTerm`
+    - `HOUnif`: unification algorithms on `HOTerm`
     - `Type`: polymorphic types (à la ML)
-    - `Substs`: variable substitutions
+    - `TypeUnif`: unification on types
+    - `Substs`: variable substitutions for types and terms
     - `Signature`: map from symbols to types
-    - `TypeInference`: Hindley-Milner-like type inference algorithm
+    - `TypeInference`: Hindley-Milner-like type inference algorithm. Converts
+        untyped terms and formulas to typed terms and formulas
     - `Precedence`: total order on symbols
     - `Ordering`: orderings on terms
     - `Position`: positions in terms (paths in trees)
     - `Cnf`: transformation of formulas into Clause Normal Form
-    - `Index`: definition of term index signatures
+    - `Index`: definition of term index signatures. Related modules:
         - `Dtree`: perfect discrimination tree, for rewriting
-        - `NPDtree`: non-perfect discrimination tree, for rewriting
+        - `NPDtree`: non-perfect discrimination tree, for rewriting and term indexing
         - `Fingerprint`: fingerprint term indexing
+        - `FastFingerprint`: attempt (failed for now) to make `Fingerprint` faster
         - `FeatureVector`: feature-vector indexing for subsumption
     - `Rewriting`: rewriting on terms, ordered rewriting, formula rewriting
     - `FormulaShape`: detection of some specific formulas (definitions...)
     - `Skolem`: skolemization
+    - `Lambda`: lambda-calculus (beta reduction) on higher-order terms
     - `HO`: higher-order operations, including beta-reduction
     - `Transform`: computation of fixpoints over transformations of formulas
     - `Multiset`: low level multiset of elements, with multiset ordering
     - `Trace_tstp`: proof traces from TSTP provers
     - `CallProver`: call a TSTP prover on a problem
+    - `Congruence`: simple congruence closure on terms (decides ground equality)
 
 - Helpers:
     - `Hash`: utils for hashing values
     - `Hashcons`: perfect sharing of structurally equal values (terms...)
     - `Util`: many utils on lists, printing, strings...
+    - `Monad`: monadic utils (error monad, list, option)
     - `PartialOrder`: matrix representation of partial orderings, with completion
+    - `Options`: global CLI options to be used with `Arg` (set debug level, etc.)
+    - `lib/MultiMap`: functional multimap
+    - `lib/PersistentHashtbl`: persistent (immutable) hashtable
     - `lib/Sequence`: library of iterators
     - `lib/Bencode`: B-encode serialization format
     - `lib/Bij`: GADT-based serialization/deserialization library
@@ -100,7 +115,14 @@ Logtk provides several useful parts for logic-related implementations:
     - `Lex_theory`: lexer for theory description files
     - `Parse_theory`: parser for theory description files
     - `Signal`: lightweight publish-subscribe pattern
-    - `MultiMap`: multimap functorial implementation
+
+- Arbitrary instances (optional):
+    - `ArTerm`: generation of random terms
+    - `ArForm`: random first order formulas
+    - `ArType`: random types
+    - `ArSignature`: random signatures
+    - `ArSymbol`: random symbols
+    - `ArPattern`: random meta-patterns
 
 ## Documentation
 
@@ -111,11 +133,9 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 - consider moving the proof-checking part of tools/proof_check_tstp.ml
     to trace_tstp (can be used for embedded proof checking)
 
-- polymorphism in parser and meta-prover (allow vars to have non ground type)
 - typing in meta-prover, with typing preconditions (for expressing sets with types)
 
 - substitution trees
-- general purpose discrimination trees (simple)
 - path indexing? (better for merges)
 
 - tool to maintain/update a KB
