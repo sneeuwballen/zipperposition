@@ -231,15 +231,9 @@ module Ctx = struct
     (* enrich signature with new symbols *)
     STbl.fold
       (fun s (ty,scope) signature ->
-        (* evaluate type (no renaming needed because we don't care
-            about collisions, all variables will be grounded) *)
-        let ty = S.apply_no_renaming ctx.subst ty scope in
-        (* bind all remaining free variables to [ctx.default] *)
-        let vars = Ty.free_vars ty in
-        let subst' = S.of_list
-          (List.map (fun v -> v, 1, ctx.default, 0) vars)
-        in
-        let ty = S.apply_no_renaming subst' ty scope in
+        (* evaluate type. if variables remain, they are generalized *)
+        let renaming = S.Renaming.create 4 in
+        let ty = S.apply ~renaming ctx.subst ty scope in
         (* add to signature *)
         Signature.declare signature s ty)
       ctx.symbols signature
