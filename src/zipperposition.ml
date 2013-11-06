@@ -205,6 +205,7 @@ let preprocess ?meta ~signature ~plugins ~params formulas =
   let ord = params.param_ord precedence in
   let select = Sel.selection_from_string ~ord params.param_select in
   Util.debug 1 "selection function: %s" params.param_select;
+  Util.debug 1 "signature: %a" Signature.pp signature;
   let ctx = Ctx.create ~ord ~select ~signature () in
   (* build the env *)
   let env = Env.create ?meta ~ctx params signature in
@@ -298,7 +299,10 @@ let annotate_formulas ~signature formulas =
       f, file, name)
     formulas
   in
-  Sequence.persistent formulas
+  (* caution: evaluate formulas BEFORE *)
+  let formulas = Sequence.persistent formulas in
+  let signature = TypeInference.Ctx.to_signature tyctx in
+  formulas, signature
 
 (** Process the given file (try to solve it) *)
 let process_file ?meta ~plugins ~params file =
@@ -317,13 +321,14 @@ let process_file ?meta ~plugins ~params file =
   (* obtain a set of proved formulas, and an initial signature *)
   let formulas = Util_tptp.sourced_formulas ~file decls in
   let signature = Util_tptp.type_declarations decls in
-  (* perform type inference on formulas *)
-  let formulas = annotate_formulas ~signature formulas in
+  (* perform type inference on formulas (also update signature) *)
+  let formulas, signature = annotate_formulas ~signature formulas in
   let formulas = Sequence.map PF.of_sourced formulas in
   let formulas = PF.Set.of_seq formulas in
   (* obtain clauses + env *)
   Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
     (PF.Set.to_seq formulas);
+  Util.debug 2 "input signature: %a" Signature.pp signature;
   let env, clauses = preprocess ?meta ~signature ~plugins ~params formulas in
   (* pre-saturation *)
   let num_clauses = C.CSet.size clauses in

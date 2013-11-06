@@ -287,4 +287,6 @@ let mk_precedence ~penv set =
   let constrs = penv.constrs @ List.map (fun rule -> rule set) penv.constr_rules in
   let signature = penv.base in
   let symbols = Signature.to_symbols signature in
-  Precedence.create ~complete:false constrs symbols
+  let symbols' = PFormula.Set.symbols set in
+  let symbols' = Symbol.Set.elements symbols' in
+  Precedence.create ~complete:false constrs (List.rev_append symbols symbols')
