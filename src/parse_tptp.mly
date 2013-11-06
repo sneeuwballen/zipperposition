@@ -188,7 +188,7 @@ fof_unitary_formula:
   | LEFT_PAREN f=fof_logic_formula RIGHT_PAREN { f }
 
 fof_quantified_formula:
-  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN f=fof_unary_formula { f }
+  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN f=fof_unitary_formula { f }
   | q=fol_quantifier LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN f=fof_unitary_formula
     { q vars f }
 
