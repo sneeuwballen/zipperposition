@@ -231,6 +231,8 @@ let get_proof c = c.hcproof
 
 let is_empty c = Array.length c.hclits = 0
 
+let length c = Array.length c.hclits
+
 let stats () = CHashcons.stats ()
 
 (** descendants of the clause *)

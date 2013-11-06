@@ -48,7 +48,7 @@ type t = private {
   hcctx : Ctx.t;                          (** context of the clause *)
   mutable hctag : int;                    (** unique ID of the clause *)
   mutable hcflags : int;                  (** boolean flags for the clause *)
-  mutable hcweight : int;                 (** weight of clause *)
+  mutable hcweight : int;                 (** weight of clause (sum of size of terms) *)
   mutable hcselected : BV.t;              (** bitvector for selected literals *)
   mutable hcvars : FOTerm.t list;           (** the free variables *)
   mutable hcproof : Proof.t;             (** Proof of the clause *)
@@ -136,6 +136,9 @@ val stats : unit -> (int*int*int*int*int*int)
 
 val is_empty : t -> bool
   (** Is the clause an empty clause? *)
+
+val length : t -> int
+  (** Number of literals *)
 
 val descendants : t -> int SmallSet.t
   (** set of ID of descendants of the clause *)
