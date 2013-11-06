@@ -383,11 +383,16 @@ let add_reasoner reasoner kb =
 let on_lemma r =
   let s = MetaReasoner.on_new_fact_by r "lemma" in
   Signal.map s (fun lit ->
-    let p, terms = MRT.decode_head mapping_lemma "lemma" lit in
-    (* recover a formula from the raw datalog literal *)
-    let f = MetaPattern.apply (p, terms) in
-    let f = MetaPattern.EncodedForm.decode f in
-    NewLemma (f, lit))
+    try
+      let p, terms = MRT.decode_head mapping_lemma "lemma" lit in
+      (* recover a formula from the raw datalog literal *)
+      let f = MetaPattern.apply (p, terms) in
+      let f = MetaPattern.EncodedForm.decode f in
+      NewLemma (f, lit)
+    with e -> 
+      Util.debug 0 "KB.on_lemma: exn %s" (Printexc.to_string e);
+      raise e
+    )
 
 let on_axiom r =
   let s = MetaReasoner.on_new_fact_by r "axiom" in

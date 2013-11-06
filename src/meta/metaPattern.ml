@@ -79,8 +79,9 @@ module EncodedForm = struct
       let varty = HOT.lambda_var_ty t in
       HOT.mk_lambda ~varty (decode_t t')
     | HOT.Const _ -> t
-    | HOT.At ({HOT.term=HOT.Const s}, [t'])
-      when (Symbol.eq s __var_symbol || Symbol.eq s __fun_symbol) -> decode_t t'
+    | HOT.At ({HOT.term=HOT.Const s}, t'::l)
+      when (Symbol.eq s __var_symbol || Symbol.eq s __fun_symbol) ->
+      HOT.mk_at (decode_t t') (List.map decode_t l)
     | HOT.At (t, l) -> HOT.mk_at (decode_t t) (List.map decode_t l)
 
   let encode f =
