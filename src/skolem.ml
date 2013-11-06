@@ -59,6 +59,9 @@ let fresh_sym ~ctx =
 let update_var ~ctx t =
   ctx.sc_var_index <- max ctx.sc_var_index (T.max_var (T.vars t) + 1)
 
+let clear_var ~ctx =
+  ctx.sc_var_index <- 0
+
 let fresh_var ~ctx =
   let n = ctx.sc_var_index in
   ctx.sc_var_index <- n + 1;

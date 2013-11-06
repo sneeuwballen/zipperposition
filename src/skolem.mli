@@ -40,6 +40,9 @@ val to_signature : ctx -> Signature.t
 val fresh_sym : ctx:ctx -> Symbol.t
   (** Just obtain a fresh skolem symbol *)
 
+val clear_var : ctx:ctx -> unit
+  (** reset the variable counter (once a formula has been processed) *)
+
 val fresh_var : ctx:ctx -> int
   (** Unique index for universal variables *)
 

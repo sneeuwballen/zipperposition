@@ -209,6 +209,8 @@ let cnf_of ?(ctx=Skolem.create ()) f =
       Util.debug 4 "... NNF: %a" F.pp f;
       let f = miniscope f in
       Util.debug 4 "... miniscoped: %a" F.pp f;
+      (* adjust the variable counter to [f] before skolemizing *)
+      Skolem.clear_var ~ctx;
       F.iter (Skolem.update_var ~ctx) f;
       let f = skolemize ~ctx f in
       Util.debug 4 "... skolemized: %a" F.pp f;
