@@ -30,6 +30,9 @@ module S = Substs.FO
 module SMap = Symbol.Map
 
 let prof_npdtree_retrieve = Util.mk_profiler "NPDtree_retrieve"
+let prof_npdtree_term_unify = Util.mk_profiler "NPDtree_term_unify"
+let prof_npdtree_term_generalizations = Util.mk_profiler "NPDtree_term_generalizations"
+let prof_npdtree_term_specializations = Util.mk_profiler "NPDtree_term_specializations"
 
 (** {2 Term traversal} *)
 
@@ -44,7 +47,7 @@ let skip t pos =
   let t_pos = T.at_cpos t pos in
   pos + t_pos.T.tsize
 
-(** {2 Discrimination tree} *)
+(** {2 Unix index} *)
 
 module Make(E : Index.EQUATION) = struct
   module E = E
@@ -52,8 +55,6 @@ module Make(E : Index.EQUATION) = struct
   type rhs = E.rhs
 
   module Leaf = Index.MakeLeaf(E)
-
-  module SMap = SMap
 
   type t = {
     star : t option;  (* by variable *)
@@ -152,9 +153,13 @@ module Make(E : Index.EQUATION) = struct
                 traverse subtrie acc (skip t i)  (* skip subterm *)
             end
     in
-    let acc = traverse dt acc 0 in
-    Util.exit_prof prof_npdtree_retrieve;
-    acc
+    try
+      let acc = traverse dt acc 0 in
+      Util.exit_prof prof_npdtree_retrieve;
+      acc
+    with e ->
+      Util.exit_prof prof_npdtree_retrieve;
+      raise e
 
   (** iterate on all (term -> value) in the tree *)
   let rec iter dt k =
@@ -169,6 +174,219 @@ module Make(E : Index.EQUATION) = struct
     let n = ref 0 in
     iter dt (fun _ _ -> incr n);
     !n
+  
+  let to_dot buf t =
+    failwith "NPDTree.to_dot: not implemented"
+end
+
+(** {2 General purpose index} *)
+
+module SIMap = Map.Make(struct
+  type t = Symbol.t * int
+  let compare (s1,i1) (s2,i2) = if i1 = i2 then Symbol.compare s1 s2 else i1-i2
+end)
+
+module MakeTerm(X : Set.OrderedType) = struct
+  module Leaf = Index.MakeLeaf(X)
+
+  type elt = X.t
+
+  type t = {
+    star : t option;  (* by variable *)
+    map : t SIMap.t;  (* by symbol+arity *)
+    leaf : Leaf.t;    (* leaves *)
+  }  (** The discrimination tree *)
+
+  let empty () = {map=SIMap.empty; star=None; leaf=Leaf.empty;}
+
+  let is_empty n = n.star = None && SIMap.is_empty n.map && Leaf.is_empty n.leaf
+
+  (** get/add/remove the leaf for the given term. The
+      continuation k takes the leaf, and returns a leaf option
+      that replaces the old leaf. 
+      This function returns the new trie. *)
+  let goto_leaf trie t k =
+    (* the root of the tree *)
+    let root = trie in
+    (* function to go to the given leaf, building it if needed.
+        [t] is the same term, [i] is the index in the term *)
+    let rec goto trie t i rebuild =
+      if T.size t = i
+        then match k trie.leaf with
+          | leaf' when leaf' == trie.leaf -> root (* no change, return same tree *)
+          | leaf' -> rebuild {trie with leaf=leaf'; }
+        else match (T.at_cpos t i).T.term with
+          | (T.Var _ | T.BoundVar _) ->
+            let subtrie = match trie.star with
+              | None -> empty ()
+              | Some trie' -> trie'
+            in
+            let rebuild subtrie =
+              if is_empty subtrie
+                then rebuild {trie with star=None; }
+                else rebuild {trie with star=Some subtrie ;}
+            in
+            goto subtrie t (i+1) rebuild
+          | T.Node (s, l) ->
+            let arity = List.length l in
+            let subtrie =
+              try SIMap.find (s,arity) trie.map
+              with Not_found -> empty ()
+            in
+            let rebuild subtrie =
+              if is_empty subtrie
+                then rebuild {trie with map=SIMap.remove (s,arity) trie.map; }
+                else rebuild {trie with map=SIMap.add (s,arity) subtrie trie.map ;}
+            in
+            goto subtrie t (i+1) rebuild
+  in
+  goto trie t 0 (fun t -> t)
+
+  let add trie t data =
+    let k leaf = Leaf.add leaf t data in
+    goto_leaf trie t k
+
+  let remove trie t data =
+    let k leaf = Leaf.remove leaf t data in
+    goto_leaf trie t k
+
+  (* skip one term in the tree. Calls [k] with [acc] on corresponding
+    subtries. *)
+  let skip_tree trie acc k =
+    (* [n]: number of branches to skip (corresponding to subterms) *)
+    let rec skip trie n acc k =
+      if n = 0
+        then k acc trie
+        else
+          let acc = match trie.star with
+          | None -> acc
+          | Some trie' -> skip trie' (n-1) acc k
+          in
+          SIMap.fold
+            (fun (_,arity) trie' acc -> skip trie' (n+arity-1) acc k)
+            trie.map acc
+    in
+    skip trie 1 acc k
+
+  let retrieve_unifiables ?(subst=S.empty ()) dt sc_dt t sc_t acc k =
+    Util.enter_prof prof_npdtree_term_unify;
+    (* recursive traversal of the trie, following paths compatible with t *)
+    let rec traverse trie acc i =
+      if i = T.size t
+        then Leaf.fold_unify ~subst trie.leaf sc_dt t sc_t acc k
+        else match (T.at_cpos t i).T.term with
+          | (T.Var _ | T.BoundVar _) ->
+            (* skip one term in all branches of the trie *)
+            skip_tree trie acc
+              (fun acc subtrie -> traverse subtrie acc (i+1))
+          | T.Node (s, l) ->
+            let arity = List.length l in
+            let acc =
+              try
+                let subtrie = SIMap.find (s,arity) trie.map in
+                traverse subtrie acc (i+1)
+              with Not_found -> acc
+            in
+            begin match trie.star with
+              | None -> acc
+              | Some subtrie ->
+                traverse subtrie acc (skip t i)  (* skip subterm of [t] *)
+            end
+    in
+    try
+      let acc = traverse dt acc 0 in
+      Util.exit_prof prof_npdtree_term_unify;
+      acc
+    with e ->
+      Util.exit_prof prof_npdtree_term_unify;
+      raise e
+
+  let retrieve_generalizations ?(subst=S.empty ()) dt sc_dt t sc_t acc k =
+    Util.enter_prof prof_npdtree_term_generalizations;
+    (* recursive traversal of the trie, following paths compatible with t *)
+    let rec traverse trie acc i =
+      if i = T.size t
+        then Leaf.fold_match ~subst trie.leaf sc_dt t sc_t acc k
+        else match (T.at_cpos t i).T.term with
+          | (T.Var _ | T.BoundVar _) ->
+            begin match trie.star with
+            | None -> acc
+            | Some subtrie ->
+              traverse subtrie acc (i+1)  (* match "*" against "*" only *)
+            end
+          | T.Node (s, l) ->
+            let arity = List.length l in
+            let acc =
+              try
+                let subtrie = SIMap.find (s,arity) trie.map in
+                traverse subtrie acc (i+1)
+              with Not_found -> acc
+            in
+            begin match trie.star with
+              | None -> acc
+              | Some subtrie ->
+                traverse subtrie acc (skip t i)  (* skip subterm *)
+            end
+    in
+    try
+      let acc = traverse dt acc 0 in
+      Util.exit_prof prof_npdtree_term_generalizations;
+      acc
+    with e ->
+      Util.exit_prof prof_npdtree_term_generalizations;
+      raise e
+
+  let retrieve_specializations ?(subst=S.empty ()) dt sc_dt t sc_t acc k =
+    Util.enter_prof prof_npdtree_term_specializations;
+    (* recursive traversal of the trie, following paths compatible with t *)
+    let rec traverse trie acc i =
+      if i = T.size t
+        then Leaf.fold_matched ~subst trie.leaf sc_dt t sc_t acc k
+        else match (T.at_cpos t i).T.term with
+          | (T.Var _ | T.BoundVar _) ->
+            (* match * against any subterm *)
+            skip_tree trie acc
+              (fun acc subtrie -> traverse subtrie acc (i+1))
+          | T.Node (s, l) ->
+            (* only same symbol *)
+            let arity = List.length l in
+            begin try
+              let subtrie = SIMap.find (s,arity) trie.map in
+              traverse subtrie acc (i+1)
+            with Not_found -> acc
+            end
+    in
+    try
+      let acc = traverse dt acc 0 in
+      Util.exit_prof prof_npdtree_term_specializations;
+      acc
+    with e ->
+      Util.exit_prof prof_npdtree_term_specializations;
+      raise e
+
+  (** iterate on all (term -> value) in the tree *)
+  let rec iter dt k =
+    Leaf.iter dt.leaf k;
+    begin match dt.star with
+    | None -> ()
+    | Some trie' -> iter trie' k
+    end;
+    SIMap.iter (fun _ trie' -> iter trie' k) dt.map
+
+  let rec fold dt k acc =
+    let acc = Leaf.fold dt.leaf acc k in
+    let acc = match dt.star with
+    | None -> acc
+    | Some trie' -> fold trie' k acc
+    in
+    SIMap.fold (fun _ trie' acc -> fold trie' k acc) dt.map acc
+
+  let size dt =
+    let n = ref 0 in
+    iter dt (fun _ _ -> incr n);
+    !n
+
+  let name = "npdtree"
   
   let to_dot buf t =
     failwith "NPDTree.to_dot: not implemented"

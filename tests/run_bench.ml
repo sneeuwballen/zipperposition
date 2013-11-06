@@ -127,17 +127,22 @@ module BenchFastFingerprint = MakeIdxBench(IntFastFingerprint)
 module BenchFingerprint16 = MakeIdxBench(struct include IntFingerprint let empty () = empty_with Fingerprint.fp16 end)
 module BenchFastFingerprint16 = MakeIdxBench(struct include IntFastFingerprint let empty () = empty_with FastFingerprint.fp16 end)
 
+module IntNPDtree = NPDtree.MakeTerm(OrderedInt)
+module BenchNPDTree = MakeIdxBench(IntNPDtree)
+
 let bench_idx n =
   let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
   let ifinger = BenchFingerprint.idx_of_terms terms in
   let ifastfinger = BenchFastFingerprint.idx_of_terms terms in
   let ifinger16 = BenchFingerprint16.idx_of_terms terms in
   let ifastfinger16 = BenchFastFingerprint16.idx_of_terms terms in
+  let inpdtree = BenchNPDTree.idx_of_terms terms in
   Bench.bench
     [ Util.sprintf "bench_fingerprint_%d" n, BenchFingerprint.bench ifinger terms
     ; Util.sprintf "bench_fast_fingerprint_%d" n, BenchFastFingerprint.bench ifastfinger terms
     ; Util.sprintf "bench_fingerprint_fp16_%d" n, BenchFingerprint16.bench ifinger16 terms
     ; Util.sprintf "bench_fast_fingerprint_fp16_%d" n, BenchFastFingerprint16.bench ifastfinger16 terms
+    ; Util.sprintf "bench_npdtree_%d" n, BenchNPDTree.bench inpdtree terms
     ]
 
 (** {2 Type checking} *)

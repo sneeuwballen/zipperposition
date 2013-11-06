@@ -283,9 +283,12 @@ let props =
   let module TestFingerprint = TestTerm(IntFingerprint) in
   let module IntFastFingerprint = FastFingerprint.Make(OrderedInt) in
   let module TestFastFingerprint = TestTerm(IntFastFingerprint) in
+  let module IntNPDtree = NPDtree.MakeTerm(OrderedInt) in
+  let module TestIntNPDTree = TestTerm(IntNPDtree) in
   QCheck.flatten
     [ TestDtree.props
     ; TestNPDtree.props
     ; TestFingerprint.props
     ; TestFastFingerprint.props
+    ; TestIntNPDTree.props
     ]

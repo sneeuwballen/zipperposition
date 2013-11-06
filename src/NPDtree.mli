@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Non-Perfect Discrimination Tree} *)
 
-(** This module provides a simplification index, based on a
+(** This module provides a simplification index and a term index, based on a
     non-perfect discrimination tree (see "the handbook of automated reasoning",
     chapter "term indexing", for instance). It should be more compact
     in memory than {!Dtree}, and maybe more optimized too.
@@ -33,3 +33,4 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module Make(E : Index.EQUATION) : Index.UNIT_IDX with module E = E
 
+module MakeTerm(X : Set.OrderedType) : Index.TERM_IDX with type elt = X.t
