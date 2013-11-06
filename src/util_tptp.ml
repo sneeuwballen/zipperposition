@@ -157,7 +157,7 @@ let infer_type ctx decls =
   Sequence.iter
     (fun decl ->
       Util.debug 3 "infer type for %a" A.pp_declaration decl;
-      match decl with
+      try match decl with
       | A.Include _
       | A.IncludeOnly _ -> ()
       | A.NewType _ -> ()  (* ignore *)
@@ -168,6 +168,9 @@ let infer_type ctx decls =
       | A.FOF(_,_,f,_)
       | A.TFF(_,_,f,_) -> TypeInference.FO.constrain_form ctx f
       | A.THF(_,_,f,_) -> ignore (TypeInference.HO.constrain ctx f)
+      with e ->
+        Util.debug 0 "error when checking %a" A.pp_declaration decl;
+        raise e
       )
     decls;
   TypeInference.Ctx.bind_to_default ctx

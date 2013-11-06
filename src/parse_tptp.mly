@@ -188,6 +188,7 @@ fof_unitary_formula:
   | LEFT_PAREN f=fof_logic_formula RIGHT_PAREN { f }
 
 fof_quantified_formula:
+  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN f=fof_unary_formula { f }
   | q=fol_quantifier LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN f=fof_unitary_formula
     { q vars f }
 
@@ -272,6 +273,7 @@ system_functor: s=atomic_system_word { s }
 /* prenex quantified type */
 tff_type:
   | ty=tff_term_type { ty }
+  | FORALL LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_type { ty }  /* be nice... */
   | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_type { ty }
 
 /* general type, without quantifiers */
@@ -296,7 +298,7 @@ tff_ty_args:
 
 tff_ty_vars:
   | v=tff_ty_var COLUMN TYPE_TY {  [v] }
-  | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
+  | v=tff_ty_var COLUMN TYPE_TY COMMA l=tff_ty_vars { v::l }
 
 tff_ty_var: w=UPPER_WORD { Ty.var w }
 
