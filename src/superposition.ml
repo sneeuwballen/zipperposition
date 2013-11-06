@@ -177,9 +177,12 @@ let infer_passive (actives:ProofState.ActiveSet.t) clause =
       (* rewrite subterms of u *)
       T.all_positions ~pos:u_pos u acc
         (fun acc u_p p ->
+          if T.is_var u_p
+          (* ignore variables *)
+          then acc
           (* all terms that occur in an equation in the active_set
              and that are potentially unifiable with u_p (u at position p) *)
-          I.retrieve_unifiables actives#idx_sup_from 1 u_p 0 acc
+          else I.retrieve_unifiables actives#idx_sup_from 1 u_p 0 acc
             (fun acc s with_pos subst ->
               let active = with_pos.C.WithPos.clause in
               let s_pos = with_pos.C.WithPos.pos in
