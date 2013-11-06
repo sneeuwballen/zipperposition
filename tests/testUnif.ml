@@ -56,7 +56,7 @@ let check_variant =
   let pp = T.to_string in
   let prop t =
     let renaming = S.Renaming.create 5 in
-    let t' = S.apply ~renaming (S.empty ()) t 0 in
+    let t' = S.apply ~renaming S.empty t 0 in
     FOUnif.are_variant t t'
   in
   mk_test ~pp ~name gen prop

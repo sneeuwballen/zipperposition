@@ -59,7 +59,7 @@ let occurs_check subst v sc_v t sc_t =
   check v sc_v t sc_t
 
 (** Unify terms, returns a substitution or raises Fail *)
-let unification ?(subst=S.empty ()) a sc_a b sc_b =
+let unification ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_unification;
   (* recursive unification *)
   let rec unif subst s sc_s t sc_t =
@@ -104,7 +104,7 @@ let unification ?(subst=S.empty ()) a sc_a b sc_b =
 (** [matching a b] returns sigma such that sigma(a) = b, or raises
     Fail. Only variables from the context of [a] can
     be bound in the substitution. *)
-let matching ?(subst=S.empty ()) a sc_a b sc_b =
+let matching ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_matching;
   (* recursive matching *)
   let rec unif subst s sc_s t sc_t =
@@ -142,7 +142,7 @@ let matching ?(subst=S.empty ()) a sc_a b sc_b =
     Util.exit_prof prof_matching;
     raise Fail
 
-let variant ?(subst=S.empty ()) a sc_a b sc_b =
+let variant ?(subst=S.empty) a sc_a b sc_b =
   Util.enter_prof prof_variant;
   (* recursive variant checking *)
   let rec unif subst s sc_s t sc_t =
@@ -190,7 +190,7 @@ let are_variant t1 t2 =
     [offset] is used to create new variables. *)
 let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
                 ?(is_com=fun s -> Symbol.has_attr Symbol.attr_commut s)
-                ?offset ?(subst=S.empty ()) a sc_a b sc_b =
+                ?offset ?(subst=S.empty) a sc_a b sc_b =
   (* function to get fresh variables *)
   let offset = match offset with
     | Some o -> o

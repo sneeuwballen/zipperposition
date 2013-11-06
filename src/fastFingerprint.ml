@@ -224,7 +224,7 @@ module Make(X : Set.OrderedType) = struct
         | _ -> acc)
       trie.sub acc
 
-  let retrieve_unifiables ?(subst=S.empty ()) idx o_i t o_t acc f =
+  let retrieve_unifiables ?(subst=S.empty) idx o_i t o_t acc f =
     let fingerprint = idx.fp t in
     let rec retrieve trie acc i =
       if i = Array.length fingerprint
@@ -251,7 +251,7 @@ module Make(X : Set.OrderedType) = struct
     in
     retrieve idx.trie acc 0
 
-  let retrieve_generalizations ?(subst=S.empty ()) idx o_i t o_t acc f =
+  let retrieve_generalizations ?(subst=S.empty) idx o_i t o_t acc f =
     let fingerprint = idx.fp t in
     let rec retrieve trie acc i =
       if i = Array.length fingerprint
@@ -273,7 +273,7 @@ module Make(X : Set.OrderedType) = struct
     in
     retrieve idx.trie acc 0
 
-  let retrieve_specializations ?(subst=S.empty ()) idx o_i t o_t acc f = 
+  let retrieve_specializations ?(subst=S.empty) idx o_i t o_t acc f = 
     let fingerprint = idx.fp t in
     let rec retrieve trie acc i =
       if i = Array.length fingerprint

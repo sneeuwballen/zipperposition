@@ -122,7 +122,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq =
     Sequence.fold remove dt seq
 
-  let retrieve ?(subst=S.empty ()) ~sign dt sc_dt t sc_t acc k =
+  let retrieve ?(subst=S.empty) ~sign dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_retrieve;
     (* extended callback *)
     let k' acc t' eqn subst =
@@ -268,7 +268,7 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     skip trie 1 acc k
 
-  let retrieve_unifiables ?(subst=S.empty ()) dt sc_dt t sc_t acc k =
+  let retrieve_unifiables ?(subst=S.empty) dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_term_unify;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc i =
@@ -301,7 +301,7 @@ module MakeTerm(X : Set.OrderedType) = struct
       Util.exit_prof prof_npdtree_term_unify;
       raise e
 
-  let retrieve_generalizations ?(subst=S.empty ()) dt sc_dt t sc_t acc k =
+  let retrieve_generalizations ?(subst=S.empty) dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_term_generalizations;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc i =
@@ -336,7 +336,7 @@ module MakeTerm(X : Set.OrderedType) = struct
       Util.exit_prof prof_npdtree_term_generalizations;
       raise e
 
-  let retrieve_specializations ?(subst=S.empty ()) dt sc_dt t sc_t acc k =
+  let retrieve_specializations ?(subst=S.empty) dt sc_dt t sc_t acc k =
     Util.enter_prof prof_npdtree_term_specializations;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie acc i =

@@ -90,7 +90,7 @@ module Ctx = struct
       scope = ~-1;
       var = ~-1;
       signature;
-      subst = S.empty ();
+      subst = S.empty;
       to_bind = [];
       renaming = Substs.Ty.Renaming.create 7;
       symbols = STbl.create 7;
@@ -106,7 +106,7 @@ module Ctx = struct
   let clear ctx =
     ctx.scope <- 0;
     ctx.var <- ~-1;
-    ctx.subst <- S.empty ();
+    ctx.subst <- S.empty;
     ctx.to_bind <- [];
     STbl.clear ctx.symbols;
     ctx.signature <- Signature.empty;

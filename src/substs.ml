@@ -37,7 +37,7 @@ module type S = sig
   type t
     (** A substitution that binds term variables to other terms *)
 
-  val empty : unit -> t
+  val empty : t
     (** The identity substitution *)
 
   val is_empty : t -> bool
@@ -148,34 +148,50 @@ module Common(T : TERM) = struct
   module M = PersistentHashtbl.Make(TermInt)
   module H = Hashtbl.Make(TermInt)
 
-  type t = (term * int) M.t
+  type t =
+    | E
+    | M of (term * int) M.t
 
-  let empty () = M.empty ()
+  let empty = E
 
-  let is_empty = M.is_empty
+  let is_empty = function
+    | E -> true
+    | M m -> M.is_empty m
 
-  let lookup subst v s_v =
-    if T.is_var v
-      then M.find subst (v, s_v)
-      else raise Not_found
+  let lookup subst v s_v = match subst with
+    | E -> raise Not_found
+    | M m -> 
+      if T.is_var v
+        then M.find m (v, s_v)
+        else raise Not_found
 
-  let mem subst v s_v = M.mem subst (v, s_v)
+  let mem subst v s_v = match subst with
+    | E -> false
+    | M m -> M.mem m (v, s_v)
 
   (** Recursively lookup a variable in the substitution, until we get a value
       that is not a variable or that is not bound *)
-  let rec get_var subst v sc_v =
-    try let t, sc_t = lookup subst v sc_v in
-        if T.is_var t && (sc_t <> sc_v || not (T.eq t v))
-          then get_var subst t sc_t
-          else t, sc_t (* fixpoint of lookup *)
-    with Not_found -> v, sc_v
+  let rec get_var subst v sc_v = match subst with
+    | E -> v, sc_v
+    | M m ->
+      try let t, sc_t = lookup subst v sc_v in
+          if T.is_var t && (sc_t <> sc_v || not (T.eq t v))
+            then get_var subst t sc_t
+            else t, sc_t (* fixpoint of lookup *)
+      with Not_found -> v, sc_v
 
   let bind subst v s_v t s_t =
     let t', s_t' = get_var subst v s_v in
     if s_t' = s_t && T.eq t' t
       then subst (* compatible (absence of) bindings *)
       else if T.is_var t'
-        then M.replace subst (t', s_t') (t, s_t)
+        then
+          let m = match subst with
+            | E -> M.create 11
+            | M m -> m
+          in
+          let m' = M.replace m (t', s_t') (t, s_t) in
+          M m'
         else
           let msg = Util.sprintf
             "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
@@ -183,79 +199,98 @@ module Common(T : TERM) = struct
           in
           raise (Invalid_argument msg)
 
-  let remove subst v s_v = M.remove subst (v, s_v)
+  let remove subst v s_v = match subst with
+    | E -> E
+    | M m -> M (M.remove m (v, s_v))
 
-  let append s1 s2 =
-    M.merge
-      (fun (v,s_v) b1 b2 -> match b1, b2 with
-        | None, _ -> b2
-        | _, None -> b1
-        | Some (t1, s1), Some (t2, s2) ->
-          if T.eq t1 t2 && s1 = s2
-            then Some (t1, s1)
-            else
-              let msg = Util.sprintf
-                "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
-                  T.pp v s_v T.pp t1 s1 T.pp t2 s2
-              in
-              raise (Invalid_argument msg))
-      s1 s2
+  let append s1 s2 = match s1, s2 with
+    | E, _ -> s2
+    | _, E -> s1
+    | M m1, M m2 ->
+      let m = M.merge
+        (fun (v,s_v) b1 b2 -> match b1, b2 with
+          | None, _ -> b2
+          | _, None -> b1
+          | Some (t1, s1), Some (t2, s2) ->
+            if T.eq t1 t2 && s1 = s2
+              then Some (t1, s1)
+              else
+                let msg = Util.sprintf
+                  "Subst.bind: inconsistent binding for %a[%d]: %a[%d] and %a[%d]"
+                    T.pp v s_v T.pp t1 s1 T.pp t2 s2
+                in
+                raise (Invalid_argument msg))
+        m1 m2
+      in
+      M m
   
   let compose s1 s2 = failwith "Subst.compose: not implemented"
 
-  let fold subst acc f =
-    M.fold (fun acc (v,s_v) (t,s_t) -> f acc v s_v t s_t) acc subst
+  let fold subst acc f = match subst with
+    | E -> acc
+    | M m -> M.fold (fun acc (v,s_v) (t,s_t) -> f acc v s_v t s_t) acc m
 
-  let iter subst k =
-    M.iter subst (fun (v,s_v) (t,s_t) -> k v s_v t s_t)
+  let iter subst k = match subst with
+    | E -> ()
+    | M m -> M.iter m (fun (v,s_v) (t,s_t) -> k v s_v t s_t)
 
   (* is the substitution a renaming? *)
-  let is_renaming subst =
+  let is_renaming subst = match subst with
+  | E -> true
+  | M m ->
     begin try
       let codomain = H.create 5 in
-      M.iter subst
+      M.iter m
         (fun _ (t,s_t) ->
           (* is some var bound to a non-var term? *)
           if not (T.is_var t) then raise Exit;
           H.replace codomain (t,s_t) ());
       (* as many variables in codomain as variables in domain *)
-      H.length codomain = M.length subst
+      H.length codomain = M.length m
     with Exit -> false
     end
 
   (* set of variables bound by subst, with their scope *)
-  let domain s =
+  let domain s = match s with
+  | E -> H.create 1
+  | M m ->
     let set = H.create 5 in
-    M.iter s (fun (v,s_v) _ -> H.replace set (v,s_v) ());
+    M.iter m (fun (v,s_v) _ -> H.replace set (v,s_v) ());
     set
 
   (* set of terms that some variables are bound to by the substitution *)
-  let codomain s =
+  let codomain s = match s with
+  | E -> H.create 1
+  | M m ->
     let set = H.create 5 in
-    M.iter s (fun _ (t,s_t) -> H.replace set (t,s_t) ());
+    M.iter m (fun _ (t,s_t) -> H.replace set (t,s_t) ());
     set
 
   (* variables introduced by the subst *)
-  let introduced subst =
+  let introduced subst = match subst with
+  | E -> H.create 1
+  | M m ->
     let set = H.create 5 in
-    M.iter subst
+    M.iter m
       (fun _ (t,s_t) ->
         let vars = T.vars t in
         List.iter (fun v -> H.replace set (v,s_t) ()) vars);
     set
 
-  let to_seq subst =
-    let seq = M.to_seq subst in
+  let to_seq subst = match subst with
+  | E -> Sequence.empty
+  | M m ->
+    let seq = M.to_seq m in
     Sequence.map (fun ((v, s_v), (t, s_t)) -> v, s_v, t, s_t) seq
 
   let to_list subst =
     let seq = to_seq subst in
     Sequence.to_rev_list seq
 
-  let of_seq ?(init=empty ()) seq =
+  let of_seq ?(init=empty) seq =
     Sequence.fold (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init seq
 
-  let of_list ?(init=empty ()) l = match l with
+  let of_list ?(init=empty) l = match l with
     | [] -> init
     | _::_ ->
       List.fold_left (fun subst (v,s_v,t,s_t) -> bind subst v s_v t s_t) init l
@@ -363,9 +398,9 @@ module MakeProd(T : TYPED_TERM) = struct
     ty : Ty.t;
   }
 
-  let empty () = {
-    term = TSubst.empty ();
-    ty = Ty.empty ();
+  let empty = {
+    term = TSubst.empty;
+    ty = Ty.empty;
   }
   
   let ty_subst s = s.ty
@@ -376,7 +411,7 @@ module MakeProd(T : TYPED_TERM) = struct
   let update_ty s f =
     { s with ty = f s.ty }
 
-  let of_ty ty = { term = TSubst.empty (); ty; }
+  let of_ty ty = { term = TSubst.empty; ty; }
 
   let is_empty s = TSubst.is_empty s.term && Ty.is_empty s.ty
 
@@ -422,8 +457,8 @@ module MakeProd(T : TYPED_TERM) = struct
 
   let to_seq t = TSubst.to_seq t.term
   let to_list t = TSubst.to_list t.term
-  let of_seq ?(init=empty ()) seq = { init with term=TSubst.of_seq ~init:init.term seq; }
-  let of_list ?(init=empty ()) l = { init with term=TSubst.of_list ~init:init.term l; }
+  let of_seq ?(init=empty) seq = { init with term=TSubst.of_seq ~init:init.term seq; }
+  let of_list ?(init=empty) l = { init with term=TSubst.of_list ~init:init.term l; }
 
   let bij = Bij.(map
     ~inject:(fun s -> s.term, s.ty)

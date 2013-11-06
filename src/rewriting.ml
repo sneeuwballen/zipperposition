@@ -311,7 +311,7 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
       raise (RewrittenIn (t', subst, rule))
     in
     let rules = ref [] in
-    let t' = compute_nf ~rules (S.empty ()) t 0 in
+    let t' = compute_nf ~rules S.empty t 0 in
     t', !rules
 
   let rewrite trs t =
@@ -412,7 +412,7 @@ module FormRW = struct
       raise (RewrittenIn (r, subst, rule))
     in
     let rules = ref [] in
-    let f' = compute_nf ~rules (S.empty ()) f 0 in
+    let f' = compute_nf ~rules S.empty f 0 in
     if not (F.eq f f') 
       then Util.debug 3 "normal form of %a: %a" F.pp f F.pp f';
     f', !rules
