@@ -36,51 +36,86 @@ module T = HOTerm
 
 (* TODO: flag to check whether a term is beta-reduced *)
 
-let beta_reduce ?(depth=0) t =
-  Util.enter_prof prof_beta_reduce;
-  (* recursive reduction in call by value. [env] contains the environment for
-  De Bruijn indexes. *)
-  let rec beta_reduce ~depth env t = match t.T.term with
-  | T.Var _ -> t
+(* match l_expected against l_arg. All types of l_arg must have a
+  corresponding generalization in l_expected (but l_expected can be
+  longer, it's a partial application) *)
+let rec _match_list subst l_expected s_e l_arg s_a = match l_expected, l_arg with
+  | [], [] -> subst
+  | [], _ -> failwith "lambda_apply_list: too many arguments"
+  | _, [] -> subst   (* all arguments pass *)
+  | ty::l_expected', arg::l_arg' ->
+    (* match expected type with argument *)
+    let subst = TypeUnif.unify ~subst ty s_e arg s_a in 
+    _match_list subst l_expected' s_e l_arg' s_a
+
+let match_types ?(subst=Substs.Ty.empty) ty s_ty args s_args =
+  match ty.Type.ty, args with
+  | _, [] -> subst
+  | Type.Fun (_, expected), _ ->
+    (* match expected types against provided types *)
+    _match_list subst expected s_ty args s_args
+  | _ ->
+    (* raise some type error *)
+    TypeUnif.fail subst ty s_ty Type.((__var ~-1) <== args) s_args
+
+(* recursive reduction in call by value. [env] contains the environment for
+De Bruijn indexes. [subst] is a substitution on types. *)
+let rec beta_reduce_rec ~depth ~subst env t =
+  let ty = Substs.Ty.apply_no_renaming subst t.T.ty 0 in
+  match t.T.term with
+  | T.Var i -> T.mk_var ~ty i
   | T.BoundVar n when n < List.length env ->
     (* look for the possible binding for [n] *)
     begin match List.nth env n with
-    | None -> t
+    | None -> T.mk_bound_var ~ty n
     | Some t' ->
-      assert (Type.eq t.T.ty t'.T.ty);
+      assert (Type.eq ty t'.T.ty);
       T.db_lift ~depth depth t' (* need to lift free vars *)
     end
-  | T.Const _
-  | T.BoundVar _ -> t
+  | T.BoundVar n -> T.mk_bound_var ~ty n
+  | T.Const s -> T.mk_const ~ty s
   | T.Lambda t' ->
-    let varty = T.lambda_var_ty t in
-    let t'' = beta_reduce ~depth:(depth+1) (None::env) t' in
+    let varty = Substs.Ty.apply_no_renaming subst (T.lambda_var_ty t) 0 in
+    let t'' = beta_reduce_rec ~depth:(depth+1) ~subst (None::env) t' in
     T.mk_lambda ~varty t''
-  | T.At ({T.term=T.Lambda t1} as head, t2::l) ->
-    (* a beta-redex! Fire!! First evaluate t2, then remplace
-        db0 by [t2] in [t1] *)
-    Util.debug 4 "beta-reduce: %a @ [%a]" T.pp head (Util.pp_list T.pp) (t2::l);
-    let t2' = beta_reduce ~depth env t2 in
-    assert (Type.eq t2.T.ty t2'.T.ty);
-    assert (Type.eq (T.lambda_var_ty head) t2'.T.ty);
-    let env' = Some t2' :: env in
-    let t1' = beta_reduce ~depth env' t1 in
+  | T.At (t, l) ->
+    let t' = beta_reduce_rec ~depth ~subst env t in
+    let l' = List.map (beta_reduce_rec ~depth ~subst env) l in
+    mk_at_check ~depth ~subst env t' l'
+(* apply term to arguments, beta-reducing at root. [l] is assumed to be
+  fully evaluated. *)
+and mk_at_check ~depth ~subst env t l =
+  (* specialize types if needed *)
+  let ty_args = List.map T.get_type l in
+  let subst = match_types ~subst t.T.ty 0 ty_args 0 in
+  match t.T.term, l with
+  | T.Lambda t1, t2::l ->
+    (* a beta-redex! Fire!! Remplace db0 by [t2] in [t1] and beta reduce [t1] *)
+    Util.debug 4 "beta-reduce: %a @ [%a]" T.pp t (Util.pp_list T.pp) (t2::l);
+    let env' = Some t2 :: env in
+    let t1' = beta_reduce_rec ~depth ~subst env' t1 in
     Util.debug 4 " ---> %a @ [%a]" T.pp t1' (Util.pp_list T.pp) l;
     (* now reduce t1' @ l, if l not empty *)
-    mk_at_check ~depth env t1' l
-  | T.At (t, l) ->
-    let t' = beta_reduce ~depth env t in
-    let l' = List.map (beta_reduce ~depth env) l in
-    mk_at_check ~depth env t' l'
-  and mk_at_check ~depth env t l = match t.T.term, l with
-    | _, [] -> t
-    | T.Lambda _, l ->
-      beta_reduce ~depth env (T.mk_at t l)  (* redex *)
-    | _, l -> T.mk_at t l   (* just apply *)
-  in
-  let t' = beta_reduce ~depth [] t in
-  Util.exit_prof prof_beta_reduce;
-  t'
+    mk_at_check ~depth ~subst:Substs.Ty.empty env t1' l
+  | _, [] ->
+    (* no argument, no need to do anything but type specialization *)
+    let subst = Substs.HO.of_ty subst in
+    Substs.HO.apply_no_renaming ~depth subst t 0
+  | _, _ ->
+    let subst = Substs.HO.of_ty subst in
+    let t' = Substs.HO.apply_no_renaming ~depth subst t 0 in
+    let l' = List.map (fun t -> Substs.HO.apply_no_renaming ~depth subst t 0) l in
+    T.mk_at t' l'
+
+let beta_reduce ?(depth=0) t =
+  Util.enter_prof prof_beta_reduce;
+  try
+    let t' = beta_reduce_rec ~depth ~subst:Substs.Ty.empty [] t in
+    Util.exit_prof prof_beta_reduce;
+    t'
+  with e ->
+    Util.exit_prof prof_beta_reduce;
+    raise e
 
 let rec eta_reduce t =
   match t.T.term with
@@ -105,38 +140,19 @@ let lambda_abstract t ~sub =
 let lambda_abstract_list t args =
   List.fold_right (fun sub t -> lambda_abstract t ~sub) args t
 
-(* match l_expected against l_arg. All types of l_arg must have a
-  corresponding generalization in l_expected (but l_expected can be
-  longer, it's a partial application) *)
-let rec _match_list subst l_expected s_e l_arg s_a = match l_expected, l_arg with
-  | [], [] -> subst
-  | [], _ -> failwith "lambda_apply_list: too many arguments"
-  | _, [] -> subst   (* all arguments pass *)
-  | ty::l_expected', arg::l_arg' ->
-    (* match expected type with argument *)
-    let subst = TypeUnif.match_ ~subst ty s_e arg s_a in 
-    _match_list subst l_expected' s_e l_arg' s_a
-
-let match_types ?(subst=Substs.Ty.empty) ty s_ty args s_args =
-  match ty.Type.ty with
-  | Type.Fun (_, expected) ->
-    (* match expected types against provided types *)
-    _match_list subst expected s_ty args s_args
-  | _ ->
-    (* raise some type error *)
-    TypeUnif.fail subst ty s_ty Type.((__var ~-1) <== args) s_args
-
 let can_apply ty args =
   try ignore (match_types ty 0 args 0); true
   with TypeUnif.Error _ -> false
 
-let lambda_apply_list t args =
-  (* specialize type of [t] *)
-  let ty_args = List.map T.get_type args in
-  let subst = match_types t.T.ty 0 ty_args 0 in
-  let subst = Substs.HO.of_ty subst in
-  let t' = Substs.HO.apply_no_renaming subst t 0 in
-  (* apply function and reduce *)
-  let t' = T.mk_at t' args in
-  let t' = beta_reduce t' in
-  t'
+(* TODO: efficient, type safe apply_reduce (see above) that carries subst
+  and apply it to terms *)
+
+let lambda_apply_list ?(depth=0) t args =
+  Util.enter_prof prof_beta_reduce;
+  try
+    let t' = mk_at_check ~depth ~subst:Substs.Ty.empty [] t args in
+    Util.exit_prof prof_beta_reduce;
+    t'
+  with e ->
+    Util.exit_prof prof_beta_reduce;
+    raise e

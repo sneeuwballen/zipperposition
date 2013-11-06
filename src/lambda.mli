@@ -62,7 +62,7 @@ val can_apply : Type.t -> Type.t list -> bool
   (** Can we apply a term with the given type to terms with
       the corresponding list of types? *)
 
-val lambda_apply_list : term -> term list -> term
+val lambda_apply_list : ?depth:int -> term -> term list -> term
   (** Apply a lambda to a list of arguments.
       The type of the lambda must be a generalization of a function
       that takes the list's types as arguments.
