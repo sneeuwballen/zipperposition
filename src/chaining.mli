@@ -84,6 +84,8 @@ val add_order : env:Env.t -> ?proof:Proof.t list ->
                 less:Symbol.t -> lesseq:Symbol.t -> unit
   (** Declare a new total ordering instance *)
 
+val add_tstp_order : env:Env.t -> unit
+
 val setup_penv : penv:PEnv.t -> unit
 
 val setup_env : env:Env.t -> unit

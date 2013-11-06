@@ -77,13 +77,14 @@ val add_signature : ctx:t -> Signature.t -> unit
 val add_ac : ctx:t -> ?proof:Proof.t list -> Symbol.t -> unit
   (** Symbol is AC *)
 
-(* TODO: also update signature so that less and lesseq have same type
-        and occur in signature *)
 val add_order : ctx:t -> ?proof:Proof.t list ->
                 less:Symbol.t -> lesseq:Symbol.t ->
                 Theories.TotalOrder.instance
   (** Pair of symbols that constitute an ordering.
       @return the corresponding instance. *)
+
+val add_tstp_order : ctx:t -> Theories.TotalOrder.instance
+  (** Specific version of {!add_order} for $less and $lesseq *)
 
 val declare : ctx:t -> Symbol.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)

@@ -325,7 +325,7 @@ let setup_env ?(ac=false) ~env =
     AC.add_ac ~env S.Arith.product;
     end;
   (* be sure that the ordering is present in the context *)
-  Chaining.add_order ~env ?proof:None ~less:S.Arith.less ~lesseq:S.Arith.lesseq;
+  Chaining.add_tstp_order ~env;
   (* we are (until proved otherwise) incomplete *)
   Ctx.lost_completeness ~ctx:(Env.ctx env);
   ()

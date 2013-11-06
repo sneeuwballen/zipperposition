@@ -571,29 +571,44 @@ let axioms ~ctx ~instance =
 
 (** {2 Env} *)
 
+let _setup_rules ~env =
+  Util.debug 3 "setup chaining inferences";
+  Env.add_is_trivial ~env is_tautology;
+  Env.add_is_trivial ~env is_semantic_tautology;
+  Env.add_simplify ~env simplify;
+  Env.add_unary_inf ~env "reflexivity_res" reflexivity_res;
+  Env.add_binary_inf ~env "ineq_chaining_left" ineq_chaining_left;
+  Env.add_binary_inf ~env "ineq_chaining_right" ineq_chaining_right;
+  Env.add_binary_inf ~env "eq_chaining_passive" eq_chaining_passive;
+  Env.add_binary_inf ~env "eq_chaining_active" eq_chaining_active;
+  ()
+
 let add_order ~env ?proof ~less ~lesseq =
   let ctx = Env.ctx env in
   let spec = Ctx.total_order ctx in
   let exists_some = Theories.TotalOrder.exists_order ~spec in
   Util.debug 1 "enable chaining for order %a, %a" Symbol.pp less Symbol.pp lesseq;
   (* first ordering, we have to enable the chaining inferences *)
-  if not exists_some then begin
-    Util.debug 3 "setup chaining inferences";
-    Env.add_is_trivial ~env is_tautology;
-    Env.add_is_trivial ~env is_semantic_tautology;
-    Env.add_simplify ~env simplify;
-    Env.add_unary_inf ~env "reflexivity_res" reflexivity_res;
-    Env.add_binary_inf ~env "ineq_chaining_left" ineq_chaining_left;
-    Env.add_binary_inf ~env "ineq_chaining_right" ineq_chaining_right;
-    Env.add_binary_inf ~env "eq_chaining_passive" eq_chaining_passive;
-    Env.add_binary_inf ~env "eq_chaining_active" eq_chaining_active;
-    end;
+  if not exists_some then _setup_rules ~env;
   (* declare instance *)
   let instance = Ctx.add_order ~ctx ?proof ~less ~lesseq in
   (* add clauses *)
   let clauses = axioms ~ctx:(Env.ctx env) ~instance in
   Env.add_passive ~env (Sequence.of_list clauses);
   ()
+
+let add_tstp_order ~env =
+  let ctx = Env.ctx env in
+  let spec = Ctx.total_order ctx in
+  let exists_some = Theories.TotalOrder.exists_order ~spec in
+  Util.debug 1 "enable chaining for TSTP order";
+  (* add instance *)
+  let instance = Ctx.add_tstp_order ~ctx in
+  if not exists_some then _setup_rules ~env;
+  (* add clauses *)
+  let clauses = axioms ~ctx:(Env.ctx env) ~instance in
+  Env.add_passive ~env (Sequence.of_list clauses);
+  ()   
 
 let setup_penv ~penv =
   ()  (* TODO? *)

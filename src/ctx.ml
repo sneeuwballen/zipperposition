@@ -107,3 +107,17 @@ let add_order ~ctx ?proof ~less ~lesseq =
 
 let declare ~ctx symb ty =
   ctx.signature <- Signature.declare ctx.signature symb ty
+
+let add_tstp_order ~ctx =
+  let less = Symbol.Arith.less in
+  let lesseq = Symbol.Arith.lesseq in
+  let spec = ctx.total_order in
+  try
+    Theories.TotalOrder.find ~spec less
+  with Not_found ->
+    (* declare types of $less and $lesseq *)
+    let ty = Type.(o <== [var 0; var 0]) in
+    declare ~ctx less ty;
+    declare ~ctx lesseq ty;
+    let instance = Theories.TotalOrder.add ~spec ?proof:None ~less ~lesseq in
+    instance
