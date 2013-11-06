@@ -88,6 +88,6 @@ let check_ordering_inv_by_subst ord =
   mk_test ~n:1000 ~name ~pp ~size gen prop
 
 let props =
-  [ check_ordering_inv_by_subst (O.kbo (Precedence.default Signature.empty))
-  ; check_ordering_inv_by_subst (O.rpo6 (Precedence.default Signature.empty))
+  [ check_ordering_inv_by_subst (O.kbo (Precedence.default []))
+  ; check_ordering_inv_by_subst (O.rpo6 (Precedence.default []))
   ]

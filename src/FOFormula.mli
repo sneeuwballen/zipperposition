@@ -142,6 +142,9 @@ val is_closed : t -> bool   (** All variables bound? *)
 
 val contains_symbol : Symbol.t -> t -> bool
 
+val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
+  (** Set of symbols occurring in the formula *)
+
 (** {2 De Bruijn indexes} *)
 
 val db_closed : t -> bool

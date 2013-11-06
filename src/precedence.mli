@@ -95,6 +95,11 @@ val create : ?complete:bool -> constr list -> Symbol.t list -> t
       If [complete] is true (default false) the symbol list is completed using
       special symbols. *)
 
-val default : Signature.t -> t
-  (** default precedence on the given signature *)
+val default : Symbol.t list -> t
+  (** default precedence *)
 
+val default_of_set : Symbol.Set.t -> t
+  (** default precedence on the given set of symbols *)
+
+val default_of_signature : Signature.t -> t
+  (** default precedence on the given signature *)

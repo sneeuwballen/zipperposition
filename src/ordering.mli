@@ -80,8 +80,10 @@ val subterm : t
 
 (** {2 Global table of Orders} *)
 
-val default : Signature.t -> t
+val default : Symbol.t list -> t
   (** default ordering on terms (RPO6) *)
+
+val default_prec : Precedence.t -> t
 
 val choose : string -> Precedence.t -> t
   (** Choose ordering by name among registered ones, or

@@ -396,6 +396,9 @@ let contains_symbol sy f =
   let terms = terms_seq f in
   Sequence.exists (T.contains_symbol sy) terms
 
+let symbols ?(init=Symbol.Set.empty) f =
+  T.symbols ~init (terms_seq f)
+
 (** {2 De Bruijn indexes} *)
 
 let db_closed f =

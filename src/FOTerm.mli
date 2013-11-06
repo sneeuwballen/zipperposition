@@ -173,8 +173,11 @@ val db_from_var : ?depth:int -> t -> t -> t
 
 (** {2 High-level operations} *)
 
-val symbols : t Sequence.t -> Symbol.Set.t   (** Symbols of the terms (keys of signature) *)
-val contains_symbol : Symbol.t -> t -> bool  (** Does the term contain the symbol *)
+val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
+  (** Symbols of the terms (keys of signature) *)
+
+val contains_symbol : Symbol.t -> t -> bool
+  (** Does the term contain this given symbol? *)
 
 (** {2 Fold} *)
 

@@ -384,14 +384,14 @@ let rec head t = match t.term with
   | Node (s, _) -> s
   | Var _ | BoundVar _ -> raise (Invalid_argument "Term.head: variable")
 
-let symbols seq =
+let symbols ?(init=Symbol.Set.empty) seq =
   let rec symbols set t = match t.term with
     | Var _ | BoundVar _ -> set
     | Node (s, l) ->
       let set = Symbol.Set.add s set in
       List.fold_left symbols set l
   in
-  Sequence.fold symbols Symbol.Set.empty seq
+  Sequence.fold symbols init seq
 
 (** Does t contains the symbol f? *)
 let rec contains_symbol f t =

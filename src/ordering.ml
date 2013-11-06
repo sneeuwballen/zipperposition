@@ -376,7 +376,7 @@ let none =
       ord_precedence = prec;
       ord_clear_cache = (fun () -> ());
     } in
-  ord (Precedence.default Signature.empty)
+  ord (Precedence.default [])
 
 let subterm =
   let ord_compare t1 t2 =
@@ -392,7 +392,7 @@ let subterm =
     ord_precedence = prec;
     ord_clear_cache = (fun () -> ());
   } in
-  ord (Precedence.default Signature.empty)
+  ord (Precedence.default [])
 
 (** {2 Globa table of orders} *)
 
@@ -404,8 +404,11 @@ let __table =
   Hashtbl.add h "subterm" (set_precedence subterm);
   h
 
-let default signature =
-  rpo6 (Precedence.default signature)
+let default l =
+  rpo6 (Precedence.default l)
+
+let default_prec prec =
+  rpo6 prec
 
 let choose name prec =
   try

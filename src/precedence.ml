@@ -258,11 +258,16 @@ let create ?(complete=false) constrs symbols =
   (* initial precedence *)
   mk_prec symbols table weight
 
-let default signature =
-  (* two constraints: false, true at end of precedence, and arity constraint *)
+let default l =
+  (* two constraints: false, true at end of precedence, and alpha constraint
+    to be sure that the ordering is total *)
   let constrs =
     [min_constraint [Symbol.false_symbol; Symbol.true_symbol];
-     arity_constraint signature;
      alpha_constraint] in
-  create constrs (Signature.to_symbols signature)
+  create constrs l
 
+let default_of_set set =
+  default (Symbol.Set.elements set)
+
+let default_of_signature signature =
+  default (Signature.to_symbols signature)
