@@ -61,8 +61,7 @@ type t = {
 
 type clause = t
 
-let compact c =
-  lazy (Array.map Lit.form_of_lit c.hclits)
+let compact c = Lits.compact c.hclits
 
 let to_seq c =
   Lits.to_seq c.hclits
@@ -175,13 +174,15 @@ let create_a ?parents ?selected ~ctx lits proof =
   Util.incr_stat stat_mk_hclause;
   Util.enter_prof prof_mk_hclause;
   (* Rename variables.
-    TODO: type-check, so that variables' types may be specialized? *)
   let renaming = Ctx.renaming_clear ~ctx in
   let lits = Lits.apply_subst ~renaming ~ord:ctx.Ctx.ord
     S.empty lits 0 in
+  *)
   let all_vars = Lits.vars lits in
+  (* proof *)
+  let proof' = proof (Lits.compact lits) in
   (* create the structure *)
-  let rec c = {
+  let c = {
     hclits = lits;
     hcctx = ctx;
     hcflags = 0;
@@ -189,16 +190,13 @@ let create_a ?parents ?selected ~ctx lits proof =
     hcweight = 0;
     hcselected = __no_select;
     hcvars = all_vars;
-    hcproof = Obj.magic 0;
+    hcproof = proof';
     hcparents = [];
     hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
     hcsimplto = None;
   } in
   let old_hc, c = c, CHashcons.hashcons c in
   if c == old_hc then begin
-    (* update proof *)
-    let proof' = proof (compact c) in
-    c.hcproof <- proof';
     (* select literals, if not already done *)
     begin c.hcselected <- match selected with
       | Some bv -> bv

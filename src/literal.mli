@@ -180,7 +180,11 @@ module Arr : sig
 
   val terms : t array -> FOTerm.t Sequence.t
 
+  val compact : t array -> CompactClause.t
+    (** Make a compact clause *)
+
   val to_form : t array -> FOFormula.t
+    (** Make a 'or' formula from literals *)
 
   val apply_subst : renaming:Substs.FO.Renaming.t ->
                     ord:Ordering.t -> Substs.FO.t ->

@@ -51,7 +51,8 @@ let prof_remove_simpl = Util.mk_profiler "proofState.remove_simpl"
 
 let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 
-module TermIndex = Fingerprint.Make(C.WithPos)
+(* module TermIndex = Fingerprint.Make(C.WithPos) *)
+module TermIndex = NPDtree.MakeTerm(C.WithPos)
 
 module UnitIndex = NPDtree.Make(struct
   type t = T.t * T.t * bool * C.t
@@ -104,12 +105,12 @@ module ActiveSet = struct
     let idx = SubsumptionIndex.of_signature signature in
     (object (self)
       val mutable m_clauses = C.CSet.empty
-      val mutable m_sup_into = TermIndex.empty
-      val mutable m_sup_from = TermIndex.empty
-      val mutable m_ord_left = TermIndex.empty
-      val mutable m_ord_right = TermIndex.empty
-      val mutable m_ord_subterm = TermIndex.empty
-      val mutable m_back_demod = TermIndex.empty
+      val mutable m_sup_into = TermIndex.empty ()
+      val mutable m_sup_from = TermIndex.empty ()
+      val mutable m_ord_left = TermIndex.empty ()
+      val mutable m_ord_right = TermIndex.empty ()
+      val mutable m_ord_subterm = TermIndex.empty ()
+      val mutable m_back_demod = TermIndex.empty ()
       val mutable m_fv = idx
       method ctx = ctx
       method clauses = m_clauses
@@ -222,7 +223,7 @@ module SimplSet = struct
   (** Create a simplification set *)
   let create ~ctx =
     object
-      val mutable m_simpl = UnitIndex.empty
+      val mutable m_simpl = UnitIndex.empty ()
       method ctx = ctx
       method idx_simpl = m_simpl
 

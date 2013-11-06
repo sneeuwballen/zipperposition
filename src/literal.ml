@@ -536,6 +536,9 @@ module Arr = struct
   let terms lits =
     Sequence.flatMap terms (Sequence.of_array lits)
 
+  let compact lits =
+    lazy (Array.map form_of_lit lits)
+
   let to_form lits =
     let lits = Array.map form_of_lit lits in
     let lits = Array.to_list lits in
