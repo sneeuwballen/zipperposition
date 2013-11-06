@@ -321,6 +321,9 @@ let process_file ?meta ~plugins ~params file =
   (* obtain a set of proved formulas, and an initial signature *)
   let formulas = Util_tptp.sourced_formulas ~file decls in
   let signature = Util_tptp.type_declarations decls in
+  (* XXX ugly, but well. We need special symbols to be properly declared
+      before  they are inferred with too specialized a type. *)
+  let signature = Signature.merge signature Signature.Arith.signature in
   (* perform type inference on formulas (also update signature) *)
   let formulas, signature = annotate_formulas ~signature formulas in
   let formulas = Sequence.map PF.of_sourced formulas in
