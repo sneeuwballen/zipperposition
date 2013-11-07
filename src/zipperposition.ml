@@ -304,9 +304,10 @@ let annotate_formulas ~signature formulas =
   let signature = TypeInference.Ctx.to_signature tyctx in
   formulas, signature
 
-(** Process the given file (try to solve it) *)
-let process_file ?meta ~plugins ~params file =
-  Util.debug 1 "================ process file %s ===========" file;
+(* try to refute the set of clauses contained in the [env]. Parameters are
+   used to influence how saturation is done, for how long it runs, etc.
+   @return the result and final env. *)
+let try_to_refute ~env ~params result =
   let steps = if params.param_steps = 0
     then None else (Util.debug 0 "run for %d steps" params.param_steps;
                     Some params.param_steps)
@@ -315,6 +316,17 @@ let process_file ?meta ~plugins ~params file =
                     ignore (setup_alarm params.param_timeout);
                     Some (Util.get_start_time () +. params.param_timeout -. 0.25))
   in
+  let result, num = match result with
+    | Sat.Unsat _ -> result, 0  (* already found unsat during presaturation *)
+    | _ -> Sat.given_clause ~generating:true ?steps ?timeout ~env
+  in
+  Util.debug 1 "done %d iterations" num;
+  Util.debug 1 "final precedence: %a" Precedence.pp (Env.precedence env);
+  result, env
+
+(** Process the given file (try to solve it) *)
+let process_file ?meta ~plugins ~params file =
+  Util.debug 1 "================ process file %s ===========" file;
   (* parse formulas *)
   let decls = Util_tptp.parse_file ~recursive:true file in
   Util.debug 1 "parsed %d declarations" (Sequence.length decls);
@@ -344,14 +356,9 @@ let process_file ?meta ~plugins ~params file =
     num_clauses (Util.pp_seq ~sep:"\n%%  " C.pp) clauses;
   (* add clauses to passive set of [env] *)
   Env.add_passive ~env clauses;
-  (* saturate *)
-  let result, num = match result with
-    | Sat.Unsat _ -> result, 0  (* already found unsat during presaturation *)
-    | _ -> Sat.given_clause ~generating:true ?steps ?timeout ~env
-  in
+  (* saturate, possibly changing env *)
+  let result, env = try_to_refute ~env ~params result in
   Util.debug 1 "=================================================";
-  Util.debug 1 "done %d iterations" num;
-  Util.debug 1 "final precedence: %a" Precedence.pp (Env.precedence env);
   (* print some statistics *)
   if params.param_stats then begin
     print_stats ~env;
@@ -361,6 +368,7 @@ let process_file ?meta ~plugins ~params file =
   print_dots ~env result;
   print_meta ~env;
   print_szs_result ~file ~env result;
+  Util.debug 1 "=================================================";
   ()
 
 (** Print the content of the KB, and exit *)
