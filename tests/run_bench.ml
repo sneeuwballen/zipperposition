@@ -131,7 +131,9 @@ module IntNPDtree = NPDtree.MakeTerm(OrderedInt)
 module BenchNPDTree = MakeIdxBench(IntNPDtree)
 
 let bench_idx n =
-  let terms = QCheck.Arbitrary.generate ~rand ~n ArTerm.default in
+  let terms = List.filter
+    (fun t -> not (T.is_var t))
+    (QCheck.Arbitrary.generate ~rand ~n ArTerm.default) in
   let ifinger = BenchFingerprint.idx_of_terms terms in
   let ifastfinger = BenchFastFingerprint.idx_of_terms terms in
   let ifinger16 = BenchFingerprint16.idx_of_terms terms in
