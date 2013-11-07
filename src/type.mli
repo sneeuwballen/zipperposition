@@ -103,6 +103,10 @@ val free_vars : t -> t list
 val arity : t -> int
   (** Number of arguments of the type (If it's a function, else 0)*)
 
+val expected_args : t -> t list
+  (** Types expected as argument by [ty]. Empty list if [ty] is not a function,
+      otherwise a list of length [arity ty]. *)
+
 val is_ground : t -> bool
   (** Is the type ground? (means that no {!Var} occur in it) *)
 

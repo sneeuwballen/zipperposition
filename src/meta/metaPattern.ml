@@ -111,45 +111,36 @@ end
 
 We encode formulas as terms, because it allows us to lambda-abstract
 over them, which makes the order of variables pretty clear.
-
-TODO: remove the list of types, the EncodedForm already contains a function
-type
 *)
 
 type t =
-  | Pattern of EncodedForm.t * Type.t list
+  | Pattern of EncodedForm.t
 
-let compare (Pattern (t1, types1)) (Pattern (t2, types2)) =
-  let c = EncodedForm.compare t1 t2 in
-  if c <> 0
-    then c
-    else Util.lexicograph Type.cmp types1 types2
+let compare (Pattern t1) (Pattern t2) =
+  EncodedForm.compare t1 t2
 
 let eq p1 p2 = compare p1 p2 = 0
 
-let hash (Pattern (t, types)) =
-  Hash.hash_list Type.hash (EncodedForm.hash t) types
+let hash (Pattern t) = EncodedForm.hash t
 
-let pp buf (Pattern (p, _)) =
-  EncodedForm.pp buf p
+let pp buf (Pattern p) = EncodedForm.pp buf p
 
 let to_string p = Util.on_buffer pp p
 
 let pp_apply buf (p, args) =
   Printf.bprintf buf "%a(%a)" pp p (Util.pp_list EncodedForm.pp) args
 
-let fmt fmt (Pattern (p, _)) =
+let fmt fmt (Pattern p) =
   Format.pp_print_string fmt (Util.on_buffer HOT.pp p)
 
-let debug fmt (Pattern (p, types)) =
-  Format.fprintf fmt "pat(%a, [%a])" HOT.debug p
-    (Sequence.pp_seq Type.fmt) (Sequence.of_list types)
+let debug fmt (Pattern p) =
+  Format.fprintf fmt "pat(%a)" HOT.debug p
 
 let bij =
   Bij.(map
-    ~inject:(fun (Pattern (t, types)) -> t, types)
-    ~extract:(fun (t, types) -> Pattern (t, types))
-    (pair EncodedForm.bij (list_ Type.bij)))
+    ~inject:(fun (Pattern t) -> t)
+    ~extract:(fun t -> Pattern t)
+    EncodedForm.bij)
 
 (** {2 Basic Operations} *)
 
@@ -172,35 +163,25 @@ let create f =
   let symbols = List.rev (functions_in_order [] f) in
   (* create pattern by lambda abstraction *)
   let pat = Lambda.lambda_abstract_list f symbols in
-  let types = match pat.HOT.ty.Type.ty with
-    | Type.Fun (_, l) -> l
-    | _ -> []
-  in
-  Pattern (pat, types), symbols
+  Pattern pat, symbols
 
-let arity = function
-  | Pattern (_, l) -> List.length l
+let arity (Pattern p) = Type.arity p.HOT.ty
 
 let can_apply (pat,args) =
   match pat with
-  | Pattern (t, types) ->
-    (* type checking for compatibility of [args] and [types] *)
-    Lambda.can_apply t.HOT.ty (List.map HOT.get_type args)
+  | Pattern t -> Lambda.can_apply t.HOT.ty (List.map HOT.get_type args)
 
 let apply (pat, args) =
   match pat with
-  | Pattern (t, types) -> Lambda.lambda_apply_list t args
+  | Pattern p -> Lambda.lambda_apply_list p args
 
 (** Maps a pattern, parametrized by some of its variables, into datalog terms *)
 let mapping =
   let module MT = MetaReasoner.Translate in
-  let m = MT.triple MT.term (MT.list_ MT.type_) (MT.list_ MT.term) in
+  let m = MT.pair MT.term (MT.list_ MT.term) in
   MT.map
-    ~inject:(fun (Pattern (p,types), args) ->
-      assert (List.length args = List.length types);
-      p, types, args)
-    ~extract:(fun (t, types, args) ->
-      Pattern (t, types), args)
+    ~inject:(fun (Pattern p, args) -> p, args)
+    ~extract:(fun (t, args) -> Pattern t, args)
     m
 
 (** Matches the first pattern (curryfied term) against the second one. Only
@@ -221,9 +202,10 @@ let matching_terms p1 o_1 p2 o_2 =
 let matching pat right =
   Util.enter_prof prof_matching;
   match pat with
-  | Pattern (t', types) ->
+  | Pattern t' ->
     (* instantiate with variables *)
     let offset = HOT.max_var (HOT.vars t') + 1 in
+    let types = Type.expected_args t'.HOT.ty in
     let vars = List.mapi (fun i ty -> HOT.mk_var ~ty (i+offset)) types in
     let left = Lambda.lambda_apply_list t' vars in
     (* match left and right *)

@@ -144,9 +144,6 @@ let can_apply ty args =
   try ignore (match_types ty 0 args 0); true
   with TypeUnif.Error _ -> false
 
-(* TODO: efficient, type safe apply_reduce (see above) that carries subst
-  and apply it to terms *)
-
 let lambda_apply_list ?(depth=0) t args =
   Util.enter_prof prof_beta_reduce;
   try

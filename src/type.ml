@@ -161,6 +161,11 @@ let arity ty = match ty.ty with
   | Var _
   | App _ -> 0
 
+let expected_args ty = match ty.ty with
+  | Fun (_, l) -> l
+  | Var _
+  | App _ -> []
+
 let is_ground t = t.ground
 
 let rec size ty = match ty.ty with
