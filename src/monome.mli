@@ -105,7 +105,8 @@ val divby : t -> Symbol.t -> t    (** Division by constant, must be > 0 *)
 val succ : t -> t                 (** +1 *)
 val pred : t -> t                 (** -1 *)
 
-val sum_list : t list -> t  (** Sum of a list. @raise Failure if the list is empty *)
+val sum_list : t list -> t
+  (** Sum of a list. @raise Failure if the list is empty *)
 
 val comparison : t -> t -> Comparison.t
   (** Try to compare two monomes. They may not be comparable (ie on some
