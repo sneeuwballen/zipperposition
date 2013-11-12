@@ -13,12 +13,16 @@
 open Logtk;;
 open Libzipperposition;;
 open Logtk.Sequence.Infix;;
-open Logtk.Type.Infix;;
+open Logtk.Type;;
 #install_printer FOTerm.fmt;;
 #install_printer HOTerm.fmt;;
 #install_printer Literal.fmt;;
 #install_printer Clause.fmt;;
 #install_printer FOFormula.fmt;;
+#install_printer Untyped.FO.fmt;;
+#install_printer Untyped.Form.fmt;;
+#install_printer Untyped.HO.fmt;;
+#install_printer Type.Parsed.fmt;;
 #install_printer Substs.FO.fmt;;
 #install_printer Substs.HO.fmt;;
 #install_printer Proof.fmt;;
@@ -29,8 +33,18 @@ open Logtk.Type.Infix;;
 module T = Logtk.FOTerm;;
 module F = Logtk.FOFormula;;
 module M = Monome;;
-let pterm s = Logtk.Parse_tptp.parse_term Logtk.Lex_tptp.token (Lexing.from_string s);;
-let pform s = Logtk.Parse_tptp.parse_formula Logtk.Lex_tptp.token (Lexing.from_string s);;
+let pterm s =
+    let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create ~base:true () in
+    let _, clos = TypeInference.FO.infer tyctx t 0 in
+    let renaming = Substs.Ty.Renaming.create 5 in
+    TypeInference.Ctx.apply_closure ~renaming tyctx clos
+;;
+let pform s =
+    let f = Parse_tptp.parse_formula Lex_tptp.token (Lexing.from_string s) in
+    let tyctx = TypeInference.Ctx.create ~base:true () in
+    TypeInference.FO.convert_form ~ctx:tyctx f
+;;
 Printf.printf "finished loading\n";;
 (* vim:syntax=ocaml
 *)
