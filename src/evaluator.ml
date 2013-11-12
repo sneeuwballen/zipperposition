@@ -87,24 +87,29 @@ module FO = struct
     | T.Var _
     | T.BoundVar _ -> t
     | T.Node (s, []) ->
-      begin try
-        (* evaluate constant *)
-        let f = Symbol.Tbl.find ev s in
-        match f t.T.ty s [] with
+      let t' =
+        try
+          (* evaluate constant *)
+          let f = Symbol.Tbl.find ev s in
+          f t.T.ty s []
+        with Not_found -> None
+      in
+      begin match t' with
         | None -> t
         | Some t' -> eval ev t'
-      with Not_found -> t
       end
     | T.Node (s, l) ->
       (* evaluate subterms, then the term itself *)
       let l' = List.map (eval ev) l in
-      begin try
-        let f = Symbol.Tbl.find ev s in
-        match f t.T.ty s l' with
+      let t' = 
+        try
+          let f = Symbol.Tbl.find ev s in
+          f t.T.ty s l'
+        with Not_found -> None
+      in
+      begin match t' with
         | None -> T.mk_node ~ty:t.T.ty s l'  (* replace *)
         | Some t' -> eval ev t'
-      with Not_found ->
-        T.mk_node ~ty:t.T.ty s l'
       end
 
   let eval_form ev f =
@@ -115,7 +120,7 @@ module FO = struct
   (* helpers *)
 
   let _unary l = match l with
-    | [{T.term=T.Node(s,l')}] -> `Unary (s, l)
+    | [{T.term=T.Node(s,l')}] -> `Unary (s, l')
     | _ -> `None
   let _binary l = match l with
     | [{T.term=T.Node(s1,l1')}; {T.term=T.Node(s2,l2')}] ->
