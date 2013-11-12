@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module F = Basic.Form
 module HOT = Basic.HO
 
+exception ParseError of Location.t
+
 type declaration =
   | CNF of name * role * Basic.Form.t list * optional_info
   | FOF of name * role * Basic.Form.t * optional_info

@@ -107,3 +107,8 @@ let to_string pos =
 let pp_opt buf o = match o with
   | None -> Printf.bprintf buf "<no location>"
   | Some pos -> pp buf pos
+
+let set_file buf filename =
+  let open Lexing in
+  buf.lex_curr_p <- {buf.lex_curr_p with pos_fname=filename;};
+  ()

@@ -498,8 +498,7 @@ let formulas_of_statements statements =
       | A.Axiom (_, _, f) -> Sequence.singleton f
       | A.Theory (_, _, premises) -> gather_premises premises
       | A.Clause (head, body) -> Sequence.empty
-      | A.Include _
-      | A.Error _ -> Sequence.empty)
+      | A.Include _ -> Sequence.empty)
     statements
 
 (* apply the axiom definition to args, getting back a pattern,args *)
@@ -659,7 +658,6 @@ let closure_of_statement ctx statement =
     let c = Clause (head, body) in
     return (fun kb -> add_clause kb c)
   | A.Include _ -> failwith "KB.kb_of_statements: remaining includes"
-  | A.Error _ -> failwith "KB.kb_of_statements: error in list"
 
 (** Conversion of a list of Ast_theory.statement to a KB *)
 let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
@@ -697,21 +695,16 @@ let parse_theory_file ?base filename =
   try
     let ic = open_in filename in
     let lexbuf = Lexing.from_channel ic in
+    Location.set_file lexbuf filename;
     let statements = Parse_theory.parse_statements Lex_theory.token lexbuf in
-    begin try
-      (* error, fail *)
-      let e = List.find A.is_error statements in
-      let msg = Util.sprintf "error in parsed KB: %s" (A.error_to_string e) in
-      Monad.Err.fail msg
-    with Not_found ->
-      (* no error, proceed *)
-      kb_of_statements ?base (Sequence.of_list statements)
-    end
+    kb_of_statements ?base (Sequence.of_list statements)
   with Unix.Unix_error (e, _, _) ->
     let msg =
-      Util.sprintf "error reading theory file %s: %s"
-      filename (Unix.error_message e)
-    in
+      Util.sprintf "IO error reading theory file %s: %s"
+      filename (Unix.error_message e) in
+    Monad.Err.fail msg
+  | A.ParseError loc ->
+    let msg = Util.sprintf "parse_theory_file: syntax error at %a" Location.pp loc in
     Monad.Err.fail msg
   
 let save filename kb =

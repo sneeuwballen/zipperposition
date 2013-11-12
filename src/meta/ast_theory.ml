@@ -29,6 +29,8 @@ open Logtk
 
 module BF = Basic.Form
 
+exception ParseError of Location.t
+
 type statement =
   | Lemma of string * string list * premise list
   | LemmaInline of BF.t * premise list
@@ -36,7 +38,6 @@ type statement =
   | Theory of string * string list * premise list
   | Clause of clause
   | Include of string
-  | Error of string * Lexing.position * Lexing.position
   (** Parse statement *)
 and premise =
   | IfPattern of BF.t
@@ -44,16 +45,6 @@ and premise =
   | IfTheory of string * string list
 and clause = raw_lit * raw_lit list
 and raw_lit = string * string list
-
-let is_error = function
-  | Error (_, _, _) -> true
-  | _ -> false
-
-let error_to_string = function
-  | Error (msg, start, stop) ->
-    Util.sprintf "parse error at %s - %s: %s"
-      (Util.pp_pos start) (Util.pp_pos stop)  msg
-  | _ -> failwith "Ast_theory.error_to_string: not an error"
 
 (** Print a statement *)
 let pp buf statement =
@@ -91,9 +82,6 @@ let pp buf statement =
     Printf.bprintf buf "%a :- %a." pp_lit head (Util.pp_list pp_lit) body
   | Include s ->
     Printf.bprintf buf "include %s." s
-  | Error (e, start, stop) ->
-    Printf.bprintf buf "parse error %s (%s to %s)" e
-      (Util.pp_pos start) (Util.pp_pos stop)
 
 (** Print a list of statements, separated by \n *)
 let pp_statements buf statements =
@@ -114,5 +102,4 @@ let generalize_statement stmt =
   | Axiom (n,l, f) -> Axiom (n,l, BF.generalize_vars f)
   | Theory (n,l, premises) -> Theory (n,l, generalize_premises premises)
   | Clause _
-  | Include _
-  | Error _ -> stmt
+  | Include _ -> stmt

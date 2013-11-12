@@ -97,9 +97,9 @@ let process file =
       (fun d -> Util.printf "%a\n" A.pp_declaration d)
       decls
   with
-  | Util_tptp.ParseError _ as e ->
+  | Ast_tptp.ParseError loc ->
     (* syntax error *)
-    Printf.eprintf "%s\n" (Util_tptp.string_of_error e);
+    Util.eprintf "parse error at %a\n" Location.pp loc;
     exit 1
   | TypeUnif.Error e ->
     Util.eprintf "%a\n" TypeUnif.pp_error e;

@@ -115,7 +115,11 @@ parse_statements: l=statements EOI { l }
 statements:
   | EOI { [] }
   | s=statement l=statements { s :: l }
-  | error statements { [Ast_theory.Error ("syntax error", $startpos($1), $endpos($1))] }
+  | error statements
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      raise (Ast_theory.ParseError loc)
+    }
 
 statement:
   | t=theory { t }

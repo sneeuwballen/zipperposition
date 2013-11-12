@@ -105,9 +105,9 @@ let parse_and_cnf files =
         let decls = Util_tptp.parse_file ~recursive:true file in
         let decls = to_cnf ~ctx decls in
         decls
-      with Util_tptp.ParseError _ as e ->
+      with Ast_tptp.ParseError loc ->
         (* syntax error *)
-        Printf.printf "%s\n" (Util_tptp.string_of_error e);
+        Util.eprintf "parse error at %a\n" Location.pp loc;
         exit 1)
     files
   in

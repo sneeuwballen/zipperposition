@@ -60,3 +60,8 @@ val fmt : Format.formatter -> t -> unit
 val to_string : t -> string
 
 val pp_opt : Buffer.t -> t option -> unit
+
+(** {2 Lexbuf} *)
+
+val set_file : Lexing.lexbuf -> string -> unit
+  (** Change the file name used for positions in this lexbuf *)

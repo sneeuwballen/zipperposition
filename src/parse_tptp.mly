@@ -140,6 +140,11 @@ declaration:
     { Ast_tptp.Include (remove_quotes x) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED COMMA names=name_list RIGHT_PAREN DOT
     { Ast_tptp.IncludeOnly (x, names) }
+  | error
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      raise (Ast_tptp.ParseError loc)
+    }
 
 role: w=LOWER_WORD { Ast_tptp.role_of_string w }
 

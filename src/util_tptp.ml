@@ -80,11 +80,6 @@ let _raise_error filename lexbuf =
   let e_c = end_.Lexing.pos_cnum - end_.Lexing.pos_bol in
   raise (ParseError (filename, s_l, s_c, e_l, e_c))
 
-let _set_file buf filename =
-  let open Lexing in
-  buf.lex_curr_p <- {buf.lex_curr_p with pos_fname=filename;};
-  ()
-
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
@@ -95,7 +90,7 @@ let parse_file ~recursive f =
     | _ -> open_in (find_file filename dir) in
     begin try
       let buf = Lexing.from_channel input in
-      _set_file buf filename;
+      Location.set_file buf filename;
       let decls =
         try Parse_tptp.parse_declarations Lex_tptp.token buf
         with Parse_tptp.Error ->
@@ -116,7 +111,11 @@ let parse_file ~recursive f =
           | (A.Include _ | A.IncludeOnly _), _ ->
             Queue.push decl result_decls)
         decls
-    with _ as e ->
+    with (A.ParseError loc) as e ->
+      close_in input;
+      Util.debug 1 "parse_tptp: syntax error: %a" Location.pp loc;
+      raise e
+    | _ as e ->
       close_in input;
       raise e
     end;
