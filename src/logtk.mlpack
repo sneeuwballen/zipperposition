@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 449865f23f166f282dc78ff0c330d9e1)
+# DO NOT EDIT (digest: dfd9545ecadc4856deb8d917e3098586)
 HO
 FO
 Symbol
@@ -44,6 +44,7 @@ Options
 Untyped
 Monad
 FastFingerprint
+Evaluator
 lib/Sequence
 lib/Bij
 lib/Cache

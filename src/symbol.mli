@@ -171,6 +171,10 @@ module Arith : sig
   val remainder_t : t
   val remainder_f : t
 
+  val is_int : t
+  val is_rat : t
+  val is_real : t
+
   val to_int : t
   val to_rat : t
   val to_real : t

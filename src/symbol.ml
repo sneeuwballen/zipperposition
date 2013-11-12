@@ -336,6 +336,10 @@ module Arith = struct
   let remainder_t = mk_const "$remainder_t"
   let remainder_f = mk_const "$remainder_f"
 
+  let is_int = mk_const "$is_int"
+  let is_rat = mk_const "$is_rat"
+  let is_real = mk_const "$is_real"
+
   let to_int = mk_const "$to_int"
   let to_rat = mk_const "$to_rat"
   let to_real = mk_const "$to_real"

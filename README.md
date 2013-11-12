@@ -84,6 +84,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `Trace_tstp`: proof traces from TSTP provers
     - `CallProver`: call a TSTP prover on a problem
     - `Congruence`: simple congruence closure on terms (decides ground equality)
+    - `Evaluator`: helps evaluating terms using interpreted symbols
 
 - Helpers:
     - `Hash`: utils for hashing values

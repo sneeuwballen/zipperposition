@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6da3dc4be016d7074545d7aee09838e1)
+# DO NOT EDIT (digest: 6ddaa93cfa5823d02a8be75630124c87)
 src/HO
 src/FO
 src/Symbol
@@ -44,6 +44,7 @@ src/Options
 src/Untyped
 src/Monad
 src/FastFingerprint
+src/Evaluator
 src/lib/Sequence
 src/lib/Bij
 src/lib/Cache
