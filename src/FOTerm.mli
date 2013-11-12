@@ -244,8 +244,3 @@ val bij : t Bij.t
 
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
-
-(** {2 Type erasure} *)
-
-val erase_types : ?depth:int -> t -> Untyped.FO.t
-  (** Erase types (except for variables) *)

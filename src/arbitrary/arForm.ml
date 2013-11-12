@@ -24,7 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Arbitrary Untyped Terms} *)
+(** {1 Arbitrary Basic Terms} *)
 
 open Logtk
 open QCheck
@@ -32,9 +32,9 @@ open QCheck
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
 
-module ArbitraryUntyped = struct
-  module UF = Untyped.Form
-  module AT = ArTerm.ArbitraryUntyped
+module ArbitraryBasic = struct
+  module UF = Basic.Form
+  module AT = ArTerm.ArbitraryBasic
 
   let atom =
     Arbitrary.(choose
@@ -65,21 +65,21 @@ end
 
 let atom =
   Arbitrary.(
-    ArbitraryUntyped.atom >>= fun f ->
+    ArbitraryBasic.atom >>= fun f ->
     let ctx = TypeInference.Ctx.create () in
     return (TypeInference.FO.convert_form ~ctx f)
   )
 
 let clause =
   Arbitrary.(
-    list ArbitraryUntyped.atom >>= fun lits ->
+    list ArbitraryBasic.atom >>= fun lits ->
     let ctx = TypeInference.Ctx.create () in
     return (TypeInference.FO.convert_clause ~ctx lits)
   )
 
 let default = 
   Arbitrary.(
-    ArbitraryUntyped.default >>= fun f ->
+    ArbitraryBasic.default >>= fun f ->
     let ctx = TypeInference.Ctx.create () in
     return (TypeInference.FO.convert_form ~ctx f)
   )

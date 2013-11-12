@@ -763,16 +763,3 @@ let bij =
         | "lam" -> BranchFrom (Lazy.force bij_lam, fun (varty,t') -> mk_lambda ~varty t')
         | "at" -> BranchFrom (Lazy.force bij_at, fun (t, l) -> mk_at t l)
         | _ -> raise (DecodingError "expected Term")))
-
-let erase_types t =
-  let module UT = Untyped.HO in
-  let rec erase depth t = match t.term with
-  | Const s -> UT.const s
-  | At (t, l) -> UT.app (erase depth t) (List.map (erase depth) l)
-  | Var i -> UT.var ~ty:(Type.to_parsed t.ty) (Util.sprintf "X%d" i)
-  | BoundVar i -> UT.var ~ty:(Type.to_parsed t.ty) (Util.sprintf "Y%d" (depth-i-1))
-  | Lambda t' ->
-    let var = UT.var ~ty:(Type.to_parsed t.ty) (Util.sprintf "Y%d" depth) in
-    UT.lambda ~var (erase (depth+1) t')
-  in
-  erase 0 t

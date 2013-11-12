@@ -52,18 +52,20 @@ Logtk provides several useful parts for logic-related implementations:
     - `FOTerm`: first-order typed terms
     - `HOTerm`: higher-order typed terms
     - `FOFormula`: first-order formulas (with typed terms)
-    - `Untyped`: simple non-typed terms and formulas (after parsing). Contains:
-        - `Untyped.FO`: first order untyped terms
-        - `Untyped.HO`: higher order untyped terms
-        - `Untyped.Form`: first order untyped formulas
+    - `Basic`: simple terms and formulas with locations and optional typing. Typically used after parsing. Contains:
+        - `Basic.Ty`: polymorphic types with quantifiers
+        - `Basic.FO`: first order terms
+        - `Basic.Form`: first order formulas
+        - `Basic.HO`: higher order terms
     - `FOUnif`: unification algorithms on `FOTerm`
     - `HOUnif`: unification algorithms on `HOTerm`
-    - `Type`: polymorphic types (à la ML)
-    - `TypeUnif`: unification on types
     - `Substs`: variable substitutions for types and terms
     - `Signature`: map from symbols to types
-    - `TypeInference`: Hindley-Milner-like type inference algorithm. Converts
-        untyped terms and formulas to typed terms and formulas
+    - `Type`: polymorphic types (à la ML). Operations on types include:
+        - `TypeUnif`: unification on types
+        - `TypeInference`: Hindley-Milner-like type inference algorithm. Converts untyped terms and formulas to typed terms and formulas
+        - `TypeErasure`: conversion from typed terms and formulas to basic ones
+        - `TypeConversion`: converts between `Basic.Ty.t` and `Type.t`
     - `Precedence`: total order on symbols
     - `Ordering`: orderings on terms
     - `Position`: positions in terms (paths in trees)
@@ -93,6 +95,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `Monad`: monadic utils (error monad, list, option)
     - `PartialOrder`: matrix representation of partial orderings, with completion
     - `Options`: global CLI options to be used with `Arg` (set debug level, etc.)
+    - `Location`: location within a file
     - `lib/MultiMap`: functional multimap
     - `lib/PersistentHashtbl`: persistent (immutable) hashtable
     - `lib/Sequence`: library of iterators

@@ -24,18 +24,17 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Arbitrary Basic Terms} *)
+(** {1 Type erasure for terms and formulas} *)
 
-open Logtk
+module FO : sig
+  val erase : ?depth:int -> FOTerm.t -> Basic.FO.t
+    (** Erase types (except for variables) *)
+end
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+module Form : sig
+  val erase : ?depth:int -> FOFormula.t -> Basic.Form.t
+end
 
-val atom : FOFormula.t arbitrary
-  (** Atomic formula *)
-
-val clause : FOFormula.t list arbitrary
-  (** clause *)
-
-val default : FOFormula.t arbitrary
-  (** polymorphic formula with connectives (DB-closed) *)
-
+module HO : sig
+  val erase : ?depth:int -> HOTerm.t -> Basic.HO.t
+end

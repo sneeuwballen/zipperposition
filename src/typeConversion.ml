@@ -24,18 +24,55 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Arbitrary Basic Terms} *)
+(** {1 Conversion between type representations} *)
 
-open Logtk
+module BTy = Basic.Ty
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type ctx = {
+  mutable n : int;
+  tbl : (string, Type.t) Hashtbl.t;
+}
 
-val atom : FOFormula.t arbitrary
-  (** Atomic formula *)
+let create_ctx () = {
+  tbl = Hashtbl.create 5;
+  n = 1;
+}
 
-val clause : FOFormula.t list arbitrary
-  (** clause *)
+let clear ctx =
+  ctx.n <- 1;
+  Hashtbl.clear ctx.tbl;
+  ()
 
-val default : FOFormula.t arbitrary
-  (** polymorphic formula with connectives (DB-closed) *)
+let of_basic ?(ctx=create_ctx ()) ty =
+  let rec convert ty = match ty with
+  | BTy.Var s ->
+    begin try
+      Hashtbl.find ctx.tbl s
+    with Not_found ->
+      let v = Type.var ctx.n in
+      ctx.n <- ctx.n + 1;
+      Hashtbl.add ctx.tbl s v;
+      v
+    end
+  | BTy.App (s, l) ->
+    let l = List.map convert l in
+    Type.app s l
+  | BTy.Fun (ret, l) ->
+    let ret = convert ret in
+    let l = List.map convert l in
+    Type.mk_fun ret l
+  in
+  convert ty
 
+let of_quantified ?ctx q = of_basic ?ctx q.BTy.ty
+
+let rec to_basic ty = match ty.Type.ty with
+  | Type.Var i -> BTy.var (Util.sprintf "T%d" i)
+  | Type.App (s, l) -> BTy.app s (List.map to_basic l)
+  | Type.Fun (ret, l) -> BTy.mk_fun (to_basic ret) (List.map to_basic l)
+
+let to_quantified ty =
+  let fv = Type.free_vars ty in
+  let vars = List.map to_basic fv in
+  let ty = to_basic ty in
+  BTy.forall_atom vars ty

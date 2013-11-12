@@ -11,15 +11,15 @@ form must reproduce the above copyright notice, this list of conditions and the
 following disclaimer in the documentation and/or other materials provided with
 the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBBTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BBT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBBTORS BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+DAMAGES (INCLUDING, BBT NOT LIMITED TO, PROCUREMENT OF SUBSTITBTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OBT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
@@ -79,7 +79,7 @@ module Ctx = struct
     mutable to_bind : (Type.t * scope) list;  (* constructor variables to bind *)
     renaming : Substs.Ty.Renaming.t;
     symbols : (Type.t * scope) STbl.t; (* symbol -> instantiated type *)
-    tyctx : Type.ctx;               (* convert types *)
+    tyctx : TypeConversion.ctx;     (* convert types *)
     vars : (string, (int * Type.t)) Hashtbl.t;  (* var name -> number + type *)
   }
 
@@ -94,7 +94,7 @@ module Ctx = struct
       to_bind = [];
       renaming = Substs.Ty.Renaming.create 7;
       symbols = STbl.create 7;
-      tyctx = Type.create_ctx ();
+      tyctx = TypeConversion.create_ctx ();
       vars = Hashtbl.create 7;
     } in
     ctx
@@ -110,7 +110,7 @@ module Ctx = struct
     ctx.to_bind <- [];
     STbl.clear ctx.symbols;
     ctx.signature <- Signature.empty;
-    Hashtbl.clear ctx.tyctx;
+    TypeConversion.clear ctx.tyctx;
     Hashtbl.clear ctx.vars;
     ()
 
@@ -138,8 +138,11 @@ module Ctx = struct
     ctx.var <- n - 1 ;
     Type.__var n
 
-  let _of_parsed ctx ty =
-    Type.of_parsed ~ctx:ctx.tyctx ty
+  let _of_quantified ctx ty =
+    TypeConversion.of_quantified ~ctx:ctx.tyctx ty
+
+  let _of_ty ctx ty =
+    TypeConversion.of_basic ~ctx:ctx.tyctx ty
 
   (* variable number and type, for the given name. An optional type can
     be provided.*)
@@ -219,8 +222,8 @@ module Ctx = struct
     ctx.signature <- Signature.declare ctx.signature s ty;
     ()
 
-  let declare_parsed ctx s ty =
-    let ty = _of_parsed ctx ty in
+  let declare_basic ctx s ty =
+    let ty = _of_quantified ctx ty in
     declare ctx s ty
 
   let eval_type ?(renaming=S.Renaming.create 4) ctx ty s_ty =
@@ -302,12 +305,12 @@ module type S = sig
 end
 
 module FO = struct
-  module UT = Untyped.FO
+  module BT = Basic.FO
   module T = FOTerm
-  module UF = Untyped.Form
+  module BF = Basic.Form
   module F = FOFormula
 
-  type untyped = UT.t
+  type untyped = BT.t
   type typed = T.t
 
   let _get_sym ~arity ctx s scope  =
@@ -318,28 +321,31 @@ module FO = struct
 
   (* convert type *)
   let _get_ty ctx ty =
-    Ctx._of_parsed ctx ty
+    Ctx._of_ty ctx ty
+
+  let _get_quantified ctx ty =
+    Ctx._of_quantified ctx ty
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
     continuation to build a typed term. *)
   let rec infer_rec ctx t s_t =
-    match t with
-    | UT.Var (name, ty) ->
-      let ty = _get_ty ctx ty in
+    let ty, closure = match t.BT.term with
+    | BT.Var name ->
+      let ty = _get_ty ctx (BT.get_ty t) in
       let i, ty = Ctx._get_var ctx ~ty name in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_var ~ty i
       in
       ty, closure
-    | UT.App (s, []) ->
+    | BT.App (s, []) ->
       let ty = _get_sym ~arity:0 ctx s s_t in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_const ~ty s
       in
       ty, closure
-    | UT.App (s, l) ->
+    | BT.App (s, l) ->
       let ty_s = _get_sym ~arity:(List.length l) ctx s s_t in
       let sub = List.map (fun t' -> infer_rec ctx t' s_t) l in
       let ty_l, closure_l = List.split sub in
@@ -354,10 +360,17 @@ module FO = struct
         T.mk_node ~ty s l'
       in
       ty_ret, closure
+    in
+    (* ensure consistency of type and type annotation *)
+    match t.BT.ty with
+    | None -> ty, closure
+    | Some ty' ->
+      Ctx.unify_and_set ctx ty s_t (Ctx._of_ty ctx ty') s_t;
+      ty, closure
 
-  let infer_var_scope ctx t s_t = match t with
-    | UT.Var (name, ty) ->
-      let ty = _get_ty ctx ty in
+  let infer_var_scope ctx t s_t = match t.BT.term with
+    | BT.Var name ->
+      let ty = _get_ty ctx (BT.get_ty t) in
       let i = Ctx._enter_var_scope ctx name ty in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
@@ -366,13 +379,13 @@ module FO = struct
       closure
     | _ -> assert false
 
-  let exit_var_scope ctx t = match t with
-    | UT.Var (name, _) -> Ctx._exit_var_scope ctx name
+  let exit_var_scope ctx t = match t.BT.term with
+    | BT.Var name -> Ctx._exit_var_scope ctx name
     | _ -> assert false
 
   let infer ctx t s_t =
     Util.enter_prof prof_infer;
-    Util.debug 5 "infer_term %a" UT.pp t;
+    Util.debug 5 "infer_term %a" BT.pp t;
     try
       let ty, k = infer_rec ctx t s_t in
       Util.exit_prof prof_infer;
@@ -390,42 +403,42 @@ module FO = struct
     let ty1, _ = infer ctx t s_t in
     Ctx.unify_and_set ctx ty1 s_t ty s_ty
 
-  let rec infer_form_rec ctx f s_f = match f with
-    | UF.Bool b ->
+  let rec infer_form_rec ctx f s_f = match f.BF.form with
+    | BF.Bool b ->
       let closure renaming subst = if b then F.mk_true else F.mk_false in
       closure
-    | UF.Nary (op, l) ->
+    | BF.Nary (op, l) ->
       (* closures of sub formulas *)
       let l' = List.map (fun f' -> infer_form_rec ctx f' s_f) l in
       let closure renaming subst =
         let l'' = List.map (fun f' -> f' renaming subst) l' in
         match op with
-        | UF.And -> F.mk_and l''
-        | UF.Or -> F.mk_or l''
+        | BF.And -> F.mk_and l''
+        | BF.Or -> F.mk_or l''
       in
       closure
-    | UF.Binary (op, f1, f2) ->
+    | BF.Binary (op, f1, f2) ->
       let closure_f1 = infer_form_rec ctx f1 s_f in
       let closure_f2 = infer_form_rec ctx f2 s_f in
       let closure renaming subst =
         let f1' = closure_f1 renaming subst in
         let f2' = closure_f2 renaming subst in
         match op with
-        | UF.Imply -> F.mk_imply f1' f2'
-        | UF.Equiv -> F.mk_equiv f1' f2'
+        | BF.Imply -> F.mk_imply f1' f2'
+        | BF.Equiv -> F.mk_equiv f1' f2'
       in
       closure
-    | UF.Not f' ->
+    | BF.Not f' ->
       let closure_f' = infer_form_rec ctx f' s_f in
       (fun renaming subst -> F.mk_not (closure_f' renaming subst))
-    | UF.Atom p ->
+    | BF.Atom p ->
       let ty, clos = infer ctx p s_f in
       Ctx.unify_and_set ctx ty s_f Type.o s_f;  (* must return Type.o *)
       let closure renaming subst =
         F.mk_atom (clos renaming subst)
       in
       closure
-    | UF.Equal (t1, t2) ->
+    | BF.Equal (t1, t2) ->
       let ty1, c1 = infer ctx t1 s_f in
       let ty2, c2 = infer ctx t2 s_f in
       Ctx.unify_and_set ctx ty1 s_f ty2 s_f;  (* must have same type *)
@@ -433,7 +446,7 @@ module FO = struct
         F.mk_eq (c1 renaming subst) (c2 renaming subst)
       in
       closure
-    | UF.Quant (op, vars, f') ->
+    | BF.Quant (op, vars, f') ->
       let clos_vars = List.map (fun t -> infer_var_scope ctx t s_f) vars in
       let clos_f =
         Util.finally
@@ -444,13 +457,13 @@ module FO = struct
         let vars' = List.map (fun c -> c renaming subst) clos_vars in
         let f' = clos_f renaming subst in
         match op with
-        | UF.Forall -> F.mk_forall_list vars' f'
-        | UF.Exists -> F.mk_exists_list vars' f'
+        | BF.Forall -> F.mk_forall_list vars' f'
+        | BF.Exists -> F.mk_exists_list vars' f'
       in
       closure
 
   let infer_form ctx f s_f =
-    Util.debug 5 "infer_form %a" UF.pp f;
+    Util.debug 5 "infer_form %a" BF.pp f;
     let c_f = infer_form_rec ctx f s_f in
     c_f
 
@@ -492,10 +505,10 @@ module FO = struct
 end
 
 module HO = struct
-  module UT = Untyped.HO
+  module BT = Basic.HO
   module T = HOTerm
 
-  type untyped = UT.t
+  type untyped = BT.t
   type typed = T.t
 
   let _get_sym ~arity ctx s scope =
@@ -506,11 +519,14 @@ module HO = struct
 
   (* convert type *)
   let _get_ty ctx ty =
-    Ctx._of_parsed ctx ty
+    Ctx._of_ty ctx ty
 
-  let infer_var_scope ctx t s_t = match t with
-    | UT.Var (name, ty) ->
-      let ty = _get_ty ctx ty in
+  let _get_quantified ctx ty =
+    Ctx._of_quantified ctx ty
+
+  let infer_var_scope ctx t s_t = match t.BT.term with
+    | BT.Var name ->
+      let ty = _get_ty ctx (BT.get_ty t) in
       let i = Ctx._enter_var_scope ctx name ty in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
@@ -519,8 +535,8 @@ module HO = struct
       ty, closure
     | _ -> assert false
 
-  let exit_var_scope ctx t = match t with
-    | UT.Var (name, _) -> Ctx._exit_var_scope ctx name
+  let exit_var_scope ctx t = match t.BT.term with
+    | BT.Var name -> Ctx._exit_var_scope ctx name
     | _ -> assert false
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
@@ -528,24 +544,24 @@ module HO = struct
     @param pred true if we expect a proposition
     @param arity expected number of arguments *)
   let rec infer_rec ?(arity=0) ctx t s_t =
-    match t with
-    | UT.Var (name, ty) ->
-      let ty = _get_ty ctx ty in
+    let ty, closure = match t.BT.term with
+    | BT.Var name ->
+      let ty = _get_ty ctx (BT.get_ty t) in
       let i, ty = Ctx._get_var ctx ~ty name in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_var ~ty i
       in
       ty, closure
-    | UT.Const s ->
+    | BT.Const s ->
       let ty = _get_sym ~arity ctx s s_t in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty s_t in
         T.mk_const ~ty s
       in
       ty, closure
-    | UT.App (_, []) -> assert false
-    | UT.App (t, l) ->
+    | BT.App (_, []) -> assert false
+    | BT.App (t, l) ->
       let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t s_t in
       let ty_l, clos_l = List.split
         (List.map (fun t' -> infer_rec ctx t' s_t) l) in
@@ -558,7 +574,7 @@ module HO = struct
         T.mk_at t' l'
       in
       ty_ret, closure
-    | UT.Lambda (v, t) ->
+    | BT.Lambda (v, t) ->
       let ty_v, clos_v = infer_var_scope ctx v s_t in
       let ty_t, clos_t = Util.finally
         ~f:(fun () -> infer_rec ctx t s_t)
@@ -572,10 +588,17 @@ module HO = struct
         T.mk_lambda_var [v'] t'
       in
       ty, closure 
+    in
+    (* ensure consistency of type and type annotation *)
+    match t.BT.ty with
+    | None -> ty, closure
+    | Some ty' ->
+      Ctx.unify_and_set ctx ty s_t (Ctx._of_ty ctx ty') s_t;
+      ty, closure
 
   let infer ctx t s_t =
     Util.enter_prof prof_infer;
-    Util.debug 5 "infer_term %a" UT.pp t;
+    Util.debug 5 "infer_term %a" BT.pp t;
     try
       let ty, k = infer_rec ctx t s_t in
       Ctx.exit_scope ctx;

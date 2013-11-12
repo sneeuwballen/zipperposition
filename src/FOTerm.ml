@@ -727,13 +727,3 @@ let bij =
         | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
         | "n" -> BranchFrom (Lazy.force bij_node, fun (s,l,ty) -> mk_node ~ty s l)
         | _ -> raise (DecodingError "expected Term")))
-
-module UT = Untyped.FO
-
-let erase_types ?(depth=0) t =
-  let rec erase t = match t.term with
-  | Var i -> UT.var ~ty:(Type.to_parsed t.ty) (Util.sprintf "X%d" i)
-  | BoundVar i -> UT.var ~ty:(Type.to_parsed t.ty) (Util.sprintf "Y%d" (depth-i-1))
-  | Node (s, l) -> UT.app s (List.map erase l)
-  in
-  erase t

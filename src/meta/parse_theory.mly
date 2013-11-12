@@ -28,9 +28,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %{
   open Logtk
 
-  module T = Untyped.FO
-  module F = Untyped.Form
-  module Ty = Type.Parsed
+  module T = Basic.FO
+  module F = Basic.Form
+  module Ty = Basic.Ty
+  module L = Location
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
@@ -62,7 +63,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token COLUMN
 %token STAR
 %token ARROW
-%token FORALL_TY  /* quantification on types */
 %token TYPE_TY  /* tType */
 
 %token AND
@@ -182,7 +182,10 @@ fof_formula:
 
 fof_sequent:
   | l=fof_tuple GENTZEN_ARROW r=fof_tuple
-    { F.mk_imply (F.mk_and l) (F.mk_or r) }
+    { (* TODO accurate locs for subterms *)
+      let loc = L.mk_pos $startpos $endpos in
+      F.mk_imply ~loc (F.mk_and ~loc l) (F.mk_or ~loc r)
+    }
   | LEFT_PAREN seq=fof_sequent RIGHT_PAREN { seq }
 
 fof_tuple:
@@ -191,7 +194,10 @@ fof_tuple:
 fof_logic_formula:
   | f=fof_unitary_formula { f }
   | l=fof_logic_formula o=binary_connective r=fof_logic_formula
-    { o l r }
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      o ?loc:(Some loc) l r
+    }
 
 fof_unitary_formula:
   | fof_quantified_formula { $1 }
@@ -201,20 +207,27 @@ fof_unitary_formula:
 
 fof_quantified_formula:
   | q=fol_quantifier LEFT_BRACKET vars=variables RIGHT_BRACKET COLUMN f=fof_unitary_formula
-    { q vars f }
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      q ~loc vars f
+    }
 
 fof_unary_formula:
-  | o=unary_connective f=fof_unitary_formula { o f }
+  | o=unary_connective f=fof_unitary_formula
+    {
+     let loc = L.mk_pos $startpos $endpos in
+     o ~loc f
+    }
   
 %inline binary_connective:
   | EQUIV { F.mk_equiv }
   | IMPLY { F.mk_imply }
-  | LEFT_IMPLY { fun l r -> F.mk_imply r l }
+  | LEFT_IMPLY { fun ?loc l r -> F.mk_imply ?loc r l }
   | XOR { F.mk_xor }
-  | NOTVLINE { fun x y -> F.mk_not (F.mk_or [x; y]) }
-  | NOTAND { fun x y -> F.mk_not (F.mk_and [x; y]) }
-  | AND { fun x y -> F.mk_and [x;y] }
-  | VLINE { fun x y -> F.mk_or [x;y] }
+  | NOTVLINE { fun ?loc x y -> F.mk_not ?loc (F.mk_or ?loc [x; y]) }
+  | NOTAND { fun ?loc x y -> F.mk_not ?loc (F.mk_and ?loc [x; y]) }
+  | AND { fun ?loc x y -> F.mk_and ?loc [x;y] }
+  | VLINE { fun ?loc x y -> F.mk_or ?loc [x;y] }
 %inline fol_quantifier:
   | FORALL { F.forall }
   | EXISTS { F.exists }
@@ -225,7 +238,11 @@ atomic_formula:
   | TRUE { F.mk_true } 
   | FALSE { F.mk_false }
   | l=term o=infix_connective r=term { o l r }
-  | function_term { F.atom $1 }
+  | t=function_term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      F.atom ~loc t
+    }
 
 %inline infix_connective:
   | EQUAL { F.mk_eq }
@@ -245,8 +262,16 @@ function_term:
   | system_term { $1 }
 
 plain_term:
-  | s=constant { T.const s }
-  | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
+  | s=constant
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.const ~loc s
+    }
+  | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app ~loc f args
+    }
 
 constant:
 | s=atomic_word { Symbol.mk_const s }
@@ -254,8 +279,12 @@ constant:
 functor_: f=atomic_word { Symbol.mk_const f }
 
 defined_term:
-  | defined_atom { T.const $1 }
-  | defined_atomic_term { $1 }
+  | t=defined_atom
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.const ~loc t
+    }
+  | t=defined_atomic_term { t }
 
 defined_atom:
   | n=INTEGER { Symbol.mk_bigint (Big_int.big_int_of_string n) }
@@ -264,30 +293,41 @@ defined_atom:
   | s=DISTINCT_OBJECT { Symbol.mk_distinct s }
 
 defined_atomic_term:
-  | defined_plain_term { $1 }
+  | t=defined_plain_term { t }
   /* | defined_infix_term { $1 } */
 
 defined_plain_term:
-  | s=defined_constant { T.const s }
-  | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
+  | s=defined_constant
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.const ~loc s
+    }
+  | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app ~loc f args
+    }
 
-defined_constant: defined_functor { $1 }
+defined_constant: t=defined_functor { t }
 defined_functor: s=atomic_defined_word { s }
 
 system_term:
-  | c=system_constant { T.const c }
-  | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN { T.app f args }
+  | c=system_constant
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.const ~loc c
+    }
+  | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.app ~loc f args
+    }
 
-system_constant: system_functor { $1 }
+system_constant: t=system_functor { t }
 system_functor: s=atomic_system_word { s }
 
-/* prenex quantified type */
-tff_type:
-  | ty=tff_term_type { ty }
-  | FORALL_TY LEFT_BRACKET tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_type { ty }
-
 /* general type, without quantifiers */
-tff_term_type:
+tff_type: 
   | ty=tff_atom_type { ty }
   | l=tff_atom_type ARROW r=tff_atom_type
     { Ty.mk_fun r [l] }
@@ -297,18 +337,14 @@ tff_term_type:
 tff_atom_type:
   | v=tff_ty_var { v }
   | w=type_const { Ty.const w }
-  | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_term_type) RIGHT_PAREN
+  | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_type) RIGHT_PAREN
     { Ty.app w l }
   | TYPE_TY { Ty.tType }
-  | LEFT_PAREN ty=tff_term_type RIGHT_PAREN { ty }
+  | LEFT_PAREN ty=tff_type RIGHT_PAREN { ty }
 
 tff_ty_args:
   | ty=tff_atom_type { [ty] }
   | hd=tff_atom_type STAR tl=tff_ty_args { hd :: tl }
-
-tff_ty_vars:
-  | v=tff_ty_var COLUMN TYPE_TY {  [v] }
-  | v=tff_ty_var COLUMN TYPE_TY l=tff_ty_vars { v::l }
 
 tff_ty_var: w=UPPER_WORD { Ty.var w }
 
@@ -322,8 +358,16 @@ variables:
   | l=separated_nonempty_list(COMMA, variable) { l }
 
 variable:
-  | x=UPPER_WORD { T.var ~ty:Ty.i x }
-  | x=UPPER_WORD COLUMN ty=tff_type { T.var ~ty x }
+  | x=UPPER_WORD
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.var ~loc x
+    }
+  | x=UPPER_WORD COLUMN ty=tff_type
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      T.var ~loc ~ty x
+    }
 
 atomic_word:
   | s=SINGLE_QUOTED { remove_quotes s }

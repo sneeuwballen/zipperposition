@@ -37,7 +37,8 @@ Library "logtk"
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
                     Trace_tstp, CallProver, Congruence, TypeUnif, Options,
-                    Untyped, Monad, FastFingerprint, Evaluator,
+                    Basic, Monad, FastFingerprint, Evaluator, Location,
+                    TypeConversion, TypeErasure,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
                     lib/Bencode, lib/BV, lib/PersistentHashtbl
   BuildDepends:     unix,num,str

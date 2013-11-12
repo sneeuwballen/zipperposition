@@ -103,20 +103,20 @@ let mk_proof_obligation proof =
   else try
     let goal, step = match proof with
     | TT.InferForm (f, lazy step) ->
-      let f = F.erase_types (F.close_forall f) in
+      let f = TypeErasure.Form.erase (F.close_forall f) in
       A.FOF(step.TT.id, A.R_conjecture, f, []), step
     | TT.InferClause (c, lazy step) ->
-      let c = F.erase_types (F.close_forall (F.mk_or c)) in
+      let c = TypeErasure.Form.erase (F.close_forall (F.mk_or c)) in
       A.FOF(step.TT.id, A.R_conjecture, c, []), step
     | _ -> assert false 
     in
     let premises = Util.list_fmap
       (fun parent -> match parent with
         | TT.InferClause (c, lazy step') ->
-          let c = F.erase_types (F.close_forall (F.mk_or c)) in
+          let c = TypeErasure.Form.erase (F.close_forall (F.mk_or c)) in
           Some (A.FOF(step'.TT.id, A.R_axiom, c, []))
         | TT.InferForm(f, lazy step') ->
-          let f = F.erase_types (F.close_forall f) in
+          let f = TypeErasure.Form.erase (F.close_forall f) in
           Some (A.FOF(step'.TT.id, A.R_axiom, f, []))
         | TT.Axiom _
         | TT.Theory _ -> None)

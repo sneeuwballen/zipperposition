@@ -283,7 +283,9 @@ let of_decls ?(base=Signature.base) decls =
         let p = InferForm (f, step) in
         add_step name p
       end
-    | A.TypeDecl (_, s, ty) -> TypeInference.Ctx.declare_parsed ctx s ty
+    | A.TypeDecl (_, s, ty) ->
+      let ty = TypeConversion.of_quantified ty in
+      TypeInference.Ctx.declare ctx s ty
     | A.FOF _
     | A.CNF _
     | A.TFF _

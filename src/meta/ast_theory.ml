@@ -27,19 +27,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module UF = Untyped.Form
+module BF = Basic.Form
 
 type statement =
   | Lemma of string * string list * premise list
-  | LemmaInline of UF.t * premise list
-  | Axiom of string * string list * UF.t
+  | LemmaInline of BF.t * premise list
+  | Axiom of string * string list * BF.t
   | Theory of string * string list * premise list
   | Clause of clause
   | Include of string
   | Error of string * Lexing.position * Lexing.position
   (** Parse statement *)
 and premise =
-  | IfPattern of UF.t
+  | IfPattern of BF.t
   | IfAxiom of string * string list
   | IfTheory of string * string list
 and clause = raw_lit * raw_lit list
@@ -63,7 +63,7 @@ let pp buf statement =
     Printf.bprintf buf "%s(%a)" s (Util.pp_list Buffer.add_string) args
   in
   let pp_premise buf premise = match premise with
-  | IfPattern t -> UF.pp buf t
+  | IfPattern t -> BF.pp buf t
   | IfAxiom (s, args) -> Printf.bprintf buf "axiom %a" pp_datalog (s, args)
   | IfTheory (s, args) -> Printf.bprintf buf "theory %a" pp_datalog (s, args)
   in
@@ -80,9 +80,9 @@ let pp buf statement =
       pp_datalog (s,args) pp_premises premises
   | LemmaInline (f, premises) ->
     Printf.bprintf buf "lemma axiom %a if %a."
-      UF.pp f pp_premises premises
+      BF.pp f pp_premises premises
   | Axiom (s, args, f) ->
-    Printf.bprintf buf "%a is axiom %a." pp_datalog (s, args) UF.pp f
+    Printf.bprintf buf "%a is axiom %a." pp_datalog (s, args) BF.pp f
   | Theory (s, args, premises) ->
     Printf.bprintf buf "theory %a is %a." pp_datalog (s, args)
       pp_premises premises
@@ -103,15 +103,15 @@ let pp_statements buf statements =
 (** Generalize the variables occurring in the statement *)
 let generalize_statement stmt =
   let generalize_premise p = match p with
-  | IfPattern f -> IfPattern (UF.generalize_vars f)
+  | IfPattern f -> IfPattern (BF.generalize_vars f)
   | IfAxiom _
   | IfTheory _ -> p
   in
   let generalize_premises = List.map generalize_premise in
   match stmt with
   | Lemma (n,l, premises) -> Lemma (n,l, generalize_premises premises)
-  | LemmaInline(f, premises) -> LemmaInline(UF.generalize_vars f, generalize_premises premises)
-  | Axiom (n,l, f) -> Axiom (n,l, UF.generalize_vars f)
+  | LemmaInline(f, premises) -> LemmaInline(BF.generalize_vars f, generalize_premises premises)
+  | Axiom (n,l, f) -> Axiom (n,l, BF.generalize_vars f)
   | Theory (n,l, premises) -> Theory (n,l, generalize_premises premises)
   | Clause _
   | Include _

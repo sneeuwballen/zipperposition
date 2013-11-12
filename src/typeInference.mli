@@ -110,7 +110,7 @@ module Ctx : sig
         @raise TypeUnif.Error if an inconsistency (with inferred types) is
           detected. *)
 
-  val declare_parsed : t -> Symbol.t -> Type.Parsed.t -> unit
+  val declare_basic : t -> Symbol.t -> Basic.Ty.quantified -> unit
     (** Declare the type of a symbol, in raw form *)
 
   val unify_and_set : t -> Type.t -> scope -> Type.t -> scope -> unit
@@ -184,37 +184,37 @@ module type S = sig
 end
 
 module FO : sig
-  include S with type untyped = Untyped.FO.t and type typed = FOTerm.t
+  include S with type untyped = Basic.FO.t and type typed = FOTerm.t
 
-  val infer_form : Ctx.t -> Untyped.Form.t -> scope -> FOFormula.t Closure.t
+  val infer_form : Ctx.t -> Basic.Form.t -> scope -> FOFormula.t Closure.t
     (** Inferring the type of a formula is trivial, it's always {!Type.o}.
         However, here we can still return a closure that produces a
         type formula *)
 
-  val constrain_form : Ctx.t -> Untyped.Form.t -> unit
+  val constrain_form : Ctx.t -> Basic.Form.t -> unit
     (** Assert that the formula should be well-typed. *)
 
-  val signature_forms : Signature.t -> Untyped.Form.t Sequence.t -> Signature.t
+  val signature_forms : Signature.t -> Basic.Form.t Sequence.t -> Signature.t
     (** Infer signature for this sequence of formulas *)
 
   val convert : ?generalize:bool -> ctx:Ctx.t ->
-                Untyped.FO.t -> FOTerm.t
+                Basic.FO.t -> FOTerm.t
     (** Convert a term into a typed term.
         @param generalize if true, constructor types are generalized (default false)  *)
 
   val convert_form : ?generalize:bool -> ctx:Ctx.t ->
-                      Untyped.Form.t -> FOFormula.t
+                      Basic.Form.t -> FOFormula.t
     (** Convert a formula into a typed formula.
         @param generalize see {!convert} *)
 
   val convert_clause : ?generalize:bool -> ctx:Ctx.t ->
-                        Untyped.Form.t list -> FOFormula.t list
+                        Basic.Form.t list -> FOFormula.t list
     (** Convert a "clause". Type variables are bound in the same scope
         for all formulas in the list. 
         @param generalize see {!convert} *)
 
   val convert_seq : ?generalize:bool -> ctx:Ctx.t ->
-                    Untyped.Form.t Sequence.t -> FOFormula.t list
+                    Basic.Form.t Sequence.t -> FOFormula.t list
     (** Given the signature for those formulas, infer their type and convert
         untyped formulas into typed formulas. Also updates the context. Type
         variables of each formulas live in distinct scopes. 
@@ -223,20 +223,20 @@ module FO : sig
 end
 
 module HO : sig
-  include S with type untyped = Untyped.HO.t and type typed= HOTerm.t
+  include S with type untyped = Basic.HO.t and type typed= HOTerm.t
 
-  val constrain : ctx:Ctx.t -> Untyped.HO.t -> unit
+  val constrain : ctx:Ctx.t -> Basic.HO.t -> unit
     (** Constrain the term to be well-typed and of boolean type *)
 
   val convert : ?generalize:bool -> ?ret:Type.t -> ctx:Ctx.t ->
-                Untyped.HO.t -> HOTerm.t
+                Basic.HO.t -> HOTerm.t
     (** Convert a single untyped term to a typed term. Binds free constructor
         variables to default.
         @param ret is the type we expect for this term (default: {!Type.o})
         @param generalize if true, constructor types are generalized (default false) *)
 
   val convert_seq : ?generalize:bool -> ctx:Ctx.t ->
-                    Untyped.HO.t Sequence.t -> HOTerm.t list
+                    Basic.HO.t Sequence.t -> HOTerm.t list
     (** Infer the types of those terms and annotate each term and subterm with
         its type. Also updates the context's signature.
         All terms are assumed to be boolean. *)

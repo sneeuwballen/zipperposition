@@ -91,7 +91,6 @@ rule token = parse
   | "raw" { RAW }
   | vline { VLINE }
   | '&' { AND }
-  | "!>" { FORALL_TY }
   | '!' { FORALL }
   | '?' { EXISTS }
   | "$true" { TRUE }

@@ -215,6 +215,3 @@ val bij : t Bij.t
 
 module Tbl : Hashtbl.S with type key = t
 
-(** {2 Type erasure} *)
-
-val erase_types : t -> Untyped.Form.t

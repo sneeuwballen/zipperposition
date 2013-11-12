@@ -28,9 +28,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module UF = Untyped.Form
+module BF = Basic.Form
 
-let printer = ref UF.pp
+let printer = ref BF.pp
 
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
@@ -43,7 +43,7 @@ let pp_base = ref false
 let options =
   [ "-cat", Arg.Set cat_input, "print input declarations"
   ; "-base", Arg.Set pp_base, "print signature of base symbols"
-  ; "-tstp", Arg.Unit (fun () -> printer := UF.pp_tstp), "output in TSTP format"
+  ; "-tstp", Arg.Unit (fun () -> printer := BF.pp_tstp), "output in TSTP format"
   ] @ Options.global_opts
 
 (* check the given file *)

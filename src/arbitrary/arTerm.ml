@@ -35,8 +35,8 @@ module HOT = HOTerm
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
 
-module ArbitraryUntyped = struct
-  module UT = Untyped.FO
+module ArbitraryBasic = struct
+  module UT = Basic.FO
 
   let ground =
     let a = UT.const (Symbol.mk_const "a") in
@@ -63,9 +63,9 @@ module ArbitraryUntyped = struct
     let c = UT.const (Symbol.mk_const "c") in
     let d = UT.const (Symbol.mk_const "d") in
     let e = UT.const (Symbol.mk_const "e") in
-    let x = UT.var ~ty:(Type.Parsed.var "A") "X" in
-    let y = UT.var ~ty:(Type.Parsed.var "B") "Y" in
-    let z = UT.var ~ty:(Type.Parsed.var "C") "Z" in
+    let x = UT.var ~ty:(Basic.Ty.var "A") "X" in
+    let y = UT.var ~ty:(Basic.Ty.var "B") "Y" in
+    let z = UT.var ~ty:(Basic.Ty.var "C") "Z" in
     let f x y = UT.app (Symbol.mk_const "f") [x; y] in
     let sum x y = UT.app (Symbol.mk_const "sum") [x; y] in
     let g x = UT.app (Symbol.mk_const "g") [x] in
@@ -96,17 +96,17 @@ module ArbitraryUntyped = struct
 end
 
 let default =
-  Arbitrary.(ArbitraryUntyped.default >>= fun t ->
+  Arbitrary.(ArbitraryBasic.default >>= fun t ->
     let ctx = TypeInference.Ctx.create () in
     return (TypeInference.FO.convert ~ctx t))
 
 let ground =
-  Arbitrary.(ArbitraryUntyped.ground >>= fun t ->
+  Arbitrary.(ArbitraryBasic.ground >>= fun t ->
     let ctx = TypeInference.Ctx.create () in
     return (TypeInference.FO.convert ~ctx t))
 
 let pred =
-  Arbitrary.(ArbitraryUntyped.pred >>= fun t ->
+  Arbitrary.(ArbitraryBasic.pred >>= fun t ->
     let ctx = TypeInference.Ctx.create () in
     let ty, closure = TypeInference.FO.infer ctx t 0 in
     TypeInference.Ctx.unify_and_set ctx ty 0 Type.o 0;
@@ -129,12 +129,12 @@ let pos t =
 
 module HO = struct
   let ground =
-    Arbitrary.(ArbitraryUntyped.HO.ground >>= fun t ->
+    Arbitrary.(ArbitraryBasic.HO.ground >>= fun t ->
       let ctx = TypeInference.Ctx.create () in
       return (TypeInference.HO.convert ~ctx t))
 
   let default =
-    Arbitrary.(ArbitraryUntyped.HO.default >>= fun t ->
+    Arbitrary.(ArbitraryBasic.HO.default >>= fun t ->
       let ctx = TypeInference.Ctx.create () in
       return (TypeInference.HO.convert ~ctx t))
 end

@@ -24,18 +24,30 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Arbitrary Basic Terms} *)
+(** {1 Conversion between type representations} *)
 
-open Logtk
+(** {2 Basic -> Type} *)
 
-type 'a arbitrary = 'a QCheck.Arbitrary.t
+type ctx
+  (** Context used to map names to ints *)
 
-val atom : FOFormula.t arbitrary
-  (** Atomic formula *)
+val create_ctx : unit -> ctx
 
-val clause : FOFormula.t list arbitrary
-  (** clause *)
+val clear : ctx -> unit
 
-val default : FOFormula.t arbitrary
-  (** polymorphic formula with connectives (DB-closed) *)
+val of_basic : ?ctx:ctx -> Basic.Ty.t -> Type.t
+  (** Conversion from a {!Basic.Ty.t} term representation.
+      An optional {!ctx} can be used to map named variables
+      to {!Type.Var}s. *)
 
+val of_quantified : ?ctx:ctx -> Basic.Ty.quantified -> Type.t
+  (** Same as {!of_basic}, ignoring the quantifiers *)
+
+(** {2 Type -> Basic} *)
+
+val to_basic : Type.t -> Basic.Ty.t
+  (** Convert back to "parsed" raw type *)
+
+val to_quantified : Type.t -> Basic.Ty.quantified
+  (** Convert to basic type representation and quantify
+      all variables universally *)

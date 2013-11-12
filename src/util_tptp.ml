@@ -12,15 +12,15 @@ form must reproduce the above copyright notice, this list of conditions and the
 following disclaimer in the documentation and/or other materials provided with
 the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBBTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BBT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBBTORS BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+DAMAGES (INCLUDING, BBT NOT LIMITED TO, PROCUREMENT OF SUBSTITBTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OBT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module A = Ast_tptp
 module T = FOTerm
 module F = FOFormula
-module UT = Untyped.FO
-module UF = Untyped.Form
+module BT = Basic.FO
+module BF = Basic.Form
 
 (** {2 Printing/Parsing} *)
 
@@ -80,6 +80,11 @@ let _raise_error filename lexbuf =
   let e_c = end_.Lexing.pos_cnum - end_.Lexing.pos_bol in
   raise (ParseError (filename, s_l, s_c, e_l, e_c))
 
+let _set_file buf filename =
+  let open Lexing in
+  buf.lex_curr_p <- {buf.lex_curr_p with pos_fname=filename;};
+  ()
+
 let parse_file ~recursive f =
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
@@ -90,6 +95,7 @@ let parse_file ~recursive f =
     | _ -> open_in (find_file filename dir) in
     begin try
       let buf = Lexing.from_channel input in
+      _set_file buf filename;
       let decls =
         try Parse_tptp.parse_declarations Lex_tptp.token buf
         with Parse_tptp.Error ->
@@ -162,7 +168,8 @@ let infer_type ctx decls =
       | A.IncludeOnly _ -> ()
       | A.NewType _ -> ()  (* ignore *)
       | A.TypeDecl(_, s, ty) ->
-        TypeInference.Ctx.declare_parsed ctx s ty
+        let ty = TypeConversion.of_quantified ty in
+        TypeInference.Ctx.declare ctx s ty
       | A.CNF(_,_,c,_) ->
         List.iter (fun f -> TypeInference.FO.constrain_form ctx f) c
       | A.FOF(_,_,f,_)
@@ -184,7 +191,7 @@ let type_declarations decls =
   Sequence.fold
     (fun signature decl -> match decl with
       | A.TypeDecl (_, s, ty) ->
-        let ty = Type.of_parsed ty in
+        let ty = TypeConversion.of_quantified ty in
         Signature.declare signature s ty
       | _ -> signature)
     Signature.empty decls
@@ -199,7 +206,7 @@ let declare_symbols ?(name=__name_symbol) signature =
   Sequence.mapi
     (fun i (s, ty) ->
       let name = name i s in
-      A.TypeDecl (name, s, Type.to_parsed ty))
+      A.TypeDecl (name, s, TypeConversion.to_quantified ty))
     seq
 
 let __is_conjecture = function
@@ -215,12 +222,12 @@ let formulas ?(negate=__is_conjecture) decls =
       | A.IncludeOnly _ -> None
       | A.CNF(_, role, c, _) ->
         if negate role
-          then Some (UF.mk_not (UF.mk_or c))
-          else Some (UF.mk_or c)
+          then Some (BF.mk_not (BF.mk_or c))
+          else Some (BF.mk_or c)
       | A.FOF(_, role, f, _)
       | A.TFF(_, role, f, _) ->
         if negate role
-          then Some (UF.mk_not f)
+          then Some (BF.mk_not f)
           else Some f
       | A.THF _ -> None)
     decls
@@ -235,13 +242,13 @@ let sourced_formulas ?(negate=__is_conjecture) ?(file="unknown_file") decls =
       | A.CNF(name, role, c, _) ->
         let source = A.string_of_name name in
         if negate role
-          then Some (UF.mk_not (UF.mk_or c), file, source)
-          else Some (UF.mk_or c, file, source)
+          then Some (BF.mk_not (BF.mk_or c), file, source)
+          else Some (BF.mk_or c, file, source)
       | A.FOF(name, role, f, _)
       | A.TFF(name, role, f, _) ->
         let source = A.string_of_name name in
         if negate role
-          then Some (UF.mk_not f, file, source)
+          then Some (BF.mk_not f, file, source)
           else Some (f, file, source)
       | A.THF _ -> None)
     decls

@@ -136,54 +136,6 @@ val bij : t Bij.t
   (** Bijection. Note that GVar cannot be decoded nor encoded. Only
       closed types work. *)
 
-(** {2 Parsed types}
-This module exports a very simple representation of types, typically
-obtained right after parsing. No hashconsing is performed,
-and variables are still strings.
-*)
-
-module Parsed : sig
-  type t = private
-    | Var of string
-    | App of string * t list
-    | Fun of t * t list
-
-  val eq : t -> t -> bool
-  val cmp : t -> t -> int
-  val hash : t -> int
-
-  val var : string -> t
-  val app : string -> t list -> t
-  val const : string -> t
-  val mk_fun : t -> t list -> t
-  val (<==) : t -> t list -> t
-  val (<=.) : t -> t -> t
-
-  val i : t
-  val o : t
-  val int : t
-  val rat : t
-  val real : t
-  val tType : t
-
-  val pp : Buffer.t -> t -> unit
-  val pp_tstp : Buffer.t -> t -> unit
-  val to_string : t -> string
-  val fmt : Format.formatter -> t -> unit
-end
-
-type ctx = (string, t) Hashtbl.t
-
-val create_ctx : unit -> ctx
-
-val of_parsed : ?ctx:ctx -> Parsed.t -> t
-  (** Conversion from a {!Parsed.t} term representation.
-      An optional {!ctx} can be used to map named variables
-      to {!Var}s. *)
-
-val to_parsed : t -> Parsed.t
-  (** Convert back to "parsed" raw type *)
-
 (** {2 Misc} *)
 
 val __var : int -> t

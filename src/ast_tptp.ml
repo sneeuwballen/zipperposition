@@ -25,16 +25,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 TPTP Ast} *)
 
-module F = Untyped.Form
-module HOT = Untyped.HO
+module F = Basic.Form
+module HOT = Basic.HO
 
 type declaration =
-  | CNF of name * role * Untyped.Form.t list * optional_info
-  | FOF of name * role * Untyped.Form.t * optional_info
-  | TFF of name * role * Untyped.Form.t * optional_info
-  | THF of name * role * Untyped.HO.t * optional_info  (* XXX not parsed yet *)
-  | TypeDecl of name * Symbol.t * Type.Parsed.t  (* type declaration *)
-  | NewType of name * string  (* declare new type constant... *)
+  | CNF of name * role * Basic.Form.t list * optional_info
+  | FOF of name * role * Basic.Form.t * optional_info
+  | TFF of name * role * Basic.Form.t * optional_info
+  | THF of name * role * Basic.HO.t * optional_info  (* XXX not parsed yet *)
+  | TypeDecl of name * Symbol.t * Basic.Ty.quantified  (* type declaration *)
+  | NewType of name * string * Basic.Ty.quantified (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)
   (** top level declaration *)
@@ -72,7 +72,7 @@ let name_of_decl = function
   | TFF (n, _, _, _) -> n
   | THF (n, _, _, _) -> n
   | TypeDecl (n, _, _) -> n
-  | NewType (n, _) -> n
+  | NewType (n, _, _) -> n
   | IncludeOnly _
   | Include _ ->
     raise (Invalid_argument "Ast_tptp.name_of_decl: include directive has no name")
@@ -172,9 +172,9 @@ let pp_declaration buf = function
     Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
   | TypeDecl (name, s, ty) ->
     Printf.bprintf buf "tff(%a, type, (%a : %a))."
-      pp_name name Symbol.pp s Type.Parsed.pp_tstp ty
-  | NewType (name, s) ->
-    Printf.bprintf buf "tff(%a, type, (%s: $tType))." pp_name name s
+      pp_name name Symbol.pp s Basic.Ty.pp_quant_tstp ty
+  | NewType (name, s, kind) ->
+    Printf.bprintf buf "tff(%a, type, (%s: %a))." pp_name name s Basic.Ty.pp_quant kind
   | CNF (name, role, c, generals) ->
     __pp_formula buf (Util.pp_list ~sep:" | " F.pp_tstp) ("cnf", name, role, c, generals)
   | FOF (name, role, f, generals) ->

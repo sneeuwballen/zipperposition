@@ -73,6 +73,7 @@ type result =
   | Unknown
   | Error of string
 
+(* TODO: optional argument for additional parameters (order,heuristics,etc.) *)
 
 val call : ?timeout:int -> prover:Prover.t ->
            Ast_tptp.declaration list -> result

@@ -30,24 +30,94 @@ This module exports very simple and basic representations of terms
 and formulas. Those representations are typically output by parsers
 and should be transformed into more powerful representations
 (see {!FOTerm}, {!HOTerm}, {!FOFormula}...) before use.
-
-XXX: add optional locations to terms/types, to allow better error report?
 *)
 
-(** {2 First Order terms} *)
+(** {2 Type representation}
 
-module FO : sig
+This module exports a very simple representation of types, typically
+obtained right after parsing. No hashconsing is performed,
+and variables are still strings.
+*)
+
+module Ty : sig
   type t = private
-    | App of Symbol.t * t list
-    | Var of string * Type.Parsed.t
+    | Var of string
+    | App of string * t list
+    | Fun of t * t list
+
+  type quantified = private {
+    vars : t list;
+    ty : t;
+    loc : Location.t option;
+  }
 
   val eq : t -> t -> bool
   val cmp : t -> t -> int
   val hash : t -> int
 
-  val app : Symbol.t -> t list -> t
-  val const : Symbol.t -> t
-  val var : ty:Type.Parsed.t -> string -> t
+  val var : string -> t
+  val app : string -> t list -> t
+  val const : string -> t
+  val mk_fun : t -> t list -> t
+  val (<==) : t -> t list -> t
+  val (<=.) : t -> t -> t
+
+  val is_var : t -> bool
+  val is_fun : t -> bool
+  val is_app : t -> bool
+
+  (** quantifiers: the list of types must be a list of variables *)
+
+  val atom : ?loc:Location.t -> t -> quantified
+  val forall : ?loc:Location.t -> t list -> quantified -> quantified
+  val forall_atom : ?loc:Location.t -> t list -> t -> quantified
+
+  val loc : quantified -> Location.t option  (** location in file *)
+
+  val i : t
+  val o : t
+  val int : t
+  val rat : t
+  val real : t
+  val tType : t
+
+  val pp : Buffer.t -> t -> unit
+  val pp_tstp : Buffer.t -> t -> unit
+  val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
+
+  val pp_quant : Buffer.t -> quantified -> unit
+  val pp_quant_tstp : Buffer.t -> quantified -> unit
+  val to_string_quant : quantified -> string
+  val fmt_quant : Format.formatter -> quantified -> unit
+end
+
+(** {2 First Order terms} *)
+
+module FO : sig
+  type t = private {
+    term : tree;
+    ty : Ty.t option;
+    loc : Location.t option;
+  }
+  and tree = private
+    | App of Symbol.t * t list
+    | Var of string
+
+  val eq : t -> t -> bool
+  val cmp : t -> t -> int
+  val hash : t -> int
+
+  val app : ?loc:Location.t -> Symbol.t -> t list -> t
+  val const : ?loc:Location.t -> Symbol.t -> t
+  val var : ?loc:Location.t -> ?ty:Ty.t -> string -> t
+
+  val is_var : t -> bool
+  val is_app : t -> bool
+
+  val loc : t -> Location.t option
+  val cast : t -> Ty.t -> t
+  val get_ty : t -> Ty.t   (* obtain type of variables (always present) *)
 
   val symbols : t Sequence.t -> Symbol.Set.t
   val free_vars : ?init:t list -> t -> t list
@@ -76,7 +146,11 @@ module Form : sig
     | Forall
     | Exists
 
-  type t = private
+  type t = private {
+    form : tree;
+    loc : Location.t option;
+  }
+  and tree = private
     | Nary of l_op * t list
     | Binary of b_op * t * t
     | Not of t
@@ -92,17 +166,17 @@ module Form : sig
   val cmp : t -> t -> int
   val hash : t -> int
 
-  val mk_and : t list -> t
-  val mk_or : t list -> t
-  val mk_not : t -> t
-  val mk_eq : FO.t -> FO.t -> t
-  val mk_neq : FO.t -> FO.t -> t
-  val mk_equiv : t -> t -> t
-  val mk_xor : t -> t -> t
-  val mk_imply : t -> t -> t
-  val atom : FO.t -> t
-  val forall : FO.t list -> t -> t
-  val exists : FO.t list -> t -> t
+  val mk_and : ?loc:Location.t -> t list -> t
+  val mk_or : ?loc:Location.t -> t list -> t
+  val mk_not : ?loc:Location.t -> t -> t
+  val mk_eq : ?loc:Location.t -> FO.t -> FO.t -> t
+  val mk_neq : ?loc:Location.t -> FO.t -> FO.t -> t
+  val mk_equiv : ?loc:Location.t -> t -> t -> t
+  val mk_xor : ?loc:Location.t -> t -> t -> t
+  val mk_imply : ?loc:Location.t -> t -> t -> t
+  val atom : ?loc:Location.t -> FO.t -> t
+  val forall : ?loc:Location.t -> FO.t list -> t -> t
+  val exists : ?loc:Location.t -> FO.t list -> t -> t
   val mk_true : t
   val mk_false : t 
 
@@ -114,6 +188,8 @@ module Form : sig
   val generalize_vars : t -> t
     (** See {!FO.generalize_vars} *)
 
+  val loc : t -> Location.t option
+
   val pp : Buffer.t -> t -> unit
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
@@ -123,30 +199,38 @@ end
 (** {2 Higher order Terms} *)
 
 module HO : sig
-  type t = private
+  type t = private {
+    term : tree;
+    ty : Ty.t option;
+    loc : Location.t option;
+  }
+  and tree = private
     | Const of Symbol.t
     | App of t * t list
-    | Var of string * Type.Parsed.t
+    | Var of string
     | Lambda of t * t
 
   val eq : t -> t -> bool
   val cmp : t -> t -> int
   val hash : t -> int
 
-  val const : Symbol.t -> t
-  val app : t -> t list -> t
-  val at : t -> t -> t
-  val var : ty:Type.Parsed.t -> string -> t
+  val const : ?loc:Location.t -> Symbol.t -> t
+  val app : ?loc:Location.t -> t -> t list -> t
+  val at : ?loc:Location.t -> t -> t -> t
+  val var : ?loc:Location.t -> ?ty:Ty.t -> string -> t
+
+  val cast : t -> Ty.t -> t
+  val get_ty : t -> Ty.t   (* obtain type of variables (always present) *)
 
   val true_term : t
   val false_term : t
 
-  val forall : var:t -> t -> t
-  val exists : var:t -> t -> t
-  val lambda : var:t -> t -> t
+  val forall : ?loc:Location.t -> var:t -> t -> t
+  val exists : ?loc:Location.t -> var:t -> t -> t
+  val lambda : ?loc:Location.t -> var:t -> t -> t
 
-  val forall_list : t list -> t -> t
-  val exists_list : t list -> t -> t
+  val forall_list : ?loc:Location.t -> t list -> t -> t
+  val exists_list : ?loc:Location.t -> t list -> t -> t
 
   val of_term : FO.t -> t
   val of_form : Form.t -> t

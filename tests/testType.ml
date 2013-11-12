@@ -12,15 +12,15 @@ form must reproduce the above copyright notice, this list of conditions and the
 following disclaimer in the documentation and/or other materials provided with
 the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBBTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BBT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBBTORS BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+DAMAGES (INCLUDING, BBT NOT LIMITED TO, PROCUREMENT OF SUBSTITBTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OBT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
@@ -30,18 +30,18 @@ open Logtk
 open Logtk_arbitrary
 open QCheck
 
-module UT = Untyped.FO
+module BT = Basic.FO
 
 let check_infer_all_symbs =
-  let gen = Arbitrary.(list ArTerm.ArbitraryUntyped.default) in
+  let gen = Arbitrary.(list ArTerm.ArbitraryBasic.default) in
   let name = "type_infer_all_symbols" in
-  let pp = PP.(list UT.to_string) in
+  let pp = PP.(list BT.to_string) in
   (* check that after type inference, all symbols apppear in the signature *)
   let prop terms =
     let ctx = TypeInference.Ctx.create () in
     List.iter (fun t -> ignore (TypeInference.FO.infer ctx t 0)) terms;
     let signature = TypeInference.Ctx.to_signature ctx in
-    let symbols = UT.symbols (Sequence.of_list terms) in
+    let symbols = BT.symbols (Sequence.of_list terms) in
     Symbol.Set.for_all (Signature.mem signature) symbols
   in
   mk_test ~pp ~name gen prop

@@ -151,7 +151,7 @@ let bench_idx n =
 
 let bench_type_inf n =
   let terms = QCheck.Arbitrary.generate ~rand ~n
-    ArTerm.ArbitraryUntyped.default in
+    ArTerm.ArbitraryBasic.default in
   let ctx = TypeInference.Ctx.create () in
   List.iter
     (fun t -> ignore (TypeInference.FO.infer ctx t 0))

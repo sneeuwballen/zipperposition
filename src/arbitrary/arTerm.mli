@@ -50,13 +50,13 @@ module HO : sig
     (** HO polymorphic term *)
 end
 
-module ArbitraryUntyped : sig
-  val default : Untyped.FO.t arbitrary
+module ArbitraryBasic : sig
+  val default : Basic.FO.t arbitrary
     (** Default polymorphic term *)
 
-  val ground : Untyped.FO.t arbitrary
+  val ground : Basic.FO.t arbitrary
     (** Default ground monomorphic term *)
 
-  val pred : Untyped.FO.t arbitrary
+  val pred : Basic.FO.t arbitrary
     (** predicates (type "o") *)
 end

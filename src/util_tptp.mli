@@ -80,7 +80,7 @@ val declare_symbols : ?name:(int -> Symbol.t -> Ast_tptp.name) ->
 
 val formulas : ?negate:(Ast_tptp.role -> bool) ->
                Ast_tptp.declaration Sequence.t ->
-               Untyped.Form.t Sequence.t
+               Basic.Form.t Sequence.t
   (** Extract only the formulas from some declarations. Formulas with
       a role that satisfies [negate] are negated.
       [negate] is true, by default, only for {!Ast_tptp.R_conjecture})*)
@@ -88,7 +88,7 @@ val formulas : ?negate:(Ast_tptp.role -> bool) ->
 val sourced_formulas : ?negate:(Ast_tptp.role -> bool) ->
                        ?file:string ->
                        Ast_tptp.declaration Sequence.t ->
-                       Untyped.Form.sourced Sequence.t
+                       Basic.Form.sourced Sequence.t
   (** Same as {!formulas}, but keeps a source attached to formulas.
       A [file] name has to be provided for the source to be accurate,
       the default is "unknown_file". *)

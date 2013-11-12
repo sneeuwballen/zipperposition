@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module UF = Untyped.Form
+module BF = Basic.Form
 module F = FOFormula
 module A = Ast_tptp
 
@@ -57,7 +57,7 @@ let to_cnf decls =
           let clauses = Cnf.cnf_of ~ctx (F.mk_not f) in
           Sequence.map
             (fun c ->
-              let c = List.map F.erase_types c in
+              let c = List.map TypeErasure.Form.erase c in
               A.CNF(n,A.R_negated_conjecture,c,info))
             (Sequence.of_list clauses)
         | _ ->
@@ -67,7 +67,7 @@ let to_cnf decls =
           let clauses = Cnf.cnf_of ~ctx f in
           Sequence.map
             (fun c ->
-              let c = List.map F.erase_types c in
+              let c = List.map TypeErasure.Form.erase c in
               A.CNF(n,role,c,info))
             (Sequence.of_list clauses)
         end
