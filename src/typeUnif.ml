@@ -80,8 +80,12 @@ let _occur_check subst v s_v t s_t =
   | Ty.App (_, l) -> List.exists (fun t' -> check t' s_t) l
   | Ty.Fun (ret, l) ->
     check ret s_t || List.exists (fun t' -> check t' s_t) l
+  | Ty.Fun (vars, ty') ->
+    if List.memq v vars then false else _occur_check v s_v ty' s_t
   in
   check t s_t
+
+(* TODO: handle quantification everywhere... *)
 
 (** {2 Unification} *)
 

@@ -284,7 +284,7 @@ let of_decls ?(base=Signature.base) decls =
         add_step name p
       end
     | A.TypeDecl (_, s, ty) ->
-      let ty = TypeConversion.of_quantified ty in
+      let ty = TypeConversion.of_basic ty in
       TypeInference.Ctx.declare ctx s ty
     | A.FOF _
     | A.CNF _

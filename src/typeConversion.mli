@@ -40,14 +40,8 @@ val of_basic : ?ctx:ctx -> Basic.Ty.t -> Type.t
       An optional {!ctx} can be used to map named variables
       to {!Type.Var}s. *)
 
-val of_quantified : ?ctx:ctx -> Basic.Ty.quantified -> Type.t
-  (** Same as {!of_basic}, ignoring the quantifiers *)
-
 (** {2 Type -> Basic} *)
 
 val to_basic : Type.t -> Basic.Ty.t
   (** Convert back to "parsed" raw type *)
 
-val to_quantified : Type.t -> Basic.Ty.quantified
-  (** Convert to basic type representation and quantify
-      all variables universally *)

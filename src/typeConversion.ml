@@ -61,18 +61,15 @@ let of_basic ?(ctx=create_ctx ()) ty =
     let ret = convert ret in
     let l = List.map convert l in
     Type.mk_fun ret l
+  | BTy.Forall (vars, ty) ->
+    let vars' = List.map convert vars in
+    let ty' = convert ty in
+    Type.forall vars' ty'
   in
   convert ty
-
-let of_quantified ?ctx q = of_basic ?ctx q.BTy.ty
 
 let rec to_basic ty = match ty.Type.ty with
   | Type.Var i -> BTy.var (Util.sprintf "T%d" i)
   | Type.App (s, l) -> BTy.app s (List.map to_basic l)
   | Type.Fun (ret, l) -> BTy.mk_fun (to_basic ret) (List.map to_basic l)
-
-let to_quantified ty =
-  let fv = Type.free_vars ty in
-  let vars = List.map to_basic fv in
-  let ty = to_basic ty in
-  BTy.forall_atom vars ty
+  | Type.Forall (vars, ty') -> BTy.forall (List.map to_basic vars) (to_basic ty')

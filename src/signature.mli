@@ -43,8 +43,9 @@ val find : t -> Symbol.t -> Type.t
   (** Lookup the type of this symbol, or
       @raise Not_found if the symbol is not in the signature *)
 
-val arity : t -> Symbol.t -> int
-  (** Arity of the given symbol, or
+val arity : t -> Symbol.t -> int * int
+  (** Arity of the given symbol, or failure.
+      see {!Type.arity} for more details about the returned value.
       @raise Not_found if the symbol is not in the signature *)
 
 val cardinal : t -> int

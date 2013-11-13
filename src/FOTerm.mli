@@ -42,6 +42,7 @@ and term_cell = private
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
   | Node of Symbol.t * t list   (** term application *)
+  | Ty of Type.t                (** lifted type *)
 and sourced_term =
   t * string * string           (** Term + file,name *)
 
@@ -100,6 +101,7 @@ val mk_var : ty:Type.t -> int -> t  (** Create a variable. Providing a type is m
 val mk_bound_var : ty:Type.t -> int -> t  (** Create a De Bruijn index. *)
 val mk_node : ty:Type.t -> Symbol.t -> t list -> t    (** Application *)
 val mk_const : ty:Type.t -> Symbol.t -> t       (** Shortcut for constants *)
+val mk_ty : Type.t -> t
 
 val true_term : t                        (** tautology symbol *)
 val false_term : t                       (** antilogy symbol *)
@@ -113,6 +115,7 @@ val is_var : t -> bool
 val is_bound_var : t -> bool
 val is_node : t -> bool
 val is_const : t -> bool
+val is_ty : t -> bool
 
 val at_pos : t -> Position.t -> t
   (** retrieve subterm at pos, or raise Invalid_argument*)

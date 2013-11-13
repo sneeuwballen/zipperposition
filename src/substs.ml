@@ -67,6 +67,34 @@ module type S = sig
   val remove : t -> term -> int -> t
     (** Remove the given binding. No other variable should depend on it... *)
 
+  (** {3 Environment for De Bruijn indices} TODO
+
+  module Env : sig
+    val depth : t -> int
+      (** Depth of the environment, ie how many De Bruijn indices are
+          bound *)
+
+    val lookup : t -> int -> term option
+      (** [lookup subst n] finds the binding for the [n]-th De Bruijn index.
+          @return None if the De Bruijn index is not bound, [Some t']
+            if it is bound to [t'] ([t'] lives in the same scope a [t]) *)
+
+    val push : t -> term -> t
+      (** [push subst t] enters the scope of a new variable, binding
+          it to [t] *)
+
+    val push_none : t -> t
+      (** Enter a scope, without binding the variable to anything.
+          Calling [lookup subst 0] will return None *)
+
+    val exit : t -> t
+      (** Exit the scope of the last De Bruijn index.
+          @raise Invalid_argument if the environment was empty (ie depth=0) *)
+  end
+  *)
+
+  (** {2 Set operations} *)
+
   module H : Hashtbl.S with type key = term * scope
     (** Set of bound terms *)
 
@@ -351,28 +379,42 @@ module Ty = struct
         v
   end
 
+  (* is the variable masked by a quantifier? *)
+  let rec _is_masked masked v s_v = match masked with
+    | [] -> false
+    | (v',s_v')::masked' ->
+      (s_v = s_v' && Type.eq v v') || _is_masked masked' v s_v
+
   (* apply substitution *)
   let apply subst ~renaming ty sc_ty =
-    let rec _apply ty sc_ty = match ty.Type.ty with
+    let rec _apply masked ty sc_ty = match ty.Type.ty with
     | Type.App (_, []) -> ty
     | _ when Type.is_ground ty -> ty
     | Type.App (s, l) ->
-      let l' = List.map (fun ty' -> _apply ty' sc_ty) l in
+      let l' = List.map (fun ty' -> _apply masked ty' sc_ty) l in
       Type.app s l'
     | Type.Fun (ret, l) ->
-      let ret' = _apply ret sc_ty in
-      let l' = List.map (fun ty' -> _apply ty' sc_ty) l in
+      let ret' = _apply masked ret sc_ty in
+      let l' = List.map (fun ty' -> _apply masked ty' sc_ty) l in
       Type.mk_fun ret' l'
     | Type.Var _ ->
       begin try
+        (* masked variables are not bound *)
+        if _is_masked masked ty sc_ty then raise Not_found;
         (* type variable is bound, recurse *)
         let ty', sc_ty' = lookup subst ty sc_ty in
-        _apply ty' sc_ty'
+        _apply masked ty' sc_ty'
       with Not_found ->
         Renaming.rename renaming ty sc_ty
       end
+    | Type.Forall (vars, ty') ->
+      (* hide [vars] and apply substitution to [ty'] *)
+      let masked' = List.fold_left (fun masked v -> (v, sc_ty) :: masked) masked vars in
+      let ty'' = _apply masked' ty' sc_ty in
+      let vars' = List.map (fun v -> Renaming.rename renaming v sc_ty) vars in
+      Type.forall vars' ty''
     in
-    _apply ty sc_ty
+    _apply [] ty sc_ty
 
   let apply_no_renaming subst ty sc_ty =
     apply subst ~renaming:Renaming.dummy ty sc_ty

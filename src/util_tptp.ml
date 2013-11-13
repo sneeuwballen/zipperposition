@@ -167,7 +167,7 @@ let infer_type ctx decls =
       | A.IncludeOnly _ -> ()
       | A.NewType _ -> ()  (* ignore *)
       | A.TypeDecl(_, s, ty) ->
-        let ty = TypeConversion.of_quantified ty in
+        let ty = TypeConversion.of_basic ty in
         TypeInference.Ctx.declare ctx s ty
       | A.CNF(_,_,c,_) ->
         List.iter (fun f -> TypeInference.FO.constrain_form ctx f) c
@@ -190,7 +190,7 @@ let type_declarations decls =
   Sequence.fold
     (fun signature decl -> match decl with
       | A.TypeDecl (_, s, ty) ->
-        let ty = TypeConversion.of_quantified ty in
+        let ty = TypeConversion.of_basic ty in
         Signature.declare signature s ty
       | _ -> signature)
     Signature.empty decls
@@ -205,7 +205,7 @@ let declare_symbols ?(name=__name_symbol) signature =
   Sequence.mapi
     (fun i (s, ty) ->
       let name = name i s in
-      A.TypeDecl (name, s, TypeConversion.to_quantified ty))
+      A.TypeDecl (name, s, TypeConversion.to_basic ty))
     seq
 
 let __is_conjecture = function

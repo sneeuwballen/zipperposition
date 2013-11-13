@@ -113,7 +113,7 @@ let size s = SMap.cardinal s
 
 let well_founded s =
   SMap.exists
-    (fun _ ty -> Type.arity ty = 0)
+    (fun _ ty -> snd (Type.arity ty) = 0)
     s
 
 let to_symbols signature =

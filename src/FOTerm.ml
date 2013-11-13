@@ -43,6 +43,7 @@ and term_cell =
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
   | Node of Symbol.t * t list   (** term application *)
+  | Ty of Type.t                (** lifted type *)
 and sourced_term =
   t * string * string           (** Term + file,name *)
 
@@ -58,6 +59,7 @@ let hash_term t =
   | BoundVar i -> Hash.hash_int2 22 (Hash.hash_int i)
   | Node (s, []) -> Symbol.hash s
   | Node (s, l) -> Hash.hash_list (fun x -> x.tag) (Symbol.hash s) l
+  | Ty ty -> Type.hash ty
   in
   Hash.combine h_type h_term
 
@@ -69,6 +71,7 @@ let rec hash_novar t =
   | Node (s, l) ->
     let h = Symbol.hash s in
     Hash.hash_list hash_novar h l
+  | Ty ty -> 11
   in
   Hash.combine h_type h_term
 
@@ -78,7 +81,7 @@ let subterm ~sub t =
   let rec check t =
     sub == t ||
     match t.term with
-    | Var _ | BoundVar _ | Node (_, []) -> false
+    | Var _ | BoundVar _ | Node (_, []) | Ty _ -> false
     | Node (_, subterms) -> List.exists check subterms
   in
   check t
@@ -153,6 +156,7 @@ let hashcons_equal x y =
   | Node (_, []), Node (_, _::_)
   | Node (_, _::_), Node (_, []) -> false
   | Node (sa, la), Node (sb, lb) -> Symbol.eq sa sb && eq_subterms la lb
+  | Ty tya, Ty tyb -> Type.eq tya tyb
   | _ -> false
 
 (** hashconsing for terms *)
@@ -238,6 +242,10 @@ let mk_node ~ty s l =
 
 let mk_const ~ty s = mk_node ~ty s []
 
+let mk_ty ty =
+  let my_t = {term=Ty ty; ty=Type.tType; flags=0; tsize=1; tag= ~-1; } in
+  H.hashcons my_t
+
 let true_term = mk_const ~ty:Type.o Symbol.true_symbol
 let false_term = mk_const ~ty:Type.o Symbol.false_symbol
 
@@ -259,6 +267,8 @@ let is_node t = match t.term with
   | Node _ -> true
   | _ -> false
 
+let is_ty t = match t.term with | Ty _ -> true | _ -> false
+
 let rec at_pos t pos = match t.term, pos with
   | _, [] -> t
   | Var _, _::_ -> invalid_arg "wrong position in term"
@@ -278,7 +288,7 @@ let rec replace_pos t pos new_t = match t.term, pos with
     in [t] by the term [by]. *)
 let rec replace t ~old ~by = match t.term with
   | _ when t == old -> by
-  | Var _ | BoundVar _ -> t
+  | Var _ | BoundVar _ | Ty _ -> t
   | Node (s, l) ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
     mk_node ~ty:t.ty s l'
@@ -309,11 +319,13 @@ let rec monomorphic t =
   Type.is_ground t.ty &&
   match t.term with
   | Var _ | BoundVar _ | Node (_, []) -> true
+  | Ty ty -> Type.is_ground ty
   | Node (_, l) -> List.for_all monomorphic l
 
 let rec var_occurs x t = match t.term with
   | Var _ | BoundVar _ -> x == t
-  | Node (s, []) -> false
+  | Ty _
+  | Node (_, []) -> false
   | Node (s, l) -> List.exists (var_occurs x) l
 
 let max_var vars =
@@ -335,7 +347,7 @@ let min_var vars =
 (** add variables of the term to the set *)
 let add_vars set t =
   let rec add set t = match t.term with
-  | BoundVar _ | Node (_, []) -> ()
+  | BoundVar _ | Node (_, []) | Ty _ -> ()
   | Var _ -> Tbl.replace set t ()
   | Node (_, l) -> add_list set l
   and add_list set l = match l with
@@ -366,14 +378,14 @@ let vars_prefix_order t =
   let rec traverse acc t = match t.term with
   | Var _ when List.memq t acc -> acc
   | Var _ -> t :: acc
-  | BoundVar _ | Node (_, []) -> acc
+  | BoundVar _ | Node (_, []) | Ty _ -> acc
   | Node (_, l) -> List.fold_left traverse acc l
   in List.rev (traverse [] t)
 
 (** depth of term *)
 let depth t =
   let rec depth t = match t.term with
-  | Var _ | BoundVar _ -> 1
+  | Var _ | BoundVar _ | Ty _ -> 1
   | Node (_, l) -> 1 + depth_list 0 l
   and depth_list m l = match l with
   | [] -> m
@@ -382,11 +394,11 @@ let depth t =
 
 let rec head t = match t.term with
   | Node (s, _) -> s
-  | Var _ | BoundVar _ -> raise (Invalid_argument "Term.head: variable")
+  | Var _ | BoundVar _ | Ty _ -> raise (Invalid_argument "Term.head: variable")
 
 let symbols ?(init=Symbol.Set.empty) seq =
   let rec symbols set t = match t.term with
-    | Var _ | BoundVar _ -> set
+    | Var _ | BoundVar _ | Ty _ -> set
     | Node (s, l) ->
       let set = Symbol.Set.add s set in
       List.fold_left symbols set l
@@ -396,7 +408,7 @@ let symbols ?(init=Symbol.Set.empty) seq =
 (** Does t contains the symbol f? *)
 let rec contains_symbol f t =
   match t.term with
-  | Var _ | BoundVar _ -> false
+  | Var _ | BoundVar _ | Ty _ -> false
   | Node (g, ts) -> Symbol.eq g f || List.exists (contains_symbol f) ts
 
 (** {2 De Bruijn Indexes manipulations} *)

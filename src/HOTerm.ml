@@ -221,7 +221,7 @@ let rec mk_at t l = match t.term, l with
     let ty_args = List.map get_type l in
     try
       (* infer the type returned by the function application *)
-      let ty = Type.apply_fun t.ty ty_args in
+      let ty = Type.apply t.ty ty_args in
       let my_t = {term=At (t,l); ty; tsize=0; flags=0; tag= -1} in
       let t = H.hashcons my_t in
       (if t == my_t

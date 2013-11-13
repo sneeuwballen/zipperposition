@@ -36,9 +36,10 @@ type t = {
   mutable id : int;  (* hashconsing tag *)
 }
 and tree =
-  | Var of int              (** Universal type variable *)
+  | Var of int              (** type variable *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
+  | Forall of t list * t    (** explicit quantification *)
 
 type ty = t
 
@@ -48,6 +49,8 @@ let rec eq_struct t1 t2 = match t1.ty, t2.ty with
     s1 = s2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
   | Fun (ret1,l1), Fun (ret2,l2) ->
     ret1 == ret2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
+  | Forall (vars1,ty1), Forall (vars2, ty2) ->
+    ty1 == ty2 && (try List.for_all2 (==) vars1 vars2 with Invalid_argument _ -> false)
   | _, _ -> false
 
 let hash t = t.id
@@ -56,6 +59,7 @@ let rec _hash_top t = match t.ty with
   | Var i -> i
   | App (s, l) -> Hash.hash_list hash (Hash.hash_string s) l
   | Fun (ret, l) -> Hash.hash_list hash (hash ret) l
+  | Forall (vars, ty) -> Hash.hash_list hash (hash ty) vars
 
 (* hashconsing *)
 module H = Hashcons.Make(struct
@@ -72,6 +76,7 @@ let cmp ty1 ty2 = ty1.id - ty2.id
 let is_var = function | {ty=Var _} -> true | _ -> false
 let is_app = function | {ty=App _} -> true | _ -> false
 let is_fun = function | {ty=Fun _} -> true | _ -> false
+let is_forall = function | {ty=Forall _} -> true | _ -> false
 
 module Tbl = Hashtbl.Make(struct
   type t = ty
@@ -122,8 +127,6 @@ let (@@) s args =
     end;
   ty'
 
-(** {2 Basic types} *)
-
 let const s = s @@ []
 
 let app s args = s @@ args
@@ -133,6 +136,16 @@ let var i =
   H.hashcons {ty=Var i; id= ~-1; ground=false; }
 
 let mk_fun = (<==)
+
+let forall vars ty =
+  if not (List.for_all is_var vars) then raise (Invalid_argument "Type.forall");
+  match vars, ty.ty with
+  | [], _ -> ty
+  | _::_, Forall (vars', ty') ->
+    (* flatten forall's *)
+    H.hashcons {ty=Forall(vars@vars', ty'); id= ~-1; ground=false; }
+  | _::_, _ ->
+    H.hashcons {ty=Forall(vars, ty); id= ~-1; ground=false; }
 
 (** {2 Basic types} *)
 
@@ -151,20 +164,34 @@ let rec _free_vars set ty =
   | Var _ -> Set.add ty set
   | App (_, l) -> List.fold_left _free_vars set l
   | Fun (ret, l) -> List.fold_left _free_vars (_free_vars set ret) l
+  | Forall (vars, ty') ->
+    let set' = _free_vars Set.empty ty' in
+    let set' = Set.filter (fun v -> not (List.memq v vars)) set' in
+    Set.union set set'
 
 let free_vars ty =
   let set = _free_vars Set.empty ty in
   Set.elements set
 
-let arity ty = match ty.ty with
-  | Fun (_, l) -> List.length l
-  | Var _
-  | App _ -> 0
+let close_forall ty =
+  let fvars = free_vars ty in
+  forall fvars ty
 
-let expected_args ty = match ty.ty with
-  | Fun (_, l) -> l
+let rec arity ty = match ty.ty with
+  | Fun (_, l) -> 0, List.length l
   | Var _
-  | App _ -> []
+  | App _ -> 0, 0
+  | Forall (vars, ty') ->
+    let i1, i2 = arity ty' in
+    List.length vars + i1, i2
+
+let rec expected_args ty = match ty.ty with
+  | Fun (_, l) -> [], l
+  | Var _
+  | App _ -> [], []
+  | Forall (vars, ty') ->
+    let l1, l2 = expected_args ty' in
+    vars @ l1, l2
 
 let is_ground t = t.ground
 
@@ -173,47 +200,62 @@ let rec size ty = match ty.ty with
   | App (_, []) -> 1
   | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
   | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
+  | Forall (vars, ty') -> size ty' + List.length vars
 
-let apply_fun f args =
+let _is_empty_subst = function | [] -> true | _::_ -> false
+
+(* substitute variables by types in [ty] *)
+let rec _apply_subst subst ty =
+  if _is_empty_subst subst then ty
+  else match ty.ty with
+  | Var _ ->
+    begin try
+      let ty' = List.assq ty subst in
+      _apply_subst subst ty'
+    with Not_found -> ty
+    end
+  | App (s, l) -> app s (_apply_subst_list subst l)
+  | Fun (ret, l) -> mk_fun (_apply_subst subst ret) (_apply_subst_list subst l)
+  | Forall (vars, ty') ->
+    (* hide the bound variables *)
+    let subst = List.filter (fun (v,_) -> not (List.memq v vars)) subst in
+    forall vars (_apply_subst subst ty')
+and _apply_subst_list subst l = match l with
+  | [] -> []
+  | ty::l' -> _apply_subst subst ty :: _apply_subst_list subst l'
+
+(* apply a type to arguments *)
+let apply ty args =
+  (* apply subst(ty) to subst(args) *)
+  let rec apply subst ty args =
+    match ty.ty, args with
+    | _, [] -> _apply_subst subst ty
+    | Fun (ret, l), l' -> apply_fun subst ret l l'
+    | Forall (vars, ty'), _ -> apply_forall subst ty' vars args
+    | _, _ -> failwith "Type.apply: expected function or forall type"
   (* recursive matching of expected arguments and provided arguments.
     careful: we could have a curried function *)
-  let rec apply_fun f_ret f_args args = match f_ret.ty, f_args, args with
-    | _, x::f_args', y::args' ->
-      (* match arguments *)
-      if eq x y
-        then apply_fun f_ret f_args' args'
-        else failwith "Type.apply_fun: argument type mismatch"
-    | _, [], [] -> f_ret  (* total application *)
-    | Fun (f_ret', f_args'), _, _ -> assert false
-    | _, [], _ -> failwith "Type.apply_fun: too many arguments"
-    | _, _::_, [] ->
+  and apply_fun subst f_ret f_args args = match f_args, args with
+    | x::f_args', y::args' ->
+      (* match arguments after substitution *)
+      if eq (_apply_subst subst x) (_apply_subst subst y)
+        then apply_fun subst f_ret f_args' args'
+        else failwith "Type.apply: argument type mismatch"
+    | [], [] ->
+      (* total application *)
+      _apply_subst subst f_ret
+    | [], _ -> failwith "Type.apply: too many arguments"
+    | _::_, [] ->
       (* partial application. The remaining arguments need be provided *)
-      mk_fun f_ret f_args
+      mk_fun (_apply_subst subst f_ret) (_apply_subst_list subst f_args)
+  (* forall(vars,ty') applied to args *)
+  and apply_forall subst ty' vars args = match vars, args with
+    | [], _ -> apply subst ty' args
+    | v::vars', a::args' ->
+      let subst' = (v,a) :: subst in
+      apply_forall subst' ty' vars' args'
   in
-  match f.ty, args with
-  | _, [] -> f
-  | Fun (ret, l), l' -> apply_fun ret l l'
-  | _, _ -> failwith "Type.apply_fun: expected function type"
-
-let rec looks_similar ty1 ty2 =
-  ty1 == ty2 ||
-  match ty1.ty, ty2.ty with
-  | Var _, _
-  | _, Var _ -> true
-  | App (s1, []), App (s2, []) -> s1 = s2
-  | App (_, []), App (_, _)
-  | App (_, _), App (_, []) -> false
-  | App (s1, l1), App (s2, l2) ->
-    s1 = s2 && looks_similar_list l1 l2
-  | Fun (ret1, l1), Fun (ret2, l2) ->
-    looks_similar ret1 ret2 &&
-    looks_similar_list l1 l2
-  | _ -> false
-and looks_similar_list l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [], _
-  | _, [] -> false
-  | ty1::l1', ty2::l2' -> looks_similar ty1 ty2 && looks_similar_list l1' l2
+  apply [] ty args
 
 (** {2 IO} *)
 
@@ -225,6 +267,8 @@ let rec pp buf t = match t.ty with
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
+  | Forall (vars, ty') ->
+    Printf.bprintf buf "∀ %a. %a" (Util.pp_list pp) vars pp_inner ty'
 and pp_inner buf t = match t.ty with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
@@ -238,6 +282,11 @@ let rec pp_tstp buf t = match t.ty with
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
+  | Forall (vars, ty') ->
+    Printf.bprintf buf "!>[%a]: %a" (Util.pp_list pp_bvar) vars pp_inner ty'
+and pp_bvar buf v =
+  pp_tstp buf v;
+  Buffer.add_string buf ":%tType"
 and pp_inner buf t = match t.ty with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp_tstp buf t; Buffer.add_char buf ')'
@@ -251,18 +300,22 @@ let to_string t =
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
 let bij =
+  let (!!) = Lazy.force in
   Bij.(fix (fun bij' ->
-    let bij_app = lazy (pair string_ (list_ (Lazy.force bij'))) in
-    let bij_fun = lazy (pair (Lazy.force bij') (list_ (Lazy.force bij'))) in
+    let bij_app = lazy (pair string_ (list_ (!! bij'))) in
+    let bij_fun = lazy (pair (!! bij') (list_ (!! bij'))) in
+    let bij_forall = lazy (pair (list_ (!! bij')) (!! bij')) in
     switch
       ~inject:(fun ty -> match ty.ty with
         | Var i -> "v", BranchTo (int_, i)
-        | App (p, l) -> "at", BranchTo (Lazy.force bij_app, (p, l))
-        | Fun (ret, l) -> "fun", BranchTo (Lazy.force bij_fun, (ret, l)))
+        | App (p, l) -> "at", BranchTo (!! bij_app, (p, l))
+        | Fun (ret, l) -> "fun", BranchTo (!! bij_fun, (ret, l))
+        | Forall (vars, ty) -> "all", BranchTo(!! bij_forall, (vars, ty)))
       ~extract:(function
         | "v" -> BranchFrom (int_, var)
-        | "at" -> BranchFrom (Lazy.force bij_app, fun (s,l) -> app s l)
-        | "fun" -> BranchFrom (Lazy.force bij_fun, fun (ret,l) -> mk_fun ret l)
+        | "at" -> BranchFrom (!! bij_app, fun (s,l) -> app s l)
+        | "fun" -> BranchFrom (!! bij_fun, fun (ret,l) -> mk_fun ret l)
+        | "all" -> BranchFrom (!! bij_forall, fun (vars,ty) -> forall vars ty)
         | _ -> raise (DecodingError "expected Type"))))
 
 (** {2 Misc} *)

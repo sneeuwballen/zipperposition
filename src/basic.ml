@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Terms without type, typically produced from AST} *)
 
+module S = Symbol
+
 (** {2 Type representation} *)
 
 module Ty = struct
@@ -33,12 +35,7 @@ module Ty = struct
     | Var of string
     | App of string * t list
     | Fun of t * t list
-
-  type quantified = {
-    vars : t list;
-    ty : t;
-    loc : Location.t option;
-  }
+    | Forall of t list * t
 
   let eq a b = a = b
   let cmp a b = Pervasives.compare a b
@@ -63,24 +60,15 @@ module Ty = struct
   let is_var = function | Var _ -> true | _ -> false
   let is_fun = function | Fun _ -> true | _ -> false
   let is_app = function | App _ -> true | _ -> false
+  let is_forall = function | Forall _ -> true | _ -> false
 
-  let atom ?loc ty = {
-    vars = [];
-    ty;
-    loc;
-  }
-
-  let forall ?loc vars q =
+  let forall vars ty =
     assert (List.for_all is_var vars);
     (* flatten forall *)
-    match vars, q.vars with
-    | [], _ -> { q with loc; }
-    | _::_, [] -> { ty=q.ty; vars; loc; }
-    | _::_, vars' -> { ty=q.ty; vars= vars@vars'; loc; }
-
-  let forall_atom ?loc vars t = forall ?loc vars (atom t)
-
-  let loc q = q.loc
+    match vars, ty with
+    | [], _ -> ty
+    | _::_, Forall (vars', ty') -> Forall (vars @ vars', ty')  (* flatten *)
+    | _::_, _ -> Forall (vars, ty)
 
   let i = const "$i"
   let o = const "$o"
@@ -88,6 +76,14 @@ module Ty = struct
   let rat = const "$rat"
   let real = const "$real"
   let tType = const "$tType"
+
+  (* fresh names *)
+  let gensym =
+    let n = ref 1 in
+    fun () ->
+      let name = "__Ty_" ^ string_of_int !n in
+      incr n;
+      name
 
   let rec pp buf t = match t with
     | Var s -> Buffer.add_string buf s
@@ -98,20 +94,26 @@ module Ty = struct
       Printf.bprintf buf "%a > %a" pp x pp ret
     | Fun (ret, l) ->
       Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp) l pp ret
+    | Forall (vars, ty') ->
+      Printf.bprintf buf "∀ %a. %a" (Util.pp_list pp) vars pp ty'
 
-  let pp_tstp = pp
+  let rec pp_tstp buf t = match t with
+    | Var s -> Buffer.add_string buf s
+    | App (s, []) -> Buffer.add_string buf s
+    | App (s, l) ->
+      Printf.bprintf buf "%s(%a)" s (Util.pp_list pp_tstp) l
+    | Fun (ret, [x]) ->
+      Printf.bprintf buf "%a > %a" pp_tstp x pp_tstp ret
+    | Fun (ret, l) ->
+      Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_tstp) l pp_tstp ret
+    | Forall (vars, ty') ->
+      Printf.bprintf buf "!>[%a]: %a" (Util.pp_list pp_var) vars pp_tstp ty'
+  and pp_var buf t =
+    pp_tstp buf t;
+    Buffer.add_string buf ":$tType"
+
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
-
-  let pp_quant buf q = match q.vars with
-    | [] -> pp buf q.ty
-    | _ -> Printf.bprintf buf "!%a. %a" (Util.pp_list pp) q.vars pp q.ty
-  let pp_quant_tstp buf q = match q.vars with
-    | [] -> pp_tstp buf q.ty
-    | _ ->
-      Printf.bprintf buf "!>[%a]: %a" (Util.pp_list pp_tstp) q.vars pp_tstp q.ty
-  let to_string_quant = Util.on_buffer pp_quant
-  let fmt_quant fmt q = Format.pp_print_string fmt (to_string_quant q)
 end
 
 (** {2 First Order terms} *)
@@ -147,6 +149,25 @@ module FO = struct
   let get_ty t = match t.ty with
     | Some ty -> ty
     | None -> failwith "Basic.FO.get_ty: no type"
+
+  exception ExpectedType of t
+
+  let rec as_ty t =
+    match t.term with
+    | App (s, []) when S.eq s S.wildcard_symbol ->
+      (* fresh variable *)
+      Ty.var (Ty.gensym ())
+    | App (S.Const(s,_), l) ->
+      let l' = List.map as_ty l in
+      Ty.app s l'
+    | Var n ->
+      begin match t.ty with
+        | None
+        | Some (Ty.App ("$tType", [])) -> Ty.var n
+        | _ -> raise (ExpectedType t)
+      end
+    | App (s, _) ->
+      raise (ExpectedType t)
   
   let symbols seq =
     let rec recurse set t = match t.term with
@@ -431,6 +452,27 @@ module HO = struct
   let get_ty t = match t.ty with
     | Some ty -> ty
     | None -> failwith "Basic.HO.get_ty: no type"
+
+  exception ExpectedType of t
+
+  let rec as_ty t =
+    match t.term with
+    | Const s when S.eq s S.wildcard_symbol ->
+      (* fresh variable *)
+      Ty.var (Ty.gensym ())
+    | Const (S.Const(s,_)) -> Ty.app s []
+    | App ({term=Const(S.Const(s,_))}, l) ->
+      let l' = List.map as_ty l in
+      Ty.app s l'
+    | Var n ->
+      begin match t.ty with
+        | None
+        | Some (Ty.App ("$tType", [])) -> Ty.var n
+        | _ -> raise (ExpectedType t)
+      end
+    | App (_, _)
+    | Const _
+    | Lambda _ -> raise (ExpectedType t)
 
   let _same_name v1 v2 = match v1.term, v2.term with
     | Var n1, Var n2 -> n1 = n2

@@ -110,7 +110,7 @@ module Ctx : sig
         @raise TypeUnif.Error if an inconsistency (with inferred types) is
           detected. *)
 
-  val declare_basic : t -> Symbol.t -> Basic.Ty.quantified -> unit
+  val declare_basic : t -> Symbol.t -> Basic.Ty.t -> unit
     (** Declare the type of a symbol, in raw form *)
 
   val unify_and_set : t -> Type.t -> scope -> Type.t -> scope -> unit
@@ -151,6 +151,9 @@ This module, abstract in the exact kind of term it types, takes as input
 a signature and an {b untyped term}, and updates the typing context
 so that the {b untyped term} can be converted into a {b typed term}. *)
 
+exception Error of string
+  (** Raised when type inference fails *)
+
 module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
@@ -167,7 +170,7 @@ module type S = sig
         @return the inferred type of the untyped term (possibly a type var)
           along with a closure to produce a typed term once every
           constraint has been solved
-        @raise TypeUnif.Error if the types are inconsistent *)
+        @raise Error if the types are inconsistent *)
 
   (** {3 Constraining types}
   
@@ -176,11 +179,11 @@ module type S = sig
 
   val constrain_term_term : Ctx.t -> untyped -> scope -> untyped -> scope -> unit
     (** Force the two terms to have the same type in this context
-        @raise TypeUnif.Error if an inconsistency is detected *)
+        @raise Error if an inconsistency is detected *)
 
   val constrain_term_type : Ctx.t -> untyped -> scope -> Type.t -> scope -> unit
     (** Force the term's type and the given type to be the same.
-        @raise TypeUnif.Error if an inconsistency is detected *)
+        @raise Error if an inconsistency is detected *)
 end
 
 module FO : sig

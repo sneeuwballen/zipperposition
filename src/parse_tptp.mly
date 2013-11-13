@@ -128,7 +128,7 @@ declaration:
     { Ast_tptp.TFF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
-      match ty.Ty.ty with
+      match ty with
       | Ty.App ("$tType", [])
       | Ty.Fun (Ty.App ("$tType",[]), _) ->
         (* declare a new type symbol *)
@@ -332,16 +332,9 @@ system_functor: s=atomic_system_word { s }
 
 /* prenex quantified type */
 tff_quantified_type:
-  | ty=tff_type
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Ty.atom ~loc ty
-    }
+  | ty=tff_type { ty }
   | FORALL_TY LEFT_BRACKET vars=tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_quantified_type
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      Ty.forall ~loc vars ty
-    }
+    { Ty.forall vars ty }
 
 /* general type, without quantifiers */
 tff_type: 

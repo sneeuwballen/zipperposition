@@ -35,8 +35,8 @@ type declaration =
   | FOF of name * role * Basic.Form.t * optional_info
   | TFF of name * role * Basic.Form.t * optional_info
   | THF of name * role * Basic.HO.t * optional_info  (* XXX not parsed yet *)
-  | TypeDecl of name * Symbol.t * Basic.Ty.quantified  (* type declaration *)
-  | NewType of name * string * Basic.Ty.quantified (* declare new type constant... *)
+  | TypeDecl of name * Symbol.t * Basic.Ty.t  (* type declaration *)
+  | NewType of name * string * Basic.Ty.t (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)
   (** top level declaration *)
@@ -174,9 +174,9 @@ let pp_declaration buf = function
     Printf.bprintf buf "include('%s', [%a])." filename (Util.pp_list pp_name) names
   | TypeDecl (name, s, ty) ->
     Printf.bprintf buf "tff(%a, type, (%a : %a))."
-      pp_name name Symbol.pp s Basic.Ty.pp_quant_tstp ty
+      pp_name name Symbol.pp s Basic.Ty.pp_tstp ty
   | NewType (name, s, kind) ->
-    Printf.bprintf buf "tff(%a, type, (%s: %a))." pp_name name s Basic.Ty.pp_quant kind
+    Printf.bprintf buf "tff(%a, type, (%s: %a))." pp_name name s Basic.Ty.pp_tstp kind
   | CNF (name, role, c, generals) ->
     __pp_formula buf (Util.pp_list ~sep:" | " F.pp_tstp) ("cnf", name, role, c, generals)
   | FOF (name, role, f, generals) ->

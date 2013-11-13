@@ -44,12 +44,7 @@ module Ty : sig
     | Var of string
     | App of string * t list
     | Fun of t * t list
-
-  type quantified = private {
-    vars : t list;
-    ty : t;
-    loc : Location.t option;
-  }
+    | Forall of t list * t
 
   val eq : t -> t -> bool
   val cmp : t -> t -> int
@@ -62,17 +57,13 @@ module Ty : sig
   val (<==) : t -> t list -> t
   val (<=.) : t -> t -> t
 
+  val forall : t list -> t -> t
+    (** the list of types must be a list of variables *)
+
   val is_var : t -> bool
   val is_fun : t -> bool
   val is_app : t -> bool
-
-  (** quantifiers: the list of types must be a list of variables *)
-
-  val atom : ?loc:Location.t -> t -> quantified
-  val forall : ?loc:Location.t -> t list -> quantified -> quantified
-  val forall_atom : ?loc:Location.t -> t list -> t -> quantified
-
-  val loc : quantified -> Location.t option  (** location in file *)
+  val is_forall : t -> bool
 
   val i : t
   val o : t
@@ -85,11 +76,6 @@ module Ty : sig
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
-
-  val pp_quant : Buffer.t -> quantified -> unit
-  val pp_quant_tstp : Buffer.t -> quantified -> unit
-  val to_string_quant : quantified -> string
-  val fmt_quant : Format.formatter -> quantified -> unit
 end
 
 (** {2 First Order terms} *)
@@ -118,6 +104,12 @@ module FO : sig
   val loc : t -> Location.t option
   val cast : t -> Ty.t -> t
   val get_ty : t -> Ty.t   (* obtain type of variables (always present) *)
+
+  exception ExpectedType of t
+
+  val as_ty : t -> Ty.t
+    (** Interpret the term as a type.
+        @raise ExpectedType if it's not possible (numeric symbols...) *)
 
   val symbols : t Sequence.t -> Symbol.Set.t
   val free_vars : ?init:t list -> t -> t list
@@ -221,6 +213,12 @@ module HO : sig
 
   val cast : t -> Ty.t -> t
   val get_ty : t -> Ty.t   (* obtain type of variables (always present) *)
+
+  exception ExpectedType of t
+
+  val as_ty : t -> Ty.t
+    (** Interpret the term as a type.
+        @raise ExpectedType if the structure of the term doesn't fit *)
 
   val true_term : t
   val false_term : t

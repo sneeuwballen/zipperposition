@@ -42,9 +42,10 @@ type t = private {
   mutable id : int;  (* hashconsing tag *)
 }
 and tree = private
-  | Var of int              (** Type variable, universally quantified *)
+  | Var of int              (** Type variable *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
+  | Forall of t list * t    (** explicit quantification *)
 
 type ty = t
 
@@ -55,6 +56,7 @@ val hash : t -> int         (* hash of the structure *)
 val is_var : t -> bool
 val is_app : t -> bool
 val is_fun : t -> bool
+val is_forall : t -> bool
 
 module Tbl : Hashtbl.S with type key = ty
 module Set : Sequence.Set.S with type elt = ty
@@ -86,6 +88,11 @@ val mk_fun : t -> t list -> t
   (** Function type. The first argument is the return type.
       see {!(<==)}. *)
 
+val forall : t list -> t -> t
+  (** [forall vars ty] quantifies [ty] over [vars].
+      If [vars] is the empty list, returns [ty].
+      @raise Invalid_argument if some element of [vars] is not a variable *)
+
 (** {2 Basic types} *)
 
 val i : t       (* individuals *)
@@ -100,12 +107,26 @@ val tType : t   (* "type" of types *)
 val free_vars : t -> t list
   (** List of free variables ({!Var}) that are not bound *)
 
-val arity : t -> int
-  (** Number of arguments of the type (If it's a function, else 0)*)
+val close_forall : t -> t
+  (** bind free variables *)
 
-val expected_args : t -> t list
-  (** Types expected as argument by [ty]. Empty list if [ty] is not a function,
-      otherwise a list of length [arity ty]. *)
+val arity : t -> int * int
+  (** Number of arguments the type expects.
+     If [arity ty] returns [a, b] that means that it
+     expects [a] arguments to be used as arguments of Forall, and
+     [b] arguments to be used for function application. *)
+
+val expected_args : t -> t list * t list
+  (** Types expected as argument by [ty].
+      The first list is the list of variables that need to be bound
+      in a forall, the second is the list of argument types for the function.
+      
+      {[let l1, l2 = expected_args ty in
+       let i1, i2 = arity ty in
+       assert i1 = List.length l1;
+       assett i2 = List.length l2;
+      ]}
+  *)
 
 val is_ground : t -> bool
   (** Is the type ground? (means that no {!Var} occur in it) *)
@@ -113,17 +134,11 @@ val is_ground : t -> bool
 val size : t -> int
   (** Size of type, in number of "nodes" *)
 
-val apply_fun : t -> t list -> t
-  (** Given a function type, and a list of arguments, return the
-      type that results from applying the function to the arguments.
+val apply : t -> t list -> t
+  (** Given a function/forall type, and a list of arguments, return the
+      type that results from applying the function/forall to the arguments.
       No unification is done, types must check exactly.
       @raise Failure if the types do not match *)
-
-val looks_similar : t -> t -> bool
-  (** Quick check that two types {b might} be unifiable or equal, but
-      designed to be fast.
-      If the types are unifiable then this function returns true, but
-      it can also return true in cases where unifiability isn't present *)
 
 (** {2 IO} *)
 
