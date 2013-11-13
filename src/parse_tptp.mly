@@ -59,6 +59,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token ARROW
 %token FORALL_TY  /* quantification on types */
 %token TYPE_TY  /* tType */
+%token WILDCARD  /* $_ */
 
 %token AND
 %token NOTAND
@@ -371,6 +372,7 @@ tff_ty_var: w=UPPER_WORD { Ty.var w }
 type_const:
   | w=LOWER_WORD { w }
   | w=DOLLAR_WORD { w }
+  | WILDCARD { "$_" }
 
 arguments: separated_nonempty_list(COMMA, term) { $1 }
 
@@ -392,6 +394,7 @@ variable:
 atomic_word:
   | s=SINGLE_QUOTED { remove_quotes s }
   | s=LOWER_WORD { s }
+  | WILDCARD { "$_" }
 
 atomic_defined_word:
   | w=DOLLAR_WORD { Symbol.mk_const w }

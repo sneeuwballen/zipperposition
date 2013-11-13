@@ -164,6 +164,7 @@ let table = Type.(
     Symbol.and_symbol, o <== [o; o];
     Symbol.or_symbol, o <== [o; o];
     Symbol.equiv_symbol, o <== [o; o];
+    Symbol.wildcard_symbol, x;
     Symbol.Arith.less, o <== [x; x];
     Symbol.Arith.lesseq, o <== [x; x];
     Symbol.Arith.greater, o <== [x; x];
@@ -186,6 +187,9 @@ let table = Type.(
     Symbol.Arith.to_int, int <=. x;
     Symbol.Arith.to_rat, rat <=. x;
     Symbol.Arith.to_real, real <=. x;
+    Symbol.Arith.is_int, o <== [x];
+    Symbol.Arith.is_rat, o <== [x];
+    Symbol.Arith.is_real, o <== [x];
     (* special symbols, used for precedence
     Symbol.db_symbol, Type.i;
     Symbol.split_symbol, Type.o;
@@ -218,30 +222,31 @@ module Arith = struct
   let table = Type.(
     let module S = Symbol in
     let x = var 0 in
-    [ S.mk_const "$less", o <== [x; x]
-    ; S.mk_const "$lesseq", o <== [x; x]
-    ; S.mk_const "$greater", o <== [x; x]
-    ; S.mk_const "$greatereq", o <== [x; x]
-    ; S.mk_const "$uminus", x <== [x]
-    ; S.mk_const "$sum", x <== [x; x]
-    ; S.mk_const "$difference", x <== [x; x]
-    ; S.mk_const "$product", x <== [x; x]
-    ; S.mk_const "$quotient", x <== [x; x]
-    ; S.mk_const "$quotient_f", int <== [x; x]
-    ; S.mk_const "$quotient_t", int <== [x; x]
-    ; S.mk_const "$quotient_e", int <== [x; x]
-    ; S.mk_const "$remainder_f", int <== [x; x]
-    ; S.mk_const "$remainder_t", int <== [x; x]
-    ; S.mk_const "$remainder_e", int <== [x; x]
-    ; S.mk_const "$floor", int <== [x]
-    ; S.mk_const "$ceiling", int <== [x]
-    ; S.mk_const "$truncate", int <== [x]
-    ; S.mk_const "$round", int <== [x]
-    ; S.mk_const "$is_int", o <== [x]
-    ; S.mk_const "$is_rat", o <== [x]
-    ; S.mk_const "$to_int", int <== [x]
-    ; S.mk_const "$to_rat", rat <== [x]
-    ; S.mk_const "$to_real", real <== [x]
+    [ Symbol.Arith.less, o <== [x; x]
+    ; Symbol.Arith.lesseq, o <== [x; x]
+    ; Symbol.Arith.greater, o <== [x; x]
+    ; Symbol.Arith.greatereq, o <== [x; x]
+    ; Symbol.Arith.uminus, x <=. x
+    ; Symbol.Arith.sum, x <== [x; x]
+    ; Symbol.Arith.difference, x <== [x; x]
+    ; Symbol.Arith.product, x <== [x; x]
+    ; Symbol.Arith.quotient, x <== [x; x]
+    ; Symbol.Arith.quotient_e, int <== [x; x]
+    ; Symbol.Arith.quotient_f, int <== [x; x]
+    ; Symbol.Arith.quotient_t, int <== [x; x]
+    ; Symbol.Arith.remainder_e, int <== [x; x]
+    ; Symbol.Arith.remainder_f, int <== [x; x]
+    ; Symbol.Arith.remainder_t, int <== [x; x]
+    ; Symbol.Arith.floor, int <=. x
+    ; Symbol.Arith.ceiling, int <=. x
+    ; Symbol.Arith.round, int <=. x
+    ; Symbol.Arith.truncate, int <=. x
+    ; Symbol.Arith.to_int, int <=. x
+    ; Symbol.Arith.to_rat, rat <=. x
+    ; Symbol.Arith.to_real, real <=. x
+    ; Symbol.Arith.is_int, o <== [x]
+    ; Symbol.Arith.is_rat, o <== [x]
+    ; Symbol.Arith.is_real, o <== [x]
     ])
 
   let operators = List.map fst table

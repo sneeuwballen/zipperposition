@@ -119,6 +119,8 @@ val or_symbol : t
 val connectives : t list  (** List of the connectives *)
 val is_connective : t -> bool
 
+val wildcard_symbol : t   (** $_ for type inference *)
+
 (** {2 Arithmetic} *)
 
 (** Arithmetic (assumes the symbols verify {!is_numeric}).

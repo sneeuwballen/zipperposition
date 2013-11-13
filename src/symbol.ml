@@ -201,6 +201,8 @@ let connectives =
 
 let is_connective s = List.exists (fun s' -> eq s s') connectives
 
+let wildcard_symbol = mk_const "$_"
+
 (** {2 IO} *)
 
 let to_string_debug s = match s with

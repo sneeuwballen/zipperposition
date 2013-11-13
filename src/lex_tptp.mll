@@ -93,6 +93,7 @@ rule token = parse
   | "$true" { TRUE }
   | "$false" { FALSE }
   | "$tType" { TYPE_TY }
+  | "$_" { WILDCARD }
   (* | ';' { SEMICOLUMN } *)
   | ':' { COLUMN }
   | '>' { ARROW }
