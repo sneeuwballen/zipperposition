@@ -101,7 +101,7 @@ val new_flag : unit -> int
 val mk_var : ty:Type.t -> int -> t
   (** Create a variable. Providing a type is mandatory. *)
 
-val mk_bound_var : ty:Type.t -> int -> t
+val __mk_bound_var : ty:Type.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
       {b Warning}: be careful and try not to use this function directly*)
 

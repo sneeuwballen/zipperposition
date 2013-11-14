@@ -78,8 +78,11 @@ val mk_equiv : t -> t -> t
 val mk_xor : t -> t -> t
 val mk_eq : term -> term -> t
 val mk_neq : term -> term -> t
-val mk_forall : ty:Type.t -> t -> t
-val mk_exists : ty:Type.t -> t -> t
+
+(** Quantifiers: the term list must be a list of free variables. *)
+
+val mk_forall : term list -> t -> t
+val mk_exists : term list -> t -> t
 
 (** {2 Flags} *)
 
@@ -147,27 +150,32 @@ val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
 
 (** {2 De Bruijn indexes} *)
 
-val db_closed : t -> bool
-  (** All De Bruijn indexes bound? *)
+module DB : sig
+  val closed : ?depth:int -> t -> bool
+    (** check whether the term is closed (all DB vars are bound within
+        the term) *)
 
-val db_contains : t -> int -> bool
-  (** Does the formula contain the De Bruijn variable of index n? *)
+  val contains : t -> int -> bool
+    (** Does t contains the De Bruijn variable of index n? *)
 
-val db_replace : t -> term -> t
-  (** Replace De Bruijn index 0 by the given term *)
+  val shift : ?depth:int -> int -> t -> t
+    (** shift the non-captured De Bruijn indexes in the term by n *)
 
-val db_lift : t -> t
+  val unshift : ?depth:int -> int -> t -> t
+    (** Unshift the term (decrement indices of all free De Bruijn variables
+        inside) by [n] *)
 
-val db_unlift : ?depth:int -> t -> t
+  val replace : ?depth:int -> t -> sub:term -> t
+    (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
 
-val db_from_term : t -> term -> t
-  (** Replace the given term by a De Bruijn index *)
+  val from_var : ?depth:int -> t -> var:term -> t
+    (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
+        Same as {!replace}. *)
 
-val db_from_var : t -> term -> t
-  (** Replace the given variable by a De Bruijn index *)
-
-val mk_forall_list : term list -> t -> t
-val mk_exists_list : term list -> t -> t
+  val eval : ?depth:int -> term DBEnv.t -> t -> t
+    (** Evaluate the formula in the given De Bruijn environment, by
+        replacing De Bruijn indices by their value in the environment. *)
+end
 
 val close_forall : t -> t   (** Bind all free variables with forall *)
 val close_exists : t -> t   (** Bind all free variables with exists *)

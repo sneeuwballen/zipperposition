@@ -61,6 +61,7 @@ val hash : t -> int
 val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
 val ty : t -> Type.t
+val lambda_var_ty : t -> Type.t     (** Only on lambda terms. @raise Invalid_argument otherwise. *)
 
 module Tbl : Hashtbl.S with type key = t
 module Set : Sequence.Set.S with type elt = t
@@ -91,10 +92,16 @@ val new_flag : unit -> int
 
 The constructors take care of type-checking and hashconsing.
 They may raise Type.Error in case of type error.
+
+Use {!mk_lambda} rather than {!__mk_lambda}, and try not to create bound
+variables by yourself.
 *)
 
 val mk_var : ty:Type.t -> int -> t
   (** Create a variable. The index must be >= 0 *)
+
+val __mk_bound_var : ty:Type.t -> int -> t  (** not documented *)
+val __mk_lambda : varty:Type.t -> t -> t    (** not documented *)
 
 val mk_const : Symbol.t -> t
   (** Constant. The type of the constant is the type of the symbol. *)
@@ -136,6 +143,9 @@ val mk_or_list : t list -> t
 val mk_lambda : t list -> t -> t   (** (lambda v1,...,vn. t). *)
 val mk_forall : t list -> t -> t
 val mk_exists : t list -> t -> t
+
+val __mk_forall : varty:Type.t -> t -> t
+val __mk_exists : varty:Type.t -> t -> t
 
 val cast : t -> Type.t -> t
   (** Change the type. Only works for variables and bound variables. *)

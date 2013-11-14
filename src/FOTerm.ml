@@ -206,7 +206,7 @@ let mk_var ~ty idx =
               flags= 0; tag= -1} in
   H.hashcons my_v
 
-let mk_bound_var ~ty idx =
+let __mk_bound_var ~ty idx =
   assert (idx >= 0);
   let my_v = {term = BoundVar idx; ty; tsize = 1;
               flags=0; tag= -1} in
@@ -446,7 +446,7 @@ module DB = struct
       match t.term with
       | _ when is_ground t -> t  (* closed. *)
       | BoundVar i when i >= depth ->
-        mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
+        __mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
       | Node (_, _, []) | Var _ | BoundVar _ -> t
       | Node (s, tyargs, l) ->
         mk_node ~tyargs s (List.map recurse l)
@@ -461,7 +461,7 @@ module DB = struct
     let rec recurse t =
       match t.term with
       | _ when is_ground t -> t
-      | BoundVar i -> if i >= depth then mk_bound_var ~ty:t.ty (i-n) else t
+      | BoundVar i -> if i >= depth then __mk_bound_var ~ty:t.ty (i-n) else t
       | Node (_, _, []) | Var _ -> t
       | Node (s, tyargs, l) ->
         mk_node ~tyargs s (List.map recurse l)
@@ -471,7 +471,7 @@ module DB = struct
   let replace ?(depth=0) t ~sub =
     (* recurse and replace [sub]. *)
     let rec replace t = match t.term with
-    | _ when eq t sub -> mk_bound_var ~ty:t.ty depth
+    | _ when eq t sub -> __mk_bound_var ~ty:t.ty depth
     | Var _
     | Node (_, _, [])
     | BoundVar _ -> t
@@ -731,7 +731,7 @@ let bij =
         | Var i -> "v", BranchTo (bij_var, (i, t.ty))
         | Node (s, tyargs, l) -> "n", BranchTo (!!!bij_node, (s, tyargs, l)))
         ~extract:(function
-        | "bv" -> BranchFrom (bij_var, fun (i,ty) -> mk_bound_var ~ty i)
+        | "bv" -> BranchFrom (bij_var, fun (i,ty) -> __mk_bound_var ~ty i)
         | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
         | "n" -> BranchFrom (!!!bij_node, fun (s,tyargs,l) -> mk_node ~tyargs s l)
         | _ -> raise (DecodingError "expected Term")))

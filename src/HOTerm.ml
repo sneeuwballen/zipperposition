@@ -181,9 +181,9 @@ let lambda_var_ty t = match t.term with
   | Lambda _ ->
     begin match t.ty.Type.ty with
     | Type.Fun (_, arg::_) -> arg
-    | _ -> failwith "lambda_var_ty: expected function type"
+    | _ -> raise (Invalid_argument "lambda_var_ty: expected function type")
     end
-  | _ -> failwith "lambda_var_ty: expected lambda term"
+  | _ -> raise (Invalid_argument "lambda_var_ty: expected lambda term")
 
 (** {2 Smart constructors} *)
 
@@ -198,14 +198,14 @@ let mk_var ~ty idx =
               tag= -1} in
   H.hashcons my_v
 
-let mk_bound_var ~ty idx =
+let __mk_bound_var ~ty idx =
   assert (idx >= 0);
   let my_v = {term = BoundVar idx; ty; tsize = 1;
               flags=(flag_db_closed_computed lor flag_normal_form);
               tag= -1} in
   H.hashcons my_v
 
-let _mk_lambda ~varty t' =
+let __mk_lambda ~varty t' =
   let ty = Type.mk_fun t'.ty [varty] in
   let my_t = {term=Lambda t'; ty; flags=0; tsize=0; tag= -1} in
   let t = H.hashcons my_t in
@@ -331,7 +331,7 @@ let rec replace_pos t pos new_t = match t.term, pos with
   | (Var _ | BoundVar _), _::_ -> invalid_arg "wrong position in term"
   | Lambda t', 0::subpos ->
     let varty = lambda_var_ty t in
-    _mk_lambda ~varty (replace_pos t' subpos new_t)
+    __mk_lambda ~varty (replace_pos t' subpos new_t)
   | At (t, tyargs, l), 0::subpos -> mk_at ~tyargs (replace_pos t subpos new_t) l
   | At (t, tyargs, l), n::subpos when n <= List.length l ->
     let t' = replace_pos (List.nth l (n-1)) subpos new_t in
@@ -346,7 +346,7 @@ let rec replace t ~old ~by = match t.term with
   | Var _ | BoundVar _ | Const _ -> t
   | Lambda t' ->
     let varty = lambda_var_ty t in
-    _mk_lambda ~varty (replace t' ~old ~by)
+    __mk_lambda ~varty (replace t' ~old ~by)
   | At (t, tyargs, l) ->
     mk_at ~tyargs (replace t ~old ~by) (List.map (fun t' -> replace t' ~old ~by) l)
 
@@ -544,11 +544,11 @@ module DB = struct
       match t.term with
       | _ when closed t -> t  (* closed. *)
       | BoundVar i when i >= depth ->
-        mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
+        __mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
       | Var _ | BoundVar _ | Const _ -> t
       | Lambda t' ->
         let varty = lambda_var_ty t in
-        _mk_lambda ~varty (recurse (depth+1) t') (* increase depth and recurse *)
+        __mk_lambda ~varty (recurse (depth+1) t') (* increase depth and recurse *)
       | At (t, tyargs, l) ->
         mk_at ~tyargs (recurse depth t) (List.map (recurse depth) l)
     in
@@ -563,11 +563,11 @@ module DB = struct
       match t.term with
       | _ when closed t -> t
       | BoundVar i ->
-        if i >= depth then mk_bound_var ~ty:t.ty (i-n) else t
+        if i >= depth then __mk_bound_var ~ty:t.ty (i-n) else t
       | Const _ | Var _ -> t
       | Lambda t' ->
         let varty = lambda_var_ty t in
-        _mk_lambda ~varty (recurse (depth+1) t')
+        __mk_lambda ~varty (recurse (depth+1) t')
       | At (t, tyargs, l) ->
         mk_at ~tyargs (recurse depth t) (List.map (recurse depth) l)
     in recurse depth t
@@ -575,10 +575,10 @@ module DB = struct
   let replace ?(depth=0) t ~sub =
     (* recurse and replace [sub]. *)
     let rec replace depth t = match t.term with
-    | _ when t == sub -> mk_bound_var ~ty:t.ty depth
+    | _ when t == sub -> __mk_bound_var ~ty:t.ty depth
     | Lambda t' ->
       let varty = lambda_var_ty t in
-      _mk_lambda ~varty (replace (depth+1) t')
+      __mk_lambda ~varty (replace (depth+1) t')
     | Var _
     | Const _
     | BoundVar _ -> t
@@ -604,7 +604,7 @@ module DB = struct
       | Lambda t' ->
         let varty = lambda_var_ty t in
         let t' = eval (depth+1) (DBEnv.push_none env) t' in
-        _mk_lambda ~varty t'
+        __mk_lambda ~varty t'
       | At (t, tyargs, l) ->
         let t' = eval depth env t in
         let l' = List.map (eval depth env) l in
@@ -624,7 +624,7 @@ let rec mk_lambda vars t = match vars with
   | var::vars' ->
     let t' = mk_lambda vars' t in
     let varty = var.ty in
-    _mk_lambda ~varty (DB.from_var (DB.shift 1 t') ~var)
+    __mk_lambda ~varty (DB.from_var (DB.shift 1 t') ~var)
 
 let rec mk_forall vars t = match vars with
   | [] -> t
@@ -639,6 +639,13 @@ let rec mk_exists vars t = match vars with
     let t' = mk_exists vars' t in
     let varty = var.ty in
     mk_at ~tyargs:[varty] exists_term [mk_lambda [var] t']
+
+let __mk_forall ~varty t =
+  mk_at ~tyargs:[varty] forall_term [__mk_lambda ~varty t]
+
+let __mk_exists ~varty t =
+  mk_at ~tyargs:[varty] exists_term [__mk_lambda ~varty t]
+
 
 (** Bind all free variables by 'forall' *)
 let close_forall t =
@@ -657,7 +664,7 @@ let rec curry t =
   let ty = FOT.ty t in
   match t.FOT.term with
   | FOT.Var i -> mk_var ~ty i
-  | FOT.BoundVar i -> mk_bound_var ~ty i
+  | FOT.BoundVar i -> __mk_bound_var ~ty i
   | FOT.Node (f, [], []) -> mk_const f
   | FOT.Node (f, tyargs, l) ->
     mk_at ~tyargs (mk_const f) (List.map curry l)
@@ -666,7 +673,7 @@ let rec uncurry t =
   let ty = t.ty in
   match t.term with
   | Var i -> FOT.mk_var ~ty i
-  | BoundVar i -> FOT.mk_bound_var ~ty i
+  | BoundVar i -> FOT.__mk_bound_var ~ty i
   | Lambda t' -> failwith "cannot uncurry lambda"
   | Const s -> FOT.mk_const s
   | At ({term=Const s}, tyargs, l) ->
@@ -787,9 +794,9 @@ let bij =
         | Lambda t' -> "lam", BranchTo (!!!bij_lam, (lambda_var_ty t, t'))
         | At (t, tyargs, l) -> "at", BranchTo (!!!bij_at, (t, tyargs, l)))
         ~extract:(function
-        | "bv" -> BranchFrom (bij_var, fun (i,ty) -> mk_bound_var ~ty i)
+        | "bv" -> BranchFrom (bij_var, fun (i,ty) -> __mk_bound_var ~ty i)
         | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
         | "c" -> BranchFrom (bij_cst, fun s -> mk_const s)
-        | "lam" -> BranchFrom (!!!bij_lam, fun (varty,t') -> _mk_lambda ~varty t')
+        | "lam" -> BranchFrom (!!!bij_lam, fun (varty,t') -> __mk_lambda ~varty t')
         | "at" -> BranchFrom (!!!bij_at, fun (t, tyargs, l) -> mk_at ~tyargs t l)
         | _ -> raise (DecodingError "expected Term")))

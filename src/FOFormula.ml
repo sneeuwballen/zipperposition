@@ -209,10 +209,10 @@ let mk_eq t1 t2 =
 
 let mk_neq t1 t2 = mk_not (mk_eq t1 t2)
 
-let mk_forall ~ty f =
+let __mk_forall ~ty f =
   H.hashcons { form=Forall (ty,f); flags=0; id= ~-1; }
 
-let mk_exists ~ty f =
+let __mk_exists ~ty f =
   H.hashcons { form=Exists (ty,f); flags=0; id= ~-1; }
 
 module FCache = Cache.Replacing(struct
@@ -233,8 +233,8 @@ let rec map_leaf f form = match form.form with
   | False
   | Atom _
   | Equal _ -> f form  (* replace by image *)
-  | Forall (ty,f') -> mk_forall ~ty (map_leaf f f')
-  | Exists (ty,f') -> mk_exists ~ty (map_leaf f f')
+  | Forall (ty,f') -> __mk_forall ~ty (map_leaf f f')
+  | Exists (ty,f') -> __mk_exists ~ty (map_leaf f f')
 
 let map f form =
   map_leaf
@@ -271,8 +271,8 @@ let rec map_depth ?(depth=0) f form = match form.form with
   | False -> form
   | Atom p -> mk_atom (f depth p)
   | Equal (t1, t2) -> mk_eq (f depth t1) (f depth t2)
-  | Forall (ty,f') -> mk_forall ~ty (map_depth ~depth:(depth+1) f f')
-  | Exists (ty,f') -> mk_exists ~ty (map_depth ~depth:(depth+1) f f')
+  | Forall (ty,f') -> __mk_forall ~ty (map_depth ~depth:(depth+1) f f')
+  | Exists (ty,f') -> __mk_exists ~ty (map_depth ~depth:(depth+1) f f')
 
 let rec map_leaf_depth ?(depth=0) f form = match form.form with
   | And l -> mk_and (List.map (map_leaf_depth ~depth f) l)
@@ -284,8 +284,8 @@ let rec map_leaf_depth ?(depth=0) f form = match form.form with
   | False
   | Atom _
   | Equal _ -> f depth form  (* replace by image *)
-  | Forall (ty,f') -> mk_forall ~ty (map_leaf_depth ~depth:(depth+1) f f')
-  | Exists (ty,f') -> mk_exists ~ty (map_leaf_depth ~depth:(depth+1) f f')
+  | Forall (ty,f') -> __mk_forall ~ty (map_leaf_depth ~depth:(depth+1) f f')
+  | Exists (ty,f') -> __mk_exists ~ty (map_leaf_depth ~depth:(depth+1) f f')
 
 let fold_depth ?(depth=0) f acc form =
   let rec recurse f acc depth form = match form.form with
@@ -401,76 +401,77 @@ let symbols ?(init=Symbol.Set.empty) f =
 
 (** {2 De Bruijn indexes} *)
 
-let db_closed f =
-  try
-    fold_depth
-      (fun () depth t -> if not (T.db_closed ~depth t) then raise Exit)
-      () f;
-    true
-  with Exit ->
-    false
+module DB = struct
+  let closed ?(depth=0) f =
+    try
+      fold_depth ~depth
+        (fun () depth t -> if not (T.DB.closed ~depth t) then raise Exit)
+        () f;
+      true
+    with Exit ->
+      false
 
-let db_contains f n =
-  try
-    fold_depth
-      (fun () depth t -> if T.db_contains t (n+depth) then raise Exit)
-      () f;
-    false
-  with Exit ->
-    true
+  let contains f n =
+    try
+      fold_depth ~depth:0
+        (fun () depth t -> if T.DB.contains t (n+depth) then raise Exit)
+        () f;
+      false
+    with Exit ->
+      true
 
-let db_replace f t =
-  map_depth
-    ~depth:0
-    (fun depth t' -> T.db_replace ~depth ~into:t' ~by:(T.db_lift depth t))
-    f
+  let shift ?(depth=0) n f =
+    map_depth ~depth (fun depth t -> T.DB.shift ~depth n t) f
 
-exception FoundType of Type.t
+  let unshift ?(depth=0) n f =
+    map_depth ~depth (fun depth t -> T.DB.unshift ~depth n t) f
 
-let db_lift f =
-  map_depth (fun depth t -> T.db_lift ~depth 1 t) f
+  let replace ?(depth=0) f ~sub =
+    map_depth ~depth (fun depth t -> T.DB.replace ~depth t ~sub) f
 
-let db_unlift ?(depth=0) f =
-  map_depth ~depth (fun depth t -> T.db_unlift ~depth t) f
+  let from_var ?depth f ~var =
+    assert (T.is_var var);
+    replace ?depth f ~sub:var
 
-let db_from_term f t =
-  map_depth (fun depth t' -> T.db_from_term ~depth t' t) f
+  let eval ?(depth=0) env f =
+    map_depth
+      ~depth
+      (fun depth t' -> T.DB.eval ~depth env t')
+      f
+end
 
-let db_from_var f v =
-  db_from_term f v
+let rec mk_forall vars f = match vars with
+  | [] -> f
+  | var::vars' ->
+    let f' = mk_forall vars' f in
+    __mk_forall ~ty:(T.ty var) (DB.from_var (DB.shift 1 f') var)
 
-let mk_forall_list vars f =
-  List.fold_right
-    (fun v f ->
-      let ty = T.get_type v in
-      mk_forall ~ty (db_from_var (db_lift f) v))
-    vars f
-
-let mk_exists_list vars f =
-  List.fold_right
-    (fun v f ->
-      let ty = T.get_type v in
-      mk_exists ~ty (db_from_var (db_lift f) v))
-    vars f
+let rec mk_exists vars f = match vars with
+  | [] -> f
+  | var::vars' ->
+    let f' = mk_exists vars' f in
+    __mk_exists ~ty:(T.ty var) (DB.from_var (DB.shift 1 f') var)
 
 let close_forall f =
   let fv = free_variables f in
-  mk_forall_list fv f
+  mk_forall fv f
 
 let close_exists f =
   let fv = free_variables f in
-  mk_exists_list fv f
+  mk_exists fv f
 
 let open_forall ?(offset=0) f =
   let offset = max offset (T.max_var (free_variables f) + 1) in
-  let rec open_one offset f = match f.form with
+  (* open next forall, replacing it with a fresh var *)
+  let rec open_one offset env f = match f.form with
   | Forall (ty,f') ->
     let v = T.mk_var ~ty offset in
-    let new_f' = db_replace f' v in
-    open_one (offset+1) new_f'
-  | _ -> f
+    let env' = DBEnv.push env v in
+    open_one (offset+1) env' f'
+  | _ ->
+    DB.eval env f  (* replace *)
   in
-  open_one offset f
+  open_one offset DBEnv.empty f
 
 let rec open_and f = match f.form with
   | And l -> Util.list_flatmap open_and l
@@ -498,8 +499,8 @@ let rec flatten f =
   | Imply (f1, f2) -> mk_imply (flatten f1) (flatten f2)
   | Equiv (f1, f2) -> mk_equiv (flatten f1) (flatten f2)
   | Not f' -> mk_not (flatten f')
-  | Forall (ty,f') -> mk_forall ~ty (flatten f')
-  | Exists (ty,f') -> mk_exists ~ty (flatten f')
+  | Forall (ty,f') -> __mk_forall ~ty (flatten f')
+  | Exists (ty,f') -> __mk_exists ~ty (flatten f')
   | True
   | False
   | Atom _
@@ -524,10 +525,10 @@ let simplify f =
       let l' = List.map (simplify ~depth) l in
       flatten (mk_or l')
     | Forall (_,f')
-    | Exists (_,f') when not (db_contains f' 0) ->
-      simplify ~depth (db_unlift ~depth f')
-    | Forall (ty,f') -> mk_forall ~ty (simplify ~depth:(depth+1) f')
-    | Exists (ty,f') -> mk_exists ~ty (simplify ~depth:(depth+1) f')
+    | Exists (_,f') when not (DB.contains f' 0) ->
+      simplify ~depth (DB.unshift ~depth 1 f')
+    | Forall (ty,f') -> __mk_forall ~ty (simplify ~depth:(depth+1) f')
+    | Exists (ty,f') -> __mk_exists ~ty (simplify ~depth:(depth+1) f')
     | Equal (a,b) when T.eq a b -> mk_true
     | Equal _ -> f
     | Atom _
@@ -586,8 +587,8 @@ let ac_normal_form f =
     let l' = List.map recurse l in
     let l' = List.sort compare l' in
     mk_or l'
-  | Forall (ty,f') -> mk_forall ~ty (recurse f')
-  | Exists (ty,f') -> mk_exists ~ty (recurse f')
+  | Forall (ty,f') -> __mk_forall ~ty (recurse f')
+  | Exists (ty,f') -> __mk_exists ~ty (recurse f')
   in
   recurse (flatten f)
 
@@ -613,8 +614,8 @@ let to_term f =
     | Imply (f1, f2) -> T.mk_imply (to_term f1) (to_term f2)
     | Equal (t1, t2) -> T.mk_eq (T.curry t1) (T.curry t2)
     | Not f' -> T.mk_not (to_term f')
-    | Forall (ty,f') -> T.mk_forall ~varty:ty (to_term f')
-    | Exists (ty,f') -> T.mk_exists ~varty:ty (to_term f')
+    | Forall (ty,f') -> T.__mk_forall ~varty:ty (to_term f')
+    | Exists (ty,f') -> T.__mk_exists ~varty:ty (to_term f')
     | Atom p -> T.curry p)
     f
 
@@ -623,32 +624,30 @@ let of_term t =
   let rec recurse t = match t.T.term with
   | _ when t == T.true_term -> mk_true
   | _ when t == T.false_term -> mk_false
-  | T.At ({T.term=T.Const s}, [{T.term=T.Lambda t'} as lam]) when S.eq s S.forall_symbol ->
+  | T.At ({T.term=T.Const s}, _, [{T.term=T.Lambda t'} as lam]) when S.eq s S.forall_symbol ->
     let ty = T.lambda_var_ty lam in
-    mk_forall ~ty (recurse t')
-  | T.At ({T.term=T.Const s}, [{T.term=T.Lambda t'} as lam]) when S.eq s S.exists_symbol ->
+    __mk_forall ~ty (recurse t')
+  | T.At ({T.term=T.Const s}, _, [{T.term=T.Lambda t'} as lam]) when S.eq s S.exists_symbol ->
     let ty = T.lambda_var_ty lam in
-    mk_exists ~ty (recurse t')
+    __mk_exists ~ty (recurse t')
   | T.Lambda _ -> failwith "FOFormula.of_term: unexpected lambda term"
-  | T.Const s ->
-    let ty = T.get_type t in
-    mk_atom (FOTerm.mk_const ~ty s)
+  | T.Const s -> mk_atom (FOTerm.mk_const s)
   | T.Var _ | T.BoundVar _ -> failwith "F.of_term: not first-order, var under formula"
-  | T.At ({T.term=T.Const s}, l) when S.eq s S.and_symbol ->
+  | T.At ({T.term=T.Const s}, _, l) when S.eq s S.and_symbol ->
       mk_and (List.map recurse l)
-  | T.At ({T.term=T.Const s}, l) when S.eq s S.or_symbol ->
+  | T.At ({T.term=T.Const s}, _, l) when S.eq s S.or_symbol ->
       mk_or (List.map recurse l)
-  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.equiv_symbol ->
+  | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.equiv_symbol ->
     mk_equiv (recurse a) (recurse b)
-  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.imply_symbol ->
+  | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.imply_symbol ->
     mk_imply (recurse a) (recurse b)
-  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.or_symbol ->
+  | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.or_symbol ->
     mk_and [recurse a; recurse b]
-  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.and_symbol ->
+  | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.and_symbol ->
     mk_or [recurse a; recurse b]
-  | T.At ({T.term=T.Const s}, [a; b]) when S.eq s S.eq_symbol ->
+  | T.At ({T.term=T.Const s}, _, [a; b]) when S.eq s S.eq_symbol ->
     mk_eq (T.uncurry a) (T.uncurry b)
-  | T.At ({T.term=T.Const s}, [t']) when S.eq s S.not_symbol ->
+  | T.At ({T.term=T.Const s}, _, [t']) when S.eq s S.not_symbol ->
     mk_not (recurse t')
   | _ -> mk_atom (T.uncurry t)
   in
