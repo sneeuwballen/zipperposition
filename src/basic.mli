@@ -32,6 +32,45 @@ and should be transformed into more powerful representations
 (see {!FOTerm}, {!HOTerm}, {!FOFormula}...) before use.
 *)
 
+(** {2 Symbols}
+
+Raw, untyped symbols from the AST. *)
+
+module Sym : sig
+  type t = private
+    | Int of Big_int.big_int
+    | Rat of Ratio.ratio
+    | Real of float
+    | Const of string
+
+  val eq : t -> t -> bool
+  val cmp : t -> t -> int
+  val hash : t -> int
+
+  val mk_const : string -> t
+  val mk_distinct : string -> t
+  val mk_bigint : Big_int.big_int -> t
+  val mk_int : int -> t
+  val mk_rat : int -> int -> t
+  val mk_ratio : Ratio.ratio -> t
+  val mk_real : float -> t
+
+  val parse_num : string -> t
+    (** Parse an Int or a Rat *)
+
+  val true_ : t
+  val false_ : t
+  val wildcard : t
+
+  module Set : Sequence.Set.S with type elt = t
+  module Map : Sequence.Map.S with type key = t
+
+  val pp : Buffer.t -> t -> unit
+  val fmt : Format.formatter -> t -> unit
+  val to_string : t -> string
+  val to_string_tstp : t -> string
+end
+
 (** {2 Type representation}
 
 This module exports a very simple representation of types, typically
@@ -87,15 +126,15 @@ module FO : sig
     loc : Location.t option;
   }
   and tree = private
-    | App of Symbol.t * t list
+    | App of Sym.t * t list
     | Var of string
 
   val eq : t -> t -> bool
   val cmp : t -> t -> int
   val hash : t -> int
 
-  val app : ?loc:Location.t -> Symbol.t -> t list -> t
-  val const : ?loc:Location.t -> Symbol.t -> t
+  val app : ?loc:Location.t -> Sym.t -> t list -> t
+  val const : ?loc:Location.t -> Sym.t -> t
   val var : ?loc:Location.t -> ?ty:Ty.t -> string -> t
 
   val is_var : t -> bool
@@ -111,7 +150,7 @@ module FO : sig
     (** Interpret the term as a type.
         @raise ExpectedType if it's not possible (numeric symbols...) *)
 
-  val symbols : t Sequence.t -> Symbol.Set.t
+  val symbols : t Sequence.t -> Sym.Set.t
   val free_vars : ?init:t list -> t -> t list
 
   val generalize_vars : t -> t
@@ -197,7 +236,7 @@ module HO : sig
     loc : Location.t option;
   }
   and tree = private
-    | Const of Symbol.t
+    | Const of Sym.t
     | App of t * t list
     | Var of string
     | Lambda of t * t
@@ -206,7 +245,7 @@ module HO : sig
   val cmp : t -> t -> int
   val hash : t -> int
 
-  val const : ?loc:Location.t -> Symbol.t -> t
+  val const : ?loc:Location.t -> Sym.t -> t
   val app : ?loc:Location.t -> t -> t list -> t
   val at : ?loc:Location.t -> t -> t -> t
   val var : ?loc:Location.t -> ?ty:Ty.t -> string -> t

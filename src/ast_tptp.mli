@@ -32,7 +32,7 @@ type declaration =
   | FOF of name * role * Basic.Form.t * optional_info
   | TFF of name * role * Basic.Form.t * optional_info
   | THF of name * role * Basic.HO.t * optional_info  (* XXX not parsed yet *)
-  | TypeDecl of name * Symbol.t * Basic.Ty.t  (* type declaration *)
+  | TypeDecl of name * Basic.Sym.t * Basic.Ty.t  (* type declaration *)
   | NewType of name * string * Basic.Ty.t (* declare new type constant... *)
   | Include of string
   | IncludeOnly of string * name list   (* include a subset of names *)

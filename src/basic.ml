@@ -26,19 +26,91 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Terms without type, typically produced from AST} *)
 
-module S = Symbol
+(** {2 Symbols} *)
+
+module Sym = struct
+  type t =
+    | Int of Big_int.big_int
+    | Rat of Ratio.ratio
+    | Real of float
+    | Const of string
+
+  type sym = t
+
+  let cmp s1 s2 =
+    let __to_int = function
+      | Int _ -> 1
+      | Rat _ -> 2
+      | Real _ -> 3
+      | Const _ -> 4  (* const are bigger! *)
+    in
+    match s1, s2 with
+    | Const s1, Const s2 -> String.compare s1 s2
+    | Int n1, Int n2 -> Big_int.compare_big_int n1 n2
+    | Rat n1, Rat n2 -> Ratio.compare_ratio n1 n2
+    | Real f1, Real f2 -> Pervasives.compare f1 f2
+    | _, _ -> __to_int s1 - __to_int s2
+
+  let eq a b = cmp a b = 0
+
+  let hash s = match s with
+    | Const s -> Hash.hash_string s
+    | Int n -> Hash.hash_string (Big_int.string_of_big_int n)
+    | Rat n -> Hash.hash_string (Ratio.string_of_ratio n)
+    | Real f -> int_of_float f
+
+  let mk_const s = Const s
+
+  let mk_distinct s = Const s
+
+  let mk_bigint i = Int i
+
+  let mk_int i = Int (Big_int.big_int_of_int i)
+
+  let mk_ratio rat = Rat rat
+
+  let mk_rat i j =
+    Rat (Ratio.create_ratio (Big_int.big_int_of_int i) (Big_int.big_int_of_int j))
+
+  let mk_real f = Real f
+
+  let parse_num str =
+    let n = Num.num_of_string str in
+    if Num.is_integer_num n
+      then Int (Num.big_int_of_num n)
+      else Rat (Num.ratio_of_num n)
+
+  let true_ = mk_const "$true"
+  let false_ = mk_const "$false"
+  let wildcard = mk_const "$_"
+
+  module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
+  module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
+
+  let to_string s = match s with
+    | Const s -> s
+    | Int n -> Big_int.string_of_big_int n
+    | Rat n -> Ratio.string_of_ratio n
+    | Real f -> string_of_float f
+
+  let to_string_tstp = to_string
+
+  let pp buf s = Buffer.add_string (to_string s)
+
+  let fmt fmt s = Format.pp_print_string fmt (to_string s)
+end
 
 (** {2 Type representation} *)
 
 module Ty = struct
   type t =
     | Var of string
-    | App of string * t list
+    | App of Sym.t * t list
     | Fun of t * t list
     | Forall of t list * t
+  let cmp a b = Pervasives.compare a b
 
   let eq a b = a = b
-  let cmp a b = Pervasives.compare a b
   let hash a = Hashtbl.hash a
 
   let var s = Var s
@@ -125,12 +197,22 @@ module FO = struct
     loc : Location.t option;
   }
   and tree =
-    | App of Symbol.t * t list
+    | App of Sym.t * t list
     | Var of string
 
-  let eq a b = a = b
-  let cmp a b = Pervasives.compare a b
-  let hash a = Hashtbl.hash a
+  let rec cmp t1 t2 = match t1, t2 with
+    | Var s1, Var s2 -> String.compare s1 s2
+    | Var _, App _ -> 1
+    | App _, Var _ -> ~-1
+    | App (s1, l1), App (s2, l2) ->
+      let c = Sym.cmp s1 s2 in
+      if c <> 0 then c else Util.lexicograph cmp l1 l2
+
+  let eq a b = cmp a b = 0
+
+  let rec hash a = match a with
+    | Var s -> Hash.hash_string s
+    | App (s, l) -> Hash.hash_list hash (Sym.hash s) l
 
   let app ?loc s l = {loc; ty=None; term=App (s, l); }
 
@@ -154,10 +236,10 @@ module FO = struct
 
   let rec as_ty t =
     match t.term with
-    | App (s, []) when S.eq s S.wildcard_symbol ->
+    | App (s, []) when Sym.eq s Sym.wildcard ->
       (* fresh variable *)
       Ty.var (Ty.gensym ())
-    | App (S.Const(s,_), l) ->
+    | App (Sym.Const s, l) ->
       let l' = List.map as_ty l in
       Ty.app s l'
     | Var n ->
@@ -166,8 +248,7 @@ module FO = struct
         | Some (Ty.App ("$tType", [])) -> Ty.var n
         | _ -> raise (ExpectedType t)
       end
-    | App (s, _) ->
-      raise (ExpectedType t)
+    | App (_, _) -> raise (ExpectedType t)
   
   let symbols seq =
     let rec recurse set t = match t.term with
@@ -420,7 +501,7 @@ module HO = struct
     loc : Location.t option;
   }
   and tree =
-    | Const of Symbol.t
+    | Const of string
     | App of t * t list
     | Var of string
     | Lambda of t * t
@@ -500,7 +581,7 @@ module HO = struct
       {loc; ty=None; term=Lambda (var, _replace_var var t); }
     | _ -> failwith "Untyped.HO.lambda: expect (var, term)"
 
-  let true_term = const Symbol.true_symbol
+  let true_term = const stringrue_symbol
   let false_term = const Symbol.false_symbol
 
   let forall ?loc ~var t =
