@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: b0b38a06ee221668961f568603caf4b6)
+# DO NOT EDIT (digest: 6329bfdb4642486cc2728c851a258e03)
 HO
 FO
 Symbol
@@ -48,6 +48,7 @@ Evaluator
 Location
 TypeConversion
 TypeErasure
+DBEnv
 lib/Sequence
 lib/Bij
 lib/Cache

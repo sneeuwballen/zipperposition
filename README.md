@@ -87,6 +87,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `CallProver`: call a TSTP prover on a problem
     - `Congruence`: simple congruence closure on terms (decides ground equality)
     - `Evaluator`: helps evaluating terms using interpreted symbols
+    - `DBEnv`: environment for substituting De Bruijn indices
 
 - Helpers:
     - `Hash`: utils for hashing values
