@@ -67,32 +67,6 @@ module type S = sig
   val remove : t -> term -> int -> t
     (** Remove the given binding. No other variable should depend on it... *)
 
-  (** {3 Environment for De Bruijn indices} TODO
-
-  module Env : sig
-    val depth : t -> int
-      (** Depth of the environment, ie how many De Bruijn indices are
-          bound *)
-
-    val lookup : t -> int -> term option
-      (** [lookup subst n] finds the binding for the [n]-th De Bruijn index.
-          @return None if the De Bruijn index is not bound, [Some t']
-            if it is bound to [t'] ([t'] lives in the same scope a [t]) *)
-
-    val push : t -> term -> t
-      (** [push subst t] enters the scope of a new variable, binding
-          it to [t] *)
-
-    val push_none : t -> t
-      (** Enter a scope, without binding the variable to anything.
-          Calling [lookup subst 0] will return None *)
-
-    val exit : t -> t
-      (** Exit the scope of the last De Bruijn index.
-          @raise Invalid_argument if the environment was empty (ie depth=0) *)
-  end
-  *)
-
   (** {2 Set operations} *)
 
   module H : Hashtbl.S with type key = term * scope
@@ -379,52 +353,43 @@ module Ty = struct
         v
   end
 
-  (* is the variable masked by a quantifier? *)
-  let rec _is_masked masked v s_v = match masked with
-    | [] -> false
-    | (v',s_v')::masked' ->
-      (s_v = s_v' && Type.eq v v') || _is_masked masked' v s_v
-
   (* apply substitution *)
-  let apply subst ~renaming ty sc_ty =
-    let rec _apply masked ty sc_ty = match ty.Type.ty with
+  let apply ?(depth=0) subst ~renaming ty sc_ty =
+    let rec _apply depth ty sc_ty = match ty.Type.ty with
+    | Type.BVar _ -> ty
     | Type.App (_, []) -> ty
     | _ when Type.is_ground ty -> ty
     | Type.App (s, l) ->
-      let l' = List.map (fun ty' -> _apply masked ty' sc_ty) l in
+      let l' = List.map (fun ty' -> _apply depth ty' sc_ty) l in
       Type.app s l'
     | Type.Fun (ret, l) ->
-      let ret' = _apply masked ret sc_ty in
-      let l' = List.map (fun ty' -> _apply masked ty' sc_ty) l in
+      let ret' = _apply depth ret sc_ty in
+      let l' = List.map (fun ty' -> _apply depth ty' sc_ty) l in
       Type.mk_fun ret' l'
     | Type.Var _ ->
       begin try
-        (* masked variables are not bound *)
-        if _is_masked masked ty sc_ty then raise Not_found;
         (* type variable is bound, recurse *)
         let ty', sc_ty' = lookup subst ty sc_ty in
-        _apply masked ty' sc_ty'
+        let ty' = Type.DB.shift ~depth:0 depth ty' in
+        _apply depth ty' sc_ty'
       with Not_found ->
         Renaming.rename renaming ty sc_ty
       end
-    | Type.Forall (vars, ty') ->
-      (* hide [vars] and apply substitution to [ty'] *)
-      let masked' = List.fold_left (fun masked v -> (v, sc_ty) :: masked) masked vars in
-      let ty'' = _apply masked' ty' sc_ty in
-      let vars' = List.map (fun v -> Renaming.rename renaming v sc_ty) vars in
-      Type.forall vars' ty''
+    | Type.Forall ty' ->
+      let ty' = _apply (depth+1) ty' sc_ty in
+      Type.__forall ty'
     in
-    _apply [] ty sc_ty
+    _apply depth ty sc_ty
 
-  let apply_no_renaming subst ty sc_ty =
-    apply subst ~renaming:Renaming.dummy ty sc_ty
+  let apply_no_renaming ?depth subst ty sc_ty =
+    apply subst ?depth ~renaming:Renaming.dummy ty sc_ty
 end
 
 (** {2 Substitutions on various Terms} *)
 
 module type TYPED_TERM = sig
   include TERM
-  val get_type : t -> Type.t  (* only on variables *)
+  val ty : t -> Type.t  (* only on variables *)
   val mk_var : ty:Type.t -> int -> t  (* build variable *)
 end
 
@@ -531,7 +496,7 @@ module MakeProd(T : TYPED_TERM) = struct
       if h == dummy then v else
       try TSubst.H.find h.term (v, s_v)
       with Not_found ->
-        let ty = T.get_type v in
+        let ty = T.ty v in
         let ty = Ty.apply ty_subst ~renaming:h.ty ty s_v in
         let v' = T.mk_var ~ty (TSubst.H.length h.term) in
         TSubst.H.add h.term (v, s_v) v';
@@ -542,8 +507,8 @@ module MakeProd(T : TYPED_TERM) = struct
   end
 
   (* apply the substitution on a type *)
-  let apply_ty subst ~renaming ty s_ty =
-    Ty.apply subst.ty ~renaming:renaming.Renaming.ty ty s_ty
+  let apply_ty ?depth subst ~renaming ty s_ty =
+    Ty.apply ?depth subst.ty ~renaming:renaming.Renaming.ty ty s_ty
 end
 
 module FO = struct
@@ -558,11 +523,12 @@ module FO = struct
     | T.BoundVar _ when Type.is_ground t.T.ty -> t
     | T.BoundVar i ->
       let ty = apply_ty ~renaming subst t.T.ty scope in
-      T.mk_bound_var ~ty i
-    | T.Node (s, l) ->
+      T.__mk_bound_var ~ty i
+    | T.Node (_, [], []) -> t
+    | T.Node (s, tyargs, l) ->
       let l' = _apply_rec_list ~renaming subst scope l in
-      let ty = apply_ty ~renaming subst t.T.ty scope in
-      T.mk_node ~ty s l'
+      let tyargs' = List.map (fun ty -> apply_ty ~renaming subst ty scope) tyargs in
+      T.mk_node ~tyargs:tyargs' s l'
     | T.Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       begin try
@@ -598,22 +564,20 @@ module HO = struct
     if T.is_ground t then t (* subst(t) = t, if t ground *)
     else match t.T.term with
     | (T.Const _ | T.BoundVar _) when Type.is_ground t.T.ty -> t
-    | T.Const f ->
-      let ty = apply_ty ~renaming subst t.T.ty scope in
-      T.mk_const ~ty f
+    | T.Const _ -> t
     | T.BoundVar i ->
       let ty = apply_ty ~renaming subst t.T.ty scope in
-      T.mk_bound_var ~ty i
+      T.__mk_bound_var ~ty i
     | T.Lambda t' ->
       let t'' = _apply_rec ~renaming ~depth:(depth+1) subst t' scope in
       let varty = apply_ty ~renaming subst (T.lambda_var_ty t) scope in
-      T.mk_lambda ~varty t''
+      T.__mk_lambda ~varty t''
     | T.Var i ->
       (* two cases, depending on whether [t] is bound by [subst] or not *)
       begin try
         let t', sc_t' = lookup subst t scope in
         (* if t' contains free De Bruijn symbols, lift them by [binder_depth] *)
-        let t' = T.db_lift ~depth depth t' in
+        let t' = T.DB.shift ~depth:0 depth t' in
         (* also apply [subst] to [t'] *)
         _apply_rec ~renaming ~depth subst t' sc_t'
       with Not_found ->
@@ -621,10 +585,11 @@ module HO = struct
         let ty_subst = subst.ty in
         Renaming.rename ty_subst renaming t scope 
       end
-    | T.At (t, l) ->
+    | T.At (t, tyargs, l) ->
       let t' = _apply_rec ~renaming ~depth subst t scope in
       let l' = List.map (fun t' -> _apply_rec ~renaming ~depth subst t' scope) l in
-      T.mk_at t' l'
+      let tyargs' = List.map (fun ty -> apply_ty ~renaming subst ty scope) tyargs in
+      T.mk_at ~tyargs:tyargs' t' l'
 
   (** Apply substitution to term, replacing variables by the terms they are bound to.
       [renaming] is used to rename free variables (not bound

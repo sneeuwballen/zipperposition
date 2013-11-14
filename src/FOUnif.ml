@@ -54,7 +54,7 @@ let occurs_check subst v sc_v t sc_t =
               check v sc_v t' sc_t'
         with Not_found -> false)
       | BoundVar _ -> false
-      | Node (_, l) -> check_list v sc_v l sc_t
+      | Node (_, _, l) -> check_list v sc_v l sc_t
   and check_list v sc_v l sc_l = match l with
   | [] -> false
   | t::l' -> check v sc_v t sc_l || check_list v sc_v l' sc_l
@@ -85,7 +85,9 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
         then raise Fail (* occur check *)
         else S.bind subst t sc_t s sc_s (* bind s *)
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
-    | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
+    | Node (f, tyargs1, l1), Node (g, tyargs2, l2)
+      when Symbol.eq f g && List.length l1 = List.length l2 ->
+      let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
       unif_list subst l1 sc_s l2 sc_t
     | _, _ -> raise Fail
   (* unify pair of lists of terms *)
@@ -95,6 +97,12 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
   | t1::l1', t2::l2' ->
     let subst = unif subst t1 sc_1 t2 sc_2 in
     unif_list subst l1' sc_1 l2' sc_2
+  and unif_types subst l1 sc_1 l2 sc_2 = match l1, l2 with
+  | [], [] -> subst
+  | [], _ | _, [] -> raise Fail
+  | ty1::l1', ty2::l2' ->
+    let subst = TypeUnif.unify_fo ~subst ty1 sc_1 ty2 sc_2 in
+    unif_types subst l1' sc_1 l2' sc_2
   in
   (* try unification, and return solution/exception (with profiler handling) *)
   try
@@ -124,9 +132,6 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
     | _ when T.is_ground s && T.is_ground t ->
       raise Fail (* terms are not equal, and ground. failure. *)
     | Var _, Var _ when sc_s <> sc_t ->
-      let ty_s = T.get_type s in
-      let ty_t = T.get_type t in
-      let subst = TypeUnif.unify_fo ~subst ty_s sc_s ty_t sc_t in
       S.bind subst s sc_s t sc_t
     | Var _, _ ->
       if occurs_check subst s sc_s t sc_t || sc_s <> sc_a
@@ -135,7 +140,9 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
              context [sc_a] in which variables can be bound. *)
         else S.bind subst s sc_s t sc_t (* bind s *)
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
-    | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
+    | Node (f, tyargs1, l1), Node (g, tyargs2, l2)
+      when Symbol.eq f g && List.length l1 = List.length l2 ->
+      let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
       unif_list subst l1 sc_s l2 sc_t
     | _, _ -> raise Fail
   (* unify pair of lists of terms *)
@@ -145,6 +152,12 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
   | t1::l1', t2::l2' ->
     let subst = unif subst t1 sc_1 t2 sc_2 in
     unif_list subst l1' sc_1 l2' sc_2
+  and unif_types subst l1 sc_1 l2 sc_2 = match l1, l2 with
+  | [], [] -> subst
+  | [], _ | _, [] -> raise Fail
+  | ty1::l1', ty2::l2' ->
+    let subst = TypeUnif.match_fo ~subst ty1 sc_1 ty2 sc_2 in
+    unif_types subst l1' sc_1 l2' sc_2
   in
   (* try matching, and return solution/exception (with profiler handling) *)
   try
@@ -173,7 +186,9 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
     | Var i, Var j when i <> j && sc_s = sc_t -> raise Fail
     | Var _, Var _ -> S.bind subst s sc_s t sc_t (* bind s *)
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
-    | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
+    | Node (f, tyargs1, l1), Node (g, tyargs2, l2)
+      when Symbol.eq f g && List.length l1 = List.length l2 ->
+      let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
       unif_list subst l1 sc_s l2 sc_t
     | _, _ -> raise Fail
   (* unify pair of lists of terms *)
@@ -183,6 +198,12 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
   | t1::l1', t2::l2' ->
     let subst = unif subst t1 sc_1 t2 sc_2 in
     unif_list subst l1' sc_1 l2' sc_2
+  and unif_types subst l1 sc_1 l2 sc_2 = match l1, l2 with
+  | [], [] -> subst
+  | [], _ | _, [] -> raise Fail
+  | ty1::l1', ty2::l2' ->
+    let subst = TypeUnif.variant_fo ~subst ty1 sc_1 ty2 sc_2 in
+    unif_types subst l1' sc_1 l2' sc_2
   in
   try
     let subst = unif subst a sc_a b sc_b in
@@ -206,8 +227,8 @@ let are_variant t1 t2 =
     is much more costly than [matching]. By default [is_ac] returns true only
     for symbols that have [attr_ac], and [is_com] only for [attr_commut].
     [offset] is used to create new variables. *)
-let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
-                ?(is_com=fun s -> Symbol.has_attr Symbol.attr_commut s)
+let matching_ac ?(is_ac=fun s -> Symbol.has_flag Symbol.flag_ac s)
+                ?(is_com=fun s -> Symbol.has_flag Symbol.flag_commut s)
                 ?offset ?(subst=S.empty) a sc_a b sc_b =
   (* function to get fresh variables *)
   let offset = match offset with
@@ -235,17 +256,18 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
                context [sc_a] in which variables can be bound. *)
           else k (S.bind subst s sc_s t sc_t) (* bind s and continue *)
       | BoundVar i, BoundVar j -> if i = j then k subst
-      | Node (f, l1), Node (g, l2) when f == g && is_ac f ->
+      | Node (f, tyargs, l1), Node (g, _, l2) when f == g && is_ac f ->
         (* flatten into a list of terms that do not have [f] as head symbol *)
         let l1 = T.flatten_ac f l1
         and l2 = T.flatten_ac f l2 in 
         (* eliminate terms that are common to l1 and l2 *)
         let l1, l2 = eliminate_common l1 l2 in
         (* permutative matching *)
-        unif_ac ~ty:s.T.ty subst f l1 sc_s [] l2 sc_t k
-      | Node (f, [x1;y1]), Node (g, [x2;y2]) when f == g && is_com f ->
+        unif_ac ~tyargs subst f l1 sc_s [] l2 sc_t k
+      | Node (f, _, [x1;y1]), Node (g, _, [x2;y2]) when f == g && is_com f ->
         unif_com subst x1 y1 sc_s x2 y2 sc_t k
-      | Node (f, l1), Node (g, l2) when f == g && List.length l1 = List.length l2 ->
+      | Node (f, _, l1), Node (g, _, l2) when f == g && List.length l1 = List.length l2 ->
+        (* TODO match type arguments *)
         unif_list subst l1 sc_s l2 sc_t k  (* regular decomposition *)
       | _, _ -> ()  (* failure, close branch *)
     with TypeUnif.Error _ -> ()
@@ -264,7 +286,7 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
     ()
   (* try all permutations of [left@right] against [l1]. [left,right] is a
      zipper over terms to be matched against [l1]. *)
-  and unif_ac ~ty subst f l1 sc_1 left right sc_2 k =
+  and unif_ac ~tyargs subst f l1 sc_1 left right sc_2 k =
     match l1, left, right with
     | [], [], [] -> k subst  (* success *)
     | _ when List.length l1 > List.length left + List.length right ->
@@ -274,20 +296,20 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       unif subst x1 sc_1 x2 sc_2
         (fun subst ->
           (* continue without x1 and x2 *)
-          unif_ac ~ty subst f l1' sc_1 [] (left @ right') sc_2 k);
+          unif_ac ~tyargs subst f l1' sc_1 [] (left @ right') sc_2 k);
       (* try x1 against right', keeping x2 on the side *)
-      unif_ac ~ty subst f l1 sc_1 (x2::left) right' sc_2 k;
+      unif_ac ~tyargs subst f l1 sc_1 (x2::left) right' sc_2 k;
       (* try to bind x1 to [x2+z] where [z] is fresh,
          if len(l1) < len(left+right) *)
       if T.is_var x1 && List.length l1 < List.length left + List.length right then
-        let z = fresh_var ~ty:(T.get_type x1) in
+        let z = fresh_var ~ty:(T.ty x1) in
         (* offset trick: we need [z] in both contexts sc_1 and sc_2, so we
            bind it so that (z,sc_2) -> (z,sc_1), and use (z,sc_1) to continue
            the matching *)
         let subst' = S.bind subst z sc_2 z sc_1 in
-        let x2' = T.mk_node ~ty f [x2; z] in
+        let x2' = T.mk_node ~tyargs f [x2; z] in
         let subst' = S.bind subst' x1 sc_1 x2' sc_2 in
-        unif_ac ~ty subst' f (z::l1') sc_1 left right' sc_2 k
+        unif_ac ~tyargs subst' f (z::l1') sc_1 left right' sc_2 k
     | x1::l1', left, [] -> ()
     | [], _, _ -> ()  (* failure, some terms are not matched *)
   (* eliminate common occurrences of terms in [l1] and [l2] *)

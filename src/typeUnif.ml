@@ -85,8 +85,6 @@ let _occur_check subst v s_v t s_t =
   in
   check t s_t
 
-(* TODO: handle quantification everywhere... *)
-
 (** {2 Unification} *)
 
 (* unification *)
@@ -114,6 +112,9 @@ let rec _unify_rec subst ty1 s1 ty2 s2 =
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
       subst
       l1 l2
+  | Ty.BVar i1, Ty.BVar i2 when i1 = i2 -> subst
+  | Ty.Forall ty1', Ty.Forall ty2' ->
+    _unify_rec subst ty1' s1 ty2' s2
   | _ -> fail subst ty1 s1 ty2 s2
 
 let unify ?(subst=S.empty) ty1 s1 ty2 s2 =
@@ -178,6 +179,9 @@ let rec _match_rec ~protect subst ty1 s1 ty2 s2 =
       (fun subst ty1 ty2 -> _match_rec ~protect subst ty1 s1 ty2 s2)
       subst
       l1 l2
+  | Ty.BVar i1, Ty.BVar i2 when i1 = i2 -> subst
+  | Ty.Forall ty1', Ty.Forall ty2' ->
+    _match_rec ~protect subst ty1' s1 ty2' s2
   | _ -> fail subst ty1 s1 ty2 s2
 
 let match_ ?(subst=S.empty) ty1 s1 ty2 s2 =
@@ -226,6 +230,9 @@ let rec _variant_rec subst ty1 s1 ty2 s2 =
       (fun subst ty1 ty2 -> _unify_rec subst ty1 s1 ty2 s2)
       subst
       l1 l2
+  | Ty.BVar i1, Ty.BVar i2 when i1 = i2 -> subst
+  | Ty.Forall ty1', Ty.Forall ty2' ->
+    _variant_rec subst ty1' s1 ty2' s2
   | _ -> fail subst ty1 s1 ty2 s2
 
 let variant ?(subst=S.empty) ty1 s1 ty2 s2 =

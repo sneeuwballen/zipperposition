@@ -110,6 +110,10 @@ let hash s = match s with
   | Real f -> int_of_float f
 
 let mk_const ?(flags=0) ~ty s =
+  begin match Type.free_vars ty with
+    | [] -> ()
+    | _::_ -> failwith "Symbol.mk_const: type has free variables"
+  end;
   let symb = Const (s, { tag= ~-1; flags; ty; }) in
   H.hashcons symb
 

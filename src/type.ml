@@ -54,8 +54,7 @@ let rec eq_struct t1 t2 = match t1.ty, t2.ty with
     s1 = s2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
   | Fun (ret1,l1), Fun (ret2,l2) ->
     ret1 == ret2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
-  | Forall (vars1,ty1), Forall (vars2, ty2) ->
-    ty1 == ty2 && (try List.for_all2 (==) vars1 vars2 with Invalid_argument _ -> false)
+  | Forall ty1, Forall ty2 -> ty1 == ty2
   | _, _ -> false
 
 let hash t = t.id
@@ -149,7 +148,7 @@ let bvar i =
 let mk_fun = (<==)
 
 (* real constructor *)
-let _forall ty =
+let __forall ty =
   H.hashcons {ty=Forall ty; id= ~-1; ground=false; }
 
 (** Handling De Bruijn indexes. We assume that all types are
@@ -157,7 +156,7 @@ let _forall ty =
     by a quantifier. *)
 module DB = struct
   (* type is closed (ie all {!BVar} are properly scoped *)
-  let closed ty =
+  let closed ?(depth=0) ty =
     let rec closed depth ty =
       ty.ground || match ty.ty with
       | Var _
@@ -170,10 +169,10 @@ module DB = struct
       | [] -> true
       | ty::l' -> closed depth ty && closed_list depth l'
     in
-    closed 0 ty
+    closed depth ty
 
   (* replace [var] by outermost De Bruijn *)
-  let replace ty ~var =
+  let replace ?(depth=0) ty ~var =
     let rec recurse depth ty =
       if ty.ground then ty
       else match ty.ty with
@@ -181,17 +180,17 @@ module DB = struct
       | Var _
       | App (_, []) -> ty
       | BVar i -> assert (i<depth); ty  (* must be closed *)
-      | Fun (ret, l) -> mk_fun (recurse depth ret) (recurse_l depth ret)
+      | Fun (ret, l) -> mk_fun (recurse depth ret) (recurse_l depth l)
       | App (s, l) -> app s (recurse_l depth l)
-      | Forall ty' -> _forall (recurse (depth+1) ty')
+      | Forall ty' -> __forall (recurse (depth+1) ty')
     and recurse_l depth l = match l with
       | [] -> []
       | ty::l' -> recurse depth ty :: recurse_l depth l'
     in
-    recurse 0 ty
+    recurse depth ty
 
   (* shift free De Bruijn indexes by [n] *)
-  let shift n ty =
+  let shift ?(depth=0) n ty =
     let rec shift depth ty =
       if ty.ground then ty
       else match ty.ty with
@@ -200,15 +199,15 @@ module DB = struct
         | BVar i -> bvar (i+n)         (* shift *)
         | Fun (ret, l) -> mk_fun (shift depth ret) (shift_l depth l)
         | App (s, l) -> app s (shift_l depth l)
-        | Forall ty' -> _forall (shift (depth+1) ty')
+        | Forall ty' -> __forall (shift (depth+1) ty')
     and shift_l depth = function
       | [] -> []
       | ty::l' -> shift depth ty :: shift_l depth l'
     in
-    shift 0 ty
+    shift depth ty
 
   (* evaluate ty in the given environment. *)
-  let eval env ty =
+  let eval ?(depth=0) env ty =
     let rec eval depth env ty =
     if ty.ground then ty
     else match ty.ty with
@@ -218,17 +217,18 @@ module DB = struct
           | Some ty' -> shift depth ty'
         end
       | App (_, [])
-      | Var _
-      | BVar _ -> ty
+      | Var _ -> ty
       | App (s, l) -> app s (eval_list depth env l)
       | Fun (ret, l) -> mk_fun (eval depth env ret) (eval_list depth env l)
-      | Forall ty' -> _forall (eval (depth+1) (DBEnv.push_none env) ty')
+      | Forall ty' -> __forall (eval (depth+1) (DBEnv.push_none env) ty')
     and eval_list depth env l = match l with
       | [] -> []
       | ty::l' ->
         eval depth env ty :: eval_list depth env l'
     in
-    eval 0 env ty
+    eval depth env ty
+
+  let eval_list ?(depth=0) env l = List.map (eval ~depth env) l
 end
 
 let rec forall vars ty = match vars with
@@ -237,7 +237,7 @@ let rec forall vars ty = match vars with
     assert (is_var v);
     let ty' = forall vars' ty in
     let ty' = DB.replace ty' ~var:v in
-    _forall ty'
+    __forall ty'
 
 (** {2 Basic types} *)
 
@@ -270,6 +270,7 @@ let close_forall ty =
 let rec arity ty = match ty.ty with
   | Fun (_, l) -> 0, List.length l
   | Var _
+  | BVar _
   | App _ -> 0, 0
   | Forall ty' ->
     let i1, i2 = arity ty' in
@@ -277,6 +278,7 @@ let rec arity ty = match ty.ty with
 
 let rec expected_args ty = match ty.ty with
   | Fun (_, l) -> l
+  | BVar _
   | Var _
   | App _ -> []
   | Forall ty' -> expected_args ty'
@@ -285,6 +287,7 @@ let is_ground t = t.ground
 
 let rec size ty = match ty.ty with
   | Var _
+  | BVar _
   | App (_, []) -> 1
   | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
   | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
@@ -334,7 +337,7 @@ let rec pp_rec depth buf t = match t.ty with
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
   | Forall ty' ->
-    Printf.bprintf buf "∀ Tb%i. %a" depth vars (pp_inner (depth+1)) ty'
+    Printf.bprintf buf "∀ Tb%i. %a" depth (pp_inner (depth+1)) ty'
 and pp_inner depth buf t = match t.ty with
   | Fun (_, _::_) ->
     Buffer.add_char buf '('; pp_rec depth buf t; Buffer.add_char buf ')'
@@ -351,7 +354,7 @@ let rec pp_tstp_rec depth buf t = match t.ty with
   | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret
   | Fun (ret, l) ->
     Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_tstp_rec depth) ret
-  | Forall (vars, ty') ->
+  | Forall ty' ->
     Printf.bprintf buf "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
 and pp_inner depth buf t = match t.ty with
   | Fun (_, _::_) ->
@@ -372,18 +375,20 @@ let bij =
   Bij.(fix (fun bij' ->
     let bij_app = lazy (pair string_ (list_ (!! bij'))) in
     let bij_fun = lazy (pair (!! bij') (list_ (!! bij'))) in
-    let bij_forall = lazy (pair (list_ (!! bij')) (!! bij')) in
+    let bij_forall = bij' in
     switch
       ~inject:(fun ty -> match ty.ty with
         | Var i -> "v", BranchTo (int_, i)
+        | BVar i -> "bv", BranchTo (int_, i)
         | App (p, l) -> "at", BranchTo (!! bij_app, (p, l))
         | Fun (ret, l) -> "fun", BranchTo (!! bij_fun, (ret, l))
-        | Forall (vars, ty) -> "all", BranchTo(!! bij_forall, (vars, ty)))
+        | Forall ty -> "all", BranchTo(!! bij_forall, ty))
       ~extract:(function
         | "v" -> BranchFrom (int_, var)
+        | "bv" -> BranchFrom (int_, bvar)
         | "at" -> BranchFrom (!! bij_app, fun (s,l) -> app s l)
         | "fun" -> BranchFrom (!! bij_fun, fun (ret,l) -> mk_fun ret l)
-        | "all" -> BranchFrom (!! bij_forall, fun (vars,ty) -> forall vars ty)
+        | "all" -> BranchFrom (!! bij_forall, fun ty -> __forall ty)
         | _ -> raise (DecodingError "expected Type"))))
 
 (** {2 Misc} *)

@@ -75,32 +75,6 @@ module type S = sig
   val remove : t -> term -> int -> t
     (** Remove the given binding. No other variable should depend on it... *)
 
-  (** {3 Environment for De Bruijn indices} TODO
-
-  module Env : sig
-    val depth : t -> int
-      (** Depth of the environment, ie how many De Bruijn indices are
-          bound *)
-
-    val lookup : t -> int -> term option
-      (** [lookup subst n] finds the binding for the [n]-th De Bruijn index.
-          @return None if the De Bruijn index is not bound, [Some t']
-            if it is bound to [t'] ([t'] lives in the same scope a [t]) *)
-
-    val push : t -> term -> t
-      (** [push subst t] enters the scope of a new variable, binding
-          it to [t] *)
-
-    val push_none : t -> t
-      (** Enter a scope, without binding the variable to anything.
-          Calling [lookup subst 0] will return None *)
-
-    val exit : t -> t
-      (** Exit the scope of the last De Bruijn index.
-          @raise Invalid_argument if the environment was empty (ie depth=0) *)
-  end
-  *)
-
   (** {2 Set operations} *)
 
   module H : Hashtbl.S with type key = term * scope
@@ -168,11 +142,11 @@ module Ty : sig
 
   module Renaming : RENAMING
 
-  val apply : t -> renaming:Renaming.t -> Type.t -> scope -> Type.t
+  val apply : ?depth:int -> t -> renaming:Renaming.t -> Type.t -> scope -> Type.t
     (** Apply the substitution to the type.
         @param renaming used to desambiguate free variables from distinct scopes *)
 
-  val apply_no_renaming : t -> Type.t -> scope -> Type.t
+  val apply_no_renaming : ?depth:int -> t -> Type.t -> scope -> Type.t
     (** Same as {!apply}, but performs no renaming of free variables.
         {b Caution}, can entail collisions between scopes! *)
 end

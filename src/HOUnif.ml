@@ -53,7 +53,7 @@ let occurs_check subst v sc_v t sc_t =
         with Not_found -> false)
       | Const _ | BoundVar _ -> false
       | Lambda t' -> check v sc_v t' sc_t
-      | At (t, l) ->
+      | At (t, _, l) ->
         check v sc_v t sc_t || List.exists (fun t' -> check v sc_v t' sc_t) l
   in
   check v sc_v t sc_t
@@ -83,11 +83,18 @@ let unification ?(subst=S.empty) a sc_a b sc_b =
       unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Const f, Const g when Symbol.eq f g -> subst
-    | At (t1, l1), At (t2, l2) when List.length l1 = List.length l2 ->
+    | At (t1, tyargs1, l1), At (t2, tyargs2, l2) when List.length l1 = List.length l2 ->
+      let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
       List.fold_left2
         (fun subst t1' t2' -> unif subst t1' sc_s t2' sc_t)
         subst (t1 :: l1) (t2 :: l2)
     | _, _ -> raise Fail
+  and unif_types subst l1 sc_1 l2 sc_2 = match l1, l2 with
+  | [], [] -> subst
+  | [], _ | _, [] -> raise Fail
+  | ty1::l1', ty2::l2' ->
+    let subst = TypeUnif.unify_ho ~subst ty1 sc_1 ty2 sc_2 in
+    unif_types subst l1' sc_1 l2' sc_2
   in
   (* try unification, and return solution/exception (with profiler handling) *)
   try
@@ -124,11 +131,18 @@ let matching ?(subst=S.empty) a sc_a b sc_b =
     | Lambda t1', Lambda t2' -> unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Const f, Const g when Symbol.eq f g -> subst
-    | At (t1, l1), At (t2, l2) when List.length l1 = List.length l2 ->
+    | At (t1, tyargs1, l1), At (t2, tyargs2, l2) when List.length l1 = List.length l2 ->
+      let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
       List.fold_left2
         (fun subst t1' t2' -> unif subst t1' sc_s t2' sc_t)
         subst (t1 :: l1) (t2 :: l2)
     | _, _ -> raise Fail
+  and unif_types subst l1 sc_1 l2 sc_2 = match l1, l2 with
+  | [], [] -> subst
+  | [], _ | _, [] -> raise Fail
+  | ty1::l1', ty2::l2' ->
+    let subst = TypeUnif.match_ho ~subst ty1 sc_1 ty2 sc_2 in
+    unif_types subst l1' sc_1 l2' sc_2
   in
   (* try matching, and return solution/exception (with profiler handling) *)
   try
@@ -160,11 +174,18 @@ let variant ?(subst=S.empty) a sc_a b sc_b =
       unif subst t1' sc_s t2' sc_t
     | BoundVar i, BoundVar j -> if i = j then subst else raise Fail
     | Const f, Const g when Symbol.eq f g -> subst
-    | At (t1, l1), At (t2, l2) when List.length l1 = List.length l2 ->
+    | At (t1, tyargs1, l1), At (t2, tyargs2, l2) when List.length l1 = List.length l2 ->
+      let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
       List.fold_left2
         (fun subst t1' t2' -> unif subst t1' sc_s t2' sc_t)
         subst (t1 :: l1) (t2 :: l2)
     | _, _ -> raise Fail
+  and unif_types subst l1 sc_1 l2 sc_2 = match l1, l2 with
+  | [], [] -> subst
+  | [], _ | _, [] -> raise Fail
+  | ty1::l1', ty2::l2' ->
+    let subst = TypeUnif.variant_ho ~subst ty1 sc_1 ty2 sc_2 in
+    unif_types subst l1' sc_1 l2' sc_2
   in
   try
     let subst = unif subst a sc_a b sc_b in
@@ -186,10 +207,10 @@ let are_variant t1 t2 =
 
 (** [matching_ac a b] returns substitutions such that [subst(a) =_AC b]. It
     is much more costly than [matching]. By default [is_ac] returns true only
-    for symbols that have [attr_ac], and [is_com] only for [attr_commut].
+    for symbols that have [flag_ac], and [is_com] only for [flag_commut].
     [offset] is used to create new variables. *)
-let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
-                ?(is_com=fun s -> Symbol.has_attr Symbol.attr_commut s)
+let matching_ac ?(is_ac=fun s -> Symbol.has_flag Symbol.flag_ac s)
+                ?(is_com=fun s -> Symbol.has_flag Symbol.flag_commut s)
                 ?offset ?(subst=S.empty) a sc_a b sc_b =
   (* function to get fresh variables *)
   let offset = match offset with
@@ -219,8 +240,9 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       | Lambda t1', Lambda t2' ->
         unif subst t1' sc_s t2' sc_t k
       | BoundVar i, BoundVar j -> if i = j then k subst
-      | At ({T.term=T.Const f} as head, l1), At ({T.term=T.Const g}, l2)
+      | At ({T.term=T.Const f} as head, tyargs1, l1), At ({T.term=T.Const g}, tyargs2, l2)
         when Symbol.eq f g && is_ac f ->
+        let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
         (* flatten into a list of terms that do not have [f] as head symbol *)
         let l1 = T.flatten_ac f l1
         and l2 = T.flatten_ac f l2 in 
@@ -229,18 +251,26 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
         (* eliminate terms that are common to l1 and l2 *)
         let l1, l2 = eliminate_common l1 l2 in
         (* permutative matching *)
-        unif_ac subst head l1 sc_s [] l2 sc_t k
-      | At ({T.term=T.Const f}, [x1;y1]), At ({T.term=T.Const g}, [x2;y2])
+        unif_ac ~tyargs:tyargs1 subst head l1 sc_s [] l2 sc_t k
+      | At ({T.term=T.Const f}, tyargs1, [x1;y1]), At ({T.term=T.Const g}, tyargs2, [x2;y2])
         when Symbol.eq f g && is_com f ->
         Util.debug 5 "com_match for %a: [%a] and [%a]" Symbol.pp f
           (Util.pp_list T.pp) [x1;y1] (Util.pp_list T.pp) [x2;y2];
+        let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
         unif_com subst x1 y1 sc_s x2 y2 sc_t k
-      | At (t1, l1), At (t2, l2) ->
+      | At (t1, tyargs1, l1), At (t2, tyargs2, l2) ->
         (* regular decomposition, but from the left *)
+        let subst = unif_types subst tyargs1 sc_s tyargs2 sc_t in
         unif_list subst (t1::l1) sc_s (t2::l2) sc_t k
       | Const f, Const g when Symbol.eq f g -> k subst
       | _, _ -> ()  (* failure, close branch *)
     with TypeUnif.Error _ -> ()
+  and unif_types subst l1 sc_1 l2 sc_2 = match l1, l2 with
+  | [], [] -> subst
+  | [], _ | _, [] -> raise Fail
+  | ty1::l1', ty2::l2' ->
+    let subst = TypeUnif.match_ho ~subst ty1 sc_1 ty2 sc_2 in
+    unif_types subst l1' sc_1 l2' sc_2
   (* unify lists *)
   and unif_list subst l1 sc_1 l2 sc_2 k = match l1, l2 with
   | [], [] -> k subst
@@ -255,7 +285,7 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
     ()
   (* try all permutations of [left@right] against [l1]. [left,right] is a
      zipper over terms to be matched against [l1]. *)
-  and unif_ac subst f l1 sc_1 left right sc_2 k =
+  and unif_ac ~tyargs subst f l1 sc_1 left right sc_2 k =
     match l1, left, right with
     | [], [], [] -> k subst  (* success *)
     | _ when List.length l1 > List.length left + List.length right ->
@@ -265,20 +295,20 @@ let matching_ac ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
       unif subst x1 sc_1 x2 sc_2
         (fun subst ->
           (* continue without x1 and x2 *)
-          unif_ac subst f l1' sc_1 [] (left @ right') sc_2 k);
+          unif_ac ~tyargs subst f l1' sc_1 [] (left @ right') sc_2 k);
       (* try x1 against right', keeping x2 on the side *)
-      unif_ac subst f l1 sc_1 (x2::left) right' sc_2 k;
+      unif_ac ~tyargs subst f l1 sc_1 (x2::left) right' sc_2 k;
       (* try to bind x1 to [x2+z] where [z] is fresh,
          if len(l1) < len(left+right) *)
       if T.is_var x1 && List.length l1 < List.length left + List.length right then
-        let z = fresh_var ~ty:(T.get_type x1) in
+        let z = fresh_var ~ty:(T.ty x1) in
         (* offset trick: we need [z] in both contexts sc_1 and sc_2, so we
            bind it so that (z,sc_2) -> (z,sc_1), and use (z,sc_1) to continue
            the matching *)
         let subst' = S.bind subst z sc_2 z sc_1 in
-        let x2' = T.mk_at f [x2; z] in
+        let x2' = T.mk_at ~tyargs f [x2; z] in
         let subst' = S.bind subst' x1 sc_1 x2' sc_2 in
-        unif_ac subst' f (z::l1') sc_1 left right' sc_2 k
+        unif_ac ~tyargs subst' f (z::l1') sc_1 left right' sc_2 k
     | x1::l1', left, [] -> ()
     | [], _, _ -> ()  (* failure, some terms are not matched *)
   (* eliminate common occurrences of terms in [l1] and [l2] *)

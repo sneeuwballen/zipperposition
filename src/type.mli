@@ -98,6 +98,9 @@ val forall : t list -> t -> t
       If [vars] is the empty list, returns [ty].
       @raise Invalid_argument if some element of [vars] is not a variable *)
 
+val __forall : t -> t
+  (** not documented. *)
+
 (** {2 Basic types} *)
 
 val i : t       (* individuals *)
@@ -121,7 +124,7 @@ val arity : t -> int * int
      expects [a] arguments to be used as arguments of Forall, and
      [b] arguments to be used for function application. *)
 
-val expected_args : t -> t list * t list
+val expected_args : t -> t list
   (** Types expected as function argument by [ty]. The length of the
       list [expected_args ty] is the same as [snd (arity ty)]. *)
 
@@ -136,6 +139,26 @@ val apply : t -> t list -> t
       type that results from applying the function/forall to the arguments.
       No unification is done, types must check exactly.
       @raise Error if the types do not match *)
+
+(** {2 De Bruijn indices}
+use with caution.
+*)
+
+module DB : sig
+  val closed : ?depth:int -> t -> bool
+    (** check whether the type is closed (all DB vars are bound within
+        the term) *)
+
+  val shift : ?depth:int -> int -> t -> t
+    (** shift the non-captured De Bruijn indexes in the type by n *)
+
+  val replace : ?depth:int -> t -> var:t -> t
+    (** [replace t ~sub] replaces [var] by a fresh De Bruijn index in [t]. *)
+
+  val eval : ?depth:int -> t DBEnv.t -> t -> t
+    (** Evaluate the type in the given De Bruijn environment, by
+        replacing De Bruijn indices by their value in the environment. *)
+end
 
 (** {2 IO} *)
 

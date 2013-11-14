@@ -178,10 +178,10 @@ module DB : sig
         inside) by [n] *)
 
   val replace : ?depth:int -> t -> sub:t -> t
-    (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
+    (** [replace t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
 
   val from_var : ?depth:int -> t -> var:t -> t
-    (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
+    (** [from_var t ~var] replace [var] by a De Bruijn symbol in t.
         Same as {!replace}. *)
 
   val eval : ?depth:int -> t DBEnv.t -> t -> t
