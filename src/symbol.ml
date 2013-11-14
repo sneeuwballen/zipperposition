@@ -33,44 +33,45 @@ type t =
   | Real of float
 and const_info = {
   mutable tag : int;
-  mutable attrs : int;
+  mutable flags : int;
+  ty : Type.t;
 } (** Additional information for hashconsed symbols *)
 
 type symbol = t
 
-(** {2 Boolean attributes} *)
+(** {2 Boolean flags} *)
 
-type symbol_attribute = int
+type flag = int
 
-let attr_skolem = 1 lsl 0
-let attr_split = 1 lsl 1
-let attr_binder = 1 lsl 2
-let attr_infix = 1 lsl 3
-let attr_ac = 1 lsl 4
-let attr_multiset = 1 lsl 5
-let attr_fresh_const = 1 lsl 6
-let attr_commut = 1 lsl 7
-let attr_distinct = 1 lsl 8
+let flag_skolem = 1 lsl 0
+let flag_split = 1 lsl 1
+let flag_binder = 1 lsl 2
+let flag_infix = 1 lsl 3
+let flag_ac = 1 lsl 4
+let flag_multiset = 1 lsl 5
+let flag_fresh_const = 1 lsl 6
+let flag_commut = 1 lsl 7
+let flag_distinct = 1 lsl 8
 
-let attrs s = match s with
-  | Const (_, info) -> info.attrs
+let flags s = match s with
+  | Const (_, info) -> info.flags
   | Int _
   | Rat _
   | Real _ -> 0
 
-let has_attr attr s = (attrs s land attr) <> 0
+let has_flag flag s = (flags s land flag) <> 0
 
 (** Hashconsing *)
 
 let eq_base s1 s2 = match s1, s2 with
-  | Const (s1,_), Const (s2, _) -> s1 = s2
+  | Const (s1,i1), Const (s2, i2) -> s1 = s2 && Type.eq i1.ty i2.ty
   | Int n1, Int n2 -> Big_int.eq_big_int n1 n2
   | Rat n1, Rat n2 -> Ratio.eq_ratio n1 n2
   | Real f1, Real f2 -> f1 = f2
   | _ -> false
 
 let hash_base s = match s with
-  | Const (s, _) -> Hash.hash_string s
+  | Const (s, i) -> Hash.combine (Hash.hash_string s) (Type.hash i.ty)
   | Int n -> Hashtbl.hash n
   | Rat n -> Hashtbl.hash n
   | Real f -> Hashtbl.hash f
@@ -83,9 +84,6 @@ module H = Hashcons.Make(struct
     | Const (s, info) -> info.tag <- i
     | _ -> ()
 end)
-
-let is_used s =
-  H.mem (Const (s, { tag= ~-1; attrs=0; }))
 
 (** {2 Basic operations} *)
 
@@ -111,13 +109,13 @@ let hash s = match s with
   | Rat n -> Hash.hash_string (Ratio.string_of_ratio n)
   | Real f -> int_of_float f
 
-let mk_const ?(attrs=0) s =
-  let symb = Const (s, { tag= ~-1; attrs; }) in
+let mk_const ?(flags=0) ~ty s =
+  let symb = Const (s, { tag= ~-1; flags; ty; }) in
   H.hashcons symb
 
-let mk_distinct ?(attrs=0) s =
-  let attrs = attrs lor attr_distinct in
-  mk_const ~attrs s
+let mk_distinct ?(flags=0) ?(ty=Type.i) s =
+  let flags = flags lor flag_distinct in
+  mk_const ~flags ~ty s
 
 let mk_bigint i = Int i
 
@@ -154,7 +152,13 @@ let is_numeric s = match s with
   | Real _ | Int _ | Rat _ -> true | _ -> false
 
 let is_distinct s = match s with
-  | Const _ -> has_attr attr_distinct s | _ -> false
+  | Const _ -> has_flag flag_distinct s | _ -> false
+
+let ty s = match s with
+  | Int _ -> Type.int
+  | Rat _ -> Type.rat
+  | Real _ -> Type.real
+  | Const (_, i) -> i.ty
 
 module Tbl = Hashtbl.Make(struct
   type t = symbol
@@ -174,17 +178,36 @@ end)
 
 (** {2 connectives} *)
 
-let true_symbol = mk_const "$true"
-let false_symbol = mk_const "$false"
-let eq_symbol = mk_const ~attrs:(attr_infix lor attr_multiset lor
-                                  attr_commut) "="
-let exists_symbol = mk_const ~attrs:attr_binder "?"
-let forall_symbol = mk_const ~attrs:attr_binder "!"
-let not_symbol = mk_const "~"
-let imply_symbol = mk_const ~attrs:attr_infix "=>"
-let equiv_symbol = mk_const ~attrs:(attr_infix lor attr_commut) "<=>"
-let and_symbol = mk_const ~attrs:(attr_infix lor attr_ac lor attr_multiset) "&"
-let or_symbol = mk_const ~attrs:(attr_infix lor attr_ac lor attr_multiset) "|"
+let x = Type.var 0
+
+let true_symbol = mk_const ~ty:Type.o "$true"
+let false_symbol = mk_const ~ty:Type.o "$false"
+
+let eq_symbol =
+  let flags = flag_infix lor flag_multiset lor flag_commut in
+  let ty = Type.(forall [x] (o <== [x;x])) in
+  mk_const ~ty ~flags "="
+
+let ty_binder = Type.(forall [x] (o <=. (o <=. x)))  (* ('a -> o) -> o *)
+
+let exists_symbol = mk_const ~flags:flag_binder ~ty:ty_binder "?"
+let forall_symbol = mk_const ~flags:flag_binder ~ty:ty_binder "!"
+
+let not_symbol = mk_const ~ty:Type.(o <=. o) "~"
+
+let ty_bin_op = Type.(o <== [o;o])
+
+let imply_symbol =
+  mk_const ~flags:flag_infix ~ty:ty_bin_op "=>"
+
+let equiv_symbol =
+  mk_const ~flags:(flag_infix lor flag_commut) ~ty:ty_bin_op "<=>"
+
+let and_symbol =
+  mk_const ~flags:(flag_infix lor flag_ac lor flag_multiset) ~ty:ty_bin_op "&"
+
+let or_symbol =
+  mk_const ~flags:(flag_infix lor flag_ac lor flag_multiset) ~ty:ty_bin_op "|"
 
 let connectives =
   [ true_symbol
@@ -201,12 +224,14 @@ let connectives =
 
 let is_connective s = List.exists (fun s' -> eq s s') connectives
 
-let wildcard_symbol = mk_const "$_"
+(* wildcard symbol, a universal type *)
+let wildcard_symbol =
+  mk_const ~ty:Type.(forall [x] x) "$_"
 
 (** {2 IO} *)
 
 let to_string_debug s = match s with
-  | Const (s,_) -> s
+  | Const (s,i) -> Util.sprintf "%s:%a" s Type.pp i.ty
   | Int n -> Big_int.string_of_big_int n
   | Rat n -> Ratio.string_of_ratio n
   | Real f -> string_of_float f
@@ -221,28 +246,32 @@ let to_string_tstp s = match s with
   | _ when eq s and_symbol -> "&"
   | _ when eq s or_symbol -> "|"
   | _ when eq s imply_symbol -> "=>"
-  | _ -> to_string_debug s (* default *)
+  | Const (s, _) -> s
+  | Int n -> Big_int.string_of_big_int n
+  | Rat n -> Ratio.string_of_ratio n
+  | Real f -> string_of_float f
 
 let pp_tstp buf s = Buffer.add_string buf (to_string_tstp s)
 
-let to_string s = to_string_debug s
+let to_string = to_string_tstp
 
 let __default_pp = ref pp_debug
 let pp buf s = !__default_pp buf s
 
 let set_default_pp pp = __default_pp := pp
 
-let fmt fmt s = Format.pp_print_string fmt (to_string s)
+let fmt fmt s = Format.pp_print_string fmt (to_string_debug s)
 
 let bij =
+  let bij_const = Bij.(triple string_ int_ Type.bij) in
   Bij.switch
     ~inject:(fun s -> match s with
-      | Const (s,info) -> "const", Bij.(BranchTo (pair string_ int_, (s, info.attrs)))
+      | Const (s,info) -> "const", Bij.(BranchTo (bij_const, (s, info.flags, info.ty)))
       | Int n -> "int", Bij.(BranchTo (string_, Big_int.string_of_big_int n))
       | Rat n -> "rat", Bij.(BranchTo (string_, Ratio.string_of_ratio n))
       | Real f -> "real", Bij.(BranchTo (float_, f)))
     ~extract:(fun c -> match c with
-      | "const" -> Bij.(BranchFrom (pair string_ int_, fun (s,attrs) -> mk_const ~attrs s))
+      | "const" -> Bij.(BranchFrom (bij_const, fun (s,flags,ty) -> mk_const ~flags ~ty s))
       | "int" -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
       | "rat" -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
       | "real" -> Bij.(BranchFrom (float_, mk_real))
@@ -252,6 +281,15 @@ let bij =
 
 module Arith = struct
   exception TypeMismatch of string
+
+  (* type helpers *)
+
+  let ty_1 = Type.(forall [x] (x <=. x))
+  let ty_2 = Type.(forall [x] (x <== [x;x]))
+  let ty_2_int = Type.(forall [x] (int <== [x;x]))
+  let ty_cast into = Type.(forall [x] (into <=. x))
+  let ty_check = Type.(forall [x] (o <=. x)) 
+  let ty_2_o = Type.(forall [x] (o <== [x;x]))
 
   (* helper to raise errors *)
   let _ty_mismatch fmt =
@@ -269,13 +307,13 @@ module Arith = struct
   | Real f -> 0
   | _ -> _ty_mismatch "cannot compute sign of symbol %a" pp s
 
-  let floor = mk_const "$floor"
-  let ceiling = mk_const "$ceiling"
-  let truncate = mk_const "$truncate"
-  let round = mk_const "$round"
+  let floor = mk_const ~ty:(ty_cast Type.int) "$floor"
+  let ceiling = mk_const ~ty:(ty_cast Type.int) "$ceiling"
+  let truncate = mk_const ~ty:(ty_cast Type.int) "$truncate"
+  let round = mk_const ~ty:(ty_cast Type.int) "$round"
 
-  let prec = mk_const "$prec"
-  let succ = mk_const "$succ"
+  let prec = mk_const ~ty:ty_1 "$prec"
+  let succ = mk_const ~ty:ty_1 "$succ"
 
   let one_i = mk_int 1
   let zero_i = mk_int 0
@@ -283,12 +321,6 @@ module Arith = struct
   let zero_rat = mk_rat 0 1
   let one_f = mk_real 1.
   let zero_f = mk_real 0.
-
-  let typeof s =  match s with
-    | Int _ -> Type.int
-    | Rat _ -> Type.rat
-    | Real _ -> Type.real
-    | _ -> _ty_mismatch "cannot compute type of symbol %a" pp s
 
   let zero_of_ty ty =
     if Type.eq ty Type.int then zero_i
@@ -325,31 +357,31 @@ module Arith = struct
   | Real f -> f = 1.
   | Const _ -> false
 
-  let sum = mk_const "$sum"
-  let difference = mk_const "$difference"
-  let uminus = mk_const "$uminus"
-  let product = mk_const "$product"
-  let quotient = mk_const "$quotient"
+  let sum = mk_const ~ty:ty_2 "$sum"
+  let difference = mk_const ~ty:ty_2 "$difference"
+  let uminus = mk_const ~ty:ty_1 "$uminus"
+  let product = mk_const ~ty:ty_2 "$product"
+  let quotient = mk_const ~ty:ty_2 "$quotient"
 
-  let quotient_e = mk_const "$quotient_e"
-  let quotient_t = mk_const "$quotient_t"
-  let quotient_f = mk_const "$quotient_f"
-  let remainder_e = mk_const "$remainder_e"
-  let remainder_t = mk_const "$remainder_t"
-  let remainder_f = mk_const "$remainder_f"
+  let quotient_e = mk_const ~ty:ty_2_int "$quotient_e"
+  let quotient_t = mk_const ~ty:ty_2_int "$quotient_t"
+  let quotient_f = mk_const ~ty:ty_2_int "$quotient_f"
+  let remainder_e = mk_const ~ty:ty_2_int "$remainder_e"
+  let remainder_t = mk_const ~ty:ty_2_int "$remainder_t"
+  let remainder_f = mk_const ~ty:ty_2_int "$remainder_f"
 
-  let is_int = mk_const "$is_int"
-  let is_rat = mk_const "$is_rat"
-  let is_real = mk_const "$is_real"
+  let is_int = mk_const ~ty:ty_check "$is_int"
+  let is_rat = mk_const ~ty:ty_check "$is_rat"
+  let is_real = mk_const ~ty:ty_check "$is_real"
 
-  let to_int = mk_const "$to_int"
-  let to_rat = mk_const "$to_rat"
-  let to_real = mk_const "$to_real"
+  let to_int = mk_const ~ty:(ty_cast Type.int) "$to_int"
+  let to_rat = mk_const ~ty:(ty_cast Type.rat) "$to_rat"
+  let to_real = mk_const ~ty:(ty_cast Type.real) "$to_real"
 
-  let less = mk_const "$less"
-  let lesseq = mk_const "$lesseq"
-  let greater = mk_const "$greater"
-  let greatereq = mk_const "$greatereq"
+  let less = mk_const ~ty:ty_2_o "$less"
+  let lesseq = mk_const ~ty:ty_2_o "$lesseq"
+  let greater = mk_const ~ty:ty_2_o "$greater"
+  let greatereq = mk_const ~ty:ty_2_o "$greatereq"
 
   let set =
     let l = [
@@ -557,28 +589,28 @@ end
 (** pseudo symbol kept for locating bound vars in precedence. Bound
     vars are grouped in the precedence together w.r.t other symbols,
     but compare to each other by their index. *)
-let db_symbol = mk_const "$$db_magic_cookie"
+let db_symbol = mk_const ~ty:Type.i "$$db_magic_cookie"
 
 (** pseudo symbol for locating split symbols in precedence. Split
     symbols compare lexicographically with other split symbols,
     but are in a fixed location in precedence w.r.t other kinds of
     symbols. *)
-let split_symbol = mk_const "$$split_magic_cookie"
+let split_symbol = mk_const ~ty:Type.i "$$split_magic_cookie"
 
 (** pseudo symbol for locating magic constants in precedence.
     This is useful for keeping the precedence finite while managing
     an infinite set of fresh constants, that are used for
     testing terms for ground joinability (replacing variables
     with such constants) *)
-let const_symbol = mk_const "$$const_magic_cookie"
+let const_symbol = mk_const ~ty:Type.i "$$const_magic_cookie"
 
 (** pseudo symbol to locate numbers in the precedence *)
-let num_symbol = mk_const "$$num_magic_cookie"
+let num_symbol = mk_const ~ty:Type.i "$$num_magic_cookie"
 
 (** Infinite set of symbols, accessed by index, that will not collide with
     the signature of the problem *)
-let mk_fresh_const i =
-  mk_const ~attrs:attr_fresh_const ("$$c_" ^ string_of_int i)
+let mk_fresh_const i ~ty =
+  mk_const ~flags:flag_fresh_const ~ty ("$$c_" ^ string_of_int i)
 
 (** {2 Generation of symbols} *)
 
@@ -594,9 +626,9 @@ module Gensym = struct
       count = 0;
     }
 
-  let new_ gensym =
+  let new_ gensym ~ty =
     let n = gensym.count in
     gensym.count <- n + 1;
     let s = Util.sprintf "%s%d" gensym.prefix n in
-    mk_const s
+    mk_const ~ty s
 end

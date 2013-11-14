@@ -23,12 +23,21 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Symbols} *)
+(** {1 Symbols}
+
+Symbols are either numeric constants, or hashconsed, typed strings
+representing logical functions, constants and predicates.
+Two symbols with the same name but distinct types are distinct.
+*)
 
 (** {2 Definition of symbols} *)
 
 (** Symbols have a mixed representation, with string constants being
     hashconsed, but not numeric literals. *)
+
+type const_info
+  (** Additional information for hashconsed symbols. Contains type,
+      etc. but remains opaque. *)
 
 (** A symbol of TPTP *)
 type t = private
@@ -36,10 +45,6 @@ type t = private
   | Int of Big_int.big_int
   | Rat of Ratio.ratio
   | Real of float
-and const_info = private {
-  mutable tag : int;
-  mutable attrs : int;
-} (** Additional information for hashconsed symbols *)
 
 type symbol = t
 
@@ -52,28 +57,28 @@ val eq : t -> t -> bool
 val hash : t -> int
   (** hash the symbol *)
 
-(** {2 Boolean attributes} *)
+(** {2 Boolean flags}
+Boolean flags are flags that can be attached to symbols. Since
+symbols are perfectly shared, a flag is system-wide. Flags can
+be combined using the {s lor} operator.
+*)
 
-(** Boolean attributes are flags that can be attached to symbols. Since
-    symbols are perfectly shared, a flag is system-wide. Flags can
-    be combined using the {s lor} operator. *)
+type flag = int
 
-type symbol_attribute = int
-
-val attr_skolem : symbol_attribute      (** skolem symbol? *)
-val attr_split : symbol_attribute       (** symbol used for splitting? *)
-val attr_binder : symbol_attribute      (** is the symbol a binding symbol? *)
-val attr_infix : symbol_attribute       (** symbol is binary infix? *)
-val attr_ac : symbol_attribute          (** symbol is associative-commutative? *)
-val attr_multiset : symbol_attribute    (** symbol has multiset status for RPO *)
-val attr_fresh_const : symbol_attribute (** symbol that is a fresh constant *)
-val attr_commut : symbol_attribute      (** symbol that is commutative (not ac) *)
-val attr_distinct : symbol_attribute    (** distinct element (between "") *)
+val flag_skolem : flag          (** skolem symbol? *)
+val flag_split : flag           (** symbol used for splitting? *)
+val flag_binder : flag          (** is the symbol a binding symbol? *)
+val flag_infix : flag           (** symbol is binary infix? *)
+val flag_ac : flag              (** symbol is associative-commutative? *)
+val flag_multiset : flag        (** symbol has multiset status for RPO *)
+val flag_fresh_const : flag     (** symbol that is a fresh constant *)
+val flag_commut : flag          (** symbol that is commutative (not ac) *)
+val flag_distinct : flag        (** distinct element (between "") *)
 
 (** {2 Constructors} *)
 
-val mk_const : ?attrs:symbol_attribute -> string -> t
-val mk_distinct : ?attrs:symbol_attribute -> string -> t
+val mk_const : ?flags:flag -> ty:Type.t -> string -> t
+val mk_distinct : ?flags:flag -> ?ty:Type.t -> string -> t  (** default type: $i *)
 val mk_bigint : Big_int.big_int -> t
 val mk_int : int -> t
 val mk_rat : int -> int -> t
@@ -89,11 +94,14 @@ val is_rat : t -> bool
 val is_real : t -> bool
 val is_numeric : t -> bool  (* any of the 3 above *)
 
-val attrs : t -> symbol_attribute
+val flags : t -> flag
   (** access the attributes of a symbol *)
 
-val has_attr : symbol_attribute -> t -> bool
+val has_flag : flag -> t -> bool
   (** does the symbol have this attribute? *)
+
+val ty : t -> Type.t
+  (** Access the type of this symbol. *)
 
 module Map : Sequence.Map.S with type key = t
 module Set : Sequence.Set.S with type elt = t
@@ -150,8 +158,6 @@ module Arith : sig
   val zero_rat : t
   val one_f : t
   val zero_f : t
-
-  val typeof : t -> Type.t        (** Type of a constant *)
 
   val zero_of_ty : Type.t -> t
   val one_of_ty : Type.t -> t
@@ -243,7 +249,7 @@ val split_symbol : t (** pseudo symbol for locating split symbols in precedence 
 val const_symbol : t (** pseudo symbol for locating magic constants in precedence *)
 val num_symbol : t   (** pseudo symbol to locate numbers in the precedence *)
 
-val mk_fresh_const : int -> t
+val mk_fresh_const : int -> ty:Type.t -> t
   (** Infinite set of symbols, accessed by index, that will not collide with
       the signature of the problem *)
 
@@ -270,6 +276,6 @@ module Gensym : sig
   val create : ?prefix:string -> unit -> t
     (** New generator of fresh symbols *)
 
-  val new_ : t -> symbol
-    (** Fresh symbol *)
+  val new_ : t -> ty:Type.t -> symbol
+    (** Fresh symbol with given type. *)
 end
