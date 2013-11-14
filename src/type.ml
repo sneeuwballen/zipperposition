@@ -37,14 +37,19 @@ type t = {
 }
 and tree =
   | Var of int              (** type variable *)
+  | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
-  | Forall of t list * t    (** explicit quantification *)
+  | Forall of t             (** explicit quantification *)
 
 type ty = t
 
+exception Error of string
+  (** Generic error on types. *)
+
 let rec eq_struct t1 t2 = match t1.ty, t2.ty with
   | Var i1, Var i2 -> i1 = i2
+  | BVar i1, BVar i2 -> i1 = i2
   | App (s1, l1), App (s2, l2) -> 
     s1 = s2 && (try List.for_all2 (==) l1 l2 with Invalid_argument _ -> false)
   | Fun (ret1,l1), Fun (ret2,l2) ->
@@ -57,9 +62,10 @@ let hash t = t.id
 
 let rec _hash_top t = match t.ty with
   | Var i -> i
+  | BVar i -> Hash.hash_int i
   | App (s, l) -> Hash.hash_list hash (Hash.hash_string s) l
   | Fun (ret, l) -> Hash.hash_list hash (hash ret) l
-  | Forall (vars, ty) -> Hash.hash_list hash (hash ty) vars
+  | Forall ty -> Hash.hash_int (hash ty)
 
 (* hashconsing *)
 module H = Hashcons.Make(struct
@@ -74,6 +80,7 @@ let eq t1 t2 = t1 == t2
 let cmp ty1 ty2 = ty1.id - ty2.id
 
 let is_var = function | {ty=Var _} -> true | _ -> false
+let is_bvar = function | {ty=BVar _} -> true | _ -> false
 let is_app = function | {ty=App _} -> true | _ -> false
 let is_fun = function | {ty=Fun _} -> true | _ -> false
 let is_forall = function | {ty=Forall _} -> true | _ -> false
@@ -135,17 +142,102 @@ let var i =
   if i < 0 then failwith "Type.var: expected a nonnegative int";
   H.hashcons {ty=Var i; id= ~-1; ground=false; }
 
+let bvar i =
+  if i < 0 then failwith "Type.bvar: expected a nonnegative int";
+  H.hashcons {ty=BVar i; id= ~-1; ground=false; }
+
 let mk_fun = (<==)
 
-let forall vars ty =
-  if not (List.for_all is_var vars) then raise (Invalid_argument "Type.forall");
-  match vars, ty.ty with
-  | [], _ -> ty
-  | _::_, Forall (vars', ty') ->
-    (* flatten forall's *)
-    H.hashcons {ty=Forall(vars@vars', ty'); id= ~-1; ground=false; }
-  | _::_, _ ->
-    H.hashcons {ty=Forall(vars, ty); id= ~-1; ground=false; }
+(* real constructor *)
+let _forall ty =
+  H.hashcons {ty=Forall ty; id= ~-1; ground=false; }
+
+(** Handling De Bruijn indexes. We assume that all types are
+    always {!DB.closed}, ie all De Bruijn indices are properly bound
+    by a quantifier. *)
+module DB = struct
+  (* type is closed (ie all {!BVar} are properly scoped *)
+  let closed ty =
+    let rec closed depth ty =
+      ty.ground || match ty.ty with
+      | Var _
+      | App (_, []) -> true
+      | BVar i -> i < depth
+      | App (_, l) -> closed_list depth l
+      | Fun (ret, l) -> closed depth ret && closed_list depth l
+      | Forall ty' -> closed (depth+1) ty'
+    and closed_list depth l = match l with
+      | [] -> true
+      | ty::l' -> closed depth ty && closed_list depth l'
+    in
+    closed 0 ty
+
+  (* replace [var] by outermost De Bruijn *)
+  let replace ty ~var =
+    let rec recurse depth ty =
+      if ty.ground then ty
+      else match ty.ty with
+      | Var _ when eq var ty -> bvar depth  (* replace [var] by De Bruijn *)
+      | Var _
+      | App (_, []) -> ty
+      | BVar i -> assert (i<depth); ty  (* must be closed *)
+      | Fun (ret, l) -> mk_fun (recurse depth ret) (recurse_l depth ret)
+      | App (s, l) -> app s (recurse_l depth l)
+      | Forall ty' -> _forall (recurse (depth+1) ty')
+    and recurse_l depth l = match l with
+      | [] -> []
+      | ty::l' -> recurse depth ty :: recurse_l depth l'
+    in
+    recurse 0 ty
+
+  (* shift free De Bruijn indexes by [n] *)
+  let shift n ty =
+    let rec shift depth ty =
+      if ty.ground then ty
+      else match ty.ty with
+        | Var _ -> ty
+        | BVar i when i < depth -> ty  (* protected *)
+        | BVar i -> bvar (i+n)         (* shift *)
+        | Fun (ret, l) -> mk_fun (shift depth ret) (shift_l depth l)
+        | App (s, l) -> app s (shift_l depth l)
+        | Forall ty' -> _forall (shift (depth+1) ty')
+    and shift_l depth = function
+      | [] -> []
+      | ty::l' -> shift depth ty :: shift_l depth l'
+    in
+    shift 0 ty
+
+  (* evaluate ty in the given environment. *)
+  let eval env ty =
+    let rec eval depth env ty =
+    if ty.ground then ty
+    else match ty.ty with
+      | BVar i ->
+        begin match DBEnv.find env i with
+          | None -> ty
+          | Some ty' -> shift depth ty'
+        end
+      | App (_, [])
+      | Var _
+      | BVar _ -> ty
+      | App (s, l) -> app s (eval_list depth env l)
+      | Fun (ret, l) -> mk_fun (eval depth env ret) (eval_list depth env l)
+      | Forall ty' -> _forall (eval (depth+1) (DBEnv.push_none env) ty')
+    and eval_list depth env l = match l with
+      | [] -> []
+      | ty::l' ->
+        eval depth env ty :: eval_list depth env l'
+    in
+    eval 0 env ty
+end
+
+let rec forall vars ty = match vars with
+  | [] -> ty
+  | v::vars' ->
+    assert (is_var v);
+    let ty' = forall vars' ty in
+    let ty' = DB.replace ty' ~var:v in
+    _forall ty'
 
 (** {2 Basic types} *)
 
@@ -162,12 +254,10 @@ let rec _free_vars set ty =
   if ty.ground then set
   else match ty.ty with
   | Var _ -> Set.add ty set
+  | BVar _ -> set
   | App (_, l) -> List.fold_left _free_vars set l
   | Fun (ret, l) -> List.fold_left _free_vars (_free_vars set ret) l
-  | Forall (vars, ty') ->
-    let set' = _free_vars Set.empty ty' in
-    let set' = Set.filter (fun v -> not (List.memq v vars)) set' in
-    Set.union set set'
+  | Forall ty' -> _free_vars set ty'
 
 let free_vars ty =
   let set = _free_vars Set.empty ty in
@@ -181,17 +271,15 @@ let rec arity ty = match ty.ty with
   | Fun (_, l) -> 0, List.length l
   | Var _
   | App _ -> 0, 0
-  | Forall (vars, ty') ->
+  | Forall ty' ->
     let i1, i2 = arity ty' in
-    List.length vars + i1, i2
+    i1 + 1, i2
 
 let rec expected_args ty = match ty.ty with
-  | Fun (_, l) -> [], l
+  | Fun (_, l) -> l
   | Var _
-  | App _ -> [], []
-  | Forall (vars, ty') ->
-    let l1, l2 = expected_args ty' in
-    vars @ l1, l2
+  | App _ -> []
+  | Forall ty' -> expected_args ty'
 
 let is_ground t = t.ground
 
@@ -200,97 +288,77 @@ let rec size ty = match ty.ty with
   | App (_, []) -> 1
   | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
   | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
-  | Forall (vars, ty') -> size ty' + List.length vars
+  | Forall ty' -> 1 + size ty' 
 
-let _is_empty_subst = function | [] -> true | _::_ -> false
+let _error msg = raise (Error msg)
 
-(* substitute variables by types in [ty] *)
-let rec _apply_subst subst ty =
-  if _is_empty_subst subst then ty
-  else match ty.ty with
-  | Var _ ->
-    begin try
-      let ty' = List.assq ty subst in
-      _apply_subst subst ty'
-    with Not_found -> ty
-    end
-  | App (s, l) -> app s (_apply_subst_list subst l)
-  | Fun (ret, l) -> mk_fun (_apply_subst subst ret) (_apply_subst_list subst l)
-  | Forall (vars, ty') ->
-    (* hide the bound variables *)
-    let subst = List.filter (fun (v,_) -> not (List.memq v vars)) subst in
-    forall vars (_apply_subst subst ty')
-and _apply_subst_list subst l = match l with
-  | [] -> []
-  | ty::l' -> _apply_subst subst ty :: _apply_subst_list subst l'
-
-(* apply a type to arguments *)
+(* apply a type to arguments. *)
 let apply ty args =
-  (* apply subst(ty) to subst(args) *)
-  let rec apply subst ty args =
+  (* apply (eval env ty) to (eval env args) *)
+  let rec apply ~env ty args =
     match ty.ty, args with
-    | _, [] -> _apply_subst subst ty
-    | Fun (ret, l), l' -> apply_fun subst ret l l'
-    | Forall (vars, ty'), _ -> apply_forall subst ty' vars args
-    | _, _ -> failwith "Type.apply: expected function or forall type"
+    | _, [] -> DB.eval env ty
+    | Fun (ret, l), l' -> apply_fun ~env ret l l'
+    | Forall ty', a::args' ->
+      let env = DBEnv.push env a in
+      apply ~env ty' args'
+    | _, _ -> _error "Type.apply: expected function or forall type"
   (* recursive matching of expected arguments and provided arguments.
     careful: we could have a curried function *)
-  and apply_fun subst f_ret f_args args = match f_args, args with
+  and apply_fun ~env f_ret f_args args = match f_args, args with
     | x::f_args', y::args' ->
       (* match arguments after substitution *)
-      if eq (_apply_subst subst x) (_apply_subst subst y)
-        then apply_fun subst f_ret f_args' args'
-        else failwith "Type.apply: argument type mismatch"
+      if eq (DB.eval env x) (DB.eval env y)
+        then apply_fun ~env f_ret f_args' args'
+        else _error "Type.apply: argument type mismatch"
     | [], [] ->
-      (* total application *)
-      _apply_subst subst f_ret
-    | [], _ -> failwith "Type.apply: too many arguments"
+      (* total application, evaluate the return type. special case of last case. *)
+      DB.eval env f_ret
+    | [], _ -> apply ~env f_ret args
     | _::_, [] ->
-      (* partial application. The remaining arguments need be provided *)
-      mk_fun (_apply_subst subst f_ret) (_apply_subst_list subst f_args)
-  (* forall(vars,ty') applied to args *)
-  and apply_forall subst ty' vars args = match vars, args with
-    | [], _ -> apply subst ty' args
-    | v::vars', a::args' ->
-      let subst' = (v,a) :: subst in
-      apply_forall subst' ty' vars' args'
+      (* partial application. The remaining arguments will have to be
+          provided by another call to {!apply}. *)
+      mk_fun (DB.eval env f_ret) (DB.eval_list env f_args)
   in
-  apply [] ty args
+  apply ~env:DBEnv.empty ty args
 
 (** {2 IO} *)
 
-let rec pp buf t = match t.ty with
+let rec pp_rec depth buf t = match t.ty with
   | Var i -> Printf.bprintf buf "T%d" i
+  | BVar i -> Printf.bprintf buf "Tb%i" (depth-i-1)
   | App (p, []) -> Buffer.add_string buf p
-  | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
+  | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list (pp_rec depth)) args
   | Fun (ret, []) -> assert false
-  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
+  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
-  | Forall (vars, ty') ->
-    Printf.bprintf buf "∀ %a. %a" (Util.pp_list pp) vars pp_inner ty'
-and pp_inner buf t = match t.ty with
+    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
+  | Forall ty' ->
+    Printf.bprintf buf "∀ Tb%i. %a" depth vars (pp_inner (depth+1)) ty'
+and pp_inner depth buf t = match t.ty with
   | Fun (_, _::_) ->
-    Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
-  | _ -> pp buf t
+    Buffer.add_char buf '('; pp_rec depth buf t; Buffer.add_char buf ')'
+  | _ -> pp_rec depth buf t
 
-let rec pp_tstp buf t = match t.ty with
+let pp buf t = pp_rec 0 buf t
+
+let rec pp_tstp_rec depth buf t = match t.ty with
   | Var i -> Printf.bprintf buf "T%d" i
+  | BVar i -> Printf.bprintf buf "Tb%d" (depth-i-1)
   | App (p, []) -> Buffer.add_string buf p
-  | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list pp) args
+  | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list (pp_tstp_rec depth)) args
   | Fun (ret, []) -> assert false
-  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" pp_inner arg pp_inner ret
+  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret
   | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp_inner) l pp ret
+    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_tstp_rec depth) ret
   | Forall (vars, ty') ->
-    Printf.bprintf buf "!>[%a]: %a" (Util.pp_list pp_bvar) vars pp_inner ty'
-and pp_bvar buf v =
-  pp_tstp buf v;
-  Buffer.add_string buf ":%tType"
-and pp_inner buf t = match t.ty with
+    Printf.bprintf buf "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
+and pp_inner depth buf t = match t.ty with
   | Fun (_, _::_) ->
-    Buffer.add_char buf '('; pp_tstp buf t; Buffer.add_char buf ')'
-  | _ -> pp_tstp buf t
+    Buffer.add_char buf '('; pp_tstp_rec depth buf t; Buffer.add_char buf ')'
+  | _ -> pp_tstp_rec depth buf t
+
+let pp_tstp buf t = pp_tstp_rec 0 buf t
 
 let to_string t =
   let b = Buffer.create 15 in

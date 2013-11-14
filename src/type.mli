@@ -43,17 +43,22 @@ type t = private {
 }
 and tree = private
   | Var of int              (** Type variable *)
+  | BVar of int             (** Bound variable (De Bruijn index) *)
   | App of string * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
-  | Forall of t list * t    (** explicit quantification *)
+  | Forall of t             (** explicit quantification using De Bruijn index *)
 
 type ty = t
+
+exception Error of string
+  (** Generic error on types. *)
 
 val eq : t -> t -> bool     (* syntactic equality *)
 val cmp : t -> t -> int     (* syntactic comparison *)
 val hash : t -> int         (* hash of the structure *)
 
 val is_var : t -> bool
+val is_bvar : t -> bool
 val is_app : t -> bool
 val is_fun : t -> bool
 val is_forall : t -> bool
@@ -117,19 +122,11 @@ val arity : t -> int * int
      [b] arguments to be used for function application. *)
 
 val expected_args : t -> t list * t list
-  (** Types expected as argument by [ty].
-      The first list is the list of variables that need to be bound
-      in a forall, the second is the list of argument types for the function.
-      
-      {[let l1, l2 = expected_args ty in
-       let i1, i2 = arity ty in
-       assert i1 = List.length l1;
-       assett i2 = List.length l2;
-      ]}
-  *)
+  (** Types expected as function argument by [ty]. The length of the
+      list [expected_args ty] is the same as [snd (arity ty)]. *)
 
 val is_ground : t -> bool
-  (** Is the type ground? (means that no {!Var} occur in it) *)
+  (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)
 
 val size : t -> int
   (** Size of type, in number of "nodes" *)
@@ -138,7 +135,7 @@ val apply : t -> t list -> t
   (** Given a function/forall type, and a list of arguments, return the
       type that results from applying the function/forall to the arguments.
       No unification is done, types must check exactly.
-      @raise Failure if the types do not match *)
+      @raise Error if the types do not match *)
 
 (** {2 IO} *)
 
