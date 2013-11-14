@@ -25,25 +25,33 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Signature} *)
 
-type t = Type.t Symbol.Map.t
+module SMap : Sequence.Map.S with type key = string
+
+type t = private Symbol.t SMap.t
   (** A signature maps symbols to types *)
 
 val empty : t
   (** Empty signature *)
 
-val mem : t -> Symbol.t -> bool
+val mem : t -> string -> bool
   (** Is the symbol declared? *)
 
-val declare : t -> Symbol.t -> Type.t -> t
+val declare : t -> string -> Symbol.t -> t
   (** Declare the symbol, or
       @raise Invalid_argument if the symbol is already defined with
-             a different type *)
+             a different type, or if the type has free variables *)
 
-val find : t -> Symbol.t -> Type.t
-  (** Lookup the type of this symbol, or
+val declare_ty : t -> string -> Type.t -> t
+  (** Same as {!declare} but also builds the symbol *)
+
+val find : t -> string -> Symbol.t
+  (** Lookup a symbol by its name, or
       @raise Not_found if the symbol is not in the signature *)
 
-val arity : t -> Symbol.t -> int * int
+val find_type : t -> string -> Type.t
+  (** Same as {!find} but extracts the type *)
+
+val arity : t -> string -> int * int
   (** Arity of the given symbol, or failure.
       see {!Type.arity} for more details about the returned value.
       @raise Not_found if the symbol is not in the signature *)
@@ -54,19 +62,19 @@ val cardinal : t -> int
 val is_ground : t -> bool
   (** Only ground types? *)
 
-val is_bool : t -> Symbol.t -> bool
+val is_bool : t -> string -> bool
   (** Has the symbol a boolean return sort?
       @raise Not_found if the symbol is not in the signature *)
 
-val is_not_bool : t -> Symbol.t -> bool
+val is_not_bool : t -> string -> bool
 
 val merge : t -> t -> t
   (** Merge two signatures together *)
 
-val map : t -> (Symbol.t -> Type.t -> Type.t) -> t
+val map : t -> (string -> Symbol.t -> Symbol.t) -> t
   (** Transform types *)
 
-val filter : t -> (Symbol.t -> Type.t -> bool) -> t
+val filter : t -> (string -> Symbol.t -> bool) -> t
   (** Only keep part of the signature *)
 
 val diff : t -> t -> t
@@ -87,15 +95,15 @@ val to_symbols : t -> Symbol.t list
 val to_set : t -> Symbol.Set.t
   (** Set of symbols of the signature *)
 
-val iter : t -> (Symbol.t -> Type.t -> unit) -> unit
+val iter : t -> (string -> Symbol.t -> unit) -> unit
 
-val fold : t -> 'a -> ('a -> Symbol.t -> Type.t -> 'a) -> 'a
+val fold : t -> 'a -> ('a -> string -> Symbol.t -> 'a) -> 'a
 
-val to_seq : t -> (Symbol.t * Type.t) Sequence.t
-val of_seq : (Symbol.t * Type.t) Sequence.t -> t
+val to_seq : t -> (string * Symbol.t) Sequence.t
+val of_seq : (string * Symbol.t) Sequence.t -> t
 
-val to_list : t -> (Symbol.t * Type.t) list
-val of_list : (Symbol.t * Type.t) list -> t
+val to_list : t -> (string * Symbol.t) list
+val of_list : (string * Symbol.t) list -> t
 
 (** {2 IO} *)
 
