@@ -31,7 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** term *)
 type t = private {
   term : term_cell;             (** the term itself *)
-  ty : Type.t;                  (** type *)
+  mutable ty : Type.t;          (** type *)
   mutable tsize : int;          (** size (number of subterms) *)
   mutable flags : int;          (** boolean flags about the term *)
   mutable tag : int;            (** hashconsing tag *)
@@ -42,8 +42,9 @@ and term_cell = private
   | BoundVar of int             (** bound variable (De Bruijn index) *)
   | Lambda of t                 (** lambda abstraction over one variable. *)
   | Const of Symbol.t           (** Constant *)
-  | At of t * t list            (** HO function application.
-                                    Invariant: first term is not a {!At}. *)
+  | At of t * Type.t list * t list
+    (** HO function application. Invariant: first term is not a {!At}. *)
+
 and sourced_term =
   t * string * string           (** Term + file,name *)
 
@@ -59,7 +60,7 @@ val compare : t -> t -> int         (** a simple order on terms *)
 val hash : t -> int
 val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
-val get_type : t -> Type.t
+val ty : t -> Type.t
 
 module Tbl : Hashtbl.S with type key = t
 module Set : Sequence.Set.S with type elt = t
@@ -86,22 +87,25 @@ val get_flag : int -> t -> bool
 val new_flag : unit -> int
   (** New flag, different from all other flags *)
 
-val mk_var : ty:Type.t -> int -> t  (** Create a variable. The index must be >= 0 *)
-val mk_bound_var : ty:Type.t -> int -> t  (** De Bruijn index, must be >= 0 *)
+(** {2 Smart Constructors}
 
-val mk_lambda : varty:Type.t -> t -> t
-  (** [mk_lambda ~varty t'] creates the lambda function with
-      type [varty -> t'.ty] *)
+The constructors take care of type-checking and hashconsing.
+They may raise Type.Error in case of type error.
+*)
 
-val mk_const : ty:Type.t -> Symbol.t -> t
-  (** Constant, with a given type *)
+val mk_var : ty:Type.t -> int -> t
+  (** Create a variable. The index must be >= 0 *)
 
-val mk_at : t -> t list -> t
-  (** Apply a term to other terms. Type can be deduced from arguments.
-      @raise Failure if types do not match. *)
+val mk_const : Symbol.t -> t
+  (** Constant. The type of the constant is the type of the symbol. *)
 
-val true_term : t   (** tautology symbol *)
-val false_term : t  (** antilogy symbol *)
+val mk_at : ?tyargs:Type.t list -> t -> t list -> t
+  (** Apply a term to other terms. Type can be deduced from the constant,
+      the optional type arguments, and the term arguments.
+      @raise Type.Error if types do not match. *)
+
+val true_term : t   (** tautology term *)
+val false_term : t  (** antilogy term *)
 
 val not_term : t
 val and_term : t
@@ -109,9 +113,9 @@ val or_term : t
 val imply_term : t
 val equiv_term : t
 
-val eq_term : Type.t -> t
-val forall_term : Type.t -> t
-val exists_term : Type.t -> t
+val eq_term : t
+val forall_term : t
+val exists_term : t
 
 val mk_not : t -> t
 val mk_and : t -> t -> t
@@ -121,9 +125,6 @@ val mk_equiv : t -> t -> t
 val mk_xor : t -> t -> t
 val mk_eq : t -> t -> t
 val mk_neq : t -> t -> t
-val mk_lambda : varty:Type.t -> t -> t
-val mk_forall : varty:Type.t -> t -> t
-val mk_exists : varty:Type.t -> t -> t
 
 val mk_and_list : t list -> t
 val mk_or_list : t list -> t
@@ -132,13 +133,12 @@ val mk_or_list : t list -> t
     list of variables that is bound, then the quantified/abstracted
     term. *)
 
-val mk_lambda_var : t list -> t -> t   (** (lambda v1,...,vn. t). *)
-val mk_forall_var : t list -> t -> t
-val mk_exists_var : t list -> t -> t
+val mk_lambda : t list -> t -> t   (** (lambda v1,...,vn. t). *)
+val mk_forall : t list -> t -> t
+val mk_exists : t list -> t -> t
 
-val cast : t -> Type.t -> t           (** Set the type *)
-
-val lambda_var_ty : t -> Type.t       (** Type of arguments this lambda accepts *)
+val cast : t -> Type.t -> t
+  (** Change the type. Only works for variables and bound variables. *)
 
 (** {2 Properties} *)
 
@@ -201,29 +201,32 @@ val is_fo : t -> bool             (** Check whether the term is convertible
 
 val atomic : t -> bool        (** does not contain connectives/quantifiers *)
 
-val db_closed : ?depth:int -> t -> bool
-  (** check whether the term is closed (all DB vars are bound within the term) *)
+module DB : sig
+  val closed : ?depth:int -> t -> bool
+    (** check whether the term is closed (all DB vars are bound within
+        the term) *)
 
-val db_contains : t -> int -> bool
-  (** Does t contains the De Bruijn variable of index n? *)
+  val contains : t -> int -> bool
+    (** Does t contains the De Bruijn variable of index n? *)
 
-val db_replace : ?depth:int -> into:t -> by:t -> t
-  (** Substitution of De Bruijn symbol by a term. [db_replace ~into ~by]
-      replaces the De Bruijn symbol 0 by [by] in [into]. *)
+  val shift : ?depth:int -> int -> t -> t
+    (** shift the non-captured De Bruijn indexes in the term by n *)
 
-val db_lift : ?depth:int -> int -> t -> t
-  (** lift the non-captured De Bruijn indexes in the term by n *)
+  val unshift : ?depth:int -> int -> t -> t
+    (** Unshift the term (decrement indices of all free De Bruijn variables
+        inside) by [n] *)
 
-val db_unlift : ?depth:int -> t -> t
-  (** Unlift the term (decrement indices of all free De Bruijn variables
-      inside *)
+  val replace : ?depth:int -> t -> sub:t -> t
+    (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
 
-val db_from_term : ?depth:int -> t -> t -> t
-  (** [db_from_term t t'] Replace [t'] by a fresh De Bruijn index in [t]. *)
+  val from_var : ?depth:int -> t -> var:t -> t
+    (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
+        Same as {!replace}. *)
 
-val db_from_var : ?depth:int -> t -> t -> t
-  (** [db_from_var t v] replace v by a De Bruijn symbol in t.
-      Same as db_from_term. *)
+  val eval : ?depth:int -> t DBEnv.t -> t -> t
+    (** Evaluate the term in the given De Bruijn environment, by
+        replacing De Bruijn indices by their value in the environment. *)
+end
 
 (** {2 High level operations} *)
 
