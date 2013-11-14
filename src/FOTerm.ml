@@ -30,48 +30,33 @@ module PB = Position.Build
 let prof_mk_node = Util.mk_profiler "Term.mk_node"
 let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 
-(** term *)
 type t = {
   term : term_cell;       (** the term itself *)
-  ty : Type.t;            (** type of the term *)
+  mutable ty : Type.t;    (** type of the term *)
   mutable tsize : int;    (** size (number of subterms) *)
   mutable flags : int;    (** boolean flags about the term *)
   mutable tag : int;      (** hashconsing tag *)
 }
-(** content of the term *)
+
 and term_cell =
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Node of Symbol.t * t list   (** term application *)
-  | Ty of Type.t                (** lifted type *)
+  | Node of Symbol.t * Type.t list * t list   (** term application *)
 and sourced_term =
   t * string * string           (** Term + file,name *)
 
 type term = t
 
-(** list of variables *)
 type varlist = t list
-
-let hash_term t =
-  let h_type = Type.hash t.ty in
-  let h_term = match t.term with
-  | Var i -> Hash.hash_int i
-  | BoundVar i -> Hash.hash_int2 22 (Hash.hash_int i)
-  | Node (s, []) -> Symbol.hash s
-  | Node (s, l) -> Hash.hash_list (fun x -> x.tag) (Symbol.hash s) l
-  | Ty ty -> Type.hash ty
-  in
-  Hash.combine h_type h_term
 
 let rec hash_novar t =
   let h_type = Type.hash t.ty in
   let h_term = match t.term with
   | Var _ -> 42
   | BoundVar _ -> 43
-  | Node (s, l) ->
+  | Node (s, _, l) ->
     let h = Symbol.hash s in
     Hash.hash_list hash_novar h l
-  | Ty ty -> 11
   in
   Hash.combine h_type h_term
 
@@ -81,8 +66,8 @@ let subterm ~sub t =
   let rec check t =
     sub == t ||
     match t.term with
-    | Var _ | BoundVar _ | Node (_, []) | Ty _ -> false
-    | Node (_, subterms) -> List.exists check subterms
+    | Var _ | BoundVar _ | Node (_, _, []) -> false
+    | Node (_, _, subterms) -> List.exists check subterms
   in
   check t
 
@@ -92,7 +77,7 @@ let compare x y = x.tag - y.tag
 
 let hash x = x.tag
 
-let get_type t = t.ty
+let ty t = t.ty
 
 module TermHASH = struct
   type t = term
@@ -139,24 +124,37 @@ module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
 
 (** {2 Global terms table (hashconsing)} *)
 
+(* structural hash *)
+let hash_term t =
+  match t.term with
+  | Var i -> Hash.hash_int i
+  | BoundVar i -> Hash.hash_int2 22 (Hash.hash_int i)
+  | Node (s, tys, []) -> Hash.hash_list Type.hash (Symbol.hash s) tys
+  | Node (s, tys, l) ->
+    let h = Hash.hash_list Type.hash (Symbol.hash s) tys in
+    Hash.hash_list (fun x -> x.tag) h l
+
+(* structural eq *)
 let hashcons_equal x y =
   (* pairwise comparison of subterms *)
   let rec eq_subterms a b = match a, b with
     | [], [] -> true
     | a::a1, b::b1 -> a == b && eq_subterms a1 b1
-    | _, _ -> false
+    | _ -> false
+  and eq_types a b = match a, b with
+    | [], [] -> true
+    | xa::a', xb::b' -> Type.eq xa xb && eq_types a' b'
+    | _ -> false
   in
-  (* compare types *)
-  Type.eq x.ty y.ty &&
-  (* compare types and subterms, if same structure *)
+  (* compare type args and subterms, if same structure *)
   match x.term, y.term with
   | Var i, Var j
-  | BoundVar i, BoundVar j -> i = j
-  | Node (sa, []), Node (sb, []) -> Symbol.eq sa sb
-  | Node (_, []), Node (_, _::_)
-  | Node (_, _::_), Node (_, []) -> false
-  | Node (sa, la), Node (sb, lb) -> Symbol.eq sa sb && eq_subterms la lb
-  | Ty tya, Ty tyb -> Type.eq tya tyb
+  | BoundVar i, BoundVar j -> i = j && Type.eq x.ty y.ty
+  | Node (sa, [], []), Node (sb, [], []) -> Symbol.eq sa sb
+  | Node (_, _, []), Node (_, _, _::_)
+  | Node (_, _, _::_), Node (_, _, []) -> false
+  | Node (sa, tysa, la), Node (sb, tysb, lb) ->
+    Symbol.eq sa sb && eq_subterms la lb && eq_types tysa tysb
   | _ -> false
 
 (** hashconsing for terms *)
@@ -189,6 +187,10 @@ let get_flag flag t = (t.flags land flag) != 0
 (** {2 Typing} *)
 
 let cast t ty =
+  begin match t.term with
+    | Var _ | BoundVar _ -> ()
+    | _ -> raise (Invalid_argument "cast")
+  end;
   H.hashcons { t with ty ; tag = ~-1; }
 
 (** {2 Smart constructors} *)
@@ -218,20 +220,31 @@ let rec compute_tsize l = match l with
   | [] -> 1  (* with the initial symbol! *)
   | x::l' -> x.tsize + compute_tsize l'
 
-let mk_node ~ty s l =
+(* compute type of s(tyargs @ l) *)
+let _compute_ty s tyargs l =
+  match tyargs, l with
+    | [], [] -> Symbol.ty s
+    | _ ->
+      let all_ty_args = tyargs @ (List.map ty l) in
+      Type.apply (Symbol.ty s) all_ty_args
+
+let mk_node ?(tyargs=[]) s l =
   Util.enter_prof prof_mk_node;
+  let ty = _compute_ty s tyargs l in
+  (* hashcons term *)
   let t = match l with
   | [] ->
-    let my_t = {term=Node (s, l); ty; flags=flag_ground;
+    let my_t = {term=Node (s, tyargs, l); ty; flags=flag_ground;
                tsize=1; tag= -1} in
-    H.hashcons my_t
+    let t = H.hashcons my_t in
+    t
   | _::_ ->
-    let my_t = {term=Node (s, l); ty; flags=0;
+    let my_t = {term=Node (s, tyargs, l); ty; flags=0;
                tsize=0; tag= -1} in
     let t = H.hashcons my_t in
     if t == my_t
       then begin
-        (* compute ground-ness of term and size *)
+        (* compute meta-data: groundness, size *)
         set_flag flag_ground t (compute_is_ground l);
         t.tsize <- compute_tsize l;
       end;
@@ -240,14 +253,10 @@ let mk_node ~ty s l =
   Util.exit_prof prof_mk_node;
   t
 
-let mk_const ~ty s = mk_node ~ty s []
+let mk_const ?(tyargs=[]) s = mk_node ~tyargs s []
 
-let mk_ty ty =
-  let my_t = {term=Ty ty; ty=Type.tType; flags=0; tsize=1; tag= ~-1; } in
-  H.hashcons my_t
-
-let true_term = mk_const ~ty:Type.o Symbol.true_symbol
-let false_term = mk_const ~ty:Type.o Symbol.false_symbol
+let true_term = mk_const Symbol.true_symbol
+let false_term = mk_const Symbol.false_symbol
 
 (** {2 Subterms and positions} *)
 
@@ -260,38 +269,36 @@ let is_bound_var t = match t.term with
   | _ -> false
 
 let is_const t = match t.term with
-  | Node (s, []) -> true
+  | Node (s, _, []) -> true
   | _ -> false
 
 let is_node t = match t.term with
   | Node _ -> true
   | _ -> false
 
-let is_ty t = match t.term with | Ty _ -> true | _ -> false
-
 let rec at_pos t pos = match t.term, pos with
   | _, [] -> t
   | Var _, _::_ -> invalid_arg "wrong position in term"
-  | Node (_, l), i::subpos when i < List.length l ->
+  | Node (_, _, l), i::subpos when i < List.length l ->
     at_pos (List.nth l i) subpos
   | _ -> invalid_arg "index too high for subterm"
 
 let rec replace_pos t pos new_t = match t.term, pos with
   | _, [] -> new_t
   | (Var _ | BoundVar _), _::_ -> invalid_arg "wrong position in term"
-  | Node (s, l), i::subpos when i < List.length l ->
+  | Node (s, tyargs, l), i::subpos when i < List.length l ->
     let new_subterm = replace_pos (Util.list_get l i) subpos new_t in
-    mk_node ~ty:t.ty s (Util.list_set l i new_subterm)
+    mk_node ~tyargs s (Util.list_set l i new_subterm)
   | _ -> invalid_arg "index too high for subterm"
 
 (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)
 let rec replace t ~old ~by = match t.term with
-  | _ when t == old -> by
-  | Var _ | BoundVar _ | Ty _ -> t
-  | Node (s, l) ->
+  | _ when eq t old -> by
+  | Var _ | BoundVar _ -> t
+  | Node (s, tyargs, l) ->
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
-    mk_node ~ty:t.ty s l'
+    mk_node ~tyargs s l'
 
 (** Size of the term (number of subterms) *)
 let size t = t.tsize
@@ -301,7 +308,7 @@ let at_cpos t pos =
   let rec recurse t pos =
     match t.term, pos with
     | _, 0 -> t
-    | Node (_, l), _ -> get_subpos l (pos - 1)
+    | Node (_, _, l), _ -> get_subpos l (pos - 1)
     | _ -> failwith "bad compact position"
   and get_subpos l pos =
     match l, pos with
@@ -318,15 +325,15 @@ let is_ground t = get_flag flag_ground t
 let rec monomorphic t =
   Type.is_ground t.ty &&
   match t.term with
-  | Var _ | BoundVar _ | Node (_, []) -> true
-  | Ty ty -> Type.is_ground ty
-  | Node (_, l) -> List.for_all monomorphic l
+  | Var _ | BoundVar _ | Node (_, [], []) -> true
+  | Node (_, tyargs, l) ->
+    List.for_all Type.is_ground tyargs &&
+    List.for_all monomorphic l
 
 let rec var_occurs x t = match t.term with
   | Var _ | BoundVar _ -> x == t
-  | Ty _
-  | Node (_, []) -> false
-  | Node (s, l) -> List.exists (var_occurs x) l
+  | Node (s, _, []) -> false
+  | Node (s, _, l) -> List.exists (var_occurs x) l
 
 let max_var vars =
   let rec aux idx = function
@@ -347,9 +354,9 @@ let min_var vars =
 (** add variables of the term to the set *)
 let add_vars set t =
   let rec add set t = match t.term with
-  | BoundVar _ | Node (_, []) | Ty _ -> ()
+  | BoundVar _ | Node (_, _, []) -> ()
   | Var _ -> Tbl.replace set t ()
-  | Node (_, l) -> add_list set l
+  | Node (_, _, l) -> add_list set l
   and add_list set l = match l with
   | [] -> ()
   | x::l' -> add set x; add_list set l'
@@ -378,28 +385,28 @@ let vars_prefix_order t =
   let rec traverse acc t = match t.term with
   | Var _ when List.memq t acc -> acc
   | Var _ -> t :: acc
-  | BoundVar _ | Node (_, []) | Ty _ -> acc
-  | Node (_, l) -> List.fold_left traverse acc l
+  | BoundVar _ | Node (_, _, []) -> acc
+  | Node (_, _, l) -> List.fold_left traverse acc l
   in List.rev (traverse [] t)
 
 (** depth of term *)
 let depth t =
   let rec depth t = match t.term with
-  | Var _ | BoundVar _ | Ty _ -> 1
-  | Node (_, l) -> 1 + depth_list 0 l
+  | Var _ | BoundVar _ -> 1
+  | Node (_, _, l) -> 1 + depth_list 0 l
   and depth_list m l = match l with
   | [] -> m
   | t::l' -> depth_list (max m (depth t)) l'
   in depth t
 
-let rec head t = match t.term with
-  | Node (s, _) -> s
-  | Var _ | BoundVar _ | Ty _ -> raise (Invalid_argument "Term.head: variable")
+let head t = match t.term with
+  | Node (s, _, _) -> s
+  | Var _ | BoundVar _ -> raise (Invalid_argument "Term.head: variable")
 
 let symbols ?(init=Symbol.Set.empty) seq =
   let rec symbols set t = match t.term with
-    | Var _ | BoundVar _ | Ty _ -> set
-    | Node (s, l) ->
+    | Var _ | BoundVar _ -> set
+    | Node (s, _, l) ->
       let set = Symbol.Set.add s set in
       List.fold_left symbols set l
   in
@@ -408,99 +415,98 @@ let symbols ?(init=Symbol.Set.empty) seq =
 (** Does t contains the symbol f? *)
 let rec contains_symbol f t =
   match t.term with
-  | Var _ | BoundVar _ | Ty _ -> false
-  | Node (g, ts) -> Symbol.eq g f || List.exists (contains_symbol f) ts
+  | Var _ | BoundVar _ -> false
+  | Node (g, _, ts) -> Symbol.eq g f || List.exists (contains_symbol f) ts
 
 (** {2 De Bruijn Indexes manipulations} *)
 
-let db_closed ?(depth=0) t =
-  let rec recurse depth t = match t.term with
-  | BoundVar i -> i < depth
-  | Node (_, [])
-  | Var _ -> true
-  | Node (_, l) -> recurse_list depth l
-  and recurse_list depth l = match l with
-  | [] -> true
-  | x::l' -> recurse depth x && recurse_list depth l'
-  in
-  recurse depth t
+module DB = struct
+  (* term is closed (ie all {!BoundVar} are properly scoped *)
+  let closed ?(depth=0) t =
+    let rec recurse depth t = match t.term with
+    | BoundVar i -> i < depth
+    | Node (_, _, [])
+    | Var _ -> true
+    | Node (_, _, l) -> recurse_list depth l
+    and recurse_list depth l = match l with
+    | [] -> true
+    | x::l' -> recurse depth x && recurse_list depth l'
+    in
+    recurse depth t
 
-(* check whether t contains the De Bruijn symbol n *)
-let rec db_contains t n = match t.term with
-  | BoundVar i -> i = n
-  | Node (_, l) -> List.exists (fun t' -> db_contains t' n) l
-  | Var _ -> false
+  (* check whether t contains the De Bruijn symbol n *)
+  let rec contains t n = match t.term with
+    | BoundVar i -> i = n
+    | Node (_, _, l) -> List.exists (fun t' -> contains t' n) l
+    | Var _ -> false
 
-(* lift the non-captured De Bruijn indexes in the term by n *)
-let db_lift ?(depth=0) n t =
-  (* traverse the term, looking for non-captured DB indexes.
-     [depth] is the number of binders on the path from the root of the
-     term, to the current position. *)
-  let rec recurse depth t = 
-    match t.term with
-    | _ when is_ground t -> t  (* closed. *)
-    | BoundVar i when i >= depth ->
-      mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
-    | Node (_, []) | Var _ | BoundVar _ -> t
-    | Node (s, l) ->
-      mk_node ~ty:t.ty s (List.map (recurse depth) l)
-  in
-  assert (n >= 0);
-  if depth=0 && n = 0 then t else recurse depth t
+  (* shift the non-captured De Bruijn indexes in the term by n *)
+  let shift ?(depth=0) n t =
+    let rec recurse t = 
+      match t.term with
+      | _ when is_ground t -> t  (* closed. *)
+      | BoundVar i when i >= depth ->
+        mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
+      | Node (_, _, []) | Var _ | BoundVar _ -> t
+      | Node (s, tyargs, l) ->
+        mk_node ~tyargs s (List.map recurse l)
+    in
+    assert (n >= 0);
+    if n = 0 then t else recurse t
 
-(* replace 0 by [by] into [into] *)
-let db_replace ?(depth=0) ~into ~by =
-  (* replace db by s in t *)
-  let rec replace depth s t = match t.term with
-  | BoundVar n ->
-    if n = depth
-      then db_lift depth s   (* free vars must be lifted *)
-      else t
-  | Node (_, [])
-  | Var _ -> t
-  | Node (f, l) ->
-    mk_node ~ty:t.ty f (List.map (replace depth s) l)
-  in
-  replace depth by into
+  (* unshift the term (decrement indices of all free De Bruijn variables inside) *)
+  let unshift ?(depth=0) n t =
+    (* only unlift DB symbol that are free. [depth] is the number of binders
+       on the path from the root term. *)
+    let rec recurse t =
+      match t.term with
+      | _ when is_ground t -> t
+      | BoundVar i -> if i >= depth then mk_bound_var ~ty:t.ty (i-n) else t
+      | Node (_, _, []) | Var _ -> t
+      | Node (s, tyargs, l) ->
+        mk_node ~tyargs s (List.map recurse l)
+    in recurse t
 
-(* unlift the term (decrement indices of all free De Bruijn variables inside *)
-let db_unlift ?(depth=0) t =
-  (* only unlift DB symbol that are free. [depth] is the number of binders
-     on the path from the root term. *)
-  let rec recurse depth t =
-    match t.term with
+  (** Replace [sub] by a fresh De Bruijn index in [t]. *)
+  let replace ?(depth=0) t ~sub =
+    (* recurse and replace [sub]. *)
+    let rec replace t = match t.term with
+    | _ when eq t sub -> mk_bound_var ~ty:t.ty depth
+    | Var _
+    | Node (_, _, [])
+    | BoundVar _ -> t
+    | Node (s, tyargs, l) ->
+      mk_node ~tyargs s (List.map replace l)
+    in
+    replace t
+
+  let from_var ?depth t ~var =
+    assert (is_var var);
+    replace ?depth t ~sub:var
+
+  (* evaluate t in the given environment. *)
+  let eval ?(depth=0) env t =
+    let rec eval t = match t.term with
     | _ when is_ground t -> t
-    | BoundVar i -> if i >= depth then mk_bound_var ~ty:t.ty (i-1) else t
-    | Node (_, []) | Var _ -> t
-    | Node (s, l) ->
-      mk_node ~ty:t.ty s (List.map (recurse depth) l)
-  in recurse depth t
-
-(** Replace [t'] by a fresh De Bruijn index in [t]. *)
-let db_from_term ?(depth=0) t t' =
-  (* recurse and replace [t']. *)
-  let rec replace depth t = match t.term with
-  | _ when t == t' -> mk_bound_var ~ty:t.ty depth
-  | Var _
-  | Node (_, [])
-  | BoundVar _ -> t
-  | Node (s, l) ->
-    mk_node ~ty:t.ty s (List.map (replace depth) l)
-  in
-  replace depth t
-
-(** [db_from_var t v] replace v by a De Bruijn symbol in t.
-  Same as db_from_term. *)
-let db_from_var ?depth t v =
-  assert (is_var v);
-  db_from_term ?depth t v
+    | Var _
+    | Node (_, _, []) -> t
+    | BoundVar i ->
+      begin match DBEnv.find env i with
+        | None -> t  (* not bound *)
+        | Some t' -> shift depth t'
+      end
+    | Node (s, tyargs, l) ->
+      mk_node ~tyargs s (List.map eval l)
+    in
+    eval t
+end
 
 (** {2 Fold} *)
 
 let rec _all_pos_rec f vars acc pb t = match t.term with
   | Var _ | BoundVar _ ->
     if vars then f acc t (PB.to_pos pb) else acc
-  | Node (hd, tl) ->
+  | Node (hd, _, tl) ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     _all_pos_rec_list f vars acc pb tl 0
 and _all_pos_rec_list f vars acc pb l i = match l with
@@ -522,37 +528,37 @@ let flatten_ac f l =
   | [] -> acc
   | x::l' -> flatten (deconstruct acc x) l'
   and deconstruct acc t = match t.term with
-  | Node (f', l') when Symbol.eq f f' ->
+  | Node (f', _, l') when Symbol.eq f f' ->
     flatten acc l'
   | _ -> t::acc
   in flatten [] l
 
 (** normal form of the term modulo AC *)
-let ac_normal_form ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
-                   ?(is_com=fun s -> Symbol.has_attr Symbol.attr_commut s)
+let ac_normal_form ?(is_ac=fun s -> Symbol.has_flag Symbol.flag_ac s)
+                   ?(is_com=fun s -> Symbol.has_flag Symbol.flag_commut s)
                    t =
   Util.enter_prof prof_ac_normal_form;
   let rec normalize t = match t.term with
     | Var _ -> t
     | BoundVar _ -> t
-    | Node (f, ([_;_] as l)) when is_ac f ->
+    | Node (f, tyargs, ([_;_] as l)) when is_ac f ->
       let l = flatten_ac f l in
       let l = List.map normalize l in
       let l = List.sort compare l in
       (match l with
         | x::l' -> List.fold_left
-          (fun subt x -> mk_node ~ty:t.ty f [x;subt])
+          (fun subt x -> mk_node ~tyargs f [x;subt])
           x l'
         | [] -> assert false)
-    | Node (f, [a;b]) when is_com f ->
+    | Node (f, tyargs, [a;b]) when is_com f ->
       let a = normalize a in
       let b = normalize b in
       if compare a b > 0
-        then mk_node ~ty:t.ty f [b; a]
+        then mk_node ~tyargs f [b; a]
         else t
-    | Node (f, l) ->
+    | Node (f, tyargs, l) ->
       let l = List.map normalize l in
-      mk_node ~ty:t.ty f l
+      mk_node ~tyargs f l
   in
   let t' = normalize t in
   Util.exit_prof prof_ac_normal_form;
@@ -560,9 +566,9 @@ let ac_normal_form ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
 
 (** Check whether the two terms are AC-equal. Optional arguments specify
     which symbols are AC or commutative (by default by looking at
-    attr_ac and attr_commut) *)
-let ac_eq ?(is_ac=fun s -> Symbol.has_attr Symbol.attr_ac s)
-          ?(is_com=fun s -> Symbol.has_attr Symbol.attr_commut s)
+    flag_ac and flag_commut) *)
+let ac_eq ?(is_ac=fun s -> Symbol.has_flag Symbol.flag_ac s)
+          ?(is_com=fun s -> Symbol.has_flag Symbol.flag_commut s)
           t1 t2 =
   let t1' = ac_normal_form ~is_ac ~is_com t1
   and t2' = ac_normal_form ~is_ac ~is_com t2 in
@@ -572,7 +578,7 @@ let ac_symbols ~is_ac seq =
   let rec find set t = match t.term with
   | Var _
   | BoundVar _ -> set
-  | Node (s, l) ->
+  | Node (s, _, l) ->
     let set = if is_ac s then Symbol.Set.add s set else set in
     List.fold_left find set l
   in
@@ -590,26 +596,22 @@ let pp_tstp_depth depth buf t =
   (* recursive printing *)
   let rec pp_rec buf t = match t.term with
   | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-  | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
-    && Symbol.eq s' Symbol.equiv_symbol ->
-    Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
-  | Node (s, [{term=Node (s', [a; b])}])
-    when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
-    Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
-  | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
-    Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
-  | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
+  | Node (s, _, [a;b]) when Symbol.has_flag Symbol.flag_infix s ->
     Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
-  | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
+  | Node (s, _, body1::((_::_) as body)) when Symbol.has_flag Symbol.flag_infix s ->
     let sep = Util.sprintf " %a " Symbol.pp s in
     Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
       (Util.pp_list ~sep pp_surrounded) body
-  | Node (s, []) -> Symbol.pp_tstp buf s
-  | Node (s, args) ->
-    Printf.bprintf buf "%a(%a)" Symbol.pp_tstp s (Util.pp_list ~sep:", " pp_rec) args
+  | Node (s, [], []) -> Symbol.pp_tstp buf s
+  | Node (s, tyargs, args) ->
+    Printf.bprintf buf "%a("Symbol.pp_tstp s;
+    Util.pp_list Type.pp_tstp buf tyargs;
+    (match tyargs, args with | _::_, _::_ -> Buffer.add_string buf ", " | _ -> ());
+    Util.pp_list pp_rec buf args;
+    Buffer.add_string buf ")"
   | Var i -> Printf.bprintf buf "X%d" i
   and pp_surrounded buf t = match t.term with
-  | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
+  | Node (s, _, _::_::_) when Symbol.has_flag Symbol.flag_infix s ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
   in
@@ -622,21 +624,13 @@ let rec pp_depth ?(hooks=[]) depth buf t =
   let rec pp_rec buf t =
     begin match t.term with
     | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-    | Node (s, [{term=Node (s', [a;b])}]) when Symbol.eq s Symbol.not_symbol
-      && Symbol.eq s' Symbol.equiv_symbol ->
-      Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
-    | Node (s, [{term=Node (s', [a; b])}])
-      when Symbol.eq s Symbol.not_symbol && Symbol.eq s' Symbol.eq_symbol ->
-      Printf.bprintf buf "%a ≠ %a" pp_surrounded a pp_surrounded b
-    | Node (s, [t]) when Symbol.eq s Symbol.not_symbol ->
-      Printf.bprintf buf "%a%a" Symbol.pp s pp_rec t
-    | Node (s, [a;b]) when Symbol.has_attr Symbol.attr_infix s ->
+    | Node (s, _, [a;b]) when Symbol.has_flag Symbol.flag_infix s ->
       Printf.bprintf buf "%a %a %a" pp_surrounded a Symbol.pp s pp_surrounded b
-    | Node (s, body1::((_::_) as body)) when Symbol.has_attr Symbol.attr_infix s ->
+    | Node (s, _, body1::((_::_) as body)) when Symbol.has_flag Symbol.flag_infix s ->
       let sep = Util.sprintf " %a " Symbol.pp s in
       Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
         (Util.pp_list ~sep pp_surrounded) body
-    | Node (s, args) ->
+    | Node (s, _, args) ->
       (* try to use some hook *)
       if List.exists (fun hook -> hook pp_rec buf t) hooks
       then ()
@@ -656,7 +650,7 @@ let rec pp_depth ?(hooks=[]) depth buf t =
     if !print_all_types
       then Printf.bprintf buf ":%a" Type.pp t.ty
   and pp_surrounded buf t = match t.term with
-  | Node (s, _::_::_) when Symbol.has_attr Symbol.attr_infix s ->
+  | Node (s, _, _::_::_) when Symbol.has_flag Symbol.flag_infix s ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
   in
@@ -665,7 +659,7 @@ let rec pp_depth ?(hooks=[]) depth buf t =
 (* hook that prints arithmetic expressions *)
 let arith_hook pp_rec buf t =
   let pp_surrounded buf t = match t.term with
-  | Node (s, [_;_]) when
+  | Node (s, _, [_;_]) when
     Symbol.eq s Symbol.Arith.sum ||
     Symbol.eq s Symbol.Arith.product ||
     Symbol.eq s Symbol.Arith.difference ||
@@ -674,23 +668,23 @@ let arith_hook pp_rec buf t =
   | _ -> pp_rec buf t
   in
   match t.term with
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.less ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.less ->
     Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.lesseq ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.lesseq ->
     Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greater ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.greater ->
     Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.greatereq ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.greatereq ->
     Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.sum ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.sum ->
     Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.difference ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.difference ->
     Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.product ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.product ->
     Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a; b]) when Symbol.eq s Symbol.Arith.quotient ->
+  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.quotient ->
     Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, [a]) when Symbol.eq s Symbol.Arith.uminus ->
+  | Node (s, _, [a]) when Symbol.eq s Symbol.Arith.uminus ->
     Printf.bprintf buf "-%a" pp_surrounded a; true;
   | _ -> false  (* default *)
 
@@ -715,27 +709,29 @@ let rec debug fmt t =
   begin match t.term with
   | Var i -> Format.fprintf fmt "X%d" i
   | BoundVar i -> Format.fprintf fmt "Y%d" i
-  | Node (s, []) ->
+  | Node (s, [], []) ->
     Format.pp_print_string fmt (Symbol.to_string s)
-  | Node (s, l) ->
-    Format.fprintf fmt "(%s %a)" (Symbol.to_string s)
+  | Node (s, tyargs, l) ->
+    Format.fprintf fmt "(%s %a %a)" (Symbol.to_string s)
+      (Sequence.pp_seq Type.fmt) (Sequence.of_list tyargs)
       (Sequence.pp_seq debug) (Sequence.of_list l)
   end;
   Format.fprintf fmt ":%a" Type.fmt t.ty
 
 let bij =
   let open Bij in
+  let (!!!) = Lazy.force in
   fix
     (fun bij ->
-      let bij_node = lazy (triple Symbol.bij (list_ (Lazy.force bij)) Type.bij) in
+      let bij_node = lazy (triple Symbol.bij (list_ Type.bij) (list_ !!!bij)) in
       let bij_var = pair int_ Type.bij in
       switch
         ~inject:(fun t -> match t.term with
         | BoundVar i -> "bv", BranchTo (bij_var, (i,t.ty))
         | Var i -> "v", BranchTo (bij_var, (i, t.ty))
-        | Node (s, l) -> "n", BranchTo (Lazy.force bij_node, (s, l, t.ty)))
+        | Node (s, tyargs, l) -> "n", BranchTo (!!!bij_node, (s, tyargs, l)))
         ~extract:(function
         | "bv" -> BranchFrom (bij_var, fun (i,ty) -> mk_bound_var ~ty i)
         | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
-        | "n" -> BranchFrom (Lazy.force bij_node, fun (s,l,ty) -> mk_node ~ty s l)
+        | "n" -> BranchFrom (!!!bij_node, fun (s,tyargs,l) -> mk_node ~tyargs s l)
         | _ -> raise (DecodingError "expected Term")))

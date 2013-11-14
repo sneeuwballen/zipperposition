@@ -29,27 +29,28 @@ and takes the type into account (two terms are only equal if
 they have the same type).
 *)
 
-(** term *)
 type t = private {
   term : term_cell;       (** the term itself *)
-  ty : Type.t;            (** type of the term *)
+  mutable ty : Type.t;    (** type of the term *)
   mutable tsize : int;    (** size (number of subterms) *)
   mutable flags : int;    (** boolean flags about the term *)
   mutable tag : int;      (** hashconsing tag *)
-}
-(** content of the term *)
+} (** Representation of term *)
+
 and term_cell = private
   | Var of int                  (** variable *)
   | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Node of Symbol.t * t list   (** term application *)
-  | Ty of Type.t                (** lifted type *)
+  | Node of Symbol.t * Type.t list * t list   (** term application *)
+
+  (** structure of the term *)
+
 and sourced_term =
   t * string * string           (** Term + file,name *)
 
 type term = t
 
-(** list of variables *)
 type varlist = t list
+  (** list of variables *)
 
 (** {2 Comparison, equality, containers} *)
 
@@ -59,7 +60,7 @@ val compare : t -> t -> int         (** a simple order on terms *)
 val hash : t -> int                 (** Fast hash on hashconsed terms *)
 val hash_novar : t -> int           (** Hash that does not depend on variables *)
 
-val get_type : t -> Type.t          (** Obtain the type of a term.. *)
+val ty : t -> Type.t                (** Obtain the type of a term.. *)
 
 module Tbl : sig
   include Hashtbl.S with type key = t
@@ -97,17 +98,29 @@ val new_flag : unit -> int
 
 (** {2 Smart constructors} *)
 
-val mk_var : ty:Type.t -> int -> t  (** Create a variable. Providing a type is mandatory. *)
-val mk_bound_var : ty:Type.t -> int -> t  (** Create a De Bruijn index. *)
-val mk_node : ty:Type.t -> Symbol.t -> t list -> t    (** Application *)
-val mk_const : ty:Type.t -> Symbol.t -> t       (** Shortcut for constants *)
-val mk_ty : Type.t -> t
+val mk_var : ty:Type.t -> int -> t
+  (** Create a variable. Providing a type is mandatory. *)
 
-val true_term : t                        (** tautology symbol *)
-val false_term : t                       (** antilogy symbol *)
+val mk_bound_var : ty:Type.t -> int -> t
+  (** Create a bound variable. Providing a type is mandatory.
+      {b Warning}: be careful and try not to use this function directly*)
+
+val mk_node : ?tyargs:Type.t list -> Symbol.t -> t list -> t
+  (** Apply a symbol to a list of terms, and possibly a list of types
+      if the type of the symbol requires so. Partial application is not
+      supported and will raise a type error. The type is automatically
+      computed.
+      @raise Type.Error if types do not match. *)
+
+val mk_const : ?tyargs:Type.t list -> Symbol.t -> t
+  (** Shortcut for constants, same semantic as {!mk_node} with an
+      empty term list. *)
+
+val true_term : t     (** tautology term *)
+val false_term : t    (** antilogy term *)
 
 val cast : t -> Type.t -> t
-  (** Change the type. *)
+  (** Change the type. Only works for variables and bound variables. *)
 
 (** {2 Subterms and positions} *)
 
@@ -115,7 +128,6 @@ val is_var : t -> bool
 val is_bound_var : t -> bool
 val is_node : t -> bool
 val is_const : t -> bool
-val is_ty : t -> bool
 
 val at_pos : t -> Position.t -> t
   (** retrieve subterm at pos, or raise Invalid_argument*)
@@ -148,31 +160,34 @@ val depth : t -> int                     (** depth of the term *)
 val head : t -> Symbol.t                 (** head symbol (or Invalid_argument) *)
 val size : t -> int
 
-(** {2 De Bruijn Indexes manipulations} *)
+(** {2 De Bruijn Indexes manipulations *)
 
-val db_closed : ?depth:int -> t -> bool
-  (** check whether the term is closed (all DB vars are bound within the term) *)
+module DB : sig
+  val closed : ?depth:int -> t -> bool
+    (** check whether the term is closed (all DB vars are bound within
+        the term) *)
 
-val db_contains : t -> int -> bool
-  (** Does t contains the De Bruijn variable of index n? *)
+  val contains : t -> int -> bool
+    (** Does t contains the De Bruijn variable of index n? *)
 
-val db_replace : ?depth:int -> into:t -> by:t -> t
-  (** Substitution of De Bruijn symbol by a term. [db_replace ~into ~by]
-      replaces the De Bruijn symbol 0 by [by] in [into]. *)
+  val shift : ?depth:int -> int -> t -> t
+    (** shift the non-captured De Bruijn indexes in the term by n *)
 
-val db_lift : ?depth:int -> int -> t -> t
-  (** lift the non-captured De Bruijn indexes in the term by n *)
+  val unshift : ?depth:int -> int -> t -> t
+    (** Unshift the term (decrement indices of all free De Bruijn variables
+        inside) by [n] *)
 
-val db_unlift : ?depth:int -> t -> t
-  (** Unlift the term (decrement indices of all free De Bruijn variables
-      inside *)
+  val replace : ?depth:int -> t -> sub:t -> t
+    (** [db_from_term t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
 
-val db_from_term : ?depth:int -> t -> t -> t
-  (** [db_from_term t t'] Replace [t'] by a fresh De Bruijn index in [t]. *)
+  val from_var : ?depth:int -> t -> var:t -> t
+    (** [db_from_var t ~var] replace [var] by a De Bruijn symbol in t.
+        Same as {!replace}. *)
 
-val db_from_var : ?depth:int -> t -> t -> t
-  (** [db_from_var t v] replace v by a De Bruijn symbol in t.
-      Same as db_from_term. *)
+  val eval : ?depth:int -> t DBEnv.t -> t -> t
+    (** Evaluate the term in the given De Bruijn environment, by
+        replacing De Bruijn indices by their value in the environment. *)
+end
 
 (** {2 High-level operations} *)
 
