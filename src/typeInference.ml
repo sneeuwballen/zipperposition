@@ -207,7 +207,7 @@ module Ctx = struct
           let vars = _new_vars ctx arity in
           let ty = Type.(ret <== vars) in
           STbl.add ctx.symbols s ty;
-          ctx.to_bind <- ret :: ctx.to_bind;
+          ctx.to_bind <- ret :: vars @ ctx.to_bind;
           ty
       end
 
