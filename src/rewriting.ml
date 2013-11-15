@@ -153,11 +153,11 @@ module MakeOrdered(E : Index.EQUATION with type rhs = T.t) = struct
     let rec reduce reduce' t =
       match t.T.term with
       | T.Var _ | T.BoundVar _ -> t
-      | T.Node (s, l) ->
+      | T.Node (s, tyargs, l) ->
         let l' = List.map reduce' l in
         let t' = if List.for_all2 (==) l l'
           then t
-          else T.mk_node ~ty:t.T.ty s l' in
+          else T.mk_node ~tyargs s l' in
         (* now rewrite the term itself *)
         rewrite_here reduce' t'
     (* rewrite once at this position. If it succeeds,
@@ -285,10 +285,10 @@ module MakeTRS(I : functor(E : Index.EQUATION) -> Index.UNIT_IDX with module E =
     (* compute normal form of [subst(t, offset)] *)
     let rec compute_nf ~rules subst t offset =
       match t.T.term with
-      | T.Node (hd, l) ->
+      | T.Node (hd, tyargs, l) ->
         (* rewrite subterms first *)
         let l' = List.map (fun t' -> compute_nf ~rules subst t' offset) l in
-        let t' = T.mk_node ~ty:t.T.ty hd l' in
+        let t' = T.mk_node ~tyargs hd l' in
         (* rewrite at root *)
         reduce_at_root ~rules t'
       | T.Var _ ->

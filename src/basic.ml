@@ -83,6 +83,14 @@ module Sym = struct
   let true_ = mk_const "$true"
   let false_ = mk_const "$false"
   let wildcard = mk_const "$_"
+  let and_ = mk_const "&"
+  let or_ = mk_const "|"
+  let imply = mk_const "=>"
+  let equiv = mk_const "<=>"
+  let not_ = mk_const "~"
+  let eq_ = mk_const "="
+  let forall = mk_const "!!"
+  let exists = mk_const "??"
 
   module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
   module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
@@ -95,7 +103,7 @@ module Sym = struct
 
   let to_string_tstp = to_string
 
-  let pp buf s = Buffer.add_string (to_string s)
+  let pp buf s = Buffer.add_string buf (to_string s)
 
   let fmt fmt s = Format.pp_print_string fmt (to_string s)
 end
@@ -105,7 +113,7 @@ end
 module Ty = struct
   type t =
     | Var of string
-    | App of Sym.t * t list
+    | App of string * t list
     | Fun of t * t list
     | Forall of t list * t
   let cmp a b = Pervasives.compare a b
@@ -200,7 +208,7 @@ module FO = struct
     | App of Sym.t * t list
     | Var of string
 
-  let rec cmp t1 t2 = match t1, t2 with
+  let rec cmp t1 t2 = match t1.term, t2.term with
     | Var s1, Var s2 -> String.compare s1 s2
     | Var _, App _ -> 1
     | App _, Var _ -> ~-1
@@ -210,7 +218,7 @@ module FO = struct
 
   let eq a b = cmp a b = 0
 
-  let rec hash a = match a with
+  let rec hash a = match a.term with
     | Var s -> Hash.hash_string s
     | App (s, l) -> Hash.hash_list hash (Sym.hash s) l
 
@@ -249,15 +257,21 @@ module FO = struct
         | _ -> raise (ExpectedType t)
       end
     | App (_, _) -> raise (ExpectedType t)
+
+  let rec of_ty ty = match ty with
+    | Ty.Var s -> var s
+    | Ty.App (s, l) -> app (Sym.mk_const s) (List.map of_ty l)
+    | Ty.Forall _ -> raise (Invalid_argument "Basic.FO.of_ty: forall")
+    | Ty.Fun _ -> raise (Invalid_argument "Basic.FO.of_ty: fun")
   
   let symbols seq =
     let rec recurse set t = match t.term with
     | App (s, l) ->
-      let set = Symbol.Set.add s set in
+      let set = Sym.Set.add s set in
       List.fold_left recurse set l
     | Var _ -> set
     in
-    Sequence.fold recurse Symbol.Set.empty seq
+    Sequence.fold recurse Sym.Set.empty seq
 
   let free_vars ?(init=[]) t =
     let rec find set t = match t.term with
@@ -287,9 +301,9 @@ module FO = struct
       {t with term=App(s, l'); }
 
   let rec pp buf t = match t.term with
-    | App (s, []) -> Symbol.pp buf s
+    | App (s, []) -> Sym.pp buf s
     | App (s, l) ->
-      Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list pp) l
+      Printf.bprintf buf "%a(%a)" Sym.pp s (Util.pp_list pp) l
     | Var s -> Buffer.add_string buf s
 
   (* print var with its type *)
@@ -501,7 +515,7 @@ module HO = struct
     loc : Location.t option;
   }
   and tree =
-    | Const of string
+    | Const of Sym.t
     | App of t * t list
     | Var of string
     | Lambda of t * t
@@ -538,11 +552,11 @@ module HO = struct
 
   let rec as_ty t =
     match t.term with
-    | Const s when S.eq s S.wildcard_symbol ->
+    | Const s when Sym.eq s Sym.wildcard ->
       (* fresh variable *)
       Ty.var (Ty.gensym ())
-    | Const (S.Const(s,_)) -> Ty.app s []
-    | App ({term=Const(S.Const(s,_))}, l) ->
+    | Const (Sym.Const s) -> Ty.app s []
+    | App ({term=Const(Sym.Const s)}, l) ->
       let l' = List.map as_ty l in
       Ty.app s l'
     | Var n ->
@@ -554,6 +568,12 @@ module HO = struct
     | App (_, _)
     | Const _
     | Lambda _ -> raise (ExpectedType t)
+
+  let rec of_ty ty = match ty with
+    | Ty.Var s -> var s
+    | Ty.App (s, l) -> app (const (Sym.mk_const s)) (List.map of_ty l)
+    | Ty.Forall _ -> raise (Invalid_argument "Basic.FO.of_ty: forall")
+    | Ty.Fun _ -> raise (Invalid_argument "Basic.FO.of_ty: fun")
 
   let _same_name v1 v2 = match v1.term, v2.term with
     | Var n1, Var n2 -> n1 = n2
@@ -581,14 +601,14 @@ module HO = struct
       {loc; ty=None; term=Lambda (var, _replace_var var t); }
     | _ -> failwith "Untyped.HO.lambda: expect (var, term)"
 
-  let true_term = const stringrue_symbol
-  let false_term = const Symbol.false_symbol
+  let true_term = const Sym.true_
+  let false_term = const Sym.false_
 
   let forall ?loc ~var t =
-    at ?loc (const ?loc Symbol.forall_symbol) (lambda ?loc ~var t)
+    at ?loc (const ?loc Sym.forall) (lambda ?loc ~var t)
 
   let exists ?loc ~var t =
-    at ?loc (const ?loc Symbol.exists_symbol) (lambda ?loc ~var t)
+    at ?loc (const ?loc Sym.exists) (lambda ?loc ~var t)
 
   let rec forall_list ?loc vars t = match vars with
     | [] -> t
@@ -608,16 +628,16 @@ module HO = struct
     | Form.Bool true -> true_term
     | Form.Bool false -> false_term
     | Form.Nary (Form.And, l) ->
-      app (const Symbol.and_symbol) (List.map of_form l)
+      app (const Sym.and_) (List.map of_form l)
     | Form.Nary (Form.Or, l) ->
-      app (const Symbol.or_symbol) (List.map of_form l)
+      app (const Sym.or_) (List.map of_form l)
     | Form.Binary (Form.Equiv, f1, f2) ->
-      app (const Symbol.equiv_symbol) [of_form f1; of_form f2]
+      app (const Sym.equiv) [of_form f1; of_form f2]
     | Form.Binary (Form.Imply, f1, f2) ->
-      app (const Symbol.imply_symbol) [of_form f1; of_form f2]
+      app (const Sym.imply) [of_form f1; of_form f2]
     | Form.Equal (t1, t2) ->
-      app (const Symbol.eq_symbol) [of_term t1; of_term t2]
-    | Form.Not f' -> at (const Symbol.not_symbol) (of_form f')
+      app (const Sym.eq_) [of_term t1; of_term t2]
+    | Form.Not f' -> at (const Sym.not_) (of_form f')
     | Form.Atom p -> of_term p
     | Form.Quant (Form.Forall, l, f') ->
       forall_list (List.map of_term l) (of_form f')
@@ -632,7 +652,7 @@ module HO = struct
     | _ -> failwith "pp_var"
 
   let rec pp buf t = match t.term with
-    | Const s -> Symbol.pp buf s
+    | Const s -> Sym.pp buf s
     | Var s -> Buffer.add_string buf s
     | App (_, []) -> assert false
     | App (t, l) -> Util.pp_list ~sep:" @ " pp_inner buf (t :: l)
@@ -648,9 +668,9 @@ module HO = struct
     | Var _ | Const _ -> pp buf t
 
   let rec pp_tstp buf t = match t.term with
-    | Const s when Symbol.eq s Symbol.forall_symbol -> Buffer.add_string buf "!!"
-    | Const s when Symbol.eq s Symbol.exists_symbol -> Buffer.add_string buf "??"
-    | Const s -> Symbol.pp buf s
+    | Const s when Sym.eq s Sym.forall -> Buffer.add_string buf "!!"
+    | Const s when Sym.eq s Sym.exists -> Buffer.add_string buf "??"
+    | Const s -> Sym.pp buf s
     | Var s -> Buffer.add_string buf s
     | App (_, []) -> assert false
     | App (t, l) -> Util.pp_list ~sep:" @ " pp_inner buf (t :: l)

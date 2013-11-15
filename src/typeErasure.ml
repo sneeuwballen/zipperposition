@@ -1,4 +1,30 @@
 
+(*
+Copyright (c) 2013, Simon Cruanes
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.  Redistributions in binary
+form must reproduce the above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other materials provided with
+the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*)
+
+(** {1 Type erasure for terms and formulas} *)
 
 module FO = struct
   module T = FOTerm
@@ -8,7 +34,10 @@ module FO = struct
     let rec erase t = match t.T.term with
     | T.Var i -> BT.var ~ty:(TypeConversion.to_basic t.T.ty) (Util.sprintf "X%d" i)
     | T.BoundVar i -> BT.var ~ty:(TypeConversion.to_basic t.T.ty) (Util.sprintf "Y%d" (depth-i-1))
-    | T.Node (s, l) -> BT.app s (List.map erase l)
+    | T.Node (s, tyargs, l) ->
+      let tyargs = List.map (fun ty -> BT.of_ty (TypeConversion.to_basic ty)) tyargs in
+      let s = Symbol.to_basic s in
+      BT.app s (tyargs @ List.map erase l)
     in
     erase t
 end
@@ -45,8 +74,10 @@ module HO = struct
 
   let erase ?(depth=0) t =
     let rec erase depth t = match t.T.term with
-    | T.Const s -> BT.const s
-    | T.At (t, l) -> BT.app (erase depth t) (List.map (erase depth) l)
+    | T.Const s -> BT.const (Symbol.to_basic s)
+    | T.At (t, tyargs, l) ->
+      let tyargs = List.map (fun ty -> BT.of_ty (TypeConversion.to_basic ty)) tyargs in
+      BT.app (erase depth t) (tyargs @ List.map (erase depth) l)
     | T.Var i ->
       BT.var ~ty:(TypeConversion.to_basic t.T.ty) (Util.sprintf "X%d" i)
     | T.BoundVar i ->

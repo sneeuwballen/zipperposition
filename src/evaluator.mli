@@ -36,7 +36,7 @@ handy for arithmetic, where there are many distinct interpreted symbols.
 module type S = sig
   type term
 
-  type eval_fun = Type.t -> Symbol.t -> term list -> term option
+  type eval_fun = tyargs:Type.t list -> Symbol.t -> term list -> term option
     (** An  evaluation function takes a symbol application, and a list of
         arguments, and can decide to return a new term based on that.
         If it returns None, it means that the term is already evaluated. *)

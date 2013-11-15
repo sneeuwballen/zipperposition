@@ -151,7 +151,7 @@ module KBO = struct
           then (add_pos_var balance x; (wb + 1, x = y))
           else (add_neg_var balance x; (wb - 1, x = y))
       | T.BoundVar _ -> (if pos then wb + 1 else wb - 1), false
-      | T.Node (s, l) ->
+      | T.Node (s, _, l) ->
         let wb' = if pos then wb + prec.prec_weight s else wb - prec.prec_weight s in
         balance_weight_rec wb' l y pos false
     (** list version of the previous one, threaded with the check result *)
@@ -198,12 +198,12 @@ module KBO = struct
         let wb', contains = balance_weight wb t1 y true in
         (wb' - 1, if contains then Gt else Incomparable)
       (* node/node, De Bruijn/De Bruijn *)
-      | T.Node (f, ss), T.Node (g, ts) -> tckbo_composite wb f g ss ts
+      | T.Node (f, _, ss), T.Node (g, _, ts) -> tckbo_composite wb f g ss ts
       | T.BoundVar i, T.BoundVar j ->
         (wb, if i = j then Eq else Incomparable)
       (* node and something else *)
-      | T.Node (f, ss), T.BoundVar _ -> tckbo_composite wb f Symbol.db_symbol ss []
-      | T.BoundVar _, T.Node (g, ts) -> tckbo_composite wb Symbol.db_symbol g [] ts
+      | T.Node (f, _, ss), T.BoundVar _ -> tckbo_composite wb f Symbol.db_symbol ss []
+      | T.BoundVar _, T.Node (g, _, ts) -> tckbo_composite wb Symbol.db_symbol g [] ts
     (** tckbo, for composite terms (ie non variables). It takes a symbol
         and a list of subterms. *)
     and tckbo_composite wb f g ss ts =
@@ -228,7 +228,7 @@ module KBO = struct
     (** recursive comparison *)
     and tckbo_rec wb f g ss ts =
       if f = g
-        then if Symbol.has_attr Symbol.attr_multiset f
+        then if Symbol.has_flag Symbol.flag_multiset f
           (* use multiset or lexicographic comparison *)
           then tckbocommute wb ss ts
           else tckbolex wb ss ts
@@ -263,16 +263,16 @@ module RPO6 = struct
     | _, T.Var _ -> if T.var_occurs t s then Gt else Incomparable
     | T.Var _, _ -> if T.var_occurs s t then Lt else Incomparable
     (* node/node, De Bruijn/De Bruijn *)
-    | T.Node (f, ss), T.Node (g, ts) -> rpo6_composite ~prec s t f g ss ts
+    | T.Node (f, _, ss), T.Node (g, _, ts) -> rpo6_composite ~prec s t f g ss ts
     | T.BoundVar i, T.BoundVar j ->
       if i = j then Eq else Incomparable
     (* node and something else *)
-    | T.Node (f, ss), T.BoundVar _ -> rpo6_composite ~prec s t f Symbol.db_symbol ss []
-    | T.BoundVar _, T.Node (g, ts) -> rpo6_composite ~prec s t Symbol.db_symbol g [] ts
+    | T.Node (f, _, ss), T.BoundVar _ -> rpo6_composite ~prec s t f Symbol.db_symbol ss []
+    | T.BoundVar _, T.Node (g, _, ts) -> rpo6_composite ~prec s t Symbol.db_symbol g [] ts
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
     match prec.prec_compare f g with
-    | 0 when Symbol.has_attr Symbol.attr_multiset f ->
+    | 0 when Symbol.has_flag Symbol.flag_multiset f ->
       cMultiset ~prec ss ts (* multiset subterm comparison *)
     | 0 ->
       cLMA ~prec s t ss ts  (* lexicographic subterm comparison *)

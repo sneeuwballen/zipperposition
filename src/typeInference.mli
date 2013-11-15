@@ -28,12 +28,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 This module is used for two things that overlap:
 - inferring the types of symbols that have not been declared (e.g. in
   "fof" or "cnf" TPTP statements) so as to enrich a {!Signature.t}
-- converting {!Untyped} terms or formulas into typed formulas, by inferring
-  the exact type of each subterm.
+- converting {!Basic} terms or formulas into typed formulas, by inferring
+  the exact type of each subterm (and possibly inferring type parameters).
 
 In this context, {b generalizing} type variables means that if some symbol
 whose type was unknown and its type still contains variables after the
-type inference, those variables are kept instead of being bound to
+type inference, those variables are quantified instead of being bound to
 a default type (typically {!Type.i}).
 
 For instance: say [f] is not declared and occurs in the term [f(f(nil))]
@@ -41,9 +41,10 @@ with the declared constructor [nil : list(A)]. The inferred type for
 [f] should be something like [list(B) -> list(B)].
 - If we generalize, we declare that [f : list(A) -> list(A)] (for all [A]).
 - If we don't, we declare that [f : list($i) -> list($i)].
-*)
 
-type scope = Substs.scope
+Here we use a single scope when we unify and substitute type variables,
+the scope 0.
+*)
 
 (** {2 Closures} 
 A closure is a function that returns a ['a] value if provided with a proper
@@ -63,8 +64,8 @@ respectively.
 module Closure : sig
   include Monad.S with type 'a t = Substs.Ty.Renaming.t -> Substs.Ty.t -> 'a
 
-  val pure_ty : Type.t -> scope -> Type.t t
-    (** Evaluate the type,scope in some renaming,subst *)
+  val pure_ty : Type.t -> Type.t t
+    (** Evaluate the type in some renaming,subst *)
 end
 
 module TraverseClosure : Monad.TRAVERSE with type 'a M.t = 'a Closure.t
@@ -96,7 +97,8 @@ module Ctx : sig
     (** Remove every data from the context. It is as new. *)
 
   val exit_scope : t -> unit
-    (** Exit the current scope (formula, clause). *)
+    (** Exit the current scope (formula, clause), meaning that free variables's
+        types are reset. *)
 
   val add_signature : t -> Signature.t -> unit
     (** Specify the type of some symbols *)
@@ -104,18 +106,18 @@ module Ctx : sig
   val set_signature : t -> Signature.t -> unit
     (** Set the exact signature. The old one will be erased. *)
 
-  val declare : t -> Symbol.t -> Type.t -> unit
-    (** Declare the type of a symbol. The type {b must} be compatible
-        (unifiable with) the current type of the symbol, if any.
-        @raise TypeUnif.Error if an inconsistency (with inferred types) is
+  val declare : t -> string -> Type.t -> unit
+    (** Declare the type of a symbol. The type {b must} be equal to
+        the current type of the symbol, if any.
+        @raise Type.Error if an inconsistency (with inferred types) is
           detected. *)
 
-  val declare_basic : t -> Symbol.t -> Basic.Ty.t -> unit
+  val declare_basic : t -> string -> Basic.Ty.t -> unit
     (** Declare the type of a symbol, in raw form *)
 
-  val unify_and_set : t -> Type.t -> scope -> Type.t -> scope -> unit
-    (** Unify the two types in the given scopes.
-        @raise TypeUnif.Error if types are not unifiable in the context *)
+  val unify_and_set : t -> Type.t -> Type.t -> unit
+    (** Unify the two types.
+        @raise Type.Error if types are not unifiable in the context *)
 
   val to_signature : t -> Signature.t
     (** Obtain the type of all symbols whose type has been inferred.
@@ -158,14 +160,12 @@ module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : Ctx.t -> untyped -> scope -> Type.t * typed Closure.t
+  val infer : Ctx.t -> untyped -> Type.t * typed Closure.t
     (** Infer the type of this term under the given signature. This updates
-        the context's typing environment! The resulting type's variables
-        belong to the given scope.
+        the context's typing environment!
 
         @param ctx the context
         @param untyped the untyped term whose type must be inferred
-        @param scope where the term's type variables live
 
         @return the inferred type of the untyped term (possibly a type var)
           along with a closure to produce a typed term once every
@@ -177,11 +177,11 @@ module type S = sig
   This section is mostly useful for inferring a signature without
   converting untyped_terms into typed_terms. *)
 
-  val constrain_term_term : Ctx.t -> untyped -> scope -> untyped -> scope -> unit
+  val constrain_term_term : Ctx.t -> untyped -> untyped -> unit
     (** Force the two terms to have the same type in this context
         @raise Error if an inconsistency is detected *)
 
-  val constrain_term_type : Ctx.t -> untyped -> scope -> Type.t -> scope -> unit
+  val constrain_term_type : Ctx.t -> untyped -> Type.t -> unit
     (** Force the term's type and the given type to be the same.
         @raise Error if an inconsistency is detected *)
 end
@@ -189,7 +189,7 @@ end
 module FO : sig
   include S with type untyped = Basic.FO.t and type typed = FOTerm.t
 
-  val infer_form : Ctx.t -> Basic.Form.t -> scope -> FOFormula.t Closure.t
+  val infer_form : Ctx.t -> Basic.Form.t -> FOFormula.t Closure.t
     (** Inferring the type of a formula is trivial, it's always {!Type.o}.
         However, here we can still return a closure that produces a
         type formula *)
@@ -212,15 +212,13 @@ module FO : sig
 
   val convert_clause : ?generalize:bool -> ctx:Ctx.t ->
                         Basic.Form.t list -> FOFormula.t list
-    (** Convert a "clause". Type variables are bound in the same scope
-        for all formulas in the list. 
+    (** Convert a "clause". 
         @param generalize see {!convert} *)
 
   val convert_seq : ?generalize:bool -> ctx:Ctx.t ->
                     Basic.Form.t Sequence.t -> FOFormula.t list
     (** Given the signature for those formulas, infer their type and convert
-        untyped formulas into typed formulas. Also updates the context. Type
-        variables of each formulas live in distinct scopes. 
+        untyped formulas into typed formulas. Also updates the context. 
         @param generalize see {!convert} *)
  
 end

@@ -138,6 +138,18 @@ let parse_num str =
     then Int (Num.big_int_of_num n)
     else Rat (Num.ratio_of_num n)
 
+let of_basic ?(ty=Type.i) s = match s with
+  | Basic.Sym.Int n -> mk_bigint n
+  | Basic.Sym.Rat n -> mk_ratio n
+  | Basic.Sym.Real n -> mk_real n
+  | Basic.Sym.Const s -> mk_const ~ty s
+
+let to_basic = function
+  | Int n -> Basic.Sym.mk_bigint n
+  | Rat n -> Basic.Sym.mk_ratio n
+  | Real n -> Basic.Sym.mk_real n
+  | Const (s,_) -> Basic.Sym.mk_const s
+
 let is_const s = match s with
   | Const _ -> true | _ -> false
 

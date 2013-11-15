@@ -113,12 +113,11 @@ let list_constraint l =
         nb - na
     with Not_found -> 0
 
-let arity_constraint signature s1 s2 =
-  try
-    let s1sort = SMap.find s1 signature
-    and s2sort = SMap.find s2 signature in
-    (Type.arity s1sort) - (Type.arity s2sort)  (* bigger arity means bigger symbol *)
-  with Not_found -> 0
+let arity_constraint s1 s2 =
+  let _, a1 = Type.arity (Symbol.ty s1) in
+  let _, a2 = Type.arity (Symbol.ty s2) in
+  (* bigger arity means bigger symbol *)
+  a1 - a2
 
 let invfreq_constraint formulas =
   let freq_table = STbl.create 5 in
@@ -126,7 +125,7 @@ let invfreq_constraint formulas =
   let rec form_freq f = F.iter term_freq f
   and term_freq t = match t.T.term with
     | T.Var _ | T.BoundVar _ -> ()
-    | T.Node (s,l) ->
+    | T.Node (s, _, l) ->
       (let count = try STbl.find freq_table s with Not_found -> 0 in
       STbl.replace freq_table s (count+1);
       List.iter term_freq l)
@@ -236,8 +235,8 @@ let create ?(complete=false) constrs symbols =
       (* some symbols are not explicitely in the signature. Instead, they
          are represented by 'generic' symbols *)
       let transform_symbol s = match s with
-        | _ when Symbol.has_attr Symbol.attr_split s -> Symbol.split_symbol
-        | _ when Symbol.has_attr Symbol.attr_fresh_const s -> Symbol.const_symbol
+        | _ when Symbol.has_flag Symbol.flag_split s -> Symbol.split_symbol
+        | _ when Symbol.has_flag Symbol.flag_fresh_const s -> Symbol.const_symbol
         | _ -> s
       in
       let a' = transform_symbol a

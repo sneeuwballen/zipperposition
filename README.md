@@ -134,6 +134,8 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 
 ## TODO
 
+- tool to print a trace as DOT
+
 - consider moving the proof-checking part of tools/proof_check_tstp.ml
     to trace_tstp (can be used for embedded proof checking)
 

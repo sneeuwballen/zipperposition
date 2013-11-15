@@ -92,7 +92,7 @@ module Make(E : Index.EQUATION) = struct
                 else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie t (i+1) rebuild
-          | T.Node (s, _) ->
+          | T.Node (s, _, _) ->
             let subtrie =
               try SMap.find s trie.map
               with Not_found -> empty ()
@@ -140,7 +140,7 @@ module Make(E : Index.EQUATION) = struct
             | Some subtrie ->
               traverse subtrie acc (i+1)  (* match "*" against "*" *)
             end
-          | T.Node (s, _) ->
+          | T.Node (s, _, _) ->
             let acc =
               try
                 let subtrie = SMap.find s trie.map in
@@ -227,7 +227,7 @@ module MakeTerm(X : Set.OrderedType) = struct
                 else rebuild {trie with star=Some subtrie ;}
             in
             goto subtrie t (i+1) rebuild
-          | T.Node (s, l) ->
+          | T.Node (s, _, l) ->
             let arity = List.length l in
             let subtrie =
               try SIMap.find (s,arity) trie.map
@@ -279,7 +279,7 @@ module MakeTerm(X : Set.OrderedType) = struct
             (* skip one term in all branches of the trie *)
             skip_tree trie acc
               (fun acc subtrie -> traverse subtrie acc (i+1))
-          | T.Node (s, l) ->
+          | T.Node (s, _, l) ->
             let arity = List.length l in
             let acc =
               try
@@ -314,7 +314,7 @@ module MakeTerm(X : Set.OrderedType) = struct
             | Some subtrie ->
               traverse subtrie acc (i+1)  (* match "*" against "*" only *)
             end
-          | T.Node (s, l) ->
+          | T.Node (s, _, l) ->
             let arity = List.length l in
             let acc =
               try
@@ -347,7 +347,7 @@ module MakeTerm(X : Set.OrderedType) = struct
             (* match * against any subterm *)
             skip_tree trie acc
               (fun acc subtrie -> traverse subtrie acc (i+1))
-          | T.Node (s, l) ->
+          | T.Node (s, _, l) ->
             (* only same symbol *)
             let arity = List.length l in
             begin try

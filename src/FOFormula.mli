@@ -84,6 +84,9 @@ val mk_neq : term -> term -> t
 val mk_forall : term list -> t -> t
 val mk_exists : term list -> t -> t
 
+val __mk_forall : ty:Type.t -> t -> t
+val __mk_exists : ty:Type.t -> t -> t
+
 (** {2 Flags} *)
 
 val flag_simplified : int

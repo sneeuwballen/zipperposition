@@ -55,7 +55,8 @@ val has_includes : Ast_tptp.declaration Sequence.t -> bool
 (** {2 Type inference} *)
 
 val infer_type : TypeInference.Ctx.t -> Ast_tptp.declaration Sequence.t -> unit
-  (** Infer types from type declarations and formulas *)
+  (** Infer types from type declarations and formulas.
+      @raise Type.Error if there is a type error. *)
 
 val signature : ?signature:Signature.t ->
                 Ast_tptp.declaration Sequence.t ->
@@ -66,7 +67,7 @@ val type_declarations : Ast_tptp.declaration Sequence.t -> Signature.t
   (** Initial signature obtained by only considering the type declarations.
       In contrast to {!signature}, this doesn't perform type inference. *)
 
-val declare_symbols : ?name:(int -> Symbol.t -> Ast_tptp.name) ->
+val declare_symbols : ?name:(int -> string -> Ast_tptp.name) ->
                       Signature.t ->
                       Ast_tptp.declaration Sequence.t
   (** Declare the symbols of the signature. A custom function

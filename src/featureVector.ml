@@ -67,7 +67,7 @@ module Make(C : Index.CLAUSE) = struct
     let rec _depth_term depth t = match t.T.term with
       | T.Var _
       | T.BoundVar _ -> 0
-      | T.Node (_, l) ->
+      | T.Node (_, _, l) ->
         let depth' = depth + 1 in
         List.fold_left (fun acc t' -> acc + _depth_term depth' t') depth l
 
@@ -87,8 +87,8 @@ module Make(C : Index.CLAUSE) = struct
         f = (fun lits ->
           let table = STbl.create 3 in
           let rec gather t = match t.T.term with
-          | T.Node (s, l) ->
-            (if Symbol.has_attr Symbol.attr_split s
+          | T.Node (s, _, l) ->
+            (if Symbol.has_flag Symbol.flag_split s
               then STbl.replace table s ());
             List.iter gather l
           | T.BoundVar _ | T.Var _ -> ()
@@ -103,8 +103,8 @@ module Make(C : Index.CLAUSE) = struct
         f = (fun lits ->
           let table = STbl.create 3 in
           let rec gather t = match t.T.term with
-          | T.Node (s, l) ->
-            (if Symbol.has_attr Symbol.attr_skolem s
+          | T.Node (s, _, l) ->
+            (if Symbol.has_flag Symbol.flag_skolem s
               then STbl.replace table s ());
             List.iter gather l
           | T.BoundVar _ | T.Var _ -> ()
@@ -116,7 +116,7 @@ module Make(C : Index.CLAUSE) = struct
     (* iterate on symbols of a term *)
     let rec _iter_symb t k = match t.T.term with
       | T.Var _ | T.BoundVar _ -> ()
-      | T.Node (s, l) -> k s; List.iter (fun t -> _iter_symb t k) l
+      | T.Node (s, _, l) -> k s; List.iter (fun t -> _iter_symb t k) l
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
@@ -139,7 +139,7 @@ module Make(C : Index.CLAUSE) = struct
     let rec max_depth_term symb t depth =
       match t.T.term with
       | T.Var _ | T.BoundVar _ -> -1
-      | T.Node (s, l) ->
+      | T.Node (s, _, l) ->
         let cur_depth = if Symbol.eq s symb then depth else -1 in
         List.fold_left
           (fun maxdepth subterm -> max maxdepth (max_depth_term symb subterm (depth+1)))
@@ -259,9 +259,10 @@ module Make(C : Index.CLAUSE) = struct
     (* list of (salience: float, feature) *)
     let features = ref [] in
     (* create features for the symbols *)
-    SMap.iter
-      (fun s ty ->
-        let arity = Type.arity ty in
+    Signature.iter signature
+      (fun _ s ->
+        let ty = Symbol.ty s in
+        let _, arity = Type.arity ty in
         if ignore s
           then ()  (* base symbols don't count *)
         else if Type.eq ty Type.o
@@ -273,8 +274,7 @@ module Make(C : Index.CLAUSE) = struct
                        0, Feature.max_depth_minus s;
                        1 + arity, Feature.count_symb_plus s;
                        1 + arity, Feature.count_symb_minus s]
-                      @ !features)
-      signature;
+                      @ !features);
     (* only take a limited number of features *)
     let features = List.sort (fun (s1,_) (s2,_) -> s2 - s1) !features in
     let features = Util.list_take max_features features in

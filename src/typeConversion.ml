@@ -68,8 +68,13 @@ let of_basic ?(ctx=create_ctx ()) ty =
   in
   convert ty
 
-let rec to_basic ty = match ty.Type.ty with
+let to_basic ty =
+  let rec to_basic depth ty = match ty.Type.ty with
   | Type.Var i -> BTy.var (Util.sprintf "T%d" i)
-  | Type.App (s, l) -> BTy.app s (List.map to_basic l)
-  | Type.Fun (ret, l) -> BTy.mk_fun (to_basic ret) (List.map to_basic l)
-  | Type.Forall (vars, ty') -> BTy.forall (List.map to_basic vars) (to_basic ty')
+  | Type.BVar i -> BTy.var (Util.sprintf "Tb%d" (depth-i-1))
+  | Type.App (s, l) -> BTy.app s (List.map (to_basic depth) l)
+  | Type.Fun (ret, l) -> BTy.mk_fun (to_basic depth ret) (List.map (to_basic depth) l)
+  | Type.Forall ty' ->
+    BTy.forall [BTy.var (Util.sprintf "Tb%d" depth)] (to_basic (depth+1) ty')
+  in
+  to_basic 0 ty

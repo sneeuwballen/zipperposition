@@ -77,11 +77,11 @@ let _occur_check subst v s_v t s_t =
       check t' s_t'
     with Not_found -> false
     end
+  | Ty.BVar _ -> false
   | Ty.App (_, l) -> List.exists (fun t' -> check t' s_t) l
   | Ty.Fun (ret, l) ->
     check ret s_t || List.exists (fun t' -> check t' s_t) l
-  | Ty.Fun (vars, ty') ->
-    if List.memq v vars then false else _occur_check v s_v ty' s_t
+  | Ty.Forall ty' -> check ty' s_t
   in
   check t s_t
 

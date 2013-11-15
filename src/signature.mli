@@ -44,6 +44,10 @@ val declare : t -> string -> Symbol.t -> t
 val declare_ty : t -> string -> Type.t -> t
   (** Same as {!declare} but also builds the symbol *)
 
+val declare_sym : t -> Symbol.t -> t
+  (** Declare the symbol by itself (by its name)
+      @raise Invalid_argument if the symbol is not  a string *)
+
 val find : t -> string -> Symbol.t
   (** Lookup a symbol by its name, or
       @raise Not_found if the symbol is not in the signature *)

@@ -92,6 +92,12 @@ val mk_real : float -> t
 
 val parse_num : string -> t             (** Parse an Int or a Rat *)
 
+val of_basic : ?ty:Type.t -> Basic.Sym.t -> t
+  (** Convert the basic symbol into a typed symbol *)
+
+val to_basic : t -> Basic.Sym.t
+  (** Forget the type *)
+
 val is_const : t -> bool
 val is_distinct : t -> bool
 val is_int : t -> bool

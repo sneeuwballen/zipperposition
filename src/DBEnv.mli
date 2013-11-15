@@ -36,6 +36,9 @@ val empty : 'a t
 val is_empty : 'a t -> bool
   (** Are there bindings? *)
 
+val singleton : 'a -> 'a t
+  (** Single binding *)
+
 val push : 'a t -> 'a -> 'a t
   (** Create a new environment, when entering a scope, where the De Bruijn
       index 0 is bound to the given value *)

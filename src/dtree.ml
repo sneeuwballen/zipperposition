@@ -52,7 +52,7 @@ let compare_char c1 c2 =
   (* compare variables by index *)
   let compare_vars v1 v2 = match v1.T.term, v2.T.term with
     | T.Var i, T.Var j ->
-      if i <> j then i - j else Type.cmp (T.get_type v1) (T.get_type v2)
+      if i <> j then i - j else Type.cmp (T.ty v1) (T.ty v2)
     | _ -> assert false
   in
   match c1, c2 with
@@ -71,7 +71,7 @@ let rec term_to_char t =
   match t.T.term with
   | T.Var _ -> Variable t
   | T.BoundVar i -> BoundVariable i
-  | T.Node (f, _) -> Symbol f
+  | T.Node (f, _, _) -> Symbol f
 
 (** convert term to list of var/symbol *)
 let to_list t =

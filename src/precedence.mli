@@ -70,7 +70,7 @@ val cluster_constraint : Symbol.t list list -> constr
 val list_constraint : Symbol.t list -> constr
   (** symbols in the given list are in decreasing order *)
 
-val arity_constraint : Signature.t -> constr
+val arity_constraint : constr
   (** decreasing arity constraint *)
 
 val invfreq_constraint : FOFormula.t Sequence.t -> constr

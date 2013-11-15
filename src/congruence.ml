@@ -262,13 +262,13 @@ module FO = Make(struct
   let subterms t = match t.T.term with
     | T.Var _
     | T.BoundVar _ -> []
-    | T.Node (s, l) -> l
+    | T.Node (s, _, l) -> l
 
   let update_subterms t l = match t.T.term, l with
     | (T.Var _
     | T.BoundVar _), [] -> t
-    | T.Node (s, l), l' when List.length l = List.length l' ->
-      T.mk_node ~ty:t.T.ty s l'
+    | T.Node (s, tyargs, l), l' when List.length l = List.length l' ->
+      T.mk_node ~tyargs s l'
     | _ -> assert false
 end)
 
@@ -283,15 +283,15 @@ module HO = Make(struct
     | T.Const _
     | T.Var _
     | T.BoundVar _ -> []
-    | T.At (t, l) -> t :: l
+    | T.At (t, _, l) -> t :: l
     | T.Lambda t' -> [t']
 
   let update_subterms t l = match t.T.term, l with
     | (T.Const _ | T.Var _ | T.BoundVar _), [] -> t
-    | T.At (t, l), (t' :: l') ->
-      T.mk_at t' l'
+    | T.At (t, tyargs, l), (t' :: l') ->
+      T.mk_at ~tyargs t' l'
     | T.Lambda _, [t'] ->
       let varty = T.lambda_var_ty t in
-      T.mk_lambda ~varty t'
+      T.__mk_lambda ~varty t'
     | _ -> assert false
 end)

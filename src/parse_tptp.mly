@@ -132,7 +132,7 @@ declaration:
       | Ty.App ("$tType", [])
       | Ty.Fun (Ty.App ("$tType",[]), _) ->
         (* declare a new type symbol *)
-        Ast_tptp.NewType (name, Sym.to_string_tstp s, ty)
+        Ast_tptp.NewType (name, s, ty)
       | _ -> Ast_tptp.TypeDecl (name, s, ty)
     }
   | CNF LEFT_PAREN name=name COMMA role=role COMMA c=cnf_formula info=annotations RIGHT_PAREN DOT
@@ -161,8 +161,8 @@ answer_tuple:
 
 type_decl:
   | LEFT_PAREN tydecl=type_decl RIGHT_PAREN { tydecl }
-  | s=atomic_word COLUMN ty=tff_quantified_type { Sym.mk_const s, ty }
-  | s=DOLLAR_WORD COLUMN ty=tff_quantified_type { Sym.mk_const s, ty }
+  | s=atomic_word COLUMN ty=tff_quantified_type { s, ty }
+  | s=DOLLAR_WORD COLUMN ty=tff_quantified_type { s, ty }
 
 cnf_formula:
   | LEFT_PAREN c=disjunction RIGHT_PAREN { c }

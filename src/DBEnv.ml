@@ -35,7 +35,9 @@ let empty = { size=0; stack=[]; }
 
 let is_empty env = env.size = 0
 
-let push env ty = {size=env.size+1; stack=(Some ty) :: env.stack; }
+let singleton x = { size=1; stack = [Some x]; }
+
+let push env x = {size=env.size+1; stack=(Some x) :: env.stack; }
 
 let push_none env =  {size=env.size+1; stack=None :: env.stack; }
 
@@ -47,4 +49,4 @@ let pop env =
   | _::tl -> {size=env.size-1; stack=tl; }
 
 let find env n =
-  if n < env.size then List.nth env.stack else None
+  if n < env.size then List.nth env.stack n else None

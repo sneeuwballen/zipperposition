@@ -32,10 +32,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module Ty = Type
 module S = Substs.Ty
 module Unif = TypeUnif
+module Sym = Basic.Sym
 
-module STbl = Symbol.Tbl
-
-type scope = Substs.scope
+module STbl = Hashtbl.Make(struct
+  type t = string
+  let equal s1 s2 = s1 = s2
+  let hash = Hash.hash_string
+end)
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 
@@ -57,8 +60,8 @@ module Closure = struct
       let x = clos renaming subst in
       f x renaming subst
 
-  let pure_ty ty s_ty =
-    fun renaming subst -> Substs.Ty.apply subst ~renaming ty s_ty
+  let pure_ty ty =
+    fun renaming subst -> Substs.Ty.apply subst ~renaming ty 0
 end
 
 module TraverseClosure = Monad.Traverse(Closure)
@@ -72,13 +75,12 @@ Scope 0 should be used for ground types.
 module Ctx = struct
   type t = {
     default : Type.t;               (* default type *)
-    mutable scope : int;            (* next scope *)
     mutable var : int;              (* generate fresh vars *)
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
-    mutable to_bind : (Type.t * scope) list;  (* constructor variables to bind *)
+    mutable to_bind : Type.t list;  (* constructor variables to bind *)
     renaming : Substs.Ty.Renaming.t;
-    symbols : (Type.t * scope) STbl.t; (* symbol -> instantiated type *)
+    symbols : Type.t STbl.t;        (* symbol -> instantiated type *)
     tyctx : TypeConversion.ctx;     (* convert types *)
     vars : (string, (int * Type.t)) Hashtbl.t;  (* var name -> number + type *)
   }
@@ -87,7 +89,6 @@ module Ctx = struct
     let signature = if base then Signature.base else Signature.empty in
     let ctx = {
       default;
-      scope = ~-1;
       var = ~-1;
       signature;
       subst = S.empty;
@@ -104,7 +105,6 @@ module Ctx = struct
     { ctx with signature; }
 
   let clear ctx =
-    ctx.scope <- 0;
     ctx.var <- ~-1;
     ctx.subst <- S.empty;
     ctx.to_bind <- [];
@@ -124,13 +124,6 @@ module Ctx = struct
   let set_signature ctx signature =
     ctx.signature <- signature;
     ()
-
-  let _cur_scope ctx = ctx.scope
-
-  let _new_scope ctx =
-    let n = ctx.scope in
-    ctx.scope <- n-1;
-    n
 
   (* generate fresh vars. Those should always live in their own scope *)
   let _new_var ctx =
@@ -179,51 +172,46 @@ module Ctx = struct
   let _exit_var_scope ctx name =
     Hashtbl.remove ctx.vars name
 
-  (* unify within the context's substitution *)
-  let unify ctx ty1 s1 ty2 s2 =
-    Unif.unify ~subst:ctx.subst ty1 s1 ty2 s2
+  (* unify within the context's substitution. scopes are 0 *)
+  let unify ctx ty1 ty2 =
+    Unif.unify ~subst:ctx.subst ty1 0 ty2 0
 
   (* same as {!unify}, but also updates the ctx's substitution *)
-  let unify_and_set ctx ty1 s1 ty2 s2 =
-    let subst = unify ctx ty1 s1 ty2 s2 in
+  let unify_and_set ctx ty1 ty2 =
+    let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
   (* If the function symbol has an unknown type, a fresh variable
-     (in a fresh scope, that is) is returned. Otherwise the known
-     type of the symbol is returned along with a new scope,
-     so that, for instance, "nil" (the empty list) can have several
-     concrete types (using distinct scopes).
+     is returned. Otherwise the known type of the symbol is returned.
      
      @arity the expected arity (if not declared)
   *)
   let type_of_fun ~arity ctx s =
     match s with
-    | Symbol.Int _
-    | Symbol.Rat _
-    | Symbol.Real _ -> `Declared (Symbol.Arith.typeof s)  (* ground *)
-    | Symbol.Const _ ->
+    | Sym.Int _ -> Type.int
+    | Sym.Rat _ -> Type.rat
+    | Sym.Real _ -> Type.real  (* ground *)
+    | Sym.Const s ->
       begin try
-        let ty = Signature.find ctx.signature s in
-        `Declared ty
+        let sym = Signature.find ctx.signature s in
+        Symbol.ty sym
       with Not_found ->
         (* give a new type variable to this symbol. The symbol will not
           be able to be polymorphic (need to declare it!). *)
         try
-          let ty, scope = STbl.find ctx.symbols s in
-          `Scoped (ty, scope)
+          let ty = STbl.find ctx.symbols s in
+          ty
         with Not_found ->
-          let ret = Type.var 0 in
-          let vars = Util.list_range 1 (arity+1) in
-          let vars = List.map Type.var vars in
+          let ret = _new_var ctx in
+          let vars = _new_vars ctx arity in
           let ty = Type.(ret <== vars) in
-          let scope = _new_scope ctx in
-          STbl.add ctx.symbols s (ty, scope);
-          ctx.to_bind <- (ret, scope) :: ctx.to_bind;
-          `Scoped (ty, scope)
+          STbl.add ctx.symbols s ty;
+          ctx.to_bind <- ret :: ctx.to_bind;
+          ty
       end
 
   let declare ctx s ty =
-    ctx.signature <- Signature.declare ctx.signature s ty;
+    ctx.signature <- Signature.declare_ty ctx.signature s ty;
     ()
 
   let declare_basic ctx s ty =
@@ -237,28 +225,28 @@ module Ctx = struct
     let signature = ctx.signature in
     (* enrich signature with new symbols *)
     STbl.fold
-      (fun s (ty,scope) signature ->
+      (fun s ty signature ->
         (* evaluate type. if variables remain, they are generalized *)
-        let renaming = S.Renaming.create 4 in
-        let ty = S.apply ~renaming ctx.subst ty scope in
+        let ty = S.apply_no_renaming ctx.subst ty 0 in
         (* generalize free vars, if any *)
         let ty = Type.close_forall ty in
         (* add to signature *)
-        Signature.declare signature s ty)
+        Signature.declare_ty signature s ty)
       ctx.symbols signature
 
   let bind_to_default ctx =
     List.iter
-      (fun (v, s_v) ->
+      (fun v ->
         (* try to bind the variable. Will fail if already bound to
             something else, which is fine. *)
-        try unify_and_set ctx v s_v ctx.default s_v
+        try unify_and_set ctx v ctx.default
         with TypeUnif.Error _ -> ())
       ctx.to_bind;
     ctx.to_bind <- []
 
   let generalize ctx =
-    (* keep constructor variables as they are *)
+    (* keep constructor variables as they are, they will be generalized
+        if {!to_signature} is called. *)
     ctx.to_bind <- []
 
   (* clear and return the renaming *)
@@ -285,32 +273,30 @@ module type S = sig
   type untyped (* untyped term *)
   type typed   (* typed term *)
 
-  val infer : Ctx.t -> untyped -> scope -> Type.t * typed Closure.t
+  val infer : Ctx.t -> untyped -> Type.t * typed Closure.t
     (** Infer the type of this term under the given signature. This updates
-        the context's typing environment! The resulting type's variables
-        belong to the given scope.
+        the context's typing environment!
 
         @param ctx the context
         @param untyped the untyped term whose type must be inferred
-        @param scope where the term's type variables live
 
         @return the inferred type of the untyped term (possibly a type var)
           along with a closure to produce a typed term once every
           constraint has been solved
-        @raise TypeUnif.Error if the types are inconsistent *)
+        @raise Error if the types are inconsistent *)
 
   (** {3 Constraining types}
   
   This section is mostly useful for inferring a signature without
   converting untyped_terms into typed_terms. *)
 
-  val constrain_term_term : Ctx.t -> untyped -> scope -> untyped -> scope -> unit
+  val constrain_term_term : Ctx.t -> untyped -> untyped -> unit
     (** Force the two terms to have the same type in this context
-        @raise TypeUnif.Error if an inconsistency is detected *)
+        @raise Error if an inconsistency is detected *)
 
-  val constrain_term_type : Ctx.t -> untyped -> scope -> Type.t -> scope -> unit
+  val constrain_term_type : Ctx.t -> untyped -> Type.t -> unit
     (** Force the term's type and the given type to be the same.
-        @raise TypeUnif.Error if an inconsistency is detected *)
+        @raise Error if an inconsistency is detected *)
 end
 
 exception BadArity
@@ -337,10 +323,6 @@ module FO = struct
   type untyped = BT.t
   type typed = T.t
 
-  (* convert type *)
-  let _get_ty ctx ty =
-    Ctx._of_ty ctx ty
-
   (* convert (and possibly complete) this list of args *)
   let rec _complete_type_args ctx arity args =
     if arity < 0 then raise BadArity;
@@ -348,54 +330,43 @@ module FO = struct
     | [] -> Ctx._new_vars ctx arity  (* add variables *)
     | a::args' ->
       (* convert [a] into a type *)
-      let ty = BT.as_ty a in
-      _complete_type_args ctx (arity-1) args'
+      let ty = Ctx._of_ty ctx (BT.as_ty a) in
+      ty :: _complete_type_args ctx (arity-1) args'
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
     continuation to build a typed term. *)
-  let rec infer_rec ctx t s_t =
+  let rec infer_rec ctx t =
     let ty, closure = match t.BT.term with
     | BT.Var name ->
-      let ty = _get_ty ctx (BT.get_ty t) in
+      let ty = Ctx._of_ty ctx (BT.get_ty t) in
       let i, ty = Ctx._get_var ctx ~ty name in
       let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty s_t in
+        let ty = Substs.Ty.apply ~renaming subst ty 0 in
         T.mk_var ~ty i
       in
       ty, closure
     | BT.App (s, l) ->
-      (* two main cases, depending on whether [s] is declared *)
-      let ty_s, scope, args =
-      match Ctx.type_of_fun ~arity:(List.length l) ctx s with
-      | `Declared ty ->
-        let n_bound, n_args = Type.arity ty in
-        (* separation between type arguments and proper term arguments,
-            based on the expected arity of the symbol.
-            We split [l] into the list [bound], containing [n_bound] types,
-            and [args], containing [n_args] terms. *)
-        let bound, args = _split_arity n_args l in
-        let bound = _complete_type_args ctx n_bound bound in
-        (* specialize [ty] by applying it to type arguments *)
-        let ty' = Type.apply ty bound in
-        ty', s_t, args
-      | `Scoped (ty, scope) ->
-        (* no parameters *)
-        ty, scope, l
-      in
+      (* use type of [s] *)
+      let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
+      let n_tyargs, n_args = Type.arity ty_s in
+      (* separation between type arguments and proper term arguments,
+          based on the expected arity of the symbol.
+          We split [l] into the list [tyargs], containing [n_tyargs] types,
+          and [args], containing [n_args] terms. *)
+      let tyargs, args = _split_arity n_args l in
+      let tyargs = _complete_type_args ctx n_tyargs tyargs in
       (* create sub-closures, by inferring the type of [args] *)
-      let sub = List.map (fun t' -> infer_rec ctx t' s_t) args in
-      let ty_args, closure_args = List.split sub in
-      (* [s] has type [ty_s] once applied to polymorphic type arguments,
-          but must also have type [ty_l -> 'a].
-          We generate a fresh variable 'a (named [ty_ret]),
-          which is also the result. *)
-      let ty_ret = Ctx._new_var ctx in
-      Ctx.unify_and_set ctx ty_s scope (Type.mk_fun ty_ret ty_args) s_t;
+      let l = List.map (fun t' -> infer_rec ctx t') args in
+      let ty_of_args, closure_args = List.split l in
+      (* compute return type *)
+      let ty_ret = Type.apply ty_s (tyargs @ ty_of_args) in
       (* now to produce the closure, that first creates subterms *)
       let closure renaming subst =
         let args' = List.map (fun closure' -> closure' renaming subst) closure_args in
-        let ty = Substs.Ty.apply ~renaming subst ty_ret s_t in
-        T.mk_node ~ty s args'
+        let tyargs' = List.map (fun ty -> Substs.Ty.apply ~renaming subst ty 0) tyargs in
+        let ty_s' = Substs.Ty.apply ~renaming subst ty_s 0 in
+        let s' = Symbol.of_basic ~ty:ty_s' s in
+        T.mk_node ~tyargs:tyargs' s' args'
       in
       ty_ret, closure
     in
@@ -403,15 +374,15 @@ module FO = struct
     match t.BT.ty with
     | None -> ty, closure
     | Some ty' ->
-      Ctx.unify_and_set ctx ty s_t (Ctx._of_ty ctx ty') s_t;
+      Ctx.unify_and_set ctx ty (Ctx._of_ty ctx ty');
       ty, closure
 
-  let infer_var_scope ctx t s_t = match t.BT.term with
+  let infer_var_scope ctx t = match t.BT.term with
     | BT.Var name ->
-      let ty = _get_ty ctx (BT.get_ty t) in
+      let ty = Ctx._of_ty ctx (BT.get_ty t) in
       let i = Ctx._enter_var_scope ctx name ty in
       let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty s_t in
+        let ty = Substs.Ty.apply ~renaming subst ty 0 in
         T.mk_var ~ty i
       in
       closure
@@ -421,11 +392,11 @@ module FO = struct
     | BT.Var name -> Ctx._exit_var_scope ctx name
     | _ -> assert false
 
-  let infer ctx t s_t =
+  let infer ctx t =
     Util.enter_prof prof_infer;
     Util.debug 5 "infer_term %a" BT.pp t;
     try
-      let ty, k = infer_rec ctx t s_t in
+      let ty, k = infer_rec ctx t in
       Util.exit_prof prof_infer;
       ty, k
     with (* error handling: return a nice message *)
@@ -443,22 +414,22 @@ module FO = struct
       Util.exit_prof prof_infer;
       raise e
 
-  let constrain_term_term ctx t1 s1 t2 s2 =
-    let ty1, _ = infer ctx t1 s1 in
-    let ty2, _ = infer ctx t2 s2 in
-    Ctx.unify_and_set ctx ty1 s1 ty2 s2
+  let constrain_term_term ctx t1 t2 =
+    let ty1, _ = infer ctx t1 in
+    let ty2, _ = infer ctx t2 in
+    Ctx.unify_and_set ctx ty1 ty2
 
-  let constrain_term_type ctx t s_t ty s_ty =
-    let ty1, _ = infer ctx t s_t in
-    Ctx.unify_and_set ctx ty1 s_t ty s_ty
+  let constrain_term_type ctx t ty =
+    let ty1, _ = infer ctx t in
+    Ctx.unify_and_set ctx ty1 ty
 
-  let rec infer_form_rec ctx f s_f = match f.BF.form with
+  let rec infer_form_rec ctx f = match f.BF.form with
     | BF.Bool b ->
       let closure renaming subst = if b then F.mk_true else F.mk_false in
       closure
     | BF.Nary (op, l) ->
       (* closures of sub formulas *)
-      let l' = List.map (fun f' -> infer_form_rec ctx f' s_f) l in
+      let l' = List.map (fun f' -> infer_form_rec ctx f') l in
       let closure renaming subst =
         let l'' = List.map (fun f' -> f' renaming subst) l' in
         match op with
@@ -467,8 +438,8 @@ module FO = struct
       in
       closure
     | BF.Binary (op, f1, f2) ->
-      let closure_f1 = infer_form_rec ctx f1 s_f in
-      let closure_f2 = infer_form_rec ctx f2 s_f in
+      let closure_f1 = infer_form_rec ctx f1 in
+      let closure_f2 = infer_form_rec ctx f2 in
       let closure renaming subst =
         let f1' = closure_f1 renaming subst in
         let f2' = closure_f2 renaming subst in
@@ -478,36 +449,36 @@ module FO = struct
       in
       closure
     | BF.Not f' ->
-      let closure_f' = infer_form_rec ctx f' s_f in
+      let closure_f' = infer_form_rec ctx f' in
       (fun renaming subst -> F.mk_not (closure_f' renaming subst))
     | BF.Atom p ->
-      let ty, clos = infer ctx p s_f in
-      Ctx.unify_and_set ctx ty s_f Type.o s_f;  (* must return Type.o *)
+      let ty, clos = infer ctx p in
+      Ctx.unify_and_set ctx ty Type.o;  (* must return Type.o *)
       let closure renaming subst =
         F.mk_atom (clos renaming subst)
       in
       closure
     | BF.Equal (t1, t2) ->
-      let ty1, c1 = infer ctx t1 s_f in
-      let ty2, c2 = infer ctx t2 s_f in
-      Ctx.unify_and_set ctx ty1 s_f ty2 s_f;  (* must have same type *)
+      let ty1, c1 = infer ctx t1 in
+      let ty2, c2 = infer ctx t2 in
+      Ctx.unify_and_set ctx ty1 ty2;  (* must have same type *)
       let closure renaming subst =
         F.mk_eq (c1 renaming subst) (c2 renaming subst)
       in
       closure
     | BF.Quant (op, vars, f') ->
-      let clos_vars = List.map (fun t -> infer_var_scope ctx t s_f) vars in
+      let clos_vars = List.map (fun t -> infer_var_scope ctx t) vars in
       let clos_f =
         Util.finally
           ~h:(fun () -> List.iter (fun t -> exit_var_scope ctx t) vars)
-          ~f:(fun () -> infer_form_rec ctx f' s_f)
+          ~f:(fun () -> infer_form_rec ctx f')
       in
       let closure renaming subst =
         let vars' = List.map (fun c -> c renaming subst) clos_vars in
         let f' = clos_f renaming subst in
         match op with
-        | BF.Forall -> F.mk_forall_list vars' f'
-        | BF.Exists -> F.mk_exists_list vars' f'
+        | BF.Forall -> F.mk_forall vars' f'
+        | BF.Exists -> F.mk_exists vars' f'
       in
       closure
 
@@ -517,7 +488,7 @@ module FO = struct
     c_f
 
   let constrain_form ctx f =
-    let _ = infer_form ctx f 0 in
+    let _ = infer_form ctx f in
     ()
 
   let signature_forms signature seq =
@@ -526,17 +497,17 @@ module FO = struct
     Ctx.to_signature ctx
 
   let convert ?(generalize=false) ~ctx t =
-    let _, closure = infer ctx t 0 in
+    let _, closure = infer ctx t in
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     Ctx.apply_closure ctx closure
 
   let convert_form ?(generalize=false) ~ctx f =
-    let closure = infer_form ctx f 0 in
+    let closure = infer_form ctx f in
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     Ctx.apply_closure ctx closure
 
   let convert_clause ?(generalize=false) ~ctx c =
-    let closures = List.map (fun lit -> infer_form ctx lit 0) c in
+    let closures = List.map (fun lit -> infer_form ctx lit) c in
     Ctx.exit_scope ctx;
     (* use same renaming for all formulas, to keep
       a consistent scope *)
@@ -546,7 +517,7 @@ module FO = struct
 
   let convert_seq ?(generalize=false) ~ctx forms =
     (* build closures, inferring all types *)
-    let closures = Sequence.map (fun f -> infer_form ctx f 0) forms in
+    let closures = Sequence.map (fun f -> infer_form ctx f) forms in
     let closures = Sequence.to_rev_list closures in
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     (* apply closures to the final substitution *)
@@ -560,16 +531,22 @@ module HO = struct
   type untyped = BT.t
   type typed = T.t
 
-  (* convert type *)
-  let _get_ty ctx ty =
-    Ctx._of_ty ctx ty
+  (* convert (and possibly complete) this list of args *)
+  let rec _complete_type_args ctx arity args =
+    if arity < 0 then raise BadArity;
+    match args with
+    | [] -> Ctx._new_vars ctx arity  (* add variables *)
+    | a::args' ->
+      (* convert [a] into a type *)
+      let ty = Ctx._of_ty ctx (BT.as_ty a) in
+      ty :: _complete_type_args ctx (arity-1) args'
 
-  let infer_var_scope ctx t s_t = match t.BT.term with
+  let infer_var_scope ctx t = match t.BT.term with
     | BT.Var name ->
-      let ty = _get_ty ctx (BT.get_ty t) in
+      let ty = Ctx._of_ty ctx (BT.get_ty t) in
       let i = Ctx._enter_var_scope ctx name ty in
       let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty s_t in
+        let ty = Substs.Ty.apply ~renaming subst ty 0 in
         T.mk_var ~ty i
       in
       ty, closure
@@ -583,20 +560,20 @@ module HO = struct
     continuation to build a typed term
     @param pred true if we expect a proposition
     @param arity expected number of arguments *)
-  let rec infer_rec ?(arity=0) ctx t s_t =
+  let rec infer_rec ?(arity=0) ctx t =
     let ty, closure = match t.BT.term with
     | BT.Var name ->
-      let ty = _get_ty ctx (BT.get_ty t) in
+      let ty = Ctx._of_ty ctx (BT.get_ty t) in
       let i, ty = Ctx._get_var ctx ~ty name in
       let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty s_t in
+        let ty = Substs.Ty.apply ~renaming subst ty 0 in
         T.mk_var ~ty i
       in
       ty, closure
     | BT.Lambda (v, t) ->
-      let ty_v, clos_v = infer_var_scope ctx v s_t in
+      let ty_v, clos_v = infer_var_scope ctx v in
       let ty_t, clos_t = Util.finally
-        ~f:(fun () -> infer_rec ctx t s_t)
+        ~f:(fun () -> infer_rec ctx t)
         ~h:(fun () -> exit_var_scope ctx v)
       in
       (* type is ty_v -> ty_t *)
@@ -604,36 +581,39 @@ module HO = struct
       let closure renaming subst =
         let t' = clos_t renaming subst in
         let v' = clos_v renaming subst in
-        T.mk_lambda_var [v'] t'
+        T.mk_lambda [v'] t'
       in
       ty, closure 
     | BT.Const s ->
       (* recover the type *)
-      let ty =
-        match Ctx.type_of_fun ~arity ctx s with
-        | `Declared ty -> ty
-        | `Scoped (ty, scope) ->
-          let v = Ctx._new_var ctx in
-          Ctx.unify ctx v s_t ty scope;
-          v
-      in
+      let ty = Ctx.type_of_fun ~arity ctx s in
       let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty s_t in
-        T.mk_const ~ty s
+        let ty = Substs.Ty.apply ~renaming subst ty 0 in
+        let s = Symbol.of_basic ~ty s in
+        T.mk_const s
       in
       ty, closure
-    | BT.App (_, []) -> assert false
     | BT.App (t, l) ->
-      let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t s_t in
-      let ty_l, clos_l = List.split
-        (List.map (fun t' -> infer_rec ctx t' s_t) l) in
-      let ty_ret = Ctx._new_var ctx in
-      (* t:ty_t, l:ty_l. now we must have  ty_t = (ty_l -> ty_ret) *)
-      Ctx.unify_and_set ctx ty_t s_t Type.(ty_ret <== ty_l) s_t;
+      (* we are going to assume that the type of [t], as inferred, is a forall
+          or a function (or a constant iff [l] is empty *)
+      let ty_t, clos_t = infer_rec ~arity:(List.length l) ctx t in
+      let n_tyargs, n_args = Type.arity ty_t in
+      (* separation between type arguments and proper term arguments,
+          based on the expected arity of the head [t].
+          We split [l] into the list [tyargs], containing [n_tyargs] types,
+          and [args], containing [n_args] terms. *)
+      let tyargs, args = _split_arity n_args l in
+      let tyargs = _complete_type_args ctx n_tyargs tyargs in
+      (* create sub-closures, by inferring the type of [args] *)
+      let l = List.map (fun t' -> infer_rec ctx t') args in
+      let ty_of_args, closure_args = List.split l in
+      (* compute return type *)
+      let ty_ret = Type.apply ty_t (tyargs @ ty_of_args) in
       let closure renaming subst =
         let t' = clos_t renaming subst in
-        let l' = List.map (fun c -> c renaming subst) clos_l in
-        T.mk_at t' l'
+        let tyargs' = List.map (fun ty -> Substs.Ty.apply ~renaming subst ty 0) tyargs in
+        let l' = List.map (fun c -> c renaming subst) closure_args in
+        T.mk_at ~tyargs:tyargs' t' l'
       in
       ty_ret, closure
     in
@@ -641,14 +621,14 @@ module HO = struct
     match t.BT.ty with
     | None -> ty, closure
     | Some ty' ->
-      Ctx.unify_and_set ctx ty s_t (Ctx._of_ty ctx ty') s_t;
+      Ctx.unify_and_set ctx ty (Ctx._of_ty ctx ty');
       ty, closure
 
-  let infer ctx t s_t =
+  let infer ctx t =
     Util.enter_prof prof_infer;
     Util.debug 5 "infer_term %a" BT.pp t;
     try
-      let ty, k = infer_rec ctx t s_t in
+      let ty, k = infer_rec ctx t in
       Ctx.exit_scope ctx;
       Util.exit_prof prof_infer;
       ty, k
@@ -657,31 +637,31 @@ module HO = struct
       Util.exit_prof prof_infer;
       raise e
 
-  let constrain_term_term ctx t1 s1 t2 s2 =
-    let ty1, _ = infer ctx t1 s1 in
-    let ty2, _ = infer ctx t2 s2 in
-    Ctx.unify_and_set ctx ty1 s1 ty2 s2
+  let constrain_term_term ctx t1 t2 =
+    let ty1, _ = infer ctx t1 in
+    let ty2, _ = infer ctx t2 in
+    Ctx.unify_and_set ctx ty1 ty2 
 
-  let constrain_term_type ctx t s_t ty s_ty =
-    let ty1, _ = infer ctx t s_t in
-    Ctx.unify_and_set ctx ty1 s_t ty s_ty
+  let constrain_term_type ctx t ty =
+    let ty1, _ = infer ctx t in
+    Ctx.unify_and_set ctx ty1 ty
 
   let constrain ~ctx t =
-    let ty, _ = infer ctx t 0 in
-    Ctx.unify_and_set ctx ty 0 Type.o 0;
+    let ty, _ = infer ctx t in
+    Ctx.unify_and_set ctx ty Type.o;
     ()
 
   let convert ?(generalize=false) ?(ret=Type.o) ~ctx t =
-    let ty, closure = infer ctx t 0 in
-    Ctx.unify_and_set ctx ty 0 ret 0;
+    let ty, closure = infer ctx t in
+    Ctx.unify_and_set ctx ty ret;
     if generalize then Ctx.generalize ctx else Ctx.bind_to_default ctx;
     Ctx.apply_closure ctx closure
 
   let convert_seq ?(generalize=false) ~ctx terms =
     let closures = Sequence.map
       (fun t ->
-        let ty, closure = infer ctx t 0 in
-        Ctx.unify_and_set ctx ty 0 Type.o 0;
+        let ty, closure = infer ctx t in
+        Ctx.unify_and_set ctx ty Type.o;
         closure)
       terms
     in

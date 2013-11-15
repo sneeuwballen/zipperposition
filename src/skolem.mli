@@ -37,7 +37,7 @@ val to_signature : ctx -> Signature.t
   (** Signature of all new skolem symbols that were created using this
       context. *)
 
-val fresh_sym : ctx:ctx -> Symbol.t
+val fresh_sym : ctx:ctx -> ty:Type.t -> Symbol.t
   (** Just obtain a fresh skolem symbol *)
 
 val clear_var : ctx:ctx -> unit

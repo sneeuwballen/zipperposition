@@ -58,6 +58,10 @@ let declare_ty signature s ty =
   let symb = Symbol.mk_const ~ty s in
   declare signature s symb
 
+let declare_sym signature s = match s with
+  | Symbol.Const (n,_) -> declare signature n s
+  | _ -> raise (Invalid_argument "Signature.declare_sym: expected string")
+
 let cardinal signature = SMap.cardinal signature
 
 let arity signature s =

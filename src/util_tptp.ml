@@ -162,7 +162,7 @@ let infer_type ctx decls =
   Sequence.iter
     (fun decl ->
       Util.debug 3 "infer type for %a" A.pp_declaration decl;
-      try match decl with
+      match decl with
       | A.Include _
       | A.IncludeOnly _ -> ()
       | A.NewType _ -> ()  (* ignore *)
@@ -174,9 +174,6 @@ let infer_type ctx decls =
       | A.FOF(_,_,f,_)
       | A.TFF(_,_,f,_) -> TypeInference.FO.constrain_form ctx f
       | A.THF(_,_,f,_) -> ignore (TypeInference.HO.constrain ctx f)
-      with e ->
-        Util.debug 0 "error when checking %a" A.pp_declaration decl;
-        raise e
       )
     decls;
   TypeInference.Ctx.bind_to_default ctx
@@ -191,19 +188,20 @@ let type_declarations decls =
     (fun signature decl -> match decl with
       | A.TypeDecl (_, s, ty) ->
         let ty = TypeConversion.of_basic ty in
-        Signature.declare signature s ty
+        Signature.declare_ty signature s ty
       | _ -> signature)
     Signature.empty decls
 
 let __name_symbol i sy =
-  let str = Util.sprintf "'ty_decl_%d_%a'" i Symbol.pp sy in
+  let str = Util.sprintf "'ty_decl_%d_%s'" i sy in
   A.NameString str
 
 let declare_symbols ?(name=__name_symbol) signature =
   let signature = Signature.diff signature Signature.base in
   let seq = Signature.to_seq signature in
   Sequence.mapi
-    (fun i (s, ty) ->
+    (fun i (s, sym) ->
+      let ty = Symbol.ty sym in
       let name = name i s in
       A.TypeDecl (name, s, TypeConversion.to_basic ty))
     seq

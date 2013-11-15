@@ -64,39 +64,37 @@ let rec beta_reduce_rec ~depth ~subst env t =
   let ty = Substs.Ty.apply_no_renaming subst t.T.ty 0 in
   match t.T.term with
   | T.Var i -> T.mk_var ~ty i
-  | T.BoundVar n when n < List.length env ->
+  | T.BoundVar n ->
     (* look for the possible binding for [n] *)
-    begin match List.nth env n with
-    | None -> T.mk_bound_var ~ty n
+    begin match DBEnv.find env n with
+    | None -> T.__mk_bound_var ~ty n
     | Some t' ->
       assert (Type.eq ty t'.T.ty);
-      T.db_lift ~depth depth t' (* need to lift free vars *)
+      T.DB.shift ~depth depth t' (* need to lift free vars *)
     end
-  | T.BoundVar n -> T.mk_bound_var ~ty n
-  | T.Const s -> T.mk_const ~ty s
+  | T.Const s -> T.mk_const s
   | T.Lambda t' ->
     let varty = Substs.Ty.apply_no_renaming subst (T.lambda_var_ty t) 0 in
-    let t'' = beta_reduce_rec ~depth:(depth+1) ~subst (None::env) t' in
-    T.mk_lambda ~varty t''
-  | T.At (t, l) ->
+    let env' = DBEnv.push_none env in
+    let t'' = beta_reduce_rec ~depth:(depth+1) ~subst env' t' in
+    T.__mk_lambda ~varty t''
+  | T.At (t, tyargs, l) ->
     let t' = beta_reduce_rec ~depth ~subst env t in
     let l' = List.map (beta_reduce_rec ~depth ~subst env) l in
-    mk_at_check ~depth ~subst env t' l'
+    let tyargs = List.map (fun ty -> Substs.Ty.apply_no_renaming subst ty 0) tyargs in
+    mk_at_check ~tyargs ~depth ~subst env t' l'
 (* apply term to arguments, beta-reducing at root. [l] is assumed to be
   fully evaluated. *)
-and mk_at_check ~depth ~subst env t l =
-  (* specialize types if needed *)
-  let ty_args = List.map T.get_type l in
-  let subst = match_types ~subst t.T.ty 0 ty_args 0 in
+and mk_at_check ~tyargs ~depth ~subst env t l =
   match t.T.term, l with
   | T.Lambda t1, t2::l ->
     (* a beta-redex! Fire!! Remplace db0 by [t2] in [t1] and beta reduce [t1] *)
     Util.debug 4 "beta-reduce: %a @ [%a]" T.pp t (Util.pp_list T.pp) (t2::l);
-    let env' = Some t2 :: env in
+    let env' = DBEnv.push env t2 in
     let t1' = beta_reduce_rec ~depth ~subst env' t1 in
     Util.debug 4 " ---> %a @ [%a]" T.pp t1' (Util.pp_list T.pp) l;
     (* now reduce t1' @ l, if l not empty *)
-    mk_at_check ~depth ~subst:Substs.Ty.empty env t1' l
+    mk_at_check ~tyargs ~depth ~subst:Substs.Ty.empty env t1' l
   | _, [] ->
     (* no argument, no need to do anything but type specialization *)
     let subst = Substs.HO.of_ty subst in
@@ -110,7 +108,7 @@ and mk_at_check ~depth ~subst env t l =
 let beta_reduce ?(depth=0) t =
   Util.enter_prof prof_beta_reduce;
   try
-    let t' = beta_reduce_rec ~depth ~subst:Substs.Ty.empty [] t in
+    let t' = beta_reduce_rec ~depth ~subst:Substs.Ty.empty DBEnv.empty t in
     Util.exit_prof prof_beta_reduce;
     t'
   with e ->
@@ -120,20 +118,20 @@ let beta_reduce ?(depth=0) t =
 let rec eta_reduce t =
   match t.T.term with
   | T.Var _ | T.BoundVar _ | T.Const _ -> t
-  | T.Lambda {T.term=T.At (t', [{T.term=T.BoundVar 0}])} when not (T.db_contains t' 0) ->
-    eta_reduce (T.db_unlift t')  (* remove the lambda and variable *)
+  | T.Lambda {T.term=T.At (t', [], [{T.term=T.BoundVar 0}])} when not (T.DB.contains t' 0) ->
+    eta_reduce (T.DB.unshift 1 t')  (* remove the lambda and variable *)
   | T.Lambda t' ->
     let varty = T.lambda_var_ty t in
-    T.mk_lambda ~varty (eta_reduce t')
-  | T.At (t, l) ->
-    T.mk_at (eta_reduce t) (List.map eta_reduce l)
+    T.__mk_lambda ~varty (eta_reduce t')
+  | T.At (t, tyargs, l) ->
+    T.mk_at ~tyargs (eta_reduce t) (List.map eta_reduce l)
 
 let lambda_abstract t ~sub =
   Util.enter_prof prof_lambda_abstract;
   (* abstract the term *)
-  let t' = T.db_from_term t sub in
+  let t' = T.DB.replace t ~sub in
   let varty = sub.T.ty in
-  let t' = T.mk_lambda ~varty t' in
+  let t' = T.__mk_lambda ~varty t' in
   Util.exit_prof prof_lambda_abstract;
   t'
 
@@ -147,7 +145,7 @@ let can_apply ty args =
 let lambda_apply_list ?(depth=0) t args =
   Util.enter_prof prof_beta_reduce;
   try
-    let t' = mk_at_check ~depth ~subst:Substs.Ty.empty [] t args in
+    let t' = mk_at_check ~tyargs:[] ~depth ~subst:Substs.Ty.empty DBEnv.empty t args in
     Util.exit_prof prof_beta_reduce;
     t'
   with e ->

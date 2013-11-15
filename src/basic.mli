@@ -61,6 +61,14 @@ module Sym : sig
   val true_ : t
   val false_ : t
   val wildcard : t
+  val and_ : t
+  val or_ : t
+  val imply : t
+  val equiv : t
+  val not_ : t
+  val eq_ : t
+  val forall : t
+  val exists : t
 
   module Set : Sequence.Set.S with type elt = t
   module Map : Sequence.Map.S with type key = t
@@ -149,6 +157,10 @@ module FO : sig
   val as_ty : t -> Ty.t
     (** Interpret the term as a type.
         @raise ExpectedType if it's not possible (numeric symbols...) *)
+
+  val of_ty : Ty.t -> t
+    (** Converse operation of {!as_ty}
+        @raise Invalid_argument if the type has a forall/arrow inside *)
 
   val symbols : t Sequence.t -> Sym.Set.t
   val free_vars : ?init:t list -> t -> t list
@@ -258,6 +270,10 @@ module HO : sig
   val as_ty : t -> Ty.t
     (** Interpret the term as a type.
         @raise ExpectedType if the structure of the term doesn't fit *)
+
+  val of_ty : Ty.t -> t
+    (** Converse operation of {!as_ty}
+        @raise Invalid_argument if the type has a forall/arrow inside *)
 
   val true_term : t
   val false_term : t

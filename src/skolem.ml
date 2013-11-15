@@ -52,8 +52,8 @@ let create ?(base=Signature.base) ?(prefix="logtk_sk__") () =
 
 let to_signature ctx = ctx.sc_signature
 
-let fresh_sym ~ctx =
-  Symbol.Gensym.new_ ctx.sc_gensym
+let fresh_sym ~ctx ~ty =
+  Symbol.Gensym.new_ ~ty ctx.sc_gensym
 
 (* update varindex in [ctx] so that it won't get captured in [t] *)
 let update_var ~ctx t =
@@ -83,13 +83,14 @@ let skolem_form ~ctx ~ty f =
           (FOUnif.form_variant f' 1 f 0))
       ctx.sc_fcache;
     (* fresh symbol *)
-    let symb = fresh_sym ~ctx in
-    let skolem_term = T.mk_node ~ty symb vars in
+    let symb = fresh_sym ~ctx ~ty in
+    let skolem_term = T.mk_node symb vars in
     (* replace variable by skolem t*)
-    let new_f = F.db_unlift (F.db_replace f skolem_term) in
+    let env = DBEnv.singleton skolem_term in
+    let new_f = F.DB.unshift 1 (F.DB.eval env f) in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
     (* update signature *)
-    ctx.sc_signature <- Signature.declare ctx.sc_signature symb ty;
+    ctx.sc_signature <- Signature.declare_sym ctx.sc_signature symb;
     Util.debug 5 "new skolem symbol %a with type %a" Symbol.pp symb Type.pp ty;
     new_f
   with FoundFormVariant(f',new_f',subst) ->

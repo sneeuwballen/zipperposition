@@ -31,17 +31,17 @@ module F = FOFormula
 
 (* map terms to distinct variables of same type *)
 let __mk_vars args =
-  List.mapi (fun i v -> T.mk_var ~ty:(T.get_type v) i) args
+  List.mapi (fun i v -> T.mk_var ~ty:(T.ty v) i) args
 
 let is_definition f =
   (* check that r is a definition of l=f(x1,...,xn) *)
   let check_def l r =
     match l.T.term with
     | T.Var _ | T.BoundVar _ -> false
-    | T.Node (f, ts) ->
+    | T.Node (f, tyargs, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       List.for_all T.is_var ts &&
-      let l' = T.mk_node ~ty:l.T.ty f (__mk_vars ts) in
+      let l' = T.mk_node ~tyargs f (__mk_vars ts) in
       FOUnif.are_variant l l'
       && not (T.contains_symbol f r)
       && List.for_all (fun x -> T.var_occurs x l) (T.vars r)
@@ -57,10 +57,10 @@ let is_pred_definition f =
   let check_def l r =
     match l.T.term with
     | T.Var _ | T.BoundVar _ -> false
-    | T.Node (f, ts) ->
+    | T.Node (f, tyargs, ts) ->
       (* l=f(x1,...,xn) where r contains no other var than x1,...,xn, and n >= 0 *)
       List.for_all T.is_var ts &&
-      let l' = T.mk_node ~ty:l.T.ty f (__mk_vars ts) in
+      let l' = T.mk_node ~tyargs f (__mk_vars ts) in
       (try ignore(FOUnif.variant l 0 l' 1); true with FOUnif.Fail -> false)
       && not (F.contains_symbol f r)
       && List.for_all (fun x -> T.var_occurs x l) (F.free_variables r)
@@ -76,7 +76,7 @@ let is_rewrite_rule f =
   let check_rule l r =
     match l.T.term with
     | T.Var _ | T.BoundVar _ -> false
-    | T.Node (_, _) -> List.for_all (fun x -> T.var_occurs x l) (T.vars r)
+    | T.Node (_, _, _) -> List.for_all (fun x -> T.var_occurs x l) (T.vars r)
   in
   let f = F.open_forall f in
   match f.F.form with
@@ -89,7 +89,7 @@ let is_pred_rewrite_rule f =
   let check_rule l r =
     match l.T.term with
     | T.Var _ | T.BoundVar _ -> false
-    | T.Node (_, _) ->
+    | T.Node (_, _, _) ->
       List.for_all (fun x -> T.var_occurs x l) (F.free_variables r)
   in
   let f = F.open_forall f in
@@ -100,14 +100,14 @@ let is_pred_rewrite_rule f =
 
 let is_const_definition f =
   match f.F.form with
-  | F.Equal ({T.term=T.Node (s, [])}, r) -> Some (s, r)
-  | F.Equal (l, {T.term=T.Node (s, [])}) -> Some (s, l)
+  | F.Equal ({T.term=T.Node (s, _, [])}, r) -> Some (s, r)
+  | F.Equal (l, {T.term=T.Node (s, _, [])}) -> Some (s, l)
   | _ -> None
 
 let is_const_pred_definition f =
   match f.F.form with
-  | F.Equiv ({F.form=F.Atom {T.term=T.Node (s, [])}}, r) -> Some (s,r)
-  | F.Equiv (l,{F.form=F.Atom {T.term=T.Node (s, [])}}) -> Some (s,l)
+  | F.Equiv ({F.form=F.Atom {T.term=T.Node (s, _, [])}}, r) -> Some (s,r)
+  | F.Equiv (l,{F.form=F.Atom {T.term=T.Node (s, _, [])}}) -> Some (s,l)
   | _ -> None
 
 (** {2 Interface to Tranform} *)

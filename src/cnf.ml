@@ -66,22 +66,22 @@ let rec miniscope f =
   | F.Forall (ty,{F.form=F.And l}) ->
     (* forall x (and l) -> and (forall x f' \ f' in l) *)
     let l = List.map miniscope l in
-    let with_v, without_v = List.partition (fun f -> F.db_contains f 0) l in
-    F.mk_and (List.map (F.mk_forall ~ty) with_v @ List.map F.db_unlift without_v)
+    let with_v, without_v = List.partition (fun f -> F.DB.contains f 0) l in
+    F.mk_and (List.map (F.__mk_forall ~ty) with_v @ List.map (F.DB.unshift 1) without_v)
   | F.Forall (ty, {F.form=F.Or l}) ->
     let l = List.map miniscope l in
-    let with_v, without_v = List.partition (fun f -> F.db_contains f 0) l in
-    F.mk_or (F.mk_forall ~ty (F.mk_or with_v) :: List.map F.db_unlift without_v)
-  | F.Forall (ty,f') -> F.mk_forall ~ty (miniscope f')
+    let with_v, without_v = List.partition (fun f -> F.DB.contains f 0) l in
+    F.mk_or (F.__mk_forall ~ty (F.mk_or with_v) :: List.map (F.DB.unshift 1) without_v)
+  | F.Forall (ty,f') -> F.__mk_forall ~ty (miniscope f')
   | F.Exists (ty, {F.form=F.And l}) ->
     let l = List.map miniscope l in
-    let with_v, without_v = List.partition (fun f -> F.db_contains f 0) l in
-    F.mk_and (F.mk_exists ~ty (F.mk_and with_v) :: List.map F.db_unlift without_v)
+    let with_v, without_v = List.partition (fun f -> F.DB.contains f 0) l in
+    F.mk_and (F.__mk_exists ~ty (F.mk_and with_v) :: List.map (F.DB.unshift 1) without_v)
   | F.Exists (ty, {F.form=F.Or l}) ->
     let l = List.map miniscope l in
-    let with_v, without_v = List.partition (fun f -> F.db_contains f 0) l in
-    F.mk_or (List.map (F.mk_exists ~ty) with_v @ List.map F.db_unlift without_v)
-  | F.Exists (ty,f') -> F.mk_exists ~ty (miniscope f')
+    let with_v, without_v = List.partition (fun f -> F.DB.contains f 0) l in
+    F.mk_or (List.map (F.__mk_exists ~ty) with_v @ List.map (F.DB.unshift 1) without_v)
+  | F.Exists (ty,f') -> F.__mk_exists ~ty (miniscope f')
   | F.And l -> F.mk_and (List.map miniscope l)
   | F.Or l -> F.mk_or (List.map miniscope l)
   | F.Imply (f1, f2) -> F.mk_imply (miniscope f1) (miniscope f2)
@@ -114,10 +114,10 @@ let rec nnf polarity f = match f.F.form with
         nnf polarity (F.mk_and [ F.mk_imply f1 f2; F.mk_imply f2 f1 ])
       else
         nnf polarity (F.mk_or [ F.mk_and [f1; f2]; F.mk_and [F.mk_not f1; F.mk_not f2] ])
-  | F.Not {F.form=F.Forall (ty,f')} -> F.mk_exists ~ty (nnf polarity (F.mk_not f'))
-  | F.Forall (ty,f') -> F.mk_forall ~ty (nnf polarity f')
-  | F.Not {F.form=F.Exists (ty,f')} -> F.mk_forall ~ty (nnf polarity (F.mk_not f'))
-  | F.Exists (ty,f') -> F.mk_exists ~ty (nnf polarity f')
+  | F.Not {F.form=F.Forall (ty,f')} -> F.__mk_exists ~ty (nnf polarity (F.mk_not f'))
+  | F.Forall (ty,f') -> F.__mk_forall ~ty (nnf polarity f')
+  | F.Not {F.form=F.Exists (ty,f')} -> F.__mk_forall ~ty (nnf polarity (F.mk_not f'))
+  | F.Exists (ty,f') -> F.__mk_exists ~ty (nnf polarity f')
   | F.Not f' when F.is_atomic f' -> f
   | F.Not _ -> failwith "NNF failure!"
   | F.True
@@ -142,7 +142,8 @@ let skolemize ~ctx f =
     (* remove quantifier, replace by fresh variable *)
     F.iter (Skolem.update_var ~ctx) f';
     let v = T.mk_var ~ty (Skolem.fresh_var ~ctx) in
-    let new_f' = F.db_unlift (F.db_replace f' v) in
+    let env = DBEnv.singleton v in
+    let new_f' = F.DB.unshift 1 (F.DB.eval env f') in
     skolemize new_f'
   in
   skolemize f
