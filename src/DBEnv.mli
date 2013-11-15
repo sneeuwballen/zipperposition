@@ -47,6 +47,10 @@ val push_none : 'a t -> 'a t
   (** Create a new environment, when entering a scope, where
       the De Bruijn index 0 is bound to nothing. *)
 
+val push_none_multiple : 'a t -> int -> 'a t
+  (** Call [push_none] [n] times (after we've entered [n] scopes, for
+      instances) *)
+
 val pop : 'a t -> 'a t
   (** Exit a scope, removing the top binding.
       @raise Invalid_argument if the env is empty *)

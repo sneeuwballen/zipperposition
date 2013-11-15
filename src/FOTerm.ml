@@ -493,7 +493,12 @@ module DB = struct
     | BoundVar i ->
       begin match DBEnv.find env i with
         | None -> t  (* not bound *)
-        | Some t' -> shift depth t'
+        | Some t' ->
+          (if not (Type.eq t.ty t'.ty) then
+            let msg = Util.sprintf "T.DB.eval at %d: distinct type %a and %a"
+              i Type.pp t.ty Type.pp t'.ty in
+            raise (Type.Error msg));
+          shift depth t'
       end
     | Node (s, tyargs, l) ->
       mk_node ~tyargs s (List.map eval l)
@@ -604,7 +609,7 @@ let pp_tstp_depth depth buf t =
       (Util.pp_list ~sep pp_surrounded) body
   | Node (s, [], []) -> Symbol.pp_tstp buf s
   | Node (s, tyargs, args) ->
-    Printf.bprintf buf "%a("Symbol.pp_tstp s;
+    Printf.bprintf buf "%a(" Symbol.pp_tstp s;
     Util.pp_list Type.pp_tstp buf tyargs;
     (match tyargs, args with | _::_, _::_ -> Buffer.add_string buf ", " | _ -> ());
     Util.pp_list pp_rec buf args;
@@ -630,16 +635,19 @@ let rec pp_depth ?(hooks=[]) depth buf t =
       let sep = Util.sprintf " %a " Symbol.pp s in
       Printf.bprintf buf "%a%s%a" pp_surrounded body1 sep
         (Util.pp_list ~sep pp_surrounded) body
-    | Node (s, _, args) ->
+    | Node (s, tyargs, args) ->
       (* try to use some hook *)
       if List.exists (fun hook -> hook pp_rec buf t) hooks
       then ()
-      else begin
-        (* default case for nodes *)
-        match args with
-        | [] -> Symbol.pp buf s
-        | _::_ ->
-          Printf.bprintf buf "%a(%a)" Symbol.pp s (Util.pp_list ~sep:", " pp_rec) args
+      else (* default case for nodes *)
+        begin match tyargs, args with
+        | [], [] -> Symbol.pp buf s
+        | _ ->
+          Printf.bprintf buf "%a(" Symbol.pp_tstp s;
+          Util.pp_list Type.pp_tstp buf tyargs;
+          (match tyargs, args with | _::_, _::_ -> Buffer.add_string buf ", " | _ -> ());
+          Util.pp_list pp_rec buf args;
+          Buffer.add_string buf ")";
         end
     | Var i ->
       if not !print_all_types && !print_var_types && not (Type.eq t.ty Type.i)

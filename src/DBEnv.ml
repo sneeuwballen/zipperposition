@@ -41,6 +41,9 @@ let push env x = {size=env.size+1; stack=(Some x) :: env.stack; }
 
 let push_none env =  {size=env.size+1; stack=None :: env.stack; }
 
+let rec push_none_multiple env n =
+  if n <= 0 then env else push_none (push_none_multiple env (n-1))
+
 let size env = env.size
 
 let pop env =

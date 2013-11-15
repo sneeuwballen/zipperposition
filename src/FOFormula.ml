@@ -436,7 +436,11 @@ module DB = struct
   let eval ?(depth=0) env f =
     map_depth
       ~depth
-      (fun depth t' -> T.DB.eval ~depth env t')
+      (fun depth' t' ->
+        (* need to push as many None in env as we met quantifiers
+            between [f] and [t'] *)
+        let env = DBEnv.push_none_multiple env (depth' - depth) in
+        T.DB.eval ~depth:depth' env t')
       f
 end
 

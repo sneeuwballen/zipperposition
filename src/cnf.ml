@@ -141,6 +141,7 @@ let skolemize ~ctx f =
   | F.Forall (ty,f') ->
     (* remove quantifier, replace by fresh variable *)
     F.iter (Skolem.update_var ~ctx) f';
+    Util.debug 5 "type of variable: %a" Type.pp ty;
     let v = T.mk_var ~ty (Skolem.fresh_var ~ctx) in
     let env = DBEnv.singleton v in
     let new_f' = F.DB.unshift 1 (F.DB.eval env f') in

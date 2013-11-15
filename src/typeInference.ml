@@ -178,6 +178,7 @@ module Ctx = struct
 
   (* same as {!unify}, but also updates the ctx's substitution *)
   let unify_and_set ctx ty1 ty2 =
+    Util.debug 5 "unify %a and %a (ctx: %a)" Type.pp ty1 Type.pp ty2 Substs.Ty.pp ctx.subst;
     let subst = unify ctx ty1 ty2 in
     ctx.subst <- subst
 
@@ -217,9 +218,6 @@ module Ctx = struct
   let declare_basic ctx s ty =
     let ty = _of_ty ctx ty in
     declare ctx s ty
-
-  let eval_type ?(renaming=S.Renaming.create 4) ctx ty s_ty =
-    S.apply ctx.subst ~renaming ty s_ty
 
   let to_signature ctx =
     let signature = ctx.signature in
@@ -355,16 +353,24 @@ module FO = struct
           and [args], containing [n_args] terms. *)
       let tyargs, args = _split_arity n_args l in
       let tyargs = _complete_type_args ctx n_tyargs tyargs in
+      let ty_s' = Type.apply ty_s tyargs in
+      Util.debug 5 "applied type for %a: %a" Sym.pp s Type.pp ty_s';
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (fun t' -> infer_rec ctx t') args in
       let ty_of_args, closure_args = List.split l in
-      (* compute return type *)
-      let ty_ret = Type.apply ty_s (tyargs @ ty_of_args) in
+      (* [s] has type [ty_s] once applied to polymorphic type arguments,
+          but must also have type [ty_l -> 'a].
+          We generate a fresh variable 'a (named [ty_ret]),
+          which is also the result. *)
+      let ty_ret = Ctx._new_var ctx in
+      Ctx.unify_and_set ctx ty_s' (Type.mk_fun ty_ret ty_of_args);
       (* now to produce the closure, that first creates subterms *)
       let closure renaming subst =
         let args' = List.map (fun closure' -> closure' renaming subst) closure_args in
         let tyargs' = List.map (fun ty -> Substs.Ty.apply ~renaming subst ty 0) tyargs in
+        Util.debug 5 "eval type %a in %a" Type.pp ty_s Substs.Ty.pp subst;
         let ty_s' = Substs.Ty.apply ~renaming subst ty_s 0 in
+        Util.debug 5 "final type for %a: %a" Sym.pp s Type.pp ty_s';
         let s' = Symbol.of_basic ~ty:ty_s' s in
         T.mk_node ~tyargs:tyargs' s' args'
       in
@@ -470,7 +476,7 @@ module FO = struct
       let clos_vars = List.map (fun t -> infer_var_scope ctx t) vars in
       let clos_f =
         Util.finally
-          ~h:(fun () -> List.iter (fun t -> exit_var_scope ctx t) vars)
+          ~h:(fun () -> List.iter (fun t -> exit_var_scope ctx t) (List.rev vars))
           ~f:(fun () -> infer_form_rec ctx f')
       in
       let closure renaming subst =
@@ -482,9 +488,9 @@ module FO = struct
       in
       closure
 
-  let infer_form ctx f s_f =
+  let infer_form ctx f =
     Util.debug 5 "infer_form %a" BF.pp f;
-    let c_f = infer_form_rec ctx f s_f in
+    let c_f = infer_form_rec ctx f in
     c_f
 
   let constrain_form ctx f =
@@ -604,11 +610,17 @@ module HO = struct
           and [args], containing [n_args] terms. *)
       let tyargs, args = _split_arity n_args l in
       let tyargs = _complete_type_args ctx n_tyargs tyargs in
+      let ty_t' = Type.apply ty_t tyargs in
       (* create sub-closures, by inferring the type of [args] *)
       let l = List.map (fun t' -> infer_rec ctx t') args in
       let ty_of_args, closure_args = List.split l in
-      (* compute return type *)
-      let ty_ret = Type.apply ty_t (tyargs @ ty_of_args) in
+      (* [s] has type [ty_s] once applied to polymorphic type arguments,
+          but must also have type [ty_l -> 'a].
+          We generate a fresh variable 'a (named [ty_ret]),
+          which is also the result. *)
+      let ty_ret = Ctx._new_var ctx in
+      Ctx.unify_and_set ctx ty_t' (Type.mk_fun ty_ret ty_of_args);
+      (* closure *)
       let closure renaming subst =
         let t' = clos_t renaming subst in
         let tyargs' = List.map (fun ty -> Substs.Ty.apply ~renaming subst ty 0) tyargs in

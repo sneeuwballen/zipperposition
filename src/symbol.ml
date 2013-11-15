@@ -271,7 +271,7 @@ let pp_tstp buf s = Buffer.add_string buf (to_string_tstp s)
 
 let to_string = to_string_tstp
 
-let __default_pp = ref pp_debug
+let __default_pp = ref pp_tstp
 let pp buf s = !__default_pp buf s
 
 let set_default_pp pp = __default_pp := pp

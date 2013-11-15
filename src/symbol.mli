@@ -266,8 +266,10 @@ val mk_fresh_const : int -> ty:Type.t -> t
 
 (** {2 IO} *)
 
-val to_string : t -> string
 val pp_debug : Buffer.t -> t -> unit
+val to_string_debug : t -> string
+
+val to_string : t -> string
 val to_string_tstp : t -> string
 val pp_tstp : Buffer.t -> t -> unit
 

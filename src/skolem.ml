@@ -82,7 +82,9 @@ let skolem_form ~ctx ~ty f =
           (fun subst -> raise (FoundFormVariant (f', new_f', subst)))
           (FOUnif.form_variant f' 1 f 0))
       ctx.sc_fcache;
-    (* fresh symbol *)
+    (* fresh symbol with the proper type *)
+    let ty_vars = List.map T.ty vars in
+    let ty = Type.(ty <== ty_vars) in
     let symb = fresh_sym ~ctx ~ty in
     let skolem_term = T.mk_node symb vars in
     (* replace variable by skolem t*)
