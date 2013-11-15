@@ -35,7 +35,7 @@ let a = T.mk_const (Symbol.mk_const ~ty:Type.i "a")
 let b = T.mk_const (Symbol.mk_const ~ty:Type.i "b")
 let x = T.mk_var ~ty:Type.i 1
 let y = T.mk_var ~ty:Type.i 2
-let f x y = T.mk_node (Symbol.mk_const ~ty:Type.i "f") [x; y]
+let f x y = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "f") [x; y]
 let g x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "g") [x]
 let h x y z = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i;i]) "h") [x;y;z]
 let nil = T.mk_const (Symbol.mk_const ~ty:Type.(forall [var 0] (app "list" [var 0])) "nil")
@@ -55,10 +55,17 @@ let test_rename () =
   ()
 
 let test_unify () =
+  let v = Type.var 0 in
+  let f ty x y = T.mk_node ~tyargs:[ty]
+    (Symbol.mk_const ~ty:Type.(forall [v] (v <== [v;v])) "f") [x; y] in
+  let g ty x = T.mk_node ~tyargs:[ty]
+    (Symbol.mk_const ~ty:Type.(forall [v] (v <=. v)) "g") [x] in
+  let nil ty = T.mk_const ~tyargs:[ty]
+    (Symbol.mk_const ~ty:Type.(forall [v] (app "list" [v])) "nil") in
   let x = T.mk_var ~ty:Type.(app "list" [var 3]) 0 in
   let y = T.mk_var ~ty:Type.(app "list" [int]) 1 in
-  let t1 = f x (g y) in
-  let t2 = f nil (g x) in
+  let t1 = let ty = Type.(app "list" [var 3]) in f ty x (g ty x) in
+  let t2 = let ty = Type.(app "list" [int]) in f ty (nil Type.int) (g ty y) in
   let subst = FOUnif.unification t1 0 t2 1 in
   let renaming = S.Renaming.create 5 in
   let t1' = S.apply subst ~renaming t1 0 in

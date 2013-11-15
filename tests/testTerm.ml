@@ -37,7 +37,7 @@ module HOT = HOTerm
 (** unit tests *)
 
 let ty = Type.i
-let f x y = HOT.mk_at (HOT.mk_const (Symbol.mk_const ~ty:Type.i "f")) [x; y]
+let f x y = HOT.mk_at (HOT.mk_const (Symbol.mk_const ~ty:Type.(i <== [i;i]) "f")) [x; y]
 let g x = HOT.mk_at (HOT.mk_const (Symbol.mk_const ~ty:Type.(i <=. i) "g")) [x]
 let h x y z = HOT.mk_at (HOT.mk_const (Symbol.mk_const ~ty:Type.(i <== [i;i;i]) "h")) [x;y;z]
 let a = HOT.mk_const (Symbol.mk_const ~ty:Type.i "a")
@@ -46,7 +46,7 @@ let x = HOT.mk_var ~ty:Type.i 0
 let y = HOT.mk_var ~ty:Type.i 1
 
 let test_db_shift () =
-  let t = HOT.mk_lambda [x;y] (f y (g x)) in
+  let t = HOT.mk_lambda [x] (f x (g (HOT.__mk_bound_var ~ty:Type.i 0))) in
   let t' = HOT.DB.shift 1 t in
   let t1 = HOT.mk_lambda [x] (f x (g (HOT.__mk_bound_var ~ty:Type.i 1))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
