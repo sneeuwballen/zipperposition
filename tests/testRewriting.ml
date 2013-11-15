@@ -32,24 +32,22 @@ module T = FOTerm
 module S = Substs.FO
 module Rw = Rewriting.TRS
 
-let ty = Type.i
-
-let a = T.mk_const ~ty (Symbol.mk_const "a")
-let b = T.mk_const ~ty (Symbol.mk_const "b")
-let c = T.mk_const ~ty (Symbol.mk_const "c")
-let d = T.mk_const ~ty (Symbol.mk_const "d")
-let f x y = T.mk_node ~ty (Symbol.mk_const "f") [x; y]
-let g x = T.mk_node ~ty (Symbol.mk_const "g") [x]
-let h x = T.mk_node ~ty (Symbol.mk_const "h") [x]
-let zero = T.mk_const ~ty (Symbol.mk_const "0")
-let succ n = T.mk_node ~ty (Symbol.mk_const "s") [n]
-let plus a b = T.mk_node ~ty (Symbol.mk_const "+") [a; b]
-let minus a = T.mk_node ~ty (Symbol.mk_const "-") [a]
-let times a b = T.mk_node ~ty (Symbol.mk_const "x") [a; b]
-let x = T.mk_var ~ty 1
-let y = T.mk_var ~ty 2
-let z = T.mk_var ~ty 3
-let u = T.mk_var ~ty 4
+let a = T.mk_const (Symbol.mk_const ~ty:Type.i "a")
+let b = T.mk_const (Symbol.mk_const ~ty:Type.i "b")
+let c = T.mk_const (Symbol.mk_const ~ty:Type.i "c")
+let d = T.mk_const (Symbol.mk_const ~ty:Type.i "d")
+let f x y = T.mk_node (Symbol.mk_const ~ty:Type.i "f") [x; y]
+let g x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "g") [x]
+let h x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "h") [x]
+let zero = T.mk_const (Symbol.mk_const ~ty:Type.i "0")
+let succ n = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "s") [n]
+let plus a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "+") [a; b]
+let minus a = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "-") [a]
+let times a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "x") [a; b]
+let x = T.mk_var ~ty:Type.i 1
+let y = T.mk_var ~ty:Type.i 2
+let z = T.mk_var ~ty:Type.i 3
+let u = T.mk_var ~ty:Type.i 4
 
 let rec from_int n =
   assert (n >= 0);
@@ -60,7 +58,7 @@ let peano_to_int t =
   let rec count t n =
     match t.T.term with
     | _ when T.eq t zero -> n
-    | T.Node (s, [t2]) when Symbol.eq s (Symbol.mk_const "s") -> count t2 (n+1)
+    | T.Node (Symbol.Const("s",_), _, [t2]) -> count t2 (n+1)
     | _ -> failwith "not peano!"
   in count t 0
 
@@ -72,8 +70,8 @@ let rec print_peano_nice buf t =
     match t.T.term with
     | T.Var _
     | T.BoundVar _ -> T.pp buf t
-    | T.Node (h, []) -> Printf.bprintf buf "%a" Symbol.pp h
-    | T.Node (h, l) -> Printf.bprintf buf "%a(%a)" Symbol.pp h (Util.pp_list T.pp) l
+    | T.Node (h, _, []) -> Printf.bprintf buf "%a" Symbol.pp h
+    | T.Node (h, _, l) -> Printf.bprintf buf "%a(%a)" Symbol.pp h (Util.pp_list T.pp) l
 
 (** Simple rewriting system for Peano arithmetic with + and x *)
 let peano_trs =

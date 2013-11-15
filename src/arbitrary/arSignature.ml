@@ -34,10 +34,8 @@ let _arbitrary_of gen_ty =
   QCheck.Arbitrary.(
     let gen = 
       ArSymbol.set >>= fun symbs ->
-      let size = Symbol.Set.cardinal symbs in
-      list_repeat size gen_ty >>= fun types ->
       let l = Sequence.to_rev_list (Symbol.Set.to_seq symbs) in
-      let signature = Signature.of_list (List.combine l types) in
+      let signature = List.fold_left Signature.declare_sym Signature.empty l in
       (* be sure that we only accept well founded signatures *)
       return (if Signature.well_founded signature then Some signature else None)
     in

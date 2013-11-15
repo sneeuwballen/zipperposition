@@ -36,7 +36,7 @@ open Logtk;;
 let pterm s =
     let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create ~base:true () in
-    let _, clos = TypeInference.FO.infer tyctx t 0 in
+    let _, clos = TypeInference.FO.infer tyctx t in
     let renaming = Substs.Ty.Renaming.create 5 in
     TypeInference.Ctx.apply_closure ~renaming tyctx clos
 ;;

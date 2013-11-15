@@ -29,6 +29,7 @@ open Logtk
 
 module A = Ast_theory
 module T = HOTerm
+module Sym = Basic.Sym
 module BT = Basic.HO
 module F = FOFormula
 module MRT = MetaReasoner.Translate
@@ -567,10 +568,10 @@ module MapToVar = struct
 end
 
 let str_to_terms l =
-  List.map (fun s -> BT.const (Symbol.mk_const s)) l
+  List.map (fun s -> BT.const (Sym.mk_const s)) l
 
 let closure_of_terms ctx l =
-  let l = List.map (fun t -> snd (TypeInference.HO.infer ctx t 0)) l in
+  let l = List.map (fun t -> snd (TypeInference.HO.infer ctx t)) l in
   TypeInference.TraverseClosure.seq l
 
 (* type inference closure of a premise *)
@@ -578,7 +579,7 @@ let closure_of_premise ctx p =
   let open TypeInference.Closure in
   match p with
   | A.IfPattern f ->
-    TypeInference.FO.infer_form ctx f 0 >>= fun f' ->
+    TypeInference.FO.infer_form ctx f >>= fun f' ->
     let f' = MetaPattern.EncodedForm.encode f' in
     let pat, args = MetaPattern.create f' in
     return (IfPattern (pat, args))
@@ -601,7 +602,7 @@ let closure_of_statement ctx statement =
   match statement with
   | A.Axiom (s, args, f) ->
     (* convert axiom *)
-    TypeInference.FO.infer_form ctx f 0 >>= fun f' ->
+    TypeInference.FO.infer_form ctx f >>= fun f' ->
     closure_of_terms ctx (str_to_terms args) >>= fun left ->
     let f' = MetaPattern.EncodedForm.encode f' in
     let p, right = MetaPattern.create f' in
@@ -615,7 +616,7 @@ let closure_of_statement ctx statement =
     return (fun kb -> add_axiom kb axiom)
   | A.LemmaInline (f, premises) ->
     (* describe a lemma *)
-    TypeInference.FO.infer_form ctx f 0 >>= fun f' ->
+    TypeInference.FO.infer_form ctx f >>= fun f' ->
     closure_of_premises ctx premises >>= fun premises' ->
     let f' = MetaPattern.EncodedForm.encode f' in
     let pat, args = MetaPattern.create f' in

@@ -31,14 +31,14 @@ module T = FOTerm
 module S = Substs.FO
 
 let ty = Type.i
-let a = T.mk_const ~ty (Symbol.mk_const "a")
-let b = T.mk_const ~ty (Symbol.mk_const "b")
-let x = T.mk_var ~ty 0
-let y = T.mk_var ~ty 1
-let f x y = T.mk_node ~ty (Symbol.mk_const "f") [x; y]
-let g x = T.mk_node ~ty (Symbol.mk_const "g") [x]
-let h x y z = T.mk_node ~ty (Symbol.mk_const "h") [x;y;z]
-let nil = T.mk_const ~ty:Type.(app "list" [var 0]) (Symbol.mk_const "nil")
+let a = T.mk_const (Symbol.mk_const ~ty:Type.i "a")
+let b = T.mk_const (Symbol.mk_const ~ty:Type.i "b")
+let x = T.mk_var ~ty:Type.i 1
+let y = T.mk_var ~ty:Type.i 2
+let f x y = T.mk_node (Symbol.mk_const ~ty:Type.i "f") [x; y]
+let g x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "g") [x]
+let h x y z = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i;i]) "h") [x;y;z]
+let nil = T.mk_const (Symbol.mk_const ~ty:Type.(forall [var 0] (app "list" [var 0])) "nil")
 
 let test_rename () =
   let t1 = f x (g y) in

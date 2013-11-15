@@ -36,11 +36,12 @@ let prof_matching = Util.mk_profiler "meta.pattern.matching"
 let prof_encode = Util.mk_profiler "meta.pattern.encode"
 let prof_decode = Util.mk_profiler "meta.pattern.decode"
 
-let __var_symbol = Symbol.mk_const "V"
-let __fun_symbol = Symbol.mk_const "S"
+let x = Type.var 0
+let __var_symbol = Symbol.mk_const ~ty:Type.(forall [x] (x <=. x)) "V"
+let __fun_symbol = Symbol.mk_const ~ty:Type.(forall [x] (x <=. x)) "S"
 
-let __var ty = HOT.mk_const ~ty:Type.(ty <=. ty) __var_symbol
-let __fun ty = HOT.mk_const ~ty:Type.(ty <=. ty) __fun_symbol
+let __var ty = HOT.mk_const __var_symbol
+let __fun ty = HOT.mk_const __fun_symbol
 
 (** {2 Encoding as terms} *)
 
@@ -62,14 +63,14 @@ module EncodedForm = struct
     | HOT.BoundVar _ -> t
     | HOT.Lambda t' ->
       let varty = HOT.lambda_var_ty t in
-      HOT.mk_lambda ~varty (encode_t t')
+      HOT.__mk_lambda ~varty (encode_t t')
     | HOT.Const s when not (Symbol.is_connective s) -> 
       (** Similarly to the Var case, here we need to protect constants
           from being bound to variables once abstracted into variables *)
       HOT.mk_at (__fun t.HOT.ty) [t]
     | HOT.Const _ -> t
-    | HOT.At (t, l) ->
-      HOT.mk_at (encode_t t) (List.map encode_t l)
+    | HOT.At (t, tyargs, l) ->
+      HOT.mk_at ~tyargs (encode_t t) (List.map encode_t l)
 
   (* Inverse operation of {! encode_t} *)
   let rec decode_t t = match t.HOT.term with
@@ -77,12 +78,13 @@ module EncodedForm = struct
     | HOT.BoundVar _ -> t
     | HOT.Lambda t' ->
       let varty = HOT.lambda_var_ty t in
-      HOT.mk_lambda ~varty (decode_t t')
+      HOT.__mk_lambda ~varty (decode_t t')
     | HOT.Const _ -> t
-    | HOT.At ({HOT.term=HOT.Const s}, t'::l)
+    | HOT.At ({HOT.term=HOT.Const s}, tyargs, t'::l)
       when (Symbol.eq s __var_symbol || Symbol.eq s __fun_symbol) ->
-      HOT.mk_at (decode_t t') (List.map decode_t l)
-    | HOT.At (t, l) -> HOT.mk_at (decode_t t) (List.map decode_t l)
+      HOT.mk_at ~tyargs (decode_t t') (List.map decode_t l)
+    | HOT.At (t, tyargs, l) ->
+      HOT.mk_at ~tyargs (decode_t t) (List.map decode_t l)
 
   let encode f =
     Util.enter_prof prof_encode;
@@ -154,7 +156,7 @@ let rec functions_in_order acc t = match t.HOT.term with
   | HOT.Const _
   | HOT.Var _
   | HOT.BoundVar _ -> acc
-  | HOT.At (t, l) ->
+  | HOT.At (t, _, l) ->
     let acc = functions_in_order acc t in
     List.fold_left functions_in_order acc l
 
@@ -165,11 +167,14 @@ let create f =
   let pat = Lambda.lambda_abstract_list f symbols in
   Pattern pat, symbols
 
-let arity (Pattern p) = Type.arity p.HOT.ty
+let arity (Pattern p) =
+  let i, a = Type.arity p.HOT.ty in
+  assert (i=0); (* lambda *)
+  a
 
 let can_apply (pat,args) =
   match pat with
-  | Pattern t -> Lambda.can_apply t.HOT.ty (List.map HOT.get_type args)
+  | Pattern t -> Lambda.can_apply t.HOT.ty (List.map HOT.ty args)
 
 let apply (pat, args) =
   match pat with

@@ -37,25 +37,25 @@ module HOT = HOTerm
 (** unit tests *)
 
 let ty = Type.i
-let f x y = HOT.mk_at (HOT.mk_const ~ty:Type.(ty <== [ty;ty]) (Symbol.mk_const "f")) [x;y]
-let g x = HOT.mk_at (HOT.mk_const ~ty:Type.(ty <== [ty])  (Symbol.mk_const "g")) [x]
-let h x y z = HOT.mk_at (HOT.mk_const ~ty:Type.(ty <== [ty;ty;ty]) (Symbol.mk_const "h")) [x;y;z]
-let a = HOT.mk_const ~ty (Symbol.mk_const "a")
-let b = HOT.mk_const ~ty (Symbol.mk_const "b")
-let x = HOT.mk_var ~ty 0
-let y = HOT.mk_var ~ty 1
+let f x y = HOT.mk_at (HOT.mk_const (Symbol.mk_const ~ty:Type.i "f")) [x; y]
+let g x = HOT.mk_at (HOT.mk_const (Symbol.mk_const ~ty:Type.(i <=. i) "g")) [x]
+let h x y z = HOT.mk_at (HOT.mk_const (Symbol.mk_const ~ty:Type.(i <== [i;i;i]) "h")) [x;y;z]
+let a = HOT.mk_const (Symbol.mk_const ~ty:Type.i "a")
+let b = HOT.mk_const (Symbol.mk_const ~ty:Type.i "b")
+let x = HOT.mk_var ~ty:Type.i 0
+let y = HOT.mk_var ~ty:Type.i 1
 
-let test_db_lift () =
-  let t = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 1))) in
-  let t' = HOT.db_lift 1 t in
-  let t1 = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 2))) in
+let test_db_shift () =
+  let t = HOT.mk_lambda [x;y] (f y (g x)) in
+  let t' = HOT.DB.shift 1 t in
+  let t1 = HOT.mk_lambda [x] (f x (g (HOT.__mk_bound_var ~ty:Type.i 1))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 
-let test_db_unlift () =
-  let t = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 2))) in
-  let t' = HOT.db_unlift t in
-  let t1 = HOT.mk_lambda ~varty:ty (f (HOT.mk_bound_var ~ty 0) (g (HOT.mk_bound_var ~ty 1))) in
+let test_db_unshift () =
+  let t = HOT.__mk_lambda ~varty:ty (f (HOT.__mk_bound_var ~ty 0) (g (HOT.__mk_bound_var ~ty 2))) in
+  let t' = HOT.DB.unshift 1 t in
+  let t1 = HOT.__mk_lambda ~varty:ty (f (HOT.__mk_bound_var ~ty 0) (g (HOT.__mk_bound_var ~ty 1))) in
   assert_equal ~cmp:HOT.eq ~printer:HOT.to_string t1 t';
   ()
 
@@ -63,8 +63,8 @@ let test_beta_reduce () =
   let redex =
     let x' = HOT.mk_var ~ty:Type.(i <=. i) 2 in
     HOT.mk_at
-      (HOT.mk_lambda_var [x'] (f (HOT.mk_at x' [a]) (HOT.mk_at x' [b])))
-      [HOT.mk_lambda_var [x] (g x)]
+      (HOT.mk_lambda [x'] (f (HOT.mk_at x' [a]) (HOT.mk_at x' [b])))
+      [HOT.mk_lambda [x] (g x)]
   in
   let t' = Lambda.beta_reduce redex in
   let t1 = f (g a) (g b) in
@@ -73,8 +73,8 @@ let test_beta_reduce () =
 
 let suite =
   "test_term" >:::
-    [ "test_db_lift" >:: test_db_lift
-    ; "test_db_unlift" >:: test_db_unlift
+    [ "test_db_shift" >:: test_db_shift
+    ; "test_db_unshift" >:: test_db_unshift
     ; "test_beta_reduce" >:: test_beta_reduce
     ]
 
@@ -106,7 +106,7 @@ let check_replace_id =
   let pp = PP.(pair T.to_string Position.to_string) in
   let prop (t, pos) =
     let sub = T.at_pos t pos in
-    Prop.assume (T.db_closed sub);
+    Prop.assume (T.DB.closed sub);
     let t' = T.replace_pos t pos sub in
     T.eq t t'
   in
@@ -129,7 +129,7 @@ let check_min_max_vars =
   mk_test ~n:1000 ~pp:T.to_string ~name:"term_min_max_var" gen prop
 
 (* TODO: write a term arbitrary instance for DB terms (lambda terms?)
-   and check that a lifted/unlifted closed term remains closed *)
+   and check that a shifted/unshifted closed term remains closed *)
 
 let props =
   [ check_size_subterm

@@ -31,6 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   module T = Basic.FO
   module F = Basic.Form
   module Ty = Basic.Ty
+  module Sym = Basic.Sym
   module L = Location
 
   let remove_quotes s =
@@ -278,9 +279,9 @@ plain_term:
     }
 
 constant:
-| s=atomic_word { Symbol.mk_const s }
+| s=atomic_word { Sym.mk_const s }
 | s=atomic_defined_word { s }
-functor_: f=atomic_word { Symbol.mk_const f }
+functor_: f=atomic_word { Sym.mk_const f }
 
 defined_term:
   | t=defined_atom
@@ -291,10 +292,10 @@ defined_term:
   | t=defined_atomic_term { t }
 
 defined_atom:
-  | n=INTEGER { Symbol.mk_bigint (Big_int.big_int_of_string n) }
-  | n=RATIONAL { Symbol.mk_ratio (Ratio.ratio_of_string n) }
-  | n=REAL { Symbol.mk_real (float_of_string n) }
-  | s=DISTINCT_OBJECT { Symbol.mk_distinct s }
+  | n=INTEGER { Sym.mk_bigint (Big_int.big_int_of_string n) }
+  | n=RATIONAL { Sym.mk_ratio (Ratio.ratio_of_string n) }
+  | n=REAL { Sym.mk_real (float_of_string n) }
+  | s=DISTINCT_OBJECT { Sym.mk_distinct s }
 
 defined_atomic_term:
   | t=defined_plain_term { t }
@@ -378,10 +379,10 @@ atomic_word:
   | s=LOWER_WORD { s }
 
 atomic_defined_word:
-  | w=DOLLAR_WORD { Symbol.mk_const w }
+  | w=DOLLAR_WORD { Sym.mk_const w }
 
 atomic_system_word:
-  | w=DOLLAR_DOLLAR_WORD { Symbol.mk_const w }
+  | w=DOLLAR_DOLLAR_WORD { Sym.mk_const w }
 
 %%
 

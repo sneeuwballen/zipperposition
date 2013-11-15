@@ -101,6 +101,10 @@ let process file =
     (* syntax error *)
     Util.eprintf "parse error at %a\n" Location.pp loc;
     exit 1
+  | Type.Error msg ->
+    Util.eprintf "type error: %s\n" msg;
+    Printexc.print_backtrace stderr;
+    exit 1
   | TypeUnif.Error e ->
     Util.eprintf "%a\n" TypeUnif.pp_error e;
     Printexc.print_backtrace stderr;

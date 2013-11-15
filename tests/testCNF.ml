@@ -63,7 +63,7 @@ let check_miniscope_db_closed =
   let name = "cnf_miniscope_db_closed" in
   (* check that miniscoping preserved db_closed *)
   let prop f =
-    F.db_closed f = F.db_closed (Cnf.miniscope f)
+    F.DB.closed f = F.DB.closed (Cnf.miniscope f)
   in
   mk_test ~name ~pp gen prop
 

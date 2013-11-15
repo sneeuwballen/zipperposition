@@ -39,10 +39,14 @@ let check_infer_all_symbs =
   (* check that after type inference, all symbols apppear in the signature *)
   let prop terms =
     let ctx = TypeInference.Ctx.create () in
-    List.iter (fun t -> ignore (TypeInference.FO.infer ctx t 0)) terms;
+    List.iter (fun t -> ignore (TypeInference.FO.infer ctx t)) terms;
     let signature = TypeInference.Ctx.to_signature ctx in
     let symbols = BT.symbols (Sequence.of_list terms) in
-    Symbol.Set.for_all (Signature.mem signature) symbols
+    Basic.Sym.Set.for_all
+      (function
+        | Basic.Sym.Const s -> Signature.mem signature s
+        | _ -> true)
+      symbols
   in
   mk_test ~pp ~name gen prop
 

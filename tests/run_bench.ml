@@ -31,18 +31,18 @@ open Logtk_arbitrary
 
 module T = FOTerm
 
-let a = T.mk_const ~ty:Type.i (Symbol.mk_const "a")
-let b = T.mk_const ~ty:Type.i (Symbol.mk_const "b")
-let c = T.mk_const ~ty:Type.i (Symbol.mk_const "c")
-let d = T.mk_const ~ty:Type.i (Symbol.mk_const "d")
-let f x y = T.mk_node ~ty:Type.i (Symbol.mk_const "f") [x; y]
-let g x = T.mk_node ~ty:Type.i (Symbol.mk_const "g") [x]
-let h x = T.mk_node ~ty:Type.i (Symbol.mk_const "h") [x]
-let zero = T.mk_const ~ty:Type.i (Symbol.mk_const "0")
-let succ n = T.mk_node ~ty:Type.i (Symbol.mk_const "s") [n]
-let plus a b = T.mk_node ~ty:Type.i (Symbol.mk_const "+") [a; b]
-let minus a = T.mk_node ~ty:Type.i (Symbol.mk_const "-") [a]
-let times a b = T.mk_node ~ty:Type.i (Symbol.mk_const "x") [a; b]
+let a = T.mk_const (Symbol.mk_const ~ty:Type.i "a")
+let b = T.mk_const (Symbol.mk_const ~ty:Type.i "b")
+let c = T.mk_const (Symbol.mk_const ~ty:Type.i "c")
+let d = T.mk_const (Symbol.mk_const ~ty:Type.i "d")
+let f x y = T.mk_node (Symbol.mk_const ~ty:Type.i "f") [x; y]
+let g x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "g") [x]
+let h x = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "h") [x]
+let zero = T.mk_const (Symbol.mk_const ~ty:Type.i "0")
+let succ n = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "s") [n]
+let plus a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "+") [a; b]
+let minus a = T.mk_node (Symbol.mk_const ~ty:Type.(i <=. i) "-") [a]
+let times a b = T.mk_node (Symbol.mk_const ~ty:Type.(i <== [i;i]) "x") [a; b]
 let x = T.mk_var ~ty:Type.i 1
 let y = T.mk_var ~ty:Type.i 2
 let z = T.mk_var ~ty:Type.i 3
@@ -154,7 +154,7 @@ let bench_type_inf n =
     ArTerm.ArbitraryBasic.default in
   let ctx = TypeInference.Ctx.create () in
   List.iter
-    (fun t -> ignore (TypeInference.FO.infer ctx t 0))
+    (fun t -> ignore (TypeInference.FO.infer ctx t))
     terms;
   ()
 

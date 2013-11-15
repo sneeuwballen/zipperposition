@@ -40,7 +40,10 @@ let rat = Arbitrary.(lift2 Symbol.mk_rat (~-50 -- 50) (1 -- 80))
 let arith = Arbitrary.choose [int; rat]
 
 let text =
-  QCheck.Arbitrary.(map (among ["f"; "g"; "h"; "a"; "b"; "c"; "d"]) Symbol.mk_const)
+  QCheck.Arbitrary.(
+    among ["f"; "g"; "h"; "a"; "b"; "c"; "d"] >>= fun s ->
+    ArType.ground >>= fun ty ->
+    return (Symbol.mk_const ~ty s))
 
 let default =
   Arbitrary.choose [base; text; arith]

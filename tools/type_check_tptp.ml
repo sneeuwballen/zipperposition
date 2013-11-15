@@ -63,7 +63,9 @@ let check file =
     in
     Printf.printf "signature:\n";
     Signature.iter signature
-      (fun s ty -> Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
+      (fun _ s ->
+        let ty = Symbol.ty s in
+        Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
     Printf.printf "formulas:\n";
     Sequence.iter
       (fun f -> Util.printf "  %a\n" !printer f)

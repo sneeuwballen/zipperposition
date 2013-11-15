@@ -31,6 +31,7 @@ open QCheck
 
 module T = FOTerm
 module F = FOFormula
+module Sym = Basic.Sym
 module HOT = HOTerm
 
 type 'a arbitrary = 'a QCheck.Arbitrary.t
@@ -39,16 +40,16 @@ module ArbitraryBasic = struct
   module UT = Basic.FO
 
   let ground =
-    let a = UT.const (Symbol.mk_const "a") in
-    let b = UT.const (Symbol.mk_const "b") in
-    let c = UT.const (Symbol.mk_const "c") in
-    let d = UT.const (Symbol.mk_const "d") in
-    let e = UT.const (Symbol.mk_const "e") in
-    let f x y = UT.app (Symbol.mk_const "f") [x; y] in
-    let sum x y = UT.app (Symbol.mk_const "sum") [x; y] in
-    let g x = UT.app (Symbol.mk_const "g") [x] in
-    let h x = UT.app (Symbol.mk_const "h") [x] in
-    let ite x y z = UT.app (Symbol.mk_const "ite") [x; y; z] in
+    let a = UT.const (Sym.mk_const "a") in
+    let b = UT.const (Sym.mk_const "b") in
+    let c = UT.const (Sym.mk_const "c") in
+    let d = UT.const (Sym.mk_const "d") in
+    let e = UT.const (Sym.mk_const "e") in
+    let f x y = UT.app (Sym.mk_const "f") [x; y] in
+    let sum x y = UT.app (Sym.mk_const "sum") [x; y] in
+    let g x = UT.app (Sym.mk_const "g") [x] in
+    let h x = UT.app (Sym.mk_const "h") [x] in
+    let ite x y z = UT.app (Sym.mk_const "ite") [x; y; z] in
     Arbitrary.(
       let base = among [a; b; c; d; e; ] in
       let t = fix ~max:6 ~base (fun sub ->
@@ -58,19 +59,19 @@ module ArbitraryBasic = struct
       t)
 
   let default =
-    let a = UT.const (Symbol.mk_const "a") in
-    let b = UT.const (Symbol.mk_const "b") in
-    let c = UT.const (Symbol.mk_const "c") in
-    let d = UT.const (Symbol.mk_const "d") in
-    let e = UT.const (Symbol.mk_const "e") in
+    let a = UT.const (Sym.mk_const "a") in
+    let b = UT.const (Sym.mk_const "b") in
+    let c = UT.const (Sym.mk_const "c") in
+    let d = UT.const (Sym.mk_const "d") in
+    let e = UT.const (Sym.mk_const "e") in
     let x = UT.var ~ty:(Basic.Ty.var "A") "X" in
     let y = UT.var ~ty:(Basic.Ty.var "B") "Y" in
     let z = UT.var ~ty:(Basic.Ty.var "C") "Z" in
-    let f x y = UT.app (Symbol.mk_const "f") [x; y] in
-    let sum x y = UT.app (Symbol.mk_const "sum") [x; y] in
-    let g x = UT.app (Symbol.mk_const "g") [x] in
-    let h x = UT.app (Symbol.mk_const "h") [x] in
-    let ite x y z = UT.app (Symbol.mk_const "ite") [x; y; z] in
+    let f x y = UT.app (Sym.mk_const "f") [x; y] in
+    let sum x y = UT.app (Sym.mk_const "sum") [x; y] in
+    let g x = UT.app (Sym.mk_const "g") [x] in
+    let h x = UT.app (Sym.mk_const "h") [x] in
+    let ite x y z = UT.app (Sym.mk_const "ite") [x; y; z] in
     Arbitrary.(
       let base = among [a; b; c; d; e; x; y; z] in
       let t = fix ~max:6 ~base (fun sub ->
@@ -80,10 +81,10 @@ module ArbitraryBasic = struct
       t)
 
   let pred = 
-    let p x y = UT.app (Symbol.mk_const "p") [x; y] in
-    let q x = UT.app (Symbol.mk_const "q") [x] in
-    let r x = UT.app (Symbol.mk_const "r") [x] in
-    let s = UT.const (Symbol.mk_const "s") in
+    let p x y = UT.app (Sym.mk_const "p") [x; y] in
+    let q x = UT.app (Sym.mk_const "q") [x] in
+    let r x = UT.app (Sym.mk_const "r") [x] in
+    let s = UT.const (Sym.mk_const "s") in
     let sub = default in
     QCheck.Arbitrary.(choose
       [ lift2 p sub sub; lift q sub; lift r sub; return s; ])
@@ -108,8 +109,8 @@ let ground =
 let pred =
   Arbitrary.(ArbitraryBasic.pred >>= fun t ->
     let ctx = TypeInference.Ctx.create () in
-    let ty, closure = TypeInference.FO.infer ctx t 0 in
-    TypeInference.Ctx.unify_and_set ctx ty 0 Type.o 0;
+    let ty, closure = TypeInference.FO.infer ctx t in
+    TypeInference.Ctx.unify_and_set ctx ty Type.o;
     let t = TypeInference.Ctx.apply_closure ctx closure in
     return t)
 
@@ -119,10 +120,10 @@ let pos t =
     let rec recurse t pb st =
       let stop = return (PB.to_pos pb) in
       match t.T.term with
-        | T.Node (_, [])
+        | T.Node (_, _, [])
         | T.Var _
         | T.BoundVar _ -> PB.to_pos pb
-        | T.Node (_, l) ->
+        | T.Node (_, _, l) ->
           choose (stop :: List.mapi (fun i t' -> recurse t' (PB.add pb i)) l) st
     in
     recurse t (PB.of_pos []))
@@ -142,36 +143,36 @@ end
 (*
 let arbitrary signature =
   let open QCheck.Arbitrary in
-  let base, recur = Symbol.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
-  let consts = among (Symbol.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
-  let funs = Sequence.to_list (Symbol.Map.to_seq recur) in
+  let base, recur = Sym.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
+  let consts = among (Sym.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
+  let funs = Sequence.to_list (Sym.Map.to_seq recur) in
   _ar_any_ty ~ground:false ~depth:0 ~consts ~funs signature
 
 let arbitrary_ground signature =
   let open QCheck.Arbitrary in
-  let base, recur = Symbol.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
-  let consts = among (Symbol.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
-  let funs = Sequence.to_list (Symbol.Map.to_seq recur) in
+  let base, recur = Sym.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
+  let consts = among (Sym.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
+  let funs = Sequence.to_list (Sym.Map.to_seq recur) in
   _ar_any_ty ~ground:true ~depth:0 ~consts ~funs signature
       
 let arbitrary_pred signature =
   let open QCheck.Arbitrary in
-  let types = Sequence.to_list (Symbol.Map.values signature) in
+  let types = Sequence.to_list (Sym.Map.values signature) in
   let some_ty = among types in
   let mk_preds st =
-    [ Symbol.mk_const "p", Type.(o <== [some_ty st; some_ty st])
-    ; Symbol.mk_const "q", Type.(o <== [some_ty st])
-    ; Symbol.mk_const "r", Type.(o <== [some_ty st])
-    ; Symbol.mk_const "s", Type.o
+    [ Sym.mk_const "p", Type.(o <== [some_ty st; some_ty st])
+    ; Sym.mk_const "q", Type.(o <== [some_ty st])
+    ; Sym.mk_const "r", Type.(o <== [some_ty st])
+    ; Sym.mk_const "s", Type.o
     ]
   in
   mk_preds >>= fun preds ->
   let signature = List.fold_left
     (fun sign (s,ty) -> Signature.declare sign s ty)
     signature preds in
-  let base, recur = Symbol.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
-  let consts = among (Symbol.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
-  let funs = Sequence.to_list (Symbol.Map.to_seq recur) in
+  let base, recur = Sym.Map.partition (fun _ ty -> Type.arity ty = 0) signature in
+  let consts = among (Sym.Map.fold (fun s ty acc -> mk_const ~ty s :: acc) base []) in
+  let funs = Sequence.to_list (Sym.Map.to_seq recur) in
   _ar_ty ~ground:false ~depth:0 ~consts ~funs Type.o
 
 (* TODO *)
@@ -208,7 +209,7 @@ and _non_const ~ground ~depth ~consts ~funs ty =
 (* term of any type in the const set *)
 and _ar_any_ty ~ground ~depth ~consts ~funs signature =
   let open QCheck.Arbitrary in
-  let types = Sequence.to_list (Symbol.Map.values signature) in
+  let types = Sequence.to_list (Sym.Map.values signature) in
   among types >>= fun ty ->
   _ar_ty ~ground ~depth ~consts ~funs ty
 

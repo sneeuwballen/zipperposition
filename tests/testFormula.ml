@@ -69,25 +69,25 @@ let check_simplify_preserve_closed =
   let gen = ArForm.default in
   let name = "formula_simplify_preserve_closed" in
   let prop f =
-    F.db_closed f = F.db_closed (F.simplify f)
+    F.DB.closed f = F.DB.closed (F.simplify f)
   in
   mk_test ~n:1000 ~pp ~name gen prop
 
 let check_db_lift_preserve_closed =
   let gen = ArForm.default in
-  let name = "formula_db_lift_preserve_closed" in
+  let name = "formula_db_shift_preserve_closed" in
   let prop f =
-    Prop.assume (F.db_closed f);
-    F.db_closed (F.db_lift f)
+    Prop.assume (F.DB.closed f);
+    F.DB.closed (F.DB.shift 1 f)
   in
   mk_test ~n:100 ~pp ~name gen prop
 
 let check_db_unlift_preserve_closed =
   let gen = ArForm.default in
-  let name = "formula_db_unlift_preserve_closed" in
+  let name = "formula_db_unshift_preserve_closed" in
   let prop f =
-    Prop.assume (F.db_closed f);
-    F.db_closed (F.db_unlift f)
+    Prop.assume (F.DB.closed f);
+    F.DB.closed (F.DB.unshift 1 f)
   in
   mk_test ~n:100 ~pp ~name gen prop
 
