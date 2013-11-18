@@ -244,32 +244,48 @@ let options =
 let parse_args () =
   Arg.parse options (fun f -> file := f) "check the given TSTP derivation"
 
+let main file =
+  try
+    let trace = TT.parse ~recursive:true file in
+    match trace with
+    | None -> Util.debug 0 "could not parse proof. failure."
+    | Some trace ->
+      if !print_problem
+        then Util.printf "derivation:\n%a" TT.pp_tstp trace;
+      Util.debug 1 "trace of %d steps" (TT.size trace);
+      (* check that the steps form a DAG *)
+      if not (TT.is_dag trace) then begin
+        Util.debug 0 "derivation is not a DAG, failure.";
+        exit 1
+      end else Util.debug 0 "derivation is a DAG";
+      (* validate steps one by one *)
+      let checked = CheckedTrace.create trace in
+      check_all ~progress:!progress ~provers ~checked ~timeout:!timeout;
+      (* print failures *)
+      List.iter
+        (fun (proof, res) -> match res with
+          | Failed prover ->
+            Util.debug 1 "trying to prove %a with %s failed" TT.pp1 proof prover
+          | _ -> assert false)
+        (CheckedTrace.failures ~checked);
+      (* check the global structure of the validated steps *)
+      if check_structure ~minimum:!minimum ~checked
+        then Util.debug 0 "validated steps form a correct proof. success."
+        else Util.debug 0 "proof structure incorrect. failure."
+  with
+  | Ast_tptp.ParseError loc ->
+    (* syntax error *)
+    Util.eprintf "parse error at %a\n" Location.pp loc;
+    exit 1
+  | Type.Error msg
+  | TypeInference.Error msg ->
+    Util.eprintf "%s\n" msg;
+    exit 1
+  | TypeUnif.Error e ->
+    Util.eprintf "%a\n" TypeUnif.pp_error e;
+    exit 1
+
 (** main entry point *)
 let () =
   parse_args ();
-  let trace = TT.parse ~recursive:true !file in
-  match trace with
-  | None -> Util.debug 0 "could not parse proof. failure."
-  | Some trace ->
-    if !print_problem
-      then Util.printf "derivation:\n%a" TT.pp_tstp trace;
-    Util.debug 1 "trace of %d steps" (TT.size trace);
-    (* check that the steps form a DAG *)
-    if not (TT.is_dag trace) then begin
-      Util.debug 0 "derivation is not a DAG, failure.";
-      exit 1
-    end else Util.debug 0 "derivation is a DAG";
-    (* validate steps one by one *)
-    let checked = CheckedTrace.create trace in
-    check_all ~progress:!progress ~provers ~checked ~timeout:!timeout;
-    (* print failures *)
-    List.iter
-      (fun (proof, res) -> match res with
-        | Failed prover ->
-          Util.debug 1 "trying to prove %a with %s failed" TT.pp1 proof prover
-        | _ -> assert false)
-      (CheckedTrace.failures ~checked);
-    (* check the global structure of the validated steps *)
-    if check_structure ~minimum:!minimum ~checked
-      then Util.debug 0 "validated steps form a correct proof. success."
-      else Util.debug 0 "proof structure incorrect. failure."
+  main !file
