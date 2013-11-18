@@ -27,15 +27,15 @@ module T = FOTerm
 let ty = Type.int
 
 let rules, symbols = 
-  let s_symb = Symbol.mk_const "s" in
-  let z_symb = Symbol.mk_const "zero" in
-  let plus_symb = Symbol.mk_const "plus" in
-  let mult_symb = Symbol.mk_const "mult" in
+  let s_symb = Symbol.mk_const ~ty:Type.(i <=. i) "s" in
+  let z_symb = Symbol.mk_const ~ty:Type.i "zero" in
+  let plus_symb = Symbol.mk_const ~ty:Type.(i <== [i;i]) "plus" in
+  let mult_symb = Symbol.mk_const ~ty:Type.(i <== [i;i]) "mult" in
   (* term constructors *)
-  let zero = T.mk_const ~ty z_symb in
-  let s x = T.mk_node ~ty s_symb [x] in
-  let plus x y = T.mk_node ~ty plus_symb [x; y] in
-  let mult x y = T.mk_node ~ty mult_symb [x; y] in
+  let zero = T.mk_const z_symb in
+  let s x = T.mk_node s_symb [x] in
+  let plus x y = T.mk_node plus_symb [x; y] in
+  let mult x y = T.mk_node mult_symb [x; y] in
   let x = T.mk_var ~ty 0 in
   let y = T.mk_var ~ty 1 in
   let z = T.mk_var ~ty 2 in
