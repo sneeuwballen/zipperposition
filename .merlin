@@ -1,9 +1,9 @@
 S src/
 S src/meta/
-S containers/
+S src/containers/
 B _build/
 B _build/src/
-B _build/containers/
+B _build/src/containers/
 B _build/src/meta/
 PKG datalog
 PKG sequence
