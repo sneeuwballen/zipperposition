@@ -38,7 +38,7 @@ val parse_file : recursive:bool -> string -> Ast_tptp.declaration Sequence.t
   (** Parsing a TPTP file is here presented with a [recursive] option
       that, if true, will make "include" directives to be recursively
       parsed. It uses {!find_file} for included files.
-      @raise {!Ast_tptp.ParseError} in case a syntax error is met. *)
+      @raise Ast_tptp.ParseError in case a syntax error is met. *)
 
 (* TODO: a function that takes a TPTP file, and returns the list of
         files that it depends on (recursive includes) *)

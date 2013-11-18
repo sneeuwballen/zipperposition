@@ -163,7 +163,7 @@ val size : t -> int
 val ty_vars : Type.Set.t -> t -> Type.Set.t
   (** Set of free type variables *)
 
-(** {2 De Bruijn Indexes manipulations *)
+(** {2 De Bruijn Indexes manipulations} *)
 
 module DB : sig
   val closed : ?depth:int -> t -> bool
