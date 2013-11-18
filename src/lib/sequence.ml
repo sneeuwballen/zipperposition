@@ -231,8 +231,9 @@ end
 
 (** Iterate on the sequence, storing elements in a data structure.
     The resulting sequence can be iterated on as many times as needed. *)
-let persistent (seq : 'a t) : 'a t =
-  let l = MList.of_seq seq in
+let persistent ?(blocksize=64) seq =
+  if blocksize < 2 then failwith "Sequence.persistent: blocksize too small";
+  let l = MList.of_seq ~size:blocksize seq in
   from_iter (fun k -> MList.iter k l)
 
 (** Sort the sequence. Eager, O(n) ram and O(n ln(n)) time. *)
@@ -329,11 +330,13 @@ exception ExitSequence
 (** Take at most [n] elements from the sequence *)
 let take n seq =
   let count = ref 0 in
-  fun k ->
-    try
-      seq
-        (fun x -> if !count < n then begin incr count; k x end
-                                else raise ExitSequence)
+  if n = 0 then empty
+    else fun k ->
+      try
+        seq (fun x ->
+          incr count;
+          k x;
+          if !count = n then raise ExitSequence)
     with ExitSequence -> ()
 
 (** Drop the [n] first elements of the sequence *)
@@ -433,16 +436,23 @@ let to_array seq =
       a
     end
 
-let of_array a = from_iter (fun k -> Array.iter k a)
+let of_array a =
+  fun k ->
+    for i = 0 to Array.length a - 1 do
+      k (Array.unsafe_get a i)
+    done
 
 let of_array_i a =
-  let seq k =
-    for i = 0 to Array.length a - 1 do k (i, a.(i)) done
-  in from_iter seq
+  fun k ->
+    for i = 0 to Array.length a - 1 do
+      k (i, Array.unsafe_get a i)
+    done
 
 let of_array2 a =
   fun k ->
-    for i = 0 to Array.length a - 1 do k i a.(i) done
+    for i = 0 to Array.length a - 1 do
+      k i (Array.unsafe_get a i)
+    done
 
 (** [array_slice a i j] Sequence of elements whose indexes range
     from [i] to [j] *)
@@ -530,6 +540,10 @@ let to_buffer seq buf =
 let int_range ~start ~stop =
   fun k ->
     for i = start to stop do k i done
+
+let int_range_dec ~start ~stop =
+  fun k ->
+    for i = start downto stop do k i done
 
 (** Convert the given set to a sequence. The set module must be provided. *)
 let of_set (type s) (type v) m set =
@@ -671,12 +685,18 @@ end
 module Infix = struct
   let (--) i j = int_range ~start:i ~stop:j
 
+  let (--^) i j = int_range_dec ~start:i ~stop:j
+
   let (|>) x f = f x
 
   let (@@) a b = append a b
 
   let (>>=) x f = flatMap f x
 end
+
+let (--) = Infix.(--)
+
+let (--^) = Infix.(--^)
 
 (** {2 Pretty printing of sequences} *)
 
@@ -693,3 +713,16 @@ let pp_seq ?(sep=", ") pp_elt formatter seq =
         end);
       pp_elt formatter x)
     seq
+
+let pp_buf ?(sep=", ") pp_elt buf seq =
+  let first = ref true in
+  iter
+    (fun x -> 
+      if !first then first := false else Buffer.add_string buf sep;
+      pp_elt buf x)
+    seq
+
+let to_string ?sep pp_elt seq =
+  let buf = Buffer.create 25 in
+  pp_buf ?sep (fun buf x -> Buffer.add_string buf (pp_elt x)) buf seq;
+  Buffer.contents buf
