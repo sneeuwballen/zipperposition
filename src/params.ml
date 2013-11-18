@@ -95,6 +95,7 @@ let parse_args () =
   (* options list *) 
   let options =
     [ "-ord", Arg.Set_string ord, "choose ordering (rpo,kbo)"
+    ; "-bt", Arg.Bool Printexc.record_backtrace, "enable/disable backtraces"
     ; "-version", Arg.Set version, "print version"
     ; "-steps", Arg.Set_int steps, "maximal number of steps of given clause loop"
     ; "-calculus", Arg.Set_string calculus, "set calculus ('superposition' or 'delayed' (default))"
