@@ -452,12 +452,15 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
             (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
             then begin
               assert (O.compare ord (S.apply_no_renaming subst l 1) (S.apply_no_renaming subst r 1) = Comp.Gt);
+              Util.debug 5 "t=%a[0], l= %a[1], r=%a[1], subst=%a"
+                T.pp t T.pp l T.pp r S.pp subst;
               clauses := unit_clause :: !clauses;
               Util.incr_stat stat_demodulate_step;
               raise (RewriteInto (r, subst))
             end);
       t (* not found any match, normal form found *)
     with RewriteInto (t', subst) ->
+      Util.debug 5 "rewrite %a into %a" T.pp t T.pp t';
       normal_form ~restrict subst t' 1 (* done one rewriting step, continue *)
   (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
      0, but then we normal_form terms in which variables are really the variables
@@ -465,14 +468,14 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
      variables are bound to terms in context 0 *)
   and normal_form ~restrict subst t scope =
     match t.T.term with
+    | T.BoundVar _
     | T.Var _ -> S.apply_no_renaming subst t scope
-    | T.BoundVar _ -> t
     | T.Node (s, tyargs, l) ->
       (* rewrite subterms *)
       let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
-      let t' = if List.for_all2 (==) l l'
-        then t
-        else T.mk_node ~tyargs s l' in
+      let tyargs' = List.map
+        (fun ty -> Substs.Ty.apply_no_renaming (S.ty_subst subst) ty scope) tyargs in
+      let t' = T.mk_node ~tyargs:tyargs' s l' in
       (* rewrite term at root *)
       reduce_at_root ~restrict t'
   in
