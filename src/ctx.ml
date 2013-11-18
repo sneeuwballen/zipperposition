@@ -96,17 +96,22 @@ let add_order ~ctx ?proof ~less ~lesseq =
   with Not_found ->
     let instance = Theories.TotalOrder.add ~spec ?proof ~less ~lesseq in
     (* declare missing symbols, if any; also take care that
-      less and lesseq have the same type, which is, a binary predicate *)
+      less and lesseq have the same type, which is, a binary predicate 
+      FIXME check types?
     if not (Signature.mem ctx.signature less) || not (Signature.mem ctx.signature lesseq)
       then failwith "Ctx.add_order: order symbols must be declared";
     let ty_less = Signature.find ctx.signature less in
     let ty_lesseq = Signature.find ctx.signature lesseq in
     if not (Type.eq ty_less ty_lesseq)
       then TypeUnif.fail Substs.Ty.empty ty_less 0 ty_lesseq 0;
+    *)
     instance
 
-let declare ~ctx symb ty =
-  ctx.signature <- Signature.declare ctx.signature symb ty
+let declare_ty ~ctx symb ty =
+  ctx.signature <- Signature.declare_ty ctx.signature symb ty
+
+let declare_sym ~ctx symb =
+  ctx.signature <- Signature.declare_sym ctx.signature symb
 
 let add_tstp_order ~ctx =
   let less = Symbol.Arith.less in
@@ -116,8 +121,7 @@ let add_tstp_order ~ctx =
     Theories.TotalOrder.find ~spec less
   with Not_found ->
     (* declare types of $less and $lesseq *)
-    let ty = Type.(o <== [var 0; var 0]) in
-    declare ~ctx less ty;
-    declare ~ctx lesseq ty;
+    declare_sym ~ctx less;
+    declare_sym ~ctx lesseq;
     let instance = Theories.TotalOrder.add ~spec ?proof:None ~less ~lesseq in
     instance

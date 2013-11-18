@@ -94,11 +94,11 @@ let do_superposition ~ctx active_clause sc_a active_pos
                 C.pp active_clause sc_a T.pp s T.pp t
                 C.pp passive_clause sc_p T.pp u T.pp v
                 Position.pp passive_pos S.pp subst;
-  if not (T.db_closed s)
+  if not (T.DB.closed s)
   then (Util.debug 3 "... active term is not DB-closed"; acc)
   else if not sign_st 
   then (Util.debug 3 "... active literal is negative"; acc)
-  else if not (T.db_closed (T.at_pos u subterm_pos))
+  else if not (T.DB.closed (T.at_pos u subterm_pos))
     && (List.exists (fun x -> S.mem subst x sc_p) (T.vars (T.at_pos u subterm_pos)))
   then (Util.debug 3 "... narrowing with De Bruijn indices"; acc)
   else
@@ -336,11 +336,11 @@ let infer_split c =
   let rec next_split_term () = 
     let s = "$$split_" ^ (string_of_int !split_count) in
     incr split_count;
-    T.mk_const ~ty:Type.o (Symbol.mk_const ~attrs:Symbol.attr_split s)
+    T.mk_const (Symbol.mk_const ~flags:Symbol.flag_split ~ty:Type.o s)
   in
   (* is the term made of a split symbol? *)
   let is_split_term t = match t.T.term with
-  | T.Node (s, []) when Symbol.has_attr Symbol.attr_split s -> true
+  | T.Node (s, _, []) when Symbol.has_flag Symbol.flag_split s -> true
   | _ -> false
   in
   (* literals that are ground, or split symbols *)
@@ -467,12 +467,12 @@ let demod_nf ?(restrict=false) (simpl_set : PS.SimplSet.t) clauses t =
     match t.T.term with
     | T.Var _ -> S.apply_no_renaming subst t scope
     | T.BoundVar _ -> t
-    | T.Node (s, l) ->
+    | T.Node (s, tyargs, l) ->
       (* rewrite subterms *)
       let l' = List.map (fun t' -> normal_form ~restrict:false subst t' scope) l in
       let t' = if List.for_all2 (==) l l'
         then t
-        else T.mk_node ~ty:t.T.ty s l' in
+        else T.mk_node ~tyargs s l' in
       (* rewrite term at root *)
       reduce_at_root ~restrict t'
   in
@@ -699,7 +699,7 @@ let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
   and equatable_terms clauses t1 t2 =
     match t1.T.term, t2.T.term with
     | _ when T.eq t1 t2 -> Some clauses  (* trivial *)
-    | T.Node (f, ss), T.Node (g, ts)
+    | T.Node (f, _, ss), T.Node (g, _, ts)
     when Symbol.eq f g && List.length ss = List.length ts ->
       (* try to make the terms equal directly *)
       (match equate_root clauses t1 t2 with
@@ -920,9 +920,13 @@ let eq_subsumes a b =
     match u.T.term, v.T.term with
     | _ when u == v -> true 
     | _ when equate_root a b u v -> true
-    | T.Node (f, ss), T.Node (g, ts)
-    when Symbol.eq f g && List.length ss = List.length ts ->
-      List.for_all2 (equate_terms a b) ss ts
+    | T.Node (f, tyargs_u, ss), T.Node (g, tyargs_v, ts)
+      when Symbol.eq f g->
+      begin try
+        List.for_all2 Type.eq tyargs_u tyargs_v &&
+        List.for_all2 (equate_terms a b) ss ts
+      with Invalid_argument _ -> false
+      end
     | _ -> false
   (* check whether a\sigma = u and b\sigma = v, for some sigma; or the commutation thereof *)
   and equate_root a b u v =

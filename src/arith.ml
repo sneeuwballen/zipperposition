@@ -47,40 +47,40 @@ module T = struct
   include FOTerm  (* for the rest of arith *)
 
   let rec is_arith t = match t.term with
-    | Node ((S.Int _ | S.Rat _ | S.Real _), []) -> true
-    | Node (s, _) when Symbol.Arith.is_arith s -> true
+    | Node ((S.Int _ | S.Rat _ | S.Real _), _, []) -> true
+    | Node (s, _, _) when Symbol.Arith.is_arith s -> true
     | Var _
     | BoundVar _ -> is_arith_ty t.ty
     | _ -> false
 
   let is_arith_const t = match t.term with
-    | Node ((S.Int _ | S.Rat _ | S.Real _), []) -> true
+    | Node ((S.Int _ | S.Rat _ | S.Real _), _, []) -> true
     | _ -> false
 
   let rec sum_list l = match l with
     | [] -> failwith "Arith.sum_list: got empty list"
     | [x] -> x
-    | x::l' -> mk_node ~ty:x.ty S.Arith.sum [x; sum_list l']
+    | x::l' -> mk_node ~tyargs:[ty x] S.Arith.sum [x; sum_list l']
 
-  let mk_sum t1 t2 = mk_node ~ty:t1.ty S.Arith.sum [t1; t2]
-  let mk_difference t1 t2 = mk_node ~ty:t1.ty S.Arith.difference [t1; t2]
-  let mk_product t1 t2 = mk_node ~ty:t1.ty S.Arith.product [t1; t2]
-  let mk_quotient t1 t2 = mk_node ~ty:t1.ty S.Arith.quotient [t1; t2]
-  let mk_uminus t = mk_node ~ty:t.ty S.Arith.uminus [t]
+  let mk_sum t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.sum [t1; t2]
+  let mk_difference t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.difference [t1; t2]
+  let mk_product t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.product [t1; t2]
+  let mk_quotient t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.quotient [t1; t2]
+  let mk_uminus t = mk_node ~tyargs:[ty t] S.Arith.uminus [t]
 
   let mk_less t1 t2 =
     if is_arith_const t1 && is_arith_const t2
       then if S.Arith.Op.less (head t1) (head t2)
         then true_term
         else false_term
-      else mk_node ~ty:Type.o S.Arith.less [t1; t2]
+      else mk_node ~tyargs:[ty t1] S.Arith.less [t1; t2]
 
   let mk_lesseq t1 t2 =
     if is_arith_const t1 && is_arith_const t2
       then if S.Arith.Op.lesseq (head t1) (head t2)
         then true_term
         else false_term
-      else mk_node ~ty:Type.o S.Arith.lesseq [t1; t2]
+      else mk_node ~tyargs:[ty t1] S.Arith.lesseq [t1; t2]
 
   let mk_greater t1 t2 = mk_less t2 t1
   let mk_greatereq t1 t2 = mk_lesseq t2 t1
@@ -90,8 +90,8 @@ module T = struct
     let rec gather set t = match t.term with
     | Var _
     | BoundVar _ -> Tbl.replace set t ()
-    | Node (s, []) when S.is_numeric s -> ()
-    | Node (s, l) when S.Arith.is_arith s ->
+    | Node (s, _, []) when S.is_numeric s -> ()
+    | Node (s, _, l) when S.Arith.is_arith s ->
       List.iter (gather set) l
     | Node _ -> Tbl.replace set t ()
     in
@@ -134,43 +134,22 @@ end
 module F = struct
   include FOFormula
 
-  let rec simplify f = match f.form with
-  | True
-  | False -> f
-  | Not {form=Atom {T.term=T.Node(S.Const("$greater",_), [l;r])}} ->
-    simplify (mk_atom (T.mk_lesseq l r))
-  | Not {form=Atom {T.term=T.Node(S.Const("$greatereq",_), [l;r])}} ->
-    simplify (mk_atom (T.mk_less l r))
-  | Not {form=Atom {T.term=T.Node(S.Const("$less",_), [l;r])}} ->
-    simplify (mk_atom (T.mk_lesseq r l))
-  | Not {form=Atom {T.term=T.Node(S.Const("$lesseq",_), [l;r])}} ->
-    simplify (mk_atom (T.mk_less r l))
-  | Atom {T.term=T.Node(S.Const("$greater",_), [l;r])} ->
-    simplify (mk_atom (T.mk_less r l))
-  | Atom {T.term=T.Node(S.Const("$greatereq",_), [l;r])} ->
-    simplify (mk_atom (T.mk_lesseq r l))
-  | Or l -> mk_or (List.map simplify l)
-  | And l -> mk_and (List.map simplify l)
-  | Not {form=Equal(l,r)} ->
-    let l' = T.simplify l in
-    let r' = T.simplify r in
-    if T.eq l' r'
-      then mk_false
-      else mk_neq l' r'
-  | Not f' -> mk_not (simplify f')
-  | Equiv (f1, f2) -> mk_equiv (simplify f1) (simplify f2)
-  | Imply (f1, f2) -> mk_imply (simplify f1) (simplify f2)
-  | Atom p ->
-    let p' = T.simplify p in
-    mk_atom p'
-  | Equal (l, r) ->
-    let l' = T.simplify l in
-    let r' = T.simplify r in
-    if T.is_arith_const l'  && T.is_arith_const r' && l' != r'
-      then mk_false
-      else mk_eq l' r'
-  | Forall (ty,f') -> mk_forall ~ty (simplify f')
-  | Exists (ty,f') -> mk_exists ~ty (simplify f')
+  let simplify f =
+    map_leaf
+      (fun f -> match f.form with
+        | Atom p ->
+          let p' = T.simplify p in
+          mk_atom p'
+        | Equal (t1, t2) ->
+          let t1' = T.simplify t1 in
+          let t2' = T.simplify t2 in
+          if T.is_arith_const t1'  && T.is_arith_const t1'
+            then if T.eq t1' t2'
+              then mk_true
+              else mk_false
+            else mk_eq t1' t2'
+        | _ -> f)
+      f
 end
 
 (** {2 View a Literal as an arithmetic Literal}. *)
@@ -237,23 +216,23 @@ module Lit = struct
       | True -> Literal.mk_tauto
       | False -> Literal.mk_absurd
       | Eq (t, const) ->
-        mk_eq ~ord t (T.mk_const ~ty:t.T.ty const)
+        mk_eq ~ord t (T.mk_const const)
       | Neq (t, const) ->
-        mk_neq ~ord t (T.mk_const ~ty:t.T.ty const)
+        mk_neq ~ord t (T.mk_const const)
       | L_less (t, const) when S.is_int const ->
         (* t < c ----> t <= c - 1 *)
-        mk_lesseq t (T.mk_const ~ty:t.T.ty (S.Arith.Op.prec const))
+        mk_lesseq t (T.mk_const (S.Arith.Op.prec const))
       | L_less (t, const) ->
-        mk_less t (T.mk_const ~ty:t.T.ty const)
+        mk_less t (T.mk_const const)
       | L_lesseq (t, const) ->
-        mk_lesseq t (T.mk_const ~ty:t.T.ty const)
+        mk_lesseq t (T.mk_const const)
       | R_less (const, t) when S.is_int const ->
         (* c < t ----> c+1 <= t  *)
-        mk_lesseq (T.mk_const ~ty:t.T.ty (S.Arith.Op.succ const)) t
+        mk_lesseq (T.mk_const (S.Arith.Op.succ const)) t
       | R_less (const, t) ->
-        mk_less (T.mk_const ~ty:t.T.ty const) t
+        mk_less (T.mk_const const) t
       | R_lesseq (const, t) ->
-        mk_lesseq (T.mk_const ~ty:t.T.ty const) t
+        mk_lesseq (T.mk_const const) t
   end
 
   (** {3 Comparison with 0} *)
@@ -328,21 +307,21 @@ module Lit = struct
         if T.is_arith l || T.is_arith r
           then extract_eqn l r sign
           else failwith "not arithmetic"
-      | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, true) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), _, [a; b])}, true) ->
         extract_lt a b
-      | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), [a; b])}, false) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), _, [a; b])}, false) ->
         extract_le b a
-      | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, true) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), _, [a; b])}, true) ->
         extract_le a b
-      | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), [a; b])}, false) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$lesseq",_), _, [a; b])}, false) ->
         extract_lt b a
-      | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, true) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), _, [a; b])}, true) ->
         extract_lt b a
-      | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), [a; b])}, false) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greater",_), _, [a; b])}, false) ->
         extract_le a b
-      | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, true) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), _, [a; b])}, true) ->
         extract_le b a
-      | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), [a; b])}, false) ->
+      | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), _, [a; b])}, false) ->
         extract_lt a b
       | Literal.Prop _ -> failwith "not arithmetic"
       in
@@ -365,7 +344,7 @@ module Lit = struct
     let to_lit ~ord lit =
       let mk_zero m =
         let ty = M.type_of m in
-        T.mk_const ~ty (S.Arith.zero_of_ty ty)
+        T.mk_const (S.Arith.zero_of_ty ty)
       in
       match lit with
       | True -> Literal.mk_tauto
@@ -489,7 +468,7 @@ module Lit = struct
       in
       (* divide [const] by [c] if possible *)
       let c, const = if S.Arith.Op.divides c const
-        then S.Arith.one_of_ty (S.Arith.typeof c), S.Arith.Op.quotient const c
+        then S.Arith.one_of_ty (S.ty c), S.Arith.Op.quotient const c
         else c, const
       in
       let lit' = match e with
@@ -597,7 +576,7 @@ module Lit = struct
     let _scale_eqn t m lit =
       if not (M.total_expression m)
         then
-          let t = T.mk_product (T.mk_const ~ty:(M.type_of m) m.M.divby) t in
+          let t = T.mk_product (T.mk_const m.M.divby) t in
           let t' = M.to_term (M.product m m.M.divby) in
           mk_eq ~ord t t'
         else
@@ -662,14 +641,13 @@ module Lit = struct
 
   let heuristic_eliminate lit =
     match lit with
-    | ( Literal.Equation ({T.term=T.Node(prod, [x1; x2])}, {T.term=T.Node(n,[])}, false, _)
-      | Literal.Equation ({T.term=T.Node(n,[])}, {T.term=T.Node(prod, [x1; x2])}, false, _))
+    | ( Literal.Equation ({T.term=T.Node(prod, _, [x1; x2])}, {T.term=T.Node(n,_,[])}, false, _)
+      | Literal.Equation ({T.term=T.Node(n,_,[])}, {T.term=T.Node(prod, _,[x1; x2])}, false, _))
       when S.eq prod S.Arith.product && T.is_var x1 && T.eq x1 x2 && S.is_numeric n ->
       (* ahah, square root spotted! *)
       Util.debug 5 "heuristic_elim tries sqrt of %a" S.pp n;
       begin match n with
       | S.Int n ->
-        let ty = Type.int in
         if Big_int.sign_big_int n >= 0
           then
             let s = Big_int.sqrt_big_int n in
@@ -677,19 +655,18 @@ module Lit = struct
               then
                 (* n is positive, and has an exact square root, try both
                     the positive and negative square roots*)
-                [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const ~ty (S.mk_bigint s)) 0
+                [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_bigint s)) 0
                 ; Substs.FO.bind Substs.FO.empty x1 0
-                  (T.mk_const ~ty (S.mk_bigint (Big_int.minus_big_int s))) 0 ]
+                  (T.mk_const (S.mk_bigint (Big_int.minus_big_int s))) 0 ]
               else []
           else []
       | S.Rat n -> []  (* TODO *)
       | S.Real n ->
-        let ty = Type.real in
         if n >= 0.
           then
             let s = sqrt n in
-            [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const ~ty (S.mk_real s)) 0
-            ; Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const ~ty (S.mk_real (~-. s))) 0
+            [ Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_real s)) 0
+            ; Substs.FO.bind Substs.FO.empty x1 0 (T.mk_const (S.mk_real (~-. s))) 0
             ]
           else []
       | _ -> failwith "unknown numeric type!?"
@@ -709,11 +686,11 @@ module Lits = struct
     let rec purify_term ~root t = match t.T.term with
     | T.Var _
     | T.BoundVar _ -> t
-    | T.Node (s,[]) when S.is_numeric s -> t
-    | T.Node (s, l) when S.Arith.is_arith s ->
+    | T.Node (s, _, []) when S.is_numeric s -> t
+    | T.Node (s, tyargs, l) when S.Arith.is_arith s ->
       if root
         then (* recurse, still in root arith expression *)
-          T.mk_node ~ty:t.T.ty s (List.map (purify_term ~root) l)
+          T.mk_node ~tyargs s (List.map (purify_term ~root) l)
         else begin
           (* purify this term out! *)
           let ty = t.T.ty in
@@ -726,7 +703,8 @@ module Lits = struct
           (* return variable instead of literal *)
           v
         end
-    | T.Node (s, l) -> T.mk_node ~ty:t.T.ty s (List.map (purify_term ~root:false) l)
+    | T.Node (s, tyargs, l) ->
+      T.mk_node ~tyargs s (List.map (purify_term ~root:false) l)
     in
     (* purify each literal *)
     Array.iteri

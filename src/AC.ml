@@ -43,34 +43,32 @@ let stat_ac_redundant = Util.mk_stat "ac.redundant"
 type spec = Theories.AC.t
 
 let axioms ~ctx s =
-  let signature = Ctx.signature ~ctx in
   let ord = Ctx.ord ~ctx in
-  let ty = Signature.find signature s in
-  match ty.Type.ty with
-  | Type.Fun (ret, [ret1;ret2]) when Type.eq ret ret1 && Type.eq ret ret2 ->
-    (* type is ok. *)
-    let x = T.mk_var ~ty:ret 0 in
-    let y = T.mk_var ~ty:ret 1 in
-    let z = T.mk_var ~ty:ret 2 in
-    let f x y = T.mk_node ~ty:ret s [x;y] in
-    let res = ref [] in
-    (* build clause l=r *)
-    let add_clause l r =
-      let name = Util.sprintf "ac_%a_%d" Symbol.pp s (List.length !res) in
-      let proof cc = Proof.mk_c_axiom cc ~file:"/dev/ac" ~name in
-      let c = C.create ~ctx [ Lit.mk_eq ~ord l r ] proof in
-      C.set_flag C.flag_persistent c true;
-      res := c :: !res
-    in
-    add_clause (f x y) (f y x);
-    add_clause (f (f x y) z) (f x (f y z));
-    add_clause (f x (f y z)) (f z (f x y));
-    add_clause (f x (f y z)) (f y (f x z));
-    add_clause (f x (f y z)) (f z (f y x));
-    !res
-  | _ ->
-    Util.debug 1 "AC symbol %a has wrong type %a" Symbol.pp s Type.pp ty;
-    assert false
+  let ty = Symbol.ty s in
+  let ty_args_n, args_n = Type.arity ty in
+  if args_n <> 2 then failwith "AC.axioms: AC symbol must be of arity 2";
+  let ty_var = List.hd (Type.expected_args ty) in
+  let x = T.mk_var ~ty:ty_var 0 in
+  let y = T.mk_var ~ty:ty_var 1 in
+  let z = T.mk_var ~ty:ty_var 2 in
+  (* type parameters should be the same as the concrete type? FIXME *)
+  let tyargs = Sequence.(to_list (map (fun _ -> ty_var) (1 -- ty_args_n))) in
+  let f x y = T.mk_node ~tyargs s [x;y] in
+  let res = ref [] in
+  (* build clause l=r *)
+  let add_clause l r =
+    let name = Util.sprintf "ac_%a_%d" Symbol.pp s (List.length !res) in
+    let proof cc = Proof.mk_c_axiom cc ~file:"/dev/ac" ~name in
+    let c = C.create ~ctx [ Lit.mk_eq ~ord l r ] proof in
+    C.set_flag C.flag_persistent c true;
+    res := c :: !res
+  in
+  add_clause (f x y) (f y x);
+  add_clause (f (f x y) z) (f x (f y z));
+  add_clause (f x (f y z)) (f z (f x y));
+  add_clause (f x (f y z)) (f y (f x z));
+  add_clause (f x (f y z)) (f z (f y x));
+  !res
   
 (** {2 Rules} *)
 

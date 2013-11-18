@@ -65,7 +65,7 @@ let parse_args () =
   and timeout = ref 0.
   and proof = ref "debug"
   and split = ref false
-  and theories = ref true
+  and theories = ref false
   and calculus = ref "superposition"
   and presaturate = ref false
   and dot_file = ref None
@@ -112,7 +112,7 @@ let parse_args () =
     ; "-arith", Arg.Set arith, "enable arithmetic"
     ; "-arith-ac", Arg.Set arith_ac, "enable AC axioms for arith"
     ; "-progress", Arg.Unit set_progress, "print progress"
-    ; "-no-theories", Arg.Clear theories, "do not detect theories in input"
+    ; "-theories", Arg.Bool (fun b -> theories := b), "enable/disable theory detection"
     ; "-proof", Arg.Set_string proof, "choose proof printing (none, debug, or tstp)"
     ; "-presaturate", Arg.Set presaturate, "pre-saturate (interreduction of) the initial clause set"
     ; "-stats", Arg.Set stats, "print statistics"

@@ -424,8 +424,14 @@ let () =
   Vector.iter params.param_files
     (fun file ->
       try process_file ?meta ~plugins ~params file
-      with Util_tptp.ParseError _ as e ->
-        Util.eprintf "file %s: %s\n" file (Util_tptp.string_of_error e));
+      with
+      | Type.Error msg ->
+        Util.eprintf "type error: %s\n" msg;
+        Printexc.print_backtrace stderr;
+      | Ast_tptp.ParseError loc ->
+        Util.eprintf "parse error (at %a)\n" Location.pp loc;
+        Printexc.print_backtrace stderr;
+    );
   (* save KB? *)
   save_kb ?meta ~params;
   ()

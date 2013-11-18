@@ -86,5 +86,8 @@ val add_order : ctx:t -> ?proof:Proof.t list ->
 val add_tstp_order : ctx:t -> Theories.TotalOrder.instance
   (** Specific version of {!add_order} for $less and $lesseq *)
 
-val declare : ctx:t -> Symbol.t -> Type.t -> unit
+val declare_ty : ctx:t -> string -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
+
+val declare_sym : ctx:t -> Symbol.t -> unit
+  (** Declare the symbol *)

@@ -63,7 +63,7 @@ let const constant =
   {
     coeffs = T.Map.empty;
     constant;
-    divby = S.Arith.one_of_ty (S.Arith.typeof constant);
+    divby = S.Arith.one_of_ty (S.ty constant);
   }
 
 let singleton ?divby coeff t =
@@ -71,15 +71,15 @@ let singleton ?divby coeff t =
     then const coeff  (* 0 *)
     else
       let coeffs = T.Map.singleton t coeff in
-      let constant = S.Arith.zero_of_ty (S.Arith.typeof coeff) in
+      let constant = S.Arith.zero_of_ty (S.ty coeff) in
       let divby = match divby with
       | Some d -> d
-      | None -> S.Arith.one_of_ty (S.Arith.typeof coeff)
+      | None -> S.Arith.one_of_ty (S.ty coeff)
       in
       { coeffs; constant; divby; }
 
 let of_list constant l =
-  let divby = S.Arith.one_of_ty (S.Arith.typeof constant) in
+  let divby = S.Arith.one_of_ty (S.ty constant) in
   let coeffs = List.fold_left
     (fun m (coeff, t) ->
       if S.Arith.is_zero coeff
@@ -114,7 +114,7 @@ let add_const m c =
   { m with constant; }
 
 let add m coeff t = match t.T.term with
-  | T.Node (s, []) when S.is_numeric s ->
+  | T.Node (s, _, []) when S.is_numeric s ->
     (* special case: if the term is a constant *)
     add_const m (S.Arith.Op.product coeff s)
   | _ ->
@@ -133,7 +133,7 @@ let add m coeff t = match t.T.term with
 let remove m t =
   { m with coeffs=T.Map.remove t m.coeffs; }
 
-let type_of m = S.Arith.typeof m.constant
+let type_of m = S.ty m.constant
 
 let is_constant m = T.Map.is_empty m.coeffs
 
@@ -185,7 +185,7 @@ let normalize m = match m.constant with
     (* multiply by 1/divby *)
     let constant = S.Arith.Op.quotient m.constant m.divby in
     let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' m.divby) m.coeffs in
-    let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
+    let one = S.Arith.one_of_ty (S.ty m.constant) in
     { constant; coeffs; divby=one; }
   | _ -> assert false
 
@@ -288,11 +288,11 @@ let rec divby m const =
     normalize { m with divby; }
 
 let succ m =
-  let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
+  let one = S.Arith.one_of_ty (S.ty m.constant) in
   add_const m one
 
 let pred m =
-  let one = S.Arith.one_of_ty (S.Arith.typeof m.constant) in
+  let one = S.Arith.one_of_ty (S.ty m.constant) in
   add_const m (S.Arith.Op.uminus one)
 
 let rec sum_list = function
@@ -330,37 +330,37 @@ exception NotLinear of string
 
 let of_term t =
   let rec of_term t = match t.T.term with
-  | T.Node (s, [t1; t2]) when S.eq s S.Arith.sum ->
+  | T.Node (s, _, [t1; t2]) when S.eq s S.Arith.sum ->
     let m1 = of_term t1 in
     let m2 = of_term t2 in
     sum m1 m2
-  | T.Node (s, [t1; t2]) when S.eq s S.Arith.difference ->
+  | T.Node (s, _, [t1; t2]) when S.eq s S.Arith.difference ->
     let m1 = of_term t1 in
     let m2 = of_term t2 in
     difference m1 m2
-  | T.Node (s, [t']) when S.eq s S.Arith.uminus ->
+  | T.Node (s, _, [t']) when S.eq s S.Arith.uminus ->
     let m = of_term t' in
     uminus m
-  | T.Node (s, [{T.term=T.Node (s',[])}; t2])
+  | T.Node (s, _, [{T.term=T.Node (s',_,[])}; t2])
     when S.eq s S.Arith.product && S.is_numeric s' ->
     let m = of_term t2 in
     product m s'
-  | T.Node (S.Const("$succ",_), [t']) ->
+  | T.Node (S.Const("$succ",_), _, [t']) ->
     let m = of_term t' in
     succ m
-  | T.Node (S.Const("$pred",_), [t']) ->
+  | T.Node (S.Const("$pred",_), _, [t']) ->
     let m = of_term t' in
     pred m
-  | T.Node (s, [t2; {T.term=T.Node (s',[])}])
+  | T.Node (s, _,[t2; {T.term=T.Node (s',_,[])}])
     when S.eq s S.Arith.product && S.is_numeric s' ->
     let m = of_term t2 in
     product m s'
-  | T.Node (s, [t2; {T.term=T.Node (s',[])}])
+  | T.Node (s, _,[t2; {T.term=T.Node (s',_,[])}])
     when S.eq s S.Arith.quotient && S.is_numeric s' && not (S.Arith.is_zero s') ->
     let m = of_term t2 in
     divby m s'
-  | T.Node (s, []) when S.is_numeric s -> const s
-  | T.Node (s, [_; _]) when S.Arith.is_arith s ->
+  | T.Node (s, _, []) when S.is_numeric s -> const s
+  | T.Node (s, _, [_; _]) when S.Arith.is_arith s ->
     raise (NotLinear (Util.sprintf "non linear op %a" S.pp s)) (* failure *)
   | T.Var _
   | T.BoundVar _ ->
@@ -382,15 +382,14 @@ let of_term_opt t =
 
 (* FIXME types types types *)
 let to_term m =
-  let ty = type_of m in
-  let add x y = T.mk_node ~ty S.Arith.sum [x;y] in
-  let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const ~ty s) x in
+  let add x y = T.mk_node ~tyargs:[T.ty x] S.Arith.sum [x;y] in
+  let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
   let prod s x = if S.Arith.is_one s then x
-    else T.mk_node ~ty S.Arith.product [T.mk_const ~ty s; x]
+    else T.mk_node ~tyargs:[T.ty x] S.Arith.product [T.mk_const s; x]
   in
   let sum =
     if T.Map.is_empty m.coeffs
-      then T.mk_const ~ty m.constant (* constant *)
+      then T.mk_const m.constant (* constant *)
     else
       (* remove one coeff to make the basic sum *)
       let t, c = T.Map.choose m.coeffs in
@@ -408,7 +407,7 @@ let to_term m =
   in
   if S.Arith.is_one m.divby
     then sum
-    else T.mk_node ~ty S.Arith.quotient [sum; T.mk_const ~ty m.divby]
+    else T.mk_node ~tyargs:[T.ty sum] S.Arith.quotient [sum; T.mk_const m.divby]
 
 let apply_subst ~renaming subst m sc_m =
   if T.Map.is_empty m.coeffs then m else

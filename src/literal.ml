@@ -180,7 +180,7 @@ let orientation_of = function
 
 let ineq_lit ~spec lit =
   match lit with
-  | Prop ({T.term=T.Node(s, [l;r])}, true) ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) ->
     let instance = TO.find ~spec s in
     let strict = Symbol.eq s instance.TO.less in
     TO.({ left=l; right=r; strict; instance; })
@@ -208,15 +208,15 @@ let is_nonstrict_ineq ~spec lit =
     false
 
 let ineq_lit_of ~instance lit = match lit with
-  | Prop ({T.term=T.Node(s, [l;r])}, true) when Symbol.eq s instance.TO.less ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) when Symbol.eq s instance.TO.less ->
     TO.({ left=l; right=r; strict=true; instance; })
-  | Prop ({T.term=T.Node(s, [l;r])}, true) when Symbol.eq s instance.TO.lesseq ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) when Symbol.eq s instance.TO.lesseq ->
     TO.({ left=l; right=r; strict=false; instance; })
   | _ -> raise Not_found
 
 let is_ineq_of ~instance lit =
   match lit with
-  | Prop ({T.term=T.Node(s, [l;r])}, true) ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) ->
     Symbol.eq s instance.TO.less || Symbol.eq s instance.TO.lesseq
   | _ -> false
 
@@ -256,11 +256,11 @@ let mk_absurd = False
 
 let mk_less instance l r =
   let open Theories.TotalOrder in
-  mk_true (T.mk_node ~ty:Type.o instance.less [l; r])
+  mk_true (T.mk_node ~tyargs:[T.ty l] instance.less [l; r])
 
 let mk_lesseq instance l r =
   let open Theories.TotalOrder in
-  mk_true (T.mk_node ~ty:Type.o instance.lesseq [l; r])
+  mk_true (T.mk_node ~tyargs:[T.ty l] instance.lesseq [l; r])
 
 let apply_subst ~renaming ~ord subst lit scope =
   match lit with
@@ -427,9 +427,9 @@ let pp_tstp buf lit =
 
 let pp_arith buf lit =
   match lit with
-  | Prop ({T.term=T.Node(f,[a;b])},true) when Symbol.eq f Symbol.Arith.less ->
+  | Prop ({T.term=T.Node(f, _, [a;b])},true) when Symbol.eq f Symbol.Arith.less ->
     Printf.bprintf buf "%a < %a" T.pp_arith a T.pp_arith b
-  | Prop ({T.term=T.Node(f,[a;b])},true) when Symbol.eq f Symbol.Arith.lesseq ->
+  | Prop ({T.term=T.Node(f, _, [a;b])},true) when Symbol.eq f Symbol.Arith.lesseq ->
     Printf.bprintf buf "%a ≤ %a" T.pp_arith a T.pp_arith b
   | Prop (p, true) -> T.pp_arith buf p
   | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp_arith p

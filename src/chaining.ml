@@ -76,7 +76,7 @@ let _gather_positions ~eligible ~signature lits scope pos subst =
 let _check_eq_chaining_active ~ctx active s_a active_pos subst =
   let s, t, sign = Lits.get_eqn active.C.hclits active_pos in
   sign &&
-  T.db_closed t &&
+  T.DB.closed t &&
   begin (* s' not < t' *)
     let ord = Ctx.ord ~ctx in
     let renaming = Ctx.renaming_clear ~ctx in
@@ -335,7 +335,7 @@ let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc
     Position.pp left_pos C.pp right Position.pp right_pos;
   let signature = Ctx.signature ctx in
   let instance = (Lits.get_ineq ~spec left.C.hclits left_pos).TO.instance in
-  let mk_less t1 t2 = Lit.mk_true (T.mk_node ~ty:Type.o instance.TO.less [t1; t2]) in
+  let mk_less t1 t2 = Lit.mk_true (T.mk_node instance.TO.less [t1; t2]) in
   let t1 = (Lits.get_ineq ~spec right.C.hclits right_pos).TO.left in
   (* find other inequality literals that can be chained on *)
   let eligible c = C.Eligible.ineq_of c instance in

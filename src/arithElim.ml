@@ -217,7 +217,7 @@ let case_switch active_set c =
     let t' = Substs.FO.apply ~renaming subst t s_c in
     (* the case switch on t *)
     let lits_case = List.map
-      (fun n -> Lit.mk_eq ~ord t' (T.mk_const ~ty:Type.int (S.mk_bigint n)))
+      (fun n -> Lit.mk_eq ~ord t' (T.mk_const (S.mk_bigint n)))
       (_int_range lower higher)
     in
     let new_lits = lits_left @ lits_right @ lits_case in
@@ -238,7 +238,7 @@ let case_switch active_set c =
         if olit.TO.strict
           then acc  (* on integers, we should only have <=, not < *)
         else begin match l.T.term, r.T.term with
-          | T.Node (S.Int lower, []), _ when not (Arith.T.is_arith_const r) ->
+          | T.Node (S.Int lower, _, []), _ when not (Arith.T.is_arith_const r) ->
             (* const <= r, look for r <= const' in index *)
             I.retrieve_unifiables active_set#idx_ord_left 1 r 0 acc
               (fun acc _ with_pos subst ->
@@ -248,14 +248,14 @@ let case_switch active_set c =
                   let i' = List.hd pos' in
                   let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
                   begin match olit'.TO.right.T.term with
-                  | T.Node (S.Int higher, []) ->
+                  | T.Node (S.Int higher, _, []) ->
                     (* found higher bound, now we can do the case switch *)
                     _do_case_switch c 0 i c' 1 i' r lower higher subst acc
                   | _ -> acc
                   end
                 with Not_found ->
                   acc)
-          | _, T.Node (S.Int higher, []) when not (Arith.T.is_arith_const l) ->
+          | _, T.Node (S.Int higher, _, []) when not (Arith.T.is_arith_const l) ->
             (* l <= const, look for const' <= l in index *)
             I.retrieve_unifiables active_set#idx_ord_right 1 l 0 acc
               (fun acc _ with_pos subst ->
@@ -265,7 +265,7 @@ let case_switch active_set c =
                   let i' = List.hd pos' in
                   let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
                   begin match olit'.TO.left.T.term with
-                  | T.Node (S.Int lower, []) ->
+                  | T.Node (S.Int lower, _, []) ->
                     (* found lower bound *)
                     _do_case_switch c' 1 i' c 0 i l lower higher subst acc
                   | _ -> acc

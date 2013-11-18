@@ -310,7 +310,8 @@ let ground_pair t1 t2 =
   let _, subst = List.fold_left
     (fun (i,subst) v ->
       (* bind [v] to a fresh constant *)
-      let const = T.mk_const ~ty:v.T.ty (Symbol.mk_fresh_const i) in
+      let ty = T.ty v in
+      let const = T.mk_const (Symbol.mk_fresh_const ~ty i) in
       let subst' = S.bind subst v 0 const 0 in
       (i+1, subst'))
     (0, S.empty) vars in
