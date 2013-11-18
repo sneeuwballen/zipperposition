@@ -30,8 +30,6 @@ open Logtk
 
 module BF = Basic.Form
 
-let printer = ref BF.pp
-
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
   ()
@@ -41,9 +39,8 @@ let stats = ref false
 let pp_base = ref false
 
 let options =
-  [ "-cat", Arg.Set cat_input, "print input declarations"
+  [ "-cat", Arg.Set cat_input, "print (annotated) declarations"
   ; "-base", Arg.Set pp_base, "print signature of base symbols"
-  ; "-tstp", Arg.Unit (fun () -> printer := BF.pp_tstp), "output in TSTP format"
   ] @ Options.global_opts
 
 (* check the given file *)
@@ -53,23 +50,21 @@ let check file =
   try
     (* parse *)
     let decls = Util_tptp.parse_file ~recursive:true file in
-    (if !cat_input
-      then Sequence.iter
-        (fun d -> Util.printf "%a\n" Ast_tptp.pp_declaration d) decls);
     (* type check *)
-    let signature = if !pp_base
-      then Util_tptp.signature decls
-      else Signature.diff (Util_tptp.signature decls) Signature.base
-    in
+    let signature, decls' = Util_tptp.annotate_type decls in
+    let signature = if !pp_base then signature else Signature.diff signature Signature.base in
     Printf.printf "signature:\n";
     Signature.iter signature
       (fun _ s ->
         let ty = Symbol.ty s in
         Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
-    Printf.printf "formulas:\n";
-    Sequence.iter
-      (fun f -> Util.printf "  %a\n" !printer f)
-      (Util_tptp.formulas decls);
+    (* print formulas *)
+    if !cat_input then begin
+      Printf.printf "formulas:\n";
+      Sequence.iter 
+        (fun decl -> Util.printf "  %a\n" Ast_tptp.pp_declaration decl)
+        decls';
+      end;
     (if !stats then begin
       Util.printf "number of symbols: %d\n" (Signature.size signature);
       Util.printf "number of input declarations: %d\n" (Sequence.length decls);
@@ -78,6 +73,10 @@ let check file =
   | Ast_tptp.ParseError loc ->
     (* syntax error *)
     Util.eprintf "parse error at %a\n" Location.pp loc;
+    exit 1
+  | Type.Error msg
+  | TypeInference.Error msg ->
+    Util.eprintf "%s\n" msg;
     exit 1
   | TypeUnif.Error e ->
     Util.eprintf "%a\n" TypeUnif.pp_error e;

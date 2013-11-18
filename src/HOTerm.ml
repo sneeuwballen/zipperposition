@@ -353,6 +353,16 @@ let rec replace t ~old ~by = match t.term with
 (** Size of the term (number of subterms) *)
 let size t = t.tsize
 
+let rec ty_vars set t = match t.term with
+  | Var _
+  | BoundVar _ 
+  | Const _ -> Type.free_vars_set set t.ty
+  | Lambda t' -> ty_vars set t'
+  | At (head, tyargs, l) ->
+    let set = ty_vars set head in
+    let set = List.fold_left Type.free_vars_set set tyargs in
+    List.fold_left ty_vars set l
+
 (** get subterm by its position *)
 let rec at_cpos t pos = match t.term, pos with
   | _, 0 -> t

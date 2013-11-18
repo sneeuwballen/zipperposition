@@ -79,7 +79,7 @@ val flag_distinct : flag        (** distinct element (between "") *)
 
 val mk_const : ?flags:flag -> ty:Type.t -> string -> t
   (** Build a typed symbol with the given name and type.
-      @raise Invalid_argument if the type contains free variables *)
+      @raise Type.Error if the type contains free variables *)
 
 val mk_distinct : ?flags:flag -> ?ty:Type.t -> string -> t
   (** default type: $i *)

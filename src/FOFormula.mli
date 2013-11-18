@@ -140,6 +140,9 @@ val subterm : term -> t -> bool
 val free_variables : t -> FOTerm.varlist
   (** Variables not bound by any (formula) quantifier *)
 
+val ty_vars : Type.Set.t -> t -> Type.Set.t
+  (** Set of free type variables *)
+
 val var_occurs : term -> t -> bool
 
 val is_atomic : t -> bool   (** No connectives? *)

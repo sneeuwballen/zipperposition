@@ -32,9 +32,18 @@ module FO : sig
 end
 
 module Form : sig
-  val erase : ?depth:int -> FOFormula.t -> Basic.Form.t
+  val erase : ?close_ty:bool -> ?depth:int -> FOFormula.t -> Basic.Form.t
+    (** Erase types (except for variables) and convert to basic formula
+        representation.
+        
+        @param close_ty (default true) if true, quantify universally on
+          free type variables *)
 end
 
 module HO : sig
-  val erase : ?depth:int -> HOTerm.t -> Basic.HO.t
+  val erase : ?close_ty:bool -> ?depth:int -> HOTerm.t -> Basic.HO.t
+    (** Erase type annotations except type parameters and for variables, by
+        converting to a basic term
+
+        @param close_ty see {!Form.erase} *)
 end

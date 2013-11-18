@@ -112,6 +112,9 @@ val tType : t   (* "type" of types *)
 
 (** {2 Utils} *)
 
+val free_vars_set : Set.t -> t -> Set.t
+  (** Add the free variables to the given set *)
+
 val free_vars : t -> t list
   (** List of free variables ({!Var}) that are not bound *)
 

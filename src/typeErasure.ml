@@ -47,7 +47,7 @@ module Form = struct
   module BT = Basic.FO
   module BF = Basic.Form
 
-  let erase ?(depth=0) f =
+  let erase ?(close_ty=true) ?(depth=0) f =
     let rec erase depth f = match f.F.form with
       | F.True -> BF.mk_true
       | F.False -> BF.mk_false
@@ -65,14 +65,21 @@ module Form = struct
         let v = BT.var ~ty:(TypeConversion.to_basic ty) (Util.sprintf "Y%d" depth) in
         BF.exists [v] (erase (depth+1) f')
     in
-    erase depth f
+    let f' = erase depth f in
+    let f' = if close_ty
+      then
+        let tyvars = Type.Set.elements (F.ty_vars Type.Set.empty f) in
+        let tyvars = List.map (fun ty -> BT.of_ty (TypeConversion.to_basic ty)) tyvars in
+        BF.forall tyvars f'
+      else f' in
+    f'
 end
 
 module HO = struct
   module T = HOTerm
   module BT = Basic.HO
 
-  let erase ?(depth=0) t =
+  let erase ?(close_ty=true) ?(depth=0) t =
     let rec erase depth t = match t.T.term with
     | T.Const s -> BT.const (Symbol.to_basic s)
     | T.At (t, tyargs, l) ->
@@ -86,5 +93,12 @@ module HO = struct
       let var = BT.var ~ty:(TypeConversion.to_basic t.T.ty) (Util.sprintf "Y%d" depth) in
       BT.lambda ~var (erase (depth+1) t')
     in
-    erase depth t
+    let t' = erase depth t in
+    let t' = if close_ty
+      then
+        let tyvars = Type.Set.elements (T.ty_vars Type.Set.empty t) in
+        let tyvars = List.map (fun ty -> BT.of_ty (TypeConversion.to_basic ty)) tyvars in
+        BT.forall_list tyvars t'
+      else t' in
+    t'
 end

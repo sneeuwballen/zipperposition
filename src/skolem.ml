@@ -83,10 +83,13 @@ let skolem_form ~ctx ~ty f =
           (FOUnif.form_variant f' 1 f 0))
       ctx.sc_fcache;
     (* fresh symbol with the proper type *)
-    let ty_vars = List.map T.ty vars in
-    let ty = Type.(ty <== ty_vars) in
+    let ty_of_vars = List.map T.ty vars in
+    let ty = Type.(ty <== ty_of_vars) in
+    (* close the type w.r.t its type variables *)
+    let tyargs = Type.free_vars ty in
+    let ty = Type.forall tyargs ty in
     let symb = fresh_sym ~ctx ~ty in
-    let skolem_term = T.mk_node symb vars in
+    let skolem_term = T.mk_node ~tyargs symb vars in
     (* replace variable by skolem t*)
     let env = DBEnv.singleton skolem_term in
     let new_f = F.DB.unshift 1 (F.DB.eval env f) in

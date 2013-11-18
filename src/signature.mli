@@ -39,14 +39,15 @@ val mem : t -> string -> bool
 val declare : t -> string -> Symbol.t -> t
   (** Declare the symbol, or
       @raise Invalid_argument if the symbol is already defined with
-             a different type, or if the type has free variables *)
+             a different type
+      @raise Type.Error if the type has free variables *)
 
 val declare_ty : t -> string -> Type.t -> t
   (** Same as {!declare} but also builds the symbol *)
 
 val declare_sym : t -> Symbol.t -> t
   (** Declare the symbol by itself (by its name)
-      @raise Invalid_argument if the symbol is not  a string *)
+      @raise Invalid_argument if the symbol is not a string *)
 
 val find : t -> string -> Symbol.t
   (** Lookup a symbol by its name, or

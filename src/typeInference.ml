@@ -310,7 +310,7 @@ let _split_arity arity l =
     | _, [] -> assert false
     | _, x::post' -> drop (n-1) (x::pre) post'
   in
-  drop (arity-n) [] l
+  drop (n - arity) [] l
 
 module FO = struct
   module BT = Basic.FO
@@ -347,6 +347,8 @@ module FO = struct
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
       let n_tyargs, n_args = Type.arity ty_s in
+      if n_args > List.length l
+        then raise (Type.Error (Util.sprintf "expected %d arguments" n_args));
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the symbol.
           We split [l] into the list [tyargs], containing [n_tyargs] types,

@@ -250,17 +250,17 @@ let tType = const "$tType"
 
 (** {2 Utils} *)
 
-let rec _free_vars set ty =
+let rec free_vars_set set ty =
   if ty.ground then set
   else match ty.ty with
   | Var _ -> Set.add ty set
   | BVar _ -> set
-  | App (_, l) -> List.fold_left _free_vars set l
-  | Fun (ret, l) -> List.fold_left _free_vars (_free_vars set ret) l
-  | Forall ty' -> _free_vars set ty'
+  | App (_, l) -> List.fold_left free_vars_set set l
+  | Fun (ret, l) -> List.fold_left free_vars_set (free_vars_set set ret) l
+  | Forall ty' -> free_vars_set set ty'
 
 let free_vars ty =
-  let set = _free_vars Set.empty ty in
+  let set = free_vars_set Set.empty ty in
   Set.elements set
 
 let close_forall ty =

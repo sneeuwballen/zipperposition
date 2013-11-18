@@ -249,3 +249,38 @@ let sourced_formulas ?(negate=__is_conjecture) ?(file="unknown_file") decls =
           else Some (f, file, source)
       | A.THF _ -> None)
     decls
+
+let annotate_type ?(signature=Signature.base) ?(close_ty=true) decls =
+  let ctx = TypeInference.Ctx.of_signature signature in
+  let decls' = Sequence.fmap
+    (fun decl ->
+      Util.debug 3 "infer type for %a" A.pp_declaration decl;
+      match decl with
+      | A.Include _
+      | A.IncludeOnly _ 
+      | A.NewType _ -> None (* remove *)
+      | A.TypeDecl(name, s, ty) ->
+        let ty = TypeConversion.of_basic ty in
+        TypeInference.Ctx.declare ctx s ty;
+        Some decl
+      | A.CNF(name,role,c,info) ->
+        let c' = TypeInference.FO.convert_clause ~ctx c in
+        let f' = F.close_forall (F.mk_or c') in
+        let f' = TypeErasure.Form.erase ~close_ty f' in
+        Some (A.TFF(name,role,f',info))
+      | A.FOF(name,role,f,info)
+      | A.TFF(name,role,f,info) ->
+        let f' = TypeInference.FO.convert_form ~ctx f in
+        let f' = TypeErasure.Form.erase ~close_ty f' in
+        Some (A.TFF(name,role,f',info))
+      | A.THF(name,role,t,info) ->
+        let t' = TypeInference.HO.convert ~ret:Type.o ~ctx t in
+        let t' = TypeErasure.HO.erase ~close_ty t' in
+        Some (A.THF(name,role,t',info))
+      )
+    decls
+  in
+  let decls' = Sequence.persistent decls' in
+  let signature = TypeInference.Ctx.to_signature ctx in
+  signature, decls'
+

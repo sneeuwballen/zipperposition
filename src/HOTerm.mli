@@ -190,6 +190,9 @@ val depth : t -> int                     (** depth of the term *)
 val head : t -> Symbol.t                 (** head symbol (or Invalid_argument) *)
 val size : t -> int
 
+val ty_vars : Type.Set.t -> t -> Type.Set.t
+  (** Set of free type variables *)
+
 val symbols : t Sequence.t -> Symbol.Set.t   (** Symbols of the terms (keys of signature) *)
 val contains_symbol : Symbol.t -> t -> bool
 

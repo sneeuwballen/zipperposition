@@ -259,7 +259,7 @@ module FO = struct
     | App (_, _) -> raise (ExpectedType t)
 
   let rec of_ty ty = match ty with
-    | Ty.Var s -> var s
+    | Ty.Var s -> var ~ty:Ty.tType s
     | Ty.App (s, l) -> app (Sym.mk_const s) (List.map of_ty l)
     | Ty.Forall _ -> raise (Invalid_argument "Basic.FO.of_ty: forall")
     | Ty.Fun _ -> raise (Invalid_argument "Basic.FO.of_ty: fun")
@@ -390,8 +390,17 @@ module Form = struct
       (fun f v -> _replace_var v f)
       f vars
 
-  let forall ?loc vars f = {loc; form=Quant (Forall, vars, _replace_vars vars f); }
-  let exists ?loc vars f = {loc; form=Quant (Exists, vars, _replace_vars vars f); }
+  let forall ?loc vars f = match f.form with
+    | Quant (Forall, vars', f') ->
+      {loc; form=Quant (Forall, vars @ vars', _replace_vars vars f'); }
+    | _ ->
+      {loc; form=Quant (Forall, vars, _replace_vars vars f); }
+
+  let exists ?loc vars f = match f.form with
+    | Quant (Exists, vars', f') ->
+      {loc; form=Quant (Exists, vars @ vars', _replace_vars vars f'); }
+    | _ ->
+      {loc; form=Quant (Exists, vars, _replace_vars vars f); }
 
   let free_vars f =
     let rec find set f = match f.form with
@@ -570,7 +579,7 @@ module HO = struct
     | Lambda _ -> raise (ExpectedType t)
 
   let rec of_ty ty = match ty with
-    | Ty.Var s -> var s
+    | Ty.Var s -> var ~ty:Ty.tType s
     | Ty.App (s, l) -> app (const (Sym.mk_const s)) (List.map of_ty l)
     | Ty.Forall _ -> raise (Invalid_argument "Basic.FO.of_ty: forall")
     | Ty.Fun _ -> raise (Invalid_argument "Basic.FO.of_ty: fun")

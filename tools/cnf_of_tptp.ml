@@ -57,8 +57,8 @@ let to_cnf decls =
           let clauses = Cnf.cnf_of ~ctx (F.mk_not f) in
           Sequence.map
             (fun c ->
-              let c = List.map TypeErasure.Form.erase c in
-              A.CNF(n,A.R_negated_conjecture,c,info))
+              let c = TypeErasure.Form.erase (F.close_forall (F.mk_or c)) in
+              A.TFF(n,A.R_negated_conjecture,c,info))
             (Sequence.of_list clauses)
         | _ ->
           (* type conjecture *)
@@ -67,8 +67,8 @@ let to_cnf decls =
           let clauses = Cnf.cnf_of ~ctx f in
           Sequence.map
             (fun c ->
-              let c = List.map TypeErasure.Form.erase c in
-              A.CNF(n,role,c,info))
+              let c = TypeErasure.Form.erase (F.close_forall (F.mk_or c)) in
+              A.TFF(n,role,c,info))
             (Sequence.of_list clauses)
         end
       | A.CNF _ as d -> Sequence.singleton d
@@ -101,6 +101,7 @@ let process file =
     (* syntax error *)
     Util.eprintf "parse error at %a\n" Location.pp loc;
     exit 1
+  | TypeInference.Error msg
   | Type.Error msg ->
     Util.eprintf "type error: %s\n" msg;
     Printexc.print_backtrace stderr;

@@ -356,6 +356,9 @@ let free_variables f =
   iter (fun t -> T.add_vars set t) f;
   T.Tbl.fold (fun v () acc -> v :: acc) set []
 
+let ty_vars set f =
+  fold T.ty_vars set f
+
 let is_atomic f = match f.form with
   | And _
   | Or _

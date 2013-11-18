@@ -112,7 +112,9 @@ let hash s = match s with
 let mk_const ?(flags=0) ~ty s =
   begin match Type.free_vars ty with
     | [] -> ()
-    | _::_ -> failwith "Symbol.mk_const: type has free variables"
+    | _::_ ->
+      let msg = Util.sprintf "Symbol.mk_const (%s): type %a has free variables" s Type.pp ty in
+      raise (Type.Error msg)
   end;
   let symb = Const (s, { tag= ~-1; flags; ty; }) in
   H.hashcons symb

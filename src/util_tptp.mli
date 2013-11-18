@@ -87,3 +87,14 @@ val sourced_formulas : ?negate:(Ast_tptp.role -> bool) ->
   (** Same as {!formulas}, but keeps a source attached to formulas.
       A [file] name has to be provided for the source to be accurate,
       the default is "unknown_file". *)
+
+val annotate_type : ?signature:Signature.t ->
+                    ?close_ty:bool ->
+                    Ast_tptp.declaration Sequence.t ->
+                    Signature.t * Ast_tptp.declaration Sequence.t
+  (** Mixture of {!infer_type} and {!signature}, where formulas are
+      annotated with their type (full TFF output) and the
+      signature is returned. 
+      
+      @param close_ty universally quantify on free type variables (default true)
+      *)
