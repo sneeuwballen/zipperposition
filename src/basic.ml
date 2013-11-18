@@ -390,14 +390,16 @@ module Form = struct
       (fun f v -> _replace_var v f)
       f vars
 
-  let forall ?loc vars f = match f.form with
-    | Quant (Forall, vars', f') ->
+  let forall ?loc vars f = match vars, f.form with
+    | [], _ -> {f with loc; }
+    | _, Quant (Forall, vars', f') ->
       {loc; form=Quant (Forall, vars @ vars', _replace_vars vars f'); }
-    | _ ->
+    | _, _ ->
       {loc; form=Quant (Forall, vars, _replace_vars vars f); }
 
-  let exists ?loc vars f = match f.form with
-    | Quant (Exists, vars', f') ->
+  let exists ?loc vars f = match vars, f.form with
+    | [], _ -> {f with loc; }
+    | _, Quant (Exists, vars', f') ->
       {loc; form=Quant (Exists, vars @ vars', _replace_vars vars f'); }
     | _ ->
       {loc; form=Quant (Exists, vars, _replace_vars vars f); }
