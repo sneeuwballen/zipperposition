@@ -423,15 +423,19 @@ let () =
   (* master process: process files *)
   Vector.iter params.param_files
     (fun file ->
-      try process_file ?meta ~plugins ~params file
+      begin try process_file ?meta ~plugins ~params file
       with
       | Type.Error msg ->
         Util.eprintf "type error: %s\n" msg;
         Printexc.print_backtrace stderr;
+      | TypeUnif.Error e ->
+        Util.eprintf "type error: %a\n" TypeUnif.pp_error e;
+        Printexc.print_backtrace stderr;
       | Ast_tptp.ParseError loc ->
         Util.eprintf "parse error (at %a)\n" Location.pp loc;
         Printexc.print_backtrace stderr;
-    );
+      end;
+      flush stderr);
   (* save KB? *)
   save_kb ?meta ~params;
   ()
