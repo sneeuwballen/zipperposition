@@ -159,13 +159,14 @@ let unifier ty1 ty2 =
 (** {2 Matching} *)
 
 let rec _match_rec ~protect subst ty1 s1 ty2 s2 =
+  let s_protect = s2 in
   let ty1, s1 = S.get_var subst ty1 s1 in
   let ty2, s2 = S.get_var subst ty2 s2 in
   match ty1.Ty.ty, ty2.Ty.ty with
   | _ when Ty.eq ty1 ty2 && (s1 = s2 || Ty.is_ground ty1)-> subst
   | Ty.Var _, _ ->
     (* fail if occur check, or if we need to bind a protected variable *)
-    if _occur_check subst ty1 s1 ty2 s2 || (List.memq ty1 protect && s1 = s2)
+    if _occur_check subst ty1 s1 ty2 s2 || (List.memq ty1 protect && s1 = s_protect)
       then fail subst ty1 s1 ty2 s2
       else S.bind subst ty1 s1 ty2 s2
   | Ty.App (sym1, l1), Ty.App (sym2, l2) when sym1 = sym2 && List.length l1 = List.length l2 ->
