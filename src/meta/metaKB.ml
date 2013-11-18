@@ -668,8 +668,10 @@ let kb_of_statements ?(base=Signature.base) ?(init=empty) statements =
     (* context is local *)
     let ctx = TypeInference.Ctx.of_signature base in
     let closure = closure_of_statement ctx statement in
-    (* generalize types as much as possible *)
+    (* FIXME: generalize types as much as possible (how to deal with type params?)
     TypeInference.Ctx.generalize ctx;
+    *)
+    TypeInference.Ctx.bind_to_default ctx;
     let modify_kb = TypeInference.Ctx.apply_closure ctx closure in
     modify_kb kb
   in

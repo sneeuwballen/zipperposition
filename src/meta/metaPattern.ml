@@ -40,8 +40,8 @@ let x = Type.var 0
 let __var_symbol = Symbol.mk_const ~ty:Type.(forall [x] (x <=. x)) "V"
 let __fun_symbol = Symbol.mk_const ~ty:Type.(forall [x] (x <=. x)) "S"
 
-let __var ty = HOT.mk_const __var_symbol
-let __fun ty = HOT.mk_const __fun_symbol
+let __var = HOT.mk_const __var_symbol
+let __fun = HOT.mk_const __fun_symbol
 
 (** {2 Encoding as terms} *)
 
@@ -59,7 +59,7 @@ module EncodedForm = struct
           that we won't match an abstracted symbol with a variable, e.g.
           (p a) with (p X) once a is abstracted to A. (p X) will become
           (p (__var X)), and the substitution will be rejected. *)
-      HOT.mk_at (__var t.HOT.ty) [t]
+      HOT.mk_at __var ~tyargs:[t.HOT.ty] [t]
     | HOT.BoundVar _ -> t
     | HOT.Lambda t' ->
       let varty = HOT.lambda_var_ty t in
@@ -67,7 +67,7 @@ module EncodedForm = struct
     | HOT.Const s when not (Symbol.is_connective s) -> 
       (** Similarly to the Var case, here we need to protect constants
           from being bound to variables once abstracted into variables *)
-      HOT.mk_at (__fun t.HOT.ty) [t]
+      HOT.mk_at __fun ~tyargs:[t.HOT.ty] [t]
     | HOT.Const _ -> t
     | HOT.At (t, tyargs, l) ->
       HOT.mk_at ~tyargs (encode_t t) (List.map encode_t l)
@@ -80,7 +80,7 @@ module EncodedForm = struct
       let varty = HOT.lambda_var_ty t in
       HOT.__mk_lambda ~varty (decode_t t')
     | HOT.Const _ -> t
-    | HOT.At ({HOT.term=HOT.Const s}, tyargs, t'::l)
+    | HOT.At ({HOT.term=HOT.Const s}, _::tyargs, t'::l)
       when (Symbol.eq s __var_symbol || Symbol.eq s __fun_symbol) ->
       HOT.mk_at ~tyargs (decode_t t') (List.map decode_t l)
     | HOT.At (t, tyargs, l) ->

@@ -369,7 +369,7 @@ module FO = struct
         let args' = List.map (fun closure' -> closure' renaming subst) closure_args in
         let tyargs' = List.map (fun ty -> Substs.Ty.apply ~renaming subst ty 0) tyargs in
         Util.debug 5 "eval type %a in %a" Type.pp ty_s Substs.Ty.pp subst;
-        let ty_s' = Substs.Ty.apply ~renaming subst ty_s 0 in
+        let ty_s' = Type.close_forall (Substs.Ty.apply ~renaming subst ty_s 0) in
         Util.debug 5 "final type for %a: %a" Sym.pp s Type.pp ty_s';
         let s' = Symbol.of_basic ~ty:ty_s' s in
         T.mk_node ~tyargs:tyargs' s' args'
@@ -594,7 +594,7 @@ module HO = struct
       (* recover the type *)
       let ty = Ctx.type_of_fun ~arity ctx s in
       let closure renaming subst =
-        let ty = Substs.Ty.apply ~renaming subst ty 0 in
+        let ty = Type.close_forall (Substs.Ty.apply ~renaming subst ty 0) in
         let s = Symbol.of_basic ~ty s in
         T.mk_const s
       in

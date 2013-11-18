@@ -198,7 +198,9 @@ let mk_eq t1 t2 =
   if T.eq t1 t2
     then mk_true
   else if not (Type.eq t1.T.ty t2.T.ty)
-    then failwith "Formula.mk_eq: expected same type on both sides"
+    then failwith
+      (Util.sprintf "Formula.mk_eq: expected same type, got %a:%a and %a:%a"
+      T.pp t1 Type.pp (T.ty t1) T.pp t2 Type.pp (T.ty t2))
   else
     let f = { form=Equal(t1,t2); flags=flag_simplified; id= ~-1; } in
     let f' = H.hashcons f in
