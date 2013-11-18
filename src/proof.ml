@@ -209,7 +209,7 @@ let bij =
 
 let pp_notrec buf proof =
   match proof with
-  | Axiom(f,n) -> Printf.bprintf buf "axiom '%s' in '%s'" f n
+  | Axiom(f,n) -> Printf.bprintf buf "axiom '%s' in '%s'" n f
   | InferForm (f, _) -> F.pp buf f
   | InferClause(c, _) -> CC.pp buf c
 
