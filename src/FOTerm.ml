@@ -230,23 +230,26 @@ let _compute_ty s tyargs l =
 
 let mk_node ?(tyargs=[]) s l =
   Util.enter_prof prof_mk_node;
-  let ty = _compute_ty s tyargs l in
   (* hashcons term *)
   let t = match l with
   | [] ->
-    let my_t = {term=Node (s, tyargs, l); ty; flags=flag_ground;
+    let my_t = {term=Node (s, tyargs, l); ty=Obj.magic 0; flags=flag_ground;
                tsize=1; tag= -1} in
     let t = H.hashcons my_t in
+    if t.ty == Obj.magic 0 then begin
+      t.ty <- _compute_ty s tyargs l
+      end;
     t
   | _::_ ->
-    let my_t = {term=Node (s, tyargs, l); ty; flags=0;
+    let my_t = {term=Node (s, tyargs, l); ty=Obj.magic 0; flags=0;
                tsize=0; tag= -1} in
     let t = H.hashcons my_t in
-    if t == my_t
+    if t.ty == Obj.magic 0
       then begin
         (* compute meta-data: groundness, size *)
         set_flag flag_ground t (compute_is_ground l);
         t.tsize <- compute_tsize l;
+        t.ty <- _compute_ty s tyargs l;
       end;
     t
   in
