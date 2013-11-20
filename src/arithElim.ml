@@ -100,7 +100,7 @@ let factor_arith c =
         List.fold_left
           (fun acc subst -> mk_instance subst :: acc)
           acc substs
-      with Failure _ -> acc)
+      with Monome.NotLinear _ -> acc)
 
 let pivot_arith c =
   let ctx = c.C.hcctx in

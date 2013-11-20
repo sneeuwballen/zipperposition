@@ -151,7 +151,7 @@ module Lit : sig
 
     val extract : Literal.t -> t
       (** Convert a regular literal into an extracted literal.
-          @raise Failure if the literal is not a linear expression *)
+          @raise Monome.NotLinear if the literal is not a linear expression *)
 
     (* TODO: put a cache in extract. And maybe also on some other
         literal pivots *)

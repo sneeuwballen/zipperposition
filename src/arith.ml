@@ -260,43 +260,37 @@ module Lit = struct
       Util.enter_prof prof_arith_extract;
       (* extract literal from (l=r | l!=r) *)
       let extract_eqn l r sign =
-        try
-          let m1 = M.of_term l in
-          let m2 = M.of_term r in
-          let m = M.difference m1 m2 in
-          (* remove denominator, it doesn't matter *)
-          let m = M.normalize_eq_zero m in
-          if M.is_constant m
-          then if M.sign m = 0
-            then if sign then True else False
-            else if sign then False else True
-          else if not (M.has_instances m) && sign
-            then False
-          else if sign
-            then Eq m
-            else Neq m
-        with M.NotLinear msg ->
-          failwith ("not linear: " ^ msg)
+        let m1 = M.of_term l in
+        let m2 = M.of_term r in
+        let m = M.difference m1 m2 in
+        (* remove denominator, it doesn't matter *)
+        let m = M.normalize_eq_zero m in
+        if M.is_constant m
+        then if M.sign m = 0
+          then if sign then True else False
+          else if sign then False else True
+        else if not (M.has_instances m) && sign
+          then False
+        else if sign
+          then Eq m
+          else Neq m
       (* extract lit from (l <= r | l < r) *)
       and extract_less ~strict l r =
-        try
-          let m1 = M.of_term l in
-          let m2 = M.of_term r in
-          let m = M.difference m1 m2 in
-          (* remove the denominator *)
-          assert (S.Arith.sign m.M.divby > 0);
-          let m = M.normalize_eq_zero m in
-          if M.is_constant m then match M.sign m with
-            | 0 -> if strict then False else True
-            | n when n < 0 -> True
-            | _ -> False
-          else if strict && Type.eq (M.type_of m) Type.int
-            then Leq M.(normalize_eq_zero (succ m))  (* m < 0 ---> m+1 <= 0 *)
-          else if strict
-            then Lt m
-            else Leq m
-        with M.NotLinear msg ->
-          failwith ("not linear: " ^ msg)
+        let m1 = M.of_term l in
+        let m2 = M.of_term r in
+        let m = M.difference m1 m2 in
+        (* remove the denominator *)
+        assert (S.Arith.sign m.M.divby > 0);
+        let m = M.normalize_eq_zero m in
+        if M.is_constant m then match M.sign m with
+          | 0 -> if strict then False else True
+          | n when n < 0 -> True
+          | _ -> False
+        else if strict && Type.eq (M.type_of m) Type.int
+          then Leq M.(normalize_eq_zero (succ m))  (* m < 0 ---> m+1 <= 0 *)
+        else if strict
+          then Lt m
+          else Leq m
       in
       let extract_le a b = extract_less ~strict:false a b in
       let extract_lt a b = extract_less ~strict:true a b in
@@ -306,7 +300,7 @@ module Lit = struct
       | Literal.Equation (l, r, sign, _) ->
         if T.is_arith l || T.is_arith r
           then extract_eqn l r sign
-          else failwith "not arithmetic"
+          else raise (Monome.NotLinear "lit.extract")
       | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), _, [a; b])}, true) ->
         extract_lt a b
       | Literal.Prop ({T.term=T.Node (S.Const ("$less",_), _, [a; b])}, false) ->
@@ -323,7 +317,7 @@ module Lit = struct
         extract_le b a
       | Literal.Prop ({T.term=T.Node (S.Const ("$greatereq",_), _, [a; b])}, false) ->
         extract_lt a b
-      | Literal.Prop _ -> failwith "not arithmetic"
+      | Literal.Prop _ -> raise (Monome.NotLinear "lit.extract")
       in
       Util.debug 5 "arith extraction of %a gives %a" Literal.pp lit pp ans;
       Util.exit_prof prof_arith_extract;
@@ -331,7 +325,7 @@ module Lit = struct
 
     let extract_opt lit =
       try Some (extract lit)
-      with Failure _ -> None
+      with Monome.NotLinear _ -> None
 
     let get_monome = function
     | Eq m
@@ -609,7 +603,7 @@ module Lit = struct
       | Multiple _ ->
         (* do not chose a specific pivot *)
         lit
-    with Failure _ ->
+    with Monome.NotLinear _ ->
       lit
 
   (* find instances of variables that eliminate the literal *)
