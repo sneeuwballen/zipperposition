@@ -188,16 +188,27 @@ module FO = struct
       Some (T.mk_const (S.Arith.Op.to_real n))
     | _ -> None
 
-  let _ev_sum ~tyargs s l = match _binary l with
+  let _ev_sum ~tyargs _ l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.sum n1 n2))
     | `Binary (n1, _, [], n2, _, l2) when S.Arith.is_zero n1 ->
       Some (T.mk_node ~tyargs n2 l2) (* 0+x --> x *)
     | `Binary (n1, _, l1, n2, _, []) when S.Arith.is_zero n2 ->
       Some (T.mk_node ~tyargs n1 l1) (* x+0 --> x *)
-    | _ -> None
+    | _ ->
+      begin match l with
+      | [t1; t2] when t1.T.tag > t2.T.tag ->
+        (* AC-normalization *)
+        Some (T.mk_node ~tyargs S.Arith.sum [t2; t1])
+      | _ -> None
+      end
 
-  let _ev_difference ~tyargs s l = match _binary l with
+  let mk_sum ~tyargs l =
+    match _ev_sum ~tyargs S.Arith.sum l with
+    | None -> T.mk_node ~tyargs S.Arith.sum l
+    | Some t' -> t'
+
+  let _ev_difference ~tyargs _ l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.difference n1 n2))
     | `Binary (n1, _, [], n2, tys2, l2) when S.Arith.is_zero n1 ->
@@ -206,7 +217,12 @@ module FO = struct
       Some (T.mk_node ~tyargs:tys1 n1 l1)  (* x-0 ---> x *)
     | _ -> None
 
-  let _ev_product ~tyargs s l = match _binary l with
+  let mk_difference ~tyargs l =
+    match _ev_difference ~tyargs S.Arith.difference l with
+    | None -> T.mk_node ~tyargs S.Arith.difference l
+    | Some t' -> t'
+
+  let rec _ev_product ~tyargs _ l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.product n1 n2))
     | `Binary (n1, _, [], n2, _, l2) when S.Arith.is_zero n1 ->
@@ -217,7 +233,31 @@ module FO = struct
       Some (T.mk_node ~tyargs n2 l2) (* 1*x --> x *)
     | `Binary (n1, _, l1, n2, _, []) when S.Arith.is_one n2 ->
       Some (T.mk_node ~tyargs n1 l1) (* x*1 --> x *)
-    | _ -> None
+    | _ ->
+      begin match l with
+      | [{T.term=T.Node (S.Const ("$sum",_), _, [a;b])}; c]
+      | [c; {T.term=T.Node (S.Const ("$sum",_), _, [a;b])}] ->
+        (* distributivity over sum *)
+        Some (mk_sum ~tyargs
+          [ mk_product ~tyargs [a; c]
+          ; mk_product ~tyargs [b; c]
+          ])
+      | [{T.term=T.Node (S.Const ("$difference",_), _, [a;b])}; c]
+      | [c; {T.term=T.Node (S.Const ("$difference",_), _, [a;b])}] ->
+        (* distributivity over difference *)
+        Some (mk_difference ~tyargs
+          [ mk_product ~tyargs [a; c]
+          ; mk_product ~tyargs [b; c]
+          ])
+      | [t1; t2] when t1.T.tag > t2.T.tag ->
+        (* AC-normalization *)
+        Some (T.mk_node ~tyargs S.Arith.product [t2; t1])
+      | _ -> None
+      end
+  and mk_product ~tyargs l =
+    match _ev_product ~tyargs S.Arith.product l with
+    | None -> T.mk_node ~tyargs S.Arith.product l
+    | Some t' -> t'
 
   let _ev_quotient ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
