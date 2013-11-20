@@ -153,9 +153,6 @@ module Lit : sig
       (** Convert a regular literal into an extracted literal.
           @raise Monome.NotLinear if the literal is not a linear expression *)
 
-    (* TODO: put a cache in extract. And maybe also on some other
-        literal pivots *)
-
     val extract_opt : Literal.t -> t option
       (** Same as {!extract}, but doesn't raise *)
 

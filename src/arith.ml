@@ -256,8 +256,7 @@ module Lit = struct
 
     let to_string = Util.on_buffer pp
 
-    let extract lit =
-      Util.enter_prof prof_arith_extract;
+    let _extract lit =
       (* extract literal from (l=r | l!=r) *)
       let extract_eqn l r sign =
         let m1 = M.of_term l in
@@ -319,6 +318,24 @@ module Lit = struct
         extract_lt a b
       | Literal.Prop _ -> raise (Monome.NotLinear "lit.extract")
       in
+      Util.debug 5 "arith extraction of %a gives %a" Literal.pp lit pp ans;
+      Util.exit_prof prof_arith_extract;
+      ans
+
+    module LitCache = Cache.Replacing(struct
+      type t = Literal.t
+      let equal = Literal.eq
+      let hash = Literal.hash
+    end)
+
+    (* cache for literal extraction (because it will be called often
+        on the same literals when distinct inference/simplification
+        rules are run on a given clause *)
+    let __cache = LitCache.create 512
+
+    let extract lit =
+      Util.enter_prof prof_arith_extract;
+      let ans = LitCache.with_cache __cache _extract lit in
       Util.debug 5 "arith extraction of %a gives %a" Literal.pp lit pp ans;
       Util.exit_prof prof_arith_extract;
       ans
