@@ -143,7 +143,7 @@ module F = struct
         | Equal (t1, t2) ->
           let t1' = T.simplify t1 in
           let t2' = T.simplify t2 in
-          if T.is_arith_const t1'  && T.is_arith_const t1'
+          if T.is_arith_const t1'  && T.is_arith_const t2'
             then if T.eq t1' t2'
               then mk_true
               else mk_false
