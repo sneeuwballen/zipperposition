@@ -630,7 +630,7 @@ module Lit = struct
       try
         let elit = E.extract lit in
         E.eliminate ?fresh_var elit
-      with Failure _ -> []
+      with Monome.NotLinear _ -> []
     in
     let unif_arith ~subst t1 sc_t m sc_m =
       FOUnif.unification ~subst t1 sc_t (M.to_term m) sc_m
@@ -765,7 +765,7 @@ module Lits = struct
                 let lits = Array.of_list lits in
                 add_res lits)
             pivots
-      with Failure _ -> ()
+      with Monome.NotLinear _ -> ()
     done;
     !results
 
