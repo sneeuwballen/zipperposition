@@ -22,15 +22,21 @@ An additional library, `logtk_meta`, can be built if you have
     $ opam install datalog
     $ ./configure --enable-meta
 
+If you have installed [qcheck](https://github.com/c-cube/qcheck/), for instance
+via `opam install qcheck`, you can enable the property-based testing with
 
-To build the library, documentation and tools, type in a terminal located in
-the root directory of the project:
+    $ ./configure --enable-qcheck
+    $ make tests
+
+After the configuration is done, to build the library, documentation and tools,
+type in a terminal located in the root directory of the project:
 
     $ make
 
-If you use `ocamlfind` (which you should), installation is just:
+If you use `ocamlfind` (which you should), installation/uninstallation are just:
 
     $ make install
+    $ make uninstall
 
 ## Usage
 
@@ -135,6 +141,8 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 ## TODO
 
 - tool to print a trace as DOT
+- handle existential type var
+- handle ite/let in TPTP
 
 - consider moving the proof-checking part of tools/proof_check_tstp.ml
     to trace_tstp (can be used for embedded proof checking)
