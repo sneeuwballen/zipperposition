@@ -19,10 +19,10 @@ open Logtk.Type;;
 #install_printer Literal.fmt;;
 #install_printer Clause.fmt;;
 #install_printer FOFormula.fmt;;
-#install_printer Untyped.FO.fmt;;
-#install_printer Untyped.Form.fmt;;
-#install_printer Untyped.HO.fmt;;
-#install_printer Type.Parsed.fmt;;
+#install_printer Basic.FO.fmt;;
+#install_printer Basic.Ty.fmt;;
+#install_printer Basic.Form.fmt;;
+#install_printer Basic.HO.fmt;;
 #install_printer Substs.FO.fmt;;
 #install_printer Substs.HO.fmt;;
 #install_printer Proof.fmt;;
@@ -36,7 +36,7 @@ module M = Monome;;
 let pterm s =
     let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create ~base:true () in
-    let _, clos = TypeInference.FO.infer tyctx t 0 in
+    let _, clos = TypeInference.FO.infer tyctx t in
     let renaming = Substs.Ty.Renaming.create 5 in
     TypeInference.Ctx.apply_closure ~renaming tyctx clos
 ;;

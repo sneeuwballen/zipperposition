@@ -62,6 +62,8 @@ module T = struct
     | [x] -> x
     | x::l' -> mk_node ~tyargs:[ty x] S.Arith.sum [x; sum_list l']
 
+  (* TODO: simplify on the fly? *)
+
   let mk_sum t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.sum [t1; t2]
   let mk_difference t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.difference [t1; t2]
   let mk_product t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.product [t1; t2]
