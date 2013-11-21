@@ -320,8 +320,8 @@ let split_limit = ref 100
 module UF = UnionFind.Make(struct
   type key = T.t
   type value = Lit.t list
-  let equal = (==)
-  let hash t = t.T.tag
+  let equal = T.eq
+  let hash = T.hash
   let zero = []
   let merge = List.rev_append
 end)
@@ -681,14 +681,12 @@ let basic_simplify c =
     end
 
 let handle_distinct_constants ~ctx lit =
-  (* bool equivalence *)
-  let __equiv a b = (a && b) || (not a && not b) in
   match lit with
   | Lit.Equation
     ({T.term=T.Node (s1, [], [])},
      {T.term=T.Node (s2, [], [])} , sign, _)
     when Symbol.is_distinct s1 && Symbol.is_distinct s2 ->
-    if __equiv sign (Symbol.eq s1 s2)
+    if sign = (Symbol.eq s1 s2)
       then Lit.mk_tauto  (* "a" = "a", or "a" != "b" *)
       else Lit.mk_absurd (* "a" = "b" or "a" != "a" *)
   | _ -> lit
