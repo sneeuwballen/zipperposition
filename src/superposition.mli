@@ -58,6 +58,9 @@ val is_semantic_tautology : Clause.t -> bool
       to see if negative literals imply some positive Literal.t *)
 *)
 
+val handle_distinct_constants : ctx:Ctx.t -> Literal.t -> Literal.t
+  (** Decide on "quoted" "symbols" (which are all distinct) *)
+
 val basic_simplify : Clause.t -> Clause.t
   (** basic simplifications (remove duplicate literals, trivial literals,
       destructive equality resolution...) *)

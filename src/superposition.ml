@@ -680,6 +680,19 @@ let basic_simplify c =
       new_clause
     end
 
+let handle_distinct_constants ~ctx lit =
+  (* bool equivalence *)
+  let __equiv a b = (a && b) || (not a && not b) in
+  match lit with
+  | Lit.Equation
+    ({T.term=T.Node (s1, [], [])},
+     {T.term=T.Node (s2, [], [])} , sign, _)
+    when Symbol.is_distinct s1 && Symbol.is_distinct s2 ->
+    if __equiv sign (Symbol.eq s1 s2)
+      then Lit.mk_tauto  (* "a" = "a", or "a" != "b" *)
+      else Lit.mk_absurd (* "a" = "b" or "a" != "a" *)
+  | _ -> lit
+
 exception FoundMatch of T.t * Clause.t * S.t
 
 let positive_simplify_reflect (simpl_set : PS.SimplSet.t) c =
@@ -1144,4 +1157,5 @@ let setup_env ~env =
   Env.add_is_trivial ~env is_semantic_tautology;
   *)
   Env.add_is_trivial ~env is_trivial;
+  Env.add_lit_rule ~env "distinct_symbol" handle_distinct_constants;
   ()
