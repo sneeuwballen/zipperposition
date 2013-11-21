@@ -1,5 +1,12 @@
 
-% Proof of lemma on finite domain partial functions
+% Definition of many functional structures
+
+% option
+tff(ty_none, type, none : !>[A:$tType]: option(A)).
+tff(ty_some, type, some : !>[A:$tType]: A > option(A)).
+tff(option1, axiom,
+    ![A:$tType, O:option(A)]: (O = none(A) | ?[X:A]: (O = some(A,X)))).
+tff(option2, axiom, ![A:$tType, X:A]: (none(A) != some(A,X))).
 
 % map
 tff(ty_selected, type, select : !>[A:$tType, B:$tType]: (map(A,B) * A) > B).
@@ -35,13 +42,3 @@ tff(list4, axiom, ![A:$tType, L:list(A)]:
     (L = nil(A) | ?[L2:list(A), X:A]: L=cons(A,X,L2))).
 
 tff(list5, axiom, ![A:$tType, L:list(A), X:A]: cons(A,X,L) != nil(A)).
-
-% goal: L subset dom(F) => x::L subset dom(F + x -> y)
-
-tff(g, conjecture,
-    ![A:$tType, B:$tType, F:map(A,B), X:A, Y:B, L:list(A)]:
-        (
-            (![Z:A]: (mem_list(A,Z,L) => mem_map(A,B,Z,F))) =>
-            (![Z:A]: (mem_list(A,Z,cons(A,X,L)) => mem_map(A,B,Z,update(A,B,F,X,Y))))
-        )
-    ).
