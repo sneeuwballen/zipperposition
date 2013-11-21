@@ -60,6 +60,9 @@ let flags s = match s with
   | Real _ -> 0
 
 let has_flag flag s = (flags s land flag) <> 0
+let add_flag flag s = match s with
+  | Const (_, info) -> info.flags <- info.flags lor flag
+  | _ -> failwith "cannot add_flag to numeric symbol"
 
 (** Hashconsing *)
 
@@ -116,8 +119,15 @@ let mk_const ?(flags=0) ~ty s =
       let msg = Util.sprintf "Symbol.mk_const (%s): type %a has free variables" s Type.pp ty in
       raise (Type.Error msg)
   end;
-  let symb = Const (s, { tag= ~-1; flags; ty; }) in
-  H.hashcons symb
+  let info = { tag= ~-1; flags; ty; } in
+  let symb = Const (s, info) in
+  let symb' = H.hashcons symb in
+  if symb' == symb then begin
+    (* check syntactically whether it's a distinct symbol or not *)
+    let is_distinct = s <> "" &&  s.[0] = '"' && s.[String.length s - 1] = '"' in
+    if is_distinct then add_flag flag_distinct symb';
+    end;
+  symb'
 
 let mk_distinct ?(flags=0) ?(ty=Type.i) s =
   let flags = flags lor flag_distinct in
