@@ -191,10 +191,10 @@ module FO = struct
   let _ev_sum ~tyargs _ l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.sum n1 n2))
-    | `Binary (n1, _, [], n2, _, l2) when S.Arith.is_zero n1 ->
-      Some (T.mk_node ~tyargs n2 l2) (* 0+x --> x *)
-    | `Binary (n1, _, l1, n2, _, []) when S.Arith.is_zero n2 ->
-      Some (T.mk_node ~tyargs n1 l1) (* x+0 --> x *)
+    | `Binary (n1, _, [], n2, tys2, l2) when S.Arith.is_zero n1 ->
+      Some (T.mk_node ~tyargs:tys2 n2 l2) (* 0+x --> x *)
+    | `Binary (n1, tys1, l1, n2, _, []) when S.Arith.is_zero n2 ->
+      Some (T.mk_node ~tyargs:tys1 n1 l1) (* x+0 --> x *)
     | _ ->
       begin match l with
       | [t1; t2] when t1.T.tag > t2.T.tag ->
@@ -225,9 +225,9 @@ module FO = struct
   let rec _ev_product ~tyargs _ l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.product n1 n2))
-    | `Binary (n1, _, [], n2, _, l2) when S.Arith.is_zero n1 ->
+    | `Binary (n1, [], [], n2, _, l2) when S.Arith.is_zero n1 ->
       Some (T.mk_const n1) (* 0*x --> 0 *)
-    | `Binary (n1, _, l1, n2, _, []) when S.Arith.is_zero n2 ->
+    | `Binary (n1, _, l1, n2, [], []) when S.Arith.is_zero n2 ->
       Some (T.mk_const n2)  (* x*0 --> 0 *)
     | `Binary (n1, _, [], n2, tys2, l2) when S.Arith.is_one n1 ->
       Some (T.mk_node ~tyargs:tys2 n2 l2) (* 1*x --> x *)
@@ -271,32 +271,32 @@ module FO = struct
 
   let _ev_quotient_e ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
-      Some (T.mk_const ~tyargs (S.Arith.Op.quotient_e n1 n2))
+      Some (T.mk_const (S.Arith.Op.quotient_e n1 n2))
     | _ -> None
 
   let _ev_quotient_f ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
-      Some (T.mk_const ~tyargs (S.Arith.Op.quotient_f n1 n2))
+      Some (T.mk_const (S.Arith.Op.quotient_f n1 n2))
     | _ -> None
 
   let _ev_quotient_t ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
-      Some (T.mk_const ~tyargs (S.Arith.Op.quotient_t n1 n2))
+      Some (T.mk_const (S.Arith.Op.quotient_t n1 n2))
     | _ -> None
 
   let _ev_remainder_e ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
-      Some (T.mk_const ~tyargs (S.Arith.Op.remainder_e n1 n2))
+      Some (T.mk_const (S.Arith.Op.remainder_e n1 n2))
     | _ -> None
 
   let _ev_remainder_f ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
-      Some (T.mk_const ~tyargs (S.Arith.Op.remainder_f n1 n2))
+      Some (T.mk_const (S.Arith.Op.remainder_f n1 n2))
     | _ -> None
 
   let _ev_remainder_t ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
-      Some (T.mk_const ~tyargs (S.Arith.Op.remainder_t n1 n2))
+      Some (T.mk_const (S.Arith.Op.remainder_t n1 n2))
     | _ -> None
 
   let _ev_less ~tyargs s l = match _binary l with
