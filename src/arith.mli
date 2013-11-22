@@ -43,7 +43,11 @@ module T : sig
     (** Sum of those terms *)
 
   val is_arith : FOTerm.t -> bool
-    (** Is the term arithmetic? *)
+    (** Is the term arithmetic? Includes constants, variables, and
+        more complicated expressions built from arithmetic operators *)
+
+  val is_compound_arith : FOTerm.t -> bool
+    (** Is the term a composite arithmetic expression? *)
 
   val is_arith_const : FOTerm.t -> bool
     (** Is the term an arithmetic constant? *)

@@ -656,8 +656,10 @@ let basic_simplify c =
     (fun i lit ->
       if BV.get bv i then match lit with
         | Lit.Equation (l, r, false, _) when (T.is_var l || T.is_var r)
-          && not (Arith.Lit.is_arith lit) ->
-          (* eligible for destructive Equality Resolution, try to update subst *)
+          && not (Arith.T.is_compound_arith l || Arith.T.is_compound_arith r) ->
+          (* eligible for destructive Equality Resolution, try to update
+              [subst]. Compount arith expressions are not allowed because
+              they should be purified away (converse to destructive ER). *)
           begin try
             let subst' = FOUnif.unification ~subst:!subst l 0 r 0 in
             BV.reset bv i;

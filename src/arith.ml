@@ -57,6 +57,13 @@ module T = struct
     | Node ((S.Int _ | S.Rat _ | S.Real _), _, []) -> true
     | _ -> false
 
+  let is_compound_arith t = match t.term with
+    | Node ((S.Int _ | S.Rat _ | S.Real _), [], []) -> false (* const *)
+    | Node (s, _, _::_) when Symbol.Arith.is_arith s -> true
+    | Var _
+    | BoundVar _
+    | Node (_, _, _) -> false
+
   let rec sum_list l = match l with
     | [] -> failwith "Arith.sum_list: got empty list"
     | [x] -> x
