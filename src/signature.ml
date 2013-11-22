@@ -47,8 +47,9 @@ let declare signature s symb =
     if Symbol.eq symb symb'
       then signature  (* ok *)
       else
+        let ty_s, ty_s' = Symbol.ty symb, Symbol.ty symb' in
         let msg = Util.sprintf "type error for %s: %a and %a are incompatible"
-          s Symbol.pp symb Symbol.pp symb'
+          s Type.pp ty_s Type.pp ty_s'
         in
         raise (Invalid_argument msg)
   with Not_found ->
