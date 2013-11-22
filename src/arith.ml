@@ -630,7 +630,7 @@ module Lit = struct
         (* do not chose a specific pivot *)
         lit
     with Monome.NotLinear _ ->
-      lit
+      Literal.fmap ~ord T.simplify lit
 
   (* find instances of variables that eliminate the literal *)
   let eliminate ?(elim_var=(fun v -> true)) ?fresh_var lit =
