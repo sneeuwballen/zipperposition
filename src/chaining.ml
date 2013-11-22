@@ -181,15 +181,17 @@ let do_eq_chaining_left ~ctx active s_a active_pos passive s_p passive_pos subst
     then begin
       (* now we can combine the two clauses *)
       let renaming = Ctx.renaming_clear ~ctx in
-      (* literals of new clause *)
+      (* literals of new clause: active... *)
       let lits_a = Util.array_except_idx active.C.hclits (List.hd active_pos) in
       let lits_a = Lit.apply_subst_list ~ord ~renaming subst lits_a s_a in
+      (* and passive (subst then replace subterms) *)
       let lits_p = Array.copy passive.C.hclits in
+      let lits_p = Lits.apply_subst ~renaming ~ord subst lits_p s_p in
+      let t' = Substs.FO.apply ~renaming subst t s_a in
       List.iter
-        (fun pos -> Lits.replace_pos ~ord lits_p ~at:pos ~by:t)
+        (fun pos -> Lits.replace_pos ~ord lits_p ~at:pos ~by:t')
         positions;
-      let lits_p = Array.to_list (Lits.apply_subst ~renaming ~ord subst lits_p s_p) in
-      let new_lits = lits_a @ lits_p in
+      let new_lits = lits_a @ Array.to_list lits_p in
       (* proof *)
       (*let premises = active.C.hcproof :: passive.C.hcproof :: instance.TO.proof in*)
       let premises = active.C.hcproof :: passive.C.hcproof :: [] in
@@ -228,15 +230,17 @@ let do_eq_chaining_right ~ctx active s_a active_pos passive s_p passive_pos subs
     then begin
       (* now we can combine the two clauses *)
       let renaming = Ctx.renaming_clear ~ctx in
-      (* literals of new clause *)
+      (* literals of new clause: active... *)
       let lits_a = Util.array_except_idx active.C.hclits (List.hd active_pos) in
       let lits_a = Lit.apply_subst_list ~ord ~renaming subst lits_a s_a in
+      (* and passive (subst then replace subterms) *)
       let lits_p = Array.copy passive.C.hclits in
+      let lits_p = Lits.apply_subst ~renaming ~ord subst lits_p s_p in
+      let t' = Substs.FO.apply ~renaming subst t s_a in
       List.iter
-        (fun pos -> Lits.replace_pos ~ord lits_p ~at:pos ~by:t)
+        (fun pos -> Lits.replace_pos ~ord lits_p ~at:pos ~by:t')
         positions;
-      let lits_p = Array.to_list (Lits.apply_subst ~renaming ~ord subst lits_p s_p) in
-      let new_lits = lits_a @ lits_p in
+      let new_lits = lits_a @ Array.to_list lits_p in
       (* proof *)
       let premises = active.C.hcproof :: passive.C.hcproof :: [] (* instance.TO.proof *) in
       let theories = ["total_order"] in
