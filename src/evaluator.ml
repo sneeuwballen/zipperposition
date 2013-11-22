@@ -229,10 +229,10 @@ module FO = struct
       Some (T.mk_const n1) (* 0*x --> 0 *)
     | `Binary (n1, _, l1, n2, _, []) when S.Arith.is_zero n2 ->
       Some (T.mk_const n2)  (* x*0 --> 0 *)
-    | `Binary (n1, _, [], n2, _, l2) when S.Arith.is_one n1 ->
-      Some (T.mk_node ~tyargs n2 l2) (* 1*x --> x *)
-    | `Binary (n1, _, l1, n2, _, []) when S.Arith.is_one n2 ->
-      Some (T.mk_node ~tyargs n1 l1) (* x*1 --> x *)
+    | `Binary (n1, _, [], n2, tys2, l2) when S.Arith.is_one n1 ->
+      Some (T.mk_node ~tyargs:tys2 n2 l2) (* 1*x --> x *)
+    | `Binary (n1, tys1, l1, n2, _, []) when S.Arith.is_one n2 ->
+      Some (T.mk_node ~tyargs:tys1 n1 l1) (* x*1 --> x *)
     | _ ->
       begin match l with
       | [{T.term=T.Node (S.Const ("$sum",_), _, [a;b])}; c]
