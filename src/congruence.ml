@@ -129,9 +129,12 @@ module Make(T : TERM) = struct
     assert (Array.length n1.subnodes = Array.length n2.subnodes);
     let l1' = List.map (fun n -> (_find n).term) (Array.to_list n1.subnodes) in
     let l2' = List.map (fun n -> (_find n).term) (Array.to_list n2.subnodes) in
-    let t1 = T.update_subterms n1.term l1' in
-    let t2 = T.update_subterms n2.term l2' in
-    T.eq t1 t2
+    try
+      let t1 = T.update_subterms n1.term l1' in
+      let t2 = T.update_subterms n2.term l2' in
+      T.eq t1 t2
+    with Type.Error _ ->
+      false
 
   (* check whether all congruences of [node] are computed, by
       looking at equivalence classes of [subnodes] *)
