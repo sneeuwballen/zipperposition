@@ -147,7 +147,13 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 - consider moving the proof-checking part of tools/proof_check_tstp.ml
     to trace_tstp (can be used for embedded proof checking)
 
+- functor for unification (parametrized by term/subst and is_var/deref_var/can_unify
+    for specific optims like is_ground)
+- more functors (unif, but also CNF? rewriting? ordering? indexes)
+
 - typing in meta-prover, with typing preconditions (for expressing sets with types)
+    - OR: use untyped HO terms (or maybe hypergraph)
+    - OR: (untyped) hypergraph-rewriting based meta-prover
 
 - substitution trees
 - path indexing? (better for merges)
