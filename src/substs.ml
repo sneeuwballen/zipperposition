@@ -121,7 +121,7 @@ module type RENAMING = sig
     (** Cleanup the content of the renaming. It is as new afterwards! *)
 end
 
-(** {2 Hidden functor}
+(** {2 Functor}
 
 This functor provides the base types for substitutions and renamings.
 Application depends too much on the term structure. It must
@@ -139,7 +139,7 @@ module type TERM = sig
   val bij : t Bij.t
 end
 
-module Common(T : TERM) = struct
+module Make(T : TERM) = struct
   type term = T.t
 
   module TermInt = struct
@@ -336,7 +336,7 @@ module Ty = struct
     let pp = Type.pp
   end
 
-  include Common(T)
+  include Make(T)
   
   module Renaming = struct
     type t = Type.t H.t
@@ -390,18 +390,45 @@ module Ty = struct
     apply subst ?depth ~renaming:Renaming.dummy ty sc_ty
 end
 
-(** {2 Substitutions on various Terms} *)
+(** {2 Substitutions on typed Terms} *)
 
+(** Typed terms *)
 module type TYPED_TERM = sig
   include TERM
-  val ty : t -> Type.t  (* only on variables *)
-  val mk_var : ty:Type.t -> int -> t  (* build variable *)
+
+  val ty : t -> Type.t
+    (** Obtain the type of a term. Only called on variables, so
+        other terms may not have types. *)
+
+  val mk_var : ty:Type.t -> int -> t
+    (** build a typed variable from an index *)
+end
+
+(** Substitution on typed terms *)
+module type TYPED = sig
+  type term
+
+  include S with type term := term
+
+  val ty_subst : t -> Ty.t
+    (** The substitution on types *)
+
+  val bind_ty : t -> Type.t -> scope -> Type.t -> scope -> t
+    (** Bind types *)
+
+  val update_ty : t -> (Ty.t -> Ty.t) -> t
+    (** Update the type substitution inside the substitution *)
+
+  val of_ty : Ty.t -> t
+    (** Lift substitution on type to substution on terms *)
+
+  module Renaming : RENAMING
 end
 
 (* Functor that builds substitutions from term substitution +
   type substitution *)
-module MakeProd(T : TYPED_TERM) = struct
-  module TSubst = Common(T)
+module MakeTyped(T : TYPED_TERM) = struct
+  module TSubst = Make(T)
 
   type term = T.t
 
@@ -520,7 +547,7 @@ module FO = struct
   module T = FOTerm
   module F = FOFormula
 
-  include MakeProd(T)
+  include MakeTyped(T)
 
   let rec apply ~renaming subst t scope =
     if T.is_ground t && T.monomorphic t then t (* subst(t) = t, if t ground *)
@@ -563,7 +590,7 @@ end
 module HO = struct
   module T = HOTerm
 
-  include MakeProd(T)
+  include MakeTyped(T)
 
   let rec _apply_rec ~renaming ~depth subst t scope =
     if T.is_ground t then t (* subst(t) = t, if t ground *)
@@ -610,3 +637,4 @@ module HO = struct
   let apply_no_renaming ?(depth=0) subst t scope =
     _apply_rec ~renaming:Renaming.dummy ~depth subst t scope
 end
+

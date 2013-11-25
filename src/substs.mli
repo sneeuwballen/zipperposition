@@ -134,6 +134,26 @@ module type RENAMING = sig
     (** Cleanup the content of the renaming. It is as new afterwards! *)
 end
 
+(** {2 Functor}
+
+This functor provides the base types for substitutions and renamings.
+Application depends too much on the term structure, so it must
+be implemented separately.
+*)
+
+module type TERM = sig
+  type t
+  val eq : t -> t -> bool
+  val compare : t -> t -> int
+  val is_var : t -> bool
+  val vars : t -> t list  (* list of vars of the term *)
+  val hash : t -> int
+  val pp : Buffer.t -> t -> unit
+  val bij : t Bij.t
+end
+
+module Make(T : TERM) : S with type term = T.t
+
 (** {2 Substitutions on types}
 
 This kind of substitution is used to keep track of universal type
@@ -156,13 +176,30 @@ module Ty : sig
         {b Caution}, can entail collisions between scopes! *)
 end
 
-(** {2 Substitutions on various Terms}
+(** {2 Substitutions on typed terms}
 
 Substitutions on terms also contain a substitution on types, because unifying
-term variables requires to unify their types. *)
+term variables requires to unify their types. The implementation doesn't
+abstract on types.
+*)
 
-module FO : sig
-  include S with type term = FOTerm.t
+(** Typed terms *)
+module type TYPED_TERM = sig
+  include TERM
+
+  val ty : t -> Type.t
+    (** Obtain the type of a term. Only called on variables, so
+        other terms may not have types. *)
+
+  val mk_var : ty:Type.t -> int -> t
+    (** build a typed variable from an index *)
+end
+
+(** Substitution on typed terms *)
+module type TYPED = sig
+  type term
+
+  include S with type term := term
 
   val ty_subst : t -> Ty.t
     (** The substitution on types *)
@@ -177,6 +214,14 @@ module FO : sig
     (** Lift substitution on type to substution on terms *)
 
   module Renaming : RENAMING
+end
+
+module MakeTyped(T : TYPED_TERM) : TYPED with type term = T.t
+
+(** {2 Substitution on FO terms} *)
+
+module FO : sig
+  include TYPED with type term = FOTerm.t
 
   val apply : renaming:Renaming.t -> t -> term -> scope -> term
     (** Apply substitution to term, replacing variables by the terms they are bound to.
@@ -192,22 +237,10 @@ module FO : sig
     (** Apply the substitution to the formula *)
 end
 
+(** {2 Substitution on HO terms} *)
+
 module HO : sig
-  include S with type term = HOTerm.t
-
-  val ty_subst : t -> Ty.t
-    (** The substitution on types *)
-
-  val bind_ty : t -> Type.t -> scope -> Type.t -> scope -> t
-    (** Bind types *)
-
-  val update_ty : t -> (Ty.t -> Ty.t) -> t
-    (** Update the type substitution inside the substitution *)
-
-  val of_ty : Ty.t -> t
-    (** Lift substitution on type to substution on terms *)
-
-  module Renaming : RENAMING
+  include TYPED with type term = HOTerm.t
 
   val apply : ?depth:int -> renaming:Renaming.t -> t -> term -> scope -> term
     (** Apply substitution to term, replacing variables by the terms they are
