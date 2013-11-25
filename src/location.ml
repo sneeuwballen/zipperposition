@@ -88,21 +88,23 @@ let smaller p1 p2 =
   
 
 let pp buf pos =
-  Printf.bprintf buf "file '%s': line %d, col %d to line %d, col %d"
-    pos.file
-    pos.start_line pos.start_column
-    pos.stop_line pos.stop_column
-
-let fmt fmt pos =
-  Format.fprintf fmt "@[<h>file '%s': line %d:%d to line %d:%d@]"
-    pos.file
-    pos.start_line pos.start_column
-    pos.stop_line pos.stop_column
+  if pos.start_line = pos.stop_line
+  then
+    Printf.bprintf buf "file '%s': line %d, col %d to %d"
+      pos.file pos.start_line pos.start_column pos.stop_column
+  else
+    Printf.bprintf buf "file '%s': line %d, col %d to line %d, col %d"
+      pos.file
+      pos.start_line pos.start_column
+      pos.stop_line pos.stop_column
 
 let to_string pos =
   let buf = Buffer.create 25 in
   pp buf pos;
   Buffer.contents buf
+
+let fmt fmt pos =
+  Format.pp_print_string fmt (to_string pos)
 
 let pp_opt buf o = match o with
   | None -> Printf.bprintf buf "<no location>"
