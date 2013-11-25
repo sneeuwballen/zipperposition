@@ -52,7 +52,7 @@ module EncodedForm = struct
   type t = HOT.t
 
   (* Encoding of term, in a form that allows to distinguish variables from
-      constants even after abstracting symbols *)
+      constants even after abstracting symbols. It preserves types. *)
   let rec encode_t t = match t.HOT.term with
     | HOT.Var _ ->
       (* First order variable. We add a special constant before it, so
@@ -64,11 +64,13 @@ module EncodedForm = struct
     | HOT.Lambda t' ->
       let varty = HOT.lambda_var_ty t in
       HOT.__mk_lambda ~varty (encode_t t')
-    | HOT.Const s when not (Symbol.is_connective s) -> 
+    | HOT.At ({HOT.term=HOT.Const s} as head, tyargs, l) when Symbol.is_connective s ->
+      (* do not prefix connectives *)
+      HOT.mk_at ~tyargs head (List.map encode_t l)
+    | HOT.Const _ -> 
       (** Similarly to the Var case, here we need to protect constants
           from being bound to variables once abstracted into variables *)
       HOT.mk_at __fun ~tyargs:[t.HOT.ty] [t]
-    | HOT.Const _ -> t
     | HOT.At (t, tyargs, l) ->
       HOT.mk_at ~tyargs (encode_t t) (List.map encode_t l)
 
@@ -85,6 +87,8 @@ module EncodedForm = struct
       HOT.mk_at ~tyargs (decode_t t') (List.map decode_t l)
     | HOT.At (t, tyargs, l) ->
       HOT.mk_at ~tyargs (decode_t t) (List.map decode_t l)
+
+  (* TODO: use a cache for encoding? *)
 
   let encode f =
     Util.enter_prof prof_encode;
