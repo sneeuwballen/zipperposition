@@ -346,6 +346,7 @@ module FO = struct
     | BT.App (s, l) ->
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
+      Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
       let n_tyargs, n_args = Type.arity ty_s in
       if n_args > List.length l
         then raise (Type.Error (Util.sprintf "expected %d arguments" n_args));
@@ -402,7 +403,7 @@ module FO = struct
 
   let infer ctx t =
     Util.enter_prof prof_infer;
-    Util.debug 5 "infer_term %a" BT.pp t;
+    Util.debug 5 "infer_term %a (at %a)" BT.pp t Location.pp_opt t.BT.loc;
     try
       let ty, k = infer_rec ctx t in
       Util.exit_prof prof_infer;
