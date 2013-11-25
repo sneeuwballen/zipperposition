@@ -31,14 +31,14 @@ let combine hash i =
 let hash_int i = combine 0 i
 
 (** Hash two ints *)
-let hash_int2 i j = combine (combine 0 i) j
+let hash_int2 i j = combine i j
 
 (** Hash three ints *)
-let hash_int3 i j k = combine (combine (combine 0 i) j) k
+let hash_int3 i j k = combine (combine i j) k
 
 (** Hash four ints *)
 let hash_int4 i j k l =
-  combine (combine (combine (combine 0 i) j) k) l
+  combine (combine (combine i j) k) l
 
 (** Hash a list. Each element is hashed using [f]. *)
 let rec hash_list f h l = match l with
