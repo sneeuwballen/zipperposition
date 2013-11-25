@@ -77,6 +77,8 @@ module Sym : sig
   val fmt : Format.formatter -> t -> unit
   val to_string : t -> string
   val to_string_tstp : t -> string
+
+  val bij : t Bij.t
 end
 
 (** {2 Type representation}
@@ -107,6 +109,9 @@ module Ty : sig
   val forall : t list -> t -> t
     (** the list of types must be a list of variables *)
 
+  val vars : t -> t list
+    (** List of free variables *)
+
   val is_var : t -> bool
   val is_fun : t -> bool
   val is_app : t -> bool
@@ -123,6 +128,7 @@ module Ty : sig
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
+  val bij : t Bij.t
 end
 
 (** {2 First Order terms} *)
@@ -172,6 +178,7 @@ module FO : sig
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
+  val bij : t Bij.t
 end
 
 (** {2 First Order formulas} *)
@@ -265,6 +272,14 @@ module HO : sig
   val cast : t -> Ty.t -> t
   val get_ty : t -> Ty.t   (* obtain type of variables (always present) *)
 
+  val is_var : t -> bool
+  val is_app : t -> bool
+  val is_const : t -> bool
+  val is_lambda : t -> bool
+
+  val free_vars : ?init:t list -> t -> t list
+    (** List of free variables *)
+
   exception ExpectedType of t
 
   val as_ty : t -> Ty.t
@@ -292,4 +307,5 @@ module HO : sig
   val pp_tstp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
+  val bij : t Bij.t
 end

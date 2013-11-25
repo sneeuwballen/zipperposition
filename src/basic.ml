@@ -106,6 +106,19 @@ module Sym = struct
   let pp buf s = Buffer.add_string buf (to_string s)
 
   let fmt fmt s = Format.pp_print_string fmt (to_string s)
+
+  let bij = Bij.switch
+    ~inject:(function
+      | Const s -> "const", Bij.(BranchTo (string_, s))
+      | Int n -> "int", Bij.(BranchTo (string_, Big_int.string_of_big_int n))
+      | Rat n -> "rat", Bij.(BranchTo (string_, Ratio.string_of_ratio n))
+      | Real f -> "real", Bij.(BranchTo (float_, f)))
+    ~extract:(fun c -> match c with
+      | "const" -> Bij.(BranchFrom (string_, fun s -> mk_const s))
+      | "int" -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
+      | "rat" -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
+      | "real" -> Bij.(BranchFrom (float_, mk_real))
+      | c -> raise (Bij.DecodingError "expected symbol"))
 end
 
 (** {2 Type representation} *)
@@ -149,6 +162,19 @@ module Ty = struct
     | [], _ -> ty
     | _::_, Forall (vars', ty') -> Forall (vars @ vars', ty')  (* flatten *)
     | _::_, _ -> Forall (vars, ty)
+
+  let vars ty =
+    let rec vars acc ty = match ty with
+    | Var _ -> if List.mem ty acc then acc else ty :: acc
+    | App (_, []) -> acc
+    | App (_, l) -> List.fold_left vars acc l
+    | Fun (ret, l) -> List.fold_left vars (vars acc ret) l
+    | Forall (v_list, ty') ->
+      let acc' = vars [] ty' in
+      let acc' = List.filter (fun v -> not (List.mem v v_list) && not (List.mem v acc)) acc' in
+      acc' @ acc
+    in
+    vars [] ty
 
   let i = const "$i"
   let o = const "$o"
@@ -194,6 +220,25 @@ module Ty = struct
 
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let bij =
+    let (!!) = Lazy.force in
+    Bij.(fix (fun bij' ->
+      let bij_app = lazy (pair string_ (list_ (!! bij'))) in
+      let bij_fun = lazy (pair (!! bij') (list_ (!! bij'))) in
+      let bij_forall = lazy (pair (list_ !!bij') !!bij') in
+      switch
+        ~inject:(function
+          | Var i -> "v", BranchTo (string_, i)
+          | App (p, l) -> "at", BranchTo (!! bij_app, (p, l))
+          | Fun (ret, l) -> "fun", BranchTo (!! bij_fun, (ret, l))
+          | Forall (vars, ty) -> "all", BranchTo(!! bij_forall, (vars,ty)))
+        ~extract:(function
+          | "v" -> BranchFrom (string_, var)
+          | "at" -> BranchFrom (!! bij_app, fun (s,l) -> app s l)
+          | "fun" -> BranchFrom (!! bij_fun, fun (ret,l) -> mk_fun ret l)
+          | "all" -> BranchFrom (!! bij_forall, fun (vars,ty) -> forall vars ty)
+          | _ -> raise (DecodingError "expected Type"))))
 end
 
 (** {2 First Order terms} *)
@@ -317,6 +362,22 @@ module FO = struct
   let pp_tstp = pp
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let bij =
+    let open Bij in
+    let (!!!) = Lazy.force in
+    fix
+      (fun bij ->
+        let bij_app = lazy (pair Sym.bij (list_ !!!bij)) in
+        let bij_var = pair string_ (opt Ty.bij) in
+        switch
+          ~inject:(fun t -> match t.term with
+          | Var s -> "v", BranchTo (bij_var, (s, t.ty))
+          | App (s, l) -> "n", BranchTo (!!!bij_app, (s, l)))
+          ~extract:(function
+          | "v" -> BranchFrom (bij_var, fun (s,ty) -> var ?ty s)
+          | "n" -> BranchFrom (!!!bij_app, fun (s,l) -> app s l)
+          | _ -> raise (DecodingError "expected Term")))
 end
 
 (** {2 First Order formulas} *)
@@ -559,6 +620,11 @@ module HO = struct
     | Some ty -> ty
     | None -> failwith "Basic.HO.get_ty: no type"
 
+  let is_var t = match t.term with | Var _ -> true | _ -> false
+  let is_app t = match t.term with | App _ -> true | _ -> false
+  let is_const t = match t.term with | Const _ -> true | _ -> false
+  let is_lambda t = match t.term with | Lambda _ -> true | _ -> false
+
   exception ExpectedType of t
 
   let rec as_ty t =
@@ -629,6 +695,18 @@ module HO = struct
     | [] -> t
     | var::vars' -> exists ?loc ~var (exists_list vars' t)
 
+  let free_vars ?(init=[]) t =
+    let rec find set t = match t.term with
+      | Const _ -> set
+      | Var _ -> if List.mem t set then set else t :: set
+      | App (_, l) -> List.fold_left find set l
+      | Lambda (v, t') ->
+        let set' = find [] t' in
+        let set' = List.filter (fun v' -> not (eq v v') && not (List.mem v' set)) set' in
+        set' @ set
+    in
+    find init t
+
   let rec of_term t =
     let loc = t.FO.loc in
     match t.FO.term with
@@ -698,4 +776,26 @@ module HO = struct
 
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let bij =
+    let open Bij in
+    let (!!!) = Lazy.force in
+    fix
+      (fun bij ->
+        let bij_lam = lazy (pair !!!bij !!!bij) in
+        let bij_var = pair string_ (opt Ty.bij) in
+        let bij_cst = Sym.bij in
+        let bij_at = lazy (pair !!!bij (list_ !!!bij)) in
+        switch
+          ~inject:(fun t -> match t.term with
+          | Var s -> "v", BranchTo (bij_var, (s, t.ty))
+          | Const s -> "c", BranchTo (bij_cst, s)
+          | Lambda (v,t') -> "lam", BranchTo (!!!bij_lam, (v, t'))
+          | App (t, l) -> "at", BranchTo (!!!bij_at, (t, l)))
+          ~extract:(function
+          | "v" -> BranchFrom (bij_var, fun (s,ty) -> var ?ty s)
+          | "c" -> BranchFrom (bij_cst, fun s -> const s)
+          | "lam" -> BranchFrom (!!!bij_lam, fun (var,t') -> lambda ~var t')
+          | "at" -> BranchFrom (!!!bij_at, fun (t, l) -> app t l)
+          | _ -> raise (DecodingError "expected Term")))
 end
