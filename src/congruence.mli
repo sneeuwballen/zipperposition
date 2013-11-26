@@ -70,6 +70,11 @@ module type S = sig
         then [find cc mem == repr] holds.
     *)
 
+  val iter_roots : t -> (term -> unit) -> unit
+    (** Iterate on the congruence classes' representative elements.
+        Exactly one term per congruence class will be passed to the
+        function. *)
+
   val mk_eq : t -> term -> term -> unit
     (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
         the congruence *)

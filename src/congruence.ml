@@ -65,6 +65,11 @@ module type S = sig
         then [find cc mem == repr] holds.
     *)
 
+  val iter_roots : t -> (term -> unit) -> unit
+    (** Iterate on the congruence classes' representative elements.
+        Exactly one term per congruence class will be passed to the
+        function. *)
+
   val mk_eq : t -> term -> term -> unit
     (** [mk_eq congruence t1 t2] asserts that [t1 = t2] belongs to
         the congruence *)
@@ -304,6 +309,14 @@ module Make(T : TERM) = struct
         f ~mem ~repr)
       cc.tbl
 
+  let _iter_roots_node cc f =
+    H.iter
+      (fun _ node ->
+        if node == node.next then f node)
+      cc.tbl
+
+  let iter_roots cc f = _iter_roots_node cc (fun node -> f node.term)
+
   let mk_eq cc t1 t2 =
     let n1 = _get cc t1 in
     let n2 = _get cc t2 in
@@ -341,7 +354,33 @@ module Make(T : TERM) = struct
     search [] n1 n2
 
   let cycles cc =
-    failwith "no_cycles: not implemented"
+    try
+      let explored = H.create 7 in
+      (* starting from each root, explore "less" graph in DFS *)
+      _iter_roots_node cc
+        (fun root ->
+          H.clear explored;
+          let s = Stack.create () in
+          (* initial step *)
+          H.add explored root.term ();
+          List.iter (fun node' -> Stack.push (node', [root]) s) root.lower;
+          (* explore *)
+          while not (Stack.is_empty s) do
+            let node, path = Stack.pop s in
+            if not (H.mem explored node.term) then begin
+              H.add explored node.term ();
+              (* explore children *)
+              List.iter
+                (fun node' ->
+                  if List.memq node' path
+                    then raise Exit (* found cycle *)
+                    else Stack.push (node', node::path) s)
+                node.lower
+            end;
+          done);
+      false
+    with Exit ->
+      true
 end
 
 module FO = Make(struct
