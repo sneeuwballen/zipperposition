@@ -209,7 +209,7 @@ let create ?(complete=false) constrs symbols =
         are new and have effectively been added *)
     let prec_add_symbols new_symbols = 
       let old_len = List.length symbols in
-      let all_symbols = Util.list_union (==) new_symbols symbols in
+      let all_symbols = Util.list_union Symbol.eq new_symbols symbols in
       let new_len = List.length all_symbols in
       if new_len > old_len then begin
         (* some symbols have been added *)

@@ -43,6 +43,9 @@ module type S = sig
   val copy : t -> t
     (** Copy of the partial order *)
 
+  val size : t -> int
+    (** Number of elements *)
+
   val extend : t -> elt list -> t
     (** Add new elements to the ordering, creating a new ordering.
         They will not be ordered at all w.r.t previous elements. *)
@@ -66,6 +69,9 @@ module type S = sig
 
   val compare : t -> elt -> elt -> Comparison.t
     (** compare two elements in the ordering. *)
+
+  val pairs : t -> (elt * elt) list
+    (** list of pairs (a > b) *)
 
   val elements : t -> elt list
     (** Elements of the partial order. If the ordering is total,

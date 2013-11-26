@@ -38,6 +38,9 @@ module type S = sig
   val copy : t -> t
     (** Copy of the partial order *)
 
+  val size : t -> int
+    (** Number of elements *)
+
   val extend : t -> elt list -> t
     (** Add new elements to the ordering, creating a new ordering.
         They will not be ordered at all w.r.t previous elements. *)
@@ -61,6 +64,9 @@ module type S = sig
 
   val compare : t -> elt -> elt -> Comparison.t
     (** compare two elements in the ordering. *)
+
+  val pairs : t -> (elt * elt) list
+    (** list of pairs (a > b) *)
 
   val elements : t -> elt list
     (** Elements of the partial order. If the ordering is total,
@@ -140,10 +146,21 @@ module Make(E : ELEMENT) = struct
   }
 
   let create elements =
-    let elements = Array.of_list elements in
-    let tbl = H.create (Array.length elements) in
-    Array.iteri (fun i e -> H.replace tbl e i) elements;
-    (* there may be duplicates... *)
+    let tbl = H.create 15 in
+    (* remove replicate on the fly, by building a list of non-duplicated
+      elements by decreasing index. *)
+    let n = ref 0 in
+    let elements = List.fold_left
+      (fun acc e ->
+        if not (H.mem tbl e) then begin
+          H.replace tbl e !n;
+          incr n;
+          e :: acc
+        end else acc)
+      [] elements
+    in
+    let elements = Array.of_list (List.rev elements) in
+    Array.iteri (fun i e -> assert (H.find tbl e = i)) elements;
     let size = H.length tbl in
     let cmp = BoolMatrix.create size size in
     { elements; tbl; size; cmp; total=false; }
@@ -152,6 +169,8 @@ module Make(E : ELEMENT) = struct
       mutable part *)
   let copy po =
     { po with cmp = BoolMatrix.copy po.cmp; }
+
+  let size po = po.size
 
   (* copy with more elements *)
   let extend po elements' =
@@ -196,17 +215,18 @@ module Make(E : ELEMENT) = struct
     let cmp = po.cmp in
     (* propagate recursively *)
     let rec propagate i j =
-      if BoolMatrix.get cmp i j then () (* stop *)
+      if i = j || BoolMatrix.get cmp i j
+      then () (* stop, already propagated *)
       else begin
         BoolMatrix.set cmp i j;
-        (* k > i and i > j -> k -> j *)
+        (* k > i and i > j => k > j *)
         for k = 0 to n-1 do
-          if k <> i && BoolMatrix.get cmp k i && k <> j
+          if k <> i && BoolMatrix.get cmp k i
             then propagate k j
         done;
-        (* i > j and j > k -> i -> k *)
+        (* i > j and j > k => i > k *)
         for k = 0 to n-1 do
-          if k <> j && BoolMatrix.get cmp j k && i <> k
+          if k <> j && BoolMatrix.get cmp j k
             then propagate i k
         done;
       end
@@ -254,5 +274,20 @@ module Make(E : ELEMENT) = struct
     | true, false -> Comparison.Gt
     | false, true -> Comparison.Lt
 
-  let elements po = Array.to_list po.elements
+  let pairs po =
+    let acc = ref [] in
+    for i = 0 to po.size -1 do
+      for j = 0 to po.size -1 do
+        if i<>j && BoolMatrix.get po.cmp i j
+          then acc := (po.elements.(i), po.elements.(j)) :: !acc
+      done
+    done;
+    !acc
+
+  let elements po =
+    let l = Array.to_list po.elements in
+    (* sort in {b decreasing} order *)
+    List.fast_sort
+      (fun x y -> Comparison.to_total (compare po y x))
+      l
 end
