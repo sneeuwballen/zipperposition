@@ -502,15 +502,18 @@ let is_semantic_tautology c =
   let res = List.exists
     (fun instance ->
       let cc = Congruence.FO.create ~size:13 () in
-      let to_check = ref [] in   (* ineq to checks afterward *)
+      (* ineq to checks afterward *)
+      let to_check = ref [] in
+      (* build congruence *)
       Array.iter
         (fun lit -> match lit with
         | Lit.Equation (l, r, false, _) -> Congruence.FO.mk_eq cc l r
+        | Lit.Equation (l, r, true, _) -> to_check := `Eq (l,r) :: !to_check
         | Lit.Prop (_, true) ->
           begin try
             let olit = Lit.ineq_lit_of ~instance lit in
             if olit.TO.strict
-              then to_check := olit :: !to_check
+              then to_check := `Lt (olit.TO.left, olit.TO.right) :: !to_check
               else
                 (* left <= right ----> we add  right < less to CC *)
                 let l = olit.TO.left in
@@ -520,12 +523,12 @@ let is_semantic_tautology c =
           end
         | _ -> ())
         c.C.hclits;
+      (* check if inequality holds in congruence OR congruence tautological *)
+      Congruence.FO.cycles cc ||
       List.exists
-        (fun olit ->
-          assert olit.TO.strict;
-          let l = olit.TO.left in
-          let r = olit.TO.right in
-          Congruence.FO.is_less cc l r)
+        (function
+        | `Eq (l,r) -> Congruence.FO.is_eq cc l r
+        | `Lt (l,r) -> Congruence.FO.is_less cc l r)
         !to_check)
     instances
   in
