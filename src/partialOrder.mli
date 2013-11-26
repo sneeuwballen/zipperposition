@@ -23,32 +23,63 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Partial Ordering on symbols} *)
+(** {1 Partial Ordering}
 
-(** A partial ordering on symbols, as a matrix. It computes the
-    transitive closure on the relation it induces, automatically. *)
+A dense partial ordering on objects, implemented with a matrix. It allows
+one to combine partial orders, to complete it using a total order, to
+compute its transitive closure...
+*)
 
-type t
-  (** the partial order *)
+module type S = sig
+  type elt
+    (** Elements that can be compared *)
 
-val mk_partial_order : Symbol.t list -> t
-  (** build an empty partial order for the list of symbols *)
+  type t
+    (** the partial order on elements of type [elt] *)
 
-val is_total : t -> bool
-  (** is the ordering total? *)
+  val create : elt list -> t
+    (** build an empty partial order for the list of elements *)
 
-val complete : t -> (Symbol.t -> Symbol.t -> int) -> unit
-  (** complete the partial order using the given order on
-      symbols to compare unordered pairs. If the given comparison
-      function is not total, the ordering may still not be
-      complete. The comparison function [f] is assumed to be such
-      that [transitive_closure f] is a partial order. *)
+  val copy : t -> t
+    (** Copy of the partial order *)
 
-val compare : t -> Symbol.t -> Symbol.t -> int
-  (** compare two symbols in the ordering. The ordering must be total! *)
+  val extend : t -> elt list -> t
+    (** Add new elements to the ordering, creating a new ordering.
+        They will not be ordered at all w.r.t previous elements. *)
 
-val symbols : t -> Symbol.t list
-  (** symbols, in decreasing order (assuming the ordering is total) *)
+  val is_total : t -> bool
+    (** Is the ordering total (i.e. each pair of elements it contains
+        is ordered)? *)
 
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
+  val enrich : t -> (elt -> elt -> Comparison.t) -> unit
+    (** Compare unordered pairs with the given partial order function. *)
+
+  val complete : t -> (elt -> elt -> int) -> unit
+    (** [complete po f] completes [po] using the function [f]
+        elements to compare still unordered pairs. If [f x y] returns 0
+        then [x] and [y] are still incomparable in [po] afterwards.
+        If the given comparison function is not total, the ordering may still
+        not be complete. The comparison function [f] is assumed to be such
+        that [transitive_closure f] is a partial order. *)
+
+  val compare : t -> elt -> elt -> Comparison.t
+    (** compare two elements in the ordering. *)
+
+  val elements : t -> elt list
+    (** Elements of the partial order. If the ordering is total,
+        they will be sorted by decreasing order (maximum first) *)
+end
+
+(** {2 Functor Implementation} *)
+
+module type ELEMENT = sig
+  type t
+
+  val eq : t -> t -> bool
+    (** Equality function on elements *)
+
+  val hash : t -> int
+    (** Hashing on elements *)
+end
+
+module Make(E : ELEMENT) : S with type elt = E.t

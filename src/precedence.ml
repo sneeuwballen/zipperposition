@@ -27,9 +27,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module T = FOTerm
 module F = FOFormula
-module PO = PartialOrder
 module STbl = Symbol.Tbl
 module SMap = Symbol.Map
+
+module PO = PartialOrder.Make(Symbol)
 
 type constr = Symbol.t -> Symbol.t -> int
   (** an ordering constraint (a possibly non-total ordering on symbols) *)
@@ -189,12 +190,12 @@ let complete_symbols symbols =
 
 (** Order the list of symbols using the constraints *)
 let order_symbols constrs symbols =
-  let po = PartialOrder.mk_partial_order symbols in
+  let po = PO.create symbols in
   (* complete the partial order using constraints, starting with the
      strongest ones *)
-  List.iter (fun constr -> PartialOrder.complete po constr) constrs;
-  assert (PartialOrder.is_total po);
-  PartialOrder.symbols po
+  List.iter (fun constr -> PO.complete po constr) constrs;
+  assert (PO.is_total po);
+  PO.elements po
 
 (** build a precedence on the [symbols] from a list of constraints *)
 let create ?(complete=false) constrs symbols =
@@ -213,23 +214,25 @@ let create ?(complete=false) constrs symbols =
       if new_len > old_len then begin
         (* some symbols have been added *)
         Util.debug 3 "add %a to the precedence"
-                      (Util.pp_list ~sep:", " Symbol.pp) new_symbols;
+            (Util.pp_list ~sep:", " Symbol.pp) new_symbols;
         Util.debug 3 "old precedence %a" pp_snapshot symbols;
 
         (* build a partial order that respects the current ordering *)
-        let po = PartialOrder.mk_partial_order all_symbols in
-        PartialOrder.complete po (list_constraint symbols);
+        let po = PO.create all_symbols in
+        PO.complete po (list_constraint symbols);
         (* complete it with the constraints *)
-        List.iter (fun constr -> PartialOrder.complete po constr) constrs;
-        assert (PartialOrder.is_total po);
-        (* get the new precedence from the completed partial order *)
-        let all_symbols = PartialOrder.symbols po in
+        List.iter (fun constr -> PO.complete po constr) constrs;
+        assert (PO.is_total po);
+        (* get the new precedence from the completed partial order.
+          all_symbols is now in decreasing order. *)
+        let all_symbols = PO.elements po in
         let table' = mk_table all_symbols in
         let prec' = mk_prec all_symbols table' weight in
         Util.debug 3 "new precedence %a" pp_snapshot all_symbols;
         (* return number of new symbols *)
         prec', new_len - old_len
-      end else mk_prec symbols table weight, 0
+      end else
+        mk_prec symbols table weight, 0
     in
     let prec_compare a b = 
       (* some symbols are not explicitely in the signature. Instead, they
