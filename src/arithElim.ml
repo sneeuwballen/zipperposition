@@ -136,55 +136,71 @@ let purify_arith c =
 
 (* if a < t1, a < t2, .... a < tn occurs in clause, where t_i are all
    arithmetic constants, replace by  a < max_i(t_i) *)
-let factor_bounds c = c (* TODO *)
-(*
+let factor_bounds c =
   Util.enter_prof prof_factor_bounds;
   let ctx = c.C.hcctx in
+  (* only for TPTP ordering *)
   let instance = TO.tstp_instance ~spec:(Ctx.total_order ctx) in
   (* [bv] stores which literals should survive *)
   let bv = BV.create ~size:(Array.length c.C.hclits) true in
-  let left = T.Tbl.create 5 in   (* terms t such that  t < constant *)
-  let right = T.Tbl.create 5 in  (* terms t such that constant < t *)
-  Lits.fold_lits ~eligible:C.Eligible.pos c.C.hclits ()
-    (fun () lit i ->
+  (* literals seen as comparisons with monomes *)
+  let lits = Array.map
+    (fun lit ->
       try
         let olit = Lit.ineq_lit_of ~instance lit in
         let l = olit.TO.left in
         let r = olit.TO.right in
         let strict = olit.TO.strict in
-        match l.T.term, r.T.term with
-        | T.Node ((S.Int _ | S.Rat _ | S.Real _) as s, []), _
-          when not (Arith.T.is_arith_const r) ->
-          begin try
-            (* find whether [r] has another bound *)
-            let (i', s', strict') = T.Tbl.find right r in
-            if S.eq s s' && (strict <> strict')
-              then begin
-                (* if s=s' then  s' < r  or s <= r ----> s <= r *)
-                T.Tbl.replace right r (i, s, false);
-                BV.reset i;
-                BV.reset i';
-              end
-            else if S.Arith.Op.less s s'
-              (* if s < s' then  s' <| r  or  s <| r -----> s <| r *)
-              then begin
-                T.Tbl.replace right r (i, s, strict);
-                BV.reset bv i;
-                BV.reset bv i;
-              end
-          with Not_found ->
-            T.Tbl.add right r (i, s, strict) (* remember bound for r *)
-          end
-        | _, T.Node ((S.Int _ | S.Rat _ | S.Real _) as s, []
-          when not (Arith.T.is_arith_const l) ->
-      with Not_found -> ());
-  if BV.length bv < Array.length c.C.hclits then begin
-    assert false (* TODO *)
-
-
-    end
-  else c  (* no change *)
-    *)
+        match Arith.T.is_arith l, Arith.T.is_arith r with
+        | true, true
+        | false, false -> `Ignore
+        | false, true ->
+          let m = Monome.of_term r in
+          `HigherBound (l, m)
+        | true, false ->
+          let m = Monome.of_term l in
+          `LowerBound (m, r)
+      with Not_found | Monome.NotLinear _ -> `Ignore)
+    c.C.hclits
+  in
+  (* remove literals that are redundant *)
+  Array.iteri
+    (fun i lit -> match lit with
+    | `Ignore -> ()
+    | `LowerBound (m, r) ->
+      if Util.array_exists
+        (function
+          | `LowerBound (m', r') ->
+            (* if m < r and m' < r and m > m', then m' < r is enough *)
+            T.eq r r' && Monome.comparison m m' = Comparison.Gt
+          | _ -> false)
+        lits
+        then BV.reset bv i
+    | `HigherBound (l, m) ->
+      if Util.array_exists
+        (function
+          | `HigherBound (l', m') ->
+            (* if l < m and l < m', then l < max(m,m') is enough *)
+            T.eq l l' && Monome.comparison m m' = Comparison.Lt
+          | _ -> false)
+        lits
+        then BV.reset bv i
+    )
+    lits;
+  (* see whether some lits were removed *)
+  if BV.cardinal bv < Array.length c.C.hclits then begin
+    let lits' = BV.select bv c.C.hclits in
+    let proof cc = Proof.mk_c_step ~theories:["equality";"arith"]
+      ~rule:"arith_factor_bounds" cc [c.C.hcproof] in
+    let new_c = C.create ~parents:[c] ~ctx lits' proof in
+    Util.debug 3 "arith_factor_bounds of %a gives %a" C.pp c C.pp new_c;
+    assert (List.length lits' < Array.length c.C.hclits);
+    Util.exit_prof prof_factor_bounds;
+    Util.incr_stat stat_factor_bounds;
+    new_c
+  end else
+    let _ = Util.exit_prof prof_factor_bounds in
+    c  (* no change *)
 
 (* enumerate integers from lower to higher, included. Returns an empty list
     if lower > higher *)
