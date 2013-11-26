@@ -329,7 +329,7 @@ let _all_lits_but_positions lits positions =
       | i::_ -> BV.reset bv i
       | [] -> assert false)
     positions;
-  List.map fst (BV.select bv lits)
+  BV.select bv lits
 
 (* inequality chaining between two clauses *)
 let do_ineq_chaining ~ctx left s_left left_pos right s_right right_pos subst acc =
@@ -558,7 +558,7 @@ let simplify c =
         end);
   if BV.cardinal bv < size
     then begin
-      let lits = List.map fst (BV.select bv c.C.hclits) in
+      let lits = BV.select bv c.C.hclits in
       let theories = ["total_order"] in
       instances := Util.list_uniq TO.eq !instances;
       (*

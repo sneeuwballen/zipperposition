@@ -362,7 +362,7 @@ let has_selected_lits c = not (BV.is_empty c.hcselected)
 let is_selected c i = BV.get c.hcselected i
 
 (** Indexed list of selected literals *)
-let selected_lits c = BV.select c.hcselected c.hclits
+let selected_lits c = BV.selecti c.hcselected c.hclits
 
 (** is the clause a unit clause? *)
 let is_unit_clause c = match c.hclits with

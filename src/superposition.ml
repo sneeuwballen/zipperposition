@@ -668,7 +668,7 @@ let basic_simplify c =
           end
         | _ -> ())
     lits;
-  let new_lits = List.map fst (BV.select bv lits) in
+  let new_lits = BV.select bv lits in
   let renaming = Ctx.renaming_clear ~ctx in
   let new_lits = Lit.apply_subst_list ~ord ~renaming !subst new_lits 0 in
   let new_lits = Util.list_uniq Lit.eq_com new_lits in

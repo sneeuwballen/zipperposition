@@ -768,7 +768,7 @@ module Lits = struct
             (fun lit' ->
               (* build a new literal from lit', if the term is maximal *)
               let t = Lit.Pivoted.get_term lit' in
-              if List.exists (fun (t',_) -> T.eq t t') terms then
+              if List.exists (fun t' -> T.eq t t') terms then
                 let lits = Util.array_except_idx lits i in
                 let lits = Lit.Pivoted.to_lit ~ord lit' :: lits in
                 let lits = Array.of_list lits in
