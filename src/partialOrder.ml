@@ -47,13 +47,16 @@ module type S = sig
         is ordered)? *)
 
   val enrich : t -> (elt -> elt -> Comparison.t) -> unit
-    (** Compare unordered pairs with the given partial order function. *)
+    (** Compare unordered pairs with the given partial order function.
+        If the function returns {!Comparison.Eq} on two elements [x] and
+        [y], then the ordering cannot be total anymore. *)
 
   val complete : t -> (elt -> elt -> int) -> unit
-    (** complete the partial order using the given order on
-        elements to compare still unordered pairs. If the given comparison
-        function is not total, the ordering may still not be
-        complete. The comparison function [f] is assumed to be such
+    (** [complete po f] completes [po] using the function [f]
+        elements to compare still unordered pairs. If [f x y] returns 0
+        then [x] and [y] are still incomparable in [po] afterwards.
+        If the given comparison function is not total, the ordering may still
+        not be complete. The comparison function [f] is assumed to be such
         that [transitive_closure f] is a partial order. *)
 
   val compare : t -> elt -> elt -> Comparison.t
@@ -198,12 +201,12 @@ module Make(E : ELEMENT) = struct
         BoolMatrix.set cmp i j;
         (* k > i and i > j -> k -> j *)
         for k = 0 to n-1 do
-          if k <> i && BoolMatrix.get cmp k i
+          if k <> i && BoolMatrix.get cmp k i && k <> j
             then propagate k j
         done;
         (* i > j and j > k -> i -> k *)
         for k = 0 to n-1 do
-          if k <> j && BoolMatrix.get cmp j k
+          if k <> j && BoolMatrix.get cmp j k && i <> k
             then propagate i k
         done;
       end

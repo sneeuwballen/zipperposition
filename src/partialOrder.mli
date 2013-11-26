@@ -52,7 +52,9 @@ module type S = sig
         is ordered)? *)
 
   val enrich : t -> (elt -> elt -> Comparison.t) -> unit
-    (** Compare unordered pairs with the given partial order function. *)
+    (** Compare unordered pairs with the given partial order function.
+        If the function returns {!Comparison.Eq} on two elements [x] and
+        [y], then the ordering cannot be total anymore. *)
 
   val complete : t -> (elt -> elt -> int) -> unit
     (** [complete po f] completes [po] using the function [f]
