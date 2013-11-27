@@ -206,15 +206,19 @@ let factor_bounds c =
     let _ = Util.exit_prof prof_factor_bounds in
     c  (* no change *)
 
-(* enumerate integers from 0 to range, included. Returns an empty list
-    if range < 0 *)
-let _int_range range =
+(* enumerate integers from 0 to range. Bounds are excluded or included
+    depending on params [strict_low] and [strict_high] (if true, bound is
+    excluded). Returns an empty list is the range is empty. *)
+let _int_range ~strict_low ~strict_high range =
   let rec enum acc i = match Big_int.compare_big_int i range with
-    | 0 -> i::acc  (* last one *)
-    | n when n > 0 -> []   (* empty range *)
+    | 0 when not strict_high -> i :: acc (* include range *)
+    | n when n >= 0 -> acc  (* gone too high, remember that range is excluded *)
     | _ -> enum (i::acc) (Big_int.succ_big_int i)
   in
-  enum [] Big_int.zero_big_int
+  (* include lower bound? *)
+  let start = Big_int.zero_big_int in
+  let start = if strict_low then Big_int.succ_big_int start else start in
+  enum [] start
 
 (* new inference, kind of the dual of inequality chaining for integer
    inequalities. See the .mli file for more explanations. *)
@@ -226,7 +230,7 @@ let case_switch active_set c =
   let instance = TO.tstp_instance ~spec in  (* $less, $lesseq *)
   (* do the case switch inference. c contains lower <= t,
       c' contains t <= lower+range. Enumerates t = lower + i for i in 0 ... range *)
-  let _do_case_switch c s_c i c' s_c' i' t lower s_lower range subst acc =
+  let _do_case_switch c s_c i c' s_c' i' t lower s_lower strict_low strict_high range subst acc =
     Util.debug 5 "case_switch between %a at %d and %a at %d" C.pp c i C.pp c' i';
     let renaming = Ctx.renaming_clear ~ctx in
     let lits_left = Util.array_except_idx c.C.hclits i in
@@ -241,7 +245,7 @@ let case_switch active_set c =
         let monome = Monome.add_const lower (S.mk_bigint n) in
         let monome = Monome.apply_subst ~renaming subst monome s_lower in
         Lit.mk_eq ~ord t' (Monome.to_term monome))
-      (_int_range range)
+      (_int_range ~strict_low ~strict_high range)
     in
     let new_lits = lits_left @ lits_right @ lits_case in
     let proof cc = Proof.mk_c_step cc ~rule:"arith_case_switch" [c.C.hcproof; c'.C.hcproof] in
@@ -257,8 +261,8 @@ let case_switch active_set c =
   let new_clauses = Util.array_foldi
     (fun acc i lit -> match lit with
       | `Ignore -> acc
-      | `LowerBound (false, low, t) when Type.eq Type.int (Monome.type_of low) ->
-        (* low <| r, see whether we can find high with r <| high and
+      | `LowerBound (strict_low, low, t) when Type.eq Type.int (Monome.type_of low) ->
+        (* low < r, see whether we can find high with r < high and
            high-low = constant *)
         I.retrieve_unifiables active_set#idx_ord_left 1 t 0 acc
           (fun acc _ with_pos subst ->
@@ -267,7 +271,7 @@ let case_switch active_set c =
               let pos' = with_pos.C.WithPos.pos in
               let i' = List.hd pos' in
               let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
-              if olit'.TO.strict then raise Exit;
+              let strict_high = olit'.TO.strict in
               (* see whether the right term is a monome *)
               let high = Monome.of_term olit'.TO.right in
               assert (Type.eq Type.int (Monome.type_of high));
@@ -283,14 +287,14 @@ let case_switch active_set c =
                   (* ok, found a high bound, such that high-low is a constant,
                       so t ranges from low to high. Typing ensures that
                       high is also an integer monome. *)
-                  _do_case_switch c 0 i c' 1 i' t low 0 range subst acc
+                  _do_case_switch c 0 i c' 1 i' t low 0 strict_low strict_high range subst acc
                 | _ -> assert false
               else acc
             with Exit | Not_found | Monome.NotLinear _ ->
               acc)
       | `LowerBound _ ->
         acc  (* other lower bounds are ignored *)
-      | `HigherBound (false, t, high) when Type.eq Type.int (Monome.type_of high) ->
+      | `HigherBound (strict_high, t, high) when Type.eq Type.int (Monome.type_of high) ->
         (* converse case (symmetric of the `LowerBound case) *)
         I.retrieve_unifiables active_set#idx_ord_right 1 t 0 acc
           (fun acc _ with_pos subst ->
@@ -299,7 +303,7 @@ let case_switch active_set c =
               let pos' = with_pos.C.WithPos.pos in
               let i' = List.hd pos' in
               let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
-              if olit'.TO.strict then raise Exit;
+              let strict_low = olit'.TO.strict in
               (* see whether the left term is a monome *)
               let low = Monome.of_term olit'.TO.left in
               assert (Type.eq Type.int (Monome.type_of low));
@@ -315,7 +319,7 @@ let case_switch active_set c =
                   (* ok, found a high bound, such that high-low is a constant,
                       so t ranges from low to high. Typing ensures that
                       high is also an integer monome. *)
-                _do_case_switch c' 1 i' c 0 i t low 1 range subst acc
+                _do_case_switch c' 1 i' c 0 i t low 1 strict_low strict_high range subst acc
                 | _ -> assert false
               else acc
             with Exit | Not_found | Monome.NotLinear _ ->
