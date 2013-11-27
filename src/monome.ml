@@ -278,7 +278,6 @@ let product m c =
     { m with constant; coeffs; }
 
 let rec divby m const =
-  assert (S.Arith.sign const >= 0);
   if S.Arith.is_zero const
     then raise Division_by_zero
   else if S.Arith.sign const < 0
