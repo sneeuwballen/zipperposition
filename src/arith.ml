@@ -46,23 +46,25 @@ let is_arith_ty ty =
 module T = struct
   include FOTerm  (* for the rest of arith *)
 
-  let rec is_arith t = match t.term with
-    | Node ((S.Int _ | S.Rat _ | S.Real _), _, []) -> true
-    | Node (s, _, _) when Symbol.Arith.is_arith s -> true
+  let arith_kind t = match t.term with
+    | Node ((S.Int _ | S.Rat _ | S.Real _), _, []) -> `Const
+    | Node (s, _, _) when Symbol.Arith.is_arith s -> `Expr
     | Var _
-    | BoundVar _ -> is_arith_ty t.ty
-    | _ -> false
+    | BoundVar _ ->
+      if is_arith_ty t.ty then `Var else `Not
+    | _ -> `Not
 
-  let is_arith_const t = match t.term with
-    | Node ((S.Int _ | S.Rat _ | S.Real _), _, []) -> true
-    | _ -> false
+  let is_arith t = match arith_kind t with
+    | `Const | `Expr | `Var -> true
+    | `Not -> false
 
-  let is_compound_arith t = match t.term with
-    | Node ((S.Int _ | S.Rat _ | S.Real _), [], []) -> false (* const *)
-    | Node (s, _, _::_) when Symbol.Arith.is_arith s -> true
-    | Var _
-    | BoundVar _
-    | Node (_, _, _) -> false
+  let is_arith_const t = match arith_kind t with
+    | `Const -> true
+    | `Var | `Expr | `Not -> false
+
+  let is_compound_arith t = match arith_kind t with
+    | `Expr -> true
+    | `Var | `Const | `Not -> false
 
   let rec sum_list l = match l with
     | [] -> failwith "Arith.sum_list: got empty list"

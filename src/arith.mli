@@ -42,9 +42,12 @@ module T : sig
   val sum_list : FOTerm.t list -> FOTerm.t
     (** Sum of those terms *)
 
-  val is_arith : FOTerm.t -> bool
-    (** Is the term arithmetic? Includes constants, variables, and
+  val arith_kind : FOTerm.t -> [ `Const | `Var | `Expr | `Not ]
+    (** Is the term an arithmetic expression? Includes constants, variables, and
         more complicated expressions built from arithmetic operators *)
+
+  val is_arith : FOTerm.t -> bool
+    (** Same as {!arith_kind}, but returns true for any result that is not `Not *)
 
   val is_compound_arith : FOTerm.t -> bool
     (** Is the term a composite arithmetic expression? *)
