@@ -146,15 +146,14 @@ let _view_lits_as_bounds ~ctx lits =
         let l = olit.TO.left in
         let r = olit.TO.right in
         let strict = olit.TO.strict in
-        match Arith.T.is_arith l, Arith.T.is_arith r with
-        | true, true
-        | false, false -> `Ignore
-        | false, true ->
+        match Arith.T.arith_kind l, Arith.T.arith_kind r with
+        | (`Var | `Not), (`Const | `Expr) ->
           let m = Monome.of_term r in
           `HigherBound (strict, l, m)
-        | true, false ->
+        | (`Const | `Expr), (`Var | `Not) ->
           let m = Monome.of_term l in
           `LowerBound (strict, m, r)
+        | _ -> `Ignore
       with Not_found | Monome.NotLinear _ -> `Ignore)
     lits
 

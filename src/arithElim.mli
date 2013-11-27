@@ -60,8 +60,9 @@ val axioms : PFormula.t list
         C1 or a <= b     C2 or b <= c
     -------------------------------------
         C1 or C2 or or_{i=a....c} (b = i)
-    if a and c are integer constants. If a > c, then the range a...c
-    is empty and the literal has been erased.
+    if a and c are integer linear expressions whose difference is
+    a constant. If a > c, then the range a...c is empty and the literal
+    is just removed. 
 *)
 val case_switch : Env.binary_inf_rule
 
@@ -69,7 +70,7 @@ val case_switch : Env.binary_inf_rule
         C or a < t1 or a < t2 ... or a < tn
         ===================================
           C or a < max(t1, ..., tn)
-  if t_i are arithmetic constants
+  if t_i are comparable linear expressions
 *)
 val factor_bounds : Env.simplify_rule
 
