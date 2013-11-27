@@ -752,6 +752,8 @@ module Lits = struct
   let pivot ~ord ~eligible lits =
     let results = ref [] in
     let add_res a = results := a :: !results in
+    (* offset to create new vars *)
+    let offset = max 1 (1 + T.max_var (Literals.vars lits)) in
     for i = 0 to Array.length lits - 1 do
       if eligible i lits.(i) then try
         (* try to pivot the i-th literal *)
@@ -770,11 +772,28 @@ module Lits = struct
             (fun lit' ->
               (* build a new literal from lit', if the term is maximal *)
               let t = Lit.Pivoted.get_term lit' in
-              if List.exists (fun t' -> T.eq t t') terms then
+              let m = Lit.Pivoted.get_monome lit' in
+              let divby = m.Monome.divby in
+              if List.exists (fun t' -> T.eq t t') terms then begin
+                (* arith constraint, if required *)
+                let constraint_ =
+                  if Type.eq (T.ty t) Type.int
+                  && not (Symbol.Arith.is_one divby)
+                  then (* add a divisibility constraint *)
+                    let v = T.mk_var ~ty:Type.int offset in
+                    let lit = Literal.mk_neq ~ord
+                      (T.mk_product (T.mk_const divby) v)
+                      (Monome.to_term (Monome.normalize_eq_zero m))
+                    in
+                    [lit]
+                  else []
+                in
+                (* build new array of literals *)
                 let lits = Util.array_except_idx lits i in
-                let lits = Lit.Pivoted.to_lit ~ord lit' :: lits in
+                let lits = Lit.Pivoted.to_lit ~ord lit' :: constraint_ @ lits in
                 let lits = Array.of_list lits in
-                add_res lits)
+                add_res lits
+              end)
             pivots
       with Monome.NotLinear _ -> ()
     done;
