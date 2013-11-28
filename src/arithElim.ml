@@ -229,15 +229,16 @@ let case_switch active_set c =
   let spec = Ctx.total_order ctx in
   let instance = TO.tstp_instance ~spec in  (* $less, $lesseq *)
   (* do the case switch inference. c contains lower <= t,
-      c' contains t <= lower+range. Enumerates t = lower + i for i in 0 ... range *)
-  let _do_case_switch c s_c i c' s_c' i' t lower s_lower strict_low strict_high range subst acc =
+      c' contains t <= lower+range. [s_foo] is the scope of [foo].
+      Enumerates t = lower + i for i in 0 ... range *)
+  let _do_case_switch c s_c i c' s_c' i' t s_t lower s_lower strict_low strict_high range subst acc =
     Util.debug 5 "case_switch between %a at %d and %a at %d" C.pp c i C.pp c' i';
     let renaming = Ctx.renaming_clear ~ctx in
     let lits_left = Util.array_except_idx c.C.hclits i in
     let lits_left = Lit.apply_subst_list ~renaming ~ord subst lits_left s_c in
     let lits_right = Util.array_except_idx c'.C.hclits i' in
     let lits_right = Lit.apply_subst_list ~renaming ~ord subst lits_right s_c' in
-    let t' = Substs.FO.apply ~renaming subst t s_c in
+    let t' = Substs.FO.apply ~renaming subst t s_t in
     (* the case switch on t: for n=0...range, compute monome=lower+n, apply
       substitution to it, and add literal  t=monome *)
     let lits_case = List.map
@@ -287,7 +288,7 @@ let case_switch active_set c =
                   (* ok, found a high bound, such that high-low is a constant,
                       so t ranges from low to high. Typing ensures that
                       high is also an integer monome. *)
-                  _do_case_switch c 0 i c' 1 i' t low 0 strict_low strict_high range subst acc
+                  _do_case_switch c 0 i c' 1 i' t 0 low 0 strict_low strict_high range subst acc
                 | _ -> assert false
               else acc
             with Exit | Not_found | Monome.NotLinear _ ->
@@ -319,7 +320,7 @@ let case_switch active_set c =
                   (* ok, found a high bound, such that high-low is a constant,
                       so t ranges from low to high. Typing ensures that
                       high is also an integer monome. *)
-                _do_case_switch c' 1 i' c 0 i t low 1 strict_low strict_high range subst acc
+                _do_case_switch c' 1 i' c 0 i t 0 low 1 strict_low strict_high range subst acc
                 | _ -> assert false
               else acc
             with Exit | Not_found | Monome.NotLinear _ ->
