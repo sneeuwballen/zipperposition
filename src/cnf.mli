@@ -37,13 +37,21 @@ val is_lit : FOFormula.t -> bool
 val is_clause : FOFormula.t list -> bool
   (** Is it a clause, ie a list of literals? *)
 
-val miniscope : FOFormula.t -> FOFormula.t
-  (** Apply miniscoping transformation to the term *)
+val miniscope : ?distribute_exists:bool -> FOFormula.t -> FOFormula.t
+  (** Apply miniscoping transformation to the term.
+      @param distribute_exists see whether ?X:(p(X)|q(X)) should be
+        transformed into (?X: p(X) | ?X: q(X)). Default: [false] *)
 
 type clause = FOFormula.t list
   (** Basic clause representation, as list of literals *)
 
-val cnf_of : ?ctx:Skolem.ctx -> FOFormula.t -> clause list
-  (** Transform the clause into proper CNF; returns a list of clauses *)
+type options =
+  | DistributeExists
 
-val cnf_of_list : ?ctx:Skolem.ctx -> FOFormula.t list -> clause list
+val cnf_of : ?opts:options list -> ?ctx:Skolem.ctx ->
+             FOFormula.t -> clause list
+  (** Transform the clause into proper CNF; returns a list of clauses.
+      Options are used to tune the behavior. *)
+
+val cnf_of_list : ?opts:options list -> ?ctx:Skolem.ctx ->
+                  FOFormula.t list -> clause list

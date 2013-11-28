@@ -59,10 +59,9 @@ and is_lit f = match f.F.form with
 let is_clause l = List.for_all is_lit l
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
-let rec miniscope f =
-  let f = F.simplify f in
+let miniscope ?(distribute_exists=false) f =
   (* recursive miniscoping *)
-  match f.F.form with
+  let rec miniscope f = match f.F.form with
   | F.Forall (ty,{F.form=F.And l}) ->
     (* forall x (and l) -> and (forall x f' \ f' in l) *)
     let l = List.map miniscope l in
@@ -80,7 +79,14 @@ let rec miniscope f =
   | F.Exists (ty, {F.form=F.Or l}) ->
     let l = List.map miniscope l in
     let with_v, without_v = List.partition (fun f -> F.DB.contains f 0) l in
-    F.mk_or (List.map (F.__mk_exists ~ty) with_v @ List.map (F.DB.unshift 1) without_v)
+    (* see whether we push the existential into the formulas [with_v], in
+        which the variable occurs, or whether we keep it outside *)
+    let with_v = if distribute_exists
+      then List.map (F.__mk_exists ~ty) with_v
+      else [F.__mk_exists ~ty (F.mk_or with_v)]
+    in
+    let without_v = List.map (F.DB.unshift 1) without_v in
+    F.mk_or (with_v @ without_v)
   | F.Exists (ty,f') -> F.__mk_exists ~ty (miniscope f')
   | F.And l -> F.mk_and (List.map miniscope l)
   | F.Or l -> F.mk_or (List.map miniscope l)
@@ -91,6 +97,8 @@ let rec miniscope f =
   | F.False
   | F.Equal _
   | F.Atom _ -> f
+  in
+  miniscope (F.simplify f)
 
 (* negation normal form (also remove equivalence and implications).
     [polarity] is the polarity of the formula, ie the parity of the number
@@ -185,8 +193,11 @@ and product a b =
 type clause = F.t list
   (** Basic clause representation, as list of literals *)
 
+type options =
+  | DistributeExists
+
 (* Transform the clause into proper CNF; returns a list of clauses *)
-let cnf_of ?(ctx=Skolem.create ()) f =
+let cnf_of ?(opts=[]) ?(ctx=Skolem.create ()) f =
   let f = F.flatten f in
   Util.debug 4 "reduce %a to CNF..." F.pp f;
   let clauses = if is_cnf f
@@ -209,7 +220,8 @@ let cnf_of ?(ctx=Skolem.create ()) f =
       Util.debug 4 "... simplified: %a" F.pp f;
       let f = nnf true f in
       Util.debug 4 "... NNF: %a" F.pp f;
-      let f = miniscope f in
+      let distribute_exists = List.mem DistributeExists opts in
+      let f = miniscope ~distribute_exists f in
       Util.debug 4 "... miniscoped: %a" F.pp f;
       (* adjust the variable counter to [f] before skolemizing *)
       Skolem.clear_var ~ctx;
@@ -223,12 +235,5 @@ let cnf_of ?(ctx=Skolem.create ()) f =
   assert (List.for_all is_clause clauses);
   clauses
 
-let cnf_of_list ?(ctx=Skolem.create ()) l =
-  Util.list_flatmap (fun f -> cnf_of ~ctx f) l
-
-let as_transform ~ctx =
-  let transform f =
-    let clauses = cnf_of ~ctx f in
-    List.map (fun c -> F.mk_or c) clauses
-  in
-  Transform.Tr ("cnf", transform)
+let cnf_of_list ?(opts=[]) ?(ctx=Skolem.create ()) l =
+  Util.list_flatmap (fun f -> cnf_of ~opts ~ctx f) l
