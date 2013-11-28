@@ -40,9 +40,11 @@ module Lit = Literal
 module Lits = Literal.Arr
 
 let prof_case_switch = Util.mk_profiler "arith.case_switch"
+let prof_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 let prof_factor_bounds = Util.mk_profiler "arith.factor_bounds"
 
 let stat_case_switch = Util.mk_stat "arith.case_switch"
+let stat_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_factor_bounds = Util.mk_stat "arith.factor_bounds"
 
 (** {2 Inference Rules} *)
@@ -333,6 +335,77 @@ let case_switch active_set c =
   Util.exit_prof prof_case_switch;
   new_clauses
 
+let inner_case_switch c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let spec = Ctx.total_order ctx in
+  let instance = TO.tstp_instance ~spec in  (* $less, $lesseq *)
+  (* do the case switch, removing lits i and j, adding t=low+k
+     where k in [0... range] *)
+  let _do_case_switch i j t low range strict_low strict_high subst acc =
+    Util.debug 5 "inner_case_switch in %a: %a in (%a,%a+%s) subst is %a"
+      C.pp c T.pp t Monome.pp low Monome.pp low
+      (Big_int.string_of_big_int range) Substs.FO.pp subst;
+    (* remove lits i and j *)
+    let lits = Util.array_foldi
+      (fun acc i' lit -> if i' <> i && i' <> j then lit :: acc else acc)
+      [] c.C.hclits
+    in
+    List.fold_left
+      (fun acc k ->
+        let renaming = Ctx.renaming_clear ~ctx in
+        let low' = Monome.apply_subst ~renaming subst low 0 in
+        let t' = Substs.FO.apply ~renaming subst t 0 in
+        let lit =
+          Literal.mk_neq ~ord t'
+            (Arith.T.mk_sum (Monome.to_term low') (T.mk_const (S.mk_bigint k)))
+        in
+        let lits' = Literal.apply_subst_list ~ord ~renaming subst lits 0 in
+        let new_lits = lit :: lits' in
+        let proof cc = Proof.mk_c_step cc ~rule:"arith_inner_case_switch" [c.C.hcproof] in
+        let parents = [c] in
+        let new_clause = C.create ~parents ~ctx new_lits proof in
+        Util.debug 5 "  --> inner case switch gives clause %a" C.pp new_clause;
+        new_clause :: acc)
+      acc (_int_range ~strict_low ~strict_high range)
+  in
+  (* view literals as arithmetic bounds when possible *)
+  let lits = _view_lits_as_bounds ~ctx c.C.hclits in
+  (* fold on literals *)
+  let new_clauses = Util.array_foldi
+    (fun acc i lit -> match lit with
+      | `Ignore -> acc
+      | `LowerBound (strict_high, high, t) when Type.eq Type.int (T.ty t) ->
+        (* take the negation: high < t is the constraint  t <= high *)
+        let strict_high = not strict_high in
+        Util.array_foldi
+          (fun acc j lit' ->
+            if j = i then acc else match lit' with
+            | `HigherBound (strict_low, t', low) when Type.eq Type.int (T.ty t') ->
+              let strict_low = not strict_low in
+              begin try
+                (* unify t and t', see if it makes for a proper framing of t *)
+                let subst = FOUnif.unification t 0 t' 0 in
+                let range = Monome.difference high low in
+                if Monome.is_constant range
+                  then match range.Monome.constant with
+                  | S.Int range ->
+                    _do_case_switch i j t low range strict_low strict_high subst acc
+                  | _ -> assert false
+                  else acc
+              with FOUnif.Fail -> acc
+              end
+            | _ -> acc
+          )
+          acc lits
+      | `LowerBound _
+      | `HigherBound _ -> acc
+      )
+    [] lits
+  in
+  Util.exit_prof prof_case_switch;
+  new_clauses
+
 let axioms =
   (* parse a pformula
   let pform ~name s =
@@ -370,6 +443,7 @@ let setup_env ?(ac=false) ~env =
   Env.add_unary_inf ~env "arith_pivot" pivot_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
+  Env.add_unary_inf ~env "arith_inner_case_switch" inner_case_switch;
   Env.add_binary_inf ~env "arith_case_switch" case_switch;
   Env.add_simplify ~env factor_bounds;
   (* declare some AC symbols *)

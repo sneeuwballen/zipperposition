@@ -56,23 +56,33 @@ val purify_arith : Env.unary_inf_rule
 val axioms : PFormula.t list
   (** Set of axioms useful to do arithmetic *)
 
-(* inference rule
-        C1 or a <= b     C2 or b <= c
-    -------------------------------------
-        C1 or C2 or or_{i=a....c} (b = i)
-    if a and c are integer linear expressions whose difference is
-    a constant. If a > c, then the range a...c is empty and the literal
-    is just removed. 
-*)
 val case_switch : Env.binary_inf_rule
+  (** inference rule
+          C1 or a <= b     C2 or b <= c
+      -------------------------------------
+          C1 or C2 or or_{i=a....c} (b = i)
+      if a and c are integer linear expressions whose difference is
+      a constant. If a > c, then the range a...c is empty and the literal
+      is just removed. 
+  *)
 
-(* simplification rule
-        C or a < t1 or a < t2 ... or a < tn
-        ===================================
-          C or a < max(t1, ..., tn)
-  if t_i are comparable linear expressions
-*)
+val inner_case_switch : Env.unary_inf_rule
+  (** inference rule
+        C1 or a <= b or b <= c
+        ----------------------
+            C1 or b!=i
+        for each i in [c...a]. See (a <= b or b <= c or C1) as
+        the rule  (b < a and c < b) -> C1, then make the head of the rule
+        true
+  *)
+
 val factor_bounds : Env.simplify_rule
+  (** simplification rule
+          C or a < t1 or a < t2 ... or a < tn
+          ===================================
+            C or a < max(t1, ..., tn)
+    if t_i are comparable linear expressions
+  *)
 
 (* TODO: redundancy criterion:
          t1 < a or a < t2 or C
