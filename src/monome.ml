@@ -299,37 +299,23 @@ let rec sum_list = function
   | [m] -> m
   | m::l' -> sum m (sum_list l')
 
-(* assuming m1, m2 have same divby, check whether [m1] is always bigger or
-   equal than [m2] *)
-let _dominates m1 m2 =
-  (* bigger constant *)
-  S.Arith.Op.greatereq m1.constant m2.constant &&
-  (* all terms of m2 appear in m1 with bigger or equal a coefficient *)
-  T.Map.for_all
-    (fun t c2 ->
-      try
-        let c1 = T.Map.find t m1.coeffs in
-        S.Arith.Op.greatereq c1 c2
-      with Not_found -> false)
-    m2.coeffs
-
-let dominates m1 m2 =
-  (* same type *)
-  Type.eq (type_of m1) (type_of m2)
-  &&
-  let m1, m2 = reduce_same_divby m1 m2 in
-  _dominates m1 m2
-
 let comparison m1 m2 =
   (* same type *)
   if Type.eq (type_of m1) (type_of m2)
-  then let m1, m2 = reduce_same_divby m1 m2 in
-    match _dominates m1 m2, _dominates m2 m1 with
-    | true, true -> Comparison.Eq
-    | true, false -> Comparison.Gt
-    | false, true -> Comparison.Lt
-    | false, false -> Comparison.Incomparable
+  then
+    (* if m1-m2 is a constant, they are comparable, otherwise it
+        depends on the model/instance *)
+    let m = difference m1 m2 in
+    match is_constant m, S.Arith.sign m.constant with
+    | false, _ -> Comparison.Incomparable
+    | true, 0 -> Comparison.Eq
+    | true, n when n < 0 -> Comparison.Lt
+    | true, _ -> Comparison.Gt
   else Comparison.Incomparable
+
+let dominates m1 m2 = match comparison m1 m2 with
+  | Comparison.Eq | Comparison.Gt -> true
+  | Comparison.Lt | Comparison.Incomparable -> false
 
 exception NotLinear of string
   (** Used by [of_term] *)
