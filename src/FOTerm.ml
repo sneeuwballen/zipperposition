@@ -620,8 +620,10 @@ let pp_tstp_depth depth buf t =
   | Node (s, [], []) -> Symbol.pp_tstp buf s
   | Node (s, tyargs, args) ->
     Printf.bprintf buf "%a(" Symbol.pp_tstp s;
-    Util.pp_list Type.pp_tstp buf tyargs;
-    (match tyargs, args with | _::_, _::_ -> Buffer.add_string buf ", " | _ -> ());
+    if not (Symbol.has_flag Symbol.flag_ad_hoc_poly s) then begin
+      Util.pp_list Type.pp_tstp buf tyargs;
+      (match tyargs, args with | _::_, _::_ -> Buffer.add_string buf ", " | _ -> ());
+      end;
     Util.pp_list pp_rec buf args;
     Buffer.add_string buf ")"
   | Var i -> Printf.bprintf buf "X%d" i
@@ -654,8 +656,10 @@ let rec pp_depth ?(hooks=[]) depth buf t =
         | [], [] -> Symbol.pp buf s
         | _ ->
           Printf.bprintf buf "%a(" Symbol.pp_tstp s;
-          Util.pp_list Type.pp_tstp buf tyargs;
-          (match tyargs, args with | _::_, _::_ -> Buffer.add_string buf ", " | _ -> ());
+          if not (Symbol.has_flag Symbol.flag_ad_hoc_poly s) then begin
+            Util.pp_list Type.pp_tstp buf tyargs;
+            (match tyargs, args with | _::_, _::_ -> Buffer.add_string buf ", " | _ -> ());
+            end;
           Util.pp_list pp_rec buf args;
           Buffer.add_string buf ")";
         end
@@ -700,10 +704,12 @@ let arith_hook pp_rec buf t =
     Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
   | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.product ->
     Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.quotient ->
+  | Node (s, _, [a; b]) when Symbol.(eq s Arith.quotient || eq s Arith.quotient_e) ->
     Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
   | Node (s, _, [a]) when Symbol.eq s Symbol.Arith.uminus ->
     Printf.bprintf buf "-%a" pp_surrounded a; true;
+  | Node (s, _, [a;b]) when Symbol.eq s Symbol.Arith.remainder_e ->
+    Printf.bprintf buf "%a mod %a" pp_surrounded a pp_surrounded b; true;
   | _ -> false  (* default *)
 
 let pp_debug buf t = pp_depth 0 buf t
