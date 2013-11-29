@@ -52,6 +52,7 @@ let flag_multiset = 1 lsl 5
 let flag_fresh_const = 1 lsl 6
 let flag_commut = 1 lsl 7
 let flag_distinct = 1 lsl 8
+let flag_ad_hoc_poly = 1 lsl 9
 
 let flags s = match s with
   | Const (_, info) -> info.flags
@@ -212,7 +213,7 @@ let true_symbol = mk_const ~ty:Type.o "$true"
 let false_symbol = mk_const ~ty:Type.o "$false"
 
 let eq_symbol =
-  let flags = flag_infix lor flag_multiset lor flag_commut in
+  let flags = flag_infix lor flag_multiset lor flag_commut lor flag_ad_hoc_poly in
   let ty = Type.(forall [x] (o <== [x;x])) in
   mk_const ~ty ~flags "="
 
@@ -335,13 +336,13 @@ module Arith = struct
   | Real f -> 0
   | _ -> _ty_mismatch "cannot compute sign of symbol %a" pp s
 
-  let floor = mk_const ~ty:(ty_cast Type.int) "$floor"
-  let ceiling = mk_const ~ty:(ty_cast Type.int) "$ceiling"
-  let truncate = mk_const ~ty:(ty_cast Type.int) "$truncate"
-  let round = mk_const ~ty:(ty_cast Type.int) "$round"
+  let floor = mk_const ~flags:(flag_ad_hoc_poly) ~ty:(ty_cast Type.int) "$floor"
+  let ceiling = mk_const ~flags:(flag_ad_hoc_poly) ~ty:(ty_cast Type.int) "$ceiling"
+  let truncate = mk_const ~flags:(flag_ad_hoc_poly) ~ty:(ty_cast Type.int) "$truncate"
+  let round = mk_const ~flags:(flag_ad_hoc_poly) ~ty:(ty_cast Type.int) "$round"
 
-  let prec = mk_const ~ty:ty_1 "$prec"
-  let succ = mk_const ~ty:ty_1 "$succ"
+  let prec = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_1 "$prec"
+  let succ = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_1 "$succ"
 
   let one_i = mk_int 1
   let zero_i = mk_int 0
@@ -385,31 +386,31 @@ module Arith = struct
   | Real f -> f = 1.
   | Const _ -> false
 
-  let sum = mk_const ~ty:ty_2 "$sum"
-  let difference = mk_const ~ty:ty_2 "$difference"
-  let uminus = mk_const ~ty:ty_1 "$uminus"
-  let product = mk_const ~ty:ty_2 "$product"
-  let quotient = mk_const ~ty:ty_2 "$quotient"
+  let sum = mk_const ~flags:(flag_ad_hoc_poly lor flag_ac) ~ty:ty_2 "$sum"
+  let difference = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2 "$difference"
+  let uminus = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_1 "$uminus"
+  let product = mk_const ~flags:(flag_ad_hoc_poly lor flag_ac) ~ty:ty_2 "$product"
+  let quotient = mk_const ~ty:ty_2 ~flags:(flag_ad_hoc_poly) "$quotient"
 
-  let quotient_e = mk_const ~ty:ty_2_int "$quotient_e"
-  let quotient_t = mk_const ~ty:ty_2_int "$quotient_t"
-  let quotient_f = mk_const ~ty:ty_2_int "$quotient_f"
-  let remainder_e = mk_const ~ty:ty_2_int "$remainder_e"
-  let remainder_t = mk_const ~ty:ty_2_int "$remainder_t"
-  let remainder_f = mk_const ~ty:ty_2_int "$remainder_f"
+  let quotient_e = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_int "$quotient_e"
+  let quotient_t = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_int "$quotient_t"
+  let quotient_f = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_int "$quotient_f"
+  let remainder_e = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_int "$remainder_e"
+  let remainder_t = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_int "$remainder_t"
+  let remainder_f = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_int "$remainder_f"
 
-  let is_int = mk_const ~ty:ty_check "$is_int"
-  let is_rat = mk_const ~ty:ty_check "$is_rat"
-  let is_real = mk_const ~ty:ty_check "$is_real"
+  let is_int = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_check "$is_int"
+  let is_rat = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_check "$is_rat"
+  let is_real = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_check "$is_real"
 
-  let to_int = mk_const ~ty:(ty_cast Type.int) "$to_int"
-  let to_rat = mk_const ~ty:(ty_cast Type.rat) "$to_rat"
-  let to_real = mk_const ~ty:(ty_cast Type.real) "$to_real"
+  let to_int = mk_const ~flags:(flag_ad_hoc_poly) ~ty:(ty_cast Type.int) "$to_int"
+  let to_rat = mk_const ~flags:(flag_ad_hoc_poly) ~ty:(ty_cast Type.rat) "$to_rat"
+  let to_real = mk_const ~flags:(flag_ad_hoc_poly) ~ty:(ty_cast Type.real) "$to_real"
 
-  let less = mk_const ~ty:ty_2_o "$less"
-  let lesseq = mk_const ~ty:ty_2_o "$lesseq"
-  let greater = mk_const ~ty:ty_2_o "$greater"
-  let greatereq = mk_const ~ty:ty_2_o "$greatereq"
+  let less = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_o "$less"
+  let lesseq = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_o "$lesseq"
+  let greater = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_o "$greater"
+  let greatereq = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_2_o "$greatereq"
 
   let set =
     let l = [

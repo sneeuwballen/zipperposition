@@ -74,6 +74,7 @@ val flag_multiset : flag        (** symbol has multiset status for RPO *)
 val flag_fresh_const : flag     (** symbol that is a fresh constant *)
 val flag_commut : flag          (** symbol that is commutative (not ac) *)
 val flag_distinct : flag        (** distinct element (between "") *)
+val flag_ad_hoc_poly : flag     (** ad-hoc polymorphic *)
 
 (** {2 Constructors} *)
 
