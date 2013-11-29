@@ -61,8 +61,8 @@ module T : sig
   val mk_quotient : FOTerm.t -> FOTerm.t -> FOTerm.t
   val mk_uminus : FOTerm.t -> FOTerm.t
 
-  val mk_quotient_e : FOTerm.t -> Big_int.big_int -> FOTerm.t
-  val mk_remainder_e : FOTerm.t -> Big_int.big_int -> FOTerm.t
+  val mk_quotient_e : FOTerm.t -> Symbol.t -> FOTerm.t
+  val mk_remainder_e : FOTerm.t -> Symbol.t -> FOTerm.t
 
   (** Smart constructors, that perform small simplifications *)
 

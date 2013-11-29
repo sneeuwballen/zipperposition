@@ -340,7 +340,6 @@ let inner_case_switch c =
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
   let spec = Ctx.total_order ctx in
-  let instance = TO.tstp_instance ~spec in  (* $less, $lesseq *)
   (* do the case switch, removing lits i and j, adding t=low+k
      where k in [0... range] *)
   let _do_case_switch i j t low range strict_low strict_high subst acc =
@@ -440,7 +439,80 @@ let bounds_are_tautology c =
 
 (** {2 Modular Integer Arithmetic} *)
 
-let simplify_remainder c = c (* TODO *)
+let _view_lits_as_remainder ~ctx lits =
+  Array.map
+    (fun lit -> match lit with
+      | Literal.Equation ({T.term=T.Node(s, _, [t;n])}, c, sign, _)
+      | Literal.Equation (c, {T.term=T.Node(s, _, [t;n])}, sign, _)
+        when S.eq s S.Arith.remainder_e
+        && Arith.T.is_arith_const n
+        && Arith.T.is_arith_const c
+        && Type.eq Type.int (T.ty t) ->
+        let n, c = T.head n, T.head c in
+        (* last check: must have a positive int *)
+        if S.Arith.sign n <= 0 then `Ignore else `EqMod (t, n, c, sign)
+      | _ -> `Ignore)
+    lits
+
+let _mk_remainder ~ord lit = match lit with
+  | `EqMod (t, n, c, sign) ->
+    Lit.mk_lit ~ord (Arith.T.mk_remainder_e t n) (T.mk_const c) sign
+  | `Ignore -> assert false
+  | `True -> Lit.mk_tauto
+  | `False -> Lit.mk_absurd
+
+module MA = ModularArith
+
+(* basic simplifications on modulo equations *)
+let simplify_remainder c =
+  let ctx = c.C.hcctx in
+  let lits = _view_lits_as_remainder ~ctx c.C.hclits in
+  let changed = BV.create ~size:(Array.length lits) false in
+  let lits' = Array.mapi
+    (fun i lit ->
+      try match lit with
+      | `Ignore -> `Ignore
+      | `EqMod (_, n, c, sign) when S.Arith.is_one n ->
+        if S.Arith.is_zero c = sign
+          then `True   (* t mod 1 = 0, or t mod 1 != c *)
+          else `False  (* opposite case, absurd *)
+      | `EqMod (t, n, c, sign) ->
+        (* see whether [t] is [n * t'] *)
+        let e = MA.Expr.of_term t in
+        let e, c = if not (S.Arith.is_zero e.MA.Expr.const)
+          then begin  (* move the constant of [e] rhs *)
+            BV.set changed i;
+            MA.Expr.remove_const e, MA.sum ~n c e.MA.Expr.const
+          end else e, MA.modulo ~n c
+        in
+        let e = match MA.Expr.factor e n with
+          | None -> e
+          | Some e' -> e'
+        in
+        if BV.get changed i
+          then `EqMod (MA.Expr.to_term e, n, c, sign)
+          else `Ignore
+      with MA.Expr.NotLinear ->
+        `Ignore)
+    lits
+  in
+  if BV.cardinal changed > 0
+    then begin
+      let ord = Ctx.ord ctx in
+      (* build new clause, some literals changed *)
+      let new_lits = Array.mapi
+        (fun i lit ->
+          if BV.get changed i
+            then _mk_remainder ~ord lits'.(i)
+            else lit)
+        c.C.hclits
+      in
+      let proof cc = Proof.mk_c_step cc ~rule:"arith_simplify_remainder" [c.C.hcproof] in
+      let parents = [c] in
+      let new_clause = C.create_a ~parents ~ctx new_lits proof in
+      Util.debug 5 "simplify remainder in %a --> %a" C.pp c C.pp new_clause;
+      new_clause
+    end else c
 
 let enum_remainder_cases c = [] (* TODO *)
 
@@ -485,6 +557,9 @@ let setup_env ?(ac=false) ~env =
   Env.add_binary_inf ~env "arith_case_switch" case_switch;
   Env.add_simplify ~env factor_bounds;
   Env.add_is_trivial ~env bounds_are_tautology;
+  (* modular arith *)
+  Env.add_simplify ~env simplify_remainder;
+  Env.add_unary_inf ~env "arith_enum_remainder" enum_remainder_cases;
   (* declare some AC symbols *)
   if ac then begin
     AC.add_ac ~env S.Arith.sum;

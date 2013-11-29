@@ -81,11 +81,11 @@ module T = struct
 
   let mk_remainder_e t s =
     assert (Type.eq (ty t) Type.int);
-    mk_node ~tyargs:[Type.int] S.Arith.remainder_e [t; mk_const (S.mk_bigint s)]
+    mk_node ~tyargs:[Type.int] S.Arith.remainder_e [t; mk_const s]
 
   let mk_quotient_e t s =
     assert (Type.eq (ty t) Type.int);
-    mk_node ~tyargs:[Type.int] S.Arith.quotient_e [t; mk_const (S.mk_bigint s)]
+    mk_node ~tyargs:[Type.int] S.Arith.quotient_e [t; mk_const s]
 
   let mk_less t1 t2 =
     if is_arith_const t1 && is_arith_const t2
@@ -782,18 +782,18 @@ module Lits = struct
               let divby = m.Monome.divby in
               if List.exists (fun t' -> T.eq t t') terms then begin
                 (* arith constraint, if required *)
-                let constraint_ = match divby with
-                  | S.Int i when not (S.Arith.is_one divby) ->
+                let constraint_ =
+                  if Type.(eq int (S.ty divby)) && not (S.Arith.is_one divby) then
                     (* add a divisibility constraint:
                       let m = m' + c in m' mod i = -c *)
                     let c = S.Arith.Op.remainder_e (S.Arith.Op.uminus m.Monome.constant) divby in
                     let m' = Monome.(to_term (remove_const (remove_divby m))) in
                     let lit = Literal.mk_neq ~ord
-                      (T.mk_remainder_e m' i)
+                      (T.mk_remainder_e m' divby)
                       (T.mk_const c)
                     in
                     [lit]
-                  | _ -> []
+                  else []
                 in
                 (* build new array of literals *)
                 let lits = Util.array_except_idx lits i in
