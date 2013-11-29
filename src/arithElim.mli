@@ -34,7 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-(** {2 Inference Rules} *)
+(** {2 Inference Rules for General Arithmetic} *)
 
 val rewrite_lit : Env.lit_rewrite_rule
   (** Simplify literals by evaluating them; in the case of integer monomes,
@@ -51,10 +51,9 @@ val pivot_arith : Env.unary_inf_rule
   (** Pivot arithmetic literals *)
 
 val purify_arith : Env.unary_inf_rule
-  (** Purification inference *)
-
-val axioms : PFormula.t list
-  (** Set of axioms useful to do arithmetic *)
+  (** Purification inference.
+    TODO: only purify non-ground composite arith expressions (ground ones
+    are ok if AC-normalized) *)
 
 val case_switch : Env.binary_inf_rule
   (** inference rule
@@ -90,7 +89,25 @@ val bounds_are_tautology : Clause.t -> bool
 (* TODO: redundancy criterion:
    a<b subsumes c<d if c<a and b<=d, or c<=a and b<d *)
 
+(** {2 Modular Integer Arithmetic} *)
+
+val simplify_remainder : Env.simplify_rule
+  (** Simplifications on remainder constraints *)
+
+val enum_remainder_cases : Env.unary_inf_rule
+  (** When remainder(t, n) occurs somewhere with [n] a constant, add the
+      clause Or_{i=0...n-1} remainder(t, n) = i
+      assuming n is not too big. *)
+
+(* TODO: Gauss theorem to infer 6|t if 2|t and 3|t, for instance *)
+
+(* TODO: use diophantine equations for solving divisibility constraints on
+         linear expressions that contain only variables? *)
+
 (** {2 Setup} *)
+
+val axioms : PFormula.t list
+  (** Set of axioms useful to do arithmetic *)
 
 val setup_penv : penv:PEnv.t -> unit
 

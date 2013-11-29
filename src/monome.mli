@@ -60,6 +60,9 @@ val add : t -> Symbol.t -> FOTerm.t -> t  (** Add term with coefficient. Sums co
 val add_const : t -> Symbol.t -> t        (** Add given number to constant *)
 val remove : t -> FOTerm.t -> t           (** Remove the term *)
 
+val remove_divby : t -> t   (** Remove divby *)
+val remove_const : t -> t   (** Remove constant *)
+
 val type_of : t -> Type.t           (** type of the monome *)
 
 val is_constant : t -> bool

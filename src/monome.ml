@@ -135,6 +135,10 @@ let remove m t =
 
 let type_of m = S.ty m.constant
 
+let remove_divby m = { m with divby=S.Arith.one_of_ty (type_of m); }
+
+let remove_const m = { m with constant=S.Arith.zero_of_ty (type_of m); }
+
 let is_constant m = T.Map.is_empty m.coeffs
 
 let sign m =

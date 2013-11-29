@@ -79,6 +79,14 @@ module T = struct
   let mk_quotient t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.quotient [t1; t2]
   let mk_uminus t = mk_node ~tyargs:[ty t] S.Arith.uminus [t]
 
+  let mk_remainder_e t s =
+    assert (Type.eq (ty t) Type.int);
+    mk_node ~tyargs:[Type.int] S.Arith.remainder_e [t; mk_const (S.mk_bigint s)]
+
+  let mk_quotient_e t s =
+    assert (Type.eq (ty t) Type.int);
+    mk_node ~tyargs:[Type.int] S.Arith.quotient_e [t; mk_const (S.mk_bigint s)]
+
   let mk_less t1 t2 =
     if is_arith_const t1 && is_arith_const t2
       then if S.Arith.Op.less (head t1) (head t2)
@@ -752,8 +760,6 @@ module Lits = struct
   let pivot ~ord ~eligible lits =
     let results = ref [] in
     let add_res a = results := a :: !results in
-    (* offset to create new vars *)
-    let offset = max 1 (1 + T.max_var (Literals.vars lits)) in
     for i = 0 to Array.length lits - 1 do
       if eligible i lits.(i) then try
         (* try to pivot the i-th literal *)
@@ -776,17 +782,18 @@ module Lits = struct
               let divby = m.Monome.divby in
               if List.exists (fun t' -> T.eq t t') terms then begin
                 (* arith constraint, if required *)
-                let constraint_ =
-                  if Type.eq (T.ty t) Type.int
-                  && not (Symbol.Arith.is_one divby)
-                  then (* add a divisibility constraint *)
-                    let v = T.mk_var ~ty:Type.int offset in
+                let constraint_ = match divby with
+                  | S.Int i when not (S.Arith.is_one divby) ->
+                    (* add a divisibility constraint:
+                      let m = m' + c in m' mod i = -c *)
+                    let c = S.Arith.Op.remainder_e (S.Arith.Op.uminus m.Monome.constant) divby in
+                    let m' = Monome.(to_term (remove_const (remove_divby m))) in
                     let lit = Literal.mk_neq ~ord
-                      (T.mk_product (T.mk_const divby) v)
-                      (Monome.to_term (Monome.normalize_eq_zero m))
+                      (T.mk_remainder_e m' i)
+                      (T.mk_const c)
                     in
                     [lit]
-                  else []
+                  | _ -> []
                 in
                 (* build new array of literals *)
                 let lits = Util.array_except_idx lits i in

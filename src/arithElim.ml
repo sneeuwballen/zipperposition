@@ -46,6 +46,7 @@ let prof_factor_bounds = Util.mk_profiler "arith.factor_bounds"
 let stat_case_switch = Util.mk_stat "arith.case_switch"
 let stat_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_factor_bounds = Util.mk_stat "arith.factor_bounds"
+let stat_bound_tauto = Util.mk_stat "arith.bound_tautology"
 
 (** {2 Inference Rules} *)
 
@@ -431,8 +432,19 @@ let bounds_are_tautology c =
       | _ -> false)
     lits
   in
-  if res then Util.debug 2 "redundant clause %a: bounds are tautology" C.pp c;
+  if res then begin
+    Util.debug 2 "redundant clause %a: bounds are tautology" C.pp c;
+    Util.incr_stat stat_bound_tauto;
+    end;
   res
+
+(** {2 Modular Integer Arithmetic} *)
+
+let simplify_remainder c = c (* TODO *)
+
+let enum_remainder_cases c = [] (* TODO *)
+
+(** {2 Setup} *)
 
 let axioms =
   (* parse a pformula
@@ -444,8 +456,6 @@ let axioms =
   in
   *)
   []  (* TODO: some simplification stuff? Or distributivity? *)
-
-(** {2 Setup} *)
 
 let setup_penv ~penv =
   (* rule for formula simplification *)
