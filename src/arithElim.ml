@@ -406,6 +406,34 @@ let inner_case_switch c =
   Util.exit_prof prof_case_switch;
   new_clauses
 
+(* if c =  a < t or t < b or c'  with b > a, it's a tautology *)
+let bounds_are_tautology c =
+  let ctx = c.C.hcctx in
+  let lits = _view_lits_as_bounds ~ctx c.C.hclits in
+  let res = Util.array_exists
+    (function
+      | `LowerBound (strict_low, l, t) ->
+        Util.array_exists
+          (function
+            | `HigherBound (strict_high, t', r) when T.eq t t' ->
+              let both_strict = strict_low && strict_high in
+              begin match Monome.comparison l r with
+              | Comparison.Incomparable -> false
+              | Comparison.Eq ->
+                not both_strict (* n < t | t <= n is redundant *)
+              | Comparison.Lt -> true
+              | Comparison.Gt ->
+                (not both_strict) && Type.eq (T.ty t) Type.int && Monome.(eq (succ l) r)
+                  (* l <= t | t <= l+1 is redundant in integers *)
+              end
+            | _ -> false)
+          lits
+      | _ -> false)
+    lits
+  in
+  if res then Util.debug 2 "redundant clause %a: bounds are tautology" C.pp c;
+  res
+
 let axioms =
   (* parse a pformula
   let pform ~name s =
@@ -446,6 +474,7 @@ let setup_env ?(ac=false) ~env =
   Env.add_unary_inf ~env "arith_inner_case_switch" inner_case_switch;
   Env.add_binary_inf ~env "arith_case_switch" case_switch;
   Env.add_simplify ~env factor_bounds;
+  Env.add_is_trivial ~env bounds_are_tautology;
   (* declare some AC symbols *)
   if ac then begin
     AC.add_ac ~env S.Arith.sum;

@@ -73,21 +73,19 @@ val inner_case_switch : Env.unary_inf_rule
             C1 or b!=i
         for each i in [c...a]. See (a <= b or b <= c or C1) as
         the rule  (b < a and c < b) -> C1, then make the head of the rule
-        true
-  *)
+        true *)
 
 val factor_bounds : Env.simplify_rule
   (** simplification rule
           C or a < t1 or a < t2 ... or a < tn
           ===================================
             C or a < max(t1, ..., tn)
-    if t_i are comparable linear expressions
-  *)
+    if t_i are comparable linear expressions *)
 
-(* TODO: redundancy criterion:
+val bounds_are_tautology : Clause.t -> bool
+(* detect tautologies such as
          t1 < a or a < t2 or C
-         =====================  if t1 < t2
-*)
+         =====================  if t1 < t2 *)
 
 (* TODO: redundancy criterion:
    a<b subsumes c<d if c<a and b<=d, or c<=a and b<d *)
