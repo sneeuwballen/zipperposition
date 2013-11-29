@@ -531,7 +531,7 @@ module Arith = struct
     | _ -> floor (quotient s1 s2)
 
     let remainder_e s1 s2 = match s1, s2 with
-    | Int n1, Int n2 -> mk_bigint (fst (Big_int.quomod_big_int n1 n2))
+    | Int n1, Int n2 -> mk_bigint (snd (Big_int.quomod_big_int n1 n2))
     | _ -> difference s1 (product (quotient_e s1 s2) s2)
 
     let remainder_t s1 s2 = match s1, s2 with
