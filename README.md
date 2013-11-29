@@ -140,6 +140,22 @@ See [this page](http://cedeela.fr/~simon/software/logtk/).
 
 ## TODO
 
+- FOTerm:
+    - constructor Ty (Type.t -> Term.t) for easier type arguments
+    - allow partial application (see previous)
+    - constructor HVar for hidden, possibly non hashconsed, vars that are only
+        used to generate fresh variables (AC/HO unif) and disappear
+        during renaming
+    - rename mk_node --> app
+    - AC-normalize terms when head symbol is AC, at hashconsing time
+- HOTerm:
+    - same as FOTerm: constructor Ty, constructor HVar
+    - careful with scoping of (Ty ty), De Bruijn should live in same space
+- basic:
+    - type to represent FO/HO terms and also types (factors many things)
+- symbol: flags used for hashconsing
+- AC-RPO
+
 - tool to print a trace as DOT
 - handle existential type var
 - handle ite/let in TPTP
