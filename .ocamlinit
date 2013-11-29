@@ -30,6 +30,7 @@ open Logtk.Type;;
 #install_printer Signature.fmt;;
 #install_printer Type.fmt;;
 #install_printer Monome.fmt;;
+#install_printer ModularArith.Expr.fmt;;
 module T = Logtk.FOTerm;;
 module F = Logtk.FOFormula;;
 module M = Monome;;
