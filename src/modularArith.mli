@@ -68,10 +68,18 @@ module Expr : sig
   val to_term : t -> FOTerm.t
     (** Convert the expression back to a term *)
 
-  val factor : t -> Symbol.t -> t option
-    (** [factor e c] tries to factorize [e] by [c], returning [e/c] if
+  val quotient : t -> Symbol.t -> t option
+    (** [quotient e c] tries to divide [e] by [c], returning [e/c] if
         it is still an integer expression.
-        For instance, [factor (2x + 4y) 2] will return [Some (x + 2y)] *)
+        For instance, [quotient (2x + 4y) 2] will return [Some (x + 2y)] *)
+
+  val divisible : t -> Symbol.t -> bool
+    (** [divisible e n] returns true if all coefficients of [e] are
+        divisible by [n] and n is an int >= 2 *)
+
+  val factorize : t -> (t * Symbol.t) option
+    (** Factorize [e] into [Some (e',s)] if [e = e' x s], None
+        otherwise (ie if s=1) *)
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string

@@ -47,6 +47,7 @@ let stat_case_switch = Util.mk_stat "arith.case_switch"
 let stat_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_factor_bounds = Util.mk_stat "arith.factor_bounds"
 let stat_bound_tauto = Util.mk_stat "arith.bound_tautology"
+let stat_simplify_remainder = Util.mk_stat "arith.simplify_remainder"
 
 (** {2 Inference Rules} *)
 
@@ -477,21 +478,35 @@ let simplify_remainder c =
           then `True   (* t mod 1 = 0, or t mod 1 != c *)
           else `False  (* opposite case, absurd *)
       | `EqMod (t, n, c, sign) ->
-        (* see whether [t] is [n * t'] *)
         let e = MA.Expr.of_term t in
-        let e, c = if not (S.Arith.is_zero e.MA.Expr.const)
-          then begin  (* move the constant of [e] rhs *)
-            BV.set changed i;
-            MA.Expr.remove_const e, MA.sum ~n c e.MA.Expr.const
-          end else e, MA.modulo ~n c
-        in
-        let e = match MA.Expr.factor e n with
-          | None -> e
-          | Some e' -> e'
-        in
-        if BV.get changed i
-          then `EqMod (MA.Expr.to_term e, n, c, sign)
-          else `Ignore
+        (* first move [c] into [e] *)
+        let e' = MA.Expr.add_const e (S.Arith.Op.uminus c) in
+        (* see whether [t] is [n * t'] *)
+        if MA.Expr.divisible e' n
+          (* if [MA.Expr.divides e n] then it's tautology/absurd
+            depending on sign  (e.g. 3a mod 3 = 0 is true). *)
+          then if sign
+            then `True
+            else `False
+          else begin
+            let e' = match MA.Expr.factorize e' with
+            | None ->  e'
+            | Some (e'', s) ->
+              (* [e = e' × s], decompose [s] into prime factors and
+                remove the factors of [s] that are prime with [n]. To do
+                this, just compute gcd(s,n), because s = s' . gcd(s,n) with
+                s' prime with n.
+                Ex: [6t+4 mod 2 ---> (3t+2 mod 2]. *)
+              let gcd = S.Arith.Op.gcd s n in
+              assert (S.Arith.sign gcd > 0);
+              MA.Expr.product e'' gcd
+            in
+            (* move constant back to rhs *)
+            let c' = MA.modulo ~n (S.Arith.Op.uminus e'.MA.Expr.const) in
+            let e' = MA.Expr.remove_const e' in
+            if not (S.eq c c' && MA.Expr.eq e e') then BV.set changed i;
+            `EqMod (MA.Expr.to_term e', n, c', sign)
+          end
       with MA.Expr.NotLinear ->
         `Ignore)
     lits
@@ -511,6 +526,7 @@ let simplify_remainder c =
       let parents = [c] in
       let new_clause = C.create_a ~parents ~ctx new_lits proof in
       Util.debug 5 "simplify remainder in %a --> %a" C.pp c C.pp new_clause;
+      Util.incr_stat stat_simplify_remainder;
       new_clause
     end else c
 

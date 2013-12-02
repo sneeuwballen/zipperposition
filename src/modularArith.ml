@@ -176,11 +176,27 @@ module Expr = struct
       (* add the constant (if needed) *)
       add_sym e.const sum
 
-  let factor e c =
+  let quotient e c =
     if S.Arith.sign c <= 0
     then None
     else try Some (_fmap (fun s -> S.Arith.Op.quotient s c) e)
     with S.Arith.TypeMismatch _ -> None
+
+  let divisible e c =
+    S.Arith.Op.divides c e.const &&
+    List.for_all (fun (c',_) -> S.Arith.Op.divides c c') e.terms
+
+  let factorize e =
+    let gcd = if S.Arith.is_zero e.const then S.Arith.one_i else e.const in
+    let gcd = List.fold_left
+      (fun gcd (c, _) -> S.Arith.Op.gcd c gcd)
+      gcd e.terms
+    in
+    if S.Arith.is_one gcd
+      then None
+      else match quotient e gcd with
+      | None -> assert false
+      | Some e' -> Some (e', gcd)
 
   let pp buf e =
     let pp_pair buf (s, t) =
