@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 Trace of a TSTP prover} *)
 
+(* TODO: make a functor over F (formula type) *)
+
 type id = Ast_tptp.name
 
 type t =

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d5208c692a8b7364fe8ff779e3165ecb)
+# DO NOT EDIT (digest: 09b8a565eab3fb8261ce439ae92b94f7)
 src/HO
 src/FO
 src/Symbol
@@ -49,6 +49,7 @@ src/Location
 src/TypeConversion
 src/TypeErasure
 src/DBEnv
+src/Scoped
 src/lib/Sequence
 src/lib/Bij
 src/lib/Cache
