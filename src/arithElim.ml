@@ -48,6 +48,8 @@ let stat_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_factor_bounds = Util.mk_stat "arith.factor_bounds"
 let stat_bound_tauto = Util.mk_stat "arith.bound_tautology"
 let stat_simplify_remainder = Util.mk_stat "arith.simplify_remainder"
+let stat_infer_remainder_of_divisors = Util.mk_stat "arith.remainder_of_divisors"
+let stat_enum_remainder_cases = Util.mk_stat "arith.enum_remainder_cases"
 
 (** {2 Inference Rules} *)
 
@@ -340,7 +342,6 @@ let case_switch active_set c =
 let inner_case_switch c =
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
-  let spec = Ctx.total_order ctx in
   (* do the case switch, removing lits i and j, adding t=low+k
      where k in [0... range] *)
   let _do_case_switch i j t low range strict_low strict_high subst acc =
@@ -440,101 +441,171 @@ let bounds_are_tautology c =
 
 (** {2 Modular Integer Arithmetic} *)
 
-let _view_lits_as_remainder ~ctx lits =
-  Array.map
-    (fun lit -> match lit with
-      | Literal.Equation ({T.term=T.Node(s, _, [t;n])}, c, sign, _)
-      | Literal.Equation (c, {T.term=T.Node(s, _, [t;n])}, sign, _)
-        when S.eq s S.Arith.remainder_e
-        && Arith.T.is_arith_const n
-        && Arith.T.is_arith_const c
-        && Type.eq Type.int (T.ty t) ->
-        let n, c = T.head n, T.head c in
-        (* last check: must have a positive int *)
-        if S.Arith.sign n <= 0 then `Ignore else `EqMod (t, n, c, sign)
-      | _ -> `Ignore)
-    lits
+let _view_lit_as_remainder lit = match lit with
+  | Literal.Equation ({T.term=T.Node(s, _, [t;n])}, c, sign, _)
+  | Literal.Equation (c, {T.term=T.Node(s, _, [t;n])}, sign, _)
+    when S.eq s S.Arith.remainder_e
+    && Arith.T.is_arith_const n
+    && Arith.T.is_arith_const c
+    && Type.eq Type.int (T.ty t) ->
+    let n, c = T.head n, T.head c in
+    (* last check: must have a positive int *)
+    if S.Arith.sign n <= 0 then `Ignore lit else `EqMod (t, n, c, sign)
+  | _ -> `Ignore lit
 
+let _view_lits_as_remainder lits =
+  Array.map _view_lit_as_remainder lits
+
+(* convert view back into a proper literal *)
 let _mk_remainder ~ord lit = match lit with
   | `EqMod (t, n, c, sign) ->
     Lit.mk_lit ~ord (Arith.T.mk_remainder_e t n) (T.mk_const c) sign
-  | `Ignore -> assert false
+  | `Ignore lit' -> lit'  (* keep same lit *)
   | `True -> Lit.mk_tauto
   | `False -> Lit.mk_absurd
 
 module MA = ModularArith
 
-(* basic simplifications on modulo equations *)
-let simplify_remainder c =
-  let ctx = c.C.hcctx in
-  let lits = _view_lits_as_remainder ~ctx c.C.hclits in
-  let changed = BV.create ~size:(Array.length lits) false in
-  let lits' = Array.mapi
-    (fun i lit ->
-      try match lit with
-      | `Ignore -> `Ignore
-      | `EqMod (_, n, c, sign) when S.Arith.is_one n ->
-        if S.Arith.is_zero c = sign
-          then `True   (* t mod 1 = 0, or t mod 1 != c *)
-          else `False  (* opposite case, absurd *)
-      | `EqMod (t, n, c, sign) ->
-        let e = MA.Expr.of_term t in
-        (* first move [c] into [e] *)
-        let e' = MA.Expr.add_const e (S.Arith.Op.uminus c) in
-        (* see whether [t] is [n * t'] *)
-        if MA.Expr.divisible e' n
-          (* if [MA.Expr.divides e n] then it's tautology/absurd
-            depending on sign  (e.g. 3a mod 3 = 0 is true). *)
-          then
-            let _ = BV.set changed i in
-            if sign
-              then `True
-              else `False
-          else begin
-            let e' = match MA.Expr.factorize e' with
-            | None ->  e'
-            | Some (e'', s) ->
-              (* [e = e' × s], decompose [s] into prime factors and
-                remove the factors of [s] that are prime with [n]. To do
-                this, just compute gcd(s,n), because s = s' . gcd(s,n) with
-                s' prime with n.
-                Ex: [6t+4 mod 2 ---> (3t+2 mod 2]. *)
-              let gcd = S.Arith.Op.gcd s n in
-              assert (S.Arith.sign gcd > 0);
-              MA.Expr.product e'' gcd
-            in
-            (* move constant back to rhs *)
-            let c' = MA.modulo ~n (S.Arith.Op.uminus e'.MA.Expr.const) in
-            let e' = MA.Expr.remove_const e' in
-            if not (S.eq c c' && MA.Expr.eq e e') then BV.set changed i;
-            `EqMod (MA.Expr.to_term e', n, c', sign)
-          end
-      with MA.Expr.NotLinear ->
-        `Ignore)
-    lits
-  in
-  if BV.cardinal changed > 0
-    then begin
-      let ord = Ctx.ord ctx in
-      (* build new clause, some literals changed *)
-      let new_lits = Array.mapi
-        (fun i lit ->
-          if BV.get changed i
-            then _mk_remainder ~ord lits'.(i)
-            else lit)
-        c.C.hclits
-      in
-      let proof cc = Proof.mk_c_step cc ~rule:"arith_simplify_remainder" [c.C.hcproof] in
-      let parents = [c] in
-      let new_clause = C.create_a ~parents ~ctx new_lits proof in
-      Util.debug 5 "simplify remainder in %a --> %a" C.pp c C.pp new_clause;
-      Util.incr_stat stat_simplify_remainder;
-      new_clause
-    end else c
+let simplify_remainder_term ~tyargs f l =
+  match l with
+  | [t; n] when S.eq f S.Arith.remainder_e && Arith.T.is_arith_const n ->
+    let n = T.head n in
+    (* remainder(t,n) where n is a const *)
+    begin try
+      let e = MA.Expr.of_term t in
+      begin match MA.Expr.factorize e with
+        | None -> None
+        | Some (e', coeff) ->
+          (* e = e' * coeff, apply the distributivity rule that states
+            that  (a*b) mod n = ((a mod n) * (b mod n)) mod n *)
+          let coeff' = S.Arith.Op.remainder_e coeff n in
+          let e' = MA.Expr.product e' coeff' in
+          let t' = MA.Expr.to_term e' in
+          if T.eq t t'
+            then None
+            else Some (Arith.T.mk_remainder_e t' n)
+      end
+    with MA.Expr.NotLinear -> None
+    end
+  | _ -> None
 
-let enum_remainder_cases c = [] (* TODO *)
+(* basic simplifications on equational literals of shape "a mod b ?= c" *)
+let simplify_remainder_lit ~ctx lit =
+  let ord = Ctx.ord ctx in
+  let lit' = _view_lit_as_remainder lit in
+  let lit' = match _view_lit_as_remainder lit with
+  | `Ignore _ -> lit'
+  | `EqMod (_, n, c, sign) when S.Arith.is_one n ->
+    if S.Arith.is_zero c = sign
+      then `True   (* t mod 1 = 0, or t mod 1 != c *)
+      else `False  (* opposite case, absurd *)
+  | `EqMod (t, n, c, sign) ->
+    try
+      let e = MA.Expr.of_term t in
+      (* first move [c] into [e] *)
+      let e' = MA.Expr.add_const e (S.Arith.Op.uminus c) in
+      (* see whether [t] is [n * t'] *)
+      if MA.Expr.divisible e' n
+        (* if [MA.Expr.divides e n] then it's tautology/absurd
+          depending on sign  (e.g. 3a mod 3 = 0 is true). *)
+        then if sign
+          then `True
+          else `False
+        else
+          let e' = match MA.Expr.factorize e' with
+          | None ->  e'
+          | Some (e'', s) ->
+            (* [e = e' × s], decompose [s] into prime factors and
+              remove the factors of [s] that are prime with [n]. To do
+              this, just compute gcd(s,n), because s = s' . gcd(s,n) with
+              s' prime with n.
+              Ex: [6t+4 mod 2 ---> (3t+2 mod 2]. *)
+            let gcd = S.Arith.Op.gcd s n in
+            assert (S.Arith.sign gcd > 0);
+            MA.Expr.product e'' gcd
+          in
+          (* move constant back to rhs *)
+          let c' = MA.modulo ~n (S.Arith.Op.uminus e'.MA.Expr.const) in
+          let e' = MA.Expr.remove_const e' in
+          `EqMod (MA.Expr.to_term e', n, c', sign)
+      with MA.Expr.NotLinear ->
+        `Ignore lit
+  in
+  _mk_remainder ~ord lit'
+
+(* infer remainders of divisors of [n], given remainders modulo [n].
+  in other words, a mod 6 = 0 ===> a mod 2 = 0  and a mod 3 = 0 *)
+let infer_remainder_of_divisors c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let lits = _view_lits_as_remainder c.C.hclits in
+  Util.array_foldi
+    (fun acc i lit -> match lit with
+      | `EqMod (t, n, const, true) when Type.eq Type.int (T.ty t) ->
+        (* compute set of divisors of [n], then for each such [d]
+           replace by [t-c mod d = 0] *)
+        let divisors = match n with
+          | S.Int n -> S.Arith.Op.divisors n
+          | _ -> assert false
+        in
+        (* put const on lhs *)
+        let t' = Arith.T.mk_difference t (T.mk_const const) in
+        List.fold_left
+          (fun acc n' ->
+            let lits' = Util.array_except_idx c.C.hclits i in
+            let lits' = Lit.mk_eq ~ord
+              (Arith.T.mk_remainder_e t' (Symbol.mk_bigint n'))
+              (T.mk_const S.Arith.zero_i) :: lits'
+            in
+            let parents = [c] in
+            let proof cc = Proof.mk_c_step cc ~rule:"remainder_divisor" [c.C.hcproof] in
+            let new_c = C.create ~ctx ~parents lits' proof in
+            Util.debug 5 "remainder_of_divisors: from %a  deduce %a" C.pp c C.pp new_c;
+            Util.incr_stat stat_infer_remainder_of_divisors;
+            new_c :: acc
+          ) acc divisors
+      | _ -> acc)
+    [] lits
+
+(* when [a mod n] occurs in a clause, instantiate [Or_{i=0..n-1} a mod n = i] *)
+let enum_remainder_cases c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let lits = _view_lits_as_remainder c.C.hclits in
+  Array.fold_left
+    (fun acc lit -> match lit with
+      | `EqMod (t, n, c, sign) ->
+        (* TODO: if n divides t-c, do not enumerate but assert  t-c mod n = 0 *)
+        begin try
+          (* ignore constant *)
+          let e = MA.Expr.of_term t in
+          let e' = MA.Expr.remove_const e in
+          let t' = MA.Expr.to_term e' in
+          (* range: 0 .. n-1 *)
+          let range = match n with
+            | S.Int n' -> _int_range ~strict_low:false ~strict_high:true n'
+            | _ -> assert false
+          in
+          (* make clause *)
+          let lits' = List.map
+            (fun i ->
+              Lit.mk_eq ~ord (Arith.T.mk_remainder_e t' n) (T.mk_const (S.mk_bigint i)))
+            range
+          in
+          let proof cc = Proof.mk_c_axiom cc ~file:"/dev/mod" ~name:"enum" in
+          let new_c = C.create ~ctx lits' proof in
+          Util.debug 5 "instantiate enum of remainder for %a: clause %a" S.pp n C.pp new_c;
+          Util.incr_stat stat_enum_remainder_cases;
+          new_c :: acc
+        with MA.Expr.NotLinear -> acc
+        end
+      | _ -> acc)
+    [] lits
 
 (** {2 Setup} *)
+
+(* TODO: some simplification stuff? Or distributivity?
+   TODO: axiomatize quotient_e using remainder_e? *)
 
 let axioms =
   (* parse a pformula
@@ -545,7 +616,7 @@ let axioms =
     pf
   in
   *)
-  []  (* TODO: some simplification stuff? Or distributivity? *)
+  []
 
 let setup_penv ~penv =
   (* rule for formula simplification *)
@@ -566,6 +637,9 @@ let setup_penv ~penv =
   ()
 
 let setup_env ?(ac=false) ~env =
+  (* basics *)
+  Env.interpret_symbols ~env Evaluator.FO.arith;
+  (* rules *)
   Env.add_lit_rule ~env "arith_rw" rewrite_lit;
   Env.add_unary_inf ~env "arith_factor" factor_arith;
   Env.add_unary_inf ~env "arith_pivot" pivot_arith;
@@ -576,7 +650,9 @@ let setup_env ?(ac=false) ~env =
   Env.add_simplify ~env factor_bounds;
   Env.add_is_trivial ~env bounds_are_tautology;
   (* modular arith *)
-  Env.add_simplify ~env simplify_remainder;
+  Env.interpret_symbol ~env S.Arith.remainder_e simplify_remainder_term;
+  Env.add_lit_rule ~env "arith_simplify_remainder" simplify_remainder_lit;
+  Env.add_unary_inf ~env "arith_remainder_divisors" infer_remainder_of_divisors;
   Env.add_unary_inf ~env "arith_enum_remainder" enum_remainder_cases;
   (* declare some AC symbols *)
   if ac then begin

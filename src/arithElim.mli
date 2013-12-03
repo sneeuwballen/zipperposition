@@ -91,15 +91,23 @@ val bounds_are_tautology : Clause.t -> bool
 
 (** {2 Modular Integer Arithmetic} *)
 
-val simplify_remainder : Env.simplify_rule
-  (** Simplifications on remainder constraints *)
+val simplify_remainder_term : Evaluator.FO.eval_fun
+  (** Evaluation of some $remainder_e expressions. *)
+
+val simplify_remainder_lit : Env.lit_rewrite_rule
+  (** Simplifications on remainder literals/constraints *)
+
+val infer_remainder_of_divisors : Env.unary_inf_rule
+  (** Given a clause with [a mod n = 0], infers the same clause with
+      [a mod n' = 0] where [n'] ranges over the strict, non-trivial divisors
+      of [n].
+      For instance, from [C or a mod 6 = 0] we can deduce
+      [C or a mod 3 = 0] and [C or a mod 2 = 0] *)
 
 val enum_remainder_cases : Env.unary_inf_rule
   (** When remainder(t, n) occurs somewhere with [n] a constant, add the
       clause Or_{i=0...n-1} remainder(t, n) = i
       assuming n is not too big. *)
-
-(* TODO: Gauss theorem to infer 6|t if 2|t and 3|t, for instance *)
 
 (* TODO: use diophantine equations for solving divisibility constraints on
          linear expressions that contain only variables? *)
