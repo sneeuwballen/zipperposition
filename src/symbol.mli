@@ -250,6 +250,11 @@ module Arith : sig
     val lesseq : t -> t -> bool
     val greater : t -> t -> bool
     val greatereq : t -> t -> bool
+
+    val divisors : Big_int.big_int -> Big_int.big_int list
+      (** List of non-trivial strict divisors of the int.
+          @return [] if int <= 1, the list of divisors otherwise. Empty list
+            for prime numbers, obviously. *)
   end
 end
 

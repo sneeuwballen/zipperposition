@@ -344,8 +344,8 @@ module Arith = struct
   let prec = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_1 "$prec"
   let succ = mk_const ~flags:(flag_ad_hoc_poly) ~ty:ty_1 "$succ"
 
-  let one_i = mk_int 1
-  let zero_i = mk_int 0
+  let one_i = mk_bigint Big_int.unit_big_int
+  let zero_i = mk_bigint Big_int.zero_big_int
   let one_rat = mk_rat 1 1
   let zero_rat = mk_rat 0 1
   let one_f = mk_real 1.
@@ -610,6 +610,19 @@ module Arith = struct
     | Const _, _ -> _ty_mismatch "not a numeric constant: %a" pp s1
     | _, Const _ -> _ty_mismatch "not a numeric constant: %a" pp s2
     | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
+
+    (* factorize [n] into a product of prime numbers. [n] must be positive *)
+    let divisors n =
+      if (Big_int.le_big_int n Big_int.zero_big_int)
+        then raise (Invalid_argument "prime_factors: expected number > 0")
+      else try
+        let n = Big_int.int_of_big_int n in
+        let l = ref [] in
+        for i = 2 to n/2 do
+          if i < n && n mod i = 0 then l := i :: !l
+        done;
+        List.rev_map Big_int.big_int_of_int !l
+      with Failure _ -> []  (* too big *)
   end
 end
 
