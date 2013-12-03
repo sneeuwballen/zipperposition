@@ -59,6 +59,9 @@ module type S = sig
   val interpreted : t -> Symbol.t -> bool
     (** Is there a registered evaluation function for this symbol? *)
 
+  val eval_head : t -> term -> term
+    (** Evaluate the term's root, but not subterms *)
+
   val eval : t -> term -> term
     (** Recursively evaluate the term *)
 end
@@ -70,6 +73,9 @@ module FO : sig
 
   val eval_form : t -> FOFormula.t -> FOFormula.t
     (** Evaluate a formula *)
+
+  val app : ?tyargs:Type.t list -> t -> Symbol.t -> term list -> term
+    (** Function application, but evaluating if needed *)
 
   val arith : (Symbol.t * eval_fun) list
     (** List of evaluators for arithmetic *)

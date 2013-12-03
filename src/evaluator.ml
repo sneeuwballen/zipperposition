@@ -59,6 +59,9 @@ module type S = sig
   val interpreted : t -> Symbol.t -> bool
     (** Is there a registered evaluation function for this symbol? *)
 
+  val eval_head : t -> term -> term
+    (** Evaluate the term's root, but not subterms *)
+
   val eval : t -> term -> term
     (** Recursively evaluate the term *)
 end
@@ -82,22 +85,29 @@ module FO = struct
 
   let interpreted t s = Symbol.Tbl.mem t s
 
+  (* non-recursive evaluation *)
+  let rec eval_head ev t = match t.T.term with
+    | T.Var _
+    | T.BoundVar _ -> t
+    | T.Node (s, tyargs, l) ->
+      let t' =
+        try
+          (* evaluate constant *)
+          let f = Symbol.Tbl.find ev s in
+          f ~tyargs s l
+        with Not_found -> None
+      in
+      begin match t' with
+        | None -> t
+        | Some t' -> eval_head ev t'
+      end
+
   (* recursive evaluation *)
   let rec eval ev t = match t.T.term with
     | T.Var _
     | T.BoundVar _ -> t
     | T.Node (s, tyargs, []) ->
-      let t' =
-        try
-          (* evaluate constant *)
-          let f = Symbol.Tbl.find ev s in
-          f ~tyargs s []
-        with Not_found -> None
-      in
-      begin match t' with
-        | None -> t
-        | Some t' -> eval ev t'
-      end
+      eval_head ev t
     | T.Node (s, tyargs, l) ->
       (* evaluate subterms, then the term itself *)
       let l' = List.map (eval ev) l in
@@ -118,6 +128,8 @@ module FO = struct
 
   let eval_form ev f =
     FOFormula.map_depth (fun _ t -> eval ev t) f
+
+  let app ?tyargs ev s l = eval_head ev (T.mk_node ?tyargs s l)
 
   module S = Symbol
 
