@@ -107,7 +107,13 @@ val infer_remainder_of_divisors : Env.unary_inf_rule
 val enum_remainder_cases : Env.unary_inf_rule
   (** When remainder(t, n) occurs somewhere with [n] a constant, add the
       clause Or_{i=0...n-1} remainder(t, n) = i
-      assuming n is not too big. *)
+      assuming n is not too big.
+      
+      TODO: maybe it's better to resolve directly [C or a mod n != b]
+      into [C or Or_{i=0..n-1, i != b} a mod n = i]? *)
+
+val remainder_of_equality : Env.unary_inf_rule
+  (** Infer from [n a = b] that [n] divides [b] *)
 
 (* TODO: use diophantine equations for solving divisibility constraints on
          linear expressions that contain only variables? *)

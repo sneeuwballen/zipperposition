@@ -50,6 +50,7 @@ let stat_bound_tauto = Util.mk_stat "arith.bound_tautology"
 let stat_simplify_remainder = Util.mk_stat "arith.simplify_remainder"
 let stat_infer_remainder_of_divisors = Util.mk_stat "arith.remainder_of_divisors"
 let stat_enum_remainder_cases = Util.mk_stat "arith.enum_remainder_cases"
+let stat_remainder_of_equality = Util.mk_stat "arith.remainder_of_eq"
 
 (** {2 Inference Rules} *)
 
@@ -602,6 +603,45 @@ let enum_remainder_cases c =
       | _ -> acc)
     [] lits
 
+(* when a lit of the form [n a = b] with a, b ground occurs, infer that
+    [b mod n = 0] *)
+let remainder_of_equality c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  Util.array_foldi
+    (fun acc i lit -> match lit with
+      | Lit.Equation (l, r, true, _)
+        when T.is_ground l && T.is_ground r && Type.eq Type.int (T.ty l) ->
+        begin match Arith.Lit.Extracted.extract_opt lit with
+        | Some (Arith.Lit.Extracted.Eq m) ->
+          (* m = 0, where m ground and integer *)
+          assert (Monome.is_ground m);
+          let terms = Monome.to_list m in
+          List.fold_left
+            (fun acc (coeff, t) ->
+              if not (S.Arith.is_one coeff)
+                then begin
+                  (* m' + coeff*t = 0, so m' mod coeff = 0 *) 
+                  let m' = Monome.remove m t in
+                  let t' = Monome.to_term m' in
+                  let lit = Lit.mk_eq ~ord
+                    (Arith.T.mk_remainder_e t' (S.Arith.Op.abs coeff))
+                    (T.mk_const S.Arith.zero_i)
+                  in
+                  let lits' = lit :: Util.array_except_idx c.C.hclits i in
+                  let proof cc = Proof.mk_c_step cc ~rule:"remainder_of_eq" [c.C.hcproof] in
+                  let new_c = C.create ~ctx lits' proof in
+                  Util.debug 5 "deduce remainders from %a: clause %a" C.pp c C.pp new_c;
+                  Util.incr_stat stat_remainder_of_equality;
+                  new_c :: acc
+                end
+              else acc)
+            acc terms
+        | _ -> acc
+        end
+      | _ -> acc)
+    [] c.C.hclits
+
 (** {2 Setup} *)
 
 (* TODO: some simplification stuff? Or distributivity?
@@ -654,6 +694,7 @@ let setup_env ?(ac=false) ~env =
   Env.add_lit_rule ~env "arith_simplify_remainder" simplify_remainder_lit;
   Env.add_unary_inf ~env "arith_remainder_divisors" infer_remainder_of_divisors;
   Env.add_unary_inf ~env "arith_enum_remainder" enum_remainder_cases;
+  Env.add_unary_inf ~env "arith_remainder_of_eq" remainder_of_equality;
   (* declare some AC symbols *)
   if ac then begin
     AC.add_ac ~env S.Arith.sum;
