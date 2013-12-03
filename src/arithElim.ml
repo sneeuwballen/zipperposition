@@ -485,9 +485,11 @@ let simplify_remainder c =
         if MA.Expr.divisible e' n
           (* if [MA.Expr.divides e n] then it's tautology/absurd
             depending on sign  (e.g. 3a mod 3 = 0 is true). *)
-          then if sign
-            then `True
-            else `False
+          then
+            let _ = BV.set changed i in
+            if sign
+              then `True
+              else `False
           else begin
             let e' = match MA.Expr.factorize e' with
             | None ->  e'
