@@ -155,26 +155,20 @@ module Expr = struct
       raise NotLinear
 
   let to_term e = 
-    let ty = Type.int in
-    let add x y = T.mk_node ~tyargs:[ty] S.Arith.sum [x;y] in
-    let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
-    let prod s x = if S.Arith.is_one s then x
-      else T.mk_node ~tyargs:[ty] S.Arith.product [T.mk_const s; x]
-    in
     match e.terms with
     | [] -> T.mk_const e.const
     | (c, t)::rest ->
       (* remove one coeff to make the basic sum *)
-      let sum = prod c t in
+      let sum = Arith.T.mk_product (T.mk_const c) t in
       (* add coeff*term for the remaining terms *)
       let sum = List.fold_left
         (fun sum (coeff, t') ->
           assert (not (S.Arith.is_zero coeff));
-          add sum (prod coeff t'))
+          Arith.T.mk_sum sum (Arith.T.mk_product (T.mk_const coeff) t'))
         sum rest
       in
       (* add the constant (if needed) *)
-      add_sym e.const sum
+      Arith.T.mk_sum (T.mk_const e.const) sum
 
   let quotient e c =
     if S.Arith.sign c <= 0
@@ -187,12 +181,11 @@ module Expr = struct
     List.for_all (fun (c',_) -> S.Arith.Op.divides c c') e.terms
 
   let factorize e =
-    let gcd = if S.Arith.is_zero e.const then S.Arith.one_i else e.const in
     let gcd = List.fold_left
       (fun gcd (c, _) -> S.Arith.Op.gcd c gcd)
-      gcd e.terms
+      e.const e.terms
     in
-    if S.Arith.is_one gcd
+    if S.Arith.is_one gcd || S.Arith.is_zero gcd
       then None
       else match quotient e gcd with
       | None -> assert false
