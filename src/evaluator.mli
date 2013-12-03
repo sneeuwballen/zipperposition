@@ -51,8 +51,7 @@ module type S = sig
     (** Copy the evaluator *)
 
   val register : t -> Symbol.t -> eval_fun -> unit
-    (** Add an evaluation function to the evaluator. If another function
-        was already registered *)
+    (** Add an evaluation function to the evaluator. *)
 
   val register_list : t -> (Symbol.t * eval_fun) list -> unit
 

@@ -72,18 +72,30 @@ module FO = struct
 
   type eval_fun = tyargs:Type.t list -> Symbol.t -> term list -> term option
 
-  type t = eval_fun Symbol.Tbl.t
+  type t = eval_fun list Symbol.Tbl.t
 
   let create () = Symbol.Tbl.create 13
 
   let copy = Symbol.Tbl.copy
 
-  let register t s f = Symbol.Tbl.replace t s f
+  let register t s f =
+    try
+      let l = Symbol.Tbl.find t s in
+      Symbol.Tbl.replace t s (f::l)
+    with Not_found ->
+      Symbol.Tbl.add t s [f]
 
   let register_list t l =
     List.iter (fun (s, f) -> register t s f) l
 
   let interpreted t s = Symbol.Tbl.mem t s
+
+  let rec _eval_head funs ~tyargs s l = match funs with
+    | [] -> None
+    | f::funs' ->
+      match f ~tyargs s l with
+      | None -> _eval_head funs' ~tyargs s l
+      | (Some _) as ans -> ans
 
   (* non-recursive evaluation *)
   let rec eval_head ev t = match t.T.term with
@@ -93,8 +105,8 @@ module FO = struct
       let t' =
         try
           (* evaluate constant *)
-          let f = Symbol.Tbl.find ev s in
-          f ~tyargs s l
+          let funs = Symbol.Tbl.find ev s in
+          _eval_head funs ~tyargs s l
         with Not_found -> None
       in
       begin match t' with
@@ -113,8 +125,8 @@ module FO = struct
       let l' = List.map (eval ev) l in
       let t' = 
         try
-          let f = Symbol.Tbl.find ev s in
-          f ~tyargs s l'
+          let funs = Symbol.Tbl.find ev s in
+          _eval_head funs ~tyargs s l
         with
         | Not_found -> None
         | Type.Error _ as e ->
