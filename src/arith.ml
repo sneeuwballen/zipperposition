@@ -66,18 +66,24 @@ module T = struct
     | `Expr -> true
     | `Var | `Const | `Not -> false
 
-  let rec sum_list l = match l with
-    | [] -> failwith "Arith.sum_list: got empty list"
-    | [x] -> x
-    | x::l' -> mk_node ~tyargs:[ty x] S.Arith.sum [x; sum_list l']
+  (* evaluator for arith *)
+  let __ev =
+    let e = Evaluator.FO.create () in
+    Evaluator.FO.with_arith e;
+    e
 
   (* TODO: simplify on the fly? *)
 
-  let mk_sum t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.sum [t1; t2]
-  let mk_difference t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.difference [t1; t2]
-  let mk_product t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.product [t1; t2]
-  let mk_quotient t1 t2 = mk_node ~tyargs:[ty t1] S.Arith.quotient [t1; t2]
-  let mk_uminus t = mk_node ~tyargs:[ty t] S.Arith.uminus [t]
+  let mk_sum t1 t2 = Evaluator.FO.app ~tyargs:[ty t1] __ev S.Arith.sum [t1; t2]
+  let mk_difference t1 t2 = Evaluator.FO.app ~tyargs:[ty t1] __ev S.Arith.difference [t1; t2]
+  let mk_product t1 t2 = Evaluator.FO.app ~tyargs:[ty t1] __ev S.Arith.product [t1; t2]
+  let mk_quotient t1 t2 = Evaluator.FO.app ~tyargs:[ty t1] __ev S.Arith.quotient [t1; t2]
+  let mk_uminus t = Evaluator.FO.app ~tyargs:[ty t] __ev S.Arith.uminus [t]
+
+  let rec sum_list l = match l with
+    | [] -> failwith "Arith.sum_list: got empty list"
+    | [x] -> x
+    | x::l' -> mk_sum x (sum_list l')
 
   let mk_remainder_e t s =
     assert (Type.eq (ty t) Type.int);
@@ -129,12 +135,6 @@ module T = struct
     | l -> List.exists (fun t' -> _var_occur_strict v t') l
 
   let flag_simplified = new_flag ()
-
-  (* evaluator for arith *)
-  let __ev =
-    let e = Evaluator.FO.create () in
-    Evaluator.FO.with_arith e;
-    e
 
   let simplify t =
     if get_flag flag_simplified t
