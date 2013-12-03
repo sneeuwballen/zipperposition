@@ -58,6 +58,9 @@ type simplify_rule = Clause.t -> Clause.t
 type is_trivial_rule = Clause.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
+type term_rewrite_rule = FOTerm.t -> FOTerm.t
+  (** Rewrite rule on terms *)
+
 type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
   (** Rewrite rule on literals *)
 
@@ -134,11 +137,17 @@ val add_is_trivial : env:t -> is_trivial_rule -> unit
 val add_expert : env:t -> Experts.t -> unit
   (** Add an expert structure *)
 
-val add_rewrite_rule : env:t -> string -> (FOTerm.t -> FOTerm.t) -> unit
+val add_rewrite_rule : env:t -> string -> term_rewrite_rule -> unit
   (** Add a term rewrite rule *)
 
 val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
   (** Add a literal rewrite rule *)
+
+val interpret_symbol : env:t -> Symbol.t -> Evaluator.FO.eval_fun -> unit
+  (** Add an evaluation function for a symbol. The evaluation
+      function will be used by {!simplify}. *)
+
+val interpret_symbols : env:t -> (Symbol.t * Evaluator.FO.eval_fun) list -> unit
 
 (** {2 Use the Env} *)
 
