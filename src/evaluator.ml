@@ -286,7 +286,7 @@ module FO = struct
   let _ev_quotient ~tyargs s l = match _binary l with
     | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
       begin try
-        Some (T.mk_const ~tyargs (S.Arith.Op.quotient n1 n2))
+        Some (T.mk_const (S.Arith.Op.quotient n1 n2))
       with Division_by_zero -> None
       end
     | `Binary (n1, tys1, l1, n2, _, []) when S.Arith.is_one n2 ->
