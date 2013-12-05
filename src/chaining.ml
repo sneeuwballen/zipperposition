@@ -449,25 +449,23 @@ let reflexivity_res c =
   let eligible = C.Eligible.max c in
   Lits.fold_ineq ~spec ~eligible c.C.hclits []
     (fun acc lit lit_pos ->
-      try
-        let subst = FOUnif.unification lit.TO.left 0 lit.TO.right 0 in
-        if lit.TO.strict
-          then begin
-            (* remove lit and make a new clause after substitution *)
-            let i = List.hd lit_pos in
-            let lits = Util.array_except_idx c.C.hclits i in
-            let renaming = Ctx.renaming_clear ~ctx in
-            let lits = Lit.apply_subst_list ~ord ~renaming subst lits 0 in
-            let premises = c.C.hcproof :: [] (* lit.TO.instance.TO.proof *) in
-            let theories = ["total_order"] in
-            let rule = "reflexivity_res" in
-            let proof cc = Proof.mk_c_step ~theories ~rule cc premises in
-            let new_c = C.create ~parents:[c] ~ctx lits proof in
-            Util.debug 3 "reflexivity res of %a gives %a" C.pp c C.pp new_c;
-            new_c :: acc
-          end
-        else acc
-      with FOUnif.Fail -> acc)
+      if lit.TO.strict
+        then try
+          let subst = FOUnif.unification lit.TO.left 0 lit.TO.right 0 in
+          (* remove lit and make a new clause after substitution *)
+          let i = List.hd lit_pos in
+          let lits = Util.array_except_idx c.C.hclits i in
+          let renaming = Ctx.renaming_clear ~ctx in
+          let lits = Lit.apply_subst_list ~ord ~renaming subst lits 0 in
+          let premises = c.C.hcproof :: [] (* lit.TO.instance.TO.proof *) in
+          let theories = ["total_order"] in
+          let rule = "reflexivity_res" in
+          let proof cc = Proof.mk_c_step ~theories ~rule cc premises in
+          let new_c = C.create ~parents:[c] ~ctx lits proof in
+          Util.debug 3 "reflexivity res of %a gives %a" C.pp c C.pp new_c;
+          new_c :: acc
+        with FOUnif.Fail -> acc
+      else acc)
 
 let is_tautology c =
   let ctx = c.C.hcctx in
