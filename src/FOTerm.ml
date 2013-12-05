@@ -704,8 +704,10 @@ let arith_hook pp_rec buf t =
     Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
   | Node (s, _, [a; b]) when Symbol.eq s Symbol.Arith.product ->
     Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
-  | Node (s, _, [a; b]) when Symbol.(eq s Arith.quotient || eq s Arith.quotient_e) ->
+  | Node (s, _, [a; b]) when Symbol.(eq s Arith.quotient) ->
     Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
+  | Node (s, _, [a; b]) when Symbol.(eq s Arith.quotient_e) ->
+    Printf.bprintf buf "%a // %a" pp_surrounded a pp_surrounded b; true
   | Node (s, _, [a]) when Symbol.eq s Symbol.Arith.uminus ->
     Printf.bprintf buf "-%a" pp_surrounded a; true;
   | Node (s, _, [a;b]) when Symbol.eq s Symbol.Arith.remainder_e ->
