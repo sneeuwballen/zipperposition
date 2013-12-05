@@ -380,7 +380,7 @@ let rewrite ~env c =
         then t
         else begin
           applied_rules := SmallSet.add !applied_rules "evaluation";
-          Util.debug 5 "Env: rewrite %a int %a" T.pp t T.pp t';
+          Util.debug 5 "Env: rewrite %a into %a" T.pp t T.pp t';
           reduce_term env.rewrite_rules t'  (* re-apply rules *)
         end
     | (name, r)::rules' ->
@@ -388,7 +388,7 @@ let rewrite ~env c =
       if t != t'
         then begin
           applied_rules := SmallSet.add !applied_rules name;
-          Util.debug 5 "Env: rewrite %a int %a" T.pp t T.pp t';
+          Util.debug 5 "Env: rewrite %a into %a" T.pp t T.pp t';
           reduce_term env.rewrite_rules t'  (* re-apply all rules *)
         end else reduce_term rules' t  (* try next rule *)
   in

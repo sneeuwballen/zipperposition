@@ -352,7 +352,8 @@ let of_term t =
     let m = of_term t2 in
     product m s'
   | T.Node (s, _,[t2; {T.term=T.Node (s',_,[])}])
-    when S.eq s S.Arith.quotient && S.is_numeric s' && not (S.Arith.is_zero s') ->
+    when (S.eq s S.Arith.quotient || S.eq s S.Arith.quotient_e)
+    && S.is_numeric s' && not (S.Arith.is_zero s') ->
     let m = of_term t2 in
     divby m s'
   | T.Node (s, _, []) when S.is_numeric s -> const s
@@ -376,7 +377,6 @@ let of_term_opt t =
   try Some (of_term t)
   with NotLinear _ -> None
 
-(* FIXME types types types *)
 let to_term m =
   let add x y = T.mk_node ~tyargs:[T.ty x] S.Arith.sum [x;y] in
   let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
@@ -402,8 +402,10 @@ let to_term m =
       add_sym m.constant sum
   in
   if S.Arith.is_one m.divby
-    then sum
-    else T.mk_node ~tyargs:[T.ty sum] S.Arith.quotient [sum; T.mk_const m.divby]
+  then sum
+  else
+    let q = if Type.eq Type.int (T.ty sum) then S.Arith.quotient_e else S.Arith.quotient in
+    T.mk_node ~tyargs:[T.ty sum] q [sum; T.mk_const m.divby]
 
 let apply_subst ~renaming subst m sc_m =
   if T.Map.is_empty m.coeffs then m else

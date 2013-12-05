@@ -185,6 +185,7 @@ module Expr = struct
       (fun gcd (c, _) -> S.Arith.Op.gcd c gcd)
       e.const e.terms
     in
+    let gcd = S.Arith.Op.abs gcd in
     if S.Arith.is_one gcd || S.Arith.is_zero gcd
       then None
       else match quotient e gcd with
