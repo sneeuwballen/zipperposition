@@ -655,17 +655,19 @@ let basic_simplify c =
   Array.iteri
     (fun i lit ->
       if BV.get bv i then match lit with
-        | Lit.Equation (l, r, false, _) when (T.is_var l || T.is_var r)
-          && not (Arith.T.is_compound_arith l || Arith.T.is_compound_arith r) ->
+        | Lit.Equation (({T.term=T.Var _} as var), t, false, _)
+        | Lit.Equation (t, ({T.term=T.Var _} as var), false, _) ->
+          if not (Arith.T.is_arith var && Arith.Lits.shielded lits var && Arith.T.is_compound_arith t)
           (* eligible for destructive Equality Resolution, try to update
-              [subst]. Compount arith expressions are not allowed because
-              they should be purified away (converse to destructive ER). *)
-          begin try
-            let subst' = FOUnif.unification ~subst:!subst l 0 r 0 in
-            BV.reset bv i;
-            subst := subst';
-          with FOUnif.Fail -> ()
-          end
+              [subst]. We do not eliminate x!=t when t is an arithmetic
+              expression and x occurs somewhere else, that would nullify
+              purification. *)
+            then try
+              let subst' = FOUnif.unification ~subst:!subst var 0 t 0 in
+              BV.reset bv i;
+              subst := subst';
+            with FOUnif.Fail -> ()
+          else ()
         | _ -> ())
     lits;
   let new_lits = BV.select bv lits in
