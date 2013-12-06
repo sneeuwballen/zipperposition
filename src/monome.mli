@@ -31,41 +31,34 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     functions and predicates, that occur immediately under an arithmetic
     operator. For instance, in the term "f(X) + 1 + 3 × a", the variables
     are "f(X)" and "a", with coefficients "1" and "3".
-
-    Monomes of integers {b must} satisfy the property that each
-    coefficient is divisible by the [divby] field.
 *)
 
 open Logtk
 
 type t = private {
-  coeffs : Symbol.t FOTerm.Map.t;
-  constant : Symbol.t;
-  divby : Symbol.t;  (* divide everything by this constant (cool for ints) *)
+  const : Symbol.t;
+  terms : (Symbol.t * FOTerm.t) list;
 }
 
 val eq : t -> t -> bool       (* structural equality *)
 val compare : t -> t -> int   (* arbitrary total order on monomes *)
 val hash : t -> int
 
+val ty : t -> Type.t   (** type of the monome *)
+
 val const : Symbol.t -> t           (** Empty monomial, from constant (decides type) *)
-val singleton : ?divby:Symbol.t ->
-                Symbol.t ->
-                FOTerm.t -> t         (** One term. *)
+val singleton : Symbol.t -> FOTerm.t -> t         (** One term. *)
 val of_list : Symbol.t -> (Symbol.t * FOTerm.t) list -> t
 
 val find : t -> FOTerm.t -> Symbol.t  (** @raise Not_found if not present *)
 val mem : t -> FOTerm.t -> bool       (** Is the term in the monome? *)
+
 val add : t -> Symbol.t -> FOTerm.t -> t  (** Add term with coefficient. Sums coeffs. *)
 val add_const : t -> Symbol.t -> t        (** Add given number to constant *)
 val remove : t -> FOTerm.t -> t           (** Remove the term *)
-
-val remove_divby : t -> t   (** Remove divby *)
 val remove_const : t -> t   (** Remove constant *)
 
-val type_of : t -> Type.t           (** type of the monome *)
-
-val is_constant : t -> bool
+val is_const : t -> bool
   (** Returns [true] if the monome is only a constant *)
 
 val sign : t -> int
@@ -82,29 +75,15 @@ val vars : t -> FOTerm.t list
   (** Variables that occur in some term of the monome *)
 
 val to_list : t -> (Symbol.t * FOTerm.t) list
-  (** Terms and their coefficients. Ignores the constant and divby! *)
+  (** Terms and their coefficients. Ignores the constant! *)
 
 val var_occurs : FOTerm.t -> t -> bool
   (** Does the variable occur in the monome? *)
-
-val reduce_same_divby : t -> t -> t * t
-  (** Reduce the two monomes to the same denominator *)
-
-val normalize : t -> t
-  (** Normalize the [divby] field. If rat/real, divby will be 1,
-      otherwise some coefficient will be irreducible. *)
-
-val normalize_eq_zero : t -> t
-  (** Same as {!normalize}, but also allows to multiply or divide by any
-      positive number since we consider that the monome is equal to zero. For
-      integers, in particular, this will simply {b remove} the divby constant.
-      For integer monomes, the result will have coprime coefficients. *)
 
 val sum : t -> t -> t
 val difference : t -> t -> t
 val uminus : t -> t
 val product : t -> Symbol.t -> t  (** Product with constant *)
-val divby : t -> Symbol.t -> t    (** Division by constant, must be > 0 *)
 val succ : t -> t                 (** +1 *)
 val pred : t -> t                 (** -1 *)
 
@@ -115,15 +94,19 @@ val comparison : t -> t -> Comparison.t
   (** Try to compare two monomes. They may not be comparable (ie on some
       points, or in some models, one will be bigger), but some pairs of
       monomes are:
-      for instance, 2X + 1 < 2X + 4  is always true
-    *)
+      for instance, 2X + 1 < 2X + 4  is always true *)
 
 val dominates : t -> t -> bool
   (** [dominates m1 m2] is true if [m1] is always bigger or equal than
       [m2], in any model or variable valuation.
       if [dominates m1 m2 && dominates m2 m1], then [m1 = m2]. *)
 
-exception NotLinear of string
+val normalize_wrt_zero : t -> t
+  (** Allows to multiply or divide by any positive number since we consider
+      that the monome is equal to (or compared with) zero.
+      For integer monomes, the result will have co-prime coefficients. *)
+
+exception NotLinear
   
 val of_term : FOTerm.t -> t
   (** try to get a monome from a term.
@@ -142,11 +125,17 @@ val apply_subst : renaming:Substs.FO.Renaming.t ->
 val is_ground : t -> bool
   (** Are there no variables in the monome? *)
 
+val reduce_same_factor : t -> t -> FOTerm.t -> t * t
+  (** [reduce_same_factor m1 m2 t] multiplies [m1] and [m2] by
+      some constants, so that their coefficient for [t] is the
+      same.
+      @raise Invalid_argument if [t] does not belong to [m1] or [m2] *)
+
 val pp : Buffer.t -> t -> unit
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
 
-(** {2 Satisfiability} *)
+(** {2 Specific to Int} *)
 
 val has_instances : t -> bool
   (** For real or rational, always true. For integers, returns true
@@ -156,23 +145,51 @@ val has_instances : t -> bool
       The intuition is that this returns [true] iff the monome actually has
       some instances in its type. Trivially true in reals or rationals, this is
       only the case for integers if [m.coeffs + m.constant = 0] is a
-      satisfiable diophantine equation.
-  *)
+      satisfiable diophantine equation. *)
 
-val total_expression : t -> bool
-  (** For real or rationals, always true. For integers, returns true
-      iff the monome evaluates to an integer for any valuation of free
-      variables and terms that occur in the right hand side. Most of
-      the time, it means that the denominator is 1.
-
-      For instance, a/2 is not a total expression, 3 + 5Y is total,
-      but (3Y+7/5) has instances without being total. *)
-
+(*
 val floor : t -> t
   (** Highest monome that is <= m, and that satisfies [has_instances]. *)
 
 val ceil : t -> t
   (** Same as {!round_low} but rounds high *)
+*)
+
+val quotient : t -> Symbol.t -> t option
+  (** [quotient e c] tries to divide [e] by [c], returning [e/c] if
+      it is still an integer expression.
+      For instance, [quotient (2x + 4y) 2] will return [Some (x + 2y)] *)
+
+val divisible : t -> Symbol.t -> bool
+  (** [divisible e n] returns true if all coefficients of [e] are
+      divisible by [n] and n is an int >= 2 *)
+
+val factorize : t -> (t * Symbol.t) option
+  (** Factorize [e] into [Some (e',s)] if [e = e' x s], None
+      otherwise (ie if s=1) *)
+
+(** {2 For fields (Q,R)} *)
+
+val exact_quotient : t -> Symbol.t -> t
+  (** Division in a field.
+      @raise Division_by_zero if the denominator is zero. *)
+
+(** {2 Modular Computations} *)
+
+module Modulo : sig
+  val modulo : n:Symbol.t -> Symbol.t -> Symbol.t
+    (** Representative of the number in Z/nZ *)
+
+  val sum : n:Symbol.t -> Symbol.t -> Symbol.t -> Symbol.t
+    (** Sum in Z/nZ *)
+
+  val uminus : n:Symbol.t -> Symbol.t -> Symbol.t
+    (** Additive inverse in Z/nZ *)
+
+  val inverse : n:Symbol.t -> Symbol.t -> Symbol.t
+    (** Multiplicative inverse in Z/nZ.
+        TODO (only works if [n] prime) *)
+end
 
 (** {2 Find Solutions} *)
 
@@ -212,8 +229,7 @@ module Solve : sig
         but that it returns a list of [n] elements!
 
         @param gcd is the gcd of all members of [l].
-        @param l is a list of at least 2 elements, none of which should be 0
-    *)
+        @param l is a list of at least 2 elements, none of which should be 0 *)
 
   val eq_zero : ?fresh_var:(Type.t -> FOTerm.t) -> t -> solution list
     (** Returns substitutions that make the monome always equal to zero.

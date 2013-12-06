@@ -33,284 +33,154 @@ module T = FOTerm
 module S = Symbol
 
 type t = {
-  coeffs : Symbol.t T.Map.t;
-  constant : Symbol.t;
-  divby : Symbol.t;  (* divide everything by this constant (cool for ints) *)
+  const : Symbol.t;
+  terms : (Symbol.t * FOTerm.t) list;
 }
 
-let eq m1 m2 =
-  Symbol.eq m1.constant m2.constant &&
-  Symbol.eq m1.divby m2.divby &&
-  T.Map.equal Symbol.eq m1.coeffs m2.coeffs
+let eq t1 t2 =
+  S.eq t1.const t2.const &&
+  try List.for_all2 (fun (a1,t1) (a2, t2) -> S.eq a1 a2 && T.eq t1 t2) t1.terms t2.terms
+  with Invalid_argument _ -> false
 
 let compare m1 m2 =
+  let cmp_pair (s1,t1) (s2,t2) = Util.lexicograph_combine [T.compare t1 t2; S.compare s1 s2] in
   Util.lexicograph_combine
-    [ Symbol.compare m1.constant m2.constant
-    ; Symbol.compare m1.divby m2.divby
-    ; T.Map.compare Symbol.compare m1.coeffs m2.coeffs
+    [ S.compare m1.const m2.const
+    ; Util.lexicograph cmp_pair m1.terms m2.terms;
     ]
 
 let hash m =
-  Hash.hash_int3
-    (Symbol.hash m.constant)
-    (Symbol.hash m.divby)
-    (T.Map.fold
-      (fun t coeff acc -> Hash.hash_int3 acc (Symbol.hash coeff) (T.hash t))
-      m.coeffs 13)
+  let hash_pair (s,t) = Hash.combine (S.hash s) (T.hash t) in
+  Hash.hash_list hash_pair (S.hash m.const) m.terms
 
-let const constant =
-  assert (S.is_numeric constant);
-  {
-    coeffs = T.Map.empty;
-    constant;
-    divby = S.Arith.one_of_ty (S.ty constant);
-  }
+let ty m = S.ty m.const
 
-let singleton ?divby coeff t =
+(* merge two lists and maintain them sorted. Symbols for a given term
+    are combined using [op] *)
+let rec _merge op l1 l2 = match l1, l2 with
+  | [], l
+  | l, [] -> l
+  | (s1, t1)::l1', (s2, t2)::l2' ->
+    match T.compare t1 t2 with
+    | 0 ->
+      let s' = op s1 s2 in
+      if S.Arith.is_zero s'
+        then _merge op l1' l2'  (* t disappears *)
+        else (s', t1) :: _merge op l1' l2'
+    | n when n < 0 -> (s1, t1) :: _merge op l1' l2
+    | _ -> (s2, t2) :: _merge op l1 l2'
+
+(* map [f] on all symbols of [e] *)
+let _fmap f e =
+  let terms = Util.list_fmap
+    (fun (s,t) ->
+      let s' = f s in
+      if S.Arith.is_zero s'
+        then None  (* [t] doesn't occur anymore *)
+        else Some (s', t))
+    e.terms
+  in
+  { const=f e.const; terms; }
+
+  let const s =
+    assert (S.is_numeric s);
+    { const=s; terms=[]; }
+
+let singleton coeff t =
   if S.Arith.is_zero coeff
     then const coeff  (* 0 *)
     else
-      let coeffs = T.Map.singleton t coeff in
-      let constant = S.Arith.zero_of_ty (S.ty coeff) in
-      let divby = match divby with
-      | Some d -> d
-      | None -> S.Arith.one_of_ty (S.ty coeff)
-      in
-      { coeffs; constant; divby; }
+      let terms = [coeff, t] in
+      let const = S.Arith.zero_of_ty (S.ty coeff) in
+      { terms; const; }
 
-let of_list constant l =
-  let divby = S.Arith.one_of_ty (S.ty constant) in
-  let coeffs = List.fold_left
-    (fun m (coeff, t) ->
-      if S.Arith.is_zero coeff
-        then m
-        else T.Map.add t coeff m)
-    T.Map.empty l
+let find e t =
+  let rec find l t = match l with
+    | [] -> raise Not_found
+    | (s, t')::_ when T.eq t t' -> s
+    | _::l' -> find l' t
   in
-  { constant; coeffs; divby; }
+  find e.terms t
 
-let pp buf monome =
-  Buffer.add_char buf '(';
-  T.Map.iter
-    (fun t coeff -> Printf.bprintf buf "%a×%a + " S.pp coeff T.pp t)
-    monome.coeffs;
-  S.pp buf monome.constant;
-  if S.Arith.is_one monome.divby
-    then Buffer.add_char buf ')'
-    else Printf.bprintf buf ")/%a" S.pp monome.divby
+let mem e t =
+  try ignore (find e t); true
+  with Not_found -> false
 
-let to_string monome = Util.on_buffer pp monome
+let add e s t =
+  let rec add l s t = match l with
+    | [] -> [s, t]
+    | (s', t')::l' ->
+      if T.eq t t'
+        then (S.Arith.Op.sum s s', t) :: l'
+        else (s', t') :: add l' s t
+  in
+  { e with terms = add e.terms s t; }
 
-let fmt fmt m = Format.pp_print_string fmt (to_string m)
+let add_const e s =
+  { e with const = S.Arith.Op.sum e.const s; }
 
-let mem m t = T.Map.mem t m.coeffs
+let remove e t =
+  { e with terms = List.filter (fun (_, t') -> not (T.eq t t')) e.terms; }
 
-let find m t = T.Map.find t m.coeffs
+let remove_const e =
+  { e with const = S.Arith.zero_of_ty (ty e); }
 
-let add_const m c =
-  (* same denominator *)
-  let c = S.Arith.Op.product c m.divby in
-  let constant = S.Arith.Op.sum c m.constant in
-  { m with constant; }
-
-let add m coeff t = match t.T.term with
-  | T.Node (s, _, []) when S.is_numeric s ->
-    (* special case: if the term is a constant *)
-    add_const m (S.Arith.Op.product coeff s)
-  | _ ->
-    let coeff = S.Arith.Op.product coeff m.divby in
-    (* compute sum of coeffs for [t], if need be *)
-    let c =
-      try
-        let coeff' = T.Map.find t m.coeffs in
-        S.Arith.Op.sum coeff coeff'
-      with Not_found -> coeff
-    in
-    if S.Arith.is_zero c
-      then {m with coeffs=T.Map.remove t m.coeffs;}
-      else {m with coeffs=T.Map.add t c m.coeffs;}
-
-let remove m t =
-  { m with coeffs=T.Map.remove t m.coeffs; }
-
-let type_of m = S.ty m.constant
-
-let remove_divby m = { m with divby=S.Arith.one_of_ty (type_of m); }
-
-let remove_const m = { m with constant=S.Arith.zero_of_ty (type_of m); }
-
-let is_constant m = T.Map.is_empty m.coeffs
+let is_const e = match e.terms with | [] -> true | _ -> false
 
 let sign m =
-  if not (is_constant m) then invalid_arg "sign: require constant monome";
-  assert (S.Arith.sign m.divby > 0);
-  S.Arith.sign m.constant
+  if not (is_const m) then invalid_arg "Monome.sign";
+  S.Arith.sign m.const
 
-let size m = T.Map.cardinal m.coeffs
+let of_list s l =
+  List.fold_left
+    (fun e (s,t) -> add e s t)
+    (const s) l
 
-let terms m =
-  T.Map.fold (fun t coeff acc -> t :: acc) m.coeffs []
+let size e = List.length e.terms
 
-let vars m =
-  T.vars_list (terms m)
+let terms m = List.map snd m.terms
 
-let to_list m =
-  T.Map.fold (fun t coeff acc -> (coeff,t) :: acc) m.coeffs []
+let vars e =
+  let seq = Sequence.of_list e.terms in
+  let seq = Sequence.map snd seq in
+  T.vars_seq seq
 
-let var_occurs v m =
-  List.exists (fun t -> T.var_occurs v t) (terms m)
+let to_list e = e.terms
 
-(* scale: multiply all coeffs by constant, multiply divby by same constant.
-  This yields the very same monome *)
-let _scale m c =
-  assert (S.is_numeric c);
-  assert (not (S.Arith.is_zero c));
-  assert (S.Arith.sign m.divby > 0);
-  if S.Arith.is_one c
-    then m  (* same monome *)
-    else
-      let c = S.Arith.Op.abs c in
-      let constant = S.Arith.Op.product c m.constant in
-      let coeffs = T.Map.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
-      let divby = S.Arith.Op.product m.divby c in
-      { constant; coeffs; divby; }
+let var_occurs v e =
+  List.exists (fun (_, t) -> T.var_occurs v t) e.terms
 
-let normalize m = match m.constant with
-  | S.Int _ ->
-    (* divide by common gcd of coeffs and divby *)
-    let gcd = S.Arith.Op.gcd m.constant m.divby in
-    let gcd = T.Map.fold (fun _ c gcd -> S.Arith.Op.gcd c gcd) m.coeffs gcd in
-    let constant = S.Arith.Op.quotient m.constant gcd in
-    let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
-    let divby = S.Arith.Op.quotient m.divby gcd in
-    { constant; coeffs; divby; }
-  | S.Rat _
-  | S.Real _ ->
-    (* multiply by 1/divby *)
-    let constant = S.Arith.Op.quotient m.constant m.divby in
-    let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' m.divby) m.coeffs in
-    let one = S.Arith.one_of_ty (S.ty m.constant) in
-    { constant; coeffs; divby=one; }
-  | _ -> assert false
+let sum e1 e2 =
+  let const = S.Arith.Op.sum e1.const e2.const in
+  let terms = _merge S.Arith.Op.sum e1.terms e2.terms in
+  { const; terms; }
 
-(* for integers,  *)
-let normalize_eq_zero m =
-  match m.constant with
-  | S.Int _ when not (is_constant m) ->
-    (* divide by common gcd of coeffs and constant *)
-    let gcd = T.Map.fold (fun _ c gcd -> S.Arith.Op.gcd c gcd) m.coeffs m.constant in
-    let constant = S.Arith.Op.quotient m.constant gcd in
-    let coeffs = T.Map.map (fun c' -> S.Arith.Op.quotient c' gcd) m.coeffs in
-    let divby = S.Arith.one_i in  (* no more. *)
-    { constant; coeffs; divby; }
-  | _ -> normalize m
+let difference e1 e2 =
+  let const = S.Arith.Op.difference e1.const e2.const in
+  let terms = _merge S.Arith.Op.difference e1.terms e2.terms in
+  { const; terms; }
 
-(* reduce to same divby (same denominator) *)
-let reduce_same_divby m1 m2 =
-  if S.eq m1.divby m2.divby then m1, m2 else
-  match m1.divby, m2.divby with
-  | S.Int n1, S.Int n2 ->
-    let gcd = Big_int.gcd_big_int n1 n2 in
-    assert (Big_int.sign_big_int n1 > 0);
-    assert (Big_int.sign_big_int n2 > 0);
-    assert (Big_int.sign_big_int gcd > 0);
-    (* n1 × n2 = gcd × lcm, so we need to raise both n1 and n2 to lcm.
-       to do that, let us introduce  n1 = gcd × d1, and n2 = gcd × d2.
-       Then
-          n1 × d2 = gcd × d1 × d2, and
-          n2 × d1 = gcd × d2 × d1
-       so we multiply m1 by d2, and m2 by d1.
-    *)
-    let d1 = S.mk_bigint (Big_int.div_big_int n1 gcd) in
-    let d2 = S.mk_bigint (Big_int.div_big_int n2 gcd) in
-    Util.debug 5 "reduce same divby: %a, %a have gcd %s, mult by %a, %a"
-      pp m1 pp m2 (Big_int.string_of_big_int gcd) S.pp d2 S.pp d1;
-    _scale m1 d2, _scale m2 d1
-  | c1, c2 ->
-    (* reduce m1 / c1 and m2 / c2 to same denominator. We choose c2
-       arbitrarily, so we need to scale m1 with c2/c1. *)
-    _scale m1 (S.Arith.Op.quotient c2 c1), m2
+let product e s = _fmap (fun s' -> S.Arith.Op.product s s') e
 
-let sum m1 m2 =
-  let m1, m2 = reduce_same_divby m1 m2 in
-  let constant = S.Arith.Op.sum m1.constant m2.constant in
-  let coeffs = T.Map.merge
-    (fun t c1 c2 -> match c1, c2 with
-    | None, Some c
-    | Some c, None -> Some c
-    | Some c1, Some c2 ->
-      let c = S.Arith.Op.sum c1 c2 in
-      if S.Arith.is_zero c
-        then None
-        else Some c
-    | None, None -> assert false)
-    m1.coeffs m2.coeffs
-  in
-  { m1 with constant; coeffs; }
+let uminus e = _fmap S.Arith.Op.uminus e
 
-let difference m1 m2 =
-  let m1, m2 = reduce_same_divby m1 m2 in
-  let constant = S.Arith.Op.difference m1.constant m2.constant in
-  let coeffs = T.Map.merge
-    (fun t c1 c2 -> match c1, c2 with
-    | None, Some c -> Some (S.Arith.Op.uminus c)
-    | Some c, None -> Some c
-    | Some c1, Some c2 ->
-      let c = S.Arith.Op.difference c1 c2 in
-      if S.Arith.is_zero c
-        then None
-        else Some c
-    | None, None -> assert false)
-    m1.coeffs m2.coeffs
-  in
-  { m1 with constant; coeffs; }
+let succ e = add_const e (S.Arith.one_of_ty (ty e))
 
-let uminus m =
-  let constant = S.Arith.Op.uminus m.constant in
-  let coeffs = T.Map.map S.Arith.Op.uminus m.coeffs in
-  { m with constant; coeffs; }
-
-(* product by constant *)
-let product m c =
-  if S.Arith.is_zero c
-    then const c  (* 0 *)
-  else if S.Arith.Op.divides c m.divby && S.Arith.sign c > 0
-    then { m with divby = S.Arith.Op.quotient m.divby c }
-  else  (* itemwise product *)
-    let constant = S.Arith.Op.product m.constant c in
-    let coeffs = T.Map.map (fun c' -> S.Arith.Op.product c c') m.coeffs in
-    { m with constant; coeffs; }
-
-let rec divby m const =
-  if S.Arith.is_zero const
-    then raise Division_by_zero
-  else if S.Arith.sign const < 0
-    then divby (uminus m) (S.Arith.Op.uminus const)
-  else
-    let divby = S.Arith.Op.product const m.divby in
-    normalize { m with divby; }
-
-let succ m =
-  let one = S.Arith.one_of_ty (S.ty m.constant) in
-  add_const m one
-
-let pred m =
-  let one = S.Arith.one_of_ty (S.ty m.constant) in
-  add_const m (S.Arith.Op.uminus one)
+let pred e = add_const e (S.Arith.Op.uminus (S.Arith.one_of_ty (ty e)))
 
 let rec sum_list = function
-  | [] -> failwith "Monome.sum_list: empty list"
+  | [] -> failwith "Monome.sum_list"
   | [m] -> m
   | m::l' -> sum m (sum_list l')
 
 let comparison m1 m2 =
   (* same type *)
-  if Type.eq (type_of m1) (type_of m2)
+  if Type.eq (ty m1) (ty m2)
   then
     (* if m1-m2 is a constant, they are comparable, otherwise it
         depends on the model/instance *)
     let m = difference m1 m2 in
-    match is_constant m, S.Arith.sign m.constant with
+    match is_const m, S.Arith.sign m.const with
     | false, _ -> Comparison.Incomparable
     | true, 0 -> Comparison.Eq
     | true, n when n < 0 -> Comparison.Lt
@@ -321,8 +191,20 @@ let dominates m1 m2 = match comparison m1 m2 with
   | Comparison.Eq | Comparison.Gt -> true
   | Comparison.Lt | Comparison.Incomparable -> false
 
-exception NotLinear of string
-  (** Used by [of_term] *)
+let normalize_wrt_zero m =
+  match m.const with
+  | S.Int _ when not (is_const m) ->
+    (* divide by common gcd of coeffs and constant *)
+    let gcd = List.fold_left (fun gcd (c,_) -> S.Arith.Op.gcd c gcd) m.const m.terms in
+    let const = S.Arith.Op.quotient m.const gcd in
+    let terms = List.map (fun (c,t) -> S.Arith.Op.quotient c gcd, t) m.terms in
+    { const; terms; }
+  | S.Int _ 
+  | S.Rat _
+  | S.Real _ -> m
+  | _ -> failwith "Monome.normalize_wrt_zero"
+
+exception NotLinear
 
 let of_term t =
   let rec of_term t = match t.T.term with
@@ -352,13 +234,15 @@ let of_term t =
     let m = of_term t2 in
     product m s'
   | T.Node (s, _,[t2; {T.term=T.Node (s',_,[])}])
-    when (S.eq s S.Arith.quotient || S.eq s S.Arith.quotient_e)
+    when not (Type.eq (T.ty t2) Type.int)
+    && (S.eq s S.Arith.quotient || S.eq s S.Arith.quotient_e)
     && S.is_numeric s' && not (S.Arith.is_zero s') ->
+    (* division of coefficients and constant *)
     let m = of_term t2 in
-    divby m s'
+    _fmap (fun s -> S.Arith.Op.quotient s s') m
   | T.Node (s, _, []) when S.is_numeric s -> const s
   | T.Node (s, _, [_; _]) when S.Arith.is_arith s ->
-    raise (NotLinear (Util.sprintf "non linear op %a" S.pp s)) (* failure *)
+    raise NotLinear 
   | T.Var _
   | T.BoundVar _ ->
     let ty = t.T.ty in
@@ -371,115 +255,146 @@ let of_term t =
   in
   try of_term t
   with Symbol.Arith.TypeMismatch msg ->
-    raise (NotLinear ("type error: " ^ msg))
+    raise NotLinear
 
 let of_term_opt t =
   try Some (of_term t)
-  with NotLinear _ -> None
+  with NotLinear -> None
 
-let to_term m =
-  let add x y = T.mk_node ~tyargs:[T.ty x] S.Arith.sum [x;y] in
-  let add_sym s x = if S.Arith.is_zero s then x else add (T.mk_const s) x in
-  let prod s x = if S.Arith.is_one s then x
-    else T.mk_node ~tyargs:[T.ty x] S.Arith.product [T.mk_const s; x]
-  in
-  let sum =
-    if T.Map.is_empty m.coeffs
-      then T.mk_const m.constant (* constant *)
-    else
-      (* remove one coeff to make the basic sum *)
-      let t, c = T.Map.choose m.coeffs in
-      let map = T.Map.remove t m.coeffs in
-      let sum = prod c t in
-      (* add coeff*term for the remaining terms *)
-      let sum = T.Map.fold
-        (fun t' coeff sum ->
-          assert (not (S.Arith.is_zero coeff));
-          add sum (prod coeff t'))
-        map sum 
-      in
-      (* add the constant (if needed) *)
-      add_sym m.constant sum
-  in
-  if S.Arith.is_one m.divby
-  then sum
-  else
-    let q = if Type.eq Type.int (T.ty sum) then S.Arith.quotient_e else S.Arith.quotient in
-    T.mk_node ~tyargs:[T.ty sum] q [sum; T.mk_const m.divby]
+let to_term e = 
+  match e.terms with
+  | [] -> T.mk_const e.const
+  | (c, t)::rest ->
+    (* remove one coeff to make the basic sum *)
+    let sum = Arith.T.mk_product (T.mk_const c) t in
+    (* add coeff*term for the remaining terms *)
+    let sum = List.fold_left
+      (fun sum (coeff, t') ->
+        assert (not (S.Arith.is_zero coeff));
+        Arith.T.mk_sum sum (Arith.T.mk_product (T.mk_const coeff) t'))
+      sum rest
+    in
+    (* add the constant (if needed) *)
+    Arith.T.mk_sum (T.mk_const e.const) sum
 
 let apply_subst ~renaming subst m sc_m =
-  if T.Map.is_empty m.coeffs then m else
-    let m' = const m.constant in
-    (* add terms one by one, after applying the substitution to them *)
-    let m' = T.Map.fold
-      (fun t c m' ->
-        (* apply subst to [t] *)
-        let t' = Substs.FO.apply ~renaming subst t sc_m in
-        add m' c t')
-      m.coeffs m'
-    in
-    { m' with divby= m.divby; }
+  match m.terms with
+  | [] -> m
+  | _::_ ->
+    List.fold_left
+      (fun m (s,t) -> add m s (Substs.FO.apply ~renaming subst t sc_m))
+      (const m.const) m.terms
 
 let is_ground m =
-  T.Map.for_all (fun t _ -> T.is_ground t) m.coeffs
+  List.for_all (fun (_, t) -> T.is_ground t) m.terms
 
-(** {2 Satisfiability} *)
+let pp buf e =
+  let pp_pair buf (s, t) =
+    if S.Arith.is_one s
+      then T.pp buf t
+      else Printf.bprintf buf "%a×%a" S.pp s T.pp t
+  in
+  match e.terms with
+  | [] -> S.pp buf e.const
+  | _::_ when S.Arith.is_zero e.const ->
+    Util.pp_list ~sep:" + " pp_pair buf e.terms
+  | _::_ ->
+    Printf.bprintf buf "%a + %a" S.pp e.const (Util.pp_list ~sep:" + " pp_pair) e.terms
+
+let to_string monome = Util.on_buffer pp monome
+
+let fmt fmt m = Format.pp_print_string fmt (to_string m)
+
+(* manage so that m1[t] = m2[t] *)
+let reduce_same_factor m1 m2 t =
+  try
+    let s1 = find m1 t in
+    let s2 = find m2 t in
+    match s1, s2 with
+    | S.Int n1, S.Int n2 ->
+      let gcd = Big_int.gcd_big_int n1 n2 in
+      assert (Big_int.sign_big_int n1 > 0);
+      assert (Big_int.sign_big_int n2 > 0);
+      assert (Big_int.sign_big_int gcd > 0);
+      (* n1 × n2 = gcd × lcm, so we need to raise both n1 and n2 to lcm.
+         to do that, let us introduce  n1 = gcd × d1, and n2 = gcd × d2.
+         Then
+            n1 × d2 = gcd × d1 × d2, and
+            n2 × d1 = gcd × d2 × d1
+         so we multiply m1 by d2, and m2 by d1.
+      *)
+      let d1 = S.mk_bigint (Big_int.div_big_int n1 gcd) in
+      let d2 = S.mk_bigint (Big_int.div_big_int n2 gcd) in
+      Util.debug 5 "reduce same factor: %a, %a have gcd %s, mult by %a, %a"
+        pp m1 pp m2 (Big_int.string_of_big_int gcd) S.pp d2 S.pp d1;
+      product m1 d2, product m2 d1
+    | S.Rat _, S.Rat _
+    | S.Real _, S.Real _ ->
+      m1, product m2 (S.Arith.Op.quotient s1 s2)
+    | _ -> raise (Invalid_argument "Monome.reduce_same_factor")
+  with Not_found ->
+    raise (Invalid_argument "Monome.reduce_same_factor")
+
+(** {2 Specific to Int} *)
 
 let has_instances m =
-  let res = match m.constant with
+  let res = match m.const with
   | S.Real _
   | S.Rat _ -> true
-  | S.Int c when is_constant m -> Big_int.sign_big_int c = 0
+  | S.Int c when is_const m -> Big_int.sign_big_int c = 0
   | S.Int _ ->
-    let terms = to_list m in
-    begin match terms with
+    begin match m.terms with
     | [] -> assert false
     | (g,_) :: l ->
       let g = List.fold_left (fun g (c,_) -> S.Arith.Op.gcd c g) g l in
-      S.Arith.Op.divides g m.constant
+      S.Arith.Op.divides g m.const
     end
   | _ -> assert false
   in
   Util.debug 5 "monome %a has instances: %B" pp m res;
   res
 
-let total_expression m =
-  let m = normalize m in
-  let res = match m.constant with
-  | S.Real _
-  | S.Rat _ -> true
-  | S.Int _ ->
-    (* either divby is 1, or the monome is an integer constant *)
-    S.Arith.is_one m.divby ||
-    (T.Map.is_empty m.coeffs && S.Arith.Op.divides m.divby m.constant)
-  | _ -> assert false
-  in
-  Util.debug 5 "monome %a is a total expression: %B" pp m res;
-  res
+let quotient e c =
+  if S.Arith.sign c <= 0
+  then None
+  else try Some (_fmap (fun s -> S.Arith.Op.quotient s c) e)
+  with S.Arith.TypeMismatch _ -> None
 
-let floor m = match m.constant with
-  | S.Int _ when T.Map.is_empty m.coeffs ->
-    (* m = m.constant / m.divby *)
-    let constant = S.Arith.Op.quotient_f m.constant m.divby in
-    let one = S.Arith.one_i in
-    { m with constant; divby=one; }
-  | _ -> m
+let divisible e c =
+  S.Arith.Op.divides c e.const &&
+  List.for_all (fun (c',_) -> S.Arith.Op.divides c c') e.terms
 
-let ceil m =
-match m.constant with
-  | S.Int _ when T.Map.is_empty m.coeffs ->
-    (* m = m.constant / m.divby *)
-    let constant = match m.constant, m.divby with
-    | S.Int a, S.Int b ->
-      let q, r = Big_int.quomod_big_int a b in
-      if Big_int.sign_big_int b = 0
-        then S.mk_bigint q
-        else S.mk_bigint (Big_int.succ_big_int q)  (* round up! *)
-    | _ -> assert false
+let factorize e =
+  if Type.eq Type.int (ty e)
+  then
+    let gcd = List.fold_left
+      (fun gcd (c, _) -> S.Arith.Op.gcd c gcd)
+      e.const e.terms
     in
-    let one = S.Arith.one_i in
-    { m with constant; divby=one; }
-  | _ -> m
+    let gcd = S.Arith.Op.abs gcd in
+    if S.Arith.is_one gcd || S.Arith.is_zero gcd
+      then None
+      else match quotient e gcd with
+      | None -> assert false
+    | Some e' -> Some (e', gcd)
+  else None
+
+(** {2 Fields *)
+
+let exact_quotient e c =
+  _fmap (fun s -> S.Arith.Op.quotient s c) e
+
+(** {2 Modular Computations} *)
+
+module Modulo = struct
+  let modulo ~n c = S.Arith.Op.remainder_e c n
+
+  let sum ~n c1 c2 = modulo ~n (S.Arith.Op.sum c1 c2)
+
+  let uminus ~n c = modulo ~n (S.Arith.Op.uminus c)
+
+  let inverse ~n c = failwith "Monome.Modulo.inverse: not implemented"
+end
 
 (** {2 Find Solutions} *)
 
@@ -666,7 +581,7 @@ module Solve = struct
       | None -> __fresh_var m
       | Some f -> f
     in
-    match m.constant with
+    match m.const with
     | S.Rat _
     | S.Real _ ->
       (* eliminate variables by extracting them *)
@@ -676,26 +591,24 @@ module Solve = struct
           if T.is_var t
             then try
               let m = if S.Arith.sign c > 0
-                then divby (uminus (remove m t)) c
-                else divby (remove m t) (S.Arith.Op.uminus c)
+                then exact_quotient (uminus (remove m t)) c
+                else exact_quotient (remove m t) (S.Arith.Op.uminus c)
               in
               let _ = FOUnif.unification t 0 (to_term m) 0 in
               Some [ t, m ]
             with FOUnif.Fail -> None
             else None)
         terms
-    | S.Int _ when is_constant m -> []
+    | S.Int _ when is_const m -> []
     | S.Int _ ->
-      (* m = 0 <=> m * m.divby = 0, so scale it *)
-      let m = normalize_eq_zero m in
-      assert (S.Arith.is_one m.divby);
+      let m = normalize_wrt_zero m in
       (* need to solve a diophantine equation *)
       let terms = to_list m in
       begin match terms with
-      | [] when S.Arith.is_zero m.constant -> [[]]  (* trivial *)
-      | [c, t] when S.Arith.Op.divides c m.constant ->
+      | [] when S.Arith.is_zero m.const -> [[]]  (* trivial *)
+      | [c, t] when S.Arith.Op.divides c m.const ->
         (* [c * x + constant = 0], let [x = - constant / c] *)
-        let n = S.Arith.Op.quotient (S.Arith.Op.uminus m.constant) c in
+        let n = S.Arith.Op.quotient (S.Arith.Op.uminus m.const) c in
         [ [t, const n] ]
       | _::_::_ as l when List.exists _is_one_abs l ->
         (* at leat one of the coefficients is +/- 1. Extract
@@ -711,7 +624,7 @@ module Solve = struct
       | _::_::_ as l ->
         (* extract coefficients *)
         let l' = List.map (fun (c,_) -> _of_symb c) l in
-        let c = _of_symb m.constant in
+        let c = _of_symb m.const in
         begin try
           let gcd = List.fold_left Big_int.gcd_big_int (List.hd l') (List.tl l') in
           (* coefficients for the solution hyperplane *)
@@ -736,7 +649,8 @@ module Solve = struct
       end
     | _ -> failwith "bad type for a monome"
 
-  let lower_zero ?fresh_var ~strict m = match m.constant with
+  let lower_zero ?fresh_var ~strict m =
+    match m.const with
     | S.Rat _
     | S.Real _ ->
       if strict
@@ -750,10 +664,10 @@ module Solve = struct
                 let m = if S.Arith.sign c > 0
                   then
                     (* c * t + m < 0 reachable by t = -m/c - 1 *)
-                    pred (divby (uminus (remove m t)) c)
+                    pred (exact_quotient (uminus (remove m t)) c)
                   else
                     (* -c * t + m < 0 reachable by t = m/c + 1 *)
-                    succ (divby (remove m t) (S.Arith.Op.uminus c))
+                    succ (exact_quotient (remove m t) (S.Arith.Op.uminus c))
                 in
                 let _ = FOUnif.unification t 0 (to_term m) 0 in
                 Some [ t, m ]
@@ -762,15 +676,14 @@ module Solve = struct
           terms
       else (* non-strict implies that equality is ok *)
         eq_zero ?fresh_var m
-    | S.Int _ when is_constant m -> []
+    | S.Int _ when is_const m -> []
     | S.Int _ ->
-      let m = normalize_eq_zero m in
-      let terms = to_list m in
-      begin match terms with
+      let m = normalize_wrt_zero m in
+      begin match m.terms with
       | [] -> []
-      | [c, t] when S.Arith.Op.divides c m.constant ->
+      | [c, t] when S.Arith.Op.divides c m.const ->
         (* c * t + m < 0 ----> t = (-m / c) - 1 *)
-        let v = S.Arith.Op.(quotient (uminus m.constant) c) in
+        let v = S.Arith.Op.(quotient (uminus m.const) c) in
         let v = if S.Arith.sign c > 0
           then S.Arith.Op.prec v
           else S.Arith.Op.succ v
@@ -778,15 +691,15 @@ module Solve = struct
         [ [t, const v] ]
       | [c, t] ->
         (* must be integer, take the quotient itself *)
-        let v = S.Arith.Op.(quotient_f (uminus m.constant) c) in
+        let v = S.Arith.Op.(quotient_f (uminus m.const) c) in
         let v = if S.Arith.sign c < 0 then S.Arith.Op.succ v else v in
         [ [t, const v] ]
-      | _::_::_ when List.exists _is_one_abs terms ->
+      | _::_::_ when List.exists _is_one_abs m.terms ->
         if strict
         then
           (* there is some coefficient equal to one, just extract the
             corresponding terms and make them equal to monome + 1 *)
-          let terms = List.filter _is_one_abs terms in
+          let terms = List.filter _is_one_abs m.terms in
           List.map
             (fun (c,t) ->
               let m' = remove m t in
@@ -805,11 +718,11 @@ module Solve = struct
           such that m = n is solvable, then we call {!eq_zero}. *)
         let gcd = List.fold_left
           (fun gcd (c,_) -> Big_int.gcd_big_int gcd (_of_symb c))
-          (_of_symb m.constant) terms
+          (_of_symb m.const) m.terms
         in
         (* now we shift the constant until it is a multiple of the gcd.
            m < const  ----> m = const' with const' < const *)
-        let c = Big_int.minus_big_int (_of_symb m.constant) in
+        let c = Big_int.minus_big_int (_of_symb m.const) in
         let q, r = Big_int.quomod_big_int c gcd in
         let c' = if Big_int.sign_big_int r = 0
           then if strict
@@ -821,7 +734,7 @@ module Solve = struct
             Big_int.mult_big_int q gcd
         in
         let c' = S.mk_bigint (Big_int.minus_big_int c') in
-        let m' = { m with constant = c'; } in
+        let m' = { m with const = c'; } in
         eq_zero ?fresh_var m'
       end
     | _ -> failwith "bad type for a monome"

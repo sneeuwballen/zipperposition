@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e4482bd6c4600a0397bf957d6d22717f)
+# DO NOT EDIT (digest: 245755ea35366a187de7ff58bdf1184f)
 ClauseQueue
 Clause
 Const
@@ -25,7 +25,6 @@ Monome
 Arith
 ArithElim
 Interval
-ModularArith
 containers/LazyGraph
 containers/Leftistheap
 containers/Vector
