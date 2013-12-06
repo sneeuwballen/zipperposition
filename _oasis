@@ -38,7 +38,7 @@ Library "logtk"
                     FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
                     Trace_tstp, CallProver, Congruence, TypeUnif, Options,
                     Basic, Monad, FastFingerprint, Evaluator, Location,
-                    TypeConversion, TypeErasure, DBEnv, Scoped,
+                    TypeConversion, TypeErasure, DBEnv, Scoped, Interfaces,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
                     lib/Bencode, lib/BV, lib/PersistentHashtbl
   BuildDepends:     unix,num,str

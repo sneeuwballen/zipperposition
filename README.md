@@ -69,7 +69,8 @@ Logtk provides several useful parts for logic-related implementations:
     - `Signature`: map from symbols to types
     - `Type`: polymorphic types (à la ML). Operations on types include:
         - `TypeUnif`: unification on types
-        - `TypeInference`: Hindley-Milner-like type inference algorithm. Converts untyped terms and formulas to typed terms and formulas
+        - `TypeInference`: Hindley-Milner-like type inference algorithm.
+                           Converts untyped terms and formulas to typed terms and formulas
         - `TypeErasure`: conversion from typed terms and formulas to basic ones
         - `TypeConversion`: converts between `Basic.Ty.t` and `Type.t`
     - `Precedence`: total order on symbols
@@ -103,6 +104,8 @@ Logtk provides several useful parts for logic-related implementations:
     - `PartialOrder`: matrix representation of partial orderings, with completion
     - `Options`: global CLI options to be used with `Arg` (set debug level, etc.)
     - `Location`: location within a file
+    - `Comparison`: partial order
+    - `Interfaces`: many useful module interfaces
     - `lib/MultiMap`: functional multimap
     - `lib/PersistentHashtbl`: persistent (immutable) hashtable
     - `lib/Sequence`: library of iterators

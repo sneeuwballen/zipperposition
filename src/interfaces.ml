@@ -1,3 +1,4 @@
+
 (*
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
@@ -23,45 +24,41 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Partial Ordering values} *)
+(** {1 Interfaces} *)
 
-type t = Lt | Eq | Gt | Incomparable
-  (** partial order *)
-
-type comparison = t
-
-let to_string = function
-  | Lt -> "=<="
-  | Gt -> "=>="
-  | Eq -> "==="
-  | Incomparable -> "=?="
-
-let combine cmp1 cmp2 = match cmp1, cmp2 with
-  | Eq, Eq
-  | Eq, Incomparable | Incomparable, Eq -> Eq
-  | Lt, Incomparable | Incomparable, Lt -> Lt
-  | Gt, Incomparable | Incomparable, Gt -> Gt
-  | Incomparable, Incomparable -> Incomparable
-  | _ ->
-    raise (Invalid_argument "inconsistent comparisons") (* not compatible *)
-
-let opp cmp = match cmp with
-  | Eq | Incomparable -> cmp
-  | Lt -> Gt
-  | Gt -> Lt
-
-let to_total ord = match ord with
-  | Lt -> -1
-  | Gt -> 1
-  | Eq | Incomparable -> 0
-
-let of_total ord = match ord with
-  | 0 -> Eq
-  | x when x > 0 -> Gt
-  | _ -> Lt
-
-module type PARTIAL_ORD = sig
+module type EQ = sig
   type t
+  val eq : t -> t -> bool
+end
 
-  val partial_cmp : t -> t -> comparison
+module type HASH = sig
+  include EQ
+  val hash : t -> int
+end
+
+module type ORD = sig
+  type t
+  val cmp : t -> t -> int
+end
+
+module type PRINT = sig
+  type t
+  val pp : Buffer.t -> t -> unit
+  val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
+end
+
+module type ITER = sig
+  type 'a t
+
+  val to_seq : 'a t -> 'a Sequence.t
+  val of_seq : ?init:'a t -> 'a Sequence.t -> 'a t
+  val to_list : 'a t -> 'a list
+  val of_list : ?init:'a t -> 'a list -> 'a t
+end
+
+module type SERIALIZABLE = sig
+  type t
+  
+  val bij : t Bij.t
 end

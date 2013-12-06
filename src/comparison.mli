@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type t = Lt | Eq | Gt | Incomparable
   (** partial order *)
 
+type comparison = t
+
 val to_string : t -> string
   (** Infix Representation *)
 
@@ -46,3 +48,9 @@ val to_total : t -> int
 
 val of_total : int -> t
   (** Conversion from a total order *)
+
+module type PARTIAL_ORD = sig
+  type t
+
+  val partial_cmp : t -> t -> comparison
+end

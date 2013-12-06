@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: d8047812845feefcde1f92cca3c86989)
+# DO NOT EDIT (digest: 529fc9342d40366ba8b5a0c635b26905)
 HO
 FO
 Symbol
@@ -50,6 +50,7 @@ TypeConversion
 TypeErasure
 DBEnv
 Scoped
+Interfaces
 lib/Sequence
 lib/Bij
 lib/Cache
