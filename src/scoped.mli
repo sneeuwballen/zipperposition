@@ -172,3 +172,11 @@ end
 (** {2 Functor} *)
 
 module Make(Sym : SYMBOL) : S with module Sym = Sym
+
+(* TODO: MakeHashconsed, with same interface *)
+
+(* TODO: module Named, for the named-variable pendant of this (with scoping
+  operation to convert back-and-forth) *)
+
+(* TODO: path-selection operation (for handling general-data in TPTP), see
+        XSLT or CSS *)
