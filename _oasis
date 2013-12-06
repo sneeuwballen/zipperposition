@@ -33,12 +33,13 @@ Library "logtk"
   Modules:          HO, FO, Symbol, Hash, Hashcons, FOTerm, HOTerm, FOFormula,
                     Util, FOUnif, HOUnif, Type, Substs, Signature, TypeInference, 
                     Lex_tptp, Ast_tptp, Parse_tptp, Lambda, Multiset,
+                    ScopedTerm,
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
                     Trace_tstp, CallProver, Congruence, TypeUnif, Options,
                     Basic, Monad, FastFingerprint, Evaluator, Location,
-                    TypeConversion, TypeErasure, DBEnv, Scoped, Interfaces,
+                    TypeConversion, TypeErasure, DBEnv, Interfaces,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
                     lib/Bencode, lib/BV, lib/PersistentHashtbl
   BuildDepends:     unix,num,str

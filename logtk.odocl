@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: abc318379a5a409321bf3d7e5098de1e)
+# DO NOT EDIT (digest: c8bbc056f80fc75c87c4b51f559aa281)
 src/HO
 src/FO
 src/Symbol
@@ -20,6 +20,7 @@ src/Ast_tptp
 src/Parse_tptp
 src/Lambda
 src/Multiset
+src/ScopedTerm
 src/Comparison
 src/PartialOrder
 src/Precedence
@@ -49,7 +50,6 @@ src/Location
 src/TypeConversion
 src/TypeErasure
 src/DBEnv
-src/Scoped
 src/Interfaces
 src/lib/Sequence
 src/lib/Bij

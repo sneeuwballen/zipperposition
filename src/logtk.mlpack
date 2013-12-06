@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 529fc9342d40366ba8b5a0c635b26905)
+# DO NOT EDIT (digest: 1f29fea05e9c083619a1601b80ceb11e)
 HO
 FO
 Symbol
@@ -20,6 +20,7 @@ Ast_tptp
 Parse_tptp
 Lambda
 Multiset
+ScopedTerm
 Comparison
 PartialOrder
 Precedence
@@ -49,7 +50,6 @@ Location
 TypeConversion
 TypeErasure
 DBEnv
-Scoped
 Interfaces
 lib/Sequence
 lib/Bij

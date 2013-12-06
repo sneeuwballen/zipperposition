@@ -35,12 +35,21 @@ module type SYMBOL = sig
   include Interfaces.SERIALIZABLE with type t := t
 end
 
+module type DATA = sig
+  type t
+
+  val create : unit -> t
+  val copy : t -> t
+end
+
 (** {2 Signature of a Term Representation}
 
 Terms are optionally typed (in which case types are terms) *)
 
 module type S = sig
   module Sym : SYMBOL
+
+  module Data : DATA
 
   type t
     (** Abstract type of term *)
@@ -60,9 +69,14 @@ module type S = sig
   val ty : t -> t option
     (** Type of the term, if present *)
 
-  val eq : t -> t -> bool
-  val hash : t -> int
-  val cmp : t -> t -> int
+  val data : t -> Data.t
+    (** Additional data for the term (unique to the term) *)
+
+  val set_data : t -> Data.t -> unit
+    (** Change data associated with the term *)
+
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
 
   (** {3 Bool flags} *)
 
@@ -162,22 +176,19 @@ module type S = sig
 
   (** {3 IO} *)
 
-  val pp : Buffer.t -> t -> unit
-  val to_string : t -> string
-  val fmt : Format.formatter -> t -> unit
+  include Interfaces.PRINT with type t := t
+
+  (* TODO include Interfaces.SERIALIZABLE with type t := t *)
 end
 
 (** {2 Functor} *)
 
-module Make(Sym : SYMBOL) = struct
-  module Sym = Sym
+module type BASE_TERM = sig
+  module Sym : SYMBOL
+  module Data : DATA
 
   (* term *)
-  type t = {
-    term : view;
-    ty : t option;
-    mutable flags : int;
-  }
+  type t
 
   (* head form *)
   and view =
@@ -189,71 +200,23 @@ module Make(Sym : SYMBOL) = struct
 
   type term = t
 
-  let view t = t.term
-  let ty t = t.ty
+  val view : t -> view
+  val ty : t -> t option
 
-  let rec hash t =
-    let h = match view t with
-    | Var i -> i
-    | BVar i -> Hash.combine 11 i
-    | Bind (s, t') -> Hash.combine (Sym.hash s) (hash t')
-    | Const s -> Sym.hash s
-    | App (f, l) ->
-      Hash.hash_list hash (hash f) l
-    in
-    _hash_ty h t
-  and _hash_ty h t = match t.ty with
-    | None -> h
-    | Some ty -> Hash.combine h (hash ty)
+  val eq : t -> t -> bool
+  val hash : t -> int
+  val cmp : t -> t -> int
 
-  let rec eq t1 t2 =
-    _eq_ty t1 t2 &&
-    match view t1, view t2 with
-    | Var i, Var j
-    | BVar i, BVar j -> i = j
-    | Const s1, Const s2 -> Sym.eq s1 s2
-    | Bind (s1, t1'), Bind (s2, t2') ->
-      Sym.eq s1 s2 && eq t1' t2'
-    | App (f1, l1), App (f2, l2) ->
-      eq f1 f2 && _eq_list l1 l2
-    | _ -> false
-  and _eq_ty t1 t2 = match ty t1, ty t2 with
-    | None, None -> true
-    | Some ty1, Some ty2 -> eq ty1 ty2
-    | None, Some _
-    | Some _, None -> false
-  and _eq_list l1 l2 = match l1, l2 with
-    | [], [] -> true
-    | [], _
-    | _, [] -> false
-    | t1::l1', t2::l2' -> eq t1 t2 && _eq_list l1' l2'
+  val const : ?ty:t -> Sym.t -> t
+  val app : ?ty:t -> t -> t list -> t
+  val bind : ?ty:t -> Sym.t -> t -> t
+  val var : ?ty:t -> int -> t
+  val bvar : ?ty:t -> int -> t
+end
 
-  let cmp t1 t2 = failwith "Scoped.cmp: not implemented"
-
-  let _flag_gen = Util.Flag.create ()
-  let new_flag () = Util.Flag.get_new _flag_gen
-  let set_flag t flag truth =
-    if truth
-      then t.flags <- t.flags lor flag
-      else t.flags <- t.flags land (lnot flag)
-  let get_flag t flag = (t.flags land flag) != 0
-  let flags t = t.flags
-
-  (** {3 Constructors} *)
-
-  let const ?ty s = { term=Const s; ty; flags=0; }
-
-  let rec app ?ty f l =
-    match f.term, l with
-    | _, [] -> {f with ty; }
-    | App (f', l'), _ -> app ?ty f' (l' @ l)
-    | _ -> {term=App (f, l); ty; flags=0;}
-
-  let var ?ty i = {term=Var i; ty; flags=0; }
-
-  let bvar ?ty i = {term=BVar i; ty; flags=0; }
-
-  let bind ?ty s t' = {term=Bind (s,t'); ty; flags=0; }
+(* common code for hashconsed and non-hashconsed terms *)
+module Common(T : BASE_TERM) = struct
+  open T
 
   let is_var t = match view t with | Var _ -> true | _ -> false
   let is_bvar t = match view t with | BVar _ -> true | _ -> false
@@ -461,7 +424,7 @@ module Make(Sym : SYMBOL) = struct
 
   (* [replace t ~old ~by] syntactically replaces all occurrences of [old]
       in [t] by the term [by]. *)
-  let rec replace t ~old ~by = match t.term with
+  let rec replace t ~old ~by = match view t with
     | _ when eq t old -> by
     | Var _ | BVar _ | Const _ -> t
     | Bind (s, t') ->
@@ -534,3 +497,217 @@ module Make(Sym : SYMBOL) = struct
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
 end
 
+module Base(Sym : SYMBOL)(Data : DATA) = struct
+  module Sym = Sym
+  module Data = Data
+
+  (* term *)
+  type t = {
+    term : view;
+    ty : t option;
+    mutable data : Data.t;
+    mutable flags : int;
+  }
+  (* head form *)
+  and view =
+    | Var of int
+    | BVar of int
+    | Bind of Sym.t * t
+    | Const of Sym.t
+    | App of t * t list
+  type term = t
+
+  let view t = t.term
+  let ty t = t.ty
+  let data t = t.data
+  let set_data t data = t.data <- data
+
+  let rec hash t =
+    let h = match view t with
+    | Var i -> i
+    | BVar i -> Hash.combine 11 i
+    | Bind (s, t') -> Hash.combine (Sym.hash s) (hash t')
+    | Const s -> Sym.hash s
+    | App (f, l) ->
+      Hash.hash_list hash (hash f) l
+    in
+    _hash_ty h t
+  and _hash_ty h t = match t.ty with
+    | None -> h
+    | Some ty -> Hash.combine h (hash ty)
+
+  let rec eq t1 t2 =
+    _eq_ty t1 t2 &&
+    match view t1, view t2 with
+    | Var i, Var j
+    | BVar i, BVar j -> i = j
+    | Const s1, Const s2 -> Sym.eq s1 s2
+    | Bind (s1, t1'), Bind (s2, t2') ->
+      Sym.eq s1 s2 && eq t1' t2'
+    | App (f1, l1), App (f2, l2) ->
+      eq f1 f2 && _eq_list l1 l2
+    | _ -> false
+  and _eq_ty t1 t2 = match ty t1, ty t2 with
+    | None, None -> true
+    | Some ty1, Some ty2 -> eq ty1 ty2
+    | None, Some _
+    | Some _, None -> false
+  and _eq_list l1 l2 = match l1, l2 with
+    | [], [] -> true
+    | [], _
+    | _, [] -> false
+    | t1::l1', t2::l2' -> eq t1 t2 && _eq_list l1' l2'
+
+  let cmp t1 t2 = failwith "Scoped.cmp: not implemented"
+
+  let _flag_gen = Util.Flag.create ()
+  let new_flag () = Util.Flag.get_new _flag_gen
+  let set_flag t flag truth =
+    if truth
+      then t.flags <- t.flags lor flag
+      else t.flags <- t.flags land (lnot flag)
+  let get_flag t flag = (t.flags land flag) != 0
+  let flags t = t.flags
+
+  (** {3 Constructors} *)
+
+  let const ?ty s = { term=Const s; ty; flags=0; data=Data.create(); }
+
+  let rec app ?ty f l =
+    match f.term, l with
+    | _, [] -> {f with ty; }
+    | App (f', l'), _ -> app ?ty f' (l' @ l)
+    | _ -> {term=App (f, l); ty; flags=0; data=Data.create(); }
+
+  let var ?ty i = {term=Var i; ty; flags=0; data=Data.create(); }
+
+  let bvar ?ty i = {term=BVar i; ty; flags=0; data=Data.create(); }
+
+  let bind ?ty s t' = {term=Bind (s,t'); ty; flags=0; data=Data.create(); }
+end
+
+module BaseHashconsed(Sym : SYMBOL)(Data : DATA) = struct
+  module Sym = Sym
+  module Data = Data
+
+  (* term *)
+  type t = {
+    term : view;
+    ty : t option;
+    mutable id : int;
+    mutable data : Data.t;
+    mutable flags : int;
+  }
+  (* head form *)
+  and view =
+    | Var of int
+    | BVar of int
+    | Bind of Sym.t * t
+    | Const of Sym.t
+    | App of t * t list
+  type term = t
+
+  let view t = t.term
+  let ty t = t.ty
+  let data t = t.data
+  let set_data t data = t.data <- data
+
+  let hash t = t.id
+  let eq t1 t2 = t1 == t2
+  let cmp t1 t2 = t1.id - t2.id
+
+  let _hash_ty h t = match t.ty with
+    | None -> h
+    | Some ty -> Hash.combine h (hash ty)
+  let _hash_norec t =
+    let h = match view t with
+    | Var i -> i
+    | BVar i -> Hash.combine 11 i
+    | Bind (s, t') -> Hash.combine (Sym.hash s) (hash t')
+    | Const s -> Sym.hash s
+    | App (f, l) ->
+      Hash.hash_list hash (hash f) l
+    in
+    _hash_ty h t
+
+  let rec _eq_norec t1 t2 =
+    _eq_ty t1 t2 &&
+    match view t1, view t2 with
+    | Var i, Var j
+    | BVar i, BVar j -> i = j
+    | Const s1, Const s2 -> Sym.eq s1 s2
+    | Bind (s1, t1'), Bind (s2, t2') ->
+      Sym.eq s1 s2 && eq t1' t2'
+    | App (f1, l1), App (f2, l2) ->
+      eq f1 f2 && _eq_list l1 l2
+    | _ -> false
+  and _eq_ty t1 t2 = match ty t1, ty t2 with
+    | None, None -> true
+    | Some ty1, Some ty2 -> eq ty1 ty2
+    | None, Some _
+    | Some _, None -> false
+  and _eq_list l1 l2 = match l1, l2 with
+    | [], [] -> true
+    | [], _
+    | _, [] -> false
+    | t1::l1', t2::l2' -> eq t1 t2 && _eq_list l1' l2'
+
+  let _flag_gen = Util.Flag.create ()
+  let new_flag () = Util.Flag.get_new _flag_gen
+  let set_flag t flag truth =
+    if truth
+      then t.flags <- t.flags lor flag
+      else t.flags <- t.flags land (lnot flag)
+  let get_flag t flag = (t.flags land flag) != 0
+  let flags t = t.flags
+
+  (** {3 Constructors} *)
+
+  module H = Hashcons.Make(struct
+    type t = term
+    let equal = _eq_norec
+    let hash = _hash_norec
+    let tag i t = assert (t.id = ~-1); t.id <- i
+  end)
+
+  let const ?ty s =
+    H.hashcons { term=Const s; id= ~-1; ty; flags=0; data=Data.create(); }
+
+  let rec app ?ty f l =
+    match f.term, l with
+    | _, [] -> {f with ty; }
+    | App (f', l'), _ -> app ?ty f' (l' @ l)
+    | _ ->
+      H.hashcons {term=App (f, l); id= ~-1; ty; flags=0; data=Data.create(); }
+
+  let var ?ty i =
+    H.hashcons {term=Var i; id= ~-1; ty; flags=0; data=Data.create(); }
+
+  let bvar ?ty i =
+    H.hashcons {term=BVar i; id= ~-1; ty; flags=0; data=Data.create(); }
+
+  let bind ?ty s t' =
+    H.hashcons {term=Bind (s,t'); id= ~-1; ty; flags=0; data=Data.create(); }
+end
+
+module UnitData = struct
+  type t = unit
+  let create() = ()
+  let copy()=()
+end
+
+module MakeData(Sym : SYMBOL)(Data : DATA) = struct
+  module B = Base(Sym)(Data)
+  include B
+  include Common(B)
+end
+
+module Make(Sym : SYMBOL) = MakeData(Sym)(UnitData)
+
+module MakeHashconsedData(Sym : SYMBOL)(Data : DATA) = struct
+  module B = BaseHashconsed(Sym)(Data)
+  include B
+  include Common(B)
+end
+
+module MakeHashconsed(Sym : SYMBOL) = MakeHashconsedData(Sym)(UnitData)

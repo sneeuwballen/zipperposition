@@ -35,12 +35,21 @@ module type SYMBOL = sig
   include Interfaces.SERIALIZABLE with type t := t
 end
 
+module type DATA = sig
+  type t
+
+  val create : unit -> t
+  val copy : t -> t
+end
+
 (** {2 Signature of a Term Representation}
 
 Terms are optionally typed (in which case types are terms) *)
 
 module type S = sig
   module Sym : SYMBOL
+
+  module Data : DATA
 
   type t
     (** Abstract type of term *)
@@ -59,6 +68,12 @@ module type S = sig
 
   val ty : t -> t option
     (** Type of the term, if present *)
+
+  val data : t -> Data.t
+    (** Additional data for the term (unique to the term) *)
+
+  val set_data : t -> Data.t -> unit
+    (** Change data associated with the term *)
 
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
@@ -166,14 +181,28 @@ module type S = sig
   (* TODO include Interfaces.SERIALIZABLE with type t := t *)
 end
 
-(** {2 Functor} *)
+(** {2 Functors} *)
 
-module Make(Sym : SYMBOL) : S with module Sym = Sym
+module UnitData : DATA with type t = unit
+  (** Ignore data (trivial data) *)
 
-(* TODO: MakeHashconsed, with same interface *)
+module Make(Sym : SYMBOL) :
+  S with module Sym = Sym and module Data = UnitData
 
-(* TODO: module Named, for the named-variable pendant of this (with scoping
-  operation to convert back-and-forth) *)
+module MakeHashconsed(Sym : SYMBOL) :
+  S with module Sym = Sym and module Data = UnitData
+
+module MakeData(Sym : SYMBOL)(Data : DATA) :
+  S with module Sym = Sym and module Data = Data
+
+module MakeHashconsedData(Sym : SYMBOL)(Data : DATA) :
+  S with module Sym = Sym and module Data = Data
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)
+
+(* TODO: functor for scoping operation (and inverse) between
+        ScopedTerm and NamedTerm *)
+
+(* TODO: functor for translating terms with a type of symbol to terms with
+          another type of symbol *)
