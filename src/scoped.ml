@@ -29,12 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module type SYMBOL = sig
   type t
 
-  val eq : t -> t -> bool
-  val hash : t -> int
-  val cmp : t -> t -> int
-
-  val pp : Buffer.t -> t -> unit
-  val bij : t Bij.t
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
+  include Interfaces.PRINT with type t := t
+  include Interfaces.SERIALIZABLE with type t := t
 end
 
 (** {2 Signature of a Term Representation}

@@ -62,3 +62,15 @@ module type SERIALIZABLE = sig
   
   val bij : t Bij.t
 end
+
+module type MONOID = sig
+  type t
+
+  val zero : t
+  val plus : t -> t -> t
+end
+
+module type GROUP = sig
+  include MONOID
+  val inverse : t -> t
+end
