@@ -25,163 +25,377 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Symbols} *)
 
-(** A symbol of TPTP *)
-type t =
-  | Const of string * const_info
+type view =
+  | Const of string
   | Int of Big_int.big_int
   | Rat of Ratio.ratio
   | Real of float
-and const_info = {
-  mutable tag : int;
-  mutable flags : int;
-  ty : Type.t;
-} (** Additional information for hashconsed symbols *)
 
-type symbol = t
+exception TypeMismatch of string
+  (** This exception is raised when Arith functions are called
+      on non-numeric values (Const). *)
 
-(** {2 Boolean flags} *)
+(** {2 Main Signature} *)
 
-type flag = int
+module type S = sig
+  type t
 
-let flag_skolem = 1 lsl 0
-let flag_split = 1 lsl 1
-let flag_binder = 1 lsl 2
-let flag_infix = 1 lsl 3
-let flag_ac = 1 lsl 4
-let flag_multiset = 1 lsl 5
-let flag_fresh_const = 1 lsl 6
-let flag_commut = 1 lsl 7
-let flag_distinct = 1 lsl 8
-let flag_ad_hoc_poly = 1 lsl 9
+  val view : t -> view
 
-let flags s = match s with
-  | Const (_, info) -> info.flags
-  | Int _
-  | Rat _
-  | Real _ -> 0
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
+  include Interfaces.PRINT with type t := t
+  include Interfaces.SERIALIZABLE with type t := t
 
-let has_flag flag s = (flags s land flag) <> 0
-let add_flag flag s = match s with
-  | Const (_, info) -> info.flags <- info.flags lor flag
-  | _ -> failwith "cannot add_flag to numeric symbol"
+  module Map : Sequence.Map.S with type key = t
+  module Set : Sequence.Set.S with type elt = t
+  module Tbl : Hashtbl.S with type key = t
 
-(** Hashconsing *)
+  val mk_const : string -> t
+  val mk_distinct : string -> t
+  val mk_bigint : Big_int.big_int -> t
+  val mk_int : int -> t
+  val mk_ratio : Ratio.ratio -> t
+  val mk_rat : int -> int -> t
+  val mk_real : float -> t
+  val parse_num : string -> t
 
-let eq_base s1 s2 = match s1, s2 with
-  | Const (s1,i1), Const (s2, i2) -> s1 = s2 && Type.eq i1.ty i2.ty
-  | Int n1, Int n2 -> Big_int.eq_big_int n1 n2
-  | Rat n1, Rat n2 -> Ratio.eq_ratio n1 n2
-  | Real f1, Real f2 -> f1 = f2
-  | _ -> false
+  val is_const : t -> bool
+  val is_distinct : t -> bool
+  val is_int : t -> bool
+  val is_rat : t -> bool
+  val is_real : t -> bool
+  val is_numeric : t -> bool  (* any of the 3 above *)
 
-let hash_base s = match s with
-  | Const (s, i) -> Hash.combine (Hash.hash_string s) (Type.hash i.ty)
-  | Int n -> Hashtbl.hash n
-  | Rat n -> Hashtbl.hash n
-  | Real f -> Hashtbl.hash f
+  val ty : t -> [`Int | `Rat | `Real | `Other]
+end
 
-module H = Hashcons.Make(struct
-  type t = symbol
-  let equal s1 s2 = eq_base s1 s2
-  let hash s = hash_base s
-  let tag i s = match s with
-    | Const (s, info) -> info.tag <- i
-    | _ -> ()
-end)
+module Basic = struct
+  type t = view
+  type sym = t
 
-(** {2 Basic operations} *)
+  let view s = s
 
-let compare s1 s2 =
-  let __to_int = function
-    | Int _ -> 1
-    | Rat _ -> 2
-    | Real _ -> 3
-    | Const _ -> 4  (* const are bigger! *)
-  in
-  match s1, s2 with
-  | Const (_, info1), Const (_, info2) -> info1.tag - info2.tag
-  | Int n1, Int n2 -> Big_int.compare_big_int n1 n2
-  | Rat n1, Rat n2 -> Ratio.compare_ratio n1 n2
-  | Real f1, Real f2 -> Pervasives.compare f1 f2
-  | _, _ -> __to_int s1 - __to_int s2
+  let cmp s1 s2 =
+    let __to_int = function
+      | Int _ -> 1
+      | Rat _ -> 2
+      | Real _ -> 3
+      | Const _ -> 4  (* const are bigger! *)
+    in
+    match s1, s2 with
+    | Const s1, Const s2 -> String.compare s1 s2
+    | Int n1, Int n2 -> Big_int.compare_big_int n1 n2
+    | Rat n1, Rat n2 -> Ratio.compare_ratio n1 n2
+    | Real f1, Real f2 -> Pervasives.compare f1 f2
+    | _, _ -> __to_int s1 - __to_int s2
 
-let eq a b = compare a b = 0
+  let eq a b = cmp a b = 0
 
-let hash s = match s with
-  | Const (_, info) -> info.tag
-  | Int n -> Hash.hash_string (Big_int.string_of_big_int n)
-  | Rat n -> Hash.hash_string (Ratio.string_of_ratio n)
-  | Real f -> int_of_float f
+  let hash s = match s with
+    | Const s -> Hash.hash_string s
+    | Int n -> Hash.hash_string (Big_int.string_of_big_int n)
+    | Rat n -> Hash.hash_string (Ratio.string_of_ratio n)
+    | Real f -> int_of_float f
 
-let mk_const ?(flags=0) ~ty s =
-  begin match Type.free_vars ty with
-    | [] -> ()
-    | _::_ ->
-      let msg = Util.sprintf "Symbol.mk_const (%s): type %a has free variables" s Type.pp ty in
-      raise (Type.Error msg)
-  end;
-  let info = { tag= ~-1; flags; ty; } in
-  let symb = Const (s, info) in
-  let symb' = H.hashcons symb in
-  if symb' == symb then begin
-    (* check syntactically whether it's a distinct symbol or not *)
-    let is_distinct = s <> "" &&  s.[0] = '"' && s.[String.length s - 1] = '"' in
-    if is_distinct then add_flag flag_distinct symb';
-    end;
-  symb'
+  let mk_const s = Const s
 
-let mk_distinct ?(flags=0) ?(ty=Type.i) s =
-  let flags = flags lor flag_distinct in
-  mk_const ~flags ~ty s
+  let mk_distinct s = Const s
 
-let mk_bigint i = Int i
+  let mk_bigint i = Int i
 
-let mk_int i = Int (Big_int.big_int_of_int i)
+  let mk_int i = Int (Big_int.big_int_of_int i)
 
-let mk_ratio rat = Rat rat
+  let mk_ratio rat = Rat rat
 
-let mk_rat i j =
-  Rat (Ratio.create_ratio (Big_int.big_int_of_int i) (Big_int.big_int_of_int j))
+  let mk_rat i j =
+    Rat (Ratio.create_ratio (Big_int.big_int_of_int i) (Big_int.big_int_of_int j))
 
-let mk_real f = Real f
+  let mk_real f = Real f
 
-let parse_num str =
-  let n = Num.num_of_string str in
-  if Num.is_integer_num n
-    then Int (Num.big_int_of_num n)
-    else Rat (Num.ratio_of_num n)
+  let parse_num str =
+    let n = Num.num_of_string str in
+    if Num.is_integer_num n
+      then Int (Num.big_int_of_num n)
+      else Rat (Num.ratio_of_num n)
 
-let of_basic ?(ty=Type.i) s = match s with
-  | Basic.Sym.Int n -> mk_bigint n
-  | Basic.Sym.Rat n -> mk_ratio n
-  | Basic.Sym.Real n -> mk_real n
-  | Basic.Sym.Const s -> mk_const ~ty s
+  module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
+  module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
+  module Tbl = Hashtbl.Make(struct type t = sym let equal = eq let hash = hash end)
 
-let to_basic = function
-  | Int n -> Basic.Sym.mk_bigint n
-  | Rat n -> Basic.Sym.mk_ratio n
-  | Real n -> Basic.Sym.mk_real n
-  | Const (s,_) -> Basic.Sym.mk_const s
+  let is_const = function | Const _ -> true | _ -> false
+  let is_int = function | Int _ -> true | _ -> false
+  let is_rat = function | Rat _ -> true | _ -> false
+  let is_real = function | Real _ -> true | _ -> false
+  let is_numeric = function | Int _ | Rat _ | Real _ -> true | _ -> false
 
-let is_const s = match s with
-  | Const _ -> true | _ -> false
+  let is_distinct s = match s with
+    | Const s -> s <> "" &&  s.[0] = '"' && s.[String.length s - 1] = '"'
+    | _ -> false
 
-let is_int s = match s with
-  | Int _ -> true | _ -> false
+  let to_string s = match s with
+    | Const s -> s
+    | Int n -> Big_int.string_of_big_int n
+    | Rat n -> Ratio.string_of_ratio n
+    | Real f -> string_of_float f
 
-let is_rat s = match s with
-  | Int _
-  | Rat _ -> true
-  | _ -> false
+  let pp buf s = Buffer.add_string buf (to_string s)
 
-let is_real s = match s with
-  | Real f -> true | _ -> false
+  let fmt fmt s = Format.pp_print_string fmt (to_string s)
 
-let is_numeric s = match s with
-  | Real _ | Int _ | Rat _ -> true | _ -> false
+  let bij = Bij.switch
+    ~inject:(function
+      | Const s -> "const", Bij.(BranchTo (string_, s))
+      | Int n -> "int", Bij.(BranchTo (string_, Big_int.string_of_big_int n))
+      | Rat n -> "rat", Bij.(BranchTo (string_, Ratio.string_of_ratio n))
+      | Real f -> "real", Bij.(BranchTo (float_, f)))
+    ~extract:(fun c -> match c with
+      | "const" -> Bij.(BranchFrom (string_, fun s -> mk_const s))
+      | "int" -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
+      | "rat" -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
+      | "real" -> Bij.(BranchFrom (float_, mk_real))
+      | c -> raise (Bij.DecodingError "expected symbol"))
 
-let is_distinct s = match s with
-  | Const _ -> has_flag flag_distinct s | _ -> false
+  let ty = function
+    | Int _ -> `Int
+    | Rat _ -> `Rat
+    | Real _ -> `Real
+    | Const _ -> `Other
+end
+
+module MakeHashconsed(X: sig end) = struct
+  type const_info = {
+    mutable tag : int;
+    mutable flags : int;
+  } (** Additional information for hashconsed symbols *)
+
+  type t =
+    | HConst of string * const_info
+    | HInt of Big_int.big_int
+    | HRat of Ratio.ratio
+    | HReal of float
+
+  type sym = t
+
+  let view t = match t with
+    | HConst (s, _) -> Const s
+    | HInt n -> Int n
+    | HRat n -> Rat n
+    | HReal n -> Real n
+
+  (** {2 Boolean flags} *)
+
+  type flag = int
+  let new_flag =
+    let gen = Util.Flag.create () in
+    fun () -> Util.Flag.get_new gen
+
+  let flag_skolem = new_flag ()
+  let flag_binder = new_flag ()
+  let flag_infix = new_flag ()
+  let flag_ac = new_flag ()
+  let flag_multiset = new_flag ()
+  let flag_commut = new_flag ()
+  let flag_distinct = new_flag ()
+  let flag_ad_hoc_poly = new_flag ()
+
+  let flags s = match s with
+    | HConst (_, info) -> info.flags
+    | HInt _
+    | HRat _
+    | HReal _ -> 0
+
+  let has_flag flag s = (flags s land flag) <> 0
+  let add_flag flag s = match s with
+    | HConst (_, info) -> info.flags <- info.flags lor flag
+    | _ -> failwith "cannot add_flag to numeric symbol"
+
+  (** Hashconsing *)
+
+  let eq_base s1 s2 = match s1, s2 with
+    | HConst (s1,i1), HConst (s2, i2) -> s1 = s2
+    | HInt n1, HInt n2 -> Big_int.eq_big_int n1 n2
+    | HRat n1, HRat n2 -> Ratio.eq_ratio n1 n2
+    | HReal f1, HReal f2 -> f1 = f2
+    | _ -> false
+
+  let hash_base s = match s with
+    | HConst (s, i) -> Hash.hash_string s
+    | HInt n -> Hashtbl.hash n
+    | HRat n -> Hashtbl.hash n
+    | HReal f -> Hashtbl.hash f
+
+  module H = Hashcons.Make(struct
+    type t = sym
+    let equal s1 s2 = eq_base s1 s2
+    let hash s = hash_base s
+    let tag i s = match s with
+      | HConst (s, info) -> info.tag <- i
+      | _ -> ()
+  end)
+
+  (** {2 Basic operations} *)
+
+  let cmp s1 s2 =
+    let __to_int = function
+      | HInt _ -> 1
+      | HRat _ -> 2
+      | HReal _ -> 3
+      | HConst _ -> 4  (* const are bigger! *)
+    in
+    match s1, s2 with
+    | HConst (_, info1), HConst (_, info2) -> info1.tag - info2.tag
+    | HInt n1, HInt n2 -> Big_int.compare_big_int n1 n2
+    | HRat n1, HRat n2 -> Ratio.compare_ratio n1 n2
+    | HReal f1, HReal f2 -> Pervasives.compare f1 f2
+    | _, _ -> __to_int s1 - __to_int s2
+
+  let eq a b = cmp a b = 0
+
+  let hash s = match s with
+    | HConst (_, info) -> info.tag
+    | HInt n -> Hash.hash_string (Big_int.string_of_big_int n)
+    | HRat n -> Hash.hash_string (Ratio.string_of_ratio n)
+    | HReal f -> int_of_float f
+
+  module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
+  module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
+  module Tbl = Hashtbl.Make(struct type t = sym let equal = eq let hash = hash end)
+
+  let mk_const ?(flags=0) s =
+    let info = { tag= ~-1; flags; } in
+    let symb = HConst (s, info) in
+    let symb' = H.hashcons symb in
+    if symb' == symb then begin
+      (* check syntactically whether it's a distinct symbol or not *)
+      let is_distinct = s <> "" &&  s.[0] = '"' && s.[String.length s - 1] = '"' in
+      if is_distinct then add_flag flag_distinct symb';
+      end;
+    symb'
+
+  let mk_distinct ?(flags=0) s =
+    let flags = flags lor flag_distinct in
+    mk_const ~flags s
+
+  let mk_bigint i = HInt i
+
+  let mk_int i = HInt (Big_int.big_int_of_int i)
+
+  let mk_ratio rat = HRat rat
+
+  let mk_rat i j =
+    HRat (Ratio.create_ratio (Big_int.big_int_of_int i) (Big_int.big_int_of_int j))
+
+  let mk_real f = HReal f
+
+  let parse_num str =
+    let n = Num.num_of_string str in
+    if Num.is_integer_num n
+      then HInt (Num.big_int_of_num n)
+      else HRat (Num.ratio_of_num n)
+
+  let of_basic s = match s with
+    | Int n -> mk_bigint n
+    | Rat n -> mk_ratio n
+    | Real n -> mk_real n
+    | Const s -> mk_const s
+
+  let to_basic = view
+
+  let is_const s = match s with
+    | HConst _ -> true | _ -> false
+
+  let is_int s = match s with
+    | HInt _ -> true | _ -> false
+
+  let is_rat s = match s with
+    | HInt _
+    | HRat _ -> true
+    | _ -> false
+
+  let is_real s = match s with
+    | HReal f -> true | _ -> false
+
+  let is_numeric s = match s with
+    | HReal _ | HInt _ | HRat _ -> true | _ -> false
+
+  let is_distinct s = match s with
+    | HConst _ -> has_flag flag_distinct s | _ -> false
+
+  let ty = function
+    | HInt _ -> `Int
+    | HRat _ -> `Rat
+    | HReal _ -> `Real
+    | HConst _ -> `Other
+
+  let __printers = Hashtbl.create 5
+
+  let add_printer name pp =
+    if Hashtbl.mem __printers name then failwith ("printer " ^ name ^ " already present");
+    Hashtbl.add __printers name pp
+
+  let _pp buf s = match s with
+    | HConst (s, _) -> Buffer.add_string buf s
+    | HInt n -> Buffer.add_string buf (Big_int.string_of_big_int n)
+    | HRat n -> Buffer.add_string buf (Ratio.string_of_ratio n)
+    | HReal f -> Buffer.add_string buf (string_of_float f)
+
+  let () =
+    add_printer "debug" _pp
+
+  let __default_pp = ref _pp
+
+  let pp buf s = !__default_pp buf s
+  let to_string = Util.on_buffer pp
+
+  let print name buf s =
+    try (Hashtbl.find __printers name) buf s
+    with Not_found -> failwith ("unknown symbol printer: " ^ name)
+
+  let set_default_printer pp = __default_pp := pp
+end
+
+module TPTP(Symb : sig
+  include S
+  val declare_ac : t -> unit
+  val declare_commut : t -> unit
+  val declare_multiset : t -> unit
+  val declare_infix : t -> unit
+  val declare_ad_hoc_poly : t -> unit
+end) = struct
+  type t = Symb.t
+
+  let true_ = Symb.mk_const "$true"
+  let false_ = Symb.mk_const "$false"
+  let wildcard = Symb.mk_const "$_"
+  let and_ = Symb.mk_const "&"
+  let or_ = Symb.mk_const "|"
+  let imply = Symb.mk_const "=>"
+  let equiv = Symb.mk_const "<=>"
+  let xor = Symb.mk_const "<~>"
+  let not_ = Symb.mk_const "~"
+  let eq = Symb.mk_const "="
+  let neq = Symb.mk_const "!="
+  let forall = Symb.mk_const "!"
+  let exists = Symb.mk_const "?"
+
+  let () =
+    List.iter Symb.declare_ac [and_; or_];
+    List.iter Symb.declare_commut [eq; xor; equiv; neq; ];
+    List.iter Symb.declare_ad_hoc_poly [eq; neq; forall; exists];
+    List.iter Symb.declare_infix [and_; or_; imply; equiv; xor; eq; neq];
+    List.iter Symb.declare_multiset [and_; or_];
+    ()
+end
+
+exception TypeMismatch of string
+  (** This exception is raised when Arith functions are called
+      on non-numeric values (Const). *)
+
+module Arith(Symb : S) = struct
+
+
+end
 
 let ty s = match s with
   | Int _ -> Type.int
