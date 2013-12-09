@@ -178,7 +178,7 @@ module type S = sig
 
   include Interfaces.PRINT with type t := t
 
-  (* TODO include Interfaces.SERIALIZABLE with type t := t *)
+  include Interfaces.SERIALIZABLE with type t := t
 end
 
 (** {2 Functors} *)

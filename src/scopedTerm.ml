@@ -178,7 +178,7 @@ module type S = sig
 
   include Interfaces.PRINT with type t := t
 
-  (* TODO include Interfaces.SERIALIZABLE with type t := t *)
+  include Interfaces.SERIALIZABLE with type t := t
 end
 
 (** {2 Functor} *)
@@ -495,6 +495,30 @@ module Common(T : BASE_TERM) = struct
   let pp buf t = pp_depth 0 buf t
   let to_string t = Util.on_buffer pp t
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+  let bij =
+    let open Bij in
+    let (!!!) = Lazy.force in
+    fix
+      (fun bij ->
+        let bij_bind = lazy (triple (opt !!!bij) Sym.bij !!!bij) in
+        let bij_var = lazy (pair (opt !!!bij) int_) in
+        let bij_cst = lazy (pair (opt !!!bij) Sym.bij) in
+        let bij_at = lazy (triple (opt !!!bij) !!!bij (list_ !!!bij)) in
+        switch
+          ~inject:(fun t -> match view t with
+          | BVar i -> "bv", BranchTo (!!!bij_var, (ty t, i))
+          | Var i -> "v", BranchTo (!!!bij_var, (ty t, i))
+          | Const s -> "c", BranchTo (!!!bij_cst, (ty t, s))
+          | Bind (s, t') -> "bind", BranchTo (!!!bij_bind, (ty t, s, t'))
+          | App (t, l) -> "a", BranchTo (!!!bij_at, (ty t, t, l)))
+          ~extract:(function
+          | "bv" -> BranchFrom (!!!bij_var, fun (ty,i) -> bvar ?ty i)
+          | "v" -> BranchFrom (!!!bij_var, fun (ty,i) -> var ?ty i)
+          | "c" -> BranchFrom (!!!bij_cst, fun (ty,s) -> const ?ty s)
+          | "bind" -> BranchFrom (!!!bij_bind, fun (ty,s,t') -> bind ?ty s t')
+          | "a" -> BranchFrom (!!!bij_at, fun (ty, t, l) -> app ?ty t l)
+          | _ -> raise (DecodingError "expected Term")))
 end
 
 module Base(Sym : SYMBOL)(Data : DATA) = struct
