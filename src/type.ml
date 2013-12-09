@@ -25,9 +25,189 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Types} *)
 
-let prof_unify = Util.mk_profiler "Type.unify"
-let prof_variant = Util.mk_profiler "Type.variant"
+exception Error of string
+  (** Generic error on types. *)
 
+(** Base symbols for types *)
+module type BASE_SYMBOL = sig
+  type t
+
+  val arrow : t
+  val forall : t
+  val i : t
+  val o : t
+  val tType : t
+  val int : t
+  val rat : t
+  val real : t
+end
+
+module type S = sig
+  module T : ScopedTerm.S
+
+  module Base : BASE_SYMBOL with type t = T.Sym.t
+
+  type t = T.t
+
+  type ty = t
+
+  type view = private
+  | Var of int              (** Type variable *)
+  | BVar of int             (** Bound variable (De Bruijn index) *)
+  | App of T.Sym.t * t list (** parametrized type *)
+  | Fun of t * t list       (** Function type *)
+  | Forall of t             (** explicit quantification using De Bruijn index *)
+
+  val view : t -> view
+    (** Type-centric view of the head of this type.
+        @raise Invalid_argument if the argument is not a type. *)
+
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
+
+  val is_var : t -> bool
+  val is_bvar : t -> bool
+  val is_app : t -> bool
+  val is_fun : t -> bool
+  val is_forall : t -> bool
+
+  (** {2 Constructors} *)
+
+  val (<==) : t -> t list -> t
+    (** General function type. [x <== l] is the same as [x] if [l]
+        is empty. Invariant: the return type is never a function type. *)
+
+  val (<=.) : t -> t -> t
+    (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
+
+  val (@@) : string -> t list -> t
+    (** [s @@ args] applies the sort [s] to arguments [args]. *)
+
+  val var : int -> t
+    (** Build a type variable. The integer must be >= 0 *)
+
+  val app : string -> t list -> t
+    (** Parametrized type *)
+
+  val const : string -> t
+    (** Constant sort *)
+
+  val mk_fun : t -> t list -> t
+    (** Function type. The first argument is the return type.
+        see {!(<==)}. *)
+
+  val forall : t list -> t -> t
+    (** [forall vars ty] quantifies [ty] over [vars].
+        If [vars] is the empty list, returns [ty].
+        @raise Invalid_argument if some element of [vars] is not a variable *)
+
+  val __forall : t -> t
+    (** not documented. *)
+
+  (** {2 Basic types} *)
+
+  val i : t       (* individuals *)
+  val o : t       (* propositions *)
+  val int : t     (* ints *)
+  val rat : t     (* rational numbers *)
+  val real : t    (* real numbers *)
+  val tType : t   (* "type" of types *)
+
+  (** {2 Utils} *)
+
+  val free_vars_set : Set.t -> t -> Set.t
+    (** Add the free variables to the given set *)
+
+  val free_vars : t -> t list
+    (** List of free variables ({!Var}) that are not bound *)
+
+  val close_forall : t -> t
+    (** bind free variables *)
+
+  val arity : t -> int * int
+    (** Number of arguments the type expects.
+       If [arity ty] returns [a, b] that means that it
+       expects [a] arguments to be used as arguments of Forall, and
+       [b] arguments to be used for function application. *)
+
+  val expected_args : t -> t list
+    (** Types expected as function argument by [ty]. The length of the
+        list [expected_args ty] is the same as [snd (arity ty)]. *)
+
+  val is_ground : t -> bool
+    (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)
+
+  val size : t -> int
+    (** Size of type, in number of "nodes" *)
+
+  val apply : t -> t list -> t
+    (** Given a function/forall type, and a list of arguments, return the
+        type that results from applying the function/forall to the arguments.
+        No unification is done, types must check exactly.
+        @raise Error if the types do not match *)
+
+  (** {2 IO} *)
+
+  include Interfaces.PRINT with type t := t
+  include Interfaces.SERIALIZABLE with type t := t
+
+  (** {2 Misc} *)
+
+  val __var : int -> t
+    (** Escape hatch to generate fresh variables with negative indexes.
+        Use at your own risk... *)
+end
+
+module TPTP(S : sig type t val of_string : string -> t end) = struct
+  type t = S.t
+
+  let arrow = S.of_string ">"
+  let forall = S.of_string "!>"
+  let i = S.of_string "$i"
+  let o = S.of_string "$o"
+  let tType = S.of_string "$tType"
+  let int = S.of_string "$int"
+  let rat = S.of_string "$rat"
+  let real = S.of_string "$real"
+end
+
+module Make(T : ScopedTerm.S)(Base : BASE_SYMBOL with type t = T.Sym.t) = struct
+  module T = T
+  module Sym = T.Sym
+  module Base = Base
+
+  type t = T.t
+
+  type ty = t
+
+  type view = 
+  | Var of int              (** type variable *)
+  | BVar of int             (** Bound variable (De Bruijn index) *)
+  | App of Sym.t * t list   (** parametrized type *)
+  | Fun of t * t list       (** Function type *)
+  | Forall of t             (** explicit quantification *)
+
+  let view t = match T.view t with
+    | T.Var i -> Var i
+    | T.BVar i -> BVar i
+    | T.Bind (s, t') when Sym.eq s Base.forall ->
+      Forall t'
+    | T.App (head, (t'::l') as l) ->
+      begin match T.view l with
+      | T.Const s when Sym.eq s Base.arrow -> Fun (t', l')
+      | T.Const s -> App (s, l)
+      | _ -> raise (Invalid_argument "Type.view")
+      end
+    | _ -> raise (Invalid_argument "Type.view")
+
+  let hash = T.hash
+  let eq = T.eq
+  let cmp = T.cmp
+
+
+end
+
+(*
 (** {2 Main Type representation} *)
 
 type t = {
@@ -405,3 +585,4 @@ let bij =
 
 let __var i =
   H.hashcons {ty=Var i; id= ~-1; ground=false; }
+*)
