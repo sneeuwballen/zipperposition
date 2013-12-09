@@ -204,6 +204,19 @@ let normalize_wrt_zero m =
   | S.Real _ -> m
   | _ -> failwith "Monome.normalize_wrt_zero"
 
+let split m =
+  let const1, const2 = if S.Arith.sign m.const >= 0
+    then m.const, S.Arith.zero_of_ty (ty m)
+    else S.Arith.zero_of_ty (ty m), m.const
+  in
+  let terms1, terms2 =
+    List.partition
+      (fun (coeff,t) -> S.Arith.sign coeff > 0)
+      m.terms in
+  let m1 = {terms=terms1; const=const1; } in
+  let m2 = {terms=terms2; const=const2; } in
+  m1, uminus m2
+
 exception NotLinear
 
 let of_term t =

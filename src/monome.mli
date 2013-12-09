@@ -106,6 +106,12 @@ val normalize_wrt_zero : t -> t
       that the monome is equal to (or compared with) zero.
       For integer monomes, the result will have co-prime coefficients. *)
 
+val split : t -> t * t
+  (** [split m] splits into a monome with positive coefficients, and one
+      with negative coefficients.
+      @return [m1, m2] such that [m = m1 - m2] and [m1,m2] both have positive
+        coefficients *)
+
 exception NotLinear
   
 val of_term : FOTerm.t -> t
