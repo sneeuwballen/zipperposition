@@ -41,11 +41,20 @@ module type ORD = sig
   val cmp : t -> t -> int
 end
 
+(** Print a type t *)
 module type PRINT = sig
   type t
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
   val fmt : Format.formatter -> t -> unit
+end
+
+(** Register printers by name *)
+module type PRINT_OVERLOAD = sig
+  type t
+  val pp_with : string -> Buffer.t -> t -> unit
+  val add_printer : string -> (Buffer.t -> t -> unit) -> unit
+  val set_default_printer : string -> unit   (** Used by PRINT.pp... *)
 end
 
 module type ITER = sig
