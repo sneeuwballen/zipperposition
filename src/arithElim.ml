@@ -34,6 +34,7 @@ module T = FOTerm
 module F = FOFormula
 module C = Clause
 module I = ProofState.TermIndex
+module M = Monome
 module PF = PFormula
 module TO = Theories.TotalOrder
 module Lit = Literal
@@ -102,31 +103,12 @@ let factor_arith c =
   Lits.fold_lits ~eligible c.C.hclits []
     (fun acc lit i ->
       try
-        let elit = Arith.Lit.Extracted.extract lit in
-        let substs = Arith.Lit.Extracted.factor elit in
+        let elit = Arith.Lit.Canonical.extract lit in
+        let substs = Arith.Lit.Canonical.factor elit in
         List.fold_left
           (fun acc subst -> mk_instance subst :: acc)
           acc substs
-      with Monome.NotLinear _ -> acc)
-
-let pivot_arith c =
-  let ctx = c.C.hcctx in
-  let eligible = C.Eligible.always in
-  let lits'_list = Arith.Lits.pivot ~ord:(Ctx.ord ctx) ~eligible c.C.hclits
-  in
-  Util.list_fmap
-    (fun lits' ->
-      if Lits.eq_com c.C.hclits lits'
-        then None
-        else begin
-          (* build new clause *)
-          let proof cc = Proof.mk_c_step ~theories:["equality";"arith"]
-            ~rule:"arith_pivot" cc [c.C.hcproof] in
-          let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
-          Util.debug 3 "arith_pivot of %a: %a" C.pp c C.pp new_c;
-          Some new_c
-        end)
-    lits'_list
+      with M.NotLinear -> acc)
 
 let purify_arith c =
   let ctx = c.C.hcctx in
@@ -155,13 +137,13 @@ let _view_lits_as_bounds ~ctx lits =
         let strict = olit.TO.strict in
         match Arith.T.arith_kind l, Arith.T.arith_kind r with
         | (`Var | `Not), (`Const | `Expr) ->
-          let m = Monome.of_term r in
+          let m = M.of_term r in
           `HigherBound (strict, l, m)
         | (`Const | `Expr), (`Var | `Not) ->
-          let m = Monome.of_term l in
+          let m = M.of_term l in
           `LowerBound (strict, m, r)
         | _ -> `Ignore
-      with Not_found | Monome.NotLinear _ -> `Ignore)
+      with Not_found | M.NotLinear -> `Ignore)
     lits
 
 (* if a < t1, a < t2, .... a < tn occurs in clause, where t_i are all
@@ -183,7 +165,7 @@ let factor_bounds c =
         (function
           | `LowerBound (_, m', r') ->
             (* if m < r and m' < r and m > m', then m' < r is enough *)
-            T.eq r r' && Monome.comparison m m' = Comparison.Gt
+            T.eq r r' && M.comparison m m' = Comparison.Gt
           | _ -> false)
         lits
         then BV.reset bv i
@@ -192,7 +174,7 @@ let factor_bounds c =
         (function
           | `HigherBound (_, l', m') ->
             (* if l < m and l < m', then l < max(m,m') is enough *)
-            T.eq l l' && Monome.comparison m m' = Comparison.Lt
+            T.eq l l' && M.comparison m m' = Comparison.Lt
           | _ -> false)
         lits
         then BV.reset bv i
@@ -250,9 +232,9 @@ let case_switch active_set c =
       substitution to it, and add literal  t=monome *)
     let lits_case = List.map
       (fun n ->
-        let monome = Monome.add_const lower (S.mk_bigint n) in
-        let monome = Monome.apply_subst ~renaming subst monome s_lower in
-        Lit.mk_eq ~ord t' (Monome.to_term monome))
+        let monome = M.add_const lower (S.mk_bigint n) in
+        let monome = M.apply_subst ~renaming subst monome s_lower in
+        Lit.mk_eq ~ord t' (M.to_term monome))
       (_int_range ~strict_low ~strict_high range)
     in
     let new_lits = lits_left @ lits_right @ lits_case in
@@ -269,7 +251,7 @@ let case_switch active_set c =
   let new_clauses = Util.array_foldi
     (fun acc i lit -> match lit with
       | `Ignore -> acc
-      | `LowerBound (strict_low, low, t) when Type.eq Type.int (Monome.type_of low) ->
+      | `LowerBound (strict_low, low, t) when Type.eq Type.int (M.ty low) ->
         (* low < r, see whether we can find high with r < high and
            high-low = constant *)
         I.retrieve_unifiables active_set#idx_ord_left 1 t 0 acc
@@ -281,16 +263,16 @@ let case_switch active_set c =
               let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
               let strict_high = olit'.TO.strict in
               (* see whether the right term is a monome *)
-              let high = Monome.of_term olit'.TO.right in
-              assert (Type.eq Type.int (Monome.type_of high));
+              let high = M.of_term olit'.TO.right in
+              assert (Type.eq Type.int (M.ty high));
               (* compute range= subst(high)-subst(low) *)
               let renaming = Ctx.renaming_clear ~ctx in
-              let low' = Monome.apply_subst ~renaming subst low 0 in
-              let high' = Monome.apply_subst ~renaming subst high 1 in
-              let range = Monome.difference high' low' in
+              let low' = M.apply_subst ~renaming subst low 0 in
+              let high' = M.apply_subst ~renaming subst high 1 in
+              let range = M.difference high' low' in
               (* see whether range is a constant *)
-              if Monome.is_constant range
-              then match range.Monome.constant with
+              if M.is_const range
+              then match range.M.const with
                 | S.Int range ->
                   (* ok, found a high bound, such that high-low is a constant,
                       so t ranges from low to high. Typing ensures that
@@ -298,11 +280,11 @@ let case_switch active_set c =
                   _do_case_switch c 0 i c' 1 i' t 0 low 0 strict_low strict_high range subst acc
                 | _ -> assert false
               else acc
-            with Exit | Not_found | Monome.NotLinear _ ->
+            with Exit | Not_found | M.NotLinear ->
               acc)
       | `LowerBound _ ->
         acc  (* other lower bounds are ignored *)
-      | `HigherBound (strict_high, t, high) when Type.eq Type.int (Monome.type_of high) ->
+      | `HigherBound (strict_high, t, high) when Type.eq Type.int (M.ty high) ->
         (* converse case (symmetric of the `LowerBound case) *)
         I.retrieve_unifiables active_set#idx_ord_right 1 t 0 acc
           (fun acc _ with_pos subst ->
@@ -313,16 +295,16 @@ let case_switch active_set c =
               let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
               let strict_low = olit'.TO.strict in
               (* see whether the left term is a monome *)
-              let low = Monome.of_term olit'.TO.left in
-              assert (Type.eq Type.int (Monome.type_of low));
+              let low = M.of_term olit'.TO.left in
+              assert (Type.eq Type.int (M.ty low));
               (* compute range= subst(high)-subst(low) *)
               let renaming = Ctx.renaming_clear ~ctx in
-              let low' = Monome.apply_subst ~renaming subst low 1 in
-              let high' = Monome.apply_subst ~renaming subst high 0 in
-              let range = Monome.difference high' low' in
+              let low' = M.apply_subst ~renaming subst low 1 in
+              let high' = M.apply_subst ~renaming subst high 0 in
+              let range = M.difference high' low' in
               (* see whether range is a constant *)
-              if Monome.is_constant range
-              then match range.Monome.constant with
+              if M.is_const range
+              then match range.M.const with
                 | S.Int range ->
                   (* ok, found a high bound, such that high-low is a constant,
                       so t ranges from low to high. Typing ensures that
@@ -330,7 +312,7 @@ let case_switch active_set c =
                 _do_case_switch c' 1 i' c 0 i t 0 low 1 strict_low strict_high range subst acc
                 | _ -> assert false
               else acc
-            with Exit | Not_found | Monome.NotLinear _ ->
+            with Exit | Not_found | M.NotLinear ->
               acc)
       | `HigherBound _ ->
         acc (* other higher bounds are ignored *)
@@ -347,7 +329,7 @@ let inner_case_switch c =
      where k in [0... range] *)
   let _do_case_switch i j t low range strict_low strict_high subst acc =
     Util.debug 5 "inner_case_switch in %a: %a in (%a,%a+%s) subst is %a"
-      C.pp c T.pp t Monome.pp low Monome.pp low
+      C.pp c T.pp t M.pp low M.pp low
       (Big_int.string_of_big_int range) Substs.FO.pp subst;
     (* remove lits i and j *)
     let lits = Util.array_foldi
@@ -357,11 +339,11 @@ let inner_case_switch c =
     List.fold_left
       (fun acc k ->
         let renaming = Ctx.renaming_clear ~ctx in
-        let low' = Monome.apply_subst ~renaming subst low 0 in
+        let low' = M.apply_subst ~renaming subst low 0 in
         let t' = Substs.FO.apply ~renaming subst t 0 in
         let lit =
           Literal.mk_neq ~ord t'
-            (Arith.T.mk_sum (Monome.to_term low') (T.mk_const (S.mk_bigint k)))
+            (Arith.T.mk_sum (M.to_term low') (T.mk_const (S.mk_bigint k)))
         in
         let lits' = Literal.apply_subst_list ~ord ~renaming subst lits 0 in
         let new_lits = lit :: lits' in
@@ -389,9 +371,9 @@ let inner_case_switch c =
               begin try
                 (* unify t and t', see if it makes for a proper framing of t *)
                 let subst = FOUnif.unification t 0 t' 0 in
-                let range = Monome.difference high low in
-                if Monome.is_constant range
-                  then match range.Monome.constant with
+                let range = M.difference high low in
+                if M.is_const range
+                  then match range.M.const with
                   | S.Int range ->
                     _do_case_switch i j t low range strict_low strict_high subst acc
                   | _ -> assert false
@@ -420,13 +402,13 @@ let bounds_are_tautology c =
           (function
             | `HigherBound (strict_high, t', r) when T.eq t t' ->
               let both_strict = strict_low && strict_high in
-              begin match Monome.comparison l r with
+              begin match M.comparison l r with
               | Comparison.Incomparable -> false
               | Comparison.Eq ->
                 not both_strict (* n < t | t <= n is redundant *)
               | Comparison.Lt -> true
               | Comparison.Gt ->
-                (not both_strict) && Type.eq (T.ty t) Type.int && Monome.(eq (succ l) r)
+                (not both_strict) && Type.eq (T.ty t) Type.int && M.(eq (succ l) r)
                   (* l <= t | t <= l+1 is redundant in integers *)
               end
             | _ -> false)
@@ -465,28 +447,26 @@ let _mk_remainder ~ord lit = match lit with
   | `True -> Lit.mk_tauto
   | `False -> Lit.mk_absurd
 
-module MA = ModularArith
-
 let simplify_remainder_term ~tyargs f l =
   match l with
   | [t; n] when S.eq f S.Arith.remainder_e && Arith.T.is_arith_const n ->
     let n = T.head n in
     (* remainder(t,n) where n is a const *)
     begin try
-      let e = MA.Expr.of_term t in
-      begin match MA.Expr.factorize e with
+      let e = M.of_term t in
+      begin match M.factorize e with
         | None -> None
         | Some (e', coeff) ->
           (* e = e' * coeff, apply the distributivity rule that states
             that  (a*b) mod n = ((a mod n) * (b mod n)) mod n *)
           let coeff' = S.Arith.Op.remainder_e coeff n in
-          let e' = MA.Expr.product e' coeff' in
-          let t' = MA.Expr.to_term e' in
+          let e' = M.product e' coeff' in
+          let t' = M.to_term e' in
           if T.eq t t'
             then None
             else Some (Arith.T.mk_remainder_e t' n)
       end
-    with MA.Expr.NotLinear -> None
+    with M.NotLinear -> None
     end
   | _ -> None
 
@@ -502,18 +482,18 @@ let simplify_remainder_lit ~ctx lit =
       else `False  (* opposite case, absurd *)
   | `EqMod (t, n, c, sign) ->
     try
-      let e = MA.Expr.of_term t in
+      let e = M.of_term t in
       (* first move [c] into [e] *)
-      let e' = MA.Expr.add_const e (S.Arith.Op.uminus c) in
+      let e' = M.add_const e (S.Arith.Op.uminus c) in
       (* see whether [t] is [n * t'] *)
-      if MA.Expr.divisible e' n
+      if M.divisible e' n
         (* if [MA.Expr.divides e n] then it's tautology/absurd
           depending on sign  (e.g. 3a mod 3 = 0 is true). *)
         then if sign
           then `True
           else `False
         else
-          let e' = match MA.Expr.factorize e' with
+          let e' = match M.factorize e' with
           | None ->  e'
           | Some (e'', s) ->
             (* [e = e' × s], decompose [s] into prime factors and
@@ -523,13 +503,13 @@ let simplify_remainder_lit ~ctx lit =
               Ex: [6t+4 mod 2 ---> (3t+2 mod 2]. *)
             let gcd = S.Arith.Op.gcd s n in
             assert (S.Arith.sign gcd > 0);
-            MA.Expr.product e'' gcd
+            M.product e'' gcd
           in
           (* move constant back to rhs *)
-          let c' = MA.modulo ~n (S.Arith.Op.uminus e'.MA.Expr.const) in
-          let e' = MA.Expr.remove_const e' in
-          `EqMod (MA.Expr.to_term e', n, c', sign)
-      with MA.Expr.NotLinear ->
+          let c' = M.Modulo.modulo ~n (S.Arith.Op.uminus e'.M.const) in
+          let e' = M.remove_const e' in
+          `EqMod (M.to_term e', n, c', sign)
+      with M.NotLinear ->
         `Ignore lit
   in
   _mk_remainder ~ord lit'
@@ -579,9 +559,9 @@ let enum_remainder_cases c =
         (* TODO: if n divides t-c, do not enumerate but assert  t-c mod n = 0 *)
         begin try
           (* ignore constant *)
-          let e = MA.Expr.of_term t in
-          let e' = MA.Expr.remove_const e in
-          let t' = MA.Expr.to_term e' in
+          let e = M.of_term t in
+          let e' = M.remove_const e in
+          let t' = M.to_term e' in
           (* range: 0 .. n-1 *)
           let range = match n with
             | S.Int n' -> _int_range ~strict_low:false ~strict_high:true n'
@@ -598,7 +578,7 @@ let enum_remainder_cases c =
           Util.debug 5 "instantiate enum of remainder for %a: clause %a" S.pp n C.pp new_c;
           Util.incr_stat stat_enum_remainder_cases;
           new_c :: acc
-        with MA.Expr.NotLinear -> acc
+        with M.NotLinear -> acc
         end
       | _ -> acc)
     [] lits
@@ -612,18 +592,19 @@ let remainder_of_equality c =
     (fun acc i lit -> match lit with
       | Lit.Equation (l, r, true, _)
         when T.is_ground l && T.is_ground r && Type.eq Type.int (T.ty l) ->
-        begin match Arith.Lit.Extracted.extract_opt lit with
-        | Some (Arith.Lit.Extracted.Eq m) ->
-          (* m = 0, where m ground and integer *)
-          assert (Monome.is_ground m);
-          let terms = Monome.to_list m in
+        begin match Arith.Lit.Canonical.extract_opt lit with
+        | Some (Arith.Lit.Canonical.Compare (Arith.Lit.Eq, m1, m2)) ->
+          (* m1 = m2, where m ground and integer *)
+          let m = M.difference m1 m2 in
+          assert (M.is_ground m);
+          let terms = M.to_list m in
           List.fold_left
             (fun acc (coeff, t) ->
               if not (S.Arith.is_one coeff)
                 then begin
                   (* m' + coeff*t = 0, so m' mod coeff = 0 *) 
-                  let m' = Monome.remove m t in
-                  let t' = Monome.to_term m' in
+                  let m' = M.remove m t in
+                  let t' = M.to_term m' in
                   let lit = Lit.mk_eq ~ord
                     (Arith.T.mk_remainder_e t' (S.Arith.Op.abs coeff))
                     (T.mk_const S.Arith.zero_i)
@@ -682,7 +663,6 @@ let setup_env ?(ac=false) ~env =
   (* rules *)
   Env.add_lit_rule ~env "arith_rw" rewrite_lit;
   Env.add_unary_inf ~env "arith_factor" factor_arith;
-  Env.add_unary_inf ~env "arith_pivot" pivot_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
   Env.add_unary_inf ~env "arith_inner_case_switch" inner_case_switch;

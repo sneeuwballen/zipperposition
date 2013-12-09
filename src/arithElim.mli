@@ -47,9 +47,6 @@ val eliminate_arith : Env.unary_inf_rule
 val factor_arith : Env.unary_inf_rule
   (** Try to unify terms of arithmetic literals *)
 
-val pivot_arith : Env.unary_inf_rule
-  (** Pivot arithmetic literals *)
-
 val purify_arith : Env.unary_inf_rule
   (** Purification inference.
     TODO: only purify non-ground composite arith expressions (ground ones
@@ -62,8 +59,7 @@ val case_switch : Env.binary_inf_rule
           C1 or C2 or or_{i=a....c} (b = i)
       if a and c are integer linear expressions whose difference is
       a constant. If a > c, then the range a...c is empty and the literal
-      is just removed. 
-  *)
+      is just removed. *)
 
 val inner_case_switch : Env.unary_inf_rule
   (** inference rule
@@ -117,6 +113,10 @@ val remainder_of_equality : Env.unary_inf_rule
 
 (* TODO: use diophantine equations for solving divisibility constraints on
          linear expressions that contain only variables? *)
+
+(* TODO: bridge between cancellative arith and modulo expressions (to
+        allow   a mod 3 = 1   &  2.a = b   ---> b mod 3 = 2
+        or something like this *)
 
 (** {2 Setup} *)
 

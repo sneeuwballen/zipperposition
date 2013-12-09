@@ -279,16 +279,16 @@ let to_term e =
   | [] -> T.mk_const e.const
   | (c, t)::rest ->
     (* remove one coeff to make the basic sum *)
-    let sum = Arith.T.mk_product (T.mk_const c) t in
+    let sum = ArithTerm.mk_product (T.mk_const c) t in
     (* add coeff*term for the remaining terms *)
     let sum = List.fold_left
       (fun sum (coeff, t') ->
         assert (not (S.Arith.is_zero coeff));
-        Arith.T.mk_sum sum (Arith.T.mk_product (T.mk_const coeff) t'))
+        ArithTerm.mk_sum sum (ArithTerm.mk_product (T.mk_const coeff) t'))
       sum rest
     in
     (* add the constant (if needed) *)
-    Arith.T.mk_sum (T.mk_const e.const) sum
+    ArithTerm.mk_sum (T.mk_const e.const) sum
 
 let apply_subst ~renaming subst m sc_m =
   match m.terms with

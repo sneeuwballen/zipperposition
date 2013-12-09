@@ -205,7 +205,7 @@ let infer_equality_resolution clause =
       assert (not sign);
       match l_pos with
       | [] -> assert false
-      | pos::_ when not (Arith.T.is_arith l) && not (Arith.T.is_arith r) ->
+      | pos::_ when not (ArithTerm.is_arith l) && not (ArithTerm.is_arith r) ->
         begin try
         let subst = FOUnif.unification l 0 r 0 in
         if BV.get (C.eligible_res clause 0 subst) pos
@@ -657,7 +657,7 @@ let basic_simplify c =
       if BV.get bv i then match lit with
         | Lit.Equation (({T.term=T.Var _} as var), t, false, _)
         | Lit.Equation (t, ({T.term=T.Var _} as var), false, _) ->
-          if not (Arith.T.is_arith var && Arith.Lits.shielded lits var && Arith.T.is_compound_arith t)
+          if not (ArithTerm.is_arith var && ArithLit.Arr.shielded lits var && ArithTerm.is_compound_arith t)
           (* eligible for destructive Equality Resolution, try to update
               [subst]. We do not eliminate x!=t when t is an arithmetic
               expression and x occurs somewhere else, that would nullify

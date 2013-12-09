@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 245755ea35366a187de7ff58bdf1184f)
+# DO NOT EDIT (digest: 28bcf652e6355c73a94472d23df81069)
 ClauseQueue
 Clause
 Const
@@ -22,9 +22,9 @@ PEnv
 Params
 Env
 Monome
-Arith
 ArithElim
-Interval
+ArithTerm
+ArithLit
 containers/LazyGraph
 containers/Leftistheap
 containers/Vector
