@@ -245,6 +245,7 @@ module Arith : sig
     val abs : t -> t (* absolute value *)
     val divides : t -> t -> bool (* [divides a b] returns true if [a] divides [b] *)
     val gcd : t -> t -> t  (* gcd of two ints, 1 for other types *)
+    val lcm : t -> t -> t   (* lcm of two ints, 1 for other types *)
 
     val less : t -> t -> bool
     val lesseq : t -> t -> bool

@@ -579,6 +579,14 @@ module Arith = struct
     | Int a, Int b -> mk_bigint (Big_int.gcd_big_int a b)
     | _ -> _ty_mismatch "gcd: expected two numerical types"
 
+    let lcm a b = match a, b with
+    | Rat _, Rat _ -> one_rat
+    | Real _, Real _ -> one_f
+    | Int a, Int b ->
+      let lcm = Big_int.(div_big_int (mult_big_int a b) (gcd_big_int a b)) in
+      mk_bigint (Big_int.abs_big_int lcm)
+    | _ -> _ty_mismatch "gcd: expected two numerical types"
+
     let less s1 s2 = match s1, s2 with
     | Int n1, Int n2 -> Big_int.lt_big_int n1 n2
     | Rat n1, Rat n2 -> Ratio.lt_ratio n1 n2
