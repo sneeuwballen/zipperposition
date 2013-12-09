@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: c8bbc056f80fc75c87c4b51f559aa281)
+# DO NOT EDIT (digest: 7421f3ab362668f0426a3e50d8bd8715)
 src/HO
 src/FO
 src/Symbol
@@ -58,6 +58,7 @@ src/lib/MultiMap
 src/lib/Bencode
 src/lib/BV
 src/lib/PersistentHashtbl
+src/lib/Mixtbl
 src/meta/MetaPattern
 src/meta/MetaKB
 src/meta/MetaReasoner

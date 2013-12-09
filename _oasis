@@ -41,7 +41,7 @@ Library "logtk"
                     Basic, Monad, FastFingerprint, Evaluator, Location,
                     TypeConversion, TypeErasure, DBEnv, Interfaces,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
-                    lib/Bencode, lib/BV, lib/PersistentHashtbl
+                    lib/Bencode, lib/BV, lib/PersistentHashtbl, lib/Mixtbl
   BuildDepends:     unix,num,str
 
 Library "logtk_meta"

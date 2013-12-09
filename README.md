@@ -112,6 +112,7 @@ Logtk provides several useful parts for logic-related implementations:
     - `lib/Bencode`: B-encode serialization format
     - `lib/Bij`: GADT-based serialization/deserialization library
     - `lib/BV`: bitvectors
+    - `lib/Mixtbl`: heterogeneous hashtable
 
 - TPTP:
     - `Lex_tptp`: TPTP syntax lexer
