@@ -120,55 +120,53 @@ module Lit : sig
   val mk_neq : ord:Ordering.t -> FOTerm.t -> FOTerm.t -> Literal.t
     (** Smart constructor for inequality *)
 
-  (** {3 Single-term literal}
-      This type helps deal with the special case where there is a single
-      term in the literal. It can therefore perform many simplifications.
-  *)
+  (** Comparison operator *)
+  type op =
+    | Eq
+    | Neq
+    | Lt
+    | Leq
 
-  module Single : sig
-    type t = private
-    | True
-    | False
-    | Eq of FOTerm.t * Symbol.t
-    | Neq of FOTerm.t * Symbol.t
-    | L_less of FOTerm.t * Symbol.t
-    | L_lesseq of FOTerm.t * Symbol.t
-    | R_less of Symbol.t * FOTerm.t
-    | R_lesseq of Symbol.t * FOTerm. t
+  (** Side of a particular term w.r.t the comparison operator *)
+  type side =
+    | Left
+    | Right
 
-    val pp : Buffer.t -> t -> unit
-    val to_string : t -> string
+  val flip : side -> side
 
-    val to_lit : ord:Ordering.t -> t -> Literal.t
-  end
-
-  (** {3 Comparison with 0}
+  (** {3 Canonical representation}
       An arithmetic literal can always be reduced to exactly one such
-      "extracted" literal, but putting all terms on the same side of the
-      relation. *)
+      "extracted" literal, by putting all terms with the same sign
+      on the same side of the relation.
+      
+      Invariant: both monomes only have positive coefficients. *)
 
-  module Extracted : sig
-    type t = private
+  module Canonical : sig
+    type t =
     | True
     | False
-    | Eq of Monome.t  (* monome = 0 *)
-    | Neq of Monome.t (* monome != 0 *)
-    | Lt of Monome.t  (* monome < 0 *)
-    | Leq of Monome.t (* monome <= 0 *)
+    | Compare of op * Monome.t * Monome.t
 
     val pp : Buffer.t -> t -> unit
     val to_string : t -> string
+
+    val monomes : t -> Monome.t * Monome.t
+      (** Return the monomes inside the literal.
+          @raise Invalid_argument if the literal is true or false *)
+
+    val op : t -> op
+      (** Return the operator, or
+          @raise Invalid_argument if the literal is true or false *)
 
     val extract : Literal.t -> t
-      (** Convert a regular literal into an extracted literal.
+      (** Convert a regular literal into a canonical literal.
           @raise Monome.NotLinear if the literal is not a linear expression *)
 
     val extract_opt : Literal.t -> t option
       (** Same as {!extract}, but doesn't raise *)
 
-    val get_monome : t -> Monome.t
-      (** Return the monome inside the literal.
-          @raise Invalid_argument if the literal is true or false *)
+    val size : t -> int
+      (** Number of distinct non-arithmetic subterms *)
 
     val to_lit : ord:Ordering.t -> t -> Literal.t
       (** Conversion back to a literal *)
@@ -182,49 +180,68 @@ module Lit : sig
       (** Attempt to eliminate the literal *)
   end
 
-  (** {3 Literal with isolated term}
-      This form is used for complex literals, that have
-      several non-arithmetic subterms. An {!Extracted.t} can
-      be transformed in several {!Pivoted.t}, or into one {!Single.t}.
+  (** {3 Single-term literal}
+      This type helps deal with the special case where there is a single
+      term in the literal. It can therefore perform many simplifications. *)
 
-      See the very important {!pivot} operation. *)
-
-  module Pivoted : sig
+  module Single : sig
     type t = private
-    | Eq of FOTerm.t * Monome.t
-    | Neq of FOTerm.t * Monome.t
-    | L_less of FOTerm.t * Monome.t   (* term < monome *)
-    | L_lesseq of FOTerm.t * Monome.t
-    | R_less of Monome.t * FOTerm.t
-    | R_lesseq of Monome.t * FOTerm.t
+    | True
+    | False
+    | Compare of op * side * FOTerm.t * Symbol.t
 
     val pp : Buffer.t -> t -> unit
     val to_string : t -> string
 
-    val get_term : t -> FOTerm.t
-      (** Extract the term part. *)
+    val of_canonical : Canonical.t -> t option
 
-    val get_monome : t -> Monome.t
-      (** Extract the monome part from the lit. *)
+    val simplify : t -> t
 
     val to_lit : ord:Ordering.t -> t -> Literal.t
-      (** Convert back into a regular literal *)
-
-    module List : sig
-      val get_terms : t list -> FOTerm.t list
-    end
   end
 
-  (** {3 Pivot operation} *)
+  (** {3 Focused literal}
+      Same as {!Canonical}, but with the focus on a given maximal term of
+      the literal *)
 
-  type pivot_result =
-    | Single of Single.t
-    | Multiple of Pivoted.t list
-    | True
-    | False
+  module Focused : sig
+    (** literal with focus on a single term within. The
+        term always has a stricly positive coefficient. *)
+    type t = private {
+      side : side;      (* which side of the operator is the term? *)
+      op : op;          (* comparison operator *)
+      coeff : Symbol.t; (* strictly positive coeff of term *)
+      term : FOTerm.t;  (* focused term *)
+      same_side : Monome.t;   (* monome on the same side of comparison *)
+      other_side : Monome.t;  (* monome on the other side of comparison *)
+    }
 
-  val pivot : Extracted.t -> pivot_result
-    (** Pivots of an {!Extracted.t} *)
+    val term : t -> FOTerm.t
+    val op : t -> op
+    val coeff : t -> Symbol.t
+    val monomes : t -> Monome.t * Monome.t
+
+    val pp : Buffer.t -> t -> unit
+    val to_string : t -> string
+
+    val cmp : t -> t -> int
+
+    val to_lit : ord:Ordering.t -> t -> Literal.t
+
+    val ty : t -> Type.t
+      (** Type of the literal's expression *)
+
+    val product : Symbol.t -> t -> t
+      (** Product by constant *)
+
+    val of_canonical : ord:Ordering.t -> Canonical.t -> t list
+      (** Isolate maximal subterms of a {!Canonical.t} representation *)
+
+    val scale : t -> t -> t * t
+      (** Multiply the two literals by some constants, so that their focused
+          term has the same coefficient. For integers, it requires computing
+          their lcm. *)
+  end
 
   (** {3 High level operations} *)
 
@@ -235,11 +252,6 @@ module Lit : sig
     (** If the literal is arithmetic, return [true] iff it is compatible
         with the theory of arithmetic (e.g. X+2Y=3 is ok, but 1=2 is not).
         Otherwise return [true] *)
-
-  val make_total : ord:Ordering.t -> Literal.t -> Literal.t
-    (** be sure that the literal is "total", ie, if it's an equation, that
-        replacing one side by the other is always safe.
-        In particular:   a = b/3  is {b NOT} total for integers. *)
 
   val simplify : ord:Ordering.t -> Literal.t -> Literal.t
     (** Simplify a literal (evaluation) *)
@@ -266,18 +278,11 @@ module Lits : sig
                Literal.t array -> Literal.t array
     (** Purify the literals, by replacing arithmetic terms that occur
         under a non-interpreted predicate of formula, by a fresh variable,
-        and adding the constraint variable=arith subterm to the literals. *)
+        and adding the constraint variable=arith subterm to the literals.
+        
+        TODO: purify even constant terms (but not numeric constants) so
+              that superposition works on p(a) & 2a = b? *)
 
-  val pivot : ord:Ordering.t ->
-              eligible:(int -> Literal.t -> bool) ->
-              Literal.t array ->
-              Literal.t array list
-    (** [pivot ~ord ~eligible lits] tries to pivot each literal
-        which is [eligible] (ie [eligible index lit] returns [true]).
-        Pivoting is done by extracting arithmetic literals [t <| monome]
-        and replacing the old literal by those new ones (if [t] maximal).
-        It returns a list of such pivoted arrays, each pivoted array resulting
-        from a single pivoted literal. *)
 
   val eliminate : ord:Ordering.t ->
                   eligible:(int -> Literal.t -> bool) ->
