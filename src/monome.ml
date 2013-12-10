@@ -56,10 +56,11 @@ let hash m =
 let ty m = S.ty m.const
 
 (* merge two lists and maintain them sorted. Symbols for a given term
-    are combined using [op] *)
+    are combined using [op]. terms occurring only one one side
+    are preserved. *)
 let rec _merge op l1 l2 = match l1, l2 with
-  | [], l
-  | l, [] -> l
+  | l, []
+  | [], l -> l
   | (s1, t1)::l1', (s2, t2)::l2' ->
     match T.compare t1 t2 with
     | 0 ->
@@ -111,7 +112,11 @@ let add e s t =
     | [] -> [s, t]
     | (s', t')::l' ->
       if T.eq t t'
-        then (S.Arith.Op.sum s s', t) :: l'
+        then
+          let s'' = S.Arith.Op.sum s s' in
+          if S.Arith.is_zero s''
+            then l'
+            else (s'', t) :: l'
         else (s', t') :: add l' s t
   in
   { e with terms = add e.terms s t; }
@@ -161,14 +166,12 @@ let sum e1 e2 =
   let terms = _merge S.Arith.Op.sum e1.terms e2.terms in
   { const; terms; }
 
+let uminus e = _fmap S.Arith.Op.uminus e
+
 let difference e1 e2 =
-  let const = S.Arith.Op.difference e1.const e2.const in
-  let terms = _merge S.Arith.Op.difference e1.terms e2.terms in
-  { const; terms; }
+  sum e1 (uminus e2)
 
 let product e s = _fmap (fun s' -> S.Arith.Op.product s s') e
-
-let uminus e = _fmap S.Arith.Op.uminus e
 
 let succ e = add_const e (S.Arith.one_of_ty (ty e))
 
@@ -213,15 +216,20 @@ let normalize_wrt_zero m =
 let split m =
   let const1, const2 = if S.Arith.sign m.const >= 0
     then m.const, S.Arith.zero_of_ty (ty m)
-    else S.Arith.zero_of_ty (ty m), m.const
+    else S.Arith.zero_of_ty (ty m), S.Arith.Op.abs m.const
   in
-  let terms1, terms2 =
-    List.partition
-      (fun (coeff,t) -> S.Arith.sign coeff > 0)
-      m.terms in
+  let rec partition = function
+    | [] -> [], []
+    | (c,t)::l' ->
+      let l1, l2 = partition l' in
+      if S.Arith.sign c > 0
+        then (c,t)::l1, l2
+        else l1, (S.Arith.Op.uminus c, t)::l2
+  in
+  let terms1, terms2 = partition m.terms in
   let m1 = {terms=terms1; const=const1; } in
   let m2 = {terms=terms2; const=const2; } in
-  m1, uminus m2
+  m1, m2
 
 exception NotLinear
 
