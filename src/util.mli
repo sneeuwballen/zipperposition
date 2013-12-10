@@ -140,6 +140,8 @@ val times : int -> (unit -> 'a) -> 'a list
 
 val list_product : 'a list -> 'b list -> ('a * 'b) list
   (** Cartesian product *)
+val list_fold_product : 'a list -> 'b list -> 'c -> ('c -> 'a -> 'b -> 'c) -> 'c
+  (** Fold on the cartesian product *)
 
 val list_diagonal : 'a list -> ('a * 'a) list
   (** All pairs of distinct positions of the list. [list_diagonal l] will
