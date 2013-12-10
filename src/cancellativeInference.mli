@@ -46,12 +46,6 @@ val canc_equality_resolution: Env.unary_inf_rule
 val canc_equality_factoring: Env.unary_inf_rule
   (** cancellative equality factoring *)
 
-val canc_eq_chaining_active : Env.binary_inf_rule
-  (** cancellative equality chaining where the clause is active *)
-
-val canc_eq_chaining_passive : Env.binary_inf_rule
-  (** cancellative equality chaining where the clause is passive *)
-
 val canc_ineq_chaining_left : Env.binary_inf_rule
   (** cancellative inequality chaining where the clause is on the left. *)
 
