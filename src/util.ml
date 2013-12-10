@@ -322,6 +322,14 @@ let list_product l1 l2 =
       acc l2)
     [] l1
 
+let list_fold_product l1 l2 acc f =
+  List.fold_left
+    (fun acc x1 ->
+      List.fold_left
+        (fun acc x2 -> f acc x1 x2)
+        acc l2
+    ) acc l1
+
 let list_diagonal l =
   let rec gen acc l = match l with
   | [] -> acc
