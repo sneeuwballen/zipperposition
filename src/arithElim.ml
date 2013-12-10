@@ -31,6 +31,7 @@ open Logtk
 
 module S = Symbol
 module T = FOTerm
+module AT = ArithTerm
 module F = FOFormula
 module C = Clause
 module I = ProofState.TermIndex
@@ -57,10 +58,10 @@ let stat_remainder_of_equality = Util.mk_stat "arith.remainder_of_eq"
 
 let rewrite_lit ~ctx lit =
   let ord = Ctx.ord ~ctx in
-  let lit' = Arith.Lit.simplify ~ord lit in
-  if Arith.Lit.is_trivial lit'
+  let lit' = ArithLit.simplify ~ord lit in
+  if ArithLit.is_trivial lit'
     then Lit.mk_tauto
-  else if Arith.Lit.has_instances lit'
+  else if ArithLit.has_instances lit'
     then lit'
     else Lit.mk_absurd
 
@@ -69,7 +70,7 @@ let eliminate_arith c =
   let ord = Ctx.ord ctx in
   let eligible = C.Eligible.max c in
   (* find new arrays of literals, after substitution *)
-  let lits'_list = Arith.Lits.eliminate ~ord ~eligible c.C.hclits in
+  let lits'_list = ArithLit.Arr.eliminate ~ord ~eligible c.C.hclits in
   (* turn new arrays into clauses, if needed *)
   List.fold_left
     (fun acc lits' ->
@@ -103,8 +104,8 @@ let factor_arith c =
   Lits.fold_lits ~eligible c.C.hclits []
     (fun acc lit i ->
       try
-        let elit = Arith.Lit.Canonical.extract lit in
-        let substs = Arith.Lit.Canonical.factor elit in
+        let elit = ArithLit.Canonical.extract lit in
+        let substs = ArithLit.Canonical.factor elit in
         List.fold_left
           (fun acc subst -> mk_instance subst :: acc)
           acc substs
@@ -113,7 +114,7 @@ let factor_arith c =
 let purify_arith c =
   let ctx = c.C.hcctx in
   let eligible = C.Eligible.(max c) in
-  let lits' = Arith.Lits.purify ~ord:(Ctx.ord ctx) ~eligible c.C.hclits
+  let lits' = ArithLit.Arr.purify ~ord:(Ctx.ord ctx) ~eligible c.C.hclits
   in
   if Lits.eq_com c.C.hclits lits'
     then []
@@ -123,29 +124,6 @@ let purify_arith c =
       [new_c]
     end
 
-(* view array of literals as either lower bound for a term,
-    or higher bound for a term, or something else *)
-let _view_lits_as_bounds ~ctx lits =
-  (* only for TPTP ordering *)
-  let instance = TO.tstp_instance ~spec:(Ctx.total_order ctx) in
-  Array.map
-    (fun lit ->
-      try
-        let olit = Lit.ineq_lit_of ~instance lit in
-        let l = olit.TO.left in
-        let r = olit.TO.right in
-        let strict = olit.TO.strict in
-        match Arith.T.arith_kind l, Arith.T.arith_kind r with
-        | (`Var | `Not), (`Const | `Expr) ->
-          let m = M.of_term r in
-          `HigherBound (strict, l, m)
-        | (`Const | `Expr), (`Var | `Not) ->
-          let m = M.of_term l in
-          `LowerBound (strict, m, r)
-        | _ -> `Ignore
-      with Not_found | M.NotLinear -> `Ignore)
-    lits
-
 (* if a < t1, a < t2, .... a < tn occurs in clause, where t_i are all
    arithmetic constants, replace by  a < max_i(t_i) *)
 let factor_bounds c =
@@ -154,18 +132,18 @@ let factor_bounds c =
   (* [bv] stores which literals should survive *)
   let bv = BV.create ~size:(Array.length c.C.hclits) true in
   (* literals seen as comparisons with monomes *)
-  let lits = _view_lits_as_bounds ~ctx c.C.hclits in
+  let lits = ArithLit.Arr.view_bounds c.C.hclits in
   assert (Array.length lits = Array.length c.C.hclits);
   (* remove literals that are redundant *)
   Array.iteri
     (fun i lit -> match lit with
-    | `Ignore -> ()
+    | `Ignore _ -> ()
     | `LowerBound (_, m, r) ->
       if Util.array_exists
         (function
           | `LowerBound (_, m', r') ->
             (* if m < r and m' < r and m > m', then m' < r is enough *)
-            T.eq r r' && M.comparison m m' = Comparison.Gt
+            T.eq r r' && S.Arith.Op.greater m m'
           | _ -> false)
         lits
         then BV.reset bv i
@@ -174,7 +152,7 @@ let factor_bounds c =
         (function
           | `HigherBound (_, l', m') ->
             (* if l < m and l < m', then l < max(m,m') is enough *)
-            T.eq l l' && M.comparison m m' = Comparison.Lt
+            T.eq l l' && S.Arith.Op.less m m'
           | _ -> false)
         lits
         then BV.reset bv i
@@ -211,7 +189,8 @@ let _int_range ~strict_low ~strict_high range =
 
 (* new inference, kind of the dual of inequality chaining for integer
    inequalities. See the .mli file for more explanations. *)
-let case_switch active_set c =
+let case_switch (active_set: ProofState.ActiveSet.t) c = []  (* TODO *)
+  (*
   Util.enter_prof prof_case_switch;
   let ctx = active_set#ctx in
   let ord = Ctx.ord ctx in
@@ -246,11 +225,11 @@ let case_switch active_set c =
     new_c :: acc
   in
   (* view literals as arithmetic bounds when possible *)
-  let lits = _view_lits_as_bounds ~ctx c.C.hclits in
+  let lits = ArithLit.Arr.view_bounds c.C.hclits in
   (* fold on literals *)
   let new_clauses = Util.array_foldi
     (fun acc i lit -> match lit with
-      | `Ignore -> acc
+      | `Ignore _ -> acc
       | `LowerBound (strict_low, low, t) when Type.eq Type.int (M.ty low) ->
         (* low < r, see whether we can find high with r < high and
            high-low = constant *)
@@ -321,15 +300,17 @@ let case_switch active_set c =
   in
   Util.exit_prof prof_case_switch;
   new_clauses
+  *)
 
 let inner_case_switch c =
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
   (* do the case switch, removing lits i and j, adding t=low+k
-     where k in [0... range] *)
+     where k in [0... range]
+     FIXME: need a coefficient in front of [t]? *)
   let _do_case_switch i j t low range strict_low strict_high subst acc =
     Util.debug 5 "inner_case_switch in %a: %a in (%a,%a+%s) subst is %a"
-      C.pp c T.pp t M.pp low M.pp low
+      C.pp c T.pp t S.pp low S.pp low
       (Big_int.string_of_big_int range) Substs.FO.pp subst;
     (* remove lits i and j *)
     let lits = Util.array_foldi
@@ -339,11 +320,10 @@ let inner_case_switch c =
     List.fold_left
       (fun acc k ->
         let renaming = Ctx.renaming_clear ~ctx in
-        let low' = M.apply_subst ~renaming subst low 0 in
         let t' = Substs.FO.apply ~renaming subst t 0 in
         let lit =
           Literal.mk_neq ~ord t'
-            (Arith.T.mk_sum (M.to_term low') (T.mk_const (S.mk_bigint k)))
+            (T.mk_const (S.Arith.Op.sum low (S.mk_bigint k)))
         in
         let lits' = Literal.apply_subst_list ~ord ~renaming subst lits 0 in
         let new_lits = lit :: lits' in
@@ -355,11 +335,11 @@ let inner_case_switch c =
       acc (_int_range ~strict_low ~strict_high range)
   in
   (* view literals as arithmetic bounds when possible *)
-  let lits = _view_lits_as_bounds ~ctx c.C.hclits in
+  let lits = ArithLit.Arr.view_bounds c.C.hclits in
   (* fold on literals *)
   let new_clauses = Util.array_foldi
     (fun acc i lit -> match lit with
-      | `Ignore -> acc
+      | `Ignore _ -> acc
       | `LowerBound (strict_high, high, t) when Type.eq Type.int (T.ty t) ->
         (* take the negation: high < t is the constraint  t <= high *)
         let strict_high = not strict_high in
@@ -371,13 +351,11 @@ let inner_case_switch c =
               begin try
                 (* unify t and t', see if it makes for a proper framing of t *)
                 let subst = FOUnif.unification t 0 t' 0 in
-                let range = M.difference high low in
-                if M.is_const range
-                  then match range.M.const with
-                  | S.Int range ->
-                    _do_case_switch i j t low range strict_low strict_high subst acc
-                  | _ -> assert false
-                  else acc
+                let range = S.Arith.Op.difference high low in
+                match range with
+                | S.Int range ->
+                  _do_case_switch i j t low range strict_low strict_high subst acc
+                | _ -> assert false
               with FOUnif.Fail -> acc
               end
             | _ -> acc
@@ -392,9 +370,10 @@ let inner_case_switch c =
   new_clauses
 
 (* if c =  a < t or t < b or c'  with b > a, it's a tautology *)
-let bounds_are_tautology c =
+let bounds_are_tautology c = false (* TODO *)
+  (*
   let ctx = c.C.hcctx in
-  let lits = _view_lits_as_bounds ~ctx c.C.hclits in
+  let lits = ArithLit.Arr.view_bounds c.C.hclits in
   let res = Util.array_exists
     (function
       | `LowerBound (strict_low, l, t) ->
@@ -421,6 +400,7 @@ let bounds_are_tautology c =
     Util.incr_stat stat_bound_tauto;
     end;
   res
+  *)
 
 (** {2 Modular Integer Arithmetic} *)
 
@@ -428,8 +408,8 @@ let _view_lit_as_remainder lit = match lit with
   | Literal.Equation ({T.term=T.Node(s, _, [t;n])}, c, sign, _)
   | Literal.Equation (c, {T.term=T.Node(s, _, [t;n])}, sign, _)
     when S.eq s S.Arith.remainder_e
-    && Arith.T.is_arith_const n
-    && Arith.T.is_arith_const c
+    && AT.is_arith_const n
+    && AT.is_arith_const c
     && Type.eq Type.int (T.ty t) ->
     let n, c = T.head n, T.head c in
     (* last check: must have a positive int *)
@@ -442,14 +422,14 @@ let _view_lits_as_remainder lits =
 (* convert view back into a proper literal *)
 let _mk_remainder ~ord lit = match lit with
   | `EqMod (t, n, c, sign) ->
-    Lit.mk_lit ~ord (Arith.T.mk_remainder_e t n) (T.mk_const c) sign
+    Lit.mk_lit ~ord (AT.mk_remainder_e t n) (T.mk_const c) sign
   | `Ignore lit' -> lit'  (* keep same lit *)
   | `True -> Lit.mk_tauto
   | `False -> Lit.mk_absurd
 
 let simplify_remainder_term ~tyargs f l =
   match l with
-  | [t; n] when S.eq f S.Arith.remainder_e && Arith.T.is_arith_const n ->
+  | [t; n] when S.eq f S.Arith.remainder_e && AT.is_arith_const n ->
     let n = T.head n in
     (* remainder(t,n) where n is a const *)
     begin try
@@ -464,7 +444,7 @@ let simplify_remainder_term ~tyargs f l =
           let t' = M.to_term e' in
           if T.eq t t'
             then None
-            else Some (Arith.T.mk_remainder_e t' n)
+            else Some (AT.mk_remainder_e t' n)
       end
     with M.NotLinear -> None
     end
@@ -530,12 +510,12 @@ let infer_remainder_of_divisors c =
           | _ -> assert false
         in
         (* put const on lhs *)
-        let t' = Arith.T.mk_difference t (T.mk_const const) in
+        let t' = AT.mk_difference t (T.mk_const const) in
         List.fold_left
           (fun acc n' ->
             let lits' = Util.array_except_idx c.C.hclits i in
             let lits' = Lit.mk_eq ~ord
-              (Arith.T.mk_remainder_e t' (Symbol.mk_bigint n'))
+              (AT.mk_remainder_e t' (Symbol.mk_bigint n'))
               (T.mk_const S.Arith.zero_i) :: lits'
             in
             let parents = [c] in
@@ -570,7 +550,7 @@ let enum_remainder_cases c =
           (* make clause *)
           let lits' = List.map
             (fun i ->
-              Lit.mk_eq ~ord (Arith.T.mk_remainder_e t' n) (T.mk_const (S.mk_bigint i)))
+              Lit.mk_eq ~ord (AT.mk_remainder_e t' n) (T.mk_const (S.mk_bigint i)))
             range
           in
           let proof cc = Proof.mk_c_axiom cc ~file:"/dev/mod" ~name:"enum" in
@@ -592,8 +572,8 @@ let remainder_of_equality c =
     (fun acc i lit -> match lit with
       | Lit.Equation (l, r, true, _)
         when T.is_ground l && T.is_ground r && Type.eq Type.int (T.ty l) ->
-        begin match Arith.Lit.Canonical.extract_opt lit with
-        | Some (Arith.Lit.Canonical.Compare (Arith.Lit.Eq, m1, m2)) ->
+        begin match ArithLit.Canonical.extract_opt lit with
+        | Some (ArithLit.Canonical.Compare (ArithLit.Eq, m1, m2)) ->
           (* m1 = m2, where m ground and integer *)
           let m = M.difference m1 m2 in
           assert (M.is_ground m);
@@ -606,7 +586,7 @@ let remainder_of_equality c =
                   let m' = M.remove m t in
                   let t' = M.to_term m' in
                   let lit = Lit.mk_eq ~ord
-                    (Arith.T.mk_remainder_e t' (S.Arith.Op.abs coeff))
+                    (AT.mk_remainder_e t' (S.Arith.Op.abs coeff))
                     (T.mk_const S.Arith.zero_i)
                   in
                   let lits' = lit :: Util.array_except_idx c.C.hclits i in
@@ -642,7 +622,7 @@ let axioms =
 let setup_penv ~penv =
   (* rule for formula simplification *)
   let simplify_rule set pf =
-    let f' = Arith.F.simplify pf.PF.form in
+    let f' = AT.Form.simplify pf.PF.form in
     if F.eq pf.PF.form f'
       then []
       else
@@ -680,8 +660,8 @@ let setup_env ?(ac=false) ~env =
     AC.add_ac ~env S.Arith.sum;
     AC.add_ac ~env S.Arith.product;
     end;
-  (* be sure that the ordering is present in the context *)
-  Chaining.add_tstp_order ~env;
+  (* enable cancellative inferences *)
+  CancellativeInference.setup_env ~env;
   (* we are (until proved otherwise) incomplete *)
   Ctx.lost_completeness ~ctx:(Env.ctx env);
   ()

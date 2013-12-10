@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: af5ec6c680f81263580f84f94aa71fc8)
+# DO NOT EDIT (digest: 3b0a4e5d68d180a271d67dd4db29f4bb)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -37,6 +37,7 @@
 "src/env.cmx": for-pack(Libzipperposition)
 "src/monome.cmx": for-pack(Libzipperposition)
 "src/arithElim.cmx": for-pack(Libzipperposition)
+"src/cancellativeInference.cmx": for-pack(Libzipperposition)
 "src/arithTerm.cmx": for-pack(Libzipperposition)
 "src/arithLit.cmx": for-pack(Libzipperposition)
 "src/containers/lazyGraph.cmx": for-pack(Libzipperposition)

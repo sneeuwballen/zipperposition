@@ -22,7 +22,7 @@ Library "libzipperposition"
   Modules:  ClauseQueue, Clause, Const, Experts, Extensions,
             Literal, MetaProverState, CompactClause, Ctx, Proof, ProofState,
             Saturate, Selection, Superposition, PFormula, Theories, AC,
-            Chaining, PEnv, Params, Env, Monome, ArithElim,
+            PEnv, Params, Env, Monome, ArithElim, CancellativeInference,
             ArithTerm, ArithLit
   InternalModules:  containers/LazyGraph, containers/Leftistheap,
                     containers/Vector, containers/Sequence, containers/SmallSet,

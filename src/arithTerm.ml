@@ -30,7 +30,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module S = Symbol
-module M = Monome
 
 let prof_arith_simplify = Util.mk_profiler "arith.simplify"
 

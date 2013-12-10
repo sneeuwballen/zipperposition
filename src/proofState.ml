@@ -65,6 +65,16 @@ module UnitIndex = NPDtree.Make(struct
     if C.is_oriented_rule c then 2 else 1
 end)
 
+module CancellativeIndex = NPDtree.MakeTerm(struct
+  type t = C.t * int * ArithLit.Focused.t
+  let compare (c1,i1,lit1) (c2,i2,lit2) =
+    if i1 = i2
+      then if C.eq c1 c2
+        then ArithLit.Focused.cmp lit1 lit2
+        else C.compare c1 c2
+      else i1-i2
+end)
+
 module SubsumptionIndex = FeatureVector.Make(struct
   type t = C.t
   let cmp = C.compare
@@ -90,6 +100,7 @@ module ActiveSet = struct
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
+      idx_canc : CancellativeIndex.t;       (** all terms indexed for cancellative inferences *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 
@@ -104,12 +115,14 @@ module ActiveSet = struct
       val mutable m_clauses = C.CSet.empty
       val mutable m_sup_into = TermIndex.empty ()
       val mutable m_sup_from = TermIndex.empty ()
+      val mutable m_canc = CancellativeIndex.empty ()
       val mutable m_back_demod = TermIndex.empty ()
       val mutable m_fv = idx
       method ctx = ctx
       method clauses = m_clauses
       method idx_sup_into = m_sup_into
       method idx_sup_from = m_sup_from
+      method idx_canc = m_canc
       method idx_back_demod = m_back_demod
       method idx_fv = m_fv
 
@@ -136,14 +149,22 @@ module ActiveSet = struct
             f tree t with_pos);
         ()
 
+      method update_canc f c =
+        (* cancellative inferences: terms directly under a linear arith expr *)
+        m_canc <- ArithLit.Arr.fold_focused
+          ~eligible:C.Eligible.pos c.C.hclits ~ord:(Ctx.ord ctx) m_canc
+          (fun tree i focused ->
+            f tree focused.ArithLit.Focused.term (c,i,focused));
+        ()
+
       (** add clauses (only process the ones not present in the set) *)
       method add cs =
         Util.enter_prof prof_add_active;
         let cs = Sequence.filter (fun c -> not (C.CSet.mem m_clauses c)) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.of_seq m_clauses cs;
-        let op tree = TermIndex.add tree in
-        Sequence.iter (self#update op) cs;
+        Sequence.iter (self#update TermIndex.add) cs;
+        Sequence.iter (self#update_canc CancellativeIndex.add) cs;
         m_fv <- SubsumptionIndex.add_seq m_fv cs;
         Util.exit_prof prof_add_active
 
@@ -153,8 +174,8 @@ module ActiveSet = struct
         let cs = Sequence.filter (C.CSet.mem m_clauses) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.remove_seq m_clauses cs;
-        let op tree = TermIndex.remove tree in
-        Sequence.iter (self#update op) cs;
+        Sequence.iter (self#update TermIndex.remove) cs;
+        Sequence.iter (self#update_canc CancellativeIndex.remove) cs;
         m_fv <- SubsumptionIndex.remove_seq m_fv cs;
         Util.exit_prof prof_remove_active
     end :> t)

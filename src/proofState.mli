@@ -34,6 +34,8 @@ open Logtk
 module TermIndex : Index.TERM_IDX with type elt = Clause.WithPos.t
 module UnitIndex : Index.UNIT_IDX with type E.t = (FOTerm.t * FOTerm.t * bool * Clause.t)
                                   and type E.rhs = FOTerm.t
+module CancellativeIndex : Index.TERM_IDX
+  with type elt = Clause.t * int * ArithLit.Focused.t
 module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
 
 (** {2 Set of active clauses} *)
@@ -44,6 +46,7 @@ module ActiveSet : sig
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
+      idx_canc : CancellativeIndex.t;       (** all terms indexed for cancellative inferences *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 

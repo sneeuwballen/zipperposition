@@ -33,6 +33,7 @@ module T = FOTerm
 module AT = ArithTerm
 module S = Symbol
 module M = Monome
+module TO = Theories.TotalOrder
 module Literals = Literal.Arr
 
 let prof_arith_extract = Util.mk_profiler "arith.extract"
@@ -550,6 +551,77 @@ let heuristic_eliminate lit =
 (** {2 Arrays of literals} *)
 
 module Arr = struct
+  let fold_canonical ?(eligible=fun _ _ -> true) lits acc f =
+    Util.array_foldi
+      (fun acc i lit ->
+        if eligible i lit
+          then match Canonical.extract_opt lit with
+          | None -> acc
+          | Some lit' -> f acc i lit'
+        else acc)
+      acc lits
+
+  let view_canonical lits =
+    Array.map
+      (fun lit ->
+        try `Canonical (Canonical.extract lit)
+        with Monome.NotLinear -> `Ignore lit)
+      lits
+
+  let fold_focused ?(eligible=fun _ _ -> true) ~ord lits acc f =
+    Util.array_foldi
+      (fun acc i lit ->
+        if eligible i lit
+          then match Canonical.extract_opt lit with
+          | None -> acc
+          | Some lit' ->
+            let l = Focused.of_canonical ~ord lit' in
+            List.fold_left (fun acc focused -> f acc i focused) acc l
+        else acc)
+      acc lits
+
+  let view_focused ~ord lits =
+    Array.map
+      (fun lit ->
+        try
+          let lit' = Canonical.extract lit in
+          `Focused (Focused.of_canonical ~ord lit')
+        with Monome.NotLinear -> `Ignore lit)
+      lits
+
+  let view_bounds lits =
+    Array.map
+      (fun lit ->
+        match Monad.Opt.(
+        Canonical.extract_opt lit >>=
+        Single.of_canonical >>= function
+        | Single.Compare(Lt, Right, t, c) ->
+          Some (`LowerBound(true, c, t))
+        | Single.Compare(Leq, Right, t, c) ->
+          Some (`LowerBound(false, c, t))
+        | Single.Compare(Lt, Left, t, c) ->
+          Some (`HigherBound(true, t, c))
+        | Single.Compare(Leq, Left, t, c) ->
+          Some (`HigherBound(false, t, c))
+        | _ -> None)
+        with None -> `Ignore lit
+        | Some b -> b)
+      lits
+
+  let view_general_bounds lits =
+    Array.map
+      (fun lit ->
+        try
+          let canonical = Canonical.extract lit in
+          begin match canonical with
+          | Canonical.Compare(Lt,m1,m2) -> `Lower(true,m1,m2)
+          | Canonical.Compare(Leq,m1,m2) -> `Lower(false,m1,m2)
+          | _ -> `Ignore lit
+          end
+        with M.NotLinear ->
+          `Ignore lit)
+      lits
+
   let purify ~ord ~eligible lits =
     let new_lits = ref [] in
     let _add_lit lit = new_lits := lit :: !new_lits in

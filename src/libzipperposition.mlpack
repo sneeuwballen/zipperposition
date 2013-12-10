@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 28bcf652e6355c73a94472d23df81069)
+# DO NOT EDIT (digest: 067dd65077f439ad6b67d06081953129)
 ClauseQueue
 Clause
 Const
@@ -17,12 +17,12 @@ Superposition
 PFormula
 Theories
 AC
-Chaining
 PEnv
 Params
 Env
 Monome
 ArithElim
+CancellativeInference
 ArithTerm
 ArithLit
 containers/LazyGraph

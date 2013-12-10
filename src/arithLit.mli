@@ -117,7 +117,7 @@ module Single : sig
   type t = private
   | True
   | False
-  | Compare of op * side * FOTerm.t * Symbol.t
+  | Compare of op * side * FOTerm.t * Symbol.t  (* side: side of the term w.r.t operator *)
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
@@ -201,6 +201,36 @@ val heuristic_eliminate : Literal.t -> Substs.FO.t list
 (** {2 Arrays of literals} *)
 
 module Arr : sig
+  val fold_canonical : ?eligible:(int -> Literal.t -> bool) ->
+                       Literal.t array -> 'a ->
+                       ('a -> int -> Canonical.t -> 'a) -> 'a
+    (** Fold on canonical literals, with their index in the array *)
+
+  val view_canonical : Literal.t array ->
+                       [ `Ignore of Literal.t | `Canonical of Canonical.t ] array
+    (** View literals as canonical literals or regular literals *)
+
+  val fold_focused : ?eligible:(int -> Literal.t -> bool) ->
+                      ord:Ordering.t -> 
+                      Literal.t array -> 'a ->
+                      ('a -> int -> Focused.t -> 'a) -> 'a
+    (** Fold on focused literals with their index. An index can occur several
+        times (or none) depending on how many focused terms its literal has *)
+
+  val view_focused :  ord:Ordering.t -> 
+                      Literal.t array ->
+                      [ `Ignore of Literal.t
+                      | `Focused of Focused.t list ] array 
+    (** View literals as regular literals or list of focused literals *)
+
+  val view_bounds : Literal.t array ->
+    [ `Ignore of Literal.t
+    | `LowerBound of bool * Symbol.t * FOTerm.t
+    | `HigherBound of bool * FOTerm.t * Symbol.t
+    ] array
+    (** Simple case where terms are bounded with arithmetic constants.
+        Booleans indicate strictness of bound *)
+
   val purify : ord:Ordering.t -> 
                eligible:(int -> Literal.t -> bool) ->
                Literal.t array -> Literal.t array
