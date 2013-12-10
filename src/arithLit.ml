@@ -121,7 +121,6 @@ module Canonical = struct
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
   let of_monome op m =
-    let m = M.normalize_wrt_zero m in
     if M.is_const m
     then match op with
       | Eq -> if M.sign m = 0 then True else False
@@ -129,6 +128,7 @@ module Canonical = struct
       | Lt -> if M.sign m < 0 then True else False
       | Leq -> if M.sign m <= 0 then True else False
     else
+      let m = M.normalize_wrt_zero m in
       let m, op = match op with
         | Lt when Type.eq Type.int (M.ty m) ->
           (* m < 0 ---> m+1 <= 0 *)

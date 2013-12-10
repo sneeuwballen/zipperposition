@@ -47,31 +47,41 @@ let stat_canc_ineq_factoring = Util.mk_stat "canc.ineq_factoring"
 let stat_canc_ineq_chaining = Util.mk_stat "canc.ineq_chaining"
 
 (* do cancellative superposition *)
-let _do_canc ~ctx active idx_a lit_a s_a passive idx_p lit_p s_p subst acc =
+let _do_canc ~ctx ~active:(active,idx_a,lit_a,s_a) ~passive:(passive,idx_p,lit_p,s_p) subst acc =
   let ord = Ctx.ord ctx in
   (* TODO: check also that lit_a.term maximal in lit_a,
     and lit_p.term maximal in lit_p. For this, need AC-compatible order *)
   if C.is_maxlit active idx_a subst s_a
   && C.is_maxlit passive idx_p subst s_p
   then begin
+    let renaming = Ctx.renaming_clear ctx in
     (* get both lit with same coeff for unified term *)
     let lit_a, lit_p = Foc.scale lit_a lit_p in
     assert (S.Arith.sign lit_a.Foc.coeff > 0);
     assert (S.Arith.sign lit_p.Foc.coeff > 0);
-    let renaming = Ctx.renaming_clear ctx in
+    let lit_a = Foc.apply_subst ~renaming subst lit_a s_a in
+    let lit_p = Foc.apply_subst ~renaming subst lit_p s_p in
     (* other literals *)
     let lits_a = Util.array_except_idx active.C.hclits idx_a in
     let lits_a = Literal.apply_subst_list ~renaming ~ord subst lits_a s_a in
     let lits_p = Util.array_except_idx passive.C.hclits idx_p in
     let lits_p = Literal.apply_subst_list ~renaming ~ord subst lits_p s_p in
-    (* new literal: lit_a="t+m1=m2", lit_p="t'+m1' R m2'" for some
-      relation R. Now let's replace t' by m2-m1 in lit', ie,
-      build m = "m1'-m2'+(m2-m1) R 0". *)
-    let m_p = M.difference lit_p.Foc.same_side lit_p.Foc.other_side in
-    let m_p = M.apply_subst ~renaming subst m_p s_p in
-    let m_a = M.difference lit_a.Foc.other_side lit_a.Foc.same_side in
-    let m_a = M.apply_subst ~renaming subst m_a s_a in
-    let m = M.sum m_a m_p in
+    (* new literal: lit_a=[t+m1=m2], lit_p=[t'+m1' R m2'] for some
+      relation R. Now let's replace t' by [m2-m1] in lit', ie,
+      build m = [m1'-m2'+(m2-m1) R 0]. *)
+    let m1, m2 = lit_a.Foc.same_side, lit_a.Foc.other_side in
+    let m1', m2' = lit_p.Foc.same_side, lit_p.Foc.other_side in
+    let m = match lit_p.Foc.side with
+      | ArithLit.Left ->
+        (* [t' + m1' R m2'], therefore  [m1' + (m2 - m1) - m2' R 0]
+          and therefore [m1' + m2 - (m2' + m1) R 0
+          since [t' = t = m2 - m1] *)
+        M.difference (M.sum m1' m2) (M.sum m2' m1)
+      | ArithLit.Right ->
+        (* [m2' R t' + m1'], same reasoning gets us [m2' - m1' - (m2 - m1) R 0]
+            and thus [m1 + m2' - (m1' + m2) R 0] *)
+        M.difference (M.sum m1 m2') (M.sum m2 m1')
+    in
     let lit = Canon.of_monome lit_p.Foc.op m in
     let lit = Canon.to_lit ~ord lit in
     let all_lits = lit :: lits_a @ lits_p in
@@ -97,7 +107,7 @@ let canc_sup_active (state:ProofState.ActiveSet.t) c =
         Util.debug 5 "attempt to active superpose %a in %a[%d]" T.pp t C.pp c i;
         I.retrieve_unifiables state#idx_canc 0 t 1 acc
           (fun acc t' (passive,j,lit') subst ->
-            _do_canc ~ctx c i lit 1 passive j lit' 0 subst acc
+            _do_canc ~ctx ~active:(c,i,lit,1) ~passive:(passive,j,lit',0) subst acc
           )
       | _ -> acc)
   in
@@ -116,7 +126,7 @@ let canc_sup_passive state c =
           match lit'.Foc.op with
           | ArithLit.Eq ->
             (* rewrite using lit' *)
-            _do_canc ~ctx active j lit' 1 c i lit 0 subst acc
+            _do_canc ~ctx ~active:(active,j,lit',1) ~passive:(c,i,lit,0) subst acc
           | _ -> acc
         ))
   in

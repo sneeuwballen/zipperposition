@@ -205,6 +205,7 @@ let normalize_wrt_zero m =
   | S.Int _ when not (is_const m) ->
     (* divide by common gcd of coeffs and constant *)
     let gcd = List.fold_left (fun gcd (c,_) -> S.Arith.Op.gcd c gcd) m.const m.terms in
+    let gcd = S.Arith.Op.abs gcd in
     let const = S.Arith.Op.quotient m.const gcd in
     let terms = List.map (fun (c,t) -> S.Arith.Op.quotient c gcd, t) m.terms in
     { const; terms; }
