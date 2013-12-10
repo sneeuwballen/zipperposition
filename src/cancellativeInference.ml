@@ -41,6 +41,9 @@ module Canon = ArithLit.Canonical
 module Foc = ArithLit.Focused
 
 let stat_canc_sup = Util.mk_stat "canc.superposition"
+let stat_cancellation = Util.mk_stat "canc.cancellation"
+let stat_canc_eq_factoring= Util.mk_stat "canc.eq_factoring"
+let stat_canc_ineq_factoring= Util.mk_stat "canc.ineq_factoring"
 
 (* do cancellative superposition *)
 let _do_canc ~ctx active idx_a lit_a s_a passive idx_p lit_p s_p subst acc =
@@ -130,6 +133,7 @@ let cancellation c =
       ~rule:"cancellation" cc [c.C.hcproof] in
     let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
     Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c Substs.FO.pp subst C.pp new_c;
+    Util.incr_stat stat_cancellation;
     new_c
   in
   (* try to factor arith literals *)
@@ -147,7 +151,61 @@ let cancellation c =
               mk_instance subst :: acc
             with FOUnif.Fail -> acc))
 
-let canc_equality_factoring c =  []
+let canc_equality_factoring c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let eligible = C.Eligible.eq in
+  (* focused literals (only for equalities) *)
+  let lits = ArithLit.Arr.view_focused ~ord ~eligible c.C.hclits in
+  Util.array_foldi
+    (fun acc i lit -> match lit with
+      | `Focused (ArithLit.Eq, l) ->
+        (* try each focused term in this literal *)
+        List.fold_left
+          (fun acc lit ->
+            assert (lit.Foc.op = ArithLit.Eq);
+            Util.array_foldi
+              (fun acc j lit' -> match lit' with
+                | `Focused (ArithLit.Eq, l') when j <> i ->
+                  List.fold_left
+                    (fun acc lit' ->
+                      try
+                        (* try to unify both focused terms *)
+                        let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
+                        (* check maximality of left literal *)
+                        if not (C.is_maxlit c i subst 0) then raise Exit;
+                        (* lit is [t + m1 = m2], lit' is [t + m1' = m2']
+                            now we infer, as for regular eq.factoring,
+                            t = m2-m1 | t = m2'-m1'
+                            ----------------------------------
+                            m2 - m1 != m2' - m1'| t = m2' - m1'
+                            ===================================
+                            m2 + m1' != m2' + m1 | t + m1' = m2'
+                            and canonize literals again.
+                            Here we keep the second literal, and remove the first. *)
+                        let new_lits = Util.array_except_idx c.C.hclits i in
+                        let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
+                        let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
+                        let new_lit = Canon.to_lit ~ord
+                          (Canon.of_monome ArithLit.Neq
+                            (M.difference (M.sum m2 m1') (M.sum m2' m1)))
+                        in
+                        let new_lits = new_lit :: new_lits in
+                        (* apply subst and build clause *)
+                        let new_lits = Literal.apply_subst_list
+                          ~renaming:(Ctx.renaming_clear ctx) ~ord subst new_lits 0 in
+                        let proof cc = Proof.mk_c_step cc ~rule:"canc_eq_factoring" [c.C.hcproof] in
+                        let new_c = C.create ~ctx new_lits proof in
+                        Util.debug 5 "cancellative_eq_factoring: %a gives %a" C.pp c C.pp new_c;
+                        Util.incr_stat stat_canc_eq_factoring;
+                        new_c :: acc
+                      with FOUnif.Fail | Exit -> acc)
+                    acc l'
+                | _ -> acc)
+              acc lits)
+          acc l
+      | _ -> acc)
+    [] lits
   
 let canc_ineq_chaining_left state c = []
   
