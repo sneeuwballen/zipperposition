@@ -45,7 +45,8 @@ val eliminate_arith : Env.unary_inf_rule
       and thus eliminate it *)
 
 val factor_arith : Env.unary_inf_rule
-  (** Try to unify terms of arithmetic literals *)
+  (** Try to unify terms of arithmetic literals
+      TODO: remove? (cancellation should do it) *)
 
 val purify_arith : Env.unary_inf_rule
   (** Purification inference.

@@ -40,8 +40,9 @@ val canc_sup_active: Env.binary_inf_rule
 val canc_sup_passive: Env.binary_inf_rule
   (** cancellative superposition where given clause is passive *)
 
-val canc_equality_resolution: Env.unary_inf_rule
-  (** cancellative equality resolution *)
+val cancellation: Env.unary_inf_rule
+  (** cancellation (unifies some terms on both sides of a
+      comparison operator) *)
 
 val canc_equality_factoring: Env.unary_inf_rule
   (** cancellative equality factoring *)

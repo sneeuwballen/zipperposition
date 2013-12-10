@@ -109,18 +109,45 @@ let canc_sup_passive state c =
       Util.debug 5 "attempt to passive superpose %a in %a[%d]" T.pp t C.pp c i;
       I.retrieve_unifiables state#idx_canc 1 t 0 acc
         (fun acc t' (active,j,lit') subst ->
-          _do_canc ~ctx active j lit' 1 c i lit 0 subst acc
+          match lit'.Foc.op with
+          | ArithLit.Eq ->
+            (* rewrite using lit' *)
+            _do_canc ~ctx active j lit' 1 c i lit 0 subst acc
+          | _ -> acc
         ))
   in
   res
 
-let canc_equality_resolution c = []
+let cancellation c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let eligible = C.Eligible.max c in
+  (* instantiate the clause with subst *)
+  let mk_instance subst =
+    let renaming = Ctx.renaming_clear ~ctx in
+    let lits' = Literal.Arr.apply_subst ~ord ~renaming subst c.C.hclits 0 in
+    let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
+      ~rule:"cancellation" cc [c.C.hcproof] in
+    let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
+    Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c Substs.FO.pp subst C.pp new_c;
+    new_c
+  in
+  (* try to factor arith literals *)
+  ArithLit.Arr.fold_canonical ~eligible c.C.hclits []
+    (fun acc i lit ->
+      match lit with
+      | Canon.True | Canon.False -> acc
+      | Canon.Compare (op, m1, m2) ->
+        let l1 = M.terms m1 in
+        let l2 = M.terms m2 in
+        Util.list_fold_product l1 l2 acc
+          (fun acc t1 t2 ->
+            try
+              let subst = FOUnif.unification t1 0 t2 0 in
+              mk_instance subst :: acc
+            with FOUnif.Fail -> acc))
 
 let canc_equality_factoring c =  []
-
-let canc_eq_chaining_active state c = []
-  
-let canc_eq_chaining_passive state c = []
   
 let canc_ineq_chaining_left state c = []
   
@@ -142,7 +169,7 @@ let setup_env ~env =
   Util.debug 2 "cancellative inf: setup env";
   Env.add_binary_inf ~env "canc_sup_active" canc_sup_active;
   Env.add_binary_inf ~env "canc_sup_passive" canc_sup_passive;
-  Env.add_unary_inf ~env "canc_eq_resolution" canc_equality_resolution;
+  Env.add_unary_inf ~env "cancellation" cancellation;
   Env.add_unary_inf ~env "canc_eq_factoring" canc_equality_factoring;
   Env.add_binary_inf ~env "canc_ineq_chaining_left" canc_ineq_chaining_left;
   Env.add_binary_inf ~env "canc_ineq_chaining_right" canc_ineq_chaining_right;
