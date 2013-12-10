@@ -199,7 +199,7 @@ end) : sig
 
   val wildcard : t   (** $_ for type inference *)
 
-  include Interface.PRINT with type t := t
+  include Interfaces.PRINT with type t := t
 end
 
 (** {2 Arith Interface}
