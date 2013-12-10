@@ -42,8 +42,9 @@ module Foc = ArithLit.Focused
 
 let stat_canc_sup = Util.mk_stat "canc.superposition"
 let stat_cancellation = Util.mk_stat "canc.cancellation"
-let stat_canc_eq_factoring= Util.mk_stat "canc.eq_factoring"
-let stat_canc_ineq_factoring= Util.mk_stat "canc.ineq_factoring"
+let stat_canc_eq_factoring = Util.mk_stat "canc.eq_factoring"
+let stat_canc_ineq_factoring = Util.mk_stat "canc.ineq_factoring"
+let stat_canc_ineq_chaining = Util.mk_stat "canc.ineq_chaining"
 
 (* do cancellative superposition *)
 let _do_canc ~ctx active idx_a lit_a s_a passive idx_p lit_p s_p subst acc =
@@ -207,7 +208,80 @@ let canc_equality_factoring c =
       | _ -> acc)
     [] lits
   
-let canc_ineq_chaining_left state c = []
+let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  (* perform chaining (if ordering conditions respected) *)
+  let _chaining ~left:(c,s_c,i,lit,strict) ~right:(c',s_c',j,lit',strict') subst acc =
+    Util.debug 5 "attempt chaining between %a and %a..." C.pp c C.pp c';
+    if C.is_maxlit c s_c subst i
+    && C.is_maxlit c' s_c' subst j
+    then begin
+      let renaming = Ctx.renaming_clear ~ctx in
+      (* make sure [t] has the same coefficient in [lit] and [lit'] *)
+      let lit, lit' = Foc.scale lit lit' in
+      let lit = Foc.apply_subst ~renaming subst lit s_c in
+      let lit' = Foc.apply_subst ~renaming subst lit' s_c' in
+      (* now, lit = [c.t + m1 <| m2],  lit' = [m1' <| m2' + c.t] for some positive
+          coefficient [c]. let us deduce (with context) that
+          [m1' - m2' <| m2 - m1], therefore [m1' + m1 <| m2 + m2'] 
+          and canonize this literal. *)
+      let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
+      let m1', m2' = lit'.Foc.other_side, lit'.Foc.same_side in
+      let strict = strict || strict' in
+      let lits_left = Util.array_except_idx c.C.hclits i in
+      let lits_left = Literal.apply_subst_list ~renaming ~ord subst lits_left s_c in
+      let lits_right = Util.array_except_idx c'.C.hclits j in
+      let lits_right = Literal.apply_subst_list ~renaming ~ord subst lits_right s_c' in
+      let lits =
+        if strict
+          then
+            (* m1+m1' - (m2+m2') < 0 *)
+            [ Canon.to_lit ~ord
+                (Canon.of_monome ArithLit.Lt
+                  (M.difference (M.sum m1 m1') (M.sum m2 m2')))
+            ]
+          else
+            (* m1' = c.t + m1   OR   m1+m1' - (m2+m2') < 0 *)
+            [ Canon.to_lit ~ord
+                (Canon.of_monome ArithLit.Eq
+                  (M.difference m1' (M.add m1 lit.Foc.coeff lit.Foc.term)))
+            ; Canon.to_lit ~ord
+                (Canon.of_monome ArithLit.Lt
+                  (M.difference (M.sum m1 m1') (M.sum m2 m2')))
+            ]
+      in
+      let all_lits = lits @ lits_left @ lits_right in
+      (* build clause *)
+      let proof cc = Proof.mk_c_step cc ~rule:"canc_ineq_chaining" [c.C.hcproof; c'.C.hcproof] in
+      let new_c = C.create ~ctx ~parents:[c;c'] all_lits proof in
+      Util.debug 5 "ineq chaining of %a and %a gives %a" C.pp c C.pp c' C.pp new_c;
+      Util.incr_stat stat_canc_ineq_chaining;
+      new_c :: acc
+    end else
+      acc
+  in
+  let res = ArithLit.Arr.fold_focused ~ord c.C.hclits []
+    (fun acc i lit ->
+      match lit.Foc.op with
+      | ArithLit.Leq | ArithLit.Lt ->
+        let t = lit.Foc.term in
+        let strict = lit.Foc.op = ArithLit.Lt in
+        I.retrieve_unifiables state#idx_canc 0 t 1 acc
+          (fun acc t' (c',j,lit') subst ->
+            (* lit' = t' + m1' <| m2' ? *)
+            match lit'.Foc.op, lit.Foc.side, lit'.Foc.side with
+            | (ArithLit.Leq | ArithLit.Lt), ArithLit.Left, ArithLit.Right ->
+              let strict' = lit'.Foc.op = ArithLit.Lt in
+              _chaining ~left:(c,1,i,lit,strict) ~right:(c',0,j,lit',strict') subst acc
+            | (ArithLit.Leq | ArithLit.Lt), ArithLit.Right, ArithLit.Left ->
+              let strict' = lit'.Foc.op = ArithLit.Lt in
+              _chaining ~left:(c',0,j,lit',strict') ~right:(c,1,i,lit,strict) subst acc
+            | _ -> acc
+          )
+      | _ -> acc)
+  in
+  res
   
 let canc_ineq_chaining_right state c = []
   
@@ -229,8 +303,7 @@ let setup_env ~env =
   Env.add_binary_inf ~env "canc_sup_passive" canc_sup_passive;
   Env.add_unary_inf ~env "cancellation" cancellation;
   Env.add_unary_inf ~env "canc_eq_factoring" canc_equality_factoring;
-  Env.add_binary_inf ~env "canc_ineq_chaining_left" canc_ineq_chaining_left;
-  Env.add_binary_inf ~env "canc_ineq_chaining_right" canc_ineq_chaining_right;
+  Env.add_binary_inf ~env "canc_ineq_chaining" canc_ineq_chaining;
   Env.add_unary_inf ~env "canc_reflexivity_res" canc_reflexivity_res;
   Env.add_unary_inf ~env "canc_ineq_factoring" canc_ineq_factoring;
   Env.add_is_trivial ~env is_tautology;
