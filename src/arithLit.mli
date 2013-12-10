@@ -78,6 +78,7 @@ module Canonical : sig
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
 
   val monomes : t -> Monome.t * Monome.t
     (** Return the monomes inside the literal.
@@ -122,7 +123,7 @@ end
     term in the literal. It can therefore perform many simplifications. *)
 
 module Single : sig
-  type t = private
+  type t =
   | True
   | False
   | Compare of op * side * FOTerm.t * Symbol.t  (* side: side of the term w.r.t operator *)
@@ -160,6 +161,7 @@ module Focused : sig
 
   val pp : Buffer.t -> t -> unit
   val to_string : t -> string
+  val fmt : Format.formatter -> t -> unit
 
   val cmp : t -> t -> int
 

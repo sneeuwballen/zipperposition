@@ -118,6 +118,7 @@ module Canonical = struct
     Printf.bprintf buf "%a %a %a" M.pp m1 _pp_op op M.pp m2
 
   let to_string = Util.on_buffer pp
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
   let of_monome op m =
     let m = M.normalize_wrt_zero m in
@@ -384,6 +385,7 @@ module Focused = struct
         M.pp t.other_side _pp_op t.op S.pp t.coeff T.pp t.term M.pp t.same_side
 
   let to_string = Util.on_buffer pp
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
   let cmp t1 t2 =
     let c = Util.lexicograph_combine
