@@ -146,7 +146,18 @@ val at_cpos : t -> int -> t
 val max_cpos : t -> int
   (** maximum compact position in the term *)
 
-val var_occurs : t -> t -> bool          (** [var_occurs x t] true iff x in t *)
+(** {2 Sequences} *)
+
+module Seq : sig
+  val vars : t -> t Sequence.t
+  val subterms : t -> t Sequence.t
+  val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
+  val symbols : t -> Symbol.t Sequence.t
+  val max_var : t Sequence.t -> int
+  val min_var : t Sequence.t -> int
+end
+
+val var_occurs : var:t -> t -> bool      (** [var_occurs ~var t] true iff [var] in t *)
 val is_ground : t -> bool                (** is the term ground? (no free vars) *)
 val monomorphic : t -> bool              (** true if the term contains no type var *)
 val max_var : varlist -> int             (** find the maximum variable index, or 0 *)
@@ -154,7 +165,6 @@ val min_var : varlist -> int             (** minimum variable, or 0 if ground *)
 val add_vars : unit Tbl.t -> t -> unit   (** add variables of the term to the set *)
 val vars : t -> varlist                  (** compute variables of the term *)
 val vars_list : t list -> varlist        (** variables of terms in the list *)
-val vars_seq : t Sequence.t -> varlist   (** variables of terms in the sequence *)
 val vars_prefix_order : t -> varlist     (** variables of the term in prefix traversal order *)
 val depth : t -> int                     (** depth of the term *)
 val head : t -> Symbol.t                 (** head symbol (or Invalid_argument) *)
@@ -194,8 +204,8 @@ end
 
 (** {2 High-level operations} *)
 
-val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
-  (** Symbols of the terms (keys of signature) *)
+val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
+  (** Symbols of the term (keys of signature) *)
 
 val contains_symbol : Symbol.t -> t -> bool
   (** Does the term contain this given symbol? *)
