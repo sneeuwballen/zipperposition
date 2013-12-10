@@ -90,9 +90,6 @@ module ActiveSet = struct
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_ord_left : TermIndex.t;       (** terms at LHS of inequality *)
-      idx_ord_right : TermIndex.t;      (** terms at RHS of inequality *)
-      idx_ord_subterm : TermIndex.t;    (** subterms of inequality literals *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 
@@ -107,18 +104,12 @@ module ActiveSet = struct
       val mutable m_clauses = C.CSet.empty
       val mutable m_sup_into = TermIndex.empty ()
       val mutable m_sup_from = TermIndex.empty ()
-      val mutable m_ord_left = TermIndex.empty ()
-      val mutable m_ord_right = TermIndex.empty ()
-      val mutable m_ord_subterm = TermIndex.empty ()
       val mutable m_back_demod = TermIndex.empty ()
       val mutable m_fv = idx
       method ctx = ctx
       method clauses = m_clauses
       method idx_sup_into = m_sup_into
       method idx_sup_from = m_sup_from
-      method idx_ord_left = m_ord_left
-      method idx_ord_right = m_ord_right
-      method idx_ord_subterm = m_ord_subterm
       method idx_back_demod = m_back_demod
       method idx_fv = m_fv
 
@@ -143,32 +134,6 @@ module ActiveSet = struct
           (fun tree t pos ->
             let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
             f tree t with_pos);
-        (* terms occurring immediately under an inequation, on LHS or RHS *)
-        let spec = Ctx.total_order ~ctx:c.C.hcctx in
-        let left, right = Lits.fold_ineq ~spec
-          ~eligible:(C.Eligible.chaining c) c.C.hclits (m_ord_left,m_ord_right)
-          (fun (left,right) lit lit_pos ->
-            let l = lit.TO.left in
-            let with_pos = C.WithPos.( {term=l; pos=(lit_pos@[Position.left_pos]); clause=c} ) in
-            let left = f left l with_pos in
-            let r = lit.TO.right in
-            let with_pos = C.WithPos.( {term=r; pos=(lit_pos@[Position.right_pos]); clause=c} ) in
-            let right = f right r with_pos in
-            left, right)
-        in
-        m_ord_left <- left;
-        m_ord_right <- right;
-        (* subterms occurring under an inequation *)
-        m_ord_subterm <- Lits.fold_terms ~which:`Both ~subterms:true
-          ~eligible:(C.Eligible.chaining c) c.C.hclits m_ord_subterm
-          (fun tree t pos ->
-            match pos with
-            | [_; _] ->
-              tree  (* this must be the inequality itself, not the subterms *)
-            | _::_::_ ->
-              let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-              f tree t with_pos
-            | _ -> assert false);
         ()
 
       (** add clauses (only process the ones not present in the set) *)

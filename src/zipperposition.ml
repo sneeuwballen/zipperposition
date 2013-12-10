@@ -122,9 +122,8 @@ let setup_penv ?(ctx=Skolem.create ()) ~penv () =
   if (PEnv.get_params ~penv).param_expand_def then
     PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
   if (PEnv.get_params ~penv).param_arith then
-    ArithElim.setup_penv ~penv;  (* TODO chaining! *)
+    ArithElim.setup_penv ~penv;
   AC.setup_penv ~penv;
-  Chaining.setup_penv ~penv;
   (* be sure to get a total order on symbols *)
   PEnv.add_constr ~penv Precedence.alpha_constraint;
   ()
@@ -135,7 +134,6 @@ let setup_env ~env =
   | x -> failwith ("unknown calculus " ^ x)
   end;
   AC.setup_env ~env;
-  Chaining.setup_env ~env;
   if (Env.get_params ~env).param_arith then begin
     let ac = (Env.get_params ~env).param_arith_ac in
     T.set_default_pp T.pp_arith;

@@ -5849,7 +5849,6 @@ let setup_t =
                            "PFormula";
                            "Theories";
                            "AC";
-                           "Chaining";
                            "PEnv";
                            "Params";
                            "Env";

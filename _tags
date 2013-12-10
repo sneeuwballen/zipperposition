@@ -32,7 +32,6 @@
 "src/pFormula.cmx": for-pack(Libzipperposition)
 "src/theories.cmx": for-pack(Libzipperposition)
 "src/AC.cmx": for-pack(Libzipperposition)
-"src/chaining.cmx": for-pack(Libzipperposition)
 "src/pEnv.cmx": for-pack(Libzipperposition)
 "src/params.cmx": for-pack(Libzipperposition)
 "src/env.cmx": for-pack(Libzipperposition)

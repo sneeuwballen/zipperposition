@@ -17,7 +17,6 @@ src/Superposition
 src/PFormula
 src/Theories
 src/AC
-src/Chaining
 src/PEnv
 src/Params
 src/Env
