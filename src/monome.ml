@@ -125,6 +125,17 @@ let remove e t =
 let remove_const e =
   { e with const = S.Arith.zero_of_ty (ty e); }
 
+module Seq = struct
+  let terms m =
+    fun k -> List.iter (fun (_, t) -> k t) m.terms
+
+  let vars m =
+    Sequence.flatMap T.Seq.vars (terms m)
+
+  let coeffs m =
+    fun k -> List.iter k m.terms
+end
+
 let is_const e = match e.terms with | [] -> true | _ -> false
 
 let sign m =
@@ -140,15 +151,10 @@ let size e = List.length e.terms
 
 let terms m = List.map snd m.terms
 
-let vars e =
-  let seq = Sequence.of_list e.terms in
-  let seq = Sequence.map snd seq in
-  T.vars_seq seq
-
 let to_list e = e.terms
 
-let var_occurs v e =
-  List.exists (fun (_, t) -> T.var_occurs v t) e.terms
+let var_occurs ~var e =
+  List.exists (fun (_, t) -> T.var_occurs ~var t) e.terms
 
 let sum e1 e2 =
   let const = S.Arith.Op.sum e1.const e2.const in
@@ -574,7 +580,7 @@ module Solve = struct
 
   (* default generator of fresh variables *)
   let __fresh_var m =
-    let count = ref (T.max_var (vars m) + 1) in
+    let count = ref (T.Seq.max_var (Seq.vars m) + 1) in
     fun ty ->
       let n = !count in
       incr count;

@@ -262,6 +262,19 @@ let mk_lesseq instance l r =
   let open Theories.TotalOrder in
   mk_true (T.mk_node ~tyargs:[T.ty l] instance.lesseq [l; r])
 
+module Seq = struct
+  let terms lit k = match lit with
+    | Equation(l, r, _, _) -> k l; k r
+    | Prop(p, _) -> k p
+    | True
+    | False -> ()
+
+  let vars lit = Sequence.flatMap T.Seq.vars (terms lit)
+
+  let symbols lit =
+    Sequence.flatMap T.Seq.symbols (terms lit)
+end
+
 let apply_subst ~renaming ~ord subst lit scope =
   match lit with
   | Equation (l,r,sign,_) ->
@@ -274,12 +287,10 @@ let apply_subst ~renaming ~ord subst lit scope =
   | True
   | False -> lit
 
-let symbols lit = match lit with
-  | Equation (l,r,_,_) ->
-    T.symbols (Sequence.of_list [l;r])
-  | Prop (p,_) -> T.symbols (Sequence.singleton p)
-  | True
-  | False -> Symbol.Set.empty
+let symbols lit =
+  Sequence.fold
+    (fun set s -> Symbol.Set.add s set)
+    Symbol.Set.empty (Seq.symbols lit)
 
 let reord ~ord lit =
   match lit with

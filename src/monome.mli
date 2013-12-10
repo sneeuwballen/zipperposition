@@ -58,6 +58,12 @@ val add_const : t -> Symbol.t -> t        (** Add given number to constant *)
 val remove : t -> FOTerm.t -> t           (** Remove the term *)
 val remove_const : t -> t   (** Remove constant *)
 
+module Seq : sig
+  val terms : t -> FOTerm.t Sequence.t
+  val vars : t -> FOTerm.t Sequence.t
+  val coeffs : t -> (Symbol.t * FOTerm.t) Sequence.t
+end
+
 val is_const : t -> bool
   (** Returns [true] if the monome is only a constant *)
 
@@ -71,13 +77,10 @@ val size : t -> int
 val terms : t -> FOTerm.t list
   (** List of terms that occur in the monome with non-nul coefficients *)
 
-val vars : t -> FOTerm.t list
-  (** Variables that occur in some term of the monome *)
-
 val to_list : t -> (Symbol.t * FOTerm.t) list
   (** Terms and their coefficients. Ignores the constant! *)
 
-val var_occurs : FOTerm.t -> t -> bool
+val var_occurs : var:FOTerm.t -> t -> bool
   (** Does the variable occur in the monome? *)
 
 val sum : t -> t -> t

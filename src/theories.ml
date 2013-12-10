@@ -84,7 +84,7 @@ module AC = struct
     T.ac_symbols ~is_ac:(is_ac ~spec) seq
 
   let symbols_of_forms ~spec f =
-    T.ac_symbols ~is_ac:(is_ac ~spec) (Sequence.flatMap F.terms_seq f)
+    T.ac_symbols ~is_ac:(is_ac ~spec) (Sequence.flatMap F.Seq.terms f)
 
   let proofs ~spec =
     STbl.fold

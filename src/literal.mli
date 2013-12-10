@@ -117,7 +117,11 @@ val vars : t -> FOTerm.varlist (** gather variables *)
 val var_occurs : FOTerm.t -> t -> bool
 val is_ground : t -> bool
 
-val terms : t -> FOTerm.t Sequence.t (** Terms occuring in the literal *)
+module Seq : sig
+  val terms : t -> FOTerm.t Sequence.t
+  val vars : t -> FOTerm.t Sequence.t
+  val symbols : t -> Symbol.t Sequence.t
+end
 
 val get_eqn : t -> side:int -> FOTerm.t * FOTerm.t * bool
   (** Equational view of a literal *)
