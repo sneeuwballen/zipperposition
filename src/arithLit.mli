@@ -87,6 +87,10 @@ module Canonical : sig
     (** Return the operator, or
         @raise Invalid_argument if the literal is true or false *)
 
+  val of_monome : op -> Monome.t -> t
+    (** [of_monome op m] builds the canonical form of [m op 0] (comparison
+        with 0 where [m] is on the left) *)
+
   val extract : Literal.t -> t
     (** Convert a regular literal into a canonical literal.
         @raise Monome.NotLinear if the literal is not a linear expression *)

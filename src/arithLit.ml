@@ -119,44 +119,37 @@ module Canonical = struct
 
   let to_string = Util.on_buffer pp
 
+  let of_monome op m =
+    let m = M.normalize_wrt_zero m in
+    if M.is_const m
+    then match op with
+      | Eq -> if M.sign m = 0 then True else False
+      | Neq -> if M.sign m = 0 then False else True
+      | Lt -> if M.sign m < 0 then True else False
+      | Leq -> if M.sign m <= 0 then True else False
+    else
+      let m, op = match op with
+        | Lt when Type.eq Type.int (M.ty m) ->
+          (* m < 0 ---> m+1 <= 0 *)
+          M.succ m, Leq
+        | _ -> m, op
+      in
+      let m1, m2 = M.split m in
+      Compare(op, m1, m2)
+
   let _extract lit =
     (* extract literal from (l=r | l!=r) *)
     let extract_eqn l r sign =
       let m1 = M.of_term l in
       let m2 = M.of_term r in
       let m = M.difference m1 m2 in
-      (* remove denominator, it doesn't matter *)
-      let m = M.normalize_wrt_zero m in
-      if M.is_const m
-      then if M.sign m = 0
-        then if sign then True else False
-        else if sign then False else True
-      else if not (M.has_instances m) && sign
-        then False
-      else
-        let m1, m2 = M.split m in
-        if sign
-          then Compare(Eq, m1, m2)
-          else Compare(Neq, m1, m2)
+      of_monome (if sign then Eq else Neq) m
     (* extract lit from (l <= r | l < r) *)
     and extract_less ~strict l r =
       let m1 = M.of_term l in
       let m2 = M.of_term r in
       let m = M.difference m1 m2 in
-      let m = M.normalize_wrt_zero m in
-      if M.is_const m then match M.sign m with
-        | 0 -> if strict then False else True
-        | n when n < 0 -> True
-        | _ -> False
-      else if strict && Type.eq (M.ty m) Type.int
-        then
-          let m1, m2 = M.split (M.succ m) in  (* m1 < m2 ---> m1+1 <= m2 *)
-          Compare(Leq, m1, m2)
-      else
-        let m1, m2 = M.split m in
-        if strict
-          then Compare(Lt, m1, m2)
-          else Compare(Leq, m1, m2)
+      of_monome (if strict then Lt else Leq) m
     in
     let extract_le a b = extract_less ~strict:false a b in
     let extract_lt a b = extract_less ~strict:true a b in
