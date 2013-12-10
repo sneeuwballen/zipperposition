@@ -330,6 +330,14 @@ let weight f =
   in
   count 0 f
 
+module Seq = struct
+  let terms f k = iter k f
+
+  let vars f = Sequence.flatMap FOTerm.Seq.vars (terms f)
+
+  let symbols f = Sequence.flatMap FOTerm.Seq.symbols (terms f)
+end
+
 let add_terms set f = iter (fun t -> T.Tbl.replace set t ()) f
 
 let terms f =
@@ -337,19 +345,14 @@ let terms f =
   add_terms set f;
   set
 
-let terms_seq f =
-  Sequence.from_iter (fun k -> iter k f)
-
 let subterm t f =
-  try
-    iter (fun t' -> if T.subterm ~sub:t t' then raise Exit) f;
-    false
-  with Exit ->
-    true
+  Sequence.exists
+    (fun t' -> T.subterm ~sub:t t')
+    (Seq.terms f)
 
-let var_occurs v f =
-  assert (T.is_var v);
-  subterm v f
+let var_occurs ~var f =
+  assert (T.is_var var);
+  Sequence.exists (T.var_occurs ~var) (Seq.terms f)
 
 let free_variables f =
   let set = T.Tbl.create 5 in
@@ -398,11 +401,10 @@ let is_closed f =
   | _ -> false
 
 let contains_symbol sy f =
-  let terms = terms_seq f in
-  Sequence.exists (T.contains_symbol sy) terms
+  Sequence.exists (Symbol.eq sy) (Seq.symbols f)
 
 let symbols ?(init=Symbol.Set.empty) f =
-  T.symbols ~init (terms_seq f)
+  Sequence.fold (fun set s -> Symbol.Set.add s set) init (Seq.symbols f)
 
 (** {2 De Bruijn indexes} *)
 
@@ -470,7 +472,7 @@ let close_exists f =
   mk_exists fv f
 
 let open_forall ?(offset=0) f =
-  let offset = max offset (T.max_var (free_variables f) + 1) in
+  let offset = max offset (T.Seq.max_var (Seq.vars f)) + 1 in
   (* open next forall, replacing it with a fresh var *)
   let rec open_one offset env f = match f.form with
   | Forall (ty,f') ->
@@ -514,13 +516,6 @@ let rec flatten f =
   | False
   | Atom _
   | Equal _ -> f
-
-(* does the var [v] occur in some term of [f]? *)
-let _var_occurs v f =
-  if is_ground f
-    then false
-    else
-      Sequence.exists (T.var_occurs v) (terms_seq f)
 
 let simplify f =
   let rec simplify ~depth f =

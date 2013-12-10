@@ -128,11 +128,14 @@ val weight : t -> int
 
 (** The following functions gather the subterms of a formula. *)
 
+module Seq : sig
+  val terms : t -> term Sequence.t
+  val vars : t -> term Sequence.t
+  val symbols : t -> Symbol.t Sequence.t
+end
+
 val add_terms : unit FOTerm.Tbl.t -> t -> unit
 val terms : t -> unit FOTerm.Tbl.t
-
-val terms_seq : t -> term Sequence.t
-  (** Sequence of terms. FOTerms may occur several times *)
 
 val subterm : term -> t -> bool
   (** [subterm t f] true iff [t] occurs in some term of [f] *)
@@ -143,7 +146,7 @@ val free_variables : t -> FOTerm.varlist
 val ty_vars : Type.Set.t -> t -> Type.Set.t
   (** Set of free type variables *)
 
-val var_occurs : term -> t -> bool
+val var_occurs : var:term -> t -> bool
 
 val is_atomic : t -> bool   (** No connectives? *)
 val is_ground : t -> bool   (** No variables? *)

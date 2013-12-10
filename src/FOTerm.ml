@@ -313,6 +313,55 @@ let rec ty_vars set t = match t.term with
     let set = List.fold_left Type.free_vars_set set tyargs in
     List.fold_left ty_vars set l
 
+module Seq = struct
+  let rec vars t k = match t.term with
+    | Var _ -> k t
+    | BoundVar _
+    | Node (_, _, []) -> ()
+    | Node (_, _, l) -> _vars_list l k
+  and _vars_list l k = match l with
+    | [] -> ()
+    | t::l' -> vars t k; _vars_list l' k
+
+  let rec subterms t k =
+    k t;
+    match t.term with
+    | Var _
+    | BoundVar _ -> ()
+    | Node (_, _, l) -> List.iter (fun t' -> subterms t' k) l
+
+  let subterms_depth t k =
+    let rec recurse depth t =
+      k (t, depth);
+      match t.term with
+      | Node (_, _, ((_::_) as l)) ->
+        let depth' = depth + 1 in
+        List.iter (fun t' -> recurse depth' t') l
+      | _ -> ()
+    in
+    recurse 0 t
+
+  let rec symbols t k = match t.term with
+    | Var _ | BoundVar _ -> ()
+    | Node (s, _, []) -> k s
+    | Node (s, _, l) ->
+      k s;
+      _symbols_list l k
+  and _symbols_list l k = match l with
+    | [] -> ()
+    | t::l' -> symbols t k; _symbols_list l' k
+
+  let max_var seq =
+    let r = ref 0 in
+    seq (function {term=Var i} -> r := max i !r | _ -> ());
+    !r
+
+  let min_var seq =
+    let r = ref max_int in
+    seq (function {term=Var i} -> r := min i !r | _ -> ());
+    !r
+end
+
 (** get subterm by its position *)
 let at_cpos t pos = 
   let rec recurse t pos =
@@ -340,10 +389,7 @@ let rec monomorphic t =
     List.for_all Type.is_ground tyargs &&
     List.for_all monomorphic l
 
-let rec var_occurs x t = match t.term with
-  | Var _ | BoundVar _ -> x == t
-  | Node (s, _, []) -> false
-  | Node (s, _, l) -> List.exists (var_occurs x) l
+let var_occurs ~var t = Sequence.exists (fun t' -> eq var t') (Seq.vars t)
 
 let max_var vars =
   let rec aux idx = function
@@ -363,15 +409,7 @@ let min_var vars =
 
 (** add variables of the term to the set *)
 let add_vars set t =
-  let rec add set t = match t.term with
-  | BoundVar _ | Node (_, _, []) -> ()
-  | Var _ -> Tbl.replace set t ()
-  | Node (_, _, l) -> add_list set l
-  and add_list set l = match l with
-  | [] -> ()
-  | x::l' -> add set x; add_list set l'
-  in
-  add set t
+  Sequence.iter (fun v -> Tbl.replace set v ()) (Seq.vars t)
 
 (** compute variables of the term *)
 let vars t =
@@ -411,22 +449,14 @@ let depth t =
 
 let head t = match t.term with
   | Node (s, _, _) -> s
-  | Var _ | BoundVar _ -> raise (Invalid_argument "Term.head: variable")
+  | Var _ | BoundVar _ -> raise (Invalid_argument "Term.head")
 
-let symbols ?(init=Symbol.Set.empty) seq =
-  let rec symbols set t = match t.term with
-    | Var _ | BoundVar _ -> set
-    | Node (s, _, l) ->
-      let set = Symbol.Set.add s set in
-      List.fold_left symbols set l
-  in
-  Sequence.fold symbols init seq
+let symbols ?(init=Symbol.Set.empty) t =
+  Sequence.fold (fun set s -> Symbol.Set.add s set) init (Seq.symbols t)
 
 (** Does t contains the symbol f? *)
-let rec contains_symbol f t =
-  match t.term with
-  | Var _ | BoundVar _ -> false
-  | Node (g, _, ts) -> Symbol.eq g f || List.exists (contains_symbol f) ts
+let contains_symbol f t =
+  Sequence.exists (Symbol.eq f) (Seq.symbols t)
 
 (** {2 De Bruijn Indexes manipulations} *)
 
