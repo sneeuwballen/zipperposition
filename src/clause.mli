@@ -215,6 +215,9 @@ module Eligible : sig
   val chaining : clause -> t
     (** Eligible for chaining *)
 
+  val eq : t
+    (** Equations *)
+
   val ineq : clause -> t
     (** Only literals that are inequations *)
 

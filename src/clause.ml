@@ -401,6 +401,10 @@ module Eligible = struct
     let bv = eligible_chaining c 0 S.empty in
     fun i lit -> BV.get bv i
 
+  let eq i lit = match lit with
+    | Lit.Equation (_, _, true, _) -> true
+    | _ -> false
+
   let ineq c =
     let spec = Ctx.total_order c.hcctx in
     fun i lit -> Lit.is_ineq ~spec lit

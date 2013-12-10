@@ -571,11 +571,13 @@ module Arr = struct
         else acc)
       acc lits
 
-  let view_canonical lits =
-    Array.map
-      (fun lit ->
-        try `Canonical (Canonical.extract lit)
-        with Monome.NotLinear -> `Ignore lit)
+  let view_canonical ?(eligible=fun _ _ -> true) lits =
+    Array.mapi
+      (fun i lit ->
+        if eligible i lit
+          then try `Canonical (Canonical.extract lit)
+          with Monome.NotLinear -> `Ignore lit
+        else `Ignore lit)
       lits
 
   let fold_focused ?(eligible=fun _ _ -> true) ~ord lits acc f =
@@ -590,13 +592,17 @@ module Arr = struct
         else acc)
       acc lits
 
-  let view_focused ~ord lits =
-    Array.map
-      (fun lit ->
-        try
-          let lit' = Canonical.extract lit in
-          `Focused (Focused.of_canonical ~ord lit')
-        with Monome.NotLinear -> `Ignore lit)
+  let view_focused ?(eligible=fun _ _ -> true) ~ord lits =
+    Array.mapi
+      (fun i lit ->
+        if eligible i lit 
+        then
+          try
+            let lit' = Canonical.extract lit in
+            let l = Focused.of_canonical ~ord lit' in
+            `Focused (Canonical.op lit', l)
+          with Monome.NotLinear -> `Ignore lit
+        else `Ignore lit)
       lits
 
   let view_bounds lits =

@@ -220,7 +220,8 @@ module Arr : sig
                        ('a -> int -> Canonical.t -> 'a) -> 'a
     (** Fold on canonical literals, with their index in the array *)
 
-  val view_canonical : Literal.t array ->
+  val view_canonical : ?eligible:(int -> Literal.t -> bool) ->
+                       Literal.t array ->
                        [ `Ignore of Literal.t | `Canonical of Canonical.t ] array
     (** View literals as canonical literals or regular literals *)
 
@@ -231,11 +232,13 @@ module Arr : sig
     (** Fold on focused literals with their index. An index can occur several
         times (or none) depending on how many focused terms its literal has *)
 
-  val view_focused :  ord:Ordering.t -> 
+  val view_focused :  ?eligible:(int -> Literal.t -> bool) ->
+                      ord:Ordering.t -> 
                       Literal.t array ->
                       [ `Ignore of Literal.t
-                      | `Focused of Focused.t list ] array 
-    (** View literals as regular literals or list of focused literals *)
+                      | `Focused of op * Focused.t list ] array 
+    (** View literals as regular literals, or an arith
+        literal as an operator and a list of focused views of the literal *)
 
   val view_bounds : Literal.t array ->
     [ `Ignore of Literal.t

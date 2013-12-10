@@ -186,6 +186,9 @@ let ineq_lit ~spec lit =
     TO.({ left=l; right=r; strict; instance; })
   | _ -> raise Not_found
 
+let is_eq lit = equational lit && is_pos lit
+let is_neq lit = equational lit && is_neg lit
+
 let is_ineq ~spec lit =
   try
     let _ = ineq_lit ~spec lit in

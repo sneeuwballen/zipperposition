@@ -71,6 +71,8 @@ val ineq_lit : spec:Theories.TotalOrder.t -> t -> Theories.TotalOrder.lit
       total order literal.
       @raise Not_found if the literal is not an inequality *)
 
+val is_eq : t -> bool (* a = b *)
+val is_neq : t -> bool (* a != b *)
 val is_ineq : spec:Theories.TotalOrder.t -> t -> bool
 val is_strict_ineq : spec:Theories.TotalOrder.t -> t -> bool
 val is_nonstrict_ineq : spec:Theories.TotalOrder.t -> t -> bool
