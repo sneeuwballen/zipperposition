@@ -100,6 +100,10 @@ module Canonical : sig
   val to_lit : ord:Ordering.t -> t -> Literal.t
     (** Conversion back to a literal *)
 
+  val apply_subst : renaming:Substs.FO.Renaming.t ->
+                    Substs.FO.t -> t -> Substs.scope -> t
+    (** Apply substitution to the literal *)
+
   val factor : t -> Substs.FO.t list
     (** Unify non-arith subterms pairwise, return corresponding
         substitutions *)
@@ -165,6 +169,10 @@ module Focused : sig
 
   val of_canonical : ord:Ordering.t -> Canonical.t -> t list
     (** Isolate maximal subterms of a {!Canonical.t} representation *)
+
+  val apply_subst : renaming:Substs.FO.Renaming.t ->
+                    Substs.FO.t -> t -> Substs.scope -> t
+    (** Apply substitution to the focused literal *)
 
   val scale : t -> t -> t * t
     (** Multiply the two literals by some constants, so that their focused

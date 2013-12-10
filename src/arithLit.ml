@@ -224,6 +224,15 @@ module Canonical = struct
     | Compare (op, m1, m2) ->
       _mk_op ~ord op (M.to_term m1) (M.to_term m2)
 
+  let apply_subst ~renaming subst lit s_lit =
+    match lit with
+    | True
+    | False -> lit
+    | Compare (op, m1, m2) ->
+      let m1' = M.apply_subst ~renaming subst m1 s_lit in
+      let m2' = M.apply_subst ~renaming subst m2 s_lit in
+      Compare (op, m1', m2')
+
   (* unify non-arith subterms pairwise *)
   let factor lit = match lit with
   | True
@@ -446,6 +455,12 @@ module Focused = struct
           let m2' = M.remove m2 term in
           { term; side=Right; op; coeff; same_side=m2'; other_side=m1; })
         (max_terms m2)
+
+  let apply_subst ~renaming subst lit s_lit =
+    let term = Substs.FO.apply ~renaming subst lit.term s_lit in
+    let same_side = M.apply_subst ~renaming subst lit.same_side s_lit in
+    let other_side = M.apply_subst ~renaming subst lit.other_side s_lit in
+    { lit with term; same_side; other_side; }
 
   let scale l1 l2 =
     let lcm = S.Arith.Op.lcm l1.coeff l2.coeff in
