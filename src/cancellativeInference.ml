@@ -238,13 +238,12 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
           and canonize this literal. *)
       let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
       let m1', m2' = lit'.Foc.other_side, lit'.Foc.same_side in
-      let strict = strict || strict' in
       let lits_left = Util.array_except_idx c.C.hclits i in
       let lits_left = Literal.apply_subst_list ~renaming ~ord subst lits_left s_c in
       let lits_right = Util.array_except_idx c'.C.hclits j in
       let lits_right = Literal.apply_subst_list ~renaming ~ord subst lits_right s_c' in
       let lits =
-        if strict
+        if strict || strict'
           then
             (* m1+m1' - (m2+m2') < 0 *)
             [ Canon.to_lit ~ord
@@ -252,10 +251,10 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
                   (M.difference (M.sum m1 m1') (M.sum m2 m2')))
             ]
           else
-            (* m1' = c.t + m1   OR   m1+m1' - (m2+m2') < 0 *)
+            (* m1'-m2' = c.t   OR   m1+m1' - (m2+m2') < 0 *)
             [ Canon.to_lit ~ord
                 (Canon.of_monome ArithLit.Eq
-                  (M.difference m1' (M.add m1 lit.Foc.coeff lit.Foc.term)))
+                  (M.difference m1' (M.add m2' lit.Foc.coeff lit.Foc.term)))
             ; Canon.to_lit ~ord
                 (Canon.of_monome ArithLit.Lt
                   (M.difference (M.sum m1 m1') (M.sum m2 m2')))
