@@ -90,29 +90,24 @@ module FO = struct
 
   let interpreted t s = Symbol.Tbl.mem t s
 
-  let rec _eval_head funs ~tyargs s l = match funs with
-    | [] -> None
+  let rec _eval_head ev funs ~tyargs s l = match funs with
+    | [] -> T.mk_node ~tyargs s l
     | f::funs' ->
       match f ~tyargs s l with
-      | None -> _eval_head funs' ~tyargs s l
-      | (Some _) as ans -> ans
+      | None -> _eval_head ev funs' ~tyargs s l
+      | Some t' -> eval_head ev t'
 
   (* non-recursive evaluation *)
-  let rec eval_head ev t = match t.T.term with
+  and eval_head ev t = match t.T.term with
     | T.Var _
     | T.BoundVar _ -> t
     | T.Node (s, tyargs, l) ->
-      let t' =
-        try
-          (* evaluate constant *)
-          let funs = Symbol.Tbl.find ev s in
-          _eval_head funs ~tyargs s l
-        with Not_found -> None
-      in
-      begin match t' with
-        | None -> t
-        | Some t' -> eval_head ev t'
-      end
+      try
+        (* evaluate constant *)
+        let funs = Symbol.Tbl.find ev s in
+        _eval_head ev funs ~tyargs s l
+      with Not_found ->
+        t
 
   (* recursive evaluation *)
   let rec eval ev t = match t.T.term with
@@ -123,109 +118,115 @@ module FO = struct
     | T.Node (s, tyargs, l) ->
       (* evaluate subterms, then the term itself *)
       let l' = List.map (eval ev) l in
-      let t' = 
+      let t' =
         try
           let funs = Symbol.Tbl.find ev s in
-          _eval_head funs ~tyargs s l
+          _eval_head ev funs ~tyargs s l'
         with
-        | Not_found -> None
+        | Not_found -> t
         | Type.Error _ as e ->
           Util.debug 0 "type error when evaluating %a" T.pp t;
           raise e
       in
-      begin match t' with
-        | None -> T.mk_node ~tyargs s l'  (* replace *)
-        | Some t' -> eval ev t'
-      end
+      if T.eq t t'
+        then t'
+        else eval ev t'
 
   let eval_form ev f =
     FOFormula.map_depth (fun _ t -> eval ev t) f
 
-  let app ?tyargs ev s l = eval_head ev (T.mk_node ?tyargs s l)
+  let app ?(tyargs=[]) ev s l =
+    try
+      let funs = Symbol.Tbl.find ev s in
+      _eval_head ev funs ~tyargs s l
+    with Not_found ->
+      T.mk_node ~tyargs s l
 
   module S = Symbol
 
   (* helpers *)
 
+  let _match t = match t.T.term with
+    | T.Node(s,_,[]) -> `Const s
+    | T.Node(s,tys,l') -> `Node (s, tys, l')
+    | _ -> `None
   let _unary l = match l with
-    | [{T.term=T.Node(s,_,l')}] -> `Unary (s, l')
+    | [a] -> _match a
     | _ -> `None
   let _binary l = match l with
-    | [{T.term=T.Node(s1,tys1,l1')}; {T.term=T.Node(s2,tys2,l2')}] ->
-      `Binary (s1, tys1, l1', s2, tys2, l2')
+    | [a; b] -> `Binary (_match a, a, _match b, b)
     | _ -> `None
 
   let _ev_uminus ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.uminus n))  (* - n ----> -n *)
-    | `Unary (s', [t']) when S.eq s' S.Arith.uminus ->
+    | `Node (s', _, [t']) when S.eq s' S.Arith.uminus ->
       Some t'  (* -(-t) --> t *)
     | _ -> None
 
   let _ev_floor ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.floor n))
     | _ -> None
 
   let _ev_ceiling ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.ceiling n))
     | _ -> None
 
   let _ev_round ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.round n))
     | _ -> None
 
   let _ev_truncate ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.truncate n))
     | _ -> None
 
   let _ev_is_int ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (if S.is_int n then T.true_term else T.false_term)
     | _ -> None
 
   let _ev_is_rat ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (if S.is_rat n then T.true_term else T.false_term)
     | _ -> None
 
   let _ev_is_real ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (if S.is_real n then T.true_term else T.false_term)
     | _ -> None
 
   let _ev_to_int ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.to_int n))
     | _ -> None
 
   let _ev_to_rat ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.to_rat n))
     | _ -> None
 
   let _ev_to_real ~tyargs s l = match _unary l with
-    | `Unary (n, []) when S.is_numeric n ->
+    | `Const n when S.is_numeric n ->
       Some (T.mk_const (S.Arith.Op.to_real n))
     | _ -> None
 
-  let _ev_sum ~tyargs _ l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+  let _ev_sum ~tyargs _ l =
+    Util.debug 5 "evaluate sum %a" (Util.pp_list T.pp) l;
+    match _binary l with
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.sum n1 n2))
-    | `Binary (n1, _, [], n2, tys2, l2) when S.Arith.is_zero n1 ->
-      Some (T.mk_node ~tyargs:tys2 n2 l2) (* 0+x --> x *)
-    | `Binary (n1, tys1, l1, n2, _, []) when S.Arith.is_zero n2 ->
-      Some (T.mk_node ~tyargs:tys1 n1 l1) (* x+0 --> x *)
-    | _ ->
-      begin match l with
-      | [t1; t2] when t1.T.tag > t2.T.tag ->
-        (* AC-normalization *)
-        Some (T.mk_node ~tyargs S.Arith.sum [t2; t1])
-      | _ -> None
-      end
+    | `Binary (`Const n1, _, _, t2) when S.Arith.is_zero n1 ->
+      Some t2 (* 0+x --> x *)
+    | `Binary (_, t1, `Const n2, _) when S.Arith.is_zero n2 ->
+      Some t1 (* x+0 --> x *)
+    | `Binary (_, t1, _, t2) when t1.T.tag > t2.T.tag ->
+      (* AC-normalization *)
+      Some (T.mk_node ~tyargs S.Arith.sum [t2; t1])
+    | _ -> None
 
   let mk_sum ~tyargs l =
     match _ev_sum ~tyargs S.Arith.sum l with
@@ -233,12 +234,14 @@ module FO = struct
     | Some t' -> t'
 
   let _ev_difference ~tyargs _ l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.difference n1 n2))
-    | `Binary (n1, _, [], n2, tys2, l2) when S.Arith.is_zero n1 ->
-      Some (T.mk_node ~tyargs S.Arith.uminus [T.mk_node ~tyargs:tys2 n2 l2])  (* 0-x --> -x *)
-    | `Binary (n1, tys1, l1, n2, _, []) when S.Arith.is_zero n2 ->
-      Some (T.mk_node ~tyargs:tys1 n1 l1)  (* x-0 ---> x *)
+    | `Binary (`Const n1, _, _, t2) when S.Arith.is_zero n1 ->
+      Some (T.mk_node ~tyargs:[T.ty t2] S.Arith.uminus [t2])  (* 0-x --> -x *)
+    | `Binary (_, t1, `Const n2, _) when S.Arith.is_zero n2 ->
+      Some t1  (* x-0 ---> x *)
+    | `Binary (_, t1, `Node(s',_,[t']), _) when S.eq s' S.Arith.uminus ->
+      Some (mk_sum ~tyargs [t1; t'])   (* x- (-y) ---> x + y *)
     | _ -> None
 
   let mk_difference ~tyargs l =
@@ -246,100 +249,101 @@ module FO = struct
     | None -> T.mk_node ~tyargs S.Arith.difference l
     | Some t' -> t'
 
-  let rec _ev_product ~tyargs _ l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+  let rec _ev_product ~tyargs _ l =
+    Util.debug 5 "evaluate product %a" (Util.pp_list T.pp) l;
+    match _binary l with
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.product n1 n2))
-    | `Binary (n1, [], [], n2, _, l2) when S.Arith.is_zero n1 ->
+    | `Binary (`Const n1, _, _, _) when S.Arith.is_zero n1 ->
       Some (T.mk_const n1) (* 0*x --> 0 *)
-    | `Binary (n1, _, l1, n2, [], []) when S.Arith.is_zero n2 ->
+    | `Binary (_, _, `Const n2, _) when S.Arith.is_zero n2 ->
       Some (T.mk_const n2)  (* x*0 --> 0 *)
-    | `Binary (n1, _, [], n2, tys2, l2) when S.Arith.is_one n1 ->
-      Some (T.mk_node ~tyargs:tys2 n2 l2) (* 1*x --> x *)
-    | `Binary (n1, tys1, l1, n2, _, []) when S.Arith.is_one n2 ->
-      Some (T.mk_node ~tyargs:tys1 n1 l1) (* x*1 --> x *)
-    | _ ->
-      begin match l with
-      | [{T.term=T.Node (S.Const ("$sum",_), _, [a;b])}; c]
-      | [c; {T.term=T.Node (S.Const ("$sum",_), _, [a;b])}] ->
-        (* distributivity over sum *)
-        Some (mk_sum ~tyargs
-          [ mk_product ~tyargs [a; c]
-          ; mk_product ~tyargs [b; c]
-          ])
-      | [{T.term=T.Node (S.Const ("$difference",_), _, [a;b])}; c]
-      | [c; {T.term=T.Node (S.Const ("$difference",_), _, [a;b])}] ->
-        (* distributivity over difference *)
-        Some (mk_difference ~tyargs
-          [ mk_product ~tyargs [a; c]
-          ; mk_product ~tyargs [b; c]
-          ])
-      | [t1; t2] when t1.T.tag > t2.T.tag ->
-        (* AC-normalization *)
-        Some (T.mk_node ~tyargs S.Arith.product [t2; t1])
-      | _ -> None
-      end
+    | `Binary (`Const n1, _, _, t2) when S.Arith.is_one n1 ->
+      Some t2 (* 1*x --> x *)
+    | `Binary (_, t1, `Const n2, _) when S.Arith.is_one n2 ->
+      Some t1 (* x*1 --> x *)
+    | ( `Binary (`Node (s, _, [a;b]), _, _, c)
+      | `Binary (_, c, `Node (s, _, [a;b]), _) )
+      when S.eq s S.Arith.sum ->
+      (* distributivity over sum *)
+      Some (mk_sum ~tyargs
+        [ mk_product ~tyargs [a; c]
+        ; mk_product ~tyargs [b; c]
+        ])
+    | ( `Binary (`Node (s,_,[a;b]), _, _, c)
+      | `Binary (_, c, `Node (s, _, [a;b]), _) )
+      when S.eq s S.Arith.difference ->
+      (* distributivity over difference *)
+      Some (mk_difference ~tyargs
+        [ mk_product ~tyargs [a; c]
+        ; mk_product ~tyargs [b; c]
+        ])
+    | `Binary (_, t1, _, t2) when t1.T.tag > t2.T.tag ->
+      (* AC-normalization *)
+      Some (T.mk_node ~tyargs S.Arith.product [t2; t1])
+    | _ -> None
   and mk_product ~tyargs l =
     match _ev_product ~tyargs S.Arith.product l with
     | None -> T.mk_node ~tyargs S.Arith.product l
     | Some t' -> t'
 
   let _ev_quotient ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       begin try
         Some (T.mk_const (S.Arith.Op.quotient n1 n2))
       with Division_by_zero -> None
       end
-    | `Binary (n1, tys1, l1, n2, _, []) when S.Arith.is_one n2 ->
-      Some (T.mk_node ~tyargs:tys1 n1 l1)
+    | `Binary (_, t1, `Const n2, _) when S.Arith.is_one n2 ->
+      Some t1
     | _ -> None
 
   let _ev_quotient_e ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.quotient_e n1 n2))
     | _ -> None
 
   let _ev_quotient_f ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.quotient_f n1 n2))
     | _ -> None
 
   let _ev_quotient_t ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.quotient_t n1 n2))
     | _ -> None
 
   let _ev_remainder_e ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.remainder_e n1 n2))
     | _ -> None
 
   let _ev_remainder_f ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.remainder_f n1 n2))
     | _ -> None
 
   let _ev_remainder_t ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (T.mk_const (S.Arith.Op.remainder_t n1 n2))
     | _ -> None
 
   let _ev_less ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (if S.Arith.Op.less n1 n2 then T.true_term else T.false_term)
     | _ -> None
 
   let _ev_lesseq ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (if S.Arith.Op.lesseq n1 n2 then T.true_term else T.false_term)
     | _ -> None
 
   let _ev_greater ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (if S.Arith.Op.greater n1 n2 then T.true_term else T.false_term)
     | _ -> None
 
   let _ev_greatereq ~tyargs s l = match _binary l with
-    | `Binary (n1, _, [], n2, _, []) when S.is_numeric n1 && S.is_numeric n2 ->
+    | `Binary (`Const n1, _, `Const n2, _) when S.is_numeric n1 && S.is_numeric n2 ->
       Some (if S.Arith.Op.greatereq n1 n2 then T.true_term else T.false_term)
     | _ -> None
 
