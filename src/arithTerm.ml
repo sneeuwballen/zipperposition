@@ -68,8 +68,6 @@ let __ev =
   Evaluator.FO.with_arith e;
   e
 
-(* TODO: simplify on the fly? *)
-
 let mk_sum t1 t2 = Evaluator.FO.app ~tyargs:[ty t1] __ev S.Arith.sum [t1; t2]
 let mk_difference t1 t2 = Evaluator.FO.app ~tyargs:[ty t1] __ev S.Arith.difference [t1; t2]
 let mk_product t1 t2 = Evaluator.FO.app ~tyargs:[ty t1] __ev S.Arith.product [t1; t2]

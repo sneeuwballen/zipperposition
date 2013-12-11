@@ -426,30 +426,34 @@ module Focused = struct
 
   let of_canonical ~ord e =
     (* extract maximal terms from list *)
-    let max_terms m =
-      let terms = Multiset.create (M.terms m) in
-      let bv = Multiset.max (Ordering.compare ord) terms in
+    let filter_max l =
+      let terms = Multiset.create l in
+      let bv = Multiset.max (fun (_,t1)(_,t2) -> Ordering.compare ord t1 t2) terms in
       BV.select bv (Multiset.to_array terms)
     in
     match e with
     | Canonical.True
     | Canonical.False -> []
     | _ ->
-      let m1, m2 = Canonical.monomes e in
       let op = Canonical.op e in
+      let m1, m2 = Canonical.monomes e in
+      let terms = 
+        (List.map (fun t -> `Left, t) (M.terms m1)) @
+        (List.map (fun t -> `Right, t) (M.terms m2))
+      in
+      let max_terms = filter_max terms in
       List.map
-        (fun term ->
-          let coeff = M.find m1 term in
-          let m1' = M.remove m1 term in
-          { term; side=Left; op; coeff; same_side=m1'; other_side=m2; })
-        (max_terms m1)
-      @
-      List.map
-        (fun term ->
-          let coeff = M.find m2 term in
-          let m2' = M.remove m2 term in
-          { term; side=Right; op; coeff; same_side=m2'; other_side=m1; })
-        (max_terms m2)
+        (function
+          | `Left, term ->
+            let coeff = M.find m1 term in
+            let m1' = M.remove m1 term in
+            { term; side=Left; op; coeff; same_side=m1'; other_side=m2; }
+          | `Right, term ->
+            let coeff = M.find m2 term in
+            let m2' = M.remove m2 term in
+            { term; side=Right; op; coeff; same_side=m2'; other_side=m1; }
+        )
+        max_terms
 
   let apply_subst ~renaming subst lit s_lit =
     let term = Substs.FO.apply ~renaming subst lit.term s_lit in
