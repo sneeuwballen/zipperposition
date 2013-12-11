@@ -60,7 +60,7 @@ module type S = sig
 
   module Base : BASE_SYMBOL with type t = T.Sym.t
 
-  type t = T.t
+  type t = private T.t
 
   type ty = t
 
@@ -116,6 +116,10 @@ module type S = sig
 
   val __forall : t -> t
     (** not documented. *)
+
+  val of_term : T.t -> t option
+    (** Check whether the given term is a valid representation of a type,
+        in which case return it *)
 
   (** {2 Basic types} *)
 
