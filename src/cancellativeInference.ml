@@ -40,11 +40,22 @@ module M = Monome
 module Canon = ArithLit.Canonical
 module Foc = ArithLit.Focused
 
+(* TODO: check maximality of focused terms in literals after substitution
+  (t + m1 R m2:  check that not (t < t') for t' in m1 and t' in m2 *)
+
 let stat_canc_sup = Util.mk_stat "canc.superposition"
 let stat_cancellation = Util.mk_stat "canc.cancellation"
 let stat_canc_eq_factoring = Util.mk_stat "canc.eq_factoring"
 let stat_canc_ineq_factoring = Util.mk_stat "canc.ineq_factoring"
 let stat_canc_ineq_chaining = Util.mk_stat "canc.ineq_chaining"
+let stat_canc_reflexivity_resolution = Util.mk_stat "canc.reflexivity_resolution"
+
+let prof_canc_sup = Util.mk_profiler "canc.superposition"
+let prof_cancellation = Util.mk_profiler "canc.cancellation"
+let prof_canc_eq_factoring = Util.mk_profiler "canc.eq_factoring"
+let prof_canc_ineq_factoring = Util.mk_profiler "canc.ineq_factoring"
+let prof_canc_ineq_chaining = Util.mk_profiler "canc.ineq_chaining"
+let prof_canc_reflexivity_resolution = Util.mk_profiler "canc.reflexivity_resolution"
 
 (* do cancellative superposition *)
 let _do_canc ~ctx ~active:(active,idx_a,lit_a,s_a) ~passive:(passive,idx_p,lit_p,s_p) subst acc =
@@ -96,6 +107,7 @@ let _do_canc ~ctx ~active:(active,idx_a,lit_a,s_a) ~passive:(passive,idx_p,lit_p
     acc
 
 let canc_sup_active (state:ProofState.ActiveSet.t) c =
+  Util.enter_prof prof_canc_sup;
   let ctx = state#ctx in
   let ord = Ctx.ord ctx in
   let eligible = C.Eligible.param c in
@@ -111,9 +123,11 @@ let canc_sup_active (state:ProofState.ActiveSet.t) c =
           )
       | _ -> acc)
   in
+  Util.exit_prof prof_canc_sup;
   res
 
 let canc_sup_passive state c =
+  Util.enter_prof prof_canc_sup;
   let ctx = state#ctx in
   let ord = Ctx.ord ctx in
   let eligible = C.Eligible.res c in
@@ -130,9 +144,11 @@ let canc_sup_passive state c =
           | _ -> acc
         ))
   in
+  Util.exit_prof prof_canc_sup;
   res
 
 let cancellation c =
+  Util.enter_prof prof_cancellation;
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
   let eligible = C.Eligible.max c in
@@ -148,7 +164,7 @@ let cancellation c =
     new_c
   in
   (* try to factor arith literals *)
-  ArithLit.Arr.fold_canonical ~eligible c.C.hclits []
+  let res = ArithLit.Arr.fold_canonical ~eligible c.C.hclits []
     (fun acc i lit ->
       match lit with
       | Canon.True | Canon.False -> acc
@@ -161,14 +177,18 @@ let cancellation c =
               let subst = FOUnif.unification t1 0 t2 0 in
               mk_instance subst :: acc
             with FOUnif.Fail -> acc))
+  in
+  Util.exit_prof prof_cancellation;
+  res
 
 let canc_equality_factoring c =
+  Util.enter_prof prof_canc_eq_factoring;
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
   let eligible = C.Eligible.eq in
   (* focused literals (only for equalities) *)
   let lits = ArithLit.Arr.view_focused ~ord ~eligible c.C.hclits in
-  Util.array_foldi
+  let res = Util.array_foldi
     (fun acc i lit -> match lit with
       | `Focused (ArithLit.Eq, l) ->
         (* try each focused term in this literal *)
@@ -217,8 +237,12 @@ let canc_equality_factoring c =
           acc l
       | _ -> acc)
     [] lits
+  in
+  Util.exit_prof prof_canc_eq_factoring;
+  res
   
 let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
+  Util.enter_prof prof_canc_ineq_chaining;
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
   (* perform chaining (if ordering conditions respected) *)
@@ -226,6 +250,7 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
     Util.debug 5 "attempt chaining between %a and %a..." C.pp c C.pp c';
     if C.is_maxlit c s_c subst i
     && C.is_maxlit c' s_c' subst j
+    (* TODO: also check that terms are maximal in their literal *)
     then begin
       let renaming = Ctx.renaming_clear ~ctx in
       (* make sure [t] has the same coefficient in [lit] and [lit'] *)
@@ -290,13 +315,145 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
           )
       | _ -> acc)
   in
+  Util.exit_prof prof_canc_ineq_chaining;
   res
   
-let canc_ineq_chaining_right state c = []
+(* XXX note: useless since there is factor/cancellation + simplifications
+  on literals *)
+let canc_reflexivity_res c =
+  []
+  (*
+  Util.enter_prof prof_canc_reflexivity_resolution;
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let eligible = C.Eligible.(combine [neg; max c]) in
+  let res = ArithLit.Arr.fold_canonical ~eligible c.C.hclits []
+    (fun acc i lit -> match lit with
+      | Canon.Compare (ArithLit.Lt, m1, m2) ->
+        acc (* TODO *)
+
+      | _ -> acc)
+  in
+  Util.exit_prof prof_canc_reflexivity_resolution;
+  res
+  *)
   
-let canc_reflexivity_res c = []
-  
-let canc_ineq_factoring c = []
+let canc_ineq_factoring c =
+  Util.enter_prof prof_canc_ineq_factoring;
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  (* factoring1 for lit, lit'. Let:
+      lit = [t + m1 <| m2], and lit' = [t + m1' <| m2'].
+      If [m2 - m1 < m2' - m1'], then the first lit doesn't
+      contribute a constraint to the clause
+      (a < 0 | a < 5 ----> a < 5), so by constraining this
+      to be false we have
+      [m2' - m1' <| m2 - m1 | lit'], in other words,
+      [m2' + m1 <| m2 + m1' | lit'] *)
+  let _factor1 lit lit' other_lits acc =
+    let strict = lit.Foc.op = ArithLit.Lt in
+    let strict' = lit'.Foc.op = ArithLit.Lt in
+    let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
+    let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
+    let new_op = if strict || strict' then ArithLit.Leq else ArithLit.Lt in
+    (* build new literal (the guard) *)
+    let new_lit = match lit.Foc.side, lit'.Foc.side with
+      | ArithLit.Left, ArithLit.Left ->
+        (* t on left, relation is a "lower than" relation *)
+        Canon.to_lit ~ord
+          (Canon.of_monome new_op
+            (M.difference (M.sum m2' m1) (M.sum m2 m1')))
+      | ArithLit.Right, ArithLit.Right ->
+        (* t on right, relation is "bigger than" *)
+        Canon.to_lit ~ord
+          (Canon.of_monome new_op
+            (M.difference (M.sum m2 m1') (M.sum m2' m1)))
+      | _ -> assert false
+    in
+    let new_lits = new_lit :: other_lits in
+    (* apply subst and build clause *)
+    let proof cc = Proof.mk_c_step cc ~rule:"canc_ineq_factoring1" [c.C.hcproof] in
+    let new_c = C.create ~ctx new_lits proof in
+    Util.debug 5 "cancellative_ineq_factoring1: %a gives %a" C.pp c C.pp new_c;
+    Util.incr_stat stat_canc_ineq_factoring;
+    new_c :: acc
+  (* slightly different: with same notation for lit and lit',
+    but this time we eliminate lit' *)
+  and _factor2 lit lit' other_lits acc =
+    let strict = lit.Foc.op = ArithLit.Lt in
+    let strict' = lit'.Foc.op = ArithLit.Lt in
+    let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
+    let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
+    let new_op = if strict || strict' then ArithLit.Leq else ArithLit.Lt in
+    (* build new literal (the guard) *)
+    let new_lit = match lit.Foc.side, lit'.Foc.side with
+      | ArithLit.Left, ArithLit.Left ->
+        (* t on left, relation is a "lower than" relation *)
+        Canon.to_lit ~ord
+          (Canon.of_monome new_op
+            (M.difference (M.sum m1' m2) (M.sum m1 m2')))
+      | ArithLit.Right, ArithLit.Right ->
+        (* t on right, relation is "bigger than" *)
+        Canon.to_lit ~ord
+          (Canon.of_monome new_op
+            (M.difference (M.sum m1 m2') (M.sum m1' m2)))
+      | _ -> assert false
+    in
+    let new_lits = new_lit :: other_lits in
+    (* apply subst and build clause *)
+    let proof cc = Proof.mk_c_step cc ~rule:"canc_ineq_factoring2" [c.C.hcproof] in
+    let new_c = C.create ~ctx new_lits proof in
+    Util.debug 5 "cancellative_ineq_factoring2: %a gives %a" C.pp c C.pp new_c;
+    Util.incr_stat stat_canc_ineq_factoring;
+    new_c :: acc
+  in
+  (* factor lit and lit' (2 ways) *)
+  let _factor ~left:(lit,i,op) ~right:(lit',j,op') subst acc =
+    let lit, lit' = Foc.scale lit lit' in
+    let renaming = Ctx.renaming_clear ~ctx in
+    let lit = Foc.apply_subst ~renaming subst lit 0 in
+    let lit' = Foc.apply_subst ~renaming subst lit' 0 in
+    let all_lits = Literal.Arr.apply_subst ~renaming ~ord subst c.C.hclits 0 in
+    (* the two inferences (eliminate lit i/lit j respectively) *)
+    let acc = _factor1 lit lit' (Util.array_except_idx all_lits i) acc in
+    let acc = _factor2 lit lit' (Util.array_except_idx all_lits j) acc in
+    acc
+  in
+  (* pairwise unify terms of focused lits *)
+  let eligible = C.Eligible.pos in
+  let view = ArithLit.Arr.view_focused ~eligible ~ord c.C.hclits in
+  let res = Util.array_foldi
+    (fun acc i lit -> match lit with
+    | `Focused ((ArithLit.Lt | ArithLit.Leq) as op, l) ->
+      List.fold_left
+        (fun acc lit ->
+          Util.array_foldi
+            (fun acc j lit' -> match lit' with
+            | `Focused ((ArithLit.Lt | ArithLit.Leq) as op', l') when i <> j ->
+              List.fold_left
+                (fun acc lit' ->
+                  (* only work on same side of comparison *)
+                  if lit'.Foc.side = lit.Foc.side
+                    then try
+                      (* unify the two terms *)
+                      let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
+                      (* check maximality of left literal *)
+                      if C.is_maxlit c i subst 0
+                        then
+                          (* factor lit and lit' *)
+                          _factor ~left:(lit,i,op) ~right:(lit',j,op') subst acc
+                        else acc
+                    with FOUnif.Fail -> acc
+                  else acc)
+                acc l'
+            | _ -> acc)
+            acc view)
+        acc l
+      | _ -> acc)
+    [] view
+  in
+  Util.exit_prof prof_canc_ineq_factoring;
+  res
 
 let is_tautology c = false
 
