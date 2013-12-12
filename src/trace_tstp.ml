@@ -239,9 +239,11 @@ let of_decls ?(base=Signature.base) decls =
       in
       let esa = status <> "thm" in
       `Parents (rule, esa, parents)
-    | A.GNode ("file", [A.GString file; A.GString name]) ->
+    | A.GNode ("file", (A.GString file :: A.GString name :: _)) ->
       let parents = Lazy.from_val [|(Axiom (file,name))|] in
       `Parents ("axiom", false, parents)
+    | A.GNode ("trivial", _) ->
+      `Parents ("trivial", false, lazy [||])
     | _ ->
       Util.debug 1 "not a valid proof step: %a" A.pp_general_debug info;
       `NoIdea
