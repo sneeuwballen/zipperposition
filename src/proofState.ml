@@ -320,14 +320,10 @@ type t =
     active_set : ActiveSet.t;            (** active clauses *)
     passive_set : PassiveSet.t;          (** passive clauses *)
     meta_prover : MetaProverState.t option;
-    experts : Experts.Set.t;            (** Set of current experts *)
-
-    add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
 let create ~ctx ?meta params signature =
-  let queues = ClauseQueue.default_queues
-  and _experts = ref (Experts.Set.empty ~ctx) in
+  let queues = ClauseQueue.default_queues in
   object
     val m_active = (ActiveSet.create ~ctx signature :> ActiveSet.t)
     val m_passive = (PassiveSet.create ~ctx queues :> PassiveSet.t)
@@ -338,15 +334,6 @@ let create ~ctx ?meta params signature =
     method passive_set = m_passive
     method simpl_set = m_simpl
     method meta_prover = meta
-    method experts = !_experts
-    method add_expert e =
-      let es = Experts.update_ctx e ~ctx in
-      _experts := Experts.Set.add_list !_experts es;
-      (* add clauses of each expert to the set of passive clauses *)
-      let clauses = Sequence.flatMap
-        (fun e -> Sequence.of_list (Experts.clauses e))
-        (Sequence.of_list es) in
-      m_passive#add clauses
   end
 
 type stats = int * int * int (* num passive, num active, num simplification *)

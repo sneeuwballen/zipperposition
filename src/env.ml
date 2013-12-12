@@ -227,9 +227,6 @@ let add_simplify ~env r =
 let add_is_trivial ~env r =
   env.is_trivial <- r :: env.is_trivial
 
-let add_expert ~env expert =
-  env.state#add_expert expert
-
 let add_rewrite_rule ~env name rule =
   env.rewrite_rules <- (name, rule) :: env.rewrite_rules
 
@@ -241,9 +238,6 @@ let interpret_symbol ~env s rule =
 
 let interpret_symbols ~env l =
   List.iter (fun (s,rule) -> interpret_symbol ~env s rule) l
-
-let get_experts ~env =
-  env.state#experts
 
 let get_meta ~env =
   env.state#meta_prover
@@ -268,9 +262,8 @@ let signature env = Ctx.signature env.ctx
 let state env = env.state
 
 let pp buf env = 
-  Printf.bprintf buf "env(state: %a, experts: %a)"
+  Printf.bprintf buf "env(state: %a)"
     ProofState.debug env.state
-    Experts.Set.pp (get_experts ~env)
 
 let fmt fmt env =
   Format.pp_print_string fmt (Util.on_buffer pp env)
@@ -351,15 +344,13 @@ let do_unary_inferences ~env c =
   Util.exit_prof prof_generate_unary;
   Sequence.of_list clauses
 
-(** Check whether the clause is trivial (also with Experts) *)
 let is_trivial ~env c =
   if C.get_flag C.flag_persistent c then false else
-  begin match env.is_trivial with
+  match env.is_trivial with
   | [] -> false
   | [f] -> f c
   | [f;g] -> f c || g c
   | l -> List.exists (fun f -> f c) l
-  end || Experts.Set.is_redundant (get_experts ~env) c
 
 let is_active ~env c =
   C.CSet.mem env.state#active_set#clauses c
@@ -519,7 +510,6 @@ let simplify ~env old_c =
     let c = rewrite ~env c in
     let c = rw_simplify ~env c in
     let c = basic_simplify ~env c in
-    let c = Experts.Set.simplify (get_experts env) c in
     let c = active_simplify ~env c in
     if not (Lits.eq_com c.C.hclits old_c.C.hclits)
       then begin
@@ -564,11 +554,10 @@ let backward_simplify ~env given =
   Util.exit_prof prof_back_simplify;
   before, Sequence.of_list after
 
-(** Simplify the clause w.r.t to the active set and experts *)
+(** Simplify the clause w.r.t to the active set *)
 let forward_simplify ~env c =
   let c = C.follow_simpl c in
   let c = rewrite ~env c in
-  let c = Experts.Set.simplify (get_experts ~env) c in
   let c = rw_simplify ~env c in
   let c = basic_simplify ~env c in
   c
@@ -672,17 +661,14 @@ let meta_step ~env c =
     let results = List.rev_append results' results in
     (* use results *)
     Util.list_flatmap
-      (fun result -> match result with
+      begin fun result -> match result with
         | MetaProverState.Deduced (f,parents) ->
           (* reduce result in CNF *)
           let cset = cnf ~env (PF.Set.singleton f) in
           C.CSet.to_list cset
         | MetaProverState.Theory (th_name, th_args, lit) ->
           []
-        | MetaProverState.Expert expert ->
-          Util.debug 1 "meta-prover: expert %a" Experts.pp expert;
-          add_expert env expert;
-          [])
+      end
       results
     end
   in

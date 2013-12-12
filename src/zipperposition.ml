@@ -84,11 +84,10 @@ let print_json_stats ~env =
       let seq = MetaProverState.theories meta in
       Util.sprintf "[%a]" (Util.pp_seq MetaProverState.pp_theory) seq
   in
-  let experts = Experts.Set.size (Env.get_experts ~env) in
   let o = Util.sprintf
-    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }"
+    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s }"
     (encode_hashcons (T.H.stats ()))
-    (encode_hashcons (C.CHashcons.stats ())) theories experts
+    (encode_hashcons (C.CHashcons.stats ())) theories
   in
   Util.debug 1 "json_stats: %s" o
 
@@ -361,7 +360,6 @@ let process_file ?meta ~plugins ~params file =
   if params.param_stats then begin
     print_stats ~env;
     print_json_stats ~env;
-    Util.debug 1 "experts: %a" Experts.Set.pp (Env.get_experts ~env);
     end;
   print_dots ~env result;
   print_meta ~env;

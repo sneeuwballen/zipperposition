@@ -146,8 +146,7 @@ let meta_prover ~meta =
     let lemmas = Util.list_fmap
       (function
         | MetaProverState.Deduced (pf', _) -> Some pf'
-        | MetaProverState.Theory _
-        | MetaProverState.Expert _ -> None)
+        | MetaProverState.Theory _ -> None)
       res
     in
     if lemmas = []

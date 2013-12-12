@@ -33,7 +33,6 @@ open Logtk_meta
 type result =
   | Deduced of PFormula.t * source list
   | Theory of string * HOTerm.t list * source list
-  | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
 and source =
@@ -75,9 +74,6 @@ val prover : t -> MetaProver.t
 
 val theories : t -> (string * HOTerm.t list) Sequence.t
   (** List of theories detected so far *)
-
-val experts : t -> Experts.t Sequence.t
-  (** Current list of experts that can be used *)
 
 val results : t -> result Sequence.t
   (** All results *)

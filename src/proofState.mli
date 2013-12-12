@@ -101,9 +101,6 @@ type t =
     active_set : ActiveSet.t;            (** active clauses *)
     passive_set : PassiveSet.t;          (** passive clauses *)
     meta_prover : MetaProverState.t option;
-    experts : Experts.Set.t;            (** Set of current experts *)
-
-    add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
 val create : ctx:Ctx.t -> ?meta:MetaProverState.t ->

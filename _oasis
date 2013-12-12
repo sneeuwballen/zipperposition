@@ -19,7 +19,7 @@ Description:
 Library "libzipperposition"
   Path: src/
   Pack: true
-  Modules:  ClauseQueue, Clause, Const, Experts, Extensions,
+  Modules:  ClauseQueue, Clause, Const, Extensions,
             Literal, MetaProverState, CompactClause, Ctx, Proof, ProofState,
             Saturate, Selection, Superposition, PFormula, Theories, AC,
             PEnv, Params, Env, Monome, ArithElim, CancellativeInference,

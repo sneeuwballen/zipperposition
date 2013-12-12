@@ -1,9 +1,8 @@
 # OASIS_START
-# DO NOT EDIT (digest: fbc79dba0c2329e4c874130ec8b473bf)
+# DO NOT EDIT (digest: f3babf2f418bb371e0d1c3a9fc85f95a)
 src/ClauseQueue
 src/Clause
 src/Const
-src/Experts
 src/Extensions
 src/Literal
 src/MetaProverState

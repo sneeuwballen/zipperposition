@@ -53,23 +53,12 @@ let trs = Rewriting.TRS.of_list rules
 let rewrite_peano t =
   Rewriting.TRS.rewrite trs t
 
-let rec expert ~ctx =
-  let open Experts in
-  { expert_name = "peano_arith";
-    expert_descr = "evaluation for Peano arithmetic";
-    expert_equal = (fun t1 t2 -> T.eq (rewrite_peano t1) (rewrite_peano t2));
-    expert_sig = Symbol.Set.of_seq (Sequence.of_list symbols);
-    expert_clauses = [];
-    expert_canonize = rewrite_peano;
-    expert_ord = (fun _ -> true);
-    expert_ctx = ctx;
-    expert_update_ctx = (fun ctx -> [expert ~ctx]);
-    expert_solve = None;
-  }
-
 let ext =
   let open Extensions in
-  let actions = [Ext_expert expert; Ext_signal_incompleteness] in
+  let actions =
+    [ Ext_term_rewrite ("peano_rw", rewrite_peano)
+    ; Ext_signal_incompleteness
+    ] in
   { name = "peano";
     actions;
   }

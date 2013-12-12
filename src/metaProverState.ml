@@ -45,7 +45,6 @@ module Lits = Literal.Arr
 type result =
   | Deduced of PFormula.t * source list
   | Theory of string * T.t list * source list
-  | Expert of Experts.t
   (** Feedback from the meta-prover *)
 
 and source =
@@ -63,7 +62,6 @@ type t = {
   prover : M.MetaProver.t;    (* real meta-prover *)
   mutable sources : source LitMap.t;     (** for reconstructing proofs *)
   mutable theories : (string * T.t list * source list) list;
-  mutable experts : Experts.t list;
   mutable results : result list;
   mutable new_results : result list;  (* recent results *)
   mutable new_patterns : M.MetaPattern.t list;  (** List of new patterns to match *)
@@ -73,7 +71,6 @@ type t = {
 let add_new_result p res =
   begin match res with
   | Theory (s, args, proof) -> p.theories <- (s, args, proof) :: p.theories
-  | Expert e -> p.experts <- e :: p.experts
   | Deduced _ -> ()
   end;
   p.results <- res :: p.results;
@@ -115,7 +112,6 @@ let create ?(kb=M.MetaKB.empty) () =
     prover = M.MetaProver.create ~kb ();
     sources = LitMap.empty;
     theories = [];
-    experts = [];
     results = [];
     new_results = [];
     new_patterns = [];
@@ -198,8 +194,6 @@ let theories p =
     (fun (name, args, _) -> name, args)
     (Sequence.of_list p.theories)
 
-let experts p = Sequence.of_list p.experts
-
 let results p = Sequence.of_list p.results
 
 let reasoner p = M.MetaProver.reasoner p.prover
@@ -224,7 +218,6 @@ let pp_result buf r = match r with
   | Deduced (f, _) -> Printf.bprintf buf "deduced %a" PF.pp f
   | Theory (n, args, _) ->
     Printf.bprintf buf "theory %s(%a)" n (Util.pp_list T.pp) args
-  | Expert e -> Printf.bprintf buf "expert %a" Experts.pp e
 
 let pp_theory buf (name, args) =
   match args with

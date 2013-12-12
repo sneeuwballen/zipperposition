@@ -134,9 +134,6 @@ val add_simplify : env:t -> simplify_rule -> unit
 val add_is_trivial : env:t -> is_trivial_rule -> unit
   (** Add tautology detection rule *)
 
-val add_expert : env:t -> Experts.t -> unit
-  (** Add an expert structure *)
-
 val add_rewrite_rule : env:t -> string -> term_rewrite_rule -> unit
   (** Add a term rewrite rule *)
 
@@ -154,8 +151,6 @@ val interpret_symbols : env:t -> (Symbol.t * Evaluator.FO.eval_fun) list -> unit
 val simplify : env:t -> Clause.t -> Clause.t
   (** Simplify the clause w.r.t the proof state. It uses many simplification
       rules and rewriting rules. *)
-
-val get_experts : env:t -> Experts.Set.t
 
 val get_meta : env:t -> MetaProverState.t option
 
@@ -202,7 +197,7 @@ val do_unary_inferences : env:t -> Clause.t -> Clause.t Sequence.t
   (** do unary inferences for the given clause *)
 
 val is_trivial : env:t -> Clause.t -> bool
-  (** Check whether the clause is trivial (also with Experts) *)
+  (** Check whether the clause is trivial *)
 
 val is_active : env:t -> Clause.t -> bool
   (** Is the clause in the active set *)
