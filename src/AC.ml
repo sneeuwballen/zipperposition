@@ -57,8 +57,8 @@ let axioms ~ctx s =
   let res = ref [] in
   (* build clause l=r *)
   let add_clause l r =
-    let name = Util.sprintf "ac_%a_%d" Symbol.pp s (List.length !res) in
-    let proof cc = Proof.mk_c_axiom cc ~file:"/dev/ac" ~name in
+    let theories = [Util.sprintf "ac(%a)" Symbol.pp s] in
+    let proof cc = Proof.mk_c_trivial ~theories cc in
     let c = C.create ~ctx [ Lit.mk_eq ~ord l r ] proof in
     C.set_flag C.flag_persistent c true;
     res := c :: !res
@@ -110,7 +110,8 @@ let simplify ~spec ~ctx c =
       let symbols = Sequence.to_list (Symbol.Set.to_seq symbols) in
       let ac_proof = Util.list_flatmap (Theories.AC.find_proof ~spec) symbols in
       let premises = c.C.hcproof :: ac_proof in
-      let proof cc = Proof.mk_c_step cc ~rule:"ac" premises in
+      let proof cc = Proof.mk_c_simp ~theories:["ac"]
+        ~rule:"normalize" cc premises in
       let parents = c :: c.C.hcparents in
       let new_c = C.create ~parents ~ctx lits proof in
       Util.exit_prof prof_simplify;

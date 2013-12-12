@@ -32,6 +32,7 @@ type t = FOFormula.t array lazy_t
 
 val eq : t -> t -> bool
 val hash : t -> int
+val cmp : t -> t -> int
 
 val is_empty : t -> bool
 

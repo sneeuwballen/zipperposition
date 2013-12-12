@@ -54,7 +54,7 @@ val create : ?follow:bool -> FOFormula.t -> Proof.t -> t
       then the old proof is kept. PFormulas are hashconsed.
       @param follow follow simpl_to links if the formula has any (default false) *)
 
-val of_sourced : FOFormula.sourced_form -> t
+val of_sourced : ?role:string -> FOFormula.sourced_form -> t
 val to_sourced : t -> FOFormula.sourced_form option
 
 val follow_simpl : t -> t

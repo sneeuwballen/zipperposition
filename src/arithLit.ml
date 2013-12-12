@@ -729,7 +729,7 @@ module Arr = struct
       let renaming = Substs.FO.Renaming.create 5 in
       let lits' = Literal.apply_subst_list ~ord ~renaming subst lits' 0 in
       let lits' = Array.of_list lits' in
-      add_res lits'
+      add_res (subst,lits')
     in
     for i = 0 to Array.length lits - 1 do
       if eligible i lits.(i) then begin

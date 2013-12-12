@@ -300,7 +300,7 @@ let cnf ~env set =
       let proof cc =
         match clauses with
         | [[f']] when F.eq f f' -> Proof.adapt_c pf.PF.proof cc  (* keep proof *)
-        | _ -> Proof.mk_c_step ~esa:true cc ~rule:"cnf" [pf.PF.proof]
+        | _ -> Proof.mk_c_esa ~rule:"cnf" cc [pf.PF.proof]
       in
       let clauses = List.map (fun c -> C.create_forms ~ctx c proof) clauses in
       C.CSet.add_list cset clauses)
@@ -405,7 +405,7 @@ let rewrite ~env c =
     then c (* no simplification *)
     else begin
       let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-      let proof c' = Proof.mk_c_step c' rule [c.C.hcproof] in
+      let proof c' = Proof.mk_c_simp ~rule c' [c.C.hcproof] in
       let parents = [c] in
       let new_clause = C.create_a ~parents ~ctx:env.ctx lits' proof in
       Util.debug 3 "Env: term rewritten clause %a into %a" C.pp c C.pp new_clause;
@@ -434,7 +434,7 @@ let rewrite_lits ~env c =
   if Lits.eq_com lits c.C.hclits then c
   else begin  (* simplifications occurred! *)
     let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-    let proof c' = Proof.mk_c_step c' rule [c.C.hcproof] in
+    let proof c' = Proof.mk_c_simp ~rule c' [c.C.hcproof] in
     let parents = [c] in
     let new_clause = C.create_a ~parents ~ctx:env.ctx lits proof in
     Util.debug 3 "Env: lit rewritten %a into %a" C.pp c C.pp new_clause;

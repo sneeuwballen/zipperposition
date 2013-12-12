@@ -38,8 +38,12 @@ let eq (lazy c1) (lazy c2) =
   with Invalid_argument _ ->
     false
 
-let hash (lazy c) =  (* TODO *)
+let hash (lazy c) =
   Array.fold_left (fun h f -> Hash.combine h (F.hash f)) 143 c
+
+(* TODO: optimize *)
+let cmp (lazy c1) (lazy c2) =
+  Util.lexicograph F.compare (Array.to_list c1) (Array.to_list c2)
 
 let is_empty (lazy c) = Array.length c = 0
 

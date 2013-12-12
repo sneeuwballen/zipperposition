@@ -73,12 +73,14 @@ let eliminate_arith c =
   let lits'_list = ArithLit.Arr.eliminate ~ord ~eligible c.C.hclits in
   (* turn new arrays into clauses, if needed *)
   List.fold_left
-    (fun acc lits' ->
+    (fun acc (subst,lits') ->
       if Lits.eq_com c.C.hclits lits'
         then acc
         else begin
           (* build new clause *)
-          let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
+          let info = [Substs.FO.to_string subst] in
+          let proof cc = Proof.mk_c_inference
+            ~theories:["arith";"equality"] ~info
             ~rule:"arith_instantiate" cc [c.C.hcproof] in
           let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
           Util.debug 3 "arith instantiate %a into %a" C.pp c C.pp new_c;
@@ -94,8 +96,8 @@ let factor_arith c =
   let mk_instance subst =
     let renaming = Ctx.renaming_clear ~ctx in
     let lits' = Lits.apply_subst ~ord ~renaming subst c.C.hclits 0 in
-    let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
-      ~rule:"factor" cc [c.C.hcproof] in
+    let proof cc = Proof.mk_c_inference ~theories:["arith"; "equality"]
+      ~info:[Substs.FO.to_string subst] ~rule:"factor" cc [c.C.hcproof] in
     let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
     Util.debug 3 "factor %a (with %a) into %a" C.pp c Substs.FO.pp subst C.pp new_c;
     new_c
@@ -119,7 +121,7 @@ let purify_arith c =
   if Lits.eq_com c.C.hclits lits'
     then []
     else begin
-      let proof cc = Proof.mk_c_step ~rule:"purify" cc [c.C.hcproof] in
+      let proof cc = Proof.mk_c_inference ~rule:"purify" cc [c.C.hcproof] in
       let new_c = C.create_a ~ctx ~parents:[c] lits' proof in
       [new_c]
     end
@@ -161,7 +163,7 @@ let factor_bounds c =
   (* see whether some lits were removed *)
   if BV.cardinal bv < Array.length c.C.hclits then begin
     let lits' = BV.select bv c.C.hclits in
-    let proof cc = Proof.mk_c_step ~theories:["equality";"arith"]
+    let proof cc = Proof.mk_c_simp ~theories:["equality";"arith"]
       ~rule:"arith_factor_bounds" cc [c.C.hcproof] in
     let new_c = C.create ~parents:[c] ~ctx lits' proof in
     Util.debug 3 "arith_factor_bounds of %a gives %a" C.pp c C.pp new_c;
@@ -327,7 +329,8 @@ let inner_case_switch c =
         in
         let lits' = Literal.apply_subst_list ~ord ~renaming subst lits 0 in
         let new_lits = lit :: lits' in
-        let proof cc = Proof.mk_c_step cc ~rule:"arith_inner_case_switch" [c.C.hcproof] in
+        let proof cc = Proof.mk_c_inference ~theories:["arith";"equality"]
+          ~rule:"arith_inner_case_switch" cc [c.C.hcproof] in
         let parents = [c] in
         let new_clause = C.create ~parents ~ctx new_lits proof in
         Util.debug 5 "  --> inner case switch gives clause %a" C.pp new_clause;
@@ -519,7 +522,9 @@ let infer_remainder_of_divisors c =
               (T.mk_const S.Arith.zero_i) :: lits'
             in
             let parents = [c] in
-            let proof cc = Proof.mk_c_step cc ~rule:"remainder_divisor" [c.C.hcproof] in
+            let proof cc = Proof.mk_c_inference
+              ~theories:["arith"; "equality"]
+              ~rule:"remainder_divisor" cc [c.C.hcproof] in
             let new_c = C.create ~ctx ~parents lits' proof in
             Util.debug 5 "remainder_of_divisors: from %a  deduce %a" C.pp c C.pp new_c;
             Util.incr_stat stat_infer_remainder_of_divisors;
@@ -553,7 +558,7 @@ let enum_remainder_cases c =
               Lit.mk_eq ~ord (AT.mk_remainder_e t' n) (T.mk_const (S.mk_bigint i)))
             range
           in
-          let proof cc = Proof.mk_c_axiom cc ~file:"/dev/mod" ~name:"enum" in
+          let proof cc = Proof.mk_c_trivial ~theories:["arith"; "equality"] cc in
           let new_c = C.create ~ctx lits' proof in
           Util.debug 5 "instantiate enum of remainder for %a: clause %a" S.pp n C.pp new_c;
           Util.incr_stat stat_enum_remainder_cases;
@@ -590,7 +595,9 @@ let remainder_of_equality c =
                     (T.mk_const S.Arith.zero_i)
                   in
                   let lits' = lit :: Util.array_except_idx c.C.hclits i in
-                  let proof cc = Proof.mk_c_step cc ~rule:"remainder_of_eq" [c.C.hcproof] in
+                  let proof cc = Proof.mk_c_inference
+                    ~theories:["arith"; "equality"] ~rule:"remainder_of_eq"
+                    cc [c.C.hcproof] in
                   let new_c = C.create ~ctx lits' proof in
                   Util.debug 5 "deduce remainders from %a: clause %a" C.pp c C.pp new_c;
                   Util.incr_stat stat_remainder_of_equality;
@@ -626,7 +633,8 @@ let setup_penv ~penv =
     if F.eq pf.PF.form f'
       then []
       else
-        let proof = Proof.mk_f_step f' ~rule:"arith_simplify" [pf.PF.proof] in
+        let proof = Proof.mk_f_simp ~theories:["arith";"equality"]
+          ~rule:"arith_simplify" f' [pf.PF.proof] in
         let pf' = PF.create f' proof in
         [PEnv.SimplifyInto pf']
   in

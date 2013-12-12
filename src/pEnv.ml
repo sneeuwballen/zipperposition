@@ -127,7 +127,7 @@ let cnf ~ctx =
     match clauses with
     | [[f]] when F.eq f pf.PF.form -> []
     | _ ->
-      let proof f' = Proof.mk_f_step ~esa:true f' ~rule:"cnf" [pf.PF.proof] in
+      let proof f' = Proof.mk_f_esa ~rule:"cnf" f' [pf.PF.proof] in
       let clauses =
         List.map
           (fun c ->
@@ -162,7 +162,7 @@ let rw_term ?(rule="rw") ~premises trs =
       else
         let premises = PF.Set.to_seq premises in
         let premises = Sequence.to_list (Sequence.map PF.get_proof premises) in
-        let proof = Proof.mk_f_step f' ~rule (pf.PF.proof::premises) in
+        let proof = Proof.mk_f_simp ~rule f' (pf.PF.proof::premises) in
         let pf' = PF.create f' proof in
         [SimplifyInto pf']
 
@@ -177,7 +177,7 @@ let rw_form ?(rule="rw") ~premises frs =
       else
         let premises = PF.Set.to_seq premises in
         let premises = Sequence.to_list (Sequence.map PF.get_proof premises) in
-        let proof = Proof.mk_f_step f' ~rule (pf.PF.proof::premises) in
+        let proof = Proof.mk_f_simp ~rule f' (pf.PF.proof::premises) in
         let pf' = PF.create f' proof in
         let _ = Util.debug 5 "rewritten %a in %a!" PF.pp pf PF.pp pf' in
         [SimplifyInto pf']
@@ -189,7 +189,7 @@ let fmap_term ~rule func =
     if F.eq f f'
       then []
       else
-        let proof = Proof.mk_f_step f' ~rule [pf.PF.proof] in
+        let proof = Proof.mk_f_simp ~rule f' [pf.PF.proof] in
         let pf' = PF.create f' proof in
         [SimplifyInto pf']
 

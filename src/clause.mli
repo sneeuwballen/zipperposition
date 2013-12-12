@@ -197,7 +197,7 @@ val is_oriented_rule : t -> bool
 val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
   (** symbols that occur in the clause *)
 
-val from_forms : file:string -> name:string -> ctx:Ctx.t -> FOFormula.t list -> t
+val from_forms : ?role:string -> file:string -> name:string -> ctx:Ctx.t -> FOFormula.t list -> t
   (** Conversion of a formula list to a clause *)
 
 (** {2 Filter literals} *)

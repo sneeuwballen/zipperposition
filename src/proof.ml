@@ -32,72 +32,134 @@ open Logtk
 module F = FOFormula
 module CC = CompactClause
 
-type t =
-  | Axiom of string * string
-  | InferForm of FOFormula.t * step
-  | InferClause of CompactClause.t * step
-and step = {
-  rule : string;
-  parents : t array;
-  esa : bool;
-  theories : string list;
+(** Classification of proof steps *)
+type step_kind =
+  | Inference of string
+  | Simplification of string
+  | Esa of string
+  | File of string * string * string
+  | Trivial  (* trivial, or trivial within theories *)
+
+type step_result =
+  | Form of FOFormula.t
+  | Clause of CompactClause.t
+
+type t = {
+  result : step_result;       (** conclusion of the step *)
+  kind : step_kind;           (** kind of step *)
+  parents : t array;          (** parent proof steps *)
+  theories : string list;     (** theories used for the proof step *)
+  additional_info : string list;   (** additional info, prover-dependent *)
 }
 
 type proof = t 
 
-let rec eq p1 p2 = match p1, p2 with
-  | Axiom (f1, n1), Axiom (f2, n2) -> f1 = f2 && n1 = n2
-  | InferForm (f1, step1), InferForm(f2, step2) ->
-    F.eq f1 f2
-  | InferClause (c1, step1), InferClause(c2, step2) ->
-    CC.eq c1 c2
+let eq p1 p2 =
+  p1.kind = p2.kind &&
+  p1.additional_info = p2.additional_info &&
+  p1.theories = p2.theories &&
+  match p1.result, p2.result with
+  | Form f1, Form f2 -> F.eq f1 f2
+  | Clause c1, Clause c2 -> CC.eq c1 c2
   | _ -> false
 
-let hash p = match p with
-  | Axiom (f, n) -> Hash.hash_int2 (Hash.hash_string f) (Hash.hash_string n)
-  | InferForm (f,_) -> F.hash f
-  | InferClause (c, _) -> CC.hash c
+let hash p =
+  Hash.combine
+    (Hashtbl.hash p.kind)
+    (match p.result with
+      | Form f -> F.hash f
+      | Clause c -> CC.hash c)
 
-let cmp p1 p2 = Pervasives.compare p1 p2
+let cmp p1 p2 =
+  let c = Pervasives.compare p1.kind p2.kind in
+  if c = 0
+    then match p1.result, p2.result with
+      | Form f1, Form f2 -> F.compare f1 f2
+      | Clause c1, Clause c2 -> CC.cmp c1 c2
+      | Form _, Clause _ -> 1
+      | Clause _, Form _ -> ~-1
+    else c
 
 (** {2 Constructors and utils} *)
 
-let mk_f_axiom f ~file ~name =
-  InferForm (f, {rule="axiom"; parents = [| Axiom (file,name) |];
-                 esa=false; theories=[]; })
+let mk_f_trivial ?(info=[]) ?(theories=[]) f =
+  { result=Form f; kind=Trivial; theories;
+    parents = [| |]; additional_info=info; }
 
-let mk_c_axiom c ~file ~name =
-  InferClause (c, {rule="axiom"; parents = [| Axiom (file,name) |];
-                   esa=false; theories=[]; })
+let mk_f_file ?(info=[]) ?(theories=[]) ~role ~file ~name f =
+  { result=Form f; kind=File(role,file,name); theories;
+    parents = [| |]; additional_info=info; }
 
-let mk_f_step ?(theories=["equality"]) ?(esa=false) f ~rule parents =
-  assert(rule <> "axiom");
-  InferForm (f, {rule; parents=Array.of_list parents; esa; theories; })
+let mk_f_inference ?(info=[]) ?(theories=[]) ~rule f parents =
+  { result=Form f; theories; kind=Inference(rule);
+    parents = Array.of_list parents; additional_info=info; }
 
-let mk_c_step ?(theories=["equality"]) ?(esa=false) c ~rule parents =
-  assert(rule <> "axiom");
-  InferClause (c, {rule; parents=Array.of_list parents; esa; theories; })
+let mk_f_simp ?(info=[]) ?(theories=[]) ~rule f parents =
+  { result=Form f; kind=Simplification(rule); theories;
+    parents=Array.of_list parents; additional_info=info; }
+
+let mk_f_esa ?(info=[]) ?(theories=[]) ~rule f parents =
+  { result=Form f; kind=Esa(rule); theories;
+    parents=Array.of_list parents; additional_info=info; }
+
+let mk_c_trivial ?(info=[]) ?(theories=[]) c =
+  { result=Clause c; kind=Trivial; theories;
+    parents = [| |]; additional_info=info; }
+
+let mk_c_file ?(info=[]) ?(theories=[]) ~role ~file ~name c =
+  { result=Clause c; kind=File(role,file,name); theories;
+    parents = [| |]; additional_info=info; }
+
+let mk_c_inference ?(info=[]) ?(theories=[]) ~rule c parents =
+  { result=Clause c; theories; kind=Inference(rule);
+    parents = Array.of_list parents; additional_info=info; }
+
+let mk_c_simp ?(info=[]) ?(theories=[]) ~rule c parents =
+  { result=Clause c; kind=Simplification(rule); theories;
+    parents=Array.of_list parents; additional_info=info; }
+
+let mk_c_esa ?(info=[]) ?(theories=[]) ~rule c parents =
+  { result=Clause c; kind=Esa(rule); theories;
+    parents=Array.of_list parents; additional_info=info; }
 
 let adapt_c p c =
-  match p with
-  | Axiom _ -> p
-  | InferClause(_,step)
-  | InferForm (_,step) -> InferClause(c,step)
+  { p with result=Clause c; }
 
 let adapt_f p f =
-  match p with
-  | Axiom _ -> p
-  | InferClause(_,step)
-  | InferForm (_,step) -> InferForm(f,step)
+  { p with result=Form f; }
+
+let is_file = function
+  | {kind=File _} -> true
+  | _ -> false
 
 let is_axiom = function
-  | Axiom _ -> true
+  | {kind=File("axiom", _, _)} -> true
   | _ -> false
 
-let is_proof_of_false = function
-  | InferForm ({F.form=F.False}, _) -> true
-  | InferClause(c,_) when CC.is_empty c -> true
+let is_proof_of_false p =
+  match p.result with
+  | Form {F.form=F.False} -> true
+  | Clause c when CC.is_empty c -> true
   | _ -> false
+
+let rule p = match p.kind with
+  | Trivial
+  | File _ -> None
+  | Esa rule
+  | Simplification rule
+  | Inference rule -> Some rule
+
+let role p = match p.kind with
+  | Trivial
+  | Inference _
+  | Esa _
+  | Simplification _ -> "plain"
+  | File(role,_,_) -> role
+
+module Theories = struct
+  let eq = ["equality"]
+  let arith = ["equality"; "arith"]
+end
 
 (** {2 Proof traversal} *)
 
@@ -123,12 +185,7 @@ let traverse ?(traversed=ProofTbl.create 11) proof k =
     else begin
       ProofTbl.add traversed proof ();
       (* traverse premises first *)
-      begin match proof with
-      | Axiom _ -> ()
-      | InferForm (_, step)
-      | InferClause (_, step) ->
-        Array.iter (fun proof' -> Queue.push proof' queue) step.parents
-      end;
+      Array.iter (fun proof' -> Queue.push proof' queue) proof.parents;
       (* call [k] on the proof *)
       k proof;
     end
@@ -154,36 +211,35 @@ let depth proof =
     let (p, d) = Queue.pop q in
     if ProofTbl.mem explored proof then () else begin
       ProofTbl.add explored proof ();
-      match p with
-      | Axiom _ -> depth := max d !depth
-      | InferForm(_, step)
-      | InferClause (_, step) ->
-        (* explore parents *)
-        Array.iter (fun p -> Queue.push (p, d+1) q) step.parents
+      begin match p.kind with
+      | File _ | Trivial -> depth := max d !depth
+      | Inference _ | Esa _ | Simplification _ -> ()
+      end;
+      (* explore parents *)
+      Array.iter (fun p -> Queue.push (p, d+1) q) p.parents
     end
   done;
   !depth
 
 (* physically share subproofs, to save memory *)
-let share t =
-  Util.debug 0 "Proof.share: not implemented";  (* TODO *)
-  t
+let share t = failwith "Proof.share: not implemented"  (* TODO *)
 
 (** {2 Conversion to a graph of proofs} *)
 
 (** Get a graph of the proof *)
 let as_graph =
-  let f proof = match proof with
-  | Axiom _ -> LazyGraph.Node(proof, proof, Sequence.empty)
-  | InferClause(_, step)
-  | InferForm (_, step) ->
-    let parents = Sequence.of_array step.parents in
-    let parents = Sequence.map (fun p' -> (step.rule, p')) parents in
-    LazyGraph.Node (proof, proof, parents)
+  let f p =
+    match rule p with
+    | None -> LazyGraph.Node(p, p, Sequence.empty)
+    | Some rule ->
+      let parents = Sequence.of_array p.parents in
+      let parents = Sequence.map (fun p' -> (rule, p')) parents in
+      LazyGraph.Node (p, p, parents)
   in
   LazyGraph.make ~eq:eq ~hash:hash f
 
-let bij =
+let bij = Bij.map ~inject:(fun _ -> assert false) ~extract:(fun _ -> assert false) Bij.unit_
+(* FIXME
   Bij.(fix
     (fun bij_ ->
       let bij_step = lazy (map
@@ -204,85 +260,106 @@ let bij =
             | "clause" -> BranchFrom(Lazy.force bij_clause, (fun(c,step) -> InferClause(c,step)))
             | c -> raise (DecodingError "expected proof step"))
     ))
+*)
 
 (** {2 IO} *)
 
-let pp_notrec buf proof =
-  match proof with
-  | Axiom(f,n) -> Printf.bprintf buf "axiom '%s' in '%s'" n f
-  | InferForm (f, _) -> F.pp buf f
-  | InferClause(c, _) -> CC.pp buf c
+let pp_kind_tstp buf k = match k with
+  | File (role,file,name) ->
+    Printf.bprintf buf "file('%s', '%s')" file name
+  | Inference rule ->
+    Printf.bprintf buf "inference(%s, [status(thm)])" rule
+  | Simplification rule ->
+    Printf.bprintf buf "inference(%s, [status(thm)])" rule
+  | Esa rule ->
+    Printf.bprintf buf "inference(%s, [status(esa)])" rule
+  | Trivial ->
+    Printf.bprintf buf "trivial([status(thm)])"
+
+let pp_kind buf k = match k with
+  | File (role,file,name) ->
+    Printf.bprintf buf "%s '%s' in '%s'" role name file
+  | Inference rule ->
+    Printf.bprintf buf "inf %s" rule
+  | Simplification rule ->
+    Printf.bprintf buf "simp %s" rule
+  | Esa rule ->
+    Printf.bprintf buf "esa %s" rule
+  | Trivial -> Buffer.add_string buf "trivial"
+
+let pp_result buf = function
+  | Form f -> F.pp buf f
+  | Clause c -> CC.pp buf c
+
+let pp_result_of buf proof = pp_result buf proof.result
+
+let pp_notrec buf p =
+  Printf.bprintf buf "%a <-- %a [%a]"
+    pp_result_of p pp_kind p.kind
+    (Util.pp_array pp_result_of) p.parents
 
 let fmt fmt proof =
   Format.pp_print_string fmt (Util.on_buffer pp_notrec proof)
 
-let _extract_axiom proof = match proof with
-  | Axiom (f,n) -> f,n
-  | _ -> assert false
-
 let pp_debug buf proof =
   traverse proof
-    (function
-      | Axiom (f,n) -> ()
-      | InferClause(c, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
-        let f,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "%a <--- axiom %s in file '%s'\n" CC.pp c n f
-      | InferForm(f, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
-        let file,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "%a <--- axiom %s in file '%s'\n" F.pp f n file
-      | InferForm (f, step) ->
-        Printf.bprintf buf "%a <--- %s with\n" F.pp f step.rule;
+    begin fun p -> match p.kind with
+      | File(role,file,name) ->
+        Printf.bprintf buf "%a <--- %a, theories [%a]\n"
+          pp_result p.result pp_kind p.kind
+          (Util.pp_list Buffer.add_string) p.theories;
+      | Trivial ->
+        Printf.bprintf buf "%a <--- trivial, theories [%a]\n"
+          pp_result p.result (Util.pp_list Buffer.add_string) p.theories;
+      | Inference _
+      | Simplification _
+      | Esa _ ->
+        Printf.bprintf buf "%a <--- %a, theories [%a] with\n"
+          pp_result p.result pp_kind p.kind
+          (Util.pp_list Buffer.add_string) p.theories;
         Array.iter
-          (fun premise -> Printf.bprintf buf "  %a\n" pp_notrec premise)
-          step.parents
-      | InferClause (c, step) ->
-        Printf.bprintf buf "%a <--- %s with\n" CC.pp c step.rule;
-        Array.iter
-          (fun premise -> Printf.bprintf buf "  %a\n" pp_notrec premise)
-          step.parents
-    )
+          (fun premise -> Printf.bprintf buf "    %a\n" pp_result premise.result)
+          p.parents
+    end
 
-let _pp_parent_names buf names =
-  Util.pp_array ~sep:"," (fun buf -> Printf.bprintf buf "%i") buf names
+let _pp_parent buf = function
+  | `Name i -> Printf.bprintf buf "%d" i
+  | `Theory s -> Printf.bprintf buf "theory(%s)" s
+
+let _pp_kind_tstp buf (k,parents) = match k with
+  | Trivial ->
+    Printf.bprintf buf "trivial([%a])"
+      (Util.pp_list _pp_parent) parents
+  | File (role,file,name) ->
+    Printf.bprintf buf "file('%s', '%s', [%a])"
+      file name (Util.pp_list _pp_parent) parents
+  | Inference rule ->
+    Printf.bprintf buf "inference('%s', [status(thm)], [%a])"
+      rule (Util.pp_list _pp_parent) parents
+  | Simplification rule ->
+    Printf.bprintf buf "inference('%s', [status(thm)], [%a])"
+      rule (Util.pp_list _pp_parent) parents
+  | Esa rule ->
+    Printf.bprintf buf "inference('%s', [status(esa)], [%a])"
+      rule (Util.pp_list _pp_parent) parents
 
 let pp_tstp buf proof =
   let namespace = ProofTbl.create 5 in
-  let pp_theory b name = Printf.bprintf b "theory(%s)" name in
   traverse proof
-    (fun p ->
+    begin fun p ->
       let name = get_name ~namespace p in
-      match p with
-      | Axiom _ -> () 
-      | InferClause(c, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
-        let f,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "cnf(%d, axiom, %a, file('%s', '%s')).\n"
-          name CC.pp_tstp c f n
-      | InferForm(f, ({rule="axiom"} as step)) when is_axiom step.parents.(0)->
-        let file,n = _extract_axiom step.parents.(0) in
-        Printf.bprintf buf "tff(%d, axiom, %a, file('%s', '%s')).\n"
-          name F.pp_tstp f file n
-      | InferForm(f, step) ->
-        let names = Array.map (get_name ~namespace) step.parents in
-        let theories = match step.theories with
-        | [] -> ""
-        | l -> Util.sprintf ",%a" (Util.pp_list pp_theory) l
-        in
-        let status = if step.esa then "esa" else "thm" in
-        Printf.bprintf buf
-          "tff(%d, plain, %a, inference('%s', [status(%s)], [%a%s])).\n"
-          name F.pp_tstp (F.close_forall f) step.rule status
-            _pp_parent_names names theories
-      | InferClause(c, step) ->
-        let names = Array.map (get_name ~namespace) step.parents in
-        let theories = match step.theories with
-        | [] -> ""
-        | l -> Util.sprintf ",%a" (Util.pp_list pp_theory) l
-        in
-        let status = if step.esa then "esa" else "thm" in
-        Printf.bprintf buf
-          "cnf(%d, plain, %a, inference('%s', [status(%s)], [%a%s])).\n"
-          name CC.pp_tstp c step.rule status _pp_parent_names names theories
-    )
+      let parents =
+        List.map (fun p -> `Name (get_name namespace p)) (Array.to_list p.parents) @
+        List.map (fun s -> `Theory s) p.theories
+      in
+      match p.result with
+      | Form f ->
+        Printf.bprintf buf "tff(%d, %s, %a, %a).\n"
+          name (role p) F.pp_tstp f _pp_kind_tstp (p.kind,parents)
+      | Clause c ->
+        Printf.bprintf buf "cnf(%d, %s, %a, %a).\n"
+          name (role p) CC.pp_tstp c _pp_kind_tstp (p.kind,parents)
+    end
 
 (** Prints the proof according to the given input switch *)
 let pp switch buf proof = match switch with
@@ -297,7 +374,7 @@ let as_dot_graph =
   LazyGraph.map
     ~vertices:(fun p ->
       if is_proof_of_false p then `Color "red" :: `Label "[]" :: attributes
-      else if is_axiom p then label p :: `Color "yellow" :: attributes
+      else if is_file p then label p :: `Color "yellow" :: attributes
       else label p :: attributes)
     ~edges:(fun e -> [`Label e])
     as_graph

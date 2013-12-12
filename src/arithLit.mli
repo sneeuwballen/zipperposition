@@ -262,7 +262,7 @@ module Arr : sig
   val eliminate : ord:Ordering.t ->
                   eligible:(int -> Literal.t -> bool) ->
                   Literal.t array ->
-                  Literal.t array list
+                  (Substs.FO.t * Literal.t array) list
     (** Try to eliminate literals by finding relevant instantiations.
         Instantiations must bind variables only to satisfiable terms
         (ie terms that always represent at least one integer).

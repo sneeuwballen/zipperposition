@@ -127,7 +127,7 @@ let create ?(kb=M.MetaKB.empty) () =
     (function | M.MetaKB.NewLemma (f, lit) ->
       let premises = find_premises p lit in
       let proofs = List.map proof_of_source premises in
-      let proof = Proof.mk_f_step f ~rule:"lemma" proofs in
+      let proof = Proof.mk_f_inference ~info:["meta_prover"] ~rule:"lemma" f proofs in
       let pf = PF.create f proof in
       Util.debug 1 "meta-prover: lemma %a" PF.pp pf;
       add_new_result p (Deduced (pf, premises));

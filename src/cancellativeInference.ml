@@ -57,6 +57,8 @@ let prof_canc_ineq_factoring = Util.mk_profiler "canc.ineq_factoring"
 let prof_canc_ineq_chaining = Util.mk_profiler "canc.ineq_chaining"
 let prof_canc_reflexivity_resolution = Util.mk_profiler "canc.reflexivity_resolution"
 
+let theories = ["arith"; "equality"]
+
 (* do cancellative superposition *)
 let _do_canc ~ctx ~active:(active,idx_a,lit_a,s_a) ~passive:(passive,idx_p,lit_p,s_p) subst acc =
   let ord = Ctx.ord ctx in
@@ -97,7 +99,8 @@ let _do_canc ~ctx ~active:(active,idx_a,lit_a,s_a) ~passive:(passive,idx_p,lit_p
     let lit = Canon.to_lit ~ord lit in
     let all_lits = lit :: lits_a @ lits_p in
     (* build clause *)
-    let proof cc = Proof.mk_c_step cc ~rule:"canc_sup" [active.C.hcproof; passive.C.hcproof] in
+    let proof cc = Proof.mk_c_inference ~theories ~info:[Substs.FO.to_string subst]
+      ~rule:"canc_sup" cc [active.C.hcproof; passive.C.hcproof] in
     let new_c = C.create ~parents:[active;passive] ~ctx all_lits proof in
     Util.debug 5 "cancellative superposition of %a and %a gives %a"
       C.pp active C.pp passive C.pp new_c;
@@ -156,7 +159,7 @@ let cancellation c =
   let mk_instance subst =
     let renaming = Ctx.renaming_clear ~ctx in
     let lits' = Literal.Arr.apply_subst ~ord ~renaming subst c.C.hclits 0 in
-    let proof cc = Proof.mk_c_step ~theories:["arith";"equality"]
+    let proof cc = Proof.mk_c_inference ~info:[Substs.FO.to_string subst] ~theories
       ~rule:"cancellation" cc [c.C.hcproof] in
     let new_c = C.create_a ~parents:[c] ~ctx lits' proof in
     Util.debug 3 "cancellation of %a (with %a) into %a" C.pp c Substs.FO.pp subst C.pp new_c;
@@ -225,7 +228,9 @@ let canc_equality_factoring c =
                         (* apply subst and build clause *)
                         let new_lits = Literal.apply_subst_list
                           ~renaming:(Ctx.renaming_clear ctx) ~ord subst new_lits 0 in
-                        let proof cc = Proof.mk_c_step cc ~rule:"canc_eq_factoring" [c.C.hcproof] in
+                        let proof cc = Proof.mk_c_inference ~theories
+                          ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j]
+                          ~rule:"canc_eq_factoring" cc [c.C.hcproof] in
                         let new_c = C.create ~ctx new_lits proof in
                         Util.debug 5 "cancellative_eq_factoring: %a gives %a" C.pp c C.pp new_c;
                         Util.incr_stat stat_canc_eq_factoring;
@@ -287,7 +292,9 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
       in
       let all_lits = lits @ lits_left @ lits_right in
       (* build clause *)
-      let proof cc = Proof.mk_c_step cc ~rule:"canc_ineq_chaining" [c.C.hcproof; c'.C.hcproof] in
+      let proof cc = Proof.mk_c_inference ~theories
+        ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j]
+        ~rule:"canc_ineq_chaining" cc [c.C.hcproof; c'.C.hcproof] in
       let new_c = C.create ~ctx ~parents:[c;c'] all_lits proof in
       Util.debug 5 "ineq chaining of %a and %a gives %a" C.pp c C.pp c' C.pp new_c;
       Util.incr_stat stat_canc_ineq_chaining;
@@ -350,7 +357,7 @@ let canc_ineq_factoring c =
       to be false we have
       [m2' - m1' <| m2 - m1 | lit'], in other words,
       [m2' + m1 <| m2 + m1' | lit'] *)
-  let _factor1 lit lit' other_lits acc =
+  let _factor1 ~info lit lit' other_lits acc =
     let strict = lit.Foc.op = ArithLit.Lt in
     let strict' = lit'.Foc.op = ArithLit.Lt in
     let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
@@ -372,14 +379,15 @@ let canc_ineq_factoring c =
     in
     let new_lits = new_lit :: other_lits in
     (* apply subst and build clause *)
-    let proof cc = Proof.mk_c_step cc ~rule:"canc_ineq_factoring1" [c.C.hcproof] in
+    let proof cc = Proof.mk_c_inference ~theories ~info
+      ~rule:"canc_ineq_factoring1" cc [c.C.hcproof] in
     let new_c = C.create ~ctx new_lits proof in
     Util.debug 5 "cancellative_ineq_factoring1: %a gives %a" C.pp c C.pp new_c;
     Util.incr_stat stat_canc_ineq_factoring;
     new_c :: acc
   (* slightly different: with same notation for lit and lit',
     but this time we eliminate lit' *)
-  and _factor2 lit lit' other_lits acc =
+  and _factor2 ~info lit lit' other_lits acc =
     let strict = lit.Foc.op = ArithLit.Lt in
     let strict' = lit'.Foc.op = ArithLit.Lt in
     let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
@@ -401,7 +409,8 @@ let canc_ineq_factoring c =
     in
     let new_lits = new_lit :: other_lits in
     (* apply subst and build clause *)
-    let proof cc = Proof.mk_c_step cc ~rule:"canc_ineq_factoring2" [c.C.hcproof] in
+    let proof cc = Proof.mk_c_inference ~theories ~info
+      ~rule:"canc_ineq_factoring2" cc [c.C.hcproof] in
     let new_c = C.create ~ctx new_lits proof in
     Util.debug 5 "cancellative_ineq_factoring2: %a gives %a" C.pp c C.pp new_c;
     Util.incr_stat stat_canc_ineq_factoring;
@@ -415,8 +424,9 @@ let canc_ineq_factoring c =
     let lit' = Foc.apply_subst ~renaming subst lit' 0 in
     let all_lits = Literal.Arr.apply_subst ~renaming ~ord subst c.C.hclits 0 in
     (* the two inferences (eliminate lit i/lit j respectively) *)
-    let acc = _factor1 lit lit' (Util.array_except_idx all_lits i) acc in
-    let acc = _factor2 lit lit' (Util.array_except_idx all_lits j) acc in
+    let info = [Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j] in
+    let acc = _factor1 ~info lit lit' (Util.array_except_idx all_lits i) acc in
+    let acc = _factor2 ~info lit lit' (Util.array_except_idx all_lits j) acc in
     acc
   in
   (* pairwise unify terms of focused lits *)

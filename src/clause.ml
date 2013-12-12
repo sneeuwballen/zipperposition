@@ -379,9 +379,9 @@ let symbols ?(init=Symbol.Set.empty) seq =
     (fun set c -> Lits.symbols ~init:set c.hclits)
     init seq
 
-let from_forms ~file ~name ~ctx forms =
+let from_forms ?(role="axiom") ~file ~name ~ctx forms =
   let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
-  let proof c = Proof.mk_c_axiom c ~file ~name in
+  let proof c = Proof.mk_c_file ~role ~file ~name c in
   create_a ~ctx lits proof
 
 (** {2 Filter literals} *)

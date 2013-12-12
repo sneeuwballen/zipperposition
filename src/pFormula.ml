@@ -62,9 +62,8 @@ let get_form t = t.form
 let get_proof t = t.proof
 
 let to_sourced t =
-  match t.proof with
-  | Proof.InferForm (f, {Proof.parents=[|Proof.Axiom (file,name)|]}) ->
-    Some ((t.form, file, name))
+  match t.proof.Proof.kind with
+  | Proof.File (_, file, name) -> Some (t.form, file, name)
   | _ -> None
 
 let rec _follow_simpl n pf =
@@ -81,8 +80,8 @@ let create ?(follow=false) form proof =
     then follow_simpl pf
     else pf
 
-let of_sourced (f, file,name) =
-  let proof = Proof.mk_f_axiom f ~file ~name in
+let of_sourced ?(role="axiom") (f, file,name) =
+  let proof = Proof.mk_f_file ~role ~file ~name f in
   create f proof
 
 let simpl_to ~from ~into =
