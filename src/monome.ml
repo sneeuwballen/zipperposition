@@ -207,10 +207,10 @@ let normalize_wrt_zero m =
     (* divide by common gcd of coeffs and constant *)
     let gcd = List.fold_left (fun gcd (c,_) -> S.Arith.Op.gcd c gcd) m.const m.terms in
     let gcd = S.Arith.Op.abs gcd in
-    let const = S.Arith.Op.quotient m.const gcd in
-    let terms = List.map (fun (c,t) -> S.Arith.Op.quotient c gcd, t) m.terms in
-    { const; terms; to_term=None; }
-  | S.Int _ 
+    if S.Arith.is_one gcd
+      then m
+      else _fmap (fun c -> S.Arith.Op.quotient c gcd) m
+  | S.Int _
   | S.Rat _
   | S.Real _ -> m
   | _ -> failwith "Monome.normalize_wrt_zero"

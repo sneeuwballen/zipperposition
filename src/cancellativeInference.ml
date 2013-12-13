@@ -264,7 +264,10 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
     && C.is_maxlit c' s_c' subst j
     (* TODO: also check that terms are maximal in their literal *)
     then begin
+      Util.debug 5 "chaining: left=%a, right=%a" Foc.pp lit Foc.pp lit';
       let renaming = Ctx.renaming_clear ~ctx in
+      assert (lit.Foc.side = ArithLit.Left);
+      assert (lit'.Foc.side = ArithLit.Right);
       (* make sure [t] has the same coefficient in [lit] and [lit'] *)
       let lit, lit' = Foc.scale lit lit' in
       let lit = Foc.apply_subst ~renaming subst lit s_c in
