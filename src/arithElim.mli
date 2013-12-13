@@ -99,13 +99,15 @@ val infer_remainder_of_divisors : Env.unary_inf_rule
       [a mod n' = 0] where [n'] ranges over the strict, non-trivial divisors
       of [n].
       For instance, from [C or a mod 6 = 0] we can deduce
-      [C or a mod 3 = 0] and [C or a mod 2 = 0] *)
+      [C or a mod 3 = 0] and [C or a mod 2 = 0]
+
+      TODO: negative version of it (with a OR) *)
 
 val enum_remainder_cases : Env.unary_inf_rule
   (** When remainder(t, n) occurs somewhere with [n] a constant, add the
       clause Or_{i=0...n-1} remainder(t, n) = i
       assuming n is not too big.
-      
+
       TODO: maybe it's better to resolve directly [C or a mod n != b]
       into [C or Or_{i=0..n-1, i != b} a mod n = i]? *)
 
@@ -114,6 +116,9 @@ val remainder_of_equality : Env.unary_inf_rule
 
 (* TODO: use diophantine equations for solving divisibility constraints on
          linear expressions that contain only variables? *)
+
+(* TODO: [t != n.X or C], where x \not\in vars(C), must be
+        simplified to [t mod n != 0 or C] *)
 
 (* TODO: bridge between cancellative arith and modulo expressions (to
         allow   a mod 3 = 1   &  2.a = b   ---> b mod 3 = 2
