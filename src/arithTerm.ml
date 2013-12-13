@@ -161,3 +161,14 @@ module Form = struct
         | _ -> f)
       f
 end
+
+let int_range ~strict_low ~strict_high range =
+  let rec enum acc i = match Big_int.compare_big_int i range with
+    | 0 when not strict_high -> i :: acc (* include range *)
+    | n when n >= 0 -> acc  (* gone too high, remember that range is excluded *)
+    | _ -> enum (i::acc) (Big_int.succ_big_int i)
+  in
+  (* include lower bound? *)
+  let start = Big_int.zero_big_int in
+  let start = if strict_low then Big_int.succ_big_int start else start in
+  enum [] start

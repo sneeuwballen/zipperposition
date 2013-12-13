@@ -49,6 +49,8 @@ let stat_canc_eq_factoring = Util.mk_stat "canc.eq_factoring"
 let stat_canc_ineq_factoring = Util.mk_stat "canc.ineq_factoring"
 let stat_canc_ineq_chaining = Util.mk_stat "canc.ineq_chaining"
 let stat_canc_reflexivity_resolution = Util.mk_stat "canc.reflexivity_resolution"
+let stat_canc_case_switch = Util.mk_stat "canc.case_switch"
+let stat_canc_inner_case_switch = Util.mk_stat "canc.inner_case_switch"
 
 let prof_canc_sup = Util.mk_profiler "canc.superposition"
 let prof_cancellation = Util.mk_profiler "canc.cancellation"
@@ -56,6 +58,8 @@ let prof_canc_eq_factoring = Util.mk_profiler "canc.eq_factoring"
 let prof_canc_ineq_factoring = Util.mk_profiler "canc.ineq_factoring"
 let prof_canc_ineq_chaining = Util.mk_profiler "canc.ineq_chaining"
 let prof_canc_reflexivity_resolution = Util.mk_profiler "canc.reflexivity_resolution"
+let prof_canc_case_switch = Util.mk_profiler "canc.case_switch"
+let prof_canc_inner_case_switch = Util.mk_profiler "canc.inner_case_switch"
 
 let stat_canc_semantic_tautology = Util.mk_stat "canc.semantic_tauto"
 let prof_canc_semantic_tautology = Util.mk_profiler "canc.semantic_tauto"
@@ -327,6 +331,188 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
   in
   Util.exit_prof prof_canc_ineq_chaining;
   res
+
+let case_switch_limit = ref (S.mk_int 30)
+
+(* new inference, kind of the dual of inequality chaining for integer
+   inequalities. See the .mli file for more explanations. *)
+let canc_case_switch (state: ProofState.ActiveSet.t) c =
+  Util.enter_prof prof_canc_case_switch;
+  let ctx = state#ctx in
+  let ord = Ctx.ord ctx in
+  (* try case switch between ~left and ~right.
+    lit = [m1 + nt <| m2], lit' = [m2' <| m1' + nt],
+    so [nt] lives within [m2'-m1', ..., m2-m1]. If those two bounds differ
+    only by a constant, then we can enumerate the cases. *)
+  let _case_switch ~left:(c,s_c,i,lit,strict) ~right:(c',s_c',j,lit',strict') subst acc =
+    let lit, lit' = Foc.scale lit lit' in
+    (* negation of strictness (range inclusive if bound was exclusive,
+        because contrapositive) *)
+    let strict_low = lit'.Foc.op = ArithLit.Lt in
+    let strict_high = lit.Foc.op = ArithLit.Lt in
+    (* apply subst and decompose *)
+    let renaming = Ctx.renaming_clear ~ctx in
+    let lit = Foc.apply_subst ~renaming subst lit s_c in
+    let lit' = Foc.apply_subst ~renaming subst lit' s_c' in
+    let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
+    let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
+    let m = M.difference (M.sum m2 m1') (M.sum m1 m2') in
+    let n = lit.Foc.coeff in
+    let t = lit.Foc.term in
+    if M.is_const m
+    && S.Arith.Op.less m.M.const !case_switch_limit
+    && C.is_maxlit c s_c subst i
+    && C.is_maxlit c' s_c' subst j
+    then begin
+      let low = M.difference m2' m1' in
+      Util.debug 5 "case_switch between %a at %d and %a at %d" C.pp c i C.pp c' j;
+      let range = match m.M.const with
+        | S.Int n -> n
+        | _ -> assert false
+      in
+      let lits_left = Util.array_except_idx c.C.hclits i in
+      let lits_left = Lit.apply_subst_list ~renaming ~ord subst lits_left s_c in
+      let lits_right = Util.array_except_idx c'.C.hclits j in
+      let lits_right = Lit.apply_subst_list ~renaming ~ord subst lits_right s_c' in
+      (* the case switch on [nt]: for n=0...range, add literal  [nt=low + n] *)
+      let lits_case = List.map
+        (fun k ->
+          let lit = Canon.to_lit ~ord
+            (Canon.of_monome ArithLit.Eq
+              (M.add
+                (M.add_const low (S.mk_bigint k))
+                (S.Arith.Op.uminus n) t))
+          in
+          lit)
+        (AT.int_range ~strict_low ~strict_high range)
+      in
+      let new_lits = lits_left @ lits_right @ lits_case in
+      let proof cc = Proof.mk_c_inference
+        ~theories:["arith"] ~info:[Substs.FO.to_string subst]
+        ~rule:"arith_case_switch" cc [c.C.hcproof; c'.C.hcproof] in
+      let parents = [c; c'] in
+      let new_c = C.create ~parents ~ctx new_lits proof in
+      Util.debug 5 "  --> case switch gives clause %a" C.pp new_c;
+      Util.incr_stat stat_canc_case_switch;
+      new_c :: acc
+    end else acc
+  in
+  let new_clauses = ArithLit.Arr.fold_focused ~ord c.C.hclits []
+    (fun acc i lit ->
+      match lit.Foc.op with
+      | (ArithLit.Leq | ArithLit.Lt) when Type.eq Type.int (S.ty lit.Foc.coeff) ->
+        let t = lit.Foc.term in
+        let strict = lit.Foc.op = ArithLit.Lt in
+        I.retrieve_unifiables state#idx_canc 0 t 1 acc
+          (fun acc t' (c',j,lit') subst ->
+            (* lit' = t' + m1' <| m2' ? *)
+            match lit'.Foc.op, lit.Foc.side, lit'.Foc.side with
+            | (ArithLit.Leq | ArithLit.Lt), ArithLit.Left, ArithLit.Right ->
+              let strict' = lit'.Foc.op = ArithLit.Lt in
+              _case_switch ~left:(c,1,i,lit,strict) ~right:(c',0,j,lit',strict') subst acc
+            | (ArithLit.Leq | ArithLit.Lt), ArithLit.Right, ArithLit.Left ->
+              let strict' = lit'.Foc.op = ArithLit.Lt in
+              _case_switch ~left:(c',0,j,lit',strict') ~right:(c,1,i,lit,strict) subst acc
+            | _ -> acc
+          )
+      | _ -> acc)
+  in
+  Util.exit_prof prof_canc_case_switch;
+  new_clauses
+
+let canc_inner_case_switch c =
+  Util.enter_prof prof_canc_inner_case_switch;
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  (* lit = [t + m1 <| m2], lit' = [m2' <| t + m1']. In other words,
+      [t > m2-m1 and t < m2'-m1' --> other_lits]. If
+      [m2'-m1' - (m2-m1) is a constant, we can enumerate the possibilities
+      by replacing lit and lit' by [n.t != m2'+m1-(m2+m1')+k]
+      for k in [0... range] *)
+  let _try_case_switch ~left:(lit,i,op) ~right:(lit',j,op') subst acc =
+    assert (lit.Foc.side = ArithLit.Left);
+    assert (lit'.Foc.side = ArithLit.Right);
+    (* negation of strictness (range inclusive if bound was exclusive,
+        because contrapositive) *)
+    let strict_low = lit'.Foc.op = ArithLit.Leq in
+    let strict_high = lit.Foc.op = ArithLit.Leq in
+    (* apply subst and decompose *)
+    let renaming = Ctx.renaming_clear ~ctx in
+    let lit = Foc.apply_subst ~renaming subst lit 0 in
+    let lit' = Foc.apply_subst ~renaming subst lit' 0 in
+    let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
+    let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
+    let m = M.difference (M.sum m2' m1) (M.sum m1' m2) in
+    let n = lit.Foc.coeff in
+    let t = lit.Foc.term in
+    if M.is_const m
+    && S.Arith.Op.less m.M.const !case_switch_limit
+    then begin
+      let low = M.difference m2 m1 in
+      let range = match m.M.const with
+        | S.Int n -> n
+        | _ -> assert false
+      in
+      Util.debug 5 "inner_case_switch in %a for %a·%a; subst is %a, range=%s"
+        C.pp c S.pp n T.pp t Substs.FO.pp subst (Big_int.string_of_big_int range);
+      (* remove lits i and j *)
+      let other_lits = Util.array_foldi
+        (fun acc i' lit -> if i' <> i && i' <> j then lit :: acc else acc)
+        [] c.C.hclits
+      in
+      let other_lits = Literal.apply_subst_list ~renaming ~ord subst other_lits 0 in
+      List.fold_left
+        (fun acc k ->
+          let lit = Canon.to_lit ~ord
+            (Canon.of_monome ArithLit.Neq
+              (M.add
+                (M.add_const low (S.mk_bigint k))
+                (S.Arith.Op.uminus n) t))
+          in
+          let new_lits = lit :: other_lits in
+          let proof cc = Proof.mk_c_inference ~theories:["arith";"equality"]
+            ~rule:"canc_inner_case_switch" cc [c.C.hcproof] in
+          let parents = [c] in
+          let new_clause = C.create ~parents ~ctx new_lits proof in
+          Util.debug 5 "  --> inner case switch gives clause %a" C.pp new_clause;
+          Util.incr_stat stat_canc_inner_case_switch;
+          new_clause :: acc)
+        acc (AT.int_range ~strict_low ~strict_high range)
+    end else acc
+  in
+  (* focused view of arith literals *)
+  let lits = ArithLit.Arr.view_focused ~ord c.C.hclits in
+  (* fold on literals *)
+  let new_clauses = Util.array_foldi
+    (fun acc i lit -> match lit with
+    | `Focused ((ArithLit.Leq|ArithLit.Lt) as op, l) ->
+      List.fold_left
+        (fun acc lit ->
+          let side = lit.Foc.side in
+          Util.array_foldi
+            (fun acc j lit' -> match lit' with
+            | `Focused ((ArithLit.Leq|ArithLit.Lt) as op', l') ->
+              List.fold_left
+                begin fun acc lit' ->
+                  let side' = lit'.Foc.side in
+                  if side <> side' then try
+                    (* unify the two terms, then scale them to the same coefficient *)
+                    let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
+                    let lit, lit' = Foc.scale lit lit' in
+                    if side = ArithLit.Left
+                      then _try_case_switch ~left:(lit,i,op) ~right:(lit',j,op') subst acc
+                      else _try_case_switch ~left:(lit',j,op') ~right:(lit,i,op) subst acc
+                  with FOUnif.Fail -> acc
+                  else acc
+                end acc l'
+            | _ -> acc)
+          acc lits
+        ) acc l
+    | _ -> acc
+    ) [] lits
+  in
+  Util.exit_prof prof_canc_inner_case_switch;
+  new_clauses
   
 (* XXX note: useless since there is factor/cancellation + simplifications
   on literals *)
@@ -548,6 +734,8 @@ let setup_env ~env =
   Env.add_binary_inf ~env "canc_ineq_chaining" canc_ineq_chaining;
   Env.add_unary_inf ~env "canc_reflexivity_res" canc_reflexivity_res;
   Env.add_unary_inf ~env "canc_ineq_factoring" canc_ineq_factoring;
+  Env.add_binary_inf ~env "canc_case_switch" canc_case_switch;
+  Env.add_unary_inf ~env "canc_inner_case_switch" canc_inner_case_switch;
   Env.add_is_trivial ~env is_tautology;
   ()
   

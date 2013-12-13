@@ -41,12 +41,8 @@ module TO = Theories.TotalOrder
 module Lit = Literal
 module Lits = Literal.Arr
 
-let prof_case_switch = Util.mk_profiler "arith.case_switch"
-let prof_inner_case_switch = Util.mk_profiler "arith.inner_case_switch"
 let prof_factor_bounds = Util.mk_profiler "arith.factor_bounds"
 
-let stat_case_switch = Util.mk_stat "arith.case_switch"
-let stat_inner_case_switch = Util.mk_stat "arith.inner_case_switch"
 let stat_factor_bounds = Util.mk_stat "arith.factor_bounds"
 let stat_bound_tauto = Util.mk_stat "arith.bound_tautology"
 let stat_simplify_remainder = Util.mk_stat "arith.simplify_remainder"
@@ -175,203 +171,6 @@ let factor_bounds c =
   end else
     let _ = Util.exit_prof prof_factor_bounds in
     c  (* no change *)
-
-(* enumerate integers from 0 to range. Bounds are excluded or included
-    depending on params [strict_low] and [strict_high] (if true, bound is
-    excluded). Returns an empty list is the range is empty. *)
-let _int_range ~strict_low ~strict_high range =
-  let rec enum acc i = match Big_int.compare_big_int i range with
-    | 0 when not strict_high -> i :: acc (* include range *)
-    | n when n >= 0 -> acc  (* gone too high, remember that range is excluded *)
-    | _ -> enum (i::acc) (Big_int.succ_big_int i)
-  in
-  (* include lower bound? *)
-  let start = Big_int.zero_big_int in
-  let start = if strict_low then Big_int.succ_big_int start else start in
-  enum [] start
-
-(* new inference, kind of the dual of inequality chaining for integer
-   inequalities. See the .mli file for more explanations. *)
-let case_switch (active_set: ProofState.ActiveSet.t) c = []  (* TODO *)
-  (*
-  Util.enter_prof prof_case_switch;
-  let ctx = active_set#ctx in
-  let ord = Ctx.ord ctx in
-  let spec = Ctx.total_order ctx in
-  let instance = TO.tstp_instance ~spec in  (* $less, $lesseq *)
-  (* do the case switch inference. c contains lower <= t,
-      c' contains t <= lower+range. [s_foo] is the scope of [foo].
-      Enumerates t = lower + i for i in 0 ... range *)
-  let _do_case_switch c s_c i c' s_c' i' t s_t lower s_lower strict_low strict_high range subst acc =
-    Util.debug 5 "case_switch between %a at %d and %a at %d" C.pp c i C.pp c' i';
-    let renaming = Ctx.renaming_clear ~ctx in
-    let lits_left = Util.array_except_idx c.C.hclits i in
-    let lits_left = Lit.apply_subst_list ~renaming ~ord subst lits_left s_c in
-    let lits_right = Util.array_except_idx c'.C.hclits i' in
-    let lits_right = Lit.apply_subst_list ~renaming ~ord subst lits_right s_c' in
-    let t' = Substs.FO.apply ~renaming subst t s_t in
-    (* the case switch on t: for n=0...range, compute monome=lower+n, apply
-      substitution to it, and add literal  t=monome *)
-    let lits_case = List.map
-      (fun n ->
-        let monome = M.add_const lower (S.mk_bigint n) in
-        let monome = M.apply_subst ~renaming subst monome s_lower in
-        Lit.mk_eq ~ord t' (M.to_term monome))
-      (_int_range ~strict_low ~strict_high range)
-    in
-    let new_lits = lits_left @ lits_right @ lits_case in
-    let proof cc = Proof.mk_c_step cc ~rule:"arith_case_switch" [c.C.hcproof; c'.C.hcproof] in
-    let parents = [c; c'] in
-    let new_c = C.create ~parents ~ctx new_lits proof in
-    Util.debug 5 "  --> case switch gives clause %a" C.pp new_c;
-    Util.incr_stat stat_case_switch;
-    new_c :: acc
-  in
-  (* view literals as arithmetic bounds when possible *)
-  let lits = ArithLit.Arr.view_bounds c.C.hclits in
-  (* fold on literals *)
-  let new_clauses = Util.array_foldi
-    (fun acc i lit -> match lit with
-      | `Ignore _ -> acc
-      | `LowerBound (strict_low, low, t) when Type.eq Type.int (M.ty low) ->
-        (* low < r, see whether we can find high with r < high and
-           high-low = constant *)
-        I.retrieve_unifiables active_set#idx_ord_left 1 t 0 acc
-          (fun acc _ with_pos subst ->
-            try
-              let c' = with_pos.C.WithPos.clause in
-              let pos' = with_pos.C.WithPos.pos in
-              let i' = List.hd pos' in
-              let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
-              let strict_high = olit'.TO.strict in
-              (* see whether the right term is a monome *)
-              let high = M.of_term olit'.TO.right in
-              assert (Type.eq Type.int (M.ty high));
-              (* compute range= subst(high)-subst(low) *)
-              let renaming = Ctx.renaming_clear ~ctx in
-              let low' = M.apply_subst ~renaming subst low 0 in
-              let high' = M.apply_subst ~renaming subst high 1 in
-              let range = M.difference high' low' in
-              (* see whether range is a constant *)
-              if M.is_const range
-              then match range.M.const with
-                | S.Int range ->
-                  (* ok, found a high bound, such that high-low is a constant,
-                      so t ranges from low to high. Typing ensures that
-                      high is also an integer monome. *)
-                  _do_case_switch c 0 i c' 1 i' t 0 low 0 strict_low strict_high range subst acc
-                | _ -> assert false
-              else acc
-            with Exit | Not_found | M.NotLinear ->
-              acc)
-      | `LowerBound _ ->
-        acc  (* other lower bounds are ignored *)
-      | `HigherBound (strict_high, t, high) when Type.eq Type.int (M.ty high) ->
-        (* converse case (symmetric of the `LowerBound case) *)
-        I.retrieve_unifiables active_set#idx_ord_right 1 t 0 acc
-          (fun acc _ with_pos subst ->
-            try
-              let c' = with_pos.C.WithPos.clause in
-              let pos' = with_pos.C.WithPos.pos in
-              let i' = List.hd pos' in
-              let olit' = Lit.ineq_lit_of ~instance c'.C.hclits.(i') in
-              let strict_low = olit'.TO.strict in
-              (* see whether the left term is a monome *)
-              let low = M.of_term olit'.TO.left in
-              assert (Type.eq Type.int (M.ty low));
-              (* compute range= subst(high)-subst(low) *)
-              let renaming = Ctx.renaming_clear ~ctx in
-              let low' = M.apply_subst ~renaming subst low 1 in
-              let high' = M.apply_subst ~renaming subst high 0 in
-              let range = M.difference high' low' in
-              (* see whether range is a constant *)
-              if M.is_const range
-              then match range.M.const with
-                | S.Int range ->
-                  (* ok, found a high bound, such that high-low is a constant,
-                      so t ranges from low to high. Typing ensures that
-                      high is also an integer monome. *)
-                _do_case_switch c' 1 i' c 0 i t 0 low 1 strict_low strict_high range subst acc
-                | _ -> assert false
-              else acc
-            with Exit | Not_found | M.NotLinear ->
-              acc)
-      | `HigherBound _ ->
-        acc (* other higher bounds are ignored *)
-      )
-    [] lits
-  in
-  Util.exit_prof prof_case_switch;
-  new_clauses
-  *)
-
-let inner_case_switch c =
-  let ctx = c.C.hcctx in
-  let ord = Ctx.ord ctx in
-  (* do the case switch, removing lits i and j, adding t=low+k
-     where k in [0... range]
-     FIXME: need a coefficient in front of [t]? *)
-  let _do_case_switch i j t low range strict_low strict_high subst acc =
-    Util.debug 5 "inner_case_switch in %a: %a in (%a,%a+%s) subst is %a"
-      C.pp c T.pp t S.pp low S.pp low
-      (Big_int.string_of_big_int range) Substs.FO.pp subst;
-    (* remove lits i and j *)
-    let lits = Util.array_foldi
-      (fun acc i' lit -> if i' <> i && i' <> j then lit :: acc else acc)
-      [] c.C.hclits
-    in
-    List.fold_left
-      (fun acc k ->
-        let renaming = Ctx.renaming_clear ~ctx in
-        let t' = Substs.FO.apply ~renaming subst t 0 in
-        let lit =
-          Literal.mk_neq ~ord t'
-            (T.mk_const (S.Arith.Op.sum low (S.mk_bigint k)))
-        in
-        let lits' = Literal.apply_subst_list ~ord ~renaming subst lits 0 in
-        let new_lits = lit :: lits' in
-        let proof cc = Proof.mk_c_inference ~theories:["arith";"equality"]
-          ~rule:"arith_inner_case_switch" cc [c.C.hcproof] in
-        let parents = [c] in
-        let new_clause = C.create ~parents ~ctx new_lits proof in
-        Util.debug 5 "  --> inner case switch gives clause %a" C.pp new_clause;
-        new_clause :: acc)
-      acc (_int_range ~strict_low ~strict_high range)
-  in
-  (* view literals as arithmetic bounds when possible *)
-  let lits = ArithLit.Arr.view_bounds c.C.hclits in
-  (* fold on literals *)
-  let new_clauses = Util.array_foldi
-    (fun acc i lit -> match lit with
-      | `Ignore _ -> acc
-      | `LowerBound (strict_high, high, t) when Type.eq Type.int (T.ty t) ->
-        (* take the negation: high < t is the constraint  t <= high *)
-        let strict_high = not strict_high in
-        Util.array_foldi
-          (fun acc j lit' ->
-            if j = i then acc else match lit' with
-            | `HigherBound (strict_low, t', low) when Type.eq Type.int (T.ty t') ->
-              let strict_low = not strict_low in
-              begin try
-                (* unify t and t', see if it makes for a proper framing of t *)
-                let subst = FOUnif.unification t 0 t' 0 in
-                let range = S.Arith.Op.difference high low in
-                match range with
-                | S.Int range ->
-                  _do_case_switch i j t low range strict_low strict_high subst acc
-                | _ -> assert false
-              with FOUnif.Fail -> acc
-              end
-            | _ -> acc
-          )
-          acc lits
-      | `LowerBound _
-      | `HigherBound _ -> acc
-      )
-    [] lits
-  in
-  Util.exit_prof prof_case_switch;
-  new_clauses
 
 (* if c =  a < t or t < b or c'  with b > a, it's a tautology *)
 let bounds_are_tautology c = false (* TODO *)
@@ -579,7 +378,7 @@ let enum_remainder_cases c =
           let t' = M.to_term e' in
           (* range: 0 .. n-1 *)
           let range = match n with
-            | S.Int n' -> _int_range ~strict_low:false ~strict_high:true n'
+            | S.Int n' -> AT.int_range ~strict_low:false ~strict_high:true n'
             | _ -> assert false
           in
           (* make clause *)
@@ -748,8 +547,6 @@ let setup_env ?(ac=false) ~env =
   Env.add_unary_inf ~env "arith_factor" factor_arith;
   Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
-  Env.add_unary_inf ~env "arith_inner_case_switch" inner_case_switch;
-  Env.add_binary_inf ~env "arith_case_switch" case_switch;
   Env.add_simplify ~env factor_bounds;
   Env.add_is_trivial ~env bounds_are_tautology;
   (* modular arith *)

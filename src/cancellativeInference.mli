@@ -56,6 +56,28 @@ val canc_reflexivity_res : Env.unary_inf_rule
 val canc_ineq_factoring : Env.unary_inf_rule
   (** Factoring between two inequation literals *)
 
+val case_switch_limit : Symbol.t ref
+  (** Positive integers: maximum width of a case switch. Default: 30 *)
+
+val canc_case_switch : Env.binary_inf_rule
+  (** inference rule
+          C1 or a <= b     C2 or b <= c
+      -------------------------------------
+          C1 or C2 or or_{i=a....c} (b = i)
+      if a and c are integer linear expressions whose difference is
+      a constant. If a > c, then the range a...c is empty and the literal
+      is just removed. *)
+
+val canc_inner_case_switch : Env.unary_inf_rule
+  (** inference rule
+        C1 or a <= b or b <= c
+        ----------------------
+            C1 or b!=i
+        for each i in [c...a]. See (a <= b or b <= c or C1) as
+        the rule  (b < a and c < b) -> C1, then make the head of the rule
+        true *)
+
+
 val is_tautology : Clause.t -> bool
   (** is the clause a tautology w.r.t linear expressions? *)
 

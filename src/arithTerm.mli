@@ -86,3 +86,10 @@ module Form : sig
         $greater and $greatereq, and simplifies subterms. *)
 end
 
+(** {2 Utils} *)
+
+val int_range : strict_low:bool -> strict_high:bool -> Big_int.big_int ->
+                Big_int.big_int list
+  (** enumerate integers from 0 to range. Bounds are excluded or included
+      depending on params [strict_low] and [strict_high] (if true, bound is
+      excluded). Returns an empty list is the range is empty. *)
