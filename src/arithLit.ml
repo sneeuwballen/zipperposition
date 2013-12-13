@@ -130,9 +130,14 @@ module Canonical = struct
     else
       let m = M.normalize_wrt_zero m in
       let m, op = match op with
+        (*
         | Lt when Type.eq Type.int (M.ty m) ->
           (* m < 0 ---> m+1 <= 0 *)
           M.succ m, Leq
+        *)
+        | Leq when Type.eq Type.int (M.ty m) ->
+          (* m <= 0 ---> m-1 < 0 *)
+          M.pred m, Lt
         | _ -> m, op
       in
       let m1, m2 = M.split m in
