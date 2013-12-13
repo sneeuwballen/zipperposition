@@ -101,7 +101,8 @@ val infer_remainder_of_divisors : Env.unary_inf_rule
       For instance, from [C or a mod 6 = 0] we can deduce
       [C or a mod 3 = 0] and [C or a mod 2 = 0]
 
-      TODO: negative version of it (with a OR) *)
+      Also negative version: [C or a mod n != 0]
+      ----> [C or Or_{d|n} (a mod d != 0)] *)
 
 val enum_remainder_cases : Env.unary_inf_rule
   (** When remainder(t, n) occurs somewhere with [n] a constant, add the
@@ -117,7 +118,8 @@ val remainder_of_equality : Env.unary_inf_rule
 (* TODO: use diophantine equations for solving divisibility constraints on
          linear expressions that contain only variables? *)
 
-(* TODO: [t != n.X or C], where x \not\in vars(C), must be
+val remainder_of_var_ineq : Env.simplify_rule
+  (** [t != n.X or C], where x \not\in vars(C), can be simplified
         simplified to [t mod n != 0 or C] *)
 
 (* TODO: bridge between cancellative arith and modulo expressions (to

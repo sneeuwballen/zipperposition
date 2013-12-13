@@ -53,6 +53,7 @@ let stat_simplify_remainder = Util.mk_stat "arith.simplify_remainder"
 let stat_infer_remainder_of_divisors = Util.mk_stat "arith.remainder_of_divisors"
 let stat_enum_remainder_cases = Util.mk_stat "arith.enum_remainder_cases"
 let stat_remainder_of_equality = Util.mk_stat "arith.remainder_of_eq"
+let stat_remainder_of_var_ineq = Util.mk_stat "arith.remainder_of_var_ineq"
 
 (** {2 Inference Rules} *)
 
@@ -639,6 +640,71 @@ let remainder_of_equality c =
       | _ -> acc)
     [] c.C.hclits
 
+exception FoundSingleVar of [`Left|`Right] * Symbol.t * FOTerm.t
+
+let _var_occurs_exactly_once_in_lits var lits =
+  assert (T.is_var var);
+  let seq = Sequence.of_array lits in
+  let seq = Sequence.flatMap Literal.Seq.vars seq in
+  let seq = Sequence.filter (fun v' -> T.eq v' var) seq in
+  Sequence.length seq = 1
+
+(* [t != n.X or C] becomes [t mod n != 0 or C] if [X] does not occur in [C]. *)
+let remainder_of_var_ineq c =
+  let ctx = c.C.hcctx in
+  let ord = Ctx.ord ctx in
+  let changed = ref false in
+  let lits' = Array.mapi
+    (fun i lit -> match lit with
+      | Lit.Equation (l, r, false, _)
+        when not (T.is_ground l && T.is_ground r) && Type.eq Type.int (T.ty l) ->
+        begin match ArithLit.Canonical.extract_opt lit with
+        | Some (ArithLit.Canonical.Compare (ArithLit.Neq, m1, m2)) ->
+          (* m1 != m2, integer monomes that are not ground *)
+          let terms =
+            List.map (fun (c,t) -> `Left, c, t) (M.to_list m1) @
+            List.map (fun (c,t) -> `Right, c, t) (M.to_list m2)
+          in
+          begin try
+            List.iter
+              (fun (side, n, t) ->
+                if T.is_var t && _var_occurs_exactly_once_in_lits t c.C.hclits
+                  then raise (FoundSingleVar(side, n, t)))
+              terms;
+            (* did not found a single var *)
+            lit
+          with FoundSingleVar(side, n, var) ->
+            (* build [m] such that [lit === m != n*X]. *)
+            let m = match side with
+              | `Left -> M.difference m2 (M.remove m1 var)
+              | `Right -> M.difference m1 (M.remove m2 var)
+            in
+            assert (not (M.var_occurs ~var m));
+            let lit' = Literal.mk_neq ~ord
+              (AT.mk_remainder_e (M.to_term m) n)
+              (T.mk_const S.Arith.zero_i)
+            in
+            changed := true;
+            lit'
+          end
+        | _ -> lit
+        end
+      | _ -> lit)
+    c.C.hclits
+  in
+  if !changed
+    then begin
+      let proof cc = Proof.mk_c_simp
+        ~theories:["arith"; "equality"] ~rule:"remainder_of_var_ineq"
+        cc [c.C.hcproof] in
+      let new_c = C.create_a ~ctx lits' proof in
+      Util.debug 5 "simplified remainder from var ineq of %a: clause %a"
+        C.pp c C.pp new_c;
+      Util.incr_stat stat_remainder_of_var_ineq;
+      new_c
+    end else
+      c
+
 (** {2 Setup} *)
 
 (* TODO: some simplification stuff? Or distributivity?
@@ -692,6 +758,7 @@ let setup_env ?(ac=false) ~env =
   Env.add_unary_inf ~env "arith_remainder_divisors" infer_remainder_of_divisors;
   Env.add_unary_inf ~env "arith_enum_remainder" enum_remainder_cases;
   Env.add_unary_inf ~env "arith_remainder_of_eq" remainder_of_equality;
+  Env.add_simplify ~env remainder_of_var_ineq;
   (* declare some AC symbols *)
   if ac then begin
     AC.add_ac ~env S.Arith.sum;
