@@ -530,6 +530,35 @@ let infer_remainder_of_divisors c =
             Util.incr_stat stat_infer_remainder_of_divisors;
             new_c :: acc
           ) acc divisors
+      | `EqMod (t, n, const, false) when Type.eq Type.int (T.ty t) ->
+        (* replace [t - c mod n != 0] by [Or_d (t - c) mod d != 0] for [d]
+            ranging in divisors of [n] *)
+        let divisors = match n with
+          | S.Int n -> S.Arith.Op.divisors n
+          | _ -> assert false
+        in
+        if divisors <> []
+          then
+            let lits' = Util.array_except_idx c.C.hclits i in
+            let t' = AT.mk_difference t (T.mk_const const) in
+            let new_lits = List.map
+              (fun d ->
+                let new_lit = Lit.mk_neq ~ord
+                  (AT.mk_remainder_e t' (Symbol.mk_bigint d))
+                  (T.mk_const S.Arith.zero_i)
+                in new_lit)
+              divisors
+            in
+            let all_lits = new_lits @ lits' in
+            let parents = [c] in
+            let proof cc = Proof.mk_c_inference
+              ~theories:["arith"; "equality"]
+              ~rule:"remainder_divisor" cc [c.C.hcproof] in
+            let new_c = C.create ~ctx ~parents all_lits proof in
+            Util.debug 5 "remainder_of_divisors: from %a  deduce %a" C.pp c C.pp new_c;
+            Util.incr_stat stat_infer_remainder_of_divisors;
+            new_c :: acc
+          else acc
       | _ -> acc)
     [] lits
 
