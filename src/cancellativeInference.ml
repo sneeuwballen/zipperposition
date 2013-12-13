@@ -57,6 +57,9 @@ let prof_canc_ineq_factoring = Util.mk_profiler "canc.ineq_factoring"
 let prof_canc_ineq_chaining = Util.mk_profiler "canc.ineq_chaining"
 let prof_canc_reflexivity_resolution = Util.mk_profiler "canc.reflexivity_resolution"
 
+let stat_canc_semantic_tautology = Util.mk_stat "canc.semantic_tauto"
+let prof_canc_semantic_tautology = Util.mk_profiler "canc.semantic_tauto"
+
 let theories = ["arith"; "equality"]
 
 (* do cancellative superposition *)
@@ -468,8 +471,67 @@ let canc_ineq_factoring c =
   Util.exit_prof prof_canc_ineq_factoring;
   res
 
-(* TODO: congruence closure?! *)
-let is_tautology c = false
+(* redundancy criterion: if variables are replaced by constants,
+   do equations and inequations in left part of =>
+   always imply something on the right part of => ?
+
+   e,g, transitivity is redundant, because we have
+   ~ x<y | ~ y<z | x<z, once simplified and grounded,
+   x < y & y < z ==> x < z is always trivial
+
+   We consider that  a <= b is negation for b < a, and use the congruence
+   closure (same as for {!Superposition.is_semantic_tautology}) *)
+let is_tautology c =
+  Util.enter_prof prof_canc_semantic_tautology;
+  let cc = Congruence.FO.create ~size:13 () in
+  (* ineq to checks afterward *)
+  let to_check = ref [] in
+  (* monomes met so far (to compare them) *)
+  let monomes = ref [] in
+  (* build congruence *)
+  ArithLit.Arr.fold_canonical c.C.hclits ()
+    begin fun () i lit -> match lit with
+      | Canon.True | Canon.False -> ()
+      | Canon.Compare (op, m1, m2) ->
+        monomes := m1 :: m2 :: !monomes;
+        match op with
+        | ArithLit.Neq ->
+          Congruence.FO.mk_eq cc (M.to_term m1) (M.to_term m2)
+        | ArithLit.Eq ->
+          to_check := `Eq (M.to_term m1, M.to_term m2) :: !to_check
+        | ArithLit.Leq ->
+          Congruence.FO.mk_less cc (M.to_term m2) (M.to_term m1)
+        | ArithLit.Lt ->
+          to_check := `Lt (M.to_term m1, M.to_term m2) :: !to_check
+    end;
+  List.iter
+    (fun (m1, m2) ->
+      if m1 != m2 then
+        (* m1 and m2 are comparable? *)
+        match M.comparison m1 m2 with
+        | Comparison.Eq ->
+          Congruence.FO.mk_eq cc (M.to_term m1) (M.to_term m2)
+        | Comparison.Lt ->
+          Congruence.FO.mk_less cc (M.to_term m1) (M.to_term m2)
+        | Comparison.Gt ->
+          Congruence.FO.mk_less cc (M.to_term m2) (M.to_term m1)
+        | Comparison.Incomparable -> ())
+    (Util.list_diagonal !monomes);
+  (* check if inequality holds in congruence OR congruence tautological *)
+  let res =
+    Congruence.FO.cycles cc ||
+    List.exists
+      (function
+      | `Eq (l,r) -> Congruence.FO.is_eq cc l r
+      | `Lt (l,r) -> Congruence.FO.is_less cc l r)
+      !to_check
+  in
+  if res then begin
+    Util.incr_stat stat_canc_semantic_tautology;
+    Util.debug 2 "%a is a cancellative semantic tautology" C.pp c;
+    end;
+  Util.exit_prof prof_canc_semantic_tautology;
+  res
 
 (** {2 Setup} *)
 

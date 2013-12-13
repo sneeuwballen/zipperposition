@@ -109,7 +109,7 @@ val enum_remainder_cases : Env.unary_inf_rule
       clause Or_{i=0...n-1} remainder(t, n) = i
       assuming n is not too big.
 
-      TODO: maybe it's better to resolve directly [C or a mod n != b]
+      XXX: maybe it's better to resolve directly [C or a mod n != b]
       into [C or Or_{i=0..n-1, i != b} a mod n = i]? *)
 
 val remainder_of_equality : Env.unary_inf_rule
