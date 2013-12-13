@@ -296,7 +296,7 @@ let pp_result_of buf proof = pp_result buf proof.result
 let pp_notrec buf p =
   Printf.bprintf buf "%a <-- %a [%a]"
     pp_result_of p pp_kind p.kind
-    (Util.pp_array pp_result_of) p.parents
+    (Util.pp_list Buffer.add_string) p.theories
 
 let fmt fmt proof =
   Format.pp_print_string fmt (Util.on_buffer pp_notrec proof)
@@ -368,9 +368,18 @@ let pp switch buf proof = match switch with
   | "debug" -> pp_debug buf proof
   | _ -> failwith ("unknown proof-printing format: " ^ switch)
 
+let _pp_list_str = Util.pp_list Buffer.add_string
+
 let as_dot_graph =
-  let label proof = `Label (Util.on_buffer pp_notrec proof) in
-  let attributes = [`Shape "box"; `Style "filled"] in
+  let label proof =
+    (* TODO: boxes
+    let s = Util.sprintf "{%a|%a|%a}" pp_result_of proof
+      _pp_list_str proof.theories _pp_list_str proof.additional_info in
+      *)
+    let s = Util.sprintf "%a" pp_result_of proof in
+    `Label s
+  in
+  let attributes = [`Shape "box" (* "record" *) ; `Style "filled"] in
   LazyGraph.map
     ~vertices:(fun p ->
       if is_proof_of_false p then `Color "red" :: `Label "[]" :: attributes
