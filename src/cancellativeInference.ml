@@ -362,7 +362,10 @@ let canc_ineq_factoring c =
     let strict' = lit'.Foc.op = ArithLit.Lt in
     let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
     let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-    let new_op = if strict || strict' then ArithLit.Leq else ArithLit.Lt in
+    (* always using a "<" constraint is safe, so its negation is to always
+        use "<=" as an alternative. But if both are strict, we know that
+        using "<" is ok (see paper on cancellative sup/chaining). *)
+    let new_op = if strict && strict' then ArithLit.Lt else ArithLit.Leq in
     (* build new literal (the guard) *)
     let new_lit = match lit.Foc.side, lit'.Foc.side with
       | ArithLit.Left, ArithLit.Left ->
@@ -392,7 +395,7 @@ let canc_ineq_factoring c =
     let strict' = lit'.Foc.op = ArithLit.Lt in
     let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
     let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-    let new_op = if strict || strict' then ArithLit.Leq else ArithLit.Lt in
+    let new_op = if strict && strict' then ArithLit.Lt else ArithLit.Leq in
     (* build new literal (the guard) *)
     let new_lit = match lit.Foc.side, lit'.Foc.side with
       | ArithLit.Left, ArithLit.Left ->
@@ -465,6 +468,7 @@ let canc_ineq_factoring c =
   Util.exit_prof prof_canc_ineq_factoring;
   res
 
+(* TODO: congruence closure?! *)
 let is_tautology c = false
 
 (** {2 Setup} *)
