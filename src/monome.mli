@@ -38,6 +38,7 @@ open Logtk
 type t = private {
   const : Symbol.t;
   terms : (Symbol.t * FOTerm.t) list;
+  mutable to_term : FOTerm.t option;  (* cache for to_term *)
 }
 
 val eq : t -> t -> bool       (* structural equality *)

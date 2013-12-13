@@ -35,6 +35,7 @@ module S = Symbol
 type t = {
   const : Symbol.t;
   terms : (Symbol.t * FOTerm.t) list;
+  mutable to_term : FOTerm.t option;
 }
 
 let eq t1 t2 =
@@ -81,11 +82,11 @@ let _fmap f e =
         else Some (s', t))
     e.terms
   in
-  { const=f e.const; terms; }
+  { const=f e.const; terms; to_term=None; }
 
-  let const s =
-    assert (S.is_numeric s);
-    { const=s; terms=[]; }
+let const s =
+  assert (S.is_numeric s);
+  { const=s; terms=[]; to_term=None; }
 
 let singleton coeff t =
   if S.Arith.is_zero coeff
@@ -93,7 +94,7 @@ let singleton coeff t =
     else
       let terms = [coeff, t] in
       let const = S.Arith.zero_of_ty (S.ty coeff) in
-      { terms; const; }
+      { terms; const; to_term=None; }
 
 let find e t =
   let rec find l t = match l with
@@ -119,16 +120,16 @@ let add e s t =
             else (s'', t) :: l'
         else (s', t') :: add l' s t
   in
-  { e with terms = add e.terms s t; }
+  { e with terms = add e.terms s t; to_term=None; }
 
 let add_const e s =
-  { e with const = S.Arith.Op.sum e.const s; }
+  { e with const = S.Arith.Op.sum e.const s; to_term=None; }
 
 let remove e t =
-  { e with terms = List.filter (fun (_, t') -> not (T.eq t t')) e.terms; }
+  { e with terms = List.filter (fun (_, t') -> not (T.eq t t')) e.terms; to_term=None; }
 
 let remove_const e =
-  { e with const = S.Arith.zero_of_ty (ty e); }
+  { e with const = S.Arith.zero_of_ty (ty e); to_term=None; }
 
 module Seq = struct
   let terms m =
@@ -164,7 +165,7 @@ let var_occurs ~var e =
 let sum e1 e2 =
   let const = S.Arith.Op.sum e1.const e2.const in
   let terms = _merge S.Arith.Op.sum e1.terms e2.terms in
-  { const; terms; }
+  { const; terms; to_term=None; }
 
 let uminus e = _fmap S.Arith.Op.uminus e
 
@@ -208,7 +209,7 @@ let normalize_wrt_zero m =
     let gcd = S.Arith.Op.abs gcd in
     let const = S.Arith.Op.quotient m.const gcd in
     let terms = List.map (fun (c,t) -> S.Arith.Op.quotient c gcd, t) m.terms in
-    { const; terms; }
+    { const; terms; to_term=None; }
   | S.Int _ 
   | S.Rat _
   | S.Real _ -> m
@@ -228,8 +229,8 @@ let split m =
         else l1, (S.Arith.Op.uminus c, t)::l2
   in
   let terms1, terms2 = partition m.terms in
-  let m1 = {terms=terms1; const=const1; } in
-  let m2 = {terms=terms2; const=const2; } in
+  let m1 = {terms=terms1; const=const1; to_term=None; } in
+  let m2 = {terms=terms2; const=const2; to_term=None; } in
   m1, m2
 
 exception NotLinear
@@ -289,21 +290,27 @@ let of_term_opt t =
   try Some (of_term t)
   with NotLinear -> None
 
-let to_term e = 
-  match e.terms with
-  | [] -> T.mk_const e.const
-  | (c, t)::rest ->
-    (* remove one coeff to make the basic sum *)
-    let sum = ArithTerm.mk_product (T.mk_const c) t in
-    (* add coeff*term for the remaining terms *)
-    let sum = List.fold_left
-      (fun sum (coeff, t') ->
-        assert (not (S.Arith.is_zero coeff));
-        ArithTerm.mk_sum sum (ArithTerm.mk_product (T.mk_const coeff) t'))
-      sum rest
+let to_term e =
+  match e.to_term with
+  | Some t -> t
+  | None ->
+    let t = match e.terms with
+    | [] -> T.mk_const e.const
+    | (c, t)::rest ->
+      (* remove one coeff to make the basic sum *)
+      let sum = ArithTerm.mk_product (T.mk_const c) t in
+      (* add coeff*term for the remaining terms *)
+      let sum = List.fold_left
+        (fun sum (coeff, t') ->
+          assert (not (S.Arith.is_zero coeff));
+          ArithTerm.mk_sum sum (ArithTerm.mk_product (T.mk_const coeff) t'))
+        sum rest
+      in
+      (* add the constant (if needed) *)
+      ArithTerm.mk_sum (T.mk_const e.const) sum
     in
-    (* add the constant (if needed) *)
-    ArithTerm.mk_sum (T.mk_const e.const) sum
+    e.to_term <- Some t;
+    t
 
 let apply_subst ~renaming subst m sc_m =
   match m.terms with
