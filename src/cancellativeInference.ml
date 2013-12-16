@@ -69,12 +69,13 @@ let theories = ["arith"; "equality"]
 (* do cancellative superposition *)
 let _do_canc ~ctx ~active:(active,idx_a,lit_a,s_a) ~passive:(passive,idx_p,lit_p,s_p) subst acc =
   let ord = Ctx.ord ctx in
-  (* TODO: check also that lit_a.term maximal in lit_a,
-    and lit_p.term maximal in lit_p. For this, need AC-compatible order *)
+  let renaming = Ctx.renaming_clear ctx in
+  (* check ordering conditions *)
   if C.is_maxlit active idx_a subst s_a
   && C.is_maxlit passive idx_p subst s_p
+  && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit_a s_a)
+  && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit_p s_p)
   then begin
-    let renaming = Ctx.renaming_clear ctx in
     (* get both lit with same coeff for unified term *)
     let lit_a, lit_p = Foc.scale lit_a lit_p in
     assert (S.Arith.sign lit_a.Foc.coeff > 0);
@@ -185,7 +186,9 @@ let cancellation c =
           (fun acc t1 t2 ->
             try
               let subst = FOUnif.unification t1 0 t2 0 in
-              mk_instance subst :: acc
+              if C.is_maxlit c i subst 0
+                then mk_instance subst :: acc
+                else acc
             with FOUnif.Fail -> acc))
   in
   Util.exit_prof prof_cancellation;
@@ -196,6 +199,45 @@ let canc_equality_factoring c =
   let ctx = c.C.hcctx in
   let ord = Ctx.ord ctx in
   let eligible = C.Eligible.eq in
+  let _do_factoring ~left:(lit,i) ~right:(lit',j) subst acc =
+    let renaming = Ctx.renaming_clear ctx in
+    (* check maximality of left literal, and maximality of involved
+        terms within their literal *)
+    if C.is_maxlit c i subst 0
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit 0)
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' 0)
+    then begin
+      (* lit is [t + m1 = m2], lit' is [t + m1' = m2']
+          now we infer, as for regular eq.factoring,
+          t = m2-m1 | t = m2'-m1'
+          ----------------------------------
+          m2 - m1 != m2' - m1'| t = m2' - m1'
+          ===================================
+          m2 + m1' != m2' + m1 | t + m1' = m2'
+          and canonize literals again.
+          Here we keep the second literal, and remove the first. *)
+      let lit, lit' = Foc.scale lit lit' in
+      let lit = Foc.apply_subst ~renaming subst lit 0 in
+      let lit' = Foc.apply_subst ~renaming subst lit' 0 in
+      let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
+      let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
+      let new_lit = Canon.to_lit ~ord
+        (Canon.of_monome ArithLit.Neq
+          (M.difference (M.sum m2 m1') (M.sum m2' m1)))
+      in
+      let other_lits = Util.array_except_idx c.C.hclits i in
+      let other_lits = Literal.apply_subst_list ~renaming ~ord subst other_lits 0 in
+      (* apply subst and build clause *)
+      let all_lits = new_lit :: other_lits in
+      let proof cc = Proof.mk_c_inference ~theories
+        ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j]
+        ~rule:"canc_eq_factoring" cc [c.C.hcproof] in
+      let new_c = C.create ~ctx all_lits proof in
+      Util.debug 5 "cancellative_eq_factoring: %a gives %a" C.pp c C.pp new_c;
+      Util.incr_stat stat_canc_eq_factoring;
+      new_c :: acc
+    end else acc
+  in
   (* focused literals (only for equalities) *)
   let lits = ArithLit.Arr.view_focused ~ord ~eligible c.C.hclits in
   let res = Util.array_foldi
@@ -213,35 +255,7 @@ let canc_equality_factoring c =
                       try
                         (* try to unify both focused terms *)
                         let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
-                        (* check maximality of left literal *)
-                        if not (C.is_maxlit c i subst 0) then raise Exit;
-                        (* lit is [t + m1 = m2], lit' is [t + m1' = m2']
-                            now we infer, as for regular eq.factoring,
-                            t = m2-m1 | t = m2'-m1'
-                            ----------------------------------
-                            m2 - m1 != m2' - m1'| t = m2' - m1'
-                            ===================================
-                            m2 + m1' != m2' + m1 | t + m1' = m2'
-                            and canonize literals again.
-                            Here we keep the second literal, and remove the first. *)
-                        let new_lits = Util.array_except_idx c.C.hclits i in
-                        let m1, m2 = lit.Foc.same_side, lit.Foc.other_side in
-                        let m1', m2' = lit'.Foc.same_side, lit'.Foc.other_side in
-                        let new_lit = Canon.to_lit ~ord
-                          (Canon.of_monome ArithLit.Neq
-                            (M.difference (M.sum m2 m1') (M.sum m2' m1)))
-                        in
-                        let new_lits = new_lit :: new_lits in
-                        (* apply subst and build clause *)
-                        let new_lits = Literal.apply_subst_list
-                          ~renaming:(Ctx.renaming_clear ctx) ~ord subst new_lits 0 in
-                        let proof cc = Proof.mk_c_inference ~theories
-                          ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j]
-                          ~rule:"canc_eq_factoring" cc [c.C.hcproof] in
-                        let new_c = C.create ~ctx new_lits proof in
-                        Util.debug 5 "cancellative_eq_factoring: %a gives %a" C.pp c C.pp new_c;
-                        Util.incr_stat stat_canc_eq_factoring;
-                        new_c :: acc
+                        _do_factoring ~left:(lit,i) ~right:(lit',j) subst acc
                       with FOUnif.Fail | Exit -> acc)
                     acc l'
                 | _ -> acc)
@@ -260,12 +274,13 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
   (* perform chaining (if ordering conditions respected) *)
   let _chaining ~left:(c,s_c,i,lit,strict) ~right:(c',s_c',j,lit',strict') subst acc =
     Util.debug 5 "attempt chaining between %a and %a..." C.pp c C.pp c';
+    let renaming = Ctx.renaming_clear ~ctx in
     if C.is_maxlit c s_c subst i
     && C.is_maxlit c' s_c' subst j
-    (* TODO: also check that terms are maximal in their literal *)
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit s_c)
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' s_c')
     then begin
       Util.debug 5 "chaining: left=%a, right=%a" Foc.pp lit Foc.pp lit';
-      let renaming = Ctx.renaming_clear ~ctx in
       assert (lit.Foc.side = ArithLit.Left);
       assert (lit'.Foc.side = ArithLit.Right);
       (* make sure [t] has the same coefficient in [lit] and [lit'] *)
@@ -366,6 +381,8 @@ let canc_case_switch (state: ProofState.ActiveSet.t) c =
     && S.Arith.Op.less m.M.const !case_switch_limit
     && C.is_maxlit c s_c subst i
     && C.is_maxlit c' s_c' subst j
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit s_c)
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' s_c')
     then begin
       let low = M.difference m2' m1' in
       Util.debug 5 "case_switch between %a at %d and %a at %d" C.pp c i C.pp c' j;
@@ -613,16 +630,23 @@ let canc_ineq_factoring c =
   in
   (* factor lit and lit' (2 ways) *)
   let _factor ~left:(lit,i,op) ~right:(lit',j,op') subst acc =
-    let lit, lit' = Foc.scale lit lit' in
     let renaming = Ctx.renaming_clear ~ctx in
-    let lit = Foc.apply_subst ~renaming subst lit 0 in
-    let lit' = Foc.apply_subst ~renaming subst lit' 0 in
-    let all_lits = Literal.Arr.apply_subst ~renaming ~ord subst c.C.hclits 0 in
-    (* the two inferences (eliminate lit i/lit j respectively) *)
-    let info = [Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j] in
-    let acc = _factor1 ~info lit lit' (Util.array_except_idx all_lits i) acc in
-    let acc = _factor2 ~info lit lit' (Util.array_except_idx all_lits j) acc in
-    acc
+    (* check maximality of left literal, and maximality of factored terms
+      within their respective literals *)
+    if C.is_maxlit c i subst 0
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit 0)
+    && Foc.is_max ~ord (Foc.apply_subst ~renaming subst lit' 0)
+    then begin
+      let lit, lit' = Foc.scale lit lit' in
+      let lit = Foc.apply_subst ~renaming subst lit 0 in
+      let lit' = Foc.apply_subst ~renaming subst lit' 0 in
+      let all_lits = Literal.Arr.apply_subst ~renaming ~ord subst c.C.hclits 0 in
+      (* the two inferences (eliminate lit i/lit j respectively) *)
+      let info = [Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j] in
+      let acc = _factor1 ~info lit lit' (Util.array_except_idx all_lits i) acc in
+      let acc = _factor2 ~info lit lit' (Util.array_except_idx all_lits j) acc in
+      acc
+    end else acc
   in
   (* pairwise unify terms of focused lits *)
   let eligible = C.Eligible.pos in
@@ -642,12 +666,7 @@ let canc_ineq_factoring c =
                     then try
                       (* unify the two terms *)
                       let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
-                      (* check maximality of left literal *)
-                      if C.is_maxlit c i subst 0
-                        then
-                          (* factor lit and lit' *)
-                          _factor ~left:(lit,i,op) ~right:(lit',j,op') subst acc
-                        else acc
+                      _factor ~left:(lit,i,op) ~right:(lit',j,op') subst acc
                     with FOUnif.Fail -> acc
                   else acc)
                 acc l'

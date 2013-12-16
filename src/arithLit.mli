@@ -173,6 +173,11 @@ module Focused : sig
   val product : Symbol.t -> t -> t
     (** Product by constant *)
 
+  val is_max : ord:Ordering.t -> t -> bool
+    (** [is_max ~ord lit] checks whether the focused term is {b maximal} in the
+        literal w.r.t [ord], ie if it's dominated by no other term on any side
+        of the relation. *)
+
   val of_canonical : ord:Ordering.t -> Canonical.t -> t list
     (** Isolate maximal subterms of a {!Canonical.t} representation *)
 

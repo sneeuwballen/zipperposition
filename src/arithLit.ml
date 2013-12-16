@@ -431,6 +431,18 @@ module Focused = struct
       other_side=M.product t.other_side s;
     }
 
+  let is_max ~ord lit =
+    let not_dominated_by t' =
+      match Ordering.compare ord lit.term t' with
+      | Comparison.Gt
+      | Comparison.Eq
+      | Comparison.Incomparable -> true
+      | Comparison.Lt -> false
+    in
+    Sequence.for_all not_dominated_by (M.Seq.terms lit.same_side)
+    &&
+    Sequence.for_all not_dominated_by (M.Seq.terms lit.other_side)
+
   let of_canonical ~ord e =
     (* extract maximal terms from list *)
     let filter_max l =
