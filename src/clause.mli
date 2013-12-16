@@ -67,8 +67,6 @@ val to_seq : t -> (FOTerm.t * FOTerm.t * bool) Sequence.t
 
 val terms : t -> FOTerm.t Sequence.t
 
-val to_prec_clause : t -> Precedence.clause
-
 (** {2 Flags} *)
 
 val flag_ground : int                             (** clause is ground *)

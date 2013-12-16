@@ -118,12 +118,12 @@ val add_operation : penv:t -> prio:int -> operation -> unit
 val add_operation_rule : penv:t -> prio:int -> (PFormula.Set.t -> operation) -> unit
   (** Add an operation that depends on the initial set of formulas to process *)
 
-val add_constr : penv:t -> Precedence.constr -> unit
+val add_constr : penv:t -> Precedence.Constr.t -> unit
   (** Add a precedence constraint *)
 
-val add_constrs : penv:t -> Precedence.constr list -> unit
+val add_constrs : penv:t -> Precedence.Constr.t list -> unit
 
-val add_constr_rule : penv:t -> (PFormula.Set.t -> Precedence.constr) -> unit
+val add_constr_rule : penv:t -> (PFormula.Set.t -> Precedence.Constr.t) -> unit
   (** Add a precedence constraint rule *)
 
 val mk_precedence : penv:t -> PFormula.Set.t -> Precedence.t

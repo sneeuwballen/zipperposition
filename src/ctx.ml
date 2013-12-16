@@ -75,7 +75,7 @@ let is_completeness_preserved ~ctx = ctx.complete
 
 let add_signature ~ctx signature =
   ctx.signature <- Signature.merge ctx.signature signature;
-  ctx.ord <- Ordering.add_signature ctx.ord ctx.signature;
+  ctx.ord <- Ordering.add_seq ctx.ord (Sequence.map snd (Signature.to_seq ctx.signature));
   ()
 
 let ac ~ctx = ctx.ac

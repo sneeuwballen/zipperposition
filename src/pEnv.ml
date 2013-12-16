@@ -220,8 +220,8 @@ let expand_def set pf =
 type t = {
   mutable axioms : PF.Set.t;
   mutable ops : (int * (PF.Set.t -> operation)) list;  (* int: priority *)
-  mutable constrs : Precedence.constr list;
-  mutable constr_rules : (PF.Set.t -> Precedence.constr) list;
+  mutable constrs : Precedence.Constr.t list;
+  mutable constr_rules : (PF.Set.t -> Precedence.Constr.t) list;
   mutable base : Signature.t;
   meta : MetaProverState.t option;
   params : Params.t;
@@ -288,4 +288,4 @@ let mk_precedence ~penv set =
   let symbols = Signature.to_symbols signature in
   let symbols' = PFormula.Set.symbols set in
   let symbols' = Symbol.Set.elements symbols' in
-  Precedence.create ~complete:false constrs (List.rev_append symbols symbols')
+  Precedence.create constrs (List.rev_append symbols symbols')

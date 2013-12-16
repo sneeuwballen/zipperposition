@@ -127,7 +127,7 @@ let parse_args () =
   Arg.parse options add_file "solve problems in files";
   if Vector.is_empty files
     then Vector.push files "stdin";
-  let param_ord = Ordering.choose !ord in
+  let param_ord = Ordering.by_name !ord in
   (* return parameter structure *)
   { param_ord; param_seed = !seed; param_steps = !steps;
     param_version= !version; param_calculus= !calculus; param_timeout = !timeout;

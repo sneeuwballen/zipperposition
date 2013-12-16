@@ -124,7 +124,7 @@ let setup_penv ?(ctx=Skolem.create ()) ~penv () =
     ArithElim.setup_penv ~penv;
   AC.setup_penv ~penv;
   (* be sure to get a total order on symbols *)
-  PEnv.add_constr ~penv Precedence.alpha_constraint;
+  PEnv.add_constr ~penv Precedence.Constr.alpha;
   ()
 
 let setup_env ~env =

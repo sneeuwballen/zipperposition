@@ -1124,8 +1124,7 @@ let rec condensation c =
 
 let setup_penv ~ctx ~penv =
   let constrs =
-    [Precedence.min_constraint
-      [Symbol.split_symbol; Symbol.false_symbol; Symbol.true_symbol]]
+    [ Precedence.Constr.min [Symbol.split_symbol; Symbol.false_symbol; Symbol.true_symbol ]]
   and rule_remove_trivial = PEnv.remove_trivial
   in
   PEnv.add_constrs ~penv constrs;

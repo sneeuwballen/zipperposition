@@ -536,7 +536,7 @@ let setup_penv ~penv =
   let base = Signature.Arith.signature in
   PEnv.add_base_sig ~penv base;
   PEnv.add_operation ~penv ~prio:2 simplify_rule;
-  PEnv.add_constr ~penv (Precedence.min_constraint (Signature.to_symbols base));
+  PEnv.add_constr ~penv (Precedence.Constr.min (Signature.to_symbols base));
   ()
 
 let setup_env ?(ac=false) ~env =

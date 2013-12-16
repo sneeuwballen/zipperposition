@@ -69,8 +69,6 @@ let to_seq c =
 let terms c =
   Lits.terms c.hclits
 
-let to_prec_clause c = Lit.Arr.to_forms c.hclits
-
 (** {2 boolean flags} *)
 
 let new_flag =
