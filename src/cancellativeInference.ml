@@ -107,7 +107,8 @@ let _do_canc ~ctx ~active:(active,idx_a,lit_a,s_a) ~passive:(passive,idx_p,lit_p
     let lit = Canon.to_lit ~ord lit in
     let all_lits = lit :: lits_a @ lits_p in
     (* build clause *)
-    let proof cc = Proof.mk_c_inference ~theories ~info:[Substs.FO.to_string subst]
+    let proof cc = Proof.mk_c_inference ~theories
+      ~info:[Substs.FO.to_string subst; Util.sprintf "lhs(%a)" T.pp lit_a.Foc.term]
       ~rule:"canc_sup" cc [active.C.hcproof; passive.C.hcproof] in
     let new_c = C.create ~parents:[active;passive] ~ctx all_lits proof in
     Util.debug 5 "cancellative superposition of %a and %a gives %a"
@@ -318,7 +319,9 @@ let canc_ineq_chaining (state:ProofState.ActiveSet.t) c =
       let all_lits = lits @ lits_left @ lits_right in
       (* build clause *)
       let proof cc = Proof.mk_c_inference ~theories
-        ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j]
+        ~info:[Substs.FO.to_string subst; Util.sprintf "idx(%d,%d)" i j
+              ; Util.sprintf "left(%a)" T.pp lit.Foc.term
+              ; Util.sprintf "right(%a)" T.pp lit'.Foc.term]
         ~rule:"canc_ineq_chaining" cc [c.C.hcproof; c'.C.hcproof] in
       let new_c = C.create ~ctx ~parents:[c;c'] all_lits proof in
       Util.debug 5 "ineq chaining of %a and %a gives %a" C.pp c C.pp c' C.pp new_c;
