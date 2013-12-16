@@ -277,6 +277,19 @@ class Run(object):
         return rows
 
     @command
+    def inconsistency(self, display=True):
+        "finds the files on which provers give inconsistent results"
+        query = """select filename, prover, result, time from results r where
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "sat" > 0)
+          and
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "unsat" > 0)
+          ;"""
+        rows = list(self.conn.execute(query))
+        if display:
+            self.print_rows(rows)
+        return rows
+
+    @command
     def json_dump(self):
         "dumps the table in json format"
         query = """select filename, prover, result, time, output from results;"""
