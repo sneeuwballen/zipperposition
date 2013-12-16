@@ -116,11 +116,12 @@ let purify_arith c =
   let lits' = ArithLit.Arr.purify ~ord:(Ctx.ord ctx) ~eligible c.C.hclits
   in
   if Lits.eq_com c.C.hclits lits'
-    then []
+    then c
     else begin
       let proof cc = Proof.mk_c_inference ~rule:"purify" cc [c.C.hcproof] in
       let new_c = C.create_a ~ctx ~parents:[c] lits' proof in
-      [new_c]
+      Util.debug 5 "purification of %a --> %a" C.pp c C.pp new_c;
+      new_c
     end
 
 (* if a < t1, a < t2, .... a < tn occurs in clause, where t_i are all
@@ -369,7 +370,7 @@ let enum_remainder_cases c =
   let lits = _view_lits_as_remainder c.C.hclits in
   Array.fold_left
     (fun acc lit -> match lit with
-      | `EqMod (t, n, c, sign) ->
+      | `EqMod (t, n, c, sign) when not (T.is_var t) ->
         (* TODO: if n divides t-c, do not enumerate but assert  t-c mod n = 0 *)
         begin try
           (* ignore constant *)
@@ -546,8 +547,8 @@ let setup_env ?(ac=false) ~env =
   (* rules *)
   Env.add_lit_rule ~env "arith_rw" rewrite_lit;
   Env.add_unary_inf ~env "arith_factor" factor_arith;
-  Env.add_unary_inf ~env "arith_purify" purify_arith;
   Env.add_unary_inf ~env "arith_elim" eliminate_arith;
+  Env.add_simplify ~env purify_arith;
   Env.add_simplify ~env factor_bounds;
   Env.add_is_trivial ~env bounds_are_tautology;
   (* modular arith *)
