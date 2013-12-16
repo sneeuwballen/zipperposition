@@ -195,7 +195,12 @@ module Make(Sym : SYMBOL) = struct
   let pp_snapshot buf s =
     Util.pp_list ~sep:" > " Sym.pp buf s
 
-  let pp buf prec = pp_snapshot buf prec.snapshot
+  let pp buf prec =
+    Util.pp_list ~sep:" > "
+      (fun buf s -> match status prec s with
+        | Multiset -> Printf.bprintf buf "%a[M]" Sym.pp s
+        | Lexicographic -> Sym.pp buf s)
+      buf prec.snapshot
 
   let to_string = Util.on_buffer pp
 
