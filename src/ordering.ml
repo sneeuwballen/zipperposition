@@ -331,10 +331,12 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
       (** recursive comparison *)
       and tckbo_rec wb f g ss ts =
         if f = g
-          then if Symbol.has_flag Symbol.flag_multiset f
+          then match Prec.status prec f with
+          | Precedence.Multiset ->
             (* use multiset or lexicographic comparison *)
-            then tckbocommute wb ss ts
-            else tckbolex wb ss ts
+            tckbocommute wb ss ts
+          | Precedence.Lexicographic ->
+            tckbolex wb ss ts
           else
             (* just compute variable and weight balances *)
             let wb', _ = balance_weight_rec wb ss 0 true false in
@@ -368,8 +370,8 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
       | T.BoundVar i, T.BoundVar j ->
         if i = j then Eq else Incomparable
       (* node and something else *)
-      | T.Node (f, _, ss), T.BoundVar _ -> rpo6_composite ~prec s t f Symbol.db_symbol ss []
-      | T.BoundVar _, T.Node (g, _, ts) -> rpo6_composite ~prec s t Symbol.db_symbol g [] ts
+      | T.Node (f, _, ss), T.BoundVar _ -> Comparison.Incomparable
+      | T.BoundVar _, T.Node (g, _, ts) -> Comparison.Incomparable
     (* handle the composite cases *)
     and rpo6_composite ~prec s t f g ss ts =
       match Prec.compare prec f g with
