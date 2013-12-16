@@ -515,7 +515,7 @@ let canc_inner_case_switch c =
               List.fold_left
                 begin fun acc lit' ->
                   let side' = lit'.Foc.side in
-                  if side <> side' then try
+                  if side <> side' && Type.eq Type.int (T.ty lit.Foc.term) then try
                     (* unify the two terms, then scale them to the same coefficient *)
                     let subst = FOUnif.unification lit.Foc.term 0 lit'.Foc.term 0 in
                     let lit, lit' = Foc.scale lit lit' in
