@@ -25,251 +25,346 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Precedence (total ordering) on symbols} *)
 
-module T = FOTerm
-module F = FOFormula
-module STbl = Symbol.Tbl
-module SMap = Symbol.Map
+type symbol_status =
+  | Multiset
+  | Lexicographic
 
-module PO = PartialOrder.Make(Symbol)
+(** {2 Signature} *)
 
-type constr = Symbol.t -> Symbol.t -> int
-  (** an ordering constraint (a possibly non-total ordering on symbols) *)
+module type S = sig
+  type symbol
 
-type  clause = FOFormula.t list
-  (** Abstraction of a clause. It's only a list of terms. *)
+  type t
+    (** Total Ordering on a finite number of symbols, plus a few more
+        data (weight for KBO, status for RPC) *)
 
-type t = {
-  prec_snapshot : Symbol.t list;  (** symbols in decreasing order *)
-  prec_compare : Symbol.t -> Symbol.t -> int;       (** Compare symbols *)
-  prec_weight : Symbol.t -> int;
-  prec_set_weight : (Symbol.t -> int) -> t;
-  prec_add_symbols : Symbol.t list -> t * int;
-    (** add the given symbols to the precedenc (returns how many are new) *)
-} (** A total ordering on symbols *)
+  type precedence = t
 
-let eq p1 p2 =
-  List.length p1.prec_snapshot = List.length p2.prec_snapshot
-  && List.for_all2 (==) p1.prec_snapshot p2.prec_snapshot
+  val eq : t -> t -> bool
+    (** Check whether the two precedences are equal (same snapshot) *)
 
-let snapshot p = p.prec_snapshot
+  val snapshot : t -> symbol list
+    (** Current list of symbols, in decreasing order *)
 
-let compare p s1 s2 = p.prec_compare s1 s2
+  val compare : t -> symbol -> symbol -> int
+    (** Compare two symbols using the precedence *)
 
-let add_symbols p l =
-  let p', _ = p.prec_add_symbols l in
-  p'
+  val status : t -> symbol -> symbol_status
+    (** Status of the symbol *)
 
-let add_signature p signature =
-  let symbols = Signature.to_symbols signature in
-  add_symbols p symbols
+  val weight : t -> symbol -> int
+    (** Weight of a symbol (for KBO). Strictly positive int. *)
 
-let pp_snapshot buf s =
-  Util.pp_list ~sep:" > " Symbol.pp buf s
+  val add_list : t -> symbol list -> t
+    (** Update the precedence with the given symbols *)
 
-let pp buf prec = pp_snapshot buf prec.prec_snapshot
+  val add_seq : t -> symbol Sequence.t -> t
 
-let to_string p =
-  let b = Buffer.create 32 in
-  pp b p;
-  Buffer.contents b
+  val declare_status : t -> symbol -> symbol_status -> t
+    (** Change the status of the given precedence *)
 
-let fmt fmt p = Format.pp_print_string fmt (to_string p)
+  module Seq : sig
+    val symbols : t -> symbol Sequence.t
+  end
 
-(* ----------------------------------------------------------------------
- * hard constraints on the ordering
- * ---------------------------------------------------------------------- *)
+  val pp_snapshot : Buffer.t -> symbol list -> unit
+  val pp : Buffer.t -> t -> unit
+  val fmt : Format.formatter -> t -> unit
+  val to_string : t -> string
 
-let cluster_constraint clusters =
-  let table = STbl.create 5
-  and cluster_num = ref 0 in
-  (* for each cluster, assign it a (incremented) number, and
-     remember symbol->number for every symbol of the cluster *)
-  List.iter
-    (fun cluster ->
-      let num = !cluster_num in
-      incr cluster_num;
-      List.iter (fun symb -> STbl.add table symb num) cluster)
-    clusters;
-  (* compare symbols by their number, if they have. Smaller numbers are bigger symbols *)
-  let compare s1 s2 =
-    try
-      let s1_num = STbl.find table s1
-      and s2_num = STbl.find table s2 in
-      s2_num - s1_num
-    with Not_found -> 0 (* at least one is not in the table, we do not order *)
-  in compare
+  (** {2 Builtin constraints} *)
 
-(** build a hashtable from the given ordering *)
-let mk_table symbols =
-  let table = STbl.create 5 in
-  let _ = List.fold_left (fun i s -> STbl.add table s i; i+1) 0 symbols
-  in table
+  module Constr : sig
+    type t = symbol -> symbol -> Comparison.t
+      (** A partial order on symbols, used to make the precedence more
+          precise *)
 
-let list_constraint l =
-  let table = mk_table l in
-  (* compare symbols by number. Smaller symbols have bigger number *)
-  fun a b ->
-    try let na = STbl.find table a
-        and nb = STbl.find table b in
-        nb - na
-    with Not_found -> 0
+    val cluster : symbol list list -> t
+      (** ordering constraint by clustering symbols by decreasing order.
+          all symbols in the first clusters are bigger than those in the second, etc. *)
 
-let arity_constraint s1 s2 =
-  let _, a1 = Type.arity (Symbol.ty s1) in
-  let _, a2 = Type.arity (Symbol.ty s2) in
-  (* bigger arity means bigger symbol *)
-  a1 - a2
+    val of_list : symbol list -> t
+      (** symbols in the given list are in decreasing order *)
 
-let invfreq_constraint formulas =
-  let freq_table = STbl.create 5 in
-  (* frequency of symbols in clause *)
-  let rec form_freq f = F.iter term_freq f
-  and term_freq t = match t.T.term with
-    | T.Var _ | T.BoundVar _ -> ()
-    | T.Node (s, _, l) ->
-      (let count = try STbl.find freq_table s with Not_found -> 0 in
-      STbl.replace freq_table s (count+1);
-      List.iter term_freq l)
-  in
-  Sequence.iter form_freq formulas;
-  (* compare by inverse frequency (higher frequency => smaller) *)
-  fun s1 s2 ->
-    let freq1 = try STbl.find freq_table s1 with Not_found -> 0
-    and freq2 = try STbl.find freq_table s2 with Not_found -> 0 in
-    freq2 - freq1
+    val of_precedence : precedence -> t
+      (** Copy of another precedence on the common symbols *)
 
-let max_constraint symbols =
-  let table = STbl.create 5
-  and num = ref 0 in
-  (* give number to symbols *)
-  List.iter
-    (fun symb -> let n = !num in
-      incr num; STbl.add table symb n)
-    symbols;
-  let compare a b =
-    (* not found implies the symbol is smaller than maximal symbols *)
-    let a_n = try STbl.find table a with Not_found -> !num
-    and b_n = try STbl.find table b with Not_found -> !num in
-    b_n - a_n  (* if a > b then a_n < b_n *)
-  in compare
+    val arity : (symbol -> int) -> t
+      (** decreasing arity constraint (big arity => high in precedence) *)
 
-let min_constraint symbols =
-  let table = STbl.create 11
-  and num = ref 0 in
-  (* give number to symbols *)
-  List.iter
-    (fun symb -> let n = !num in
-      incr num; STbl.add table symb n)
-    symbols;
-  fun a b ->
-    (* not found implies the symbol is bigger than minimal symbols *)
-    let a_n = try STbl.find table a with Not_found -> -1
-    and b_n = try STbl.find table b with Not_found -> -1 in
-    b_n - a_n  (* if a > b then a_n < b_n *)
+    val invfreq : symbol Sequence.t -> t
+      (** symbols with high frequency are smaller *)
 
-(* regular string ordering *)
-let alpha_constraint a b = Symbol.compare a b
+    val max : symbol list -> t
+      (** maximal symbols, in decreasing order *)
 
-(* ----------------------------------------------------------------------
- * Weight function
- * ---------------------------------------------------------------------- *)
+    val min : symbol list -> t
+      (** minimal symbols, in decreasing order *)
 
-(** weight of f = arity of f + 4 *)
-let weight_modarity signature a =
-  try fst (SMap.find a signature) + 4
-  with Not_found -> 4
+    val alpha : t
+      (** alphabetic ordering on symbols *)
+  end
 
-(** constant weight *)
-let weight_constant a = 4
+  (** {2 Creation of a precedence from constraints} *)
 
-(** {2 Creation of a precedence from constraints} *)
+  val create : Constr.t list -> symbol list -> t
+    (** make a precedence from the given constraints. Constraints near
+        the head of the list are {b more important} than constraints close
+        to the tail. Only the very first constraint is assured to be totally
+        satisfied if constraints do not agree with one another. *)
 
-(** Add the special symbols to the list *)
-let complete_symbols symbols = 
-  Util.list_union (==) symbols (Signature.to_symbols Signature.base)
+  val default : symbol list -> t
+    (** default precedence. Default status for symbols is {!Lexicographic}. *)
 
-(** Order the list of symbols using the constraints *)
-let order_symbols constrs symbols =
-  let po = PO.create symbols in
-  (* complete the partial order using constraints, starting with the
-     strongest ones *)
-  List.iter (fun constr -> PO.complete po constr) constrs;
-  assert (PO.is_total po);
-  PO.elements po
+  val default_seq : symbol Sequence.t -> t
+    (** default precedence on the given sequence of symbols *)
+end
 
-(** build a precedence on the [symbols] from a list of constraints *)
-let create ?(complete=false) constrs symbols =
-  let symbols = if complete then complete_symbols symbols else symbols in
-  let symbols = order_symbols constrs symbols in
-  let table = mk_table symbols in
-  let weight = weight_constant in
-  (* how to build a precedence *)
-  let rec mk_prec symbols table weight =
-    (** Add the given symbols to the precedence. Returns how many of them
-        are new and have effectively been added *)
-    let prec_add_symbols new_symbols = 
-      let old_len = List.length symbols in
-      let all_symbols = Util.list_union Symbol.eq new_symbols symbols in
-      let new_len = List.length all_symbols in
-      if new_len > old_len then begin
-        (* some symbols have been added *)
-        Util.debug 3 "add %a to the precedence"
-            (Util.pp_list ~sep:", " Symbol.pp) new_symbols;
-        Util.debug 3 "old precedence %a" pp_snapshot symbols;
+(** {2 Functor} *)
 
-        (* build a partial order that respects the current ordering *)
-        let po = PO.create all_symbols in
-        PO.complete po (list_constraint symbols);
-        (* complete it with the constraints *)
-        List.iter (fun constr -> PO.complete po constr) constrs;
-        assert (PO.is_total po);
-        (* get the new precedence from the completed partial order.
-          all_symbols is now in decreasing order. *)
-        let all_symbols = PO.elements po in
-        let table' = mk_table all_symbols in
-        let prec' = mk_prec all_symbols table' weight in
-        Util.debug 3 "new precedence %a" pp_snapshot all_symbols;
-        (* return number of new symbols *)
-        prec', new_len - old_len
-      end else
-        mk_prec symbols table weight, 0
-    in
-    let prec_compare a b = 
-      (* some symbols are not explicitely in the signature. Instead, they
-         are represented by 'generic' symbols *)
-      let transform_symbol s = match s with
-        | _ when Symbol.has_flag Symbol.flag_split s -> Symbol.split_symbol
-        | _ when Symbol.has_flag Symbol.flag_fresh_const s -> Symbol.const_symbol
-        | _ -> s
+module type SYMBOL = sig
+  type t
+
+  val eq : t -> t -> bool
+  val hash : t -> int
+  val cmp : t -> t -> int
+
+  val false_ : t
+  val true_ : t
+
+  val pp : Buffer.t -> t -> unit
+end
+
+module Make(Sym : SYMBOL) = struct
+  type symbol = Sym.t
+
+  module Tbl = PersistentHashtbl.Make(struct
+    type t = Sym.t
+    let equal = Sym.eq
+    let hash = Sym.hash
+  end)
+
+  (* used to complete orderings *)
+  module PO = PartialOrder.Make(Sym)
+
+  type t = {
+    snapshot : symbol list; (* symbols by decreasing order *)
+    index : int Tbl.t;      (* symbol -> index in precedence *)
+    weight : symbol -> int; (* symbol -> weight *)
+    status : unit Tbl.t;    (* set of multiset-status symbols *)
+    constr : (symbol -> symbol -> Comparison.t) list;
+      (* constraints used to build the precedence *)
+  }
+
+  type precedence = t
+
+  let eq p1 p2 =
+    try List.for_all2 (==) p1.snapshot p2.snapshot
+    with Invalid_argument _ -> false
+
+  let snapshot p = p.snapshot
+
+  let compare p s1 s2 =
+    let i1 = try Tbl.find p.index s1 with Not_found -> -1 in
+    let i2 = try Tbl.find p.index s2 with Not_found -> -1 in
+    let c = i2 - i1 in
+    if c = 0
+      then Sym.cmp s1 s2
+      else c
+
+  let status p s =
+    if Tbl.mem p.status s
+      then Multiset
+      else Lexicographic
+
+  let weight p s = p.weight s
+
+  let declare_status p s status =
+    match status with
+    | Lexicographic when not (Tbl.mem p.status s) -> p
+    | Multiset when (Tbl.mem p.status s) -> p
+    | Lexicographic ->
+      { p with status = Tbl.remove p.status s; }
+    | Multiset ->
+      { p with status = Tbl.replace p.status s (); }
+
+  module Seq = struct
+    let symbols p = Sequence.of_list p.snapshot
+  end
+
+  let pp_snapshot buf s =
+    Util.pp_list ~sep:" > " Sym.pp buf s
+
+  let pp buf prec = pp_snapshot buf prec.snapshot
+
+  let to_string = Util.on_buffer pp
+
+  let fmt fmt p = Format.pp_print_string fmt (to_string p)
+
+  (* build a table  symbol -> i. such as if
+      [tbl s = i], then w[List.nth i l = s] *)
+  let _mk_table l =
+    Util.list_foldi
+      (fun tbl i s -> Tbl.replace tbl s i)
+      (Tbl.create 7) l
+
+  (** {3 Constraints} *)
+
+  module Constr = struct
+    type t = symbol -> symbol -> Comparison.t
+
+    let cluster clusters =
+      (* symbol -> index of cluster the symbol belongs to *)
+      let tbl = Util.list_foldi
+        (fun acc i cluster ->
+          List.fold_left (fun acc s -> Tbl.replace acc s i) acc cluster)
+        (Tbl.create 7) clusters
       in
-      let a' = transform_symbol a
-      and b' = transform_symbol b in
-      try STbl.find table b' - STbl.find table a'
-      with Not_found ->
-        Symbol.compare a' b'
+      (* compare symbols by their index, if they have one.
+          Smaller numbers are bigger symbols *)
+      fun s1 s2 ->
+        try
+          let i1 = Tbl.find tbl s1 in
+          let i2 = Tbl.find tbl s2 in
+          Comparison.of_total (i2 - i1)
+        with Not_found -> Comparison.Incomparable
+
+    let of_list l =
+      let tbl = _mk_table l in
+      (* compare symbols by number. Smaller symbols have bigger number *)
+      fun s1 s2 ->
+        try
+          let i1 = Tbl.find tbl s1 in
+          let i2 = Tbl.find tbl s2 in
+          Comparison.of_total (i2 - i1)
+        with Not_found -> Comparison.Incomparable
+
+    let of_precedence p = of_list p.snapshot
+
+    let arity arity_of s1 s2 =
+      (* bigger arity means bigger symbol *)
+      Comparison.of_total (arity_of s1 - arity_of s2)
+
+    let invfreq seq =
+      (* symbol -> number of occurrences of symbol in seq *)
+      let tbl = Sequence.fold
+        (fun tbl s ->
+          try Tbl.replace tbl s (Tbl.find tbl s + 1)
+          with Not_found -> Tbl.replace tbl s 1)
+        (Tbl.create 7) seq
+      in
+      (* compare by inverse frequency (higher frequency => smaller) *)
+      fun s1 s2 ->
+        try
+          let n1 = Tbl.find tbl s1 in
+          let n2 = Tbl.find tbl s2 in
+          Comparison.of_total (n2 - n1)
+        with Not_found -> Comparison.Incomparable
+
+    let _find_noexc tbl s =
+      try Some (Tbl.find tbl s)
+      with Not_found -> None
+
+    let max symbols =
+      let tbl = _mk_table symbols in
+      (* not found implies the symbol is smaller than maximal symbols *)
+      fun s1 s2 ->
+        match _find_noexc tbl s1, _find_noexc tbl s2 with
+        | None, None -> Comparison.Incomparable
+        | Some _, None -> Comparison.Gt
+        | None, Some _ -> Comparison.Lt
+        | Some i1, Some i2 -> Comparison.of_total (i2 - i1)
+
+    let min symbols =
+      let tbl = _mk_table symbols in
+      (* not found implies the symbol is smaller than maximal symbols *)
+      fun s1 s2 ->
+        match _find_noexc tbl s1, _find_noexc tbl s2 with
+        | None, None -> Comparison.Incomparable
+        | Some _, None -> Comparison.Lt
+        | None, Some _ -> Comparison.Gt
+        | Some i1, Some i2 -> Comparison.of_total (i2 - i1)
+
+    (* regular string ordering *)
+    let alpha a b =
+      Comparison.of_total (Sym.cmp a b)
+  end
+
+  (** {3 Weight} *)
+
+  (* weight of f = arity of f + 4 *)
+  let weight_modarity arity_of a = arity_of a + 4
+
+  (* constant weight *)
+  let weight_constant _ = 4
+
+  (** {2 Creation of a precedence from constraints} *)
+
+  (* order the set of symbols using the constraints *)
+  let _order_symbols constrs symbols =
+    let symbols = List.map fst (Tbl.to_list symbols) in
+    let po = PO.create symbols in
+    (* complete the partial order using constraints, starting with the
+       strongest ones *)
+    List.iter (fun constr -> PO.enrich po constr) constrs;
+    if not (PO.is_total po)
+      then failwith "Precedence: constraints are not total";
+    PO.elements po
+
+  let create constrs symbols =
+    (* compute snapshot *)
+    let symbols = List.fold_left
+      (fun tbl s -> Tbl.replace tbl s ()) (Tbl.create 7) symbols in
+    let snapshot = _order_symbols constrs symbols in
+    let index = _mk_table snapshot in
+    let weight = weight_constant in
+    let status = Tbl.create 5 in
+    { snapshot; index; weight; status; constr=constrs; }
+
+  (* how to add a list of symbols to a precedence *)
+  let add_list p l =
+    if List.for_all (fun s -> Tbl.mem p.index s) l
+      then p  (* already present *)
+      else begin
+        Util.debug 3 "add %a to the precedence" pp_snapshot l;
+        let c = Constr.of_precedence p in
+        (* hashtable of symbols *)
+        let symbols = Sequence.fold
+          (fun tbl s -> Tbl.replace tbl s ())
+          (Tbl.create 13)
+          Sequence.(append (of_list p.snapshot) (of_list l))
+        in
+        (* compute new ordering. First constraint is to be an extension
+            of [p]. *)
+        let snapshot = _order_symbols (c :: p.constr) symbols in
+        let index = _mk_table snapshot in
+        { p with snapshot; index; }
+      end
+
+  let add_seq p seq = add_list p (Sequence.to_rev_list seq)
+
+  let default l =
+    (* two constraints: false, true at end of precedence, and alpha constraint
+      to be sure that the ordering is total *)
+    let constrs =
+      [ Constr.min [ Sym.false_; Sym.true_ ]
+      ; Constr.alpha
+      ]
     in
-    let prec_weight s = weight s in
-    let prec_set_weight weight' = mk_prec symbols table weight' in
-    { prec_snapshot = symbols;
-      prec_add_symbols;
-      prec_compare;
-      prec_weight;
-      prec_set_weight;
-    }
-  in
-  (* initial precedence *)
-  mk_prec symbols table weight
+    create constrs l
 
-let default l =
-  (* two constraints: false, true at end of precedence, and alpha constraint
-    to be sure that the ordering is total *)
-  let constrs =
-    [min_constraint [Symbol.false_symbol; Symbol.true_symbol];
-     alpha_constraint] in
-  create constrs l
+  let default_seq seq =
+    default (Sequence.to_rev_list seq)
+end
 
-let default_of_set set =
-  default (Symbol.Set.elements set)
+module Default = Make(struct
+  type t = Symbol.t
+  let eq = Symbol.eq
+  let hash = Symbol.hash
+  let cmp = Symbol.compare
+  let true_ = Symbol.true_symbol
+  let false_ = Symbol.false_symbol
+  let pp = Symbol.pp
+end)
 
-let default_of_signature signature =
-  default (Signature.to_symbols signature)
+include Default
