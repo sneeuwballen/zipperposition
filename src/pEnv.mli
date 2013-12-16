@@ -126,6 +126,9 @@ val add_constrs : penv:t -> Precedence.Constr.t list -> unit
 val add_constr_rule : penv:t -> (PFormula.Set.t -> Precedence.Constr.t) -> unit
   (** Add a precedence constraint rule *)
 
+val add_status : penv:t -> (Symbol.t * Precedence.symbol_status) list -> unit
+  (** Specify explicitely the status of some symbols *)
+
 val mk_precedence : penv:t -> PFormula.Set.t -> Precedence.t
   (** Make a precedence out of the formulas and constraints *)
 

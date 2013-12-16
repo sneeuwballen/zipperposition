@@ -537,6 +537,7 @@ let setup_penv ~penv =
   PEnv.add_base_sig ~penv base;
   PEnv.add_operation ~penv ~prio:2 simplify_rule;
   PEnv.add_constr ~penv (Precedence.Constr.min (Signature.to_symbols base));
+  CancellativeInference.setup_penv ~penv;
   ()
 
 let setup_env ?(ac=false) ~env =

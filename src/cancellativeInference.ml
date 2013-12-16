@@ -746,8 +746,12 @@ let is_tautology c =
 
 (** {2 Setup} *)
 
-let setup_penv ~ctx ~penv =
+let setup_penv ~penv =
   Util.debug 2 "cancellative inf: setup penv";
+  PEnv.add_status ~penv
+    [ S.Arith.sum, Precedence.Multiset
+    ; S.Arith.product, Precedence.Multiset
+    ];
   ()
 
 let setup_env ~env =

@@ -222,6 +222,7 @@ type t = {
   mutable ops : (int * (PF.Set.t -> operation)) list;  (* int: priority *)
   mutable constrs : Precedence.Constr.t list;
   mutable constr_rules : (PF.Set.t -> Precedence.Constr.t) list;
+  mutable status : (Symbol.t * Precedence.symbol_status) list;
   mutable base : Signature.t;
   meta : MetaProverState.t option;
   params : Params.t;
@@ -254,6 +255,7 @@ let create ?(base=Signature.base) ?meta params =
     ops = [];
     constrs = [];
     constr_rules = [];
+    status = [];
     base;
     meta;
     params;
@@ -282,10 +284,17 @@ let add_constrs ~penv l =
 let add_constr_rule ~penv r =
   penv.constr_rules <- r :: penv.constr_rules
 
+let add_status ~penv l = penv.status <- List.rev_append l penv.status
+
 let mk_precedence ~penv set =
   let constrs = penv.constrs @ List.map (fun rule -> rule set) penv.constr_rules in
   let signature = penv.base in
   let symbols = Signature.to_symbols signature in
   let symbols' = PFormula.Set.symbols set in
   let symbols' = Symbol.Set.elements symbols' in
-  Precedence.create constrs (List.rev_append symbols symbols')
+  let p = Precedence.create constrs (List.rev_append symbols symbols') in
+  let p = List.fold_left
+    (fun p (s,status) -> Precedence.declare_status p s status)
+    p penv.status
+  in
+  p

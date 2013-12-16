@@ -83,7 +83,7 @@ val is_tautology : Clause.t -> bool
 
 (** {2 Contributions to Env and Penv} *)
 
-val setup_penv : ctx:Skolem.ctx -> penv:PEnv.t -> unit
+val setup_penv : penv:PEnv.t -> unit
 
 val setup_env : env:Env.t -> unit
   (** Add rules to the environment. *)
