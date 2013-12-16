@@ -93,6 +93,7 @@ val mk_c_esa : ?info:string list -> ?theories:string list -> rule:string ->
 val adapt_f : t -> FOFormula.t -> t
 val adapt_c : t -> CompactClause.t -> t
 
+val is_trivial : t -> bool
 val is_file : t -> bool
 val is_axiom : t -> bool
 val is_proof_of_false : t -> bool

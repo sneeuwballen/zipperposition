@@ -132,6 +132,10 @@ let is_file = function
   | {kind=File _} -> true
   | _ -> false
 
+let is_trivial = function
+  | {kind=Trivial} -> true
+  | _ -> false
+
 let is_axiom = function
   | {kind=File("axiom", _, _)} -> true
   | _ -> false
@@ -370,21 +374,48 @@ let pp switch buf proof = match switch with
 
 let _pp_list_str = Util.pp_list Buffer.add_string
 
+let _escape_dot s =
+  let b = Buffer.create (String.length s + 5) in
+  String.iter
+    (fun c ->
+      begin match c with
+      | '|' | '\\' | '{' | '}' | '<' | '>' -> Buffer.add_char b '\\';
+      | _ -> ()
+      end;
+      Buffer.add_char b c)
+    s;
+  Buffer.contents b
+
+let _to_str_escape fmt =
+  Printf.kbprintf
+    (fun b -> _escape_dot (Buffer.contents b))
+    (Buffer.create 15)
+    fmt
+
 let as_dot_graph =
+  let no_other_info proof = match proof.theories, proof.additional_info with
+    | [], [] -> true
+    | _ -> false
+  in
   let label proof =
-    (* TODO: boxes
-    let s = Util.sprintf "{%a|%a|%a}" pp_result_of proof
-      _pp_list_str proof.theories _pp_list_str proof.additional_info in
-      *)
-    let s = Util.sprintf "%a" pp_result_of proof in
+    let s = if no_other_info proof
+      then Util.on_buffer pp_result_of proof
+      else Util.sprintf "{%s|{theories:%s|info:%s}}"
+        (_to_str_escape "%a" pp_result_of proof)
+        (_to_str_escape "%a" _pp_list_str proof.theories)
+        (_to_str_escape "%a" _pp_list_str proof.additional_info)
+    in
+    (* let s = Util.sprintf "%a" pp_result_of proof in *)
     `Label s
   in
-  let attributes = [`Shape "box" (* "record" *) ; `Style "filled"] in
+  let shape proof = if no_other_info proof then `Shape "box" else `Shape "record" in
+  let attributes = [`Style "filled"] in
   LazyGraph.map
     ~vertices:(fun p ->
-      if is_proof_of_false p then `Color "red" :: `Label "[]" :: attributes
-      else if is_file p then label p :: `Color "yellow" :: attributes
-      else label p :: attributes)
+      if is_proof_of_false p then `Color "red" :: `Label "[]" :: `Shape "box" :: attributes
+      else if is_file p then label p :: `Color "yellow" :: `Shape "box" :: attributes
+      else if is_trivial p then label p :: `Color "orange" :: shape p :: attributes
+      else label p :: shape p :: attributes)
     ~edges:(fun e -> [`Label e])
     as_graph
 
