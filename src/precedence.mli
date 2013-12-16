@@ -139,4 +139,4 @@ module Make(Sym : SYMBOL) : S with type symbol = Sym.t
 
 module Default : S with type symbol = Symbol.t
 
-include module type of Default with type t := Default.t
+include module type of Default with type t = Default.t
