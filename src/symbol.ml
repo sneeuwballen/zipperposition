@@ -25,22 +25,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Symbols} *)
 
-type view =
-  | Const of string
-  | Int of Big_int.big_int
-  | Rat of Ratio.ratio
-  | Real of float
-
-exception TypeMismatch of string
-  (** This exception is raised when Arith functions are called
-      on non-numeric values (Const). *)
-
 (** {2 Main Signature} *)
 
 module type S = sig
   type t
-
-  val view : t -> view
 
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
@@ -51,30 +39,32 @@ module type S = sig
   module Set : Sequence.Set.S with type elt = t
   module Tbl : Hashtbl.S with type key = t
 
-  val mk_const : string -> t
-  val mk_distinct : string -> t
-  val mk_bigint : Big_int.big_int -> t
-  val mk_int : int -> t
-  val mk_ratio : Ratio.ratio -> t
-  val mk_rat : int -> int -> t
-  val mk_real : float -> t
-  val parse_num : string -> t
+  val of_string : string -> t
+end
 
-  val is_const : t -> bool
-  val is_distinct : t -> bool
+module type WITH_NUMBER = sig
+  type t
+
+  val mk_int : string -> t
+  val mk_rat : string -> t
+  val mk_real : string -> t
+
   val is_int : t -> bool
   val is_rat : t -> bool
   val is_real : t -> bool
-  val is_numeric : t -> bool  (* any of the 3 above *)
+  val is_numeric : t -> bool
 
-  val ty : t -> [`Int | `Rat | `Real | `Other]
+  val ty : t -> [ `Int | `Rat | `Real | `Other ]
 end
 
 module Basic = struct
-  type t = view
-  type sym = t
+  type t =
+    | Const of string
+    | Int of string
+    | Rat of string
+    | Real of string
 
-  let view s = s
+  type sym = t
 
   let cmp s1 s2 =
     let __to_int = function
@@ -84,40 +74,29 @@ module Basic = struct
       | Const _ -> 4  (* const are bigger! *)
     in
     match s1, s2 with
-    | Const s1, Const s2 -> String.compare s1 s2
-    | Int n1, Int n2 -> Big_int.compare_big_int n1 n2
-    | Rat n1, Rat n2 -> Ratio.compare_ratio n1 n2
-    | Real f1, Real f2 -> Pervasives.compare f1 f2
+    | Const s1, Const s2
+    | Int s1, Int s2
+    | Rat s1, Rat s2
+    | Real s1, Real s2 -> String.compare s1 s2
     | _, _ -> __to_int s1 - __to_int s2
 
   let eq a b = cmp a b = 0
 
   let hash s = match s with
+    | Int s
+    | Rat s
+    | Real s
     | Const s -> Hash.hash_string s
-    | Int n -> Hash.hash_string (Big_int.string_of_big_int n)
-    | Rat n -> Hash.hash_string (Ratio.string_of_ratio n)
-    | Real f -> int_of_float f
 
-  let mk_const s = Const s
+  let of_string s = Const s
 
-  let mk_distinct s = Const s
+  let mk_const = of_string
 
-  let mk_bigint i = Int i
+  let mk_int s = Int s
 
-  let mk_int i = Int (Big_int.big_int_of_int i)
+  let mk_rat s = Rat s
 
-  let mk_ratio rat = Rat rat
-
-  let mk_rat i j =
-    Rat (Ratio.create_ratio (Big_int.big_int_of_int i) (Big_int.big_int_of_int j))
-
-  let mk_real f = Real f
-
-  let parse_num str =
-    let n = Num.num_of_string str in
-    if Num.is_integer_num n
-      then Int (Num.big_int_of_num n)
-      else Rat (Num.ratio_of_num n)
+  let mk_real s = Real s
 
   module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
   module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
@@ -135,9 +114,9 @@ module Basic = struct
 
   let to_string s = match s with
     | Const s -> s
-    | Int n -> Big_int.string_of_big_int n
-    | Rat n -> Ratio.string_of_ratio n
-    | Real f -> string_of_float f
+    | Int n -> n
+    | Rat n -> n
+    | Real f -> f
 
   let pp buf s = Buffer.add_string buf (to_string s)
 
@@ -146,14 +125,14 @@ module Basic = struct
   let bij = Bij.switch
     ~inject:(function
       | Const s -> "const", Bij.(BranchTo (string_, s))
-      | Int n -> "int", Bij.(BranchTo (string_, Big_int.string_of_big_int n))
-      | Rat n -> "rat", Bij.(BranchTo (string_, Ratio.string_of_ratio n))
+      | Int n -> "int", Bij.(BranchTo (string_, n))
+      | Rat n -> "rat", Bij.(BranchTo (string_, n))
       | Real f -> "real", Bij.(BranchTo (float_, f)))
     ~extract:(fun c -> match c with
-      | "const" -> Bij.(BranchFrom (string_, fun s -> mk_const s))
-      | "int" -> Bij.(BranchFrom (string_, (fun n -> mk_bigint (Big_int.big_int_of_string n))))
-      | "rat" -> Bij.(BranchFrom (string_, (fun n -> mk_ratio (Ratio.ratio_of_string n))))
-      | "real" -> Bij.(BranchFrom (float_, mk_real))
+      | "const" -> Bij.(BranchFrom (string_, mk_const))
+      | "int" -> Bij.(BranchFrom (string_, mk_int))
+      | "rat" -> Bij.(BranchFrom (string_, mk_rat))
+      | "real" -> Bij.(BranchFrom (string_, mk_real))
       | c -> raise (Bij.DecodingError "expected symbol"))
 
   let ty = function
@@ -163,7 +142,7 @@ module Basic = struct
     | Const _ -> `Other
 end
 
-module MakeHashconsed(X: sig end) = struct
+module MakeHashconsed(X : sig end) = struct
   type const_info = {
     mutable tag : int;
     mutable flags : int;
@@ -176,6 +155,12 @@ module MakeHashconsed(X: sig end) = struct
     | HReal of float
 
   type sym = t
+
+  type view =
+    | Const of string
+    | Int of Big_int.big_int
+    | Rat of Ratio.ratio
+    | Real of float
 
   let view t = match t with
     | HConst (s, _) -> Const s

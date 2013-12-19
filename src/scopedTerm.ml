@@ -147,12 +147,26 @@ module type S = sig
     (** bind several free variables in the term, transforming it
         to use De Bruijn indices *)
 
+  (** {3 Iterators} *)
+
+  module Seq : sig
+    val vars : t -> t Sequence.t
+    val subterms : t -> t Sequence.t
+    val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
+    val symbols : t -> Sym.t Sequence.t
+    val types : t -> t Sequence.t
+    val max_var : t Sequence.t -> int
+    val min_var : t Sequence.t -> int
+    val add_set : Set.t -> t Sequence.t -> Set.t
+    val add_tbl : unit Tbl.t -> t Sequence.t -> unit
+  end
+
   (** {3 Positions} *)
 
-  val at_pos : t -> Position.t -> t 
+  val at_pos : t -> Position.t -> t
     (** retrieve subterm at pos, or raise Invalid_argument*)
 
-  val replace_pos : t -> Position.t -> t -> t
+  val replace_pos : t -> Position.t -> by:t -> t
     (** replace t|_p by the second term *)
 
   val replace : t -> old:t -> by:t -> t
@@ -161,18 +175,38 @@ module type S = sig
 
   (** {3 Variables} *)
 
-  val vars_seq : t -> t Sequence.t
-    (** Sequence of variables of the term. Each variable may occur several
-        times in the sequence. *)
-
-  val vars_set : ?init:unit Tbl.t -> t -> unit Tbl.t
-    (** Add the variables of the term to a set (can be provided) *)
-
   val close_vars : ?ty:t -> Sym.t -> t -> t
     (** Close all free variables of the term using the binding symbol *)
 
   val ground : t -> bool
     (** true if the term contains no variables (either free or bounds) *)
+
+  (** {3 Misc} *)
+
+  val size : t -> int
+
+  val depth : t -> int
+
+  val head : t -> Sym.t option
+    (** Head symbol, or None if the term is a (bound) variable *)
+
+  val all_positions : ?vars:bool -> ?pos:Position.t ->
+                      t -> 'a ->
+                      ('a -> t -> Position.t -> 'a) -> 'a
+    (** Fold on all subterms of the given term, with their position.
+        @param pos the initial position (prefix). Default: empty.
+        @param vars if true, also fold on variables Default: [false].
+        @return the accumulator *)
+
+  (** {3 AC} *)
+
+  module AC : sig
+    val flatten : is_ac:(Sym.t -> bool) -> t -> t
+
+    val args : is_ac:(Sym.t -> bool) -> t -> t list
+
+    val symbols : is_ac:(Sym.t -> bool) -> t -> Sym.t Sequence.t
+  end
 
   (** {3 IO} *)
 
@@ -253,7 +287,7 @@ module Common(T : BASE_TERM) = struct
   end
 
   (** {3 De Bruijn} *)
-  
+
   module DB = struct
     (* check wether the term is closed w.r.t. De Bruijn variables *)
     let closed ?(depth=0) t =
@@ -398,6 +432,74 @@ module Common(T : BASE_TERM) = struct
         bind ?ty s t')
       vars t
 
+  (** {3 Iterators} *)
+
+  module Seq = struct
+    let rec vars t k = match view t with
+      | Var _ -> k t
+      | BVar _
+      | Const _ -> ()
+      | App (head, l) -> vars head k; _vars_list l k
+      | Bind (_, t') -> vars t' k
+    and _vars_list l k = match l with
+      | [] -> ()
+      | t::l' -> vars t k; _vars_list l' k
+
+    let rec subterms t k =
+      k t;
+      match view t with
+      | Var _
+      | BVar _
+      | Const _ -> ()
+      | Bind (_, t') -> subterms t' k
+      | App(_, l) -> List.iter (fun t' -> subterms t' k) l
+
+    let subterms_depth t k =
+      let rec recurse depth t =
+        k (t, depth);
+        match view t with
+        | App (_,l) ->
+          let depth' = depth + 1 in
+          List.iter (fun t' -> recurse depth' t') l
+        | Bind (_, t') -> recurse (depth+1) t'
+        | _ -> ()
+      in
+      recurse 0 t
+
+    let rec symbols t k = match view t with
+      | Var _ | BVar _ -> ()
+      | Const s -> k s
+      | App (head, l) -> symbols head k; _symbols_list l k
+      | Bind (s, t') -> k s; symbols t' k
+    and _symbols_list l k = match l with
+      | [] -> ()
+      | t::l' -> symbols t k; _symbols_list l' k
+
+    let rec types t k =
+      begin match ty t with
+        | None -> ()
+        | Some ty -> k ty
+      end;
+      match view t with
+      | Var _ | BVar _ | Const _ -> ()
+      | App (head, l) -> types head k; List.iter (fun t' -> types t' k) l
+      | Bind (_, t') -> types t' k
+
+    let max_var seq =
+      let r = ref 0 in
+      seq (fun t -> match view t with Var i -> r := max i !r | _ -> ());
+      !r
+
+    let min_var seq =
+      let r = ref max_int in
+      seq (fun t -> match view t with Var i -> r := min i !r | _ -> ());
+      !r
+
+    let add_set = Sequence.fold (fun set t -> Set.add t set)
+
+    let add_tbl tbl = Sequence.iter (fun t -> Tbl.replace tbl t ())
+  end
+
   (** {3 Positions} *)
 
   let rec at_pos t pos = match view t, pos with
@@ -409,15 +511,15 @@ module Common(T : BASE_TERM) = struct
       at_pos (List.nth l (n-1)) subpos
     | _ -> invalid_arg "index too high for subterm"
 
-  let rec replace_pos t pos new_t = match view t, pos with
-    | _, [] -> new_t
+  let rec replace_pos t pos ~by = match view t, pos with
+    | _, [] -> by
     | (Var _ | BVar _), _::_ -> invalid_arg "wrong position in term"
     | Bind (s, t'), 0::subpos ->
-      bind ?ty:(ty t) s (replace_pos t' subpos new_t)
+      bind ?ty:(ty t) s (replace_pos t' subpos ~by)
     | App (f, l), 0::subpos ->
-      app ?ty:(ty t) (replace_pos f subpos new_t) l
+      app ?ty:(ty t) (replace_pos f subpos ~by) l
     | App (f, l), n::subpos when n <= List.length l ->
-      let t' = replace_pos (List.nth l (n-1)) subpos new_t in
+      let t' = replace_pos (List.nth l (n-1)) subpos ~by in
       let l' = Util.list_set l n t' in
       app ?ty:(ty t) f l'
     | _ -> invalid_arg "index too high for subterm"
@@ -436,30 +538,61 @@ module Common(T : BASE_TERM) = struct
 
   (** {3 Variables} *)
 
-  let rec vars_seq t k =
-    begin match ty t with
-      | None -> ()
-      | Some ty -> vars_seq ty k
-    end;
-    match view t with
-      | Var _ -> k t
-      | BVar _
-      | Const _ -> ()
-      | Bind (_, t') -> vars_seq t' k
-      | App (f, l) ->
-        vars_seq f k;
-        List.iter (fun t' -> vars_seq t' k) l
-
-  let vars_set ?(init=Tbl.create 5) t =
-    vars_seq t (fun v -> Tbl.replace init v ());
-    init
-
   let close_vars ?ty s t =
-    let vars = Tbl.to_list (vars_set t) in
-    let vars = List.map fst vars in
-    bind_vars ?ty s vars t
+    let vars = Seq.add_set Set.empty (Seq.vars t) in
+    bind_vars ?ty s (Set.elements vars) t
 
-  let ground t = Sequence.is_empty (vars_seq t)
+  let ground t = Sequence.is_empty (Seq.vars t)
+
+  (** {3 Misc} *)
+
+  let rec size t = match view t with
+    | Const _
+    | Var _
+    | BVar _ -> 1
+    | Bind (_, t') -> 1 + size t'
+    | App (head, l) -> _size_list (1 + size head) l
+  and _size_list acc l = match l with
+    | [] -> acc
+    | t::l' -> _size_list (acc + size t) l'
+
+  let rec depth t = match view t with
+    | Const _
+    | Var _
+    | BVar _ -> 1
+    | Bind (_, t') -> 1 + depth t'
+    | App (head, l) -> 1 + _depth_list (depth head) l
+  and _depth_list acc l = match l with
+    | [] -> acc
+    | t::l' -> _depth_list (max acc (depth t)) l'
+
+  let rec head t = match view t with
+    | BVar _ | Var _ -> None
+    | Const s
+    | Bind (s, _) -> Some s
+    | App (h, _) -> head h
+
+  module PB = Position.Build
+
+  let rec _all_pos_rec f vars acc pb t = match view t with
+    | Var _ | BVar _ ->
+      if vars then f acc t (PB.to_pos pb) else acc
+    | Const _ -> f acc t (PB.to_pos pb)
+    | App (hd, tl) ->
+      let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
+      let acc = _all_pos_rec f vars acc (PB.add pb 0) hd in
+      _all_pos_rec_list f vars acc pb tl 1
+    | Bind (_, t') ->
+      let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
+      _all_pos_rec f vars acc (PB.add pb 0) t'
+  and _all_pos_rec_list f vars acc pb l i = match l with
+    | [] -> acc
+    | t::l' ->
+      let acc = _all_pos_rec f vars acc (PB.add pb i) t in
+      _all_pos_rec_list f vars acc pb l' (i+1)
+
+  let all_positions ?(vars=false) ?(pos=[]) t acc f =
+    _all_pos_rec f vars acc (PB.of_pos pos) t
 
   (** {3 IO} *)
 
@@ -720,18 +853,20 @@ module UnitData = struct
   let copy()=()
 end
 
-module MakeData(Sym : SYMBOL)(Data : DATA) = struct
+module LocationData = struct
+  type t = Location.t option ref
+  let create() = ref None
+  let copy r = ref !r
+end
+
+module Make(Sym : SYMBOL)(Data : DATA) = struct
   module B = Base(Sym)(Data)
   include B
   include Common(B)
 end
 
-module Make(Sym : SYMBOL) = MakeData(Sym)(UnitData)
-
-module MakeHashconsedData(Sym : SYMBOL)(Data : DATA) = struct
+module MakeHashconsed(Sym : SYMBOL)(Data : DATA) = struct
   module B = BaseHashconsed(Sym)(Data)
   include B
   include Common(B)
 end
-
-module MakeHashconsed(Sym : SYMBOL) = MakeHashconsedData(Sym)(UnitData)

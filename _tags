@@ -1,7 +1,7 @@
 # OASIS_START
-# DO NOT EDIT (digest: 972fedda1b43ab6adffc92eabe846f9b)
-# Ignore VCS directories, you can use the same kind of rule outside 
-# OASIS_START/STOP if you want to exclude directories that contains 
+# DO NOT EDIT (digest: 0fddad5f8a10198c67546e453b0639eb)
+# Ignore VCS directories, you can use the same kind of rule outside
+# OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
@@ -74,12 +74,12 @@
 "src/lib/BV.cmx": for-pack(Logtk)
 "src/lib/persistentHashtbl.cmx": for-pack(Logtk)
 "src/lib/mixtbl.cmx": for-pack(Logtk)
-<src/*.ml{,i}>: pkg_unix
-<src/*.ml{,i}>: pkg_num
-<src/*.ml{,i}>: pkg_str
-<src/lib/*.ml{,i}>: pkg_unix
-<src/lib/*.ml{,i}>: pkg_num
-<src/lib/*.ml{,i}>: pkg_str
+<src/*.ml{,i}>: package(unix)
+<src/*.ml{,i}>: package(num)
+<src/*.ml{,i}>: package(str)
+<src/lib/*.ml{,i}>: package(unix)
+<src/lib/*.ml{,i}>: package(num)
+<src/lib/*.ml{,i}>: package(str)
 # Library logtk_meta
 "src/meta/logtk_meta.cmxs": use_logtk_meta
 "src/meta/metaPattern.cmx": for-pack(Logtk_meta)
@@ -91,10 +91,10 @@
 "src/meta/parse_theory.cmx": for-pack(Logtk_meta)
 "src/meta/signal.cmx": for-pack(Logtk_meta)
 <src/meta/*.ml{,i}>: use_logtk
-<src/meta/*.ml{,i}>: pkg_datalog
-<src/meta/*.ml{,i}>: pkg_unix
-<src/meta/*.ml{,i}>: pkg_num
-<src/meta/*.ml{,i}>: pkg_str
+<src/meta/*.ml{,i}>: package(datalog)
+<src/meta/*.ml{,i}>: package(unix)
+<src/meta/*.ml{,i}>: package(num)
+<src/meta/*.ml{,i}>: package(str)
 # Library logtk_arbitrary
 "src/arbitrary/logtk_arbitrary.cmxs": use_logtk_arbitrary
 "src/arbitrary/arTerm.cmx": for-pack(Logtk_arbitrary)
@@ -105,69 +105,69 @@
 "src/arbitrary/arPattern.cmx": for-pack(Logtk_arbitrary)
 <src/arbitrary/*.ml{,i}>: use_logtk_meta
 <src/arbitrary/*.ml{,i}>: use_logtk
-<src/arbitrary/*.ml{,i}>: pkg_qcheck
-<src/arbitrary/*.ml{,i}>: pkg_datalog
-<src/arbitrary/*.ml{,i}>: pkg_unix
-<src/arbitrary/*.ml{,i}>: pkg_num
-<src/arbitrary/*.ml{,i}>: pkg_str
+<src/arbitrary/*.ml{,i}>: package(qcheck)
+<src/arbitrary/*.ml{,i}>: package(datalog)
+<src/arbitrary/*.ml{,i}>: package(unix)
+<src/arbitrary/*.ml{,i}>: package(num)
+<src/arbitrary/*.ml{,i}>: package(str)
 # Executable run_bench
 "tests/run_bench.native": use_logtk_arbitrary
 "tests/run_bench.native": use_logtk_meta
 "tests/run_bench.native": use_logtk
-"tests/run_bench.native": pkg_bench
-"tests/run_bench.native": pkg_qcheck
-"tests/run_bench.native": pkg_datalog
-"tests/run_bench.native": pkg_unix
-"tests/run_bench.native": pkg_num
-"tests/run_bench.native": pkg_str
-<tests/*.ml{,i}>: pkg_bench
+"tests/run_bench.native": package(bench)
+"tests/run_bench.native": package(qcheck)
+"tests/run_bench.native": package(datalog)
+"tests/run_bench.native": package(unix)
+"tests/run_bench.native": package(num)
+"tests/run_bench.native": package(str)
+<tests/*.ml{,i}>: package(bench)
 # Executable run_tests
 "tests/run_tests.native": use_logtk_arbitrary
 "tests/run_tests.native": use_logtk_meta
 "tests/run_tests.native": use_logtk
-"tests/run_tests.native": pkg_oUnit
-"tests/run_tests.native": pkg_qcheck
-"tests/run_tests.native": pkg_datalog
-"tests/run_tests.native": pkg_unix
-"tests/run_tests.native": pkg_num
-"tests/run_tests.native": pkg_str
+"tests/run_tests.native": package(oUnit)
+"tests/run_tests.native": package(qcheck)
+"tests/run_tests.native": package(datalog)
+"tests/run_tests.native": package(unix)
+"tests/run_tests.native": package(num)
+"tests/run_tests.native": package(str)
 <tests/*.ml{,i}>: use_logtk_arbitrary
 <tests/*.ml{,i}>: use_logtk_meta
 <tests/*.ml{,i}>: use_logtk
-<tests/*.ml{,i}>: pkg_oUnit
-<tests/*.ml{,i}>: pkg_qcheck
-<tests/*.ml{,i}>: pkg_datalog
-<tests/*.ml{,i}>: pkg_unix
-<tests/*.ml{,i}>: pkg_num
-<tests/*.ml{,i}>: pkg_str
+<tests/*.ml{,i}>: package(oUnit)
+<tests/*.ml{,i}>: package(qcheck)
+<tests/*.ml{,i}>: package(datalog)
+<tests/*.ml{,i}>: package(unix)
+<tests/*.ml{,i}>: package(num)
+<tests/*.ml{,i}>: package(str)
 # Executable type_check_tptp
 "tools/type_check_tptp.native": use_logtk
-"tools/type_check_tptp.native": pkg_unix
-"tools/type_check_tptp.native": pkg_num
-"tools/type_check_tptp.native": pkg_str
+"tools/type_check_tptp.native": package(unix)
+"tools/type_check_tptp.native": package(num)
+"tools/type_check_tptp.native": package(str)
 # Executable cnf_of_tptp
 "tools/cnf_of_tptp.native": use_logtk
-"tools/cnf_of_tptp.native": pkg_unix
-"tools/cnf_of_tptp.native": pkg_num
-"tools/cnf_of_tptp.native": pkg_str
+"tools/cnf_of_tptp.native": package(unix)
+"tools/cnf_of_tptp.native": package(num)
+"tools/cnf_of_tptp.native": package(str)
 # Executable detect_theories
 "tools/detect_theories.native": use_logtk_meta
 "tools/detect_theories.native": use_logtk
-"tools/detect_theories.native": pkg_datalog
-"tools/detect_theories.native": pkg_unix
-"tools/detect_theories.native": pkg_num
-"tools/detect_theories.native": pkg_str
+"tools/detect_theories.native": package(datalog)
+"tools/detect_theories.native": package(unix)
+"tools/detect_theories.native": package(num)
+"tools/detect_theories.native": package(str)
 <tools/*.ml{,i}>: use_logtk_meta
-<tools/*.ml{,i}>: pkg_datalog
+<tools/*.ml{,i}>: package(datalog)
 # Executable proof_check_tstp
 "tools/proof_check_tstp.native": use_logtk
-"tools/proof_check_tstp.native": pkg_unix
-"tools/proof_check_tstp.native": pkg_num
-"tools/proof_check_tstp.native": pkg_str
+"tools/proof_check_tstp.native": package(unix)
+"tools/proof_check_tstp.native": package(num)
+"tools/proof_check_tstp.native": package(str)
 <tools/*.ml{,i}>: use_logtk
-<tools/*.ml{,i}>: pkg_unix
-<tools/*.ml{,i}>: pkg_num
-<tools/*.ml{,i}>: pkg_str
+<tools/*.ml{,i}>: package(unix)
+<tools/*.ml{,i}>: package(num)
+<tools/*.ml{,i}>: package(str)
 # OASIS_STOP
 true: use_menhir
 <src/**/*.cmx>: inline(10)

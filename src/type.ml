@@ -29,23 +29,22 @@ exception Error of string
   (** Generic error on types. *)
 
 (** Base symbols for types *)
-module type BASE_SYMBOL = sig
+module type BASE_SYMBOLS = sig
   type t
 
   val arrow : t
-  val forall : t
+  val forall_ty : t
   val i : t
   val o : t
   val tType : t
-  val int : t
-  val rat : t
-  val real : t
 end
 
 module type S = sig
   module T : ScopedTerm.S
 
-  module Base : BASE_SYMBOL with type t = T.Sym.t
+  module Base : BASE_SYMBOLS with type t = T.Sym.t
+
+  type symbol = T.Sym.t
 
   type t = T.t
 
@@ -54,7 +53,7 @@ module type S = sig
   type view = private
   | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
-  | App of T.Sym.t * t list (** parametrized type *)
+  | App of symbol * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
@@ -112,14 +111,11 @@ module type S = sig
 
   val i : t       (* individuals *)
   val o : t       (* propositions *)
-  val int : t     (* ints *)
-  val rat : t     (* rational numbers *)
-  val real : t    (* real numbers *)
   val tType : t   (* "type" of types *)
 
   (** {2 Utils} *)
 
-  val free_vars_set : Set.t -> t -> Set.t
+  val free_vars_set : T.Set.t -> t -> T.Set.t
     (** Add the free variables to the given set *)
 
   val free_vars : t -> t list
@@ -166,38 +162,37 @@ module TPTP(S : sig type t val of_string : string -> t end) = struct
   type t = S.t
 
   let arrow = S.of_string ">"
-  let forall = S.of_string "!>"
+  let forall_ty = S.of_string "!>"
   let i = S.of_string "$i"
   let o = S.of_string "$o"
   let tType = S.of_string "$tType"
-  let int = S.of_string "$int"
-  let rat = S.of_string "$rat"
-  let real = S.of_string "$real"
 end
 
-module Make(T : ScopedTerm.S)(Base : BASE_SYMBOL with type t = T.Sym.t) = struct
+module Make(T : ScopedTerm.S)(Base : BASE_SYMBOLS with type t = T.Sym.t) = struct
   module T = T
   module Sym = T.Sym
   module Base = Base
+
+  type symbol = Sym.t
 
   type t = T.t
 
   type ty = t
 
-  type view = 
+  type view =
   | Var of int              (** type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
-  | App of Sym.t * t list   (** parametrized type *)
+  | App of symbol * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
   | Forall of t             (** explicit quantification *)
 
   let view t = match T.view t with
     | T.Var i -> Var i
     | T.BVar i -> BVar i
-    | T.Bind (s, t') when Sym.eq s Base.forall ->
+    | T.Bind (s, t') when Sym.eq s Base.forall_ty ->
       Forall t'
-    | T.App (head, (t'::l') as l) ->
-      begin match T.view l with
+    | T.App (head, ((t'::l') as l)) ->
+      begin match T.view head with
       | T.Const s when Sym.eq s Base.arrow -> Fun (t', l')
       | T.Const s -> App (s, l)
       | _ -> raise (Invalid_argument "Type.view")
@@ -208,300 +203,172 @@ module Make(T : ScopedTerm.S)(Base : BASE_SYMBOL with type t = T.Sym.t) = struct
   let eq = T.eq
   let cmp = T.cmp
 
+  let is_var ty = match view ty with | Var _ -> true | _ -> false
+  let is_bvar ty = match view ty with | BVar _ -> true | _ -> false
+  let is_app ty = match view ty with App _ -> true | _ -> false
+  let is_fun ty = match view ty with | Fun _ -> true | _ -> false
+  let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 
+  let tType = T.const Base.tType
+  let i = T.const ~ty:tType Base.i
+  let o = T.const ~ty:tType Base.o
+
+  let var i =
+    if i < 0 then raise (Invalid_argument "Type.var");
+    T.var ~ty:tType i
+
+  let app s l = T.app ~ty:tType (T.const s) l
+
+  let const s = T.const ~ty:tType s
+
+  let rec mk_fun ret args =
+    match args with
+    | [] -> ret
+    | _::_ ->
+      match view ret with
+      | Fun (ret', args') ->
+        (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
+            constructor invariant. [args] must be applied before [args']
+            need to be supplied.
+            Example: [(a <- b) <- c] requires [c] first *)
+        mk_fun ret' (args @ args')
+      | _ -> T.app ~ty:tType (T.const Base.arrow) (ret :: args)
+
+  let forall vars ty =
+    T.bind_vars ~ty:tType Base.forall_ty vars ty
+
+  let __forall ty = T.bind Base.forall_ty ty
+
+  let (<==) = mk_fun
+  let (<=.) ret a = mk_fun ret [a]
+  let (@@) = app
+
+  let free_vars_set set t = T.Seq.add_set set (T.Seq.vars t)
+
+  let free_vars ty =
+    T.Set.elements (free_vars_set T.Set.empty ty)
+
+  let close_forall ty =
+    let vars = free_vars ty in
+    forall vars ty
+
+  let rec arity ty = match view ty with
+    | Fun (_, l) -> 0, List.length l
+    | Var _
+    | BVar _
+    | App _ -> 0, 0
+    | Forall ty' ->
+      let i1, i2 = arity ty' in
+      i1 + 1, i2
+
+  let rec expected_args ty = match view ty with
+    | Fun (_, l) -> l
+    | BVar _
+    | Var _
+    | App _ -> []
+    | Forall ty' -> expected_args ty'
+
+  let is_ground = T.ground
+
+  let size = T.size
+
+  let rec pp_rec depth buf t = match view t with
+    | Var i -> Printf.bprintf buf "T%d" i
+    | BVar i -> Printf.bprintf buf "Tb%i" (depth-i-1)
+    | App (p, []) -> Buffer.add_string buf (Sym.to_string p)
+    | App (p, args) ->
+      Printf.bprintf buf "%s(%a)" (Sym.to_string p) (Util.pp_list (pp_rec depth)) args
+    | Fun (ret, []) -> assert false
+    | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret
+    | Fun (ret, l) ->
+      Printf.bprintf buf "(%a) > %a"
+        (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
+    | Forall ty' ->
+      Printf.bprintf buf "∀ Tb%i. %a" depth (pp_inner (depth+1)) ty'
+  and pp_inner depth buf t = match view t with
+    | Fun (_, _::_) ->
+      Buffer.add_char buf '('; pp_rec depth buf t; Buffer.add_char buf ')'
+    | _ -> pp_rec depth buf t
+
+  let pp buf t = pp_rec 0 buf t
+
+  let rec pp_tstp_rec depth buf t = match view t with
+    | Var i -> Printf.bprintf buf "T%d" i
+    | BVar i -> Printf.bprintf buf "Tb%d" (depth-i-1)
+    | App (p, []) -> Buffer.add_string buf (Sym.to_string p)
+    | App (p, args) ->
+      Printf.bprintf buf "%s(%a)" (Sym.to_string p) (Util.pp_list (pp_tstp_rec depth)) args
+    | Fun (ret, []) -> assert false
+    | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret
+    | Fun (ret, l) ->
+      Printf.bprintf buf "(%a) > %a"
+        (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_tstp_rec depth) ret
+    | Forall ty' ->
+      Printf.bprintf buf "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
+  and pp_inner depth buf t = match view t with
+    | Fun (_, _::_) ->
+      Buffer.add_char buf '('; pp_tstp_rec depth buf t; Buffer.add_char buf ')'
+    | _ -> pp_tstp_rec depth buf t
+
+  let pp_tstp buf t = pp_tstp_rec 0 buf t
+
+  let to_string t =
+    let b = Buffer.create 15 in
+    pp b t;
+    Buffer.contents b
+
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+
+  let _error msg = raise (Error msg)
+
+  (* apply a type to arguments. *)
+  let apply ty args =
+    (* apply ty to args *)
+    let rec apply ty args =
+      match view ty, args with
+      | _, [] -> ty
+      | Fun (ret, l), l' -> apply_fun ret l l'
+      | Forall ty', a::args' ->
+        let ty' = T.DB.eval (DBEnv.singleton a) ty' in
+        apply ty' args'
+      | _, _ -> _error "Type.apply: expected function or forall type"
+    (* recursive matching of expected arguments and provided arguments.
+      careful: we could have a curried function *)
+    and apply_fun f_ret f_args args =
+      match f_args, args with
+      | x::f_args', y::args' ->
+        (* match arguments after substitution *)
+        if eq x y
+          then apply_fun f_ret f_args' args'
+          else
+            let msg = Util.sprintf
+            "Type.apply: wrong argument type, expected %a but got %a" T.pp x T.pp y
+            in _error msg
+      | [], [] ->
+        (* total application, result is return type. special case of last case. *)
+        f_ret
+      | [], _ -> apply f_ret args
+      | _::_, [] ->
+        (* partial application. The remaining arguments will have to be
+            provided by another call to {!apply}. *)
+        mk_fun f_ret f_args
+    in
+    apply ty args
+
+  let bij = T.bij
+
+  let __var =
+    let r = ref ~-1 in
+    fun () ->
+      let n = !r in
+      decr r;
+      T.var ~ty:tType n
 end
 
-(*
-(** {2 Main Type representation} *)
-
-type t = {
-  ty : tree; (* shape of the term *)
-  mutable ground : bool;
-  mutable id : int;  (* hashconsing tag *)
-}
-and tree =
-  | Var of int              (** type variable *)
-  | BVar of int             (** Bound variable (De Bruijn index) *)
-  | App of string * t list  (** parametrized type *)
-  | Fun of t * t list       (** Function type *)
-  | Forall of t             (** explicit quantification *)
-
-type ty = t
-
-exception Error of string
-  (** Generic error on types. *)
-
-let eq t1 t2 = t1 == t2
-
-let hash t = t.id
-
-let cmp ty1 ty2 = ty1.id - ty2.id
-
-let rec _eq_list l1 l2 = match l1, l2 with
-  | [], [] -> true
-  | [], _
-  | _, [] -> false
-  | x1::l1', x2::l2' -> eq x1 x2 && _eq_list l1' l2'
-
-let _eq_top t1 t2 = match t1.ty, t2.ty with
-  | Var i1, Var i2 
-  | BVar i1, BVar i2 -> i1 = i2
-  | App (s1, l1), App (s2, l2) -> 
-    s1 = s2 && _eq_list l1 l2
-  | Fun (ret1,l1), Fun (ret2,l2) ->
-    eq ret1 ret2 && _eq_list l1 l2
-  | Forall ty1, Forall ty2 -> eq ty1 ty2
-  | _, _ -> false
-
-let _hash_top t = match t.ty with
-  | Var i -> i
-  | BVar i -> Hash.combine 33 i
-  | App (s, l) -> Hash.hash_list hash (Hash.hash_string s) l
-  | Fun (ret, l) -> Hash.hash_list hash (hash ret) l
-  | Forall ty ->  Hash.combine 12 (hash ty)
-
-(* hashconsing *)
-module H = Hashcons.Make(struct
-  type t = ty
-  let equal = _eq_top
-  let hash = _hash_top
-  let tag i ty = (assert (ty.id = ~-1); ty.id <- i)
-end)
-
-let is_var = function | {ty=Var _} -> true | _ -> false
-let is_bvar = function | {ty=BVar _} -> true | _ -> false
-let is_app = function | {ty=App _} -> true | _ -> false
-let is_fun = function | {ty=Fun _} -> true | _ -> false
-let is_forall = function | {ty=Forall _} -> true | _ -> false
-
-module Tbl = Hashtbl.Make(struct
-  type t = ty
-  let equal = eq
-  let hash = hash
-end)
-
-module Set = Sequence.Set.Make(struct
-  type t = ty
-  let compare = cmp
-end)
-
-(** {2 Infix constructors} *)
-
-let rec _list_ground l = match l with
-  | [] -> true
-  | ty::l' -> ty.ground && _list_ground l'
-
-(* real constructor *)
-let _mk_fun ret args =
-  let ty = {ty=Fun (ret, args); id= ~-1; ground=false;} in
-  let ty' = H.hashcons ty in
-  if ty == ty' then begin
-    ty'.ground <- ret.ground && _list_ground args
-    end;
-  ty'
-
-let rec mk_fun ret args =
-  match args with
-  | [] -> ret
-  | _::_ ->
-    match ret.ty with
-    | Fun (ret', args') ->
-      (* invariant: flatten function types. Symmetric w.r.t the {!HOTerm.At}
-          constructor invariant. [args] must be applied before [args']
-          need to be supplied.
-          Example: [(a <- b) <- c] requires [c] first *)
-      mk_fun ret' (args @ args')
-    | _ -> _mk_fun ret args
-
-let (<==) = mk_fun
-
-let (<=.) ret arg = mk_fun ret [arg]
-
-let app s args =
-  let my_ty = {ty=App(s, args); id= ~-1; ground=false} in
-  let ty' = H.hashcons my_ty in
-  if my_ty == ty' then begin
-    ty'.ground <- _list_ground args;
-    end;
-  ty'
-
-let const s = app s []
-
-let (@@) = app
-
-let var i =
-  if i < 0 then failwith "Type.var: expected a nonnegative int";
-  H.hashcons {ty=Var i; id= ~-1; ground=false; }
-
-let bvar i =
-  if i < 0 then failwith "Type.bvar: expected a nonnegative int";
-  H.hashcons {ty=BVar i; id= ~-1; ground=false; }
-
-(* real constructor *)
-let __forall ty =
-  H.hashcons {ty=Forall ty; id= ~-1; ground=ty.ground; }
-
-(** Handling De Bruijn indexes. We assume that all types are
-    always {!DB.closed}, ie all De Bruijn indices are properly bound
-    by a quantifier. *)
-module DB = struct
-  (* type is closed (ie all {!BVar} are properly scoped *)
-  let closed ?(depth=0) ty =
-    let rec closed depth ty =
-      ty.ground || match ty.ty with
-      | Var _
-      | App (_, []) -> true
-      | BVar i -> i < depth
-      | App (_, l) -> closed_list depth l
-      | Fun (ret, l) -> closed depth ret && closed_list depth l
-      | Forall ty' -> closed (depth+1) ty'
-    and closed_list depth l = match l with
-      | [] -> true
-      | ty::l' -> closed depth ty && closed_list depth l'
-    in
-    closed depth ty
-
-  (* replace [var] by outermost De Bruijn *)
-  let replace ?(depth=0) ty ~var =
-    let rec recurse depth ty =
-      if ty.ground then ty
-      else match ty.ty with
-      | Var _ when eq var ty -> bvar depth  (* replace [var] by De Bruijn *)
-      | Var _
-      | App (_, []) -> ty
-      | BVar i -> assert (i<depth); ty  (* must be closed *)
-      | Fun (ret, l) -> mk_fun (recurse depth ret) (recurse_l depth l)
-      | App (s, l) -> app s (recurse_l depth l)
-      | Forall ty' -> __forall (recurse (depth+1) ty')
-    and recurse_l depth l = match l with
-      | [] -> []
-      | ty::l' -> recurse depth ty :: recurse_l depth l'
-    in
-    recurse depth ty
-
-  (* shift free De Bruijn indexes by [n] *)
-  let shift ?(depth=0) n ty =
-    let rec shift depth ty =
-      if ty.ground then ty
-      else match ty.ty with
-        | Var _ -> ty
-        | BVar i when i < depth -> ty  (* protected *)
-        | BVar i -> bvar (i+n)         (* shift *)
-        | Fun (ret, l) -> mk_fun (shift depth ret) (shift_l depth l)
-        | App (s, l) -> app s (shift_l depth l)
-        | Forall ty' -> __forall (shift (depth+1) ty')
-    and shift_l depth = function
-      | [] -> []
-      | ty::l' -> shift depth ty :: shift_l depth l'
-    in
-    shift depth ty
-
-  (* evaluate ty in the given environment. *)
-  let eval ?(depth=0) env ty =
-    let rec eval depth env ty =
-    if ty.ground then ty
-    else match ty.ty with
-      | BVar i ->
-        begin match DBEnv.find env i with
-          | None -> ty
-          | Some ty' -> shift depth ty'
-        end
-      | App (_, [])
-      | Var _ -> ty
-      | App (s, l) -> app s (eval_list depth env l)
-      | Fun (ret, l) -> mk_fun (eval depth env ret) (eval_list depth env l)
-      | Forall ty' -> __forall (eval (depth+1) (DBEnv.push_none env) ty')
-    and eval_list depth env l = match l with
-      | [] -> []
-      | ty::l' ->
-        eval depth env ty :: eval_list depth env l'
-    in
-    eval depth env ty
-
-  let eval_list ?(depth=0) env l = List.map (eval ~depth env) l
+module TPTP(S : sig type t val of_string : string -> t end) = struct
+  type t = S.t
 end
-
-let rec forall vars ty = match vars with
-  | [] -> ty
-  | v::vars' ->
-    assert (is_var v);
-    let ty' = forall vars' ty in
-    let ty' = DB.replace ty' ~var:v in
-    __forall ty'
-
-(** {2 Basic types} *)
-
-let i = const "$i"
-let o = const "$o"
-let int = const "$int"
-let rat = const "$rat"
-let real = const "$real"
-let tType = const "$tType"
-
-(** {2 Utils} *)
-
-let rec free_vars_set set ty =
-  if ty.ground then set
-  else match ty.ty with
-  | Var _ -> Set.add ty set
-  | BVar _ -> set
-  | App (_, l) -> List.fold_left free_vars_set set l
-  | Fun (ret, l) -> List.fold_left free_vars_set (free_vars_set set ret) l
-  | Forall ty' -> free_vars_set set ty'
-
-let free_vars ty =
-  let set = free_vars_set Set.empty ty in
-  Set.elements set
-
-let close_forall ty =
-  let fvars = free_vars ty in
-  forall fvars ty
-
-let rec arity ty = match ty.ty with
-  | Fun (_, l) -> 0, List.length l
-  | Var _
-  | BVar _
-  | App _ -> 0, 0
-  | Forall ty' ->
-    let i1, i2 = arity ty' in
-    i1 + 1, i2
-
-let rec expected_args ty = match ty.ty with
-  | Fun (_, l) -> l
-  | BVar _
-  | Var _
-  | App _ -> []
-  | Forall ty' -> expected_args ty'
-
-let is_ground t = t.ground
-
-let rec size ty = match ty.ty with
-  | Var _
-  | BVar _
-  | App (_, []) -> 1
-  | App (s, l) -> List.fold_left (fun acc ty' -> acc + size ty') 1 l
-  | Fun (ret, l) -> List.fold_left (fun acc ty' -> acc + size ty') (size ret) l
-  | Forall ty' -> 1 + size ty' 
-
-let _error msg = raise (Error msg)
-
-let rec pp_rec depth buf t = match t.ty with
-  | Var i -> Printf.bprintf buf "T%d" i
-  | BVar i -> Printf.bprintf buf "Tb%i" (depth-i-1)
-  | App (p, []) -> Buffer.add_string buf p
-  | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list (pp_rec depth)) args
-  | Fun (ret, []) -> assert false
-  | Fun (ret, [arg]) -> Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret
-  | Fun (ret, l) ->
-    Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " (pp_inner depth)) l (pp_rec depth) ret
-  | Forall ty' ->
-    Printf.bprintf buf "∀ Tb%i. %a" depth (pp_inner (depth+1)) ty'
-and pp_inner depth buf t = match t.ty with
-  | Fun (_, _::_) ->
-    Buffer.add_char buf '('; pp_rec depth buf t; Buffer.add_char buf ')'
-  | _ -> pp_rec depth buf t
-
-let pp buf t = pp_rec 0 buf t
 
 (* apply a type to arguments. *)
 let apply ty args =

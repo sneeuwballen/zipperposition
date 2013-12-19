@@ -40,17 +40,14 @@ exception Error of string
   (** Generic error on types. *)
 
 (** Base symbols for types *)
-module type BASE_SYMBOL = sig
+module type BASE_SYMBOLS = sig
   type t
 
   val arrow : t
-  val forall : t
+  val forall_ty : t
   val i : t
   val o : t
   val tType : t
-  val int : t
-  val rat : t
-  val real : t
 end
 
 (** {2 Main signature} *)
@@ -58,16 +55,18 @@ end
 module type S = sig
   module T : ScopedTerm.S
 
-  module Base : BASE_SYMBOL with type t = T.Sym.t
+  module Base : BASE_SYMBOLS with type t = T.Sym.t
 
-  type t = private T.t
+  type symbol = T.Sym.t
+
+  type t = T.t
 
   type ty = t
 
   type view = private
   | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
-  | App of T.Sym.t * t list (** parametrized type *)
+  | App of symbol * t list  (** parametrized type *)
   | Fun of t * t list       (** Function type *)
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
@@ -84,25 +83,21 @@ module type S = sig
   val is_fun : t -> bool
   val is_forall : t -> bool
 
+  (** {2 Basic types} *)
+
+  val i : t       (* individuals *)
+  val o : t       (* propositions *)
+  val tType : t   (* "type" of types *)
+
   (** {2 Constructors} *)
-
-  val (<==) : t -> t list -> t
-    (** General function type. [x <== l] is the same as [x] if [l]
-        is empty. Invariant: the return type is never a function type. *)
-
-  val (<=.) : t -> t -> t
-    (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
-
-  val (@@) : string -> t list -> t
-    (** [s @@ args] applies the sort [s] to arguments [args]. *)
 
   val var : int -> t
     (** Build a type variable. The integer must be >= 0 *)
 
-  val app : string -> t list -> t
+  val app : symbol -> t list -> t
     (** Parametrized type *)
 
-  val const : string -> t
+  val const : symbol -> t
     (** Constant sort *)
 
   val mk_fun : t -> t list -> t
@@ -117,18 +112,15 @@ module type S = sig
   val __forall : t -> t
     (** not documented. *)
 
-  val of_term : T.t -> t option
-    (** Check whether the given term is a valid representation of a type,
-        in which case return it *)
+  val (@@) : string -> t list -> t
+    (** [s @@ args] applies the sort [s] to arguments [args]. *)
 
-  (** {2 Basic types} *)
+  val (<==) : t -> t list -> t
+    (** General function type. [x <== l] is the same as [x] if [l]
+        is empty. Invariant: the return type is never a function type. *)
 
-  val i : t       (* individuals *)
-  val o : t       (* propositions *)
-  val int : t     (* ints *)
-  val rat : t     (* rational numbers *)
-  val real : t    (* real numbers *)
-  val tType : t   (* "type" of types *)
+  val (<=.) : t -> t -> t
+    (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
 
   (** {2 Utils} *)
 
@@ -177,11 +169,23 @@ end
 
 (** {2 Functor} *)
 
-module Make(T : ScopedTerm.S)(Base : BASE_SYMBOL with type t = T.Sym.t) :
+module Make(T : ScopedTerm.S)(Base : BASE_SYMBOLS with type t = T.Sym.t) :
   S with module T = T and module Base = Base
 
 (** {2 Utils} *)
 
 module TPTP(S : sig type t val of_string : string -> t end)
-  : BASE_SYMBOL with type t = S.t
+  : BASE_SYMBOLS with type t = S.t
   (** Base symbols for TPTP *)
+
+module TPTP_Basic : BASE_SYMBOLS with type t = Symbol.Basic.t
+
+module TPTP_Std : BASE_SYMBOLS with type t = Symbol.Std.t
+
+(** {2 Default instances} *)
+
+module Basic : S with module T = ScopedTerm.Basic and module Base = TPTP_Basic
+
+module Std : S with module T = ScopedTerm.Std and module Base = TPTP_Std
+
+include module type of Std

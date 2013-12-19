@@ -147,12 +147,26 @@ module type S = sig
     (** bind several free variables in the term, transforming it
         to use De Bruijn indices *)
 
+  (** {3 Iterators} *)
+
+  module Seq : sig
+    val vars : t -> t Sequence.t
+    val subterms : t -> t Sequence.t
+    val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
+    val symbols : t -> Sym.t Sequence.t
+    val types : t -> t Sequence.t
+    val max_var : t Sequence.t -> int
+    val min_var : t Sequence.t -> int
+    val add_set : Set.t -> t Sequence.t -> Set.t
+    val add_tbl : unit Tbl.t -> t Sequence.t -> unit
+  end
+
   (** {3 Positions} *)
 
-  val at_pos : t -> Position.t -> t 
+  val at_pos : t -> Position.t -> t
     (** retrieve subterm at pos, or raise Invalid_argument*)
 
-  val replace_pos : t -> Position.t -> t -> t
+  val replace_pos : t -> Position.t -> by:t -> t
     (** replace t|_p by the second term *)
 
   val replace : t -> old:t -> by:t -> t
@@ -161,18 +175,38 @@ module type S = sig
 
   (** {3 Variables} *)
 
-  val vars_seq : t -> t Sequence.t
-    (** Sequence of variables of the term. Each variable may occur several
-        times in the sequence. *)
-
-  val vars_set : ?init:unit Tbl.t -> t -> unit Tbl.t
-    (** Add the variables of the term to a set (can be provided) *)
-
   val close_vars : ?ty:t -> Sym.t -> t -> t
     (** Close all free variables of the term using the binding symbol *)
 
   val ground : t -> bool
     (** true if the term contains no variables (either free or bounds) *)
+
+  (** {3 Misc} *)
+
+  val size : t -> int
+
+  val depth : t -> int
+
+  val head : t -> Sym.t option
+    (** Head symbol, or None if the term is a (bound) variable *)
+
+  val all_positions : ?vars:bool -> ?pos:Position.t ->
+                      t -> 'a ->
+                      ('a -> t -> Position.t -> 'a) -> 'a
+    (** Fold on all subterms of the given term, with their position.
+        @param pos the initial position (prefix). Default: empty.
+        @param vars if true, also fold on variables Default: [false].
+        @return the accumulator *)
+
+  (** {3 AC} *)
+
+  module AC : sig
+    val flatten : is_ac:(Sym.t -> bool) -> t -> t
+
+    val args : is_ac:(Sym.t -> bool) -> t -> t list
+
+    val symbols : is_ac:(Sym.t -> bool) -> t -> Sym.t Sequence.t
+  end
 
   (** {3 IO} *)
 
@@ -186,16 +220,13 @@ end
 module UnitData : DATA with type t = unit
   (** Ignore data (trivial data) *)
 
-module Make(Sym : SYMBOL) :
-  S with module Sym = Sym and module Data = UnitData
+module LocationData : DATA with type t = Location.t option ref
+  (** Data: location in a file *)
 
-module MakeHashconsed(Sym : SYMBOL) :
-  S with module Sym = Sym and module Data = UnitData
-
-module MakeData(Sym : SYMBOL)(Data : DATA) :
+module Make(Sym : SYMBOL)(Data : DATA) :
   S with module Sym = Sym and module Data = Data
 
-module MakeHashconsedData(Sym : SYMBOL)(Data : DATA) :
+module MakeHashconsed(Sym : SYMBOL)(Data : DATA) :
   S with module Sym = Sym and module Data = Data
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see

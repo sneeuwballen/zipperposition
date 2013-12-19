@@ -25,23 +25,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Symbols}
 
-Symbols are either numeric constants, or hashconsed, typed strings
-representing logical functions, constants and predicates.
-Two symbols with the same name but distinct types are distinct.
+Symbols are abstract, but must be constructible from strings, printable,
+comparable and hashable.
 *)
 
-type view =
-  | Const of string
-  | Int of Big_int.big_int
-  | Rat of Ratio.ratio
-  | Real of float
-
-(** {2 Main Signature} *)
+(** {2 Main Signatures} *)
 
 module type S = sig
   type t
-
-  val view : t -> view
 
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
@@ -52,88 +43,60 @@ module type S = sig
   module Set : Sequence.Set.S with type elt = t
   module Tbl : Hashtbl.S with type key = t
 
-  val mk_const : string -> t
-  val mk_distinct : string -> t
-  val mk_bigint : Big_int.big_int -> t
-  val mk_int : int -> t
-  val mk_ratio : Ratio.ratio -> t
-  val mk_rat : int -> int -> t
-  val mk_real : float -> t
-  val parse_num : string -> t
+  val of_string : string -> t
+end
 
-  val is_const : t -> bool
-  val is_distinct : t -> bool
+module type WITH_NUMBER = sig
+  type t
+
+  val mk_int : string -> t
+  val mk_rat : string -> t
+  val mk_real : string -> t
+
   val is_int : t -> bool
   val is_rat : t -> bool
   val is_real : t -> bool
-  val is_numeric : t -> bool  (* any of the 3 above *)
+  val is_numeric : t -> bool
 
-  val ty : t -> [`Int | `Rat | `Real | `Other]
+  val ty : t -> [ `Int | `Rat | `Real | `Other ]
 end
-
-(** {2 Properties of symbols}
-    Properties are boolean flags.  Boolean flags are flags that can be attached
-    to symbols. Flags can be combined using the {s lor} operator. *)
-
-module type PROPERTIES = sig
-  type symbol
-
-  type flag = int
-
-  val flag_skolem : flag          (** skolem symbol? *)
-  val flag_binder : flag          (** is the symbol a binding symbol? *)
-  val flag_infix : flag           (** symbol is binary infix? *)
-  val flag_ac : flag              (** symbol is associative-commutative? *)
-  val flag_multiset : flag        (** symbol has multiset status for RPO *)
-  val flag_commut : flag          (** symbol that is commutative (not ac) *)
-  val flag_distinct : flag        (** distinct element (between "") *)
-  val flag_ad_hoc_poly : flag     (** ad-hoc polymorphic *)
-
-  val new_flag : unit -> flag
-
-  (** Property map: maps symbols to their properties. A default map is
-      provided, but one can use its own not to pollute the default map *)
-  module Map : sig
-    type t
-
-    val create : unit -> t
-
-    val copy : t -> t
-  end
-
-  val default : Map.t
-
-  val add : ?map:Map.t -> symbol -> flag -> unit
-  val remove : ?map:Map.t -> symbol -> flag -> unit
-  val forget : ?map:Map.t -> symbol -> unit  (* forget symbol, removing it from table *)
-  val get : ?map:Map.t -> symbol -> bool
-end
-
-module MakeProperties(Symb : Interfaces.HASH) : PROPERTIES with type symbol = Symb.t
 
 (** {2 Basic symbols}
 Symbols to be used for parsing, AST transformations, etc. They are not
 hashconsed and are very simple and lightweight. *)
 
 module Basic : sig
-  type t = view
+  type t = private
+    | Const of string
+    | Int of string
+    | Rat of string
+    | Real of string
 
   include S with type t := t
-  module Prop : PROPERTIES with type symbol = t
+
+  val mk_const : string -> t   (* synonym of {!of_string} *)
+  val is_const : t -> bool
+
+  include WITH_NUMBER with type t := t
 end
 
-(** {2 Hashconsed symbol} *)
+(** {2 Hashconsed symbol}
+This functor takes no argument, but can be used to create several instances
+of the symbols. *)
 
 module MakeHashconsed(X : sig end) : sig
-  type const_info
+  type t
 
-  type t = private
-    | HConst of string * const_info
-    | HInt of Big_int.big_int
-    | HRat of Ratio.ratio
-    | HReal of float
+  type view = private
+    | Const of string
+    | Int of Big_int.big_int
+    | Rat of Ratio.ratio
+    | Real of float
+
+  val view : t -> view
 
   include S with type t := t
+  include WITH_NUMBER with type t := t
 
   (** retrocompatiblity: flags *)
 
@@ -168,15 +131,7 @@ end
 (** {2 TPTP Interface}
 Creates symbol and give them properties. *)
 
-module TPTP(Symb : sig
-  include S
-
-  val declare_ac : t -> unit
-  val declare_commut : t -> unit
-  val declare_multiset : t -> unit
-  val declare_infix : t -> unit
-  val declare_ad_hoc_poly : t -> unit
-end) : sig
+module TPTP(Symb : S) : sig
   type t = Symb.t
 
   (** connectives *)
@@ -194,10 +149,37 @@ end) : sig
   val and_ : t
   val or_ : t
 
+  val forall_ty
+  val i
+  val o
+  val tType
+
   val connectives : Symb.Set.t
   val is_connective : t -> bool
 
   val wildcard : t   (** $_ for type inference *)
+
+  type tptp_view =
+    | True
+    | False
+    | Eq
+    | Neq
+    | Exists
+    | Forall
+    | Imply
+    | Equiv
+    | Xor
+    | Not
+    | And
+    | Or
+    | Forall_ty
+    | I
+    | O
+    | TType
+    | Wildcard
+    | Other of t
+
+  val view : t -> tptp_view
 
   include Interfaces.PRINT with type t := t
 end
@@ -210,7 +192,24 @@ exception TypeMismatch of string
   (** This exception is raised when Arith functions are called
       on non-numeric values (Const). *)
 
-module Arith(Symb : S) : sig
+module Arith(Symb : sig
+  include WITH_NUMBER
+
+  type arith_view =
+    | Const of string
+    | Int of Big_int.big_int
+    | Rat of Ratio.ratio
+    | Real of float
+
+  val arith_view : t -> arith_view
+
+  val mk_bigint : Big_int.big_int -> t
+  val mk_int : int -> t
+  val mk_ratio : Ratio.ratio -> t
+  val mk_rat : int -> int -> t
+  val mk_real : float -> t
+  val parse_num : string -> t
+end) : sig
   type t = Symb.t
 
   val sign : t -> int   (* -1, 0 or 1 *)
@@ -263,8 +262,7 @@ module Arith(Symb : S) : sig
   val greater : t
   val greatereq : t
 
-  val set : Symb.Set.t
-    (** Set of arithmetic symbols *)
+  val symbols : t Sequence.t
 
   val is_arith : t -> bool
     (** Is the symbol an arithmetic symbol? *)
@@ -328,7 +326,7 @@ module Gensym(Symb : S) : sig
     (** New generator of fresh symbols *)
 
   val new_ : t -> Symb.t
-    (** Fresh symbol *)
+    (** Fresh symbol (with unique name) *)
 end
 
 
