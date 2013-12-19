@@ -23,73 +23,93 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 FOTerm Orderings} *)
+(** {1 Term Orderings} *)
 
 (** {2 Type definitions} *)
 
-type t = {
-  ord_clear_cache : unit -> unit;                 (** Clear underlying cache *)
-  ord_compare : FOTerm.t -> FOTerm.t -> Comparison.t; (** Compare two terms *)
-  ord_precedence : Precedence.t;                  (** Current precedence *)
-  ord_set_precedence : Precedence.t -> t;         (** Change the precedence *)
-  ord_name : string;                              (** Name of the ordering *)
-} (** A reduction ordering on terms *)
+module type S = sig
+  module Prec : Precedence.S with type symbol = Symbol.t
 
-val compare : t -> FOTerm.t -> FOTerm.t -> Comparison.t
-  (** Compare two terms *)
+  type term
 
-val precedence : t -> Precedence.t
-  (** Current precedence *)
+  type symbol = Prec.symbol
 
-val set_precedence : t -> Precedence.t -> t
-  (** Change the precedence. The new one must be a superset of the old one. *)
+  type t
+    (** Partial ordering on terms *)
 
-val add_symbols : t -> Symbol.t list -> t
-  (** Update precedence with symbols *)
+  type ordering = t
 
-val add_signature : t -> Signature.t -> t
-  (** Update precedence with signature *)
+  val compare : t -> term -> term -> Comparison.t
+    (** Compare two terms using the given ordering *)
 
-val name : t -> string
-val clear_cache : t -> unit
+  val precedence : t -> Prec.t
+    (** Current precedence *)
 
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
-val to_string : t -> string
-  
-(** {2 Ordering implementations} *)
+  val set_precedence : t -> Prec.t -> t
+    (** Change the precedence. The new one must be a superset of the old one.
+        @raise Invalid_argument if the new precedence is not compatible
+          with the old one *)
 
-(** Partial ordering on terms. This provides several
-    simplification orderings (compatible with substitution,
-    with the subterm property, and monotonic).
-    
-    Some orderings do not satisfy all those properties.*)
+  val update_precedence : t -> (Prec.t -> Prec.t) -> t
+    (** Update the precedence with a function.
+        @raise Invalid_argument if the new precedence is not compatible
+          with the previous one (see {!set_precedence}). *)
 
-val kbo : Precedence.t -> t
-  (** Knuth-Bendix simplification ordering *)
+  val add_list : t -> symbol list -> t
+    (** Update precedence with symbols *)
 
-val rpo6 : Precedence.t -> t
-  (** Efficient implementation of RPO (recursive path ordering) *)
+  val add_seq : t -> symbol Sequence.t -> t
+    (** Update precedence with signature *)
 
-val none : t
-  (** All terms are incomparable (equality still works). Not a simplification
-      ordering. *)
+  val name : t -> string
+    (** Name that describes this ordering *)
 
-val subterm : t
-  (** Subterm ordering. Not a simplification ordering. *)
+  val clear_cache : t -> unit
 
-(** {2 Global table of Orders} *)
+  val pp : Buffer.t -> t -> unit
+  val fmt : Format.formatter -> t -> unit
+  val to_string : t -> string
 
-val default : Symbol.t list -> t
-  (** default ordering on terms (RPO6) *)
+  (** {2 Ordering implementations}
+      An ordering is a partial ordering on terms. Several implementations
+      are simplification orderings (compatible with substitution,
+      with the subterm property, and monotonic), some other are not. *)
 
-val default_prec : Precedence.t -> t
+  val kbo : Prec.t -> t
+    (** Knuth-Bendix simplification ordering *)
 
-val choose : string -> Precedence.t -> t
-  (** Choose ordering by name among registered ones, or
-      @raise Failure if no ordering with the given name are registered. *)
+  val rpo6 : Prec.t -> t
+    (** Efficient implementation of RPO (recursive path ordering) *)
 
-val register : string -> (Precedence.t -> t) -> unit
-  (** Register a new ordering, which can depend on a precedence.
-      The name must not be registered already.
-      @raise Invalid_argument if the name is already used. *)
+  val none : t
+    (** All terms are incomparable (equality still works).
+        Not a simplification ordering. *)
+
+  val subterm : t
+    (** Subterm ordering. Not a simplification ordering. *)
+
+  (** {2 Global table of Orders} *)
+
+  val default_of_list : symbol list -> t
+    (** default ordering on terms (RPO6) using default precedence *)
+
+  val default_of_prec : Prec.t -> t
+
+  val by_name : string -> Prec.t -> t
+    (** Choose ordering by name among registered ones, or
+        @raise Invalid_argument if no ordering with the given name are registered. *)
+
+  val register : string -> (Prec.t -> t) -> unit
+    (** Register a new ordering, which can depend on a precedence.
+        The name must not be registered already.
+        @raise Invalid_argument if the name is already used. *)
+end
+
+(** {2 Functor} *)
+
+module Make(P : Precedence.S with type symbol = Symbol.t) :
+  S with module Prec = P and type term = FOTerm.t
+
+module Default : S with module Prec = Precedence.Default and type term = FOTerm.t
+
+include module type of Default with module Prec = Default.Prec

@@ -25,81 +25,118 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Precedence (total ordering) on symbols} *)
 
-type constr = Symbol.t -> Symbol.t -> int
-  (** an ordering constraint (a possibly non-total ordering on symbols) *)
+type symbol_status =
+  | Multiset
+  | Lexicographic
 
-type  clause = FOFormula.t list
-  (** Abstraction of a clause. It's only a list of terms. *)
+(** {2 Signature} *)
 
-type t = {
-  prec_snapshot : Symbol.t list;  (** symbols in decreasing order *)
-  prec_compare : Symbol.t -> Symbol.t -> int;       (** Compare symbols *)
-  prec_weight : Symbol.t -> int;
-  prec_set_weight : (Symbol.t -> int) -> t;
-  prec_add_symbols : Symbol.t list -> t * int;
-    (** add the given symbols to the precedenc (returns how many are new) *)
-} (** A total ordering on symbols *)
+module type S = sig
+  type symbol
 
-val eq : t -> t -> bool
-  (** Check whether the two precedences are equal (same snapshot) *)
+  type t
+    (** Total Ordering on a finite number of symbols, plus a few more
+        data (weight for KBO, status for RPC) *)
 
-val snapshot : t -> Symbol.t list
-  (** Current list of symbols, in decreasing order *)
+  type precedence = t
 
-val compare : t -> Symbol.t -> Symbol.t -> int
-  (** Compare two symbols using the precedence *)
+  val eq : t -> t -> bool
+    (** Check whether the two precedences are equal (same snapshot) *)
 
-val add_symbols : t -> Symbol.t list -> t
-  (** Update the precedence with the given symbols *)
+  val snapshot : t -> symbol list
+    (** Current list of symbols, in decreasing order *)
 
-val add_signature : t -> Signature.t -> t
-  (** Update the precedence with the symbols that are present in the
-      signature *)
+  val compare : t -> symbol -> symbol -> int
+    (** Compare two symbols using the precedence *)
 
-val pp_snapshot : Buffer.t -> Symbol.t list -> unit
-val pp : Buffer.t -> t -> unit
-val fmt : Format.formatter -> t -> unit
-val to_string : t -> string
+  val status : t -> symbol -> symbol_status
+    (** Status of the symbol *)
 
-(** {2 Builtin constraints} *)
+  val weight : t -> symbol -> int
+    (** Weight of a symbol (for KBO). Strictly positive int. *)
 
-val cluster_constraint : Symbol.t list list -> constr
-  (** ordering constraint by clustering symbols by decreasing order.
-      all symbols in the first clusters are bigger than those in the second, etc. *)
+  val add_list : t -> symbol list -> t
+    (** Update the precedence with the given symbols *)
 
-val list_constraint : Symbol.t list -> constr
-  (** symbols in the given list are in decreasing order *)
+  val add_seq : t -> symbol Sequence.t -> t
 
-val arity_constraint : constr
-  (** decreasing arity constraint *)
+  val declare_status : t -> symbol -> symbol_status -> t
+    (** Change the status of the given precedence *)
 
-val invfreq_constraint : FOFormula.t Sequence.t -> constr
-  (** symbols with high frequency are smaller *)
+  module Seq : sig
+    val symbols : t -> symbol Sequence.t
+  end
 
-val max_constraint : Symbol.t list -> constr
-  (** maximal symbols, in decreasing order *)
+  val pp_snapshot : Buffer.t -> symbol list -> unit
+  val pp : Buffer.t -> t -> unit
+  val fmt : Format.formatter -> t -> unit
+  val to_string : t -> string
 
-val min_constraint : Symbol.t list -> constr
-  (** minimal symbols, in decreasing order *)
+  (** {2 Builtin constraints} *)
 
-val alpha_constraint : constr
-  (** regular (alphabetic) ordering on symbols *)
+  module Constr : sig
+    type t = symbol -> symbol -> Comparison.t
+      (** A partial order on symbols, used to make the precedence more
+          precise *)
 
-(** {2 Creation of a precedence from constraints} *)
+    val cluster : symbol list list -> t
+      (** ordering constraint by clustering symbols by decreasing order.
+          all symbols in the first clusters are bigger than those in the second, etc. *)
 
-val create : ?complete:bool -> constr list -> Symbol.t list -> t
-  (** make a precedence from the given constraints. First constraints are
-      more important than later constraints. Only the very first constraint
-      is assured to be totally satisfied.
-      
-      If [complete] is true (default false) the symbol list is completed using
-      special symbols. *)
+    val of_list : symbol list -> t
+      (** symbols in the given list are in decreasing order *)
 
-val default : Symbol.t list -> t
-  (** default precedence *)
+    val of_precedence : precedence -> t
+      (** Copy of another precedence on the common symbols *)
 
-val default_of_set : Symbol.Set.t -> t
-  (** default precedence on the given set of symbols *)
+    val arity : (symbol -> int) -> t
+      (** decreasing arity constraint (big arity => high in precedence) *)
 
-val default_of_signature : Signature.t -> t
-  (** default precedence on the given signature *)
+    val invfreq : symbol Sequence.t -> t
+      (** symbols with high frequency are smaller *)
+
+    val max : symbol list -> t
+      (** maximal symbols, in decreasing order *)
+
+    val min : symbol list -> t
+      (** minimal symbols, in decreasing order *)
+
+    val alpha : t
+      (** alphabetic ordering on symbols *)
+  end
+
+  (** {2 Creation of a precedence from constraints} *)
+
+  val create : Constr.t list -> symbol list -> t
+    (** make a precedence from the given constraints. Constraints near
+        the head of the list are {b more important} than constraints close
+        to the tail. Only the very first constraint is assured to be totally
+        satisfied if constraints do not agree with one another. *)
+
+  val default : symbol list -> t
+    (** default precedence. Default status for symbols is {!Lexicographic}. *)
+
+  val default_seq : symbol Sequence.t -> t
+    (** default precedence on the given sequence of symbols *)
+end
+
+(** {2 Functor} *)
+
+module type SYMBOL = sig
+  type t
+
+  val eq : t -> t -> bool
+  val hash : t -> int
+  val cmp : t -> t -> int
+
+  val false_ : t
+  val true_ : t
+
+  val pp : Buffer.t -> t -> unit
+end
+
+module Make(Sym : SYMBOL) : S with type symbol = Sym.t
+
+module Default : S with type symbol = Symbol.t
+
+include module type of Default with type t = Default.t

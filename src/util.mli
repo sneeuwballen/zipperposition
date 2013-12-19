@@ -135,6 +135,8 @@ val list_take : int -> 'a list -> 'a list
 val list_drop : int -> 'a list -> 'a list
 (** range from i to j *)
 val list_range : int -> int -> int list
+(** fold on list, with index *)
+val list_foldi : ('b -> int -> 'a -> 'b) -> 'b -> 'a list -> 'b
 (** call the function n times with unit *)
 val times : int -> (unit -> 'a) -> 'a list
 

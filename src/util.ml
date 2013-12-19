@@ -311,6 +311,15 @@ let rec list_range low high =
   | _, _ when low = high -> []
   | _ -> low :: (list_range (low+1) high)
 
+let list_foldi f acc l =
+  let rec foldi f acc i l = match l with
+  | [] -> acc
+  | x::l' ->
+    let acc = f acc i x in
+    foldi f acc (i+1) l'
+  in
+  foldi f acc 0 l
+
 let rec times i f =
   if i = 0 then []
   else (f ()) :: (times (i-1) f)
