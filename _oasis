@@ -42,7 +42,7 @@ Library "logtk"
                     TypeConversion, TypeErasure, DBEnv, Interfaces,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
                     lib/Bencode, lib/BV, lib/PersistentHashtbl, lib/Mixtbl
-  BuildDepends:     unix,num,str
+  BuildDepends:     unix,str,zarith
 
 Library "logtk_meta"
   Path:             src/meta/
