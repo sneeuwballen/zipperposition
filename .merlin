@@ -10,6 +10,7 @@ B _build/src/meta
 B _build/src/arbitrary
 B _build/tools/
 B _build/tests/
+PKG zarith
 PKG oUnit
 PKG bench
 PKG datalog
