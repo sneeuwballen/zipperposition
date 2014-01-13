@@ -29,112 +29,64 @@ Symbols are abstract, but must be constructible from strings, printable,
 comparable and hashable.
 *)
 
-(** {2 Main Signatures} *)
+type connective =
+  | Not
+  | And
+  | Or
+  | Imply
+  | Equiv
+  | Xor
+  | Eq
+  | Neq
+  | HasType
+  | True
+  | False
+  | Exists
+  | Forall
+  | ForallTy
+  | Arrow
+  | Wildcard
+  | TType (* type of types *)
 
-module type S = sig
-  type t
+type const_symbol = private {
+  mutable cs_id : int;
+  cs_name : string;
+}
 
-  include Interfaces.HASH with type t := t
-  include Interfaces.ORD with type t := t
-  include Interfaces.PRINT with type t := t
-  include Interfaces.SERIALIZABLE with type t := t
+type t =
+  | Connective of connective
+  | Const of const_symbol
+  | Int of Z.t
+  | Rat of Q.t
 
-  module Map : Sequence.Map.S with type key = t
-  module Set : Sequence.Set.S with type elt = t
-  module Tbl : Hashtbl.S with type key = t
+include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
+include Interfaces.PRINT with type t := t
+(*
+include Interfaces.SERIALIZABLE with type t := t
+include Interfaces.PRINT_OVERLOAD with type t := t
+*)
 
-  val of_string : string -> t
-end
+module Map : Sequence.Map.S with type key = t
+module Set : Sequence.Set.S with type elt = t
+module Tbl : Hashtbl.S with type key = t
 
-module type WITH_NUMBER = sig
-  type t
+val ty : t -> [ `Int | `Rat | `Other ]
 
-  val mk_int : string -> t
-  val mk_rat : string -> t
-  val mk_real : string -> t
+(** {2 Base Constructors} *)
 
-  val is_int : t -> bool
-  val is_rat : t -> bool
-  val is_real : t -> bool
-  val is_numeric : t -> bool
+val of_string : string -> t
 
-  val ty : t -> [ `Int | `Rat | `Real | `Other ]
-end
+val mk_int : Z.t -> t
+val of_int : int -> t
+val mk_rat : Q.t -> t
+val of_rat : int -> int -> t
 
-(** {2 Basic symbols}
-Symbols to be used for parsing, AST transformations, etc. They are not
-hashconsed and are very simple and lightweight. *)
+val is_int : t -> bool
+val is_rat : t -> bool
+val is_numeric : t -> bool
 
-module Basic : sig
-  type t = private
-    | Const of string
-    | Int of string
-    | Rat of string
-    | Real of string
-
-  include S with type t := t
-
-  val mk_const : string -> t   (* synonym of {!of_string} *)
-  val is_const : t -> bool
-
-  include WITH_NUMBER with type t := t
-end
-
-(** {2 Hashconsed symbol}
-This functor takes no argument, but can be used to create several instances
-of the symbols. *)
-
-module MakeHashconsed(X : sig end) : sig
-  type t
-
-  type view = private
-    | Const of string
-    | Int of Big_int.big_int
-    | Rat of Ratio.ratio
-    | Real of float
-
-  val view : t -> view
-
-  include S with type t := t
-  include WITH_NUMBER with type t := t
-
-  (** retrocompatiblity: flags *)
-
-  type flag = int
-
-  val flag_skolem : flag          (** skolem symbol? *)
-  val flag_binder : flag          (** is the symbol a binding symbol? *)
-  val flag_infix : flag           (** symbol is binary infix? *)
-  val flag_ac : flag              (** symbol is associative-commutative? *)
-  val flag_multiset : flag        (** symbol has multiset status for RPO *)
-  val flag_commut : flag          (** symbol that is commutative (not ac) *)
-  val flag_distinct : flag        (** distinct element (between "") *)
-  val flag_ad_hoc_poly : flag     (** ad-hoc polymorphic *)
-
-  val new_flag : unit -> flag
-  val add_flag : t -> flag -> unit
-  val has_flag : t -> flag -> bool
-
-  (** retrocompatibility: constructors *)
-
-  val mk_const : ?flags:int -> string -> t
-  val mk_distinct : ?flags:int -> string -> t
-
-  val of_basic : Basic.t -> t
-  val to_basic : t -> Basic.t
-
-  (** retrocompatibility: printers *)
-
-  include Interfaces.PRINT_OVERLOAD with type t := t
-end
-
-(** {2 TPTP Interface}
-Creates symbol and give them properties. *)
-
-module TPTP(Symb : S) : sig
-  type t = Symb.t
-
-  (** connectives *)
+module Base : sig
   val true_ : t
   val false_ : t
   val eq : t
@@ -149,452 +101,150 @@ module TPTP(Symb : S) : sig
   val and_ : t
   val or_ : t
 
-  val forall_ty
-  val i
-  val o
-  val tType
-
-  val connectives : Symb.Set.t
-  val is_connective : t -> bool
+  val forall_ty : t
+  val arrow : t
+  val tType : t
 
   val wildcard : t   (** $_ for type inference *)
+end
 
-  type tptp_view =
-    | True
-    | False
-    | Eq
-    | Neq
-    | Exists
-    | Forall
-    | Imply
-    | Equiv
-    | Xor
-    | Not
-    | And
-    | Or
-    | Forall_ty
-    | I
-    | O
-    | TType
-    | Wildcard
-    | Other of t
+(** {2 Generation of symbols} *)
 
-  val view : t -> tptp_view
+val gensym : ?prefix:string -> unit -> t
+  (** Fresh symbol (with unique name) *)
+
+(** {2 TPTP Interface}
+Creates symbol and give them properties. *)
+
+module TPTP : sig
+  val i : t
+  val o : t
+  val int : t
+  val rat : t
+  val real : t
+
+  val connectives : Set.t
+  val is_connective : t -> bool
 
   include Interfaces.PRINT with type t := t
+  (** printer for TPTP *)
+
+  (** {3 Arith Symbols} *)
+
+  module Arith : sig
+
+    val floor : t
+    val ceiling : t
+    val truncate : t
+    val round : t
+
+    val prec : t
+    val succ : t
+
+    val sum : t
+    val difference : t
+    val uminus : t
+    val product : t
+    val quotient : t
+
+    val quotient_e : t
+    val quotient_t : t
+    val quotient_f : t
+    val remainder_e : t
+    val remainder_t : t
+    val remainder_f : t
+
+    val is_int : t
+    val is_rat : t
+
+    val to_int : t
+    val to_rat : t
+
+    val less : t
+    val lesseq : t
+    val greater : t
+    val greatereq : t
+
+    val symbols : t Sequence.t
+
+    val is_arith : t -> bool
+      (** Is the symbol a TPTP arithmetic symbol? *)
+  end
 end
 
-(** {2 Arith Interface}
-Some functions may raise Division_by_zero, some other may raise TypeMismatch
-if operands do not have compatible types. *)
+(** The module {!ArithOp} deals only with numeric constants, i.e., all symbols
+    must verify {!is_numeric} (and most of the time, have the same type).
+    The semantics of operations follows
+    {{: http://www.cs.miami.edu/~tptp/TPTP/TR/TPTPTR.shtml#Arithmetic} TPTP}.
+  *)
 
-exception TypeMismatch of string
+module ArithOp : sig
+  exception TypeMismatch of string
   (** This exception is raised when Arith functions are called
-      on non-numeric values (Const). *)
-
-module Arith(Symb : sig
-  include WITH_NUMBER
+      on non-numeric values *)
 
   type arith_view =
-    | Const of string
-    | Int of Big_int.big_int
-    | Rat of Ratio.ratio
-    | Real of float
+    [ `Int of Z.t
+    | `Rat of Q.t
+    | `Other of t
+    ]
 
-  val arith_view : t -> arith_view
+  val view : t -> arith_view
+  (** Arith centered view of symbols *)
 
-  val mk_bigint : Big_int.big_int -> t
-  val mk_int : int -> t
-  val mk_ratio : Ratio.ratio -> t
-  val mk_rat : int -> int -> t
-  val mk_real : float -> t
   val parse_num : string -> t
-end) : sig
-  type t = Symb.t
 
   val sign : t -> int   (* -1, 0 or 1 *)
-
-  val floor : t
-  val ceiling : t
-  val truncate : t
-  val round : t
-
-  val prec : t
-  val succ : t
 
   val one_i : t
   val zero_i : t
   val one_rat : t
   val zero_rat : t
-  val one_f : t
-  val zero_f : t
 
-  val zero_of_ty : [<`Int | `Rat | `Real] -> t
-  val one_of_ty : [<`Int | `Rat | `Real] -> t
+  val zero_of_ty : [<`Int | `Rat ] -> t
+  val one_of_ty : [<`Int | `Rat ] -> t
 
   val is_zero : t -> bool
   val is_one : t -> bool
   val is_minus_one : t -> bool
 
-  val sum : t
-  val difference : t
-  val uminus : t
-  val product : t
-  val quotient : t
+  val floor : t -> t
+  val ceiling : t -> t
+  val truncate : t -> t
+  val round : t -> t
 
-  val quotient_e : t
-  val quotient_t : t
-  val quotient_f : t
-  val remainder_e : t
-  val remainder_t : t
-  val remainder_f : t
+  val prec : t -> t
+  val succ : t -> t
 
-  val is_int : t
-  val is_rat : t
-  val is_real : t
+  val sum : t -> t -> t
+  val difference : t -> t -> t
+  val uminus : t -> t
+  val product : t -> t -> t
+  val quotient : t -> t -> t
 
-  val to_int : t
-  val to_rat : t
-  val to_real : t
+  val quotient_e : t -> t -> t
+  val quotient_t : t -> t -> t
+  val quotient_f : t -> t -> t
+  val remainder_e : t -> t -> t
+  val remainder_t : t -> t -> t
+  val remainder_f : t -> t -> t
 
-  val less : t
-  val lesseq : t
-  val greater : t
-  val greatereq : t
+  val to_int : t -> t
+  val to_rat : t -> t
 
-  val symbols : t Sequence.t
+  val abs : t -> t (* absolute value *)
+  val divides : t -> t -> bool (* [divides a b] returns true if [a] divides [b] *)
+  val gcd : t -> t -> t  (* gcd of two ints, 1 for other types *)
+  val lcm : t -> t -> t   (* lcm of two ints, 1 for other types *)
 
-  val is_arith : t -> bool
-    (** Is the symbol an arithmetic symbol? *)
+  val less : t -> t -> bool
+  val lesseq : t -> t -> bool
+  val greater : t -> t -> bool
+  val greatereq : t -> t -> bool
 
-  (** The module {!Op} deals only with numeric constants, i.e., all symbols
-      must verify {!is_numeric} (and most of the time, have the same type).
-      The semantics of operations follows
-      {{: http://www.cs.miami.edu/~tptp/TPTP/TR/TPTPTR.shtml#Arithmetic} TPTP}.
-    *)
-
-  module Op : sig
-    val floor : t -> t
-    val ceiling : t -> t
-    val truncate : t -> t
-    val round : t -> t
-
-    val prec : t -> t
-    val succ : t -> t
-
-    val sum : t -> t -> t
-    val difference : t -> t -> t
-    val uminus : t -> t
-    val product : t -> t -> t
-    val quotient : t -> t -> t
-
-    val quotient_e : t -> t -> t
-    val quotient_t : t -> t -> t
-    val quotient_f : t -> t -> t
-    val remainder_e : t -> t -> t
-    val remainder_t : t -> t -> t
-    val remainder_f : t -> t -> t
-
-    val to_int : t -> t
-    val to_rat : t -> t
-    val to_real : t -> t
-
-    val abs : t -> t (* absolute value *)
-    val divides : t -> t -> bool (* [divides a b] returns true if [a] divides [b] *)
-    val gcd : t -> t -> t  (* gcd of two ints, 1 for other types *)
-    val lcm : t -> t -> t   (* lcm of two ints, 1 for other types *)
-
-    val less : t -> t -> bool
-    val lesseq : t -> t -> bool
-    val greater : t -> t -> bool
-    val greatereq : t -> t -> bool
-
-    val divisors : Big_int.big_int -> Big_int.big_int list
-      (** List of non-trivial strict divisors of the int.
-          @return [] if int <= 1, the list of divisors otherwise. Empty list
-            for prime numbers, obviously. *)
-  end
+  val divisors : Z.t -> Z.t list
+    (** List of non-trivial strict divisors of the int.
+        @return [] if int <= 1, the list of divisors otherwise. Empty list
+          for prime numbers, obviously. *)
 end
 
-(** {2 Generation of symbols} *)
-
-module Gensym(Symb : S) : sig
-  type t
-    (** Generator of fresh symbols *)
-
-  val create : ?prefix:string -> unit -> t
-    (** New generator of fresh symbols *)
-
-  val new_ : t -> Symb.t
-    (** Fresh symbol (with unique name) *)
-end
-
-
-
-(*
-(** {2 Definition of symbols} *)
-
-(** Symbols have a mixed representation, with string constants being
-    hashconsed, but not numeric literals. *)
-
-type const_info
-  (** Additional information for hashconsed symbols. Contains type,
-      etc. but remains opaque. *)
-
-(** A symbol of TPTP *)
-type t = private
-  | Const of string * const_info
-  | Int of Big_int.big_int
-  | Rat of Ratio.ratio
-  | Real of float
-
-type symbol = t
-
-val compare : t -> t -> int
-  (** total ordering on symbols *)
-
-val eq : t -> t -> bool
-  (** Equality of symbols *)
-
-val hash : t -> int
-  (** hash the symbol *)
-
-(** {2 Boolean flags}
-Boolean flags are flags that can be attached to symbols. Since
-symbols are perfectly shared, a flag is system-wide. Flags can
-be combined using the {s lor} operator.
-*)
-
-type flag = int
-
-val flag_skolem : flag          (** skolem symbol? *)
-val flag_split : flag           (** symbol used for splitting? *)
-val flag_binder : flag          (** is the symbol a binding symbol? *)
-val flag_infix : flag           (** symbol is binary infix? *)
-val flag_ac : flag              (** symbol is associative-commutative? *)
-val flag_multiset : flag        (** symbol has multiset status for RPO *)
-val flag_fresh_const : flag     (** symbol that is a fresh constant *)
-val flag_commut : flag          (** symbol that is commutative (not ac) *)
-val flag_distinct : flag        (** distinct element (between "") *)
-val flag_ad_hoc_poly : flag     (** ad-hoc polymorphic *)
-
-(** {2 Constructors} *)
-
-val mk_const : ?flags:flag -> ty:Type.t -> string -> t
-  (** Build a typed symbol with the given name and type.
-      @raise Type.Error if the type contains free variables *)
-
-val mk_distinct : ?flags:flag -> ?ty:Type.t -> string -> t
-  (** default type: $i *)
-
-val mk_bigint : Big_int.big_int -> t
-val mk_int : int -> t
-val mk_rat : int -> int -> t
-val mk_ratio : Ratio.ratio -> t
-val mk_real : float -> t
-
-val parse_num : string -> t             (** Parse an Int or a Rat *)
-
-val of_basic : ?ty:Type.t -> Basic.Sym.t -> t
-  (** Convert the basic symbol into a typed symbol *)
-
-val to_basic : t -> Basic.Sym.t
-  (** Forget the type *)
-
-val is_const : t -> bool
-val is_distinct : t -> bool
-val is_int : t -> bool
-val is_rat : t -> bool
-val is_real : t -> bool
-val is_numeric : t -> bool  (* any of the 3 above *)
-
-val flags : t -> flag
-  (** access the attributes of a symbol *)
-
-val has_flag : flag -> t -> bool
-  (** does the symbol have this attribute? *)
-
-val ty : t -> Type.t
-  (** Access the type of this symbol. *)
-
-module Map : Sequence.Map.S with type key = t
-module Set : Sequence.Set.S with type elt = t
-module Tbl : Hashtbl.S with type key = t
-
-(** {2 connectives} *)
-
-(** Those symbols are useful to embed formulas in terms. This may be useful
-    in non first-order logic, or to apply some term-specific operation
-    such as unification, rewriting or AC-matching to formulas *)
-
-val true_symbol : t
-val false_symbol : t
-val eq_symbol : t
-val exists_symbol : t
-val forall_symbol : t
-val not_symbol : t
-val imply_symbol : t
-val equiv_symbol : t
-val and_symbol : t
-val or_symbol : t
-
-val connectives : t list  (** List of the connectives *)
-val is_connective : t -> bool
-
-val wildcard_symbol : t   (** $_ for type inference *)
-
-(** {2 Arithmetic} *)
-
-(** Arithmetic (assumes the symbols verify {!is_numeric}).
-    {!Arith} contains the symbols, and {!Arith.Op} contains the computational
-    part of arithmetic (compute the result of operations) *)
-
-module Arith : sig
-  (** some functions may raise Division_by_zero *)
-
-  val sign : t -> int   (* -1, 0 or 1 *)
-
-  val floor : t
-  val ceiling : t
-  val truncate : t
-  val round : t
-
-  val prec : t
-  val succ : t
-
-  val one_i : t
-  val zero_i : t
-  val one_rat : t
-  val zero_rat : t
-  val one_f : t
-  val zero_f : t
-
-  val zero_of_ty : Type.t -> t
-  val one_of_ty : Type.t -> t
-
-  val is_zero : t -> bool
-  val is_one : t -> bool
-  val is_minus_one : t -> bool
-
-  val sum : t
-  val difference : t
-  val uminus : t
-  val product : t
-  val quotient : t
-
-  val quotient_e : t
-  val quotient_t : t
-  val quotient_f : t
-  val remainder_e : t
-  val remainder_t : t
-  val remainder_f : t
-
-  val is_int : t
-  val is_rat : t
-  val is_real : t
-
-  val to_int : t
-  val to_rat : t
-  val to_real : t
-
-  val less : t
-  val lesseq : t
-  val greater : t
-  val greatereq : t
-
-  val set : Set.t
-    (** Set of arithmetic symbols *)
-
-  val is_arith : t -> bool
-    (** Is the symbol an arithmetic symbol? *)
-
-  (** The module {!Op} deals only with numeric constants, i.e., all symbols
-      must verify {!is_numeric} (and most of the time, have the same type).
-      The semantics of operations follows
-      {{: http://www.cs.miami.edu/~tptp/TPTP/TR/TPTPTR.shtml#Arithmetic} TPTP}.
-    *)
-
-  module Op : sig
-    val floor : t -> t
-    val ceiling : t -> t
-    val truncate : t -> t
-    val round : t -> t
-
-    val prec : t -> t
-    val succ : t -> t
-
-    val sum : t -> t -> t
-    val difference : t -> t -> t
-    val uminus : t -> t
-    val product : t -> t -> t
-    val quotient : t -> t -> t
-
-    val quotient_e : t -> t -> t
-    val quotient_t : t -> t -> t
-    val quotient_f : t -> t -> t
-    val remainder_e : t -> t -> t
-    val remainder_t : t -> t -> t
-    val remainder_f : t -> t -> t
-
-    val to_int : t -> t
-    val to_rat : t -> t
-    val to_real : t -> t
-
-    val abs : t -> t (* absolute value *)
-    val divides : t -> t -> bool (* [divides a b] returns true if [a] divides [b] *)
-    val gcd : t -> t -> t  (* gcd of two ints, 1 for other types *)
-    val lcm : t -> t -> t   (* lcm of two ints, 1 for other types *)
-
-    val less : t -> t -> bool
-    val lesseq : t -> t -> bool
-    val greater : t -> t -> bool
-    val greatereq : t -> t -> bool
-
-    val divisors : Big_int.big_int -> Big_int.big_int list
-      (** List of non-trivial strict divisors of the int.
-          @return [] if int <= 1, the list of divisors otherwise. Empty list
-            for prime numbers, obviously. *)
-  end
-end
-
-
-(** {2 "Magic" symbols} *)
-
-val db_symbol : t    (** pseudo symbol kept for locating bound vars in precedence *)
-val split_symbol : t (** pseudo symbol for locating split symbols in precedence *)
-val const_symbol : t (** pseudo symbol for locating magic constants in precedence *)
-val num_symbol : t   (** pseudo symbol to locate numbers in the precedence *)
-
-val mk_fresh_const : int -> ty:Type.t -> t
-  (** Infinite set of symbols, accessed by index, that will not collide with
-      the signature of the problem *)
-
-(** {2 IO} *)
-
-val pp_debug : Buffer.t -> t -> unit
-val to_string_debug : t -> string
-
-val to_string : t -> string
-val to_string_tstp : t -> string
-val pp_tstp : Buffer.t -> t -> unit
-
-val pp : Buffer.t -> t -> unit   (* uses default printer *)
-val fmt : Format.formatter -> t -> unit
-
-val set_default_pp : (Buffer.t -> t -> unit) -> unit (* change default printer *)
-
-val bij : t Bij.t
-
-(** {2 Generation of symbols} *)
-
-module Gensym : sig
-  type t
-    (** Generator of fresh symbols *)
-
-  val create : ?prefix:string -> unit -> t
-    (** New generator of fresh symbols *)
-
-  val new_ : t -> ty:Type.t -> symbol
-    (** Fresh symbol with given type. *)
-end
-*)

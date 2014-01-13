@@ -32,7 +32,9 @@ module type SYMBOL = sig
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
   include Interfaces.PRINT with type t := t
+  (*
   include Interfaces.SERIALIZABLE with type t := t
+  *)
 end
 
 module type DATA = sig
@@ -77,13 +79,6 @@ module type S = sig
 
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
-
-  (** {3 Bool flags} *)
-
-  val flags : t -> int
-  val new_flag : unit -> int
-  val set_flag : t -> int -> bool -> unit
-  val get_flag : t -> int -> bool
 
   (** {3 Constructors} *)
 
@@ -212,7 +207,9 @@ module type S = sig
 
   include Interfaces.PRINT with type t := t
 
+  (* FIXME
   include Interfaces.SERIALIZABLE with type t := t
+  *)
 end
 
 (** {2 Functors} *)
@@ -228,6 +225,10 @@ module Make(Sym : SYMBOL)(Data : DATA) :
 
 module MakeHashconsed(Sym : SYMBOL)(Data : DATA) :
   S with module Sym = Sym and module Data = Data
+
+(** {2 Default Implementation} *)
+
+module Std : S with module Sym = Symbol and module Data = UnitData
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)

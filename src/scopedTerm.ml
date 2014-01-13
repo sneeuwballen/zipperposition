@@ -32,7 +32,9 @@ module type SYMBOL = sig
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
   include Interfaces.PRINT with type t := t
+  (*
   include Interfaces.SERIALIZABLE with type t := t
+  *)
 end
 
 module type DATA = sig
@@ -77,13 +79,6 @@ module type S = sig
 
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
-
-  (** {3 Bool flags} *)
-
-  val flags : t -> int
-  val new_flag : unit -> int
-  val set_flag : t -> int -> bool -> unit
-  val get_flag : t -> int -> bool
 
   (** {3 Constructors} *)
 
@@ -212,7 +207,9 @@ module type S = sig
 
   include Interfaces.PRINT with type t := t
 
+  (* FIXME
   include Interfaces.SERIALIZABLE with type t := t
+  *)
 end
 
 (** {2 Functor} *)
@@ -870,3 +867,6 @@ module MakeHashconsed(Sym : SYMBOL)(Data : DATA) = struct
   include B
   include Common(B)
 end
+
+module Std = Make(Symbol)(UnitData)
+
