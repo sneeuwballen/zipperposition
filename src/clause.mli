@@ -41,14 +41,16 @@ val stat_fresh : Util.stat
 val stat_mk_hclause : Util.stat
 val stat_new_clause : Util.stat
 
+type scope = Substs.scope
+
 type t = private {
   hclits : Literal.t array;               (** the literals *)
   hcctx : Ctx.t;                          (** context of the clause *)
   mutable hctag : int;                    (** unique ID of the clause *)
   mutable hcflags : int;                  (** boolean flags for the clause *)
-  mutable hcweight : int;                 (** weight of clause *)
+  mutable hcweight : int;                 (** weight of clause (sum of size of terms) *)
   mutable hcselected : BV.t;              (** bitvector for selected literals *)
-  mutable hcvars : Term.t list;           (** the free variables *)
+  mutable hcvars : FOTerm.t list;           (** the free variables *)
   mutable hcproof : Proof.t;             (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
@@ -60,10 +62,10 @@ type clause = t
 val compact : t -> CompactClause.t
   (** Turn into a compact clause *)
 
-val to_seq : t -> (Term.t * Term.t * bool) Sequence.t
+val to_seq : t -> (FOTerm.t * FOTerm.t * bool) Sequence.t
   (** Easy iteration on literals *)
 
-val to_prec_clause : t -> Precedence.clause
+val terms : t -> FOTerm.t Sequence.t
 
 (** {2 Flags} *)
 
@@ -73,6 +75,7 @@ val flag_persistent : int                         (** clause cannot be redundant
 
 val set_flag : int -> t -> bool -> unit     (** set boolean flag *)
 val get_flag : int -> t -> bool             (** get value of boolean flag *)
+val new_flag : unit -> int                  (** new flag that can be used on clauses *)
 
 (** {2 Basics} *)
 
@@ -119,17 +122,21 @@ val create_a : ?parents:t list -> ?selected:BV.t ->
       ownership of the input array. *)
 
 val create_forms : ?parents:t list -> ?selected:BV.t ->
-                    ctx:Ctx.t -> Formula.t list ->
+                    ctx:Ctx.t -> FOFormula.t list ->
                     (CompactClause.t -> Proof.t) -> t
   (** Directly from list of formulas *)
 
 val get_proof : t -> Proof.t
+  (** Extract its proof from the clause *)
 
 val stats : unit -> (int*int*int*int*int*int)
   (** hashconsing stats *)
 
 val is_empty : t -> bool
   (** Is the clause an empty clause? *)
+
+val length : t -> int
+  (** Number of literals *)
 
 val descendants : t -> int SmallSet.t
   (** set of ID of descendants of the clause *)
@@ -140,31 +147,31 @@ val update_ctx : ctx:Ctx.t -> t -> t
 val check_ord : ord:Ordering.t -> t -> unit
   (** checks that the clause is up-to-date w.r.t. the ordering *)
 
-val apply_subst : ?recursive:bool -> renaming:Substs.Renaming.t ->
-                  Substs.t -> t -> Substs.scope -> t
+val apply_subst : renaming:Substs.FO.Renaming.t ->
+                  Substs.FO.t -> t -> Substs.scope -> t
   (** apply the substitution to the clause *)
 
-val maxlits : t -> Substs.scope -> Substs.t -> BV.t
+val maxlits : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are maximal under [ord] *)
 
-val is_maxlit : t -> Substs.scope -> Substs.t -> int -> bool
+val is_maxlit : t -> Substs.scope -> Substs.FO.t -> int -> bool
   (** Is the i-th literal maximal in subst(clause)? Equivalent to
       Bitvector.get (maxlits ~ord c subst) i *)
 
-val eligible_res : t -> Substs.scope -> Substs.t -> BV.t
+val eligible_res : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for resolution. THe literal has to be either maximal
       among selected literals of the same sign, if some literal is selected,
       or maximal if none is selected. *)
 
-val eligible_param : t -> Substs.scope -> Substs.t -> BV.t
+val eligible_param : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. That means the literal
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
-val eligible_chaining : t -> Substs.scope -> Substs.t -> BV.t
+val eligible_chaining : t -> Substs.scope -> Substs.FO.t -> BV.t
   (** Bitvector of literals of [subst(clause)] that are eligible
       for equality chaining or inequality chaining. That amouns to being
       a maximal, positive inequality literal within the clause,
@@ -185,10 +192,10 @@ val is_unit_clause : t -> bool
 val is_oriented_rule : t -> bool
   (** Is the clause a positive oriented clause? *)
 
-val infer_type : TypeInference.Ctx.t -> t Sequence.t -> unit
-val signature : ?signature:Signature.t -> t Sequence.t -> Signature.t
+val symbols : ?init:Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
+  (** symbols that occur in the clause *)
 
-val from_forms : file:string -> name:string -> ctx:Ctx.t -> Formula.t list -> t
+val from_forms : ?role:string -> file:string -> name:string -> ctx:Ctx.t -> FOFormula.t list -> t
   (** Conversion of a formula list to a clause *)
 
 (** {2 Filter literals} *)
@@ -206,11 +213,17 @@ module Eligible : sig
   val chaining : clause -> t
     (** Eligible for chaining *)
 
+  val eq : t
+    (** Equations *)
+
   val ineq : clause -> t
     (** Only literals that are inequations *)
 
   val ineq_of : clause -> Theories.TotalOrder.instance -> t
     (** Only literals that are inequations for the given ordering *)
+
+  val max : clause -> t
+    (** Maximal literals of the clause *)
 
   val pos : t
     (** Only positive literals *)
@@ -290,8 +303,6 @@ module CSet : sig
   val to_list : t -> clause list
   val of_list : clause list -> t
 
-  val infer_type : TypeInference.Ctx.t -> t -> unit
-
   val to_seq : t -> clause Sequence.t
   val of_seq : t -> clause Sequence.t -> t
   val remove_seq : t -> clause Sequence.t -> t
@@ -305,7 +316,7 @@ module WithPos : sig
   type t = {
     clause : clause;
     pos : Position.t;
-    term : Term.t;
+    term : FOTerm.t;
   }
 
   val compare : t -> t -> int

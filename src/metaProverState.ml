@@ -34,8 +34,8 @@ let prof_scan_formula = Util.mk_profiler "meta.scan_formula"
 let prof_scan_set = Util.mk_profiler "meta.scan_set"
 let prof_add_lits = Util.mk_profiler "meta.add_lits"
 
-module T = Term
-module F = Formula
+module T = HOTerm
+module F = FOFormula
 module PF = PFormula
 module C = Clause
 module M = Logtk_meta
@@ -44,8 +44,7 @@ module Lits = Literal.Arr
 
 type result =
   | Deduced of PFormula.t * source list
-  | Theory of string * Term.t list
-  | Expert of Experts.t
+  | Theory of string * T.t list * source list
   (** Feedback from the meta-prover *)
 
 and source =
@@ -62,8 +61,7 @@ end)
 type t = {
   prover : M.MetaProver.t;    (* real meta-prover *)
   mutable sources : source LitMap.t;     (** for reconstructing proofs *)
-  mutable theories : (string * Term.t list) list;
-  mutable experts : Experts.t list;
+  mutable theories : (string * T.t list * source list) list;
   mutable results : result list;
   mutable new_results : result list;  (* recent results *)
   mutable new_patterns : M.MetaPattern.t list;  (** List of new patterns to match *)
@@ -72,8 +70,7 @@ type t = {
 (* add a new result *)
 let add_new_result p res =
   begin match res with
-  | Theory (s, args) -> p.theories <- (s, args) :: p.theories
-  | Expert e -> p.experts <- e :: p.experts
+  | Theory (s, args, proof) -> p.theories <- (s, args, proof) :: p.theories
   | Deduced _ -> ()
   end;
   p.results <- res :: p.results;
@@ -100,31 +97,39 @@ let proof_of_source = function
   | FromClause c -> c.C.hcproof
   | FromForm pf -> pf.PF.proof
 
+let explain p lit =
+  let premises = find_premises p lit in
+  List.map proof_of_source premises
+
 (* new results have been handled, clean up *)
 let flush_new_results p =
   p.new_results <- []
+
+let prover p = p.prover
 
 let create ?(kb=M.MetaKB.empty) () =
   let p = {
     prover = M.MetaProver.create ~kb ();
     sources = LitMap.empty;
     theories = [];
-    experts = [];
     results = [];
     new_results = [];
     new_patterns = [];
   } in
   (* hook events to p.results *)
   M.Signal.on (M.MetaProver.on_theory p.prover)
-    (function | M.MetaKB.NewTheory (name, args) ->
-      add_new_result p (Theory (name, args));
+    (function | M.MetaKB.NewTheory (name, args, lit) ->
+      let premises = find_premises p lit in
+      Util.debug 1 "meta-prover: theory %s(%a)" name (Util.pp_list T.pp) args;
+      add_new_result p (Theory (name, args, premises));
       true);
   M.Signal.on (M.MetaProver.on_lemma p.prover)
     (function | M.MetaKB.NewLemma (f, lit) ->
       let premises = find_premises p lit in
       let proofs = List.map proof_of_source premises in
-      let proof = Proof.mk_f_step f ~rule:"lemma" proofs in
+      let proof = Proof.mk_f_inference ~info:["meta_prover"] ~rule:"lemma" f proofs in
       let pf = PF.create f proof in
+      Util.debug 1 "meta-prover: lemma %a" PF.pp pf;
       add_new_result p (Deduced (pf, premises));
       true);
   p
@@ -184,9 +189,10 @@ let scan_set p set =
   Util.exit_prof prof_scan_set;
   results
 
-let theories p = Sequence.of_list p.theories
-
-let experts p = Sequence.of_list p.experts
+let theories p =
+  Sequence.map
+    (fun (name, args, _) -> name, args)
+    (Sequence.of_list p.theories)
 
 let results p = Sequence.of_list p.results
 
@@ -210,8 +216,8 @@ let save_kb_file p filename =
 
 let pp_result buf r = match r with
   | Deduced (f, _) -> Printf.bprintf buf "deduced %a" PF.pp f
-  | Theory (n, args) -> Printf.bprintf buf "theory %s(%a)" n (Util.pp_list T.pp) args
-  | Expert e -> Printf.bprintf buf "expert %a" Experts.pp e
+  | Theory (n, args, _) ->
+    Printf.bprintf buf "theory %s(%a)" n (Util.pp_list T.pp) args
 
 let pp_theory buf (name, args) =
   match args with

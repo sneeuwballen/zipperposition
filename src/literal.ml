@@ -29,16 +29,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module F = Formula
-module S = Substs
+module T = FOTerm
+module F = FOFormula
+module S = Substs.FO
 module TO = Theories.TotalOrder
 module Pos = Position
 module PB = Position.Build
 
+type scope = Substs.scope
+
 type t =
-  | Equation of Term.t * Term.t * bool * Comparison.t
-  | Prop of Term.t * bool
+  | Equation of T.t * T.t * bool * Comparison.t
+  | Prop of T.t * bool
   | True
   | False
   (** a literal, that is, a signed equation or a proposition *)
@@ -86,27 +88,27 @@ let compare l1 l2 =
   | False, False -> 0
   | _, _ -> __to_int l1 - __to_int l2
 
-let variant ?(subst=Substs.empty) lit1 sc1 lit2 sc2 =
+let variant ?(subst=S.empty) lit1 sc1 lit2 sc2 =
   match lit1, lit2 with
   | Prop (p1, sign1), Prop (p2, sign2) when sign1 = sign2 ->
-    Unif.variant ~subst p1 sc1 p2 sc2
+    FOUnif.variant ~subst p1 sc1 p2 sc2
   | True, True
   | False, False -> subst
   | Equation (l1, r1, sign1, _), Equation (l2, r2, sign2, _) when sign1 = sign2 ->
     begin try
-      let subst = Unif.variant ~subst l1 sc1 l2 sc2 in
-      Unif.variant ~subst r1 sc1 r2 sc2
-    with Unif.Fail ->
-      let subst = Unif.variant ~subst l1 sc1 r2 sc2 in
-      Unif.variant ~subst r1 sc1 l2 sc2
+      let subst = FOUnif.variant ~subst l1 sc1 l2 sc2 in
+      FOUnif.variant ~subst r1 sc1 r2 sc2
+    with FOUnif.Fail ->
+      let subst = FOUnif.variant ~subst l1 sc1 r2 sc2 in
+      FOUnif.variant ~subst r1 sc1 l2 sc2
     end
-  | _ -> raise Unif.Fail
+  | _ -> raise FOUnif.Fail
 
 let are_variant lit1 lit2 =
   try
     let _ = variant lit1 0 lit2 1 in
     true
-  with Unif.Fail ->
+  with FOUnif.Fail ->
     false
 
 let to_multiset lit = match lit with
@@ -178,11 +180,14 @@ let orientation_of = function
 
 let ineq_lit ~spec lit =
   match lit with
-  | Prop ({T.term=T.Node(s, [l;r])}, true) ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) ->
     let instance = TO.find ~spec s in
     let strict = Symbol.eq s instance.TO.less in
     TO.({ left=l; right=r; strict; instance; })
   | _ -> raise Not_found
+
+let is_eq lit = equational lit && is_pos lit
+let is_neq lit = equational lit && is_neg lit
 
 let is_ineq ~spec lit =
   try
@@ -206,25 +211,22 @@ let is_nonstrict_ineq ~spec lit =
     false
 
 let ineq_lit_of ~instance lit = match lit with
-  | Prop ({T.term=T.Node(s, [l;r])}, true) when Symbol.eq s instance.TO.less ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) when Symbol.eq s instance.TO.less ->
     TO.({ left=l; right=r; strict=true; instance; })
-  | Prop ({T.term=T.Node(s, [l;r])}, true) when Symbol.eq s instance.TO.lesseq ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) when Symbol.eq s instance.TO.lesseq ->
     TO.({ left=l; right=r; strict=false; instance; })
   | _ -> raise Not_found
 
 let is_ineq_of ~instance lit =
   match lit with
-  | Prop ({T.term=T.Node(s, [l;r])}, true) ->
+  | Prop ({T.term=T.Node(s, _, [l;r])}, true) ->
     Symbol.eq s instance.TO.less || Symbol.eq s instance.TO.lesseq
   | _ -> false
 
-(* TODO: remove, typechecking should do its work *)
-let check_type a b =
-  let ok = not (T.has_type a) || not (T.has_type b) || T.compatible_type a b in
-  assert ok
-
 (* primary constructor *)
 let mk_lit ~ord a b sign =
+  if not (Type.eq a.T.ty b.T.ty)
+    then TypeUnif.fail Substs.Ty.empty a.T.ty 0 b.T.ty 0;
   match a, b with
   | _ when a == b -> if sign then True else False
   | _ when a == T.true_term && b == T.false_term -> if sign then False else True
@@ -233,9 +235,7 @@ let mk_lit ~ord a b sign =
   | _ when b == T.true_term -> Prop (a, sign)
   | _ when a == T.false_term -> Prop (b, not sign)
   | _ when b == T.false_term -> Prop (a, not sign)
-  | _ ->
-    check_type a b;
-    Equation (a, b, sign, Ordering.compare ord a b)
+  | _ -> Equation (a, b, sign, Ordering.compare ord a b)
 
 let mk_eq ~ord a b = mk_lit ~ord a b true
 
@@ -244,31 +244,56 @@ let mk_neq ~ord a b = mk_lit ~ord a b false
 let mk_prop p sign = match p with
   | _ when p == T.true_term -> if sign then True else False
   | _ when p == T.false_term -> if sign then False else True
-  | _ -> Prop (p, sign)
+  | _ ->
+    if not (Type.eq p.T.ty Type.o)
+      then TypeUnif.fail Substs.Ty.empty p.T.ty 0 Type.o 0;
+    Prop (p, sign)
 
 let mk_true p = mk_prop p true
 
 let mk_false p = mk_prop p false
 
+let mk_tauto = True
+
+let mk_absurd = False
+
 let mk_less instance l r =
   let open Theories.TotalOrder in
-  mk_true (T.mk_node instance.less [l; r])
+  mk_true (T.mk_node ~tyargs:[T.ty l] instance.less [l; r])
 
 let mk_lesseq instance l r =
   let open Theories.TotalOrder in
-  mk_true (T.mk_node instance.lesseq [l; r])
+  mk_true (T.mk_node ~tyargs:[T.ty l] instance.lesseq [l; r])
 
-let apply_subst ?(recursive=true) ~renaming ~ord subst lit scope =
+module Seq = struct
+  let terms lit k = match lit with
+    | Equation(l, r, _, _) -> k l; k r
+    | Prop(p, _) -> k p
+    | True
+    | False -> ()
+
+  let vars lit = Sequence.flatMap T.Seq.vars (terms lit)
+
+  let symbols lit =
+    Sequence.flatMap T.Seq.symbols (terms lit)
+end
+
+let apply_subst ~renaming ~ord subst lit scope =
   match lit with
   | Equation (l,r,sign,_) ->
-    let new_l = S.apply ~recursive ~renaming subst l scope
-    and new_r = S.apply ~recursive ~renaming subst r scope in
+    let new_l = S.apply ~renaming subst l scope
+    and new_r = S.apply ~renaming subst r scope in
     mk_lit ~ord new_l new_r sign
   | Prop (p, sign) ->
-    let p' = S.apply ~recursive ~renaming subst p scope in
+    let p' = S.apply ~renaming subst p scope in
     mk_prop p' sign
   | True
   | False -> lit
+
+let symbols lit =
+  Sequence.fold
+    (fun set s -> Symbol.Set.add s set)
+    Symbol.Set.empty (Seq.symbols lit)
 
 let reord ~ord lit =
   match lit with
@@ -330,9 +355,9 @@ let add_vars set = function
   | False -> ()
 
 let vars lit =
-  let set = T.THashSet.create () in
+  let set = T.Tbl.create 7 in
   add_vars set lit;
-  T.THashSet.to_list set
+  T.Tbl.to_list set
 
 let var_occurs v lit = match lit with
   | Prop (p,_) -> T.var_occurs v p
@@ -345,6 +370,14 @@ let is_ground lit = match lit with
   | Prop (p, _) -> T.is_ground p
   | True
   | False -> true
+
+let terms lit =
+  Sequence.from_iter (fun k ->
+    match lit with
+    | Equation (l,r,_,_) -> k l; k r
+    | Prop (p, _) -> k p
+    | True
+    | False -> ())
 
 let get_eqn lit ~side =
   match lit with
@@ -363,6 +396,9 @@ let at_pos lit pos = match lit, pos with
   | False, [i] when i = Position.left_pos -> T.false_term
   | _ -> raise Not_found
 
+let type_at_pos ctx lit s_lit pos =
+  failwith "not implemented" (* TODO *)
+
 let replace_pos ~ord lit ~at ~by = match lit, at with
   | Equation (l, r, sign, _), i::pos' when i = Position.left_pos ->
     mk_lit ~ord (T.replace_pos l pos' by) r sign
@@ -374,28 +410,14 @@ let replace_pos ~ord lit ~at ~by = match lit, at with
   | False, [i] when i = Position.left_pos -> lit
   | _ -> invalid_arg (Util.sprintf "wrong pos %a" Position.pp at)
 
-let infer_type ctx lit =
-  match lit with
-  | Equation (l,r,_,_) ->
-    TypeInference.constrain_term_term ctx l r
-  | Prop (p,_) ->
-    TypeInference.constrain_term_type ctx p Type.o
-  | True
-  | False -> ()
-
-let signature ?(signature=Signature.empty) lit =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  infer_type ctx lit;
-  TypeInference.Ctx.to_signature ctx
-
-let apply_subst_list ?(recursive=true) ~renaming ~ord subst lits scope =
+let apply_subst_list ~renaming ~ord subst lits scope =
   List.map
-    (fun lit -> apply_subst ~recursive ~renaming ~ord subst lit scope)
+    (fun lit -> apply_subst ~renaming ~ord subst lit scope)
     lits
 
 (** {2 IO} *)
 
-let pp buf lit =
+let pp_debug buf lit =
   match lit with
   | Prop (p, true) -> T.pp buf p
   | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp p
@@ -416,6 +438,26 @@ let pp_tstp buf lit =
     Printf.bprintf buf "%a = %a" T.pp_tstp l T.pp_tstp r
   | Equation (l, r, false, _) ->
     Printf.bprintf buf "%a != %a" T.pp_tstp l T.pp_tstp r
+
+let pp_arith buf lit =
+  match lit with
+  | Prop ({T.term=T.Node(f, _, [a;b])},true) when Symbol.eq f Symbol.Arith.less ->
+    Printf.bprintf buf "%a < %a" T.pp_arith a T.pp_arith b
+  | Prop ({T.term=T.Node(f, _, [a;b])},true) when Symbol.eq f Symbol.Arith.lesseq ->
+    Printf.bprintf buf "%a ≤ %a" T.pp_arith a T.pp_arith b
+  | Prop (p, true) -> T.pp_arith buf p
+  | Prop (p, false) -> Printf.bprintf buf "¬%a" T.pp_arith p
+  | True -> Buffer.add_string buf "true"
+  | False -> Buffer.add_string buf "false"
+  | Equation (l, r, true, _) ->
+    Printf.bprintf buf "%a = %a" T.pp_arith l T.pp_arith r
+  | Equation (l, r, false, _) ->
+    Printf.bprintf buf "%a ≠ %a" T.pp_arith l T.pp_arith r
+
+let __pp = ref pp_debug
+let set_default_pp pp = __pp := pp
+
+let pp buf lit = !__pp buf lit
 
 let to_string t = Util.on_buffer pp t
 
@@ -465,7 +507,7 @@ module Arr = struct
 
   let hash lits =
     Array.fold_left
-      (fun h lit -> Hash.hash_int2 h (hash lit))
+      (fun h lit -> Hash.combine h (hash lit))
       13 lits
 
   let hash_novar lits =
@@ -473,9 +515,9 @@ module Arr = struct
       (fun h lit -> Hash.hash_int2 h (hash_novar lit))
       13 lits
 
-  let variant ?(subst=Substs.empty) a1 sc1 a2 sc2 =
+  let variant ?(subst=S.empty) a1 sc1 a2 sc2 =
     if Array.length a1 <> Array.length a2
-      then raise Unif.Fail;
+      then raise FOUnif.Fail;
     let subst = ref subst in
     for i = 0 to Array.length a1 - 1 do
       subst := variant ~subst:!subst a1.(i) sc1 a2.(i) sc2;
@@ -486,7 +528,7 @@ module Arr = struct
     try
       let _ = variant a1 0 a2 1 in
       true
-    with Unif.Fail ->
+    with FOUnif.Fail ->
       false
 
   let weight lits =
@@ -496,14 +538,20 @@ module Arr = struct
     Array.fold_left (fun d lit -> max d (depth lit)) 0 lits
 
   let vars lits =
-    let set = T.THashSet.create () in
+    let set = T.Tbl.create 11 in
     for i = 0 to Array.length lits - 1 do
       add_vars set lits.(i);
     done;
-    T.THashSet.to_list set
+    T.Tbl.to_list set
 
   let is_ground lits =
     Util.array_forall is_ground lits
+
+  let terms lits =
+    Sequence.flatMap terms (Sequence.of_array lits)
+
+  let compact lits =
+    lazy (Array.map form_of_lit lits)
 
   let to_form lits =
     let lits = Array.map form_of_lit lits in
@@ -511,10 +559,13 @@ module Arr = struct
     F.mk_or lits
 
   (** Apply the substitution to the array of literals, with scope *)
-  let apply_subst ?(recursive=true) ~renaming ~ord subst lits scope =
+  let apply_subst ~renaming ~ord subst lits scope =
     Array.map
-      (fun lit -> apply_subst ~recursive ~renaming ~ord subst lit scope)
+      (fun lit -> apply_subst ~renaming ~ord subst lit scope)
       lits
+
+  let fmap ~ord lits f =
+    Array.map (fun lit -> fmap ~ord f lit) lits
 
   (** bitvector of literals that are positive *)
   let pos lits =
@@ -538,6 +589,16 @@ module Arr = struct
     let bv = Multiset.max (fun lit1 lit2 -> compare_partial ~ord lit1 lit2) m in
     bv
 
+  let is_trivial lits =
+    Util.array_exists
+      (function
+      | True -> true
+      | False -> false
+      | Equation (l, r, true, _) -> T.eq l r
+      | Equation (l, r, false, _) -> false
+      | Prop (_, _) -> false)
+      lits
+
   (** Convert the lits into a sequence of equations *)
   let to_seq lits =
     Sequence.from_iter
@@ -557,19 +618,16 @@ module Arr = struct
   let to_forms lits =
     Array.to_list (Array.map form_of_lit lits)
 
-  let infer_type ctx lits =
-    Array.iter (infer_type ctx) lits
-
-  let signature ?(signature=Signature.empty) lits =
-    let ctx = TypeInference.Ctx.of_signature signature in
-    infer_type ctx lits;
-    TypeInference.Ctx.to_signature ctx
-
   (** {3 High Order combinators} *)
 
   let at_pos lits pos = match pos with
     | idx::pos' when idx >= 0 && idx < Array.length lits ->
       at_pos lits.(idx) pos'
+    | _ -> raise Not_found
+
+  let type_at_pos ctx lits s_lit pos = match pos with
+    | idx::pos' when idx >= 0 && idx < Array.length lits ->
+      type_at_pos ctx lits.(idx) s_lit pos'
     | _ -> raise Not_found
 
   let replace_pos ~ord lits ~at ~by = match at with
@@ -593,6 +651,19 @@ module Arr = struct
         invalid_arg (Util.sprintf "lit %a not an inequation" pp lits.(idx))
       end
     | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
+
+  let order_instances ~spec lits =
+    let rec fold acc i =
+      if i = Array.length lits then acc
+      else try
+        let lit = ineq_lit ~spec lits.(i) in
+        let acc = lit.TO.instance :: acc in
+        fold acc (i+1)
+      with Not_found ->
+        fold acc (i+1)
+    in
+    let l = fold [] 0 in
+    Util.list_uniq TO.eq l
 
   let terms_under_ineq ~instance lits =
     Sequence.from_iter
@@ -689,7 +760,8 @@ module Arr = struct
           f acc l [i; Pos.left_pos]
         | Equation (l,r,sign,(Comparison.Eq | Comparison.Incomparable)), `Max ->
           (* visit both sides, they are both (potentially) maximal *)
-          f acc l [i; Pos.left_pos]
+          let acc = f acc l [i; Pos.left_pos] in
+          f acc r [i; Pos.right_pos]
         | Equation (l,r,sign,_), `Both ->
           (* visit both sides of the equation *)
           if subterms
@@ -709,6 +781,11 @@ module Arr = struct
         | False, _ -> acc
         in fold acc (i+1)
     in fold acc 0
+
+  let symbols ?(init=Symbol.Set.empty) lits =
+    Array.fold_left
+      (fun set lit -> Symbol.Set.union set (symbols lit))
+      init lits
 
   (** {3 IO} *)
 

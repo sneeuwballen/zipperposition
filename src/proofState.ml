@@ -31,9 +31,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 module C = Clause
-module S = Substs
+module S = Substs.FO
 module Lit = Literal
 module Lits = Literal.Arr
 module Pos = Position
@@ -41,13 +41,25 @@ module PB = Position.Build
 module CQ = ClauseQueue
 module TO = Theories.TotalOrder
 
-module TermIndex = Fingerprint.Make(C.WithPos)
+let prof_add_active = Util.mk_profiler "proofState.add_active"
+let prof_remove_active = Util.mk_profiler "proofState.remove_active"
+let prof_add_passive = Util.mk_profiler "proofState.add_passive"
+let prof_next_passive = Util.mk_profiler "proofState.next_passive"
+let prof_clean_passive = Util.mk_profiler "proofState.clean_passive"
+let prof_add_simpl = Util.mk_profiler "proofState.add_simpl"
+let prof_remove_simpl = Util.mk_profiler "proofState.remove_simpl"
 
-module UnitIndex = Dtree.Make(struct
-  type t = Term.t * Term.t * bool * C.t
-  type rhs = Term.t
-  let equal (t11,t12,s1,c1) (t21,t22,s2,c2) =
-    T.eq t11 t21 && T.eq t12 t22 && s1 = s2 && C.eq c1 c2
+let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
+
+(* module TermIndex = Fingerprint.Make(C.WithPos) *)
+module TermIndex = NPDtree.MakeTerm(C.WithPos)
+
+module UnitIndex = NPDtree.Make(struct
+  type t = T.t * T.t * bool * C.t
+  type rhs = T.t
+  let compare (t11,t12,s1,c1) (t21,t22,s2,c2) =
+    Util.lexicograph_combine [T.compare t11 t21; T.compare t12 t22;
+                              compare s1 s2; C.compare c1 c2]
   let extract (t1,t2,sign,_) = t1, t2, sign
   let priority (_,_,_,c) =
     if C.is_oriented_rule c then 2 else 1
@@ -58,8 +70,6 @@ module SubsumptionIndex = FeatureVector.Make(struct
   let cmp = C.compare
   let to_lits = C.to_seq
 end)
-
-let stat_passive_cleanup = Util.mk_stat "cleanup of passive set"
 
 (* XXX: no customization of indexing for now
 let _indexes =
@@ -80,8 +90,6 @@ module ActiveSet = struct
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_ord_side : TermIndex.t;       (** terms immediately under inequality *)
-      idx_ord_subterm : TermIndex.t;    (** subterms of inequality literals *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 
@@ -94,18 +102,14 @@ module ActiveSet = struct
     let idx = SubsumptionIndex.of_signature signature in
     (object (self)
       val mutable m_clauses = C.CSet.empty
-      val mutable m_sup_into = TermIndex.empty
-      val mutable m_sup_from = TermIndex.empty
-      val mutable m_ord_side = TermIndex.empty
-      val mutable m_ord_subterm = TermIndex.empty
-      val mutable m_back_demod = TermIndex.empty
+      val mutable m_sup_into = TermIndex.empty ()
+      val mutable m_sup_from = TermIndex.empty ()
+      val mutable m_back_demod = TermIndex.empty ()
       val mutable m_fv = idx
       method ctx = ctx
       method clauses = m_clauses
       method idx_sup_into = m_sup_into
       method idx_sup_from = m_sup_from
-      method idx_ord_side = m_ord_subterm
-      method idx_ord_subterm = m_ord_subterm
       method idx_back_demod = m_back_demod
       method idx_fv = m_fv
 
@@ -130,43 +134,27 @@ module ActiveSet = struct
           (fun tree t pos ->
             let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
             f tree t with_pos);
-        (* terms occurring immediately under an inequation *)
-        let spec = Ctx.total_order ~ctx:c.C.hcctx in
-        m_ord_side <- Lits.fold_ineq ~spec
-          ~eligible:(C.Eligible.chaining c) c.C.hclits m_ord_side
-          (fun tree lit pos ->
-            let l = lit.TO.left in
-            let with_pos = C.WithPos.( {term=l; pos=(pos@[0]); clause=c} ) in
-            let tree = f tree l with_pos in
-            let r = lit.TO.right in
-            let with_pos = C.WithPos.( {term=r; pos=(pos@[1]); clause=c} ) in
-            let tree = f tree r with_pos in
-            tree);
-        (* subterms occurring under an inequation *)
-        m_ord_subterm <- Lits.fold_terms ~which:`Both ~subterms:true
-          ~eligible:(C.Eligible.chaining c) c.C.hclits m_ord_subterm
-          (fun tree t pos ->
-            let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-            f tree t with_pos);
         ()
 
       (** add clauses (only process the ones not present in the set) *)
       method add cs =
+        Util.enter_prof prof_add_active;
         let cs = Sequence.filter (fun c -> not (C.CSet.mem m_clauses c)) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.of_seq m_clauses cs;
-        let op tree = TermIndex.add tree in
-        Sequence.iter (self#update op) cs;
-        m_fv <- SubsumptionIndex.add_seq m_fv cs
+        Sequence.iter (self#update TermIndex.add) cs;
+        m_fv <- SubsumptionIndex.add_seq m_fv cs;
+        Util.exit_prof prof_add_active
 
       (** remove clauses (only process the ones present in the set) *)
       method remove cs =
+        Util.enter_prof prof_remove_active;
         let cs = Sequence.filter (C.CSet.mem m_clauses) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.remove_seq m_clauses cs;
-        let op tree = TermIndex.remove tree in
-        Sequence.iter (self#update op) cs;
-        m_fv <- SubsumptionIndex.remove_seq m_fv cs
+        Sequence.iter (self#update TermIndex.remove) cs;
+        m_fv <- SubsumptionIndex.remove_seq m_fv cs;
+        Util.exit_prof prof_remove_active
     end :> t)
 end
 
@@ -198,17 +186,21 @@ module SimplSet = struct
   (** Create a simplification set *)
   let create ~ctx =
     object
-      val mutable m_simpl = UnitIndex.empty
+      val mutable m_simpl = UnitIndex.empty ()
       method ctx = ctx
       method idx_simpl = m_simpl
 
       method add cs =
+        Util.enter_prof prof_add_simpl;
         let cs = Sequence.filter C.is_unit_clause cs in
-        m_simpl <- Sequence.fold (apply UnitIndex.add) m_simpl cs
+        m_simpl <- Sequence.fold (apply UnitIndex.add) m_simpl cs;
+        Util.exit_prof prof_add_simpl
 
       method remove cs =
+        Util.enter_prof prof_remove_simpl;
         let cs = Sequence.filter C.is_unit_clause cs in
-        m_simpl <- Sequence.fold (apply UnitIndex.remove) m_simpl cs
+        m_simpl <- Sequence.fold (apply UnitIndex.remove) m_simpl cs;
+        Util.exit_prof prof_remove_simpl
     end
 end
 
@@ -239,6 +231,7 @@ module PassiveSet = struct
 
       (** add clauses (not already present in set) to the set *)
       method add cs =
+        Util.enter_prof prof_add_passive;
         let cs = Sequence.filter (fun c -> not (C.CSet.mem m_clauses c)) cs in
         let cs = Sequence.persistent cs in
         m_clauses <- C.CSet.of_seq m_clauses cs;
@@ -246,14 +239,16 @@ module PassiveSet = struct
           (* add to i-th queue *)
           let (q, w) = m_queues.(i) in
           m_queues.(i) <- (CQ.adds q cs, w)
-        done
+        done;
+        Util.exit_prof prof_add_passive
 
       (** remove clauses (not from the queues) *)
-      method remove id = 
+      method remove id =
         m_clauses <- C.CSet.remove_id m_clauses id
 
       (** next clause *)
       method next () =
+        Util.enter_prof prof_next_passive;
         let first_idx, w = m_state in
         (* search in the idx-th queue *)
         let rec search idx weight =
@@ -277,15 +272,19 @@ module PassiveSet = struct
           else if idx = length then next_idx 0 (* cycle *)
           else search idx 0 (* search in this queue *)
         in
-        search first_idx w
+        let res = search first_idx w in
+        Util.exit_prof prof_next_passive;
+        res
 
       (* cleanup the clause queues *)
       method clean () =
+        Util.enter_prof prof_clean_passive;
         Util.incr_stat stat_passive_cleanup;
         for i = 0 to length - 1 do
           let q, w = m_queues.(i) in
           m_queues.(i) <- CQ.clean q m_clauses, w
-        done
+        done;
+        Util.exit_prof prof_clean_passive
     end
 end
 
@@ -298,14 +297,10 @@ type t =
     active_set : ActiveSet.t;            (** active clauses *)
     passive_set : PassiveSet.t;          (** passive clauses *)
     meta_prover : MetaProverState.t option;
-    experts : Experts.Set.t;            (** Set of current experts *)
-
-    add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
 let create ~ctx ?meta params signature =
-  let queues = ClauseQueue.default_queues
-  and _experts = ref (Experts.Set.empty ~ctx) in
+  let queues = ClauseQueue.default_queues in
   object
     val m_active = (ActiveSet.create ~ctx signature :> ActiveSet.t)
     val m_passive = (PassiveSet.create ~ctx queues :> PassiveSet.t)
@@ -316,15 +311,6 @@ let create ~ctx ?meta params signature =
     method passive_set = m_passive
     method simpl_set = m_simpl
     method meta_prover = meta
-    method experts = !_experts
-    method add_expert e =
-      let es = Experts.update_ctx e ~ctx in
-      _experts := Experts.Set.add_list !_experts es;
-      (* add clauses of each expert to the set of passive clauses *)
-      let clauses = Sequence.flatMap
-        (fun e -> Sequence.of_list (Experts.clauses e))
-        (Sequence.of_list es) in
-      m_passive#add clauses
   end
 
 type stats = int * int * int (* num passive, num active, num simplification *)

@@ -29,17 +29,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module T = FOTerm
+
 type t = {
   name : string;
   actions : action list;
 } (** An extension *)
 and action =
   | Ext_general of (Env.t -> unit)
-  | Ext_expert of (ctx:Ctx.t -> Experts.t)
   | Ext_binary_inf_rule of string * Env.binary_inf_rule
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
   | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
-  | Ext_term_rewrite of string * (Term.t -> Term.t)
+  | Ext_term_rewrite of string * (T.t -> T.t)
   | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
   | Ext_simplification_rule of (Clause.t -> Clause.t)
   (** Action that can be performed by an extension *)
@@ -77,7 +78,6 @@ let dyn_load filename =
 let apply ~env ext =
   let apply_action action = match action with
   | Ext_general f -> f env
-  | Ext_expert e -> Env.add_expert ~env (e ~ctx:(Env.ctx env))
   | Ext_binary_inf_rule (name, r) -> Env.add_binary_inf ~env name r
   | Ext_unary_inf_rule (name, r) -> Env.add_unary_inf ~env name r
   | Ext_signal_incompleteness -> Ctx.lost_completeness (Env.ctx env)

@@ -29,13 +29,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+module S = Substs.FO
+
+type scope = Substs.scope
+
 type t = {
   mutable ord : Ordering.t;           (** current ordering on terms *)
   mutable select : Selection.t;       (** selection function for literals *)
   mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
-  renaming : Substs.Renaming.t;       (** Renaming *)
+  renaming : S.Renaming.t;            (** Global Renaming *)
   ac : Theories.AC.t;                 (** AC symbols *)
   total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
@@ -47,7 +51,7 @@ let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
     skolem = Skolem.create ~prefix:"zsk" ();
     signature;
     complete=true;
-    renaming = Substs.Renaming.create 13;
+    renaming = S.Renaming.create 13;
     ac = Theories.AC.create ();
     total_order = Theories.TotalOrder.create ();
   } in
@@ -63,12 +67,16 @@ let skolem_ctx ~ctx = ctx.skolem
 
 let signature ~ctx = ctx.signature
 
-let lost_completeness ~ctx = ctx.complete <- false
+let lost_completeness ~ctx =
+  if ctx.complete then Util.debug 1 "completeness is lost";
+  ctx.complete <- false
 
 let is_completeness_preserved ~ctx = ctx.complete
 
 let add_signature ~ctx signature =
-  ctx.signature <- Signature.merge ctx.signature signature
+  ctx.signature <- Signature.merge ctx.signature signature;
+  ctx.ord <- Ordering.add_seq ctx.ord (Sequence.map snd (Signature.to_seq ctx.signature));
+  ()
 
 let ac ~ctx = ctx.ac
 
@@ -76,40 +84,44 @@ let total_order ~ctx = ctx.total_order
 
 let renaming_clear ~ctx =
   let r = ctx.renaming in
-  Substs.Renaming.clear r;
+  S.Renaming.clear r;
   r
 
-let add_ac ~ctx s = Theories.AC.add ~spec:ctx.ac s
+let add_ac ~ctx ?proof s = Theories.AC.add ~spec:ctx.ac ?proof s
 
-let add_order ~ctx ~less ~lesseq =
-  let _ = Theories.TotalOrder.add ~spec:ctx.total_order ~less ~lesseq in
-  ()
+let add_order ~ctx ?proof ~less ~lesseq =
+  let spec = ctx.total_order in
+  try
+    Theories.TotalOrder.find ~spec less
+  with Not_found ->
+    let instance = Theories.TotalOrder.add ~spec ?proof ~less ~lesseq in
+    (* declare missing symbols, if any; also take care that
+      less and lesseq have the same type, which is, a binary predicate 
+      FIXME check types?
+    if not (Signature.mem ctx.signature less) || not (Signature.mem ctx.signature lesseq)
+      then failwith "Ctx.add_order: order symbols must be declared";
+    let ty_less = Signature.find ctx.signature less in
+    let ty_lesseq = Signature.find ctx.signature lesseq in
+    if not (Type.eq ty_less ty_lesseq)
+      then TypeUnif.fail Substs.Ty.empty ty_less 0 ty_lesseq 0;
+    *)
+    instance
 
-(** {2 Type inference} *)
+let declare_ty ~ctx symb ty =
+  ctx.signature <- Signature.declare_ty ctx.signature symb ty
 
-let tyctx ~ctx = TypeInference.Ctx.of_signature ctx.signature
+let declare_sym ~ctx symb =
+  ctx.signature <- Signature.declare_sym ctx.signature symb
 
-let declare ~ctx symb ty =
-  ctx.signature <- Signature.declare ctx.signature symb ty
-
-let constrain_term_type ~ctx t ty =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.constrain_term_type tyctx t ty;
-  ctx.signature <- TypeInference.Ctx.to_signature tyctx
-
-let constrain_term_term ~ctx t1 t2 =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.constrain_term_term tyctx t1 t2;
-  ctx.signature <- TypeInference.Ctx.to_signature tyctx
-  
-let infer_type ~ctx t =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.infer tyctx t
-
-let check_term_type ~ctx t ty =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.check_term_type tyctx t ty
-
-let check_term_term ~ctx t1 t2 =
-  let tyctx = TypeInference.Ctx.of_signature ctx.signature in
-  TypeInference.check_term_term tyctx t1 t2
+let add_tstp_order ~ctx =
+  let less = Symbol.Arith.less in
+  let lesseq = Symbol.Arith.lesseq in
+  let spec = ctx.total_order in
+  try
+    Theories.TotalOrder.find ~spec less
+  with Not_found ->
+    (* declare types of $less and $lesseq *)
+    declare_sym ~ctx less;
+    declare_sym ~ctx lesseq;
+    let instance = Theories.TotalOrder.add ~spec ?proof:None ~less ~lesseq in
+    instance

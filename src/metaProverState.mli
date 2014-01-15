@@ -32,8 +32,7 @@ open Logtk_meta
 
 type result =
   | Deduced of PFormula.t * source list
-  | Theory of string * Term.t list
-  | Expert of Experts.t
+  | Theory of string * HOTerm.t list * source list
   (** Feedback from the meta-prover *)
 
 and source =
@@ -64,11 +63,17 @@ val scan_set : t -> Clause.CSet.t -> result list
 val proof_of_source : source -> Proof.t
   (** Extract the proof of a source *)
 
-val theories : t -> (string * Term.t list) Sequence.t
-  (** List of theories detected so far *)
+val explain : t -> MetaReasoner.Logic.literal -> Proof.t list
+  (** Find why the given literal is true.
+      @raise Invalid_argument if the literal is not true in Datalog
+      @raise Not_found if the literal's premises are not explained by
+        previous scan_clause/scan_formula *)
 
-val experts : t -> Experts.t Sequence.t
-  (** Current list of experts that can be used *)
+val prover : t -> MetaProver.t
+  (** MetaProver itself *)
+
+val theories : t -> (string * HOTerm.t list) Sequence.t
+  (** List of theories detected so far *)
 
 val results : t -> result Sequence.t
   (** All results *)
@@ -82,14 +87,14 @@ val kb : t -> Logtk_meta.MetaKB.t
 val add_kb : t -> Logtk_meta.MetaKB.t -> unit
   (** Merge KB with the given KB *)
 
-val parse_kb_file : t -> string -> unit
+val parse_kb_file : t -> string -> unit Monad.Err.t
   (** Parse KB from this file *)
 
-val parse_theory_file : t -> string -> unit
+val parse_theory_file : t -> string -> unit Monad.Err.t
   (** Update KB with the content of this file *)
 
 val save_kb_file : t -> string -> unit
   (** Save the KB into this file *)
 
 val pp_result : Buffer.t -> result -> unit
-val pp_theory : Buffer.t -> (string * Term.t list) -> unit
+val pp_theory : Buffer.t -> (string * HOTerm.t list) -> unit

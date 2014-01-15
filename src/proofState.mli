@@ -32,8 +32,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 open Logtk
 
 module TermIndex : Index.TERM_IDX with type elt = Clause.WithPos.t
-module UnitIndex : Index.UNIT_IDX with type E.t = (Term.t * Term.t * bool * Clause.t)
-                                  and type E.rhs = Term.t
+module UnitIndex : Index.UNIT_IDX with type E.t = (FOTerm.t * FOTerm.t * bool * Clause.t)
+                                  and type E.rhs = FOTerm.t
 module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
 
 (** {2 Set of active clauses} *)
@@ -44,8 +44,6 @@ module ActiveSet : sig
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_ord_side : TermIndex.t;       (** terms immediately under inequality *)
-      idx_ord_subterm : TermIndex.t;    (** subterms of inequality literals *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 
@@ -100,9 +98,6 @@ type t =
     active_set : ActiveSet.t;            (** active clauses *)
     passive_set : PassiveSet.t;          (** passive clauses *)
     meta_prover : MetaProverState.t option;
-    experts : Experts.Set.t;            (** Set of current experts *)
-
-    add_expert : Experts.t -> unit;     (** Add an expert *)
   >
 
 val create : ctx:Ctx.t -> ?meta:MetaProverState.t ->

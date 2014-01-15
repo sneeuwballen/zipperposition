@@ -56,7 +56,7 @@ let check_timeout = function
 let given_clause_step ?(generating=true) ~env num =
   let ctx = Env.ctx env in
   let ord = Ctx.ord ctx in
-  Util.debug 3 "env for next given loop: %a" Env.pp env;
+  Util.debug 4 "env for next given loop: %a" Env.pp env;
   (* select next given clause *)
   match Env.next_passive ~env with
   | None -> Sat (* passive set is empty *)
@@ -65,7 +65,6 @@ let given_clause_step ?(generating=true) ~env num =
     | None ->
       Util.incr_stat stat_redundant_given;
       Util.debug 2 "given clause %a is redundant" C.pp c;
-      Env.add_simpl ~env (Sequence.singleton c);
       Unknown
     | Some c when C.is_empty c ->
       Unsat c  (* empty clause found *)
@@ -110,7 +109,7 @@ let given_clause_step ?(generating=true) ~env num =
         (fun c ->
           let c = Env.forward_simplify ~env c in
           (* keep clauses  that are not redundant *)
-          if Env.is_trivial ~env c
+          if Env.is_trivial ~env c || Env.is_active ~env c || Env.is_passive ~env c
             then None
             else Some c)
         inferred_clauses

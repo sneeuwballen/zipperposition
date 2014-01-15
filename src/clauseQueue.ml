@@ -65,89 +65,89 @@ let mk_queue ?(accept=(fun _ -> true)) ~weight name =
 let is_empty q =
   Leftistheap.is_empty q.heap
 
-let add q hc =
-  if q.functions.accept hc
+let add q c =
+  if q.functions.accept c
     then
-      let w = q.functions.weight hc in
-      let heap = Leftistheap.insert q.heap (w, hc) in
+      let w = q.functions.weight c in
+      let heap = Leftistheap.insert q.heap (w, c) in
       { q with heap; }
     else q
 
 let adds q hcs =
   let heap =
     Sequence.fold
-      (fun heap hc ->
-        if q.functions.accept hc
+      (fun heap c ->
+        if q.functions.accept c
           then
-            let w = q.functions.weight hc in
-            Leftistheap.insert heap (w,hc)
+            let w = q.functions.weight c in
+            Leftistheap.insert heap (w,c)
           else heap)
       q.heap hcs in
   { q with heap; }
 
 let take_first q =
   (if is_empty q then raise Not_found);
-  let new_h, (_, hc) = Leftistheap.extract_min q.heap in
+  let new_h, (_, c) = Leftistheap.extract_min q.heap in
   let q' = { q with heap=new_h; } in
-  q', hc 
+  q', c 
 
 (** Keep only the clauses that are in the set *)
 let clean q set =
-  let new_heap = Leftistheap.filter q.heap (fun (_, hc) -> C.CSet.mem set hc) in
+  let new_heap = Leftistheap.filter q.heap (fun (_, c) -> C.CSet.mem set c) in
   { q with heap=new_heap; }
 
 let name q = q.functions.name
 
 let fifo =
   let name = "fifo_queue" in
-  mk_queue ~weight:(fun hc -> hc.C.hctag) name
+  mk_queue ~weight:(fun c -> c.C.hctag) name
 
 let clause_weight =
   let name = "clause_weight" in
-  mk_queue ~weight:(fun hc -> hc.C.hcweight) name
+  mk_queue ~weight:(fun c -> c.C.hcweight * C.length c) name
   
 let goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = Lit.is_neg lit in
-  let is_goal_clause hc = Util.array_forall is_goal_lit hc.C.hclits in
+  let is_goal_clause c = Util.array_forall is_goal_lit c.C.hclits in
   let name = "prefer_goals" in
-  mk_queue ~accept:is_goal_clause ~weight:(fun hc -> hc.C.hcweight) name
+  mk_queue ~accept:is_goal_clause ~weight:(fun c -> c.C.hcweight * C.length c) name
 
 let ground =
-  let is_ground hc = hc.C.hcvars = [] in
+  let is_ground c = c.C.hcvars = [] in
   let name = "prefer_ground" in
-  mk_queue ~accept:is_ground ~weight:(fun hc -> hc.C.hcweight) name
+  mk_queue ~accept:is_ground ~weight:(fun c -> c.C.hcweight * C.length c) name
 
 let non_goals =
   (* check whether a literal is a goal *)
   let is_goal_lit lit = Lit.is_neg lit in
-  let is_non_goal_clause hc = Util.array_forall (fun x -> not (is_goal_lit x)) hc.C.hclits in
+  let is_non_goal_clause c = Util.array_forall (fun x -> not (is_goal_lit x)) c.C.hclits in
   let name = "prefer_non_goals" in
-  mk_queue ~accept:is_non_goal_clause ~weight:(fun hc -> hc.C.hcweight) name
+  mk_queue ~accept:is_non_goal_clause ~weight:(fun c -> c.C.hcweight * C.length c) name
 
 let pos_unit_clauses =
-  let is_unit_pos hc = match hc.C.hclits with
+  let is_unit_pos c = match c.C.hclits with
   | [| lit |] when Lit.is_pos lit -> true
   | _ -> false
   in
   let name = "prefer_pos_unit_clauses" in
-  mk_queue ~accept:is_unit_pos ~weight:(fun hc -> hc.C.hcweight) name
+  mk_queue ~accept:is_unit_pos ~weight:(fun c -> c.C.hcweight * C.length c) name
 
 let horn =
   let accept c = Lit.is_horn c.C.hclits in
   let name = "prefer_horn" in
-  mk_queue ~accept ~weight:(fun hc -> hc.C.hcweight) name
+  mk_queue ~accept ~weight:(fun c -> c.C.hcweight * C.length c) name
 
 let lemmas =
   let name = "lemmas" in
-  let accept hc = C.get_flag C.flag_lemma hc in
+  let accept c = C.get_flag C.flag_lemma c in
   (* use a fifo on lemmas *)
-  mk_queue ~accept ~weight:(fun _ -> 1) name
+  mk_queue ~accept ~weight:(fun c -> c.C.hcweight) name
 
 let default_queues =
-  [ fifo, 2;
-    clause_weight, 2;
-    lemmas, 1;
+  [ fifo, 2
+  ; clause_weight, 2
+  (* ; lemmas, 1 *)
   ]
   (*
   [ (clause_weight, 4);

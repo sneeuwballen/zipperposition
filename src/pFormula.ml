@@ -29,11 +29,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module F = Formula
+module F = FOFormula
 
 type t = {
-  form : Formula.t;
+  form : FOFormula.t;
   proof : Proof.t;
+  mutable id : int;
+  mutable simpl_to : t option;
 }
 
 type pform = t
@@ -44,101 +46,72 @@ let cmp t1 t2 =
   let c = F.compare t1.form t2.form in
   if c <> 0 then c else Proof.cmp t1.proof t2.proof
 
-let create form proof = { form; proof; }
+let eq_noproof t1 t2 = F.eq t1.form t2.form
+
+let cmp_noproof t1 t2 = F.compare t1.form t2.form
+
+module H = Hashcons.Make(struct
+  type t = pform
+  let equal pf1 pf2 = F.eq pf1.form pf2.form
+  let hash pf = F.hash pf.form
+  let tag i pf = pf.id <- i
+end)
 
 let get_form t = t.form
 
 let get_proof t = t.proof
 
-let of_sourced (f, file,name) =
-  let proof = Proof.mk_f_axiom f ~file ~name in
-  create f proof
-
 let to_sourced t =
-  match t.proof with
-  | Proof.InferForm (f, {Proof.parents=[|Proof.Axiom (file,name)|]}) ->
-    Some ((t.form, file, name))
+  match t.proof.Proof.kind with
+  | Proof.File (_, file, name) -> Some (t.form, file, name)
   | _ -> None
 
-let signature t = F.signature t.form
+let rec _follow_simpl n pf =
+  if n > 10_000 then failwith (Util.sprintf "follow_simpl loops on %a" F.pp pf.form);
+  match pf.simpl_to with
+  | None -> pf
+  | Some pf' -> _follow_simpl (n+1) pf'
 
-let signature_seq ?init seq =
-  F.signature_seq ?signature:init (Sequence.map get_form seq)
+let follow_simpl pf = _follow_simpl 0 pf
+
+let create ?(follow=false) form proof =
+  let pf = H.hashcons { form; proof; id= ~-1; simpl_to=None; } in
+  if follow
+    then follow_simpl pf
+    else pf
+
+let of_sourced ?(role="axiom") (f, file,name) =
+  let proof = Proof.mk_f_file ~role ~file ~name f in
+  create f proof
+
+let simpl_to ~from ~into =
+  let from = follow_simpl from in
+  let into' = follow_simpl into in
+  if not (eq from into')
+    then from.simpl_to <- Some into
+
+let symbols ?init f = F.symbols ?init f.form
 
 let pp buf t = F.pp buf t.form
+let pp_tstp buf t = F.pp_tstp buf t.form
 let to_string t = F.to_string t.form
 let fmt fmt t = F.fmt fmt t.form
 
+let bij = Bij.(map
+  ~inject:(fun pf -> pf.form, pf.proof)
+  ~extract:(fun (form,proof) -> create form proof)
+  (pair F.bij Proof.bij))
+
 (** {2 Set of formulas} *)
 
-module FSet = struct
-  module H = Hashtbl.Make(struct
+module Set = struct
+  include Sequence.Set.Make(struct
     type t = pform
-    let equal = eq
-    let hash = hash
+    let compare = cmp_noproof
   end)
 
-  type t = unit H.t
-
-  let create () = H.create 15
-
-  let eq s1 s2 =
-    H.length s1 = H.length s2 &&
-    try
-      H.iter
-        (fun pf () -> if not (H.mem s2 pf) then raise Exit)
-        s1;
-      true
-    with Exit -> false
-
-  let add set pf = H.replace set pf ()
-
-  let remove set pf = H.remove set pf
-
-  let flatMap set f =
-    let s' = H.create (H.length set) in
-    H.iter
-      (fun pf () ->
-        let l = f pf in
-        List.iter (fun pf -> add s' pf) l)
-      set;
-    s'
-
-  let iter set k = H.iter (fun pf () -> k pf) set
-
-  let of_seq ?(init=create ()) seq =
-    Sequence.iter (add init) seq;
-    init
-
-  let to_seq set =
-    Sequence.from_iter (fun k -> iter set k)
-
-  let of_list l =
-    let s = create () in
-    List.iter (add s) l;
-    s
-
-  let to_list set =
-    let l = ref [] in
-    iter set (fun x -> l := x :: !l);
-    !l
-
-  let size set = H.length set
+  let symbols ?(init=Symbol.Set.empty) set =
+    fold
+      (fun f set -> symbols ~init:set f)
+      set init
 end
-
-(** {2 Transformations} *)
-
-module TransformDag = Transform.MakeDAG(struct
-  type t = pform
-
-  let to_form pf = pf.form
-
-  let of_form ~rule ~parents form =
-    let proof = match parents with
-    | [] -> Proof.mk_f_axiom form ~file:"" ~name:rule
-    | _::_ ->
-      let premises = List.map get_proof parents in
-      Proof.mk_f_step ~esa:true form ~rule premises
-    in
-    { form; proof; }
-end)

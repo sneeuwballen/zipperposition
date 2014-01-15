@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 module Lit = Literal
 module Lits = Literal.Arr
 

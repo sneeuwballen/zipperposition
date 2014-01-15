@@ -22,21 +22,23 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 
 open Logtk
 
-module T = Term
+module T = FOTerm
+
+let ty = Type.int
 
 let rules, symbols = 
-  let s_symb = Symbol.mk_const "s" in
-  let z_symb = Symbol.mk_const "zero" in
-  let plus_symb = Symbol.mk_const "plus" in
-  let mult_symb = Symbol.mk_const "mult" in
+  let s_symb = Symbol.mk_const ~ty:Type.(i <=. i) "s" in
+  let z_symb = Symbol.mk_const ~ty:Type.i "zero" in
+  let plus_symb = Symbol.mk_const ~ty:Type.(i <== [i;i]) "plus" in
+  let mult_symb = Symbol.mk_const ~ty:Type.(i <== [i;i]) "mult" in
   (* term constructors *)
   let zero = T.mk_const z_symb in
   let s x = T.mk_node s_symb [x] in
   let plus x y = T.mk_node plus_symb [x; y] in
   let mult x y = T.mk_node mult_symb [x; y] in
-  let x = T.mk_var ~ty:Type.i 0 in
-  let y = T.mk_var ~ty:Type.i 1 in
-  let z = T.mk_var ~ty:Type.i 2 in
+  let x = T.mk_var ~ty 0 in
+  let y = T.mk_var ~ty 1 in
+  let z = T.mk_var ~ty 2 in
   [ plus (s x) y, s (plus x y);
     plus zero x, x;
     plus (plus x y) z, plus x (plus y z);
@@ -51,23 +53,12 @@ let trs = Rewriting.TRS.of_list rules
 let rewrite_peano t =
   Rewriting.TRS.rewrite trs t
 
-let rec expert ~ctx =
-  let open Experts in
-  { expert_name = "peano_arith";
-    expert_descr = "evaluation for Peano arithmetic";
-    expert_equal = (fun t1 t2 -> T.eq (rewrite_peano t1) (rewrite_peano t2));
-    expert_sig = Symbol.SSet.of_seq (Sequence.of_list symbols);
-    expert_clauses = [];
-    expert_canonize = rewrite_peano;
-    expert_ord = (fun _ -> true);
-    expert_ctx = ctx;
-    expert_update_ctx = (fun ctx -> [expert ~ctx]);
-    expert_solve = None;
-  }
-
 let ext =
   let open Extensions in
-  let actions = [Ext_expert expert; Ext_signal_incompleteness] in
+  let actions =
+    [ Ext_term_rewrite ("peano_rw", rewrite_peano)
+    ; Ext_signal_incompleteness
+    ] in
   { name = "peano";
     actions;
   }

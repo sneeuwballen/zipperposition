@@ -29,9 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
+module T = FOTerm
 module C = Clause
-module F = Formula
+module F = FOFormula
 module PF = PFormula
 module Lit = Literal
 module Lits = Literal.Arr
@@ -65,11 +65,11 @@ type simplify_rule = Clause.t -> Clause.t
 type is_trivial_rule = Clause.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
 
+type term_rewrite_rule = FOTerm.t -> FOTerm.t
+  (** Rewrite rule on terms *)
+
 type lit_rewrite_rule = ctx:Ctx.t -> Lit.t -> Lit.t
   (** Rewrite rule on literals *)
-
-type preprocess_rule = string * (ctx:Ctx.t -> Transform.t)
-  (** A preprocessing rule, which is a named transformation of formula. *)
 
 type t = {
   mutable params : Params.t;
@@ -81,7 +81,7 @@ type t = {
   mutable unary_rules : (string * unary_inf_rule) list;
     (** the unary inference rules *)
 
-  mutable rewrite_rules : (string * (Term.t -> Term.t)) list;
+  mutable rewrite_rules : (string * (T.t -> T.t)) list;
     (** Rules to apply to term *)
 
   mutable lit_rules : (string * lit_rewrite_rule) list;
@@ -109,18 +109,6 @@ type t = {
   mutable is_trivial : is_trivial_rule list;
     (** single test to detect trivial clauses *)
 
-  mutable axioms : PFormula.FSet.t;
-    (** a list of axioms to add to the problem *)
-
-  mutable mk_constr : (Formula.t Sequence.t -> Precedence.constr list) list;
-    (** How to build constraints from a list of clauses *)
-
-  mutable constr : Precedence.constr list;
-    (** some constraints on the precedence *)
-
-  mutable preprocess : preprocess_rule list;
-    (** how to preprocess the initial list of formulas *)
-
   mutable state : ProofState.t;
     (** Proof state *)
 
@@ -129,6 +117,9 @@ type t = {
 
   mutable on_empty : (Clause.t -> unit) list;
     (** Callbacks for empty clause detection *)
+
+  mutable evaluator : Evaluator.FO.t;
+    (** Evaluator *)
 }
 
 (** {2 Basic operations} *)
@@ -149,13 +140,10 @@ let create ?meta ~ctx params signature =
     redundant = [];
     backward_redundant = [];
     is_trivial = [];
-    axioms = PFormula.FSet.create ();
-    mk_constr = [];
-    constr = [];
-    preprocess = [];
     state;
     empty_clauses = C.CSet.empty;
     on_empty = [];
+    evaluator = Evaluator.FO.create ();
   } in
   env
 
@@ -201,12 +189,6 @@ let remove_simpl ~env cs =
 let clean_passive ~env =
   env.state#passive_set#clean ()
 
-let add_constrs ~env constrs =
-  env.constr <- Sequence.fold (fun cs c -> c::cs) env.constr constrs
-
-let add_mk_constr ~env mk_constr =
-  env.mk_constr <- mk_constr :: env.mk_constr
-
 let get_passive ~env =
   C.CSet.to_seq env.state#passive_set#clauses
 
@@ -245,25 +227,17 @@ let add_simplify ~env r =
 let add_is_trivial ~env r =
   env.is_trivial <- r :: env.is_trivial
 
-let add_expert ~env expert =
-  env.state#add_expert expert
-
 let add_rewrite_rule ~env name rule =
   env.rewrite_rules <- (name, rule) :: env.rewrite_rules
 
 let add_lit_rule ~env name rule =
   env.lit_rules <- (name, rule) :: env.lit_rules
 
-let add_preprocess_rule ~env rule =
-  env.preprocess <- env.preprocess @ [rule]
+let interpret_symbol ~env s rule =
+  Evaluator.FO.register env.evaluator s rule
 
-let add_axioms ~env seq =
-  Sequence.iter
-    (fun ax -> PFormula.FSet.add env.axioms ax)
-    seq
-
-let get_experts ~env =
-  env.state#experts
+let interpret_symbols ~env l =
+  List.iter (fun (s,rule) -> interpret_symbol ~env s rule) l
 
 let get_meta ~env =
   env.state#meta_prover
@@ -280,14 +254,6 @@ let get_some_empty_clause ~env =
 let add_on_empty ~env h =
   env.on_empty <- h :: env.on_empty
 
-(** Compute all ordering constraints for the given list of clauses *)
-let compute_constrs ~env cs =
-  let constrs = env.constr in
-  let constrs = List.fold_left
-    (fun acc mk_constr -> acc @ mk_constr cs)
-    constrs env.mk_constr
-  in constrs
-
 let ctx env = env.ctx
 let ord env = Ctx.ord env.ctx
 let precedence env = Ordering.precedence (ord env)
@@ -296,9 +262,8 @@ let signature env = Ctx.signature env.ctx
 let state env = env.state
 
 let pp buf env = 
-  Printf.bprintf buf "env(state: %a, experts: %a)"
+  Printf.bprintf buf "env(state: %a)"
     ProofState.debug env.state
-    Experts.Set.pp (get_experts ~env)
 
 let fmt fmt env =
   Format.pp_print_string fmt (Util.on_buffer pp env)
@@ -323,10 +288,10 @@ type stats = int * int * int
 let stats ~env =
   ProofState.stats env.state
 
-let cnf ~env pf_list =
+let cnf ~env set =
   let ctx = env.ctx in
-  let clauses = Sequence.flatMap
-    (fun pf ->
+  let clauses = Sequence.fold
+    (fun cset pf ->
       let f = pf.PF.form in
       Util.debug 3 "reduce %a to CNF..." F.pp f;
       (* reduce to CNF this clause *)
@@ -335,13 +300,15 @@ let cnf ~env pf_list =
       let proof cc =
         match clauses with
         | [[f']] when F.eq f f' -> Proof.adapt_c pf.PF.proof cc  (* keep proof *)
-        | _ -> Proof.mk_c_step ~esa:true cc ~rule:"cnf" [pf.PF.proof]
+        | _ -> Proof.mk_c_esa ~rule:"cnf" cc [pf.PF.proof]
       in
       let clauses = List.map (fun c -> C.create_forms ~ctx c proof) clauses in
-      Sequence.of_list clauses)
-    (Sequence.of_list pf_list)
+      C.CSet.add_list cset clauses)
+    C.CSet.empty (PF.Set.to_seq set)
   in
-  Sequence.to_rev_list clauses
+  (* declaration of new skolem symbols *)
+  Ctx.add_signature ~ctx (Skolem.to_signature ctx.Ctx.skolem);
+  clauses
 
 let next_passive ~env =
   env.state#passive_set#next ()
@@ -377,26 +344,42 @@ let do_unary_inferences ~env c =
   Util.exit_prof prof_generate_unary;
   Sequence.of_list clauses
 
-(** Check whether the clause is trivial (also with Experts) *)
 let is_trivial ~env c =
-  begin match env.is_trivial with
+  if C.get_flag C.flag_persistent c then false else
+  match env.is_trivial with
   | [] -> false
   | [f] -> f c
   | [f;g] -> f c || g c
   | l -> List.exists (fun f -> f c) l
-  end || Experts.Set.is_redundant (get_experts ~env) c
 
-(** Apply rewrite rules *)
+let is_active ~env c =
+  C.CSet.mem env.state#active_set#clauses c
+
+let is_passive ~env c =
+  C.CSet.mem env.state#passive_set#clauses c
+
+(** Apply rewrite rules AND evaluation functions *)
 let rewrite ~env c =
+  Util.debug 5 "rewrite clause %a..." C.pp c;
   let applied_rules = ref (SmallSet.empty ~cmp:String.compare) in
   let rec reduce_term rules t =
     match rules with
-    | [] -> t
+    | [] ->
+      (* all rules tried, now evaluate *)
+      let t' = Evaluator.FO.eval env.evaluator t in
+      if T.eq t t'
+        then t
+        else begin
+          applied_rules := SmallSet.add !applied_rules "evaluation";
+          Util.debug 5 "Env: rewrite %a into %a" T.pp t T.pp t';
+          reduce_term env.rewrite_rules t'  (* re-apply rules *)
+        end
     | (name, r)::rules' ->
       let t' = r t in
       if t != t'
         then begin
           applied_rules := SmallSet.add !applied_rules name;
+          Util.debug 5 "Env: rewrite %a into %a" T.pp t T.pp t';
           reduce_term env.rewrite_rules t'  (* re-apply all rules *)
         end else reduce_term rules' t  (* try next rule *)
   in
@@ -422,10 +405,10 @@ let rewrite ~env c =
     then c (* no simplification *)
     else begin
       let rule = "rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-      let proof c' = Proof.mk_c_step c' rule [c.C.hcproof] in
+      let proof c' = Proof.mk_c_simp ~rule c' [c.C.hcproof] in
       let parents = [c] in
       let new_clause = C.create_a ~parents ~ctx:env.ctx lits' proof in
-      Util.debug 3 "rewritten %a into %a" C.pp c C.pp new_clause;
+      Util.debug 3 "Env: term rewritten clause %a into %a" C.pp c C.pp new_clause;
       new_clause
     end
 
@@ -437,28 +420,33 @@ let rewrite_lits ~env c =
   | [] -> lit
   | (name,r)::rules' ->
     let lit' = r ~ctx lit in  (* apply the rule *)
-    if Lit.eq lit lit'
+    if Lit.eq_com lit lit'
       then rewrite_lit rules' lit
       else begin
         applied_rules := SmallSet.add !applied_rules name;
+        Util.debug 5 "Env: rewritten lit %a into %a" Lit.pp lit Lit.pp lit';
         rewrite_lit env.lit_rules lit'
       end
   in
   (* apply lit rules *)
+  let c = C.follow_simpl c in
   let lits = Array.map (fun lit -> rewrite_lit env.lit_rules lit) c.C.hclits in
-  if SmallSet.is_empty !applied_rules then c
+  if Lits.eq_com lits c.C.hclits then c
   else begin  (* simplifications occurred! *)
     let rule = "lit_rw_" ^ (String.concat "_" (SmallSet.to_list !applied_rules)) in
-    let proof c' = Proof.mk_c_step c' rule [c.C.hcproof] in
+    let proof c' = Proof.mk_c_simp ~rule c' [c.C.hcproof] in
     let parents = [c] in
     let new_clause = C.create_a ~parents ~ctx:env.ctx lits proof in
-    Util.debug 3 "lit rewritten %a into %a" C.pp c C.pp new_clause;
+    Util.debug 3 "Env: lit rewritten %a into %a" C.pp c C.pp new_clause;
     new_clause
   end
 
 (** All basic simplification of the clause itself *)
 let rec basic_simplify ~env c =
-  (* first, rewrite literals (if needed) *)
+  (* first, rewrite terms *)
+  let c = rewrite ~env c in
+  let c = C.follow_simpl c in
+  (* rewrite literals (if needed) *)
   let c = match env.lit_rules with
   | [] -> c
   | l -> rewrite_lits ~env c
@@ -475,13 +463,15 @@ let rec basic_simplify ~env c =
   if C.eq c c'
     then c'
     else begin
-      C.simpl_to c c';
+      C.simpl_to ~from:c ~into:c';
       basic_simplify ~env c'  (* fixpoint *)
     end
 
 (* rewrite clause with simpl_set *)
 let rec rw_simplify ~env c =
+  if C.get_flag C.flag_persistent c then c else
   let simpl_set = env.state#simpl_set in
+  let c = C.follow_simpl c in
   let c' = match env.rw_simplify with
   | [] -> c
   | [f] -> f simpl_set c
@@ -490,10 +480,13 @@ let rec rw_simplify ~env c =
   in
   if C.eq c c'
     then c'
-    else rw_simplify ~env c'
+    else 
+      let _ = C.simpl_to ~from:c ~into:c' in
+      rw_simplify ~env c'
 
 (* simplify clause w.r.t. active set *)
 let rec active_simplify ~env c =
+  if C.get_flag C.flag_persistent c then c else
   let active = env.state#active_set in
   let c' = match env.active_simplify with
   | [] -> c
@@ -503,7 +496,9 @@ let rec active_simplify ~env c =
   in
   if C.eq c c'
     then c'
-    else active_simplify ~env c'
+    else
+      let _ = C.simpl_to ~from:c ~into:c' in
+      active_simplify ~env c'
 
 (** Simplify the hclause. Returns both the hclause and its simplification. *)
 let simplify ~env old_c =
@@ -515,7 +510,6 @@ let simplify ~env old_c =
     let c = rewrite ~env c in
     let c = rw_simplify ~env c in
     let c = basic_simplify ~env c in
-    let c = Experts.Set.simplify (get_experts env) c in
     let c = active_simplify ~env c in
     if not (Lits.eq_com c.C.hclits old_c.C.hclits)
       then begin
@@ -560,10 +554,10 @@ let backward_simplify ~env given =
   Util.exit_prof prof_back_simplify;
   before, Sequence.of_list after
 
-(** Simplify the clause w.r.t to the active set and experts *)
+(** Simplify the clause w.r.t to the active set *)
 let forward_simplify ~env c =
+  let c = C.follow_simpl c in
   let c = rewrite ~env c in
-  let c = Experts.Set.simplify (get_experts ~env) c in
   let c = rw_simplify ~env c in
   let c = basic_simplify ~env c in
   c
@@ -667,24 +661,15 @@ let meta_step ~env c =
     let results = List.rev_append results' results in
     (* use results *)
     Util.list_flatmap
-      (fun result -> match result with
+      begin fun result -> match result with
         | MetaProverState.Deduced (f,parents) ->
-          cnf ~env [f] (* reduce result in CNF *)
-        | MetaProverState.Theory (th_name, th_args) ->
-          Util.debug 1 "meta-prover: theory %a" MetaProverState.pp_result result;
+          (* reduce result in CNF *)
+          let cset = cnf ~env (PF.Set.singleton f) in
+          C.CSet.to_list cset
+        | MetaProverState.Theory (th_name, th_args, lit) ->
           []
-        | MetaProverState.Expert expert ->
-          Util.debug 1 "meta-prover: expert %a" Experts.pp expert;
-          add_expert env expert;
-          [])
+      end
       results
     end
   in
   Sequence.of_list results
-
-(** Preprocess set of formulas *)
-let preprocess ~env l =
-  let tr_list = List.map (fun (name, f) -> name, f ~ctx:env.ctx) env.preprocess in
-  let dag = PF.TransformDag.create tr_list in
-  let l' = PFormula.TransformDag.transform dag l in
-  l'

@@ -1,9 +1,8 @@
 # OASIS_START
-# DO NOT EDIT (digest: 7eeaa07f9f12687713b8ae0b033c1b42)
+# DO NOT EDIT (digest: 7b854a795187726c76c0e26022959fb4)
 ClauseQueue
 Clause
 Const
-Experts
 Extensions
 Literal
 MetaProverState
@@ -17,18 +16,13 @@ Superposition
 PFormula
 Theories
 AC
-Chaining
+PEnv
 Params
 Env
-containers/PersistentGraph
-containers/Hashset
-containers/PHashtbl
-containers/PersistentHashtbl
-containers/Heap
+containers/LazyGraph
 containers/Leftistheap
 containers/Vector
 containers/Sequence
 containers/SmallSet
-containers/Gen
 containers/UnionFind
 # OASIS_STOP

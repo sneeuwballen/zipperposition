@@ -58,6 +58,9 @@ val is_semantic_tautology : Clause.t -> bool
       to see if negative literals imply some positive Literal.t *)
 *)
 
+val handle_distinct_constants : ctx:Ctx.t -> Literal.t -> Literal.t
+  (** Decide on "quoted" "symbols" (which are all distinct) *)
+
 val basic_simplify : Clause.t -> Clause.t
   (** basic simplifications (remove duplicate literals, trivial literals,
       destructive equality resolution...) *)
@@ -77,7 +80,7 @@ val subsumes : Literal.t array -> Literal.t array -> bool
 
 val subsumes_with : Literal.t array -> Substs.scope ->
                     Literal.t array -> Substs.scope ->
-                    Substs.t option
+                    Substs.FO.t option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
 val eq_subsumes : Literal.t array -> Literal.t array -> bool
@@ -95,7 +98,9 @@ val contextual_literal_cutting : ProofState.ActiveSet.t -> Clause.t -> Clause.t
 val condensation : Clause.t -> Clause.t
   (** condensation *)
 
-(** {2 Contributions to Env} *)
+(** {2 Contributions to Env and Penv} *)
+
+val setup_penv : ctx:Skolem.ctx -> penv:PEnv.t -> unit
 
 val setup_env : env:Env.t -> unit
   (** Add rules to the environment. *)

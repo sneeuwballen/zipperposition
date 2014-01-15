@@ -31,18 +31,27 @@ open Logtk
 
 type spec = Theories.AC.t
 
-val axioms : spec:spec -> ctx:Ctx.t -> Clause.t list
+val axioms : ctx:Ctx.t -> Symbol.t -> Clause.t list
   (** List of (persistent) axioms that are needed for simplifications to
-      be complete. The signature is required for type inference. *)
+      be complete for the given symbol. The [ctx] is required for type inference
+      and building clauses . *)
 
 (** {2 Rules} *)
 
 val is_trivial_lit : spec:spec -> Literal.t -> bool
+  (** Is the literal AC-trivial? *)
 
 val is_trivial : spec:spec -> Clause.t -> bool
   (** Check whether the clause is AC-trivial *)
 
 val simplify : spec:spec -> ctx:Ctx.t -> Clause.t -> Clause.t
   (** Simplify the clause modulo AC *)
+
+val add_ac : ?proof:Proof.t list -> env:Env.t -> 
+             Symbol.t -> unit
+  (** Declare that the given symbol is AC, and update the Env subsequently
+      by adding clauses, etc. *)
+
+val setup_penv : penv:PEnv.t -> unit
 
 val setup_env : env:Env.t -> unit

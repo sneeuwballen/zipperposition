@@ -1,4 +1,6 @@
+
 (*
+Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
 All rights reserved.
 
@@ -23,25 +25,22 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Heuristic precedence} *)
+(** {1 Tests} *)
 
 open Logtk
+open Libzipperposition
 
-(** This module is used to search for a precedence that optimizes some
-    criteria. It uses hill-climbing to search for a solution, but
-    does not guarantee that  the optimum will be reached.
-    *)
+let props = QCheck.flatten
+  [ TestMonome.props
+  ; TestArith.props
+  ; TestInterval.props
+  ]
 
-val compute : ?signature:Signature.t ->
-              (Precedence.t -> Ordering.t) ->
-              Precedence.constr list ->
-              Precedence.constr list ->
-              Clause.t Sequence.t ->
-              Precedence.t
-  (** define a constraint on symbols that is believed to improve
-      the search by enabling as many simplifications as possible. It takes
-      an ordering as a parameter, to be able to decide the orientation of
-      terms in a given precedence, and ordering constraints that are
-      respectively weaker/stronger than the optimization (the first one, weaker,
-      is applied to break ties, the second one, stronger, is always enforced first) *)
+let specs =
+  [ "-debug", Arg.Int Util.set_debug, "set debug level"
+  ]
 
+let _ =
+  Arg.parse specs (fun _ -> ()) "run test suite";
+  ignore (QCheck.run_tests props);
+  ()

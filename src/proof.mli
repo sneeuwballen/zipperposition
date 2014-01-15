@@ -29,51 +29,85 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type t = private
-  | Axiom of string * string (* filename, axiom name *)
-  | InferForm of Formula.t * step
-  | InferClause of CompactClause.t * step
-and step = {
-  rule : string;
-  parents : t array;
-  esa : bool;  (** Equisatisfiable step? *)
-  theories : string list;
+(** Classification of proof steps *)
+type step_kind =
+  | Inference of string
+  | Simplification of string
+  | Esa of string
+  | File of string * string * string  (** role, file, name *)
+  | Trivial (** trivial, or trivial within theories *)
+
+type step_result =
+  | Form of FOFormula.t
+  | Clause of CompactClause.t
+
+type t = private {
+  result : step_result;       (** conclusion of the step *)
+  kind : step_kind;           (** kind of step *)
+  parents : t array;          (** parent proof steps *)
+  theories : string list;     (** theories used for the proof step *)
+  additional_info : string list;   (** additional info, prover-dependent *)
 }
 
-(** {b note}: Equality does not take the parents into account. Two
-    proofs that have the same conclusion are equal. *)
+(** {b note}: Equality, hashing and comparison do not take the parents into
+account. Two proofs that have the same conclusion are equal. *)
 
 val eq : t -> t -> bool
 val hash : t -> int
 val cmp : t -> t -> int
 
-(** {2 Constructors and utils} *)
+(** {2 Constructors and utils}
+In all the following constructors, [theories] defaults to the empty list.
+Axiom constructors have default role "axiom" *)
 
-(** Rule must {b NOT} be "axiom" for deduction steps.
-    [esa] is false by default. *)
+val mk_f_trivial : ?info:string list -> ?theories:string list -> FOFormula.t -> t
 
-val mk_f_axiom : Formula.t -> file:string -> name:string -> t
-val mk_c_axiom : CompactClause.t -> file:string -> name:string -> t
+val mk_f_file : ?info:string list -> ?theories:string list ->
+                role:string -> file:string -> name:string ->
+                FOFormula.t -> t
 
-val mk_f_step : ?theories:string list -> ?esa:bool ->
-                Formula.t -> rule:string -> t list -> t
-  (** Inference step that lead to the given formula. [esa = true] means
-      that the inference only preserved equisatisfiability (default false),
-      [theories] is a list of theories that are used by the inference
-      (default [["equality"]]). *)
+val mk_f_inference : ?info:string list -> ?theories:string list -> rule:string ->
+                     FOFormula.t -> t list -> t
 
-val mk_c_step : ?theories:string list -> ?esa:bool ->
-                CompactClause.t -> rule:string -> t list -> t
-  (** Inference step that lead to the given clause. [esa = true] means
-      that the inference only preserved equisatisfiability (default false),
-      [theories] is a list of theories that are used by the inference
-      (default [["equality"]]). *)
+val mk_f_simp : ?info:string list -> ?theories:string list -> rule:string ->
+                 FOFormula.t -> t list -> t
 
-val adapt_f : t -> Formula.t -> t
+val mk_f_esa : ?info:string list -> ?theories:string list -> rule:string ->
+                FOFormula.t -> t list -> t
+
+val mk_c_trivial : ?info:string list -> ?theories:string list -> CompactClause.t -> t
+
+val mk_c_file : ?info:string list -> ?theories:string list ->
+                role:string -> file:string -> name:string ->
+                CompactClause.t -> t
+
+val mk_c_inference : ?info:string list -> ?theories:string list -> rule:string ->
+                     CompactClause.t -> t list -> t
+
+val mk_c_simp : ?info:string list -> ?theories:string list -> rule:string ->
+                CompactClause.t -> t list -> t
+
+val mk_c_esa : ?info:string list -> ?theories:string list -> rule:string ->
+                CompactClause.t -> t list -> t
+
+val adapt_f : t -> FOFormula.t -> t
 val adapt_c : t -> CompactClause.t -> t
 
+val is_trivial : t -> bool
+val is_file : t -> bool
 val is_axiom : t -> bool
 val is_proof_of_false : t -> bool
+
+val rule : t -> string option
+  (** Rule name for Esa/Simplification/Inference steps *)
+
+val role : t -> string
+  (** TSTP role of the proof step ("plain" for inferences/simp/esa) *)
+
+module Theories : sig
+  val eq : string list
+  val arith : string list
+end
 
 (** {2 Proof traversal} *)
 
@@ -101,18 +135,20 @@ val share : t -> t
 
 (** {2 Conversion to a graph of proofs} *)
 
-val to_graph : t -> (t, string) PersistentGraph.t
+val as_graph : (t, t, string) LazyGraph.t
   (** Get a graph of the proof *)
 
-val bij : ord:Ordering.t -> t Bij.t
-  (** Bijection. A global table of proof steps is maintained! Use a fresh
-      bijection to get a fresh proof steps table. *)
+val bij : t Bij.t
+  (** TODO, not implemented *)
 
 (** {2 IO} *)
 
-val pp_notrec : Buffer.t -> t -> unit
-  (** Print the step in debug mode, but not its parents *)
+val pp_kind : Buffer.t -> step_kind -> unit
+val pp_kind_tstp : Buffer.t -> step_kind -> unit
+val pp_result : Buffer.t -> step_result -> unit
 
+val pp_result_of : Buffer.t -> t -> unit
+val pp_notrec : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
   (** Non recursive printing on formatter *)
 
@@ -121,9 +157,16 @@ val pp_debug : Buffer.t -> t -> unit
 val pp : string -> Buffer.t -> t -> unit
   (** Prints the proof according to the given input switch *)
 
+val as_dot_graph : (t, LazyGraph.Dot.attribute list, LazyGraph.Dot.attribute list) LazyGraph.t
+
 val pp_dot : name:string -> Buffer.t -> t -> unit
   (** Pretty print the proof as a DOT graph *)
 
 val pp_dot_file : ?name:string -> string -> t -> unit
   (** print to dot into a file *)
 
+val pp_dot_seq : name:string -> Buffer.t -> t Sequence.t -> unit
+  (** Print a set of proofs as a DOT graph, sharing common subproofs *)
+
+val pp_dot_seq_file : ?name:string -> string -> t Sequence.t -> unit
+  (** same as {!pp_dot_seq} but into a file *)

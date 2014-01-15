@@ -31,8 +31,7 @@ open Logtk
 open Logtk_meta
 open Params
 
-module T = Term
-module F = Formula
+module T = FOTerm
 module PF = PFormula
 module O = Ordering
 module C = Clause
@@ -55,9 +54,9 @@ let print_stats ~env =
       what sz num sum_length small median big
   and print_state_stats (num_active, num_passive, num_simpl) =
     Util.debug 1 "proof state stats:";
-    Util.debug 1 "  active clauses          %d" num_active;
-    Util.debug 1 "  passive clauses         %d" num_passive;
-    Util.debug 1 "  simplification clauses  %d" num_simpl
+    Util.debug 1 "stat:  active clauses          %d" num_active;
+    Util.debug 1 "stat:  passive clauses         %d" num_passive;
+    Util.debug 1 "stat:  simplification clauses  %d" num_simpl
   and print_gc () =
     let stats = Gc.stat () in
     Util.debug 1 ("GC: minor words %.0f; major_words: %.0f; max_heap: %d; "
@@ -84,11 +83,10 @@ let print_json_stats ~env =
       let seq = MetaProverState.theories meta in
       Util.sprintf "[%a]" (Util.pp_seq MetaProverState.pp_theory) seq
   in
-  let experts = Experts.Set.size (Env.get_experts ~env) in
   let o = Util.sprintf
-    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s, \"experts\":%d }"
+    "{ \"terms\": %s, \"clauses\": %s, \"theories\": %s }"
     (encode_hashcons (T.H.stats ()))
-    (encode_hashcons (C.CHashcons.stats ())) theories experts
+    (encode_hashcons (C.CHashcons.stats ())) theories
   in
   Util.debug 1 "json_stats: %s" o
 
@@ -114,10 +112,19 @@ let print_version ~params =
   if params.param_version
     then (Printf.printf "%% zipperposition v%s\n" Const.version; exit 0)
 
-let setup_calculus ~env =
-  match (Env.get_params ~env).param_calculus with
-  | "superposition" -> Superposition.setup_env ~env
-  | x -> failwith ("unknown calculus " ^ x)
+let setup_penv ?(ctx=Skolem.create ()) ~penv () =
+  Superposition.setup_penv ~ctx ~penv;
+  if (PEnv.get_params ~penv).param_expand_def then
+    PEnv.add_operation ~penv ~prio:1 PEnv.expand_def;
+  AC.setup_penv ~penv;
+  (* be sure to get a total order on symbols *)
+  PEnv.add_constr ~penv Precedence.Constr.alpha;
+  ()
+
+let setup_env ~env =
+  Superposition.setup_env ~env;
+  AC.setup_env ~env;
+  ()
 
 (** Make an optional meta-prover and parse its KB *)
 let mk_meta ~params =
@@ -125,10 +132,16 @@ let mk_meta ~params =
     (* create meta *)
     let meta = MetaProverState.create () in
     (* handle KB *)
-    MetaProverState.parse_kb_file meta params.param_kb;
+    begin match MetaProverState.parse_kb_file meta params.param_kb with
+    | Monad.Err.Ok () -> ()
+    | Monad.Err.Error msg -> Util.debug 0 "error: %s" msg
+    end;
     (* read some theory files *)
     List.iter
-      (fun file -> MetaProverState.parse_theory_file meta file)
+      (fun file ->
+        match MetaProverState.parse_theory_file meta file with
+        | Monad.Err.Ok () -> ()
+        | Monad.Err.Error msg -> Util.debug 0 "%s" msg)
       params.param_kb_load;
     Some meta
   end else
@@ -159,82 +172,44 @@ let load_plugins ~params =
         [ext])
     params.param_plugins
 
-(** Precedence *)
-let mk_precedence ?(constrs=[]) ~params formulas =
-  let formulas = Sequence.map PF.get_form (Sequence.of_list formulas) in
-  let constrs = constrs @
-    [Precedence.invfreq_constraint formulas; Precedence.alpha_constraint]
-  in
-  let signature = F.signature_seq formulas in
-  let symbols = Signature.to_symbols signature in
-  Precedence.create ~complete:false constrs symbols
-
-(* TODO: use Env.preprocess to reduce to CNF + expand defs *)
-
-(** Create the environment from parameters and formulas *)
-let mk_env ?meta ?constrs ~params formulas =
-  let precedence = mk_precedence ?constrs ~params formulas in
+(* build initial env and clauses *)
+let preprocess ?meta ~signature ~plugins ~params formulas =
+  (* penv *)
+  let penv = PEnv.create ~base:signature ?meta params in
+  setup_penv ~penv ();
+  let formulas = PEnv.process ~penv formulas in
+  Util.debug 3 "formulas pre-processed into:\n  %a"
+    (Util.pp_seq ~sep:"\n  " PF.pp) (PF.Set.to_seq formulas);
+  (* now build a context *)
+  let precedence = PEnv.mk_precedence ~penv formulas in
   Util.debug 1 "precedence: %a" Precedence.pp precedence;
   let ord = params.param_ord precedence in
-  Util.debug 1 "selection function: %s" params.param_select;
   let select = Sel.selection_from_string ~ord params.param_select in
-  let signature = PF.signature_seq (Sequence.of_list formulas) in
-  let ctx = Ctx.create ~select ~signature ~ord () in
+  Util.debug 1 "selection function: %s" params.param_select;
+  Util.debug 1 "signature: %a" Signature.pp signature;
+  let ctx = Ctx.create ~ord ~select ~signature () in
+  (* build the env *)
   let env = Env.create ?meta ~ctx params signature in
-  setup_calculus ~env;
-  env
-
-(** Use the environment to compute a new environment. The idea is
-    that formulas are preprocessed using [env], and then a new environment
-    is computed using the preprocessed formulas (different signature, etc.).
-    Returns *)
-let do_preprocessing ?meta ~params ~env formulas =
-  let formulas = Env.preprocess ~env formulas in
-  Util.debug 3 "formulas pre-processed into:\n  %a"
-    (Util.pp_list ~sep:"\n  " PF.pp) formulas;
-  let constrs = Env.compute_constrs ~env
-    (Sequence.map PF.get_form (Sequence.of_list formulas)) in
-  let env' = mk_env ~constrs ?meta ~params formulas in
-  (* transfert experts *)
-  Experts.Set.iter (Env.get_experts ~env) (Env.add_expert ~env:env');
-  env', formulas
-
-(** Enrichment of the initial set of clauses by detecting some theories *)
-let enrich_with_theories ~env clauses =
-  List.fold_left
-    (fun acc hc ->
-      let lemmas = Env.meta_step ~env hc in
-      Sequence.fold
-        (fun acc hc -> hc::acc) acc lemmas)
-    clauses clauses
-
-(* build initial env and clauses *)
-let load_everything ?meta ~plugins ~params formulas =
-  (* initial env *)
-  let env = mk_env ?meta ~params formulas in
-  Extensions.apply_list ~env plugins;
-  (* env after preprocessing *)
-  Util.debug 1 "preprocessing...";
-  let env, formulas = do_preprocessing ?meta ~params ~env formulas in
-  Extensions.apply_list ~env plugins;
+  setup_env ~env;
+  (* reduce to CNF *)
   Util.debug 1 "reduce to CNF...";
   let clauses = Env.cnf ~env formulas in
-  Util.debug 3 "CNF:\n  %a" (Util.pp_list ~sep:"\n  " C.pp) clauses;
-  let clauses = enrich_with_theories ~env clauses in
+  Util.debug 3 "CNF:\n  %a" (Util.pp_seq ~sep:"\n  " C.pp) (C.CSet.to_seq clauses);
+  (* return env + clauses *)
   env, clauses
 
 (* pre-saturation *)
 let presaturate_clauses ~env clauses =
   Util.debug 1 "presaturate initial clauses";
-  Env.add_passive ~env (Sequence.of_list clauses);
+  Env.add_passive ~env clauses;
   let result, num = Sat.presaturate ~env in
   Util.debug 1 "initial presaturation in %d steps" num;
   (* pre-saturated set of clauses *)
-  let clauses = Env.get_active ~env in
+  let clauses = Sequence.persistent (Env.get_active ~env) in
   (* remove clauses from [env] *)
   Env.remove_active ~env clauses;
   Env.remove_passive ~env clauses;
-  result, Sequence.to_rev_list clauses
+  result, clauses
 
 (** Print some content of the state, based on environment variables *)
 let print_dots ~env result =
@@ -243,7 +218,14 @@ let print_dots ~env result =
   begin match params.param_dot_file, result with
   | Some dot_f, Sat.Unsat c ->
     let name = "unsat_graph" in
+    (* print proof of false *)
     Proof.pp_dot_file ~name dot_f c.C.hcproof
+  | Some dot_f, (Sat.Sat | Sat.Unknown) when params.param_dot_sat ->
+    (* print saturated set *)
+    let name = "sat_set" in
+    let seq = Sequence.append (Env.get_active ~env) (Env.get_passive ~env) in
+    let seq = Sequence.map C.get_proof seq in
+    Proof.pp_dot_seq_file ~name dot_f seq
   | _ -> ()
   end;
   ()
@@ -259,31 +241,54 @@ let print_meta ~env =
       (MetaReasoner.size (MetaProverState.reasoner meta))
   | None -> ()
 
-let print_szs_result ~env result =
+let print_szs_result ~file ~env result =
+  let params = Env.get_params ~env in
   match result with
   | Sat.Unknown
-  | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut\n"
+  | Sat.Timeout -> Printf.printf "%% SZS status ResourceOut for '%s'\n" file
   | Sat.Error s ->
-    Printf.printf "%% SZS status InternalError\n";
+    Printf.printf "%% SZS status InternalError for '%s'\n" file;
     Util.debug 1 "error is: %s" s
   | Sat.Sat ->
     if Ctx.is_completeness_preserved (Env.ctx env)
-      then Printf.printf "%% SZS status CounterSatisfiable\n"
-      else Printf.printf "%% SZS status GaveUp\n";
-    Util.debug 1 "saturated set:\n  %a\n"
-      (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ~env)
+      then Printf.printf "%% SZS status CounterSatisfiable for '%s'\n" file
+      else Printf.printf "%% SZS status GaveUp for '%s'\n" file;
+    begin match params.param_proof with
+      | "none" -> ()
+      | "tstp" ->
+        Util.debug 1 "saturated set:\n  %a\n"
+          (Util.pp_seq ~sep:"\n  " C.pp_tstp_full) (Env.get_active ~env)
+      | "debug" ->
+        Util.debug 1 "saturated set:\n  %a\n"
+          (Util.pp_seq ~sep:"\n  " C.pp) (Env.get_active ~env)
+      | n -> failwith ("unknown proof format: " ^ n)
+    end
   | Sat.Unsat c ->
     (* print status then proof *)
-    let params = Env.get_params ~env in
-    Printf.printf "%% SZS status Theorem\n";
+    Printf.printf "%% SZS status Theorem for '%s'\n" file;
     Util.printf "%% SZS output start Refutation\n";
     Util.printf "%a" (Proof.pp params.param_proof) c.C.hcproof;
     Printf.printf "%% SZS output end Refutation\n";
     ()
 
-(** Process the given file (try to solve it) *)
-let process_file ?meta ~plugins ~params file =
-  Util.debug 1 "================ process file %s ===========" file;
+(* perform type inference on those formulas *)
+let annotate_formulas ~signature formulas =
+  let tyctx = TypeInference.Ctx.of_signature signature in
+  let formulas = Sequence.map
+    (fun (f, file,name) ->
+      let f = TypeInference.FO.convert_form ~ctx:tyctx f in
+      f, file, name)
+    formulas
+  in
+  (* caution: evaluate formulas BEFORE *)
+  let formulas = Sequence.persistent formulas in
+  let signature = TypeInference.Ctx.to_signature tyctx in
+  formulas, signature
+
+(* try to refute the set of clauses contained in the [env]. Parameters are
+   used to influence how saturation is done, for how long it runs, etc.
+   @return the result and final env. *)
+let try_to_refute ~env ~params result =
   let steps = if params.param_steps = 0
     then None else (Util.debug 0 "run for %d steps" params.param_steps;
                     Some params.param_steps)
@@ -292,42 +297,55 @@ let process_file ?meta ~plugins ~params file =
                     ignore (setup_alarm params.param_timeout);
                     Some (Util.get_start_time () +. params.param_timeout -. 0.25))
   in
-  (* parse formulas *)
-  let decls = Util_tptp.parse_file ~recursive:true file in
-  Util.debug 1 "parsed %d declarations" (Sequence.length decls);
-  (* obtain proved formulas *)
-  let formulas = Util_tptp.sourced_formulas ~file decls in
-  let formulas = Sequence.map PF.of_sourced formulas in
-  let formulas = Sequence.to_rev_list formulas in
-  (* obtain clauses + env *)
-  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_list ~sep:"\n%%  " PF.pp) formulas;
-  let env, clauses = load_everything ?meta ~plugins ~params formulas in
-  (* pre-saturation *)
-  let num_clauses = List.length clauses in
-  let result, clauses = if params.param_presaturate
-    then presaturate_clauses ~env clauses
-    else Sat.Unknown, clauses
-  in
-  Util.debug 1 "signature: %a" Signature.pp_no_base (Env.signature env);
-  Util.debug 2 "%d clauses processed into:\n%%  %a"
-    num_clauses (Util.pp_list ~sep:"\n%%  " C.pp) clauses;
-  (* add clauses to passive set of [env] *)
-  Env.add_passive ~env (Sequence.of_list clauses);
-  (* saturate *)
   let result, num = match result with
     | Sat.Unsat _ -> result, 0  (* already found unsat during presaturation *)
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ~env
   in
-  Util.debug 1 "=================================================";
   Util.debug 1 "done %d iterations" num;
   Util.debug 1 "final precedence: %a" Precedence.pp (Env.precedence env);
+  result, env
+
+(** Process the given file (try to solve it) *)
+let process_file ?meta ~plugins ~params file =
+  Util.debug 1 "================ process file %s ===========" file;
+  (* parse formulas *)
+  let decls = Util_tptp.parse_file ~recursive:true file in
+  Util.debug 1 "parsed %d declarations" (Sequence.length decls);
+  (* obtain a set of proved formulas, and an initial signature *)
+  let formulas = Util_tptp.sourced_formulas ~file decls in
+  let signature = Util_tptp.type_declarations decls in
+  (* perform type inference on formulas (also update signature) *)
+  let formulas, signature = annotate_formulas ~signature formulas in
+  let formulas = Sequence.map PF.of_sourced formulas in
+  let formulas = PF.Set.of_seq formulas in
+  (* obtain clauses + env *)
+  Util.debug 2 "input formulas:\n%%  %a" (Util.pp_seq ~sep:"\n%%  " PF.pp)
+    (PF.Set.to_seq formulas);
+  Util.debug 2 "input signature: %a" Signature.pp signature;
+  let env, clauses = preprocess ?meta ~signature ~plugins ~params formulas in
+  (* pre-saturation *)
+  let num_clauses = C.CSet.size clauses in
+  let result, clauses = if params.param_presaturate
+    then presaturate_clauses ~env (C.CSet.to_seq clauses)
+    else Sat.Unknown, C.CSet.to_seq clauses
+  in
+  Util.debug 1 "signature: %a" Signature.pp_no_base (Env.signature env);
+  Util.debug 2 "%d clauses processed into:\n%%  %a"
+    num_clauses (Util.pp_seq ~sep:"\n%%  " C.pp) clauses;
+  (* add clauses to passive set of [env] *)
+  Env.add_passive ~env clauses;
+  (* saturate, possibly changing env *)
+  let result, env = try_to_refute ~env ~params result in
+  Util.debug 1 "=================================================";
   (* print some statistics *)
-  print_stats ~env;
-  print_json_stats ~env;
+  if params.param_stats then begin
+    print_stats ~env;
+    print_json_stats ~env;
+    end;
   print_dots ~env result;
   print_meta ~env;
-  Util.debug 1 "experts: %a" Experts.Set.pp (Env.get_experts ~env);
-  print_szs_result ~env result;
+  print_szs_result ~file ~env result;
+  Util.debug 1 "=================================================";
   ()
 
 (** Print the content of the KB, and exit *)
@@ -361,6 +379,12 @@ let save_kb ?meta ~params =
       (fun () -> MetaProverState.save_kb_file meta file)
 
 let () =
+  (* GC! increase max overhead because we want the GC to be faster, even if
+      it implies more wasted memory. *)
+  let gc = Gc.get () in
+  Gc.set { gc with Gc.space_overhead=150; }
+
+let () =
   (* parse arguments *)
   let params = Params.parse_args () in
   Random.init params.param_seed;
@@ -374,7 +398,21 @@ let () =
   (if params.param_kb_print then print_kb ?meta);
   (if params.param_kb_clear then clear_kb params);
   (* master process: process files *)
-  List.iter (process_file ?meta ~plugins ~params) params.param_files;
+  Vector.iter params.param_files
+    (fun file ->
+      begin try process_file ?meta ~plugins ~params file
+      with
+      | Type.Error msg ->
+        Util.eprintf "type error: %s\n" msg;
+        Printexc.print_backtrace stderr;
+      | TypeUnif.Error e ->
+        Util.eprintf "type error: %a\n" TypeUnif.pp_error e;
+        Printexc.print_backtrace stderr;
+      | Ast_tptp.ParseError loc ->
+        Util.eprintf "parse error (at %a)\n" Location.pp loc;
+        Printexc.print_backtrace stderr;
+      end;
+      flush stderr);
   (* save KB? *)
   save_kb ?meta ~params;
   ()

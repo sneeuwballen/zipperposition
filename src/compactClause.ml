@@ -28,32 +28,40 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module Lit = Literal
-module Lits = Literal.Arr
+module F = FOFormula
 
-type t = Literal.t array
+type t = FOFormula.t array lazy_t
 
-let eq c1 c2 = Lits.eq c1 c2
+let eq (lazy c1) (lazy c2) =
+  try
+    Util.array_forall2 F.eq c1 c2
+  with Invalid_argument _ ->
+    false
 
-let hash c = Lits.hash c
+let hash (lazy c) =
+  Array.fold_left (fun h f -> Hash.combine h (F.hash f)) 143 c
 
-let is_empty c = Array.length c = 0
+(* TODO: optimize *)
+let cmp (lazy c1) (lazy c2) =
+  Util.lexicograph F.compare (Array.to_list c1) (Array.to_list c2)
 
-let iter c f = Array.iter f c
+let is_empty (lazy c) = Array.length c = 0
 
-let to_seq c = Sequence.from_iter (fun k -> iter c k)
+let iter (lazy c) f = Array.iter f c
+
+let to_seq c = Sequence.from_iter (fun k -> Array.iter k (Lazy.force c))
 
 let pp buf c =
   match c with
-  | [| |] -> Buffer.add_string buf "$false"
-  | [| _ |] -> Lit.pp buf c.(0)
-  | _ -> Printf.bprintf buf "[%a]" Lits.pp c
+  | lazy [| |] -> Buffer.add_string buf "$false"
+  | lazy [| x |] -> F.pp buf x
+  | lazy l -> Printf.bprintf buf "[%a]" (Util.pp_array ~sep:" | " F.pp) l
 
 let pp_tstp buf c =
   match c with
-  | [| |] -> Buffer.add_string buf "$false"
-  | [| _ |] -> Lit.pp_tstp buf c.(0)
-  | _ -> Printf.bprintf buf "(%a)" Lits.pp_tstp c
+  | lazy [| |] -> Buffer.add_string buf "$false"
+  | lazy [| x |] -> F.pp_tstp buf x
+  | lazy l -> Printf.bprintf buf "(%a)" (Util.pp_array ~sep:" | " F.pp_tstp) l
 
 let to_string c =
   Util.on_buffer pp c
@@ -61,4 +69,8 @@ let to_string c =
 let fmt fmt c =
   Format.pp_print_string fmt (to_string c)
 
-let bij ~ord = Lits.bij ~ord
+let bij =
+  Bij.(map
+    ~inject:(fun (lazy c) -> c)
+    ~extract:(fun c -> Lazy.from_val c)
+    (array_ F.bij))

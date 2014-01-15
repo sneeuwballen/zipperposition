@@ -28,39 +28,68 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module STbl = Symbol.SHashtbl
+module STbl = Symbol.Tbl
+module T = FOTerm
+module F = FOFormula
+module PF = PFormula
 
 (** {2 Associativity-Commutativity} *)
 
 module AC = struct
-  type t = {
-    is_ac : Symbol.t -> bool;
-    symbols : unit -> Symbol.SSet.t;
-    add : Symbol.t -> unit;
-  } (** Specification: which symbols are AC? *)
+  type t = Proof.t list STbl.t
 
-  let create ?(base=true) () =
-    let h = STbl.create 13 in
-    let is_ac s = STbl.mem h s in
-    let symbols () =
-      STbl.fold
-        (fun s () set -> Symbol.SSet.add s set)
-        h Symbol.SSet.empty
+  let create () = STbl.create 7
+
+  let is_ac ~spec s = STbl.mem spec s
+
+  let axioms s =
+    (* FIXME: need to recover type of [f]
+    let x = T.mk_var 0 in
+    let y = T.mk_var 1 in
+    let z = T.mk_var 2 in
+    let f x y = T.mk_node s [x; y] in
+    let mk_eq x y = F.mk_eq x y in
+    let mk_pform name f =
+      let f = F.close_forall f in
+      let name = Util.sprintf "%s_%a" name Symbol.pp s in
+      let proof = Proof.mk_f_axiom f ~file:"/dev/ac" ~name in
+      PF.create f proof
     in
-    let add s = STbl.replace h s () in
-    let spec = { is_ac; symbols; add; } in
-    (* add basic AC symbol *)
-    if base then begin
-      add Symbol.Arith.sum;
-      add Symbol.Arith.product;
-      end;
-    spec
+    [ mk_pform "associative" (mk_eq (f (f x y) z) (f x (f y z)))
+    ; mk_pform "commutative" (mk_eq (f x y) (f y x))
+    ]
+    *)
+    []
 
-  let add ~spec s = spec.add s
+  let add ~spec ?proof s =
+    let proof = match proof with
+    | Some p -> p
+    | None -> (* new axioms *)
+      List.map PF.get_proof (axioms s)
+    in
+    STbl.replace spec s proof
 
-  let is_ac ~spec s = spec.is_ac s
+  let is_ac ~spec s = STbl.mem spec s
 
-  let symbols ~spec = spec.symbols ()
+  let exists_ac ~spec = STbl.length spec > 0
+
+  let find_proof ~spec s = STbl.find spec s
+
+  let symbols ~spec =
+    STbl.fold
+      (fun s _ set -> Symbol.Set.add s set)
+      spec Symbol.Set.empty
+
+  let symbols_of_terms ~spec seq =
+    T.ac_symbols ~is_ac:(is_ac ~spec) seq
+
+  let symbols_of_forms ~spec f =
+    T.ac_symbols ~is_ac:(is_ac ~spec) (Sequence.flatMap F.Seq.terms f)
+
+  let proofs ~spec =
+    STbl.fold
+      (fun _ proofs acc -> List.rev_append proofs acc)
+      spec []
 end
 
 (** {2 Total Ordering} *)
@@ -69,6 +98,7 @@ module TotalOrder = struct
   type instance = {
     less : Symbol.t;
     lesseq : Symbol.t;
+    proof : Proof.t list;
   } (** A single instance of total ordering *)
 
   type t = {
@@ -77,8 +107,8 @@ module TotalOrder = struct
   } (** Specification of which symbols implement total orderings *)
 
   type lit = {
-    left : Term.t;
-    right : Term.t;
+    left : FOTerm.t;
+    right : FOTerm.t;
     strict : bool;
     instance : instance;
   } (** A literal is an atomic inequality. [strict] is [true] iff the
@@ -103,20 +133,68 @@ module TotalOrder = struct
   let is_order_symbol ~spec s =
     STbl.mem spec.less_tbl s || STbl.mem spec.lesseq_tbl s
 
-  let add ~spec ~less ~lesseq =
+  let axioms ~less ~lesseq =
+    (* FIXME: need to recover type of less's arguments
+    let x = T.mk_var 0 in
+    let y = T.mk_var 1 in
+    let z = T.mk_var 2 in
+    let mk_less x y = F.mk_atom (T.mk_node ~ty:Type.o less [x;y]) in
+    let mk_lesseq x y = F.mk_atom (T.mk_node ~ty:Type.o lesseq [ x;y]) in
+    let mk_eq x y = F.mk_eq x y in
+    let mk_pform name f =
+      let f = F.close_forall f in
+      let name = Util.sprintf "%s_%a_%a" name Symbol.pp less Symbol.pp lesseq in
+      let proof = Proof.mk_f_axiom f ~file:"/dev/order" ~name in
+      PF.create f proof
+    in
+    [ mk_pform "total" (F.mk_or [mk_less x y; mk_eq x y; mk_less y x])
+    ; mk_pform "irreflexive" (F.mk_not (mk_less x x))
+    ; mk_pform "transitive" (F.mk_imply (F.mk_and [mk_less x y; mk_less y z]) (mk_less x z))
+    ; mk_pform "nonstrict" (F.mk_equiv (mk_lesseq x y) (F.mk_or [mk_less x y; mk_eq x y]))
+    ]
+    *)
+    []
+
+  let add ~spec ?proof ~less ~lesseq =
+    let proof = match proof with
+    | Some p -> p
+    | None ->
+      List.map PF.get_proof (axioms ~less ~lesseq)
+    in
     if STbl.mem spec.less_tbl less || STbl.mem spec.lesseq_tbl lesseq
       then raise (Invalid_argument "ordering instances overlap");
-    let instance = { less; lesseq; } in
+    let instance = { less; lesseq; proof; } in
     STbl.add spec.less_tbl less instance;
     STbl.add spec.lesseq_tbl lesseq instance;
     instance
 
-  let create ?(base=true) () =
+  let eq i1 i2 =
+    Symbol.eq i1.less i2.less && Symbol.eq i1.lesseq i2.lesseq
+
+  let tstp_instance ~spec =
+    try
+      find ~spec Symbol.Arith.less
+    with Not_found ->
+      let less = Symbol.Arith.less in
+      let lesseq = Symbol.Arith.lesseq in
+      (* add instance *)
+      add ~spec ?proof:None ~less ~lesseq
+
+  let create () =
     let spec = {
       less_tbl = STbl.create 13;
       lesseq_tbl = STbl.create 13;
     } in
-    if base then
-      ignore (add ~spec ~less:Symbol.Arith.less ~lesseq:Symbol.Arith.lesseq);
     spec
+
+  let exists_order ~spec =
+    assert (STbl.length spec.lesseq_tbl = STbl.length spec.less_tbl);
+    STbl.length spec.less_tbl > 0
+
+  let pp_instance buf i =
+    Printf.bprintf buf "total_order{%a, %a}" Symbol.pp i.less Symbol.pp i.lesseq
+
+  let to_string_instance i = Util.on_buffer pp_instance i
+
+  let fmt_instance fmt i = Format.pp_print_string fmt (to_string_instance i)
 end

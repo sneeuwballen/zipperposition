@@ -1,9 +1,8 @@
 # OASIS_START
-# DO NOT EDIT (digest: 96109db4c266be9a53b7223d6c1b8388)
+# DO NOT EDIT (digest: e95165405f27c13b4f60c18397d2d2cc)
 src/ClauseQueue
 src/Clause
 src/Const
-src/Experts
 src/Extensions
 src/Literal
 src/MetaProverState
@@ -17,7 +16,7 @@ src/Superposition
 src/PFormula
 src/Theories
 src/AC
-src/Chaining
+src/PEnv
 src/Params
 src/Env
 # OASIS_STOP

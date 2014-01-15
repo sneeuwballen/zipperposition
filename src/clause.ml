@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-module T = Term
-module S = Substs
+module T = FOTerm
+module S = Substs.FO
 module Lit = Literal
 module Lits = Literal.Arr
 
@@ -43,6 +43,8 @@ let prof_mk_hclause_raw = Util.mk_profiler "mk_hclause_raw"
 
 (** {2 Type def} *)
 
+type scope = Substs.scope
+
 type t = {
   hclits : Literal.t array;               (** the literals *)
   hcctx : Ctx.t;                          (** context of the clause *)
@@ -50,7 +52,7 @@ type t = {
   mutable hcflags : int;                  (** boolean flags for the clause *)
   mutable hcweight : int;                 (** weight of clause *)
   mutable hcselected : BV.t;              (** bitvector for selected literals *)
-  mutable hcvars : Term.t list;           (** the free variables *)
+  mutable hcvars : FOTerm.t list;           (** the free variables *)
   mutable hcproof : Proof.t;              (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
@@ -59,18 +61,23 @@ type t = {
 
 type clause = t
 
-let compact c = c.hclits
+let compact c = Lits.compact c.hclits
 
 let to_seq c =
-  Lit.Arr.to_seq c.hclits
+  Lits.to_seq c.hclits
 
-let to_prec_clause c = Lit.Arr.to_forms c.hclits
+let terms c =
+  Lits.terms c.hclits
 
- (** {2 boolean flags} *)
+(** {2 boolean flags} *)
 
-let flag_ground = 1 lsl 0
-let flag_lemma = 1 lsl 1
-let flag_persistent = 1 lsl 2
+let new_flag =
+  let flag_gen = Util.Flag.create () in
+  fun () -> Util.Flag.get_new flag_gen
+
+let flag_ground = new_flag ()
+let flag_lemma = new_flag ()
+let flag_persistent = new_flag ()
 
 let set_flag flag c truth =
   if truth
@@ -130,23 +137,29 @@ let is_child_of ~child c =
   c.hcdescendants <- descendants
 
 (* see if [c] is known to simplify into some other clause *)
-let rec follow_simpl c = match c.hcsimplto with
+let rec _follow_simpl n c =
+  if n > 10_000 then failwith (Util.sprintf "follow_simpl loops on %a" Lits.pp c.hclits);
+  match c.hcsimplto with
   | None -> c
   | Some c' ->
     Util.debug 3 "clause %a already simplified to %a" Lits.pp c.hclits Lits.pp c'.hclits;
-    follow_simpl c'
+    _follow_simpl (n+1) c'
+
+let follow_simpl c = _follow_simpl 0 c
 
 (* [from] simplifies into [into] *)
 let simpl_to ~from ~into =
   let from = follow_simpl from in
   assert (from.hcsimplto = None);
-  if from != into then
+  let into' = follow_simpl into in
+  (* avoid cycles *)
+  if from != into' then
     from.hcsimplto <- Some into
 
 module CHashcons = Hashcons.Make(struct
   type t = clause
   let hash c = Lits.hash c.hclits
-  let equal c1 c2 = Lits.eq c1.hclits c2.hclits && c1.hcctx == c2.hcctx
+  let equal c1 c2 = Lits.eq_com c1.hclits c2.hclits && c1.hcctx == c2.hcctx
   let tag i c = (assert (c.hctag = (-1)); c.hctag <- i)
 end)
 
@@ -158,13 +171,16 @@ let __no_select = BV.empty ()
 let create_a ?parents ?selected ~ctx lits proof =
   Util.incr_stat stat_mk_hclause;
   Util.enter_prof prof_mk_hclause;
-  (* Rename variables *)
+  (* Rename variables.
   let renaming = Ctx.renaming_clear ~ctx in
-  let lits = Lits.apply_subst ~recursive:false ~renaming ~ord:ctx.Ctx.ord
+  let lits = Lits.apply_subst ~renaming ~ord:ctx.Ctx.ord
     S.empty lits 0 in
+  *)
   let all_vars = Lits.vars lits in
+  (* proof *)
+  let proof' = proof (Lits.compact lits) in
   (* create the structure *)
-  let rec c = {
+  let c = {
     hclits = lits;
     hcctx = ctx;
     hcflags = 0;
@@ -172,16 +188,13 @@ let create_a ?parents ?selected ~ctx lits proof =
     hcweight = 0;
     hcselected = __no_select;
     hcvars = all_vars;
-    hcproof = Obj.magic 0;
+    hcproof = proof';
     hcparents = [];
     hcdescendants = SmallSet.empty ~cmp:(fun i j -> i-j);
     hcsimplto = None;
   } in
   let old_hc, c = c, CHashcons.hashcons c in
   if c == old_hc then begin
-    (* update proof *)
-    let proof' = proof (compact c) in
-    c.hcproof <- proof';
     (* select literals, if not already done *)
     begin c.hcselected <- match selected with
       | Some bv -> bv
@@ -216,6 +229,8 @@ let get_proof c = c.hcproof
 
 let is_empty c = Array.length c.hclits = 0
 
+let length c = Array.length c.hclits
+
 let stats () = CHashcons.stats ()
 
 (** descendants of the clause *)
@@ -246,11 +261,11 @@ let check_ord ~ord c =
 
 (** Apply substitution to the clause. Note that using the same renaming for all
     literals is important. *)
-let rec apply_subst ?recursive ~renaming subst c scope =
+let rec apply_subst ~renaming subst c scope =
   let ctx = c.hcctx in
   let ord = Ctx.ord ~ctx in
   let lits = Array.map
-    (fun lit -> Lit.apply_subst ?recursive ~renaming ~ord subst lit scope)
+    (fun lit -> Lit.apply_subst ~renaming ~ord subst lit scope)
     c.hclits in
   let descendants = c.hcdescendants in
   let proof = Proof.adapt_c c.hcproof in
@@ -263,9 +278,7 @@ let rec apply_subst ?recursive ~renaming subst c scope =
 let maxlits c scope subst =
   let ord = Ctx.ord c.hcctx in
   let renaming = Ctx.renaming_clear ~ctx:c.hcctx in
-  let lits =
-    Lits.apply_subst ~recursive:true ~ord ~renaming subst c.hclits scope
-  in
+  let lits = Lits.apply_subst ~ord ~renaming subst c.hclits scope in
   Lits.maxlits ~ord lits
 
 (** Check whether the literal is maximal *)
@@ -286,8 +299,8 @@ let eligible_res c scope subst =
      selected ones otherwise. *)
   let check_sign = not (BV.is_empty selected) in
   let bv = if BV.is_empty selected
-    then BV.create ~size:n true else
-    BV.copy selected
+    then BV.create ~size:n true
+    else BV.copy selected
   in
   (* Only keep literals that are maximal. If [check_sign] is true, comparisons
      are only done between same-sign literals. *)
@@ -347,7 +360,7 @@ let has_selected_lits c = not (BV.is_empty c.hcselected)
 let is_selected c i = BV.get c.hcselected i
 
 (** Indexed list of selected literals *)
-let selected_lits c = BV.select c.hcselected c.hclits
+let selected_lits c = BV.selecti c.hcselected c.hclits
 
 (** is the clause a unit clause? *)
 let is_unit_clause c = match c.hclits with
@@ -359,20 +372,14 @@ let is_oriented_rule c = match c.hclits with
   | [| Lit.Equation (_,_,true,Comparison.Lt) |] -> true (* oriented *)
   | _ -> false
 
-let infer_type ctx clauses =
-  Sequence.iter
-    (fun c -> Lits.infer_type ctx c.hclits)
-    clauses
+let symbols ?(init=Symbol.Set.empty) seq =
+  Sequence.fold
+    (fun set c -> Lits.symbols ~init:set c.hclits)
+    init seq
 
-(** Compute signature of this set of clauses *)
-let signature ?(signature=Signature.empty) clauses =
-  let ctx = TypeInference.Ctx.of_signature signature in
-  infer_type ctx clauses;
-  TypeInference.Ctx.to_signature ctx
-
-let from_forms ~file ~name ~ctx forms =
+let from_forms ?(role="axiom") ~file ~name ~ctx forms =
   let lits = Lits.of_forms ~ord:ctx.Ctx.ord forms in
-  let proof c = Proof.mk_c_axiom c ~file ~name in
+  let proof c = Proof.mk_c_file ~role ~file ~name c in
   create_a ~ctx lits proof
 
 (** {2 Filter literals} *)
@@ -392,12 +399,21 @@ module Eligible = struct
     let bv = eligible_chaining c 0 S.empty in
     fun i lit -> BV.get bv i
 
+  let eq i lit = match lit with
+    | Lit.Equation (_, _, true, _) -> true
+    | _ -> false
+
   let ineq c =
     let spec = Ctx.total_order c.hcctx in
     fun i lit -> Lit.is_ineq ~spec lit
 
   let ineq_of clause instance =
     fun i lit -> Lit.is_ineq_of ~instance lit
+
+  let max c =
+    let bv = Lits.maxlits ~ord:(Ctx.ord c.hcctx) c.hclits in
+    fun i lit ->
+      BV.get bv i
 
   let pos i lit = Lit.is_pos lit
 
@@ -496,8 +512,6 @@ module CSet = struct
 
   let of_seq set seq = Sequence.fold add set seq
 
-  let infer_type ctx set = infer_type ctx (to_seq set)
-
   let remove_seq set seq = Sequence.fold remove set seq
 
   let remove_id_seq set seq = Sequence.fold remove_id set seq
@@ -510,10 +524,10 @@ module WithPos = struct
   type t = {
     clause : clause;
     pos : Position.t;
-    term : Term.t;
+    term : T.t;
   }
   let compare t1 t2 =
-    let c = Pervasives.compare t1.clause t2.clause in
+    let c = t1.clause.hctag - t2.clause.hctag in
     if c <> 0 then c else
     let c = T.compare t1.term t2.term in
     if c <> 0 then c else
@@ -574,7 +588,7 @@ let bij ~ctx =
     ~extract:(fun (lits,proof) ->
       let proof = Proof.adapt_c proof in
       create_a ~ctx lits proof)
-    (pair (Lits.bij ~ord) (Proof.bij ~ord))
+    (pair (Lits.bij ~ord) Proof.bij)
     )
 
 let bij_set ~ctx =

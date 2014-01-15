@@ -28,17 +28,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
+(* TODO: also allow to contribute to {!PEnv} *)
+
 type t = {
   name : string;
   actions : action list;
 } (** An extension *)
 and action =
   | Ext_general of (Env.t -> unit)
-  | Ext_expert of (ctx:Ctx.t -> Experts.t)
   | Ext_binary_inf_rule of string * Env.binary_inf_rule
   | Ext_unary_inf_rule of string * Env.unary_inf_rule
   | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
-  | Ext_term_rewrite of string * (Term.t -> Term.t)
+  | Ext_term_rewrite of string * (FOTerm.t -> FOTerm.t)
   | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
   | Ext_simplification_rule of (Clause.t -> Clause.t)
   (** Action that can be performed by an extension *)

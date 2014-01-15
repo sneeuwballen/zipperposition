@@ -28,20 +28,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type t = Literal.t array
+type t = FOFormula.t array lazy_t
 
 val eq : t -> t -> bool
 val hash : t -> int
+val cmp : t -> t -> int
 
 val is_empty : t -> bool
 
-val iter : t -> (Literal.t -> unit) -> unit
+val iter : t -> (FOFormula.t -> unit) -> unit
 
-val to_seq : t -> Literal.t Sequence.t
+val to_seq : t -> FOFormula.t Sequence.t
 
 val pp : Buffer.t -> t -> unit
 val pp_tstp : Buffer.t -> t -> unit
 
 val to_string : t -> string
 val fmt : Format.formatter -> t -> unit
-val bij : ord:Ordering.t -> t Bij.t
+val bij : t Bij.t

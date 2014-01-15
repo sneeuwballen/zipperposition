@@ -89,7 +89,7 @@ class Run(object):
                 constraint foobar unique (filename, prover) on conflict replace
                 );"""
             self.conn.execute(create_query)
-            atexit.register(lambda : db.close())
+            atexit.register(lambda : self.conn.close())
         except sqlite3.OperationalError as e:
             pass
 
@@ -271,6 +271,19 @@ class Run(object):
         "finds the files on which provers give a different result"
         query = """select filename, prover, result, time from results r where
             (select count(distinct result) from results r2 where r2.filename=r.filename) > 1 ;"""
+        rows = list(self.conn.execute(query))
+        if display:
+            self.print_rows(rows)
+        return rows
+
+    @command
+    def inconsistency(self, display=True):
+        "finds the files on which provers give inconsistent results"
+        query = """select filename, prover, result, time from results r where
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "sat" > 0)
+          and
+          (select count(*) from results r2 where r2.filename=r.filename and r2.result = "unsat" > 0)
+          ;"""
         rows = list(self.conn.execute(query))
         if display:
             self.print_rows(rows)
