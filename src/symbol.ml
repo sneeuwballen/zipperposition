@@ -85,7 +85,9 @@ module H = Hashcons.Make(struct
   let equal s1 s2 = eq_base s1 s2
   let hash s = hash_base s
   let tag i s = match s with
-    | Const (s, info) -> info.tag <- i
+    | Const (s, info) ->
+      assert (info.tag = ~-1);
+      info.tag <- i
     | _ -> ()
 end)
 
@@ -260,7 +262,7 @@ let wildcard_symbol =
 (** {2 IO} *)
 
 let to_string_debug s = match s with
-  | Const (s,i) -> Util.sprintf "%s:%a" s Type.pp i.ty
+  | Const (s,i) -> Util.sprintf "%s:%a (id %d)" s Type.pp i.ty i.tag
   | Int n -> Big_int.string_of_big_int n
   | Rat n -> Ratio.string_of_ratio n
   | Real f -> string_of_float f
