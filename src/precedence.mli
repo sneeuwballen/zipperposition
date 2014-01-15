@@ -49,6 +49,9 @@ module type S = sig
   val compare : t -> symbol -> symbol -> int
     (** Compare two symbols using the precedence *)
 
+  val mem : t -> symbol -> bool
+    (** Is the symbol part of the precedence? *)
+
   val status : t -> symbol -> symbol_status
     (** Status of the symbol *)
 
@@ -68,6 +71,7 @@ module type S = sig
   end
 
   val pp_snapshot : Buffer.t -> symbol list -> unit
+  val pp_debug : Buffer.t -> t -> unit
   val pp : Buffer.t -> t -> unit
   val fmt : Format.formatter -> t -> unit
   val to_string : t -> string
@@ -133,6 +137,7 @@ module type SYMBOL = sig
   val true_ : t
 
   val pp : Buffer.t -> t -> unit
+  val pp_debug : Buffer.t -> t -> unit
 end
 
 module Make(Sym : SYMBOL) : S with type symbol = Sym.t
