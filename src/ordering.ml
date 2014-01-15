@@ -128,14 +128,14 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
 
   type t = {
     cache : Comparison.t Cache.t;
-    compare : term -> term -> Comparison.t;
+    compare : Prec.t -> term -> term -> Comparison.t;
     prec : Prec.t;
     name : string;
   } (** Partial ordering on terms *)
 
   type ordering = t
 
-  let compare ord t1 t2 = ord.compare t1 t2
+  let compare ord t1 t2 = ord.compare ord.prec t1 t2
 
   let precedence ord = ord.prec
 
@@ -150,6 +150,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
   let set_precedence ord prec' =
     if not (_check_precedence ord.prec prec')
       then raise (Invalid_argument "Ordering.set_precedence");
+    Cache.clear ord.cache;
     { ord with prec=prec'; }
 
   let update_precedence ord f =
@@ -368,7 +369,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
       (* node/node, De Bruijn/De Bruijn *)
       | T.Node (f, _, ss), T.Node (g, _, ts) -> rpo6_composite ~prec s t f g ss ts
       | T.BoundVar i, T.BoundVar j ->
-        if i = j then Eq else Incomparable
+        if i = j && Type.eq s.T.ty t.T.ty then Eq else Incomparable
       (* node and something else *)
       | T.Node (f, _, ss), T.BoundVar _ -> Comparison.Incomparable
       | T.BoundVar _, T.Node (g, _, ts) -> Comparison.Incomparable
@@ -433,26 +434,26 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
 
   let kbo prec =
     let cache = Cache.create 4096 in
-    let compare = Cache.with_cache cache
-      (fun a b -> KBO.compare_terms ~prec:prec a b)
+    let compare prec = Cache.with_cache cache
+      (fun a b -> KBO.compare_terms ~prec a b)
     in
     { cache; compare; name=KBO.name; prec; }
 
   let rpo6 prec =
     let cache = Cache.create 4096 in
-    let compare = Cache.with_cache cache
-      (fun a b -> RPO6.compare_terms ~prec:prec a b)
+    let compare prec = Cache.with_cache cache
+      (fun a b -> RPO6.compare_terms ~prec a b)
     in
     { cache; compare; name=RPO6.name; prec; }
 
   let __cache = Cache.create 5
 
   let none =
-    let compare t1 t2 = if T.eq t1 t2 then Eq else Incomparable in
+    let compare _ t1 t2 = if T.eq t1 t2 then Eq else Incomparable in
     { cache=__cache; compare; prec=Prec.default []; name="none"; }
 
   let subterm =
-    let compare t1 t2 =
+    let compare _ t1 t2 =
       if T.eq t1 t2 then Eq
       else if T.subterm ~sub:t1 t2 then Lt
       else if T.subterm ~sub:t2 t1 then Gt
