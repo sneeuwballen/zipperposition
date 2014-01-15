@@ -40,6 +40,9 @@ type pform = t
 
 let eq t1 t2 = F.eq t1.form t2.form && Proof.eq t1.proof t2.proof
 let hash t = Hash.hash_int2 (F.hash t.form) (Proof.hash t.proof)
+let cmp t1 t2 =
+  let c = F.compare t1.form t2.form in
+  if c <> 0 then c else Proof.cmp t1.proof t2.proof
 
 let create form proof = { form; proof; }
 

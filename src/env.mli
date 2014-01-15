@@ -35,123 +35,133 @@ type binary_inf_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t list
 type unary_inf_rule = Clause.t -> Clause.t list
   (** unary infererences *)
 
+type rw_simplify_rule = ProofState.SimplSet.t -> Clause.t -> Clause.t 
+  (** Simplify a clause w.r.t. a simplification set *)
+
+type active_simplify_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.t
+  (** Simplify the given clause using clauses from the active set. *)
+
+type backward_simplify_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
+  (** backward simplification by a unit clause. It returns a set of
+      active clauses that can potentially be simplified by the given clause.
+      [backward_simplify active c] therefore returns a subset of [active]. *)
+
+type redundant_rule = ProofState.ActiveSet.t -> Clause.t -> bool
+  (** check whether the clause is redundant w.r.t the set *)
+
+type backward_redundant_rule = ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
+  (** find redundant clauses in set w.r.t the clause *)
+
+type simplify_rule = Clause.t -> Clause.t
+  (** Simplify the clause structurally (basic simplifications) *)
+
+type is_trivial_rule = Clause.t -> bool
+  (** Rule that checks whether the clause is trivial (a tautology) *)
+
 type lit_rewrite_rule = ctx:Ctx.t -> Literal.t -> Literal.t
   (** Rewrite rule on literals *)
 
 type preprocess_rule = string * (ctx:Ctx.t -> Transform.t)
-  (** A preprocessing rule, which is a named transformation of formula. *)
+  (** A preprocessing rule, which is a named transformation of formula.
+  TODO remove and use some Clause|Formula format with forward
+    simplification ptr *)
 
-type t = {
-  mutable params : Params.t;
-  mutable ctx : Ctx.t;
+type t
+  (** Global context for a superposition proof. It contains the inference
+      rules, the context, the proof state... *)
 
-  mutable binary_rules : (string * binary_inf_rule) list;
-    (** the binary inference rules *)
-  
-  mutable unary_rules : (string * unary_inf_rule) list;
-    (** the unary inference rules *)
-
-  mutable rewrite_rules : (string * (Term.t -> Term.t)) list;
-    (** Rules to apply to term *)
-
-  mutable lit_rules : (string * lit_rewrite_rule) list;
-    (** Rules to be applied to literals *)
-  
-  mutable basic_simplify : Clause.t -> Clause.t;
-    (** how to simplify a clause *)
-  
-  mutable rw_simplify : ProofState.SimplSet.t -> Clause.t -> Clause.t;
-    (** how to simplify a clause w.r.t a set of unit clauses *)
-  
-  mutable active_simplify : ProofState.ActiveSet.t -> Clause.t -> Clause.t;
-    (** how to simplify a clause w.r.t an active set of clauses *)
-
-  mutable backward_simplify : ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t;
-    (** backward simplification by a unit clause. It returns a set of
-        active clauses that can potentially be simplified by the given clause *)
-
-  mutable redundant : ProofState.ActiveSet.t -> Clause.t -> bool;
-    (** check whether the clause is redundant w.r.t the set *)
-
-  mutable backward_redundant : ProofState.ActiveSet.t -> Clause.t -> Clause.t list;
-    (** find redundant clauses in set w.r.t the clause *)
-
-  mutable list_simplify : Clause.t -> Clause.t list;
-    (** how to simplify a clause into a (possibly empty) list
-        of clauses. This subsumes the notion of trivial clauses (that
-        are simplified into the empty list of clauses) *)
-
-  mutable is_trivial : Clause.t -> bool;
-    (** single test to detect trivial clauses *)
-
-  mutable axioms : PFormula.t list;
-    (** a list of axioms to add to the problem *)
-
-  mutable mk_constr : (Formula.t Sequence.t -> Precedence.constr list) list;
-    (** How to build constraints from a list of clauses *)
-
-  mutable constr : Precedence.constr list;
-    (** some constraints on the precedence *)
-
-  mutable preprocess : preprocess_rule list;
-    (** how to preprocess the initial list of formulas *)
-
-  mutable state : ProofState.t;
-    (** Proof state *)
-
-  mutable empty_clauses : Clause.CSet.t;
-    (** Set of empty clauses *)
-
-  mutable on_empty : (Clause.t -> unit) list;
-    (** Callbacks for empty clause detection *)
-}
-
-(** {2 Basic operations} *)
+(** {2 Modify the Env} *)
 
 val create : ?meta:MetaProverState.t -> ctx:Ctx.t -> Params.t ->
              Signature.t -> t
   (** Create an environment (initially empty) *)
 
 val add_passive : env:t -> Clause.t Sequence.t -> unit
+  (** Add passive clauses *)
 
 val add_active : env:t -> Clause.t Sequence.t -> unit
+  (** Add active clauses *)
 
 val add_simpl : env:t -> Clause.t Sequence.t -> unit
+  (** Add simplification clauses *)
 
 val remove_passive : env:t -> Clause.t Sequence.t -> unit
+  (** Remove passive clauses *)
 
 val remove_passive_id : env:t -> int Sequence.t -> unit
+  (** Remove passive clauses by their ID *)
 
 val remove_active : env:t -> Clause.t Sequence.t -> unit
+  (** Remove active clauses *)
 
 val remove_simpl  : env:t -> Clause.t Sequence.t -> unit
+  (** Remove simplification clauses *)
 
 val clean_passive : env:t -> unit
-  (** Clean passive set *)
+  (** Clean passive set (remove old clauses from clause queues) *)
 
 val add_constrs : env:t -> Precedence.constr Sequence.t -> unit
+  (** Add precedence constraints to the env *)
 
 val add_mk_constr : env:t -> (Formula.t Sequence.t -> Precedence.constr list) -> unit
+  (** Add constraint factory *)
 
 val get_passive : env:t -> Clause.t Sequence.t
+  (** Passive clauses *)
 
 val get_active : env:t -> Clause.t Sequence.t
+  (** Active clauses *)
 
 val get_simpl : env:t -> Clause.t Sequence.t
+  (** Clauses that can be used for simplification (unit clauses, mostly) *)
 
 val add_binary_inf : env:t -> string -> binary_inf_rule -> unit
+  (** Add a binary inference rule *)
 
 val add_unary_inf : env:t -> string -> unary_inf_rule -> unit
+  (** Add a unary inference rule *)
+
+val add_rw_simplify : env:t -> rw_simplify_rule -> unit
+  (** Add forward rewriting rule *)
+
+val add_active_simplify : env:t -> active_simplify_rule -> unit
+  (** Add simplification w.r.t active set *)
+
+val add_backward_simplify : env:t -> backward_simplify_rule -> unit
+  (** Add simplification of the active set *)
+
+val add_redundant : env:t -> redundant_rule -> unit
+  (** Add redundancy criterion w.r.t. the active set *)
+
+val add_backward_redundant : env:t -> backward_redundant_rule -> unit
+  (** Add rule that finds redundant clauses within active set *)
+
+val add_simplify : env:t -> simplify_rule -> unit
+  (** Add basic simplification rule *)
+
+val add_is_trivial : env:t -> is_trivial_rule -> unit
+  (** Add tautology detection rule *)
 
 val add_expert : env:t -> Experts.t -> unit
+  (** Add an expert structure *)
 
 val add_rewrite_rule : env:t -> string -> (Term.t -> Term.t) -> unit
+  (** Add a term rewrite rule *)
 
 val add_lit_rule : env:t -> string -> lit_rewrite_rule -> unit
+  (** Add a literal rewrite rule *)
 
 val add_preprocess_rule : env:t -> preprocess_rule -> unit
+  (** Preprocessing rule *)
 
-val list_simplify : env:t -> Clause.t -> Clause.t list
+val add_axioms : env:t -> PFormula.t Sequence.t -> unit
+  (** Add axioms to the environment *)
+
+(** {2 Use the Env} *)
+
+val simplify : env:t -> Clause.t -> Clause.t
+  (** Simplify the clause w.r.t the proof state. It uses many simplification
+      rules and rewriting rules. *)
 
 val get_experts : env:t -> Experts.Set.t
 
@@ -160,16 +170,24 @@ val get_meta : env:t -> MetaProverState.t option
 val get_params : env:t -> Params.t
 
 val get_empty_clauses : env:t -> Clause.CSet.t
+  (** Set of known empty clauses *)
+
 val get_some_empty_clause : env:t -> Clause.t option
+  (** Some empty clause, if present, otherwise None *)
 
 val add_on_empty : env:t -> (Clause.t -> unit) -> unit
+  (** Callback, that will be called when an empty clause is added to the
+      active or passive set *)
 
 val compute_constrs : env:t -> Formula.t Sequence.t -> Precedence.constr list
   (** Compute all ordering constraints for the given list of clauses *)
 
+val ctx : t -> Ctx.t
 val ord : t -> Ordering.t
 val precedence : t -> Precedence.t
 val signature : t -> Signature.t
+
+val state : t -> ProofState.t
 
 val pp : Buffer.t -> t -> unit
 val fmt : Format.formatter -> t -> unit
@@ -180,7 +198,7 @@ type stats = int * int * int
   (** statistics on clauses : num active, num passive, num simplification *)
 
 val cnf : env:t -> PFormula.t list -> Clause.t list
-  (** Reduce formulas to CNF *)
+  (** Reduce formulas to CNF TODO: FormOrClause.t *)
 
 val stats : env:t -> stats
   (** Compute stats *)
@@ -205,7 +223,7 @@ val backward_simplify : env:t -> Clause.t -> Clause.CSet.t * Clause.t Sequence.t
       CSet of clauses that become redundant, and the sequence of those
       very same clauses after simplification. *)
 
-val forward_simplify : env:t -> Clause.t -> Clause.t Sequence.t
+val forward_simplify : env:t -> Clause.t -> Clause.t
   (** Simplify the clause w.r.t to the active set and experts *)
 
 val remove_orphans : env:t -> Clause.t Sequence.t -> unit
@@ -217,12 +235,12 @@ val generate : env:t -> Clause.t -> Clause.t Sequence.t
 val is_redundant : env:t -> Clause.t -> bool
   (** Is the given clause redundant w.r.t the active set? *)
 
-val subsumed_by : env:t -> Clause.t -> Clause.t list
+val subsumed_by : env:t -> Clause.t -> Clause.CSet.t
   (** List of active clauses subsumed by the given clause *)
 
-val all_simplify : env:t -> Clause.t -> Clause.t list
-  (** Use all simplification rules to convert a clause into a list of maximally
-      simplified clauses (possibly empty, if trivial). *)
+val all_simplify : env:t -> Clause.t -> Clause.t option
+  (** Use all simplification rules to convert a clause into a maximally
+      simplified clause (or None, if trivial). *)
 
 val meta_step : env:t -> Clause.t -> Clause.t Sequence.t
   (** Do one step of the meta-prover with the current given clause. New clauses
@@ -230,5 +248,6 @@ val meta_step : env:t -> Clause.t -> Clause.t Sequence.t
   
 val preprocess : env:t -> PFormula.t list -> PFormula.t list
   (** Preprocess formulas. This has a fixpoint semantic, i.e. it applies
-      preprocessing rules until none applies anymore *)
+      preprocessing rules until none applies anymore
+      TODO use FormOrClause.t *)
 

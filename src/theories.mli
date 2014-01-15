@@ -38,8 +38,9 @@ module AC : sig
     add : Symbol.t -> unit;
   }
 
-  val create : unit -> t
-    (** Create a new specification *)
+  val create : ?base:bool -> unit -> t
+    (** Create a new specification. If [base] is true (default), then
+        AC symbols from the default signature are declared (arithmetic...) *)
 
   val add : spec:t -> Symbol.t -> unit
     (** Add the symbol to the list of AC symbols *)
@@ -60,9 +61,18 @@ module TotalOrder : sig
 
   type t 
 
-  val create : unit -> t
+  type lit = {
+    left : Term.t;
+    right : Term.t;
+    strict : bool;
+    instance : instance;
+  } (** A literal is an atomic inequality. [strict] is [true] iff the
+      literal is a strict inequality, and the ordering itself
+      is also provided. *)
+
+  val create : ?base:bool -> unit -> t
     (** New specification. It already contains an instance
-        for "$less" and "$lesseq". *)
+        for "$less" and "$lesseq" if [base] is true (default). *)
 
   val add : spec:t -> less:Symbol.t -> lesseq:Symbol.t -> instance
     (** New instance of ordering.

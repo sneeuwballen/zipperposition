@@ -32,6 +32,9 @@ open Logtk
 module T = Term
 module F = Formula
 module S = Substs
+module TO = Theories.TotalOrder
+module Pos = Position
+module PB = Position.Build
 
 type t =
   | Equation of Term.t * Term.t * bool * Comparison.t
@@ -238,11 +241,22 @@ let mk_eq ~ord a b = mk_lit ~ord a b true
 
 let mk_neq ~ord a b = mk_lit ~ord a b false
 
-let mk_prop ~ord p sign = mk_lit ~ord p T.true_term sign
+let mk_prop p sign = match p with
+  | _ when p == T.true_term -> if sign then True else False
+  | _ when p == T.false_term -> if sign then False else True
+  | _ -> Prop (p, sign)
 
-let mk_true ~ord p = mk_prop ~ord p true
+let mk_true p = mk_prop p true
 
-let mk_false ~ord p = mk_prop ~ord p false
+let mk_false p = mk_prop p false
+
+let mk_less instance l r =
+  let open Theories.TotalOrder in
+  mk_true (T.mk_node instance.less [l; r])
+
+let mk_lesseq instance l r =
+  let open Theories.TotalOrder in
+  mk_true (T.mk_node instance.lesseq [l; r])
 
 let apply_subst ?(recursive=true) ~renaming ~ord subst lit scope =
   match lit with
@@ -268,8 +282,8 @@ let lit_of_form ~ord f =
   match f.F.form with
   | F.True -> True
   | F.False -> False
-  | F.Atom a -> mk_true ~ord a
-  | F.Not {F.form=F.Atom a} -> mk_false ~ord a
+  | F.Atom a -> mk_true a
+  | F.Not {F.form=F.Atom a} -> mk_false a
   | F.Equal (l,r) -> mk_eq ~ord l r
   | F.Not {F.form=F.Equal (l,r)} -> mk_neq ~ord l r
   | _ -> failwith (Util.sprintf "not a literal: %a" F.pp f)
@@ -303,7 +317,7 @@ let fmap ~ord f = function
     mk_lit ~ord new_left new_right sign
   | Prop (p, sign) ->
     let p' = f p in
-    mk_prop ~ord p' sign
+    mk_prop p' sign
   | True -> True
   | False -> False
 
@@ -419,6 +433,15 @@ let bij ~ord =
 
 module Arr = struct
   let eq lits1 lits2 =
+    let rec check i =
+      if i = Array.length lits1 then true else
+      eq lits1.(i) lits2.(i) && check (i+1)
+    in
+    if Array.length lits1 <> Array.length lits2
+      then false
+      else check 0
+
+  let eq_com lits1 lits2 =
     let rec check i =
       if i = Array.length lits1 then true else
       eq_com lits1.(i) lits2.(i) && check (i+1)
@@ -608,36 +631,84 @@ module Arr = struct
       else if not (eligible i lits.(i)) then fold acc (i+1)
       else
         let acc = match lits.(i) with
-        | Equation (l,r,sign,Comparison.Gt) ->
+        | Equation (l,r,sign,Comparison.Gt) when sign_ok sign ->
           f acc l r sign [i; Position.left_pos]
-        | Equation (l,r,sign,Comparison.Lt) ->
+        | Equation (l,r,sign,Comparison.Lt) when sign_ok sign ->
           f acc r l sign [i; Position.right_pos]
-        | Equation (l,r,sign,_) ->
+        | Equation (l,r,sign,_) when sign_ok sign ->
           if both
           then (* visit both sides of the equation *)
             let acc = f acc r l sign [i; Position.right_pos] in
             f acc l r sign [i; Position.left_pos]
           else (* only visit one side (arbitrary) *)
             f acc l r sign [i; Position.left_pos]
-        | Prop (p, sign) ->
+        | Prop (p, sign) when sign_ok sign ->
           f acc p T.true_term sign [i; Position.left_pos]
+        | Prop _
+        | Equation _
         | True
         | False -> acc
         in fold acc (i+1)
     in fold acc 0
 
-  (** decompose the literal at given position *)
-  let get_eqn lits pos = match pos with
-    | idx::eq_side::_ ->
-      begin match lits.(idx) with
-      | Equation (l,r,sign,_) when eq_side = Position.left_pos -> (l, r, sign)
-      | Equation (l,r,sign,_) when eq_side = Position.right_pos -> (r, l, sign)
-      | Prop (p, sign) when eq_side = Position.left_pos -> (p, T.true_term, sign)
-      | True when eq_side = Position.left_pos -> (T.true_term, T.true_term, true)
-      | False when eq_side = Position.left_pos -> (T.true_term, T.true_term, false)
-      | _ -> invalid_arg "wrong side"
-      end
-    | _ -> invalid_arg "wrong kind of position (needs list of >= 2 elements)"
+  let fold_ineq ~spec ~eligible lits acc f =
+    let rec fold acc i =
+      if i = Array.length lits then acc
+      else if not (eligible i lits.(i)) then fold acc (i+1)
+      else
+        let acc =
+          try
+            let lit = ineq_lit ~spec lits.(i) in
+            let pos = [i; Position.left_pos] in
+            f acc lit pos
+          with Not_found ->
+            acc
+        in
+        fold acc (i+1)
+    in fold acc 0
+
+  (* TODO: new arguments *)
+  let fold_terms ?(vars=false) ~(which : [< `Max|`One|`Both]) ~subterms ~eligible lits acc f =
+    let rec fold acc i =
+      if i = Array.length lits
+        then acc
+      else if not (eligible i lits.(i))
+        then fold acc (i+1)   (* ignore lit *)
+      else
+        let acc = match lits.(i), which with
+        | Equation (l,r,sign,Comparison.Gt), (`Max | `One) ->
+          if subterms
+            then T.all_positions ~vars ~pos:[i; Pos.left_pos] l acc f
+            else f acc l [i; Pos.left_pos]
+        | Equation (l,r,sign,Comparison.Lt), (`Max | `One) ->
+          if subterms
+            then T.all_positions ~vars ~pos:[i; Pos.right_pos] r acc f
+            else f acc r [i; Pos.left_pos]
+        | Equation (l,r,sign,_), `One ->
+          (* only visit one side (arbitrary) *)
+          f acc l [i; Pos.left_pos]
+        | Equation (l,r,sign,(Comparison.Eq | Comparison.Incomparable)), `Max ->
+          (* visit both sides, they are both (potentially) maximal *)
+          f acc l [i; Pos.left_pos]
+        | Equation (l,r,sign,_), `Both ->
+          (* visit both sides of the equation *)
+          if subterms
+            then
+              let acc = T.all_positions ~vars ~pos:[i; Pos.left_pos] l acc f in
+              let acc = T.all_positions ~vars ~pos:[i; Pos.right_pos] r acc f in
+              acc
+            else
+              let acc = f acc l [i; Pos.left_pos] in
+              let acc = f acc r [i; Pos.right_pos] in
+              acc
+        | Prop (p, _), _ ->
+          if subterms
+            then T.all_positions ~vars ~pos:[i; Pos.left_pos] p acc f
+            else f acc p [i; Pos.left_pos]
+        | True, _
+        | False, _ -> acc
+        in fold acc (i+1)
+    in fold acc 0
 
   (** {3 IO} *)
 

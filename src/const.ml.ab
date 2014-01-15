@@ -1,3 +1,4 @@
+
 (*
 Zipperposition: a functional superposition prover for prototyping
 Copyright (c) 2013, Simon Cruanes
@@ -24,39 +25,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Dynamic extensions} *)
+(** {6 Configuration and Globals} *)
 
-open Logtk
+(* place for storage *)
+let home = "$(datadir)/"
 
-type t = {
-  name : string;
-  actions : action list;
-} (** An extension *)
-and action =
-  | Ext_general of (Env.t -> unit)
-  | Ext_expert of (ctx:Ctx.t -> Experts.t)
-  | Ext_binary_inf_rule of string * Env.binary_inf_rule
-  | Ext_unary_inf_rule of string * Env.unary_inf_rule
-  | Ext_signal_incompleteness  (** with extension, prover is incomplete *)
-  | Ext_term_rewrite of string * (Term.t -> Term.t)
-  | Ext_lit_rewrite of string * (ctx:Ctx.t -> Literal.t -> Literal.t)
-  | Ext_simplification_rule of (Clause.t -> Clause.t)
-  (** Action that can be performed by an extension *)
+let version = "$(pkg_version)"
 
-val register : t -> unit
-  (** Register an extension to the (current) prover. Plugins should call this
-      when they are loaded. *)
-
-type load_result =
-  | Ext_success of t
-  | Ext_failure of string
-  (** Result of an attempt to load a plugin *)
-
-val dyn_load : string -> load_result
-  (** Try to load the extension located in the given file *)
-
-val apply : env:Env.t -> t -> unit
-  (** Apply the extension to the Env.t, adding rules, modifying the env
-      in place. *)
-
-val apply_list : env:Env.t -> t list -> unit
+(* vim:filetype=ocaml:
+*)

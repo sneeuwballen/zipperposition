@@ -35,6 +35,7 @@ type t = {
   mutable skolem : Skolem.ctx;        (** Context for skolem symbols *)
   mutable signature : Signature.t;    (** Signature *)
   mutable complete : bool;            (** Completeness preserved? *)
+  renaming : Substs.Renaming.t;       (** Renaming *)
   ac : Theories.AC.t;                 (** AC symbols *)
   total_order : Theories.TotalOrder.t;(** Total ordering *)
 }
@@ -46,6 +47,7 @@ let create ?(ord=Ordering.none) ?(select=Selection.no_select) ~signature () =
     skolem = Skolem.create ~prefix:"zsk" ();
     signature;
     complete=true;
+    renaming = Substs.Renaming.create 13;
     ac = Theories.AC.create ();
     total_order = Theories.TotalOrder.create ();
   } in
@@ -71,6 +73,11 @@ let add_signature ~ctx signature =
 let ac ~ctx = ctx.ac
 
 let total_order ~ctx = ctx.total_order
+
+let renaming_clear ~ctx =
+  let r = ctx.renaming in
+  Substs.Renaming.clear r;
+  r
 
 let add_ac ~ctx s = Theories.AC.add ~spec:ctx.ac s
 

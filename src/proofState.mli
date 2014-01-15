@@ -31,9 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 open Logtk
 
-type clause_pos = Clause.t * Position.t * Term.t
-
-module TermIndex : Index.TERM_IDX with type elt = clause_pos
+module TermIndex : Index.TERM_IDX with type elt = Clause.WithPos.t
 module UnitIndex : Index.UNIT_IDX with type E.t = (Term.t * Term.t * bool * Clause.t)
                                   and type E.rhs = Term.t
 module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
@@ -46,8 +44,8 @@ module ActiveSet : sig
       clauses : Clause.CSet.t;          (** set of active clauses *)
       idx_sup_into : TermIndex.t;       (** index for superposition into the set *)
       idx_sup_from : TermIndex.t;       (** index for superposition from the set *)
-      idx_left_ord : TermIndex.t;       (** terms on left of an inequality *)
-      idx_right_ord : TermIndex.t;      (** terms on right of an inequality *)
+      idx_ord_side : TermIndex.t;       (** terms immediately under inequality *)
+      idx_ord_subterm : TermIndex.t;    (** subterms of inequality literals *)
       idx_back_demod : TermIndex.t;     (** index for backward demodulation/simplifications *)
       idx_fv : SubsumptionIndex.t;      (** index for subsumption *)
 

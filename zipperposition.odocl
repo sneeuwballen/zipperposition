@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e2a4152d030465f67fcf4bb88c552924)
+# DO NOT EDIT (digest: 96109db4c266be9a53b7223d6c1b8388)
 src/ClauseQueue
 src/Clause
 src/Const
@@ -20,5 +20,4 @@ src/AC
 src/Chaining
 src/Params
 src/Env
-src/Arith
 # OASIS_STOP

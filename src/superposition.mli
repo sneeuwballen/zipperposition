@@ -75,8 +75,8 @@ val negative_simplify_reflect : ProofState.SimplSet.t -> Clause.t -> Clause.t
 val subsumes : Literal.t array -> Literal.t array -> bool
   (** subsumes c1 c2 iff c1 subsumes c2 *)
 
-val subsumes_with : Literal.t array Substs.scoped ->
-                    Literal.t array Substs.scoped ->
+val subsumes_with : Literal.t array -> Substs.scope ->
+                    Literal.t array -> Substs.scope ->
                     Substs.t option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
@@ -86,7 +86,7 @@ val eq_subsumes : Literal.t array -> Literal.t array -> bool
 val subsumed_by_set : ProofState.ActiveSet.t -> Clause.t -> bool
   (** check whether the clause is subsumed by any clause in the set *)
 
-val subsumed_in_set : ProofState.ActiveSet.t -> Clause.t -> Clause.t list
+val subsumed_in_set : ProofState.ActiveSet.t -> Clause.t -> Clause.CSet.t
   (** list of clauses in the active set that are subsumed by the clause *)
 
 val contextual_literal_cutting : ProofState.ActiveSet.t -> Clause.t -> Clause.t

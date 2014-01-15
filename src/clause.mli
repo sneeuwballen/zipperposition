@@ -52,6 +52,7 @@ type t = private {
   mutable hcproof : Proof.t;             (** Proof of the clause *)
   mutable hcparents : t list;             (** parents of the clause *)
   mutable hcdescendants : int SmallSet.t ;(** the set of IDs of descendants of the clause *)
+  mutable hcsimplto : t option;           (** simplifies into the clause *)
 } 
 
 type clause = t
@@ -94,6 +95,13 @@ end
 val is_child_of : child:t -> t -> unit
   (** [is_child_of ~child c] is to be called to remember that [child] is a child
       of [c], is has been infered/simplified from [c] *)
+
+val follow_simpl : t -> t
+  (** Follow the "hcsimplto" links until the clause has None *)
+
+val simpl_to : from:t -> into:t -> unit
+  (** [simpl_to ~from ~into] sets the link of [from] to [into], so that
+      the simplification of [from] into [into] is cached. *)
 
 module CHashcons : Hashcons.S with type elt = clause
 
@@ -146,11 +154,21 @@ val is_maxlit : t -> Substs.scope -> Substs.t -> int -> bool
 
 val eligible_res : t -> Substs.scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
-      are eligible for resolution. *)
+      are eligible for resolution. THe literal has to be either maximal
+      among selected literals of the same sign, if some literal is selected,
+      or maximal if none is selected. *)
 
 val eligible_param : t -> Substs.scope -> Substs.t -> BV.t
   (** Bitvector that indicates which of the literals of [subst(clause)]
-      are eligible for paramodulation. *)
+      are eligible for paramodulation. That means the literal
+      is positive, no literal is selecteed, and the literal
+      is maximal among literals of [subst(clause)]. *)
+
+val eligible_chaining : t -> Substs.scope -> Substs.t -> BV.t
+  (** Bitvector of literals of [subst(clause)] that are eligible
+      for equality chaining or inequality chaining. That amouns to being
+      a maximal, positive inequality literal within the clause,
+      and assume the clause has no selected literal. *)
 
 val has_selected_lits : t -> bool
   (** does the clause have some selected literals? *)
@@ -254,6 +272,12 @@ module CSet : sig
   val choose : t -> clause option
     (** Choose a clause in the set *)
 
+  val union : t -> t -> t
+    (** Union of sets *)
+
+  val inter : t -> t -> t
+    (** Intersection of sets *)
+
   val iter : t -> (clause -> unit) -> unit
     (** iterate on clauses in the set *)
 
@@ -274,11 +298,19 @@ module CSet : sig
   val remove_id_seq : t -> int Sequence.t -> t
 end
 
-(** {2 Positions in clauses} *)
+(** {2 Clauses with more data} *)
 
-type clause_pos = t * Position.t * Term.t
+(** Clause within which a subterm (and its position) are hilighted *)
+module WithPos : sig
+  type t = {
+    clause : clause;
+    pos : Position.t;
+    term : Term.t;
+  }
 
-val compare_clause_pos : clause_pos -> clause_pos -> int
+  val compare : t -> t -> int
+  val pp : Buffer.t -> t -> unit
+end
 
 (** {2 IO} *)
 

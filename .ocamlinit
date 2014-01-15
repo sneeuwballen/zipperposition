@@ -1,5 +1,4 @@
 #use "topfind";;
-#require "yojson";;
 #require "datalog";;
 #require "num";;
 #require "unix";;

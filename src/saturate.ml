@@ -54,45 +54,34 @@ let check_timeout = function
 
 (** One iteration of the main loop ("given clause loop") *)
 let given_clause_step ?(generating=true) ~env num =
-  let ctx = env.Env.ctx in
+  let ctx = Env.ctx env in
   let ord = Ctx.ord ctx in
-  let experts = Env.get_experts env in
   Util.debug 3 "env for next given loop: %a" Env.pp env;
   (* select next given clause *)
   match Env.next_passive ~env with
   | None -> Sat (* passive set is empty *)
   | Some c ->
-    (* simplify given clause w.r.t. active set, then remove redundant clauses *)
-    let c_list = Env.all_simplify ~env c in
-    let c_list = List.filter
-      (fun c' -> not (Env.is_redundant ~env c'))
-      c_list
-    in
-    match c_list with
-    | [] -> 
-      Util.debug 2 "given clause %a is redundant" C.pp c;
+    begin match Env.all_simplify ~env c with
+    | None ->
       Util.incr_stat stat_redundant_given;
-      Unknown  (* all simplifications are redundant *)
-    | c::_ when C.is_empty c ->
-      Unsat c  (* empty clause found *)
-    | c::new_clauses when Experts.Set.is_redundant experts c ->
       Util.debug 2 "given clause %a is redundant" C.pp c;
       Env.add_simpl ~env (Sequence.singleton c);
-      Env.add_passive ~env (Sequence.of_list new_clauses);
-      Unknown  (* redundant given clause *)
-    | c::new_clauses ->
-      let new_clauses = Vector.from_list new_clauses in
-      (* select first clause, the other ones are passive *) 
+      Unknown
+    | Some c when C.is_empty c ->
+      Unsat c  (* empty clause found *)
+    | Some c ->
+      (* process this clause! *)
+      let new_clauses = Vector.create 15 in
       assert (not (Env.is_redundant ~env c));
       (* process the given clause! *)
       Util.incr_stat stat_processed_given;
       C.check_ord ~ord c;
-      Util.debug 2 "============ step %5d  ============" num;
+      Util.debug 2 "================= step %5d  ===============" num;
       Util.debug 1 "given: %a" C.pp c;
       (* yield control to meta-prover *)
       Vector.append_seq new_clauses (Env.meta_step ~env c);
       (* find clauses that are subsumed by given in active_set *)
-      let subsumed_active = Sequence.of_list (Env.subsumed_by ~env c) in
+      let subsumed_active = C.CSet.to_seq (Env.subsumed_by ~env c) in
       Env.remove_active ~env subsumed_active;
       Env.remove_simpl ~env subsumed_active;
       Env.remove_orphans ~env subsumed_active; (* orphan criterion *)
@@ -117,24 +106,25 @@ let given_clause_step ?(generating=true) ~env num =
         else Sequence.empty in
       (* simplification of inferred clauses w.r.t active set; only the non-trivial ones
          are kept (by list-simplify) *)
-      let inferred_clauses = Sequence.flatMap
+      let inferred_clauses = Sequence.fmap
         (fun c ->
-          let cs = Env.forward_simplify ~env c in
+          let c = Env.forward_simplify ~env c in
           (* keep clauses  that are not redundant *)
-          let cs = Sequence.filter (fun c -> not (Env.is_trivial ~env c)) cs in
-          cs)
+          if Env.is_trivial ~env c
+            then None
+            else Some c)
         inferred_clauses
       in
       Vector.append_seq new_clauses inferred_clauses;
-      (if Util.get_debug () >= 2
-        then Vector.iter new_clauses
-          (fun new_c -> Util.debug 2 "    inferred new clause %a" C.pp new_c));
+      (if Util.get_debug () >= 2 then Vector.iter new_clauses
+        (fun new_c -> Util.debug 2 "    inferred new clause %a" C.pp new_c));
       (* add new clauses (including simplified active clauses) to passive set and simpl_set *)
       Env.add_passive ~env (Vector.to_seq new_clauses);
       (* test whether the empty clause has been found *)
       match Env.get_some_empty_clause ~env with
       | None -> Unknown
       | Some empty_clause -> Unsat empty_clause
+    end
 
 (** print progress *)
 let print_progress ~env steps =

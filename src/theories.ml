@@ -39,7 +39,7 @@ module AC = struct
     add : Symbol.t -> unit;
   } (** Specification: which symbols are AC? *)
 
-  let create () =
+  let create ?(base=true) () =
     let h = STbl.create 13 in
     let is_ac s = STbl.mem h s in
     let symbols () =
@@ -48,7 +48,13 @@ module AC = struct
         h Symbol.SSet.empty
     in
     let add s = STbl.replace h s () in
-    { is_ac; symbols; add; }
+    let spec = { is_ac; symbols; add; } in
+    (* add basic AC symbol *)
+    if base then begin
+      add Symbol.Arith.sum;
+      add Symbol.Arith.product;
+      end;
+    spec
 
   let add ~spec s = spec.add s
 
@@ -70,8 +76,14 @@ module TotalOrder = struct
     lesseq_tbl : instance STbl.t;
   } (** Specification of which symbols implement total orderings *)
 
-  let create () =
-    { less_tbl = STbl.create 13; lesseq_tbl = STbl.create 13; }
+  type lit = {
+    left : Term.t;
+    right : Term.t;
+    strict : bool;
+    instance : instance;
+  } (** A literal is an atomic inequality. [strict] is [true] iff the
+      literal is a strict inequality, and the ordering itself
+      is also provided. *)
 
   let is_less ~spec s = STbl.mem spec.less_tbl s
 
@@ -98,4 +110,13 @@ module TotalOrder = struct
     STbl.add spec.less_tbl less instance;
     STbl.add spec.lesseq_tbl lesseq instance;
     instance
+
+  let create ?(base=true) () =
+    let spec = {
+      less_tbl = STbl.create 13;
+      lesseq_tbl = STbl.create 13;
+    } in
+    if base then
+      ignore (add ~spec ~less:Symbol.Arith.less ~lesseq:Symbol.Arith.lesseq);
+    spec
 end

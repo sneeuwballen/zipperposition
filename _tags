@@ -67,4 +67,5 @@
 # OASIS_STOP
 <src/const.cmx>: for-pack(Libzipperposition)
 <**/*.cmx>: inline(15)
-<**/*.native> or <**/*.byte>: package(num), package(dynlink), package(str), package(unix), package(logtk), package(datalog), package(logtk.meta)
+<plugins>: not_hygienic
+true: classic_display

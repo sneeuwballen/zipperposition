@@ -42,6 +42,7 @@ and step = {
   rule : string;
   parents : t array;
   esa : bool;
+  theories : string list;
 }
 
 type proof = t 
@@ -64,18 +65,20 @@ let cmp p1 p2 = Pervasives.compare p1 p2
 (** {2 Constructors and utils} *)
 
 let mk_f_axiom f ~file ~name =
-  InferForm (f, {rule="axiom"; parents = [| Axiom (file,name) |]; esa=false; })
+  InferForm (f, {rule="axiom"; parents = [| Axiom (file,name) |];
+                 esa=false; theories=[]; })
 
 let mk_c_axiom c ~file ~name =
-  InferClause (c, {rule="axiom"; parents = [| Axiom (file,name) |]; esa=false; })
+  InferClause (c, {rule="axiom"; parents = [| Axiom (file,name) |];
+                   esa=false; theories=[]; })
 
-let mk_f_step ?(esa=false) f ~rule parents =
+let mk_f_step ?(theories=["equality"]) ?(esa=false) f ~rule parents =
   assert(rule <> "axiom");
-  InferForm (f, {rule; parents=Array.of_list parents; esa;})
+  InferForm (f, {rule; parents=Array.of_list parents; esa; theories; })
 
-let mk_c_step ?(esa=false) c ~rule parents =
+let mk_c_step ?(theories=["equality"]) ?(esa=false) c ~rule parents =
   assert(rule <> "axiom");
-  InferClause (c, {rule; parents=Array.of_list parents; esa;})
+  InferClause (c, {rule; parents=Array.of_list parents; esa; theories; })
 
 let adapt_c p c =
   match p with
@@ -184,27 +187,26 @@ let to_graph proof =
   g
 
 let bij ~ord =
-  let open Bij in
-  fix
+  Bij.(fix
     (fun bij_ ->
       let bij_step = map
-        ~inject:(fun step -> step.rule, step.parents, step.esa)
-        ~extract:(fun (rule,parents,esa) -> {rule;parents;esa;})
-          (triple string_ (array_ (bij_ ())) bool_) in
+        ~inject:(fun step -> step.rule, step.parents, step.esa, step.theories)
+        ~extract:(fun (rule,parents,esa,theories) -> {rule;parents;esa;theories;})
+          (quad string_ (array_ (Lazy.force bij_)) bool_ (list_ string_)) in
       let bij_axiom = pair string_ string_
       and bij_form = pair F.bij bij_step
       and bij_clause = pair (CC.bij ~ord) bij_step
       in switch
           ~inject:(function
-            | Axiom (f,n) -> 'a', BranchTo(bij_axiom, (f,n))
-            | InferForm(f,step) -> 'f', BranchTo(bij_form, (f,step))
-            | InferClause(c,step) -> 'c', BranchTo(bij_clause, (c,step)))
+            | Axiom (f,n) -> "axiom", BranchTo(bij_axiom, (f,n))
+            | InferForm(f,step) -> "form", BranchTo(bij_form, (f,step))
+            | InferClause(c,step) -> "clause", BranchTo(bij_clause, (c,step)))
           ~extract:(function
-            | 'a' -> BranchFrom(bij_axiom, (fun (f,n) -> Axiom(f,n)))
-            | 'f' -> BranchFrom(bij_form, (fun(f,step) -> InferForm(f,step)))
-            | 'c' -> BranchFrom(bij_clause, (fun(c,step) -> InferClause(c,step)))
+            | "axiom" -> BranchFrom(bij_axiom, (fun (f,n) -> Axiom(f,n)))
+            | "form" -> BranchFrom(bij_form, (fun(f,step) -> InferForm(f,step)))
+            | "clause" -> BranchFrom(bij_clause, (fun(c,step) -> InferClause(c,step)))
             | c -> raise (DecodingError "expected proof step"))
-    )
+    ))
 
 (** {2 IO} *)
 
@@ -213,6 +215,9 @@ let pp_notrec buf proof =
   | Axiom(f,n) -> Printf.bprintf buf "axiom '%s' in %s" f n
   | InferForm (f, _) -> F.pp buf f
   | InferClause(c, _) -> CC.pp buf c
+
+let fmt fmt proof =
+  Format.pp_print_string fmt (Util.on_buffer pp_notrec proof)
 
 let _extract_axiom proof = match proof with
   | Axiom (f,n) -> f,n
@@ -245,6 +250,7 @@ let _pp_parent_names buf names =
 
 let pp_tstp buf proof =
   let namespace = ProofTbl.create 5 in
+  let pp_theory b name = Printf.bprintf b "theory(%s)" name in
   traverse proof
     (fun p ->
       let name = get_name ~namespace p in
@@ -260,16 +266,25 @@ let pp_tstp buf proof =
           name F.pp_tstp f file n
       | InferForm(f, step) ->
         let names = Array.map (get_name ~namespace) step.parents in
+        let theories = match step.theories with
+        | [] -> ""
+        | l -> Util.sprintf ",%a" (Util.pp_list pp_theory) l
+        in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
-          "tff(%d, plain, %a, inference('%s', [status(%s)], [%a,theory(equality)])).\n"
-          name F.pp_tstp (F.close_forall f) step.rule status _pp_parent_names names
+          "tff(%d, plain, %a, inference('%s', [status(%s)], [%a%s])).\n"
+          name F.pp_tstp (F.close_forall f) step.rule status
+            _pp_parent_names names theories
       | InferClause(c, step) ->
         let names = Array.map (get_name ~namespace) step.parents in
+        let theories = match step.theories with
+        | [] -> ""
+        | l -> Util.sprintf ",%a" (Util.pp_list pp_theory) l
+        in
         let status = if step.esa then "esa" else "thm" in
         Printf.bprintf buf
-          "cnf(%d, plain, %a, inference('%s', [status(%s)], [%a,theory(equality)])).\n"
-          name CC.pp_tstp c step.rule status _pp_parent_names names
+          "cnf(%d, plain, %a, inference('%s', [status(%s)], [%a%s])).\n"
+          name CC.pp_tstp c step.rule status _pp_parent_names names theories
     )
 
 (** Prints the proof according to the given input switch *)
