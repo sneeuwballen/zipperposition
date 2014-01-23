@@ -30,10 +30,20 @@ module Sym = Symbol
 
 type symbol = Sym.t
 
+module Kind = struct
+  type t =
+    | Type
+    | FOTerm
+    | HOTerm
+    | FOFormula
+    | Generic  (* other terms *)
+end
+
 (* term *)
 type t = {
   term : view;
   ty : t;
+  kind : Kind.t;
   mutable id : int;
   mutable flags : int;
 }
@@ -44,19 +54,19 @@ and view =
   | Bind of Sym.t * t
   | Const of Sym.t
   | App of t * t list
+
 type term = t
 
 let view t = t.term
 let ty t = t.ty
+let kind t = t.kind
 
 let hash t = t.id
 let eq t1 t2 = t1 == t2
 let cmp t1 t2 = t1.id - t2.id
 
 let _hash_ty h t =
-  if t.ty == t
-  then h
-  else Hash.combine h (hash t.ty)
+  Hash.hash_int3 h t.ty.id (Hashtbl.hash t.kind)
 let _hash_norec t =
   let h = match view t with
   | Var i -> i
@@ -70,7 +80,8 @@ let _hash_norec t =
 
 let rec _eq_norec t1 t2 =
   _eq_ty t1 t2 &&
-  match view t1, view t2 with
+  t1.kind = t2.kind &&
+  match t1.term, t2.term with
   | Var i, Var j
   | BVar i, BVar j -> i = j
   | Const s1, Const s2 -> Sym.eq s1 s2
@@ -98,6 +109,7 @@ let get_flag t flag = (t.flags land flag) != 0
 let flags t = t.flags
 
 let flag_ground = new_flag()
+(* TODO: use this flag! *)
 
 (** {3 Constructors} *)
 
@@ -108,27 +120,29 @@ module H = Hashcons.Make(struct
   let tag i t = assert (t.id = ~-1); t.id <- i
 end)
 
-let const ~ty s =
-  H.hashcons { term=Const s; id= ~-1; ty; flags=0; }
+let const ~kind ~ty s =
+  H.hashcons { term=Const s; kind; id= ~-1; ty; flags=0; }
 
-let rec app ~ty f l =
+let rec app ~kind ~ty f l =
   match f.term, l with
   | _, [] -> {f with ty; }
-  | App (f', l'), _ -> app ~ty f' (l' @ l)
+  | App (f', l'), _ ->
+    app ~kind ~ty f' (l' @ l)  (* flatten *)
   | _ ->
-    H.hashcons {term=App (f, l); id= ~-1; ty; flags=0; }
+    H.hashcons {term=App (f, l); kind; id= ~-1; ty; flags=0; }
 
-let var ~ty i =
-  H.hashcons {term=Var i; id= ~-1; ty; flags=0; }
+let var ~kind ~ty i =
+  H.hashcons {term=Var i; kind; id= ~-1; ty; flags=0; }
 
-let bvar ~ty i =
-  H.hashcons {term=BVar i; id= ~-1; ty; flags=0; }
+let bvar ~kind ~ty i =
+  H.hashcons {term=BVar i; kind; id= ~-1; ty; flags=0; }
 
-let bind ~ty s t' =
-  H.hashcons {term=Bind (s,t'); id= ~-1; ty; flags=0; }
+let bind ~kind ~ty s t' =
+  H.hashcons {term=Bind (s,t'); kind; id= ~-1; ty; flags=0; }
 
 let rec tType =
-  let rec _t = {term=Const (Sym.Conn Sym.TType); id= ~-1; ty=_t; flags=0; } in
+  let rec _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Type;
+                id= ~-1; ty=_t; flags=0; } in
   H.hashcons _t
 
 let cast ~ty t =
@@ -207,19 +221,19 @@ module DB = struct
       then t.ty
       else recurse depth t.ty
       in
-      match view t with
-        | Var i -> var ~ty i
-        | Const s -> const ~ty s
+      match t.term with
+        | Var i -> var ~kind:t.kind ~ty i
+        | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->
           if i >= depth
             then (* shift *)
-              bvar ~ty (i + n)
-            else bvar ~ty i
+              bvar ~kind:t.kind ~ty (i + n)
+            else bvar ~kind:t.kind ~ty i
         | Bind (s, t') ->
           let t' = recurse (depth+1) t' in
-          bind ~ty s t'
+          bind ~kind:t.kind ~ty s t'
         | App (f, l) ->
-          app ~ty (recurse depth f) (List.map (recurse depth) l)
+          app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
     in
     assert (n >= 0);
     if depth=0 && n = 0
@@ -236,18 +250,18 @@ module DB = struct
       else recurse depth t.ty
       in
       match view t with
-        | Var i -> var ~ty i
+        | Var i -> var ~kind:t.kind ~ty i
         | BVar i ->
           if i >= depth
             then (* unshift this free De Bruijn index *)
-              bvar ~ty (i-n)
-            else bvar ~ty i
-        | Const s -> const ~ty s
+              bvar ~kind:t.kind ~ty (i-n)
+            else bvar ~kind:t.kind ~ty i
+        | Const s -> const ~kind:t.kind ~ty s
         | Bind (s, t') ->
           let t' = recurse (depth+1) t' in
-          bind ~ty s t'
+          bind ~kind:t.kind ~ty s t'
         | App (f, l) ->
-          app ~ty (recurse depth f) (List.map (recurse depth) l)
+          app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
     in
     recurse depth t
 
@@ -260,15 +274,15 @@ module DB = struct
       in
       match view t with
         | _ when eq t sub ->
-          bvar ~ty depth  (* replace *)
-        | Var i -> var ~ty i
-        | BVar i -> bvar ~ty i
-        | Const s -> const ~ty s
+          bvar ~kind:t.kind ~ty depth  (* replace *)
+        | Var i -> var ~kind:t.kind ~ty i
+        | BVar i -> bvar ~kind:t.kind ~ty i
+        | Const s -> const ~kind:t.kind ~ty s
         | Bind (s, t') ->
           let t' = recurse (depth+1) t' in
-          bind ~ty s t'
+          bind ~kind:t.kind ~ty s t'
         | App (f, l) ->
-          app ~ty (recurse depth f) (List.map (recurse depth) l)
+          app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
     in
     recurse depth t
 
@@ -283,11 +297,11 @@ module DB = struct
       else eval env t.ty
       in
       match view t with
-        | Var i -> var ~ty i
-        | Const s -> const ~ty s
+        | Var i -> var ~kind:t.kind ~ty i
+        | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->
           begin match DBEnv.find env i with
-            | None -> bvar ~ty i
+            | None -> bvar ~kind:t.kind ~ty i
             | Some t' ->
               (* need to shift this term, because we crossed [i] binder
                   from the scope [t'] was defined in. *)
@@ -295,9 +309,9 @@ module DB = struct
           end
         | Bind (s, t') ->
           let t' = eval (DBEnv.push_none env) t' in
-          bind ~ty s t'
+          bind ~kind:t.kind ~ty s t'
         | App (f, l) ->
-          app ~ty (eval env f) (List.map (eval env) l)
+          app ~kind:t.kind ~ty (eval env f) (List.map (eval env) l)
     in
     eval env t
 end
@@ -307,7 +321,7 @@ let bind_vars ~ty s vars t =
     (fun v t ->
       assert (is_var v);
       let t' = DB.replace (DB.shift 1 t) ~sub:v in
-      bind ~ty s t')
+      bind ~kind:t.kind ~ty s t')
     vars t
 
 (** {3 Iterators} *)
@@ -390,13 +404,13 @@ let rec replace_pos t pos ~by = match view t, pos with
   | _, [] -> by
   | (Var _ | BVar _), _::_ -> invalid_arg "wrong position in term"
   | Bind (s, t'), 0::subpos ->
-    bind ~ty:t.ty s (replace_pos t' subpos ~by)
+    bind ~kind:t.kind ~ty:t.ty s (replace_pos t' subpos ~by)
   | App (f, l), 0::subpos ->
-    app ~ty:t.ty (replace_pos f subpos ~by) l
+    app ~kind:t.kind ~ty:t.ty (replace_pos f subpos ~by) l
   | App (f, l), n::subpos when n <= List.length l ->
     let t' = replace_pos (List.nth l (n-1)) subpos ~by in
     let l' = Util.list_set l n t' in
-    app ~ty:t.ty f l'
+    app ~kind:t.kind ~ty:t.ty f l'
   | _ -> invalid_arg "index too high for subterm"
 
 (* [replace t ~old ~by] syntactically replaces all occurrences of [old]
@@ -405,11 +419,11 @@ let rec replace t ~old ~by = match view t with
   | _ when eq t old -> by
   | Var _ | BVar _ | Const _ -> t
   | Bind (s, t') ->
-    bind ~ty:t.ty s (replace t' ~old ~by)
+    bind ~kind:t.kind ~ty:t.ty s (replace t' ~old ~by)
   | App (f, l) ->
     let f' = replace f ~old ~by in
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
-    app ~ty:t.ty f' l'
+    app ~kind:t.kind ~ty:t.ty f' l'
 
 (** {3 Variables} *)
 
@@ -503,6 +517,7 @@ let pp buf t = pp_depth 0 buf t
 let to_string t = Util.on_buffer pp t
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
+(* FIXME
 let bij =
   let open Bij in
   let (!!!) = Lazy.force in
@@ -526,3 +541,4 @@ let bij =
         | "bind" -> BranchFrom (!!!bij_bind, fun (ty,s,t') -> bind ~ty s t')
         | "a" -> BranchFrom (!!!bij_at, fun (ty, t, l) -> app ~ty t l)
         | _ -> raise (DecodingError "expected Term")))
+*)

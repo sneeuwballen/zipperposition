@@ -24,7 +24,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
-(** {1 Scoped Terms} *)
+(** {1 Scoped Terms}
+
+Those terms are not designed to be used directly, but rather to provide
+a generic backend (implementing De Bruijn indices, subterms, substitutions,
+etc.) for other more specific representations like Type, FOTerm, FOFormula...
+*)
 
 type symbol = Symbol.t
 
@@ -43,6 +48,19 @@ type view = private
 val view : t -> view
   (** View on the term's head form *)
 
+module Kind : sig
+  (** "kind" of a term, i.e. what is its meaning, in which context is it
+      used *)
+  type t =
+    | Type
+    | FOTerm
+    | HOTerm
+    | FOFormula
+    | Generic  (* other terms *)
+end
+
+val kind : t -> Kind.t
+
 val ty : t -> t
   (** Type of the term *)
 
@@ -51,18 +69,21 @@ include Interfaces.ORD with type t := t
 
 (** {3 Constructors} *)
 
-val const : ty:t -> symbol -> t
-val app : ty:t -> t -> t list -> t
-val bind : ty:t -> symbol -> t -> t
-val var : ty:t -> int -> t
-val bvar : ty:t -> int -> t
+val const : kind:Kind.t -> ty:t -> symbol -> t
+val app : kind:Kind.t -> ty:t -> t -> t list -> t
+val bind : kind:Kind.t -> ty:t -> symbol -> t -> t
+val var : kind:Kind.t -> ty:t -> int -> t
+val bvar : kind:Kind.t -> ty:t -> int -> t
 
 val tType : t
   (** The root of the type system. It's its own type, i.e.
-      [ty tType == tType] *)
+      [ty tType == tType], and it has kind [`Type] *)
 
 val cast : ty:t -> t -> t
   (** Change the type *)
+
+val change_kind : kind:Kind.t -> t -> t
+  (** Change the kind *)
 
 val is_var : t -> bool
 val is_bvar : t -> bool
@@ -114,7 +135,7 @@ end
 
 (** {3 High level constructors} *)
 
-val bind_vars : ty:t -> symbol -> t list -> t -> t
+val bind_vars : kind:Kind.t -> ty:t -> symbol -> t list -> t -> t
   (** bind several free variables in the term, transforming it
       to use De Bruijn indices.
       @param ty return type of the term *)
@@ -147,7 +168,7 @@ val replace : t -> old:t -> by:t -> t
 
 (** {3 Variables} *)
 
-val close_vars : ty:t -> symbol -> t -> t
+val close_vars : kind:Kind.t -> ty:t -> symbol -> t -> t
   (** Close all free variables of the term using the binding symbol *)
 
 val ground : t -> bool
