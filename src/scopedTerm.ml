@@ -391,27 +391,29 @@ end
 
 (** {3 Positions} *)
 
-let rec at_pos t pos = match view t, pos with
-  | _, [] -> t
-  | (Var _ | BVar _), _::_ -> invalid_arg "wrong position in term"
-  | Bind(_, t'), 0::subpos -> at_pos t' subpos
-  | App (t, _), 0::subpos -> at_pos t subpos
-  | App (_, l), n::subpos when n <= List.length l ->
-    at_pos (List.nth l (n-1)) subpos
-  | _ -> invalid_arg "index too high for subterm"
+module Pos = struct
+  let rec at t pos = match view t, pos with
+    | _, [] -> t
+    | (Var _ | BVar _), _::_ -> invalid_arg "wrong position in term"
+    | Bind(_, t'), 0::subpos -> at t' subpos
+    | App (t, _), 0::subpos -> at t subpos
+    | App (_, l), n::subpos when n <= List.length l ->
+      at (List.nth l (n-1)) subpos
+    | _ -> invalid_arg "index too high for subterm"
 
-let rec replace_pos t pos ~by = match view t, pos with
-  | _, [] -> by
-  | (Var _ | BVar _), _::_ -> invalid_arg "wrong position in term"
-  | Bind (s, t'), 0::subpos ->
-    bind ~kind:t.kind ~ty:t.ty s (replace_pos t' subpos ~by)
-  | App (f, l), 0::subpos ->
-    app ~kind:t.kind ~ty:t.ty (replace_pos f subpos ~by) l
-  | App (f, l), n::subpos when n <= List.length l ->
-    let t' = replace_pos (List.nth l (n-1)) subpos ~by in
-    let l' = Util.list_set l n t' in
-    app ~kind:t.kind ~ty:t.ty f l'
-  | _ -> invalid_arg "index too high for subterm"
+  let rec replace t pos ~by = match view t, pos with
+    | _, [] -> by
+    | (Var _ | BVar _), _::_ -> invalid_arg "wrong position in term"
+    | Bind (s, t'), 0::subpos ->
+      bind ~kind:t.kind ~ty:t.ty s (replace t' subpos ~by)
+    | App (f, l), 0::subpos ->
+      app ~kind:t.kind ~ty:t.ty (replace f subpos ~by) l
+    | App (f, l), n::subpos when n <= List.length l ->
+      let t' = replace (List.nth l (n-1)) subpos ~by in
+      let l' = Util.list_set l n t' in
+      app ~kind:t.kind ~ty:t.ty f l'
+    | _ -> invalid_arg "index too high for subterm"
+end
 
 (* [replace t ~old ~by] syntactically replaces all occurrences of [old]
     in [t] by the term [by]. *)

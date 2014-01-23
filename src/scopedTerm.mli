@@ -156,11 +156,13 @@ end
 
 (** {3 Positions} *)
 
-val at_pos : t -> Position.t -> t
-  (** retrieve subterm at pos, or raise Invalid_argument*)
+module Pos : sig
+  val at : t -> Position.t -> t
+    (** retrieve subterm at pos, or raise Invalid_argument*)
 
-val replace_pos : t -> Position.t -> by:t -> t
-  (** replace t|_p by the second term *)
+  val replace : t -> Position.t -> by:t -> t
+    (** replace t|_p by the second term *)
+end
 
 val replace : t -> old:t -> by:t -> t
   (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
