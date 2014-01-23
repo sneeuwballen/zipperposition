@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Scoped Terms} *)
 
-module Sym : module type of Symbol
+type symbol = Symbol.t
 
 type t
   (** Abstract type of term *)
@@ -36,8 +36,8 @@ type term = t
 type view = private
   | Var of int
   | BVar of int
-  | Bind of Sym.t * t
-  | Const of Sym.t
+  | Bind of symbol * t
+  | Const of symbol
   | App of t * t list
 
 val view : t -> view
@@ -51,11 +51,15 @@ include Interfaces.ORD with type t := t
 
 (** {3 Constructors} *)
 
-val const : ty:t -> Sym.t -> t
+val const : ty:t -> symbol -> t
 val app : ty:t -> t -> t list -> t
-val bind : ty:t -> Sym.t -> t -> t
+val bind : ty:t -> symbol -> t -> t
 val var : ty:t -> int -> t
 val bvar : ty:t -> int -> t
+
+val tType : t
+  (** The root of the type system. It's its own type, i.e.
+      [ty tType == tType] *)
 
 val is_var : t -> bool
 val is_bvar : t -> bool
@@ -107,7 +111,7 @@ end
 
 (** {3 High level constructors} *)
 
-val bind_vars : ty:t -> Sym.t -> t list -> t -> t
+val bind_vars : ty:t -> symbol -> t list -> t -> t
   (** bind several free variables in the term, transforming it
       to use De Bruijn indices.
       @param ty return type of the term *)
@@ -118,7 +122,7 @@ module Seq : sig
   val vars : t -> t Sequence.t
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
-  val symbols : t -> Sym.t Sequence.t
+  val symbols : t -> symbol Sequence.t
   val types : t -> t Sequence.t
   val max_var : t Sequence.t -> int
   val min_var : t Sequence.t -> int
@@ -140,11 +144,11 @@ val replace : t -> old:t -> by:t -> t
 
 (** {3 Variables} *)
 
-val close_vars : ty:t -> Sym.t -> t -> t
+val close_vars : ty:t -> symbol -> t -> t
   (** Close all free variables of the term using the binding symbol *)
 
 val ground : t -> bool
-  (** true if the term contains no variables (either free or bounds) *)
+  (** [true] if the term contains no free variables *)
 
 (** {3 Misc} *)
 
@@ -152,7 +156,7 @@ val size : t -> int
 
 val depth : t -> int
 
-val head : t -> Sym.t option
+val head : t -> symbol option
   (** Head symbol, or None if the term is a (bound) variable *)
 
 val all_positions : ?vars:bool -> ?pos:Position.t ->
@@ -166,11 +170,11 @@ val all_positions : ?vars:bool -> ?pos:Position.t ->
 (** {3 AC} *)
 
 module AC : sig
-  val flatten : is_ac:(Sym.t -> bool) -> t -> t
+  val flatten : is_ac:(symbol -> bool) -> t -> t
 
-  val args : is_ac:(Sym.t -> bool) -> t -> t list
+  val args : is_ac:(symbol -> bool) -> t -> t list
 
-  val symbols : is_ac:(Sym.t -> bool) -> t -> Sym.t Sequence.t
+  val symbols : is_ac:(symbol -> bool) -> t -> symbol Sequence.t
 end
 
 (** {3 IO} *)

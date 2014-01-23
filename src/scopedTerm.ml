@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module Sym = Symbol
 
+type symbol = Sym.t
+
 (* term *)
 type t = {
   term : view;
@@ -84,6 +86,8 @@ and _eq_list l1 l2 = match l1, l2 with
   | _, [] -> false
   | t1::l1', t2::l2' -> eq t1 t2 && _eq_list l1' l2'
 
+(** {3 Flags} *)
+
 let _flag_gen = Util.Flag.create ()
 let new_flag () = Util.Flag.get_new _flag_gen
 let set_flag t flag truth =
@@ -92,6 +96,8 @@ let set_flag t flag truth =
     else t.flags <- t.flags land (lnot flag)
 let get_flag t flag = (t.flags land flag) != 0
 let flags t = t.flags
+
+let flag_ground = new_flag()
 
 (** {3 Constructors} *)
 
@@ -120,6 +126,10 @@ let bvar ~ty i =
 
 let bind ~ty s t' =
   H.hashcons {term=Bind (s,t'); id= ~-1; ty; flags=0; }
+
+let rec tType =
+  let rec _t = {term=Const (Sym.Conn Sym.TType); id= ~-1; ty=_t; flags=0; } in
+  H.hashcons _t
 
 let is_var t = match view t with | Var _ -> true | _ -> false
 let is_bvar t = match view t with | BVar _ -> true | _ -> false
