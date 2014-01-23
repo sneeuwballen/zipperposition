@@ -111,6 +111,10 @@ val (<=.) : t -> t -> t
 val of_term : ScopedTerm.t -> t option
   (** Conversion from a term, if structure matches *)
 
+val of_term_exn : ScopedTerm.t -> t
+  (** Same as [of_term], but without option
+      @raise Invalid_argument if the term is not a type *)
+
 val is_type : ScopedTerm.t -> bool
   (** Is the term a representation of a type? *)
 

@@ -109,6 +109,10 @@ let of_term ty = match T.kind ty with
   | T.Kind.Type -> Some ty
   | _ -> None
 
+let of_term_exn ty = match T.kind ty with
+  | T.Kind.Type -> ty
+  | _ -> raise (Invalid_argument "Type.of_term_exn")
+
 let is_type t = match T.kind t with
   | T.Kind.Type -> true
   | _ -> false
