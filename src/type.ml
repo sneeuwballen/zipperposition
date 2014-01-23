@@ -36,6 +36,8 @@ type t = T.t
 
 type ty = t
 
+let kind = T.Kind.Type
+
 type view =
   | Var of int              (** Type variable *)
   | BVar of int             (** Bound variable (De Bruijn index) *)
@@ -43,15 +45,19 @@ type view =
   | Fun of t * t list       (** Function type *)
   | Forall of t             (** explicit quantification using De Bruijn index *)
 
-let view t = match T.view t with
-  | T.Var i -> Var i
-  | T.BVar i -> BVar i
-  | T.Bind (Symbol.Conn Symbol.Forall, t') -> Forall t'
-  | T.App (head, ((t'::l') as l)) ->
-    begin match T.view head with
-    | T.Const (Symbol.Conn Symbol.Arrow) -> Fun (t', l')
-    | T.Const s -> App (s, l)
-    | _ -> raise (Invalid_argument "Type.view")
+let view t = match T.kind t with
+  | T.Kind.Type ->
+    begin match T.view t with
+    | T.Var i -> Var i
+    | T.BVar i -> BVar i
+    | T.Bind (Symbol.Conn Symbol.Forall, t') -> Forall t'
+    | T.App (head, ((t'::l') as l)) ->
+      begin match T.view head with
+      | T.Const (Symbol.Conn Symbol.Arrow) -> Fun (t', l')
+      | T.Const s -> App (s, l)
+      | _ -> failwith "Type.view"
+      end
+    | _ -> failwith "Type.view"
     end
   | _ -> raise (Invalid_argument "Type.view")
 
@@ -71,9 +77,9 @@ let var i =
   if i < 0 then raise (Invalid_argument "Type.var");
   T.var ~ty:tType i
 
-let app s l = T.app ~ty:tType (T.const ~ty:tType s) l
+let app s l = T.app ~kind ~ty:tType (T.const ~kind ~ty:tType s) l
 
-let const s = T.const ~ty:tType s
+let const s = T.const ~kind ~ty:tType s
 
 let rec mk_fun ret args =
   match args with
@@ -86,7 +92,8 @@ let rec mk_fun ret args =
           need to be supplied.
           Example: [(a <- b) <- c] requires [c] first *)
       mk_fun ret' (args @ args')
-    | _ -> T.app ~ty:tType (T.const ~ty:tType Symbol.Base.arrow) (ret :: args)
+    | _ ->
+      T.app ~kind ~ty:tType (T.const ~kind ~ty:tType Symbol.Base.arrow) (ret :: args)
 
 let forall vars ty =
   T.bind_vars ~ty:tType Symbol.Base.forall_ty vars ty
@@ -98,16 +105,13 @@ let (<=.) ret a = mk_fun ret [a]
 let (@@) = app
 
 (* downcast *)
-let of_term ty =
-  (* check structure *)
-  let rec check ty = match view ty with
-    | Var _ | BVar _ -> ()
-    | App (_, l) -> List.iter check l
-    | Fun (ret,l) -> check ret; List.iter check l
-    | Forall ty' -> check ty'
-  in
-  try check ty; Some ty
-  with Invalid_argument _ -> None
+let of_term ty = match T.kind ty with
+  | T.Kind.Type -> Some ty
+  | _ -> None
+
+let is_type t = match T.kind t with
+  | T.Kind.Type -> true
+  | _ -> false
 
 (** {2 Containers} *)
 

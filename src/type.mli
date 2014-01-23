@@ -27,8 +27,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {2 Main Type representation}
 
+Types are represented using ScopedTerm, with kind Type. Therefore, they
+are hashconsed and scoped.
+
 Common representation of types, including higher-order
-and polymorphic types. Types are hashconsed and all type variables
+and polymorphic types. All type variables
 are assumed to be universally quantified in the outermost possible
 scope (outside any other quantifier).
 
@@ -107,6 +110,9 @@ val (<=.) : t -> t -> t
 
 val of_term : ScopedTerm.t -> t option
   (** Conversion from a term, if structure matches *)
+
+val is_type : ScopedTerm.t -> bool
+  (** Is the term a representation of a type? *)
 
 (** {2 Containers} *)
 
