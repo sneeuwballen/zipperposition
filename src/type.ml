@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 exception Error of string
   (** Generic error on types. *)
 
-module T = ScopedTerm.Std
+module T = ScopedTerm
 
 type symbol = Symbol.t
 

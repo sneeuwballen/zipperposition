@@ -43,7 +43,7 @@ exception Error of string
 
 type symbol = Symbol.t
 
-type t = private ScopedTerm.Std.t
+type t = private ScopedTerm.t
 (** Type is a subtype of the general structure ScopedTerm.t,
     with explicit conversion *)
 
@@ -105,7 +105,7 @@ val (<==) : t -> t list -> t
 val (<=.) : t -> t -> t
   (** Unary function type. [x <=. y] is the same as [x <== [y]]. *)
 
-val of_term : ScopedTerm.Std.t -> t option
+val of_term : ScopedTerm.t -> t option
   (** Conversion from a term, if structure matches *)
 
 (** {2 Containers} *)
