@@ -49,6 +49,9 @@ module type S = sig
   val compare : t -> symbol -> symbol -> int
     (** Compare two symbols using the precedence *)
 
+  val mem : t -> symbol -> bool
+    (** Is the symbol part of the precedence? *)
+
   val status : t -> symbol -> symbol_status
     (** Status of the symbol *)
 
@@ -68,6 +71,7 @@ module type S = sig
   end
 
   val pp_snapshot : Buffer.t -> symbol list -> unit
+  val pp_debug : Buffer.t -> t -> unit
   val pp : Buffer.t -> t -> unit
   val fmt : Format.formatter -> t -> unit
   val to_string : t -> string
@@ -133,6 +137,7 @@ module type SYMBOL = sig
   val true_ : t
 
   val pp : Buffer.t -> t -> unit
+  val pp_debug : Buffer.t -> t -> unit
 end
 
 module Make(Sym : SYMBOL) = struct
@@ -172,6 +177,8 @@ module Make(Sym : SYMBOL) = struct
       then Sym.cmp s1 s2
       else c
 
+  let mem p s = Tbl.mem p.index s
+
   let status p s =
     if Tbl.mem p.status s
       then Multiset
@@ -200,6 +207,13 @@ module Make(Sym : SYMBOL) = struct
       (fun buf s -> match status prec s with
         | Multiset -> Printf.bprintf buf "%a[M]" Sym.pp s
         | Lexicographic -> Sym.pp buf s)
+      buf prec.snapshot
+
+  let pp_debug buf prec =
+    Util.pp_list ~sep:" > "
+      (fun buf s -> match status prec s with
+        | Multiset -> Printf.bprintf buf "%a[M]" Sym.pp_debug s
+        | Lexicographic -> Sym.pp_debug buf s)
       buf prec.snapshot
 
   let to_string = Util.on_buffer pp
@@ -343,6 +357,7 @@ module Make(Sym : SYMBOL) = struct
             of [p]. *)
         let snapshot = _order_symbols (c :: p.constr) symbols in
         let index = _mk_table snapshot in
+        Util.debug 3 "--> snapshot %a" pp_snapshot snapshot;
         { p with snapshot; index; }
       end
 
@@ -370,6 +385,7 @@ module Default = Make(struct
   let true_ = Symbol.true_symbol
   let false_ = Symbol.false_symbol
   let pp = Symbol.pp
+  let pp_debug= Symbol.pp_debug
 end)
 
 include Default
