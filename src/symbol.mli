@@ -54,8 +54,8 @@ type const_symbol = private {
 }
 
 type t =
-  | Connective of connective
-  | Const of const_symbol
+  | Conn of connective
+  | Cst of const_symbol
   | Int of Z.t
   | Rat of Q.t
 

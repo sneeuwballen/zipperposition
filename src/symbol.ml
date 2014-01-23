@@ -50,46 +50,46 @@ type const_symbol = {
 }
 
 type t =
-  | Connective of connective
-  | Const of const_symbol
+  | Conn of connective
+  | Cst of const_symbol
   | Int of Z.t
   | Rat of Q.t
 
 type sym = t
 
 let cmp a b = match a, b with
-  | Const s1, Const s2 -> s1.cs_id - s2.cs_id
-  | Const _, _ -> 1
-  | _, Const _ -> -1
+  | Cst s1, Cst s2 -> s1.cs_id - s2.cs_id
+  | Cst _, _ -> 1
+  | _, Cst _ -> -1
   | _, _ -> Pervasives.compare a b
 
 let eq a b = cmp a b = 0
 
 let hash = function
-  | Const s -> s.cs_id
+  | Cst s -> s.cs_id
   | c -> Hashtbl.hash c
-  let of_string s = Const s
+  let of_string s = Cst s
 
 module Map = Sequence.Map.Make(struct type t = sym let compare = cmp end)
 module Set = Sequence.Set.Make(struct type t = sym let compare = cmp end)
 module Tbl = Hashtbl.Make(struct type t = sym let equal = eq let hash = hash end)
 
-let is_const = function | Const _ -> true | _ -> false
+let is_const = function | Cst _ -> true | _ -> false
 let is_int = function | Int _ -> true | _ -> false
 let is_rat = function | Rat _ -> true | _ -> false
 let is_numeric = function | Int _ | Rat _ | _ -> false
 
 let is_distinct s = match s with
-  | Const c ->
+  | Cst c ->
     let s = c.cs_name in
     s <> "" &&  s.[0] = '"' && s.[String.length s - 1] = '"'
   | _ -> false
 
 let to_string s = match s with
-  | Const c -> c.cs_name
+  | Cst c -> c.cs_name
   | Int n -> Z.to_string n
   | Rat n -> Q.to_string n
-  | Connective o ->
+  | Conn o ->
       begin match o with
       | Not -> "¬"
       | And -> "∧" 
@@ -119,7 +119,7 @@ let ty = function
   | Rat _ -> `Rat
   | _ -> `Other
 
-(** {2 Constructors} *)
+(** {2 Cstructors} *)
 module H = Hashcons.Make(struct
   type t = const_symbol
   let equal x y = x.cs_name = y.cs_name
@@ -130,7 +130,7 @@ end)
 let of_string name=
   let cs = {cs_name=name; cs_id= ~-1;} in
   let cs = H.hashcons cs in
-  Const cs
+  Cst cs
 
 let mk_const = of_string
 
@@ -141,22 +141,22 @@ let mk_rat s = Rat s
 let of_rat i j = Rat (Q.of_ints i j)
 
 module Base = struct
-  let true_ = Connective True
-  let false_ = Connective False
-  let wildcard = Connective Wildcard
-  let and_ = Connective And
-  let or_ = Connective Or
-  let imply = Connective Imply
-  let equiv = Connective Equiv
-  let xor = Connective Xor
-  let not_ = Connective Not
-  let eq = Connective Eq
-  let neq = Connective Neq
-  let forall = Connective Forall
-  let exists = Connective Exists
-  let forall_ty = Connective ForallTy
-  let arrow = Connective Arrow
-  let tType = Connective TType
+  let true_ = Conn True
+  let false_ = Conn False
+  let wildcard = Conn Wildcard
+  let and_ = Conn And
+  let or_ = Conn Or
+  let imply = Conn Imply
+  let equiv = Conn Equiv
+  let xor = Conn Xor
+  let not_ = Conn Not
+  let eq = Conn Eq
+  let neq = Conn Neq
+  let forall = Conn Forall
+  let exists = Conn Exists
+  let forall_ty = Conn ForallTy
+  let arrow = Conn Arrow
+  let tType = Conn TType
 end
 
 (* TODO
@@ -167,7 +167,7 @@ end
     Hashtbl.add __printers name pp
 
   let _pp buf s = match s with
-    | HConst (s, _) -> Buffer.add_string buf s
+    | HCst (s, _) -> Buffer.add_string buf s
     | HInt n -> Buffer.add_string buf (Big_int.string_of_big_int n)
     | HRat n -> Buffer.add_string buf (Ratio.string_of_ratio n)
     | HReal f -> Buffer.add_string buf (string_of_float f)
@@ -192,10 +192,10 @@ let gensym =
 
 module TPTP = struct
   let pp buf = function
-    | Const s -> Buffer.add_string buf s.cs_name
+    | Cst s -> Buffer.add_string buf s.cs_name
     | Int i -> Buffer.add_string buf (Z.to_string i)
     | Rat n -> Buffer.add_string buf (Q.to_string n)
-    | Connective o ->
+    | Conn o ->
         Buffer.add_string buf (match o with
           | Eq -> "="
           | Neq -> "!="
@@ -230,8 +230,8 @@ module TPTP = struct
   (Sequence.of_list [ Base.and_; Base.or_; Base.equiv; Base.imply; ])
 
   let is_connective = function
-    | Connective _ -> true
-    | Const _
+    | Conn _ -> true
+    | Cst _
     | Int _
     | Rat _ -> false
 
@@ -291,7 +291,7 @@ end
 module ArithOp = struct
   exception TypeMismatch of string
     (** This exception is raised when Arith functions are called
-        on non-numeric values (Const). *)
+        on non-numeric values (Cst). *)
 
   (* helper to raise errors *)
   let _ty_mismatch fmt =
@@ -384,15 +384,15 @@ module ArithOp = struct
   let sum s1 s2 = match s1, s2 with
   | Int n1, Int n2 -> mk_int Z.(n1 + n2)
   | Rat n1, Rat n2 -> mk_rat Q.(n1 + n2)
-  | (Const _ | Connective _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
-  | _, (Const _ | Connective _) -> _ty_mismatch "not a numeric constant: %a" pp s2
+  | (Cst _ | Conn _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+  | _, (Cst _ | Conn _) -> _ty_mismatch "not a numeric constant: %a" pp s2
   | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
   let difference s1 s2 = match s1, s2 with
   | Int n1, Int n2 -> mk_int Z.(n1 - n2)
   | Rat n1, Rat n2 -> mk_rat Q.(n1 - n2)
-  | (Const _ | Connective _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
-  | _, (Const _ | Connective _) -> _ty_mismatch "not a numeric constant: %a" pp s2
+  | (Cst _ | Conn _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+  | _, (Cst _ | Conn _) -> _ty_mismatch "not a numeric constant: %a" pp s2
   | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
   let uminus s = match s with
@@ -403,8 +403,8 @@ module ArithOp = struct
   let product s1 s2 = match s1, s2 with
   | Int n1, Int n2 -> mk_int Z.(n1 * n2)
   | Rat n1, Rat n2 -> mk_rat Q.(n1 * n2)
-  | (Const _ | Connective _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
-  | _, (Const _ | Connective _) -> _ty_mismatch "not a numeric constant: %a" pp s2
+  | (Cst _ | Conn _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+  | _, (Cst _ | Conn _) -> _ty_mismatch "not a numeric constant: %a" pp s2
   | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
   let quotient s1 s2 = match s1, s2 with
@@ -417,8 +417,8 @@ module ArithOp = struct
     if Q.sign n2 = 0
     then raise Division_by_zero
     else mk_rat (Q.div n1 n2)
-  | (Const _ | Connective _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
-  | _, (Const _ | Connective _) -> _ty_mismatch "not a numeric constant: %a" pp s2
+  | (Cst _ | Conn _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+  | _, (Cst _ | Conn _) -> _ty_mismatch "not a numeric constant: %a" pp s2
   | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
   let quotient_e s1 s2 = match s1, s2 with
@@ -482,15 +482,15 @@ module ArithOp = struct
   let less s1 s2 = match s1, s2 with
   | Int n1, Int n2 -> Z.lt n1 n2
   | Rat n1, Rat n2 -> Q.lt n1 n2
-  | (Const _ | Connective _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
-  | _, (Const _ | Connective _) -> _ty_mismatch "not a numeric constant: %a" pp s2
+  | (Cst _ | Conn _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+  | _, (Cst _ | Conn _) -> _ty_mismatch "not a numeric constant: %a" pp s2
   | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
   let lesseq s1 s2 = match s1, s2 with
   | Int n1, Int n2 -> Z.leq n1 n2
   | Rat n1, Rat n2 -> Q.leq n1 n2
-  | (Const _ | Connective _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
-  | _, (Const _ | Connective _) -> _ty_mismatch "not a numeric constant: %a" pp s2
+  | (Cst _ | Conn _), _ -> _ty_mismatch "not a numeric constant: %a" pp s1
+  | _, (Cst _ | Conn _) -> _ty_mismatch "not a numeric constant: %a" pp s2
   | _ -> _ty_mismatch "incompatible numeric types: %a and %a" pp s1 pp s2
 
   let greater s1 s2 = less s2 s1
