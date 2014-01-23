@@ -131,6 +131,10 @@ let rec tType =
   let rec _t = {term=Const (Sym.Conn Sym.TType); id= ~-1; ty=_t; flags=0; } in
   H.hashcons _t
 
+let cast ~ty t =
+  let my_t = { t with id= ~-1; ty; } in
+  H.hashcons my_t
+
 let is_var t = match view t with | Var _ -> true | _ -> false
 let is_bvar t = match view t with | BVar _ -> true | _ -> false
 let is_const t = match view t with | Const _ -> true | _ -> false

@@ -65,13 +65,13 @@ let is_app ty = match view ty with App _ -> true | _ -> false
 let is_fun ty = match view ty with | Fun _ -> true | _ -> false
 let is_forall ty = match view ty with | Forall _ -> true | _ -> false
 
-let tType = T.const Symbol.Base.tType
+let tType = T.tType
 
 let var i =
   if i < 0 then raise (Invalid_argument "Type.var");
   T.var ~ty:tType i
 
-let app s l = T.app ~ty:tType (T.const s) l
+let app s l = T.app ~ty:tType (T.const ~ty:tType s) l
 
 let const s = T.const ~ty:tType s
 
@@ -86,7 +86,7 @@ let rec mk_fun ret args =
           need to be supplied.
           Example: [(a <- b) <- c] requires [c] first *)
       mk_fun ret' (args @ args')
-    | _ -> T.app ~ty:tType (T.const Symbol.Base.arrow) (ret :: args)
+    | _ -> T.app ~ty:tType (T.const ~ty:tType Symbol.Base.arrow) (ret :: args)
 
 let forall vars ty =
   T.bind_vars ~ty:tType Symbol.Base.forall_ty vars ty
@@ -226,8 +226,8 @@ let apply ty args =
         then apply_fun f_ret f_args' args'
         else
           let msg = Util.sprintf
-            "Type.apply: argument type mismatch, expected %a[%d] but got %a[%d]"
-              pp x x.id pp y y.id
+            "Type.apply: argument type mismatch, expected %a but got %a"
+              T.pp (x:>T.t) T.pp (y:>T.t)
           in _error msg
     | [], [] ->
       (* total application, result is return type. special case of last case. *)
@@ -253,8 +253,9 @@ module TPTP = struct
   let rec pp_tstp_rec depth buf t = match view t with
     | Var i -> Printf.bprintf buf "T%d" i
     | BVar i -> Printf.bprintf buf "Tb%d" (depth-i-1)
-    | App (p, []) -> Buffer.add_string buf p
-    | App (p, args) -> Printf.bprintf buf "%s(%a)" p (Util.pp_list (pp_tstp_rec depth)) args
+    | App (p, []) -> Symbol.pp buf p
+    | App (p, args) -> Printf.bprintf buf "%a(%a)" Symbol.pp p
+      (Util.pp_list (pp_tstp_rec depth)) args
     | Fun (ret, []) -> assert false
     | Fun (ret, [arg]) ->
       Printf.bprintf buf "%a > %a" (pp_inner depth) arg (pp_inner depth) ret

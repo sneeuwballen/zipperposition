@@ -61,6 +61,9 @@ val tType : t
   (** The root of the type system. It's its own type, i.e.
       [ty tType == tType] *)
 
+val cast : ty:t -> t -> t
+  (** Change the type *)
+
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_const : t -> bool
