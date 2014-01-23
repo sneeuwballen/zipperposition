@@ -35,12 +35,14 @@ type term = FOTerm.t
 (* TODO: attributes, to speed up
     simplification/flattening/groundness/closenes checking *)
 
-type t = private {
-  form : cell;
-  mutable flags : int;
-  mutable id : int;
-}
-and cell = private
+type t = private ScopedTerm.t
+
+type form = t
+
+type sourced_form = t * string * string
+  (** form, filename, axiom name *)
+
+type view = private
   | True
   | False
   | Atom of term
@@ -53,13 +55,11 @@ and cell = private
   | Forall of Type.t * t  (** Quantified formula, with De Bruijn index *)
   | Exists of Type.t * t
 
-type sourced_form = t * string * string    (* form, filename, axiom name *)
-type form = t
+val view : t -> view
+  (** View of the formula *)
 
-val eq : t -> t -> bool
-val compare : t -> t -> int
-val hash : t -> int
-val hash_novar : t -> int
+include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
 
 (** {b Caution}: constructors can raise Failure if the types are not
     as expected.
@@ -140,7 +140,7 @@ val terms : t -> unit FOTerm.Tbl.t
 val subterm : term -> t -> bool
   (** [subterm t f] true iff [t] occurs in some term of [f] *)
 
-val free_variables : t -> FOTerm.varlist
+val free_variables : t -> FOTerm.Set.t
   (** Variables not bound by any (formula) quantifier *)
 
 val ty_vars : Type.Set.t -> t -> Type.Set.t

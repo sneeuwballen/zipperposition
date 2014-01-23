@@ -24,41 +24,56 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *)
 
 (** {1 First-order terms}
-Terms are all annotated with their type. Hashconsing is always performed,
-and takes the type into account (two terms are only equal if
-they have the same type).
+Terms use ScopedTerm with kind "FOTerm".
 *)
 
-type t = private {
-  term : term_cell;       (** the term itself *)
-  mutable ty : Type.t;    (** type of the term *)
-  mutable tsize : int;    (** size (number of subterms) *)
-  mutable flags : int;    (** boolean flags about the term *)
-  mutable tag : int;      (** hashconsing tag *)
-} (** Representation of term *)
+(** {2 Typed Symbol} *)
 
-and term_cell = private
-  | Var of int                  (** variable *)
-  | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Node of Symbol.t * Type.t list * t list   (** term application *)
+type symbol = Symbol.t
 
-  (** structure of the term *)
+module TypedSymbol : sig
+  type t = private {
+    sym : symbol;
+    ty : Type.t;
+  }
 
-and sourced_term =
-  t * string * string           (** Term + file,name *)
+  val make : ty:Type.t -> symbol -> t
+  val ty : t -> Type.t
+  val sym : t -> Symbol.t
+
+  include Interfaces.HASH with type t := t
+  include Interfaces.ORD with type t := t
+  include Interfaces.PRINT with type t := t
+
+  module TPTP : sig
+    val true_ : t
+    val false_ : t
+  end
+end
+
+(** {2 Term} *)
+
+type t = private ScopedTerm.t
 
 type term = t
 
-type varlist = t list
-  (** list of variables *)
+type view = private
+  | Var of int                (** Term variable *)
+  | BVar of int               (** Bound variable (De Bruijn index) *)
+  | App of TypedSymbol.t * Type.t list * t list (** Function application *)
+
+type sourced_term =
+  t * string * string           (** Term + file,name *)
+
+val view : t -> view
 
 (** {2 Comparison, equality, containers} *)
 
-val subterm : sub:t -> t -> bool    (** checks whether [sub] is a (non-strict) subterm of [t] *)
-val eq : t -> t -> bool             (** standard equality on terms *)
-val compare : t -> t -> int         (** a simple order on terms *)
-val hash : t -> int                 (** Fast hash on hashconsed terms *)
-val hash_novar : t -> int           (** Hash that does not depend on variables *)
+val subterm : sub:t -> t -> bool
+  (** checks whether [sub] is a (non-strict) subterm of [t] *)
+
+include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
 
 val ty : t -> Type.t                (** Obtain the type of a term.. *)
 
@@ -78,73 +93,61 @@ module Map : Sequence.Map.S with type key = t
 module TCache : Cache.S with type key = t
 module T2Cache : Cache.S2 with type key1 = t and type key2 = t
 
-(** {2 Global terms table (hashconsing)} *)
+(** {2 Constructors} *)
 
-module H : Hashcons.S with type elt = t
+val var : ty:Type.t -> int -> t
+  (** Create a variable. Providing a type is mandatory.
+      The index must be non-negative,
+      @raise Invalid_argument otherwise. *)
 
-(** {2 Boolean flags} *)
-
-val flag_ground : int       (** No variables *)
-val flag_monomorphic : int  (** No type variable in term nor subterms *)
-
-val set_flag : int -> t -> bool -> unit
-  (** set or reset the given flag of the term to bool *)
-
-val get_flag : int -> t -> bool
-  (** read the flag *)
-
-val new_flag : unit -> int
-  (** New flag, different from all other term flags *)
-
-(** {2 Smart constructors} *)
-
-val mk_var : ty:Type.t -> int -> t
-  (** Create a variable. Providing a type is mandatory. *)
-
-val __mk_bound_var : ty:Type.t -> int -> t
+val bvar : ty:Type.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
       {b Warning}: be careful and try not to use this function directly*)
 
-val mk_node : ?tyargs:Type.t list -> Symbol.t -> t list -> t
-  (** Apply a symbol to a list of terms, and possibly a list of types
-      if the type of the symbol requires so. Partial application is not
+val app : ?tyargs:Type.t list -> TypedSymbol.t -> t list -> t
+  (** Apply a typed symbol to a list of type arguments (optional) and
+      a list of term arguments. Partial application is not
       supported and will raise a type error. The type is automatically
       computed.
       @raise Type.Error if types do not match. *)
 
-val mk_const : ?tyargs:Type.t list -> Symbol.t -> t
-  (** Shortcut for constants, same semantic as {!mk_node} with an
-      empty term list. *)
+val const : ?tyargs:Type.t list -> TypedSymbol.t -> t
+  (** Create a typed constant. Specialization of [app]. *)
 
-val true_term : t     (** tautology term *)
-val false_term : t    (** antilogy term *)
-
-val cast : t -> Type.t -> t
+val cast : ty:Type.t -> t -> t
   (** Change the type. Only works for variables and bound variables. *)
 
-(** {2 Subterms and positions} *)
+val of_term : ScopedTerm.t -> t option
+val is_term : ScopedTerm.t -> bool
 
 val is_var : t -> bool
-val is_bound_var : t -> bool
-val is_node : t -> bool
+val is_bvar : t -> bool
+val is_app : t -> bool
 val is_const : t -> bool
 
-val at_pos : t -> Position.t -> t
-  (** retrieve subterm at pos, or raise Invalid_argument*)
+module TPTP : sig
+  val true_ : t     (** tautology term *)
+  val false_ : t    (** antilogy term *)
 
-val replace_pos : t -> Position.t -> t -> t
-  (** replace t|_p by the second term. They should have the same type. *)
+  include Interfaces.PRINT with type t := t
+end
+
+(** {2 Subterms and Positions} *)
+
+module Pos : sig
+  val at : t -> Position.t -> t
+  (** retrieve subterm at pos
+      @raise Invalid_argument if the position is invalid *)
+
+  val replace_at : t -> Position.t -> by:t -> t
+  (** [replace_at t pos ~by] replaces the subterm at position [pos]
+      in [t] by the term [by]. The two terms should have the same type.
+      @raise Invalid_argument if the position is not valid *)
+end
 
 val replace : t -> old:t -> by:t -> t
   (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
       in [t] by the term [by]. *)
-
-val at_cpos : t -> int -> t
-  (** retrieve subterm at the compact pos.
-      @raise Invalid_argument if the position is not valid within the term *)
-
-val max_cpos : t -> int
-  (** maximum compact position in the term *)
 
 (** {2 Sequences} *)
 
@@ -153,54 +156,28 @@ module Seq : sig
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> Symbol.t Sequence.t
+  val add_symbols : Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
   val max_var : t Sequence.t -> int
   val min_var : t Sequence.t -> int
+  val add_vars : Set.t -> t Sequence.t -> Set.t
+  val ty_vars : t -> Type.t Sequence.t
+  val add_ty_vars : Type.Set.t -> t Sequence.t -> Type.Set.t
 end
 
-val var_occurs : var:t -> t -> bool      (** [var_occurs ~var t] true iff [var] in t *)
-val is_ground : t -> bool                (** is the term ground? (no free vars) *)
-val monomorphic : t -> bool              (** true if the term contains no type var *)
-val max_var : varlist -> int             (** find the maximum variable index, or 0 *)
-val min_var : varlist -> int             (** minimum variable, or 0 if ground *)
-val add_vars : unit Tbl.t -> t -> unit   (** add variables of the term to the set *)
-val vars : t -> varlist                  (** compute variables of the term *)
-val vars_list : t list -> varlist        (** variables of terms in the list *)
-val vars_prefix_order : t -> varlist     (** variables of the term in prefix traversal order *)
-val depth : t -> int                     (** depth of the term *)
-val head : t -> Symbol.t                 (** head symbol (or Invalid_argument) *)
-val size : t -> int
+val var_occurs : var:t -> t -> bool     (** [var_occurs ~var t] true iff [var] in t *)
+val is_ground : t -> bool               (** is the term ground? (no free vars) *)
+val monomorphic : t -> bool             (** true if the term contains no type var *)
+val max_var : Set.t -> int              (** find the maximum variable index, or 0 *)
+val min_var : Set.t -> int              (** minimum variable, or 0 if ground *)
+val add_vars : unit Tbl.t -> t -> unit  (** add variables of the term to the set *)
+val vars : t Sequence.t -> Set.t        (** compute variables of the terms *)
+val vars_prefix_order : t -> t list     (** variables of the term in prefix traversal order *)
+val depth : t -> int                    (** depth of the term *)
+val head : t -> Symbol.t                (** head symbol (or Invalid_argument) *)
+val size : t -> int                     (** Size (number of nodes) *)
 
-val ty_vars : Type.Set.t -> t -> Type.Set.t
+val ty_vars : t -> Type.Set.t
   (** Set of free type variables *)
-
-(** {2 De Bruijn Indexes manipulations} *)
-
-module DB : sig
-  val closed : ?depth:int -> t -> bool
-    (** check whether the term is closed (all DB vars are bound within
-        the term) *)
-
-  val contains : t -> int -> bool
-    (** Does t contains the De Bruijn variable of index n? *)
-
-  val shift : ?depth:int -> int -> t -> t
-    (** shift the non-captured De Bruijn indexes in the term by n *)
-
-  val unshift : ?depth:int -> int -> t -> t
-    (** Unshift the term (decrement indices of all free De Bruijn variables
-        inside) by [n] *)
-
-  val replace : ?depth:int -> t -> sub:t -> t
-    (** [replace t ~sub] replaces [sub] by a fresh De Bruijn index in [t]. *)
-
-  val from_var : ?depth:int -> t -> var:t -> t
-    (** [from_var t ~var] replace [var] by a De Bruijn symbol in t.
-        Same as {!replace}. *)
-
-  val eval : ?depth:int -> t DBEnv.t -> t -> t
-    (** Evaluate the term in the given De Bruijn environment, by
-        replacing De Bruijn indices by their value in the environment. *)
-end
 
 (** {2 High-level operations} *)
 
@@ -214,7 +191,8 @@ val contains_symbol : Symbol.t -> t -> bool
 
 (** High level fold-like combinators *)
 
-val all_positions : ?vars:bool -> ?pos:Position.t -> t -> 'a ->
+val all_positions : ?vars:bool -> ?pos:Position.t ->
+                    t -> 'a ->
                     ('a -> t -> Position.t -> 'a) -> 'a
   (** apply f to all non-variable positions in t, accumulating the
       results along.
@@ -222,24 +200,28 @@ val all_positions : ?vars:bool -> ?pos:Position.t -> t -> 'a ->
 
 (** {2 Some AC-utils} *)
 
-val flatten_ac : Symbol.t -> t list -> t list
-  (** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
-      elements that have [f] as head symbol. For instance, if l=[1+2; 3+(4+5)]
-      with f="+", this will return [1;2;3;4;5], perhaps in a different order *)
+module type AC_SPEC = sig
+  val is_ac : Symbol.t -> bool
+  val is_comm : Symbol.t -> bool
+end
 
-val ac_normal_form :  ?is_ac:(Symbol.t -> bool) ->
-                      ?is_com:(Symbol.t -> bool) ->
-                      t -> t
-  (** normal form of the term modulo AC *)
+module AC(A : AC_SPEC) : sig
+  val flatten : Symbol.t -> t list -> t list
+    (** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
+        elements that have [f] as head symbol. For instance, if l=[1+2; 3+(4+5)]
+        with f="+", this will return [1;2;3;4;5], perhaps in a different order *)
 
-val ac_eq : ?is_ac:(Symbol.t -> bool) -> ?is_com:(Symbol.t -> bool) ->
-            t -> t -> bool
-  (** Check whether the two terms are AC-equal. Optional arguments specify
-      which symbols are AC or commutative (by default by looking at
-      attr_ac and attr_commut). *)
+  val normal_form : t -> t
+    (** normal form of the term modulo AC *)
 
-val ac_symbols : is_ac:(Symbol.t -> bool) -> t Sequence.t -> Symbol.Set.t
-  (** Set of symbols occurring in the terms, that are AC *)
+  val eq : t -> t -> bool
+    (** Check whether the two terms are AC-equal. Optional arguments specify
+        which symbols are AC or commutative (by default by looking at
+        attr_ac and attr_commut). *)
+
+  val symbols : t Sequence.t -> Symbol.Set.t
+    (** Set of symbols occurring in the terms, that are AC *)
+end
 
 (** {2 Printing/parsing} *)
 
@@ -260,10 +242,8 @@ val pp_tstp : Buffer.t -> t -> unit
 val arith_hook : print_hook           (* hook to print arithmetic expressions *)
 val pp_arith : Buffer.t -> t -> unit  (* use arith_hook with pp_debug *)
 
-val pp : Buffer.t -> t -> unit
-val set_default_pp : (Buffer.t -> t -> unit) -> unit
-val to_string : t -> string
-val fmt : Format.formatter -> t -> unit
+include Interfaces.PRINT with type t := t
+include Interfaces.PRINT_OVERLOAD with type t := t
 
 val print_var_types : bool ref
   (** If true, {!pp_debug} will print types of all vars, except those of type $i *)
@@ -271,7 +251,12 @@ val print_var_types : bool ref
 val print_all_types : bool ref
   (** If true, {!pp_debug} will print the types of all annotated terms *)
 
-val bij : t Bij.t
+include Interfaces.SERIALIZABLE with type t := t
 
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
+
+(** {2 Misc} *)
+
+val __var : ty:Type.t -> int -> t
+  (** create vars even with negative indices. Caution. *)
