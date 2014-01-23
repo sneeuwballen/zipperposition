@@ -174,8 +174,6 @@ module TPTP : sig
   val int : t
   val rat : t
   val real : t
-
-  include Interfaces.PRINT with type t := t
 end
 
 (** {2 Misc} *)
