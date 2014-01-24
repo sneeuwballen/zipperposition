@@ -26,58 +26,99 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 First-order terms} *)
 
 module PB = Position.Build
+module T = ScopedTerm
 
 let prof_mk_node = Util.mk_profiler "Term.mk_node"
 let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 
-type t = {
-  term : term_cell;       (** the term itself *)
-  mutable ty : Type.t;    (** type of the term *)
-  mutable tsize : int;    (** size (number of subterms) *)
-  mutable flags : int;    (** boolean flags about the term *)
-  mutable tag : int;      (** hashconsing tag *)
-}
+(** {2 Typed Symbol} *)
 
-and term_cell =
-  | Var of int                  (** variable *)
-  | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Node of Symbol.t * Type.t list * t list   (** term application *)
-and sourced_term =
-  t * string * string           (** Term + file,name *)
+type symbol = Symbol.t
+
+module TypedSymbol = struct
+  type t = {
+    sym : symbol;
+    ty : Type.t;
+  }
+
+  let make ~ty sym = { ty; sym; }
+  let ty ts = ts.ty
+  let sym ts = ts.sym
+
+  let hash ts = Hash.combine (Symbol.hash ts.sym) (Type.hash ts.ty)
+  let eq ts1 ts2 =
+    Type.eq ts1.ty ts2.ty &&
+    Symbol.eq ts1.sym ts2.sym
+
+  let cmp ts1 ts2 =
+    let c = Type.cmp ts1.ty ts2.ty in
+    if c <> 0 then c else Symbol.cmp ts1.sym ts2.sym
+
+  let print buf ts = Symbol.pp buf ts.sym
+  let to_string ts = Symbol.to_string ts.sym
+  let fmt fmt ts = Symbol.fmt fmt ts.sym
+
+  module TPTP = struct
+    let true_ = make ~ty:Type.TPTP.o Symbol.Base.true_
+    let false_ = make ~ty:Type.TPTP.o Symbol.Base.false_
+  end
+end
+
+module TS = TypedSymbol
+
+(** {2 Term} *)
+
+type t = T.t
 
 type term = t
 
-type varlist = t list
+type sourced_term =
+  t * string * string           (** Term + file,name *)
 
-let rec hash_novar t =
-  let h_type = Type.hash t.ty in
-  let h_term = match t.term with
-  | Var _ -> 42
-  | BoundVar _ -> 43
-  | Node (s, _, l) ->
-    let h = Symbol.hash s in
-    Hash.hash_list hash_novar h l
-  in
-  Hash.combine h_type h_term
+type view =
+  | Var of int                (** Term variable *)
+  | BVar of int               (** Bound variable (De Bruijn index) *)
+  | App of TypedSymbol.t * Type.t list * t list (** Function application *)
+
+(* split list between types, terms *)
+let rec _split_types l = match l with
+  | [] -> [], []
+  | x::l' when Type.is_type x ->
+      let l1, l2 = _split_types l' in
+      (Type.of_term_exn x)::l1, l2
+  | _ -> [], l
+
+let view t = match T.view t with
+  | T.Var i -> Var i
+  | T.BVar i -> BVar i
+  | T.App (hd, args) ->
+      begin match T.view hd with
+      | T.Const s ->
+          let ty = Type.of_term_exn (T.ty hd) in
+          let ts = TypedSymbol.make ~ty s in
+          (* split arguments into type arguments + term arguments *)
+          let tyargs, args = _split_types args in
+          App (ts, tyargs, args)
+      | _ -> assert false
+      end
+  | _ -> assert false
 
 (** {2 Comparison, equality, containers} *)
 
 let subterm ~sub t =
   let rec check t =
-    sub == t ||
-    match t.term with
-    | Var _ | BoundVar _ | Node (_, _, []) -> false
-    | Node (_, _, subterms) -> List.exists check subterms
+    T.eq sub t ||
+    match T.view t with
+    | T.Var _ | T.BVar _ | T.App (_, []) -> false
+    | T.App (_, args) -> List.exists check args
+    | _ -> false
   in
   check t
 
-let eq x y = x == y  (* because of hashconsing *)
-
-let compare x y = x.tag - y.tag
-
-let hash x = x.tag
-
-let ty t = t.ty
+let eq = T.eq
+let hash = T.hash
+let cmp = T.cmp
+let ty t = Type.of_term_exn (T.ty t)
 
 module TermHASH = struct
   type t = term
@@ -111,87 +152,24 @@ end
 
 module Set = Sequence.Set.Make(struct
   type t = term
-  let compare = compare
+  let compare = cmp
 end)
 
 module Map = Sequence.Map.Make(struct
   type t = term
-  let compare = compare
+  let compare = cmp
 end)
 
 module TCache = Cache.Replacing(TermHASH)
 module T2Cache = Cache.Replacing2(TermHASH)(TermHASH)
 
-(** {2 Global terms table (hashconsing)} *)
-
-(* structural hash *)
-let hash_term t =
-  match t.term with
-  | Var i -> Hash.hash_int i
-  | BoundVar i -> Hash.hash_int2 22 (Hash.hash_int i)
-  | Node (s, tys, []) -> Hash.hash_list Type.hash (Symbol.hash s) tys
-  | Node (s, tys, l) ->
-    let h = Hash.hash_list Type.hash (Symbol.hash s) tys in
-    Hash.hash_list (fun x -> x.tag) h l
-
-(* structural eq *)
-let hashcons_equal x y =
-  (* pairwise comparison of subterms *)
-  let rec eq_subterms a b = match a, b with
-    | [], [] -> true
-    | a::a1, b::b1 -> a == b && eq_subterms a1 b1
-    | _ -> false
-  and eq_types a b = match a, b with
-    | [], [] -> true
-    | xa::a', xb::b' -> Type.eq xa xb && eq_types a' b'
-    | _ -> false
-  in
-  (* compare type args and subterms, if same structure *)
-  match x.term, y.term with
-  | Var i, Var j
-  | BoundVar i, BoundVar j -> i = j && Type.eq x.ty y.ty
-  | Node (sa, [], []), Node (sb, [], []) -> Symbol.eq sa sb
-  | Node (_, _, []), Node (_, _, _::_)
-  | Node (_, _, _::_), Node (_, _, []) -> false
-  | Node (sa, tysa, la), Node (sb, tysb, lb) ->
-    Symbol.eq sa sb && eq_subterms la lb && eq_types tysa tysb
-  | _ -> false
-
-(** hashconsing for terms *)
-(* module H  = Hashcons.Make(struct *)
-module H = Hashcons.Make(struct
-  type t = term
-
-  let equal x y = hashcons_equal x y
-
-  let hash t = hash_term t
-
-  let tag i t = (assert (t.tag = -1); t.tag <- i)
-end)
-
-(** {2 Boolean flags} *)
-
-let __gen = Util.Flag.create ()
-let new_flag () = Util.Flag.get_new __gen
-
-let flag_ground = new_flag ()
-let flag_monomorphic = new_flag ()
-
-let set_flag flag t truth =
-  if truth
-    then t.flags <- t.flags lor flag
-    else t.flags <- t.flags land (lnot flag)
-
-let get_flag flag t = (t.flags land flag) != 0
-
 (** {2 Typing} *)
 
-let cast t ty =
-  begin match t.term with
-    | Var _ | BoundVar _ -> ()
-    | _ -> raise (Invalid_argument "cast")
-  end;
-  H.hashcons { t with ty ; tag = ~-1; }
+let cast ~ty t =
+  match T.view t with
+  | T.Var _ | T.BVar _ -> T.cast ~ty:(ty :> T.t) t
+  | T.App _ -> raise (Invalid_argument "FOTerm.cast")
+  | _ -> assert false
 
 (** {2 Smart constructors} *)
 
@@ -200,151 +178,125 @@ let cast t ty =
     
     TODO: flag_monomorphic *)
 
-let mk_var ~ty idx =
-  assert (idx >= 0);
-  let my_v = {term = Var idx; ty; tsize = 1;
-              flags= 0; tag= -1} in
-  H.hashcons my_v
+let kind = T.Kind.FOTerm
 
-let __mk_bound_var ~ty idx =
-  assert (idx >= 0);
-  let my_v = {term = BoundVar idx; ty; tsize = 1;
-              flags=0; tag= -1} in
-  H.hashcons my_v
+let var ~ty i =
+  assert (i >= 0);
+  T.var ~kind ~ty:(ty :> T.t) i
 
-let rec compute_is_ground l = match l with
-  | [] -> true
-  | x::l' -> (get_flag flag_ground x) && compute_is_ground l'
+let bvar ~ty i =
+  assert (i >= 0);
+  T.bvar ~kind ~ty:(ty :> T.t) i
 
-let rec compute_tsize l = match l with
-  | [] -> 1  (* with the initial symbol! *)
-  | x::l' -> x.tsize + compute_tsize l'
+(* compute type of s(tyargs  *)
+let _compute_ty ty_fun tyargs l =
+  let ty' = Type.apply ty_fun tyargs in
+  Type.apply ty' (List.map ty l)
 
-(* compute type of s(tyargs @ l) *)
-let _compute_ty s tyargs l =
-  match tyargs, l with
-    | [], [] -> Symbol.ty s
-    | _ ->
-      let all_ty_args = tyargs @ (List.map ty l) in
-      Type.apply (Symbol.ty s) all_ty_args
-
-let mk_node ?(tyargs=[]) s l =
+let app ?(tyargs=[]) ts args =
   Util.enter_prof prof_mk_node;
-  (* hashcons term *)
-  let t = match l with
-  | [] ->
-    let my_t = {term=Node (s, tyargs, l); ty=Obj.magic 0; flags=flag_ground;
-               tsize=1; tag= -1} in
-    let t = H.hashcons my_t in
-    if t.ty == Obj.magic 0 then begin
-      t.ty <- _compute_ty s tyargs l
-      end;
-    t
-  | _::_ ->
-    let my_t = {term=Node (s, tyargs, l); ty=Obj.magic 0; flags=0;
-               tsize=0; tag= -1} in
-    let t = H.hashcons my_t in
-    if t.ty == Obj.magic 0
-      then begin
-        (* compute meta-data: groundness, size *)
-        set_flag flag_ground t (compute_is_ground l);
-        t.tsize <- compute_tsize l;
-        t.ty <- _compute_ty s tyargs l;
-      end;
-    t
-  in
+  (* first; compute type *)
+  let ty = _compute_ty ts.TS.ty tyargs args in
+  (* create constant *)
+  let cst = T.const ~kind ~ty:(ts.TS.ty :> T.t) ts.TS.sym in
+  (* apply constant to type args and args *)
+  let res = T.app ~kind ~ty:(ty:>T.t) cst ((tyargs :> T.t list) @ args) in
   Util.exit_prof prof_mk_node;
-  t
+  res
 
-let mk_const ?(tyargs=[]) s = mk_node ~tyargs s []
+let const ?(tyargs=[]) ts =
+  match tyargs with
+  | [] ->
+    let ty = _compute_ty ts.TS.ty tyargs [] in
+    T.const ~kind ~ty:(ts.TS.ty :> T.t) ts.TS.sym
+  | _::_ ->  app ~tyargs ts []
 
-let true_term = mk_const Symbol.true_symbol
-let false_term = mk_const Symbol.false_symbol
+let is_var t = match T.view t with
+  | T.Var _ -> true
+  | _ -> false
+
+let is_bvar t = match T.view t with
+  | T.BVar _ -> true
+  | _ -> false
+
+let is_const t = match T.view t with
+  | T.Const _ -> true
+  | _ -> false
+
+let is_node t = match T.view t with
+  | T.Const _
+  | T.App _ -> true
+  | _ -> false
+
+let of_term t = match T.kind t with
+  | T.Kind.FOTerm _ -> Some t
+  | _ -> None
+
+let of_term_exn t = match T.kind t with
+  | T.Kind.FOTerm _ -> t
+  | _ -> raise (Invalid_argument "Term.of_term_exn")
+
+let is_term t = match T.kind t with
+  | T.Kind.FOTerm _ -> true
+  | _ -> false
+
+module TPTP = struct
+  let true_ = const TS.TPTP.true_
+  let false_ = const TS.TPTP.false_
+end
 
 (** {2 Subterms and positions} *)
 
-let is_var t = match t.term with
-  | Var _ -> true
-  | _ -> false
+module Pos = struct
+  let at t pos = of_term_exn (T.Pos.at (t :> T.t) pos)
 
-let is_bound_var t = match t.term with
-  | BoundVar _ -> true
-  | _ -> false
+  let replace t pos ~by = of_term_exn (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
+end
 
-let is_const t = match t.term with
-  | Node (s, _, []) -> true
-  | _ -> false
-
-let is_node t = match t.term with
-  | Node _ -> true
-  | _ -> false
-
-let rec at_pos t pos = match t.term, pos with
-  | _, [] -> t
-  | Var _, _::_ -> invalid_arg "wrong position in term"
-  | Node (_, _, l), i::subpos when i < List.length l ->
-    at_pos (List.nth l i) subpos
-  | _ -> invalid_arg "index too high for subterm"
-
-let rec replace_pos t pos new_t = match t.term, pos with
-  | _, [] -> new_t
-  | (Var _ | BoundVar _), _::_ -> invalid_arg "wrong position in term"
-  | Node (s, tyargs, l), i::subpos when i < List.length l ->
-    let new_subterm = replace_pos (Util.list_get l i) subpos new_t in
-    mk_node ~tyargs s (Util.list_set l i new_subterm)
-  | _ -> invalid_arg "index too high for subterm"
-
-(** [replace t ~old ~by] syntactically replaces all occurrences of [old]
-    in [t] by the term [by]. *)
-let rec replace t ~old ~by = match t.term with
-  | _ when eq t old -> by
-  | Var _ | BoundVar _ -> t
-  | Node (s, tyargs, l) ->
-    let l' = List.map (fun t' -> replace t' ~old ~by) l in
-    mk_node ~tyargs s l'
-
-(** Size of the term (number of subterms) *)
-let size t = t.tsize
-
-let rec ty_vars set t = match t.term with
-  | Var _
-  | BoundVar _ -> Type.free_vars_set set t.ty
-  | Node (_, tyargs, l) ->
-    let set = List.fold_left Type.free_vars_set set tyargs in
-    List.fold_left ty_vars set l
+let replace t ~old ~by =
+  of_term_exn (T.replace (t:>T.t) ~old:(old:>T.t) ~by:(by:>T.t))
 
 module Seq = struct
-  let rec vars t k = match t.term with
-    | Var _ -> k t
-    | BoundVar _
-    | Node (_, _, []) -> ()
-    | Node (_, _, l) -> _vars_list l k
+  let rec vars t k =
+    match T.kind t, T.view t with
+    | T.Kind.FOTerm, T.Var _ -> k t
+    | T.Kind.FOTerm, T.BVar _
+    | T.Kind.FOTerm, T.App (_, []) -> ()
+    | T.Kind.FOTerm, T.App (_, l) -> _vars_list l k
+    | _ -> ()
   and _vars_list l k = match l with
     | [] -> ()
     | t::l' -> vars t k; _vars_list l' k
 
   let rec subterms t k =
-    k t;
-    match t.term with
-    | Var _
-    | BoundVar _ -> ()
-    | Node (_, _, l) -> List.iter (fun t' -> subterms t' k) l
+    if is_term t then begin
+      k t;
+      match T.view t with
+      | T.Var _
+      | T.BVar _ -> ()
+      | T.App (_, l) -> List.iter (fun t' -> subterms t' k) l
+      | _ -> assert false
+    end
 
   let subterms_depth t k =
     let rec recurse depth t =
-      k (t, depth);
-      match t.term with
-      | Node (_, _, ((_::_) as l)) ->
-        let depth' = depth + 1 in
-        List.iter (fun t' -> recurse depth' t') l
-      | _ -> ()
+      if is_term t then begin
+        k (t, depth);
+        match T.view t with
+        | T.App (_, ((_::_) as l)) ->
+          let depth' = depth + 1 in
+          List.iter (fun t' -> recurse depth' t') l
+        | _ -> ()
+      end
     in
     recurse 0 t
 
-  let rec symbols t k = match t.term with
-    | Var _ | BoundVar _ -> ()
-    | Node (s, _, []) -> k s
-    | Node (s, _, l) ->
+  let rec symbols t k =
+    match T.kind t, T.view t with
+    | T.Kind.FOTerm, T.Var _
+    | T.Kind.FOTerm, T.BVar _ -> ()
+    | T.Kind.FOTerm, T.App (T.Const s, []) -> k s
+    | T.Kind.FOTerm, T.App (T.Const s, l) ->
       k s;
       _symbols_list l k
   and _symbols_list l k = match l with
@@ -361,6 +313,16 @@ module Seq = struct
     seq (function {term=Var i} -> r := min i !r | _ -> ());
     !r
 end
+
+(* FIXME: symbols are counted? beware of T.Const *)
+let size t = T.size (t:>T.t)
+
+let rec ty_vars set t = match t.term with
+  | Var _
+  | BoundVar _ -> Type.free_vars_set set t.ty
+  | Node (_, tyargs, l) ->
+    let set = List.fold_left Type.free_vars_set set tyargs in
+    List.fold_left ty_vars set l
 
 (** get subterm by its position *)
 let at_cpos t pos = 
