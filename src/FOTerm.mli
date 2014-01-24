@@ -42,8 +42,8 @@ module Cst : sig
 
   val make : ty:Type.t -> symbol -> t
 
-  val of_const : ScopedTerm.t -> t option
-  val of_const_exn : ScopedTerm.t -> t
+  val of_term : ScopedTerm.t -> t option
+  val of_term_exn : ScopedTerm.t -> t
   val is_const : ScopedTerm.t -> bool
 
   include Interfaces.HASH with type t := t
@@ -53,6 +53,35 @@ module Cst : sig
   module TPTP : sig
     val true_ : t
     val false_ : t
+    include Interfaces.PRINT with type t := t
+
+    module Arith : sig
+      val floor : t
+      val ceiling : t
+      val truncate : t
+      val round : t
+
+      val prec : t
+      val succ : t
+
+      val sum : t
+      val difference : t
+      val uminus : t
+      val product : t
+      val quotient : t
+
+      val quotient_e : t
+      val quotient_t : t
+      val quotient_f : t
+      val remainder_e : t
+      val remainder_t : t
+      val remainder_f : t
+
+      val less : t
+      val lesseq : t
+      val greater : t
+      val greatereq : t
+    end
   end
 end
 
@@ -130,30 +159,6 @@ val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 
-module TPTP : sig
-  val true_ : t     (** tautology term *)
-  val false_ : t    (** antilogy term *)
-
-  include Interfaces.PRINT with type t := t
-end
-
-(** {2 Subterms and Positions} *)
-
-module Pos : sig
-  val at : t -> Position.t -> t
-  (** retrieve subterm at pos
-      @raise Invalid_argument if the position is invalid *)
-
-  val replace_at : t -> Position.t -> by:t -> t
-  (** [replace_at t pos ~by] replaces the subterm at position [pos]
-      in [t] by the term [by]. The two terms should have the same type.
-      @raise Invalid_argument if the position is not valid *)
-end
-
-val replace : t -> old:t -> by:t -> t
-  (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
-      in [t] by the term [by]. *)
-
 (** {2 Sequences} *)
 
 module Seq : sig
@@ -161,12 +166,11 @@ module Seq : sig
   val subterms : t -> t Sequence.t
   val subterms_depth : t -> (t * int) Sequence.t  (* subterms with their depth *)
   val symbols : t -> Symbol.t Sequence.t
-  val add_symbols : Symbol.Set.t -> t Sequence.t -> Symbol.Set.t
   val max_var : t Sequence.t -> int
   val min_var : t Sequence.t -> int
-  val add_vars : Set.t -> t Sequence.t -> Set.t
   val ty_vars : t -> Type.t Sequence.t
-  val add_ty_vars : Type.Set.t -> t Sequence.t -> Type.Set.t
+
+  val add_set : Set.t -> t Sequence.t -> Set.t
 end
 
 val var_occurs : var:t -> t -> bool     (** [var_occurs ~var t] true iff [var] in t *)
@@ -176,13 +180,36 @@ val max_var : Set.t -> int              (** find the maximum variable index, or 
 val min_var : Set.t -> int              (** minimum variable, or 0 if ground *)
 val add_vars : unit Tbl.t -> t -> unit  (** add variables of the term to the set *)
 val vars : t Sequence.t -> Set.t        (** compute variables of the terms *)
-val vars_prefix_order : t -> t list     (** variables of the term in prefix traversal order *)
+val vars_prefix_order : t -> t list     (** variables in prefix traversal order *)
 val depth : t -> int                    (** depth of the term *)
 val head : t -> Symbol.t                (** head symbol (or Invalid_argument) *)
 val size : t -> int                     (** Size (number of nodes) *)
 
 val ty_vars : t -> Type.Set.t
   (** Set of free type variables *)
+
+(** {2 Subterms and Positions} *)
+
+module Pos : sig
+  val at : t -> Position.t -> t
+  (** retrieve subterm at pos
+      @raise Invalid_argument if the position is invalid *)
+
+  val replace : t -> Position.t -> by:t -> t
+  (** [replace t pos ~by] replaces the subterm at position [pos]
+      in [t] by the term [by]. The two terms should have the same type.
+      @raise Invalid_argument if the position is not valid *)
+
+  val at_cpos : t -> int -> t
+    (** retrieve subterm at the compact pos, or raise Invalid_argument*)
+
+  val max_cpos : t -> int
+    (** maximum compact position in the term *)
+end
+
+val replace : t -> old:t -> by:t -> t
+  (** [replace t ~old ~by] syntactically replaces all occurrences of [old]
+      in [t] by the term [by]. *)
 
 (** {2 High-level operations} *)
 
@@ -230,36 +257,45 @@ end
 
 (** {2 Printing/parsing} *)
 
-type print_hook = (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+val print_all_types : bool ref
+  (** If true, {!pp} will print the types of all annotated terms *)
+
+type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
   (** User-provided hook that can be used to print terms (the {!Node} case)
-      before the default printing occurs.
-      A hook takes as first argument the recursive printing function
+      before the default printing occurs. The int argument is the De Bruijn
+      depth in the term.
+      A hook takes as arguments the depth and the recursive printing function
       that it can use to print subterms.
       A hook should return [true] if it fired, [false] to fall back
       on the default printing. *)
 
-val pp_depth : ?hooks:print_hook list -> int -> Buffer.t -> t -> unit
-val pp_tstp_depth : int -> Buffer.t -> t -> unit
-
-val pp_debug : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
-
-val arith_hook : print_hook           (* hook to print arithmetic expressions *)
-val pp_arith : Buffer.t -> t -> unit  (* use arith_hook with pp_debug *)
+val add_hook : print_hook -> unit
 
 include Interfaces.PRINT with type t := t
-include Interfaces.PRINT_OVERLOAD with type t := t
 
-val print_var_types : bool ref
-  (** If true, {!pp_debug} will print types of all vars, except those of type $i *)
-
-val print_all_types : bool ref
-  (** If true, {!pp_debug} will print the types of all annotated terms *)
-
+(* TODO
 include Interfaces.SERIALIZABLE with type t := t
+*)
 
 val debug : Format.formatter -> t -> unit
   (** debug printing, with sorts *)
+
+(** {2 TPTP} *)
+
+module TPTP : sig
+  val true_ : t     (** tautology term *)
+  val false_ : t    (** antilogy term *)
+
+  include Interfaces.PRINT with type t := t
+
+  module Arith : sig
+    val arith_hook : print_hook
+      (** hook to print arithmetic expressions *)
+
+    val pp_debug : Buffer.t -> t -> unit
+      (** use arith_hook with pp_debug *)
+  end
+end
 
 (** {2 Misc} *)
 
