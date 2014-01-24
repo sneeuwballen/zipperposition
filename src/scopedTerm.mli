@@ -52,6 +52,7 @@ module Kind : sig
   (** "kind" of a term, i.e. what is its meaning, in which context is it
       used *)
   type t =
+    | Const
     | Type
     | FOTerm
     | HOTerm

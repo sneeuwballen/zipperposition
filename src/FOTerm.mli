@@ -27,19 +27,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Terms use ScopedTerm with kind "FOTerm".
 *)
 
-(** {2 Typed Symbol} *)
-
 type symbol = Symbol.t
 
-module TypedSymbol : sig
-  type t = private {
-    sym : symbol;
-    ty : Type.t;
-  }
+(** {2 Typed Constant}
 
-  val make : ty:Type.t -> symbol -> t
+A typed constant is a symbol with its type. It is also repreented
+as a ScopedTerm.*)
+
+module Cst : sig
+  type t = private ScopedTerm.t
+
   val ty : t -> Type.t
   val sym : t -> Symbol.t
+
+  val make : ty:Type.t -> symbol -> t
+
+  val of_const : ScopedTerm.t -> t option
+  val of_const_exn : ScopedTerm.t -> t
+  val is_const : ScopedTerm.t -> bool
 
   include Interfaces.HASH with type t := t
   include Interfaces.ORD with type t := t
@@ -60,7 +65,7 @@ type term = t
 type view = private
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
-  | App of TypedSymbol.t * Type.t list * t list (** Function application *)
+  | App of Cst.t * Type.t list * t list (** Function application *)
 
 type sourced_term =
   t * string * string           (** Term + file,name *)
@@ -104,14 +109,14 @@ val bvar : ty:Type.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
       {b Warning}: be careful and try not to use this function directly*)
 
-val app : ?tyargs:Type.t list -> TypedSymbol.t -> t list -> t
+val app : ?tyargs:Type.t list -> Cst.t -> t list -> t
   (** Apply a typed symbol to a list of type arguments (optional) and
       a list of term arguments. Partial application is not
       supported and will raise a type error. The type is automatically
       computed.
       @raise Type.Error if types do not match. *)
 
-val const : ?tyargs:Type.t list -> TypedSymbol.t -> t
+val const : ?tyargs:Type.t list -> Cst.t -> t
   (** Create a typed constant. Specialization of [app]. *)
 
 val cast : ty:Type.t -> t -> t

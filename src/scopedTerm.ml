@@ -32,6 +32,7 @@ type symbol = Sym.t
 
 module Kind = struct
   type t =
+    | Const (* typed constant *)
     | Type
     | FOTerm
     | HOTerm

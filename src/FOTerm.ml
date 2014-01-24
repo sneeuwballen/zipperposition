@@ -31,32 +31,36 @@ module T = ScopedTerm
 let prof_mk_node = Util.mk_profiler "Term.mk_node"
 let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 
-(** {2 Typed Symbol} *)
-
 type symbol = Symbol.t
 
-module TypedSymbol = struct
-  type t = {
-    sym : symbol;
-    ty : Type.t;
-  }
+(** {2 Typed Symbol} *)
 
-  let make ~ty sym = { ty; sym; }
-  let ty ts = ts.ty
-  let sym ts = ts.sym
+module Cst = struct
+  type t = T.t
 
-  let hash ts = Hash.combine (Symbol.hash ts.sym) (Type.hash ts.ty)
-  let eq ts1 ts2 =
-    Type.eq ts1.ty ts2.ty &&
-    Symbol.eq ts1.sym ts2.sym
+  let make ~ty sym = T.const ~kind:T.Kind.Const ~ty:(ty:>T.t) sym
 
-  let cmp ts1 ts2 =
-    let c = Type.cmp ts1.ty ts2.ty in
-    if c <> 0 then c else Symbol.cmp ts1.sym ts2.sym
+  let ty c = T.ty c
 
-  let print buf ts = Symbol.pp buf ts.sym
-  let to_string ts = Symbol.to_string ts.sym
-  let fmt fmt ts = Symbol.fmt fmt ts.sym
+  let sym c = match T.view c with
+    | T.Const s -> s
+    | _ -> assert false
+
+  let is_const t = match T.kind t with
+    | T.Kind.Const -> true
+    | _ -> false
+
+  let of_term t = if is_const t then Some t else None
+  let of_term_exn t = if is_const t
+  then t else raise (Invalid_argument "T.Cst.of_term_exn")
+
+  let hash = T.hash
+  let eq = T.eq
+  let cmp = T.cmp
+
+  let print buf c = Symbol.pp buf (sym c)
+  let to_string c = Symbol.to_string (sym c)
+  let fmt fmt c = Symbol.fmt fmt (sym c)
 
   module TPTP = struct
     let true_ = make ~ty:Type.TPTP.o Symbol.Base.true_
@@ -64,7 +68,7 @@ module TypedSymbol = struct
   end
 end
 
-module TS = TypedSymbol
+module TS = Cst
 
 (** {2 Term} *)
 
@@ -78,7 +82,7 @@ type sourced_term =
 type view =
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
-  | App of TypedSymbol.t * Type.t list * t list (** Function application *)
+  | App of Cst.t * Type.t list * t list (** Function application *)
 
 (* split list between types, terms *)
 let rec _split_types l = match l with
@@ -95,7 +99,7 @@ let view t = match T.view t with
       begin match T.view hd with
       | T.Const s ->
           let ty = Type.of_term_exn (T.ty hd) in
-          let ts = TypedSymbol.make ~ty s in
+          let ts = Cst.make ~ty s in
           (* split arguments into type arguments + term arguments *)
           let tyargs, args = _split_types args in
           App (ts, tyargs, args)
