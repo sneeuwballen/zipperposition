@@ -86,6 +86,10 @@ val is_int : t -> bool
 val is_rat : t -> bool
 val is_numeric : t -> bool
 
+module Seq : sig
+  val add_set : Set.t -> t Sequence.t -> Set.t
+end
+
 module Base : sig
   val true_ : t
   val false_ : t

@@ -37,6 +37,8 @@ scope (outside any other quantifier).
 
 See {!TypeInference} for inferring types from terms and formulas,
 and {!Signature} to associate types with symbols.
+
+TODO: think of a good way of representating AC operators (+, ...)
 *)
 
 exception Error of string

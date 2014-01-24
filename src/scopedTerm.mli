@@ -29,6 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Those terms are not designed to be used directly, but rather to provide
 a generic backend (implementing De Bruijn indices, subterms, substitutions,
 etc.) for other more specific representations like Type, FOTerm, FOFormula...
+
+TODO: records!
 *)
 
 type symbol = Symbol.t

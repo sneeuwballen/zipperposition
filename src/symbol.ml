@@ -79,6 +79,11 @@ let is_int = function | Int _ -> true | _ -> false
 let is_rat = function | Rat _ -> true | _ -> false
 let is_numeric = function | Int _ | Rat _ | _ -> false
 
+module Seq = struct
+  let add_set set =
+    Sequence.fold (fun set s -> Set.add s set) set
+end
+
 let is_distinct s = match s with
   | Cst c ->
     let s = c.cs_name in
