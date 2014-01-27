@@ -64,6 +64,7 @@ and general_data =
   | GColumn of general_data * general_data
   | GNode of string * general_data list
   | GList of general_data list
+(* TODO: use PrologTerm.t *)
 
 val name_of_decl : declaration -> name
   (** Find the name of the declaration, or
