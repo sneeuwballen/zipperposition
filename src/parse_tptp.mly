@@ -31,6 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   module Ty = Basic.Ty
   module L = Location
   module Sym = Basic.Sym
+  module PT = PrologTerm
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
@@ -408,22 +409,22 @@ annotations:
 
 general_term:
   | general_data { $1 }
-  | l=general_data COLUMN r=general_term { Ast_tptp.GColumn (l,r) }
+  | l=general_data COLUMN r=general_term { PT.column l r }
   | general_list { $1 }
 
 general_data:
-  | w=atomic_word { Ast_tptp.GString w }
+  | w=atomic_word { PT.const w }
   | general_function { $1 }
-  | INTEGER { Ast_tptp.GInt (int_of_string $1) }
-  | v=UPPER_WORD { Ast_tptp.GVar v }
-  | w=DISTINCT_OBJECT { Ast_tptp.GString w }
+  | INTEGER { PT.of_int (int_of_string $1) }
+  | v=UPPER_WORD { PT.var v }
+  | w=DISTINCT_OBJECT { PT.const w }
 
 general_function:
   | f=atomic_word LEFT_PAREN l=separated_nonempty_list(COMMA, general_term) RIGHT_PAREN
-    { Ast_tptp.GNode (f, l) }
+    { PT.app f l }
 
 general_list:
   | LEFT_BRACKET l=separated_list(COMMA, general_term) RIGHT_BRACKET
-    { Ast_tptp.GList l }
+    { PT.list_ l }
 
 %%

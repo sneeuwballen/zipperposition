@@ -57,14 +57,7 @@ and role =
   | R_unknown     (* error *)
   (** formula role *)
 and optional_info = general_data list
-and general_data =
-  | GString of string
-  | GVar of string   (* variable *)
-  | GInt of int
-  | GColumn of general_data * general_data
-  | GNode of string * general_data list
-  | GList of general_data list
-(* TODO: use PrologTerm.t *)
+and general_data = PrologTerm.t
 
 val name_of_decl : declaration -> name
   (** Find the name of the declaration, or

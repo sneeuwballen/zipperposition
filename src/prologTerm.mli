@@ -35,7 +35,42 @@ type t =
   | Var of string             (** variable *)
   | Int of Z.t                (** integer *)
   | Rat of Q.t                (** rational *)
-  | Node of string * t list   (** apply symbol *)
-  | Bind of t list * t        (** bind n variables *)
+  | App of string * t list   (** apply symbol *)
+  | Bind of string * t list * t   (** bind n variables *)
   | List of t list            (** special constructor for lists *)
   | Column of t * t           (** t:t (useful for typing, e.g.) *)
+
+type term = t
+
+include Interfaces.HASH with type t := t
+include Interfaces.ORD with type t := t
+
+val var : string -> t
+val int_ : Z.t -> t
+val of_int : int -> t
+val rat : Q.t -> t
+val app : string -> t list -> t
+val const : string -> t
+val bind : string -> t list -> t -> t
+val list_ : t list -> t
+val nil : t
+val column : t -> t -> t
+
+val is_var : t -> bool
+
+module Set : Sequence.Set.S with type elt = term
+module Map : Sequence.Map.S with type key = term
+module Tbl : Hashtbl.S with type key = term
+
+module Seq : sig
+  val vars : t -> t Sequence.t
+  val bound_vars : t -> t Sequence.t
+  val subterms : t -> t Sequence.t
+  val symbols : t -> string Sequence.t
+  val add_set : Set.t -> t Sequence.t -> Set.t
+end
+
+val ground : t -> bool
+val close_all : string -> t -> t  (** Bind all free vars with the symbol *)
+
+include Interfaces.PRINT with type t := t
