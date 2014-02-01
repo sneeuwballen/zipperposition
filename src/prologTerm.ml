@@ -37,17 +37,39 @@ type t =
 
 type term = t
 
-let rec eq t1 t2 = match t1, t2 with
-  | Var s1, Var s2 -> s1 = s2
-  | Int i1, Int i2 -> Z.equal i1 i2
-  | Rat n1, Rat n2 -> Q.equal n1 n2
+let __to_int = function
+  | Var _ -> 0
+  | Int _ -> 1
+  | Rat _ -> 2
+  | App _ -> 3
+  | Bind _ -> 4
+  | List _ -> 5
+  | Column _ -> 6
+
+let rec cmp t1 t2 = match t1, t2 with
+  | Var s1, Var s2 -> String.compare s1 s2
+  | Int i1, Int i2 -> Z.compare i1 i2
+  | Rat n1, Rat n2 -> Q.compare n1 n2
   | App (s1,l1), App (s2, l2) ->
-    s1 = s2 && (try List.for_all2 eq l1 l2 with Invalid_argument _ -> false)
+    let c = String.compare s1 s2 in
+    if c = 0
+    then Util.lexicograph cmp l1 l2
+    else c
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-      s1 = s2 && eq t1 t2 &&
-      (try List.for_all2 eq v1 v2 with Invalid_argument _ -> false)
-  | Column (x1,y1), Column (x2,y2) -> eq x1 x2 && eq y1 y2
-  | _ -> false
+    let c = String.compare s1 s2 in
+    if c = 0
+    then
+      let c' = cmp t1 t2 in
+      if c' = 0
+      then Util.lexicograph cmp v1 v2
+      else c'
+    else c
+  | Column (x1,y1), Column (x2,y2) ->
+    let c = cmp x1 x2 in
+    if c = 0 then cmp y1 y2 else c
+  | _ -> __to_int t1 - __to_int t2
+
+let eq t1 t2 = cmp t1 t2 = 0
 
 let rec hash t = match t with
   | Var s -> Hash.hash_string s
@@ -61,8 +83,6 @@ let rec hash t = match t with
     let h = Hash.combine (Hash.hash_string s) (hash t') in
     Hash.hash_list hash h v
   | Column (x,y) -> Hash.combine (hash x) (hash y)
-
-let rec cmp t1 t2 = Pervasives.compare t1 t2  (* FIXME *)
 
 let var s = Var s
 let int_ i = Int i
