@@ -64,8 +64,11 @@ module Tbl : Hashtbl.S with type key = term
 
 module Seq : sig
   val vars : t -> t Sequence.t
-  val bound_vars : t -> t Sequence.t
+  val free_vars : t -> t Sequence.t
   val subterms : t -> t Sequence.t
+  val subterms_with_bound : t -> (t * Set.t) Sequence.t
+    (** subterm and variables bound at this subterm *)
+
   val symbols : t -> string Sequence.t
   val add_set : Set.t -> t Sequence.t -> Set.t
 end

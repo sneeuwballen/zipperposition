@@ -122,27 +122,54 @@ module Seq = struct
       | Var _ | Int _ | Rat _ -> ()
       | List l
       | App (_, l) -> List.iter iter l
-      | Bind (_, v, t') -> List.iter iter v; k t'
+      | Bind (_, v, t') -> List.iter iter v; iter t'
       | Column(x,y) -> k x; k y
     in iter t
 
   let vars t = subterms t |> Sequence.filter is_var
 
-  let bound_vars t k = failwith "not implemented" (* TODO*)
+  let add_set s seq =
+    Sequence.fold (fun set x -> Set.add x set) s seq
+
+  let subterms_with_bound t k =
+    let rec iter bound t =
+      k (t, bound);
+      match t with
+      | Var _ | Int _ | Rat _ -> ()
+      | List l
+      | App (_, l) -> List.iter (iter bound) l
+      | Bind (_, v, t') ->
+          (* add variables of [v] to the set *)
+          let bound' = List.fold_left
+            (fun set v -> add_set set (vars v))
+            bound v
+          in
+          iter bound' t'
+      | Column(x,y) -> k (x, bound); k (y, bound)
+    in iter Set.empty t
+
+  let free_vars t =
+    subterms_with_bound t
+      |> Sequence.fmap (fun (v,bound) ->
+          if is_var v && not (Set.mem v bound)
+          then Some v
+          else None)
 
   let symbols t = subterms t
       |> Sequence.fmap (function
         | App (s, _) -> Some s
         | Bind (s, _, _) -> Some s
         | _ -> None)
-
-  let add_set s seq =
-    Sequence.fold (fun set x -> Set.add x set) s seq
 end
 
 let ground t = Seq.vars t |> Sequence.is_empty
 
-let close_all s t = failwith "not implemented" (* TODO *)
+let close_all s t =
+  let vars = Seq.free_vars t
+    |> Seq.add_set Set.empty
+    |> Set.elements
+  in
+  bind s vars t
 
 let rec pp buf t = match t with
   | Var s -> Buffer.add_string buf s
