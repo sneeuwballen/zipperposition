@@ -25,8 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Substitutions}
 
-Substitutions map variables to terms/types. They pack both a substitution for
-De Bruijn indices, and a substitution on free variables (within a scope).
+Substitutions map variables to terms/types. They work on free variables (within
+a scope, so that the same variable can live within several scopes).
 
 The concept of scope is to allow the same free variable to be used in
 several contexts without being renamed. A scope is kind of a namespace,
@@ -39,216 +39,127 @@ type scope = int
 
 type 'a scoped = 'a * scope
 
-(** {2 Signature of substitutions} *)
+type term = ScopedTerm.t
 
-module type S = sig
-  type term
-    (** Some term structure *)
+(** {2 Renamings}
+A renaming is used to disambiguate variables that come from distinct
+scopes but have the same index. It is used to merge together several scopes, in
+a sound way, by ensuring variables from those scopes are mapped to distinct
+variables of the new scope. For instance, a given renaming applied to (X,0) and
+(X,1) will return two different variables, as if one of the X had been renamed
+prior to unification/binding. *)
 
-  (** {3 Basics} *)
-
+module Renaming : sig
   type t
-    (** A substitution that binds term variables to other terms *)
+  val create : unit -> t
+  val clear : t -> unit
+end
 
-  val empty : t
-    (** The identity substitution *)
+(** {3 Basics} *)
 
-  val is_empty : t -> bool
-    (** Is the substitution empty? *)
+type t
+  (** A substitution that binds term variables to other terms *)
 
-  (** {3 Operations on Substitutions} *)
+type subst = t
 
-  val lookup : t -> term -> scope -> term * scope
-    (** Lookup variable in substitution.
-        @raise Not_found if variable not bound. *)
+val empty : t
+  (** The identity substitution *)
 
-  val get_var : t -> term -> scope -> term * scope
-    (** Lookup recursively the var in the substitution, until it is not a
-        variable anymore, or it is not bound *)
+val is_empty : t -> bool
+  (** Is the substitution empty? *)
 
-  val mem : t -> term -> scope -> bool
-    (** Check whether the variable is bound by the substitution *)
+(** {3 Operations on Substitutions} *)
+
+val lookup : t -> term -> scope -> term * scope
+  (** Lookup variable in substitution.
+      @raise Not_found if variable not bound. *)
+
+val get_var : t -> term -> scope -> term * scope
+  (** Lookup recursively the var in the substitution, until it is not a
+      variable anymore, or it is not bound *)
+
+val mem : t -> term -> scope -> bool
+  (** Check whether the variable is bound by the substitution *)
+
+exception KindError
+
+val bind : t -> term -> scope -> term -> scope -> t
+  (** Add [v] -> [t] to the substitution. Both terms have a context.
+      @raise Invalid_argument if [v] is already bound in
+        the same context, to another term.
+      @raise KindError if a term of a given kind is bound to a term
+        of another kind (see {!ScopedTerm.Kind.t}) *)
+
+val append : t -> t -> t
+  (** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
+
+val remove : t -> term -> int -> t
+  (** Remove the given binding. No other variable should depend on it... *)
+
+(** {2 Set operations} *)
+
+val domain : t -> (term * scope) Sequence.t
+  (** Domain of substitution *)
+
+val codomain : t -> (term * scope) Sequence.t
+  (** Codomain (image terms) of substitution *)
+
+val introduced : t -> (term * scope) Sequence.t
+  (** Variables introduced by the substitution (ie vars of codomain) *)
+
+(*
+val compose : t -> t -> t
+  (** [compose s1 s2] is the substitution that to [x] associates
+      [s1 (s2 x)]. *)
+*)
+
+val is_renaming : t -> bool
+  (** Check whether the substitution is a variable renaming *)
+
+include Interfaces.PRINT with type t := t
+
+val fold : t -> 'a -> ('a -> term -> scope -> term -> scope -> 'a) -> 'a
+val iter : t -> (term -> scope -> term -> scope -> unit) -> unit
+
+val to_seq : t -> (term * scope * term * scope) Sequence.t
+val to_list : t -> (term * scope * term * scope) list
+val of_seq : ?init:t -> (term * scope * term * scope) Sequence.t -> t
+val of_list : ?init:t -> (term * scope * term * scope) list -> t
+
+val apply : ?depth:int -> t -> renaming:Renaming.t -> term -> scope -> term
+  (** Apply the substitution to the given term.
+      @param renaming used to desambiguate free variables from distinct scopes *)
+
+val apply_no_renaming : ?depth:int -> t -> term -> scope -> term
+  (** Same as {!apply}, but performs no renaming of free variables.
+      {b Caution}, can entail collisions between scopes! *)
+
+(* TODO
+include Interfaces.SERIALIZABLE with type t := t
+*)
+
+(** {2 Specializations} *)
+
+module type SPECIALIZED = sig
+  type term
+  type t = subst
+
+  val apply : ?depth:int -> t -> renaming:Renaming.t -> term -> scope -> term
+    (** Apply the substitution to the given term/type.
+        @param renaming used to desambiguate free variables from distinct scopes *)
+
+  val apply_no_renaming : ?depth:int -> t -> term -> scope -> term
+    (** Same as {!apply}, but performs no renaming of free variables.
+      {b Caution}, can entail collisions between scopes! *)
 
   val bind : t -> term -> scope -> term -> scope -> t
     (** Add [v] -> [t] to the substitution. Both terms have a context.
         @raise Invalid_argument if [v] is already bound in
           the same context, to another term. *)
-
-  val append : t -> t -> t
-    (** [append s1 s2] is the substitution that maps [t] to [s2 (s1 t)]. *)
-
-  val remove : t -> term -> int -> t
-    (** Remove the given binding. No other variable should depend on it... *)
-
-  (** {2 Set operations} *)
-
-  module H : Hashtbl.S with type key = term * scope
-    (** Set of bound terms *)
-
-  val domain : t -> unit H.t
-    (** Domain of substitution *)
-
-  val codomain : t -> unit H.t
-    (** Codomain (image terms) of substitution *)
-
-  val introduced : t -> unit H.t
-    (** Variables introduced by the substitution (ie vars of codomain) *)
-
-  val compose : t -> t -> t
-    (** [compose s1 s2] is the substitution that to [x] associates
-        [s1 (s2 x)].
-        XXX not implemented *)
-
-  val is_renaming : t -> bool
-    (** Check whether the substitution is a variable renaming *)
-
-  val pp : Buffer.t -> t -> unit
-  val to_string : t -> string
-  val fmt : Format.formatter -> t -> unit
-
-  val fold : t -> 'a -> ('a -> term -> scope -> term -> scope -> 'a) -> 'a
-  val iter : t -> (term -> scope -> term -> scope -> unit) -> unit
-
-  val to_seq : t -> (term * scope * term * scope) Sequence.t
-  val to_list : t -> (term * scope * term * scope) list
-  val of_seq : ?init:t -> (term * scope * term * scope) Sequence.t -> t
-  val of_list : ?init:t -> (term * scope * term * scope) list -> t
-
-  val bij : t Bij.t
 end
 
-(** {2 Renaming}
-A renaming is used to merge together several scopes, in a sound way,
-by ensuring variables from those scopes are mapped to distinct
-variables of the new scope. For instance, a given renaming
-applied to (X,0) and (X,1) will return two different variables, as
-if one of the X had been renamed prior to unification/binding. *)
+module Ty : SPECIALIZED with type term = Type.t
 
-module type RENAMING = sig
-  type t
+module FO : SPECIALIZED with type term = FOTerm.t
 
-  val create : int -> t
-    (** Fresh renaming *)
-
-  val clear : t -> unit
-    (** Cleanup the content of the renaming. It is as new afterwards! *)
-end
-
-(** {2 Functor}
-
-This functor provides the base types for substitutions and renamings.
-Application depends too much on the term structure, so it must
-be implemented separately.
-*)
-
-module type TERM = sig
-  type t
-  val eq : t -> t -> bool
-  val compare : t -> t -> int
-  val is_var : t -> bool
-  val vars : t -> t list  (* list of vars of the term *)
-  val hash : t -> int
-  val pp : Buffer.t -> t -> unit
-  val bij : t Bij.t
-end
-
-module Make(T : TERM) : S with type term = T.t
-
-(** {2 Substitutions on types}
-
-This kind of substitution is used to keep track of universal type
-variables during type unification. Other substitutions use this kind
-of substitutions to deal with free variables's types (that may need to
-be specialized).
-*)
-
-module Ty : sig
-  include S with type term = Type.t
-
-  module Renaming : RENAMING
-
-  val apply : ?depth:int -> t -> renaming:Renaming.t -> Type.t -> scope -> Type.t
-    (** Apply the substitution to the type.
-        @param renaming used to desambiguate free variables from distinct scopes *)
-
-  val apply_no_renaming : ?depth:int -> t -> Type.t -> scope -> Type.t
-    (** Same as {!apply}, but performs no renaming of free variables.
-        {b Caution}, can entail collisions between scopes! *)
-end
-
-(** {2 Substitutions on typed terms}
-
-Substitutions on terms also contain a substitution on types, because unifying
-term variables requires to unify their types. The implementation doesn't
-abstract on types.
-*)
-
-(** Typed terms *)
-module type TYPED_TERM = sig
-  include TERM
-
-  val ty : t -> Type.t
-    (** Obtain the type of a term. Only called on variables, so
-        other terms may not have types. *)
-
-  val mk_var : ty:Type.t -> int -> t
-    (** build a typed variable from an index *)
-end
-
-(** Substitution on typed terms *)
-module type TYPED = sig
-  type term
-
-  include S with type term := term
-
-  val ty_subst : t -> Ty.t
-    (** The substitution on types *)
-
-  val bind_ty : t -> Type.t -> scope -> Type.t -> scope -> t
-    (** Bind types *)
-
-  val update_ty : t -> (Ty.t -> Ty.t) -> t
-    (** Update the type substitution inside the substitution *)
-
-  val of_ty : Ty.t -> t
-    (** Lift substitution on type to substution on terms *)
-
-  module Renaming : RENAMING
-end
-
-module MakeTyped(T : TYPED_TERM) : TYPED with type term = T.t
-
-(** {2 Substitution on FO terms} *)
-
-module FO : sig
-  include TYPED with type term = FOTerm.t
-
-  val apply : renaming:Renaming.t -> t -> term -> scope -> term
-    (** Apply substitution to term, replacing variables by the terms they are bound to.
-
-        [renaming] is used to rename free variables (not bound by [subst])
-        while avoiding collisions. *)
-
-  val apply_no_renaming : t -> term -> scope -> term
-    (** Apply the substitution, and does not rename variables. {b Caution}, this
-        can entail collisions between scopes! *)
-
-  val apply_f : renaming:Renaming.t -> t -> FOFormula.t -> scope -> FOFormula.t
-    (** Apply the substitution to the formula *)
-end
-
-(** {2 Substitution on HO terms} *)
-
-module HO : sig
-  include TYPED with type term = HOTerm.t
-
-  val apply : ?depth:int -> renaming:Renaming.t -> t -> term -> scope -> term
-    (** Apply substitution to term, replacing variables by the terms they are
-        bound to.
-        @param depth number of binders surrounding the term (used for De
-        Bruijn indexes) *)
-
-  val apply_no_renaming : ?depth:int -> t -> term -> scope -> term
-    (** Apply the substitution, and does not rename variables. {b Caution}, this
-        can entail collisions between scopes! *)
-end
+module HO : SPECIALIZED with type term = HOTerm.t
