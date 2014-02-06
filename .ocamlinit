@@ -1,4 +1,5 @@
 #use "topfind";;
+#require "zarith";;
 #require "num";;
 #require "unix";;
 #require "datalog";;

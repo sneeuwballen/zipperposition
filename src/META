@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8fb0c5a4d702cb536fdc3496562ef40a)
+# DO NOT EDIT (digest: 72a36419d345c2f883c65c99a6cf06be)
 version = "0.1"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
@@ -25,7 +25,7 @@ package "extended" (
  version = "0.1"
  description =
  "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "unix str zarith"
+ requires = "logtk zarith"
  archive(byte) = "logtk_extended.cma"
  archive(byte, plugin) = "logtk_extended.cma"
  archive(native) = "logtk_extended.cmxa"

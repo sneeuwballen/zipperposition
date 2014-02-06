@@ -51,6 +51,7 @@ let view t = match T.kind t with
     | T.Var i -> Var i
     | T.BVar i -> BVar i
     | T.Bind (Symbol.Conn Symbol.ForallTy, t') -> Forall t'
+    | T.Const s -> App (s, [])
     | T.App (head, ((t'::l') as l)) ->
       begin match T.view head with
       | T.Const (Symbol.Conn Symbol.Arrow) -> Fun (t', l')

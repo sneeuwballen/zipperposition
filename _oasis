@@ -40,9 +40,10 @@ Library "logtk"
   Pack:             true
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
                     Hash, Interfaces, DBEnv, Position, Hashcons,
-                    lib/Sequence, lib/Cache, lib/Bij
+                    lib/Sequence, lib/Cache, lib/Bij, lib/Bencode
                     # HOTerm
   BuildDepends:     zarith,unix,str
+  XMETARequires:    zarith,unix,str
 
 Library "logtk_extended"
   Path:             src/
@@ -64,6 +65,7 @@ Library "logtk_extended"
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
                     lib/Bencode, lib/BV, lib/PersistentHashtbl, lib/Mixtbl
   BuildDepends:     unix,str,zarith
+  XMETARequires:    logtk,zarith
 
 Library "logtk_meta"
   Path:             src/meta/
