@@ -15,12 +15,20 @@ Description:
     at providing basic types and algorithms (terms, unification, orderings,
     indexing, etc.) that can be factored out of several applications.
 
+Flag "tools"
+  Description:  Build and install basic tools (CNF, etc.)
+  Default:      false
+
 Flag "meta"
   Description:  Build and install meta-prover
   Default:      false
 
 Flag "bench"
   Description:  Build and run benchmarks
+  Default:      false
+
+Flag "extended"
+  Description:  Extended library
   Default:      false
 
 Flag "qcheck"
@@ -30,6 +38,19 @@ Flag "qcheck"
 Library "logtk"
   Path:             src/
   Pack:             true
+  Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
+                    Hash, Interfaces, DBEnv, Position, Hashcons,
+                    lib/Sequence, lib/Cache, lib/Bij
+                    # HOTerm
+  BuildDepends:     zarith,unix,str
+
+Library "logtk_extended"
+  Path:             src/
+  Pack:             true
+  FindlibName:      extended
+  FindlibParent:    logtk
+  Build$:           flag(extended)
+  Install$:         flag(extended)
   Modules:          HO, FO, Symbol, Hash, Hashcons, FOTerm, HOTerm, FOFormula,
                     Util, FOUnif, HOUnif, Type, Substs, Signature, TypeInference, 
                     Lex_tptp, Ast_tptp, Parse_tptp, Lambda, Multiset,
@@ -90,45 +111,48 @@ Test all
   Run$: flag(tests) & flag(meta) & flag(qcheck)
 
 Executable run_tests
-  Path: tests/
-  Install: false
-  CompiledObject: native
-  MainIs: run_tests.ml
-  Build$: flag(tests) & flag(meta) & flag(qcheck)
-  BuildDepends: logtk,oUnit,logtk.meta,logtk.arbitrary
+  Path:             tests/
+  Install:          false
+  CompiledObject:   native
+  MainIs:           run_tests.ml
+  Build$:           flag(tests) & flag(meta) & flag(qcheck)
+  BuildDepends:     logtk,logtk.extended,oUnit,logtk.meta,logtk.arbitrary
 
 # TPTP syntax and type checking
 Executable type_check_tptp
-  Path: tools/
-  Install: true
-  CompiledObject: native
+  Path:             tools/
+  Build$:           flag(tools)
+  Install$:         flag(tools)
+  CompiledObject:   native
   MainIs: type_check_tptp.ml
   BuildDepends: logtk
 
 # Conversion to CNF
 Executable cnf_of_tptp
-  Path: tools/
-  Install: true
-  CompiledObject: native
-  MainIs: cnf_of_tptp.ml
-  BuildDepends: logtk
+  Path:             tools/
+  Build$:           flag(tools)
+  Install$:         flag(tools)
+  CompiledObject:   native
+  MainIs:           cnf_of_tptp.ml
+  BuildDepends:     logtk,logtk.extended
 
 # detection of theories
 Executable detect_theories
-  Path: tools/
-  Build$: flag(meta)
-  Install$: flag(meta)
-  CompiledObject: native
-  MainIs: detect_theories.ml
-  BuildDepends: logtk,logtk.meta
+  Path:             tools/
+  Build$:           flag(meta) & flag(tools)
+  Install$:         flag(meta) & flag(tools)
+  CompiledObject:   native
+  MainIs:           detect_theories.ml
+  BuildDepends:     logtk,logtk.extended,logtk.meta
 
 # proof checking
 Executable proof_check_tstp
-  Path: tools/
-  Install: true
-  CompiledObject: native
-  MainIs: proof_check_tstp.ml
-  BuildDepends: logtk
+  Path:             tools/
+  Build$:           flag(tools)
+  Install$:         flag(tools)
+  CompiledObject:   native
+  MainIs:           proof_check_tstp.ml
+  BuildDepends:     logtk,logtk.extended
 
 SourceRepository head
   Type: git
