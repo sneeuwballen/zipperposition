@@ -146,6 +146,9 @@ let view t = match T.view t with
           App (c, tyargs, args)
       | _ -> assert false
       end
+  | T.Const s ->
+      let ty = Type.of_term_exn (T.ty t) in
+      App (Cst.make ~ty s, [], [])
   | _ -> assert false
 
 (** {2 Comparison, equality, containers} *)
@@ -361,8 +364,7 @@ let rec size t = match T.view t with
   | T.App (_, l) -> List.fold_left (fun s t' -> s + size t') 1 l
   | _ -> assert false
 
-(* TODO: use ground-ness checks *)
-let is_ground t = Sequence.is_empty (Seq.vars t)
+let is_ground t = T.ground t
 
 let monomorphic t = Sequence.is_empty (Seq.ty_vars t)
 

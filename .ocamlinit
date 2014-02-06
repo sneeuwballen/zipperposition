@@ -9,36 +9,23 @@
 #directory "_build/src/arbitrary/";;
 #directory "_build/tests/";;
 #load "logtk.cma";;
-#load "logtk_meta.cma";;
-#install_printer Logtk.Symbol.fmt;;
-#install_printer Logtk.Type.fmt;;
-#install_printer Logtk.FOTerm.fmt;;
-#install_printer Logtk.HOTerm.fmt;;
-#install_printer Logtk.FOFormula.fmt;;
-#install_printer Logtk.Signature.fmt;;
-#install_printer Logtk.Substs.FO.fmt;;
-#install_printer Logtk.Substs.HO.fmt;;
-#install_printer Logtk.Substs.Ty.fmt;;
-#install_printer Logtk.Symbol.fmt;;
-#install_printer Logtk.Precedence.fmt;;
-#install_printer Logtk.Ordering.fmt;;
-#install_printer Logtk.Ast_tptp.fmt_general;;
-#install_printer Logtk.Ast_tptp.fmt_role;;
-#install_printer Logtk.Ast_tptp.fmt_declaration;;
-#install_printer Logtk.Transform.fmt;;
-#install_printer Logtk.Trace_tstp.fmt;;
-#install_printer Logtk.TypeUnif.fmt_error;;
-#install_printer Logtk.Basic.Sym.fmt;;
-#install_printer Logtk.Basic.Ty.fmt;;
-#install_printer Logtk.Basic.FO.fmt;;
-#install_printer Logtk.Basic.Form.fmt;;
-#install_printer Logtk.Basic.HO.fmt;;
+open Logtk;;
+module T = FOTerm;;
+module PT = PrologTerm;;
+module Sym = Symbol;;
+let (~<) = Symbol.of_string;;
+#install_printer Symbol.fmt;;
+#install_printer Type.fmt;;
+#install_printer FOTerm.Cst.fmt;;
+#install_printer FOTerm.fmt;;
+#install_printer PrologTerm.fmt;;
+#install_printer FOFormula.fmt;;
+#install_printer HOTerm.fmt;;
+#install_printer Substs.fmt;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type;;
-module T = Logtk.FOTerm;;
 module F = Logtk.FOFormula;;
 module HOT = Logtk.HOTerm;;
-open Logtk;;
 let pterm s =
     let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in
     let tyctx = TypeInference.Ctx.create ~base:true () in
@@ -51,7 +38,19 @@ let pform s =
     let tyctx = TypeInference.Ctx.create ~base:true () in
     TypeInference.FO.convert_form ~ctx:tyctx f
 ;;
+(* optional part: exnteded *)
+#load "logtk_extended.cma";;
+#install_printer Logtk.Precedence.fmt;;
+#install_printer Logtk.Ordering.fmt;;
+#install_printer Logtk.Ast_tptp.fmt_general;;
+#install_printer Logtk.Ast_tptp.fmt_role;;
+#install_printer Logtk.Ast_tptp.fmt_declaration;;
+#install_printer Logtk.Transform.fmt;;
+#install_printer Logtk.Trace_tstp.fmt;;
+#install_printer Logtk.TypeUnif.fmt_error;;
+#install_printer Logtk.Signature.fmt;;
 (* optional part: meta *)
+#load "logtk_meta.cma";;
 #install_printer Logtk_meta.MetaPattern.fmt;;
 #install_printer Logtk_meta.MetaPattern.EncodedForm.fmt;;
 #install_printer Logtk_meta.MetaPattern.Set.fmt;;

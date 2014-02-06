@@ -204,7 +204,6 @@ include Interfaces.PRINT with type t := t
 include Interfaces.SERIALIZABLE with type t := t
 *)
 
-
 (* TODO: path-selection operation (for handling general-data in TPTP), see
         XSLT or CSS *)
 

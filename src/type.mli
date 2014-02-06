@@ -165,13 +165,6 @@ val apply : t -> t list -> t
       No unification is done, types must check exactly.
       @raise Error if the types do not match *)
 
-(** {2 IO} *)
-
-include Interfaces.PRINT with type t := t
-(*
-include Interfaces.SERIALIZABLE with type t := t
-*)
-
 (** {2 TPTP} specific printer and types *)
 
 module TPTP : sig
@@ -187,6 +180,13 @@ module TPTP : sig
   val rat : t
   val real : t
 end
+
+(** {2 IO} *)
+
+include Interfaces.PRINT with type t := t
+(*
+include Interfaces.SERIALIZABLE with type t := t
+*)
 
 (** {2 Misc} *)
 
