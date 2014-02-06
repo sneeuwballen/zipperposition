@@ -75,7 +75,7 @@ let tType = T.tType
 
 let var i =
   if i < 0 then raise (Invalid_argument "Type.var");
-  T.var ~ty:tType i
+  T.var ~kind ~ty:tType i
 
 let app s l = T.app ~kind ~ty:tType (T.const ~kind ~ty:tType s) l
 
@@ -96,9 +96,10 @@ let rec mk_fun ret args =
       T.app ~kind ~ty:tType (T.const ~kind ~ty:tType Symbol.Base.arrow) (ret :: args)
 
 let forall vars ty =
-  T.bind_vars ~ty:tType Symbol.Base.forall_ty vars ty
+  T.bind_vars ~kind ~ty:tType Symbol.Base.forall_ty vars ty
 
-let __forall ty = T.bind Symbol.Base.forall_ty ty
+let __forall ty =
+  T.bind ~kind ~ty:tType Symbol.Base.forall_ty ty
 
 let (<==) = mk_fun
 let (<=.) ret a = mk_fun ret [a]
@@ -251,12 +252,13 @@ let apply ty args =
 module TPTP = struct
   let arrow = Symbol.of_string ">"
   let forall_ty = Symbol.of_string "!>"
+  let tType = T.tType
 
-  let i = Symbol.of_string "$i"
-  let o = Symbol.of_string "$o"
-  let int = Symbol.of_string "$int"
-  let rat = Symbol.of_string "$rat"
-  let real = Symbol.of_string "$real"
+  let i = const Symbol.TPTP.i
+  let o = const Symbol.TPTP.o
+  let int = const Symbol.TPTP.int
+  let rat = const Symbol.TPTP.rat
+  let real = const Symbol.TPTP.real
 
   let rec pp_tstp_rec depth buf t = match view t with
     | Var i -> Printf.bprintf buf "T%d" i
@@ -341,4 +343,4 @@ let bij =
 (** {2 Misc} *)
 
 let __var i =
-  T.var ~ty:tType i
+  T.var ~kind ~ty:tType i

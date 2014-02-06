@@ -110,7 +110,8 @@ let get_flag t flag = (t.flags land flag) != 0
 let flags t = t.flags
 
 let flag_ground = new_flag()
-(* TODO: use this flag! *)
+
+let ground t = get_flag t flag_ground
 
 (** {3 Constructors} *)
 
@@ -122,7 +123,12 @@ module H = Hashcons.Make(struct
 end)
 
 let const ~kind ~ty s =
-  H.hashcons { term=Const s; kind; id= ~-1; ty; flags=0; }
+  let my_t = { term=Const s; kind; id= ~-1; ty; flags=0; } in
+  let t = H.hashcons my_t in
+  if t == my_t then begin
+    if ground ty then set_flag t flag_ground true;
+  end;
+  t
 
 let rec app ~kind ~ty f l =
   match f.term, l with
@@ -130,7 +136,13 @@ let rec app ~kind ~ty f l =
   | App (f', l'), _ ->
     app ~kind ~ty f' (l' @ l)  (* flatten *)
   | _ ->
-    H.hashcons {term=App (f, l); kind; id= ~-1; ty; flags=0; }
+      let my_t = {term=App (f, l); kind; id= ~-1; ty; flags=0; } in
+      let t = H.hashcons my_t in
+      if t == my_t then begin
+        if ground ty && ground f && List.for_all ground l
+          then set_flag t flag_ground true;
+      end;
+      t
 
 let var ~kind ~ty i =
   H.hashcons {term=Var i; kind; id= ~-1; ty; flags=0; }
@@ -143,11 +155,20 @@ let bind ~kind ~ty s t' =
 
 let rec tType =
   let rec _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Type;
-                id= ~-1; ty=_t; flags=0; } in
+                id= ~-1; ty=_t; flags=flag_ground; } in
   H.hashcons _t
 
-let cast ~ty t =
-  let my_t = { t with id= ~-1; ty; } in
+let cast ~ty old =
+  let my_t = { old with id= ~-1; ty; } in
+  let t = H.hashcons my_t in
+  if t == my_t then begin
+    if get_flag old flag_ground && ground ty
+      then set_flag t flag_ground true;
+  end;
+  t
+
+let change_kind ~kind old =
+  let my_t = { old with kind; id= ~-1; } in
   H.hashcons my_t
 
 let is_var t = match view t with | Var _ -> true | _ -> false
@@ -218,11 +239,13 @@ module DB = struct
        [depth] is the number of binders on the path from the root of the
        term, to the current position. *)
     let rec recurse depth t =
-      let ty = if t.ty == t
-      then t.ty
-      else recurse depth t.ty
+      let ty =
+        if t.ty == t
+        then t.ty
+        else recurse depth t.ty
       in
       match t.term with
+        | _ when ground t -> t
         | Var i -> var ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->
@@ -246,11 +269,13 @@ module DB = struct
     (* only unlift DB symbol that are free. [depth] is the number of binders
        on the path from the root term. *)
     let rec recurse depth t =
-      let ty = if t.ty == t
-      then t.ty
-      else recurse depth t.ty
+      let ty =
+        if t.ty == t
+        then t.ty
+        else recurse depth t.ty
       in
       match view t with
+        | _ when ground t -> t
         | Var i -> var ~kind:t.kind ~ty i
         | BVar i ->
           if i >= depth
@@ -269,9 +294,10 @@ module DB = struct
   let replace ?(depth=0) t ~sub =
     (* recurse and replace [sub]. *)
     let rec recurse depth t =
-      let ty = if t.ty == t
-      then t.ty
-      else recurse depth t.ty
+      let ty =
+        if t.ty == t
+        then t.ty
+        else recurse depth t.ty
       in
       match view t with
         | _ when eq t sub ->
@@ -293,11 +319,13 @@ module DB = struct
 
   let eval env t =
     let rec eval env t =
-      let ty = if t.ty == t
-      then t.ty
-      else eval env t.ty
+      let ty =
+        if t.ty == t
+        then t.ty
+        else eval env t.ty
       in
       match view t with
+        | _ when ground t -> t
         | Var i -> var ~kind:t.kind ~ty i
         | Const s -> const ~kind:t.kind ~ty s
         | BVar i ->
@@ -317,18 +345,19 @@ module DB = struct
     eval env t
 end
 
-let bind_vars ~ty s vars t =
+let bind_vars ~kind ~ty s vars t =
   List.fold_right
     (fun v t ->
       assert (is_var v);
       let t' = DB.replace (DB.shift 1 t) ~sub:v in
-      bind ~kind:t.kind ~ty s t')
+      bind ~kind ~ty s t')
     vars t
 
 (** {3 Iterators} *)
 
 module Seq = struct
   let rec vars t k = match view t with
+    | _ when ground t -> ()
     | Var _ -> k t
     | BVar _
     | Const _ -> ()
@@ -430,11 +459,9 @@ let rec replace t ~old ~by = match view t with
 
 (** {3 Variables} *)
 
-let close_vars ~ty s t =
+let close_vars ~kind ~ty s t =
   let vars = Seq.add_set Set.empty (Seq.vars t) in
-  bind_vars ~ty s (Set.elements vars) t
-
-let ground t = Sequence.is_empty (Seq.vars t)
+  bind_vars ~kind ~ty s (Set.elements vars) t
 
 (** {3 Misc} *)
 

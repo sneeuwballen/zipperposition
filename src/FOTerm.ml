@@ -243,7 +243,7 @@ let app ?(tyargs=[]) c args =
   (* first; compute type *)
   let ty = _compute_ty (Cst.ty c) tyargs args in
   (* apply constant to type args and args *)
-  let res = T.app ~kind ~ty:(ty:>T.t) c ((tyargs :> T.t list) @ args) in
+  let res = T.app ~kind ~ty:(ty:>T.t) c ((tyargs : Type.t list :> T.t list) @ args) in
   Util.exit_prof prof_mk_node;
   res
 

@@ -196,16 +196,6 @@ val all_positions : ?vars:bool -> ?pos:Position.t ->
       @param vars if true, also fold on variables Default: [false].
       @return the accumulator *)
 
-(** {3 AC} *)
-
-module AC : sig
-  val flatten : is_ac:(symbol -> bool) -> t -> t
-
-  val args : is_ac:(symbol -> bool) -> t -> t list
-
-  val symbols : is_ac:(symbol -> bool) -> t -> symbol Sequence.t
-end
-
 (** {3 IO} *)
 
 include Interfaces.PRINT with type t := t

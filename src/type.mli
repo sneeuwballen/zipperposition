@@ -100,7 +100,7 @@ val forall : t list -> t -> t
 val __forall : t -> t
   (** not documented. *)
 
-val (@@) : string -> t list -> t
+val (@@) : symbol -> t list -> t
   (** [s @@ args] applies the sort [s] to arguments [args]. *)
 
 val (<==) : t -> t list -> t
