@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8f729a8e027b9b263eaec35fc01daedf)
+# DO NOT EDIT (digest: 8928ca9a3ecbd0dafc389149b98a93b7)
 Symbol
 ScopedTerm
 FOTerm
@@ -11,8 +11,11 @@ Interfaces
 DBEnv
 Position
 Hashcons
+HOTerm
+Substs
 lib/Sequence
 lib/Cache
 lib/Bij
 lib/Bencode
+lib/PersistentHashtbl
 # OASIS_STOP

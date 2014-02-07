@@ -126,6 +126,8 @@ val to_list : t -> (term * scope * term * scope) list
 val of_seq : ?init:t -> (term * scope * term * scope) Sequence.t -> t
 val of_list : ?init:t -> (term * scope * term * scope) list -> t
 
+(** {2 Applying a substitution} *)
+
 val apply : ?depth:int -> t -> renaming:Renaming.t -> term -> scope -> term
   (** Apply the substitution to the given term.
       @param renaming used to desambiguate free variables from distinct scopes *)
