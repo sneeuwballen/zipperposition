@@ -26,65 +26,70 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Higher Order Terms} *)
 
+module T = ScopedTerm
 module FOT = FOTerm
 
 (** {2 Type Definitions} *)
 
-(** term *)
-type t = {
-  term : term_cell;             (** the term itself *)
-  mutable ty : Type.t;          (** type *)
-  mutable tsize : int;          (** size (number of subterms) *)
-  mutable flags : int;          (** boolean flags about the term *)
-  mutable tag : int;            (** hashconsing tag *)
-}
-(** content of the term *)
-and term_cell =
-  | Var of int                  (** variable *)
-  | BoundVar of int             (** bound variable (De Bruijn index) *)
-  | Lambda of t                 (** lambda abstraction over one variable. *)
-  | Const of Symbol.t           (** Constant *)
-  | At of t * Type.t list * t list    (** HO application *)
+type symbol = Symbol.t
 
-and sourced_term =
-  t * string * string           (** Term + file,name *)
+type t = ScopedTerm.t
 
 type term = t
 
-type varlist = t list
+type view =
+  | Var of int                  (** variable *)
+  | BVar of int             (** bound variable (De Bruijn index) *)
+  | Lambda of t                 (** lambda abstraction over one variable. *)
+  | Const of symbol             (** Typed constant *)
+  | App of t * Type.t list * t list
+    (** HO function application. Invariant: first term is not a {!App}. *)
 
-(** {2 Basics} *)
+type sourced_term =
+  t * string * string           (** Term + file,name *)
 
-let rec hash_novar t =
-  let h_type = Type.hash t.ty in
-  let h_term = match t.term with
-  | Var _ -> 42
-  | BoundVar _ -> 43
-  | Const s -> Symbol.hash s
-  | Lambda t' -> Hash.hash_int t'.tag
-  | At (t,_,l) -> Hash.hash_list hash_novar (hash_novar t) l
-  in
-  Hash.combine h_type h_term
+let ty t = Type.of_term_exn (T.ty t)
+
+(* split list between types, terms *)
+let rec _split_types l = match l with
+  | [] -> [], []
+  | x::l' when Type.is_type x ->
+      let l1, l2 = _split_types l' in
+      (Type.of_term_exn x)::l1, l2
+  | _ -> [], l
+
+let view t = match T.view t with
+  | T.Var i -> Var i
+  | T.BVar i -> BVar i
+  | T.Bind (Symbol.Conn Symbol.Lambda, t') -> Lambda t'
+  | T.Const s -> Const s
+  | T.App (hd, l) ->
+      let tyargs, args = _split_types l in
+      App (hd, tyargs, args)
+  | _ -> assert false
+
+let is_term t = match T.kind t with T.Kind.HOTerm -> true | _ -> false
+let of_term t =
+  if is_term t then Some t else None
+let of_term_exn t =
+  if not (is_term t) then raise (Invalid_argument "of_term_exn");
+  t
 
 (** {2 Comparison, equality, containers} *)
 
 let subterm ~sub t =
   let rec check t =
-    sub == t ||
-    match t.term with
-    | Var _ | BoundVar _ | Const _ -> false
-    | Lambda t' -> check t'
-    | At (t, _, l) -> check t || List.exists check l
+    T.eq sub t ||
+    match T.view t with
+    | T.Var _ | T.BVar _ | T.App (_, []) -> false
+    | T.App (_, args) -> List.exists check args
+    | _ -> false
   in
   check t
 
-let eq x y = x == y  (* because of hashconsing *)
-
-let compare x y = x.tag - y.tag
-
-let hash x = x.tag
-
-let ty t = t.ty
+let eq = T.eq
+let cmp = T.cmp
+let hash = T.hash
 
 module TermHASH = struct
   type t = term
@@ -92,8 +97,31 @@ module TermHASH = struct
   let hash = hash
 end
 
-module Tbl = Hashtbl.Make(TermHASH)
+module Tbl = struct
+  include Hashtbl.Make(TermHASH)
 
+  let add_list tbl l =
+    List.iter (fun x -> replace tbl x ()) l
+
+  let add_seq tbl seq =
+    Sequence.iter (fun x -> replace tbl x ()) seq
+
+  let to_list set = fold (fun x _ acc -> x :: acc) set []
+
+  let from_list l =
+    let tbl = create 13 in
+    add_list tbl l;
+    tbl
+
+  let to_seq set = fun k -> iter (fun x () -> k x) set
+
+  let from_seq seq =
+    let tbl = create 13 in
+    add_seq tbl seq;
+    tbl
+end
+
+(* FIXME: does   module Set = T.Set   work here? *)
 module Set = Sequence.Set.Make(struct
   type t = term
   let compare = compare
@@ -106,83 +134,17 @@ end)
 
 module Cache = Cache.Replacing(TermHASH)
 
-(** {2 Global terms table (hashconsing)} *)
-
-let hash_term t =
-  match t.term with
-  | Var i -> Hash.combine (Hash.hash_int i) (Type.hash t.ty)
-  | BoundVar i -> Hash.hash_int2 (Type.hash t.ty) (Hash.hash_int i)
-  | Const s -> Symbol.hash s
-  | Lambda t' -> Hash.hash_int t'.tag
-  | At (t, tyargs, l) ->
-    let h = Hash.hash_list Type.hash t.tag tyargs in
-    Hash.hash_list (fun t' -> t'.tag) h l
-
-let hashcons_equal x y =
-  (* pairwise comparison of subterms *)
-  let rec eq_subterms a b = match a, b with
-    | [], [] -> true
-    | a::a1, b::b1 -> a == b && eq_subterms a1 b1
-    | _ -> false
-  and eq_types a b = match a, b with
-    | [], [] -> true
-    | xa::a', xb::b' -> Type.eq xa xb && eq_types a' b'
-    | _ -> false
-  in
-  (* compare subterms, if same structure *)
-  match x.term, y.term with
-  | Var i, Var j
-  | BoundVar i, BoundVar j -> i = j && Type.eq x.ty y.ty
-  | Const s1, Const s2 -> Symbol.eq s1 s2
-  | Lambda ta, Lambda tb -> ta == tb && Type.eq x.ty y.ty
-  | At (t1, tyargs1, l1), At (t2, tyargs2, l2) ->
-    t1 == t2 && eq_subterms l1 l2 && eq_types tyargs1 tyargs2
-  | _ -> false
-
-(** hashconsing for terms *)
-(* module H  = Hashcons.Make(struct *)
-module H = Hashcons.Make(struct
-  type t = term
-
-  let equal x y = hashcons_equal x y
-
-  let hash t = hash_term t
-
-  let tag i t = (assert (t.tag = -1); t.tag <- i)
-end)
-
-(** {2 Boolean flags} *)
-
-let __gen = Util.Flag.create ()
-let new_flag () = Util.Flag.get_new __gen
-
-let flag_db_closed = new_flag ()
-and flag_normal_form = new_flag ()
-and flag_ground = new_flag ()
-and flag_db_closed_computed = new_flag ()
-
-let set_flag flag t truth =
-  if truth
-    then t.flags <- t.flags lor flag
-    else t.flags <- t.flags land (lnot flag)
-
-let get_flag flag t = (t.flags land flag) != 0
-
 (** {2 Typing} *)
 
-let cast t ty =
-  begin match t.term with
-    | Var _ | BoundVar _ -> ()
-    | _ -> raise (Invalid_argument "cast")
-  end;
-  H.hashcons { t with ty; tag = ~-1; }
+let cast ~ty t = T.cast ~ty:(ty :> T.t) t
 
-let lambda_var_ty t = match t.term with
-  | Lambda _ ->
-    begin match t.ty.Type.ty with
-    | Type.Fun (_, arg::_) -> arg
-    | _ -> raise (Invalid_argument "lambda_var_ty: expected function type")
-    end
+let lambda_var_ty t = match T.view t with
+  | T.Bind (Symbol.Conn Symbol.Lambda, _) ->
+      let ty = Type.of_term_exn (T.ty t) in
+      begin match Type.view ty with
+      | Type.Fun (_, arg::_) -> arg
+      | _ -> raise (Invalid_argument "lambda_var_ty: expected function type")
+      end
   | _ -> raise (Invalid_argument "lambda_var_ty: expected lambda term")
 
 (** {2 Smart constructors} *)
@@ -190,503 +152,156 @@ let lambda_var_ty t = match t.term with
 (** In this section, term smart constructors are defined. They perform
     hashconsing, and precompute some properties (flags) *)
 
-let mk_var ~ty idx =
-  assert (idx >= 0);
-  let my_v = {term = Var idx; ty; tsize = 1;
-              flags=(flag_db_closed lor flag_db_closed_computed lor
-                     flag_normal_form);
-              tag= -1} in
-  H.hashcons my_v
+let var ~(ty:Type.t) i =
+  T.var ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) i
 
-let __mk_bound_var ~ty idx =
-  assert (idx >= 0);
-  let my_v = {term = BoundVar idx; ty; tsize = 1;
-              flags=(flag_db_closed_computed lor flag_normal_form);
-              tag= -1} in
-  H.hashcons my_v
+let bvar ~(ty:Type.t) i =
+  T.bvar ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) i
+
+(* compute type of s(tyargs  *)
+let _compute_ty ty_fun tyargs l =
+  let ty' = Type.apply ty_fun tyargs in
+  Type.apply ty' (List.map ty l)
+
+let app ?(tyargs=[]) hd args =
+  (* first; compute type *)
+  let ty = _compute_ty (ty hd) tyargs args in
+  (* apply constant to type args and args *)
+  let res = T.app ~kind:T.Kind.HOTerm ~ty:(ty:>T.t) hd ((tyargs :> t list) @ args) in
+  res
+
+let const ?(tyargs=[]) ~(ty:Type.t) symbol =
+  let c = T.const ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) symbol in
+  match tyargs with
+  | [] -> c
+  | _::_ -> app ~tyargs c []
 
 let __mk_lambda ~varty t' =
-  let ty = Type.mk_fun t'.ty [varty] in
-  let my_t = {term=Lambda t'; ty; flags=0; tsize=0; tag= -1} in
-  let t = H.hashcons my_t in
-  (if t == my_t
-    then begin (* compute ground-ness of term *)
-      set_flag flag_ground t (get_flag flag_ground t');
-      t.tsize <- t'.tsize + 1;
-    end);
-  t
+  let ty = Type.mk_fun (ty t') [varty] in
+  T.bind ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) Symbol.Base.lambda t'
 
-let mk_const s =
-  let my_t = {term=Const s; ty=Symbol.ty s;
-              flags=(flag_db_closed lor flag_db_closed_computed lor flag_normal_form);
-              tsize=1; tag= -1;} in
-  let t = H.hashcons my_t in
-  t
+let mk_lambda vars t =
+  List.fold_right
+    (fun v t ->
+      let t' = T.DB.replace t ~sub:v in
+      __mk_lambda ~varty:(ty v) t')
+    vars t
 
-(* compute type of t(tyargs @ l) *)
-let _compute_ty t tyargs l =
-  match tyargs, l with
-    | [], [] -> t.ty
-    | _ ->
-      let all_ty_args = tyargs @ (List.map ty l) in
-      Type.apply t.ty all_ty_args
+let is_var t = match T.view t with | T.Var _ -> true | _ -> false
+let is_bvar t = match T.view t with | T.BVar _ -> true | _ -> false
+let is_const t = match T.view t with | T.Const _ -> true | _ -> false
+let is_app t = match T.view t with | T.App _ -> true | _ -> false
+let is_lambda t = match T.view t with | T.Bind _ -> true | _ -> false
 
-(* enforce invariant:  (t @ l) @ l' -----> t @ (concat l l') *)
-let rec _mk_at t tyargs l =
-  match t.term, tyargs, l with
-  | At (_,_,_::_), _::_, _ ->
-    failwith "HOTerm.mk_at: type arguments must be in prefix position"
-  | At (t', tyargs', l'), [], _ ->
-    _mk_at t' tyargs' (l' @ l) (* flatten (t @ ty @ l) @ l' ---> t @ ty @ (concat l l') *)
-  | At (t', tyargs', []), _::_, _  ->
-    _mk_at t' (tyargs' @ tyargs) l   (* flatten (t @ ty) @ ty' @ l ---> t @ (concat ty ty') l *)
-  | _, [], [] ->
-    t (* t @ [] ---> t *)
-  | _, _, _ ->
-    let ty = _compute_ty t tyargs l in
-    let my_t = {term=At (t,tyargs,l); ty; tsize=0; flags=0; tag= -1} in
-    let t = H.hashcons my_t in
-    if t == my_t
-      then begin
-        (* compute ground-ness of term *)
-        let is_ground = get_flag flag_ground t &&
-          List.for_all (get_flag flag_ground) l
-        in
-        set_flag flag_ground t is_ground;
-        t.tsize <- List.fold_left (fun s t' -> s + t'.tsize) (t.tsize+1) l;
-      end;
-    t
+(** {2 Sequences} *)
 
-let mk_at ?(tyargs=[]) t l =
-  match tyargs, l with
-  | [], [] -> t
-  | _ -> _mk_at t tyargs l
+module Seq = struct
+  let subterms = T.Seq.subterms
+  let vars = T.Seq.vars
+  let subterms_depth = T.Seq.subterms_depth
+  let symbols t =
+    T.Seq.symbols t |>
+      Sequence.filter (fun s -> not (Symbol.eq s Symbol.Base.lambda))
+  let max_var = T.Seq.max_var
+  let min_var = T.Seq.min_var
+  let ty_vars t = T.Seq.types t |> Sequence.flatMap vars
+  let add_set set ts =
+    Sequence.fold (fun set t -> Set.add t set) set ts
+end
 
-let true_term = mk_const Symbol.true_symbol
-let false_term = mk_const Symbol.false_symbol
-
-(** Easy constructors for formulas *)
-
-let not_term = mk_const Symbol.not_symbol
-let and_term = mk_const Symbol.and_symbol
-let or_term = mk_const Symbol.or_symbol
-let imply_term = mk_const Symbol.imply_symbol
-let equiv_term = mk_const Symbol.equiv_symbol
-
-let eq_term = mk_const Symbol.eq_symbol
-let forall_term = mk_const Symbol.forall_symbol
-let exists_term = mk_const Symbol.exists_symbol
-
-let mk_not t = mk_at not_term [t]
-let mk_and a b = mk_at and_term [a; b]
-let mk_or a b = mk_at or_term [a; b]
-let mk_imply a b = mk_at imply_term [a; b]
-let mk_equiv a b = mk_at equiv_term [a; b]
-let mk_xor a b = mk_not (mk_equiv a b)
-let mk_eq a b = mk_at ~tyargs:[a.ty] eq_term [a; b]   (* use type of left arg *)
-let mk_neq a b = mk_not (mk_eq a b)
-
-let rec mk_and_list l = match l with
-  | [] -> true_term
-  | [x] -> x
-  | x::l' -> mk_and x (mk_and_list l')
-
-let rec mk_or_list l = match l with
-  | [] -> false_term
-  | [x] -> x
-  | x::l' -> mk_or x (mk_or_list l')
+let var_occurs ~var t =
+  Seq.vars t |> Sequence.exists (eq t)
 
 (** {2 Subterms and positions} *)
 
-let is_var t = match t.term with
-  | Var _ -> true
-  | _ -> false
+module Pos = struct
+  let at = T.Pos.at
+  let replace = T.Pos.replace
+end
 
-let is_bound_var t = match t.term with
-  | BoundVar _ -> true
-  | _ -> false
+let replace = T.replace
 
-let is_lambda t = match t.term with
-  | Lambda _ -> true
-  | _ -> false
-
-let is_const t = match t.term with
-  | Const _ -> true
-  | _ -> false
-
-let is_at t = match t.term with
-  | At _ -> true
-  | _ -> false
-
-let rec at_pos t pos = match t.term, pos with
-  | _, [] -> t
-  | Var _, _::_ -> invalid_arg "wrong position in term"
-  | Lambda t', 0::subpos -> at_pos t' subpos
-  | At (t, _, _), 0::subpos -> at_pos t subpos
-  | At (_, _, l), n::subpos when n <= List.length l -> at_pos (List.nth l (n-1)) subpos
-  | _ -> invalid_arg "index too high for subterm"
-
-let rec replace_pos t pos new_t = match t.term, pos with
-  | _, [] -> new_t
-  | (Var _ | BoundVar _), _::_ -> invalid_arg "wrong position in term"
-  | Lambda t', 0::subpos ->
-    let varty = lambda_var_ty t in
-    __mk_lambda ~varty (replace_pos t' subpos new_t)
-  | At (t, tyargs, l), 0::subpos -> mk_at ~tyargs (replace_pos t subpos new_t) l
-  | At (t, tyargs, l), n::subpos when n <= List.length l ->
-    let t' = replace_pos (List.nth l (n-1)) subpos new_t in
-    let l' = Util.list_set l n t' in
-    mk_at ~tyargs t l'
-  | _ -> invalid_arg "index too high for subterm"
-
-(** [replace t ~old ~by] syntactically replaces all occurrences of [old]
-    in [t] by the term [by]. *)
-let rec replace t ~old ~by = match t.term with
-  | _ when t == old -> by
-  | Var _ | BoundVar _ | Const _ -> t
-  | Lambda t' ->
-    let varty = lambda_var_ty t in
-    __mk_lambda ~varty (replace t' ~old ~by)
-  | At (t, tyargs, l) ->
-    mk_at ~tyargs (replace t ~old ~by) (List.map (fun t' -> replace t' ~old ~by) l)
-
-(** Size of the term (number of subterms) *)
-let size t = t.tsize
-
-let rec ty_vars set t = match t.term with
-  | Var _
-  | BoundVar _ 
-  | Const _ -> Type.free_vars_set set t.ty
-  | Lambda t' -> ty_vars set t'
-  | At (head, tyargs, l) ->
-    let set = ty_vars set head in
-    let set = List.fold_left Type.free_vars_set set tyargs in
-    List.fold_left ty_vars set l
-
-(** get subterm by its position *)
-let rec at_cpos t pos = match t.term, pos with
-  | _, 0 -> t
-  | Lambda t', _ -> at_cpos t' (pos-1)
-  | At (t, _, l), _ ->
-    let s = size t in
-    if s > pos then at_cpos t pos else get_subpos l (pos-s)
+let rec size t = match T.view t with
+  | T.Var _
+  | T.BVar _ -> 1
+  | T.Const _ -> 1
+  | T.Bind (_, t') -> 1+ size t'
+  | T.App (f, l) -> List.fold_left (fun s t' -> s + size t') (1+size f) l
   | _ -> assert false
-and get_subpos l pos =
-  match l, pos with
-  | t::l', _ when size t > pos -> at_cpos t pos  (* search inside the term *)
-  | t::l', _ -> get_subpos l' (pos - size t) (* continue to next term *)
-  | [], _ -> assert false
 
-let max_cpos t = size t - 1
+let is_ground t = Seq.vars t |> Sequence.is_empty
 
-let is_ground t = get_flag flag_ground t
+let var_occurs ~var t = Seq.vars t |> Sequence.exists (eq var)
 
-let rec monomorphic t =
-  Type.is_ground t.ty &&
-  match t.term with
-  | Var _ | BoundVar _ | Const _ -> true
-  | Lambda t' -> monomorphic t'
-  | At (t, tyargs, l) ->
-    monomorphic t && List.for_all Type.is_ground tyargs && List.for_all monomorphic l
-  
+let monomorphic t = Seq.ty_vars t |> Sequence.is_empty
 
-let rec var_occurs x t = match t.term with
-  | Const s -> false
-  | Var _
-  | BoundVar _ -> x == t
-  | Lambda t' -> var_occurs x t'
-  | _ when is_ground t -> false  (* no variable *)
-  | At (t, _, l) -> var_occurs x t || List.exists (var_occurs x) l
+let max_var set = Set.to_seq set |> Seq.max_var
 
-let max_var vars =
-  let rec aux idx = function
-  | [] -> idx
-  | ({term=Var i}::vars) -> aux (max i idx) vars
-  | _::vars -> assert false
-  in
-  aux 0 vars
+let min_var set = Set.to_seq set |> Seq.min_var
 
-let min_var vars =
-  let rec aux idx = function
-  | [] -> idx
-  | ({term=Var i}::vars) -> aux (min i idx) vars
-  | _ -> assert false
-  in
-  aux 0 vars
+let add_vars tbl t = Seq.vars t (fun x -> Tbl.replace tbl x ())
 
-(** add variables of the term to the set *)
-let rec add_vars set t = match t.term with
-| Var _ -> Tbl.replace set t ()
-| Const _
-| BoundVar _ -> ()
-| Lambda t' -> add_vars set t'
-| At (t, _, l) -> add_vars set t; List.iter (add_vars set) l
-
-(** compute variables of the term *)
-let vars t =
-  let set = Tbl.create 5 in
-  add_vars set t;
-  Tbl.fold (fun t () acc -> t :: acc) set []
-
-(** Compute variables of terms in the list *)
-let vars_list l =
-  let set = Tbl.create 5 in
-  List.iter (add_vars set) l;
-  Tbl.fold (fun t () acc -> t :: acc) set []
-
-(** Compute variables of terms in the sequence *)
-let vars_seq seq =
-  let set = Tbl.create 5 in
-  Sequence.iter (add_vars set) seq;
-  Tbl.fold (fun t () acc -> t :: acc) set []
+let vars ts = Sequence.flatMap Seq.vars ts |> Seq.add_set Set.empty
 
 let vars_prefix_order t =
-  let rec traverse acc t = match t.term with
-  | Const _
-  | BoundVar _ -> acc
-  | Var _ when List.memq t acc -> acc
-  | Var _ -> t :: acc
-  | Lambda t' -> traverse acc t'
-  | At (t, _, l) ->
-    let acc = traverse acc t in
-    List.fold_left traverse acc l
-  in
-  traverse [] t
+  Seq.vars t
+    |> Sequence.fold (fun l x -> if not (List.memq x l) then x::l else l) []
+    |> List.rev
 
-(** depth of term *)
-let rec depth t = match t.term with
-  | Var _ | BoundVar _ | Const _ -> 1
-  | Lambda t' -> 1 + depth t'
-  | At (t, _, l) ->
-    List.fold_left (fun acc t' -> max acc (depth t')) (depth t) l
+let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
-let rec head t = match t.term with
-  | Const s -> s
-  | At (t, _, _) -> head t
-  | BoundVar _
-  | Lambda _ -> raise (Invalid_argument "Term.head: lambda")
-  | Var _ -> raise (Invalid_argument "Term.head: variable")
+let rec head t = match T.view t with
+  | T.Const s -> s
+  | T.App (t, _) -> head t
+  | T.BVar _
+  | T.Bind _ -> raise (Invalid_argument "Term.head: lambda")
+  | T.Var _ -> raise (Invalid_argument "Term.head: variable")
 
-let symbols seq =
-  let rec symbols set t = match t.term with
-    | Var _
-    | BoundVar _ -> set
-    | Const s -> Symbol.Set.add s set
-    | Lambda t' -> symbols set t'
-    | At (t, _, l) ->
-      List.fold_left symbols (symbols set t) l
-  in
-  Sequence.fold symbols Symbol.Set.empty seq
-
-(** Does t contains the symbol f? *)
-let rec contains_symbol f t =
-  match t.term with
-  | Var _
-  | BoundVar _ -> false
-  | Const s -> Symbol.eq s f
-  | Lambda t' -> contains_symbol f t'
-  | At (t, _, l) ->
-    contains_symbol f t || List.exists (fun t' -> contains_symbol f t') l
-
-(** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
-    elements that have [f] as head symbol. For instance, if l=[1+2; 3+(4+5)]
-    with f="+", this will return [1;2;3;4;5], perhaps in a different order *)
-let flatten_ac f l =
-  let rec flatten acc l = match l with
-  | [] -> acc
-  | x::l' -> flatten (deconstruct acc x) l'
-  and deconstruct acc t = match t.term with
-  | At ({term=Const f'}, _, l) when Symbol.eq f f' ->
-    flatten acc l
-  | _ -> t::acc
-  in flatten [] l
-
-(** {2 De Bruijn indexes} *)
-
-(** check whether the term is a term or an atomic proposition *)
-let rec atomic t =
-  match t.term with
-  | Var _ | BoundVar _ -> true
-  | Lambda t' -> atomic t'
-  | Const s ->
-    not Symbol.(eq s and_symbol || eq s or_symbol || eq s imply_symbol || eq s
-      not_symbol || eq s eq_symbol || eq s equiv_symbol)
-  | At (t, _, l) -> atomic t && List.for_all atomic l
-
-module DB = struct
-  (* compute whether the term is closed w.r.t. De Bruijn (bound) variables *)
-  let rec compute_db_closed depth t = match t.term with
-    | BoundVar i -> i < depth
-    | Lambda t' -> compute_db_closed (depth+1) t'
-    | Const _
-    | Var _ -> true
-    | At (t, _, l) ->
-      compute_db_closed depth t && List.for_all (compute_db_closed depth) l
-
-  (** check wether the term is closed w.r.t. De Bruijn variables *)
-  let closed ?(depth=0) t =
-    match depth with
-    | 0 ->
-      (* compute and store result, if not already computed *)
-      (if not (get_flag flag_db_closed_computed t) then begin
-        set_flag flag_db_closed_computed t true;
-        set_flag flag_db_closed t (compute_db_closed 0 t);
-        end);
-      (* return flag *)
-      get_flag flag_db_closed t
-    | _ -> compute_db_closed depth t
-
-  (** check whether t contains the De Bruijn symbol n *)
-  let rec contains t n = match t.term with
-    | BoundVar i -> i = n
-    | Const _
-    | Var _ -> false
-    | Lambda t' -> contains t' (n+1)
-    | At (t, _, l) ->
-      contains t n || List.exists (fun t' -> contains t' n) l
-
-  (** shift the non-captured De Bruijn indexes in the term by n *)
-  let shift ?(depth=0) n t =
-    (* traverse the term, looking for non-captured DB indexes.
-       [depth] is the number of binders on the path from the root of the
-       term, to the current position. *)
-    let rec recurse depth t = 
-      match t.term with
-      | _ when closed t -> t  (* closed. *)
-      | BoundVar i when i >= depth ->
-        __mk_bound_var ~ty:t.ty (i+n) (* lift by n, term not captured *)
-      | Var _ | BoundVar _ | Const _ -> t
-      | Lambda t' ->
-        let varty = lambda_var_ty t in
-        __mk_lambda ~varty (recurse (depth+1) t') (* increase depth and recurse *)
-      | At (t, tyargs, l) ->
-        mk_at ~tyargs (recurse depth t) (List.map (recurse depth) l)
-    in
-    assert (n >= 0);
-    if depth=0 && n = 0 then t else recurse depth t
-
-  (* unshift the term (decrement indices of all free De Bruijn variables inside *)
-  let unshift ?(depth=0) n t =
-    (* only unlift DB symbol that are free. [depth] is the number of binders
-       on the path from the root term. *)
-    let rec recurse depth t =
-      match t.term with
-      | _ when closed t -> t
-      | BoundVar i ->
-        if i >= depth then __mk_bound_var ~ty:t.ty (i-n) else t
-      | Const _ | Var _ -> t
-      | Lambda t' ->
-        let varty = lambda_var_ty t in
-        __mk_lambda ~varty (recurse (depth+1) t')
-      | At (t, tyargs, l) ->
-        mk_at ~tyargs (recurse depth t) (List.map (recurse depth) l)
-    in recurse depth t
-
-  let replace ?(depth=0) t ~sub =
-    (* recurse and replace [sub]. *)
-    let rec replace depth t = match t.term with
-    | _ when t == sub -> __mk_bound_var ~ty:t.ty depth
-    | Lambda t' ->
-      let varty = lambda_var_ty t in
-      __mk_lambda ~varty (replace (depth+1) t')
-    | Var _
-    | Const _
-    | BoundVar _ -> t
-    | At (t, tyargs, l) ->
-      mk_at ~tyargs (replace depth t) (List.map (replace depth) l)
-    in
-    replace depth t
-
-  let from_var ?depth t ~var =
-    assert (is_var var);
-    replace ?depth t ~sub:var
-
-  let eval ?(depth=0) env t =
-    let rec eval depth env t = match t.term with
-      | _ when closed t || is_ground t -> t
-      | Const _
-      | Var _ -> t
-      | BoundVar i ->
-        begin match DBEnv.find env i with
-        | None -> t
-        | Some t' -> shift depth t'
-        end
-      | Lambda t' ->
-        let varty = lambda_var_ty t in
-        let t' = eval (depth+1) (DBEnv.push_none env) t' in
-        __mk_lambda ~varty t'
-      | At (t, tyargs, l) ->
-        let t' = eval depth env t in
-        let l' = List.map (eval depth env) l in
-        mk_at ~tyargs t' l'
-    in
-    eval depth env t
+module AC = struct
+  let flatten f l =
+    let rec flatten acc l = match l with
+    | [] -> acc
+    | x::l' -> flatten (deconstruct acc x) l'
+    and deconstruct acc t = match T.view t with
+    | T.App (hd, l) ->
+      begin match T.view hd with
+        | T.Const f' when Symbol.eq f f' -> flatten acc l
+        | _ -> t::acc
+      end
+    | _ -> t::acc
+    in flatten [] l
 end
 
 (** {2 High-level operations} *)
 
-(** constructors with free variables. The first argument is the
-    list of variables that is bound, then the quantified/abstracted
-    term. *)
+let symbols ?(init=Symbol.Set.empty) t =
+  Seq.symbols t |> Symbol.Seq.add_set init 
 
-let rec mk_lambda vars t = match vars with
-  | [] -> t
-  | var::vars' ->
-    let t' = mk_lambda vars' t in
-    let varty = var.ty in
-    __mk_lambda ~varty (DB.from_var (DB.shift 1 t') ~var)
-
-let rec mk_forall vars t = match vars with
-  | [] -> t
-  | var::vars' ->
-    let t' = mk_forall vars' t in
-    let varty = var.ty in
-    mk_at ~tyargs:[varty] forall_term [mk_lambda [var] t']
-
-let rec mk_exists vars t = match vars with
-  | [] -> t
-  | var::vars' ->
-    let t' = mk_exists vars' t in
-    let varty = var.ty in
-    mk_at ~tyargs:[varty] exists_term [mk_lambda [var] t']
-
-let __mk_forall ~varty t =
-  mk_at ~tyargs:[varty] forall_term [__mk_lambda ~varty t]
-
-let __mk_exists ~varty t =
-  mk_at ~tyargs:[varty] exists_term [__mk_lambda ~varty t]
-
-
-(** Bind all free variables by 'forall' *)
-let close_forall t =
-  let vars = vars t in
-  mk_forall vars t
-
-(** Bind all free variables by 'exists' *)
-let close_exists t =
-  let vars = vars t in
-  mk_exists vars t
+let contains_symbol s t =
+  Seq.symbols t |> Sequence.exists (Symbol.eq s)
 
 (** {2 High level operations} *)
 
 (* Curry all subterms *)
 let rec curry t =
   let ty = FOT.ty t in
-  match t.FOT.term with
-  | FOT.Var i -> mk_var ~ty i
-  | FOT.BoundVar i -> __mk_bound_var ~ty i
-  | FOT.Node (f, [], []) -> mk_const f
-  | FOT.Node (f, tyargs, l) ->
-    mk_at ~tyargs (mk_const f) (List.map curry l)
+  match FOT.view t with
+  | FOT.Var i -> var ~ty i
+  | FOT.BVar i -> bvar ~ty i
+  | FOT.App (f, tyargs, l) ->
+    let ty_hd = FOT.Cst.ty f in
+    let sym_hd = FOT.Cst.sym f in
+    let c = const ~ty:ty_hd sym_hd in
+    app ~tyargs c (List.map curry l)
 
 let rec uncurry t =
-  let ty = t.ty in
-  match t.term with
-  | Var i -> FOT.mk_var ~ty i
-  | BoundVar i -> FOT.__mk_bound_var ~ty i
-  | Lambda t' -> failwith "cannot uncurry lambda"
-  | Const s -> FOT.mk_const s
-  | At ({term=Const s}, tyargs, l) ->
+  let ty = ty t in
+  match T.view t with
+  | T.Var i -> FOT.var ~ty i
+  | T.BVar i -> FOT.bvar ~ty i
+  | T.Bind (Symbol.Conn Symbol.Lambda, t') -> failwith "cannot uncurry lambda"
+  | T.Const s -> FOT.const (FOT.Cst.s ~ty)
+  | T.App (hd, l) ->
     let l = List.map uncurry l in
     FOT.mk_node ~tyargs s l
   | _ -> failwith "cannot uncurry higher-order application"
@@ -774,19 +389,20 @@ let to_string t = Util.sprintf "%a" pp t
 
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
-let rec debug fmt t = match t.term with
+let rec debug fmt t = match view t with
   | Var i ->
-    Format.fprintf fmt "X%d:%a" i Type.fmt t.ty
-  | BoundVar i -> Format.fprintf fmt "Y%d" i
+    Format.fprintf fmt "X%d:%a" i Type.fmt (ty t)
+  | BVar i -> Format.fprintf fmt "Y%d" i
   | Lambda t' -> 
     let varty = lambda_var_ty t in
     Format.fprintf fmt "(lambda %a %a)" Type.fmt varty debug t'
   | Const s -> Symbol.fmt fmt s
-  | At (t, tyargs, l) ->
+  | App (t, tyargs, l) ->
     Format.fprintf fmt "(%a %a %a)" debug t
       (Sequence.pp_seq ~sep:" " Type.fmt) (Sequence.of_list tyargs)
       (Sequence.pp_seq ~sep:" " debug) (Sequence.of_list l)
 
+(*
 let bij =
   let open Bij in
   let (!!!) = Lazy.force in
@@ -810,3 +426,41 @@ let bij =
         | "lam" -> BranchFrom (!!!bij_lam, fun (varty,t') -> __mk_lambda ~varty t')
         | "at" -> BranchFrom (!!!bij_at, fun (t, tyargs, l) -> mk_at ~tyargs t l)
         | _ -> raise (DecodingError "expected Term")))
+*)
+
+module TPTP = struct
+  let true_ = const ~ty:Type.TPTP.o Symbol.Base.true_
+  let false_ = const ~ty:Type.TPTP.o Symbol.Base.false_
+
+  (** Easy constructors for formulas *)
+
+  let not_ = const ~ty:Type.(TPTP.o <=. TPTP.o) Symbol.Base.not_
+  let not_term = mk_const Symbol.not_symbol
+  let and_term = mk_const Symbol.and_symbol
+  let or_term = mk_const Symbol.or_symbol
+  let imply_term = mk_const Symbol.imply_symbol
+  let equiv_term = mk_const Symbol.equiv_symbol
+
+  let eq_term = mk_const Symbol.eq_symbol
+  let forall_term = mk_const Symbol.forall_symbol
+  let exists_term = mk_const Symbol.exists_symbol
+
+  let mk_not t = mk_at not_term [t]
+  let mk_and a b = mk_at and_term [a; b]
+  let mk_or a b = mk_at or_term [a; b]
+  let mk_imply a b = mk_at imply_term [a; b]
+  let mk_equiv a b = mk_at equiv_term [a; b]
+  let mk_xor a b = mk_not (mk_equiv a b)
+  let mk_eq a b = mk_at ~tyargs:[a.ty] eq_term [a; b]   (* use type of left arg *)
+  let mk_neq a b = mk_not (mk_eq a b)
+
+  let rec mk_and_list l = match l with
+    | [] -> true_term
+    | [x] -> x
+    | x::l' -> mk_and x (mk_and_list l')
+
+  let rec mk_or_list l = match l with
+    | [] -> false_term
+    | [x] -> x
+    | x::l' -> mk_or x (mk_or_list l')
+end

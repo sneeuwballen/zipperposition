@@ -40,7 +40,7 @@ type view = private
   | Var of int                  (** variable *)
   | BVar of int             (** bound variable (De Bruijn index) *)
   | Lambda of t                 (** lambda abstraction over one variable. *)
-  | Const of Symbol.t           (** Typed constant *)
+  | Const of symbol             (** Typed constant *)
   | App of t * Type.t list * t list
     (** HO function application. Invariant: first term is not a {!App}. *)
 
@@ -48,6 +48,11 @@ type sourced_term =
   t * string * string           (** Term + file,name *)
 
 val view : t -> view
+val ty : t -> Type.t
+
+val of_term : ScopedTerm.t -> t option
+val of_term_exn : ScopedTerm.t -> t
+val is_term : ScopedTerm.t -> bool
 
 (** {2 Comparison, equality, containers} *)
 
@@ -57,7 +62,12 @@ val subterm : sub:t -> t -> bool
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
-val lambda_var_ty : t -> Type.t     (** Only on lambda terms. @raise Invalid_argument otherwise. *)
+val lambda_var_ty : t -> Type.t
+  (** Only on lambda terms: returns the type of the function argument.
+     @raise Invalid_argument otherwise. *)
+
+val cast : ty:Type.t -> t -> t
+  (** Change the type. Only works for variables and bound variables. *)
 
 module Tbl : sig
   include Hashtbl.S with type key = t
@@ -99,60 +109,22 @@ val app : ?tyargs:Type.t list -> t -> t list -> t
       computed.
       @raise Type.Error if types do not match. *)
 
-val const : ?tyargs:Type.t list -> symbol -> t
-  (** Create a constant. *)
+val const : ?tyargs:Type.t list -> ty:Type.t -> symbol -> t
+  (** Create a typed constant. *)
 
 val __mk_lambda : varty:Type.t -> t -> t    (** not documented *)
-val __mk_forall : varty:Type.t -> t -> t
-val __mk_exists : varty:Type.t -> t -> t
 
 (** constructors with free variables. The first argument is the
     list of variables that is bound, then the quantified/abstracted
     term. *)
 
 val mk_lambda : t list -> t -> t   (** (lambda v1,...,vn. t). *)
-val mk_forall : t list -> t -> t
-val mk_exists : t list -> t -> t
-
-val cast : ty:Type.t -> t -> t
-  (** Change the type. Only works for variables and bound variables. *)
-
-val of_term : ScopedTerm.t -> t option
-val is_term : ScopedTerm.t -> bool
 
 val is_var : t -> bool
 val is_bvar : t -> bool
 val is_app : t -> bool
 val is_const : t -> bool
 val is_lambda : t -> bool
-
-module Base : sig
-  val true_ : t   (** tautology term *)
-  val false_ : t  (** antilogy term *)
-
-  val not_ : t
-  val and_ : t
-  val or_ : t
-  val imply : t
-  val equiv : t
-
-  val eq : t
-  val forall : t
-  val exists : t
-
-  val mk_not : t -> t
-  val mk_and : t -> t -> t
-  val mk_or : t -> t -> t
-  val mk_imply : t -> t -> t
-  val mk_equiv : t -> t -> t
-  val mk_xor : t -> t -> t
-  val mk_eq : t -> t -> t
-  val mk_neq : t -> t -> t
-
-  val mk_and_list : t list -> t
-  val mk_or_list : t list -> t
-end
-
 
 (** {2 Sequences} *)
 
@@ -194,12 +166,6 @@ module Pos : sig
   (** [replace t pos ~by] replaces the subterm at position [pos]
       in [t] by the term [by]. The two terms should have the same type.
       @raise Invalid_argument if the position is not valid *)
-
-  val at_cpos : t -> int -> t
-    (** retrieve subterm at the compact pos, or raise Invalid_argument*)
-
-  val max_cpos : t -> int
-    (** maximum compact position in the term *)
 end
 
 val replace : t -> old:t -> by:t -> t
@@ -213,12 +179,6 @@ val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
 
 val contains_symbol : Symbol.t -> t -> bool
   (** Does the term contain this given symbol? *)
-
-val close_forall : t -> t
-  (** Bind all free variables with 'forall' *)
-
-val close_exists : t -> t
-  (** Bind all free variables with 'exists' *)
 
 (** {2 Conversion with {!FOTerm}} *)
 
@@ -241,11 +201,7 @@ the case this amount is 0 (for instance in clauses)
 val print_all_types : bool ref
 
 val pp_depth : int -> Buffer.t -> t -> unit
-val pp_tstp_depth : int -> Buffer.t -> t -> unit
-
 val pp_debug : Buffer.t -> t -> unit
-val pp_tstp : Buffer.t -> t -> unit
-
 
 include Interfaces.PRINT with type t := t
 
@@ -257,6 +213,42 @@ include Interfaces.SERIALIZABLE with type t := t
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
+
+  val true_ : t   (** tautology term *)
+  val false_ : t  (** antilogy term *)
+
+  val not_ : t
+  val and_ : t
+  val or_ : t
+  val imply : t
+  val equiv : t
+
+  val eq : t
+  val forall : t
+  val exists : t
+
+  val mk_forall : t list -> t -> t
+  val mk_exists : t list -> t -> t
+
+  val mk_not : t -> t
+  val mk_and : t -> t -> t
+  val mk_or : t -> t -> t
+  val mk_imply : t -> t -> t
+  val mk_equiv : t -> t -> t
+  val mk_xor : t -> t -> t
+  val mk_eq : t -> t -> t
+  val mk_neq : t -> t -> t
+
+  val mk_and_list : t list -> t
+  val mk_or_list : t list -> t
+
+  val close_forall : t -> t
+    (** Bind all free variables with 'forall' *)
+
+  val close_exists : t -> t
+    (** Bind all free variables with 'exists' *)
+end
+
 end
 
 val debug : Format.formatter -> t -> unit
