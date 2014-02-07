@@ -152,6 +152,7 @@ val cast : ty:Type.t -> t -> t
   (** Change the type. Only works for variables and bound variables. *)
 
 val of_term : ScopedTerm.t -> t option
+val of_term_exn : ScopedTerm.t -> t
 val is_term : ScopedTerm.t -> bool
 
 val is_var : t -> bool

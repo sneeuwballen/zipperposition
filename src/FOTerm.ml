@@ -38,7 +38,7 @@ type symbol = Symbol.t
 module Cst = struct
   type t = T.t
 
-  let make ~(ty:Type.t) sym = T.const ~kind:T.Kind.Const ~ty:(ty:>T.t) sym
+  let make ~(ty:Type.t) sym = T.const ~kind:T.Kind.FOTerm ~ty:(ty:>T.t) sym
 
   let ty c = Type.of_term_exn (T.ty c)
 
