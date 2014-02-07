@@ -40,8 +40,8 @@ type connective =
   | Exists
   | Forall
   | ForallTy
-  | Arrow
   | Lambda
+  | Arrow
   | Wildcard
   | TType
 

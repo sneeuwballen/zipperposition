@@ -136,7 +136,7 @@ module Cache = Cache.Replacing(TermHASH)
 
 (** {2 Typing} *)
 
-let cast ~ty t = T.cast ~ty:(ty :> T.t) t
+let cast ~ty t = T.cast ~ty:(ty : Type.t :> T.t) t
 
 let lambda_var_ty t = match T.view t with
   | T.Bind (Symbol.Conn Symbol.Lambda, _) ->
@@ -167,7 +167,8 @@ let app ?(tyargs=[]) hd args =
   (* first; compute type *)
   let ty = _compute_ty (ty hd) tyargs args in
   (* apply constant to type args and args *)
-  let res = T.app ~kind:T.Kind.HOTerm ~ty:(ty:>T.t) hd ((tyargs :> t list) @ args) in
+  let res = T.app ~kind:T.Kind.HOTerm ~ty:(ty:>T.t) hd
+    ((tyargs : Type.t list :> t list) @ args) in
   res
 
 let const ?(tyargs=[]) ~(ty:Type.t) symbol =
@@ -204,7 +205,8 @@ module Seq = struct
       Sequence.filter (fun s -> not (Symbol.eq s Symbol.Base.lambda))
   let max_var = T.Seq.max_var
   let min_var = T.Seq.min_var
-  let ty_vars t = T.Seq.types t |> Sequence.flatMap vars
+  let ty_vars t =
+    subterms t |> Sequence.flatMap (fun t -> Type.Seq.vars (ty t))
   let add_set set ts =
     Sequence.fold (fun set t -> Set.add t set) set ts
 end
@@ -227,7 +229,6 @@ let rec size t = match T.view t with
   | T.Const _ -> 1
   | T.Bind (_, t') -> 1+ size t'
   | T.App (f, l) -> List.fold_left (fun s t' -> s + size t') (1+size f) l
-  | _ -> assert false
 
 let is_ground t = Seq.vars t |> Sequence.is_empty
 
@@ -247,6 +248,9 @@ let vars_prefix_order t =
   Seq.vars t
     |> Sequence.fold (fun l x -> if not (List.memq x l) then x::l else l) []
     |> List.rev
+
+let ty_vars t =
+  Seq.ty_vars t |> Type.Seq.add_set Type.Set.empty
 
 let depth t = Seq.subterms_depth t |> Sequence.map snd |> Sequence.fold max 0
 
@@ -282,6 +286,7 @@ let contains_symbol s t =
 
 (** {2 High level operations} *)
 
+(*
 (* Curry all subterms *)
 let rec curry t =
   let ty = FOT.ty t in
@@ -300,10 +305,10 @@ let rec uncurry t =
   | T.Var i -> FOT.var ~ty i
   | T.BVar i -> FOT.bvar ~ty i
   | T.Bind (Symbol.Conn Symbol.Lambda, t') -> failwith "cannot uncurry lambda"
-  | T.Const s -> FOT.const (FOT.Cst.s ~ty)
+  | T.Const s -> FOT.const (FOT.Cst.make ~ty s)
   | T.App (hd, l) ->
     let l = List.map uncurry l in
-    FOT.mk_node ~tyargs s l
+    FOT.app ~tyargs (FOT.Cst.make ~ty s) l
   | _ -> failwith "cannot uncurry higher-order application"
 
 let rec is_fo t = match t.term with
@@ -313,79 +318,61 @@ let rec is_fo t = match t.term with
   | At ({term=Const _}, _, l) -> List.for_all is_fo l
   | At _ -> false (* (X|lambda t) @ _ is not first-order  *)
   | Const _ -> true
+*)
 
 (** {2 IO} *)
 
 let print_all_types = ref false
 
-let pp_tstp_depth depth buf t =
+type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+
+let pp_depth ?(hooks=[]) depth buf t =
   let depth = ref depth in
   (* recursive printing *)
-  let rec pp_rec buf t = match t.term with
-  | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+  let rec pp_rec buf t = match view t with
+  | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
   | Lambda t' ->
     let varty = lambda_var_ty t in
-    Printf.bprintf buf "^[%a:%a]: " pp_bvar () Type.pp varty;
+    Printf.bprintf buf "λ%a:%a. " pp_bvar () Type.pp varty;
     incr depth;
     pp_surrounded buf t';
     decr depth
   | Const s -> Symbol.pp buf s
-  | Var i -> Printf.bprintf buf "X%d" i
-  | At (t, tyargs, l) ->
-    pp_surrounded buf t;  Buffer.add_string buf " @ ";
-    Util.pp_list ~sep:" @ " Type.pp_tstp buf tyargs;
-    (if l<>[] && tyargs<>[] then Buffer.add_string buf " @ ");
-    Util.pp_list ~sep:" @ " pp_surrounded buf l
-  and pp_surrounded buf t = match t.term with
-  | At (_, _, _) ->
+  | Var i ->
+      if not !print_all_types
+      then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
+      else Printf.bprintf buf "X%d" i
+  | App (hd, tyargs, l) ->
+    (* try to use some hook *)
+    if List.exists (fun hook -> hook !depth pp_rec buf t) hooks
+    then ()
+    else (* default case for nodes *)
+      begin match tyargs, l with
+      | [], [] -> pp_rec buf hd
+      | _ ->
+        Printf.bprintf buf "%a " pp_surrounded hd;
+        Util.pp_list ~sep:" " Type.TPTP.pp buf tyargs;
+        begin match tyargs, l with
+        | _::_, _::_ -> Buffer.add_string buf " "
+        | _ -> ()
+        end;
+        Util.pp_list ~sep:" " pp_rec buf l
+      end
+  and pp_surrounded buf t = match view t with
+  | App (_, _, _) | Lambda _ ->
     Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
   | _ -> pp_rec buf t
   and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in
   pp_rec buf t
 
-(* lightweight printing *)
-let rec pp_depth depth buf t =
-  let depth = ref depth in
-  (* recursive printing *)
-  let rec pp_rec buf t =
-    begin match t.term with
-    | BoundVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-    | Lambda t' ->
-      let varty = lambda_var_ty t in
-      Printf.bprintf buf "λ%a:%a. " pp_bvar () Type.pp varty;
-      incr depth;
-      pp_surrounded buf t';
-      decr depth
-    | Const s -> Symbol.pp buf s
-    | Var i ->
-      if Type.eq t.ty Type.i
-        then Printf.bprintf buf "X%d" i
-        else Printf.bprintf buf "X%d:%a" i Type.pp t.ty
-    | At (t, tyargs, l) ->
-      pp_surrounded buf t;  Buffer.add_string buf " @ ";
-      Util.pp_list ~sep:" @ " Type.pp buf tyargs;
-      (if l<>[] && tyargs<>[] then Buffer.add_string buf " @ ");
-      Util.pp_list ~sep:" @ " pp_surrounded buf l
-    end;
-    if !print_all_types then Printf.bprintf buf ":%a" Type.pp t.ty
-  and pp_surrounded buf t = match t.term with
-  | At _ ->
-    Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
-  | _ -> pp_rec buf t
-  and pp_bvar buf () = Printf.bprintf buf "Y%d" !depth in
-  pp_rec buf t
+let __hooks = ref []
+let add_hook h = __hooks := h :: !__hooks
+
+let pp buf t = pp_depth ~hooks:!__hooks 0 buf t
 
 let pp_debug buf t = pp_depth 0 buf t
 
-let pp_tstp buf t = pp_tstp_depth 0 buf t
-
-let __default_pp = ref pp_debug
-
-let pp buf t = !__default_pp buf t
-
-let set_default_pp pp = __default_pp := pp
-
-let to_string t = Util.sprintf "%a" pp t
+let to_string = Util.on_buffer pp
 
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
@@ -393,7 +380,7 @@ let rec debug fmt t = match view t with
   | Var i ->
     Format.fprintf fmt "X%d:%a" i Type.fmt (ty t)
   | BVar i -> Format.fprintf fmt "Y%d" i
-  | Lambda t' -> 
+  | Lambda t' ->
     let varty = lambda_var_ty t in
     Format.fprintf fmt "(lambda %a %a)" Type.fmt varty debug t'
   | Const s -> Symbol.fmt fmt s
@@ -422,9 +409,9 @@ let bij =
         ~extract:(function
         | "bv" -> BranchFrom (bij_var, fun (i,ty) -> __mk_bound_var ~ty i)
         | "v" -> BranchFrom (bij_var, fun (i,ty) -> mk_var ~ty i)
-        | "c" -> BranchFrom (bij_cst, fun s -> mk_const s)
+        | "c" -> BranchFrom (bij_cst, fun s -> const s)
         | "lam" -> BranchFrom (!!!bij_lam, fun (varty,t') -> __mk_lambda ~varty t')
-        | "at" -> BranchFrom (!!!bij_at, fun (t, tyargs, l) -> mk_at ~tyargs t l)
+        | "at" -> BranchFrom (!!!bij_at, fun (t, tyargs, l) -> app ~tyargs t l)
         | _ -> raise (DecodingError "expected Term")))
 *)
 
@@ -435,32 +422,100 @@ module TPTP = struct
   (** Easy constructors for formulas *)
 
   let not_ = const ~ty:Type.(TPTP.o <=. TPTP.o) Symbol.Base.not_
-  let not_term = mk_const Symbol.not_symbol
-  let and_term = mk_const Symbol.and_symbol
-  let or_term = mk_const Symbol.or_symbol
-  let imply_term = mk_const Symbol.imply_symbol
-  let equiv_term = mk_const Symbol.equiv_symbol
+  let and_ = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.and_
+  let or_ = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.or_
+  let imply = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.imply
+  let equiv = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.equiv
+  let xor = const ~ty:Type.(TPTP.o <== [TPTP.o; TPTP.o]) Symbol.Base.xor
 
-  let eq_term = mk_const Symbol.eq_symbol
-  let forall_term = mk_const Symbol.forall_symbol
-  let exists_term = mk_const Symbol.exists_symbol
+  let eq = const
+    ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0]))
+    Symbol.Base.eq
+  let neq = const
+    ~ty:Type.(forall [var 0] (TPTP.o <== [var 0; var 0]))
+    Symbol.Base.neq
+  let forall = const
+    ~ty:Type.(forall [var 0] (TPTP.o <=. (TPTP.o <=. var 0)))
+    Symbol.Base.forall
+  let exists = const
+    ~ty:Type.(forall [var 0] (TPTP.o <=. (TPTP.o <=. var 0)))
+    Symbol.Base.exists
 
-  let mk_not t = mk_at not_term [t]
-  let mk_and a b = mk_at and_term [a; b]
-  let mk_or a b = mk_at or_term [a; b]
-  let mk_imply a b = mk_at imply_term [a; b]
-  let mk_equiv a b = mk_at equiv_term [a; b]
-  let mk_xor a b = mk_not (mk_equiv a b)
-  let mk_eq a b = mk_at ~tyargs:[a.ty] eq_term [a; b]   (* use type of left arg *)
-  let mk_neq a b = mk_not (mk_eq a b)
+  let mk_forall vars f =
+    List.fold_right
+      (fun v f -> app forall [mk_lambda [v] f])
+      vars f
+
+  let mk_exists vars f =
+    List.fold_right
+      (fun v f -> app exists [mk_lambda [v] f])
+      vars f
+
+  let mk_not t = app not_ [t]
+  let mk_and a b = app and_ [a; b]
+  let mk_or a b = app or_ [a; b]
+  let mk_imply a b = app imply [a; b]
+  let mk_equiv a b = app equiv [a; b]
+  let mk_xor a b = app xor [a; b]
+  let mk_eq a b = app ~tyargs:[ty a] eq [a; b]   (* use type of left arg *)
+  let mk_neq a b = app ~tyargs:[ty a] neq [a; b]
 
   let rec mk_and_list l = match l with
-    | [] -> true_term
+    | [] -> true_
     | [x] -> x
     | x::l' -> mk_and x (mk_and_list l')
 
   let rec mk_or_list l = match l with
-    | [] -> false_term
+    | [] -> false_
     | [x] -> x
     | x::l' -> mk_or x (mk_or_list l')
+
+  let close_forall t =
+    let vars = vars (Sequence.singleton t) |> Set.elements in
+    mk_forall vars t
+
+  let close_exists t =
+    let vars = vars (Sequence.singleton t) |> Set.elements in
+    mk_exists vars t
+
+  let pp_tstp_depth depth buf t =
+    let depth = ref depth in
+    (* recursive printing *)
+    let rec pp_rec buf t = match view t with
+    | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
+    | Lambda t' ->
+      let varty = lambda_var_ty t in
+      Printf.bprintf buf "^[%a:%a]: " pp_bvar () Type.pp varty;
+      incr depth;
+      pp_surrounded buf t';
+      decr depth
+    | Const s -> Symbol.pp buf s
+    | Var i ->
+        if not !print_all_types
+        then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
+        else Printf.bprintf buf "X%d" i
+    | App (hd, tyargs, l) ->
+      begin match tyargs, l with
+      | [], [] -> pp_rec buf hd
+      | _ ->
+        Printf.bprintf buf "%a " pp_surrounded hd;
+        Util.pp_list ~sep:" @ " Type.TPTP.pp buf tyargs;
+        begin match tyargs, l with
+        | _::_, _::_ -> Buffer.add_string buf " @ "
+        | _ -> ()
+        end;
+        Util.pp_list ~sep:" @ " pp_rec buf l
+      end
+    and pp_surrounded buf t = match view t with
+    | App (_, _, _) | Lambda _ ->
+      Buffer.add_char buf '('; pp_rec buf t; Buffer.add_char buf ')'
+    | _ -> pp_rec buf t
+    and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in
+    pp_rec buf t
+
+  let pp buf t = pp_tstp_depth 0 buf t
+
+  let to_string = Util.on_buffer pp
+
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
 end

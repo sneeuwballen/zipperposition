@@ -174,14 +174,14 @@ val replace : t -> old:t -> by:t -> t
 
 (** {2 High-level operations} *)
 
-val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t
-  (** Symbols of the term (keys of signature) *)
+val symbols : ?init:Symbol.Set.t -> t -> Symbol.Set.t (** Symbols of the term (keys of signature) *)
 
 val contains_symbol : Symbol.t -> t -> bool
   (** Does the term contain this given symbol? *)
 
 (** {2 Conversion with {!FOTerm}} *)
 
+(*
 val curry : FOTerm.t -> t
   (** Curry all subterms *)
 
@@ -191,6 +191,7 @@ val uncurry : t -> FOTerm.t
 val is_fo : t -> bool
   (** Check whether the term is convertible to a
       first-order term (no binders, no variable applied to something...) *)
+*)
 
 (** {2 IO}
 
@@ -200,7 +201,10 @@ the case this amount is 0 (for instance in clauses)
 
 val print_all_types : bool ref
 
-val pp_depth : int -> Buffer.t -> t -> unit
+type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
+val add_hook : print_hook -> unit
+
+val pp_depth : ?hooks:print_hook list -> int -> Buffer.t -> t -> unit
 val pp_debug : Buffer.t -> t -> unit
 
 include Interfaces.PRINT with type t := t
@@ -222,8 +226,10 @@ module TPTP : sig
   val or_ : t
   val imply : t
   val equiv : t
+  val xor : t
 
   val eq : t
+  val neq : t
   val forall : t
   val exists : t
 
@@ -247,8 +253,6 @@ module TPTP : sig
 
   val close_exists : t -> t
     (** Bind all free variables with 'exists' *)
-end
-
 end
 
 val debug : Format.formatter -> t -> unit
