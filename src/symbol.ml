@@ -41,6 +41,7 @@ type connective =
   | Forall
   | ForallTy
   | Arrow
+  | Lambda
   | Wildcard
   | TType
 
@@ -109,6 +110,7 @@ let to_string s = match s with
       | False -> "false"
       | Exists -> "∃"
       | Forall -> "∀"
+      | Lambda -> "λ"
       | ForallTy -> "Λ"
       | Arrow -> "->"
       | Wildcard -> "_"
@@ -159,6 +161,7 @@ module Base = struct
   let neq = Conn Neq
   let forall = Conn Forall
   let exists = Conn Exists
+  let lambda = Conn Lambda
   let forall_ty = Conn ForallTy
   let arrow = Conn Arrow
   let tType = Conn TType
@@ -216,6 +219,7 @@ module TPTP = struct
           | Exists -> "?"
           | Forall -> "!"
           | ForallTy -> "!>"
+          | Lambda -> "^"
           | Arrow -> ">"
           | Wildcard -> "$_"
           | TType -> "$tType"

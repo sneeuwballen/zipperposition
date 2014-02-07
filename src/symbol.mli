@@ -44,6 +44,7 @@ type connective =
   | Exists
   | Forall
   | ForallTy
+  | Lambda
   | Arrow
   | Wildcard
   | TType (* type of types *)
@@ -100,6 +101,7 @@ module Base : sig
   val imply : t
   val equiv : t
   val xor : t
+  val lambda : t
 
   val not_ : t
   val and_ : t
