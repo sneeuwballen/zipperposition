@@ -40,7 +40,7 @@ Library "logtk"
   Pack:             true
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
                     Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm,
-                    Substs, Unif,
+                    Substs, Unif, Formula,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl
   BuildDepends:     zarith,unix,str
@@ -54,13 +54,13 @@ Library "logtk_extended"
   Build$:           flag(extended)
   Install$:         flag(extended)
   Modules:          HO, FO, Symbol, Hash, Hashcons, FOTerm, HOTerm, FOFormula,
-                    Util, FOUnif, HOUnif, Type, Substs, Signature, TypeInference, 
+                    Util, Type, Substs, Signature, TypeInference, 
                     Lex_tptp, Ast_tptp, Parse_tptp, Lambda, Multiset,
                     ScopedTerm,
                     Comparison, PartialOrder, Precedence, Ordering, Position,
                     Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
                     FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
-                    Trace_tstp, CallProver, Congruence, TypeUnif, Options,
+                    Trace_tstp, CallProver, Congruence, Options,
                     Basic, Monad, FastFingerprint, Evaluator, Location,
                     TypeConversion, TypeErasure, DBEnv, Interfaces,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,

@@ -19,12 +19,12 @@ let (~<) = Symbol.of_string;;
 #install_printer FOTerm.Cst.fmt;;
 #install_printer FOTerm.fmt;;
 #install_printer PrologTerm.fmt;;
-#install_printer FOFormula.fmt;;
+#install_printer Formula.fmt;;
 #install_printer HOTerm.fmt;;
 #install_printer Substs.fmt;;
 open Logtk.Sequence.Infix;;
 open Logtk.Type;;
-module F = Logtk.FOFormula;;
+module F = Logtk.Formula;;
 module HOT = Logtk.HOTerm;;
 let pterm s =
     let t = Parse_tptp.parse_term Lex_tptp.token (Lexing.from_string s) in

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: bee4f46062f83a65f65cd0b581d17e9c)
+# DO NOT EDIT (digest: 0e836e1370a2ecf356d4b40fab0cf301)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -29,6 +29,7 @@
 "src/HOTerm.cmx": for-pack(Logtk)
 "src/substs.cmx": for-pack(Logtk)
 "src/unif.cmx": for-pack(Logtk)
+"src/formula.cmx": for-pack(Logtk)
 "src/lib/sequence.cmx": for-pack(Logtk)
 "src/lib/cache.cmx": for-pack(Logtk)
 "src/lib/bij.cmx": for-pack(Logtk)
@@ -43,10 +44,7 @@
 "src/hashcons.cmx": for-pack(Logtk_extended)
 "src/FOTerm.cmx": for-pack(Logtk_extended)
 "src/HOTerm.cmx": for-pack(Logtk_extended)
-"src/FOFormula.cmx": for-pack(Logtk_extended)
 "src/util.cmx": for-pack(Logtk_extended)
-"src/FOUnif.cmx": for-pack(Logtk_extended)
-"src/HOUnif.cmx": for-pack(Logtk_extended)
 "src/type.cmx": for-pack(Logtk_extended)
 "src/substs.cmx": for-pack(Logtk_extended)
 "src/signature.cmx": for-pack(Logtk_extended)
@@ -76,7 +74,6 @@
 "src/trace_tstp.cmx": for-pack(Logtk_extended)
 "src/callProver.cmx": for-pack(Logtk_extended)
 "src/congruence.cmx": for-pack(Logtk_extended)
-"src/typeUnif.cmx": for-pack(Logtk_extended)
 "src/options.cmx": for-pack(Logtk_extended)
 "src/basic.cmx": for-pack(Logtk_extended)
 "src/monad.cmx": for-pack(Logtk_extended)

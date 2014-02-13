@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: ed7f4fd8d818bbeb1cf1bdd812f383e0)
+# DO NOT EDIT (digest: 2baeb1dfa16cfe3ca1c684c60a3e9efa)
 Symbol
 ScopedTerm
 FOTerm
@@ -14,6 +14,7 @@ Hashcons
 HOTerm
 Substs
 Unif
+Formula
 lib/Sequence
 lib/Cache
 lib/Bij

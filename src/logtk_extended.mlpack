@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: c91e66af914dd978a0670d37ac736fbd)
+# DO NOT EDIT (digest: b07c908f380f31b1000b5fde4392aad5)
 HO
 FO
 Symbol
@@ -9,8 +9,6 @@ FOTerm
 HOTerm
 FOFormula
 Util
-FOUnif
-HOUnif
 Type
 Substs
 Signature
@@ -40,7 +38,6 @@ NPDtree
 Trace_tstp
 CallProver
 Congruence
-TypeUnif
 Options
 Basic
 Monad
