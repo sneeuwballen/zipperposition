@@ -48,7 +48,9 @@ type view =
 type sourced_term =
   t * string * string           (** Term + file,name *)
 
-let ty t = Type.of_term_exn (T.ty t)
+let ty t = match T.ty t with
+  | T.NoType -> assert false
+  | T.HasType ty -> Type.of_term_exn ty
 
 (* split list between types, terms *)
 let rec _split_types l = match l with
@@ -140,7 +142,7 @@ let cast ~ty t = T.cast ~ty:(ty : Type.t :> T.t) t
 
 let lambda_var_ty t = match T.view t with
   | T.Bind (Symbol.Conn Symbol.Lambda, _) ->
-      let ty = Type.of_term_exn (T.ty t) in
+      let ty = Type.of_term_exn (T.ty_exn t) in
       begin match Type.view ty with
       | Type.Fun (_, arg::_) -> arg
       | _ -> raise (Invalid_argument "lambda_var_ty: expected function type")

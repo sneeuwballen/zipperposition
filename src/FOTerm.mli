@@ -29,62 +29,6 @@ Terms use ScopedTerm with kind "FOTerm".
 
 type symbol = Symbol.t
 
-(** {2 Typed Constant}
-
-A typed constant is a symbol with its type. It is also repreented
-as a ScopedTerm.*)
-
-module Cst : sig
-  type t = private ScopedTerm.t
-
-  val ty : t -> Type.t
-  val sym : t -> Symbol.t
-
-  val make : ty:Type.t -> symbol -> t
-
-  val of_term : ScopedTerm.t -> t option
-  val of_term_exn : ScopedTerm.t -> t
-  val is_const : ScopedTerm.t -> bool
-
-  include Interfaces.HASH with type t := t
-  include Interfaces.ORD with type t := t
-  include Interfaces.PRINT with type t := t
-
-  module TPTP : sig
-    val true_ : t
-    val false_ : t
-    include Interfaces.PRINT with type t := t
-
-    module Arith : sig
-      val floor : t
-      val ceiling : t
-      val truncate : t
-      val round : t
-
-      val prec : t
-      val succ : t
-
-      val sum : t
-      val difference : t
-      val uminus : t
-      val product : t
-      val quotient : t
-
-      val quotient_e : t
-      val quotient_t : t
-      val quotient_f : t
-      val remainder_e : t
-      val remainder_t : t
-      val remainder_f : t
-
-      val less : t
-      val lesseq : t
-      val greater : t
-      val greatereq : t
-    end
-  end
-end
-
 (** {2 Term} *)
 
 type t = private ScopedTerm.t
@@ -94,7 +38,8 @@ type term = t
 type view = private
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
-  | App of Cst.t * Type.t list * t list (** Function application *)
+  | Const of Symbol.t         (** Typed constant *)
+  | App of t * Type.t list * t list   (** Application to a list of types and term *)
 
 type sourced_term =
   t * string * string           (** Term + file,name *)
@@ -138,15 +83,12 @@ val bvar : ty:Type.t -> int -> t
   (** Create a bound variable. Providing a type is mandatory.
       {b Warning}: be careful and try not to use this function directly*)
 
-val app : ?tyargs:Type.t list -> Cst.t -> t list -> t
-  (** Apply a typed symbol to a list of type arguments (optional) and
-      a list of term arguments. Partial application is not
-      supported and will raise a type error. The type is automatically
-      computed.
-      @raise Type.Error if types do not match. *)
+val const : ty:Type.t -> symbol -> t
+  (** Create a typed constant *)
 
-val const : ?tyargs:Type.t list -> Cst.t -> t
-  (** Create a typed constant. Specialization of [app]. *)
+val app : ?tyargs:Type.t list -> t -> t list -> t
+  (** Apply a term to a list of terms and possibly of type arguments
+      @raise Type.Error if types do not match. *)
 
 val cast : ty:Type.t -> t -> t
   (** Change the type. Only works for variables and bound variables. *)
@@ -290,6 +232,31 @@ module TPTP : sig
   include Interfaces.PRINT with type t := t
 
   module Arith : sig
+    val floor : t
+    val ceiling : t
+    val truncate : t
+    val round : t
+
+    val prec : t
+    val succ : t
+
+    val sum : t
+    val difference : t
+    val uminus : t
+    val product : t
+    val quotient : t
+
+    val quotient_e : t
+    val quotient_t : t
+    val quotient_f : t
+    val remainder_e : t
+    val remainder_t : t
+    val remainder_f : t
+
+    val less : t
+    val lesseq : t
+    val greater : t
+    val greatereq : t
     val arith_hook : print_hook
       (** hook to print arithmetic expressions *)
 

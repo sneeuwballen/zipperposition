@@ -33,84 +33,6 @@ let prof_ac_normal_form = Util.mk_profiler "ac_normal_form"
 
 type symbol = Symbol.t
 
-(** {2 Typed Constant} *)
-
-module Cst = struct
-  type t = T.t
-
-  let make ~(ty:Type.t) sym = T.const ~kind:T.Kind.FOTerm ~ty:(ty:>T.t) sym
-
-  let ty c = Type.of_term_exn (T.ty c)
-
-  let sym c = match T.view c with
-    | T.Const s -> s
-    | _ -> assert false
-
-  let is_const t = match T.kind t with
-    | T.Kind.Const -> true
-    | _ -> false
-
-  let of_term t = if is_const t then Some t else None
-  let of_term_exn t = if is_const t
-  then t else raise (Invalid_argument "T.Cst.of_term_exn")
-
-  let hash = T.hash
-  let eq = T.eq
-  let cmp = T.cmp
-
-  let pp buf c = Symbol.pp buf (sym c)
-  let to_string c = Symbol.to_string (sym c)
-  let fmt fmt c = Symbol.fmt fmt (sym c)
-
-  module TPTP = struct
-    let true_ = make ~ty:Type.TPTP.o Symbol.Base.true_
-    let false_ = make ~ty:Type.TPTP.o Symbol.Base.false_
-    let pp buf c = Symbol.TPTP.pp buf (sym c)
-    let to_string c = Symbol.TPTP.to_string (sym c)
-    let fmt fmt c = Symbol.TPTP.fmt fmt (sym c)
-
-    module Arith = struct
-      open Type.TPTP
-
-      let x = Type.var 0
-      let y = Type.var 1
-
-      let ty1 = Type.(forall [x] (int <=. x))
-
-      let floor = make ~ty:ty1 Symbol.TPTP.Arith.floor
-      let ceiling = make ~ty:ty1 Symbol.TPTP.Arith.ceiling
-      let truncate = make ~ty:ty1 Symbol.TPTP.Arith.truncate
-      let round = make ~ty:ty1 Symbol.TPTP.Arith.round
-
-      let prec = make ~ty:Type.(int <=. int) Symbol.TPTP.Arith.prec
-      let succ = make ~ty:Type.(int <=. int) Symbol.TPTP.Arith.succ
-
-      let ty2 = Type.(forall [x] (x <== [x;x]))
-      let ty2i = Type.(int <== [int;int])
-
-      let sum = make ~ty:ty2 Symbol.TPTP.Arith.sum
-      let difference = make ~ty:ty2 Symbol.TPTP.Arith.difference
-      let uminus = make ~ty:ty2 Symbol.TPTP.Arith.uminus
-      let product = make ~ty:ty2 Symbol.TPTP.Arith.product
-      let quotient = make ~ty:ty2 Symbol.TPTP.Arith.quotient
-
-      let quotient_e = make ~ty:ty2i Symbol.TPTP.Arith.quotient_e
-      let quotient_t = make ~ty:ty2i Symbol.TPTP.Arith.quotient_t
-      let quotient_f = make ~ty:ty2i Symbol.TPTP.Arith.quotient_f
-      let remainder_e = make ~ty:ty2i Symbol.TPTP.Arith.remainder_e
-      let remainder_t = make ~ty:ty2i Symbol.TPTP.Arith.remainder_t
-      let remainder_f = make ~ty:ty2i Symbol.TPTP.Arith.remainder_f
-
-      let ty2o = Type.(forall [x] (o <== [x;x]))
-
-      let less = make ~ty:ty2o Symbol.TPTP.Arith.less
-      let lesseq = make ~ty:ty2o Symbol.TPTP.Arith.lesseq
-      let greater = make ~ty:ty2o Symbol.TPTP.Arith.greater
-      let greatereq = make ~ty:ty2o Symbol.TPTP.Arith.greatereq
-    end
-  end
-end
-
 (** {2 Term} *)
 
 type t = T.t
@@ -123,7 +45,8 @@ type sourced_term =
 type view =
   | Var of int                (** Term variable *)
   | BVar of int               (** Bound variable (De Bruijn index) *)
-  | App of Cst.t * Type.t list * t list (** Function application *)
+  | Const of Symbol.t         (** Typed constant *)
+  | App of t * Type.t list * t list   (** Application to a list of types and term *)
 
 (* split list between types, terms *)
 let rec _split_types l = match l with
@@ -137,18 +60,10 @@ let view t = match T.view t with
   | T.Var i -> Var i
   | T.BVar i -> BVar i
   | T.App (hd, args) ->
-      begin match T.view hd with
-      | T.Const s ->
-          let ty = Type.of_term_exn (T.ty hd) in
-          let c = Cst.make ~ty s in
-          (* split arguments into type arguments + term arguments *)
-          let tyargs, args = _split_types args in
-          App (c, tyargs, args)
-      | _ -> assert false
-      end
-  | T.Const s ->
-      let ty = Type.of_term_exn (T.ty t) in
-      App (Cst.make ~ty s, [], [])
+    (* split arguments into type arguments + term arguments *)
+    let tyargs, args = _split_types args in
+    App (hd, tyargs, args)
+  | T.Const s -> Const s
   | _ -> assert false
 
 (** {2 Comparison, equality, containers} *)
@@ -157,8 +72,8 @@ let subterm ~sub t =
   let rec check t =
     T.eq sub t ||
     match T.view t with
-    | T.Var _ | T.BVar _ | T.App (_, []) -> false
-    | T.App (_, args) -> List.exists check args
+    | T.Var _ | T.BVar _ -> false
+    | T.App (f, l) -> check f || List.exists check l
     | _ -> false
   in
   check t
@@ -166,7 +81,9 @@ let subterm ~sub t =
 let eq = T.eq
 let hash = T.hash
 let cmp = T.cmp
-let ty t = Type.of_term_exn (T.ty t)
+let ty t = match T.ty t with
+  | T.NoType -> assert false
+  | T.HasType ty -> Type.of_term_exn ty
 
 module TermHASH = struct
   type t = term
@@ -223,7 +140,7 @@ let cast ~(ty:Type.t) t =
 
 (** In this section, term smart constructors are defined. They perform
     hashconsing, and precompute some properties (flags).
-    
+
     TODO: flag_monomorphic *)
 
 let kind = T.Kind.FOTerm
@@ -236,24 +153,23 @@ let bvar ~(ty:Type.t) i =
   assert (i >= 0);
   T.bvar ~kind ~ty:(ty :> T.t) i
 
+let const ~(ty:Type.t) s =
+  T.const ~kind ~ty:(ty :> T.t) s
+
 (* compute type of s(tyargs  *)
 let _compute_ty ty_fun tyargs l =
   let ty' = Type.apply ty_fun tyargs in
   Type.apply ty' (List.map ty l)
 
-let app ?(tyargs=[]) c args =
+let app ?(tyargs=[]) f l =
   Util.enter_prof prof_mk_node;
   (* first; compute type *)
-  let ty = _compute_ty (Cst.ty c) tyargs args in
+  let ty = _compute_ty (ty f) tyargs l in
   (* apply constant to type args and args *)
-  let res = T.app ~kind ~ty:(ty:>T.t) c ((tyargs : Type.t list :> T.t list) @ args) in
+  let res = T.app ~kind ~ty:(ty:>T.t) f
+   ((tyargs : Type.t list :> T.t list) @ l) in
   Util.exit_prof prof_mk_node;
   res
-
-let const ?(tyargs=[]) c =
-  match tyargs with
-  | [] -> c
-  | _::_ ->  app ~tyargs c []
 
 let is_var t = match T.view t with
   | T.Var _ -> true
@@ -285,12 +201,12 @@ let is_term t = match T.kind t with
   | _ -> false
 
 module Seq = struct
-  let rec vars t k =  (* TODO: use ground-ness flag *)
-    match T.kind t, T.view t with
+  let rec vars t k =
+    if T.ground t then ()
+    else match T.kind t, T.view t with
     | T.Kind.FOTerm, T.Var _ -> k t
-    | T.Kind.FOTerm, T.BVar _
-    | T.Kind.FOTerm, T.App (_, []) -> ()
-    | T.Kind.FOTerm, T.App (_, l) -> _vars_list l k
+    | T.Kind.FOTerm, T.BVar _ -> ()
+    | T.Kind.FOTerm, T.App (f, l) -> vars f k; List.iter (fun t -> vars t k) l
     | _ -> ()
   and _vars_list l k = match l with
     | [] -> ()
@@ -302,7 +218,7 @@ module Seq = struct
       match T.view t with
       | T.Var _
       | T.BVar _ -> ()
-      | T.App (_, l) -> List.iter (fun t' -> subterms t' k) l
+      | T.App (f, l) -> subterms f k; List.iter (fun t' -> subterms t' k) l
       | _ -> assert false
     end
 
@@ -482,7 +398,7 @@ module AC(A : AC_SPEC) = struct
         let l = List.sort cmp l in
         begin match l with
           | x::l' ->
-            let ty = T.ty t in
+            let ty = T.ty_exn t in
             let tyargs = (tyargs :> T.t list) in
             List.fold_left
               (fun subt x -> T.app ~ty ~kind:T.Kind.FOTerm f (tyargs@[x;subt]))
@@ -494,11 +410,11 @@ module AC(A : AC_SPEC) = struct
         let a = normalize a in
         let b = normalize b in
         if cmp a b > 0
-          then T.app ~kind:T.Kind.FOTerm ~ty:(T.ty t) f [b; a]
+          then T.app ~kind:T.Kind.FOTerm ~ty:(ty t :>T.t) f [b; a]
           else t
       | T.App (f, l) ->
         let l = List.map normalize l in
-        T.app ~kind:T.Kind.FOTerm ~ty:(T.ty t) f l 
+        T.app ~kind:T.Kind.FOTerm ~ty:(T.ty_exn t) f l 
       | _ -> assert false
     in
     let t' = normalize t in
@@ -535,9 +451,9 @@ let rec pp_depth ?(hooks=[]) depth buf t =
       then ()
       else (* default case for nodes *)
         begin match tyargs, args with
-        | [], [] -> Cst.pp buf s
+        | [], [] -> pp_rec buf s
         | _ ->
-          Printf.bprintf buf "%a(" Cst.TPTP.pp s;
+          Printf.bprintf buf "%a(" pp_rec s;
           Util.pp_list Type.TPTP.pp buf tyargs;
           begin match tyargs, args with
           | _::_, _::_ -> Buffer.add_string buf ", "
@@ -546,6 +462,7 @@ let rec pp_depth ?(hooks=[]) depth buf t =
           Util.pp_list pp_rec buf args;
           Buffer.add_string buf ")";
         end
+    | Const s -> Symbol.TPTP.pp buf s
     | Var i ->
       if not !print_all_types
         then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)
@@ -571,9 +488,10 @@ let rec debug fmt t =
   | Var i -> Format.fprintf fmt "X%d" i
   | BVar i -> Format.fprintf fmt "Y%d" i
   | App (s, [], []) ->
-    Cst.fmt fmt s
+    debug fmt s
+  | Const s -> Symbol.fmt fmt s
   | App (s, tyargs, l) ->
-    Format.fprintf fmt "(%a %a %a)" Cst.fmt s
+    Format.fprintf fmt "(%a %a %a)" debug s
       (Sequence.pp_seq Type.fmt) (Sequence.of_list tyargs)
       (Sequence.pp_seq debug) (Sequence.of_list l)
   end;
@@ -582,17 +500,18 @@ let rec debug fmt t =
 (** {2 TPTP} *)
 
 module TPTP = struct
-  let true_ = const Cst.TPTP.true_
-  let false_ = const Cst.TPTP.false_
+  let true_ = const ~ty:Type.TPTP.o Symbol.Base.true_
+  let false_ = const ~ty:Type.TPTP.o Symbol.Base.false_
 
   let _pp_tstp_depth depth buf t =
     let depth = ref depth in
     (* recursive printing *)
     let rec pp_rec buf t = match view t with
     | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-    | App (s, [], []) -> Cst.TPTP.pp buf s
+    | Const s -> Symbol.TPTP.pp buf s
+    | App (s, [], []) -> pp_rec buf s
     | App (s, tyargs, args) ->
-      Printf.bprintf buf "%a(" Cst.TPTP.pp s;
+      Printf.bprintf buf "%a(" pp_rec s;
       Util.pp_list Type.TPTP.pp buf tyargs;
       begin match tyargs, args with
         | _::_, _::_ -> Buffer.add_string buf ", "
@@ -609,43 +528,83 @@ module TPTP = struct
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
 
   module Arith = struct
+    open Type.TPTP
+
+    let x = Type.var 0
+    let y = Type.var 1
+
+    let ty1 = Type.(forall [x] (int <=. x))
+
+    let floor = const ~ty:ty1 Symbol.TPTP.Arith.floor
+    let ceiling = const ~ty:ty1 Symbol.TPTP.Arith.ceiling
+    let truncate = const ~ty:ty1 Symbol.TPTP.Arith.truncate
+    let round = const ~ty:ty1 Symbol.TPTP.Arith.round
+
+    let prec = const ~ty:Type.(int <=. int) Symbol.TPTP.Arith.prec
+    let succ = const ~ty:Type.(int <=. int) Symbol.TPTP.Arith.succ
+
+    let ty2 = Type.(forall [x] (x <== [x;x]))
+    let ty2i = Type.(int <== [int;int])
+
+    let sum = const ~ty:ty2 Symbol.TPTP.Arith.sum
+    let difference = const ~ty:ty2 Symbol.TPTP.Arith.difference
+    let uminus = const ~ty:ty2 Symbol.TPTP.Arith.uminus
+    let product = const ~ty:ty2 Symbol.TPTP.Arith.product
+    let quotient = const ~ty:ty2 Symbol.TPTP.Arith.quotient
+
+    let quotient_e = const ~ty:ty2i Symbol.TPTP.Arith.quotient_e
+    let quotient_t = const ~ty:ty2i Symbol.TPTP.Arith.quotient_t
+    let quotient_f = const ~ty:ty2i Symbol.TPTP.Arith.quotient_f
+    let remainder_e = const ~ty:ty2i Symbol.TPTP.Arith.remainder_e
+    let remainder_t = const ~ty:ty2i Symbol.TPTP.Arith.remainder_t
+    let remainder_f = const ~ty:ty2i Symbol.TPTP.Arith.remainder_f
+
+    let ty2o = Type.(forall [x] (o <== [x;x]))
+
+    let less = const ~ty:ty2o Symbol.TPTP.Arith.less
+    let lesseq = const ~ty:ty2o Symbol.TPTP.Arith.lesseq
+    let greater = const ~ty:ty2o Symbol.TPTP.Arith.greater
+    let greatereq = const ~ty:ty2o Symbol.TPTP.Arith.greatereq
+
     (* hook that prints arithmetic expressions *)
     let arith_hook depth pp_rec buf t =
-      let module CA = Cst.TPTP.Arith in
-      let _eq_sym s cst = Symbol.eq s (Cst.sym cst) in
+      let _eq_sym s cst =  match T.view cst with
+        | T.Const s' -> Symbol.eq s s'
+        | _ -> false
+      in
       let pp_surrounded buf t = match view t with
       | App (s, _, [_;_]) when
-        Cst.eq s CA.sum ||
-        Cst.eq s CA.product ||
-        Cst.eq s CA.difference ||
-        Cst.eq s CA.quotient ->
+        eq s sum ||
+        eq s product ||
+        eq s difference ||
+        eq s quotient ->
         Buffer.add_char buf '(';
         pp_rec buf t;
         Buffer.add_char buf ')'
       | _ -> pp_rec buf t
       in
       match view t with
-      | App (s, _, [a; b]) when Cst.eq s CA.less ->
+      | App (s, _, [a; b]) when eq s less ->
         Printf.bprintf buf "%a < %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.lesseq ->
+      | App (s, _, [a; b]) when eq s lesseq ->
         Printf.bprintf buf "%a ≤ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.greater ->
+      | App (s, _, [a; b]) when eq s greater ->
         Printf.bprintf buf "%a > %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.greatereq ->
+      | App (s, _, [a; b]) when eq s greatereq ->
         Printf.bprintf buf "%a ≥ %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.sum ->
+      | App (s, _, [a; b]) when eq s sum ->
         Printf.bprintf buf "%a + %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.difference ->
+      | App (s, _, [a; b]) when eq s difference ->
         Printf.bprintf buf "%a - %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.product ->
+      | App (s, _, [a; b]) when eq s product ->
         Printf.bprintf buf "%a × %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.quotient ->
+      | App (s, _, [a; b]) when eq s quotient ->
         Printf.bprintf buf "%a / %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a; b]) when Cst.eq s CA.quotient_e ->
+      | App (s, _, [a; b]) when eq s quotient_e ->
         Printf.bprintf buf "%a // %a" pp_surrounded a pp_surrounded b; true
-      | App (s, _, [a]) when Cst.eq s CA.uminus ->
+      | App (s, _, [a]) when eq s uminus ->
         Printf.bprintf buf "-%a" pp_surrounded a; true;
-      | App (s, _, [a;b]) when Cst.eq s CA.remainder_e ->
+      | App (s, _, [a;b]) when eq s remainder_e ->
         Printf.bprintf buf "%a mod %a" pp_surrounded a pp_surrounded b; true;
       | _ -> false  (* default *)
 

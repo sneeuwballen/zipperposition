@@ -55,7 +55,6 @@ module Kind : sig
   (** "kind" of a term, i.e. what is its meaning, in which context is it
       used *)
   type t =
-    | Const
     | Type
     | FOTerm
     | HOTerm
@@ -65,8 +64,16 @@ end
 
 val kind : t -> Kind.t
 
-val ty : t -> t
-  (** Type of the term *)
+type type_result =
+  | NoType
+  | HasType of t
+
+val ty : t -> type_result
+  (** Type of the term, if any *)
+
+val ty_exn : t -> t
+  (** Same as {!ty}, but fails if the term has no type
+      @raise Invalid_argument if the type is [NoType] *)
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
@@ -82,8 +89,8 @@ val record : kind:Kind.t -> ty:t -> (string * t) list -> t
   (** @raise Failure if record is ill-formed *)
 
 val tType : t
-  (** The root of the type system. It's its own type, i.e.
-      [ty tType == tType], and it has kind [`Type] *)
+  (** The root of the type system. It doesn't have a type.
+      It has kind [Kind.Type] *)
 
 val cast : ty:t -> t -> t
   (** Change the type *)

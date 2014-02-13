@@ -70,7 +70,7 @@ module Renaming = struct
       begin try
         H.find tbl (v, s_v)
       with Not_found ->
-        let v' = T.var ~kind:(T.kind v) ~ty:(T.ty v) (H.length tbl) in
+        let v' = T.var ~kind:(T.kind v) ~ty:(T.ty_exn v) (H.length tbl) in
         H.add tbl (v, s_v) v';
         v'
       end
@@ -244,10 +244,12 @@ let fmt fmt subst =
 
 let apply ?(depth=0) subst ~renaming t s_t =
   let rec _apply depth t s_t =
-    if T.ground t then t
-    else
+    match T.ty t with
+    | T.NoType -> t
+    | _ when T.ground t -> t
+    | T.HasType ty ->
       let kind = T.kind t in
-      let ty = _apply depth (T.ty t) s_t in
+      let ty = _apply depth ty s_t in
       match T.view t with
       | T.Const s -> T.const ~kind ~ty s
       | T.BVar i -> T.bvar ~kind ~ty i
@@ -263,7 +265,7 @@ let apply ?(depth=0) subst ~renaming t s_t =
         with Not_found ->
           (* variable not bound by [subst], rename it
               (after specializing its type if needed) *)
-          let t = if T.eq ty (T.ty t) then t else T.var ~kind ~ty i in
+          let t = T.var ~kind ~ty i in
           Renaming.rename renaming t s_t
         end
       | T.Bind (s, sub_t) ->
