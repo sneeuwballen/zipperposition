@@ -88,7 +88,7 @@ let occurs_check subst v sc_v t sc_t =
           with Not_found -> false
           end
       | T.Const _ | T.BVar _ -> false
-      | T.Bind (_, t') -> check v sc_v t' sc_t
+      | T.Bind (_, varty, t') -> check v sc_v varty sc_t || check v sc_v t' sc_t
       | T.Record l -> List.exists (fun (_,t') -> check v sc_v t' sc_t) l
       | T.App (hd, l) ->
         check v sc_v hd sc_t || List.exists (fun t' -> check v sc_v t' sc_t) l
@@ -122,7 +122,8 @@ let unification ?(subst=Substs.empty) a sc_a b sc_b =
       if occurs_check subst t sc_t s sc_s
         then raise Fail (* occur check *)
         else Substs.bind subst t sc_t s sc_s (* bind s *)
-    | T.Bind (s1, t1'), T.Bind (s2, t2') when Symbol.eq s1 s2 ->
+    | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
+      let subst = unif subst varty1 sc_s varty2 sc_t in
       unif subst t1' sc_s t2' sc_t
     | T.BVar i, T.BVar j -> if i = j then subst else raise Fail
     | T.Const f, T.Const g when Symbol.eq f g -> subst
@@ -172,7 +173,8 @@ let matching ?(subst=Substs.empty) ~pattern sc_a b sc_b =
           (* occur check, or [s] is in the same scope
              as [t] and belongs to the variables that need to be preserved *)
         else Substs.bind subst s sc_s t sc_t (* bind s *)
-    | T.Bind (s1, t1'), T.Bind (s2, t2') when Symbol.eq s1 s2 ->
+    | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
+      let subst = unif ~keep subst varty1 sc_s varty2 sc_t in
       unif ~keep subst t1' sc_s t2' sc_t
     | T.BVar i, T.BVar j when i = j -> subst
     | T.Const f, T.Const g when Symbol.eq f g -> subst
@@ -221,7 +223,8 @@ let variant ?(subst=Substs.empty) a sc_a b sc_b =
       raise Fail (* terms are not equal, and ground. failure. *)
     | T.Var i, T.Var j when i <> j && sc_s = sc_t -> raise Fail
     | T.Var _, T.Var _ -> Substs.bind subst s sc_s t sc_t (* bind s *)
-    | T.Bind (s1, t1'), T.Bind (s2, t2') when Symbol.eq s1 s2 ->
+    | T.Bind (s1, varty1, t1'), T.Bind (s2, varty2, t2') when Symbol.eq s1 s2 ->
+      let subst = unif subst varty1 sc_s varty2 sc_t in
       unif subst t1' sc_s t2' sc_t
     | T.BVar i, T.BVar j when i = j -> subst
     | T.Const f, T.Const g when Symbol.eq f g -> subst

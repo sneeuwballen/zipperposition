@@ -38,8 +38,8 @@ type term = t
 
 type view = private
   | Var of int                  (** variable *)
-  | BVar of int             (** bound variable (De Bruijn index) *)
-  | Lambda of t                 (** lambda abstraction over one variable. *)
+  | BVar of int                 (** bound variable (De Bruijn index) *)
+  | Lambda of Type.t * t        (** lambda abstraction over one variable. *)
   | Const of symbol             (** Typed constant *)
   | App of t * Type.t list * t list
     (** HO function application. Invariant: first term is not a {!App}. *)
@@ -49,6 +49,7 @@ type sourced_term =
 
 val view : t -> view
 val ty : t -> Type.t
+val kind : ScopedTerm.Kind.t
 
 val of_term : ScopedTerm.t -> t option
 val of_term_exn : ScopedTerm.t -> t
@@ -201,13 +202,11 @@ the case this amount is 0 (for instance in clauses)
 
 val print_all_types : bool ref
 
-type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
-val add_hook : print_hook -> unit
-
-val pp_depth : ?hooks:print_hook list -> int -> Buffer.t -> t -> unit
-val pp_debug : Buffer.t -> t -> unit
-
 include Interfaces.PRINT with type t := t
+include Interfaces.PRINT_DE_BRUIJN with type t := t
+    and type term := t
+
+val add_hook : print_hook -> unit
 
 (* TODO
 include Interfaces.SERIALIZABLE with type t := t
@@ -217,6 +216,9 @@ include Interfaces.SERIALIZABLE with type t := t
 
 module TPTP : sig
   include Interfaces.PRINT with type t := t
+  include Interfaces.PRINT_DE_BRUIJN with type t := t
+      and type term := t
+      and type print_hook := print_hook
 
   val true_ : t   (** tautology term *)
   val false_ : t  (** antilogy term *)

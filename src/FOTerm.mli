@@ -46,6 +46,8 @@ type sourced_term =
 
 val view : t -> view
 
+val kind : ScopedTerm.Kind.t
+
 (** {2 Comparison, equality, containers} *)
 
 val subterm : sub:t -> t -> bool
@@ -203,18 +205,11 @@ end
 val print_all_types : bool ref
   (** If true, {!pp} will print the types of all annotated terms *)
 
-type print_hook = int -> (Buffer.t -> t -> unit) -> Buffer.t -> t -> bool
-  (** User-provided hook that can be used to print terms (the {!Node} case)
-      before the default printing occurs. The int argument is the De Bruijn
-      depth in the term.
-      A hook takes as arguments the depth and the recursive printing function
-      that it can use to print subterms.
-      A hook should return [true] if it fired, [false] to fall back
-      on the default printing. *)
+include Interfaces.PRINT with type t := t
+include Interfaces.PRINT_DE_BRUIJN with type t := t
+    and type term := t
 
 val add_hook : print_hook -> unit
-
-include Interfaces.PRINT with type t := t
 
 (* TODO
 include Interfaces.SERIALIZABLE with type t := t
@@ -230,6 +225,9 @@ module TPTP : sig
   val false_ : t    (** antilogy term *)
 
   include Interfaces.PRINT with type t := t
+  include Interfaces.PRINT_DE_BRUIJN with type t := t
+    and type term := t
+    and type print_hook := print_hook
 
   module Arith : sig
     val floor : t
@@ -257,6 +255,7 @@ module TPTP : sig
     val lesseq : t
     val greater : t
     val greatereq : t
+
     val arith_hook : print_hook
       (** hook to print arithmetic expressions *)
 

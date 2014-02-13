@@ -268,9 +268,10 @@ let apply ?(depth=0) subst ~renaming t s_t =
           let t = T.var ~kind ~ty i in
           Renaming.rename renaming t s_t
         end
-      | T.Bind (s, sub_t) ->
+      | T.Bind (s, varty, sub_t) ->
+          let varty' = _apply depth varty s_t in
           let sub_t' = _apply (depth+1) sub_t s_t in
-          T.bind ~kind ~ty s sub_t'
+          T.bind ~kind ~varty:varty' ~ty s sub_t'
       | T.App (hd, l) ->
           let hd' = _apply depth hd s_t in
           let l' = _apply_list depth l s_t in

@@ -50,7 +50,9 @@ let view t = match T.kind t with
     begin match T.view t with
     | T.Var i -> Var i
     | T.BVar i -> BVar i
-    | T.Bind (Symbol.Conn Symbol.ForallTy, t') -> Forall t'
+    | T.Bind (Symbol.Conn Symbol.ForallTy, varty, t') ->
+      assert (T.eq varty T.tType);
+      Forall t'
     | T.Const s -> App (s, [])
     | T.App (head, ((t'::l') as l)) ->
       begin match T.view head with
@@ -100,7 +102,7 @@ let forall vars ty =
   T.bind_vars ~kind ~ty:tType Symbol.Base.forall_ty vars ty
 
 let __forall ty =
-  T.bind ~kind ~ty:tType Symbol.Base.forall_ty ty
+  T.bind ~kind ~ty:tType ~varty:tType Symbol.Base.forall_ty ty
 
 let (<==) = mk_fun
 let (<=.) ret a = mk_fun ret [a]

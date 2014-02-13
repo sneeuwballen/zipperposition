@@ -43,7 +43,7 @@ type term = t
 type view = private
   | Var of int
   | BVar of int
-  | Bind of symbol * t
+  | Bind of symbol * t * t (** Type, sub-term *)
   | Const of symbol
   | Record of (string * t) list
   | App of t * t list
@@ -58,7 +58,7 @@ module Kind : sig
     | Type
     | FOTerm
     | HOTerm
-    | FOFormula
+    | Formula of t
     | Generic  (* other terms *)
 end
 
@@ -82,7 +82,7 @@ include Interfaces.ORD with type t := t
 
 val const : kind:Kind.t -> ty:t -> symbol -> t
 val app : kind:Kind.t -> ty:t -> t -> t list -> t
-val bind : kind:Kind.t -> ty:t -> symbol -> t -> t
+val bind : kind:Kind.t -> ty:t -> varty:t -> symbol -> t -> t
 val var : kind:Kind.t -> ty:t -> int -> t
 val bvar : kind:Kind.t -> ty:t -> int -> t
 val record : kind:Kind.t -> ty:t -> (string * t) list -> t

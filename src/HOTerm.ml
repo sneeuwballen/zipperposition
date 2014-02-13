@@ -39,8 +39,8 @@ type term = t
 
 type view =
   | Var of int                  (** variable *)
-  | BVar of int             (** bound variable (De Bruijn index) *)
-  | Lambda of t                 (** lambda abstraction over one variable. *)
+  | BVar of int                 (** bound variable (De Bruijn index) *)
+  | Lambda of Type.t * t        (** lambda abstraction over one variable. *)
   | Const of symbol             (** Typed constant *)
   | App of t * Type.t list * t list
     (** HO function application. Invariant: first term is not a {!App}. *)
@@ -63,12 +63,15 @@ let rec _split_types l = match l with
 let view t = match T.view t with
   | T.Var i -> Var i
   | T.BVar i -> BVar i
-  | T.Bind (Symbol.Conn Symbol.Lambda, t') -> Lambda t'
+  | T.Bind (Symbol.Conn Symbol.Lambda, varty, t') ->
+    Lambda (Type.of_term_exn varty, t')
   | T.Const s -> Const s
   | T.App (hd, l) ->
       let tyargs, args = _split_types l in
       App (hd, tyargs, args)
   | _ -> assert false
+
+let kind = T.Kind.HOTerm
 
 let is_term t = match T.kind t with T.Kind.HOTerm -> true | _ -> false
 let of_term t =
@@ -141,12 +144,8 @@ module Cache = Cache.Replacing(TermHASH)
 let cast ~ty t = T.cast ~ty:(ty : Type.t :> T.t) t
 
 let lambda_var_ty t = match T.view t with
-  | T.Bind (Symbol.Conn Symbol.Lambda, _) ->
-      let ty = Type.of_term_exn (T.ty_exn t) in
-      begin match Type.view ty with
-      | Type.Fun (_, arg::_) -> arg
-      | _ -> raise (Invalid_argument "lambda_var_ty: expected function type")
-      end
+  | T.Bind (Symbol.Conn Symbol.Lambda, varty, _) ->
+      Type.of_term_exn varty
   | _ -> raise (Invalid_argument "lambda_var_ty: expected lambda term")
 
 (** {2 Smart constructors} *)
@@ -155,10 +154,10 @@ let lambda_var_ty t = match T.view t with
     hashconsing, and precompute some properties (flags) *)
 
 let var ~(ty:Type.t) i =
-  T.var ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) i
+  T.var ~kind ~ty:(ty :> T.t) i
 
 let bvar ~(ty:Type.t) i =
-  T.bvar ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) i
+  T.bvar ~kind ~ty:(ty :> T.t) i
 
 (* compute type of s(tyargs  *)
 let _compute_ty ty_fun tyargs l =
@@ -169,24 +168,24 @@ let app ?(tyargs=[]) hd args =
   (* first; compute type *)
   let ty = _compute_ty (ty hd) tyargs args in
   (* apply constant to type args and args *)
-  let res = T.app ~kind:T.Kind.HOTerm ~ty:(ty:>T.t) hd
+  let res = T.app ~kind ~ty:(ty:>T.t) hd
     ((tyargs : Type.t list :> t list) @ args) in
   res
 
 let const ?(tyargs=[]) ~(ty:Type.t) symbol =
-  let c = T.const ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) symbol in
+  let c = T.const ~kind ~ty:(ty :> T.t) symbol in
   match tyargs with
   | [] -> c
   | _::_ -> app ~tyargs c []
 
 let __mk_lambda ~varty t' =
   let ty = Type.mk_fun (ty t') [varty] in
-  T.bind ~kind:T.Kind.HOTerm ~ty:(ty :> T.t) Symbol.Base.lambda t'
+  T.bind ~kind ~ty:(ty :> T.t) ~varty:(varty:Type.t:>T.t) Symbol.Base.lambda t'
 
 let mk_lambda vars t =
   List.fold_right
     (fun v t ->
-      let t' = T.DB.replace t ~sub:v in
+      let t' = T.DB.replace (T.DB.shift 1 t) ~sub:v in
       __mk_lambda ~varty:(ty v) t')
     vars t
 
@@ -229,7 +228,7 @@ let rec size t = match T.view t with
   | T.Var _
   | T.BVar _ -> 1
   | T.Const _ -> 1
-  | T.Bind (_, t') -> 1+ size t'
+  | T.Bind (_, _, t') -> 1+ size t'
   | T.Record l -> List.fold_left (fun acc (_,t') -> acc+size t') 0 l
   | T.App (f, l) -> List.fold_left (fun s t' -> s + size t') (1+size f) l
 
@@ -335,8 +334,7 @@ let pp_depth ?(hooks=[]) depth buf t =
   (* recursive printing *)
   let rec pp_rec buf t = match view t with
   | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-  | Lambda t' ->
-    let varty = lambda_var_ty t in
+  | Lambda (varty,t') ->
     Printf.bprintf buf "λ%a:%a. " pp_bvar () Type.pp varty;
     incr depth;
     pp_surrounded buf t';
@@ -384,8 +382,7 @@ let rec debug fmt t = match view t with
   | Var i ->
     Format.fprintf fmt "X%d:%a" i Type.fmt (ty t)
   | BVar i -> Format.fprintf fmt "Y%d" i
-  | Lambda t' ->
-    let varty = lambda_var_ty t in
+  | Lambda (varty,t') ->
     Format.fprintf fmt "(lambda %a %a)" Type.fmt varty debug t'
   | Const s -> Symbol.fmt fmt s
   | App (t, tyargs, l) ->
@@ -482,13 +479,12 @@ module TPTP = struct
     let vars = vars (Sequence.singleton t) |> Set.elements in
     mk_exists vars t
 
-  let pp_tstp_depth depth buf t =
+  let pp_depth ?(hooks=[]) depth buf t =
     let depth = ref depth in
     (* recursive printing *)
     let rec pp_rec buf t = match view t with
     | BVar i -> Printf.bprintf buf "Y%d" (!depth - i - 1)
-    | Lambda t' ->
-      let varty = lambda_var_ty t in
+    | Lambda (varty,t') ->
       Printf.bprintf buf "^[%a:%a]: " pp_bvar () Type.pp varty;
       incr depth;
       pp_surrounded buf t';
@@ -517,7 +513,7 @@ module TPTP = struct
     and pp_bvar buf () =  Printf.bprintf buf "Y%d" !depth in
     pp_rec buf t
 
-  let pp buf t = pp_tstp_depth 0 buf t
+  let pp buf t = pp_depth 0 buf t
 
   let to_string = Util.on_buffer pp
 

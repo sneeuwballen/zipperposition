@@ -48,6 +48,8 @@ type view =
   | Const of Symbol.t         (** Typed constant *)
   | App of t * Type.t list * t list   (** Application to a list of types and term *)
 
+let kind = T.Kind.FOTerm
+
 (* split list between types, terms *)
 let rec _split_types l = match l with
   | [] -> [], []
@@ -142,8 +144,6 @@ let cast ~(ty:Type.t) t =
     hashconsing, and precompute some properties (flags).
 
     TODO: flag_monomorphic *)
-
-let kind = T.Kind.FOTerm
 
 let var ~(ty:Type.t) i =
   assert (i >= 0);
@@ -503,7 +503,7 @@ module TPTP = struct
   let true_ = const ~ty:Type.TPTP.o Symbol.Base.true_
   let false_ = const ~ty:Type.TPTP.o Symbol.Base.false_
 
-  let _pp_tstp_depth depth buf t =
+  let pp_depth ?(hooks=[]) depth buf t =
     let depth = ref depth in
     (* recursive printing *)
     let rec pp_rec buf t = match view t with
@@ -523,7 +523,7 @@ module TPTP = struct
     in
     pp_rec buf t
 
-  let pp buf t = _pp_tstp_depth 0 buf t
+  let pp buf t = pp_depth 0 buf t
   let to_string = Util.on_buffer pp
   let fmt fmt t = Format.pp_print_string fmt (to_string t)
 

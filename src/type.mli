@@ -65,6 +65,8 @@ val view : t -> view
   (** Type-centric view of the head of this type.
       @raise Invalid_argument if the argument is not a type. *)
 
+val kind : ScopedTerm.Kind.t
+
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
