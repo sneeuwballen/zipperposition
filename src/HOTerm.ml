@@ -228,6 +228,7 @@ let rec size t = match T.view t with
   | T.BVar _ -> 1
   | T.Const _ -> 1
   | T.Bind (_, t') -> 1+ size t'
+  | T.Record l -> List.fold_left (fun acc (_,t') -> acc+size t') 0 l
   | T.App (f, l) -> List.fold_left (fun s t' -> s + size t') (1+size f) l
 
 let is_ground t = Seq.vars t |> Sequence.is_empty
@@ -259,6 +260,7 @@ let rec head t = match T.view t with
   | T.App (t, _) -> head t
   | T.BVar _
   | T.Bind _ -> raise (Invalid_argument "Term.head: lambda")
+  | T.Record _ -> raise (Invalid_argument "Term.head: record")
   | T.Var _ -> raise (Invalid_argument "Term.head: variable")
 
 module AC = struct

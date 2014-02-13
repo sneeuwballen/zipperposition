@@ -273,6 +273,9 @@ let apply ?(depth=0) subst ~renaming t s_t =
           let hd' = _apply depth hd s_t in
           let l' = _apply_list depth l s_t in
           T.app ~kind ~ty hd' l'
+      | T.Record l ->
+          let l' = List.map (fun (s,t') -> s, _apply depth t' s_t) l in
+          T.record ~kind ~ty l'
   and _apply_list depth l s_l = match l with
     | [] -> []
     | t::l' -> _apply depth t s_l :: _apply_list depth l' s_l

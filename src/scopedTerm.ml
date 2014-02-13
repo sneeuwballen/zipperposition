@@ -54,6 +54,7 @@ and view =
   | BVar of int
   | Bind of Sym.t * t
   | Const of Sym.t
+  | Record of (string * t) list
   | App of t * t list
 
 type term = t
@@ -74,6 +75,8 @@ let _hash_norec t =
   | BVar i -> Hash.combine 11 i
   | Bind (s, t') -> Hash.combine (Sym.hash s) (hash t')
   | Const s -> Sym.hash s
+  | Record l ->
+    Hash.hash_list (fun (s,t') -> Hash.combine (Hash.hash_string s) (hash t')) 17 l
   | App (f, l) ->
     Hash.hash_list hash (hash f) l
   in
@@ -153,6 +156,25 @@ let bvar ~kind ~ty i =
 let bind ~kind ~ty s t' =
   H.hashcons {term=Bind (s,t'); kind; id= ~-1; ty; flags=0; }
 
+(* if any string of [l] appears in [seen], fail *)
+let rec __check_duplicates seen l = match l with
+  | [] -> ()
+  | (s,_) :: l' ->
+      if List.mem s seen
+      then failwith ("ill-formed record: field " ^ s ^ " appears twice")
+      else __check_duplicates (s::seen) l'
+
+let record ~kind ~ty l =
+  __check_duplicates [] l;
+  let l = List.sort (fun (s1,_) (s2,_) -> String.compare s1 s2) l in
+  let my_t = {term=Record l; kind; ty; id= ~-1; flags=0; } in
+  let t = H.hashcons my_t in
+  if t == my_t then begin
+        if ground ty && List.for_all (fun (_,t) -> ground t) l
+          then set_flag t flag_ground true;
+  end;
+  t
+
 let rec tType =
   let rec _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Type;
                 id= ~-1; ty=_t; flags=flag_ground; } in
@@ -218,6 +240,7 @@ module DB = struct
       | Bind(_, t') -> closed (depth+1) t'
       | Const _
       | Var _ -> true
+      | Record l -> List.for_all (fun (_,t') -> closed depth t') l
       | App (f, l) -> closed depth f && List.for_all (closed depth) l
     in
     closed depth t
@@ -230,6 +253,7 @@ module DB = struct
     | Const _
     | Var _ -> false
     | Bind (_, t') -> contains t' (n+1)
+    | Record l -> List.exists (fun (_,t') -> contains t' n) l
     | App (f, l) ->
       contains f n || List.exists (fun t' -> contains t' n) l
 
@@ -256,6 +280,9 @@ module DB = struct
         | Bind (s, t') ->
           let t' = recurse (depth+1) t' in
           bind ~kind:t.kind ~ty s t'
+        | Record l ->
+          record ~kind:t.kind ~ty
+            (List.map (fun (s,t') -> s, recurse depth t') l)
         | App (f, l) ->
           app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
     in
@@ -286,6 +313,9 @@ module DB = struct
         | Bind (s, t') ->
           let t' = recurse (depth+1) t' in
           bind ~kind:t.kind ~ty s t'
+        | Record l ->
+          record ~kind:t.kind ~ty
+            (List.map (fun (s,t') -> s, recurse depth t') l)
         | App (f, l) ->
           app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
     in
@@ -308,6 +338,9 @@ module DB = struct
         | Bind (s, t') ->
           let t' = recurse (depth+1) t' in
           bind ~kind:t.kind ~ty s t'
+        | Record l ->
+          record ~kind:t.kind ~ty
+            (List.map (fun (s,t') -> s, recurse depth t') l)
         | App (f, l) ->
           app ~kind:t.kind ~ty (recurse depth f) (List.map (recurse depth) l)
     in
@@ -339,6 +372,9 @@ module DB = struct
         | Bind (s, t') ->
           let t' = eval (DBEnv.push_none env) t' in
           bind ~kind:t.kind ~ty s t'
+        | Record l ->
+          record ~kind:t.kind ~ty
+            (List.map (fun (s,t') -> s, eval env t') l)
         | App (f, l) ->
           app ~kind:t.kind ~ty (eval env f) (List.map (eval env) l)
     in
@@ -362,6 +398,7 @@ module Seq = struct
     | BVar _
     | Const _ -> ()
     | App (head, l) -> vars head k; _vars_list l k
+    | Record l -> List.iter (fun (s,t') -> vars t' k) l
     | Bind (_, t') -> vars t' k
   and _vars_list l k = match l with
     | [] -> ()
@@ -374,6 +411,7 @@ module Seq = struct
     | BVar _
     | Const _ -> ()
     | Bind (_, t') -> subterms t' k
+    | Record l -> List.iter (fun (s,t') -> subterms t' k) l
     | App(_, l) -> List.iter (fun t' -> subterms t' k) l
 
   let subterms_depth t k =
@@ -383,6 +421,7 @@ module Seq = struct
       | App (_,l) ->
         let depth' = depth + 1 in
         List.iter (fun t' -> recurse depth' t') l
+      | Record l -> List.iter (fun (s,t') -> recurse depth t') l
       | Bind (_, t') -> recurse (depth+1) t'
       | _ -> ()
     in
@@ -392,6 +431,7 @@ module Seq = struct
     | Var _ | BVar _ -> ()
     | Const s -> k s
     | App (head, l) -> symbols head k; _symbols_list l k
+    | Record l -> List.iter (fun (s,t') -> symbols t' k) l
     | Bind (s, t') -> k s; symbols t' k
   and _symbols_list l k = match l with
     | [] -> ()
@@ -402,6 +442,7 @@ module Seq = struct
     match view t with
     | Var _ | BVar _ | Const _ -> ()
     | App (head, l) -> types head k; List.iter (fun t' -> types t' k) l
+    | Record l -> List.iter (fun (s,t') -> types t' k) l
     | Bind (_, t') -> types t' k
 
   let max_var seq =
@@ -452,6 +493,9 @@ let rec replace t ~old ~by = match view t with
   | Var _ | BVar _ | Const _ -> t
   | Bind (s, t') ->
     bind ~kind:t.kind ~ty:t.ty s (replace t' ~old ~by)
+  | Record l ->
+    record ~kind:t.kind ~ty:t.ty
+      (List.map (fun (s,t') -> s, replace t' ~old ~by) l)
   | App (f, l) ->
     let f' = replace f ~old ~by in
     let l' = List.map (fun t' -> replace t' ~old ~by) l in
@@ -470,6 +514,7 @@ let rec size t = match view t with
   | Var _
   | BVar _ -> 1
   | Bind (_, t') -> 1 + size t'
+  | Record l -> List.fold_left (fun acc (_,t') -> acc + size t') 1 l
   | App (head, l) -> _size_list (1 + size head) l
 and _size_list acc l = match l with
   | [] -> acc
@@ -480,13 +525,14 @@ let rec depth t = match view t with
   | Var _
   | BVar _ -> 1
   | Bind (_, t') -> 1 + depth t'
+  | Record l -> 1 + List.fold_left (fun acc (_,t') -> max acc (depth t')) 0 l
   | App (head, l) -> 1 + _depth_list (depth head) l
 and _depth_list acc l = match l with
   | [] -> acc
   | t::l' -> _depth_list (max acc (depth t)) l'
 
 let rec head t = match view t with
-  | BVar _ | Var _ -> None
+  | BVar _ | Var _ | Record _ -> None
   | Const s
   | Bind (s, _) -> Some s
   | App (h, _) -> head h
@@ -501,6 +547,13 @@ let rec _all_pos_rec f vars acc pb t = match view t with
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     let acc = _all_pos_rec f vars acc (PB.add pb 0) hd in
     _all_pos_rec_list f vars acc pb tl 1
+  | Record l ->
+    let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
+    let _, acc = List.fold_left
+      (fun (i,acc) (_, t') ->
+        i+1, _all_pos_rec f vars acc (PB.add pb i) t')
+      (0, acc) l
+    in acc
   | Bind (_, t') ->
     let acc = f acc t (PB.to_pos pb) in  (* apply to term itself *)
     _all_pos_rec f vars acc (PB.add pb 0) t'
@@ -522,6 +575,17 @@ let rec pp_depth depth buf t =
   | Const s -> Sym.pp buf s
   | Bind (s, t') ->
     Printf.bprintf buf "%a Y%d. %a" Sym.pp s depth (_pp_surrounded (depth+1)) t'
+  | Record [] ->
+    Buffer.add_string buf "{}"
+  | Record l ->
+    Buffer.add_char buf '{';
+    List.iteri
+      (fun i (s, t') ->
+        if i>0 then Buffer.add_string buf ", ";
+        Printf.bprintf buf "%s: " s;
+        pp_depth depth buf t')
+      l;
+    Buffer.add_char buf '}'
   | App (f, l) ->
     assert (l <> []);
     _pp_surrounded depth buf f;

@@ -45,6 +45,7 @@ type view = private
   | BVar of int
   | Bind of symbol * t
   | Const of symbol
+  | Record of (string * t) list
   | App of t * t list
 
 val view : t -> view
@@ -77,6 +78,8 @@ val app : kind:Kind.t -> ty:t -> t -> t list -> t
 val bind : kind:Kind.t -> ty:t -> symbol -> t -> t
 val var : kind:Kind.t -> ty:t -> int -> t
 val bvar : kind:Kind.t -> ty:t -> int -> t
+val record : kind:Kind.t -> ty:t -> (string * t) list -> t
+  (** @raise Failure if record is ill-formed *)
 
 val tType : t
   (** The root of the type system. It's its own type, i.e.
