@@ -454,7 +454,7 @@ let rec pp_depth ?(hooks=[]) depth buf t =
         | [], [] -> pp_rec buf s
         | _ ->
           Printf.bprintf buf "%a(" pp_rec s;
-          Util.pp_list Type.TPTP.pp buf tyargs;
+          Util.pp_list Type.pp buf tyargs;
           begin match tyargs, args with
           | _::_, _::_ -> Buffer.add_string buf ", "
           | _ -> ()
@@ -462,7 +462,7 @@ let rec pp_depth ?(hooks=[]) depth buf t =
           Util.pp_list pp_rec buf args;
           Buffer.add_string buf ")";
         end
-    | Const s -> Symbol.TPTP.pp buf s
+    | Const s -> Symbol.pp buf s
     | Var i ->
       if not !print_all_types
         then Printf.bprintf buf "X%d:%a" i Type.pp (ty t)

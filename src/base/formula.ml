@@ -356,7 +356,21 @@ module Make(MyT : TERM) = struct
     let imply f1 f2 = T.app ~kind ~ty __imply [f1; f2]
     let equiv f1 f2 = T.app ~kind ~ty __equiv [f1; f2]
     let xor f1 f2 = T.app ~kind ~ty __xor [f1; f2]
-    let eq t1 t2 = T.app ~kind ~ty __eq ([t1; t2] : term list :> T.t list)
+
+    let __check_same t1 t2 =
+      let ty1 = MyT.ty t1 and ty2 = MyT.ty t2 in
+      if not (Type.eq ty1 ty2)
+        then
+          let msg = Util.sprintf
+            "Formula.Base.eq: expect same types for %a and %a, got %a and %a"
+            (MyT.pp_depth 0) t1 Type.pp ty1 (MyT.pp_depth 0) t2 Type.pp ty2
+          in
+          raise (Type.Error msg)
+
+    let eq t1 t2 =
+      __check_same t1 t2;
+      T.app ~kind ~ty __eq ([t1; t2] : term list :> T.t list)
+
     let neq t1 t2 = T.app ~kind ~ty __neq ([t1; t2] : term list :> T.t list)
 
     let and_ = function

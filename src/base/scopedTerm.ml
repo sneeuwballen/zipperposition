@@ -35,6 +35,8 @@ module Kind = struct
     | Type
     | FOTerm
     | HOTerm
+    | BasicFOTerm
+    | BasicHOTerm
     | Formula of t
     | Generic  (* other terms *)
 end

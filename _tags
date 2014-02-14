@@ -168,4 +168,4 @@
 <tools/*.ml{,i}>: package(zarith)
 # OASIS_STOP
 true: use_menhir
-<src/**/*.cmx>: inline(10)
+#<src/**/*.cmx>: inline(10)

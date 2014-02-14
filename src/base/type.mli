@@ -102,6 +102,9 @@ val forall : t list -> t -> t
 val __forall : t -> t
   (** not documented. *)
 
+val __bvar : int -> t
+  (** not documented. *)
+
 val (@@) : symbol -> t list -> t
   (** [s @@ args] applies the sort [s] to arguments [args]. *)
 

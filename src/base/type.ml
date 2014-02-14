@@ -101,6 +101,9 @@ let rec mk_fun ret args =
 let forall vars ty =
   T.bind_vars ~kind ~ty:tType Symbol.Base.forall_ty vars ty
 
+let __bvar i =
+  T.bvar ~kind ~ty:tType i
+
 let __forall ty =
   T.bind ~kind ~ty:tType ~varty:tType Symbol.Base.forall_ty ty
 
