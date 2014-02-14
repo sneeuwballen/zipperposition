@@ -1,0 +1,10 @@
+# OASIS_START
+# DO NOT EDIT (digest: adc6520c7f80062cb8bf8ae152c10dcc)
+Parse_tptp
+Lex_tptp
+Ast_tptp
+Util_tptp
+Location
+Trace_tstp
+CallProver
+# OASIS_STOP

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 140929b2575da2eb0e3620414a2a4dde)
+# DO NOT EDIT (digest: 947424027f5289a0c5f95b2fb3a4eecd)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -31,6 +31,7 @@
 "src/base/substs.cmx": for-pack(Logtk)
 "src/base/unif.cmx": for-pack(Logtk)
 "src/base/signature.cmx": for-pack(Logtk)
+"src/base/basicTerm.cmx": for-pack(Logtk)
 "src/base/lib/sequence.cmx": for-pack(Logtk)
 "src/base/lib/cache.cmx": for-pack(Logtk)
 "src/base/lib/bij.cmx": for-pack(Logtk)
@@ -43,6 +44,25 @@
 <src/base/lib/*.ml{,i}>: package(zarith)
 # Library logtk_extended
 "src/extended/logtk_extended.cmxs": use_logtk_extended
+"src/extended/lambda.cmx": for-pack(Logtk_extended)
+"src/extended/index.cmx": for-pack(Logtk_extended)
+"src/extended/dtree.cmx": for-pack(Logtk_extended)
+"src/extended/fingerprint.cmx": for-pack(Logtk_extended)
+"src/extended/rewriting.cmx": for-pack(Logtk_extended)
+"src/extended/featureVector.cmx": for-pack(Logtk_extended)
+"src/extended/formulaShape.cmx": for-pack(Logtk_extended)
+"src/extended/skolem.cmx": for-pack(Logtk_extended)
+"src/extended/cnf.cmx": for-pack(Logtk_extended)
+"src/extended/transform.cmx": for-pack(Logtk_extended)
+"src/extended/NPDtree.cmx": for-pack(Logtk_extended)
+"src/extended/congruence.cmx": for-pack(Logtk_extended)
+"src/extended/options.cmx": for-pack(Logtk_extended)
+"src/extended/fastFingerprint.cmx": for-pack(Logtk_extended)
+"src/extended/evaluator.cmx": for-pack(Logtk_extended)
+"src/extended/typeErasure.cmx": for-pack(Logtk_extended)
+"src/extended/lib/multiMap.cmx": for-pack(Logtk_extended)
+"src/extended/lib/BV.cmx": for-pack(Logtk_extended)
+"src/extended/lib/mixtbl.cmx": for-pack(Logtk_extended)
 <src/extended/*.ml{,i}>: use_logtk
 <src/extended/*.ml{,i}>: package(unix)
 <src/extended/*.ml{,i}>: package(zarith)
@@ -57,6 +77,7 @@
 "src/parsers/util_tptp.cmx": for-pack(Logtk_parsers)
 "src/parsers/location.cmx": for-pack(Logtk_parsers)
 "src/parsers/trace_tstp.cmx": for-pack(Logtk_parsers)
+"src/parsers/callProver.cmx": for-pack(Logtk_parsers)
 <src/parsers/*.ml{,i}>: use_logtk
 <src/parsers/*.ml{,i}>: package(str)
 <src/parsers/*.ml{,i}>: package(unix)

@@ -5,6 +5,9 @@
 #require "datalog";;
 #require "str";;
 #directory "_build/src/";;
+#directory "_build/src/base";;
+#directory "_build/src/extended";;
+#directory "_build/src/parsers";;
 #directory "_build/src/meta/";;
 #directory "_build/src/arbitrary/";;
 #directory "_build/tests/";;
