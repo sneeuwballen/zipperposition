@@ -28,7 +28,11 @@ Flag "bench"
   Default:      false
 
 Flag "extended"
-  Description:  Extended library
+  Description:  Build and install the Extended library
+  Default:      false
+
+Flag "parsers"
+  Description:  Build and install parsers (requires menhir)
   Default:      false
 
 Flag "qcheck"
@@ -36,37 +40,49 @@ Flag "qcheck"
   Default:      false
 
 Library "logtk"
-  Path:             src/
+  Path:             src/base/
   Pack:             true
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
-                    Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm,
-                    Substs, Unif, Formula,
+                    Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm, Formula,
+                    Substs, Unif, Signature,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
-                    lib/PersistentHashtbl
-  BuildDepends:     zarith,unix,str
-  XMETARequires:    zarith,unix,str
+                    lib/PersistentHashtbl, lib/Monad
+                    #TypeInference,
+                    #Comparison, PartialOrder, Precedence, Ordering,
+                    #Multiset, Cnf,
+  BuildDepends:     zarith,unix
+  XMETARequires:    zarith,unix
 
 Library "logtk_extended"
-  Path:             src/
+  Path:             src/extended
   Pack:             true
   FindlibName:      extended
   FindlibParent:    logtk
   Build$:           flag(extended)
   Install$:         flag(extended)
-  Modules:          HO, FO, Symbol, Hash, Hashcons, FOTerm, HOTerm, FOFormula,
-                    Util, Type, Substs, Signature, TypeInference, 
-                    Lex_tptp, Ast_tptp, Parse_tptp, Lambda, Multiset,
-                    ScopedTerm,
-                    Comparison, PartialOrder, Precedence, Ordering, Position,
-                    Cnf, Index, Dtree, Fingerprint, Rewriting, FeatureVector,
-                    FormulaShape, Util_tptp, Skolem, Transform, NPDtree,
+  Modules:          Signature, TypeInference, 
+                    Lambda, 
+                    Index, Dtree, Fingerprint, Rewriting, FeatureVector,
+                    FormulaShape, Skolem, Transform, NPDtree,
                     Trace_tstp, CallProver, Congruence, Options,
-                    Basic, Monad, FastFingerprint, Evaluator, Location,
-                    TypeConversion, TypeErasure, DBEnv, Interfaces,
+                    Basic, FastFingerprint, Evaluator,
+                    TypeConversion, TypeErasure,
                     lib/Sequence, lib/Bij, lib/Cache, lib/MultiMap,
                     lib/Bencode, lib/BV, lib/PersistentHashtbl, lib/Mixtbl
-  BuildDepends:     unix,str,zarith
-  XMETARequires:    logtk,zarith
+  BuildDepends:     logtk,unix,zarith
+  XMETARequires:    logtk,unix,zarith
+
+Library "logtk_parsers"
+  Path:             src/parsers
+  Pack:             true
+  Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp, Location,
+                    Trace_tstp, CallProver
+  Build$:           flag(parsers)
+  Install$:         flag(parsers)
+  FindlibName:      parsers
+  FindlibParent:    logtk
+  BuildDepends:     logtk,str
+  XMETARequires:    logtk,str,menhir
 
 Library "logtk_meta"
   Path:             src/meta/

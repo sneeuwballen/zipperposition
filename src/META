@@ -1,48 +1,12 @@
 # OASIS_START
-# DO NOT EDIT (digest: 72a36419d345c2f883c65c99a6cf06be)
+# DO NOT EDIT (digest: 04f82eb38913b534a838d705f577566d)
 version = "0.1"
 description =
 "Logic toolkit, designed primarily for first-order automated reasoning."
-requires = "zarith unix str"
-archive(byte) = "logtk.cma"
-archive(byte, plugin) = "logtk.cma"
-archive(native) = "logtk.cmxa"
-archive(native, plugin) = "logtk.cmxs"
-exists_if = "logtk.cma"
-package "meta" (
- version = "0.1"
- description =
- "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "logtk datalog"
- archive(byte) = "logtk_meta.cma"
- archive(byte, plugin) = "logtk_meta.cma"
- archive(native) = "logtk_meta.cmxa"
- archive(native, plugin) = "logtk_meta.cmxs"
- exists_if = "logtk_meta.cma"
-)
-
-package "extended" (
- version = "0.1"
- description =
- "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "logtk zarith"
- archive(byte) = "logtk_extended.cma"
- archive(byte, plugin) = "logtk_extended.cma"
- archive(native) = "logtk_extended.cmxa"
- archive(native, plugin) = "logtk_extended.cmxs"
- exists_if = "logtk_extended.cma"
-)
-
-package "arbitrary" (
- version = "0.1"
- description =
- "Logic toolkit, designed primarily for first-order automated reasoning."
- requires = "logtk logtk.meta datalog qcheck"
- archive(byte) = "logtk_arbitrary.cma"
- archive(byte, plugin) = "logtk_arbitrary.cma"
- archive(native) = "logtk_arbitrary.cmxa"
- archive(native, plugin) = "logtk_arbitrary.cmxs"
- exists_if = "logtk_arbitrary.cma"
-)
+archive(byte) = "logtk_parser.cma"
+archive(byte, plugin) = "logtk_parser.cma"
+archive(native) = "logtk_parser.cmxa"
+archive(native, plugin) = "logtk_parser.cmxs"
+exists_if = "logtk_parser.cma"
 # OASIS_STOP
 

@@ -1,0 +1,25 @@
+# OASIS_START
+# DO NOT EDIT (digest: cc584ca5d44ed54ae3d17bd8b9f3c380)
+Symbol
+ScopedTerm
+FOTerm
+Type
+Util
+PrologTerm
+Hash
+Interfaces
+DBEnv
+Position
+Hashcons
+HOTerm
+Formula
+Substs
+Unif
+Signature
+lib/Sequence
+lib/Cache
+lib/Bij
+lib/Bencode
+lib/PersistentHashtbl
+lib/Monad
+# OASIS_STOP

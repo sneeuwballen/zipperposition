@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: ebf99911ccdc465c3c32185a859f85cb) *)
+(* DO NOT EDIT (digest: ed6d7f2cabf50a943754ca8081d78c29) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -557,8 +557,9 @@ let package_default =
   {
      MyOCamlbuildBase.lib_ocaml =
        [
-          ("logtk", ["src"; "src/lib"], []);
-          ("logtk_extended", ["src"; "src/lib"], []);
+          ("logtk", ["src/base"; "src/base/lib"], []);
+          ("logtk_extended", ["src/extended"; "src/extended/lib"], []);
+          ("logtk_parsers", ["src/parsers"], []);
           ("logtk_meta", ["src/meta"], []);
           ("logtk_arbitrary", ["src/arbitrary"], [])
        ];
@@ -566,18 +567,36 @@ let package_default =
      flags = [];
      includes =
        [
-          ("tools", ["src"; "src/lib"; "src/meta"]);
-          ("tests", ["src"; "src/arbitrary"; "src/lib"; "src/meta"]);
-          ("src/meta", ["src"; "src/lib"]);
-          ("src/lib", ["src"]);
-          ("src/arbitrary", ["src"; "src/lib"; "src/meta"]);
-          ("src", ["src/lib"])
+          ("tools",
+            [
+               "src/base";
+               "src/base/lib";
+               "src/extended";
+               "src/extended/lib";
+               "src/meta"
+            ]);
+          ("tests",
+            [
+               "src/arbitrary";
+               "src/base";
+               "src/base/lib";
+               "src/extended";
+               "src/extended/lib";
+               "src/meta"
+            ]);
+          ("src/parsers", ["src/base"; "src/base/lib"]);
+          ("src/meta", ["src/base"; "src/base/lib"]);
+          ("src/extended/lib", ["src/base"; "src/base/lib"; "src/extended"]);
+          ("src/extended", ["src/base"; "src/base/lib"; "src/extended/lib"]);
+          ("src/base/lib", ["src/base"]);
+          ("src/base", ["src/base/lib"]);
+          ("src/arbitrary", ["src/base"; "src/base/lib"; "src/meta"])
        ]
   }
   ;;
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default package_default;;
 
-# 582 "myocamlbuild.ml"
+# 601 "myocamlbuild.ml"
 (* OASIS_STOP *)
 Ocamlbuild_plugin.dispatch dispatch_default;;
