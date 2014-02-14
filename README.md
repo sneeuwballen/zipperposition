@@ -54,7 +54,7 @@ Logtk provides several useful parts for logic-related implementations:
 
 - Logic related modules:
     - `Symbol`: representation of logical constants, including text symbols
-        and numeric symbols
+        and numeric symbols (using `Zarith`).
     - `FOTerm`: first-order typed terms
     - `HOTerm`: higher-order typed terms
     - `FOFormula`: first-order formulas (with typed terms)

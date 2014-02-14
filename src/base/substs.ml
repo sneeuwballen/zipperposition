@@ -245,7 +245,9 @@ let fmt fmt subst =
 let apply ?(depth=0) subst ~renaming t s_t =
   let rec _apply depth t s_t =
     match T.ty t with
-    | T.NoType -> t
+    | T.NoType ->
+      assert(T.ground t);
+      t
     | _ when T.ground t -> t
     | T.HasType ty ->
       let kind = T.kind t in

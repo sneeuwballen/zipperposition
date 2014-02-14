@@ -25,38 +25,30 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Signature} *)
 
-module SMap : Sequence.Map.S with type key = string
+module SMap : module type of Symbol.Map
 
-type t = private Symbol.t SMap.t
+type t = private Type.t SMap.t
   (** A signature maps symbols to types *)
 
 val empty : t
   (** Empty signature *)
 
-val mem : t -> string -> bool
+val mem : t -> Symbol.t -> bool
   (** Is the symbol declared? *)
 
-val declare : t -> string -> Symbol.t -> t
+val declare : t -> Symbol.t -> Type.t -> t
   (** Declare the symbol, or
-      @raise Invalid_argument if the symbol is already defined with
-             a different type
+      @raise Invalid_argument if the symbol is already defined with a different type
       @raise Type.Error if the type has free variables *)
 
-val declare_ty : t -> string -> Type.t -> t
-  (** Same as {!declare} but also builds the symbol *)
+val find : t -> Symbol.t -> Type.t option
+  (** Lookup the type of a symbol *)
 
-val declare_sym : t -> Symbol.t -> t
-  (** Declare the symbol by itself (by its name)
-      @raise Invalid_argument if the symbol is not a string *)
-
-val find : t -> string -> Symbol.t
-  (** Lookup a symbol by its name, or
+val find_exn : t -> Symbol.t -> Type.t
+  (** Lookup the type of a symbol
       @raise Not_found if the symbol is not in the signature *)
 
-val find_type : t -> string -> Type.t
-  (** Same as {!find} but extracts the type *)
-
-val arity : t -> string -> int * int
+val arity : t -> Symbol.t -> int * int
   (** Arity of the given symbol, or failure.
       see {!Type.arity} for more details about the returned value.
       @raise Not_found if the symbol is not in the signature *)
@@ -67,70 +59,66 @@ val cardinal : t -> int
 val is_ground : t -> bool
   (** Only ground types? *)
 
-val is_bool : t -> string -> bool
-  (** Has the symbol a boolean return sort?
-      @raise Not_found if the symbol is not in the signature *)
-
-val is_not_bool : t -> string -> bool
-
 val merge : t -> t -> t
-  (** Merge two signatures together *)
+  (** Merge two signatures together.
+      @raise Invalid_argument if they share some symbols with distinct types *)
 
-val map : t -> (string -> Symbol.t -> Symbol.t) -> t
-  (** Transform types *)
-
-val filter : t -> (string -> Symbol.t -> bool) -> t
+val filter : t -> (Symbol.t -> Type.t -> bool) -> t
   (** Only keep part of the signature *)
 
 val diff : t -> t -> t
   (** [diff s1 s2] contains the symbols of [s1] that do not appear
       in [s2]. Useful to remove base symbols. *)
 
-val size : t -> int
-  (** Number of symbols *)
-
 val well_founded : t -> bool
   (** Are there some symbols of arity 0 in the signature?
       @return true iff the Herbrand term universe of this signature is
         non empty  *)
 
-val to_symbols : t -> Symbol.t list
-  (** extract the list of symbols from the complete signature *)
+module Seq : sig
+  val symbols : t -> Symbol.t Sequence.t
+  val types : t -> Type.t Sequence.t
+  val to_seq : t -> (Symbol.t * Type.t) Sequence.t
+  val of_seq : (Symbol.t * Type.t) Sequence.t -> t
+end
 
 val to_set : t -> Symbol.Set.t
   (** Set of symbols of the signature *)
 
-val iter : t -> (string -> Symbol.t -> unit) -> unit
+val to_list : t -> (Symbol.t * Type.t) list
+val of_list : (Symbol.t * Type.t) list -> t
 
-val fold : t -> 'a -> ('a -> string -> Symbol.t -> 'a) -> 'a
+val iter : t -> (Symbol.t -> Type.t -> unit) -> unit
 
-val to_seq : t -> (string * Symbol.t) Sequence.t
-val of_seq : (string * Symbol.t) Sequence.t -> t
-
-val to_list : t -> (string * Symbol.t) list
-val of_list : (string * Symbol.t) list -> t
+val fold : t -> 'a -> ('a -> Symbol.t -> Type.t -> 'a) -> 'a
 
 (** {2 IO} *)
 
-val pp : Buffer.t -> t -> unit
-val to_string : t -> string
-val fmt : Format.formatter -> t -> unit
+include Interfaces.PRINT with type t := t
 
-val pp_no_base : Buffer.t -> t -> unit
-  (** Print the signature, minus the base symbols *)
+(** {2 Pre-defined signature in TPTP} *)
 
-(** {2 Pre-defined symbols} *)
+module TPTP : sig
+  val base : t
+  val is_base_symbol : Symbol.t -> bool
+  val base_symbols : Symbol.Set.t
 
-val base : t
-val is_base_symbol : Symbol.t -> bool
-val base_symbols : Symbol.Set.t
+  val is_bool : t -> Symbol.t -> bool
+    (** Has the symbol a boolean return sort?
+        @raise Not_found if the symbol is not in the signature *)
 
-(** {2 Arith} *)
+  val is_not_bool : t -> Symbol.t -> bool
 
-module Arith : sig
-  val operators : Symbol.t list
+  val pp_no_base : Buffer.t -> t -> unit
+    (** Print the signature, minus the base symbols *)
 
-  val is_operator : Symbol.t -> bool
+  (** {3 Arith} *)
 
-  val signature : t
+  module Arith : sig
+    val operators : Symbol.Set.t
+
+    val is_operator : Symbol.t -> bool
+
+    val signature : t
+  end
 end

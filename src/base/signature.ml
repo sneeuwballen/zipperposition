@@ -25,10 +25,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Signature} *)
 
-module SMap = Sequence.Map.Make(String)
-module SSet = Symbol.Set
+module SMap = Symbol.Map
 
-type t = Symbol.t SMap.t
+type t = Type.t SMap.t
   (** A signature maps symbols to their sort *)
 
 let empty = SMap.empty
@@ -36,51 +35,35 @@ let empty = SMap.empty
 let mem signature s = SMap.mem s signature
 
 let find signature s =
+  try Some (SMap.find s signature)
+  with Not_found -> None
+
+let find_exn signature s =
   SMap.find s signature
 
-let find_type signature s =
-  Symbol.ty (find signature s)
-
-let declare signature s symb =
+let declare signature symb ty =
   try
-    let symb' = find signature s in
-    if Symbol.eq symb symb'
+    let ty' = find_exn signature symb in
+    if Type.eq ty ty'
       then signature  (* ok *)
       else
-        let ty_s, ty_s' = Symbol.ty symb, Symbol.ty symb' in
-        let msg = Util.sprintf "type error for %s: %a and %a are incompatible"
-          s Type.pp ty_s Type.pp ty_s'
+        let msg = Util.sprintf "type error for %a: %a and %a are incompatible"
+          Symbol.pp symb Type.pp ty Type.pp ty'
         in
         raise (Invalid_argument msg)
   with Not_found ->
-    SMap.add s symb signature
-
-let declare_ty signature s ty =
-  let symb = Symbol.mk_const ~ty s in
-  declare signature s symb
-
-let declare_sym signature s = match s with
-  | Symbol.Const (n,_) -> declare signature n s
-  | _ -> raise (Invalid_argument "Signature.declare_sym: expected string")
+    if not (ScopedTerm.DB.closed (ty : Type.t :> ScopedTerm.t))
+      then raise (Invalid_argument "Signature.declare: non-closed type");
+    SMap.add symb ty signature
 
 let cardinal signature = SMap.cardinal signature
 
 let arity signature s =
-  let symb = find signature s in
-  Type.arity (Symbol.ty symb)
+  let ty = find_exn signature s in
+  Type.arity ty
 
 let is_ground signature =
-  SMap.for_all (fun _ symb -> Type.is_ground (Symbol.ty symb)) signature
-
-let is_bool signature s =
-  let symb = find signature s in
-  match Symbol.ty symb with
-  | {Type.ty=Type.Fun (ret, _)} when Type.eq ret Type.o -> true
-  | ty when Type.eq ty Type.o -> true
-  | _ -> false
-
-let is_not_bool signature s =
-  not (is_bool signature s)
+  SMap.for_all (fun _ ty -> Type.is_ground ty) signature
 
 let to_seq signature = SMap.to_seq signature
 let of_seq seq = SMap.of_seq seq
@@ -90,22 +73,20 @@ let of_list l = SMap.of_seq (Sequence.of_list l)
 
 let merge s1 s2 =
   SMap.merge
-    (fun s s1 s2 -> match s1, s2 with
+    (fun s t1 t2 -> match t1, t2 with
       | None, None -> None (* ?? *)
-      | Some s1, Some s2 ->
-        if Symbol.eq s1 s2
-          then Some s1
+      | Some ty1, Some ty2 ->
+        if Type.eq ty1 ty2
+          then Some ty1
           else
             let msg =
-              Util.sprintf "Signature.merge: incompatible types for %s: %a and %a"
-              s Type.pp (Symbol.ty s1) Type.pp (Symbol.ty s2)
+              Util.sprintf "Signature.merge: incompatible types for %a: %a and %a"
+              Symbol.pp s Type.pp ty1 Type.pp ty2
             in
-            failwith msg
+            raise (Invalid_argument msg)
       | Some s1, None -> Some s1
       | None, Some s2 -> Some s2)
     s1 s2
-
-let map s f = SMap.mapi f s
 
 let filter s p = SMap.filter p s
 
@@ -122,14 +103,26 @@ let size s = SMap.cardinal s
 
 let well_founded s =
   SMap.exists
-    (fun _ sym -> snd (Type.arity (Symbol.ty sym)) = 0)
+    (fun _ ty -> snd (Type.arity ty) = 0)
     s
 
-let to_symbols signature =
-  SMap.fold (fun _ s l -> s :: l) signature []
+module Seq = struct
+  let symbols s =
+    SMap.to_seq s |> Sequence.map fst
 
-let to_set signature =
-  SMap.fold (fun _ s set -> SSet.add s set) signature SSet.empty
+  let types s =
+    SMap.to_seq s |> Sequence.map snd
+
+  let to_seq = SMap.to_seq
+
+  let of_seq = SMap.of_seq
+end
+
+let to_set s = Seq.symbols s |> Symbol.Set.of_seq
+
+let to_list s = Seq.to_seq s |> Sequence.to_rev_list
+
+let of_list s = Sequence.of_list s |> Seq.of_seq
 
 let iter s f =
   SMap.iter f s
@@ -140,9 +133,10 @@ let fold s acc f =
 (** {2 IO} *)
 
 let pp buf s =
-  let pp_pair buf (_,s) = Printf.bprintf buf "%a: %a" Symbol.pp s Type.pp (Symbol.ty s) in
+  let pp_pair buf (s,ty) =
+    Printf.bprintf buf "%a: %a" Symbol.pp s Type.pp ty in
   Printf.bprintf buf "{";
-  Util.pp_seq pp_pair buf (to_seq s);
+  Util.pp_seq pp_pair buf (Seq.to_seq s);
   Printf.bprintf buf "}";
   ()
 
@@ -152,86 +146,106 @@ let to_string s =
 let fmt fmt s =
   Format.pp_print_string fmt (to_string s)
 
+  (* TODO
 let bij =
   let open Bij in
   map
     ~inject:(fun signature -> Sequence.to_list (to_seq signature))
     ~extract:(fun l -> of_seq (Sequence.of_list l))
     (list_ (pair string_ Symbol.bij))
+    *)
 
-(** {2 Pre-defined symbols} *)
+module TPTP = struct
+  let is_bool signature s =
+    let rec _is_bool_ty ty = match Type.view ty with
+      | Type.Fun (ret, _)  when Type.eq ret Type.TPTP.o -> true
+      | _ when Type.eq ty Type.TPTP.o -> true
+      | Type.Forall ty' -> _is_bool_ty ty'
+      | _ -> false
+    in _is_bool_ty (find_exn signature s)
 
-let arith_table =
-  [ Symbol.Arith.less
-  ; Symbol.Arith.lesseq
-  ; Symbol.Arith.greater
-  ; Symbol.Arith.greatereq
-  ; Symbol.Arith.uminus
-  ; Symbol.Arith.sum
-  ; Symbol.Arith.difference
-  ; Symbol.Arith.product
-  ; Symbol.Arith.quotient
-  ; Symbol.Arith.quotient_e
-  ; Symbol.Arith.quotient_f
-  ; Symbol.Arith.quotient_t
-  ; Symbol.Arith.remainder_e
-  ; Symbol.Arith.remainder_f
-  ; Symbol.Arith.remainder_t
-  ; Symbol.Arith.floor
-  ; Symbol.Arith.ceiling
-  ; Symbol.Arith.round
-  ; Symbol.Arith.truncate
-  ; Symbol.Arith.to_int
-  ; Symbol.Arith.to_rat
-  ; Symbol.Arith.to_real
-  ; Symbol.Arith.is_int
-  ; Symbol.Arith.is_rat
-  ; Symbol.Arith.is_real
-  ]
+  let is_not_bool signature s =
+    not (is_bool signature s)
 
-let table =
-  [ Symbol.true_symbol
-  ; Symbol.false_symbol
-  ; Symbol.eq_symbol
-  ; Symbol.exists_symbol
-  ; Symbol.forall_symbol
-  ; Symbol.not_symbol
-  ; Symbol.imply_symbol
-  ; Symbol.and_symbol
-  ; Symbol.or_symbol
-  ; Symbol.equiv_symbol
-  ; Symbol.wildcard_symbol
-  (* special symbols
-  ; Symbol.db_symbol
-  ; Symbol.split_symbol
-  ; Symbol.const_symbol
-  ; Symbol.num_symbol
-  ; *)
-  ] @ arith_table
+  (** {2 Pre-defined symbols} *)
 
-let of_list_sym l =
-  List.fold_left
-    (fun signature symb -> match symb with
-      | Symbol.Const (s, _) -> SMap.add s symb signature
-      | _ -> assert false)
-    empty l
+  let x = Type.var 0
+  let y = Type.var 1
 
-let base = of_list_sym table
+  let ty_1_to_int = Type.(forall [x] (Type.TPTP.int <=. x))
+  let ty2op = Type.(forall [x] (x <== [x;x]))
+  let ty2op_to_i = Type.(TPTP.(int <== [int;int]))
+  let ty2op_to_o = Type.(TPTP.(o <== [int;int]))
 
-let base_symbols = SSet.of_seq (Sequence.of_list table)
+  let arith_table =
+    let open Type.TPTP in
+    [ Symbol.TPTP.Arith.less, ty2op_to_o
+    ; Symbol.TPTP.Arith.lesseq, ty2op_to_o
+    ; Symbol.TPTP.Arith.greater, ty2op_to_o
+    ; Symbol.TPTP.Arith.greatereq, ty2op_to_o
+    ; Symbol.TPTP.Arith.uminus, Type.(forall [x] (x <=. x))
+    ; Symbol.TPTP.Arith.sum, ty2op
+    ; Symbol.TPTP.Arith.difference, ty2op
+    ; Symbol.TPTP.Arith.product, ty2op
+    ; Symbol.TPTP.Arith.quotient, ty2op
+    ; Symbol.TPTP.Arith.quotient_e, ty2op_to_i
+    ; Symbol.TPTP.Arith.quotient_f, ty2op_to_i
+    ; Symbol.TPTP.Arith.quotient_t, ty2op_to_i
+    ; Symbol.TPTP.Arith.remainder_e, ty2op_to_i
+    ; Symbol.TPTP.Arith.remainder_f, ty2op_to_i
+    ; Symbol.TPTP.Arith.remainder_t, ty2op_to_i
+    ; Symbol.TPTP.Arith.floor, ty_1_to_int
+    ; Symbol.TPTP.Arith.ceiling, ty_1_to_int
+    ; Symbol.TPTP.Arith.round, ty_1_to_int
+    ; Symbol.TPTP.Arith.truncate, ty_1_to_int
+    ; Symbol.TPTP.Arith.to_int, Type.(forall [x] (int <=. x))
+    ; Symbol.TPTP.Arith.to_rat, Type.(forall [x] (rat <=. x))
+    ; Symbol.TPTP.Arith.is_int, Type.(forall [x] (o <=. x))
+    ; Symbol.TPTP.Arith.is_rat, Type.(forall [x] (o <=. x))
+    ]
 
-let is_base_symbol s = SSet.mem s base_symbols
+  let table =
+    let open Type.TPTP in
+    [ Symbol.Base.true_, o
+    ; Symbol.Base.false_, o
+    ; Symbol.Base.eq, Type.(forall [x] (o <== [x;x]))
+    ; Symbol.Base.neq, Type.(forall [x] (o <== [x;x]))
+    ; Symbol.Base.exists, Type.(forall [x] (o <=. (o <=. x)))
+    ; Symbol.Base.forall, Type.(forall [x] (o <=. (o <=. x)))
+    ; Symbol.Base.not_, Type.(o <=. o)
+    ; Symbol.Base.imply, Type.(o <== [o;o])
+    ; Symbol.Base.and_, Type.(o <== [o;o])
+    ; Symbol.Base.or_, Type.(o <== [o;o])
+    ; Symbol.Base.equiv, Type.(o <== [o;o])
+    ; Symbol.Base.xor, Type.(o <== [o;o])
+    ; Symbol.Base.wildcard, Type.(forall [x] x)
+    (* special symbols
+    ; Symbol.db_symbol
+    ; Symbol.split_symbol
+    ; Symbol.const_symbol
+    ; Symbol.num_symbol
+    ; *)
+    ]
 
-let pp_no_base buf s =
-  pp buf (diff s base)
+  let base = of_list table
 
-(** {2 Arith} *)
+  let base_symbols = to_set base
 
-module Arith = struct
-  let operators = arith_table
+  let is_base_symbol s = Symbol.Set.mem s base_symbols
 
-  let is_operator s = List.exists (fun s' -> Symbol.eq s s') arith_table
+  let pp_no_base buf s =
+    pp buf (diff s base)
 
-  let signature = of_list_sym arith_table
+  (** {2 Arith} *)
+
+  module Arith = struct
+    let operators =
+      Sequence.of_list arith_table
+        |> Sequence.map fst
+        |> Symbol.Set.of_seq
+
+    let is_operator s = Symbol.Set.mem s operators
+
+    let signature = of_list (table @ arith_table)
+  end
 end
-
