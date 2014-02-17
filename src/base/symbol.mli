@@ -80,8 +80,10 @@ val of_string : string -> t
 
 val mk_int : Z.t -> t
 val of_int : int -> t
+val int_of_string : string -> t
 val mk_rat : Q.t -> t
 val of_rat : int -> int -> t
+val rat_of_string : string -> t
 
 val is_int : t -> bool
 val is_rat : t -> bool

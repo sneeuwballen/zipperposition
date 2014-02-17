@@ -359,6 +359,7 @@ module Conv = struct
 
   let of_prolog ~ctx t =
     let rec of_prolog t = match t with
+      | PT.Location (t',_) -> of_prolog t'
       | PT.Column (PT.Var name, PT.Const (Symbol.Conn Symbol.TType))
       | PT.Var name ->
         assert (name <> "");

@@ -150,9 +150,11 @@ let mk_const = of_string
 
 let mk_int s = Int s
 let of_int i = Int (Z.of_int i)
+let int_of_string s = Int (Z.of_string s)
 
 let mk_rat s = Rat s
 let of_rat i j = Rat (Q.of_ints i j)
+let rat_of_string s = Rat (Q.of_string s)
 
 module Base = struct
   let true_ = Conn True

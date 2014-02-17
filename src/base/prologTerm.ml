@@ -35,6 +35,7 @@ type t =
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
+  | Location of t * Location.t      (** Indicates a location. Mostly ignored otherwise. *)
 
 type term = t
 
@@ -47,6 +48,7 @@ let __to_int = function
   | Bind _ -> 5
   | List _ -> 6
   | Column _ -> 7
+  | Location _ -> 8
 
 let rec cmp t1 t2 = match t1, t2 with
   | Var s1, Var s2 -> String.compare s1 s2
@@ -70,6 +72,8 @@ let rec cmp t1 t2 = match t1, t2 with
   | Column (x1,y1), Column (x2,y2) ->
     let c = cmp x1 x2 in
     if c = 0 then cmp y1 y2 else c
+  | Location (t1', _), _ -> cmp t1' t2
+  | _, Location (t2', _) -> cmp t1 t2'
   | _ -> __to_int t1 - __to_int t2
 
 let eq t1 t2 = cmp t1 t2 = 0
@@ -86,21 +90,33 @@ let rec hash t = match t with
     let h = Hash.combine (Symbol.hash s) (hash t') in
     Hash.hash_list hash h v
   | Column (x,y) -> Hash.combine (hash x) (hash y)
+  | Location (t, _) -> hash t
 
-let var s = Var s
+let var ?ty s = match ty with
+  | None -> Var s
+  | Some ty -> Column (Var s, ty)
 let int_ i = Int i
 let of_int i = Int (Z.of_int i)
 let rat n = Rat n
-let app s l  = App(s,l)
+let app s l = match l with
+  | [] -> s
+  | _::_ -> App(s,l)
 let const s = Const s
-let bind s v l = Bind(s,v,l)
+let bind s v l = match v with
+  | [] -> l
+  | _::_ -> Bind(s,v,l)
 let list_ l = List l
 let nil = list_ []
 let column x y = Column(x,y)
+let at_loc ~loc t = Location (t, loc)
 
 let is_var = function
   | Var _ -> true
   | _ -> false
+
+let rec skip_loc = function
+  | Location (t, _) -> skip_loc t
+  | t -> t
 
 module Set = Sequence.Set.Make(struct
   type t = term
@@ -119,14 +135,17 @@ end)
 
 module Seq = struct
   let subterms t k =
-    let rec iter t =
-      k t;
-      match t with
-      | Var _ | Int _ | Rat _ | Const _ -> ()
-      | List l
-      | App (_, l) -> List.iter iter l
-      | Bind (_, v, t') -> List.iter iter v; iter t'
-      | Column(x,y) -> k x; k y
+    let rec iter t = match t with
+      | Location(t, _) -> iter t
+      | _ ->
+        k t;
+        match t with
+        | Location _ -> assert false
+        | Var _ | Int _ | Rat _ | Const _ -> ()
+        | List l
+        | App (_, l) -> List.iter iter l
+        | Bind (_, v, t') -> List.iter iter v; iter t'
+        | Column(x,y) -> k x; k y
     in iter t
 
   let vars t = subterms t |> Sequence.filter is_var
@@ -135,9 +154,12 @@ module Seq = struct
     Sequence.fold (fun set x -> Set.add x set) s seq
 
   let subterms_with_bound t k =
-    let rec iter bound t =
+    let rec iter bound t = match t with
+    | Location (t', _) -> iter bound t'
+    | _ ->
       k (t, bound);
       match t with
+      | Location _ -> assert false
       | Var _ | Int _ | Rat _ | Const _ -> ()
       | List l
       | App (_, l) -> List.iter (iter bound) l
@@ -165,22 +187,6 @@ module Seq = struct
         | _ -> None)
 end
 
-module TPTP = struct
-  let true_ = const Symbol.Base.true_
-  let false_ = const Symbol.Base.false_
-
-  let and_ l = app (const Symbol.Base.and_) l
-  let or_ l = app (const Symbol.Base.or_) l
-  let not_ a = app (const Symbol.Base.not_) [a]
-  let equiv a b = app (const Symbol.Base.equiv) [a;b]
-  let xor a b = app (const Symbol.Base.xor) [a;b]
-  let imply a b = app (const Symbol.Base.imply) [a;b]
-  let eq a b = app (const Symbol.Base.eq) [a;b]
-  let neq a b = app (const Symbol.Base.neq) [a;b]
-  let forall vars f = bind Symbol.Base.forall vars f
-  let exists vars f = bind Symbol.Base.exists vars f
-end
-
 let ground t = Seq.vars t |> Sequence.is_empty
 
 let close_all s t =
@@ -191,6 +197,7 @@ let close_all s t =
   bind s vars t
 
 let rec pp buf t = match t with
+  | Location (t,_) -> pp buf t
   | Var s -> Buffer.add_string buf s
   | Int i -> Buffer.add_string buf (Z.to_string i)
   | Rat i -> Buffer.add_string buf (Q.to_string i)
@@ -217,3 +224,97 @@ let rec pp buf t = match t with
 
 let to_string = Util.on_buffer pp
 let fmt fmt t = Format.pp_print_string fmt (to_string t)
+
+module TPTP = struct
+  let true_ = const Symbol.Base.true_
+  let false_ = const Symbol.Base.false_
+
+  let const ?loc s = match loc with
+    | None -> const s
+    | Some loc -> at_loc ~loc (const s)
+  let app ?loc hd l = match loc with
+    | None -> app hd l
+    | Some loc -> at_loc ~loc (app hd l)
+  let bind ?loc s vars t = match loc with
+    | None -> bind s vars t
+    | Some loc -> at_loc ~loc (bind s vars t)
+  let var ?loc ?ty name = match loc with
+    | None -> var ?ty name
+    | Some loc -> at_loc ~loc (var ?ty name)
+
+  let and_ ?loc l = app ?loc (const Symbol.Base.and_) l
+  let or_ ?loc l = app ?loc (const Symbol.Base.or_) l
+  let not_ ?loc a = app ?loc (const Symbol.Base.not_) [a]
+  let equiv ?loc a b = app ?loc (const Symbol.Base.equiv) [a;b]
+  let xor ?loc a b = app ?loc (const Symbol.Base.xor) [a;b]
+  let imply ?loc a b = app ?loc (const Symbol.Base.imply) [a;b]
+  let eq ?loc a b = app ?loc (const Symbol.Base.eq) [a;b]
+  let neq ?loc a b = app ?loc (const Symbol.Base.neq) [a;b]
+  let forall ?loc vars f = bind ?loc Symbol.Base.forall vars f
+  let exists ?loc vars f = bind ?loc Symbol.Base.exists vars f
+
+  let mk_fun_ty l ret = match l with
+    | [] -> ret
+    | _::_ -> app (const Symbol.Base.arrow) (ret::l)
+  let tType = const Symbol.Base.tType
+  let forall_ty vars t = bind Symbol.Base.forall_ty vars t
+
+  let rec pp buf t = match t with
+    | Location (t, _) -> pp buf t
+    | Var s -> Buffer.add_string buf s
+    | Int i -> Buffer.add_string buf (Z.to_string i)
+    | Rat i -> Buffer.add_string buf (Q.to_string i)
+    | Const s -> Symbol.pp buf s
+    | List l ->
+        Buffer.add_char buf '[';
+        Util.pp_list ~sep:"," pp buf l;
+        Buffer.add_char buf ']'
+    | App (Const (Symbol.Conn Symbol.And), l) ->
+      Util.pp_list ~sep:" & " pp_surrounded buf l
+    | App (Const (Symbol.Conn Symbol.Or), l) ->
+      Util.pp_list ~sep:" | " pp_surrounded buf l
+    | App (Const (Symbol.Conn Symbol.Not), [a]) ->
+      Printf.bprintf buf "~%a" pp_surrounded a
+    | App (Const (Symbol.Conn Symbol.Imply), [a;b]) ->
+      Printf.bprintf buf "%a => %aa" pp_surrounded a pp_surrounded b
+    | App (Const (Symbol.Conn Symbol.Xor), [a;b]) ->
+      Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
+    | App (Const (Symbol.Conn Symbol.Equiv), [a;b]) ->
+      Printf.bprintf buf "%a <=> %a" pp_surrounded a pp_surrounded b
+    | App (Const (Symbol.Conn Symbol.Eq), [a;b]) ->
+      Printf.bprintf buf "%a = %a" pp_surrounded a pp_surrounded b
+    | App (Const (Symbol.Conn Symbol.Neq), [a;b]) ->
+      Printf.bprintf buf "%a != %a" pp_surrounded a pp_surrounded b
+    | App (Const (Symbol.Conn Symbol.Arrow), [ret;a]) ->
+      Printf.bprintf buf "%a > %a" pp a pp ret
+    | App (Const (Symbol.Conn Symbol.Arrow), ret::l) ->
+      Printf.bprintf buf "(%a) > %a" (Util.pp_list ~sep:" * " pp) l pp_surrounded ret
+    | App (s, l) ->
+        pp buf s;
+        Buffer.add_char buf '(';
+        Util.pp_list ~sep:"," pp buf l;
+        Buffer.add_char buf ')'
+    | Bind (s, vars, t') ->
+        Symbol.pp buf s;
+        Buffer.add_char buf '[';
+        Util.pp_list ~sep:"," pp_typed_var buf vars;
+        Buffer.add_string buf "]:";
+        pp_surrounded buf t'
+    | Column(x,y) ->
+        pp buf x;
+        Buffer.add_char buf ':';
+        pp buf y
+  and pp_typed_var buf = function
+    | Column (Var s, Const (Symbol.Conn Symbol.TType))
+    | Var s -> Buffer.add_string buf s
+    | Column (Var s, ty) ->
+      Printf.bprintf buf "%s:%a" s pp ty
+    | _ -> assert false
+  and pp_surrounded buf t = match t with
+    | App _
+    | Bind _ -> Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
+    | _ -> pp buf t
+
+let to_string = Util.on_buffer pp
+let fmt fmt t = Format.pp_print_string fmt (to_string t)
+end

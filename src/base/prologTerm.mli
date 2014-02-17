@@ -40,13 +40,14 @@ type t =
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
+  | Location of t * Location.t      (** Indicates a location. Mostly ignored otherwise. *)
 
 type term = t
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
 
-val var : string -> t
+val var : ?ty:t -> string -> t
 val int_ : Z.t -> t
 val of_int : int -> t
 val rat : Q.t -> t
@@ -56,8 +57,12 @@ val bind : Symbol.t -> t list -> t -> t
 val list_ : t list -> t
 val nil : t
 val column : t -> t -> t
+val at_loc : loc:Location.t -> t -> t
 
 val is_var : t -> bool
+
+val skip_loc : t -> t
+  (** Remove prefixing location constructors *)
 
 module Set : Sequence.Set.S with type elt = term
 module Map : Sequence.Map.S with type key = term
@@ -77,19 +82,31 @@ end
 val ground : t -> bool
 val close_all : Symbol.t -> t -> t  (** Bind all free vars with the symbol *)
 
+include Interfaces.PRINT with type t := t
+
 module TPTP : sig
   val true_ : t
   val false_ : t
-  val and_ : t list -> t
-  val or_ : t list -> t
-  val not_ : t -> t
-  val equiv : t -> t -> t
-  val xor : t -> t -> t
-  val imply : t -> t -> t
-  val eq : t -> t -> t
-  val neq : t -> t -> t
-  val forall : t list -> t -> t
-  val exists : t list -> t -> t
-end
 
-include Interfaces.PRINT with type t := t
+  val var : ?loc:Location.t -> ?ty:t -> string -> t
+  val const : ?loc:Location.t -> Symbol.t -> t
+  val app : ?loc:Location.t -> t -> t list -> t
+  val bind : ?loc:Location.t -> Symbol.t -> t list -> t -> t
+
+  val and_ : ?loc:Location.t -> t list -> t
+  val or_ : ?loc:Location.t -> t list -> t
+  val not_ : ?loc:Location.t -> t -> t
+  val equiv : ?loc:Location.t -> t -> t -> t
+  val xor : ?loc:Location.t -> t -> t -> t
+  val imply : ?loc:Location.t -> t -> t -> t
+  val eq : ?loc:Location.t -> t -> t -> t
+  val neq : ?loc:Location.t -> t -> t -> t
+  val forall : ?loc:Location.t -> t list -> t -> t
+  val exists : ?loc:Location.t -> t list -> t -> t
+
+  val mk_fun_ty : t list -> t -> t
+  val tType : t
+  val forall_ty : t list -> t -> t
+
+  include Interfaces.PRINT with type t := t
+end

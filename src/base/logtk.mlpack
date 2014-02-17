@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 83f52f6958bf679bc3efdead111f4a14)
+# DO NOT EDIT (digest: d958db61f1b8ee5307b846d72607fe42)
 Symbol
 ScopedTerm
 FOTerm
@@ -23,4 +23,5 @@ lib/Bij
 lib/Bencode
 lib/PersistentHashtbl
 lib/Monad
+lib/Location
 # OASIS_STOP

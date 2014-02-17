@@ -64,6 +64,7 @@ module Ctx = struct
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
     mutable to_bind : Type.t list;  (* list of variables to eventually bind (close) *)
+    mutable locs : Location.t list; (* stack of locations *)
     renaming : Substs.Renaming.t;
     symbols : Type.t Symbol.Tbl.t;  (* symbol -> instantiated type *)
     tyvars : (string, int) Hashtbl.t;            (* type variable -> number *)
@@ -77,6 +78,7 @@ module Ctx = struct
       signature;
       subst = S.empty;
       to_bind = [];
+      locs = [];
       renaming = Substs.Renaming.create ();
       symbols = Symbol.Tbl.create 7;
       tyvars = Hashtbl.create 6;
@@ -95,6 +97,7 @@ module Ctx = struct
     ctx.var <- ~-1;
     ctx.subst <- S.empty;
     ctx.to_bind <- [];
+    ctx.locs <- [];
     Symbol.Tbl.clear ctx.symbols;
     ctx.signature <- Signature.empty;
     Hashtbl.clear ctx.vars;
@@ -157,6 +160,13 @@ module Ctx = struct
 
   let _exit_var_scope ctx name =
     Hashtbl.remove ctx.vars name
+
+  let with_loc ctx ~loc f =
+    let old_locs = ctx.locs in
+    ctx.locs <- loc::old_locs;
+    Util.finally
+      ~h:(fun () -> ctx.locs <- old_locs)
+      ~f
 
   (* unify within the context's substitution. scopes are 0 *)
   let unify ctx ty1 ty2 =
@@ -298,8 +308,13 @@ let _split_arity arity l =
   drop (n - arity) [] l
 
 (* error-raising function *)
-let __error msg =
+let __error ctx msg =
   let b = Buffer.create 15 in
+  (* print closest location *)
+  begin match ctx.Ctx.locs with
+  | [] -> ()
+  | loc::_ -> Printf.bprintf b "at %a:" Location.pp loc
+  end;
   Printf.bprintf b "error during type inference: ";
   Printf.kbprintf
     (fun b -> raise (Type.Error (Buffer.contents b)))
@@ -321,18 +336,20 @@ module FO = struct
     | a::args' ->
       (* convert [a] into a type *)
       match Ctx._of_ty ctx a with
-      | None -> __error "term %a is not a type" PT.pp a
+      | None -> __error ctx "term %a is not a type" PT.pp a
       | Some ty -> ty :: _complete_type_args ctx (arity-1) args'
 
   (* infer a type for [t], possibly updating [ctx]. Also returns a
     continuation to build a typed term. *)
   let rec infer_rec ctx t =
     match t with
+    | PT.Location (t', loc) ->
+      Ctx.with_loc ctx ~loc (fun () -> infer_rec ctx t')
     | PT.Column (PT.Var name, ty) ->
       (* typed var *)
       let ty = match Ctx._of_ty ctx ty with
         | Some ty -> ty
-        | None -> __error "expected type, got %a" PT.pp ty
+        | None -> __error ctx "expected type, got %a" PT.pp ty
       in
       let i, ty = Ctx._get_var ctx ~ty name in
       let closure ctx =
@@ -362,7 +379,7 @@ module FO = struct
       Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
       let n_tyargs, n_args = Type.arity ty_s in
       if n_args > List.length l
-        then __error "expected %d arguments, got only %d" n_args (List.length l);
+        then __error ctx "expected %d arguments, got only %d" n_args (List.length l);
       (* separation between type arguments and proper term arguments,
           based on the expected arity of the symbol.
           We split [l] into the list [tyargs], containing [n_tyargs] types,
@@ -395,13 +412,13 @@ module FO = struct
     | PT.List _
     | PT.Column _
     | PT.App _
-    | PT.Bind _ -> __error "expected first-order term"
+    | PT.Bind _ -> __error ctx "expected first-order term"
 
   let infer_var_scope ctx t = match t with
     | PT.Column (PT.Var name, ty) ->
       let ty = match Ctx._of_ty ctx ty with
         | Some ty -> ty
-        | None -> __error "expected type, got %a" PT.pp ty
+        | None -> __error ctx "expected type, got %a" PT.pp ty
       in
       let i = Ctx._enter_var_scope ctx name ty in
       let closure ctx =
@@ -432,7 +449,7 @@ module FO = struct
     with (* error handling: return a nice message *)
     | BadArity ->
       Util.exit_prof prof_infer;
-      __error "bad arity when trying to type %a" PT.pp t
+      __error ctx "bad arity when trying to type %a" PT.pp t
     | e ->
       Util.exit_prof prof_infer;
       raise e
@@ -447,6 +464,8 @@ module FO = struct
     Ctx.unify_and_set ctx ty1 ty
 
   let rec infer_form_rec ctx f = match f with
+    | PT.Location (f,loc) ->
+      Ctx.with_loc ctx ~loc (fun () -> infer_form_rec ctx f)
     | PT.Const (Sym.Conn ((Sym.True | Sym.False) as b)) ->
       fun _ ->
         begin match b with
@@ -512,7 +531,7 @@ module FO = struct
     | PT.List _
     | PT.Int _
     | PT.Bind _
-    | PT.Rat _ -> __error "expected formula, got %a" PT.pp f
+    | PT.Rat _ -> __error ctx "expected formula, got %a" PT.pp f
 
   let infer_form ctx f =
     Util.debug 5 "infer_form %a" PT.pp f;
