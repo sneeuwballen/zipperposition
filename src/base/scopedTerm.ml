@@ -104,7 +104,10 @@ let rec _eq_norec t1 t2 =
   | App (f1, l1), App (f2, l2) ->
     eq f1 f2 && _eq_list l1 l2
   | _ -> false
-and _eq_ty t1 t2 = eq t1.ty t2.ty
+and _eq_ty t1 t2 = match t1.ty, t2.ty with
+  | NoType, NoType -> true
+  | HasType ty1, HasType ty2 -> ty1 == ty2
+  | _ -> false
 and _eq_list l1 l2 = match l1, l2 with
   | [], [] -> true
   | [], _
@@ -145,7 +148,8 @@ let const ~kind ~ty s =
 
 let rec app ~kind ~ty f l =
   match f.term, l with
-  | _, [] -> {f with ty=HasType ty; }
+  | _, [] ->
+    H.hashcons {f with ty=HasType ty; id= ~-1; }
   | App (f', l'), _ ->
     app ~kind ~ty f' (l' @ l)  (* flatten *)
   | _ ->

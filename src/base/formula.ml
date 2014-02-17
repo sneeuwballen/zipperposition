@@ -285,6 +285,8 @@ module Make(MyT : TERM) = struct
               | Sym.Imply -> Equiv (a,b)
               | Sym.Eq -> Eq (MyT.of_term_exn a, MyT.of_term_exn b)
               | Sym.Neq -> Neq (MyT.of_term_exn a, MyT.of_term_exn b)
+              | Sym.And -> And [a; b]
+              | Sym.Or -> Or [a; b]
               | _ -> assert false
               end
           | _ -> assert false
@@ -868,7 +870,7 @@ module Make(MyT : TERM) = struct
       Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
     | _ -> pp_outer buf f
     in
-    pp_outer buf (flatten f)
+    pp_outer buf f
 
   let pp = pp_depth 0
 
@@ -925,7 +927,7 @@ module Make(MyT : TERM) = struct
         Buffer.add_char buf '('; pp_outer buf f; Buffer.add_char buf ')';
       | _ -> pp_outer buf f
       in
-      pp_outer buf (flatten f)
+      pp_outer buf f
 
     let pp = pp_depth 0
 

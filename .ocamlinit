@@ -13,6 +13,7 @@
 #directory "_build/tests/";;
 #load "logtk.cma";;
 open Logtk;;
+module ST = ScopedTerm;;
 module T = FOTerm;;
 module PT = PrologTerm;;
 module Sym = Symbol;;
@@ -22,7 +23,7 @@ let (~<) = Symbol.of_string;;
 #install_printer FOTerm.Cst.fmt;;
 #install_printer FOTerm.fmt;;
 #install_printer PrologTerm.fmt;;
-#install_printer Formula.fmt;;
+#install_printer Formula.FO.fmt;;
 #install_printer HOTerm.fmt;;
 #install_printer Substs.fmt;;
 open Logtk.Sequence.Infix;;

@@ -124,6 +124,10 @@ let is_type t = match T.kind t with
   | T.Kind.Type -> true
   | _ -> false
 
+let () =
+  assert(not(is_type tType));
+  ()
+
 (** {2 Containers} *)
 
 module Set = Sequence.Set.Make(struct

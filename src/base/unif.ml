@@ -83,7 +83,7 @@ let occurs_check subst v sc_v t sc_t =
       | T.Var _ ->
           (* if [t] is a var bound by [subst], check in its image *)
           begin try
-            let (t', sc_t') = Substs.lookup subst t sc_t in
+            let t', sc_t' = Substs.lookup subst t sc_t in
             check v sc_v t' sc_t'
           with Not_found -> false
           end
@@ -91,7 +91,8 @@ let occurs_check subst v sc_v t sc_t =
       | T.Bind (_, varty, t') -> check v sc_v varty sc_t || check v sc_v t' sc_t
       | T.Record l -> List.exists (fun (_,t') -> check v sc_v t' sc_t) l
       | T.App (hd, l) ->
-        check v sc_v hd sc_t || List.exists (fun t' -> check v sc_v t' sc_t) l
+        check v sc_v hd sc_t ||
+        List.exists (fun t' -> check v sc_v t' sc_t) l  (* TODO: unroll *)
   in
   check v sc_v t sc_t
 

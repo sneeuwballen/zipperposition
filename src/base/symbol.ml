@@ -58,11 +58,18 @@ type t =
 
 type sym = t
 
+let __to_int = function
+  | Conn _ -> 0
+  | Int _ -> 1
+  | Rat _ -> 2
+  | Cst _ -> 3
+
 let cmp a b = match a, b with
   | Cst s1, Cst s2 -> s1.cs_id - s2.cs_id
-  | Cst _, _ -> 1
-  | _, Cst _ -> -1
-  | _, _ -> Pervasives.compare a b
+  | Int i, Int j -> Z.compare i j
+  | Rat i, Rat j -> Q.compare i j
+  | Conn c1, Conn c2 -> Pervasives.compare c1 c2
+  | _ -> __to_int a - __to_int b
 
 let eq a b = cmp a b = 0
 

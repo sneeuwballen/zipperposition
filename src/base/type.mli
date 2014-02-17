@@ -179,7 +179,6 @@ module TPTP : sig
 
   val i : t       (* individuals *)
   val o : t       (* propositions *)
-  val tType : t   (* "type" of types *)
 
   val int : t
   val rat : t
