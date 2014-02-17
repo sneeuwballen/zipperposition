@@ -357,12 +357,18 @@ module Conv = struct
     let rec of_prolog t = match t with
       | PT.Column (PT.Var name, PT.Const (Symbol.Conn Symbol.TType))
       | PT.Var name ->
-          begin try var (Hashtbl.find ctx name)
-          with Not_found ->
-            let n = Hashtbl.length ctx in
-            Hashtbl.add ctx name n;
-            var n
-          end
+        assert (name <> "");
+        begin try var (Hashtbl.find ctx name)
+        with Not_found ->
+          let n = Hashtbl.length ctx in
+          Hashtbl.add ctx name n;
+          var n
+        end
+      | PT.Const (Symbol.Conn Symbol.Wildcard) ->
+        (* fresh var that will never occur again *)
+        let n = Hashtbl.length ctx in
+        Hashtbl.add ctx "" n;  (* increases length, but not reachable *)
+        var n
       | PT.Int _
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s

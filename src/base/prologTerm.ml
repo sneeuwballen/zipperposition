@@ -165,6 +165,22 @@ module Seq = struct
         | _ -> None)
 end
 
+module TPTP = struct
+  let true_ = const Symbol.Base.true_
+  let false_ = const Symbol.Base.false_
+
+  let and_ l = app (const Symbol.Base.and_) l
+  let or_ l = app (const Symbol.Base.or_) l
+  let not_ a = app (const Symbol.Base.not_) [a]
+  let equiv a b = app (const Symbol.Base.equiv) [a;b]
+  let xor a b = app (const Symbol.Base.xor) [a;b]
+  let imply a b = app (const Symbol.Base.imply) [a;b]
+  let eq a b = app (const Symbol.Base.eq) [a;b]
+  let neq a b = app (const Symbol.Base.neq) [a;b]
+  let forall vars f = bind Symbol.Base.forall vars f
+  let exists vars f = bind Symbol.Base.exists vars f
+end
+
 let ground t = Seq.vars t |> Sequence.is_empty
 
 let close_all s t =

@@ -77,4 +77,19 @@ end
 val ground : t -> bool
 val close_all : Symbol.t -> t -> t  (** Bind all free vars with the symbol *)
 
+module TPTP : sig
+  val true_ : t
+  val false_ : t
+  val and_ : t list -> t
+  val or_ : t list -> t
+  val not_ : t -> t
+  val equiv : t -> t -> t
+  val xor : t -> t -> t
+  val imply : t -> t -> t
+  val eq : t -> t -> t
+  val neq : t -> t -> t
+  val forall : t list -> t -> t
+  val exists : t list -> t -> t
+end
+
 include Interfaces.PRINT with type t := t
