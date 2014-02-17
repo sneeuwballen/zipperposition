@@ -39,6 +39,24 @@ module type S = sig
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 end
 
+(** {2 Monadic traversal}
+This functor allows to build fold and map functions with a monadic interface.
+*)
+
+module type TRAVERSE = sig
+  type 'a monad
+    (** monad used for traversal *)
+
+  val fold : 'a Sequence.t -> 'b monad -> ('b -> 'a -> 'b monad) -> 'b monad
+  val fold_l : 'a list -> 'b monad -> ('b -> 'a -> 'b monad) -> 'b monad
+
+  val map_l : 'a list -> ('a -> 'b monad) -> 'b list monad
+
+  val seq : 'a monad list -> 'a list monad
+end
+
+module Traverse(M : S) : TRAVERSE with type 'a monad = 'a M.t
+
 (** {2 Option Monad} *)
 
 module Opt : sig
@@ -53,12 +71,16 @@ module Opt : sig
 
   val is_some : _ option -> bool
   val is_none : _ option -> bool
+
+  include TRAVERSE with type 'a monad := 'a option
 end
 
 (** {2 List monad} *)
 
 module L : sig
   include S with type 'a t = 'a list
+
+  include TRAVERSE with type 'a monad := 'a list
 end
 
 (** {2 Error monad} *)
@@ -80,25 +102,16 @@ module Err : sig
   val fail_exn : exn -> 'a t
 
   val to_opt : 'a t -> 'a option
+
+  include TRAVERSE with type 'a monad := 'a err
 end
+(** {2 Composition monad} *)
 
-(** {2 Monadic traversal}
-This functor allows to build fold and map functions with a monadic interface.
-*)
+module Fun(Domain : sig type t end) : sig
+  type domain = Domain.t
+  type 'a fun_ = domain -> 'a
 
-module type TRAVERSE = sig
-  module M : S
-    (** monad used for traversal *)
+  include S with type 'a t = 'a fun_
 
-  val fold : 'a Sequence.t -> 'b M.t -> ('b -> 'a -> 'b M.t) -> 'b M.t
-  val fold_l : 'a list -> 'b M.t -> ('b -> 'a -> 'b M.t) -> 'b M.t
-
-  val map_l : 'a list -> ('a -> 'b M.t) -> 'b list M.t
-
-  val seq : 'a M.t list -> 'a list M.t
+  include TRAVERSE with type 'a monad := 'a fun_
 end
-
-module Traverse(M : S) : TRAVERSE with module M = M
-
-module TraverseOpt : TRAVERSE with type 'a M.t = 'a option
-module TraverseErr : TRAVERSE with type 'a M.t = 'a Err.t

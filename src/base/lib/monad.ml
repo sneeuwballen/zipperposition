@@ -39,135 +39,159 @@ module type S = sig
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 end
 
-(** {2 Option Monad} *)
-
-module Opt = struct
-  type 'a t = 'a option
-
-  let maybe opt x = match opt with
-    | Some y -> y
-    | None -> x
-
-  let (>>=) opt f = match opt with
-  | None -> None
-  | Some x -> f x
-
-  let return x = Some x
-
-  let map x f = match x with
-    | None -> None
-    | Some x' -> Some (f x')
-
-  let get = function
-  | Some x -> x
-  | None -> invalid_arg "Opt.get"
-
-  let is_some = function | Some _ -> true | None -> false
-  let is_none = function | None -> true | Some _ -> false
-end
-
-(** {2 Error monad} *)
-
-module Err = struct
-  type 'a err =
-    | Ok of 'a
-    | Error of string
-
-  type 'a t = 'a err
-
-  let return x = Ok x
-
-  let map x f = match x with
-    | Ok x -> Ok (f x)
-    | Error s -> Error s
-
-  let guard ?(print=Printexc.to_string) f =
-    try
-      Ok (f ())
-    with e ->
-      Error (print e)
-
-  let fail s = Error s
-  let fail_exn ex = Error (Printexc.to_string ex)
-
-  let (>>=) x f = match x with
-    | Ok x' -> f x'
-    | Error s -> Error s
-
-  let to_opt = function
-    | Ok x -> Some x
-    | Error _ -> None
-end
-
-(** {2 List monad} *)
-
-module L = struct
-  type 'a t = 'a list
-
-  let return x = [x]
-
-  let map x f = List.map f x
-
-  let (>>=) l f =
-    let rec expand l = match l with
-    | [] -> []
-    | x::l' ->
-      List.rev_append (f x) (expand l')
-    in
-    expand l
-end
-
 (** {2 Monadic traversal}
 This functor allows to build fold and map functions with a monadic interface.
 *)
 
 module type TRAVERSE = sig
-  module M : S
-    (** monad used for traversal *)
+  type 'a monad
 
-  val fold : 'a Sequence.t -> 'b M.t -> ('b -> 'a -> 'b M.t) -> 'b M.t
-  val fold_l : 'a list -> 'b M.t -> ('b -> 'a -> 'b M.t) -> 'b M.t
+  val fold : 'a Sequence.t -> 'b monad -> ('b -> 'a -> 'b monad) -> 'b monad
+  val fold_l : 'a list -> 'b monad -> ('b -> 'a -> 'b monad) -> 'b monad
 
-  val map_l : 'a list -> ('a -> 'b M.t) -> 'b list M.t
+  val map_l : 'a list -> ('a -> 'b monad) -> 'b list monad
 
-  val seq : 'a M.t list -> 'a list M.t
+  val seq : 'a monad list -> 'a list monad
 end
 
 module Traverse(M : S) = struct
-  module M = M
+  open M
+
+  type 'a monad = 'a M.t
 
   let fold seq acc f =
-    let open M in
     Sequence.fold
       (fun acc x -> acc >>= fun acc -> f acc x)
       acc seq
 
   let fold_l l acc f =
-    let open M in
     List.fold_left
       (fun acc x -> acc >>= fun acc -> f acc x)
       acc l
 
   let map_l l f =
-    let open M in
     let rec map l = match l with
-      | [] -> M.return []
+      | [] -> return []
       | x::l' ->
         f x >>= fun x' ->
         map l' >>= fun l' ->
-        M.return (x' :: l')
+        return (x' :: l')
     in
     map l
 
-  open M
-
   let rec seq l = match l with
-    | [] -> M.return []
+    | [] -> return []
     | x::l' ->
       x >>= fun x' ->
       seq l' >>= fun l'' ->
       M.return (x' :: l'')
 end
 
-module TraverseOpt = Traverse(Opt)
-module TraverseErr = Traverse(Err)
+(** {2 Option Monad} *)
+
+module Opt = struct
+  module Inner = struct
+    type 'a t = 'a option
+
+    let maybe opt x = match opt with
+      | Some y -> y
+      | None -> x
+
+    let (>>=) opt f = match opt with
+    | None -> None
+    | Some x -> f x
+
+    let return x = Some x
+
+    let map x f = match x with
+      | None -> None
+      | Some x' -> Some (f x')
+
+    let get = function
+    | Some x -> x
+    | None -> invalid_arg "Opt.get"
+
+    let is_some = function | Some _ -> true | None -> false
+    let is_none = function | None -> true | Some _ -> false
+  end
+  include Inner
+  include Traverse(Inner)
+end
+
+(** {2 Error monad} *)
+
+module Err = struct
+  module Inner = struct
+    type 'a err =
+      | Ok of 'a
+      | Error of string
+
+    type 'a t = 'a err
+
+    let return x = Ok x
+
+    let map x f = match x with
+      | Ok x -> Ok (f x)
+      | Error s -> Error s
+
+    let guard ?(print=Printexc.to_string) f =
+      try
+        Ok (f ())
+      with e ->
+        Error (print e)
+
+    let fail s = Error s
+    let fail_exn ex = Error (Printexc.to_string ex)
+
+    let (>>=) x f = match x with
+      | Ok x' -> f x'
+      | Error s -> Error s
+
+    let to_opt = function
+      | Ok x -> Some x
+      | Error _ -> None
+  end
+  include Inner
+  include Traverse(Inner)
+end
+
+(** {2 List monad} *)
+
+module L = struct
+  module Inner = struct
+    type 'a t = 'a list
+
+    let return x = [x]
+
+    let map x f = List.map f x
+
+    let (>>=) l f =
+      let rec expand l = match l with
+      | [] -> []
+      | x::l' ->
+        List.rev_append (f x) (expand l')
+      in
+      expand l
+  end
+  include Inner
+  include Traverse(Inner)
+end
+
+(** {2 Composition monad} *)
+
+module Fun(Domain : sig type t end) = struct
+  module Inner = struct
+    type domain = Domain.t
+    type 'a fun_ = domain -> 'a
+    type 'a t = 'a fun_
+
+    let return x _ = x
+
+    let (>>=) f1 f2 x =
+      f2 (f1 x) x
+
+    let map f f1 x = f1 (f x)
+  end
+  include Inner
+  include Traverse(Inner)
+end
