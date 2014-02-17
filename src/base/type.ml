@@ -346,6 +346,60 @@ let bij =
         | _ -> raise (DecodingError "expected Type"))))
 *)
 
+(** {2 Conversions} *)
+
+module Conv = struct
+  module PT = PrologTerm
+
+  exception LocalExit
+
+  let of_prolog ~ctx t =
+    let rec of_prolog t = match t with
+      | PT.Column (PT.Var name, PT.Const (Symbol.Conn Symbol.TType))
+      | PT.Var name ->
+          begin try var (Hashtbl.find ctx name)
+          with Not_found ->
+            let n = Hashtbl.length ctx in
+            Hashtbl.add ctx name n;
+            var n
+          end
+      | PT.Int _
+      | PT.Rat _ -> raise LocalExit
+      | PT.Const s -> const s
+      | PT.App (PT.Const (Symbol.Conn Symbol.Arrow), ret::l) ->
+        let ret = of_prolog ret in
+        let l = List.map of_prolog l in
+        mk_fun ret l
+      | PT.App (PT.Const hd, l) ->
+        let l = List.map of_prolog l in
+        app hd l
+      | PT.Bind (Symbol.Conn Symbol.ForallTy, vars, t') ->
+        let vars = List.map of_prolog vars in
+        let t' = of_prolog t' in
+        forall vars t'
+      | PT.Bind _
+      | PT.App _
+      | PT.Column _
+      | PT.List _ -> raise LocalExit
+    in
+    try Some (of_prolog t)
+    with LocalExit -> None
+
+  let to_prolog ?(depth=0) t =
+    let rec to_prolog depth t = match view t with
+    | Var i -> PT.var (Util.sprintf "A%d" i)
+    | BVar i -> PT.var (Util.sprintf "B%d" (depth-i-1))
+    | App (s,l) -> PT.app (PT.const s) (List.map (to_prolog depth) l)
+    | Fun (ret, l) ->
+      PT.app (PT.const Symbol.Base.arrow)
+        (to_prolog depth ret :: List.map (to_prolog depth) l)
+    | Forall t' ->
+      PT.bind Symbol.Base.forall_ty
+        [PT.var (Util.sprintf "B%d" depth)]
+        (to_prolog depth t')
+    in
+    to_prolog depth t
+end
 
 (** {2 Misc} *)
 

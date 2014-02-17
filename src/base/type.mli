@@ -193,6 +193,13 @@ include Interfaces.PRINT with type t := t
 include Interfaces.SERIALIZABLE with type t := t
 *)
 
+(** {2 Conversions} *)
+
+module Conv : sig
+  val of_prolog : ctx:(string,int) Hashtbl.t -> PrologTerm.t -> t option
+  val to_prolog : ?depth:int -> t -> PrologTerm.t
+end
+
 (** {2 Misc} *)
 
 val __var : int -> t
