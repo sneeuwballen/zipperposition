@@ -38,8 +38,8 @@ val mem : t -> Symbol.t -> bool
 
 val declare : t -> Symbol.t -> Type.t -> t
   (** Declare the symbol, or
-      @raise Invalid_argument if the symbol is already defined with a different type
-      @raise Type.Error if the type has free variables *)
+      @raise Type.Error if the symbol is already defined with a different type
+      @raise Invalid_argument if the type has free variables *)
 
 val find : t -> Symbol.t -> Type.t option
   (** Lookup the type of a symbol *)
@@ -61,7 +61,7 @@ val is_ground : t -> bool
 
 val merge : t -> t -> t
   (** Merge two signatures together.
-      @raise Invalid_argument if they share some symbols with distinct types *)
+      @raise Type.Error if they share some symbols with distinct types *)
 
 val filter : t -> (Symbol.t -> Type.t -> bool) -> t
   (** Only keep part of the signature *)

@@ -50,7 +50,7 @@ let declare signature symb ty =
         let msg = Util.sprintf "type error for %a: %a and %a are incompatible"
           Symbol.pp symb Type.pp ty Type.pp ty'
         in
-        raise (Invalid_argument msg)
+        raise (Type.Error msg)
   with Not_found ->
     if not (ScopedTerm.DB.closed (ty : Type.t :> ScopedTerm.t))
       then raise (Invalid_argument "Signature.declare: non-closed type");
@@ -83,7 +83,7 @@ let merge s1 s2 =
               Util.sprintf "Signature.merge: incompatible types for %a: %a and %a"
               Symbol.pp s Type.pp ty1 Type.pp ty2
             in
-            raise (Invalid_argument msg)
+            raise (Type.Error msg)
       | Some s1, None -> Some s1
       | None, Some s2 -> Some s2)
     s1 s2
