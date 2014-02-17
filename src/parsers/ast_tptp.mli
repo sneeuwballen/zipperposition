@@ -27,17 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 exception ParseError of Location.t
 
-type declaration =
-  | CNF of name * role * Basic.Form.t list * optional_info
-  | FOF of name * role * Basic.Form.t * optional_info
-  | TFF of name * role * Basic.Form.t * optional_info
-  | THF of name * role * Basic.HO.t * optional_info  (* XXX not parsed yet *)
-  | TypeDecl of name * string * Basic.Ty.t  (* type declaration *)
-  | NewType of name * string * Basic.Ty.t (* declare new type constant... *)
-  | Include of string
-  | IncludeOnly of string * name list   (* include a subset of names *)
-  (** top level declaration *)
-and name =
+type name =
   | NameInt of int
   | NameString of string
   (** name of a formula *)
@@ -59,12 +49,6 @@ and role =
 and optional_info = general_data list
 and general_data = PrologTerm.t
 
-val name_of_decl : declaration -> name
-  (** Find the name of the declaration, or
-      @raise Invalid_argument if the declaration is an include directive *)
-
-(** {2 IO} *)
-
 val role_of_string : string -> role
 val string_of_role : role -> string
 val pp_role : Buffer.t -> role -> unit
@@ -80,6 +64,65 @@ val fmt_general : Format.formatter -> general_data -> unit
 val pp_generals : Buffer.t -> general_data list -> unit
 val fmt_generals : Format.formatter -> general_data list -> unit
 
-val pp_declaration : Buffer.t -> declaration -> unit
-val fmt_declaration : Format.formatter -> declaration -> unit
 
+module type S = sig
+  type hoterm
+  type form
+  type ty
+
+  type t =
+    | CNF of name * role * form list * optional_info
+    | FOF of name * role * form * optional_info
+    | TFF of name * role * form * optional_info
+    | THF of name * role * hoterm * optional_info  (* XXX not parsed yet *)
+    | TypeDecl of name * string * ty  (* type declaration for a symbol *)
+    | NewType of name * string * ty (* declare new type constant... *)
+    | Include of string
+    | IncludeOnly of string * name list   (* include a subset of names *)
+    (** top level declaration *)
+
+  type declaration = t
+
+  val get_name : t -> name
+    (** Find the name of the declaration, or
+        @raise Invalid_argument if the declaration is an include directive *)
+
+  (** {2 IO} *)
+
+  include Interfaces.PRINT with type t := t
+end
+
+(** default is with prolog terms everywhere *)
+module Untyped : S
+  with type hoterm = PrologTerm.t
+  and type form = PrologTerm.t
+  and type ty = PrologTerm.t
+
+(** Typed version *)
+module Typed : S
+  with type hoterm = HOTerm.t
+  and type form = Formula.FO.t
+  and type ty = Type.t
+
+module type MAP = sig
+  module From : S
+  module To : S
+
+  val map :
+    form:(From.form -> To.form) ->
+    ho:(From.hoterm -> To.hoterm) ->
+    ty:(From.ty -> To.ty) ->
+    From.t -> To.t
+
+  val flat_map :
+    cnf:(From.form list -> To.form list list) ->
+    form:(From.form -> To.form list) ->
+    ho:(From.hoterm -> To.hoterm list) ->
+    ty:(From.ty -> To.ty) ->
+    From.t list -> To.t list
+end
+
+(** Mappings! *)
+module Map(From:S)(To:S) : MAP
+  with module From = From
+  and module To = To

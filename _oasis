@@ -46,7 +46,7 @@ Library "logtk"
                     Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm, Formula,
                     Substs, Unif, Signature, TypeInference,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
-                    lib/PersistentHashtbl, lib/Monad
+                    lib/PersistentHashtbl, lib/Monad, lib/Location
                     #Comparison, Precedence, Ordering,
                     #lib/Multiset, lib/PartialOrder
   BuildDepends:     zarith,unix
@@ -70,7 +70,7 @@ Library "logtk_extended"
 Library "logtk_parsers"
   Path:             src/parsers
   Pack:             true
-  Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp, Location,
+  Modules:          Parse_tptp, Lex_tptp, Ast_tptp, Util_tptp,
                     Trace_tstp, CallProver
   Build$:           flag(parsers)
   Install$:         flag(parsers)

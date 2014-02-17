@@ -34,7 +34,7 @@ val find_file : string -> string -> string
       It also looks in the "TPTP" environment variable.
       @raise Failure if no such file can be found. *)
 
-val parse_file : recursive:bool -> string -> Ast_tptp.declaration Sequence.t
+val parse_file : recursive:bool -> string -> Ast_tptp.Untyped.t Sequence.t
   (** Parsing a TPTP file is here presented with a [recursive] option
       that, if true, will make "include" directives to be recursively
       parsed. It uses {!find_file} for included files.
@@ -45,56 +45,53 @@ val parse_file : recursive:bool -> string -> Ast_tptp.declaration Sequence.t
 
 (** Printing is simpler, because it does not involve includes. *)
 
-val print_into : out_channel -> Ast_tptp.declaration Sequence.t -> unit
-val print_into_file : string -> Ast_tptp.declaration Sequence.t -> unit
-val print_into_buf : Buffer.t -> Ast_tptp.declaration Sequence.t -> unit
+module type S = sig
+  module A : Ast_tptp.S
 
-val has_includes : Ast_tptp.declaration Sequence.t -> bool
-  (** Check whether some include declaration can be found in the sequence *)
+  val print_into : out_channel -> A.t Sequence.t -> unit
+  val print_into_file : string -> A.t Sequence.t -> unit
+  val print_into_buf : Buffer.t -> A.t Sequence.t -> unit
 
-(** {2 Type inference} *)
+  val has_includes : A.t Sequence.t -> bool
+    (** Check whether some include declaration can be found in the sequence *)
 
-val infer_type : TypeInference.Ctx.t -> Ast_tptp.declaration Sequence.t -> unit
-  (** Infer types from type declarations and formulas.
+  val type_declarations : A.t Sequence.t -> Signature.t
+    (** Initial signature obtained by only considering the type declarations.
+        In contrast to {!signature}, this doesn't perform type inference. *)
+
+  val declare_symbols : ?name:(int -> string -> Ast_tptp.name) ->
+                        Signature.t -> A.t Sequence.t
+    (** Declare the symbols of the signature. A custom function
+        to name the [i]-th symbol declaration can be provided. *)
+
+  val formulas : ?negate:(Ast_tptp.role -> bool) ->
+                 A.t Sequence.t -> A.form Sequence.t
+    (** Extract only the formulas from some declarations. Formulas with
+        a role that satisfies [negate] are negated.
+        [negate] is true, by default, only for {!Ast_tptp.R_conjecture})*)
+
+  val sourced_formulas : ?negate:(Ast_tptp.role -> bool) ->
+                         ?file:string ->
+                         A.t Sequence.t ->
+                         (A.form * string * string) Sequence.t
+    (** Same as {!formulas}, but keeps a source attached to formulas.
+        A [file] name has to be provided for the source to be accurate,
+        the default is "unknown_file". *)
+end
+
+module Untyped : S with module A = Ast_tptp.Untyped
+module Typed : S with module A = Ast_tptp.Typed
+
+(** {2 Type inference and erasure} *)
+
+val infer_types : TypeInference.Ctx.t ->
+                  Ast_tptp.Untyped.t Sequence.t ->
+                  Signature.t * Ast_tptp.Typed.t Sequence.t
+  (** Infer types from type declarations and formulas, returning a sequence
+      of well-typed ASTs, and the inferred signature.
       @raise Type.Error if there is a type error. *)
 
-val signature : ?signature:Signature.t ->
-                Ast_tptp.declaration Sequence.t ->
-                Signature.t
-  (** Same as {!infer_type}, but returns a signature once it's done *)
-
-val type_declarations : Ast_tptp.declaration Sequence.t -> Signature.t
-  (** Initial signature obtained by only considering the type declarations.
-      In contrast to {!signature}, this doesn't perform type inference. *)
-
-val declare_symbols : ?name:(int -> string -> Ast_tptp.name) ->
-                      Signature.t ->
-                      Ast_tptp.declaration Sequence.t
-  (** Declare the symbols of the signature. A custom function
-      to name the [i]-th symbol declaration can be provided. *)
-
-val formulas : ?negate:(Ast_tptp.role -> bool) ->
-               Ast_tptp.declaration Sequence.t ->
-               Basic.Form.t Sequence.t
-  (** Extract only the formulas from some declarations. Formulas with
-      a role that satisfies [negate] are negated.
-      [negate] is true, by default, only for {!Ast_tptp.R_conjecture})*)
-
-val sourced_formulas : ?negate:(Ast_tptp.role -> bool) ->
-                       ?file:string ->
-                       Ast_tptp.declaration Sequence.t ->
-                       Basic.Form.sourced Sequence.t
-  (** Same as {!formulas}, but keeps a source attached to formulas.
-      A [file] name has to be provided for the source to be accurate,
-      the default is "unknown_file". *)
-
-val annotate_type : ?signature:Signature.t ->
-                    ?close_ty:bool ->
-                    Ast_tptp.declaration Sequence.t ->
-                    Signature.t * Ast_tptp.declaration Sequence.t
-  (** Mixture of {!infer_type} and {!signature}, where formulas are
-      annotated with their type (full TFF output) and the
-      signature is returned. 
-      
-      @param close_ty universally quantify on free type variables (default true)
-      *)
+val erase_types : Ast_tptp.Typed.t Sequence.t ->
+                  Ast_tptp.Untyped.t Sequence.t
+  (** Reverse operation of {!infer_types}, that erases types and converts
+      formulas and terms back to {!PrologTerm.t}. *)

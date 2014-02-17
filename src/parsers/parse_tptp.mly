@@ -26,11 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Parser} *)
 
 %{
-  module T = Basic.FO
-  module F = Basic.Form
-  module Ty = Basic.Ty
   module L = Location
-  module Sym = Basic.Sym
+  module Sym = Symbol
   module PT = PrologTerm
 
   let remove_quotes s =
@@ -101,11 +98,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %nonassoc NOTVLINE
 %nonassoc NOTAND
 
-%start <Basic.FO.t> parse_term
-%start <Basic.Form.t> parse_formula
-%start <Ast_tptp.declaration> parse_declaration
-%start <Ast_tptp.declaration list> parse_declarations
-%start <Basic.FO.t list list> parse_answer_tuple
+%start <PrologTerm.t> parse_term
+%start <PrologTerm.t> parse_formula
+%start <Ast_tptp.Untyped.declaration> parse_declaration
+%start <Ast_tptp.Untyped.declaration list> parse_declarations
+%start <PrologTerm.t list list> parse_answer_tuple
 
 %%
 
@@ -124,24 +121,25 @@ declarations:
 
 declaration:
   | FOF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
-    { Ast_tptp.FOF (name, role, f, info) }
+    { Ast_tptp.Untyped.FOF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role=role COMMA f=fof_formula info=annotations RIGHT_PAREN DOT
-    { Ast_tptp.TFF (name, role, f, info) }
+    { Ast_tptp.Untyped.TFF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
       match ty with
-      | Ty.App ("$tType", [])
-      | Ty.Fun (Ty.App ("$tType",[]), _) ->
+      | PT.Const (Symbol.Conn Symbol.TType)
+      | PT.App (PT.Const (Sym.Conn Sym.Arrow),
+               (PT.Const (Sym.Conn Sym.TType) :: _)) ->
         (* declare a new type symbol *)
-        Ast_tptp.NewType (name, s, ty)
-      | _ -> Ast_tptp.TypeDecl (name, s, ty)
+        Ast_tptp.Untyped.NewType (name, s, ty)
+      | _ -> Ast_tptp.Untyped.TypeDecl (name, s, ty)
     }
   | CNF LEFT_PAREN name=name COMMA role=role COMMA c=cnf_formula info=annotations RIGHT_PAREN DOT
-    { Ast_tptp.CNF (name, role, c, info) }
+    { Ast_tptp.Untyped.CNF (name, role, c, info) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED RIGHT_PAREN DOT
-    { Ast_tptp.Include (remove_quotes x) }
+    { Ast_tptp.Untyped.Include (remove_quotes x) }
   | INCLUDE LEFT_PAREN x=SINGLE_QUOTED COMMA names=name_list RIGHT_PAREN DOT
-    { Ast_tptp.IncludeOnly (x, names) }
+    { Ast_tptp.Untyped.IncludeOnly (x, names) }
   | error
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -177,18 +175,18 @@ literal:
   | NOT f=atomic_formula
     {
       let loc = L.mk_pos $startpos $endpos in
-      F.mk_not ~loc f
+      PT.TPTP.not_ ~loc f
     }
 
 fof_formula:
   | fof_logic_formula { $1 }
-  | fof_sequent { $1 } 
+  | fof_sequent { $1 }
 
 fof_sequent:
   | l=fof_tuple GENTZEN_ARROW r=fof_tuple
     { (* TODO accurate locs for subterms *)
       let loc = L.mk_pos $startpos $endpos in
-      F.mk_imply ~loc (F.mk_and ~loc l) (F.mk_or ~loc r)
+      PT.TPTP.imply ~loc (PT.TPTP.and_ ~loc l) (PT.TPTP.or_ ~loc r)
     }
   | LEFT_PAREN seq=fof_sequent RIGHT_PAREN { seq }
 
@@ -225,33 +223,33 @@ fof_unary_formula:
     }
   
 %inline binary_connective:
-  | EQUIV { F.mk_equiv }
-  | IMPLY { F.mk_imply }
-  | LEFT_IMPLY { fun ?loc l r -> F.mk_imply ?loc r l }
-  | XOR { F.mk_xor }
-  | NOTVLINE { fun ?loc x y -> F.mk_not ?loc (F.mk_or ?loc [x; y]) }
-  | NOTAND { fun ?loc x y -> F.mk_not ?loc (F.mk_and ?loc [x; y]) }
-  | AND { fun ?loc x y -> F.mk_and ?loc [x;y] }
-  | VLINE { fun ?loc x y -> F.mk_or ?loc [x;y] }
+  | EQUIV { PT.TPTP.equiv }
+  | IMPLY { PT.TPTP.imply }
+  | LEFT_IMPLY { fun ?loc l r -> PT.TPTP.imply ?loc r l }
+  | XOR { PT.TPTP.xor }
+  | NOTVLINE { fun ?loc x y -> PT.TPTP.not_ ?loc (PT.TPTP.or_ ?loc [x; y]) }
+  | NOTAND { fun ?loc x y -> PT.TPTP.not_ ?loc (PT.TPTP.and_ ?loc [x; y]) }
+  | AND { fun ?loc x y -> PT.TPTP.and_ ?loc [x;y] }
+  | VLINE { fun ?loc x y -> PT.TPTP.or_ ?loc [x;y] }
 %inline fol_quantifier:
-  | FORALL { F.forall }
-  | EXISTS { F.exists }
+  | FORALL { PT.TPTP.forall }
+  | EXISTS { PT.TPTP.exists }
 %inline unary_connective:
-  | NOT { F.mk_not }
+  | NOT { PT.TPTP.not_ }
 
 atomic_formula:
-  | TRUE { F.mk_true } 
-  | FALSE { F.mk_false }
+  | TRUE { PT.TPTP.true_ } 
+  | FALSE { PT.TPTP.false_ }
   | l=term o=infix_connective r=term { o l r }
   | t=function_term
     {
       let loc = L.mk_pos $startpos $endpos in
-      F.atom ~loc t
+      PT.at_loc ~loc t
     }
 
 %inline infix_connective:
-  | EQUAL { F.mk_eq }
-  | NOT_EQUAL { F.mk_neq }
+  | EQUAL { PT.TPTP.eq }
+  | NOT_EQUAL { PT.TPTP.neq }
 
 /* Terms */
 
@@ -270,32 +268,35 @@ plain_term:
   | s=constant
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.const ~loc s
+      PT.TPTP.const ~loc s
     }
   | f=functor_ LEFT_PAREN args=arguments RIGHT_PAREN
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.app ~loc f args
+      PT.TPTP.app ~loc f args
     }
 
 constant:
-| s=atomic_word { Sym.mk_const s }
+| s=atomic_word { Sym.of_string s }
 | s=atomic_defined_word { s }
-functor_: f=atomic_word { Sym.mk_const f }
+functor_: f=atomic_word { PT.const (Sym.of_string f) }
 
 defined_term:
   | t=defined_atom
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.const ~loc t
+      PT.TPTP.const ~loc t
     }
   | t=defined_atomic_term { t }
 
 defined_atom:
-  | n=INTEGER { Sym.mk_bigint (Big_int.big_int_of_string n) }
-  | n=RATIONAL { Sym.mk_ratio (Ratio.ratio_of_string n) }
-  | n=REAL { Sym.mk_real (float_of_string n) }
-  | s=DISTINCT_OBJECT { Sym.mk_distinct s }
+  | n=INTEGER { Sym.int_of_string n }
+  | n=RATIONAL { Sym.rat_of_string n }
+  | n=REAL {
+      let loc = L.mk_pos $startpos $endpos in
+      raise (Ast_tptp.ParseError loc)
+    }
+  | s=DISTINCT_OBJECT { Sym.of_string s }
 
 defined_atomic_term:
   | t=defined_plain_term { t }
@@ -305,12 +306,12 @@ defined_plain_term:
   | s=defined_constant
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.const ~loc s
+      PT.TPTP.const ~loc s
     }
   | f=defined_functor LEFT_PAREN args=arguments RIGHT_PAREN
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.app ~loc f args
+      PT.TPTP.app ~loc (PT.const f) args
     }
 
 defined_constant: t=defined_functor { t }
@@ -320,12 +321,12 @@ system_term:
   | c=system_constant
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.const ~loc c
+      PT.TPTP.const ~loc c
     }
   | f=system_functor LEFT_PAREN args=arguments RIGHT_PAREN
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.app ~loc f args
+      PT.TPTP.app ~loc (PT.const f) args
     }
 
 system_constant: t=system_functor { t }
@@ -335,22 +336,22 @@ system_functor: s=atomic_system_word { s }
 tff_quantified_type:
   | ty=tff_type { ty }
   | FORALL_TY LEFT_BRACKET vars=tff_ty_vars RIGHT_BRACKET COLUMN ty=tff_quantified_type
-    { Ty.forall vars ty }
+    { PT.TPTP.forall vars ty }
 
 /* general type, without quantifiers */
-tff_type: 
+tff_type:
   | ty=tff_atom_type { ty }
   | l=tff_atom_type ARROW r=tff_atom_type
-    { Ty.mk_fun r [l] }
+    { PT.TPTP.mk_fun_ty [l] r }
   | LEFT_PAREN args=tff_ty_args RIGHT_PAREN ARROW r=tff_atom_type
-    { Ty.mk_fun r args }
+    { PT.TPTP.mk_fun_ty args r }
 
 tff_atom_type:
   | v=tff_ty_var { v }
-  | w=type_const { Ty.const w }
+  | w=type_const { PT.TPTP.const w }
   | w=type_const LEFT_PAREN l=separated_nonempty_list(COMMA, tff_type) RIGHT_PAREN
-    { Ty.app w l }
-  | TYPE_TY { Ty.tType }
+    { PT.TPTP.app (PT.const w) l }
+  | TYPE_TY { PT.TPTP.tType }
   | LEFT_PAREN ty=tff_type RIGHT_PAREN { ty }
 
 tff_ty_args:
@@ -361,12 +362,12 @@ tff_ty_vars:
   | v=tff_ty_var COLUMN TYPE_TY {  [v] }
   | v=tff_ty_var COLUMN TYPE_TY COMMA l=tff_ty_vars { v::l }
 
-tff_ty_var: w=UPPER_WORD { Ty.var w }
+tff_ty_var: w=UPPER_WORD { PT.var w }
 
 type_const:
-  | w=LOWER_WORD { w }
-  | w=DOLLAR_WORD { w }
-  | WILDCARD { "$_" }
+  | w=LOWER_WORD { Sym.of_string w }
+  | w=DOLLAR_WORD { Sym.of_string w }
+  | WILDCARD { Sym.Base.wildcard }
 
 arguments: separated_nonempty_list(COMMA, term) { $1 }
 
@@ -377,12 +378,12 @@ variable:
   | x=UPPER_WORD
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.var ~loc x
+      PT.TPTP.var ~loc x
     }
   | x=UPPER_WORD COLUMN ty=tff_type
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.var ~loc ~ty x
+      PT.TPTP.var ~loc ~ty x
     }
 
 atomic_word:
@@ -391,10 +392,10 @@ atomic_word:
   | WILDCARD { "$_" }
 
 atomic_defined_word:
-  | w=DOLLAR_WORD { Sym.mk_const w }
+  | w=DOLLAR_WORD { Sym.of_string w }
 
 atomic_system_word:
-  | w=DOLLAR_DOLLAR_WORD { Sym.mk_const w }
+  | w=DOLLAR_DOLLAR_WORD { Sym.of_string w }
 
 name_list:
   l=separated_list(COMMA, name) { l }
@@ -413,15 +414,15 @@ general_term:
   | general_list { $1 }
 
 general_data:
-  | w=atomic_word { PT.const w }
+  | w=atomic_word { PT.const (Sym.of_string w) }
   | general_function { $1 }
   | INTEGER { PT.of_int (int_of_string $1) }
   | v=UPPER_WORD { PT.var v }
-  | w=DISTINCT_OBJECT { PT.const w }
+  | w=DISTINCT_OBJECT { PT.const (Sym.of_string w) }
 
 general_function:
   | f=atomic_word LEFT_PAREN l=separated_nonempty_list(COMMA, general_term) RIGHT_PAREN
-    { PT.app f l }
+    { PT.app (PT.const (Sym.of_string f)) l }
 
 general_list:
   | LEFT_BRACKET l=separated_list(COMMA, general_term) RIGHT_BRACKET
