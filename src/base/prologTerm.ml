@@ -27,13 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Prolog-like Terms}. *)
 
 type t =
-  | Var of string             (** variable *)
-  | Int of Z.t                (** integer *)
-  | Rat of Q.t                (** rational *)
-  | App of string * t list   (** apply symbol *)
-  | Bind of string * t list * t   (** bind n variables *)
-  | List of t list            (** special constructor for lists *)
-  | Column of t * t           (** t:t (useful for typing, e.g.) *)
+  | Var of string                   (** variable *)
+  | Int of Z.t                      (** integer *)
+  | Rat of Q.t                      (** rational *)
+  | Const of Symbol.t               (** constant *)
+  | App of t * t list               (** apply term *)
+  | Bind of Symbol.t * t list * t   (** bind n variables *)
+  | List of t list                  (** special constructor for lists *)
+  | Column of t * t                 (** t:t (useful for typing, e.g.) *)
 
 type term = t
 
@@ -41,22 +42,24 @@ let __to_int = function
   | Var _ -> 0
   | Int _ -> 1
   | Rat _ -> 2
-  | App _ -> 3
-  | Bind _ -> 4
-  | List _ -> 5
-  | Column _ -> 6
+  | Const _ -> 3
+  | App _ -> 4
+  | Bind _ -> 5
+  | List _ -> 6
+  | Column _ -> 7
 
 let rec cmp t1 t2 = match t1, t2 with
   | Var s1, Var s2 -> String.compare s1 s2
   | Int i1, Int i2 -> Z.compare i1 i2
   | Rat n1, Rat n2 -> Q.compare n1 n2
+  | Const s1, Const s2 -> Symbol.cmp s1 s2
   | App (s1,l1), App (s2, l2) ->
-    let c = String.compare s1 s2 in
+    let c = cmp s1 s2 in
     if c = 0
     then Util.lexicograph cmp l1 l2
     else c
   | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-    let c = String.compare s1 s2 in
+    let c = Symbol.cmp s1 s2 in
     if c = 0
     then
       let c' = cmp t1 t2 in
@@ -75,12 +78,12 @@ let rec hash t = match t with
   | Var s -> Hash.hash_string s
   | Int i -> Z.hash i
   | Rat n -> Hash.hash_string (Q.to_string n)  (* TODO: find better *)
-  | App (s, []) -> Hash.hash_string s
+  | Const s -> Symbol.hash s
   | App (s, l) ->
-    Hash.hash_list hash (Hash.hash_string s) l
+    Hash.hash_list hash (hash s) l
   | List l -> Hash.hash_list hash 0x42 l
   | Bind (s,v,t') ->
-    let h = Hash.combine (Hash.hash_string s) (hash t') in
+    let h = Hash.combine (Symbol.hash s) (hash t') in
     Hash.hash_list hash h v
   | Column (x,y) -> Hash.combine (hash x) (hash y)
 
@@ -89,7 +92,7 @@ let int_ i = Int i
 let of_int i = Int (Z.of_int i)
 let rat n = Rat n
 let app s l  = App(s,l)
-let const s = app s []
+let const s = Const s
 let bind s v l = Bind(s,v,l)
 let list_ l = List l
 let nil = list_ []
@@ -119,7 +122,7 @@ module Seq = struct
     let rec iter t =
       k t;
       match t with
-      | Var _ | Int _ | Rat _ -> ()
+      | Var _ | Int _ | Rat _ | Const _ -> ()
       | List l
       | App (_, l) -> List.iter iter l
       | Bind (_, v, t') -> List.iter iter v; iter t'
@@ -135,7 +138,7 @@ module Seq = struct
     let rec iter bound t =
       k (t, bound);
       match t with
-      | Var _ | Int _ | Rat _ -> ()
+      | Var _ | Int _ | Rat _ | Const _ -> ()
       | List l
       | App (_, l) -> List.iter (iter bound) l
       | Bind (_, v, t') ->
@@ -157,7 +160,7 @@ module Seq = struct
 
   let symbols t = subterms t
       |> Sequence.fmap (function
-        | App (s, _) -> Some s
+        | Const s -> Some s
         | Bind (s, _, _) -> Some s
         | _ -> None)
 end
@@ -175,18 +178,18 @@ let rec pp buf t = match t with
   | Var s -> Buffer.add_string buf s
   | Int i -> Buffer.add_string buf (Z.to_string i)
   | Rat i -> Buffer.add_string buf (Q.to_string i)
+  | Const s -> Symbol.pp buf s
   | List l ->
       Buffer.add_char buf '[';
       Util.pp_list ~sep:"," pp buf l;
       Buffer.add_char buf ']'
-  | App (s, []) -> Buffer.add_string buf s
   | App (s, l) ->
-      Buffer.add_string buf s;
+      pp buf s;
       Buffer.add_char buf '(';
       Util.pp_list ~sep:"," pp buf l;
       Buffer.add_char buf ')'
   | Bind (s, vars, t') ->
-      Buffer.add_string buf s;
+      Symbol.pp buf s;
       Buffer.add_char buf '[';
       Util.pp_list ~sep:"," pp buf vars;
       Buffer.add_string buf "]:";

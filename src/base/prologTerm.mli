@@ -32,13 +32,14 @@ etc.
 *)
 
 type t =
-  | Var of string             (** variable *)
-  | Int of Z.t                (** integer *)
-  | Rat of Q.t                (** rational *)
-  | App of string * t list   (** apply symbol *)
-  | Bind of string * t list * t   (** bind n variables *)
-  | List of t list            (** special constructor for lists *)
-  | Column of t * t           (** t:t (useful for typing, e.g.) *)
+  | Var of string                   (** variable *)
+  | Int of Z.t                      (** integer *)
+  | Rat of Q.t                      (** rational *)
+  | Const of Symbol.t               (** constant *)
+  | App of t * t list               (** apply term *)
+  | Bind of Symbol.t * t list * t   (** bind n variables *)
+  | List of t list                  (** special constructor for lists *)
+  | Column of t * t                 (** t:t (useful for typing, e.g.) *)
 
 type term = t
 
@@ -49,9 +50,9 @@ val var : string -> t
 val int_ : Z.t -> t
 val of_int : int -> t
 val rat : Q.t -> t
-val app : string -> t list -> t
-val const : string -> t
-val bind : string -> t list -> t -> t
+val app : t -> t list -> t
+val const : Symbol.t -> t
+val bind : Symbol.t -> t list -> t -> t
 val list_ : t list -> t
 val nil : t
 val column : t -> t -> t
@@ -69,11 +70,11 @@ module Seq : sig
   val subterms_with_bound : t -> (t * Set.t) Sequence.t
     (** subterm and variables bound at this subterm *)
 
-  val symbols : t -> string Sequence.t
+  val symbols : t -> Symbol.t Sequence.t
   val add_set : Set.t -> t Sequence.t -> Set.t
 end
 
 val ground : t -> bool
-val close_all : string -> t -> t  (** Bind all free vars with the symbol *)
+val close_all : Symbol.t -> t -> t  (** Bind all free vars with the symbol *)
 
 include Interfaces.PRINT with type t := t
