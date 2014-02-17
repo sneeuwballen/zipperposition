@@ -44,7 +44,7 @@ Library "logtk"
   Pack:             true
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
                     Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm, Formula,
-                    Substs, Unif, Signature, BasicTerm, TypeInference,
+                    Substs, Unif, Signature, TypeInference,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad
                     #Comparison, Precedence, Ordering,

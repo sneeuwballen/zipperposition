@@ -53,11 +53,10 @@ module Kind : sig
   (** "kind" of a term, i.e. what is its meaning, in which context is it
       used *)
   type t =
+    | Kind
     | Type
     | FOTerm
     | HOTerm
-    | BasicFOTerm
-    | BasicHOTerm
     | Formula of t
     | Generic  (* other terms *)
 end

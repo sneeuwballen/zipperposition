@@ -32,11 +32,10 @@ type symbol = Sym.t
 
 module Kind = struct
   type t =
+    | Kind
     | Type
     | FOTerm
     | HOTerm
-    | BasicFOTerm
-    | BasicHOTerm
     | Formula of t
     | Generic  (* other terms *)
 end
@@ -187,7 +186,7 @@ let record ~kind ~ty l =
   t
 
 let rec tType =
-  let _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Type;
+  let _t = {term=Const (Sym.Conn Sym.TType); kind=Kind.Kind;
             id= ~-1; ty=NoType; flags=flag_ground; } in
   H.hashcons _t
 

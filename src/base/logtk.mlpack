@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: b48e4ae2ec093c4a1bbf4c6456e88af4)
+# DO NOT EDIT (digest: 83f52f6958bf679bc3efdead111f4a14)
 Symbol
 ScopedTerm
 FOTerm
@@ -16,7 +16,6 @@ Formula
 Substs
 Unif
 Signature
-BasicTerm
 TypeInference
 lib/Sequence
 lib/Cache
