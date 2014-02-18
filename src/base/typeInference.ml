@@ -415,7 +415,7 @@ module FO = struct
     | PT.App _
     | PT.Bind _ -> __error ctx "expected first-order term"
 
-  let infer_var_scope ctx t = match t with
+  let rec infer_var_scope ctx t = match t with
     | PT.Column (PT.Var name, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
@@ -433,11 +433,14 @@ module FO = struct
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i
       in closure
+    | PT.Location (t', loc) ->
+      Ctx.with_loc ctx ~loc (fun () -> infer_var_scope ctx t')
     | _ -> assert false
 
-  let exit_var_scope ctx t = match t with
+  let rec exit_var_scope ctx t = match t with
     | PT.Column (PT.Var name, _)
     | PT.Var name -> Ctx._exit_var_scope ctx name
+    | PT.Location (t', _) -> exit_var_scope ctx t'
     | _ -> assert false
 
   let infer ctx t =

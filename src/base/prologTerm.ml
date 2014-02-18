@@ -278,7 +278,7 @@ module TPTP = struct
     | App (Const (Symbol.Conn Symbol.Not), [a]) ->
       Printf.bprintf buf "~%a" pp_surrounded a
     | App (Const (Symbol.Conn Symbol.Imply), [a;b]) ->
-      Printf.bprintf buf "%a => %aa" pp_surrounded a pp_surrounded b
+      Printf.bprintf buf "%a => %a" pp_surrounded a pp_surrounded b
     | App (Const (Symbol.Conn Symbol.Xor), [a;b]) ->
       Printf.bprintf buf "%a <~> %a" pp_surrounded a pp_surrounded b
     | App (Const (Symbol.Conn Symbol.Equiv), [a;b]) ->
@@ -297,7 +297,7 @@ module TPTP = struct
         Util.pp_list ~sep:"," pp buf l;
         Buffer.add_char buf ')'
     | Bind (s, vars, t') ->
-        Symbol.pp buf s;
+        Symbol.TPTP.pp buf s;
         Buffer.add_char buf '[';
         Util.pp_list ~sep:"," pp_typed_var buf vars;
         Buffer.add_string buf "]:";
@@ -311,12 +311,14 @@ module TPTP = struct
     | Var s -> Buffer.add_string buf s
     | Column (Var s, ty) ->
       Printf.bprintf buf "%s:%a" s pp ty
+    | Location (t',_) -> pp_typed_var buf t'
     | _ -> assert false
   and pp_surrounded buf t = match t with
-    | App _
+    | App (Const (Symbol.Conn _), _::_::_)
     | Bind _ -> Buffer.add_char buf '('; pp buf t; Buffer.add_char buf ')'
+    | Location (t',_) -> pp_surrounded buf t'
     | _ -> pp buf t
 
-let to_string = Util.on_buffer pp
-let fmt fmt t = Format.pp_print_string fmt (to_string t)
+  let to_string = Util.on_buffer pp
+  let fmt fmt t = Format.pp_print_string fmt (to_string t)
 end
