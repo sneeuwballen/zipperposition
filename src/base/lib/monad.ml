@@ -90,69 +90,125 @@ end
 (** {2 Option Monad} *)
 
 module Opt = struct
-  module Inner = struct
-    type 'a t = 'a option
+  type 'a t = 'a option
 
-    let maybe opt x = match opt with
-      | Some y -> y
-      | None -> x
+  let maybe opt x = match opt with
+    | Some y -> y
+    | None -> x
 
-    let (>>=) opt f = match opt with
+  let (>>=) opt f = match opt with
+  | None -> None
+  | Some x -> f x
+
+  let return x = Some x
+
+  let map x f = match x with
     | None -> None
-    | Some x -> f x
+    | Some x' -> Some (f x')
 
-    let return x = Some x
+  let get = function
+  | Some x -> x
+  | None -> invalid_arg "Opt.get"
 
-    let map x f = match x with
-      | None -> None
-      | Some x' -> Some (f x')
+  let is_some = function | Some _ -> true | None -> false
+  let is_none = function | None -> true | Some _ -> false
 
-    let get = function
-    | Some x -> x
-    | None -> invalid_arg "Opt.get"
+  exception LocalExit
 
-    let is_some = function | Some _ -> true | None -> false
-    let is_none = function | None -> true | Some _ -> false
-  end
-  include Inner
-  include Traverse(Inner)
+  let fold seq acc f = match acc with
+  | None -> None
+  | Some acc ->
+    try
+      let x = Sequence.fold
+        (fun acc x -> match f acc x with
+          | None -> raise LocalExit
+          | Some y -> y)
+        acc seq
+      in Some x
+    with LocalExit -> None
+
+  let fold_l l = fold (Sequence.of_list l)
+
+  let map_l l f =
+    let rec map acc l = match l with
+    | [] -> Some (List.rev acc)
+    | x::l' ->
+        match f x with
+        | None -> None
+        | Some y -> map (y::acc) l'
+    in map [] l
+
+  let seq l =
+    let rec iter acc l = match l with
+    | [] -> Some (List.rev acc)
+    | None::_ -> None
+    | Some x::l' -> iter (x::acc) l'
+    in iter [] l
 end
 
 (** {2 Error monad} *)
 
 module Err = struct
-  module Inner = struct
-    type 'a err =
-      | Ok of 'a
-      | Error of string
+  type 'a err =
+    | Ok of 'a
+    | Error of string
 
-    type 'a t = 'a err
+  type 'a t = 'a err
 
-    let return x = Ok x
+  let return x = Ok x
 
-    let map x f = match x with
-      | Ok x -> Ok (f x)
-      | Error s -> Error s
+  let map x f = match x with
+    | Ok x -> Ok (f x)
+    | Error s -> Error s
 
-    let guard ?(print=Printexc.to_string) f =
-      try
-        Ok (f ())
-      with e ->
-        Error (print e)
+  let guard ?(print=Printexc.to_string) f =
+    try
+      Ok (f ())
+    with e ->
+      Error (print e)
 
-    let fail s = Error s
-    let fail_exn ex = Error (Printexc.to_string ex)
+  let fail s = Error s
+  let fail_exn ex = Error (Printexc.to_string ex)
 
-    let (>>=) x f = match x with
-      | Ok x' -> f x'
-      | Error s -> Error s
+  let (>>=) x f = match x with
+    | Ok x' -> f x'
+    | Error s -> Error s
 
-    let to_opt = function
-      | Ok x -> Some x
-      | Error _ -> None
-  end
-  include Inner
-  include Traverse(Inner)
+  let to_opt = function
+    | Ok x -> Some x
+    | Error _ -> None
+
+  exception LocalExit of string
+
+  let fold seq acc f =
+    match acc with Error s -> acc
+    | Ok acc ->
+    try
+      let x = Sequence.fold
+        (fun acc x -> match f acc x with
+          | Error s -> raise (LocalExit s)
+          | Ok y -> y)
+        acc seq
+      in Ok x
+    with LocalExit s -> Error s
+
+  let fold_l l = fold (Sequence.of_list l)
+
+  let map_l l f =
+    let rec map acc l = match l with
+    | [] -> Ok (List.rev acc)
+    | x::l' ->
+        match f x with
+        | Error s -> Error s
+        | Ok y -> map (y::acc) l'
+    in map [] l
+
+  let seq l =
+    let rec iter acc l = match l with
+    | [] -> Ok (List.rev acc)
+    | Error s::_ -> Error s
+    | Ok x::l' -> iter (x::acc) l'
+    in iter [] l
 end
 
 (** {2 List monad} *)
@@ -180,18 +236,27 @@ end
 (** {2 Composition monad} *)
 
 module Fun(Domain : sig type t end) = struct
-  module Inner = struct
-    type domain = Domain.t
-    type 'a fun_ = domain -> 'a
-    type 'a t = 'a fun_
+  type domain = Domain.t
+  type 'a fun_ = domain -> 'a
+  type 'a t = 'a fun_
 
-    let return x _ = x
+  let return x _ = x
 
-    let (>>=) f1 f2 x =
-      f2 (f1 x) x
+  let (>>=) f1 f2 x =
+    f2 (f1 x) x
 
-    let map f f1 x = f1 (f x)
-  end
-  include Inner
-  include Traverse(Inner)
+  let map f f1 x = f1 (f x)
+
+  let fold (seq:'a Sequence.t) (acc:'b t) (f:'b -> 'a -> 'b t) =
+    Sequence.fold
+      (fun acc x ->
+        fun elt -> (f (acc elt) x) elt)
+      acc seq
+
+  let fold_l l = fold (Sequence.of_list l)
+
+  let map_l l f elt = List.map (fun x -> f x elt) l
+
+  let seq l elt =
+    List.map (fun f -> f elt) l
 end

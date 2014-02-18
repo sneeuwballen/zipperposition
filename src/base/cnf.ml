@@ -228,9 +228,12 @@ let rec to_cnf f = match F.view f with
   | F.True
   | F.False -> [[f]]
   | F.Not f' ->
-    if F.is_atomic f'
-      then [[f]]
-      else failwith (Util.sprintf "should be atomic: %a" F.pp f')
+      begin match F.view f' with
+      | F.Eq (a,b) -> [[F.Base.neq a b]]
+      | F.Neq (a,b) -> [[F.Base.eq a b]]
+      | _ when F.is_atomic f' ->[[f]]
+      | _ -> failwith (Util.sprintf "should be atomic: %a" F.pp f')
+      end
   | F.And l ->
     (* simply concat sub-CNF *)
     Util.list_flatmap to_cnf l
@@ -269,12 +272,17 @@ let cnf_of ?(opts=[]) ?(ctx=Skolem.create Signature.empty) f =
       match F.view f with
       | F.Or l -> [l]  (* works because [f] flattened before *)
       | F.False
-      | F.True 
+      | F.True
       | F.Eq _
       | F.Neq _
       | F.Atom _ -> [[f]]
-      | F.Not f' when F.is_atomic f' -> [[f]]
-      | F.Not _
+      | F.Not f'  ->
+        begin match F.view f' with
+        | F.Eq (a,b) -> [[F.Base.neq a b]]
+        | F.Neq (a,b) -> [[F.Base.eq a b]]
+        | _ when F.is_atomic f' ->[[f]]
+        | _ -> failwith (Util.sprintf "should be atomic: %a" F.pp f')
+        end
       | F.Equiv _
       | F.Imply _
       | F.Xor _
