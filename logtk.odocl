@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 0c6503245e67b011be6c21c8027b9703)
+# DO NOT EDIT (digest: 9f67e1fdee1a61ecd96ce4bc20f35095)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -20,6 +20,8 @@ src/base/TypeInference
 src/base/Comparison
 src/base/Precedence
 src/base/Ordering
+src/base/Skolem
+src/base/Cnf
 src/base/lib/Sequence
 src/base/lib/Cache
 src/base/lib/Bij

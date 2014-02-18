@@ -29,16 +29,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 type ctx
   (** Context needed to create new symbols *)
 
-val create : ?base:Signature.t -> ?prefix:string -> unit -> ctx
+val create : ?prefix:string -> Signature.t ->  ctx
   (** New skolem contex. A prefix can be provided, which will be
-      added to all newly created skolem symbols *)
+      added to all newly created skolem symbols.
+      @param signature initial signature the context holds. *)
 
 val to_signature : ctx -> Signature.t
   (** Signature of all new skolem symbols that were created using this
       context. *)
 
 val fresh_sym : ctx:ctx -> ty:Type.t -> Symbol.t
-  (** Just obtain a fresh skolem symbol *)
+  (** Just obtain a fresh skolem symbol. It is also declared
+      in the inner signature. *)
 
 val clear_var : ctx:ctx -> unit
   (** reset the variable counter (once a formula has been processed) *)
@@ -49,7 +51,7 @@ val fresh_var : ctx:ctx -> int
 val update_var : ctx:ctx -> FOTerm.t -> unit
   (** Avoid collisions with variables of this term in calls to {!fresh_var}. *)
 
-val skolem_form : ctx:ctx -> ty:Type.t -> FOFormula.t -> FOFormula.t
+val skolem_form : ctx:ctx -> ty:Type.t -> Formula.FO.t -> Formula.FO.t
   (** Skolemize the given formula at root (assumes it occurs just under an
       existential quantifier, whose De Bruijn variable 0 is replaced
       by a fresh symbol applied to free variables). This also caches symbols,
@@ -59,8 +61,7 @@ val skolem_form : ctx:ctx -> ty:Type.t -> FOFormula.t -> FOFormula.t
       For instance, [skolem_form ~ctx p(a, b, db0, X)] will yield
       something like [p(a, b, sk42(X), X)].
 
-      @param ty the type of the De Bruijn variable to replace
-      *)
+      @param ty the type of the De Bruijn variable to replace *)
 
 val skolem_ho : ctx:ctx -> ty:Type.t -> HOTerm.t -> HOTerm.t
   (** Skolemize a higher order term. Quite the same as {!skolem_form}.

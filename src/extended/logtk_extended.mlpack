@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: e61fc2ac5d4be10b78608a76f9b4f562)
+# DO NOT EDIT (digest: b7e9f7f645d3dc8c688cc0f73cacec2f)
 Lambda
 Index
 Dtree
@@ -7,15 +7,12 @@ Fingerprint
 Rewriting
 FeatureVector
 FormulaShape
-Skolem
-Cnf
 Transform
 NPDtree
 Congruence
 Options
 FastFingerprint
 Evaluator
-TypeErasure
 lib/MultiMap
 lib/Mixtbl
 # OASIS_STOP

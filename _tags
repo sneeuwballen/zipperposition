@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 6b2da12120a823b9e0b1c22cfd87d97a)
+# DO NOT EDIT (digest: 53accd38ed12f8ba7d6ed2156a51db6a)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -35,6 +35,8 @@
 "src/base/comparison.cmx": for-pack(Logtk)
 "src/base/precedence.cmx": for-pack(Logtk)
 "src/base/ordering.cmx": for-pack(Logtk)
+"src/base/skolem.cmx": for-pack(Logtk)
+"src/base/cnf.cmx": for-pack(Logtk)
 "src/base/lib/sequence.cmx": for-pack(Logtk)
 "src/base/lib/cache.cmx": for-pack(Logtk)
 "src/base/lib/bij.cmx": for-pack(Logtk)
@@ -58,15 +60,12 @@
 "src/extended/rewriting.cmx": for-pack(Logtk_extended)
 "src/extended/featureVector.cmx": for-pack(Logtk_extended)
 "src/extended/formulaShape.cmx": for-pack(Logtk_extended)
-"src/extended/skolem.cmx": for-pack(Logtk_extended)
-"src/extended/cnf.cmx": for-pack(Logtk_extended)
 "src/extended/transform.cmx": for-pack(Logtk_extended)
 "src/extended/NPDtree.cmx": for-pack(Logtk_extended)
 "src/extended/congruence.cmx": for-pack(Logtk_extended)
 "src/extended/options.cmx": for-pack(Logtk_extended)
 "src/extended/fastFingerprint.cmx": for-pack(Logtk_extended)
 "src/extended/evaluator.cmx": for-pack(Logtk_extended)
-"src/extended/typeErasure.cmx": for-pack(Logtk_extended)
 "src/extended/lib/multiMap.cmx": for-pack(Logtk_extended)
 "src/extended/lib/mixtbl.cmx": for-pack(Logtk_extended)
 <src/extended/*.ml{,i}>: use_logtk

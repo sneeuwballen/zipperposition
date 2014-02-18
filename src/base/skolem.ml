@@ -26,38 +26,48 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Skolem symbols} *)
 
+module ST = ScopedTerm
 module T = FOTerm
-module F = FOFormula
-module S = Substs.FO
+module F = Formula.FO
+module S = Substs
 
 type ctx = {
-  sc_gensym : Symbol.Gensym.t;                  (* new symbols *)
-  mutable sc_var_index : int;                   (* fresh universal vars *)
+  sc_prefix : string;
+  mutable sc_gensym : int;              (* new symbols *)
+  mutable sc_var_index : int;           (* fresh universal vars *)
   mutable sc_cache : (T.t * T.t) list;  (* term -> skolemized term *)
-  mutable sc_fcache : (F.t * F.t) list; 
+  mutable sc_fcache : (F.t * F.t) list;
   mutable sc_signature : Signature.t;
 }
 
 (* TODO: use a term index for the cache? *)
 
-let create ?(base=Signature.base) ?(prefix="logtk_sk__") () =
+let create ?(prefix="logtk_sk__") signature =
   let ctx = {
-    sc_gensym = Symbol.Gensym.create ~prefix ();
+    sc_prefix=prefix;
+    sc_gensym = 0;
     sc_var_index = 0;
     sc_cache = [];
     sc_fcache = [];
-    sc_signature = base;
+    sc_signature = signature;
   } in
   ctx
 
 let to_signature ctx = ctx.sc_signature
 
 let fresh_sym ~ctx ~ty =
-  Symbol.Gensym.new_ ~ty ctx.sc_gensym
+  let n = ctx.sc_gensym in
+  ctx.sc_gensym <- n+1;
+  let s = Symbol.of_string (ctx.sc_prefix ^ string_of_int n) in
+  (* declare type of the new symbol *)
+  ctx.sc_signature <- Signature.declare ctx.sc_signature s ty;
+  Util.debug 5 "new skolem symbol %a with type %a" Symbol.pp s Type.pp ty;
+  s
 
 (* update varindex in [ctx] so that it won't get captured in [t] *)
 let update_var ~ctx t =
-  ctx.sc_var_index <- max ctx.sc_var_index (T.max_var (T.vars t) + 1)
+  let m = max ctx.sc_var_index ((T.Seq.vars t |> T.Seq.max_var) + 1) in
+  ctx.sc_var_index <- m
 
 let clear_var ~ctx =
   ctx.sc_var_index <- 0
@@ -72,7 +82,7 @@ exception FoundVariant of T.t * T.t * S.t
 exception FoundFormVariant of F.t * F.t * S.t
 
 let skolem_form ~ctx ~ty f =
-  let vars = F.free_variables f in
+  let vars = F.Seq.vars f |> T.Seq.add_set T.Set.empty |> T.Set.elements in
   (* find a variant of [f] *)
   try
     List.iter
@@ -80,28 +90,31 @@ let skolem_form ~ctx ~ty f =
         Util.debug 5 "check variant %a and %a" F.pp f F.pp f';
         Sequence.iter
           (fun subst -> raise (FoundFormVariant (f', new_f', subst)))
-          (FOUnif.form_variant f' 1 f 0))
+          (Unif.Form.variant f' 1 f 0))
       ctx.sc_fcache;
     (* fresh symbol with the proper type *)
     let ty_of_vars = List.map T.ty vars in
     let ty = Type.(ty <== ty_of_vars) in
     (* close the type w.r.t its type variables *)
-    let tyargs = Type.free_vars ty in
+    let tyargs = Type.vars ty in
     let ty = Type.forall tyargs ty in
-    let symb = fresh_sym ~ctx ~ty in
-    let skolem_term = T.mk_node ~tyargs symb vars in
+    let const = T.const ~ty (fresh_sym ~ctx ~ty) in
+    let skolem_term = T.app ~tyargs const vars in
     (* replace variable by skolem t*)
-    let env = DBEnv.singleton skolem_term in
-    let new_f = F.DB.unshift 1 (F.DB.eval env f) in
+    let env = DBEnv.singleton (skolem_term : T.t :> ST.t) in
+    let new_f =
+        ST.DB.eval env (f : F.t :> ST.t)
+      |> ST.DB.unshift 1
+      |> (fun t -> match F.of_term t with
+          | None -> assert (T.is_term t); F.Base.atom (T.of_term_exn t)
+          | Some f -> f)
+    in
     ctx.sc_fcache <- (f, new_f) :: ctx.sc_fcache;
-    (* update signature *)
-    ctx.sc_signature <- Signature.declare_sym ctx.sc_signature symb;
-    Util.debug 5 "new skolem symbol %a with type %a" Symbol.pp symb Type.pp ty;
     new_f
   with FoundFormVariant(f',new_f',subst) ->
     Util.debug 5 "form %a is variant of %a under %a" F.pp f' F.pp f S.pp subst;
-    let renaming = S.Renaming.create 5 in
-    let new_f = S.apply_f ~renaming subst new_f' 1 in
+    let renaming = S.Renaming.create () in
+    let new_f = S.Form.apply ~renaming subst new_f' 1 in
     new_f
 
 let skolem_ho ~ctx ~ty f = failwith "Skolem_ho: not implemented"

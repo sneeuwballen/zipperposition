@@ -45,7 +45,7 @@ Library "logtk"
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
                     Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm, Formula,
                     Substs, Unif, Signature, TypeInference,
-                    Comparison, Precedence, Ordering,
+                    Comparison, Precedence, Ordering, Skolem, Cnf,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
                     lib/Multiset, lib/BV, lib/PartialOrder
@@ -60,9 +60,8 @@ Library "logtk_extended"
   Build$:           flag(extended)
   Install$:         flag(extended)
   Modules:          Lambda, Index, Dtree, Fingerprint, Rewriting,
-                    FeatureVector, FormulaShape, Skolem, Cnf, Transform,
+                    FeatureVector, FormulaShape, Transform,
                     NPDtree, Congruence, Options, FastFingerprint, Evaluator,
-                    TypeErasure,
                     lib/MultiMap, lib/Mixtbl
   BuildDepends:     logtk,unix,zarith
   XMETARequires:    logtk,unix,zarith

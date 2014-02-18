@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 92c966dfc24c7594e876e900cd7800f6)
+# DO NOT EDIT (digest: 45118ef67db97b003c6ebfeb146dae6c)
 Symbol
 ScopedTerm
 FOTerm
@@ -20,6 +20,8 @@ TypeInference
 Comparison
 Precedence
 Ordering
+Skolem
+Cnf
 lib/Sequence
 lib/Cache
 lib/Bij
