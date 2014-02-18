@@ -171,4 +171,5 @@
 <tools/*.ml{,i}>: package(zarith)
 # OASIS_STOP
 true: use_menhir
+<src/base/{scopedTerm,FOTerm,Type}.cmx>: inline(15)
 #<src/**/*.cmx>: inline(10)
