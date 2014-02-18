@@ -184,6 +184,8 @@ module type S = sig
   val of_term : HOTerm.t -> t
   *)
 
+  val to_prolog : ?depth:int -> t -> PrologTerm.t
+
   (** {2 IO} *)
 
   include Interfaces.PRINT with type t := t
@@ -221,6 +223,8 @@ module type TERM = sig
   end
 
   module Set : Sequence.Set.S with type elt = t
+
+  val to_prolog : ?depth:int -> t -> PrologTerm.t
 
   include Interfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t
@@ -821,6 +825,34 @@ module Make(MyT : TERM) = struct
     in
     recurse t
   *)
+
+  let to_prolog ?(depth=0) f =
+    let module PT = PrologTerm in
+    let rec to_prolog depth f = match view f with
+    | True -> PT.TPTP.true_
+    | False -> PT.TPTP.false_
+    | Not f' -> PT.TPTP.not_ (to_prolog depth f')
+    | And l -> PT.TPTP.and_ (List.map (to_prolog depth) l)
+    | Or l -> PT.TPTP.or_ (List.map (to_prolog depth) l)
+    | Imply (a,b) -> PT.TPTP.imply (to_prolog depth a) (to_prolog depth b)
+    | Equiv (a,b) -> PT.TPTP.equiv (to_prolog depth a) (to_prolog depth b)
+    | Xor (a,b) -> PT.TPTP.xor (to_prolog depth a) (to_prolog depth b)
+    | Eq (a,b) -> PT.TPTP.eq (MyT.to_prolog ~depth a) (MyT.to_prolog ~depth b)
+    | Neq (a,b) -> PT.TPTP.neq (MyT.to_prolog ~depth a) (MyT.to_prolog ~depth b)
+    | Atom a -> MyT.to_prolog ~depth a
+    | Forall (tyvar, f') ->
+      PT.TPTP.forall
+        [PT.column
+            (PT.var (Util.sprintf "Y%d" depth))
+            (Type.Conv.to_prolog ~depth tyvar)]
+        (to_prolog (depth+1) f')
+    | Exists (tyvar, f') ->
+      PT.TPTP.exists
+        [PT.column
+            (PT.var (Util.sprintf "Y%d" depth))
+            (Type.Conv.to_prolog ~depth tyvar)]
+        (to_prolog (depth+1) f')
+    in to_prolog depth f
 
   (** {2 IO} *)
 

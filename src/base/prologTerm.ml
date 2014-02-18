@@ -26,6 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Prolog-like Terms}. *)
 
+type location = ParseLocation.t
+
 type t =
   | Var of string                   (** variable *)
   | Int of Z.t                      (** integer *)
@@ -35,7 +37,7 @@ type t =
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
-  | Location of t * Location.t      (** Indicates a location. Mostly ignored otherwise. *)
+  | Location of t * location      (** Indicates a location. Mostly ignored otherwise. *)
 
 type term = t
 

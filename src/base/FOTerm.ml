@@ -432,6 +432,22 @@ module AC(A : AC_SPEC) = struct
       |> Symbol.Seq.add_set Symbol.Set.empty
 end
 
+(** {2 Conversions} *)
+
+let to_prolog ?(depth=0) t =
+  let module PT = PrologTerm in
+  let rec to_prolog t =
+    let ty = ty t in
+    match view t with
+    | Var i -> PT.column (PT.var (Util.sprintf "X%d" i)) (Type.Conv.to_prolog ~depth ty)
+    | BVar i -> PT.var (Util.sprintf "Y%d" (depth-i-1))
+    | App (f,tyargs,l) ->
+        PT.app (to_prolog f)
+          (List.map (Type.Conv.to_prolog ~depth) tyargs @
+           List.map to_prolog l)
+    | Const f -> PT.const f
+  in to_prolog t
+
 (** {2 Printing/parsing} *)
 
 let print_all_types = ref false

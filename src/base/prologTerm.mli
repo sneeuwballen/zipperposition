@@ -31,6 +31,8 @@ simplicity make them good for heavy AST transformations, output of parsing,
 etc.
 *)
 
+type location = ParseLocation.t
+
 type t =
   | Var of string                   (** variable *)
   | Int of Z.t                      (** integer *)
@@ -40,7 +42,7 @@ type t =
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
-  | Location of t * Location.t      (** Indicates a location. Mostly ignored otherwise. *)
+  | Location of t * location      (** Indicates a location. Mostly ignored otherwise. *)
 
 type term = t
 
@@ -57,7 +59,7 @@ val bind : Symbol.t -> t list -> t -> t
 val list_ : t list -> t
 val nil : t
 val column : t -> t -> t
-val at_loc : loc:Location.t -> t -> t
+val at_loc : loc:location -> t -> t
 
 val is_var : t -> bool
 
@@ -88,21 +90,21 @@ module TPTP : sig
   val true_ : t
   val false_ : t
 
-  val var : ?loc:Location.t -> ?ty:t -> string -> t
-  val const : ?loc:Location.t -> Symbol.t -> t
-  val app : ?loc:Location.t -> t -> t list -> t
-  val bind : ?loc:Location.t -> Symbol.t -> t list -> t -> t
+  val var : ?loc:location -> ?ty:t -> string -> t
+  val const : ?loc:location -> Symbol.t -> t
+  val app : ?loc:location -> t -> t list -> t
+  val bind : ?loc:location -> Symbol.t -> t list -> t -> t
 
-  val and_ : ?loc:Location.t -> t list -> t
-  val or_ : ?loc:Location.t -> t list -> t
-  val not_ : ?loc:Location.t -> t -> t
-  val equiv : ?loc:Location.t -> t -> t -> t
-  val xor : ?loc:Location.t -> t -> t -> t
-  val imply : ?loc:Location.t -> t -> t -> t
-  val eq : ?loc:Location.t -> t -> t -> t
-  val neq : ?loc:Location.t -> t -> t -> t
-  val forall : ?loc:Location.t -> t list -> t -> t
-  val exists : ?loc:Location.t -> t list -> t -> t
+  val and_ : ?loc:location -> t list -> t
+  val or_ : ?loc:location -> t list -> t
+  val not_ : ?loc:location -> t -> t
+  val equiv : ?loc:location -> t -> t -> t
+  val xor : ?loc:location -> t -> t -> t
+  val imply : ?loc:location -> t -> t -> t
+  val eq : ?loc:location -> t -> t -> t
+  val neq : ?loc:location -> t -> t -> t
+  val forall : ?loc:location -> t list -> t -> t
+  val exists : ?loc:location -> t list -> t -> t
 
   val mk_fun_ty : t list -> t -> t
   val tType : t

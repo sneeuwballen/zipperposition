@@ -200,6 +200,10 @@ module AC(A : AC_SPEC) : sig
     (** Set of symbols occurring in the terms, that are AC *)
 end
 
+(** {2 Conversions} *)
+
+val to_prolog : ?depth:int -> t -> PrologTerm.t
+
 (** {2 Printing/parsing} *)
 
 val print_all_types : bool ref

@@ -188,6 +188,8 @@ module type S = sig
   val of_term : HOTerm.t -> t
   *)
 
+  val to_prolog : ?depth:int -> t -> PrologTerm.t
+
   (** {2 IO} *)
 
   include Interfaces.PRINT with type t := t
@@ -225,6 +227,8 @@ module type TERM = sig
   end
 
   module Set : Sequence.Set.S with type elt = t
+
+  val to_prolog : ?depth:int -> t -> PrologTerm.t
 
   include Interfaces.PRINT_DE_BRUIJN with type t := t
       and type term := t

@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module Ty = Type
 module S = Substs
 module Sym = Symbol
+module Loc = ParseLocation
 
 let prof_infer = Util.mk_profiler "TypeInference.infer"
 
@@ -64,7 +65,7 @@ module Ctx = struct
     mutable signature : Signature.t;(* symbol -> type *)
     mutable subst : S.t;            (* variable bindings *)
     mutable to_bind : Type.t list;  (* list of variables to eventually bind (close) *)
-    mutable locs : Location.t list; (* stack of locations *)
+    mutable locs : Loc.t list; (* stack of locations *)
     renaming : Substs.Renaming.t;
     symbols : Type.t Symbol.Tbl.t;  (* symbol -> instantiated type *)
     tyvars : (string, int) Hashtbl.t;            (* type variable -> number *)
@@ -126,7 +127,7 @@ module Ctx = struct
       else _new_var ctx :: _new_vars ctx (n-1)
 
   (* convert a prolog term into a type *)
-  let _of_ty ctx ty =
+  let ty_of_prolog ctx ty =
     Type.Conv.of_prolog ~ctx:ctx.tyvars ty
 
   (* variable number and type, for the given name. An optional type can
@@ -313,7 +314,7 @@ let __error ctx msg =
   (* print closest location *)
   begin match ctx.Ctx.locs with
   | [] -> ()
-  | loc::_ -> Printf.bprintf b "at %a:" Location.pp loc
+  | loc::_ -> Printf.bprintf b "at %a:" Loc.pp loc
   end;
   Printf.bprintf b "error during type inference: ";
   Printf.kbprintf
@@ -335,7 +336,7 @@ module FO = struct
     | [] -> Ctx._new_vars ctx arity  (* add variables *)
     | a::args' ->
       (* convert [a] into a type *)
-      match Ctx._of_ty ctx a with
+      match Ctx.ty_of_prolog ctx a with
       | None -> __error ctx "term %a is not a type" PT.pp a
       | Some ty -> ty :: _complete_type_args ctx (arity-1) args'
 
@@ -347,7 +348,7 @@ module FO = struct
       Ctx.with_loc ctx ~loc (fun () -> infer_rec ctx t')
     | PT.Column (PT.Var name, ty) ->
       (* typed var *)
-      let ty = match Ctx._of_ty ctx ty with
+      let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
         | None -> __error ctx "expected type, got %a" PT.pp ty
       in
@@ -416,7 +417,7 @@ module FO = struct
 
   let infer_var_scope ctx t = match t with
     | PT.Column (PT.Var name, ty) ->
-      let ty = match Ctx._of_ty ctx ty with
+      let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
         | None -> __error ctx "expected type, got %a" PT.pp ty
       in
@@ -590,12 +591,12 @@ module HO = struct
     | [] -> Ctx._new_vars ctx arity  (* add variables *)
     | a::args' ->
       (* convert [a] into a type *)
-      let ty = Ctx._of_ty ctx (BT.as_ty a) in
+      let ty = Ctx.ty_of_prolog ctx (BT.as_ty a) in
       ty :: _complete_type_args ctx (arity-1) args'
 
   let infer_var_scope ctx t = match t.BT.term with
     | BT.Var name ->
-      let ty = Ctx._of_ty ctx (BT.get_ty t) in
+      let ty = Ctx.ty_of_prolog ctx (BT.get_ty t) in
       let i = Ctx._enter_var_scope ctx name ty in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty 0 in
@@ -615,7 +616,7 @@ module HO = struct
   let rec infer_rec ?(arity=0) ctx t =
     let ty, closure = match t.BT.term with
     | BT.Var name ->
-      let ty = Ctx._of_ty ctx (BT.get_ty t) in
+      let ty = Ctx.ty_of_prolog ctx (BT.get_ty t) in
       let i, ty = Ctx._get_var ctx ~ty name in
       let closure renaming subst =
         let ty = Substs.Ty.apply ~renaming subst ty 0 in
@@ -679,7 +680,7 @@ module HO = struct
     match t.BT.ty with
     | None -> ty, closure
     | Some ty' ->
-      Ctx.unify_and_set ctx ty (Ctx._of_ty ctx ty');
+      Ctx.unify_and_set ctx ty (Ctx.ty_of_prolog ctx ty');
       ty, closure
 
   let infer ctx t =

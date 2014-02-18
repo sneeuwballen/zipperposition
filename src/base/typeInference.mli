@@ -90,6 +90,9 @@ module Ctx : sig
         @raise Type.Error if an inconsistency (with inferred types) is
           detected. *)
 
+  val ty_of_prolog : t -> PrologTerm.t -> Type.t option
+    (** Type conversion from PrologTerm *)
+
   val bind_to_default : t -> unit
     (** Free constructor variables are bound to the [default] type provided
         at creation of the context. *)
