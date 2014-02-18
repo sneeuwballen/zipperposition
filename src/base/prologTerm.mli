@@ -29,11 +29,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Those terms are not hashconsed, nor do they use De Bruijn indices. Their
 simplicity make them good for heavy AST transformations, output of parsing,
 etc.
+
+Terms are only compared, hashsed, etc. by their "term" component (the algebraic
+variant). Additional fields (location...) are ignored for almost every
+operation.
 *)
 
 type location = ParseLocation.t
 
-type t =
+type t = {
+  term : view;
+  loc : location option;
+}
+and view = private
   | Var of string                   (** variable *)
   | Int of Z.t                      (** integer *)
   | Rat of Q.t                      (** rational *)
@@ -42,7 +50,6 @@ type t =
   | Bind of Symbol.t * t list * t   (** bind n variables *)
   | List of t list                  (** special constructor for lists *)
   | Column of t * t                 (** t:t (useful for typing, e.g.) *)
-  | Location of t * location      (** Indicates a location. Mostly ignored otherwise. *)
 
 type term = t
 
@@ -62,9 +69,6 @@ val column : t -> t -> t
 val at_loc : loc:location -> t -> t
 
 val is_var : t -> bool
-
-val skip_loc : t -> t
-  (** Remove prefixing location constructors *)
 
 module Set : Sequence.Set.S with type elt = term
 module Map : Sequence.Map.S with type key = term

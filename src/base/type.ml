@@ -358,9 +358,8 @@ module Conv = struct
   exception LocalExit
 
   let of_prolog ~ctx t =
-    let rec of_prolog t = match t with
-      | PT.Location (t',_) -> of_prolog t'
-      | PT.Column (PT.Var name, PT.Const (Symbol.Conn Symbol.TType))
+    let rec of_prolog t = match t.PT.term with
+      | PT.Column ({PT.term=PT.Var name}, {PT.term=PT.Const (Symbol.Conn Symbol.TType)})
       | PT.Var name ->
         assert (name <> "");
         begin try var (Hashtbl.find ctx name)
@@ -377,11 +376,11 @@ module Conv = struct
       | PT.Int _
       | PT.Rat _ -> raise LocalExit
       | PT.Const s -> const s
-      | PT.App (PT.Const (Symbol.Conn Symbol.Arrow), ret::l) ->
+      | PT.App ({PT.term=PT.Const (Symbol.Conn Symbol.Arrow)}, ret::l) ->
         let ret = of_prolog ret in
         let l = List.map of_prolog l in
         mk_fun ret l
-      | PT.App (PT.Const hd, l) ->
+      | PT.App ({PT.term=PT.Const hd}, l) ->
         let l = List.map of_prolog l in
         app hd l
       | PT.Bind (Symbol.Conn Symbol.ForallTy, vars, t') ->

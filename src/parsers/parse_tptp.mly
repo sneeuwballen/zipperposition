@@ -129,10 +129,10 @@ declaration:
     { A.TFF (name, role, f, info) }
   | TFF LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
-      match ty with
+      match ty.PT.term with
       | PT.Const (Symbol.Conn Symbol.TType)
-      | PT.App (PT.Const (Sym.Conn Sym.Arrow),
-               (PT.Const (Sym.Conn Sym.TType) :: _)) ->
+      | PT.App ({PT.term=PT.Const (Sym.Conn Sym.Arrow)},
+               ({PT.term=PT.Const (Sym.Conn Sym.TType)} :: _)) ->
         (* declare a new type symbol *)
         A.NewType (name, s, ty)
       | _ -> A.TypeDecl (name, s, ty)
@@ -206,8 +206,8 @@ fof_logic_formula:
 
 fof_unitary_formula:
   | fof_quantified_formula { $1 }
-  | fof_unary_formula { $1 } 
-  | atomic_formula { $1 } 
+  | fof_unary_formula { $1 }
+  | atomic_formula { $1 }
   | LEFT_PAREN f=fof_logic_formula RIGHT_PAREN { f }
 
 fof_quantified_formula:
@@ -224,7 +224,7 @@ fof_unary_formula:
      let loc = L.mk_pos $startpos $endpos in
      o ~loc f
     }
-  
+
 %inline binary_connective:
   | EQUIV { PT.TPTP.equiv }
   | IMPLY { PT.TPTP.imply }
@@ -241,7 +241,7 @@ fof_unary_formula:
   | NOT { PT.TPTP.not_ }
 
 atomic_formula:
-  | TRUE { PT.TPTP.true_ } 
+  | TRUE { PT.TPTP.true_ }
   | FALSE { PT.TPTP.false_ }
   | l=term o=infix_connective r=term { o l r }
   | t=function_term

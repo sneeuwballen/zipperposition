@@ -343,10 +343,11 @@ module FO = struct
   (* infer a type for [t], possibly updating [ctx]. Also returns a
     continuation to build a typed term. *)
   let rec infer_rec ctx t =
-    match t with
-    | PT.Location (t', loc) ->
-      Ctx.with_loc ctx ~loc (fun () -> infer_rec ctx t')
-    | PT.Column (PT.Var name, ty) ->
+    match t.PT.loc with
+    | None -> infer_rec_view ctx t.PT.term
+    | Some loc -> Ctx.with_loc ctx ~loc (fun () -> infer_rec_view ctx t.PT.term)
+  and infer_rec_view ctx t = match t with
+    | PT.Column ({PT.term=PT.Var name}, ty) ->
       (* typed var *)
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
@@ -374,7 +375,7 @@ module FO = struct
         T.const ~ty s
       in
       ty_s, closure
-    | PT.App (PT.Const s, l) ->
+    | PT.App ({PT.term=PT.Const s}, l) ->
       (* use type of [s] *)
       let ty_s = Ctx.type_of_fun ~arity:(List.length l) ctx s in
       Util.debug 5 "type of symbol %a: %a" Sym.pp s Type.pp ty_s;
@@ -415,8 +416,8 @@ module FO = struct
     | PT.App _
     | PT.Bind _ -> __error ctx "expected first-order term"
 
-  let rec infer_var_scope ctx t = match t with
-    | PT.Column (PT.Var name, ty) ->
+  let infer_var_scope ctx t = match t.PT.term with
+    | PT.Column ({PT.term=PT.Var name}, ty) ->
       let ty = match Ctx.ty_of_prolog ctx ty with
         | Some ty -> ty
         | None -> __error ctx "expected type, got %a" PT.pp ty
@@ -433,14 +434,11 @@ module FO = struct
         let ty = Ctx.apply_ty ctx ty in
         T.var ~ty i
       in closure
-    | PT.Location (t', loc) ->
-      Ctx.with_loc ctx ~loc (fun () -> infer_var_scope ctx t')
     | _ -> assert false
 
-  let rec exit_var_scope ctx t = match t with
-    | PT.Column (PT.Var name, _)
+  let exit_var_scope ctx t = match t.PT.term with
+    | PT.Column ({PT.term=PT.Var name}, _)
     | PT.Var name -> Ctx._exit_var_scope ctx name
-    | PT.Location (t', _) -> exit_var_scope ctx t'
     | _ -> assert false
 
   let infer ctx t =
@@ -467,9 +465,12 @@ module FO = struct
     let ty1, _ = infer ctx t in
     Ctx.unify_and_set ctx ty1 ty
 
-  let rec infer_form_rec ctx f = match f with
-    | PT.Location (f,loc) ->
-      Ctx.with_loc ctx ~loc (fun () -> infer_form_rec ctx f)
+  let rec infer_form_rec ctx f =
+    match f.PT.loc with
+    | None -> infer_form_rec_view ctx f
+    | Some loc ->
+      Ctx.with_loc ctx ~loc (fun () -> infer_form_rec_view ctx f)
+  and infer_form_rec_view ctx f = match f.PT.term with
     | PT.Const (Sym.Conn ((Sym.True | Sym.False) as b)) ->
       fun _ ->
         begin match b with
@@ -477,17 +478,17 @@ module FO = struct
         | Sym.False -> F.Base.false_
         | _ -> assert false
         end
-    | PT.App (PT.Const (Sym.Conn Sym.And), l) ->
+    | PT.App ({PT.term=PT.Const (Sym.Conn Sym.And)}, l) ->
       let l' = List.map (fun f' -> infer_form_rec ctx f') l in
       fun ctx ->
         let l' = (Closure.seq l') ctx in
         F.Base.and_ l'
-    | PT.App (PT.Const (Sym.Conn Sym.Or), l) ->
+    | PT.App ({PT.term=PT.Const (Sym.Conn Sym.Or)}, l) ->
       let l' = List.map (fun f' -> infer_form_rec ctx f') l in
       fun ctx ->
         let l' = (Closure.seq l') ctx in
         F.Base.or_ l'
-    | PT.App (PT.Const (Sym.Conn ((Sym.Equiv | Sym.Xor | Sym.Imply) as conn)), [a;b]) ->
+    | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Equiv | Sym.Xor | Sym.Imply) as conn))}, [a;b]) ->
       let a' = infer_form_rec ctx a  and b' = infer_form_rec ctx b in
       fun ctx ->
         let a = a' ctx and b = b' ctx in
@@ -497,7 +498,7 @@ module FO = struct
         | Sym.Imply -> F.Base.imply a b
         | _ -> assert false
         end
-    | PT.App (PT.Const (Sym.Conn Sym.Not), [a]) ->
+    | PT.App ({PT.term=PT.Const (Sym.Conn Sym.Not)}, [a]) ->
       let a' = infer_form_rec ctx a in
       fun ctx -> F.Base.not_ (a' ctx)
     | PT.Bind(Sym.Conn ((Sym.Forall | Sym.Exists) as conn), vars, f') ->
@@ -513,7 +514,7 @@ module FO = struct
         | Sym.Exists -> F.Base.exists (vars' ctx) (f' ctx)
         | _ -> assert false
         end
-    | PT.App (PT.Const (Sym.Conn ((Sym.Eq | Sym.Neq) as conn)), [a;b]) ->
+    | PT.App ({PT.term=PT.Const (Sym.Conn ((Sym.Eq | Sym.Neq) as conn))}, [a;b]) ->
       (* a ?= b *)
       let tya, a = infer ctx a in
       let tyb, b = infer ctx b in
