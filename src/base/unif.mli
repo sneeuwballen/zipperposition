@@ -68,6 +68,16 @@ module Ty : S with type term = Type.t
 module FO : S with type term = FOTerm.t
 module HO : S with type term = HOTerm.t
 
+(** {2 Formulas} *)
+
+module Form : sig
+  val variant : ?subst:subst ->
+                Formula.FO.t -> scope -> Formula.FO.t -> scope ->
+                subst Sequence.t
+
+  val are_variant : Formula.FO.t -> Formula.FO.t -> bool
+end
+
 (** {2 AC} *)
 
 module type AC_SPEC = sig

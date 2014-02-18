@@ -286,7 +286,7 @@ module Make(MyT : TERM) = struct
               begin match conn with
               | Sym.Equiv -> Equiv (a,b)
               | Sym.Xor -> Xor (a,b)
-              | Sym.Imply -> Equiv (a,b)
+              | Sym.Imply -> Imply (a,b)
               | Sym.Eq -> Eq (MyT.of_term_exn a, MyT.of_term_exn b)
               | Sym.Neq -> Neq (MyT.of_term_exn a, MyT.of_term_exn b)
               | Sym.And -> And [a; b]

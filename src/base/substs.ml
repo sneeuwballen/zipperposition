@@ -323,10 +323,10 @@ module Ty = struct
   type t = subst
 
   let apply ?depth subst ~renaming t s_t =
-    Type.of_term_exn (apply ?depth subst ~renaming (t : Type.t :> T.t) s_t)
+    Type.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming ?depth subst t s_t =
-    Type.of_term_exn (apply_no_renaming ?depth subst (t : Type.t :> T.t) s_t)
+    Type.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -336,10 +336,10 @@ module FO = struct
   type t = subst
 
   let apply ?depth subst ~renaming t s_t =
-    FOTerm.of_term_exn (apply ?depth subst ~renaming (t : FOTerm.t :> T.t) s_t)
+    FOTerm.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming ?depth subst t s_t =
-    FOTerm.of_term_exn (apply_no_renaming ?depth subst (t : FOTerm.t :> T.t) s_t)
+    FOTerm.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end
@@ -349,10 +349,23 @@ module HO = struct
   type t = subst
 
   let apply ?depth subst ~renaming t s_t =
-    HOTerm.of_term_exn (apply ?depth subst ~renaming (t : HOTerm.t :> T.t) s_t)
+    HOTerm.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
 
   let apply_no_renaming ?depth subst t s_t =
-    HOTerm.of_term_exn (apply_no_renaming ?depth subst (t : HOTerm.t :> T.t) s_t)
+    HOTerm.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
+
+  let bind = (bind :> t -> term -> scope -> term -> scope -> t)
+end
+
+module Form = struct
+  type term = Formula.FO.t
+  type t = subst
+
+  let apply ?depth subst ~renaming t s_t =
+    Formula.FO.of_term_exn (apply ?depth subst ~renaming (t : term :> T.t) s_t)
+
+  let apply_no_renaming ?depth subst t s_t =
+    Formula.FO.of_term_exn (apply_no_renaming ?depth subst (t : term :> T.t) s_t)
 
   let bind = (bind :> t -> term -> scope -> term -> scope -> t)
 end

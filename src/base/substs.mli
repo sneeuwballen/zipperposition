@@ -165,3 +165,5 @@ module Ty : SPECIALIZED with type term = Type.t
 module FO : SPECIALIZED with type term = FOTerm.t
 
 module HO : SPECIALIZED with type term = HOTerm.t
+
+module Form : SPECIALIZED with type term = Formula.FO.t

@@ -345,6 +345,79 @@ module HO = struct
     (are_variant :> term -> term -> bool)
 end
 
+module Form = struct
+  module F = Formula.FO
+
+  let variant ?(subst=Substs.empty) f1 sc_1 f2 sc_2 =
+    (* CPS, with [k] the continuation that is given the answer
+      substitutions *)
+    let rec unif subst f1 f2 k = match F.view f1, F.view f2 with
+      | _ when F.eq f1 f2 -> k subst
+      | F.Atom p1, F.Atom p2 ->
+        begin try
+          let subst = FO.variant ~subst p1 sc_1 p2 sc_2 in
+          k subst
+        with Fail -> ()
+        end
+      | F.Eq (t11, t12), F.Eq (t21, t22)
+      | F.Neq (t11, t12), F.Neq (t21, t22) ->
+        begin try
+          let subst = FO.variant ~subst t11 sc_1 t21 sc_2 in
+          let subst = FO.variant ~subst t12 sc_1 t22 sc_2 in
+          k subst
+        with Fail -> ()
+        end;
+        begin try
+          let subst = FO.variant ~subst t11 sc_1 t22 sc_2 in
+          let subst = FO.variant ~subst t12 sc_1 t21 sc_2 in
+          k subst
+        with Fail -> ()
+        end;
+      | F.Not f1', F.Not f2' -> unif subst f1' f2' k
+      | F.Imply (f11, f12), F.Imply (f21, f22)
+      | F.Xor (f11, f12), F.Xor (f21, f22)
+      | F.Equiv(f11, f12), F.Imply (f21, f22) ->
+        unif subst f11 f21 (fun subst -> unif subst f21 f22 k)
+      | F.And l1, F.And l2
+      | F.Or l1, F.Or l2 ->
+        if List.length l1 = List.length l2
+          then unif_ac subst l1 [] l2 k
+          else ()  (* not. *)
+      | F.Exists (ty1,f1'), F.Exists (ty2,f2')
+      | F.Forall (ty1,f1'), F.Forall (ty2,f2') ->
+        begin try
+          let subst = Ty.variant ~subst ty1 sc_1 ty2 sc_2 in
+          unif subst f1' f2' k
+        with Fail -> ()
+        end
+      | F.True, F.True
+      | F.False, F.False -> k subst  (* yep :) *)
+      | _ -> ()  (* failure :( *)
+    (* invariant: [l1] and [left @ right] always have the same length *)
+    and unif_ac subst l1 left right k = match l1, left, right with
+      | [], [], [] -> k subst  (* success! *)
+      | f1::l1', left, f2::right' ->
+        (* f1 = f2 ? *)
+        unif subst f1 f2
+          (fun subst -> unif_ac subst l1' [] (left @ right') k);
+        (* f1 against right', keep f2 for later *)
+        unif_ac subst l1 (f2::left) right' k;
+        ()
+      | _::_, left, [] -> ()
+      | _ -> assert false
+    in
+    (* flattening (for and/or) *)
+    let f1 = F.flatten f1 in
+    let f2 = F.flatten f2 in
+    (* bottom continuation *)
+    let seq k = unif subst f1 f2 k in
+    Sequence.from_iter seq
+
+  let are_variant f1 f2 =
+    let seq = variant f1 0 f2 1 in
+    not (Sequence.is_empty seq)
+end
+
 (** {2 AC} *)
 
 module type AC_SPEC = sig
