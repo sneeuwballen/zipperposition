@@ -5,7 +5,7 @@ Homepage:    https://github.com/c-cube/logtk
 Authors:     Simon Cruanes
 License:     BSD3
 LicenseFile: LICENSE
-Plugins:     META (0.3)
+Plugins:     META (0.3), DevFiles (0.3)
 OCamlVersion: >= 4.00.1
 BuildTools:  ocamlbuild
 
@@ -45,10 +45,10 @@ Library "logtk"
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
                     Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm, Formula,
                     Substs, Unif, Signature, TypeInference,
+                    Comparison, Precedence, Ordering,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
-                    lib/PersistentHashtbl, lib/Monad, lib/ParseLocation
-                    #Comparison, Precedence, Ordering,
-                    #lib/Multiset, lib/PartialOrder
+                    lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
+                    lib/Multiset, lib/BV, lib/PartialOrder
   BuildDepends:     zarith,unix
   XMETARequires:    zarith,unix
 
@@ -63,7 +63,7 @@ Library "logtk_extended"
                     FeatureVector, FormulaShape, Skolem, Cnf, Transform,
                     NPDtree, Congruence, Options, FastFingerprint, Evaluator,
                     TypeErasure,
-                    lib/MultiMap, lib/BV, lib/Mixtbl
+                    lib/MultiMap, lib/Mixtbl
   BuildDepends:     logtk,unix,zarith
   XMETARequires:    logtk,unix,zarith
 

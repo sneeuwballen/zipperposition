@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9d0ae7fbb5cfb6583443fe3fa889b513)
+# DO NOT EDIT (digest: 0c6503245e67b011be6c21c8027b9703)
 src/base/Symbol
 src/base/ScopedTerm
 src/base/FOTerm
@@ -17,6 +17,9 @@ src/base/Substs
 src/base/Unif
 src/base/Signature
 src/base/TypeInference
+src/base/Comparison
+src/base/Precedence
+src/base/Ordering
 src/base/lib/Sequence
 src/base/lib/Cache
 src/base/lib/Bij
@@ -24,6 +27,9 @@ src/base/lib/Bencode
 src/base/lib/PersistentHashtbl
 src/base/lib/Monad
 src/base/lib/ParseLocation
+src/base/lib/Multiset
+src/base/lib/BV
+src/base/lib/PartialOrder
 src/meta/MetaPattern
 src/meta/MetaKB
 src/meta/MetaReasoner

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 4a684fae4c6560b35ae171acee1f8719)
+# DO NOT EDIT (digest: 6b2da12120a823b9e0b1c22cfd87d97a)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -32,6 +32,9 @@
 "src/base/unif.cmx": for-pack(Logtk)
 "src/base/signature.cmx": for-pack(Logtk)
 "src/base/typeInference.cmx": for-pack(Logtk)
+"src/base/comparison.cmx": for-pack(Logtk)
+"src/base/precedence.cmx": for-pack(Logtk)
+"src/base/ordering.cmx": for-pack(Logtk)
 "src/base/lib/sequence.cmx": for-pack(Logtk)
 "src/base/lib/cache.cmx": for-pack(Logtk)
 "src/base/lib/bij.cmx": for-pack(Logtk)
@@ -39,6 +42,9 @@
 "src/base/lib/persistentHashtbl.cmx": for-pack(Logtk)
 "src/base/lib/monad.cmx": for-pack(Logtk)
 "src/base/lib/parseLocation.cmx": for-pack(Logtk)
+"src/base/lib/multiset.cmx": for-pack(Logtk)
+"src/base/lib/BV.cmx": for-pack(Logtk)
+"src/base/lib/partialOrder.cmx": for-pack(Logtk)
 <src/base/*.ml{,i}>: package(unix)
 <src/base/*.ml{,i}>: package(zarith)
 <src/base/lib/*.ml{,i}>: package(unix)
@@ -62,7 +68,6 @@
 "src/extended/evaluator.cmx": for-pack(Logtk_extended)
 "src/extended/typeErasure.cmx": for-pack(Logtk_extended)
 "src/extended/lib/multiMap.cmx": for-pack(Logtk_extended)
-"src/extended/lib/BV.cmx": for-pack(Logtk_extended)
 "src/extended/lib/mixtbl.cmx": for-pack(Logtk_extended)
 <src/extended/*.ml{,i}>: use_logtk
 <src/extended/*.ml{,i}>: package(unix)

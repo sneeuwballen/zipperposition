@@ -68,6 +68,31 @@ let view t = match T.view t with
   | T.Const s -> Const s
   | _ -> assert false
 
+module Classic = struct
+  let rec _drop_types l = match l with
+    | [] -> []
+    | t::l' when Type.is_type t -> _drop_types l
+    | _::_ -> l
+
+  type view =
+  | Var of int
+  | BVar of int
+  | App of symbol * t list  (** covers Const and App *)
+  | NonFO   (* any other case *)
+
+  let view t = match T.view t with
+    | T.Var i -> Var i
+    | T.BVar i -> BVar i
+    | T.App (hd, l) ->
+        begin match T.view hd with
+        | T.Const s -> App (s, _drop_types l)
+        | _ -> NonFO
+        end
+    | T.Const s -> App (s, [])
+    | T.Bind _
+    | T.Record _ -> NonFO
+end
+
 (** {2 Comparison, equality, containers} *)
 
 let subterm ~sub t =

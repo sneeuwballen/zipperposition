@@ -381,11 +381,11 @@ module Default = Make(struct
   type t = Symbol.t
   let eq = Symbol.eq
   let hash = Symbol.hash
-  let cmp = Symbol.compare
-  let true_ = Symbol.true_symbol
-  let false_ = Symbol.false_symbol
+  let cmp = Symbol.cmp
+  let true_ = Symbol.Base.true_
+  let false_ = Symbol.Base.false_
   let pp = Symbol.pp
-  let pp_debug= Symbol.pp_debug
+  let pp_debug= Symbol.pp
 end)
 
 include Default

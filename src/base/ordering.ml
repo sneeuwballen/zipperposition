@@ -118,6 +118,7 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
   type symbol = Prec.symbol
 
   module T = FOTerm
+  module TC = FOTerm.Classic
   module Cache = T.T2Cache
 
   type term = T.t
@@ -203,8 +204,9 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
         then
           { offset = 0; pos_counter = 0; neg_counter = 0; balance = Obj.magic None }
         else begin
-          let vars = T.vars_list [t1; t2] in
-          let minvar, maxvar = T.min_var vars, T.max_var vars in
+          let vars = Sequence.of_list [t1; t2] |> Sequence.flatMap T.Seq.vars in
+          let minvar = T.Seq.min_var vars in
+          let maxvar = T.Seq.max_var vars in
           assert (minvar <= maxvar);
           let width = maxvar - minvar + 1 in  (* width between min var and max var *)
           let vb = {
@@ -243,17 +245,18 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
       (** variable balance, weight balance, t contains variable y. pos
           stands for positive (is t the left term) *)
       let rec balance_weight wb t y pos =
-        match t.T.term with
-        | T.Var x ->
+        match TC.view t with
+        | TC.Var x ->
           if pos
             then (add_pos_var balance x; (wb + 1, x = y))
             else (add_neg_var balance x; (wb - 1, x = y))
-        | T.BoundVar _ -> (if pos then wb + 1 else wb - 1), false
-        | T.Node (s, _, l) ->
+        | TC.BVar _ -> (if pos then wb + 1 else wb - 1), false
+        | TC.App (s, l) ->
           let wb' = if pos
             then wb + Prec.weight prec s
             else wb - Prec.weight prec s in
           balance_weight_rec wb' l y pos false
+        | TC.NonFO -> assert false
       (** list version of the previous one, threaded with the check result *)
       and balance_weight_rec wb terms y pos res = match terms with
         | [] -> (wb, res)
@@ -283,29 +286,31 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
         wb'', res
       (** tupled version of kbo (kbo_5 of the paper) *)
       and tckbo wb t1 t2 =
-        match t1.T.term, t2.T.term with
+        match TC.view t1, TC.view t2 with
         | _ when T.eq t1 t2 -> (wb, Eq) (* do not update weight or var balance *)
-        | T.Var x, T.Var y ->
+        | TC.Var x, TC.Var y ->
           add_pos_var balance x;
           add_neg_var balance y;
           (wb, Incomparable)
-        | T.Var x,  _ ->
+        | TC.NonFO, _
+        | _, TC.NonFO -> wb, Incomparable
+        | TC.Var x,  _ ->
           add_pos_var balance x;
           let wb', contains = balance_weight wb t2 x false in
           (wb' + 1, if contains then Lt else Incomparable)
-        |  _, T.Var y ->
+        |  _, TC.Var y ->
           add_neg_var balance y;
           let wb', contains = balance_weight wb t1 y true in
           (wb' - 1, if contains then Gt else Incomparable)
         (* node/node, De Bruijn/De Bruijn *)
-        | T.Node (f, _, ss), T.Node (g, _, ts) -> tckbo_composite wb f g ss ts
-        | T.BoundVar i, T.BoundVar j ->
+        | TC.App (f, ss), TC.App (g, ts) -> tckbo_composite wb f g ss ts
+        | TC.BVar i, TC.BVar j ->
           (wb, if i = j then Eq else Incomparable)
         (* node and something else *)
-        | T.Node (f, _, ss), T.BoundVar _ ->
+        | TC.App (f, ss), TC.BVar _ ->
           let wb', _ = balance_weight wb t1 0 true in
           wb'-1, Comparison.Gt
-        | T.BoundVar _, T.Node (g, _, ts) ->
+        | TC.BVar _, TC.App (g, ts) ->
           let wb', _ = balance_weight wb t1 0 false in
           wb'+1, Comparison.Lt
       (** tckbo, for composite terms (ie non variables). It takes a symbol
@@ -362,17 +367,20 @@ module Make(P : Precedence.S with type symbol = Symbol.t) = struct
     (** recursive path ordering *)
     let rec rpo6 ~prec s t =
       if T.eq s t then Eq else  (* equality test is cheap *)
-      match s.T.term, t.T.term with
-      | T.Var _, T.Var _ -> Incomparable
-      | _, T.Var _ -> if T.var_occurs t s then Gt else Incomparable
-      | T.Var _, _ -> if T.var_occurs s t then Lt else Incomparable
+      match TC.view s, TC.view t with
+      | TC.Var _, TC.Var _ -> Incomparable
+      | _, TC.Var _ -> if T.var_occurs t s then Gt else Incomparable
+      | TC.Var _, _ -> if T.var_occurs s t then Lt else Incomparable
+      (* whatever *)
+      | TC.NonFO, _
+      | _, TC.NonFO -> Comparison.Incomparable
       (* node/node, De Bruijn/De Bruijn *)
-      | T.Node (f, _, ss), T.Node (g, _, ts) -> rpo6_composite ~prec s t f g ss ts
-      | T.BoundVar i, T.BoundVar j ->
-        if i = j && Type.eq s.T.ty t.T.ty then Eq else Incomparable
+      | TC.App (f, ss), TC.App (g, ts) -> rpo6_composite ~prec s t f g ss ts
+      | TC.BVar i, TC.BVar j ->
+        if i = j && Type.eq (T.ty s) (T.ty t) then Eq else Incomparable
       (* node and something else *)
-      | T.Node (f, _, ss), T.BoundVar _ -> Comparison.Incomparable
-      | T.BoundVar _, T.Node (g, _, ts) -> Comparison.Incomparable
+      | TC.App (f, ss), TC.BVar _ -> Comparison.Incomparable
+      | TC.BVar _, TC.App (g, ts) -> Comparison.Incomparable
     (* handle the composite cases *)
     and rpo6_composite ~prec s t f g ss ts =
       match Prec.compare prec f g with

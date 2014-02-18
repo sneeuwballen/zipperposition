@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 59f5a583b7fa0dd64d7a5e2ba20e9913)
+# DO NOT EDIT (digest: 92c966dfc24c7594e876e900cd7800f6)
 Symbol
 ScopedTerm
 FOTerm
@@ -17,6 +17,9 @@ Substs
 Unif
 Signature
 TypeInference
+Comparison
+Precedence
+Ordering
 lib/Sequence
 lib/Cache
 lib/Bij
@@ -24,4 +27,7 @@ lib/Bencode
 lib/PersistentHashtbl
 lib/Monad
 lib/ParseLocation
+lib/Multiset
+lib/BV
+lib/PartialOrder
 # OASIS_STOP

@@ -48,6 +48,17 @@ val view : t -> view
 
 val kind : ScopedTerm.Kind.t
 
+(** {2 Classic view} *)
+module Classic : sig
+  type view = private
+  | Var of int
+  | BVar of int
+  | App of symbol * t list  (** covers Const and App, ignores type arguments *)
+  | NonFO   (* any other case *)
+
+  val view : t -> view
+end
+
 (** {2 Comparison, equality, containers} *)
 
 val subterm : sub:t -> t -> bool
