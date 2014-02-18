@@ -27,8 +27,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 TPTP Syntax and types checking} *)
 
 open Logtk
+open Logtk_parsers
 
-module BF = Basic.Form
+module PT = PrologTerm
 
 let print_line () =
   Printf.printf "%s\n" (Util.str_repeat "=" 60);
@@ -51,35 +52,30 @@ let check file =
     (* parse *)
     let decls = Util_tptp.parse_file ~recursive:true file in
     (* type check *)
-    let signature, decls' = Util_tptp.annotate_type decls in
-    let signature = if !pp_base then signature else Signature.diff signature Signature.base in
+    let signature, decls' = Util_tptp.infer_types (`sign Signature.empty) decls in
+    let decls' = Util_tptp.erase_types decls' in
     Printf.printf "signature:\n";
     Signature.iter signature
-      (fun _ s ->
-        let ty = Symbol.ty s in
+      (fun s ty ->
         Util.printf "  %a : %a\n" Symbol.pp s Type.pp ty);
     (* print formulas *)
     if !cat_input then begin
       Printf.printf "formulas:\n";
       Sequence.iter 
-        (fun decl -> Util.printf "  %a\n" Ast_tptp.pp_declaration decl)
+        (fun decl -> Util.printf "  %a\n" Ast_tptp.Untyped.pp decl)
         decls';
       end;
     (if !stats then begin
-      Util.printf "number of symbols: %d\n" (Signature.size signature);
+      Util.printf "number of symbols: %d\n" (Signature.cardinal signature);
       Util.printf "number of input declarations: %d\n" (Sequence.length decls);
       end);
   with
   | Ast_tptp.ParseError loc ->
     (* syntax error *)
-    Util.eprintf "parse error at %a\n" Location.pp loc;
+    Util.eprintf "parse error at %a\n" ParseLocation.pp loc;
     exit 1
-  | Type.Error msg
-  | TypeInference.Error msg ->
+  | Type.Error msg ->
     Util.eprintf "%s\n" msg;
-    exit 1
-  | TypeUnif.Error e ->
-    Util.eprintf "%a\n" TypeUnif.pp_error e;
     exit 1
 
 let main () =

@@ -44,7 +44,7 @@ Library "logtk"
   Pack:             true
   Modules:          Symbol, ScopedTerm, FOTerm, Type, Util, PrologTerm,
                     Hash, Interfaces, DBEnv, Position, Hashcons, HOTerm, Formula,
-                    Substs, Unif, Signature, TypeInference,
+                    Substs, Unif, Signature, TypeInference, Options,
                     Comparison, Precedence, Ordering, Skolem, Cnf,
                     lib/Sequence, lib/Cache, lib/Bij, lib/Bencode,
                     lib/PersistentHashtbl, lib/Monad, lib/ParseLocation,
@@ -61,7 +61,7 @@ Library "logtk_extended"
   Install$:         flag(extended)
   Modules:          Lambda, Index, Dtree, Fingerprint, Rewriting,
                     FeatureVector, FormulaShape, Transform,
-                    NPDtree, Congruence, Options, FastFingerprint, Evaluator,
+                    NPDtree, Congruence, FastFingerprint, Evaluator,
                     lib/MultiMap, lib/Mixtbl
   BuildDepends:     logtk,unix,zarith
   XMETARequires:    logtk,unix,zarith
@@ -128,44 +128,44 @@ Executable run_tests
   Install:          false
   CompiledObject:   native
   MainIs:           run_tests.ml
-  Build$:           flag(tests) & flag(meta) & flag(qcheck)
+  Build$:           flag(tests) & flag(meta) & flag(qcheck) & flag(extended)
   BuildDepends:     logtk,logtk.extended,oUnit,logtk.meta,logtk.arbitrary
 
 # TPTP syntax and type checking
 Executable type_check_tptp
   Path:             tools/
-  Build$:           flag(tools)
-  Install$:         flag(tools)
+  Build$:           flag(tools) & flag(parsers)
+  Install$:         flag(tools) & flag(parsers)
   CompiledObject:   native
-  MainIs: type_check_tptp.ml
-  BuildDepends: logtk
+  MainIs:           type_check_tptp.ml
+  BuildDepends:     logtk,logtk.parsers
 
 # Conversion to CNF
 Executable cnf_of_tptp
   Path:             tools/
-  Build$:           flag(tools)
-  Install$:         flag(tools)
+  Build$:           flag(tools) & flag(parsers)
+  Install$:         flag(tools) & flag(parsers)
   CompiledObject:   native
   MainIs:           cnf_of_tptp.ml
-  BuildDepends:     logtk,logtk.extended
+  BuildDepends:     logtk,logtk.parsers
+
+# proof checking
+#Executable proof_check_tstp
+#  Path:             tools/
+#  Build$:           flag(tools) & flag(parsers) & false
+#  Install$:         flag(tools) & flag(parsers) & false
+#  CompiledObject:   native
+#  MainIs:           proof_check_tstp.ml
+#  BuildDepends:     logtk,logtk.parsers
 
 # detection of theories
 Executable detect_theories
   Path:             tools/
-  Build$:           flag(meta) & flag(tools)
-  Install$:         flag(meta) & flag(tools)
+  Build$:           flag(meta) & flag(tools) & flag(extended)
+  Install$:         flag(meta) & flag(tools) & flag(extended)
   CompiledObject:   native
   MainIs:           detect_theories.ml
   BuildDepends:     logtk,logtk.extended,logtk.meta
-
-# proof checking
-Executable proof_check_tstp
-  Path:             tools/
-  Build$:           flag(tools)
-  Install$:         flag(tools)
-  CompiledObject:   native
-  MainIs:           proof_check_tstp.ml
-  BuildDepends:     logtk,logtk.extended
 
 SourceRepository head
   Type: git

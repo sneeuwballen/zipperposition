@@ -240,18 +240,16 @@ module Untyped = struct
         | AU.THF _ -> None)
       decls
 
-  class ty_decl_visitor = object
-    inherit [Signature.t] AU.visitor
-    val tyctx = Hashtbl.create 5
-    method tydecl signature s ty =
-      begin match Type.Conv.of_prolog ~ctx:tyctx ty with
-      | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
-      | Some ty' -> Signature.declare signature (Symbol.of_string s) ty'
-      end
-  end
-
   let type_declarations decls =
-    AU.fold (new ty_decl_visitor) Signature.empty decls
+    let tyctx = Hashtbl.create 5 in
+    AU.fold (object
+      inherit [Signature.t] AU.visitor
+      method tydecl signature s ty =
+        begin match Type.Conv.of_prolog ~ctx:tyctx ty with
+        | None -> raise (Type.Error ("expected type, got " ^ PT.to_string ty))
+        | Some ty' -> Signature.declare signature (Symbol.of_string s) ty'
+        end
+      end) Signature.empty decls
 
   let __name_symbol i sy =
     let str = Util.sprintf "'ty_decl_%d_%s'" i sy in
@@ -349,14 +347,14 @@ module Typed = struct
       decls
 
   class ty_decl_visitor = object
-    inherit [Signature.t] AT.visitor
-    val tyctx = Hashtbl.create 5
-    method tydecl signature s ty =
-      Signature.declare signature (Symbol.of_string s) ty
   end
 
   let type_declarations decls =
-    AT.fold (new ty_decl_visitor) Signature.empty decls
+    AT.fold (object
+        inherit [Signature.t] AT.visitor
+        method tydecl signature s ty =
+          Signature.declare signature (Symbol.of_string s) ty
+      end) Signature.empty decls
 
   let __name_symbol i sy =
     let str = Util.sprintf "'ty_decl_%d_%s'" i sy in
@@ -465,3 +463,33 @@ let erase_types typed =
 let annotate_types init untyped =
   let _, typed = infer_types init untyped in
   erase_types typed
+
+let to_cnf signature decls =
+  (* formulas with correct negation sign *)
+  let ctx = Skolem.create signature in
+  let clauses = Sequence.flatMap
+    (fun decl -> match decl with
+      | AT.TFF(n,r,f,info)
+      | AT.FOF(n,r,f,info) ->
+        let f, role = match r with
+        | Ast.R_conjecture -> F.Base.not_ f, Ast.R_negated_conjecture
+        | _ -> f, r
+        in
+        let clauses = Cnf.cnf_of ~ctx f in
+        Sequence.map
+          (fun c ->
+            match decl with
+            | AT.TFF _ -> AT.TFF(n,role, F.close_forall (F.Base.or_ c),info)
+            | AT.FOF _ -> AT.CNF(n,role, c,info)
+            | _ -> assert false)
+            (Sequence.of_list clauses)
+      | AT.THF _ -> failwith "cnf_of_tptp cannot deal with HO terms right now."
+      | _ -> Sequence.singleton decl
+    ) decls
+  in
+  (* make sure the clauses don't change.
+    iterating again would change skolems, etc, which is bad. *)
+  let clauses = Sequence.persistent clauses in
+  let signature = Skolem.to_signature ctx in
+  signature, clauses
+

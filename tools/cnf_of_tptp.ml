@@ -27,10 +27,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 Reduction to CNF of TPTP file} *)
 
 open Logtk
+open Logtk_parsers
 
-module BF = Basic.Form
-module F = FOFormula
+module F = Formula.FO
 module A = Ast_tptp
+module AU = Ast_tptp.Untyped
+module AT = Ast_tptp.Typed
 
 let declare_types = ref false
 let print_sig = ref false
@@ -40,44 +42,6 @@ let options =
   ; "-signature", Arg.Set print_sig, "print signature"
   ] @ Options.global_opts
 
-(* conversion to CNF of declarations *)
-let to_cnf decls =
-  let signature = Util_tptp.type_declarations decls in
-  let tyctx = TypeInference.Ctx.of_signature signature in
-  let ctx = Skolem.create ~base:signature () in
-  let seq = Sequence.flatMap
-    (function
-      | A.FOF(n,role,f,info)
-      | A.TFF(n,role,f,info) ->
-        begin match role with
-        | A.R_conjecture ->
-          (* type conjecture *)
-          let f = TypeInference.FO.convert_form ~ctx:tyctx f in
-          (* negate conjecture *)
-          let clauses = Cnf.cnf_of ~ctx (F.mk_not f) in
-          Sequence.map
-            (fun c ->
-              let c = TypeErasure.Form.erase (F.close_forall (F.mk_or c)) in
-              A.TFF(n,A.R_negated_conjecture,c,info))
-            (Sequence.of_list clauses)
-        | _ ->
-          (* type conjecture *)
-          let f = TypeInference.FO.convert_form ~ctx:tyctx f in
-          (* translate, keeping the same role *)
-          let clauses = Cnf.cnf_of ~ctx f in
-          Sequence.map
-            (fun c ->
-              let c = TypeErasure.Form.erase (F.close_forall (F.mk_or c)) in
-              A.TFF(n,role,c,info))
-            (Sequence.of_list clauses)
-        end
-      | A.CNF _ as d -> Sequence.singleton d
-      | _ -> Sequence.empty)
-    decls
-  in
-  (* iterating again would change skolems, etc, which is bad *)
-  Sequence.persistent seq, Skolem.to_signature ctx
-
 (* process the given file, converting it to CNF *)
 let process file =
   Util.debug 1 "process file %s" file;
@@ -85,29 +49,25 @@ let process file =
     (* parse *)
     let decls = Util_tptp.parse_file ~recursive:true file in
     (* to CNF *)
-    let decls, signature = to_cnf decls in
+    let signature, decls = Util_tptp.infer_types (`sign Signature.empty) decls in
+    let signature, decls = Util_tptp.to_cnf signature decls in
     let decls = if !declare_types
-      then Sequence.append (Util_tptp.declare_symbols signature) decls
+      then Sequence.append (Util_tptp.Typed.declare_symbols signature) decls
       else decls
     in
     if !print_sig
       then Util.printf "signature: %a\n" Signature.pp signature;
     (* print *)
     Sequence.iter
-      (fun d -> Util.printf "%a\n" A.pp_declaration d)
+      (fun d -> Util.printf "%a\n" AT.pp d)
       decls
   with
   | Ast_tptp.ParseError loc ->
     (* syntax error *)
-    Util.eprintf "parse error at %a\n" Location.pp loc;
+    Util.eprintf "parse error at %a\n" ParseLocation.pp loc;
     exit 1
-  | TypeInference.Error msg
-  | Type.Error msg ->
-    Util.eprintf "type error: %s\n" msg;
-    Printexc.print_backtrace stderr;
-    exit 1
-  | TypeUnif.Error e ->
-    Util.eprintf "%a\n" TypeUnif.pp_error e;
+  | Type.Error e ->
+    Util.eprintf "%s\n" e;
     Printexc.print_backtrace stderr;
     exit 1
 

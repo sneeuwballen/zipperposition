@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 53accd38ed12f8ba7d6ed2156a51db6a)
+# DO NOT EDIT (digest: abc99270769f638e8b16a58194a06589)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -32,6 +32,7 @@
 "src/base/unif.cmx": for-pack(Logtk)
 "src/base/signature.cmx": for-pack(Logtk)
 "src/base/typeInference.cmx": for-pack(Logtk)
+"src/base/options.cmx": for-pack(Logtk)
 "src/base/comparison.cmx": for-pack(Logtk)
 "src/base/precedence.cmx": for-pack(Logtk)
 "src/base/ordering.cmx": for-pack(Logtk)
@@ -63,7 +64,6 @@
 "src/extended/transform.cmx": for-pack(Logtk_extended)
 "src/extended/NPDtree.cmx": for-pack(Logtk_extended)
 "src/extended/congruence.cmx": for-pack(Logtk_extended)
-"src/extended/options.cmx": for-pack(Logtk_extended)
 "src/extended/fastFingerprint.cmx": for-pack(Logtk_extended)
 "src/extended/evaluator.cmx": for-pack(Logtk_extended)
 "src/extended/lib/multiMap.cmx": for-pack(Logtk_extended)
@@ -142,14 +142,19 @@
 <tests/*.ml{,i}>: package(unix)
 <tests/*.ml{,i}>: package(zarith)
 # Executable type_check_tptp
+"tools/type_check_tptp.native": use_logtk_parsers
 "tools/type_check_tptp.native": use_logtk
+"tools/type_check_tptp.native": package(str)
 "tools/type_check_tptp.native": package(unix)
 "tools/type_check_tptp.native": package(zarith)
 # Executable cnf_of_tptp
-"tools/cnf_of_tptp.native": use_logtk_extended
+"tools/cnf_of_tptp.native": use_logtk_parsers
 "tools/cnf_of_tptp.native": use_logtk
+"tools/cnf_of_tptp.native": package(str)
 "tools/cnf_of_tptp.native": package(unix)
 "tools/cnf_of_tptp.native": package(zarith)
+<tools/*.ml{,i}>: use_logtk_parsers
+<tools/*.ml{,i}>: package(str)
 # Executable detect_theories
 "tools/detect_theories.native": use_logtk_meta
 "tools/detect_theories.native": use_logtk_extended
@@ -158,14 +163,9 @@
 "tools/detect_theories.native": package(unix)
 "tools/detect_theories.native": package(zarith)
 <tools/*.ml{,i}>: use_logtk_meta
-<tools/*.ml{,i}>: package(datalog)
-# Executable proof_check_tstp
-"tools/proof_check_tstp.native": use_logtk_extended
-"tools/proof_check_tstp.native": use_logtk
-"tools/proof_check_tstp.native": package(unix)
-"tools/proof_check_tstp.native": package(zarith)
 <tools/*.ml{,i}>: use_logtk_extended
 <tools/*.ml{,i}>: use_logtk
+<tools/*.ml{,i}>: package(datalog)
 <tools/*.ml{,i}>: package(unix)
 <tools/*.ml{,i}>: package(zarith)
 # OASIS_STOP

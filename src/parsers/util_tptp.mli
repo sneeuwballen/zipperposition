@@ -107,3 +107,11 @@ val annotate_types : [`ctx of TypeInference.Ctx.t | `sign of Signature.t] ->
                      Ast_tptp.Untyped.t Sequence.t ->
                      Ast_tptp.Untyped.t Sequence.t
   (** Round-trip of type inference and type erasure. *)
+
+val to_cnf : Signature.t ->
+             Ast_tptp.Typed.t Sequence.t ->
+             Signature.t * Ast_tptp.Typed.t Sequence.t
+  (** [to_cnf s decls] reduces declarations to CNF, and returns
+      the updated signature (with new skolem symbols) and
+      a sequence of declarations that is the CNf of the old one
+      (only TFF and CNF formulas, in clausal form) *)
